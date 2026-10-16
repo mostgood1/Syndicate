@@ -321,6 +321,39 @@ def write_atomic(path: Path, doc: dict[str, Any]) -> None:
     os.replace(tmp, path)
 
 
+def write_postmortem(root: Path, path: Path, sheet: dict[str, Any], rec: dict[str, Any], day: str) -> dict[str, Any] | None:
+    """The ENGINE LEDGER for one reconciled sheet (lane result-cards, user 2026-10-16: "what did we get wrong - this is
+    something that can help optimize our sim engine"): `<sport>/<date>.postmortem.jsonl`, one record per graded
+    featured bet -- verdict (close x result), the sim's error where it was the reason, opportunity vs efficiency from
+    box-score usage (NHL / MLB / NFL). Rewritten whole each run; a failure here never fails the reconcile."""
+    try:
+        from syndicate.features.shared import box_usage
+        from syndicate.features.shared import play_card_results as pcr
+
+        gpc = _load("grade_play_cards")
+        sport = str(sheet.get("sport"))
+        records = pcr.sheet_postmortem(sheet, rec)                   # first pass: which bets are graded
+        cards = [{"card_id": r["card_id"], "event_id": r.get("event_id"), "market": r.get("market"), "player": r.get("player"),
+                  "line": r.get("line"), "side": r.get("side"), "price": r.get("price"), "p_market": r.get("p_market"),
+                  "commence_time": next((g.get("commence_time") for g in sheet.get("games") or []
+                                         if g.get("event_id") == r.get("event_id")), None)}
+                 for r in records if r.get("kind") == "prop"]
+        closes = gpc.closing_fairs(root, sport, day, cards)
+        cache = root / "cheatsheets" / ".usage_cache"
+        records = pcr.sheet_postmortem(sheet, rec, closes=closes,
+                                       usage=lambda card, item: box_usage.usage_for(card, item, cache=cache, data_root=root))
+        out = path.with_name(f"{day}.postmortem.jsonl")
+        tmp = out.with_name(out.name + ".tmp")
+        tmp.write_text("".join(json.dumps(r, default=str) + "\n" for r in records), encoding="utf-8")
+        tmp.replace(out)
+        summary = pcr.engine_summary(records)
+        print(f"POSTMORTEM {sport} date={day} {json.dumps(summary)} closes={len(closes)}", flush=True)
+        return summary
+    except Exception as exc:  # noqa: BLE001 -- the engine ledger is an addition, never a failed reconcile
+        print(f"POSTMORTEM {sheet.get('sport')} date={day} failed: {type(exc).__name__}: {exc}", flush=True)
+        return None
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--data-root", default=os.environ.get("SYNDICATE_DATA_ROOT"))
@@ -392,6 +425,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"RECONCILE {doc['sport']} date={day} nothing settled yet -- no file", flush=True)
                 continue
             write_atomic(target, rec)
+            write_postmortem(root, path, doc, rec, day)
             print(f"RECONCILE {doc['sport']} date={day} props {c['props_graded']}/{c['props']} (values {c['props_valued']}, "
                   f"explained voids {len(rec['void'])}, finals {len(rec['scores'])}) "
                   f"lines {c['lines_graded']}/{c['lines']} graded_population={len(graded)}", flush=True)

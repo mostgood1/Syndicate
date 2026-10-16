@@ -53,3 +53,36 @@ def test_only_supported_props_get_usage(tmp_path):
     assert bu.usage_for({"sport": "mlb", "date": "2026-10-15", "market": "h2h"}, {"kind": "game"}, cache=tmp_path) is None
     assert bu.player_id("nhl", {"headshot_url": "https://assets.nhle.com/mugs/nhl/latest/8478402.png"}) == "8478402"
     assert bu.player_id("mlb", {"player_id": 607192}) == "607192"
+
+
+def test_nfl_targets_carries_and_attempts_from_the_play_by_play(tmp_path):
+    pbp = tmp_path / "nfl_source" / "tracking" / "nflverse" / "pbp"
+    pbp.mkdir(parents=True)
+    head = "game_id,game_date,pass_attempt,rush_attempt,sack,two_point_attempt,receiver_player_name,receiver_player_id," \
+           "rusher_player_name,rusher_player_id,passer_player_name,passer_player_id\n"
+    rows = []
+    for date, targets in (("2026-10-15", 2), ("2026-10-05", 6), ("2026-09-28", 5), ("2026-09-21", 7)):
+        rows += [f"g,{date},1,0,0,0,T.Horton,00-1,,,G.Smith,00-9" for _ in range(targets)]
+    rows.append("g,2026-10-15,1,0,1,0,,,,,G.Smith,00-9")                        # a sack: not a pass attempt
+    rows.append("g,2026-10-15,1,0,0,1,T.Horton,00-1,,,G.Smith,00-9")             # a two-point try: not counted
+    rows += ["g,2026-10-15,0,1,0,0,,,K.Walker,00-2,," for _ in range(3)]
+    (pbp / "pbp_2026.csv").write_text(head + "\n".join(rows) + "\n", encoding="utf-8")
+    card = {"sport": "nfl", "date": "2026-10-15", "market": "Receiving Yards", "player": "Tory Horton"}
+    u = bu.usage_for(card, {"kind": "prop"}, cache=tmp_path, data_root=tmp_path)
+    assert u["metric"] == "Targets" and u["actual"] == 2.0 and u["usual"] == 6.0 and u["games"] == 3
+    attempts = bu.usage_for(dict(card, market="Passing Yards", player="Geno Smith"), {"kind": "prop"}, cache=tmp_path, data_root=tmp_path)
+    assert attempts["actual"] == 2.0                                               # the sack and the two-point try left out
+    assert bu.usage_for(dict(card, market="Anytime TD"), {"kind": "prop"}, cache=tmp_path, data_root=tmp_path) is None
+    assert bu.usage_for(dict(card, market="Rushing Yards", player="Kenneth Walker III"), {"kind": "prop"}, cache=tmp_path,
+                        data_root=tmp_path) is None                                # 3 carries but no earlier games: no usual
+
+
+def test_two_players_sharing_a_key_are_never_guessed(tmp_path):
+    pbp = tmp_path / "nfl_source" / "tracking" / "nflverse" / "pbp"
+    pbp.mkdir(parents=True)
+    head = "game_id,game_date,pass_attempt,rush_attempt,sack,two_point_attempt,receiver_player_name,receiver_player_id\n"
+    rows = ["g,2026-10-15,1,0,0,0,J.Smith,00-1", "g,2026-10-15,1,0,0,0,J.Smith,00-2"]
+    rows += [f"g,{d},1,0,0,0,J.Smith,00-1" for d in ("2026-10-05", "2026-09-28", "2026-09-21")]
+    (pbp / "pbp_2026.csv").write_text(head + "\n".join(rows) + "\n", encoding="utf-8")
+    card = {"sport": "nfl", "date": "2026-10-15", "market": "Receptions", "player": "Jaxon Smith"}
+    assert bu.usage_for(card, {"kind": "prop"}, cache=tmp_path, data_root=tmp_path) is None

@@ -10,6 +10,9 @@ Free, keyless sources the cheat sheets already use (no OddsAPI):
        a goalie's opportunity is the shots he faces, not his minutes)
   MLB  StatsAPI `people/{id}/stats?stats=gameLog&group=hitting|pitching&gameType=R|P` -> plate appearances for a
        batter, batters faced for a pitcher (his usual from STARTS only, when the graded game was a start)
+  NFL  the nflverse play-by-play already on the data root (`nfl_source/tracking/nflverse/pbp/pbp_<season>.csv`,
+       refreshed daily) -> TARGETS for a receiving prop, CARRIES for a rushing prop, PASS ATTEMPTS (sacks out) for a
+       passing prop; the usual from the season's earlier games. No network.
 
 The usual is the mean over the `USUAL_GAMES` games before the graded one, across the season boundary (early in a
 season a player has three or four games). Every miss is reported as None -- a blank line on the card, never a guess.
@@ -18,6 +21,7 @@ from __future__ import annotations
 
 import re
 import statistics
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -88,11 +92,81 @@ def mlb_usage(api: Any, pid: str, date: str, *, pitcher: bool) -> dict[str, Any]
             "games": len(values), "of": "starts" if started else "games", "count": True, "source": "MLB StatsAPI game log"}
 
 
-def usage_for(card: Mapping[str, Any], item: Mapping[str, Any], *, cache: Path, fetch: Any = None) -> dict[str, Any] | None:
+_NFL_METRICS = (("recei", "Targets", "target", "receiver_player_name", "target"),
+                ("reception", "Targets", "target", "receiver_player_name", "target"),
+                ("rush", "Carries", "carry", "rusher_player_name", "carry"),
+                ("pass", "Pass attempts", "pass attempt", "passer_player_name", "attempt"))
+_SUFFIX = {"jr", "sr", "ii", "iii", "iv", "v"}
+
+
+def _nfl_key(name: Any) -> tuple[str, str] | None:
+    """First initial + last name: 'Tory Horton' and nflverse's 'T.Horton' meet here; suffixes dropped."""
+    parts = [p for p in re.split(r"[\s.]+", str(name or "").lower().replace("'", "")) if p and p not in _SUFFIX]
+    return (parts[0][0], re.sub(r"[^a-z]", "", parts[-1])) if len(parts) >= 2 else None
+
+
+@lru_cache(maxsize=2)
+def _nfl_index(path: str, mtime: float) -> dict[tuple[str, str], dict[str, dict[str, int]]]:
+    """(initial, last) -> game_date -> {target, carry, attempt}; ambiguous keys (two players in one game) dropped."""
+    import csv
+
+    out: dict[tuple[str, str], dict[str, dict[str, int]]] = {}
+    seen: dict[tuple[tuple[str, str], str], set] = {}
+    with open(path, encoding="utf-8") as fh:
+        for row in csv.DictReader(fh):
+            if row.get("two_point_attempt") == "1" or not row.get("game_date"):
+                continue
+            date = row["game_date"]
+            for col, kind, cond in (("receiver_player_name", "target", row.get("pass_attempt") == "1"),
+                                    ("rusher_player_name", "carry", row.get("rush_attempt") == "1"),
+                                    ("passer_player_name", "attempt", row.get("pass_attempt") == "1" and row.get("sack") != "1")):
+                key = _nfl_key(row.get(col)) if cond else None
+                if key is None:
+                    continue
+                pid = row.get(col.replace("_name", "_id")) or row.get(col)
+                seen.setdefault((key, date), set()).add(pid)
+                day = out.setdefault(key, {}).setdefault(date, {"target": 0, "carry": 0, "attempt": 0})
+                day[kind] += 1
+    for (key, date), ids in seen.items():
+        if len(ids) > 1:                                 # two players share the key that day: never guessed
+            out.get(key, {}).pop(date, None)
+    return out
+
+
+def nfl_usage(data_root: Path, player: Any, date: str, market: Any) -> dict[str, Any] | None:
+    m = str(market or "").lower()
+    metric = next((x for x in _NFL_METRICS if x[0] in m), None)
+    key = _nfl_key(player)
+    if metric is None or key is None or "td" in m.split() or "touchdown" in m:
+        return None
+    year, month = int(date[:4]), int(date[5:7])
+    path = Path(data_root) / "nfl_source" / "tracking" / "nflverse" / "pbp" / f"pbp_{year if month >= 8 else year - 1}.csv"
+    if not path.is_file():
+        return None
+    games = _nfl_index(str(path), path.stat().st_mtime).get(key) or {}
+    if date not in games:
+        return None
+    kind = metric[4]
+    before = [games[d][kind] for d in sorted(games, reverse=True) if d < date][:USUAL_GAMES]
+    usual = _usual([float(v) for v in before])
+    if usual is None:
+        return None
+    return {"metric": metric[1], "unit": "", "per": metric[2], "actual": float(games[date][kind]), "usual": round(usual, 1),
+            "games": len(before), "count": True, "source": "nflverse play-by-play"}
+
+
+def usage_for(card: Mapping[str, Any], item: Mapping[str, Any], *, cache: Path, fetch: Any = None,
+              data_root: Path | None = None) -> dict[str, Any] | None:
     """The graded game's usage for a player prop, or None (not a prop, an unsupported sport, a goalie, no id)."""
     sport = str(card.get("sport") or "").lower()
-    if (item.get("kind") or "prop") != "prop" or sport not in ("nhl", "mlb"):
+    if (item.get("kind") or "prop") != "prop" or sport not in ("nhl", "mlb", "nfl"):
         return None
+    if sport == "nfl":
+        try:
+            return nfl_usage(Path(data_root), card.get("player") or item.get("player") or item.get("player_name"),
+                             str(card.get("date") or ""), card.get("market")) if data_root else None
+        except Exception:  # noqa: BLE001 -- usage is a line on a card, never a failed grade
+            return None
     pid, date, market = player_id(sport, item), str(card.get("date") or ""), card.get("market")
     if not pid or not date:
         return None

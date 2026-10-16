@@ -609,6 +609,10 @@ def build_sport(sport: str, rows: list[dict[str, Any]], *, selected_date: str, c
                 "shop": cs.shop_gap(quote.get("book_prices")),
                 "fair_method": quote.get("fair_method"),
                 "evidence_error": facts.get("error"),
+                # The sim's mean (and spread, where the sport publishes one) for the engine ledger's "what did we get
+                # wrong" (lane result-cards, 2026-10-16): projected vs the actual on every graded featured row.
+                "projected": (r.get("projection") or {}).get("projected"),
+                "projected_sd": (r.get("projection") or {}).get("projected_sd"),
                 "check": check.as_dict(),
             })
     # Player vs player (user 2026-10-15: "add player vs player matchups like batter vs pitcher"): MLB batter vs the

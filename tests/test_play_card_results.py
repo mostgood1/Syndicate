@@ -110,3 +110,64 @@ def test_the_grader_renders_result_cards_and_the_engine_ledger(tmp_path):
     assert "stamp win" in html and "FINAL · 27–66" in html
     post = [json.loads(x) for x in (root / "playcards" / "postmortem.jsonl").read_text(encoding="utf-8").splitlines()]
     assert len(post) == 1 and post[0]["card_id"] == "l2_d4b4" and post[0]["outcome"] == "win"
+
+
+def test_a_miss_is_placed_against_the_sims_own_range():
+    prop = {"kind": "prop", "side": "over", "line": 50.5, "projected": 58.0, "projected_sd": 15.0}
+    j = pcr.sim_judgement(prop, "SYNDICATE PICK", 40.0)
+    assert j["z"] == -1.2 and "outside the sim's own range, 1.2 sd" in j["text"]
+    assert "inside the sim's own range" in pcr.sim_judgement(prop, "SYNDICATE PICK", 49.0)["text"]
+    # no mean on file: the side it backed is judged, never an invented error
+    side_only = pcr.sim_judgement({"kind": "prop", "side": "over", "line": 2.5, "p_model": 0.58}, "SYNDICATE PICK", 4.0)
+    assert side_only["right_side"] is True and side_only["error"] is None and "had the over at 58%" in side_only["text"]
+
+
+def _sheet():
+    from syndicate.features.shared import cheat_sheets as cs
+
+    row = lambda player, verdict="value", p_model=0.60: {
+        "player": player, "event_id": "e1", "market": "Receptions", "line": 4.5, "side": "over", "books_quoting": 6,
+        "projected": 5.6, "check": {"verdict": verdict, "ev_market": 3.0, "price": 110, "book": "fanduel",
+                                    "p_market": 0.50, "p_model": p_model, "reasons": []}}
+    rows = [row("Featured Win"), row("Featured Loss", p_model=0.40), row("Not Featured"), row("Ungraded")]
+    pick = {"pick_id": "l2_x", "kind": "game", "event_id": "e1", "market": "spreads", "side": "home", "line": -3.5,
+            "segment": "full", "price": -110, "p_model": 0.58, "p_market": 0.5, "ev_pct": 2.5, "label": "SYNDICATE PICK",
+            "player_name": None, "matchup": "A @ B", "home_team": "B", "away_team": "A"}
+    sheet = {"sport": "nfl", "date": "2026-10-15", "rows": rows, "picks": [pick], "game_lines": [],
+             "sections": {"value": [0, 1, 3], "every_prop": [0, 1, 2, 3]}, "games": [{"event_id": "e1", "commence_time": "x"}]}
+    rec = {"props": {cs.prop_result_key(rows[0]): {"y": 1.0, "v": 7.0}, cs.prop_result_key(rows[1]): {"y": 0.0, "v": 2.0},
+                     cs.prop_result_key(rows[2]): {"y": 1.0, "v": 6.0}},
+           "picks": {cs.pick_result_key(pick): {"y": 0.0}}, "scores": {"e1": {"home": 20.0, "away": 21.0}}}
+    return sheet, rec
+
+
+def test_every_graded_featured_bet_lands_in_the_engine_ledger():
+    sheet, rec = _sheet()
+    seen = []
+    out = pcr.sheet_postmortem(sheet, rec, usage=lambda card, item: seen.append(card["player"]) or None,
+                               closes={})
+    players = [r.get("player") for r in out]
+    assert "Featured Win" in players and "Featured Loss" in players
+    assert "Not Featured" not in players and "Ungraded" not in players            # every_prop is not featured; no result
+    win = next(r for r in out if r["player"] == "Featured Win")
+    assert win["label"] == "SYNDICATE PICK" and win["sim"]["right_side"] is True and win["actual"] == 7.0
+    assert win["result"]["units"] == 1.1 and win["sections"] == ["value"] and win["source"] == "sheet"
+    loss = next(r for r in out if r["player"] == "Featured Loss")
+    assert loss["label"] == "PRICE PLAY" and loss["sim"] is None                  # the sim is judged only where it backed it
+    pick = next(r for r in out if r.get("pick_id") == "l2_x")
+    assert pick["outcome"] == "loss" and pick["actual"] == -1.0 and pick["sim"]["right_side"] is False
+    assert seen == ["Featured Win", "Featured Loss"]                             # usage asked for props only
+    s = pcr.engine_summary(out)
+    assert s["graded"] == 3 and s["sim_judged"] == 2 and s["sim_right_side"] == 1 and s["sim_mean_error"] == 1.4
+
+
+def test_the_reconcile_writes_the_engine_ledger_beside_the_sheet(tmp_path):
+    # Reachability: the reconcile's own hook writes <sport>/<date>.postmortem.jsonl.
+    sheet, rec = _sheet()
+    d = tmp_path / "cheatsheets" / "nfl"
+    d.mkdir(parents=True)
+    path = d / "2026-10-15.json"
+    path.write_text("{}", encoding="utf-8")
+    summary = _script("reconcile_cheat_sheets").write_postmortem(tmp_path, path, sheet, rec, "2026-10-15")
+    lines = (d / "2026-10-15.postmortem.jsonl").read_text(encoding="utf-8").splitlines()
+    assert summary["graded"] == 3 and len(lines) == 3

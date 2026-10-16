@@ -114,6 +114,41 @@ def closing_fair(quotes: list[dict[str, Any]], card: dict[str, Any]) -> dict[str
             "clv_pp": None if card.get("p_market") is None else round(100 * (p - float(card["p_market"])), 2)}
 
 
+def closing_fairs(root: Path, sport: str, day: str, cards: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """card_id -> the closing fair (as `closing_fair`) for MANY cards in one streaming pass over the day's and the next
+    day's quote files, parsing only lines for the cards' own events -- a nightly sheet of hundreds of rows must not
+    load eleven days of quotes the way one card can."""
+    events = {str(c.get("event_id")) for c in cards if c.get("event_id")}
+    if not events:
+        return {}
+    directory = root / f"{sport}_source" / "tracking" / "book_quotes"
+    nxt = (datetime.fromisoformat(day) + timedelta(days=1)).date().isoformat()
+    quotes: list[dict[str, Any]] = []
+    for name in (day, nxt):
+        path = directory / f"{name}.jsonl"
+        if not path.is_file():
+            continue
+        with path.open(encoding="utf-8") as fh:
+            for line in fh:
+                if not any(e in line for e in events):
+                    continue
+                try:
+                    q = json.loads(line)
+                except ValueError:
+                    continue
+                if q.get("price") is not None and str(q.get("event_id")) in events:
+                    quotes.append(q)
+    by_event: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for q in quotes:
+        by_event[str(q.get("event_id"))].append(q)
+    out = {}
+    for c in cards:
+        fair = closing_fair(by_event.get(str(c.get("event_id")), []), c) if c.get("price") is not None else None
+        if fair:
+            out[str(c["card_id"])] = fair
+    return out
+
+
 def match_key(sport: Any, market: Any, player: Any, side: Any, line: Any) -> tuple:
     """The population key's own normalisation: market and side lower-cased, line a float or None."""
     return (str(sport or "").lower(), str(market or "").strip().lower(), player_key(player), str(side or "").lower(),
@@ -302,7 +337,7 @@ def main(argv: list[str] | None = None) -> int:
     if not args.no_result_cards:
         from syndicate.features.shared import box_usage
 
-        usage = lambda card, item: box_usage.usage_for(card, item, cache=root / "playcards" / ".usage_cache")
+        usage = lambda card, item: box_usage.usage_for(card, item, cache=root / "playcards" / ".usage_cache", data_root=root)
         print(f"PLAY_CARDS_RESULTS {json.dumps(render_results(cards, root, usage=usage))}", flush=True)
     graded = [c for c in cards if c.get("result")]
     print(f"PLAY_CARDS_GRADE cards={len(cards)} due={len(due)} closed={sum(1 for c in cards if c.get('close'))} "

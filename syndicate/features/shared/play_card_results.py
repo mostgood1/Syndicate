@@ -114,9 +114,18 @@ def usage_split(usage: Mapping[str, Any] | None, side: str, res: str | None) -> 
 
 
 def sim_judgement(item: Mapping[str, Any], label: str, actual: float | None) -> dict[str, Any] | None:
-    """The sim's error, only where the sim was the reason (a SYNDICATE PICK) and projects in the line's own units."""
+    """The sim's error, only where the sim was the reason (a SYNDICATE PICK) and projects in the line's own units. With
+    the sim's spread (`projected_sd`, NFL publishes it) a miss is also placed against the sim's own range."""
     if label != "SYNDICATE PICK":
         return None
+    if is_over_under(item) and _num(item.get("projected")) is None:     # no mean on file: judge the side it backed
+        p_model, line = _num(item.get("p_model")), _num(item.get("line"))
+        side = str(item.get("side") or "").lower()
+        if p_model is None or actual is None or line is None or actual == line:
+            return None
+        right = (actual > line) == (side == "over")
+        return {"projected": None, "actual": actual, "error": None, "right_side": right, "z": None,
+                "text": f"SmartSim had the {side} at {p_model:.0%}: it {'came in' if right else 'did not come in'}"}
     if not is_over_under(item):            # a side: the sim backed it at p_model; was the side right?
         p_model, p_market = _num(item.get("p_model")), _num(item.get("p_market"))
         if p_model is None or actual is None:
@@ -132,10 +141,13 @@ def sim_judgement(item: Mapping[str, Any], label: str, actual: float | None) -> 
         return None
     error = actual - projected
     right_side = (projected > line) == (actual > line) and actual != line
-    return {"projected": projected, "actual": actual, "error": round(error, 2), "right_side": right_side,
+    sd = _num(item.get("projected_sd"))
+    z = round(error / sd, 2) if sd else None
+    spread = ("" if z is None else f" ({'inside' if abs(z) <= 1 else 'outside'} the sim's own range, {abs(z):.1f} sd)")
+    return {"projected": projected, "actual": actual, "error": round(error, 2), "right_side": right_side, "z": z,
             "text": (f"SmartSim projected {_g(projected)}; the actual was {_g(actual)} -- the sim was "
                      f"{'right' if right_side else 'wrong'} about the side of {_g(line)} and {abs(error):.1f} "
-                     f"{'high' if error < 0 else 'low'}")}
+                     f"{'high' if error < 0 else 'low'}{spread}")}
 
 
 def facts(item: Mapping[str, Any], *, sport: str, actual: float | None, score: Mapping[str, Any] | None,
@@ -292,10 +304,126 @@ def result_overrides(fields: Mapping[str, Any], item: Mapping[str, Any], card: M
     return over, classification
 
 
+def classify(item: Mapping[str, Any], card: Mapping[str, Any], *, label: str, entry: Mapping[str, Any] | None,
+             score: Mapping[str, Any] | None, usage: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    """The engine reading of one graded bet: the verdict, the sim's error (where it was the reason), time vs rate."""
+    res = outcome(card.get("result"))
+    close = card.get("close") or {}
+    actual = actual_value(item, entry, score)
+    sim = sim_judgement(item, label, actual)
+    use = usage_split(usage, str(item.get("side") or "").lower(), res)
+    v = verdict(res, close, label, sim, use)
+    over_under = is_over_under(item)
+    return {"outcome": res, "verdict": v["key"], "tone": v["tone"], "beat_close": close_verdict(close),
+            "ev_close_pct": _num(close.get("ev_close_pct")), "clv_pp": _num(close.get("clv_pp")), "actual": actual,
+            "projected": _num(item.get("projected")) if over_under else None,
+            "projected_sd": _num(item.get("projected_sd")) if over_under else None,
+            "sim": sim, "usage": dict(usage) if usage else None, "usage_kind": (use or {}).get("kind")}
+
+
+def _units(price: Any, y: float | None) -> float | None:
+    p = _num(price)
+    if y is None or p is None:
+        return None
+    return round((p / 100 if p > 0 else 100 / -p), 3) if y == 1 else (-1.0 if y == 0 else 0.0)
+
+
+def sheet_postmortem(sheet: Mapping[str, Any], reconciled: Mapping[str, Any] | None, *, usage: Any = None,
+                     closes: Mapping[str, Any] | None = None) -> list[dict[str, Any]]:
+    """The engine ledger for one sheet: one record per GRADED FEATURED bet -- the Syndicate picks, every featured row
+    section and the game-line value section (user 2026-10-16: "what did we get wrong ... can help optimize our sim
+    engine"). `usage(card, item)` adds box-score usage; `closes[card_id]` the closing fair. Read-only of its inputs."""
+    from syndicate.features.shared import cheat_sheets as cs
+    from syndicate.features.shared import play_cards as pc
+    from syndicate.features.shared.cheat_sheet_record import FEATURED
+
+    if not reconciled:
+        return []
+    sport, day = str(sheet.get("sport")), str(sheet.get("date"))
+    featured = {k for k, _ in FEATURED}
+    scores = reconciled.get("scores") or {}
+    out: list[dict[str, Any]] = []
+
+    def add(item: Mapping[str, Any], card: dict[str, Any], *, label: str, entry: Mapping[str, Any] | None, sections: list[str]):
+        if outcome(card.get("result")) is None:
+            return
+        found = usage(card, item) if callable(usage) and (item.get("kind") or "prop") == "prop" else None
+        c = classify(item, card, label=label, entry=entry, score=scores.get(str(item.get("event_id"))), usage=found)
+        out.append({**postmortem(card, dict(item, label=label), c), "source": "sheet", "sections": sections})
+
+    in_sections: dict[int, list[str]] = {}
+    for key, ids in (sheet.get("sections") or {}).items():
+        if key in featured and key != "lines_value":
+            for i in ids:
+                in_sections.setdefault(int(i), []).append(key)
+    rows = sheet.get("rows") or []
+    for i, keys in sorted(in_sections.items()):
+        if i >= len(rows):
+            continue
+        row = rows[i]
+        entry = (reconciled.get("props") or {}).get(cs.prop_result_key(row))
+        chk = row.get("check") or {}
+        y = _num((entry or {}).get("y"))
+        cid = pc.card_id(sport, day, row)
+        card = {"card_id": cid, "sport": sport, "date": day, "event_id": row.get("event_id"), "kind": "prop",
+                "market": row.get("market"), "line": row.get("line"), "side": row.get("side"), "price": chk.get("price"),
+                "book": chk.get("book"), "books_quoting": row.get("books_quoting"), "p_market": chk.get("p_market"),
+                "p_model": chk.get("p_model"), "ev_market": chk.get("ev_market"), "player": row.get("player"),
+                "result": None if y is None else {"y": y, "units": _units(chk.get("price"), y)},
+                "close": (closes or {}).get(cid) or {}}
+        add(dict(row, p_model=chk.get("p_model"), p_market=chk.get("p_market")), card,
+            label=pc.row_label(sport, row), entry=entry, sections=keys)
+    for pick in sheet.get("picks") or []:
+        entry = (reconciled.get("picks") or {}).get(cs.pick_result_key(pick))
+        y = _num((entry or {}).get("y"))
+        card = {"card_id": pick.get("pick_id"), "sport": sport, "date": day, "event_id": pick.get("event_id"),
+                "kind": pick.get("kind"), "pick_id": pick.get("pick_id"), "market": pick.get("market"), "line": pick.get("line"),
+                "side": pick.get("side"), "segment": pick.get("segment"), "price": pick.get("price"), "book": pick.get("book"),
+                "books_quoting": pick.get("books"), "p_market": pick.get("p_market"), "p_model": pick.get("p_model"),
+                "ev_market": pick.get("ev_pct"), "player": pick.get("player_name"),
+                "result": None if y is None else {"y": y, "units": _units(pick.get("price"), y)},
+                "close": (closes or {}).get(str(pick.get("pick_id"))) or {}}
+        add(pick, card, label=pick.get("label") or cs.pick_label(pick), entry=entry, sections=["picks"])
+    lines = sheet.get("game_lines") or []
+    for i in (sheet.get("sections") or {}).get("lines_value") or []:
+        if int(i) >= len(lines):
+            continue
+        line = dict(lines[int(i)], kind="game")
+        entry = (reconciled.get("lines") or {}).get(cs.line_result_key(line))
+        chk = line.get("check") or {}
+        y = _num((entry or {}).get("y"))
+        card = {"card_id": f"line:{cs.line_result_key(line)}", "sport": sport, "date": day, "event_id": line.get("event_id"),
+                "kind": "game", "market": line.get("market"), "line": line.get("line"), "side": line.get("side"),
+                "price": chk.get("price"), "book": chk.get("book"), "books_quoting": line.get("books_quoting"),
+                "p_market": chk.get("p_market"), "p_model": chk.get("p_model"), "ev_market": chk.get("ev_market"),
+                "result": None if y is None else {"y": y, "units": _units(chk.get("price"), y)}, "close": {}}
+        add(dict(line, p_model=chk.get("p_model"), p_market=chk.get("p_market")), card,
+            label=cs.pick_label({"sport": sport, "market": line.get("market"), "p_model": chk.get("p_model"),
+                                 "p_market": chk.get("p_market")}), entry=entry, sections=["lines_value"])
+    return out
+
+
+def engine_summary(records: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
+    """Counts with their denominators: verdicts, opportunity vs efficiency on losses, the sim's side record and its
+    mean error where it projected (positive = the sim was LOW)."""
+    recs = list(records)
+    verdicts: dict[str, int] = {}
+    for r in recs:
+        verdicts[r.get("verdict") or "?"] = verdicts.get(r.get("verdict") or "?", 0) + 1
+    losses = [r for r in recs if r.get("outcome") == "loss" and r.get("usage_kind")]
+    sims = [r["sim"] for r in recs if r.get("sim")]
+    errors = [s["error"] for s in sims if isinstance(s.get("error"), (int, float))]
+    return {"graded": len(recs), "verdicts": verdicts,
+            "losses_with_usage": len(losses),
+            "losses_opportunity": sum(1 for r in losses if r["usage_kind"] == "opportunity"),
+            "sim_judged": len(sims), "sim_right_side": sum(1 for s in sims if s.get("right_side")),
+            "sim_errors": len(errors), "sim_mean_error": round(sum(errors) / len(errors), 2) if errors else None}
+
+
 def postmortem(card: Mapping[str, Any], item: Mapping[str, Any], classification: Mapping[str, Any]) -> dict[str, Any]:
     """The engine-ledger record for one graded card: the bet, the prices, the sim, the actual and the classification."""
     keep = ("card_id", "sport", "date", "event_id", "kind", "pick_id", "market", "line", "side", "segment", "price", "book",
-            "books_quoting", "p_market", "p_model", "ev_market")
+            "books_quoting", "p_market", "p_model", "ev_market", "result")
     out = {k: card.get(k) for k in keep}
     out.update({"player": card.get("player") or item.get("player_name") or item.get("player"),
                 "label": item.get("label") or card.get("label"), "sim_view": item.get("sim_view"), **classification})
