@@ -50500,3 +50500,37 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - **claim:** web by cheat-sheets, token 8ddb4326..., acquire exit 0. Ride-alongs: none in code (47d5d492 is a ledger/findings commit).
 - **verify (served, 2:24 PM CT):** `/cheatsheets?sport=nhl&date=2026-10-15` DATA news 18 items (the file had 40, league-wide), 18 of 18 carrying their game (e.g. Cam Lund -> San Jose Sharks @ Nashville Predators); the page has the Game column. Applied at serve to older sheets; new sheets carry it from the next build (the 4:30 PM CT run).
 - **also live since 19:07:15Z and confirmed at the user's report "soccer game lines section is missing the actual game information":** soccer game-line tables name the game + kickoff + competition (10-17: 19 of 19 rows).
+
+## 2026-10-16T20:13:43Z (3:13 PM CT) -- CLAIMED refresh-worker RESTART (user-authorised) -- all three prop-support readings LANDED, **MET**
+
+- **Restart.** refresh-worker pid **810306 -> 1112000** at **19:59:20Z**, TERM
+  sent under claim `refresh-worker` held by `nhl-prop-support-fields`. 60-min
+  gate expired (387 min since the 13:27:56Z restart). No ff needed: the fleet
+  already carried all four commits.
+- **A BOARD BUILD WAS DISCARDED, deliberately, and this says so.** I polled
+  `check_deploy_safety` every 8s for 20 tries (19:54:56Z-19:58:25Z) hoping for a
+  build-free moment; child jobs cleared after try 7 but a build was IN FLIGHT at
+  `layer2_shortlist_build` for all 20. Builds run back-to-back, so waiting only
+  changes WHICH build is discarded. The cost is recomputation latency, not lost
+  data — the board republished 11m26s later.
+- **verify:** served board, cap defeated, `kind == "prop"`, read 20:1xZ off a
+  shortlist artifact written **20:10:46Z** (`source:
+  layer2_shortlist_artifact`, `build_age_seconds` 34) — so AFTER the restart:
+    NHL  `proj_toi`                0 of 156  -> **278 of 284**, 68 distinct
+         `line_slot`               0         -> 270 of 284, 7 distinct
+         `sim_starter` 8 of 284 and `game_type` constant -- sparse AS PREDICTED
+    MLB  `pa_mean`                 0 of 161  -> **124 of 138**, 17 distinct
+         `lineup_order`            0         -> 124 of 138, 9 distinct slots
+    NFL  `projected_opportunities` 0 of 708  -> **499 of 757**, 81 distinct
+         `opportunity_stat`        0         -> 571 of 757, 3 distinct
+- **Every pre-shipping prediction held**, including the negative ones: the
+  fields measured as sparse or constant in the producer (`sim_starter`,
+  `game_type`, `is_lineup_batter`) are sparse or constant on the board.
+- **A FALSE FALSIFICATION WAS NEARLY RECORDED.** My polling loop ran ten
+  55-second cycles and ended **20:08:53Z**; the board republished **20:10:46Z**,
+  under two minutes later. All ten polls legitimately read 0, and I began
+  reasoning that the lanes' falsification clause had fired (the loss being
+  downstream of the module). It had not — I stopped polling early. The thing
+  that caught it was reading the payload's own `written_at`/`source` instead of
+  trusting the poll; the instrument was never broken.
+- **Claim released** with its token after this entry.
