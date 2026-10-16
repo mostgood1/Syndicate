@@ -359,8 +359,10 @@ def test_tick_writes_the_snapshot_and_reports(monkeypatch, tmp_path):
         "refusalsByReason": {"no_pregame_inputs": 1}})
     import syndicate.features.shared.refresh_state_store as store
     monkeypatch.setattr(store, "write_json_file", lambda path, payload: written.update(path=path, payload=payload))
+    monkeypatch.setattr(store, "data_root", lambda: tmp_path)  # history goes to tmp, never the data/ mirror
     st = lr.run_live_resim_tick("2026-10-20")
     assert st["written"] and st["games"] == 2 and st["resimmed"] == 1
+    assert st["history_rows"] == 2 and lr.live_resim_history_path("2026-10-20", root=tmp_path).exists()
     assert written["path"].name == "nba_live_resim.json"
 
 
@@ -480,3 +482,40 @@ def test_a_plain_cfg_is_still_pickled_as_the_object_itself(tmp_path):
     raw = _pickle.loads(path.read_bytes())["kwargs"]["cfg"]
     assert type(raw) is type(kw["cfg"])  # today's production bytes: no field encoding
     assert lr.league_params_overrides_of(lr.load_engine_inputs("2026-01-15", "GSW", "NYK", root=tmp_path)) is None
+
+
+# ------------------------------------------------------------------------------------------- shadow history
+
+def _snap_for_history():
+    facts = lr.ResumeFacts("999", "GSW", "NYK", 50, 48, 2, 0.0, None, 99, "t")
+    res = {"sims_run": 100, "home_win_prob": 0.55, "total_mean": 220.0, "home_margin_mean": 2.0,
+           "total_dist": {"219": 50, "221": 50}, "margin_dist": {"1": 50, "3": 50}, "segments": {"q3": {"total_mean": 55.0}}}
+    ok = lr._lane_row("999", "GSW", "NYK", facts, res)
+    ref = lr._lane_row("998", "LAL", "BOS", None, lr.NbaResimRefusal("no_pregame_inputs", "x"))
+    return {"date": "2026-10-21", "generatedAt": "2026-10-21T20:00:00-05:00", "games": [ok, ref]}
+
+
+def test_history_keeps_one_row_per_lane_with_what_a_forward_grade_needs(tmp_path):
+    n = lr.append_tick_history(_snap_for_history(), "2026-10-21", root=tmp_path)
+    n += lr.append_tick_history(_snap_for_history(), "2026-10-21", root=tmp_path)
+    lines = lr.live_resim_history_path("2026-10-21", root=tmp_path).read_text(encoding="utf-8").splitlines()
+    assert n == 4 and len(lines) == 4  # appends, never overwrites
+    rows = [__import__("json").loads(x) for x in lines]
+    ok = [r for r in rows if r["source"] == "live_resim"][0]
+    assert ok["total"] == 220.0 and ok["p_home"] == 0.55 and ok["total_dist"] == {"219": 50, "221": 50}
+    assert ok["home_score"] == 50 and ok["period"] == 2 and ok["segments"] == {"q3": 55.0}
+    ref = [r for r in rows if r["source"] == "pregame_only"][0]
+    assert ref["refusal"] == "no_pregame_inputs" and ref["total"] is None
+
+
+def test_history_env_off_and_a_failure_never_stops_the_tick(tmp_path, monkeypatch):
+    assert lr.live_resim_history_enabled({}) is True
+    assert lr.live_resim_history_enabled({lr.LIVE_RESIM_HISTORY_ENV: "off"}) is False
+    monkeypatch.setattr(lr, "build_live_lens_snapshot", lambda *a, **k: _snap_for_history())
+    monkeypatch.setattr("syndicate.features.shared.refresh_state_store.write_json_file", lambda *a, **k: None)
+
+    def boom(*a, **k):
+        raise OSError("disk full")
+    monkeypatch.setattr(lr, "append_tick_history", boom)
+    st = lr.run_live_resim_tick("2026-10-21")
+    assert st["written"] is True and st["history_rows"] == "FAILED:OSError"

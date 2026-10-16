@@ -40,6 +40,7 @@ RUNS ON A WORKER. NEVER IN A REQUEST HANDLER.
 
 from __future__ import annotations
 
+import json
 import os
 import pickle
 import time
@@ -931,6 +932,63 @@ def fit_snapshot_to_budget(snapshot: dict[str, Any], *, max_bytes: int = MAX_SNA
     return snapshot, len(json.dumps(snapshot, separators=(",", ":")))
 
 
+# SHADOW HISTORY (2026-10-16). The tick OVERWRITES `live/nba_live_resim.json`, so a shadow season leaves nothing to
+# grade. THE VALID READ failed (findings_2026-10-09 §13); the next gate is FORWARD, on the 2026-27 regular season --
+# the only untouched holdout -- and needs every tick's lanes kept. One compact row per game per tick, appended to
+# `<data root>/nba_source/data/processed/live_resim_history/<date>.jsonl` (~2-3 KB/row with the two histograms;
+# ~2 MB/day on a 10-game slate). Local disk only, never keyvalue, never read on a request path. Absent env = ON
+# whenever the re-sim loop runs (the loop itself is SYNDICATE_NBA_LIVE_RESIM-gated); `off` disables it. A failure
+# is printed and swallowed: history can never stop a tick.
+LIVE_RESIM_HISTORY_ENV = "SYNDICATE_NBA_LIVE_RESIM_HISTORY"
+
+
+def live_resim_history_enabled(env: Optional[Mapping[str, str]] = None) -> bool:
+    raw = str((env if env is not None else os.environ).get(LIVE_RESIM_HISTORY_ENV) or "").strip().lower()
+    return raw not in ("0", "false", "off", "no")
+
+
+def live_resim_history_path(date_str: str, *, root: Optional[Path] = None, league: str = LEAGUE) -> Path:
+    if root is None:
+        from syndicate.features.shared.refresh_state_store import data_root
+
+        root = data_root()
+    return Path(root) / f"{league}_source" / "data" / "processed" / "live_resim_history" / f"{date_str}.jsonl"
+
+
+def history_rows(snapshot: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """One compact row per game lane in a snapshot: state, the published numbers and their histograms, provenance."""
+    rows: list[dict[str, Any]] = []
+    for g in snapshot.get("games") or []:
+        for lane in g.get("gameLens") or []:
+            proj = lane.get("projection") or {}
+            rows.append({
+                "t": snapshot.get("generatedAt"), "date": snapshot.get("date"), "event_id": g.get("event_id"),
+                "home_code": g.get("home_code"), "away_code": g.get("away_code"),
+                "source": lane.get("source"), "refusal": lane.get("liveResimRefusal"),
+                "as_of": lane.get("liveStateAsOf"),
+                "period": proj.get("period"), "clock_s": proj.get("clockSeconds"),
+                "home_score": proj.get("homeScore"), "away_score": proj.get("awayScore"),
+                "score_source": proj.get("scoreSource"),
+                "total": proj.get("total"), "margin": proj.get("homeMargin"), "p_home": lane.get("modelHomeWinProb"),
+                "sims": lane.get("simsRun"), "total_dist": proj.get("totalRunsDist"), "margin_dist": proj.get("marginDist"),
+                "segments": {k: (v or {}).get("total_mean") for k, v in (proj.get("segments") or {}).items()},
+                "resume": lane.get("resumeMatch"),
+            })
+    return rows
+
+
+def append_tick_history(snapshot: Mapping[str, Any], date_str: str, *, root: Optional[Path] = None) -> int:
+    rows = history_rows(snapshot)
+    if not rows:
+        return 0
+    path = live_resim_history_path(date_str, root=root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as fh:
+        for r in rows:
+            fh.write(json.dumps(r, separators=(",", ":"), default=str) + "\n")
+    return len(rows)
+
+
 def run_live_resim_tick(date_str: Optional[str] = None, **kwargs: Any) -> dict[str, Any]:
     """One tick: build, size-check, write. Returns a small status dict (also printed, prefix NBA_LIVE_RESIM_TICK)."""
     from syndicate.features.shared.refresh_state_store import write_json_file
@@ -953,6 +1011,11 @@ def run_live_resim_tick(date_str: Optional[str] = None, **kwargs: Any) -> dict[s
     if size <= MAX_SNAPSHOT_BYTES:
         write_json_file(live_lens_snapshot_path(), snapshot)
         status["written"] = True
+    if live_resim_history_enabled():
+        try:
+            status["history_rows"] = append_tick_history(snapshot, date_str)
+        except Exception as exc:  # noqa: BLE001 -- history must never stop the tick
+            status["history_rows"] = f"FAILED:{type(exc).__name__}"
     status["elapsed_s"] = round(time.monotonic() - started, 1)
     print("NBA_LIVE_RESIM_TICK " + " ".join(f"{k}={v}" for k, v in status.items()), flush=True)
     return status
