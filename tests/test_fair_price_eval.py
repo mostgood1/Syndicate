@@ -73,3 +73,41 @@ def test_calibration_recovers_a_known_slope() -> None:
         ys.append(1.0 if rng.random() < true else 0.0)
     a, b = fpe.calibration(ps, ys)
     assert abs(a) < 0.1 and 0.6 < b < 0.8
+
+
+def test_h5_shin_fresh_drops_a_book_that_moved_off_the_line_and_keeps_the_rest() -> None:
+    """The 10-15 Knicks total: books that re-posted at 226.5 still count at 225.5 in today's fair. `shin_fresh` drops them."""
+    from datetime import datetime, timezone
+
+    t0 = datetime(2026, 10, 15, 13, 17, tzinfo=timezone.utc)
+    start = datetime(2026, 10, 16, 0, 0, tzinfo=timezone.utc)
+    sight = datetime(2026, 10, 15, 23, 0, tzinfo=timezone.utc)
+    g = fpe.group_key("ev1", "totals", "full", "", "under", 225.5)
+    hist = {
+        (g, "fanduel", "over"): [(t0, -110, start)], (g, "fanduel", "under"): [(t0, -110, start)],      # moved off later
+        (g, "betrivers", "over"): [(t0, -130, start)], (g, "betrivers", "under"): [(t0, 107, start)],   # still here
+    }
+    later = datetime(2026, 10, 15, 18, 0, tzinfo=timezone.utc)
+    activity = {(g[:4], "fanduel"): [(t0, 225.5), (later, 226.5)], (g[:4], "betrivers"): [(t0, 225.5)]}
+    row = {"gkey": g, "t": sight.isoformat(), "sd": "under", "sport": "nba", "game": "nba|ev1", "y": 1.0, "px": 107, "pnl": 1.07}
+    fpe.evaluate([dict(row)], hist, max_age_h=24.0, max_stale_h=24.0, dup_threshold=0.9)          # no activity: shin == shin_fresh
+    scored = [dict(row)]
+    report = fpe.evaluate(scored, hist, max_age_h=24.0, max_stale_h=24.0, dup_threshold=0.9, activity=activity)
+    r = scored[0]
+    assert r["stale_books"] == 1
+    assert r["sight_books_shin"] == 2 and r["sight_books_shin_fresh"] == 1
+    assert math.isclose(r["sight_shin_fresh"], devig([-130, 107], method="shin")[1], rel_tol=1e-9)
+    assert r["sight_shin_fresh"] < r["sight_shin"], "betrivers' own no-vig under is below the stale -110 median"
+    assert report["h5_fresh_vs_shin"]["by_sport"]["nba"]["share_rows_with_a_stale_book"] == 1.0
+    assert report["h5_fresh_vs_shin"]["pooled_ex_nba"] == {"n": 0}, "NBA (preseason) is never pooled"
+
+
+def test_h5_a_move_after_the_sighting_does_not_count() -> None:
+    from datetime import datetime, timezone
+
+    g = fpe.group_key("ev1", "totals", "full", "", "over", 225.5)
+    t0, t = datetime(2026, 10, 15, 13, tzinfo=timezone.utc), datetime(2026, 10, 15, 14, tzinfo=timezone.utc)
+    later = datetime(2026, 10, 15, 15, tzinfo=timezone.utc)
+    assert not fpe.moved_off({(g[:4], "fd"): [(later, 226.5)]}, g, "fd", t0, t)
+    assert fpe.moved_off({(g[:4], "fd"): [(datetime(2026, 10, 15, 13, 30, tzinfo=timezone.utc), 226.5)]}, g, "fd", t0, t)
+    assert not fpe.moved_off({(g[:4], "fd"): [(datetime(2026, 10, 15, 13, 30, tzinfo=timezone.utc), 225.5)]}, g, "fd", t0, t)
