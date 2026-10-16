@@ -50494,3 +50494,9 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - **verify (MEASURED, same instrument before and after).**
   - Baseline 19:05:39Z vs after 19:09:57Z, from `/mlb/assets/{cards.css,season.css,betting_card.js,back_to_top.js}` on 127.0.0.1:10000: all 200, identical sizes (43,826 / 26,390 / 50,021 / 1,132) and identical sha256 (CR-stripped).
   - **The source is distinguished, not assumed.** Identical bytes cannot tell the two dirs apart. The page's mtime-based `asset_version` can: the live `/mlb/season/2026/betting-card` carries `?v=1792177635...`, the native copies' max mtime (1792177635), where the vendored files' would be 1790817013.
+
+## 2026-10-16 19:23:45Z (2:23 PM CT) -- web ff 06241083 -> f81f1c2d + `reload-web` (2.0 s, 0 failures): cheat-sheet news tied to its game on the sheet (lane `cheat-sheets`, session 9e18a0e7) -- NO outage, no worker restart
+- **ask:** user 2026-10-16 "look at the news impact piece and make sure its aligned with the correct game on the schedule".
+- **claim:** web by cheat-sheets, token 8ddb4326..., acquire exit 0. Ride-alongs: none in code (47d5d492 is a ledger/findings commit).
+- **verify (served, 2:24 PM CT):** `/cheatsheets?sport=nhl&date=2026-10-15` DATA news 18 items (the file had 40, league-wide), 18 of 18 carrying their game (e.g. Cam Lund -> San Jose Sharks @ Nashville Predators); the page has the Game column. Applied at serve to older sheets; new sheets carry it from the next build (the 4:30 PM CT run).
+- **also live since 19:07:15Z and confirmed at the user's report "soccer game lines section is missing the actual game information":** soccer game-line tables name the game + kickoff + competition (10-17: 19 of 19 rows).
