@@ -2373,3 +2373,16 @@ command. A filter on a guard's output is a way to not see the guard.
   - Every half-life from 1 to 4 seasons was ≥ the constant, and the 2020-26 subset was no better.
   - Down-weighting halves the effective n, and β drifts together with the offsets.
 - **How to apply:** before serving a time-varying parameter because an era split "looks different", run the registered walk-forward against the constant. Report the effective sample size the weighting leaves.
+
+## 2026-10-16 RULE: a SUPPORT field is only a gate if you measured that it VARIES across the population first `[lane nfl-prop-support-fields -> nfl-prop-opportunity-volume]`
+
+- **What happened:** I shipped `sample_games` onto NFL prop rows to give the  board something to gate on besides edge magnitude. It was correct,  reachable, tested, and **useless**: measured afterwards over 157  ceiling-rejected vs 453 accepted markets, its median is **5.0 on both  sides**. In week 6 it is a CALENDAR count — it cannot tell a rotational  player from a starter, which is the only thing it was wanted for.
+- **The field that worked** was the projected OPPORTUNITY (receptions /  carries / attempts): 0.67..10.33, a 15x spread, and 4 of the 6 players  under 1.00 were the known-bad rows.
+- **Rule:** before publishing a field so something can gate on it, compute  its distribution over the population it must separate — count,  distinct values, and the two sides' medians. A field with no spread is  indistinguishable from a working one at every level except the data,  which is `model_engine_standard.md`'s own failure mode.
+- **It generalises to provenance too:** NHL's `sim_starter` is 4/364 (sparse  by design, goalies only) and `game_type` is constant; MLB's  `is_lineup_batter` is True on all 414 rows. Each is worth publishing as  provenance and worth NOT calling a gate. Applied prospectively on both,  which is the only reason those two lanes did not repeat the mistake.
+
+## 2026-10-16 RULE: there is no quiet window on this fleet during active hours — board builds run back-to-back `[measured]`
+
+- **Measured:** two observe-only watchers, 63 cycles over 15:19Z-16:15Z, and  a board build was IN FLIGHT on `refresh-worker` in **every single one**  (24 of 24 on the second watcher across 9m45s; a build takes ~8.5min).
+- **Why it matters:** `check_deploy_safety` ends with "Wait, or proceed  deliberately", which reads as though waiting will clear it. It will not.  A refresh-worker restart during active hours discards a board build, which  is why the day's restarts are logged as "claimed restart" rather than as  clear windows.
+- **Rule:** for an OBSERVABILITY-only change, do not restart — record the  reading as owed and let the next restart by anyone carry it (that is how  `5457b428`'s reading arrived, inside the hour). For a change that must go  now, proceed deliberately and SAY in `deploys.md` that a build was  discarded. Do not budget session time for a window that does not come.
