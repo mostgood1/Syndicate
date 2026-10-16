@@ -991,7 +991,8 @@ death, never life — do not invert it.
 - Blocked by: none
 
 
-### uefa-outscope-ratings — OPEN — opened 2026-10-16 — session 436c79e2-3793-435f-bfe6-20c830515554
+### uefa-outscope-ratings — CLOSED 2026-10-16 (GOAL MET) — opened 2026-10-16 — session 436c79e2-3793-435f-bfe6-20c830515554
+- **CLOSED 2026-10-16: GOAL MET.** Verification ran: H-FIT SUPPORTED −0.0072 [−0.0113, −0.0032], H-PRIOR SUPPORTED −0.0653 on 6,187 held-out matches; 241/241 current OOS clubs rated (196 fitted, 45 thin); 31 offline tests pass. Registration 8e025175, code 61628cbd, results 43eda5ec, todo e0a2a9bb. Next (#699 step 3) is the backtest vs the de-vigged close, not this lane.
 - Goal: todo #699 Stage 1 step (ii): ratings for UEFA clubs outside our ten leagues, fit from UEFA results on production's rating scale with the measured CONST offsets, shrunk to an association prior; pre-registered walk-forward (fitted vs prior-only vs PROMOTED_TEAM_RATING) with a verdict and CI; library + hermetic tests on main; wired into nothing
 - Files: syndicate/features/soccer/uefa_outscope_ratings.py (NEW), scripts/fit_uefa_outscope_ratings.py (NEW), tests/test_uefa_outscope_ratings.py (NEW), .syndicate/findings_2026-10-16_uefa_outscope_ratings.md (NEW), docs/ai_context/todo.md (#699 section only)
 - Hypothesis: H-FIT: per-club ratings fit from UEFA results (shrunk to an association prior) beat the prior-only arm on held-out 1X2 log loss for UEFA matches with >=1 out-of-scope club
