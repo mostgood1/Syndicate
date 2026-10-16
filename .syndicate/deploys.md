@@ -50302,3 +50302,31 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   it. Shipping a support field without that measurement is exactly what the NFL
   pass got wrong, so it waits for the payload to be found. 144-161 MLB prop rows
   carry no support today.
+
+## 2026-10-16T15:32:36Z (10:32 AM CT) -- MLB hitter prop support landed on main; TWO readings now owed (NHL + MLB), batched for one restart
+
+- **Changes on main, neither staged on the fleet.** `1ca7041f` (NHL:
+  `proj_toi` + `line_slot`) and `587d4163` (MLB: `pa_mean`, `ab_mean`,
+  `lineup_order`). Both additive fields, no scoring change, so they BATCH into
+  one restart per the restart rule.
+- **No quiet window exists right now.** An observe-only watcher ran **12
+  cycles** from 15:19Z to 2026-10-16T15:32:36Z and never saw CLEAR: 4 to 12 blockers every
+  cycle (odds refresh, soccer artifact builds, live NCAAF polling, and a board
+  build in flight most cycles). It never restarts anything -- it reports, so the
+  restart stays attended. Thursday-night live NCAAF is the reason.
+- **verify (NHL):** served NHL prop rows carrying `projection.proj_toi`.
+  CONTROL 14:38Z: **0 of 156**.
+- **verify (MLB):** served MLB prop rows carrying `projection.pa_mean`.
+  CONTROL 15:0xZ: **0 of 161**.
+  Both against NCAAF 723/723 and NFL 1,067/1,067 at the same instant, so the
+  instrument reads non-zero and both 0s are real.
+- **MLB's value is PROVENANCE, not a gate, and the commit says so.** Measured on
+  `daily_summary_2026_10_16.json` (414 hitter rows): `is_lineup_batter` is True
+  on ALL 414 and `pa_mean` spans only 3.27..4.74 -- a monotone function of
+  batting slot (4.51 at slot 1 to 3.47 at slot 9). **MLB has no NFL-style
+  low-role population**, so publishing support there does not fix a defect; it
+  labels a row. Pinned by a test that fails if the slot spread ever exceeds
+  1.5 PA, because prose in a docstring would have rotted.
+- **Owed:** one fleet ff to `587d4163`+ and one refresh-worker restart, then
+  both counts re-read. Lanes `nhl-prop-support-fields` and
+  `mlb-prop-support-fields` stay OPEN until they land.

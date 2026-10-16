@@ -1028,13 +1028,14 @@ death, never life — do not invert it.
 - Blocked by: none (waiting on a quiet window, not on another lane).
 ### mlb-prop-support-fields — OPEN — opened 2026-10-16 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
 - Goal: MLB hitter prop board rows carry the volume and role their payload already holds -- pa_mean, ab_mean and lineup_order -- verified on the served board as a non-zero populated count where all MLB prop rows read NONE today, and the lane states plainly that MLB's value here is PROVENANCE rather than a defect gate because its population contains no low-role players.
-- Files: syndicate/features/shared/prop_projections.py (the hitter_threshold projection dicts / support publish ONLY), tests/test_mlb_prop_support_fields.py (NEW)
-- Hypothesis: Same copy shape as NFL and NHL: _hitters[(name,bucket)] = dict(row) keeps the WHOLE payload row (prop_projections.py:471), so pa_mean/ab_mean/lineup_order are already reachable where the hitter_threshold dicts are built (~751 and ~795), and cards.py:3507 already gates on pa_mean elsewhere. Measured on daily_summary_2026_10_16.json (414 hitter rows): pa_mean 414/414 nonzero, 18 distinct, 3.27..4.74; ab_mean same; lineup_order exactly 46 rows per slot 1-9; is_lineup_batter True on ALL 414.
+- GOAL: NOT MET — code landed (`587d4163`: 11 tests, 8 real mutants / 8 caught / 0 survivors, 467 tests pass across the 24 suites importing the module with 0 failures). The goal names the SERVED board and that reading has not landed.
+- What is left: one reading — served MLB prop rows carrying `projection.pa_mean`, after a fleet ff + refresh-worker restart. Batched with lane `nhl-prop-support-fields`, which owes the same kind of reading.
+- Blocking it: no quiet window. An observe-only watcher ran 11+ cycles from 15:19Z and never saw CLEAR (4-12 blockers each cycle; Thursday-night live NCAAF). CONTROL taken: **MLB 0 of 161**, against NCAAF 723/723 and NFL 1,067/1,067 at the same instant.
+- The SECOND half of the goal is already MET and is the more useful half: MLB's value here is PROVENANCE, not a defect gate. `is_lineup_batter` is True on all 414 payload rows and `pa_mean` spans 3.27..4.74, a monotone function of batting slot — **MLB has no NFL-style low-role population**. Pinned by a test that fails if the slot spread exceeds 1.5 PA.
+- A first-round mutation survivor was a genuine MISSING TEST, not a bad mutant: removing the HR site's stamp passed all nine original tests because they only exercised the bucket path. The HR path now has its own tests.
 - Falsification test: If the served board still reports 0 MLB prop rows with pa_mean after the publish, the loss is downstream of this module. And the lane must NOT claim a gating win: is_lineup_batter is constant True and pa_mean spans only 1.5 PA (a monotone function of lineup slot, 4.51 at slot 1 to 3.47 at slot 9), so if the write-up implies MLB had an NFL-style low-role population it is wrong -- MLB's payload holds lineup batters only.
-- Verification: Served board, cap defeated, kind=='prop': count of MLB prop rows with projection.pa_mean populated, before (0 of 161, measured 2026-10-16T15:0xZ) and after a refresh-worker restart. Plus unit tests driving the real attach_projections, with a reachability test that two payload rows publish two different values.
-- Blocked by: none
-
-
+- Files: syndicate/features/shared/prop_projections.py (the hitter_threshold projection dicts / support publish ONLY), tests/test_mlb_prop_support_fields.py (NEW)
+- Blocked by: none (waiting on a quiet window, not on another lane).
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
