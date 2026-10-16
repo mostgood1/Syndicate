@@ -50200,3 +50200,34 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - **The commit's resolvers, read from the live code** (fleet tree `848ac784`, refresh-worker env, read-only replay, 14:19Z, slate 10-16): 45 h2h matches, all YES. Kalshi-best h2h rows: soccer **40 price+ticker** (was 0), 10 soccer still unresolved, 4 nba, 50 ncaaf. `scope_rows_to_venue` puts all 40 at `venue_feed` with a ticker.
 - **NOT MOVED, and why:** `VENUE_SCOPE venue=kalshi venue_not_quoting` read 38/45 before and 32-35/41-43 after. Its input is the commit's ~42 edge-qualified rows, and few of those are soccer moneylines, so it does not measure this change. Kalshi positions stayed 0 in this window.
 - **Still open elsewhere:** NCAAF (`9c0b2b85`, lane `kalshi-ncaaf-series`) is NOT in `848ac784` and loads at the next ff+restart. NBA: 4 Kalshi-best h2h rows unresolved, not diagnosed.
+
+## 2026-10-16 14:19:33Z (9:19 AM CT) fleet ff 848ac784 -> 70116f4a + 14:23:29Z live-odds-worker TERM/respawn (786301 -> 855610): the MLB engine off vendor, live lens phase 2 (lane `mlb-sim-engine-native-p2`, session 2d413211)
+
+- **What changed.**
+  - `syndicate/features/mlb/sim_engine/`: all 31 vendored modules, generated verbatim.
+  - `syndicate/features/mlb/tools_port/`: closures of 5 vendored tools modules.
+  - The live-lens port imports only these. No vendored module is loaded and nothing is put on `sys.path`.
+  - Data roots are unchanged: every relocated `Path(__file__)` resolves to its vendored twin.
+- **Ride-alongs, each with its owner's stated intent.**
+  - `9c0b2b85` Kalshi NCAAF join: on disk, loads at the next refresh-worker restart, which this deploy did not take.
+  - `a6c3d388` NBA live shadow tick history: "loads at the next live-odds-worker restart". It is now loaded; `SYNDICATE_NBA_LIVE_RESIM` is on, and history is absent, which means on.
+  - `bb0baa23` and `c043ede2`: tests only.
+  - `848ac784` (sim-gap, scheduled after 13:27Z) was already on the fleet: the pre-ff HEAD was 848ac784.
+- **Locks.**
+  - Both claims were taken by the lane, gated on exit code and holder.
+  - Safety read in full: NOT CLEAR (live-odds-worker child jobs). Not restarted until 0 children.
+  - Props/MLB-refresh idle after 10 s; ff-only to the exact SHA, with HEAD containment re-checked before the TERM.
+  - Idle after 235 s at a 1 s poll. Claims released with `--token`.
+- **Parity before deploy.** One frozen snapshot of production's `mlb_source/source_artifacts/data`, 2026-10-16, nice 19, PYTHONHASHSEED=0.
+  - Reports entry: 262 leaves, 0 diffs.
+  - Live entry: 19,561 leaves including 5 written files (one is the stats client's disk cache), 0 diffs beyond 20 `performance.*Ms` leaves.
+  - Self-checks are 0, and the plants were caught.
+  - **Port arm: 0 vendored modules loaded AFTER the call on both entries**, against 24 in the vendored arm.
+- **verify (MEASURED).**
+  - Under the new worker's env, importing the port loads 0 vendored modules, and `estimate_live.__module__` = `syndicate.features.mlb.sim_engine.live_mc`.
+  - `/proc/locks`: the MLB loop flock is held by 855610.
+  - The new worker's loop rewrote `live_lens_report_2026_10_16.json` at 14:25:01Z (166,125 B), 82 s after the respawn.
+- **OWED.**
+  - (1) The first refresh-built `mlb_source/data/live_lens/render_sync/live_lens_reports_2026_10_16.json` after 14:19:33Z (a watcher is running).
+  - (2) A live-MC tick on a LIVE game by the native engine: `liveModelProbOver` non-null on live entries, compared with 10-15's 40/56 rate.
+- **Rollback.** `git revert 70116f4a` restores phase 1, the vendored engine imports. Phase 1 itself is `b9542acb`.
