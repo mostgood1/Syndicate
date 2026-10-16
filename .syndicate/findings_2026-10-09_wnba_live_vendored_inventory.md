@@ -239,3 +239,30 @@ game" is the rule's TRIGGER; that the rule (not some other filter) removed each 
 Implication beyond P5: the availability rule (enabled 2026-10-05 by user decision on its pregame minutes gain) also
 gives ZERO pregame minutes to players who then play ~19 median minutes after sitting one game -- 217 such on-court
 instances at 5:00 Q4 alone. That is a pregame trade-off for the rule's owner, not something P5 changes.
+
+## P5 BACKTEST RESULT (2026-10-16 17:2xZ): the native re-sim PASSES the pre-registered test
+
+Run: `scripts/backtest_wnba_live_resim.py`, frozen `1c353e05` (WNBA resume parity vs origin/main `87e62aeb` 8/8
+identical), production engine (nothing enabled after the 10-15 VALID read), mechanisms {}, 200 sims, PYTHONHASHSEED=0,
+k inputs, all 1,360 anchored checkpoint rows, **0 refusals**. Scored by `score_wnba_live_checkpoint_baseline` pairing
+(`p5_score.py`; fleet `~/wnba_live_bt/p5_run/p5_scores.json`). Native minus linear lens, negative = native better,
+95% bootstrap CI over games:
+
+| regular season (n=331 each) | total MAE | ML Brier | cover Brier | over Brier |
+|---|---|---|---|---|
+| end Q1 | +0.265 [-0.415, +0.963] | -0.0051 [-0.013, +0.003] | -0.0017 [-0.016, +0.013] | -0.0118 [-0.024, +0.000] |
+| end Q2 | -0.256 [-0.839, +0.347] | **-0.0115 [-0.017, -0.005]** | -0.0096 [-0.022, +0.004] | -0.0034 [-0.013, +0.005] |
+| end Q3 | -0.389 [-0.788, +0.001] | **-0.0085 [-0.014, -0.003]** | +0.0003 [-0.009, +0.009] | **-0.0058 [-0.011, -0.001]** |
+| 5:00 Q4 | +0.048 [-0.166, +0.275] | -0.0035 [-0.008, +0.001] | -0.0020 [-0.009, +0.005] | +0.0001 [-0.003, +0.004] |
+
+Playoffs (n=9 per cell): nothing significant either way. **Pre-registered falsification (lane block): native must beat
+the linear lens with a CI excluding 0 at >= 1 checkpoint and lose at none -> MET** (ML end Q2 and Q3, over end Q3; no
+cell worse). Caveat: 3 significant of 16 regular-season cell x market tests, all one direction -- consistent, small.
+The ML gain lands where the linear lens trailed ESPN's live WP (+0.011 / +0.009 at end Q2 / Q3) and closes most of
+it; like P3 on NBA, the gain is on margin/ML, not totals.
+
+5:00 Q4 split by real five (k): both_real n=165 vs any_sampled n=166 -- no difference measurable on any market.
+
+**This is the backtest gate only.** P5's goal still needs: the cut-over code (native re-sim replaces the vendored
+tick at `wnba/live_lens.py:65` and the linear `_wnba_live_*` lens, plus the gated-off vendored-app fallbacks in
+`refresh_wnba_oddsapi_props.py`), the widened end-state grep, and the live reading at the 2027 opener (`#694`).

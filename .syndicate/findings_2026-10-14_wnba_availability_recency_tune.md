@@ -102,3 +102,21 @@ exactly (477/680, 261 absent).
 re-sim resume the REAL late-game five on +34 / +58 of 680 sides. Whether that becomes better LIVE projections (paired
 live MAE/Brier vs k) is the remaining question -- it needs P3's re-fits and runs inside P5's backtest on these inputs
 (`~/wnba_live_bt/engine_inputs_asof_<rule>/`).
+
+## 6. Live accuracy per rule (2026-10-16 17:2xZ): small gains for the variants, nothing worse
+
+Same P5 run, each variant's native predictions paired against native(k) on the same 1,360 rows (negative = variant
+better). Regular season (n=331 each):
+
+| | regular_k2_min20 | exempt_apps3of5 |
+|---|---|---|
+| total MAE end Q1 | **-0.092 [-0.176, -0.009]** | -0.108 [-0.230, +0.014] |
+| total MAE end Q2 | **-0.066 [-0.130, -0.002]** | +0.019 [-0.082, +0.121] |
+| cover Brier end Q2 | -0.0019 [-0.004, +0.001] | **-0.0044 [-0.008, -0.000]** |
+| any regular cell worse (CI > 0) | none | none |
+
+All other regular-season cells n.s. Playoffs (n=9) n.s. or boundary. **Effects are real but tiny** (0.07-0.09 points of
+total MAE; 0.004 Brier) and few cells clear. Combined with §4 (pregame neutral) and §5 (real five 0.701 -> 0.751 /
+0.787): neither variant hurts anything measured; `regular_k2_min20` has the two total-MAE gains and the smaller
+minutes-bias shift (-0.43 vs -0.94). No pre-registered live rule existed for this comparison -- the enable decision is
+the user's.
