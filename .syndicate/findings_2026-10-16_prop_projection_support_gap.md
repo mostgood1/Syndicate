@@ -247,3 +247,64 @@ ranking on ~320 distinct markets.
 A **volume** count rather than a calendar one -- targets, carries, or snaps
 behind the rate, not games the team played. That is a producer change in
 `nfl/props.py`'s rate computation, not a copy, and it is not claimed here.
+
+## The opportunity field, verified against production payloads BEFORE the restart (18:5xZ)
+
+Lane `nfl-prop-opportunity-volume`'s verification is not the served count --
+`sample_games` passed a count check and still failed to gate. It is the field's
+distribution on each side of the ceiling. That does **not** need the restart:
+the served board supplies the ceiling classification (`edge_vs_market_pct`) and
+the artifact supplies the companion volume row, which is exactly the join the
+deployed code performs. One row per distinct (player, market, line, game).
+
+```
+  side           n      p10      p25   median      p75
+  REJECTED      93     1.00     1.60     3.60     7.50
+  accepted     298     1.80     3.20     5.00    16.40
+  no companion volume row: 25 rejected, 35 accepted
+```
+
+| threshold | REJECTED | accepted | enrichment |
+|---|---:|---:|---:|
+| opportunities < 1.0 | 7.5% | 1.7% | **4.5x** |
+| < 1.5 | 22.6% | 5.7% | **4.0x** |
+| < 2.0 | 31.2% | 10.7% | 2.9x |
+| < 3.0 | 40.9% | 18.8% | 2.2x |
+
+**It separates, and `sample_games` did not** (5.0 vs 5.0). Every quantile is
+lower on the rejected side. That is the lane's discrimination clause, met on
+production payloads.
+
+### But it is a SIGNAL, not a clean gate, and the overlap says so
+
+Medians are 3.60 against 5.00 and the distributions overlap heavily. The most
+selective threshold (<1.0) catches **7.5% of rejected rows**; the most
+productive (<2.0) catches 31% but also flags **10.7% of accepted** ones. So it
+cannot replace the ceiling by itself.
+
+### The comparison I owe, because it cuts against this field
+
+The earlier `projected/line < 0.6` discriminator was **sharper**: 19% of
+rejected against 1% of accepted, a **19x** enrichment, versus 4.0x here.
+
+**And the opportunity field is still the more valuable of the two**, for a
+reason worth stating rather than assuming: `projected/line` is nearly the same
+quantity the ceiling already gates on (a large negative edge *is* a projection
+far below its line), so it is **derived** and can tell you almost nothing the
+edge does not. `projected_opportunities` is **independent** -- it is volume, not
+price disagreement. An independent signal at 4x is worth more to a gate than a
+derived one at 19x, because only the independent one adds information. Stated
+as reasoning, not as a measurement: nothing here tests their joint behaviour.
+
+### What is still owed
+
+- The **served** count (0 of 708 at 18:4xZ, worker unrestarted since 13:27:56Z).
+  This preview joins the same two sources the deployed code joins, but it is a
+  preview, not the served reading.
+- **Coverage is partial:** 25 of 118 rejected rows (21%) and 35 of 333 accepted
+  have no companion volume row at all, so a gate on this field is silent on a
+  fifth of the population it would judge -- which is the `unknown must not
+  default permissive` case, and the field is `None` there by design.
+- Their joint behaviour (opportunities AND implied probability AND ratio) is
+  untested. The ceiling recommendation still stands as two checks, and this
+  measurement does not promote the opportunity field to being one of them.
