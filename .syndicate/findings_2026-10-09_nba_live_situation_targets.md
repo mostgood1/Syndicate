@@ -968,3 +968,20 @@ Early (Q1/Q2) the deviation carries ~NO information about the final total; it is
   - (1) a state-dependent shrink: total = pr + w(f)·(nat − pr), with w fitted on FIT. It ties pr early and gains late, but needs its own pre-registered forward gate.
   - (2) price live margin/ML only, where native is better than PROD out of sample (§13).
   - (3) find what live state is informative early (in-game pace vs pregame pace, foul rate, the 3PA rate) before touching the engine.
+
+### §15b (2026-10-16, user chose "Shrink totals"): shrink fitted on FIT in the PRODUCTION config -- it collapses to the line
+
+The PROD config runs in production, since the VALID read failed. Data: gate_v4_k0 + inputs_v4, FIT regular, n ≈ 780. The shrink is total = B + w·(nat − B), with B = current score + the pregame TARGET total pro-rata (available live from the persisted inputs; production targets are market-anchored). w is the OLS slope clipped to [0, 1]; split-half scoring. Comparator: market pregame_rate (the gate's).
+
+| checkpoint | w (all) | native − mkt pr | B − mkt pr | split-half shrink − mkt pr |
+|---|---|---|---|---|
+| end Q1 | **0.00** | +0.74 | +0.04 | +0.16 / −0.01 |
+| end Q2 | **0.00** | +0.30 | −0.02 | +0.03 / −0.00 |
+| end Q3 | **0.00** | +0.25 | −0.03 | +0.04 / −0.02 |
+| 5:00 Q4 | 1.00 | +0.07 | +0.00 | +0.12 / −0.02 (w 1.00 / 0.64: unstable) |
+
+**Reading:**
+- In the production config the native early-game total deviation has NO usable signal (w = 0 at Q1-Q3), and the shrink reduces to "B", which ties market pregame_rate.
+- It removes native's loss (+0.74 at end Q1) but cannot BEAT the line. §14's total rule ("beat pregame_rate at Q1-Q3") is therefore unreachable by a shrink.
+- A live total that equals the pro-rata line has, by construction, no edge against a live book.
+- **Not built**: the user's "shrink totals" choice is re-presented with this result (see the user report), since building it buys protection, not edge.
