@@ -3180,3 +3180,36 @@ FIT league splits (home / away / total). 17,400/17,400 calls with levers, 0 erro
 
 **Next:** R2-b (REB −1.4) and R2-c (3P% +1.6) on FIT, then ONE full FIT of the round-2 config. The "full" mode (random
 quarter env) is measured separately against S8 / S3 / within-SD, as pre-registered.
+
+### R2-b / R2-c — DIAGNOSIS + PRE-REGISTRATION 2026-10-16 (before any build or run)
+
+**R2-b (REB −1.4) is downstream.**
+- Sim misses per team-game (fit_f5) are 45.76 vs real 47.19: −1.43, about all of the REB gap at ~0.93 rebounds per miss.
+- That comes from FGA −0.89 plus FGM +0.54, the extra makes being the 3P% excess.
+- The rebound credit rates are not wrong; the misses are. So R2-c goes first and R2-b is re-read after it.
+
+**R2-c (3P% +1.6 pts) ROOT CAUSE (engine.py ~:1758 / :1767 / :1891 and ~:1826–1830):**
+- The shooting-foul draw has ONE rate for 2PA and 3PA (`foul_per_fga` × the shooter FT mult).
+- With FOULED_MISS_NOT_FGA a fouled MISSED three leaves FGA/3PA (3 FTs instead).
+- **Real:** 0.411 three-shot FT trips per team-game. ESPN pbp, 816 FIT games ("Free Throw - 1 of 3": 635; vs
+  "1 of 2": 9.56/team-game; "1 of 1": 2.48).
+- **The sim (estimate):** ~36 3PA × ~0.095 × ~0.64 miss × 0.70 ≈ 1.5 three-shot trips per team-game, about 3.6× real.
+  Each is a missed three removed from 3PA: 13.5 / 36 = 0.375 against 13.5 / 37.5 = 0.360. That is the whole residual.
+
+**Mechanism:** EventSimConfig `foul_3pa_mult: float = 1.0` (1.0 = off, byte-identical).
+- It multiplies the shooting-foul probability on a three at all three draw sites (no extra RNG draw).
+- It is threaded into the EXACT solver (`_loop_points_per_possession` / `_iterations_per_possession` /
+  `_solve_eff_mult` gain `foul3_mult`, exact old arithmetic at 1.0) so the target still holds.
+- The block-rate denominator keeps 1.0 (a minor, disclosed inconsistency).
+
+**Step 1 (12 sweep dates, round-2 config = fit_f5 + quarter mean + real split):**
+- Grid foul_3pa_mult ∈ {0.5, 0.3, 0.2}. The harness records three-shot trips per side (`ft3`, from record_events).
+- **Reading:** three-shot trips per team-game vs real 0.411; 3P% vs real 0.3594 (± 0.008); FTA; total bias.
+- **Pick:** trips closest to 0.411 with 3P% in its band. FTA is expected to FALL (~2–3/team): fewer 3-shot trips.
+- **Step 2, pre-registered now:** re-fit the FT volume at the pick, with the base non-shooting PF + bonus grid
+  (as #3l) against FTA 22.69 and PF 19.67. Then re-measure s/Δ on the disjoint dates (P3's ordering), then the
+  12-date check with all guards.
+- R2-b is re-read after R2-c. Then ONE full FIT of the round-2 config.
+
+**Lane claim added:** engine.py, the foul_3pa_mult field + the three shooting-foul draw sites + the `foul3_mult`
+keyword of the three solver helpers and their EXACT call sites, section only.
