@@ -50038,3 +50038,15 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - After the next refresh-worker restart, live NFL/NCAAF rows read "pregame proj X".
   - SEA@DEN (7:15 PM CT): live NFL rows have no Win% and no "Our sim has".
   - The ledger's live-first NFL share with a probability falls from ~95% toward 0.
+
+## 2026-10-16 00:25:14Z (7:25 PM CT 10-15) -- web ff 6cd9eeb9 -> 4a660b3e + `reload-web` (2.0 s, 0 failures): the contradiction tag and the "pregame proj" label key on `pregame_on_live` alone (lane `live-winpct-blank`, session 9e18a0e7) -- no restart; the `layer2_board` part loads at the NEXT refresh-worker restart (batched with 6cd9eeb9's card column)
+- **NFL MEASURED for the 23:36:35Z deploy (e5a87271), SEA@DEN live, shortlist API 00:22:38Z:**
+  - 114 live NFL rows: 114 `pregame_on_live`, 0 `model_probability`, 114 `sim_model_prob_over` kept, 0 live-aware.
+  - 1,217 pregame NFL rows: 0 flagged.
+  - Same reading, NCAAF: 25 live rows, all live-aware (`live_gameline_join`), 0 `model_probability`. The live number sits in `live_model_prob_over`, the Live column (e.g. GASO@ODU 0.20).
+- **WHY THIS CHANGE.** `live_gameline_join` keeps `projected` as the PREGAME mean on purpose, so on a live re-sim row:
+  - the contradiction tag still compared the pregame mean with the in-play line (GASO@ODU over 44.5: 34.2, gap 10.28);
+  - the label, which excluded live-aware rows, was missing.
+  Both now key on `pregame_on_live`, which the sweep sets before the join. A production-order test covers it (sweep, then join).
+- **claim:** web token c2c3c921..., acquire exit 0. Ride-alongs: none.
+- **verify (owed, after the next refresh-worker restart):** live NFL/NCAAF rows read "pregame proj X"; 0 "SIM CONTRADICTS" on live NFL/NCAAF rows; the ledger's live-first NFL share with a probability falls from ~95% toward 0.
