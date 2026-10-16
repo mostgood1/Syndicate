@@ -990,6 +990,15 @@ death, never life — do not invert it.
 - Verification: Correlation table with n and CIs per role pair written to the findings file; a paper SGP ledger row per suggestion on the fleet; the sheet section rendered with the estimate label
 - Blocked by: none
 
+
+### uefa-outscope-ratings — OPEN — opened 2026-10-16 — session 436c79e2-3793-435f-bfe6-20c830515554
+- Goal: todo #699 Stage 1 step (ii): ratings for UEFA clubs outside our ten leagues, fit from UEFA results on production's rating scale with the measured CONST offsets, shrunk to an association prior; pre-registered walk-forward (fitted vs prior-only vs PROMOTED_TEAM_RATING) with a verdict and CI; library + hermetic tests on main; wired into nothing
+- Files: syndicate/features/soccer/uefa_outscope_ratings.py (NEW), scripts/fit_uefa_outscope_ratings.py (NEW), tests/test_uefa_outscope_ratings.py (NEW), .syndicate/findings_2026-10-16_uefa_outscope_ratings.md (NEW), docs/ai_context/todo.md (#699 section only)
+- Hypothesis: H-FIT: per-club ratings fit from UEFA results (shrunk to an association prior) beat the prior-only arm on held-out 1X2 log loss for UEFA matches with >=1 out-of-scope club
+- Falsification test: registered in the findings file s1 before any fit: Δ(fitted − prior-only) point estimate >= 0 is FALSIFIED
+- Verification: walk-forward 2017-2026 report with verdict + 95% bootstrap CI + coverage counts in the findings file; pytest tests/test_uefa_outscope_ratings.py passes offline
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
