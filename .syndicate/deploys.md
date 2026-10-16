@@ -50123,3 +50123,20 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - After the respawn (port): 56 live entries, 18:48-22:07 CT; 40 carry one (132 values).
 - **Why the log looked empty.** The worker log shows only `LIVE_MC_BAIL` lines: 864 `status_not_live`, for the slate's non-live game, plus 4 `no_snapshot_or_sim_context`. Live MC prints only on bail (port `app_slice.py:12147`), so success is silent and the log alone could not show it.
 - **No errors.** 0 `live_lens_port/app_slice.py", line` traceback frames, and 0 "MLB live-lens port" / "local live-lens build failed" lines, in live-odds-worker.log, live-odds-worker.log.1 and refresh-worker.log. The 164 + 51 mentions of `live_lens_port` are all `ALL_PROCESS_MEMORY` lines listing a CI pytest argv.
+
+## 2026-10-16 12:55Z (7:55 AM CT) -- NOT DEPLOYED: Kalshi NCAAF moneylines + full-game spreads join the board (`9c0b2b85`, lane `kalshi-ncaaf-series`, session 0d3deab6) -- loads at the NEXT refresh-worker restart (batch it; no restart taken here)
+- **BUG:** `KXNCAAFGAME` ('Troy wins') and `KXNCAAFSPREAD` ('Kennesaw St. wins by over 7.5 points') were absent from `kalshi_catalogue.SERIES_SPORT`. All 400 markets of each classified `unmapped_series`, so Kalshi-best NCAAF h2h rows priced from the aggregator with no ticker.
+- **FIX:** both registered (sport `ncaaf`, segment `full`). Segment families (1H/2H spreads and totals, 1Q-4Q) and `KXNCAAFBOWLGAME` stay unregistered. New `kalshi_catalogue.club_key` = `team_aliases.chip_join_key` (same as `canonical_team` for every sport but NCAAF, where it reaches FCS clubs) plus one "X St." -> "X State" retry for ncaaf. Used by `match_event_blob` and `_side_for_team`. Kalshi NCAAF names resolved: 136/254 -> 249/254. The 5 left (Grambling St., Southern University, St. Thomas, Tennessee-Martin, University at Albany) refuse.
+- **TESTS:** `tests/test_kalshi_ncaaf_series.py`, 16 end-to-end cases on real tickers (7 of the first 14 failed on origin/main). Green: 984 tests across `test_kalshi*`, `test_portfolio_commit*`, `test_venue_scope*`, `test_team_aliases*`, including the moneyline coupling test and the Cubs/White Sox city-ambiguity test.
+- **MEASUREMENT: a REPLAY, not a deploy.** The real `join_kalshi_to_board` ran over the fleet's live `kalshi_markets.json` (13,469 markets) and `_board_rows_for_join`, with the live refresh-worker's environment (pid 796999, values not printed), at nice 19. Before = `848ac784`, after = `9c0b2b85`, read 12:53-12:55Z. The after run read a markets refresh 3 min newer (fetched_at 12:51:49Z vs 12:54:53Z, same count).
+
+  | slate | NCAAF h2h rows | KXNCAAFGAME h2h matches | KXNCAAFSPREAD matches | KXNCAAFTOTAL matches |
+  |---|---|---|---|---|
+  | 10-16 | 50 | 0 -> **49** (home YES 30, away YES 19) | 0 -> **41** | 48 -> 48 |
+  | 10-17 | 46 | 0 -> **17** | 0 -> **39** | 42 -> 42 |
+
+  Every h2h match is YES on the row's own club code (sample: `KXNCAAFGAME-26OCT17FSUMIA-MIA` "Miami (FL)" -> home Miami Hurricanes; `-26OCT17OSUIND-OSU` "Ohio St." -> away Ohio State). `team_side_unresolved` unchanged at 6 / 5.
+- **NOT A CAP PROBLEM:** the live `KXNCAAFGAME` 400 carry events 10-16..10-29 (10-16: 70, 10-17: 96). Only the stale on-disk copy (fetched_at 10-01) looked starved.
+- **verify (owed, after the next refresh-worker restart):**
+  - `[portfolio_commit] KALSHI_BOARD_JOIN` `matched` rises by roughly the h2h + spread counts above.
+  - NCAAF Kalshi-best h2h rows in the commit carry a `venue_ticker` ending in the row's own club code.
