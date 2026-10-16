@@ -50140,3 +50140,14 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - **verify (owed, after the next refresh-worker restart):**
   - `[portfolio_commit] KALSHI_BOARD_JOIN` `matched` rises by roughly the h2h + spread counts above.
   - NCAAF Kalshi-best h2h rows in the commit carry a `venue_ticker` ending in the row's own club code.
+
+## 2026-10-16 13:2xZ -- READING: NBA T-window provider (fd7f2a2d) fired on a real slate -- **MET** (lane `nba-t-window-provider`, closed; session 2d413211)
+
+- **Markers.** Read through `refresh_state_store.read_json_file` under the live-odds-worker's env. The filesystem `reports/live_refresh_loop/t_window_sweeps.json` is a STALE 2026-09-30 copy; the live markers are in keyvalue.
+  - The store (date 2026-10-15) holds the first NBA T-window markers: `nba:ramp` x2, `nba:closing` x1.
+  - Both are for 10-15 preseason games, from `_nba_commence_times('2026-10-15')`: 0012600055 tip 23:30Z, 0012600020 tip 00:30Z.
+- **Timing.**
+  - Ramp sweeps fired at T-65.2 min and T-74.9 min. The first was about 10 min late because the tick was busy with a 738 s odds job.
+  - Closing for 0055 fired at T-8.9 min.
+- **The missing closing sweep for 0020 is by design.** At its T-10 (00:20Z) 0055 was live, and `_t_window_due_sports` skips live sports because their slate-wide cadence covers pregame events.
+  - Measured, not assumed: 8 `ODDS_SWEEP_LAUNCHED` lines including nba between 00:20 and 00:30Z, every 75-140 s.
