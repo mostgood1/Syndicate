@@ -148,6 +148,134 @@ licenses nothing on the board.
 
 ## 3. Results
 
+Run 2026-10-16 at Idle priority, after `61628cbd` (code, audit and coverage on main before the fit).
+Driver: `scripts/fit_uefa_outscope_ratings.py run --root C:/tmp/uefa-offsets`.
+Output: `C:/tmp/uefa-offsets/report_outscope.json` (research root, not git).
+**6,187 held-out matches over the 2017-2026 test seasons, each with ≥1 OOS club.** 4,109 of them
+are OOS vs OOS.
+
+### Verdicts
+
+| test | Δ 1X2 log loss | 95% CI | verdict |
+|---|---|---|---|
+| **H-FIT: (c) FITTED − (b) PRIOR-ONLY** | **−0.0072** | [−0.0113, −0.0032] | **SUPPORTED** |
+| **H-PRIOR: (b) PRIOR-ONLY − (a) PROMOTED** | **−0.0653** | [−0.0737, −0.0560] | **SUPPORTED** |
+
+Mean held-out log loss by arm:
+
+| arm | log loss |
+|---|---|
+| (a0) silent 0.0 (`_rating_for`) | 1.0322 |
+| (a) PROMOTED_TEAM_RATING | 1.0308 |
+| (b) PRIOR-ONLY | 0.9654 |
+| **(c) FITTED** | **0.9582** |
+
+- **Read in proportion.** Almost all of the gain over what production would do comes from the
+  association prior (−0.065). Club-level fitting adds a further −0.007, which is real (CI
+  below 0, 8 of 10 seasons below 0) but about a tenth of the size. PROMOTED and the silent 0.0
+  are indistinguishable (−0.0014 [−0.0078, +0.0042]). Both are bad because they rate every OOS
+  club as one club.
+- **Per season, FITTED − PRIOR:** 2017 −0.013, 2018 +0.002, 2019 −0.006, 2020 −0.019,
+  2021 −0.018, 2022 −0.006, 2023 −0.021, 2024 +0.011, 2025 −0.004, 2026 −0.005. That is 8 of 10
+  below 0. PRIOR − PROMOTED is below 0 in **10 of 10** seasons (−0.035 to −0.106).
+
+### Secondary results (none used for a verdict)
+
+- FITTED − PROMOTED −0.0725 [−0.0817, −0.0623]; FITTED − silent 0.0 −0.0740 [−0.0831, −0.0641].
+- Δ Brier: FITTED − PRIOR −0.0046 [−0.0073, −0.0019]; PRIOR − PROMOTED −0.0430 [−0.0488, −0.0368].
+- Subsets, FITTED − PRIOR (n):
+  - OOS vs in-scope (2,078) −0.0097 [−0.0159, −0.0039]; OOS vs OOS (4,109) −0.0060 [−0.0114, −0.0005].
+  - UCL (1,346) −0.0101 [−0.0179, −0.0018]; UEL (2,570) −0.0085 [−0.0147, −0.0026];
+    **UECL (2,271) −0.0041 [−0.0117, +0.0039]**, which does not separate on its own.
+  - **Main draw (3,503) −0.0041 [−0.0091, +0.0010]**, which does not separate either; qualifying
+    (2,684) −0.0113 [−0.0181, −0.0044]. The club-level gain is mostly in qualifying, where the
+    association prior is weakest. In the main draw, which is what Stage 1 would price, the prior
+    already does most of the work.
+  - Matches with a THIN OOS club (1,328) −0.0116 [−0.0209, −0.0021]; no thin club (4,859)
+    −0.0060 [−0.0105, −0.0014]. Shrinkage works: even a thin club's few matches help.
+- PRIOR − PROMOTED is largest in the UCL (−0.088) and on OOS vs OOS matches (−0.077).
+
+### Descriptive half-life grid (no verdict; τ re-used from the primary inner selection)
+
+| half-life | FITTED − PRIOR at that half-life | FITTED vs primary (365 d) FITTED |
+|---|---|---|
+| 182 d | −0.0064 [−0.0095, −0.0033] | +0.0073 [+0.0045, +0.0101] (worse) |
+| **365 d (primary)** | −0.0072 | — |
+| 730 d | −0.0078 [−0.0127, −0.0029] | −0.0015 [−0.0037, +0.0006] |
+| no decay | −0.0060 [−0.0123, +0.0004] | +0.0046 [−0.0006, +0.0095] |
+
+FITTED beats PRIOR at every half-life. Between 365 d and 730 d there is no separable difference,
+and both beat no decay and 182 d. Unlike the league offsets (item (i)), club strength DOES want
+recency, but the primary stays at 365 d per the registration.
+
+### τ selection (the inner rule)
+
+- **τ_club** (club deviations) chose 2 / 5 / 10 / 20 across seasons (2 in 2 of 10), and the
+  snapshot chose **10**. It is interior to the grid.
+- **τ_k** (association effects) chose **2, the grid's lower edge, in 5 of 10 seasons** (2018-21,
+  2024), for both the prior and the fitted arm. It also chose 2 in the snapshot. The rest chose 5.
+  - The boundary is on the ASSOCIATION shrinkage, not the club shrinkage. The data want the
+    association effects shrunk LESS than the grid allows.
+  - The PRIMARY verdict stays on the registered grid. No exploratory arm below 2 was run.
+  - Testing τ_k < 2 (or a flat, unpenalised association effect) is a pre-registered follow-up.
+    The direction suggests a small further gain for both (b) and (c), not a change of sign.
+
+### Snapshot as of 2026-10-16 (full model)
+
+- **CONST** fit on all 2014-26 cross-league matches: β = 1.662. Offsets are item (i)'s, centred:
+  EPL +0.275 … Belgium −0.254.
+- **OOS model:** μ 0.052, η 0.356, out-of-scope mean **g_A −0.568, g_D −0.507**, τ_club 10, τ_k 2.
+  So an OOS club with no data and no association sits well below every one of our leagues. The
+  Belgian centred offset is −0.25.
+- **Associations, m_A + m_D:**
+  - Strongest: Greece +0.99, Norway +0.93, Türkiye +0.90, Denmark +0.87, Cyprus +0.74, Poland +0.70,
+    Czechia +0.69.
+  - Weakest: San Marino −1.53, Wales −1.26, Northern Ireland −0.99, Luxembourg −0.91, Gibraltar −0.91.
+  - These are 365-day-weighted, so they describe the RECENT era. Norway's place is mostly
+    Bodø/Glimt.
+- **Coverage, OOS clubs that played in season labels 2025 or 2026 (2025-26, and 2026-27 to date): 241,
+  every one rated.**
+  - **196 are fitted (≥ 6 UEFA matches in season labels 2023-2026) and 45 are THIN (< 6).**
+  - 7 have an unknown association, so they get g plus their club deviation.
+  - Over 2014-26 there are 525 OOS clubs in all. The other 284 have not played since the 2024-25 season,
+    so the snapshot table leaves them out (the library still rates any of them on request).
+- **Examples** (effective A / D; production units A/β, D/β with offset 0 in brackets; n = UEFA
+  matches in season labels 2023-2026):
+
+| club | assoc | A | D | prod units | n |
+|---|---|---|---|---|---|
+| Bodø/Glimt | Norway | +0.35 ±0.15 | +0.03 ±0.16 | (+0.21, +0.02) | 56 |
+| Galatasaray | Türkiye | +0.13 | −0.14 | (+0.08, −0.08) | 40 |
+| Olympiacos | Greece | −0.11 | +0.16 | (−0.06, +0.10) | 43 |
+| Shakhtar Donetsk | Ukraine | +0.01 | −0.08 | (+0.01, −0.05) | 38 |
+| Celtic | Scotland | −0.07 | −0.28 | (−0.04, −0.17) | 32 |
+| RB Salzburg | Austria | −0.06 | −0.26 | (−0.04, −0.15) | 36 |
+| Dinamo Zagreb | Croatia | −0.08 | −0.20 | (−0.05, −0.12) | 44 |
+| Young Boys | Switzerland | −0.16 | −0.31 | (−0.10, −0.19) | 30 |
+
+  Read against in-scope clubs: a mid-table Belgian or Eredivisie club is about A = D = −0.25, and
+  an average EPL club is A = D = +0.27. On this scale the top OOS clubs sit at or above
+  Belgian/Dutch mid-table and below an average EPL side. The approximate SEs are ±0.15-0.20 for
+  established clubs and ±0.25-0.30 for thin ones.
+
 ## 4. What cannot be estimated
 
+- **Whether these ratings beat the de-vigged UEFA close.** That is Stage 1 step 3, the go/no-go
+  gate, and it is not run here. Log loss here is against outcomes only.
+- **Knockout ties and second legs.** They are scored as ordinary 90-minute matches. Aggregate
+  state (a team protecting a lead) is not modelled.
+- **MLS and Championship clubs:** 0 UEFA matches.
+- **66 clubs (7 of the current 241) with no known association.** They sit on g plus their club
+  deviation, which is registration-literal. Filling them in by geography is a cheap follow-up.
+- **The association prior is fit from the same UEFA results.** It is not UEFA's published
+  coefficient, though that is computed from the same results. No external coefficient was
+  compared.
+- **The bootstrap resamples matches, not clubs.** Matches of one club are correlated, so the CIs are
+  somewhat optimistic. The season count (8 of 10 below 0) is the cruder, cluster-robust check.
+
 ## 5. Deviations from the registration
+
+- **None to the primary.** One CLARIFICATION, where the registration was silent: the descriptive
+  half-life arms re-use the τ that the primary (365 d) inner rule chose for that season, rather
+  than re-selecting τ per half-life. This was decided before the run and is written in the driver
+  (`cmd_run`).
