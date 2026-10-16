@@ -50478,3 +50478,8 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - The next production MLB sim runs only native scripts (1 s recorder), writes engine state under engines/mlb and nothing under vendor/mlb_bettingv2/data, and its `MLB_INPUT_CHECKLIST` line reads as before.
   - Watcher running.
 - **Rollback.** `git revert 31ee73c2`, then ff. The vendored data dir is untouched (it is the rollback state).
+
+## 2026-10-16 19:07:15Z (2:07 PM CT) -- web ff 9b88014d -> 06241083 + `reload-web` (2.0 s, 0 failures): every cheat-sheet row says whose player it is -- club in words, vs the opponent, the competition (lane `cheat-sheets`, session 9e18a0e7) -- NO outage, no worker restart
+- **ask:** user 2026-10-16 "soccer cheat sheet need to be clearer about teams - logos are good, but not good enough. Esp to inidcate player props and what team they are on".
+- **claim:** web by cheat-sheets, token 3d01b40c..., acquire exit 0. **Ride-along: `ba4abbe6`** (lane mlb-betting-card-assets-native) -- the MLB betting-card page serves its 4 static assets from `syndicate/static/mlb/betting_card/`, byte-identical copies (its test asserts every accessor returns the same text); effect: one asset_version change. Plus ledger commits.
+- **verify (served, 2:08 PM CT):** `/cheatsheets?sport=soccer&date=2026-10-16` DATA: 81 rows, team on 79 (was 62 in the file), league on 81; 6 of 6 games carry a competition (Ligue 1, Championship, LaLiga, Serie A, Bundesliga, Eredivisie); page has `clubLine` + `playerCell`. Screenshot: featured rows read "[crest] 1. FC Koln VS [crest] Eintracht Frankfurt BUNDESLIGA"; tables "Levante · vs Deportivo · LaLiga".
