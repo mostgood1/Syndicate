@@ -92,6 +92,7 @@ def test_shrinkage_pulls_noise_to_zero_and_keeps_signal():
 
 # ------------------------------------------------------------------------------------------- the sheet's SGPs
 from syndicate.features.nfl import sgp as sheet_sgp  # noqa: E402
+from syndicate.features.shared import cheat_sheets as sheet_cs  # noqa: E402
 
 CELLS = {"cells": {"type": {"Passing Yards|QB~Receiving Yards|R1~teammate": {"rho": 0.32},
                             "Receiving Yards|R1~Receptions|R1~same_player": {"rho": 0.8}},
@@ -178,3 +179,44 @@ def test_the_page_leads_with_worth_it_and_labels_the_book_price_an_estimate():
     assert "not a quote" in block and "no edge is claimed" in block
     assert "Layer 2" not in block + row and "board" not in (block + row).lower()
     assert "sgpBlock(d, game)" in page
+
+
+# ------------------------------------------------------------------------------------------- the paper grader
+def _grader():
+    spec = importlib.util.spec_from_file_location(
+        "grade_sgp_paper", Path(__file__).resolve().parents[1] / "scripts" / "grade_sgp_paper.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _rec(sgp_id, legs, p=0.3, event="e1"):
+    return {"sgp_id": sgp_id, "date": "2026-10-18", "event_id": event, "relation": "teammate", "p_joint": p,
+            "worth_it_odds": 250, "est_book_odds": 180,
+            "legs": [{"player": pl, "market": mk, "side": sd, "line": ln, "bet": f"{pl} {sd} {ln}"} for pl, mk, sd, ln in legs]}
+
+
+def test_a_parlay_wins_only_when_every_leg_wins_and_a_void_leg_voids_it():
+    g = _grader()
+    legs = [("Patrick Mahomes", "Passing Yards", "over", 260.5), ("Travis Kelce", "Receiving Yards", "over", 55.5)]
+    key = lambda pl, mk, sd, ln: sheet_cs.prop_result_key({"player": pl, "market": mk, "side": sd, "line": ln})  # noqa: E731
+    both = {"props": {key(*legs[0]): {"y": 1.0, "v": 301}, key(*legs[1]): {"y": 1.0, "v": 70}}}
+    one = {"props": {key(*legs[0]): {"y": 1.0, "v": 301}, key(*legs[1]): {"y": 0.0, "v": 40}}}
+    void = {"props": {key(*legs[0]): {"y": 1.0, "v": 301}}, "void": {key(*legs[1]): "dnp_void"}}
+    assert g.grade_one(_rec("a", legs), both)["status"] == "won"
+    assert g.grade_one(_rec("a", legs), one)["status"] == "lost"
+    assert g.grade_one(_rec("a", legs), void)["status"] == "void"
+    assert g.grade_one(_rec("a", legs), None)["status"] == "pending"
+
+
+def test_the_summary_compares_the_hit_rate_with_the_predicted_probability_and_prices_both_rois():
+    g = _grader()
+    graded = [{"status": "won", "p_joint": 0.3, "event_id": "e1", "relation": "teammate", "worth_it_odds": 250, "est_book_odds": 180},
+              {"status": "lost", "p_joint": 0.3, "event_id": "e1", "relation": "teammate", "worth_it_odds": 250, "est_book_odds": 180},
+              {"status": "lost", "p_joint": 0.3, "event_id": "e2", "relation": "same_player", "worth_it_odds": 250, "est_book_odds": 180},
+              {"status": "void", "p_joint": 0.3, "event_id": "e3"}, {"status": "pending", "p_joint": 0.3, "event_id": "e4"}]
+    s = g.summarize(graded)
+    assert s["settled"] == 3 and s["void"] == 1 and s["pending"] == 1 and s["games"] == 2
+    assert s["hit_rate"] == pytest.approx(1 / 3, abs=1e-4) and s["predicted"] == pytest.approx(0.3)
+    assert s["roi_at_worth_it_price"] == pytest.approx(3.5 / 3 - 1, abs=1e-4)
+    assert s["teammate"]["n"] == 2 and s["same_player"]["n"] == 1

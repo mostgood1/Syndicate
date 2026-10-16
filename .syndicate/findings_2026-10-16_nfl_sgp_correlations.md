@@ -83,3 +83,18 @@ State each suggestion as **our joint probability -> fair SGP odds -> "worth it a
 compares against the book's real SGP quote; show the assumed-discount estimate second, labelled an estimate.
 Same-player tickets flagged as the pairing books price tightest. Paper ledger per suggestion; no edge label until a
 pre-registered, game-clustered test passes (#621).
+
+## PRE-REGISTRATION (written 2026-10-16, before any suggestion has settled)
+
+The sheet's SGPs are graded nightly by `scripts/grade_sgp_paper.py` (called at the end of the cheat-sheet
+reconcile) from `cheatsheets/nfl/sgp_ledger.jsonl`; a parlay voids if any leg voids and is never counted either way.
+
+1. **Calibration (the one claim this ledger can test):** over the first >= 150 settled parlays, the realized joint
+   hit rate minus the mean predicted `p_joint`, game-clustered, has a 95% interval that includes 0. Reported
+   overall and per relation (same player / teammate / opponent). A miss in either direction is a finding about the
+   copula or the leg marginals, recorded as such -- not tuned away.
+2. **No "edge" label, ever, from this ledger alone.** The worth-it ROI is built to sit near +5% by construction and
+   the estimated-book ROI is the 18.5% assumption restated. An edge label needs REAL SGP prices captured at
+   suggestion time (none exist in the repo) and a game-clustered ROI test over >= 300 settled parlays whose 95%
+   lower bound clears zero.
+3. Analysis population fixed now: every ledger record (2-leg, NFL REG season, 2026), no exclusions after the fact.
