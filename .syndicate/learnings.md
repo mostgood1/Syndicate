@@ -2364,3 +2364,12 @@ command. A filter on a guard's output is a way to not see the guard.
   - A write path that swallows errors needs a test that the write SUCCEEDS.
   - Measure determinism before claiming a same-seed pairing.
   - Treat a single-window finding as a lead until a second window agrees.
+
+## 2026-10-16 -- RULE: a drift visible in point estimates is not a predictive gain; register the time-varying model and test it against the constant `[lane uefa-offsets-recency-prod, session 570a6cd1]`
+- **Overturned belief:** "the UEFA offsets drift, so a 12-season constant is stale for 2026 use" (findings 2026-10-16, uefa-league-offsets).
+- **Measured:**
+  - The drift reappears on production's scale. Recency-weighted EPL−La Liga is −0.19 against −0.11 under the constant.
+  - Yet recency-weighted offsets LOST to the constant out of sample: +0.0010 [−0.0024, +0.0048] over 1,278 matches.
+  - Every half-life from 1 to 4 seasons was ≥ the constant, and the 2020-26 subset was no better.
+  - Down-weighting halves the effective n, and β drifts together with the offsets.
+- **How to apply:** before serving a time-varying parameter because an era split "looks different", run the registered walk-forward against the constant. Report the effective sample size the weighting leaves.

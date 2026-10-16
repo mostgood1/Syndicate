@@ -7,6 +7,14 @@ Same rules as state.md: when a fact changes, EDIT THE LINE.
 
 ## [soccer-uefa-competitions] UEFA CLUB COMPETITIONS (UCL / UEL / UECL): REGISTERED FOR FIXTURES, GAME ODDS, LIVE SCOREBOARD AND VENUE JOINS, WITH NO MODEL. SERVED ON THE FLEET `[verified 2026-10-15, lane soccer-uefa-competitions]`
 
+- **Cross-league offset on PRODUCTION's ratings `[verified 2026-10-16, lane uefa-offsets-recency-prod, research only, nothing wired]`:**
+  - A CONSTANT per-league offset beats no offset: Δ log loss −0.0555 [−0.0724, −0.0378], n=1,278 held-out matches.
+  - Recency weighting does NOT beat the constant offset (+0.0010 [−0.0024, +0.0048]).
+  - β = 1.66 [1.44, 1.90].
+  - 19% of UEFA-match attack ratings sit on production's +0.35 clamp.
+  - `match_team_name` never matches `Sporting CP` to football-data's `Sp Lisbon`.
+  - Source: `.syndicate/findings_2026-10-16_uefa_offsets_recency_prod.md`.
+
 - **What is verified (2026-10-15, read directly):**
   - The ESPN scoreboards `uefa.champions`, `uefa.europa` and `uefa.europa.conf` answer on the existing URL pattern. `build_soccer_schedule.py` wrote UCL 144 matches across 8 weeks and UECL 108 across 6.
   - OddsAPI's free `/v4/sports` listing has `soccer_uefa_champs_league`, `soccer_uefa_europa_league` and `soccer_uefa_europa_conference_league`, all active. The free `/events` endpoint returned 18 / 10 / 9 events.
