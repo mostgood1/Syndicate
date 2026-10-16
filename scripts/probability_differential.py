@@ -183,6 +183,9 @@ AMERICAN_TO_PROBABILITY: list[Impl] = [
          "int(str(value)) -- rejects any non-integer text"),
     Impl("american_to_probability", "syndicate.features.mlb.hr_targets", "_american_odds_implied_prob",
          "int(value) on the raw object -- TRUNCATES a float"),
+    # ADDED 2026-10-16 (lane `ci-suite-red-1015`): the generated MLB live-lens port
+    # (329edb1d) carried this converter over from the vendored flask_frontend.py.
+    Impl("american_to_probability", "syndicate.features.mlb.live_lens_port.app_slice", "_american_odds_implied_prob"),
     Impl("american_to_probability", "syndicate.features.nba.cards", "_implied_prob_from_american"),
     Impl("american_to_probability", "syndicate.features.wnba.cards", "_implied_prob_from_american"),
     Impl("american_to_probability", "syndicate.features.ncaab.mirror_export", "_american_to_probability",
@@ -452,6 +455,10 @@ NOT_REACHABLE: list[tuple[str, str]] = []
 # Converter-SHAPED names that are not scalar prob<->odds converters. Each needs
 # a reason, so that "it isn't one" is a claim someone made and not an omission.
 NOT_A_SCALAR_CONVERTER: dict[str, str] = {
+    # ADDED 2026-10-16 (lane `ci-suite-red-1015`): the generated MLB live-lens port (329edb1d).
+    "syndicate/features/mlb/live_lens_port/app_slice.py:_decimal_ip_from_outs": "pitcher outs -> innings pitched (outs / 3); not a price or a probability",
+    "syndicate/features/mlb/live_lens_port/app_slice.py:_normalize_american_odds": "coerces a value to a rounded american int; a parser, not a conversion",
+    "syndicate/features/mlb/live_lens_port/app_slice.py:_threshold_prob_to_count": "probability x sim_count -> an expected COUNT of sims; not a price",
     "scripts/backtest_mlb_first5_vs_market.py:devig_home": "two/three-way devig; takes an h2h Mapping, returns (prob, was_three_way). Its scalar half, `implied`, IS registered",
     "scripts/backtest_soccer_market_prior.py:_devig": "sequence in, sequence out (same shape as opportunity_signals.devig)",
     "scripts/build_soccer_picks.py:_devig": "normalizes a probability dict; not scalar",

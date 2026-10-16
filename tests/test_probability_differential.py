@@ -55,6 +55,12 @@ KNOWN_FAILING = {
         "syndicate.features.intelligence:odds_to_implied_probability",
         "syndicate.features.mlb.cards:_american_implied_prob",
         "syndicate.features.mlb.hr_targets:_american_odds_implied_prob",
+        # ADDED 2026-10-16 (lane `ci-suite-red-1015`): the generated MLB live-lens
+        # port (329edb1d) of the same vendored function -- the differential puts it
+        # in hr_targets' cluster, identical on every input (truncates a fractional
+        # price). A fix in the port is overwritten on regeneration; fix both at the
+        # vendored source.
+        "syndicate.features.mlb.live_lens_port.app_slice:_american_odds_implied_prob",
         "syndicate.features.ncaab.mirror_export:_american_to_probability",
         "syndicate.features.nhl.sim_engine.hockeysim.adapters:american_to_implied",
         "syndicate.features.shared.odds_book_quotes:_implied_probability",

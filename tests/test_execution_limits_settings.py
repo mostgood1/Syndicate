@@ -315,9 +315,20 @@ def test_the_worker_stamp_carries_the_saved_caps(store, monkeypatch):
     """The page reads the WORKER's stamp, not web's env. If the stamp does not
     carry these numbers the banner reports the old caps forever."""
     from syndicate.features.shared import execution_ledger
+    from syndicate.features.shared import refresh_state_store
+    # IMPORT BEFORE PATCHING. `record_execution_state` imports pipeline.execute_portfolio,
+    # which binds `execution_mode` / `live_execution_armed` BY NAME at import. First
+    # imported under the lambdas below, it kept "live" + armed for the rest of the
+    # process, and every later paper-execution test was refused as
+    # `live_mode_requires_venue_scope` (test_paper_execution_batch x5 in CI's chunk,
+    # ci-suite #697, 2026-10-16).
+    import pipeline.execute_portfolio  # noqa: F401
+    import pipeline.portfolio_commit  # noqa: F401
 
     written: dict = {}
-    monkeypatch.setattr(execution_ledger, "write_json_file", lambda path, payload: written.update(payload), raising=False)
+    # `record_execution_state` imports write_json_file LOCALLY from refresh_state_store,
+    # so a patch on execution_ledger's own name never reached it: patch the source.
+    monkeypatch.setattr(refresh_state_store, "write_json_file", lambda path, payload: written.update(payload))
     monkeypatch.setattr(execution_ledger, "execution_mode", lambda: "live")
     monkeypatch.setattr(execution_ledger, "live_execution_armed", lambda: True)
     _set(store, max_day_dollars_kalshi=22.0, max_day_orders_polymarket=3)
@@ -326,6 +337,7 @@ def test_the_worker_stamp_carries_the_saved_caps(store, monkeypatch):
     caps = state["limits"]
     assert caps["max_day_dollars_kalshi"] == 22.0
     assert caps["max_day_orders_polymarket"] == 3
+    assert written.get("limits", {}).get("max_day_dollars_kalshi") == 22.0   # the stub saw the write
 
 
 # ---------------------------------------------------------------------------

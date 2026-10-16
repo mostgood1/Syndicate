@@ -128,7 +128,9 @@ def test_anytime_scorer_point_estimate_hits_the_floor():
 
 
 def test_a_market_with_no_registry_entry_is_unchanged():
-    row = _row(sport="soccer", market="player_assists", model_edge_pct=10.0)
+    # Was "player_assists" until 1cef9c79 (2026-10-15) registered it: a REAL market
+    # name drifts into the registry; this one never can (ci-suite #697).
+    row = _row(sport="soccer", market="player_never_registered_market", model_edge_pct=10.0)
     assert _sizing_model_edge(row) == pytest.approx(10.0)
 
 
