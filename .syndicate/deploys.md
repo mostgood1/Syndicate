@@ -50079,3 +50079,8 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - `reasons` gains `moneyline_other_club_has_its_own_contract` and `three_way_no_leg_is_not_a_board_bet`.
   - `VENUE_SCOPE venue=kalshi` `venue_not_quoting` falls (29 of 35 at 03:55:51Z).
   - Any soccer Kalshi order carries a ticker whose club suffix (or `-TIE`) is the row's own side.
+
+## 2026-10-16 12:26:26Z (7:26 AM CT) -- refresh-worker claimed RESTART only, no code change (HEAD already 4a660b3e; started 12:26:32Z, restarts=8) + `reload-web` (2.0 s, 0 failures): load the live Win% label and tag fixes (6cd9eeb9 + 4a660b3e) (lane `live-winpct-blank`, session 9e18a0e7)
+- **why:** the running worker (pid 660548, 10-15 23:36:42Z) predated both. Batched overnight under the restart rule; the last restart was ~13 h ago.
+- **claim:** refresh-worker token e040fd7b..., acquire exit 0. Window gate: refresh-worker blockers only, positive lines required; window after 64 readings (MLB sim finished, child jobs none, board build idle).
+- **verify (owed, tonight's live NCAAF, then Sunday's NFL):** live NFL/NCAAF rows read "pregame proj X", with 0 "SIM CONTRADICTS" from a pregame mean.
