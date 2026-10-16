@@ -631,7 +631,7 @@ once this index exists: re-splitting would orphan the parts.
 | [nhl-sim-engine] | NHL SIM (hockeysim) — `nhl_sim_input_checklist.py` PASSES, exit 0 `[measured 2026-08-20, lane nhl-model-owner] | `state_model.md` |
 | [model-skill] | MODEL SKILL (`#428`) — measured vs not | `state_model.md` |
 | [model-edge-ceiling] | THE 15-POINT PLAUSIBILITY CEILING REFUSES 470 PLAUSIBLE ROWS (0 of 525 imply an impossible probability) AND HIDES A LARGE-GAP BUG LIST `[measured 2026-10-15]` | `state_model.md` |
-| [prop-projection-support] | PROP PROJECTIONS CARRY NO SUPPORT FIELD ON NFL (0 of 705) OR SOCCER (0 of 391) — 91% of ceiling-rejected prop rows have none, so only magnitude can gate `[measured 2026-10-16]` | `state_model.md` |
+| [prop-projection-support] | NFL PROP SUPPORT IS PUBLISHED AND SERVED (0 of 1,070 -> 1,067 of 1,067); NHL + MLB still carry none; "soccer 0 of 391" WITHDRAWN as a misclassification `[measured 2026-10-16]` | `state_model.md` |
 | [sim-scheduling-blocker] | 2026-08-17 02:1xZ — VERIFIED (sim-scheduling): the primary goal has ONE blocker — **ARCHIVED 2026-08-19 to `st | `state_model.md` |
 | [sim-edge-analysis-2026-09-01] | FULL-PLATFORM SIM-ENGINE EDGE ANALYSIS — strategy synthesis + new from-code facts `[2026-09-01, session syndic | `state_model.md` |
 | [accuracy-autorun-rearm-state] | `#626`(h) IS ARMED, RAN, AND PASSED. The budget, not memory, is now the constraint. `[2026-09-04, lane accurac | `state_model.md` |

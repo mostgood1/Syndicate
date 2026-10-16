@@ -50231,3 +50231,28 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - (1) The first refresh-built `mlb_source/data/live_lens/render_sync/live_lens_reports_2026_10_16.json` after 14:19:33Z (a watcher is running).
   - (2) A live-MC tick on a LIVE game by the native engine: `liveModelProbOver` non-null on live entries, compared with 10-15's 40/56 rate.
 - **Rollback.** `git revert 70116f4a` restores phase 1, the vendored engine imports. Phase 1 itself is `b9542acb`.
+
+## 2026-10-16T14:39:43Z (9:39 AM CT) -- READING: NFL prop SUPPORT fields are SERVED -- **MET** (lane `nfl-prop-support-fields`, `5457b428`)
+
+- **verify:** served board, cap defeated, gated on the row's own `kind == "prop"`
+  (not a market-name heuristic): **NFL `projection.sample_games` 0 of 1,070 at
+  12:32:38Z -> 1,067 of 1,067 at 2026-10-16T14:39:43Z**, `projected_sd` on 922 of 1,067.
+- **The code is confirmed to have RUN, not inferred from the outcome.** Fleet ff
+  `5457b428` -> `848ac784` with a claimed refresh-worker TERM at 13:27:51Z
+  (entry above); live refresh-worker pid 810306 started 13:27:56Z; fleet HEAD
+  `70116f4a` has `5457b428` as an ancestor.
+- **The restart was a PEER's.** I deferred mine under the 60-min gate (one ran
+  12:26:32Z) and recorded the reading as owed at the next restart by anyone --
+  which is what happened. Recorded as theirs, not mine.
+- **Control that makes it a measurement:** NCAAF, which already published both
+  fields, read 723 of 723 at the SAME instant, while NHL (156 prop rows) and MLB
+  (144) still read NONE. So the change is NFL's and not an instrument shift.
+- **CORRECTION to `e6e93335`, same reading.** "soccer 0 of 391" was MY
+  misclassification: that census classified by market NAME, and those 352 rows
+  are `alternate_totals_corners` carrying `kind == "game"` -- a team market.
+  **Soccer has ZERO `kind == "prop"` rows`**, and 139 soccer recommendation
+  files in the 10-1x window carry 0 `player_props` entries. The soccer half of
+  that finding is withdrawn; `state_model.md [prop-projection-support]` is
+  rewritten in place rather than contradicted.
+- **Remaining gap is NHL + MLB**, not NFL or soccer: 156 and 144 prop rows with
+  no support field. Same class, different modules, not claimed here.
