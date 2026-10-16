@@ -1009,6 +1009,14 @@ death, never life — do not invert it.
 - Verification: walk-forward by season; per-match 1X2 log loss offset minus no-offset with match bootstrap CI; offsets with bootstrap intervals; coverage printed
 - Blocked by: none
 
+### uefa-offsets-recency-prod — OPEN — opened 2026-10-16 — session 570a6cd1-da77-42f2-b7cc-75f9669276a1
+- Goal: todo #699 Stage 1 item (i): a PRE-REGISTERED (committed before any fit) walk-forward test of a recency-weighted per-league UEFA offset vs the single 12-season constant offset vs no offset, with the club component = production compute_team_ratings attack/defence as of each kickoff; findings file with verdicts, beta and offsets with intervals; #699 updated; NOTHING wired into sim/board/worker/deploy
+- Files: .syndicate/findings_2026-10-16_uefa_offsets_recency_prod.md, scripts/fit_uefa_offsets_prod_ratings.py, syndicate/features/soccer/uefa_league_offsets.py, tests/test_uefa_league_offsets.py
+- Hypothesis: H-REC: offsets fit with exponential recency weights (half-life 2 seasons) beat the single constant 2014..S-1 offset on held-out cross-league 1X2 log loss, on production's rating scale; H-PROD: the constant offset still beats no offset on production's rating scale
+- Falsification test: Pre-registered in .syndicate/findings_2026-10-16_uefa_offsets_recency_prod.md section 1, committed BEFORE any fit
+- Verification: walk-forward test seasons 2017-2026; paired per-match log-loss bootstrap CI (2000, seed 699); verdict rule of the 2026-10-16 registration
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
