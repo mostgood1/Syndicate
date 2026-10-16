@@ -4,8 +4,8 @@ from __future__ import annotations
 player, consumed by syndicate/features/intelligence.py and Ask The Syndicate)
 current.
 
-The vendor mlb_bettingv2 fetch+build pipeline always writes into
-vendor/mlb_bettingv2/data/, not into the mlb_source artifact roots the app
+The fetch+build pipeline (native copies of the vendored scripts since 2026-10-16) writes its default outputs into
+the engine DATA root engines/mlb/data/, not into the mlb_source artifact roots the app
 actually reads from -- this script wraps that pipeline and copies the result
 into place. Meant to run on a weekly cadence (the underlying Statcast scrape
 is too slow/heavy for a daily job), gated by a staleness check so a run with
@@ -29,10 +29,13 @@ from datetime import datetime
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-VENDOR_ROOT = REPO_ROOT / "vendor" / "mlb_bettingv2"
-FETCH_SCRIPT = VENDOR_ROOT / "tools" / "statcast" / "fetch_statcast_raw_pitches_x64.py"
-BUILD_SCRIPT = VENDOR_ROOT / "tools" / "datasets" / "build_statcast_player_feature_set.py"
-VENDOR_FEATURES_DIR = VENDOR_ROOT / "data" / "statcast" / "features"
+# Lane mlb-engine-data-native-p4: the NATIVE copies of the two vendored scripts (scripts/port_mlb_sim_engine.py), and
+# the engine DATA root they write their default outputs under (engines/mlb, which replaced vendor/mlb_bettingv2).
+ENGINE_ROOT = REPO_ROOT / "engines" / "mlb"
+NATIVE_TOOLS = REPO_ROOT / "syndicate" / "features" / "mlb" / "native" / "tools"
+FETCH_SCRIPT = NATIVE_TOOLS / "statcast" / "fetch_statcast_raw_pitches_x64.py"
+BUILD_SCRIPT = NATIVE_TOOLS / "datasets" / "build_statcast_player_feature_set.py"
+ENGINE_FEATURES_DIR = ENGINE_ROOT / "data" / "statcast" / "features"
 
 
 def _data_root() -> Path:
@@ -139,11 +142,11 @@ def _run(cmd: list[str]) -> None:
 def refresh(*, season: int, start_date: str, end_date: str) -> None:
     raw_root = _raw_pitch_root()
     raw_root.mkdir(parents=True, exist_ok=True)
-    # `--out-root` / `--raw-root` are passed EXPLICITLY. Both vendor scripts
-    # default to `vendor/mlb_bettingv2/data/...`, resolved off `__file__` --
-    # gitignored and inside the ephemeral checkout. Letting either default is
-    # the whole defect. The vendor scripts themselves are unchanged; they
-    # already take these flags.
+    # `--out-root` / `--raw-root` are passed EXPLICITLY. Both scripts default to
+    # the engine data root (`engines/mlb/data/...`; `vendor/mlb_bettingv2/data/...`
+    # before 2026-10-16), resolved off `__file__` -- gitignored and inside the
+    # ephemeral checkout. Letting either default is the whole defect. The scripts
+    # are verbatim copies of the vendored ones; they already take these flags.
     _run([
         sys.executable, str(FETCH_SCRIPT),
         "--start-date", start_date, "--end-date", end_date,
@@ -158,7 +161,7 @@ def refresh(*, season: int, start_date: str, end_date: str) -> None:
         "--write-latest",
     ])
     for name in (f"player_features_{season}.json", "player_features_latest.json"):
-        src = VENDOR_FEATURES_DIR / name
+        src = ENGINE_FEATURES_DIR / name
         if not src.exists():
             print(f"expected build output missing: {src}", flush=True)
             continue

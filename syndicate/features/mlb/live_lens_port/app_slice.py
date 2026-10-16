@@ -40,9 +40,10 @@ try:
 except Exception:
     msvcrt = None
 
-# EDIT: the vendored app's repo root and web dir, named explicitly because this module lives in Syndicate. They are DATA
-# roots only: nothing is put on sys.path, and the sim_engine / tools imports below are Syndicate's own (phase 2).
-_ROOT = Path(__file__).resolve().parents[4] / "vendor" / "mlb_bettingv2"
+# EDIT: the app's repo root and web dir, named explicitly because this module lives in Syndicate. They are DATA roots
+# only, and since lane mlb-engine-data-native-p4 the root is Syndicate's engines/mlb (where the vendored app's
+# vendor/mlb_bettingv2 data now lives); nothing is put on sys.path, and every import below is Syndicate's own.
+_ROOT = Path(__file__).resolve().parents[4] / "engines" / "mlb"
 _WEB_DIR = _ROOT / "tools" / "web"
 
 from syndicate.features.mlb.sim_engine.data.statsapi import (
@@ -92,7 +93,7 @@ from syndicate.features.mlb.native.tools.eval.settle_locked_policy_cards import 
 app = Flask(__name__)
 
 
-_ROOT_DIR = _ROOT  # EDIT: the vendored repo root, as Path(__file__).parents[2] resolved it there
+_ROOT_DIR = _ROOT  # EDIT: the engine DATA root (engines/mlb), where Path(__file__).parents[2] resolved the vendored one
 
 
 _TRACKED_DATA_DIR = _ROOT_DIR / "data"

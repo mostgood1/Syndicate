@@ -1,5 +1,5 @@
 from __future__ import annotations
-_VENDORED_FILE = str(__import__("pathlib").Path(__file__).resolve().parents[4].joinpath('vendor', 'mlb_bettingv2', 'sim_engine', 'market_pitcher_props.py'))  # EDIT: this module's path in vendor/, so every DATA root resolves there
+_ENGINE_FILE = str(__import__("pathlib").Path(__file__).resolve().parents[4].joinpath('engines', 'mlb', 'sim_engine', 'market_pitcher_props.py'))  # EDIT: this module's path under the engines/mlb DATA root (same depth as vendor/mlb_bettingv2)
 
 import json
 import re
@@ -126,7 +126,7 @@ def load_pitcher_prop_lines(
 
     lines_by_pitcher maps normalized pitcher name -> market -> {line, over_odds, under_odds, src, stale?}
     """
-    v2_root = Path(_VENDORED_FILE).resolve().parents[1]
+    v2_root = Path(_ENGINE_FILE).resolve().parents[1]
     # Ensure ODDS_API_KEY can be picked up from MLB-BettingV2/.env in tools that call this.
     load_dotenv_if_present(v2_root / ".env")
     orig = Path(original_repo_root) if original_repo_root else (v2_root.parent / "MLB-Betting")

@@ -97,11 +97,28 @@ def cmd_prepare(args) -> int:
         _sh(["cp", "-a", str(PROD_DATA / sub), str(snap / "data" / sub)])
     overlay = Path(args.overlay) / "syndicate" / "features" / "mlb"
     _sh(["rsync", "-a", "--exclude=__pycache__", f"{overlay}/", f"{snap}/Syndicate/syndicate/features/mlb/"])
+    # The engine DATA root (engines/mlb, lane mlb-engine-data-native-p4): its git-tracked inputs, when the worktree has it.
+    if (Path(args.overlay) / "engines").is_dir():
+        _sh(["rsync", "-a", "--exclude=__pycache__", f"{Path(args.overlay) / 'engines'}/", f"{snap}/Syndicate/engines/"])
     for arm in ARMS:
         _sh(["cp", "-a", str(snap), str(work / arm)])
         (work / arm / "trace").mkdir()
         (work / arm / "site").mkdir()
         (work / arm / "site" / "sitecustomize.py").write_text(SITECUSTOMIZE, encoding="utf-8")
+    native_engines = work / "native" / "Syndicate" / "engines" / "mlb"
+    if native_engines.is_dir():
+        # The deploy's own migration, run in the native arm: its runtime state comes from the vendored data exactly as
+        # production's will. Tracked/modified is answered by the real fleet checkout (the arm copies carry no .git).
+        r = subprocess.run([sys.executable, str(Path(args.overlay) / "scripts" / "migrate_mlb_engine_data.py"),
+                            "--repo", str(work / "native" / "Syndicate"), "--git-repo", str(FLEET_CHECKOUT)],
+                           capture_output=True, text=True)
+        print("native-arm migration:", r.stdout.strip() or r.stderr[-500:])
+        if r.returncode != 0:
+            return 4
+    missing = [arm for arm in ARMS if not (work / arm / "site" / "sitecustomize.py").is_file()]
+    if missing:  # without it an arm's process tree goes unrecorded and "nothing vendored loaded" is unmeasured
+        print(json.dumps({"error": f"sitecustomize missing in arms {missing}"}))
+        return 5
     shutil.rmtree(snap)
     print(json.dumps({"work": str(work), "arms": list(ARMS)}))
     return 0
@@ -144,6 +161,8 @@ def cmd_run(args) -> int:
     for arm in ARMS:
         arm_dir = work / arm
         cwd = arm_dir / "Syndicate" / "vendor" / "mlb_bettingv2"
+        if arm == "native" and (arm_dir / "Syndicate" / "engines" / "mlb").is_dir():
+            cwd = arm_dir / "Syndicate" / "engines" / "mlb"  # the job's cwd since lane mlb-engine-data-native-p4
         script = arm_dir / "Syndicate" / SCRIPT[arm]
         log = open(arm_dir / "run.log", "w", encoding="utf-8")
         procs[arm] = (subprocess.Popen(["nice", "-n", "19", sys.executable, str(script), *_job_argv(args)], cwd=cwd,
@@ -229,16 +248,27 @@ NATIVE_SCRIPTS = "<ARM>/Syndicate/syndicate/features/mlb/native/tools/"
 VENDORED_SCRIPTS = "<ARM>/Syndicate/vendor/mlb_bettingv2/tools/"
 
 
-def _map_native_scripts(obj: Any, counter: list[int]) -> Any:
+#: Lane mlb-engine-data-native-p4: the native arm's engine DATA root is engines/mlb where the vendored arm's is
+#: vendor/mlb_bettingv2 -- in file paths and in values. Mapped back, COUNTED separately ("engine_root_mapped").
+NATIVE_ENGINE_ROOT = "<ARM>/Syndicate/engines/mlb"
+VENDORED_ENGINE_ROOT = "<ARM>/Syndicate/vendor/mlb_bettingv2"
+NATIVE_ENGINE_REL = "Syndicate/engines/mlb/"
+VENDORED_ENGINE_REL = "Syndicate/vendor/mlb_bettingv2/"
+
+
+def _map_native_scripts(obj: Any, counter: list[int], engine_counter: list[int] | None = None) -> Any:
     if isinstance(obj, str):
         if NATIVE_SCRIPTS in obj:
             counter[0] += obj.count(NATIVE_SCRIPTS)
-            return obj.replace(NATIVE_SCRIPTS, VENDORED_SCRIPTS)
+            obj = obj.replace(NATIVE_SCRIPTS, VENDORED_SCRIPTS)
+        if engine_counter is not None and NATIVE_ENGINE_ROOT in obj:
+            engine_counter[0] += obj.count(NATIVE_ENGINE_ROOT)
+            obj = obj.replace(NATIVE_ENGINE_ROOT, VENDORED_ENGINE_ROOT)
         return obj
     if isinstance(obj, list):
-        return [_map_native_scripts(x, counter) for x in obj]
+        return [_map_native_scripts(x, counter, engine_counter) for x in obj]
     if isinstance(obj, dict):
-        return {k: _map_native_scripts(v, counter) for k, v in obj.items()}
+        return {k: _map_native_scripts(v, counter, engine_counter) for k, v in obj.items()}
     return obj
 
 
@@ -258,7 +288,19 @@ def _normalize(obj: Any, arm_dir: Path) -> Any:
 
 def _diff(arm_a: Path, arm_b: Path, since: float, plant: bool = False, map_scripts: bool = False) -> dict:
     fa, fb = _changed_files(arm_a, since), _changed_files(arm_b, since)
-    mapped = [0]
+    mapped, engine_mapped = [0], [0]
+    vendor_writes_b: list[str] = []
+    if map_scripts:
+        # B is the native arm: anything it wrote under vendor/ is a failure in itself; its engine-root files are
+        # compared against the vendored arm's files at the vendored root.
+        vendor_writes_b = sorted(r for r in fb if r.startswith("Syndicate/vendor/"))
+        remapped = {}
+        for rel, path in fb.items():
+            if rel.startswith(NATIVE_ENGINE_REL):
+                engine_mapped[0] += 1
+                rel = VENDORED_ENGINE_REL + rel[len(NATIVE_ENGINE_REL):]
+            remapped[rel] = path
+        fb = remapped
     diffs: list[str] = []
     leaves = 0
     for rel in sorted(set(fa) - set(fb)):
@@ -271,7 +313,7 @@ def _diff(arm_a: Path, arm_b: Path, since: float, plant: bool = False, map_scrip
             continue
         a, b = _normalize(_load(fa[rel]), arm_a), _normalize(_load(fb[rel]), arm_b)
         if map_scripts:
-            b = _map_native_scripts(b, mapped)
+            b = _map_native_scripts(b, mapped, engine_mapped)
         if plant and planted is None and isinstance(b, (dict, list)) and b:
             if isinstance(b, dict):
                 k = next((k for k, v in b.items() if isinstance(v, (int, float)) and not isinstance(v, bool)), None)
@@ -280,7 +322,8 @@ def _diff(arm_a: Path, arm_b: Path, since: float, plant: bool = False, map_scrip
                     planted = f"{rel}.{k}"
         leaves += _leaves(a, b, rel, diffs)
     return {"files_a": len(fa), "files_b": len(fb), "leaves": leaves, "diffs": diffs, "planted": planted,
-            "native_script_paths_mapped": mapped[0]}
+            "native_script_paths_mapped": mapped[0], "engine_root_mapped": engine_mapped[0],
+            "native_vendor_writes": vendor_writes_b}
 
 
 def _key(d: str) -> str:
@@ -318,11 +361,16 @@ def cmd_compare(args) -> int:
                                       "diffs": len(test["diffs"]), "ignored_wallclock": len(t_ign),
                                       "beyond_floor": len(beyond_floor), "first_beyond_floor": beyond_floor[:25],
                                       "planted": test["planted"],
-                                      "native_script_paths_mapped": test["native_script_paths_mapped"]},
+                                      "native_script_paths_mapped": test["native_script_paths_mapped"],
+                                      "engine_root_mapped": test["engine_root_mapped"],
+                                      "native_vendor_writes": test["native_vendor_writes"][:20]},
         "trace": traces,
     }
     print(json.dumps(report, indent=1))
-    native_clean = traces["native"]["processes"] > 0 and traces["native"]["processes_loading_vendor"] == 0 \
+    # Every arm must have RECORDED its process tree: an arm with 0 processes measured nothing (2026-10-16: a misplaced
+    # setup step left two arms without the sitecustomize, and "0 processes loading vendor" would have read as clean).
+    native_clean = all(traces[a]["processes"] > 0 for a in ARMS) and not test["native_vendor_writes"] \
+        and traces["native"]["processes_loading_vendor"] == 0 \
         and not traces["native"]["vendored_scripts_run"]
     if args.plant:
         return 0 if beyond_floor else 3

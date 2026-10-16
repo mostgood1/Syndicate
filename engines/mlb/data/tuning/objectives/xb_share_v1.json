@@ -1,0 +1,12 @@
+{
+  "name": "xb_share_v1",
+  "description": "Primary objective for the pm_xb_share_mult sweep: targets both sides of the diagnosed engine-shape defect in one objective -- total_bases_1plus is over-projected (avg_p=0.660 vs emp=0.574, essentially the hits-over-projection issue restated) while total_bases_4plus/5plus are under-projected (0.122 vs 0.152, 0.061 vs 0.070). xb_share_mult (default 0.94, dampened below neutral) directly controls the singles-vs-extra-base split on contact, so raising it should simultaneously improve both sides. hr_brier carried as a guardrail since HR already has its own promoted fix (hr_rate_mult=1.10) that this shouldn't quietly regress; totals MAE and starter pitches_bias as low-weight sanity terms.",
+  "metrics": [
+    {"path": "hitter_props_likelihood_topn_weighted.total_bases_1plus_brier", "direction": "lower", "weight": 2.0},
+    {"path": "hitter_props_likelihood_topn_weighted.total_bases_4plus_brier", "direction": "lower", "weight": 2.0},
+    {"path": "hitter_props_likelihood_topn_weighted.total_bases_5plus_brier", "direction": "lower", "weight": 1.0},
+    {"path": "hitter_hr_likelihood_topn_weighted.hr_brier", "direction": "lower", "weight": 0.5},
+    {"path": "full_weighted.mae_total_runs", "direction": "lower", "weight": 0.5},
+    {"path": "pitcher_props_starters_weighted.pitches_bias", "direction": "lower_abs", "weight": 0.25}
+  ]
+}

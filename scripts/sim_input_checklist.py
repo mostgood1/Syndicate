@@ -49,12 +49,13 @@ from dataclasses import fields
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-VENDOR = REPO / "vendor" / "mlb_bettingv2"
-for _p in (str(REPO), str(VENDOR)):
-    if _p not in sys.path:
-        sys.path.insert(0, _p)
+if str(REPO) not in sys.path:
+    sys.path.insert(0, str(REPO))
 
-ENGINE = VENDOR / "sim_engine"
+# The engine PRODUCTION runs: Syndicate's generated copy (lanes mlb-sim-engine-native-p2 / mlb-engine-data-native-p4,
+# scripts/port_mlb_sim_engine.py --check). The vendored root is not put on sys.path, so nothing here can audit a
+# different engine from the one that runs.
+ENGINE = REPO / "syndicate" / "features" / "mlb" / "sim_engine"
 
 
 def _data_root() -> Path:
@@ -218,7 +219,7 @@ def _disabled_by_config(date_str=None):
     """
     out = {}
     try:
-        from sim_engine.forward_tuning import (FORWARD_BVP_MATCHUP_MODE,
+        from syndicate.features.mlb.sim_engine.forward_tuning import (FORWARD_BVP_MATCHUP_MODE,
                                                should_use_forward_tuning)
     except Exception:
         return out
@@ -504,7 +505,7 @@ def joint_site_problems() -> list:
     # The joint reads that dict, so a key absent there yields a CONSTANT column,
     # whose rank correlation is undefined for every pair it appears in.
     try:
-        from sim_engine.joint_outcomes import HITTER_MARKET_ROW_KEYS
+        from syndicate.features.mlb.sim_engine.joint_outcomes import HITTER_MARKET_ROW_KEYS
     except Exception as exc:
         return problems + [f"could not import joint_outcomes -- invariant did NOT run: {exc}"]
 
@@ -593,8 +594,8 @@ def main() -> int:
               "recorded at both, and every joint market's row_key exists in both dicts")
     spec_problems = list(spec_problems) + list(joint_problems)
 
-    from sim_engine.data.roster_artifact import read_game_roster_artifact
-    from sim_engine.models import BatterProfile, PitcherProfile
+    from syndicate.features.mlb.sim_engine.data.roster_artifact import read_game_roster_artifact
+    from syndicate.features.mlb.sim_engine.models import BatterProfile, PitcherProfile
 
     # THE SOURCE IS RECORDED, not just used. A report that does not say which
     # rosters it measured cannot be checked against them, which is exactly how a
@@ -668,15 +669,15 @@ def main() -> int:
         # its own call here; see the provenance table in
         # docs/ai_context/mlb_sim_engine_reference.md.
         from datetime import date as _date
-        from sim_engine.data.arsenal import (apply_arsenal_to_batter,
+        from syndicate.features.mlb.sim_engine.data.arsenal import (apply_arsenal_to_batter,
                                              apply_arsenal_to_pitcher)
-        from sim_engine.data.batted_ball import (apply_batted_ball_to_batter,
+        from syndicate.features.mlb.sim_engine.data.batted_ball import (apply_batted_ball_to_batter,
                                                  apply_batted_ball_to_pitcher)
-        from sim_engine.data.build_roster import _apply_cached_statcast_pitch_splits
-        from sim_engine.data.quality import apply_quality
-        from sim_engine.data.statcast_bvp import (apply_starter_bvp_hr_multipliers,
+        from syndicate.features.mlb.sim_engine.data.build_roster import _apply_cached_statcast_pitch_splits
+        from syndicate.features.mlb.sim_engine.data.quality import apply_quality
+        from syndicate.features.mlb.sim_engine.data.statcast_bvp import (apply_starter_bvp_hr_multipliers,
                                                   default_bvp_cache)
-        from sim_engine.data.statcast_pitch_splits import default_statcast_cache
+        from syndicate.features.mlb.sim_engine.data.statcast_pitch_splits import default_statcast_cache
         _sc, _bc = default_statcast_cache(), default_bvp_cache()
 
     for path in paths:

@@ -1,5 +1,5 @@
 from __future__ import annotations
-_VENDORED_FILE = str(__import__("pathlib").Path(__file__).resolve().parents[5].joinpath('vendor', 'mlb_bettingv2', 'sim_engine', 'data', 'statcast_pitch_splits.py'))  # EDIT: this module's path in vendor/, so every DATA root resolves there
+_ENGINE_FILE = str(__import__("pathlib").Path(__file__).resolve().parents[5].joinpath('engines', 'mlb', 'sim_engine', 'data', 'statcast_pitch_splits.py'))  # EDIT: this module's path under the engines/mlb DATA root (same depth as vendor/mlb_bettingv2)
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -49,7 +49,7 @@ def _clamp(x: float, lo: float, hi: float) -> float:
 
 
 def default_statcast_cache(ttl_seconds: int = 7 * 24 * 3600, cache_dir: str | None = None) -> DiskCache:
-    root = Path(cache_dir) if cache_dir else (Path(_VENDORED_FILE).resolve().parents[2] / "data" / "cache" / "statcast")
+    root = Path(cache_dir) if cache_dir else (Path(_ENGINE_FILE).resolve().parents[2] / "data" / "cache" / "statcast")
     return DiskCache(root_dir=root, default_ttl_seconds=ttl_seconds)
 
 
@@ -67,7 +67,7 @@ def _artifact_root() -> Path:
     override = str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip()
     if override:
         return Path(override).expanduser().resolve()
-    return Path(_VENDORED_FILE).resolve().parents[4] / "data"
+    return Path(_ENGINE_FILE).resolve().parents[4] / "data"
 
 
 def _load_artifact(season: int) -> Optional[Dict[str, dict]]:

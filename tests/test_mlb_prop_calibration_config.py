@@ -23,8 +23,10 @@ import unittest
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-CONFIG = REPO_ROOT / "vendor" / "mlb_bettingv2" / "data" / "tuning" / "hitter_props_calibration" / "default.json"
-FITTER = REPO_ROOT / "vendor" / "mlb_bettingv2" / "tools" / "tune" / "fit_hitter_prob_calibration.py"
+# The copies the ENGINE reads and the fit RUNS (lane mlb-engine-data-native-p4): engines/mlb is the engine DATA root and
+# the fitter is the generated native copy. Testing the vendored files would test what nothing reads any more.
+CONFIG = REPO_ROOT / "engines" / "mlb" / "data" / "tuning" / "hitter_props_calibration" / "default.json"
+FITTER = REPO_ROOT / "syndicate" / "features" / "mlb" / "native" / "tools" / "tune" / "fit_hitter_prob_calibration.py"
 SCRIPT = REPO_ROOT / "scripts" / "fit_mlb_prop_calibration.py"
 
 

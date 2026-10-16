@@ -1,11 +1,11 @@
 from __future__ import annotations
-_VENDORED_FILE = str(__import__("pathlib").Path(__file__).resolve().parents[4].joinpath('vendor', 'mlb_bettingv2', 'sim_engine', 'pitcher_so_model.py'))  # EDIT: this module's path in vendor/, so every DATA root resolves there
+_ENGINE_FILE = str(__import__("pathlib").Path(__file__).resolve().parents[4].joinpath('engines', 'mlb', 'sim_engine', 'pitcher_so_model.py'))  # EDIT: this module's path under the engines/mlb DATA root (same depth as vendor/mlb_bettingv2)
 
 import math
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-_DEFAULT_MODEL_PATH = (Path(_VENDORED_FILE).resolve().parents[1] / "data" / "models" / "pitcher_so_poisson_v1.json").resolve()
+_DEFAULT_MODEL_PATH = (Path(_ENGINE_FILE).resolve().parents[1] / "data" / "models" / "pitcher_so_poisson_v1.json").resolve()
 _MODEL_CACHE: Dict[str, Any] = {}
 
 

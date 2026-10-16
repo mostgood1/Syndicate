@@ -46,22 +46,38 @@ def test_live_lens_imports_no_vendored_module():
     assert json.loads(r.stdout.strip().splitlines()[-1]) == []
 
 
-def test_vendored_file_targets_exist():
+def test_engine_file_sits_under_engines_mlb_at_the_vendored_depth():
+    """`_ENGINE_FILE` is the module's path as if its tree sat at engines/mlb (lane mlb-engine-data-native-p4). The file
+    need not exist; its PARENTS are the point: the package root is engines/mlb and the repo root is where it was."""
     import syndicate.features.mlb.sim_engine as S
 
+    engine_root = (ROOT / "engines" / "mlb").resolve()
     sites = {}
     for mi in pkgutil.walk_packages(S.__path__, S.__name__ + "."):
-        vf = getattr(importlib.import_module(mi.name), "_VENDORED_FILE", None)
-        if vf:
-            sites[mi.name] = vf
+        ef = getattr(importlib.import_module(mi.name), "_ENGINE_FILE", None)
+        if ef:
+            sites[mi.name] = Path(ef).resolve()
     assert len(sites) >= 10, sites  # 13 at generation; a drop means the EDIT rule stopped firing
-    if VENDOR_SIM.exists():
-        assert all(Path(v).is_file() for v in sites.values()), sites
+    for name, ef in sites.items():
+        rel = ef.relative_to(engine_root)  # raises if the file is not under engines/mlb
+        assert rel.parts[0] == "sim_engine", (name, rel)
+        assert ef.parents[len(rel.parts) - 1] == engine_root
+        assert ef.parents[len(rel.parts) + 1] == ROOT.resolve()  # the repo root: same depth as vendor/mlb_bettingv2
 
 
 @pytest.mark.skipif(not VENDOR_SIM.exists(), reason="vendor tree absent")
-def test_data_roots_resolve_as_in_vendor():
-    """Every no-argument data-root helper that reads `__file__` returns the same directory in both trees."""
+def test_data_roots_moved_to_engines_mlb_and_nothing_else_moved():
+    """Every no-argument data-root helper that reads `__file__`: what resolved under vendor/mlb_bettingv2 now resolves to
+    the SAME relative path under engines/mlb; what resolved anywhere else (the Syndicate repo's own data/) is unchanged."""
+    vendor_root = (ROOT / "vendor" / "mlb_bettingv2").resolve()
+    engine_root = (ROOT / "engines" / "mlb").resolve()
+
+    def expected(vendored_value) -> str:
+        p = Path(str(vendored_value)).resolve()
+        try:
+            return str(engine_root / p.relative_to(vendor_root))
+        except ValueError:
+            return str(p)
     sys.path.insert(0, str(VENDOR_SIM.parent))
     try:
         checked = 0
@@ -69,7 +85,7 @@ def test_data_roots_resolve_as_in_vendor():
             n = importlib.import_module(f"syndicate.features.mlb.sim_engine.{mod}")
             v = importlib.import_module(f"sim_engine.{mod}")
             attr = "_ROOT" if mod == "forward_tuning" else "_DEFAULT_MODEL_PATH"
-            assert str(getattr(n, attr)) == str(getattr(v, attr))
+            assert str(Path(str(getattr(n, attr))).resolve()) == expected(getattr(v, attr))
             checked += 1
         for mod in ("data.arsenal", "data.batted_ball", "data.conditional_mix", "data.quality", "data.statcast_bvp",
                     "data.roster_registry", "data.statcast_pitch_splits"):
@@ -80,7 +96,7 @@ def test_data_roots_resolve_as_in_vendor():
                     continue
                 if "__file__" not in inspect.getsource(fn):
                     continue
-                assert str(getattr(native, name)()) == str(fn()), f"{mod}.{name}"
+                assert str(Path(str(getattr(native, name)())).resolve()) == expected(fn()), f"{mod}.{name}"
                 checked += 1
         assert checked >= 9, checked
     finally:

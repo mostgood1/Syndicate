@@ -63,8 +63,9 @@ def test_every_launched_script_is_a_native_file():
     assert launched >= 10, launched  # 11 at generation; a drop means the rule stopped firing
 
 
-def test_data_roots_stay_on_the_vendored_tree():
+def test_data_root_is_engines_mlb():
+    """The daily sim's DATA root (and subprocess cwd) is engines/mlb since lane mlb-engine-data-native-p4."""
     import syndicate.features.mlb.native.tools.daily_update as DU
 
-    assert Path(DU._ROOT_DIR).resolve() == VENDOR.resolve()
+    assert Path(DU._ROOT_DIR).resolve() == (ROOT / "engines" / "mlb").resolve()
     assert Path(DU._NATIVE_ROOT).resolve() == NATIVE.resolve()

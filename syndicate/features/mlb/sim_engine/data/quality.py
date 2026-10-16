@@ -17,7 +17,7 @@ contact_rate, pulled_air_rate, pitch_velo_mean, pitch_extension_mean.
 """
 
 from __future__ import annotations
-_VENDORED_FILE = str(__import__("pathlib").Path(__file__).resolve().parents[5].joinpath('vendor', 'mlb_bettingv2', 'sim_engine', 'data', 'quality.py'))  # EDIT: this module's path in vendor/, so every DATA root resolves there
+_ENGINE_FILE = str(__import__("pathlib").Path(__file__).resolve().parents[5].joinpath('engines', 'mlb', 'sim_engine', 'data', 'quality.py'))  # EDIT: this module's path under the engines/mlb DATA root (same depth as vendor/mlb_bettingv2)
 
 import json
 import os
@@ -44,7 +44,7 @@ def _root() -> Path:
     o = str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip()
     if o:
         return Path(o).expanduser().resolve()
-    return Path(_VENDORED_FILE).resolve().parents[4] / "data"
+    return Path(_ENGINE_FILE).resolve().parents[4] / "data"
 
 
 def load_quality(season: int) -> Optional[dict]:

@@ -41,7 +41,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-CACHE_DIR = REPO_ROOT / "vendor/mlb_bettingv2/data/cache/statcast/pitcher_pitch_splits"
+CACHE_DIR = REPO_ROOT / "engines/mlb/data/cache/statcast/pitcher_pitch_splits"  # the engine DATA root (lane mlb-engine-data-native-p4)
 # Mirrored artifact tree, so `artifact_publisher` + the mirror refresh see it.
 REL_OUT = "mlb_source/source_artifacts/data/pitch_splits"
 

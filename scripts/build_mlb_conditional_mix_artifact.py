@@ -57,10 +57,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO / "vendor" / "mlb_bettingv2"))
+if str(REPO) not in sys.path:  # the native engine (lane mlb-engine-data-native-p4); nothing vendored on sys.path
+    sys.path.insert(0, str(REPO))
 
 REL = "mlb_source/source_artifacts/data/conditional_mix"
-RAW = "vendor/mlb_bettingv2/data/raw/statcast/pitches/{season}/*.csv.gz"
+RAW = "engines/mlb/data/raw/statcast/pitches/{season}/*.csv.gz"  # the engine DATA root (lane mlb-engine-data-native-p4)
 
 ALL_COUNTS = [f"{b}-{s}" for b in range(4) for s in range(3)]
 EPS = 0.01          # league floor, applied to every candidate equally
@@ -84,7 +85,7 @@ def _tvd(a: dict, b: dict) -> float:
 
 def _load(season: int, max_files: int):
     """-> rows of (date, pitcher, count, hand, pitch_type_value)"""
-    from sim_engine.data.pitch_codes import canon_pitch_type
+    from syndicate.features.mlb.sim_engine.data.pitch_codes import canon_pitch_type
 
     files = sorted(glob.glob(str(REPO / RAW.format(season=season))))[:max_files]
     if not files:

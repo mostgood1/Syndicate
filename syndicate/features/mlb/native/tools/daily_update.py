@@ -1,5 +1,5 @@
 from __future__ import annotations
-_VENDORED_FILE = str(__import__("pathlib").Path(__file__).resolve().parents[5].joinpath('vendor', 'mlb_bettingv2', 'tools', 'daily_update.py'))  # EDIT: this module's path in vendor/, so every DATA root resolves there
+_ENGINE_FILE = str(__import__("pathlib").Path(__file__).resolve().parents[5].joinpath('engines', 'mlb', 'tools', 'daily_update.py'))  # EDIT: this module's path under the engines/mlb DATA root (same depth as vendor/mlb_bettingv2)
 _NATIVE_ROOT = __import__("pathlib").Path(__file__).resolve().parents[5].joinpath('syndicate', 'features', 'mlb', 'native')  # EDIT: CODE root -- vendored `tools` scripts run from their native copies
 _SYNDICATE_ROOT = str(__import__("pathlib").Path(__file__).resolve().parents[5])  # EDIT: the Syndicate repo root goes on sys.path, never the vendored one
 
@@ -37,7 +37,7 @@ if sys.platform.startswith("win"):
         pass
 
 # Ensure the project root (MLB-BettingV2/) is importable when running this file directly.
-_ROOT_DIR = Path(_VENDORED_FILE).resolve().parents[1]
+_ROOT_DIR = Path(_ENGINE_FILE).resolve().parents[1]
 _TRACKED_DATA_DIR = (_ROOT_DIR / "data").resolve()
 _DATA_ROOT_DIR_ENV = str(
     os.environ.get("MLB_BETTING_DATA_ROOT")
@@ -2816,7 +2816,7 @@ def _build_next_day_ui_daily_command(args: argparse.Namespace, raw_argv: List[st
     next_season = _season_from_date_str(str(next_date), int(args.season))
     cmd = [
         sys.executable,  # do NOT .resolve(): on Linux venvs that dereferences the symlink to the system interpreter (no site-packages)
-        str(Path(_VENDORED_FILE).resolve()),
+        str(__import__("pathlib").Path(__file__).resolve()),  # EDIT: CODE -- relaunch THIS native script
         "--workflow",
         "ui-daily",
         "--date",

@@ -1,5 +1,5 @@
 from __future__ import annotations
-_VENDORED_FILE = str(__import__("pathlib").Path(__file__).resolve().parents[5].joinpath('vendor', 'mlb_bettingv2', 'sim_engine', 'data', 'statsapi.py'))  # EDIT: this module's path in vendor/, so every DATA root resolves there
+_ENGINE_FILE = str(__import__("pathlib").Path(__file__).resolve().parents[5].joinpath('engines', 'mlb', 'sim_engine', 'data', 'statsapi.py'))  # EDIT: this module's path under the engines/mlb DATA root (same depth as vendor/mlb_bettingv2)
 
 from dataclasses import dataclass
 from datetime import datetime
@@ -23,7 +23,7 @@ def _default_statsapi_cache_root() -> Path:
     data_root_env = str(os.environ.get("MLB_BETTING_DATA_ROOT") or "").strip()
     if data_root_env:
         return (Path(data_root_env).resolve() / "cache" / "statsapi").resolve()
-    return (Path(_VENDORED_FILE).resolve().parents[2] / "data" / "cache" / "statsapi").resolve()
+    return (Path(_ENGINE_FILE).resolve().parents[2] / "data" / "cache" / "statsapi").resolve()
 
 
 @dataclass
@@ -150,7 +150,7 @@ def load_feed_live_from_raw(season: int, date_str: str, game_pk: int, raw_root: 
             if data_root_env:
                 root = Path(data_root_env).resolve() / "raw" / "statsapi" / "feed_live"
             else:
-                root = Path(_VENDORED_FILE).resolve().parents[2] / "data" / "raw" / "statsapi" / "feed_live"
+                root = Path(_ENGINE_FILE).resolve().parents[2] / "data" / "raw" / "statsapi" / "feed_live"
         p = Path(root) / str(int(season)) / str(date_str) / f"{game_pk_i}.json.gz"
         if not p.exists():
             return None
@@ -567,7 +567,7 @@ def _parse_park_from_game_data(game_data: Dict[str, Any]) -> ParkFactors:
 
     # Apply optional Statcast-derived park factor overrides if present.
     try:
-        root = Path(_VENDORED_FILE).resolve().parents[2]
+        root = Path(_ENGINE_FILE).resolve().parents[2]
         p = root / "data" / "park" / "park_factors.json"
         if p.exists():
             with open(p, "r", encoding="utf-8") as f:
@@ -606,7 +606,7 @@ def _load_local_umpire_factor_map() -> Dict[int, Dict[str, Any]]:
     Returns: {umpire_id: {..}} and name-keyed entries are handled separately.
     """
     try:
-        root = Path(_VENDORED_FILE).resolve().parents[2]
+        root = Path(_ENGINE_FILE).resolve().parents[2]
         p = root / "data" / "umpire" / "umpire_factors.json"
         if not p.exists():
             return {}
@@ -638,7 +638,7 @@ def _load_local_umpire_factor_map_anykey() -> Dict[str, Dict[str, Any]]:
         if _UMPIRE_FACTOR_MAP_CACHE is not None:
             return _UMPIRE_FACTOR_MAP_CACHE
 
-        root = Path(_VENDORED_FILE).resolve().parents[2]
+        root = Path(_ENGINE_FILE).resolve().parents[2]
         p = root / "data" / "umpire" / "umpire_factors.json"
         if not p.exists():
             _UMPIRE_FACTOR_MAP_CACHE = {}

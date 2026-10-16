@@ -55,9 +55,10 @@ ROOTS = ["_live_lens_reports_payload", "start_live_lens_background_loop",
 
 #: The header: the vendored module's own top-level import statements (copied verbatim, see `_header`), then this.
 _HEADER_ROOTS = '''
-# EDIT: the vendored app's repo root and web dir, named explicitly because this module lives in Syndicate. They are DATA
-# roots only: nothing is put on sys.path, and the sim_engine / tools imports below are Syndicate's own (phase 2).
-_ROOT = Path(__file__).resolve().parents[4] / "vendor" / "mlb_bettingv2"
+# EDIT: the app's repo root and web dir, named explicitly because this module lives in Syndicate. They are DATA roots
+# only, and since lane mlb-engine-data-native-p4 the root is Syndicate's engines/mlb (where the vendored app's
+# vendor/mlb_bettingv2 data now lives); nothing is put on sys.path, and every import below is Syndicate's own.
+_ROOT = Path(__file__).resolve().parents[4] / "engines" / "mlb"
 _WEB_DIR = _ROOT / "tools" / "web"
 '''
 
@@ -66,7 +67,7 @@ _WEB_DIR = _ROOT / "tools" / "web"
 EDITS: list[tuple[str, str]] = [
     # In the vendored file parents[2] of tools/web/flask_frontend.py IS vendor/mlb_bettingv2 -- the header's _ROOT.
     ("_ROOT_DIR = Path(__file__).resolve().parents[2]\n",
-     "_ROOT_DIR = _ROOT  # EDIT: the vendored repo root, as Path(__file__).parents[2] resolved it there\n"),
+     "_ROOT_DIR = _ROOT  # EDIT: the engine DATA root (engines/mlb), where Path(__file__).parents[2] resolved the vendored one\n"),
 ]
 
 

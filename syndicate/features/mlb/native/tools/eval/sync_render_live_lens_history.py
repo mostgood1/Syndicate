@@ -1,5 +1,5 @@
 from __future__ import annotations
-_VENDORED_FILE = str(__import__("pathlib").Path(__file__).resolve().parents[6].joinpath('vendor', 'mlb_bettingv2', 'tools', 'eval', 'sync_render_live_lens_history.py'))  # EDIT: this module's path in vendor/, so every DATA root resolves there
+_ENGINE_FILE = str(__import__("pathlib").Path(__file__).resolve().parents[6].joinpath('engines', 'mlb', 'tools', 'eval', 'sync_render_live_lens_history.py'))  # EDIT: this module's path under the engines/mlb DATA root (same depth as vendor/mlb_bettingv2)
 _SYNDICATE_ROOT = str(__import__("pathlib").Path(__file__).resolve().parents[6])  # EDIT: the Syndicate repo root goes on sys.path, never the vendored one
 
 import argparse
@@ -14,7 +14,7 @@ import urllib.request
 from typing import Any, Dict, List
 
 
-_ROOT = Path(_VENDORED_FILE).resolve().parents[2]
+_ROOT = Path(_ENGINE_FILE).resolve().parents[2]
 if _SYNDICATE_ROOT not in sys.path:
     sys.path.insert(0, _SYNDICATE_ROOT)
 

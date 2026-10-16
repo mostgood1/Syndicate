@@ -1,0 +1,11 @@
+{
+  "name": "starter_workload_v1",
+  "description": "Primary objective for the starter-hook-add-pitches sweep: pitch-count bias/SO-MAE/outs-MAE improvement (Phase 1 priority #1 of the MLB sim accuracy plan), with ML/totals carried at low weight as a sanity term so a workload win that quietly wrecks game-level calibration doesn't get selected.",
+  "metrics": [
+    {"path": "pitcher_props_starters_weighted.pitches_bias", "direction": "lower_abs", "weight": 4.0},
+    {"path": "pitcher_props_starters_weighted.so_mae", "direction": "lower", "weight": 2.0},
+    {"path": "pitcher_props_starters_weighted.outs_mae", "direction": "lower", "weight": 2.0},
+    {"path": "full_weighted.brier_home_win", "direction": "lower", "weight": 0.5},
+    {"path": "full_weighted.mae_total_runs", "direction": "lower", "weight": 0.5}
+  ]
+}

@@ -1,5 +1,5 @@
 from __future__ import annotations
-_VENDORED_FILE = str(__import__("pathlib").Path(__file__).resolve().parents[6].joinpath('vendor', 'mlb_bettingv2', 'tools', 'eval', 'eval_sim_day_vs_actual.py'))  # EDIT: this module's path in vendor/, so every DATA root resolves there
+_ENGINE_FILE = str(__import__("pathlib").Path(__file__).resolve().parents[6].joinpath('engines', 'mlb', 'tools', 'eval', 'eval_sim_day_vs_actual.py'))  # EDIT: this module's path under the engines/mlb DATA root (same depth as vendor/mlb_bettingv2)
 _SYNDICATE_ROOT = str(__import__("pathlib").Path(__file__).resolve().parents[6])  # EDIT: the Syndicate repo root goes on sys.path, never the vendored one
 
 import argparse
@@ -25,7 +25,7 @@ if sys.platform.startswith("win"):
 
 
 # Ensure the project root (MLB-BettingV2/) is importable.
-_ROOT = Path(_VENDORED_FILE).resolve().parents[2]
+_ROOT = Path(_ENGINE_FILE).resolve().parents[2]
 _TRACKED_DATA_DIR = (_ROOT / "data").resolve()
 _DATA_ROOT_ENV = str(__import__("os").environ.get("MLB_BETTING_DATA_ROOT") or "").strip()
 _DATA_DIR = (Path(_DATA_ROOT_ENV).resolve() if _DATA_ROOT_ENV else _TRACKED_DATA_DIR)

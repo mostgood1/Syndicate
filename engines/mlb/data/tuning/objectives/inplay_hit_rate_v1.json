@@ -1,0 +1,11 @@
+{
+  "name": "inplay_hit_rate_v1",
+  "description": "Primary objective for the pm_inplay_hit_rate_mult sweep: root-cause fix for the measured hits over-projection (~10pt on hits_1plus, +6pt hits_2plus per the 44-day backfill scorecard). Targets hits_1plus/2plus brier+logloss directly (the actual diagnosed defect) rather than the light logistic calibration already promoted, with totals MAE as a secondary check since in-play hit rate feeds the same run environment, and a starter-workload sanity term so a hits win doesn't quietly regress the already-promoted Phase 1 #1 fix.",
+  "metrics": [
+    {"path": "hitter_props_likelihood_topn_weighted.hits_1plus_brier", "direction": "lower", "weight": 3.0},
+    {"path": "hitter_props_likelihood_topn_weighted.hits_2plus_brier", "direction": "lower", "weight": 2.0},
+    {"path": "hitter_props_likelihood_topn_weighted.hits_1plus_logloss", "direction": "lower", "weight": 1.0},
+    {"path": "full_weighted.mae_total_runs", "direction": "lower", "weight": 1.0},
+    {"path": "pitcher_props_starters_weighted.pitches_bias", "direction": "lower_abs", "weight": 0.5}
+  ]
+}

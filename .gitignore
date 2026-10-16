@@ -171,6 +171,10 @@ reports/live_refresh_loop/weather_fetch.log
 # Generated source trees are operational artifacts, not Render deploy inputs.
 data/*_source/data/
 vendor/*/data/
+# The native engines' DATA roots (engines/mlb replaced vendor/mlb_bettingv2's, lane mlb-engine-data-native-p4): runtime
+# state (roster registry, statcast caches, ...) is ignored as it was there; the engine's git-tracked inputs are added
+# with --force, as they were under vendor/.
+engines/*/data/
 
 # NCAAF's real SmartSim 2.0 projection artifacts nest under data/ncaaf_source/data/
 # (NFL's own equivalent avoids this by living directly under nfl_source/, no

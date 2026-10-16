@@ -1,5 +1,5 @@
 from __future__ import annotations
-_VENDORED_FILE = str(__import__("pathlib").Path(__file__).resolve().parents[5].joinpath('vendor', 'mlb_bettingv2', 'sim_engine', 'data', 'statcast_bvp.py'))  # EDIT: this module's path in vendor/, so every DATA root resolves there
+_ENGINE_FILE = str(__import__("pathlib").Path(__file__).resolve().parents[5].joinpath('engines', 'mlb', 'sim_engine', 'data', 'statcast_bvp.py'))  # EDIT: this module's path under the engines/mlb DATA root (same depth as vendor/mlb_bettingv2)
 
 import csv
 import gzip
@@ -28,7 +28,7 @@ class BvPCounts:
 
 
 def _root() -> Path:
-    return Path(_VENDORED_FILE).resolve().parents[2]
+    return Path(_ENGINE_FILE).resolve().parents[2]
 
 
 def default_bvp_cache(ttl_seconds: int = 30 * 24 * 3600, cache_dir: str | None = None) -> DiskCache:

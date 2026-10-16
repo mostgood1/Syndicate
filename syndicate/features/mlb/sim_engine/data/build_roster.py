@@ -1,5 +1,5 @@
 from __future__ import annotations
-_VENDORED_FILE = str(__import__("pathlib").Path(__file__).resolve().parents[5].joinpath('vendor', 'mlb_bettingv2', 'sim_engine', 'data', 'build_roster.py'))  # EDIT: this module's path in vendor/, so every DATA root resolves there
+_ENGINE_FILE = str(__import__("pathlib").Path(__file__).resolve().parents[5].joinpath('engines', 'mlb', 'sim_engine', 'data', 'build_roster.py'))  # EDIT: this module's path under the engines/mlb DATA root (same depth as vendor/mlb_bettingv2)
 
 import json
 from pathlib import Path
@@ -117,7 +117,7 @@ def _apply_cached_statcast_pitch_splits(
 def _default_profile_cache_root() -> Path:
     # build_roster.py lives at MLB-BettingV2/sim_engine/data/build_roster.py
     # parents[2] => MLB-BettingV2/
-    root = Path(_VENDORED_FILE).resolve().parents[2]
+    root = Path(_ENGINE_FILE).resolve().parents[2]
     return root / "data" / "cache" / "roster_profiles"
 
 
@@ -547,7 +547,7 @@ def _load_manager_tendencies_anykey() -> Dict[str, Dict[str, Any]]:
     if _MANAGER_TENDENCIES_CACHE is not None:
         return _MANAGER_TENDENCIES_CACHE
     try:
-        root = Path(_VENDORED_FILE).resolve().parents[2]
+        root = Path(_ENGINE_FILE).resolve().parents[2]
         p = root / "data" / "manager" / "manager_tendencies.json"
         if not p.exists():
             _MANAGER_TENDENCIES_CACHE = {}
@@ -916,7 +916,7 @@ def _load_statcast_quality_map_anykey(season: int) -> Dict[str, Any]:
     if season_i in _STATCAST_QUALITY_CACHE_BY_SEASON:
         return _STATCAST_QUALITY_CACHE_BY_SEASON[season_i]
     try:
-        root = Path(_VENDORED_FILE).resolve().parents[2]
+        root = Path(_ENGINE_FILE).resolve().parents[2]
         base = root / "data" / "statcast" / "quality"
         # Preferred stable path
         p = base / f"player_quality_{season_i}.json"
@@ -944,7 +944,7 @@ def _load_statcast_features_anykey(season: int) -> Dict[str, Any]:
     if season_i in _STATCAST_FEATURES_CACHE_BY_SEASON:
         return _STATCAST_FEATURES_CACHE_BY_SEASON[season_i]
     try:
-        root = Path(_VENDORED_FILE).resolve().parents[2]
+        root = Path(_ENGINE_FILE).resolve().parents[2]
         base = root / "data" / "statcast" / "features"
         p = base / f"player_features_{season_i}.json"
         if not p.exists():

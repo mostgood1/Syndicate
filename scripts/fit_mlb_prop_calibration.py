@@ -1,14 +1,15 @@
 """Refit the MLB hitter-prop calibration against PRODUCTION, and prove it held-out.
 
 `#624` step 1. This is the reproducible entrypoint behind
-`vendor/mlb_bettingv2/data/tuning/hitter_props_calibration/default.json`; the
+`engines/mlb/data/tuning/hitter_props_calibration/default.json` (under vendor/mlb_bettingv2 until 2026-10-16); the
 first fit of it (2026-09-01) found the DEPLOYED config had gone stale and was
 measurably worse than no calibration at all.
 
 WHY THIS EXISTS RATHER THAN A SCRATCH SCRIPT. `#622` wants calibration refit on
 a schedule with a held-out gate, and a fit nobody can re-run is a fit nobody can
 check. The math is NOT reimplemented here: the fit is
-`vendor/mlb_bettingv2/tools/tune/fit_hitter_prob_calibration.py` and the
+`syndicate/features/mlb/native/tools/tune/fit_hitter_prob_calibration.py` (the generated copy of the vendored
+script) and the
 observation extraction is its own `_extract_prop_pairs`. A second definition of
 either would drift from the thing being judged.
 
@@ -48,7 +49,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-from vendor.mlb_bettingv2.tools.tune.fit_hitter_prob_calibration import (  # noqa: E402
+from syndicate.features.mlb.native.tools.tune.fit_hitter_prob_calibration import (  # noqa: E402  (native copy, lane mlb-engine-data-native-p4)
     _extract_prop_pairs,
     _iter_reports_from_batch,
 )
@@ -59,8 +60,10 @@ except ImportError:  # run as `python scripts/<name>.py`
     from _base_url import admin_token as resolve_admin_token, default_base_url
 
 DEFAULT_BASE = default_base_url()
-CONFIG_PATH = REPO_ROOT / "vendor" / "mlb_bettingv2" / "data" / "tuning" / "hitter_props_calibration" / "default.json"
-FITTER = REPO_ROOT / "vendor" / "mlb_bettingv2" / "tools" / "tune" / "fit_hitter_prob_calibration.py"
+# The engine input this fit writes, at the engine DATA root the native engine reads (engines/mlb replaced
+# vendor/mlb_bettingv2, lane mlb-engine-data-native-p4) -- written anywhere else, the engine would never see it.
+CONFIG_PATH = REPO_ROOT / "engines" / "mlb" / "data" / "tuning" / "hitter_props_calibration" / "default.json"
+FITTER = REPO_ROOT / "syndicate" / "features" / "mlb" / "native" / "tools" / "tune" / "fit_hitter_prob_calibration.py"
 
 
 # --------------------------------------------------------------------- scoring

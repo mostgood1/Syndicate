@@ -32,12 +32,12 @@ def test_port_imports_with_both_entry_points():
     assert callable(app_slice.start_live_lens_background_loop)
 
 
-def test_root_edit_resolves_the_vendored_repo_root():
-    """In the vendored file `Path(__file__).parents[2]` of tools/web/flask_frontend.py is vendor/mlb_bettingv2; the port
-    lives elsewhere, so the EDIT must land on that same directory or every default data path moves."""
+def test_root_edit_resolves_the_engine_data_root():
+    """In the vendored file `Path(__file__).parents[2]` of tools/web/flask_frontend.py is vendor/mlb_bettingv2, the
+    app's DATA root; since lane mlb-engine-data-native-p4 that root is Syndicate's engines/mlb."""
     from syndicate.features.mlb.live_lens_port import app_slice
 
-    expected = (ROOT / "vendor" / "mlb_bettingv2").resolve()
+    expected = (ROOT / "engines" / "mlb").resolve()
     assert Path(app_slice._ROOT).resolve() == expected
     assert Path(app_slice._ROOT_DIR).resolve() == expected
     assert Path(app_slice._WEB_DIR).resolve() == expected / "tools" / "web"

@@ -11,11 +11,16 @@ tools mirror"). Generates, from vendor/mlb_bettingv2/:
     (syndicate/features/mlb/live_lens_port/app_slice.py, scripts/port_mlb_live_lens.py), which roots them.
 
 The only hand-written behaviour is EDITS, all mechanical, each counted:
-  * VENDORED FILE: `Path(__file__)` -> `Path(_VENDORED_FILE)`, the module's path in the vendored tree, so every
-    `.resolve().parents[k]` DATA root lands where it did in vendor/ (the copy sits at a different depth).
+  * ENGINE FILE: `Path(__file__)` -> `Path(_ENGINE_FILE)`: the module's path as if its tree sat at engines/mlb/
+    instead of vendor/mlb_bettingv2/ (lane mlb-engine-data-native-p4). That root is a Syndicate-owned DATA root at the
+    SAME depth below the repo, so every `.resolve().parents[k]` keeps its meaning: the 33 sites that reached the
+    vendored repo root (parents[1] / parents[2] -> `data/`, `.env`) now reach engines/mlb, and the 5 that reached the
+    Syndicate repo root (`parents[4] / "data"` in sim_engine/data/) still do. engines/mlb/data/ holds the 12 git-tracked
+    engine inputs; the runtime state the engine writes there is gitignored and migrated by
+    scripts/migrate_mlb_engine_data.py.
   * NATIVE SCRIPTS: a script path rooted at the repo root (`_ROOT_DIR / "tools" / ...`, `_ROOT / "tools" / ...`) is
-    CODE, so it becomes `_NATIVE_ROOT / "tools" / ...` -- the native copy, never the vendored script. The same
-    `_ROOT_DIR` stays the vendored root everywhere else (data, subprocess cwd).
+    CODE, so it becomes `_NATIVE_ROOT / "tools" / ...` -- the native copy. The same `_ROOT_DIR` is the engine DATA root
+    everywhere else (data, subprocess cwd).
   * SYS.PATH: each script's `if str(<root>) not in sys.path: sys.path.insert(0, str(<root>))` puts the SYNDICATE repo
     root on sys.path instead of the vendored one, so the rewritten imports resolve and a missed vendored import fails
     loudly instead of silently loading vendor.
@@ -53,7 +58,13 @@ WEB_SLICE = "syndicate.features.mlb.live_lens_port.app_slice"
 APP = VENDOR / "tools" / "web" / "flask_frontend.py"
 #: Entry points that RUN vendored tools today: the daily sim (scripts/run_mlb_daily_sim_job.py) and the refresh-worker's
 #: season-manifest launcher (scripts/run_refresh_worker.py).
-ENTRY_SCRIPTS = ["tools/daily_update.py", "tools/eval/build_season_betting_cards_manifest.py"]
+ENTRY_SCRIPTS = ["tools/daily_update.py", "tools/eval/build_season_betting_cards_manifest.py",
+                 # Engine-input PRODUCERS Syndicate runs (lane mlb-engine-data-native-p4): scripts/refresh_mlb_statcast_features.py
+                 # (raw pitches + the player feature set) and scripts/fit_mlb_prop_calibration.py (the hitter calibration).
+                 "tools/statcast/fetch_statcast_raw_pitches_x64.py", "tools/datasets/build_statcast_player_feature_set.py",
+                 "tools/tune/fit_hitter_prob_calibration.py"]
+#: The Syndicate-owned engine DATA root, relative to the repo -- the same depth as vendor/mlb_bettingv2.
+ENGINE_ROOT_PARTS = ("engines", "mlb")
 VENDORED_ROOTS = {"sim_engine", "tools"}
 
 #: Per-file EDITS beyond the mechanical ones, for sim_engine: {path relative to sim_engine/: [(anchor, replacement)]}.
@@ -66,9 +77,16 @@ SIM_EDITS: dict[str, list[tuple[str, str]]] = {
 
 #: Per-file EDITS for the tools copies, applied AFTER the mechanical ones: {path relative to vendor/mlb_bettingv2: [...]}.
 TOOLS_EDITS: dict[str, list[tuple[str, str]]] = {
+    # CODE, not data: the next-day build relaunches THIS script. Under the ENGINE FILE rule `Path(_ENGINE_FILE)` names
+    # engines/mlb/tools/daily_update.py, which does not exist (and under phase 3's vendored-file rule it named the
+    # VENDORED script -- a latent defect: unreachable in production, which passes --build-next-day off).
+    "tools/daily_update.py": [
+        ("        str(Path(_ENGINE_FILE).resolve()),\n",
+         "        str(__import__(\"pathlib\").Path(__file__).resolve()),  # EDIT: CODE -- relaunch THIS native script\n"),
+    ],
     # A provenance LABEL written into daily_summary_<date>_profile_bundle.json. `daily_update_py` is now the native
-    # script (NATIVE SCRIPTS rule), which `_rel` cannot make relative to the vendored `_ROOT`, so it would record an
-    # absolute path where production records "tools/daily_update.py" -- the same relative path the native tree mirrors.
+    # script (NATIVE SCRIPTS rule), which `_rel` cannot make relative to `_ROOT`, so it would record an absolute path
+    # where production records "tools/daily_update.py" -- the same relative path the native tree mirrors.
     # Measured by scripts/mlb_daily_sim_parity.py 2026-10-16 as the ONE leaf beyond the noise floor; no reader exists.
     "tools/daily_update_multi_profile.py": [
         ('"daily_update_tool": _rel(daily_update_py),',
@@ -157,15 +175,15 @@ def _edit_module(text: str, out_rel: Path, vendored_rel: Path, report: dict) -> 
         raise SystemExit(f"[{out_rel}] a sys.path edit outside the known two-line shape")
     # IMPORT PATHS
     text = _rewrite_imports(text, out_rel.as_posix())
-    # VENDORED FILE
+    # ENGINE FILE
     n_file = text.count("Path(__file__)")
     if n_file:
         if text.count("__file__") != n_file:
             raise SystemExit(f"[{out_rel}] __file__ used outside Path(__file__); extend the EDIT rule deliberately")
-        text = text.replace("Path(__file__)", "Path(_VENDORED_FILE)")
-        header.insert(0, _path_line("_VENDORED_FILE", out_rel, ("vendor", "mlb_bettingv2", *vendored_rel.parts),
-                                    as_str=True, why="this module's path in vendor/, so every DATA root resolves there"))
-        report["vendored_file"] = report.get("vendored_file", 0) + n_file
+        text = text.replace("Path(__file__)", "Path(_ENGINE_FILE)")
+        header.insert(0, _path_line("_ENGINE_FILE", out_rel, (*ENGINE_ROOT_PARTS, *vendored_rel.parts), as_str=True,
+                                    why="this module's path under the engines/mlb DATA root (same depth as vendor/mlb_bettingv2)"))
+        report["engine_file"] = report.get("engine_file", 0) + n_file
     text = _insert_header(text, header)
     compile(text, str(out_rel), "exec")
     _check_no_vendored_imports(out_rel.as_posix(), text)
@@ -314,7 +332,7 @@ def main() -> int:
               f"native tools: {len(tl)} files / {sum(tl.values())} lines")
         for rel, n in sorted(tl.items(), key=lambda kv: -kv[1]):
             print(f"  {n:6d}  {rel}")
-        print(f"EDIT counts: vendored-file {report.get('vendored_file', 0)}, script joins {report.get('script_joins', 0)}, "
+        print(f"EDIT counts: engine-file {report.get('engine_file', 0)}, script joins {report.get('script_joins', 0)}, "
               f"sys.path {report.get('sys_path', 0)}")
         for src, target in report.get("script_targets", []):
             print(f"  script launch: {src} -> native {target}")

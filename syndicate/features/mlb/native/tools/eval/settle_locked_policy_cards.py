@@ -1,5 +1,5 @@
 from __future__ import annotations
-_VENDORED_FILE = str(__import__("pathlib").Path(__file__).resolve().parents[6].joinpath('vendor', 'mlb_bettingv2', 'tools', 'eval', 'settle_locked_policy_cards.py'))  # EDIT: this module's path in vendor/, so every DATA root resolves there
+_ENGINE_FILE = str(__import__("pathlib").Path(__file__).resolve().parents[6].joinpath('engines', 'mlb', 'tools', 'eval', 'settle_locked_policy_cards.py'))  # EDIT: this module's path under the engines/mlb DATA root (same depth as vendor/mlb_bettingv2)
 _SYNDICATE_ROOT = str(__import__("pathlib").Path(__file__).resolve().parents[6])  # EDIT: the Syndicate repo root goes on sys.path, never the vendored one
 
 import argparse
@@ -11,7 +11,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
-REPO_ROOT = Path(_VENDORED_FILE).resolve().parents[2]
+REPO_ROOT = Path(_ENGINE_FILE).resolve().parents[2]
 DATA_ROOT_ENV = str(os.environ.get("MLB_BETTING_DATA_ROOT") or "").strip()
 DATA_ROOT = Path(DATA_ROOT_ENV).resolve() if DATA_ROOT_ENV else None
 TRACKED_DATA_ROOT = (REPO_ROOT / "data").resolve()

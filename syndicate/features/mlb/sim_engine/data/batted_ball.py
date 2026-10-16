@@ -32,7 +32,7 @@ player, or weight 0 leaves the profile untouched.
 """
 
 from __future__ import annotations
-_VENDORED_FILE = str(__import__("pathlib").Path(__file__).resolve().parents[5].joinpath('vendor', 'mlb_bettingv2', 'sim_engine', 'data', 'batted_ball.py'))  # EDIT: this module's path in vendor/, so every DATA root resolves there
+_ENGINE_FILE = str(__import__("pathlib").Path(__file__).resolve().parents[5].joinpath('engines', 'mlb', 'sim_engine', 'data', 'batted_ball.py'))  # EDIT: this module's path under the engines/mlb DATA root (same depth as vendor/mlb_bettingv2)
 
 import json
 import os
@@ -52,7 +52,7 @@ def _root() -> Path:
     override = str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip()
     if override:
         return Path(override).expanduser().resolve()
-    return Path(_VENDORED_FILE).resolve().parents[4] / "data"
+    return Path(_ENGINE_FILE).resolve().parents[4] / "data"
 
 
 def load_batted_ball(season: int) -> Optional[dict]:

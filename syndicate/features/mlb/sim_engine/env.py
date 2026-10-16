@@ -1,5 +1,5 @@
 from __future__ import annotations
-_VENDORED_FILE = str(__import__("pathlib").Path(__file__).resolve().parents[4].joinpath('vendor', 'mlb_bettingv2', 'sim_engine', 'env.py'))  # EDIT: this module's path in vendor/, so every DATA root resolves there
+_ENGINE_FILE = str(__import__("pathlib").Path(__file__).resolve().parents[4].joinpath('engines', 'mlb', 'sim_engine', 'env.py'))  # EDIT: this module's path under the engines/mlb DATA root (same depth as vendor/mlb_bettingv2)
 
 import os
 from pathlib import Path
@@ -33,7 +33,7 @@ def load_dotenv_if_present(dotenv_path: Optional[Path] = None) -> Dict[str, str]
     Returns the parsed key/value pairs.
     """
     try:
-        path = Path(dotenv_path) if dotenv_path else (Path(_VENDORED_FILE).resolve().parents[1] / ".env")
+        path = Path(dotenv_path) if dotenv_path else (Path(_ENGINE_FILE).resolve().parents[1] / ".env")
         if not path.exists():
             return {}
         parsed = _parse_dotenv_text(path.read_text(encoding="utf-8"))

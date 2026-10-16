@@ -1,5 +1,5 @@
 from __future__ import annotations
-_VENDORED_FILE = str(__import__("pathlib").Path(__file__).resolve().parents[5].joinpath('vendor', 'mlb_bettingv2', 'sim_engine', 'data', 'roster_registry.py'))  # EDIT: this module's path in vendor/, so every DATA root resolves there
+_ENGINE_FILE = str(__import__("pathlib").Path(__file__).resolve().parents[5].joinpath('engines', 'mlb', 'sim_engine', 'data', 'roster_registry.py'))  # EDIT: this module's path under the engines/mlb DATA root (same depth as vendor/mlb_bettingv2)
 
 import json
 from dataclasses import dataclass
@@ -14,7 +14,7 @@ _SCHEMA_VERSION = 1
 def _root_dir() -> Path:
     # roster_registry.py lives at MLB-BettingV2/sim_engine/data/roster_registry.py
     # parents[2] => MLB-BettingV2/
-    return Path(_VENDORED_FILE).resolve().parents[2]
+    return Path(_ENGINE_FILE).resolve().parents[2]
 
 
 def default_registry_dir() -> Path:
