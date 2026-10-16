@@ -153,6 +153,12 @@ class EventSimConfig:
     # "mean" = the targets read correctly, the mean shift only (no random env, no extra RNG draw); "full" = the mean
     # shift plus the random environment as originally written.
     quarter_targets_mode: str = "off"
+    # SHOOTING FOULS ON THREES (lane basketball-scenario-calibration, round 2 R2-c, pre-registered c35e8e89). The loop
+    # draws one shooting-foul rate for 2PA and 3PA; real threes are fouled far less (0.41 three-shot trips per
+    # team-game, ESPN pbp, 2025-26 FIT, vs ~1.5 in the sim), and with FOULED_MISS_NOT_FGA each fouled missed three
+    # leaves 3PA -- the whole residual 3P% excess. A multiplier on the foul probability when the shot is a three; the
+    # EXACT solver models it too. 1.0 = off (byte-identical; no extra RNG draw either way).
+    foul_3pa_mult: float = 1.0
 
     # Outcome priors (fallbacks when player priors are missing)
     base_tov_per_poss: float = 0.125
@@ -503,17 +509,23 @@ def _ft_rate_multipliers(players: pd.DataFrame, minutes: np.ndarray) -> np.ndarr
     return mult
 
 
-def _iterations_per_possession(p_tov: float, p3: float, fg2: float, fg3: float, foul: float, oreb: float) -> float:
+def _iterations_per_possession(p_tov: float, p3: float, fg2: float, fg3: float, foul: float, oreb: float, *, foul3_mult: float = 1.0) -> float:
     """1 + c: the loop's expected shot iterations per possession (see _loop_points_per_possession)."""
     t = float(np.clip(p_tov, 0.0, 0.6))
     s3 = float(np.clip(p3, 0.0, 1.0))
     made = (1.0 - s3) * float(np.clip(fg2, 0.05, 0.95)) + s3 * float(np.clip(fg3, 0.05, 0.95))
     f = float(np.clip(foul, 0.0, 0.95))
     o = float(np.clip(oreb, 0.05, 0.55))
-    return 1.0 + (1.0 - t) * (1.0 - made) * (1.0 - 0.70 * f) * o
+    if foul3_mult == 1.0:
+        return 1.0 + (1.0 - t) * (1.0 - made) * (1.0 - 0.70 * f) * o
+    f3 = float(np.clip(foul * foul3_mult, 0.0, 0.95))
+    m2 = float(np.clip(fg2, 0.05, 0.95))
+    m3 = float(np.clip(fg3, 0.05, 0.95))
+    miss_cont = (1.0 - s3) * (1.0 - m2) * (1.0 - 0.70 * f) + s3 * (1.0 - m3) * (1.0 - 0.70 * f3)
+    return 1.0 + (1.0 - t) * miss_cont * o
 
 
-def _loop_points_per_possession(p_tov: float, p3: float, fg2: float, fg3: float, foul: float, ft: float, oreb: float, eff: float) -> float:
+def _loop_points_per_possession(p_tov: float, p3: float, fg2: float, fg3: float, foul: float, ft: float, oreb: float, eff: float, *, foul3_mult: float = 1.0) -> float:
     """Expected points per team possession under the PBP loop's own rules at multiplier `eff`.
 
     The 0.32 (and-one) and 0.70 (fouled miss -> free throws) shares are the loop's own constants below.
@@ -527,9 +539,15 @@ def _loop_points_per_possession(p_tov: float, p3: float, fg2: float, fg3: float,
     o = float(np.clip(oreb, 0.05, 0.55))
     made = (1.0 - s3) * m2 + s3 * m3
     pts = (1.0 - s3) * m2 * 2.0 + s3 * m3 * 3.0
-    pts += made * f * 0.32 * ftp
-    pts += f * 0.70 * ftp * ((1.0 - s3) * (1.0 - m2) * 2.0 + s3 * (1.0 - m3) * 3.0)
-    cont = (1.0 - t) * (1.0 - made) * (1.0 - 0.70 * f) * o
+    if foul3_mult == 1.0:
+        pts += made * f * 0.32 * ftp
+        pts += f * 0.70 * ftp * ((1.0 - s3) * (1.0 - m2) * 2.0 + s3 * (1.0 - m3) * 3.0)
+        cont = (1.0 - t) * (1.0 - made) * (1.0 - 0.70 * f) * o
+    else:  # `foul_3pa_mult`: threes fouled at f x foul3_mult
+        f3 = float(np.clip(foul * foul3_mult, 0.0, 0.95))
+        pts += ((1.0 - s3) * m2 * f + s3 * m3 * f3) * 0.32 * ftp
+        pts += 0.70 * ftp * ((1.0 - s3) * (1.0 - m2) * f * 2.0 + s3 * (1.0 - m3) * f3 * 3.0)
+        cont = (1.0 - t) * ((1.0 - s3) * (1.0 - m2) * (1.0 - 0.70 * f) + s3 * (1.0 - m3) * (1.0 - 0.70 * f3)) * o
     # Iterations per possession are 1 + cont, not 1 / (1 - cont): every attempt spends period/q_poss seconds, so the
     # quarter clock reaches 0 before the possessions run out and the loop then refuses every later
     # offensive-rebound continuation (`q_remaining > 0`). Measured on the WNBA loop 2026-10-01 (1.1016 per possession
@@ -560,7 +578,7 @@ def _loop_shot_share(players: pd.DataFrame, minutes: np.ndarray, col_pm: str) ->
 
 
 def _solve_eff_mult(target_ppp: float, p_tov: float, p3: float, fg2: float, fg3: float, foul: float, ft: float, oreb: float, lo: float = 0.70, hi: float = 1.30,
-                    *, bonus_trip_share: float = 0.0, bonus_ft: Optional[float] = None) -> float:
+                    *, bonus_trip_share: float = 0.0, bonus_ft: Optional[float] = None, foul3_mult: float = 1.0) -> float:
     """Bisection for eff with the modelled points per possession == target_ppp, clipped to [lo, hi].
 
     `bonus_trip_share` s > 0 (bonus mechanism on): a share s of possessions are two-shot FT trips at `bonus_ft` x eff
@@ -572,7 +590,7 @@ def _solve_eff_mult(target_ppp: float, p_tov: float, p3: float, fg2: float, fg3:
     bft = float(ft if bonus_ft is None else bonus_ft)
 
     def model(e: float) -> float:
-        loop = _loop_points_per_possession(*args, e)
+        loop = _loop_points_per_possession(*args, e) if foul3_mult == 1.0 else _loop_points_per_possession(*args, e, foul3_mult=foul3_mult)
         if sb <= 0.0:
             return loop
         return (1.0 - sb) * loop + sb * 2.0 * float(np.clip(bft * e, 0.45, 0.95))
@@ -968,6 +986,7 @@ def simulate_pbp_game_boxscore(
                     fg3=float(np.sum(np.asarray(fg3_v, dtype=float) * share3)),
                     foul=float(rates["foul_per_fga"]) * float(np.sum(foul_share)),
                     oreb=float(cfg.base_oreb_rate) * float(oreb_m),
+                    foul3_mult=float(getattr(cfg, "foul_3pa_mult", 1.0)),
                 )
                 rates["p_tov"] = float(rates["p_tov"]) / max(1.0, iters)
         except Exception:
@@ -1059,6 +1078,7 @@ def simulate_pbp_game_boxscore(
                     oreb=float(cfg.base_oreb_rate) * float(oreb_m),
                     bonus_trip_share=sv_bonus_share,
                     bonus_ft=(_team_avg(ftv, _loop_shot_share(players, mins, "_prior_fta_pm"), 0.78) if sv_bonus_share > 0.0 else None),
+                    foul3_mult=float(getattr(cfg, "foul_3pa_mult", 1.0)),
                 )
                 if side == "h":
                     eff_mult_h = solved
@@ -1755,7 +1775,8 @@ def simulate_pbp_game_boxscore(
                     except Exception:
                         return
 
-                foul = bool(rng.random() < foul_per_fga) if not SHOOTER_FT_RATE else False
+                foul_p = foul_per_fga * (float(getattr(cfg, "foul_3pa_mult", 1.0)) if shot_is_3 else 1.0)
+                foul = bool(rng.random() < foul_p) if not SHOOTER_FT_RATE else False
 
                 if offense_home:
                     if shot_is_3:
@@ -1764,7 +1785,7 @@ def simulate_pbp_game_boxscore(
                         w = _usage_w(home_players, "_prior_fga_pm", h_line)
                     sh = int(_pick_weighted(rng, list(range(len(home_players))), w) or 0)
                     if SHOOTER_FT_RATE:
-                        foul = bool(rng.random() < float(np.clip(foul_per_fga * float(h_ft_mult[sh]), 0.0, 0.95)))
+                        foul = bool(rng.random() < float(np.clip(foul_p * float(h_ft_mult[sh]), 0.0, 0.95)))
 
                     h["fga"][sh] += 1
                     if shot_is_3:
@@ -1888,7 +1909,7 @@ def simulate_pbp_game_boxscore(
                         w = _usage_w(away_players, "_prior_fga_pm", a_line)
                     sh = int(_pick_weighted(rng, list(range(len(away_players))), w) or 0)
                     if SHOOTER_FT_RATE:
-                        foul = bool(rng.random() < float(np.clip(foul_per_fga * float(a_ft_mult[sh]), 0.0, 0.95)))
+                        foul = bool(rng.random() < float(np.clip(foul_p * float(a_ft_mult[sh]), 0.0, 0.95)))
 
                     a["fga"][sh] += 1
                     if shot_is_3:
