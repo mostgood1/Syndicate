@@ -1005,6 +1005,14 @@ death, never life — do not invert it.
 - Verification: per-competition verdicts with 95% bootstrap CIs, join coverage and credits spent in the findings file; tests/test_uefa_close_backtest.py passes offline
 - Blocked by: none
 
+### alt-ladders — OPEN — opened 2026-10-16 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
+- Goal: Player alternate-line ladders for the cheat sheet's games are captured once per game, late pregame (option c, user 2026-10-16), for NFL, MLB, NHL and NBA (NCAAF has no player alternates -- verified), at ~210 credits/day or less, written to <sport>_source/tracking/alt_ladders/<date>.jsonl and never mixed into the main book_quotes stream
+- Files: scripts/fetch_alt_ladders.py, tests/test_fetch_alt_ladders.py, .syndicate/findings_2026-10-16_alt_line_cost.md
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: after the fleet ff + scheduled task: the first late-pregame game per sport has an alt_ladders row set with several rungs per player, its state file records the billed credits (x-requests-last), and the day's alt credits stay under the daily cap
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
