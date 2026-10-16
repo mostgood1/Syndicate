@@ -982,6 +982,14 @@ death, never life — do not invert it.
 - Verification: Reader grep + live doc read + fleet log scan
 - Blocked by: none
 
+### nfl-sgp-builder — OPEN — opened 2026-10-16 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
+- Goal: NFL same-game-parlay suggestions on the NFL cheat sheet: 2-3 legs from the sheet's own rows, a joint probability from correlations measured on nflverse play-by-play (not assumed), the break-even payout, and the price stated at an ASSUMED book discount labelled as an estimate; paper-graded against outcomes, no edge label until a pre-registered game-clustered test passes (#621)
+- Files: syndicate/features/nfl/sgp.py, scripts/build_nfl_sgp_correlations.py, scripts/grade_sgp_paper.py, tests/test_nfl_sgp.py, .syndicate/findings_2026-10-16_nfl_sgp_correlations.md
+- Hypothesis: Same-game NFL legs are correlated by role (QB pass yds with his top receivers' yds; a team's yards with its win) enough that the joint differs from the product of the legs by a measurable lift
+- Falsification test: Leak-free role-pair lifts on 2022-2025 pbp have 95% CIs that include 1.0 for every pair the sheet can build -> no SGP surface; report null
+- Verification: Correlation table with n and CIs per role pair written to the findings file; a paper SGP ledger row per suggestion on the fleet; the sheet section rendered with the estimate label
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
