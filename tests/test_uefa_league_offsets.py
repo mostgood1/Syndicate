@@ -190,3 +190,27 @@ def test_paired_bootstrap_ci_is_deterministic_and_brackets_the_mean():
 def test_domestic_leagues_exclude_uefa_competitions():
     assert set(ulo.DOMESTIC_LEAGUES) == {"epl", "la_liga", "bundesliga", "serie_a", "ligue_1", "mls",
                                          "eredivisie", "primeira_liga", "championship", "belgian_pro_league"}
+
+
+def test_unit_weights_reproduce_the_unweighted_fit():
+    matches = _synthetic_cross({"epl": 0.3, "eredivisie": -0.3}, n=600)
+    a = ulo.fit_cross_league(matches, with_offset=True)
+    b = ulo.fit_cross_league(matches, with_offset=True, weights=[1.0] * len(matches))
+    assert b.beta == pytest.approx(a.beta, abs=1e-6)
+    assert b.offsets["epl"] == pytest.approx(a.offsets["epl"], abs=1e-6)
+
+
+def test_recency_weights_track_a_drifted_offset_and_are_reachable():
+    """A drifted era is recovered when old matches are down-weighted (off != on)."""
+    old = _synthetic_cross({"epl": 0.0, "la_liga": 0.0}, n=3000, seed=2)
+    new = _synthetic_cross({"epl": 0.3, "la_liga": -0.3}, n=3000, seed=3)
+    matches = old + new
+    flat = ulo.fit_cross_league(matches, with_offset=True)
+    rec = ulo.fit_cross_league(matches, with_offset=True, weights=[0.01] * len(old) + [1.0] * len(new))
+    assert flat.offsets["epl"] == pytest.approx(0.15, abs=0.05)
+    assert rec.offsets["epl"] == pytest.approx(0.3, abs=0.05)
+
+
+def test_weights_must_align_with_matches():
+    with pytest.raises(ValueError):
+        ulo.fit_cross_league(_synthetic_cross({"epl": 0.1, "eredivisie": -0.1}, n=10), with_offset=True, weights=[1.0])

@@ -278,9 +278,21 @@ class CrossFit:
         return lh, la
 
 
-def fit_cross_league(matches: Sequence[CrossMatch], *, with_offset: bool) -> CrossFit:
-    """Poisson MLE on training matches. Extra-time matches are excluded (score includes ET)."""
-    train = [m for m in matches if not m.extra_time]
+def fit_cross_league(matches: Sequence[CrossMatch], *, with_offset: bool,
+                     weights: Sequence[float] | None = None) -> CrossFit:
+    """Poisson MLE on training matches. Extra-time matches are excluded (score includes ET).
+
+    `weights` (one per entry of `matches`, default all 1) scales each match's log-likelihood:
+    the recency-weighted arm of the 2026-10-16 production-ratings registration
+    (`.syndicate/findings_2026-10-16_uefa_offsets_recency_prod.md`) weights the WHOLE
+    likelihood, so mu, eta, beta and the offsets all move with it.
+    """
+    if weights is not None and len(weights) != len(matches):
+        raise ValueError("weights must have one entry per match")
+    w_all = [1.0] * len(matches) if weights is None else [float(x) for x in weights]
+    kept = [(m, w) for m, w in zip(matches, w_all) if not m.extra_time]
+    train = [m for m, _ in kept]
+    wt = np.array([w for _, w in kept], dtype=float)
     leagues = tuple(sorted({m.home_league for m in train} | {m.away_league for m in train}))
     li = {lg: i for i, lg in enumerate(leagues)}
     hg = np.array([m.home_goals for m in train], dtype=float)
@@ -299,8 +311,8 @@ def fit_cross_league(matches: Sequence[CrossMatch], *, with_offset: bool) -> Cro
         d = (off[hl] - off[al]) if k else 0.0
         lh = np.exp(mu + eta * home + beta * xh + d)
         la = np.exp(mu + beta * xa - d)
-        nll = float(np.sum(lh - hg * np.log(lh)) + np.sum(la - ag * np.log(la))) + 0.5 * tiny * float(off @ off)
-        rh, ra = lh - hg, la - ag
+        nll = float(np.sum(wt * (lh - hg * np.log(lh))) + np.sum(wt * (la - ag * np.log(la)))) + 0.5 * tiny * float(off @ off)
+        rh, ra = wt * (lh - hg), wt * (la - ag)
         grad = [rh.sum() + ra.sum(), (rh * home).sum(), (rh * xh).sum() + (ra * xa).sum()]
         g_off = tiny * off.copy()
         if k:
@@ -309,7 +321,7 @@ def fit_cross_league(matches: Sequence[CrossMatch], *, with_offset: bool) -> Cro
         return nll, np.concatenate([grad, g_off])
 
     start = np.zeros(3 + k)
-    start[0] = math.log(max(1e-6, float((hg.sum() + ag.sum()) / max(1, 2 * len(train)))))
+    start[0] = math.log(max(1e-6, float((wt @ hg + wt @ ag) / max(1e-9, 2 * wt.sum()))))
     start[2] = 1.0
     theta = minimize(objective, start, jac=True, method="L-BFGS-B").x
     offsets: dict[str, float] = {}
