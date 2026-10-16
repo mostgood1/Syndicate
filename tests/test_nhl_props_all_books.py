@@ -1,4 +1,4 @@
-"""NHL props come from every book in the region, not a 3-book allowlist (lane props-book-coverage, user 2026-10-16)."""
+"""NHL props ask ten books, not three, at the same credits (lane props-book-coverage, user 2026-10-16)."""
 from __future__ import annotations
 
 import pandas as pd
@@ -36,9 +36,13 @@ def _run(monkeypatch, **env):
     return _Client.calls
 
 
-def test_the_default_asks_the_whole_region(monkeypatch):
+def test_the_default_asks_ten_books_at_one_regions_price(monkeypatch):
+    # Measured 2026-10-16: a list of <= 10 books from any regions bills as ONE region; this list returned 7 books on one
+    # NHL event (the old default 3, regions=us 5 without Pinnacle) at 1 credit.
     calls = _run(monkeypatch)
-    assert calls and all(c["bookmakers"] is None and c["regions"] == "us" for c in calls)
+    listed = lno.NHL_PROP_BOOKMAKERS.split(",")
+    assert len(listed) == len(set(listed)) == 10 and {"pinnacle", "espnbet", "hardrockbet", "draftkings", "fanduel"} <= set(listed)
+    assert calls and calls[0]["bookmakers"] == lno.NHL_PROP_BOOKMAKERS
 
 
 def test_the_env_still_narrows_it(monkeypatch):

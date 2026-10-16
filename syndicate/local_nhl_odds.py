@@ -625,14 +625,19 @@ def _commence_date_et(commence_time_iso: Optional[str]) -> Optional[str]:
         return None
 
 
+NHL_PROP_BOOKMAKERS = ("draftkings,fanduel,betmgm,williamhill_us,betrivers,fanatics,espnbet,hardrockbet,pinnacle,"
+                       "betonlineag")       # 10 = one region's credits (see collect_oddsapi_props)
+
+
 def collect_oddsapi_props(date: str) -> pd.DataFrame:
     rows: List[Dict] = []
     client = OddsApiClient(rate_limit_per_sec=10.0)
-    # Every book in the region, not a 3-book allowlist (lane props-book-coverage, user 2026-10-16 "Lift the cap"): the
-    # old default `fanduel,draftkings,pinnacle` capped every NHL prop at 3 books while the other sports' props carry the
-    # whole `us` set. OddsAPI bills a bookmakers list of up to 10 as one region, so the region costs the same credits.
-    # PROPS_ODDSAPI_BOOKMAKERS still narrows it when set.
-    bookmakers = os.getenv("PROPS_ODDSAPI_BOOKMAKERS", "").strip() or None
+    # TEN books, not three (lane props-book-coverage, user 2026-10-16 "Lift the cap"). OddsAPI bills a bookmakers list of
+    # up to 10 -- from ANY regions -- as one region, so ten cost what three did. Measured on one NHL event, one market,
+    # 2026-10-16: the old 3-book list cost 1 credit and returned 3 books; regions=us cost 1 and returned 5 but DROPPED
+    # Pinnacle (not a `us` book); this list cost 1 and returned 7 -- Pinnacle (the sharp reference) and ESPN Bet + Hard
+    # Rock (`us2` books, absent from every shard since 09-30) included. PROPS_ODDSAPI_BOOKMAKERS still overrides it.
+    bookmakers = os.getenv("PROPS_ODDSAPI_BOOKMAKERS", NHL_PROP_BOOKMAKERS).strip() or None
     regions = os.getenv("PROPS_ODDSAPI_REGIONS", "us").strip() or "us"
     max_workers = max(1, int(os.getenv("PROPS_ODDSAPI_WORKERS", "6") or "6"))
     # player_total_saves: OddsAPI's NHL goalie-saves key (lane nhl-confirmed-goalies, user decision 2026-10-05:
