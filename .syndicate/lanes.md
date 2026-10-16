@@ -1000,6 +1000,14 @@ death, never life — do not invert it.
 - Verification: walk-forward 2017-2026 report with verdict + 95% bootstrap CI + coverage counts in the findings file; pytest tests/test_uefa_outscope_ratings.py passes offline
 - Blocked by: none
 
+### nhl-lineup-status — OPEN — opened 2026-10-16 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
+- Goal: NHL lineup building stops dressing a player the news collector holds OUT/IR (or scratched) at build time: measured first (how many OUT players this season's lineups dressed, and whether each actually played), then removal only (no TOI redistribution), behind a reachability test, verified on the fleet's next lineups file
+- Files: syndicate/features/nhl/sim_engine/hockeysim/ingestion/collect.py, syndicate/features/nhl/sim_engine/hockeysim/ingestion/lineups.py, syndicate/features/nhl/lineup_availability.py, tests/test_nhl_lineup_status.py, scripts/measure_nhl_lineup_status.py, .syndicate/findings_2026-10-16_nhl_lineup_status.md
+- Hypothesis: Absence survey 2026-10-16: NHL reads no status (Granlund ANA Out at 12:31 PM was L1/PP1 at 20.8 min in the 2:06 PM lineups); OUT players dressed in lineups put props on players who do not play and leave their slot's TOI on the bench
+- Falsification test: If the season-to-date replay finds OUT/IR-at-build players who were dressed and then actually played in most cases (the collector's OUT is wrong more often than right), removal is withheld and the finding recorded instead
+- Verification: findings file: per-game count of dressed-but-OUT players and their actual played/not-played, before; after the fleet ff: the next lineups_<date>.csv has 0 players the collector held OUT at build time, with the excluded names logged
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
