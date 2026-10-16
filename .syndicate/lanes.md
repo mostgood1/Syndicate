@@ -1009,9 +1009,11 @@ death, never life — do not invert it.
 - Verification: walk-forward by season; per-match 1X2 log loss offset minus no-offset with match bootstrap CI; offsets with bootstrap intervals; coverage printed
 - Blocked by: none
 
-### uefa-offsets-recency-prod — OPEN — opened 2026-10-16 — session 570a6cd1-da77-42f2-b7cc-75f9669276a1
+### uefa-offsets-recency-prod — CLOSED — opened 2026-10-16 — closed 2026-10-16 — session 570a6cd1-da77-42f2-b7cc-75f9669276a1
+- **GOAL VERDICT 2026-10-16 ~15:40Z: GOAL: MET.** The pre-registration `e8ca6f94` landed before any fit (15:08Z), and the pre-fit name audit plus deviation 1 (a Sporting CP alias) is `b76b9709`. The club component is production's `compute_team_ratings` as of each kickoff. **H-REC FALSIFIED:** REC(730 d) − CONST is +0.0010 [−0.0024, +0.0048] over 1,278 held-out matches, and no half-life beats CONST. **H-PROD SUPPORTED:** CONST − NONE is −0.0555 [−0.0724, −0.0378]. β = 1.66 [1.44, 1.90], and 19% of UEFA attack ratings sit on the +0.35 clamp (a lead for `soccer-team-strength`). Offsets with CIs, and the next steps, are in todo #699 and the findings file. Nothing is wired.
 - Goal: todo #699 Stage 1 item (i): a PRE-REGISTERED (committed before any fit) walk-forward test of a recency-weighted per-league UEFA offset vs the single 12-season constant offset vs no offset, with the club component = production compute_team_ratings attack/defence as of each kickoff; findings file with verdicts, beta and offsets with intervals; #699 updated; NOTHING wired into sim/board/worker/deploy
-- Files: .syndicate/findings_2026-10-16_uefa_offsets_recency_prod.md, scripts/fit_uefa_offsets_prod_ratings.py, syndicate/features/soccer/uefa_league_offsets.py, tests/test_uefa_league_offsets.py
+- Files: (released on close 2026-10-16 — was .syndicate/findings_2026-10-16_uefa_offsets_recency_prod.md, scripts/fit_uefa_offsets_prod_ratings.py, syndicate/features/soccer/uefa_league_offsets.py, tests/test_uefa_league_offsets.py, docs/ai_context/todo.md #699 section only)
+- Findings: .syndicate/findings_2026-10-16_uefa_offsets_recency_prod.md
 - Hypothesis: H-REC: offsets fit with exponential recency weights (half-life 2 seasons) beat the single constant 2014..S-1 offset on held-out cross-league 1X2 log loss, on production's rating scale; H-PROD: the constant offset still beats no offset on production's rating scale
 - Falsification test: Pre-registered in .syndicate/findings_2026-10-16_uefa_offsets_recency_prod.md section 1, committed BEFORE any fit
 - Verification: walk-forward test seasons 2017-2026; paired per-match log-loss bootstrap CI (2000, seed 699); verdict rule of the 2026-10-16 registration

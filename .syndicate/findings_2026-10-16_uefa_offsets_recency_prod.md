@@ -136,11 +136,121 @@ on the scale production would serve with). A SUPPORTED verdict licenses nothing 
 
 ## 3. Results
 
-(written after the fit)
+Run 2026-10-16 ~15:30Z at Idle priority. Driver: `scripts/fit_uefa_offsets_prod_ratings.py run`.
+Output: `C:/tmp/uefa-offsets/report_prod.json` (and `report_prod_no_alias.json`).
+The primary arm uses the deviation-1 alias: **1,603 eligible matches, 1,278 of them held out over
+the 2017-2026 test seasons.**
+
+### Verdicts
+
+| test | Δ 1X2 log loss | 95% CI | verdict |
+|---|---|---|---|
+| **H-REC: REC(half-life 730 d) − CONST** | **+0.0010** | [−0.0024, +0.0048] | **FALSIFIED** |
+| **H-PROD: CONST − NONE** | **−0.0555** | [−0.0724, −0.0378] | **SUPPORTED** |
+| sensitivity, registration-literal (no alias, 1,540): H-REC | +0.0011 | [−0.0027, +0.0046] | FALSIFIED |
+| sensitivity, registration-literal: H-PROD | −0.0552 | [−0.0717, −0.0378] | SUPPORTED |
+
+Mean held-out log loss by arm:
+
+| arm | log loss |
+|---|---|
+| NONE | 1.0593 |
+| **CONST** | **1.0039** |
+| REC 730 d | 1.0049 |
+| REC 365 d (descriptive) | 1.0067 |
+| REC 1095 d (descriptive) | 1.0044 |
+| REC 1460 d (descriptive) | 1.0042 |
+
+For comparison, the 2026-10-16 module's own goals ratings scored OFFSET 1.0110 and NO-OFFSET 1.0551.
+So **production's xG ratings with the constant offset are the best club component measured so
+far** (1.0039). The match sets differ slightly (1,278 test matches in both runs, but the
+eligibility rules differ), so this comparison is descriptive.
+
+**Secondary results** (none used for a verdict):
+- REC − NONE: −0.0544 [−0.0720, −0.0362].
+- Δ Brier: REC − CONST +0.0005 [−0.0019, +0.0032]; CONST − NONE −0.0403 [−0.0524, −0.0276].
+- Big-5-only subset: REC − CONST +0.0000 [−0.0046, +0.0049]; CONST − NONE −0.0270 [−0.0395, −0.0141].
+- **2020-26 test seasons only** (the era where the drift was seen): REC − CONST +0.0004
+  [−0.0042, +0.0049]; CONST − NONE −0.0530 [−0.0728, −0.0332].
+- Per season, REC − CONST:
+  - 2017 +0.001, 2018 +0.007, 2019 +0.001, 2020 +0.001, 2021 −0.007;
+  - 2022 +0.008, 2023 +0.011, 2024 −0.007, 2025 −0.002, 2026 +0.003.
+  - The CIs of 2 seasons (2018, 2023) lie entirely ABOVE 0; none lie below.
+- Per season, CONST − NONE is below 0 in all 10 seasons.
+
+**Descriptive half-life grid:** REC 365 d is +0.0029, 730 d +0.0010, 1095 d +0.0005 and
+1460 d +0.0003, all relative to CONST. The loss falls steadily toward CONST as the half-life
+grows. **No half-life beats equal weighting.**
+
+### Parameters (95% bootstrap, 1,000 resamples over matches, seed 699)
+
+| arm | μ | η (home) | **β** |
+|---|---|---|---|
+| NONE (2014-26) | 0.170 [0.119, 0.219] | 0.255 [0.194, 0.318] | **0.93 [0.71, 1.17]** |
+| CONST (2014-26) | 0.083 [0.035, 0.130] | 0.261 [0.205, 0.320] | **1.66 [1.44, 1.90]** |
+| REC as of 2026-10-16 | 0.087 [0.014, 0.151] | 0.282 [0.209, 0.367] | **1.74 [1.40, 2.06]** |
+
+**Offsets vs EPL** (log goal rate, on production's rating scale). `eff n` is the REC effective
+match count, `(Σw)²/Σw²`.
+
+| league | n | CONST vs EPL | 95% CI | REC vs EPL (2026-10-16) | 95% CI | eff n |
+|---|---|---|---|---|---|---|
+| EPL | 553 | 0 | — | 0 | — | 286 |
+| La Liga | 533 | −0.109 | [−0.165, −0.050] | −0.193 | [−0.283, −0.110] | 259 |
+| Bundesliga | 477 | −0.136 | [−0.210, −0.064] | −0.213 | [−0.305, −0.119] | 238 |
+| Serie A | 456 | −0.200 | [−0.259, −0.132] | −0.253 | [−0.341, −0.162] | 239 |
+| Ligue 1 | 391 | −0.239 | [−0.307, −0.172] | −0.273 | [−0.373, −0.181] | 194 |
+| Primeira Liga | 278 | −0.467 | [−0.543, −0.381] | −0.495 | [−0.602, −0.381] | 148 |
+| Eredivisie | 240 | −0.519 | [−0.598, −0.421] | −0.624 | [−0.740, −0.485] | 131 |
+| Belgian Pro League | 200 | −0.529 | [−0.628, −0.432] | −0.581 | [−0.710, −0.444] | 99 |
+| MLS | 0 | **NOT ESTIMABLE** | | | | |
+| Championship | 0 | **NOT ESTIMABLE** | | | | |
+
+Centred CONST offsets are EPL +0.275, La Liga +0.166, Bundesliga +0.139, Serie A +0.075,
+Ligue 1 +0.035, Primeira −0.192, Eredivisie −0.244 and Belgium −0.254. All centred values are in
+`report_prod.json`.
+
+### Engine read (beyond the verdicts)
+
+- **The drift is real on production's scale too, but it does not pay.**
+  - Recency-weighted offsets as of today put the EPL further ahead of every league:
+    - La Liga −0.19 vs −0.11 under CONST, Bundesliga −0.21 vs −0.14, Eredivisie −0.62 vs −0.52.
+    - The walk-forward shows the same thing: the CONST La Liga offset moves +0.03 (2017) ->
+      −0.09 (2025), and REC moves −0.18 by 2025.
+  - Yet REC never beats CONST out of sample, at any half-life.
+  - The likely reason is visible in β. **β drifts as well:** CONST β is 1.80 (2017), 1.72 (2020),
+    1.71 (2023) and 1.57 (2025); REC β falls to 1.36 by 2025. Recency weighting moves the offsets
+    and β together, and the variance it adds (effective n roughly halves) outweighs the bias it
+    removes.
+  - **Serve the constant offset.** Do not carry a recency weight forward without a new
+    registration, for example a separate drift term on β or a per-pair test.
+- **β = 1.66 is the larger finding, and it is about production's ratings, not about UEFA.**
+  - On its own module's goals ratings β was 0.80 (domestic gaps shrink in UEFA). On production's
+    ratings β is **1.66 [1.44, 1.90]**: production's rating gaps must be **amplified ×1.66** to
+    match UEFA goal rates.
+  - Production's ratings are linear in the xG ratio, scaled by `_RATING_SCALE = 0.55` and
+    **clamped at ±0.35** (`_RATING_CAP`).
+  - **611 of 3,206 UEFA-match attack ratings (19%) sit exactly on the +0.35 clamp**, and 614 of
+    6,412 attack + defence values (9.6%) sit on a clamp. So production cannot tell the top clubs
+    apart — exactly the clubs that play in the UCL.
+  - This lines up with #699's existing domestic note: pregame 1X2 loses to the de-vigged close and
+    **favourites are underrated**. A compressed, clamped rating predicts precisely that. It is a
+    LEAD for lane `soccer-team-strength`, not a measured domestic defect: no domestic test was run
+    here.
+- **Production name join defect:** `match_team_name` does not match `Sporting CP` to
+  football-data's `Sp Lisbon` (0 of 63). Production's `_rating_for` would return a silent `0.0`
+  for Sporting wherever an ESPN-spelled name reaches it. A UEFA Stage 1 sim needs an explicit
+  ESPN -> production alias map, audited the way section 2 audited it.
 
 ## 4. What cannot be estimated
 
-(written after the fit)
+- **MLS and Championship offsets:** 0 cross-league UEFA matches, so NOT ESTIMABLE (as before).
+- **Whether a drift model of another form helps:** for example a time-varying β, a per-pair
+  offset, or a random walk on offsets. Only exponential whole-likelihood weighting was registered
+  and tested.
+- **The domestic consequence of β = 1.66 and the clamp.** No domestic backtest was run in this lane.
+- **The 524 out-of-scope clubs**, and **beating the de-vigged UEFA close.** Those are Stage 1
+  items (ii) and (iii).
 
 ## 5. Deviations from the registration
 
