@@ -49,3 +49,31 @@ them. **Expectation: arm B (new roster) has lower log loss than arm A (July rost
   A REFUTED verdict opens a lead to re-fit the share calibration (the `calibration_role_mixture*`
   constants), which absorbed stale squads (engine standard 4.4). No re-tuning on this window.
 - **Season phase:** all population matches are 2026-27 regular season; no phase mixing.
+
+## RESULT 2026-10-16 (first grade, the 2026-10-15 run; FINAL: 98 >= 60 matches, so no 10-22 re-grade)
+
+Grader `scripts/soccer_season_audit/roster_refresh_grade.py` from github/main, run on the fleet host by the scheduled task
+`soccer-roster-refresh-grade` at 2026-10-16 12:53Z (07:53 CT; it fired a day late). Runner `C:/tmp/soccer-roster-grade/run_grade.sh 2026-10-15`, nice 19, exit 0. Report:
+`C:/tmp/soccer-roster-grade/grade_2026-10-15.json` (outside git). Input manifest digest `440d029a419bd3a3`, the frozen snapshot,
+assert passed. `SMOKE_NOT_THE_REGISTERED_GRADE: false`. Kickoff floor 2026-10-07T01:00Z. Fleet HEAD `5457b428`, github/main `9c0b2b85`.
+The soccer engine files (`syndicate/features/soccer`, `scripts/build_soccer_artifacts.py`) did NOT differ between them (empty diff).
+
+- **Matches graded: 98.** belgian_pro_league 9, bundesliga 9, championship 24, epl 10, eredivisie 9, la_liga 9, ligue_1 9,
+  primeira_liga 9, serie_a 10. Coverage loss: 1 staged match with no outcome or distribution.
+- **Players per market:** 2,654 appeared outfield players listed in both arms (both markets).
+- **SOT >= 1 (0.5):** log loss A 0.58986, B 0.58981. **B - A = -0.00006, 95% CI [-0.00187, +0.00171].**
+  Realised/expected: A 1.1124, B 1.0677.
+- **Anytime scorer:** log loss A 0.31245, B 0.31272. **B - A = +0.00027, 95% CI [-0.00094, +0.00144].**
+  Realised/expected: A 1.177, B 1.1266.
+- **Appeared in one arm only:** only_B 20 (B's rescues), only_A 0 (no stale keep that appeared).
+- **Per league B - A (descriptive; per-player means), SOT / anytime:** belgian +0.01008 / -0.00061, bundesliga +0.00161 / +0.00335,
+  championship -0.00145 / -0.00044, epl -0.00489 / -0.00091, eredivisie +0.00676 / +0.00527, la_liga -0.00128 / -0.00042,
+  ligue_1 -0.00037 / -0.00034, primeira -0.00017 / -0.00213, serie_a -0.00648 / -0.00008.
+
+**VERDICT: INCONCLUSIVE.** Under the pre-registered rule, neither CI lies wholly < 0, so it is not SUPPORTED, and neither lies wholly > 0, so it is not REFUTED.
+`underpowered: false` (98 >= 60), so this grade is FINAL. The 10-22 task `soccer-roster-refresh-grade-final` runs only if this grade is missing
+or has < 60 matches, so it should no-op.
+
+**Consequence (as registered):** the refresh stays and is not reverted. No re-fit lead opens, because that is triggered only by REFUTED. No re-tuning on
+this window. Descriptive only, not a verdict: both arms under-predict appeared listed players (realised/expected > 1), and B less so
+(SOT 1.11 -> 1.07, anytime 1.18 -> 1.13). That points the same way as H-RR's mechanism, but the paired log loss does not resolve it.
