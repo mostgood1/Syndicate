@@ -115,7 +115,24 @@ on the scale production would serve with). A SUPPORTED verdict licenses nothing 
 
 ## 2. Coverage
 
-(written after the pull)
+(written after the pull and the name audit, BEFORE any fit)
+
+- **Production inputs pulled:** 107 of 107 season files, 0 failures. Understat (big 5)
+  covers 2014..2026 and football-data (Eredivisie, Primeira Liga, Belgium) covers 2013..2026,
+  so each league-season holds what a fleet would hold.
+- **Cross-league UEFA matches: 1,618** (the same placement as 2026-10-16).
+- **Name audit** (`prod_name_map.json` in the research root): 111 clubs.
+  - 40 ESPN names differ from production's key, and **all 40 pairings are correct**: for example
+    `Internazionale` -> `Inter`, `RB Leipzig` -> `RasenBallsport Leipzig`, `Braga` -> `Sp Braga`,
+    `Union St.-Gilloise` -> `St. Gilloise`. No ESPN name maps to more than one production key.
+  - **`Sporting CP` NEVER matches (63 of 63 matches).** football-data spells it `Sp Lisbon`, and
+    `match_team_name` finds nothing. That is the case where production's `_rating_for` hands back a
+    silent `0.0`. See deviation 1.
+  - Athletic Club (1 match) and Napoli (2) are unmatched only on dates where their row is absent
+    from the as-of table. They are excluded as registered.
+- **Eligible with the deviation-1 alias: 1,603.** Excluded: 2 with no production rating, 13 with
+  under 5 rated matches. 3 have no status payload and are kept as non-neutral 90-minute results.
+  **Registration-literal (no alias): 1,540**, because 63 Sporting matches drop out.
 
 ## 3. Results
 
@@ -127,4 +144,11 @@ on the scale production would serve with). A SUPPORTED verdict licenses nothing 
 
 ## 5. Deviations from the registration
 
-(none yet)
+- **1. Sporting CP alias (2026-10-16 ~15:40Z, decided after the name audit and BEFORE any fit).**
+  - The registration says an unmatched club is excluded, and only a WRONG pairing gets an alias.
+  - Sporting is a MISSING pairing. Excluding it drops 63 of 1,603 matches and removes Portugal's
+    strongest UEFA club, which would bias Portugal's offset.
+  - So one explicit alias, `("primeira_liga", "Sporting CP") -> "Sp Lisbon"`, is applied, and the
+    **primary results use it.**
+  - The **registration-literal run (no alias, 1,540 matches) is reported beside the primary
+    results** as a sensitivity check (`run --no-aliases`).

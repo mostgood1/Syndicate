@@ -56,7 +56,11 @@ FIRST_SEASON = 2014
 SNAPSHOT_DAY = date(2026, 10, 16)
 # Registered pre-fit name audit: explicit aliases for pairings the audit finds WRONG.
 # Every entry is a section-5 deviation in the findings file. {(league, espn_name): prod_name}
-ALIASES: dict[tuple[str, str], str] = {}
+ALIASES: dict[tuple[str, str], str] = {
+    # football-data spells Sporting "Sp Lisbon"; match_team_name finds nothing, so production's
+    # `_rating_for` would hand back a silent 0.0. Deviation 1 (pre-fit, 2026-10-16).
+    ("primeira_liga", "Sporting CP"): "Sp Lisbon",
+}
 
 
 def _write_json(path: Path, payload) -> None:
@@ -77,7 +81,8 @@ def _read_csvs(paths) -> list[dict]:
 class ProdRatingIndex:
     """Production's `compute_team_ratings` per (league, kickoff day), on the fleet's disk depth."""
 
-    def __init__(self, prod_root: Path):
+    def __init__(self, prod_root: Path, *, use_aliases: bool = True):
+        self.use_aliases = use_aliases
         self.rows: dict[str, list[tuple[int, str, dict]]] = {}
         self.seasons_on_disk: dict[str, list[int]] = {}
         for lg in BIG5 + GOALS:
@@ -109,7 +114,8 @@ class ProdRatingIndex:
 
     def lookup(self, league: str, espn_name: str, day: date):
         table = self.ratings(league, day)
-        name = ALIASES.get((league, espn_name)) or match_team_name(espn_name, list(table))
+        alias = ALIASES.get((league, espn_name)) if self.use_aliases else None
+        name = alias if alias in table else match_team_name(espn_name, list(table))
         return name, (table.get(name) if name else None)
 
 
@@ -121,9 +127,9 @@ def _placed(root: Path):
     return ulo.place_matches(uefa, membership), flags
 
 
-def _build(root: Path):
+def _build(root: Path, *, use_aliases: bool = True):
     placed, flags = _placed(root)
-    index = ProdRatingIndex(root / "prod_history")
+    index = ProdRatingIndex(root / "prod_history", use_aliases=use_aliases)
     matches: list[ulo.CrossMatch] = []
     days: dict[str, date] = {}
     skipped = Counter()
@@ -176,7 +182,7 @@ def recency_weights(train, days, anchor: date, half_life_days: int) -> list[floa
 
 def cmd_names(args) -> int:
     root = Path(args.root)
-    matches, _, skipped, name_map, index = _build(root)
+    matches, _, skipped, name_map, index = _build(root, use_aliases=not args.no_aliases)
     multi = [e for e in name_map if len(e["prod"]) > 1]
     unmatched = [e for e in name_map if e["unmatched"]]
     out = {"seasons_on_disk": index.seasons_on_disk, "eligible": len(matches), "skipped": dict(skipped),
@@ -194,8 +200,8 @@ def _ci(values) -> list[float]:
 
 def cmd_run(args) -> int:
     root = Path(args.root)
-    matches, days, skipped, name_map, index = _build(root)
-    report: dict = {"registration": ".syndicate/findings_2026-10-16_uefa_offsets_recency_prod.md s1",
+    matches, days, skipped, name_map, index = _build(root, use_aliases=not args.no_aliases)
+    report: dict = {"aliases": not args.no_aliases,"registration": ".syndicate/findings_2026-10-16_uefa_offsets_recency_prod.md s1",
                     "seasons_on_disk": index.seasons_on_disk,
                     "eligible": {"cross_league_rated": len(matches), "skipped": dict(skipped),
                                  "extra_time": sum(m.extra_time for m in matches),
@@ -317,8 +323,9 @@ def cmd_run(args) -> int:
         print("PARAMS", k, json.dumps(entry, default=float), flush=True)
     report["parameters"] = {"boot": args.boot, "snapshot_day": SNAPSHOT_DAY.isoformat(),
                             "half_life_days": PRIMARY_HALF_LIFE_DAYS, **params}
-    _write_json(root / "report_prod.json", report)
-    print(f"REPORT {root / 'report_prod.json'}", flush=True)
+    out = root / ("report_prod_no_alias.json" if args.no_aliases else "report_prod.json")
+    _write_json(out, report)
+    print(f"REPORT {out}", flush=True)
     return 0
 
 
@@ -327,9 +334,11 @@ def main(argv=None) -> int:
     sub = p.add_subparsers(dest="cmd", required=True)
     names = sub.add_parser("names")
     names.add_argument("--root", required=True)
+    names.add_argument("--no-aliases", action="store_true", help="registration-literal join (no ALIASES)")
     run = sub.add_parser("run")
     run.add_argument("--root", required=True)
     run.add_argument("--boot", type=int, default=1000)
+    run.add_argument("--no-aliases", action="store_true", help="registration-literal join (no ALIASES)")
     args = p.parse_args(argv)
     return cmd_names(args) if args.cmd == "names" else cmd_run(args)
 
