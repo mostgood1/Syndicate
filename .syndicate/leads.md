@@ -1138,3 +1138,5 @@ that is not a fix.
     - Pass if, over >= 14 new kickoff dates and >= 30 games per market: (a) |predicted EV - realised ROI| <= 5 pts (baseline 44.6); (b) its Brier beats the margin fair with a CI excluding 0; (c) the blend beats the recalibrated fair, else drop the sim term; (d) band factors are stable across date halves. No market withheld.
   - **Lead, not an edge (not pre-registered, ~11 sub-cuts):** sim FOR -3% vs AGAINST -54% replicates (+51.1 [+22, +93]), above 3.0 decimal only. FOR realised about what the fair predicted.
   - Scratch: `soccerfair/`.
+
+- 2026-10-16 (session 9e18a0e7) -- **RESOLVED: the "EV fair counts STALE quotes" lead (10-15, lane `fair-price-v2`) is FALSIFIED as registered (H5).** Over 77,321 pregame lines / 430 games, dropping books that moved off the line changes log loss by +0.000005 [-0.000012, +0.000023]; such books are on 1.41% of rows and move the fair >= 2 pts on 0.02%. The served board's 34-78% stale share counts old SIGHTINGS, not moved prices. Keep the board's fair. NBA untested (preseason): re-read on the regular season. Do not pick the original lead up.
