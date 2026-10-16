@@ -925,6 +925,14 @@ death, never life — do not invert it.
 - Verification: unit tests on the classifier (all four close x result quadrants, opportunity vs efficiency vs within-range, price plays never judged on the sim); a fleet grader run renders result PNGs for the graded 10-15 cards; the engine ledger holds one record per graded featured bet with its denominators; the user reviews the result cards
 - Blocked by: none
 
+### props-book-coverage — OPEN — opened 2026-10-16 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
+- Goal: NHL player props are fetched from every OddsAPI us book instead of the 3-book allowlist (fanduel, draftkings, pinnacle), measured on the next fleet NHL props run as distinct books captured per event and the credits it cost per event against the 3-book baseline; and a one-call-per-sport us2 probe measures which prop books the us2 region adds, so the user can price adding it
+- Files: syndicate/local_nhl_odds.py (the PROPS_ODDSAPI_BOOKMAKERS default in collect_oddsapi_props ONLY), tests/test_nhl_props_all_books.py (NEW), .syndicate/findings_2026-10-16_props_book_coverage.md (NEW)
+- Hypothesis: User 2026-10-16: 'we have a lot of spots that say only 3-5 books ... is it possible they just arent being mapped right?' Measured: not a mapping bug (sheet books_quoting = raw exact-line count on 1,024 of 1,031 prop rows); the first drop is the fetch -- props request us only and NHL props are capped at 3 books. Lifting the cap costs no extra credits (OddsAPI bills a bookmakers list of up to 10 as one region)
+- Falsification test: If the next NHL props run captures no more than 3 books per event, the cap was not the binding constraint; if its per-event credit cost rises above the 3-book baseline, the billing premise is wrong and the change is reverted pending the user
+- Verification: unit test that the default request carries no bookmakers list and regions=us (env override kept); after the fleet ff: distinct books in nhl_source/tracking/odds_nhl_player_props_opening_<date>.csv and the per-event NHL credit cost from the quota recorder, before vs after; the us2 probe's per-sport book lists in the findings file
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
