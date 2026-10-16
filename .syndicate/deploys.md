@@ -50190,3 +50190,13 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - **claims:** refresh-worker token a5b4ffe9..., web token b0521187..., both acquire exit 0 after the 60-min spacing from the 12:26Z restart. Window after 10 readings. Ride-alongs: none.
 - **verify (now):** recorder rows first sighted after the restart, read 13:35Z: NCAAF 106 records, 106 with the key, 96 with a value; NFL 48 / 48 / 44. Rows in the H3 band (`me` None, |mp - fp| > 15 pts): NCAAF 34, NFL 14.
 - **verify (owed):** the 10-17 6:30 AM CT run carries `raw_sim_records` > 0 and an `engine.trust.h3` row. The substantial read is the 10-18 run (10-17 games, every side recorded after the restart).
+
+## 2026-10-16 14:19Z (9:19 AM CT) -- READING: Kalshi moneyline fix `53dc96bb` LIVE on refresh-worker -- MET (lane `kalshi-moneyline-board-join`, session 674e9851, CLOSED) -- no restart taken by this lane
+- **How it loaded:** not my restart. Lane `sim-gap-ev-study` fast-forwarded the fleet `5457b428 -> 848ac784` at 13:27:51Z and took a claimed restart (`role_restarts.jsonl` 13:27:52Z, holder `sim-gap-ev-study`). The new pid 810306 started 13:27:56Z, so it runs `848ac784`, which contains `53dc96bb`. The user had approved my restart; I did not take it, because one ran <60 min earlier and the code was already loaded.
+- **Readings, the same lines as the 13:15Z baseline:**
+  - `[portfolio_commit] KALSHI_BOARD_JOIN` matched **346 -> 481-495** (12 lines, 13:57:04-14:18:14Z).
+  - `moneyline_other_club_has_its_own_contract` is 130-136 and `three_way_no_leg_is_not_a_board_bet` is 50-55 on every line (0 of 15 before).
+  - `[kalshi_odds] BOARD_JOIN` (6,000-market pass) 269-317 -> 266-331 on the same slate shape; both new reasons are present there too.
+- **The commit's resolvers, read from the live code** (fleet tree `848ac784`, refresh-worker env, read-only replay, 14:19Z, slate 10-16): 45 h2h matches, all YES. Kalshi-best h2h rows: soccer **40 price+ticker** (was 0), 10 soccer still unresolved, 4 nba, 50 ncaaf. `scope_rows_to_venue` puts all 40 at `venue_feed` with a ticker.
+- **NOT MOVED, and why:** `VENUE_SCOPE venue=kalshi venue_not_quoting` read 38/45 before and 32-35/41-43 after. Its input is the commit's ~42 edge-qualified rows, and few of those are soccer moneylines, so it does not measure this change. Kalshi positions stayed 0 in this window.
+- **Still open elsewhere:** NCAAF (`9c0b2b85`, lane `kalshi-ncaaf-series`) is NOT in `848ac784` and loads at the next ff+restart. NBA: 4 Kalshi-best h2h rows unresolved, not diagnosed.
