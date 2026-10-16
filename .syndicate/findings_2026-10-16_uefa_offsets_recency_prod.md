@@ -252,6 +252,19 @@ Ligue 1 +0.035, Primeira −0.192, Eredivisie −0.244 and Belgium −0.254. All
 - **The 524 out-of-scope clubs**, and **beating the de-vigged UEFA close.** Those are Stage 1
   items (ii) and (iii).
 
+## 3a. CORRECTION 2026-10-16 (after a domestic test): β = 1.66 is NOT evidence of compression
+
+- **Section 3's engine read called β = 1.66 "the larger finding" and a sign that production's
+  ratings are compressed. The domestic test overturned that reading.**
+- The test is lane `soccer-team-strength`, `3209cf0a`, `.syndicate/findings_2026-10-16_soccer_rating_compression.md`:
+  - the refit domestic multiplier is m̂ = 1.58, matching the gain of 1.59 that the served engine
+    already applies to these ratings;
+  - removing the +0.35 clamp is FALSIFIED (it makes predictions worse).
+- So a β of ~1.6 to 1.7 is the engine's own gain on these rating units, seen again in UEFA. It is
+  not a defect, and the 19% clamp share does not cost domestic accuracy.
+- β stays a parameter to refit in the UEFA backtest (item (iii)). The verdicts and offsets in
+  section 3 are unchanged.
+
 ## 5. Deviations from the registration
 
 - **1. Sporting CP alias (2026-10-16 ~15:40Z, decided after the name audit and BEFORE any fit).**
