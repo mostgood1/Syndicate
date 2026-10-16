@@ -877,3 +877,31 @@ Co-signed into findings_2026-10-06 "THE VALID READ — PRE-REGISTRATION". It run
   - => G3 as registered FAILS on FIT. It is left as written: changing it after seeing the FIT shape would fit the gate to the data.
   - Expect G3 to fail on VALID unless VALID differs materially.
   - The late-game ML regression is a real FIT finding (end-game/bonus fouling in the final config moves late win probability the wrong way), reported to the calibration lane.
+
+### §13 RESULT -- G3, THE VALID READ (read 2026-10-16 00:0xZ, same pass as the calibration lane's read): **FAIL**
+
+REGULAR VALID 2026-03-01..04-12; 335 games, 329-331 per checkpoint. FINAL (fit_f5) − PROD (gate_v4_k0), paired by game, game-clustered bootstrap.
+
+| | total |err| | margin |err| | ML log-loss |
+|---|---|---|---|
+| end Q1 | −0.03 [−0.43, +0.38] | −0.16 [−0.48, +0.18] | −0.022 [−0.045, +0.001] |
+| end Q2 | −0.06 [−0.38, +0.25] | −0.22 [−0.53, +0.08] | **−0.022 [−0.043, −0.001]** |
+| end Q3 | −0.19 [−0.38, +0.00] | **−0.22 [−0.42, −0.02]** | −0.008 [−0.023, +0.008] |
+| 5:00 Q4 | −0.06 [−0.19, +0.07] | **−0.14 [−0.27, −0.02]** | **−0.021 [−0.035, −0.008]** |
+| **pooled Q1-Q3** | **−0.10 [−0.32, +0.13] ✗** | **−0.20 [−0.39, −0.01] ✓** | **−0.017 [−0.032, −0.003] ✓** |
+
+- (a) Pooled all-better: **FAIL on total only.** (b) 5:00 Q4 not worse (≤ +0.05): **FAIL on total** (upper +0.07); margin and ML better.
+- **G3 FAIL.** Combined with the calibration lane's G1 / G2 FAIL, THE VALID READ fails. Per the user's rule, nothing is enabled and there is no joint deploy.
+
+**Reported once, not gated (§12 rule on VALID; FINAL native vs pregame_rate):**
+- Total is WORSE at end Q1 (+0.47 [+0.13, +0.84]) and end Q2 (+0.28 [+0.01, +0.57]), with ties at Q3 / Q4.
+- Margin and ML tie everywhere. The FIT-window ML advantage over pregame_rate did not hold on VALID.
+- Native total bias is −1.67 / −1.42 / +1.08 / +0.10 (pregame_rate −0.77 / −0.50 / +1.47 / −0.67).
+
+**Correction to the FIT-smoke note above:** the late-Q4 ML regression seen on FIT (+0.010) did NOT replicate on VALID (−0.021 [−0.035, −0.008], FINAL better). It is not a robust finding; withdrawn as a lead.
+
+**Reading:**
+- Phase 2 makes the live re-sim better than its production self on margin and win probability out of sample.
+- It does not move totals accuracy, and it still does not beat "score + pregame line pro rata" on totals.
+- The live totals problem is ACCURACY, not level. Candidate drivers remain unmeasured: REB −1.4, trailer-FTA shape, the §11 frame gap.
+- Postseason: graded with the calibration lane's stratum; not run here yet (the inputs chain is still recording postseason dates).
