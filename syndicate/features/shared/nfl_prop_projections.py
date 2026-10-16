@@ -384,6 +384,17 @@ def attach_nfl_prop_projections(
             no_probability_rows += 1
             continue
 
+        # `sample_games` keeps None rather than coercing to 0: "no sample
+        # recorded" and "zero games played" are different claims, and a consumer
+        # gating on support has to be able to tell them apart. Same coercion
+        # shape as `props.py` uses when it writes the field.
+        _raw_games = entry.get("sample_games")
+        _support_games = (
+            int(_raw_games)
+            if isinstance(_raw_games, (int, float)) and not isinstance(_raw_games, bool)
+            else None
+        )
+
         projection: dict[str, Any] = {
             # The projected STAT, for the display column. Distinct from the
             # probability below and never interchangeable with it.
@@ -398,6 +409,21 @@ def attach_nfl_prop_projections(
             "sim_source": entry.get("sim_source"),
             "rate_source": entry.get("rate_source"),
             "player_team": entry.get("player_team"),
+            # THE SUPPORT, PUBLISHED `[2026-10-16, lane nfl-prop-support-fields]`.
+            # Both values were ALREADY on `entry` -- the wk6 artifact carries
+            # `sample_games` on 1,094 of 1,094 rows and `projected_sd` on 785,
+            # and the price ladder below reads BOTH off this same dict. They
+            # were simply never copied onto the projection, so the served board
+            # showed 0 of 705 NFL prop rows with any support field, and 188 of
+            # 206 ceiling-rejected prop rows had none.
+            #
+            # That is what left `_MODEL_EDGE_MAX_POINTS` as the only available
+            # gate: with no support on the row, a 49-point "edge" off a
+            # rotational player's near-empty season is indistinguishable from a
+            # real one, and the accepted population sits +7.85% ABOVE the line
+            # while those rows sit at 0.25x of it.
+            "projected_sd": _as_float(entry.get("projected_sd")),
+            "sample_games": _support_games,
         }
         if repriced:
             projection["line_repriced"] = True

@@ -960,6 +960,15 @@ death, never life — do not invert it.
 - Verification: failing e2e tests (MLB ML, soccer win, soccer draw) go green; fleet BOARD_JOIN before/after moneyline matched counts in deploys.md
 - Blocked by: none
 - **STATUS 2026-10-16 04:14Z: FIX SHIPPED to main, NOT LOADED** (loads at the next refresh-worker restart). Replay on fleet inputs: h2h matches 0 -> 72 (10-16 slate), Kalshi-best soccer h2h rows with price+ticker 0 -> 62/72; see deploys.md 2026-10-16 04:14Z. YES-side audit caught a would-be wrong-club order (two-way NO leg vs `_side_to_kalshi` always-YES); each club now takes only its own contract. OWED: fleet BOARD_JOIN after-count post-restart. NCAAF ML is a separate gap (`KXNCAAFGAME` unmapped_series in the catalogue).
+### nfl-prop-support-fields — OPEN — opened 2026-10-16 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- Goal: NFL prop board rows carry the support fields their own artifact already populates -- sample_games on every row and projected_sd wherever the stat has one -- verified on the SERVED board as a non-zero populated count where it reads 0 of 705 today, with a reachability test proving off != on so the field cannot be inert.
+- Files: syndicate/features/shared/nfl_prop_projections.py (the _attach projection dict literal / support-field copy ONLY), tests/test_nfl_prop_support_fields.py (NEW)
+- Hypothesis: The fields are already on `entry` and are dropped by the projection dict literal at nfl_prop_projections.py:386-400, which copies 7 keys (projected, side, basis, source, sim_source, rate_source, player_team) and not these two -- while lines 419-420 of the SAME function read entry.get('projected_sd') and entry.get('sample_games') for the price ladder. Measured on the fleet artifact nfl_prop_projections_2026_wk6.json: sample_games populated on 1094 of 1094 rows, projected_sd on 785.
+- Falsification test: If the served board still reports 0 NFL prop rows with sample_games after the copy is added, the loss is DOWNSTREAM of this function (a board-level field filter or a published-projection allowlist), not in this dict literal, and this lane's premise is wrong.
+- Verification: Served board, cap defeated: count of NFL prop rows with projection.sample_games populated, before (0 of 705, measured 2026-10-16T03:5xZ) and after. Plus a unit test asserting the projection dict carries both fields, and a reachability test that removing the copy makes the count fall to 0.
+- Blocked by: none
+
+
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
