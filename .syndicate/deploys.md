@@ -50170,3 +50170,10 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 `situation` is null on all 4 finals, which is correct. Small finding: `status_token` reads `FINAL` where ESPN reads `Final/OT`, so the OT is visible only in the linescore labels. The response envelope said `source=inline_artifact_stale`, `artifact_age_seconds=29072` against a max of 180, and `published_at=2026-10-16T04:59:47Z`, so the chips were served from an 8 h-old artifact. The finals were still right. Whether the serve-time ESPN refresh runs for past-date finals was not checked.
 
 **Owed:** a live reading during a game window. The next ones are NCAAF Saturday 2026-10-17 (full FBS slate) and NFL Sunday 2026-10-18 from 8:30 AM CT (HOU @ JAX, London). No task has been scheduled for them; the task file did not ask for one.
+
+## 2026-10-16 13:17Z -- READING: live interval Actual on served cards (lane layer2-live-segment-actuals)
+
+- **Verdict: NOT MEASURED** (not a pass). Scheduled read (task layer2-interval-actual-reading-1015), READ-ONLY; nothing restarted, reloaded or deployed.
+- Method: each cycle fetched `/api/board/game-chips?sports=nfl,ncaaf,soccer`, the page's own POST `/api/intelligence/query` (`response.ranked_all`) and `/api/board/layer2-shortlist?limit=5000` concurrently (same instant). 5 cycles ~90-100 s apart: 13:10:37Z, 13:11:03Z, 13:12:49Z, 13:14:33Z, 13:16:12Z (08:10-08:16 CDT, Fri).
+- Every read: chips 329 = pregame 242 / final 86 / postponed 1, **live 0**. `ranked_all` 4540-4574 rows; interval (segment != full) totals rows in nfl/ncaaf/soccer = 1, matched to a live chip = 0. Raw shortlist 2000 rows (the `limit=5000` came back capped at 2000), interval rows carrying `game.segment_score` = 0 -- consistent with no live game, not evidence against d6a5ffc5.
+- The scheduled window landed after the Thu 10-15 slate had finished and before Friday's soccer/NCAAF. Interval clause still owed; Saturday 10-17 fallback task stands.
