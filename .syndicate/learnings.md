@@ -2333,3 +2333,14 @@ command. A filter on a guard's output is a way to not see the guard.
 - **Companion:** the same-day rule that a betting cell's null is its own
   predicted EV, not 0. Both are the same mistake -- assuming a null instead of
   deriving it from the population in hand.
+
+## 2026-10-16 RULE: one statistic, two owners -- the EV fair and the projection's anchor fair are computed differently, and a row can be +EV against one and -EV against the other `[lane fair-price-v2, session 9e18a0e7]`
+- Measured on the 10-15 NBA board. The QUOTE fair behind `ev_pct` / Suggested / the sizer / the cheat-sheet `p_market` takes every grid cell, STALE INCLUDED (`layer2_board._resolve_fair` -> `_two_sided_prices_by_book`). The GRID fair behind the projection blend uses cells within 900 s of the freshest only (`book_grid.py:663-702`).
+- On the Knicks total 225.5, 7 of 8 books had moved off the line hours earlier. The stale median made one book's +107 under look +3.5% EV, and it was the only Suggested NBA row. Fresh-only, it is about -4.6%.
+- Stale share inside the quote fair on the served board: 34-78% by sport.
+- **Rule:** before reading an EV, a sim gap or a "sim agrees", find which fair each side of the comparison used. Two fairs on one row is a defect until shown otherwise. Fix it at the producer, as one fair (H5, `fair-price-v2`), not with a reconciling patch at a reader.
+
+## 2026-10-16 RULE: a display fix must target the payload the page READS -- the board page reads the embedded intelligence payload, whose cards carry no `projection` dict `[lane live-winpct-blank, session 9e18a0e7]`
+- I wrote the "pregame proj" label to read `item.projection.pregame_on_live`. The flag was set correctly, and verified on the shortlist API (114 of 114 NFL rows). The page still showed 0 labels on 22 live rows.
+- The page reads `initial-intelligence-response`, 17 MB, built from cards (`layer2_rows_to_board_cards`) that drop the projection dict. The fix was a card column.
+- **Rule:** verify a UI change on the page's own payload, not on an API that looks equivalent. Card columns are built on the refresh-worker (`book_grid_artifact`), so a web reload does not deliver them; a worker restart does.

@@ -744,3 +744,4 @@ once this index exists: re-splitting would orphan the parts.
 | [refresh-run-lanes] | Refresh-run lane topology, and refusals are now LOGGED [verified 2026-09-25/26] | `state_worker.md` |
 | [pregame-sweep-cadence] | THE IDLE LOOP NOW WAKES WHEN A SPORT'S OWN PREGAME SWEEP IS DUE; soccer schedules refetch a near window betwee | `state_worker.md` |
 | [web-oom-leak] | WEB SERVICE MEMORY GROWTH — LIVE: UPDATE 37..44 + the 2026-09-09 block; UPDATE 1..36 archived to state_archive | `state_worker.md` |
+| [live-winpct-blank] | LIVE NFL/NCAAF ROWS SHOW NO PREGAME SIM PROBABILITY -- Win%, "Our sim has" and the direction tag withheld on in-play lines; projection kept [verified 2026-10-15/16] | `state_board.md` |
