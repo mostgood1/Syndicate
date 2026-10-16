@@ -122,6 +122,30 @@ licenses nothing on the board.
 
 (written after the audit, BEFORE any fit)
 
+- **Eligible OOS matches: 7,914** of 7,954 with ≥1 OOS club, 2014-2026. Excluded 40: 19 whose
+  in-scope club has no production rating and 21 whose in-scope club has < 5 rated matches
+  (mostly 2014, the start of the fleet-depth window). 18 have no status payload and are kept as
+  non-neutral 90-minute results; 379 went to extra time (not trained on, scored as draws).
+  **5,231 are OOS vs OOS.** Per season: 2014 553, 2015 614, 2016 560, 2017 531, 2018 617,
+  2019 581, 2020 441, 2021 672, 2022 651, 2023 657, 2024 775, 2025 771, 2026 491 (to date).
+  **Test seasons 2017-2026: 6,187 matches.**
+- **Associations** (`scripts/fit_uefa_outscope_ratings.py assoc`, `outscope_assoc_audit.json` in the
+  research root): ESPN venue country on 9,524 of 9,998 events; 525 OOS clubs; 50 associations.
+  **66 OOS clubs are UNKNOWN** (63 with no home match carrying a country, 3 ties: Hapoel Tel Aviv,
+  Hapoel Kiryat Shmona, Dinamo Brest). Registration-literal: they get the out-of-scope mean `g`,
+  and no country was filled in for them by hand.
+- **Audit result.** The < 80%-share / tie rule flagged 18 clubs. 13 of them, and 7 more seen on a
+  skim of the full per-country list, are exile or stadium-name artefacts. The mode is right for the
+  flagged Ukrainian and Israeli clubs (Shakhtar 42 of 67 in Ukraine, Maccabi Tel-Aviv 49 of 68),
+  so they are not overridden. **13 explicit overrides (`OVERRIDES` in the driver), geography
+  only:** Sparta Prague and Bohemians 1905 Austria -> Czechia (ESPN's "Generali Arena" is also
+  Austria Wien's stadium); Maccabi Petah-Tikva Bulgaria -> Israel; ND Gorica Estonia -> Slovenia;
+  Gomel Greece -> Belarus; Isloch Minsk, ML Vitebsk, Neman Grodno, Torpedo Zhodino Hungary ->
+  Belarus; Radnicki Nis North Macedonia -> Serbia; Kryvbas, Polissya Zhytomyr, SC Dnipro-1
+  Slovakia -> Ukraine.
+- 3 OOS clubs sit in one of OUR countries (Zulte Waregem, Go Ahead Eagles, Torreense;
+  Welsh clubs are Wales). They are treated as any other association, as registered.
+
 ## 3. Results
 
 ## 4. What cannot be estimated
