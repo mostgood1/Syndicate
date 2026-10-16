@@ -187,6 +187,15 @@ REASON_NEEDS_EVENT_MAPPING = "needs_event_mapping"
 # which is what makes the measurement readable before anything is priced.
 REASON_EVENT_UNMATCHED = "event_not_on_our_board"
 REASON_EVENT_AMBIGUOUS = "event_matches_two_games"
+# THE NO LEG OF A THREE-WAY IS NOT A BOARD ROW. On a soccer h2h, NO on "Villarreal
+# wins" pays on a draw AND on an Espanyol win, so it is not the Espanyol row's
+# bet, and NO on "Tie is the result" is not either club's. The two-way NO is the
+# other club (MLB, NFL, NHL); the three-way NO is a double chance, which the
+# board does not carry. Counted per board row it was refused for.
+REASON_THREE_WAY_NO_LEG = "three_way_no_leg_is_not_a_board_bet"
+# The OTHER club's h2h row, met by a "<Club> wins" market. Not a gap: that club
+# has its own `-<CODE>` contract and is matched from it. See the join's h2h branch.
+REASON_ML_OTHER_CLUB = "moneyline_other_club_has_its_own_contract"
 # A PROP contract whose game could not be pinned to one of the board rows it
 # keys onto. A prop's key is (market, player, line) -- no game -- so on a
 # doubleheader the same player's rows from BOTH halves share it, and the
@@ -391,6 +400,54 @@ def _series_family(series: Any) -> str:
 _WINS_TITLE = re.compile(r"^\s*(?P<team>.+?)\s+wins\s*\??\s*$", re.IGNORECASE)
 
 
+def _scan_club_codes(
+    markets: Sequence[Mapping[str, Any]],
+) -> dict[str, dict[str, set[str]]]:
+    """`{series_family: {CODE: {names Kalshi gave it}}}`. See `build_club_code_names`."""
+    found: dict[str, dict[str, set[str]]] = {}
+    for market in markets or ():
+        if not isinstance(market, Mapping):
+            continue
+        ticker = str(market.get("ticker") or "").strip().upper()
+        if not ticker or "-" not in ticker:
+            continue
+        code = ticker.rsplit("-", 1)[-1].strip()
+        # `TIE` is the draw leg and names no club.
+        if not code or code == "TIE" or not code.isalnum():
+            continue
+        title_match = _WINS_TITLE.match(str(market.get("title") or ""))
+        if not title_match:
+            continue
+        name = title_match.group("team").strip()
+        if not name:
+            continue
+        family = _series_family(market.get("series"))
+        if not family:
+            continue
+        found.setdefault(family, {}).setdefault(code, set()).add(name)
+    return found
+
+
+def build_club_code_collisions(
+    markets: Sequence[Mapping[str, Any]],
+) -> dict[str, set[str]]:
+    """`{series_family: {CODE, ...}}`: the codes `build_club_code_names` DROPS.
+
+    Dropping a code from the family map is not enough on its own:
+    `match_event_blob` then falls through to the GLOBAL soccer alias map, where
+    `CEL` is Celta Vigo and `LEV` is Levante. In KXUEL `CEL` is Celtic AND Celje
+    and `LEV` is Leverkusen AND Levski (measured 2026-10-15), so a Celtic v
+    Feyenoord contract resolved onto our Celta Vigo v Feyenoord game. The venue
+    has told us the code is ambiguous in this competition; `_resolve_event`
+    refuses it rather than let the global map guess.
+    """
+    return {
+        family: {code for code, names in codes.items() if len(names) > 1}
+        for family, codes in _scan_club_codes(markets).items()
+        if any(len(names) > 1 for names in codes.values())
+    }
+
+
 def build_club_code_names(
     markets: Sequence[Mapping[str, Any]],
 ) -> dict[str, dict[str, str]]:
@@ -420,29 +477,8 @@ def build_club_code_names(
     order: two clubs claiming one code inside one competition is the ambiguity
     this module refuses everywhere else.
     """
-    found: dict[str, dict[str, set[str]]] = {}
-    for market in markets or ():
-        if not isinstance(market, Mapping):
-            continue
-        ticker = str(market.get("ticker") or "").strip().upper()
-        if not ticker or "-" not in ticker:
-            continue
-        code = ticker.rsplit("-", 1)[-1].strip()
-        # `TIE` is the draw leg and names no club.
-        if not code or code == "TIE" or not code.isalnum():
-            continue
-        title_match = _WINS_TITLE.match(str(market.get("title") or ""))
-        if not title_match:
-            continue
-        name = title_match.group("team").strip()
-        if not name:
-            continue
-        family = _series_family(market.get("series"))
-        if not family:
-            continue
-        found.setdefault(family, {}).setdefault(code, set()).add(name)
     out: dict[str, dict[str, str]] = {}
-    for family, codes in found.items():
+    for family, codes in _scan_club_codes(markets).items():
         resolved = {
             code: next(iter(names))
             for code, names in codes.items()
@@ -460,8 +496,16 @@ def _resolve_event(
     *,
     games: Sequence[Mapping[str, Any]] | None = None,
     memo: dict | None = None,
+    collided: Mapping[str, set[str]] | None = None,
 ) -> dict[str, Any]:
     """Which of our games this game-line market belongs to.
+
+    `collided` (from `build_club_code_collisions`): a blob that opens or closes
+    with a code its own series family gives to two clubs is REFUSED as
+    ambiguous, even when the global alias map would resolve it, because that
+    resolution is a guess the venue has already contradicted. Checked on the
+    blob's 2-4 character ends, which can over-refuse a coincidental split and
+    never under-refuse. Refusing is the direction that cannot lose money.
 
     `games` (from `_distinct_games(board_rows)`) and `memo` let the game-line
     branch resolve 6,000 markets without rescanning ~5,600 rows per market and
@@ -505,6 +549,19 @@ def _resolve_event(
         commence_hint=commence_hint,
     )
     result.setdefault("sport", sport)
+    family_collided = (collided or {}).get(family) if collided else None
+    if family_collided and result.get("status") == "ok":
+        upper = str(blob).upper()
+        ends = {upper[:n] for n in (2, 3, 4)} | {upper[-n:] for n in (2, 3, 4)}
+        hit = sorted(ends & set(family_collided))
+        if hit:
+            result = {
+                "status": "ambiguous",
+                "reason": "club_code_collides_in_series_family",
+                "blob": blob,
+                "codes": hit,
+                "sport": sport,
+            }
     if memo is not None:
         memo[key] = dict(result)
     return result
@@ -602,6 +659,11 @@ def _event_key(row: Mapping[str, Any]) -> tuple[str, str, float] | None:
     except (TypeError, ValueError):
         # A moneyline has no line. Keyed at 0.0 so it is reachable rather than
         # dropped -- `h2h` rows genuinely carry no number.
+        line = 0.0
+    if line != line:
+        # NaN IS "NO LINE" TOO. NHL h2h rows on the fleet shortlist carry
+        # `line: NaN` (measured 2026-10-15), and a NaN key never compares equal,
+        # so those rows looked indexed and could never be reached.
         line = 0.0
     return (event_id, market, line)
 
@@ -742,9 +804,13 @@ def _key_line(value: Any) -> tuple[bool, float | None]:
     if value is None or (isinstance(value, str) and not value.strip()):
         return (True, None)
     try:
-        return (True, float(value))
+        parsed = float(value)
     except (TypeError, ValueError):
         return (False, None)
+    # NaN is how some feeds spell "no line" (NHL h2h rows, 2026-10-15). As a key
+    # it matches nothing, not even another NaN, so it is the same value as None.
+    # An unparseable string still refuses above.
+    return (True, None) if parsed != parsed else (True, parsed)
 
 
 def _match_key(match: Mapping[str, Any]) -> tuple[str, str, str, float, str, str] | None:
@@ -1337,6 +1403,7 @@ def join_kalshi_to_board(
     # this is read rather than guessed, and it is scoped per competition
     # because four measured codes mean different clubs in different leagues.
     club_code_names = build_club_code_names(kalshi_markets)
+    club_code_collisions = build_club_code_collisions(kalshi_markets)
     # The game-line resolver's inputs, built ONCE: `board_rows` is fixed from here
     # on, so its distinct games are too, and every market of one game shares a
     # blob (see `_resolve_event`).
@@ -1512,7 +1579,12 @@ def join_kalshi_to_board(
                     continue
 
             resolution = _resolve_event(
-                market, board_rows, club_code_names, games=resolve_games, memo=resolve_memo
+                market,
+                board_rows,
+                club_code_names,
+                games=resolve_games,
+                memo=resolve_memo,
+                collided=club_code_collisions,
             )
             status = str(resolution.get("status") or "")
             if resolution.get("matched_by") == "commence_time":
@@ -1597,8 +1669,18 @@ def join_kalshi_to_board(
             if is_team_spread:
                 strike = float(verdict["line"])
                 wanted: tuple[tuple[Any, Any], ...] = ((-strike, True), (strike, False))
+            elif verdict.get("line") is None:
+                # A MONEYLINE (h2h, draw, btts) HAS NO LINE, AND THE INDEX KEYS IT
+                # AT 0.0. `_parse_title` returns `line: None` and `_event_key`
+                # indexes h2h rows at 0.0, so looking up `None` missed EVERY
+                # moneyline. Measured 2026-10-15 on the fleet: 528 moneyline
+                # markets, 0 h2h matches, while the fan-in showed Kalshi as the
+                # best h2h price. The commit's resolvers come from these matches,
+                # so those rows were refused or priced with no ticker.
+                wanted = ((0.0, None),)
             else:
                 wanted = ((verdict["line"], None),)
+            is_line_less = verdict.get("line") is None
 
             game_rows: list[tuple[Mapping[str, Any], Any, Any]] = []
             for board_line, expect_named in wanted:
@@ -1620,7 +1702,24 @@ def join_kalshi_to_board(
             subject = verdict.get("subject")
             for row, board_line, expect_named in game_rows:
                 board_side = str(row.get("side") or "").strip().lower()
-                if subject:
+                if market_key == "btts" and subject == "btts":
+                    # A true two-way contract: YES is the board's `btts|yes`.
+                    if board_side not in {"yes", "no"}:
+                        _refuse("unmapped_board_side")
+                        continue
+                    kalshi_side = board_side
+                elif market_key == "h2h" and subject == "draw":
+                    # "Tie is the result": YES is the draw row. NO is "either
+                    # club wins", which no single board row is.
+                    if board_side != "draw":
+                        _refuse(REASON_THREE_WAY_NO_LEG)
+                        continue
+                    kalshi_side = "yes"
+                elif subject and market_key == "h2h" and board_side == "draw":
+                    # "<Club> wins" never prices the draw row, YES or NO.
+                    _refuse(REASON_THREE_WAY_NO_LEG)
+                    continue
+                elif subject:
                     # A TEAM-NAMED market: "Texas wins by over 3.5 runs" is YES
                     # on Texas. The board row's side is `away`/`home`, so the
                     # named club has to be resolved against the event's own two
@@ -1649,6 +1748,18 @@ def join_kalshi_to_board(
                         # wrote a row for it. REFUSED BY NAME -- pricing it here
                         # is precisely the inversion this block exists to stop.
                         _refuse(REASON_SPREAD_ORIENTATION)
+                        continue
+                    if market_key == "h2h" and not is_named:
+                        # EACH CLUB'S MONEYLINE ROW TAKES ITS OWN CONTRACT, AND
+                        # ONLY ON YES. Kalshi lists one market per club (`-MIN`,
+                        # `-ATH`), and `kalshi_orders._side_to_kalshi` buys YES on
+                        # whatever ticker an h2h home/away row carries. Stamping
+                        # the ATH row with `-MIN` on the NO leg (the spread
+                        # pattern) would have bought YES on Minnesota for an
+                        # Athletics bet whenever `-MIN` was the last match on the
+                        # key. It is also wrong on its own terms in a three-way:
+                        # NO on "<Club> wins" pays on the draw too.
+                        _refuse(REASON_ML_OTHER_CLUB)
                         continue
                     kalshi_side = "yes" if is_named else "no"
                 else:
@@ -1701,7 +1812,10 @@ def join_kalshi_to_board(
                         # `_match_key` and `_row_key` must name the same bet;
                         # storing the strike here would rebuild the +X/-X
                         # collision inside the ticker resolver's index.
-                        "line": board_line,
+                        # A line-less market keeps NO line (None), because that is
+                        # what `_row_key` reads off an h2h row. 0.0 is only the
+                        # index's slot; stored here it would never resolve.
+                        "line": None if is_line_less else board_line,
                         "board_side": board_side,
                         "kalshi_side": kalshi_side,
                         "kalshi_american": kalshi_price,
@@ -1787,7 +1901,9 @@ def join_kalshi_to_board(
         row_events = {str(r.get("event_id") or "") for r in rows}
         _dh_number = _split_doubleheader(event_blob_from_ticker(market.get("ticker")) or "")[1]
         if len(row_events) > 1 or _dh_number is not None:
-            resolution = _resolve_event(market, rows, club_code_names)
+            resolution = _resolve_event(
+                market, rows, club_code_names, collided=club_code_collisions
+            )
             wanted_event = str(resolution.get("event_id") or "")
             if str(resolution.get("status") or "") != "ok" or not wanted_event:
                 _refuse(REASON_PROP_GAME_UNRESOLVED)

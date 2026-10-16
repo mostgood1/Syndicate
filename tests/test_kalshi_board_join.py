@@ -1057,3 +1057,236 @@ def test_the_caller_reads_a_key_the_join_actually_returns():
     assert "refusals={joined.get" not in src, (
         "the log line must not interpolate a key the join does not return"
     )
+
+
+# --------------------------------------------------------------------------
+# Moneylines: `_parse_title` says line None, the h2h index says 0.0
+# --------------------------------------------------------------------------
+#
+# Measured 2026-10-15 on the fleet (lane kalshi-moneyline-board-join): 528
+# moneyline-grammar markets, ZERO h2h matches, while the fan-in put Kalshi on
+# the board as the best h2h price. The commit's resolvers are built from this
+# join, so 72 Kalshi-best soccer h2h rows were refused `venue_not_quoting` and
+# 51 NCAAF rows were priced off the aggregator with no ticker (unplaceable).
+# Every fixture below goes through `join_kalshi_to_board` end to end and then
+# through the resolvers the commit builds, because a helper-level test is how
+# the draw grammar shipped inert once already (`ffb7db83`).
+
+
+def _ml_market(ticker, series, title, yes=-122, no=117, **kw):
+    m = {
+        "ticker": ticker,
+        "series": series,
+        "title": title,
+        "yes_american": yes,
+        "no_american": no,
+        "yes_probability": 0.55,
+        "no_probability": 0.46,
+    }
+    m.update(kw)
+    return m
+
+
+def _ml_rows(sport, away, home, event_id="evt-ml", sides=("away", "home"), line=None, market="h2h"):
+    return [
+        {
+            "sport": sport,
+            "event_id": event_id,
+            "market": market,
+            "away_team": away,
+            "home_team": home,
+            "side": side,
+            "line": line,
+            "segment": "full",
+            "model_edge_pct": 2.0,
+            "quote": {"bookmaker": "kalshi", "price": 100},
+        }
+        for side in sides
+    ]
+
+
+def _ml_join(markets, rows, monkeypatch, date):
+    monkeypatch.setenv("SYNDICATE_KALSHI_GAME_LINES", "1")
+    return join_kalshi_to_board(markets, rows, selected_date=date)
+
+
+def _resolved(report, row):
+    from syndicate.features.shared.kalshi_board_join import (
+        kalshi_price_resolver,
+        kalshi_ticker_resolver,
+    )
+
+    matches = report["matches"]
+    return kalshi_price_resolver(matches)(row), kalshi_ticker_resolver(matches)(row)
+
+
+_MIN_ATH_ML = [
+    _ml_market("KXMLBGAME-26AUG242140MINATH-MIN", "KXMLBGAME", "Minnesota wins", yes=-122, no=117),
+    _ml_market("KXMLBGAME-26AUG242140MINATH-ATH", "KXMLBGAME", "Athletics wins", yes=110, no=-130),
+]
+
+
+def test_mlb_moneyline_each_row_takes_its_own_clubs_contract_on_yes(monkeypatch):
+    """The reported repro: "Minnesota wins" against MIN@ATH h2h rows refused
+    `no_matching_board_row` with kalshi_key_sample `h2h|minnesota|None`.
+
+    AND THE OTHER CLUB IS NEVER PRICED OFF THIS CONTRACT'S NO LEG. The order
+    builder buys YES on whatever ticker an h2h row carries, so an ATH row stamped
+    with `-MIN` would buy Minnesota. Each club is matched from its own market,
+    in either market order."""
+    from syndicate.features.shared.kalshi_board_join import REASON_ML_OTHER_CLUB
+
+    rows = _ml_rows("mlb", "MIN", "ATH")
+    for markets in (_MIN_ATH_ML, list(reversed(_MIN_ATH_ML))):
+        report = _ml_join(markets, rows, monkeypatch, "2026-08-24")
+        assert report["reasons"].get(REASON_NO_BOARD_ROW) is None, report["reasons"]
+        pairs = {(m["board_side"], m["kalshi_side"], m["ticker"]) for m in report["matches"]}
+        assert pairs == {
+            ("away", "yes", "KXMLBGAME-26AUG242140MINATH-MIN"),
+            ("home", "yes", "KXMLBGAME-26AUG242140MINATH-ATH"),
+        }, pairs
+        assert report["reasons"].get(REASON_ML_OTHER_CLUB) == 2
+        assert _resolved(report, rows[0]) == (-122, "KXMLBGAME-26AUG242140MINATH-MIN")
+        assert _resolved(report, rows[1]) == (110, "KXMLBGAME-26AUG242140MINATH-ATH")
+
+
+def test_one_clubs_market_alone_leaves_the_other_row_unpriced(monkeypatch):
+    market = _MIN_ATH_ML[0]
+    rows = _ml_rows("mlb", "MIN", "ATH")
+    report = _ml_join([market], rows, monkeypatch, "2026-08-24")
+    assert _resolved(report, rows[0]) == (-122, "KXMLBGAME-26AUG242140MINATH-MIN")
+    assert _resolved(report, rows[1]) == (None, None)
+
+
+def test_moneyline_row_with_a_nan_line_still_matches(monkeypatch):
+    """NHL h2h rows on the fleet shortlist carry `line: NaN`, not None. NaN keys
+    never compare equal, so both the index and the resolver missed them."""
+    rows = _ml_rows("mlb", "MIN", "ATH", line=float("nan"))
+    report = _ml_join(_MIN_ATH_ML, rows, monkeypatch, "2026-08-24")
+    assert len(report["matches"]) == 2
+    assert _resolved(report, rows[0]) == (-122, "KXMLBGAME-26AUG242140MINATH-MIN")
+    assert _resolved(report, rows[1]) == (110, "KXMLBGAME-26AUG242140MINATH-ATH")
+
+
+def test_every_moneyline_match_is_the_leg_the_order_builder_buys(monkeypatch):
+    """THE COUPLING TEST for moneylines, twin of `test_kalshi_orders`'s spread
+    one. `_side_to_kalshi` derives the leg from the row's side alone (h2h
+    home/away/draw -> YES, btts yes/no -> itself), so the join's `kalshi_side`
+    must equal that for every match it emits -- or the price we sized and the
+    leg we buy are two different bets."""
+    from syndicate.features.shared.kalshi_orders import _side_to_kalshi
+
+    btts = _ml_market("KXLALIGABTTS-26OCT30VILESP", "KXLALIGABTTS", "Will both teams score?")
+    cases = [
+        (_MIN_ATH_ML, _ml_rows("mlb", "MIN", "ATH"), "2026-08-24"),
+        (_LALIGA_ML, _laliga_rows(), "2026-10-30"),
+        ([btts], _ml_rows("soccer", "Espanyol", "Villarreal", sides=("yes", "no"), market="btts"),
+         "2026-10-30"),
+    ]
+    seen = 0
+    for markets, rows, date in cases:
+        for match in _ml_join(markets, rows, monkeypatch, date)["matches"]:
+            seen += 1
+            assert _side_to_kalshi(match["board_side"], match["market"], match["line"]) == (
+                match["kalshi_side"]
+            ), match
+    assert seen == 7
+
+
+_LALIGA_ML = [
+    _ml_market("KXLALIGAGAME-26OCT30VILESP-VIL", "KXLALIGAGAME", "Villarreal wins", yes=-150, no=120),
+    _ml_market("KXLALIGAGAME-26OCT30VILESP-ESP", "KXLALIGAGAME", "Espanyol wins", yes=300, no=-400),
+    _ml_market("KXLALIGAGAME-26OCT30VILESP-TIE", "KXLALIGAGAME", "Tie is the result", yes=250, no=-320),
+]
+
+
+def _laliga_rows():
+    # Soccer: Kalshi writes HOME first (VIL = Villarreal at home).
+    return _ml_rows("soccer", "Espanyol", "Villarreal", sides=("home", "away", "draw"))
+
+
+def test_soccer_team_win_prices_only_the_named_club_never_the_no_leg(monkeypatch):
+    """THREE-WAY. NO on "Villarreal wins" pays on a draw too, so it is NOT the
+    Espanyol row's bet. Pricing the other club's row with the NO quote would be
+    a confident price on a different contract."""
+    rows = _laliga_rows()
+    report = _ml_join(_LALIGA_ML[:1], rows, monkeypatch, "2026-10-30")
+    pairs = {(m["board_side"], m["kalshi_side"]) for m in report["matches"]}
+    assert pairs == {("home", "yes")}, (pairs, report["reasons"])
+    home, away, draw = rows
+    assert _resolved(report, home) == (-150, "KXLALIGAGAME-26OCT30VILESP-VIL")
+    assert _resolved(report, away) == (None, None)
+    assert _resolved(report, draw) == (None, None)
+
+
+def test_soccer_draw_leg_prices_the_draw_row_yes(monkeypatch):
+    """`Tie is the result` -> subject "draw". `_side_for_team` cannot place a
+    draw, so it refused `team_side_unresolved`. The draw row takes YES; NO on a
+    draw is "either club wins", which no single board row is."""
+    rows = _laliga_rows()
+    report = _ml_join(_LALIGA_ML, rows, monkeypatch, "2026-10-30")
+    pairs = {(m["board_side"], m["kalshi_side"], m["ticker"]) for m in report["matches"]}
+    assert pairs == {
+        ("home", "yes", "KXLALIGAGAME-26OCT30VILESP-VIL"),
+        ("away", "yes", "KXLALIGAGAME-26OCT30VILESP-ESP"),
+        ("draw", "yes", "KXLALIGAGAME-26OCT30VILESP-TIE"),
+    }, (pairs, report["reasons"])
+    home, away, draw = rows
+    assert _resolved(report, draw) == (250, "KXLALIGAGAME-26OCT30VILESP-TIE")
+    assert _resolved(report, away) == (300, "KXLALIGAGAME-26OCT30VILESP-ESP")
+
+
+def test_a_club_code_that_collides_in_its_series_family_refuses(monkeypatch):
+    """KXUEL lists `CEL` for Celtic AND Celje, so `build_club_code_names` drops
+    it -- and the matcher then fell back to the GLOBAL soccer map, where `CEL`
+    is Celta Vigo. On a board carrying Celta Vigo v Feyenoord, Kalshi's Celtic v
+    Feyenoord contract resolved onto our game: a bet on the wrong match at a
+    confident price. A code the family itself cannot pin down must refuse."""
+    from syndicate.features.shared.kalshi_board_join import REASON_EVENT_AMBIGUOUS
+
+    markets = [
+        _ml_market("KXUELGAME-26OCT22CELFEY-CEL", "KXUELGAME", "Celtic wins"),
+        _ml_market("KXUELGAME-26OCT22CELFEY-FEY", "KXUELGAME", "Feyenoord wins"),
+        _ml_market("KXUELGAME-26OCT22CELBET-CEL", "KXUELGAME", "NK Celje wins"),
+    ]
+    rows = _ml_rows("soccer", "Feyenoord", "Celta Vigo", sides=("home", "away", "draw"))
+    report = _ml_join(markets, rows, monkeypatch, "2026-10-22")
+    assert report["matches"] == [], report["matches"]
+    assert report["reasons"].get(REASON_EVENT_AMBIGUOUS, 0) == 2, report["reasons"]
+
+
+def test_a_collided_code_is_reported_by_family():
+    from syndicate.features.shared.kalshi_board_join import build_club_code_collisions
+
+    markets = [
+        _ml_market("KXUELGAME-26OCT22CELFEY-CEL", "KXUELGAME", "Celtic wins"),
+        _ml_market("KXUELGAME-26OCT22CELBET-CEL", "KXUELGAME", "NK Celje wins"),
+        _ml_market("KXUELGAME-26OCT22CELFEY-FEY", "KXUELGAME", "Feyenoord wins"),
+    ]
+    assert build_club_code_collisions(markets) == {"KXUEL": {"CEL"}}
+
+
+def test_soccer_btts_yes_and_no_rows_take_their_own_legs(monkeypatch):
+    """"Will both teams score?" names no club (subject "btts"), so the team
+    branch refused it; and its line is None, so the index missed it first. YES
+    is the board's `btts|yes`, NO is `btts|no` -- a true two-way contract."""
+    market = _ml_market("KXLALIGABTTS-26OCT30VILESP", "KXLALIGABTTS", "Will both teams score?",
+                        yes=-130, no=110)
+    rows = _ml_rows("soccer", "Espanyol", "Villarreal", sides=("yes", "no"), market="btts")
+    report = _ml_join([market], rows, monkeypatch, "2026-10-30")
+    pairs = {(m["board_side"], m["kalshi_side"]) for m in report["matches"]}
+    assert pairs == {("yes", "yes"), ("no", "no")}, (pairs, report["reasons"])
+    assert _resolved(report, rows[0]) == (-130, "KXLALIGABTTS-26OCT30VILESP")
+    assert _resolved(report, rows[1]) == (110, "KXLALIGABTTS-26OCT30VILESP")
+
+
+def test_a_segment_draw_still_refuses_at_the_order_builder():
+    """Only the full-game draw is a contract we stamp (`-TIE`, "Tie is the
+    result"). "Tie 1st Half" is refused by the catalogue and must not become
+    placeable through the order builder's side map either."""
+    from syndicate.features.shared.kalshi_orders import OrderBuildError, _side_to_kalshi
+
+    assert _side_to_kalshi("draw", "h2h") == "yes"
+    for market in ("h2h_h1", "totals", "spreads", "btts"):
+        with pytest.raises(OrderBuildError):
+            _side_to_kalshi("draw", market)

@@ -172,6 +172,12 @@ def _side_to_kalshi(side: Any, market: Any = None, line: Any = None) -> str:
     market_key = str(market or "").strip().lower()
     if raw in {"home", "away"} and market_key in _TEAM_SIDED_MARKETS:
         return "yes"
+    # THE DRAW IS ITS OWN CONTRACT TOO: `...-TIE`, "Tie is the result". The join
+    # stamps a soccer `h2h|draw` row ONLY from that market and only on YES, so
+    # backing the draw is BUY YES on `-TIE`. Full-game `h2h` only: a segment draw
+    # ("Tie 1st Half") stays refused by the catalogue and must not reach here.
+    if raw == "draw" and market_key == "h2h":
+        return "yes"
     if raw in {"home", "away"} and market_key.startswith("spreads"):
         return _spread_side_from_line(side, market, line)
     raise OrderBuildError(f"unmappable_side: {side!r} market={market!r}")
