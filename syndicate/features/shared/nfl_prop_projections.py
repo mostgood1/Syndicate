@@ -74,6 +74,23 @@ from syndicate.features.shared.wnba_game_projections import _attach_sim_probabil
 #: both read `source`.
 PROJECTION_SOURCE = "nfl_prop_model"
 
+#: Yardage stat -> the stat that counts the OPPORTUNITIES behind it.
+#:
+#: Only yardage markets appear here, because for a volume market the projection
+#: already IS the opportunity count and a self-reference would publish the same
+#: number twice under two names. `anytime_td` is deliberately absent: it has no
+#: line and no natural denominator.
+#:
+#: These are the three pairings the artifact actually supports, measured on
+#: `nfl_prop_projections_2026_wk6.json`: receiving_yards 114/114 players also
+#: carry receptions, passing_yards 24/24 carry passing_attempts, rushing_yards
+#: 32/66 carry rushing_attempts.
+_OPPORTUNITY_STAT: dict[str, str] = {
+    "receiving_yards": "receptions",
+    "rushing_yards": "rushing_attempts",
+    "passing_yards": "passing_attempts",
+}
+
 
 def _as_float(value: Any) -> float | None:
     if value is None or isinstance(value, bool):
@@ -425,6 +442,43 @@ def attach_nfl_prop_projections(
             "projected_sd": _as_float(entry.get("projected_sd")),
             "sample_games": _support_games,
         }
+        # THE OPPORTUNITY BEHIND THE RATE `[2026-10-16, lane
+        # nfl-prop-opportunity-volume]`. `sample_games` turned out NOT to
+        # discriminate: measured 2026-10-16 on 157 ceiling-rejected vs 453
+        # accepted distinct markets, its median is 5.0 on BOTH sides, because in
+        # week 6 it is a CALENDAR count. The signal that DID separate them was a
+        # low ABSOLUTE projection -- a ROLE disagreement.
+        #
+        # This publishes that role directly, and needs no new computation:
+        # `receptions` / `rushing_attempts` / `passing_attempts` are already
+        # extracted stats and already prop markets, so the opportunity count is
+        # the SAME player's own projection under a companion stat, reached with
+        # the `inputs_for` the reprice branch already uses.
+        #
+        # Availability, measured on `nfl_prop_projections_2026_wk6.json`:
+        # receiving_yards 114/114 players also carry receptions, passing_yards
+        # 24/24 carry passing_attempts, rushing_yards 32/66 carry
+        # rushing_attempts (so rushing is partial and the field is absent, not
+        # faked, for the rest).
+        #
+        # AND IT DISCRIMINATES, which is the test `sample_games` failed:
+        # projected receptions spans 0.67..10.33 (15x, median 3.20), and 4 of
+        # the 6 players below 1.00 are the collapsed rows from the ceiling
+        # study -- jalen brooks 0.67 (the population minimum), parkinson 0.80,
+        # melton 0.80, royals 1.00, allen 1.40.
+        _opportunity_stat = _OPPORTUNITY_STAT.get(stat)
+        if _opportunity_stat:
+            projection["opportunity_stat"] = _opportunity_stat
+            _parts = key.split("::")
+            _vol = (index.inputs_for(_opportunity_stat, _parts[1])
+                    if len(_parts) >= 2 else None)
+            # Absent rather than 0.0 when the companion market is not quoted for
+            # this player: "no opportunity projection" and "projected zero
+            # touches" are different claims, and the second is the one a
+            # consumer would act on.
+            projection["projected_opportunities"] = (
+                _as_float(_vol.get("projected_value")) if _vol else None
+            )
         if repriced:
             projection["line_repriced"] = True
             rows_repriced_at_line += 1

@@ -1040,6 +1040,16 @@ death, never life — do not invert it.
 - Falsification test: If the served board still reports 0 MLB prop rows with pa_mean after the publish, the loss is downstream of this module. And the lane must NOT claim a gating win: is_lineup_batter is constant True and pa_mean spans only 1.5 PA (a monotone function of lineup slot, 4.51 at slot 1 to 3.47 at slot 9), so if the write-up implies MLB had an NFL-style low-role population it is wrong -- MLB's payload holds lineup batters only.
 - Files: syndicate/features/shared/prop_projections.py (the hitter_threshold projection dicts / support publish ONLY), tests/test_mlb_prop_support_fields.py (NEW)
 - Blocked by: none (waiting on a quiet window, not on another lane).
+### nfl-prop-opportunity-volume — OPEN — opened 2026-10-16 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- Goal: NFL yardage prop rows carry the projected OPPORTUNITY behind the rate -- receptions for receiving yards, rushing attempts for rushing yards, passing attempts for passing yards -- so a consumer can tell a low-role projection from a real edge, verified on the served board as a non-zero populated count and shown to separate the measured collapsed rows from the population.
+- Files: syndicate/features/shared/nfl_prop_projections.py (the opportunity lookup / publish ONLY), tests/test_nfl_prop_opportunity_volume.py (NEW)
+- Hypothesis: This needs no new computation: receptions, rushing_attempts and passing_attempts are ALREADY extracted stats and already prop markets, so the opportunity count is the same player's own projection under a companion stat, reachable via the index's existing inputs_for(stat, player_segment). Measured on nfl_prop_projections_2026_wk6.json: receiving_yards 114/114 players also have receptions, passing_yards 24/24 have passing_attempts, rushing_yards 32/66 have rushing_attempts. And it DISCRIMINATES where sample_games did not -- projected receptions spans 0.67..10.33 (15x) against sample_games' identical 5.0 medians, and 4 of the 6 players below 1.00 receptions are the collapsed rows from the ceiling study (jalen brooks 0.67 = the population minimum, parkinson 0.80, melton 0.80, royals 1.00, allen 1.40 vs a median of 3.20).
+- Falsification test: If the served board still reports 0 yardage rows with projected_opportunities after the publish, the loss is downstream. And if the field does NOT separate the collapsed rows from the population on the SERVED board the way it does in the artifact, the lane must say so rather than claim a gate -- the NFL sample_games pass already shipped one field that failed exactly that test.
+- Verification: Served board, cap defeated, kind=='prop': count of NFL yardage rows carrying projection.projected_opportunities, before (0) and after a restart; plus the p10/median of that field for ceiling-rejected vs accepted rows, which is the measurement that says whether it gates. Unit tests driving the real attach_nfl_prop_projections with a reachability test.
+- Blocked by: none
+
+
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
