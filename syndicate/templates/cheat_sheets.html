@@ -141,6 +141,17 @@ table.every td { vertical-align: middle; }
 .vsr { font-weight: 700; white-space: nowrap; } .vsr.hit { color: var(--accent); } .vsr.miss { color: var(--price); }
 .tr { font-weight: 700; white-space: nowrap; } .tr.up { color: var(--accent); } .tr.down { color: var(--price); } .tr.flat { color: var(--muted); }
 th.sortable { cursor: pointer; user-select: none; white-space: nowrap; } th.sortable:hover, th.sortable.on { color: var(--accent); } .ep { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
+/* Whose player it is, in words (user 2026-10-16: "logos are good, but not good enough"): the club bold with its crest,
+   "vs" the opponent, the competition -- in the featured rows and under every name in the tables. */
+.club { display: inline-flex; align-items: center; gap: 5px; font-weight: 800; color: var(--ink);
+  border-bottom: 2px solid color-mix(in srgb, var(--green) 70%, transparent); padding-bottom: 1px; }
+.club img { width: 18px; height: 18px; object-fit: contain; }
+.vsl { color: var(--muted); font-size: .85em; margin: 0 6px; text-transform: uppercase; letter-spacing: .06em; }
+.lg { font: 800 11px/1 var(--display); letter-spacing: .07em; text-transform: uppercase; color: var(--cyan);
+  border: 1px solid color-mix(in srgb, var(--cyan) 45%, transparent); border-radius: 3px; padding: 2px 5px; margin-left: 6px; }
+.pn { display: inline-flex; flex-direction: column; gap: 1px; line-height: 1.2; }
+.pn .clubs { font-weight: 500; font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+.pn .clubs b { color: var(--ink); font-weight: 700; }
 img.mini.crest { object-fit: contain; background: none; border-radius: 0; }
 img.mini { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; object-position: 50% 18%; background: color-mix(in srgb, var(--blue) 10%, var(--bg1)); } .bk { color: var(--muted); font-size: 12px; }
 .chip.phase { color: var(--accent2); background: color-mix(in srgb, var(--blue) 14%, transparent); }
@@ -317,7 +328,7 @@ function propRow(r, i) {
   return `<div class="prop"${i != null ? ` data-ri="${i}"` : ""}>
     <div class="who">${face(r)}
       <div class="line1">${verdictChip(c)}${live}<b>${esc(r.player)}</b>${r.pos ? `<span class="pos">${esc(r.pos)}</span>` : ""}${card}</div>
-      <div class="meta"><span class="tm">${img(src(r.team_logo_src, r.team_logo))}${esc(r.team || "")}</span>${r.opponent ? ` vs <span class="tm">${img(src(r.opponent_logo_src, r.opponent_logo))}${esc(r.opponent)}</span>` : ""}${r.kickoff_ct ? ` · <span class="kick">${esc(r.kickoff_ct)}</span>` : ""}${dvp}${r.injury ? " · " + esc(r.injury) : ""}</div>
+      <div class="meta">${clubLine(r)}${r.kickoff_ct ? ` · <span class="kick">${esc(r.kickoff_ct)}</span>` : ""}${dvp}${r.injury ? " · " + esc(r.injury) : ""}</div>
       <div class="bet">${esc(betText(r))} · ${odds(c.price)} ${esc(c.book || "")}</div></div>
     <div>${strip(c)}<div class="nums"><span>price <b>${pct(implied(c.price))}</b></span><span>fair <b>${pct(c.p_market)}</b></span><span>model <b>${pct(c.p_model)}</b></span><span>form-adj <b>${pct(c.p_posterior)}</b></span></div></div>
     <div><div class="form" title="The last 10 games on this line, newest first: green cleared it, grey did not">${formDots(r)}</div><div class="nums"><span>L5 <b>${c.form5 ? c.form5.hits + "/" + c.form5.games : "–"}</b></span><span>L10 <b>${c.form10 ? c.form10.hits + "/" + c.form10.games : "–"}</b></span>
@@ -391,7 +402,7 @@ function consistencyTable(d, ids) {
   const f = x => x && x.games ? `${x.hits}/${x.games}` : "–";
   return `<div class="tbl"><table class="every"><thead><tr><th>Player</th><th>Bet</th><th>L5</th><th>L10</th><th>Trend</th><th>Best price</th><th>Implies</th><th>Fair</th><th>EV</th></tr></thead><tbody>${
     ids.map(i => { const r = d.rows[i], c = r.check || {}, onesided = c.verdict === "one_sided_fair";
-      return `<tr data-ri="${i}"><td><span class="ep">${miniFace(r)}${esc(r.player)}${r.pos ? ` <span class="pos">${esc(r.pos)}</span>` : ""}</span></td><td>${esc(betText(r))}</td><td class="n"><b>${f(c.form5)}</b></td><td class="n"><b>${f(c.form10)}</b></td><td>${trend(c)}</td><td class="n">${odds(c.price)} <span class="bk">${esc(c.book || "")}</span></td><td class="n">${pct(implied(c.price))}</td><td class="n">${onesided ? "one-sided" : pct(c.p_market)}</td><td class="n">${onesided || c.ev_market == null ? "–" : evs(c.ev_market)}</td></tr>`; }).join("")}</tbody></table></div>`;
+      return `<tr data-ri="${i}"><td>${playerCell(r, true)}</td><td>${esc(betText(r))}</td><td class="n"><b>${f(c.form5)}</b></td><td class="n"><b>${f(c.form10)}</b></td><td>${trend(c)}</td><td class="n">${odds(c.price)} <span class="bk">${esc(c.book || "")}</span></td><td class="n">${pct(implied(c.price))}</td><td class="n">${onesided ? "one-sided" : pct(c.p_market)}</td><td class="n">${onesided || c.ev_market == null ? "–" : evs(c.ev_market)}</td></tr>`; }).join("")}</tbody></table></div>`;
 }
 // Against this opponent: the actual previous results on THIS line, newest first ("1 game is fine but give something
 // helpful, like previous result"), and the record once there are a few meetings.
@@ -417,14 +428,14 @@ function pvpTable(d, ids, heads) {
         : p.kind === "receiver_vs_defenders" ? `${ln.plays} plays: ${ln.catches} rec, ${ln.yards} yds · ${ln.pbu} PBU · ${ln.int} INT`
         : p.kind === "qb_vs_defenders" ? ((ln.hawks || []).map(h => `${shortName(h.name)} ${h.int} INT ${h.pbu} PBU`).join(" · ") || "–")
         : `${ln.avg || "–"} / ${ln.ops || "–"}`;
-      return `<tr data-ri="${i}"><td><span class="ep">${miniFace(r)}${esc(r.player)}</span></td><td>${esc(betText(r))}</td><td>${esc(p.opponent || "")}</td><td>${esc(p.summary || "")}</td><td class="n">${esc(rate)}</td><td class="n">${c.form10 && c.form10.games ? c.form10.hits + "/" + c.form10.games : "–"}</td><td class="n">${odds(c.price)} <span class="bk">${esc(c.book || "")}</span></td><td class="n">${onesided ? "one-sided" : pct(c.p_market)}</td><td class="n">${onesided || c.ev_market == null ? "–" : evs(c.ev_market)}</td></tr>`; }).join("")}</tbody></table></div>`;
+      return `<tr data-ri="${i}"><td>${playerCell(r, false)}</td><td>${esc(betText(r))}</td><td>${esc(p.opponent || "")}</td><td>${esc(p.summary || "")}</td><td class="n">${esc(rate)}</td><td class="n">${c.form10 && c.form10.games ? c.form10.hits + "/" + c.form10.games : "–"}</td><td class="n">${odds(c.price)} <span class="bk">${esc(c.book || "")}</span></td><td class="n">${onesided ? "one-sided" : pct(c.p_market)}</td><td class="n">${onesided || c.ev_market == null ? "–" : evs(c.ev_market)}</td></tr>`; }).join("")}</tbody></table></div>`;
 }
 // Matchups: the opponent's rank at allowing this stat, 1 = allows the most; and the player's record vs this opponent.
 function matchupTable(d, ids) {
   if (!ids.length) return `<div class="empty">No prop here faces a defense in the softest (or, for an under, toughest) fifth for its stat.</div>`;
   return `<div class="tbl"><table class="every"><thead><tr><th>Player</th><th>Bet</th><th>Opponent</th><th>Allows</th><th>Per game</th><th>Vs this opponent</th><th>L10</th><th>Best price</th><th>Fair</th><th>EV</th></tr></thead><tbody>${
     ids.map(i => { const r = d.rows[i], c = r.check || {}, mu = r.matchup || {}, onesided = c.verdict === "one_sided_fair";
-      return `<tr data-ri="${i}"><td><span class="ep">${miniFace(r)}${esc(r.player)}${r.pos ? ` <span class="pos">${esc(r.pos)}</span>` : ""}</span></td><td>${esc(betText(r))}</td><td><span class="tm">${img(src(r.opponent_logo_src, r.opponent_logo))}${esc(mu.opponent || r.opponent || "")}</span></td><td class="n">${mu.nth_most ? `<b>${ordinal(mu.nth_most)}</b> most of ${mu.of}` : "–"}</td><td class="n">${typeof mu.per_game === "number" ? mu.per_game.toFixed(1) : "–"}</td><td class="n">${vsText(r)}</td><td class="n">${c.form10 && c.form10.games ? c.form10.hits + "/" + c.form10.games : "–"}</td><td class="n">${odds(c.price)} <span class="bk">${esc(c.book || "")}</span></td><td class="n">${onesided ? "one-sided" : pct(c.p_market)}</td><td class="n">${onesided || c.ev_market == null ? "–" : evs(c.ev_market)}</td></tr>`; }).join("")}</tbody></table></div>`;
+      return `<tr data-ri="${i}"><td>${playerCell(r, true)}</td><td>${esc(betText(r))}</td><td><span class="tm">${img(src(r.opponent_logo_src, r.opponent_logo))}${esc(mu.opponent || r.opponent || "")}</span></td><td class="n">${mu.nth_most ? `<b>${ordinal(mu.nth_most)}</b> most of ${mu.of}` : "–"}</td><td class="n">${typeof mu.per_game === "number" ? mu.per_game.toFixed(1) : "–"}</td><td class="n">${vsText(r)}</td><td class="n">${c.form10 && c.form10.games ? c.form10.hits + "/" + c.form10.games : "–"}</td><td class="n">${odds(c.price)} <span class="bk">${esc(c.book || "")}</span></td><td class="n">${onesided ? "one-sided" : pct(c.p_market)}</td><td class="n">${onesided || c.ev_market == null ? "–" : evs(c.ev_market)}</td></tr>`; }).join("")}</tbody></table></div>`;
 }
 const exportBtn = name => `<button type="button" class="btn no-export" data-export="${esc(name)}">Export image</button>`;
 // "1 rows" -> "1 row", "1 games" -> "1 game": a count of one reads singular, on the sheet and in an export.
@@ -454,7 +465,7 @@ function linesTable(d, ids, withGame) {
   const games = Object.fromEntries((d.games || []).map(g => [g.event_id, g]));
   return `<div class="tbl"><table class="every"><thead><tr>${withGame ? "<th>Game</th>" : ""}<th>Market</th><th>Bet</th><th>Best price</th><th>Implies</th><th>Fair</th><th>EV</th><th>Model</th><th>Sim</th><th>Read</th></tr></thead><tbody>${
     ids.map(i => { const g = d.game_lines[i], c = g.check || {}, gm = games[g.event_id] || {};
-      return `<tr data-li="${i}">${withGame ? `<td><span class="ep">${img(src(gm.away_logo_src, gm.away_logo), "mini")}${img(src(gm.home_logo_src, gm.home_logo), "mini")}<span class="kick">${esc(gm.kickoff_ct || "")}</span></span></td>` : ""}<td>${LINE_MARKET[g.market] || esc(g.market)}</td><td><b>${lineBet(g)}</b></td><td class="n">${odds(c.price)} <span class="bk">${esc(c.book || "")} · ${g.books_quoting} bks</span></td><td class="n">${pct(implied(c.price))}</td><td class="n">${c.verdict === "one_sided_fair" ? "one-sided" : pct(c.p_market)}</td><td class="n"><span class="ev ${c.ev_market > 0 ? "gain" : "neg"}">${c.verdict === "one_sided_fair" ? "–" : evs(c.ev_market)}</span></td><td class="n">${pct(c.p_model)}</td><td class="n">${lineSim(g)}</td><td><span class="chip ${c.verdict}">${VERDICT[c.verdict] || esc(c.verdict)}</span></td></tr>`; }).join("")}</tbody></table></div>`;
+      return `<tr data-li="${i}">${withGame ? `<td><span class="ep">${img(src(gm.away_logo_src, gm.away_logo), "mini")}${img(src(gm.home_logo_src, gm.home_logo), "mini")}<span class="pn"><span>${esc(gm.away_team || "")} @ ${esc(gm.home_team || "")}</span><span class="clubs"><span class="kick">${esc(gm.kickoff_ct || "")}</span>${gm.league ? " · " + esc(gm.league) : ""}</span></span></span></td>` : ""}<td>${LINE_MARKET[g.market] || esc(g.market)}</td><td><b>${lineBet(g)}</b></td><td class="n">${odds(c.price)} <span class="bk">${esc(c.book || "")} · ${g.books_quoting} bks</span></td><td class="n">${pct(implied(c.price))}</td><td class="n">${c.verdict === "one_sided_fair" ? "one-sided" : pct(c.p_market)}</td><td class="n"><span class="ev ${c.ev_market > 0 ? "gain" : "neg"}">${c.verdict === "one_sided_fair" ? "–" : evs(c.ev_market)}</span></td><td class="n">${pct(c.p_model)}</td><td class="n">${lineSim(g)}</td><td><span class="chip ${c.verdict}">${VERDICT[c.verdict] || esc(c.verdict)}</span></td></tr>`; }).join("")}</tbody></table></div>`;
 }
 // "Every prop on the sheet" sorts on any column (user 2026-10-15: "ability to sort columns, esp the L5 and L10 so we
 // can see the highest hit rates across everything"). A hit rate needs its sample: a row with fewer than 5 (L5) / 8
@@ -495,7 +506,21 @@ function everyTable(d, ids) {
   }).join("");
   return `<div class="tbl"><table class="every"><thead><tr>${head}</tr></thead><tbody>${
     sortedIds(d, ids, sort).map(i => { const r = d.rows[i], c = r.check || {}, onesided = c.verdict === "one_sided_fair";
-      return `<tr data-ri="${i}"><td><span class="ep">${miniFace(r)}${esc(r.player)}${r.pos ? ` <span class="pos">${esc(r.pos)}</span>` : ""}</span></td><td>${esc(betText(r))}</td><td class="n">${odds(c.price)} <span class="bk">${esc(c.book || "")}</span></td><td class="n">${pct(implied(c.price))}</td><td class="n">${onesided ? "one-sided" : pct(c.p_market)}</td><td class="n"><span class="ev ${!onesided && c.ev_market > 0 ? "gain" : "neg"}">${onesided || c.ev_market == null ? "–" : evs(c.ev_market)}</span></td><td class="n">${pct(c.p_model)}</td><td class="n">${f(c.form5)}</td><td class="n">${f(c.form10)}</td><td><span class="chip ${c.verdict}">${VERDICT[c.verdict] || esc(c.verdict)}</span></td></tr>`; }).join("")}</tbody></table></div>`;
+      return `<tr data-ri="${i}"><td>${playerCell(r, true)}</td><td>${esc(betText(r))}</td><td class="n">${odds(c.price)} <span class="bk">${esc(c.book || "")}</span></td><td class="n">${pct(implied(c.price))}</td><td class="n">${onesided ? "one-sided" : pct(c.p_market)}</td><td class="n"><span class="ev ${!onesided && c.ev_market > 0 ? "gain" : "neg"}">${onesided || c.ev_market == null ? "–" : evs(c.ev_market)}</span></td><td class="n">${pct(c.p_model)}</td><td class="n">${f(c.form5)}</td><td class="n">${f(c.form10)}</td><td><span class="chip ${c.verdict}">${VERDICT[c.verdict] || esc(c.verdict)}</span></td></tr>`; }).join("")}</tbody></table></div>`;
+}
+// Whose player it is (user 2026-10-16): "[crest] CLUB vs [crest] Opponent · League". The club is spelled out --
+// a crest alone did not say which side a player was on.
+function clubLine(r) {
+  const team = r.team_name || r.team;
+  const club = team ? `<span class="club">${img(src(r.team_logo_src, r.team_logo))}${esc(team)}</span>` : "";
+  const opp = r.opponent ? `<span class="vsl">vs</span><span class="tm">${img(src(r.opponent_logo_src, r.opponent_logo))}${esc(r.opponent)}</span>` : "";
+  return club + opp + (r.league ? `<span class="lg">${esc(r.league)}</span>` : "");
+}
+// A table's player cell: the face, the name, and under it the club and the opponent in words.
+function playerCell(r, withPos) {
+  const team = r.team_name || r.team;
+  const clubs = [team ? `<b>${esc(team)}</b>` : "", r.opponent ? `vs ${esc(r.opponent)}` : "", r.league ? esc(r.league) : ""].filter(Boolean).join(" · ");
+  return `<span class="ep">${miniFace(r)}<span class="pn"><span>${esc(r.player)}${withPos && r.pos ? ` <span class="pos">${esc(r.pos)}</span>` : ""}</span>${clubs ? `<span class="clubs">${clubs}</span>` : ""}</span></span>`;
 }
 const matchupLine = g => `${img(src(g.away_logo_src, g.away_logo))}${esc(g.away_team || "")} @ ${img(src(g.home_logo_src, g.home_logo))}${esc(g.home_team || g.matchup || "")}`;
 function gamesBlock(d, games) {

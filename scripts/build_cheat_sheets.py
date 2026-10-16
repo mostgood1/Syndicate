@@ -973,6 +973,9 @@ def main(argv: list[str] | None = None) -> int:
         if not sheet["rows"] and not sheet.get("game_lines") and not sheet.get("picks") and prior is None:
             print(f"CHEAT_SHEET {sport} date={selected} no {selected} games with pregame props -- nothing written", flush=True)
             continue
+        filled = cs.fill_teams(sheet)          # a row's team from its game when the evidence had none (2026-10-16)
+        if filled:
+            print(f"CHEAT_SHEET {sport} teams filled from the game: {filled}", flush=True)
         images = attach_images(sheet, data_root / "cheatsheets" / ".img_cache")
         write_atomic(target, sheet)
         counts = {k: len(v) for k, v in sheet["sections"].items()}

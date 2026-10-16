@@ -21,6 +21,8 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
+from functools import lru_cache
+from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
 PRIOR_STRENGTH = 40.0          # k: games' worth of weight the market price carries in the consistency posterior.
@@ -1217,6 +1219,111 @@ def void_label(reason: Any) -> str:
     return "Not gradeable"
 
 
+SOCCER_LEAGUES = {"epl": "Premier League", "championship": "Championship", "la_liga": "LaLiga", "bundesliga": "Bundesliga",
+                  "serie_a": "Serie A", "ligue_1": "Ligue 1", "eredivisie": "Eredivisie", "primeira_liga": "Primeira Liga",
+                  "belgian_pro_league": "Belgian Pro League", "mls": "MLS", "ucl": "Champions League", "uel": "Europa League",
+                  "uecl": "Conference League"}
+_UEFA = {"ucl", "uel", "uecl"}
+# A club's name differs between feeds ("1. FC Köln" vs "FC Cologne", "Le Mans FC" vs "Le Mans"): the loose key folds
+# accents, drops the affixes, and maps the exonyms that measured as different (2026-10-16).
+_CLUB_AFFIXES = {"fc", "cf", "afc", "sc", "ac", "as", "ss", "us", "sv", "vfb", "vfl", "tsg", "club", "cd", "ud", "rc", "sd",
+                 "rcd", "fk", "sk", "bk", "if", "aik", "cfc", "calcio", "de", "the"}
+_EXONYMS = {"koln": "cologne", "munchen": "munich", "monchengladbach": "gladbach", "borussiamonchengladbach": "gladbach"}
+
+
+def _loose(name: Any) -> str:
+    import unicodedata
+
+    text = unicodedata.normalize("NFKD", str(name or "")).encode("ascii", "ignore").decode().lower()
+    words = [w for w in re.split(r"[^a-z]+", text) if w and w not in _CLUB_AFFIXES]
+    key = "".join(words)
+    return _EXONYMS.get(key, key)
+
+
+@lru_cache(maxsize=1)
+def _soccer_league_index() -> dict[str, frozenset]:
+    """normalized team name -> the leagues whose branding snapshot lists it (the files `team_logos` already reads, one
+    per league: `soccer_source/<league>/source_artifacts/data/processed/team_branding/*.csv`). Read once per process."""
+    from syndicate.features.shared import team_logos
+    from syndicate.features.shared.team_branding import read_team_branding_snapshot
+
+    index: dict[str, set] = {}
+    for path in team_logos._branding_files("soccer"):
+        league = Path(path).parents[4].name
+        for row in read_team_branding_snapshot(path):
+            for key in (row.display_name, row.location, row.abbreviation):
+                if team_logos._norm(key):
+                    index.setdefault(team_logos._norm(key), set()).add(league)
+            for key in (row.display_name, row.location):
+                if _loose(key):
+                    index.setdefault("~" + _loose(key), set()).add(league)
+    return {k: frozenset(v) for k, v in index.items()}
+
+
+def _leagues_of(name: Any) -> frozenset:
+    from syndicate.features.shared import team_logos
+
+    index = _soccer_league_index()
+    hit = index.get(team_logos._norm(name))
+    if hit:
+        return hit
+    try:
+        from syndicate.features.shared.team_aliases import canonical_team
+
+        canonical = canonical_team("soccer", name)
+    except Exception:  # noqa: BLE001
+        canonical = None
+    if canonical and index.get(team_logos._norm(canonical)):
+        return index[team_logos._norm(canonical)]
+    return index.get("~" + _loose(name), frozenset()) if _loose(name) else frozenset()
+
+
+def soccer_league(home: Any, away: Any) -> str | None:
+    """The competition two clubs meet in: the domestic league both are listed in, else the UEFA one both are in. None
+    when it cannot be told -- a missing league label, never a guessed one."""
+    shared = _leagues_of(home) & _leagues_of(away)
+    domestic = sorted(shared - _UEFA)
+    if len(domestic) == 1:
+        return SOCCER_LEAGUES.get(domestic[0], domestic[0])
+    uefa = sorted(shared & _UEFA)
+    return SOCCER_LEAGUES.get(uefa[0], uefa[0]) if len(uefa) == 1 and not domestic else None
+
+
+def fill_teams(sheet: dict[str, Any]) -> int:
+    """Every prop row names the team its player is on (user 2026-10-16: soccer sheets must say "what team they are on"):
+    a row with no team but a known opponent in a known game is on the OTHER side of that game. Soccer games and rows
+    also get their competition. Returns how many rows got a team. In place; never overwrites a team already set."""
+    games = {g.get("event_id"): g for g in sheet.get("games") or []}
+    soccer = str(sheet.get("sport") or "") == "soccer"
+    if soccer:
+        for g in games.values():
+            if not g.get("league"):
+                league = soccer_league(g.get("home_team"), g.get("away_team"))
+                if league:
+                    g["league"] = league
+    filled = 0
+    norm = lambda x: re.sub(r"[^a-z0-9]", "", str(x or "").lower())
+    for r in sheet.get("rows") or []:
+        g = games.get(r.get("event_id"))
+        if not g:
+            continue
+        if soccer and g.get("league") and not r.get("league"):
+            r["league"] = g["league"]
+        if r.get("team") or not r.get("opponent"):
+            continue
+        home, away, opp = g.get("home_team"), g.get("away_team"), norm(r.get("opponent"))
+        side = "home" if opp and opp in (norm(away),) else "away" if opp and opp in (norm(home),) else None
+        if side is None:          # the opponent is named differently (a short club name): match by containment
+            side = "home" if opp and (opp in norm(away) or norm(away) in opp) else \
+                "away" if opp and (opp in norm(home) or norm(home) in opp) else None
+        if side:
+            r["team"] = r["team_name"] = g.get(f"{side}_team")
+            r["team_logo"] = r.get("team_logo") or g.get(f"{side}_logo")
+            r["team_logo_src"] = r.get("team_logo_src") or g.get(f"{side}_logo_src")
+            filled += 1
+    return filled
+
+
 def page_payload(sheets: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any]]:
     """sport -> the sheet as the page shows it, sports in board order.
 
@@ -1232,6 +1339,8 @@ def page_payload(sheets: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any
         # The reconciled file (scripts/reconcile_cheat_sheets.py) rides in on the sheet; each row and line takes its
         # result, and the page keeps only the summary (user 2026-10-15: "toggles between pregame sheets and
         # reconciled sheets").
+        sheet = dict(sheet, rows=[dict(r) for r in sheet.get("rows") or []], games=[dict(g) for g in sheet.get("games") or []])
+        fill_teams(sheet)                     # every row says whose player it is (user 2026-10-16)
         rec = sheet.get("reconciled") if isinstance(sheet.get("reconciled"), Mapping) else None
         graded_props = (rec or {}).get("props") or {}
         graded_lines = (rec or {}).get("lines") or {}

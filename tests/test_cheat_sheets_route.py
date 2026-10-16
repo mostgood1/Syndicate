@@ -217,3 +217,34 @@ def test_a_syndicate_pick_gets_a_pick_graphic_and_a_picks_only_sheet_is_served(h
     assert "Our sim has New York Knicks" not in html.split("Why we like it", 1)[1].split("</ul>", 1)[0]   # never the reason
     assert "Only 2 books quote it" in html
     assert client.get(f"/cheatsheets/card/nba/{TODAY}/l2_ffffffffffffffff").status_code == 404
+
+
+def test_every_soccer_row_says_whose_player_it_is(monkeypatch):
+    # User 2026-10-16: "soccer cheat sheet need to be clearer about teams - logos are good, but not good enough. Esp to
+    # indicate player props and what team they are on". A row with no team but a known opponent is on the OTHER side.
+    from syndicate.features.shared import cheat_sheets as cs
+
+    monkeypatch.setattr(cs, "_leagues_of", lambda name: {"Levante": frozenset({"la_liga"}), "Deportivo": frozenset({"la_liga"}),
+                                                         "Ajax": frozenset({"eredivisie", "ucl"}),
+                                                         "Celtic": frozenset({"ucl"})}.get(name, frozenset()))
+    sheet = {"sport": "soccer", "games": [{"event_id": "e1", "home_team": "Levante", "away_team": "Deportivo",
+                                           "home_logo": "L.png", "away_logo": "D.png"},
+                                          {"event_id": "e2", "home_team": "Celtic", "away_team": "Ajax"}],
+             "rows": [{"event_id": "e1", "player": "Adrian de la Fuente", "opponent": "Deportivo", "team": None},
+                      {"event_id": "e1", "player": "Jeremy Toljan", "opponent": "Deportivo", "team": "Levante"},
+                      {"event_id": "e1", "player": "Nobody", "opponent": None, "team": None},
+                      {"event_id": "e2", "player": "X", "opponent": "Celtic", "team": None}]}
+    assert cs.fill_teams(sheet) == 2
+    first, kept, unknown, uefa = sheet["rows"]
+    assert first["team"] == "Levante" and first["team_logo"] == "L.png" and first["league"] == "LaLiga"
+    assert kept["team"] == "Levante" and unknown["team"] is None             # never overwritten, never guessed
+    assert uefa["team"] == "Ajax" and uefa["league"] == "Champions League"   # no shared domestic league: the UEFA one
+    assert cs.soccer_league("Levante", "Nowhere FC") is None
+
+
+def test_the_page_spells_out_the_club(tmp_path, monkeypatch):
+    from pathlib import Path
+
+    page = (Path(__file__).resolve().parents[1] / "syndicate" / "templates" / "cheat_sheets.html").read_text(encoding="utf-8")
+    assert "function clubLine(r)" in page and "function playerCell(r, withPos)" in page
+    assert page.count("${playerCell(r, ") == 4 and "${clubLine(r)}" in page
