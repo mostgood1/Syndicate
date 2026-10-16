@@ -13,7 +13,9 @@ from syndicate.features.shared import odds_regions as orx
 REPO = Path(__file__).resolve().parents[1]
 # What each sport's props got from regions=us, 10-01..10-16 (props shards on the fleet).
 SEEN_US = {"nfl": {"draftkings", "bovada", "betonlineag", "fanduel", "betrivers", "betmgm", "fanatics", "williamhill_us"},
-           "ncaaf": {"betonlineag", "fanduel", "bovada", "draftkings", "betrivers", "betmgm"}}
+           "ncaaf": {"betonlineag", "fanduel", "bovada", "draftkings", "betrivers", "betmgm"},
+           # soccer prop-call shards 10-01..10-16, 573,710 rows (lane soccer-uefa-competitions)
+           "soccer": {"betrivers", "fanduel", "draftkings", "betmgm", "mybookieag", "bovada", "fanatics", "williamhill_us"}}
 
 
 def _script(name):
@@ -35,7 +37,14 @@ def test_the_knobs():
     assert orx.prop_bookmakers("nfl", env={"SYNDICATE_NFL_PROP_BOOKMAKERS": ""}) is None              # back to the region
     assert orx.prop_bookmakers("nfl", env={"SYNDICATE_NFL_PROP_BOOKMAKERS": "fanduel"}) == "fanduel"
     assert orx.prop_bookmakers("nfl", env={"SYNDICATE_NFL_PROP_REGIONS": "eu"}) is None   # a widened region keeps its meaning
-    assert orx.prop_bookmakers("soccer", env={}) is None and orx.prop_bookmakers("wnba", env={}) is None  # not listed
+    assert orx.prop_bookmakers("wnba", env={}) is None                                              # not listed
+    assert orx.prop_bookmakers("soccer", env={"SYNDICATE_SOCCER_PROP_REGIONS": "us,eu"}) is None      # widened soccer keeps its meaning
+
+
+def test_soccer_ten_keep_every_book_soccer_props_had():
+    books = orx.prop_bookmakers("soccer", env={}).split(",")
+    assert len(books) == len(set(books)) <= 10
+    assert SEEN_US["soccer"] <= set(books)                            # MyBookie included: the shared list would drop it
 
 
 def test_the_basketball_fetcher_defaults_to_the_league_list(monkeypatch):

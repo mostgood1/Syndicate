@@ -250,3 +250,28 @@ def test_refused_names_stay_refused(stub_branding):
     # `#631` refused these by name; a UEFA fixture is not evidence enough to map them.
     for name in ("Inter", "Enschede", "St. Truidense"):
         assert stub_branding.canonical_team("soccer", name) is None
+
+
+def test_soccer_prop_call_sends_the_ten_books_only_when_configured(monkeypatch):
+    """Reachability: the list must reach the REQUEST, and `None` must leave it out."""
+    props = _load_script("fetch_soccer_oddsapi_props_local")
+    sent = []
+
+    class _Resp:
+        headers: dict = {}
+        url = "https://api.the-odds-api.com/v4/x"
+        status_code = 200
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"bookmakers": []}
+
+    monkeypatch.setattr(props.requests, "get", lambda url, params=None, timeout=None: sent.append(dict(params)) or _Resp())
+    monkeypatch.setattr(props, "record_oddsapi_quota", lambda *a, **k: None)
+    for books in (None, "betrivers,mybookieag"):
+        props.fetch_event_player_props("k", sport_key="soccer_epl", event_id="e1", region="us",
+                                       markets=["player_goal_scorer_anytime"], bookmakers=books)
+    assert "bookmakers" not in sent[0] and sent[0]["regions"] == "us"
+    assert sent[1]["bookmakers"] == "betrivers,mybookieag"

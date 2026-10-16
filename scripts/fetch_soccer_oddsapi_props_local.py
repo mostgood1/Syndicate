@@ -209,19 +209,21 @@ def fetch_event_player_props(
     event_id: str,
     region: str,
     markets: list[str],
+    bookmakers: str | None = None,
 ) -> dict[str, Any] | None:
     url = f"{_get_base_url()}/sports/{sport_key}/events/{event_id}/odds"
+    params = {
+        "apiKey": api_key,
+        "regions": region,
+        "markets": ",".join(markets),
+        "oddsFormat": "american",
+    }
+    # Ten named books bill as ONE region and take precedence over `regions`
+    # (lane props-book-coverage). None asks the region exactly as before.
+    if bookmakers:
+        params["bookmakers"] = bookmakers
     try:
-        response = requests.get(
-            url,
-            params={
-                "apiKey": api_key,
-                "regions": region,
-                "markets": ",".join(markets),
-                "oddsFormat": "american",
-            },
-            timeout=20,
-        )
+        response = requests.get(url, params=params, timeout=20)
         # response.url, not url: the markets= the attribution buckets read
         # live in params, and the recorder redacts apiKey before persisting.
         record_oddsapi_quota(response.headers, sport="soccer", endpoint=response.url)
@@ -562,6 +564,11 @@ def main() -> int:
     region = prop_regions("soccer", args.region)
     if region != args.region:
         print(f"[soccer_props] PROP_REGIONS base={args.region} -> {region}", flush=True)
+    from syndicate.features.shared.odds_regions import prop_bookmakers
+
+    # None when SYNDICATE_SOCCER_PROP_REGIONS widened the region: that knob keeps its meaning.
+    books = prop_bookmakers("soccer")
+    print(f"[soccer_props] PROP_BOOKMAKERS {books or 'none (region)'}", flush=True)
     events = fetch_events(api_key, sport_key=sport_key, region=region)
     print(f"Fetched {len(events)} events for {sport_key}")
     scoped_ids: set[str] = set()
@@ -598,7 +605,8 @@ def main() -> int:
         if not event_id:
             continue
         payload = fetch_event_player_props(
-            api_key, sport_key=sport_key, event_id=event_id, region=region, markets=request_markets
+            api_key, sport_key=sport_key, event_id=event_id, region=region, markets=request_markets,
+            bookmakers=books,
         )
         if payload is None:
             continue
