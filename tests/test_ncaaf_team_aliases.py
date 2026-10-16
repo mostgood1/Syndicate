@@ -258,9 +258,12 @@ def test_an_unknown_school_resolves_to_nothing_without_raising() -> None:
 # ---------------------------------------------------------------------------
 
 
+# SOCCER RE-PINNED 2026-10-15 (lane soccer-uefa-competitions, `25fea6ac`): the UCL/UEL/UECL
+# branding adds 55 clubs from leagues we do not carry. Diffed before/after over the tracked
+# branding: aliases 508 -> 597 and nicknames 71 -> 99, with 0 keys removed and 0 changed in either.
 @pytest.mark.parametrize(
     "sport,alias_entries,nickname_entries",
-    [("mlb", 38, 27), ("nfl", 39, 32), ("nba", 42, 26), ("wnba", 50, 0), ("soccer", 508, 71)],
+    [("mlb", 38, 27), ("nfl", 39, 32), ("nba", 42, 26), ("wnba", 50, 0), ("soccer", 597, 99)],
 )
 def test_the_other_sports_maps_are_the_same_size_as_before(
     sport: str, alias_entries: int, nickname_entries: int
@@ -301,7 +304,11 @@ def test_resolution_for_every_other_sport_is_unchanged(sport, token, expected) -
     assert canonical_team(sport, token) == expected
 
 
-@pytest.mark.parametrize("sport,tokens", [("mlb", 86), ("nfl", 95), ("nba", 92), ("wnba", 49), ("soccer", 403)])
+# SOCCER 403 -> 518 (2026-10-15, `25fea6ac`): +121 tokens, and 6 domestic tokens leave the set
+# because a UEFA club now shares them -- `inter` (Inter Miami / Inter d'Escaldes), `lincoln`,
+# `rb` (Leipzig / Salzburg), `red`, `sk`, `sparta` (Rotterdam / Prague). That is the guard working:
+# a bare `soccer|h2h|sparta` quote key would otherwise be free to match the wrong Sparta.
+@pytest.mark.parametrize("sport,tokens", [("mlb", 86), ("nfl", 95), ("nba", 92), ("wnba", 49), ("soccer", 518)])
 def test_unambiguous_club_tokens_unchanged_for_the_other_sports(sport, tokens) -> None:
     assert len(ta.unambiguous_club_tokens(sport)) == tokens
 
