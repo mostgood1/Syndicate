@@ -1001,3 +1001,10 @@ FIT regular, 802-811 games per checkpoint. y = remaining regulation points − p
 - **The only stable effect is a constant per checkpoint:** the pro-rata line over-projects remaining REGULATION points by ~2-2.5 pts at the period breaks. Part of that is OT, since the market total includes it and this y does not; the rest is the scoring shape across quarters. It is not a live-state signal.
 - **Conclusion:** none of these early in-game states (pace, efficiency, FT/3PA/foul rates, score vs line, margin) predicts remaining NBA points beyond the market line in 2025-26. Together with §15/§15b, the totals edge is not in our state features. A live book sees the same box score and moves its line at least as well.
 - Recommendation recorded for the user: stop live-totals modelling work; the forward gate (§14) still records totals for completeness.
+- **§14 AMENDMENT (2026-10-16 ~14:4xZ, BEFORE any 2026-27 regular-season data; user decision "Re-point gate + watch"):** the forward gate is re-pointed from TOTALS to MARGIN + WIN PROBABILITY. §15 / §15b / §16 showed the totals rule cannot be met by this model: no early signal beyond the line.
+  - **Comparator:** `pregame_rate` (the shadow lens runs the PROD config, since Phase 2 is not enabled, so there is no PROD-vs-FINAL arm).
+  - **PASS (all required), game-clustered bootstrap, n stated:**
+    - (a) pooled end Q1/Q2/Q3: margin |err| native − pr CI upper < 0, AND ML log-loss native − pr CI upper < 0;
+    - (b) 5:00 Q4: margin and ML NOT significantly worse (CI lower ≤ 0). This is a noise-proof not-worse bar, the G3 lesson.
+  - **Reported only, not gated:** total |err| and bias vs pr; 80% coverage; native vs live market when a ±2-min live line exists; refusals; the real-five share.
+  - Everything else unchanged: population, window, config-label stratification, read ONCE at the end, no interim peeks at pass metrics.
