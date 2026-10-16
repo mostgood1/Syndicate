@@ -2394,3 +2394,16 @@ per fetch). After the props book lists shipped, "books per group after 17:31Z" v
 7 -> 2, NCAAF 3 -> 2) because 20 minutes of changes were set against a morning of accumulation. On the SAME groups,
 before vs before+after, it was a gain (NFL 7 -> 9, NCAAF 4 -> 5, NHL 2 -> 5). **How to apply:** any before/after count
 from this shard compares one population with itself; a window comparison measures how often prices move, not books.
+
+
+## 2026-10-16 -- "Stale relative to the freshest book" compares feeds that run on different clocks (session 9e18a0e7)
+
+**Belief overturned:** the 10-06 seen-basis rule ("a cell is stale 15 min behind the most recently SEEN book on the
+market") was taken as the fix for collapsing book counts. It still collapsed them whenever ONE venue is captured more
+often than the rest: Kalshi / ProphetX pollers vs hourly sportsbook prop fetches -> Martinez K 2.5 read 1 of 10 books,
+the board priced it against Kalshi's own two sides, and 20+ of 66 suggested picks rested on one venue.
+**Rule:** judge a quote against ITS OWN BOOK's latest capture of the event, plus a separate dead-feed ceiling -- never
+against another feed's clock. And read the LATEST start time on a line: quotes keep the old one when a start moves.
+**Measurement trap, also from today:** "sides with 1 fresh book while >= 2 quote" counts MOVED LINES (every other book
+re-posted at a new number) along with the defect -- 369 of NFL's 405 were correct. Before using a staleness share as
+a pass/fail line, split out rows whose stale books are fresh at another line of the same bet.

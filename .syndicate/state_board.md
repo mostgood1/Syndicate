@@ -7,6 +7,7 @@ Same rules as state.md: when a fact changes, EDIT THE LINE.
 
 ## [board-freshness] BOARD FRESHNESS AND STALENESS
 
+- **STALENESS IS NOW JUDGED AGAINST THE BOOK'S OWN CAPTURE, NOT THE MARKET'S FRESHEST BOOK** `[verified on the fleet 2026-10-16 23:34Z, 7d4cce94, lane book-grid-own-capture-staleness]`. A cell is stale only when (a) it is > 15 min older than that book's freshest quote on the same event (the book stopped quoting the line) or (b) the book's freshest quote on the event is > 2 h behind the event's freshest (pregame; 10 min once started, read off the LATEST start time on the line). The 10-06 rule (15 min behind the market's most recently SEEN book) collapsed `books_quoting` to the last-captured venue: Martinez K 2.5 read 1 of 10 books (Kalshi polled every few minutes vs hourly MLB sportsbook props) -> now **9 of 10**; MLB sides with 1 fresh book while >= 2 quote **59/484 -> 7/483**. NFL 405/2,411 still read that way and are CORRECT (369 = moved lines, 36 = pulled Anytime TDs). `SYNDICATE_BOOK_GRID_STALE_BASIS=market_seen` restores the old rule. **Board: no suggested pick when the fair rests on one venue** (`single_book_fair`): 0 such picks on any date at 23:35Z (was 19-23 of ~66). Findings: `findings_2026-10-16_one_book_staleness.md`.
 **THE BOARD HAS TWO INDEPENDENT CAUSES, and fixing one is not enough.**
 
 - **Cause 1 — refusal rate.** 96.7% of board cycles were refused before any work:
