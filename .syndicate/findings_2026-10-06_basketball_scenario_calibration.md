@@ -3255,3 +3255,35 @@ keyword of the three solver helpers and their EXACT call sites, section only.
 - Then s/Δ re-measured on the disjoint dates, the 12-date check, the full FIT.
 - R2-b (REB) and the residual 3P% are re-read on the re-fit composition. They are not tuned on this window until
   then.
+
+### R2-c step 2 — RESULT 2026-10-16 21:35Z (done 21:32Z; foul_2pa_mult committed, parity 5,400/5,400): NOT CONFIRMED; it exposes a STRUCTURAL defect in the shooting-foul model
+
+**Run:** the round-2 config + foul_3pa_mult 0.12, foul_2pa_mult ∈ {1.4, 1.7, 2.0}, the 12 sweep dates, 166 team-games.
+
+| foul_2pa_mult | 3-shot trips (real 0.41) | FTA (target 22.69 ± 0.3) | PF (19.67 ± 0.4) | foul-outs | 3P% (.3611) | 2P% (.5446) | FGA (89.08) | 3PA (36.77) | REB (43.81) | bias |
+|---|---|---|---|---|---|---|---|---|---|---|
+| (1.0, 3PA 1.0 = before) | 3.49 | 22.96 | 19.66 | 0.207 | .3736 | .5549 | 87.94 | 35.90 | 42.24 | +0.63 |
+| 1.4 | 0.42 | 16.17 ✗ | 18.00 ✗ | 0.150 | **.3612** | .5939 | 89.94 | 39.05 | 42.21 | +1.05 |
+| 1.7 | 0.41 | 19.23 ✗ | 19.64 ✓ | 0.212 | .3534 | .5970 | 88.55 | 38.92 | 41.78 | +0.76 |
+| 2.0 | 0.41 | 22.35 ✗ (−0.34) | 21.35 ✗ | 0.293 ✗ | .3483 | .6004 | 87.20 | 38.93 | 41.33 | +1.15 |
+
+- Quarter shares hold at every point.
+- **Verdict:** no point meets FTA and PF together. NOT CONFIRMED.
+
+**What it shows, the structural defect:**
+- Every shot type that gets fouled more gets an INFLATED make %. With 2PA fouls up, 2P% goes .555 → .600 against real
+  .545, and 3P% falls as 3PA fouls drop.
+- **Mechanism (belief, from the code):** the loop draws make/miss with the player's REAL 2P% / 3P%. That rate is
+  already net of fouled misses, because real stats exclude fouled misses from FGA. FOULED_MISS_NOT_FGA then removes the
+  fouled misses AGAIN, so the recorded % is p / (1 − 0.7·f·(1 − p)).
+- So the sim's make % depends on its own foul rate. Any re-fit of the foul composition moves the shooting
+  percentages. The pre-round "3P% +1.6" was largely this, with threes over-fouled.
+- **A correct model needs:** (i) a make probability defined on ALL attempts (de-netted from the prior using the foul
+  rate); (ii) a realistic foul share by shot type (2PA ≫ 3PA); (iii) the FT / PF volume re-fitted on top.
+- That is a coherent engine change, larger than one lever, and the #1d FOULED_MISS_NOT_FGA port is part of it.
+
+**Status:**
+- foul_3pa_mult / foul_2pa_mult stay on main at 1.0 (off). R2-c is PAUSED pending a decision on building the coherent
+  shooting-foul model.
+- **Round-2 config so far:** fit_f5 + quarter_targets_mode=mean + quarters_calibration.json (R2-a, CONFIRMED on 12
+  dates).
