@@ -965,6 +965,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### oddsapi-quota-fake-baseline-impact — CLOSED — opened 2026-10-16 — closed 2026-10-16 — session 2e0f
+- GOAL: MET -- Goal (verbatim): Decide what the fake 10-11 fleet quota baseline affected (readers, any action taken) and recommend repair vs age-out; read-only on Redis. Reading: reader grep (only ops.py:3287 + diagnose_betting_pipeline.py read baseline), live doc GET 2026-10-16T18:59Z, fleet log scan; nothing acted. User decided 2026-10-16: let it age out (roll ~10-18 08:15Z), no Redis write.
 - Goal: Decide what the fake 10-11 fleet quota baseline affected (readers, any action taken) and recommend repair vs age-out; read-only on Redis
 - Files: .syndicate/log/2026-10-16.md, .syndicate/leads.md
 - Hypothesis: Only the display endpoint and diagnose script read baseline; nothing gates on burn, so the fake baseline mis-states burn/projection but changed no decision
