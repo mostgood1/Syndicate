@@ -46,9 +46,13 @@ def embed_card_images(fields: dict[str, Any], cache: Path) -> dict[str, Any]:
 
     out = dict(fields)
     for key, size in (("headshot", img.CARD_SIZE), ("team_logo", img.ROW_SIZE), ("home_logo", img.ROW_SIZE),
-                      ("away_logo", img.ROW_SIZE)):
-        if out.get(key):
-            out[key] = img.data_uri(img.cache_image(out[key], cache, size), cache)
+                      ("away_logo", img.ROW_SIZE), ("hero", img.HERO_SIZE), ("hero_away", img.HERO_SIZE),
+                      ("hero_home", img.HERO_SIZE)):
+        value = str(out.get(key) or "")
+        if value.startswith("/cheatsheets/img/"):          # the sheet's cached copy (the hero is cached at 900px)
+            out[key] = img.data_uri(value.rsplit("/", 1)[-1].split(".", 1)[0], cache)
+        elif value:
+            out[key] = img.data_uri(img.cache_image(value, cache, size), cache)
     return out
 
 

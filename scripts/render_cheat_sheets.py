@@ -81,6 +81,7 @@ def main(argv: list[str] | None = None) -> int:
     html = html.replace("/*__DATA__*/null", json.dumps(payload, default=str).replace("</", "<\\/"), 1)
     html = html.replace("/*__META__*/null", json.dumps(meta), 1).replace("__LOGO_SRC__", logo)
     html = html.replace("<!--__SITE_HEAD__-->", "", 1).replace("<!--__SITE_HEADER__-->", "", 1)
+    html = html.replace("/*__BRAND_TOKENS__*/", cs.brand_tokens(), 1)        # the brand JSON's colours (2026-10-16)
     out = Path(args.out)
     out.write_text(html, encoding="utf-8")
     print(f"CHEAT_SHEET_PAGE {out} sports={list(payload)} rows={ {k: len(v['rows']) for k, v in payload.items()} } "

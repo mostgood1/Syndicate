@@ -6,43 +6,62 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@700;800;900&family=Barlow:wght@400;500;600;700&display=swap">
 <style>
-/* Layout: sport tabs, then stacked sheet sections; each row pairs the bet with a probability strip (price vs fair vs model vs form). */
+/* Layout: sport tabs, then stacked sheet sections; each row pairs the bet with a probability strip (price vs fair vs model vs form).
+   BRAND (user 2026-10-16): the page mirrors the play cards -- every colour is a token from
+   syndicate/static/brand/syndicate_roi_brand.json, injected below by render_page, or a mix of one. No literals:
+   tests/test_brand_kit.py checks it. */
+/*__BRAND_TOKENS__*/
 :root {
   color-scheme: dark;
-  --bg: #04070c; --bg2: #08111c; --card: #0a141f; --ink: #eef3f7; --muted: #8fa3b3; --rule: #183044; --track: #1a2b3b;
-  --accent: #8cff2e; --accent2: #1fa8ff; --accent-soft: rgba(140,255,46,.12);
-  --price: #ff6b57; --fair: #eef3f7; --model: #b59bff; --form: #1fa8ff;
-  --v-value: #8cff2e; --v-value-bg: rgba(140,255,46,.14);
-  --v-priced: #ffbe3d; --v-priced-bg: rgba(255,190,61,.13); --v-neutral: #93a4b2; --v-neutral-bg: rgba(147,164,178,.14);
-  --hit: #8cff2e; --miss: #33475a;
-  --display: "Saira Condensed", "Arial Narrow", Impact, sans-serif;
-  --body: "Barlow", "Segoe UI", Helvetica, Arial, sans-serif;
-  --mono: "Barlow", "Segoe UI", Helvetica, Arial, sans-serif;
+  --bg: var(--bg0); --card: var(--bg1); --rule: color-mix(in srgb, var(--blue) 22%, var(--bg1)); --track: color-mix(in srgb, var(--blue) 14%, var(--bg1));
+  --edge: color-mix(in srgb, var(--blue) 45%, var(--bg1));
+  --accent: var(--green); --accent2: var(--blue); --accent-soft: color-mix(in srgb, var(--green) 12%, transparent);
+  --price: var(--viz-price); --fair: var(--ink); --model: var(--viz-model); --form: var(--blue);
+  --v-value: var(--green); --v-value-bg: color-mix(in srgb, var(--green) 14%, transparent);
+  --v-priced: var(--amber); --v-priced-bg: color-mix(in srgb, var(--amber) 13%, transparent); --v-neutral: var(--muted); --v-neutral-bg: color-mix(in srgb, var(--muted) 14%, transparent);
+  --hit: var(--green); --miss: color-mix(in srgb, var(--blue) 20%, var(--bg2));
+  --mono: var(--body);
 }
-body { background: radial-gradient(1200px 500px at 15% -10%, rgba(31,168,255,.16), transparent 60%), radial-gradient(900px 420px at 95% 0%, rgba(140,255,46,.10), transparent 60%), var(--bg); color: var(--ink); font: 15px/1.55 var(--body); font-variant-numeric: tabular-nums; }
+body { background: radial-gradient(700px 360px at 6% -8%, color-mix(in srgb, var(--blue) 26%, transparent), transparent 62%),
+  radial-gradient(600px 320px at 96% -6%, color-mix(in srgb, var(--cyan) 14%, transparent), transparent 60%),
+  radial-gradient(900px 420px at 100% 12%, color-mix(in srgb, var(--green) 10%, transparent), transparent 60%), var(--bg); color: var(--ink); font: 15px/1.55 var(--body); font-variant-numeric: tabular-nums; }
 .slant { display: inline-block; transform: skewX(-8deg); }
 .brand { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
-.brand img { width: 88px; height: 88px; border-radius: 10px; box-shadow: 0 0 0 2px rgba(140,255,46,.55), 0 0 24px rgba(31,168,255,.35); }
+.brand img { width: 88px; height: 88px; border-radius: 12px;
+  box-shadow: 0 0 0 3px var(--green), 0 0 26px color-mix(in srgb, var(--green) 50%, transparent), 0 0 50px color-mix(in srgb, var(--blue) 40%, transparent); }
+.chrome, .wordmark .w1, .xhead .w1 { text-transform: uppercase;
+  background: linear-gradient(180deg, var(--chrome-hi) 0%, var(--chrome-mid) 36%, var(--chrome-lo) 50%, var(--chrome-hi) 63%, var(--chrome-mid) 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-stroke: 1px rgba(0,0,0,.6);
+  filter: drop-shadow(0 3px 0 rgba(0,0,0,.95)) drop-shadow(0 0 16px color-mix(in srgb, var(--blue) 55%, transparent)); }
+.brush { display: inline-block; justify-self: start; filter: drop-shadow(0 0 14px color-mix(in srgb, var(--green) 60%, transparent)); }
+.brush > span { display: inline-block; padding: .28em 1.1em .34em; color: var(--bg0);
+  background: linear-gradient(180deg, var(--chrome-hi) -70%, var(--green) 40%, var(--green-deep));
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 664 138' preserveAspectRatio='none'%3E%3Cfilter id='r' x='-5%25' y='-25%25' width='110%25' height='150%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.022 .11' numOctaves='3' seed='7' result='n'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='n' scale='22' xChannelSelector='R' yChannelSelector='G'/%3E%3C/filter%3E%3Cg filter='url(%23r)' fill='black'%3E%3Cpath d='M30 22 L650 8 L632 96 L10 112 Z'/%3E%3Crect x='96' y='96' width='11' height='26' rx='5.5'/%3E%3Ccircle cx='101.5' cy='122' r='7'/%3E%3Crect x='398' y='94' width='12' height='32' rx='6'/%3E%3Ccircle cx='404' cy='127' r='7.5'/%3E%3C/g%3E%3C/svg%3E") center / 100% 100% no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 664 138' preserveAspectRatio='none'%3E%3Cfilter id='r' x='-5%25' y='-25%25' width='110%25' height='150%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.022 .11' numOctaves='3' seed='7' result='n'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='n' scale='22' xChannelSelector='R' yChannelSelector='G'/%3E%3C/filter%3E%3Cg filter='url(%23r)' fill='black'%3E%3Cpath d='M30 22 L650 8 L632 96 L10 112 Z'/%3E%3Crect x='96' y='96' width='11' height='26' rx='5.5'/%3E%3Ccircle cx='101.5' cy='122' r='7'/%3E%3Crect x='398' y='94' width='12' height='32' rx='6'/%3E%3Ccircle cx='404' cy='127' r='7.5'/%3E%3C/g%3E%3C/svg%3E") center / 100% 100% no-repeat; }
 .wordmark { display: grid; gap: 2px; }
-.wordmark .w1 { font: 900 clamp(34px, 6vw, 54px)/.9 var(--display); letter-spacing: .02em; text-transform: uppercase; color: #f4f7fa; text-shadow: 0 2px 0 #1b2a38; }
-.wordmark .w2 { font: 800 clamp(22px, 3.6vw, 30px)/1 var(--display); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); text-shadow: 0 0 18px rgba(140,255,46,.45); }
+.wordmark .w1 { font: 900 clamp(38px, 6.6vw, 64px)/.9 var(--display); letter-spacing: .02em; }
+.wordmark .w2 { font: 900 clamp(20px, 3.4vw, 28px)/1 var(--display); letter-spacing: .08em; text-transform: uppercase; }
 .foot { display: flex; flex-wrap: wrap; gap: 10px 22px; justify-content: space-between; align-items: center; border-top: 2px solid var(--accent); padding-top: 12px;
   font: 800 15px/1 var(--display); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .foot b { color: var(--ink); } .foot .x { color: var(--accent2); }
 .honest { font: 800 16px/1.2 var(--display); letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
 .wrap { max-width: 1120px; margin: 0 auto; padding-inline: 18px; padding-block: 22px 60px; display: grid; gap: 22px; }
 h1 { font: 700 clamp(30px, 5vw, 44px)/1 var(--display); letter-spacing: .01em; margin: 0; text-transform: uppercase; }
-h2 { font: 900 25px/1.05 var(--display); text-transform: uppercase; letter-spacing: .04em; margin: 0; color: var(--accent); transform: skewX(-8deg); text-shadow: 0 0 14px rgba(140,255,46,.35); }
+h2 { display: inline-block; font: 900 22px/1.05 var(--display); text-transform: uppercase; letter-spacing: .07em; margin: 0; color: var(--bg0);
+  padding: 6px 18px 5px; transform: skewX(-10deg); border-radius: 4px; background: linear-gradient(90deg, var(--green-deep), var(--green));
+  box-shadow: 0 0 18px color-mix(in srgb, var(--green) 55%, transparent); }
 .sub { color: var(--muted); font-size: 13.5px; max-width: 75ch; }
 .tabs { display: flex; flex-wrap: wrap; gap: 8px; }
 .tab { font: 800 18px/1 var(--display); letter-spacing: .05em; text-transform: uppercase; padding: 9px 16px; border-radius: 6px;
   border: 1px solid var(--rule); background: var(--card); color: var(--ink); cursor: pointer; }
-.tab[aria-selected="true"] { background: var(--accent); color: #04110a; border-color: var(--accent); box-shadow: 0 0 16px rgba(140,255,46,.4); }
+.tab[aria-selected="true"] { background: var(--accent); color: var(--bg0); border-color: var(--accent); box-shadow: 0 0 16px color-mix(in srgb, var(--green) 45%, transparent); }
 .tab:focus-visible, .chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12.5px; color: var(--muted); align-items: center; }
 .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
 .legend .tick { width: 3px; height: 12px; border-radius: 1px; }
-section.sheet { background: linear-gradient(180deg, var(--bg2), var(--card)); border: 1px solid #1d3a55; border-radius: 10px; padding: 16px 16px 6px; display: grid; gap: 10px; box-shadow: inset 0 0 0 1px rgba(31,168,255,.08), 0 0 24px rgba(31,168,255,.06); }
+section.sheet { background: linear-gradient(180deg, color-mix(in srgb, var(--bg2) 94%, transparent), color-mix(in srgb, var(--bg0) 96%, transparent)),
+  repeating-linear-gradient(135deg, rgba(255,255,255,.022) 0 2px, transparent 2px 7px);
+  border: 2px solid color-mix(in srgb, var(--blue) 60%, transparent); border-radius: 12px; padding: 16px 16px 6px; display: grid; gap: 10px;
+  box-shadow: 0 0 20px color-mix(in srgb, var(--blue) 24%, transparent), inset 0 0 26px color-mix(in srgb, var(--blue) 8%, transparent); }
 .sheet header { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; justify-content: space-between; }
 .sheet header p { margin: 0; color: var(--muted); font-size: 13px; max-width: 70ch; }
 .count { font: 500 12.5px var(--mono); color: var(--muted); }
@@ -54,7 +73,7 @@ section.sheet { background: linear-gradient(180deg, var(--bg2), var(--card)); bo
 .bet { font: 500 13px var(--mono); margin-top: 2px; }
 .chip { display: inline-block; font: 800 12px/1 var(--display); letter-spacing: .07em; text-transform: uppercase; padding: 4px 7px; border-radius: 4px; margin-right: 6px; }
 .chip.value { color: var(--v-value); background: var(--v-value-bg); }
-.chip.playchip { color: var(--accent2); background: rgba(31,168,255,.14); }
+.chip.playchip { color: var(--accent2); background: color-mix(in srgb, var(--blue) 14%, transparent); }
 .chip.streak_priced_in { color: var(--v-priced); background: var(--v-priced-bg); } .chip.neutral { color: var(--v-neutral); background: var(--v-neutral-bg); }
 .strip { position: relative; height: 26px; }
 .strip .track { position: absolute; left: 0; right: 0; top: 11px; height: 4px; background: var(--track); border-radius: 2px; }
@@ -83,7 +102,7 @@ td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .empty { color: var(--muted); font-size: 13px; padding: 8px 0 12px; }
 .note { font-size: 13px; color: var(--muted); border-left: 3px solid var(--accent2); padding-left: 10px; }
 .who { display: grid; grid-template-columns: 52px 1fr; gap: 4px 12px; align-items: center; }
-.who .face { width: 52px; height: 52px; border-radius: 50%; background: #0f2233 center/cover no-repeat; border: 2px solid #1d3a55; overflow: hidden; display: grid; place-items: center; grid-row: span 3; }
+.who .face { width: 52px; height: 52px; border-radius: 50%; background: color-mix(in srgb, var(--blue) 10%, var(--bg1)) center/cover no-repeat; border: 2px solid var(--edge); overflow: hidden; display: grid; place-items: center; grid-row: span 3; }
 /* Fill the circle exactly and anchor near the top: MLB headshots are portrait (64x96), and as a grid item the image
    sized to 52x78 and was clipped at its middle -- the top of the head cut off (user 2026-10-15). */
 .who .face { position: relative; }
@@ -93,10 +112,10 @@ td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .who .line1 { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
 .tm { display: inline-flex; align-items: center; gap: 5px; font-weight: 600; color: var(--ink); }
 .tm img { width: 18px; height: 18px; object-fit: contain; }
-.pos { font: 800 11px/1 var(--display); letter-spacing: .08em; color: #04110a; background: var(--accent2); padding: 3px 6px; border-radius: 3px; }
+.pos { font: 800 11px/1 var(--display); letter-spacing: .08em; color: var(--bg0); background: var(--accent2); padding: 3px 6px; border-radius: 3px; }
 .kick { color: var(--accent2); font-weight: 600; }
 .slate { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; padding-bottom: 10px; }
-.sg { border: 1px solid var(--rule); border-radius: 8px; padding: 10px 12px; display: grid; gap: 6px; background: rgba(10,21,32,.6); }
+.sg { border: 1px solid var(--rule); border-radius: 8px; padding: 10px 12px; display: grid; gap: 6px; background: color-mix(in srgb, var(--bg1) 60%, transparent); }
 .sg .teams { display: grid; gap: 4px; }
 .sg .t { display: flex; align-items: center; gap: 8px; font-weight: 600; }
 .sg .t img { width: 26px; height: 26px; object-fit: contain; }
@@ -110,33 +129,33 @@ td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .days { display: flex; flex-wrap: wrap; gap: 6px; }
 .btn { display: inline-flex; align-items: center; gap: 6px; font: 800 13px/1 var(--display); letter-spacing: .07em; text-transform: uppercase;
   padding: 7px 11px; border-radius: 5px; border: 1px solid var(--rule); background: var(--card); color: var(--ink); cursor: pointer; text-decoration: none; }
-.btn:hover { border-color: var(--accent2); } .btn.on { background: var(--accent); color: #04110a; border-color: var(--accent); }
+.btn:hover { border-color: var(--accent2); } .btn.on { background: var(--accent); color: var(--bg0); border-color: var(--accent); }
 .btn[disabled] { opacity: .6; cursor: progress; }
 .sheet header .btn { margin-left: auto; }
-.line1 .btn { padding: 4px 8px; font-size: 11.5px; color: var(--accent); border-color: rgba(140,255,46,.45); }
-.chip.started { color: #ffbe3d; background: rgba(255,190,61,.13); }
-.chip.beta { color: #04110a; background: var(--accent2); vertical-align: 4px; }
-.chip.one_sided_fair { color: #c7b8ff; background: rgba(181,155,255,.14); }
-.chip.suspect_price { color: #ff8a7a; background: rgba(255,90,74,.14); }
+.line1 .btn { padding: 4px 8px; font-size: 11.5px; color: var(--accent); border-color: color-mix(in srgb, var(--green) 45%, transparent); }
+.chip.started { color: var(--amber); background: color-mix(in srgb, var(--amber) 13%, transparent); }
+.chip.beta { color: var(--bg0); background: var(--accent2); vertical-align: 4px; }
+.chip.one_sided_fair { color: var(--viz-model); background: color-mix(in srgb, var(--viz-model) 14%, transparent); }
+.chip.suspect_price { color: var(--viz-price); background: color-mix(in srgb, var(--red) 14%, transparent); }
 table.every td { vertical-align: middle; }
 .vsr { font-weight: 700; white-space: nowrap; } .vsr.hit { color: var(--accent); } .vsr.miss { color: var(--price); }
 .tr { font-weight: 700; white-space: nowrap; } .tr.up { color: var(--accent); } .tr.down { color: var(--price); } .tr.flat { color: var(--muted); }
 th.sortable { cursor: pointer; user-select: none; white-space: nowrap; } th.sortable:hover, th.sortable.on { color: var(--accent); } .ep { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
-img.mini { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; object-position: 50% 18%; background: #0f2233; } .bk { color: var(--muted); font-size: 12px; }
-.chip.phase { color: var(--accent2); background: rgba(31,168,255,.14); }
+img.mini { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; object-position: 50% 18%; background: color-mix(in srgb, var(--blue) 10%, var(--bg1)); } .bk { color: var(--muted); font-size: 12px; }
+.chip.phase { color: var(--accent2); background: color-mix(in srgb, var(--blue) 14%, transparent); }
 a.sg { color: inherit; text-decoration: none; cursor: pointer; transition: border-color .15s, transform .15s; }
 a.sg:hover { border-color: var(--accent); transform: translateY(-1px); }
-.gamebar { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; padding: 12px 14px; border: 1px solid #1d3a55; border-radius: 10px; background: var(--bg2); }
+.gamebar { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; padding: 12px 14px; border: 1px solid var(--edge); border-radius: 10px; background: var(--bg2); }
 .gamebar .gm { display: flex; align-items: center; gap: 8px; font: 800 24px/1.1 var(--display); text-transform: uppercase; letter-spacing: .03em; }
 .gamebar .gm img { width: 30px; height: 30px; object-fit: contain; }
 .xframe { box-sizing: border-box; position: fixed; left: -30000px; top: 0; width: 1080px; padding: 36px 40px 30px; display: grid; gap: 20px; color: var(--ink); font: 16px/1.5 var(--body);
-  background: radial-gradient(900px 480px at 10% -8%, rgba(31,168,255,.25), transparent 62%), radial-gradient(800px 460px at 100% 6%, rgba(140,255,46,.14), transparent 60%), var(--bg); }
+  background: radial-gradient(900px 480px at 10% -8%, color-mix(in srgb, var(--blue) 25%, transparent), transparent 62%), radial-gradient(800px 460px at 100% 6%, color-mix(in srgb, var(--green) 14%, transparent), transparent 60%), var(--bg); }
 .xhead { display: grid; grid-template-columns: 110px 1fr; gap: 16px 22px; align-items: center; }
-.xhead > img { width: 110px; height: 110px; border-radius: 14px; box-shadow: 0 0 0 3px rgba(140,255,46,.6), 0 0 28px rgba(31,168,255,.4); }
-.xhead .w1 { font: 900 64px/.9 var(--display); letter-spacing: .02em; text-transform: uppercase; }
-.xhead .w2 { margin-top: 6px; font: 900 34px/1 var(--display); letter-spacing: .06em; text-transform: uppercase; color: #04110a; background: var(--accent); padding: 3px 18px 1px; }
+.xhead > img { width: 110px; height: 110px; border-radius: 14px; box-shadow: 0 0 0 3px var(--green), 0 0 28px color-mix(in srgb, var(--blue) 40%, transparent); }
+.xhead .w1 { font: 900 72px/.9 var(--display); letter-spacing: .02em; }
+.xhead .w2 { margin-top: 6px; font: 900 34px/1 var(--display); letter-spacing: .06em; text-transform: uppercase; color: var(--bg0); background: var(--accent); padding: 3px 18px 1px; }
 .xday { grid-column: 1 / -1; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 20px;
-  padding: 10px 16px; border: 2px solid #1d3a55; border-radius: 10px; background: rgba(10,21,32,.85);
+  padding: 10px 16px; border: 2px solid var(--edge); border-radius: 10px; background: color-mix(in srgb, var(--bg1) 85%, transparent);
   font: 800 28px/1.1 var(--display); text-transform: uppercase; letter-spacing: .05em; }
 .xday .xgame { display: flex; gap: 8px; align-items: center; color: var(--accent2); font-size: 26px; }
 .xday .xgame img { width: 32px; height: 32px; object-fit: contain; }
@@ -161,8 +180,8 @@ a.sg:hover { border-color: var(--accent); transform: translateY(-1px); }
 tr.rw td:first-child { box-shadow: inset 3px 0 0 var(--accent); } tr.rl td:first-child { box-shadow: inset 3px 0 0 var(--price); }
 .prop.rw { box-shadow: inset 3px 0 0 var(--accent); padding-left: 10px; } .prop.rl { box-shadow: inset 3px 0 0 var(--price); padding-left: 10px; }
 .rec { font: 800 13px/1 var(--display); letter-spacing: .06em; text-transform: uppercase; padding: 5px 8px; border-radius: 4px; white-space: nowrap; color: var(--accent); background: var(--v-value-bg); }
-.rec.neg { color: var(--price); background: rgba(255,107,87,.14); } .rec.none { color: var(--muted); background: var(--v-neutral-bg); }
-.recbar { display: grid; gap: 10px; padding: 14px 16px; border: 1px solid #1d3a55; border-radius: 10px; background: linear-gradient(180deg, var(--bg2), var(--card)); }
+.rec.neg { color: var(--price); background: color-mix(in srgb, var(--viz-price) 14%, transparent); } .rec.none { color: var(--muted); background: var(--v-neutral-bg); }
+.recbar { display: grid; gap: 10px; padding: 14px 16px; border: 1px solid var(--edge); border-radius: 10px; background: linear-gradient(180deg, var(--bg2), var(--card)); }
 .recbar .items { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; }
 .recbar .it { display: inline-flex; gap: 8px; align-items: center; font-weight: 600; }
 .recbar p { margin: 0; color: var(--muted); font-size: 12.5px; }
@@ -178,18 +197,21 @@ tr.rw td:first-child { box-shadow: inset 3px 0 0 var(--accent); } tr.rl td:first
 /* A pick's who-block has four text lines (chips, name, bet, game) beside a face that spans three: every text line
    stays in the text column, or the game line drops under the face one word per line. */
 .prop.pick .who > :not(.face) { grid-column: 2; }
-.ptile { border: 1px solid #1d3a55; border-radius: 8px; padding: 6px 6px 5px; background: rgba(10,21,32,.75); display: grid; gap: 1px; text-align: center; }
-.ptile span { font: 800 11px/1.2 var(--display); letter-spacing: .07em; text-transform: uppercase; color: var(--accent2); }
-.ptile b { font: 800 21px/1.1 var(--display); color: var(--ink); } .ptile b.gain { color: var(--accent); }
+.ptile { border: 2px solid var(--blue); border-radius: 9px; padding: 6px 6px 5px; display: grid; gap: 1px; text-align: center;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg2) 92%, transparent), color-mix(in srgb, var(--bg0) 94%, transparent));
+  box-shadow: 0 0 12px color-mix(in srgb, var(--blue) 40%, transparent), inset 0 0 14px color-mix(in srgb, var(--blue) 14%, transparent); }
+.ptile span { font: 800 11px/1.2 var(--display); letter-spacing: .08em; text-transform: uppercase; color: var(--cyan); }
+.ptile b { font: 900 22px/1.1 var(--display); color: var(--green); text-shadow: 0 0 12px color-mix(in srgb, var(--green) 55%, transparent); }
 .ptile i { font-style: normal; font-size: 11.5px; color: var(--muted); }
 .checks { grid-column: 1 / -1; list-style: none; margin: 2px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 4px 18px; }
 .checks li { font-size: 13px; padding-left: 20px; position: relative; }
 .checks li::before { content: "✓"; position: absolute; left: 2px; color: var(--accent); font-weight: 800; }
 /* A point's tone: a record that backs the side is ticked, one that argues against it is flagged, the rest is context
    (user 2026-10-15: a 0-in-3 record vs this team is shown, never ticked). */
-.checks li.ctx::before { content: "•"; color: var(--accent2); left: 5px; }
-.checks li.against::before { content: "!"; color: #ffbe3d; left: 6px; }
-.checks li.against b { color: #ffbe3d; }
+.checks li.ctx::before { color: color-mix(in srgb, var(--green) 55%, transparent); }
+.checks li.against::before { content: ""; left: 1px; top: .2em; width: 14px; height: 14px; background: var(--red);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' fill='black' d='M12 1.8 23.4 22H.6zM10.7 8.5h2.6l-.4 7.2h-1.8zM12 17.4a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3z'/%3E%3C/svg%3E") center / 14px no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' fill='black' d='M12 1.8 23.4 22H.6zM10.7 8.5h2.6l-.4 7.2h-1.8zM12 17.4a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3z'/%3E%3C/svg%3E") center / 14px no-repeat; }
+.checks li.against b { color: var(--red); }
 .checks li b { color: var(--accent2); font: 800 11.5px var(--display); letter-spacing: .06em; text-transform: uppercase; margin-right: 5px; }
 .xframe .ptile b { font-size: 26px; } .xframe .ptile span { font-size: 13px; } .xframe .checks li { font-size: 16px; }
 @media (max-width: 760px) { .prop.pick { grid-template-columns: 1fr; } .ptiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -204,7 +226,7 @@ tr.rw td:first-child { box-shadow: inset 3px 0 0 var(--accent); } tr.rl td:first
 <div class="wrap">
   <header style="display:grid;gap:12px">
     <div class="brand"><img id="brandLogo" alt="Syndicate ROI" src="__LOGO_SRC__">
-      <div class="wordmark"><span class="w1 slant">Syndicate ROI</span><span class="w2 slant">Cheat Sheets</span></div></div>
+      <div class="wordmark"><span class="w1 slant">Syndicate ROI</span><span class="brush slant"><span class="w2">Cheat Sheets</span></span></div></div>
     <div class="dayline"><span class="day" id="dayLabel"></span><span class="asof" id="asOf"></span></div>
     <div class="viewbar" id="viewbar"></div>
     <nav class="days" id="days" aria-label="Sheet date"></nav>
@@ -318,7 +340,7 @@ function pickRow(p, i) {
     ? `<a class="btn no-export" href="/cheatsheets/card/${esc(STATE.sport)}/${esc(META.date)}/${esc(p.pick_id)}" target="_blank" rel="noopener">Pick graphic</a>` : "";
   const live = started(p.commence_time) ? `<span class="chip started">Started</span>` : "";
   // The board's suggested set moves with prices; a pick it no longer backs keeps its record price and says so.
-  const off = p.on_board === false && !started(p.commence_time) ? `<span class="chip neutral" title="The board no longer suggests this at the current price">Not on the board now</span>` : "";
+  const off = p.on_board === false && !started(p.commence_time) ? `<span class="chip neutral" title="Picks move with prices: at today's price this no longer qualifies. It stays on the record at the price shown.">No longer a pick at this price</span>` : "";
   const proj = p.kind === "prop" && typeof p.projected === "number" ? `proj ${p.projected.toFixed(1)} vs ${p.line}` : "sim win rate";
   const why = [play
     ? `<li><b>Price</b>The edge is the price: ${p.books > 1 ? `${p.books} books put it at ` : p.books === 1 ? "its one book's no-vig price is " : "the market puts it at "}${pct(p.p_market)} (fair ${odds(p.fair_price)}); ${esc(p.book_name || p.book || "the best book")} pays ${odds(p.price)}, ${evs(p.ev_pct)}</li>`
@@ -344,7 +366,7 @@ function picksBlock(d, game) {
   const picks = (d.picks || []).map((p, i) => [p, i]).filter(([p]) => !game || p.event_id === game.event_id);
   if (!picks.length) return "";
   const plays = picks.filter(([p]) => isPricePlay(p)).length, sims = picks.length - plays;
-  return sectionShell("picks", "Syndicate picks", "The Layer 2 board's suggested plays for these games: the best price beats the no-vig fair by 2% or more, net of any exchange fee, on a fresh quote. A SYNDICATE PICK is one our sim backs too; a PRICE PLAY is the same price edge without the sim's backing. Each is promoted at the price shown and stays on the record at that price.",
+  return sectionShell("picks", "Syndicate picks", "Our featured plays for these games: the best price beats the no-vig fair by 2% or more, net of any exchange fee, on a fresh quote. A SYNDICATE PICK is one our sim backs too; a PRICE PLAY is the same price edge without the sim's backing. Each is promoted at the price shown and stays on the record at that price.",
     [sims ? `${sims} pick${sims === 1 ? "" : "s"}` : "", plays ? `${plays} price play${plays === 1 ? "" : "s"}` : ""].filter(Boolean).join(" · "),
     `<div class="rowlist">${picks.map(([p, i]) => pickRow(p, i)).join("")}</div>`);
 }
@@ -430,7 +452,7 @@ function linesTable(d, ids, withGame) {
     ids.map(i => { const g = d.game_lines[i], c = g.check || {}, gm = games[g.event_id] || {};
       return `<tr data-li="${i}">${withGame ? `<td><span class="ep">${img(src(gm.away_logo_src, gm.away_logo), "mini")}${img(src(gm.home_logo_src, gm.home_logo), "mini")}<span class="kick">${esc(gm.kickoff_ct || "")}</span></span></td>` : ""}<td>${LINE_MARKET[g.market] || esc(g.market)}</td><td><b>${lineBet(g)}</b></td><td class="n">${odds(c.price)} <span class="bk">${esc(c.book || "")} · ${g.books_quoting} bks</span></td><td class="n">${pct(implied(c.price))}</td><td class="n">${c.verdict === "one_sided_fair" ? "one-sided" : pct(c.p_market)}</td><td class="n"><span class="ev ${c.ev_market > 0 ? "gain" : "neg"}">${c.verdict === "one_sided_fair" ? "–" : evs(c.ev_market)}</span></td><td class="n">${pct(c.p_model)}</td><td class="n">${lineSim(g)}</td><td><span class="chip ${c.verdict}">${VERDICT[c.verdict] || esc(c.verdict)}</span></td></tr>`; }).join("")}</tbody></table></div>`;
 }
-// "Every prop on the board" sorts on any column (user 2026-10-15: "ability to sort columns, esp the L5 and L10 so we
+// "Every prop on the sheet" sorts on any column (user 2026-10-15: "ability to sort columns, esp the L5 and L10 so we
 // can see the highest hit rates across everything"). A hit rate needs its sample: a row with fewer than 5 (L5) / 8
 // (L10) games sorts BELOW every full sample, so 1-for-1 never outranks 9 of 10.
 const EVERY_COLS = [
@@ -512,8 +534,8 @@ function dedupNews(items) {
 function newsBlock(d) {
   const news = dedupNews(d.news || []);
   if (!news.length) return "";
-  return sectionShell("news", "News impact", "Status changes captured by Syndicate's news collector in the last day, with that team's game props on the board.", `${news.length}`,
-    `<div class="tbl"><table><thead><tr><th>Player</th><th>Team</th><th>Change</th><th>Captured</th><th>Game props on board</th></tr></thead><tbody>${
+  return sectionShell("news", "News impact", "Status changes captured by Syndicate's news collector in the last day, with that team's props on this sheet.", `${news.length}`,
+    `<div class="tbl"><table><thead><tr><th>Player</th><th>Team</th><th>Change</th><th>Captured</th><th>Props on this sheet</th></tr></thead><tbody>${
       news.slice(0, 20).map(n => `<tr><td>${esc(n.player)}</td><td>${esc(n.team)}</td><td>${esc(n.previous_status || "not listed")} → ${esc(n.status || "cleared")}</td><td class="n">${esc(ctDateTime(n.captured_at))}</td><td class="n">${n.game_props_on_board}</td></tr>`).join("")}</tbody></table></div>`);
 }
 function gameHref(id) {
@@ -543,7 +565,7 @@ function render() {
   if (d.picks_only) {
     document.getElementById("viewbar").innerHTML = viewbar(d);
     document.getElementById("sheet").innerHTML = (reconciledView(d) ? recordBar(d, {}, {}, null) : "") + picksBlock(d, null)
-      + `<section class="sheet"><div class="note">${esc(SPORT_NAMES[STATE.sport] || STATE.sport)} cheat sheets start with the regular season; until then this sheet carries the board's suggested picks only.</div></section>`;
+      + `<section class="sheet"><div class="note">${esc(SPORT_NAMES[STATE.sport] || STATE.sport)} cheat sheets start with the regular season; until then this sheet carries the Syndicate picks only.</div></section>`;
     if (reconciledView(d)) applyResults();
     return;
   }
@@ -569,8 +591,8 @@ function render() {
     if ((d.game_lines || []).length) html += sectionShell("lines_value", "Game lines: value at the best price", "Spreads, moneylines and totals where the best price beats the no-vig fair by 2% or more, net of exchange fees. Pick a game for its full line card.", `${(lineSecs.value || []).length} lines`, linesTable(d, lineSecs.value || [], true));
     if ((lineSecs.shop || []).length) html += sectionShell("lines_shop", "Game lines: shop the number", "Same game line, same side: the books disagree by 2 points or more of implied probability.", `${lineSecs.shop.length} lines`, linesTable(d, lineSecs.shop, true));
   }
-  if (!game) html += sectionShell("every", "Every prop on the board", "Every prop priced on this sheet. Click any column to sort -- L5 / L10 rank by hit rate, and a short sample sorts below a full one.", `${(secs.every_prop || []).length} props`, everyTable(d, secs.every_prop || []));
-  if (game) html += sectionShell("every", "Every prop on the board", "Everything priced for this game: the best price, what it implies, the no-vig fair where both sides are quoted, the model, and recent form.", `${(secs.every_prop || []).length} props`, everyTable(d, secs.every_prop || []));
+  if (!game) html += sectionShell("every", "Every prop on the sheet", "Every prop priced on this sheet. Click any column to sort -- L5 / L10 rank by hit rate, and a short sample sorts below a full one.", `${(secs.every_prop || []).length} props`, everyTable(d, secs.every_prop || []));
+  if (game) html += sectionShell("every", "Every prop on the sheet", "Everything priced for this game: the best price, what it implies, the no-vig fair where both sides are quoted, the model, and recent form.", `${(secs.every_prop || []).length} props`, everyTable(d, secs.every_prop || []));
   if ((secs.shop_gaps || []).length) html += sectionShell("shop", "Price shopping", "Same line, same side: what betting the median book gives away against the best one.", "", shopTable(d, secs.shop_gaps));
   html += gamesBlock(d, game ? [game] : (d.games || []));
   if (!game) html += newsBlock(d);
@@ -829,7 +851,7 @@ async function exportSection(btn) {
     await loadH2I();
     frame = await buildExport(section);
     // The frame sits off-screen while it lays out; the capture puts it back at the origin (else the PNG is blank).
-    const url = await window.htmlToImage.toPng(frame, {pixelRatio: 2, backgroundColor: "#04070c",
+    const url = await window.htmlToImage.toPng(frame, {pixelRatio: 2, backgroundColor: getComputedStyle(document.documentElement).getPropertyValue("--bg0").trim() || "black",
       style: {position: "static", left: "0", top: "0"}, fontEmbedCSS: await fontEmbedCSS()});
     const a = document.createElement("a");
     a.href = url;
@@ -862,15 +884,15 @@ function unitsChart(series) {
   const W = 1000, H = 260, pad = 36, vals = series.flatMap(x => [x.cum_units, x.cum_value_units, 0]);
   const lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo || 1;
   const X = i => pad + (W - 2 * pad) * i / (series.length - 1), Y = v => H - pad - (H - 2 * pad) * (v - lo) / span;
-  const line = (key, color) => `<polyline fill="none" stroke="${color}" stroke-width="3" points="${series.map((x, i) => `${X(i).toFixed(1)},${Y(x[key]).toFixed(1)}`).join(" ")}"/>`;
+  const line = (key, color) => `<polyline fill="none" style="stroke:${color}" stroke-width="3" points="${series.map((x, i) => `${X(i).toFixed(1)},${Y(x[key]).toFixed(1)}`).join(" ")}"/>`;
   const last = series[series.length - 1];
   return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Running units: all featured ${unitsText(last.cum_units)}, value ${unitsText(last.cum_value_units)}">
-    <line x1="${pad}" x2="${W - pad}" y1="${Y(0)}" y2="${Y(0)}" stroke="#2a4257" stroke-dasharray="4 4"/>
-    <text x="${pad}" y="${Y(0) - 6}" fill="#8fa3b3" font-size="13">0u</text>
-    ${line("cum_units", "#8cff2e")}${line("cum_value_units", "#1fa8ff")}
-    <text x="${pad}" y="${H - 8}" fill="#8fa3b3" font-size="13">${esc(dayShort(series[0].date))}</text>
-    <text x="${W - pad}" y="${H - 8}" fill="#8fa3b3" font-size="13" text-anchor="end">${esc(dayShort(last.date))}</text></svg>
-    <div class="key"><span><i style="background:#8cff2e"></i>All featured picks ${unitsText(last.cum_units)}</span><span><i style="background:#1fa8ff"></i>Value at the best price ${unitsText(last.cum_value_units)}</span></div></div>`;
+    <line x1="${pad}" x2="${W - pad}" y1="${Y(0)}" y2="${Y(0)}" style="stroke:var(--edge)" stroke-dasharray="4 4"/>
+    <text x="${pad}" y="${Y(0) - 6}" style="fill:var(--muted)" font-size="13">0u</text>
+    ${line("cum_units", "var(--green)")}${line("cum_value_units", "var(--blue)")}
+    <text x="${pad}" y="${H - 8}" style="fill:var(--muted)" font-size="13">${esc(dayShort(series[0].date))}</text>
+    <text x="${W - pad}" y="${H - 8}" style="fill:var(--muted)" font-size="13" text-anchor="end">${esc(dayShort(last.date))}</text></svg>
+    <div class="key"><span><i style="background:var(--green)"></i>All featured picks ${unitsText(last.cum_units)}</span><span><i style="background:var(--blue)"></i>Value at the best price ${unitsText(last.cum_value_units)}</span></div></div>`;
 }
 function dayTable(R, days) {
   if (!days.length) return `<div class="empty">No graded day here yet.</div>`;

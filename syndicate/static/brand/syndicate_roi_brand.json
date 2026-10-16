@@ -1,0 +1,49 @@
+{
+  "_doc": "SyndicateROI brand constants (user 2026-10-16: the brand spec, plus 'put all brand constants in a JSON config ... and let the JSON enforce consistency'). The play-card template and the cheat-sheet page take every colour, the copy and the layout order from here via syndicate/features/shared/brand_kit.py; tests/test_brand_kit.py fails if either file hard-codes a colour.",
+  "name": "SyndicateROI",
+  "wordmark": "Syndicate ROI",
+  "handle": "@SyndicateROI",
+  "tagline": ["Data driven", "Discipline", "Long-term edge"],
+  "personality": ["Sharp", "Professional", "Analytical", "Aggressive", "Premium", "Confident", "Sports-focused"],
+  "colors": {
+    "green": "#8CFF00",
+    "green_deep": "#4FD400",
+    "blue": "#00AEEF",
+    "blue_deep": "#0068A8",
+    "cyan": "#00E5FF",
+    "bg0": "#050505",
+    "bg1": "#101010",
+    "bg2": "#151515",
+    "chrome_hi": "#FFFFFF",
+    "chrome_mid": "#C8D0D8",
+    "chrome_lo": "#6B7682",
+    "ink": "#F4F7FA",
+    "muted": "#9AA6B2",
+    "red": "#FF3B3B",
+    "red_deep": "#9E1414",
+    "amber": "#FFC23D",
+    "viz_price": "#FF6B57",
+    "viz_model": "#B59BFF"
+  },
+  "mix_pct": {"dark": 70, "green": 20, "blue": 10},
+  "fonts": {"display": "Saira Condensed", "body": "Barlow"},
+  "canvas": {"width": 1080, "height": 1350},
+  "layout": ["header", "matchup", "banner", "hero", "bet", "dashboard", "analysis", "ticker", "footer"],
+  "header_pct": [10, 15],
+  "hero_pct": {"prop": [40, 60], "spread": [35, 50], "total": [35, 50]},
+  "hero_image_px": 900,
+  "dashboard_cards": 4,
+  "why_bullets": [4, 6],
+  "against_bullets": [3, 4],
+  "panels": {
+    "why": "Why we like it",
+    "against": "Case against",
+    "sim": "SmartSim outlook",
+    "market": "Market outlook"
+  },
+  "ticker_separator": "|",
+  "footer": {
+    "disclaimer": "Every play is graded at the closing line and the result. We post the wins. We post the losses.",
+    "age": "21+ · Bet responsibly"
+  }
+}

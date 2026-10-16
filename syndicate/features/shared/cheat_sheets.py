@@ -1283,12 +1283,19 @@ def page_payload(sheets: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any
     return out
 
 
+def brand_tokens() -> str:
+    """The brand JSON's colours and fonts as CSS variables (user 2026-10-16: the sheets mirror the play cards' brand)."""
+    from syndicate.features.shared import brand_kit
+
+    return brand_kit.css_tokens()
+
+
 def render_record_page(template: str, record: Mapping[str, Any] | None, *, logo_src: str, meta: Mapping[str, Any]) -> str:
     """The season record page: the same template, with `record.json` (cheat_sheet_record) inlined as its data."""
     data = json.dumps(record, default=str).replace("</", "<\\/")
     info = json.dumps(dict(meta), default=str).replace("</", "<\\/")
     return (template.replace("/*__DATA__*/null", data, 1).replace("/*__META__*/null", info, 1)
-            .replace("__LOGO_SRC__", logo_src))
+            .replace("__LOGO_SRC__", logo_src).replace("/*__BRAND_TOKENS__*/", brand_tokens(), 1))
 
 
 def render_page(template: str, sheets: Iterable[Mapping[str, Any]], *, logo_src: str,
@@ -1297,4 +1304,4 @@ def render_page(template: str, sheets: Iterable[Mapping[str, Any]], *, logo_src:
     data = json.dumps(page_payload(sheets), default=str).replace("</", "<\\/")
     info = json.dumps(dict(meta or {"mode": "static"}), default=str).replace("</", "<\\/")
     return (template.replace("/*__DATA__*/null", data, 1).replace("/*__META__*/null", info, 1)
-            .replace("__LOGO_SRC__", logo_src))
+            .replace("__LOGO_SRC__", logo_src).replace("/*__BRAND_TOKENS__*/", brand_tokens(), 1))

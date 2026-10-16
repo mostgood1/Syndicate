@@ -209,7 +209,8 @@ def test_a_syndicate_pick_gets_a_pick_graphic_and_a_picks_only_sheet_is_served(h
     # The side is the headline and its number the bet line (the 2026-10-15 X-style card); the strip repeats both.
     assert ">New York Knicks</div>" in html and ">-5.5 spread</div>" in html and "New York Knicks -5.5 spread" in html
     # Sim 47.9% vs market 50%: the sim does not back it, so it is a PRICE PLAY -- no sim number on its graphic.
-    assert "Market vs price" in html and "Season: Net rating NYK +4.0" in html and "Our sim" not in html
+    # The brand-spec card (2026-10-16): its dashboard is the MARKET outlook, never SmartSim, on a price play.
+    assert "Market outlook" in html and "SmartSim outlook" not in html and "Season: Net rating NYK +4.0" in html and "Our sim" not in html
     assert ">PRICE PLAY</span>" in html and "PRICE PLAY #" not in html                              # no number
     assert "Our sim has New York Knicks" not in html.split("Why we like it", 1)[1].split("</ul>", 1)[0]   # never the reason
     assert "Only 2 books quote it" in html

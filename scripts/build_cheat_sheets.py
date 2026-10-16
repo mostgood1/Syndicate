@@ -645,10 +645,12 @@ def build_sport(sport: str, rows: list[dict[str, Any]], *, selected_date: str, c
 
 IMAGE_FIELDS = (
     ("rows", (("headshot_url", "headshot_src", 96), ("headshot_url", "headshot_card_src", 260),
-              ("team_logo", "team_logo_src", 96), ("opponent_logo", "opponent_logo_src", 96))),
+              ("team_logo", "team_logo_src", 96), ("opponent_logo", "opponent_logo_src", 96),
+              ("hero_url", "hero_src", 900))),
     ("games", (("home_logo", "home_logo_src", 96), ("away_logo", "away_logo_src", 96))),
     ("picks", (("headshot_url", "headshot_src", 96), ("headshot_url", "headshot_card_src", 260),
-               ("team_logo", "team_logo_src", 96), ("home_logo", "home_logo_src", 96), ("away_logo", "away_logo_src", 96))),
+               ("team_logo", "team_logo_src", 96), ("home_logo", "home_logo_src", 96), ("away_logo", "away_logo_src", 96),
+               ("hero_url", "hero_src", 900), ("hero_away_url", "hero_away_src", 900), ("hero_home_url", "hero_home_src", 900))),
 )
 
 
@@ -796,9 +798,12 @@ def merge_picks(fresh: list[dict[str, Any]], prior: dict[str, Any] | None, *, ro
 
 
 def attach_images(sheet: dict[str, Any], cache: Path) -> dict[str, int]:
-    """Cache each headshot / logo once on the data root and point the sheet at the app's same-origin copy."""
+    """Cache each headshot / logo once on the data root and point the sheet at the app's same-origin copy. A card's
+    HERO (the brand spec's athlete, 2026-10-16) is cached at 900px, for the rows and picks a card can be made of only."""
     from syndicate.features.shared import cheat_sheet_images as img
+    from syndicate.features.shared import play_cards as pc
 
+    pc.attach_heroes(sheet)
     counts = {"urls": 0, "cached": 0}
     seen: dict[tuple[str, int], str | None] = {}
     for section, fields in IMAGE_FIELDS:

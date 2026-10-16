@@ -21,6 +21,7 @@ from __future__ import annotations
 import hashlib
 import html
 import json
+import re
 import string
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -77,6 +78,37 @@ def eligible(row: Mapping[str, Any]) -> bool:
     return check.get("verdict") == "value" and ev >= MIN_EV and int(row.get("books_quoting") or 0) >= MIN_BOOKS
 
 
+def attach_heroes(sheet: dict[str, Any]) -> int:
+    """Name each card's hero on the sheet (brand spec 2026-10-16: the athlete is the focus). A prop: the player's own
+    cutout at its largest free size. A side: the backed team's star, the player the books offer the most markets on. A
+    total: both teams' stars. Only rows a card can be made of, so the generator fetches a handful of images, not all."""
+    from syndicate.features.shared import brand_kit
+
+    sport, rows, named = sheet.get("sport"), sheet.get("rows") or [], 0
+    for r in rows:
+        if r.get("headshot_url") and eligible(r):
+            r["hero_url"] = brand_kit.hero_url(sport, r["headshot_url"])
+            named += 1
+    for p in sheet.get("picks") or []:
+        side = str(p.get("side") or "").lower()
+        if p.get("kind") == "prop":
+            if p.get("headshot_url"):
+                p["hero_url"] = brand_kit.hero_url(sport, p["headshot_url"])
+                named += 1
+        elif side in ("home", "away"):
+            star = brand_kit.team_star(rows, p.get(f"{side}_team"))
+            if star:
+                p["hero_url"], p["hero_name"] = brand_kit.hero_url(sport, star["headshot_url"]), star.get("player")
+                named += 1
+        elif str(p.get("market") or "").lower().startswith(("totals", "alternate_totals")):
+            for k in ("away", "home"):
+                star = brand_kit.team_star(rows, p.get(f"{k}_team"))
+                if star:
+                    p[f"hero_{k}_url"] = brand_kit.hero_url(sport, star["headshot_url"])
+                    named += 1
+    return named
+
+
 def select(sheet: Mapping[str, Any], *, per_sport: int = 3) -> list[dict[str, Any]]:
     rows = [r for r in sheet.get("rows") or [] if eligible(r)]
     rows.sort(key=lambda r: (-(r["check"]["ev_market"] or 0), -int(r.get("books_quoting") or 0)))
@@ -100,29 +132,43 @@ def _ordinal(n: int) -> str:
     return f"{n}{'th' if 10 <= n % 100 <= 20 else {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')}"
 
 
-def why_and_risk(row: Mapping[str, Any], game: Mapping[str, Any] | None) -> tuple[list[str], list[str]]:
+def _brand_range(key: str, default: tuple[int, int]) -> tuple[int, int]:
+    try:
+        from syndicate.features.shared import brand_kit
+
+        lo, hi = brand_kit.load()[key]
+        return int(lo), int(hi)
+    except Exception:  # noqa: BLE001 -- the card still renders without the brand file
+        return default
+
+
+def why_points(row: Mapping[str, Any], game: Mapping[str, Any] | None) -> tuple[list[tuple[str, str]], list[str]]:
+    """(why as (tone, text), risk). Tone "for" backs the bet; "ctx" is context. The brand spec asks for 4-6 reasons
+    (user 2026-10-16); they come from the row's own evidence and are never padded."""
+    from syndicate.features.shared import cheat_sheets as cs
+
     c = row.get("check") or {}
-    why, risk = [], []
+    why: list[tuple[str, str]] = []
+    risk: list[str] = []
     if row.get("injury"):
         risk.append(f"Listed {row['injury']}")
     if int(row.get("books_quoting") or 0) < 4:
         risk.append(f"Only {row.get('books_quoting')} books quote this side, so the fair rests on few prices")
     fair = american_from_prob(c.get("p_market"))
-    why.append(f"Best price {fmt_american(c.get('price'))} beats the no-vig fair ({fmt_american(fair)}) by {c.get('ev_market'):+.1f}%")
+    why.append(("for", f"Best price {fmt_american(c.get('price'))} beats the no-vig fair ({fmt_american(fair)}) by {c.get('ev_market'):+.1f}%"))
     shop = row.get("shop") or {}
     if shop.get("gap_pp", 0) >= 1.0:
-        why.append(f"{shop.get('books')} books quote it; the median book is {shop['gap_pp']:.1f} pts worse than the best")
-    # Recent form is on the card's chart as context, never as a reason: streaks measured as already in the price
-    # (consistency backtest 2026-10-14: 5/5 rungs hit 2.6 pts below the fair across NFL, NBA, MLB).
+        why.append(("for", f"{shop.get('books')} books quote it; the median book is {shop['gap_pp']:.1f} pts worse than the best"))
     dvp = row.get("dvp") or {}
     if dvp.get("nth_most") and row.get("pos"):
         stat = str(dvp.get("stat", "")).replace("_", " ")
         n = int(dvp["nth_most"])
         side_good = (row.get("side") in ("over", "yes") and n <= 10) or (row.get("side") == "under" and n >= 23)
-        (why if side_good else risk).append(f"{row.get('opponent')} allow the {_ordinal(n)} most {stat} to {row['pos']}s")
+        text = f"{row.get('opponent')} allow the {_ordinal(n)} most {stat} to {row['pos']}s"
+        why.append(("for", text)) if side_good else risk.append(text)
     script = (game or {}).get("script") or {}
     if script.get("read"):
-        why.append(f"Sim script: {script['read']}")
+        why.append(("ctx", f"Sim script: {script['read']}"))
     p_model, p_mkt = c.get("p_model"), c.get("p_market")
     if isinstance(p_model, (int, float)) and isinstance(p_mkt, (int, float)) and abs(p_model - p_mkt) >= 0.05:
         risk.append(f"Model says {p_model:.0%} vs market {p_mkt:.0%}: big model gaps are usually model error, not edge")
@@ -130,19 +176,82 @@ def why_and_risk(row: Mapping[str, Any], game: Mapping[str, Any] | None) -> tupl
         if "model loses to the book" in reason:
             risk.append("Our model trails the book in this market (measured), so it is context only")
             break
-    return why[:5], risk[:3] or ["Lines move: re-check the price before betting"]
+    # Form and history are CONTEXT, never the reason: streaks measured as already in the price (consistency backtest
+    # 2026-10-14: 5/5 rungs hit 2.6 pts below the fair across NFL, NBA, MLB). One that argues against the side is a risk.
+    line, side = row.get("line"), row.get("side")
+    values = (c.get("form10") or {}).get("values") or []
+    context = cs.recent_points(values, line=line, side=side, opponents=row.get("form_labels"), base=p_mkt)[-1:]
+    context += [p for p in (cs.vs_team_point(row, line=line, side=side, base=p_mkt), cs.pvp_point(row.get("pvp"))) if p]
+    for pt in context:
+        text = f"{pt['label']}: {pt['text']}" if pt.get("label") else pt["text"]
+        why.append(("ctx", text)) if pt.get("tone") != "against" else risk.append(text)
+    return why, risk
+
+
+def market_risks(fields: Mapping[str, Any]) -> list[str]:
+    """What can beat this kind of bet even when the price is right -- true of every bet of its kind, so the case
+    against is never empty (brand spec: 3-4 risks). The specific risks come first; these only top the list up."""
+    kind, market = fields.get("kind") or "prop", str(fields.get("market") or "").lower()
+    side, line = str(fields.get("side") or "").lower(), fields.get("line")
+    p = _implied(str(fields.get("price") or "").replace("+", ""))
+    out: list[str] = []
+    if kind == "prop":
+        out.append("One game, one stat line: a short night or a role change sinks an over" if side in ("over", "yes")
+                   else "One big play is enough to beat an under" if side == "under"
+                   else "Single-game props swing on role and minutes")
+    elif market.startswith(("totals", "alternate_totals")):
+        out.append("Pace and late scoring swing a total" if side == "over" else "One late score or overtime breaks an under")
+    elif market.startswith(("spreads", "alternate_spreads")):
+        if isinstance(line, (int, float)) and line <= -7:
+            out.append("Big favourite: a late backdoor cover is live")
+        elif isinstance(line, (int, float)) and line > 0:
+            out.append("The cover needs the game close late")
+        else:
+            out.append("A spread can turn on the last possession")
+    elif market.startswith("h2h"):
+        out.append("An underdog loses more often than it wins: the edge is the price, not a likely win"
+                   if p is not None and p < 0.5 else "A short price leaves little room if it goes wrong")
+    if fields.get("segment_label") and str(fields.get("segment_label")).lower() not in ("full game", "full"):
+        out.append(f"A {fields['segment_label']} bet is a small slice of the game: more variance")
+    out.append("Variance: a +EV bet still loses often; the edge pays over many bets")
+    out.append("Lines move: re-check the price before betting")
+    return out
+
+
+def finish_case(fields: dict[str, Any]) -> dict[str, Any]:
+    """Cap the reasons at the brand maximum and top the case against up to the brand minimum with `market_risks`."""
+    _lo, why_max = _brand_range("why_bullets", (4, 6))
+    risk_min, risk_max = _brand_range("against_bullets", (3, 4))
+    fields["why"] = list(fields.get("why") or [])[:why_max]
+    fields["why_tones"] = list(fields.get("why_tones") or [])[:why_max]
+    risk = [r for r in fields.get("risk") or [] if r]
+    for extra in market_risks(fields):
+        if len(risk) >= risk_min:
+            break
+        if extra not in risk and not ("re-check" in extra and any("re-check" in r for r in risk)):
+            risk.append(extra)
+    fields["risk"] = risk[:risk_max]
+    return fields
+
+
+def why_and_risk(row: Mapping[str, Any], game: Mapping[str, Any] | None) -> tuple[list[str], list[str]]:
+    why, risk = why_points(row, game)
+    _lo, why_max = _brand_range("why_bullets", (4, 6))
+    return [text for _tone, text in why][:why_max], risk[:4] or ["Lines move: re-check the price before betting"]
 
 
 def card_fields(row: Mapping[str, Any], *, sport: str, date: str, number: int, game: Mapping[str, Any] | None,
                 label: str = "FREE PLAY") -> dict[str, Any]:
     c = row.get("check") or {}
-    why, risk = why_and_risk(row, game)
+    points, risk = why_points(row, game)
     side = str(row.get("side") or "").upper()
     line = row.get("line")
     market = str(row.get("market") or "").replace("player_", "").replace("_", " ")
     bet = f"{side} {line:g} {market}" if isinstance(line, (int, float)) else f"{side} {market}"
     values = (c.get("form10") or {}).get("values") or []
-    return {
+    matchup = (game or {}).get("matchup") or row.get("matchup") or ""
+    away, _, home = matchup.partition(" @ ")
+    return finish_case({
         "id": card_id(sport, date, row), "label": label, "number": number, "sport": SPORT_LABELS.get(sport, sport.upper()),
         "date": date, "matchup": (game or {}).get("matchup") or "", "commence_time": (game or {}).get("commence_time"),
         "player": row.get("player"), "team": row.get("team"), "bet": bet.upper(), "price": fmt_american(c.get("price")),
@@ -150,12 +259,25 @@ def card_fields(row: Mapping[str, Any], *, sport: str, date: str, number: int, g
         "edge": f"{c.get('ev_market'):+.1f}%", "win_prob": f"{(c.get('p_market') or 0):.0%}",
         "model_prob": None if c.get("p_model") is None else f"{c['p_model']:.0%}",
         "form_values": list(values)[:10][::-1], "form_labels": list(row.get("form_labels") or [])[:10][::-1],
-        "line": line, "side": row.get("side"), "why": why, "risk": risk,
-        "pos": row.get("pos"), "headshot": row.get("headshot_url"), "team_logo": row.get("team_logo"),
+        "line": line, "side": row.get("side"), "why": [t for _tone, t in points], "why_tones": [tone for tone, _t in points],
+        "risk": risk, "pos": row.get("pos"), "headshot": row.get("headshot_url"), "team_logo": row.get("team_logo"),
+        "hero": row.get("hero_src") or row.get("hero_url"),
         "home_logo": (game or {}).get("home_logo"), "away_logo": (game or {}).get("away_logo"),
         "kickoff_ct": (game or {}).get("kickoff_ct") or row.get("kickoff_ct"),
         "kind": "prop", "market": row.get("market"),
-    }
+        **team_colors(sport, team=(row.get("team_name"), row.get("team")), away=away, home=home),
+    })
+
+
+def team_colors(sport: str, *, team: Iterable[Any] = (), away: Any = None, home: Any = None) -> dict[str, Any]:
+    """The card's team accents (brand spec: "team colours as subtle accents only"); None where a team is unknown."""
+    try:
+        from syndicate.features.shared import brand_kit
+
+        return {"team_color": brand_kit.team_color(sport, *team), "away_color": brand_kit.team_color(sport, away),
+                "home_color": brand_kit.team_color(sport, home)}
+    except Exception:  # noqa: BLE001 -- an accent is decoration
+        return {"team_color": None, "away_color": None, "home_color": None}
 
 
 # --------------------------------------------------------------------------------------------------------------------
@@ -253,7 +375,18 @@ def pick_card_fields(pick: Mapping[str, Any], *, sport: str, date: str, number: 
         fields["chart_title"] = "Market vs price" if play else "Sim vs market"
         fields["chart_svg"] = prob_svg(None if play else p_model, p_mkt, _implied(pick.get("price")))
         fields["chart_caption"] = "the best price has to beat the no-vig market"
-    return fields
+    # The hero (brand spec 2026-10-16): a prop's own player; a side's team star; a total's two stars. The generator
+    # picks the star and caches the cutout (`hero_src`); `hero_url` is the remote copy for a PNG render.
+    side = str(pick.get("side") or "").lower()
+    backed = pick.get(f"{side}_team") if side in ("home", "away") else None
+    fields.update({"hero": pick.get("hero_src") or pick.get("hero_url"),
+                   "hero_away": pick.get("hero_away_src") or pick.get("hero_away_url"),
+                   "hero_home": pick.get("hero_home_src") or pick.get("hero_home_url"),
+                   "hero_name": pick.get("hero_name"), "team_logo": fields["team_logo"] or (
+                       pick.get(f"{side}_logo") if side in ("home", "away") else None),
+                   **team_colors(sport, team=(pick.get("team"), backed) if is_prop else (backed,),
+                                 away=pick.get("away_team"), home=pick.get("home_team"))})
+    return finish_case(fields)
 
 
 def ledger_record(fields: Mapping[str, Any], row: Mapping[str, Any], *, sport: str, generated_at: str,
@@ -368,22 +501,80 @@ def _is_total(fields: Mapping[str, Any]) -> bool:
     return (fields.get("kind") or "prop") != "prop" and str(fields.get("market") or "").lower().startswith(("totals", "alternate_totals"))
 
 
-def hero_html(fields: Mapping[str, Any]) -> str:
-    """The card's hero, as the X.com posts carry one (user 2026-10-15: the design "isnt as 'drippy' as" them): the player
-    large over his team's crest (a prop), the backed side's crest (a side), both crests (a total); initials last."""
+_ENERGY = ('<svg class="energy" viewBox="0 0 760 668" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">'
+           '<g filter="url(#soft)"><polyline class="bolt" points="700,40 664,118 690,124 640,214"/>'
+           '<polyline class="bolt-g" points="250,520 214,578 236,584 196,650"/></g>'
+           '<polyline class="bolt-core" points="700,40 664,118 690,124 640,214"/>'
+           '<path class="bolt" d="M120 470 Q 380 300 720 380" opacity=".35"/></svg>')
+
+
+def stage(fields: Mapping[str, Any]) -> dict[str, str]:
+    """The HERO (brand spec 2026-10-16: "the athlete is the focus", 40-60% of a prop card, 35-50% of a side or a total):
+    the cutout as tall as the space from the banner to the dashboard, over the team-colour glow, an energy ring and the
+    crest. A side without a star's face shows its crest large; a total shows both teams equally."""
     e = lambda s: html.escape(str(s if s is not None else ""), quote=True)
-    logo = fields.get("team_logo")
-    if fields.get("headshot"):
+    logo, face = fields.get("team_logo"), fields.get("hero") or fields.get("headshot")
+    tight = bool(face) and str(fields.get("sport") or "").upper() in ("MLB", "NHL")   # square, head-tight cutouts
+    glow = '<div class="team-glow"></div><div class="ring"></div>' + _ENERGY
+    color = fields.get("team_color")
+    style = f"--tc: {color};" if color and re.fullmatch(r"#[0-9A-Fa-f]{6}", str(color)) else ""
+    if _is_total(fields):
+        faces = [(k, fields.get(f"hero_{k}")) for k in ("away", "home") if fields.get(f"hero_{k}")]
+        if len(faces) == 2:
+            crests = "".join(f'<img class="crest-duo bg {k}" src="{e(fields[f"{k}_logo"])}" alt="">'
+                             for k in ("away", "home") if fields.get(f"{k}_logo"))
+            body = "".join(f'<img class="head {k}" src="{e(src)}" alt="">' for k, src in faces)
+            return {"hero": glow + crests + body + '<span class="vs">VS</span>', "stage_class": "duo", "stage_style": style}
+        if fields.get("away_logo") or fields.get("home_logo"):
+            crests = "".join(f'<img class="crest-duo {k}" src="{e(fields[f"{k}_logo"])}" alt="">'
+                             for k in ("away", "home") if fields.get(f"{k}_logo"))
+            return {"hero": glow + crests + '<span class="vs">VS</span>', "stage_class": "duo", "stage_style": style}
+    if face:
         crest = f'<img class="crestbg" src="{e(logo)}" alt="">' if logo else ""
-        return f'<div class="hero">{crest}<img class="head" src="{e(fields["headshot"])}" alt=""></div>'
-    if _is_total(fields) and (fields.get("away_logo") or fields.get("home_logo")):
-        crests = "".join(f'<img class="crest-{k}" src="{e(fields[f"{k}_logo"])}" alt="">'
-                         for k in ("away", "home") if fields.get(f"{k}_logo"))
-        return f'<div class="hero duo">{crests}<span class="vs">VS</span></div>'
+        return {"hero": glow + crest + f'<img class="head" src="{e(face)}" alt="">',
+                "stage_class": "tight" if tight else "solo", "stage_style": style}
     if logo:
-        return f'<div class="hero solo"><img class="crest-big" src="{e(logo)}" alt=""></div>'
+        return {"hero": glow + f'<img class="crest-big" src="{e(logo)}" alt="">', "stage_class": "solo", "stage_style": style}
     initials = "".join(w[0] for w in str(fields.get("player") or "").split()[:2]).upper()
-    return f'<div class="hero solo"><span class="ini">{e(initials)}</span></div>'
+    return {"hero": glow + f'<span class="ini">{e(initials)}</span>', "stage_class": "solo", "stage_style": style}
+
+
+def hero_html(fields: Mapping[str, Any]) -> str:
+    """The hero's markup alone (kept for callers that only need the picture)."""
+    return stage(fields)["hero"]
+
+
+def mini_html(fields: Mapping[str, Any]) -> str:
+    """Under the odds plate: a prop's last games against the line; a backed pick's sim against the market. A PRICE
+    PLAY shows neither -- its graphic never carries the sim's number (user 2026-10-15)."""
+    values, line, side = fields.get("form_values") or [], fields.get("line"), fields.get("side")
+    if values and isinstance(line, (int, float)):
+        top = max(max(values), float(line)) * 1.12 or 1.0
+        n, w, h = len(values), 300, 58
+        bw = w / n
+        y = lambda v: h - (v / top) * (h - 4)
+        parts = [f'<svg class="spark" viewBox="0 0 {w} {h}" xmlns="http://www.w3.org/2000/svg">']
+        hits = 0
+        for i, v in enumerate(values):
+            hit = v != line and ((v > line) if side in ("over", "yes") else (v < line))
+            hits += hit
+            parts.append(f'<rect class="{"hit" if hit else "miss"}" x="{i * bw + bw * .14:.1f}" y="{y(v):.1f}" '
+                         f'width="{bw * .72:.1f}" height="{h - y(v):.1f}" rx="2"/>')
+        parts.append(f'<line class="ln" x1="0" x2="{w}" y1="{y(float(line)):.1f}" y2="{y(float(line)):.1f}"/></svg>')
+        label = f'<div class="lbl">Last {n}<b>{hits} of {n} {html.escape(str(side or ""))} {float(line):g}</b></div>'
+        return f'<div class="mini">{label}{"".join(parts)}</div>'
+    if fields.get("price_play") or not fields.get("model_prob") or not fields.get("win_prob"):
+        return ""
+    try:
+        sim, mkt = float(str(fields["model_prob"]).rstrip("%")) / 100, float(str(fields["win_prob"]).rstrip("%")) / 100
+    except ValueError:
+        return ""
+    bars = (f'<svg class="spark" viewBox="0 0 300 58" xmlns="http://www.w3.org/2000/svg">'
+            f'<rect class="bar-sim" x="0" y="4" width="{max(4, 220 * sim):.1f}" height="20" rx="3"/>'
+            f'<text x="{max(4, 220 * sim) + 8:.1f}" y="20">SIM {sim:.0%}</text>'
+            f'<rect class="bar-mkt" x="0" y="34" width="{max(4, 220 * mkt):.1f}" height="20" rx="3"/>'
+            f'<text x="{max(4, 220 * mkt) + 8:.1f}" y="50">MKT {mkt:.0%}</text></svg>')
+    return f'<div class="mini"><div class="lbl">SmartSim<b>vs no-vig</b></div>{bars}</div>'
 
 
 def card_text(fields: Mapping[str, Any]) -> dict[str, str]:
@@ -418,20 +609,46 @@ def render_card(fields: Mapping[str, Any], logo_uri: str, template: str | None =
     proj = fields.get("projected")
     sim_note = (f"proj {float(proj):.1f} vs {float(line):g}" if isinstance(proj, (int, float)) and isinstance(line, (int, float))
                 else "sim win rate")
+    try:
+        from syndicate.features.shared import brand_kit
+
+        brand, brand_css = brand_kit.load(), brand_kit.css_tokens()
+    except Exception:  # noqa: BLE001 -- a card without the brand file still renders, in the browser's defaults
+        brand, brand_css = {}, ""
+    panels, tagline, footer = brand.get("panels") or {}, list(brand.get("tagline") or ["", "", ""]), brand.get("footer") or {}
+    hexed = lambda c: c if c and re.fullmatch(r"#[0-9A-Fa-f]{6}", str(c)) else None
+    books = fields.get("books")
+    tile3 = (e(fields.get("tile3_k") or "SmartSim"), e(fields.get("tile3_v") or fields.get("model_prob") or "–"),
+             e(fields.get("tile3_s") or sim_note))
+    hero = stage(fields)
     return string.Template(template if template is not None else TEMPLATE.read_text(encoding="utf-8")).safe_substitute(
+        brand_css=brand_css, wordmark=e(brand.get("wordmark") or "Syndicate ROI"),
         logo=logo_uri, label=e(fields["label"]), number=fields["number"], away=e(away), home=e(home),
         # "FREE PLAY #3"; a Syndicate pick is just "SYNDICATE PICK" (user 2026-10-15: "remove the number").
         tag=e(fields["label"]) if fields.get("hide_number") else f'{e(fields["label"])} #{fields["number"]}',
         sport=e(fields["sport"]), kickoff=e(fields.get("kickoff_ct") or kickoff_label(fields.get("commence_time"))),
         player=e(fields["player"]), headline=e(text["headline"]), subline=e(text["subline"]), betline=e(text["betline"]),
-        strip_bet=e(text["strip"]), hero=hero_html(fields),
+        strip_bet=e(text["strip"]), sep=e(brand.get("ticker_separator") or "|"),
+        hero=hero["hero"], stage_class=hero["stage_class"], stage_style=e(hero["stage_style"]), mini=mini_html(fields),
+        away_style=f"--tc: {hexed(fields.get('away_color'))};" if hexed(fields.get("away_color")) else "",
+        home_style=f"--tc: {hexed(fields.get('home_color'))};" if hexed(fields.get("home_color")) else "",
         away_crest=crest(fields.get("away_logo")), home_crest=crest(fields.get("home_logo")),
-        bet=e(fields["bet"]), price=e(fields["price"]), book=e(book_name(fields["book"])), books=e(fields["books"]),
-        bks="bk" if fields.get("books") == 1 else "bks",
+        bet=e(fields["bet"]), price=e(fields["price"]), book=e(book_name(fields["book"])), books=e(books),
+        bks="bk" if books == 1 else "bks",
         fair=e(fields["fair"]), edge=e(fields["edge"]), win_prob=e(fields["win_prob"]),
-        tile3_k=e(fields.get("tile3_k") or "SmartSim"), tile3_v=e(fields.get("tile3_v") or fields.get("model_prob") or "–"),
-        tile3_s=e(fields.get("tile3_s") or sim_note),
-        outlook_title="Market outlook" if fields.get("price_play") else "SmartSim outlook",
+        tile3_k=tile3[0], tile3_v=tile3[1], tile3_s=tile3[2],
+        # The METRIC DASHBOARD's four cards (brand spec): best price, the fair, the sim (or the books on a price play), edge.
+        t1_k="Best price", t1_v=e(fields["price"]),
+        t1_s=f'{e(book_name(fields["book"]))} · {e(books)} {"bk" if books == 1 else "bks"}' if books else e(book_name(fields["book"])),
+        t2_k="Fair line", t2_v=e(fields["fair"]), t2_s=f"no-vig {e(fields['win_prob'])}",
+        t3_k=tile3[0], t3_v=tile3[1], t3_s=tile3[2],
+        t4_k="Edge", t4_v=e(fields["edge"]), t4_s="vs the fair price",
+        outlook_title=e(panels.get("market") or "Market outlook") if fields.get("price_play")
+        else e(panels.get("sim") or "SmartSim outlook"),
+        why_title=e(panels.get("why") or "Why we like it"), against_title=e(panels.get("against") or "Case against"),
+        tag_1=e(tagline[0] if tagline else ""), tag_2=e(tagline[1] if len(tagline) > 1 else ""),
+        tag_3=e(tagline[2] if len(tagline) > 2 else ""), handle=e(brand.get("handle") or "@SyndicateROI"),
+        disclaimer=e(footer.get("disclaimer") or ""), age=e(footer.get("age") or ""),
         chart=fields.get("chart_svg") or chart_svg(values, fields["form_labels"], line, side),
         chart_title=e(fields.get("chart_title") or "Last games"),
         chart_caption=e(caption),

@@ -3,250 +3,308 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@700;800;900&family=Barlow:wght@500;600;700&display=swap">
 <style>
-/* Syndicate ROI pick graphic, 1080 x 1350 (X 4:5), in the style of the X.com posts the user supplied (user 2026-10-15:
-   the design "isnt as 'drippy' as" them): stadium lights and smoke, chrome title, a brush-stroke banner, chamfered neon
-   panels with tab labels, icon tiles, a big hero, the pick repeated in a bottom strip. Every text block is fitted to
-   its box by the script at the end -- nothing is cut off and nothing ends in "...". */
-:root { --bg: #03060b; --panel: #07111b; --panel2: #0a1724; --edge: #1d3a55; --green: #8cff2e; --green2: #4fe81c;
-  --blue: #1fa8ff; --ice: #9fdcff; --white: #f4f7fa; --muted: #9db0bf; --red: #ff5a4a; --amber: #ffbe3d;
-  --display: "Saira Condensed", Impact, "Arial Narrow", sans-serif; --body: "Barlow", "Segoe UI", Arial, sans-serif;
-  --cut: 22px; }
+/* SyndicateROI play card, 1080 x 1350 (X 4:5), built to the brand spec the user supplied 2026-10-16. Order, never
+   rearranged: HEADER, MATCHUP, FREE PLAY BANNER, HERO, MAIN BET, METRIC DASHBOARD, ANALYSIS PANELS, BOTTOM TICKER,
+   FOOTER. Every colour is a token from syndicate/static/brand/syndicate_roi_brand.json (injected below); this file
+   holds no colour of its own -- tests/test_brand_kit.py checks it. The athlete is the hero: a cutout as tall as the
+   space from the banner to the dashboard, the panels glass over its lower edge. Every text block is fitted to its box
+   by the script at the end -- nothing is cut off and nothing ends in "...". */
+$brand_css
 * { box-sizing: border-box; margin: 0; }
 html, body { width: 1080px; height: 1350px; }
-body { background: var(--bg); color: var(--white); font-family: var(--body); position: relative; overflow: hidden; }
+body { background: var(--bg0); color: var(--ink); font-family: var(--body); position: relative; overflow: hidden; }
 .bg { position: absolute; inset: 0; width: 1080px; height: 1350px; z-index: 0; }
-.page { position: relative; z-index: 1; height: 1350px; padding: 26px 34px 20px; display: flex; flex-direction: column; gap: 14px; }
-.slant { transform: skewX(-9deg); display: inline-block; }
+.page { position: relative; z-index: 2; height: 1350px; padding: 20px 30px 16px; display: flex; flex-direction: column; gap: 11px; }
 
-/* header: logo, chrome title, brush banner */
-.top { display: grid; grid-template-columns: 180px 1fr; align-items: center; gap: 18px; height: 182px; }
-.logo { width: 178px; height: 178px; border-radius: 22px; object-fit: cover;
-  box-shadow: 0 0 0 3px rgba(140,255,46,.8), 0 0 40px rgba(31,168,255,.55), 0 0 90px rgba(140,255,46,.25); }
-.titles { display: grid; justify-items: center; gap: 2px; }
-.chrome { font: 900 96px/.9 var(--display); letter-spacing: .02em; text-transform: uppercase; transform: skewX(-9deg);
-  background: linear-gradient(180deg, #ffffff 0%, #e9eef4 34%, #7d8a97 50%, #f7fafc 64%, #aab6c2 100%);
-  -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-stroke: 2px #0a1018;
-  filter: drop-shadow(0 5px 0 #000) drop-shadow(0 0 22px rgba(31,168,255,.45)); }
-.banner { position: relative; width: 640px; height: 96px; display: grid; place-items: center; }
-.banner svg { position: absolute; inset: -8px -12px -26px; width: calc(100% + 24px); height: calc(100% + 34px);
-  filter: drop-shadow(0 0 16px rgba(140,255,46,.65)); }
-.banner .txt { position: relative; display: block; max-width: 600px; overflow: hidden; text-align: center; font: 900 66px/1.1 var(--display); color: #041006; transform: skewX(-9deg);
-  letter-spacing: .02em; text-transform: uppercase; white-space: nowrap; text-shadow: 0 2px 0 rgba(255,255,255,.35); }
+/* chrome lettering: the wordmark and the athlete / team name */
+.chrome { text-transform: uppercase; transform: skewX(-9deg); transform-origin: left;
+  background: linear-gradient(180deg, var(--chrome-hi) 0%, var(--chrome-mid) 36%, var(--chrome-lo) 50%, var(--chrome-hi) 63%, var(--chrome-mid) 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-stroke: 1.5px rgba(0,0,0,.65);
+  filter: drop-shadow(0 4px 0 rgba(0,0,0,.95)) drop-shadow(0 0 20px color-mix(in srgb, var(--blue) 55%, transparent)); }
 
-/* chamfered neon panel: the border layer and the fill layer share one clip path; the glow follows it */
-.panel { position: relative; padding: 18px 22px; filter: drop-shadow(0 0 12px rgba(140,255,46,.35)); }
+/* HEADER: hooded logo + chrome wordmark, green glow, blue highlight rule */
+.top { height: 128px; flex: none; display: grid; grid-template-columns: 124px 1fr; align-items: center; gap: 22px; }
+.logo { width: 124px; height: 124px; border-radius: 20px; object-fit: cover;
+  box-shadow: 0 0 0 3px var(--green), 0 0 34px color-mix(in srgb, var(--green) 55%, transparent), 0 0 70px color-mix(in srgb, var(--blue) 45%, transparent); }
+.wordmark-wrap { position: relative; padding-bottom: 14px; }
+.wordmark { font: 900 112px/.9 var(--display); letter-spacing: .02em; white-space: nowrap; }
+.wordmark-wrap::after { content: ""; position: absolute; left: 4px; right: 40px; bottom: 0; height: 5px; border-radius: 3px;
+  background: linear-gradient(90deg, var(--green), var(--cyan) 55%, transparent);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--green) 70%, transparent), 0 0 30px color-mix(in srgb, var(--blue) 50%, transparent); }
+
+/* glass panels: every section glows, has depth and a texture -- no flat rectangles */
+.glass { position: relative; border-radius: 14px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg2) 82%, transparent), color-mix(in srgb, var(--bg0) 90%, transparent)),
+              repeating-linear-gradient(135deg, rgba(255,255,255,.025) 0 2px, transparent 2px 7px);
+  backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px); }
+.glass.blue { border: 2px solid var(--blue);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--blue) 45%, transparent), inset 0 0 24px color-mix(in srgb, var(--blue) 14%, transparent); }
+
+/* MATCHUP: away @ home, team colours as a subtle accent only */
+.matchup { height: 74px; flex: none; padding: 0 22px; display: grid; grid-template-columns: 1fr 52px 1fr auto; align-items: center; gap: 14px; }
+.team { display: flex; align-items: center; gap: 12px; min-width: 0; height: 100%; }
+.team .nm { flex: 1; min-width: 0; font: 800 31px/1.02 var(--display); text-transform: uppercase; letter-spacing: .02em; overflow: hidden; max-height: 64px; }
+.crest { width: 56px; height: 56px; object-fit: contain; flex: none; border-radius: 50%; padding: 6px;
+  background: radial-gradient(circle at 40% 32%, var(--chrome-hi), var(--chrome-mid) 70%);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tc, var(--blue)) 85%, transparent), 0 0 14px color-mix(in srgb, var(--tc, var(--blue)) 60%, transparent); }
+.team .nm { border-bottom: 3px solid color-mix(in srgb, var(--tc, var(--blue)) 70%, transparent); padding-bottom: 2px; }
+.at { width: 50px; height: 50px; border-radius: 50%; display: grid; place-items: center; font: 900 28px/1 var(--display); color: var(--bg0);
+  background: radial-gradient(circle at 35% 30%, var(--chrome-hi), var(--green) 55%, var(--green-deep)); box-shadow: 0 0 20px color-mix(in srgb, var(--green) 70%, transparent); }
+.when { text-align: right; font: 800 21px/1.15 var(--display); letter-spacing: .07em; text-transform: uppercase; color: var(--blue); white-space: nowrap; }
+.when b { display: block; color: var(--ink); font-size: 24px; }
+
+/* FREE PLAY BANNER: a neon-green paint stroke with a black distressed edge, at a slight angle */
+.banner { position: relative; height: 92px; flex: none; width: 600px; display: grid; place-items: center; transform: rotate(-2.2deg); margin-left: -6px; }
+.banner svg { position: absolute; inset: -10px -14px -24px; width: calc(100% + 28px); height: calc(100% + 34px);
+  filter: drop-shadow(0 0 18px color-mix(in srgb, var(--green) 65%, transparent)); }
+.banner .paint { fill: var(--green); } .banner .paint-lo { fill: var(--green-deep); } .banner .grit { fill: var(--bg0); }
+.banner .txt { position: relative; display: block; max-width: 540px; overflow: hidden; text-align: center; font: 900 70px/1.1 var(--display);
+  color: var(--bg0); transform: skewX(-9deg); letter-spacing: .03em; text-transform: uppercase; white-space: nowrap;
+  text-shadow: 0 2px 0 rgba(255,255,255,.3); }
+
+/* HERO: the athlete, as tall as the space from the banner to the dashboard (prop 40-60%, side / total 35-50%) */
+.stage { position: absolute; z-index: 1; top: 228px; right: 0; width: 760px; height: 668px; pointer-events: none; }
+.stage .team-glow { position: absolute; right: 40px; bottom: 30px; width: 640px; height: 640px; border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--tc, var(--blue)) 46%, transparent) 0, color-mix(in srgb, var(--blue) 22%, transparent) 42%, transparent 68%); }
+.stage .ring { position: absolute; right: 120px; bottom: 120px; width: 470px; height: 470px; border-radius: 50%;
+  border: 3px solid color-mix(in srgb, var(--cyan) 55%, transparent); box-shadow: 0 0 30px color-mix(in srgb, var(--cyan) 45%, transparent), inset 0 0 30px color-mix(in srgb, var(--blue) 35%, transparent); }
+.stage .energy { position: absolute; inset: 0; width: 100%; height: 100%; }
+.stage .energy .bolt { fill: none; stroke: var(--cyan); stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+.stage .energy .bolt-core { fill: none; stroke: var(--chrome-hi); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.stage .energy .bolt-g { fill: none; stroke: var(--green); stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+.stage .crestbg { position: absolute; right: 150px; top: 40px; width: 400px; height: 400px; object-fit: contain; opacity: .22;
+  filter: saturate(1.25) drop-shadow(0 0 30px color-mix(in srgb, var(--blue) 50%, transparent)); }
+/* the cutout: anchored to the dashboard, faded under the bet column on the left and into the dashboard at the foot */
+.stage .head { position: absolute; right: -200px; bottom: 0; width: 1000px; height: 800px; object-fit: contain; object-position: 60% bottom;
+  -webkit-mask-image: linear-gradient(to bottom, black 76%, transparent 99%), linear-gradient(to right, transparent 0, black 30%);
+  -webkit-mask-composite: source-in; mask-image: linear-gradient(to bottom, black 76%, transparent 99%), linear-gradient(to right, transparent 0, black 30%);
+  mask-composite: intersect;
+  filter: drop-shadow(0 0 2px var(--cyan)) drop-shadow(0 0 22px color-mix(in srgb, var(--blue) 70%, transparent)) contrast(1.06) saturate(1.08); }
+/* a SQUARE cutout (MLB's silo, NHL's mug) is head-tight: drawn in a smaller box so the cap clears the matchup bar */
+.stage.tight .head { width: 760px; height: 600px; right: -40px; object-position: 70% bottom; }
+.stage.duo .head { width: 420px; height: 430px; object-position: center bottom; -webkit-mask-image: linear-gradient(to bottom, black 70%, transparent 98%);
+  mask-image: linear-gradient(to bottom, black 70%, transparent 98%); }
+.stage.duo .head.away { right: 330px; bottom: 150px; height: 430px; }
+.stage.duo .head.home { right: -10px; bottom: 150px; height: 430px; }
+.stage.duo .vs { right: 300px; top: 210px; z-index: 2; }
+.stage.duo .crest-duo.bg { opacity: .2; width: 250px; height: 250px; }
+.stage.duo .crest-duo.bg.away { right: 410px; top: 50px; } .stage.duo .crest-duo.bg.home { right: 60px; top: 50px; }
+.stage .crest-big { position: absolute; right: 120px; bottom: 140px; width: 440px; height: 440px; object-fit: contain;
+  filter: drop-shadow(0 0 24px rgba(255,255,255,.22)) drop-shadow(0 0 60px color-mix(in srgb, var(--blue) 55%, transparent)); }
+.stage .crest-duo { position: absolute; width: 320px; height: 320px; object-fit: contain;
+  filter: drop-shadow(0 0 20px rgba(255,255,255,.2)) drop-shadow(0 0 50px color-mix(in srgb, var(--blue) 50%, transparent)); }
+.stage .crest-duo.away { right: 360px; top: 70px; } .stage .crest-duo.home { right: 40px; bottom: 120px; }
+.stage .vs { position: absolute; right: 300px; top: 300px; font: 900 96px/1 var(--display); color: var(--green); transform: skewX(-9deg);
+  text-shadow: 0 0 26px color-mix(in srgb, var(--green) 75%, transparent), 0 4px 0 rgba(0,0,0,.9); }
+.stage .ini { position: absolute; right: 200px; bottom: 220px; font: 900 220px/1 var(--display); color: var(--chrome-lo); opacity: .6; }
+
+/* MAIN BET: name (chrome), bet (neon green), odds (black on a green plate) */
+.bet { position: relative; flex: 0 0 360px; width: 548px; display: flex; flex-direction: column; justify-content: center; gap: 6px; min-height: 0; overflow: hidden; padding-left: 4px; }
+.headline { font: 900 96px/.92 var(--display); letter-spacing: .005em; overflow: hidden; max-height: 1.9em; padding-right: 14px; }
+.subline { font: 800 26px/1.05 var(--display); color: var(--cyan); letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; overflow: hidden;
+  text-shadow: 0 0 12px color-mix(in srgb, var(--cyan) 45%, transparent); }
+.subline:empty { display: none; }
+.betline { font: 900 66px/1.0 var(--display); text-transform: uppercase; transform: skewX(-8deg); transform-origin: left; overflow: hidden; max-height: 2.05em;
+  color: var(--green); text-shadow: 0 0 26px color-mix(in srgb, var(--green) 60%, transparent), 0 4px 0 rgba(0,0,0,.85); }
+.betline:empty { display: none; }
+.odds { align-self: flex-start; flex: none; margin: 4px 0 2px 8px; font: 900 46px/1 var(--display); color: var(--bg0); padding: 7px 34px 5px;
+  background: linear-gradient(180deg, var(--chrome-hi) -40%, var(--green) 45%, var(--green-deep)); transform: skewX(-10deg); border-radius: 8px;
+  box-shadow: 0 0 30px color-mix(in srgb, var(--green) 65%, transparent), inset 0 -4px 0 rgba(0,0,0,.2); }
+.mini { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 12px; margin-top: 6px; }
+.mini .lbl { font: 800 17px/1.15 var(--display); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.mini .lbl b { display: block; color: var(--ink); font-size: 21px; letter-spacing: .04em; }
+.spark { width: 300px; height: 58px; }
+.spark .hit { fill: var(--green); } .spark .miss { fill: var(--red); opacity: .8; }
+.spark .ln { stroke: var(--cyan); stroke-width: 2.5; stroke-dasharray: 7 5; }
+.spark .bar-sim { fill: var(--green); } .spark .bar-mkt { fill: var(--chrome-mid); }
+.spark text { fill: var(--ink); font: 800 17px var(--display); letter-spacing: .06em; }
+
+/* METRIC DASHBOARD: four cards, blue border, green numbers, glow */
+.dash { position: relative; flex: none; height: 134px; padding: 22px 16px 12px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.tile { position: relative; border: 2px solid var(--blue); border-radius: 12px; display: grid; justify-items: center; align-content: center; gap: 3px; padding: 6px 4px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg2) 92%, transparent), color-mix(in srgb, var(--bg0) 94%, transparent));
+  box-shadow: 0 0 16px color-mix(in srgb, var(--blue) 50%, transparent), inset 0 0 20px color-mix(in srgb, var(--blue) 18%, transparent); }
+.tile::before { content: ""; position: absolute; left: 14px; right: 14px; top: -2px; height: 3px; border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--cyan), transparent); }
+.tile .k { font: 800 20px/1 var(--display); letter-spacing: .09em; color: var(--cyan); text-transform: uppercase; white-space: nowrap; }
+.tile .v { font: 900 50px/1 var(--display); color: var(--green); white-space: nowrap;
+  text-shadow: 0 0 18px color-mix(in srgb, var(--green) 65%, transparent), 0 3px 0 rgba(0,0,0,.8); }
+.tile .s { font: 700 16px/1.1 var(--body); color: var(--muted); text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; overflow: hidden; max-width: 100%; }
+.tab { position: absolute; top: -17px; left: 50%; transform: translateX(-50%) skewX(-12deg); z-index: 3; white-space: nowrap;
+  font: 900 25px/1 var(--display); letter-spacing: .09em; text-transform: uppercase; color: var(--bg0);
+  background: linear-gradient(90deg, var(--green-deep), var(--green)); padding: 6px 24px 5px; border-radius: 4px;
+  box-shadow: 0 0 20px color-mix(in srgb, var(--green) 65%, transparent); }
+.tab.blue { background: linear-gradient(90deg, var(--blue-deep), var(--blue)); box-shadow: 0 0 20px color-mix(in srgb, var(--blue) 65%, transparent); }
+.tab.red { background: linear-gradient(90deg, var(--red-deep), var(--red)); color: var(--chrome-hi); box-shadow: 0 0 18px color-mix(in srgb, var(--red) 60%, transparent); }
+
+/* ANALYSIS PANELS: chamfered neon frames; the border and the fill share one clip path, the glow follows it */
+.analysis { flex: 1; min-height: 0; display: grid; grid-template-columns: 1.16fr .84fr; gap: 16px; margin-top: 8px; }
+.panel { position: relative; min-height: 0; padding: 30px 20px 14px; display: flex; flex-direction: column; --cut: 20px; }
 .panel::before, .panel::after { content: ""; position: absolute; clip-path: polygon(var(--cut) 0, calc(100% - var(--cut)) 0,
   100% var(--cut), 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, var(--cut) 100%, 0 calc(100% - var(--cut)), 0 var(--cut)); }
 .panel::before { inset: 0; background: linear-gradient(135deg, var(--green), var(--blue) 55%, var(--green)); }
-.panel::after { inset: 3px; background: linear-gradient(180deg, rgba(10,23,36,.97), rgba(5,12,20,.97)); }
-.panel.blue { filter: drop-shadow(0 0 12px rgba(31,168,255,.4)); }
-.panel.blue::before { background: linear-gradient(135deg, var(--blue), #0d5fa0 60%, var(--blue)); }
-.panel.red { filter: drop-shadow(0 0 10px rgba(255,90,74,.35)); }
-.panel.red::before { background: linear-gradient(135deg, var(--red), #8a1f16 60%, var(--red)); }
+.panel::after { inset: 3px; background: linear-gradient(180deg, color-mix(in srgb, var(--bg2) 96%, transparent), color-mix(in srgb, var(--bg0) 97%, transparent)); }
+.panel.green { filter: drop-shadow(0 0 12px color-mix(in srgb, var(--green) 40%, transparent)); }
+.panel.red { filter: drop-shadow(0 0 12px color-mix(in srgb, var(--red) 40%, transparent)); }
+.panel.red::before { background: linear-gradient(135deg, var(--red), var(--red-deep) 60%, var(--red)); }
 .panel > * { position: relative; z-index: 1; }
-.tab { position: absolute; top: -17px; left: 50%; transform: translateX(-50%) skewX(-12deg); z-index: 2; white-space: nowrap;
-  font: 900 25px/1 var(--display); letter-spacing: .08em; text-transform: uppercase; color: #041006;
-  background: linear-gradient(90deg, var(--green2), var(--green)); padding: 6px 22px 5px; border-radius: 4px;
-  box-shadow: 0 0 18px rgba(140,255,46,.6); }
-.tab.blue { background: linear-gradient(90deg, #0e7fd0, var(--blue)); color: #02101c; box-shadow: 0 0 18px rgba(31,168,255,.6); }
-.tab.red { background: linear-gradient(90deg, #d93a2b, var(--red)); color: #1a0402; box-shadow: 0 0 16px rgba(255,90,74,.55); }
+ul { list-style: none; padding: 0; display: grid; gap: 9px; flex: 1; min-height: 0; overflow: hidden; align-content: start; }
+li { font: 600 var(--li, 21px)/1.24 var(--body); padding-left: 36px; position: relative; color: var(--ink); }
+li::before { content: ""; position: absolute; left: 0; top: .08em; width: 25px; height: 25px; }
+/* WHY WE LIKE IT: green checks -- solid when the point backs the bet, outlined when it is context (form, history) */
+.why li::before { border-radius: 50%; background: var(--green); box-shadow: 0 0 11px color-mix(in srgb, var(--green) 60%, transparent); }
+.why li::after { content: ""; position: absolute; left: 0; top: .08em; width: 25px; height: 25px; background: var(--bg0);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 12.5l4 4 8-9' fill='none' stroke='black' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/19px no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 12.5l4 4 8-9' fill='none' stroke='black' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/19px no-repeat; }
+.why li.ctx::before { background: transparent; border: 2.5px solid var(--green); box-shadow: 0 0 8px color-mix(in srgb, var(--green) 40%, transparent); }
+.why li.ctx::after { background: var(--green); }
+/* CASE AGAINST: red warning triangles */
+.against li::before { background: var(--red); filter: drop-shadow(0 0 6px color-mix(in srgb, var(--red) 70%, transparent));
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' d='M12 1.8 23.4 22H.6zM10.7 8.5h2.6l-.4 7.2h-1.8zM12 17.4a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3z' fill='black'/%3E%3C/svg%3E") center/25px no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' d='M12 1.8 23.4 22H.6zM10.7 8.5h2.6l-.4 7.2h-1.8zM12 17.4a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3z' fill='black'/%3E%3C/svg%3E") center/25px no-repeat; }
 
-/* matchup */
-.matchup { height: 86px; padding: 0 24px; display: grid; grid-template-columns: 1fr 64px 1fr auto; align-items: center; gap: 14px; }
-.team { display: flex; align-items: center; gap: 12px; min-width: 0; height: 100%; }
-.team .nm { flex: 1; min-width: 0; font: 800 33px/1.02 var(--display); text-transform: uppercase; letter-spacing: .02em; overflow: hidden; max-height: 68px; }
-.crest { width: 58px; height: 58px; object-fit: contain; flex: none; filter: drop-shadow(0 0 8px rgba(255,255,255,.18)); }
-.at { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; font: 900 30px/1 var(--display);
-  color: #041006; background: radial-gradient(circle at 35% 30%, #c8ff8e, var(--green) 60%, #3fb80f); box-shadow: 0 0 20px rgba(140,255,46,.7); }
-.when { text-align: right; font: 800 22px/1.15 var(--display); letter-spacing: .07em; text-transform: uppercase; color: var(--blue); white-space: nowrap; }
-.when b { display: block; color: var(--white); font-size: 26px; }
+/* BOTTOM TICKER: ESPN-style, neon green glow -- FREE PLAY #X | BET | ODDS */
+.ticker { position: relative; flex: none; height: 64px; display: grid; grid-template-columns: auto 1fr; align-items: stretch; border-radius: 8px; overflow: hidden;
+  background: linear-gradient(180deg, var(--bg2), var(--bg0)); border-top: 3px solid var(--green);
+  box-shadow: 0 0 22px color-mix(in srgb, var(--green) 50%, transparent), 0 -2px 0 color-mix(in srgb, var(--green) 30%, transparent); }
+.ticker .flag { display: flex; align-items: center; gap: 12px; padding: 0 30px 0 12px; margin-right: 10px;
+  background: linear-gradient(90deg, var(--green-deep), var(--green)); clip-path: polygon(0 0, 100% 0, calc(100% - 22px) 100%, 0 100%);
+  font: 900 34px/1 var(--display); color: var(--bg0); text-transform: uppercase; letter-spacing: .03em; white-space: nowrap; }
+.ticker .flag img { width: 46px; height: 46px; border-radius: 8px; object-fit: cover; box-shadow: 0 0 0 2px var(--bg0); }
+.ticker .feed { align-self: center; padding-right: 18px; font: 900 36px/1 var(--display); text-transform: uppercase; white-space: nowrap; overflow: hidden;
+  color: var(--ink); transform: skewX(-8deg); transform-origin: left; }
+.ticker .feed i { font-style: normal; color: var(--green); margin: 0 14px; text-shadow: 0 0 10px color-mix(in srgb, var(--green) 70%, transparent); }
+.ticker .feed b { color: var(--green); text-shadow: 0 0 14px color-mix(in srgb, var(--green) 55%, transparent); }
 
-/* the pick */
-.pick { height: 226px; padding: 14px 26px; display: grid; grid-template-columns: 1fr 250px; gap: 10px; }
-.pick-body { display: flex; flex-direction: column; justify-content: center; gap: 4px; min-width: 0; min-height: 0; overflow: hidden; }
-.headline { font: 900 80px/.92 var(--display); text-transform: uppercase; letter-spacing: .005em; transform: skewX(-8deg);
-  transform-origin: left; overflow: hidden; max-height: 1.86em; color: var(--white); text-shadow: 0 4px 0 #000, 0 0 26px rgba(31,168,255,.35); }
-.subline { font: 800 26px/1.05 var(--display); color: var(--blue); letter-spacing: .07em; text-transform: uppercase;
-  white-space: nowrap; overflow: hidden; }
-.subline:empty { display: none; }
-.betline { font: 900 58px/1.02 var(--display); text-transform: uppercase; transform: skewX(-8deg); transform-origin: left;
-  white-space: nowrap; overflow: hidden; color: var(--green);
-  text-shadow: 0 0 24px rgba(140,255,46,.55), 0 4px 0 #0b2a05; }
-.betline:empty { display: none; }
-.pill { align-self: flex-start; flex: none; margin: 2px 0 2px 6px; font: 900 38px/1 var(--display); color: #041006; padding: 6px 34px 4px;
-  background: linear-gradient(180deg, #c6ff86, var(--green) 55%, #49d214); transform: skewX(-10deg); border-radius: 8px;
-  box-shadow: 0 0 26px rgba(140,255,46,.6), inset 0 -4px 0 rgba(0,0,0,.18); }
-.hero { position: relative; height: 100%; display: grid; place-items: end center; }
-.hero::before { content: ""; position: absolute; left: 50%; bottom: 0; width: 230px; height: 230px; transform: translateX(-50%);
-  border-radius: 50%; background: radial-gradient(circle, rgba(31,168,255,.45), rgba(140,255,46,.18) 45%, transparent 70%); }
-.hero .crestbg { position: absolute; width: 190px; height: 190px; object-fit: contain; top: 6px; left: 50%;
-  transform: translateX(-50%); opacity: .2; filter: saturate(1.2); }
-.hero .head { position: relative; height: 196px; width: 196px; object-fit: cover; object-position: 50% 18%; border-radius: 50%;
-  border: 5px solid var(--green); box-shadow: 0 0 0 4px rgba(4,8,14,.9), 0 0 34px rgba(140,255,46,.55), 0 0 70px rgba(31,168,255,.4); }
-.hero.solo, .hero.duo { place-items: center; }
-.hero .crest-big { position: relative; width: 180px; height: 180px; object-fit: contain;
-  filter: drop-shadow(0 0 18px rgba(255,255,255,.25)) drop-shadow(0 0 40px rgba(31,168,255,.45)); }
-.hero.duo img { position: absolute; width: 128px; height: 128px; object-fit: contain; filter: drop-shadow(0 0 16px rgba(255,255,255,.22)); }
-.hero.duo .crest-away { left: 6px; top: 6px; } .hero.duo .crest-home { right: 6px; bottom: 6px; }
-.hero.duo .vs { position: relative; font: 900 54px/1 var(--display); color: var(--green); transform: skewX(-9deg);
-  text-shadow: 0 0 20px rgba(140,255,46,.7), 0 3px 0 #000; }
-.hero .ini { position: relative; font: 900 96px/1 var(--display); color: var(--muted); }
-
-/* outlook tiles (SmartSim on a pick, the market's books on a price play) */
-.outlook { height: 140px; padding: 26px 18px 12px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
-.tile { border: 2px solid #1b4a6e; border-radius: 12px; background: linear-gradient(180deg, rgba(14,34,54,.9), rgba(6,14,24,.9));
-  display: grid; grid-template-columns: 1fr; justify-items: center; align-content: center; gap: 2px; position: relative; padding: 6px 4px; }
-.tile .k { font: 800 21px/1 var(--display); letter-spacing: .08em; color: var(--ice); text-transform: uppercase; white-space: nowrap; }
-.tile .v { font: 900 44px/1 var(--display); color: var(--white); white-space: nowrap; }
-.tile .v.g { color: var(--green); text-shadow: 0 0 18px rgba(140,255,46,.55); }
-.tile .s { font: 700 17px/1.1 var(--body); color: var(--muted); text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
-.tile svg.ic { position: absolute; right: 9px; bottom: 8px; width: 26px; height: 26px; opacity: .9; }
-
-/* lower: the chart, why, risk */
-.lower { flex: 1; min-height: 0; display: grid; grid-template-columns: 0.82fr 1.18fr; gap: 16px; }
-.box { min-height: 0; padding: 28px 18px 12px; display: flex; flex-direction: column; gap: 8px; }
-.box ul { flex: 1; min-height: 0; overflow: hidden; align-content: start; }
-.right { display: flex; flex-direction: column; gap: 22px; min-height: 0; }
-.right .why { flex: 1 1 0; } .right .risk { flex: 0 1 auto; max-height: 46%; }
-.chart svg { width: 100%; height: auto; display: block; }
-.cap { font: 700 17px/1.2 var(--body); color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
-ul { list-style: none; padding: 0; display: grid; gap: 8px; }
-li { font: 600 var(--li, 21px)/1.24 var(--body); padding-left: 34px; position: relative; color: #e3ebf1; }
-.why li::before { content: ""; position: absolute; left: 0; top: .1em; width: 24px; height: 24px; border-radius: 50%;
-  background: var(--green) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 12.5l4 4 8-9' fill='none' stroke='%23041006' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/18px no-repeat;
-  box-shadow: 0 0 10px rgba(140,255,46,.55); }
-.why li.ctx::before { background: rgba(31,168,255,.18); box-shadow: none; border: 2px solid var(--blue);
-  background-image: radial-gradient(circle, var(--blue) 0 4px, transparent 5px); }
-.risk li::before { content: "!"; position: absolute; left: 0; top: .1em; width: 24px; height: 24px; border-radius: 50%;
-  background: var(--amber); color: #1a1000; font: 900 17px/24px var(--display); text-align: center; }
-
-/* bottom strip and tagline */
-.strip { height: 80px; padding: 0 22px; display: grid; grid-template-columns: auto 4px 56px 1fr; align-items: center; gap: 18px; }
-.strip .tag2 { font: 900 46px/1 var(--display); color: var(--green); transform: skewX(-9deg); white-space: nowrap;
-  text-shadow: 0 0 18px rgba(140,255,46,.6), 0 3px 0 #0b2a05; }
-.strip .bar { width: 4px; height: 52px; background: linear-gradient(var(--green), var(--blue)); border-radius: 2px; }
-.strip img { width: 56px; height: 56px; border-radius: 10px; object-fit: cover; box-shadow: 0 0 0 2px var(--green); }
-.strip .sb { font: 900 40px/1 var(--display); text-transform: uppercase; white-space: nowrap; overflow: hidden; transform: skewX(-8deg);
-  transform-origin: left; color: var(--white); }
-.strip .sb b { color: var(--green); }
-.tagline { display: flex; justify-content: space-between; align-items: center; font: 800 21px/1 var(--display);
-  letter-spacing: .1em; text-transform: uppercase; color: #cdd8e1; padding: 0 6px; }
+/* FOOTER */
+.tagline { flex: none; display: flex; justify-content: space-between; align-items: center; font: 800 21px/1 var(--display);
+  letter-spacing: .1em; text-transform: uppercase; color: var(--chrome-mid); padding: 2px 6px 0; }
 .tagline span { display: inline-flex; align-items: center; gap: 9px; }
+.tagline .dot { color: var(--green); }
 .tagline svg { width: 24px; height: 24px; }
-.tagline .x { color: var(--white); }
-.fine { font: 600 14.5px/1.3 var(--body); color: #71889a; display: flex; justify-content: space-between; padding: 0 6px; }
+.tagline .ic-b { stroke: var(--blue); fill: none; } .tagline .ic-g { fill: var(--green); } .tagline .ic-gs { stroke: var(--green); fill: none; }
+.tagline .x { color: var(--ink); } .tagline .x svg path { fill: var(--ink); }
+.fine { flex: none; font: 600 14px/1.3 var(--body); color: var(--muted); display: flex; justify-content: space-between; padding: 0 6px; opacity: .85; }
+
+/* background art */
+.bg .base { fill: var(--bg0); }
+.bg .s-blue { stop-color: var(--blue); } .bg .s-green { stop-color: var(--green); } .bg .s-cyan { stop-color: var(--cyan); }
+.bg .s-ink { stop-color: var(--chrome-hi); } .bg .s-bg { stop-color: var(--bg0); }
+.bg .lamp { fill: var(--chrome-hi); } .bg .lamp-halo { fill: var(--cyan); }
+.bg .fleck-g { fill: var(--green); } .bg .fleck-b { fill: var(--blue); }
+.bg .arc { fill: none; stroke: var(--blue); stroke-width: 3; } .bg .arc-g { fill: none; stroke: var(--green); stroke-width: 3; }
 </style></head>
 <body>
 <svg class="bg" viewBox="0 0 1080 1350" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
   <defs>
-    <radialGradient id="gb" cx="12%" cy="0%" r="70%"><stop offset="0" stop-color="#1f6fd1" stop-opacity=".55"/><stop offset="1" stop-color="#03060b" stop-opacity="0"/></radialGradient>
-    <radialGradient id="gg" cx="100%" cy="16%" r="62%"><stop offset="0" stop-color="#4fe81c" stop-opacity=".30"/><stop offset="1" stop-color="#03060b" stop-opacity="0"/></radialGradient>
-    <radialGradient id="gf" cx="50%" cy="100%" r="60%"><stop offset="0" stop-color="#4fe81c" stop-opacity=".22"/><stop offset="1" stop-color="#03060b" stop-opacity="0"/></radialGradient>
-    <linearGradient id="beam" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cfe9ff" stop-opacity=".22"/><stop offset="1" stop-color="#cfe9ff" stop-opacity="0"/></linearGradient>
+    <radialGradient id="gb" cx="10%" cy="0%" r="72%"><stop offset="0" class="s-blue" stop-opacity=".5"/><stop offset="1" class="s-bg" stop-opacity="0"/></radialGradient>
+    <radialGradient id="gg" cx="100%" cy="22%" r="62%"><stop offset="0" class="s-green" stop-opacity=".22"/><stop offset="1" class="s-bg" stop-opacity="0"/></radialGradient>
+    <radialGradient id="gf" cx="50%" cy="104%" r="58%"><stop offset="0" class="s-green" stop-opacity=".2"/><stop offset="1" class="s-bg" stop-opacity="0"/></radialGradient>
+    <radialGradient id="gc" cx="72%" cy="44%" r="42%"><stop offset="0" class="s-cyan" stop-opacity=".16"/><stop offset="1" class="s-bg" stop-opacity="0"/></radialGradient>
+    <linearGradient id="beam" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="s-ink" stop-opacity=".24"/><stop offset="1" class="s-ink" stop-opacity="0"/></linearGradient>
     <filter id="smoke" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".006 .011" numOctaves="4" seed="11"/>
-      <feColorMatrix values="0 0 0 0 .55  0 0 0 0 .66  0 0 0 0 .78  0 0 0 .55 -.18"/></filter>
+      <feColorMatrix values="0 0 0 0 .5  0 0 0 0 .6  0 0 0 0 .72  0 0 0 .5 -.18"/></filter>
     <filter id="grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="3"/>
-      <feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .06 0"/></filter>
-    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6"/></filter>
+      <feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .055 0"/></filter>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="7"/></filter>
     <filter id="soft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.2"/></filter>
   </defs>
-  <rect width="1080" height="1350" fill="#03060b"/>
-  <rect width="1080" height="1350" fill="url(#gb)"/><rect width="1080" height="1350" fill="url(#gg)"/><rect width="1080" height="1350" fill="url(#gf)"/>
-  <rect width="1080" height="1350" filter="url(#smoke)" opacity=".55"/>
-  <!-- stadium lights, top corners, and their beams -->
-  <g opacity=".95">
-    <polygon points="60,40 230,40 520,1350 -200,1350" fill="url(#beam)" opacity=".55"/>
-    <polygon points="850,40 1020,40 1300,1350 560,1350" fill="url(#beam)" opacity=".45"/>
-    <g filter="url(#glow)" fill="#bfe4ff"><rect x="58" y="26" width="176" height="74" rx="10"/><rect x="848" y="26" width="176" height="74" rx="10"/></g>
-    <g fill="#ffffff" filter="url(#soft)">
-      <circle cx="80" cy="44" r="9"/><circle cx="108" cy="44" r="9"/><circle cx="136" cy="44" r="9"/><circle cx="164" cy="44" r="9"/><circle cx="192" cy="44" r="9"/><circle cx="220" cy="44" r="9"/>
-      <circle cx="80" cy="72" r="9"/><circle cx="108" cy="72" r="9"/><circle cx="136" cy="72" r="9"/><circle cx="164" cy="72" r="9"/><circle cx="192" cy="72" r="9"/><circle cx="220" cy="72" r="9"/>
-      <circle cx="870" cy="44" r="9"/><circle cx="898" cy="44" r="9"/><circle cx="926" cy="44" r="9"/><circle cx="954" cy="44" r="9"/><circle cx="982" cy="44" r="9"/><circle cx="1010" cy="44" r="9"/>
-      <circle cx="870" cy="72" r="9"/><circle cx="898" cy="72" r="9"/><circle cx="926" cy="72" r="9"/><circle cx="954" cy="72" r="9"/><circle cx="982" cy="72" r="9"/><circle cx="1010" cy="72" r="9"/>
+  <rect class="base" width="1080" height="1350"/>
+  <rect width="1080" height="1350" fill="url(#gb)"/><rect width="1080" height="1350" fill="url(#gg)"/>
+  <rect width="1080" height="1350" fill="url(#gf)"/><rect width="1080" height="1350" fill="url(#gc)"/>
+  <rect width="1080" height="1350" filter="url(#smoke)" opacity=".5"/>
+  <!-- arena lights: two banks at the top corners and their beams through the smoke -->
+  <g>
+    <polygon points="40,30 220,30 560,1350 -260,1350" fill="url(#beam)" opacity=".5"/>
+    <polygon points="860,30 1040,30 1340,1350 540,1350" fill="url(#beam)" opacity=".42"/>
+    <g filter="url(#glow)" class="lamp-halo" opacity=".55"><rect x="38" y="16" width="184" height="70" rx="10"/><rect x="858" y="16" width="184" height="70" rx="10"/></g>
+    <g class="lamp" filter="url(#soft)">
+      <circle cx="60" cy="34" r="8"/><circle cx="88" cy="34" r="8"/><circle cx="116" cy="34" r="8"/><circle cx="144" cy="34" r="8"/><circle cx="172" cy="34" r="8"/><circle cx="200" cy="34" r="8"/>
+      <circle cx="60" cy="62" r="8"/><circle cx="88" cy="62" r="8"/><circle cx="116" cy="62" r="8"/><circle cx="144" cy="62" r="8"/><circle cx="172" cy="62" r="8"/><circle cx="200" cy="62" r="8"/>
+      <circle cx="880" cy="34" r="8"/><circle cx="908" cy="34" r="8"/><circle cx="936" cy="34" r="8"/><circle cx="964" cy="34" r="8"/><circle cx="992" cy="34" r="8"/><circle cx="1020" cy="34" r="8"/>
+      <circle cx="880" cy="62" r="8"/><circle cx="908" cy="62" r="8"/><circle cx="936" cy="62" r="8"/><circle cx="964" cy="62" r="8"/><circle cx="992" cy="62" r="8"/><circle cx="1020" cy="62" r="8"/>
     </g>
   </g>
-  <!-- neon lightning beside the banner and paint flecks -->
-  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
-    <polyline points="1046,150 1018,206 1040,210 1004,276" stroke="#8cff2e" stroke-width="5" filter="url(#soft)"/>
-    <polyline points="1046,150 1018,206 1040,210 1004,276" stroke="#eaffd6" stroke-width="2"/>
-    <polyline points="246,210 226,240 242,243 218,284" stroke="#1fa8ff" stroke-width="4" filter="url(#soft)" opacity=".9"/>
+  <!-- electric arcs at the banner and paint flecks -->
+  <g stroke-linecap="round" stroke-linejoin="round">
+    <polyline class="arc-g" points="640,232 616,268 636,272 604,322" filter="url(#soft)"/>
+    <polyline class="arc" points="20,330 44,356 30,360 54,398" filter="url(#soft)" opacity=".9"/>
   </g>
-  <g fill="#8cff2e" opacity=".55"><circle cx="1020" cy="300" r="4"/><circle cx="1034" cy="318" r="2.5"/><circle cx="1006" cy="330" r="2"/>
-    <circle cx="30" cy="1236" r="5"/><circle cx="52" cy="1250" r="2.5"/><circle cx="1052" cy="1230" r="4"/><circle cx="1036" cy="1246" r="2"/></g>
+  <g opacity=".55"><circle class="fleck-g" cx="634" cy="340" r="4"/><circle class="fleck-g" cx="648" cy="356" r="2.5"/><circle class="fleck-g" cx="618" cy="364" r="2"/>
+    <circle class="fleck-g" cx="22" cy="1210" r="5"/><circle class="fleck-g" cx="44" cy="1224" r="2.5"/><circle class="fleck-b" cx="1058" cy="1204" r="4"/><circle class="fleck-b" cx="1040" cy="1220" r="2"/></g>
   <rect width="1080" height="1350" filter="url(#grain)"/>
 </svg>
 
+<div class="stage $stage_class" style="$stage_style">$hero</div>
+
 <div class="page">
-  <header class="top"><img class="logo" alt="Syndicate ROI" src="$logo">
-    <div class="titles"><div class="chrome">Syndicate ROI</div>
-      <div class="banner">
-        <svg viewBox="0 0 664 138" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
-          <defs><filter id="rough" x="-5%" y="-25%" width="110%" height="150%"><feTurbulence type="fractalNoise" baseFrequency=".022 .11" numOctaves="3" seed="7" result="n"/>
-            <feDisplacementMap in="SourceGraphic" in2="n" scale="20" xChannelSelector="R" yChannelSelector="G"/></filter>
-            <linearGradient id="paint" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9ff8f"/><stop offset=".5" stop-color="#8cff2e"/><stop offset="1" stop-color="#4fd814"/></linearGradient></defs>
-          <g filter="url(#rough)" fill="url(#paint)">
-            <path d="M30 22 L650 8 L632 96 L10 112 Z"/>
-            <!-- the drips -->
-            <rect x="96" y="96" width="11" height="26" rx="5.5"/><circle cx="101.5" cy="122" r="7"/>
-            <rect x="232" y="100" width="8" height="16" rx="4"/><circle cx="236" cy="117" r="5"/>
-            <rect x="398" y="94" width="12" height="32" rx="6"/><circle cx="404" cy="127" r="7.5"/>
-            <rect x="548" y="92" width="9" height="20" rx="4.5"/><circle cx="552.5" cy="113" r="5.5"/>
-          </g>
-        </svg>
-        <span class="txt" data-fit="34">$tag</span></div></div>
+  <header class="top"><img class="logo" alt="SyndicateROI" src="$logo">
+    <div class="wordmark-wrap"><div class="wordmark chrome" data-fit="70">$wordmark</div></div>
   </header>
 
-  <div class="matchup panel blue">
-    <div class="team">$away_crest<span class="nm" data-fit="20">$away</span></div>
+  <div class="matchup glass blue">
+    <div class="team" style="$away_style">$away_crest<span class="nm" data-fit="20">$away</span></div>
     <div class="at">@</div>
-    <div class="team">$home_crest<span class="nm" data-fit="20">$home</span></div>
+    <div class="team" style="$home_style">$home_crest<span class="nm" data-fit="20">$home</span></div>
     <div class="when">$sport<b>$kickoff</b></div>
   </div>
 
-  <section class="pick panel">
-    <div class="pick-body">
-      <div class="headline" data-fit="44">$headline</div>
-      <div class="subline" data-fit="18">$subline</div>
-      <div class="betline" data-fit="30">$betline</div>
-      <div class="pill">($price)</div>
-    </div>
-    $hero
+  <div class="banner">
+    <svg viewBox="0 0 664 138" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+      <defs><filter id="rough" x="-5%" y="-25%" width="110%" height="150%"><feTurbulence type="fractalNoise" baseFrequency=".022 .11" numOctaves="3" seed="7" result="n"/>
+        <feDisplacementMap in="SourceGraphic" in2="n" scale="22" xChannelSelector="R" yChannelSelector="G"/></filter>
+        <filter id="speck" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".55" numOctaves="2" seed="5" result="t"/>
+          <feColorMatrix in="t" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -9 4.2"/><feComposite in2="SourceGraphic" operator="in"/></filter></defs>
+      <g filter="url(#rough)">
+        <path class="paint-lo" d="M34 30 L654 14 L636 104 L14 118 Z" opacity=".55"/>
+        <path class="paint" d="M30 22 L650 8 L632 96 L10 112 Z"/>
+        <rect class="paint" x="96" y="96" width="11" height="26" rx="5.5"/><circle class="paint" cx="101.5" cy="122" r="7"/>
+        <rect class="paint" x="232" y="100" width="8" height="16" rx="4"/><circle class="paint" cx="236" cy="117" r="5"/>
+        <rect class="paint" x="398" y="94" width="12" height="32" rx="6"/><circle class="paint" cx="404" cy="127" r="7.5"/>
+        <rect class="paint" x="548" y="92" width="9" height="20" rx="4.5"/><circle class="paint" cx="552.5" cy="113" r="5.5"/>
+      </g>
+      <!-- black distressed texture inside the stroke -->
+      <path class="grit" d="M30 22 L650 8 L632 96 L10 112 Z" filter="url(#speck)" opacity=".5"/>
+    </svg>
+    <span class="txt" data-fit="34">$tag</span></div>
+
+  <section class="bet">
+    <div class="headline chrome" data-fit="44">$headline</div>
+    <div class="subline" data-fit="18">$subline</div>
+    <div class="betline" data-fit="30">$betline</div>
+    <div class="odds">($price)</div>
+    $mini
   </section>
 
-  <section class="outlook panel blue"><div class="tab blue">$outlook_title</div>
-    <div class="tile"><div class="k">Best price</div><div class="v">$price</div><div class="s">$book · $books $bks</div>
-      <svg class="ic" viewBox="0 0 24 24"><path d="M12 2v20M17 6.5c0-2-2.2-3.2-5-3.2s-5 1.3-5 3.4c0 4.8 10 2.5 10 7.6 0 2.2-2.3 3.5-5 3.5s-5.2-1.3-5.2-3.4" fill="none" stroke="#8cff2e" stroke-width="2.2" stroke-linecap="round"/></svg></div>
-    <div class="tile"><div class="k">Fair line</div><div class="v">$fair</div><div class="s">no-vig $win_prob</div>
-      <svg class="ic" viewBox="0 0 24 24"><path d="M12 3v18M5 7h14M5 7l-3 7a3.5 3.5 0 0 0 6 0zM19 7l-3 7a3.5 3.5 0 0 0 6 0z" fill="none" stroke="#1fa8ff" stroke-width="2" stroke-linejoin="round"/></svg></div>
-    <div class="tile"><div class="k">$tile3_k</div><div class="v">$tile3_v</div><div class="s">$tile3_s</div>
-      <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="#1fa8ff" stroke-width="2"/><circle cx="12" cy="12" r="5" fill="none" stroke="#1fa8ff" stroke-width="2"/><circle cx="12" cy="12" r="1.8" fill="#8cff2e"/></svg></div>
-    <div class="tile"><div class="k">Edge</div><div class="v g">$edge</div><div class="s">vs the fair price</div>
-      <svg class="ic" viewBox="0 0 24 24"><path d="M3 18l6-6 4 4 8-9M15 7h6v6" fill="none" stroke="#8cff2e" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+  <section class="dash glass blue"><div class="tab blue">$outlook_title</div>
+    <div class="tile"><div class="k">$t1_k</div><div class="v">$t1_v</div><div class="s">$t1_s</div></div>
+    <div class="tile"><div class="k">$t2_k</div><div class="v">$t2_v</div><div class="s">$t2_s</div></div>
+    <div class="tile"><div class="k">$t3_k</div><div class="v">$t3_v</div><div class="s">$t3_s</div></div>
+    <div class="tile"><div class="k">$t4_k</div><div class="v">$t4_v</div><div class="s">$t4_s</div></div>
   </section>
 
-  <div class="lower">
-    <section class="box chart panel blue"><div class="tab blue">$chart_title</div>$chart<div class="cap">$chart_caption</div></section>
-    <div class="right">
-      <section class="box why panel"><div class="tab">Why we like it</div><ul>$why</ul></section>
-      <section class="box risk panel red"><div class="tab red">The risk</div><ul>$risk</ul></section>
-    </div>
+  <div class="analysis">
+    <section class="panel green why"><div class="tab">$why_title</div><ul>$why</ul></section>
+    <section class="panel red against"><div class="tab red">$against_title</div><ul>$risk</ul></section>
   </div>
 
-  <div class="strip panel">
-    <span class="tag2">$tag</span><span class="bar"></span><img src="$logo" alt="">
-    <span class="sb" data-fit="22">$strip_bet <b>($price)</b></span>
+  <div class="ticker">
+    <span class="flag"><img src="$logo" alt="">$tag</span>
+    <span class="feed" data-fit="20">$strip_bet<i>$sep</i><b>($price)</b></span>
   </div>
   <div class="tagline">
-    <span><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" stroke="#1fa8ff" stroke-width="2.6" stroke-linecap="round"/></svg>Data driven</span>
-    <span><svg viewBox="0 0 24 24"><path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z" fill="#8cff2e"/></svg>Discipline</span>
-    <span><svg viewBox="0 0 24 24"><path d="M4 17a8 8 0 1 1 16 0" fill="none" stroke="#1fa8ff" stroke-width="2.4"/><path d="M12 17l4-6" stroke="#8cff2e" stroke-width="2.6" stroke-linecap="round"/></svg>Long-term edge</span>
-    <span class="x"><svg viewBox="0 0 24 24"><path d="M4 3h4.6l4.2 5.9L18 3h2.2l-6.4 7.4L21 21h-4.6l-4.6-6.4L6.2 21H4l6.8-7.8z" fill="#f4f7fa"/></svg>@SyndicateROI</span>
+    <span><svg viewBox="0 0 24 24"><path class="ic-b" d="M4 20V10M10 20V4M16 20v-7M22 20H2" stroke-width="2.6" stroke-linecap="round"/></svg>$tag_1</span>
+    <span class="dot">•</span>
+    <span><svg viewBox="0 0 24 24"><path class="ic-g" d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z"/></svg>$tag_2</span>
+    <span class="dot">•</span>
+    <span><svg viewBox="0 0 24 24"><path class="ic-b" d="M4 17a8 8 0 1 1 16 0" stroke-width="2.4"/><path class="ic-gs" d="M12 17l4-6" stroke-width="2.6" stroke-linecap="round"/></svg>$tag_3</span>
+    <span class="x"><svg viewBox="0 0 24 24"><path d="M4 3h4.6l4.2 5.9L18 3h2.2l-6.4 7.4L21 21h-4.6l-4.6-6.4L6.2 21H4l6.8-7.8z"/></svg>$handle</span>
   </div>
-  <div class="fine"><span>Every play is graded at the closing line and the result. We post the wins. We post the losses.</span><span>21+ · Bet responsibly</span></div>
+  <div class="fine"><span>$disclaimer</span><span>$age</span></div>
 </div>
 <script>
 // Fit every text block to its box (user 2026-10-15: "the pick images are having text cut off"): a headline or a bet
-// shrinks until it fits, the lists shrink 21px -> 14px, and only then does a list drop its LAST bullet -- a whole
+// shrinks until it fits, the lists shrink 21px -> 15px, and only then does a list drop its LAST bullet -- a whole
 // statement, never a cut one.
 (function () {
   // A tall display face draws a few px above and below a 1.0 line box; that is not overflow, a wrapped line is.
@@ -263,25 +321,26 @@ li { font: 600 var(--li, 21px)/1.24 var(--body); padding-left: 34px; position: r
     });
   }
   function fitLists() {
-    var boxes = Array.prototype.slice.call(document.querySelectorAll(".lower .box:not(.chart) ul"));
-    var full = function () { return boxes.some(over); };
+    var boxes = Array.prototype.slice.call(document.querySelectorAll(".analysis ul"));
+    var strict = function (el) { return el.scrollHeight > el.clientHeight + 1; };
+    var full = function () { return boxes.some(strict); };
     var size = 21;
     document.documentElement.style.setProperty("--li", size + "px");
-    while (full() && size > 14) { size -= 1; document.documentElement.style.setProperty("--li", size + "px"); }
+    while (full() && size > 15) { size -= 1; document.documentElement.style.setProperty("--li", size + "px"); }
     boxes.forEach(function (b) {
       var items = b.children;
-      for (var i = items.length - 1; i > 0 && over(b); i--) items[i].remove();
+      for (var i = items.length - 1; i > 0 && strict(b); i--) items[i].remove();
     });
   }
-  // The pick block as a whole: headline and bet shrink together until the block fits its panel (the pill stays).
-  function fitPick() {
-    var body = document.querySelector('.pick-body'); if (!body) return;
-    var parts = ['.headline', '.betline'].map(function (q) { return document.querySelector(q); }).filter(Boolean);
+  // The bet block as a whole: name and bet shrink together until the block fits (the odds plate stays).
+  function fitBet() {
+    var body = document.querySelector(".bet"); if (!body) return;
+    var parts = [".headline", ".betline"].map(function (q) { return document.querySelector(q); }).filter(Boolean);
     for (var k = 0; k < 40 && body.scrollHeight > body.clientHeight + 2; k++) {
-      parts.forEach(function (el) { var f = parseFloat(getComputedStyle(el).fontSize); if (f > 34) el.style.fontSize = (f - 3) + 'px'; });
+      parts.forEach(function (el) { var f = parseFloat(getComputedStyle(el).fontSize); if (f > 36) el.style.fontSize = (f - 3) + "px"; });
     }
   }
-  function fit() { fitText(); fitPick(); fitLists(); }
+  function fit() { fitText(); fitBet(); fitLists(); }
   fit();
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
 })();
