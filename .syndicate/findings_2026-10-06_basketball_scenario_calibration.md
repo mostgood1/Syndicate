@@ -3213,3 +3213,45 @@ quarter env) is measured separately against S8 / S3 / within-SD, as pre-register
 
 **Lane claim added:** engine.py, the foul_3pa_mult field + the three shooting-foul draw sites + the `foul3_mult`
 keyword of the three solver helpers and their EXACT call sites, section only.
+
+### R2-c step 1 — RESULT 2026-10-16 20:50Z (grid done 20:46Z; code 1d592fab, parity 5,400/5,400): NOT CONFIRMED; the cause hypothesis is REFUTED, but the FT-trip composition is badly wrong
+
+**Run:** the round-2 config (fit_f5 + quarter mean + real split), the 12 sweep dates, foul_3pa_mult ∈ {1.0, 0.5, 0.3,
+0.2}; 166 team-games without OT.
+
+| foul_3pa_mult | 3-shot trips/team-game (real 0.41) | 3P% (real .3611) | 2P% (real .5446) | 3PM | 3PA | FGA | FTA (real 22.52) | REB (real 43.81) | bias |
+|---|---|---|---|---|---|---|---|---|---|
+| 1.0 | **3.49** | .3736 | .5549 | 13.41 | 35.90 | 87.94 | 22.96 | 42.24 | +0.63 |
+| 0.5 | 1.72 | .3713 | .5737 | 14.03 | 37.79 | 90.16 | 16.70 | 42.66 | +0.63 |
+| 0.3 | 1.02 | .3697 | .5826 | 14.26 | 38.56 | 91.07 | 14.19 | 42.78 | +0.57 |
+| 0.2 | 0.67 | .3696 | .5874 | 14.39 | 38.93 | 91.47 | 12.95 | 42.76 | +0.65 |
+
+**Verdict by the rule: NOT CONFIRMED** (no point has 3P% in [.3514, .3674]).
+
+**Belief overturned:** the fouled-miss removal explains only ~0.004 of the 3P% excess (.3736 → .3696 at 0.2), not the
+~0.0125. The residual 3P% lies elsewhere.
+
+**The real finding: the FT-trip COMPOSITION is grossly wrong, and FTA only matched by compensation.**
+- The sim takes **3.49 three-shot trips per team-game, 8.5× real** (~10.5 FTA from fouled threes vs real ~1.2).
+- 2-shot FTA ≈ 22.96 − 10.47 − ~2.7 and-ones ≈ 9.8, i.e. ~4.9 two-shot trips vs real 9.56 ("1 of 2", including bonus
+  and intentional).
+- So 2PA shooting fouls are about HALF of real, and the #3/#3l FT-volume fit (bonus 0.03, base non-shoot 0.065) was
+  built on top of the inflated three-shot trips.
+- Cutting foul_3pa_mult alone collapses FTA (−10 at 0.2). EXACT then lifts every make rate to keep points (2P% .555 →
+  .587) and FGA rises (no FT trip ends the possession).
+
+**R2-c step 2 — PRE-REGISTRATION (before any run): re-fit the shooting-foul composition jointly.**
+- New default-off EventSimConfig `foul_2pa_mult` (1.0 = off), the twin of foul_3pa_mult (the same draw sites and
+  solver plumbing).
+- Fix foul_3pa_mult = 0.12 (3-shot trips ≈ 3.49 × m ≈ 0.42).
+- Grid foul_2pa_mult ∈ {1.4, 1.7, 2.0}, with bonus 0.03 and base non-shoot 0.065 held.
+- **Targets:**
+  - 3-shot trips 0.41 ± 0.10;
+  - FTA 22.69 ± 0.3 (FIT target);
+  - team PF 19.67 ± 0.4;
+  - foul-outs [0.153, 0.233] and P(6th | 5th) [0.1607, 0.2643] guarded.
+- **Readings:** 3P%, 2P%, FGA, 3PA, REB, total bias, the quarter shares (R2-a must hold).
+- **If FTA and PF cannot both hold:** a joint m2 × base-non-shoot grid follows (its own pre-reg).
+- Then s/Δ re-measured on the disjoint dates, the 12-date check, the full FIT.
+- R2-b (REB) and the residual 3P% are re-read on the re-fit composition. They are not tuned on this window until
+  then.
