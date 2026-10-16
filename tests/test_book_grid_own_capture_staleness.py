@@ -105,3 +105,13 @@ def test_unknown_seen_age_still_falls_back_to_the_movement_rule():
     rows, _seen = _martinez()
     best, _row = _best(book_grid.build_book_grid(rows, now=NOW, last_seen=None))
     assert best["books_quoting"] == 1                                       # only Kalshi moved recently
+
+
+def test_a_moved_start_time_reads_the_latest_one():
+    # Measured 10-16: TB @ CLE quotes carried both 22:00Z and 00:00Z; the anchor's older copy made a 7 PM game
+    # read as live at 5:32 PM and the 10-minute live feed limit marked every sportsbook stale.
+    rows, seen = _martinez(start_in_h=1.5)
+    for r in rows[:4]:
+        r["commence_time"] = _iso(NOW - timedelta(minutes=30))     # an earlier start time on older quotes
+    best, _row = _best(book_grid.build_book_grid(rows, now=NOW, last_seen=seen))
+    assert best["books_quoting"] == 10

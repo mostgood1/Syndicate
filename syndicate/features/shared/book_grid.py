@@ -185,14 +185,20 @@ def _stale_basis_is_own_capture() -> bool:
     return str(os.environ.get(_STALE_BASIS_ENV) or "").strip().lower() not in {"moved", "market_seen"}
 
 
-def _started(row: Mapping[str, Any], now: datetime) -> bool:
-    try:
-        start = datetime.fromisoformat(str(row.get("commence_time") or "").replace("Z", "+00:00"))
-    except ValueError:
-        return False
-    if start.tzinfo is None:
-        start = start.replace(tzinfo=timezone.utc)
-    return start <= now
+def _started(rows: Iterable[Mapping[str, Any]], now: datetime) -> bool:
+    """Has the game started? Read off the LATEST start time any quote on the line carries: a start time that
+    moved leaves the earlier one on older quotes (measured 2026-10-16, TB @ CLE: quotes at 22:00Z and 00:00Z), and
+    the anchor's own copy read a 7 PM game as live at 5:32 PM."""
+    latest = None
+    for row in rows:
+        try:
+            start = datetime.fromisoformat(str(row.get("commence_time") or "").replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if start.tzinfo is None:
+            start = start.replace(tzinfo=timezone.utc)
+        latest = start if latest is None or start > latest else latest
+    return latest is not None and latest <= now
 
 
 def _capture_index(rows: Iterable[Mapping[str, Any]], last_seen: Mapping[str, str] | None, *,
@@ -679,7 +685,7 @@ def build_book_grid(
             )
             seen_basis = _stale_basis_is_seen()
             event_key = str(anchor.get("event_id") or "")
-            feed_dead = _FEED_DEAD_LIVE_SECONDS if _started(anchor, now) else _FEED_DEAD_PREGAME_SECONDS
+            feed_dead = _FEED_DEAD_LIVE_SECONDS if _started(sides_rows, now) else _FEED_DEAD_PREGAME_SECONDS
             for book_key, sides_map in cells.items():
                 for side_key, cell in sides_map.items():
                     age = cell.get("age_seconds")
