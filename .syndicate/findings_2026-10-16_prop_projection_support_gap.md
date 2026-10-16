@@ -308,3 +308,73 @@ as reasoning, not as a measurement: nothing here tests their joint behaviour.
 - Their joint behaviour (opportunities AND implied probability AND ratio) is
   untested. The ceiling recommendation still stands as two checks, and this
   measurement does not promote the opportunity field to being one of them.
+
+## Joint behaviour of the candidate checks (19:0xZ) -- 72.4% of what the ceiling refuses has no plausibility OR role justification
+
+I left "their joint behaviour is untested" in the section above, so this closes
+it. Three classifiers over the same NFL yardage population, one row per
+distinct (player, market, line, game), **442 markets**. No outcomes are
+involved: this measures COMPLEMENTARITY, not accuracy.
+
+```
+  MAG   abs(edge_vs_market_pct) > 15      116 rows (26.2%)   production today
+  IMPL  model_prob_over >= .85 or <= .15   21 rows ( 4.8%)   the docstring's own test
+  OPP   projected_opportunities < 1.5      39 rows ( 8.8%)   the independent role signal
+```
+
+**Overlap with what production refuses today (MAG, n=116):**
+
+| | rows | share of MAG |
+|---|---:|---:|
+| also IMPL | 21 | 18.1% |
+| also OPP | 22 | 19.0% |
+| IMPL or OPP | 32 | 27.6% |
+| **NEITHER** | **84** | **72.4%** |
+
+**The headline: 84 of 116 ceiling rejections (72.4%) are refused on MAGNITUDE
+ALONE** -- neither implausible as a probability nor low-role. That is the same
+conclusion the 89.5%-ordinary measurement reached, now reached through two
+independent instruments on a different population slice.
+
+### Two things I have to state against my own earlier claims
+
+**1. `IMPL` is a COMPLETE SUBSET of `MAG` here -- all 21 of 21.** So on NFL
+yardage the implied-probability criterion catches *nothing* the magnitude bound
+misses. That does **not** contradict the earlier platform-wide finding (a
+direct `model_prob_over` test would refuse 81 rows, 26 of which MAG accepts),
+because that population was **all sports including game lines** and this one is
+**NFL yardage only**. Different denominators; both true. I am flagging it
+because quoting the 26 figure for this population would be wrong.
+
+**2. My script printed "substantially overlapping, so one may suffice" and that
+verdict is WRONG** -- it came from an arbitrary hard-coded threshold
+(`both <= min*0.34`), not from the data. The actual numbers say the opposite:
+IMPL=21, OPP=39, BOTH=11, union=49. Of 60 flag-instances only 11 are redundant
+(18%), **OPP catches 28 rows IMPL misses and IMPL catches 10 that OPP misses**.
+They are COMPLEMENTARY. The lesson is the obvious one: a heuristic verdict
+printed beside real numbers gets read as a finding, so it should not have been
+printed at all.
+
+### What replacing MAG with (IMPL or OPP) would actually do
+
+```
+  refuses 49 rows (11.1%)  vs MAG's 116 (26.2%)
+  MAG refuses, combined would ACCEPT:   84 rows returned to the board
+  MAG accepts, combined would REFUSE:   17 rows newly caught
+  opportunity UNKNOWN (gate silent):    58 of 442 (13.1%)
+```
+
+The 17 newly-caught rows are the whole argument for an independent signal: they
+are invisible to a magnitude bound by construction. The 84 returned rows are
+the cost side, and nothing here says they are PROFITABLE -- only that the
+current bound refuses them without a stated reason.
+
+### Still not established
+
+- Whether the 84 returned rows win money. No outcomes were used anywhere in
+  this arc.
+- The 13.1% with unknown opportunity: a gate on OPP is silent there, by design
+  (`None`, never permissive-by-default). Any real rule needs a stated behaviour
+  for that slice, and this measurement does not choose one.
+- Thresholds are unfitted. 1.5 opportunities and 0.85/0.15 are the docstring's
+  and a round number; nothing here fits either.
