@@ -160,6 +160,63 @@ def _stale_basis_is_seen() -> bool:
     return str(os.environ.get(_STALE_BASIS_ENV) or "").strip().lower() != "moved"
 
 
+# WHOSE CLOCK `[2026-10-16, lane book-grid-own-capture-staleness, user "Fix all sports now"]`.
+# The 10-06 rule above compares a cell's seen-age with the most recently SEEN book on the market.
+# But books reach the grid through different captures on different clocks -- the sportsbook props
+# fetch (MLB postseason ~hourly), exchange pollers (Kalshi, ProphetX) every few minutes, per-book
+# fetches -- so one late capture flipped every other book stale although all were still posting.
+# Measured on the fleet grid 2026-10-16 4:21 PM CT: Martinez strikeouts 2.5, 9 sportsbooks seen
+# 3,168.6 s ago (one capture) and Kalshi 1,144.4 s -> `books_quoting` 1 of 10, the consensus refused
+# and the line priced against Kalshi's own two sides. Grid-wide at 4:29 PM: 546 of 2,389 NFL sides,
+# 416 of 3,090 NCAAF and 59 of 484 MLB read 1 fresh book while >= 2 quoted.
+# Now a quote is current while it was seen in ITS BOOK'S own latest capture of the game. It is stale
+# when (a) the book's latest look at this game did not include this line -- the book stopped quoting
+# it (`_STALE_BEST_LAG_SECONDS` older than that book's freshest quote for the event), or (b) the
+# book's whole feed is far behind the latest look at the game (a capture that died):
+# `_FEED_DEAD_PREGAME_SECONDS` before the start, `_FEED_DEAD_LIVE_SECONDS` once it has started.
+# `SYNDICATE_BOOK_GRID_STALE_BASIS=market_seen` restores the 10-06 rule; `moved` the movement rule.
+_FEED_DEAD_PREGAME_SECONDS = 2 * 3600.0
+_FEED_DEAD_LIVE_SECONDS = 600.0
+
+
+def _stale_basis_is_own_capture() -> bool:
+    import os
+
+    return str(os.environ.get(_STALE_BASIS_ENV) or "").strip().lower() not in {"moved", "market_seen"}
+
+
+def _started(row: Mapping[str, Any], now: datetime) -> bool:
+    try:
+        start = datetime.fromisoformat(str(row.get("commence_time") or "").replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if start.tzinfo is None:
+        start = start.replace(tzinfo=timezone.utc)
+    return start <= now
+
+
+def _capture_index(rows: Iterable[Mapping[str, Any]], last_seen: Mapping[str, str] | None, *,
+                   now: datetime) -> tuple[dict[tuple[str, str], float], dict[str, float]]:
+    """(book, event) -> that book's freshest seen-age on the event; event -> the freshest seen-age of any book."""
+    by_book: dict[tuple[str, str], float] = {}
+    by_event: dict[str, float] = {}
+    if not last_seen:
+        return by_book, by_event
+    for row in rows:
+        seen = _seen_age_seconds(row, last_seen, now=now)
+        if seen is None:
+            continue
+        book = str(row.get("bookmaker") or "").strip()
+        event = str(row.get("event_id") or "")
+        if not book:
+            continue
+        if seen < by_book.get((book, event), float("inf")):
+            by_book[(book, event)] = seen
+        if seen < by_event.get(event, float("inf")):
+            by_event[event] = seen
+    return by_book, by_event
+
+
 def _price(value: Any) -> int | None:
     try:
         return int(value)
@@ -553,6 +610,12 @@ def build_book_grid(
         key = _instance_key(row)
         instances.setdefault(key, []).append(row)
 
+    own_capture = _stale_basis_is_seen() and _stale_basis_is_own_capture()
+    book_capture, event_capture = (
+        _capture_index((row for group in instances.values() for row in group), last_seen, now=now)
+        if own_capture else ({}, {})
+    )
+
     grid: list[dict[str, Any]] = []
     for key, group in instances.items():
         # ONE NAME PER INSTANCE, DECIDED ONCE HERE rather than per anchor line.
@@ -615,6 +678,8 @@ def build_book_grid(
                 default=None,
             )
             seen_basis = _stale_basis_is_seen()
+            event_key = str(anchor.get("event_id") or "")
+            feed_dead = _FEED_DEAD_LIVE_SECONDS if _started(anchor, now) else _FEED_DEAD_PREGAME_SECONDS
             for book_key, sides_map in cells.items():
                 for side_key, cell in sides_map.items():
                     age = cell.get("age_seconds")
@@ -631,7 +696,26 @@ def build_book_grid(
                         else None
                     )
                     cell["seen_lag_behind_freshest_seconds"] = seen_lag
-                    if seen_lag is not None:
+                    own_lag = feed_lag = None
+                    if own_capture and seen_age is not None:
+                        book_fresh = book_capture.get((book_key, event_key))
+                        event_fresh = event_capture.get(event_key)
+                        if book_fresh is not None and event_fresh is not None:
+                            own_lag = round(seen_age - book_fresh, 1)
+                            feed_lag = round(book_fresh - event_fresh, 1)
+                    cell["seen_lag_behind_own_capture_seconds"] = own_lag
+                    cell["feed_lag_seconds"] = feed_lag
+                    if own_lag is not None:
+                        if own_lag > _STALE_BEST_LAG_SECONDS:
+                            stale_now = True
+                            why = (f"not in {book_key}'s latest look at this game ({_duration(own_lag)} older): "
+                                   "the line is no longer quoted there")
+                        elif feed_lag > feed_dead:
+                            stale_now = True
+                            why = f"{book_key}'s whole feed is {_duration(feed_lag)} behind the latest look at this game"
+                        else:
+                            stale_now, why = False, None
+                    elif seen_lag is not None:
                         stale_now = seen_lag > _STALE_BEST_LAG_SECONDS
                         why = f"not seen for {_duration(seen_lag)} longer than the latest look at this market"
                     else:
