@@ -50050,3 +50050,32 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   Both now key on `pregame_on_live`, which the sweep sets before the join. A production-order test covers it (sweep, then join).
 - **claim:** web token c2c3c921..., acquire exit 0. Ride-alongs: none.
 - **verify (owed, after the next refresh-worker restart):** live NFL/NCAAF rows read "pregame proj X"; 0 "SIM CONTRADICTS" on live NFL/NCAAF rows; the ledger's live-first NFL share with a probability falls from ~95% toward 0.
+
+## 2026-10-16 04:14Z (11:14 PM CT 10-15) -- NOT DEPLOYED: Kalshi moneylines join the board (h2h/draw/btts), one contract per club on YES; a club code colliding inside its series family refuses (lane `kalshi-moneyline-board-join`, session 674e9851) -- loads at the NEXT refresh-worker restart (batch it; no restart taken here)
+- **BUG:** `kalshi_catalogue._parse_title` gives moneylines `line: None`, and `_event_key` indexes h2h rows at `0.0`. So `join_kalshi_to_board` refused every moneyline `no_matching_board_row`, while `venue_quote_fanin` showed Kalshi as the best h2h price. NHL h2h rows carry `line: NaN`, which missed both indexes too.
+- **WHAT `portfolio_commit` DID WITH A KALSHI-BEST h2h ROW IT COULD NOT RESOLVE** (measured by replay, below; `venue_scope.scope_rows_to_venue` fallback): it fell back to the aggregator's Kalshi price in `book_prices`, with `venue_ticker=None`.
+  - Soccer: no aggregator Kalshi price, so all refused `venue_not_quoting`.
+  - NCAAF: priced from the aggregator, unplaceable (no ticker). No wrong-ticker or wrong-side order came out of it.
+  - Fleet line, same hour: `VENUE_SCOPE venue=kalshi rows_in=35 scoped=6 refusals={'venue_not_quoting': 29}` (03:55:51Z).
+- **YES-SIDE AUDIT. A second bug was caught before it shipped.** `kalshi_orders._side_to_kalshi` buys YES on whatever ticker an h2h home/away row carries. The spread pattern (the other club takes the named market's NO) would have stamped the ATH row with `-MIN`. The order would then BUY YES on Minnesota for an Athletics bet. The rules now:
+  - Each club's h2h row is matched only from its own `-<CODE>` market, on YES. The other row is refused as `moneyline_other_club_has_its_own_contract`.
+  - The soccer draw row is matched only from `-TIE` ("Tie is the result"), on YES. Team markets never price the draw row: `three_way_no_leg_is_not_a_board_bet`.
+  - BTTS `yes`/`no` rows take their own legs.
+  - `_side_to_kalshi('draw', 'h2h')` now returns `yes`. Segment draws still raise.
+  - A coupling test asserts `kalshi_side == _side_to_kalshi(...)` for every moneyline match.
+- **COLLISIONS:** `build_club_code_collisions` reports codes a series family gives to two clubs (KXUEL `CEL` = Celtic AND Celje). `_resolve_event` refuses a blob that opens or closes with one, as `event_matches_two_games`. Before this, the global map turned `CEL` into Celta Vigo, and a Celtic v Feyenoord contract resolved onto our Celta Vigo v Feyenoord game.
+- **TESTS:** 10 new tests in `tests/test_kalshi_board_join.py`. The 7 end-to-end ones failed before the fix: MLB ML, NaN line, soccer team-win, soccer draw, BTTS, collision, collision builder. Measured green: `test_kalshi_board_join.py`, `test_kalshi_catalogue.py` and `test_kalshi_orders.py` (214 passed), and all `test_kalshi*`, `test_portfolio_commit*`, `test_venue_scope` and related tests (960 passed). Run with `SYNDICATE_DATA_ROOT` pointing at the primary tree's mirror, because the soccer aliases need `data/`.
+- **MEASUREMENT: a REPLAY, not a deploy.** The real `join_kalshi_to_board`, resolvers and `scope_rows_to_venue` ran over the fleet's own `kalshi_markets.json` (13,456 markets) and `read_layer2_shortlist`, using refresh-worker's env, at nice 19, read 04:12Z. Before = fleet tree `4a660b3e`; after = this branch. Same inputs, same instant.
+
+  | slate | h2h matches | Kalshi-best soccer h2h rows with price+ticker | commit scope `venue_feed`+ticker |
+  |---|---|---|---|
+  | 10-16 | 0 -> **72** | 0 -> **62 / 72** | 0 -> **61** (10 still `venue_not_quoting`, 1 `venue_ev_implausible`) |
+  | 10-15 | 0 -> **36** | 0 -> **30 / 33** | 0 -> **29** |
+
+  Matched series on 10-16: KXUCL 26, KXSERIEA 10, KXLALIGA 9, KXEREDIVISIE 8, KXBUNDESLIGA 6, KXLIGUE1 6, KXUEL 5, KXSERIEAW 2. Draw legs: 7.
+- **NOT FIXED HERE. NCAAF moneylines stay at 0:** all 400 `KXNCAAFGAME` markets classify `unmapped_series` (the catalogue's `SERIES_SPORT` has no entry; that file belongs to lane `soccer-uefa-competitions`). So the 51 NCAAF Kalshi-best h2h rows still price from the aggregator with no ticker. Same for `KXWNBAGAME` and `KXMLBGAME` until a slate has those games.
+- **verify (owed, after the next refresh-worker restart):**
+  - `[kalshi_odds] BOARD_JOIN` / `[portfolio_commit] KALSHI_BOARD_JOIN` `matched` rises by roughly the h2h count above. Baseline at 03:55:51Z: `matched=242`.
+  - `reasons` gains `moneyline_other_club_has_its_own_contract` and `three_way_no_leg_is_not_a_board_bet`.
+  - `VENUE_SCOPE venue=kalshi` `venue_not_quoting` falls (29 of 35 at 03:55:51Z).
+  - Any soccer Kalshi order carries a ticker whose club suffix (or `-TIE`) is the row's own side.

@@ -938,6 +938,15 @@ death, never life — do not invert it.
 - Verification: Unit: a live non-live-aware NFL row loses model_prob_over (kept as sim_model_prob_over with a reason) and the contradiction tag, keeps projected; a live_aware row and an MLB live row are untouched. Production: on the SEA@DEN 10-15 TNF live board, live NFL rows with model_probability = 0 except live-aware ones, and the ledger's live-first share with a probability falls from ~95% toward 0.
 - Blocked by: none
 
+### kalshi-moneyline-board-join — OPEN — opened 2026-10-15 — session 674e9851-5f4e-4bd9-ac77-96fdcf2fa80e
+- Goal: join_kalshi_to_board matches Kalshi moneyline markets (MLB team-win, soccer team-win, soccer draw) to h2h board rows, so the fleet BOARD_JOIN moneyline matched count rises from 0 and portfolio_commit's Kalshi resolvers return a price+ticker for a Kalshi-best h2h row; a club code that collides inside one series family refuses instead of falling back
+- Files: syndicate/features/shared/kalshi_board_join.py, tests/test_kalshi_board_join.py, syndicate/features/shared/kalshi_orders.py (_side_to_kalshi h2h draw leg ONLY)
+- Hypothesis: _parse_title returns line None for moneylines while _event_key indexes h2h rows at 0.0, so every moneyline lookup misses
+- Falsification test: an end-to-end join test with line None normalised still reports no_matching_board_row
+- Verification: failing e2e tests (MLB ML, soccer win, soccer draw) go green; fleet BOARD_JOIN before/after moneyline matched counts in deploys.md
+- Blocked by: none
+- **STATUS 2026-10-16 04:14Z: FIX SHIPPED to main, NOT LOADED** (loads at the next refresh-worker restart). Replay on fleet inputs: h2h matches 0 -> 72 (10-16 slate), Kalshi-best soccer h2h rows with price+ticker 0 -> 62/72; see deploys.md 2026-10-16 04:14Z. YES-side audit caught a would-be wrong-club order (two-way NO leg vs `_side_to_kalshi` always-YES); each club now takes only its own contract. OWED: fleet BOARD_JOIN after-count post-restart. NCAAF ML is a separate gap (`KXNCAAFGAME` unmapped_series in the catalogue).
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
