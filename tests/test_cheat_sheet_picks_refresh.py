@@ -1,0 +1,107 @@
+"""The every-15-minute picks refresh (user 2026-10-16: "for Syndicate picks (from the layer 2 board) we need the cheat
+sheets to be checking for new opps and adding them on a regular basis")."""
+from __future__ import annotations
+
+import importlib.util
+import json
+import os
+import time
+from pathlib import Path
+
+import pytest
+
+
+def _script():
+    spec = importlib.util.spec_from_file_location(
+        "build_cheat_sheets", Path(__file__).resolve().parents[1] / "scripts" / "build_cheat_sheets.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _card(pick_id, *, sport="mlb", score=1.0, day="2026-10-15", suggested=True):
+    return {"pick_id": pick_id, "kind": "game", "sport": sport, "event_id": "e7", "market": "h2h", "side": "away",
+            "line": None, "segment": "full", "suggested": suggested, "market_state": "pregame", "game_date": day,
+            "board_score": score, "board_lane": "opportunity", "player_name": None, "display_name": "Milwaukee Brewers",
+            "matchup": "Milwaukee Brewers @ Los Angeles Dodgers", "home_team": "Los Angeles Dodgers",
+            "away_team": "Milwaukee Brewers", "odds": 138,
+            "quote": {"bookmaker": "betrivers", "books_quoting": 5, "fair_probability": 0.437},
+            "fair_price": 129, "ev_pct": 3.9, "model_probability": 0.51, "detail": "Our sim has it.",
+            "commence_time": "2026-10-16T00:00:00Z"}
+
+
+@pytest.fixture
+def m(monkeypatch):
+    mod = _script()
+    monkeypatch.setattr(mod, "attach_images", lambda sheet, cache: {"urls": 0, "cached": 0})   # no network in tests
+    monkeypatch.setattr(mod, "fill_pick_history", lambda pick, *, day, intervals: None)
+    return mod
+
+
+def _write(root: Path, sport: str, day: str, doc: dict) -> Path:
+    path = root / "cheatsheets" / sport / f"{day}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(doc), encoding="utf-8")
+    return path
+
+
+def test_a_new_board_pick_joins_the_sheet_and_the_rows_are_left_alone(m, tmp_path):
+    rows = [{"player": "A", "market": "Hits", "side": "over", "line": 0.5, "event_id": "e7"}]
+    first = m.build_picks([_card("l2_old")], {"rows": rows}, sport="mlb", day="2026-10-15",
+                          now=m.datetime(2026, 10, 15, 13, 0, tzinfo=m.timezone.utc))
+    path = _write(tmp_path, "mlb", "2026-10-15", {"sport": "mlb", "date": "2026-10-15", "rows": rows,
+                                                    "picks": m.merge_picks(first, None)})
+    cards = [_card("l2_old", score=1.0) | {"odds": 160}, _card("l2_new", score=2.0)]   # the old pick's price moved
+    totals = m.refresh_picks(tmp_path, ["mlb"], ["2026-10-15"], cards, intervals=None)
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    assert totals == {"sheets": 1, "new": 1, "picks": 2}
+    assert {p["pick_id"] for p in doc["picks"]} == {"l2_old", "l2_new"}
+    assert next(p for p in doc["picks"] if p["pick_id"] == "l2_old")["price"] == 138      # first price kept
+    assert doc["rows"] == rows and doc["picks_refreshed_at"]
+
+
+def test_nothing_new_and_nothing_left_the_board_leaves_the_file_untouched(m, tmp_path):
+    picks = m.merge_picks(m.build_picks([_card("l2_a")], {"rows": []}, sport="mlb", day="2026-10-15",
+                                        now=m.datetime(2026, 10, 15, 13, 0, tzinfo=m.timezone.utc)), None)
+    path = _write(tmp_path, "mlb", "2026-10-15", {"sport": "mlb", "date": "2026-10-15", "rows": [], "picks": picks})
+    before = path.read_bytes()
+    totals = m.refresh_picks(tmp_path, ["mlb"], ["2026-10-15"], [_card("l2_a")], intervals=None)
+    assert totals["sheets"] == 0 and path.read_bytes() == before
+
+
+def test_a_pick_the_board_dropped_stays_and_says_so(m, tmp_path):
+    picks = m.merge_picks(m.build_picks([_card("l2_a")], {"rows": []}, sport="mlb", day="2026-10-15",
+                                        now=m.datetime(2026, 10, 15, 13, 0, tzinfo=m.timezone.utc)), None)
+    path = _write(tmp_path, "mlb", "2026-10-15", {"sport": "mlb", "date": "2026-10-15", "rows": [], "picks": picks})
+    m.refresh_picks(tmp_path, ["mlb"], ["2026-10-15"], [_card("l2_a", suggested=False)], intervals=None)
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    assert [p["pick_id"] for p in doc["picks"]] == ["l2_a"] and doc["picks"][0]["on_board"] is False
+
+
+def test_a_day_with_no_sheet_yet_gets_a_picks_only_sheet(m, tmp_path):
+    totals = m.refresh_picks(tmp_path, ["mlb", "nhl"], ["2026-10-15"], [_card("l2_a")], intervals=None)
+    doc = json.loads((tmp_path / "cheatsheets" / "mlb" / "2026-10-15.json").read_text(encoding="utf-8"))
+    assert totals["new"] == 1 and doc["picks_only"] is True and [p["pick_id"] for p in doc["picks"]] == ["l2_a"]
+    assert not (tmp_path / "cheatsheets" / "nhl" / "2026-10-15.json").exists()      # no pick, no sheet
+
+
+def test_the_refresh_skips_while_a_full_build_holds_the_lock(m, tmp_path, monkeypatch):
+    held = m.acquire_build_lock(tmp_path, holder="full-build today")
+    assert held is not None
+    called = []
+    monkeypatch.setattr(m, "fetch_board_cards", lambda base: called.append(base) or [])
+    args = m.argparse.Namespace(base_url="http://x", date=None, sports="mlb")
+    assert m.main_picks_only(args, tmp_path) == 0 and called == []         # skipped before touching the board
+    m.release_build_lock(held)
+    assert m.main_picks_only(args, tmp_path) == 0 and called == ["http://x"]
+    assert not (tmp_path / "cheatsheets" / ".build.lock").exists()          # released after its run
+
+
+def test_a_stale_lock_from_a_crashed_run_is_taken_over(m, tmp_path):
+    lock = tmp_path / "cheatsheets" / ".build.lock"
+    lock.parent.mkdir(parents=True)
+    lock.write_text("{}", encoding="utf-8")
+    old = time.time() - m.BUILD_LOCK_STALE_SECONDS - 60
+    os.utime(lock, (old, old))
+    assert m.acquire_build_lock(tmp_path, holder="picks-refresh") == lock
+    assert json.loads(lock.read_text(encoding="utf-8"))["holder"] == "picks-refresh"

@@ -865,6 +865,109 @@ def merge_with_record(sheet: dict[str, Any], prior: dict[str, Any] | None, *, no
     return merged
 
 
+BUILD_LOCK_STALE_SECONDS = 45 * 60     # a full build takes ~1-3 min; a lock older than this is a crashed run
+
+
+def acquire_build_lock(data_root: Path, *, holder: str, wait_seconds: float = 0.0) -> Path | None:
+    """One writer of the day's sheets at a time (O_CREAT|O_EXCL). The every-15-minute picks refresh (user 2026-10-16:
+    "checking for new opps and adding them on a regular basis") and the full builds both read a sheet, merge into it
+    and write it whole -- two at once and the later write drops what the earlier added. A full build waits for a
+    running picks refresh (seconds); a picks refresh skips a running full build, which merges picks itself. A lock
+    older than BUILD_LOCK_STALE_SECONDS is taken over. Returns the lock path to release, or None if not acquired."""
+    lock = data_root / "cheatsheets" / ".build.lock"
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    deadline = time.monotonic() + wait_seconds
+    while True:
+        try:
+            fd = os.open(str(lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                fh.write(json.dumps({"holder": holder, "pid": os.getpid(),
+                                     "at": datetime.now(timezone.utc).isoformat(timespec="seconds")}))
+            return lock
+        except FileExistsError:
+            try:
+                age = time.time() - lock.stat().st_mtime
+            except OSError:
+                continue                      # released between the two calls: try again
+            if age > BUILD_LOCK_STALE_SECONDS:
+                print(f"CHEAT_SHEET build lock stale ({age:.0f}s) -- taken over by {holder}", flush=True)
+                try:
+                    lock.unlink()
+                except OSError:
+                    pass
+                continue
+            if time.monotonic() >= deadline:
+                return None
+            time.sleep(2.0)
+
+
+def release_build_lock(lock: Path | None) -> None:
+    if lock is not None:
+        try:
+            lock.unlink()
+        except OSError:
+            pass
+
+
+def picks_only_sheet(sport: str, selected: str, board_cards: list[dict[str, Any]], prior: dict[str, Any] | None, *,
+                     intervals: Any) -> dict[str, Any]:
+    """A sheet carrying only the board's picks: a sport out of its season (2026-10-15: a preseason NBA spread was one
+    of the board's 7), or a day whose full build has not run yet when the picks refresh finds a pick for it."""
+    sheet = build_sport(sport, [], selected_date=selected, cap=1, dvp={}, context={}, positions={})
+    sheet["picks"] = merge_picks(build_picks(board_cards, sheet, sport=sport, day=selected, now=datetime.now(timezone.utc)),
+                                 prior, cards=board_cards, day=selected, intervals=intervals)
+    sheet["phase"] = season_phase(sport, selected) or "preseason"
+    sheet["picks_only"] = True
+    return sheet
+
+
+def refresh_picks(data_root: Path, sports: list[str], dates: list[str], board_cards: list[dict[str, Any]], *,
+                  intervals: Any) -> dict[str, int]:
+    """The picks refresh (user 2026-10-16: "for Syndicate picks ... we need the cheat sheets to be checking for new
+    opps and adding them on a regular basis"). Re-reads the board and merges its picks into each day's sheet -- the
+    same `merge_picks` record a full build uses (a pick keeps its first price; one the board dropped stays, marked
+    off the board) -- without re-pricing the rows. A day with no sheet yet gets a picks-only sheet when the board has
+    a pick for it; the next full build keeps those picks (it merges with the file it finds)."""
+    totals = {"sheets": 0, "new": 0, "picks": 0}
+    for selected in dates:
+        for sport in sports:
+            target = data_root / "cheatsheets" / sport / f"{selected}.json"
+            try:
+                prior = json.loads(target.read_text(encoding="utf-8")) if target.is_file() else None
+            except (OSError, ValueError):
+                prior = None
+            if prior is None and not cs.select_picks(board_cards, sport=sport, day=selected):
+                continue
+            before = {p.get("pick_id") for p in (prior or {}).get("picks") or []}
+            try:
+                if prior is None:
+                    sheet = picks_only_sheet(sport, selected, board_cards, None, intervals=intervals)
+                else:
+                    sheet = dict(prior)
+                    sheet["picks"] = merge_picks(
+                        build_picks(board_cards, sheet, sport=sport, day=selected, now=datetime.now(timezone.utc)),
+                        prior, rows=sheet.get("rows"), cards=board_cards, day=selected, intervals=intervals)
+            except Exception as exc:  # noqa: BLE001 -- this sport keeps the picks it had
+                print(f"CHEAT_SHEET_PICKS {sport} date={selected} failed: {type(exc).__name__}: {exc}", flush=True)
+                continue
+            new = [p for p in sheet.get("picks") or [] if p.get("pick_id") not in before]
+            on_board = sum(1 for p in sheet.get("picks") or [] if p.get("on_board"))
+            was = {p.get("pick_id"): bool(p.get("on_board")) for p in (prior or {}).get("picks") or []}
+            now_on = {p.get("pick_id"): bool(p.get("on_board")) for p in sheet.get("picks") or []}
+            if prior is not None and not new and was == now_on:
+                continue                  # nothing joined and nothing left the board: leave the file alone
+            sheet["picks_refreshed_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+            attach_images(sheet, data_root / "cheatsheets" / ".img_cache")
+            write_atomic(target, sheet)
+            totals["sheets"] += 1
+            totals["new"] += len(new)
+            totals["picks"] += len(sheet.get("picks") or [])
+            print(f"CHEAT_SHEET_PICKS {sport} date={selected} picks={len(sheet.get('picks') or [])} on_board={on_board} "
+                  f"new={len(new)} {[p.get('pick_id') for p in new]}{' (new picks-only sheet)' if prior is None else ''}",
+                  flush=True)
+    return totals
+
+
 def write_atomic(path: Path, doc: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + ".tmp")
@@ -879,6 +982,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--date", default=None, help="selected date (default: today, US Central; 'tomorrow' = the day ahead)")
     ap.add_argument("--base-url", default=os.environ.get("SYNDICATE_BASE_URL") or "http://127.0.0.1:10000")
     ap.add_argument("--cap", type=int, default=None, help="override the per-sport group cap")
+    ap.add_argument("--picks-only", action="store_true",
+                    help="only merge the board's current picks into today's and tomorrow's sheets (the every-15-minute "
+                         "refresh); rows are not re-priced")
     ap.add_argument("--from-quotes", action="store_true",
                     help="add the day's STARTED games that no sheet priced, rebuilt from their last pregame quotes")
     args = ap.parse_args(argv)
@@ -890,6 +996,48 @@ def main(argv: list[str] | None = None) -> int:
     if refusal:
         print(f"REFUSING: {refusal}", flush=True)
         return 2
+    if args.picks_only:
+        return main_picks_only(args, data_root)
+    lock = acquire_build_lock(data_root, holder=f"full-build {args.date or 'today'}", wait_seconds=120)
+    if lock is None:
+        print("CHEAT_SHEET build lock still held after 120s -- building anyway (a picks refresh may be overwritten)",
+              flush=True)
+    try:
+        return main_build(args, data_root)
+    finally:
+        release_build_lock(lock)
+
+
+def main_picks_only(args: Any, data_root: Path) -> int:
+    started = time.monotonic()
+    lock = acquire_build_lock(data_root, holder="picks-refresh")
+    if lock is None:
+        print("CHEAT_SHEET_PICKS skipped: a sheet build holds the lock (it merges the board's picks itself)", flush=True)
+        return 0
+    try:
+        try:
+            board_cards = fetch_board_cards(args.base_url)
+        except Exception as exc:  # noqa: BLE001
+            print(f"CHEAT_SHEET_PICKS board cards unavailable: {type(exc).__name__}: {exc}", flush=True)
+            return 1
+        from syndicate.features.shared.interval_history import IntervalHistory, cache_root
+
+        today = central_today()
+        if args.date and args.date != "tomorrow":
+            dates = [args.date]
+        else:
+            dates = [today, (datetime.fromisoformat(today) + timedelta(days=1)).date().isoformat()]
+        intervals = IntervalHistory(cache_root(data_root), today=today)
+        totals = refresh_picks(data_root, [s.strip() for s in args.sports.split(",") if s.strip()], dates, board_cards,
+                               intervals=intervals)
+        print(f"CHEAT_SHEET_PICKS done cards={len(board_cards)} dates={dates} {json.dumps(totals)} "
+              f"secs={time.monotonic() - started:.1f}", flush=True)
+        return 0
+    finally:
+        release_build_lock(lock)
+
+
+def main_build(args: Any, data_root: Path) -> int:
     selected = args.date or central_today()
     if selected == "tomorrow":                      # the day ahead (user 2026-10-15): an early look, refreshed later
         selected = (datetime.fromisoformat(central_today()) + timedelta(days=1)).date().isoformat()
@@ -934,12 +1082,7 @@ def main(argv: list[str] | None = None) -> int:
                 prior = json.loads(target.read_text(encoding="utf-8")) if target.is_file() else None
             except (OSError, ValueError):
                 prior = None
-            sheet = build_sport(sport, [], selected_date=selected, cap=1, dvp=dvp, context=context, positions=positions)
-            sheet["picks"] = merge_picks(build_picks(board_cards, sheet, sport=sport, day=selected,
-                                                     now=datetime.now(timezone.utc)), prior, cards=board_cards,
-                                         day=selected, intervals=intervals)
-            sheet["phase"] = season_phase(sport, selected) or "preseason"
-            sheet["picks_only"] = True
+            sheet = picks_only_sheet(sport, selected, board_cards, prior, intervals=intervals)
             attach_images(sheet, data_root / "cheatsheets" / ".img_cache")
             write_atomic(target, sheet)
             print(f"CHEAT_SHEET {sport} date={selected} picks-only sheet: {len(sheet['picks'])} picks", flush=True)
