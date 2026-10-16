@@ -1027,6 +1027,22 @@ death, never life — do not invert it.
 - Verification: Same-instant grid read after the fleet ff: the per-sport share vs the 4:29 PM baseline; the Martinez-type row (exchange + sportsbooks) reads books_quoting = all books in their latest capture
 - Blocked by: none
 
+### alt-ladder-consistency — OPEN — opened 2026-10-16 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
+- Goal: Each player's consistency across today's alternate rungs (empirical hit rate at every rung vs the market's de-vigged rung probability, shrunk toward the market) is computed from the captured alt ladders and shown on the NHL cheat sheet as a ladder section (NHL first; the module is sport-agnostic), and is the leg pool the NHL SGP builder draws from -- context, never an edge label (the 10-14 backtest: consistency at alt rungs lost to the price)
+- Files: syndicate/features/shared/alt_consistency.py (NEW), tests/test_alt_consistency.py (NEW)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: the NHL sheet built after the fleet ff carries a ladder table per player x stat with rung, best price, de-vigged market probability, hit rate (n) and shrunk probability; rows match the alt_ladders file for that date
+- Blocked by: none
+
+### nhl-sgp-builder — OPEN — opened 2026-10-16 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
+- Goal: NHL same-game parlays on the NHL cheat sheet from correlations measured on 2023-25 NHL box scores (linemates, a player's own stats, goalie saves x opposing shooters), validated out of sample, priced the NFL way (our probability, fair odds, 'worth it at', the book price an assumed-discount estimate), legs drawn from the alt-ladder consistency pool; paper ledger, no edge label (#621)
+- Files: scripts/build_nhl_sgp_correlations.py (NEW), tests/test_nhl_sgp_correlations.py (NEW), .syndicate/findings_2026-10-16_nhl_sgp_correlations.md (NEW), syndicate/features/nhl/sgp.py (NEW)
+- Hypothesis: NHL legs correlate by role enough to move the joint: linemates' points, a player's SOG with his points, a goalie's saves with the opposing skaters' SOG
+- Falsification test: Out of sample (fit 2023-24, scored 2024-25) the copula does not beat independence for teammate and opponent pairs -> NHL SGPs limited to same-player pairs or not shown
+- Verification: findings file with per-cell rho, n, CI and the OOS log-loss table; correlations file on the data root; the NHL sheet's SGP section rendered after the fleet ff
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
