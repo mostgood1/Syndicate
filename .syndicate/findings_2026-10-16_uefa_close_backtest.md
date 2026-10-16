@@ -107,6 +107,37 @@ Exactly what items (i) and (ii) measured, refit walk-forward:
 
 ## 2. Coverage and the pre-scoring join audit
 
+(written after the pull and the join audit, BEFORE any model probability was compared with a close)
+
+- **Pull:** 665 snapshots (UCL 303, UEL 201, UECL 161 kickoff windows), **6,240 credits** from
+  `x-requests-last`, 0 failures, recorded in the platform quota ledger (`oddsapi_quota`,
+  sport=soccer). 41 snapshots came back empty. Raw files: `C:/tmp/uefa-closes/raw/`.
+- **Join** (`scripts/backtest_uefa_vs_close.py join`, `C:/tmp/uefa-closes/joined.json`): **2,474 of
+  2,727 main-draw matches joined**: UCL 901 / 925, UEL 1,035 / 1,055, **UECL 538 / 747**.
+  The close is Pinnacle on **2,201** and the book average on 273. 0 joins needed the swapped
+  orientation.
+  - Unmatched: 218 `no_candidate` and 35 `low_score`.
+    - 206 of the `no_candidate` are UECL: 141 in 2021-22, the competition's first season, and
+      65 in the autumn of 2022-23. OddsAPI did not carry it then. Every other cell has 3 or fewer.
+    - The `low_score` cases are events missing from OddsAPI's snapshot: 31 of 35 are 2021-22
+      UCL/UEL, mostly group matchdays 1-2 (e.g. 3 of 6 UCL 19:00 games listed on 2021-09-14). Two
+      are the Cercle Brugge mislabel below. They are not name misses.
+  - **Every accepted pair below 0.85 was read: 50 distinct name pairings, all correct** (e.g.
+    `Sporting CP` -> `Sporting Lisbon`, `RB Salzburg` -> `Salzburg`, `Hapoel Be'er` -> `Hapoel Beer
+    Sheva FC`).
+- **Deviation 1 (aliases for MISSED pairs, decided before scoring).** The registration provides
+  an alias only for a WRONG pair. A sweep of the missed joins where one club matched ≥ 0.8 found
+  18 name gaps: `Ajax Amsterdam` -> `Ajax`/`AFC Ajax`, `Stade Rennais` -> `Rennes`,
+  `Racing Genk` -> `Genk`, `Zenit St Petersburg` -> `Zenit`, `Internazionale` -> `Inter Milan`,
+  and 13 more (see `ALIASES` in the driver). They are added as ALTERNATIVE names; the ESPN name is
+  still tried, and the best "ok" join wins.
+  - Effect: joins went from 2,269 to 2,474. Without the aliases, Ajax (56 matches) and Rennes
+    would be dropped wholesale, which would bias the sample.
+  - **One pairing from the same sweep is WRONG and was refused:** OddsAPI labels Cercle Brugge's
+    UECL matches `Club Brugge`. Those 2 matches stay unjoined.
+- **Snapshot year of the joined closes:** 2020 264, 2021 248, 2022 294, 2023 404, 2024 440,
+  2025 529, 2026 295 (calendar year of the snapshot).
+
 ## 3. Results
 
 ## 4. What cannot be estimated
