@@ -112,3 +112,15 @@ def test_the_ladder_is_a_separate_family_from_the_main_quotes(tmp_path):
     written = sorted(str(p.relative_to(tmp_path)).replace("\\", "/") for p in tmp_path.rglob("*") if p.is_file())
     assert all("alt_ladders" in p or p.startswith("cheatsheets/") for p in written)
     assert not any("book_quotes" in p for p in written)
+
+
+def test_an_explicit_env_file_key_wins_over_the_process_env(tmp_path, monkeypatch):
+    env = tmp_path / ".env"
+    env.write_text('OTHER=1\nODDS_API_KEY="from-file"\n', encoding="utf-8")
+    assert alt.key_from_env_file(env) == "from-file"
+    assert alt.key_from_env_file(tmp_path / "missing.env") == ""
+    seen = {}
+    monkeypatch.setenv("ODDS_API_KEY", "dead-shell-key")
+    monkeypatch.setattr(alt, "run", lambda root, sports, **kw: seen.update(kw) or {})
+    assert alt.main(["--data-root", str(tmp_path), "--env-file", str(env)]) == 0
+    assert seen["api_key"] == "from-file"

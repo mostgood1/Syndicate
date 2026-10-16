@@ -244,11 +244,26 @@ def run(data_root: Path, sports: list[str], *, now: datetime, api_key: str, cap:
     return totals
 
 
+def key_from_env_file(path: Path) -> str:
+    """The ODDS_API_KEY line of an env file. An explicit file WINS over the process env: on this host a stale
+    shell-exported ODDS_API_KEY is dead and would otherwise shadow the working key (measured 2026-10-05). The fleet
+    keeps its key in the workers' imported env, which a standalone script does not read; the scheduled task points
+    this at the repo's `.env` instead. Never printed."""
+    try:
+        for line in Path(path).read_text(encoding="utf-8").splitlines():
+            if line.strip().startswith("ODDS_API_KEY="):
+                return line.split("=", 1)[1].strip().strip('"').strip("'")
+    except OSError:
+        pass
+    return ""
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--data-root", default=os.environ.get("SYNDICATE_DATA_ROOT") or "")
     ap.add_argument("--sports", default="nfl,mlb,nhl,nba")
     ap.add_argument("--dry-run", action="store_true", help="list the due games and their worst-case credits; no calls")
+    ap.add_argument("--env-file", default=None, help="read ODDS_API_KEY from this file (it wins over the process env)")
     args = ap.parse_args(argv)
     if not args.data_root:
         print("REFUSING: no --data-root", flush=True)
@@ -259,7 +274,7 @@ def main(argv: list[str] | None = None) -> int:
         load_dotenv()
     except Exception:  # noqa: BLE001
         pass
-    api_key = os.environ.get("ODDS_API_KEY") or ""
+    api_key = (key_from_env_file(Path(args.env_file)) if args.env_file else "") or os.environ.get("ODDS_API_KEY") or ""
     if not api_key and not args.dry_run:
         print("ALT_LADDERS refusing: no ODDS_API_KEY", flush=True)
         return 2
