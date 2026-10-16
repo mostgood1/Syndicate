@@ -8,9 +8,11 @@ columns they expect. Network-based (NHL api-web), cache-first.
 from __future__ import annotations
 
 import csv
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+from syndicate.features.nhl import lineup_availability
 from syndicate.local_nhl_odds import _alias_team_abbr, _team_abbr
 
 from ..features.loaders import _load_scoreboard_games, _processed_dir
@@ -81,10 +83,13 @@ def collect_slate_inputs(
     n_games: int = 8,
     out_dir: Optional[Path] = None,
     write: bool = True,
+    availability_now: Optional[datetime] = None,
+    news_root: Optional[Path] = None,
 ) -> Dict[str, object]:
     """Collect + (optionally) write roster/lineup/starting-goalie CSVs for a slate.
 
-    Returns a summary dict with row counts and output paths.
+    Returns a summary dict with row counts and output paths. ``availability_now`` / ``news_root`` pin the
+    clock and the news collector's root for `lineup_availability` (tests, replays); production passes neither.
     """
     teams = _slate_teams(date, root)
     client = client or NhlWebIngestClient()
@@ -97,6 +102,20 @@ def collect_slate_inputs(
         book_lines = []
     roster_rows: List[Dict] = []
     goalie_rows: List[Dict] = []
+    # WHO MUST NOT DRESS `[2026-10-16, lane nhl-lineup-status]`: the news collector's Out / IR / Suspended state
+    # (and a posted scratch), as of min(now, the team's puck drop). Measured over 10-13..10-15 (58 final
+    # team-games): 32 such players were dressed and 0 played; 0 of 228 held-out player-games played.
+    availability = None
+    if lineup_availability.enabled():
+        try:
+            availability = lineup_availability.SlateAvailability.load(date, root=root, now=availability_now,
+                                                                       news_root=news_root)
+        except Exception as exc:  # noqa: BLE001 - the lineup must still build; the failure is printed, not hidden
+            print(f"NHL_LINEUP_STATUS date={date} ERROR loading availability, NOT APPLIED: {type(exc).__name__}: {exc}",
+                  flush=True)
+    else:
+        print(f"NHL_LINEUP_STATUS date={date} disabled ({lineup_availability.SWITCH_ENV}=off): nobody removed",
+              flush=True)
 
     for abbr, team_name in teams:
         team_code = _alias_team_abbr(abbr)
@@ -109,6 +128,11 @@ def collect_slate_inputs(
         # team's slot. When the club roster is known, only its players are dressed.
         if name_map:
             usage = [r for r in usage if int(r["player_id"]) in name_map]
+        # Removed BEFORE `infer_lines`, so the slot re-sort is the only redistribution (removal only, by user
+        # decision), the starter-goalie pick skips him, and `_book_listed_ids` -- which only returns ids in
+        # `usage` -- cannot force him back in: a book still listing an OUT player is not the market saying he plays.
+        if availability is not None:
+            usage = availability.apply(team_code, usage, team_name=team_name)
         if not usage:
             continue
         infer_lines(usage, must_dress=_book_listed_ids(usage, team_name, book_lines))
@@ -142,7 +166,11 @@ def collect_slate_inputs(
     summary: Dict[str, object] = {
         "date": date, "teams": len(teams),
         "lineup_rows": len(lineup_rows), "roster_rows": len(roster_rows), "goalies": len(goalie_rows),
+        "lineup_status": (availability.summary() if availability is not None
+                          else {"enabled": lineup_availability.enabled(), "applied": False}),
     }
+    if availability is not None:
+        availability.report()
     if write:
         lineups_path = out_dir / f"lineups_{date}.csv"
         roster_path = out_dir / f"roster_snapshot_{date}.csv"
@@ -153,8 +181,11 @@ def collect_slate_inputs(
         summary["lineups_path"] = str(lineups_path)
         summary["roster_path"] = str(roster_path)
         summary["goalies_path"] = str(goalies_path)
+        if availability is not None:
+            summary["exclusions_path"] = str(availability.write(out_dir))
     else:
         summary["_lineups"] = lineup_rows
         summary["_roster"] = roster_rows
         summary["_goalies"] = goalie_rows
+        summary["_exclusions"] = list(availability.excluded) if availability is not None else []
     return summary
