@@ -240,6 +240,16 @@ SERIES_SPORT: dict[str, str] = {
     # margin-vs-handicap risk class `KXMLBF5SPREAD` is excluded for. Both are
     # separate decisions with their own arguments.
     "KXNCAAF1HTOTAL": "ncaaf",
+    # NCAAF FULL-GAME MONEYLINE AND SPREAD. Measured 2026-10-16 04:12Z on the
+    # fleet: all 400 `KXNCAAFGAME` ('Troy wins') and 400 `KXNCAAFSPREAD`
+    # ('Kennesaw St. wins by over 7.5 points') markets refused at the FIRST
+    # gate with `unmapped_series` -- the title gate misses both, exactly as it
+    # missed `KXNCAAFTOTAL` -- so 51 Kalshi-best NCAAF h2h rows on that day's
+    # shortlist priced from the aggregator with no ticker and could not be
+    # placed. Both are WHOLE-GAME contracts; the segment families
+    # (`KXNCAAF1HSPREAD`, `KXNCAAF2H*`, `KXNCAAF1Q..4Q*`) stay unregistered.
+    "KXNCAAFGAME": "ncaaf",
+    "KXNCAAFSPREAD": "ncaaf",
     "KXNCAABTOTAL": "ncaab",
     # ...and the moneyline/spread pair for the same sports, for the same
     # reason. `KXMLBGAME` and `KXMLBSPREAD` currently register only because a
@@ -1079,6 +1089,28 @@ def _pick_by_commence(hits, hint):
     return scored[0][1]
 
 
+def club_key(sport: Any, value: Any) -> str | None:
+    """The canonical club a Kalshi or board team name resolves to, or None.
+
+    `team_aliases.chip_join_key`, which equals `canonical_team` for every sport
+    but NCAAF. NCAAF's alias map is FBS-only, so `canonical_team` is None for
+    every FCS club; measured 2026-10-16 over 254 Kalshi `KXNCAAFGAME` names, 118
+    were unresolved by `canonical_team` and 7 by `chip_join_key` (the CFBD
+    registry, all four divisions). Kalshi also abbreviates "State" ("Appalachian
+    St."), so an unresolved NCAAF name ending in " St." is retried once in the
+    long form. None stays None: an unplaceable name is refused by the caller.
+    """
+    try:
+        from syndicate.features.shared.team_aliases import chip_join_key
+    except Exception:
+        return None
+    resolved = chip_join_key(sport, value)
+    text = str(value or "").strip()
+    if not resolved and text.endswith(" St.") and str(sport or "").strip().lower() == "ncaaf":
+        resolved = chip_join_key(sport, text[: -len(" St.")] + " State")
+    return resolved or None
+
+
 def match_event_blob(
     blob: Any,
     games: Sequence[Mapping[str, Any]],
@@ -1175,10 +1207,9 @@ def match_event_blob(
         # not hold Kalshi's code list and cannot generate its spelling from
         # ours. Every candidate split is checked against a real game, so a
         # wrong boundary matches nothing rather than inventing a pairing.
-        try:
-            from syndicate.features.shared.team_aliases import canonical_team
-        except Exception:
-            canonical_team = None
+        # Through `club_key` (`canonical_team` for every sport but NCAAF, where
+        # it also reaches FCS clubs -- see its docstring).
+        canonical_team = club_key
 
         if canonical_team is not None:
             for game in games or []:
@@ -1551,6 +1582,8 @@ _SERIES_SEGMENT: dict[str, str] = {
     # keep returning None. The spread is additionally the margin-vs-handicap
     # risk class `KXMLBF5SPREAD` is excluded from trading for.
     "KXNCAAF1HTOTAL": "h1",
+    "KXNCAAFGAME": "full",
+    "KXNCAAFSPREAD": "full",
     "KXNCAABTOTAL": "full",
     "KXWNBAGAME": "full",
 }

@@ -960,7 +960,6 @@ death, never life — do not invert it.
 - Falsification test: an end-to-end join test with line None normalised still reports no_matching_board_row
 - Verification: failing e2e tests (MLB ML, soccer win, soccer draw) go green; fleet BOARD_JOIN before/after moneyline matched counts in deploys.md
 - Blocked by: none
-- LENT 2026-10-16 ~12:30Z to lane `kalshi-ncaaf-series` (session dda94e8f, at its request): `syndicate/features/shared/kalshi_board_join.py`, scoped to `_side_for_team` ONLY. The scope: resolve through `team_aliases.chip_join_key` (canonical_team first, so it can only add resolutions) plus an NCAAF-only `X St.` -> `X State` retry. CONDITIONS: the result stays bounded to the game's own two clubs, an ambiguous name still returns None, and `test_every_moneyline_match_is_the_leg_the_order_builder_buys` + the Cubs/White Sox city-ambiguity tests stay green. Return by deleting this line when landed.
 - **STATUS 2026-10-16 04:14Z: FIX SHIPPED to main, NOT LOADED** (loads at the next refresh-worker restart). Replay on fleet inputs: h2h matches 0 -> 72 (10-16 slate), Kalshi-best soccer h2h rows with price+ticker 0 -> 62/72; see deploys.md 2026-10-16 04:14Z. YES-side audit caught a would-be wrong-club order (two-way NO leg vs `_side_to_kalshi` always-YES); each club now takes only its own contract. OWED: fleet BOARD_JOIN after-count post-restart. NCAAF ML is a separate gap (`KXNCAAFGAME` unmapped_series in the catalogue).
 ### nfl-prop-support-fields — OPEN — opened 2026-10-16 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
 - Goal: NFL prop board rows carry the support fields their own artifact already populates -- sample_games on every row and projected_sd wherever the stat has one -- verified on the SERVED board as a non-zero populated count where it reads 0 of 705 today, with a reachability test proving off != on so the field cannot be inert.
@@ -975,11 +974,12 @@ death, never life — do not invert it.
 - Blocked by: none (waiting on a restart, not on another lane).
 ### kalshi-ncaaf-series — OPEN — opened 2026-10-16 — session 0d3deab6-210e-44e3-ab8a-a2cdb2aefaf3
 - Goal: All KXNCAAFGAME Kalshi markets classify as ncaaf, and join_kalshi_to_board matches NCAAF h2h rows (each club's row only from its own -CODE market, on YES; an unplaceable name refuses); a read-only replay over the fleet's kalshi_markets.json + shortlist shows NCAAF h2h matches > 0 (0 at 2026-10-16 04:12Z)
-- Files: tests/test_kalshi_ncaaf_series.py (NEW), syndicate/features/shared/kalshi_catalogue.py (LOAN from soccer-uefa-competitions; granted 2026-10-16 ~12:3xZ by its session local_123d3580; scope and exclusions are recorded in the lender's LENT line), syndicate/features/shared/kalshi_board_join.py (LOAN from kalshi-moneyline-board-join; `_side_for_team` only, granted in f267d3d2)
+- Files: tests/test_kalshi_ncaaf_series.py (NEW), syndicate/features/shared/kalshi_catalogue.py (LOAN from soccer-uefa-competitions; granted 2026-10-16 ~12:3xZ by its session local_123d3580; scope and exclusions are recorded in the lender's LENT line)
 - Hypothesis: n/a
 - Falsification test: n/a
 - Verification: new end-to-end test fails on origin/main and passes; tests/test_kalshi_board_join.py + tests/test_kalshi_catalogue.py green; fleet replay before/after recorded in deploys.md
 - Blocked by: none
+  - Board-join loan (`_side_for_team`, from kalshi-moneyline-board-join, f267d3d2) RETURNED on landing the code; its LENT line deleted as the lender asked.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

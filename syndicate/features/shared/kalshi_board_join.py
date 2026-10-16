@@ -682,17 +682,22 @@ def _side_for_team(
     refused, never assigned positionally: guessing which side a name refers to
     is a bet on the wrong team half the time, at a price that looks confident.
     """
+    # `club_key`, not `canonical_team`: the same resolver `match_event_blob`
+    # placed this game with, and identical to `canonical_team` for every sport
+    # but NCAAF, where it also reaches FCS clubs and Kalshi's "St." spelling
+    # (118 of 254 Kalshi NCAAF names unresolved by `canonical_team`, 2026-10-16).
+    # The answer is still bounded to this game's two clubs below.
     try:
-        from syndicate.features.shared.team_aliases import canonical_team
+        from syndicate.features.shared.kalshi_catalogue import club_key
     except Exception:
         return None
 
-    away = canonical_team(sport, resolution.get("away_team"))
-    home = canonical_team(sport, resolution.get("home_team"))
+    away = club_key(sport, resolution.get("away_team"))
+    home = club_key(sport, resolution.get("home_team"))
     if not away or not home:
         return None
 
-    named = canonical_team(sport, team)
+    named = club_key(sport, team)
     if named:
         if named == away and named != home:
             return "away"
