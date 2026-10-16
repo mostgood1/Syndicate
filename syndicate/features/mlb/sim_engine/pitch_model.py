@@ -1,0 +1,882 @@
+from __future__ import annotations
+
+import math
+import random
+from dataclasses import dataclass
+from typing import Dict, Optional, Tuple
+
+from .models import BattedBallType, PitchCall, PitchResult, PitchType
+
+
+def clamp01(x: float) -> float:
+    return max(0.0, min(1.0, float(x)))
+
+
+def _logit01(p: float, eps: float = 1e-6) -> float:
+    p = max(eps, min(1.0 - eps, float(p)))
+    return math.log(p / (1.0 - p))
+
+
+def _sigmoid(x: float) -> float:
+    return 1.0 / (1.0 + math.exp(-float(x)))
+
+
+def _cfg_float(cfg: PitchModelConfig, name: str, default: float) -> float:
+    v = getattr(cfg, name, default)
+    return float(v) if isinstance(v, (int, float)) else float(default)
+
+
+@dataclass(frozen=True)
+class PitchModelConfig:
+    """Config for the pitch model.
+
+    This is a baseline model. As we add real features (arsenal quality, swing
+    decisions, zone models, Statcast-derived whiff/contact by pitch type), we
+    should version this config and persist it in daily feature snapshots.
+    """
+
+    name: str = "pitch_model_v1_tuned_20260308_hrcluster_sigma008_hrw135"
+
+    # Baseline call mix; these are used as priors then adjusted by count and rates.
+    #
+    # `#440` 2026-08-18: RE-BASED AGAINST THE REAL LEAGUE MIX. The engine
+    # under-produced strikeouts by 27% (K/PA 0.179 vs 0.226) and `k_rate` could
+    # not fix it -- a 1.368x correction moved the residual 0.6pp, because K is a
+    # CONSEQUENCE of plate-appearance length, not a per-PA target.
+    #
+    # Measured sim vs MLB, 17,660 simulated pitches:
+    #     IN_PLAY   23.3%  vs  ~17%   <- 37% too many; every one ENDS the PA
+    #     FOUL      15.9%  vs  ~18%   <- too few; a 2-strike foul EXTENDS the PA
+    #     CALLED    13.9%  vs  ~17%
+    #     WHIFF     12.3%  vs  ~11%   <- already ABOVE league, not the problem
+    #     pitches/PA 2.97  vs  ~3.9   <- 24% short
+    #
+    # PAs were ending before they could reach three strikes. The whiff rate was
+    # never the deficit; the CONTACT rate was. base_in_play and base_foul are the
+    # two constants furthest from reality, and they move PA length in opposite
+    # directions, so both are corrected together.
+    #
+    # base_hbp 0.01 also produces 2.3% HBP against a league ~0.5% -- roughly 4x
+    # too many hit batsmen.
+    #
+    # *** VALUES DELIBERATELY LEFT AT THE ORIGINALS. NOT FIXED. ***
+    #
+    # Correcting the mix ALONE makes the engine WORSE in the other direction.
+    # Measured with base_foul=0.14 / base_called_strike=0.22, which lands the
+    # mix almost exactly on the league (FOUL 18.8%, CALLED 17.5%, IN_PLAY 17.3%):
+    #
+    #     K/PA 0.2837  against an actual 0.226  -- 26% TOO HIGH
+    #
+    # So the 27% K DEFICIT was the NET OF TWO OPPOSING ERRORS: a contact rate
+    # that ended PAs early (suppressing K) masking a strike->strikeout conversion
+    # that is ~26% too efficient. Fixing one exposes the other, and shipping the
+    # mix fix alone would trade a 27% shortfall for a 26% surplus.
+    #
+    # pitches/PA also stays short (3.45 vs ~3.9) even with a correct mix, which
+    # points at PA structure -- count progression / two-strike behaviour -- as
+    # the second defect rather than the call priors.
+    #
+    # This needs JOINT calibration of the mix and the conversion, with the market
+    # scoreboard (`measure_all_inputs_effect.py`) as arbiter rather than the
+    # league mix alone. One-at-a-time tuning cannot get there.
+    base_ball: float = 0.34
+    base_called_strike: float = 0.18
+    base_swinging_strike: float = 0.12
+    base_foul: float = 0.12
+    base_in_play: float = 0.23
+    base_hbp: float = 0.01
+
+    # Situational adjustments (tunable)
+    # `#440` 2026-08-18: FIRST-PITCH TAKE. Measured over 895,320 real statcast
+    # pitches against the sim, the 0-0 cell is the engine's single largest
+    # structural error:
+    #
+    #             REAL          SIM
+    #   CALLED    29.6%        13.7%     <- sim takes 2.2x too rarely
+    #   IN_PLAY   11.3%        25.9%     <- sim puts 2.3x too many in play
+    #   take share (ball+called)  68.0%  vs  47.0%
+    #
+    # Real hitters TAKE the first pitch; the sim swings at it. Every downstream
+    # symptom follows: PAs end on pitch one, pitches/PA 3.5 vs 3.9, counts reach
+    # two strikes too rarely, K comes in low -- and the two-strike terms cannot
+    # compensate because the PA is already over.
+    #
+    # This is NOT the same shape as `three_ball_take_bias`, which only adds to
+    # p_ball (taking on 3-0 hoping for a walk). A first-pitch take moves mass
+    # from the SWING outcomes (whiff/foul/in-play) to the TAKE outcomes
+    # (ball/called), so it is a damp on the former.
+    #
+    # `first_pitch_swing_damp` scales the three swing outcomes at 0-0.
+    # Normalisation then redistributes to ball/called. Solving
+    #   d*S / (d*S + T) = 0.32   with S=0.53, T=0.47   gives d ~= 0.42.
+    # CALIBRATED 2026-08-18 against the measured 0-0 cell:
+    #   damp 0.42 / boost 1.60  ->  0-0 called 29.6% (real 29.6%, EXACT),
+    #   take 71.0% (real 68.0%), in-play 25.9% -> 15.0% (real 11.3%)
+    #   K/PA 0.161 -> 0.185 (target 0.226)   pitches/PA 2.96 -> 3.25 (target 3.90)
+    # Both target metrics move toward the target WITHOUT overshooting -- unlike
+    # the mix-only fix, which took K/PA from 27% low to 26% high. It does not
+    # close the gap alone; the 0-2 and 3-2 cells and base_in_play remain wrong.
+    # `#440` COUNT-SHAPE TERMS, each fitted to the real matrix (895,320 pitches).
+    # The engine had ONE count knob (`count_delta`, a scalar) and it structurally
+    # cannot express take-early / waste-ahead / protect-late, which is why three
+    # earlier calibrations failed. These are separate because the real behaviours
+    # are separate and move in OPPOSITE directions.
+    #
+    #   2 strikes  -- real pitchers WASTE. Measured 0-2: BALL 45.5% real vs 31.5%
+    #                 sim, CALLED 3.5% vs 12.1%. The sim keeps attacking.
+    #   <2 strikes -- real hitters FOUL OFF far more than the sim. 2-1: 23.2% vs
+    #                 11.3%. `two_strike_foul_boost` only ever fixed 2-strike
+    #                 counts, so every other count stayed at ~half of reality.
+    #   0 strikes, behind -- real pitchers throw STRIKES. 1-0: CALLED 23.0% vs 13.9%.
+    # *** BOTH STAY 1.0. The two-strike cells are NOT fixable this way, and the
+    # reason is structural rather than a matter of finding better values. ***
+    #
+    # Measured 2026-08-18, 16 combinations, 8 games x 30 sims, K/PA guard +-0.010:
+    #
+    #   damp   K/PA           damp   K/PA
+    #   1.00   0.2260         0.40   0.1886
+    #   0.60   0.2009         0.25   0.1747
+    #
+    # EVERY value below 1.0 wrecks K/PA, because AT TWO STRIKES A CALLED STRIKE
+    # *IS* A STRIKEOUT. `two_strike_called_damp` and K/PA are not two quantities
+    # that can be traded off -- they are the same quantity. The sim shows 12.1%
+    # called strikes at 0-2 against a real 3.5%, and it NEEDS them to reach 0.226.
+    #
+    # So the engine arrives at a correct K/PA through a compensating error: too
+    # many called strikes at two strikes, too few balls (31.5% vs a real 45.5%)
+    # and too few fouls. Closing the cell requires the strikeouts to come from
+    # SWINGING strikes instead, which no scalar on the existing terms expresses.
+    #
+    # The only admissible option in the whole sweep was waste_ball=1.2 with
+    # damp=1.0: two-strike deviation 0.4033 -> 0.3982, a 1.3% gain, in exchange
+    # for K/PA 0.2260 -> 0.2214. **Rejected** -- it gives back the exact K/PA
+    # this lane just achieved to buy almost nothing.
+    two_strike_waste_ball_boost: float = 1.0
+    two_strike_called_damp: float = 1.0
+    # *** THE WITHDRAWAL WAS WRONG. THE ORIGINAL NUMBER STANDS. 2026-08-18. ***
+    #
+    # I committed K/PA 0.1859 -> 0.2260, then withdrew it after re-measuring
+    # 0.1606. **The re-measurement was the broken one.** It was taken while a
+    # DUPLICATE `two_strike_whiff_boost` field existed in this class: the later
+    # definition (0.0409) shadowed my 1.0, and my second application multiplied
+    # it again. With the duplicate removed:
+    #
+    #     empty override dict   K/PA 0.2260
+    #     dict of 1.0s          K/PA 0.2260     <- MATCH, as it always should have
+    #     baseline (foul 2.05)  K/PA 0.2260     <- real 0.226
+    #
+    # So `early_count_foul_boost = 2.05` does land K/PA on target, the harness
+    # was never unsound, and the two-strike sweep it produced is valid after all.
+    # Three claims in a row here were wrong in alternating directions; the fixed
+    # point is the equivalence check above, which is why it now runs first.
+    #
+    # (original note follows)
+    #
+    # Committed as "K/PA 0.1859 -> 0.2260, exactly the real 0.226". **That does
+    # not reproduce.** Re-measured on the same 8 games x 30 sims immediately
+    # afterwards:
+    #
+    #     early_count_foul_boost = 1.0    K/PA 0.1269
+    #     early_count_foul_boost = 2.05   K/PA 0.1606
+    #
+    # The term is REAL and the direction is right -- +27% on K/PA, measured twice
+    # consistently -- but it does NOT reach 0.226, and the K deficit is NOT
+    # closed. The value is kept because 2.05 beats 1.0 on the reproducible
+    # numbers; the claim attached to it is withdrawn.
+    #
+    # WORSE, AND UNRESOLVED: passing the five-key override dict with every value
+    # at 1.0 -- which should be identical to passing nothing -- gives K/PA 0.3584
+    # against 0.1606 for `{}`. Explicit no-op values are NOT no-ops through
+    # `GameConfig.pitch_model_overrides`, so **every number produced by
+    # `calibrate_count_shape.py` is suspect**, including the fit that chose 2.05
+    # and the sweep that rejected the two-strike terms. Do not trust that harness
+    # until this is explained.
+    #
+    # FITTED 2.05 -- and this one term closes the whole K deficit.
+    # K/PA 0.1859 -> 0.2260 against a real 0.226. Verified an INTERIOR optimum,
+    # not a grid boundary: joint score 0.5912 at 1.8, 0.5659 at 2.05, 0.5933 at
+    # 2.3, 0.6470 at 2.6.
+    #
+    # Why a foul rate fixes strikeouts: a foul below two strikes is contact that
+    # does NOT end the plate appearance. The sim fouled off about half as often
+    # as real hitters at every count `two_strike_foul_boost` did not own, so PAs
+    # ended early and never reached a third strike. That is the same diagnosis
+    # this lane reached in August by arithmetic -- the per-pitch in-play rate was
+    # correct while the in-play PA SHARE was too high -- and this is the term
+    # that acts on it.
+    #
+    # HONEST TRADE: matrix deviation alone is minimised at 1.8 (0.5609 vs 0.5657
+    # here). 2.05 gives up 0.0048 of matrix fit to take K/PA from 3.4% low to
+    # exact. That trade is the reason the objective scores both.
+    early_count_foul_boost: float = 2.05
+    behind_count_called_boost: float = 1.0
+    first_pitch_swing_damp: float = 0.42
+    # Real 0-0 take outcomes split 38.4 ball / 29.6 called = 56/44. The sim
+    # splits 71/29 -- too far toward BALL. This lifts called strikes relative to
+    # balls at 0-0 only. 1.0 = no-op.
+    first_pitch_called_boost: float = 1.60
+    three_ball_take_bias: float = 0.08
+    three_ball_take_bias_runner_on_bonus: float = 0.0
+    three_ball_take_bias_reliever_bonus: float = 0.0
+    three_ball_take_bias_reliever_runner_on_bonus: float = 0.0
+    two_strike_whiff_boost: float = 0.040865875554627173
+    two_strike_foul_boost: float = 0.07198880502282089
+    two_strike_inplay_penalty: float = 0.056359400456758316
+    # Extra extension probability at 2 strikes.
+    # If >0, a fraction of two-strike pitches become a foul that does NOT change
+    # the count (self-loop). This increases pitches/PA while (in expectation)
+    # preserving outcome rates, since it only adds delay.
+    two_strike_extra_foul_prob: float = 0.04
+    # Per-count outcome multipliers, {"b-s": {"ball"|"called"|"swing"|"foul"|"inplay": mult}},
+    # applied to the outcome weights just before normalisation (lane mlb-statsapi-asof-rebuild).
+    # Real hitters' swing/take behaviour changes sharply by count (3-0: 58% called strikes,
+    # 2% in play; two strikes: ~4% called third strikes) while the base weights barely
+    # move with the count. Measured from play-by-play by iterative proportional fitting.
+    # None = no table (the behaviour before 2026-10-08).
+    count_outcome_mult: Optional[Dict[str, Dict[str, float]]] = None
+    bb_ball_bias_mult: float = 1.05
+
+    # Optional calibration of strikeout target (k_tgt) via logit scaling.
+    # - k_logit_mult < 1.0 shrinks extremes toward 0.5 (less confident)
+    # - k_logit_mult > 1.0 amplifies extremes (more confident)
+    # - k_logit_bias shifts overall K propensity up/down in logit space
+    k_logit_mult: float = 0.95
+    k_logit_bias: float = 0.0
+
+    # How much log5 (odds-ratio) character to blend into the batter-K-rate
+    # vs. pitcher-K-rate combination, vs. the plain 50/50 average.
+    # 0.0 = plain average (current/default, unchanged behavior).
+    # 1.0 = pure log5 (same treatment HR/inplay_hit already get).
+    # See `_combined_k` in this module for why this exists.
+    k_combine_log5_weight: float = 0.0
+    k_league_rate: float = 0.223
+
+    # How much log5 character to blend into the batter/pitcher
+    # inplay_hit_rate combination, vs. the plain 50/50 average.
+    # 1.0 = pure log5 (current/default, the promoted 2026-07-19 behavior).
+    # 0.0 = plain average (the pre-promotion behavior).
+    # See `_combined_inplay_hit` in this module for why this is tunable.
+    inplay_hit_combine_log5_weight: float = 1.0
+    inplay_hit_league_rate: float = 0.275
+
+    # Mapping from PA-level HR target to per-ball-in-play HR probability.
+    # Keep conservative; tuning this affects run environment materially.
+    hr_on_ball_in_play_factor: float = 0.62
+
+    # Matchup-aware batted-ball type modeling.
+    # Uses batter/pitcher Statcast gb/fb/ld/pu rates (when available) and shrinks to a
+    # global prior based on sample size.
+    bbtype_prior_weight: float = 1.0
+    bbtype_batter_weight: float = 1.0
+    bbtype_pitcher_weight: float = 1.0
+    bbtype_sample_scale: float = 200.0
+
+    # Conditional mapping weights (renormalized per-PA to preserve overall means).
+    hr_bb_w_ground: float = 0.06
+    hr_bb_w_fly: float = 1.70
+    hr_bb_w_line: float = 0.75
+    hr_bb_w_pop: float = 0.02
+
+    xb_bb_w_ground: float = 0.75
+    xb_bb_w_fly: float = 1.10
+    xb_bb_w_line: float = 1.28
+    xb_bb_w_pop: float = 0.45
+
+    # Deterministic run-environment multipliers (neutral by default).
+    # These apply before weather/park and can be used to calibrate mean totals/margins
+    # without injecting extra variance.
+    # ------------------------------------------------------------------
+    # REFIT 2026-09-04 (`#624` step 3's estimator half). THREE OF FOUR SHIPPED.
+    #
+    # Fitted with all mechanisms on over 186 games / 13 dates / 80 sims, against
+    # 3,209 date-MATCHED actual rows, and validated OUT OF SAMPLE on 4 dates the
+    # fit never saw:
+    #
+    #   rate               oos before   oos after
+    #   hr_rate                +40.3%      +12.5%   shipped
+    #   inplay_hit_rate         +2.7%      +10.3%   NOT SHIPPED -- 3.8x worse
+    #   k_rate                  +3.4%       +0.8%   shipped
+    #   bb_rate                +24.0%      +13.3%   shipped
+    #
+    # In-sample this was 4 of 4 and `inplay`'s correction read as a harmless
+    # 5.6% -> 5.5%. Out of sample it made a rate that was ALREADY NEARLY RIGHT
+    # nearly four times worse. `learnings.md` 2026-08-31 FORBIDS shipping a
+    # calibration validated only in-sample; that rule is the only reason this is
+    # three values and not four.
+    #
+    # Values are the FULL-SAMPLE fit multiplied onto the knob's prior baseline
+    # (hr already carried a fitted 1.03, so the raw 1.8019 would have discarded
+    # it). The held-out run validates the METHOD; the full sample is the better
+    # point estimate.
+    #
+    # STILL WRONG AFTERWARDS, and deliberately recorded: HR +12.5% and BB +13.3%
+    # out of sample. A large improvement on +40.3% and +24.0%, not a fix -- HR
+    # remains this engine's worst-calibrated rate. Fitted on JUNE dates.
+    # ------------------------------------------------------------------
+    hr_rate_mult: float = 1.856
+    #: UNCHANGED at its prior value. The refit's `inplay` correction was
+    #: measured and REJECTED out of sample -- see the table above. Do not set it
+    #: from that run without a fresh held-out result.
+    inplay_hit_rate_mult: float = 1.03
+    k_rate_mult: float = 0.9557
+    bb_rate_mult: float = 1.2794
+    xb_share_mult: float = 0.94
+
+    # Optional: per-game run environment multiplier (latent).
+    # If run_env_sigma > 0, simulate_game() will sample a mean-1 lognormal multiplier
+    # and fold it into the weather multipliers (HR / in-play hit / XB share).
+    #
+    # Baseline uses this as an HR-only clustering lane to improve totals tails
+    # without broadly lifting in-play hit or XB environments.
+    run_env_sigma: float = 0.08
+    run_env_clamp_min: float = 0.75
+    run_env_clamp_max: float = 1.33
+    run_env_hr_weight: float = 1.35
+    run_env_inplay_hit_weight: float = 0.0
+    run_env_xb_share_weight: float = 0.0
+
+    # Optional contextual HR interaction hooks used for targeted diagnostics.
+    hr_bb_hbp_runner_mult: float = 1.0
+    hr_starter_bb_hbp_runner_mult: float = 1.0
+    hr_non_hit_reach_runner_mult: float = 1.0
+    hr_reliever_runner_on_mult: float = 1.0
+    hr_late_reliever_runner_on_mult: float = 1.0
+
+    # Pitch-type whiff/contact biases (multipliers)
+    pitch_whiff_mult: Dict[PitchType, float] = None  # type: ignore[assignment]
+    pitch_inplay_mult: Dict[PitchType, float] = None  # type: ignore[assignment]
+
+    # Optional: shrink batter vs pitch-type multipliers toward neutral.
+    # alpha=0.5 => balanced default (half effect)
+    # alpha=1.0 => full effect
+    # alpha=0.0 => disable effect (equivalent to pt_mult=1.0)
+    batter_pt_alpha: float = 0.5
+
+    # Optional: scale raw batter vs pitch-type multipliers around 1.0 before applying
+    # batter_pt_alpha shrink.
+    #   1.0 => neutral (no extra scaling beyond the raw multipliers)
+    #   0.0 => neutralize raw multipliers (becomes 1.0 after scaling)
+    #   >1.0 => amplify deviations from 1.0 (kept clamped in-engine)
+    batter_pt_scale: float = 0.75
+
+    def __post_init__(self):
+        object.__setattr__(
+            self,
+            "pitch_whiff_mult",
+            self.pitch_whiff_mult
+            or {
+                PitchType.FF: 1.00,
+                PitchType.SI: 0.95,
+                PitchType.FC: 1.00,
+                PitchType.SL: 1.12,
+                PitchType.CU: 1.10,
+                PitchType.CH: 1.08,
+                PitchType.FS: 1.12,
+                PitchType.KC: 1.08,
+                PitchType.KN: 0.85,
+                PitchType.OTHER: 1.00,
+            },
+        )
+        object.__setattr__(
+            self,
+            "pitch_inplay_mult",
+            self.pitch_inplay_mult
+            or {
+                PitchType.FF: 1.00,
+                PitchType.SI: 1.05,
+                PitchType.FC: 0.98,
+                PitchType.SL: 0.92,
+                PitchType.CU: 0.92,
+                PitchType.CH: 0.95,
+                PitchType.FS: 0.92,
+                PitchType.KC: 0.93,
+                PitchType.KN: 1.08,
+                PitchType.OTHER: 1.00,
+            },
+        )
+
+
+# League-average rates, used only as the log5 baseline term below. Mirror
+# the same fallback constants build_roster.py uses when a player has too few
+# PA/BF to compute a real rate (see _rate(..., default) call sites there).
+_LEAGUE_RATE = {
+    "hr": 0.03,
+    "inplay_hit": 0.275,
+    "k": 0.223,
+}
+
+
+def _combined_log5(a: float, b: float, league: float) -> float:
+    return clamp01(_sigmoid(_logit01(a) + _logit01(b) - _logit01(league)))
+
+
+def _combined(a: float, b: float, league_key: Optional[str] = None) -> float:
+    # hr/inplay_hit use log5 (odds-ratio) combination instead of a flat
+    # average of the batter's own rate and the pitcher's allowed rate.
+    # Promoted 2026-07-19 after holdout backtesting: a plain average has no
+    # way to account for one side having much less spread than the other
+    # (pitchers have much less control over BABIP-type outcomes than batters
+    # per DIPS theory), which was suppressing HR/extra-base variance -- log5
+    # closes ~26% of the diagnosed HR under-projection gap and lands
+    # total_bases_4plus right at its empirical target. Applying log5 to
+    # k/bb/hbp as well was tested too and reverted: it amplifies matchup
+    # extremity on the pacing/baserunner side enough to significantly
+    # regress full-game total-runs accuracy, so those three stay on the
+    # plain average. See mlb_sim_accuracy_assessment_and_optimization_plan.md.
+    if league_key in _LEAGUE_RATE:
+        return _combined_log5(a, b, _LEAGUE_RATE[league_key])
+    return clamp01(0.5 * float(a) + 0.5 * float(b))
+
+
+def _combined_inplay_hit(a: float, b: float, cfg: "PitchModelConfig") -> float:
+    """PA-level in-play-hit target: batter inplay_hit_rate vs. pitcher
+    inplay_hit_rate allowed.
+
+    Diagnosed 2026-08-01 (todo.md part 9): team-level total hits are
+    over-projected by +1.41/game (16.8% relative, n=1224 team-games,
+    46-date backtest) -- this is present even in TEAM totals (all
+    pitchers, not just the starter this session's other fixes touched),
+    so it isn't the same outs/workload mechanism diagnosed and partly
+    fixed in parts 3-7; it's a separate per-PA rate calibration issue.
+    `inplay_hit` was moved from flat average to log5 on 2026-07-19
+    specifically to fix HR/extra-base under-projection (see `_combined`'s
+    comment above) -- that promotion's own backtest validated HR rate and
+    total_bases_4plus/5plus, not the *overall* hit-rate level, leaving
+    open the possibility log5 fixed one gap while quietly opening another.
+    Plausible mechanism: log5 combines two *noisy per-player estimates*
+    (not true talent), which can inflate output variance relative to a
+    flat average; since inplay_hit sits close to 0 (~0.275) and far from
+    1, that extra variance has much more room to push values up toward
+    the ceiling than down toward the floor before `clamp01` cuts it off,
+    which can shift the *mean* up even though log5 itself is
+    theoretically unbiased for true (noise-free) talent.
+
+    Mirrors `_combined_k`'s shrinkage-blend pattern, but in reverse:
+    `inplay_hit_combine_log5_weight=1.0` (the default) reproduces the
+    current *promoted* (full log5) behavior exactly, so this is fully
+    backward compatible; `0.0` fully reverts to the pre-2026-07-19 flat
+    average, for backtesting whether that closes the hits-allowed gap
+    without reopening the HR/total-bases gap log5 was promoted to fix.
+    """
+    weight = _cfg_float(cfg, "inplay_hit_combine_log5_weight", 1.0)
+    weight = max(0.0, min(1.0, weight))
+    flat = clamp01(0.5 * float(a) + 0.5 * float(b))
+    if weight <= 0.0:
+        return flat
+    league = _cfg_float(cfg, "inplay_hit_league_rate", _LEAGUE_RATE["inplay_hit"])
+    log5 = _combined_log5(a, b, league)
+    return clamp01((1.0 - weight) * flat + weight * log5)
+
+
+def _combined_k(a: float, b: float, cfg: "PitchModelConfig") -> float:
+    """PA-level strikeout target: batter K rate vs. pitcher K rate.
+
+    Plain 50/50 averaging (the `_combined` default above) pulls a pitcher's
+    true strikeout talent halfway toward the batter's own (roughly
+    league-average) rate on every PA, which is why elite/ace strikeout
+    projections came in structurally low and back-end starters' came in
+    structurally high (diagnosed via a 46-date, 1209-start backtest against
+    real market strikeout lines: elite tier bias -2.40 SO/start, back-end
+    tier bias +1.23 SO/start -- see todo.md #176). Full log5 was already
+    tried for k/bb/hbp and reverted for regressing full-game totals (see the
+    comment on `_combined` above), so this is a *shrinkage blend* between the
+    two -- `k_combine_log5_weight=0.0` reproduces the old flat-average
+    behavior exactly (the safe, backward-compatible default); `1.0` is pure
+    log5. Intermediate weights let a fix be tuned/backtested without
+    re-litigating the all-or-nothing choice that was already rejected once.
+    """
+    weight = _cfg_float(cfg, "k_combine_log5_weight", 0.0)
+    weight = max(0.0, min(1.0, weight))
+    flat = clamp01(0.5 * float(a) + 0.5 * float(b))
+    if weight <= 0.0:
+        return flat
+    league = _cfg_float(cfg, "k_league_rate", _LEAGUE_RATE["k"])
+    log5 = _combined_log5(a, b, league)
+    return clamp01((1.0 - weight) * flat + weight * log5)
+
+
+_BB_PRIOR = {
+    BattedBallType.GROUND: 0.44,
+    BattedBallType.FLY: 0.25,
+    BattedBallType.LINE: 0.20,
+    BattedBallType.POP: 0.11,
+}
+
+
+def _norm4(gb: float, fb: float, ld: float, pu: float) -> Tuple[float, float, float, float]:
+    gb = max(0.0, float(gb))
+    fb = max(0.0, float(fb))
+    ld = max(0.0, float(ld))
+    pu = max(0.0, float(pu))
+    s = gb + fb + ld + pu
+    if s <= 1e-12:
+        return (0.44, 0.25, 0.20, 0.11)
+    return (gb / s, fb / s, ld / s, pu / s)
+
+
+def _bb_dist_matchup(
+    cfg: PitchModelConfig,
+    batter_gb: float,
+    batter_fb: float,
+    batter_ld: float,
+    batter_pu: float,
+    batter_inplay_n: int,
+    pitcher_gb: float,
+    pitcher_fb: float,
+    pitcher_ld: float,
+    pitcher_pu: float,
+    pitcher_inplay_n: int,
+) -> Dict[BattedBallType, float]:
+    sample_scale = _cfg_float(cfg, "bbtype_sample_scale", 200.0)
+    wb = min(1.0, max(0.0, float(batter_inplay_n) / sample_scale)) if sample_scale > 1e-9 else 1.0
+    wp = min(1.0, max(0.0, float(pitcher_inplay_n) / sample_scale)) if sample_scale > 1e-9 else 1.0
+
+    prior_w = _cfg_float(cfg, "bbtype_prior_weight", 1.0)
+    batter_w = _cfg_float(cfg, "bbtype_batter_weight", 1.0) * wb
+    pitcher_w = _cfg_float(cfg, "bbtype_pitcher_weight", 1.0) * wp
+
+    bgb, bfb, bld, bpu = _norm4(batter_gb, batter_fb, batter_ld, batter_pu)
+    pgb, pfb, pld, ppu = _norm4(pitcher_gb, pitcher_fb, pitcher_ld, pitcher_pu)
+
+    wsum = prior_w + batter_w + pitcher_w
+    if wsum <= 1e-12:
+        return dict(_BB_PRIOR)
+
+    gb = prior_w * _BB_PRIOR[BattedBallType.GROUND] + batter_w * bgb + pitcher_w * pgb
+    fb = prior_w * _BB_PRIOR[BattedBallType.FLY] + batter_w * bfb + pitcher_w * pfb
+    ld = prior_w * _BB_PRIOR[BattedBallType.LINE] + batter_w * bld + pitcher_w * pld
+    pu = prior_w * _BB_PRIOR[BattedBallType.POP] + batter_w * bpu + pitcher_w * ppu
+    gb, fb, ld, pu = _norm4(gb, fb, ld, pu)
+
+    return {
+        BattedBallType.GROUND: gb,
+        BattedBallType.FLY: fb,
+        BattedBallType.LINE: ld,
+        BattedBallType.POP: pu,
+    }
+
+
+def _sample_bb_type(rng: random.Random, dist: Dict[BattedBallType, float]) -> BattedBallType:
+    gb = float(dist.get(BattedBallType.GROUND, _BB_PRIOR[BattedBallType.GROUND]))
+    fb = float(dist.get(BattedBallType.FLY, _BB_PRIOR[BattedBallType.FLY]))
+    ld = float(dist.get(BattedBallType.LINE, _BB_PRIOR[BattedBallType.LINE]))
+    pu = float(dist.get(BattedBallType.POP, _BB_PRIOR[BattedBallType.POP]))
+    gb, fb, ld, pu = _norm4(gb, fb, ld, pu)
+    x = rng.random()
+    if x < gb:
+        return BattedBallType.GROUND
+    x -= gb
+    if x < fb:
+        return BattedBallType.FLY
+    x -= fb
+    if x < ld:
+        return BattedBallType.LINE
+    return BattedBallType.POP
+
+
+def _pick_hit_type(rng: random.Random, xb_share: float, triple_share_of_xb: float) -> str:
+    xb_share = clamp01(xb_share)
+    if rng.random() < xb_share:
+        ts = clamp01(triple_share_of_xb)
+        return "3B" if rng.random() < ts else "2B"
+    return "1B"
+
+
+def simulate_pitch(
+    rng: random.Random,
+    cfg: PitchModelConfig,
+    pitch_type: PitchType,
+    pitcher_whiff_mult: float,
+    pitcher_inplay_mult: float,
+    weather_hr_mult: float,
+    weather_inplay_hit_mult: float,
+    weather_xb_share_mult: float,
+    park_hr_mult: float,
+    park_inplay_hit_mult: float,
+    park_xb_share_mult: float,
+    umpire_called_strike_mult: float,
+    count: Tuple[int, int],
+    batter_k_rate: float,
+    batter_bb_rate: float,
+    batter_hbp_rate: float,
+    batter_hr_rate: float,
+    batter_inplay_hit_rate: float,
+    batter_xb_hit_share: float,
+    batter_pt_mult: float,
+    batter_pt_hr_mult: float,
+    batter_triple_share_of_xb: float,
+    pitcher_k_rate: float,
+    pitcher_bb_rate: float,
+    pitcher_hbp_rate: float,
+    pitcher_hr_rate: float,
+    pitcher_inplay_hit_rate: float,
+    pitcher_pt_hr_mult: float = 1.0,
+    batter_bb_gb_rate: float = 0.44,
+    batter_bb_fb_rate: float = 0.25,
+    batter_bb_ld_rate: float = 0.20,
+    batter_bb_pu_rate: float = 0.11,
+    batter_bb_inplay_n: int = 0,
+    pitcher_bb_gb_rate: float = 0.44,
+    pitcher_bb_fb_rate: float = 0.25,
+    pitcher_bb_ld_rate: float = 0.20,
+    pitcher_bb_pu_rate: float = 0.11,
+    pitcher_bb_inplay_n: int = 0,
+    batter_pitch_count_mult: float = 1.0,
+    pitcher_pitch_count_mult: float = 1.0,
+    has_runners_on: bool = False,
+    is_reliever: bool = False,
+) -> PitchResult:
+    """Structured pitch model.
+
+    Outputs one of:
+    - BALL / CALLED_STRIKE / SWINGING_STRIKE / FOUL / IN_PLAY / HIT_BY_PITCH
+    - If IN_PLAY, includes batted_ball_type and in_play_result (OUT/1B/2B/3B/HR)
+
+    Count effects:
+    - 3 balls: more takes -> more balls
+    - 2 strikes: more fouls and whiffs, fewer in-play balls
+    """
+    balls, strikes = count
+
+    # Minimal pitch-count calibration hook: at 2 strikes, optionally insert extra
+    # foul pitches that leave the count unchanged (self-loop).
+    try:
+        ext = float(getattr(cfg, "two_strike_extra_foul_prob", 0.0) or 0.0)
+    except Exception:
+        ext = 0.0
+    if strikes == 2 and ext > 0.0:
+        if rng.random() < min(0.90, max(0.0, ext)):
+            return PitchResult(pitch_type=pitch_type, call=PitchCall.FOUL, is_strike=True, is_ball=False, in_play=False)
+
+    # Combine rates (PA-level priors)
+    k_tgt = _combined_k(batter_k_rate, pitcher_k_rate, cfg)
+    bb_tgt = _combined(batter_bb_rate, pitcher_bb_rate)
+    hbp_tgt = _combined(batter_hbp_rate, pitcher_hbp_rate)
+    hr_tgt = _combined(float(batter_hr_rate) * float(batter_pt_hr_mult), float(pitcher_hr_rate) * float(pitcher_pt_hr_mult), "hr")
+    inplay_hit = _combined_inplay_hit(batter_inplay_hit_rate, pitcher_inplay_hit_rate, cfg)
+
+    # Optional K-target calibration (applied before translating k_tgt into call mix).
+    k_mult = _cfg_float(cfg, "k_logit_mult", 1.0)
+    k_bias = _cfg_float(cfg, "k_logit_bias", 0.0)
+    if (k_mult != 1.0) or (k_bias != 0.0):
+        k_tgt = clamp01(_sigmoid(_logit01(k_tgt) * k_mult + k_bias))
+
+    # Deterministic run environment tuning.
+    hr_tgt = clamp01(hr_tgt * float(getattr(cfg, "hr_rate_mult", 1.0) or 1.0))
+    inplay_hit = clamp01(inplay_hit * float(getattr(cfg, "inplay_hit_rate_mult", 1.0) or 1.0))
+    # Same hook, same stage, for the other two rates a refit corrects. Applied
+    # AFTER the k-logit calibration above deliberately: that transform shapes the
+    # curve, this scales the level, and folding a level correction into a logit
+    # mult would make the two inseparable.
+    k_tgt = clamp01(k_tgt * float(getattr(cfg, "k_rate_mult", 1.0) or 1.0))
+    bb_tgt = clamp01(bb_tgt * float(getattr(cfg, "bb_rate_mult", 1.0) or 1.0))
+
+    # Weather adjustments (kept intentionally conservative).
+    hr_tgt = clamp01(hr_tgt * float(weather_hr_mult) * float(park_hr_mult))
+    inplay_hit = clamp01(inplay_hit * float(weather_inplay_hit_mult) * float(park_inplay_hit_mult))
+    xb_share_adj = clamp01(
+        float(batter_xb_hit_share)
+        * float(getattr(cfg, "xb_share_mult", 1.0) or 1.0)
+        * float(weather_xb_share_mult)
+        * float(park_xb_share_mult)
+    )
+
+    # Priors
+    p_hbp = clamp01(cfg.base_hbp * (hbp_tgt / 0.008))
+
+    # Plate discipline / control proxy: BB target increases BALL probability
+    ball_bias = (bb_tgt - 0.08) * float(cfg.bb_ball_bias_mult)
+    take_bias = 0.0
+    if balls == 3:
+        take_bias = float(cfg.three_ball_take_bias)
+        if has_runners_on:
+            take_bias += _cfg_float(cfg, "three_ball_take_bias_runner_on_bonus", 0.0)
+        if is_reliever:
+            take_bias += _cfg_float(cfg, "three_ball_take_bias_reliever_bonus", 0.0)
+        if has_runners_on and is_reliever:
+            take_bias += _cfg_float(cfg, "three_ball_take_bias_reliever_runner_on_bonus", 0.0)
+
+    # Two-strike: more whiff/foul, less in-play
+    two_strike = 1.0 if strikes == 2 else 0.0
+    whiff_boost = float(cfg.two_strike_whiff_boost) * two_strike
+    foul_boost = float(cfg.two_strike_foul_boost) * two_strike
+    inplay_penalty = float(cfg.two_strike_inplay_penalty) * two_strike
+
+    # Pitch-type effects (global priors * pitcher-specific multipliers)
+    whiff_mult = float(cfg.pitch_whiff_mult.get(pitch_type, 1.0)) * float(pitcher_whiff_mult)
+    inplay_mult = float(cfg.pitch_inplay_mult.get(pitch_type, 1.0)) * float(pitcher_inplay_mult)
+
+    # Batter pitch-type multiplier (hook populated by features)
+    pt_mult = float(batter_pt_mult)
+    count_mult = max(
+        0.90,
+        min(
+            1.12,
+            math.sqrt(max(0.75, float(batter_pitch_count_mult)) * max(0.75, float(pitcher_pitch_count_mult))),
+        ),
+    )
+    count_delta = float(count_mult) - 1.0
+
+    p_ball = clamp01((cfg.base_ball + ball_bias + take_bias) * (1.0 + 0.45 * count_delta))
+    p_called = clamp01(cfg.base_called_strike * (1.0 - 0.5 * k_tgt) * (1.0 + 0.10 * count_delta))
+
+    # Umpire zone effect: slightly shift BALL vs CALLED_STRIKE.
+    ump = max(0.92, min(1.08, float(umpire_called_strike_mult)))
+    p_called = clamp01(p_called * ump)
+    p_ball = clamp01(p_ball * (1.0 / ump))
+    p_whiff = clamp01((cfg.base_swinging_strike + whiff_boost) * (0.7 + 1.2 * k_tgt) * whiff_mult / max(0.75, pt_mult))
+    p_foul = clamp01((cfg.base_foul + foul_boost) * (0.9 + 0.4 * (1.0 - k_tgt)) * (1.0 + 0.35 * count_delta))
+    p_inplay = clamp01((cfg.base_in_play - inplay_penalty) * (0.85 + 0.5 * (1.0 - k_tgt)) * inplay_mult * pt_mult / max(0.88, count_mult))
+
+    # `#440`: first-pitch approach. Applied AFTER all other terms and BEFORE
+    # normalisation, so it re-weights the final mix rather than competing with
+    # the count/rate scalings above.
+    if balls == 0 and strikes == 0:
+        _d = _cfg_float(cfg, "first_pitch_swing_damp", 1.0)
+        if _d != 1.0:
+            p_whiff *= _d
+            p_foul *= _d
+            p_inplay *= _d
+        _cb = _cfg_float(cfg, "first_pitch_called_boost", 1.0)
+        if _cb != 1.0:
+            p_called *= _cb
+
+    # `#440`: count-shape corrections. Same placement as the first-pitch term --
+    # after the rate/count scalings, before normalisation -- so they re-weight
+    # the final mix instead of competing with the terms above.
+    if strikes >= 2:
+        _w = _cfg_float(cfg, "two_strike_waste_ball_boost", 1.0)
+        if _w != 1.0:
+            p_ball *= _w
+        _cd = _cfg_float(cfg, "two_strike_called_damp", 1.0)
+        if _cd != 1.0:
+            p_called *= _cd
+        # NOTE: two-strike whiffs are NOT boosted here. `two_strike_whiff_boost`
+        # already exists (see the field below) and is already consumed, as
+        # `whiff_boost = cfg.two_strike_whiff_boost * two_strike`. Adding a
+        # second application here double-counted it: declaring the field twice
+        # let the later default (0.0409) win, so passing the "no-op" 1.0 raised
+        # two-strike whiffs 24x AND multiplied them again. That is what made a
+        # dict of 1.0s differ from an empty dict.
+    else:
+        # NOT an else-branch on convenience: `two_strike_foul_boost` already
+        # owns 2-strike fouls, and stacking both would double-count there.
+        _fb = _cfg_float(cfg, "early_count_foul_boost", 1.0)
+        if _fb != 1.0:
+            p_foul *= _fb
+    if strikes == 0 and balls >= 1:
+        _bc = _cfg_float(cfg, "behind_count_called_boost", 1.0)
+        if _bc != 1.0:
+            p_called *= _bc
+
+    # Normalize after HBP
+    _tab = getattr(cfg, "count_outcome_mult", None)
+    if _tab:
+        _row = _tab.get(f"{int(balls)}-{int(strikes)}")
+        if _row:
+            p_ball *= float(_row.get("ball", 1.0))
+            p_called *= float(_row.get("called", 1.0))
+            p_whiff *= float(_row.get("swing", 1.0))
+            p_foul *= float(_row.get("foul", 1.0))
+            p_inplay *= float(_row.get("inplay", 1.0))
+
+    rest = 1.0 - p_hbp
+    s = p_ball + p_called + p_whiff + p_foul + p_inplay
+    if s <= 0:
+        p_ball, p_called, p_whiff, p_foul, p_inplay = 0.40, 0.18, 0.12, 0.12, 0.18
+        s = p_ball + p_called + p_whiff + p_foul + p_inplay
+    scale = rest / s
+    p_ball *= scale
+    p_called *= scale
+    p_whiff *= scale
+    p_foul *= scale
+    p_inplay *= scale
+
+    x = rng.random()
+    if x < p_hbp:
+        return PitchResult(pitch_type=pitch_type, call=PitchCall.HIT_BY_PITCH, is_strike=False, is_ball=False, in_play=False)
+    x -= p_hbp
+    if x < p_ball:
+        return PitchResult(pitch_type=pitch_type, call=PitchCall.BALL, is_strike=False, is_ball=True, in_play=False)
+    x -= p_ball
+    if x < p_called:
+        return PitchResult(pitch_type=pitch_type, call=PitchCall.CALLED_STRIKE, is_strike=True, is_ball=False, in_play=False)
+    x -= p_called
+    if x < p_whiff:
+        return PitchResult(pitch_type=pitch_type, call=PitchCall.SWINGING_STRIKE, is_strike=True, is_ball=False, in_play=False)
+    x -= p_whiff
+    if x < p_foul:
+        return PitchResult(pitch_type=pitch_type, call=PitchCall.FOUL, is_strike=True, is_ball=False, in_play=False)
+
+    dist = _bb_dist_matchup(
+        cfg,
+        batter_bb_gb_rate,
+        batter_bb_fb_rate,
+        batter_bb_ld_rate,
+        batter_bb_pu_rate,
+        int(batter_bb_inplay_n or 0),
+        pitcher_bb_gb_rate,
+        pitcher_bb_fb_rate,
+        pitcher_bb_ld_rate,
+        pitcher_bb_pu_rate,
+        int(pitcher_bb_inplay_n or 0),
+    )
+    bb = _sample_bb_type(rng, dist)
+
+    # HR and hit-in-play mapping.
+    # Keep HR partly independent of in-play hit rate.
+    hr_on_ball_in_play = clamp01(hr_tgt * float(cfg.hr_on_ball_in_play_factor))
+    hr_w = {
+        BattedBallType.GROUND: _cfg_float(cfg, "hr_bb_w_ground", 0.06),
+        BattedBallType.FLY: _cfg_float(cfg, "hr_bb_w_fly", 1.70),
+        BattedBallType.LINE: _cfg_float(cfg, "hr_bb_w_line", 0.75),
+        BattedBallType.POP: _cfg_float(cfg, "hr_bb_w_pop", 0.02),
+    }
+    mean_hr_w = 0.0
+    for t, p in dist.items():
+        mean_hr_w += float(p) * float(hr_w.get(t, 1.0))
+    mean_hr_w = max(1e-9, mean_hr_w)
+    p_hr = clamp01(hr_on_ball_in_play * float(hr_w.get(bb, 1.0)) / mean_hr_w)
+    if rng.random() < p_hr:
+        return PitchResult(
+            pitch_type=pitch_type,
+            call=PitchCall.IN_PLAY,
+            is_strike=True,
+            is_ball=False,
+            in_play=True,
+            batted_ball_type=bb,
+            in_play_result="HR",
+        )
+
+    if rng.random() < inplay_hit:
+        xb_w = {
+            BattedBallType.GROUND: _cfg_float(cfg, "xb_bb_w_ground", 0.75),
+            BattedBallType.FLY: _cfg_float(cfg, "xb_bb_w_fly", 1.10),
+            BattedBallType.LINE: _cfg_float(cfg, "xb_bb_w_line", 1.28),
+            BattedBallType.POP: _cfg_float(cfg, "xb_bb_w_pop", 0.45),
+        }
+        mean_xb_w = 0.0
+        for t, p in dist.items():
+            mean_xb_w += float(p) * float(xb_w.get(t, 1.0))
+        mean_xb_w = max(1e-9, mean_xb_w)
+        xb_share_type = clamp01(xb_share_adj * float(xb_w.get(bb, 1.0)) / mean_xb_w)
+        hit = _pick_hit_type(rng, xb_share_type, float(batter_triple_share_of_xb))
+        return PitchResult(
+            pitch_type=pitch_type,
+            call=PitchCall.IN_PLAY,
+            is_strike=True,
+            is_ball=False,
+            in_play=True,
+            batted_ball_type=bb,
+            in_play_result=hit,
+        )
+
+    return PitchResult(
+        pitch_type=pitch_type,
+        call=PitchCall.IN_PLAY,
+        is_strike=True,
+        is_ball=False,
+        in_play=True,
+        batted_ball_type=bb,
+        in_play_result="OUT",
+    )

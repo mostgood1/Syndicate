@@ -1,0 +1,745 @@
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple
+
+
+class Handedness(str, Enum):
+    R = "R"
+    L = "L"
+    S = "S"
+
+
+class PitchType(str, Enum):
+    # Small canonical set; map Statcast/StatsAPI to these externally.
+    FF = "FF"  # 4-seam
+    SI = "SI"  # sinker
+    FC = "FC"  # cutter
+    SL = "SL"  # slider
+    CU = "CU"  # curveball
+    CH = "CH"  # changeup
+    FS = "FS"  # splitter
+    KC = "KC"  # knuckle curve
+    KN = "KN"  # knuckleball
+    OTHER = "OTHER"
+
+
+class PitchCall(str, Enum):
+    BALL = "BALL"
+    CALLED_STRIKE = "CALLED_STRIKE"
+    SWINGING_STRIKE = "SWINGING_STRIKE"
+    FOUL = "FOUL"
+    IN_PLAY = "IN_PLAY"
+    HIT_BY_PITCH = "HIT_BY_PITCH"
+
+
+class BattedBallType(str, Enum):
+    GROUND = "GROUND"
+    LINE = "LINE"
+    FLY = "FLY"
+    POP = "POP"
+
+
+class BaseState(str, Enum):
+    EMPTY = "---"
+    FIRST = "1--"
+    SECOND = "-2-"
+    THIRD = "--3"
+    FIRST_SECOND = "12-"
+    FIRST_THIRD = "1-3"
+    SECOND_THIRD = "-23"
+    LOADED = "123"
+
+
+Count = Tuple[int, int]  # balls, strikes
+
+
+@dataclass(frozen=True)
+class WeatherMultipliers:
+    hr_mult: float = 1.0
+    inplay_hit_mult: float = 1.0
+    xb_share_mult: float = 1.0
+
+
+@dataclass
+class WeatherFactors:
+    """Weather context for a game.
+
+    This is intentionally lightweight and robust to missing data.
+    """
+
+    source: str = ""
+    fetched_at: str = ""
+    condition: str = ""
+    temperature_f: Optional[float] = None
+    wind_speed_mph: Optional[float] = None
+    wind_direction: str = ""  # out|in|cross|unknown
+    wind_raw: str = ""
+    is_dome: Optional[bool] = None
+
+    def multipliers(self) -> WeatherMultipliers:
+        # If dome/closed roof, treat as neutral.
+        if self.is_dome is True:
+            return WeatherMultipliers()
+
+        # Temperature: warmer -> slightly more offense; colder -> slightly less.
+        temp = self.temperature_f
+        if isinstance(temp, (int, float)):
+            delta = float(temp) - 70.0
+            temp_factor = 1.0 + 0.003 * delta
+            temp_factor = max(0.85, min(1.15, temp_factor))
+        else:
+            temp_factor = 1.0
+
+        wind = self.wind_speed_mph
+        wind_speed = float(wind) if isinstance(wind, (int, float)) else 0.0
+        wind_dir = (self.wind_direction or "unknown").lower()
+        wind_factor = 1.0
+        if wind_speed > 10.0:
+            adj = 0.02 * (wind_speed - 10.0)
+            if wind_dir == "out":
+                wind_factor = 1.0 + adj
+            elif wind_dir == "in":
+                wind_factor = 1.0 - adj
+        wind_factor = max(0.75, min(1.25, wind_factor))
+
+        hr_mult = temp_factor * wind_factor
+        hr_mult = max(0.75, min(1.35, hr_mult))
+
+        # Hits-in-play respond more gently than HR.
+        inplay_hit_mult = 1.0 + 0.0015 * (float(temp) - 70.0) if isinstance(temp, (int, float)) else 1.0
+        inplay_hit_mult = max(0.90, min(1.10, inplay_hit_mult))
+
+        # Extra-base share is a small nudge only.
+        xb_share_mult = 1.0 + 0.0008 * (float(temp) - 70.0) if isinstance(temp, (int, float)) else 1.0
+        xb_share_mult = max(0.92, min(1.08, xb_share_mult))
+
+        return WeatherMultipliers(hr_mult=hr_mult, inplay_hit_mult=inplay_hit_mult, xb_share_mult=xb_share_mult)
+
+
+@dataclass(frozen=True)
+class ParkMultipliers:
+    hr_mult: float = 1.0
+    inplay_hit_mult: float = 1.0
+    xb_share_mult: float = 1.0
+
+
+@dataclass
+class ParkFactors:
+    """Park context for a game.
+
+    This is a heuristic geometry-based adjustment (not a true historical park factor).
+    It is designed to be stable and data-light, using venue field dimensions when available.
+    """
+
+    source: str = ""
+    fetched_at: str = ""
+    venue_id: Optional[int] = None
+    venue_name: str = ""
+    roof_type: str = ""
+    roof_status: str = ""
+
+    left_line: Optional[float] = None
+    center: Optional[float] = None
+    right_line: Optional[float] = None
+
+    # Optional derived overrides (e.g., Statcast-derived park multipliers).
+    hr_mult_override: Optional[float] = None
+    inplay_hit_mult_override: Optional[float] = None
+    xb_share_mult_override: Optional[float] = None
+
+    def multipliers(self) -> ParkMultipliers:
+        # If derived overrides exist, use them.
+        if isinstance(self.hr_mult_override, (int, float)) or isinstance(self.inplay_hit_mult_override, (int, float)) or isinstance(self.xb_share_mult_override, (int, float)):
+            hr_mult = float(self.hr_mult_override) if isinstance(self.hr_mult_override, (int, float)) else 1.0
+            inplay_hit_mult = float(self.inplay_hit_mult_override) if isinstance(self.inplay_hit_mult_override, (int, float)) else 1.0
+            xb_share_mult = float(self.xb_share_mult_override) if isinstance(self.xb_share_mult_override, (int, float)) else 1.0
+            hr_mult = max(0.85, min(1.15, hr_mult))
+            inplay_hit_mult = max(0.90, min(1.10, inplay_hit_mult))
+            xb_share_mult = max(0.92, min(1.08, xb_share_mult))
+            return ParkMultipliers(hr_mult=hr_mult, inplay_hit_mult=inplay_hit_mult, xb_share_mult=xb_share_mult)
+
+        # Closed roof / dome: treat as neutral (weather already handles the dome case too).
+        if (self.roof_status or "").lower() == "closed":
+            return ParkMultipliers()
+        if "dome" in (self.roof_type or "").lower():
+            return ParkMultipliers()
+
+        dims = [self.left_line, self.center, self.right_line]
+        dims_f = [float(x) for x in dims if isinstance(x, (int, float)) and x > 0]
+        if len(dims_f) < 2:
+            return ParkMultipliers()
+
+        avg = sum(dims_f) / float(len(dims_f))
+        baseline = 370.0
+        # Smaller park -> higher HR; larger park -> lower HR.
+        # 10ft smaller => ~+2% HR (conservative).
+        hr_mult = 1.0 + 0.0020 * (baseline - avg)
+        hr_mult = max(0.88, min(1.12, hr_mult))
+
+        # Larger outfields can slightly increase hit-in-play and extra bases.
+        inplay_hit_mult = 1.0 + 0.0008 * (avg - baseline)
+        inplay_hit_mult = max(0.95, min(1.07, inplay_hit_mult))
+
+        xb_share_mult = 1.0 + 0.0010 * (avg - baseline)
+        xb_share_mult = max(0.95, min(1.10, xb_share_mult))
+
+        return ParkMultipliers(hr_mult=hr_mult, inplay_hit_mult=inplay_hit_mult, xb_share_mult=xb_share_mult)
+
+
+@dataclass(frozen=True)
+class UmpireMultipliers:
+    called_strike_mult: float = 1.0
+
+
+@dataclass
+class UmpireFactors:
+    """Umpire context for a game.
+
+    We only model the home-plate umpire, via a small called-strike multiplier.
+    If unknown, this remains neutral.
+    """
+
+    source: str = ""
+    fetched_at: str = ""
+    home_plate_umpire_id: Optional[int] = None
+    home_plate_umpire_name: str = ""
+    called_strike_mult: float = 1.0
+
+    def multipliers(self) -> UmpireMultipliers:
+        m = float(self.called_strike_mult or 1.0)
+        m = max(0.92, min(1.08, m))
+        return UmpireMultipliers(called_strike_mult=m)
+
+
+@dataclass(frozen=True)
+class Player:
+    mlbam_id: int
+    full_name: str
+    primary_position: str
+    bat_side: Handedness
+    throw_side: Handedness
+
+
+@dataclass
+class BatterProfile:
+    player: Player
+    # Per-PA targets; the pitch engine approximates these.
+    k_rate: float = 0.22
+    bb_rate: float = 0.08
+    hbp_rate: float = 0.008
+    hr_rate: float = 0.03
+    inplay_hit_rate: float = 0.28
+    xb_hit_share: float = 0.22  # of hits (excluding HR), fraction that are 2B/3B
+    triple_share_of_xb: float = 0.12  # of (2B+3B), fraction that are 3B
+
+    # Stolen base propensity (best-effort; used for SB prop approximation).
+    # sb_attempt_rate is per "steal opportunity" (roughly: times reaching 1B).
+    sb_attempt_rate: float = 0.0
+    sb_success_rate: float = 0.72
+    vs_pitch_type: Dict[PitchType, float] = field(default_factory=dict)
+    vs_pitch_type_hr: Dict[PitchType, float] = field(default_factory=dict)
+
+    # Platoon split multipliers (best-effort). Keys are metric names:
+    # "k", "bb", "hr", "inplay". Values are multipliers vs that pitcher hand.
+    platoon_mult_vs_lhp: Dict[str, float] = field(default_factory=dict)
+    platoon_mult_vs_rhp: Dict[str, float] = field(default_factory=dict)
+
+    # Home/road split multipliers keyed by venue side.
+    # Values use the same metric names as platoon multipliers.
+    venue_mult_home: Dict[str, float] = field(default_factory=dict)
+    venue_mult_away: Dict[str, float] = field(default_factory=dict)
+
+    # Venue-specific multipliers keyed by home-team id for the ballpark.
+    # For example, games in Fenway Park key to BOS team_id regardless of opponent.
+    vs_venue_hr_mult: Dict[int, float] = field(default_factory=dict)
+    vs_venue_k_mult: Dict[int, float] = field(default_factory=dict)
+    vs_venue_bb_mult: Dict[int, float] = field(default_factory=dict)
+    vs_venue_inplay_mult: Dict[int, float] = field(default_factory=dict)
+    vs_venue_history: Dict[int, Dict[str, float]] = field(default_factory=dict)
+
+    # Statcast quality bag. `#440` -- CONTRACT SETTLED 2026-08-18.
+    #
+    # This is a UNION, not a fixed schema, and it is PARTIAL BY DESIGN. Three
+    # consumers read it and each takes only the keys it recognises:
+    #
+    #   simulate.py:163  _statcast_shape_rate_mults  reads the RAW metrics and
+    #                    DERIVES {k,bb,hr,inplay,pitch_count,xb} from them
+    #   simulate.py:1400 lookahead pressure          reads BOTH raw metrics and
+    #                    the derived multipliers, guarding each with isinstance
+    #
+    # Every read is guarded and `_rate_ratio_mult` returns 1.0 for a missing or
+    # non-numeric value, so supplying a SUBSET is legal and safe. The old comment
+    # here listed only k/bb/hr/inplay, which described the DERIVED OUTPUT and led
+    # to a hunt for a producer that could never have existed.
+    #
+    # RAW metrics (feed these):
+    #   chase_swing_rate  zone_rate  csw_rate  contact_rate  xwoba
+    #   ev_mean  ev_max  pulled_air_rate  pitch_velo_mean  pitch_extension_mean
+    #
+    # DERIVED multipliers (k/bb/hr/inplay): DO NOT FEED alongside the raw
+    # metrics. `_statcast_shape_rate_mults` already derives them, and supplying
+    # both makes the lookahead add pressure from a value the shape function has
+    # separately applied -- double-counting, the failure measured 2026-08-17.
+    statcast_quality_mult: Dict[str, float] = field(default_factory=dict)
+
+    # Optional: batter-vs-pitcher head-to-head multipliers keyed by pitcher MLBAM id.
+    # Intended to be applied only when the current pitcher matches.
+    vs_pitcher_hr_mult: Dict[int, float] = field(default_factory=dict)
+    vs_pitcher_k_mult: Dict[int, float] = field(default_factory=dict)
+    vs_pitcher_bb_mult: Dict[int, float] = field(default_factory=dict)
+    vs_pitcher_inplay_mult: Dict[int, float] = field(default_factory=dict)
+    vs_pitcher_history: Dict[int, Dict[str, float]] = field(default_factory=dict)
+
+    # Batted-ball type tendencies (share of balls in play).
+    # Defaults match the pitch-model prior distribution.
+    bb_gb_rate: float = 0.44
+    bb_fb_rate: float = 0.25
+    bb_ld_rate: float = 0.20
+    bb_pu_rate: float = 0.11
+    bb_inplay_n: int = 0
+
+
+@dataclass
+class PitcherProfile:
+    player: Player
+    k_rate: float = 0.24
+    bb_rate: float = 0.08
+    hbp_rate: float = 0.008
+    hr_rate: float = 0.03
+    inplay_hit_rate: float = 0.27
+
+    # Optional season-to-date sample sizes (best-effort, may be 0 if unknown).
+    # Used to size uncertainty when sampling per-game pitcher rates.
+    batters_faced: float = 0.0
+    balls_in_play: float = 0.0
+
+    arsenal: Dict[PitchType, float] = field(default_factory=dict)  # usage probs
+    # Count x batter-hand conditional mixes, keyed "<bucket>|<hand>". Empty means
+    # "fall back to `arsenal`", which is exactly the pre-2026-08-18 behaviour.
+    # DECLARED, not setattr: `dataclasses.replace()` drops setattr attributes,
+    # which is how `position_substitutions` stayed permanently off.
+    conditional_arsenal: Dict[str, Dict[PitchType, float]] = field(default_factory=dict)
+    count_bucket_map: Dict[str, str] = field(default_factory=dict)  # "b-s" -> bucket
+    conditional_arsenal_source: str = ""
+    # Optional pitch-type outcome multipliers (e.g., Statcast-derived vs global priors).
+    pitch_type_whiff_mult: Dict[PitchType, float] = field(default_factory=dict)
+    pitch_type_inplay_mult: Dict[PitchType, float] = field(default_factory=dict)
+    pitch_type_hr_mult: Dict[PitchType, float] = field(default_factory=dict)
+    # Cache-only Statcast (pybaseball) provenance for the above multipliers.
+    statcast_splits_source: str = ""
+    statcast_splits_n_pitches: int = 0
+    statcast_splits_start_date: str = ""
+    statcast_splits_end_date: str = ""
+    arsenal_source: str = "default"  # default|statcast
+    arsenal_sample_size: int = 0
+    stamina_pitches: int = 90
+    role: str = "RP"  # SP/CL/SU/MR/LR (starter/closer/setup/middle/long)
+
+    # Availability multiplier (0..1) derived from recent usage / fatigue.
+    # Defaults to 1.0 (fully available).
+    availability_mult: float = 1.0
+
+    # Platoon split multipliers (best-effort). Keys are metric names:
+    # "k", "bb", "hr", "inplay". Values are multipliers vs that batter side.
+    platoon_mult_vs_lhb: Dict[str, float] = field(default_factory=dict)
+    platoon_mult_vs_rhb: Dict[str, float] = field(default_factory=dict)
+
+    # Home/road split multipliers keyed by venue side.
+    venue_mult_home: Dict[str, float] = field(default_factory=dict)
+    venue_mult_away: Dict[str, float] = field(default_factory=dict)
+
+    # Venue-specific multipliers keyed by home-team id for the ballpark.
+    vs_venue_hr_mult: Dict[int, float] = field(default_factory=dict)
+    vs_venue_k_mult: Dict[int, float] = field(default_factory=dict)
+    vs_venue_bb_mult: Dict[int, float] = field(default_factory=dict)
+    vs_venue_inplay_mult: Dict[int, float] = field(default_factory=dict)
+    vs_venue_history: Dict[int, Dict[str, float]] = field(default_factory=dict)
+
+    # Statcast quality bag. `#440` -- CONTRACT SETTLED 2026-08-18.
+    #
+    # This is a UNION, not a fixed schema, and it is PARTIAL BY DESIGN. Three
+    # consumers read it and each takes only the keys it recognises:
+    #
+    #   simulate.py:163  _statcast_shape_rate_mults  reads the RAW metrics and
+    #                    DERIVES {k,bb,hr,inplay,pitch_count,xb} from them
+    #   simulate.py:1400 lookahead pressure          reads BOTH raw metrics and
+    #                    the derived multipliers, guarding each with isinstance
+    #
+    # Every read is guarded and `_rate_ratio_mult` returns 1.0 for a missing or
+    # non-numeric value, so supplying a SUBSET is legal and safe. The old comment
+    # here listed only k/bb/hr/inplay, which described the DERIVED OUTPUT and led
+    # to a hunt for a producer that could never have existed.
+    #
+    # RAW metrics (feed these):
+    #   chase_swing_rate  zone_rate  csw_rate  contact_rate  xwoba
+    #   ev_mean  ev_max  pulled_air_rate  pitch_velo_mean  pitch_extension_mean
+    #
+    # DERIVED multipliers (k/bb/hr/inplay): DO NOT FEED alongside the raw
+    # metrics. `_statcast_shape_rate_mults` already derives them, and supplying
+    # both makes the lookahead add pressure from a value the shape function has
+    # separately applied -- double-counting, the failure measured 2026-08-17.
+    statcast_quality_mult: Dict[str, float] = field(default_factory=dict)
+
+    # Batted-ball type tendencies (share of balls in play allowed).
+    # Defaults match the pitch-model prior distribution.
+    bb_gb_rate: float = 0.44
+    bb_fb_rate: float = 0.25
+    bb_ld_rate: float = 0.20
+    bb_pu_rate: float = 0.11
+    bb_inplay_n: int = 0
+
+    # Optional leverage index hint (0-1). Higher means preferred in high leverage.
+    leverage_skill: float = 0.5
+
+
+@dataclass(frozen=True)
+class Team:
+    team_id: int
+    name: str
+    abbreviation: str
+
+
+@dataclass
+class Lineup:
+    batters: List[BatterProfile]
+    pitcher: PitcherProfile
+    bench: List[BatterProfile] = field(default_factory=list)
+    bullpen: List[PitcherProfile] = field(default_factory=list)
+
+
+@dataclass
+class ManagerProfile:
+    pull_starter_pitch_count: int = 95
+    pull_starter_third_time_penalty: float = 0.04
+    # Keep starters in longer early (useful for F5 markets) unless they blow up.
+    starter_min_innings: int = 5
+    starter_blowup_run_diff: int = 6  # allow early hook if game gets out of hand
+    closer_leverage_max_run_diff: int = 3
+    use_closer_in_9th_only: bool = True
+    pinch_hit_aggressiveness: float = 0.15
+
+
+@dataclass
+class TeamRoster:
+    team: Team
+    manager: ManagerProfile
+    lineup: Lineup
+
+
+@dataclass(frozen=True)
+class PitchResult:
+    pitch_type: PitchType
+    call: PitchCall
+    is_strike: bool
+    is_ball: bool
+    in_play: bool
+    batted_ball_type: Optional[BattedBallType] = None
+    # If in_play=True, one of: OUT, 1B, 2B, 3B, HR, ROE, FC
+    in_play_result: Optional[str] = None
+
+
+@dataclass
+class InningHalfState:
+    batting_team: Team
+    fielding_team: Team
+    outs: int = 0
+    bases: BaseState = BaseState.EMPTY
+    # Runner MLBAM ids on bases (0 => empty). This lets us attribute runs and baserunning stats.
+    runner_on_1b: int = 0
+    runner_on_2b: int = 0
+    runner_on_3b: int = 0
+    runs_scored: int = 0
+    next_batter_index: int = 0
+
+
+@dataclass
+class GameConfig:
+    # ------------------------------------------------------------------
+    # HOME-FIELD ADVANTAGE. 1.0 is an EXACT no-op and is the default.
+    #
+    # THE DEFECT IT ADDRESSES, measured 2026-09-07 over 1,015 games / 78 dates
+    # (2026-05-28..08-17) against MLB StatsAPI finals: the daily sim's mean
+    # predicted home margin is **-0.186 runs** against an actual **+0.021** --
+    # it under-rates the home team by ~0.21 runs on every game. The whole of
+    # that bias sits in innings 1-5 (-0.217, -2.1 sigma); innings 6+ are
+    # unbiased (+0.010, +0.1 sigma). It is also why ACTUAL sat above PREDICTED
+    # in every calibration bin of every segment.
+    #
+    # The cause is structural: this package contained **no home-field term at
+    # all**. The only home/away asymmetry was per-player `venue_mult_home` /
+    # `venue_mult_away` splits -- shrunk toward 1.0 by `pitcher_home_away_alpha`
+    # -- plus the batting-order effect of the home team not batting in the ninth
+    # when ahead. A league-wide advantage was being asked of per-player splits
+    # that are noisy and mean-reverting, so on average it vanished.
+    #
+    # WHY IT IS APPLIED SYMMETRICALLY, and this is the part that protects the
+    # rest of the engine. `model_engine_standard.md` is explicit that adding a
+    # MECHANISM to a calibrated engine requires re-fitting whatever was
+    # absorbing it, and that two mechanisms landed together once produced a
+    # NEGATIVE interaction in 4 of 4 markets. Here the thing at risk is TOTALS,
+    # which is a separately priced market and is currently near-unbiased (full
+    # total bias -0.120 runs). So the home side is multiplied by `m` and the
+    # away side by `1/m`: the MARGIN moves and the expected TOTAL is preserved
+    # to first order, which converts "re-fit everything" into "measure that the
+    # total did not move" -- and `scripts/calibrate_mlb_home_field.py` measures
+    # exactly that rather than assuming it.
+    #
+    # Applied to `hr_rate` and `inplay_hit_rate` only: the two rates that
+    # directly create bases. Deliberately NOT `k_rate`/`bb_rate`, which would
+    # move plate-appearance counts and therefore pitch counts, bullpen entry
+    # timing and every prop that keys off them -- a much wider blast radius for
+    # the same one-dimensional effect.
+    #
+    # THE ADOPTED VALUE IS 1.0169, AND IT CAME FROM REAL ROSTERS, NOT TOY ONES.
+    #
+    # `scripts/calibrate_mlb_home_field.py` first solved 1.0096 on SYNTHETIC
+    # rosters where both sides are identical league-average teams. That number
+    # is WRONG and was never adopted. `scripts/validate_home_field_real_slate.py`
+    # measured the same elasticity on real slates with real probable pitchers:
+    #
+    #     slate        m=1.010 elasticity (runs of margin per 1%)
+    #     2026-06-18   +0.1111 +/- 0.0320
+    #     2026-07-20   +0.1220 +/- 0.0295
+    #     2026-08-05   +0.1332 +/- 0.0294
+    #     POOLED       +0.1227 +/- 0.0175    Q=0.3 on df=2 -- the slates AGREE
+    #     toy said     +0.2158               -- 5.3 sigma away
+    #
+    # Real rosters earn only ~57% of the margin a toy roster earns per percent,
+    # because rates are multiplied and then CLAMPED (`_clamp_rate(hr, 0.002,
+    # 0.12)`, inplay 0.10-0.45) and a clamp that can never bind on a uniform toy
+    # lineup binds on a real one's extremes -- the slates carry `hr_rate` from
+    # 0.0000 to 0.0694 against the toy roster's constant 0.035. Adopting 1.0096
+    # would have delivered about +0.117 runs of the +0.207 owed and read as done.
+    #
+    # HETEROGENEITY WAS CHECKED, not assumed: Cochran's Q is 0.3 on 2 degrees of
+    # freedom, so the three slates are measuring one constant and pooling them is
+    # legitimate. Had they disagreed the right conclusion would have been that
+    # the multiplier is not a constant at all.
+    #
+    # TOTALS HELD, on three independent measurements. Pooled across the real
+    # slates: -0.0108 +/- 0.0181 at m=1.010 (0.6 sigma) and -0.0262 +/- 0.0242 at
+    # m=1.020 (1.1 sigma), agreeing with the high-power synthetic estimate of
+    # ~-0.015 runs. An earlier reading put this at 11.5 sigma; that was a
+    # small-sample artifact of a trend line fitted through a definitional origin
+    # with correlated errors, and it is retracted.
+    #
+    # 1 se on the solved value is 1.0148 .. 1.0197. Set `home_field_offense_mult`
+    # explicitly to 1.0 to disable.
+    home_field_offense_mult: float = 1.0169
+
+    # *** BROKEN. DO NOT ENABLE. Kept only so the finding is not re-derived. ***
+    #
+    # Measured 2026-08-18: switching this on inflates run scoring by 8-35% across
+    # 4 games (7.27 -> 9.07, 11.33 -> 12.47, 9.47 -> 10.20, 10.67 -> 14.40).
+    # **A variance-reduction technique MUST be distribution-preserving. This one
+    # is not, so it cannot be used no matter how much variance it removes.**
+    #
+    # A first bug WAS found and fixed and did not account for it: the key used
+    # `half.next_batter_index`, which simulate.py:3178 advances MODULO the lineup
+    # length, so it held 9 values and replayed the same stream 4-5 times per
+    # game -- that version inflated scoring up to 126%. With a monotonic per-team
+    # PA counter the reseed now fires exactly once per PA with 104 distinct seeds
+    # in a 104-PA game, verified, AND SCORING IS STILL INFLATED.
+    #
+    # Residual cause not isolated. The marginal uniforms are clean (draws 1-5
+    # from 40,000 freshly-seeded streams sit within 1.2 sd of 0.5), so it is not
+    # a biased head. Suspicion is the JOINT structure of early Mersenne Twister
+    # output across independently-seeded streams, which is a known weakness --
+    # MT is seeded for one long stream, not for many short ones.
+    #
+    # IF THIS IS EVER REVISITED: do not reseed MT. Use a counter-based generator
+    # with real substreams (numpy PCG64 `.jumped(n)`, or Philox), which is
+    # designed for exactly this and carries no head-of-stream problem.
+    #
+    # COMMON RANDOM NUMBERS. Re-seed the game RNG at the start of every plate
+    # appearance from (seed, batting team, that team's PA index) rather than
+    # letting one stream run the whole game.
+    #
+    # Why: with a single per-game stream, comparing two engine configurations is
+    # far noisier than it looks. The first pitch whose outcome differs shifts
+    # every subsequent draw, so the two arms are effectively running different
+    # games from that point on. Measured 2026-08-18, the market harness had a
+    # seed-to-seed noise floor of 0.00326 Brier against effects of ~0.00138 --
+    # noise 2.4x the effect, and the sign flipped in 3 of 4 markets between two
+    # seeds. Sharing a seed across arms LOOKS like common random numbers and is
+    # not, because control flow depends on the RNG.
+    #
+    # A team's Nth plate appearance is the same logical event in both arms by
+    # definition of a batting order, so seeding on it re-synchronises the arms
+    # after any divergence instead of letting one early difference randomise the
+    # rest of the game. Inning is deliberately NOT in the key: it shifts when
+    # scoring differs, which would break the alignment this exists to create.
+    #
+    # DEFAULT OFF. It changes every simulated result (different draws), so it is
+    # a measurement tool to be switched on for BOTH arms of a comparison, never
+    # a silent change to what production simulates.
+    crn_pa_seeding: bool = False
+    innings: int = 9
+    extra_innings: int = 3
+    # Baseball full-game markets settle to a winner. Keep tied finals opt-in only.
+    allow_ties_after_max_innings: bool = False
+    # Extra-innings placed runner (regular-season MLB rule): each extra
+    # half-inning starts with the previous lineup spot on second base.
+    extras_placed_runner: bool = True
+    # End the game as soon as the home team takes the lead in the bottom of
+    # the final regulation inning or later (walk-off). Without this, walk-off
+    # halves play to 3 outs and inflate totals/home margins.
+    end_on_walkoff: bool = True
+    rng_seed: Optional[int] = None
+    max_pitches_per_pa: int = 20
+    weather: WeatherFactors = field(default_factory=WeatherFactors)
+    park: ParkFactors = field(default_factory=ParkFactors)
+    umpire: UmpireFactors = field(default_factory=UmpireFactors)
+
+    # Sensitivity knobs: scale the strength of weather/park multipliers without
+    # changing the underlying heuristics.
+    #
+    # Implemented as exponent weights in log-space (mult^weight):
+    # - 1.0 => as-is
+    # - 0.0 => neutralize (force to ~1.0)
+    # - >1 => amplify
+    weather_hr_weight: float = 1.0
+    weather_inplay_hit_weight: float = 1.0
+    weather_xb_share_weight: float = 1.0
+    park_hr_weight: float = 1.0
+    park_inplay_hit_weight: float = 1.0
+    park_xb_share_weight: float = 1.0
+    # `#440` P2: in-sim POSITION-PLAYER substitution (pinch hitters, defensive
+    # replacements). Dark-launched OFF; **ENABLED 2026-09-01** (`#624` step 3)
+    # on the measurements below, taken on current code rather than inherited.
+    #
+    # WHAT IT FIXES. Without it the nine listed starters bat all game, every
+    # game, so opportunity is over-projected and every counting prop inherits
+    # it (props are rate x opportunity). Measured, 24 games x 40 sims against an
+    # actual starter AB of 3.495:
+    #
+    #     OFF  starter AB 3.880   bias +11.0%
+    #     ON   starter AB 3.708   bias  +6.1%     44.7% of the gap closed
+    #
+    # ACCURACY, controlled A/B -- same rosters, same seeds, same odds, same
+    # outcomes, one input differing (30 games x 100 sims, 1,610 scored rows):
+    # hits +0.00288, runs +0.00314, total bases +0.00034, **rbis -0.00086**.
+    # Three of four better. **The market still beats BOTH arms in all four**,
+    # so this is a bias correction and NOT an edge; it must not be reported as
+    # one.
+    #
+    # WHY THIS DOES NOT NEED THE §4.4 RE-FIT FIRST, which is the reason it sat
+    # off. The standard's hazard is that rates fitted with a mechanism ABSENT
+    # already absorb its average effect, so re-adding OVERSHOOTS. Measured here
+    # it UNDER-corrects -- the opportunity bias is still POSITIVE at +6.1%
+    # afterwards -- so it cannot overshoot what was absorbed. And the measured
+    # negative interaction (-0.00331, worse in 4 of 4) was **both mechanisms
+    # together**: batted-ball weight stays 0.0 and pitch-type effectiveness
+    # stays unfed, so that pair is not being created here.
+    #
+    # COST: none. 22.8 -> 21.3 ms per game-sim, measured per-arm rather than
+    # reasoned, because this engine runs on a container with an OOM history.
+    #
+    # STILL OWED, and not fixed by this flag: the residual +6.1% opportunity
+    # bias and the ~12% per-PA RATE bias (`model_skill` measured opportunity as
+    # 55% of the count bias). That is the rate re-fit, a compute-heavy sweep.
+    #
+    # THIS MUST BE A DECLARED FIELD, not an attribute set on an instance.
+    # `dataclasses.replace()` rebuilds a GameConfig from its declared fields
+    # only, and the sim calls `replace(cfg, rng_seed=...)` on every run -- so a
+    # monkey-patched attribute is silently discarded before the first pitch and
+    # the feature reads as permanently disabled. Caught by the reachability test.
+    position_substitutions: bool = True
+    # Toggle batted-ball-informed baserunning: DP, sac flies, and runner advancement.
+    # When False, falls back to a simpler forced-advance baserunning model.
+    bip_baserunning: bool = True
+    # Tuning knobs for the batted-ball-informed OUT logic.
+    # These are intentionally simple (global) until we model speed/arm/depth.
+    # 2026-10-07 (lane mlb-combined-calibration): the bip_* / sb_* defaults below are the
+    # combined-calibration values -- MEASURED from 2026 StatsAPI play-by-play (scripts/
+    # mlb_dp_advancement_rates.py, mlb_steal_rate_calibration.py) or FITTED (bip_dp_rate) --
+    # shipped by logged user override of one guard (see .syndicate/lanes.md).
+    bip_dp_rate: float = 0.30
+    bip_sf_rate_flypop: float = 0.750
+    bip_sf_rate_line: float = 0.657
+    # Popups almost never score a runner from 3rd (2026 pbp: 1/54) while fly balls
+    # do (102/136). None = popups share bip_sf_rate_flypop, the behaviour before 2026-10-06.
+    bip_sf_rate_pop: Optional[float] = 0.019
+    # Tuning knobs for the batted-ball-informed HIT baserunning logic.
+    # These scale the probabilities that runners score on singles/doubles.
+    # 1.0 = baseline behavior.
+    bip_1b_p2_scores_mult: float = 1.15  # runner on 2B scores on 1B
+    bip_2b_p1_scores_mult: float = 1.15  # runner on 1B scores on 2B
+    bip_1b_p1_to_3b_rate: float = 0.24
+    bip_ground_rbi_out_rate: float = 0.18
+    bip_out_2b_to_3b_rate: float = 0.24
+    bip_out_1b_to_2b_rate: float = 0.14
+    bip_misc_advance_pitch_rate: float = 0.00733
+    bip_roe_rate: float = 0.012
+    # Per-trajectory reached-on-error rates. None = bip_roe_rate x the fixed trajectory
+    # multipliers in simulate._roe_reach_rate (the behaviour before 2026-10-06). Measured
+    # 2026 pbp: ground 0.028, line 0.006, fly+pop 0.003 -- errors concentrate on grounders.
+    bip_roe_rate_ground: Optional[float] = 0.0283
+    bip_roe_rate_line: Optional[float] = 0.0057
+    bip_roe_rate_air: Optional[float] = 0.0029
+    # Stolen-base calibration. The roster attempt rate is (SB+CS) per time on base, but
+    # the sim draws it before EVERY PA the runner sits on 1B, so it over-attempts.
+    # Measured on 2026 pbp against the profile rates (scripts/mlb_steal_rate_calibration.py).
+    # 1.0 = no change (the behaviour before 2026-10-06).
+    sb_attempt_mult: float = 0.689
+    sb_success_mult: float = 0.954
+    # Steals of THIRD (runner on 2B, 3B empty, <= 1 out), keyed off the same runner
+    # rates. 0.0 = no steals of third (the behaviour before 2026-10-06, no RNG draw).
+    # Measured 2026 pbp: 25 attempts in 1763 opportunities -> 0.144 x the profile rate.
+    sb3_attempt_mult: float = 0.144
+    sb3_success_mult: float = 0.997
+    # Double steal: on a steal-of-third attempt with a runner on 1B, the trailer goes
+    # with it with this prob (2026 pbp: 11/16). 0.0 = he does not (no RNG draw).
+    sb_double_steal_trail_prob: float = 0.6875
+    bip_fc_rate: float = 0.484
+    bip_fc_runner_on_3b_score_rate: float = 0.0
+    # On a double play with 0 outs before it, real runners do not hold: the runner on
+    # 2nd usually takes 3rd and the runner on 3rd usually scores (no RBI). Rates are
+    # MEASURED from StatsAPI play-by-play (scripts/mlb_dp_advancement_rates.py), not
+    # fitted. 0.0 = runners hold, the behaviour before 2026-10-06.
+    bip_dp_r2_to_3b_rate: float = 0.979
+    bip_dp_r3_scores_rate: float = 1.0
+    # Optional: sample per-game pitcher rates (K/BB/HBP/HR/in-play hit).
+    # This injects "today" uncertainty while keeping within-game consistency.
+    pitcher_rate_sampling: bool = True
+    # Optional tuning hook: overrides for PitcherDistributionConfig fields.
+    # Example: {"bf_scale": 0.2, "bf_min_n": 40.0}
+    # Kept as a dict to avoid circular imports from sim_engine.pitcher_distributions.
+    pitcher_distribution_overrides: Dict[str, Any] = field(default_factory=dict)
+    # Optional tuning hook: overrides for PitchModelConfig fields.
+    # Example: {"base_ball": 0.33, "base_in_play": 0.24}
+    # Kept as a dict to avoid circular imports from sim_engine.pitch_model.
+    pitch_model_overrides: Dict[str, Any] = field(default_factory=dict)
+
+    # Pitching change / bullpen management model.
+    # - off: never change pitchers (starter goes the whole game)
+    # - legacy: deterministic hook + role/leverage reliever selection (backwards compatible)
+    # - v2: probabilistic hook w/ fatigue + TTO pressure + closer constraints
+    manager_pitching: str = "v2"
+    # Optional tuning hook: overrides for manager pitching behavior.
+    # Intended for quick A/B sweeps without expanding the public config surface.
+    # Example: {"hook_jitter_pitches": 6, "starter_hook_spread": 8.0}
+    manager_pitching_overrides: Dict[str, Any] = field(default_factory=dict)
+    # Play-by-play logging. Keep off by default to avoid huge outputs.
+    # off: no PBP, pa: PA-level only, pitch: pitch+PA+inning events
+    pbp: str = "off"
+    pbp_max_events: int = 0  # 0 => unlimited
+
+
+@dataclass
+class GameResult:
+    home_team: Team
+    away_team: Team
+    home_score: int
+    away_score: int
+    innings_played: int
+    batter_stats: Dict[int, Dict[str, int]]
+    pitcher_stats: Dict[int, Dict[str, float]]
+    away_inning_runs: List[int] = field(default_factory=list)
+    home_inning_runs: List[int] = field(default_factory=list)
+    pbp_mode: str = "off"
+    pbp_truncated: bool = False
+    pbp: List[Dict[str, Any]] = field(default_factory=list)
+

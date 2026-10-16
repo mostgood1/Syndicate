@@ -327,7 +327,10 @@ def run_arm(args, mode: str, arm: str) -> int:
         "meta": {"data_root": str(data_root), "live_lens_dir": str(live_lens_dir), "clock_calls": CLOCK.calls, "import_clock_calls": clock_at_call,
                  "seconds": round(elapsed, 2), "requests": len(tape["entries"]) if mode == "record" else None,
                  "misses": tape.get("misses", []), "served": tape.get("served", []),
-                 "pythonhashseed": os.environ.get("PYTHONHASHSEED")},
+                 "pythonhashseed": os.environ.get("PYTHONHASHSEED"),
+                 # AFTER the call, so a lazy import inside the run counts too (phase 2: the port arm must list none).
+                 "vendored_modules_loaded": sorted(n for n, m in list(sys.modules.items())
+                                                   if "/vendor/" in (getattr(m, "__file__", "") or "").replace("\\", "/"))},
     }
     Path(args.out).write_text(json.dumps(out, sort_keys=True, default=str), encoding="utf-8")
     if mode == "record":
@@ -339,6 +342,7 @@ def run_arm(args, mode: str, arm: str) -> int:
                       "files_written": len(out["files"]), "clock_calls": CLOCK.calls,
                       "requests": out["meta"]["requests"], "misses": len(out["meta"]["misses"]),
                       "opened": len(opened), "seconds": out["meta"]["seconds"],
+                      "vendored_modules_loaded": len(out["meta"]["vendored_modules_loaded"]),
                       "value_keys": sorted(value.keys())[:20], "games": len(games) if isinstance(games, list) else None}))
     if os.environ.get("PYTHONHASHSEED") != "0":
         print("WARNING: PYTHONHASHSEED is not 0 -- set it so set/dict iteration order matches across the two processes")
