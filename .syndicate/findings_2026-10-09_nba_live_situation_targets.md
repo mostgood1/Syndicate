@@ -985,3 +985,19 @@ The PROD config runs in production, since the VALID read failed. Data: gate_v4_k
 - It removes native's loss (+0.74 at end Q1) but cannot BEAT the line. §14's total rule ("beat pregame_rate at Q1-Q3") is therefore unreachable by a shrink.
 - A live total that equals the pro-rata line has, by construction, no edge against a live book.
 - **Not built**: the user's "shrink totals" choice is re-presented with this result (see the user report), since building it buys protection, not edge.
+
+## 16. FIT-only research (user: "Find early signal", 2026-10-16): no early in-game state predicts remaining points beyond the line
+
+FIT regular, 802-811 games per checkpoint. y = remaining regulation points − pre-tip market total × remaining fraction. Eight features from pbp-so-far: score vs line, possession rate, points/possession, FTA rate, 3PA share, foul rate, |margin|, OREB rate. OLS split-half by game, out-of-sample.
+
+| checkpoint | resid sd | 8-feature model: OOS |err| vs line | OOS R² | intercept-only: OOS |err| vs line | mean resid (halves) |
+|---|---|---|---|---|---|
+| end Q1 | 14.9 | −0.11 [−0.33, +0.09] | −0.006 | −0.13 [−0.28, +0.01] | −2.11 (−2.16 / −2.07) |
+| end Q2 | 12.5 | −0.10 [−0.26, +0.07] | −0.019 | −0.12 [−0.26, +0.02] | −1.92 (−2.43 / −1.40) |
+| end Q3 | 8.7 | −0.34 [−0.51, −0.17] | −0.018 | **−0.37 [−0.54, −0.20]** | −2.49 (−2.95 / −2.03) |
+| 5:00 Q4 | -- | -- | -- | +0.00 | −0.10 |
+
+- Every univariate correlation is within |0.07|. Every coefficient flips sign or halves between the two halves. OOS R² ≤ 0 everywhere.
+- **The only stable effect is a constant per checkpoint:** the pro-rata line over-projects remaining REGULATION points by ~2-2.5 pts at the period breaks. Part of that is OT, since the market total includes it and this y does not; the rest is the scoring shape across quarters. It is not a live-state signal.
+- **Conclusion:** none of these early in-game states (pace, efficiency, FT/3PA/foul rates, score vs line, margin) predicts remaining NBA points beyond the market line in 2025-26. Together with §15/§15b, the totals edge is not in our state features. A live book sees the same box score and moves its line at least as well.
+- Recommendation recorded for the user: stop live-totals modelling work; the forward gate (§14) still records totals for completeness.
