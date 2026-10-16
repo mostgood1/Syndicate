@@ -20,10 +20,10 @@ from pathlib import Path
 
 import pytest
 
-from vendor.mlb_bettingv2.tools import daily_update_multi_profile as dump
+from syndicate.features.mlb.native.tools import daily_update_multi_profile as dump
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-SIM_WRITER = REPO_ROOT / "vendor" / "mlb_bettingv2" / "tools" / "daily_update.py"
+SIM_WRITER = REPO_ROOT / "syndicate" / "features" / "mlb" / "native" / "tools" / "daily_update.py"
 
 AWAY = {"id": 139, "name": "Tampa Bay Rays", "abbreviation": "TB"}
 HOME = {"id": 147, "name": "New York Yankees", "abbreviation": "NYY"}

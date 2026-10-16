@@ -7,10 +7,9 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO / "vendor" / "mlb_bettingv2"))
-
-from sim_engine.data import build_roster as br  # noqa: E402
-from sim_engine.data import recency  # noqa: E402
+pass  # vendored sys.path entry removed (lane mlb-tests-native-engine): the native engine is imported by package
+from syndicate.features.mlb.sim_engine.data import build_roster as br  # noqa: E402
+from syndicate.features.mlb.sim_engine.data import recency  # noqa: E402
 
 
 def _log(rows):

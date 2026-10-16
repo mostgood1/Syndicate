@@ -72,7 +72,6 @@ from collections import Counter
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-VENDOR = REPO / "vendor" / "mlb_bettingv2"
 
 
 class LeakRefused(RuntimeError):
@@ -84,8 +83,8 @@ def _prev_day(date: str) -> str:
 
 
 def make_client(as_of: str, season: int, cache_dir: Path, counters: Counter):
-    from sim_engine.data.disk_cache import DiskCache  # noqa: WPS433 (vendor import)
-    from sim_engine.data.statsapi import StatsApiClient
+    from syndicate.features.mlb.sim_engine.data.disk_cache import DiskCache  # noqa: WPS433 (vendor import)
+    from syndicate.features.mlb.sim_engine.data.statsapi import StatsApiClient
 
     end = _prev_day(as_of)
 
@@ -157,8 +156,8 @@ def games_for(data_dir: Path, date: str) -> list[dict]:
 
 def install_asof_statcast(raw_root: Path, date: str, season: int, counters: Counter) -> None:
     """Point build_roster's statcast loaders at features built from pitches < D."""
-    from sim_engine.data import build_roster as br
-    from tools.datasets.build_statcast_player_feature_set import build_feature_set
+    from syndicate.features.mlb.sim_engine.data import build_roster as br
+    from syndicate.features.mlb.native.tools.datasets.build_statcast_player_feature_set import build_feature_set
 
     feats = build_feature_set(raw_root=raw_root, season=season, start_date=dt.date(season, 2, 1),
                               end_date=dt.date.fromisoformat(_prev_day(date)),
@@ -225,7 +224,7 @@ class StatsApiSource:
         self.history = lp.team_history(self.games, self.hands)
 
     def games_for(self, out_root: Path, date: str, client, counters: Counter) -> list[dict]:
-        from sim_engine.data.statsapi import fetch_game_context
+        from syndicate.features.mlb.sim_engine.data.statsapi import fetch_game_context
 
         out = []
         sim_dir = out_root / "daily" / "sims" / date
@@ -264,9 +263,9 @@ class StatsApiSource:
 def build_date(data_dir: Path, out_root: Path, date: str, season: int, counters: Counter,
                raw_root: Path | None = None, games: list[dict] | None = None,
                shared_cache: Path | None = None, stamina_recent_weight: float = 0.0) -> int:
-    from sim_engine.data.build_roster import build_team_roster
-    from sim_engine.data.roster_artifact import write_game_roster_artifact
-    from sim_engine.models import Team
+    from syndicate.features.mlb.sim_engine.data.build_roster import build_team_roster
+    from syndicate.features.mlb.sim_engine.data.roster_artifact import write_game_roster_artifact
+    from syndicate.features.mlb.sim_engine.models import Team
 
     if raw_root is not None:
         install_asof_statcast(raw_root, date, season, counters)
@@ -341,8 +340,8 @@ def main(argv=None) -> int:
     empty.mkdir(parents=True, exist_ok=True)
     for k in ("MLB_BETTING_DATA_ROOT", "SYNDICATE_DATA_ROOT"):
         os.environ[k] = str(empty)
-    if str(VENDOR) not in sys.path:
-        sys.path.insert(0, str(VENDOR))
+    if str(REPO) not in sys.path:  # the native engine is imported by package (lane mlb-tests-native-engine)
+        sys.path.insert(0, str(REPO))
     data_dir = Path(os.path.expanduser(args.data_root)).resolve()
     counters = Counter()
     report = {}

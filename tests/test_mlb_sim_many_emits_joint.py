@@ -20,11 +20,11 @@ import sys
 import pytest
 
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(_REPO, "vendor", "mlb_bettingv2"))
-sys.path.insert(0, os.path.join(_REPO, "vendor", "mlb_bettingv2", "tools"))
+pass  # vendored sys.path entry removed (lane mlb-tests-native-engine): the native engine is imported by package
+sys.path.insert(0, os.path.join(_REPO, "syndicate", "features", "mlb", "native", "tools"))
 
-from sim_engine.joint_outcomes import hitter_label, lookup  # noqa: E402
-from sim_engine.models import (  # noqa: E402
+from syndicate.features.mlb.sim_engine.joint_outcomes import hitter_label, lookup  # noqa: E402
+from syndicate.features.mlb.sim_engine.models import (  # noqa: E402
     BatterProfile,
     Handedness,
     Lineup,
@@ -79,7 +79,7 @@ def rosters():
 
 
 def _sim_many(**kwargs):
-    from daily_update import _sim_many as real
+    from syndicate.features.mlb.native.tools.daily_update import _sim_many as real
 
     return real(**kwargs)
 

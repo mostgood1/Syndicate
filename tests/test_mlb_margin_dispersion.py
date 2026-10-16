@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import pytest
 
-from vendor.mlb_bettingv2.sim_engine.prob_calibration import (
+from syndicate.features.mlb.sim_engine.prob_calibration import (
     FULL_GAME_MARGIN_DISPERSION_FACTOR,
     widen_margin_distribution,
     win_probs_from_margin_distribution,

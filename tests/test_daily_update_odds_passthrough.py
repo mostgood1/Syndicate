@@ -86,7 +86,7 @@ class DailyUpdateOddsPassthroughTests(unittest.TestCase):
 
     def test_prior_day_feed_live_refresh_uses_no_cache_statsapi_client(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
-        script_path = repo_root / "vendor" / "mlb_bettingv2" / "tools" / "daily_update.py"
+        script_path = repo_root / "syndicate" / "features" / "mlb" / "native" / "tools" / "daily_update.py"
         content = script_path.read_text(encoding="utf-8")
 
         self.assertIn("Refreshing prior-day StatsAPI feed/live cache", content)

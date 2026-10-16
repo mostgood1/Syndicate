@@ -32,7 +32,7 @@ import pytest
 
 from syndicate.features.shared.live_gameline_ledger import record_key
 
-MANIFEST = Path(__file__).resolve().parents[1] / "vendor" / "mlb_bettingv2" / "tools" / "eval" / "build_season_betting_cards_manifest.py"
+MANIFEST = Path(__file__).resolve().parents[1] / "syndicate" / "features" / "mlb" / "native" / "tools" / "eval" / "build_season_betting_cards_manifest.py"
 
 
 def _manifest_module():

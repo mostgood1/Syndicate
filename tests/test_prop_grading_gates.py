@@ -37,7 +37,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
-_BUILDER_PATH = _REPO_ROOT / "vendor" / "mlb_bettingv2" / "tools" / "eval" / "build_season_betting_cards_manifest.py"
+_BUILDER_PATH = _REPO_ROOT / "syndicate" / "features" / "mlb" / "native" / "tools" / "eval" / "build_season_betting_cards_manifest.py"
 
 
 def _load_builder():

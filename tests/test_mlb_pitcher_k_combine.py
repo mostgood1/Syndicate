@@ -16,7 +16,7 @@ from __future__ import annotations
 import random
 import unittest
 
-from vendor.mlb_bettingv2.sim_engine.pitch_model import (
+from syndicate.features.mlb.sim_engine.pitch_model import (
     PitchModelConfig,
     PitchType,
     _combined,

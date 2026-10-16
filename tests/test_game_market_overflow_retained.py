@@ -21,14 +21,14 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
-from vendor.mlb_bettingv2.tools.daily_update_multi_profile import (
+from syndicate.features.mlb.native.tools.daily_update_multi_profile import (
     _rank_and_cap,
     _subtract_selected_rows,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-WRITER = REPO_ROOT / "vendor" / "mlb_bettingv2" / "tools" / "daily_update_multi_profile.py"
-MANIFEST = REPO_ROOT / "vendor" / "mlb_bettingv2" / "tools" / "eval" / "build_season_betting_cards_manifest.py"
+WRITER = REPO_ROOT / "syndicate" / "features" / "mlb" / "native" / "tools" / "daily_update_multi_profile.py"
+MANIFEST = REPO_ROOT / "syndicate" / "features" / "mlb" / "native" / "tools" / "eval" / "build_season_betting_cards_manifest.py"
 
 
 def _candidates(n: int) -> list[dict]:
@@ -124,7 +124,7 @@ class OverflowReachesGradingAsCandidateTests(unittest.TestCase):
         self.assertIn('tier="candidate"', source)
 
     def test_the_settler_settles_extras_as_the_candidate_tier(self) -> None:
-        settler = REPO_ROOT / "vendor" / "mlb_bettingv2" / "tools" / "eval" / "settle_locked_policy_cards.py"
+        settler = REPO_ROOT / "syndicate" / "features" / "mlb" / "native" / "tools" / "eval" / "settle_locked_policy_cards.py"
         source = settler.read_text(encoding="utf-8-sig")
         self.assertIn('("other_playable_candidates", "candidate"', source)
 

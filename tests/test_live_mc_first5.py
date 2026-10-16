@@ -51,8 +51,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from vendor.mlb_bettingv2.sim_engine import live_mc  # noqa: E402
-from vendor.mlb_bettingv2.sim_engine.live_mc import FIRST5_INNINGS, estimate_live  # noqa: E402
+from syndicate.features.mlb.sim_engine import live_mc  # noqa: E402
+from syndicate.features.mlb.sim_engine.live_mc import FIRST5_INNINGS, estimate_live  # noqa: E402
 
 
 class _Res:

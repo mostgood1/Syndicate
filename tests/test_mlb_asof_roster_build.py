@@ -9,11 +9,10 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
-sys.path.insert(0, str(REPO / "vendor" / "mlb_bettingv2"))
-
+pass  # vendored sys.path entry removed (lane mlb-tests-native-engine): the native engine is imported by package
 import mlb_asof_roster_build as asof  # noqa: E402
-from sim_engine.data import build_roster as br  # noqa: E402
-from sim_engine.data.statsapi import StatsApiClient  # noqa: E402
+from syndicate.features.mlb.sim_engine.data import build_roster as br  # noqa: E402
+from syndicate.features.mlb.sim_engine.data.statsapi import StatsApiClient  # noqa: E402
 
 
 def _client(monkeypatch, tmp_path, seen):
@@ -57,7 +56,7 @@ def test_statcast_features_are_built_to_D_minus_1_and_stamina_follows_the_cache_
         calls.update(kw)
         return {"pitchers": {"7": {}}, "batters": {}}
 
-    import tools.datasets.build_statcast_player_feature_set as fs
+    import syndicate.features.mlb.native.tools.datasets.build_statcast_player_feature_set as fs
     monkeypatch.setattr(fs, "build_feature_set", fake_build)
     monkeypatch.setattr(br, "_apply_statcast_features_to_pitcher", lambda prof, season: True)
     monkeypatch.setattr(br, "_apply_statcast_pitch_count_stamina_adjustment", lambda prof: True)

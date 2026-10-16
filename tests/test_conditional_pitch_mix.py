@@ -22,10 +22,9 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO / "vendor" / "mlb_bettingv2"))
-
-from sim_engine.models import PitchType  # noqa: E402
-from sim_engine.simulate import (  # noqa: E402
+pass  # vendored sys.path entry removed (lane mlb-tests-native-engine): the native engine is imported by package
+from syndicate.features.mlb.sim_engine.models import PitchType  # noqa: E402
+from syndicate.features.mlb.sim_engine.simulate import (  # noqa: E402
     _build_weight_cdf,
     _conditional_cdf,
     _sample_weight_cdf,
@@ -104,7 +103,7 @@ def test_canonical_collision_sums_probability_mass(tmp_path, monkeypatch):
     adds -- unlike `arsenal.py`, where the values are multipliers and the merge
     is a usage-weighted mean. Getting this backwards would silently halve a
     sweeper-first pitcher's breaking-ball usage."""
-    from sim_engine.data import conditional_mix as cm
+    from syndicate.features.mlb.sim_engine.data import conditional_mix as cm
 
     art = {
         "count_to_bucket": {"0-2": "0-2"},
@@ -134,7 +133,7 @@ def test_survives_the_roster_artifact_round_trip():
     """The worker reads roster artifacts. Serialisation there is an explicit
     field list, so a field omitted from it is dead in production while looking
     perfectly healthy in memory."""
-    from sim_engine.data import roster_artifact as ra
+    from syndicate.features.mlb.sim_engine.data import roster_artifact as ra
 
     src = inspect_src = Path(ra.__file__).read_text(encoding="utf-8")
     assert '"conditional_arsenal"' in src, "not serialised -- would vanish on the worker"

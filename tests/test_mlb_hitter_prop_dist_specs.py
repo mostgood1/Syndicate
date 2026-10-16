@@ -27,14 +27,15 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-VENDOR_ROOT = REPO_ROOT / "vendor" / "mlb_bettingv2"
+# The native copies production runs (lane mlb-tests-native-engine); nothing vendored goes on sys.path.
+NATIVE_TOOLS = REPO_ROOT / "syndicate" / "features" / "mlb" / "native" / "tools"
 
-if str(VENDOR_ROOT) not in sys.path:
-    sys.path.insert(0, str(VENDOR_ROOT))
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
-daily_update = pytest.importorskip("tools.daily_update")
+daily_update = pytest.importorskip("syndicate.features.mlb.native.tools.daily_update")
 
-from sim_engine.models import (  # noqa: E402
+from syndicate.features.mlb.sim_engine.models import (  # noqa: E402
     BatterProfile,
     Handedness,
     Lineup,
@@ -156,7 +157,7 @@ def _hitter_stat_value_sites() -> list[list[str]]:
     """
     import ast
 
-    tree = ast.parse((VENDOR_ROOT / "tools" / "daily_update.py").read_text(encoding="utf-8"))
+    tree = ast.parse((NATIVE_TOOLS / "daily_update.py").read_text(encoding="utf-8"))
     sites: list[list[str]] = []
     for node in ast.walk(tree):
         if not isinstance(node, ast.Assign) or not isinstance(node.value, ast.Dict):

@@ -37,7 +37,7 @@ from syndicate.features.mlb.cards import _games_from_daily_summary
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DAILY_UPDATE = REPO_ROOT / "vendor" / "mlb_bettingv2" / "tools" / "daily_update.py"
+DAILY_UPDATE = REPO_ROOT / "syndicate" / "features" / "mlb" / "native" / "tools" / "daily_update.py"
 
 
 def _summary_row(game_pk: int, away: str, home: str) -> dict:

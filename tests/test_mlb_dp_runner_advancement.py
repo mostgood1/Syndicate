@@ -12,8 +12,8 @@ import unittest
 from dataclasses import replace
 
 from tests.test_mlb_starter_leash_tunable import _roster
-from vendor.mlb_bettingv2.sim_engine.models import BattedBallType, GameConfig
-from vendor.mlb_bettingv2.sim_engine.simulate import _resolve_in_play_out_with_runners, simulate_game
+from syndicate.features.mlb.sim_engine.models import BattedBallType, GameConfig
+from syndicate.features.mlb.sim_engine.simulate import _resolve_in_play_out_with_runners, simulate_game
 
 
 class _Scripted(random.Random):
@@ -30,7 +30,7 @@ class _Scripted(random.Random):
 
 def _dp(outs, on1, on2, on3, r2, r3, rng=None):
     rng = rng or _Scripted()
-    from vendor.mlb_bettingv2.sim_engine.simulate import _tuple_to_bases
+    from syndicate.features.mlb.sim_engine.simulate import _tuple_to_bases
     bases = _tuple_to_bases(bool(on1), bool(on2), bool(on3))
     out = _resolve_in_play_out_with_runners(rng, bases, outs, on1, on2, on3, 9, BattedBallType.GROUND,
                                             1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
@@ -97,7 +97,7 @@ class FieldersChoiceCeilingTests(unittest.TestCase):
 
 
 def _sf(bb, flypop, pop):
-    from vendor.mlb_bettingv2.sim_engine.simulate import _tuple_to_bases
+    from syndicate.features.mlb.sim_engine.simulate import _tuple_to_bases
 
     class _Draw(random.Random):
         def random(self):  # 0.5: fires only for a rate above 0.5
@@ -118,7 +118,7 @@ class PopupSacFlyTests(unittest.TestCase):
 
 
 def _roe(bb, roe_rates):
-    from vendor.mlb_bettingv2.sim_engine.simulate import _tuple_to_bases
+    from syndicate.features.mlb.sim_engine.simulate import _tuple_to_bases
 
     class _Draw(random.Random):
         def random(self):  # 0.02: fires only for a rate above 0.02

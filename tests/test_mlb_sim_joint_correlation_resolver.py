@@ -18,14 +18,13 @@ import sys
 import pytest
 
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(_REPO, "vendor", "mlb_bettingv2"))
-
-from sim_engine.joint_outcomes import (  # noqa: E402
+pass  # vendored sys.path entry removed (lane mlb-tests-native-engine): the native engine is imported by package
+from syndicate.features.mlb.sim_engine.joint_outcomes import (  # noqa: E402
     JointAccumulator,
     build_labels,
     hitter_label,
 )
-from sim_engine.joint_outcomes import lookup as producer_lookup  # noqa: E402
+from syndicate.features.mlb.sim_engine.joint_outcomes import lookup as producer_lookup  # noqa: E402
 
 from syndicate.features.correlation_engine import (  # noqa: E402
     CORRELATION_BASIS_HEURISTIC,

@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import unittest
 
-from vendor.mlb_bettingv2.sim_engine.simulate import _starter_tto_quality_mult
+from syndicate.features.mlb.sim_engine.simulate import _starter_tto_quality_mult
 
 LEAGUE_K = 0.223
 ELITE_K = 0.35

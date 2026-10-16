@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import unittest
 
-from vendor.mlb_bettingv2.sim_engine.data.build_roster import (
+from syndicate.features.mlb.sim_engine.data.build_roster import (
     _derive_stamina_pitches_from_season_stats,
     _shrink_to_prior,
 )

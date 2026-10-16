@@ -41,12 +41,11 @@ import sys
 import pytest
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
-VENDOR = REPO_ROOT / "vendor" / "mlb_bettingv2"
-for _p in (str(REPO_ROOT), str(VENDOR)):
+for _p in (str(REPO_ROOT),):  # the native engine is imported by package; nothing vendored on sys.path (lane mlb-tests-native-engine)
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-from sim_engine.models import (  # noqa: E402
+from syndicate.features.mlb.sim_engine.models import (  # noqa: E402
     BatterProfile,
     GameConfig,
     Handedness,
@@ -58,7 +57,7 @@ from sim_engine.models import (  # noqa: E402
     Team,
     TeamRoster,
 )
-from sim_engine.simulate import simulate_game  # noqa: E402
+from syndicate.features.mlb.sim_engine.simulate import simulate_game  # noqa: E402
 
 
 def _batter(pid):

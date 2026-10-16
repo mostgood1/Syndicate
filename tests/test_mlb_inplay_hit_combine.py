@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import unittest
 
-from vendor.mlb_bettingv2.sim_engine.pitch_model import (
+from syndicate.features.mlb.sim_engine.pitch_model import (
     PitchModelConfig,
     _combined,
     _combined_inplay_hit,

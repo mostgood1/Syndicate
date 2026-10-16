@@ -25,9 +25,9 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import mock
 
-from vendor.mlb_bettingv2.sim_engine.data import statcast_pitch_splits as sps
-from vendor.mlb_bettingv2.sim_engine.data.disk_cache import DiskCache
-from vendor.mlb_bettingv2.sim_engine.models import PitchType
+from syndicate.features.mlb.sim_engine.data import statcast_pitch_splits as sps
+from syndicate.features.mlb.sim_engine.data.disk_cache import DiskCache
+from syndicate.features.mlb.sim_engine.models import PitchType
 
 SEASON = 2026
 PID = 999001

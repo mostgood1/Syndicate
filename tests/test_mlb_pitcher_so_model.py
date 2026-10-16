@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import unittest
 
-from vendor.mlb_bettingv2.sim_engine.pitcher_so_model import (
+from syndicate.features.mlb.sim_engine.pitcher_so_model import (
     load_so_model,
     predict_so_mean,
     recalibrate_so_output,

@@ -16,8 +16,8 @@ import unittest
 from dataclasses import replace
 
 from tests.test_mlb_starter_leash_tunable import _roster
-from vendor.mlb_bettingv2.sim_engine.models import GameConfig
-from vendor.mlb_bettingv2.sim_engine.simulate import simulate_game
+from syndicate.features.mlb.sim_engine.models import GameConfig
+from syndicate.features.mlb.sim_engine.simulate import simulate_game
 
 N = 60
 

@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import unittest
 
-from vendor.mlb_bettingv2.sim_engine.simulate import _starter_quality_hook_delta
+from syndicate.features.mlb.sim_engine.simulate import _starter_quality_hook_delta
 
 # Reference point (K-BB% zero-crossing) the defaults are calibrated around.
 REFERENCE = 0.307

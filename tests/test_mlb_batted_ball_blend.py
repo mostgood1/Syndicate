@@ -25,7 +25,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import mock
 
-from vendor.mlb_bettingv2.sim_engine.data import batted_ball as bbmod
+from syndicate.features.mlb.sim_engine.data import batted_ball as bbmod
 
 SEASON = 2026
 
@@ -158,7 +158,7 @@ class ProductionCallSiteTests(unittest.TestCase):
 
     def test_build_roster_imports_and_calls_the_blend(self) -> None:
         from pathlib import Path
-        src = Path("vendor/mlb_bettingv2/sim_engine/data/build_roster.py").read_text(
+        src = Path("syndicate/features/mlb/sim_engine/data/build_roster.py").read_text(  # the native engine (lane mlb-tests-native-engine)
             encoding="utf-8")
         self.assertIn("from .batted_ball import apply_batted_ball_to_batter", src,
                       "build_roster does not import the blend")
@@ -168,7 +168,7 @@ class ProductionCallSiteTests(unittest.TestCase):
     def test_the_weight_gate_defaults_to_off(self) -> None:
         import os
         from unittest import mock
-        from vendor.mlb_bettingv2.sim_engine.data.build_roster import _batted_ball_weight
+        from syndicate.features.mlb.sim_engine.data.build_roster import _batted_ball_weight
         with mock.patch.dict(os.environ, {}, clear=False):
             os.environ.pop("SYNDICATE_MLB_BATTED_BALL_WEIGHT", None)
             self.assertEqual(_batted_ball_weight(), 0.0)
@@ -176,7 +176,7 @@ class ProductionCallSiteTests(unittest.TestCase):
     def test_a_malformed_weight_reads_as_off_not_on(self) -> None:
         import os
         from unittest import mock
-        from vendor.mlb_bettingv2.sim_engine.data.build_roster import _batted_ball_weight
+        from syndicate.features.mlb.sim_engine.data.build_roster import _batted_ball_weight
         for junk in ("banana", "", "  "):
             with mock.patch.dict(os.environ, {"SYNDICATE_MLB_BATTED_BALL_WEIGHT": junk}):
                 self.assertEqual(_batted_ball_weight(), 0.0, f"junk {junk!r} enabled it")
@@ -184,7 +184,7 @@ class ProductionCallSiteTests(unittest.TestCase):
     def test_a_set_weight_is_honoured_and_clamped(self) -> None:
         import os
         from unittest import mock
-        from vendor.mlb_bettingv2.sim_engine.data.build_roster import _batted_ball_weight
+        from syndicate.features.mlb.sim_engine.data.build_roster import _batted_ball_weight
         with mock.patch.dict(os.environ, {"SYNDICATE_MLB_BATTED_BALL_WEIGHT": "0.35"}):
             self.assertAlmostEqual(_batted_ball_weight(), 0.35)
         with mock.patch.dict(os.environ, {"SYNDICATE_MLB_BATTED_BALL_WEIGHT": "9.0"}):

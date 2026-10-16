@@ -23,9 +23,8 @@ from dataclasses import fields, replace
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO_ROOT / "vendor" / "mlb_bettingv2"))
-
-from sim_engine.models import GameConfig  # noqa: E402
+pass  # vendored sys.path entry removed (lane mlb-tests-native-engine): the native engine is imported by package
+from syndicate.features.mlb.sim_engine.models import GameConfig  # noqa: E402
 
 
 class DefaultIsOnTests(unittest.TestCase):
@@ -77,7 +76,7 @@ class ProductionReachabilityTests(unittest.TestCase):
         """`daily_update.py` builds `GameConfig(**cfg_kwargs)`. If the flag ever
         appears in that dict, the default stops governing the daily sim and this
         change silently becomes inert."""
-        source = (REPO_ROOT / "vendor" / "mlb_bettingv2" / "tools" / "daily_update.py").read_text(
+        source = (REPO_ROOT / "syndicate" / "features" / "mlb" / "native" / "tools" / "daily_update.py").read_text(
             encoding="utf-8-sig", errors="replace"
         )
         self.assertIn("GameConfig(", source)

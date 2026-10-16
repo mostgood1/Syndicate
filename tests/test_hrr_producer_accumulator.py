@@ -28,7 +28,7 @@ from pathlib import Path
 
 import pytest
 
-SRC = Path(__file__).resolve().parents[1] / "vendor" / "mlb_bettingv2" / "tools" / "daily_update.py"
+SRC = Path(__file__).resolve().parents[1] / "syndicate" / "features" / "mlb" / "native" / "tools" / "daily_update.py"
 
 
 @pytest.fixture(scope="module")

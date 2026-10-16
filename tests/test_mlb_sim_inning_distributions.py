@@ -36,10 +36,10 @@ import sys
 import pytest
 
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(_REPO, "vendor", "mlb_bettingv2"))
-sys.path.insert(0, os.path.join(_REPO, "vendor", "mlb_bettingv2", "tools"))
+pass  # vendored sys.path entry removed (lane mlb-tests-native-engine): the native engine is imported by package
+sys.path.insert(0, os.path.join(_REPO, "syndicate", "features", "mlb", "native", "tools"))
 
-from sim_engine.inning_distributions import (  # noqa: E402
+from syndicate.features.mlb.sim_engine.inning_distributions import (  # noqa: E402
     ALL_KEYS,
     ENV_FLAG,
     EXTRAS_KEY,
@@ -49,7 +49,7 @@ from sim_engine.inning_distributions import (  # noqa: E402
     hist_count,
     hist_mass,
 )
-from sim_engine.models import (  # noqa: E402
+from syndicate.features.mlb.sim_engine.models import (  # noqa: E402
     BatterProfile,
     Handedness,
     Lineup,
@@ -103,7 +103,7 @@ def rosters():
 
 def _run(rosters, *, sims: int = 240, workers: int = 1, flag: str | None):
     """One `_sim_many` over the real engine, with the flag set or unset."""
-    from daily_update import _sim_many
+    from syndicate.features.mlb.native.tools.daily_update import _sim_many
 
     prior = os.environ.get(ENV_FLAG)
     if flag is None:

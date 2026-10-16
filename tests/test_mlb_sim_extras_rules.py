@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from vendor.mlb_bettingv2.sim_engine.models import (
+from syndicate.features.mlb.sim_engine.models import (
     BatterProfile,
     GameConfig,
     Handedness,
@@ -15,7 +15,7 @@ from vendor.mlb_bettingv2.sim_engine.models import (
     Team,
     TeamRoster,
 )
-from vendor.mlb_bettingv2.sim_engine.simulate import simulate_game
+from syndicate.features.mlb.sim_engine.simulate import simulate_game
 
 
 def _make_roster(team_id: int, name: str) -> TeamRoster:

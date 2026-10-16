@@ -16,9 +16,8 @@ import sys
 
 import pytest
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "vendor", "mlb_bettingv2"))
-
-from sim_engine.joint_outcomes import (  # noqa: E402
+pass  # vendored sys.path entry removed (lane mlb-tests-native-engine): the native engine is imported by package
+from syndicate.features.mlb.sim_engine.joint_outcomes import (  # noqa: E402
     CORR_SCALE,
     CORR_UNDEFINED,
     HITTER_MARKET_ROW_KEYS,
@@ -300,7 +299,7 @@ def test_a_REGEX_over_daily_update_reads_the_wrong_dict__do_not_use_one():
 
     source = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        "vendor", "mlb_bettingv2", "tools", "daily_update.py",
+        "syndicate", "features", "mlb", "native", "tools", "daily_update.py",
     )
     with open(source, encoding="utf-8") as handle:
         text = handle.read()

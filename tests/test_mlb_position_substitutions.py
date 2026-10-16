@@ -22,11 +22,11 @@ from __future__ import annotations
 import unittest
 from dataclasses import replace
 
-from vendor.mlb_bettingv2.sim_engine.models import (
+from syndicate.features.mlb.sim_engine.models import (
     BatterProfile, GameConfig, Handedness, Lineup, ManagerProfile,
     PitcherProfile, PitchType, Player, Team, TeamRoster,
 )
-from vendor.mlb_bettingv2.sim_engine.simulate import simulate_game
+from syndicate.features.mlb.sim_engine.simulate import simulate_game
 
 N_GAMES = 40
 
