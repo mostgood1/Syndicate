@@ -46,22 +46,9 @@ for _p in (REPO, REPO / "scripts"):
 LEAGUE = "wnba"
 
 
-def p_win_given_no_push(dist: Mapping[str, int], line: Optional[float], *, offset_sign: int = 1) -> Optional[float]:
-    """P(x + sign*line > 0 | x + sign*line != 0) from an integer histogram {str(x): count}.
-
-    Cover: x = home margin, line = home spread (home covers when margin + spread > 0).
-    Over:  x = total, line = total line, sign = -1 (over when total - line > 0)."""
-    if line is None or not dist:
-        return None
-    win = push = n = 0
-    for k, c in dist.items():
-        v = float(k) + offset_sign * float(line)
-        n += int(c)
-        if v > 0:
-            win += int(c)
-        elif v == 0:
-            push += int(c)
-    return win / (n - push) if n - push > 0 else None
+# One implementation, shared with production: the WNBA game lens prices cover / over with this same function
+# (`syndicate/features/wnba/live_resim.py`, P5 cut-over 2026-10-16).
+from syndicate.features.wnba.live_resim import p_win_given_no_push  # noqa: E402
 
 
 def native_for_row(row: Mapping[str, Any], summary: Mapping[str, Any], *, inputs_root: Path, sims: int,

@@ -135,16 +135,20 @@ playoffs 14, state from P2's `LiveGameState`, anchors from production's smart-si
 (`.syndicate/findings_2026-10-09_wnba_live_vendored_inventory.md`).
 
 **Done when** (in order):
-1. P1, P2, P3 land; P5 replaces `wnba/live_lens.py:65`'s vendored tick, the `_load_source_app` producer in
-   `scripts/refresh_wnba_oddsapi_props.py`, and the linear `_wnba_live_*` lens with P3 under WNBA params.
-2. Backtest on the corpus: native re-sim beats the linear lens on total MAE and ML Brier, paired, CI per
-   checkpoint, regular season separate from playoffs (bar in the findings file); cover / over Brier once
-   the `p_home_cover` / `p_total_over` anchors are joined.
-3. The plan's end-state grep, WIDENED to catch `importlib`-by-name loads and `scripts/`, returns no
-   vendored import on the WNBA live or sim path.
-4. **At the 2027 opener (WNBA starts in May 2027):** on the local fleet, the served WNBA lens reads
-   `live_resim` for an in-progress game, edges publish, keyvalue payload under cap. Record it in
-   `.syndicate/deploys.md`.
+1. DONE 2026-10-16 (user decision "game lens only"): the linear `_wnba_live_*` game lens is replaced by the
+   native re-sim behind `SYNDICATE_WNBA_LIVE_RESIM` (OFF) -- `wnba/live_resim.py`, `wnba/cards.py`, WNBA input
+   persist in `basketball_props_smart_sim.py`, thread start in `live_lens_loop.py`. The vendored tick in
+   `wnba/live_lens.py` is lane `nba-live-tick-native`'s faithful port; live props stay on that tick.
+2. DONE 2026-10-16: backtest gate PASSED -- native vs linear, regular season, ML Brier end Q2 -0.0115
+   [-0.017, -0.005], end Q3 -0.0085 [-0.014, -0.003], over end Q3 -0.0058 [-0.011, -0.001]; nothing worse.
+3. After `nba-live-tick-native` lands: the plan's end-state grep, WIDENED to catch `importlib`-by-name loads
+   and `scripts/`, returns no vendored import on the WNBA live or sim path.
+4. **Before / at the 2027 opener (May 2027), USER DECISIONS:** (a) turn `SYNDICATE_WNBA_LIVE_RESIM` on for the
+   refresh-worker AND web (behind the deploy locks); (b) re-decide the availability rule (K=1 kept 2026-10-16;
+   variants measured in findings_2026-10-14_wnba_availability_recency_tune.md). Then on the local fleet, for an
+   in-progress game: `WNBA_ENGINE_INPUTS_PERSISTED` lines at pregame, `WNBA_LIVE_RESIM_TICK written=True
+   resimmed>0`, and the served WNBA `gameLens` lane carries `projectionModel: native_resim` with `simsRun`.
+   Record it in `.syndicate/deploys.md`.
 
 ### `#693` — **SOCCER LIVE GAME-LINES: the in-play reading is OWED -- both fixes are live on the local fleet and have never run with a match in play** — lane `soccer-live-gameline-index-diag` (CLOSED 2026-10-01 on user instruction with this open), session a83ad238
 

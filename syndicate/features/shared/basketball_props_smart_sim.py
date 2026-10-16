@@ -3118,8 +3118,8 @@ def _call_native_engine_local(*, entrypoint_name: str, league_code: str, kwargs:
     params = inspect.signature(getattr(native_engine, entrypoint_name)).parameters
     allowed = {name for name, p in params.items() if p.kind is not inspect.Parameter.KEYWORD_ONLY}
     call_kwargs = {k: v for k, v in kwargs.items() if k in allowed}
-    if league_code == "nba" and entrypoint_name == "simulate_pbp_game_boxscore":
-        _persist_engine_inputs_once_local(call_kwargs)
+    if league_code in ("nba", "wnba") and entrypoint_name == "simulate_pbp_game_boxscore":
+        _persist_engine_inputs_once_local(call_kwargs, league=league_code)
     overrides = getattr(call_kwargs.get("cfg"), "league_params_overrides", None)
     return getattr(_engine_for_league_local(league_code, overrides), entrypoint_name)(**call_kwargs)
 
@@ -3130,10 +3130,13 @@ def _call_native_engine_local(*, entrypoint_name: str, league_code: str, kwargs:
 # WRITE-ONLY: the kwargs are pickled (serialised, never mutated), the rng is never touched, and a failure is printed
 # and swallowed -- this can never change or stop a pregame sim. A game REUSED from an existing smart_sim file makes
 # no engine call, so it has no inputs until re-simulated; the live tick refuses it by name (`no_pregame_inputs`).
+# P5 (lane wnba-native-live-cutover, 2026-10-16, user decision "game lens only"): WNBA persists too, under its own
+# league stamp and root (`live_resim.persist_engine_inputs(league="wnba")`), so the WNBA live re-sim resumes on the
+# same inputs. NBA's path, key and log line are unchanged.
 _PERSISTED_ENGINE_INPUT_KEYS: set[tuple] = set()
 
 
-def _persist_engine_inputs_once_local(call_kwargs: dict[str, Any]) -> None:
+def _persist_engine_inputs_once_local(call_kwargs: dict[str, Any], *, league: str = "nba") -> None:
     try:
         hp, ap = call_kwargs.get("home_players"), call_kwargs.get("away_players")
         if hp is None or ap is None or len(hp) == 0 or len(ap) == 0:
@@ -3144,7 +3147,7 @@ def _persist_engine_inputs_once_local(call_kwargs: dict[str, Any]) -> None:
             return
         # (date, teams) AND the frames' identity: draws of one game share the frame objects; a re-simulation of the
         # same game builds new ones and overwrites, which is what a fresh pregame run should do.
-        key = (date, home, away, id(hp), id(ap))
+        key = (date, home, away, id(hp), id(ap)) if league == "nba" else (league, date, home, away, id(hp), id(ap))
         if key in _PERSISTED_ENGINE_INPUT_KEYS:
             return
         if len(_PERSISTED_ENGINE_INPUT_KEYS) > 512:
@@ -3152,10 +3155,13 @@ def _persist_engine_inputs_once_local(call_kwargs: dict[str, Any]) -> None:
         _PERSISTED_ENGINE_INPUT_KEYS.add(key)
         from syndicate.features.nba.live_resim import persist_engine_inputs
 
-        path = persist_engine_inputs(date, home, away, call_kwargs)
-        print(f"NBA_ENGINE_INPUTS_PERSISTED date={date} game={home}_{away} bytes={path.stat().st_size}", flush=True)
+        if league == "nba":
+            path = persist_engine_inputs(date, home, away, call_kwargs)
+        else:
+            path = persist_engine_inputs(date, home, away, call_kwargs, league=league)
+        print(f"{league.upper()}_ENGINE_INPUTS_PERSISTED date={date} game={home}_{away} bytes={path.stat().st_size}", flush=True)
     except Exception as exc:  # noqa: BLE001 -- never let the persist touch the sim
-        print(f"NBA_ENGINE_INPUTS_PERSIST_FAILED {type(exc).__name__}: {str(exc)[:200]}", flush=True)
+        print(f"{league.upper()}_ENGINE_INPUTS_PERSIST_FAILED {type(exc).__name__}: {str(exc)[:200]}", flush=True)
 
 
 def _simulate_pbp_game_boxscore_local(*, league_code: str = "nba", **kwargs):

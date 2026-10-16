@@ -1255,6 +1255,14 @@ def start_live_lens_loop() -> bool:
 			start_ncaab_live_resim_loop()
 		except Exception as exc:  # noqa: BLE001 -- never let the NCAAB thread stop the shared loop starting
 			print(f"[live_lens_loop] NCAAB_LIVE_RESIM_LOOP_START_FAILED {type(exc).__name__}: {exc}", flush=True)
+		# The WNBA native live re-sim (`wnba/live_resim.py`, P5) -- its own thread for the same reason. It feeds the
+		# WNBA game lens in wnba/cards.py. Only when SYNDICATE_WNBA_LIVE_RESIM is on (absent = off).
+		try:
+			from syndicate.features.wnba.live_resim import start_loop as start_wnba_live_resim_loop
+
+			start_wnba_live_resim_loop()
+		except Exception as exc:  # noqa: BLE001 -- never let the WNBA thread stop the shared loop starting
+			print(f"[live_lens_loop] WNBA_LIVE_RESIM_LOOP_START_FAILED {type(exc).__name__}: {exc}", flush=True)
 		return True
 
 

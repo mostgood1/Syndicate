@@ -1434,6 +1434,25 @@ def _build_wnba_game_lens(game: dict[str, Any]) -> list[dict[str, Any]]:
         projected_total = _wnba_live_total_projection(
             pregame_total_projection, current_total, elapsed_min
         )
+    # P5 (lane wnba-native-live-cutover, user decision 2026-10-16 "game lens only"): when
+    # SYNDICATE_WNBA_LIVE_RESIM is on and the worker published a `live_resim` lane for this game, the
+    # NATIVE re-sim's numbers replace the linear lens's (backtest: ML Brier end Q2 -0.0115, end Q3 -0.0085,
+    # over end Q3 -0.0058 vs linear, CIs exclude 0, nothing worse). Switch off, no/stale snapshot, or a
+    # refused game -> exactly the linear lens above. The source stamp stays `live_projection` (what
+    # live_gameline_join accepts for wnba); `projectionModel` says which model produced the numbers.
+    native = None
+    if source == "live_projection":
+        try:
+            from syndicate.features.wnba import live_resim as _wnba_resim
+
+            native = _wnba_resim.native_lane(game)
+        except Exception:  # noqa: BLE001 -- the lens must render; a lookup failure falls back to linear
+            native = None
+    if native is not None:
+        model_home_win_prob = _safe_float(native.get("modelHomeWinProb"))
+        native_total = _safe_float((native.get("projection") or {}).get("total"))
+        if native_total is not None:
+            projected_total = native_total
     # Only populate markets for a genuinely live row -- a pregame-only game
     # already gets plain betting-dict-sourced Moneyline/Spread/Total
     # candidates straight from home.py; gameLens markets exist to carry an
@@ -1450,6 +1469,15 @@ def _build_wnba_game_lens(game: dict[str, Any]) -> list[dict[str, Any]]:
         if source == "live_projection"
         else {}
     )
+    if native is not None:
+        proj = native.get("projection") or {}
+        p_cover = _wnba_resim.p_win_given_no_push(proj.get("marginDist") or {}, _safe_float(betting.get("home_spread")))
+        p_over = _wnba_resim.p_win_given_no_push(proj.get("totalRunsDist") or {}, _safe_float(betting.get("total")),
+                                                 offset_sign=-1)
+        if p_cover is not None and "spread" in markets:
+            markets["spread"]["p_win"] = p_cover
+        if p_over is not None and "total" in markets:
+            markets["total"]["p_win"] = p_over
     return [
         {
             "key": "live",
@@ -1469,6 +1497,9 @@ def _build_wnba_game_lens(game: dict[str, Any]) -> list[dict[str, Any]]:
             "modelHomeWinProb": model_home_win_prob,
             "baselineHomeWinProb": pregame_p_home_win,
             "markets": markets,
+            "projectionModel": ("native_resim" if native is not None
+                                else ("linear" if source == "live_projection" else None)),
+            "simsRun": native.get("simsRun") if native is not None else None,
         }
     ]
 

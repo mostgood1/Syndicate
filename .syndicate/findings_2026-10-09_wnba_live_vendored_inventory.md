@@ -266,3 +266,24 @@ it; like P3 on NBA, the gain is on margin/ML, not totals.
 **This is the backtest gate only.** P5's goal still needs: the cut-over code (native re-sim replaces the vendored
 tick at `wnba/live_lens.py:65` and the linear `_wnba_live_*` lens, plus the gated-off vendored-app fallbacks in
 `refresh_wnba_oddsapi_props.py`), the widened end-state grep, and the live reading at the 2027 opener (`#694`).
+
+## CUT-OVER BUILT (2026-10-16 17:5xZ; user decision "game lens only, coordinate"), flag OFF
+
+- `syndicate/features/shared/basketball_props_smart_sim.py`: the pregame engine-input persist hook now also writes
+  WNBA (`persist_engine_inputs(league="wnba")`, log `WNBA_ENGINE_INPUTS_PERSISTED`); NBA's key, path and log line are
+  unchanged (P3's 38 tests pass). Write-only: same seed, same output (test).
+- NEW `syndicate/features/wnba/live_resim.py`: WNBA team names registered for the board join; `SYNDICATE_WNBA_LIVE_RESIM`
+  (absent = OFF) gates a dedicated tick thread (P3's `build_live_lens_snapshot(league="wnba")` -> `live/wnba_live_resim.json`)
+  and the lens lookup. A snapshot older than 600 s, with a missing/unparseable `generatedAt`, for another game, or a
+  REFUSED lane never reaches the lens. `p_win_given_no_push` (pushes excluded) is now shared with the backtest harness.
+- `syndicate/features/wnba/cards.py::_build_wnba_game_lens`: for a live game with a native lane, the win probability,
+  projected total, cover and over come from the re-sim; otherwise the linear lens exactly as before. The source stamp
+  stays `live_projection` (what `live_gameline_join` accepts for wnba); NEW `projectionModel` = `native_resim` /
+  `linear` and `simsRun` say which model produced the numbers.
+- `syndicate/features/shared/live_lens_loop.py`: starts the WNBA thread beside NBA's and NCAAB's, only when switched on.
+- Tests: `tests/test_wnba_live_resim.py` 12 (off -> linear, on -> native, stale/undated/refused/other-game fall back,
+  pushes excluded, tick path, persist hook); 75 targeted existing tests pass.
+
+NOT done by this lane, by decision: the vendored tick in `wnba/live_lens.py` (lane `nba-live-tick-native`'s port);
+live props from the re-sim (no WNBA live prop line was ever captured to grade one). Inert until the switch is set:
+no WNBA games until May 2027, and the switch is a user decision (todo #694 step 4).
