@@ -50483,3 +50483,14 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - **ask:** user 2026-10-16 "soccer cheat sheet need to be clearer about teams - logos are good, but not good enough. Esp to inidcate player props and what team they are on".
 - **claim:** web by cheat-sheets, token 3d01b40c..., acquire exit 0. **Ride-along: `ba4abbe6`** (lane mlb-betting-card-assets-native) -- the MLB betting-card page serves its 4 static assets from `syndicate/static/mlb/betting_card/`, byte-identical copies (its test asserts every accessor returns the same text); effect: one asset_version change. Plus ledger commits.
 - **verify (served, 2:08 PM CT):** `/cheatsheets?sport=soccer&date=2026-10-16` DATA: 81 rows, team on 79 (was 62 in the file), league on 81; 6 of 6 games carry a competition (Ligue 1, Championship, LaLiga, Serie A, Bundesliga, Eredivisie); page has `clubLine` + `playerCell`. Screenshot: featured rows read "[crest] 1. FC Koln VS [crest] Eintracht Frankfurt BUNDESLIGA"; tables "Levante · vs Deportivo · LaLiga".
+
+## 2026-10-16 19:09:55Z (2:09 PM CT) `reload-web` (2.0 s, 0 failures) loading ba4abbe6: the MLB betting-card page's static assets off vendor -- **MET** (lane `mlb-betting-card-assets-native`, closed; session 2d413211)
+
+- **What changed.** `syndicate/features/mlb/betting_card.py` reads cards.css / season.css / betting_card.js / back_to_top.js from `syndicate/static/mlb/betting_card/`, byte-identical copies. It used to read `vendor/mlb_bettingv2/tools/web/static/` on every request.
+- **Deploy.**
+  - The fleet was already at 06241083 (contains ba4abbe6; a peer's ff), so the ff was a no-op.
+  - All three claims taken (rc + holder gated). Safety read in full: live games in progress; a web HUP touches no worker.
+  - `local_production.py reload-web`: new workers [1072178, 1072179], 2 healthz probes OK.
+- **verify (MEASURED, same instrument before and after).**
+  - Baseline 19:05:39Z vs after 19:09:57Z, from `/mlb/assets/{cards.css,season.css,betting_card.js,back_to_top.js}` on 127.0.0.1:10000: all 200, identical sizes (43,826 / 26,390 / 50,021 / 1,132) and identical sha256 (CR-stripped).
+  - **The source is distinguished, not assumed.** Identical bytes cannot tell the two dirs apart. The page's mtime-based `asset_version` can: the live `/mlb/season/2026/betting-card` carries `?v=1792177635...`, the native copies' max mtime (1792177635), where the vendored files' would be 1790817013.
