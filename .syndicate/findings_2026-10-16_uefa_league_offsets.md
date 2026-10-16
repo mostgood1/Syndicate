@@ -217,7 +217,7 @@ The other fitted terms are η (home advantage) = 0.263 and μ = 0.147. **β = 0.
   - The cross-league model: `fit_cross_league`, `outcome_probs`, `score_match`.
   - Statistics: `paired_bootstrap_ci`, `verdict`.
 - **`scripts/fit_uefa_league_offsets.py pull|run`:** the research driver. It writes `report.json` to the research root.
-- **`tests/test_uefa_league_offsets.py`:** 17 hermetic tests:
+- **`tests/test_uefa_league_offsets.py`:** 15 hermetic tests (the f84447d6 commit message says 17; it is 15):
   - season-scoped promotion and relegation, and the conflict majority rule;
   - no leak from the kickoff day, and the 365-day window;
   - recovery of known offsets, and off != on reachability;
