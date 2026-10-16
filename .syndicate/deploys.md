@@ -50256,3 +50256,8 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   rewritten in place rather than contradicted.
 - **Remaining gap is NHL + MLB**, not NFL or soccer: 156 and 144 prop rows with
   no support field. Same class, different modules, not claimed here.
+
+## 2026-10-16 14:55Z (9:55 AM CT) -- MEASUREMENT for 2026-10-15 02:52Z "ci_env HOME sandbox + quota-test fix ALREADY LIVE" -- **MET** (lane `ci-env-home-sandbox`, session feaf967d)
+- **Nightly ci-suite 10-15 (`11bbdbcf7b45`, 08:00:22Z) and 10-16 (`4a660b3e6cf7`, 08:00:37Z):** `logs/job-ci-suite.log` header on both: `HOME=/home/amyn/syndicate-prod/ci-home`, key list includes `SYNDICATE_LOCAL_HOME`, `SYNDICATE_LOCAL_REDIS_URL`, `SYNDICATE_ODDSAPI_QUOTA_FORWARD(_URL)`, `USERPROFILE` (10-14's header: HOME passed through, none of these).
+- **Claim path, predicate on the fleet host (14:5xZ 10-16, real `~/syndicate-prod/local_production.env`, fleet checkout 70116f4a):** `deploy_claim._local_production_env_claim_dir()` in a child process -- old allowlist env (control) -> `/mnt/c/.../Syndicate/.syndicate/deploy_claims`; `ci_env()` -> `None`. Claim dir empty at the read. Logs hold no lane-a/session-aaa line (weak: the 10-13/10-14 claims were seen in `status`, which is not logged; the only hit was my own grep in the memory monitor's process list).
+- **Quota doc (GET only):** `nfl:offfleet` 127 calls / 164 credits -- unchanged since 02:27Z 10-15, across both nightlies; `baseline` still the fake 10-11 08:15:50Z headers, NOT re-stamped. Repair still the owner's call (leads.md 2026-10-15).
