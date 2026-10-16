@@ -116,7 +116,7 @@ def _sheet():
              {"pick_id": "l2_2", "kind": "game", "market": "totals", "side": "over", "home_team": "Texas State Bobcats",
               "away_team": "Colorado State Rams"},
              {"pick_id": "l2_3", "kind": "prop", "headshot_url": "https://a.espncdn.com/prop.png"}]
-    return {"sport": "ncaaf", "date": "2026-10-15", "rows": rows, "picks": picks}
+    return {"sport": "nfl", "date": "2026-10-15", "rows": rows, "picks": picks}
 
 
 def test_the_team_star_fronts_a_side_and_both_stars_front_a_total():
@@ -188,3 +188,37 @@ def test_the_png_builder_inlines_a_cached_hero(tmp_path):
     (tmp_path / f"{key}.bin").write_bytes(b"RIFF....WEBPVP8 ")
     out = _script("build_play_cards").embed_card_images({"hero": f"/cheatsheets/img/{key}.webp", "headshot": None}, tmp_path)
     assert out["hero"].startswith("data:image/webp;base64,") and img.HERO_SIZE == brand_kit.load()["hero_image_px"]
+
+
+def test_college_athletes_are_shown_by_their_team_logo(monkeypatch):
+    # User 2026-10-16: "use team logos for college athletes". No college player's face on a card, on the sheet page, or
+    # fetched by the generator; the team's logo is the hero. Pro sports keep their faces (the control).
+    assert brand_kit.faces_allowed("NCAAF") is False and brand_kit.faces_allowed("ncaab") is False
+    assert brand_kit.faces_allowed("nfl") is True
+    row = {"player": "Destyn Hill", "event_id": "e9", "market": "Receptions", "line": 4.5, "side": "over", "books_quoting": 5,
+           "suggested": True, "fair_method": "consensus_no_vig", "team": "Tulane", "team_name": "Tulane Green Wave",
+           "headshot_url": "https://a.espncdn.com/college.png", "hero_url": "https://a.espncdn.com/college.png",
+           "team_logo": "data:image/webp;base64,TULANE",
+           "check": {"verdict": "value", "ev_market": 3.0, "price": 110, "book": "fanduel", "p_market": 0.5, "reasons": []}}
+    college = pc.card_fields(row, sport="ncaaf", date="2026-10-17", number=1, game=None)
+    pro = pc.card_fields(row, sport="nfl", date="2026-10-17", number=1, game=None)
+    assert college["headshot"] is None and college["hero"] is None and pro["hero"] == "https://a.espncdn.com/college.png"
+    shown = pc.render_card(college, "data:,").split("</style>", 1)[1]
+    assert 'class="head"' not in shown and 'class="crest-big" src="data:image/webp;base64,TULANE"' in shown
+    pick = dict(row, pick_id="l2_9", kind="prop", display_name="Destyn Hill", bet="Over 4.5 Receptions", price=110,
+                fair_price=100, p_market=0.5, ev_pct=3.0, books=5, points=[])
+    assert pc.pick_card_fields(pick, sport="ncaab", date="2026-10-17", number=1)["headshot"] is None
+    bare = {k: v for k, v in row.items() if k != "hero_url"}
+    sheet = {"sport": "ncaaf", "date": "2026-10-17", "rows": [dict(bare)], "picks": [dict(pick, hero_url=None)], "games": []}
+    assert pc.attach_heroes(sheet) == 0 and "hero_url" not in sheet["rows"][0] and sheet["picks"][0]["hero_url"] is None
+    assert pc.attach_heroes(dict(sheet, sport="nfl", rows=[dict(bare)], picks=[dict(pick, hero_url=None)])) == 2   # control
+    page = cs.page_payload([sheet, dict(sheet, sport="nfl")])
+    assert not set(brand_kit.FACE_FIELDS) & set(page["ncaaf"]["rows"][0]) and not set(brand_kit.FACE_FIELDS) & set(page["ncaaf"]["picks"][0])
+    assert page["ncaaf"]["rows"][0]["team_logo"] == "data:image/webp;base64,TULANE"
+    assert page["nfl"]["rows"][0]["headshot_url"] == "https://a.espncdn.com/college.png"          # control
+    from syndicate.features.shared import cheat_sheet_images as img
+
+    fetched = []
+    monkeypatch.setattr(img, "cache_image", lambda url, cache, size=96, **kw: fetched.append((url, size)) or None)
+    _script("build_cheat_sheets").attach_images({"sport": "ncaaf", "rows": [dict(row)], "picks": [], "games": []}, Path("."))
+    assert sorted(fetched) == [("data:image/webp;base64,TULANE", 96), ("data:image/webp;base64,TULANE", 500)]  # logo only, never the face

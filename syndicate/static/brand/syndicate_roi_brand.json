@@ -32,6 +32,8 @@
   "header_pct": [10, 15],
   "hero_pct": {"prop": [40, 60], "spread": [35, 50], "total": [35, 50]},
   "hero_image_px": 900,
+  "logo_only_sports": ["ncaaf", "ncaab"],
+  "_logo_only_sports": "user 2026-10-16: \"use team logos for college athletes\" -- no college player's face on a card or the sheet page",
   "dashboard_cards": 4,
   "why_bullets": [4, 6],
   "against_bullets": [3, 4],

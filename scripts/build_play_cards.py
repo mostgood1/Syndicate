@@ -45,8 +45,8 @@ def embed_card_images(fields: dict[str, Any], cache: Path) -> dict[str, Any]:
     from syndicate.features.shared import cheat_sheet_images as img
 
     out = dict(fields)
-    for key, size in (("headshot", img.CARD_SIZE), ("team_logo", img.ROW_SIZE), ("home_logo", img.ROW_SIZE),
-                      ("away_logo", img.ROW_SIZE), ("hero", img.HERO_SIZE), ("hero_away", img.HERO_SIZE),
+    for key, size in (("headshot", img.CARD_SIZE), ("team_logo", img.LOGO_CARD_SIZE), ("home_logo", img.LOGO_CARD_SIZE),
+                      ("away_logo", img.LOGO_CARD_SIZE), ("hero", img.HERO_SIZE), ("hero_away", img.HERO_SIZE),
                       ("hero_home", img.HERO_SIZE)):
         value = str(out.get(key) or "")
         if value.startswith("/cheatsheets/img/"):          # the sheet's cached copy (the hero is cached at 900px)

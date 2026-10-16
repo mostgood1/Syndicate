@@ -200,10 +200,10 @@ def _card_row(sport: str, day: str, card: str) -> tuple[dict[str, Any] | None, d
 def _local_images(row: dict[str, Any], game: dict[str, Any] | None) -> tuple[dict[str, Any], dict[str, Any]]:
     """The card draws the generator's cached copies (same origin, so the PNG export can read them)."""
     row = dict(row, headshot_url=row.get("headshot_card_src") or row.get("headshot_src") or row.get("headshot_url"),
-               team_logo=row.get("team_logo_src") or row.get("team_logo"))
+               team_logo=row.get("team_logo_card_src") or row.get("team_logo_src") or row.get("team_logo"))
     if game:
-        game = dict(game, home_logo=game.get("home_logo_src") or game.get("home_logo"),
-                    away_logo=game.get("away_logo_src") or game.get("away_logo"))
+        game = dict(game, home_logo=game.get("home_logo_card_src") or game.get("home_logo_src") or game.get("home_logo"),
+                    away_logo=game.get("away_logo_card_src") or game.get("away_logo_src") or game.get("away_logo"))
     return row, game
 
 
@@ -212,8 +212,9 @@ def _fields(row: dict[str, Any], game: dict[str, Any] | None, *, sport: str, day
     if row.get("pick_id"):
         sheet = row.pop("_sheet", {}) or {}
         pick = dict(row, headshot_url=row.get("headshot_card_src") or row.get("headshot_src") or row.get("headshot_url"),
-                    team_logo=row.get("team_logo_src") or row.get("team_logo"),
-                    home_logo=row.get("home_logo_src") or row.get("home_logo"), away_logo=row.get("away_logo_src") or row.get("away_logo"))
+                    team_logo=row.get("team_logo_card_src") or row.get("team_logo_src") or row.get("team_logo"),
+                    home_logo=row.get("home_logo_card_src") or row.get("home_logo_src") or row.get("home_logo"),
+                    away_logo=row.get("away_logo_card_src") or row.get("away_logo_src") or row.get("away_logo"))
         values, labels = pc.pick_form(sheet, pick) if pick.get("kind") == "prop" else ([], [])
         return pc.pick_card_fields(pick, sport=sport, date=day, number=number, form_values=values, form_labels=labels)
     row, game = _local_images(row, game)

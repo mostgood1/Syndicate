@@ -9,6 +9,8 @@ ESPN team-branding snapshots, or of the sheet the generator already wrote: no ne
   * `team_color()`       a team's primary colour, the spec's "team colours as subtle accents only"
   * `hero_url()`         a headshot upgraded to the largest free cutout its league serves (the hero is 40-60% of a card)
   * `team_star()`        the player who fronts a team's side or total card (spec: "use team athlete hero image")
+  * `faces_allowed()`    False for college sports: their cards and sheets show the team logo, never a player's face
+                         (user 2026-10-16: "use team logos for college athletes")
 """
 from __future__ import annotations
 
@@ -75,6 +77,20 @@ def team_color(sport: Any, *names: Any) -> str | None:
         if hit:
             return hit
     return None
+
+
+FACE_FIELDS = ("headshot_url", "headshot_src", "headshot_card_src", "hero_url", "hero_src", "hero_away_url", "hero_away_src",
+               "hero_home_url", "hero_home_src", "hero_name")
+
+
+def faces_allowed(sport: Any) -> bool:
+    """False for a logo-only sport (the brand JSON's `logo_only_sports`: college)."""
+    return str(sport or "").strip().lower() not in set(load().get("logo_only_sports") or ())
+
+
+def without_faces(item: Mapping[str, Any]) -> dict[str, Any]:
+    """The item with every player-face field removed (the team logo fields stay)."""
+    return {k: v for k, v in item.items() if k not in FACE_FIELDS}
 
 
 _MLB_HEADSHOT = re.compile(r"^https://img\.mlbstatic\.com/mlb-photos/image/upload/.*?/people/(\d+)/headshot/")

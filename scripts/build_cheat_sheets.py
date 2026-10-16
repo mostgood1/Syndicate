@@ -646,11 +646,14 @@ def build_sport(sport: str, rows: list[dict[str, Any]], *, selected_date: str, c
 IMAGE_FIELDS = (
     ("rows", (("headshot_url", "headshot_src", 96), ("headshot_url", "headshot_card_src", 260),
               ("team_logo", "team_logo_src", 96), ("opponent_logo", "opponent_logo_src", 96),
-              ("hero_url", "hero_src", 900))),
-    ("games", (("home_logo", "home_logo_src", 96), ("away_logo", "away_logo_src", 96))),
+              ("hero_url", "hero_src", 900), ("team_logo", "team_logo_card_src", 500))),
+    ("games", (("home_logo", "home_logo_src", 96), ("away_logo", "away_logo_src", 96),
+               ("home_logo", "home_logo_card_src", 500), ("away_logo", "away_logo_card_src", 500))),
     ("picks", (("headshot_url", "headshot_src", 96), ("headshot_url", "headshot_card_src", 260),
                ("team_logo", "team_logo_src", 96), ("home_logo", "home_logo_src", 96), ("away_logo", "away_logo_src", 96),
-               ("hero_url", "hero_src", 900), ("hero_away_url", "hero_away_src", 900), ("hero_home_url", "hero_home_src", 900))),
+               ("hero_url", "hero_src", 900), ("hero_away_url", "hero_away_src", 900), ("hero_home_url", "hero_home_src", 900),
+               ("team_logo", "team_logo_card_src", 500), ("home_logo", "home_logo_card_src", 500),
+               ("away_logo", "away_logo_card_src", 500))),
 )
 
 
@@ -803,12 +806,17 @@ def attach_images(sheet: dict[str, Any], cache: Path) -> dict[str, int]:
     from syndicate.features.shared import cheat_sheet_images as img
     from syndicate.features.shared import play_cards as pc
 
+    from syndicate.features.shared import brand_kit
+
     pc.attach_heroes(sheet)
+    faces = brand_kit.faces_allowed(sheet.get("sport"))      # college: logos only (user 2026-10-16)
     counts = {"urls": 0, "cached": 0}
     seen: dict[tuple[str, int], str | None] = {}
     for section, fields in IMAGE_FIELDS:
         for item in sheet.get(section) or []:
             for src_field, out_field, size in fields:
+                if not faces and out_field in brand_kit.FACE_FIELDS:
+                    continue
                 url = item.get(src_field)
                 if not url:
                     continue

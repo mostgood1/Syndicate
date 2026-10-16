@@ -85,6 +85,8 @@ def attach_heroes(sheet: dict[str, Any]) -> int:
     from syndicate.features.shared import brand_kit
 
     sport, rows, named = sheet.get("sport"), sheet.get("rows") or [], 0
+    if not brand_kit.faces_allowed(sport):          # college: the team logo is the hero (user 2026-10-16)
+        return 0
     for r in rows:
         if r.get("headshot_url") and eligible(r):
             r["hero_url"] = brand_kit.hero_url(sport, r["headshot_url"])
@@ -242,6 +244,7 @@ def why_and_risk(row: Mapping[str, Any], game: Mapping[str, Any] | None) -> tupl
 
 def card_fields(row: Mapping[str, Any], *, sport: str, date: str, number: int, game: Mapping[str, Any] | None,
                 label: str = "FREE PLAY") -> dict[str, Any]:
+    row = _logo_only(sport, row)
     c = row.get("check") or {}
     points, risk = why_points(row, game)
     side = str(row.get("side") or "").upper()
@@ -267,6 +270,17 @@ def card_fields(row: Mapping[str, Any], *, sport: str, date: str, number: int, g
         "kind": "prop", "market": row.get("market"),
         **team_colors(sport, team=(row.get("team_name"), row.get("team")), away=away, home=home),
     })
+
+
+def _logo_only(sport: str, item: Mapping[str, Any]) -> Mapping[str, Any]:
+    """A college row or pick without its player's face (user 2026-10-16: "use team logos for college athletes"); the
+    card's hero falls back to the team's logo."""
+    try:
+        from syndicate.features.shared import brand_kit
+
+        return item if brand_kit.faces_allowed(sport) else brand_kit.without_faces(item)
+    except Exception:  # noqa: BLE001 -- without the brand file, keep the faces rather than fail the card
+        return item
 
 
 def team_colors(sport: str, *, team: Iterable[Any] = (), away: Any = None, home: Any = None) -> dict[str, Any]:
@@ -316,6 +330,7 @@ def pick_card_fields(pick: Mapping[str, Any], *, sport: str, date: str, number: 
                      form_values: list[float] | None = None, form_labels: list[str] | None = None) -> dict[str, Any]:
     from syndicate.features.shared import cheat_sheets as cs
 
+    pick = _logo_only(sport, pick)
     ev, p_model, p_mkt, books = pick.get("ev_pct"), pick.get("p_model"), pick.get("p_market"), int(pick.get("books") or 0)
     # SYNDICATE PICK when the sim backs the price edge, PRICE PLAY when it does not (user 2026-10-15: "if i tout our
     # sim and we show something like this it dvalues our work"). A price play's graphic never shows the sim's number.
@@ -528,7 +543,7 @@ def stage(fields: Mapping[str, Any]) -> dict[str, str]:
         if fields.get("away_logo") or fields.get("home_logo"):
             crests = "".join(f'<img class="crest-duo {k}" src="{e(fields[f"{k}_logo"])}" alt="">'
                              for k in ("away", "home") if fields.get(f"{k}_logo"))
-            return {"hero": glow + crests + '<span class="vs">VS</span>', "stage_class": "duo", "stage_style": style}
+            return {"hero": glow + crests + '<span class="vs">VS</span>', "stage_class": "duo crests", "stage_style": style}
     if face:
         crest = f'<img class="crestbg" src="{e(logo)}" alt="">' if logo else ""
         return {"hero": glow + crest + f'<img class="head" src="{e(face)}" alt="">',

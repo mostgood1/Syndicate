@@ -87,14 +87,16 @@ body { background: var(--bg0); color: var(--ink); font-family: var(--body); posi
 .stage.duo .head.away { right: 330px; bottom: 150px; height: 430px; }
 .stage.duo .head.home { right: -10px; bottom: 150px; height: 430px; }
 .stage.duo .vs { right: 300px; top: 210px; z-index: 2; }
+.stage.duo.crests .vs { right: 322px; top: 205px; }
 .stage.duo .crest-duo.bg { opacity: .2; width: 250px; height: 250px; }
 .stage.duo .crest-duo.bg.away { right: 410px; top: 50px; } .stage.duo .crest-duo.bg.home { right: 60px; top: 50px; }
 .stage .crest-big { position: absolute; right: 120px; bottom: 140px; width: 440px; height: 440px; object-fit: contain;
   filter: drop-shadow(0 0 24px rgba(255,255,255,.22)) drop-shadow(0 0 60px color-mix(in srgb, var(--blue) 55%, transparent)); }
-.stage .crest-duo { position: absolute; width: 320px; height: 320px; object-fit: contain;
+/* a total: both teams equally -- the two crests side by side at one height, VS between */
+.stage .crest-duo { position: absolute; width: 280px; height: 280px; object-fit: contain; top: 110px;
   filter: drop-shadow(0 0 20px rgba(255,255,255,.2)) drop-shadow(0 0 50px color-mix(in srgb, var(--blue) 50%, transparent)); }
-.stage .crest-duo.away { right: 360px; top: 70px; } .stage .crest-duo.home { right: 40px; bottom: 120px; }
-.stage .vs { position: absolute; right: 300px; top: 300px; font: 900 96px/1 var(--display); color: var(--green); transform: skewX(-9deg);
+.stage .crest-duo.away { right: 420px; } .stage .crest-duo.home { right: 40px; }
+.stage .vs { position: absolute; right: 328px; top: 200px; font: 900 96px/1 var(--display); color: var(--green); transform: skewX(-9deg);
   text-shadow: 0 0 26px color-mix(in srgb, var(--green) 75%, transparent), 0 4px 0 rgba(0,0,0,.9); }
 .stage .ini { position: absolute; right: 200px; bottom: 220px; font: 900 220px/1 var(--display); color: var(--chrome-lo); opacity: .6; }
 

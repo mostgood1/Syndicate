@@ -1223,6 +1223,7 @@ def page_payload(sheets: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any
     Every row is kept (a game's own sheet needs all of its props), minus the fields the page never reads. Each row
     carries its card id and whether its price check passes (only those get a pick graphic). `game_sections` holds,
     per game, the same sections the full sheet has, as indexes into `rows`."""
+    from syndicate.features.shared import brand_kit
     from syndicate.features.shared import play_cards as pc
 
     out: dict[str, dict[str, Any]] = {}
@@ -1235,8 +1236,9 @@ def page_payload(sheets: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any
         graded_props = (rec or {}).get("props") or {}
         graded_lines = (rec or {}).get("lines") or {}
         rows = []
+        faces = brand_kit.faces_allowed(sport)          # college: logos, never faces (user 2026-10-16)
         for r in sheet.get("rows") or []:
-            row = {k: v for k, v in r.items() if k not in _ROW_DROP}
+            row = {k: v for k, v in r.items() if k not in _ROW_DROP and (faces or k not in brand_kit.FACE_FIELDS)}
             row["card_id"] = pc.card_id(sport, day, r)
             row["card_ok"] = pc.eligible(r)
             if rec is not None:
@@ -1260,7 +1262,7 @@ def page_payload(sheets: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any
             lines = [dict(line, result=result_for((line.get("check") or {}).get("price"), graded_lines.get(line_result_key(line))))
                      for line in lines]
             doc["reconciled"] = {k: rec.get(k) for k in ("reconciled_at", "source", "counts")}
-        picks = [dict(p) for p in sheet.get("picks") or []]
+        picks = [dict(p) if faces else brand_kit.without_faces(p) for p in sheet.get("picks") or []]
         if rec is not None:
             graded_picks, pick_void = rec.get("picks") or {}, rec.get("picks_void") or {}
             for p in picks:

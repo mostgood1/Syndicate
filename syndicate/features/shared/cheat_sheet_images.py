@@ -17,6 +17,7 @@ from pathlib import Path
 KEY_RE = re.compile(r"^[0-9a-f]{40}$")
 ROW_SIZE = 96
 CARD_SIZE = 260
+LOGO_CARD_SIZE = 500  # a logo a card draws large (a college hero, a total's two crests): ESPN's source is 500px
 HERO_SIZE = 900      # a play card's athlete (brand spec 2026-10-16: 40-60% of the card), `hero_image_px` in the brand JSON
 
 
