@@ -50371,3 +50371,40 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - **claim:** web by play-cards, token 44b01d13..., acquire exit 0. Ride-alongs: none -- HEAD..8de3deee = 4 commits, all this session's (5070b5f4 brand spec, b04ecb3d + c271699c log, 8de3deee college logos); code diff = brand_kit.py, brand JSON, play_cards.py, cheat_sheets.py, cheat_sheet_images.py, blueprints/cheat_sheets.py, card.html, cheat_sheets.html.
 - **verify (served, 11:13 AM CT):** `/cheatsheets/card/ncaaf/2026-10-15/l2_d4b4fca48c48509d` 200: brand tokens present, ticker present, NO `class="head"` (no face), `crest-big` hero; control `/cheatsheets/card/nfl/2026-10-15/l2_08b2b09ad087b4e5` 200 with the face. `/cheatsheets` page DATA: ncaaf rows 159 with a face 0 / with a logo 159, picks 5 with a face 0; nfl rows 163 with a face 163 (control); "Our featured plays" present, "Layer 2 board" absent.
 - **owed:** the 4:30 PM CT `SyndicateCheatSheets` run is the first to cache hero cutouts (900px) and 500px card logos -- read `hero_src` / `team_logo_card_src` counts on the 10-16 sheets; the 10-17 9:15 AM `SyndicatePlayCards` run is the first scheduled render of the new card (read the PNGs).
+
+## 2026-10-16T16:16:55Z (11:16 AM CT) -- prop support arc complete on main (4 commits); THREE readings owed, and a board build was in flight for EVERY one of 63 watcher cycles
+
+- **On main, none staged on the fleet.** `5457b428` NFL `sample_games`/
+  `projected_sd` (VERIFIED earlier: 0 of 1,070 -> 1,067 of 1,067), `1ca7041f`
+  NHL `proj_toi`/`line_slot`, `587d4163` MLB `pa_mean`/`ab_mean`/
+  `lineup_order`, `dea6cee5` NFL `projected_opportunities`. All additive
+  fields, no scoring change, so all BATCH into one restart.
+- **OPERATIONAL FINDING: there was no quiet window for ~56 minutes.** Two
+  observe-only watchers ran 15:19Z-16:15Z, **63 cycles**, and a **board build
+  was IN FLIGHT on `refresh-worker` in every single one** (the second watcher
+  logged `board_build=1` on 24 of 24 cycles across 9m45s, and a build takes
+  ~8.5min, so builds are running back-to-back with no gap). `rw_children` ran
+  1-5 throughout. So "wait for CLEAR" is not a strategy during active hours --
+  a refresh-worker restart here will discard a board build, which is why
+  today's restarts are recorded as "claimed restart" rather than as clear
+  windows. Stated because the safety check's own advice ("Wait, or proceed
+  deliberately") reads as though waiting will work.
+- **I chose not to proceed deliberately.** All four changes are
+  observability-only; discarding a board build for them is the wrong trade. The
+  readings land on the next restart by anyone, which is how `5457b428`'s
+  reading arrived (a peer's 13:27:51Z restart, within the hour).
+- **verify, three counts, all with same-instant controls:**
+  NHL `projection.proj_toi` -- CONTROL 0 of 156 (14:38Z).
+  MLB `projection.pa_mean` -- CONTROL 0 of 161 (15:0xZ).
+  NFL `projection.projected_opportunities` -- CONTROL 0 (new field).
+  All against NCAAF 723/723 and NFL `sample_games` 1,067/1,067 at the same
+  instant, so the instrument reads non-zero and the zeros are real.
+- **The NFL opportunity field is the one with a real gating claim**, and its
+  verification is not just a count: it is the field's p10/median for
+  ceiling-rejected vs accepted rows on the SERVED board. In the artifact it
+  separates them (projected receptions 0.67..10.33, median 3.20; 4 of the 6
+  players under 1.00 are the collapsed rows). If it does not separate them in
+  production, the lane says so rather than claiming a gate -- `sample_games`
+  already failed exactly that test after shipping.
+- Lanes `nhl-prop-support-fields`, `mlb-prop-support-fields` and
+  `nfl-prop-opportunity-volume` stay OPEN until their readings land.
