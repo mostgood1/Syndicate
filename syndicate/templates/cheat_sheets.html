@@ -560,12 +560,17 @@ function dedupNews(items) {
     .map(n => ({...n, previous_status: n._from}))
     .sort((a, b) => b._last - a._last);
 }
+// News tied to ITS game on this sheet (user 2026-10-16: "make sure its aligned with the correct game on the schedule"):
+// the build drops a team with no game here and keeps the game on each item; a game's own sheet shows its news only.
 function newsBlock(d) {
-  const news = dedupNews(d.news || []);
+  const news = dedupNews(d.news || []).filter(n => !STATE.game || n.event_id === STATE.game);
   if (!news.length) return "";
-  return sectionShell("news", "News impact", "Status changes captured by Syndicate's news collector in the last day, with that team's props on this sheet.", `${news.length}`,
-    `<div class="tbl"><table><thead><tr><th>Player</th><th>Team</th><th>Change</th><th>Captured</th><th>Props on this sheet</th></tr></thead><tbody>${
-      news.slice(0, 20).map(n => `<tr><td>${esc(n.player)}</td><td>${esc(n.team)}</td><td>${esc(n.previous_status || "not listed")} → ${esc(n.status || "cleared")}</td><td class="n">${esc(ctDateTime(n.captured_at))}</td><td class="n">${n.game_props_on_board}</td></tr>`).join("")}</tbody></table></div>`);
+  const gameCell = n => n.event_id
+    ? `<a href="${gameHref(n.event_id)}" data-game="${esc(n.event_id)}">${esc(n.matchup || "")}</a><span class="clubs" style="display:block">${esc(n.kickoff_ct || "")}${n.after_start ? " · after the start" : ""}</span>`
+    : `<span class="bk">not on this sheet</span>`;
+  return sectionShell("news", "News impact", "Status changes from Syndicate's news collector for the teams playing on this sheet, each tied to its game, with that game's props here.", `${news.length}`,
+    `<div class="tbl"><table><thead><tr><th>Player</th><th>Team</th><th>Game</th><th>Change</th><th>Captured</th><th>Props this game</th></tr></thead><tbody>${
+      news.slice(0, 20).map(n => `<tr><td>${esc(n.player)}</td><td>${esc(n.team_name || n.team)}</td><td>${gameCell(n)}</td><td>${esc(n.previous_status || "not listed")} → ${esc(n.status || "cleared")}</td><td class="n">${esc(ctDateTime(n.captured_at))}</td><td class="n">${n.props_this_game != null ? `${n.props_this_game}${n.team_props_this_game != null ? ` <span class="bk">(${n.team_props_this_game} his team)</span>` : ""}` : (n.game_props_on_board ?? "–")}</td></tr>`).join("")}</tbody></table></div>`);
 }
 function gameHref(id) {
   const q = new URLSearchParams();

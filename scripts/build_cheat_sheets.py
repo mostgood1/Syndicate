@@ -392,7 +392,9 @@ def news_impact(sport: str, selected_date: str, out_rows: list[dict[str, Any]],
             for side in ("home_team", "away_team"):
                 by_team[str(r.get(side) or "").lower()].append(r)
     out = []
-    for ev in sorted(events, key=lambda e: e["t0"], reverse=True)[:40]:
+    # Every event in the window: `cheat_sheets.align_news` keeps the ones for THIS sheet's games and caps THEM -- a
+    # league-wide cap first let other teams' news crowd out the sheet's own (NFL 10-15: 40 of 40 for other teams).
+    for ev in sorted(events, key=lambda e: e["t0"], reverse=True)[:1000]:
         game_props = by_team.get(str(ev.get("team") or "").lower(), [])
         others = sorted((r for r in game_props if r.get("player_name") != ev["player"]),
                         key=lambda r: -(r.get("ev_pct") or -99))[:5]
@@ -974,6 +976,8 @@ def main(argv: list[str] | None = None) -> int:
             print(f"CHEAT_SHEET {sport} date={selected} no {selected} games with pregame props -- nothing written", flush=True)
             continue
         filled = cs.fill_teams(sheet)          # a row's team from its game when the evidence had none (2026-10-16)
+        news = cs.align_news(sheet)            # news tied to ITS game on this sheet, net change only (2026-10-16)
+        print(f"CHEAT_SHEET {sport} news {json.dumps(news)}", flush=True)
         if filled:
             print(f"CHEAT_SHEET {sport} teams filled from the game: {filled}", flush=True)
         images = attach_images(sheet, data_root / "cheatsheets" / ".img_cache")

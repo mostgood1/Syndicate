@@ -1324,6 +1324,77 @@ def fill_teams(sheet: dict[str, Any]) -> int:
     return filled
 
 
+def _team_keys(sport: str, name: Any) -> set[str]:
+    """The ways one team's name can be written: exact, canonical (team_aliases), loose (soccer affixes / accents)."""
+    keys = {re.sub(r"[^a-z0-9]", "", str(name or "").lower())}
+    try:
+        from syndicate.features.shared.team_aliases import canonical_team
+
+        canonical = canonical_team(sport, name)
+        if canonical:
+            keys.add(re.sub(r"[^a-z0-9]", "", str(canonical).lower()))
+    except Exception:  # noqa: BLE001
+        pass
+    if _loose(name):
+        keys.add("~" + _loose(name))
+    return {k for k in keys if k and k != "~"}
+
+
+def align_news(sheet: dict[str, Any]) -> dict[str, int]:
+    """Tie every news item to ITS team's game on THIS sheet (user 2026-10-16: "make sure its aligned with the correct
+    game on the schedule"). Measured before: NFL 10-15 0 of 40 items, NBA 10-16 0 of 13, MLB 10-16 0 of 7, NHL 10-16 1 of
+    40 were for a team playing on that sheet -- the section listed league-wide news. Now:
+      * an item whose team has no game on the sheet is DROPPED;
+      * a kept item carries the game (event_id, matchup, kickoff) and `after_start` when it was captured after the start;
+      * one row per player: the NET change across the window; a flicker back to where it started is no news;
+      * its counts are THIS game's props on THIS sheet (all, and the team's own).
+    In place; returns {"kept", "dropped_off_sheet", "dropped_no_change"}."""
+    sport = str(sheet.get("sport") or "")
+    index: dict[str, list[tuple[dict[str, Any], str]]] = {}
+    for g in sheet.get("games") or []:
+        for side in ("home", "away"):
+            for key in _team_keys(sport, g.get(f"{side}_team")):
+                index.setdefault(key, []).append((g, side))
+    rows = sheet.get("rows") or []
+    by_player: dict[tuple[str, str], dict[str, Any]] = {}
+    dropped_off = 0
+    for n in sorted(sheet.get("news") or [], key=lambda x: str(x.get("captured_at") or "")):
+        hits = {id(g): (g, side) for k in _team_keys(sport, n.get("team")) for g, side in index.get(k, [])}
+        if not hits:
+            dropped_off += 1
+            continue
+        captured = str(n.get("captured_at") or "")
+        # A doubleheader / two games in the window: the first game that starts after the news, else the latest one.
+        ordered = sorted(hits.values(), key=lambda gs: str(gs[0].get("commence_time") or ""))
+        g, side = next((gs for gs in ordered if str(gs[0].get("commence_time") or "") > captured), ordered[-1])
+        key = (str(n.get("player") or "").lower(), str(g.get("event_id")))
+        cur = by_player.get(key)
+        if cur is None:
+            cur = by_player[key] = dict(n, first_status=n.get("previous_status"), changes=0)
+        cur.update({k: v for k, v in n.items() if k != "previous_status"})
+        cur["changes"] += 1
+        cur.update({"event_id": g.get("event_id"), "matchup": g.get("matchup") or f"{g.get('away_team')} @ {g.get('home_team')}",
+                    "kickoff_ct": g.get("kickoff_ct"), "commence_time": g.get("commence_time"), "side": side,
+                    "team_name": g.get(f"{side}_team"),
+                    "after_start": bool(g.get("commence_time")) and captured >= str(g.get("commence_time"))})
+    kept, no_change = [], 0
+    for n in by_player.values():
+        before, after = str(n.pop("first_status") or "").lower(), str(n.get("status") or "").lower()
+        if before == after:
+            no_change += 1
+            continue
+        n["previous_status"] = n.get("previous_status") if n["changes"] == 1 else (before or None)
+        game_rows = [r for r in rows if r.get("event_id") == n["event_id"]]
+        team_keys = _team_keys(sport, n.get("team_name"))
+        n["props_this_game"] = len(game_rows)
+        n["team_props_this_game"] = sum(1 for r in game_rows if _team_keys(sport, r.get("team_name") or r.get("team")) & team_keys)
+        n.pop("game_props_on_board", None)
+        kept.append(n)
+    kept.sort(key=lambda x: str(x.get("captured_at") or ""), reverse=True)
+    sheet["news"] = kept[:60]
+    return {"kept": len(kept), "dropped_off_sheet": dropped_off, "dropped_no_change": no_change}
+
+
 def page_payload(sheets: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any]]:
     """sport -> the sheet as the page shows it, sports in board order.
 
@@ -1341,6 +1412,9 @@ def page_payload(sheets: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any
         # reconciled sheets").
         sheet = dict(sheet, rows=[dict(r) for r in sheet.get("rows") or []], games=[dict(g) for g in sheet.get("games") or []])
         fill_teams(sheet)                     # every row says whose player it is (user 2026-10-16)
+        if sheet.get("news") and not any(n.get("event_id") for n in sheet["news"]):
+            sheet["news"] = [dict(n) for n in sheet["news"]]
+            align_news(sheet)                 # an older sheet's league-wide news -> this sheet's games only
         rec = sheet.get("reconciled") if isinstance(sheet.get("reconciled"), Mapping) else None
         graded_props = (rec or {}).get("props") or {}
         graded_lines = (rec or {}).get("lines") or {}

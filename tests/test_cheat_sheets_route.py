@@ -248,3 +248,26 @@ def test_the_page_spells_out_the_club(tmp_path, monkeypatch):
     page = (Path(__file__).resolve().parents[1] / "syndicate" / "templates" / "cheat_sheets.html").read_text(encoding="utf-8")
     assert "function clubLine(r)" in page and "function playerCell(r, withPos)" in page
     assert page.count("${playerCell(r, ") == 4 and "${clubLine(r)}" in page
+
+
+def test_news_is_tied_to_its_game_on_this_sheet():
+    # User 2026-10-16: "make sure its aligned with the correct game on the schedule". Measured before: NFL 10-15 0 of 40
+    # items were for a team playing on that sheet.
+    from syndicate.features.shared import cheat_sheets as cs
+
+    sheet = {"sport": "nhl",
+             "games": [{"event_id": "g1", "home_team": "Anaheim Ducks", "away_team": "Boston Bruins", "matchup": "Boston Bruins @ Anaheim Ducks",
+                        "commence_time": "2026-10-17T02:00:00Z", "kickoff_ct": "Fri 9:00 PM CT"}],
+             "rows": [{"event_id": "g1", "player": "A", "team_name": "Anaheim Ducks"}, {"event_id": "g1", "player": "B", "team_name": "Boston Bruins"},
+                      {"event_id": "g9", "player": "C", "team_name": "Anaheim Ducks"}],
+             "news": [{"player": "Mikael Granlund", "team": "Anaheim Ducks", "previous_status": None, "status": "Out", "captured_at": "2026-10-16T17:31:17Z"},
+                      {"player": "Taylor Hall", "team": "Carolina Hurricanes", "previous_status": None, "status": "Out", "captured_at": "2026-10-16T16:21:17Z"},
+                      {"player": "Flicker", "team": "Boston Bruins", "previous_status": None, "status": "Out", "captured_at": "2026-10-16T15:00:00Z"},
+                      {"player": "Flicker", "team": "Boston Bruins", "previous_status": "Out", "status": None, "captured_at": "2026-10-16T15:00:00Z"},
+                      {"player": "Late", "team": "Boston Bruins", "previous_status": None, "status": "Out", "captured_at": "2026-10-17T02:30:00Z"}]}
+    out = cs.align_news(sheet)
+    assert out == {"kept": 2, "dropped_off_sheet": 1, "dropped_no_change": 1}
+    late, granlund = sheet["news"]
+    assert granlund["event_id"] == "g1" and granlund["matchup"] == "Boston Bruins @ Anaheim Ducks" and granlund["side"] == "home"
+    assert granlund["props_this_game"] == 2 and granlund["team_props_this_game"] == 1 and granlund["after_start"] is False
+    assert late["after_start"] is True                                            # captured after the start: flagged
