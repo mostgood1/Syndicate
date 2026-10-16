@@ -50151,3 +50151,22 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - Closing for 0055 fired at T-8.9 min.
 - **The missing closing sweep for 0020 is by design.** At its T-10 (00:20Z) 0055 was live, and `_t_window_due_sports` skips live sports because their slate-wide cadence covers pregame events.
   - Measured, not assumed: 8 `ODDS_SWEEP_LAUNCHED` lines including nba between 00:20 and 00:30Z, every 75-140 s.
+
+## 2026-10-15 13:04Z -- READING: football live refresh on served cards (lane games-rail-full-detail)
+
+(Header date is the task's; the scheduled task `games-rail-football-live-reading-1015` fired late, and the reading ran **2026-10-16 13:04-13:06Z = 2026-10-16 8:04-8:06 AM CT**, about 12 h after the 10-15 games ended.) READ-ONLY; nothing restarted or deployed. Source: local web `http://127.0.0.1:10000/api/board/game-chips?date=2026-10-15&sports=nfl,ncaaf`, vs ESPN `football/nfl/scoreboard?dates=20261015` and `football/college-football/scoreboard?dates=20261015&groups=80&limit=300`.
+
+**Live (state, status_token, situation): NOT MEASURED -- 0 live chips.** Population: 17 chips -- NCAAF 3 final; NFL 1 final + 13 pregame (the week-7 Sunday/Monday slate). No live game existed when this ran, so this is not a pass. The 1e1385ba live fields (`status_token` "Q3 8:12" form, `situation` down & distance) are still unread on any served payload.
+
+**Finals vs ESPN (a secondary check, not the goal): 4 of 4 MATCH.** The score and every period match, including both OT periods.
+
+| sport | matchup | chip | ESPN |
+|---|---|---|---|
+| nfl | SEA @ DEN | FINAL 14-17, [3,0,0,11,0]/[0,14,0,0,3], labels 1-4,OT | Final/OT 14-17, same |
+| ncaaf | ECU @ UAB | FINAL 17-30, [7,7,0,3,0]/[0,3,6,8,13], OT | Final/OT 17-30, same |
+| ncaaf | GASO @ ODU | FINAL 23-15, [7,9,7,0]/[7,0,0,8] | Final 23-15, same |
+| ncaaf | CSU @ TXST | FINAL 27-66, [0,21,6,0]/[21,24,21,0] | Final 27-66, same |
+
+`situation` is null on all 4 finals, which is correct. Small finding: `status_token` reads `FINAL` where ESPN reads `Final/OT`, so the OT is visible only in the linescore labels. The response envelope said `source=inline_artifact_stale`, `artifact_age_seconds=29072` against a max of 180, and `published_at=2026-10-16T04:59:47Z`, so the chips were served from an 8 h-old artifact. The finals were still right. Whether the serve-time ESPN refresh runs for past-date finals was not checked.
+
+**Owed:** a live reading during a game window. The next ones are NCAAF Saturday 2026-10-17 (full FBS slate) and NFL Sunday 2026-10-18 from 8:30 AM CT (HOU @ JAX, London). No task has been scheduled for them; the task file did not ask for one.
