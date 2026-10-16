@@ -157,10 +157,60 @@ Run at Idle priority. Driver: `scripts/soccer_team_strength_experiments.py`.
 
 ## 2. Coverage
 
-(written after the pull and the name audit, BEFORE any fit)
+(written after the pull and the name audit, BEFORE any fit; `C:/tmp/team-strength/audit.json`)
+
+- **football-data raw CSVs:** 104 of 104 league-season files (8 leagues × 2014..2026), 32,656
+  played matches with a score.
+- **Close source** over eligible matches: Pinnacle close 29,712; market-average close 1,818. That is
+  every 2026-27 match, because Pinnacle closing columns are absent from football-data this season.
+  B365 close was never needed. 10 matches had no close.
+- **Identity / reachability check PASSED:** `clamp(0.55·x, ±0.35)` equals production's unpatched
+  `compute_team_ratings` output for every rated team in 432 sampled (league, day) tables. The max
+  error was 7.5e-5, which is the 4-dp rounding.
+- **Name audit** (262 football-data club names; deviation 1 below):
+  - **Six clubs production NEVER matches**, so `_rating_for` would hand them a silent `0.0`:
+    - Bundesliga: `FC Koln` -> Understat `FC Cologne` (345 matches); `M'gladbach` ->
+      `Borussia M.Gladbach` (413).
+    - La Liga: `Ath Bilbao` -> `Athletic Club` (462); `La Coruna` -> `Deportivo La Coruna` (160).
+    - EPL: `QPR` -> `Queens Park Rangers` (38).
+    - Ligue 1: `Ajaccio GFCO` -> `GFC Ajaccio` (38).
+  - **Nine one-off WRONG pairings.** Each fires on a single day when the right club is absent from
+    the as-of table, so the fuzzy match falls through to a neighbour:
+    - big 5: `Man City` -> Manchester United; `Newcastle` -> Manchester United; `Paris FC` -> PSG;
+    - goals leagues: `Cercle Brugge` -> Club Brugge, `Aves` <-> `Chaves`, `Farense` -> Feirense,
+      `Feirense` -> Moreirense, `Mouscron` -> Mouscron-Peruwelz.
+    - Excluded, never scored.
+- **Eligible: 31,530** of 32,656. Excluded: 224 with no rating (promoted clubs with no history in
+  the depth, plus the wrong pairings), 892 under 5 rated matches, and 10 with no close.
+  - By league: EPL 4,452; La Liga 4,461; Serie A 4,437; Ligue 1 4,136; Bundesliga 3,582;
+    Primeira 3,619; Eredivisie 3,572; Belgium 3,271.
+  - By season: 2014 2,391; 2015 2,592; 2016..2025 2,425..2,680 each; 2026 431.
+  - **Held out (test seasons 2016..2026): 26,547 matches.** Training for the first test season is
+    2014..2015 (4,983 matches).
+- **One family, one date window.** Ratings, outcomes and the close all come from the same matches
+  over 2014..2026 (Understat begins 2014-15), so the CLAUDE.md cross-family intersection trap does
+  not bite here. The intersection is the eligible set itself.
 
 ## 3. Results
 
 ## 4. What cannot be estimated
 
 ## 5. Deviations from the registration
+
+- **1. Name aliases and wrong-pairing exclusions (2026-10-16 ~17:00Z, after the name audit and
+  BEFORE any fit).** These are the six MISSING and nine WRONG pairings listed in section 2. The
+  registration allowed an explicit alias for a wrong or missing pairing. Without the aliases, 1,456
+  club-appearances of six clubs (1,377 eligible matches: 30,153 -> 31,530) would drop out, including Athletic Club and Gladbach for whole seasons.
+  The wrong pairings are excluded and counted, not re-aliased, because on those days the right club
+  has no rating. **Production defect, beyond this lane:** a fixture spelled the football-data way
+  would get a 0.0 rating for those six clubs, and it would rate the wrong club on those nine days.
+  Production's fixture names come from the odds/ESPN feeds, not football-data, so whether the
+  defect is reachable in serving is NOT measured here.
+- **2. Descriptive engine-gain read (added 2026-10-16 ~17:00Z, BEFORE any fit; never a verdict).**
+  Lane `soccer-1x2-ratings-xg-source` (H37 harness, no market anchoring) left the SERVED sim's
+  per-match goal means for 2025-26 in `C:/tmp/soccer-lpb/h2h_armA_<league>.jsonl`.
+  - `scripts/soccer_team_strength_experiments.py engine` joins them to this run's as-of ratings
+    and regresses `log(home_mean / away_mean)` on the rating gap `(A_h − D_a) − (A_a − D_h)`.
+  - The slope is the ENGINE's `k`, on the same scale as arm C's refit `k`. That makes `k = 1` in
+    arms A and B a measured quantity instead of a convention.
+  - It also reports the engine's own 1X2 log loss against the close on those matches.
