@@ -242,11 +242,30 @@ def why_and_risk(row: Mapping[str, Any], game: Mapping[str, Any] | None) -> tupl
     return [text for _tone, text in why][:why_max], risk[:4] or ["Lines move: re-check the price before betting"]
 
 
+def row_label(sport: str, row: Mapping[str, Any]) -> str:
+    """A sheet row's card label by the picks' own rule (`cheat_sheets.pick_label`): SYNDICATE PICK only when the sim
+    backs the price edge by a full point -- and never in a market where our model is measured to trail the book --
+    else PRICE PLAY. There is no third label (user 2026-10-16: "stop using the free play term on the graphics - they
+    are either syndicate plays or price plays")."""
+    from syndicate.features.shared import cheat_sheets as cs
+
+    c = row.get("check") or {}
+    trails = any("model loses to the book" in str(r) for r in c.get("reasons") or [])
+    return cs.pick_label({"sport": sport, "market": row.get("market"), "p_model": c.get("p_model"),
+                          "p_market": c.get("p_market"), "sim_view": "disagrees" if trails else row.get("sim_view")})
+
+
 def card_fields(row: Mapping[str, Any], *, sport: str, date: str, number: int, game: Mapping[str, Any] | None,
-                label: str = "FREE PLAY") -> dict[str, Any]:
+                label: str | None = None) -> dict[str, Any]:
     row = _logo_only(sport, row)
+    label = label or row_label(sport, row)
+    play = label == "PRICE PLAY"
     c = row.get("check") or {}
     points, risk = why_points(row, game)
+    if play:     # a price play's graphic never shows the sim's number (user 2026-10-15)
+        points = [(tone, t) for tone, t in points if not t.startswith("Sim script:")]
+        risk = [r for r in risk if not r.startswith(("Model says", "Our model trails"))]
+        risk.insert(0, "A price edge closes fast: re-check the price before betting")
     side = str(row.get("side") or "").upper()
     line = row.get("line")
     market = str(row.get("market") or "").replace("player_", "").replace("_", " ")
@@ -267,7 +286,9 @@ def card_fields(row: Mapping[str, Any], *, sport: str, date: str, number: int, g
         "hero": row.get("hero_src") or row.get("hero_url"),
         "home_logo": (game or {}).get("home_logo"), "away_logo": (game or {}).get("away_logo"),
         "kickoff_ct": (game or {}).get("kickoff_ct") or row.get("kickoff_ct"),
-        "kind": "prop", "market": row.get("market"),
+        "kind": "prop", "market": row.get("market"), "price_play": play,
+        **({"tile3_k": "Books", "tile3_v": str(row.get("books_quoting") or "–"),
+            "tile3_s": f"consensus {(c.get('p_market') or 0):.0%}", "model_prob": None} if play else {}),
         **team_colors(sport, team=(row.get("team_name"), row.get("team")), away=away, home=home),
     })
 
@@ -417,6 +438,7 @@ def ledger_record(fields: Mapping[str, Any], row: Mapping[str, Any], *, sport: s
     c = row.get("check") or {}
     return {"card_id": fields["id"], "generated_at": generated_at, "source": source, "sport": sport, "date": fields["date"],
             "event_id": row.get("event_id"), "matchup": fields["matchup"], "commence_time": fields["commence_time"],
+            "label": fields.get("label"),
             "player": row.get("player"), "market": row.get("market"), "line": row.get("line"), "side": row.get("side"),
             "price": c.get("price"), "book": c.get("book"), "books_quoting": row.get("books_quoting"),
             "p_market": c.get("p_market"), "p_model": c.get("p_model"), "ev_market": c.get("ev_market"),
@@ -439,7 +461,7 @@ def pick_form(sheet: Mapping[str, Any], pick: Mapping[str, Any]) -> tuple[list[f
     return [], []
 
 
-def pick_cards(sheets: Iterable[Mapping[str, Any]], *, per_sport: int = 3, label: str = "FREE PLAY") -> list[tuple[dict, dict, str]]:
+def pick_cards(sheets: Iterable[Mapping[str, Any]], *, per_sport: int = 3, label: str | None = None) -> list[tuple[dict, dict, str]]:
     """(fields, item, sport) for every card across sheets, numbered per day in sport order. The SYNDICATE PICKS come
     first -- the board's suggested opps (2026-10-15) -- and a sheet without any falls back to its value rows."""
     out, n = [], 0

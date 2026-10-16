@@ -69,7 +69,8 @@ def test_the_card_renders_the_spec_order_and_the_brand_copy():
     assert "--green: #8CFF00;" in html and "$" not in html.replace("$$", "")  # tokens injected, nothing unfilled
     assert ">Why we like it<" in body and ">Case against<" in body and "@SyndicateROI" in body and "Long-term edge" in body
     ticker = body[body.index('class="ticker"'):body.index('class="tagline"')]
-    assert "FREE PLAY" in ticker and "#" not in ticker and "TORY HORTON UNDER 3.5 RECEIVING YARDS" in ticker.upper() and "(+105)" in ticker
+    assert "PRICE PLAY" in ticker and "FREE PLAY" not in html and "#" not in ticker
+    assert "TORY HORTON UNDER 3.5 RECEIVING YARDS" in ticker.upper() and "(+105)" in ticker
     assert 'class="head" src="data:image/webp;base64,HEAD"' in body           # the athlete is the hero
 
 
@@ -84,6 +85,24 @@ def test_the_case_against_is_three_to_four_and_the_reasons_at_most_six():
     assert any("One big play is enough to beat an under" in r for r in f["risk"])
     rendered = pc.render_card(f, "data:,")
     assert rendered.count('<li class="for">') + rendered.count('<li class="ctx">') == len(f["why"])
+
+
+def test_a_row_card_is_a_syndicate_pick_or_a_price_play_never_a_free_play():
+    # User 2026-10-16: "stop using the free play term on the graphics - they are either syndicate plays or price plays".
+    def row(p_model, reasons=()):
+        return {"player": "A", "market": "Receptions", "line": 2.5, "side": "over", "books_quoting": 5,
+                "check": {"verdict": "value", "ev_market": 3.0, "price": 110, "book": "fanduel", "p_market": 0.50,
+                          "p_model": p_model, "reasons": list(reasons)}}
+    assert pc.row_label("nfl", row(0.56)) == "SYNDICATE PICK"                        # the sim backs it by 6 pts
+    assert pc.row_label("nfl", row(0.505)) == "PRICE PLAY"                           # under the 1-point floor
+    assert pc.row_label("nfl", row(None)) == "PRICE PLAY"                            # no sim view at all
+    assert pc.row_label("nfl", row(0.60, ["model loses to the book in this market (measured, +3.1% worse)"])) == "PRICE PLAY"
+    pick = pc.card_fields(row(0.56), sport="nfl", date="2026-10-17", number=1, game=None)
+    play = pc.card_fields(row(0.505), sport="nfl", date="2026-10-17", number=2, game=None)
+    assert pick["label"] == "SYNDICATE PICK" and pick["model_prob"] == "56%" and not pick["price_play"]
+    assert play["label"] == "PRICE PLAY" and play["model_prob"] is None and play["tile3_k"] == "Books"
+    for f in (pick, play):
+        assert "FREE PLAY" not in pc.render_card(f, "data:,")
 
 
 def test_market_risks_know_their_bet():

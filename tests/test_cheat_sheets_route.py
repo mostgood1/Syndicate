@@ -103,7 +103,8 @@ def test_a_pick_graphic_exists_only_where_the_price_clears_the_fair(http):
     page = client.get(f"/cheatsheets/card/nfl/{TODAY}/{good}")
     html = page.data.decode()
     assert page.status_code == 200 and "TYLER ALLGEIER" in html.upper() and "UNDER 2.5 RECEPTIONS" in html
-    assert 'id="pc-toolbar"' in html and ">FREE PLAY<" in html and "FREE PLAY #" not in html     # no number (2026-10-16)
+    assert 'id="pc-toolbar"' in html and "FREE PLAY" not in html and "PLAY #" not in html      # 2026-10-16: no number, no "free play"
+    assert ">PRICE PLAY<" in html or ">SYNDICATE PICK<" in html
     assert "$" not in html.split("<script")[0].replace("$$", "")
     bench = pc.card_id("nfl", TODAY, _sheet()["rows"][1])
     refused = client.get(f"/cheatsheets/card/nfl/{TODAY}/{bench}")

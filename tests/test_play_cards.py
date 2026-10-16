@@ -77,7 +77,9 @@ def test_render_card_fills_every_placeholder(tmp_path):
                             game={"matchup": "Arizona Cardinals @ Los Angeles Rams", "commence_time": "2026-10-18T20:05:00Z"})
     html_text = m.render_card(fields, "data:image/webp;base64,AAAA")
     assert "$" not in html_text.replace("$$", "")                                   # no unfilled template field
-    assert ">FREE PLAY<" in html_text and "FREE PLAY #" not in html_text                          # never numbered (2026-10-16)
+    # never numbered, never "free play" (user 2026-10-16): the row's sim trails the market -> a PRICE PLAY, no sim number
+    assert ">PRICE PLAY<" in html_text and "FREE PLAY" not in html_text and "PLAY #" not in html_text
+    assert "Model says" not in html_text and "Market outlook" in html_text
     assert "UNDER 2.5 RECEPTIONS" in html_text and "-151" in html_text
     assert "<svg" in m.chart_svg([1, 3], ["25-W1", "26-W2"], 2.5, "under") and ">W2<" in m.chart_svg([1, 3], ["25-W1", "26-W2"], 2.5, "under")
 
@@ -136,7 +138,7 @@ def test_the_daily_cards_promote_the_syndicate_picks_first():
     with_picks = {"sport": "mlb", "date": "2026-10-15", "rows": [value_row], "picks": [_pick()]}
     without = {"sport": "nfl", "date": "2026-10-15", "rows": [value_row], "picks": []}
     cards = pc.pick_cards([with_picks, without], per_sport=3)
-    assert [(f["label"], f["player"]) for f, _item, _s in cards] == [("SYNDICATE PICK", "Milwaukee Brewers"), ("FREE PLAY", "Somebody")]
+    assert [(f["label"], f["player"]) for f, _item, _s in cards] == [("SYNDICATE PICK", "Milwaukee Brewers"), ("PRICE PLAY", "Somebody")]   # no "free play" (2026-10-16)
 
 
 

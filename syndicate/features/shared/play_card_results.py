@@ -298,7 +298,7 @@ def postmortem(card: Mapping[str, Any], item: Mapping[str, Any], classification:
             "books_quoting", "p_market", "p_model", "ev_market")
     out = {k: card.get(k) for k in keep}
     out.update({"player": card.get("player") or item.get("player_name") or item.get("player"),
-                "label": item.get("label"), "sim_view": item.get("sim_view"), **classification})
+                "label": item.get("label") or card.get("label"), "sim_view": item.get("sim_view"), **classification})
     return out
 
 

@@ -22,10 +22,10 @@ def _script(name):
 
 def test_the_close_and_the_result_give_four_verdicts():
     beat, lost = {"ev_close_pct": 2.3}, {"ev_close_pct": -3.7}
-    assert pcr.verdict("win", beat, "FREE PLAY", None, None)["key"] == "right_side"
-    assert pcr.verdict("loss", beat, "FREE PLAY", None, None)["key"] == "good_bet_bad_result"
-    assert pcr.verdict("win", lost, "FREE PLAY", None, None)["key"] == "cashed_against_close"
-    assert pcr.verdict("loss", lost, "FREE PLAY", None, None)["key"] == "wrong_side"
+    assert pcr.verdict("win", beat, "PRICE PLAY", None, None)["key"] == "right_side"
+    assert pcr.verdict("loss", beat, "PRICE PLAY", None, None)["key"] == "good_bet_bad_result"
+    assert pcr.verdict("win", lost, "PRICE PLAY", None, None)["key"] == "cashed_against_close"
+    assert pcr.verdict("loss", lost, "PRICE PLAY", None, None)["key"] == "wrong_side"
     v = pcr.verdict("win", {}, "PRICE PLAY", None, None)
     assert v["key"] == "no_close" and v["tone"] == "neutral" and any("price play" in x.lower() for x in v["lines"])
 
@@ -45,7 +45,7 @@ def test_the_sim_is_judged_only_where_it_was_the_reason():
     assert right["right_side"] is True and right["error"] == -0.86 and "right about the side of 2.5" in right["text"]
     wrong = pcr.sim_judgement(prop, "SYNDICATE PICK", 4.0)
     assert wrong["right_side"] is False and "wrong about the side" in wrong["text"] and "2.1 low" in wrong["text"]
-    assert pcr.sim_judgement(prop, "PRICE PLAY", 1.0) is None and pcr.sim_judgement(prop, "FREE PLAY", 1.0) is None
+    assert pcr.sim_judgement(prop, "PRICE PLAY", 1.0) is None and pcr.sim_judgement(prop, "", 1.0) is None
     side = pcr.sim_judgement({"kind": "game", "market": "spreads", "side": "home", "line": -15, "p_model": 0.56, "p_market": 0.5},
                              "SYNDICATE PICK", 39.0)
     assert side["right_side"] is True and "SmartSim backed this side at 56% (the market said 50%): the side came in" == side["text"]

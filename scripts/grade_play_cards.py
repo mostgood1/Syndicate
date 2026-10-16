@@ -247,7 +247,7 @@ def render_results(cards: list[dict[str, Any]], root: Path, *, out_dir: Path | N
         found = usage(c, item) if callable(usage) else None
         overrides, classification = pcr.result_overrides(fields, item, c, entry=pcr.reconciled_entry(rec, item), score=score,
                                                          usage=found)
-        post.append(pcr.postmortem(c, item, classification))
+        post.append(pcr.postmortem(dict(c, label=c.get("label") or fields.get("label")), item, classification))
         html_path = out_dir / c["date"] / f"{number:02d}_{c['sport']}_{c['card_id']}_result.html"
         if html_path.with_suffix(".png").exists():
             continue

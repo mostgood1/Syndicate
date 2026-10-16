@@ -85,7 +85,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--date", default=None)
     ap.add_argument("--sports", default="nfl,ncaaf,nhl,soccer,nba,wnba,ncaab,mlb")
     ap.add_argument("--per-sport", type=int, default=3)
-    ap.add_argument("--label", default="FREE PLAY")
+    ap.add_argument("--label", default=None, help="override every card's label (default: SYNDICATE PICK or PRICE PLAY by the "
+                                               "picks' own rule; there is no 'free play' -- user 2026-10-16)")
     ap.add_argument("--no-png", action="store_true")
     ap.add_argument("--no-embed", action="store_true", help="link images from their CDNs instead of inlining them")
     ap.add_argument("--no-ledger", action="store_true", help="render only (a preview run does not enter the record)")
