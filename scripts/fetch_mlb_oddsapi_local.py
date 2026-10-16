@@ -1671,8 +1671,13 @@ def fetch_and_write_live_odds_for_date(date_str: str, *, out_dir: Path | None = 
     # below would multiply spend by ~30x for the same regions.
     game_lines_regions = _game_line_regions(regions)
     game_lines_doc = fetch_live_game_lines_for_date(api_key, date_str, regions=game_lines_regions, bookmakers=bookmakers, events=live_events)
-    pitcher_props_doc = fetch_live_pitcher_props_for_date(api_key, date_str, regions=regions, bookmakers=bookmakers, events=live_events)
-    hitter_props_doc = fetch_live_hitter_props_for_date(api_key, date_str, regions=regions, bookmakers=bookmakers, markets=hitter_markets, events=live_events)
+    # PROPS ONLY get the ten-book list (lane props-book-coverage, 2026-10-16): game lines keep their widened regions
+    # (37 books) -- passing the list there would cut them to ten.
+    from syndicate.features.shared.odds_regions import prop_bookmakers
+
+    props_books = bookmakers or prop_bookmakers("mlb")
+    pitcher_props_doc = fetch_live_pitcher_props_for_date(api_key, date_str, regions=regions, bookmakers=props_books, events=live_events)
+    hitter_props_doc = fetch_live_hitter_props_for_date(api_key, date_str, regions=regions, bookmakers=props_books, markets=hitter_markets, events=live_events)
     # #209: drain the per-book quotes BEFORE the preserve-existing fallbacks
     # below, which can replace a doc wholesale with the previous cycle's file --
     # that file has no quotes on it, and appending the previous cycle's prices

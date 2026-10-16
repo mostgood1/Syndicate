@@ -135,6 +135,39 @@ def prop_regions(sport: str, regions: str, *, env: "dict[str, str] | None" = Non
     return widened_regions(regions, prop_regions_env(sport), env=env)
 
 
+#: PER-SPORT PROP BOOK LISTS (lane props-book-coverage, user 2026-10-16: "as long as we dont increase expense lets go
+#: ahead"). OddsAPI bills a `bookmakers` list of up to 10 -- from ANY regions -- as ONE region, so ten named books cost
+#: exactly what `regions=us` costs, and the list can reach books `us` does not have. The `us2` books (ESPN Bet, Hard
+#: Rock, Fliff, Bally, betPARX) were in no props shard of any sport since 09-30.
+#:
+#: Measured 2026-10-16, one event + one market per sport, `x-requests-last`: this list cost 1 credit on NFL (9 books
+#: back), NCAAF (7) and MLB (7) -- the same 1 credit `us` costs -- each with ESPN Bet and Hard Rock. Against what each
+#: sport's props got from `us` since 10-01 it keeps every NFL and NCAAF book and drops one MLB book (MyBookie, 11% of
+#: MLB prop lines). NHL has its own ten (`syndicate/local_nhl_odds.NHL_PROP_BOOKMAKERS`, with Pinnacle).
+#:
+#: NEVER MORE THAN 10: an 11th book bills a second region (tests/test_prop_bookmakers.py holds the line).
+PROP_BOOKMAKERS = {
+    sport: "draftkings,fanduel,betmgm,williamhill_us,betrivers,fanatics,bovada,betonlineag,espnbet,hardrockbet"
+    for sport in ("nfl", "ncaaf", "mlb")
+}
+PROP_BOOKMAKERS_ENV_TEMPLATE = "SYNDICATE_{sport}_PROP_BOOKMAKERS"
+
+
+def prop_bookmakers(sport: str, *, env: "dict[str, str] | None" = None) -> "str | None":
+    """The `bookmakers` value for one sport's PROP calls, or None (ask the region, as before).
+
+    `SYNDICATE_<SPORT>_PROP_BOOKMAKERS` overrides the list; set to "" it restores `regions` alone. A sport whose prop
+    REGIONS were widened (`SYNDICATE_<SPORT>_PROP_REGIONS`) gets None: OddsAPI lets `bookmakers` override `regions`,
+    and that knob's decision must keep meaning what it says."""
+    environ = os.environ if env is None else env
+    key = str(sport or "").strip().lower()
+    if str(environ.get(prop_regions_env(key)) or "").strip():
+        return None
+    raw = environ.get(PROP_BOOKMAKERS_ENV_TEMPLATE.format(sport=key.upper()))
+    value = PROP_BOOKMAKERS.get(key) if raw is None else raw
+    return str(value or "").strip() or None
+
+
 def game_line_regions(regions: str, *, env: "dict[str, str] | None" = None) -> str:
     """`regions` widened by the configured extras. Never narrowed.
 

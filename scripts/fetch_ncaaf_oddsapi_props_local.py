@@ -427,16 +427,18 @@ def fetch_event_odds(
     """
     resolved_sport_key = sport_key or _get_sport_key()
     url = f"{_get_base_url()}/sports/{resolved_sport_key}/events/{event_id}/odds"
-    response = requests.get(
-        url,
-        params={
-            "apiKey": api_key,
-            "regions": region,
-            "markets": ",".join(markets or _player_markets()),
-            "oddsFormat": "american",
-        },
-        timeout=20,
-    )
+    from syndicate.features.shared.odds_regions import prop_bookmakers
+
+    params = {
+        "apiKey": api_key,
+        "regions": region,
+        "markets": ",".join(markets or _player_markets()),
+        "oddsFormat": "american",
+    }
+    books = prop_bookmakers("ncaaf")       # ten books at one region's price (lane props-book-coverage, 2026-10-16)
+    if books:
+        params["bookmakers"] = books
+    response = requests.get(url, params=params, timeout=20)
     record_oddsapi_quota(response.headers, sport="ncaaf", endpoint=response.url)
     if response.status_code == 422:
         raise HTTPError(response.text, response=response)
