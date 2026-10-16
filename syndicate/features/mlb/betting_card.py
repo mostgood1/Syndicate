@@ -72,12 +72,15 @@ def _enrich_recommendation_like_payload(payload: Any) -> Any:
     return payload
 
 
-def _vendor_web_root() -> Path:
-    return (Path(__file__).resolve().parents[3] / "vendor" / "mlb_bettingv2" / "tools" / "web").resolve()
+def _web_static_dir() -> Path:
+    # Syndicate's own byte-identical copies of the vendored app's betting-card assets (lane
+    # mlb-betting-card-assets-native; they were read from vendor/mlb_bettingv2/tools/web/static/). A separate dir on
+    # purpose: syndicate/static/mlb/{cards.css,back_to_top.js} are DIFFERENT files that other pages serve.
+    return (Path(__file__).resolve().parents[2] / "static" / "mlb" / "betting_card").resolve()
 
 
 def source_web_text(filename: str) -> str | None:
-    path = (_vendor_web_root() / "static" / filename).resolve()
+    path = (_web_static_dir() / filename).resolve()
     try:
         return path.read_text(encoding="utf-8")
     except Exception:
@@ -87,7 +90,7 @@ def source_web_text(filename: str) -> str | None:
 @lru_cache(maxsize=1)
 def source_betting_card_asset_version() -> str:
     paths = [
-        _vendor_web_root() / "static" / name
+        _web_static_dir() / name
         for name in ("cards.css", "season.css", "betting_card.js", "back_to_top.js")
     ]
     mtimes: list[int] = []
