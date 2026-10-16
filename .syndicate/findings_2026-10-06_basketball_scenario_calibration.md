@@ -3101,7 +3101,7 @@ league_split_away / team splits, read by the pregame path). No code change.
   mechanism.
 - Team-level splits: a later step, only if league-level passes. FIT only; the round-2 forward test decides.
 
-### R2-a — STEP 1 RESULT + ROOT CAUSE 2026-10-16 17:05Z: the engine has NEVER used the per-quarter targets in production (a dead input)
+### R2-a — STEP 1 RESULT + ROOT CAUSE 2026-10-16 16:57Z: the engine has NEVER used the per-quarter targets in production (a dead input)
 
 **Step 1** (`R2A_real`, the 12 sweep dates, fit_f5 + `quarters_calibration.json` = the real FIT splits; 17,400
 calls, 0 errors):

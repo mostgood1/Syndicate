@@ -564,8 +564,13 @@ def run_sim(args) -> int:
                 dumped.add(key)
                 rows = [{c: (float(r[c]) if c in df.columns and r[c] == r[c] else None) for c in cols} | {"player_name": str(r["player_name"])}
                         for _, r in df.iterrows()]
+                qs = []
+                for qr in kwargs.get("quarters") or []:
+                    get = qr.get if isinstance(qr, dict) else (lambda k, _q=qr: getattr(_q, k, None))
+                    qs.append([get("home_pts_mu"), get("away_pts_mu")])
                 with open(args.dump_priors, "a", encoding="utf-8") as fh:
-                    fh.write(json.dumps({"side": side, "rows": rows}) + "\n")
+                    # R2-a: the per-quarter targets exactly as they reach the engine, beside the priors.
+                    fh.write(json.dumps({"side": side, "rows": rows, "quarters": qs}, default=float) + "\n")
 
         def real_probe(*, entrypoint_name, league_code, kwargs):
             lever_seen["calls"] += 1
