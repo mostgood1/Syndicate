@@ -999,7 +999,8 @@ death, never life — do not invert it.
 - Blocked by: none
 
 
-### uefa-close-backtest — OPEN — opened 2026-10-16 — session 436c79e2-3793-435f-bfe6-20c830515554
+### uefa-close-backtest — CLOSED 2026-10-16 (GOAL MET) — opened 2026-10-16 — session 436c79e2-3793-435f-bfe6-20c830515554
+- **CLOSED 2026-10-16: GOAL MET (verdict delivered: NO-GO for UCL, UEL and UECL).** Blend − close UCL −0.0006 [−0.0039, +0.0029], UEL +0.0025, UECL +0.0013 on 2,120 held-out matches; model − close +0.0286. 6,240 OddsAPI credits. 6 offline tests pass. Registration 7bada282, audit 3285328a.
 - Goal: todo #699 Stage 1 step (3), the go/no-go gate: a pre-registered walk-forward backtest of UEFA main-draw 1X2 pricing (production ratings + CONST offsets + out-of-scope FITTED ratings) against the de-vigged OddsAPI historical close, 2020-2026, with a per-competition GO/NO-GO verdict; research only, wired into nothing
 - Files: scripts/backfill_uefa_historical_closes.py (NEW), scripts/backtest_uefa_vs_close.py (NEW), syndicate/features/soccer/uefa_close_backtest.py (NEW), tests/test_uefa_close_backtest.py (NEW), .syndicate/findings_2026-10-16_uefa_close_backtest.md (NEW), docs/ai_context/todo.md (#699 section only)
 - Hypothesis: H-BLEND: a walk-forward model/close blend beats the de-vigged close on held-out UEFA main-draw 1X2 log loss, per competition

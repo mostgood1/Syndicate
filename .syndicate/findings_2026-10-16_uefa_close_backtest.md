@@ -140,6 +140,91 @@ Exactly what items (i) and (ii) measured, refit walk-forward:
 
 ## 3. Results
 
+Run 2026-10-16 at Idle priority, after `3285328a` (closes, join, audit and code on main before any
+scoring). Driver: `scripts/backtest_uefa_vs_close.py run`. Output:
+`C:/tmp/uefa-closes/report_close.json` (research root, not git).
+**2,474 joined main-draw matches were scored, 0 excluded.** By pair: in/in 911, in/OOS 1,029,
+OOS/OOS 534. **2,120 are in the blend seasons (2021-2026).**
+
+### THE GATE: NO-GO for all three competitions
+
+| competition | n (2021-26) | Δ LL BLEND − CLOSE | 95% CI | verdict |
+|---|---|---|---|---|
+| **UCL** | 765 | −0.0006 | [−0.0039, +0.0029] | **NO-GO / NOT DEMONSTRATED** |
+| **UEL** | 817 | +0.0025 | [−0.0013, +0.0062] | **NO-GO / FALSIFIED** |
+| **UECL** | 538 | +0.0013 | [−0.0029, +0.0056] | **NO-GO / FALSIFIED** |
+| pooled | 2,120 | +0.0011 | [−0.0011, +0.0033] | NO-GO / FALSIFIED |
+
+- **The model adds no information to the de-vigged close that survives out of sample.** The
+  walk-forward blend weight w fell every season: 0.35 (2021), 0.30, 0.20, 0.15, 0.10, **0.05
+  (2026)**. With each added season of evidence, the blend leaned further toward "trust the close".
+- **Stage 0's guards stay in place for UCL, UEL and UECL.** No serving registration is licensed.
+
+### The model alone vs the close (reported, no verdict)
+
+| | n | MODEL LL | CLOSE LL | Δ MODEL − CLOSE | 95% CI |
+|---|---|---|---|---|---|
+| all (2020-26) | 2,474 | 0.9503 | 0.9218 | **+0.0286** | [+0.0184, +0.0388] |
+| UCL | 901 | 0.9083 | 0.8894 | +0.0188 | [+0.0035, +0.0339] |
+| UEL | 1,035 | 0.9679 | 0.9368 | +0.0310 | [+0.0154, +0.0458] |
+| UECL | 538 | 0.9871 | 0.9471 | +0.0400 | [+0.0169, +0.0638] |
+
+- Δ Brier MODEL − CLOSE: UCL +0.0125, UEL +0.0203, UECL +0.0272 (all CIs above 0).
+- **By pair type** the model trails the close about equally:
+  - in/in +0.026 [+0.012, +0.040] and in/OOS +0.026 [+0.011, +0.042];
+  - OOS/OOS +0.038 [+0.013, +0.063].
+  - **So the out-of-scope ratings are not the weak link.** The gap is the same where every club
+    carries a production rating. Blend − close is −0.0003 [−0.0040, +0.0030] for in/OOS,
+    +0.0020 for in/in and +0.0021 for OOS/OOS.
+- League/group phase +0.029 and knockout +0.028: the same gap.
+- Pinnacle closes +0.031 (n 2,201) and book-average closes +0.011 [−0.021, +0.046] (n 273). The
+  model gets nearer a softer close, as expected.
+- **Per season** the gap WIDENS: 2020 +0.011, 2021 +0.022, 2022 +0.025, 2023 +0.034,
+  2024 +0.032, 2025 +0.036, 2026 (90 matches) +0.040. Blend − close is within ±0.003 of 0 in every
+  season.
+
+### Engine read (beyond the verdict)
+
+- **The model underrates favourites, exactly as it does domestically.** By decile of the close's
+  favourite probability:
+
+  | decile | close fav | model fav | actual |
+  |---|---|---|---|
+  | 1 | 0.374 | 0.395 | 0.435 |
+  | 5 | 0.524 | 0.506 | 0.547 |
+  | 6 | 0.563 | 0.528 | 0.619 |
+  | 9 | 0.726 | 0.671 | 0.753 |
+  | 10 | 0.821 | 0.778 | 0.854 |
+
+  - From the 5th decile up, the model sits 2-5 points BELOW the close and the close sits below
+    the actual rate.
+  - So the market itself underrates UEFA favourites slightly, and the model underrates them more.
+  - This is the domestic finding of lane `soccer-team-strength` again (top-decile domestic model
+    0.743 / close 0.804 / actual 0.821): **the gap is information the rating never sees**
+    (lineups, injuries, squad quality, rotation, market). It is not specific to UEFA, and it is
+    not the offsets or the OOS ratings.
+- **The size of the gap matches the domestic one** (+0.029 here, +0.022 domestically). The UEFA
+  machinery (offsets + OOS ratings) carries production's rating to UEFA at about the same quality,
+  so the weakness is upstream, in the rating itself.
+- **The widening gap over seasons** fits a market that has sharpened since 2020 while the rating
+  stayed fixed. It also fits the drift found in item (i) (the EPL pulling away), which the CONST
+  offset deliberately does not chase. Neither cause was tested.
+
 ## 4. What cannot be estimated
 
+- **Betting value.** There are no bet-time prices; a CLV test needs earlier snapshots. With blend −
+  close at about 0 there is no evidence of an edge to look for, but this did not test one.
+- **Qualifiers** (not on OddsAPI) and **UECL 2021-22 plus autumn 2022** (206 matches OddsAPI did
+  not carry).
+- **Whether better domestic information would pass the gate.** That is the domestic problem lane
+  `soccer-team-strength` is on, and this gate inherits whatever it finds.
+
 ## 5. Deviations from the registration
+
+- **1. Aliases for MISSED join pairs** (section 2), decided after the join audit and before any
+  scoring. Joins went from 2,269 to 2,474. One sweep pairing (Cercle Brugge -> Club Brugge) was
+  wrong and was refused.
+- **2. Name normalisation detail** (decided before any join was run): `normalise_name`
+  transliterates the letters NFKD does not decompose (ø, æ, ß, ł, đ, ı, þ, ð), and drops dots so
+  that `F.C.` becomes the dropped token `fc`. Both are within "accents stripped, punctuation …
+  removed" and were found by a unit test, not by the data.
