@@ -43,13 +43,15 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-from scipy.special import ndtr, ndtri, owens_t
+from scipy.special import ndtr, ndtri
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from syndicate.features.shared.box_usage import _nfl_key  # noqa: E402
+from syndicate.features.nfl.sgp import (  # noqa: E402,F401 -- shared with the cheat sheet's SGP builder
+    bvn_lower, bvn_pdf, bvn_upper, joint_over, load_pbp, player_games, usage_roles)
+from syndicate.features.nfl.sgp import name_key as _nfl_key  # noqa: E402
 from syndicate.features.shared.team_aliases import _NFL_ALIAS_TO_NAME  # noqa: E402
 
 MARKETS = {"Passing Yards": "pass_yds", "Passing Attempts": "pass_att", "Passing TDs": "pass_td",
@@ -62,106 +64,16 @@ PBP_CODES = {"ARI", "ATL", "BAL", "BUF", "CAR", "CHI", "CIN", "CLE", "DAL", "DEN
 NAME_TO_CODE = {name: code.upper() for code, name in _NFL_ALIAS_TO_NAME.items() if code.upper() in PBP_CODES}
 
 
-# ------------------------------------------------------------------------------------------------ bivariate normal
-def bvn_lower(h: np.ndarray, k: np.ndarray, rho: np.ndarray | float) -> np.ndarray:
-    """Phi2(h, k; rho) via Owen's T (vectorised). h or k at exactly 0 is nudged; the formula divides by them."""
-    h = np.where(np.abs(h) < 1e-9, 1e-9, h)
-    k = np.where(np.abs(k) < 1e-9, 1e-9, k)
-    rho = np.clip(rho, -0.999999, 0.999999)
-    s = np.sqrt(1.0 - rho * rho)
-    beta = np.where(h * k > 0, 0.0, 0.5)
-    return 0.5 * ndtr(h) + 0.5 * ndtr(k) - owens_t(h, (k - rho * h) / (h * s)) - owens_t(k, (h - rho * k) / (k * s)) - beta
-
-
-def bvn_upper(h: np.ndarray, k: np.ndarray, rho: np.ndarray | float) -> np.ndarray:
-    """P(X > h, Y > k)."""
-    return 1.0 - ndtr(h) - ndtr(k) + bvn_lower(h, k, rho)
-
-
-def bvn_pdf(h: np.ndarray, k: np.ndarray, rho: float) -> np.ndarray:
-    s2 = 1.0 - rho * rho
-    return np.exp(-(h * h - 2 * rho * h * k + k * k) / (2 * s2)) / (2 * math.pi * math.sqrt(s2))
-
-
-def joint_over(p_a: np.ndarray, p_b: np.ndarray, rho: np.ndarray | float) -> np.ndarray:
-    """P(a over AND b over) under a Gaussian copula with each leg's own P(over)."""
-    return bvn_upper(ndtri(1.0 - p_a), ndtri(1.0 - p_b), rho)
-
-
 # ------------------------------------------------------------------------------------------------ outcomes
-def load_pbp(data_root: Path, season: int) -> pd.DataFrame:
-    cols = ["game_id", "season", "season_type", "week", "game_date", "home_team", "away_team", "posteam",
-            "two_point_attempt", "play_type", "pass_attempt", "rush_attempt", "sack", "qb_dropback", "complete_pass",
-            "interception", "pass_touchdown", "touchdown", "passing_yards", "rushing_yards", "receiving_yards",
-            "passer_player_id", "passer_player_name", "rusher_player_id", "rusher_player_name",
-            "receiver_player_id", "receiver_player_name", "td_player_id", "td_player_name"]
-    path = data_root / "nfl_source" / "tracking" / "nflverse" / "pbp" / f"pbp_{season}.csv"
-    d = pd.read_csv(path, usecols=cols, low_memory=False)
-    return d[(d.season_type == "REG") & (d.two_point_attempt.fillna(0) != 1)].copy()
-
-
-def player_games(pbp: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, dict[tuple[str, str], str]]]:
-    """(game_id, pid) -> stat line + team; and per game: name key -> pid, ambiguous keys dropped."""
-    f = lambda s: s.fillna(0)  # noqa: E731
-    parts = []
-    pa = pbp[pbp.passer_player_id.notna()]
-    parts.append(pd.DataFrame({"game_id": pa.game_id, "pid": pa.passer_player_id, "name": pa.passer_player_name,
-                               "team": pa.posteam, "pass_att": ((f(pa.pass_attempt) == 1) & (f(pa.sack) != 1)).astype(int),
-                               "pass_yds": f(pa.passing_yards), "pass_td": f(pa.pass_touchdown),
-                               "ints": f(pa.interception), "dropbacks": f(pa.qb_dropback)}))
-    ru = pbp[pbp.rusher_player_id.notna() & (f(pbp.rush_attempt) == 1)]
-    parts.append(pd.DataFrame({"game_id": ru.game_id, "pid": ru.rusher_player_id, "name": ru.rusher_player_name,
-                               "team": ru.posteam, "rush_att": 1, "rush_yds": f(ru.rushing_yards)}))
-    rc = pbp[pbp.receiver_player_id.notna() & (f(pbp.pass_attempt) == 1) & (f(pbp.sack) != 1)]
-    parts.append(pd.DataFrame({"game_id": rc.game_id, "pid": rc.receiver_player_id, "name": rc.receiver_player_name,
-                               "team": rc.posteam, "targets": 1, "rec": f(rc.complete_pass),
-                               "rec_yds": f(rc.receiving_yards)}))
-    td = pbp[pbp.td_player_id.notna() & (f(pbp.touchdown) == 1)]
-    parts.append(pd.DataFrame({"game_id": td.game_id, "pid": td.td_player_id, "name": td.td_player_name,
-                               "team": None, "atd": 1}))
-    rows = pd.concat(parts, ignore_index=True)
-    stat_cols = ["pass_att", "pass_yds", "pass_td", "ints", "dropbacks", "rush_att", "rush_yds", "targets", "rec",
-                 "rec_yds", "atd"]
-    for c in stat_cols:
-        rows[c] = rows[c].fillna(0) if c in rows else 0
-    team = rows.dropna(subset=["team"]).groupby(["game_id", "pid"]).team.agg(lambda s: s.mode().iloc[0])
-    lines = rows.groupby(["game_id", "pid"])[stat_cols].sum()
-    lines["atd"] = (lines["atd"] > 0).astype(int)
-    lines = lines.join(team).reset_index()
-    names: dict[str, dict[tuple[str, str], set]] = collections.defaultdict(lambda: collections.defaultdict(set))
-    for g, pid, name in rows[["game_id", "pid", "name"]].dropna().itertuples(index=False):
-        key = _nfl_key(name)
-        if key:
-            names[g][key].add(pid)
-    index = {g: {k: next(iter(v)) for k, v in m.items() if len(v) == 1} for g, m in names.items()}
-    return lines, index
-
-
 def roles(lines: pd.DataFrame, games: pd.DataFrame) -> dict[tuple[str, str], str]:
-    """(game_id, pid) -> role from usage in the team's EARLIER games that season (no hindsight)."""
+    """(game_id, pid) -> role from usage in the team's EARLIER games that season (no hindsight); the rule itself is
+    `sgp.usage_roles`, shared with the cheat sheet so a role means the same thing in the fit and on the page."""
     lines = lines.merge(games[["game_id", "week"]], on="game_id")
     out: dict[tuple[str, str], str] = {}
     for team, g in lines.dropna(subset=["team"]).groupby("team"):
         for week in sorted(g.week.unique()):
-            prior = g[g.week < week].groupby("pid")[["dropbacks", "rush_att", "targets"]].sum()
-            now = g[g.week == week]
-            if prior.empty:
-                for gid, pid in now[["game_id", "pid"]].itertuples(index=False):
-                    out[(gid, pid)] = "UNK"
-                continue
-            qb = prior.dropbacks.idxmax() if prior.dropbacks.max() >= 20 else None
-            other = prior.drop(index=[qb]) if qb is not None else prior
-            other = other[other.dropbacks < (other.rush_att + other.targets)]
-            ground = other[other.rush_att >= other.targets].sort_values("rush_att", ascending=False).index.tolist()
-            air = other[other.rush_att < other.targets].sort_values("targets", ascending=False).index.tolist()
-            rank = {}
-            if qb is not None:
-                rank[qb] = "QB"
-            for i, pid in enumerate(ground):
-                rank[pid] = "RB1" if i == 0 else "RB2"
-            for i, pid in enumerate(air):
-                rank[pid] = ("R1", "R2", "R3")[min(i, 2)]
-            for gid, pid in now[["game_id", "pid"]].itertuples(index=False):
+            rank = usage_roles(g[g.week < week].groupby("pid")[["dropbacks", "rush_att", "targets"]].sum())
+            for gid, pid in g[g.week == week][["game_id", "pid"]].itertuples(index=False):
                 out[(gid, pid)] = rank.get(pid, "UNK")
     return out
 

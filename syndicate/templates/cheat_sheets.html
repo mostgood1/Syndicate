@@ -206,6 +206,7 @@ tr.rw td:first-child { box-shadow: inset 3px 0 0 var(--accent); } tr.rl td:first
    not a paragraph. */
 .prop.pick { border-left: 3px solid var(--accent); padding-left: 12px; grid-template-columns: minmax(200px, 1.1fr) minmax(320px, 2fr); }
 .ptiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.sgpfaces { display: flex; gap: 4px; margin-bottom: 4px; }
 /* A pick's who-block has four text lines (chips, name, bet, game) beside a face that spans three: every text line
    stays in the text column, or the game line drops under the face one word per line. */
 .prop.pick .who > :not(.face) { grid-column: 2; }
@@ -384,6 +385,37 @@ function picksBlock(d, game) {
   return sectionShell("picks", "Syndicate picks", "Our featured plays for these games: the best price beats the no-vig fair by 2% or more, net of any exchange fee, on a fresh quote. A SYNDICATE PICK is one our sim backs too; a PRICE PLAY is the same price edge without the sim's backing. Each is promoted at the price shown and stays on the record at that price.",
     [sims ? `${sims} pick${sims === 1 ? "" : "s"}` : "", plays ? `${plays} price play${plays === 1 ? "" : "s"}` : ""].filter(Boolean).join(" · "),
     `<div class="rowlist">${picks.map(([p, i]) => pickRow(p, i)).join("")}</div>`);
+}
+// Same-game parlays (NFL first, user 2026-10-16): two legs we would take on their own whose results move together --
+// correlations measured on three seasons of closing lines. Books publish no SGP price, so OUR probability, its fair
+// odds and "worth it at" lead; the book-price estimate (leg prices multiplied, less an ASSUMED discount) is second and
+// says it is an estimate. A same-player pair is flagged: books know that correlation best and price it tightest.
+const SGP_WHY = {
+  same_player: "Same player: these two rise and fall together, and books price this pairing tightest -- check the SGP price against the worth-it number before anything else.",
+  teammate: "Teammates: when one clears, the other clears more often than not, measured over three seasons.",
+  opponent: "Opponents: the game script ties these two together, measured over three seasons.",
+};
+function sgpRow(s) {
+  const legs = (s.legs || []).map(l => `<li class="ctx"><b>${esc(l.bet || "")}</b>${pct(l.p_side)} on its own</li>`).join("");
+  return `<div class="prop pick sgp">
+    <div class="who"><div class="sgpfaces">${(s.legs || []).map(miniFace).join("")}</div>
+      <div class="line1"><span class="chip value">Same-game parlay</span>${s.same_player ? `<span class="chip neutral">Same player</span>` : ""}${started(s.commence_time) ? `<span class="chip started">Started</span>` : ""}</div>
+      <div class="bet">${(s.legs || []).map(l => esc(l.bet || "")).join(" + ")}</div>
+      <div class="meta">${esc(s.matchup || "")}${s.kickoff_ct ? ` · <span class="kick">${esc(s.kickoff_ct)}</span>` : ""}</div></div>
+    <div class="ptiles">
+      <div class="ptile"><span>Both win</span><b>${pct(s.p_joint)}</b><i>${pct(s.p_independent)} if unrelated</i></div>
+      <div class="ptile"><span>Fair odds</span><b>${odds(s.fair_odds)}</b><i>our probability, no vig</i></div>
+      <div class="ptile"><span>Worth it at</span><b class="gain">${odds(s.worth_it_odds)}</b><i>or better at your book</i></div>
+      <div class="ptile"><span>Est. book price</span><b>${odds(s.est_book_odds)}</b><i>estimate: ${esc(s.book || "")} legs ${odds(s.legs_product_odds)} less ${Math.round(100 * (s.assumed_discount || 0))}%</i></div>
+    </div>
+    <ul class="checks">${legs}<li class="ctx"><b>Together</b>${esc(SGP_WHY[s.relation] || "")}</li></ul>
+  </div>`;
+}
+function sgpBlock(d, game) {
+  const sgps = (d.sgp || []).filter(s => !game || s.event_id === game.event_id);
+  if (!sgps.length) return "";
+  return sectionShell("sgp", "Same-game parlays", "Two legs we like on their own whose results move together, measured on three seasons of NFL closing lines. Books do not publish parlay prices, so the number to use is <b>worth it at</b>: take the parlay only if your book's same-game-parlay price is that or better. The book price shown is an estimate -- the leg prices multiplied together, less an assumed discount -- not a quote. Tracked on paper; no edge is claimed yet.",
+    `${sgps.length} parlay${sgps.length === 1 ? "" : "s"}`, `<div class="rowlist">${sgps.map(sgpRow).join("")}</div>`);
 }
 const SECTIONS = [
   ["value", "Value at the best price", "The best available price beats the no-vig fair price by 2% or more."],
@@ -599,11 +631,13 @@ function render() {
   if (d.picks_only) {
     document.getElementById("viewbar").innerHTML = viewbar(d);
     document.getElementById("sheet").innerHTML = (reconciledView(d) ? recordBar(d, {}, {}, null) : "") + picksBlock(d, null)
-      + `<section class="sheet"><div class="note">${esc(SPORT_NAMES[STATE.sport] || STATE.sport)} cheat sheets start with the regular season; until then this sheet carries the Syndicate picks only.</div></section>`;
+      + `<section class="sheet"><div class="note">${d.phase && d.phase !== "preseason"
+        ? "Today's full sheet is built at 8:30 AM, 12:30 PM and 4:30 PM CT; until then it carries the Syndicate picks only."
+        : `${esc(SPORT_NAMES[STATE.sport] || STATE.sport)} cheat sheets start with the regular season; until then this sheet carries the Syndicate picks only.`}</div></section>`;
     if (reconciledView(d)) applyResults();
     return;
   }
-  let html = picksBlock(d, game) + (game ? "" : slateBlock(d));
+  let html = picksBlock(d, game) + sgpBlock(d, game) + (game ? "" : slateBlock(d));
   html += SECTIONS.map(([key, title, blurb]) => {
     const ids = secs[key] || [];
     if (!ids.length && key !== "value") return "";

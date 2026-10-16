@@ -865,6 +865,34 @@ def merge_with_record(sheet: dict[str, Any], prior: dict[str, Any] | None, *, no
     return merged
 
 
+def attach_sgp(sheet: dict[str, Any], prior: dict[str, Any] | None, data_root: Path, day: str) -> None:
+    """Same-game parlays on the NFL sheet (lane `nfl-sgp-builder`, user 2026-10-16): measured correlations, our
+    probability and fair odds first, the assumed-discount estimate second; every one to the paper ledger. A failure
+    leaves the sheet without the section -- never a failed sheet."""
+    from syndicate.features.nfl import sgp
+
+    try:
+        cells = sgp.load_cells(data_root)
+        if not cells:
+            print("CHEAT_SHEET nfl sgp: no correlations file -- section skipped", flush=True)
+            sheet["sgp"] = list((prior or {}).get("sgp") or [])
+            return
+        roles = sgp.current_roles(data_root, day)
+        now = datetime.now(timezone.utc)
+        started = {str(g.get("event_id")) for g in sheet.get("games") or []
+                   if (_parse_ts(g.get("commence_time")) or now) <= now}
+        # A started game's parlays are the record from before it started: never re-suggested, never re-ledgered.
+        fresh = [s for s in sgp.suggest(sheet, cells, roles) if str(s.get("event_id")) not in started]
+        sheet["sgp"] = sgp.merge_record(fresh, (prior or {}).get("sgp"), started=started)
+        new = sgp.append_ledger(data_root / "cheatsheets" / "nfl" / "sgp_ledger.jsonl",
+                                sgp.ledger_records(fresh, day=day, generated_at=now.isoformat(timespec="seconds")))
+        print(f"CHEAT_SHEET nfl sgp {len(sheet['sgp'])} (fresh {len(fresh)}, new to the ledger {new}, roles {len(roles)})",
+              flush=True)
+    except Exception as exc:  # noqa: BLE001
+        print(f"CHEAT_SHEET nfl sgp failed: {type(exc).__name__}: {exc}", flush=True)
+        sheet["sgp"] = list((prior or {}).get("sgp") or [])
+
+
 BUILD_LOCK_STALE_SECONDS = 45 * 60     # a full build takes ~1-3 min; a lock older than this is a crashed run
 
 
@@ -1111,6 +1139,8 @@ def main_build(args: Any, data_root: Path) -> int:
         except Exception as exc:  # noqa: BLE001 -- a missing picks section is a gap, never a failed sheet
             print(f"CHEAT_SHEET {sport} picks failed: {type(exc).__name__}: {exc}", flush=True)
             sheet["picks"] = list((prior or {}).get("picks") or [])
+        if sport == "nfl":
+            attach_sgp(sheet, prior, data_root, selected)
         if sport in IDENTITY_SPORTS and sheet.get("rows"):   # after the merge, so a kept row gets its face too
             filled = fill_identity(sport, sheet["rows"], selected, data_root / "cheatsheets" / f".{sport}_cache" / selected)
             print(f"CHEAT_SHEET {sport} identity filled {filled}", flush=True)
