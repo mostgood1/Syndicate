@@ -2387,3 +2387,10 @@ command. A filter on a guard's output is a way to not see the guard.
 - **So windows DO occur — about 4% of 45s-sampled cycles — and they are SHORTER THAN THE SAMPLING INTERVAL.** The 16:52:59Z window was gone 60 seconds later with a fresh build already in flight. Build length varies too: `typical` read 8.5min earlier and 7.1min at 16:53Z, so the gap between builds is not predictable from one reading.
 - **Why the distinction matters:** `check_deploy_safety` ends with "Wait, or proceed deliberately", which reads as though waiting will clear it. Waiting does clear it — rarely, and for less than a minute. "None exist" would say do not watch; "rare and sub-minute" says a WATCHER CANNOT BE THE MECHANISM unless it ACTS within seconds of seeing one, which for a production restart means acting unattended. That is the real trade, and it is not one a safety watcher should make by itself.
 - **Rule:** for an OBSERVABILITY-only change, do not chase a window — record the reading as owed and let the next restart by anyone carry it (that is how `5457b428`'s reading arrived, inside the hour). For a change that must go now, proceed deliberately and SAY in `deploys.md` that a build was discarded. Either way, do not budget session time on waiting: the window exists but you will almost certainly be told about it after it closed.
+
+## 2026-10-16 -- the book-quote shard is a CHANGE log: compare the same groups, never window against window
+`<sport>_source/tracking/book_quotes/<date>.jsonl` gains a row when a book's quote moves (`snapshot_ts` is per book, not
+per fetch). After the props book lists shipped, "books per group after 17:31Z" vs "before" read as a DROP (NFL median
+7 -> 2, NCAAF 3 -> 2) because 20 minutes of changes were set against a morning of accumulation. On the SAME groups,
+before vs before+after, it was a gain (NFL 7 -> 9, NCAAF 4 -> 5, NHL 2 -> 5). **How to apply:** any before/after count
+from this shard compares one population with itself; a window comparison measures how often prices move, not books.
