@@ -975,11 +975,11 @@ death, never life — do not invert it.
 - Blocked by: none (waiting on a restart, not on another lane).
 ### kalshi-ncaaf-series — OPEN — opened 2026-10-16 — session 0d3deab6-210e-44e3-ab8a-a2cdb2aefaf3
 - Goal: All KXNCAAFGAME Kalshi markets classify as ncaaf, and join_kalshi_to_board matches NCAAF h2h rows (each club's row only from its own -CODE market, on YES; an unplaceable name refuses); a read-only replay over the fleet's kalshi_markets.json + shortlist shows NCAAF h2h matches > 0 (0 at 2026-10-16 04:12Z)
-- Files: tests/test_kalshi_ncaaf_series.py (NEW), syndicate/features/shared/kalshi_catalogue.py (LOAN from soccer-uefa-competitions; granted 2026-10-16 ~12:3xZ by its session local_123d3580; scope and exclusions are recorded in the lender's LENT line)
+- Files: tests/test_kalshi_ncaaf_series.py (NEW), syndicate/features/shared/kalshi_catalogue.py (LOAN from soccer-uefa-competitions; granted 2026-10-16 ~12:3xZ by its session local_123d3580; scope and exclusions are recorded in the lender's LENT line), syndicate/features/shared/kalshi_board_join.py (LOAN from kalshi-moneyline-board-join; `_side_for_team` only, granted in f267d3d2)
 - Hypothesis: n/a
 - Falsification test: n/a
 - Verification: new end-to-end test fails on origin/main and passes; tests/test_kalshi_board_join.py + tests/test_kalshi_catalogue.py green; fleet replay before/after recorded in deploys.md
-- Blocked by: a loan of `_side_for_team` in kalshi-moneyline-board-join's board-join module (requested 2026-10-16 ~12:3xZ)
+- Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
