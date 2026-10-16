@@ -910,3 +910,28 @@ REGULAR VALID 2026-03-01..04-12; 335 games, 329-331 per checkpoint. FINAL (fit_f
   - Early totals improve most: end Q1 −1.10, end Q2 −0.67 (both CI < 0). This matches the calibration lane's postseason G2: |total| −2.43, bias +10.45 -> +3.89.
   - 5:00 Q4 total +0.22 [−0.03, +0.49]: n.s., leaning worse.
   - So Phase 2's clearest live win is the postseason TOTAL level. Not gated, not enabling anything.
+
+## 14. PRE-REGISTERED 2026-10-16 (before any 2026-27 data): the FORWARD shadow gate
+
+**Why:** THE VALID READ (§13) failed, and 2025-26 has no untouched window left. The 2026-27 regular season is the only clean holdout. The shadow loop already re-sims every live NBA game. Its per-tick lanes are now kept (`live_resim_history/<date>.jsonl`, a6c3d388; loads at the next live-odds-worker restart).
+
+**Population:**
+- 2026-27 REGULAR season, first slate 2026-10-20, through 2026-12-15 or the first 300 graded games, whichever comes later.
+- Preseason, NBA Cup knockout and postseason are separate and not gated.
+- Games are graded per `resumeEngine` label. **If the label (engine config, `:lp=` / `:cfg=`) changes inside the window, each config is graded on its own games. Configs are never pooled.**
+
+**Checkpoint rows:**
+- For each game, the FIRST history row at or after each state: end Q1 / end Q2 / end Q3 (`period` = q, `clock_s` = 0, or period q+1 with clock > 11:00), and 5:00 Q4 (period 4, clock ≤ 300, the first row with clock ≥ 240).
+- Rows with `source` ≠ live_resim are refusals, tallied by reason. A game with no row in a checkpoint's window is a MISSING row, counted and not imputed.
+
+**Comparators:**
+- `pregame_rate` built offline from the same row's score and time and the pre-tip consensus line (OddsAPI snapshot, as §9). Same metrics as §12: total |err|, margin |err|, ML log-loss vs the final; 80% coverage of total_dist.
+- **If** a live market line within ±2 min of the row exists in the fleet's book-grid history: native vs live market, reported, not gated.
+
+**PASS (all required):** the §12 rule, unchanged:
+- total: native − pregame_rate CI upper < 0 at end Q1, Q2 and Q3; not worse at 5:00 Q4 (upper ≤ +0.05);
+- margin and ML: not worse at any checkpoint;
+- |total bias| < 1.0 everywhere.
+- Game-clustered bootstrap, n stated per cell.
+
+**Read ONCE** at the window's end. No interim peeks at the pass metrics; only row counts and refusal tallies are monitored.
