@@ -179,7 +179,11 @@ def test_reached_through_attach_projections(root):
     # artifacts they report unsupported / empty and still return a dict, which is what lets the flag run.
     from syndicate.features.shared import board_enrichment
 
-    _write_state(root, "nfl", [{"athlete": "Rashee Rice", "team": "Kansas City Chiefs", "status": "Out"}])
+    state = _write_state(root, "nfl", [{"athlete": "Rashee Rice", "team": "Kansas City Chiefs", "status": "Out"}])
+    # The real call site passes no `now`: the flag judges freshness against the WALL CLOCK, so the state must be fresh
+    # NOW. Stamped at the fixed NOW above, this test passed the day it was written and read `feed=stale` from then on
+    # (ci-suite 10-16 08:00Z, age 2,339 min, rows_flagged 0; todo #697, found by lane ci-suite-red-1015).
+    os.utime(state, None)
     row = _prop("Rashee Rice", "Kansas City Chiefs", "Las Vegas Raiders", "nfl", market="Receptions")
     coverage = board_enrichment.attach_projections([row], sport="nfl", selected_date="2026-10-14")
     assert coverage["out_player_props"]["source"] == "news" and coverage["out_player_props"]["rows_flagged"] == 1
