@@ -997,9 +997,11 @@ death, never life — do not invert it.
 - Blocked by: none
   - Board-join loan (`_side_for_team`, from kalshi-moneyline-board-join, f267d3d2) RETURNED on landing the code; its LENT line deleted as the lender asked.
 
-### uefa-league-offsets — OPEN — opened 2026-10-16 — session 77922136-2b4b-45da-9aea-3cbd79e0a1bb
+### uefa-league-offsets — CLOSED — opened 2026-10-16 — closed 2026-10-16 — session 77922136-2b4b-45da-9aea-3cbd79e0a1bb
+- **GOAL VERDICT 2026-10-16 ~15:05Z: GOAL: MET.** The pre-registration `87ea0b6a` landed BEFORE any fit (14:44Z). H-OFFSET is **SUPPORTED**: walk-forward 2017-2026, 1,278 held-out cross-league matches, Δ 1X2 log loss −0.0441 [−0.0601, −0.0279], and every season is below 0. Offsets with bootstrap CIs for all 8 European leagues; MLS and Championship are NOT ESTIMABLE (0 UEFA matches). Coverage: 17.3% of 9,623 UEFA matches have both clubs placed, and 524 of 646 clubs fall outside our ten leagues. Library and tests are on main; nothing is wired. Caveats (offset drift, production rating scale, β 0.80) and next steps are in todo #699 and the findings file.
 - Goal: todo #699 Stage 1 step 2: a season-scoped UEFA club -> domestic league map by ESPN team id and per-league strength offsets MEASURED from cross-league UEFA results (with intervals), against a pre-registered walk-forward falsification test; library + hermetic tests on main; NOTHING wired into sim/board/worker
-- Files: syndicate/features/soccer/uefa_league_offsets.py (NEW), scripts/fit_uefa_league_offsets.py (NEW), tests/test_uefa_league_offsets.py (NEW), .syndicate/findings_2026-10-16_uefa_league_offsets.md (NEW)
+- Files: (released on close 2026-10-16 — was syndicate/features/soccer/uefa_league_offsets.py, scripts/fit_uefa_league_offsets.py, tests/test_uefa_league_offsets.py, .syndicate/findings_2026-10-16_uefa_league_offsets.md)
+- Findings: .syndicate/findings_2026-10-16_uefa_league_offsets.md
 - Hypothesis: H-OFFSET: a single per-league additive strength offset, fit on past cross-league UEFA matches, improves held-out cross-league 1X2 prediction over a no-offset model in which clubs are rated only from their league-centred domestic ratings
 - Falsification test: Pre-registered in .syndicate/findings_2026-10-16_uefa_league_offsets.md section 1 BEFORE any fit
 - Verification: walk-forward by season; per-match 1X2 log loss offset minus no-offset with match bootstrap CI; offsets with bootstrap intervals; coverage printed
