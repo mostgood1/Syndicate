@@ -50446,3 +50446,35 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 ## 2026-10-16 18:39Z (1:39 PM CT) -- MEASURED: MLB props on the ten-book list (ee87a97d)
 - **reading (same-groups method, `mlb_source/tracking/book_quotes/2026-10-1[67].jsonl`, prop rows, cut 17:31:10Z):** 116 player+market groups on both sides, median 4 -> 6 books, mean 3.55 -> 5.44; new to those groups: espnbet 112, hardrockbet 107. All four listed sports now measured on the fleet (NHL 2 -> 5, NFL 7 -> 9, NCAAF 4 -> 5, MLB 4 -> 6). Credits per call: probe-measured only (1 per market per event).
 - **held:** NBA (1712ca60), soccer (a1d6cfea, lane soccer-uefa-competitions) and the engine ledger (9b88014d) are on main, not the fleet -- a ff would carry 31ee73c2 (mlb-engine-data-native-p4), whose runtime-state migration must run first. Asked its owner (session "P6: Port basketball smart-sim orchestrator native") to migrate + deploy; user 2026-10-16 "lets move forward".
+
+## 2026-10-16 18:42:31Z (1:42 PM CT) fleet ff ee87a97d -> 9b88014d + engine-data MIGRATION + 18:53:53Z live-odds-worker TERM/respawn (855610 -> 1059323): the MLB engine DATA root off vendor, phase 4 (lane `mlb-engine-data-native-p4`, session 2d413211)
+
+- **What changed (31ee73c2).**
+  - The native engine's DATA root is `engines/mlb` (same depth as vendor/mlb_bettingv2) and holds the 12 tracked inputs.
+  - Moved with it: `sim_input_checklist.py` (runs after every sim) on the native engine; the statcast features refresh and the calibration fitter on native scripts and engine paths; the job runs from `engines/mlb`.
+- **Why now.** The user chose "deploy now, carry theirs": 31ee73c2 on main blocked every other lane's ff, because a plain ff without the migration would start the sim cold.
+- **Ride-alongs.**
+  - Lane props-book-coverage/result-cards (session a53821; its owner asked for these): `1712ca60` NBA props 10-book list, `a1d6cfea` soccer props 10-book list, `9b88014d` cheat-sheet engine ledger.
+  - Also: `85d0bca3` basketball `quarter_targets_mode`, default "off" (config, no env); `9571f2d2` WNBA P5 live re-sim behind `SYNDICATE_WNBA_LIVE_RESIM`. That flag is ABSENT on both workers, and `start_loop()` returns unless `enabled()`.
+  - Plus soccer-team-strength lane commits and tests. No vendor/ or render.yaml changes.
+- **Locks.**
+  - Both claims taken (rc + holder gated).
+  - Safety read in full: no MLB sim, odds idle, live games in progress (WARNING: a restart pauses live-lens ticks).
+  - Waited for props + MLB refresh + MLB sim + daily_update + checklist all idle.
+  - ff-only to the exact SHA; HEAD contains it. Claims released with `--token`.
+- **Migration** (`scripts/migrate_mlb_engine_data.py`, in the same second as the ff).
+  - Copied 143 runtime files + 2 runtime-rewritten tracked inputs, 36.3 MB, sha256-verified.
+  - engines/mlb/data roster_registry has 30 files (vendor: 30); statcast cache 112 (vendor: 112).
+  - Both `player_features_*.json` are sha-equal to production's runtime copies.
+- **verify (MEASURED).**
+  - Under the new live-odds-worker's env: 0 vendored modules; app_slice `_ROOT`, engine `forward_tuning._ROOT` and the roster registry root are all `/home/amyn/Syndicate/engines/mlb`.
+  - **0 files written under vendor/mlb_bettingv2/data in the 3 min after the restart.** engines/mlb/data also saw 0 in that window, so the null holds only for that window: the live loop had nothing to cache yet.
+- **Parity before deploy** (`scripts/mlb_daily_sim_parity.py`, 3 concurrent arms, 250 sims, game 849817; the native arm was seeded by THIS migration).
+  - 1,108,848 leaves, 0 beyond the vendored self-floor.
+  - Native arm: wrote nothing under vendor/, 0 vendored modules, 0 vendored scripts. All arms traced, 6 processes each.
+  - Plant caught.
+  - Phase 4a's checklist A/B on fleet data was identical (47/47 lines, both modes).
+- **OWED** (one reading now covers phases 3 + 4).
+  - The next production MLB sim runs only native scripts (1 s recorder), writes engine state under engines/mlb and nothing under vendor/mlb_bettingv2/data, and its `MLB_INPUT_CHECKLIST` line reads as before.
+  - Watcher running.
+- **Rollback.** `git revert 31ee73c2`, then ff. The vendored data dir is untouched (it is the rollback state).
