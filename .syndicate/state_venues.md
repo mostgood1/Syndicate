@@ -395,6 +395,7 @@ half is a different question and no counter here answers it.
 
 ## [odds-cadence] ODDS CADENCE AND CAPTURE
 
+- **PROP BOOK LISTS: ten named books at one region's price** `[measured 2026-10-16, lane props-book-coverage, findings_2026-10-16_props_book_coverage.md]`. OddsAPI bills a `bookmakers` list of <= 10 (any regions) as ONE region. NHL props: `local_nhl_odds.NHL_PROP_BOOKMAKERS` (with Pinnacle) replaced the 3-book default (98df22aa, 17:14:57Z); NFL / NCAAF / MLB props: `odds_regions.prop_bookmakers` (ee87a97d, 17:31:08Z; MLB game lines untouched). Probe: 1 credit per market per event either way. On the fleet, the SAME prop groups before vs after: NHL median 2 -> 5 books (122 groups), NFL 7 -> 9 (782), NCAAF 4 -> 5 (1,126) -- ESPN Bet + Hard Rock (the `us2` books absent since 09-30) on most. MLB owed (no props fetch since). Soccer unchanged (its fetcher is held by lane soccer-uefa-competitions). The book-quote shard is a CHANGE log: never compare windows (learnings 2026-10-16).
 - **MLB quote capture has THREE regimes, not one beat. `[measured 08-15 02:5xZ,
   supersedes the single-cadence reading of 08-14 16:3xZ]`** All 371,567 rows of
   `mlb_source/tracking/book_quotes/2026-08-14.jsonl`, streamed from web and
