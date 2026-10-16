@@ -3061,3 +3061,42 @@ waits for this read.
    path.
 - The Q4 margin slope (−0.09 vs −0.14) stays with P3. The late-game win-probability lead is WITHDRAWN (it did not
   replicate).
+
+### R2-a — DIAGNOSTIC 2026-10-16 (existing runs) + PRE-REGISTRATION of step 1 (before any new run)
+
+**Diagnostic** (`fit_f5`, 791 FIT games, games without OT, points per quarter):
+
+| | Q1 | Q2 | Q3 | Q4 |
+|---|---|---|---|---|
+| real | 58.39 | 57.44 | 58.23 | 55.32 |
+| sim fit_f5 | 57.54 | 57.57 | 57.31 | 57.51 |
+| diff | −0.84 | +0.13 | −0.92 | **+2.19** |
+
+- Shares: real .2545 / .2504 / .2539 / .2412 vs sim .2503 / .2504 / .2493 / .2501, i.e. the sim is FLAT.
+- fit_rest3 (before #3) had Q4 +1.82: end-game fouling added Q4 points.
+- **Cause:** production has NO `quarters_calibration.json` (absent from the production mirror). So
+  `_quarter_splits_for_team_local` falls back to the hardcoded `_quarter_splits_local` = [.245, .245, .255, .255]: Q3/Q4
+  HEAVY, the opposite of real.
+- The engine does honour the per-quarter targets (engine.py ~:2018–2033, q_pace/q_eff = √(quarter mu ÷ game mu ÷ 4)).
+  Its other mechanisms flatten the output.
+- Real FIT splits (816 games):
+  - home .2567 / .2490 / .2535 / .2408;
+  - away .2534 / .2519 / .2538 / .2409;
+  - total .2550 / .2505 / .2537 / .2408.
+
+**The mechanism already exists as a DATA FILE** (`quarters_calibration.json`: league_split / league_split_home /
+league_split_away / team splits, read by the pregame path). No code change.
+
+**R2-a step 1 (elasticity), pre-registered:**
+- Run the fit_f5 config on the 12 sweep dates with a `quarters_calibration.json` carrying the REAL FIT league splits
+  (home, away, total). Compare with PK3, which had no file.
+- Reading: the output share per quarter → elasticity e_q = Δoutput ÷ Δtarget.
+
+**Step 2:**
+- If e_q ≥ 0.3 for Q1 and Q4: a corrected target T* = T + (real − O) ÷ e, confirmed on the 12 dates.
+- CONFIRMED if every quarter's output share is within its real FIT CI (± ~0.0022) AND the #3 guards hold (FTA,
+  foul-outs, P(6th | 5th), closers-on, H2, S8, |total bias| < 0.5).
+- Then the full FIT.
+- If e_q < 0.3, the engine flattens the shares. Diagnose why (garbage-time efficiency, rotation fatigue) before any
+  mechanism.
+- Team-level splits: a later step, only if league-level passes. FIT only; the round-2 forward test decides.
