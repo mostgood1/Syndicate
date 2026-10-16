@@ -350,8 +350,15 @@ def run_sim(args) -> int:
 
     bpss._resolve_smart_sim_roster_mode_local = lambda **_k: "pregame"
     # A comma makes a tuple lever (endgame_foul_p_by_deficit=0.2,0.0,0.2; foul_trouble_thresholds=2,3,4,5).
-    levers = {k: (tuple(float(x) for x in v.split(",")) if "," in v else float(v))
-              for k, v in (x.split("=", 1) for x in (args.lever or []))}
+    def _lever_value(v: str) -> Any:
+        if "," in v:
+            return tuple(float(x) for x in v.split(","))
+        try:
+            return float(v)
+        except ValueError:
+            return v  # a string field (quarter_targets_mode=mean)
+
+    levers = {k: _lever_value(v) for k, v in (x.split("=", 1) for x in (args.lever or []))}
     games: List[Dict[str, Any]] = []
     cur: Dict[str, Any] = {}
     orig_call, orig_rec = bpss._call_source_simulate_smart_game_local, bpss._recording_sim_draws_local

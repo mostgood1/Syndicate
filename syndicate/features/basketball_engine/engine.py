@@ -145,6 +145,14 @@ class EventSimConfig:
     # lifts one shared efficiency multiplier to hit the target, so 3P% runs +4.1 pts hot and 2P% -3.5 cold (full FIT
     # 2025-26: 3PM +1.35/team). On: (FGM - 3PM) / (FGA - 3PA) per player, used everywhere the two-point rate is read.
     fg2_from_two_point_split: bool = False
+    # PER-QUARTER TARGETS (lane basketball-scenario-calibration, round 2 R2-a, pre-registered d0d30f21). The quarter
+    # mean shift (q_pace/q_eff from each quarter's target vs the game's) and the random quarter environment read
+    # `getattr(qr, k, (qr or {}).get(k))`, whose default is evaluated EAGERLY: production passes QuarterResultLocal
+    # dataclasses, `.get` raises, and the except leaves both multipliers at 1.0 -- measured in-pipeline 2026-10-16, the
+    # same seeds with the targets swapped give identical output. "off" (default) = exactly that, today's behaviour;
+    # "mean" = the targets read correctly, the mean shift only (no random env, no extra RNG draw); "full" = the mean
+    # shift plus the random environment as originally written.
+    quarter_targets_mode: str = "off"
 
     # Outcome priors (fallbacks when player priors are missing)
     base_tov_per_poss: float = 0.125
@@ -448,6 +456,14 @@ def _player_pct(players: pd.DataFrame, made_pm: str, att_pm: str, default: float
 # The vendored module switches (SHOOTER_FT_RATE, FOULED_MISS_NOT_FGA, EXACT_TARGET_CALIBRATION, TOV_PER_ATTEMPT,
 # PLAYER_REBOUND_CREDIT and its credits, BLOCK_MODE, LEAGUE_BLOCKS_PER_MISSED_2PA, BLOCK_RATE_ASSUMED_FG3_PCT,
 # BLOCK_ALLOC_BY_RATE / _FLOOR_PM) are LeagueParams fields now; see league.py for each one's provenance.
+
+
+def _quarter_field(qr: Any, key: str, default: Any = None) -> Any:
+    """A quarter target's field from a dict or an object (QuarterResultLocal), with the default used only when the
+    field is absent. `cfg.quarter_targets_mode` != "off" only."""
+    if isinstance(qr, dict):
+        return qr.get(key, default)
+    return getattr(qr, key, default)
 
 
 def _player_two_pct(players: pd.DataFrame, default: float = 0.53, lo: float = 0.30, hi: float = 0.80) -> np.ndarray:
@@ -1270,9 +1286,15 @@ def simulate_pbp_game_boxscore(
     # Quarter loop
     # Precompute game-level target total from quarter model (if provided)
     game_mu_total = None
+    q_targets_mode = str(getattr(cfg, "quarter_targets_mode", "off") or "off").strip().lower()
+    if q_targets_mode not in ("off", "mean", "full"):
+        q_targets_mode = "off"
     try:
         if quarters and len(quarters) >= N_PERIODS:
-            gm = float(sum(float(getattr(qr, "home_pts_mu", (qr or {}).get("home_pts_mu"))) + float(getattr(qr, "away_pts_mu", (qr or {}).get("away_pts_mu"))) for qr in quarters[:N_PERIODS]))
+            if q_targets_mode == "off":
+                gm = float(sum(float(getattr(qr, "home_pts_mu", (qr or {}).get("home_pts_mu"))) + float(getattr(qr, "away_pts_mu", (qr or {}).get("away_pts_mu"))) for qr in quarters[:N_PERIODS]))
+            else:
+                gm = float(sum(float(_quarter_field(qr, "home_pts_mu")) + float(_quarter_field(qr, "away_pts_mu")) for qr in quarters[:N_PERIODS]))
             if np.isfinite(gm) and gm > 0:
                 game_mu_total = float(gm)
     except Exception:
@@ -2007,11 +2029,18 @@ def simulate_pbp_game_boxscore(
         try:
             if quarters and len(quarters) >= q:
                 qr = quarters[q - 1]
-                hm = float(getattr(qr, "home_pts_mu", (qr or {}).get("home_pts_mu")))
-                am = float(getattr(qr, "away_pts_mu", (qr or {}).get("away_pts_mu")))
-                hs = float(getattr(qr, "home_pts_sigma", (qr or {}).get("home_pts_sigma")))
-                as_ = float(getattr(qr, "away_pts_sigma", (qr or {}).get("away_pts_sigma")))
-                corr = float(getattr(qr, "corr", (qr or {}).get("corr", 0.0)))
+                if q_targets_mode == "off":
+                    hm = float(getattr(qr, "home_pts_mu", (qr or {}).get("home_pts_mu")))
+                    am = float(getattr(qr, "away_pts_mu", (qr or {}).get("away_pts_mu")))
+                    hs = float(getattr(qr, "home_pts_sigma", (qr or {}).get("home_pts_sigma")))
+                    as_ = float(getattr(qr, "away_pts_sigma", (qr or {}).get("away_pts_sigma")))
+                    corr = float(getattr(qr, "corr", (qr or {}).get("corr", 0.0)))
+                else:
+                    hm = float(_quarter_field(qr, "home_pts_mu"))
+                    am = float(_quarter_field(qr, "away_pts_mu"))
+                    hs = float(_quarter_field(qr, "home_pts_sigma"))
+                    as_ = float(_quarter_field(qr, "away_pts_sigma"))
+                    corr = float(_quarter_field(qr, "corr", 0.0))
                 tot_mu = max(1.0, float(hm + am))
                 tot_sd = float(np.sqrt(max(0.0, hs * hs + as_ * as_ + 2.0 * corr * hs * as_)))
                 sd_frac = float(np.clip(tot_sd / tot_mu, 0.02, 0.25))
@@ -2028,8 +2057,11 @@ def simulate_pbp_game_boxscore(
                 q_pace_mult = float(np.clip(np.sqrt(q_mu_mult), 0.94, 1.06))
                 q_eff_mu_mult = float(np.clip(np.sqrt(q_mu_mult), 0.94, 1.06))
 
-                # Random env: scale down slightly to avoid over-dispersion.
-                q_sd_mult = float(np.clip(1.0 + rng.normal(0.0, sd_frac * float(getattr(cfg, "env_sd_scale", 0.65))), 0.85, 1.20))
+                # Random env: scale down slightly to avoid over-dispersion. ("mean" mode: none, and no RNG draw.)
+                if q_targets_mode == "mean":
+                    q_sd_mult = 1.0
+                else:
+                    q_sd_mult = float(np.clip(1.0 + rng.normal(0.0, sd_frac * float(getattr(cfg, "env_sd_scale", 0.65))), 0.85, 1.20))
                 q_env_mult = float(np.clip(q_eff_mu_mult * q_sd_mult, 0.82, 1.22))
         except Exception:
             q_env_mult = 1.0
