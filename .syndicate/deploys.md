@@ -50330,3 +50330,38 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - **Owed:** one fleet ff to `587d4163`+ and one refresh-worker restart, then
   both counts re-read. Lanes `nhl-prop-support-fields` and
   `mlb-prop-support-fields` stay OPEN until they land.
+
+## 2026-10-16 15:00:32Z -- READING: MLB engine phase 2, the refresh's report builder ran on the native engine -- owed reading (1) **MET** (lane `mlb-sim-engine-native-p2`, session 2d413211)
+
+- **Reading.** `mlb_source/data/live_lens/render_sync/live_lens_reports_2026_10_16.json` was rewritten at 15:00:32Z, 41 min after the 70116f4a ff (14:19:33Z).
+  - Contents: `ok=True`, counts games=1 pregame=1 props=15, generatedAt 10:00:32 CT.
+  - The loop report was rewritten 14:25:01Z by the new worker 855610.
+  - 0 `live_lens_port` / native `sim_engine` traceback lines in live-odds-worker.log.
+- **Why this is the native engine.** The remote-first branch is off (all 7 keys absent, 10-15 correction), and the fleet's port imports only `syndicate.features.mlb.sim_engine`.
+- **Still owed:** (2) a live-MC tick on a LIVE game (tonight's 849817).
+
+## 2026-10-16 16:04:19Z (11:04 AM CT) fleet ff 70116f4a -> 961d5047, NO restart: the MLB daily sim off vendor, phase 3 (lane `mlb-daily-sim-native-p3`, session 2d413211)
+
+- **What changed.**
+  - `scripts/run_mlb_daily_sim_job.py` launches `syndicate/features/mlb/native/tools/daily_update.py`, with the same cwd and data root, and no vendored module or script.
+  - The job is a per-run subprocess, so it switched AT the ff.
+  - The refresh-worker's season-manifest launcher (`run_refresh_worker.py`) and the live-odds-worker's slice (3 more web helpers) load at those workers' next restarts. Both are non-urgent: their running code is phase 2's, which is consistent.
+- **Locks.**
+  - Both claims were taken, gated on exit code and holder.
+  - Safety read in full: no MLB sim, odds idle, no live games, no refresh-worker children.
+  - Waited for props + MLB refresh + MLB sim + `tools/daily_update` all idle (0 after 10 s).
+  - ff-only to the exact SHA; HEAD contains it. Released with `--token`.
+- **Ride-alongs.**
+  - `587d4163` MLB hitter-prop support fields and `1ca7041f` NHL prop support fields: their owners' entries say they are owed "one fleet ff ... and one refresh-worker restart". This is the ff half; they load at the next refresh-worker restart.
+  - The UEFA league-offsets module and lane commits: "Nothing wired".
+  - Tests.
+- **Parity before deploy** (`scripts/mlb_daily_sim_parity.py`). Three arms ran CONCURRENTLY from their own copies of the fleet checkout + MLB data: vendored, native, and vendored again as the noise floor.
+  - Setup: the job's exact argv, game 849817, 250 sims, the refresh-worker's env remapped onto each arm (never printed).
+  - All rc=0, including the locked-policy publish (200 sims had exited 1 in every arm on its 250-sim minimum).
+  - 587 files / 1,088,420 leaves. With each arm's directory normalised to `<ARM>`, the floor is 94 leaves.
+  - **Native vs vendored: 0 beyond the floor.** 91 wall-clock leaves are listed: `*_at`, `*Ms`/`*At`, and `timings.*`. 2 ops-report `command[1]` values sit in the counted native-script class, because the native run really ran the native script.
+  - **Native process tree: 6 python processes, 0 loaded a vendored module, 0 vendored scripts run.** Each vendored arm loaded vendor in all 6.
+  - Plant caught.
+  - Found and fixed on the way: multi_profile's `daily_update_tool` provenance label recorded the native absolute path. A listed TOOLS_EDIT keeps production's value, and there is no reader.
+- **verify (OWED).** The next production MLB sim after 16:04:19Z should show only native scripts in the 1 s process recorder (`/home/amyn/mlb_sim_trace.tsv`), 0 vendored daily-sim scripts, and today's daily_summary rewritten. A watcher is running.
+- **Rollback.** `git revert 961d5047`, then a fleet ff. The job is a subprocess, so no restart is needed.
