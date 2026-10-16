@@ -1008,6 +1008,15 @@ death, never life — do not invert it.
 - Verification: findings file: per-game count of dressed-but-OUT players and their actual played/not-played, before; after the fleet ff: the next lineups_<date>.csv has 0 players the collector held OUT at build time, with the excluded names logged
 - Blocked by: none
 
+
+### uefa-close-backtest — OPEN — opened 2026-10-16 — session 436c79e2-3793-435f-bfe6-20c830515554
+- Goal: todo #699 Stage 1 step (3), the go/no-go gate: a pre-registered walk-forward backtest of UEFA main-draw 1X2 pricing (production ratings + CONST offsets + out-of-scope FITTED ratings) against the de-vigged OddsAPI historical close, 2020-2026, with a per-competition GO/NO-GO verdict; research only, wired into nothing
+- Files: scripts/backfill_uefa_historical_closes.py (NEW), scripts/backtest_uefa_vs_close.py (NEW), syndicate/features/soccer/uefa_close_backtest.py (NEW), tests/test_uefa_close_backtest.py (NEW), .syndicate/findings_2026-10-16_uefa_close_backtest.md (NEW), docs/ai_context/todo.md (#699 section only)
+- Hypothesis: H-BLEND: a walk-forward model/close blend beats the de-vigged close on held-out UEFA main-draw 1X2 log loss, per competition
+- Falsification test: registered in the findings file s1 before any close is pulled: blend - close CI not entirely below 0 for a competition = NO-GO for that competition
+- Verification: per-competition verdicts with 95% bootstrap CIs, join coverage and credits spent in the findings file; tests/test_uefa_close_backtest.py passes offline
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
