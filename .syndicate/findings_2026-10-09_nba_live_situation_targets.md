@@ -905,3 +905,8 @@ REGULAR VALID 2026-03-01..04-12; 335 games, 329-331 per checkpoint. FINAL (fit_f
 - It does not move totals accuracy, and it still does not beat "score + pregame line pro rata" on totals.
 - The live totals problem is ACCURACY, not level. Candidate drivers remain unmeasured: REB −1.4, trailer-FTA shape, the §11 frame gap.
 - Postseason: graded with the calibration lane's stratum; not run here yet (the inputs chain is still recording postseason dates).
+- **§13 postseason stratum (reported, NOT gated; read 2026-10-16 ~00:2xZ), FINAL − PROD, 2026 play-in/playoffs, 83-85 games/checkpoint:**
+  - pooled Q1-Q3: total **−0.63 [−1.16, −0.12]** better, margin +0.20 [−0.16, +0.59] n.s., ML −0.016 [−0.037, +0.004] n.s.
+  - Early totals improve most: end Q1 −1.10, end Q2 −0.67 (both CI < 0). This matches the calibration lane's postseason G2: |total| −2.43, bias +10.45 -> +3.89.
+  - 5:00 Q4 total +0.22 [−0.03, +0.49]: n.s., leaning worse.
+  - So Phase 2's clearest live win is the postseason TOTAL level. Not gated, not enabling anything.
