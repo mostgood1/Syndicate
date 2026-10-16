@@ -50084,3 +50084,34 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - **why:** the running worker (pid 660548, 10-15 23:36:42Z) predated both. Batched overnight under the restart rule; the last restart was ~13 h ago.
 - **claim:** refresh-worker token e040fd7b..., acquire exit 0. Window gate: refresh-worker blockers only, positive lines required; window after 64 readings (MLB sim finished, child jobs none, board build idle).
 - **verify (owed, tonight's live NCAAF, then Sunday's NFL):** live NFL/NCAAF rows read "pregame proj X", with 0 "SIM CONTRADICTS" from a pregame mean.
+
+## 2026-10-16T12:32:38Z (7:32 AM CT) -- NFL prop SUPPORT fields staged on the fleet, NO restart (60-min gate), reading OWED
+
+- **Change.** `5457b428` publishes `sample_games` / `projected_sd` onto NFL prop
+  projections in `nfl_prop_projections.py`. Additive fields only, no scoring
+  change. Unit+mutation verified locally: 6 tests, 5 mutants / 5 caught / 0
+  survivors, 165 tests green across every suite touching the module.
+- **Fleet arrival was NOT my action.** Fleet HEAD read `5457b428` at 12:31Z, but
+  my own ff never ran -- every git call in it failed on a leaked `GIT_DIR`
+  pointing at my Windows worktree, and the "fleet ff: ->" line it printed was
+  empty. A PEER fast-forwarded the fleet between 12:29 and 12:31Z. Recorded as
+  theirs, not mine.
+- **NOT RESTARTED, deliberately.** A claimed refresh-worker restart ran
+  **12:26:32Z** (deploys.md above, "RESTART only, no code change"), i.e. ~3 min
+  before I was ready. The restart rule says wait if one is <60 min ago and BATCH
+  non-urgent changes; this is observability-only, so it batches. Two peer
+  changes are already queued the same way (`e3a06b93` kalshi join,
+  `f69366a4` label/tag).
+- **verify:** the reading that will prove it is the count of served NFL prop
+  rows carrying `projection.sample_games`. **CONTROL, measured 2026-10-16T12:32:38Z with the
+  code on the checkout and the pre-change worker still running: NFL 0 of 1,070
+  (NONE).** NCAAF, which already publishes both, reads 727 of 727 at the same
+  instant -- so the instrument is demonstrably able to read non-zero, and a 0
+  for NFL is a real 0 rather than a blind probe.
+- **Owed:** re-read that count after the next refresh-worker restart by anyone.
+  Lane `nfl-prop-support-fields` stays OPEN until it lands. If NFL still reads
+  0 after a restart that carries `5457b428`, the lane's falsification clause
+  fires: the loss is downstream of `nfl_prop_projections.py` (a board-level
+  published-key filter), not in the dict literal I changed.
+- **Claim.** refresh-worker acquired by `nfl-prop-support-fields`, released
+  without restarting.
