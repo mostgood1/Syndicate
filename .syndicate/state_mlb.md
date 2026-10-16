@@ -841,6 +841,14 @@ fallback that fires only when the vendor stage errors
 the vendor writer; it did not. That docstring caused two successive
 misdiagnoses on 2026-08-20.
 
+**ADDENDUM `[verified 2026-10-16, lane mlb-live-lens-native-p1]`: the MLB LIVE LENS RUNTIME is native (phase 1).**
+- The live-odds-worker's live-lens loop, `refresh_mlb_oddsapi.py`'s report builder and `syndicate/features/mlb/live_lens.py` run `syndicate/features/mlb/live_lens_port/app_slice.py`. It is a generated, statement-verbatim port of the vendored `flask_frontend.py` slice (`scripts/port_mlb_live_lens.py --check`), live on the fleet since b9542acb (ff 2026-10-15 22:04Z, worker restart 22:28Z).
+- Measured in production:
+  - the loop's flock is held by the port's worker;
+  - refresh render_sync written by the port at 23:00:25Z;
+  - live MC (`_live_mc_prob_over_for`) produced non-null `liveModelProbOver` in 40 of 56 live entries on the 10-15 night game, against 41 of 52 for the vendored loop that afternoon.
+- **NOT off vendor yet:** the port still imports the vendored `sim_engine.*` (incl. `live_mc`) and `tools.*` packages (phase 2). This changes none of the daily-update stage rows above.
+
 ## [mlb-ladders-native-builder] MLB LADDERS — NATIVE BUILDER SHIPPED TO THE TREE `[2026-08-19]`
 
 

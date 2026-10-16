@@ -50115,3 +50115,11 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   published-key filter), not in the dict literal I changed.
 - **Claim.** refresh-worker acquired by `nfl-prop-support-fields`, released
   without restarting.
+
+## 2026-10-16 13:0xZ -- READING: MLB live lens phase 1, live MC ran on the port in production -- owed reading (2) **MET**; lane CLOSED (lane `mlb-live-lens-native-p1`, session 2d413211)
+
+- **Reading.** Source: `source_artifacts/data/live_lens/live_lens_2026_10_15.jsonl`, split at the 17:28:26 CT respawn onto the port. `liveModelProbOver` is set from `_live_mc_prob_over_for(...)` (port `app_slice.py:10232/10361`), i.e. live MC.
+  - Before the respawn (vendored loop): 52 live entries, 12:00-14:37 CT; 41 carry a non-null `liveModelProbOver` (133 values).
+  - After the respawn (port): 56 live entries, 18:48-22:07 CT; 40 carry one (132 values).
+- **Why the log looked empty.** The worker log shows only `LIVE_MC_BAIL` lines: 864 `status_not_live`, for the slate's non-live game, plus 4 `no_snapshot_or_sim_context`. Live MC prints only on bail (port `app_slice.py:12147`), so success is silent and the log alone could not show it.
+- **No errors.** 0 `live_lens_port/app_slice.py", line` traceback frames, and 0 "MLB live-lens port" / "local live-lens build failed" lines, in live-odds-worker.log, live-odds-worker.log.1 and refresh-worker.log. The 164 + 51 mentions of `live_lens_port` are all `ALL_PROCESS_MEMORY` lines listing a CI pytest argv.
