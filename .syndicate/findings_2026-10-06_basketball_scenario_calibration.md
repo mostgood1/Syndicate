@@ -3100,3 +3100,45 @@ league_split_away / team splits, read by the pregame path). No code change.
 - If e_q < 0.3, the engine flattens the shares. Diagnose why (garbage-time efficiency, rotation fatigue) before any
   mechanism.
 - Team-level splits: a later step, only if league-level passes. FIT only; the round-2 forward test decides.
+
+### R2-a — STEP 1 RESULT + ROOT CAUSE 2026-10-16 17:05Z: the engine has NEVER used the per-quarter targets in production (a dead input)
+
+**Step 1** (`R2A_real`, the 12 sweep dates, fit_f5 + `quarters_calibration.json` = the real FIT splits; 17,400
+calls, 0 errors):
+- Output points per quarter barely move: Q4 57.66 → 57.61, against real 55.33. Elasticity Q1/Q2/Q3/Q4 =
+  0.02 / 0.03 / 0.20 / 0.008.
+- The guards still hold (FTA 22.95, foul-outs 0.216, bias +0.18).
+
+**Tracing it:**
+- The split file IS read (`_quarter_splits_for_team_local` returns the real split from the scratch root).
+- The per-quarter targets DO reach the native engine boundary: `--dump-priors` now also writes `quarters`; with the
+  file Q4 is 58.1 → 54.9.
+- In isolation the engine RESPONDS. With dict quarters, Q4 −1.8 under the full config and −4.0 with EXACT only.
+- **In-pipeline probe, same rng seeds, the targets swapped: IDENTICAL output** for given, T0 and T1 on 3 games.
+
+**ROOT CAUSE (engine.py ~:1275 and ~:2009–2013):**
+- `float(getattr(qr, "home_pts_mu", (qr or {}).get("home_pts_mu")))`. Python evaluates the getattr DEFAULT eagerly.
+- Production passes `QuarterResultLocal` DATACLASSES, not dicts, so `(qr or {}).get` raises AttributeError.
+- The surrounding `except` then sets q_env_mult = q_pace_mult = 1.0 and game_mu_total = None, silently, for every
+  quarter of every game.
+- So the quarter MEAN shift and the random quarter environment (env_sd_scale) have never been active in production.
+  Every Phase 1 / 2 measurement ran without them. The tests passed dicts.
+- This is model_engine_standard's canonical trap: CONSUMED, never influential, no log line.
+- The hardcoded split being Q3/Q4-heavy never mattered for the same reason. The sim's flat shares are the engine's
+  own dynamics.
+
+**Implications:**
+1. A bare fix would switch ON the split shaping AND the random quarter env at once in production. The latter adds
+   variance that every Phase 2 fit (S8, jitter J1) was tuned without. So the fix MUST be a default-off switch, with the
+   mean shift and the random env separable.
+2. The same eager-default pattern may exist in the vendored engine. Parity-wise it is the same behaviour.
+
+**R2-a step 1b, PRE-REGISTERED:**
+- Build (native engine, default off = byte-identical) `EventSimConfig.quarter_targets_mode`:
+  - "off" = today;
+  - "mean" = read the quarter targets correctly and apply ONLY the mean shift (q_pace/q_eff), q_sd_mult = 1;
+  - "full" = mean + the random env.
+- Tests: off byte-identical, reachability with dataclass quarters, corpus parity.
+- Then measure "mean" + the real-split file on the 12 dates.
+- CONFIRMED if every quarter's output share is inside its real FIT CI (± ~0.0022) and the #3 guards hold.
+- "full" is measured separately, against S8 / S3 / within-SD.
