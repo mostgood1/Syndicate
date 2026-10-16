@@ -935,3 +935,36 @@ REGULAR VALID 2026-03-01..04-12; 335 games, 329-331 per checkpoint. FINAL (fit_f
 - Game-clustered bootstrap, n stated per cell.
 
 **Read ONCE** at the window's end. No interim peeks at the pass metrics; only row counts and refusal tallies are monitored.
+
+## 15. FIT-only diagnosis (2026-10-16): why native live TOTALS do not beat pregame_rate
+
+FIT regular, Phase 2 final config (gate_f5 cache), n ≈ 780 per checkpoint. VALID was NOT used (already read once).
+
+**(a) Is native's deviation from pregame_rate informative?** w = OLS slope of (final − pr) on (nat − pr), split-half:
+
+| checkpoint | w (all) | split-half w | sd(nat − pr) |
+|---|---|---|---|
+| end Q1 | **+0.02** | +0.24 / −0.17 | 3.16 |
+| end Q2 | **+0.05** | −0.14 / +0.24 | 2.70 |
+| end Q3 | +0.27 | +0.28 / +0.26 | 1.85 |
+| 5:00 Q4 | +0.85 | +1.26 / +0.45 | 1.37 |
+
+Early (Q1/Q2) the deviation carries ~NO information about the final total; it is noise around the pro-rata line. It becomes informative only late (Q3 partially, 5:00 Q4 mostly).
+
+**(b) Is it the pregame target vs the market?** Removing (model target − market total) × remaining fraction (mean |gap| 2.2 pts):
+
+| checkpoint | native − pr | anchored − pr |
+|---|---|---|
+| end Q1 | +0.23 | +0.14 [−0.01, +0.29] |
+| end Q2 | +0.18 | +0.18 [+0.02, +0.33] |
+| end Q3 | +0.09 | +0.07 |
+| 5:00 Q4 | +0.06 | +0.06 |
+
+**Reading:**
+- The target gap is about 40% of the end-Q1 deficit and none of end-Q2's. The rest is the live-state response itself: the engine's early reaction to fouls, pace and score adds variance, not information.
+- Monte Carlo noise at 100 sims (SE of the mean ≈ 1.3 pts) explains only ~0.05 of it.
+- Implication: as specified, the §12/§14 total rule ("beat pregame_rate at Q1-Q3") is unlikely to be met by ANY state-driven re-sim of this model. Early on, the information is in the line, not in our state features.
+- Options for the user, none applied:
+  - (1) a state-dependent shrink: total = pr + w(f)·(nat − pr), with w fitted on FIT. It ties pr early and gains late, but needs its own pre-registered forward gate.
+  - (2) price live margin/ML only, where native is better than PROD out of sample (§13).
+  - (3) find what live state is informative early (in-game pace vs pregame pace, foul rate, the 3PA rate) before touching the engine.
