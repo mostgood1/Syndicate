@@ -125,7 +125,28 @@ Run at Idle priority. Driver: `scripts/soccer_team_strength_experiments.py stage
 
 ## 2. Coverage
 
-(written after the run's population and identity check, before any score is read)
+(written after the run's population and identity check, before any score is read;
+`C:/tmp/team-strength/stage1_coverage.json`, run 17:46-17:54Z at Idle priority, read back 64)
+
+- **FULL: 32,638 matches** (8 leagues, 2014..2026). Excluded: 8 wrong pairings and 10 with no close.
+- **Held out (2016..2026): 27,285 matches.** CORE (both sides ≥ 10 rated rows) 25,863; PROMOTED (either side
+  < 10, so the gate fires) 1,422. Of the held-out sides, 145 have 0 rows, 1,315 have 1..9 rows and 53,110 have
+  ≥ 10.
+  - Close source, held out: Pinnacle 25,386; market average 1,899 (all of 2026-27, plus a few older).
+  - Per season 2,495..2,744 matches, and 2026 has 512. The compression study's held-out set (26,547) is
+    nearly all of CORE, plus its n 5..9 matches.
+- **Identity check PASSED.** At the shipped config, the variant code reproduces production's raw
+  `compute_team_ratings` output and its `matches` count on **every one of 65,009 rated sides**, with a max
+  error of 5.0e-5 (4-dp rounding). Every production-unrated side has n = 0 in the variant code.
+- **Reachability PASSED, so no family is inert.** Share of FULL matches whose rating vector moves off C\*:
+  - W: 0.98 / 0.93 / 0.88 / 0.88 for ×1/3, 2/3, 4/3, 2. The two longer windows move nearly the same
+    matches, because the depth caps them.
+  - R: 0.98 at every half-life.
+  - B: 0.91 at every c. Matches with no current-season rows are unchanged.
+  - S: 0.998 at every n0.
+  - P fitted: **0.066**. Only gated sides change, so P can matter only on PROMOTED.
+- **One family, one window.** Ratings, outcomes and closes come from the same matches 2014..2026. The
+  intersection is the FULL set itself.
 
 ## 3. Results
 

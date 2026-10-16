@@ -586,6 +586,406 @@ def cmd_engine(args) -> int:
     return 0
 
 
+# --------------------------------------------------------------------------- stage 1: rating-INPUT variants
+# Registration: `.syndicate/findings_2026-10-16_soccer_rating_inputs.md` section 1 (734d604e).
+
+GATE_N = 10                      # build_soccer_artifacts._FEW_MATCH_GATE (ON in production since 2026-10-07)
+P0 = -0.18 / SCALE               # PROMOTED_TEAM_RATING in raw-deviation space
+SHIPPED = (("wf", 1.0), ("h", math.inf), ("c", math.inf), ("s", "gate"), ("p", "p0"))
+GRIDS = {"W": ("wf", (1.0, 1 / 3, 2 / 3, 4 / 3, 2.0)), "R": ("h", (math.inf, 40, 20, 10)),
+         "B": ("c", (math.inf, 40, 20, 10, 5)), "S": ("s", ("gate", 5, 10, 20, 40)), "P": ("p", ("p0", "fitted"))}
+ORDER = ("W", "R", "B", "S", "P")
+
+
+def _cfg(**over) -> tuple:
+    base = dict(SHIPPED)
+    base.update(over)
+    return tuple((k, base[k]) for k, _ in SHIPPED)
+
+
+def _cfg_label(cfg: tuple) -> str:
+    d, ship = dict(cfg), dict(SHIPPED)
+    parts = [f"{k}={round(v, 3) if isinstance(v, float) else v}" for k, v in d.items() if v != ship[k]]
+    return ",".join(parts) or "shipped"
+
+
+def build_full(root: Path):
+    """Every football-data match with a close: keys plus production's RAW rating and row count per side.
+
+    Unlike `build`, a side with no rating (0 rows in the depth: a promoted club) is kept -- production gives it
+    PROMOTED_TEAM_RATING -- and so is a side with 1..9 rows (production's few-match gate). Wrong pairings are
+    excluded as in `build` (deviation 1 of the compression study).
+    """
+    index = RatingIndex(root.parent / "uefa-offsets" / "prod_history" if not (root / "prod_history").exists()
+                        else root / "prod_history")
+    rows, _coverage = load_fd_matches(root / "fd_raw")
+    out, skipped = [], Counter()
+    for row in sorted(rows, key=lambda r: (r["league"], r["day"])):
+        lg, season, cutoff = row["league"], row["season"], row["day"]
+        raw = index.table(lg, season, cutoff, raw=True)
+        keys, vals, ns, wrong = [], [], [], False
+        for side in ("home", "away"):
+            fd_name = row[side]
+            alias = ALIASES.get((lg, fd_name))
+            key = alias if alias in raw else match_team_name(fd_name, list(raw))
+            if key and ((lg in GOALS and key != fd_name) or (lg, fd_name, key) in WRONG_PAIRINGS):
+                wrong = True
+            e = raw.get(key) if key else None
+            keys.append(key if e else None)
+            vals.append([e["attack_rating"], e["defense_rating"]] if e else None)
+            ns.append(int(e["matches"]) if e else 0)
+        if wrong:
+            skipped["wrong_pairing"] += 1
+            continue
+        if row["close"] is None:
+            skipped["no_close"] += 1
+            continue
+        out.append({**row, "home_key": keys[0], "away_key": keys[1], "prod_raw": vals, "prod_n": ns})
+    return out, skipped, index
+
+
+class TeamStore:
+    """Per-league, per-club chronological rating rows, as production's subset+sort sees them."""
+
+    def __init__(self, prod_root: Path):
+        self.teams: dict[str, dict[str, dict]] = {}
+        self.season_rows: dict[str, dict[int, dict]] = {}
+        self._tables: dict[tuple, list] = {}
+        for lg in LEAGUES:
+            if lg in BIG5:
+                raw = _read_csvs(sorted((prod_root / lg / "team_history").glob("teams_*.csv")))
+            else:
+                raw = team_rows_from_match_history(_read_csvs(sorted((prod_root / lg / "history").glob("matches_*.csv"))))
+            per: dict[str, list] = defaultdict(list)
+            for r in raw:
+                day = _as_iso_day(r.get("date"))
+                team = str(r.get("team") or "").strip()
+                xf, xa = loaders._safe_float(r.get("xg_for")), loaders._safe_float(r.get("xg_against"))
+                if not day or not team or xf is None or xa is None:
+                    continue
+                per[team].append((date.fromisoformat(day).toordinal(), int(float(r["season"])), xf, xa))
+            teams = {}
+            for team, items in per.items():
+                items.sort(key=lambda t: t[0])  # stable: same tie order as production's sort of the subset
+                arr = np.array(items, dtype=float)
+                season = arr[:, 1].astype(int)
+                assert np.all(np.diff(season) >= 0), f"{lg} {team}: season labels not monotone in day"
+                teams[team] = {"day": arr[:, 0], "season": season, "xf": arr[:, 2], "xa": arr[:, 3],
+                               "cf": np.concatenate([[0.0], np.cumsum(arr[:, 2])]),
+                               "ca": np.concatenate([[0.0], np.cumsum(arr[:, 3])])}
+            self.teams[lg] = teams
+            # Per league-season pooled rows, for the promoted-club prior.
+            seas: dict[int, dict] = {}
+            for team, t in teams.items():
+                for s in np.unique(t["season"]):
+                    m = t["season"] == s
+                    e = seas.setdefault(int(s), {"sum_f": 0.0, "n": 0, "teams": {}})
+                    e["sum_f"] += float(t["xf"][m].sum())
+                    e["n"] += int(m.sum())
+                    e["teams"][team] = (float(t["xf"][m].sum()), float(t["xa"][m].sum()), int(m.sum()))
+            self.season_rows[lg] = seas
+
+    def table(self, lg: str, season: int, cutoff: str) -> list:
+        key = (lg, season, cutoff)
+        if key not in self._tables:
+            c = date.fromisoformat(cutoff).toordinal()
+            rows = []
+            for team, t in self.teams[lg].items():
+                lo = int(np.searchsorted(t["season"], season - SEASONS_BACK[lg], "left"))
+                hi = int(np.searchsorted(t["day"], c, "left"))
+                if hi > lo:
+                    cur = int(np.searchsorted(t["season"], season, "left"))
+                    rows.append((team, lo, hi, max(cur, lo)))
+            self._tables[key] = rows
+        return self._tables[key]
+
+    def promoted_prior(self, lg: str, before_season: int) -> tuple[float, float]:
+        """Mean raw (x_att, x_def) of PROMOTED clubs over their promotion-season rows, seasons < before_season."""
+        seas = self.season_rows[lg]
+        num_f = num_a = 0.0
+        n = 0
+        for s, e in seas.items():
+            if s >= before_season or (s - 1) not in seas:
+                continue
+            mu = e["sum_f"] / e["n"]
+            earlier = set()
+            for b in range(s - SEASONS_BACK[lg], s):
+                earlier |= set(seas.get(b, {"teams": {}})["teams"])
+            for team, (sf, sa, k) in e["teams"].items():
+                if team not in earlier:
+                    num_f += sf / mu
+                    num_a += sa / mu
+                    n += k
+        if n == 0:
+            return (P0, P0)
+        return (num_f / n - 1.0, 1.0 - num_a / n)
+
+
+def variant_features(store: TeamStore, matches: list[dict], cfg: tuple, priors: dict | None) -> dict:
+    """Shipped-space ratings [A_h, D_h, A_a, D_a] under one input config, plus raw x and row counts."""
+    c = dict(cfg)
+    r = np.zeros((len(matches), 4))
+    raw = np.full((len(matches), 4), np.nan)
+    n_out = np.zeros((len(matches), 2), dtype=int)
+    mu_cache: dict[tuple, float] = {}
+    for i, m in enumerate(matches):
+        lg, season, cutoff = m["league"], m["season"], m["day"]
+        W = int(round(WINDOW[lg] * c["wf"]))
+        tab = store.table(lg, season, cutoff)
+        mk = (lg, season, cutoff, W)
+        if mk not in mu_cache:
+            tot = cnt = 0.0
+            for team, lo, hi, _cur in tab:
+                a = max(lo, hi - W)
+                t = store.teams[lg][team]
+                tot += t["cf"][hi] - t["cf"][a]
+                cnt += hi - a
+            mu = tot / cnt if cnt else 1.35
+            mu_cache[mk] = mu if mu > 0 else 1.35
+        mu = mu_cache[mk]
+        by_team = {team: (lo, hi, cur) for team, lo, hi, cur in tab}
+        prior = (priors or {}).get(lg, (P0, P0)) if c["p"] == "fitted" else (P0, P0)
+        for j, key in enumerate((m["home_key"], m["away_key"])):
+            n, est, x = 0, False, None
+            if key is not None and key in by_team:
+                lo, hi, cur = by_team[key]
+                t = store.teams[lg][key]
+                a = max(lo, hi - W)
+                n = hi - a
+                est = cur > lo
+                if c["h"] == math.inf:
+                    mf, ma = (t["cf"][hi] - t["cf"][a]) / n, (t["ca"][hi] - t["ca"][a]) / n
+                else:
+                    w = 0.5 ** (np.arange(n)[::-1] / c["h"])
+                    mf, ma = float(w @ t["xf"][a:hi] / w.sum()), float(w @ t["xa"][a:hi] / w.sum())
+                x = [mf / mu - 1.0, 1.0 - ma / mu]
+                raw[i, 2 * j:2 * j + 2] = x
+                if c["c"] != math.inf and hi > cur:
+                    ncur = hi - cur
+                    b = ncur / (ncur + c["c"])
+                    xc = [(t["cf"][hi] - t["cf"][cur]) / ncur / mu - 1.0, 1.0 - (t["ca"][hi] - t["ca"][cur]) / ncur / mu]
+                    x = [(1 - b) * x[0] + b * xc[0], (1 - b) * x[1] + b * xc[1]]
+            n_out[i, j] = n
+            if c["s"] == "gate":
+                if n < GATE_N:
+                    x = list(prior)
+            elif c["s"] == "none":          # production before 2026-10-07: only _fill_promoted
+                if n == 0:
+                    x = list(prior)
+            else:
+                n0 = float(c["s"])
+                target = (0.0, 0.0) if est else prior
+                x = [((n * x[k]) if n else 0.0) / (n + n0) + n0 * target[k] / (n + n0) for k in range(2)]
+            r[i, 2 * j] = round(_clamp_ship(x[0]), 4)
+            r[i, 2 * j + 1] = round(_clamp_ship(x[1]), 4)
+    return {"r": r, "raw": raw, "n": n_out}
+
+
+def _clamp_ship(x: float) -> float:
+    return max(-CAP, min(CAP, SCALE * x))
+
+
+class RDesign(Design):
+    def __init__(self, matches: list[dict], r: np.ndarray):  # noqa: D107 - shares Design's arrays
+        lg_idx = {lg: i for i, lg in enumerate(LEAGUES)}
+        self.n = len(matches)
+        self.league = np.array([lg_idx[m["league"]] for m in matches], dtype=int)
+        self.gap_h = r[:, 0] - r[:, 3]
+        self.gap_a = r[:, 2] - r[:, 1]
+        self.hg = np.array([m["hg"] for m in matches], dtype=float)
+        self.ag = np.array([m["ag"] for m in matches], dtype=float)
+
+
+class Stage1:
+    def __init__(self, store: TeamStore, matches: list[dict]):
+        self.store, self.matches = store, matches
+        self.season = np.array([m["season"] for m in matches])
+        self.y = outcome_index(matches)
+        self._feat: dict[tuple, dict] = {}
+        self._fit: dict[tuple, tuple] = {}
+
+    def priors(self, S: int) -> dict:
+        return {lg: self.store.promoted_prior(lg, S) for lg in LEAGUES}
+
+    def feats(self, cfg: tuple, S: int | None) -> dict:
+        key = (cfg, S if dict(cfg)["p"] == "fitted" else None)
+        if key not in self._feat:
+            self._feat[key] = variant_features(self.store, self.matches, cfg,
+                                               self.priors(S) if dict(cfg)["p"] == "fitted" else None)
+        return self._feat[key]
+
+    def season_fit(self, cfg: tuple, S: int, k_fixed: float | None = None) -> tuple[float, np.ndarray]:
+        """(in-sample train log loss, held-out probs for season S)."""
+        key = (cfg, S, k_fixed)
+        if key not in self._fit:
+            r = self.feats(cfg, S)["r"]
+            tr, te = self.season < S, self.season == S
+            mtr = [m for m, f in zip(self.matches, tr) if f]
+            mte = [m for m, f in zip(self.matches, te) if f]
+            params = fit(RDesign(mtr, r[tr]), k_fixed)
+            ll_tr = float(scores(predict_1x2(RDesign(mtr, r[tr]), params), self.y[tr])[0].mean())
+            self._fit[key] = (ll_tr, predict_1x2(RDesign(mte, r[te]), params), params["k"])
+        return self._fit[key][:2]
+
+
+def _metrics(probs: dict, y: np.ndarray, close: np.ndarray, masks: dict) -> dict:
+    ll = {a: scores(p, y)[0] for a, p in probs.items()}
+    br = {a: scores(p, y)[1] for a, p in probs.items()}
+    ll["close"], br["close"] = scores(close, y)
+    out = {"mean_logloss": {a: float(v.mean()) for a, v in ll.items()},
+           "mean_brier": {a: float(v.mean()) for a, v in br.items()}, "vs_Cstar": {}, "vs_close": {}}
+    gap_c = float((ll["C*"] - ll["close"]).mean())
+    for a in probs:
+        if a != "C*":
+            st = boot_mean_ci(ll[a] - ll["C*"])
+            out["vs_Cstar"][a] = {"logloss": st, "brier": boot_mean_ci(br[a] - br["C*"]),
+                                  "rule_verdict": verdict(st)}
+        vc = boot_mean_ci(ll[a] - ll["close"])
+        out["vs_close"][a] = {"logloss": vc, "share_of_Cstar_gap_closed": 1.0 - vc["mean"] / gap_c}
+    fav_side = np.where(close[:, 0] >= close[:, 2], 0, 2)
+    idx = np.arange(len(y))
+    won = (y == fav_side).astype(float)
+    pc = close[idx, fav_side]
+    top = pc >= np.quantile(pc, 0.9)
+    fav = {"all": {"n": int(len(y)), "actual": float(won.mean()), "close": float(pc.mean())},
+           "top_decile": {"n": int(top.sum()), "actual": float(won[top].mean()), "close": float(pc[top].mean())}}
+    for a, p in probs.items():
+        fav["all"][a] = float(p[idx, fav_side].mean())
+        fav["top_decile"][a] = float(p[idx, fav_side][top].mean())
+    out["favourites"] = fav
+    out["spread_sd_home_minus_away"] = {a: float(np.std(p[:, 0] - p[:, 2])) for a, p in probs.items()}
+    out["spread_sd_home_minus_away"]["close"] = float(np.std(close[:, 0] - close[:, 2]))
+    out["subsets"] = {}
+    for name, mk in masks.items():
+        if mk.sum() == 0:
+            continue
+        sub = {"n": int(mk.sum()), "mean_logloss": {a: float(v[mk].mean()) for a, v in ll.items()}}
+        for a in probs:
+            if a != "C*":
+                sub[f"{a}-C*"] = boot_mean_ci((ll[a] - ll["C*"])[mk], n_boot=500)
+        sub["C*-close"] = boot_mean_ci((ll["C*"] - ll["close"])[mk], n_boot=500)
+        out["subsets"][name] = sub
+    return out
+
+
+def cmd_stage1(args) -> int:
+    print(f"[stage1] priority={_set_idle_priority()}", flush=True)
+    root = Path(args.root)
+    prod_root = root / "prod_history" if (root / "prod_history").exists() else root.parent / "uefa-offsets" / "prod_history"
+    matches, skipped, _index = build_full(root)
+    store = TeamStore(prod_root)
+    st = Stage1(store, matches)
+    print(f"[stage1] FULL matches={len(matches)} skipped={dict(skipped)}", flush=True)
+
+    # Registered identity check: shipped config reproduces production's raw x and row count, every rated side.
+    ship = _cfg()
+    f0 = st.feats(ship, None)
+    max_err, checked = 0.0, 0
+    for i, m in enumerate(matches):
+        for j in range(2):
+            if m["prod_raw"][j] is None:
+                assert f0["n"][i, j] == 0, f"{m['league']} {m['day']} side {j}: production unrated, variant n={f0['n'][i, j]}"
+                continue
+            if f0["n"][i, j] != m["prod_n"][j]:
+                raise SystemExit(f"IDENTITY FAILED (n) {m['league']} {m['day']} {m['home']}-{m['away']} side {j}: "
+                                 f"{f0['n'][i, j]} vs production {m['prod_n'][j]}")
+            err = float(np.max(np.abs(f0["raw"][i, 2 * j:2 * j + 2] - np.array(m["prod_raw"][j]))))
+            max_err = max(max_err, err)
+            checked += 1
+            if err > 2e-4:
+                raise SystemExit(f"IDENTITY FAILED (x) {m['league']} {m['day']} {m['home']}-{m['away']} side {j}: "
+                                 f"{f0['raw'][i, 2 * j:2 * j + 2]} vs production {m['prod_raw'][j]}")
+    print(f"[stage1] identity PASSED: {checked} rated sides, max err {max_err:.2e}", flush=True)
+
+    held = np.isin(st.season, list(TEST_SEASONS))
+    prod_n = np.array([m["prod_n"] for m in matches])
+    core = (prod_n >= GATE_N).all(axis=1)
+    coverage = {"full": len(matches), "held_out": int(held.sum()), "core_held_out": int((core & held).sum()),
+                "promoted_held_out": int((~core & held).sum()), "skipped": dict(skipped),
+                "identity": {"sides": checked, "max_err": max_err},
+                "sides_by_n_held_out": {"0": int((prod_n[held] == 0).sum()), "1-9": int(((prod_n[held] > 0) & (prod_n[held] < GATE_N)).sum()),
+                                        ">=10": int((prod_n[held] >= GATE_N).sum())},
+                "close_source_held_out": dict(Counter(m["close"]["source"] for m, h in zip(matches, held) if h)),
+                "by_season": dict(Counter(int(s) for s in st.season))}
+
+    # Registered reachability check: every non-shipped grid value changes >= 1% of FULL matches.
+    reach = {}
+    for fam, (param, grid) in GRIDS.items():
+        for v in grid[1:]:
+            cfg = _cfg(**{param: v})
+            fv = st.feats(cfg, 2026)
+            changed = float((np.abs(fv["r"] - f0["r"]) > 1e-6).any(axis=1).mean())
+            reach[f"{fam}:{_cfg_label(cfg)}"] = changed
+    coverage["reachability_share_changed"] = reach
+    _write_json(root / "stage1_coverage.json", coverage)
+    print(json.dumps(coverage, indent=1), flush=True)
+    if args.coverage_only:
+        return 0
+
+    tests = [S for S in TEST_SEASONS if (st.season == S).any()]
+    probs: dict[str, list] = defaultdict(list)
+    selections: dict[str, dict] = defaultdict(dict)
+    nogate = _cfg(s="none")
+    for S in tests:
+        probs["C*"].append(st.season_fit(ship, S)[1])
+        probs["C_nogate"].append(st.season_fit(nogate, S)[1])
+        probs["N"].append(st.season_fit(ship, S, k_fixed=0.0)[1])
+        # Every grid point (descriptive) and each family's walk-forward selection (the verdict arm).
+        for fam, (param, grid) in GRIDS.items():
+            best = None
+            for v in grid:
+                cfg = _cfg(**{param: v})
+                ll_tr, p = st.season_fit(cfg, S)
+                if v != grid[0]:
+                    probs[f"{fam}:{_cfg_label(cfg)}"].append(p)
+                if best is None or ll_tr < best[0] - 1e-12:
+                    best = (ll_tr, v, p)
+            probs[f"{fam}*"].append(best[2])
+            selections[fam][S] = best[1]
+        # Cumulative, fixed order W -> R -> B -> S -> P.
+        cur = dict(SHIPPED)
+        for fam in ORDER:
+            param, grid = GRIDS[fam]
+            best = None
+            for v in grid:
+                cand = tuple((k, v if k == param else cur[k]) for k, _ in SHIPPED)
+                ll_tr, p = st.season_fit(cand, S)
+                if best is None or ll_tr < best[0] - 1e-12:
+                    best = (ll_tr, v, p)
+            cur[param] = best[1]
+        cum = tuple((k, cur[k]) for k, _ in SHIPPED)
+        probs["CUM"].append(st.season_fit(cum, S)[1])
+        selections["CUM"][S] = _cfg_label(cum)
+        print(f"[stage1] test {S}: n={(st.season == S).sum()} " + " ".join(f"{f}={selections[f][S]}" for f in ORDER)
+              + f" CUM={selections['CUM'][S]}", flush=True)
+
+    probs = {a: np.concatenate(v) for a, v in probs.items()}
+    test_matches = [m for S in tests for m, s in zip(matches, st.season) if s == S]
+    order_idx = np.concatenate([np.where(st.season == S)[0] for S in tests])
+    y = st.y[order_idx]
+    close = np.array([m["close"]["p"] for m in test_matches])
+    lg_arr = np.array([m["league"] for m in test_matches])
+    s_arr = st.season[order_idx]
+    core_t = core[order_idx]
+    masks = {"CORE": core_t, "PROMOTED": ~core_t, "big5": np.isin(lg_arr, BIG5), "goals": np.isin(lg_arr, GOALS),
+             **{f"league:{lg}": lg_arr == lg for lg in LEAGUES}, **{f"season:{S}": s_arr == S for S in tests}}
+    result = {"coverage": coverage, "selections": {f: {int(k): v for k, v in d.items()} for f, d in selections.items()},
+              "k_by_season": {f"{_cfg_label(cfg)}|{S}|{kf}": v[2] for (cfg, S, kf), v in st._fit.items()},
+              **_metrics(probs, y, close, masks)}
+    _write_json(root / "stage1_report.json", result)
+    for a in sorted(probs):
+        vc = result["vs_close"][a]["logloss"]
+        line = f"[stage1] {a:28s} LL {result['mean_logloss'][a]:.4f} vs close {vc['mean']:+.4f}"
+        if a in result["vs_Cstar"]:
+            s = result["vs_Cstar"][a]["logloss"]
+            line += f" vs C* {s['mean']:+.4f} [{s['ci'][0]:+.4f},{s['ci'][1]:+.4f}] {result['vs_Cstar'][a]['rule_verdict']}"
+        line += f" top-dec {result['favourites']['top_decile'][a]:.3f} sd {result['spread_sd_home_minus_away'][a]:.3f}"
+        print(line, flush=True)
+    print(f"[stage1] close LL {result['mean_logloss']['close']:.4f}; top-dec actual "
+          f"{result['favourites']['top_decile']['actual']:.3f} close {result['favourites']['top_decile']['close']:.3f}", flush=True)
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -597,8 +997,11 @@ def main() -> int:
     e = sub.add_parser("engine")
     e.add_argument("--root", required=True)
     e.add_argument("--dumps", default="C:/tmp/soccer-lpb")
+    s1 = sub.add_parser("stage1")
+    s1.add_argument("--root", required=True)
+    s1.add_argument("--coverage-only", action="store_true")
     args = parser.parse_args()
-    return {"audit": cmd_audit, "run": cmd_run, "engine": cmd_engine}[args.cmd](args)
+    return {"audit": cmd_audit, "run": cmd_run, "engine": cmd_engine, "stage1": cmd_stage1}[args.cmd](args)
 
 
 if __name__ == "__main__":
