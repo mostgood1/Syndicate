@@ -790,6 +790,69 @@ def result_for(price: Any, graded: Mapping[str, Any] | None) -> dict[str, Any] |
     return out
 
 
+def sgp_results(tickets: Sequence[Mapping[str, Any]], reconciled: Mapping[str, Any] | None) -> list[dict[str, Any]]:
+    """WON / LOST / VOID / PENDING for each same-game parlay, with each leg's result and actual -- the paper ledger's
+    rule (scripts/grade_sgp_paper.py imports this), so the reconciled page and the ledger can never disagree (user
+    2026-10-17: "why arent SGPs reconciled for NHL on the live site" -- the grader wrote `sgp_graded.jsonl` and the page
+    never read it). A ticket LOSES when any leg loses, is VOID when a leg is void or pushes (books' SGP void rules
+    vary, so a void is never counted either way), WINS when every leg wins, and is PENDING otherwise."""
+    props = (reconciled or {}).get("props") or {}
+    void = (reconciled or {}).get("void") or {}
+    # The player's ACTUAL stat from any graded line of the same player x market: an alt-rung leg ("OVER 30.5 saves")
+    # is usually not a line the sheet itself graded. Measured 10-16: 11 of 13 NHL parlays sat "pending" for that alone.
+    actual: dict[tuple[str, str], float] = {}
+    voided: set[tuple[str, str]] = set()
+    for key, val in props.items():
+        parts = str(key).split("|")
+        if len(parts) == 4 and isinstance(val, Mapping) and val.get("v") is not None:
+            actual[(parts[0], parts[1])] = float(val["v"])
+    for key in void:
+        parts = str(key).split("|")
+        if len(parts) == 4:
+            voided.add((parts[0], parts[1]))
+    out = []
+    for ticket in tickets:
+        legs, results = [], []
+        for leg in ticket.get("legs") or []:
+            key = prop_result_key(leg)
+            parts = key.split("|")
+            pm = (parts[0], parts[1]) if len(parts) == 4 else None
+            value = (props.get(key) or {}).get("v")
+            if key in void or (pm in voided and pm not in actual):
+                res = "void"
+            elif key in props and props[key].get("y") is not None:
+                res = "won" if float(props[key]["y"]) >= 1 else "lost"
+            elif pm in actual:
+                value = actual[pm]
+                try:
+                    line = float(leg.get("line"))
+                except (TypeError, ValueError):
+                    line = None
+                side = str(leg.get("side") or "").lower()
+                if line is None and side == "yes":                 # Anytime TD: a yes leg wins on any TD
+                    res = "won" if value > 0 else "lost"
+                elif line is None or value == line:
+                    res = "void"                                   # a push is graded like a void: never won or lost
+                elif side in ("over", "yes"):
+                    res = "won" if value > line else "lost"
+                else:
+                    res = "won" if value < line else "lost"
+            else:
+                res = "pending"
+            legs.append({"bet": leg.get("bet"), "key": key, "result": res, "actual": value})
+            results.append(res)
+        if "lost" in results:
+            status = "lost"
+        elif "void" in results:
+            status = "void"
+        elif results and all(r == "won" for r in results):
+            status = "won"
+        else:
+            status = "pending"
+        out.append({"status": status, "legs": legs})
+    return out
+
+
 # --------------------------------------------------------------------------------------------------------------------
 # Syndicate picks: the Layer 2 board's SUGGESTED opps, promoted on the sheet (user 2026-10-15: "there are 7 suggested
 # opps on the main layer2 board these need to translate somehow into the cheatsheet section - potentially as picks to
@@ -1576,6 +1639,11 @@ def page_payload(sheets: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any
                 if p["result"] is None and pick_result_key(p) in pick_void:
                     p["result_note"] = void_label(pick_void[pick_result_key(p)])
         doc["picks"] = picks
+        if rec is not None and sheet.get("sgp"):         # the parlays graded from this day's results (2026-10-17)
+            tickets = [dict(s) for s in sheet["sgp"]]
+            for s, res in zip(tickets, sgp_results(tickets, rec)):
+                s["result"] = res
+            doc["sgp"] = tickets
         # The consistency ladder carries the row's face fields for its player cell: college keeps logos only, here too.
         doc["ladders"] = [dict(lad) if faces else brand_kit.without_faces(lad) for lad in sheet.get("ladders") or []]
         lines_by_game: dict[Any, list[int]] = {}
