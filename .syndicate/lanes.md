@@ -1054,6 +1054,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### basketball-sgp-builder — OPEN — opened 2026-10-17 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
+- **STATUS 2026-10-17 19:15Z (2:15 PM CT):** WNBA tiers served before the ATL @ GSV tip (3 parlays, real-line market cells); NBA cells published for the 10-20 opener; MLB pool + cells live (served tiers owed after tonight's alt capture). Studies: `findings_2026-10-17_{basketball,mlb}_sgp_correlations.md`. Owed: first grades per sport/tier; the shrink-toward-market fix (all sports, OOS first).
 - Goal: WNBA and NBA same-game parlays built for hit rate the NHL way: a basketball correlation study (box scores, roles by minutes, OOS-validated, cells keyed PTS/REB/AST/FG3M/PRA/PR/PA/RA), alt-line capture for WNBA, a leg pool where market + last 10 + sim agree, two tiers, legs graded from the game log; live on the WNBA sheet and ready for the NBA opener 10-20
 - Files: scripts/build_basketball_sgp_correlations.py, tests/test_basketball_sgp_correlations.py, syndicate/features/shared/basketball_sgp_pool.py, tests/test_basketball_sgp_pool.py, scripts/fetch_alt_ladders.py, tests/test_fetch_alt_ladders.py, syndicate/features/shared/alt_consistency.py, syndicate/features/shared/sgp_hit_rate.py, syndicate/features/shared/mlb_sgp_pool.py, tests/test_mlb_sgp_pool.py, scripts/build_mlb_sgp_correlations.py, tests/test_mlb_sgp_correlations.py
 - Hypothesis: n/a
