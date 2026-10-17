@@ -305,7 +305,7 @@ def write_record(sheets_dir: Path, *, now: datetime) -> dict[str, Any]:
             sheet = json.loads(rec_path.with_name(f"{day}.json").read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
-        days.append(csr.day_record(sheet, reconciled))
+        days.append(csr.day_record(sheet, reconciled, cs.load_posted(sheets_dir, rec_path.parent.name, day)))
     record = csr.season_record(days, generated_at=now.isoformat(timespec="seconds"))
     write_atomic(sheets_dir / "record.json", record)
     official = record["official"]["totals"].get(csr.ALL) or {}
@@ -385,6 +385,8 @@ def main(argv: list[str] | None = None) -> int:
                 doc = json.loads(path.read_text(encoding="utf-8"))
             except (OSError, ValueError):
                 continue
+            # A row that went out on an exported graphic is graded even if no build after the post kept it.
+            doc = cs.with_posted(doc, cs.load_posted(sheets_dir, sport, day))
             if doc.get("rows") or doc.get("game_lines"):
                 sheets.append((path, doc))
         if not sheets:

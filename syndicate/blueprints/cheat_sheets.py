@@ -12,6 +12,7 @@ names what is missing, or an empty page, never an on-request rebuild. Images are
     /api/cheatsheets                      which sports and dates exist
     /api/cheatsheets/<sport>/<date>       one sheet as written
     POST /api/cheatsheets/cards           a pick graphic was exported: append it to the graded play-card ledger
+    POST /api/cheatsheets/posted          a section graphic was exported: record its rows as posted (they stay featured)
 
 A day's sheet is a record: games that started keep the rows the last build gave them (the generator merges).
 """
@@ -19,7 +20,9 @@ A day's sheet is a record: games that started keep the rows the last build gave 
 from __future__ import annotations
 
 import json
+import os
 import re
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -35,6 +38,11 @@ cheat_sheets_bp = Blueprint("cheat_sheets", __name__)
 _DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _SPORT = re.compile(r"^[a-z]{2,8}$")
 _CARD = re.compile(r"^(?:[0-9a-f]{12}|l2_[0-9a-f]{8,40})$")   # a row's card id, or a Syndicate pick's board pick_id
+_ROW_ID = re.compile(r"^[0-9a-f]{12}$")
+_SECTION = re.compile(r"^[a-z_]{1,24}$")
+# Sections whose items are already a record (picks, parlays) or are not bets (the slate, scripts, news, the ladder).
+_NOT_POSTED = frozenset({"picks", "sgp", "ladder", "slate", "script", "news", "record", "record_chart", "record_days",
+                         "record_totals"})
 TEMPLATE = Path(__file__).resolve().parents[1] / "templates" / "cheat_sheets.html"
 LOGO_SRC = "/static/brand/syndicate_roi_badge.webp"
 
@@ -80,6 +88,9 @@ def _read(sport: str, day: str) -> dict[str, Any] | None:
             doc["reconciled"] = rec
     except (OSError, ValueError):
         pass
+    posted = cs.load_posted(_sheet_dir(), sport, day)    # exported graphics: `cs.page_payload` pins their rows
+    if posted:
+        doc["posted"] = posted
     return doc
 
 
@@ -233,6 +244,50 @@ def cheat_sheet_card(sport: str, day: str, card: str):
     toolbar = _CARD_TOOLBAR.replace("__SPORT__", sport).replace("__DAY__", day).replace("__CARD__", card) \
         .replace("__BACK__", back).replace("__FILE__", f"syndicate-{sport}-{day}-pick-{number}.png")
     return Response(html.replace("</body>", toolbar + "</body>", 1), mimetype="text/html")
+
+
+@cheat_sheets_bp.post("/api/cheatsheets/posted")
+def cheat_sheet_posted():
+    """A section graphic was exported (user 2026-10-17: "Trying to promote these on twitter and the changes dont help
+    for reconciling"): its rows and game lines are recorded as POSTED in `<sport>/<date>.posted.json`, re-derived from
+    the sheet by card id (never the client), with the price and book the sheet showed. From then on every build keeps
+    them, they lead their section, and the record grades them at that price."""
+    body = request.get_json(silent=True) or {}
+    sport, day, section = str(body.get("sport") or ""), str(body.get("date") or ""), str(body.get("section") or "")
+    if not _SPORT.match(sport) or not _DAY.match(day) or not _SECTION.match(section) or section in _NOT_POSTED:
+        return jsonify({"ok": False, "error": "bad request"}), 400
+    doc = _read(sport, day)
+    if doc is None:
+        return jsonify({"ok": False, "error": "no sheet for that sport and day"}), 404
+    wanted = {"rows": [str(x) for x in body.get("card_ids") or [] if _ROW_ID.match(str(x))][:60],
+              "lines": [str(x) for x in body.get("line_ids") or [] if _ROW_ID.match(str(x))][:60]}
+    post: dict[str, Any] = {"section": section, "game": str(body.get("game") or "") or None,
+                            "posted_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                            "sheet_generated_at": doc.get("generated_at"), "rows": [], "lines": []}
+    for kind, field in (("rows", "rows"), ("lines", "game_lines")):
+        by_id: dict[str, dict[str, Any]] = {}
+        for item in doc.get(field) or []:
+            by_id.setdefault(pc.card_id(sport, day, item), item)
+        for cid in dict.fromkeys(wanted[kind]):
+            item = by_id.get(cid)
+            if item is None:
+                continue
+            check = item.get("check") or {}
+            post[kind].append({"card_id": cid, "price": check.get("price"), "book": check.get("book"),
+                               "item": {k: v for k, v in item.items() if k not in ("book_prices", "evidence_error")}})
+    missing = len(set(wanted["rows"])) + len(set(wanted["lines"])) - len(post["rows"]) - len(post["lines"])
+    if not post["rows"] and not post["lines"]:
+        return jsonify({"ok": False, "error": "none of those rows are on the sheet now -- reload and export again",
+                        "missing": missing}), 404
+    path = _sheet_dir() / sport / f"{day}{cs.POSTED_SUFFIX}"
+    current = cs.load_posted(_sheet_dir(), sport, day) or {"sport": sport, "date": day, "posts": []}
+    current["posts"] = list(current.get("posts") or []) + [post]
+    fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=path.name, suffix=".tmp")
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        json.dump(current, fh, ensure_ascii=False)
+    os.replace(tmp, path)
+    return jsonify({"ok": True, "rows": len(post["rows"]), "lines": len(post["lines"]), "missing": missing,
+                    "posted_at": post["posted_at"]}), 200
 
 
 @cheat_sheets_bp.post("/api/cheatsheets/cards")

@@ -1166,6 +1166,13 @@ def main_build(args: Any, data_root: Path) -> int:
                             context=context, positions=positions,
                             pvp_cache=data_root / "cheatsheets" / f".{sport}_cache" / selected)
         sheet = merge_with_record(sheet, prior, now=datetime.now(timezone.utc))
+        posted = cs.load_posted(data_root / "cheatsheets", sport, selected)
+        if posted:                               # rows that went out on a graphic stay on the sheet (2026-10-17)
+            sheet = cs.with_posted(sheet, posted, prior=prior)
+            if sheet.get("posted_kept"):
+                sheet["sections"] = cs.sections(sheet["rows"])
+                print(f"CHEAT_SHEET {sport} date={selected} posted rows kept {sheet['posted_kept']} (the board read no longer "
+                      f"carries them)", flush=True)
         try:
             sheet["picks"] = merge_picks(build_picks(board_cards, sheet, sport=sport, day=selected, now=datetime.now(timezone.utc)),
                                          prior, rows=sheet.get("rows"), cards=board_cards, day=selected, intervals=intervals)

@@ -497,6 +497,111 @@ def sections(rows: Iterable[Mapping[str, Any]], *, top: int = 25) -> dict[str, l
 EVERY_PROP_CAP = 200
 
 
+# ----------------------------------------------------------------------------- posted graphics
+# User 2026-10-17: "we need to look at why consistency sheets changed for NHL yesterday. Trying to promote these on
+# twitter and the changes dont help for reconciling". Every build, every page view and the record re-derived a section
+# from the rows of that moment, so a row that went out on a graphic could leave its section hours later. NHL 10-16: the
+# consistency graphic at 12:34 PM CT showed LaCombe SOG u1.5 and Karlsson SOG u2.5; the 8:27 PM build's section held
+# LaCombe and four others, Karlsson gone -- a section shows the main line's better-EV side, and that became his over
+# (3/10). An exported section is now recorded beside the sheet (`<sport>/<date>.posted.json`, written by the
+# blueprint) and what it recorded stays: every build keeps those rows, they lead their section on the page and in the
+# reconciled view, and the record grades them at the price the graphic showed.
+POSTED_SUFFIX = ".posted.json"
+# The page's section keys -> the payload's, where the two differ (every other key is the same word).
+POSTED_ROW_SECTIONS = {"matchups": "matchup_spots", "shop": "shop_gaps", "every": "every_prop"}
+POSTED_LINE_SECTIONS = {"lines_value": "value", "lines_shop": "shop", "lines": "all"}
+
+
+def load_posted(sheets_dir: Path | str, sport: str, day: str) -> dict[str, Any] | None:
+    try:
+        doc = json.loads((Path(sheets_dir) / sport / f"{day}{POSTED_SUFFIX}").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return doc if isinstance(doc, dict) and doc.get("sport") == sport and doc.get("date") == day else None
+
+
+def posted_entries(posted: Mapping[str, Any] | None, kind: str) -> list[dict[str, Any]]:
+    """Every posted row (`kind` "rows") or game line ("lines"), earliest post first, once per section: {section (the
+    payload's key), card_id, posted_at, price, book, item (the sheet's copy when it was posted)}."""
+    names = POSTED_ROW_SECTIONS if kind == "rows" else POSTED_LINE_SECTIONS
+    out: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    for post in sorted(((posted or {}).get("posts") or []), key=lambda p: str(p.get("posted_at") or "")):
+        page = str(post.get("section") or "")
+        section = names.get(page, page)
+        for e in post.get(kind) or []:
+            if not (isinstance(e, Mapping) and e.get("card_id") and isinstance(e.get("item"), Mapping)):
+                continue
+            if (section, str(e["card_id"])) in seen:
+                continue
+            seen.add((section, str(e["card_id"])))
+            out.append({"section": section, "card_id": str(e["card_id"]), "posted_at": post.get("posted_at"),
+                        "price": e.get("price"), "book": e.get("book"), "item": dict(e["item"])})
+    return out
+
+
+def posted_first(posted: Mapping[str, Any] | None, kind: str) -> dict[str, dict[str, Any]]:
+    """card_id -> the item's FIRST posting {at, price, book}: the price the record grades it at."""
+    out: dict[str, dict[str, Any]] = {}
+    for e in posted_entries(posted, kind):
+        out.setdefault(e["card_id"], {"at": e["posted_at"], "price": e["price"], "book": e["book"]})
+    return out
+
+
+def with_posted(sheet: Mapping[str, Any], posted: Mapping[str, Any] | None, *,
+                prior: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    """The sheet with every posted row and game line on it. One a later board read lost (its main line moved, its group
+    fell outside the build's cap) comes back as the last copy `prior` had, else as the copy that was posted, marked
+    `posted_kept`; its game comes from `prior` when the sheet has none."""
+    from syndicate.features.shared import play_cards as pc
+
+    sport, day = str(sheet.get("sport")), str(sheet.get("date"))
+    out = dict(sheet)
+    added = 0
+    for kind, field in (("rows", "rows"), ("lines", "game_lines")):
+        entries = posted_entries(posted, kind)
+        if not entries:
+            continue
+        items = list(out.get(field) or [])
+        have = {pc.card_id(sport, day, it) for it in items}
+        last = {pc.card_id(sport, day, it): it for it in (prior or {}).get(field) or []}
+        for e in entries:
+            if e["card_id"] in have:
+                continue
+            have.add(e["card_id"])
+            items.append(dict(last.get(e["card_id"]) or e["item"], posted_kept=True))
+            added += 1
+        out[field] = items
+    if added:
+        events = {str(g.get("event_id")) for g in out.get("games") or []}
+        need = {str(it.get("event_id")) for it in list(out.get("rows") or []) + list(out.get("game_lines") or [])} - events
+        out["games"] = list(out.get("games") or []) + [g for g in (prior or {}).get("games") or []
+                                                       if str(g.get("event_id")) in need]
+        out["posted_kept"] = added
+    return out
+
+
+def pin_posted(secs: Mapping[str, Sequence[int]], cids: Sequence[str], entries: Sequence[Mapping[str, Any]], *,
+               events: Sequence[Any] | None = None, event: Any = None) -> dict[str, list[int]]:
+    """`secs` with each section's posted items leading it, earliest post first, then the section's own order (an item
+    the section would pick anyway is not repeated). `event` (with `events`, each item's event) narrows to one game."""
+    index: dict[str, int] = {}
+    for i, cid in enumerate(cids):
+        index.setdefault(cid, i)
+    out = {k: list(v) for k, v in secs.items()}
+    lead: dict[str, list[int]] = {}
+    for e in entries:
+        i = index.get(e["card_id"])
+        if i is None or (event is not None and str((events or [])[i]) != str(event)):
+            continue
+        ids = lead.setdefault(e["section"], [])
+        if i not in ids:
+            ids.append(i)
+    for key, ids in lead.items():
+        out[key] = ids + [i for i in out.get(key) or [] if i not in ids]
+    return out
+
+
 def matchup_summary(sport: str, matchup: Mapping[str, Any] | None, dvp: Mapping[str, Any] | None) -> dict[str, Any] | None:
     """One shape for every sport's matchup: the opponent, where it ranks at allowing this stat (1 = allows the MOST),
     out of how many, and per game. NFL reads the defense-vs-position table; any evidence layer that reports
@@ -1411,6 +1516,11 @@ def page_payload(sheets: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any
         # result, and the page keeps only the summary (user 2026-10-15: "toggles between pregame sheets and
         # reconciled sheets").
         sheet = dict(sheet, rows=[dict(r) for r in sheet.get("rows") or []], games=[dict(g) for g in sheet.get("games") or []])
+        posted = sheet.pop("posted", None)
+        posted = posted if isinstance(posted, Mapping) else None
+        if posted:
+            sheet = with_posted(sheet, posted)
+        posted_rows, posted_lines = posted_first(posted, "rows"), posted_first(posted, "lines")
         fill_teams(sheet)                     # every row says whose player it is (user 2026-10-16)
         if sheet.get("news") and not any(n.get("event_id") for n in sheet["news"]):
             sheet["news"] = [dict(n) for n in sheet["news"]]
@@ -1424,8 +1534,12 @@ def page_payload(sheets: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any
             row = {k: v for k, v in r.items() if k not in _ROW_DROP and (faces or k not in brand_kit.FACE_FIELDS)}
             row["card_id"] = pc.card_id(sport, day, r)
             row["card_ok"] = pc.eligible(r)
+            first = posted_rows.get(row["card_id"])
+            if first:
+                row["posted"] = first
             if rec is not None:
-                row["result"] = result_for((r.get("check") or {}).get("price"), graded_props.get(prop_result_key(r)))
+                price = first["price"] if first and first.get("price") is not None else (r.get("check") or {}).get("price")
+                row["result"] = result_for(price, graded_props.get(prop_result_key(r)))
                 why = (rec.get("void") or {}).get(prop_result_key(r))
                 if row["result"] is None and why:
                     row["result_note"] = void_label(why)
@@ -1435,15 +1549,24 @@ def page_payload(sheets: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any
             by_game.setdefault(r.get("event_id"), []).append(i)
         doc = dict(sheet)
         doc["rows"] = rows
-        doc["sections"] = sections(rows)
+        row_ids = [r["card_id"] for r in rows]
+        row_entries = posted_entries(posted, "rows")
+        doc["sections"] = pin_posted(sections(rows), row_ids, row_entries)
+        if posted:
+            doc["posted"] = {"posts": len(posted.get("posts") or []), "rows": len(posted_rows), "lines": len(posted_lines)}
         finals = (rec or {}).get("scores") or {}
         doc["games"] = [dict(g, props=len(by_game.get(g.get("event_id"), [])),
                              **({"final": finals[str(g.get("event_id"))]} if str(g.get("event_id")) in finals else {}))
                         for g in sheet.get("games") or []]
-        lines = list(sheet.get("game_lines") or [])
+        lines = [dict(line, card_id=pc.card_id(sport, day, line)) for line in sheet.get("game_lines") or []]
+        for line in lines:
+            if line["card_id"] in posted_lines:
+                line["posted"] = posted_lines[line["card_id"]]
         if rec is not None:
-            lines = [dict(line, result=result_for((line.get("check") or {}).get("price"), graded_lines.get(line_result_key(line))))
-                     for line in lines]
+            for line in lines:
+                first = line.get("posted")
+                price = first["price"] if first and first.get("price") is not None else (line.get("check") or {}).get("price")
+                line["result"] = result_for(price, graded_lines.get(line_result_key(line)))
             doc["reconciled"] = {k: rec.get(k) for k in ("reconciled_at", "source", "counts")}
         picks = [dict(p) if faces else brand_kit.without_faces(p) for p in sheet.get("picks") or []]
         if rec is not None:
@@ -1459,12 +1582,16 @@ def page_payload(sheets: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any
         for i, line in enumerate(lines):
             lines_by_game.setdefault(line.get("event_id"), []).append(i)
         doc["game_lines"] = lines
-        doc["game_line_sections"] = game_line_sections(lines)
+        line_ids, line_entries = [line["card_id"] for line in lines], posted_entries(posted, "lines")
+        line_events, row_events = [line.get("event_id") for line in lines], [r.get("event_id") for r in rows]
+        doc["game_line_sections"] = pin_posted(game_line_sections(lines), line_ids, line_entries)
         doc["game_line_sections_by_game"] = {
-            str(event): {k: [idx[j] for j in ids] for k, ids in game_line_sections([lines[i] for i in idx]).items()}
+            str(event): pin_posted({k: [idx[j] for j in ids] for k, ids in game_line_sections([lines[i] for i in idx]).items()},
+                                   line_ids, line_entries, events=line_events, event=event)
             for event, idx in lines_by_game.items()}
         doc["game_sections"] = {
-            str(event): {k: [idx[j] for j in ids] for k, ids in sections([rows[i] for i in idx]).items()}
+            str(event): pin_posted({k: [idx[j] for j in ids] for k, ids in sections([rows[i] for i in idx]).items()},
+                                   row_ids, row_entries, events=row_events, event=event)
             for event, idx in by_game.items()}
         out[sport] = doc
     return out

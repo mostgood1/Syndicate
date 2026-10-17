@@ -70,17 +70,34 @@ def finish(t: Mapping[str, Any]) -> dict[str, Any]:
             "win_pct": round(100 * w / n, 1) if n else None, "roi_pct": round(100 * units / n, 1) if n else None}
 
 
-def day_record(sheet: Mapping[str, Any], reconciled: Mapping[str, Any]) -> dict[str, Any]:
-    """One sport's day: a tally per featured section, and all featured picks counted once."""
+def day_record(sheet: Mapping[str, Any], reconciled: Mapping[str, Any],
+               posted: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    """One sport's day: a tally per featured section, and all featured picks counted once. A row or game line that went
+    out on an exported graphic (`posted`, user 2026-10-17) counts in its section whatever later builds made of the
+    section, graded at the price the graphic showed."""
+    from syndicate.features.shared import play_cards as pc
+
+    if posted:
+        sheet = cs.with_posted(sheet, posted)
+    sport, day_key = str(sheet.get("sport")), str(sheet.get("date"))
     rows = list(sheet.get("rows") or [])
     lines = list(sheet.get("game_lines") or [])
+    row_ids = [pc.card_id(sport, day_key, r) for r in rows]
+    line_ids = [pc.card_id(sport, day_key, g) for g in lines]
+    first_row, first_line = cs.posted_first(posted, "rows"), cs.posted_first(posted, "lines")
+
+    def price(item: Mapping[str, Any], first: Mapping[str, Any] | None) -> Any:
+        return first["price"] if first and first.get("price") is not None else (item.get("check") or {}).get("price")
+
     props, line_results = reconciled.get("props") or {}, reconciled.get("lines") or {}
-    row_result = [cs.result_for((r.get("check") or {}).get("price"), props.get(cs.prop_result_key(r))) for r in rows]
-    line_result = [cs.result_for((g.get("check") or {}).get("price"), line_results.get(cs.line_result_key(g))) for g in lines]
+    row_result = [cs.result_for(price(r, first_row.get(cid)), props.get(cs.prop_result_key(r))) for r, cid in zip(rows, row_ids)]
+    line_result = [cs.result_for(price(g, first_line.get(cid)), line_results.get(cs.line_result_key(g)))
+                   for g, cid in zip(lines, line_ids)]
     picks = list(sheet.get("picks") or [])
     pick_results = reconciled.get("picks") or {}
     pick_result = [cs.result_for(pk.get("price"), pick_results.get(cs.pick_result_key(pk))) for pk in picks]
-    secs = cs.sections(rows)
+    secs = cs.pin_posted(cs.sections(rows), row_ids, cs.posted_entries(posted, "rows"))
+    line_secs = cs.pin_posted(cs.game_line_sections(lines), line_ids, cs.posted_entries(posted, "lines")) if lines else {}
     tallies: dict[str, dict[str, float]] = {}
     # Every featured bet ONCE, keyed the grader's way: a Syndicate pick that is also a value row is one bet.
     featured: dict[str, Mapping[str, Any] | None] = {}
@@ -91,7 +108,7 @@ def day_record(sheet: Mapping[str, Any], reconciled: Mapping[str, Any]) -> dict[
             results = [pick_result[i] for i in ids]
             featured.update({cs.pick_result_key(picks[i]): pick_result[i] for i in ids})
         elif key == "lines_value":
-            ids = cs.game_line_sections(lines)["value"] if lines else []
+            ids = line_secs.get("value") or []
             results = [line_result[i] for i in ids]
             featured.update({cs.pick_result_key(lines[i]): line_result[i] for i in ids})
         else:

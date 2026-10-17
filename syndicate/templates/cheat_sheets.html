@@ -134,6 +134,7 @@ td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .sheet header .btn { margin-left: auto; }
 .line1 .btn { padding: 4px 8px; font-size: 11.5px; color: var(--accent); border-color: color-mix(in srgb, var(--green) 45%, transparent); }
 .chip.started { color: var(--amber); background: color-mix(in srgb, var(--amber) 13%, transparent); }
+.chip.posted { color: var(--accent2); background: color-mix(in srgb, var(--accent2) 14%, transparent); margin-left: 6px; }
 .chip.beta { color: var(--bg0); background: var(--accent2); vertical-align: 4px; }
 .chip.one_sided_fair { color: var(--viz-model); background: color-mix(in srgb, var(--viz-model) 14%, transparent); }
 .chip.suspect_price { color: var(--viz-price); background: color-mix(in srgb, var(--red) 14%, transparent); }
@@ -327,6 +328,8 @@ function formDots(r) {
   }).join("");
 }
 const ordinal = n => n + (["th", "st", "nd", "rd"][((n % 100) - 20) % 10] || ["th", "st", "nd", "rd"][n % 100] || "th");
+// A row that went out on an exported graphic (user 2026-10-17): it stays in its section, graded at the posted price.
+const postedChip = r => r.posted ? `<span class="chip posted no-export" title="On a graphic exported at ${esc(ctTime(r.posted.at))}: ${esc(odds(r.posted.price))} ${esc(r.posted.book || "")}">Posted ${esc(ctTime(r.posted.at))}</span>` : "";
 function propRow(r, i) {
   const c = r.check, dvp = r.dvp ? ` · opp allows the ${ordinal(r.dvp.nth_most)} most ${esc(String(r.dvp.stat).replace("_", " "))} to ${esc(r.pos)}` : "";
   const ev = c.verdict === "one_sided_fair" ? null : c.ev_market;     // price vs fair -- never the streak-adjusted number
@@ -335,7 +338,7 @@ function propRow(r, i) {
   const live = started(r.commence_time) ? `<span class="chip started">Started</span>` : "";
   return `<div class="prop"${i != null ? ` data-ri="${i}"` : ""}>
     <div class="who">${face(r)}
-      <div class="line1">${verdictChip(c)}${live}<b>${esc(r.player)}</b>${r.pos ? `<span class="pos">${esc(r.pos)}</span>` : ""}${card}</div>
+      <div class="line1">${verdictChip(c)}${live}<b>${esc(r.player)}</b>${r.pos ? `<span class="pos">${esc(r.pos)}</span>` : ""}${postedChip(r)}${card}</div>
       <div class="meta">${clubLine(r)}${r.kickoff_ct ? ` · <span class="kick">${esc(r.kickoff_ct)}</span>` : ""}${dvp}${r.injury ? " · " + esc(r.injury) : ""}</div>
       <div class="bet">${esc(betText(r))} · ${odds(c.price)} ${esc(c.book || "")}</div></div>
     <div>${strip(c)}<div class="nums"><span>price <b>${pct(implied(c.price))}</b></span><span>fair <b>${pct(c.p_market)}</b></span><span>model <b>${pct(c.p_model)}</b></span><span>form-adj <b>${pct(c.p_posterior)}</b></span></div></div>
@@ -585,7 +588,7 @@ function clubLine(r) {
 function playerCell(r, withPos) {
   const team = r.team_name || r.team;
   const clubs = [team ? `<b>${esc(team)}</b>` : "", r.opponent ? `vs ${esc(r.opponent)}` : "", r.league ? esc(r.league) : ""].filter(Boolean).join(" · ");
-  return `<span class="ep">${miniFace(r)}<span class="pn"><span>${esc(r.player)}${withPos && r.pos ? ` <span class="pos">${esc(r.pos)}</span>` : ""}</span>${clubs ? `<span class="clubs">${clubs}</span>` : ""}</span></span>`;
+  return `<span class="ep">${miniFace(r)}<span class="pn"><span>${esc(r.player)}${withPos && r.pos ? ` <span class="pos">${esc(r.pos)}</span>` : ""}${postedChip(r)}</span>${clubs ? `<span class="clubs">${clubs}</span>` : ""}</span></span>`;
 }
 const matchupLine = g => `${img(src(g.away_logo_src, g.away_logo))}${esc(g.away_team || "")} @ ${img(src(g.home_logo_src, g.home_logo))}${esc(g.home_team || g.matchup || "")}`;
 function gamesBlock(d, games) {
@@ -944,11 +947,28 @@ function recountExport(sec, d) {
     if (chip) chip.outerHTML = recChip(recordOf(items.map(x => x.res)));
   }
 }
+// An exported section is recorded as POSTED (user 2026-10-17: "Trying to promote these on twitter and the changes dont
+// help for reconciling"): the rows in the image -- the frame's own, after the export trims it -- go to the server, which
+// re-reads them from the sheet by card id. Later builds keep them, they lead the section, and the record grades them
+// at the price the image showed. A results graphic (reconciled view, season record) is not a post.
+const UNPOSTED = new Set(["picks", "sgp", "ladder", "slate", "script", "news", "record"]);
+async function recordPosted(frame, key) {
+  const d = DATA[STATE.sport];
+  if (META.page === "record" || !d || reconciledView(d) || UNPOSTED.has(key)) return null;
+  const rows = new Set(), lines = new Set();
+  frame.querySelectorAll("[data-ri]").forEach(el => { const r = (d.rows || [])[+el.dataset.ri]; if (r && r.card_id) rows.add(r.card_id); });
+  frame.querySelectorAll("[data-li]").forEach(el => { const g = (d.game_lines || [])[+el.dataset.li]; if (g && g.card_id) lines.add(g.card_id); });
+  if (!rows.size && !lines.size) return null;
+  const res = await fetch("/api/cheatsheets/posted", {method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({sport: STATE.sport, date: META.date || d.date, section: key, game: STATE.game || null,
+                          card_ids: [...rows], line_ids: [...lines]})});
+  return res.json();
+}
 async function exportSection(btn) {
   const section = btn.closest("section.sheet");
   const label = btn.textContent;
   btn.textContent = "Rendering…"; btn.disabled = true;
-  let frame = null;
+  let frame = null, posted = null;
   try {
     await loadH2I();
     frame = await buildExport(section);
@@ -961,11 +981,17 @@ async function exportSection(btn) {
       : `syndicate-${STATE.sport}-${META.date || DATA[STATE.sport].date}${STATE.game ? "-game" : ""}-${section.dataset.section}.png`;
     document.body.appendChild(a); a.click(); a.remove();
     window.__lastExport = url;
+    posted = await recordPosted(frame, section.dataset.section).catch(() => ({ok: false}));
   } catch (e) {
     alert("Export failed: " + e.message);
   } finally {
     if (frame) frame.remove();
     btn.textContent = label; btn.disabled = false;
+  }
+  if (posted) {
+    btn.textContent = posted.ok ? (posted.missing ? `Recorded ${posted.rows + posted.lines} -- ${posted.missing} changed, reload` : "Recorded as posted")
+      : "Not recorded -- reload and export again";
+    setTimeout(() => { btn.textContent = label; }, 4000);
   }
 }
 
