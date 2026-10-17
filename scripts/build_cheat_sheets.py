@@ -874,10 +874,12 @@ def attach_sgp(sheet: dict[str, Any], prior: dict[str, Any] | None, data_root: P
     probability and fair odds first, the assumed-discount estimate second; every one to the sport's paper ledger. NHL
     legs come from the consistency ladder's rungs, so `attach_ladders` runs first. A failure leaves the sheet without
     the section -- never a failed sheet."""
+    from syndicate.features.nfl import sgp as sgp_core   # the shared pricing, record and ledger helpers
+
     if sport == "nhl":
         from syndicate.features.nhl import sgp
     else:
-        from syndicate.features.nfl import sgp
+        sgp = sgp_core
 
     try:
         cells = sgp.load_cells(data_root)
@@ -892,9 +894,7 @@ def attach_sgp(sheet: dict[str, Any], prior: dict[str, Any] | None, data_root: P
                    if (_parse_ts(g.get("commence_time")) or now) <= now}
         # A started game's parlays are the record from before it started: never re-suggested, never re-ledgered.
         fresh = [s for s in sgp.suggest(sheet, cells, roles) if str(s.get("event_id")) not in started]
-        sheet["sgp"] = sgp.merge_record(fresh, (prior or {}).get("sgp"), started=started)
-        from syndicate.features.nfl import sgp as sgp_core
-
+        sheet["sgp"] = sgp_core.merge_record(fresh, (prior or {}).get("sgp"), started=started)
         new = sgp_core.append_ledger(data_root / "cheatsheets" / sport / "sgp_ledger.jsonl",
                                      sgp_core.ledger_records(fresh, day=day, generated_at=now.isoformat(timespec="seconds")))
         print(f"CHEAT_SHEET {sport} sgp {len(sheet['sgp'])} (fresh {len(fresh)}, new to the ledger {new}, roles {len(roles)})",

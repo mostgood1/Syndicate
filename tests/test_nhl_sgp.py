@@ -76,3 +76,29 @@ def test_a_goal_and_a_point_by_the_same_player_never_pair():
     sheet = _sheet([_ladder("Nathan MacKinnon", "GOALS", [(0.5, 0.4, {"dk": 150})]),
                     _ladder("Nathan MacKinnon", "POINTS", [(0.5, 0.7, {"dk": -230})])])
     assert sgp.suggest(sheet, cells, ROLES) == []
+
+
+def test_reachability_the_sheet_build_attaches_nhl_parlays_and_ledgers_them(tmp_path):
+    # The first fleet run failed with `module ... nhl.sgp has no attribute merge_record` (the record helpers live in the
+    # shared NFL module): the sheet built, the section was silently absent. Run the real attach step end to end.
+    import importlib.util
+    import json
+    from pathlib import Path
+
+    spec = importlib.util.spec_from_file_location(
+        "build_cheat_sheets", Path(__file__).resolve().parents[1] / "scripts" / "build_cheat_sheets.py")
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    (tmp_path / "nhl_source" / "sgp").mkdir(parents=True)
+    (tmp_path / "nhl_source" / "sgp" / "nhl_sgp_correlations.json").write_text(json.dumps(CELLS), encoding="utf-8")
+    proc = tmp_path / "nhl_source" / "data" / "processed"
+    proc.mkdir(parents=True)
+    (proc / "lineups_2099-01-01.csv").write_text(
+        "player_id,full_name,position,line_slot,proj_toi,team\n1,Nazem Kadri,C,L1,18,Colorado Avalanche\n"
+        "2,Nathan MacKinnon,C,L1,21,Colorado Avalanche\n", encoding="utf-8")
+    sheet = _sheet([_ladder("Nazem Kadri", "POINTS", [(0.5, 0.55, {"dk": -110})]),
+                    _ladder("Nathan MacKinnon", "POINTS", [(0.5, 0.65, {"dk": -170})])])
+    sheet["games"][0]["commence_time"] = "2099-01-01T23:00:00Z"
+    m.attach_sgp(sheet, None, tmp_path, "2099-01-01", "nhl")
+    assert len(sheet["sgp"]) == 1 and sheet["sgp_basis"].startswith("two seasons of NHL")
+    assert len((tmp_path / "cheatsheets" / "nhl" / "sgp_ledger.jsonl").read_text(encoding="utf-8").splitlines()) == 1
