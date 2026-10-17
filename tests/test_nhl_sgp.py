@@ -102,3 +102,52 @@ def test_reachability_the_sheet_build_attaches_nhl_parlays_and_ledgers_them(tmp_
     m.attach_sgp(sheet, None, tmp_path, "2099-01-01", "nhl")
     assert len(sheet["sgp"]) == 1 and sheet["sgp_basis"].startswith("two seasons of NHL")
     assert len((tmp_path / "cheatsheets" / "nhl" / "sgp_ledger.jsonl").read_text(encoding="utf-8").splitlines()) == 1
+
+
+# ------------------------------------------------------------------------------- 3- and 4-leg tickets (user 2026-10-16)
+def test_the_orthant_matches_scipy_for_three_and_four_legs():
+    import numpy as np
+    from scipy.stats import multivariate_normal
+
+    from syndicate.features.nfl import sgp as core
+
+    rng = np.random.default_rng(5)
+    for k in (3, 4):
+        A = rng.normal(size=(k, k))
+        S = A @ A.T + k * np.eye(k)
+        d = np.sqrt(np.diag(S))
+        R = S / np.outer(d, d)
+        b = rng.normal(scale=0.7, size=k)
+        got = core.orthant_all(b[None, :], R[None, :, :])[0]
+        assert got == pytest.approx(multivariate_normal(mean=np.zeros(k), cov=R).cdf(b), abs=2e-4)
+    bad = np.array([[[1, .9, -.9], [.9, 1, .9], [-.9, .9, 1]]])        # pairwise rhos that cannot coexist
+    assert np.isnan(core.orthant_all(np.zeros((1, 3)), bad)[0])
+
+
+MULTI_CELLS = {"cells": {"type": {"POINTS|L1~POINTS|L1~teammate": {"rho": 0.35},
+                                  "POINTS|L1~SOG|L1~same_player": {"rho": 0.3},
+                                  "POINTS|L1~SOG|L1~teammate": {"rho": 0.15},
+                                  "SOG|L1~SOG|L1~teammate": {"rho": 0.1}}, "market": {}}}
+
+
+def _line(names):
+    return [_ladder(n, "POINTS", [(0.5, 0.6, {"dk": -150, "fd": -145})]) for n in names] + \
+           [_ladder(n, "SOG", [(1.5, 0.6, {"dk": -150})]) for n in names]
+
+
+def test_three_and_four_leg_tickets_one_book_no_clash_ranked_by_lift_with_no_estimate():
+    roles = {"aa": "L1", "bb": "L1", "cc": "L1"}
+    sheet = _sheet(_line(["A A", "B B", "C C"]))
+    out = sgp.suggest(sheet, MULTI_CELLS, {"aa": "L1", "bb": "L1", "cc": "L1", **{
+        k: v for k, v in roles.items()}})
+    multi = [s for s in out if s.get("size", 2) >= 3]
+    assert {s["size"] for s in multi} == {3, 4}
+    for s in multi:
+        assert all(s["book"] in leg["prices"] for leg in s["legs"])      # one book quotes every leg
+        assert s["show_estimate"] is False and s["lift"] >= 1.05 and s["p_joint"] >= 0.06
+        keys = [(l["player"], l["market"]) for l in s["legs"]]
+        assert len(keys) == len(set(keys))                              # never two rungs of one player's stat
+    for size in (3, 4):
+        lifts = [s["lift"] for s in multi if s["size"] == size]
+        assert lifts == sorted(lifts, reverse=True)
+    assert all(s["show_estimate"] for s in out if s.get("size", 2) == 2)

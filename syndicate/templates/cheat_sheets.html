@@ -416,21 +416,24 @@ function ladderBlock(d, game) {
 // says it is an estimate. A same-player pair is flagged: books know that correlation best and price it tightest.
 const SGP_WHY = {
   same_player: "Same player: these two rise and fall together, and books price this pairing tightest -- check the SGP price against the worth-it number before anything else.",
-  teammate: "Teammates: when one clears, the other clears more often than not, measured over three seasons.",
-  opponent: "Opponents: the game script ties these two together, measured over three seasons.",
+  teammate: "Teammates: when one clears, the other clears more often than not, measured over past seasons.",
+  opponent: "Opponents: the game script ties these together, measured over past seasons.",
+  mixed: "Every pair of legs on this ticket was measured together -- teammates, a player's own stats and the other side -- and the ticket wins together more often than its legs would apart.",
 };
 function sgpRow(s) {
   const legs = (s.legs || []).map(l => `<li class="ctx"><b>${esc(l.bet || "")}</b>${pct(l.p_side)} on its own</li>`).join("");
   return `<div class="prop pick sgp">
     <div class="who"><div class="sgpfaces">${(s.legs || []).map(miniFace).join("")}</div>
-      <div class="line1"><span class="chip value">Same-game parlay</span>${s.same_player ? `<span class="chip neutral">Same player</span>` : ""}${started(s.commence_time) ? `<span class="chip started">Started</span>` : ""}</div>
+      <div class="line1"><span class="chip value">${(s.size || 2) > 2 ? `${s.size}-leg parlay` : "Same-game parlay"}</span>${s.same_player ? `<span class="chip neutral">Same player</span>` : ""}${started(s.commence_time) ? `<span class="chip started">Started</span>` : ""}</div>
       <div class="bet">${(s.legs || []).map(l => esc(l.bet || "")).join(" + ")}</div>
       <div class="meta">${esc(s.matchup || "")}${s.kickoff_ct ? ` · <span class="kick">${esc(s.kickoff_ct)}</span>` : ""}</div></div>
     <div class="ptiles">
-      <div class="ptile"><span>Both win</span><b>${pct(s.p_joint)}</b><i>${pct(s.p_independent)} if unrelated</i></div>
+      <div class="ptile"><span>${(s.size || 2) > 2 ? `All ${s.size} win` : "Both win"}</span><b>${pct(s.p_joint)}</b><i>${pct(s.p_independent)} if unrelated</i></div>
       <div class="ptile"><span>Fair odds</span><b>${odds(s.fair_odds)}</b><i>our probability, no vig</i></div>
       <div class="ptile"><span>Worth it at</span><b class="gain">${odds(s.worth_it_odds)}</b><i>or better at your book</i></div>
-      <div class="ptile"><span>Est. book price</span><b>${odds(s.est_book_odds)}</b><i>estimate: ${esc(s.book || "")} legs ${odds(s.legs_product_odds)} less ${Math.round(100 * (s.assumed_discount || 0))}%</i></div>
+      ${s.show_estimate === false
+        ? `<div class="ptile"><span>Legs multiplied</span><b>${odds(s.legs_product_odds)}</b><i>${esc(s.book || "")} -- books pay less on correlated legs; no estimate for ${s.size} legs</i></div>`
+        : `<div class="ptile"><span>Est. book price</span><b>${odds(s.est_book_odds)}</b><i>estimate: ${esc(s.book || "")} legs ${odds(s.legs_product_odds)} less ${Math.round(100 * (s.assumed_discount || 0))}%</i></div>`}
     </div>
     <ul class="checks">${legs}<li class="ctx"><b>Together</b>${esc(SGP_WHY[s.relation] || "")}</li></ul>
   </div>`;

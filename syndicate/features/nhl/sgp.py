@@ -142,5 +142,7 @@ def suggest(sheet: Mapping[str, Any], cells: Mapping[str, Any] | None, roles: Ma
     def exclude(a: Mapping[str, Any], b: Mapping[str, Any]) -> bool:
         return a["player"] == b["player"] and frozenset({a["market"], b["market"]}) in nested
 
-    return core.pair_legs(legs_by_game(sheet, roles), cells, sheet.get("games") or [], per_game=per_game,
-                          per_sheet=per_sheet, exclude=exclude)
+    legs = legs_by_game(sheet, roles)
+    games = sheet.get("games") or []
+    return core.pair_legs(legs, cells, games, per_game=per_game, per_sheet=per_sheet, exclude=exclude) + core.multi_leg(
+        legs, cells, games, exclude=exclude)

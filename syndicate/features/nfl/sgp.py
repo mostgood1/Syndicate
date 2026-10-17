@@ -30,6 +30,21 @@ WORTH_IT_CUSHION = 0.05            # "worth it at" = 5% above fair: room for the
 MIN_LIFT = 1.03                    # the pair must win together >= 3% more often than independent legs would
 PER_GAME = 3
 PER_SHEET = 10
+# 3- and 4-leg tickets (user 2026-10-16: "we need 3-4 leg sgps as well"). Built by a beam from the best pairs: every
+# k-leg ticket in a game is ~17,500 four-leg combinations on one NHL game, so the best BEAM tickets of each size are
+# extended by one leg at a time. A bigger ticket must lift its joint further over independent legs.
+MULTI_SIZES = (3, 4)
+MIN_LIFT_MULTI = 1.05
+# A longer ticket has NO assumed-discount estimate: books price 3-4 correlated legs with a bigger margin than the
+# 18.5% note, and on the 10-16 NHL dry run the flat discount read +11% to +68% "EV" on tickets as long as +16,472.
+# So 3-4 leg tickets are ranked by LIFT (how much more often the legs win together than apart) among tickets that win
+# at least MIN_JOINT_MULTI of the time -- no lottery tickets -- and show only our probability, fair and "worth it at".
+MIN_JOINT_MULTI = 0.06
+MIN_JOINT_BEAM_PAIR = 0.12
+BEAM = 30
+PER_GAME_MULTI = 2
+PER_SHEET_MULTI = 8
+_QMC_POINTS = 4096
 MARKETS = {"Passing Yards": "pass_yds", "Passing Attempts": "pass_att", "Passing TDs": "pass_td",
            "Interceptions": "ints", "Rushing Yards": "rush_yds", "Rushing Attempts": "rush_att",
            "Receiving Yards": "rec_yds", "Receptions": "rec", "Anytime TD": "atd"}
@@ -309,7 +324,9 @@ def suggest(sheet: Mapping[str, Any], cells: Mapping[str, Any] | None,
             continue
         seen.add(ident)
         legs_by_game[str(leg["event_id"])].append(leg)
-    return pair_legs(legs_by_game, cells, sheet.get("games") or [], per_game=per_game, per_sheet=per_sheet)
+    games = sheet.get("games") or []
+    return pair_legs(legs_by_game, cells, games, per_game=per_game, per_sheet=per_sheet) + multi_leg(
+        legs_by_game, cells, games)
 
 
 def relation_of(a: Mapping[str, Any], b: Mapping[str, Any]) -> str:
@@ -362,6 +379,7 @@ def pair_legs(legs_by_game: Mapping[str, list[dict[str, Any]]], cells: Mapping[s
                 game = by_event.get(event_id) or {}
                 cands.append({
                     "sgp_id": sgp_id, "event_id": event_id, "legs": [dict(a, bet=_bet_text(a)), dict(b, bet=_bet_text(b))],
+                    "size": 2, "show_estimate": True,
                     "relation": rel, "same_player": same_player, "rho": round(rho, 3), "rho_level": level,
                     "p_joint": round(pj, 4), "p_independent": round(indep, 4), "lift": round(pj / indep, 3),
                     "fair_odds": odds_at(fair_dec),
@@ -387,6 +405,195 @@ def pair_legs(legs_by_game: Mapping[str, list[dict[str, Any]]], cells: Mapping[s
         out += picked
     out.sort(key=lambda c: -c["est_ev_pct"] + (5.0 if c["same_player"] else 0.0))
     return out[:per_sheet]
+
+
+def _qmc_points(dim: int):
+    """A fixed scrambled Sobol set on [0, 1]^dim (seeded, so a ticket prices the same every build)."""
+    import numpy as np
+    from scipy.stats import qmc
+
+    cache = _qmc_points.__dict__.setdefault("cache", {})
+    if dim not in cache:
+        cache[dim] = np.clip(qmc.Sobol(d=dim, scramble=True, seed=20261016).random(_QMC_POINTS), 1e-12, 1 - 1e-12)
+    return cache[dim]
+
+
+def orthant_all(upper, corr):
+    """P(X_1 <= b_1, ..., X_k <= b_k) for X ~ N(0, R), many tickets at once (T x k limits, T x k x k correlations):
+    Genz's separation of variables on a fixed quasi-random set, vectorised over tickets. NaN where R is not positive
+    definite (pairwise correlations that cannot coexist)."""
+    import numpy as np
+    from scipy.special import ndtr, ndtri
+
+    b = np.asarray(upper, dtype=float)
+    R = np.asarray(corr, dtype=float)
+    T, k = b.shape
+    out = np.full(T, np.nan)
+    ok = np.linalg.eigvalsh(R).min(axis=1) > 1e-6
+    if not ok.any():
+        return out
+    C = np.linalg.cholesky(R[ok])                       # (t, k, k) lower
+    bb = b[ok]
+    w = _qmc_points(k - 1)                              # (n, k-1)
+    t = bb.shape[0]
+    n = w.shape[0]
+    y = np.zeros((t, n, k))
+    e = ndtr(bb[:, 0] / C[:, 0, 0])                     # (t,)
+    f = np.repeat(e[:, None], n, axis=1)                # (t, n)
+    e_prev = np.repeat(e[:, None], n, axis=1)
+    for i in range(1, k):
+        y[:, :, i - 1] = ndtri(np.clip(w[None, :, i - 1] * e_prev, 1e-15, 1 - 1e-15))
+        shift = np.einsum("tj,tnj->tn", C[:, i, :i], y[:, :, :i])
+        e_i = ndtr((bb[:, i][:, None] - shift) / C[:, i, i][:, None])
+        f = f * e_i
+        e_prev = e_i
+    out[ok] = f.mean(axis=1)
+    return out
+
+
+def ticket_joints(tickets, cells, relation):
+    """P(every leg wins) for each ticket (a list of legs): the legs' latent normals with the measured pairwise rho,
+    signed by side (an under is the other tail). Returns (probabilities, the rho level per ticket: 'none' if any pair
+    was unmeasured)."""
+    import numpy as np
+    from scipy.special import ndtri
+
+    if not tickets:
+        return np.zeros(0), []
+    k = len(tickets[0])
+    T = len(tickets)
+    upper = np.zeros((T, k))
+    corr = np.zeros((T, k, k))
+    levels = []
+    for t, legs in enumerate(tickets):
+        sign = [1.0 if leg["side"] in ("over", "yes") else -1.0 for leg in legs]
+        for i, leg in enumerate(legs):
+            p_over = min(max(float(leg["p_over"]), 1e-6), 1 - 1e-6)
+            # win = sign_i * Z_i > sign_i * t_i with t_i = ndtri(1 - p_over); P(all) = P(all -W_i < -h_i)
+            upper[t, i] = -sign[i] * ndtri(1.0 - p_over)
+            corr[t, i, i] = 1.0
+        worst = "role"
+        for i in range(k):
+            for j in range(i + 1, k):
+                rho, level = rho_for(cells, legs[i]["type"], legs[j]["type"], relation(legs[i], legs[j]))
+                corr[t, i, j] = corr[t, j, i] = sign[i] * sign[j] * rho
+                if level == "none":
+                    worst = "none"
+                elif level == "market" and worst == "role":
+                    worst = "market"
+        levels.append(worst)
+    return orthant_all(upper, corr), levels
+
+
+def _ticket(event_id, legs, pj, cells_level, game, book, product, relations):
+    indep = 1.0
+    for leg in legs:
+        indep *= leg["p_side"]
+    fair_dec = 1.0 / pj
+    est_dec = product * (1.0 - ASSUMED_BOOK_DISCOUNT)
+    ticket = sorted(_bet_text(leg) for leg in legs)
+    sgp_id = "sgp_" + hashlib.sha1(f"{event_id}|{'|'.join(ticket)}".encode()).hexdigest()[:12]
+    return {"sgp_id": sgp_id, "event_id": event_id, "legs": [dict(leg, bet=_bet_text(leg)) for leg in legs],
+            "size": len(legs), "relation": "mixed" if len(set(relations)) > 1 else relations[0],
+            "relations": sorted(set(relations)), "same_player": "same_player" in relations, "rho_level": cells_level,
+            "p_joint": round(float(pj), 4), "p_independent": round(indep, 4), "lift": round(float(pj) / indep, 3),
+            "fair_odds": odds_at(fair_dec), "worth_it_odds": odds_at(fair_dec * (1.0 + WORTH_IT_CUSHION)),
+            "book": book, "legs_product_odds": odds_at(product), "assumed_discount": ASSUMED_BOOK_DISCOUNT,
+            "est_book_odds": odds_at(est_dec), "est_ev_pct": round((float(pj) * est_dec - 1.0) * 100.0, 1),
+            "show_estimate": len(legs) <= 2,
+            "matchup": game.get("matchup"), "commence_time": game.get("commence_time"),
+            "kickoff_ct": game.get("kickoff_ct")}
+
+
+def _best_book(legs):
+    books = set(legs[0]["prices"])
+    for leg in legs[1:]:
+        books &= set(leg["prices"])
+    best = None
+    for bk in books:
+        product = 1.0
+        for leg in legs:
+            d = payout(leg["prices"][bk])
+            if not d:
+                product = None
+                break
+            product *= d
+        if product and (best is None or product > best[1]):
+            best = (bk, product)
+    return best
+
+
+def multi_leg(legs_by_game, cells, games, *, relation: Any = None, exclude: Any = None, sizes=MULTI_SIZES,
+              per_game: int = PER_GAME_MULTI, per_sheet: int = PER_SHEET_MULTI) -> list[dict[str, Any]]:
+    """3- and 4-leg tickets by a beam from the best pairs. Every pair inside a ticket obeys the 2-leg rules (never two
+    rungs of one player's stat, never a nested pair); every leg at ONE book; the joint must beat independent legs by
+    MIN_LIFT_MULTI. Ranked like the pairs (the estimate at the assumed discount), near-duplicates dropped."""
+    relation = relation or relation_of
+    by_event = {str(g.get("event_id")): g for g in games}
+    out: list[dict[str, Any]] = []
+
+    def clash(a, b):
+        return (a["player"] == b["player"] and a["market"] == b["market"]) or (exclude is not None and exclude(a, b))
+
+    for event_id, legs in legs_by_game.items():
+        if len(legs) < 3:
+            continue
+        idx = {id(leg): i for i, leg in enumerate(legs)}
+        # level 2: every valid pair with a common book, scored by the estimate
+        pairs = [[a, b] for i, a in enumerate(legs) for b in legs[i + 1:] if not clash(a, b) and _best_book([a, b])]
+        pj2, lv2 = ticket_joints(pairs, cells, relation)
+        scored = []
+        for legs2, pj, lv in zip(pairs, pj2, lv2):
+            if pj != pj or pj < MIN_JOINT_BEAM_PAIR:
+                continue
+            lift = pj / (legs2[0]["p_side"] * legs2[1]["p_side"])
+            scored.append((lift, legs2))
+        beam = [t for _s, t in sorted(scored, key=lambda x: -x[0])[:BEAM]]
+        game = by_event.get(event_id) or {}
+        for size in range(3, max(sizes) + 1):
+            seen, cands = set(), []
+            for base in beam:
+                for leg in legs:
+                    if any(leg is x or clash(leg, x) for x in base):
+                        continue
+                    t = base + [leg]
+                    key = frozenset(idx[id(x)] for x in t)
+                    if key in seen or not _best_book(t):
+                        continue
+                    seen.add(key)
+                    cands.append(t)
+            pjs, levels = ticket_joints(cands, cells, relation)
+            built = []
+            for t, pj, lv in zip(cands, pjs, levels):
+                if pj != pj or pj <= 0:
+                    continue
+                bk, prod = _best_book(t)
+                rels = [relation(t[i], t[j]) for i in range(len(t)) for j in range(i + 1, len(t))]
+                tk = _ticket(event_id, t, pj, lv, game, bk, prod, rels)
+                if tk["lift"] >= MIN_LIFT_MULTI and tk["p_joint"] >= MIN_JOINT_MULTI:
+                    built.append((tk, t))
+            built.sort(key=lambda x: -x[0]["lift"])
+            beam = [t for _tk, t in built[:BEAM]]
+            if size in sizes:
+                kept, kept_sets = [], []
+                for tk, t in built:
+                    # identity = player x stat, not the rung: the same three players at swapped rungs is one ticket
+                    ids = {(x["player"], x["market"]) for x in t}
+                    if any(len(ids & other) >= size - 1 for other in kept_sets):
+                        continue                      # a near-duplicate of a kept ticket (all but one leg shared)
+                    kept.append(tk)
+                    kept_sets.append(ids)
+                    if len(kept) >= per_game:
+                        break
+                out += kept
+            if not beam:
+                break
+    out.sort(key=lambda c: (c["size"], -c["lift"]))
+    by_size: dict[int, list[dict[str, Any]]] = collections.defaultdict(list)
+    for c in out:
+        if len(by_size[c["size"]]) < per_sheet:
+            by_size[c["size"]].append(c)
+    return [c for size in sorted(by_size) for c in by_size[size]]
 
 
 def merge_record(fresh: list[dict[str, Any]], prior: Iterable[Mapping[str, Any]] | None, *,

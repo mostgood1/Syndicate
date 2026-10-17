@@ -107,7 +107,7 @@ def _margin_factor(row: Mapping[str, Any]) -> float | None:
     return factor if 1.0 <= factor <= 1.25 else None
 
 
-def _implied(price: Any) -> float | None:
+def _book_prob(price: Any) -> float | None:
     from syndicate.features.shared.opportunity_signals import implied_probability
 
     return implied_probability(price)
@@ -176,8 +176,8 @@ def ladder_for(row: Mapping[str, Any], alt: Mapping[float, Mapping[str, Any]] | 
                                 "rate": round(hits / games, 3) if games else None, "main": abs(rung - line) < 1e-9}
         books = alt.get(rung) or {}
         if books:
-            best_book, best_price = min(books.items(), key=lambda kv: _implied(kv[1]) or 1.0)
-            implied = sorted(x for x in (_implied(p) for p in books.values()) if x)
+            best_book, best_price = min(books.items(), key=lambda kv: _book_prob(kv[1]) or 1.0)
+            implied = sorted(x for x in (_book_prob(p) for p in books.values()) if x)
             med = implied[len(implied) // 2] if implied else None
             p_market = round(min(0.995, med / factor), 4) if (med and factor) else None
             cell.update({"best_price": best_price, "best_book": best_book, "books": len(books), "p_market": p_market,
