@@ -309,16 +309,35 @@ def suggest(sheet: Mapping[str, Any], cells: Mapping[str, Any] | None,
             continue
         seen.add(ident)
         legs_by_game[str(leg["event_id"])].append(leg)
-    games = {str(g.get("event_id")): g for g in sheet.get("games") or []}
+    return pair_legs(legs_by_game, cells, sheet.get("games") or [], per_game=per_game, per_sheet=per_sheet)
+
+
+def relation_of(a: Mapping[str, Any], b: Mapping[str, Any]) -> str:
+    if a["player"] == b["player"]:
+        return "same_player"
+    return "teammate" if a.get("team") == b.get("team") else "opponent"
+
+
+def pair_legs(legs_by_game: Mapping[str, list[dict[str, Any]]], cells: Mapping[str, Any], games: Iterable[Mapping[str, Any]],
+              *, per_game: int = PER_GAME, per_sheet: int = PER_SHEET,
+              relation: Any = None) -> list[dict[str, Any]]:
+    """The sport-agnostic half: every two legs of one game -> priced SGP candidates. A leg is a dict with player, team,
+    market, side, line, p_over, p_side, type ("MARKET|ROLE"), prices {book: American}, event_id. Two legs on the SAME
+    player AND market never pair (one rung implies the other). `relation(a, b)` names the cell family; the default is
+    same_player / teammate / opponent. Ranked by the estimate at the assumed discount -- a ranking, not an edge claim."""
+    relation = relation or relation_of
+    by_event = {str(g.get("event_id")): g for g in games}
     out: list[dict[str, Any]] = []
     for event_id, legs in legs_by_game.items():
         cands = []
         for i in range(len(legs)):
             for j in range(i + 1, len(legs)):
                 a, b = legs[i], legs[j]
+                if a["player"] == b["player"] and a["market"] == b["market"]:
+                    continue
                 same_player = a["player"] == b["player"]
-                relation = "same_player" if same_player else ("teammate" if a["team"] == b["team"] else "opponent")
-                rho, level = rho_for(cells, a["type"], b["type"], relation)
+                rel = relation(a, b)
+                rho, level = rho_for(cells, a["type"], b["type"], rel)
                 if level == "none" or rho == 0.0:
                     continue
                 pj = joint_prob(a, b, rho)
@@ -338,23 +357,32 @@ def suggest(sheet: Mapping[str, Any], cells: Mapping[str, Any] | None,
                 est_dec = product * (1.0 - ASSUMED_BOOK_DISCOUNT)
                 ticket = sorted([_bet_text(a), _bet_text(b)])
                 sgp_id = "sgp_" + hashlib.sha1(f"{event_id}|{'|'.join(ticket)}".encode()).hexdigest()[:12]
+                game = by_event.get(event_id) or {}
                 cands.append({
                     "sgp_id": sgp_id, "event_id": event_id, "legs": [dict(a, bet=_bet_text(a)), dict(b, bet=_bet_text(b))],
-                    "relation": relation, "same_player": same_player, "rho": round(rho, 3), "rho_level": level,
+                    "relation": rel, "same_player": same_player, "rho": round(rho, 3), "rho_level": level,
                     "p_joint": round(pj, 4), "p_independent": round(indep, 4), "lift": round(pj / indep, 3),
                     "fair_odds": odds_at(fair_dec),
                     "worth_it_odds": odds_at(fair_dec * (1.0 + WORTH_IT_CUSHION)),
                     "book": book, "legs_product_odds": odds_at(product),
                     "assumed_discount": ASSUMED_BOOK_DISCOUNT, "est_book_odds": odds_at(est_dec),
                     "est_ev_pct": round((pj * est_dec - 1.0) * 100.0, 1),
-                    "matchup": (games.get(event_id) or {}).get("matchup"),
-                    "commence_time": (games.get(event_id) or {}).get("commence_time"),
-                    "kickoff_ct": (games.get(event_id) or {}).get("kickoff_ct"),
+                    "matchup": game.get("matchup"), "commence_time": game.get("commence_time"),
+                    "kickoff_ct": game.get("kickoff_ct"),
                 })
         # Different players before a second leg from the same player: a same-player pair is the one books price
-        # tightest, so it never outranks a cross-player pair at an equal estimate.
+        # tightest, so it never outranks a cross-player pair at an equal estimate. One ticket per pair of players.
         cands.sort(key=lambda c: (-c["est_ev_pct"] + (5.0 if c["same_player"] else 0.0)))
-        out += cands[:per_game]
+        picked, used = [], set()
+        for c in cands:
+            who = tuple(sorted(leg["player"] for leg in c["legs"]))
+            if who in used:
+                continue
+            used.add(who)
+            picked.append(c)
+            if len(picked) >= per_game:
+                break
+        out += picked
     out.sort(key=lambda c: -c["est_ev_pct"] + (5.0 if c["same_player"] else 0.0))
     return out[:per_sheet]
 

@@ -112,11 +112,12 @@ def summarize(graded: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--data-root", default=os.environ.get("SYNDICATE_DATA_ROOT") or "")
+    ap.add_argument("--sport", default="nfl", choices=("nfl", "nhl"))
     args = ap.parse_args(argv)
     if not args.data_root:
         print("REFUSING: no --data-root", flush=True)
         return 2
-    base = Path(os.path.expanduser(args.data_root)) / "cheatsheets" / "nfl"
+    base = Path(os.path.expanduser(args.data_root)) / "cheatsheets" / args.sport
     ledger = read_jsonl(base / "sgp_ledger.jsonl")
     cache: dict[str, Any] = {}
     graded = []
@@ -132,7 +133,7 @@ def main(argv: list[str] | None = None) -> int:
         tmp = base / "sgp_graded.jsonl.tmp"
         tmp.write_text("".join(json.dumps(g) + "\n" for g in graded), encoding="utf-8")
         os.replace(tmp, base / "sgp_graded.jsonl")
-    print(f"SGP_PAPER {json.dumps(summarize(graded))} ledger={len(ledger)}", flush=True)
+    print(f"SGP_PAPER {args.sport} {json.dumps(summarize(graded))} ledger={len(ledger)}", flush=True)
     return 0
 
 

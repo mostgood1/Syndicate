@@ -435,19 +435,20 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def grade_sgp_ledger(root: Path) -> None:
-    """Grade the NFL same-game-parlay paper ledger from the reconciled sheets just written (lane `nfl-sgp-builder`).
-    Never fails the reconcile."""
-    if not (root / "cheatsheets" / "nfl" / "sgp_ledger.jsonl").is_file():
-        return
-    try:
-        import importlib.util
+    """Grade each sport's same-game-parlay paper ledger (NFL, NHL) from the reconciled sheets just written (lanes
+    `nfl-sgp-builder`, `nhl-sgp-builder`). Never fails the reconcile."""
+    for sport in ("nfl", "nhl"):
+        if not (root / "cheatsheets" / sport / "sgp_ledger.jsonl").is_file():
+            continue
+        try:
+            import importlib.util
 
-        spec = importlib.util.spec_from_file_location("grade_sgp_paper", Path(__file__).resolve().parent / "grade_sgp_paper.py")
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-        mod.main(["--data-root", str(root)])
-    except Exception as exc:  # noqa: BLE001
-        print(f"SGP_PAPER failed: {type(exc).__name__}: {exc}", flush=True)
+            spec = importlib.util.spec_from_file_location("grade_sgp_paper", Path(__file__).resolve().parent / "grade_sgp_paper.py")
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            mod.main(["--data-root", str(root), "--sport", sport])
+        except Exception as exc:  # noqa: BLE001
+            print(f"SGP_PAPER {sport} failed: {type(exc).__name__}: {exc}", flush=True)
 
 
 if __name__ == "__main__":

@@ -181,6 +181,7 @@ def ladder_for(row: Mapping[str, Any], alt: Mapping[float, Mapping[str, Any]] | 
             med = implied[len(implied) // 2] if implied else None
             p_market = round(min(0.995, med / factor), 4) if (med and factor) else None
             cell.update({"best_price": best_price, "best_book": best_book, "books": len(books), "p_market": p_market,
+                         "prices": dict(books),     # every book's rung price: an SGP is one book's ticket
                          "p_market_basis": f"estimate: alt median implied / {factor_basis}" if p_market else None})
             if p_market is not None:
                 from syndicate.features.shared.cheat_sheets import consistency_posterior

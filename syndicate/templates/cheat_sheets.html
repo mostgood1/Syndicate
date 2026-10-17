@@ -438,7 +438,7 @@ function sgpRow(s) {
 function sgpBlock(d, game) {
   const sgps = (d.sgp || []).filter(s => !game || s.event_id === game.event_id);
   if (!sgps.length) return "";
-  return sectionShell("sgp", "Same-game parlays", "Two legs we like on their own whose results move together, measured on three seasons of NFL closing lines. Books do not publish parlay prices, so the number to use is <b>worth it at</b>: take the parlay only if your book's same-game-parlay price is that or better. The book price shown is an estimate -- the leg prices multiplied together, less an assumed discount -- not a quote. Tracked on paper; no edge is claimed yet.",
+  return sectionShell("sgp", "Same-game parlays", `Two legs whose results move together, measured on ${esc(d.sgp_basis || "past seasons")}. Books do not publish parlay prices, so the number to use is <b>worth it at</b>: take the parlay only if your book's same-game-parlay price is that or better. The book price shown is an estimate -- the leg prices multiplied together, less an assumed discount -- not a quote. Tracked on paper; no edge is claimed yet.`,
     `${sgps.length} parlay${sgps.length === 1 ? "" : "s"}`, `<div class="rowlist">${sgps.map(sgpRow).join("")}</div>`);
 }
 const SECTIONS = [

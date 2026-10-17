@@ -865,31 +865,42 @@ def merge_with_record(sheet: dict[str, Any], prior: dict[str, Any] | None, *, no
     return merged
 
 
-def attach_sgp(sheet: dict[str, Any], prior: dict[str, Any] | None, data_root: Path, day: str) -> None:
-    """Same-game parlays on the NFL sheet (lane `nfl-sgp-builder`, user 2026-10-16): measured correlations, our
-    probability and fair odds first, the assumed-discount estimate second; every one to the paper ledger. A failure
-    leaves the sheet without the section -- never a failed sheet."""
-    from syndicate.features.nfl import sgp
+SGP_SPORTS = ("nfl", "nhl")
+SGP_BASIS = {"nfl": "three seasons of NFL closing lines (2023-25)", "nhl": "two seasons of NHL box scores (2023-25)"}
+
+
+def attach_sgp(sheet: dict[str, Any], prior: dict[str, Any] | None, data_root: Path, day: str, sport: str = "nfl") -> None:
+    """Same-game parlays (lanes `nfl-sgp-builder`, `nhl-sgp-builder`, user 2026-10-16): measured correlations, our
+    probability and fair odds first, the assumed-discount estimate second; every one to the sport's paper ledger. NHL
+    legs come from the consistency ladder's rungs, so `attach_ladders` runs first. A failure leaves the sheet without
+    the section -- never a failed sheet."""
+    if sport == "nhl":
+        from syndicate.features.nhl import sgp
+    else:
+        from syndicate.features.nfl import sgp
 
     try:
         cells = sgp.load_cells(data_root)
         if not cells:
-            print("CHEAT_SHEET nfl sgp: no correlations file -- section skipped", flush=True)
+            print(f"CHEAT_SHEET {sport} sgp: no correlations file -- section skipped", flush=True)
             sheet["sgp"] = list((prior or {}).get("sgp") or [])
             return
-        roles = sgp.current_roles(data_root, day)
+        roles = sgp.lineup_roles(data_root, day) if sport == "nhl" else sgp.current_roles(data_root, day)
+        sheet["sgp_basis"] = SGP_BASIS.get(sport)
         now = datetime.now(timezone.utc)
         started = {str(g.get("event_id")) for g in sheet.get("games") or []
                    if (_parse_ts(g.get("commence_time")) or now) <= now}
         # A started game's parlays are the record from before it started: never re-suggested, never re-ledgered.
         fresh = [s for s in sgp.suggest(sheet, cells, roles) if str(s.get("event_id")) not in started]
         sheet["sgp"] = sgp.merge_record(fresh, (prior or {}).get("sgp"), started=started)
-        new = sgp.append_ledger(data_root / "cheatsheets" / "nfl" / "sgp_ledger.jsonl",
-                                sgp.ledger_records(fresh, day=day, generated_at=now.isoformat(timespec="seconds")))
-        print(f"CHEAT_SHEET nfl sgp {len(sheet['sgp'])} (fresh {len(fresh)}, new to the ledger {new}, roles {len(roles)})",
+        from syndicate.features.nfl import sgp as sgp_core
+
+        new = sgp_core.append_ledger(data_root / "cheatsheets" / sport / "sgp_ledger.jsonl",
+                                     sgp_core.ledger_records(fresh, day=day, generated_at=now.isoformat(timespec="seconds")))
+        print(f"CHEAT_SHEET {sport} sgp {len(sheet['sgp'])} (fresh {len(fresh)}, new to the ledger {new}, roles {len(roles)})",
               flush=True)
     except Exception as exc:  # noqa: BLE001
-        print(f"CHEAT_SHEET nfl sgp failed: {type(exc).__name__}: {exc}", flush=True)
+        print(f"CHEAT_SHEET {sport} sgp failed: {type(exc).__name__}: {exc}", flush=True)
         sheet["sgp"] = list((prior or {}).get("sgp") or [])
 
 
@@ -997,6 +1008,9 @@ def refresh_picks(data_root: Path, sports: list[str], dates: list[str], board_ca
                 print(f"CHEAT_SHEET_PICKS {sport} date={selected} failed: {type(exc).__name__}: {exc}", flush=True)
                 continue
             ladders_changed = attach_ladders(sheet, data_root, sport, selected) if sheet.get("rows") else False
+            if ladders_changed and sport == "nhl":
+                # NHL parlays are built from the ladder's priced rungs, which land 20-90 min before puck drop
+                attach_sgp(sheet, prior, data_root, selected, sport)
             new = [p for p in sheet.get("picks") or [] if p.get("pick_id") not in before]
             on_board = sum(1 for p in sheet.get("picks") or [] if p.get("on_board"))
             was = {p.get("pick_id"): bool(p.get("on_board")) for p in (prior or {}).get("picks") or []}
@@ -1158,9 +1172,9 @@ def main_build(args: Any, data_root: Path) -> int:
         except Exception as exc:  # noqa: BLE001 -- a missing picks section is a gap, never a failed sheet
             print(f"CHEAT_SHEET {sport} picks failed: {type(exc).__name__}: {exc}", flush=True)
             sheet["picks"] = list((prior or {}).get("picks") or [])
-        if sport == "nfl":
-            attach_sgp(sheet, prior, data_root, selected)
         attach_ladders(sheet, data_root, sport, selected)
+        if sport in SGP_SPORTS:
+            attach_sgp(sheet, prior, data_root, selected, sport)
         if sport in IDENTITY_SPORTS and sheet.get("rows"):   # after the merge, so a kept row gets its face too
             filled = fill_identity(sport, sheet["rows"], selected, data_root / "cheatsheets" / f".{sport}_cache" / selected)
             print(f"CHEAT_SHEET {sport} identity filled {filled}", flush=True)
