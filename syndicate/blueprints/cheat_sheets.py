@@ -39,9 +39,10 @@ _DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _SPORT = re.compile(r"^[a-z]{2,8}$")
 _CARD = re.compile(r"^(?:[0-9a-f]{12}|l2_[0-9a-f]{8,40})$")   # a row's card id, or a Syndicate pick's board pick_id
 _ROW_ID = re.compile(r"^[0-9a-f]{12}$")
+_SGP_ID = re.compile(r"^sgp_[0-9a-f]{12}$")
 _SECTION = re.compile(r"^[a-z_]{1,24}$")
-# Sections whose items are already a record (picks, parlays) or are not bets (the slate, scripts, news, the ladder).
-_NOT_POSTED = frozenset({"picks", "sgp", "ladder", "slate", "script", "news", "record", "record_chart", "record_days",
+# Sections whose items are already a record (the Syndicate picks) or are not bets (the slate, scripts, news, ladder).
+_NOT_POSTED = frozenset({"picks", "ladder", "slate", "script", "news", "record", "record_chart", "record_days",
                          "record_totals"})
 TEMPLATE = Path(__file__).resolve().parents[1] / "templates" / "cheat_sheets.html"
 LOGO_SRC = "/static/brand/syndicate_roi_badge.webp"
@@ -260,10 +261,15 @@ def cheat_sheet_posted():
     if doc is None:
         return jsonify({"ok": False, "error": "no sheet for that sport and day"}), 404
     wanted = {"rows": [str(x) for x in body.get("card_ids") or [] if _ROW_ID.match(str(x))][:60],
-              "lines": [str(x) for x in body.get("line_ids") or [] if _ROW_ID.match(str(x))][:60]}
+              "lines": [str(x) for x in body.get("line_ids") or [] if _ROW_ID.match(str(x))][:60],
+              "sgps": [str(x) for x in body.get("sgp_ids") or [] if _SGP_ID.match(str(x))][:30]}
     post: dict[str, Any] = {"section": section, "game": str(body.get("game") or "") or None,
                             "posted_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                            "sheet_generated_at": doc.get("generated_at"), "rows": [], "lines": []}
+                            "sheet_generated_at": doc.get("generated_at"), "rows": [], "lines": [], "sgps": []}
+    tickets = {str(t.get("sgp_id")): t for t in cs.with_posted_sgps(doc.get("sgp") or [], doc.get("posted"))}
+    for sid in dict.fromkeys(wanted["sgps"]):
+        if sid in tickets:
+            post["sgps"].append({"sgp_id": sid, "item": {k: v for k, v in tickets[sid].items() if k != "posted"}})
     for kind, field in (("rows", "rows"), ("lines", "game_lines")):
         by_id: dict[str, dict[str, Any]] = {}
         for item in doc.get(field) or []:
@@ -275,8 +281,8 @@ def cheat_sheet_posted():
             check = item.get("check") or {}
             post[kind].append({"card_id": cid, "price": check.get("price"), "book": check.get("book"),
                                "item": {k: v for k, v in item.items() if k not in ("book_prices", "evidence_error")}})
-    missing = len(set(wanted["rows"])) + len(set(wanted["lines"])) - len(post["rows"]) - len(post["lines"])
-    if not post["rows"] and not post["lines"]:
+    missing = sum(len(set(wanted[k])) - len(post[k]) for k in ("rows", "lines", "sgps"))
+    if not post["rows"] and not post["lines"] and not post["sgps"]:
         return jsonify({"ok": False, "error": "none of those rows are on the sheet now -- reload and export again",
                         "missing": missing}), 404
     path = _sheet_dir() / sport / f"{day}{cs.POSTED_SUFFIX}"
@@ -286,8 +292,8 @@ def cheat_sheet_posted():
     with os.fdopen(fd, "w", encoding="utf-8") as fh:
         json.dump(current, fh, ensure_ascii=False)
     os.replace(tmp, path)
-    return jsonify({"ok": True, "rows": len(post["rows"]), "lines": len(post["lines"]), "missing": missing,
-                    "posted_at": post["posted_at"]}), 200
+    return jsonify({"ok": True, "rows": len(post["rows"]), "lines": len(post["lines"]), "sgps": len(post["sgps"]),
+                    "missing": missing, "posted_at": post["posted_at"]}), 200
 
 
 @cheat_sheets_bp.post("/api/cheatsheets/cards")

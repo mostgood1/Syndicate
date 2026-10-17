@@ -438,9 +438,9 @@ function sgpLegResult(r) {
 function sgpRow(s) {
   const res = s.result, rl = res && res.legs || [];
   const legs = (s.legs || []).map((l, i) => `<li class="ctx"><b>${esc(l.bet || "")}</b>${pct(l.p_side)} on its own${l.games ? ` · cleared ${l.hits}/${l.games} recently` : ""}${l.alt ? " · alt line" : ""}${sgpLegResult(rl[i])}</li>`).join("");
-  return `<div class="prop pick sgp${res && res.status === "won" ? " rw" : res && res.status === "lost" ? " rl" : ""}">
+  return `<div class="prop pick sgp${res && res.status === "won" ? " rw" : res && res.status === "lost" ? " rl" : ""}" data-sg="${esc(s.sgp_id || "")}">
     <div class="who"><div class="sgpfaces">${(s.legs || []).map(miniFace).join("")}</div>
-      <div class="line1">${s.family === "hit_rate" ? `<span class="chip value">Built for hit rate</span>` : ""}<span class="chip value">${(s.size || 2) > 2 ? `${s.size}-leg parlay` : "Same-game parlay"}</span>${s.same_player ? `<span class="chip neutral">Same player</span>` : ""}${res ? SGP_STATUS[res.status] || "" : started(s.commence_time) ? `<span class="chip started">Started</span>` : ""}</div>
+      <div class="line1">${s.family === "hit_rate" ? `<span class="chip value">Built for hit rate</span>` : ""}<span class="chip value">${(s.size || 2) > 2 ? `${s.size}-leg parlay` : "Same-game parlay"}</span>${s.same_player ? `<span class="chip neutral">Same player</span>` : ""}${postedChip(s)}${res ? SGP_STATUS[res.status] || "" : started(s.commence_time) ? `<span class="chip started">Started</span>` : ""}</div>
       <div class="bet">${(s.legs || []).map(l => esc(l.bet || "")).join(" + ")}</div>
       <div class="meta">${esc(s.matchup || "")}${s.kickoff_ct ? ` · <span class="kick">${esc(s.kickoff_ct)}</span>` : ""}</div></div>
     <div class="ptiles">
@@ -974,17 +974,18 @@ function recountExport(sec, d) {
 // help for reconciling"): the rows in the image -- the frame's own, after the export trims it -- go to the server, which
 // re-reads them from the sheet by card id. Later builds keep them, they lead the section, and the record grades them
 // at the price the image showed. A results graphic (reconciled view, season record) is not a post.
-const UNPOSTED = new Set(["picks", "sgp", "ladder", "slate", "script", "news", "record"]);
+const UNPOSTED = new Set(["picks", "ladder", "slate", "script", "news", "record"]);
 async function recordPosted(frame, key) {
   const d = DATA[STATE.sport];
   if (META.page === "record" || !d || reconciledView(d) || UNPOSTED.has(key)) return null;
   const rows = new Set(), lines = new Set();
   frame.querySelectorAll("[data-ri]").forEach(el => { const r = (d.rows || [])[+el.dataset.ri]; if (r && r.card_id) rows.add(r.card_id); });
   frame.querySelectorAll("[data-li]").forEach(el => { const g = (d.game_lines || [])[+el.dataset.li]; if (g && g.card_id) lines.add(g.card_id); });
-  if (!rows.size && !lines.size) return null;
+  const sgps = new Set([...frame.querySelectorAll("[data-sg]")].map(el => el.dataset.sg).filter(Boolean));
+  if (!rows.size && !lines.size && !sgps.size) return null;
   const res = await fetch("/api/cheatsheets/posted", {method: "POST", headers: {"Content-Type": "application/json"},
     body: JSON.stringify({sport: STATE.sport, date: META.date || d.date, section: key, game: STATE.game || null,
-                          card_ids: [...rows], line_ids: [...lines]})});
+                          card_ids: [...rows], line_ids: [...lines], sgp_ids: [...sgps]})});
   return res.json();
 }
 async function exportSection(btn) {
@@ -1012,7 +1013,7 @@ async function exportSection(btn) {
     btn.textContent = label; btn.disabled = false;
   }
   if (posted) {
-    btn.textContent = posted.ok ? (posted.missing ? `Recorded ${posted.rows + posted.lines} -- ${posted.missing} changed, reload` : "Recorded as posted")
+    btn.textContent = posted.ok ? (posted.missing ? `Recorded ${posted.rows + posted.lines + (posted.sgps || 0)} -- ${posted.missing} changed, reload` : "Recorded as posted")
       : "Not recorded -- reload and export again";
     setTimeout(() => { btn.textContent = label; }, 4000);
   }

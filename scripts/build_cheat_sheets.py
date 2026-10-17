@@ -895,6 +895,9 @@ def attach_sgp(sheet: dict[str, Any], prior: dict[str, Any] | None, data_root: P
         # A started game's parlays are the record from before it started: never re-suggested, never re-ledgered.
         fresh = [s for s in sgp.suggest(sheet, cells, roles) if str(s.get("event_id")) not in started]
         sheet["sgp"] = sgp_core.merge_record(fresh, (prior or {}).get("sgp"), started=started)
+        # A parlay that went out on an exported graphic stays on the sheet whatever this build suggests (2026-10-17).
+        sheet["sgp"] = cs.with_posted_sgps(sheet["sgp"], cs.load_posted(data_root / "cheatsheets", sport, day),
+                                           (prior or {}).get("sgp"))
         new = sgp_core.append_ledger(data_root / "cheatsheets" / sport / "sgp_ledger.jsonl",
                                      sgp_core.ledger_records(fresh, day=day, generated_at=now.isoformat(timespec="seconds")))
         print(f"CHEAT_SHEET {sport} sgp {len(sheet['sgp'])} (fresh {len(fresh)}, new to the ledger {new}, roles {len(roles)})",

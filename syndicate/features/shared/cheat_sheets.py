@@ -581,6 +581,36 @@ def with_posted(sheet: Mapping[str, Any], posted: Mapping[str, Any] | None, *,
     return out
 
 
+def posted_sgps(posted: Mapping[str, Any] | None) -> dict[str, dict[str, Any]]:
+    """sgp_id -> {at, item}: every posted same-game parlay, by its first posting."""
+    out: dict[str, dict[str, Any]] = {}
+    for post in sorted(((posted or {}).get("posts") or []), key=lambda p: str(p.get("posted_at") or "")):
+        for e in post.get("sgps") or []:
+            if isinstance(e, Mapping) and e.get("sgp_id") and isinstance(e.get("item"), Mapping):
+                out.setdefault(str(e["sgp_id"]), {"at": post.get("posted_at"), "item": dict(e["item"])})
+    return out
+
+
+def with_posted_sgps(tickets: Sequence[Mapping[str, Any]], posted: Mapping[str, Any] | None,
+                     prior: Sequence[Mapping[str, Any]] | None = None) -> list[dict[str, Any]]:
+    """The day's parlays with every POSTED one on them. A build re-suggests a game's parlays until it starts (the NHL
+    refresh re-runs them whenever the ladders' alt prices change), so a ticket on an exported graphic could be gone an
+    hour later. A posted ticket a build no longer suggests comes back as the last copy `prior` had, else as posted
+    (`posted_kept`); every posted ticket carries `posted` {at} and leads, earliest post first."""
+    first = posted_sgps(posted)
+    if not first:
+        return [dict(t) for t in tickets]
+    have = {str(t.get("sgp_id")): t for t in tickets}
+    last = {str(t.get("sgp_id")): t for t in prior or []}
+    lead = []
+    for sid, info in first.items():
+        ticket = have.get(sid)
+        if ticket is None:
+            ticket = dict(last.get(sid) or info["item"], posted_kept=True)
+        lead.append(dict(ticket, posted={"at": info["at"]}))
+    return lead + [dict(t) for t in tickets if str(t.get("sgp_id")) not in first]
+
+
 def pin_posted(secs: Mapping[str, Sequence[int]], cids: Sequence[str], entries: Sequence[Mapping[str, Any]], *,
                events: Sequence[Any] | None = None, event: Any = None) -> dict[str, list[int]]:
     """`secs` with each section's posted items leading it, earliest post first, then the section's own order (an item
@@ -1639,10 +1669,11 @@ def page_payload(sheets: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any
                 if p["result"] is None and pick_result_key(p) in pick_void:
                     p["result_note"] = void_label(pick_void[pick_result_key(p)])
         doc["picks"] = picks
-        if rec is not None and sheet.get("sgp"):         # the parlays graded from this day's results (2026-10-17)
-            tickets = [dict(s) for s in sheet["sgp"]]
+        tickets = with_posted_sgps(sheet.get("sgp") or [], posted)   # posted parlays stay and lead (2026-10-17)
+        if rec is not None:                              # the parlays graded from this day's results (2026-10-17)
             for s, res in zip(tickets, sgp_results(tickets, rec)):
                 s["result"] = res
+        if tickets:
             doc["sgp"] = tickets
         # The consistency ladder carries the row's face fields for its player cell: college keeps logos only, here too.
         doc["ladders"] = [dict(lad) if faces else brand_kit.without_faces(lad) for lad in sheet.get("ladders") or []]

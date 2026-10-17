@@ -83,3 +83,35 @@ def test_the_live_reconciled_page_serves_graded_parlays(tmp_path, monkeypatch):
     data = json.loads(re.search(r"const DATA = (.*?);\n", html).group(1))["nhl"]
     assert [s["result"]["status"] for s in data["sgp"]] == ["won", "lost", "pending"]
     assert "function sgpRecap" in html and "SGP_STATUS[res.status]" in html
+
+
+def test_a_posted_parlay_stays_on_the_sheet_after_a_rebuild_replaces_it(tmp_path, monkeypatch):
+    """A game's parlays are re-suggested until it starts (NHL re-runs them on every ladder change), so a ticket on an
+    exported graphic could be gone an hour later. A posted ticket stays, leads, and is graded."""
+    monkeypatch.setattr(route, "_data_root", lambda: tmp_path)
+    monkeypatch.setattr(route, "_today", lambda: "2026-10-17")
+    sheet, rec = _sheet()
+    folder = tmp_path / "cheatsheets" / "nhl"
+    folder.mkdir(parents=True)
+    path = folder / f"{DAY}.json"
+    path.write_text(json.dumps(sheet), encoding="utf-8")
+    client = app.test_client()
+    res = client.post("/api/cheatsheets/posted", json={"sport": "nhl", "date": DAY, "section": "sgp",
+                                                       "sgp_ids": ["sgp_b"], "card_ids": []})
+    assert res.status_code == 404                                             # not an id a sheet can hold: nothing recorded
+    assert cs.load_posted(tmp_path / "cheatsheets", "nhl", DAY) is None
+    sheet["sgp"][1]["sgp_id"] = "sgp_0123456789ab"
+    path.write_text(json.dumps(sheet), encoding="utf-8")
+    res = client.post("/api/cheatsheets/posted", json={"sport": "nhl", "date": DAY, "section": "sgp",
+                                                       "sgp_ids": ["sgp_0123456789ab"]})
+    assert res.status_code == 200 and res.get_json()["sgps"] == 1
+    posted = cs.load_posted(tmp_path / "cheatsheets", "nhl", DAY)
+    rebuilt = [t for t in sheet["sgp"] if t["sgp_id"] != "sgp_0123456789ab"]  # the next build no longer suggests it
+    kept = cs.with_posted_sgps(rebuilt, posted, prior=sheet["sgp"])
+    assert [t["sgp_id"] for t in kept][0] == "sgp_0123456789ab" and kept[0]["posted_kept"] and kept[0]["posted"]["at"]
+    path.write_text(json.dumps(dict(sheet, sgp=rebuilt)), encoding="utf-8")
+    (folder / f"{DAY}.reconciled.json").write_text(json.dumps(rec), encoding="utf-8")
+    html = client.get(f"/cheatsheets?sport=nhl&date={DAY}&view=reconciled").get_data(as_text=True)
+    data = json.loads(re.search(r"const DATA = (.*?);\n", html).group(1))["nhl"]
+    assert data["sgp"][0]["sgp_id"] == "sgp_0123456789ab" and data["sgp"][0]["result"]["status"] == "lost"
+    assert 'data-sg="${esc(s.sgp_id' in html and "sgp_ids: [...sgps]" in html
