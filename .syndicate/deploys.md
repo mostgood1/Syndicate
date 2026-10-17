@@ -50685,3 +50685,23 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - **owed:**
   - The served MLB tiers after tonight's TB @ CLE alt capture (~5:30-6:40 PM CT; first pitch 7:00).
   - The basketball study, then WNBA / NBA cells.
+
+
+## 2026-10-17 19:08:57Z (2:08 PM CT) fleet ff 5ac6913c -> b67ff316 + `reload-web` (2.0 s, 0 failures) + DATA WRITES `wnba_source/sgp/wnba_sgp_correlations.json`, `nba_source/sgp/nba_sgp_correlations.json` + a manual WNBA-only build: WNBA / NBA SGP correlations published (lane `basketball-sgp-builder`, session 9e18a0e7) -- NO worker restart
+- **ask:** user 2026-10-17 "we need sgp work done for alll sports - wnba needs all the same work done as NHL".
+- **claim:** web by basketball-sgp-builder (token f88cd710...), acquire exit 0; ride-alongs: none.
+- **published:**
+  - The study's REAL-LINE files, with `cells.type` emptied (market cells only -- role cells shrunk to 0 masked live market cells).
+  - WNBA: src sha256 73807e1bfa6841f3; 682 role cells dropped, 88 market cells kept.
+  - NBA: src sha256 d5a6b69a96c68c93; 6,808 role cells dropped, 143 market cells kept.
+  - No files existed at either path before.
+- **runtime:** two combos of one player sharing a part are never one ticket (P+A x P+R +0.92).
+- **verify (WNBA-only build 2:09:36 PM CT, ATL @ GSV tips 2:30):**
+  - Build log: `CHEAT_SHEET wnba sgp 3 (fresh 3: hit-rate 3 shown ...)`, `ladders 65 (alt-priced rungs 394)`.
+  - Served `/api/cheatsheets/wnba/2026-10-17`:
+    - safer, 3 legs, 64% (legs x -203 @ DraftKings, worth -156);
+    - safer, 3 legs, 66% (-238 @ William Hill, worth -172);
+    - payout, 4 legs, 54% (-138, worth -105).
+  - All at rho level `market`; each leg shows market / sim / record.
+  - The build also printed `the game log ends 2026-10-09` (stale_log flag, another lane's builders).
+- **owed:** tonight's WNBA grades; the NBA first slate 10-20; MLB served tiers tonight.
