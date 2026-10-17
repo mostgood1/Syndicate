@@ -96,6 +96,7 @@ def test_nested_pairs_are_never_a_ticket():
     a = {"player": "X", "market": "batter_hits"}
     assert M.exclude(a, {"player": "X", "market": "batter_total_bases"}) and not M.exclude(a, {"player": "Y", "market": "batter_total_bases"})
     assert not M.exclude(a, {"player": "X", "market": "batter_strikeouts"})
+    assert M.exclude({"player": "X", "market": "batter_total_bases"}, {"player": "X", "market": "batter_hits_runs_rbis"})
 
 
 def test_the_reconcile_grades_from_the_game_log_and_pitchers_by_their_start(tmp_path):

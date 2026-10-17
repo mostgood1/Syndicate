@@ -4,7 +4,7 @@ lane, user 2026-10-17: "we need sgp work done for alll sports").
 The NHL design (the shared gate, tiers and search in `syndicate.features.shared.sgp_hit_rate`) with MLB's reads:
 
   market   the books' median price on the alt rung, de-vigged by the market's typical main-line margin
-  record   the player's last 10 games before today: hitters with a plate appearance, pitchers' STARTS only (an opener's
+  record   the player's last 10 games before today: hitters with 2+ plate appearances, pitchers' STARTS only (an opener's
            relief outings are another job) -- `derived/mlb_player_game_log_<season>_{hitting,pitching}.csv` (StatsAPI)
   sim      the engine's own distribution for the game (`daily/sims/<date>/sim_*.json`: `hitter_props` /
            `pitcher_props` histograms over its simulations): P(X > rung) read straight off the histogram. These are
@@ -42,7 +42,10 @@ SIM_DIST = {"batter_hits": "hits_dist", "batter_total_bases": "total_bases_dist"
 NESTED = frozenset(frozenset(p) for p in (
     ("batter_hits", "batter_total_bases"), ("batter_hits", "batter_hits_runs_rbis"), ("batter_rbis", "batter_hits_runs_rbis"),
     ("batter_runs_scored", "batter_hits_runs_rbis"), ("batter_home_runs", "batter_total_bases"),
-    ("batter_home_runs", "batter_rbis"), ("batter_home_runs", "batter_runs_scored"), ("batter_home_runs", "batter_hits_runs_rbis")))
+    ("batter_home_runs", "batter_rbis"), ("batter_home_runs", "batter_runs_scored"), ("batter_home_runs", "batter_hits_runs_rbis"),
+    # 1+ total base IS a hit, so it implies 1+ hits+runs+RBIs: on 10-16 rungs the pair made a "2-leg" ticket that was
+    # one bet (Diaz HRR o0.5 + TB o0.5, 63% vs TB alone ~65%). Missing from the study's nested list too.
+    ("batter_total_bases", "batter_hits_runs_rbis")))
 LOG_SEASONS = 4
 LABEL = {"batter_hits": "hits", "batter_total_bases": "total bases", "batter_home_runs": "home runs", "batter_rbis": "RBIs",
          "batter_runs_scored": "runs", "batter_hits_runs_rbis": "hits+runs+RBIs", "batter_strikeouts": "strikeouts (batting)",
@@ -97,7 +100,8 @@ class GameLog:
                     games[pid].setdefault(pk, dict(row))
             return {pid: sorted(g.values(), key=lambda r: str(r.get("date") or ""), reverse=True) for pid, g in games.items()}
 
-        self.hit = index(hitting, lambda r: (_num(r.get("pa")) or 0) > 0)
+        # a hitter's game needs 2+ plate appearances -- the study's "started" rule (PA 1 is mostly a pinch hit)
+        self.hit = index(hitting, lambda r: (_num(r.get("pa")) or 0) >= 2)
         self.pit = index(pitching, lambda r: str(r.get("is_starter") or "").strip() in ("1", "1.0", "True", "true"))
 
     @classmethod
