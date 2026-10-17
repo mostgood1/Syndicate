@@ -37,6 +37,9 @@ _BIG_LINE_STEP = ((150.0, 25.0), (40.0, 10.0), (15.0, 3.0))
 # The alternate key's base (`fetch_alt_ladders`: `base_market`) -> the market name the sheet's rows use, per sport.
 # MLB and soccer rows already use OddsAPI's keys; NHL and the football sports use display names.
 ALT_TO_SHEET = {
+    # MLB batter rows use OddsAPI's keys; its PITCHER rows are bare (2026-10-17: the ladder never priced a pitcher rung)
+    "mlb": {"pitcher_strikeouts": "strikeouts", "pitcher_hits_allowed": "hits_allowed", "pitcher_earned_runs": "earned_runs",
+            "pitcher_outs": "outs"},
     "nhl": {"player_shots_on_goal": "SOG", "player_points": "POINTS", "player_goals": "GOALS",
             "player_assists": "ASSISTS", "player_total_saves": "SAVES"},
     "nfl": {"player_pass_yds": "Passing Yards", "player_pass_tds": "Passing TDs", "player_pass_attempts": "Passing Attempts",

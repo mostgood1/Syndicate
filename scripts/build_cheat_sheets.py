@@ -913,9 +913,10 @@ def merge_with_record(sheet: dict[str, Any], prior: dict[str, Any] | None, *, no
     return merged
 
 
-SGP_SPORTS = ("nfl", "nhl", "wnba", "nba")
+SGP_SPORTS = ("nfl", "nhl", "wnba", "nba", "mlb")
 SGP_BASIS = {"nfl": "three seasons of NFL closing lines (2023-25)", "nhl": "two seasons of NHL box scores (2023-25)",
-             "wnba": "past seasons of WNBA box scores", "nba": "past seasons of NBA box scores"}
+             "wnba": "past seasons of WNBA box scores", "nba": "past seasons of NBA box scores",
+             "mlb": "three seasons of MLB box scores (2023-25)"}
 
 
 def attach_sgp(sheet: dict[str, Any], prior: dict[str, Any] | None, data_root: Path, day: str, sport: str = "nfl") -> None:
@@ -931,6 +932,10 @@ def attach_sgp(sheet: dict[str, Any], prior: dict[str, Any] | None, data_root: P
         from syndicate.features.shared import basketball_sgp_pool
 
         sgp = basketball_sgp_pool.for_sport(sport)    # the hit-rate pool only (user 2026-10-17: "all the same work")
+    elif sport == "mlb":
+        from syndicate.features.shared import mlb_sgp_pool
+
+        sgp = mlb_sgp_pool.hook()
     else:
         sgp = sgp_core
 

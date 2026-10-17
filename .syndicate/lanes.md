@@ -1055,7 +1055,7 @@ death, never life — do not invert it.
 
 ### basketball-sgp-builder — OPEN — opened 2026-10-17 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
 - Goal: WNBA and NBA same-game parlays built for hit rate the NHL way: a basketball correlation study (box scores, roles by minutes, OOS-validated, cells keyed PTS/REB/AST/FG3M/PRA/PR/PA/RA), alt-line capture for WNBA, a leg pool where market + last 10 + sim agree, two tiers, legs graded from the game log; live on the WNBA sheet and ready for the NBA opener 10-20
-- Files: scripts/build_basketball_sgp_correlations.py, tests/test_basketball_sgp_correlations.py, syndicate/features/shared/basketball_sgp_pool.py, tests/test_basketball_sgp_pool.py, scripts/fetch_alt_ladders.py, tests/test_fetch_alt_ladders.py, syndicate/features/shared/alt_consistency.py, syndicate/features/shared/sgp_hit_rate.py
+- Files: scripts/build_basketball_sgp_correlations.py, tests/test_basketball_sgp_correlations.py, syndicate/features/shared/basketball_sgp_pool.py, tests/test_basketball_sgp_pool.py, scripts/fetch_alt_ladders.py, tests/test_fetch_alt_ladders.py, syndicate/features/shared/alt_consistency.py, syndicate/features/shared/sgp_hit_rate.py, syndicate/features/shared/mlb_sgp_pool.py, tests/test_mlb_sgp_pool.py, scripts/build_mlb_sgp_correlations.py, tests/test_mlb_sgp_correlations.py
 - Hypothesis: n/a
 - Falsification test: n/a
 - Verification: served WNBA/NBA sheet carries tiered parlays whose legs show market/record/sim; correlation study OOS beats independence for teammates; legs grade from the game log

@@ -302,6 +302,8 @@ def sgp_leg_actuals(root: Path, day: str, sheet: Mapping[str, Any]) -> dict[str,
 
             def actuals(root_, day_, tickets_):
                 return basketball_sgp_pool.leg_actuals(root_, day_, tickets_, sport=sport)
+        elif sport == "mlb":
+            from syndicate.features.shared.mlb_sgp_pool import leg_actuals as actuals
         elif sport == "nhl":
             from syndicate.features.nhl.sgp_pool import leg_actuals as actuals
         else:
@@ -457,7 +459,7 @@ def main(argv: list[str] | None = None) -> int:
                 # Nothing final yet: no file, so the page offers no toggle onto a sheet of dashes.
                 print(f"RECONCILE {doc['sport']} date={day} nothing settled yet -- no file", flush=True)
                 continue
-            if doc.get("sport") in ("nhl", "nfl", "wnba", "nba"):
+            if doc.get("sport") in ("nhl", "nfl", "wnba", "nba", "mlb"):
                 rec["leg_actuals"] = sgp_leg_actuals(root, day, doc)
             write_atomic(target, rec)
             write_postmortem(root, path, doc, rec, day)
