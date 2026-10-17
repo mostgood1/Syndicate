@@ -42,7 +42,8 @@ if str(REPO_ROOT) not in sys.path:
 
 BASE = "https://api.the-odds-api.com/v4"
 CENTRAL = ZoneInfo("America/Chicago")
-SPORT_KEYS = {"nfl": "americanfootball_nfl", "mlb": "baseball_mlb", "nhl": "icehockey_nhl", "nba": "basketball_nba"}
+SPORT_KEYS = {"nfl": "americanfootball_nfl", "mlb": "baseball_mlb", "nhl": "icehockey_nhl", "nba": "basketball_nba",
+              "wnba": "basketball_wnba"}
 # One alternate key per MAIN stat each fetcher already asks for, and only keys a book was seen posting (2026-10-16).
 ALT_MARKETS = {
     "nfl": ("player_pass_yds_alternate", "player_pass_tds_alternate", "player_pass_attempts_alternate",
@@ -58,6 +59,12 @@ ALT_MARKETS = {
             "player_threes_alternate", "player_points_rebounds_assists_alternate", "player_points_rebounds_alternate",
             "player_points_assists_alternate", "player_rebounds_assists_alternate", "player_steals_alternate",
             "player_blocks_alternate", "player_double_double_alternate"),
+    # WNBA (user 2026-10-17: "wnba needs all the same work done as NHL"). VERIFIED 2026-10-17 with one `/markets` call
+    # on ATL @ GSV (1 credit, 10 books): points / rebounds / assists / threes alternates at 6 books, PRA and R+A at 3,
+    # P+A and P+R at 2; double-double at 1 book is left out.
+    "wnba": ("player_points_alternate", "player_rebounds_alternate", "player_assists_alternate",
+             "player_threes_alternate", "player_points_rebounds_assists_alternate", "player_points_rebounds_alternate",
+             "player_points_assists_alternate", "player_rebounds_assists_alternate"),
 }
 WINDOW_MINUTES = (20, 90)          # fetch the first time a game is 20-90 minutes from its start (every-15-min runs)
 DAILY_CREDIT_CAP = 400             # all sports, per Central day; SYNDICATE_ALT_LADDER_DAILY_CAP overrides
@@ -79,7 +86,9 @@ def bookmakers_for(sport: str) -> str:
             return NHL_FALLBACK_BOOKS
     from syndicate.features.shared.odds_regions import PROP_BOOKMAKERS
 
-    return PROP_BOOKMAKERS[sport]
+    # WNBA's main props widen to the exchanges (`wnba_regions`) and carry no list; its alternates use NBA's ten books
+    # (one region) -- the 10-17 `/markets` probe returned all ten.
+    return PROP_BOOKMAKERS.get(sport) or PROP_BOOKMAKERS["nba"]
 
 
 def _parse_ts(value: Any) -> datetime | None:
@@ -261,7 +270,7 @@ def key_from_env_file(path: Path) -> str:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--data-root", default=os.environ.get("SYNDICATE_DATA_ROOT") or "")
-    ap.add_argument("--sports", default="nfl,mlb,nhl,nba")
+    ap.add_argument("--sports", default="nfl,mlb,nhl,nba,wnba")
     ap.add_argument("--dry-run", action="store_true", help="list the due games and their worst-case credits; no calls")
     ap.add_argument("--env-file", default=None, help="read ODDS_API_KEY from this file (it wins over the process env)")
     args = ap.parse_args(argv)

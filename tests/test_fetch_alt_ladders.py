@@ -124,3 +124,10 @@ def test_an_explicit_env_file_key_wins_over_the_process_env(tmp_path, monkeypatc
     monkeypatch.setattr(alt, "run", lambda root, sports, **kw: seen.update(kw) or {})
     assert alt.main(["--data-root", str(tmp_path), "--env-file", str(env)]) == 0
     assert seen["api_key"] == "from-file"
+
+
+def test_wnba_is_fetched_with_its_verified_alternates_on_nbas_ten_books():
+    m = alt
+    assert m.SPORT_KEYS["wnba"] == "basketball_wnba" and "player_points_alternate" in m.ALT_MARKETS["wnba"]
+    assert "player_double_double_alternate" not in m.ALT_MARKETS["wnba"]
+    assert m.bookmakers_for("wnba") == m.bookmakers_for("nba") and len(m.bookmakers_for("wnba").split(",")) <= 10
