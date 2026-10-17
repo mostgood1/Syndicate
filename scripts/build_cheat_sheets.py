@@ -46,7 +46,10 @@ SEASON_PHASES = {
     "nhl": (("2026-10-06", "2027-04-17", "regular"), ("2027-04-18", "2027-06-25", "postseason")),
     "nba": (("2026-10-20", "2027-04-11", "regular"), ("2027-04-14", "2027-06-25", "postseason")),
     "ncaab": (("2026-11-02", "2027-03-15", "regular"), ("2027-03-16", "2027-04-06", "postseason")),
-    "wnba": (("2027-05-14", "2027-09-12", "regular"), ("2027-09-13", "2027-10-25", "postseason")),
+    # The 2026 postseason was missing (set 2026-10-14 as if the season were over): the 10-17 WNBA sheet was built
+    # picks-only -- no rows, ladders or consistency -- with Atlanta @ Golden State tipping that afternoon.
+    "wnba": (("2026-09-15", "2026-10-31", "postseason"), ("2027-05-14", "2027-09-12", "regular"),
+             ("2027-09-13", "2027-10-25", "postseason")),
     "mlb": (("2026-09-29", "2026-11-05", "postseason"), ("2027-03-25", "2027-09-26", "regular"),
             ("2027-09-27", "2027-11-05", "postseason")),
 }

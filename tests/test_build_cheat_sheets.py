@@ -168,7 +168,7 @@ def test_sheets_cover_regular_season_and_postseason_never_preseason():
     assert m.season_phase("mlb", "2026-10-14") == "postseason"                               # the LCS gets a sheet
     assert m.season_phase("nba", "2026-10-14") is None and m.season_phase("nba", "2026-10-20") == "regular"   # preseason: none
     assert not m.in_season("ncaab", "2026-11-01") and m.in_season("ncaab", "2026-11-02")
-    assert m.season_phase("wnba", "2026-10-14") is None                                     # offseason
+    assert m.season_phase("wnba", "2026-10-14") == "postseason"                             # the 2026 playoffs (was wrongly "offseason")
     assert m.season_phase("nfl", "2026-10-14") == "regular" and m.season_phase("soccer", "2026-07-01") == "regular"
 
 
@@ -742,3 +742,10 @@ def test_recent_form_says_where_once():
     assert nfl[0]["text"] == "under 1.5 in 1 of 3 (newest first: 4 vs SF, 1 vs LAC, 5 @WAS)"
     nhl = cs.recent_points([4, 2, 2], line=1.5, side="over", opponents=["NJD", "MTL", "SEA"])
     assert nhl[0]["text"] == "over 1.5 in 3 of 3 (newest first: 4 v NJD, 2 v MTL, 2 v SEA)"
+
+
+def test_the_wnba_2026_postseason_gets_a_full_sheet():
+    # 2026-10-17: the WNBA table held only 2027 windows, so a playoff day built a picks-only sheet.
+    m = _script()
+    assert m.season_phase("wnba", "2026-10-17") == "postseason" and m.in_season("wnba", "2026-10-31")
+    assert m.season_phase("wnba", "2026-11-15") is None and m.season_phase("wnba", "2027-06-01") == "regular"
