@@ -286,3 +286,13 @@ def test_a_college_ladder_is_served_without_the_players_face():
     pro = next(v for k, v in out.items() if "nfl" in str(k))
     assert "headshot_url" not in college["ladders"][0] and college["ladders"][0]["team_logo_src"]
     assert pro["ladders"][0]["headshot_url"] == "https://x/p.png"
+
+
+def test_the_page_has_a_jump_bar_to_every_section(http):
+    # User 2026-10-17: "the cheat sheets need to allow for jumping to each section". The bar is built from the
+    # sections the page actually drew, never exported, and each section leaves room for it when jumped to.
+    client, root = http
+    _write(root, _sheet())
+    html = client.get("/cheatsheets?sport=nfl").get_data(as_text=True)
+    assert 'id="jump"' in html and 'class="jump no-export"' in html and "buildJump();" in html
+    assert 'sec.id = "sec-" + sec.dataset.section' in html and "scroll-margin-top" in html

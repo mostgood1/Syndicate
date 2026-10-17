@@ -188,6 +188,14 @@ a.sg:hover { border-color: var(--accent); transform: translateY(-1px); }
 .xfoot .x { color: var(--accent2); }
 /* Reconciled view (user 2026-10-15): the sheet as published, with each bet's result and each section's record. */
 .viewbar { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+/* Jump to a section (user 2026-10-17: "the cheat sheets need to allow for jumping to each section"): one chip per
+   section on the page, sticky while scrolling; never in an exported image. */
+.jump { position: sticky; top: 0; z-index: 5; display: flex; gap: 6px; overflow-x: auto; padding: 8px 0; background: var(--bg0); border-bottom: 1px solid var(--edge); scrollbar-width: thin; }
+.jump:empty { display: none; }
+.jump a { flex: none; white-space: nowrap; font: 700 12.5px/1 var(--display); text-transform: uppercase; letter-spacing: .05em; padding: 7px 10px; border: 1px solid var(--edge); border-radius: 999px; color: var(--ink); text-decoration: none; background: var(--bg2); }
+.jump a:hover, .jump a:focus-visible { border-color: var(--accent); color: var(--accent); }
+.jump a b { color: var(--muted); font-weight: 600; margin-left: 5px; }
+#sheet section.sheet { scroll-margin-top: 56px; }
 .viewbar .vnote { color: var(--muted); font-size: 13px; }
 .res { font: 700 13px var(--mono); white-space: nowrap; } td.act, .res.act { font-weight: 700; color: var(--ink); } .res.w { color: var(--accent); } .res.l { color: var(--price); } .res.p { color: var(--muted); }
 tr.rw td:first-child { box-shadow: inset 3px 0 0 var(--accent); } tr.rl td:first-child { box-shadow: inset 3px 0 0 var(--price); }
@@ -264,6 +272,7 @@ td.rungs { white-space: normal; }
     </div>
   </header>
   <div id="gamebar"></div>
+  <nav class="jump no-export" id="jump" aria-label="Jump to a section"></nav>
   <main id="sheet" style="display:grid;gap:18px"></main>
   <footer class="foot"><span><b>Data driven</b> · <b>Discipline</b> · <b>Long-term edge</b></span><span class="honest">We post the wins. We post the losses.</span><span class="x">@SyndicateROI</span></footer>
 </div>
@@ -739,6 +748,19 @@ function render() {
   document.getElementById("viewbar").innerHTML = viewbar(d);
   document.getElementById("sheet").innerHTML = (rec ? recordBar(d, secs, lineSecs, game) : "") + html;
   if (rec) applyResults();
+  buildJump();
+}
+// One chip per section the page drew, in page order, with the section's own count (user 2026-10-17).
+function buildJump() {
+  const bar = document.getElementById("jump");
+  if (!bar) return;
+  const secs = [...document.querySelectorAll("#sheet section.sheet[data-section]")].filter(sec => sec.dataset.title);
+  bar.innerHTML = secs.length < 3 ? "" : secs.map(sec => {
+    sec.id = "sec-" + sec.dataset.section;
+    const n = ((sec.querySelector("header .count") || {}).textContent || "").match(/^\s*(\d+)/);
+    const title = sec.dataset.title.replace(/:.*$/, "");
+    return `<a href="#${sec.id}">${esc(title)}${n ? `<b>${n[1]}</b>` : ""}</a>`;
+  }).join("");
 }
 // ---- Reconciled view (user 2026-10-15: "toggles between pregame sheets and reconciled sheets"). The sheet is never
 // changed: `<sport>/<date>.reconciled.json` (scripts/reconcile_cheat_sheets.py, production's grader) puts a result on
