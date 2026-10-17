@@ -271,3 +271,18 @@ def test_news_is_tied_to_its_game_on_this_sheet():
     assert granlund["event_id"] == "g1" and granlund["matchup"] == "Boston Bruins @ Anaheim Ducks" and granlund["side"] == "home"
     assert granlund["props_this_game"] == 2 and granlund["team_props_this_game"] == 1 and granlund["after_start"] is False
     assert late["after_start"] is True                                            # captured after the start: flagged
+
+
+def test_a_college_ladder_is_served_without_the_players_face():
+    # User 2026-10-16 "use team logos for college athletes": the consistency ladder copies the row's face fields for
+    # its player cell, so page_payload strips them for college sports exactly as it does for rows and picks.
+    from syndicate.features.shared import cheat_sheets as cs
+
+    ladder = {"player": "Asaad Waseem", "market": "Receiving Yards", "line": 39.5, "headshot_url": "https://x/p.png",
+              "headshot_src": "/cheatsheets/img/p.webp", "team_logo_src": "/cheatsheets/img/t.webp", "rungs": []}
+    out = cs.page_payload([{"sport": "ncaaf", "date": "2026-10-17", "rows": [], "games": [], "ladders": [ladder]},
+                           {"sport": "nfl", "date": "2026-10-18", "rows": [], "games": [], "ladders": [ladder]}])
+    college = next(v for k, v in out.items() if "ncaaf" in str(k))
+    pro = next(v for k, v in out.items() if "nfl" in str(k))
+    assert "headshot_url" not in college["ladders"][0] and college["ladders"][0]["team_logo_src"]
+    assert pro["ladders"][0]["headshot_url"] == "https://x/p.png"

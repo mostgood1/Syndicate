@@ -1453,6 +1453,8 @@ def page_payload(sheets: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any
                 if p["result"] is None and pick_result_key(p) in pick_void:
                     p["result_note"] = void_label(pick_void[pick_result_key(p)])
         doc["picks"] = picks
+        # The consistency ladder carries the row's face fields for its player cell: college keeps logos only, here too.
+        doc["ladders"] = [dict(lad) if faces else brand_kit.without_faces(lad) for lad in sheet.get("ladders") or []]
         lines_by_game: dict[Any, list[int]] = {}
         for i, line in enumerate(lines):
             lines_by_game.setdefault(line.get("event_id"), []).append(i)
