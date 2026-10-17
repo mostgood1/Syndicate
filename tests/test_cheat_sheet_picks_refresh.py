@@ -105,3 +105,23 @@ def test_a_stale_lock_from_a_crashed_run_is_taken_over(m, tmp_path):
     os.utime(lock, (old, old))
     assert m.acquire_build_lock(tmp_path, holder="picks-refresh") == lock
     assert json.loads(lock.read_text(encoding="utf-8"))["holder"] == "picks-refresh"
+
+
+def test_the_refresh_puts_alt_prices_on_the_ladder_when_they_land_after_the_full_build(m, tmp_path):
+    # Alt ladders are fetched 20-90 min before a game -- after the day's last full build for evening games -- so the
+    # 15-minute refresh recomputes the ladder and rewrites the sheet when a new capture adds prices.
+    row = {"player": "Nazem Kadri", "market": "SOG", "side": "over", "line": 2.5, "event_id": "e7",
+           "check": {"form10": {"values": [2, 3, 3, 2, 4, 4, 2, 2, 2, 0]}, "p_market": 0.52},
+           "shop": {"median_implied": 0.546}}
+    path = _write(tmp_path, "nhl", "2026-10-15", {"sport": "nhl", "date": "2026-10-15", "rows": [row], "picks": []})
+    m.refresh_picks(tmp_path, ["nhl"], ["2026-10-15"], [], intervals=None)
+    first = json.loads(path.read_text(encoding="utf-8"))
+    assert first["ladders"][0]["alt_captured"] is False
+    alt = tmp_path / "nhl_source" / "tracking" / "alt_ladders" / "2026-10-15.jsonl"
+    alt.parent.mkdir(parents=True)
+    alt.write_text(json.dumps({"player": "Nazem Kadri", "base_market": "player_shots_on_goal", "side": "over",
+                               "line": 3.5, "bookmaker": "draftkings", "price": 200}) + "\n", encoding="utf-8")
+    totals = m.refresh_picks(tmp_path, ["nhl"], ["2026-10-15"], [], intervals=None)
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    assert totals["sheets"] == 1 and doc["ladders"][0]["alt_captured"] is True
+    assert any(c.get("best_price") == 200 for c in doc["ladders"][0]["rungs"])

@@ -893,6 +893,24 @@ def attach_sgp(sheet: dict[str, Any], prior: dict[str, Any] | None, data_root: P
         sheet["sgp"] = list((prior or {}).get("sgp") or [])
 
 
+def attach_ladders(sheet: dict[str, Any], data_root: Path, sport: str, day: str) -> bool:
+    """The consistency ladder per player x stat (user 2026-10-16: "has hit 30 yds 10/10 40 yds 8/10 etc"), with the
+    captured alt rungs' prices where they exist. True when it changed. Never fails the sheet."""
+    from syndicate.features.shared import alt_consistency
+
+    try:
+        ladders = alt_consistency.build(sheet, alt_consistency.load_alt_rows(data_root, sport, day))
+    except Exception as exc:  # noqa: BLE001
+        print(f"CHEAT_SHEET {sport} ladders failed: {type(exc).__name__}: {exc}", flush=True)
+        return False
+    changed = ladders != sheet.get("ladders")
+    sheet["ladders"] = ladders
+    if changed:
+        priced = sum(1 for lad in ladders for c in lad["rungs"] if c.get("best_price") is not None)
+        print(f"CHEAT_SHEET {sport} date={day} ladders {len(ladders)} (alt-priced rungs {priced})", flush=True)
+    return changed
+
+
 BUILD_LOCK_STALE_SECONDS = 45 * 60     # a full build takes ~1-3 min; a lock older than this is a crashed run
 
 
@@ -978,12 +996,13 @@ def refresh_picks(data_root: Path, sports: list[str], dates: list[str], board_ca
             except Exception as exc:  # noqa: BLE001 -- this sport keeps the picks it had
                 print(f"CHEAT_SHEET_PICKS {sport} date={selected} failed: {type(exc).__name__}: {exc}", flush=True)
                 continue
+            ladders_changed = attach_ladders(sheet, data_root, sport, selected) if sheet.get("rows") else False
             new = [p for p in sheet.get("picks") or [] if p.get("pick_id") not in before]
             on_board = sum(1 for p in sheet.get("picks") or [] if p.get("on_board"))
             was = {p.get("pick_id"): bool(p.get("on_board")) for p in (prior or {}).get("picks") or []}
             now_on = {p.get("pick_id"): bool(p.get("on_board")) for p in sheet.get("picks") or []}
-            if prior is not None and not new and was == now_on:
-                continue                  # nothing joined and nothing left the board: leave the file alone
+            if prior is not None and not new and was == now_on and not ladders_changed:
+                continue                  # nothing joined, nothing left the board, no new alt prices: leave the file
             sheet["picks_refreshed_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
             attach_images(sheet, data_root / "cheatsheets" / ".img_cache")
             write_atomic(target, sheet)
@@ -1141,6 +1160,7 @@ def main_build(args: Any, data_root: Path) -> int:
             sheet["picks"] = list((prior or {}).get("picks") or [])
         if sport == "nfl":
             attach_sgp(sheet, prior, data_root, selected)
+        attach_ladders(sheet, data_root, sport, selected)
         if sport in IDENTITY_SPORTS and sheet.get("rows"):   # after the merge, so a kept row gets its face too
             filled = fill_identity(sport, sheet["rows"], selected, data_root / "cheatsheets" / f".{sport}_cache" / selected)
             print(f"CHEAT_SHEET {sport} identity filled {filled}", flush=True)

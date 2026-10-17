@@ -207,6 +207,13 @@ tr.rw td:first-child { box-shadow: inset 3px 0 0 var(--accent); } tr.rl td:first
 .prop.pick { border-left: 3px solid var(--accent); padding-left: 12px; grid-template-columns: minmax(200px, 1.1fr) minmax(320px, 2fr); }
 .ptiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .sgpfaces { display: flex; gap: 4px; margin-bottom: 4px; }
+td.rungs { white-space: normal; }
+.rung { display: inline-block; margin: 2px 4px 2px 0; padding: 2px 7px; border-radius: 7px; border: 1px solid color-mix(in srgb, var(--muted) 45%, transparent); font-size: 12.5px; }
+.rung b { margin-left: 2px; }
+.rung i { font-style: normal; color: var(--muted); margin-left: 4px; font-size: 11.5px; }
+.rung.main { border-color: var(--blue); }
+.rung.hit b { color: var(--green); }
+.rung.miss b { color: var(--red); }
 /* A pick's who-block has four text lines (chips, name, bet, game) beside a face that spans three: every text line
    stays in the text column, or the game line drops under the face one word per line. */
 .prop.pick .who > :not(.face) { grid-column: 2; }
@@ -385,6 +392,23 @@ function picksBlock(d, game) {
   return sectionShell("picks", "Syndicate picks", "Our featured plays for these games: the best price beats the no-vig fair by 2% or more, net of any exchange fee, on a fresh quote. A SYNDICATE PICK is one our sim backs too; a PRICE PLAY is the same price edge without the sim's backing. Each is promoted at the price shown and stays on the record at that price.",
     [sims ? `${sims} pick${sims === 1 ? "" : "s"}` : "", plays ? `${plays} price play${plays === 1 ? "" : "s"}` : ""].filter(Boolean).join(" · "),
     `<div class="rowlist">${picks.map(([p, i]) => pickRow(p, i)).join("")}</div>`);
+}
+// The consistency ladder (user 2026-10-16: "has hit 30 yds 10/10 40 yds 8/10 etc"): how often each player cleared every
+// rung around his line in his last 10 games; where the books' alternate lines were captured, the best price sits on the
+// rung. Context only -- the 10-14 backtest measured consistency at alt rungs as already priced.
+function ladderCell(c) {
+  const tone = c.rate == null ? "" : c.rate >= 0.8 ? "hit" : c.rate <= 0.3 ? "miss" : "";
+  const price = c.best_price != null ? `<i>${odds(c.best_price)}${c.p_market != null ? ` · ${pct(c.p_market)}` : ""}</i>` : "";
+  return `<span class="rung ${tone}${c.main ? " main" : ""}" title="${c.main ? "the main line" : ""}">${esc(c.label)} <b>${c.hits}/${c.games}</b>${price}</span>`;
+}
+function ladderBlock(d, game) {
+  const lads = (d.ladders || []).filter(l => !game || l.event_id === game.event_id);
+  if (!lads.length) return "";
+  const priced = lads.filter(l => l.alt_captured).length;
+  return sectionShell("ladder", "Consistency ladder", `How often each player cleared every rung around his line in his last 10 games (newest first on the row's form). Where the books' alternate lines were captured, the best price and the market's estimated probability sit on the rung${priced ? ` (${priced} of ${lads.length} have them)` : ""}. Context, not picks: we tested consistency at alternate lines and the price already accounts for it.`,
+    `${lads.length} props`,
+    `<div class="tbl"><table class="every ladder"><thead><tr><th>Player</th><th>Stat</th><th>Line</th><th>Last 10 at each rung</th></tr></thead><tbody>${
+      lads.map(l => `<tr><td>${playerCell(l, true)}</td><td>${esc(marketName(l.market))}</td><td class="n">${l.line}</td><td class="rungs">${l.rungs.map(ladderCell).join("")}</td></tr>`).join("")}</tbody></table></div>`);
 }
 // Same-game parlays (NFL first, user 2026-10-16): two legs we would take on their own whose results move together --
 // correlations measured on three seasons of closing lines. Books publish no SGP price, so OUR probability, its fair
@@ -643,6 +667,7 @@ function render() {
     if (!ids.length && key !== "value") return "";
     return sectionShell(key, title, blurb, `${ids.length} rows`, `<div class="rowlist">${ids.length ? ids.map(i => propRow(d.rows[i], i)).join("") : `<div class="empty">Nothing qualifies on this ${game ? "game" : "slate"}.</div>`}</div>`);
   }).join("");
+  html += ladderBlock(d, game);
   if ((secs.consistency || []).length) html += sectionShell("consistency", "Consistency: recent hit rates", "Every prop with a full 10-game sample that cleared its line 70% of the time or more, with the trend (last 5 against last 10). We tested consistency across NFL, NBA and MLB: the price already accounts for it, so read the EV column, not the streak.", `${secs.consistency.length} props`, consistencyTable(d, secs.consistency));
   if ((secs.matchup_spots || []).length) html += sectionShell("matchups", "Matchups: where the defense gives it up", "Overs facing a defense in the softest fifth at allowing that stat, unders facing the toughest fifth, and players who have cleared this exact line in two-thirds or more of their games against this opponent. Matchups are mostly priced in too -- context next to the price, not a pick.", `${secs.matchup_spots.length} props`, matchupTable(d, secs.matchup_spots));
   if ((secs.pvp_batters || []).length) html += sectionShell("pvp_batters", "Batter vs pitcher", "Each hitter's career line against today's probable starter (3+ plate appearances), from MLB, shown with his best-priced prop. Small samples the price already knows: context next to the price, not a pick.", `${secs.pvp_batters.length} props`, pvpTable(d, secs.pvp_batters));
