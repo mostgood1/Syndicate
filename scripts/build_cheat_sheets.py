@@ -893,18 +893,33 @@ def attach_sgp(sheet: dict[str, Any], prior: dict[str, Any] | None, data_root: P
         started = {str(g.get("event_id")) for g in sheet.get("games") or []
                    if (_parse_ts(g.get("commence_time")) or now) <= now}
         # A started game's parlays are the record from before it started: never re-suggested, never re-ledgered.
-        fresh = [s for s in sgp.suggest(sheet, cells, roles) if str(s.get("event_id")) not in started]
-        sheet["sgp"] = sgp_core.merge_record(fresh, (prior or {}).get("sgp"), started=started)
+        extra = {"data_root": data_root, "day": day} if sport == "nhl" else {}
+        fresh = [s for s in sgp.suggest(sheet, cells, roles, **extra) if str(s.get("event_id")) not in started]
+        # The sheet shows the hit-rate tickets only (user 2026-10-17: "high hit rate SGPS not plays that wiull never
+        # win" -- long shots "Off the sheet"); every fresh ticket, long shots included, still goes to the ledger.
+        shown = [s for s in fresh if s.get("family") == "hit_rate"]
+        sheet["sgp"] = sgp_core.merge_record(shown, (prior or {}).get("sgp"), started=started)
+        if sport == "nhl":
+            sheet["sgp_alt_rows"] = alt_row_count(data_root, sport, day)
         # A parlay that went out on an exported graphic stays on the sheet whatever this build suggests (2026-10-17).
         sheet["sgp"] = cs.with_posted_sgps(sheet["sgp"], cs.load_posted(data_root / "cheatsheets", sport, day),
                                            (prior or {}).get("sgp"))
         new = sgp_core.append_ledger(data_root / "cheatsheets" / sport / "sgp_ledger.jsonl",
                                      sgp_core.ledger_records(fresh, day=day, generated_at=now.isoformat(timespec="seconds")))
-        print(f"CHEAT_SHEET {sport} sgp {len(sheet['sgp'])} (fresh {len(fresh)}, new to the ledger {new}, roles {len(roles)})",
-              flush=True)
+        print(f"CHEAT_SHEET {sport} sgp {len(sheet['sgp'])} (fresh {len(fresh)}: hit-rate {len(shown)} shown, "
+              f"{len(fresh) - len(shown)} long shots to the ledger only; new to the ledger {new}, roles {len(roles)})", flush=True)
     except Exception as exc:  # noqa: BLE001
         print(f"CHEAT_SHEET {sport} sgp failed: {type(exc).__name__}: {exc}", flush=True)
         sheet["sgp"] = list((prior or {}).get("sgp") or [])
+
+
+def alt_row_count(data_root: Path, sport: str, day: str) -> int:
+    """Rows in the day's alt capture: the NHL parlays re-run when it grows (a game's rungs land 20-90 min before it)."""
+    try:
+        with open(data_root / f"{sport}_source" / "tracking" / "alt_ladders" / f"{day}.jsonl", "rb") as fh:
+            return sum(1 for _ in fh)
+    except OSError:
+        return 0
 
 
 def attach_ladders(sheet: dict[str, Any], data_root: Path, sport: str, day: str) -> bool:
@@ -1011,9 +1026,11 @@ def refresh_picks(data_root: Path, sports: list[str], dates: list[str], board_ca
                 print(f"CHEAT_SHEET_PICKS {sport} date={selected} failed: {type(exc).__name__}: {exc}", flush=True)
                 continue
             ladders_changed = attach_ladders(sheet, data_root, sport, selected) if sheet.get("rows") else False
-            if ladders_changed and sport == "nhl":
-                # NHL parlays are built from the ladder's priced rungs, which land 20-90 min before puck drop
+            if sport == "nhl" and sheet.get("rows") and (
+                    ladders_changed or alt_row_count(data_root, sport, selected) != (prior or {}).get("sgp_alt_rows")):
+                # NHL parlays are built from every priced alt rung, which land 20-90 min before each puck drop
                 attach_sgp(sheet, prior, data_root, selected, sport)
+                ladders_changed = True
             new = [p for p in sheet.get("picks") or [] if p.get("pick_id") not in before]
             on_board = sum(1 for p in sheet.get("picks") or [] if p.get("on_board"))
             was = {p.get("pick_id"): bool(p.get("on_board")) for p in (prior or {}).get("picks") or []}

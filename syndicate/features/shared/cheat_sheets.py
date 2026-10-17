@@ -840,6 +840,12 @@ def sgp_results(tickets: Sequence[Mapping[str, Any]], reconciled: Mapping[str, A
         parts = str(key).split("|")
         if len(parts) == 4:
             voided.add((parts[0], parts[1]))
+    # Legs the sheet never graded (a player off the sheet's rows): the reconcile reads them off the box-score log by the
+    # leg's player id (`nhl.sgp_pool.leg_actuals`), keyed player|market.
+    for key, value in ((reconciled or {}).get("leg_actuals") or {}).items():
+        parts = str(key).split("|")
+        if len(parts) == 2 and isinstance(value, (int, float)):
+            actual.setdefault((parts[0], parts[1]), float(value))
     out = []
     for ticket in tickets:
         legs, results = [], []

@@ -100,8 +100,11 @@ def test_reachability_the_sheet_build_attaches_nhl_parlays_and_ledgers_them(tmp_
                     _ladder("Nathan MacKinnon", "POINTS", [(0.5, 0.65, {"dk": -170})])])
     sheet["games"][0]["commence_time"] = "2099-01-01T23:00:00Z"
     m.attach_sgp(sheet, None, tmp_path, "2099-01-01", "nhl")
-    assert len(sheet["sgp"]) == 1 and sheet["sgp_basis"].startswith("two seasons of NHL")
-    assert len((tmp_path / "cheatsheets" / "nhl" / "sgp_ledger.jsonl").read_text(encoding="utf-8").splitlines()) == 1
+    # The one ticket here is a correlation-family pair (55% x 65% legs, no alt pool): since 2026-10-17 long shots go
+    # to the paper ledger only and the sheet shows the hit-rate tiers, so the section is empty and the ledger has it.
+    assert sheet["sgp"] == [] and sheet["sgp_basis"].startswith("two seasons of NHL")
+    ledger = (tmp_path / "cheatsheets" / "nhl" / "sgp_ledger.jsonl").read_text(encoding="utf-8").splitlines()
+    assert len(ledger) == 1 and json.loads(ledger[0])["family"] == "correlation"
 
 
 # ------------------------------------------------------------------------------- 3- and 4-leg tickets (user 2026-10-16)

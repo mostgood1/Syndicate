@@ -136,7 +136,11 @@ def legs_by_game(sheet: Mapping[str, Any], roles: Mapping[str, str]) -> dict[str
 
 
 def suggest(sheet: Mapping[str, Any], cells: Mapping[str, Any] | None, roles: Mapping[str, str], *,
-            per_game: int = core.PER_GAME, per_sheet: int = core.PER_SHEET) -> list[dict[str, Any]]:
+            per_game: int = core.PER_GAME, per_sheet: int = core.PER_SHEET, data_root: Path | None = None,
+            day: str | None = None) -> list[dict[str, Any]]:
+    """The hit-rate tiers from every priced alt rung (`sgp_pool`, when `data_root` and `day` are given), then the
+    correlation family. The cheat sheet shows the hit-rate tiers only (user 2026-10-17: long shots "Off the sheet");
+    every ticket still goes to the paper ledger."""
     if not cells:
         return []
     nested = set(NESTED_SAME_PLAYER)
@@ -155,4 +159,9 @@ def suggest(sheet: Mapping[str, Any], cells: Mapping[str, Any] | None, roles: Ma
         core.multi_leg(corr_legs, cells, games, exclude=exclude)
     for t in corr:
         t.setdefault("family", "correlation")
+    if data_root is not None and day:
+        from syndicate.features.nhl import sgp_pool
+
+        pool, _info = sgp_pool.legs_by_game(sheet, data_root, day, roles)
+        return sgp_pool.tickets(pool, cells, games, exclude=exclude) + corr
     return core.hit_rate_tickets(legs, cells, games, exclude=exclude) + corr

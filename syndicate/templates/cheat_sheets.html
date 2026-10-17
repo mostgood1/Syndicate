@@ -439,7 +439,12 @@ function sgpLegResult(r) {
 }
 function sgpRow(s) {
   const res = s.result, rl = res && res.legs || [];
-  const legs = (s.legs || []).map((l, i) => `<li class="ctx${rl[i] ? ({lost: " leg-l", void: " leg-v", pending: " leg-p"}[rl[i].result] || "") : ""}"><b>${esc(l.bet || "")}</b>${pct(l.p_side)} on its own${l.games ? ` · cleared ${l.hits}/${l.games} recently` : ""}${l.alt ? " · alt line" : ""}${sgpLegResult(rl[i])}</li>`).join("");
+  // A pool leg shows the three reads that let it in (2026-10-17): the market, its record, our sim.
+  const reads = l => l.p_sim != null
+    ? `market ${pct(l.p_market)} · cleared ${l.hits}/${l.games} · our sim ${pct(l.p_sim)}`
+    : `${pct(l.p_side)} on its own${l.games ? ` · cleared ${l.hits}/${l.games} recently` : ""}`;
+  const legs = (s.legs || []).map((l, i) => `<li class="ctx${rl[i] ? ({lost: " leg-l", void: " leg-v", pending: " leg-p"}[rl[i].result] || "") : ""}"><b>${esc(l.bet || "")}</b>${reads(l)}${l.alt ? " · alt line" : ""}${sgpLegResult(rl[i])}</li>`).join("");
+  const together = s.together && s.together.games ? `<li class="ctx"><b>Together</b>all ${s.size} cleared in ${s.together.hits} of the team's last ${s.together.games} games they all played</li>` : "";
   return `<div class="prop pick sgp${res && res.status === "won" ? " rw" : res && res.status === "lost" ? " rl" : ""}" data-sg="${esc(s.sgp_id || "")}">
     <div class="who"><div class="sgpfaces">${(s.legs || []).map(miniFace).join("")}</div>
       <div class="line1">${s.family === "hit_rate" ? `<span class="chip value">Built for hit rate</span>` : ""}<span class="chip value">${(s.size || 2) > 2 ? `${s.size}-leg parlay` : "Same-game parlay"}</span>${s.same_player ? `<span class="chip neutral">Same player</span>` : ""}${postedChip(s)}${res ? SGP_STATUS[res.status] || "" : started(s.commence_time) ? `<span class="chip started">Started</span>` : ""}</div>
@@ -453,17 +458,21 @@ function sgpRow(s) {
         ? `<div class="ptile"><span>Legs multiplied</span><b>${odds(s.legs_product_odds)}</b><i>${esc(s.book || "")} -- books pay less on correlated legs; no estimate for ${s.size} legs</i></div>`
         : `<div class="ptile"><span>Est. book price</span><b>${odds(s.est_book_odds)}</b><i>estimate: ${esc(s.book || "")} legs ${odds(s.legs_product_odds)} less ${Math.round(100 * (s.assumed_discount || 0))}%</i></div>`}
     </div>
-    <ul class="checks">${legs}<li class="ctx"><b>Together</b>${esc(SGP_WHY[s.family === "hit_rate" ? "hit_rate" : s.relation] || SGP_WHY[s.relation] || "")}</li></ul>
+    <ul class="checks">${legs}${together || `<li class="ctx"><b>Together</b>${esc(SGP_WHY[s.family === "hit_rate" ? "hit_rate" : s.relation] || SGP_WHY[s.relation] || "")}</li>`}</ul>
   </div>`;
 }
 function sgpBlock(d, game) {
   const sgps = (d.sgp || []).filter(s => !game || s.event_id === game.event_id);
   if (!sgps.length) return "";
-  return sectionShell("sgp", "Same-game parlays", `Two legs whose results move together, measured on ${esc(d.sgp_basis || "past seasons")}. Books do not publish parlay prices, so the number to use is <b>worth it at</b>: take the parlay only if your book's same-game-parlay price is that or better. The book price shown is an estimate -- the leg prices multiplied together, less an assumed discount -- not a quote. Tracked on paper; no edge is claimed yet.`,
+  return sectionShell("sgp", "Same-game parlays", `Built for the chance the whole ticket wins: every leg is a line the market prices as likely, the player has cleared in at least 8 of his last 10, and our sim agrees -- with how the legs move together measured on ${esc(d.sgp_basis || "past seasons")}. Heavy favourites carry vig, so the legs multiplied often pay LESS than the ticket is worth: the number to use is <b>worth it at</b> -- take it only if your book's same-game-parlay price is that or better. A book price shown on a pair is an estimate -- the legs multiplied, less an assumed discount -- not a quote. Tracked on paper; no edge is claimed yet.`,
     `${sgps.length} parlay${sgps.length === 1 ? "" : "s"}`, (() => {
-      const hr = sgps.filter(s => s.family === "hit_rate"), corr = sgps.filter(s => s.family !== "hit_rate");
+      const safer = sgps.filter(s => s.tier === "safer"), payout = sgps.filter(s => s.tier === "payout");
+      const hr = sgps.filter(s => s.family === "hit_rate" && !s.tier), corr = sgps.filter(s => s.family !== "hit_rate");
       const head = t => `<div class="note" style="margin:6px 0 2px"><b>${t}</b></div>`;
-      return sgpRecap(d, sgps) + (hr.length ? head("Built for hit rate -- lines they have been clearing, the chance the whole ticket wins first") + `<div class="rowlist">${hr.map(sgpRow).join("")}</div>` : "")
+      return sgpRecap(d, sgps)
+        + (safer.length ? head("Higher hit rate -- 2 or 3 legs, each one the market, the player's last 10 and our sim all make likely") + `<div class="rowlist">${safer.map(sgpRow).join("")}</div>` : "")
+        + (payout.length ? head("Bigger payout -- 4 or 5 of those legs, about half win, near even money") + `<div class="rowlist">${payout.map(sgpRow).join("")}</div>` : "")
+        + (hr.length ? head("Built for hit rate -- lines they have been clearing, the chance the whole ticket wins first") + `<div class="rowlist">${hr.map(sgpRow).join("")}</div>` : "")
         + (corr.length ? head("Built on correlation -- legs that win together more often than apart") + `<div class="rowlist">${corr.map(sgpRow).join("")}</div>` : "");
     })());
 }

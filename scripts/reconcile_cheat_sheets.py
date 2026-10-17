@@ -292,6 +292,28 @@ def reconcile(sheet: dict[str, Any], props: dict[str, Any], lines: dict[str, Any
                        "lines_graded": len(l_out), "picks": len(set(pick_keys)), "picks_graded": len(k_out)}}
 
 
+def nhl_leg_actuals(root: Path, day: str, sheet: Mapping[str, Any]) -> dict[str, float]:
+    """Each NHL parlay leg's actual from the box-score log (the sheet's parlays and the day's paper-ledger ones): the
+    high-hit-rate pool draws legs from players the sheet never graded (`nhl.sgp_pool.leg_actuals`)."""
+    try:
+        from syndicate.features.nhl import sgp_pool
+
+        tickets = list(sheet.get("sgp") or [])
+        ledger = root / "cheatsheets" / "nhl" / "sgp_ledger.jsonl"
+        if ledger.is_file():
+            for line in ledger.read_text(encoding="utf-8").splitlines():
+                try:
+                    rec = json.loads(line)
+                except ValueError:
+                    continue
+                if rec.get("date") == day:
+                    tickets.append(rec)
+        return sgp_pool.leg_actuals(root, day, tickets)
+    except Exception as exc:  # noqa: BLE001 -- the props still reconcile; those legs stay pending
+        print(f"RECONCILE nhl date={day} leg actuals failed: {type(exc).__name__}: {exc}", flush=True)
+        return {}
+
+
 def write_record(sheets_dir: Path, *, now: datetime) -> dict[str, Any]:
     """`<cheatsheets>/record.json` -- the running season record (user 2026-10-15: "add a running season record page")
     -- rebuilt from EVERY reconciled day on disk, so a late final or a re-graded day always flows through."""
@@ -426,6 +448,8 @@ def main(argv: list[str] | None = None) -> int:
                 # Nothing final yet: no file, so the page offers no toggle onto a sheet of dashes.
                 print(f"RECONCILE {doc['sport']} date={day} nothing settled yet -- no file", flush=True)
                 continue
+            if doc.get("sport") == "nhl":
+                rec["leg_actuals"] = nhl_leg_actuals(root, day, doc)
             write_atomic(target, rec)
             write_postmortem(root, path, doc, rec, day)
             print(f"RECONCILE {doc['sport']} date={day} props {c['props_graded']}/{c['props']} (values {c['props_valued']}, "

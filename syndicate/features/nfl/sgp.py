@@ -780,8 +780,10 @@ def ledger_records(sgps: Iterable[Mapping[str, Any]], *, day: str, generated_at:
     """The paper record: what we said, at what probability and prices, before the game. Graded later on outcomes."""
     keep = ("sgp_id", "event_id", "relation", "same_player", "rho", "rho_level", "p_joint", "p_independent", "lift",
             "fair_odds", "worth_it_odds", "book", "legs_product_odds", "assumed_discount", "est_book_odds",
-            "est_ev_pct", "matchup")
+            "est_ev_pct", "matchup", "family", "tier", "together")
+    # A pool leg (NHL, 2026-10-17) keeps its three reads and its game-log id: the reconcile grades it from the box score.
+    leg_keep = ("player", "team", "market", "side", "line", "p_over", "role", "bet", "player_id", "alt", "p_market",
+                "p_sim", "hits", "games")
     return [{"date": day, "promoted_at": generated_at, **{k: s.get(k) for k in keep},
-             "legs": [{k: leg.get(k) for k in ("player", "team", "market", "side", "line", "p_over", "role", "bet")}
-                      for leg in s.get("legs") or []]}
+             "legs": [{k: leg.get(k) for k in leg_keep if leg.get(k) is not None} for leg in s.get("legs") or []]}
             for s in sgps]
