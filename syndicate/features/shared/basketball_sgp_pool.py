@@ -34,6 +34,9 @@ PARTS = {"PTS": ("PTS",), "REB": ("REB",), "AST": ("AST",), "FG3M": ("FG3M",), "
          "PR": ("PTS", "REB"), "PA": ("PTS", "AST"), "RA": ("REB", "AST")}
 SIM_KEY = {"PTS": "pts", "REB": "reb", "AST": "ast", "FG3M": "threes"}
 NESTED = frozenset(frozenset({a, b}) for a in PARTS for b in PARTS if a != b and set(PARTS[a]) <= set(PARTS[b]))
+# Two combos of one player that share a part are near-duplicate bets (2026-10-17 basketball study, real lines: same
+# player P+A x P+R +0.92 NBA / +0.91 WNBA, P+R x R+A +0.48): never one ticket either.
+NEAR_DUPLICATE = frozenset(frozenset({a, b}) for a in ("PR", "PA", "RA") for b in ("PR", "PA", "RA") if a != b)
 LABEL = {"player_points": "points", "player_rebounds": "rebounds", "player_assists": "assists", "player_threes": "threes",
          "player_points_rebounds_assists": "pts+reb+ast", "player_points_rebounds": "pts+reb", "player_points_assists": "pts+ast",
          "player_rebounds_assists": "reb+ast"}
@@ -279,7 +282,8 @@ def exclude(a: Mapping[str, Any], b: Mapping[str, Any]) -> bool:
     """A stat and a combo containing it, same player (points + PRA): one implies much of the other."""
     if a["player"] != b["player"]:
         return False
-    return frozenset({str(a["type"]).split("|")[0], str(b["type"]).split("|")[0]}) in NESTED
+    pair = frozenset({str(a["type"]).split("|")[0], str(b["type"]).split("|")[0]})
+    return pair in NESTED or pair in NEAR_DUPLICATE
 
 
 def tickets(pool: Mapping[str, list[dict[str, Any]]], cells: Mapping[str, Any], games: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:

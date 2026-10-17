@@ -93,6 +93,8 @@ def test_a_combo_sums_the_parts_and_never_pairs_with_its_own_part():
     a = {"player": "X", "type": "PTS|S1"}
     assert B.exclude(a, {"player": "X", "type": "PR|S1"}) and B.exclude(a, {"player": "X", "type": "PRA|S1"})
     assert not B.exclude(a, {"player": "X", "type": "REB|S1"}) and not B.exclude(a, {"player": "Y", "type": "PR|S1"})
+    assert B.exclude({"player": "X", "type": "PA|S1"}, {"player": "X", "type": "PR|S1"})          # +0.92: one bet
+    assert not B.exclude({"player": "X", "type": "PA|S1"}, {"player": "Y", "type": "PR|S1"})
 
 
 def test_roles_rank_the_teams_minutes_over_its_recent_games(tmp_path):
