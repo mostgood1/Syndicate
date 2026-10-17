@@ -50652,3 +50652,22 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - Deployed module on the fleet loads week 6, 463 sim params, 75 ruled out, the 4-season usage log.
   - Pool empty: no NFL alt capture exists before Sunday. Plumbing on real week-6 names: 395 of 472 sim player-stats resolve with 10 games, 2 unmatched.
 - **owed:** the first NFL tiers Sunday as alt prices land (10:30 AM CT on); tonight's NHL grades (leg actuals from the box-score log); the hit-rate calibration by tier once a sample exists.
+
+
+## 2026-10-17 17:03:54Z-17:43:39Z (12:03-12:43 PM CT) fleet ff c4f86909 -> d52acec5 -> e00f4714 -> aee7008a -> ac8f3a33 -> 8e92c96c -> a2355a88, `reload-web` each (2.0 s, 0 failures) + a manual WNBA-only sheet build: jump bar, picks hold/cap/fold, WNBA postseason, WNBA alt capture, basketball SGP pool (lanes `cheat-sheets`, `basketball-sgp-builder`, session 9e18a0e7) -- NO worker restart
+- **asks / approvals:**
+  - "the cheat sheets need to allow for jumping to each section" -> "Deploy now (Recommended)".
+  - "NHL has a TON of syndicate picks right now (which has me concerned)" -> "Hold, cap, fold (Recommended)".
+  - "we need sgp work done for alll sports - wnba needs all the same work done as NHL" -> the WNBA season fix approved as "Deploy + build WNBA (Recommended)".
+  - WNBA alt capture and the basketball pool deployed under that request's scope.
+- **claim:** web by cheat-sheets (token fd2ea03b...), acquire exit 0, held across all six; ride-alongs: none (all mine).
+- **verify, jump bar (d52acec5 + aee7008a):** live NHL page -- sticky, 13 chips with counts; a click lands the section at 56 px (under the bar); game-line chips named.
+- **verify, picks (e00f4714):**
+  - The 12:22 PM CT refresh stamped `dropped_at`: NHL 10-17 now 151 picks, 49 shown, 102 folded ("dropped before the game -- still graded"), 29 on the board, `pick_pending` {} (cap reached).
+  - Before: 142-151 shown. Picks dropped before this deploy carry the deploy time as `dropped_at`, so those for already-started games do not fold today.
+- **verify, WNBA season (ac8f3a33; I set only 2027 windows on 10-14):** manual WNBA build 12:36:44-12:37:29 PM CT: `groups=73/73 rows=197 ... consistency 15 ... ladders 73` -- was picks-only. ATL @ GSV tips 2:30 PM CT.
+- **verify, WNBA alt (8e92c96c):**
+  - `/markets` probe (1 credit, 10 books): points / rebounds / assists / threes alternates at 6 books, combos at 2-3.
+  - Dry run on the fleet: wnba handled, due 0 at 12:39 (window opens 1:00 PM CT). NOT YET SEEN: a WNBA alt file.
+- **basketball pool (a2355a88):** inert until `wnba_source/sgp/wnba_sgp_correlations.json` exists (study running). The WNBA game log ends 2026-10-09 (another lane's history builders) -- the pool flags `stale_log`.
+- **owed:** the WNBA alt capture in today's window; the basketball correlation study, then publish and the first WNBA/NBA tiers.
