@@ -5,11 +5,11 @@ import pytest
 
 from syndicate.features.nhl import sgp
 
-CELLS = {"cells": {"type": {"POINTS|F1~SOG|F1~same_player": {"rho": 0.55},
-                            "POINTS|F1~POINTS|F1~teammate": {"rho": 0.35},
-                            "SAVES|G~SOG|F1~opponent": {"rho": 0.25}},
+CELLS = {"cells": {"type": {"POINTS|L1~SOG|L1~same_player": {"rho": 0.55},
+                            "POINTS|L1~POINTS|L1~teammate": {"rho": 0.35},
+                            "SAVES|G~SOG|L1~opponent": {"rho": 0.25}},
                    "market": {}}}
-ROLES = {"nazemkadri": "F1", "nathanmackinnon": "F1", "tristanjarry": "G"}
+ROLES = {"nazemkadri": "L1", "nathanmackinnon": "L1", "tristanjarry": "G"}
 
 
 def _ladder(player, market, rungs, team="COL", event="e1"):
@@ -28,7 +28,7 @@ def test_ladder_rungs_become_legs_inside_the_probability_band():
                                                     (3.5, 0.32, {"dk": 200}), (6.5, 0.06, {"dk": 1500})])])
     legs = sgp.legs_by_game(sheet, ROLES)["e1"]
     assert sorted(l["line"] for l in legs) == [2.5, 3.5]          # 1+ at 95% and 7+ at 6% add nothing but vig
-    assert all(l["type"] == "SOG|F1" and l["side"] == "over" for l in legs)
+    assert all(l["type"] == "SOG|L1" and l["side"] == "over" for l in legs)
 
 
 def test_linemates_points_pair_at_one_book_with_the_measured_rho():
@@ -67,4 +67,12 @@ def test_lineup_roles_read_slots_and_the_starting_goalie(tmp_path):
         "3,Mackenzie Blackwood,G,,59.0,Colorado Avalanche\n4,Scott Wedgewood,G,,1.0,Colorado Avalanche\n",
         encoding="utf-8")
     roles = sgp.lineup_roles(tmp_path, "2026-10-16")
-    assert roles == {"nathanmackinnon": "F1", "calemakar": "D1", "mackenzieblackwood": "G"}
+    assert roles == {"nathanmackinnon": "L1", "calemakar": "D1", "mackenzieblackwood": "G"}
+
+
+def test_a_goal_and_a_point_by_the_same_player_never_pair():
+    cells = {"cells": {"type": {"GOALS|L1~POINTS|L1~same_player": {"rho": 0.93}}, "market": {}},
+             "nested_same_player": ["GOALS~POINTS~same_player"]}
+    sheet = _sheet([_ladder("Nathan MacKinnon", "GOALS", [(0.5, 0.4, {"dk": 150})]),
+                    _ladder("Nathan MacKinnon", "POINTS", [(0.5, 0.7, {"dk": -230})])])
+    assert sgp.suggest(sheet, cells, ROLES) == []

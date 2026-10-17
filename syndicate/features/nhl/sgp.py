@@ -30,8 +30,12 @@ from syndicate.features.nfl import sgp as core
 CORRELATIONS = Path("nhl_source") / "sgp" / "nhl_sgp_correlations.json"
 MARKETS = ("SOG", "POINTS", "GOALS", "ASSISTS", "SAVES")
 MIN_LEG_P, MAX_LEG_P = 0.15, 0.85
-# lineup slot -> the role names in the correlations file (fitted on prior-TOI tiers of the same shape)
-ROLE_FROM_SLOT = {"L1": "F1", "L2": "F2", "L3": "F3", "L4": "F4", "D1": "D1", "D2": "D2", "D3": "D3"}
+# lineup slot -> the role names in the correlations file. The fit used the engine's own `line_slot` rule (average TOI
+# over the team's last 8 earlier games), so the names are the slots themselves.
+ROLE_FROM_SLOT = {s: s for s in ("L1", "L2", "L3", "L4", "D1", "D2", "D3")}
+# Same-player pairs where one leg implies the other (a goal IS a point): rho 0.91-0.95, never a ticket. The fit lists
+# them in `nested_same_player`; these are the defaults if the file does not.
+NESTED_SAME_PLAYER = frozenset({frozenset({"GOALS", "POINTS"}), frozenset({"ASSISTS", "POINTS"})})
 
 
 def _norm(name: Any) -> str:
@@ -129,5 +133,14 @@ def suggest(sheet: Mapping[str, Any], cells: Mapping[str, Any] | None, roles: Ma
             per_game: int = core.PER_GAME, per_sheet: int = core.PER_SHEET) -> list[dict[str, Any]]:
     if not cells:
         return []
+    nested = set(NESTED_SAME_PLAYER)
+    for key in cells.get("nested_same_player") or []:
+        parts = str(key).split("~")
+        if len(parts) == 3:
+            nested.add(frozenset(parts[:2]))
+
+    def exclude(a: Mapping[str, Any], b: Mapping[str, Any]) -> bool:
+        return a["player"] == b["player"] and frozenset({a["market"], b["market"]}) in nested
+
     return core.pair_legs(legs_by_game(sheet, roles), cells, sheet.get("games") or [], per_game=per_game,
-                          per_sheet=per_sheet)
+                          per_sheet=per_sheet, exclude=exclude)

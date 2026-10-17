@@ -320,7 +320,7 @@ def relation_of(a: Mapping[str, Any], b: Mapping[str, Any]) -> str:
 
 def pair_legs(legs_by_game: Mapping[str, list[dict[str, Any]]], cells: Mapping[str, Any], games: Iterable[Mapping[str, Any]],
               *, per_game: int = PER_GAME, per_sheet: int = PER_SHEET,
-              relation: Any = None) -> list[dict[str, Any]]:
+              relation: Any = None, exclude: Any = None) -> list[dict[str, Any]]:
     """The sport-agnostic half: every two legs of one game -> priced SGP candidates. A leg is a dict with player, team,
     market, side, line, p_over, p_side, type ("MARKET|ROLE"), prices {book: American}, event_id. Two legs on the SAME
     player AND market never pair (one rung implies the other). `relation(a, b)` names the cell family; the default is
@@ -334,6 +334,8 @@ def pair_legs(legs_by_game: Mapping[str, list[dict[str, Any]]], cells: Mapping[s
             for j in range(i + 1, len(legs)):
                 a, b = legs[i], legs[j]
                 if a["player"] == b["player"] and a["market"] == b["market"]:
+                    continue
+                if exclude is not None and exclude(a, b):
                     continue
                 same_player = a["player"] == b["player"]
                 rel = relation(a, b)
