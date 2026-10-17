@@ -50619,3 +50619,17 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - **My own four evening NHL rebuilds** (ladder and parlay deploys, 7:03-8:27 PM CT) re-ran the whole sheet; they took consistency from 2 to 3 to 5 rows.
 - **verify (served, 10:4x AM CT):** `/cheatsheets?sport=nhl&date=2026-10-16&view=reconciled` -- the consistency section leads with LaCombe SOG u1.5 (posted -103 Pinnacle; 1 SOG, won, +0.971u) and Karlsson SOG u2.5 (posted -180 DraftKings; 2 SOG, won, +0.556u), both carrying `posted` at 17:34Z, then the 4 later rows. LaCombe's last sheet price was +110 at BetOnline -- the record now grades the posted -103. `POST /api/cheatsheets/posted` with section `picks` -> 400 `bad request` (route live; nothing written for 10-17).
 - **owed:** the season record picks this up at the 23:50 CT reconcile (record.json is rebuilt from every reconciled day); the first real export after this deploy -> check `<sport>/<date>.posted.json` gains a post and the button reads "Recorded as posted".
+
+
+## 2026-10-17 15:58:31Z (10:58 AM CT) fleet ff d956cbcc -> 3d9ae451 (+ 15:59:57Z -> d22b5dac) + `reload-web` (2.0 s each, 0 failures): the reconciled sheet grades its same-game parlays; exported parlay graphics are recorded as posted (lane `cheat-sheets`, session 9e18a0e7) -- NO worker restart
+- **ask:** user 2026-10-17 "why arent SGPs reconciled for NHL on the live site"; deploy approved "Deploy now (Recommended)".
+- **cause:** `grade_sgp_paper.py` wrote `cheatsheets/<sport>/sgp_graded.jsonl` and nothing read it. The reconciled view reads only `<date>.reconciled.json` (props, game lines, picks), and the parlay section had no result display. Second gap found on the way: the 10-16 paper ledger holds 13 NHL parlays and the final sheet 10. A build re-suggests a game's parlays until it starts (NHL on every ladder change), so an exported parlay graphic could lose its tickets.
+- **change:** the rule moved to `cheat_sheets.sgp_results` (`grade_one` calls it, so page and ledger cannot disagree); page_payload grades each ticket from the day's reconciled file; the section shows Won / Lost / Void / Pending, each leg's actual, and "X of N won -- our probabilities said Y would" (paper: no units). "sgp" exports are now recorded as posted (sgp_ids), kept by builds, and lead the section. d22b5dac: a lost leg's bullet is a cross, not the list's tick.
+- **claim:** web by cheat-sheets (token 37a06a69...), acquire exit 0; ride-alongs: none.
+- **verify (served, 10:59 AM-11:01 AM CT):** `/cheatsheets?sport=nhl&date=2026-10-16&view=reconciled`
+  - payload: 10 parlays, all `lost`, predicted 0.69.
+  - rendered recap: "0 of 10 won · our probabilities said 0.7 would · paper only".
+  - each ticket "✗ Lost"; 14 of 36 legs render the cross bullet.
+  - 10-17: 8 parlays with no result (not reconciled yet).
+- **engine read:** 0 of 10 against 0.69 expected (P(0) ~0.49) -- no signal. All 10 were the low-probability correlation family (5-11%) from before the hit-rate family existed.
+- **owed:** 10-17's parlays after the 11:50 PM CT reconcile; the first real parlay export -> `posted.json` gains `sgps`.
