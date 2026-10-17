@@ -52,17 +52,46 @@ def grade_one(record: Mapping[str, Any], reconciled: Mapping[str, Any] | None) -
     """WON / LOST / VOID / PENDING for one parlay, with each leg's result."""
     props = (reconciled or {}).get("props") or {}
     void = (reconciled or {}).get("void") or {}
+    # The player's ACTUAL stat from any graded line of the same player x market: an alt-rung leg ("OVER 30.5 saves")
+    # is usually not a line the sheet itself graded. Measured 10-16: 11 of 13 NHL parlays sat "pending" for that alone.
+    actual: dict[tuple[str, str], float] = {}
+    voided: set[tuple[str, str]] = set()
+    for key, val in props.items():
+        parts = str(key).split("|")
+        if len(parts) == 4 and isinstance(val, dict) and val.get("v") is not None:
+            actual[(parts[0], parts[1])] = float(val["v"])
+    for key in void:
+        parts = str(key).split("|")
+        if len(parts) == 4:
+            voided.add((parts[0], parts[1]))
     legs, results = [], []
     for leg in record.get("legs") or []:
         key = cs.prop_result_key(leg)
-        if key in void:
+        parts = key.split("|")
+        pm = (parts[0], parts[1]) if len(parts) == 4 else None
+        value = (props.get(key) or {}).get("v")
+        if key in void or (pm in voided and pm not in actual):
             res = "void"
         elif key in props and props[key].get("y") is not None:
             res = "won" if float(props[key]["y"]) >= 1 else "lost"
+        elif pm in actual:
+            value = actual[pm]
+            try:
+                line = float(leg.get("line"))
+            except (TypeError, ValueError):
+                line = None
+            side = str(leg.get("side") or "").lower()
+            if line is None and side == "yes":                 # Anytime TD: a yes leg wins on any TD
+                res = "won" if value > 0 else "lost"
+            elif line is None or value == line:
+                res = "void"                                   # a push is graded like a void: never won or lost
+            elif side in ("over", "yes"):
+                res = "won" if value > line else "lost"
+            else:
+                res = "won" if value < line else "lost"
         else:
             res = "pending"
-        legs.append({"bet": leg.get("bet"), "key": key, "result": res,
-                     "actual": (props.get(key) or {}).get("v")})
+        legs.append({"bet": leg.get("bet"), "key": key, "result": res, "actual": value})
         results.append(res)
     if "lost" in results:
         status = "lost"

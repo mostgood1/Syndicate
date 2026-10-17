@@ -220,3 +220,17 @@ def test_the_summary_compares_the_hit_rate_with_the_predicted_probability_and_pr
     assert s["hit_rate"] == pytest.approx(1 / 3, abs=1e-4) and s["predicted"] == pytest.approx(0.3)
     assert s["roi_at_worth_it_price"] == pytest.approx(3.5 / 3 - 1, abs=1e-4)
     assert s["teammate"]["n"] == 2 and s["same_player"]["n"] == 1
+
+
+def test_an_alt_rung_leg_is_graded_from_the_players_actual_on_any_graded_line():
+    # 10-16: 11 of 13 NHL parlays sat "pending" -- their alt-rung legs were not lines the sheet itself graded.
+    g = _grader()
+    key = lambda pl, mk, sd, ln: sheet_cs.prop_result_key({"player": pl, "market": mk, "side": sd, "line": ln})  # noqa: E731
+    rec = {"props": {key("Michael DiPietro", "SAVES", "over", 27.5): {"y": 1.0, "v": 31},
+                     key("Jackson LaCombe", "SOG", "under", 1.5): {"y": 0.0, "v": 3}}}
+    record = {"sgp_id": "x", "legs": [{"player": "Michael DiPietro", "market": "SAVES", "side": "over", "line": 30.5},
+                                      {"player": "Jackson LaCombe", "market": "SOG", "side": "over", "line": 2.5}]}
+    graded = g.grade_one(record, rec)
+    assert [l["result"] for l in graded["legs"]] == ["won", "won"] and graded["status"] == "won"
+    record["legs"][0]["line"] = 31.0                                    # exactly the actual: a push, never a win
+    assert g.grade_one(record, rec)["status"] == "void"
