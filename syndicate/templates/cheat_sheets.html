@@ -418,13 +418,14 @@ const SGP_WHY = {
   same_player: "Same player: these two rise and fall together, and books price this pairing tightest -- check the SGP price against the worth-it number before anything else.",
   teammate: "Teammates: when one clears, the other clears more often than not, measured over past seasons.",
   opponent: "Opponents: the game script ties these together, measured over past seasons.",
+  hit_rate: "Built for hit rate: lines each player cleared in 7 or more of his recent games, often the lower alternate lines, at their consistency-adjusted probability; every pair moves together or is neutral. Lower lines pay less -- our tests found consistency at alternate lines already in the price.",
   mixed: "Every pair of legs on this ticket was measured together -- teammates, a player's own stats and the other side -- and the ticket wins together more often than its legs would apart.",
 };
 function sgpRow(s) {
-  const legs = (s.legs || []).map(l => `<li class="ctx"><b>${esc(l.bet || "")}</b>${pct(l.p_side)} on its own</li>`).join("");
+  const legs = (s.legs || []).map(l => `<li class="ctx"><b>${esc(l.bet || "")}</b>${pct(l.p_side)} on its own${l.games ? ` · cleared ${l.hits}/${l.games} recently` : ""}${l.alt ? " · alt line" : ""}</li>`).join("");
   return `<div class="prop pick sgp">
     <div class="who"><div class="sgpfaces">${(s.legs || []).map(miniFace).join("")}</div>
-      <div class="line1"><span class="chip value">${(s.size || 2) > 2 ? `${s.size}-leg parlay` : "Same-game parlay"}</span>${s.same_player ? `<span class="chip neutral">Same player</span>` : ""}${started(s.commence_time) ? `<span class="chip started">Started</span>` : ""}</div>
+      <div class="line1">${s.family === "hit_rate" ? `<span class="chip value">Built for hit rate</span>` : ""}<span class="chip value">${(s.size || 2) > 2 ? `${s.size}-leg parlay` : "Same-game parlay"}</span>${s.same_player ? `<span class="chip neutral">Same player</span>` : ""}${started(s.commence_time) ? `<span class="chip started">Started</span>` : ""}</div>
       <div class="bet">${(s.legs || []).map(l => esc(l.bet || "")).join(" + ")}</div>
       <div class="meta">${esc(s.matchup || "")}${s.kickoff_ct ? ` · <span class="kick">${esc(s.kickoff_ct)}</span>` : ""}</div></div>
     <div class="ptiles">
@@ -435,14 +436,19 @@ function sgpRow(s) {
         ? `<div class="ptile"><span>Legs multiplied</span><b>${odds(s.legs_product_odds)}</b><i>${esc(s.book || "")} -- books pay less on correlated legs; no estimate for ${s.size} legs</i></div>`
         : `<div class="ptile"><span>Est. book price</span><b>${odds(s.est_book_odds)}</b><i>estimate: ${esc(s.book || "")} legs ${odds(s.legs_product_odds)} less ${Math.round(100 * (s.assumed_discount || 0))}%</i></div>`}
     </div>
-    <ul class="checks">${legs}<li class="ctx"><b>Together</b>${esc(SGP_WHY[s.relation] || "")}</li></ul>
+    <ul class="checks">${legs}<li class="ctx"><b>Together</b>${esc(SGP_WHY[s.family === "hit_rate" ? "hit_rate" : s.relation] || SGP_WHY[s.relation] || "")}</li></ul>
   </div>`;
 }
 function sgpBlock(d, game) {
   const sgps = (d.sgp || []).filter(s => !game || s.event_id === game.event_id);
   if (!sgps.length) return "";
   return sectionShell("sgp", "Same-game parlays", `Two legs whose results move together, measured on ${esc(d.sgp_basis || "past seasons")}. Books do not publish parlay prices, so the number to use is <b>worth it at</b>: take the parlay only if your book's same-game-parlay price is that or better. The book price shown is an estimate -- the leg prices multiplied together, less an assumed discount -- not a quote. Tracked on paper; no edge is claimed yet.`,
-    `${sgps.length} parlay${sgps.length === 1 ? "" : "s"}`, `<div class="rowlist">${sgps.map(sgpRow).join("")}</div>`);
+    `${sgps.length} parlay${sgps.length === 1 ? "" : "s"}`, (() => {
+      const hr = sgps.filter(s => s.family === "hit_rate"), corr = sgps.filter(s => s.family !== "hit_rate");
+      const head = t => `<div class="note" style="margin:6px 0 2px"><b>${t}</b></div>`;
+      return (hr.length ? head("Built for hit rate -- lines they have been clearing, the chance the whole ticket wins first") + `<div class="rowlist">${hr.map(sgpRow).join("")}</div>` : "")
+        + (corr.length ? head("Built on correlation -- legs that win together more often than apart") + `<div class="rowlist">${corr.map(sgpRow).join("")}</div>` : "");
+    })());
 }
 const SECTIONS = [
   ["value", "Value at the best price", "The best available price beats the no-vig fair price by 2% or more."],

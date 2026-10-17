@@ -30,6 +30,7 @@ from syndicate.features.nfl import sgp as core
 CORRELATIONS = Path("nhl_source") / "sgp" / "nhl_sgp_correlations.json"
 MARKETS = ("SOG", "POINTS", "GOALS", "ASSISTS", "SAVES")
 MIN_LEG_P, MAX_LEG_P = 0.15, 0.85
+COLLECT_MAX_P = 0.92            # the hit-rate family reaches higher (core.HR_LEG_P); the correlation family stops at 0.85
 # lineup slot -> the role names in the correlations file. The fit used the engine's own `line_slot` rule (average TOI
 # over the team's last 8 earlier games), so the names are the slots themselves.
 ROLE_FROM_SLOT = {s: s for s in ("L1", "L2", "L3", "L4", "D1", "D2", "D3")}
@@ -97,15 +98,14 @@ def legs_by_game(sheet: Mapping[str, Any], roles: Mapping[str, str]) -> dict[str
         role = roles.get(_norm(lad.get("player")), "UNK")
         face = {k: lad.get(k) for k in face_keys if lad.get(k)}
         for cell in lad.get("rungs") or []:
-            p, prices = cell.get("p_market"), cell.get("prices") or {}
-            if p is None or not prices or not (MIN_LEG_P <= p <= MAX_LEG_P):
+            leg = core.rung_leg(lad, cell, role)       # the consistency-adjusted probability, every book's price
+            if leg is None or not (MIN_LEG_P <= leg["p_side"] <= COLLECT_MAX_P):
                 continue
             key = (lad.get("event_id"), _norm(lad.get("player")), market, "over", cell["rung"])
             if key in seen:
                 continue
             seen.add(key)
-            out[str(lad.get("event_id"))].append(_leg(lad.get("player"), lad.get("team"), market, "over", cell["rung"],
-                                                      float(p), prices, lad.get("event_id"), role, face))
+            out[str(lad.get("event_id"))].append(leg)
     for row in sheet.get("rows") or []:
         market = str(row.get("market") or "")
         if market not in MARKETS:
@@ -115,8 +115,12 @@ def legs_by_game(sheet: Mapping[str, Any], roles: Mapping[str, str]) -> dict[str
         except (TypeError, ValueError):
             continue
         side = str(row.get("side") or "").lower()
+        hits, games, post = core._row_consistency(row)
+        p_market_side = p_side
+        if post is not None and 0.01 < post < 0.99:
+            p_side = post                             # the sheet's consistency posterior for this side
         p_over = 1.0 - p_side if side == "under" else p_side
-        if not (MIN_LEG_P <= p_side <= MAX_LEG_P) or not row.get("book_prices"):
+        if not (MIN_LEG_P <= p_side <= COLLECT_MAX_P) or not row.get("book_prices"):
             continue
         key = (row.get("event_id"), _norm(row.get("player")), market, side, line)
         if key in seen:
@@ -124,8 +128,10 @@ def legs_by_game(sheet: Mapping[str, Any], roles: Mapping[str, str]) -> dict[str
         seen.add(key)
         role = roles.get(_norm(row.get("player")), "UNK")
         face = {k: row.get(k) for k in face_keys if row.get(k)}
-        out[str(row.get("event_id"))].append(_leg(row.get("player"), row.get("team"), market, side, line, p_over,
-                                                  row.get("book_prices") or {}, row.get("event_id"), role, face))
+        leg = _leg(row.get("player"), row.get("team"), market, side, line, p_over, row.get("book_prices") or {},
+                   row.get("event_id"), role, face)
+        leg.update({"p_market": round(p_market_side, 4), "hits": hits, "games": games})
+        out[str(row.get("event_id"))].append(leg)
     return out
 
 
@@ -144,5 +150,9 @@ def suggest(sheet: Mapping[str, Any], cells: Mapping[str, Any] | None, roles: Ma
 
     legs = legs_by_game(sheet, roles)
     games = sheet.get("games") or []
-    return core.pair_legs(legs, cells, games, per_game=per_game, per_sheet=per_sheet, exclude=exclude) + core.multi_leg(
-        legs, cells, games, exclude=exclude)
+    corr_legs = {e: [x for x in ls if x["p_side"] <= MAX_LEG_P] for e, ls in legs.items()}
+    corr = core.pair_legs(corr_legs, cells, games, per_game=per_game, per_sheet=per_sheet, exclude=exclude) + \
+        core.multi_leg(corr_legs, cells, games, exclude=exclude)
+    for t in corr:
+        t.setdefault("family", "correlation")
+    return core.hit_rate_tickets(legs, cells, games, exclude=exclude) + corr

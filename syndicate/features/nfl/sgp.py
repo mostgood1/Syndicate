@@ -41,10 +41,22 @@ MIN_LIFT_MULTI = 1.05
 # at least MIN_JOINT_MULTI of the time -- no lottery tickets -- and show only our probability, fair and "worth it at".
 MIN_JOINT_MULTI = 0.06
 MIN_JOINT_BEAM_PAIR = 0.12
+# HIT-RATE FAMILY (user 2026-10-16: "sgps should also be trying to use alt-lines and consistency data to increase hit
+# rates"). Legs a player has CLEARED (>= HR_MIN_RATE of >= HR_MIN_GAMES recent games) at lines -- often the alt
+# ladder's lower rungs -- that the consistency-adjusted probability puts at HR_LEG_P or better; pairs whose measured
+# correlation helps or is neutral (lift >= 1.0, never against); ranked by the chance the WHOLE ticket wins. Higher hit
+# rate comes from lower lines that pay less: the 10-14 backtest measured consistency at alt rungs as priced.
+HR_LEG_P = (0.55, 0.92)
+HR_MIN_RATE, HR_MIN_GAMES = 0.70, 8
+HR_PER_GAME, HR_PER_SHEET = 2, 9
+HR_BEAM = 20
+# A ticket whose legs MULTIPLIED pay less than our fair price can never be worth it: a book pays at most the legs'
+# product on correlated legs. Measured 10-16 NHL dry run: "Kadri 1+ SOG + Crosby 1+ SOG" wins 79% but the legs pay
+# -660 against a fair -375 -- a high hit rate the price has already taken. Such tickets are not shown.
 BEAM = 30
 PER_GAME_MULTI = 2
 PER_SHEET_MULTI = 8
-_QMC_POINTS = 4096
+_QMC_POINTS = 2048
 MARKETS = {"Passing Yards": "pass_yds", "Passing Attempts": "pass_att", "Passing TDs": "pass_td",
            "Interceptions": "ints", "Rushing Yards": "rush_yds", "Rushing Attempts": "rush_att",
            "Receiving Yards": "rec_yds", "Receptions": "rec", "Anytime TD": "atd"}
@@ -251,6 +263,33 @@ def _over_prob(row: Mapping[str, Any]) -> float | None:
 _TEAM_TO_PBP = {"LAR": "LA", "WSH": "WAS", "JAC": "JAX", "LVR": "LV", "OAK": "LV", "SD": "LAC", "STL": "LA"}
 
 
+def consistency_prob(p_market: float | None, hits: Any, games: Any) -> float | None:
+    """The market's probability moved toward how often the player cleared the line -- `cheat_sheets.
+    consistency_posterior`, the market as a prior worth 40 games (PROVISIONAL k). None without a market probability."""
+    from syndicate.features.shared.cheat_sheets import consistency_posterior
+
+    try:
+        return consistency_posterior(p_market, int(hits), int(games)) if games else p_market
+    except (TypeError, ValueError):
+        return p_market
+
+
+def _row_consistency(row: Mapping[str, Any]) -> tuple[int | None, int | None, float | None]:
+    """(hits, games, posterior) for the ROW'S SIDE at its line: `check.form10` and `check.p_posterior` are side-relative."""
+    check = row.get("check") or {}
+    form = check.get("form10") or {}
+    try:
+        hits, games = int(form.get("hits")), int(form.get("games"))
+    except (TypeError, ValueError):
+        hits, games = None, None
+    post = check.get("p_posterior")
+    try:
+        post = float(post)
+    except (TypeError, ValueError):
+        post = None
+    return hits, games, post
+
+
 def _leg(row: Mapping[str, Any], roles: Mapping[tuple[str, tuple[str, str]], str]) -> dict[str, Any] | None:
     market = row.get("market")
     if market not in MARKETS:
@@ -258,12 +297,17 @@ def _leg(row: Mapping[str, Any], roles: Mapping[tuple[str, tuple[str, str]], str
     po = _over_prob(row)
     if po is None:
         return None
+    side_market = po if str(row.get("side") or "").lower() in ("over", "yes") else 1.0 - po
+    hits, games, post = _row_consistency(row)
+    if post is not None and 0.01 < post < 0.99:          # the sheet's own consistency posterior for this side
+        po = post if str(row.get("side") or "").lower() in ("over", "yes") else 1.0 - post
     key = name_key(row.get("player"))
     team = str(row.get("team") or "").upper()
     role = roles.get((_TEAM_TO_PBP.get(team, team), key), "UNK") if key else "UNK"
     side = str(row.get("side") or "").lower()
     return {"player": row.get("player"), "team": row.get("team"), "market": market, "side": side, "line": row.get("line"),
             "p_over": po, "p_side": po if side in ("over", "yes") else 1.0 - po, "type": f"{market}|{role}",
+            "p_market": round(side_market, 4), "hits": hits, "games": games,
             "role": role, "prices": dict(row.get("book_prices") or {}), "event_id": row.get("event_id"),
             "pos": row.get("pos"), "headshot_card_src": row.get("headshot_card_src"),
             "headshot_src": row.get("headshot_src"), "headshot_url": row.get("headshot_url"),
@@ -325,8 +369,27 @@ def suggest(sheet: Mapping[str, Any], cells: Mapping[str, Any] | None,
         seen.add(ident)
         legs_by_game[str(leg["event_id"])].append(leg)
     games = sheet.get("games") or []
-    return pair_legs(legs_by_game, cells, games, per_game=per_game, per_sheet=per_sheet) + multi_leg(
+    corr = pair_legs(legs_by_game, cells, games, per_game=per_game, per_sheet=per_sheet) + multi_leg(
         legs_by_game, cells, games)
+    for t in corr:
+        t.setdefault("family", "correlation")
+    # the hit-rate family reads EVERY row (not only the ones we would take alone) and every priced alt rung
+    hr_legs: dict[str, list[dict[str, Any]]] = collections.defaultdict(list)
+    for row in sheet.get("rows") or []:
+        leg = _leg(row, roles)
+        if leg is not None:
+            hr_legs[str(leg["event_id"])].append(leg)
+    for lad in sheet.get("ladders") or []:
+        if lad.get("market") not in MARKETS:
+            continue
+        key = name_key(lad.get("player"))
+        team = str(lad.get("team") or "").upper()
+        role = roles.get((_TEAM_TO_PBP.get(team, team), key), "UNK") if key else "UNK"
+        for cell in lad.get("rungs") or []:
+            leg = rung_leg(lad, cell, role)
+            if leg is not None:
+                hr_legs[str(leg["event_id"])].append(leg)
+    return hit_rate_tickets(hr_legs, cells, games) + corr
 
 
 def relation_of(a: Mapping[str, Any], b: Mapping[str, Any]) -> str:
@@ -379,7 +442,7 @@ def pair_legs(legs_by_game: Mapping[str, list[dict[str, Any]]], cells: Mapping[s
                 game = by_event.get(event_id) or {}
                 cands.append({
                     "sgp_id": sgp_id, "event_id": event_id, "legs": [dict(a, bet=_bet_text(a)), dict(b, bet=_bet_text(b))],
-                    "size": 2, "show_estimate": True,
+                    "size": 2, "show_estimate": True, "family": "correlation",
                     "relation": rel, "same_player": same_player, "rho": round(rho, 3), "rho_level": level,
                     "p_joint": round(pj, 4), "p_independent": round(indep, 4), "lift": round(pj / indep, 3),
                     "fair_odds": odds_at(fair_dec),
@@ -482,6 +545,10 @@ def ticket_joints(tickets, cells, relation):
                 elif level == "market" and worst == "role":
                     worst = "market"
         levels.append(worst)
+    if k == 2:                                   # exact for a pair: Phi2 via Owen's T, no quasi-random points
+        import numpy as np
+
+        return np.asarray(bvn_lower(upper[:, 0], upper[:, 1], corr[:, 0, 1]), dtype=float), levels
     return orthant_all(upper, corr), levels
 
 
@@ -570,6 +637,7 @@ def multi_leg(legs_by_game, cells, games, *, relation: Any = None, exclude: Any 
                 bk, prod = _best_book(t)
                 rels = [relation(t[i], t[j]) for i in range(len(t)) for j in range(i + 1, len(t))]
                 tk = _ticket(event_id, t, pj, lv, game, bk, prod, rels)
+                tk["family"] = "correlation"
                 if tk["lift"] >= MIN_LIFT_MULTI and tk["p_joint"] >= MIN_JOINT_MULTI:
                     built.append((tk, t))
             built.sort(key=lambda x: -x[0]["lift"])
@@ -592,6 +660,92 @@ def multi_leg(legs_by_game, cells, games, *, relation: Any = None, exclude: Any 
     by_size: dict[int, list[dict[str, Any]]] = collections.defaultdict(list)
     for c in out:
         if len(by_size[c["size"]]) < per_sheet:
+            by_size[c["size"]].append(c)
+    return [c for size in sorted(by_size) for c in by_size[size]]
+
+
+def rung_leg(lad: Mapping[str, Any], cell: Mapping[str, Any], role: str) -> dict[str, Any] | None:
+    """One priced alt rung of the consistency ladder as an OVER leg, at the consistency-adjusted probability."""
+    p_market, prices = cell.get("p_market"), cell.get("prices") or {}
+    if p_market is None or not prices:
+        return None
+    p = cell.get("p_shrunk") if cell.get("p_shrunk") is not None else p_market
+    market = str(lad.get("market") or "")
+    face = {k: lad.get(k) for k in ("headshot_src", "headshot_url", "team_logo_src", "team_logo", "team_name", "pos")
+            if lad.get(k)}
+    return {"player": lad.get("player"), "team": lad.get("team"), "market": market, "side": "over",
+            "line": cell["rung"], "p_over": float(p), "p_side": float(p), "p_market": float(p_market),
+            "hits": cell.get("hits"), "games": cell.get("games"), "type": f"{market}|{role}", "role": role,
+            "prices": dict(prices), "event_id": lad.get("event_id"), "alt": True, **face}
+
+
+def hit_rate_tickets(legs_by_game, cells, games, *, relation: Any = None, exclude: Any = None,
+                     per_game: int = HR_PER_GAME, per_sheet: int = HR_PER_SHEET) -> list[dict[str, Any]]:
+    """2-4 leg tickets built for the chance the whole ticket wins (see HR_* above). Same one-book and clash rules as
+    every ticket; ranked by P(all win); the assumed-discount estimate only on pairs."""
+    relation = relation or relation_of
+    lo, hi = HR_LEG_P
+    pool = {}
+    for event_id, legs in legs_by_game.items():
+        keep = [leg for leg in legs if lo <= leg["p_side"] <= hi and (leg.get("games") or 0) >= HR_MIN_GAMES
+                and (leg.get("hits") or 0) / max(leg.get("games") or 1, 1) >= HR_MIN_RATE]
+        if len(keep) >= 2:
+            pool[event_id] = keep
+    by_event = {str(g.get("event_id")): g for g in games}
+    out: list[dict[str, Any]] = []
+
+    def clash(a, b):
+        return (a["player"] == b["player"] and a["market"] == b["market"]) or (exclude is not None and exclude(a, b))
+
+    for event_id, legs in pool.items():
+        game = by_event.get(event_id) or {}
+        tickets = [[a, b] for i, a in enumerate(legs) for b in legs[i + 1:] if not clash(a, b) and _best_book([a, b])]
+        for size in (2, 3, 4):
+            if size > 2:
+                cands, seen = [], set()
+                for base in tickets:
+                    for leg in legs:
+                        if any(leg is x or clash(leg, x) for x in base):
+                            continue
+                        t = base + [leg]
+                        key = frozenset((x["player"], x["market"], x["line"]) for x in t)
+                        if key in seen or not _best_book(t):
+                            continue
+                        seen.add(key)
+                        cands.append(t)
+                tickets = cands
+            pjs, levels = ticket_joints(tickets, cells, relation)
+            built = []
+            for t, pj, lv in zip(tickets, pjs, levels):
+                if pj != pj or pj <= 0:
+                    continue
+                bk, prod = _best_book(t)
+                rels = [relation(t[i], t[j]) for i in range(len(t)) for j in range(i + 1, len(t))]
+                tk = _ticket(event_id, t, pj, lv, game, bk, prod, rels)
+                if tk["lift"] < 1.0:
+                    continue                          # correlation must help or be neutral, never cut the hit rate
+                if prod < 1.0 / pj:
+                    continue                          # even the legs' product pays under our fair: never worth it
+                tk.update({"family": "hit_rate", "show_estimate": size == 2})
+                built.append((tk, t))
+            built.sort(key=lambda x: -x[0]["p_joint"])
+            tickets = [t for _tk, t in built[:HR_BEAM]]
+            kept, kept_sets = [], []
+            for tk, t in built:
+                ids = {(x["player"], x["market"]) for x in t}
+                if any(len(ids & other) >= max(size - 1, 1) for other in kept_sets):
+                    continue
+                kept.append(tk)
+                kept_sets.append(ids)
+                if len(kept) >= per_game:
+                    break
+            out += kept
+            if not tickets:
+                break
+    out.sort(key=lambda c: (c["size"], -c["p_joint"]))
+    by_size: dict[int, list[dict[str, Any]]] = collections.defaultdict(list)
+    for c in out:
+        if len(by_size[c["size"]]) < per_sheet // 3 + 1:
             by_size[c["size"]].append(c)
     return [c for size in sorted(by_size) for c in by_size[size]]
 

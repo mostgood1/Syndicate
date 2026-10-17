@@ -151,3 +151,31 @@ def test_three_and_four_leg_tickets_one_book_no_clash_ranked_by_lift_with_no_est
         lifts = [s["lift"] for s in multi if s["size"] == size]
         assert lifts == sorted(lifts, reverse=True)
     assert all(s["show_estimate"] for s in out if s.get("size", 2) == 2)
+
+
+# ------------------------------------------------------------------- the hit-rate family (user 2026-10-16)
+def _hr_ladder(player, market, rung, p, hits, prices, team="COL"):
+    return {"player": player, "market": market, "team": team, "event_id": "e1", "line": rung,
+            "rungs": [{"rung": rung, "label": f"{int(rung + 0.5)}+", "hits": hits, "games": 10, "p_market": p,
+                       "p_shrunk": p, "prices": prices}]}
+
+
+def test_hit_rate_tickets_use_consistent_legs_rank_by_the_whole_ticket_and_never_beat_the_book_product():
+    sheet = _sheet([_hr_ladder("Nazem Kadri", "POINTS", 0.5, 0.62, 8, {"dk": -150}),
+                    _hr_ladder("Nathan MacKinnon", "POINTS", 0.5, 0.70, 9, {"dk": -210}),
+                    _hr_ladder("Cale Makar", "POINTS", 0.5, 0.60, 5, {"dk": -140}),         # 5/10: not consistent
+                    _hr_ladder("Gabe Landeskog", "POINTS", 0.5, 0.58, 7, {"dk": -2000})])   # a price that never pays
+    roles = {"nazemkadri": "L1", "nathanmackinnon": "L1", "calemakar": "L1", "gabelandeskog": "L1"}
+    out = [s for s in sgp.suggest(sheet, MULTI_CELLS, roles) if s.get("family") == "hit_rate"]
+    assert out, "a consistent, correlated pair must produce a hit-rate ticket"
+    for s in out:
+        players = {l["player"] for l in s["legs"]}
+        assert "Cale Makar" not in players                               # cleared 5/10: below the 7/10 bar
+        assert sgp.core.payout(s["legs"][0]["prices"][s["book"]]) is not None
+        product = 1.0
+        for leg in s["legs"]:
+            product *= sgp.core.payout(leg["prices"][s["book"]])
+        assert product >= 1.0 / s["p_joint"] - 1e-9                      # the legs' product can at least pay fair
+        assert s["lift"] >= 1.0 and all(l["games"] >= 8 for l in s["legs"])
+    pairs = [s for s in out if s["size"] == 2]
+    assert [s["p_joint"] for s in pairs] == sorted((s["p_joint"] for s in pairs), reverse=True)
