@@ -230,6 +230,8 @@ td.rungs { white-space: normal; }
 /* A point's tone: a record that backs the side is ticked, one that argues against it is flagged, the rest is context
    (user 2026-10-15: a 0-in-3 record vs this team is shown, never ticked). */
 .checks li.ctx::before { color: color-mix(in srgb, var(--green) 55%, transparent); }
+/* A reconciled parlay leg: the bullet is the leg's result, never the list's default tick. */
+.checks li.leg-l::before { content: "✗"; color: var(--price); } .checks li.leg-v::before, .checks li.leg-p::before { content: "–"; color: var(--muted); }
 .checks li.against::before { content: ""; left: 1px; top: .2em; width: 14px; height: 14px; background: var(--red);
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' fill='black' d='M12 1.8 23.4 22H.6zM10.7 8.5h2.6l-.4 7.2h-1.8zM12 17.4a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3z'/%3E%3C/svg%3E") center / 14px no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' fill='black' d='M12 1.8 23.4 22H.6zM10.7 8.5h2.6l-.4 7.2h-1.8zM12 17.4a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3z'/%3E%3C/svg%3E") center / 14px no-repeat; }
 .checks li.against b { color: var(--red); }
@@ -437,7 +439,7 @@ function sgpLegResult(r) {
 }
 function sgpRow(s) {
   const res = s.result, rl = res && res.legs || [];
-  const legs = (s.legs || []).map((l, i) => `<li class="ctx"><b>${esc(l.bet || "")}</b>${pct(l.p_side)} on its own${l.games ? ` · cleared ${l.hits}/${l.games} recently` : ""}${l.alt ? " · alt line" : ""}${sgpLegResult(rl[i])}</li>`).join("");
+  const legs = (s.legs || []).map((l, i) => `<li class="ctx${rl[i] ? ({lost: " leg-l", void: " leg-v", pending: " leg-p"}[rl[i].result] || "") : ""}"><b>${esc(l.bet || "")}</b>${pct(l.p_side)} on its own${l.games ? ` · cleared ${l.hits}/${l.games} recently` : ""}${l.alt ? " · alt line" : ""}${sgpLegResult(rl[i])}</li>`).join("");
   return `<div class="prop pick sgp${res && res.status === "won" ? " rw" : res && res.status === "lost" ? " rl" : ""}" data-sg="${esc(s.sgp_id || "")}">
     <div class="who"><div class="sgpfaces">${(s.legs || []).map(miniFace).join("")}</div>
       <div class="line1">${s.family === "hit_rate" ? `<span class="chip value">Built for hit rate</span>` : ""}<span class="chip value">${(s.size || 2) > 2 ? `${s.size}-leg parlay` : "Same-game parlay"}</span>${s.same_player ? `<span class="chip neutral">Same player</span>` : ""}${postedChip(s)}${res ? SGP_STATUS[res.status] || "" : started(s.commence_time) ? `<span class="chip started">Started</span>` : ""}</div>
