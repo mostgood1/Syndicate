@@ -297,10 +297,15 @@ def sgp_leg_actuals(root: Path, day: str, sheet: Mapping[str, Any]) -> dict[str,
     NHL box scores, NFL usage lines: the high-hit-rate pool draws legs from players the sheet never graded."""
     sport = str(sheet.get("sport") or "")
     try:
-        if sport == "nhl":
-            from syndicate.features.nhl import sgp_pool
+        if sport in ("wnba", "nba"):
+            from syndicate.features.shared import basketball_sgp_pool
+
+            def actuals(root_, day_, tickets_):
+                return basketball_sgp_pool.leg_actuals(root_, day_, tickets_, sport=sport)
+        elif sport == "nhl":
+            from syndicate.features.nhl.sgp_pool import leg_actuals as actuals
         else:
-            from syndicate.features.nfl import sgp_pool
+            from syndicate.features.nfl.sgp_pool import leg_actuals as actuals
 
         tickets = list(sheet.get("sgp") or [])
         ledger = root / "cheatsheets" / sport / "sgp_ledger.jsonl"
@@ -312,7 +317,7 @@ def sgp_leg_actuals(root: Path, day: str, sheet: Mapping[str, Any]) -> dict[str,
                     continue
                 if rec.get("date") == day:
                     tickets.append(rec)
-        return sgp_pool.leg_actuals(root, day, tickets)
+        return actuals(root, day, tickets)
     except Exception as exc:  # noqa: BLE001 -- the props still reconcile; those legs stay pending
         print(f"RECONCILE {sport} date={day} leg actuals failed: {type(exc).__name__}: {exc}", flush=True)
         return {}
@@ -452,7 +457,7 @@ def main(argv: list[str] | None = None) -> int:
                 # Nothing final yet: no file, so the page offers no toggle onto a sheet of dashes.
                 print(f"RECONCILE {doc['sport']} date={day} nothing settled yet -- no file", flush=True)
                 continue
-            if doc.get("sport") in ("nhl", "nfl"):
+            if doc.get("sport") in ("nhl", "nfl", "wnba", "nba"):
                 rec["leg_actuals"] = sgp_leg_actuals(root, day, doc)
             write_atomic(target, rec)
             write_postmortem(root, path, doc, rec, day)
