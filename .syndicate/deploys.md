@@ -50633,3 +50633,22 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - 10-17: 8 parlays with no result (not reconciled yet).
 - **engine read:** 0 of 10 against 0.69 expected (P(0) ~0.49) -- no signal. All 10 were the low-probability correlation family (5-11%) from before the hit-rate family existed.
 - **owed:** 10-17's parlays after the 11:50 PM CT reconcile; the first real parlay export -> `posted.json` gains `sgps`.
+
+
+## 2026-10-17 16:41:50Z (11:41 AM CT) fleet ff d22b5dac -> 64c3410f + `reload-web` (2.0 s, 0 failures); 16:57:13Z (11:57 AM CT) -> c4f86909 + `reload-web` (8.0 s, 0 failures): SGPs built for HIT RATE from every priced alt rung -- NHL, then NFL the same way (lanes `nhl-sgp-builder`, `nfl-sgp-builder`, session 9e18a0e7) -- NO worker restart
+- **ask:** user 2026-10-17 "use the consistency sheets to build them so we can deliver high hit rates, not long shots ... alt lines hit rates and consistency data in general + our sim engine data"; "Two tiers"; long shots "Off the sheet"; "once NHL is up and running we need NFL to function the same way". Deploys approved: "Deploy now (Recommended)" twice.
+- **claim:** web by nhl-sgp-builder (token e316e470...), acquire exit 0, held across both ff's; ride-alongs: none (abd884af + c4f86909 + 64c3410f, all mine).
+- **what:**
+  - A leg is an alt rung where the market (>= 75%), the player's last 10 (>= 8 cleared; NHL box-score log / NFL usage lines) and the sim (>= 75%; NHL Poisson on proj_lambda / NFL Normal on projected mean and sd) all agree.
+  - The leg's probability is market-anchored (k=40).
+  - Tiers: safer, 2-3 legs, >= 62%, paying >= -250; payout, 4-5 legs, >= 45%, paying >= -143.
+  - Long shots go to the ledger only; legs carry the game-log id so the reconcile grades them.
+  - Shared half: `shared/sgp_hit_rate.py`.
+- **verify NHL (served 11:53:08 AM CT, before NJ @ WSH's 12:10 PM puck drop):**
+  - `/api/cheatsheets/nhl/2026-10-17`: `sgp_alt_rows` 1301; 3 parlays -- safer 3 legs 64% (legs x -222, worth it at -158), safer 3 legs 66% (-244 / -166), payout 5 legs 50% (-129 / +111).
+  - Refresh log: `CHEAT_SHEET nhl sgp 3 (fresh 6: hit-rate 3 shown, 3 long shots to the ledger only; new to the ledger 3)`.
+  - Page: tier headings render, each leg reads "market 85% · cleared 10/10 · our sim 91%".
+- **verify NFL:**
+  - Deployed module on the fleet loads week 6, 463 sim params, 75 ruled out, the 4-season usage log.
+  - Pool empty: no NFL alt capture exists before Sunday. Plumbing on real week-6 names: 395 of 472 sim player-stats resolve with 10 games, 2 unmatched.
+- **owed:** the first NFL tiers Sunday as alt prices land (10:30 AM CT on); tonight's NHL grades (leg actuals from the box-score log); the hit-rate calibration by tier once a sample exists.
