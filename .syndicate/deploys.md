@@ -50671,3 +50671,17 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - Dry run on the fleet: wnba handled, due 0 at 12:39 (window opens 1:00 PM CT). NOT YET SEEN: a WNBA alt file.
 - **basketball pool (a2355a88):** inert until `wnba_source/sgp/wnba_sgp_correlations.json` exists (study running). The WNBA game log ends 2026-10-09 (another lane's history builders) -- the pool flags `stale_log`.
 - **owed:** the WNBA alt capture in today's window; the basketball correlation study, then publish and the first WNBA/NBA tiers.
+
+
+## 2026-10-17 18:22:44Z (1:22 PM CT) fleet ff a2355a88 -> c174cac3, then 18:40:14Z (1:40 PM CT) -> 5ac6913c, `reload-web` each (2.0 s, 0 failures) + DATA WRITE `mlb_source/sgp/mlb_sgp_correlations.json`: MLB SGP pool + MLB bar + correlations (lane `basketball-sgp-builder`, session 9e18a0e7) -- NO worker restart
+- **ask:** user 2026-10-17 "we need sgp work done for alll sports"; MLB bar chosen: "MLB-specific bar (Recommended)".
+- **claim:** web by basketball-sgp-builder (token 74e4af7a...), acquire exit 0; ride-alongs: none. Commits: c174cac3, adbb27b0 (log), 5d0f0fa5, 896e9bd0 (study script, cherry-picked from the agent), 5ac6913c -- all this lane's.
+- **published:** `/tmp/mlb_sgp/mlb_sgp_correlations.json` (sha256 60ced6bd97a16471..., 292,492 bytes, 149 market cells) -> `<data root>/mlb_source/sgp/`. No file existed there before.
+- **dry run** (deployed module, 10-16 TB @ CLE rungs + 10-17 sim, published cells):
+  - safer: Mesa Jr. 1+ K batting + Martinez 2+ K, 54% (legs x -101, fair -104).
+  - safer: Simpson 1+ TB + Martinez 3+ hits allowed, 52% (+103).
+  - payout: 3 legs, 38% (+194).
+  - The HRR x TB one-bet pair was caught and excluded before this deploy.
+- **owed:**
+  - The served MLB tiers after tonight's TB @ CLE alt capture (~5:30-6:40 PM CT; first pitch 7:00).
+  - The basketball study, then WNBA / NBA cells.
