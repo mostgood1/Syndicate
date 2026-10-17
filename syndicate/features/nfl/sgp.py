@@ -332,7 +332,8 @@ def _bet_text(leg: Mapping[str, Any]) -> str:
         return f"{leg['player']} anytime TD"
     line = leg.get("line")
     line_txt = f"{line:g}" if isinstance(line, (int, float)) else str(line)
-    return f"{leg['player']} {leg['side'].title()} {line_txt} {leg['market'].lower()}"
+    # a pool leg may carry its own words for the market ("player_rebounds" -> "rebounds", 2026-10-17)
+    return f"{leg['player']} {leg['side'].title()} {line_txt} {str(leg.get('market_label') or leg['market']).lower()}"
 
 
 def _candidate(row: Mapping[str, Any]) -> bool:

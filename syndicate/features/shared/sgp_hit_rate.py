@@ -31,9 +31,21 @@ POOL_CAP = 16                                  # legs per game kept for the sear
 # win ~50% at about +110. `min_decimal` is the legs-multiplied price floor: a ticket that pays less is not a bet.
 TIERS = (
     {"tier": "safer", "label": "Higher hit rate", "sizes": (2, 3), "min_joint": 0.62, "min_decimal": 1.40,
-     "per_game": 2, "per_sheet": 10},
+     "per_game": 2, "per_sheet": 10,
+     "note": "Higher hit rate -- 2 or 3 legs, each one the market, the player's last 10 and our sim all make likely"},
     {"tier": "payout", "label": "Bigger payout", "sizes": (4, 5), "min_joint": 0.45, "min_decimal": 1.70,
-     "per_game": 1, "per_sheet": 6},
+     "per_game": 1, "per_sheet": 6, "note": "Bigger payout -- 4 or 5 of those legs, about half win, near even money"},
+)
+RULE = {"min_market": LEG_MIN_MARKET, "max_market": LEG_MAX_MARKET, "min_hits": LEG_MIN_HITS, "min_sim": LEG_MIN_SIM}
+# MLB (user 2026-10-17: "MLB-specific bar"): no batter alt rung reaches 75% -- 1+ hit / 1+ H+R+RBI price at 0.65-0.71
+# (10-16 TB @ CLE: 1 of 521 rungs passed the NHL gate). Legs at 65%+ that cleared 7 of 10; mostly 2-leg tickets.
+MLB_RULE = {"min_market": 0.65, "max_market": 0.95, "min_hits": 7, "min_sim": 0.65}
+MLB_TIERS = (
+    {"tier": "safer", "label": "Higher hit rate", "sizes": (2,), "min_joint": 0.45, "min_decimal": 1.60, "per_game": 2,
+     "per_sheet": 8, "note": "Higher hit rate -- 2 legs, each one the market, the player's last 10 and our sim all make "
+                             "likely; in baseball that means about half of these win"},
+    {"tier": "payout", "label": "Bigger payout", "sizes": (3,), "min_joint": 0.30, "min_decimal": 2.40, "per_game": 1,
+     "per_sheet": 4, "note": "Bigger payout -- 3 of those legs, about a third win"},
 )
 
 
@@ -81,18 +93,19 @@ def market_prob(books: Mapping[str, Any], factor: float) -> float | None:
     return min(0.995, implied[len(implied) // 2] / factor) if implied else None
 
 
-def gate(p_market: float | None, hits: int, p_sim: float | None, counts: collections.Counter) -> bool:
-    """The three reads; `counts` records which one removed a rung."""
-    if p_market is None or not (LEG_MIN_MARKET <= p_market <= LEG_MAX_MARKET):
+def gate(p_market: float | None, hits: int, p_sim: float | None, counts: collections.Counter,
+         rule: Mapping[str, float] = RULE) -> bool:
+    """The three reads; `counts` records which one removed a rung. `rule`: the sport's bar (MLB_RULE for baseball)."""
+    if p_market is None or not (rule["min_market"] <= p_market <= rule["max_market"]):
         counts["market_gate"] += 1
         return False
-    if hits < LEG_MIN_HITS:
+    if hits < rule["min_hits"]:
         counts["record_gate"] += 1
         return False
     if p_sim is None:
         counts["no_sim"] += 1
         return False
-    if p_sim < LEG_MIN_SIM:
+    if p_sim < rule["min_sim"]:
         counts["sim_gate"] += 1
         return False
     return True
@@ -147,7 +160,7 @@ def _value(t: Mapping[str, Any]) -> float:
 
 
 def tickets(pool: Mapping[str, list[dict[str, Any]]], cells: Mapping[str, Any], games: Sequence[Mapping[str, Any]], *,
-            exclude: Any = None, relation: Any = None) -> list[dict[str, Any]]:
+            exclude: Any = None, relation: Any = None, tiers: Sequence[Mapping[str, Any]] = TIERS) -> list[dict[str, Any]]:
     """The two tiers, per game: every combination of the pool's legs (one rung per player-stat, never an excluded
     pair, every leg at one book) that pays at least the tier's floor and wins at least its rate, priced by the measured
     correlations. Every ticket clears the hit-rate floor; among them the one whose legs pay closest to (or over) its
@@ -162,7 +175,7 @@ def tickets(pool: Mapping[str, list[dict[str, Any]]], cells: Mapping[str, Any], 
 
     for event_id, legs in pool.items():
         game = by_event.get(event_id) or {}
-        for spec in TIERS:
+        for spec in tiers:
             cands = []
             for size in spec["sizes"]:
                 for combo in itertools.combinations(legs, size):
@@ -190,7 +203,7 @@ def tickets(pool: Mapping[str, list[dict[str, Any]]], cells: Mapping[str, Any], 
                         rels = [relation(t[a], t[b]) for a in range(len(t)) for b in range(a + 1, len(t))]
                         tk = core._ticket(event_id, t, pj, lv, game, bk, prod, rels)
                         tk.update({"family": "hit_rate", "tier": spec["tier"], "tier_label": spec["label"],
-                                   "show_estimate": False, "together": together(t)})
+                                   "tier_note": spec.get("note"), "show_estimate": False, "together": together(t)})
                         built.append((tk, t))
             built.sort(key=lambda x: (-_value(x[0]), -x[0]["p_joint"]))
             kept, kept_sets = [], []
@@ -204,7 +217,7 @@ def tickets(pool: Mapping[str, list[dict[str, Any]]], cells: Mapping[str, Any], 
                     break
             out += kept
     final: list[dict[str, Any]] = []
-    for spec in TIERS:
+    for spec in tiers:
         mine = sorted((t for t in out if t["tier"] == spec["tier"]), key=lambda t: (-_value(t), -t["p_joint"]))
         final += mine[:spec["per_sheet"]]
     for t in final:

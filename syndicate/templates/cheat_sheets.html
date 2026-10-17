@@ -487,8 +487,8 @@ function sgpBlock(d, game) {
       const hr = sgps.filter(s => s.family === "hit_rate" && !s.tier), corr = sgps.filter(s => s.family !== "hit_rate");
       const head = t => `<div class="note" style="margin:6px 0 2px"><b>${t}</b></div>`;
       return sgpRecap(d, sgps)
-        + (safer.length ? head("Higher hit rate -- 2 or 3 legs, each one the market, the player's last 10 and our sim all make likely") + `<div class="rowlist">${safer.map(sgpRow).join("")}</div>` : "")
-        + (payout.length ? head("Bigger payout -- 4 or 5 of those legs, about half win, near even money") + `<div class="rowlist">${payout.map(sgpRow).join("")}</div>` : "")
+        + (safer.length ? head(safer[0].tier_note || "Higher hit rate -- 2 or 3 legs, each one the market, the player's last 10 and our sim all make likely") + `<div class="rowlist">${safer.map(sgpRow).join("")}</div>` : "")
+        + (payout.length ? head(payout[0].tier_note || "Bigger payout -- 4 or 5 of those legs, about half win, near even money") + `<div class="rowlist">${payout.map(sgpRow).join("")}</div>` : "")
         + (hr.length ? head("Built for hit rate -- lines they have been clearing, the chance the whole ticket wins first") + `<div class="rowlist">${hr.map(sgpRow).join("")}</div>` : "")
         + (corr.length ? head("Built on correlation -- legs that win together more often than apart") + `<div class="rowlist">${corr.map(sgpRow).join("")}</div>` : "");
     })());

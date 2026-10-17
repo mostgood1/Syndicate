@@ -44,6 +44,9 @@ NESTED = frozenset(frozenset(p) for p in (
     ("batter_runs_scored", "batter_hits_runs_rbis"), ("batter_home_runs", "batter_total_bases"),
     ("batter_home_runs", "batter_rbis"), ("batter_home_runs", "batter_runs_scored"), ("batter_home_runs", "batter_hits_runs_rbis")))
 LOG_SEASONS = 4
+LABEL = {"batter_hits": "hits", "batter_total_bases": "total bases", "batter_home_runs": "home runs", "batter_rbis": "RBIs",
+         "batter_runs_scored": "runs", "batter_hits_runs_rbis": "hits+runs+RBIs", "batter_strikeouts": "strikeouts (batting)",
+         "strikeouts": "strikeouts", "hits_allowed": "hits allowed", "earned_runs": "earned runs", "outs": "outs"}
 
 
 def fold(name: Any) -> str:
@@ -210,12 +213,13 @@ def legs_by_game(sheet: Mapping[str, Any], data_root: Path, day: str, *, log: Ga
             p_market = shared.market_prob(books, factor)
             hits = sum(1 for _g, v in history if v > rung)
             p_sim = dist_over(who["props"].get(SIM_DIST[market]), rung)
-            if not shared.gate(p_market, hits, p_sim, counts):
+            if not shared.gate(p_market, hits, p_sim, counts, shared.MLB_RULE):
                 continue
             p_leg = shared.leg_prob(p_market, hits, len(history))
             counts["legs"] += 1
             out[event].append({
-                "player": player, "team": team or kind, "market": market, "side": "over", "line": rung,
+                "player": player, "team": team or kind, "market": market, "market_label": LABEL.get(market, market),
+                "side": "over", "line": rung,
                 "p_over": p_leg, "p_side": p_leg, "type": f"{market}|UNK", "role": "UNK", "prices": dict(books),
                 "event_id": event, "p_market": round(p_market, 4), "p_sim": round(p_sim, 4), "hits": hits,
                 "games": len(history), "alt": True, "player_id": who["id"], "_history": history,
@@ -228,7 +232,7 @@ def exclude(a: Mapping[str, Any], b: Mapping[str, Any]) -> bool:
 
 
 def tickets(pool: Mapping[str, list[dict[str, Any]]], cells: Mapping[str, Any], games: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
-    return shared.tickets(pool, cells, games, exclude=exclude)
+    return shared.tickets(pool, cells, games, exclude=exclude, tiers=shared.MLB_TIERS)
 
 
 # ----------------------------------------------------------------------------- the sheet's hooks

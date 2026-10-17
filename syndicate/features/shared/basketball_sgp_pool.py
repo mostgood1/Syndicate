@@ -34,6 +34,9 @@ PARTS = {"PTS": ("PTS",), "REB": ("REB",), "AST": ("AST",), "FG3M": ("FG3M",), "
          "PR": ("PTS", "REB"), "PA": ("PTS", "AST"), "RA": ("REB", "AST")}
 SIM_KEY = {"PTS": "pts", "REB": "reb", "AST": "ast", "FG3M": "threes"}
 NESTED = frozenset(frozenset({a, b}) for a in PARTS for b in PARTS if a != b and set(PARTS[a]) <= set(PARTS[b]))
+LABEL = {"player_points": "points", "player_rebounds": "rebounds", "player_assists": "assists", "player_threes": "threes",
+         "player_points_rebounds_assists": "pts+reb+ast", "player_points_rebounds": "pts+reb", "player_points_assists": "pts+ast",
+         "player_rebounds_assists": "reb+ast"}
 MIN_SIM_MINUTES = 12.0
 ROLE_WINDOW = 8
 ROLES = ("S1", "S2", "S3", "S4", "S5", "B1", "B2", "B3")
@@ -254,7 +257,8 @@ def legs_by_game(sheet: Mapping[str, Any], data_root: Path, day: str, sport: str
             p_leg = shared.leg_prob(p_market, hits, len(history))
             counts["legs"] += 1
             out[event].append({
-                "player": player, "team": team, "market": market, "side": "over", "line": rung,
+                "player": player, "team": team, "market": market, "market_label": LABEL.get(market, market),
+                "side": "over", "line": rung,
                 "p_over": p_leg, "p_side": p_leg, "type": f"{code}|{role}", "role": role, "prices": dict(books),
                 "event_id": event, "p_market": round(p_market, 4), "p_sim": round(p_sim, 4), "hits": hits,
                 "games": len(history), "alt": True, "player_id": pid, "_history": history,
