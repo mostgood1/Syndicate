@@ -758,7 +758,9 @@ function render() {
   if (rec) applyResults();
   buildJump();
 }
-// One chip per section the page drew, in page order, with the section's own count (user 2026-10-17).
+// One chip per section the page drew, in page order, with the section's own count (user 2026-10-17). Titles that
+// share a first half ("Game lines: value ...", "Game lines: shop ...") get a name of their own.
+const JUMP_LABEL = {lines_value: "Game-line value", lines_shop: "Game-line shopping", shop: "Prop price shopping"};
 function buildJump() {
   const bar = document.getElementById("jump");
   if (!bar) return;
@@ -766,9 +768,7 @@ function buildJump() {
   bar.innerHTML = secs.length < 3 ? "" : secs.map(sec => {
     sec.id = "sec-" + sec.dataset.section;
     const n = ((sec.querySelector("header .count") || {}).textContent || "").match(/^\s*(\d+)/);
-    const [head, tail] = sec.dataset.title.split(/:\s*/);
-    const title = tail && secs.filter(o => o.dataset.title.split(":")[0] === head).length > 1
-      ? tail.charAt(0).toUpperCase() + tail.slice(1) : head;
+    const title = JUMP_LABEL[sec.dataset.section] || sec.dataset.title.split(":")[0];
     return `<a href="#${sec.id}">${esc(title)}${n ? `<b>${n[1]}</b>` : ""}</a>`;
   }).join("");
 }
