@@ -768,13 +768,53 @@ def fill_pick_history(pick: dict[str, Any], *, day: str, intervals: Any) -> str 
     return f"team_{segment}"
 
 
+# HOLD, CAP, FOLD (user 2026-10-17: "NHL has a TON of syndicate picks right now (which has me concerned)" -> "Hold,
+# cap, fold"). Measured that day: the 15-min refresh promoted every suggestion the board ever made and kept each one,
+# so NHL reached 142 picks (32 still on the board; 6 lines with BOTH sides picked at different times) against 6-9 on
+# the days before. A new suggestion now waits one refresh (PICK_HOLD_MINUTES) and joins only if the board still
+# suggests it; at most PICK_DAILY_CAP join a sport's day, best board score first; the page folds a pick the board
+# dropped before its game into a collapsed list (still graded: it was published).
+PICK_HOLD_MINUTES = 10
+PICK_DAILY_CAP = 12
+
+
+def hold_picks(fresh: list[dict[str, Any]], kept: dict[str, Any], hold: dict[str, str], *, now: datetime) -> set[str]:
+    """The NEW picks admitted at this read, and `hold` updated in place: a suggestion seen for the first time waits;
+    one still suggested PICK_HOLD_MINUTES later joins while the day has room; one the board stopped suggesting is
+    forgotten. `fresh` is in board-score order (`select_picks`)."""
+    live = {p.get("pick_id") for p in fresh}
+    for pid in list(hold):
+        if pid not in live or pid in kept:
+            hold.pop(pid)
+    ready = []
+    for p in fresh:
+        pid = p.get("pick_id")
+        if not pid or pid in kept:
+            continue
+        first = _parse_ts(hold.get(pid))
+        if first is None:
+            hold[pid] = now.isoformat(timespec="seconds")
+        elif now - first >= timedelta(minutes=PICK_HOLD_MINUTES):
+            ready.append(pid)
+    admitted = set(ready[:max(0, PICK_DAILY_CAP - len(kept))])
+    for pid in admitted:
+        hold.pop(pid, None)
+    return admitted
+
+
 def merge_picks(fresh: list[dict[str, Any]], prior: dict[str, Any] | None, *, rows: list[dict[str, Any]] | None = None,
-                cards: list[dict[str, Any]] | None = None, day: str | None = None, intervals: Any = None) -> list[dict[str, Any]]:
+                cards: list[dict[str, Any]] | None = None, day: str | None = None, intervals: Any = None,
+                hold: dict[str, str] | None = None, now: datetime | None = None) -> list[dict[str, Any]]:
     """A day's picks are a RECORD: one promoted earlier keeps its first price and stays when the board drops it later
-    (its line moved, its game started); a new one joins. Board score order, earliest promotions first on ties."""
+    (its line moved, its game started); a new one joins -- after the hold and within the day's cap when `hold` (the
+    sheet's `pick_pending`, updated in place) is given. Board score order, earliest promotions first on ties."""
+    now = now or datetime.now(timezone.utc)
     kept = {p.get("pick_id"): dict(p) for p in (prior or {}).get("picks") or [] if p.get("pick_id")}
     on_board = {c.get("pick_id"): c for c in cards or [] if c.get("pick_id")}
+    admitted = hold_picks(fresh, kept, hold, now=now) if hold is not None else None
     for p in fresh:
+        if admitted is not None and p.get("pick_id") not in kept and p.get("pick_id") not in admitted:
+            continue                                  # still on hold, or the day is full
         if p.get("pick_id") in kept:
             # The PRICE is frozen at first promotion; how the pick READS (its name, its case, its crests, its recent
             # games) follows the board while the board still carries it.
@@ -787,6 +827,11 @@ def merge_picks(fresh: list[dict[str, Any]], prior: dict[str, Any] | None, *, ro
     live = {p.get("pick_id") for p in fresh}
     for pick_id, p in kept.items():
         p["on_board"] = pick_id in live
+        # When the board stopped backing it: before its game starts, the page folds it away (still on the record).
+        if p["on_board"]:
+            p.pop("dropped_at", None)
+        else:
+            p.setdefault("dropped_at", now.isoformat(timespec="seconds"))
         card = on_board.get(pick_id)
         if card is not None and pick_id not in live:     # still on the board, just not suggested: its games still read
             p.update({k: card[k] for k in cs.PICK_RECENT_FIELDS if card.get(k)})
@@ -988,8 +1033,10 @@ def picks_only_sheet(sport: str, selected: str, board_cards: list[dict[str, Any]
     """A sheet carrying only the board's picks: a sport out of its season (2026-10-15: a preseason NBA spread was one
     of the board's 7), or a day whose full build has not run yet when the picks refresh finds a pick for it."""
     sheet = build_sport(sport, [], selected_date=selected, cap=1, dvp={}, context={}, positions={})
+    pending = dict((prior or {}).get("pick_pending") or {})
     sheet["picks"] = merge_picks(build_picks(board_cards, sheet, sport=sport, day=selected, now=datetime.now(timezone.utc)),
-                                 prior, cards=board_cards, day=selected, intervals=intervals)
+                                 prior, cards=board_cards, day=selected, intervals=intervals, hold=pending)
+    sheet["pick_pending"] = pending
     sheet["phase"] = season_phase(sport, selected) or "preseason"
     sheet["picks_only"] = True
     return sheet
@@ -1018,9 +1065,11 @@ def refresh_picks(data_root: Path, sports: list[str], dates: list[str], board_ca
                     sheet = picks_only_sheet(sport, selected, board_cards, None, intervals=intervals)
                 else:
                     sheet = dict(prior)
+                    pending = dict(prior.get("pick_pending") or {})
                     sheet["picks"] = merge_picks(
                         build_picks(board_cards, sheet, sport=sport, day=selected, now=datetime.now(timezone.utc)),
-                        prior, rows=sheet.get("rows"), cards=board_cards, day=selected, intervals=intervals)
+                        prior, rows=sheet.get("rows"), cards=board_cards, day=selected, intervals=intervals, hold=pending)
+                    sheet["pick_pending"] = pending
             except Exception as exc:  # noqa: BLE001 -- this sport keeps the picks it had
                 print(f"CHEAT_SHEET_PICKS {sport} date={selected} failed: {type(exc).__name__}: {exc}", flush=True)
                 continue
@@ -1034,8 +1083,9 @@ def refresh_picks(data_root: Path, sports: list[str], dates: list[str], board_ca
             on_board = sum(1 for p in sheet.get("picks") or [] if p.get("on_board"))
             was = {p.get("pick_id"): bool(p.get("on_board")) for p in (prior or {}).get("picks") or []}
             now_on = {p.get("pick_id"): bool(p.get("on_board")) for p in sheet.get("picks") or []}
-            if prior is not None and not new and was == now_on and not ladders_changed:
-                continue                  # nothing joined, nothing left the board, no new alt prices: leave the file
+            held = (sheet.get("pick_pending") or {}) != ((prior or {}).get("pick_pending") or {})
+            if prior is not None and not new and was == now_on and not ladders_changed and not held:
+                continue                  # nothing joined, nothing left the board, nothing on hold, no new alt prices
             sheet["picks_refreshed_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
             attach_images(sheet, data_root / "cheatsheets" / ".img_cache")
             write_atomic(target, sheet)
@@ -1193,8 +1243,11 @@ def main_build(args: Any, data_root: Path) -> int:
                 print(f"CHEAT_SHEET {sport} date={selected} posted rows kept {sheet['posted_kept']} (the board read no longer "
                       f"carries them)", flush=True)
         try:
+            pending = dict((prior or {}).get("pick_pending") or {})
             sheet["picks"] = merge_picks(build_picks(board_cards, sheet, sport=sport, day=selected, now=datetime.now(timezone.utc)),
-                                         prior, rows=sheet.get("rows"), cards=board_cards, day=selected, intervals=intervals)
+                                         prior, rows=sheet.get("rows"), cards=board_cards, day=selected, intervals=intervals,
+                                         hold=pending)
+            sheet["pick_pending"] = pending
         except Exception as exc:  # noqa: BLE001 -- a missing picks section is a gap, never a failed sheet
             print(f"CHEAT_SHEET {sport} picks failed: {type(exc).__name__}: {exc}", flush=True)
             sheet["picks"] = list((prior or {}).get("picks") or [])

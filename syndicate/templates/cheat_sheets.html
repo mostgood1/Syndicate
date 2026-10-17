@@ -196,6 +196,9 @@ a.sg:hover { border-color: var(--accent); transform: translateY(-1px); }
 .jump a:hover, .jump a:focus-visible { border-color: var(--accent); color: var(--accent); }
 .jump a b { color: var(--muted); font-weight: 600; margin-left: 5px; }
 #sheet section.sheet { scroll-margin-top: 56px; }
+details.dropped { margin-top: 10px; border-top: 1px dashed var(--edge); padding-top: 8px; }
+details.dropped > summary { cursor: pointer; color: var(--muted); font: 700 13px var(--display); text-transform: uppercase; letter-spacing: .05em; }
+details.dropped .rowlist { opacity: .72; margin-top: 8px; }
 .viewbar .vnote { color: var(--muted); font-size: 13px; }
 .res { font: 700 13px var(--mono); white-space: nowrap; } td.act, .res.act { font-weight: 700; color: var(--ink); } .res.w { color: var(--accent); } .res.l { color: var(--price); } .res.p { color: var(--muted); }
 tr.rw td:first-child { box-shadow: inset 3px 0 0 var(--accent); } tr.rl td:first-child { box-shadow: inset 3px 0 0 var(--price); }
@@ -399,13 +402,18 @@ function pickRow(p, i) {
     <ul class="checks">${why.slice(0, 8).join("")}</ul>
   </div>`;
 }
+// A pick the board stopped backing BEFORE its game started (user 2026-10-17: "Hold, cap, fold"): folded away under
+// the list, still graded -- it was published. One it backed to the start stays in the list.
+const droppedEarly = p => !!p.dropped_at && (!p.commence_time || Date.parse(p.dropped_at) < Date.parse(p.commence_time));
 function picksBlock(d, game) {
-  const picks = (d.picks || []).map((p, i) => [p, i]).filter(([p]) => !game || p.event_id === game.event_id);
-  if (!picks.length) return "";
+  const all = (d.picks || []).map((p, i) => [p, i]).filter(([p]) => !game || p.event_id === game.event_id);
+  if (!all.length) return "";
+  const picks = all.filter(([p]) => !droppedEarly(p)), dropped = all.filter(([p]) => droppedEarly(p));
   const plays = picks.filter(([p]) => isPricePlay(p)).length, sims = picks.length - plays;
+  const fold = dropped.length ? `<details class="dropped no-export"><summary>${dropped.length} pick${dropped.length === 1 ? "" : "s"} the board dropped before the game -- still graded</summary><div class="rowlist">${dropped.map(([p, i]) => pickRow(p, i)).join("")}</div></details>` : "";
   return sectionShell("picks", "Syndicate picks", "Our featured plays for these games: the best price beats the no-vig fair by 2% or more, net of any exchange fee, on a fresh quote. A SYNDICATE PICK is one our sim backs too; a PRICE PLAY is the same price edge without the sim's backing. Each is promoted at the price shown and stays on the record at that price.",
-    [sims ? `${sims} pick${sims === 1 ? "" : "s"}` : "", plays ? `${plays} price play${plays === 1 ? "" : "s"}` : ""].filter(Boolean).join(" · "),
-    `<div class="rowlist">${picks.map(([p, i]) => pickRow(p, i)).join("")}</div>`);
+    [sims ? `${sims} pick${sims === 1 ? "" : "s"}` : "", plays ? `${plays} price play${plays === 1 ? "" : "s"}` : ""].filter(Boolean).join(" · ") || "0 picks",
+    (picks.length ? `<div class="rowlist">${picks.map(([p, i]) => pickRow(p, i)).join("")}</div>` : `<div class="empty">The board backs none of today's picks right now.</div>`) + fold);
 }
 // The consistency ladder (user 2026-10-16: "has hit 30 yds 10/10 40 yds 8/10 etc"): how often each player cleared every
 // rung around his line in his last 10 games; where the books' alternate lines were captured, the best price sits on the
@@ -758,7 +766,9 @@ function buildJump() {
   bar.innerHTML = secs.length < 3 ? "" : secs.map(sec => {
     sec.id = "sec-" + sec.dataset.section;
     const n = ((sec.querySelector("header .count") || {}).textContent || "").match(/^\s*(\d+)/);
-    const title = sec.dataset.title.replace(/:.*$/, "");
+    const [head, tail] = sec.dataset.title.split(/:\s*/);
+    const title = tail && secs.filter(o => o.dataset.title.split(":")[0] === head).length > 1
+      ? tail.charAt(0).toUpperCase() + tail.slice(1) : head;
     return `<a href="#${sec.id}">${esc(title)}${n ? `<b>${n[1]}</b>` : ""}</a>`;
   }).join("");
 }
