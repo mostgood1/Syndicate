@@ -50607,3 +50607,15 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - **verify (served, 10:18 AM CT):** `/api/cheatsheets/nhl/2026-10-17` -- 6 parlays: hit_rate x 4 pairs + 1 three-leg, correlation x 1; e.g. Ritchie + Holmstrom UNDER 0.5 assists [8/10, 9/10]: both 63%, fair -170, legs multiplied -133. The page HTML carries "Built for hit rate". Build log: `ladders 30 (alt-priced rungs 0)` -- so today's legs are MAIN lines read through consistency; the alt rungs arrive with the alt fetch 20-90 min before each start and the 15-min refresh rebuilds NHL SGPs when the ladders change. NOT YET SEEN: a served hit-rate ticket on an alt rung.
 - **grader (94f6c1af):** 10-16 NHL had 11 of 13 parlays pending only because the rung was not a sheet line. Re-grade at 10:13 AM CT: 12 settled, 0 won, predicted mean 7.7% (expected 0.92 wins; P(0 wins) ~0.38 -- no signal either way), 8 pending (7 are 10-17 games + 1 DiPietro saves leg).
 - **owed:** an alt-rung hit-rate ticket served (tonight's NHL slate); the 10-18 NFL sheet's two families; NHL grades nightly.
+
+
+## 2026-10-17 15:40:30Z (10:40 AM CT) fleet ff 94f6c1af -> d956cbcc + `reload-web` (2.0 s, 0 failures) + a data write (`cheatsheets/nhl/2026-10-16.posted.json`): an exported section is recorded as POSTED and stays (lane `cheat-sheets`, session 9e18a0e7) -- NO worker restart
+- **ask:** user 2026-10-17 "we need to look at why consistency sheets changed for NHL yesterday. Trying to promote these on twitter and the changes dont help for reconciling" (with the 12:34 PM CT graphic). Deploy and the 10-16 backfill: user chose "Deploy + backfill (Recommended)".
+- **claim:** web by cheat-sheets (token 1feaa3a2...), acquire exit 0; ride-alongs: none (a1c8f59f + bc93e6d9 are ledger-only, mine).
+- **cause (measured on the 10-16 sheet):**
+  - Every build, page view and record re-derived each section from that moment's rows, and nothing recorded what was posted.
+  - The section shows the main line's better-EV side. Karlsson SOG 2.5 under (7/10) was beaten by the over (EV -0.94% vs -4.14%), so he left the section.
+  - The board grew from 108 to 186 player-stat groups through the day, so McAvoy, Pastrnak, Rakell and Mittelstadt were added.
+  - **My own four evening NHL rebuilds** (ladder and parlay deploys, 7:03-8:27 PM CT) re-ran the whole sheet; they took consistency from 2 to 3 to 5 rows.
+- **verify (served, 10:4x AM CT):** `/cheatsheets?sport=nhl&date=2026-10-16&view=reconciled` -- the consistency section leads with LaCombe SOG u1.5 (posted -103 Pinnacle; 1 SOG, won, +0.971u) and Karlsson SOG u2.5 (posted -180 DraftKings; 2 SOG, won, +0.556u), both carrying `posted` at 17:34Z, then the 4 later rows. LaCombe's last sheet price was +110 at BetOnline -- the record now grades the posted -103. `POST /api/cheatsheets/posted` with section `picks` -> 400 `bad request` (route live; nothing written for 10-17).
+- **owed:** the season record picks this up at the 23:50 CT reconcile (record.json is rebuilt from every reconciled day); the first real export after this deploy -> check `<sport>/<date>.posted.json` gains a post and the button reads "Recorded as posted".

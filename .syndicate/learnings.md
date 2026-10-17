@@ -2407,3 +2407,19 @@ against another feed's clock. And read the LATEST start time on a line: quotes k
 **Measurement trap, also from today:** "sides with 1 fresh book while >= 2 quote" counts MOVED LINES (every other book
 re-posted at a new number) along with the defect -- 369 of NFL's 405 were correct. Before using a staleness share as
 a pass/fail line, split out rows whose stale books are fresh at another line of the same bet.
+
+
+## 2026-10-17 -- a published graphic is a commitment; a section recomputed per build cannot be reconciled to it (lane `cheat-sheets`)
+**Belief overturned:** "a day's sheet is a record" (the blueprint's docstring). That was true for STARTED games' rows only.
+Before the start, each build, page view and record recomputed every section from that moment's rows. A posted section
+could therefore change under the post: NHL 10-16's 12:34 PM graphic (2 rows) became a 5-row section with one posted row
+gone, and the record graded the 5.
+**Two mechanisms, both ordinary:**
+1. Side selection by best EV flips with small price moves: Karlsson u2.5 at 7/10 lost to his over by 3.2 EV points.
+2. The board posts more props through the day: 108 groups grew to 186.
+
+A third came from my own process: four manual full rebuilds, run to deploy unrelated sections (the ladder and
+parlays), rewrote the published one.
+**Rule:** record what was published at the moment it is published, server-side, from the served data (d956cbcc:
+export = posted). Pin it in display and grading, at the published price. Never infer "what was posted" from the last
+build.
