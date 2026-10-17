@@ -1028,6 +1028,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### alt-ladder-consistency — OPEN — opened 2026-10-16 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
+- **GOAL VERDICT 2026-10-17 00:12Z (7:12 PM CT 10-16): GOAL NOT MET -- the ladder is live, the SGP leg pool is not.** Goal, verbatim: "Each player's consistency across today's alternate rungs (empirical hit rate at every rung vs the market's de-vigged rung probability, shrunk toward the market) is computed from the captured alt ladders and shown on the NHL cheat sheet as a ladder section (NHL first; the module is sport-agnostic), and is the leg pool the NHL SGP builder draws from -- context, never an edge label (the 10-14 backtest: consistency at alt rungs lost to the price)". Live 3a135213 / 08b80c60 on every sport's sheet (deploys.md 00:03:43Z): NHL 10-16 30 ladders, 41 priced rungs, served. Left: the NHL SGP builder drawing its legs from these rungs (lane nhl-sgp-builder; correlations study with a worker agent).
 - Goal: Each player's consistency across today's alternate rungs (empirical hit rate at every rung vs the market's de-vigged rung probability, shrunk toward the market) is computed from the captured alt ladders and shown on the NHL cheat sheet as a ladder section (NHL first; the module is sport-agnostic), and is the leg pool the NHL SGP builder draws from -- context, never an edge label (the 10-14 backtest: consistency at alt rungs lost to the price)
 - Files: syndicate/features/shared/alt_consistency.py (NEW), tests/test_alt_consistency.py (NEW)
 - Hypothesis: n/a
