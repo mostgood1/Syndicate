@@ -349,7 +349,7 @@ def _candidate(row: Mapping[str, Any]) -> bool:
 
 def suggest(sheet: Mapping[str, Any], cells: Mapping[str, Any] | None,
             roles: Mapping[tuple[str, tuple[str, str]], str], *, per_game: int = PER_GAME,
-            per_sheet: int = PER_SHEET) -> list[dict[str, Any]]:
+            per_sheet: int = PER_SHEET, data_root: Path | None = None, day: str | None = None) -> list[dict[str, Any]]:
     """Two-leg SGPs from legs we would take on their own (`_candidate`): same game, different bets, measured correlation that makes
     the pair win together more often than apart (lift >= MIN_LIFT), quoted by one book on both legs (an SGP is
     one book's ticket). Ranked by the estimate at the assumed discount -- a ranking, not an edge claim."""
@@ -373,6 +373,13 @@ def suggest(sheet: Mapping[str, Any], cells: Mapping[str, Any] | None,
         legs_by_game, cells, games)
     for t in corr:
         t.setdefault("family", "correlation")
+    if data_root is not None and day:
+        # The hit-rate tiers from EVERY priced alt rung, the NHL way (user 2026-10-17: "once NHL is up and running we
+        # need NFL to function the same way"): market, record and sim must agree (`nfl.sgp_pool`).
+        from syndicate.features.nfl import sgp_pool
+
+        pool, _info = sgp_pool.legs_by_game(sheet, data_root, day, roles)
+        return sgp_pool.tickets(pool, cells, games) + corr
     # the hit-rate family reads EVERY row (not only the ones we would take alone) and every priced alt rung
     hr_legs: dict[str, list[dict[str, Any]]] = collections.defaultdict(list)
     for row in sheet.get("rows") or []:

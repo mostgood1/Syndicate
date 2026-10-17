@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import collections
 import csv
-import itertools
 import math
 import re
 from datetime import datetime, timedelta, timezone
@@ -41,19 +40,10 @@ STAT_COLUMNS = {"SOG": ("shots",), "GOALS": ("goals",), "ASSISTS": ("assists",),
 ALT_MARKET = {"player_shots_on_goal": "SOG", "player_points": "POINTS", "player_goals": "GOALS",
               "player_assists": "ASSISTS", "player_total_saves": "SAVES"}
 
-LEG_MIN_MARKET, LEG_MAX_MARKET = 0.75, 0.95   # above 95% a leg adds vig, not payout
-LEG_MIN_HITS, LEG_GAMES = 8, 10
-LEG_MIN_SIM = 0.75
-DEFAULT_MARGIN = 1.05                          # the de-vig factor when the sheet has no main-line margin to read
-POOL_CAP = 16                                  # legs per game kept for the search, best market probability first
-# The two tiers (user 2026-10-17: "Two tiers"). On 10-17's prices three ~87% legs win ~66% at about -200, and five
-# win ~50% at about +110. `min_decimal` is the legs-multiplied price floor: a ticket that pays less is not a bet.
-TIERS = (
-    {"tier": "safer", "label": "Higher hit rate", "sizes": (2, 3), "min_joint": 0.62, "min_decimal": 1.40,
-     "per_game": 2, "per_sheet": 10},
-    {"tier": "payout", "label": "Bigger payout", "sizes": (4, 5), "min_joint": 0.45, "min_decimal": 1.70,
-     "per_game": 1, "per_sheet": 6},
-)
+# The gate, the tiers and the ticket search are shared with NFL (`syndicate.features.shared.sgp_hit_rate`).
+from syndicate.features.shared.sgp_hit_rate import (LEG_GAMES, LEG_MAX_MARKET, LEG_MIN_HITS, LEG_MIN_MARKET,  # noqa: E402,F401
+                                                    LEG_MIN_SIM, POOL_CAP, TIERS)
+from syndicate.features.shared import sgp_hit_rate as shared  # noqa: E402
 
 
 def _norm(name: Any) -> str:
@@ -187,59 +177,22 @@ def sim_means(data_root: Path, day: str) -> dict[tuple[str, str], float]:
 
 
 # ----------------------------------------------------------------------------- the legs
-def _margins(sheet: Mapping[str, Any]) -> dict[str, float]:
-    from syndicate.features.shared import alt_consistency as ac
-
-    found: dict[str, list[float]] = collections.defaultdict(list)
-    for row in sheet.get("rows") or []:
-        f = ac._margin_factor(row)
-        if f is not None:
-            found[str(row.get("market") or "")].append(f)
-    every = sorted(f for fs in found.values() for f in fs)
-    out = {m: sorted(fs)[len(fs) // 2] for m, fs in found.items()}
-    out["*"] = every[len(every) // 2] if every else DEFAULT_MARGIN
-    return out
-
-
-def _alt_rungs(alt_rows: Iterable[Mapping[str, Any]]) -> tuple[dict, dict]:
-    """(event, player, market) -> rung -> {book: price} (the latest capture of each book's OVER rung), and each
-    event's {home, away, commence_time}."""
-    latest: dict[tuple, tuple[str, Any]] = {}
-    games: dict[str, dict[str, Any]] = {}
-    for r in alt_rows:
-        market = ALT_MARKET.get(str(r.get("base_market") or ""))
-        if market is None or str(r.get("side") or "").lower() != "over" or r.get("line") is None or r.get("price") is None:
-            continue
-        event = str(r.get("event_id") or "")
-        games.setdefault(event, {"home": r.get("home_team"), "away": r.get("away_team"),
-                                 "commence_time": r.get("commence_time")})
-        key = (event, str(r.get("player") or ""), market, float(r["line"]), str(r.get("bookmaker") or ""))
-        stamp = str(r.get("captured_at") or "")
-        if key not in latest or stamp >= latest[key][0]:
-            latest[key] = (stamp, r.get("price"))
-    rungs: dict[tuple, dict[float, dict[str, Any]]] = collections.defaultdict(lambda: collections.defaultdict(dict))
-    for (event, player, market, line, book), (_s, price) in latest.items():
-        rungs[(event, player, market)][line][book] = price
-    return rungs, games
-
-
 def legs_by_game(sheet: Mapping[str, Any], data_root: Path, day: str, roles: Mapping[str, str], *,
                  log: GameLog | None = None, alt_rows: Iterable[Mapping[str, Any]] | None = None,
                  means: Mapping[tuple[str, str], float] | None = None) -> tuple[dict[str, list[dict[str, Any]]], dict]:
     """Every rung that passes all three reads, per game; and the counts behind it (what each gate removed)."""
     from syndicate.features.shared import alt_consistency as ac
-    from syndicate.features.shared.cheat_sheets import consistency_posterior
 
     log = log if log is not None else GameLog.load(data_root)
     alt_rows = list(alt_rows) if alt_rows is not None else ac.load_alt_rows(data_root, "nhl", day)
     means = means if means is not None else sim_means(data_root, day)
-    margins = _margins(sheet)
-    rungs, games = _alt_rungs(alt_rows)
+    margins = shared.margins(sheet)
+    rungs, games = shared.alt_rungs(alt_rows, ALT_MARKET)
     faces: dict[str, dict[str, Any]] = {}
     for src in list(sheet.get("ladders") or []) + list(sheet.get("rows") or []):
         faces.setdefault(_norm(src.get("player")), {k: src.get(k) for k in ("headshot_src", "headshot_url", "team_logo_src",
                                                                              "team_logo", "team_name", "pos") if src.get(k)})
-    counts = collections.Counter()
+    counts: collections.Counter = collections.Counter()
     out: dict[str, list[dict[str, Any]]] = collections.defaultdict(list)
     for (event, player, market), ladder in rungs.items():
         game = games.get(event) or {}
@@ -260,118 +213,29 @@ def legs_by_game(sheet: Mapping[str, Any], data_root: Path, day: str, roles: Map
         factor = margins.get(market) or margins["*"]
         for rung, books in ladder.items():
             counts["rungs"] += 1
-            implied = sorted(x for x in (ac._book_prob(p) for p in books.values()) if x)
-            if not implied:
-                continue
-            p_market = min(0.995, implied[len(implied) // 2] / factor)
-            if not (LEG_MIN_MARKET <= p_market <= LEG_MAX_MARKET):
-                counts["market_gate"] += 1
-                continue
+            p_market = shared.market_prob(books, factor)
             hits = sum(1 for _pk, v in history if v > rung)
-            if hits < LEG_MIN_HITS:
-                counts["record_gate"] += 1
-                continue
             p_sim = poisson_over(lam, rung) if lam is not None else None
-            if p_sim is None or p_sim < LEG_MIN_SIM:
-                counts["sim_gate" if p_sim is not None else "no_sim"] += 1
+            if not shared.gate(p_market, hits, p_sim, counts):
                 continue
-            p_leg = consistency_posterior(p_market, hits, len(history))
+            p_leg = shared.leg_prob(p_market, hits, len(history))
             counts["legs"] += 1
-            team = log.team_of(pid)
             out[event].append({
-                "player": player, "team": team, "market": market, "side": "over", "line": rung,
+                "player": player, "team": log.team_of(pid), "market": market, "side": "over", "line": rung,
                 "p_over": p_leg, "p_side": p_leg, "type": f"{market}|{role}", "role": role, "prices": dict(books),
                 "event_id": event, "p_market": round(p_market, 4), "p_sim": round(p_sim, 4), "hits": hits,
                 "games": len(history), "alt": True, "player_id": pid, "_history": history,
                 **faces.get(_norm(player), {})})
-    for event, legs in out.items():
-        legs.sort(key=lambda x: -x["p_market"])
-        out[event] = legs[:POOL_CAP]
-    return dict(out), {"counts": dict(counts), "games": games}
+    return shared.cap(out), {"counts": dict(counts), "games": games}
 
 
 # ----------------------------------------------------------------------------- the tickets
-def _together(legs: Sequence[Mapping[str, Any]]) -> dict[str, int] | None:
-    """Same-team tickets only: in the team's recent games where every player played, how often every leg cleared."""
-    if len({leg.get("team") for leg in legs}) != 1:
-        return None
-    per = [dict(leg.get("_history") or []) for leg in legs]
-    shared = set(per[0])
-    for h in per[1:]:
-        shared &= set(h)
-    if not shared:
-        return None
-    hits = sum(1 for pk in shared if all(h[pk] > leg["line"] for h, leg in zip(per, legs)))
-    return {"hits": hits, "games": len(shared)}
+_together = shared.together
 
 
 def tickets(pool: Mapping[str, list[dict[str, Any]]], cells: Mapping[str, Any], games: Sequence[Mapping[str, Any]], *,
             exclude: Any = None) -> list[dict[str, Any]]:
-    """The two tiers, per game: every combination of the pool's legs (one rung per player-stat, never a nested pair,
-    every leg at one book) that pays at least the tier's floor, priced by the measured correlations; ranked by the
-    chance the whole ticket wins; near-duplicates dropped."""
-    by_event = {str(g.get("event_id")): g for g in games}
-    out: list[dict[str, Any]] = []
-
-    def clash(a, b):
-        return (a["player"] == b["player"] and a["market"] == b["market"]) or (exclude is not None and exclude(a, b))
-
-    for event_id, legs in pool.items():
-        game = by_event.get(event_id) or {}
-        for spec in TIERS:
-            cands = []
-            for size in spec["sizes"]:
-                for combo in itertools.combinations(legs, size):
-                    if any(clash(a, b) for a, b in itertools.combinations(combo, 2)):
-                        continue
-                    indep = math.prod(leg["p_side"] for leg in combo)
-                    if indep < spec["min_joint"] * 0.8:
-                        continue                  # no measured correlation lifts a joint this far
-                    best = core._best_book(list(combo))
-                    if not best or best[1] < spec["min_decimal"]:
-                        continue
-                    cands.append(list(combo))
-            built = []
-            for start in range(0, len(cands), 400):
-                chunk = cands[start:start + 400]
-                by_size: dict[int, list[int]] = collections.defaultdict(list)
-                for i, t in enumerate(chunk):
-                    by_size[len(t)].append(i)
-                for size, idx in by_size.items():
-                    pjs, levels = core.ticket_joints([chunk[i] for i in idx], cells, core.relation_of)
-                    for i, pj, lv in zip(idx, pjs, levels):
-                        t = chunk[i]
-                        if pj != pj or pj < spec["min_joint"]:
-                            continue
-                        bk, prod = core._best_book(t)
-                        rels = [core.relation_of(t[a], t[b]) for a in range(len(t)) for b in range(a + 1, len(t))]
-                        tk = core._ticket(event_id, t, pj, lv, game, bk, prod, rels)
-                        tk.update({"family": "hit_rate", "tier": spec["tier"], "tier_label": spec["label"],
-                                   "show_estimate": False, "together": _together(t)})
-                        built.append((tk, t))
-            # Every ticket here clears the tier's hit-rate floor; among them the one whose legs pay closest to (or
-            # over) its fair price leads -- heavy favourites stack vig, so a 66% ticket's legs can multiply to -244
-            # against a fair -192 (NJ @ WSH, 10-17).
-            built.sort(key=lambda x: (-x[0]["p_joint"] * (core.payout(x[0]["legs_product_odds"]) or 0), -x[0]["p_joint"]))
-            kept, kept_sets = [], []
-            for tk, t in built:
-                ids = {(x["player"], x["market"]) for x in t}
-                if any(len(ids & other) >= len(ids) - 1 for other in kept_sets):
-                    continue
-                kept.append(tk)
-                kept_sets.append(ids)
-                if len(kept) >= spec["per_game"]:
-                    break
-            out += kept
-    final: list[dict[str, Any]] = []
-    for spec in TIERS:
-        mine = sorted((t for t in out if t["tier"] == spec["tier"]),
-                      key=lambda t: (-t["p_joint"] * (core.payout(t["legs_product_odds"]) or 0), -t["p_joint"]))
-        final += mine[:spec["per_sheet"]]
-    for t in final:
-        for leg in t["legs"]:
-            leg.pop("_history", None)
-    return final
+    return shared.tickets(pool, cells, games, exclude=exclude)
 
 
 # ----------------------------------------------------------------------------- grading

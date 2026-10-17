@@ -893,14 +893,13 @@ def attach_sgp(sheet: dict[str, Any], prior: dict[str, Any] | None, data_root: P
         started = {str(g.get("event_id")) for g in sheet.get("games") or []
                    if (_parse_ts(g.get("commence_time")) or now) <= now}
         # A started game's parlays are the record from before it started: never re-suggested, never re-ledgered.
-        extra = {"data_root": data_root, "day": day} if sport == "nhl" else {}
+        extra = {"data_root": data_root, "day": day}          # both sports build the hit-rate tiers from every alt rung
         fresh = [s for s in sgp.suggest(sheet, cells, roles, **extra) if str(s.get("event_id")) not in started]
         # The sheet shows the hit-rate tickets only (user 2026-10-17: "high hit rate SGPS not plays that wiull never
         # win" -- long shots "Off the sheet"); every fresh ticket, long shots included, still goes to the ledger.
         shown = [s for s in fresh if s.get("family") == "hit_rate"]
         sheet["sgp"] = sgp_core.merge_record(shown, (prior or {}).get("sgp"), started=started)
-        if sport == "nhl":
-            sheet["sgp_alt_rows"] = alt_row_count(data_root, sport, day)
+        sheet["sgp_alt_rows"] = alt_row_count(data_root, sport, day)
         # A parlay that went out on an exported graphic stays on the sheet whatever this build suggests (2026-10-17).
         sheet["sgp"] = cs.with_posted_sgps(sheet["sgp"], cs.load_posted(data_root / "cheatsheets", sport, day),
                                            (prior or {}).get("sgp"))
@@ -1026,9 +1025,9 @@ def refresh_picks(data_root: Path, sports: list[str], dates: list[str], board_ca
                 print(f"CHEAT_SHEET_PICKS {sport} date={selected} failed: {type(exc).__name__}: {exc}", flush=True)
                 continue
             ladders_changed = attach_ladders(sheet, data_root, sport, selected) if sheet.get("rows") else False
-            if sport == "nhl" and sheet.get("rows") and (
+            if sport in SGP_SPORTS and sheet.get("rows") and (
                     ladders_changed or alt_row_count(data_root, sport, selected) != (prior or {}).get("sgp_alt_rows")):
-                # NHL parlays are built from every priced alt rung, which land 20-90 min before each puck drop
+                # the parlays are built from every priced alt rung, which land 20-90 min before each start
                 attach_sgp(sheet, prior, data_root, selected, sport)
                 ladders_changed = True
             new = [p for p in sheet.get("picks") or [] if p.get("pick_id") not in before]
