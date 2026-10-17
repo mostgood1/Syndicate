@@ -944,6 +944,7 @@ def attach_sgp(sheet: dict[str, Any], prior: dict[str, Any] | None, data_root: P
         if not cells:
             print(f"CHEAT_SHEET {sport} sgp: no correlations file -- section skipped", flush=True)
             sheet["sgp"] = list((prior or {}).get("sgp") or [])
+            sheet["sgp_alt_rows"] = alt_row_count(data_root, sport, day)   # seen: the refresh need not retry until it grows
             return
         roles = sgp.lineup_roles(data_root, day) if sport == "nhl" else sgp.current_roles(data_root, day)
         sheet["sgp_basis"] = SGP_BASIS.get(sport)
