@@ -50933,3 +50933,17 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - Paper/portfolio resolver, 10-16 TB @ CLE total: `unavailable_reason: mlb_game_rescheduled_off_slate_date`.
 - **Not separately observed:** a live execution pass after the restart. Neither role log has an `EXECUTED mode=` line outside process-memory dumps, so the live state above rests on the per-role env plus the supervisor flag. That is the same state the 16:04:30Z go-live entry verified.
 - **Still owed:** the next REAL MLB postponement, end to end. The card settlement should list the game as unresolved, the ledger diagnostics should show `games_not_played_on_date >= 1`, paper settlement should show `mlb_game_not_played`, and the served lens should count `postponed`.
+
+
+## 2026-10-19 17:38:24Z (12:38 PM CT) -- fleet ff a6c32498 -> 71631544 (8 commits), NO restart: Kalshi club codes settled per event (lane `kalshi-event-scoped-codes`, session 436c79e2)
+- **ask:** user 2026-10-19 "Fast-forward the fleet to include 71631544 with the usual claim, ride-along review and whole-report CLEAR check, no restart; log it in deploys.md."
+- **claims:** refresh-worker + live-odds-worker by `kalshi-event-scoped-codes-ff`, acquire exit 0 each (tokens 4a2896e0..., 315f2d43...). Released with --token, rc 0 each; status free.
+- **safety:** `check_deploy_safety.py` NOT CLEAR at 17:38:02Z, then **CLEAR at 17:38:23Z** (whole report: MLB sim finished, odds refresh idle, 0 child jobs on either worker, board idle). WARNING in the same report: live games in progress -- relevant to a restart only, none taken. Merge 1 s later, guarded on HEAD == a6c32498.
+- **ride-alongs** (`git diff --stat a6c32498 71631544 -- syndicate pipeline scripts vendor engines wsgi.py app.py render.yaml`, read BEFORE the merge, in its own call):
+  - `kalshi_board_join.py` (mine);
+  - `basketball_engine/engine.py` (`abd8967e`, `shooting_foul_model`, default `"legacy"` = off). Inert: `git grep` on origin/main finds no setter outside the engine and tests; the fleet env has 0 mentions; no `*engine_config*.json` on the fleet data disk names it;
+  - `scripts/basketball_scenario_rates.py` (research).
+  - No render.yaml, no env change. The 5 local data modifications were kept.
+- **What loads when:** the Kalshi join runs in-process in the worker loops (`venue_odds_loop` / `intelligence_state`), so the change loads **at the next natural worker restart** (refresh-worker pid 2570293 and live-odds-worker 2570294 started 17:30:25Z on a6c32498).
+- **expect:** after that restart, replayed on 10-19..10-21's shortlists: +22 Kalshi matches, 0 removed, 0 non-UEFA; UEL fixtures matched 5->9 / 6->10 / 7->10. The OFILEV / VIKLEV / CELRCC / CELRBS events appear on the served book grid (Celtic v Celta Vigo, NK Celje v Salzburg, OFI Crete v Bayer Leverkusen, Viktoria Plzen v Levski Sofia).
+- **verify OWED:** after the next refresh-worker restart, run `wsl -- bash /mnt/c/Users/tempadmin/.claude/scheduled-tasks/_uefa_join_reading/reading.sh` (from PowerShell) and confirm those four fixtures are on the grid with a Kalshi h2h or totals quote. The scheduled re-read `uefa-kalshi-join-reread` (13:45 CT) will run BEFORE that restart unless one happens first, so it should still read the pre-fix state.
