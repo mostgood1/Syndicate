@@ -50785,3 +50785,28 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - Method: each cycle fetched `/api/board/game-chips?sports=nfl,ncaaf,soccer`, the page's own POST `/api/intelligence/query` (`response.ranked_all`) and `/api/board/layer2-shortlist?limit=5000`. 5 cycles ~90 s apart (plus fetch time): 15:42:52Z, 15:45:05Z, 15:48:42Z, 15:51:00Z, 15:52:59Z (10:42-10:53 AM CDT, Mon).
 - Every read: chips 338 = pregame 258 / final 80, **live 0** (soccer 257 pregame / 67 final; nfl 13 final / 1 pregame = MNF; **ncaaf 0 chips**). `ranked_all` 6721-6858 rows; interval totals rows on a live game = 0. Raw shortlist 2000 rows (`limit=5000` still capped at 2000), rows with `game.segment_score` = 0 -- consistent with no live game, not evidence against d6a5ffc5.
 - Interval clause still owed. Next chance: tonight's MNF (kickoff ~00:15Z 10-20, 7:15 PM CDT) or the next live NFL/NCAAF/soccer slate.
+
+## 2026-10-19 16:04:30Z (11:04 AM CT) -- LOCAL FLEET GOES LIVE MONEY: all-roles restart with `up --allow-live-execution`, Kalshi + Polymarket -- **MET (armed and enforcing); first live pass refused Kalshi on SHARD 3 = $0** (holder `fleet-go-live`, session 332cb014; USER DECISION in chat: "proceed - accounts are now loaded", then "Verify the task arguments, then take locks, drain, restart, and verify live+armed")
+
+- **What changed (config, plus code ride-along):**
+  - `~/syndicate-prod/local_production.env` += `SYNDICATE_EXECUTION_MODE=live`, `_LIVE_ARMED=1`, `_ENABLED=1`, `_VENUE=kalshi,polymarket`. Backup: `local_production.env.bak-golive-20261019T154604Z`.
+  - The `SyndicateLocalProduction` task's arguments += `--allow-live-execution`. Edited BY THE USER in Task Scheduler: the task is LogonType=Password, so `Set-ScheduledTask` returns Access denied without re-entering the credential. XML backup: `C:\SyndicateProd\SyndicateLocalProduction.task.bak-golive-20261019.xml`.
+  - **Consequence:** every task or watchdog restart now comes up LIVE. The task restarts only on FAILURE; a clean `down` leaves it `Ready` until `Start-ScheduledTask`.
+  - Code: the stamp went 63631afb -> **f39133f8** (680 commits). Order-path files changed: `kalshi_orders._side_to_kalshi` (soccer full-game `h2h|draw` -> BUY YES on `-TIE`, NEW live behaviour, unexercised), `run_live_odds_refresh_worker.py` (live-lens import port + UEFA live leagues), `local_production.py`.
+- **Caps:** stored 15:14:50Z (log 10-19): kalshi $200/day, polymarket $100/day, $25/order, $150/day all venues, 15/15/25 orders.
+- **Sequence:**
+  - Claims acquired: live-odds-worker, refresh-worker, web.
+  - `check_deploy_safety --drain` started 15:54:08Z; waited out a board build, an MLB sim, NCAAF smartsim2 and odds children; CLEAR 16:03:46Z.
+  - `down` rc=0; task `Ready`; `Start-ScheduledTask` 16:04:30Z; `/api/health` 200 within 10 s.
+  - `--undrain` `DRAIN_CLEARED owner=amyn` ~16:05Z.
+- **verify: (read 16:04:56-16:05:04Z)**
+  - All three roles' /proc environ: `MODE=live LIVE_ARMED=1 ENABLED=1 VENUE=kalshi,polymarket`, `RENDER_GIT_COMMIT=f39133f8`. Supervisor cmdline carries `up --allow-live-execution`.
+  - `/api/portfolio/live`: `execution_mode=live`, `live_armed=true`, `health.ok=true`, kill switch `clear`, 0 unreconciled, 0 unknown submits.
+  - `VENUE_BALANCES kalshi=ok:490.01 polymarket=ok:586.05`. Of Polymarket's figure, 550.00 is `depositReservation` (availableToWithdraw 36.05); the venue counts it in `buyingPower`.
+  - First live pass:
+    - `EXECUTED mode=live venue=kalshi plan_source=live armed=True positions=1 placed=0 refused={'insufficient_shard_balance': 1}` (16:05:02Z); the position was `KXMLBRBI-...-TBYDIAZ2-1 @ 0.71`.
+    - polymarket `placed=0 refused={}`.
+    - `limits` on both lines = the stored caps, `mode: live`.
+- **OPEN -- KALSHI SHARD 3 IS EMPTY:** `KALSHI_SHARD_BALANCES shards={'0': 490.0, '1': 0.01, '2': 0.0, '3': 0.0}`. MLB routes to shard 3 (`kalshi_orders.py` note, measured 2026-08-26), so every Kalshi MLB order refuses by name until the account holder moves collateral onto shard 3. `KALSHI_ORDER_KNOWN_SHARDS=0,3` is already set. This is a venue-account action, not code.
+- **STILL UNVERIFIED:** the fleet has not yet placed a real order. The signed ORDER POST from this host, the fill, and the ledger row are owed on the first placeable position. Watch any Kalshi soccer draw order specifically (new mapping).
+- **Revert:** engage the kill switch on `/portfolio` (fails closed). To go fully back to paper: restore both backups, `down`, `Start-ScheduledTask`.
