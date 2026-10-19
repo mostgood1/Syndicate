@@ -841,13 +841,11 @@ fallback that fires only when the vendor stage errors
 the vendor writer; it did not. That docstring caused two successive
 misdiagnoses on 2026-08-20.
 
-**ADDENDUM `[verified 2026-10-16, lane mlb-live-lens-native-p1]`: the MLB LIVE LENS RUNTIME is native (phase 1).**
-- The live-odds-worker's live-lens loop, `refresh_mlb_oddsapi.py`'s report builder and `syndicate/features/mlb/live_lens.py` run `syndicate/features/mlb/live_lens_port/app_slice.py`. It is a generated, statement-verbatim port of the vendored `flask_frontend.py` slice (`scripts/port_mlb_live_lens.py --check`), live on the fleet since b9542acb (ff 2026-10-15 22:04Z, worker restart 22:28Z).
-- Measured in production:
-  - the loop's flock is held by the port's worker;
-  - refresh render_sync written by the port at 23:00:25Z;
-  - live MC (`_live_mc_prob_over_for`) produced non-null `liveModelProbOver` in 40 of 56 live entries on the 10-15 night game, against 41 of 52 for the vendored loop that afternoon.
-- **NOT off vendor yet:** the port still imports the vendored `sim_engine.*` (incl. `live_mc`) and `tools.*` packages (phase 2). This changes none of the daily-update stage rows above.
+**ADDENDUM `[verified 2026-10-16..19, lanes mlb-live-lens-native-p1..p4, mlb-vendor-deletion-prep]`: production MLB runs NO vendored code; the copies are now maintained source.**
+- The live lens (live-odds-worker loop, `refresh_mlb_oddsapi.py`, `live_lens.py`) runs `syndicate/features/mlb/live_lens_port/app_slice.py`; the engine is `syndicate/features/mlb/sim_engine/`; the daily sim (`run_mlb_daily_sim_job.py`) launches `syndicate/features/mlb/native/tools/`; the engine DATA root is `engines/mlb/`.
+- Measured in production: the 10-16 23:21Z daily sim for 10-17 ran native scripts only (30 files written under engines/mlb, 0 under vendor, input checklist rc=0); live MC on the native engine filled `liveModelProbOver` in 27 of 46 live entries (10-18 game); betting-card assets serve from `syndicate/static/mlb/betting_card/` (asset_version). With `vendor/mlb_bettingv2` moved out of the tree, the test suite's 2,750 outcomes were identical and the production entry points imported 0 vendored modules.
+- **FROZEN 2026-10-19 (3c55e77b):** the three trees are no longer generated. Edit them directly; conventions and the one post-freeze behaviour edit (a6c32498, postponed-game guards in the card settler) are in `syndicate/features/mlb/FROZEN_FROM_VENDOR.md`. The generators, parity harnesses and migration script are retired; `sync_vendor_upstream.py` no longer covers MLB.
+- **NOT DONE:** `vendor/mlb_bettingv2` is still in git (the `git rm`, the upstream_sync.json entry, the CLAUDE.md mapping line and archiving the fleet's vendored data dir are a separate step, awaiting the user). The daily-update stage table above describes the vendored `daily_update.py`; the native copy runs the same stages.
 
 ## [mlb-ladders-native-builder] MLB LADDERS — NATIVE BUILDER SHIPPED TO THE TREE `[2026-08-19]`
 
