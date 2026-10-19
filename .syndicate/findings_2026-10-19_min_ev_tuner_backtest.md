@@ -77,3 +77,30 @@ step 0.5, floor 1.0, ceiling 6.0, band 1.0, trailing 150 events, min 40 events, 
 - **Cell granularity.** If weeks are too slow, pooling `market` into its family (game_line / game_total /
   player_prop) inside venue x sport x phase roughly triples events per cell. It is still a threshold and
   never an exclusion. This is a user choice: the brief named market-level cells.
+
+
+## CORRECTION 2026-10-19 19:4xZ -- production's cut line is 0.0, not 2.0, and the band was anchored wrong
+
+**What I assumed:** that the base cut was `DEFAULT_MIN_EV_PCT = 2.0`. Both the brief and the ledger survey said so, and both
+were wrong for the fleet. **What production read:** the first nightly line on the fleet, `2026-10-19T19:25:36.467Z [min_ev_tuner]
+MIN_EV_TUNER mode=shadow ... base=0.0`. refresh-worker carries `SYNDICATE_PORTFOLIO_MIN_EV_PCT=0`, the user decision of
+2026-09-16 (`state.md`, beside the family-exclusion removal). There is no stored settings key on the fleet's Redis, so the env wins.
+
+**Consequence for the design:** anchored at the configured 0.0, the marginal band `[0, 1)` held 0-5 events in every cell. Rows
+reach the ledger at EV >= ~2 because other gates bind first (fair noise, net of fee, the shortlist). So the tuner could NEVER move:
+holds by construction, not by evidence. Also, the shipped floor of 1.0 sat above the base, so a first raise to 0.5 would have
+been refused as out of bounds.
+
+**Fixed (commit below):**
+- The band is anchored at the cell's EFFECTIVE cut: max(configured cut, 5th-percentile EV taken).
+- A raise steps from that cut.
+- A lower is proposed only when the configured cut is the binding gate (`cut_not_binding` otherwise).
+- The floor defaults to 0.0.
+
+Mutation-checked: anchoring back at the configured cut fails 2 tests.
+
+**Replay at base 0.0 with the fix:** still 0 moves over 18 nights, but now for evidence reasons. Two NCAAF cells have 45-46 events in
+their band and hold only on CLV sample (18 and 28 of 30): kalshi ncaaf spreads band [3.79, 4.79) ROI -12.6% (t -0.64), CLV +1.97
+(t 4.2); polymarket ncaaf totals band [3.34, 4.34) ROI -5.3% (t -0.28), CLV +1.65 (t 4.5). Both would hold as `only_clv_significant`
+once the CLV sample fills. So the earlier "weeks, not days" estimate was too pessimistic for those two cells, and still right for
+the rest.

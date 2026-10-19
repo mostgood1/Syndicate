@@ -87,7 +87,12 @@ _PROPOSAL_CELLS_CAP = 400
 # `portfolio_settings._coerce` does: a typo must not become a different policy.
 _KNOBS: dict[str, tuple[str, float, float, float]] = {
     "step_pct": ("SYNDICATE_MIN_EV_TUNER_STEP_PCT", 0.5, 0.05, 2.0),
-    "floor_pct": ("SYNDICATE_MIN_EV_TUNER_FLOOR_PCT", 1.0, 0.0, 10.0),
+    # 0.0, not higher: production's base IS 0.0 (`SYNDICATE_PORTFOLIO_MIN_EV_PCT=0`
+    # on refresh-worker, user decision 2026-09-16, read in the first nightly line
+    # 2026-10-19 19:25:36Z `base=0.0`). A floor above the base would make the
+    # first raise from it (0.0 -> 0.5) an out-of-bounds override that
+    # `shadow_cut_line` refuses. The floor's job is "never accept negative EV".
+    "floor_pct": ("SYNDICATE_MIN_EV_TUNER_FLOOR_PCT", 0.0, 0.0, 10.0),
     "ceiling_pct": ("SYNDICATE_MIN_EV_TUNER_CEILING_PCT", 6.0, 0.5, 20.0),
     "trailing_events": ("SYNDICATE_MIN_EV_TUNER_TRAILING_EVENTS", 150.0, 10.0, 5000.0),
     "min_events": ("SYNDICATE_MIN_EV_TUNER_MIN_EVENTS", 40.0, 5.0, 5000.0),
@@ -317,31 +322,58 @@ def cell_evidence(
     }
 
 
+def _effective_cut(orders: Sequence[Mapping[str, Any]], current: float, quantile: float = 0.05) -> float:
+    """Where the cell is ACTUALLY cut: max(configured cut, the low-quantile EV taken).
+
+    WHY. Production's configured cut is 0.0 (`SYNDICATE_PORTFOLIO_MIN_EV_PCT=0`)
+    but the rows that reach the ledger sit at EV >= ~2: other gates (fair noise,
+    net of fee, the shortlist) bind first. Measured 2026-10-19: with the band
+    anchored at the configured 0.0, `[0, 1)` held 0-5 events in every cell, so
+    the tuner could never move -- holds by construction, not by evidence.
+    """
+    values = sorted(v for v in (_as_float(o.get("ev_pct")) for o in orders) if v is not None and v >= current)
+    if not values:
+        return current
+    idx = min(len(values) - 1, max(0, int(math.floor(quantile * (len(values) - 1)))))
+    return max(current, values[idx])
+
+
 def decide(
     evidence: Mapping[str, Any],
     *,
     current_pct: float,
     events_since_move: int | None,
     params: Mapping[str, float],
+    effective_pct: float | None = None,
 ) -> tuple[str, float, str]:
-    """(action, proposed_pct, reason). Pure: no I/O, no clock."""
+    """(action, proposed_pct, reason). Pure: no I/O, no clock.
+
+    `effective_pct` is where the cell is ACTUALLY being cut (see
+    `_effective_cut`); a raise steps from there so it removes real rows, and a
+    lower is only proposed when the configured cut is the binding gate.
+    """
+    effective = current_pct if effective_pct is None else max(current_pct, effective_pct)
     z = params["z"]
+    if events_since_move is not None and events_since_move < params["min_new_events"]:
+        return ACTION_HOLD, current_pct, "cooldown_awaiting_new_events"
     if (evidence.get("events") or 0) < params["min_events"]:
         return ACTION_HOLD, current_pct, "insufficient_events"
     if (evidence.get("clv_events") or 0) < params["min_clv_events"]:
         return ACTION_HOLD, current_pct, "insufficient_clv_events"
-    if events_since_move is not None and events_since_move < params["min_new_events"]:
-        return ACTION_HOLD, current_pct, "cooldown_awaiting_new_events"
     roi_t, clv_t = evidence.get("roi_t"), evidence.get("clv_t")
     if roi_t is None or clv_t is None:
         return ACTION_HOLD, current_pct, "no_variance"
     step = params["step_pct"]
     if roi_t <= -z and clv_t <= -z:
-        proposed = min(params["ceiling_pct"], round(current_pct + step, 4))
+        proposed = min(params["ceiling_pct"], round(effective + step, 4))
         if proposed <= current_pct:
             return ACTION_HOLD, current_pct, "at_ceiling"
         return ACTION_RAISE, proposed, "roi_and_clv_significantly_negative"
     if roi_t >= z and clv_t >= z:
+        if effective - current_pct >= step:
+            # Another gate cuts this cell above the configured line: lowering
+            # the line would change nothing that is placed.
+            return ACTION_HOLD, current_pct, "cut_not_binding"
         proposed = max(params["floor_pct"], round(current_pct - step, 4))
         if proposed >= current_pct:
             return ACTION_HOLD, current_pct, "at_floor"
@@ -464,28 +496,30 @@ def compute_proposals(
         evidence = cell_evidence(
             group, trailing_events=int(params["trailing_events"]), clv_scopes=clv_scopes
         )
-        band_hi = current + params["band_pct"]
+        effective = _effective_cut(group, current)
+        band_hi = effective + params["band_pct"]
         marginal_rows = []
         for order in group:
             ev_pct = _as_float(order.get("ev_pct"))
-            if ev_pct is not None and current <= ev_pct < band_hi:
+            if ev_pct is not None and effective <= ev_pct < band_hi:
                 marginal_rows.append(order)
         marginal = cell_evidence(
             marginal_rows, trailing_events=int(params["trailing_events"]), clv_scopes=clv_scopes
         )
-        marginal["band"] = [round(current, 4), round(band_hi, 4)]
+        marginal["band"] = [round(effective, 4), round(band_hi, 4)]
         # Cooldown counts the WHOLE cell's events: the band itself moves with
         # the cut, so its own count would reset on every move.
         total_events = len({_event_id(o) for o in group})
         moved_at_events = prior.get("moved_at_total_events")
         since = None if moved_at_events is None else max(0, total_events - int(moved_at_events))
         action, proposed, reason = decide(
-            marginal, current_pct=current, events_since_move=since, params=params
+            marginal, current_pct=current, events_since_move=since, params=params, effective_pct=effective
         )
         actions[action] = actions.get(action, 0) + 1
         entry = {
             "min_ev_pct": proposed if action != ACTION_HOLD else override,
             "previous_min_ev_pct": current,
+            "effective_cut_pct": round(effective, 4),
             "action": action,
             "reason": reason,
             "total_events": total_events,

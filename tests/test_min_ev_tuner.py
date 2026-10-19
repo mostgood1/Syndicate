@@ -13,7 +13,7 @@ NOW = datetime(2026, 10, 20, 13, 0, tzinfo=timezone.utc)
 
 
 def _order(i: int, *, won: bool, clv: float | None, venue="paper:kalshi", sport="ncaaf",
-           market="totals", date="2026-10-10", ev=2.5, stake=10.0, scope="same_book", event=None):
+           market="totals", date="2026-10-10", ev=2.0, stake=10.0, scope="same_book", event=None):
     mark = None if clv is None else {"clv_pct": clv, "close_book_scope": scope}
     return {
         "idempotency_key": f"k{i}",
@@ -33,12 +33,12 @@ def _order(i: int, *, won: bool, clv: float | None, venue="paper:kalshi", sport=
     }
 
 
-def _losing_cell(n=60, ev=2.5):
+def _losing_cell(n=60, ev=2.0):
     # Mostly losses with CLV consistently negative: both significantly negative.
     return [_order(i, won=(i % 5 == 0), clv=-2.0 - (i % 3) * 0.5, ev=ev) for i in range(n)]
 
 
-def _winning_cell(n=60, ev=2.5):
+def _winning_cell(n=60, ev=2.0):
     return [_order(i, won=(i % 5 != 0), clv=2.0 + (i % 3) * 0.5, ev=ev) for i in range(n)]
 
 
@@ -112,12 +112,13 @@ def test_a_cell_lost_by_its_high_ev_rows_does_not_raise_the_cut(memory_state):
     # learnings 2026-09-29: ROI has run ANTI-correlated with claimed EV. The
     # rows a raise would remove (EV in [2, 3)) are winning; the losers sit at
     # 5%. The whole cell is significantly negative -- and the cut must hold.
-    marginal = [_order(i, won=(i % 5 != 0), clv=1.0 + (i % 3) * 0.5, ev=2.5) for i in range(45)]
+    marginal = [_order(i, won=(i % 5 != 0), clv=1.0 + (i % 3) * 0.5, ev=2.0 + (i % 5) * 0.1) for i in range(45)]
     high = [_order(100 + i, won=(i % 10 == 0), clv=-2.0 - (i % 3) * 0.5, ev=5.0) for i in range(150)]
     cell = T.compute_proposals(marginal + high, state={}, base_min_ev_pct=2.0)["cells"]["kalshi|ncaaf|totals|regular"]
     assert cell["evidence"]["roi_t"] <= -2 and cell["evidence"]["clv_t"] <= -2
     assert cell["action"] != T.ACTION_RAISE
-    assert cell["marginal"]["band"] == [2.0, 3.0]
+    low, high = cell["marginal"]["band"]
+    assert 2.0 <= low < 2.5 and high < 5.0  # the 2%-EV rows, never the 5% losers
 
 
 def test_roi_alone_does_not_move(memory_state):
@@ -144,9 +145,37 @@ def test_ceiling_and_floor_bound_the_step(memory_state):
     at_ceiling = {"cells": {"kalshi|ncaaf|totals|regular": {"min_ev_pct": 6.0}}}
     cell = T.compute_proposals(_losing_cell(ev=6.5), state=at_ceiling, base_min_ev_pct=2.0)["cells"]["kalshi|ncaaf|totals|regular"]
     assert (cell["action"], cell["reason"], cell["min_ev_pct"]) == ("hold", "at_ceiling", 6.0)
-    at_floor = {"cells": {"kalshi|ncaaf|totals|regular": {"min_ev_pct": 1.0}}}
-    cell = T.compute_proposals(_winning_cell(ev=1.5), state=at_floor, base_min_ev_pct=2.0)["cells"]["kalshi|ncaaf|totals|regular"]
+    at_floor = {"cells": {"kalshi|ncaaf|totals|regular": {"min_ev_pct": 0.0}}}
+    cell = T.compute_proposals(_winning_cell(ev=0.0), state=at_floor, base_min_ev_pct=2.0)["cells"]["kalshi|ncaaf|totals|regular"]
     assert (cell["action"], cell["reason"]) == ("hold", "at_floor")
+
+
+def test_the_first_raise_from_a_zero_base_is_applied_not_refused(memory_state):
+    # Production's base is 0.0 (2026-10-19). A raise from it must yield an
+    # override `effective_min_ev_pct` honours in apply mode.
+    rows = _losing_cell(ev=0.0)
+    out = T.compute_proposals(rows, state={}, base_min_ev_pct=0.0)
+    cell = out["cells"]["kalshi|ncaaf|totals|regular"]
+    assert (cell["action"], cell["min_ev_pct"]) == ("raise", 0.5)
+    row = {"venue": "kalshi", "sport": "ncaaf", "market": "totals"}
+    assert T.effective_min_ev_pct(row, base_min_ev_pct=0.0, selected_date="2026-10-10", state=out, mode="apply") == (0.5, "tuned_cell")
+
+
+def test_band_anchors_where_the_cell_is_actually_cut_not_at_a_zero_base(memory_state):
+    # Production 2026-10-19: base 0.0, but rows reach the ledger at EV ~2+ (other
+    # gates bind first). Anchored at 0.0 the band [0, 1) is empty and nothing can
+    # ever move; anchored at the effective cut it measures the rows a raise removes.
+    rows = _losing_cell(ev=2.2)
+    cell = T.compute_proposals(rows, state={}, base_min_ev_pct=0.0)["cells"]["kalshi|ncaaf|totals|regular"]
+    assert cell["effective_cut_pct"] == 2.2
+    assert cell["marginal"]["band"] == [2.2, 3.2]
+    assert (cell["action"], cell["min_ev_pct"]) == ("raise", 2.7)
+
+
+def test_no_lower_when_another_gate_is_binding(memory_state):
+    rows = _winning_cell(ev=2.2)
+    cell = T.compute_proposals(rows, state={}, base_min_ev_pct=0.0)["cells"]["kalshi|ncaaf|totals|regular"]
+    assert (cell["action"], cell["reason"], cell["min_ev_pct"]) == ("hold", "cut_not_binding", None)
 
 
 def test_cooldown_needs_new_events_before_a_second_move(memory_state):
@@ -155,7 +184,7 @@ def test_cooldown_needs_new_events_before_a_second_move(memory_state):
     second = T.compute_proposals(rows, state=first, base_min_ev_pct=2.0)
     cell = second["cells"]["kalshi|ncaaf|totals|regular"]
     assert (cell["action"], cell["reason"], cell["min_ev_pct"]) == ("hold", "cooldown_awaiting_new_events", 2.5)
-    more = rows + [_order(100 + i, won=(i % 5 == 0), clv=-2.5 - (i % 2), date="2026-10-11", ev=3.0) for i in range(25)]
+    more = rows + [_order(100 + i, won=(i % 5 == 0), clv=-2.5 - (i % 2), date="2026-10-11", ev=2.5) for i in range(45)]
     third = T.compute_proposals(more, state=second, base_min_ev_pct=2.0)["cells"]["kalshi|ncaaf|totals|regular"]
     assert (third["action"], third["min_ev_pct"]) == ("raise", 3.0)
 
