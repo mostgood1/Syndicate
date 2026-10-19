@@ -264,9 +264,11 @@ def test_an_unknown_school_resolves_to_nothing_without_raising() -> None:
 # RE-PINNED 2026-10-19 (lane uefa-oddsapi-club-aliases, on loan): 15 UEFA vendor spellings, aliases
 # 597 -> 614 (two entries also add a folded key). Diffed over origin/main's tracked branding
 # (`git archive` root, SYNDICATE_DATA_ROOT): 0 removed / 0 changed; nicknames 99 and tokens 518 unchanged.
+# RE-PINNED 2026-10-19 #2 (lane uefa-kalshi-elim-aliases, on loan): Kalshi "Crvena Zvezda" / "Copenhagen"
+# by elimination, 614 -> 616, same tracked-branding diff: 0 removed / 0 changed / no newly ambiguous token.
 @pytest.mark.parametrize(
     "sport,alias_entries,nickname_entries",
-    [("mlb", 38, 27), ("nfl", 39, 32), ("nba", 42, 26), ("wnba", 50, 0), ("soccer", 614, 99)],
+    [("mlb", 38, 27), ("nfl", 39, 32), ("nba", 42, 26), ("wnba", 50, 0), ("soccer", 616, 99)],
 )
 def test_the_other_sports_maps_are_the_same_size_as_before(
     sport: str, alias_entries: int, nickname_entries: int

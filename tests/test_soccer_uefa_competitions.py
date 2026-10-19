@@ -207,6 +207,10 @@ _BRANDING = {
         {"name": "Slavia Prague", "short_name": "Slavia", "abbreviation": "SLP"},
         {"name": "Sabah FK", "short_name": "Sabah", "abbreviation": "SAB"},
     ],
+    "uecl": [
+        {"name": "Red Star Belgrade", "short_name": "Red Star", "abbreviation": "CZV"},
+        {"name": "F.C. København", "short_name": "København", "abbreviation": "FCK"},
+    ],
 }
 
 
@@ -240,6 +244,9 @@ def test_uefa_branding_adds_club_names_but_never_steals_a_domestic_code(stub_bra
         ("Slavia Praha", "slavia prague"),  # OddsAPI
         ("Sabah Masazir", "sabah fk"),  # Kalshi
         ("Olympiakos Piraeus", "olympiacos"),  # OddsAPI
+        # By ELIMINATION, 2026-10-19 (lane uefa-kalshi-elim-aliases): KXUECLGAME-26OCT22CZVFCC.
+        ("Crvena Zvezda", "red star belgrade"),  # Kalshi
+        ("Copenhagen", "f.c. københavn"),  # Kalshi
     ],
 )
 def test_vendor_spellings_of_uefa_clubs_resolve(stub_branding, vendor_name, canonical):

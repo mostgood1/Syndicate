@@ -513,6 +513,17 @@ _SOCCER_VENDOR_NAME_ALIASES: dict[str, str] = {
     "Universitatea Craiova": "CSU Craiova",
     "KF Egnatia": "Egnatia",
     "Inter Club d'Escaldes": "Inter D'Escaldes",
+    #
+    # BY ELIMINATION, 2026-10-19 (lane `uefa-kalshi-elim-aliases`, owner-approved loan). Both clubs on
+    # the Kalshi event were unnamed, so pairing could not fire. On the fleet, every KXUECLGAME event on
+    # 2026-10-22 went through `kalshi_board_join._resolve_event` (code incl. 71631544): 17 of 18
+    # resolved to 17 DISTINCT UECL fixtures, leaving a 1:1 remainder --
+    # KXUECLGAME-26OCT22CZVFCC ("Crvena Zvezda wins" / "Copenhagen wins") <-> Red Star Belgrade v
+    # FC Copenhagen, 2026-10-22T16:45Z. Independent identity: Crvena Zvezda is Red Star's Serbian name.
+    # THE RULE: elimination is valid ONLY when the remainder is exactly one event and one fixture, on
+    # one date, in one competition. Anything wider is a guess and is refused.
+    "Crvena Zvezda": "Red Star Belgrade",
+    "Copenhagen": "F.C. København",
     # END UEFA CLUB COMPETITIONS
 }
 
