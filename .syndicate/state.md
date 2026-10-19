@@ -552,6 +552,7 @@ once this index exists: re-splitting would orphan the parts.
 | [kalshi-execution] | Kalshi execution — session close 2026-08-26 (lane `kalshi-exchange-index`) | `state_kalshi.md` |
 | [kalshi-odds-refresh-bound] | THE VENUE FAN-OUT IS A COLD-START BURST ON A PERSISTED CLOCK, AND IT IS NOW TIME-BOUNDED `[2026-09-03, lane ka | `state_kalshi.md` |
 | [kalshi-quote-capture-coupling] | Kalshi quote capture ran ONLY inside the heavy board build — a refused heavy build stopped it for every sport  | `state_kalshi.md` |
+| [kalshi-exit-path] | KALSHI POSITIONS CAN BE SOLD BEFORE SETTLEMENT -- RUNNING IN PAPER ONLY `[verified on the fleet 2026-10-19 19: | `state_kalshi.md` |
 | [layer2-board-keyvalue-ceiling] | THE BOARD'S CEILING IS THE COMBINED KEY, NOT THE SHARDS — and `per_sport=3000` corrupted production for ~29 mi | `state_layer2.md` |
 | [layer2-realized-accuracy] | THE LAYER 2 BOARD'S REALIZED ACCURACY — the portfolio book is the surface, and the measurement chain is broken | `state_layer2.md` |
 | [layer2-score-outcomes] | THE BOARD'S SCORE, GRADED ON OUTCOMES AND CLOSES FOR THE FIRST TIME -- real price edge, fee-blind ranking, non | `state_layer2.md` |

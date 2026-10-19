@@ -845,3 +845,20 @@ board. The loop therefore checks `budget_remaining()` BEFORE spending.
   - Deployed in `fb0c91cf` at 13:39:49Z.
   - First refused heavy build after boot at 14:30:34Z. The fast path then printed `QUOTE_CAPTURE matches=910 appended=87` (nfl 2) and `kalshi_capture=joined:8248:30.0s`.
   - The capture's added fast-path time is not measured (n=1: 152.9 s vs 52-166 s before). Off switch `SYNDICATE_LAYER2_FAST_KALSHI_CAPTURE=0`, plus a deploy.
+
+## [kalshi-exit-path] KALSHI POSITIONS CAN BE SOLD BEFORE SETTLEMENT -- RUNNING IN PAPER ONLY `[verified on the fleet 2026-10-19 19:20:07Z, lane kalshi-exit-path]`
+
+- `syndicate/features/shared/execution_exits.py` (f7d775f9) runs on live-odds-worker's execution tick (300 s), after VENUE_SETTLEMENT.
+  The fleet has run it since the 19:19:01Z live-odds-worker restart onto 94c97011.
+- **Mode: PAPER.** `SYNDICATE_EXIT_MODE` is absent on the fleet, which means paper. Nothing is sent; the first trigger per entry is booked as a
+  paper exit, and each position's best NET bid (high-water mark) is kept for the counterfactual margin grid.
+- **Own document, own key space.** `reports/intelligence/execution_exits.json` (keyvalue). Exit keys are `x` + 23 hex, so
+  `_is_our_key` is False on them. Exits are never in `execution_ledger.json`, so they never reach `spent_today` / caps,
+  `unreconciled_orders`, or the entry orphan scan.
+- **Measured 19:20:07Z:** `EXIT_TICK status=ok mode=paper positions=19 live=1 quoted=12 quote_errors=0 venue=ok mismatches=0 watching=19`;
+  placement unaffected (`EXECUTED mode=live venue=kalshi` at 19:20:19Z).
+- **Venue reads now verified on production:** batched `GET /markets?tickers=A,B,...` (public) and the signed
+  `GET /portfolio/positions` (`market_positions[].position[_fp]`, signed: + = YES, - = NO). The latter matched the ledger
+  on the first read (Thornton NO x5).
+- **NOT armed for live, and NOT safe to arm:** `execution_exits.LIVE_BLOCKERS`. Settlement does not know about sales, and the v2
+  sell body (`reduce_only`, `immediate_or_cancel`) has never been accepted. A user yes is also required. Readout owed: todo #703.
