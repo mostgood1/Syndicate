@@ -67,14 +67,14 @@ death, never life — do not invert it.
 
 ## OPEN
 
-### mlb-unified-update-native — OPEN — opened 2026-10-19 — session 2d413211
+### mlb-unified-update-native — CLOSED 2026-10-19 (GOAL MET) — opened 2026-10-19 — session 2d413211
+- GOAL VERDICT `[2026-10-19 16:xxZ]`. Goal (verbatim): "Point the local Windows unified daily update's MLB step (scripts/unified_daily_update.ps1) at the native daily_update.py with the engines/mlb working directory, the last runner of vendored MLB code (user: "proceed", 2026-10-19); the step's Workflow id and Name stay (they key branches and appear in run manifests)." -- **GOAL: MET** (by its stated verification). Landed 2f12e380: PowerShell AST parse 0 errors, both resolved paths exist, no mlb_bettingv2 left in the file. LIMIT: the local Windows run itself was not executed here (a full ui-daily is heavy); the script it now runs is the one proven by the fleet parity and production.
 - Goal: Point the local Windows unified daily update's MLB step (scripts/unified_daily_update.ps1) at the native daily_update.py with the engines/mlb working directory, the last runner of vendored MLB code (user: "proceed", 2026-10-19); the step's Workflow id and Name stay (they key branches and appear in run manifests).
-- Files: scripts/unified_daily_update.ps1 (the MLB vendored-daily-update step section only)
+- Files: (released on close 2026-10-19)
 - Hypothesis: three path edits; the PowerShell parses and every path it resolves exists.
 - Falsification test: a parse error, or a resolved path that does not exist.
 - Verification: PowerShell AST parse clean; the native script and engines/mlb exist at the paths the step builds.
 - Blocked by: none
-
 ### mlb-web-tests-native — CLOSED 2026-10-19 (GOAL MET) — opened 2026-10-19 — session 2d413211
 - GOAL VERDICT `[2026-10-19 16:xxZ]`. Goal (verbatim): "Point the MLB tests that exercise functions of the VENDORED web app (vendor/mlb_bettingv2/tools/web/flask_frontend.py) at the live-lens app slice production runs (syndicate/features/mlb/live_lens_port/app_slice.py), imports and patch targets together; any test whose function is NOT in the slice is reported as testing code production does not run (user: "proceed", 2026-10-19). Per-test outcomes must not change." -- **GOAL: MET.** Landed 5ca4f4c9. JUnit over the 7 files: 556 per-test outcomes identical before/after; the fully repointed files load 0 vendored modules. Reported as testing code production does NOT run (left on vendor, marked VENDORED-ONLY, to retire with the vendored tree): the two /api/live-lens ROUTE tests in test_mlb_refresh_runner (the slice has functions, not routes -- 404 when repointed, which is how they were found) and test_render_live_lens_refresh_* (a vendored script with no launcher). Hypothesis partly FALSIFIED: not every tested function was in the slice -- 3 were vendored-only.
 - Goal: Point the MLB tests that exercise functions of the VENDORED web app (vendor/mlb_bettingv2/tools/web/flask_frontend.py) at the live-lens app slice production runs (syndicate/features/mlb/live_lens_port/app_slice.py), imports and patch targets together; any test whose function is NOT in the slice is reported as testing code production does not run (user: "proceed", 2026-10-19). Per-test outcomes must not change.
