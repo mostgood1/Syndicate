@@ -860,5 +860,12 @@ board. The loop therefore checks `budget_remaining()` BEFORE spending.
 - **Venue reads now verified on production:** batched `GET /markets?tickers=A,B,...` (public) and the signed
   `GET /portfolio/positions` (`market_positions[].position[_fp]`, signed: + = YES, - = NO). The latter matched the ledger
   on the first read (Thornton NO x5).
-- **NOT armed for live, and NOT safe to arm:** `execution_exits.LIVE_BLOCKERS`. Settlement does not know about sales, and the v2
-  sell body (`reduce_only`, `immediate_or_cancel`) has never been accepted. A user yes is also required. Readout owed: todo #703.
+- **NOT armed for live, and NOT safe to arm:** `execution_exits.LIVE_BLOCKERS` now names ONE item: the v2 sell body
+  (`reduce_only`, `immediate_or_cancel`) has never been accepted. A user yes is also required. Readout owed: todo #703.
+- **Settlement knows about sales -- on origin/main, NOT on the fleet** `[verified by tests 2026-10-19, lane kalshi-exit-settlement]`:
+  `venue_settlement.settle_from_venue` (`550a4b20`) and `paper_settlement.settle_orders`' 24h inference fallback (`f769a228`)
+  read LIVE rows of execution_exits.json by `exit_idempotency_key(entry_key)`. Filled -> P&L = sale proceeds - exit fee +
+  unsold x settle value - entry cost - entry fee (`order.exit_applied`); submitted/failed/unknown -> defer; unreadable doc ->
+  defer Kalshi; paper exits never read. No live exit -> identical grade. Loads at the next fleet ff + live-odds-worker AND
+  refresh-worker restart. UNVERIFIED: the raw `result` field of `GET /markets` (used only for a sold-to-zero entry with no
+  settlement row; absent -> it waits).
