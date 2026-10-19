@@ -494,6 +494,21 @@ death, never life — do not invert it.
 - READING 2026-10-06 19:40:24Z (deploys.md): first NBA recon written on the fleet -- 10-03 (1 game/31 rows), 10-04 (2/69), 10-05 (5/163); content checked (real finals, NBA codes). Step 2 OWED: bias pairs on a regular-season date after 2026-10-20.
 
 ### published-negative-ev — OPEN — opened 2026-10-06 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- **FIRST MARKET-BASIS PLAN, RE-DERIVED FROM THE FLEET LOG `[2026-10-19 23:2xZ]`. The veto lift is CONFIRMED, and TOTAL STAKE WENT DOWN, which is the opposite of how this change was framed.** Lane `min-ev-tuner-shadow` reported it; these are my own reads of `[portfolio_commit] PLAN_WRITTEN` on the SAME date (2026-10-19) with activation **22:43:52Z** between them:
+
+  | | before 22:10:53Z | after 23:14:18Z |
+  |---|---|---|
+  | rows_in -> sized | 19 -> **11** | 22 -> **21** |
+  | positions | 10 | **18** |
+  | staked | **$124.36** | **$64.95** |
+  | `zero_kelly_stake` | **7** | **absent (0)** |
+  | `sim_share` (PORTFOLIO_COMMIT) | 0.7841 | **0.0** |
+
+  - **The veto lift I predicted is real: `zero_kelly_stake` 7 -> 0**, and `sized` went 11 of 19 to **21 of 22**, so nearly every row now sizes. That half of the prediction holds.
+  - **The stake half does NOT.** Total staked fell **$124.36 -> $64.95 (-47.8%)** while positions nearly doubled, so mean stake per position fell **$12.44 -> $3.61 (-71%)**. Both that lane and I had written the expectation as "the added stake AND the veto lift"; the added stake is **not what happened**. More lines, much smaller tickets, and about half the capital deployed.
+  - `sim_share` **0.7841 -> 0.0** is by construction under `market` — the staked probability comes from the market fair, not the sim — so it corroborates the basis actually switched.
+- **CONFOUNDS, stated because this is NOT the registered reading.** (a) ONE plan pair, 10 vs 18 positions. (b) The row set CHANGED (`rows_in` 19 -> 22) across ~1 hour of a live slate, so this is not a controlled A/B. (c) The 22:40:24Z plan in between is `date=2026-10-20`, a different slate, and is NOT comparable. (d) **A late-evening plan on a finishing slate could show `sim_share` 0 for reasons unrelated to the flag** — `sized` RISING 11 -> 21 argues against that, but there is no post-activation plan earlier than 23:14Z to separate them, and no same-hour previous-day control was taken. The registered reading stays **2026-10-21 15:00Z**, split on `sizing.staked_probability_version`.
+- **NOT verified by me:** the `market_fair@` provenance stamps themselves. `market_fair@` appears **nowhere** in the fleet logs (0 occurrences), so that lane's "18/18 stamped `market_fair@`" came from the plan store, which is keyvalue in the worker env and whose HTTP surface returns 401 here — the limitation this lane already recorded. The stake and refusal numbers above are mine; the stamp count is theirs.
 - **#704 IS LIVE. ACTIVATION INSTANT = 2026-10-19T22:43:52Z** (the RESPAWN, not the ff), reported by lane `min-ev-tuner-shadow` and **RE-DERIVED HERE rather than accepted**, because this is the boundary the 2026-10-21 15:00Z reading splits on:
   - refresh-worker **pid 2681168**, `lstart` **Mon Oct 19 17:43:52 2026** local = **22:43:52Z**, and it is the SOLE `run_refresh_worker` process (`ps -eo pid,lstart,args`). TERM was 22:43:45Z; the supervisor exit was claimed, holder `min-ev-tuner-shadow`.
   - fleet checkout HEAD **`affc9a7ba`**, and `git merge-base --is-ancestor bd9b0571 HEAD` **passes** — so the #704 flag-reading commit is genuinely in the live code, which is the check that failed on 2026-10-19 21:0xZ when the key was written but `bd9b0571` was NOT an ancestor and the flag was therefore INERT.
