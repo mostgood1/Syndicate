@@ -36,7 +36,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from vendor.mlb_bettingv2.tools.web.flask_frontend import (  # noqa: E402
+from syndicate.features.mlb.live_lens_port.app_slice import (  # noqa: E402
     _build_game_lens,
     _lane_has_live_mc_first5,
 )

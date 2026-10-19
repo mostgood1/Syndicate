@@ -366,8 +366,7 @@ def test_every_layer_between_the_resim_and_the_board_carries_the_field():
     import pathlib
 
     repo = pathlib.Path(__file__).resolve().parents[1]
-    vendor = (repo / "vendor" / "mlb_bettingv2" / "tools" / "web"
-              / "flask_frontend.py").read_text(encoding="utf-8", errors="replace")
+    vendor = (repo / "syndicate" / "features" / "mlb" / "live_lens_port" / "app_slice.py").read_text(encoding="utf-8", errors="replace")
     lens = (repo / "syndicate" / "features" / "mlb" / "live_lens.py").read_text(encoding="utf-8")
     join = (repo / "syndicate" / "features" / "shared"
             / "live_projection_join.py").read_text(encoding="utf-8")

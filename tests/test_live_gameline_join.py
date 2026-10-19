@@ -421,7 +421,7 @@ class TestBuildGameLensStampsSimsRun:
     """
 
     def _call(self, mc):
-        from vendor.mlb_bettingv2.tools.web.flask_frontend import _build_game_lens
+        from syndicate.features.mlb.live_lens_port.app_slice import _build_game_lens
 
         card = {"status": {"abstract": "Live", "detailed": "In Progress"},
                 "predictions": {}, "markets": {}}

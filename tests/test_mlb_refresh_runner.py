@@ -274,7 +274,7 @@ class MlbRefreshRunnerTests(unittest.TestCase):
 
     def test_live_lens_report_refresh_default_is_thirty_seconds(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
-        module_path = repo_root / "vendor" / "mlb_bettingv2" / "tools" / "web" / "flask_frontend.py"
+        module_path = repo_root / "syndicate" / "features" / "mlb" / "live_lens_port" / "app_slice.py"
         spec = importlib.util.spec_from_file_location("test_mlb_flask_frontend", module_path)
         assert spec is not None and spec.loader is not None
         module = importlib.util.module_from_spec(spec)
@@ -290,7 +290,7 @@ class MlbRefreshRunnerTests(unittest.TestCase):
 
     def test_live_lens_data_dir_prefers_render_disk_when_only_syndicate_root_is_set(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
-        module_path = repo_root / "vendor" / "mlb_bettingv2" / "tools" / "web" / "flask_frontend.py"
+        module_path = repo_root / "syndicate" / "features" / "mlb" / "live_lens_port" / "app_slice.py"
         spec = importlib.util.spec_from_file_location("test_mlb_flask_frontend_data_dir", module_path)
         assert spec is not None and spec.loader is not None
         module = importlib.util.module_from_spec(spec)
@@ -312,7 +312,7 @@ class MlbRefreshRunnerTests(unittest.TestCase):
 
     def test_live_lens_reports_payload_overrides_stale_report_metadata(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
-        module_path = repo_root / "vendor" / "mlb_bettingv2" / "tools" / "web" / "flask_frontend.py"
+        module_path = repo_root / "syndicate" / "features" / "mlb" / "live_lens_port" / "app_slice.py"
         spec = importlib.util.spec_from_file_location("test_mlb_flask_frontend_reports", module_path)
         assert spec is not None and spec.loader is not None
         module = importlib.util.module_from_spec(spec)
@@ -352,6 +352,9 @@ class MlbRefreshRunnerTests(unittest.TestCase):
 
     def test_api_live_lens_overrides_stale_report_metadata_on_read_path(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
+        # VENDORED-ONLY (lane mlb-web-tests-native): this test drives the vendored Flask app's /api/live-lens ROUTE,
+        # which production never serves (Syndicate's blueprints serve /mlb/...); the live-lens slice carries the
+        # functions, not the routes. Retire it with the vendored tree.
         module_path = repo_root / "vendor" / "mlb_bettingv2" / "tools" / "web" / "flask_frontend.py"
         spec = importlib.util.spec_from_file_location("test_mlb_flask_frontend_api_live_lens", module_path)
         assert spec is not None and spec.loader is not None
@@ -599,7 +602,7 @@ class MlbRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(context["games"][0]["props"][0]["id"], "live-prop")
 
     def test_live_lens_payload_refreshes_card_before_game_lens(self) -> None:
-        from vendor.mlb_bettingv2.tools.web import flask_frontend as mlb_frontend
+        from syndicate.features.mlb.live_lens_port import app_slice as mlb_frontend
 
         captured: dict[str, object] = {}
 
@@ -650,6 +653,9 @@ class MlbRefreshRunnerTests(unittest.TestCase):
 
     def test_api_live_lens_persist_bypasses_cache_and_rewrites_report(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
+        # VENDORED-ONLY (lane mlb-web-tests-native): this test drives the vendored Flask app's /api/live-lens ROUTE,
+        # which production never serves (Syndicate's blueprints serve /mlb/...); the live-lens slice carries the
+        # functions, not the routes. Retire it with the vendored tree.
         module_path = repo_root / "vendor" / "mlb_bettingv2" / "tools" / "web" / "flask_frontend.py"
         spec = importlib.util.spec_from_file_location("test_mlb_flask_frontend_api_live_lens_persist", module_path)
         assert spec is not None and spec.loader is not None
@@ -706,7 +712,7 @@ class MlbRefreshRunnerTests(unittest.TestCase):
 
     def test_live_lens_payload_normalizes_in_progress_status_as_live(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
-        module_path = repo_root / "vendor" / "mlb_bettingv2" / "tools" / "web" / "flask_frontend.py"
+        module_path = repo_root / "syndicate" / "features" / "mlb" / "live_lens_port" / "app_slice.py"
         spec = importlib.util.spec_from_file_location("test_mlb_flask_frontend_live_status", module_path)
         assert spec is not None and spec.loader is not None
         module = importlib.util.module_from_spec(spec)
@@ -1684,6 +1690,8 @@ class MlbRefreshRunnerTests(unittest.TestCase):
 
     def test_render_live_lens_refresh_requests_live_lens_and_cache_only(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
+        # VENDORED-ONLY (lane mlb-web-tests-native): a vendored Render-era script nothing in Syndicate runs (no native
+        # copy, no launcher). Retire it with the vendored tree.
         script_path = repo_root / "vendor" / "mlb_bettingv2" / "tools" / "render_live_lens_refresh.py"
         spec = importlib.util.spec_from_file_location("test_render_live_lens_refresh", script_path)
         assert spec is not None and spec.loader is not None

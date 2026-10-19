@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import unittest
 
-from vendor.mlb_bettingv2.tools.web.flask_frontend import (
+from syndicate.features.mlb.live_lens_port.app_slice import (
     _static_season_payload_is_stale_vs_canonical,
 )
 

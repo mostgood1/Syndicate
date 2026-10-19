@@ -5378,11 +5378,11 @@ class HomeBoardTests(unittest.TestCase):
         self.assertTrue(context.get("generatedAt"))
 
     def test_mlb_live_lens_reports_payload_synthesizes_from_live_builder(self) -> None:
-        with patch("vendor.mlb_bettingv2.tools.web.flask_frontend._load_json_file", return_value={}), patch(
-            "vendor.mlb_bettingv2.tools.web.flask_frontend._live_prop_registry_summary",
+        with patch("syndicate.features.mlb.live_lens_port.app_slice._load_json_file", return_value={}), patch(
+            "syndicate.features.mlb.live_lens_port.app_slice._live_prop_registry_summary",
             return_value={"topStable": [], "topEdges": []},
         ), patch(
-            "vendor.mlb_bettingv2.tools.web.flask_frontend._live_lens_payload",
+            "syndicate.features.mlb.live_lens_port.app_slice._live_lens_payload",
             return_value={
                 "date": "2026-06-01",
                 "generatedAt": "2026-06-01T20:45:00-05:00",
@@ -5391,7 +5391,7 @@ class HomeBoardTests(unittest.TestCase):
                 "games": [{"gamePk": 1, "status": {"abstract": "Live", "detailed": "In Progress"}}],
             },
         ):
-            from vendor.mlb_bettingv2.tools.web.flask_frontend import _live_lens_reports_payload
+            from syndicate.features.mlb.live_lens_port.app_slice import _live_lens_reports_payload
 
             payload = _live_lens_reports_payload("2026-06-01")
 
