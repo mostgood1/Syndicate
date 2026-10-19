@@ -67,6 +67,12 @@ death, never life — do not invert it.
 
 ## OPEN
 
+### mlb-vendor-deletion-scope — CLOSED 2026-10-19 (GOAL MET) — opened 2026-10-19 — session 2d413211
+- GOAL VERDICT. Goal (verbatim): "Scope deleting vendor/mlb_bettingv2 (user: "scope the vendor/mlb_bettingv2 deletion", 2026-10-19): every remaining reference classified, upstream drift measured, fleet state measured, maintenance consequences and a sequenced plan; no code or production change." -- **GOAL: MET.** Findings: `.syndicate/findings_2026-10-19_mlb_vendor_deletion_scope.md`. Nothing that runs needs the tree, and the fleet wrote 0 files under it in 3 days. The vendored copy is AHEAD of upstream (137 identical / 30 differ / 23 absent upstream; upstream's 10-12 commits are Syndicate work). Pre-work before `git rm`: 7 tests still exercising vendored modules, 3 VENDORED-ONLY tests to retire, 3 hint strings, 6 vendor-comparison tests to replace, the engine reference doc. The user decides on freezing the generated copies.
+- Goal: Scope deleting vendor/mlb_bettingv2 (user: "scope the vendor/mlb_bettingv2 deletion", 2026-10-19): every remaining reference classified, upstream drift measured, fleet state measured, maintenance consequences and a sequenced plan; no code or production change.
+- Files: none (analysis only; the findings file is ledger)
+- Blocked by: none
+
 ### mlb-unified-update-native — CLOSED 2026-10-19 (GOAL MET) — opened 2026-10-19 — session 2d413211
 - GOAL VERDICT `[2026-10-19 16:xxZ]`. Goal (verbatim): "Point the local Windows unified daily update's MLB step (scripts/unified_daily_update.ps1) at the native daily_update.py with the engines/mlb working directory, the last runner of vendored MLB code (user: "proceed", 2026-10-19); the step's Workflow id and Name stay (they key branches and appear in run manifests)." -- **GOAL: MET** (by its stated verification). Landed 2f12e380: PowerShell AST parse 0 errors, both resolved paths exist, no mlb_bettingv2 left in the file. LIMIT: the local Windows run itself was not executed here (a full ui-daily is heavy); the script it now runs is the one proven by the fleet parity and production.
 - Goal: Point the local Windows unified daily update's MLB step (scripts/unified_daily_update.ps1) at the native daily_update.py with the engines/mlb working directory, the last runner of vendored MLB code (user: "proceed", 2026-10-19); the step's Workflow id and Name stay (they key branches and appear in run manifests).
