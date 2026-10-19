@@ -106,6 +106,52 @@ def test_the_refusal_sits_in_the_row_loop_and_skips_the_row():
     from syndicate.features.shared import layer2_board
 
     src = inspect.getsource(layer2_board.select_shortlist)
-    idx = src.index("if _no_market_price(row):")
-    assert "no_market_price += 1" in src[idx:idx + 220]
-    assert "continue" in src[idx:idx + 220]
+    lines = src.splitlines()
+    start = next(i for i, l in enumerate(lines)
+                 if l.strip() == "if _no_market_price(row):")
+    indent = len(lines[start]) - len(lines[start].lstrip())
+    # The BLOCK, not a character window: an earlier version of this test
+    # asserted `continue` within 220 chars of the `if`, and adding the
+    # by-family breakdown pushed it past that. Proximity was never the
+    # property worth pinning -- being inside the branch is.
+    block = []
+    for line in lines[start + 1:]:
+        if line.strip() and (len(line) - len(line.lstrip())) <= indent:
+            break
+        block.append(line.strip())
+    assert "no_market_price += 1" in block
+    assert "continue" in block
+
+
+def test_the_refusal_is_ATTRIBUTABLE_not_merely_counted():
+    """Once live, this refusal REMOVES the rows, so the served board cannot
+    show which ones went. A bare count rising would be the only signal, and
+    an unattributable refusal is the exact failure this row family took a
+    whole session to diagnose. The breakdown is keyed by `sport|market` so a
+    future change that costs another market its fair reads as a NEW FAMILY
+    rather than as a bigger number.
+    """
+    import inspect
+
+    from syndicate.features.shared import layer2_board
+
+    src = inspect.getsource(layer2_board.select_shortlist)
+    assert "no_market_price_by_family" in src
+    assert '"rows_no_market_price_by_family"' in src
+    # keyed by sport AND market, not sport alone
+    idx = src.index("no_market_price_by_family[_family]")
+    window = src[max(0, idx - 400):idx]
+    assert 'row.get("sport")' in window
+    assert 'row.get("market")' in window
+
+
+def test_the_family_key_survives_a_missing_sport_or_market():
+    """An unknown family must still be counted, never dropped or crashed."""
+    import inspect
+
+    from syndicate.features.shared import layer2_board
+
+    src = inspect.getsource(layer2_board.select_shortlist)
+    idx = src.index('_family = "%s|%s"')
+    window = src[idx:idx + 320]
+    assert window.count('or "unknown"') == 2

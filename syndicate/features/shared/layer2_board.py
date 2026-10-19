@@ -5823,6 +5823,15 @@ def select_shortlist(
     # A row carrying a MODEL edge with no market fair and no market EV.
     # Counted, never silent, for the same reason `rows_implausible_book` is.
     no_market_price = 0
+    # ATTRIBUTABLE, not just counted `[2026-10-19, after lane fair-price-v2
+    # pointed out the consequence]`. This refusal REMOVES the rows, so once it
+    # is live the served board can no longer show WHICH rows went -- a bare
+    # count rising is the only signal, and "a refusal nobody can attribute" is
+    # the exact failure this family of rows took a full session to diagnose.
+    # Keyed by `sport|market` because the discriminating fact is the FAMILY: a
+    # future change that costs some other market its fair would read as "the
+    # number went up" without it. Same shape as `withdrawn_line_by_sport`.
+    no_market_price_by_family: dict[str, int] = {}
     stale_kickoff = 0
     uninformative_ev = 0
     # A basketball prop whose player is OUT on the injury feed (board_enrichment._flag_out_player_props).
@@ -5933,6 +5942,12 @@ def select_shortlist(
         # This bounds only what the shortlist RANKS.
         if _no_market_price(row):
             no_market_price += 1
+            _family = "%s|%s" % (
+                str(row.get("sport") or "unknown"),
+                str(row.get("market") or row.get("market_key") or "unknown"),
+            )
+            no_market_price_by_family[_family] = (
+                no_market_price_by_family.get(_family, 0) + 1)
             continue
         # A0/A3, model audit 2026-08-14: AN EV THAT IS A RESTATEMENT OF THE HOLD
         # IS NOT A MEASUREMENT, AND MUST NOT SEAT A ROW.
@@ -6272,6 +6287,8 @@ def select_shortlist(
         # beside the count above because the two are one rule read from both
         # ends, and a reader comparing them needs both numbers.
         "rows_no_market_price": no_market_price,
+        "rows_no_market_price_by_family": dict(
+            sorted(no_market_price_by_family.items())),
         "rows_beyond_quote_age": beyond_quote_age,
         "rows_superseded_line": superseded_line,
         "rows_stale_quote": stale_quote,
