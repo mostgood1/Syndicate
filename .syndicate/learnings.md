@@ -2501,3 +2501,9 @@ I was one commit away from reporting **193 soccer rows as a defect** — rows wh
 - Before reading a helper's `None` as a verdict, establish that its inputs were PRESENT. For an overlay/table-backed helper, assert the table is non-empty in the same process and print the count.
 - A three-valued answer needs three branches: matched / did-not-match / could-not-look. Never fold the third into either of the first two.
 - The discriminating evidence was already on the row: `optimizer_factor: 0.8816` is stamped only AFTER both of the function's early returns, so its presence proved the code had run and found `factor >= 1.0`. `feedback_read_the_field_you_already_have`, for the Nth time.
+
+## 2026-10-19 — OVERTURNED: "the UEFA model underrates favourites" was a close-sorted decile, i.e. mostly selection (lane uefa-favourite-temper)
+- **Belief:** step 3 and the anchored lane reported top decile model 0.778 vs close 0.821 vs actual 0.854, read as "the model underrates favourites", and a favourite-sharpening fix was expected to help.
+- **Measured:** ranked by the MODEL's own favourite probability, its top decile is 0.835 vs actual 0.834, already calibrated. The domestic (a2) temperature pushed it to 0.877 and worsened UEFA log loss by +0.0032 [+0.0008, +0.0058].
+- **Why:** sorting by the close selects the matches where the close sits above the model, so the model looks low there whatever its calibration (regression to the mean on the ranking variable).
+- **Rule:** a calibration/bias claim needs deciles ranked by the PREDICTOR BEING JUDGED. Report the close-ranked table only beside the self-ranked one, never alone. Source: `.syndicate/findings_2026-10-19_uefa_favourite_temper.md`.
