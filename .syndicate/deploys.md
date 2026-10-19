@@ -50740,3 +50740,9 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 | **all** | | **31-18 (63%)** | **29.1 (59%)** |
 
   Two days: no evidence either way yet.
+
+## 2026-10-19 15:09Z -- READING: NHL scratch flag on a live slate (lane news-availability-gate)
+- **Verdict: NOT MEASURED** (not a pass). Scheduled task `nhl-scratch-flag-reading-1015` fired ~4 days late, at 10:04 AM CT Mon 10-19 (15:04Z) -- no NHL game was within its scratch window, so step 2's wait (max 40 min) could not reach a scratch posting.
+- Served now (fleet web, `/api/board/layer2-shortlist?sport=nhl`, index_written_at 15:01:31Z): nhl `out_player_props` feed_status ok, scratches_on_feed 30, out_players_on_feed 110, rows_flagged 1 = espn_injuries 1 (Logan O'Connor) / **nhl_gameinfo 0**; 499 rows. The 30 scratches loaded are last night's (latest 10-19 file record: CAR @ CGY, start 00:00Z, 6 scratches captured 00:01:16Z), a finished game -- no prop row can exist for them.
+- Collector side is healthy across the missed days (latest record per game, `news/nhl/gameinfo/<UTC date>.jsonl`): 10-15 10 games, 10-16 3, 10-17 13, 10-18 6, each with 3-6 scratches posted 0-30 min before puck. Those slates named scratches likely to carry prop rows (e.g. Rasmus Dahlin BUF 10-15 + 10-17, Josh Morrissey WPG 10-15 + 10-17, Zach Hyman EDM 10-16, Taylor Hall CAR 10-17 + 10-18, Pavel Buchnevich STL 10-15, Jake Sanderson OTT 10-15 + 10-17, Pavel Zacha / Nikita Zadorov BOS 10-18) -- but the served board for those slates is gone and no persisted per-build counter was found (a 60 s grep of the data root for a nonzero `nhl_gameinfo` count was cut by its timeout, so that absence is NOT evidence either way).
+- Owed: a re-read on a live slate, inside the ~30 min before puck drop of a game whose scratch list names a player with a prop row. Read-only; nothing restarted, deployed or changed.
