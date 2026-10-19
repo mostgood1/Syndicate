@@ -1160,6 +1160,14 @@ death, never life — do not invert it.
 - Verification: unit tests incl. off != on for both flags; paper script over the fleet's live plans + balance stamp reports per-position fixed vs compounding stake and per-venue caps, with denominators; landed on origin/main
 - Blocked by: none
 
+### min-ev-tuner-shadow — OPEN — opened 2026-10-19 — session b98807bc-5652-4301-be8c-d5f7bf07b55f
+- Goal: Close the learning loop for live Kalshi/Polymarket execution: a nightly worker-owned pass (after settlement in the intelligence-state loop) reads settled execution-ledger rows + stamped same-book CLV per venue x sport x market x season_phase cell and proposes a bounded min_ev step (raise when trailing ROI AND CLV are both significantly negative, lower when both significantly positive; event-clustered t, min sample, cooldown, floor 1.0 / ceiling 6.0, full audit in state, off switch SYNDICATE_MIN_EV_TUNER). SHADOW ONLY: nothing the commit reads changes. Never excludes a sport or market family (learnings 2026-09-16). Done = landed on main, running in shadow on the fleet with a week of MIN_EV_TUNER readouts, then a user decision to apply (apply wiring into portfolio_commit needs a loan from published-negative-ev).
+- Files: syndicate/features/shared/min_ev_tuner.py (NEW), syndicate/features/shared/season_phase.py (NEW), tests/test_min_ev_tuner.py (NEW), scripts/min_ev_tuner_readout.py (NEW), .syndicate/findings_2026-10-19_min_ev_tuner_backtest.md (NEW), pipeline/intelligence_state.py (the MIN_EV_TUNER hook block right after the settlement loop ONLY)
+- Hypothesis: n/a (build)
+- Falsification test: n/a
+- Verification: Unit tests incl. reachability (off != shadow: off writes no state, shadow writes state + logs); backtest on the fleet's production ledger with per-venue/date coverage printed (findings file); after the refresh-worker loads it, a MIN_EV_TUNER line in its log on the first cycle after 12:00Z and min_ev_tuner_state.json readable with mode=shadow; seven daily readouts recorded before the apply decision.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
