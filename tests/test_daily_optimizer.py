@@ -191,6 +191,45 @@ def test_wrap_grade_returns_exactly_what_grade_returns_and_grades_published_rows
     assert "nba|1" in state["games"] and "nba|1" not in state["pub"] and "candidates" not in state
 
 
+def test_model_ev_counts_only_rows_the_board_ranked_on_the_model_and_calibration_still_reads_every_row():
+    """Lane optimizer-model-ev-basis [2026-10-19]. Soccer's published "model EV" read -56% on 10-07 because
+    one-sided props carry a recorded model edge while the board ranked them on `market_fair`."""
+    def row(p_model):
+        return {"buckets": [f"{CELL}|x=y"], "p_model": p_model, "p_market": 0.5, "y": 0.0, "price": 100, "pnl": -1.0}
+
+    ranked_on_model, ranked_on_market = row(0.6), row(0.2)
+    legacy = opt.accumulate([ranked_on_model, ranked_on_market])
+    split = opt.accumulate([ranked_on_model, ranked_on_market], [ranked_on_model])
+    assert legacy[0] == split[0], "calibration is unchanged by the split"
+    assert legacy[1][f"{CELL}|all"][:4] == split[1][f"{CELL}|all"][:4], "market slots are unchanged"
+    assert legacy[1][f"{CELL}|all"][4] == 2 and split[1][f"{CELL}|all"][4] == 1
+    assert split[1][f"{CELL}|all"][6] == pytest.approx(0.6 * 2.0 - 1.0)
+    assert opt.accumulate([ranked_on_market], [])[1][f"{CELL}|all"][4] == 0
+
+
+def test_reachability_wrap_grade_takes_model_ev_from_model_basis_records_only():
+    def grade(records, chips, **kw):
+        return ([{"buckets": [f"{CELL}|x=y"], "p_model": r["pm"], "p_market": 0.5, "y": 1.0, "price": 100,
+                  "pnl": 1.0} for r in records], {})
+
+    records = [{"k": "a", "pm": 0.6, "eb": "model_edge"}, {"k": "b", "pm": 0.55, "eb": "model_probability"},
+               {"k": "c", "pm": 0.2, "eb": "market_fair"}, {"k": "d", "pm": 0.2}]
+    state = opt.empty_state("sig")
+    state["pub"]["nba|1"] = {"known": True, "keys": ["a", "c"], "seen": "2026-10-04"}
+    opt.wrap_grade(grade, state, game_key=lambda r: "nba|1")(records, {}, ungraded_by_sport={})
+    entry = state["candidates"]["nba|1"]
+    pool, rec = entry["pool"][f"{CELL}|all"], entry["rec"][f"{CELL}|all"]
+    assert pool[0] == 4 and pool[4] == 2, "an absent basis is unknown, never a model bet"
+    assert pool[6] == pytest.approx((0.6 * 2 - 1) + (0.55 * 2 - 1))
+    assert rec[0] == 2 and rec[4] == 1 and rec[6] == pytest.approx(0.6 * 2 - 1)
+    assert entry["cal"][CELL][0] == 4
+
+
+def test_the_scorecard_keeps_the_ev_basis_the_optimizer_splits_on():
+    from syndicate.features.shared import model_scorecard as msc
+    assert msc.strip_record({"k": "x", "eb": "model_edge"})["eb"] == "model_edge"
+
+
 def test_wrap_grade_never_breaks_the_scorecard_when_accumulation_fails():
     state = opt.empty_state("sig")
     wrapped = opt.wrap_grade(lambda records, chips, **kw: ([{"buckets": 5}], {}), state, game_key=lambda r: "x|1")

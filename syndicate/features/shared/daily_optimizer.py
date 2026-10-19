@@ -255,7 +255,19 @@ def note_published(state: dict[str, Any], day: str, records: Iterable[Mapping[st
 # ---------------------------------------------------------------------------
 
 
-def accumulate(graded: Iterable[Mapping[str, Any]]) -> tuple[dict[str, list[float]], dict[str, list[float]]]:
+# The board's ev_basis values (`layer2_board.EV_BASIS_*`) under which a row was RANKED on the model.
+# `market_fair` (and an absent basis -- unknown must not default permissive) means the model's number
+# was recorded beside the row but did not choose it.
+MODEL_EV_BASES = frozenset({"model_probability", "model_edge"})
+
+
+def model_basis(records: Iterable[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+    """The records the board ranked on the model (recorded `eb`), the only ones whose model EV it promised."""
+    return [r for r in records if str(r.get("eb") or "").strip() in MODEL_EV_BASES]
+
+
+def accumulate(graded: Iterable[Mapping[str, Any]], model_graded: Iterable[Mapping[str, Any]] | None = None,
+               ) -> tuple[dict[str, list[float]], dict[str, list[float]]]:
     """(calibration sums per cell, banded betting sums per cell|band) for one game's graded rows.
 
     cal[cell]       = [rows, sum d*d, sum d*r]
@@ -265,9 +277,35 @@ def accumulate(graded: Iterable[Mapping[str, Any]]) -> tuple[dict[str, list[floa
     price was shopped). model ev = p_model * odds - 1: what the model PROMISED, the shortlist's own
     selection quantity. A row without p_model has no model EV, so it is counted in the market slots
     only -- never as a zero-EV model bet.
+
+    `model_graded` (lane optimizer-model-ev-basis, 2026-10-19): the same game graded over its
+    `model_basis` records only. When given, the model slots come from those rows alone and calibration
+    still reads every row with a p_model. Measured 2026-10-07: soccer's published "model EV" was -56%
+    because one-sided player props carry a recorded model edge (p_model 0.31-0.71x the
+    book_margin_model fair) while the board ranked them on `market_fair` -- the column reported a
+    promise the board never made.
     """
     cal: dict[str, list[float]] = {}
     bands: dict[str, list[float]] = {}
+
+    def priced(row: Mapping[str, Any]) -> tuple[str, float, float] | None:
+        cell = cell_of(row)
+        price, pnl, p_market, y = row.get("price"), row.get("pnl"), row.get("p_market"), row.get("y")
+        if cell is None or price in (None, 0) or p_market is None or pnl is None or y is None:
+            return None
+        odds = _decimal_odds(float(price))
+        return cell, odds, float(p_market) * odds - 1.0
+
+    def add_model(row: Mapping[str, Any], cell: str, odds: float, ev: float) -> None:
+        p_model = row.get("p_model")
+        if p_model is None:
+            return
+        for band in (ev_band(100.0 * ev), ALL_BAND):
+            acc = bands.setdefault(f"{cell}|{band}", [0, 0, 0.0, 0.0, 0, 0.0, 0.0])
+            acc[4] += 1
+            acc[5] += float(row["pnl"])
+            acc[6] += float(p_model) * odds - 1.0
+
     for row in graded:
         cell = cell_of(row)
         if cell is None:
@@ -279,22 +317,22 @@ def accumulate(graded: Iterable[Mapping[str, Any]]) -> tuple[dict[str, list[floa
             acc[0] += 1
             acc[1] += d * d
             acc[2] += d * r
-        price, pnl = row.get("price"), row.get("pnl")
-        if price in (None, 0) or p_market is None or pnl is None or y is None:
+        hit = priced(row)
+        if hit is None:
             continue
-        odds = _decimal_odds(float(price))
-        ev = float(p_market) * odds - 1.0
-        model_ev = None if p_model is None else float(p_model) * odds - 1.0
+        cell, odds, ev = hit
         for band in (ev_band(100.0 * ev), ALL_BAND):
             acc = bands.setdefault(f"{cell}|{band}", [0, 0, 0.0, 0.0, 0, 0.0, 0.0])
             acc[0] += 1
             acc[1] += 1 if float(y) >= 1.0 else 0
-            acc[2] += float(pnl)
+            acc[2] += float(row["pnl"])
             acc[3] += ev
-            if model_ev is not None:
-                acc[4] += 1
-                acc[5] += float(pnl)
-                acc[6] += model_ev
+        if model_graded is None:
+            add_model(row, cell, odds, ev)
+    for row in model_graded or ():
+        hit = priced(row)
+        if hit is not None:
+            add_model(row, *hit)
     return cal, bands
 
 
@@ -313,7 +351,13 @@ def wrap_grade(grade: Callable[..., tuple[list[dict[str, Any]], dict[str, int]]]
         try:
             gk = next((key for key in (game_key(r) for r in records) if key), None)
             if gk is not None:
-                cal, pooled = accumulate(graded)
+                side = {k: v for k, v in kwargs.items() if k != "ungraded_by_sport"}
+
+                def graded_model(subset: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+                    chosen = model_basis(subset)
+                    return grade(chosen, chips, ungraded_by_sport={}, **side)[0] if chosen else []
+
+                cal, pooled = accumulate(graded, graded_model(records))
                 entry: dict[str, Any] = {"sport": gk.split("|", 1)[0], "cal": cal, "pool": pooled,
                                          "rec": {}, "pub_known": False, "pub_rows": 0}
                 pub = state["pub"].get(gk)
@@ -323,9 +367,8 @@ def wrap_grade(grade: Callable[..., tuple[list[dict[str, Any]], dict[str, int]]]
                     published = [r for r in records if str(r.get("k") or "") in keys]
                     entry["pub_rows"] = len(published)
                     if published:
-                        side = {k: v for k, v in kwargs.items() if k != "ungraded_by_sport"}
                         rec_graded, _ = grade(published, chips, ungraded_by_sport={}, **side)
-                        entry["rec"] = accumulate(rec_graded)[1]
+                        entry["rec"] = accumulate(rec_graded, graded_model(published))[1]
                 candidates[gk] = entry
         except Exception as exc:  # the optimizer must never break the scorecard
             log(f"ACCUMULATE_FAILED {type(exc).__name__}: {exc}")

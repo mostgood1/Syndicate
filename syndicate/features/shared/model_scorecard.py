@@ -79,7 +79,8 @@ REPORT_MIN_DATES = 3
 MAX_OVERLAY_BUCKETS = 100
 OVERLAY_TTL_HOURS = 72
 KEEP_FIELDS = ("k", "t", "sport", "ct", "ht", "at", "px", "fp", "fm", "bq", "ba", "me", "gs",
-               "mp")  # the raw sim (lane sim-gap-ev-study, 2026-10-16): only the sim-gap study reads it
+               "mp",  # the raw sim (lane sim-gap-ev-study, 2026-10-16): only the sim-gap study reads it
+               "eb")  # the board's ev_basis (lane optimizer-model-ev-basis, 2026-10-19): the optimizer's model-EV columns
 NOT_FINAL_MARKERS = ("not_final", "not_started", "not_complete", "no_chips_for_kickoff_date", "in_progress",
                      "unavailable", "not_in_live_state")
 
