@@ -1391,3 +1391,10 @@ Other readings:
 - **F5 moneyline:** slope 0.06, so almost no ranking information.
 
 The ranked fix plan is in the findings file. Its step 1 is a first-pitch freeze, because the current engine cannot be measured as-of without it.
+
+## [mlb-postponed-grading] A POSTPONED MLB GAME READS abstractGameState "Final", AND A RESCHEDULED gamePk's feed/live IS THE NEW GAME `[verified 2026-10-19 on the fleet, lane mlb-postponed-grading; fix UNCOMMITTED / NOT DEPLOYED]`
+
+- 849817 TB @ CLE, slate 2026-10-16: schedule `abstract Final / coded D / Postponed / officialDate 2026-10-18`. The lens log reads `Preview -> Final` (it writes `abstract` only); the lens report keeps `detailed: Postponed`. Played 10-18, TB 3-1.
+- `feed/live/<pk>` follows the reschedule: the 10-16 path now holds `Scheduled, officialDate 2026-10-18`. **A grader for date D must check `gameData.datetime.officialDate == D`**, or it grades D's picks on the makeup game.
+- Nothing graded 849817 for 10-16 (locked-policy 0 settled / picks unresolved; eval ledger 315 rows pending; 0 orders; play cards ungraded; no reconciled cheat sheet). That was TIMING: the one-shot settlement ran after the reschedule.
+- Still exposed: the generated `settle_locked_policy_cards._feed_is_final` (abstract or detailed final, no date check) and the date check in `graded_outcomes._mlb_feed_completed` (refuses postponed, not off-date). Postponed/off-date guards for `bet_status_mlb` and the lens wrapper are in `syndicate/features/mlb/game_status.py`, uncommitted; detail in `log/2026-10-19.md`.

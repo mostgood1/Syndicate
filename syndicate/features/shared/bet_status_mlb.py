@@ -31,6 +31,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from syndicate.features.mlb.game_status import grading_refusal, not_played_reason
 from syndicate.features.shared.bet_status import FULL_GAME_SEGMENT, segment_refusal
 from syndicate.features.shared.segment_actuals import (
     REASON_SEGMENT_ACTUAL_PREFIX,
@@ -228,9 +229,14 @@ def _int_or_none(value: Any) -> int | None:
 
 
 def _game_is_final(feed: Mapping[str, Any]) -> bool:
+    # NOT `abstractGameState == "Final"` alone: StatsAPI files a postponed,
+    # cancelled or suspended game under "Final" with a 0-0 linescore (gamePk
+    # 849817, 2026-10-16). See `mlb.game_status`.
     state = (
         ((feed.get("gameData") or {}).get("status") or {}).get("abstractGameState")
     )
+    if not_played_reason(feed):
+        return False
     return str(state or "").strip().lower() == "final"
 
 
@@ -238,6 +244,8 @@ def _game_has_started(feed: Mapping[str, Any]) -> bool:
     state = (
         ((feed.get("gameData") or {}).get("status") or {}).get("abstractGameState")
     )
+    if not_played_reason(feed):
+        return False
     return str(state or "").strip().lower() in {"live", "final"}
 
 
@@ -381,6 +389,9 @@ def mlb_status_resolver(selected_date: str):
         feed = _feed(game_pk)
         if not isinstance(feed, Mapping) or not feed:
             return {"unavailable_reason": REASON_NO_FEED}
+        refusal = grading_refusal(feed, selected_date)
+        if refusal:
+            return {"unavailable_reason": refusal}
         runs = _segment_runs(feed, innings_needed)
         if runs is None:
             # The feed has the game and not the segment. Named with the
@@ -473,6 +484,9 @@ def mlb_status_resolver(selected_date: str):
         feed = _feed(game_pk)
         if not isinstance(feed, Mapping) or not feed:
             return {"unavailable_reason": REASON_NO_FEED}
+        refusal = grading_refusal(feed, selected_date)
+        if refusal:
+            return {"unavailable_reason": refusal}
 
         started = _game_has_started(feed)
         is_final = _game_is_final(feed)

@@ -497,6 +497,7 @@ once this index exists: re-splitting would orphan the parts.
 | [board-per-date-freshness] | THE COMBINED BOARD DATES EACH WINDOW DATE ON ITS OWN; THE CHIP SHOWS TODAY APART FROM TOMORROW — LIVE ON WEB ` | `state_board.md` |
 | [inplay-overlay-board-cadence] | THE BOARD'S IN-PLAY ROWS COME FROM THE BOOK GRID EVERY TICK, NOT THE SHORTLIST — LIVE ON ALL THREE SERVICES `[ | `state_board.md` |
 | [intelligence-season-evidence] | INTELLIGENCE EXPLANATIONS NAMED METRICS THEY NEVER READ, AND THE READINESS GATE COULD NOT SEE THE DATA ROOT -- | `state_board.md` |
+| [live-winpct-blank] | LIVE NFL/NCAAF ROWS SHOW NO PREGAME SIM PROBABILITY -- the Win%, the "Our sim has..." sentence and the directi | `state_board.md` |
 | [nfl-model-accuracy-backtest] | NFL GAME LINES AND PROPS LOSE TO THE CLOSE IN EVERY MARKET; THE PROP PROBABILITY CARRIES NO INFORMATION AT THE | `state_football.md` |
 | [ncaaf-sim-view-coverage] | NCAAF GAME LINES CARRY A SIM VIEW ON EVERY MARKET; EDGES ARE BOUNDED BY THE 15-POINT CAP; STAKES STAY ON PRICE | `state_football.md` |
 | [nfl-live-prop-capture] | NFL PER-QUARTER PLAYER PRODUCTION IS CAPTURED AND RETRIEVABLE — the allowlist alone moved ZERO bytes `[verifie | `state_football.md` |
@@ -576,8 +577,8 @@ once this index exists: re-splitting would orphan the parts.
 | [layer2-suggested-opps] | SUGGESTED OPPS -- a per-line bet flag on top of the full board; the paper book stakes only it `[2026-10-13, la | `state_layer2.md` |
 | [layer2-likelihood-shadow] | SHADOW LIKELIHOOD -- the measured under tilt stamped beside the fair on NBA and NCAAF prop rows; nothing consu | `state_layer2.md` |
 | [forward-inputs-mirror] | FORWARD-TEST QUOTE LOGS ARE MIRRORED OUT OF RETENTION'S REACH -- seeded by hand; the daily job is on the fleet | `state_layer2.md` |
-| [news-collectors] | FREE NEWS COLLECTORS (ESPN injuries NBA/NHL/NFL/WNBA/MLB, NBA referee crews, NHL officials + scratches) -- consum | `state_layer2.md` |
-| [cheat-sheets] | CHEAT SHEETS + PLAY CARDS -- served in the app, scheduled daily; 10-14 is BETA, 10-15 the first official day | `state_layer2.md` |
+| [news-collectors] | FREE NEWS COLLECTORS (ESPN injuries NBA/NHL/NFL/WNBA/MLB, NBA referee crews, NHL officials + scratches) -- acc | `state_layer2.md` |
+| [cheat-sheets] | CHEAT SHEETS + PLAY CARDS -- served in the app, scheduled daily; 10-14 is BETA, 10-15 the first official day ` | `state_layer2.md` |
 | [segment-misgrade-regrade] | 53 OF 173 SETTLED SEGMENT ORDERS WERE GRADED AGAINST THE WRONG ACTUAL — 30.6%, AND THE ERRORS NEARLY CANCEL `[ | `state_ledger.md` |
 | [stale-test-triage] | "THE TEST IS STALE" IS A HYPOTHESIS, AND IT WAS WRONG FOR 4 OF 18 `[2026-09-05, lane stale-test-repair, commit | `state_ledger.md` |
 | [full-suite-completes] | THE FULL SUITE RAN TO COMPLETION FOR THE FIRST TIME -- 15,307 tests, 61m06s, and the 27 "NEW" failures are 6 p | `state_ledger.md` |
@@ -617,6 +618,7 @@ once this index exists: re-splitting would orphan the parts.
 | [mlb-sim-retrigger-churn] | THE MLB DAILY SIM CROWDED THE BOARD OFF refresh-worker; A RE-SIM COSTS ~15 MIN WHATEVER ITS SCOPE — FINGERPRIN | `state_mlb.md` |
 | [mlb-traditional-doubleheader-join] | A TRADITIONAL DOUBLEHEADER COULD NEVER CLEAR THE 45-MINUTE SEPARATION RULE -- FIXED PREGAME; THE IN-PLAY FIX I | `state_mlb.md` |
 | [mlb-asof-backtest] | THE MAY–JULY MLB ENGINE BEATS THE DE-VIGGED BOOK IN 0 OF 23 MARKETS (10 WORSE); MOSTLY A LEVEL ERROR, LED BY S | `state_mlb.md` |
+| [mlb-postponed-grading] | A POSTPONED MLB GAME READS abstractGameState "Final", AND A RESCHEDULED gamePk's feed/live IS THE NEW GAME `[v | `state_mlb.md` |
 | [scheduled-model-evaluation] | MODEL EVALUATION IS SCHEDULED NOW -- a daily Render cron grades the PRICED population per sport x market x seg | `state_model.md` |
 | [settlement-autorun-live-settles-zero] | THE EVALUATION-SETTLEMENT AUTORUN WAS LIVE ALL ALONG AND SETTLED ZERO — the switch was never the blocker, the  | `state_model.md` |
 | [ledger-and-primary-tree] | — MEASURED 2026-09-02, this machine | `state_model.md` |
@@ -630,13 +632,13 @@ once this index exists: re-splitting would orphan the parts.
 | [probability-statistic-ownership] | PROBABILITY-STATISTIC OWNERSHIP `[measured 08-15, shipped `2ac3c6bc`]` | `state_model.md` |
 | [nhl-sim-engine] | NHL SIM (hockeysim) — `nhl_sim_input_checklist.py` PASSES, exit 0 `[measured 2026-08-20, lane nhl-model-owner] | `state_model.md` |
 | [model-skill] | MODEL SKILL (`#428`) — measured vs not | `state_model.md` |
-| [model-edge-ceiling] | THE 15-POINT PLAUSIBILITY CEILING REFUSES 470 PLAUSIBLE ROWS (0 of 525 imply an impossible probability) AND HIDES A LARGE-GAP BUG LIST `[measured 2026-10-15]` | `state_model.md` |
-| [prop-projection-support] | NFL PROP SUPPORT IS PUBLISHED AND SERVED (0 of 1,070 -> 1,067 of 1,067); NHL + MLB still carry none; "soccer 0 of 391" WITHDRAWN as a misclassification `[measured 2026-10-16]` | `state_model.md` |
 | [sim-scheduling-blocker] | 2026-08-17 02:1xZ — VERIFIED (sim-scheduling): the primary goal has ONE blocker — **ARCHIVED 2026-08-19 to `st | `state_model.md` |
 | [sim-edge-analysis-2026-09-01] | FULL-PLATFORM SIM-ENGINE EDGE ANALYSIS — strategy synthesis + new from-code facts `[2026-09-01, session syndic | `state_model.md` |
 | [accuracy-autorun-rearm-state] | `#626`(h) IS ARMED, RAN, AND PASSED. The budget, not memory, is now the constraint. `[2026-09-04, lane accurac | `state_model.md` |
 | [nhl-live-resim] | NHL HAS A LIVE RE-SIM AND IT CAN NOW SEE ITS SLATE -- but no NHL game has yet reached the board with a probabi | `state_model.md` |
 | [nhl-player-props] | NHL PLAYER PROPS ARE PROJECTED AND PRICED ON THE BOARD, PER-LINE GATED -- and the engine still loses to a play | `state_model.md` |
+| [model-edge-ceiling] | THE 15-POINT PLAUSIBILITY CEILING REFUSES 470 PLAUSIBLE ROWS AND HIDES A LARGE-GAP BUG LIST — MEASURED 2026-10 | `state_model.md` |
+| [prop-projection-support] | NFL PROP SUPPORT IS NOW PUBLISHED AND SERVED (0 of 1,070 -> 1,067 of 1,067, `5457b428`); NHL AND MLB STILL CAR | `state_model.md` |
 | [polymarket-live-totals-quote-names-no-game] | 26 OF 28 LIVE POLYMARKET TOTALS QUOTES ON THE BOARD ARE SHARED ACROSS GAMES — one price per LINE, no game iden | `state_polymarket.md` |
 | [polymarket-fill-price-is-reported] | THE VENUE REPORTS `avgPx`. "This path has no fill price" was FALSE and cost a 12h live halt `[verified 2026-08 | `state_polymarket.md` |
 | [polymarket-capital-is-margin-held] | POLYMARKET'S CASH IS NOT ITS BUYING POWER: `marginRequirement` HOLDS IT, and the venue tells us in a field we  | `state_polymarket.md` |
@@ -744,4 +746,3 @@ once this index exists: re-splitting would orphan the parts.
 | [refresh-run-lanes] | Refresh-run lane topology, and refusals are now LOGGED [verified 2026-09-25/26] | `state_worker.md` |
 | [pregame-sweep-cadence] | THE IDLE LOOP NOW WAKES WHEN A SPORT'S OWN PREGAME SWEEP IS DUE; soccer schedules refetch a near window betwee | `state_worker.md` |
 | [web-oom-leak] | WEB SERVICE MEMORY GROWTH — LIVE: UPDATE 37..44 + the 2026-09-09 block; UPDATE 1..36 archived to state_archive | `state_worker.md` |
-| [live-winpct-blank] | LIVE NFL/NCAAF ROWS SHOW NO PREGAME SIM PROBABILITY -- Win%, "Our sim has" and the direction tag withheld on in-play lines; projection kept [verified 2026-10-15/16] | `state_board.md` |

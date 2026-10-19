@@ -65,6 +65,15 @@ id resolves to an ARCHIVED session is hard evidence the lane is orphaned. The
 markers for running sessions did NOT match any roster id, so the mapping proves
 death, never life — do not invert it.
 
+### mlb-postponed-grading — OPEN — opened 2026-10-19 — session 02aa06d1-a707-4f09-8761-06970c842750
+- Goal: An MLB game StatsAPI marks postponed/cancelled/suspended, or whose officialDate is not the slate date (rescheduled), never grades as final in paper/portfolio settlement (bet_status_mlb) and never buckets as final in the served live lens; one shared reader-side mapping, tested on a postponed StatsAPI fixture (incident 849817 TB@CLE 2026-10-16)
+- Files: syndicate/features/mlb/game_status.py syndicate/features/shared/bet_status_mlb.py syndicate/features/mlb/live_lens.py tests/test_mlb_game_status.py
+- Hypothesis: abstractGameState=Final on a postponed game (coded D) is read as final by bet_status_mlb._game_is_final and live_lens._structured_status; a rescheduled game's feed/live describes the NEW date's game
+- Falsification test: postponed fixture still resolves is_final=True / bucket final after the change
+- Verification: pytest tests/test_mlb_game_status.py + existing bet_status/live_lens tests green; fleet replay of the 10-16 schedule+postponed feed returns unavailable_reason
+- Goal verdict: "An MLB game StatsAPI marks postponed/cancelled/suspended, or whose officialDate is not the slate date (rescheduled), never grades as final in paper/portfolio settlement (bet_status_mlb) and never buckets as final in the served live lens; one shared reader-side mapping, tested on a postponed StatsAPI fixture (incident 849817 TB@CLE 2026-10-16)" GOAL: NOT MET -- code + tests done (15 new pass, 8 of them fail on HEAD; 313 related pass; fleet replay refuses 849817 for 10-16), but UNCOMMITTED in worktree youthful-blackwell-852d76 and NOT DEPLOYED. Left: commit/land (user OK), fleet restart (user approves deploys). Needs a user decision, out of these Files: graded_outcomes.py date guard (claimed by OPEN lane mlb-settlement-props-join) and generated settle_locked_policy_cards._feed_is_final (a port_mlb_sim_engine.py EDIT). Log: .syndicate/log/2026-10-19.md
+- Blocked by: none
+
 ## OPEN
 
 ### mlb-vendor-deletion-scope — CLOSED 2026-10-19 (GOAL MET) — opened 2026-10-19 — session 2d413211

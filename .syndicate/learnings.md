@@ -2435,3 +2435,13 @@ build.
 - **Overturned belief:** "UEFA pricing is weak because of the UEFA-specific parts (league offsets, out-of-scope club ratings), so better UEFA parts get it to market." Two registered steps improved those parts and both were SUPPORTED against their own baselines (offsets -0.0555, OOS fitted vs prior -0.0072).
 - **Measured:** against the de-vigged close the model trails by +0.0286 overall, and by **+0.026 on in/in pairs and +0.026 on in/OOS pairs**, so the UEFA parts add nothing to the gap. The walk-forward blend weight fell 0.35 -> 0.05 and the gate was NO-GO for all three competitions. The gap is production's domestic rating (favourites underrated, the same signature as the domestic +0.022).
 - **How to apply:** a SUPPORTED verdict against an internal baseline (prior-only, no-offset) says nothing about the distance to the market. Before a second component study, score model - close split by the component's subsets (here: pair type). If the gap is flat across them, the component is not the bottleneck, and the next study belongs upstream.
+
+## 2026-10-19 -- an MLB gamePk is not a date: feed/live follows the reschedule (lane `mlb-postponed-grading`)
+**Belief overturned:** "guarding `detailedState: Postponed` makes postponed MLB games safe to grade." That holds only while the feed
+still says Postponed. 849817 (TB @ CLE, slate 10-16) read `abstract Final / coded D` at the postponement. Within a day the SAME
+gamePk's `feed/live` described the makeup game (`Scheduled`, `officialDate 2026-10-18`), and after it was played, `Final` TB 3-1.
+The schedule endpoint for 10-16 keeps the Postponed row. `settle_locked_policy_cards._load_feed` writes whatever it fetches into
+date D's feed path, so a re-settle after the makeup game would have stored, and graded, 10-18's score as 10-16's.
+Nothing graded this time only because the one-shot settlement ran in the 'Scheduled' window.
+**Rule:** a grader for slate date D checks `gameData.datetime.officialDate == D` as well as the not-played coded state
+(D/C/U). Use `syndicate/features/mlb/game_status.grading_refusal(feed, D)`. A clean result for a postponed game is TIMING until both are checked.

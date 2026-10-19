@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from syndicate.features.mlb.cards import build_cards_page_context
+from syndicate.features.mlb.game_status import display_state, not_played_reason
 from syndicate.features.mlb.ladders_common import build_module_links
 from syndicate.features.mlb.ladders_common import format_num
 from syndicate.features.mlb.ladders_common import format_pct
@@ -121,7 +122,12 @@ def _structured_status(row: dict[str, Any], *, fallback_date: str) -> dict[str, 
     abstract = str(status.get("abstract") or status.get("abstractGameState") or "").strip()
     detailed = str(status.get("detailed") or status.get("detailedState") or abstract or row.get("startTime") or fallback_date).strip()
     lowered = f"{abstract} {detailed}".strip().lower()
-    if any(token in lowered for token in ("live", "in progress", "manager challenge", "warmup")):
+    not_played = display_state(status)
+    if not_played:
+        # StatsAPI files a postponed game under abstract "Final"; the port keeps
+        # that and only `detailed` says "Postponed" (849817, 2026-10-16).
+        abstract = not_played
+    elif any(token in lowered for token in ("live", "in progress", "manager challenge", "warmup")):
         abstract = "Live"
     elif any(token in lowered for token in ("final", "game over", "completed early")):
         abstract = "Final"
@@ -160,6 +166,8 @@ def _status_bucket_from_row(row: dict[str, Any]) -> str:
     abstract = str(status.get("abstract") or status.get("abstractGameState") or "").strip().lower()
     detailed = str(status.get("detailed") or status.get("detailedState") or "").strip().lower()
     text = f"{abstract} {detailed}".strip()
+    if not_played_reason(status):
+        return "postponed"
     if any(token in text for token in ("live", "in progress", "manager challenge", "warmup")):
         return "live"
     if any(token in text for token in ("final", "game over", "completed early")):
@@ -1799,6 +1807,7 @@ def _snapshot_counts(games: list[dict[str, Any]]) -> dict[str, int]:
         "final": sum(1 for game in games if _status_bucket_from_row(game) == "final"),
         "games": len(games),
         "live": sum(1 for game in games if _status_bucket_from_row(game) == "live"),
+        "postponed": sum(1 for game in games if _status_bucket_from_row(game) == "postponed"),
         "pregame": sum(1 for game in games if _status_bucket_from_row(game) == "pregame"),
         "props": sum(len(game.get("liveProps") or game.get("props") or game.get("trackedProps") or []) for game in games),
     }
@@ -2048,6 +2057,7 @@ def build_live_lens_snapshot_internal(selected_date: str, *, season: int | None 
         "games": len(games),
         "live": sum(1 for game in games if _status_bucket_from_row(game) == "live"),
         "final": sum(1 for game in games if _status_bucket_from_row(game) == "final"),
+        "postponed": sum(1 for game in games if _status_bucket_from_row(game) == "postponed"),
         "pregame": sum(1 for game in games if _status_bucket_from_row(game) == "pregame"),
         "props": sum(len(game.get("liveProps") or game.get("props") or game.get("trackedProps") or []) for game in games),
         "archivedLiveProps": 0,

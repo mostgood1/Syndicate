@@ -1,0 +1,167 @@
+{
+ "_source": "StatsAPI, fleet ~/syndicate-prod/data: schedule_2026-10-16 (reconcile cache, read 2026-10-17T12:45Z) and feed_live/2026-10-18/849817 (read 2026-10-19T14:02Z); trimmed to the fields graders read",
+ "schedule_game_2026_10_16": {
+  "gamePk": 849817,
+  "gameType": "L",
+  "season": "2026",
+  "gameDate": "2026-10-17T00:00:00Z",
+  "officialDate": "2026-10-18",
+  "rescheduleDate": "2026-10-18T21:08:00Z",
+  "rescheduleGameDate": "2026-10-18",
+  "status": {
+   "abstractGameState": "Final",
+   "codedGameState": "D",
+   "detailedState": "Postponed",
+   "statusCode": "DR",
+   "startTimeTBD": false,
+   "reason": "Rain",
+   "abstractGameCode": "F"
+  },
+  "teams": {
+   "away": {
+    "team": {
+     "id": 139,
+     "name": "Tampa Bay Rays"
+    }
+   },
+   "home": {
+    "team": {
+     "id": 114,
+     "name": "Cleveland Guardians"
+    }
+   }
+  },
+  "doubleHeader": "N",
+  "gameNumber": 1
+ },
+ "feed_live_after_reschedule_final": {
+  "gamePk": 849817,
+  "gameData": {
+   "status": {
+    "abstractGameState": "Final",
+    "codedGameState": "F",
+    "detailedState": "Final",
+    "statusCode": "F",
+    "startTimeTBD": false,
+    "abstractGameCode": "F"
+   },
+   "datetime": {
+    "dateTime": "2026-10-18T21:08:00Z",
+    "originalDate": "2026-10-18",
+    "officialDate": "2026-10-18",
+    "dayNight": "night",
+    "time": "5:08",
+    "ampm": "PM"
+   },
+   "teams": {
+    "home": {
+     "id": 114,
+     "name": "Cleveland Guardians",
+     "abbreviation": "CLE"
+    },
+    "away": {
+     "id": 139,
+     "name": "Tampa Bay Rays",
+     "abbreviation": "TB"
+    }
+   }
+  },
+  "liveData": {
+   "linescore": {
+    "currentInning": 9,
+    "inningState": "Bottom",
+    "innings": [
+     {
+      "num": 1,
+      "home": {
+       "runs": 0
+      },
+      "away": {
+       "runs": 1
+      }
+     },
+     {
+      "num": 2,
+      "home": {
+       "runs": 0
+      },
+      "away": {
+       "runs": 1
+      }
+     },
+     {
+      "num": 3,
+      "home": {
+       "runs": 0
+      },
+      "away": {
+       "runs": 1
+      }
+     },
+     {
+      "num": 4,
+      "home": {
+       "runs": 0
+      },
+      "away": {
+       "runs": 0
+      }
+     },
+     {
+      "num": 5,
+      "home": {
+       "runs": 0
+      },
+      "away": {
+       "runs": 0
+      }
+     },
+     {
+      "num": 6,
+      "home": {
+       "runs": 1
+      },
+      "away": {
+       "runs": 0
+      }
+     },
+     {
+      "num": 7,
+      "home": {
+       "runs": 0
+      },
+      "away": {
+       "runs": 0
+      }
+     },
+     {
+      "num": 8,
+      "home": {
+       "runs": 0
+      },
+      "away": {
+       "runs": 0
+      }
+     },
+     {
+      "num": 9,
+      "home": {
+       "runs": 0
+      },
+      "away": {
+       "runs": 0
+      }
+     }
+    ],
+    "teams": {
+     "home": {
+      "runs": 1
+     },
+     "away": {
+      "runs": 3
+     }
+    }
+   }
+  }
+ }
+}
