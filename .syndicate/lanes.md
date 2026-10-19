@@ -1260,6 +1260,14 @@ death, never life — do not invert it.
 - Verification: pytest tests/test_venue_settlement_exits.py tests/test_venue_settlement.py tests/test_execution_exits.py: no-exit entry grades identically (attributable and multi-order), paper exit changes nothing, filled live exit full and partial sale arithmetic, unreconciled exit defers, repair_impossible_venue_pnl leaves exit-adjusted rows alone, reachability through settle_from_venue with a real execution_exits.json on disk
 - Blocked by: none
 
+### uefa-favourite-temper — OPEN — opened 2026-10-19 — session ca3c8313-c460-4732-b844-c922698ed19d
+- Goal: todo #699 re-run: pre-registered UEFA Stage-1 gate with the domestic (a2) favourite temperature (T0 -0.066, T1 +0.271, K 1.577, H registered) applied to the step-3 model and anchored probs; GO/NO-GO per competition, blend w per season, top decile by close and by model; research only, wired into nothing
+- Files: scripts/backtest_uefa_anchored.py (a --favourite-temper/--gap-k/--home-term option only), tests/test_uefa_favourite_temper.py (NEW), .syndicate/findings_2026-10-19_uefa_favourite_temper.md (NEW), docs/ai_context/todo.md (#699 section only)
+- Hypothesis: H-TEMPER: the domestic gap-dependent 1X2 temperature lets a model/close blend beat the close on held-out UEFA main-draw 1X2 (expected NO-GO)
+- Falsification test: registered in findings s1 before any scoring: blend - close CI not entirely below 0 for a competition = NO-GO
+- Verification: per-competition verdicts with 95% CIs in the findings file; offline tests pass
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
