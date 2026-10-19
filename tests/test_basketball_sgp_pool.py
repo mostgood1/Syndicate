@@ -134,6 +134,21 @@ def test_the_sheet_hook_builds_nothing_without_measured_correlations(tmp_path):
     assert hook.current_roles(root, DAY) == {}
 
 
-def test_a_stale_game_log_is_reported(tmp_path):
+def test_the_newest_logged_game_is_reported_not_judged(tmp_path):
+    # A schedule gap (WNBA 10-09 -> 10-17) and an offseason (NBA) both made a "stale" flag cry wolf: it is gone.
     pool, info = B.legs_by_game(_sheet(), _world(tmp_path), "2026-10-25", "wnba")
-    assert info["stale_log"] is True and info["log_last_date"] == "2026-10-16"
+    assert info["log_last_date"] == "2026-10-16" and "stale_log" not in info
+
+
+def test_nba_names_fold_accents_and_a_traded_player_is_found_league_wide(tmp_path):
+    assert B._norm("Nikola Vučević") == B._norm("Nikola Vucevic") and B._norm("Pacôme Dadiet") == "pacomedadiet"
+    log = B.GameLog([{"PLAYER_ID": "9", "game_id": "g1", "date": "2026-04-01", "season_type": "regular",
+                      "TEAM_ABBREVIATION": "CHI", "PLAYER_NAME": "Nikola Vucevic", "MIN": 30, "PTS": 18}], "nba")
+    assert log.resolve("Nikola Vučević", ("Boston Celtics", "Detroit Pistons")) == "9"   # now plays elsewhere
+
+
+def test_the_sims_own_histogram_wins_over_its_normal():
+    player = {"pts_mean": 20.0, "pts_sd": 5.0,
+              "prop_distributions": {"pts": {"distribution": {"10": 100, "20": 300, "30": 100}}}}
+    assert B.sim_over(player, "PTS", 15.5) == 0.8                               # 400 of 500 draws, not the Normal's 0.82
+    assert abs(B.sim_over({"pra_mean": 30.0, "pra_sd": 10.0}, "PRA", 30.0) - 0.5) < 1e-9

@@ -21,6 +21,7 @@ import csv
 import json
 import math
 import re
+import unicodedata
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Iterable, Mapping, Sequence
@@ -44,11 +45,12 @@ MIN_SIM_MINUTES = 12.0
 ROLE_WINDOW = 8
 ROLES = ("S1", "S2", "S3", "S4", "S5", "B1", "B2", "B3")
 LOG_SEASONS = 4
-STALE_LOG_DAYS = 3
 
 
 def _norm(name: Any) -> str:
-    return re.sub(r"[^a-z]", "", str(name or "").lower().replace(" jr", "").replace(" sr", "").replace(" iii", "").replace(" ii", ""))
+    """'Nikola Vučević' (the NBA sim) and 'Nikola Vucevic' (the books) meet here; Jr / Sr / II / III dropped."""
+    text = unicodedata.normalize("NFKD", str(name or "")).encode("ascii", "ignore").decode().lower()
+    return re.sub(r"[^a-z]", "", text.replace(" jr", "").replace(" sr", "").replace(" iii", "").replace(" ii", ""))
 
 
 def _canon(sport: str, team: Any) -> str | None:
@@ -130,9 +132,15 @@ class GameLog:
         return str(rows[0].get("TEAM_ABBREVIATION") or "") if rows else ""
 
     def resolve(self, name: Any, clubs: Iterable[Any]) -> str | None:
+        """The player id for a name in tonight's game: on one of tonight's clubs in his latest logged game; else -- a
+        player who changed teams since his last logged game (every NBA log on opening night is last season's) -- the
+        one id league-wide with that name. The caller has already found him in tonight's sim for THIS game."""
         wanted = {_canon(self.sport, c) for c in clubs} - {None}
-        hits = [pid for pid in self.by_name.get(_norm(name), []) if _canon(self.sport, self.team_of(pid)) in wanted]
-        return hits[0] if len(hits) == 1 else None
+        ids = self.by_name.get(_norm(name), [])
+        hits = [pid for pid in ids if _canon(self.sport, self.team_of(pid)) in wanted]
+        if len(hits) == 1:
+            return hits[0]
+        return ids[0] if not hits and len(ids) == 1 else None
 
     def _value(self, row: Mapping[str, Any], code: str) -> float | None:
         total = 0.0
@@ -196,9 +204,35 @@ def sim_players(data_root: Path, sport: str, day: str) -> dict[str, dict[str, An
     return {}
 
 
+DIST_KEY = {"PTS": "pts", "REB": "reb", "AST": "ast", "FG3M": "threes", "PRA": "pra"}
+
+
+def _hist_over(dist: Mapping[str, Any], line: float) -> float | None:
+    total = over = 0.0
+    for k, w in (dist or {}).items():
+        try:
+            kk, ww = float(k), float(w)
+        except (TypeError, ValueError):
+            continue
+        total += ww
+        over += ww if kk > line else 0.0
+    return over / total if total > 0 else None
+
+
 def sim_over(player: Mapping[str, Any] | None, code: str, rung: float) -> float | None:
+    """P(over) from the sim: its own histogram when it published one (NBA `prop_distributions`: pts, reb, ast, threes,
+    pra over 500 draws), else a Normal on its mean and spread for the stat (`pra_mean` / `pra_sd`), else -- P+R, P+A,
+    R+A -- a Normal summing the parts (independence assumed: too narrow where they move together)."""
     if not player:
         return None
+    hist = ((player.get("prop_distributions") or {}).get(DIST_KEY.get(code, "")) or {}).get("distribution")
+    if isinstance(hist, Mapping) and hist:
+        p = _hist_over(hist, rung)
+        if p is not None:
+            return p
+    own = code.lower()
+    if player.get(f"{own}_mean") is not None and player.get(f"{own}_sd"):
+        return normal_over(float(player[f"{own}_mean"]), float(player[f"{own}_sd"]), rung)
     mean = var = 0.0
     for part in PARTS[code]:
         key = SIM_KEY[part]
@@ -266,16 +300,11 @@ def legs_by_game(sheet: Mapping[str, Any], data_root: Path, day: str, sport: str
                 "event_id": event, "p_market": round(p_market, 4), "p_sim": round(p_sim, 4), "hits": hits,
                 "games": len(history), "alt": True, "player_id": pid, "_history": history,
                 **faces.get(_norm(player), {})})
+    # The newest game the record could use, reported -- never judged: a "stale" warning misfired both ways (the WNBA
+    # played 10-09 then 10-17 on a current log; the NBA log is untouched all offseason because its builder rewrites a
+    # file only when there are new games).
     info = {"counts": dict(counts), "games": games, "log_last_date": log.last_date}
-    if log.last_date and log.last_date < _days_before(day, STALE_LOG_DAYS):
-        info["stale_log"] = True                    # the record misses the latest games: say so, never hide it
     return shared.cap(out), info
-
-
-def _days_before(day: str, n: int) -> str:
-    from datetime import date, timedelta
-
-    return (date.fromisoformat(day) - timedelta(days=n)).isoformat()
 
 
 def exclude(a: Mapping[str, Any], b: Mapping[str, Any]) -> bool:
@@ -303,10 +332,7 @@ def for_sport(sport: str) -> SimpleNamespace:
     def suggest(sheet, cells, roles, *, data_root=None, day=None, **_kw):
         if not cells or data_root is None or not day:
             return []
-        pool, info = legs_by_game(sheet, data_root, day, sport)
-        if info.get("stale_log"):
-            print(f"CHEAT_SHEET {sport} sgp: the game log ends {info.get('log_last_date')} -- records miss the latest games",
-                  flush=True)
+        pool, _info = legs_by_game(sheet, data_root, day, sport)
         return tickets(pool, cells, sheet.get("games") or [])
 
     return SimpleNamespace(load_cells=lambda data_root: load_cells(data_root, sport),
