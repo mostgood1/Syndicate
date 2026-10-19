@@ -51001,3 +51001,27 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   holder) that an ff of theirs would ship my ranking change, with the numbers and
   the revert switch, and asked whether they want to carry it or would rather I
   wait for their claim to clear. Queued behind their turn.
+
+## 2026-10-19T18:43:35Z -- SEQUENCE AGREED with the claim holder; my ff shrinks to ONE runtime file
+
+- The holder (session b98807bc, `local_81601787`) replied: they are ff'ing
+  `--ff-only` to **exactly `94c97011`** (their user's instruction), not to the
+  main tip, so **their deploy does NOT carry `d4837386`**. They will release
+  refresh-worker and web by token and tell me.
+- **I re-derived their load-bearing claim instead of taking it:**
+  `merge-base --is-ancestor d4837386 94c97011` is **false** (their ff does not
+  carry mine) and `merge-base --is-ancestor 94c97011 d4837386` is **true** (my
+  step afterwards is a clean fast-forward). Their claim is correct.
+- **Their narrowing leaves my deploy far smaller than my own plan would have.**
+  My ff becomes `94c97011 -> d4837386`: **5 commits whose ONLY runtime file is
+  `layer2_board.py` (+127/-3)** — the rest is ledger, tests and docs. The ff I
+  had been preparing was 63 files, +3,939/-2,058, with the MLB restructure in it.
+- **Their ff DOES carry `3c55e77b`** (it is an ancestor of `94c97011`). I had
+  already checked it for my own purposes and passed that on: deletes only
+  porting/parity/migration harnesses, no runtime, and its
+  `run_refresh_worker.py` change is a comment. Their deploy's runtime surface is
+  their own `min_ev` work plus that comment.
+- **Watching with `status` only, never `acquire` in a loop** " + an acquire poll
+  rotates the token and would strand their claim (the 2026-10-xx poller lesson).
+- Baseline for my owed reading stays the 18:37Z one: 3,695 rows, 2,992 carrying
+  `model_edge_pct` (81.0%), 407 `edge_exceeds_plausibility_ceiling`.
