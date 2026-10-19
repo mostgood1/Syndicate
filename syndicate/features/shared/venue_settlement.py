@@ -1355,6 +1355,13 @@ def fetch_kalshi_market_results(tickers: list[str]) -> tuple[dict[str, dict], st
     position sold to zero may never appear there. `GET /markets?tickers=` is
     public and states the result. Only `result` in yes|no is ever used; an
     absent or empty one means "not settled yet" and the entry waits.
+
+    MEASURED 2026-10-19T21:01Z on two markets the fleet traded live and the
+    venue graded: `KXNFLREC-26SEP27LARDEN-LARDADAMS17-6` (ledger: held yes,
+    WON) -> `result='yes'`, and `KXNFLREC-26SEP27LVNO-NOAKAMARA41-3` (held
+    yes, LOST) -> `result='no'`; both `status='finalized'`, and
+    `settlement_ts` equal to the ledger's `settled_at_venue` to the
+    microsecond.
     """
     import urllib.parse
 

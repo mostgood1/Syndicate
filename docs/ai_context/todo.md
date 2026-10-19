@@ -46087,7 +46087,7 @@ were resolved and nine already-closed rows removed from the open tables.
     `exit_idempotency_key(entry_key)`; a `filled` exit grades from both fills (`exit_adjusted_pnl`: proceeds - exit fee +
     remainder x settle value - entry cost - entry fee, detail in `order.exit_applied`); `submitted`/`failed`/unknown defers;
     an unreadable exits doc defers every Kalshi grade; sold-to-zero with no settlement row reads `GET /markets` `result`
-    (field UNVERIFIED on the wire -- an absent result just waits); paper exits are never read. Dropped from `LIVE_BLOCKERS`.
+    (field VERIFIED 2026-10-19T21:01Z on 2 graded live markets; an absent result just waits); paper exits are never read. Dropped from `LIVE_BLOCKERS`.
     Tests `tests/test_venue_settlement_exits.py`. Landed `550a4b20`. (a2) ~~`paper_settlement.settle_orders`'
     24h inference fallback ignores sales~~ **CLEARED 2026-10-19** (loan of `paper_settlement.py` from `published-negative-ev`,
     user-approved in chat): the live grading block reads LIVE exits through the same helpers -- filled -> exit-aware P&L

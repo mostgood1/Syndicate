@@ -867,5 +867,5 @@ board. The loop therefore checks `budget_remaining()` BEFORE spending.
   read LIVE rows of execution_exits.json by `exit_idempotency_key(entry_key)`. Filled -> P&L = sale proceeds - exit fee +
   unsold x settle value - entry cost - entry fee (`order.exit_applied`); submitted/failed/unknown -> defer; unreadable doc ->
   defer Kalshi; paper exits never read. No live exit -> identical grade. Loads at the next fleet ff + live-odds-worker AND
-  refresh-worker restart. UNVERIFIED: the raw `result` field of `GET /markets` (used only for a sold-to-zero entry with no
-  settlement row; absent -> it waits).
+  refresh-worker restart. `GET /markets` `result` VERIFIED 2026-10-19T21:01Z: yes/no matched the ledger on 2 venue-graded
+  live markets (won->yes, lost->no), status `finalized`, `settlement_ts` == `settled_at_venue` to the microsecond.
