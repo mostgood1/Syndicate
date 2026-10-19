@@ -3368,3 +3368,34 @@ keyword of the three solver helpers and their EXACT call sites, section only.
 - Then the volume levers (`possessions_per_game` / the pace input, `base_oreb_rate`) re-fitted on FIT.
 - Then the coherent rates re-checked; the two-shot rate gets a ×0.87 trim if it still runs over.
 - The coherent model stays default-off.
+
+**USER: "proceed with step d".**
+
+### R2-d — VOLUME: DIAGNOSIS + PRE-REGISTRATION 2026-10-19 (before any build or run)
+
+**Diagnosis** (the fit_f5 jobs, 809 FIT games):
+- Team pace reaching the orchestrator is REAL: mean 102.72 (sd 1.56; p05 / p50 / p95 99.7 / 102.9 / 105.1), against
+  real possessions 102.54 per team-game.
+- But `orchestrator/smart_sim.py` (~:1192–1195) then subtracts `inj_drag = 0.3 × outs` per team (3.68 outs per team on
+  average → **−2.21 possessions per game**) plus b2b. That is the SAME injury-count penalty that
+  `nba_sim_total_inputs.json` `skip_outs_penalties` removes from the raw TOTAL (#1f: −8.5 points). It was never
+  removed from the PACE.
+- So the sim plays 101.06 possessions where real games have 102.54, and EXACT lifts the make rates (2P% / 3P%) to hit
+  the points target on too few shots.
+
+**Mechanism:** extend `skip_outs_penalties` (the existing key) to the orchestrator's pace injury drag.
+- When the key is set, the drag is 0.
+- Production today has `{skip_def_subtraction: true}` only, so it is UNCHANGED. The research configs since #1f set
+  both keys, so the drag now goes there as well, consistently.
+- b2b drag is kept.
+- Lane claim: orchestrator/smart_sim.py, the pace injury-drag line only.
+- Tests: key absent = byte-identical; key set = no drag.
+
+**Measurement:** the 12 sweep dates, the round-2 config + coherent + this.
+- **CONFIRMED if:**
+  - possessions per team-game within 102.54 ± 0.7;
+  - FGA within 89.08 ± 1.0 (subsample real);
+  - 2P% within ±.012 and 3P% within ±.008 of the subsample real;
+  - the three shooting-trip rates within ±15%.
+- **Readings:** FTA, PF, foul-outs, REB, AST, total bias, the quarter shares.
+- **Then:** the non-shooting volume re-fit (FTA 22.69 / PF 19.67), s/Δ re-measured, the 12-date check, the full FIT.
