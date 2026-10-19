@@ -378,3 +378,16 @@ current bound refuses them without a stated reason.
   for that slice, and this measurement does not choose one.
 - Thresholds are unfitted. 1.5 opportunities and 0.85/0.15 are the docstring's
   and a round number; nothing here fits either.
+
+## RESOLVED 2026-10-19: the `mlb strikeouts` lead in this file is WITHDRAWN
+
+`[appended 2026-10-19 21:5xZ / 4:5x PM CDT, lane mlb-strikeouts-scale-check]`
+
+The "Not established" section above left the `mlb strikeouts` 5-of-5 family standing as measured at 22:02Z and unverified since, because MLB was serving 0 rows. It has now been re-measured on a live slate and **it is not a scale or denominator defect**:
+
+- `model_skill` carries `parity with the market: Brier +0.017 [-0.009, +0.042] over 193 starts; biased high ~13%` — the bias is MEASURED, with a sample size, published on the row.
+- `market_shrink` (`mlb-market-shrink-2026-10-10`) pulls `model_probability_raw` 0.6652 to 0.4241 against a market fair of 0.4129 — **96% of the way to the price** — so `model_edge_pct_raw` **+25.65** is served as `model_edge_pct` **+1.539** (`ev_pct` 2.173).
+
+**AND THIS FILE'S MEASUREMENTS USED THE WRONG FIELD.** Everything here that quotes an edge quotes `edge_vs_market_pct`, which is the RAW projection edge; the consumer reads `model_edge_pct`. For strikeouts those differ by **16.7x**. The conclusions survive for NFL / NCAAF / NHL / soccer only because their `calibration_method` is `identity`, so raw IS served — a coincidence this file never checked and did not know it was relying on.
+
+Full resolution, including two further findings I drafted from this file's framing and had to withdraw as instrument failures: `.syndicate/findings_2026-10-19_mlb_strikeouts_scale_check.md`.
