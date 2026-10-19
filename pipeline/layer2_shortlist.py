@@ -36,6 +36,18 @@ from typing import Any, Iterable, Mapping
 _UNSET = object()
 
 
+def _date_start_central(selected_date: Any):
+    """Midnight Central at the start of `selected_date` (an aware datetime), or None if it is not a date."""
+    from datetime import date, datetime, time
+    from zoneinfo import ZoneInfo
+
+    try:
+        day = date.fromisoformat(str(selected_date or "").strip()[:10])
+    except ValueError:
+        return None
+    return datetime.combine(day, time.min, tzinfo=ZoneInfo("America/Chicago"))
+
+
 def _quote_age_percentiles(values: list[float]) -> tuple[float, float, float] | None:
     """(p50, p90, max) over a sorted copy, or None when there is nothing to report."""
     if not values:
@@ -1934,10 +1946,13 @@ def build_layer2_shortlist(
         print(f"[layer2_shortlist] VENUE_REPRICE_FAILED {type(exc).__name__}: {exc}", flush=True)
 
     try:
+        # The board's own date anchors the horizon (lane `layer2-next-day-horizon`): a next-day board built before 7 PM CT
+        # otherwise drops every game of that day starting after 7 PM CT. See `select_shortlist`.
+        anchor = _date_start_central(selected_date)
         if horizon_days is _UNSET:
-            shortlist = select_shortlist(opportunities)
+            shortlist = select_shortlist(opportunities, horizon_anchor=anchor)
         else:
-            shortlist = select_shortlist(opportunities, horizon_days=horizon_days)
+            shortlist = select_shortlist(opportunities, horizon_days=horizon_days, horizon_anchor=anchor)
     except Exception as exc:
         return {
             "rows": [],

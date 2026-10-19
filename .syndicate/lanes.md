@@ -1111,6 +1111,14 @@ death, never life — do not invert it.
 - Verification: Findings doc numbers: per-family coverage, fill rate, adverse selection, realised edge per sport x market; log entry in .syndicate/log/2026-10-19.md
 - Blocked by: none
 
+### layer2-next-day-horizon — OPEN — opened 2026-10-19 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
+- Goal: A next-day (future-date) Layer 2 shortlist keeps every game on its own Central day: the horizon is counted from the selected date, not the build's UTC wall clock, so a 10-20 board built at 5 PM CT 10-19 carries OKC @ SAS (01:30Z 10-21)
+- Files: syndicate/features/shared/layer2_board.py (`select_shortlist` horizon anchor + `_within_horizon` call ONLY), pipeline/layer2_shortlist.py (the `select_shortlist` call ONLY), tests/test_layer2_next_day_horizon.py (NEW)
+- Hypothesis: _within_horizon compares the start's UTC date with now.date() (UTC) at build time; before 00:00Z a next-day board is 2 UTC days from late games
+- Falsification test: a board for 10-20 built before 00:00Z already keeps rows starting 10-21T01:30Z
+- Verification: after the next refresh-worker restart: the next-day board built before 7 PM CT carries every game on that Central day (count games vs the quote shard's)
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

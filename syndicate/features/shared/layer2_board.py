@@ -5694,8 +5694,16 @@ def select_shortlist(
     max_quote_age_seconds: float | None = None,
     stale_kickoff_seconds: float | None = None,
     hold_multiple_override: float | None = None,
+    horizon_anchor: datetime | None = None,
 ) -> dict[str, Any]:
     """The rows that get PERSISTED. Everything else lives in the ledger.
+
+    `horizon_anchor` (lane `layer2-next-day-horizon`): the start of the board's OWN date. The horizon counts days from
+    the LATER of it and the wall clock, so a board built for tomorrow keeps tomorrow's whole Central day. Measured
+    2026-10-19 17:41 CT: the 10-20 board, built before 00:00Z, dropped OKC @ SAS (01:30Z 10-21, 8:30 PM CT 10-20),
+    while its quote shard held 3,820 of that game's quotes. `_within_horizon` compared the start's UTC date with the
+    wall clock's UTC date (10-19), so the gap read as 2 days. Only the horizon moves. A build for today or an earlier
+    date is unchanged, because its anchor is earlier than the wall clock.
 
     Two consumers wanted opposite things and sizing one number for both got both
     wrong: the board wants a shortlist (#243 cut 230 rows to 34 on purpose),
@@ -5790,8 +5798,12 @@ def select_shortlist(
     # Counted, never removed (lane `stop-market-withholding`, 2026-10-05).
     on_unmeasured_model = 0
     on_unmeasured_model_by_market: dict[str, int] = {}
+    horizon_now = reference_now
+    if horizon_anchor is not None:
+        anchor = horizon_anchor if horizon_anchor.tzinfo else horizon_anchor.replace(tzinfo=timezone.utc)
+        horizon_now = max(reference_now, anchor.astimezone(timezone.utc))
     for row in opportunities:
-        if not _within_horizon(row, reference_now, horizon_days):
+        if not _within_horizon(row, horizon_now, horizon_days):
             beyond_horizon += 1
             continue
         # A market cannot be pregame after its own start time. Only fires when
