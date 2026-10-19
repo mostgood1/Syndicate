@@ -338,7 +338,7 @@ def test_the_day_ahead_is_tomorrow_in_central(monkeypatch):
     m = _script()
     monkeypatch.setattr(m, "central_today", lambda: "2026-10-14")
     seen = {}
-    monkeypatch.setattr(m, "fetch_rows", lambda base, sport: [])
+    monkeypatch.setattr(m, "fetch_rows", lambda base, sport, day=None: seen.setdefault("fetched_for", day) and [])
     monkeypatch.setattr(m, "latest_nfl_dvp", lambda root: {})
     real = m.build_sport
 
@@ -350,7 +350,7 @@ def test_the_day_ahead_is_tomorrow_in_central(monkeypatch):
     import tempfile
     with tempfile.TemporaryDirectory() as root:
         m.main(["--data-root", root, "--date", "tomorrow", "--sports", "nfl"])
-    assert seen["date"] == "2026-10-15"
+    assert seen["date"] == "2026-10-15" and seen["fetched_for"] == "2026-10-15"   # the board's own day-ahead build
 
 
 def test_consistency_and_matchup_sections():
@@ -749,3 +749,28 @@ def test_the_wnba_2026_postseason_gets_a_full_sheet():
     m = _script()
     assert m.season_phase("wnba", "2026-10-17") == "postseason" and m.in_season("wnba", "2026-10-31")
     assert m.season_phase("wnba", "2026-11-15") is None and m.season_phase("wnba", "2027-06-01") == "regular"
+
+
+
+def test_a_preview_build_reads_the_boards_build_for_its_own_day(monkeypatch):
+    # 2026-10-19: the 2 PM preview of the NBA opener read TODAY's board (no NBA games today) and got 0 groups.
+    m = _script()
+    seen = []
+
+    class _Resp:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self):
+            return b'{"rows": []}'
+
+    monkeypatch.setattr(m.urllib.request, "urlopen", lambda url, timeout=0: seen.append(url) or _Resp())
+    monkeypatch.setattr(m.json, "load", lambda resp: {"rows": []})
+    monkeypatch.setattr(m, "central_today", lambda: "2026-10-19")
+    m.fetch_rows("http://x", "nba", "2026-10-20")
+    m.fetch_rows("http://x", "nba", "2026-10-19")
+    m.fetch_rows("http://x", "nba")
+    assert seen[0].endswith("&date=2026-10-20") and "date=" not in seen[1] and "date=" not in seen[2]

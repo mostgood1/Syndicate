@@ -171,8 +171,14 @@ def player_identity(row: dict[str, Any], *, sport: str, team: Any, pos: Any, con
     return out
 
 
-def fetch_rows(base_url: str, sport: str) -> list[dict[str, Any]]:
+def fetch_rows(base_url: str, sport: str, day: str | None = None) -> list[dict[str, Any]]:
+    """The board's shortlist rows for `sport`. A PREVIEW build (any day but today) reads the board's own build for THAT
+    day (`&date=`): the default is today's board, whose quote read covers today's slate only, so a sport with no games
+    today and games tomorrow came back empty (2026-10-19: the NBA opener's 2 PM preview got 0 groups while the 10-20
+    board carried 2,000 NBA rows)."""
     url = f"{base_url}/api/board/layer2-shortlist?limit=5000&sport={sport}"
+    if day and day != central_today():
+        url += f"&date={day}"
     with urllib.request.urlopen(url, timeout=180) as resp:
         doc = json.load(resp)
     return [r for r in doc.get("rows") or [] if isinstance(r, dict)]
@@ -1240,7 +1246,7 @@ def main_build(args: Any, data_root: Path) -> int:
                 kept = {str(r.get("event_id")) for r in (prior or {}).get("rows") or []}
                 rows = quote_rows(data_root, sport, selected, skip_events=kept, now=datetime.now(timezone.utc))
             else:
-                rows = steady_rows(lambda: fetch_rows(args.base_url, sport), fetch_rows(args.base_url, sport), prior,
+                rows = steady_rows(lambda: fetch_rows(args.base_url, sport, selected), fetch_rows(args.base_url, sport, selected), prior,
                                    selected, now=datetime.now(timezone.utc))
         except Exception as exc:  # noqa: BLE001
             print(f"CHEAT_SHEET {sport} fetch failed: {type(exc).__name__}: {exc}", flush=True)
