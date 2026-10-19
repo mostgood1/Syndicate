@@ -2535,6 +2535,18 @@ def _run_execution_tick() -> None:
                 flush=True,
             )
 
+        # SELF-HEAL (lane execution-alerts, user yes 2026-10-19): a Kalshi
+        # unknown submit the venue lists under our key is resolved from the
+        # venue's own statement, BEFORE placement so this tick's reconcile books
+        # its fill. Polymarket ones stay for a human (no order route can show
+        # them). Never blocks the placer.
+        try:
+            from syndicate.features.shared.execution_self_heal import auto_resolve_unknown_submits
+
+            auto_resolve_unknown_submits()
+        except Exception as exc:  # noqa: BLE001
+            print(f"[live_odds_worker] SELF_HEAL_FAILED {type(exc).__name__}: {exc}", flush=True)
+
         # THE EXIT PATH, after settlement so a graded position is no longer
         # watched. Paper by default -- see `execution_exits`.
         _exit_tick(central_today_iso())

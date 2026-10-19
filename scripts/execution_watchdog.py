@@ -111,10 +111,11 @@ LOG_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("orders", re.compile(r"\[execute_portfolio\] (?:LIVE_ORDER status=failed|RECONCILE_FAILED)")),
     ("orders", re.compile(r"\[execution_ledger\] (?:RECONCILE_READ_FAILED|RECONCILE_SINGLE_READ_FAILED|MERGE_READ_FAILED)")),
     ("tick", re.compile(r"\[live_odds_worker\] (?:EXECUTION_ERROR|VENUE_SETTLEMENT_FAILED|ORDER_PATH_FAILED|"
-                        r"LEDGER_RECONCILE_FAILED|EXECUTION_STATE_STAMP_FAILED|VENUE_BALANCES_STAMP_FAILED)")),
+                        r"LEDGER_RECONCILE_FAILED|EXECUTION_STATE_STAMP_FAILED|VENUE_BALANCES_STAMP_FAILED|SELF_HEAL_FAILED)")),
 )
 _EXECUTION_LINE = re.compile(r"\[live_odds_worker\] EXECUTION status=(\S+) reason=(\S+) mode=(\S+) venue=(\S+)"
                              r".*? refused=(\{.*?\}) spent=")
+_SELF_HEALED = re.compile(r"\[execution_self_heal\] UNKNOWN_SUBMIT_AUTO_RESOLVED .*?finding=(\S+)")
 _VENUE_IN_LINE = re.compile(r"\bvenue=(kalshi|polymarket)")
 
 
@@ -455,8 +456,8 @@ def evaluate(readings: Mapping[str, Any], now: dt.datetime, limits: Mapping[str,
                             f"{ev.get('verdict', 'n/a')}/{ev.get('reason') or '-'}")
             dollars = sum(_num(o.get("requested_stake_dollars")) or 0.0 for o in unknown)
             add("unknown_submits", FAIL, f"{len(unknown)} live submit(s) with NO venue answer (${dollars:,.2f}) -- each may "
-                                         "or may not be a position; nothing places a retry on it until it is resolved at "
-                                         "/portfolio/live: " + "; ".join(rows))
+                                         "or may not be a position. A Kalshi one is resolved automatically once Kalshi lists it "
+                                         "under our key (execution_self_heal); anything else waits for /portfolio/live: " + "; ".join(rows))
 
     balances = readings.get("venue_balances")
     if not readings.get("monitor_error") and isinstance(state, Mapping):
@@ -531,6 +532,11 @@ def accumulate(lines: Iterable[str], acc: dict[str, Any], now: dt.datetime) -> d
                 row = bucket["refusals"].setdefault(f"{venue}:{reason}", {"ticks": 0, "max": 0})
                 row["ticks"] += 1
                 row["max"] = max(row["max"], int(count or 0))
+            continue
+        healed = _SELF_HEALED.search(line)
+        if healed:
+            bucket.setdefault("self_healed", {})
+            bucket["self_healed"][healed.group(1)] = int(bucket["self_healed"].get(healed.group(1)) or 0) + 1
             continue
         for group, pattern in LOG_PATTERNS:
             if pattern.search(line):
@@ -624,6 +630,8 @@ def build_digest(day: dt.date, orders: list[Mapping[str, Any]], readings: Mappin
     errors = (acc_day or {}).get("errors") or {}
     if errors:
         lines.append(f"  failure lines: {dict(sorted(errors.items()))}")
+    if (acc_day or {}).get("self_healed"):
+        lines.append(f"  unknown submits auto-resolved from Kalshi's order list: {acc_day['self_healed']}")
 
     unknown = readings.get("unknown_submits") or []
     stuck = [o for o in live if str(o.get("status")) == "submitted" and not o.get("outcome")]

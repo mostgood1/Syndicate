@@ -243,3 +243,10 @@ def test_watchdog_main_wires_execution_and_email(monkeypatch, tmp_path):
     monkeypatch.setenv("SYNDICATE_WATCHDOG_EXECUTION", "0")
     wd.main(["--home", str(tmp_path / "b"), "--json"])
     assert calls == {}
+
+
+def test_digest_counts_self_heal_resolutions():
+    line = ("2026-10-19T20:00:00.000Z [execution_self_heal] UNKNOWN_SUBMIT_AUTO_RESOLVED key=k finding=placed "
+            "venue_order_id=o state=filled ticker=T stake=4.5 dry_run=False error=None")
+    acc = xw.accumulate([line, "2026-10-19T20:01:00.000Z [live_odds_worker] SELF_HEAL_FAILED KeyError: x"], {}, NOW)
+    assert acc["2026-10-19"]["self_healed"] == {"placed": 1} and acc["2026-10-19"]["errors"] == {"tick": 1}
