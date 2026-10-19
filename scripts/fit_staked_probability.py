@@ -36,7 +36,17 @@ THE WRITE RULE. A cell is written only when ``brier_fit < brier_beta0`` on the
 held-out rows -- the blend must beat the MARKET ALONE out of sample, which is
 the gate `staked_probability`'s docstring pre-registered. Brier at ``beta = 1``
 (the raw model, which is what the sizer stakes today) is printed beside them so
-the reader can see all three, but it is not the gate. A write REPLACES every
+the reader can see all three, but it is not the gate.
+
+THE MARKET-ONLY RULE (lane `sim-stake-unfitted-market-only`, 2026-10-19, todo #704). A cell
+whose TRAIN fit picks ``beta = 0`` (the market alone beats every blend) AND whose held-out
+Brier at ``beta = 0`` beats the raw model's (``brier_beta0 < brier_beta1``) is written as a
+``market_only`` cell -- "fitted, market only" -- instead of being left absent. Absent means
+unfitted, which the sizer stakes on the raw sim by default; a written market-only cell is
+evidence the raw sim should not be staked there, and `SYNDICATE_STAKED_PROBABILITY_UNFITTED`
+decides whether the sizer honours it. Same floor, same chronological split.
+
+A write REPLACES every
 cell of the sport it fitted; it never merges a fresh cell beside a stale one for
 the same sport, because two fits from different ledgers pooled into one
 profile is exactly the cross-root pooling `learnings.md` forbids.
@@ -49,7 +59,7 @@ outcome; ``--clv-enrich`` uses them the one way they help -- filling
 ledger settles from 2026-09-09) with the same field names as a ledger order.
 
 ``--dry-run`` is the default. ``--write`` is explicit. Exit codes:
-  0  at least one cell is writable (written only under --write)
+  0  at least one cell is writable or market-only (written only under --write)
   2  rows were found but no cell passed the floor and the write rule
   3  no usable rows at all
 Nothing is written on any non-zero exit.
@@ -90,6 +100,9 @@ VERDICT_WRITE = "write"
 VERDICT_FLOOR = "refused_n_test_below_floor"
 VERDICT_NO_SPLIT = "refused_no_chronological_split"
 VERDICT_NO_GAIN = "refused_does_not_beat_beta0"
+VERDICT_MARKET_ONLY = "market_only"
+#: Verdicts that produce a written cell.
+WRITTEN_VERDICTS = (VERDICT_WRITE, VERDICT_MARKET_ONLY)
 
 
 def _as_float(value: Any) -> float | None:
@@ -360,6 +373,14 @@ def fit_cell(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     out["brier_fit"] = brier(test, best_beta)
     if best_beta > 0.0 and out["brier_fit"] is not None and out["brier_beta0"] is not None and out["brier_fit"] < out["brier_beta0"]:
         out["verdict"] = VERDICT_WRITE
+    elif (
+        best_beta == 0.0
+        and out["brier_beta0"] is not None
+        and out["brier_beta1"] is not None
+        and out["brier_beta0"] < out["brier_beta1"]
+    ):
+        # The market beat every blend in train AND beat the raw model out of sample.
+        out["verdict"] = VERDICT_MARKET_ONLY
     else:
         out["verdict"] = VERDICT_NO_GAIN
     return out
@@ -411,16 +432,18 @@ def write_profile(
     source = str(fit_from.get("source") or "")
     new_cells: dict[str, BlendCell] = {}
     for cell, result in results.items():
-        if result.get("verdict") != VERDICT_WRITE:
+        if result.get("verdict") not in WRITTEN_VERDICTS:
             continue
+        market_only = result["verdict"] == VERDICT_MARKET_ONLY
         new_cells[cell] = BlendCell(
-            beta=float(result["beta_fit"]),
+            beta=0.0 if market_only else float(result["beta_fit"]),
             fitted_on=fitted_on,
             n_train=int(result["n_train"]),
             n_test=int(result["n_test"]),
             brier_beta0=float(result["brier_beta0"]),
             brier_fit=float(result["brier_fit"]),
             source=source,
+            market_only=market_only,
         )
     version = f"staked_probability_v1@{fitted_on}"
     profile = StakedProbabilityProfile(cells=kept).with_cells(new_cells, version=version)
@@ -493,7 +516,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.json:
         print(json.dumps({"sport": sport, "source": source, "dropped": dropped, "cells": results}, indent=2, sort_keys=True), flush=True)
 
-    writable = [cell for cell, result in results.items() if result["verdict"] == VERDICT_WRITE]
+    writable = [cell for cell, result in results.items() if result["verdict"] in WRITTEN_VERDICTS]
     if not writable:
         print("[fit_staked_probability] NO CELL PASSED -- nothing written (exit 2)", flush=True)
         return 2

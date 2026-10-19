@@ -3,7 +3,9 @@
 Synthetic ledgers with a KNOWN truth: a market that is a noisy view of the
 true probability, and a model that is either informative (beta > 0 should
 win out of sample) or pure noise around the market (beta = 0 should win, and
-the harness must refuse to write). Plus the pre-registered floor.
+the harness writes a `market_only` cell -- lane `sim-stake-unfitted-market-only`,
+2026-10-19: before it, that cell was left ABSENT, which the sizer reads as
+"unfitted" and stakes on the raw model). Plus the pre-registered floor.
 """
 
 from __future__ import annotations
@@ -136,16 +138,39 @@ def test_an_informative_model_earns_a_positive_beta_and_is_written(tmp_path, cap
     assert profile.beta_for("mlb", "h2h", "full_game") == cell["beta"]
 
 
-def test_a_noise_model_does_not_beat_the_market_and_is_refused(tmp_path, capsys):
+def test_a_noise_model_earns_no_blend_and_is_written_MARKET_ONLY(tmp_path, capsys):
+    """The market beats every blend in train AND beats the raw model held out, so
+    the cell is written as "fitted, market only" -- never as a beta > 0 blend."""
     rows = synthetic_ledger(n=1500, model="noise")
     out = tmp_path / "profile.json"
     code = harness.main(["--sport", "mlb", "--rows-jsonl", str(_jsonl(tmp_path, rows)), "--write", "--profile-path", str(out)])
-    assert code == 2
-    assert not out.exists()
+    assert code == 0
     printed = capsys.readouterr().out
-    assert harness.VERDICT_NO_GAIN in printed
+    assert harness.VERDICT_MARKET_ONLY in printed
     # The comparison is printed either way.
     assert "B(0)" in printed and "B(fit)" in printed
+    cell = json.loads(out.read_text(encoding="utf-8"))["fields"]["cells"][cell_key("mlb", "h2h", "full_game")]
+    assert cell["market_only"] is True and cell["beta"] == 0.0
+    assert cell["brier_fit"] == cell["brier_beta0"]
+    profile, _ = load_staked_probability_profile(out)
+    assert profile.beta_for("mlb", "h2h", "full_game") == 0.0  # the sizer can never blend it
+
+
+def test_a_market_that_wins_only_IN_TRAIN_stays_unfitted_and_unwritten(tmp_path, capsys):
+    """Train picks beta 0, but out of sample the raw model beats the market: no
+    evidence that holds up, so NOTHING is written (exit 2) and the cell stays
+    unfitted. Noise for the first ~70% of dates, signal after."""
+    early = [r for r in synthetic_ledger(n=1500, model="noise", seed=3) if r["selected_date"] <= "2026-08-21"]
+    late = [r for r in synthetic_ledger(n=1500, model="informative", seed=4) if r["selected_date"] > "2026-08-21"]
+    out = tmp_path / "profile.json"
+    code = harness.main(["--sport", "mlb", "--rows-jsonl", str(_jsonl(tmp_path, early + late)), "--write", "--profile-path", str(out)])
+    printed = capsys.readouterr().out
+    assert code == 2, printed
+    assert not out.exists()
+    assert harness.VERDICT_NO_GAIN in printed
+    # Precondition: it is THIS branch (beta 0 in train, raw model better held out), not another refusal.
+    (result,) = harness.fit_all([harness.derive_row(r)[0] for r in early + late]).values()
+    assert result["beta_fit"] == 0.0 and result["brier_beta1"] < result["brier_beta0"], result
 
 
 def test_no_usable_rows_exits_3(tmp_path):

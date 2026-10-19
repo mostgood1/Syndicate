@@ -134,6 +134,9 @@ from syndicate.features.shared.opportunity_signals import staked_probability
 from syndicate.features.shared.portfolio_settings import PortfolioSettings, resolve_settings
 from syndicate.features.shared.request_path_guard import refuse_if_compute_in_request_path
 from syndicate.features.shared.staked_probability_profile import (
+    MARKET_BASIS_VERSION_PREFIX,
+    STAKED_BASIS_BLEND,
+    STAKED_BASIS_MARKET,
     UNFITTED_VERSION,
     StakedProbabilityProfile,
     load_staked_probability_profile,
@@ -771,13 +774,22 @@ def sizing_inputs_with_provenance(
             return None, refusal, provenance
 
         resolved_profile = profile if profile is not None else load_staked_probability_profile()[0]
-        beta = resolved_profile.beta_for(row.get("sport"), row.get("market"), row.get("segment"))
-        if beta > 0.0:
+        basis = resolved_profile.staked_basis(row.get("sport"), row.get("market"), row.get("segment"))
+        if basis == STAKED_BASIS_BLEND:
+            beta = resolved_profile.beta_for(row.get("sport"), row.get("market"), row.get("segment"))
             blended = staked_probability(fair, raw_model, beta=beta)
             if blended is not None and 0.0 < blended < 1.0:
                 model_probability = blended
                 provenance["blend_beta"] = beta
                 provenance["staked_probability_version"] = resolved_profile.version
+        elif basis == STAKED_BASIS_MARKET:
+            # LANE `sim-stake-unfitted-market-only` (todo #704; loan of this block from lane
+            # `published-negative-ev`): a cell with no fitted beta stakes the MARKET fair when
+            # `SYNDICATE_STAKED_PROBABILITY_UNFITTED` says so -- beta 0, the price-shopping stake
+            # `stake_attribution` computes as its EV-only counterfactual. Absent flag = `raw` = the
+            # additive model above, bit for bit. Refuses nothing: the interval gate already ran.
+            model_probability = fair
+            provenance["staked_probability_version"] = MARKET_BASIS_VERSION_PREFIX + str(resolved_profile.version)
 
     score = row.get("score")
     price_reliability = _as_float(score.get("price_reliability")) if isinstance(score, Mapping) else None

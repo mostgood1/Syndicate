@@ -69,6 +69,43 @@ from syndicate.features.shared.calibration_profile_store import load_versioned_p
 
 UNFITTED_VERSION = "unfitted"
 PROFILE_PATH_ENV = "SYNDICATE_STAKED_PROBABILITY_PROFILE_PATH"
+
+# ---------------------------------------------------------------------------
+# WHAT AN UNFITTED CELL STAKES (lane `sim-stake-unfitted-market-only`, 2026-10-19, todo #704)
+# ---------------------------------------------------------------------------
+#
+# The "known gap" in this module's docstring, measured: the fleet has NO profile, so every
+# cell is unfitted and the sizer stakes `fair + model_edge_pct/100` -- the raw sim at weight
+# ~1. From 2026-10-05 that put 52-83% of daily paper dollars on the sim, whose fitted weight
+# on 4,876 settled orders is -0.27 [-0.78, +0.18] (findings_2026-10-19_ev_overstatement_decomp.md).
+#
+# `SYNDICATE_STAKED_PROBABILITY_UNFITTED` chooses what a cell without a fitted beta stakes:
+#
+#   raw                (DEFAULT; absent and unparseable resolve here) -- today, bit for bit.
+#   market_only_cells  only a cell the fit harness WROTE as `market_only` stakes the market fair.
+#   market             a `market_only` cell AND every unfitted cell stake the market fair.
+#
+# A fitted cell (beta > 0) blends exactly as before under every mode. Nothing here refuses a
+# row: a market-fair stake is the price-shopping stake `stake_attribution` already computes as
+# its EV-only counterfactual, so the sim's share of the stake goes to 0.0 and the row stays.
+UNFITTED_MODE_ENV = "SYNDICATE_STAKED_PROBABILITY_UNFITTED"
+UNFITTED_MODE_RAW = "raw"
+UNFITTED_MODE_MARKET_ONLY_CELLS = "market_only_cells"
+UNFITTED_MODE_MARKET = "market"
+_UNFITTED_MODES = (UNFITTED_MODE_RAW, UNFITTED_MODE_MARKET_ONLY_CELLS, UNFITTED_MODE_MARKET)
+
+#: What `staked_basis` returns -- the probability the sizer prices a model-view row on.
+STAKED_BASIS_BLEND = "blend"    # a fitted beta > 0: staked_probability(fair, raw, beta)
+STAKED_BASIS_MARKET = "market"  # the market fair (beta 0)
+STAKED_BASIS_RAW = "raw"        # the raw additive model (today's unfitted behaviour)
+#: Stamped as `staked_probability_version` on a market-basis stake, ahead of the profile version.
+MARKET_BASIS_VERSION_PREFIX = "market_fair@"
+
+
+def unfitted_mode() -> str:
+    """The configured mode. Absent or unrecognised is `raw` -- today's behaviour."""
+    raw = str(os.environ.get(UNFITTED_MODE_ENV) or "").strip().lower()
+    return raw if raw in _UNFITTED_MODES else UNFITTED_MODE_RAW
 #: Relative to `data_root()`. This string IS the allowlist entry in
 #: `artifact_publisher.HOT_ARTIFACT_PATTERNS`; change both or neither.
 PROFILE_RELATIVE_PATH = "calibration/staked_probability_profile.json"
@@ -107,10 +144,13 @@ class BlendCell:
     brier_beta0: float | None = None
     brier_fit: float | None = None
     source: str | None = None
+    #: Written by the fit harness when the market alone beat every blend: "fitted, market only".
+    #: Distinct from an ABSENT cell, which is merely unfitted. Always carries beta 0.
+    market_only: bool = False
 
     @property
     def fitted(self) -> bool:
-        return self.beta > 0.0
+        return self.beta > 0.0 and not self.market_only
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -121,6 +161,7 @@ class BlendCell:
             "brier_beta0": self.brier_beta0,
             "brier_fit": self.brier_fit,
             "source": self.source,
+            "market_only": self.market_only,
         }
 
     @classmethod
@@ -134,6 +175,10 @@ class BlendCell:
         # extrapolate PAST the model, which `staked_probability` only permits
         # through an explicit `alpha`; the profile never carries one.
         beta = max(0.0, min(1.0, beta))
+        market_only = payload.get("market_only") is True
+        if market_only and beta > 0.0:
+            # Contradictory: "market only" with a model weight. Honour neither claim.
+            return None
 
         def _int(value: Any) -> int | None:
             number = _as_float(value)
@@ -147,6 +192,7 @@ class BlendCell:
             brier_beta0=_as_float(payload.get("brier_beta0")),
             brier_fit=_as_float(payload.get("brier_fit")),
             source=str(payload["source"]) if payload.get("source") is not None else None,
+            market_only=market_only,
         )
 
 
@@ -175,6 +221,18 @@ class StakedProbabilityProfile:
         """0.0 unless a FITTED cell exists. This is what the sizer reads."""
         cell = self.lookup(sport, market, segment)
         return cell.beta if cell is not None and cell.fitted else 0.0
+
+    def staked_basis(self, sport: Any, market: Any, segment: Any, *, mode: str | None = None) -> str:
+        """Which probability a model-view row in this cell is staked on. See `UNFITTED_MODE_ENV`."""
+        cell = self.lookup(sport, market, segment)
+        if cell is not None and cell.fitted:
+            return STAKED_BASIS_BLEND
+        resolved = mode if mode in _UNFITTED_MODES else unfitted_mode()
+        if resolved == UNFITTED_MODE_MARKET:
+            return STAKED_BASIS_MARKET
+        if resolved == UNFITTED_MODE_MARKET_ONLY_CELLS and cell is not None and cell.market_only:
+            return STAKED_BASIS_MARKET
+        return STAKED_BASIS_RAW
 
     def with_cells(self, cells: Mapping[str, BlendCell | Mapping[str, Any]], *, version: str) -> "StakedProbabilityProfile":
         merged: dict[str, dict[str, Any]] = {key: dict(value) for key, value in self.cells.items()}
@@ -238,6 +296,14 @@ def load_staked_probability_profile(
 __all__ = [
     "BlendCell",
     "DEFAULT_PROFILE",
+    "MARKET_BASIS_VERSION_PREFIX",
+    "STAKED_BASIS_BLEND",
+    "STAKED_BASIS_MARKET",
+    "STAKED_BASIS_RAW",
+    "UNFITTED_MODE_ENV",
+    "UNFITTED_MODE_MARKET",
+    "UNFITTED_MODE_MARKET_ONLY_CELLS",
+    "UNFITTED_MODE_RAW",
     "PROFILE_PATH_ENV",
     "PROFILE_RELATIVE_PATH",
     "StakedProbabilityProfile",
@@ -246,4 +312,5 @@ __all__ = [
     "clear_profile_cache",
     "load_staked_probability_profile",
     "profile_path",
+    "unfitted_mode",
 ]
