@@ -51328,3 +51328,11 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - **The direction is the one PREDICTED, not a reversal.** The 21:01:01Z entry wrote "Stakes fall to the EV-only counterfactual". Removing the unearned sim-added stake (w = -0.27, findings_2026-10-19_ev_overstatement_decomp.md) shrinks tickets, while lifting the zero-Kelly veto adds lines. Both mechanisms are visible: more lines, smaller tickets, about half the capital.
 - **Confounds, not glossed:** one plan pair; the row set changed across an hour of a live slate (not a controlled A/B); the 22:40:24Z plan between them is `date=2026-10-20` and not comparable. The formal reading stays published-negative-ev's 10-21 15:00Z provenance split, plus `sim-stake-forward-read-1102`.
 - **Provenance of each number:** the stake/refusal figures are from refresh-worker.log (re-derivable by anyone). The `market_fair@` 18/18 stamp count is from the keyvalue plan store, read in-process with the worker state env. `market_fair@` never appears in the logs (0 occurrences), so that count is re-derivable only from the store.
+
+
+## 2026-10-19 23:57Z (6:57 PM CT) -- basketball sim checklist fix b8b9f831 is ON THE FLEET, by ride-along (NO ff, NO claim, NO restart by me) (lane `basketball-checklist-level0`, session 4e40a1b5)
+- **ask:** user approved a fleet ff to b8b9f831; I HELD it (ride-alongs from affc9a7b carried caps-revamp's live-money code and the 10-20-approved deploy) and watched the fleet HEAD.
+- **what happened:** fleet reflog `merge d3878d69: Fast-forward` at 2026-10-19 23:54:52Z (not mine; d3878d69 is the commit the execution-alerts entry above waits for). d3878d69 contains b8b9f831; `git diff --quiet b8b9f831 HEAD -- scripts/basketball_sim_input_checklist.py` -> identical; `def bridge_engine_problems` present at :249.
+- **no restart needed:** the checklist runs only in the scheduled 07:00Z `sim-input-reports` job (`scripts/publish_sim_input_reports.py --no-pull`), a fresh process from disk.
+- **expect:** at ~07:00Z 10-20, `{nba,wnba}_source/source_artifacts/data/sim_input_report/sim_input_report_2026-10-20.json` exists (first since 10-10), `level0_bridge_reachability` rows = NATIVE ORCHESTRATOR for wnba and nba, `alarms` carries no `LEVEL 0` line.
+- **verify OWED:** that read, via `/api/ops/artifacts/stream?path=...`.
