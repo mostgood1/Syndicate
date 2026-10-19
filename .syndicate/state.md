@@ -638,7 +638,7 @@ once this index exists: re-splitting would orphan the parts.
 | [accuracy-autorun-rearm-state] | `#626`(h) IS ARMED, RAN, AND PASSED. The budget, not memory, is now the constraint. `[2026-09-04, lane accurac | `state_model.md` |
 | [nhl-live-resim] | NHL HAS A LIVE RE-SIM AND IT CAN NOW SEE ITS SLATE -- but no NHL game has yet reached the board with a probabi | `state_model.md` |
 | [nhl-player-props] | NHL PLAYER PROPS ARE PROJECTED AND PRICED ON THE BOARD, PER-LINE GATED -- and the engine still loses to a play | `state_model.md` |
-| [model-edge-ceiling] | THE 15-POINT PLAUSIBILITY CEILING REFUSES 470 PLAUSIBLE ROWS AND HIDES A LARGE-GAP BUG LIST — MEASURED 2026-10 | `state_model.md` |
+| [model-edge-ceiling] | **REPLACED AND SERVED 2026-10-19** (`d4837386`): the 15-point MAGNITUDE bound is now a probability-space test — served coverage 81.0% -> 90.6%, bound refusals 407 -> 41 `[measured]` | `state_model.md` |
 | [prop-projection-support] | NFL PROP SUPPORT IS NOW PUBLISHED AND SERVED (0 of 1,070 -> 1,067 of 1,067, `5457b428`); NHL AND MLB STILL CAR | `state_model.md` |
 | [polymarket-live-totals-quote-names-no-game] | 26 OF 28 LIVE POLYMARKET TOTALS QUOTES ON THE BOARD ARE SHARED ACROSS GAMES — one price per LINE, no game iden | `state_polymarket.md` |
 | [polymarket-fill-price-is-reported] | THE VENUE REPORTS `avgPx`. "This path has no fill price" was FALSE and cost a 12h live halt `[verified 2026-08 | `state_polymarket.md` |

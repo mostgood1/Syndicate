@@ -949,7 +949,7 @@ lockout and busy by the time it lifts, which is exactly why waiting kept losing.
 - Power-play skaters are drawn per PP segment by systematic sampling on each player's projected PP minutes (`proj_pp_toi`, real PP TOI over the window), not fixed PP1/PP2 units: PP1 members' share of team PP time 0.664 vs real 0.632 (was 0.903) `[verified on the fleet 2026-10-06 00:15Z, af737b31 -- lane nhl-elite-pp-onice]`. Total sim PP time still runs 6.84 vs 4.66 min/game real (lane nhl-pp-time).
 - While team rates are last season's frozen file (no team_rates_<season>.csv), each team's shots_per_60 = 0.6 team rate + 0.4 dressed-roster per-game SOG sum (unrated skaters at F 1.2 / D 0.9); off once the in-season file exists (2026-11-01) `[verified on the fleet 2026-10-06 14:51Z, f88c9453 -- lane nhl-early-season-shot-volume]`.
 
-## [model-edge-ceiling] THE 15-POINT PLAUSIBILITY CEILING REFUSES 470 PLAUSIBLE ROWS AND HIDES A LARGE-GAP BUG LIST — MEASURED 2026-10-15, served board, six sports, row cap defeated
+## [model-edge-ceiling] THE 15-POINT MAGNITUDE BOUND IS GONE: REPLACED 2026-10-19 BY THE PROBABILITY-SPACE TEST ITS OWN DOCSTRING DESCRIBED, AND VERIFIED ON THE SERVED BOARD — coverage 81.0% -> 90.6%, refusals 407 -> 41
 
 `_MODEL_EDGE_MAX_POINTS = 15` drops `model_edge_pct` when `abs(edge) > 15`. Over 2,855 rows carrying both an edge and a model probability it rejects 525.
 
@@ -963,6 +963,11 @@ lockout and busy by the time it lifts, which is exactly why waiting kept losing.
 - **The guard is load-bearing for the blind spot**: dropping the edge also removes those rows from every accuracy/CLV surface that reads it, so the families with the worst projection error are the least visible.
 
 **NO CODE CHANGE — the bound's value is a risk decision owed to the user.** It gates ranking on money-adjacent rows, an ordinary implied probability is not a CORRECT one, and skill is already handled separately (`_apply_skill_reliability` + `bucket_factor`). Detail: `.syndicate/findings_2026-10-15_ceiling_implied_probability.md`.
+
+
+**OUTCOME `[2026-10-19, user decision "replace the ceiling"]`.** Everything below is the MEASUREMENT THAT MOTIVATED the change and is kept for that reason; the bound it describes is no longer live. `_model_edge_for` now refuses only when the model's probability is extreme WHILE the market's is not, plus an impossible-probability guard. **Served reading, gated on the payload's `written_at` (20:23:00Z) exceeding the restart (20:12:41Z): rows carrying `model_edge_pct` 2,992/3,695 (81.0%) -> 3,606/3,979 (90.6%); bound refusals 407 -> 41; the old reason absent; `model_probability_extreme_against_ordinary_market` 41; `no_projection` 169 -> 173 as an untouched control.** The rate matched the pre-deploy in-process prediction to two decimals (90.63% both).
+
+**Scope and limits.** The same constant still bounds three OTHER quantities — `_modelled_fair_edge_for`, `_three_way_leg_edge`, `_calibrate_model_edge` — whose populations were never measured and which did NOT change. Revert is a CODE revert (revert, ff, TERM); the env flag needs a full down/up because role env is captured at `up`. Thresholds 0.85/0.15 are the docstring's own and are UNFITTED — a live NHL row at 0.1917 sits 4 points above the floor. **No outcomes were used anywhere in this arc**, so returning 366 rows to ranking is correct-by-the-stated-criterion, NOT shown profitable.
 
 ## [prop-projection-support] NFL PROP SUPPORT IS NOW PUBLISHED AND SERVED (0 of 1,070 -> 1,067 of 1,067, `5457b428`); NHL AND MLB STILL CARRY NONE, AND THE ORIGINAL "SOCCER 0 of 391" WAS A MISCLASSIFICATION — MEASURED 2026-10-16, served board, cap defeated, gated on `kind == "prop"`
 
