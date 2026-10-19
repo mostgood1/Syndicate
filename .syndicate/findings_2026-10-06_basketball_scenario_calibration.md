@@ -3514,3 +3514,26 @@ The R2D_p3 config otherwise; the 12 sweep dates.
 
 **Then:** s/Δ re-measured on the disjoint dates (the bonus rate moves s), the 12-date check (every guard,
 |bias| < 0.5), the full FIT.
+
+### R2-d step 4 — RESULT 2026-10-19 23:20Z (6 runs done 23:15Z, 0 errors): NOT CONFIRMED; no point meets FTA and PF together
+
+| bonus / base non-shoot | FTA (22.69 ± .3) | PF (19.67 ± .4) | foul-outs | bonus trips | bias |
+|---|---|---|---|---|---|
+| (R2D_p3: .03 / .065) | 21.12 | 20.24 | .254 | 0.87 | +1.45 |
+| .045 / .045 | 21.78 ✗ | 19.75 ✓ | .230 | 1.25 | +1.67 |
+| .045 / .055 | 21.95 ✗ | 20.70 ✗ | .265 | 1.35 | +2.01 |
+| .055 / .045 | 22.56 ✓ | 20.76 ✗ | .273 | 1.66 | +2.17 |
+| .055 / .055 | 22.69 ✓ | 21.64 ✗ | .318 | 1.76 | +2.60 |
+| .065 / .045 | 23.25 ✗ | 21.65 ✗ | .318 | 2.09 | +2.65 |
+| .065 / .055 | 23.58 ✗ | 22.64 ✗ | .381 | 2.24 | +2.68 |
+
+- Every step-3 guard holds at all 6 points: 3PA 36.7–37.1, 3PM 13.4–13.6, the trips, 2P% / 3P%, FGA, possessions.
+- Bias rises with the bonus rate because s (solver_bonus_trip_share 0.00791) is stale. It is re-measured at the pick
+  (as planned).
+- **Reading:** a bonus trip adds both FTA and PF. Hitting FTA needs bonus ≈ .055, and PF then needs base non-shoot
+  BELOW .045 (slope ≈ −0.09 PF per +.001 base).
+
+**R2-d step 4b — PRE-REGISTRATION 2026-10-19 (before the run):**
+- Grid: bonus ∈ {.055, .060} × base non-shoot ∈ {.030, .035}.
+- The same PASS (FTA 22.69 ± .3, PF 19.67 ± .4, foul-outs [.153, .233], step-3 guards) and the same pick rule.
+- Then s/Δ re-measured, the 12-date check, the full FIT.
