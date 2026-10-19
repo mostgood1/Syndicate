@@ -55,4 +55,30 @@ Only the descriptive table above has been computed.
 
 ## 2. Results
 
+Run 2026-10-19 ~21:1xZ at Idle priority (read back 64), after the registration was on main (`9fa31795`).
+Output: `C:/tmp/team-strength/sim_draw_report.json`. 2,724 matches, all of them with a close; 1,149 fit
+(before 2026-01-01) and 1,575 held out.
+
+| arm | fitted (δ0, δ1) on the fit half | Δ held-out LL vs sim | 95% CI | verdict |
+|---|---|---|---|---|
+| **draw term (b)** | (−0.064, **+0.153**) | −0.0005 | [−0.0015, +0.0006] | **NOT DEMONSTRATED** |
+| δ0 only | (+0.0005, 0) | −0.00001 | [−0.00002, +0.00000] | (decomposition) |
+| leave-one-league-out (secondary) | per fold | **+0.0011** | [−0.0002, +0.0026] | worse |
+
+- **δ1 came out POSITIVE on the sim (+0.15 per unit of x), the opposite sign to stage 3's Poisson (−0.36..−0.41).**
+  So the stage-3 parameters would have hurt, as the descriptive table predicted.
+- Held-out draw calibration by x tercile (sim / corrected / actual):
+  - level matches: 0.270 / 0.262 / 0.263
+  - middle: 0.253 / 0.252 / 0.282
+  - mismatches: 0.199 / 0.209 / 0.225
+- **The term moves the right way but too little, and the middle tercile it cannot reach at all.** The sim's
+  draw error is not monotone in x, so a log-linear term in x cannot fit it.
+- **Ship rule: NOTHING SHIPS for draws.** The primary verdict is NOT DEMONSTRATED.
+- Secondary: on the held-out half, the sim's own top decile of favourites is OVER-confident (0.768 predicted
+  vs 0.738 actual [0.669, 0.806], n 160). That is the opposite of the research Poisson's under-confidence. The
+  CI is wide, but it is one more sign that the sim's 1X2 shape is not the research link's, and that maps fit on
+  that link do not port to it.
+
 ## 3. Deviations
+
+- None.

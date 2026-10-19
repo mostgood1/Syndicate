@@ -77,6 +77,8 @@ from syndicate.features.soccer.features.loaders import (  # noqa: E402
 )
 
 OUTCOMES = ("home", "draw", "away")
+#: Committed per-league history (`--source-root` overrides it; a worktree carries no `data/`).
+SOURCE_ROOT = REPO_ROOT / "data" / "soccer_source"
 
 # Leagues rated from football-data match results. MLS is deliberately absent:
 # see the module docstring.
@@ -95,7 +97,7 @@ BACKTESTABLE_LEAGUES = (
 
 def _load_history(league: str) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
-    for path in sorted(glob.glob(str(REPO_ROOT / "data" / "soccer_source" / league / "history" / "*.csv"))):
+    for path in sorted(glob.glob(str(SOURCE_ROOT / league / "history" / "*.csv"))):
         rows.extend(pd.read_csv(path).to_dict("records"))
     return rows
 
@@ -123,7 +125,7 @@ def _load_team_history(league: str) -> list[dict[str, Any]]:
     "CONSUMED, container has none" alarm on this path was a symptom of the
     same gap, not a separate problem -- this fixes both at once."""
     rows: list[dict[str, Any]] = []
-    for path in sorted(glob.glob(str(REPO_ROOT / "data" / "soccer_source" / league / "team_history" / "*.csv"))):
+    for path in sorted(glob.glob(str(SOURCE_ROOT / league / "team_history" / "*.csv"))):
         rows.extend(pd.read_csv(path).to_dict("records"))
     return rows
 
@@ -136,7 +138,7 @@ def _load_espn_match_stats(league: str) -> list[dict[str, Any]]:
     hitting a market API per run). Absent file -> empty list -> `espn_stats=`
     is optional at the call site, so a league with no backfill yet degrades
     to exactly today's behaviour rather than failing."""
-    path = REPO_ROOT / "data" / "soccer_source" / league / "history" / "espn_match_stats.json"
+    path = SOURCE_ROOT / league / "history" / "espn_match_stats.json"
     if not path.exists():
         return []
     try:
@@ -317,6 +319,7 @@ def backtest_league(
     wire_market_confidence: bool = False, since: str | None = None, fd_close_dir: Path | None = None,
     fotmob_xg_path: Path | None = None,
     dump_handle: Any = None, done_keys: set | None = None,
+    rating_v2: bool = False,
 ) -> dict[str, Any]:
     history = _load_history(league)
     if not history:
@@ -383,6 +386,11 @@ def backtest_league(
     dated_totals = sorted((d, float(r["home_goals"]) + float(r["away_goals"])) for r in with_result
                           for d in [_as_iso_day(r.get("date"))] if d)
 
+    v2_config = None
+    if rating_v2:
+        from scripts.build_soccer_artifacts import _rating_v2
+        v2_config = _rating_v2(league)
+        print(f"RATING_V2 {league}: {v2_config}", flush=True)
     adapter = build_soccer_simulation_adapter(league)
     model_brier: list[float] = []
     market_brier: list[float] = []
@@ -403,7 +411,9 @@ def backtest_league(
     for day in sorted(by_day):
         if limit is not None and scored >= limit:
             break
-        ratings = compute_team_ratings(team_rows, as_of=day, window=rating_window)
+        # `--rating-v2`: PRODUCTION's RATING V2 config for this league (`build_soccer_artifacts._rating_v2`), so the
+        # A/B runs the code that ships. None for a league V2 does not cover, which is then the original rating.
+        ratings = compute_team_ratings(team_rows, as_of=day, window=rating_window, v2=v2_config)
         # H37 diagnostic: share of each team's in-window rating rows that carry FotMob xG, as of this day.
         if xg_tally is not None:
             _prior = sorted((r for r in team_rows if (_as_iso_day(r.get("date")) or "9999") < day),
@@ -512,6 +522,7 @@ def backtest_league(
                                                    "odds_away": close.get("AvgCA")})
             extra = {
                 "xg_source_arm": "fotmob" if xg_tally is not None else "production",
+                "rating_model": v2_config.label if v2_config is not None else "v1",
                 "rating_xg_share": None if not _xg_share else round(
                     (_xg_share.get(str(row.get("home_team")), 0.0) + _xg_share.get(str(row.get("away_team")), 0.0)) / 2, 4),
                 "model_over25": td.get("over_2_5_probability"),
@@ -611,6 +622,10 @@ def main() -> int:
                         help="write each scored match to --dump-matches immediately (flushed) and RESUME from the rows "
                         "already there; the summary then covers only this run's newly scored matches")
     parser.add_argument("--out", type=Path, default=None)
+    parser.add_argument("--source-root", type=Path, default=None,
+                        help="per-league history root (default <repo>/data/soccer_source)")
+    parser.add_argument("--rating-v2", action="store_true",
+                        help="rate with production's RATING V2 (build_soccer_artifacts._rating_v2); default is the original rating")
     parser.add_argument(
         "--dump-matches",
         type=Path,
@@ -619,6 +634,9 @@ def main() -> int:
         "calibration can be fitted and tested without re-running the simulation",
     )
     args = parser.parse_args()
+    if args.source_root is not None:
+        global SOURCE_ROOT
+        SOURCE_ROOT = args.source_root
 
     dump_handle, done_keys = None, None
     if args.append_dump:
@@ -655,6 +673,7 @@ def main() -> int:
             fotmob_xg_path=args.fotmob_xg,
             dump_handle=dump_handle,
             done_keys=done_keys,
+            rating_v2=args.rating_v2,
         )
         for league in leagues
     ]

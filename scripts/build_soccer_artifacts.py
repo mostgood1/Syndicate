@@ -40,7 +40,9 @@ from syndicate.features.soccer.features.corners_estimator import CORNERS_BASIS
 from syndicate.features.soccer.features.corners_estimator import apply_corners_estimator
 from syndicate.features.soccer.features.lineups import attach_confirmed_starters
 from syndicate.features.soccer.features.loaders import build_soccer_simulation_input
+from syndicate.features.soccer.features.loaders import RatingV2
 from syndicate.features.soccer.features.loaders import compute_team_ratings
+from syndicate.features.soccer.features.loaders import rating_from_raw
 from syndicate.features.soccer.features.market_anchoring import anchor_ratings_to_market
 from syndicate.features.soccer.features.market_odds import attach_market_features
 from syndicate.features.soccer.features.market_odds import attach_market_odds
@@ -58,6 +60,35 @@ from syndicate.features.soccer.ingestion.player_history import fetch_asa_mls_tea
 
 _GOALS_BASED_RATING_LEAGUES = {"eredivisie", "primeira_liga", "championship", "belgian_pro_league"}
 PROMOTED_TEAM_RATING = {"attack_rating": -0.18, "defense_rating": -0.18}
+
+#: RATING V2 (lane `soccer-team-strength`; shipped by user decision 2026-10-19). Recency, a current-season blend,
+#: and shrinkage toward a fitted promoted-club prior, which replaces the hard few-match gate. Measured -0.0019
+#: [-0.0031, -0.0009] 1X2 log loss on 27,285 held-out matches (`findings_2026-10-16_soccer_rating_inputs.md`) and
+#: re-checked through the real SoccerSim before shipping (`findings_2026-10-19_soccer_rating_v2_sim.md`).
+#: ON unless the env says off; "0" / "off" restores the original rating plus the gate exactly. Applied ONLY to the
+#: eight leagues it was measured on. MLS (undated aggregates) and the Championship (never measured) are unchanged.
+_RATING_V2_ENV = "SYNDICATE_SOCCER_RATING_V2"
+#: Fitted promoted-club prior, RAW deviation space (attack, defense): the mean raw x of promoted clubs over their
+#: promotion seasons 2015-2025 (`soccer_team_strength_experiments.TeamStore.promoted_prior(league, 2026)` on the
+#: full production history). The flat prior these replace is -0.3273 / -0.3273 (= -0.18 / 0.55).
+RATING_V2_PROMOTED_PRIOR: dict[str, tuple[float, float]] = {
+    "epl": (-0.2065, -0.1689),
+    "la_liga": (-0.1621, -0.1426),
+    "bundesliga": (-0.2271, -0.1190),
+    "serie_a": (-0.2136, -0.2700),
+    "ligue_1": (-0.1800, -0.1189),
+    "eredivisie": (-0.2359, -0.2178),
+    "primeira_liga": (-0.2151, -0.1439),
+    "belgian_pro_league": (-0.0759, -0.2064),
+}
+
+
+def _rating_v2(league: str) -> RatingV2 | None:
+    """The league's RatingV2 config, or None when V2 is off or the league was never measured."""
+    if str(os.environ.get(_RATING_V2_ENV) or "").strip().lower() in {"0", "false", "off", "no"}:
+        return None
+    prior = RATING_V2_PROMOTED_PRIOR.get(league)
+    return RatingV2(promoted_prior=prior) if prior is not None else None
 _DEFAULT_SIMULATIONS = 400
 
 
@@ -100,13 +131,13 @@ def _load_team_ratings(league: str, source_root: Path, as_of: str) -> dict[str, 
             except (OSError, ValueError):
                 espn_stats = []
         rows = team_rows_from_match_history(match_rows, espn_stats=espn_stats)
-        return compute_team_ratings(rows, as_of=as_of, window=90)
+        return compute_team_ratings(rows, as_of=as_of, window=90, v2=_rating_v2(league))
     history_dir = source_root / league / "team_history"
     frames = [pd.read_csv(path) for path in sorted(history_dir.glob("teams_*.csv"))]
     if not frames:
         raise SystemExit(f"no team history under {history_dir}; run fetch_soccer_history_local.py --kind teams first")
     rows = pd.concat(frames, ignore_index=True).to_dict("records")
-    return compute_team_ratings(rows, as_of=as_of, window=45)
+    return compute_team_ratings(rows, as_of=as_of, window=45, v2=_rating_v2(league))
 
 
 def _current_roster_names(league: str, source_root: Path | None = None) -> set[str]:
@@ -719,7 +750,7 @@ _CURRENT_HISTORY_ENV = "SYNDICATE_SOCCER_CURRENT_HISTORY"
 _FEW_MATCH_GATE = 10
 
 
-def _gate_few_match(ratings: dict[str, dict[str, float]], team_names: list[str]) -> list[str]:
+def _gate_few_match(ratings: dict[str, dict[str, float]], team_names: list[str], league: str | None = None) -> list[str]:
     """A fixture team rated from 1..9 rows gets PROMOTED_TEAM_RATING instead of that rating.
 
     MEASURED 2026-10-07 (lane `soccer-team-history-current-season`, findings 2026-10-06): with current-season
@@ -727,7 +758,12 @@ def _gate_few_match(ratings: dict[str, dict[str, float]], team_names: list[str])
     applies no shrinkage). On n 461 leak-free matches (2025-08..2026-09, nine leagues), rating such sides raw was
     WORSE on 1X2 Brier than this default by +0.0166 [+0.0015, +0.0321]; shrinking toward the default was no
     better than it (+0.0014 [-0.0091, +0.0109]). OFF unless `SYNDICATE_SOCCER_CURRENT_HISTORY` is on. Returns
-    the rating keys it replaced; their `matches` count is kept so the artifact still shows how thin they were."""
+    the rating keys it replaced; their `matches` count is kept so the artifact still shows how thin they were.
+
+    SKIPPED for a RATING V2 league: V2's shrinkage `n / (n + 5)` toward the fitted prior replaces this hard switch
+    (stage 1: C_gate +0.0007 worse than shrinkage at n0 = 5), and gating would overwrite the shrunk rating."""
+    if league is not None and _rating_v2(league) is not None:
+        return []
     if str(os.environ.get(_CURRENT_HISTORY_ENV) or "").strip().lower() not in {"1", "true", "on", "yes"}:
         return []
     gated: list[str] = []
@@ -742,11 +778,17 @@ def _gate_few_match(ratings: dict[str, dict[str, float]], team_names: list[str])
     return gated
 
 
-def _fill_promoted(ratings: dict[str, dict[str, float]], team_names: list[str]) -> list[str]:
+def _fill_promoted(ratings: dict[str, dict[str, float]], team_names: list[str], league: str | None = None) -> list[str]:
+    """A fixture team with NO rating row gets the promoted-club prior: RATING V2's fitted per-league prior when V2
+    applies to `league`, else the flat PROMOTED_TEAM_RATING."""
+    v2 = _rating_v2(league) if league is not None else None
+    fill = (dict(PROMOTED_TEAM_RATING) if v2 is None else
+            {"attack_rating": rating_from_raw(v2.promoted_prior[0]), "defense_rating": rating_from_raw(v2.promoted_prior[1]),
+             "matches": 0.0, "rating_model": v2.label})
     filled: list[str] = []
     for team in team_names:
         if match_team_name(team, list(ratings)) is None:
-            ratings[team] = dict(PROMOTED_TEAM_RATING)
+            ratings[team] = dict(fill)
             filled.append(team)
     return filled
 
@@ -1172,8 +1214,8 @@ def build_artifacts(league: str, iso_date: str, *, source_root: Path, out_root: 
 
     ratings = _load_team_ratings(league, source_root, iso_date)
     team_names = [fixture["home_team"] for fixture in fixtures_raw] + [fixture["away_team"] for fixture in fixtures_raw]
-    promoted = _fill_promoted(ratings, team_names)
-    few_match_gated = _gate_few_match(ratings, team_names)
+    promoted = _fill_promoted(ratings, team_names, league)
+    few_match_gated = _gate_few_match(ratings, team_names, league)
     player_rows = _load_player_rows(league, source_root)
 
     fixtures = [

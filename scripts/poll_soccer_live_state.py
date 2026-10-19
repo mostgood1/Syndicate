@@ -367,7 +367,7 @@ def poll_league(league: str, iso_date: str, *, source_root: Path, out_root: Path
         if has_sim:
             ratings = _load_team_ratings(league, source_root, iso_date)
             team_names = [event["home_team"] for event in live_events] + [event["away_team"] for event in live_events]
-            _fill_promoted(ratings, team_names)
+            _fill_promoted(ratings, team_names, league)
             player_rows = _load_player_rows(league, source_root)
             # The PRE-KICKOFF corners estimate, read once per league tick. `recommendations_<date>.json` is
             # rewritten as matches go pre -> in -> post, so the freeze is what still holds a pregame number

@@ -15,6 +15,7 @@ Turns the ingestion layer's outputs into engine-ready inputs:
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from statistics import mean
 from typing import Any
 
@@ -27,6 +28,65 @@ from syndicate.features.soccer.features.team_names import match_team_name
 
 _RATING_SCALE = 0.55
 _RATING_CAP = 0.35
+
+
+@dataclass(frozen=True)
+class RatingV2:
+    """Rating-input changes measured by lane `soccer-team-strength` stage 1 and shipped by user decision 2026-10-19.
+
+    Evidence: `.syndicate/findings_2026-10-16_soccer_rating_inputs.md`, the CUMULATIVE arm. Over 27,285 leak-free
+    held-out domestic matches (8 leagues, 2016-2026) it beat the shipped rating + few-match gate by -0.0019 1X2 log
+    loss [-0.0031, -0.0009]. Each piece acts on the RAW deviation `x` (before `clamp(0.55*x, +-0.35)`):
+
+    - recency: the window rows are weighted `0.5 ** (age / half_life)`, age 0 = the latest row (the league mean
+      stays unweighted);
+    - current-season blend: `x = (1-b)*x_window + b*x_current`, `b = n_cur / (n_cur + blend_c)`, where `x_current`
+      is the club's unweighted mean over its rows from `current_season`;
+    - shrinkage `n / (n + shrink_n0)` toward 0 (the league mean) for a club with a row from an earlier season,
+      or toward `promoted_prior` (raw space) for one without. This REPLACES the hard few-match gate.
+    """
+
+    half_life: float = 40.0
+    blend_c: float = 40.0
+    shrink_n0: float = 5.0
+    promoted_prior: tuple[float, float] = (-0.18 / _RATING_SCALE, -0.18 / _RATING_SCALE)
+    label: str = "v2_h40_c40_n5"
+
+
+def season_label(day: str) -> int:
+    """July..June season, labelled by its start year (the `season` column of the history files)."""
+    year, month = int(day[:4]), int(day[5:7])
+    return year if month >= 7 else year - 1
+
+
+def rating_from_raw(x: float) -> float:
+    """The shipped transform of a raw deviation: `clamp(0.55 * x, +-0.35)`, 4 dp."""
+    return round(_clamp(x * _RATING_SCALE, -_RATING_CAP, _RATING_CAP), 4)
+
+
+def _v2_raw(rows: list[dict[str, Any]], selected: list[dict[str, Any]], league_mean: float,
+            v2: RatingV2, current_season: int) -> tuple[float, float]:
+    """Raw (x_att, x_def) under RatingV2 for one club. `rows` is every usable row of the club, sorted by day."""
+    n = len(selected)
+    weights = [0.5 ** ((n - 1 - i) / v2.half_life) for i in range(n)]
+    total = sum(weights)
+    m_for = sum(w * float(r["xg_for"]) for w, r in zip(weights, selected)) / total
+    m_against = sum(w * float(r["xg_against"]) for w, r in zip(weights, selected)) / total
+    x = [m_for / league_mean - 1.0, 1.0 - m_against / league_mean]
+
+    def _season(row: dict[str, Any]) -> int | None:
+        value = _safe_float(row.get("season"))
+        return int(value) if value is not None else None
+
+    current = [r for r in rows if _season(r) == current_season]
+    if current:
+        b = len(current) / (len(current) + v2.blend_c)
+        x_cur = [mean(float(r["xg_for"]) for r in current) / league_mean - 1.0,
+                 1.0 - mean(float(r["xg_against"]) for r in current) / league_mean]
+        x = [(1 - b) * x[k] + b * x_cur[k] for k in range(2)]
+    established = any((s := _season(r)) is not None and s < current_season for r in rows)
+    target = (0.0, 0.0) if established else v2.promoted_prior
+    return tuple((n * x[k] + v2.shrink_n0 * target[k]) / (n + v2.shrink_n0) for k in range(2))
 
 
 def _safe_float(value: Any) -> float | None:
@@ -281,6 +341,7 @@ def compute_team_ratings(
     as_of: str,
     window: int | None = None,
     allow_undated: bool = False,
+    v2: RatingV2 | None = None,
 ) -> dict[str, dict[str, float]]:
     """Per-team attack/defense ratings from per-match performance rows.
 
@@ -334,6 +395,12 @@ def compute_team_ratings(
     Drops are counted and printed either way, because a ratings set that
     collapses to empty is otherwise indistinguishable from a league with no
     history.
+
+    ``v2`` (a `RatingV2`) switches attack/defense to the stage-1 rating inputs
+    (recency, current-season blend, shrinkage). None, the default, is the
+    original rating exactly, so every evaluation caller that does not pass it
+    is unchanged. With ``v2`` set, each entry also carries
+    ``rating_model = v2.label``.
     """
     cutoff = _as_iso_day(as_of)
     if not cutoff:
@@ -409,9 +476,13 @@ def compute_team_ratings(
             vals = [v for v in (_safe_float(r.get(key)) for r in selected) if v is not None]
             return round(mean(vals), 4) if vals else None
 
+        if v2 is not None:
+            x_att, x_def = _v2_raw(rows, selected, league_mean, v2, season_label(cutoff))
+        else:
+            x_att, x_def = xg_for / league_mean - 1.0, 1.0 - xg_against / league_mean
         entry: dict[str, float] = {
-            "attack_rating": round(_clamp((xg_for / league_mean - 1.0) * _RATING_SCALE, -_RATING_CAP, _RATING_CAP), 4),
-            "defense_rating": round(_clamp((1.0 - xg_against / league_mean) * _RATING_SCALE, -_RATING_CAP, _RATING_CAP), 4),
+            "attack_rating": rating_from_raw(x_att),
+            "defense_rating": rating_from_raw(x_def),
             "xg_for_per_match": round(xg_for, 4),
             "xg_against_per_match": round(xg_against, 4),
             "ppda": round(mean(ppda_values), 4) if ppda_values else 0.0,
@@ -437,6 +508,8 @@ def compute_team_ratings(
             value = _mean_of(src)
             if value is not None:
                 entry[out_key] = value
+        if v2 is not None:
+            entry["rating_model"] = v2.label
         ratings[team] = entry
     return ratings
 
