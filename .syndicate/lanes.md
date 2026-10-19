@@ -1212,6 +1212,14 @@ death, never life — do not invert it.
 - Verification: pytest on the blend + fit tests incl. a reachability test (flag off = today's raw additive model bit for bit; flag on = market fair for an unfitted cell; a fitted beta>0 cell unchanged either way); the forward verdict line from a fleet ledger dump; switch-on only on the user's decision, then a plan read showing sim_share_of_stake 0.0 on unfitted cells
 - Blocked by: user decision on the global sizing change; the portfolio_commit raw_model / beta seam (lines 761-780) is held by lane published-negative-ev and needs a loan before the flag can be read there
 
+### uefa-market-anchored-ratings — OPEN — opened 2026-10-19 — session 436c79e2-3793-435f-bfe6-20c830515554
+- Goal: todo #699 follow-up: pre-registered test of UEFA ratings anchored to past de-vigged closes (per-club attack/defence corrections on the step-3 model's rates, fit walk-forward to earlier closes), re-running the per-competition gate (anchored-model/close blend vs close); research only, wired into nothing
+- Files: syndicate/features/soccer/uefa_market_anchor.py (NEW), scripts/backtest_uefa_anchored.py (NEW), tests/test_uefa_market_anchor.py (NEW), scripts/backtest_uefa_vs_close.py (a --dump-features option only), .syndicate/findings_2026-10-19_uefa_market_anchored.md (NEW), docs/ai_context/todo.md (#699 section only)
+- Hypothesis: H-ANCHOR: anchoring club ratings to their past closes lets a model/close blend beat the close on held-out UEFA main-draw 1X2
+- Falsification test: registered in findings s1 before any fit: blend - close CI not entirely below 0 for a competition = NO-GO
+- Verification: per-competition verdicts with 95% CIs in the findings file; offline tests pass
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
