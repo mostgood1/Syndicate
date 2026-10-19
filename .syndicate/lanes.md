@@ -1184,6 +1184,7 @@ death, never life — do not invert it.
 - Falsification test: n/a
 - Verification: unit tests incl. off != on and worker-tick reachability; landed on origin/main; fleet ff + live-odds-worker restart behind claim+preflight; EXIT_TICK line on the fleet log with positions>0 quoted>0, and execution_exits.json present with watch rows; counterfactual readout after >= 7 slates
 - Blocked by: none
+- Status 2026-10-19 19:20Z: landed f7d775f9; live-odds-worker restarted onto 94c97011 at 19:19:01Z; PAPER, MET (EXIT_TICK positions=19 quoted=12 venue=ok, deploys.md 19:19:01Z). OPEN for the >= 7-slate counterfactual reading (todo #703). Live NOT armed: LIVE_BLOCKERS + user yes.
 
 ### ev-overstatement-decomp — OPEN — opened 2026-10-19 — session 24ac7737-24a5-43ea-a362-4f52295dba38
 - Goal: A findings file naming, with denominators, the component that inflates claimed ev_pct above ~4% on settled paper venue orders (fleet execution ledger 10-02..10-18, one season phase per cell), plus a proposed engine/EV-stamp change (not a threshold, no sport/market exclusion) opened as its own lane with a pre-registered forward test

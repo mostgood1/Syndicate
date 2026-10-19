@@ -46046,6 +46046,23 @@ were resolved and nine already-closed rows removed from the open tables.
 
 ## In progress
 
+- **#703 — Kalshi EXIT path (sell before settlement): PAPER on the fleet since 2026-10-19 19:19Z; counterfactual reading + live blockers owed `[2026-10-19, lane kalshi-exit-path]`.**
+
+  `syndicate/features/shared/execution_exits.py` runs on live-odds-worker's execution tick (every 300 s). It watches every
+  filled, ungraded Kalshi entry (live + `paper:kalshi`, 3-day lookback) and tracks each one's best NET bid (high-water mark).
+  It books the first trigger per entry as a PAPER exit. Rule: net bid >= entry cost + `SYNDICATE_EXIT_TAKE_PROFIT_MARGIN`
+  (0.08 $/contract, both fees) OR net bid >= raw model probability at entry. Its own doc and key space, so exits never touch
+  entry caps or entry reconciliation. Measured 19:20Z: positions=19 (1 live), quoted 12/12, venue positions read == ledger.
+  - **Owed reading (>= 2026-10-26):** `python scripts/exit_counterfactual_report.py` under live-odds-worker's env: exit vs
+    hold-to-settle by rule / mode / in_play / sport, plus the margin grid. State n and the date count. The paper sample is
+    thin: ~18 open `paper:kalshi` positions per 3 days, mostly NCAAF.
+  - **Before live (`SYNDICATE_EXIT_MODE=live` + `SYNDICATE_EXIT_LIVE_ARMED`):** (a) `venue_settlement` must reflect a sold
+    position. Today it would grade the entry from Kalshi's settlement record without knowing it was sold. (b) The v2 sell
+    body (`reduce_only`, `immediate_or_cancel`) has never been accepted by the venue, so the first live exit must be watched.
+    (c) A user yes.
+  - **v1 limits:** the fair is the PRE-GAME model view, not a live-lens fair; the cadence is 300 s; Polymarket is not built
+    (`ORDER_ACTION_SELL` exists in `polymarket_us_orders.py`).
+
 - **#701 — Per-cell min_ev learning loop: SHADOW shipped (`94c97011`), NOT YET ON THE FLEET; apply is a user decision `[2026-10-19, lane min-ev-tuner-shadow]`.**
 
   `syndicate/features/shared/min_ev_tuner.py` runs once a day (>= 12:00Z) after settlement in refresh-worker's
