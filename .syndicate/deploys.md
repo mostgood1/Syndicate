@@ -51199,3 +51199,41 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - **Memory:** refresh-worker container 17.6% -> 38.1% of 6,144 MB over the first 10 min after the cold start. A watch is armed at >= 75%.
 - **Revert path (unchanged):** a code revert of the flag reader + ff + one claimed refresh-worker TERM; or remove the env line + a full down/up.
 - **Still owed:** 81e81501 (Red Star / Copenhagen) onto the fleet. It sits behind 550a4b20 (venue settlement #703, another lane) on main, and the fleet now runs `--allow-live-execution`. The ff waits for that lane's go-ahead and is needed before the 10-22 kickoff.
+
+
+## 2026-10-19 21:36:25Z (4:36 PM CT) -- FULL FLEET down/up, ff d4837386 -> 854b59ed + `REFRESH_WORKER__SYNDICATE_COMPOUNDING_BANKROLL=shadow` (lane `compounding-bankroll`, session 3927eb2e) -- deploy MET, shadow reading OWED
+- **ask:** the user, in chat: "Yes: fast-forward the fleet to 852583f5 behind deploy_claim + preflight, set SYNDICATE_COMPOUNDING_BANKROLL=shadow on refresh-worker, restart, and read the COMPOUNDING_BANKROLL lines for a day before anything goes on."
+  - Then: "Yes: ff the fleet to 854b59ed instead of 852583f5. It adds 40640a0b (min_ev tuner fix, shadow) and 76ef318c (Kalshi join flag, default off)."
+  - Then: "Yes: carry REFRESH_WORKER__SYNDICATE_KALSHI_JOIN_ALL_GAME_LINES=1 in my down/up, written and logged by the UEFA session...". The UEFA session wrote that line at 19:49:47Z (`056a1cc4`).
+- **sequencing:** waited 60 min after the ceiling lane's refresh-worker respawn (pid 2623735, lstart 20:12:41Z), which itself came 60 min after min-ev-tuner's (19:06:08Z).
+- **claims:** all three acquired 21:13:07Z, holder `compounding-bankroll`. Tokens: refresh-worker cab482385a62cd1a, live-odds-worker fe1975f5caf29d8d, web 30a5f2eea7ff133d.
+- **baseline (21:13:24Z):**
+  - fleet HEAD d4837386, an ancestor of 854b59ed. Both workers live and armed, stamped a6c32498. healthz 200.
+  - env 123 lines: KALSHI_JOIN_ALL_GAME_LINES + STAKED_PROBABILITY_UNFITTED present, COMPOUNDING absent.
+- **ride-alongs d4837386..854b59ed (runtime):**
+  - mine: `venue_capital.py`, `execution_guard.py`, `execution_limits_settings.py`, `venue_balances.py` (comment), `pipeline/portfolio_commit.py` -- all inert unless flagged.
+  - `min_ev_tuner.py` (40640a0b, shadow).
+  - `venue_odds_loop.py` (76ef318c) -- **LIVE via the UEFA lane's env line**.
+  - `layer2_board.py` -- comment only (c9841a64).
+  - basketball `smart_sim.py` (78f73023) -- inert: `skip_outs_penalties` is absent from the fleet's `nba_sim_total_inputs.json`.
+  - vendor/ untouched.
+- **NAMED, CAPTURED BUT UNREAD:** `REFRESH_WORKER__SYNDICATE_STAKED_PROBABILITY_UNFITTED=market`, written by the user 21:01:01Z (#704). Its reader `bd9b0571` is NOT in 854b59ed. **It switches market-fair staking ON at the first refresh-worker start on a HEAD containing bd9b0571 -- list it as a ride-along then.**
+- **live games:** ~4 soccer matches were live (FEW live games, not none). The 23Z+ NHL/NBA/MNF slate had not started.
+- **timeline (UTC):**
+  - The drain from a Windows shell REFUSED (rc=2, no keyvalue env); nothing was drained.
+  - Re-run inside WSL with owner `compounding-bankroll` from 21:14:45Z. It waited out an MLB sim, a board build and odds/soccer children. **CLEAR 21:35:44Z.**
+  - Marker set; HEAD guard d4837386 ok; `--ff-only 854b59ed` clean. Env backup `.bak-compounding-20261019T213630Z`; 123 -> 126 lines, 0 removed.
+  - `down` 21:36:30 -> 21:37:13. `Start-ScheduledTask SyndicateLocalProduction` 21:37:22. **healthz 200 at 21:37:28** (web out ~75 s).
+  - Marker cleared 21:38:16. `--undrain` -> `DRAIN_CLEARED owner=compounding-bankroll`.
+- **verify (21:37:48Z, /proc environ, allowlisted keys, values truncated):**
+  - supervisor `up --allow-live-execution` (pid 2661756).
+  - refresh-worker pid 2661823 (lstart 21:37:27Z): `RENDER_GIT_COMMIT=854b59ed`, MODE=live, LIVE_ARMED=1, `SYNDICATE_COMPOUNDING_BANKROLL=shadow`, `SYNDICATE_KALSHI_JOIN_ALL_GAME_LINES=1`, `SYNDICATE_STAKED_PROBABILITY_UNFITTED=market` (unread).
+  - live-odds-worker pid 2661824: 854b59ed, MODE=live, LIVE_ARMED=1.
+  - `SYNDICATE_EXECUTION_BALANCE_CAPS` absent everywhere (caps unchanged, by design).
+- **expect / reading OWED:**
+  - Every live-plan build logs `[portfolio_commit] COMPOUNDING_BANKROLL ... mode=shadow` per venue.
+  - Staked dollars and positions placed are UNCHANGED (shadow); `staked_compounded` sits below `staked_fixed`.
+  - Kalshi bankrolls equal a shard's cash; Polymarket's is buyingPower minus the pending deposit.
+  - No `compounding_bankroll_unknown` refusal (shadow does not refuse).
+  - Note: no live-plan build had run by 21:51:49Z (cold start; the last pre-drain build was 21:14:06Z).
+- **rollback:** remove the `REFRESH_WORKER__SYNDICATE_COMPOUNDING_BANKROLL` line + full down/up (env is captured at `up`), or a code revert + one refresh-worker TERM. Shadow places nothing different either way.
