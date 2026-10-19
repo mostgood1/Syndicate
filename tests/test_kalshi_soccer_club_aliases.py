@@ -71,13 +71,23 @@ class TestAgainstTheRealRosters:
         assert canonical_team("soccer", kalshi_name)
 
     @pytest.mark.parametrize("refused", [
-        "Bilbao", "St. Truidense", "FC Koln", "M gladbach", "Enschede",
+        "Bilbao", "FC Koln", "M gladbach",
         "Los Angeles G", "Los Angeles F",
     ])
     def test_a_club_we_could_not_force_still_refuses(self, refused):
         """None is the correct answer for an unproven pairing. Guessing here is
         how a bet reaches the wrong team."""
         assert canonical_team("soccer", refused) is None
+
+    @pytest.mark.parametrize("name,expected", [
+        # PROVEN 2026-10-19 (f39133f8, lane uefa-oddsapi-club-aliases, owner-approved): this
+        # method could not supply the evidence, exact UEFA fixture pairing did --
+        # Kalshi uecl 2026-10-22 Lincoln Red Imps v FC Twente / FC Midtjylland v Sint-Truidense.
+        ("Enschede", "fc twente"),
+        ("St. Truidense", "sint truidense"),
+    ])
+    def test_a_name_later_proven_by_fixture_pairing_resolves(self, name, expected):
+        assert canonical_team("soccer", name) == expected
 
     @pytest.mark.parametrize("name,expected", [
         # The cross-league code collisions, resolved by NAME and each landing on

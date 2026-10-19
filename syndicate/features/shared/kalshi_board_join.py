@@ -489,6 +489,62 @@ def build_club_code_names(
     return out
 
 
+def _event_segment(ticker: Any) -> str:
+    """`KXUELGAME-26OCT22OFILEV-LEV` -> `26OCT22OFILEV`: the part every market of one game shares.
+
+    The series prefix differs by market type (`KXUELGAME`, `KXUELTOTAL`) and the
+    suffix by leg, but the middle segment -- date + club blob -- is the event. With
+    the series FAMILY it keys one game across all of its markets.
+    """
+    parts = str(ticker or "").strip().upper().split("-")
+    return parts[1] if len(parts) >= 3 else ""
+
+
+def build_event_club_code_names(
+    markets: Sequence[Mapping[str, Any]],
+) -> dict[tuple[str, str], dict[str, str]]:
+    """`{(series_family, event_segment): {CODE: "Club Name"}}`, per EVENT.
+
+    The competition-wide map (`build_club_code_names`) must DROP a code two clubs
+    share inside one competition -- KXUEL gives `LEV` to Leverkusen AND Levski and
+    `CEL` to Celtic AND Celje -- and `_resolve_event` then refuses or, worse, the
+    global alias map reads `LEV` as Levante. But every `KX*GAME` event lists its own
+    legs: `KXUELGAME-26OCT22OFILEV-LEV` is titled "Leverkusen wins", and
+    `KXUELGAME-26OCT22VIKLEV-LEV` "Levski Sofia wins". Inside ONE event the code has
+    exactly one club, read from the venue, so the collision is resolved, not guessed.
+
+    Measured 2026-10-19 (lane `kalshi-event-scoped-codes`): four KXUEL events
+    (OFILEV, VIKLEV, CELRCC, CELRBS) were unresolvable for exactly this reason while
+    each event's own markets named both clubs. A code given two names within one
+    event is dropped here too.
+    """
+    found: dict[tuple[str, str], dict[str, set[str]]] = {}
+    for market in markets or ():
+        if not isinstance(market, Mapping):
+            continue
+        ticker = str(market.get("ticker") or "").strip().upper()
+        segment = _event_segment(ticker)
+        if not segment:
+            continue
+        code = ticker.rsplit("-", 1)[-1].strip()
+        if not code or code == "TIE" or not code.isalnum():
+            continue
+        title_match = _WINS_TITLE.match(str(market.get("title") or ""))
+        if not title_match:
+            continue
+        name = title_match.group("team").strip()
+        family = _series_family(market.get("series"))
+        if not name or not family:
+            continue
+        found.setdefault((family, segment), {}).setdefault(code, set()).add(name)
+    out: dict[tuple[str, str], dict[str, str]] = {}
+    for key, codes in found.items():
+        resolved = {code: next(iter(names)) for code, names in codes.items() if len(names) == 1}
+        if resolved:
+            out[key] = resolved
+    return out
+
+
 def _resolve_event(
     market: Mapping[str, Any],
     board_rows: Sequence[Mapping[str, Any]],
@@ -497,6 +553,7 @@ def _resolve_event(
     games: Sequence[Mapping[str, Any]] | None = None,
     memo: dict | None = None,
     collided: Mapping[str, set[str]] | None = None,
+    event_names: Mapping[tuple[str, str], Mapping[str, str]] | None = None,
 ) -> dict[str, Any]:
     """Which of our games this game-line market belongs to.
 
@@ -512,7 +569,13 @@ def _resolve_event(
     re-matching the same event blob for every market of one game: py-spy on the
     fleet 2026-10-07 had that at 96% of a ~500 s join. The answer is a pure
     function of (blob, series family, sport, ticker start) over a fixed board,
-    so the memo hands back a copy of the identical result."""
+    so the memo hands back a copy of the identical result.
+
+    `event_names` (from `build_event_club_code_names`): the event's OWN code -> club
+    pairing, applied ONLY to codes in `collided` for this family. Such a code is named
+    from the event and exempt from the refusal -- the venue has said which club it is
+    in THIS game -- and the resolved game must then contain every club so named.
+    Events with no collided code, and `event_names=None`, resolve byte-identically."""
     from syndicate.features.shared.kalshi_catalogue import (
         event_blob_from_ticker,
         event_start_from_ticker,
@@ -529,7 +592,12 @@ def _resolve_event(
     sport = sport_for_series(market.get("series"))
     family = _series_family(market.get("series"))
     commence_hint = event_start_from_ticker(market.get("ticker"))
-    key = (blob, family, sport, repr(commence_hint))
+    family_collided = (collided or {}).get(family) if collided else None
+    # Only the codes this competition gives to two clubs are settled from the event;
+    # every other code resolves exactly as before (byte-identical).
+    event_own = (event_names or {}).get((family, _event_segment(market.get("ticker")))) if event_names else None
+    own_names = {c: n for c, n in (event_own or {}).items() if c in (family_collided or ())} or None
+    key = (blob, family, sport, repr(commence_hint), tuple(sorted(own_names.items())) if own_names else None)
     if memo is not None and key in memo:
         return dict(memo[key])
     if games is None:
@@ -538,6 +606,8 @@ def _resolve_event(
     # every sport that does not supply one, which leaves those resolutions
     # byte-identical to before.
     family_names = (code_names or {}).get(family) if code_names else None
+    if own_names:
+        family_names = {**(family_names or {}), **own_names}
     result = match_event_blob(
         blob,
         [dict(g) for g in games],
@@ -549,11 +619,28 @@ def _resolve_event(
         commence_hint=commence_hint,
     )
     result.setdefault("sport", sport)
-    family_collided = (collided or {}).get(family) if collided else None
+    if own_names and result.get("status") == "ok":
+        # THE EVENT NAMED ITS CLUBS, SO THE MATCH MUST CONTAIN THEM. `match_event_blob`
+        # still tries each raw code beside its name, and the global map reads a raw
+        # `CEL` as Celta Vigo: without this check, lifting the collision refusal below
+        # would let a Celtic contract land on a Celta Vigo game -- the 2026-10-15 defect
+        # `build_club_code_collisions` exists for. Refuse rather than trust the code.
+        from syndicate.features.shared.kalshi_catalogue import club_key
+
+        matched = next((g for g in games if str(g.get("event_id") or "") == str(result.get("event_id") or "")), None)
+        game_clubs = {club_key(sport, matched.get(side)) for side in ("home_team", "away_team")} if matched else set()
+        named = {club_key(sport, name) for name in own_names.values()}
+        if None in named or not named <= game_clubs:
+            result = {
+                "status": "ambiguous",
+                "reason": "event_names_disagree_with_game",
+                "blob": blob,
+                "sport": sport,
+            }
     if family_collided and result.get("status") == "ok":
         upper = str(blob).upper()
         ends = {upper[:n] for n in (2, 3, 4)} | {upper[-n:] for n in (2, 3, 4)}
-        hit = sorted(ends & set(family_collided))
+        hit = sorted((ends & set(family_collided)) - set(own_names or ()))
         if hit:
             result = {
                 "status": "ambiguous",
@@ -1409,6 +1496,9 @@ def join_kalshi_to_board(
     # because four measured codes mean different clubs in different leagues.
     club_code_names = build_club_code_names(kalshi_markets)
     club_code_collisions = build_club_code_collisions(kalshi_markets)
+    # ...and each EVENT's own pairing, which settles a code the competition shares
+    # between two clubs (KXUEL `LEV`, `CEL`). See `build_event_club_code_names`.
+    club_code_event_names = build_event_club_code_names(kalshi_markets)
     # The game-line resolver's inputs, built ONCE: `board_rows` is fixed from here
     # on, so its distinct games are too, and every market of one game shares a
     # blob (see `_resolve_event`).
@@ -1590,6 +1680,7 @@ def join_kalshi_to_board(
                 games=resolve_games,
                 memo=resolve_memo,
                 collided=club_code_collisions,
+                event_names=club_code_event_names,
             )
             status = str(resolution.get("status") or "")
             if resolution.get("matched_by") == "commence_time":
@@ -1907,7 +1998,8 @@ def join_kalshi_to_board(
         _dh_number = _split_doubleheader(event_blob_from_ticker(market.get("ticker")) or "")[1]
         if len(row_events) > 1 or _dh_number is not None:
             resolution = _resolve_event(
-                market, rows, club_code_names, collided=club_code_collisions
+                market, rows, club_code_names, collided=club_code_collisions,
+                event_names=club_code_event_names,
             )
             wanted_event = str(resolution.get("event_id") or "")
             if str(resolution.get("status") or "") != "ok" or not wanted_event:

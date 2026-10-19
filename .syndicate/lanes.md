@@ -1133,6 +1133,15 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: MET — owner_liveness.py --idle-min 240 read 1 SAFE of 13 CLOSED; moved `wnba-availability-recency-tune` (owner 99686b8c idle ~69h, block lastmod ~69h) to lanes_closed.md with 1 pointer. 12 WAIT (live owners / no session id); detail in log/2026-10-19.md.
 
+### kalshi-event-scoped-codes — CLOSED 2026-10-19 (GOAL MET) — opened 2026-10-19 — session 436c79e2-3793-435f-bfe6-20c830515554
+- **GOAL VERDICT:** Goal (verbatim): "Kalshi game-line markets whose club code collides inside a series family (KXUEL LEV = Leverkusen/Levski, CEL = Celtic/Celje) resolve to their fixture via the event's own '-CODE' + '<Club> wins' markets instead of being refused or mis-resolved through the global map; byte-identical when no event names apply; verified by hermetic tests and a before/after replay of join_kalshi_to_board on fleet inputs" -- **GOAL: MET** -- Verification ran: 9 new hermetic tests pass (each collided event fails without the change, off != on; the Celtic-on-Celta guard still refuses), the Kalshi suites 926 + 56 pass. Fleet replay (markets 17:27:55Z, shortlists 10-19..10-21): matches 578->586 / 451->459 / 505->511, **22 added, 0 removed, 0 non-UEFA added**, UEL fixtures matched 5->9 / 6->10 / 7->10; OFILEV, VIKLEV, CELRCC, CELRBS each on their own fixture. NOT on the fleet (needs a fleet ff + restart; batch).
+- Goal: Kalshi game-line markets whose club code collides inside a series family (KXUEL LEV = Leverkusen/Levski, CEL = Celtic/Celje) resolve to their fixture via the event's own '-CODE' + '<Club> wins' markets instead of being refused or mis-resolved through the global map; byte-identical when no event names apply; verified by hermetic tests and a before/after replay of join_kalshi_to_board on fleet inputs
+- Files: syndicate/features/shared/kalshi_board_join.py (event-scoped code names: new build_event_club_code_names + the _resolve_event event_names parameter + its two call sites in join_kalshi_to_board section only), tests/test_kalshi_event_scoped_codes.py (NEW), tests/test_kalshi_soccer_club_aliases.py (the refused-names parametrize only: Enschede / St. Truidense moved to a resolved test after f39133f8)
+- Hypothesis: OFILEV/VIKLEV/CELRCC/CELRBS fail because the collided family code is dropped and falls to the global alias map (LEV -> levante); the event's own markets name the club
+- Falsification test: after the change the four events still do not resolve on the fleet replay, or any previously matched market changes
+- Verification: pytest tests/test_kalshi_event_scoped_codes.py + existing kalshi join tests pass; fleet replay before/after: matched UEFA fixtures per day and the 4 events, plus a diff of every non-UEFA match (must be 0 changed)
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
