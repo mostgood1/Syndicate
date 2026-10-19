@@ -51094,3 +51094,16 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - **SURPRISE read off the verify line: `base=0.0`.** refresh-worker carries `SYNDICATE_PORTFOLIO_MIN_EV_PCT=0` (user decision 2026-09-16), not the 2.0 default. Anchored there, the tuner's band was empty by construction. Fixed in `40640a0b` (band anchored at the cell's effective cut, floor 0.0), which is on main but NOT loaded. It loads at the next refresh-worker restart (the compounding-bankroll lane plans an ff to origin/main + full down/up >= 20:06Z). Tomorrow's 12Z run is the first that can use it.
 - **released:** refresh-worker + web claims, by token, after this entry.
 - **owed:** 7 daily readouts (`MIN_EV_TUNER` line + `min_ev_tuner_readout.py state` inside WSL with the worker state env). First readout with 40640a0b loaded: confirm `effective_cut_pct` is present and bands are no longer `[0.0, 1.0]`.
+
+
+## 2026-10-19 19:39:17Z -- READING: Fix A (71631544) on the SERVED grid -- **MET** (lane `kalshi-event-scoped-codes`, session 436c79e2)
+- **Loaded by other lanes' restarts, not mine:** refresh-worker 19:06:08Z (min-ev-tuner-shadow, ff -> 94c97011) and live-odds-worker 19:19:11Z (kalshi-exit-path). Both started after 71631544 reached the checkout (17:38:24Z); fleet HEAD 94c97011 contains it.
+- **Instrument:** `reading2.sh` (book grid h2h + totals, generated 19:35:35Z), UEFA fixtures with a Kalshi quote.
+- **Before** (18:44Z, pre-load) -> **after:** UCL 17 -> 17; **UEL 12 -> 14** (h2h 6 -> 7); UECL 14 -> 14 (of 18 each).
+- **The four target fixtures:**
+  - Celtic v Celta Vigo [totals] -> [totals];
+  - **NK Celje v Salzburg [] -> [totals]**;
+  - OFI Crete v Bayer Leverkusen [totals] -> [totals];
+  - **Viktoria Plzen v Levski Sofia [] -> [h2h, totals]**.
+  - All four now carry a Kalshi quote. The h2h gain is limited by the shortlist (cause B); see `SYNDICATE_KALSHI_JOIN_ALL_GAME_LINES`.
+- The scheduled re-read `uefa-kalshi-join-reread` was disabled, because this reading discharges it.
