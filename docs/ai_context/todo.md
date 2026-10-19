@@ -157,8 +157,7 @@ playoffs 14, state from P2's `LiveGameState`, anchors from production's smart-si
    `wnba/live_lens.py` is lane `nba-live-tick-native`'s faithful port; live props stay on that tick.
 2. DONE 2026-10-16: backtest gate PASSED -- native vs linear, regular season, ML Brier end Q2 -0.0115
    [-0.017, -0.005], end Q3 -0.0085 [-0.014, -0.003], over end Q3 -0.0058 [-0.011, -0.001]; nothing worse.
-3. After `nba-live-tick-native` lands: the plan's end-state grep, WIDENED to catch `importlib`-by-name loads
-   and `scripts/`, returns no vendored import on the WNBA live or sim path.
+3. DONE 2026-10-19 (scheduled task wnba-p5-end-state-check, origin/main 311d64b7): the widened end-state check PASSED. An AST scan with positive controls found no runtime vendored import or load on the WNBA live or sim path. `_load_source_app` is deleted (b61c7b52), and 4 inert `sys.path.insert(<source_root>/src)` lines in basketball_props_{predictions,edges}.py are named. Table: findings_2026-10-09_wnba_live_vendored_inventory.md "END-STATE CHECK (2026-10-19)".
 4. **Before / at the 2027 opener (May 2027), USER DECISIONS:** (a) turn `SYNDICATE_WNBA_LIVE_RESIM` on for the
    refresh-worker AND web (behind the deploy locks); (b) re-decide the availability rule (K=1 kept 2026-10-16;
    variants measured in findings_2026-10-14_wnba_availability_recency_tune.md). Then on the local fleet, for an

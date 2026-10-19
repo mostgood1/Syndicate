@@ -287,3 +287,49 @@ tick at `wnba/live_lens.py:65` and the linear `_wnba_live_*` lens, plus the gate
 NOT done by this lane, by decision: the vendored tick in `wnba/live_lens.py` (lane `nba-live-tick-native`'s port);
 live props from the re-sim (no WNBA live prop line was ever captured to grade one). Inert until the switch is set:
 no WNBA games until May 2027, and the switch is a user decision (todo #694 step 4).
+
+## END-STATE CHECK (2026-10-19)
+
+Scheduled task `wnba-p5-end-state-check`, todo #694 step 3, run 2026-10-19T16:08Z against origin/main `311d64b7`.
+**Verdict: PASS** -- no runtime vendored import or load on the WNBA live or sim path.
+
+The precondition held: `syndicate/features/wnba/live_lens.py::_run_wnba_live_lens_tick` now imports
+`syndicate.features.wnba.live_tick.tick._live_lens_tick_payload` (commit 74a16106, lane `nba-live-tick-native`);
+`vendor.wnba_betting_repo` appears in it only in the docstring.
+
+**Method (widened, per "Two blind spots").** (a) An AST scan, not a name grep, of `syndicate/features/wnba/`,
+`syndicate/features/basketball_engine/`, `syndicate/features/shared/{basketball*,wnba*,live_lens_loop,live_gameline_join}.py`
+(110 files) for: imports of modules starting `vendor` / `wnba_betting` / `nba_betting`; calls to `importlib.import_module`,
+`spec_from_file_location`, `sys.path.insert/append`, `__import__`; non-docstring string constants containing `vendor/`,
+`vendor\` or `_betting_repo`. Plus a text grep for `"vendor"` path parts and `betting_repo` (catches
+`os.path.join("vendor", ...)`, which the string rule cannot).
+**Positive controls:** a planted file with all five forms -> 5 hits; `vendor/wnba_betting_repo/app.py` -> 46 hits.
+The app.py control first returned PARSE_ERROR: **a UTF-8 BOM makes `ast.parse` fail, so a scanner that reads with
+`utf-8` is blind to BOM files** -- `wnba/recon_tools/build_live_player_lens_tuning.py` was one. Re-run with `utf-8-sig`;
+every number here is from that run. (b) `scripts/refresh_wnba_oddsapi_props.py` scanned the same way.
+
+| hit | kind | what it loads | path | runtime vendored? |
+|---|---|---|---|---|
+| `shared/basketball_boxscores_history.py:54,184,301` | `importlib.import_module` | `syndicate.features.shared.basketball_props_smart_sim` | sim inputs (box-score history) | no |
+| `shared/basketball_boxscores_history.py:376` | `__import__` | `os` | sim inputs | no |
+| `shared/basketball_props_predictions.py:158,202,434` | `sys.path.insert(<source_root>/src)` | nothing: no `wnba_betting`/`nba_betting` import follows anywhere in scope | pregame props (outside live; sim-adjacent) | no -- inert residue, named |
+| `shared/basketball_props_predictions.py:272` | `__import__` | `json` | pregame props | no |
+| `shared/basketball_props_edges.py:672` | `sys.path.insert(<source_root>/src)` | nothing (as above) | pregame props edges (outside) | no -- inert residue, named |
+| `scripts/refresh_wnba_oddsapi_props.py:26` | `sys.path.insert` | REPO_ROOT | refresh (outside) | no |
+| `scripts/refresh_wnba_oddsapi_props.py:5490` | `spec_from_file_location` | `syndicate/features/wnba/recon_tools/*.py` (Syndicate copies) | refresh (outside) | no |
+| `scripts/refresh_wnba_oddsapi_props.py:6479` | string | the refusal message for a `vendor/` `--source-root` | refresh (outside) | no |
+| `shared/wnba_card_provenance.py:43` | `VENDOR = "vendor"` | a provenance label | board | no |
+
+Every other match is a provenance docstring/comment (`Source: vendor/... (sha256 ...)` headers in `wnba/live_tick/`,
+`wnba/source_cli/`, `basketball_engine/orchestrator/`). **`wnba/live_tick/` (the ported tick) has zero hits.**
+
+**(b) `_load_source_app`: no call sites remain.** Neither `_load_source_app` nor `_source_app_fallback_enabled` exists
+in the script; deleted in b61c7b52 ("delete the vendored source-app fallback"). There is therefore no gated-off
+fallback to list. The script's `predict-date` runs `python -m syndicate.features.wnba.source_cli.cli`, and the games
+history seed is `syndicate/features/wnba/seed_data/games_nba_api.csv` -- both in-repo.
+
+**Named, not blocking:** the four `sys.path.insert(<source_root>/src)` lines are dead residue of the vendored props
+CLI (they add a path nothing imports from). Removing them is a cleanup for the props lane, not P5.
+
+Not covered: `vendor/` data files read by a runtime path via a computed path (only literal path strings are caught);
+NBA's own live/sim path (out of scope for P5).
