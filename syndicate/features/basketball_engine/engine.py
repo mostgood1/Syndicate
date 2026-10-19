@@ -162,6 +162,21 @@ class EventSimConfig:
     # Its twin for two-point attempts (R2-c step 2, pre-registered d7106013): the sim takes ~half the real two-shot
     # trips, so the composition is re-fitted jointly. 1.0 = off (byte-identical).
     foul_2pa_mult: float = 1.0
+    # COHERENT SHOOTING-FOUL MODEL (round 2 R2-c', pre-registered 13db6520). "legacy" (default) = today. "coherent":
+    # the make probability is defined on ALL attempts, de-netted from the recorded prior (real FGA exclude fouled
+    # misses, so a recorded p becomes q = p(1-b)/(1-p.b)); a made shot is an and-one with P = a x r, a miss is fouled
+    # with P = b x r (an FT trip, not an FGA); r = team factor x shooter FT-rate multiplier. The legacy single foul
+    # draw (0.32 / 0.70) and foul_3pa/2pa_mult are bypassed. League rates on all attempts, NBA 2025-26 FIT (816 games):
+    # P(and-one | made 2) .0776, P(fouled | missed 2) .2417, P(and-one | made 3) .0090, P(fouled | missed 3) .0161.
+    shooting_foul_model: str = "legacy"
+    sf_a2: float = 0.0776
+    sf_b2: float = 0.2417
+    sf_a3: float = 0.0090
+    sf_b3: float = 0.0161
+    # League FTA/FGA the team factor is relative to (NBA 2025-26 FIT: 22.69 / 89.29). The team's own ratio comes from
+    # its players' per-minute priors x minutes, UNclipped (the legacy foul_per_fga is clipped at 0.20, which most teams
+    # hit -- measured 2026-10-19: normalising that by base_shooting_foul_per_fga inflated every trip ~1.3-1.7x).
+    sf_team_ref: float = 0.2541
 
     # Outcome priors (fallbacks when player priors are missing)
     base_tov_per_poss: float = 0.125
@@ -465,6 +480,26 @@ def _player_pct(players: pd.DataFrame, made_pm: str, att_pm: str, default: float
 # The vendored module switches (SHOOTER_FT_RATE, FOULED_MISS_NOT_FGA, EXACT_TARGET_CALIBRATION, TOV_PER_ATTEMPT,
 # PLAYER_REBOUND_CREDIT and its credits, BLOCK_MODE, LEAGUE_BLOCKS_PER_MISSED_2PA, BLOCK_RATE_ASSUMED_FG3_PCT,
 # BLOCK_ALLOC_BY_RATE / _FLOOR_PM) are LeagueParams fields now; see league.py for each one's provenance.
+
+
+def _sf_denet(p: float, b: float) -> float:
+    """The make probability on ALL attempts from a recorded rate `p` (fouled misses excluded) and fouled-miss rate `b`."""
+    p = float(np.clip(p, 0.0, 0.99))
+    b = float(np.clip(b, 0.0, 0.95))
+    return float(p * (1.0 - b) / max(1e-6, 1.0 - p * b))
+
+
+def _coherent_points_per_possession(p_tov: float, p3: float, q2: float, q3: float, a2: float, b2: float, a3: float, b3: float, ft: float, oreb: float, eff: float) -> float:
+    """`shooting_foul_model="coherent"`: expected points per team possession, the loop's rules (q on all attempts)."""
+    t = float(np.clip(p_tov, 0.0, 0.6))
+    s3 = float(np.clip(p3, 0.0, 1.0))
+    m2 = float(np.clip(q2 * eff, 0.05, 0.95))
+    m3 = float(np.clip(q3 * eff, 0.05, 0.95))
+    ftp = float(np.clip(ft * eff, 0.45, 0.95))
+    o = float(np.clip(oreb, 0.05, 0.55))
+    pts = (1.0 - s3) * (m2 * 2.0 + m2 * a2 * ftp + (1.0 - m2) * b2 * 2.0 * ftp)         + s3 * (m3 * 3.0 + m3 * a3 * ftp + (1.0 - m3) * b3 * 3.0 * ftp)
+    cont = (1.0 - t) * ((1.0 - s3) * (1.0 - m2) * (1.0 - b2) + s3 * (1.0 - m3) * (1.0 - b3)) * o
+    return float((1.0 - t) * pts * (1.0 + cont))
 
 
 def _quarter_field(qr: Any, key: str, default: Any = None) -> Any:
@@ -946,6 +981,22 @@ def simulate_pbp_game_boxscore(
         a_rates["foul_per_fga"] = float(np.clip(float(a_rates.get("foul_per_fga", cfg.base_shooting_foul_per_fga)) * foul_mult_a, 0.03, 0.35))
     except Exception:
         pass
+    # `shooting_foul_model` (R2-c'): bound once per call; "legacy" leaves every path below untouched.
+    sf_coherent = str(getattr(cfg, "shooting_foul_model", "legacy") or "legacy").strip().lower() == "coherent"
+    sf_a2, sf_b2 = float(getattr(cfg, "sf_a2", 0.0776)), float(getattr(cfg, "sf_b2", 0.2417))
+    sf_a3, sf_b3 = float(getattr(cfg, "sf_a3", 0.0090)), float(getattr(cfg, "sf_b3", 0.0161))
+    sf_ref = float(getattr(cfg, "sf_team_ref", 0.2541) or 0.2541)
+
+    def _sf_team_factor(players: pd.DataFrame, mins: np.ndarray, foul_mult: float) -> float:
+        m = np.maximum(0.0, np.where(np.isfinite(mins), mins, 0.0))
+        fta = float(np.nansum(np.maximum(0.0, _safe_series(players, "_prior_fta_pm").to_numpy(dtype=float)) * m))
+        fga = float(np.nansum(np.maximum(0.0, _safe_series(players, "_prior_fga_pm").to_numpy(dtype=float)) * m))
+        ratio = fta / fga if fga > 0 else sf_ref
+        return float(np.clip(ratio / sf_ref * float(foul_mult), 0.6, 1.6))
+
+    sf_team_r_h = _sf_team_factor(home_players, h_mins, foul_mult_h) if sf_coherent else 1.0
+    sf_team_r_a = _sf_team_factor(away_players, a_mins, foul_mult_a) if sf_coherent else 1.0
+    sf_a = sf_b = 0.0
 
     # Player shooting pcts
     h_fg_pct = _player_pct(home_players, "_prior_fgm_pm", "_prior_fga_pm", default=0.46, lo=0.25, hi=0.75)
@@ -982,15 +1033,22 @@ def simulate_pbp_game_boxscore(
                 share = _loop_shot_share(players, mins, "_prior_fga_pm")
                 share3 = _loop_shot_share(players, mins, "_prior_threes_att_pm")
                 foul_share = share * (np.asarray(ftm_v, dtype=float) if SHOOTER_FT_RATE else 1.0)
-                iters = _iterations_per_possession(
-                    p_tov=float(rates["p_tov"]),
-                    p3=float(rates["p3"]),
-                    fg2=float(np.sum(np.asarray(fg_v, dtype=float) * share)),
-                    fg3=float(np.sum(np.asarray(fg3_v, dtype=float) * share3)),
-                    foul=float(rates["foul_per_fga"]) * float(np.sum(foul_share)) * float(getattr(cfg, "foul_2pa_mult", 1.0)),
-                    oreb=float(cfg.base_oreb_rate) * float(oreb_m),
-                    foul3_mult=float(getattr(cfg, "foul_3pa_mult", 1.0)) / float(getattr(cfg, "foul_2pa_mult", 1.0) or 1.0),
-                )
+                if sf_coherent:
+                    _r = sf_team_r_h if rates is h_rates else sf_team_r_a
+                    _q2 = _sf_denet(float(np.sum(np.asarray(fg_v, dtype=float) * share)), sf_b2 * _r)
+                    _q3 = _sf_denet(float(np.sum(np.asarray(fg3_v, dtype=float) * share3)), sf_b3 * _r)
+                    _t, _s3 = float(np.clip(rates["p_tov"], 0.0, 0.6)), float(np.clip(rates["p3"], 0.0, 1.0))
+                    iters = 1.0 + (1.0 - _t) * ((1.0 - _s3) * (1.0 - _q2) * (1.0 - sf_b2 * _r) + _s3 * (1.0 - _q3) * (1.0 - sf_b3 * _r))                         * float(np.clip(float(cfg.base_oreb_rate) * float(oreb_m), 0.05, 0.55))
+                else:
+                    iters = _iterations_per_possession(
+                        p_tov=float(rates["p_tov"]),
+                        p3=float(rates["p3"]),
+                        fg2=float(np.sum(np.asarray(fg_v, dtype=float) * share)),
+                        fg3=float(np.sum(np.asarray(fg3_v, dtype=float) * share3)),
+                        foul=float(rates["foul_per_fga"]) * float(np.sum(foul_share)) * float(getattr(cfg, "foul_2pa_mult", 1.0)),
+                        oreb=float(cfg.base_oreb_rate) * float(oreb_m),
+                        foul3_mult=float(getattr(cfg, "foul_3pa_mult", 1.0)) / float(getattr(cfg, "foul_2pa_mult", 1.0) or 1.0),
+                    )
                 rates["p_tov"] = float(rates["p_tov"]) / max(1.0, iters)
         except Exception:
             pass
@@ -1069,20 +1127,49 @@ def simulate_pbp_game_boxscore(
                 tpp_eff = float(tpp)
                 if sv_eg_pts > 0.0:
                     tpp_eff = max(0.01, tpp_eff - sv_eg_pts / poss)
-                solved = _solve_eff_mult(
-                    tpp_eff,
-                    p_tov=float(rates["p_tov"]),
-                    p3=float(rates["p3"]),
-                    # 2PA shooters are picked by TOTAL FGA usage in the loop.
-                    fg2=_team_avg(fg2v, shot_share, 0.50),
-                    fg3=_vol_avg(fg3v, players, mins, ("_prior_threes_att_pm",), 0.34),
-                    foul=float(rates["foul_per_fga"]) * float(foul_share.sum()) * float(getattr(cfg, "foul_2pa_mult", 1.0)),
-                    ft=_team_avg(ftv, foul_share, 0.78),
-                    oreb=float(cfg.base_oreb_rate) * float(oreb_m),
-                    bonus_trip_share=sv_bonus_share,
-                    bonus_ft=(_team_avg(ftv, _loop_shot_share(players, mins, "_prior_fta_pm"), 0.78) if sv_bonus_share > 0.0 else None),
-                    foul3_mult=float(getattr(cfg, "foul_3pa_mult", 1.0)) / float(getattr(cfg, "foul_2pa_mult", 1.0) or 1.0),
-                )
+                if sf_coherent:
+                    _r = sf_team_r_h if side == "h" else sf_team_r_a
+                    _sh = shot_share * np.asarray(ft_mult, dtype=float)
+                    _rs = _r * float(_sh.sum()) if float(_sh.sum()) > 0 else _r
+                    _q2 = _sf_denet(_team_avg(fg2v, shot_share, 0.50), sf_b2 * _rs)
+                    _q3 = _sf_denet(_vol_avg(fg3v, players, mins, ("_prior_threes_att_pm",), 0.34), sf_b3 * _rs)
+                    _ftp = _team_avg(ftv, foul_share, 0.78)
+                    _sb = float(np.clip(sv_bonus_share, 0.0, 0.5))
+                    _bft = _team_avg(ftv, _loop_shot_share(players, mins, "_prior_fta_pm"), 0.78) if _sb > 0.0 else _ftp
+
+                    def _model(e: float) -> float:
+                        loop = _coherent_points_per_possession(float(rates["p_tov"]), float(rates["p3"]), _q2, _q3, sf_a2 * _rs, sf_b2 * _rs,
+                                                               sf_a3 * _rs, sf_b3 * _rs, _ftp, float(cfg.base_oreb_rate) * float(oreb_m), e)
+                        return loop if _sb <= 0.0 else (1.0 - _sb) * loop + _sb * 2.0 * float(np.clip(_bft * e, 0.45, 0.95))
+
+                    lo_, hi_ = 0.70, 1.30
+                    if _model(lo_) >= tpp_eff:
+                        solved = lo_
+                    elif _model(hi_) <= tpp_eff:
+                        solved = hi_
+                    else:
+                        for _ in range(40):
+                            mid = 0.5 * (lo_ + hi_)
+                            if _model(mid) < tpp_eff:
+                                lo_ = mid
+                            else:
+                                hi_ = mid
+                        solved = 0.5 * (lo_ + hi_)
+                else:
+                    solved = _solve_eff_mult(
+                        tpp_eff,
+                        p_tov=float(rates["p_tov"]),
+                        p3=float(rates["p3"]),
+                        # 2PA shooters are picked by TOTAL FGA usage in the loop.
+                        fg2=_team_avg(fg2v, shot_share, 0.50),
+                        fg3=_vol_avg(fg3v, players, mins, ("_prior_threes_att_pm",), 0.34),
+                        foul=float(rates["foul_per_fga"]) * float(foul_share.sum()) * float(getattr(cfg, "foul_2pa_mult", 1.0)),
+                        ft=_team_avg(ftv, foul_share, 0.78),
+                        oreb=float(cfg.base_oreb_rate) * float(oreb_m),
+                        bonus_trip_share=sv_bonus_share,
+                        bonus_ft=(_team_avg(ftv, _loop_shot_share(players, mins, "_prior_fta_pm"), 0.78) if sv_bonus_share > 0.0 else None),
+                        foul3_mult=float(getattr(cfg, "foul_3pa_mult", 1.0)) / float(getattr(cfg, "foul_2pa_mult", 1.0) or 1.0),
+                    )
                 if side == "h":
                     eff_mult_h = solved
                 else:
@@ -1779,7 +1866,7 @@ def simulate_pbp_game_boxscore(
                         return
 
                 foul_p = foul_per_fga * float(getattr(cfg, "foul_3pa_mult", 1.0) if shot_is_3 else getattr(cfg, "foul_2pa_mult", 1.0))
-                foul = bool(rng.random() < foul_p) if not SHOOTER_FT_RATE else False
+                foul = bool(rng.random() < foul_p) if (not SHOOTER_FT_RATE and not sf_coherent) else False
 
                 if offense_home:
                     if shot_is_3:
@@ -1787,8 +1874,12 @@ def simulate_pbp_game_boxscore(
                     else:
                         w = _usage_w(home_players, "_prior_fga_pm", h_line)
                     sh = int(_pick_weighted(rng, list(range(len(home_players))), w) or 0)
-                    if SHOOTER_FT_RATE:
+                    if SHOOTER_FT_RATE and not sf_coherent:
                         foul = bool(rng.random() < float(np.clip(foul_p * float(h_ft_mult[sh]), 0.0, 0.95)))
+                    if sf_coherent:
+                        sf_r = float(np.clip(sf_team_r_h * (float(h_ft_mult[sh]) if SHOOTER_FT_RATE else 1.0), 0.2, 3.0))
+                        sf_a = float(np.clip((sf_a3 if shot_is_3 else sf_a2) * sf_r, 0.0, 0.9))
+                        sf_b = float(np.clip((sf_b3 if shot_is_3 else sf_b2) * sf_r, 0.0, 0.9))
 
                     h["fga"][sh] += 1
                     if shot_is_3:
@@ -1796,6 +1887,8 @@ def simulate_pbp_game_boxscore(
 
                     eff_scale = cfg.garbage_time_eff_scale if blowout else 1.0
                     base_p = float(h_3p_pct[sh] if shot_is_3 else h_fg_pct[sh])
+                    if sf_coherent:
+                        base_p = _sf_denet(base_p, sf_b)
                     make_p = float(np.clip(base_p * eff_scale * eff_mult_h * q_env_mult * _score_effect(True), 0.05, 0.95))
                     made = bool(rng.random() < make_p)
 
@@ -1824,7 +1917,7 @@ def simulate_pbp_game_boxscore(
                                 h["ast"][int(aidx)] += 1
                                 _add_q_stat(hq["ast"], q, int(aidx), 1)
 
-                        if foul and rng.random() < 0.32:
+                        if (rng.random() < sf_a) if sf_coherent else (foul and rng.random() < 0.32):
                             h["fta"][sh] += 1
                             ftp = float(np.clip(float(h_ft_pct[sh]) * eff_mult_h * q_env_mult * _score_effect(True), 0.45, 0.95))
                             if rng.random() < ftp:
@@ -1847,9 +1940,9 @@ def simulate_pbp_game_boxscore(
                             pass
                         break
 
-                    if foul and rng.random() < 0.70:
+                    if (rng.random() < sf_b) if sf_coherent else (foul and rng.random() < 0.70):
                         n_ft = 3 if shot_is_3 else 2
-                        if FOULED_MISS_NOT_FGA:
+                        if FOULED_MISS_NOT_FGA or sf_coherent:
                             h["fga"][sh] -= 1
                             if shot_is_3:
                                 h["fg3a"][sh] -= 1
@@ -1911,8 +2004,12 @@ def simulate_pbp_game_boxscore(
                     else:
                         w = _usage_w(away_players, "_prior_fga_pm", a_line)
                     sh = int(_pick_weighted(rng, list(range(len(away_players))), w) or 0)
-                    if SHOOTER_FT_RATE:
+                    if SHOOTER_FT_RATE and not sf_coherent:
                         foul = bool(rng.random() < float(np.clip(foul_p * float(a_ft_mult[sh]), 0.0, 0.95)))
+                    if sf_coherent:
+                        sf_r = float(np.clip(sf_team_r_a * (float(a_ft_mult[sh]) if SHOOTER_FT_RATE else 1.0), 0.2, 3.0))
+                        sf_a = float(np.clip((sf_a3 if shot_is_3 else sf_a2) * sf_r, 0.0, 0.9))
+                        sf_b = float(np.clip((sf_b3 if shot_is_3 else sf_b2) * sf_r, 0.0, 0.9))
 
                     a["fga"][sh] += 1
                     if shot_is_3:
@@ -1920,6 +2017,8 @@ def simulate_pbp_game_boxscore(
 
                     eff_scale = cfg.garbage_time_eff_scale if blowout else 1.0
                     base_p = float(a_3p_pct[sh] if shot_is_3 else a_fg_pct[sh])
+                    if sf_coherent:
+                        base_p = _sf_denet(base_p, sf_b)
                     make_p = float(np.clip(base_p * eff_scale * eff_mult_a * q_env_mult * _score_effect(False), 0.05, 0.95))
                     made = bool(rng.random() < make_p)
 
@@ -1948,7 +2047,7 @@ def simulate_pbp_game_boxscore(
                                 a["ast"][int(aidx)] += 1
                                 _add_q_stat(aq["ast"], q, int(aidx), 1)
 
-                        if foul and rng.random() < 0.32:
+                        if (rng.random() < sf_a) if sf_coherent else (foul and rng.random() < 0.32):
                             a["fta"][sh] += 1
                             ftp = float(np.clip(float(a_ft_pct[sh]) * eff_mult_a * q_env_mult * _score_effect(False), 0.45, 0.95))
                             if rng.random() < ftp:
@@ -1971,9 +2070,9 @@ def simulate_pbp_game_boxscore(
                             pass
                         break
 
-                    if foul and rng.random() < 0.70:
+                    if (rng.random() < sf_b) if sf_coherent else (foul and rng.random() < 0.70):
                         n_ft = 3 if shot_is_3 else 2
-                        if FOULED_MISS_NOT_FGA:
+                        if FOULED_MISS_NOT_FGA or sf_coherent:
                             a["fga"][sh] -= 1
                             if shot_is_3:
                                 a["fg3a"][sh] -= 1

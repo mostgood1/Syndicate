@@ -299,6 +299,8 @@ def _compact_draw(h_box: Dict[str, Any], a_box: Dict[str, Any], hq: Any, aq: Any
         fq = {"H": [0.0] * 5, "A": [0.0] * 5}
         fgm = {"H": [0] * 5, "A": [0] * 5}
         ft3 = {"H": 0, "A": 0}
+        ft2s = {"H": 0, "A": 0}
+        ftb = {"H": 0, "A": 0}
         for e_ in ev:
             side_ = e_.get("off")
             if side_ not in fq:
@@ -308,6 +310,10 @@ def _compact_draw(h_box: Dict[str, Any], a_box: Dict[str, Any], hq: Any, aq: Any
                 fq[side_][qi] += int(e_.get("fta") or 0)
                 if int(e_.get("fta") or 0) == 3 and not e_.get("bonus") and not e_.get("intentional"):
                     ft3[side_] += 1   # R2-c: three-shot trips (fouled threes)
+                elif int(e_.get("fta") or 0) == 2 and not e_.get("bonus") and not e_.get("intentional"):
+                    ft2s[side_] += 1  # R2-c': shooting two-shot trips
+                elif e_.get("bonus"):
+                    ftb[side_] += 1
             elif str(e_.get("type") or "").startswith("FGM"):
                 fgm[side_][qi] += 1
         andone = {}
@@ -321,6 +327,8 @@ def _compact_draw(h_box: Dict[str, Any], a_box: Dict[str, Any], hq: Any, aq: Any
         out["fq"] = [[round(x, 3) for x in fq["H"]], [round(x, 3) for x in fq["A"]]]
         out["and1"] = [andone["H"], andone["A"]]
         out["ft3"] = [ft3["H"], ft3["A"]]
+        out["ft2s"] = [ft2s["H"], ft2s["A"]]
+        out["ftb"] = [ftb["H"], ftb["A"]]
     return out
 
 
