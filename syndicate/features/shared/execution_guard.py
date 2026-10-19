@@ -308,7 +308,7 @@ def limits(mode: str | None = None, venue: str | None = None) -> dict[str, Any]:
 
     max_day_dollars = _venue_day_dollars(normalized_venue)
 
-    return {
+    resolved_caps = {
         "mode": resolved,
         "venue": normalized_venue,
         "max_order_dollars": _stored_or_env_float(
@@ -386,6 +386,89 @@ def limits(mode: str | None = None, venue: str | None = None) -> dict[str, Any]:
             )
         ),
     }
+    if not paper:
+        _apply_balance_caps(resolved_caps, normalized_venue)
+    return resolved_caps
+
+
+# A fail-closed marker for "the balance-cap computation itself raised", so the
+# refusal can name it instead of every venue silently reading $0.
+_BALANCE_CAPS_ALL = "*"
+
+
+def _apply_balance_caps(caps: dict[str, Any], venue: str | None) -> None:
+    """Tighten the LIVE dollar caps to a share of what each venue holds.
+
+    `SYNDICATE_EXECUTION_BALANCE_CAPS=on` only; absent leaves `caps` untouched,
+    key for key (`venue_capital.balance_caps_enabled`). The dollar values
+    resolved above -- the user's stored caps, then env, then default -- become
+    CEILINGS: day = min(ceiling, day% x capital), order = min(ceiling, order% x
+    capital), so a percentage can only ever tighten what is already allowed.
+
+    THIS IS HOW A CAP COMPOUNDS. Measured 2026-10-19 the account caps were
+    stored at Kalshi $200 / Polymarket $100 / all-venues $150 / order $25 while
+    the venues held $490 and $36 (+ a $550 deposit not yet cleared): a fixed
+    number is wrong in one direction or the other on most days, and stays
+    wrong as the account moves.
+
+    A venue whose capital is UNKNOWN gets zero caps and is listed in
+    `balance_caps["fail_closed"]`; `check_order` refuses it by that name. Not
+    the house "unknown allows" rule of `_venue_available_dollars` -- see
+    `venue_capital`'s docstring for why a percentage of an unknown is not a
+    number at all.
+    """
+    from syndicate.features.shared import venue_capital as _capital
+
+    if not _capital.balance_caps_enabled():
+        return
+    ceilings = {
+        "max_order_dollars": float(caps["max_order_dollars"]),
+        "max_day_dollars_all_venues": float(caps["max_day_dollars_all_venues"]),
+        **{
+            f"max_day_dollars_{name}": float(value)
+            for name, value in (caps.get("max_day_dollars_by_venue") or {}).items()
+        },
+    }
+    venues = tuple(caps.get("max_day_dollars_by_venue") or ())
+    try:
+        derived = _capital.balance_caps(ceilings, venues=venues)
+    except Exception as exc:
+        derived = {
+            "enabled": True,
+            "fail_closed": {_BALANCE_CAPS_ALL: f"error:{type(exc).__name__}"},
+            "max_day_dollars_by_venue": {name: 0.0 for name in venues},
+            "max_order_dollars_by_venue": {name: 0.0 for name in venues},
+            "max_day_dollars_all_venues": 0.0,
+            "ceilings": ceilings,
+        }
+
+    day = dict(derived.get("max_day_dollars_by_venue") or {})
+    order = dict(derived.get("max_order_dollars_by_venue") or {})
+    caps["dollar_ceilings"] = ceilings
+    caps["balance_caps"] = derived
+    caps["max_day_dollars_by_venue"] = day
+    for name, value in day.items():
+        caps[f"max_day_dollars_{name}"] = value
+    caps["max_day_dollars_all_venues"] = float(derived.get("max_day_dollars_all_venues") or 0.0)
+    caps["max_order_dollars_by_venue"] = order
+    if venue in day:
+        caps["max_day_dollars"] = day[venue]
+    if venue in order:
+        caps["max_order_dollars"] = order[venue]
+
+
+def balance_caps_refusal(caps: Mapping[str, Any], venue: str | None) -> str | None:
+    """The fail-closed reason for `venue` under balance caps, or None."""
+    derived = caps.get("balance_caps")
+    if not isinstance(derived, Mapping):
+        return None
+    closed = derived.get("fail_closed") or {}
+    if _BALANCE_CAPS_ALL in closed:
+        return str(closed[_BALANCE_CAPS_ALL])
+    name = str(venue or "").strip().lower()
+    if name in closed:
+        return str(closed[name])
+    return None
 
 
 def kill_switch_path():
@@ -782,6 +865,19 @@ def check_order(
 
     if stake <= 0:
         return {"allowed": False, "reason": "non_positive_stake", "limits": caps}
+
+    # BALANCE CAPS ON, AND THIS VENUE'S CAPITAL UNKNOWN. Named rather than left
+    # to read as `over_max_order_dollars` against a $0 cap: "the account could
+    # not be read" and "this stake is too big" call for different responses.
+    unknown_capital = balance_caps_refusal(caps, request_venue)
+    if unknown_capital is not None:
+        return {
+            "allowed": False,
+            "reason": "balance_caps_capital_unknown",
+            "detail": unknown_capital,
+            "stake": stake,
+            "limits": caps,
+        }
 
     if stake > caps["max_order_dollars"]:
         return {

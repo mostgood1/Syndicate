@@ -189,8 +189,14 @@ def resolve_view() -> dict[str, Any]:
     live_caps = limits("live")
     values: dict[str, Any] = {}
     sources: dict[str, str] = {}
+    # THE FORM EDITS CEILINGS. With `SYNDICATE_EXECUTION_BALANCE_CAPS=on`,
+    # `limits()` tightens the dollar caps to a share of each venue's capital and
+    # keeps what it tightened FROM under `dollar_ceilings`. Showing the derived
+    # figure here would invite a save that writes today's balance-derived
+    # number back as the user's ceiling, and the cap would stop compounding.
+    ceilings = live_caps.get("dollar_ceilings") or {}
     for name in EDITABLE_FIELDS:
-        values[name] = live_caps.get(name)
+        values[name] = ceilings.get(name, live_caps.get(name))
         if _coerce(name, stored.get(name)) is not None:
             sources[name] = "stored"
         elif os.environ.get(LIVE_LIMIT_FIELDS[name]):

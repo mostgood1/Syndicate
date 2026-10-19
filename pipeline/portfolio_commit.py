@@ -192,8 +192,14 @@ def commit_live_venue_plan(
     selected_date: str,
     settings: Any,
     settled_sample_size_by_sport: Mapping[str, int] | None = None,
+    venue: str | None = None,
+    bankroll_resolver: Any = None,
 ) -> dict[str, Any]:
     """paper2's scoped rows -> the plan live may place. Pure; writes nothing.
+
+    `venue` turns on the compounding step (`_apply_compounding_bankroll`), which
+    is itself a no-op unless `SYNDICATE_COMPOUNDING_BANKROLL` is shadow|on.
+    `bankroll_resolver` replaces the stamp read, for tests.
 
     The SAME `commit_portfolio` over the rows that pass `placeable_refusal`, so
     every gate, the sizing and the refusal names are unchanged. The rows it
@@ -242,6 +248,22 @@ def commit_live_venue_plan(
             for reason, counts in sorted(table.items())
         }
 
+    # THE ACCOUNT'S OWN SIZE, not the constant (lane `compounding-bankroll`).
+    # Off unless `SYNDICATE_COMPOUNDING_BANKROLL` says shadow|on, and then it
+    # either stamps (shadow) or applies (on) a bankroll derived from what the
+    # venue actually holds. Its refusals land in the same tables, so the
+    # `sum(refusals) + positions == rows_in` contract still holds after it.
+    if venue is not None:
+        _apply_compounding_bankroll(
+            plan,
+            venue=venue,
+            settings=settings,
+            refusals=refusals,
+            by_market=by_market,
+            by_sport=by_sport,
+            resolver=bankroll_resolver,
+        )
+
     plan["refusals"] = dict(sorted(refusals.items()))
     plan["refusals_by_market"] = _ordered(by_market)
     plan["refusals_by_sport"] = _ordered(by_sport)
@@ -251,6 +273,187 @@ def commit_live_venue_plan(
     plan["placeable_rows_in"] = len(placeable)
     plan["plan_kind"] = PLAN_SOURCE_LIVE
     return plan
+
+
+# Named so a plan that compounding emptied cannot be read as "the model found
+# nothing": the venue's capital could not be read (stale/absent stamp, an
+# unclear pending deposit, an unresolvable Kalshi shard), and sizing refused.
+REFUSAL_COMPOUNDING_BANKROLL_UNKNOWN = "compounding_bankroll_unknown"
+# A stake that fell under `min_stake_units` only BECAUSE the bankroll shrank to
+# the real account. Distinct from `below_min_stake`, which `commit_portfolio`
+# says about the fixed bankroll, so the cost of compounding is countable.
+REFUSAL_BELOW_MIN_STAKE_COMPOUNDED = "below_min_stake_compounded"
+
+
+def default_bankroll_resolver(venue: str, settings: Any):
+    """`position -> sizing_bankroll(...)` over ONE stamp read, for one venue.
+
+    One read per plan, so every position of a plan is sized against the same
+    reading. Kalshi shards come from the market's own `exchange_index`
+    (`execution_guard._kalshi_shard_of`: public, cached per process, a failure
+    not cached).
+    """
+    from syndicate.features.shared.execution_guard import _kalshi_shard_of
+    from syndicate.features.shared.venue_capital import (
+        _read_stamp,
+        compounding_config,
+        sizing_bankroll,
+    )
+
+    stamp = _read_stamp()
+    config = compounding_config()
+    fixed = float(getattr(settings, "bankroll_units", 0.0) or 0.0)
+
+    def _resolve(position: Mapping[str, Any]) -> dict[str, Any]:
+        ticker = position.get("venue_ticker")
+        if isinstance(ticker, Mapping):
+            ticker = ticker.get("slug")
+        return sizing_bankroll(
+            venue,
+            fixed_bankroll=fixed,
+            ticker=ticker,
+            stamp=stamp,
+            shard_of=_kalshi_shard_of,
+            config=config,
+        )
+
+    return _resolve
+
+
+def _apply_compounding_bankroll(
+    plan: dict[str, Any],
+    *,
+    venue: str,
+    settings: Any,
+    refusals: dict[str, int],
+    by_market: dict[str, dict[str, int]],
+    by_sport: dict[str, dict[str, int]],
+    resolver: Any = None,
+) -> None:
+    """Re-dollar each live position against the venue's capital. In place.
+
+    `stake_fraction` -- what `commit_portfolio` decided, after every budget and
+    the slate ceiling -- is kept; only the number it multiplies changes. Because
+    every position's fraction already satisfies the slate ceiling as a share of
+    ONE bankroll, re-dollaring each against a SMALLER one (a Kalshi shard) keeps
+    each shard inside the same ceiling.
+
+    `shadow` writes the compounding stake beside the real one and changes
+    nothing that is placed. A position refused by compounding does not free a
+    `max_positions` slot for another row -- the cut ran before this -- which is
+    the conservative error and is stated here rather than discovered.
+    """
+    from syndicate.features.shared.venue_capital import compounding_config
+
+    config = compounding_config()
+    mode = config["mode"]
+    if mode not in {"shadow", "on"}:
+        return
+
+    fixed = float(getattr(settings, "bankroll_units", 0.0) or 0.0)
+    min_stake = float(getattr(settings, "min_stake_units", 0.0) or 0.0)
+    try:
+        resolve = resolver or default_bankroll_resolver(venue, settings)
+    except Exception as exc:
+        resolve = None
+        resolver_error = f"resolver_error:{type(exc).__name__}"
+    else:
+        resolver_error = None
+
+    kept: list[dict[str, Any]] = []
+    refused_keys: list[str] = []
+    unknown_reasons: dict[str, int] = {}
+    staked_fixed = 0.0
+    staked_compounded = 0.0
+
+    def _refuse(reason: str, position: Mapping[str, Any]) -> None:
+        refusals[reason] = refusals.get(reason, 0) + 1
+        market = str(position.get("market") or "").strip().lower() or "unkeyed"
+        sport = str(position.get("sport") or "").strip().lower() or "unkeyed"
+        by_market.setdefault(reason, {})[market] = by_market.setdefault(reason, {}).get(market, 0) + 1
+        by_sport.setdefault(reason, {})[sport] = by_sport.setdefault(reason, {}).get(sport, 0) + 1
+        refused_keys.append(str(position.get("position_key") or ""))
+
+    for position in list(plan.get("positions") or []):
+        if not isinstance(position, dict):
+            continue
+        fixed_dollars = float(position.get("stake_dollars") or 0.0)
+        staked_fixed += fixed_dollars
+        if resolve is None:
+            verdict = {"known": False, "reason": resolver_error}
+        else:
+            try:
+                verdict = dict(resolve(position) or {})
+            except Exception as exc:
+                verdict = {"known": False, "reason": f"resolver_error:{type(exc).__name__}"}
+
+        fraction = float(position.get("stake_fraction") or 0.0)
+        bankroll = float(verdict.get("bankroll") or 0.0) if verdict.get("known") else None
+        compounded = round(fraction * bankroll, 2) if bankroll is not None else None
+        stamp = {
+            "mode": mode,
+            "known": bool(verdict.get("known")),
+            "reason": verdict.get("reason"),
+            "bankroll": bankroll,
+            "fixed_bankroll": fixed,
+            "capital": verdict.get("capital") if verdict.get("known") else None,
+            "shard": verdict.get("shard"),
+            "shard_cash": verdict.get("shard_cash"),
+            "stake_dollars_fixed": round(fixed_dollars, 2),
+            "stake_dollars_compounded": compounded,
+        }
+        position["compounding"] = stamp
+
+        if not verdict.get("known"):
+            reason = str(verdict.get("reason") or "unknown")
+            unknown_reasons[reason] = unknown_reasons.get(reason, 0) + 1
+            if mode == "on":
+                _refuse(REFUSAL_COMPOUNDING_BANKROLL_UNKNOWN, position)
+                continue
+            kept.append(position)
+            continue
+
+        if mode == "on":
+            if compounded is None or compounded < min_stake:
+                _refuse(REFUSAL_BELOW_MIN_STAKE_COMPOUNDED, position)
+                continue
+            scale = (compounded / fixed_dollars) if fixed_dollars else 0.0
+            position["stake_dollars"] = compounded
+            position["bankroll_dollars"] = bankroll
+            attribution = position.get("attribution")
+            if isinstance(attribution, dict):
+                for key in ("stake_dollars_ev_only", "stake_dollars_sim_delta"):
+                    if attribution.get(key) is not None:
+                        attribution[key] = round(float(attribution[key]) * scale, 2)
+        staked_compounded += float(compounded or 0.0)
+        kept.append(position)
+
+    plan["positions"] = kept
+    totals = dict(plan.get("totals") or {})
+    if mode == "on":
+        totals["positions"] = len(kept)
+        totals["staked_dollars"] = round(sum(float(p.get("stake_dollars") or 0.0) for p in kept), 2)
+        sim_dollars = sum(
+            float(((p.get("attribution") or {}) if isinstance(p.get("attribution"), dict) else {}).get("stake_dollars_sim_delta") or 0.0)
+            for p in kept
+        )
+        totals["staked_dollars_sim_attributed"] = round(sim_dollars, 2)
+        totals["sim_share_of_staked"] = (
+            round(sim_dollars / totals["staked_dollars"], 4) if totals["staked_dollars"] else None
+        )
+    plan["totals"] = totals
+    plan["compounding"] = {
+        "mode": mode,
+        "venue": venue,
+        "config": {key: config[key] for key in ("fraction", "ceiling_dollars", "max_age_seconds")},
+        "fixed_bankroll": fixed,
+        "positions_in": len(kept) + len(refused_keys),
+        "positions_out": len(kept),
+        "staked_dollars_fixed": round(staked_fixed, 2),
+        "staked_dollars_compounded": round(staked_compounded, 2),
+        "unknown_reasons": dict(sorted(unknown_reasons.items())),
+        "refused_keys": refused_keys,
+    }
 
 
 def _write_live_venue_plan(
@@ -272,6 +475,7 @@ def _write_live_venue_plan(
             selected_date=normalized,
             settings=settings,
             settled_sample_size_by_sport=settled_sample_size_by_sport,
+            venue=venue,
         )
         live_plan["venue"] = venue
         live_plan["venue_scope_refusals"] = dict(scope_refusals or {})
@@ -312,6 +516,8 @@ def _write_live_venue_plan(
     positions = [p for p in (live_plan.get("positions") or []) if isinstance(p, Mapping)]
     totals = live_plan.get("totals") or {}
     live_keys = {p.get("position_key") for p in positions}
+    compounding = live_plan.get("compounding") if isinstance(live_plan.get("compounding"), Mapping) else None
+    compounding_refused = set((compounding or {}).get("refused_keys") or ())
     paper2_placeable = [
         p
         for p in (paper2_plan.get("positions") or [])
@@ -332,10 +538,25 @@ def _write_live_venue_plan(
         # cap and the budget. Non-zero here is a regression, never noise.
         f"paper2_positions={(paper2_plan.get('totals') or {}).get('positions')} "
         f"paper2_placeable={len(paper2_placeable)} "
-        f"paper2_placeable_missing={sum(1 for p in paper2_placeable if p.get('position_key') not in live_keys)} "
+        # Minus what compounding refused BY NAME: those are accounted for in
+        # `refusals`, and counting them here would make a working fail-closed
+        # read as the regression this check exists to catch.
+        f"paper2_placeable_missing={sum(1 for p in paper2_placeable if p.get('position_key') not in live_keys and p.get('position_key') not in compounding_refused)} "
         f"refusals={live_plan.get('refusals')}",
         flush=True,
     )
+    if compounding:
+        # The paper measurement, one line per venue per build: what the same
+        # positions cost at the fixed bankroll and at the account's own.
+        print(
+            f"[portfolio_commit] COMPOUNDING_BANKROLL date={normalized} venue={venue} "
+            f"mode={compounding.get('mode')} positions={compounding.get('positions_out')}"
+            f"/{compounding.get('positions_in')} staked_fixed=${compounding.get('staked_dollars_fixed')} "
+            f"staked_compounded=${compounding.get('staked_dollars_compounded')} "
+            f"unknown={compounding.get('unknown_reasons')} "
+            f"bankrolls={sorted({(p.get('compounding') or {}).get('bankroll') for p in positions if (p.get('compounding') or {}).get('bankroll') is not None})}",
+            flush=True,
+        )
     return live_plan
 
 

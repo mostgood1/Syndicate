@@ -249,7 +249,10 @@ def fetch_kalshi_balance() -> dict[str, Any]:
     #
     #   balance          int64   available balance in CENTS
     #   balance_dollars  string  the same figure as fixed-point dollars
-    #   portfolio_value  int64   cash PLUS open positions, in cents
+    #   portfolio_value  int64   OPEN POSITIONS ONLY, in cents -- measured
+    #                            2026-10-19T18:13Z: 450 with one open $4.50
+    #                            position beside $485.48 cash. NOT cash plus
+    #                            positions, which this line used to say.
     #
     # `balance_dollars` is preferred because it is documented as dollars, which
     # turns this module's one remaining unit ASSUMPTION into a stated fact. The
@@ -287,10 +290,11 @@ def fetch_kalshi_balance() -> dict[str, Any]:
         # It is the SUM ACROSS EXCHANGE SHARDS (docs: "includes all exchange
         # indexes when `exchange_index` is omitted") -- see `shards` below.
         "dollars": round(dollars, 2),
-        # CASH PLUS OPEN POSITIONS. A different question -- "what is the book
-        # worth" rather than "what can I deploy" -- and conflating them over a
-        # book with open positions overstates what is available by exactly the
-        # amount already at risk.
+        # OPEN POSITIONS' VALUE, excluding cash (see the shape note above). A
+        # different question -- "what is at risk" rather than "what can I
+        # deploy" -- and adding it to `dollars` overstates what is available
+        # by exactly the amount already at risk. `venue_capital` adds the two
+        # on purpose: it wants the account's size, not its free cash.
         "portfolio_value_dollars": round(portfolio_cents / 100.0, 2) if portfolio_cents is not None else None,
         "raw_value": cents if cents is not None else dollars,
         "raw_field": field,

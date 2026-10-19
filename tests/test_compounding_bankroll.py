@@ -1,0 +1,256 @@
+"""Compounding, wired: the live plan's stakes and `limits()`'s caps follow the account.
+
+REACHABILITY FIRST (`model_engine_standard`): each flag is shown to change the
+output (`off != on`) on the real call path -- `commit_live_venue_plan` and
+`execution_guard.limits()` / `check_order` -- before anything is asserted about
+the numbers. A flag that never reaches its code reads exactly like one that does
+and found nothing to change.
+"""
+
+from __future__ import annotations
+
+from datetime import datetime, timezone
+
+import pytest
+
+from syndicate.features.shared import execution_guard as guard
+from syndicate.features.shared import venue_capital as vc
+from syndicate.features.shared.execution_ledger import OrderRequest
+from syndicate.features.shared.portfolio_settings import PortfolioSettings
+
+_DATE = "2026-10-19"
+_TICKER = "KXMLBGAME-26OCT19CLETB-TB"
+
+
+@pytest.fixture(autouse=True)
+def _isolated(tmp_path, monkeypatch):
+    monkeypatch.setenv("SYNDICATE_REPORTS_ROOT", str(tmp_path))
+    monkeypatch.setenv("SYNDICATE_REFRESH_STATE_BACKEND", "file")
+    (tmp_path / "intelligence").mkdir(parents=True, exist_ok=True)
+    for name in (
+        vc.COMPOUNDING_MODE_ENV,
+        vc.BALANCE_CAPS_ENV,
+        "SYNDICATE_COMPOUNDING_BANKROLL_FRACTION",
+        "SYNDICATE_COMPOUNDING_BANKROLL_MAX_DOLLARS",
+        "SYNDICATE_EXECUTION_MAX_ORDER_DOLLARS",
+        "SYNDICATE_EXECUTION_MAX_DAY_DOLLARS",
+        "SYNDICATE_EXECUTION_MAX_DAY_DOLLARS_KALSHI",
+        "SYNDICATE_EXECUTION_MAX_DAY_DOLLARS_POLYMARKET",
+        "SYNDICATE_EXECUTION_MAX_DAY_DOLLARS_ALL_VENUES",
+        "SYNDICATE_EXECUTION_MAX_DAY_ORDERS",
+        "SYNDICATE_EXECUTION_KILL_SWITCH",
+        "SYNDICATE_EXECUTION_MODE",
+        "SYNDICATE_KALSHI_SHARD_BALANCE_GATE",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    yield
+
+
+def _write_stamp(*, polymarket_numbers=None, recorded_at=None):
+    from syndicate.features.shared.refresh_state_store import write_json_file
+    from syndicate.features.shared.venue_balances import balances_path
+
+    numbers = polymarket_numbers if polymarket_numbers is not None else {
+        "buyingPower": 586.05, "depositReservation": 550.0, "displayedAvailableSoon": 550.0,
+    }
+    write_json_file(
+        balances_path(),
+        {
+            "recorded_by": "test",
+            "recorded_at": recorded_at or datetime.now(timezone.utc).isoformat(),
+            "venues": {
+                "kalshi": {
+                    "status": "ok", "dollars": 485.48, "portfolio_value_dollars": 4.5,
+                    "shards": {"0": 170.0, "1": 75.01, "2": 0.0, "3": 240.47}, "shards_status": "ok",
+                },
+                "polymarket": {
+                    "status": "ok", "dollars": numbers.get("buyingPower", 586.05),
+                    "buying_power_dollars": numbers.get("buyingPower", 586.05),
+                    "detail": {"numbers": numbers},
+                },
+            },
+        },
+    )
+
+
+# --------------------------------------------------------------------------
+# Caps: limits() and check_order
+# --------------------------------------------------------------------------
+
+
+def test_caps_flag_off_leaves_limits_untouched_key_for_key():
+    _write_stamp()
+    before = guard.limits("live", venue="kalshi")
+    assert "balance_caps" not in before and "dollar_ceilings" not in before
+
+
+def test_caps_flag_reaches_limits_off_differs_from_on(monkeypatch):
+    _write_stamp()
+    off = guard.limits("live", venue="polymarket")
+    monkeypatch.setenv(vc.BALANCE_CAPS_ENV, "on")
+    on = guard.limits("live", venue="polymarket")
+    assert off != on
+    # defaults: order $10, polymarket day $100, all venues $150 -- now a share
+    # of $36.05 settled cash: 5% = $1.80, 25% = $9.01.
+    assert on["max_order_dollars"] == pytest.approx(1.80, abs=0.01)
+    assert on["max_day_dollars"] == pytest.approx(9.01, abs=0.01)
+    assert on["dollar_ceilings"]["max_order_dollars"] == off["max_order_dollars"]
+
+
+def test_caps_never_loosen_a_configured_ceiling(monkeypatch):
+    _write_stamp(polymarket_numbers={"buyingPower": 100_000.0, "depositReservation": 0.0})
+    monkeypatch.setenv(vc.BALANCE_CAPS_ENV, "on")
+    caps = guard.limits("live", venue="polymarket")
+    assert caps["max_order_dollars"] == 10.0
+    assert caps["max_day_dollars"] == 100.0
+    assert caps["max_day_dollars_all_venues"] == 150.0
+
+
+def test_paper_is_exempt_from_balance_caps(monkeypatch):
+    _write_stamp()
+    monkeypatch.setenv(vc.BALANCE_CAPS_ENV, "on")
+    assert "balance_caps" not in guard.limits("paper", venue="kalshi")
+
+
+def _order(venue="polymarket", stake=1.0):
+    return OrderRequest(
+        position_key="p1", selected_date=_DATE, venue=venue, sport="mlb", event_id="e1",
+        market="h2h", side="home", requested_price=-110.0, requested_stake_dollars=stake,
+    )
+
+
+def test_an_unknown_capital_refuses_by_name_when_caps_are_on(monkeypatch):
+    _write_stamp(recorded_at="2026-01-01T00:00:00+00:00")  # stale
+    allowed_off = guard.check_order(_order(), mode="live", already={"dollars": 0, "orders": 0})
+    monkeypatch.setenv(vc.BALANCE_CAPS_ENV, "on")
+    refused = guard.check_order(_order(), mode="live", already={"dollars": 0, "orders": 0})
+    assert allowed_off["reason"] != "balance_caps_capital_unknown"
+    assert refused["allowed"] is False
+    assert refused["reason"] == "balance_caps_capital_unknown"
+    assert refused["detail"] == "stale_reading"
+
+
+def test_a_stake_over_the_balance_derived_order_cap_is_refused(monkeypatch):
+    _write_stamp()
+    monkeypatch.setenv(vc.BALANCE_CAPS_ENV, "on")
+    result = guard.check_order(_order(stake=5.0), mode="live", already={"dollars": 0, "orders": 0})
+    assert result["reason"] == "over_max_order_dollars"
+
+
+def test_the_settings_form_shows_ceilings_not_the_derived_caps(monkeypatch):
+    from syndicate.features.shared.execution_limits_settings import resolve_view
+
+    _write_stamp()
+    monkeypatch.setenv(vc.BALANCE_CAPS_ENV, "on")
+    view = resolve_view()
+    assert view["max_order_dollars"] == 10.0
+    assert view["max_day_dollars_polymarket"] == 100.0
+
+
+# --------------------------------------------------------------------------
+# Sizing: commit_live_venue_plan
+# --------------------------------------------------------------------------
+
+
+def _settings(**overrides) -> PortfolioSettings:
+    values = dict(
+        bankroll_units=1000.0, max_slate_exposure_fraction=1.0, min_ev_pct=-100.0,
+        max_positions=50, min_stake_units=1.0,
+    )
+    values.update(overrides)
+    return PortfolioSettings(**values)
+
+
+def _row(event_id, *, ticker=_TICKER, score=5.0):
+    return {
+        "sport": "mlb", "event_id": event_id, "kind": "game", "market": "h2h",
+        "segment": "full_game", "line": None, "player_name": None,
+        "home_team": "Home", "away_team": "Away", "commence_time": "2026-10-19T23:05:00Z",
+        "side": "home", "quote": {"price": -110, "bookmaker": "kalshi"},
+        "ev_pct": 4.5, "model_edge_pct": 3.2,
+        "score": {"score": score, "price_reliability": 0.82},
+        "venue": "kalshi", "price_source": "venue_feed", "venue_ticker": ticker,
+    }
+
+
+def _resolver(bankroll):
+    def _resolve(position):
+        if bankroll is None:
+            return {"known": False, "reason": "stale_reading"}
+        return {"known": True, "bankroll": bankroll, "capital": 489.98, "shard": 3, "shard_cash": 240.47}
+    return _resolve
+
+
+def _plan(**kwargs):
+    from pipeline.portfolio_commit import commit_live_venue_plan
+
+    return commit_live_venue_plan(
+        [_row("g1"), _row("g2", score=4.0)], selected_date=_DATE, settings=_settings(), **kwargs
+    )
+
+
+def test_sizing_off_is_todays_plan_exactly():
+    baseline = _plan()
+    with_venue = _plan(venue="kalshi", bankroll_resolver=_resolver(100.0))
+    for plan in (baseline, with_venue):
+        plan.pop("generated_at", None)
+    assert "compounding" not in with_venue
+    assert [p["stake_dollars"] for p in with_venue["positions"]] == [
+        p["stake_dollars"] for p in baseline["positions"]
+    ]
+
+
+def test_sizing_flag_reaches_the_plan_off_differs_from_on(monkeypatch):
+    off = _plan(venue="kalshi", bankroll_resolver=_resolver(100.0))
+    assert off["positions"], "fixture must commit positions or this proves nothing"
+    monkeypatch.setenv(vc.COMPOUNDING_MODE_ENV, "on")
+    on = _plan(venue="kalshi", bankroll_resolver=_resolver(100.0))
+    off_stakes = [p["stake_dollars"] for p in off["positions"]]
+    on_stakes = [p["stake_dollars"] for p in on["positions"]]
+    assert off_stakes != on_stakes
+    for before, after, position in zip(off_stakes, on_stakes, on["positions"]):
+        assert after == pytest.approx(position["stake_fraction"] * 100.0, abs=0.01)
+        assert after == pytest.approx(before / 10.0, abs=0.02)
+    assert on["totals"]["staked_dollars"] == pytest.approx(sum(on_stakes), abs=0.01)
+
+
+def test_shadow_stamps_the_compounded_stake_and_places_the_fixed_one(monkeypatch):
+    off = _plan(venue="kalshi", bankroll_resolver=_resolver(100.0))
+    monkeypatch.setenv(vc.COMPOUNDING_MODE_ENV, "shadow")
+    shadow = _plan(venue="kalshi", bankroll_resolver=_resolver(100.0))
+    assert [p["stake_dollars"] for p in shadow["positions"]] == [p["stake_dollars"] for p in off["positions"]]
+    for position in shadow["positions"]:
+        assert position["compounding"]["stake_dollars_compounded"] == pytest.approx(
+            position["stake_fraction"] * 100.0, abs=0.01
+        )
+    assert shadow["compounding"]["mode"] == "shadow"
+
+
+def test_an_unknown_bankroll_refuses_every_position_by_name(monkeypatch):
+    monkeypatch.setenv(vc.COMPOUNDING_MODE_ENV, "on")
+    plan = _plan(venue="kalshi", bankroll_resolver=_resolver(None))
+    assert plan["positions"] == []
+    assert plan["refusals"].get("compounding_bankroll_unknown") == 2
+    assert plan["compounding"]["unknown_reasons"] == {"stale_reading": 2}
+    # The accounting contract survives: every scoped row is a position or a refusal.
+    assert sum(plan["refusals"].values()) + len(plan["positions"]) == plan["rows_in"]
+
+
+def test_a_stake_shrunk_below_the_minimum_is_refused_not_rounded_up(monkeypatch):
+    monkeypatch.setenv(vc.COMPOUNDING_MODE_ENV, "on")
+    plan = _plan(venue="kalshi", bankroll_resolver=_resolver(1.0))
+    assert plan["positions"] == []
+    assert plan["refusals"].get("below_min_stake_compounded") == 2
+    assert sum(plan["refusals"].values()) + len(plan["positions"]) == plan["rows_in"]
+
+
+def test_the_default_resolver_reads_the_stamp_and_the_orders_shard(monkeypatch):
+    """The production resolver, over a written stamp: shard 3 bounds a Kalshi row."""
+    from pipeline import portfolio_commit as pc
+
+    _write_stamp()
+    monkeypatch.setattr(guard, "_kalshi_shard_of", lambda ticker: (3, None))
+    resolve = pc.default_bankroll_resolver("kalshi", _settings())
+    verdict = resolve({"venue_ticker": _TICKER})
+    assert verdict["known"] is True
+    assert verdict["bankroll"] == pytest.approx(240.47)
