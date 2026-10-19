@@ -35,8 +35,7 @@ import time
 import traceback
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
-VENDOR = REPO / "vendor" / "mlb_bettingv2"
-for extra in (str(VENDOR), str(VENDOR / "tools"), str(REPO)):
+for extra in (str(REPO),):
     if extra not in sys.path:
         sys.path.insert(0, extra)
 
@@ -54,8 +53,8 @@ SEED = 4242
 
 
 def main() -> int:
-    from sim_engine.data.roster_artifact import roster_from_dict
-    from daily_update import _sim_many
+    from syndicate.features.mlb.sim_engine.data.roster_artifact import roster_from_dict
+    from syndicate.features.mlb.native.tools.daily_update import _sim_many
 
     OUT.mkdir(parents=True, exist_ok=True)
     done = failed = skipped = 0

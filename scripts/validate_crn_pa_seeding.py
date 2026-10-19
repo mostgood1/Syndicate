@@ -32,7 +32,7 @@ from dataclasses import replace
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO / "vendor" / "mlb_bettingv2"))
+sys.path.insert(0, str(REPO))  # the native engine is imported by package (lane mlb-research-scripts-native)
 
 STATS = ("H", "TB", "R", "RBI")
 
@@ -56,11 +56,11 @@ def main() -> int:
     ap.add_argument("--season", type=int, default=2026)
     args = ap.parse_args()
 
-    from sim_engine.data.arsenal import apply_arsenal_to_pitcher
-    from sim_engine.data.conditional_mix import apply_conditional_mix_to_pitcher
-    from sim_engine.data.roster_artifact import read_game_roster_artifact
-    from sim_engine.models import GameConfig
-    from sim_engine.simulate import simulate_game
+    from syndicate.features.mlb.sim_engine.data.arsenal import apply_arsenal_to_pitcher
+    from syndicate.features.mlb.sim_engine.data.conditional_mix import apply_conditional_mix_to_pitcher
+    from syndicate.features.mlb.sim_engine.data.roster_artifact import read_game_roster_artifact
+    from syndicate.features.mlb.sim_engine.models import GameConfig
+    from syndicate.features.mlb.sim_engine.simulate import simulate_game
 
     paths = sorted(glob.glob(str(REPO / "data/mlb_source/source_artifacts/data/**/"
                                         "roster_objs/roster_obj_*.json"), recursive=True))

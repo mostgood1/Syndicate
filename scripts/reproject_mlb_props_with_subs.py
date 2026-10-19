@@ -34,8 +34,7 @@ from dataclasses import replace
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-VENDOR = REPO_ROOT / "vendor" / "mlb_bettingv2"
-for p in (str(REPO_ROOT), str(VENDOR)):
+for p in (str(REPO_ROOT),):
     if p not in sys.path:
         sys.path.insert(0, p)
 
@@ -130,9 +129,9 @@ def main() -> int:
     parser.add_argument("--json", type=Path, default=None)
     args = parser.parse_args()
 
-    from sim_engine.data.roster_artifact import read_game_roster_artifact
-    from sim_engine.models import GameConfig
-    from sim_engine.simulate import simulate_game
+    from syndicate.features.mlb.sim_engine.data.roster_artifact import read_game_roster_artifact
+    from syndicate.features.mlb.sim_engine.models import GameConfig
+    from syndicate.features.mlb.sim_engine.simulate import simulate_game
 
     actuals = load_actuals()
     jobs = []

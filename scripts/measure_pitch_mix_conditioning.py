@@ -26,7 +26,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-RAW = "vendor/mlb_bettingv2/data/raw/statcast/pitches/*/*.csv.gz"
+RAW = "engines/mlb/data/raw/statcast/pitches/*/*.csv.gz"
 
 # Families keep the tables legible. The per-pitch-type detail is still measured;
 # families are only how it is PRINTED.

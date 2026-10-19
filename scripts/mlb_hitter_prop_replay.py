@@ -28,7 +28,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import mlb_starter_length_replay as rp  # noqa: E402
 
-TUNING = rp.VENDOR / "data" / "tuning"
+TUNING = rp.ENGINE_ROOT / "data" / "tuning"
 PROPS_FILE = TUNING / "hitter_props_calibration" / "default.json"
 HR_FILE = TUNING / "hitter_hr_calibration" / "default.json"
 
@@ -57,23 +57,23 @@ def keys() -> list[str]:
 
 
 def current_map(key: str) -> dict:
-    from sim_engine.prob_calibration import resolve_prop_calibration_cfg
+    from syndicate.features.mlb.sim_engine.prob_calibration import resolve_prop_calibration_cfg
 
     cfg = json.loads((HR_FILE if key == "hr_1plus" else PROPS_FILE).read_text(encoding="utf-8"))
     return resolve_prop_calibration_cfg(cfg, key) or {}
 
 
 def apply_map(p: float, m: dict) -> float:
-    from sim_engine.prob_calibration import apply_prob_calibration
+    from syndicate.features.mlb.sim_engine.prob_calibration import apply_prob_calibration
 
     return float(apply_prob_calibration(float(p), m))
 
 
 # ----------------------------------------------------------------- collect
 def _sim_game(job: dict) -> dict:
-    from sim_engine.data.roster_artifact import read_game_roster_artifact
-    from sim_engine.models import GameConfig
-    from sim_engine.simulate import simulate_game
+    from syndicate.features.mlb.sim_engine.data.roster_artifact import read_game_roster_artifact
+    from syndicate.features.mlb.sim_engine.models import GameConfig
+    from syndicate.features.mlb.sim_engine.simulate import simulate_game
 
     art = read_game_roster_artifact(Path(job["roster_path"]))
     away, home = art["away"], art["home"]

@@ -17,8 +17,8 @@ THREE BUILDERS, NOT FIVE, and that is a finding rather than a shortcut:
   quality      pb.statcast_batter_expected_stats + exitvelo_barrels
         ^ self-contained: two or three Statcast leaderboard calls each.
 
-  conditional_mix  reads vendor/mlb_bettingv2/data/raw/statcast/pitches/<season>/*.csv.gz
-  pitch_splits     reads vendor/mlb_bettingv2/data/cache/statcast/pitcher_pitch_splits
+  conditional_mix  reads engines/mlb/data/raw/statcast/pitches/<season>/*.csv.gz
+  pitch_splits     reads engines/mlb/data/cache/statcast/pitcher_pitch_splits
         ^ NOT schedulable here. Both read gitignored vendor trees that do not
           exist on any runner or on the worker, so scheduling them would produce
           a confident zero. `pitch_splits` is additionally SUPERSEDED -- the
@@ -77,10 +77,10 @@ BUILDERS: tuple[tuple[str, str], ...] = (
 # Deliberately named so a reader does not have to rediscover why they are absent.
 NOT_SCHEDULABLE = {
     "build_mlb_conditional_mix_artifact.py":
-        "reads vendor/mlb_bettingv2/data/raw/statcast/pitches/<season>/*.csv.gz "
+        "reads engines/mlb/data/raw/statcast/pitches/<season>/*.csv.gz "
         "(gitignored; absent on runners and on the worker)",
     "build_mlb_pitch_splits_artifact.py":
-        "reads a local DiskCache under vendor/mlb_bettingv2/data/ (gitignored), "
+        "reads a local DiskCache under engines/mlb/data/ (gitignored), "
         "AND is superseded by the arsenal builder per its own docstring",
 }
 

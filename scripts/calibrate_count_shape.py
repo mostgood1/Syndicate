@@ -28,9 +28,9 @@ from dataclasses import replace
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO / "vendor" / "mlb_bettingv2"))
+sys.path.insert(0, str(REPO))  # the native engine is imported by package (lane mlb-research-scripts-native)
 
-RAW = "vendor/mlb_bettingv2/data/raw/statcast/pitches/*/*.csv.gz"
+RAW = "engines/mlb/data/raw/statcast/pitches/*/*.csv.gz"
 OUTCOMES = ("BALL", "CALLED", "SWING", "FOUL", "IN_PLAY")
 COUNTS = ["0-0", "0-1", "0-2", "1-0", "1-1", "1-2", "2-0", "2-1", "2-2", "3-0", "3-1", "3-2"]
 
@@ -64,8 +64,8 @@ def real_matrix(max_files: int) -> dict:
 
 
 def sim_matrix(games, sims, seed, overrides):
-    from sim_engine.models import GameConfig
-    from sim_engine.simulate import simulate_game
+    from syndicate.features.mlb.sim_engine.models import GameConfig
+    from syndicate.features.mlb.sim_engine.simulate import simulate_game
 
     out = defaultdict(Counter)
     pa = k = pitches = 0
@@ -149,8 +149,8 @@ def main() -> int:
                          "K/PA miss cost about as much as a 0.04 matrix miss")
     args = ap.parse_args()
 
-    from sim_engine.data.roster_artifact import read_game_roster_artifact
-    import sim_engine.pitch_model as PM
+    from syndicate.features.mlb.sim_engine.data.roster_artifact import read_game_roster_artifact
+    import syndicate.features.mlb.sim_engine.pitch_model as PM
 
     print("loading real matrix", flush=True)
     real = real_matrix(args.max_files)

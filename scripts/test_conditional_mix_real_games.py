@@ -48,9 +48,9 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO / "vendor" / "mlb_bettingv2"))
+sys.path.insert(0, str(REPO))  # the native engine is imported by package (lane mlb-research-scripts-native)
 
-RAW = "vendor/mlb_bettingv2/data/raw/statcast/pitches/{season}/*.csv.gz"
+RAW = "engines/mlb/data/raw/statcast/pitches/{season}/*.csv.gz"
 EPS = 0.01
 
 
@@ -79,7 +79,7 @@ def main() -> int:
                     help="per pitcher-game floor for the TVD table")
     args = ap.parse_args()
 
-    from sim_engine.data.pitch_codes import canon_pitch_type
+    from syndicate.features.mlb.sim_engine.data.pitch_codes import canon_pitch_type
 
     art = json.loads(args.artifact.read_text(encoding="utf-8"))
     buckets = art.get("count_to_bucket") or {}

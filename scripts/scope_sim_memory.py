@@ -39,8 +39,7 @@ from dataclasses import replace
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-VENDOR = REPO_ROOT / "vendor" / "mlb_bettingv2"
-for p in (str(REPO_ROOT), str(VENDOR)):
+for p in (str(REPO_ROOT),):
     if p not in sys.path:
         sys.path.insert(0, p)
 
@@ -69,7 +68,7 @@ def find_roster() -> Path | None:
 
 def run(mode: str, away, home, cfg, sims: int, starters: set[str]) -> dict:
     """One game at `sims` draws. `mode` decides retain-vs-accumulate."""
-    from sim_engine.simulate import simulate_game
+    from syndicate.features.mlb.sim_engine.simulate import simulate_game
 
     gc.collect()
     tracemalloc.start()
@@ -110,8 +109,8 @@ def main() -> int:
         print("no MLB roster artifact found locally -- cannot scope")
         return 1
 
-    from sim_engine.data.roster_artifact import read_game_roster_artifact
-    from sim_engine.models import GameConfig
+    from syndicate.features.mlb.sim_engine.data.roster_artifact import read_game_roster_artifact
+    from syndicate.features.mlb.sim_engine.models import GameConfig
 
     raw = read_game_roster_artifact(roster_path)
     away, home = raw["away"], raw["home"]

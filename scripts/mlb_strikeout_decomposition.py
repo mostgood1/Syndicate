@@ -31,9 +31,9 @@ STAT_KEYS = ("OUTS", "P", "SO", "H", "BB", "HBP", "BF", "ER")
 
 
 def _sim_game(job: dict) -> dict:
-    from sim_engine.data.roster_artifact import read_game_roster_artifact
-    from sim_engine.models import GameConfig
-    from sim_engine.simulate import simulate_game
+    from syndicate.features.mlb.sim_engine.data.roster_artifact import read_game_roster_artifact
+    from syndicate.features.mlb.sim_engine.models import GameConfig
+    from syndicate.features.mlb.sim_engine.simulate import simulate_game
 
     art = read_game_roster_artifact(Path(job["roster_path"]))
     away, home = art["away"], art["home"]

@@ -46,12 +46,11 @@ import statistics
 import sys
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
-VENDOR = REPO / "vendor" / "mlb_bettingv2"
-for p in (str(REPO), str(VENDOR)):
+for p in (str(REPO),):
     if p not in sys.path:
         sys.path.insert(0, p)
 
-from sim_engine.models import (  # noqa: E402
+from syndicate.features.mlb.sim_engine.models import (  # noqa: E402
     BatterProfile,
     GameConfig,
     Handedness,
@@ -63,7 +62,7 @@ from sim_engine.models import (  # noqa: E402
     Team,
     TeamRoster,
 )
-from sim_engine.simulate import simulate_game  # noqa: E402
+from syndicate.features.mlb.sim_engine.simulate import simulate_game  # noqa: E402
 
 TARGET_MARGIN_RUNS = 0.207
 

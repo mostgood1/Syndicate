@@ -28,11 +28,11 @@ from dataclasses import replace
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-for _p in (str(REPO), str(REPO / "vendor" / "mlb_bettingv2")):
+for _p in (str(REPO),):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-RAW = "vendor/mlb_bettingv2/data/raw/statcast/pitches/*/*.csv.gz"
+RAW = "engines/mlb/data/raw/statcast/pitches/*/*.csv.gz"
 # statcast `description` -> the engine's call vocabulary
 DESC = {
     "ball": "BALL", "blocked_ball": "BALL", "pitchout": "BALL",
@@ -71,9 +71,9 @@ def real_matrix(max_files: int) -> dict:
 
 
 def sim_matrix(games: int, sims: int) -> dict:
-    from sim_engine.data.roster_artifact import read_game_roster_artifact
-    from sim_engine.models import GameConfig
-    from sim_engine.simulate import simulate_game
+    from syndicate.features.mlb.sim_engine.data.roster_artifact import read_game_roster_artifact
+    from syndicate.features.mlb.sim_engine.models import GameConfig
+    from syndicate.features.mlb.sim_engine.simulate import simulate_game
     out = defaultdict(Counter)
     paths = sorted(glob.glob(
         "data/mlb_source/source_artifacts/data/daily_pitcher_props/snapshots/*/roster_objs/roster_obj_*.json"))[:games]

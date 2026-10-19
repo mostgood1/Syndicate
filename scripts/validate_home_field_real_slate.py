@@ -51,15 +51,14 @@ import time
 import urllib.request
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
-VENDOR = REPO / "vendor" / "mlb_bettingv2"
-for _p in (str(REPO), str(VENDOR)):
+for _p in (str(REPO),):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-from sim_engine.data.build_roster import build_team, build_team_roster  # noqa: E402
-from sim_engine.data.statsapi import StatsApiClient  # noqa: E402
-from sim_engine.models import GameConfig  # noqa: E402
-from sim_engine.simulate import simulate_game  # noqa: E402
+from syndicate.features.mlb.sim_engine.data.build_roster import build_team, build_team_roster  # noqa: E402
+from syndicate.features.mlb.sim_engine.data.statsapi import StatsApiClient  # noqa: E402
+from syndicate.features.mlb.sim_engine.models import GameConfig  # noqa: E402
+from syndicate.features.mlb.sim_engine.simulate import simulate_game  # noqa: E402
 
 CACHE = pathlib.Path(os.environ.get("TEMP", "/tmp")) / "mlb_real_rosters"
 

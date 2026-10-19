@@ -45,8 +45,7 @@ from dataclasses import replace
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-VENDOR = REPO_ROOT / "vendor" / "mlb_bettingv2"
-for p in (str(REPO_ROOT), str(VENDOR)):
+for p in (str(REPO_ROOT),):
     if p not in sys.path:
         sys.path.insert(0, p)
 
@@ -140,18 +139,18 @@ def load_actual_rates(dates: "set[str] | None" = None) -> tuple:
 
 def sim_aggregates(jobs, cfg_kwargs, sims, seed, corrections, season, weight):
     from datetime import date as _dt_date
-    from sim_engine.data.arsenal import (apply_arsenal_to_batter,
+    from syndicate.features.mlb.sim_engine.data.arsenal import (apply_arsenal_to_batter,
                                          apply_arsenal_to_pitcher)
-    from sim_engine.data.batted_ball import (apply_batted_ball_to_batter,
+    from syndicate.features.mlb.sim_engine.data.batted_ball import (apply_batted_ball_to_batter,
                                              apply_batted_ball_to_pitcher)
-    from sim_engine.data.quality import apply_quality
-    from sim_engine.data.statcast_bvp import (apply_starter_bvp_hr_multipliers,
+    from syndicate.features.mlb.sim_engine.data.quality import apply_quality
+    from syndicate.features.mlb.sim_engine.data.statcast_bvp import (apply_starter_bvp_hr_multipliers,
                                               default_bvp_cache)
-    from sim_engine.data.build_roster import _apply_cached_statcast_pitch_splits
-    from sim_engine.data.roster_artifact import read_game_roster_artifact
-    from sim_engine.data.statcast_pitch_splits import default_statcast_cache
-    from sim_engine.models import GameConfig
-    from sim_engine.simulate import simulate_game
+    from syndicate.features.mlb.sim_engine.data.build_roster import _apply_cached_statcast_pitch_splits
+    from syndicate.features.mlb.sim_engine.data.roster_artifact import read_game_roster_artifact
+    from syndicate.features.mlb.sim_engine.data.statcast_pitch_splits import default_statcast_cache
+    from syndicate.features.mlb.sim_engine.models import GameConfig
+    from syndicate.features.mlb.sim_engine.simulate import simulate_game
 
     cache = default_statcast_cache()
     bvp_cache = default_bvp_cache()

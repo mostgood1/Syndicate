@@ -39,9 +39,11 @@ from collections import defaultdict
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-VENDOR = REPO / "vendor" / "mlb_bettingv2"
-if str(VENDOR) not in sys.path:
-    sys.path.insert(0, str(VENDOR))
+# The MLB engine DATA root (was vendor/mlb_bettingv2; lane mlb-research-scripts-native). Read by
+# scripts/mlb_hitter_prop_replay.py as `rp.ENGINE_ROOT`.
+ENGINE_ROOT = REPO / "engines" / "mlb"
+if str(REPO) not in sys.path:  # the native engine is imported by package (lane mlb-research-scripts-native)
+    sys.path.insert(0, str(REPO))
 
 STATSAPI = "https://statsapi.mlb.com/api/v1"
 
@@ -52,7 +54,7 @@ def _load_json(p):
 
 
 def forward_overrides() -> tuple[dict, dict]:
-    from sim_engine.forward_tuning import (
+    from syndicate.features.mlb.sim_engine.forward_tuning import (
         FORWARD_MANAGER_PITCHING_OVERRIDES_PATH as MP,
         FORWARD_PITCH_MODEL_OVERRIDES_PATH as PM,
     )
@@ -63,7 +65,7 @@ def forward_overrides() -> tuple[dict, dict]:
 
 def context_from_sim(rec: dict | None):
     """Rebuild park/weather/umpire from the stored sim record (None -> neutral)."""
-    from sim_engine.models import ParkFactors, UmpireFactors, WeatherFactors
+    from syndicate.features.mlb.sim_engine.models import ParkFactors, UmpireFactors, WeatherFactors
 
     if not rec:
         return None, None, None
@@ -119,9 +121,9 @@ def games_for_date(data_dir: Path, date: str, stored: str = "frozen") -> list[di
 
 # -------------------------------------------------------------------- sim
 def _sim_one_game(job: dict) -> dict:
-    from sim_engine.data.roster_artifact import read_game_roster_artifact
-    from sim_engine.models import GameConfig
-    from sim_engine.simulate import simulate_game
+    from syndicate.features.mlb.sim_engine.data.roster_artifact import read_game_roster_artifact
+    from syndicate.features.mlb.sim_engine.models import GameConfig
+    from syndicate.features.mlb.sim_engine.simulate import simulate_game
 
     art = read_game_roster_artifact(Path(job["roster_path"]))
     away, home = art["away"], art["home"]
