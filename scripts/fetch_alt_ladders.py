@@ -17,7 +17,15 @@ main `book_quotes` stream assumes one line per book per market, and a ladder in 
 book counts on every consumer. Every call is also recorded through `record_oddsapi_quota`, so the account's
 per-sport ledger sees it.
 
-Run every 15 minutes (it only spends on a game entering the window, once):
+EARLY + LATE (user 2026-10-19: "are we sure alt line prices arent available now? is this an availability issue or an
+issue with odds we pull and when we pull them?" -> "Early + late"). Measured that day: BOS @ DET's NBA alternates were
+posted at 7 of 10 books ~27 h before tip -- the late-only pull made the parlays appear ~1 h before each game, too late
+for a morning post. So each game is fetched TWICE: once EARLY (the first run it is 90 min - 30 h out, reading
+tomorrow's sheet too) and once LATE (20-90 min out, as before). A later capture replaces an earlier one per book x rung
+wherever the ladder is read. Rows land in the GAME's day file (the one its sheet reads); the daily cap counts credits by
+the Central day they were SPENT. Measured spend before the change: 20 / 87 / 116 credits on 10-16 / 10-17 / 10-18.
+
+Run every 15 minutes (it only spends on a game entering a window, once per window):
   nice -n 19 python scripts/fetch_alt_ladders.py --data-root /home/amyn/syndicate-prod/data
   python scripts/fetch_alt_ladders.py --data-root ... --dry-run      # the due games and the worst-case credits
 """
@@ -66,8 +74,9 @@ ALT_MARKETS = {
              "player_threes_alternate", "player_points_rebounds_assists_alternate", "player_points_rebounds_alternate",
              "player_points_assists_alternate", "player_rebounds_assists_alternate"),
 }
-WINDOW_MINUTES = (20, 90)          # fetch the first time a game is 20-90 minutes from its start (every-15-min runs)
-DAILY_CREDIT_CAP = 400             # all sports, per Central day; SYNDICATE_ALT_LADDER_DAILY_CAP overrides
+WINDOW_MINUTES = (20, 90)          # the LATE fetch: the first run a game is 20-90 minutes from its start
+EARLY_WINDOW_MINUTES = (90, 30 * 60)   # the EARLY fetch: the first run it is 90 min - 30 h out (night-before sheets)
+DAILY_CREDIT_CAP = 800             # all sports, per Central day SPENT (was 400 before early + late); env overrides
 NHL_FALLBACK_BOOKS = "draftkings,fanduel,betmgm,williamhill_us,betrivers,fanatics,espnbet,hardrockbet,pinnacle,betonlineag"
 
 
@@ -98,19 +107,31 @@ def _parse_ts(value: Any) -> datetime | None:
         return None
 
 
+def _phases_done(record: dict[str, Any] | None) -> set[str]:
+    """The phases a game was fetched in. A record from before early + late (no `phases`) was a LATE fetch."""
+    if not record:
+        return set()
+    return set((record.get("phases") or {}).keys()) or {"late"}
+
+
 def due_games(sheet: dict[str, Any], state: dict[str, Any], now: datetime,
-              window: tuple[int, int] = WINDOW_MINUTES) -> list[dict[str, Any]]:
-    """The sheet's games starting within the window that have not been fetched (one fetch per game, ever)."""
-    done = set((state.get("events") or {}).keys())
+              window: tuple[int, int] = WINDOW_MINUTES,
+              early_window: tuple[int, int] | None = EARLY_WINDOW_MINUTES) -> list[dict[str, Any]]:
+    """The sheet's games due a fetch now, each with its `phase`: LATE when 20-90 min out and not fetched late; EARLY
+    when 90 min - 30 h out and fetched in neither phase. One fetch per game per phase, ever."""
+    events = state.get("events") or {}
     out = []
     for game in sheet.get("games") or []:
         start = _parse_ts(game.get("commence_time"))
         event_id = str(game.get("event_id") or "")
-        if not start or not event_id or event_id in done:
+        if not start or not event_id:
             continue
+        done = _phases_done(events.get(event_id))
         minutes = (start - now).total_seconds() / 60.0
-        if window[0] <= minutes <= window[1]:
-            out.append(dict(game, minutes_to_start=round(minutes, 1)))
+        if window[0] <= minutes <= window[1] and "late" not in done:
+            out.append(dict(game, minutes_to_start=round(minutes, 1), phase="late"))
+        elif early_window and early_window[0] < minutes <= early_window[1] and not done:
+            out.append(dict(game, minutes_to_start=round(minutes, 1), phase="early"))
     return out
 
 
@@ -197,9 +218,22 @@ def _write_json(path: Path, doc: dict[str, Any]) -> None:
     os.replace(tmp, path)
 
 
+def _next_day(day: str) -> str:
+    return (datetime.fromisoformat(day) + timedelta(days=1)).date().isoformat()
+
+
 def credits_today(data_root: Path, day: str) -> int:
-    return sum(int(_read_json(data_root / f"{s}_source" / "tracking" / "alt_ladders" / f"{day}.state.json")
-                   .get("credits") or 0) for s in SPORT_KEYS)
+    """Credits SPENT on `day` (Central), across today's and tomorrow's state files: an early fetch for tomorrow's game
+    bills today. A state file from before early + late (no `spend`) counts its credits on its own day."""
+    total = 0
+    for sheet_day in (day, _next_day(day)):
+        for s in SPORT_KEYS:
+            state = _read_json(data_root / f"{s}_source" / "tracking" / "alt_ladders" / f"{sheet_day}.state.json")
+            if "spend" in state:
+                total += int((state.get("spend") or {}).get(day) or 0)
+            elif sheet_day == day:
+                total += int(state.get("credits") or 0)
+    return total
 
 
 def run(data_root: Path, sports: list[str], *, now: datetime, api_key: str, cap: int, dry_run: bool = False,
@@ -211,44 +245,52 @@ def run(data_root: Path, sports: list[str], *, now: datetime, api_key: str, cap:
         if sport not in SPORT_KEYS:
             print(f"ALT_LADDERS {sport} skipped: no player alternates fetched for this sport", flush=True)
             continue
-        sheet = _read_json(data_root / "cheatsheets" / sport / f"{day}.json")
         out_dir = data_root / f"{sport}_source" / "tracking" / "alt_ladders"
-        state_path = out_dir / f"{day}.state.json"
-        state = _read_json(state_path) or {"date": day, "sport": sport, "events": {}, "credits": 0}
-        games = due_games(sheet, state, now)
-        totals["due"] += len(games)
-        for game in games:
-            worst = len(ALT_MARKETS[sport])
-            label = f"{game.get('away_team')} @ {game.get('home_team')} in {game['minutes_to_start']} min"
-            if dry_run:
-                print(f"ALT_LADDERS {sport} DUE {label} -- up to {worst} credits", flush=True)
-                continue
-            if spent + worst > cap:
-                totals["skipped_cap"] += 1
-                print(f"ALT_LADDERS {sport} SKIPPED {label}: today's alt credits {spent} + {worst} > cap {cap}", flush=True)
-                continue
-            payload, cost, status = fetch_event(sport, str(game["event_id"]), ALT_MARKETS[sport], api_key=api_key, get=get)
-            spent += cost
-            captured = now.astimezone(timezone.utc).isoformat(timespec="seconds")
-            rows = ladder_rows(payload, sport=sport, captured_at=captured) if payload else []
-            if rows:
-                out_dir.mkdir(parents=True, exist_ok=True)
-                with open(out_dir / f"{day}.jsonl", "a", encoding="utf-8") as fh:
-                    for row in rows:
-                        fh.write(json.dumps(row) + "\n")
-            players = len({r["player"] for r in rows})
-            markets = sorted({r["market_key"] for r in rows})
-            state["events"][str(game["event_id"])] = {"fetched_at": captured, "status": status, "credits": cost,
-                                                      "rows": len(rows), "players": players, "markets": markets,
-                                                      "matchup": f"{game.get('away_team')} @ {game.get('home_team')}"}
-            state["credits"] = int(state.get("credits") or 0) + cost
-            _write_json(state_path, state)
-            totals["fetched"] += 1
-            totals["rows"] += len(rows)
-            totals["credits"] += cost
-            totals["errors"] += status not in ("ok", "ok_per_market")
-            print(f"ALT_LADDERS {sport} {label}: status={status} credits={cost} rows={len(rows)} players={players} "
-                  f"markets={len(markets)}", flush=True)
+        for sheet_day in (day, _next_day(day)):        # tomorrow's sheet: its games' EARLY fetch
+            sheet = _read_json(data_root / "cheatsheets" / sport / f"{sheet_day}.json")
+            state_path = out_dir / f"{sheet_day}.state.json"
+            state = _read_json(state_path) or {"date": sheet_day, "sport": sport, "events": {}, "credits": 0}
+            games = due_games(sheet, state, now)
+            totals["due"] += len(games)
+            for game in games:
+                worst = len(ALT_MARKETS[sport])
+                label = f"{game.get('away_team')} @ {game.get('home_team')} in {game['minutes_to_start']} min ({game['phase']})"
+                if dry_run:
+                    print(f"ALT_LADDERS {sport} DUE {label} -- up to {worst} credits", flush=True)
+                    continue
+                if spent + worst > cap:
+                    totals["skipped_cap"] += 1
+                    print(f"ALT_LADDERS {sport} SKIPPED {label}: today's alt credits {spent} + {worst} > cap {cap}", flush=True)
+                    continue
+                payload, cost, status = fetch_event(sport, str(game["event_id"]), ALT_MARKETS[sport], api_key=api_key, get=get)
+                spent += cost
+                captured = now.astimezone(timezone.utc).isoformat(timespec="seconds")
+                rows = ladder_rows(payload, sport=sport, captured_at=captured) if payload else []
+                if rows:
+                    out_dir.mkdir(parents=True, exist_ok=True)
+                    with open(out_dir / f"{sheet_day}.jsonl", "a", encoding="utf-8") as fh:
+                        for row in rows:
+                            fh.write(json.dumps(row) + "\n")
+                players = len({r["player"] for r in rows})
+                markets = sorted({r["market_key"] for r in rows})
+                fetch = {"fetched_at": captured, "status": status, "credits": cost, "rows": len(rows), "players": players,
+                         "markets": markets}
+                record = dict(state["events"].get(str(game["event_id"])) or {})
+                phases = dict(record.get("phases") or ({"late": {k: record[k] for k in fetch if k in record}} if record else {}))
+                phases[game["phase"]] = fetch
+                state["events"][str(game["event_id"])] = {**fetch, "phases": phases,
+                                                          "matchup": f"{game.get('away_team')} @ {game.get('home_team')}"}
+                state["credits"] = int(state.get("credits") or 0) + cost
+                spend = dict(state.get("spend") or {})
+                spend[day] = int(spend.get(day) or 0) + cost
+                state["spend"] = spend
+                _write_json(state_path, state)
+                totals["fetched"] += 1
+                totals["rows"] += len(rows)
+                totals["credits"] += cost
+                totals["errors"] += status not in ("ok", "ok_per_market")
+                print(f"ALT_LADDERS {sport} {label}: status={status} credits={cost} rows={len(rows)} players={players} "
+                      f"markets={len(markets)}", flush=True)
     totals["credits_today"] = spent
     return totals
 

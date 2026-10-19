@@ -63,7 +63,8 @@ def _no_quota_store(monkeypatch):
 
 
 def test_only_games_entering_the_window_are_fetched_once_and_only_the_alternate_keys(tmp_path):
-    _sheet(tmp_path, "nfl", [_game("soon", 75), _game("later", 200), _game("started", -5), _game("too_close", 10)])
+    # "later" is past the 30-hour EARLY window (2026-10-19): only "soon" is due, in the LATE window
+    _sheet(tmp_path, "nfl", [_game("soon", 75), _game("later", 31 * 60), _game("started", -5), _game("too_close", 10)])
     api = FakeApi()
     totals = alt.run(tmp_path, ["nfl"], now=NOW, api_key="k", cap=400, get=api)
     assert [c["markets"] for c in api.calls] == [list(alt.ALT_MARKETS["nfl"])]
@@ -131,3 +132,38 @@ def test_wnba_is_fetched_with_its_verified_alternates_on_nbas_ten_books():
     assert m.SPORT_KEYS["wnba"] == "basketball_wnba" and "player_points_alternate" in m.ALT_MARKETS["wnba"]
     assert "player_double_double_alternate" not in m.ALT_MARKETS["wnba"]
     assert m.bookmakers_for("wnba") == m.bookmakers_for("nba") and len(m.bookmakers_for("wnba").split(",")) <= 10
+
+
+
+# ---------------------------------------------------------------- early + late (user 2026-10-19: "Early + late")
+def test_a_game_is_fetched_early_then_late_and_once_per_phase(tmp_path):
+    _sheet(tmp_path, "nfl", [_game("g", 600)])                                  # 10 h out: the EARLY window
+    api = FakeApi()
+    assert alt.run(tmp_path, ["nfl"], now=NOW, api_key="k", cap=800, get=api)["fetched"] == 1
+    assert alt.run(tmp_path, ["nfl"], now=NOW + timedelta(minutes=15), api_key="k", cap=800, get=api)["fetched"] == 0
+    late = NOW + timedelta(minutes=600 - 75)                                    # 75 min out: the LATE window
+    assert alt.run(tmp_path, ["nfl"], now=late, api_key="k", cap=800, get=api)["fetched"] == 1
+    assert len(api.calls) == 2
+    state = json.loads((tmp_path / "nfl_source" / "tracking" / "alt_ladders" /
+                        f"{alt.central_day(NOW)}.state.json").read_text(encoding="utf-8"))
+    assert set(state["events"]["g"]["phases"]) == {"early", "late"} and state["credits"] == 16
+
+
+def test_tomorrows_game_is_fetched_early_into_its_own_day_file_and_billed_today(tmp_path):
+    today = alt.central_day(NOW)
+    tomorrow = (datetime.fromisoformat(today) + timedelta(days=1)).date().isoformat()
+    path = tmp_path / "cheatsheets" / "nfl" / f"{tomorrow}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"sport": "nfl", "games": [_game("t", 20 * 60)]}), encoding="utf-8")
+    api = FakeApi()
+    assert alt.run(tmp_path, ["nfl"], now=NOW, api_key="k", cap=800, get=api)["fetched"] == 1
+    out = tmp_path / "nfl_source" / "tracking" / "alt_ladders"
+    assert (out / f"{tomorrow}.jsonl").exists() and not (out / f"{today}.jsonl").exists()
+    assert alt.credits_today(tmp_path, today) == 8 and alt.credits_today(tmp_path, tomorrow) == 0
+
+
+def test_a_fetch_recorded_before_early_late_counts_as_the_late_one(tmp_path):
+    state = {"events": {"old": {"fetched_at": "x", "credits": 8}}, "credits": 8}
+    sheet = {"games": [_game("old", 60), _game("old2", 600)]}
+    due = alt.due_games(sheet, state, NOW)
+    assert [(g["event_id"], g["phase"]) for g in due] == [("old2", "early")]
