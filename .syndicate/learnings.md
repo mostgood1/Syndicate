@@ -2488,3 +2488,16 @@ Nothing graded this time only because the one-shot settlement ran in the 'Schedu
 
 - **What was true:** it is OPEN POSITIONS ONLY. Stamp 2026-10-19T18:13Z: 4.50 with exactly one $4.50 position beside $485.48 cash. Likewise Polymarket `buyingPower` INCLUDES a not-yet-cleared deposit ($550 of $586.05).
 - **The rule going forward:** before a venue balance field becomes a SIZING basis, check it against a reading where you know the answer (one known position, one known deposit). Read the fields the venue already sends (`depositReservation`, `displayedAvailableSoon`) rather than inferring from the headline number.
+
+## A helper's `None` has TWO meanings, and my check defaulted unknown to GUILTY `[2026-10-19, lane mlb-strikeouts-scale-check]`
+
+I was one commit away from reporting **193 soccer rows as a defect** — rows whose own `model_skill` note predicts a score demotion and which carry no demotion stamp. I did the right thing first: I ran the REAL `measured_bucket_skill.bucket_factor` over the SERVED rows rather than reasoning about the code. It returned `None`, so I scored them `NEITHER -- DEFECT`.
+
+**`None` from that function means either "no bucket matched this row" or "I have no overlay to match against".** My process had no overlay and said so, in a log line I had already printed and not read: `[skill_overlay] SOURCE=static reason=overlay_absent buckets=0`. Production holds `measured_bucket_skill_overlay.json` with **62 validated buckets of 3,985 tested** (FDR q=0.10, regenerated 11:30Z that morning), and it contains `soccer|player_shots|full|pregame|fair_method=book_margin_model` as a **validated `skill_pocket`** (brier_diff -0.0039, CI [-0.0058, -0.0019], 156 games / 10 dates). A validated pocket returns 1.0 and CANCELS the category demotion — which is the documented design, stated in `_apply_skill_reliability`'s own docstring.
+
+**Why:** `feedback_unknown_must_not_default_permissive` says absent must not map onto the permissive branch. This is its mirror and it is just as wrong: my check mapped absent onto the ACCUSING branch, which manufactures findings instead of hiding them. Running the real function is necessary and not sufficient — it has to run somewhere that can SEE the data the consumer sees, and a worktree cannot (`feedback_worktree_results_are_not_main`: worktrees have no `data/`).
+
+**How to apply:**
+- Before reading a helper's `None` as a verdict, establish that its inputs were PRESENT. For an overlay/table-backed helper, assert the table is non-empty in the same process and print the count.
+- A three-valued answer needs three branches: matched / did-not-match / could-not-look. Never fold the third into either of the first two.
+- The discriminating evidence was already on the row: `optimizer_factor: 0.8816` is stamped only AFTER both of the function's early returns, so its presence proved the code had run and found `factor >= 1.0`. `feedback_read_the_field_you_already_have`, for the Nth time.

@@ -1022,6 +1022,18 @@ death, never life — do not invert it.
 - Verification: per-competition verdicts with 95% CIs in the findings file; offline tests pass
 - Blocked by: none
 
+### mlb-strikeouts-scale-check — CLOSED — opened 2026-10-19 — closed 2026-10-19 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- Goal: The 2026-10-16 'mlb strikeouts 5 of 5 rejected, all over, mean |edge| 26.4' lead is resolved against production numbers: either a scale/denominator defect in the strikeouts projection is named with its pipeline hop, or it is shown to be an already-measured bias that an existing calibrator already absorbs, with the served model_edge_pct quoted rather than the raw projection edge.
+- GOAL: MET — resolved as an ALREADY-MEASURED, ALREADY-CALIBRATED bias, not a scale defect, with the served field quoted. `model_skill` carries `parity with the market: Brier +0.017 [-0.009, +0.042] over 193 starts; biased high ~13%`, and `market_shrink` (`mlb-market-shrink-2026-10-10`) pulls `model_probability_raw` 0.6652 to 0.4241 against a market fair of 0.4129 — **96% of the way to the price** — turning `model_edge_pct_raw` **+25.65** into `model_edge_pct` **+1.539** (`ev_pct` 2.173). The lead is WITHDRAWN.
+- **My 10-16 bug list counted the WRONG FIELD.** It quoted `edge_vs_market_pct` (raw) where the consumer reads `model_edge_pct`; for this family they differ by **16.7x**. Right answer on four other sports for the wrong reason, which nothing in the result flagged.
+- Platform split, measured on the served board (2,714 measured rows): `market_shrink` fires on **6 rows**, and only those 6 have a `calibration_cell` at all. 771 rows class `loses_to_market` and are served at `identity`, shrink **1.000**.
+- **I drafted that as "the calibration layer is inert" and it is WRONG.** The verdict acts on board ORDER (`_apply_skill_reliability`, `min(raw, raw*factor)`, `factor = max(0.5, 1-5*established_loss_rel)`), on ADMISSION (`verdict_class: loses_to_market` -> rests on the model), and on STAKE (`portfolio_commit.py:346`). `established_loss_rel` is consumed in seven non-test modules.
+- Demotion is REACHABLE: **1,247 rows demoted by `category`, 310 by `bucket`**, factors 0.98 down to the 0.50 floor (196 rows at the floor).
+- **I nearly reported 193 rows as a defect; they are validated skill pockets.** See `learnings.md` — `bucket_factor` returned `None` because MY process had no overlay, not because no bucket matched.
+- Only genuine gap found: `skipped_no_fair` on **59 NCAAF rows with median raw edge 25.20 points**, the largest unshrunk magnitudes on the board, held back by rank alone. Recorded as the next cell worth a skill measurement; NOT taken in this lane.
+- No outcomes were used anywhere in this lane.
+- Files: .syndicate/findings_2026-10-19_mlb_strikeouts_scale_check.md (NEW)
+- Findings: `.syndicate/findings_2026-10-19_mlb_strikeouts_scale_check.md`.
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
