@@ -50810,3 +50810,26 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - **OPEN -- KALSHI SHARD 3 IS EMPTY:** `KALSHI_SHARD_BALANCES shards={'0': 490.0, '1': 0.01, '2': 0.0, '3': 0.0}`. MLB routes to shard 3 (`kalshi_orders.py` note, measured 2026-08-26), so every Kalshi MLB order refuses by name until the account holder moves collateral onto shard 3. `KALSHI_ORDER_KNOWN_SHARDS=0,3` is already set. This is a venue-account action, not code.
 - **STILL UNVERIFIED:** the fleet has not yet placed a real order. The signed ORDER POST from this host, the fill, and the ledger row are owed on the first placeable position. Watch any Kalshi soccer draw order specifically (new mapping).
 - **Revert:** engage the kill switch on `/portfolio` (fails closed). To go fully back to paper: restore both backups, `down`, `Start-ScheduledTask`.
+
+
+## 2026-10-19 16:07:53Z (11:07 AM CT) fleet ff f39133f8 -> fceb54c1 + `reload-web` (2.0 s, 0 failures): NBA opener readiness for the SGP pool (lane `basketball-sgp-builder`, session 9e18a0e7) -- NO worker restart
+- **ask:** user 2026-10-19 "build the NBA sgps for the opener tomorrow"; deploy approved "Deploy with ride-alongs (Recommended)".
+- **claim:** web by basketball-sgp-builder (token b4fff09f...), acquire exit 0. The first acquire was refused: `fleet-go-live` held it; waited for it to free (status polls, no re-acquire). That lane deployed up to f39133f8 meanwhile, so the optimizer (4b985db8) and the soccer aliases (f39133f8) were ALREADY live from its deploy.
+- **ride-alongs left in this ff:**
+  - 661539f0 (lane `mlb-postponed-grading`): postponed games never grade final. User-approved; runtime.
+  - 2f12e380: `scripts/unified_daily_update.ps1`, Windows-only, not run on the fleet.
+  - Ledger and tests.
+- **what:**
+  - Accent-folded names (the 10-20 sim spells Vucevic, Topic, Dadiet and Gonzalez with diacritics).
+  - A traded player is found league-wide when tonight's sim places him in the game (every NBA log is last season's).
+  - The sim's own 500-draw histograms for PTS / REB / AST / threes / PRA.
+  - The stale-log flag removed.
+- **verify (deployed module, read-only):**
+  - Inputs: the 10-20 sim (BOS @ DET, PHI @ NYK, OKC @ SAS), the game logs (last game 2026-06-13), the published NBA cells (143), and sim-built test rungs (no NBA alt prices exist before ~20-90 min pre-tip).
+  - Every sim player with >= 12 projected minutes resolved: 0 `no_game_log`.
+  - 220 legs, 9 tickets (six 3-leg 65-68%, three 5-leg 51-52%).
+  - The board carries 477 NBA props for 10-20; today's 2 PM / 9 PM builds make the full NBA sheet.
+- **owed:**
+  - The NBA alt capture on 10-20 and the first SERVED NBA tiers.
+  - Their grades: the NBA game-log job adds 2026-27 games from 10-21 06:20 CT.
+  - The 661539f0 owner's own measurement.
