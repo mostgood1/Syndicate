@@ -1185,6 +1185,14 @@ death, never life — do not invert it.
 - Verification: unit tests incl. off != on and worker-tick reachability; landed on origin/main; fleet ff + live-odds-worker restart behind claim+preflight; EXIT_TICK line on the fleet log with positions>0 quoted>0, and execution_exits.json present with watch rows; counterfactual readout after >= 7 slates
 - Blocked by: none
 
+### ev-overstatement-decomp — OPEN — opened 2026-10-19 — session 24ac7737-24a5-43ea-a362-4f52295dba38
+- Goal: A findings file naming, with denominators, the component that inflates claimed ev_pct above ~4% on settled paper venue orders (fleet execution ledger 10-02..10-18, one season phase per cell), plus a proposed engine/EV-stamp change (not a threshold, no sport/market exclusion) opened as its own lane with a pre-registered forward test
+- Files: scripts/ev_overstatement_decomp.py (NEW), .syndicate/findings_2026-10-19_ev_overstatement_decomp.md (NEW)
+- Hypothesis: PRE-REGISTERED before any decomposition: the extra ev_pct above 4% is selected FAIR NOISE / price dislocation, not model edge (sizing is market_fair since 09-19). Predicted signature: high-EV rows rest on fewer books in the fair, a one-sided or venue-own fair, or a venue quote off the consensus that does not move to the close; model_edge_pct contributes ~0.
+- Falsification test: Falsified if within the >=4% band the rows with the thinnest fair (books<=2 / one-sided / venue-own) are NOT worse on ROI-minus-claimed-EV than rows with a broad fair, AND same-book CLV minus claimed EV is flat across book count; or if model-edge rows carry the shortfall.
+- Verification: Event-clustered table: claimed EV, realised ROI, same-book CLV and (ROI - claimed EV) by EV band x component (book count, fair method, side_picked_by, price_source, venue, sport/market, season phase), n rows and n events per cell, read off the fleet ledger with the coverage printout
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
