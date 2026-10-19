@@ -52,6 +52,8 @@ def main(argv: list[str] | None = None) -> int:
     from datetime import datetime, timezone
 
     decision = ex.evaluate_exit(position, quote, margin=-1.0, fair_buffer=0.0, now=datetime.now(timezone.utc))
+    # Not a rule firing: margin=-1 only prices the bid and fees. Say so on the row.
+    decision = {**decision, "rule": "manual"}
     if decision.get("bid") is None:
         print(json.dumps({"refused": f"no_bid:{decision.get('reason')}"}))
         return 3

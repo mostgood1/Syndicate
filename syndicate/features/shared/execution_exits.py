@@ -96,10 +96,11 @@ RULE_MODEL_FAIR = "model_fair"
 # record, which does not know the position was sold first" -- settlement is now
 # exit-aware (`venue_settlement.exit_adjusted_pnl`), and so is the 24h INFERENCE
 # fallback in `paper_settlement.settle_orders` (same helpers, same defer rule).
-LIVE_BLOCKERS = (
-    "the v2 sell body (reduce_only, time_in_force=immediate_or_cancel) has never"
-    " been accepted by the venue -- first live exit must be watched",
-)
+# EMPTY since 2026-10-19 22:42:59Z: the v2 sell body was ACCEPTED and FILLED on a
+# real one-contract sale (Thornton NO, order 01a15655-1d08-7994-88cc-6fdecbd1b87f:
+# `buy yes` @ limit 0.14 filled 0.13 = NO sold @ 0.87, fee $0.008, venue holding
+# -5 -> -4; deploys.md 2026-10-19 22:42Z). Arming live exits is still the user's call.
+LIVE_BLOCKERS: tuple[str, ...] = ()
 
 _DEFAULT_TAKE_PROFIT_MARGIN = 0.08
 _DEFAULT_LOOKBACK_DAYS = 3
@@ -862,6 +863,7 @@ def place_exit(
     sellable: float | None,
     send: Callable[[Mapping[str, Any]], Mapping[str, Any]] | None = None,
     persist: Callable[[Mapping[str, Any]], None] | None = None,
+    read_back: Callable[[str], Mapping[str, Any]] | None = None,
     max_contracts: int | None = None,
     limit_price: float | None = None,
     purpose: str | None = None,
@@ -935,15 +937,35 @@ def place_exit(
         (persist or _persist)(state)
         return {"placed": False, "row": row}
     _exit_row_from_view(row, view, asdict(position))
+    if row.get("status") == EXIT_FILLED and row.get("fill_price") is None and row.get("venue_order_id"):
+        # THE CREATE RESPONSE DOES NOT PRICE THE FILL. Measured on the first real
+        # sale (2026-10-19 22:42:59Z): the POST answered `filled_count=1` with no
+        # fill cost, fee or status; the same order read back 34 s later carried
+        # `taker_fill_cost_dollars` and `taker_fees_dollars`. Read it back now --
+        # an unpriced fill is unreconciled, and settlement refuses to grade it.
+        from syndicate.features.shared.kalshi_orders import fetch_order, venue_order_view
+
+        try:
+            got = (read_back or fetch_order)(str(row["venue_order_id"]))
+            if got.get("status") == "ok":
+                _exit_row_from_view(row, venue_order_view(got.get("order") or {}), asdict(position))
+        except Exception as exc:  # noqa: BLE001 -- reconcile_exit_orders retries it
+            row["read_back_error"] = f"{type(exc).__name__}: {exc}"[:200]
     (persist or _persist)(state)
     return {"placed": True, "row": row}
 
 
 def unreconciled_exits(state: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Live exits whose venue outcome is not fully known: in flight, failed, or
+    filled with no price (a fill settlement cannot grade)."""
     return [
         row
         for row in (state.get("exits") or {}).values()
-        if row.get("mode") == EXIT_LIVE and row.get("status") in {EXIT_SUBMITTED, EXIT_FAILED}
+        if row.get("mode") == EXIT_LIVE
+        and (
+            row.get("status") in {EXIT_SUBMITTED, EXIT_FAILED}
+            or (row.get("status") == EXIT_FILLED and row.get("fill_price") is None)
+        )
     ]
 
 
@@ -1298,13 +1320,18 @@ def exit_counterfactual(
         if key:
             outcome_by_key[key] = str(order.get("outcome") or "")
 
-    pending = ungradable = 0
+    pending = ungradable = manual = 0
     by_rule: dict[str, dict[str, Any]] = {}
     by_mode: dict[str, dict[str, Any]] = {}
     by_phase: dict[str, dict[str, Any]] = {}
     by_sport: dict[str, dict[str, Any]] = {}
     by_venue: dict[str, dict[str, Any]] = {}
     for row in (state.get("exits") or {}).values():
+        if row.get("purpose"):
+            # A one-off operator sale (`exit_sell_once`), not a rule's decision:
+            # it says nothing about whether the RULE beats holding.
+            manual += 1
+            continue
         outcome = outcome_by_key.get(str(row.get("entry_key") or ""), "")
         if not outcome:
             pending += 1
@@ -1361,6 +1388,7 @@ def exit_counterfactual(
         "graded": sum(b["n"] for b in by_mode.values()),
         "pending": pending,
         "ungradable": ungradable,
+        "manual_excluded": manual,
         "by_rule": _rounded(by_rule),
         "by_mode": _rounded(by_mode),
         "by_phase": _rounded(by_phase),

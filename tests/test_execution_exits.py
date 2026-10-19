@@ -540,7 +540,7 @@ def test_counterfactual_splits_by_venue(monkeypatch):
 # -- partial (one-contract) live sales ------------------------------------------
 
 
-def _filled_one(monkeypatch, *, limit_price=None):
+def _filled_one(monkeypatch, *, limit_price=None, purpose="sell_body_verification"):
     _arm_live(monkeypatch)
     state = ex._empty_state()
     sent = []
@@ -551,7 +551,7 @@ def _filled_one(monkeypatch, *, limit_price=None):
                 "fees_dollars": 0.01, "order_id": "ord-1", "venue_status": "executed"}
 
     out = ex.place_exit(state, _position(), _decision(), sellable=5.0, send=send, persist=lambda s: None,
-                        max_contracts=1, limit_price=limit_price, purpose="sell_body_verification")
+                        max_contracts=1, limit_price=limit_price, purpose=purpose)
     return state, out, sent
 
 
@@ -583,7 +583,7 @@ def test_a_paper_exit_row_never_reduces_a_holding():
 
 
 def test_counterfactual_grades_a_partial_sale_on_the_contracts_sold(monkeypatch):
-    state, _, _ = _filled_one(monkeypatch)
+    state, _, _ = _filled_one(monkeypatch, purpose=None)  # a RULE's sale, not an operator's
     order = _order(outcome="won")  # NO paid out: holding that 1 contract would have made 1 - 0.90
     report = ex.exit_counterfactual(state, [order])
     bucket = report["by_mode"]["live/live"]
@@ -591,3 +591,54 @@ def test_counterfactual_grades_a_partial_sale_on_the_contracts_sold(monkeypatch)
     assert bucket["n"] == 1
     assert bucket["exit_pnl"] == pytest.approx(1 * (0.88 - 0.90) - 0.01 - fee_share, abs=0.01)
     assert bucket["hold_pnl"] == pytest.approx(1 * (1.0 - 0.90) - fee_share, abs=0.01)
+
+
+# -- the create response does not price the fill (measured 2026-10-19) --------
+
+
+def test_an_unpriced_create_response_is_read_back(monkeypatch):
+    _arm_live(monkeypatch)
+    state = ex._empty_state()
+    reads = []
+
+    def send(_body):  # what Kalshi's POST answered: a count, nothing else
+        return {"state": "filled", "filled_count": 1, "fill_cost_dollars": None, "fees_dollars": None,
+                "order_id": "ord-7", "venue_status": None}
+
+    def read_back(order_id):
+        reads.append(order_id)
+        return {"status": "ok", "order": {"status": "executed", "fill_count_fp": "1.00",
+                                          "taker_fill_cost_dollars": "0.130000", "taker_fees_dollars": "0.008000",
+                                          "order_id": "ord-7"}}
+
+    out = ex.place_exit(state, _position(), _decision(), sellable=5.0, send=send, persist=lambda s: None,
+                        read_back=read_back, max_contracts=1)
+    assert reads == ["ord-7"]
+    row = out["row"]
+    assert row["fill_price"] == pytest.approx(0.87) and row["exit_fee_dollars"] == pytest.approx(0.008)
+    assert ex.unreconciled_exits(state) == []
+
+
+def test_an_unpriced_fill_is_unreconciled_until_priced(monkeypatch):
+    _arm_live(monkeypatch)
+    state = ex._empty_state()
+    out = ex.place_exit(
+        state, _position(), _decision(), sellable=5.0, persist=lambda s: None, max_contracts=1,
+        send=lambda b: {"state": "filled", "filled_count": 1, "order_id": "ord-8"},
+        read_back=lambda oid: {"status": "error", "reason": "timeout"},
+    )
+    assert out["row"]["fill_price"] is None
+    assert len(ex.unreconciled_exits(state)) == 1
+    blocked = ex.place_exit(state, _position(idempotency_key="c" * 24), _decision(), sellable=5.0,
+                            send=_never_send, persist=lambda s: None)
+    assert blocked["refused"] == "unreconciled_exits"
+
+
+def test_operator_sales_are_kept_out_of_the_rule_counterfactual(monkeypatch):
+    state, _, _ = _filled_one(monkeypatch)  # purpose=sell_body_verification
+    report = ex.exit_counterfactual(state, [_order(outcome="won")])
+    assert report["manual_excluded"] == 1 and report["graded"] == 0
+
+
+def test_no_live_blockers_remain_after_the_measured_sale():
+    assert ex.LIVE_BLOCKERS == ()
