@@ -51270,3 +51270,44 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - What: user wrote `~/syndicate-prod/alerts.env` (Gmail app password; mode set 600 by this session; never read or printed). `alert_mailer.py status` -> enabled=true password_set=true to/from mostgood@gmail.com smtp.gmail.com:587. Run from the worktree at `5d83b0a6` (code `92339190` + `d3878d69`), NOT from the fleet checkout (still `affc9a7b`).
 - Measured: `alert_mailer.py test` -> `EMAIL_SENT` 23:04:45Z; **user confirmed it arrived**. `execution_alert_drill.py` (own redis-server :6391, temp home, dummy worker whose /proc environ carries the drill store env; fleet web /healthz read-only): step 1 baseline 0 emails; step 2 ONE email `ALERT exec:kill_switch (+9 more)` = heartbeat 40 min, kill_switch, unreconciled, unknown_submits, balance_stale, balance_status:kalshi, balance_low:polymarket, pending_deposit, log_errors:kalshi, log_errors:polymarket (23:05:34Z); step 3 same state -> 0 emails (deduped); step 4 restore -> ONE `cleared:` email (23:05:39Z); step 5 dummy worker killed -> ONE `ALERT role:live-odds-worker (+1 more)` (+ exec:heartbeat never stamped) (23:05:41Z); step 6 digest email (23:05:43Z). 4 EMAIL_SENT, 0 failed.
 - verify OWED: (1) the user confirms the 4 DRILL emails arrived; (2) fleet checkout carries `d3878d69` -> first real watchdog run logs `EMAIL_SENT` or nothing, and `watchdog_state.json` gains an `execution` block; first real digest (10-19) arrives on that run (it is past 8 AM CT); (3) live-odds-worker restarted on `d3878d69` -> `SELF_HEAL` lines appear only when a Kalshi unknown submit exists (0 now), `SELF_HEAL_FAILED` count 0.
+
+
+## 2026-10-19 22:43:45Z (5:43 PM CT) -- fleet ff 854b59ed -> affc9a7b + refresh-worker TERM/respawn: flat-unit tuner + **#704 MARKET-FAIR STAKING LIVE** + vendor deletion + exit-aware settlement -- **MET** (lane `min-ev-tuner-shadow`, session b98807bc)
+- **ask:** user 2026-10-19, in chat: "Yes. Ff the fleet to a commit containing affc9a7b and restart refresh-worker behind claim + drain, knowing it also switches on #704 market-fair staking and carries the vendor deletion and settlement changes; coordinate with those lanes first."
+- **coordination (before anything):**
+  - `published-negative-ev` (session 4ab694ed, loan condition on #704): "No hold needed". It asked for the RESPAWN instant (its 10-21 15:00Z reading splits on `sizing.staked_probability_version`).
+  - kalshi exit lanes (session local_646aa514): "Safe -- go". Both settlement paths grade identically while there are 0 live exit rows (exit mode paper).
+  - `uefa-kalshi-elim-aliases` (436c79e2): its 81e81501 is an ancestor of affc9a7b and rides along.
+  - `mlb-vendor-delete` (2d413211, not reachable): followed its deploys.md 2026-10-19T19:23:47Z prep note (tree archived, 2 modified files reset, nothing imports it).
+  - compounding-bankroll: the 60-min rule after its 21:37:27Z respawn gated this restart to >= 22:37:27Z.
+- **claims:** refresh-worker + web + live-odds-worker by `min-ev-tuner-shadow`, acquire exit 0, ~22:00Z.
+  - live-odds-worker released by token 22:16Z to the kalshi lane, which restarted it itself to load 550a4b20.
+  - refresh-worker + web refreshed (release + acquire) 22:30:30Z, released by token 22:45:23Z. A drain held 22:01-22:10Z was cleared early so compounding's shadow commit could run.
+- **ride-alongs (854b59ed..affc9a7b):**
+  - `affc9a7b` min_ev tuner, flat units (shadow);
+  - `bd9b0571` #704 staking seam (LIVE: see below);
+  - `814f7966` vendor/mlb_bettingv2 deleted (190 tracked files);
+  - `550a4b20` + `560628cf` + `f769a228` exit-aware settlement;
+  - `81e81501` UEFA aliases;
+  - research scripts.
+  - Not carried: nothing past affc9a7b.
+- **baseline (22:01:17Z):**
+  - refresh-worker pid 2661823 on `854b59ed`. Its environ already carried `SYNDICATE_STAKED_PROBABILITY_UNFITTED` (from compounding's 21:36Z `up`), inert because bd9b0571 was absent.
+  - Plans: paper 11 positions, all `staked_probability_version=unfitted`, `zero_kelly_stake` 5; live kalshi 1 position, `zero_kelly_stake` 1.
+- **timeline (UTC):**
+  - ff `--ff-only` 22:16:06Z. The guard script fails CLOSED: it aborts on any empty or unexpected HEAD (the 19:05Z Git Bash near-miss is fixed). Reflog 854b59ed -> affc9a7b; tracked vendor/mlb_bettingv2 files 190 -> 0; the 6 local data modifications were kept.
+  - Re-drain 22:30:3xZ: worker `DRAIN_HOLD stage=mlb_sim_tick` from 22:37:25Z. A board build started ~22:33Z before the hold could bite; I waited for it (`BOARD_BUILD_TIMING wall_s=494 ok=True` 22:41:15Z, persisted LOOP_ITERATION 22:43:07Z) instead of killing it.
+  - `kill -TERM 2661823` **22:43:45.257Z**. Supervisor exit code=0 claimed=true holder=min-ev-tuner-shadow 22:43:47Z.
+  - New **pid 2681168, lstart 22:43:52Z = #704 ACTIVATION INSTANT**. Drain cleared 22:44Z.
+- **verify (MET):**
+  - `status`: web / refresh-worker / live-odds-worker all `code=affc9a7b`.
+  - Process env (pid 2681168, Python parse of /proc environ, enum allowlist): `SYNDICATE_STAKED_PROBABILITY_UNFITTED=market`, key present x1 (re-derived independently by session 4ab694ed, `e4b466e7`).
+  - **#704, the first plans after activation (23:14Z):**
+    - `PORTFOLIO_COMMIT date=2026-10-19 positions=18 staked=$64.95 sim_share=0.0` (23:14:38.842Z);
+    - paper plan (generated **23:14:00Z** = first market-basis population): 18/18 positions `market_fair@`, `zero_kelly_stake` refusals 5-7 -> **0** (the sim's zero-Kelly veto lifted, as predicted);
+    - paper:novig 7/7 and paper:prophetx 5/5 `market_fair@unfitted`.
+  - **Tuner (affc9a7b), read-only forced pass, `persist=False`, on the deployed checkout over the production ledger:** `roi_basis` present; 60 cells, 60 `effective_cut_pct`, 0 bands at [0,1); still 0 moves. polymarket ncaaf totals band [3.34, 4.34): flat **+9.61%** (dollars -5.3%), matching the local replay. Persisted state untouched (last run 19:25:35Z); tomorrow 12Z is the first nightly on affc9a7b.
+  - **Vendor:** `git ls-files vendor/mlb_bettingv2` = 0 on the fleet. The next MLB sim / live tick writing 0 files under vendor/ is OWED by lane mlb-vendor-delete.
+- **NOT attributable to #704 (checked, not assumed):** the live kalshi plan went 1 -> 0 positions. Its 23:14:29Z refusals are all EV gates that run BEFORE sizing (`below_min_ev_pct_net_of_fee` 9, `below_min_ev_pct` 2, `aggregator_priced` 1), on a changed row set (12 rows vs 9 at 22:11Z). #704 acts only on the stake after those gates. The previous position's only stake-side refusal was `zero_kelly_stake`.
+- **revert #704:** delete the env line + full down/up, or a code revert of bd9b0571 + a claimed refresh-worker TERM (deploys.md 21:01:01Z). **Revert tuner basis:** env `SYNDICATE_MIN_EV_TUNER_ROI_BASIS=dollars` (needs a full `up`).
+- **owed:** the 7 daily tuner readouts (scheduled task `min-ev-tuner-daily-readout`, 08:40 CT); the #704 forward read (`sim-stake-forward-read-1102`) and `sim-stake-activation-check` (it should now find this entry); the vendor verify.
