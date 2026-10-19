@@ -82,10 +82,74 @@ It does not test lineups, rotation or any other information source (lane `soccer
   -0.066,0.271 --gap-k 1.577 --home-term 0.27609310702396533`, Idle priority. `--skip-live`: the
   live-refit arm is not part of this registration.
 
-## 3. RESULT
+## 3. RESULT (run 2026-10-19 ~21:25Z, Idle priority; `C:/tmp/uefa-closes/report_favourite_temper.json`, log `temper_gate.log`)
 
-(filled after the run)
+Self-check passed: 2,474 rows, max |ll_model diff| 0.0, λ -> probs 6.7e-16.
+
+### H-TEMPER (primary): NO-GO in UCL, UEL and UECL
+
+Δ = LL(BLEND_T) − LL(CLOSE), test seasons 2023-2026, 95% paired bootstrap CI:
+
+| competition | n | Δ tempered blend | verdict | Δ untempered control |
+|---|---|---|---|---|
+| UCL | 536 | −0.0013 [−0.0051, +0.0028] | NO-GO / NOT DEMONSTRATED | −0.0008 [−0.0039, +0.0023] |
+| UEL | 553 | +0.0019 [−0.0020, +0.0057] | NO-GO / FALSIFIED | +0.0017 [−0.0013, +0.0048] |
+| UECL | 462 | +0.0032 [−0.0016, +0.0081] | NO-GO / FALSIFIED | +0.0016 [−0.0024, +0.0054] |
+| pooled | 1,551 | +0.0012 [−0.0013, +0.0036] | NO-GO / FALSIFIED | +0.0008 [−0.0011, +0.0027] |
+
+**Blend weight w per season** (fit on 2020..S−1): tempered **0.25 / 0.15 / 0.15 / 0.10** (2023 / 24 / 25 / 26);
+untempered control 0.20 / 0.15 / 0.10 / 0.05. Tempering raises w a little, but the blend still does not
+beat the close anywhere, and it is worse than the untempered control in UEL, UECL and pooled.
+
+- Sensitivity H = 0: same verdicts (UCL −0.0012 NOT DEMONSTRATED, UEL +0.0015, UECL +0.0023, pooled +0.0008).
+- SECONDARY, anchored + tempered: **w = 0 every season, Δ = 0 exactly** in all three competitions
+  (FALSIFIED), the same as the untempered anchored control and as the 10-19 anchored lane.
+
+### The temperature makes the UEFA model WORSE
+
+- TEMPERED − MODEL against outcomes: **+0.0032 [+0.0008, +0.0058]** over 2020-2026, **+0.0045
+  [+0.0015, +0.0080]** over the gate seasons; by competition (gate) UCL +0.0013, UEL +0.0010, **UECL
+  +0.0125 [+0.0045, +0.0212]**. Domestically the same transform helped by 0.0005.
+- KL(close ‖ model) rises from **0.0343 to 0.0403**: as on the domestic data, it moves away from the close.
+- Model − close (all seasons) +0.0286, so step 3 reproduces; tempered − close +0.0317.
+
+### Top decile by the CLOSE vs by the MODEL — the "underrated favourites" reading was partly selection
+
+| top decile sorted by | n | close | model | tempered | actual |
+|---|---|---|---|---|---|
+| the close's favourite probability | 247 | 0.821 | 0.778 | **0.811** | 0.854 |
+| the model's own favourite probability | 247 | 0.763 | **0.835** | 0.877 | **0.834** |
+
+Decile 9 by the model: model 0.717, tempered 0.746, actual 0.676.
+
+Sorted by the close, tempering closes three-quarters of the shortfall (0.778 -> 0.811 against 0.821). Sorted
+by the model's OWN probability, the untempered model is already calibrated in its top decile (0.835 vs
+0.834) and tempering makes it over-confident by 4.3 points. **The close-sorted gap is mostly a selection
+effect:** ranking by the close picks the matches where the close is above the model, so the model looks
+low there whatever its calibration. Domestically the model was under-confident by 2-3 points on its own top
+two deciles, so the (a2) fix had real room; on UEFA it has none.
+
+### Verdict
+
+**#699 Stage 1 stays NO-GO for UCL, UEL and UECL. UEFA stays market-only.** It is the expected outcome
+(section 1). The domestic (a2) temperature does not transfer: it hurts UEFA log loss and moves away from
+the close.
+
+### Engine read
+
+- **Bias:** none to correct by a temperature. The model's top decile is calibrated on its own ranking; the
+  log-loss gap to the close (+0.029) is information, not shape.
+- **Overconfidence:** introduced by (a2) on UEFA (top decile +4.3 points; decile 9 +7.0 points). UECL is
+  worst (+0.0125), where the rating gaps are widest.
+- **For the domestic lane:** evaluate any favourite fix on BOTH orderings. A close-sorted decile can show a
+  gap that the model's own calibration does not have. The domestic finding used the model's own deciles too
+  (under-confident by 2-3 points), so it stands; the UEFA "underrated favourites" summary in the 10-16 and
+  10-19 findings should be read as close-sorted.
+- **Next:** only information the close lacks (lineups, rotation) can reopen the gate. No calibration
+  transform of the existing rating can.
 
 ## 5. DEVIATIONS
 
-(none yet)
+- `--skip-live` (the live-refit anchored arm is not in this registration). Recorded in section 2 before
+  scoring.
+- None otherwise.
