@@ -106,8 +106,10 @@ def test_season_label_is_july_to_june():
     assert season_label("2026-06-30") == 2025
 
 
-def test_rating_v2_is_on_by_default_for_the_eight_measured_leagues_only(monkeypatch):
+def test_rating_v2_is_off_unless_enabled_and_covers_the_eight_measured_leagues_only(monkeypatch):
     monkeypatch.delenv("SYNDICATE_SOCCER_RATING_V2", raising=False)
+    assert _rating_v2("epl") is None, "OFF by default until the real-sim A/B passes"
+    monkeypatch.setenv("SYNDICATE_SOCCER_RATING_V2", "1")
     for league in RATING_V2_PROMOTED_PRIOR:
         assert _rating_v2(league) == RatingV2(promoted_prior=RATING_V2_PROMOTED_PRIOR[league])
     assert _rating_v2("championship") is None
@@ -119,7 +121,7 @@ def test_rating_v2_is_on_by_default_for_the_eight_measured_leagues_only(monkeypa
 
 def test_v2_league_skips_the_hard_gate_and_fills_the_fitted_prior(monkeypatch):
     monkeypatch.setenv("SYNDICATE_SOCCER_CURRENT_HISTORY", "1")
-    monkeypatch.delenv("SYNDICATE_SOCCER_RATING_V2", raising=False)
+    monkeypatch.setenv("SYNDICATE_SOCCER_RATING_V2", "1")
     ratings = {"Thin": {"attack_rating": 0.2, "defense_rating": 0.1, "matches": 4.0}}
     assert _gate_few_match(ratings, ["Thin"], "epl") == [], "shrinkage replaces the gate"
     assert ratings["Thin"]["attack_rating"] == 0.2

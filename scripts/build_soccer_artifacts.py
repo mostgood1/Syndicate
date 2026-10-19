@@ -65,7 +65,8 @@ PROMOTED_TEAM_RATING = {"attack_rating": -0.18, "defense_rating": -0.18}
 #: and shrinkage toward a fitted promoted-club prior, which replaces the hard few-match gate. Measured -0.0019
 #: [-0.0031, -0.0009] 1X2 log loss on 27,285 held-out matches (`findings_2026-10-16_soccer_rating_inputs.md`) and
 #: re-checked through the real SoccerSim before shipping (`findings_2026-10-19_soccer_rating_v2_sim.md`).
-#: ON unless the env says off; "0" / "off" restores the original rating plus the gate exactly. Applied ONLY to the
+#: OFF unless the env says "1" / "on" -- PENDING the real-sim do-no-harm A/B; the default flips to ON only if it passes.
+#: Off is the original rating plus the gate exactly. Applied ONLY to the
 #: eight leagues it was measured on. MLS (undated aggregates) and the Championship (never measured) are unchanged.
 _RATING_V2_ENV = "SYNDICATE_SOCCER_RATING_V2"
 #: Fitted promoted-club prior, RAW deviation space (attack, defense): the mean raw x of promoted clubs over their
@@ -85,7 +86,7 @@ RATING_V2_PROMOTED_PRIOR: dict[str, tuple[float, float]] = {
 
 def _rating_v2(league: str) -> RatingV2 | None:
     """The league's RatingV2 config, or None when V2 is off or the league was never measured."""
-    if str(os.environ.get(_RATING_V2_ENV) or "").strip().lower() in {"0", "false", "off", "no"}:
+    if str(os.environ.get(_RATING_V2_ENV) or "").strip().lower() not in {"1", "true", "on", "yes"}:
         return None
     prior = RATING_V2_PROMOTED_PRIOR.get(league)
     return RatingV2(promoted_prior=prior) if prior is not None else None
