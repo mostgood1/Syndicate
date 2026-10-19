@@ -19,7 +19,7 @@ Same rules as state.md: when a fact changes, EDIT THE LINE.
   - The model alone trails the close by +0.0286, about equally for in/in and in/OOS pairs. The weak link is production's domestic rating (favourites underrated), not the offsets or the out-of-scope ratings.
   - **Stage 0's no-sim guards stay.** Source: `.syndicate/findings_2026-10-16_uefa_close_backtest.md`.
 - **Out-of-scope club ratings** `[verified 2026-10-16, lane uefa-outscope-ratings, library only, wired into nothing]`: `uefa_outscope_ratings.py` FITTED beats prior-only −0.0072 [−0.0113, −0.0032] and PROMOTED_TEAM_RATING −0.0725 on 6,187 held-out matches. Source: `.syndicate/findings_2026-10-16_uefa_outscope_ratings.md`.
-- **UEL/UECL vendor club spellings** `[measured 2026-10-19, lane uefa-oddsapi-club-aliases, f39133f8 on main, NOT YET ON THE FLEET]`: 15 aliases; replayed Kalshi→board joins over tracked branding UCL 17 → 17, UEL 12 → 18, UECL 11 → 17 of 18. Soccer alias map 597 → 614, 0 removed / 0 changed.
+- **UEL/UECL vendor club spellings** `[measured 2026-10-19, lane uefa-oddsapi-club-aliases, f39133f8 on the fleet checkout since 15:50:47Z (deploys.md bdb1cb40); the workers have NOT restarted, so the served board does not use it yet]`: 15 aliases; replayed Kalshi→board joins over tracked branding UCL 17 → 17, UEL 12 → 18, UECL 11 → 17 of 18. Soccer alias map 597 → 614, 0 removed / 0 changed.
 
 - **What is verified (2026-10-15, read directly):**
   - The ESPN scoreboards `uefa.champions`, `uefa.europa` and `uefa.europa.conf` answer on the existing URL pattern. `build_soccer_schedule.py` wrote UCL 144 matches across 8 weeks and UECL 108 across 6.
