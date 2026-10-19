@@ -51182,3 +51182,20 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - or, cheaper on this fleet, a CODE revert: make `staked_probability_profile.unfitted_mode()` return `raw` (or `git revert bd9b0571`), ff, then a claimed refresh-worker TERM.
 - **notify:** lane `published-negative-ev` must be told before this goes live ahead of its 2026-10-21 15:00Z reading (its loan condition). It has been told the line is written. compounding-bankroll was told the line exists before its `up`.
 - **verify OWED:** scheduled task `sim-stake-activation-check` reads the fleet daily until activation and confirms the expectations above. Forward read `sim-stake-forward-read-1102` runs Mon 2026-11-02.
+
+
+## 2026-10-19 21:48:42Z -- READING: `SYNDICATE_KALSHI_JOIN_ALL_GAME_LINES` LIVE -- **MET** (lane `kalshi-join-all-game-lines`, session 436c79e2)
+- **Load:** lane compounding-bankroll's full down/up (ff d4837386 -> 854b59ed, which contains 76ef318c): down finished 21:37:13Z, up 21:37:22Z. refresh-worker pid 2661823 started 21:37:27Z, with the flag confirmed in /proc environ by the peer. My env line was written 19:49:47Z (056a1cc4).
+- **Reachability (refresh-worker.log):** `KALSHI_JOIN_ROWS` day=10-19 shortlist 4,297 + extra 1,813; 10-20 3,047 + 1,506; 10-21 2,734 + 1,407. No `ALL_GAME_LINES_*_FAILED` or `KALSHI_COVERAGE_FAILED` lines.
+- **Join:** `QUOTE_CAPTURE` matches 1,262 / 1,006 / 939 (baseline 483-813 per join), appended 419 / 384 / 431 (baseline 1-103; first cycles after load). `BOARD_JOIN board_rows` 6,110 / 4,553.
+- **Working set unchanged:** `TRIM_BY_SPORT kept=6000`, soccer demand 2000 (capped), the same as the baseline.
+- **Served grid, 10-20** (rebuilt 21:48:29Z), UEFA fixtures with a Kalshi quote, before (21:10:38Z build) -> after:
+  - UCL 17 -> **18**;
+  - UEL 14 -> **18** (h2h 10 -> 18);
+  - UECL 16 -> **17** (h2h 15 -> 17), all of 18.
+  - All four LEV/CEL fixtures now carry h2h + totals.
+  - The UECL miss is Red Star Belgrade v FC Copenhagen. Its aliases (81e81501) are not on the fleet; see below.
+  - The 10-21 grid had not rebuilt by 21:48Z (still the 21:10Z build).
+- **Memory:** refresh-worker container 17.6% -> 38.1% of 6,144 MB over the first 10 min after the cold start. A watch is armed at >= 75%.
+- **Revert path (unchanged):** a code revert of the flag reader + ff + one claimed refresh-worker TERM; or remove the env line + a full down/up.
+- **Still owed:** 81e81501 (Red Star / Copenhagen) onto the fleet. It sits behind 550a4b20 (venue settlement #703, another lane) on main, and the fleet now runs `--allow-live-execution`. The ff waits for that lane's go-ahead and is needed before the 10-22 kickoff.
