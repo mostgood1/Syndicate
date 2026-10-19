@@ -50761,3 +50761,20 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - Tables keep their pre-ff mtimes: `lineup_teammate_effects.parquet` 2026-10-13T15:10:54Z, `lineup_player_baselines.parquet` 2026-10-13T15:10:54Z, `pbp_espn_history.parquet` 2026-09-30T22:52:13Z.
 - Activity: the newest WNBA `smart_sim_*.json` is `smart_sim_2026-10-19_GSV_ATL.json`, 2026-10-18T05:05:11Z (also `smart_sim_2026-10-17_GSV_ATL.json` 2026-10-15T14:09:34Z).
 - verify: done. Read-only; nothing deployed, restarted or changed. With the NBA half (2026-10-14), both halves are now verified.
+
+
+## 2026-10-19 15:50:47Z (10:50 AM CT) -- fleet ff e88cd098 -> f39133f8 (19 commits), NO restart: 15 UEFA club aliases (lane `uefa-oddsapi-club-aliases`, session 436c79e2), carrying `4b985db8` (lane `optimizer-model-ev-basis`)
+- **ask:** user 2026-10-19 "proceed" -> chose "Ask that lane first"; the optimizer lane's owner session (Daily model + betting accuracy review) replied OK, under my own holder, after a whole-report CLEAR.
+- **claims:** refresh-worker / live-odds-worker / model-scorecard by `uefa-oddsapi-club-aliases-ff`, acquire exit 0 each (tokens 01c9a05e..., b2832cfd..., b72bcf5a...). Released with --token at 15:51Z, rc 0 each; status reads free.
+- **safety:** `check_deploy_safety.py` NOT CLEAR 15:4xZ-15:50Z (soccer/nba/nhl odds refreshes + build_soccer_artifacts/picks children on both workers). **CLEAR rc 0 at 15:50:44Z** (whole report: MLB sim finished, odds refresh finished, no live games, 0 child jobs on either worker, board idle). Merge 3 s later, guarded on HEAD == e88cd098.
+- **ride-alongs** (`git diff --stat e88cd098 f39133f8 -- syndicate pipeline scripts vendor engines wsgi.py app.py render.yaml`, read BEFORE the merge, in its own call):
+  - `team_aliases.py` (mine);
+  - `daily_optimizer.py` + `model_scorecard.py` (`4b985db8`, optimizer-model-ev-basis, per-run in the model-scorecard job);
+  - 21 MLB research scripts (`80ef51c8`, offline; `publish_mlb_season_artifacts.py`'s diff is string-only per the owner's review).
+  - No render.yaml, no env change. The 5 local data modifications in the checkout were kept.
+- **What loads when:**
+  - Per-run jobs spawned after 15:50:47Z (refresh_odds_sources / build_soccer_* children, the model-scorecard job) import the new code.
+  - The two long-lived worker processes (refresh-worker pid 1735547, live-odds-worker 2244750) still hold e88cd098 in memory, so the in-process board joins load the aliases **at the next natural restart**. None was taken (batch rule; last refresh-worker exit 2026-10-18 08:25Z).
+- **expect (mine):** after that restart, served Kalshi->board UEFA fixture joins of UCL 17 / UEL 18 / UECL 17 of 18 (replay over tracked branding, f39133f8's message; before: 17 / 12 / 11).
+- **verify OWED (mine):** read the served shortlist after the next refresh-worker restart: UEL/UECL h2h rows with a Kalshi venue quote, per fixture.
+- **verify OWED (optimizer-model-ev-basis, the owner reads it):** the next 11:30Z `model_scorecard_optimizer.json` shows soccer recommended model_bets restricted to model-basis rows, with soccer published model EV predicted to move from ~-56% to ~-40%.
