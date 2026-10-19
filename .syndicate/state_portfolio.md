@@ -231,6 +231,8 @@ real evaluation records: the ledger is worker-local and not in
 
 ## [portfolio-sim-sizing-gate] ONLY A MODEL MEASURED TO BEAT THE MARKET SIZES MONEY; TODAY NONE IS, SO STAKES FOLLOW PRICE `[verified on production 2026-09-19 15:17Z and 15:48Z, lane sim-sizing-skill-gate]`
 
+**CORRECTION 2026-10-19 (lane `ev-overstatement-decomp`, substrate: local fleet ledger, read-only): this title is no longer true. From 2026-10-05 (lane `stop-market-withholding`) the sim SIZES paper stakes again: its share of paper dollars by submit date was 0.00 on 10-02..10-04, 0.71-0.83 on 10-06..10-13, 0.52-0.62 on 10-14..10-17 and 0.27 on 10-18. Stakes rest on `portfolio_commit.py:761` (`fair + model_edge_pct/100`, shrunk only by `_sizing_skill_factor` >= 0.25). No staked-probability profile exists on the fleet (`<data root>/calibration/` is absent), so every cell is unfitted and sizes on the raw sim. On 4,876 settled EV>=2 orders the sim's fitted weight is -0.27 [-0.78, +0.18]. Its added dollars returned -12.2 +- 8.4% at EV>=4 against -3.3 +- 4.3% for the EV-only dollars, and pooled over EV>=2 they are no worse (-2.9 vs -3.2): unearned stake, amplifying noise. `findings_2026-10-19_ev_overstatement_decomp.md`; proposal in lane `sim-stake-unfitted-market-only` (todo #704).**
+
 USER 2026-09-19: "All sports". `portfolio_commit._sizing_model_edge` returns None
 for a sim edge unless the row's `projection.model_skill` is `measured` +
 `beats_market`, or the daily scorecard validated its bucket as a skill pocket
