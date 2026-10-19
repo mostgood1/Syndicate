@@ -390,5 +390,5 @@ def test_reachability_a_real_exits_document_on_disk_changes_the_grade(ledger, mo
 
 
 def test_live_blockers_no_longer_name_venue_settlement():
-    assert not any("venue_settlement" in b for b in ex.LIVE_BLOCKERS)
+    assert not any("settlement" in b for b in ex.LIVE_BLOCKERS)
     assert any("sell body" in b for b in ex.LIVE_BLOCKERS)  # still stands

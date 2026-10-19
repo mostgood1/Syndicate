@@ -46075,10 +46075,11 @@ were resolved and nine already-closed rows removed from the open tables.
     remainder x settle value - entry cost - entry fee, detail in `order.exit_applied`); `submitted`/`failed`/unknown defers;
     an unreadable exits doc defers every Kalshi grade; sold-to-zero with no settlement row reads `GET /markets` `result`
     (field UNVERIFIED on the wire -- an absent result just waits); paper exits are never read. Dropped from `LIVE_BLOCKERS`.
-    Tests `tests/test_venue_settlement_exits.py`. Landed `550a4b20`. (a2) **NEW, narrower:** `paper_settlement.settle_orders`'
-    24h inference fallback still grades a live entry with hold-to-settle P&L and never reads `execution_exits` -- a sold
-    entry the venue path misses for 24h would book the wrong money. Needs a loan of `paper_settlement.py` (lane
-    `published-negative-ev`); now in `LIVE_BLOCKERS`. (b) The v2 sell
+    Tests `tests/test_venue_settlement_exits.py`. Landed `550a4b20`. (a2) ~~`paper_settlement.settle_orders`'
+    24h inference fallback ignores sales~~ **CLEARED 2026-10-19** (loan of `paper_settlement.py` from `published-negative-ev`,
+    user-approved in chat): the live grading block reads LIVE exits through the same helpers -- filled -> exit-aware P&L
+    (outcome stays the game's, `settled_by` stays absent), unknown fate -> `awaiting_exit_reconcile`, unreadable doc ->
+    `awaiting_exit_unreadable`, paper exits never read. Tests `tests/test_paper_settlement_exits.py`. (b) The v2 sell
     body (`reduce_only`, `immediate_or_cancel`) has never been accepted by the venue, so the first live exit must be watched.
     (c) A user yes.
   - **v1 limits:** the fair is the PRE-GAME model view, not a live-lens fair; the cadence is 300 s; Polymarket is not built

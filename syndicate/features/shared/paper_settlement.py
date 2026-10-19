@@ -462,6 +462,9 @@ def settle_orders(
             unmapped[name] = unmapped.get(name, 0) + 1
 
     grace_hours = _venue_grace_hours()
+    # Read once, and only if a live Kalshi row gets past the grace (see below).
+    live_exits: dict | None = None
+    live_exits_error: str | None = None
 
     for order in orders:
         if order.get("outcome"):
@@ -525,6 +528,27 @@ def settle_orders(
                 _refuse(REASON_AWAITING_VENUE)
                 continue
 
+        # A LIVE KALSHI ENTRY MAY HAVE BEEN SOLD FIRST (`execution_exits`). This
+        # is the fallback for a row the venue path did not grade in the grace,
+        # so it must know about the sale too, or it books hold-to-settle money
+        # for contracts we no longer held. Same rules as `settle_from_venue`:
+        # a LIVE exit filled -> P&L from both fills; a LIVE exit of unknown
+        # fate, or an unreadable exits doc -> wait; paper exits are never read.
+        # [lane kalshi-exit-settlement, on loan from published-negative-ev]
+        exit_effect, exit_row = "none", None
+        if str(order.get("mode") or "") == "live" and "kalshi" in str(order.get("venue") or "").lower():
+            from syndicate.features.shared import venue_settlement as _vs
+
+            if live_exits is None:
+                live_exits, live_exits_error = _vs.load_live_exits()
+            if live_exits_error:
+                _refuse("awaiting_exit_unreadable")
+                continue
+            exit_effect, exit_row = _vs.exit_for_order(order, live_exits)
+            if exit_effect == "defer":
+                _refuse("awaiting_exit_reconcile")
+                continue
+
         verdict, resolved, refusal = _our_verdict(order, resolver)
         if verdict is None:
             _refuse(
@@ -532,6 +556,22 @@ def settle_orders(
                 order.get("market") if refusal == "unmapped_market" else None,
             )
             continue
+
+        if exit_effect == "sold" and exit_row is not None:
+            exit_pnl, exit_detail = _vs.exit_adjusted_pnl(order, verdict["outcome"], exit_row)
+            if exit_pnl is None:
+                _refuse(str(exit_detail.get("refused") or "exit_refused"))
+                continue
+            verdict = {
+                **verdict,
+                "pnl_dollars": exit_pnl,
+                "pnl_gross_dollars": round(
+                    exit_detail["proceeds_dollars"] + exit_detail["settlement_dollars"]
+                    - exit_detail["entry_cost_dollars"],
+                    4,
+                ),
+            }
+            order["exit_applied"] = exit_detail
 
         order["outcome"] = verdict["outcome"]
         order["pnl_dollars"] = verdict["pnl_dollars"]
