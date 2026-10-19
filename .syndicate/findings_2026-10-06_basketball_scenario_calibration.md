@@ -3438,3 +3438,42 @@ team-games without OT. Against `R2CC_coh2` (the same config without the drag fix
 - **Readings:** FTA, PF, foul-outs, REB, bias.
 - **Then:** the non-shooting volume (bonus × base non-shoot) re-fit to FTA 22.69 / PF 19.67, s/Δ re-measured, the
   12-date check (every guard, |bias| < 0.5), the full FIT.
+
+### R2-d step 2 — RESULT 2026-10-19 20:05Z (`R2D_ref`, sf_team_ref 0.307; done 20:00Z): trips fixed; NOT CONFIRMED by 0.06 on FGA; a new 3PA-share finding
+
+| | R2D_vol (ref .2541) | **R2D_ref (.307)** | real | rule |
+|---|---|---|---|---|
+| shooting two-shot trips | 9.18 | **7.34** | 7.56 | ✓ (−2.9%) |
+| and-ones | 2.47 | **2.16** | 2.34 | ✓ (−7.7%) |
+| three-shot trips | 0.47 | **0.38** | 0.39 | ✓ |
+| 2P% / 3P% | .5498 / .3623 | .5539 / .3656 | .5446 / .3611 | ✓ / ✓ |
+| FGA | 87.92 | 90.14 | 89.08 | ✗ (+1.06 vs ± 1.0) |
+| possessions | 102.82 | 102.82 | 102.54 | ✓ |
+| FTA / PF / foul-outs | 24.83 / 22.02 / .342 | 20.28 / **19.78** / .228 | 22.52 / 19.67 / .193 | readings |
+| **3PA / 3PM** | 39.91 / 14.46 | **40.13 / 14.67** | **36.77 / 13.28** | readings |
+| REB / AST / bias | 43.57 / 23.73 / +1.70 | 44.21 / 24.61 / +1.33 | 43.81 / 27.20 / 0 | readings |
+
+**New finding:** the 3PA share is inflated by the same RECORDED-vs-ATTEMPTS bookkeeping.
+- The prior 3PA share (.414 real) excludes fouled misses, which are nearly all twos.
+- The coherent loop draws the shot type on ALL attempts at the recorded share, then drops the fouled 2PA misses.
+- Recorded 3PA/FGA becomes .445: +3.4 3PA and **+1.4 3PM per team, a threes-props bias of +10%**.
+- The real attempts share is .384 (37.37 / 97.24).
+
+### R2-d step 3 — PRE-REGISTRATION 2026-10-19 (before any run): 3PA share on all attempts, coherent mode only
+
+**Mechanism:** in coherent mode, the team's p3 becomes p3_att = (p3/k3)/(p3/k3 + (1−p3)/k2), with k_type = 1 −
+b_type·r·(1 − q_type), the recorded fraction of each type's attempts.
+- It is used by the shot-type draw, the solver and the TOV iterations alike.
+- Legacy is untouched.
+- Unit test: the recorded share lands on the prior (± .015). 6/6 pass. Corpus parity runs before the commit.
+
+**Run:** R2D_ref + this, the 12 sweep dates.
+
+**CONFIRMED if:**
+- 3PA within 36.77 ± 1.0 and 3PM within 13.28 ± 0.4;
+- the trips within ±15%;
+- 2P% / 3P% in their bands;
+- FGA within ± 1.0 and possessions within ± 0.7.
+
+**Then:** the non-shooting volume re-fit (FTA 20.3 → 22.69: bonus × base non-shoot, PF held 19.67), s/Δ re-measured,
+the 12-date check (every guard, |bias| < 0.5), the full FIT.
