@@ -132,3 +132,25 @@ then converts an ask into a "price", and both sides of such a market arrive at
 - The 3 rows whose sides DIFFER were still never examined, and they remain the
   natural control for anyone revisiting this.
 - Whether 4.3% is stable or slate-specific is untested — it is one capture.
+
+## Addendum 2026-10-19 23:3xZ — a shape I missed, and an independent reproduction
+
+Lane `fair-price-v2` re-derived this before retiring the lead (`6990d9a4`):
+
+- **The 212 reproduces.** They counted **5,124** spread-shaped records where I
+  counted **4,967**, with the same 212 two-outcome/two-price markets at both
+  legs ≥ 0.975. The gap is a later capture or a slightly different shape filter;
+  the population fact is unchanged.
+- **A shape my write-up did not cover:** **158 records carry two outcomes but
+  only ONE price** (35 of them at ≥ 0.975). That shape *could* have produced
+  mirroring — one price for two sides is exactly the mechanism I hypothesised.
+  **It does not**, and the reason is mechanical: `_polymarket_sides` refuses a
+  length mismatch outright at `venue_quote_adapters.py:1273`
+  (`if not outcomes or not prices or len(outcomes) != len(prices)`), so those
+  records never reach the board. They sampled 6 and got `None` for all 6;
+  the line confirms it for all 158.
+
+So mirroring is falsified on **both** shapes — the two-price case because the
+legs are independently priced, and the one-price case because the adapter
+refuses it before any side is assigned. I had only tested the first and should
+have enumerated the shapes rather than the population.
