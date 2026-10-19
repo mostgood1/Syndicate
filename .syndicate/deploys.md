@@ -50746,3 +50746,18 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - Served now (fleet web, `/api/board/layer2-shortlist?sport=nhl`, index_written_at 15:01:31Z): nhl `out_player_props` feed_status ok, scratches_on_feed 30, out_players_on_feed 110, rows_flagged 1 = espn_injuries 1 (Logan O'Connor) / **nhl_gameinfo 0**; 499 rows. The 30 scratches loaded are last night's (latest 10-19 file record: CAR @ CGY, start 00:00Z, 6 scratches captured 00:01:16Z), a finished game -- no prop row can exist for them.
 - Collector side is healthy across the missed days (latest record per game, `news/nhl/gameinfo/<UTC date>.jsonl`): 10-15 10 games, 10-16 3, 10-17 13, 10-18 6, each with 3-6 scratches posted 0-30 min before puck. Those slates named scratches likely to carry prop rows (e.g. Rasmus Dahlin BUF 10-15 + 10-17, Josh Morrissey WPG 10-15 + 10-17, Zach Hyman EDM 10-16, Taylor Hall CAR 10-17 + 10-18, Pavel Buchnevich STL 10-15, Jake Sanderson OTT 10-15 + 10-17, Pavel Zacha / Nikita Zadorov BOS 10-18) -- but the served board for those slates is gone and no persisted per-build counter was found (a 60 s grep of the data root for a nonzero `nhl_gameinfo` count was cut by its timeout, so that absence is NOT evidence either way).
 - Owed: a re-read on a live slate, inside the ~30 min before puck drop of a game whose scratch list names a player with a prop row. Read-only; nothing restarted, deployed or changed.
+
+## 2026-10-19 15:43Z -- READING, NO DEPLOY: WNBA lineup-effects producer steps gone (lane wnba-producer-reading)
+- **Verdict: MET.** Since 2708dbe3 reached the fleet (2026-10-13 15:16:03Z), the WNBA props refresh has run 6 times. None of those runs ran `update-pbp-espn-history` or `build-lineup-teammate-effects`.
+- Fleet code: `/home/amyn/Syndicate` HEAD e88cd098; `git merge-base --is-ancestor 2708dbe3 HEAD` succeeds. `scripts/refresh_wnba_oddsapi_props.py` mentions the steps only in the removal comment (line 3834).
+- Post-ff markers (`wnba_source/data/processed/`, mtime UTC -> `results` keys):
+  - `_rotation_inputs_2026-10-16.json` 2026-10-14T14:04:52Z -> [write-pregame-expected-minutes]
+  - `_rotation_inputs_2026-10-17.json` 2026-10-15T14:08:22Z -> [write-pregame-expected-minutes]
+  - `_rotation_inputs_2026-10-18.json` 2026-10-16T11:06:13Z -> [write-pregame-expected-minutes]
+  - `_rotation_inputs_2026-10-19.json` 2026-10-18T05:04:30Z -> [write-pregame-expected-minutes]
+  - `_rotation_inputs_2026-10-20.json` 2026-10-19T06:06:28Z -> [write-pregame-expected-minutes]
+  - `_rotation_inputs_2026-10-21.json` 2026-10-19T08:14:12Z -> [write-pregame-expected-minutes]
+- The last pre-ff marker, `_rotation_inputs_2026-10-15.json` (2026-10-13T15:10:54Z), still listed both steps. That was the last run that executed them.
+- Tables keep their pre-ff mtimes: `lineup_teammate_effects.parquet` 2026-10-13T15:10:54Z, `lineup_player_baselines.parquet` 2026-10-13T15:10:54Z, `pbp_espn_history.parquet` 2026-09-30T22:52:13Z.
+- Activity: the newest WNBA `smart_sim_*.json` is `smart_sim_2026-10-19_GSV_ATL.json`, 2026-10-18T05:05:11Z (also `smart_sim_2026-10-17_GSV_ATL.json` 2026-10-15T14:09:34Z).
+- verify: done. Read-only; nothing deployed, restarted or changed. With the NBA half (2026-10-14), both halves are now verified.
