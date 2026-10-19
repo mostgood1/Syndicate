@@ -1232,6 +1232,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### kalshi-exit-settlement — OPEN — opened 2026-10-19 — session 472d0781-c5c1-4e15-9c01-bc167cce0fd2
+- **STATUS 2026-10-19 (session 472d0781):** venue_settlement half MET -- landed `550a4b20` (exit-aware grading, 19 tests in tests/test_venue_settlement_exits.py incl. reachability through the real exits doc on disk + no-exit parity) and `560628cf` (LIVE_BLOCKERS: venue_settlement item dropped, replaced by the NARROWER remaining gap: paper_settlement's 24h inference fallback books hold-to-settle P&L on a sold entry). That fix needs a loan of paper_settlement.py from published-negative-ev -- asked of the parent session, unanswered. Not on the fleet (no ff/restart by this lane). Live exits NOT armed.
 - Goal: venue_settlement grades a live Kalshi entry exit-aware: an entry whose LIVE exit row in execution_exits.json is filled books pnl = sale proceeds - entry cost - both fees for the sold contracts + settlement only on the unsold remainder; a live exit still submitted/failed defers the grade; paper exits change nothing; an entry with no exit grades exactly as today; LIVE_BLOCKERS drops the settlement item. Landed on origin/main. Live exits NOT armed (needs the user's yes).
 - Files: syndicate/features/shared/venue_settlement.py, tests/test_venue_settlement_exits.py (NEW), syndicate/features/shared/execution_exits.py (LIVE_BLOCKERS tuple + module-docstring blocker paragraph ONLY; lent by lane kalshi-exit-path, whose owner session started this one for todo #703)
 - Hypothesis: n/a (build)
