@@ -2380,6 +2380,130 @@ def _three_way_leg_edge(projection: Mapping[str, Any], row_side: str, fair: Any)
     return round(direct, 4)
 
 
+#: Which test the MEASURED-edge plausibility bound applies in `_model_edge_for`.
+#: `"probability"` (the default since 2026-10-19) applies the probability-space
+#: test the bound's own docstring always described; `"magnitude"` restores the
+#: 15-point `_MODEL_EDGE_MAX_POINTS` test verbatim. Set the env var to revert
+#: without a deploy.
+#:
+#: **THIS SCOPES TO `_model_edge_for` ONLY.** `_MODEL_EDGE_MAX_POINTS` also
+#: bounds three OTHER quantities -- `_modelled_fair_edge_for`'s modelled-fair
+#: edge, `_three_way_leg_edge`'s `price_moneyline` edge, and
+#: `_calibrate_model_edge`'s calibrated edge. None of those populations was
+#: measured, so none of them changed.
+PLAUSIBILITY_BOUND_ENV = "SYNDICATE_LAYER2_PLAUSIBILITY_BOUND"
+_PLAUSIBILITY_PROBABILITY = "probability"
+_PLAUSIBILITY_MAGNITUDE = "magnitude"
+
+#: "Extreme" in the bound's own vocabulary: the 86-89%-against-a-near-even-market
+#: case its docstring was written about.
+_MODEL_PROB_EXTREME_HIGH = 0.85
+_MODEL_PROB_EXTREME_LOW = 0.15
+
+
+def _plausibility_bound_mode() -> str:
+    raw = str(os.environ.get(PLAUSIBILITY_BOUND_ENV) or "").strip().lower()
+    return _PLAUSIBILITY_MAGNITUDE if raw == _PLAUSIBILITY_MAGNITUDE else _PLAUSIBILITY_PROBABILITY
+
+
+def _probability_is_extreme(prob: float) -> bool:
+    return prob >= _MODEL_PROB_EXTREME_HIGH or prob <= _MODEL_PROB_EXTREME_LOW
+
+
+def _plausibility_refusal(
+    projection: Mapping[str, Any], edge: float
+) -> tuple[str, dict[str, Any]] | None:
+    """Why this measured edge is not plausible, or None when it is.
+
+    **WHY THE MAGNITUDE TEST WAS REPLACED `[2026-10-19, user decision:
+    "replace the ceiling"]`.** `_MODEL_EDGE_MAX_POINTS` was a 15-point bound on
+    `abs(edge)`, and the bound's own docstring says it is not about magnitude:
+    *"the bound is on PLAUSIBILITY IN PROBABILITY SPACE, not on magnitude for
+    its own sake: an edge is accepted only if the probability it implies is one
+    a bettor could act on."* Measured against that stated criterion it failed
+    it, by two independent instruments:
+
+    - Of 525 rows it refused, **0 implied an impossible probability** and
+      **470 (89.5%) implied an ORDINARY one** (15%..85%) -- rows its own test
+      would admit. `findings_2026-10-15_ceiling_implied_probability.md`.
+    - Of 116 refused NFL-yardage markets, **84 (72.4%)** were refused on
+      magnitude ALONE: neither implausible as a probability nor low-role.
+      `findings_2026-10-16_prop_projection_support_gap.md`.
+
+    **THE TEST THIS APPLIES INSTEAD** is the docstring's own example -- a model
+    claiming ~86% against a market priced near even. A row is refused when the
+    model's probability is EXTREME *while the market's is not*.
+
+    **The market-ordinary condition is load-bearing, not decoration.** A flat
+    extreme-model band is WRONG for genuinely low-base-rate markets: an
+    anytime-TD at 8% model against an 8% market is perfectly actionable, and a
+    bare 0.15 floor refuses it. Measured on the served board, **9 rows carry an
+    extreme model AND an extreme market** (alt totals, alt spreads, ncaaf h2h,
+    `batter_home_runs`) -- both sides agreeing the outcome is unlikely, which is
+    agreement, not implausibility. Requiring the market to be ordinary spares
+    exactly those.
+
+    **MEASURED EFFECT, 1,769 served rows carrying an edge (every one of which
+    could evaluate this test -- 0 fell back):** the magnitude test refuses
+    **377 (21.3%)**, this test refuses **36 (2.0%)**. Of the 377 it also refuses
+    24 and **returns 353**; it **newly refuses 12** the magnitude test accepted,
+    which is the point of using the right instrument rather than a proxy.
+
+    The impossible-probability check is kept and is the real units/join-error
+    catcher -- it fires on 0 rows today, which is the honest reason the
+    magnitude bound was never doing that job. Exact 0.0/1.0 is handled upstream
+    by `refuse_published_certainty`, so it is not re-tested here.
+
+    **UNKNOWN DOES NOT PASS.** If either probability is absent the test cannot
+    be evaluated, so it falls back to the magnitude bound rather than admitting
+    the row. That path is defensive only: 0 of 1,769 rows needed it.
+    """
+    if _plausibility_bound_mode() == _PLAUSIBILITY_MAGNITUDE:
+        if abs(edge) > _MODEL_EDGE_MAX_POINTS:
+            return ("edge_exceeds_plausibility_ceiling",
+                    {"edge": edge, "ceiling": _MODEL_EDGE_MAX_POINTS})
+        return None
+
+    # THE PROBABILITY MUST BE THE ONE THE EDGE CAME FROM. A live row carries BOTH
+    # `model_prob_over` (pregame) and `live_model_prob_over`, and
+    # `edge_vs_market_pct` is then the LIVE edge -- `live_gameline_join` stamps
+    # `edge_basis` to say so. Testing the pregame probability against a live edge
+    # pairs two numbers that were never about the same question, and it refuses
+    # live rows for being extreme BEFORE the game started.
+    #
+    # Caught by `test_live_gameline_edge_basis.test_the_change_is_additive_and_
+    # must_stay_additive` on a fixture with pregame 0.8656, live 0.50 and a -12.0
+    # live edge: the first draft read 0.8656, called it extreme against a 0.591
+    # market, and dropped an edge that is ordinary on its own basis.
+    basis = str(projection.get("edge_basis") or "").strip().lower()
+    prob_key = "live_model_prob_over" if basis == "live" else "model_prob_over"
+    model_prob = _as_float(projection.get(prob_key))
+    market_prob = _as_float(projection.get("market_fair_prob_over"))
+    if model_prob is None or market_prob is None:
+        if abs(edge) > _MODEL_EDGE_MAX_POINTS:
+            return ("edge_exceeds_plausibility_ceiling_no_probability_to_test",
+                    {"edge": edge, "ceiling": _MODEL_EDGE_MAX_POINTS,
+                     "probability_read": prob_key,
+                     "model_prob_over": model_prob,
+                     "market_fair_prob_over": market_prob})
+        return None
+
+    if model_prob > 1.0 or model_prob < 0.0:
+        return ("model_probability_impossible",
+                {"probability_read": prob_key,
+                 "model_prob_over": model_prob, "edge": edge})
+
+    if _probability_is_extreme(model_prob) and not _probability_is_extreme(market_prob):
+        return ("model_probability_extreme_against_ordinary_market",
+                {"probability_read": prob_key,
+                 "model_prob_over": round(model_prob, 4),
+                 "market_fair_prob_over": round(market_prob, 4),
+                 "edge": edge,
+                 "extreme_at_or_below": _MODEL_PROB_EXTREME_LOW,
+                 "extreme_at_or_above": _MODEL_PROB_EXTREME_HIGH})
+    return None
+
+
 def _note_refusal(refusal: dict[str, Any] | None, reason: str, **detail: Any) -> None:
     """Name a `_model_edge_for` refusal on the caller's out-dict, if it passed one.
 
@@ -2482,9 +2606,9 @@ def _model_edge_for(row: Mapping[str, Any], side: str, fair: Any = None,
             # forbids.
             return gated
         return _modelled_fair_edge_for(projection, side)
-    if abs(edge) > _MODEL_EDGE_MAX_POINTS:
-        _note_refusal(refusal, "edge_exceeds_plausibility_ceiling",
-                      edge=edge, ceiling=_MODEL_EDGE_MAX_POINTS)
+    _bound = _plausibility_refusal(projection, edge)
+    if _bound is not None:
+        _note_refusal(refusal, _bound[0], **_bound[1])
         # Dropped, not clamped. Clamping would keep an unusable number in the
         # ranking at the ceiling value and make every affected row tie at the
         # top -- a wrong answer wearing a plausible one's clothes (#242).

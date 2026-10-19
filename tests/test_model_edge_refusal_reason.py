@@ -36,14 +36,30 @@ def _row(side="over", **projection):
 # one test per refusal path, each naming the measured population it covers
 # --------------------------------------------------------------------------
 
-def test_the_ceiling_names_itself_and_carries_both_numbers():
-    """464 of 809 gap rows. "Dropped, not clamped" is only actionable with both."""
+def test_the_plausibility_bound_names_itself_and_carries_actionable_numbers():
+    """Was `test_the_ceiling_names_itself_and_carries_both_numbers`, which used a
+    15.87-point edge with an ORDINARY implied probability (0.728). The bound was
+    replaced on 2026-10-19 (user: "replace the ceiling") and that row is now
+    correctly ALLOWED, so the case was restated on a row the new bound refuses:
+    an extreme model against an ordinary market. The original intent is
+    unchanged -- the refusal is NAMED and carries the numbers that make
+    "dropped, not clamped" actionable."""
+    refusal = {}
+    row = _row(edge_vs_market_pct=39.38, model_prob_over=0.862, market_fair_prob_over=0.468)
+    assert L._model_edge_for(row, "over", None, refusal=refusal) is None
+    assert refusal["reason"] == "model_probability_extreme_against_ordinary_market"
+    assert refusal["model_prob_over"] == pytest.approx(0.862)
+    assert refusal["market_fair_prob_over"] == pytest.approx(0.468)
+    assert refusal["edge"] == pytest.approx(39.38)
+
+
+def test_an_ordinary_implied_probability_is_no_longer_refused():
+    """The 470-row case, pinned here too: the old bound dropped this row purely
+    for magnitude and the new one allows it."""
     refusal = {}
     row = _row(edge_vs_market_pct=15.87, model_prob_over=0.728, market_fair_prob_over=0.5693)
-    assert L._model_edge_for(row, "over", None, refusal=refusal) is None
-    assert refusal["reason"] == "edge_exceeds_plausibility_ceiling"
-    assert refusal["edge"] == pytest.approx(15.87)
-    assert refusal["ceiling"] == pytest.approx(L._MODEL_EDGE_MAX_POINTS)
+    assert L._model_edge_for(row, "over", None, refusal=refusal) == pytest.approx(15.87)
+    assert refusal == {}
 
 
 def test_a_missing_projection_names_itself():
@@ -82,7 +98,10 @@ def test_an_accepted_edge_records_NO_refusal():
 
 def test_omitting_the_out_param_is_inert():
     """Every caller that has not opted in must behave exactly as before."""
-    row = _row(edge_vs_market_pct=99.0, model_prob_over=0.9, market_fair_prob_over=0.1)
+    # extreme model (0.9) against an ORDINARY market (0.45) -- refused by the
+    # bound as replaced on 2026-10-19. The original used market 0.1, which is
+    # itself extreme, so under the new rule both ends agree and the row passes.
+    row = _row(edge_vs_market_pct=45.0, model_prob_over=0.9, market_fair_prob_over=0.45)
     assert L._model_edge_for(row, "over") is None          # positional, no refusal
     assert L._model_edge_for(row, "over", None) is None    # explicit fair, no refusal
 
@@ -101,8 +120,8 @@ def test_the_shared_projection_is_NEVER_mutated():
 def test_two_sides_of_one_market_get_their_own_reasons():
     """The leak this design prevents, demonstrated: one shared projection, two
     sides, two out-dicts, and neither reason reaches the other."""
-    shared = {"edge_vs_market_pct": 15.87, "side": "home",
-              "model_prob_over": 0.728, "market_fair_prob_over": 0.5693}
+    shared = {"edge_vs_market_pct": 39.38, "side": "home",
+              "model_prob_over": 0.862, "market_fair_prob_over": 0.468}
     row = {"side": "home", "home_team": "Home FC", "away_team": "Away FC",
            "projection": shared}
     a, b = {}, {}

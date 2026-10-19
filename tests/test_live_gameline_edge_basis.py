@@ -165,20 +165,59 @@ def test_the_change_is_additive_and_must_stay_additive():
     assert layer2_board._model_edge_for({"projection": p}, "over") == pytest.approx(-12.0)
 
 
-def test_the_boards_15_point_guard_is_what_currently_catches_the_worst_rows():
-    """Why the `-39.93` row is not already mispriced on the board, and why
-    `edge_basis` is the thing that could eventually replace the guard.
+def test_the_15_point_guard_WAS_replaced_once_the_pairing_was_revisited():
+    """The successor to `test_the_boards_15_point_guard_is_what_currently_catches_
+    the_worst_rows`, which asserted the `-39.93` row stays DROPPED.
 
-    `layer2_board`'s own comment beside `_MODEL_EDGE_MAX_POINTS = 15.0` says:
-    "The real fix is an explicit `basis` on the projection... Until projections
-    carry it, this bound is the guard -- and it is a GUARD, not a calibration."
-    This change supplies that basis. **It does NOT relax the bound**, and this
-    test fails if someone relaxes it without revisiting the pairing."""
+    That test's own terms have now been met. It said: *"`layer2_board`'s own
+    comment beside `_MODEL_EDGE_MAX_POINTS = 15.0` says: 'The real fix is an
+    explicit `basis` on the projection... Until projections carry it, this bound
+    is the guard'. This change supplies that basis. It does NOT relax the bound,
+    and this test fails if someone relaxes it without revisiting the pairing."*
+
+    `[2026-10-19, user decision: "replace the ceiling"]` the bound WAS relaxed,
+    **and the pairing was revisited first** -- `_plausibility_refusal` now reads
+    `edge_basis` and tests `live_model_prob_over` on a live row instead of the
+    pregame `model_prob_over`. Reading the wrong one was a real bug in the first
+    draft, caught by this file's sibling test.
+
+    Why relaxing it was evidenced rather than convenient: of 525 rows the
+    15-point bound refused, **0** implied an impossible probability and **470
+    (89.5%)** implied an ORDINARY one; of 116 refused NFL-yardage markets **84
+    (72.4%)** were refused on magnitude alone. Over 1,769 served rows the new
+    test refuses 36 where the old refused 377.
+
+    **This row is now ALLOWED, and it is the honest edge of the decision.** Live
+    model 0.1917 against a market at 0.591 is a 40-point disagreement in which
+    BOTH ends are probabilities a bettor can act on, so the plausibility bound
+    has nothing to say about it; whether the model deserves to be believed is
+    `_apply_skill_reliability`'s question, not this one's. Note 0.1917 sits only
+    4 points above the 0.15 floor -- the thresholds are the docstring's own and
+    are UNFITTED, so this row would flip if they were ever fitted.
+    """
     from syndicate.features.shared import layer2_board
 
+    # the constant still exists: it is the revert path and it still bounds the
+    # modelled-fair, three-way and calibrated edges
     assert layer2_board._MODEL_EDGE_MAX_POINTS == 15.0
+
     p = _apply(live_projected=0.1917, edge_pp=-39.93)
     assert p["edge_basis"] == "live"
-    assert layer2_board._model_edge_for({"projection": p}, "over") is None, (
-        "a 39.93-point edge must still be DROPPED by the guard"
-    )
+    assert p["live_model_prob_over"] == pytest.approx(0.1917)
+
+    ref = {}
+    got = layer2_board._model_edge_for({"projection": p}, "over", None, refusal=ref)
+    assert got == pytest.approx(-39.93), "ordinary-vs-ordinary is no longer dropped"
+    assert ref == {}
+
+    # and the PAIRING is what makes that correct: the pregame probability on the
+    # same row IS extreme, so reading it would still refuse this row
+    assert layer2_board._probability_is_extreme(p["model_prob_over"])
+
+    # the revert flag restores the old verdict exactly
+    import os
+    os.environ[layer2_board.PLAUSIBILITY_BOUND_ENV] = "magnitude"
+    try:
+        assert layer2_board._model_edge_for({"projection": p}, "over") is None
+    finally:
+        os.environ.pop(layer2_board.PLAUSIBILITY_BOUND_ENV, None)
