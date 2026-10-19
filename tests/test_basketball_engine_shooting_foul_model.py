@@ -90,3 +90,16 @@ def test_coherent_three_point_foul_trips_are_rare():
     trips3 = sum(1 for hb, _ab, _hq, _aq in games for e in hb.get("events") or [] if e.get("type") == "FTA" and e.get("fta") == 3)
     trips2 = sum(1 for hb, _ab, _hq, _aq in games for e in hb.get("events") or [] if e.get("type") == "FTA" and e.get("fta") == 2 and not e.get("bonus"))
     assert trips2 > 5 * trips3
+
+
+def test_coherent_recorded_three_point_share_lands_on_the_prior():
+    # The prior 3PA share is recorded (fouled misses, nearly all twos, excluded); the coherent loop draws the shot type
+    # on ALL attempts, so it must de-net the share too, or the recorded share over-counts threes.
+    eng = bpss._engine_for_league_local("nba")
+    games = _run(eng, 80, shooting_foul_model="coherent", fg2_from_two_point_split=True)
+    fga = tpa = 0
+    for hb, ab, _hq, _aq in games:
+        for box in (hb, ab):
+            for p in box["players"]:
+                fga += int(p.get("fga") or 0); tpa += int(p.get("fg3a") or 0)
+    assert abs(tpa / fga - 0.17 / 0.40) < 0.015

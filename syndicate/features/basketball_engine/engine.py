@@ -1023,6 +1023,27 @@ def simulate_pbp_game_boxscore(
     a_starter_scores = _starter_like_scores(away_players, a_mins)
     h_scorer_scores = _scoring_like_scores(home_players)
     a_scorer_scores = _scoring_like_scores(away_players)
+    if sf_coherent:
+        # The 3PA share on ALL attempts (R2-c' / R2-d step 3, pre-registered below in findings). The prior share is
+        # RECORDED (fouled misses -- nearly all twos -- excluded), so drawing the shot type at it and then dropping the
+        # fouled two-point misses over-counts threes (+3.4 3PA / +1.4 3PM per team on 12 FIT dates). With k = the
+        # recorded fraction of each type's attempts, 1 - b x r x (1 - q): p3_att = (p3/k3) / (p3/k3 + (1-p3)/k2).
+        for _rates, _players, _mins, _fg2, _fg3, _r in ((h_rates, home_players, h_mins, h_fg_pct, h_3p_pct, sf_team_r_h),
+                                                        (a_rates, away_players, a_mins, a_fg_pct, a_3p_pct, sf_team_r_a)):
+            try:
+                _m = np.maximum(0.0, np.where(np.isfinite(_mins), _mins, 0.0))
+                _w3 = _m * np.maximum(0.0, np.nan_to_num(_safe_series(_players, "_prior_threes_att_pm").to_numpy(dtype=float)))
+                _w2 = _m * np.maximum(0.0, np.nan_to_num(_safe_series(_players, "_prior_fga_pm").to_numpy(dtype=float))) - _w3
+                _w2 = np.maximum(0.0, _w2)
+                _p2 = float(np.sum(_fg2 * _w2) / _w2.sum()) if _w2.sum() > 0 else 0.53
+                _pp3 = float(np.sum(_fg3 * _w3) / _w3.sum()) if _w3.sum() > 0 else 0.35
+                _k2 = 1.0 - sf_b2 * _r * (1.0 - _sf_denet(_p2, sf_b2 * _r))
+                _k3 = 1.0 - sf_b3 * _r * (1.0 - _sf_denet(_pp3, sf_b3 * _r))
+                _p3r = float(np.clip(_rates["p3"], 0.0, 0.95))
+                _x3, _x2 = _p3r / max(1e-6, _k3), (1.0 - _p3r) / max(1e-6, _k2)
+                _rates["p3"] = float(_x3 / (_x3 + _x2))
+            except Exception:
+                pass
 
     if TOV_PER_ATTEMPT:
         try:
