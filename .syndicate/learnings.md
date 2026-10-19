@@ -2423,3 +2423,11 @@ parlays), rewrote the published one.
 **Rule:** record what was published at the moment it is published, server-side, from the served data (d956cbcc:
 export = posted). Pin it in display and grading, at the published price. Never infer "what was posted" from the last
 build.
+
+## 2026-10-19 RULE: a one-time scheduled task that misses its slot NEVER fires again — check for a MISSING `lastRunAt`, not a plausible `nextRunAt` `[lane ncaaf-segment-refusal-cost]`
+
+- **Measured:** of **209** scheduled tasks (192 one-time), **8 are enabled with `nextRunAt` in the PAST and have never run**. Seven were armed across 2026-10-16..10-18 and all seven are lost, spanning at least five lanes. The whole weekend's armed readings produced nothing.
+- **Why it is invisible:** the task stays `enabled: true` and keeps its original `nextRunAt`, so a listing shows a date that READS like "about to run". The only reliable tell is the **absence of a `lastRunAt` field**, which tasks that have run do carry. Nothing warns, nothing catches up.
+- **Rule:** an armed reading is not owed TO a task, it is owed BY the lane. Before trusting one, check `lastRunAt` exists. After any gap in which the host may have slept, audit every one-time task for `enabled AND nextRunAt < now AND no lastRunAt`, and re-arm with `update_scheduled_task` (`fireAt` only, so a long prompt is not resent and truncated).
+- **Re-arm for a date the POPULATION exists on, not the next free slot.** Mine needed a live NCAAF Saturday: Monday would have reproduced the exact "unanswerable by construction" zero the lane was opened to avoid. That is also why one lane must not re-arm another's task — the date carries a requirement only its owner knows.
+- **Related, and distinct:** the known Modern Standby finding is that `lastRunAt` is DISPATCH not execution, so a run can be stalled hours. This is worse — the run is not stalled, it is LOST.
