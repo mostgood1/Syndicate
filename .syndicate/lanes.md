@@ -1068,6 +1068,15 @@ death, never life — do not invert it.
 - Verification: Unit tests for every finding, the mailer's dedupe/rate-limit/outbox, and the self-heal mapping; on the fleet: one synthetic trigger per alert in a temp home or paper/test store prefix, each producing an EMAIL_SENT line and the user receiving it; first real digest received; deploys.md entry.
 - Blocked by: none
 
+### basketball-checklist-level0 — OPEN — opened 2026-10-19 — session 4e40a1b5-73b6-4e27-8a04-13c2863aaa99
+- Goal: scripts/basketball_sim_input_checklist.py Level 0 checks what production runs (bridge -> basketball_engine.orchestrator.simulate_smart_game, no vendored module loaded) instead of calling the deleted _import_real_smart_sim_module_local, with an in-run positive control; the publisher's basketball sim_input_report runs to completion again (stopped 2026-10-10 07:00Z on AttributeError)
+- Files: scripts/basketball_sim_input_checklist.py (Level 0 + the LEAGUES 'package' label only), tests/test_basketball_sim_input_checklist_level0.py (NEW)
+- Hypothesis: the basketball report has been absent since 2026-10-10 because level0_bridge_reachability raises AttributeError before --publish writes anything
+- Falsification test: the checklist runs past Level 0 locally after the fix yet still writes no report, or a report dated after 10-10 exists in production
+- Verification: local run passes Level 0; positive-control test flips Level 0 to an alarm on a bridge without the orchestrator import and on a loaded nba_betting module; next fleet 07:00Z publish writes sim_input_report_<date>.json for nba+wnba
+- Blocked by: none
+- USER OVERRIDE 2026-10-19 ("Override, notify owner"): scripts/basketball_sim_input_checklist.py is also on nba-vendor-deletion-prep's Files line (it plans to drop the NBA arm). This lane touches Level 0 and the LEAGUES 'package' label only; owner notified.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
