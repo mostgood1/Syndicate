@@ -7826,6 +7826,16 @@ class IntelligenceStateService:
             except Exception as exc:
                 print(f"[intelligence_state] SETTLEMENT_FAILED error={exc}", flush=True)
 
+            # THE LEARNING LOOP: per-cell min_ev proposals from what just
+            # settled. Once a day (its own gate), never raises, and in the
+            # default `shadow` mode it changes nothing the commit reads.
+            try:
+                from syndicate.features.shared.min_ev_tuner import maybe_run_nightly
+
+                maybe_run_nightly()
+            except Exception as exc:
+                print(f"[intelligence_state] MIN_EV_TUNER_HOOK_FAILED error={exc}", flush=True)
+
             if commit_result.get("reason") not in {"disabled", "no_shortlist"} and commit_result.get("status") != "ok":
                 # `disabled` and `no_shortlist` are the expected quiet states and
                 # would be pure noise every cycle. Anything else is a real
