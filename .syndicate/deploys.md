@@ -50705,3 +50705,12 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - All at rho level `market`; each leg shows market / sim / record.
   - The build also printed `the game log ends 2026-10-09` (stale_log flag, another lane's builders).
 - **owed:** tonight's WNBA grades; the NBA first slate 10-20; MLB served tiers tonight.
+
+## 2026-10-19 15:04Z -- READING: live MC on the NATIVE MLB engine in production -- **MET** (lane `mlb-sim-engine-native-p2`, closed; session 2d413211)
+
+- **Reading.** Source: `source_artifacts/data/live_lens/live_lens_2026_10_18.jsonl`, the rescheduled 849817 (postponed from 10-16, played 10-18).
+  - 46 live entries, 15:45:08-18:58:06 CT; 27 carry a non-null `liveModelProbOver` (52 values, out of 230 keys over 230 topProps).
+  - `liveModelProbOver` is set from `_live_mc_prob_over_for` (live MC) in the port.
+  - Every live-odds-worker since 2026-10-16 18:54Z has loaded only the native port and native sim_engine (verified at that restart: 0 vendored modules, roots at engines/mlb).
+- **Errors.** 0 `live_lens_port/app_slice.py` / native `sim_engine` traceback frames across live-odds-worker.log .. .log.5.
+- **Rate, for context, not a pass criterion.** 27/46 here; on 10-15, 40/56 (port) and 41/52 (vendored). The rate counts prop rows with a live line in that game, so it varies by game. Code equality was proven by parity (0 diffs on both entries).
