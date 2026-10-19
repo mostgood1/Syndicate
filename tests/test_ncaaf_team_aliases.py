@@ -261,9 +261,12 @@ def test_an_unknown_school_resolves_to_nothing_without_raising() -> None:
 # SOCCER RE-PINNED 2026-10-15 (lane soccer-uefa-competitions, `25fea6ac`): the UCL/UEL/UECL
 # branding adds 55 clubs from leagues we do not carry. Diffed before/after over the tracked
 # branding: aliases 508 -> 597 and nicknames 71 -> 99, with 0 keys removed and 0 changed in either.
+# RE-PINNED 2026-10-19 (lane uefa-oddsapi-club-aliases, on loan): 15 UEFA vendor spellings, aliases
+# 597 -> 614 (two entries also add a folded key). Diffed over origin/main's tracked branding
+# (`git archive` root, SYNDICATE_DATA_ROOT): 0 removed / 0 changed; nicknames 99 and tokens 518 unchanged.
 @pytest.mark.parametrize(
     "sport,alias_entries,nickname_entries",
-    [("mlb", 38, 27), ("nfl", 39, 32), ("nba", 42, 26), ("wnba", 50, 0), ("soccer", 597, 99)],
+    [("mlb", 38, 27), ("nfl", 39, 32), ("nba", 42, 26), ("wnba", 50, 0), ("soccer", 614, 99)],
 )
 def test_the_other_sports_maps_are_the_same_size_as_before(
     sport: str, alias_entries: int, nickname_entries: int

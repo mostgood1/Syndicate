@@ -246,10 +246,22 @@ def test_vendor_spellings_of_uefa_clubs_resolve(stub_branding, vendor_name, cano
     assert stub_branding.canonical_team("soccer", vendor_name) == canonical
 
 
-def test_refused_names_stay_refused(stub_branding):
-    # `#631` refused these by name; a UEFA fixture is not evidence enough to map them.
-    for name in ("Inter", "Enschede", "St. Truidense"):
-        assert stub_branding.canonical_team("soccer", name) is None
+def test_refused_names_stay_refused(stub_branding, monkeypatch):
+    from syndicate.features.soccer import sources
+
+    ta = stub_branding
+    extra = {"eredivisie": [{"name": "FC Twente", "short_name": "Twente", "abbreviation": "TWE"}],
+             "belgian_pro_league": [{"name": "Sint-Truidense", "short_name": "Sint-Truiden", "abbreviation": "STV"}]}
+    monkeypatch.setattr(sources, "all_teams",
+                        lambda league: [dict(r) for r in (_BRANDING.get(league) or extra.get(league) or [])])
+    ta._soccer_alias_to_name.cache_clear()
+    ta._CANONICAL_MEMO.clear()
+    # `#631` refused `Inter` by name: it is Inter Miami AND Inter d'Escaldes, so no fixture settles it.
+    assert stub_branding.canonical_team("soccer", "Inter") is None
+    # `Enschede` and `St. Truidense` were refused only for want of evidence; exact fixture pairing
+    # supplied it on 2026-10-19 (lane uefa-oddsapi-club-aliases, owner-approved).
+    assert stub_branding.canonical_team("soccer", "Enschede") == "fc twente"
+    assert stub_branding.canonical_team("soccer", "St. Truidense") == "sint truidense"
 
 
 def test_soccer_prop_call_sends_the_ten_books_only_when_configured(monkeypatch):

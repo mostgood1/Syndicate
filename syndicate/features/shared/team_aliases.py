@@ -457,9 +457,11 @@ _SOCCER_VENDOR_NAME_ALIASES: dict[str, str] = {
     # PAIRING. The vendor lists a fixture (date, A vs B) in which ONE side
     # resolves; ESPN's schedule for that competition, within a day, has EXACTLY
     # ONE fixture containing that club, and its opponent is the identity. Zero
-    # or several candidates refuses, as does a name `#631` refused (`Inter`,
-    # `Enschede`, `St. Truidense`). Evidence per entry is in
-    # `.syndicate/findings_2026-10-15_uefa_kalshi_join_and_history.md`.
+    # or several candidates refuses, as does a name `#631` refused (`Inter`).
+    # `Enschede` and `St. Truidense` were on that refused list until 2026-10-19,
+    # when fixture pairing supplied the evidence `#631` lacked (entries below).
+    # Evidence per entry is in
+    # `.syndicate/findings_2026-10-15_uefa_kalshi_join_and_history.md`, or inline.
     "Be`er Sheva": "Hapoel Be'er",
     "Bodoe/Glimt": "Bodo/Glimt",
     "Bodø/Glimt": "Bodo/Glimt",
@@ -483,6 +485,34 @@ _SOCCER_VENDOR_NAME_ALIASES: dict[str, str] = {
     "Mjallby": "Mjällby AIF",
     "Shakhtar": "Shakhtar Donetsk",
     "Uni Craiova": "CSU Craiova",
+    #
+    # ADDED 2026-10-19, lane `uefa-oddsapi-club-aliases` (loan of this block from
+    # `soccer-uefa-competitions`). Measured that morning on the fleet's
+    # `game_odds_current.csv` + live Kalshi `KX{UCL,UEL,UECL}GAME`: Kalshi events joined to a
+    # board fixture were UCL 17/18, UEL 12/18, UECL 11/18, and the misses were mostly ODDSAPI
+    # spellings. Fixture pairing as above (one side resolves; ESPN's schedule has exactly one
+    # fixture with that club within 36 h). The evidence is the ESPN fixture each pairing found:
+    "Besiktas JK": "Besiktas",  # OddsAPI, uel 2026-10-22 Besiktas v Crystal Palace
+    "FC Copenhagen": "F.C. København",  # OddsAPI, uecl 2026-10-22 Red Star Belgrade v F.C. København
+    "Ferencváros TC": "Ferencvaros",  # OddsAPI, uel 2026-10-22 Ferencvaros v Torreense
+    "Hapoel Be'er Sheva": "Hapoel Be'er",  # OddsAPI, uel 2026-10-22 Union St.-Gilloise v Hapoel Be'er
+    "Hearts": "Heart of Midlothian",  # OddsAPI, uecl 2026-10-22 Trabzonspor v Heart of Midlothian
+    "Jagiellonia Białystok": "Jagiellonia Bialystok",  # OddsAPI, uel 2026-10-22 Jagiellonia Bialystok v Anderlecht
+    "Omonoia FC": "Omonia Nicosia",  # OddsAPI, uel 2026-10-22 Omonia Nicosia v Benfica
+    "PFC CSKA Sofia": "CSKA Sofia",  # OddsAPI, uecl 2026-10-22 FC Nordsjælland v CSKA Sofia
+    "PFC Levski Sofia": "Levski Sofia",  # OddsAPI, uel 2026-10-22 Viktoria Plzen v Levski Sofia
+    # `#631` left these two absent because its R1/R2 token method "need[s] evidence this method
+    # cannot supply" -- not over any doubt about identity. Exact fixture pairing IS that evidence
+    # (owner-approved 2026-10-19). `Inter` stays refused: Inter Miami / Inter d'Escaldes.
+    "Enschede": "FC Twente",  # Kalshi, uecl 2026-10-22 Lincoln Red Imps v FC Twente
+    "St. Truidense": "Sint-Truidense",  # Kalshi, uecl 2026-10-22 FC Midtjylland v Sint-Truidense
+    # Both clubs of these fixtures were unnamed, so pairing cannot reach them. Evidence: the
+    # audited ESPN<->OddsAPI historical join, findings_2026-10-16_uefa_close_backtest.md s2
+    # (kickoff window + name score, every sub-0.85 pair read by hand; 2026-10-15 kickoffs).
+    "AGF Aarhus": "AGF",
+    "Universitatea Craiova": "CSU Craiova",
+    "KF Egnatia": "Egnatia",
+    "Inter Club d'Escaldes": "Inter D'Escaldes",
     # END UEFA CLUB COMPETITIONS
 }
 
