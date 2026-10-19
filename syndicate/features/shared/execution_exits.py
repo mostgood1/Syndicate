@@ -70,7 +70,7 @@ import math
 import os
 import re
 import urllib.parse
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Sequence
@@ -862,8 +862,16 @@ def place_exit(
     sellable: float | None,
     send: Callable[[Mapping[str, Any]], Mapping[str, Any]] | None = None,
     persist: Callable[[Mapping[str, Any]], None] | None = None,
+    max_contracts: int | None = None,
+    limit_price: float | None = None,
+    purpose: str | None = None,
 ) -> dict[str, Any]:
     """The live seam. Every refusal returns `{"refused": token}` and writes nothing.
+
+    `max_contracts` caps the sale below the holding (a one-contract verification
+    sale); `limit_price` is our leg's sell limit when it should sit below the
+    quoted bid (marketable through a one-tick move). Both default to selling the
+    whole sellable holding at the bid.
 
     Order is the safety argument, as in `place_order`: switches and size are
     checked and the body BUILT first (a refusal leaves no row), then the row is
@@ -891,9 +899,11 @@ def place_exit(
         return {"refused": f"kill_switch:{switch.get('source')}"}
     if unreconciled_exits(state):
         return {"refused": "unreconciled_exits"}
-    count = int(math.floor(min(position.contracts, sellable or 0.0)))
+    cap = position.contracts if max_contracts is None else min(position.contracts, float(max_contracts))
+    count = int(math.floor(min(cap, sellable or 0.0)))
     try:
-        body = exit_order_body(position, bid=float(decision["bid"]), count=count)
+        price = float(decision["bid"]) if limit_price is None else float(limit_price)
+        body = exit_order_body(position, bid=price, count=count)
     except (ExitBuildError, KeyError, TypeError, ValueError) as exc:
         return {"refused": str(exc).split(":", 1)[0] or type(exc).__name__}
 
@@ -903,6 +913,8 @@ def place_exit(
         "mode": EXIT_LIVE,
         "status": EXIT_SUBMITTED,
         "requested_contracts": count,
+        "limit_price": price,
+        "purpose": purpose,
         "submitted_at": _utc_now(),
         "venue_order_id": None,
         "error": None,
@@ -1018,6 +1030,32 @@ def _exit_row_base(position: OpenPosition, decision: Mapping[str, Any]) -> dict[
     }
 
 
+def net_of_live_sales(
+    positions: Sequence[OpenPosition], state: Mapping[str, Any]
+) -> tuple[list[OpenPosition], int]:
+    """Positions reduced by any FILLED live exit on them. Returns `(held, fully_sold)`.
+
+    The entry row still says what was BOUGHT; after a sale the venue holds less,
+    and comparing the entry against the venue would read as a mismatch on every
+    tick. The entry fee is apportioned to what is still held.
+    """
+    exits = state.get("exits") or {}
+    held: list[OpenPosition] = []
+    fully_sold = 0
+    for p in positions:
+        row = exits.get(exit_idempotency_key(p.entry_key))
+        sold = _as_float((row or {}).get("filled_contracts")) if row else None
+        if not row or row.get("mode") != EXIT_LIVE or row.get("status") != EXIT_FILLED or not sold:
+            held.append(p)
+            continue
+        remaining = round(p.contracts - sold, 4)
+        if remaining <= 0:
+            fully_sold += 1
+            continue
+        held.append(replace(p, contracts=remaining, entry_fee_dollars=round(p.entry_fee_dollars * remaining / p.contracts, 4)))
+    return held, fully_sold
+
+
 def _update_watch(watch: dict[str, Any], position: OpenPosition, decision: Mapping[str, Any], now: str) -> None:
     row = watch.get(position.entry_key)
     if row is None:
@@ -1090,6 +1128,9 @@ def run_exit_tick(
     state = load_state()
 
     positions, skipped = open_positions(orders, today=today)
+    positions, fully_sold = net_of_live_sales(positions, state)
+    if fully_sold:
+        skipped["sold_live"] = fully_sold
     if len(positions) > _MAX_TICKERS_PER_TICK:
         # Newest first: the slate about to start beats one already settled.
         skipped["over_tick_cap"] = len(positions) - _MAX_TICKERS_PER_TICK
@@ -1272,9 +1313,20 @@ def exit_counterfactual(
             ungradable += 1
             continue
         exit_pnl = float(row.get("realized_pnl_dollars") or 0.0)
-        if row.get("status") == EXIT_FILLED and row.get("fill_price") is not None:
-            exit_pnl = round_trip_pnl(row, float(row["fill_price"]), float(row.get("exit_fee_dollars") or 0.0))
         hold = _hold_pnl(row, outcome)
+        if row.get("status") == EXIT_FILLED:
+            # Compare the contracts actually SOLD against holding those same
+            # contracts -- a one-contract sale of five is not a five-contract exit.
+            sold = _as_float(row.get("filled_contracts")) or 0.0
+            fill = _as_float(row.get("fill_price"))
+            contracts = float(row.get("contracts") or 0.0)
+            if not sold or fill is None or contracts <= 0:
+                ungradable += 1
+                continue
+            share = min(sold, contracts) / contracts
+            entry_fee = float(row.get("entry_fee_dollars") or 0.0) * share
+            exit_pnl = sold * (fill - float(row["entry_price"])) - float(row.get("exit_fee_dollars") or 0.0) - entry_fee
+            hold = sold * (_SETTLE_VALUE[outcome] - float(row["entry_price"])) - entry_fee
         mode = f"{row.get('entry_mode')}/{row.get('mode')}"
         phase = {True: "in_play", False: "pregame"}.get(row.get("in_play"), "unknown")
         for buckets, label in (

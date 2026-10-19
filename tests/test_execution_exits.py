@@ -535,3 +535,59 @@ def test_counterfactual_splits_by_venue(monkeypatch):
     report = ex.exit_counterfactual(ex.load_state(), orders)
     assert report["by_venue"]["polymarket"]["n"] == 1
     assert "polymarket/paper@0.10" in report["by_margin"]
+
+
+# -- partial (one-contract) live sales ------------------------------------------
+
+
+def _filled_one(monkeypatch, *, limit_price=None):
+    _arm_live(monkeypatch)
+    state = ex._empty_state()
+    sent = []
+
+    def send(body):
+        sent.append(body)
+        return {"state": "filled", "filled_count": 1, "fill_cost_dollars": 0.12,
+                "fees_dollars": 0.01, "order_id": "ord-1", "venue_status": "executed"}
+
+    out = ex.place_exit(state, _position(), _decision(), sellable=5.0, send=send, persist=lambda s: None,
+                        max_contracts=1, limit_price=limit_price, purpose="sell_body_verification")
+    return state, out, sent
+
+
+def test_max_contracts_sells_exactly_that_many(monkeypatch):
+    state, out, sent = _filled_one(monkeypatch, limit_price=0.96)
+    assert sent[0]["count"] == "1.00"
+    assert sent[0]["price"] == "0.0400"  # NO limit 0.96 -> YES bid at 0.04
+    row = out["row"]
+    assert row["requested_contracts"] == 1 and row["limit_price"] == 0.96
+    assert row["purpose"] == "sell_body_verification" and row["filled_contracts"] == 1
+    assert row["fill_price"] == pytest.approx(0.88)
+
+
+def test_a_partial_live_sale_reduces_what_is_held(monkeypatch):
+    state, _, _ = _filled_one(monkeypatch)
+    held, fully_sold = ex.net_of_live_sales([_position()], state)
+    assert fully_sold == 0 and held[0].contracts == 4.0
+    assert held[0].entry_fee_dollars == pytest.approx(0.0315 * 4 / 5, abs=1e-4)
+    rec = ex.reconcile_positions(held, {"status": "ok", "positions": {held[0].ticker: -4.0}})
+    assert rec["status"] == "ok" and rec["mismatches"] == []
+
+
+def test_a_paper_exit_row_never_reduces_a_holding():
+    state = ex._empty_state()
+    state["exits"][ex.exit_idempotency_key("a" * 24)] = {"mode": "paper", "status": ex.EXIT_PAPER_FILLED,
+                                                          "filled_contracts": 5, "entry_key": "a" * 24}
+    held, _ = ex.net_of_live_sales([_position()], state)
+    assert held[0].contracts == 5.0
+
+
+def test_counterfactual_grades_a_partial_sale_on_the_contracts_sold(monkeypatch):
+    state, _, _ = _filled_one(monkeypatch)
+    order = _order(outcome="won")  # NO paid out: holding that 1 contract would have made 1 - 0.90
+    report = ex.exit_counterfactual(state, [order])
+    bucket = report["by_mode"]["live/live"]
+    fee_share = 0.0315 / 5
+    assert bucket["n"] == 1
+    assert bucket["exit_pnl"] == pytest.approx(1 * (0.88 - 0.90) - 0.01 - fee_share, abs=0.01)
+    assert bucket["hold_pnl"] == pytest.approx(1 * (1.0 - 0.90) - fee_share, abs=0.01)
