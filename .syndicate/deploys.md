@@ -50833,3 +50833,15 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - The NBA alt capture on 10-20 and the first SERVED NBA tiers.
   - Their grades: the NBA game-log job adds 2026-27 games from 10-21 06:20 CT.
   - The 661539f0 owner's own measurement.
+
+
+## 2026-10-19 16:34Z -- READING: UEFA Kalshi-joined fixtures on the SERVED book grid after the 16:04Z restart (lane `uefa-oddsapi-club-aliases`, session 436c79e2) -- PARTLY MET
+- **Load:** every role restarted at 2026-10-19 16:04:12Z (role_restarts `down`, holder `fleet-go-live`, claimed; another lane's restart). Fleet HEAD is fceb54c1, which contains f39133f8. On the fleet's own runtime env, `canonical_team` resolves `Besiktas JK`, `Omonoia FC`, `FC Copenhagen`, `Hearts`, `Enschede` and `St. Truidense`, and the soccer alias map is 614 entries. **The code is loaded.**
+- **Instrument:** `/api/board/book-grid?sport=soccer&market=h2h&limit=5000`, generated 16:28:25Z. UEFA rows there carry ONLY a Kalshi book, so a UEFA fixture is on the grid exactly when a Kalshi event was resolved to its OddsAPI event_id (matched against `<comp>/api/odds/game_odds_current.csv`). Script: `C:/Users/tempadmin/.claude/scheduled-tasks/_uefa_join_reading/reading.sh`.
+- **Reading:** fixtures with a Kalshi h2h quote are **UCL 17/18, UEL 6/18, UECL 11/18**. Every fixture that is on the grid has Kalshi (34/34).
+  - **Kalshi-side aliases WORK:** `FC Midtjylland v Sint Truiden` (10-22) and `Lincoln Red Imps v FC Twente Enschede` (10-22) are on the grid priced at Kalshi.
+  - **OddsAPI-side aliases do NOT show yet:** every fixture with a new OddsAPI spelling is still absent (`Besiktas JK v Crystal Palace`, `Omonoia FC v Benfica`, `Red Star Belgrade v FC Copenhagen`, `Trabzonspor v Hearts`, ...). So are fixtures whose names already resolved (`Bournemouth v AC Milan`, `Celtic v Celta Vigo`, `OFI Crete v Bayer Leverkusen`).
+  - **So the replay's prediction (UEL 18, UECL 17) did not hold on the served grid. The replay measured canonical names, not the served path.**
+- **Not separated yet:** (a) the Kalshi quote tape / event resolution has not refreshed in the 24 min since the restart; or (b) the served path resolves Kalshi events through a different join (e.g. `pipeline/kalshi_odds_refresh.py` `_resolve_event` / `match_event_blob`, or per-league maps that exclude UEFA). (b) is the stronger lead, because fixtures whose names already resolved are missing too.
+- **No pre-restart served baseline exists:** my first grid read was after 16:04Z.
+- **Next:** a one-time re-read at ~18:45Z (scheduled task `uefa-kalshi-join-reread`). The same counts mean the gap is (b), a code path, not the tape.
