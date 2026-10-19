@@ -4149,10 +4149,11 @@ if (Test-SportEnabled 'MLB') {
     }
 }
 if (Test-SportEnabled 'NBA') {
-    $nbaVendoredRoot = Resolve-VendoredRepoPath -RelativePath 'vendor\nba_betting_repo'
-    $nbaVendoredApp = if ($nbaVendoredRoot) { Join-Path $nbaVendoredRoot 'app.py' } else { $null }
-    if (-not ($nbaVendoredApp -and (Test-Path $nbaVendoredApp))) {
-        throw "NBA self-contained refresh is unavailable because vendor\\nba_betting_repo\\app.py was not found. The fallback NBA Syndicate props refresh still requires a source-root for fresh runs and is not a self-contained replacement."
+    # The NBA refresh runs Syndicate's own source CLI and engine (lane nba-vendor-deletion-prep, 2026-10-19); its input root is the
+    # repo's NBA data bundle, not the vendored repo. The step's Name and Workflow ids stay: they key run manifests.
+    $nbaSourceRoot = Join-Path $repoRoot 'data\nba_source'
+    if (-not (Test-Path (Join-Path $nbaSourceRoot 'data'))) {
+        throw "NBA refresh is unavailable because data\\nba_source\\data was not found (the repo's NBA data bundle)."
     }
 
     $nbaScheduleCheck = Get-BasketballScheduledGamesCheck -Sport 'nba' -DateValue $Date
@@ -4179,7 +4180,7 @@ if (Test-SportEnabled 'NBA') {
             (Resolve-Python $repoRoot),
             'scripts\refresh_nba_oddsapi_props.py',
             '--date', $Date,
-            '--source-root', 'vendor\nba_betting_repo',
+            '--source-root', 'data\nba_source',
             '--artifact-root', 'data\nba_source\source_artifacts',
             '--log-file', (Join-Path $runDir 'nba_props_refresh.log'),
             '--force-refresh',

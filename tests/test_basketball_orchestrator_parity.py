@@ -1,9 +1,9 @@
 """Plan P6 parity, the in-repo half: native orchestrator == vendored orchestrator on a synthetic game, same seed.
 
 The gate of record is scripts/basketball_orchestrator_parity.py over REAL production games on the fleet
-(deploys.md). This keeps a cheap version in the suite: both leagues, every leaf, with positive controls so a
-0 can be trusted. The vendored arm is the pre-P6 bridge read from git (`VENDORED_ARM_COMMIT`); without git
-history or the vendor tree the comparison skips, and the static checks still run.
+(deploys.md). The in-suite native-vs-vendored comparison was retired 2026-10-19 (lane nba-vendor-deletion-prep; the orchestrator is frozen
+source, syndicate/features/basketball_engine/FROZEN_FROM_VENDOR.md). What stays: the static checks on the frozen modules and the harness's
+native arm / compare-outputs, which do not need the vendor tree.
 """
 
 from __future__ import annotations
@@ -67,43 +67,6 @@ def _run(arm: str, processed: Path, league: str, kwargs: dict):
     np.random.seed(5)
     random.seed(5)
     return par.arm_fn(arm)(processed_root=processed, league_code=league, kwargs=copy.deepcopy(kwargs))
-
-
-@pytest.fixture(scope="module")
-def vendored_available():
-    try:
-        par.vendored_arm_source()
-    except Exception as exc:  # no git history here
-        pytest.skip(f"pre-P6 bridge not readable from git: {exc}")
-    for pkg in ("nba_betting", "wnba_betting"):
-        if not (ROOT / "vendor" / f"{pkg}_repo" / "src" / pkg / "sim" / "smart_sim.py").exists():
-            pytest.skip("vendored orchestrator not present")
-    return True
-
-
-@pytest.mark.parametrize("league", ["nba", "wnba"])
-def test_native_equals_vendored_every_leaf(league, tmp_path, vendored_available):
-    processed, kw = _game(tmp_path, league)
-    a = _run("vendored", processed, league, kw)
-    b = _run("native", processed, league, kw)
-    n, diffs = par.leaf_compare(a, b)
-    assert n > 5000, n
-    # Lineup teammate effects are retired natively (lane basketball-pregame-teammate-effects, 2026-10-13); the vendored
-    # orchestrator still runs them. Only their diag may differ, and every other leaf must stay identical.
-    assert [d for d in diffs if not d.startswith("$.lineup_effects.")] == []
-    assert b["lineup_effects"] == {s: {"attempted": False, "applied": False, "reason": "retired"} for s in ("home", "away")}
-    assert len(b["players"]["home"]) == 10
-
-
-def test_positive_controls_the_comparison_can_fail(tmp_path, vendored_available, monkeypatch):
-    processed, kw = _game(tmp_path, "nba")
-    a = _run("vendored", processed, "nba", kw)
-    kw_seed = copy.deepcopy(kw)
-    kw_seed["cfg"].seed = 12
-    assert par.leaf_compare(a, _run("native", processed, "nba", kw_seed))[1], "a different seed did not show"
-    monkeypatch.setattr(runtime, "NBA", dataclasses.replace(runtime.NBA, prune_pregame_pool=True, stamp_team_opponent=True))
-    diffs = par.leaf_compare(a, _run("native", processed, "nba", kw))[1]
-    assert any("pregame_rotation_pool" in d for d in diffs), diffs
 
 
 def test_generated_modules_have_no_undefined_globals():

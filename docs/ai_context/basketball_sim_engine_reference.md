@@ -693,8 +693,9 @@ root. `scripts/basketball_engine_parity.py --corpus <dir>` replays every call
 through the vendored engine and through the native one. It fails on any leaf
 difference, on any difference in the RNG state after the call, and on any call
 whose vendored replay does not reproduce production's recorded output.
-`scripts/port_basketball_engine.py` regenerates `engine.py` from the vendored
-NBA source, with anchor-checked edits, and records how the port was derived.
+`scripts/port_basketball_engine.py` regenerated `engine.py` from the vendored
+NBA source, with anchor-checked edits. It was retired 2026-10-19 (lane nba-vendor-deletion-prep):
+`engine.py` is FROZEN source, edited directly (`syndicate/features/basketball_engine/FROZEN_FROM_VENDOR.md`); git history keeps the generator.
 
 **Not ported, deliberately:** `simulate_event_level_boxscore` (the non-PBP
 path). In both vendored copies it raised `NameError: period_seconds` on its
@@ -744,10 +745,11 @@ team adjustments, when team_advanced_stats_<season>_asof_<date>.csv is missing o
 ```
 
 **What changed against the vendored code, and nothing else.**
-`scripts/port_basketball_orchestrator.py` generates every module except three
-hand-written ones (`runtime.py`, `hooks.py`, `view.py`). It records each edit in
-the module headers, and `--check` exits 1 if a generated file drifts from its
-generator.
+`scripts/port_basketball_orchestrator.py` generated every module except three
+hand-written ones (`runtime.py`, `hooks.py`, `view.py`). It was retired 2026-10-19
+(lane nba-vendor-deletion-prep): the package is FROZEN source, edited directly (`syndicate/features/basketball_engine/FROZEN_FROM_VENDOR.md`). Its `--check`
+reported `smart_sim` DIFFERS at the freeze (a direct edit, 78f73023), so the test that ran it
+(`test_the_generated_modules_match_the_port_script`) was already red on main; it was retired with the generator.
   * **Only what production executes is ported.** That is the closure from
     `simulate_smart_game` and the helpers the ports read: 79 definitions over 9
     modules. The 29 replaced names are cut: their vendored bodies never ran.

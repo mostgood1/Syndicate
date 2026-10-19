@@ -22,9 +22,12 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+# The vendored WNBA app plus the ticks production RUNS: the NBA and WNBA ports (the NBA vendored app was retired,
+# lane nba-vendor-deletion-prep).
 VENDOR_APPS = [
     REPO_ROOT / "vendor" / "wnba_betting_repo" / "app.py",
-    REPO_ROOT / "vendor" / "nba_betting_repo" / "app.py",
+    REPO_ROOT / "syndicate" / "features" / "nba" / "live_tick" / "tick.py",
+    REPO_ROOT / "syndicate" / "features" / "wnba" / "live_tick" / "tick.py",
 ]
 
 
@@ -40,7 +43,7 @@ def _load_gate(path: Path):
     raise AssertionError(f"_tick_prop_klass_line_gate not found in {path}")
 
 
-@pytest.mark.parametrize("path", VENDOR_APPS, ids=lambda p: p.parent.name)
+@pytest.mark.parametrize("path", VENDOR_APPS, ids=lambda p: "/".join(p.parts[-3:-1]))
 def test_model_line_rows_are_forced_to_none(path):
     gate = _load_gate(path)
     assert gate("BET", "model") == "NONE"
@@ -48,7 +51,7 @@ def test_model_line_rows_are_forced_to_none(path):
     assert gate("BET", None) == "NONE"
 
 
-@pytest.mark.parametrize("path", VENDOR_APPS, ids=lambda p: p.parent.name)
+@pytest.mark.parametrize("path", VENDOR_APPS, ids=lambda p: "/".join(p.parts[-3:-1]))
 def test_real_market_lines_pass_through_unchanged(path):
     """Off-is-not-on: the gate must not flatten legitimate signals."""
     gate = _load_gate(path)
@@ -57,7 +60,7 @@ def test_real_market_lines_pass_through_unchanged(path):
     assert gate("NONE", "oddsapi") == "NONE"
 
 
-@pytest.mark.parametrize("path", VENDOR_APPS, ids=lambda p: p.parent.name)
+@pytest.mark.parametrize("path", VENDOR_APPS, ids=lambda p: "/".join(p.parts[-3:-1]))
 def test_gate_wraps_the_klass_rederivation_at_the_call_site(path):
     """Reachability, structurally: inside `_live_lens_tick_payload` there is a
     call `_tick_prop_klass_line_gate(_klass(...), ...)`. Presence of the helper

@@ -31,7 +31,8 @@ def _vendored_rotation_windows(league: str):
     return namespace["_rotation_windows"]
 
 
-@pytest.mark.parametrize("league", ["nba", "wnba"])
+# [nba] retired 2026-10-19 (lane nba-vendor-deletion-prep): the vendored NBA function goes with its tree.
+@pytest.mark.parametrize("league", ["wnba"])
 def test_pro_windows_reproduce_the_vendored_function_exactly(league):
     vendored = _vendored_rotation_windows(league)
     lr = rules_for(league)

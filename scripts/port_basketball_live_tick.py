@@ -1,4 +1,7 @@
-"""Generator for syndicate/features/<league>/live_tick/ -- Syndicate's port of the vendored basketball live-lens tick.
+"""NBA ARM RETIRED 2026-10-19 (lane nba-vendor-deletion-prep): syndicate/features/nba/live_tick/ is frozen source (syndicate/features/basketball_engine/FROZEN_FROM_VENDOR.md).
+This generator now produces the WNBA package only.
+
+Generator for syndicate/features/<league>/live_tick/ -- Syndicate's port of the vendored basketball live-lens tick.
 
 Lane nba-live-tick-native (2026-10-12; WNBA added the same day at the user's request). `syndicate/features/<league>/
 live_lens.py` used to import the whole vendored Flask app (`vendor/<league>_betting_repo/app.py`, 45-47k lines) on
@@ -125,18 +128,6 @@ REPO_DATA_PROCESSED_DIR = REPO_DATA_DIR / "processed"
 app = Flask(__name__)
 '''
 
-_NBA_DATA_ROOT = '''
-# ---- Data root (EDIT: replaces the vendored BASE_DIR / nba_betting.config block) ----
-# Vendored: DATA_DIR = nba_betting.config.paths.data_root = Path($NBA_BETTING_DATA_ROOT), else <vendored repo>/data.
-# Here the fallback is Syndicate's own NBA source data dir; with the env var set (every fleet role sets it) the
-# value is identical. The vendored import-time `reconcile_repo_data_to_active()` copy is NOT run.
-_DATA_ROOT = (os.environ.get("NBA_BETTING_DATA_ROOT") or "").strip()
-try:
-    _DATA_ROOT_P = Path(_DATA_ROOT) if _DATA_ROOT else (Path(__file__).resolve().parents[4] / "data" / "nba_source" / "data")
-except Exception:
-    _DATA_ROOT_P = Path(__file__).resolve().parents[4] / "data" / "nba_source" / "data"
-'''
-
 _WNBA_DATA_ROOT = '''from .league import LEAGUE, season_label_from_date
 
 # ---- Data root (EDIT: replaces the vendored BASE_DIR / wnba_betting.config block) ----
@@ -194,7 +185,6 @@ class League:
 
 
 LEAGUES = {
-    "nba": League("nba", "nba_betting", _HEADER_COMMON + _NBA_DATA_ROOT + _HEADER_TAIL, frozenset(_HEADER_NAMES_COMMON)),
     "wnba": League("wnba", "wnba_betting", _HEADER_COMMON + _WNBA_DATA_ROOT + _HEADER_TAIL,
                    frozenset(_HEADER_NAMES_COMMON | {"LEAGUE", "season_label_from_date", "_CONFIG_DATA_ROOT_ENV"})),
 }
@@ -432,7 +422,7 @@ def generate_league(league: League) -> dict[str, str]:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("--league", choices=("nba", "wnba", "all"), default="all")
+    ap.add_argument("--league", choices=("wnba", "all"), default="all")  # NBA arm retired, lane nba-vendor-deletion-prep
     ap.add_argument("--check", action="store_true")
     ap.add_argument("--without-fixes", action="store_true", help="the parity-proven verbatim text (FIXES off); needs --print-dir")
     ap.add_argument("--print-dir", help="write the packages under <dir>/<league>/ instead of the repo")
@@ -443,7 +433,7 @@ def main() -> int:
             ap.error("--without-fixes needs --print-dir (the repo always carries the fixed port)")
         APPLY_FIXES = False
     rc = 0
-    for code in (("nba", "wnba") if args.league == "all" else (args.league,)):
+    for code in (("wnba",) if args.league == "all" else (args.league,)):
         league = LEAGUES[code]
         if not (league.vendor / "app.py").exists():
             print(f"{code}: vendor tree absent, nothing to generate from")

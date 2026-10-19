@@ -172,10 +172,3 @@ def test_stamp_switch_off_is_not_on():
     on = native_smart_sim._stamp_team_opponent({"home": [{"player_name": "A"}], "away": []}, home_tri="lva", away_tri="gsv", enabled=True)
     assert on["home"][0]["team"] == "LVA" and on["home"][0]["opponent"] == "GSV"
 
-
-def test_the_generated_modules_match_the_port_script():
-    """The orchestrator is regenerated from the vendored source by scripts/port_basketball_orchestrator.py.
-    Until a deliberate native edit lands (then delete this test and say so in the module header), the files
-    must equal the generator's output, so every difference from the vendored code is a recorded edit."""
-    out = subprocess.run([sys.executable, "scripts/port_basketball_orchestrator.py", "--check"], cwd=ROOT, capture_output=True, text=True, timeout=300)
-    assert out.returncode == 0, out.stdout[-2000:] + out.stderr[-2000:]

@@ -1,4 +1,7 @@
-"""Generator for syndicate/features/<league>/source_cli/ -- Syndicate's port of the vendored `<league>_betting.cli` commands that
+"""NBA ARM RETIRED 2026-10-19 (lane nba-vendor-deletion-prep): syndicate/features/nba/source_cli/ is frozen source (syndicate/features/basketball_engine/FROZEN_FROM_VENDOR.md).
+This generator now produces the WNBA package only; the NBA story below is history.
+
+Generator for syndicate/features/<league>/source_cli/ -- Syndicate's port of the vendored `<league>_betting.cli` commands that
 the props refreshes run (NBA since 2026-10-12; WNBA added 2026-10-13, `--league`). The NBA story below is the original;
 the NBA props refresh's game-input bootstrap runs (lane nba-source-cli-native, 2026-10-12).
 
@@ -43,80 +46,10 @@ _spec.loader.exec_module(_tg)
 #: Per-league configuration; `configure(code)` installs one as the module globals the generator reads.
 LEAGUES: dict[str, dict] = {}
 
-_NBA_PKG_NAME = "nba_betting"
-
 #: The commands the props refresh runs (`_ensure_source_game_inputs`, `_run_source_predict_date`, and the full export's
 #: export-game-cards). update-pbp-espn-history and build-lineup-teammate-effects were dropped 2026-10-13: lineup
 #: teammate effects were retired (user decision; bf5718d3 removed their only reader) and the refreshes no longer run them.
-_NBA_COMMANDS = {
-    "fetch-schedule": "fetch_schedule_cmd",
-    "fetch": "fetch",
-    "build-features": "build_features_cmd",
-    "fetch-injuries": "fetch_injuries",
-    "export-game-cards": "export_game_cards_cmd",
-    "predict-date": "predict_date_cmd",
-}
-
 #: The stats.nba.com schedule source inserted before fetch_schedule_2025_26 (an EDIT below).
-_NBA_SCHEDULE_HELPER = '''def _current_nba_season(today=None) -> str:
-    """EDIT: the season in play on `today` ('2026-27' from July 2026), the one the schedule should carry."""
-    import datetime as _dt
-
-    d = today or _dt.date.today()
-    start = d.year if d.month >= 7 else d.year - 1
-    return f"{start}-{str(start + 1)[-2:]}"
-
-
-_STATS_SCHEDULE_CACHE: dict[str, dict[str, Any]] = {}
-
-
-def _stats_schedule_payload(season: str | None = None) -> dict[str, Any]:
-    """EDIT: the CDN schedule payload rebuilt from stats.nba.com ScheduleLeagueV2, which carries the same game-level fields.
-
-    cdn.nba.com/static/json/staticData/scheduleLeagueV2*.json answers 403 to this host (fleet and Windows, with or
-    without browser headers, measured 2026-10-14), so the vendored command always took the local fallback and rewrote
-    the previous season's file. One request per process (cached). Raises when the season has no games yet (e.g. before
-    the schedule is published), which leaves the local fallback in charge exactly as before.
-    """
-    season = season or _current_nba_season()
-    if season in _STATS_SCHEDULE_CACHE:
-        return _STATS_SCHEDULE_CACHE[season]
-    from nba_api.stats.endpoints.scheduleleaguev2 import ScheduleLeagueV2
-
-    frame = ScheduleLeagueV2(league_id="00", season=season, timeout=60).get_data_frames()[0]
-    if frame is None or frame.empty:
-        raise RuntimeError(f"ScheduleLeagueV2 returned no games for {season}")
-
-    def _v(row, col):
-        val = row.get(col)
-        if val is None or (isinstance(val, float) and pd.isna(val)) or (isinstance(val, str) and val == ""):
-            return None
-        return val
-
-    by_date: dict[str, list[dict[str, Any]]] = {}
-    for _, row in frame.iterrows():
-        national = [{"broadcasterName": _v(row, f"nationalBroadcasters_{i}_broadcasterDisplay")} for i in range(5)
-                    if _v(row, f"nationalBroadcasters_{i}_broadcasterDisplay")]
-        game = {
-            "gameId": _v(row, "gameId"), "gameLabel": _v(row, "gameLabel"), "gameSubtype": _v(row, "gameSubtype"),
-            "gameStatus": _v(row, "gameStatus"), "gameStatusText": _v(row, "gameStatusText"),
-            "gameDateTimeUTC": _v(row, "gameDateTimeUTC"), "gameDateUTC": _v(row, "gameDateUTC"), "gameTimeUTC": _v(row, "gameTimeUTC"),
-            "gameDateTimeEst": _v(row, "gameDateTimeEst"), "gameDateEst": _v(row, "gameDateEst"), "gameTimeEst": _v(row, "gameTimeEst"),
-            "homeTeam": {k: _v(row, f"homeTeam_{k}") for k in ("teamId", "teamTricode", "teamCity", "teamName")},
-            "awayTeam": {k: _v(row, f"awayTeam_{k}") for k in ("teamId", "teamTricode", "teamCity", "teamName")},
-            "arenaName": _v(row, "arenaName"), "arenaCity": _v(row, "arenaCity"), "arenaState": _v(row, "arenaState"),
-            "broadcasters": {"national": national},
-        }
-        by_date.setdefault(str(_v(row, "gameDate") or ""), []).append(game)
-    payload = {"leagueSchedule": {"seasonYear": str(frame["seasonYear"].iloc[0] or season),
-                                  "gameDates": [{"gameDate": d, "games": g} for d, g in by_date.items()]}}
-    _STATS_SCHEDULE_CACHE[season] = payload
-    return payload
-
-
-def fetch_schedule_2025_26() -> pd.DataFrame:
-'''
-
 #: Lane source-cli-implied-prob-zero-guard (2026-10-15). Both vendored CLIs carry the same nested converter
 #: `predict_date_cmd -> _merge_odds_df -> implied_prob_american`, which priced an American 0 as 100/(0+100) = 1.0 and
 #: fed it to `edge_win` (scripts/probability_differential.py, measured 2026-10-15). Hardening, not a live misprice:
@@ -136,76 +69,9 @@ _IMPLIED_PROB_ZERO_GUARD_EDIT = (
 )
 
 #: Anchored edits: (module, why, old, new). The ONLY hand-written behaviour in the port.
-_NBA_EDITS: list[tuple[str, str, str, str]] = [
-    (
-        "config",
-        "the vendored repo root is vendor/nba_betting_repo (parents[2] of nba_betting/config.py). The port's repo root "
-        "is source_cli/repo/: its models/ is a byte-identical copy of the vendored models (MODELS below). Like the "
-        "vendored repo on the fleet it has no .env and no data/ (checked 2026-10-12: paths.root/.env and "
-        "paths.root/data/raw/injuries.csv, the two other reads of the root, do not exist there either), and the "
-        "vendored import-time reconcile_repo_data_to_active() copy is not ported (fleet dry-run: 0 of 178 to copy).",
-        "def _repo_root() -> Path:\n    return Path(__file__).resolve().parents[2]\n",
-        "def _repo_root() -> Path:\n    return Path(__file__).resolve().parent / \"repo\"  # EDIT: Syndicate-owned repo root (models/)\n",
-    ),
-    # Lane nba-schedule-current-season (user request 2026-10-14): the vendored fetch-schedule never wrote the season in
-    # play. cdn.nba.com answers 403 to this host, so it always took the local fallback, which re-reads
-    # schedule_2025_26.csv and writes it back (fleet file: 2024-10-22..2026-04-12, empty statuses) -- no 2026-27 game
-    # reached the props refresh, the live tick's gid index or the games-history freshness trigger.
-    (
-        "schedule",
-        "a stats.nba.com ScheduleLeagueV2 source between the (403) CDN and the local fallback, rebuilt into the CDN "
-        "payload shape so the vendored parsing loop below runs unchanged",
-        "def fetch_schedule_2025_26() -> pd.DataFrame:\n",
-        _NBA_SCHEDULE_HELPER,
-    ),
-    (
-        "schedule",
-        "the CDN failure path tries stats.nba.com before the local fallback",
-        "    try:\n        payload = _request_schedule_payload()\n    except Exception:\n        return _load_local_schedule_fallback()\n",
-        "    try:\n        payload = _request_schedule_payload()\n    except Exception:\n"
-        "        try:  # EDIT: the CDN answers 403 to this host; stats.nba.com serves the same feed\n"
-        "            payload = _stats_schedule_payload()\n"
-        "        except Exception:\n"
-        "            return _load_local_schedule_fallback()\n",
-    ),
-    (
-        "cli",
-        "fetch-schedule also writes schedule_<season>.{json,csv} under the season's own name; schedule_2025_26.* stays "
-        "the alias the vendored readers open by that name (the live tick's gid index, the local fallback)",
-        "        df.to_csv(csv_path, index=False)\n",
-        "        df.to_csv(csv_path, index=False)\n"
-        "        # EDIT: the season's own name too (schedule_2026_27.*); schedule_2025_26.* stays the alias read by name\n"
-        "        season_token = str(df[\"season_year\"].dropna().iloc[0]).replace(\"-\", \"_\") if \"season_year\" in df.columns and df[\"season_year\"].notna().any() else \"\"\n"
-        "        if season_token and season_token != \"2025_26\":\n"
-        "            df.to_json(out_dir / f\"schedule_{season_token}.json\", orient=\"records\", date_format=\"iso\")\n"
-        "            df.to_csv(out_dir / f\"schedule_{season_token}.csv\", index=False)\n",
-    ),
-    (
-        "cli",
-        "VENDORED DEFECT FIXED: _load_schedule_day filtered on date_utc first and shifted that midnight-UTC date to "
-        "America/Chicago, so asking for day D returned day D+1's games (fleet A/B 2026-10-14: predict-date 10-20 built an "
-        "11-game slate, none of the opener's 3). Masked until now because the schedule held no current-season games. The "
-        "WNBA fork of the same function already prefers date_est (the ET game date); the NBA one now does too",
-        "        day_col = next((col for col in (\"date_utc\", \"date_est\", \"date\") if col in frame.columns), None)\n"
-        "        if not day_col:\n            return pd.DataFrame()\n        day_frame = frame.copy()\n",
-        "        day_col = next((col for col in (\"date_est\", \"date_utc\", \"date\") if col in frame.columns), None)  # EDIT: ET game date first (as the WNBA fork)\n"
-        "        if not day_col:\n            return pd.DataFrame()\n        day_frame = frame.copy()\n",
-    ),
-    _IMPLIED_PROB_ZERO_GUARD_EDIT,
-]
-
 #: Top-level statements that bind nothing but change behaviour: kept, at their source position in the header.
-_NBA_KEEP_STATEMENTS = {
-    ("cli", "os.environ.setdefault('ONNXRUNTIME_LOG_SEVERITY_LEVEL', '3')"),
-    ("cli", "os.environ.setdefault('ORT_DISABLE_CPUINFO', '1')"),
-    ("games_npu", "warnings.filterwarnings('ignore')"),
-}
-
 #: The vendored models the port reads through paths.models, copied byte-for-byte.
 MODELS_DST = "repo/models"
-
-LEAGUES["nba"] = dict(pkg_name=_NBA_PKG_NAME, commands=_NBA_COMMANDS, edits=_NBA_EDITS, keep=_NBA_KEEP_STATEMENTS,
-                      refresh="NBA props refresh")
 
 #: WNBA (lane nba-source-cli-native, user decision 2026-10-13): the commands scripts/refresh_wnba_oddsapi_props.py
 #: runs on EVERY refresh (`_ensure_source_game_inputs`, `_ensure_rotation_inputs_for_props_refresh`,
@@ -256,7 +122,7 @@ def configure(code: str) -> None:
     MODELS_SRC = ROOT / "vendor" / f"{code}_betting_repo" / "models"
 
 
-configure("nba")
+configure("wnba")
 
 CLI_FOOTER = '\n\nif __name__ == "__main__":\n    cli()\n'
 
@@ -473,7 +339,7 @@ def model_files() -> dict[str, bytes]:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("--league", choices=sorted(LEAGUES), default="nba")
+    ap.add_argument("--league", choices=sorted(LEAGUES), default="wnba")
     ap.add_argument("--check", action="store_true")
     ap.add_argument("--report", action="store_true")
     args = ap.parse_args()

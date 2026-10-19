@@ -20,13 +20,6 @@ PKG = ROOT / "syndicate" / "features" / "nba" / "source_cli"
 COMMANDS = {"fetch-schedule", "fetch", "build-features", "fetch-injuries", "export-game-cards", "predict-date"}
 
 
-def test_package_matches_generator():
-    if not (ROOT / "vendor" / "nba_betting_repo" / "src" / "nba_betting" / "cli.py").exists():
-        pytest.skip("vendor tree removed: nothing to regenerate from")
-    r = subprocess.run([sys.executable, str(ROOT / "scripts" / "port_basketball_source_cli.py"), "--check"], capture_output=True, text=True, cwd=ROOT)
-    assert r.returncode == 0, r.stdout + r.stderr
-
-
 def test_port_imports_nothing_vendored():
     bad = []
     for path in sorted(PKG.rglob("*.py")):

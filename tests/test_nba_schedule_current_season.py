@@ -66,14 +66,6 @@ def schedule_mod(monkeypatch):
     return schedule
 
 
-def test_the_generated_port_matches_the_generator():
-    if not (ROOT / "vendor" / "nba_betting_repo" / "src" / "nba_betting" / "cli.py").exists():
-        pytest.skip("vendor tree removed: nothing to regenerate from")
-    r = subprocess.run([sys.executable, str(ROOT / "scripts" / "port_basketball_source_cli.py"), "--league", "nba", "--check"],
-                       capture_output=True, text=True, cwd=ROOT)
-    assert r.returncode == 0, r.stdout + r.stderr
-
-
 def test_current_season():
     from syndicate.features.nba.source_cli.schedule import _current_nba_season
 

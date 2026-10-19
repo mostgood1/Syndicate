@@ -28,9 +28,10 @@ def _pkg_dir(league: str) -> Path:
 
 
 def test_generated_packages_match_generator():
-    if not all((ROOT / "vendor" / f"{lg}_betting_repo" / "app.py").exists() for lg in LEAGUES):
+    # WNBA only: the NBA package is frozen source (lane nba-vendor-deletion-prep).
+    if not (ROOT / "vendor" / "wnba_betting_repo" / "app.py").exists():
         pytest.skip("vendor tree removed: nothing to regenerate from")
-    r = subprocess.run([sys.executable, str(ROOT / "scripts" / "port_basketball_live_tick.py"), "--league", "all", "--check"],
+    r = subprocess.run([sys.executable, str(ROOT / "scripts" / "port_basketball_live_tick.py"), "--league", "wnba", "--check"],
                        capture_output=True, text=True, cwd=ROOT)
     assert r.returncode == 0, r.stdout + r.stderr
 

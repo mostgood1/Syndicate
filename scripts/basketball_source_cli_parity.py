@@ -169,7 +169,7 @@ def main(argv: list[str] | None = None) -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
     for name in ("record", "replay"):
         p = sub.add_parser(name)
-        p.add_argument("--league", choices=("nba", "wnba"), default="nba")
+        p.add_argument("--league", choices=("wnba",), default="wnba")  # NBA arm retired, lane nba-vendor-deletion-prep
         p.add_argument("--date", required=True)
         p.add_argument("--data-root", required=True)
         p.add_argument("--tape", required=True)

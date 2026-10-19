@@ -24,7 +24,8 @@ def _sha(p: Path) -> str:
     return hashlib.sha256(p.read_bytes()).hexdigest()
 
 
-@pytest.mark.parametrize("league", sorted(LEAGUES))
+# [nba] retired 2026-10-19 (lane nba-vendor-deletion-prep): the vendored NBA models go with their tree; see the invariant below.
+@pytest.mark.parametrize("league", ["wnba"])
 def test_copies_are_byte_identical_to_the_vendored_models_they_replaced(league):
     vendor = ROOT / "vendor" / f"{LEAGUES[league]}_repo" / "models"
     if not vendor.is_dir():
@@ -60,3 +61,14 @@ def test_the_copies_hold_every_file_the_predictor_loads(league):
     for target in onnx.PRIMARY_ONNX_TARGETS + onnx.EXTRA_TARGETS:
         assert (d / f"{target}_ridge.onnx").is_file(), target
     assert onnx._load_feature_columns(d), "feature columns did not load"
+
+
+def test_nba_models_are_committed_and_non_empty():
+    """Post-vendor invariant: the NBA props models production reads are git-tracked here and not empty."""
+    import subprocess
+
+    tracked = [f for f in subprocess.run(["git", "ls-files", str((NATIVE / "nba").relative_to(ROOT))], cwd=ROOT,
+                                         capture_output=True, text=True).stdout.split() if f]
+    assert len(tracked) >= 20, tracked
+    for f in tracked:
+        assert (ROOT / f).stat().st_size > 0, f

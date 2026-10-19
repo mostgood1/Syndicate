@@ -133,7 +133,8 @@ def test_punctuated_names_reach_the_vendor_pool_filter_wnba():
 
 
 def test_punctuated_names_reach_the_vendor_pool_filter_nba():
-    m = _vendor_smart_sim("nba_betting_repo", "nba_betting")
+    # The NBA side runs the native orchestrator's normaliser (frozen source, lane nba-vendor-deletion-prep), not the vendored one.
+    from syndicate.features.basketball_engine.orchestrator import player_priors as m
     names = ["De'Aaron Fox", "P.J. Washington", "D'Angelo Russell", "LeBron James"]
     excluded = {"DAL": {_norm_name_key(n).upper() for n in names[:3]}}
     fixed = _excluded_keys_for_source_filter(excluded, ("DAL",), m)

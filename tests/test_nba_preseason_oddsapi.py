@@ -24,7 +24,6 @@ import pandas as pd
 from scripts import fetch_basketball_oddsapi_props_local as fetcher
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-NBA_SRC = os.path.join(REPO_ROOT, "vendor", "nba_betting_repo", "src")
 
 PRESEASON_EVENT = {"id": "evt-pre-1", "commence_time": "2026-10-03T23:00:00Z",
                    "home_team": "Toronto Raptors", "away_team": "Miami Heat"}
@@ -100,7 +99,7 @@ class SyndicatePropsFetcherTests(unittest.TestCase):
 
 
 def _run_vendor(code: str) -> dict:
-    env = dict(os.environ, PYTHONPATH=NBA_SRC)
+    env = dict(os.environ, PYTHONPATH=REPO_ROOT)
     done = subprocess.run([sys.executable, "-c", textwrap.dedent(code)], capture_output=True, text=True,
                           env=env, cwd=REPO_ROOT, timeout=180)
     if done.returncode != 0:
@@ -108,12 +107,13 @@ def _run_vendor(code: str) -> dict:
     return json.loads(done.stdout.strip().splitlines()[-1])
 
 
-class VendoredNbaTests(unittest.TestCase):
+class SourceCliNbaTests(unittest.TestCase):
+    # Were VendoredNbaTests; now the NBA source CLI production runs (lane nba-vendor-deletion-prep).
     def test_game_odds_list_both_keys_and_price_each_under_its_own(self) -> None:
         out = _run_vendor(f"""
             import json
             from unittest import mock
-            import nba_betting.odds_api as oa
+            import syndicate.features.nba.source_cli.odds_api as oa
             pre = {json.dumps(PRESEASON_EVENT)}
             calls = []
             class R:
@@ -138,16 +138,15 @@ class VendoredNbaTests(unittest.TestCase):
     def test_no_bovada_game_odds_in_cli(self) -> None:
         out = _run_vendor("""
             import inspect, json
-            import nba_betting.cli as cli
+            import syndicate.features.nba.source_cli.cli as cli
             def src(cmd):
                 return inspect.getsource(getattr(cmd, "callback", None) or cmd)
             print(json.dumps({
                 "predict_date": "fetch_bovada_odds_current(" in src(cli.predict_date_cmd),
-                "odds_snapshots": "fetch_bovada_odds_current(" in src(cli.odds_snapshots_cmd),
                 "module_name": hasattr(cli, "fetch_bovada_odds_current"),
             }))
         """)
-        self.assertEqual(out, {"predict_date": False, "odds_snapshots": False, "module_name": False})
+        self.assertEqual(out, {"predict_date": False, "module_name": False})  # odds-snapshots was never ported
 
 
 if __name__ == "__main__":

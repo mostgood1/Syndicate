@@ -42,7 +42,8 @@ def _run(arm: str, data_root: Path, league: str) -> pd.DataFrame:
     return pd.read_csv(data_root / "processed" / "features.csv")
 
 
-@pytest.mark.parametrize("league", ["nba", "wnba"])
+# [nba] retired 2026-10-19 (lane nba-vendor-deletion-prep): nba/source_cli is frozen source.
+@pytest.mark.parametrize("league", ["wnba"])
 def test_build_features_is_identical(tmp_path, league):
     if not (_vendor(league) / "data" / "raw" / "games_nba_api.csv").exists():
         pytest.skip("vendor tree removed")
