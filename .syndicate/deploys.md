@@ -51025,3 +51025,13 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   rotates the token and would strand their claim (the 2026-10-xx poller lesson).
 - Baseline for my owed reading stays the 18:37Z one: 3,695 rows, 2,992 carrying
   `model_edge_pct` (81.0%), 407 `edge_exceeds_plausibility_ceiling`.
+
+## RIDE-ALONG AGREED: d4837386 ships with lane compounding-bankroll's deploy, not its own
+
+- **Decision (2026-10-19T18:47:29Z):** session 3927eb2e (, lane `compounding-bankroll`) has a user-approved ff to `852583f5`, which **does** carry `d4837386` — verified by me, not taken on their word (`merge-base --is-ancestor d4837386 852583f5` is true). They asked whether to carry it, hold, or let me go first. **Answer: carry it.**
+- **Why not go first.** min-ev-tuner had not restarted yet (worker still from 17:30:16Z). Once they do (~18:50Z) the 60-min rule gates the next restart to ~19:50Z, and theirs is planned 20:15-20:45Z. Inserting at 19:50Z would mean **three refresh-worker restarts in 85 minutes** and would push a user-approved deploy back ~40 min, to buy ~30 minutes of latency. The batching rule exists for that trade.
+- **The user asked me to "restart now"; the lock and the gate made that impossible either way.** The earliest own-restart was ~19:50Z, so the real choice was 19:50Z alone versus ~20:30Z riding along. Recorded plainly so this does not read as me quietly declining an instruction.
+- **Attribution stays clean inside their bundle.** The change renames the bound's refusal from `edge_exceeds_plausibility_ceiling` (**407** stamped at baseline) to `model_probability_extreme_against_ordinary_market` (**~33** expected). Nothing else in the tree emits that string, so my reading is separable from theirs even in one restart.
+- **Expected movement, which is MINE:** served rows carrying `model_edge_pct` **2,992 of 3,695 (81.0%) -> ~3,357**, i.e. ~273 rows returning. Passed to them so a coverage jump is not read as a defect.
+- **Their bundle is three changes in one restart** (full down/up, a new `REFRESH_WORKER__SYNDICATE_COMPOUNDING_BANKROLL=shadow`, and my ranking change). Flagged to them against the one-change-per-deploy rule, with the note that **mine is the one to revert first** because `SYNDICATE_LAYER2_PLAUSIBILITY_BOUND=magnitude` needs no deploy.
+- **Owed:** the after-reading off their restart, against the 18:37Z baseline. Lane `model-edge-plausibility-bound` stays OPEN until it lands.
