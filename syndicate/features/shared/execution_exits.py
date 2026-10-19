@@ -48,10 +48,12 @@ a re-send of that exit until `reconcile_exit_orders` asks the venue. Any exit
 in `submitted`/`failed` blocks every NEW live exit, for the reason an
 unreconciled entry blocks every new entry.
 
-NOT YET SAFE TO ARM, independent of the switches above: `venue_settlement`
-grades an ENTRY from Kalshi's settlement record, and that record does not know a
-position was sold first. A live exit must be reflected in settlement before
-anyone sets `SYNDICATE_EXIT_MODE=live` -- see `LIVE_BLOCKERS`.
+SETTLEMENT KNOWS ABOUT SALES (2026-10-19, lane kalshi-exit-settlement):
+`venue_settlement.settle_from_venue` reads this document's LIVE rows by
+`exit_idempotency_key(entry_key)` and grades a sold entry from both fills
+(`exit_adjusted_pnl`); a live exit still `submitted`/`failed` defers the grade,
+and paper rows are never read. NOT YET SAFE TO ARM regardless -- see
+`LIVE_BLOCKERS` for what remains.
 """
 
 from __future__ import annotations
@@ -83,9 +85,11 @@ RULE_MODEL_FAIR = "model_fair"
 
 # What must be true before live exits are armed, beyond the switches. Printed
 # on every live refusal so a person flipping the switch reads it.
+#
+# CLEARED 2026-10-19: "venue_settlement grades an entry from Kalshi's settlement
+# record, which does not know the position was sold first" -- settlement is now
+# exit-aware (`venue_settlement.exit_adjusted_pnl`).
 LIVE_BLOCKERS = (
-    "venue_settlement grades an entry from Kalshi's settlement record, which does"
-    " not know the position was sold first -- reflect exits in settlement",
     "the v2 sell body (reduce_only, time_in_force=immediate_or_cancel) has never"
     " been accepted by the venue -- first live exit must be watched",
 )

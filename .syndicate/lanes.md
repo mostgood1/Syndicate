@@ -1230,6 +1230,14 @@ death, never life — do not invert it.
 - Verification: whole-map diff 0 removed / 0 changed / no new ambiguous token over origin/main tracked branding; soccer size tests pass -v; fleet elimination replay UECL 17 -> 18 of 18 resolved
 - Blocked by: none
 
+### kalshi-exit-settlement — OPEN — opened 2026-10-19 — session 472d0781-c5c1-4e15-9c01-bc167cce0fd2
+- Goal: venue_settlement grades a live Kalshi entry exit-aware: an entry whose LIVE exit row in execution_exits.json is filled books pnl = sale proceeds - entry cost - both fees for the sold contracts + settlement only on the unsold remainder; a live exit still submitted/failed defers the grade; paper exits change nothing; an entry with no exit grades exactly as today; LIVE_BLOCKERS drops the settlement item. Landed on origin/main. Live exits NOT armed (needs the user's yes).
+- Files: syndicate/features/shared/venue_settlement.py, tests/test_venue_settlement_exits.py (NEW), syndicate/features/shared/execution_exits.py (LIVE_BLOCKERS tuple + module-docstring blocker paragraph ONLY; lent by lane kalshi-exit-path, whose owner session started this one for todo #703)
+- Hypothesis: n/a (build)
+- Falsification test: n/a
+- Verification: pytest tests/test_venue_settlement_exits.py tests/test_venue_settlement.py tests/test_execution_exits.py: no-exit entry grades identically (attributable and multi-order), paper exit changes nothing, filled live exit full and partial sale arithmetic, unreconciled exit defers, repair_impossible_venue_pnl leaves exit-adjusted rows alone, reachability through settle_from_venue with a real execution_exits.json on disk
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

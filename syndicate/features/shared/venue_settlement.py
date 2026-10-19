@@ -587,6 +587,7 @@ def _pnl_exceeds_own_fill(order: Mapping[str, Any], outcome: str, pnl: float) ->
 # Fields this module writes, and therefore the only fields a repair may clear.
 _VENUE_GRADE_FIELDS = (
     "outcome", "pnl_dollars", "settled_by", "settled_at_venue", "graded_at", "held_side",
+    "exit_applied",
 )
 
 
@@ -1045,6 +1046,12 @@ def repair_impossible_venue_pnl(*, dry_run: bool = False) -> dict[str, Any]:
         outcome = str(order.get("outcome") or "")
         if not outcome:
             continue
+        if order.get("exit_applied"):
+            # A SOLD position's P&L is not bounded by hold-to-settle arithmetic:
+            # a contract sold at a profit on a market that then resolved LOST
+            # made money, and "a loss that made money" is exactly what the
+            # bound flags. `exit_adjusted_pnl` wrote it from the sale itself.
+            continue
         stored = _num(order.get("pnl_dollars"))
         if stored is None:
             continue
@@ -1166,6 +1173,250 @@ def repair_multi_side_grades(*, dry_run: bool = False) -> dict[str, Any]:
     return {"status": "ok", **counters}
 
 
+# ---------------------------------------------------------------------------
+# Exits: a position SOLD before the market settled
+# ---------------------------------------------------------------------------
+#
+# `execution_exits` can sell a held Kalshi contract back before settlement
+# (reduce_only, its own `x`+23-hex key space, its own document). Kalshi's
+# settlement row then describes only what was STILL HELD when the market
+# settled -- the remainder, or nothing at all -- so grading the entry from that
+# row alone books hold-to-settle money for contracts we no longer owned, and a
+# fully sold position may never get a row at all and wait forever.
+#
+# So an entry whose LIVE exit FILLED is graded from our own two fills, exactly:
+#
+#     pnl = sold * exit_price - exit_fee              (the sale)
+#         + remainder * settle_value                  (settlement, unsold only)
+#         - entry_cost - entry_fee                    (what the entry paid)
+#
+# The OUTCOME stays the venue's statement about the market, as for every other
+# row -- it is a fact about the game, not about our money.
+#
+# PAPER EXITS CHANGE NOTHING. They are counterfactual; the venue still holds
+# every one of those contracts. Only `mode == "live"` exit rows are read here,
+# so a paper sale cannot reach a money record by construction.
+#
+# A LIVE EXIT WHOSE FATE IS UNKNOWN DEFERS THE GRADE. `submitted`/`failed` means
+# the sale may have traded; grading then would write hold-to-settle money that a
+# later reconcile proves wrong onto a record that is never regraded. The exit
+# tick reconciles those every cycle, so the deferral is short.
+
+_EXIT_NONE = "none"
+_EXIT_SOLD = "sold"
+_EXIT_DEFER = "defer"
+
+_SETTLE_VALUE = {OUTCOME_WON: 1.0, OUTCOME_LOST: 0.0}
+
+
+def load_live_exits() -> tuple[dict[str, dict], str | None]:
+    """`exit_key -> row` for LIVE exits only. Returns `(rows, error)`.
+
+    An UNREADABLE document is an error, never an empty one: "no sale happened"
+    and "we cannot see whether a sale happened" are opposite facts, and only
+    the first may grade.
+    """
+    try:
+        from syndicate.features.shared.execution_exits import EXIT_LIVE, load_state
+
+        state = load_state()
+    except Exception as exc:
+        return {}, f"{type(exc).__name__}: {exc}"
+    rows: dict[str, dict] = {}
+    for key, row in (state.get("exits") or {}).items():
+        if isinstance(row, Mapping) and str(row.get("mode") or "") == EXIT_LIVE:
+            rows[str(key)] = dict(row)
+    return rows, None
+
+
+def exit_for_order(order: Mapping[str, Any], live_exits: Mapping[str, Mapping[str, Any]]) -> tuple[str, Mapping[str, Any] | None]:
+    """`(effect, row)`: `none` grades as before, `sold` grades exit-aware,
+    `defer` waits for the exit to be reconciled.
+
+    Looked up by `exit_idempotency_key(entry_key)` -- the key the exit was sent
+    under -- and the row must name this entry back. Any status not known to
+    mean "nothing traded" or "traded" defers: an unknown must not default to the
+    branch that writes money.
+    """
+    from syndicate.features.shared.execution_exits import (
+        EXIT_DEAD,
+        EXIT_FILLED,
+        EXIT_REJECTED,
+        exit_idempotency_key,
+    )
+
+    entry_key = str(order.get("idempotency_key") or "").strip()
+    if not entry_key or not live_exits:
+        return _EXIT_NONE, None
+    row = live_exits.get(exit_idempotency_key(entry_key))
+    if row is None or str(row.get("entry_key") or "") != entry_key:
+        return _EXIT_NONE, None
+    status = str(row.get("status") or "")
+    if status in {EXIT_REJECTED, EXIT_DEAD}:
+        return _EXIT_NONE, row
+    if status == EXIT_FILLED:
+        sold = _num(row.get("filled_contracts"))
+        if sold is not None and sold <= 0:
+            return _EXIT_NONE, row
+        return _EXIT_SOLD, row
+    return _EXIT_DEFER, row
+
+
+def exit_adjusted_pnl(
+    order: Mapping[str, Any], outcome: str, exit_row: Mapping[str, Any]
+) -> tuple[float | None, dict[str, Any]]:
+    """P&L of an entry that was partly or fully SOLD, from both fills.
+
+    Returns `(pnl, detail)`; `pnl` is None with `detail["refused"]` naming why.
+    Every input is required except the fees, and a missing EXIT fee is
+    ESTIMATED at the full taker rate (`estimate_kalshi_fee`'s rule: understating
+    a fee invents edge) and marked so. A push refunds the remainder at cost.
+    """
+    from syndicate.features.shared.execution_exits import _probability, estimate_kalshi_fee
+
+    price = _probability(order.get("fill_price"))
+    if price is None:
+        price = _num(exit_row.get("entry_price"))
+    cost = _num(order.get("fill_stake_dollars"))
+    if price is None or not (0.0 < price < 1.0) or cost is None or cost <= 0:
+        return None, {"refused": "exit_entry_unpriced"}
+
+    contracts = _num(exit_row.get("contracts"))
+    if contracts is None or contracts <= 0:
+        contracts = float(round(cost / price))
+    sold = _num(exit_row.get("filled_contracts"))
+    exit_price = _num(exit_row.get("fill_price"))
+    if sold is None or sold <= 0 or exit_price is None or not (0.0 <= exit_price <= 1.0):
+        return None, {"refused": "exit_unpriced"}
+    # reduce_only means the venue cannot have sold more than we held; a row
+    # that says otherwise is capped and SAID, not trusted.
+    oversold = sold > contracts + 1e-9
+    sold = min(sold, contracts)
+    remainder = max(0.0, contracts - sold)
+
+    if outcome == OUTCOME_PUSH:
+        settle_value = price
+    elif outcome in _SETTLE_VALUE:
+        settle_value = _SETTLE_VALUE[outcome]
+    else:
+        return None, {"refused": f"exit_outcome_unsupported:{outcome or 'absent'}"}
+
+    exit_fee = _num(exit_row.get("exit_fee_dollars"))
+    exit_fee_estimated = exit_fee is None
+    if exit_fee is None:
+        exit_fee = estimate_kalshi_fee(str(exit_row.get("ticker") or order.get("venue_ticker") or ""), sold, exit_price)
+    entry_fee = _num(order.get("fees_dollars"))
+    entry_fee_source = "order"
+    if entry_fee is None:
+        entry_fee = _num(exit_row.get("entry_fee_dollars"))
+        entry_fee_source = "exit_row" if entry_fee is not None else "absent"
+    entry_fee = entry_fee or 0.0
+
+    proceeds = sold * exit_price
+    settlement = remainder * settle_value
+    pnl = round(proceeds - exit_fee + settlement - cost - entry_fee, 4)
+    detail = {
+        "exit_key": exit_row.get("exit_key"),
+        "contracts": round(contracts, 4),
+        "contracts_sold": round(sold, 4),
+        "contracts_settled": round(remainder, 4),
+        "exit_price": round(exit_price, 4),
+        "proceeds_dollars": round(proceeds, 4),
+        "exit_fee_dollars": round(exit_fee, 4),
+        "exit_fee_estimated": exit_fee_estimated,
+        "entry_cost_dollars": round(cost, 4),
+        "entry_fee_dollars": round(entry_fee, 4),
+        "entry_fee_source": entry_fee_source,
+        "settlement_dollars": round(settlement, 4),
+    }
+    if oversold:
+        detail["oversold_capped"] = True
+    return pnl, detail
+
+
+def _kalshi_outcome_from_leg(market_result: Any, leg: Any) -> str | None:
+    """won/lost from the venue's result and the leg the EXIT says we held.
+
+    For a FULLY sold position, whose settlement row holds nothing (or which has
+    no row at all). Both values are venue vocabulary -- `yes`/`no` -- so this is
+    the venue's arithmetic, not a read of our `side`/`line`.
+    """
+    result = str(market_result or "").strip().lower()
+    held = str(leg or "").strip().lower()
+    if result not in {"yes", "no"} or held not in {"yes", "no"}:
+        return None
+    return OUTCOME_WON if held == result else OUTCOME_LOST
+
+
+def fetch_kalshi_market_results(tickers: list[str]) -> tuple[dict[str, dict], str | None]:
+    """`ticker -> {result, status}` for markets a fully sold position left.
+
+    Kalshi's `/portfolio/settlements` lists what we HELD at settlement, so a
+    position sold to zero may never appear there. `GET /markets?tickers=` is
+    public and states the result. Only `result` in yes|no is ever used; an
+    absent or empty one means "not settled yet" and the entry waits.
+    """
+    import urllib.parse
+
+    try:
+        from syndicate.features.shared.kalshi_client import _BASE_URLS, _MARKETS_PATH, _get
+    except Exception as exc:
+        return {}, f"import: {type(exc).__name__}: {exc}"
+
+    unique = sorted({str(t).strip() for t in tickers if str(t or "").strip()})
+    out: dict[str, dict] = {}
+    error: str | None = None
+    for start in range(0, len(unique), 50):
+        chunk = unique[start : start + 50]
+        query = urllib.parse.urlencode({"tickers": ",".join(chunk), "limit": len(chunk)})
+        last = ""
+        for base in _BASE_URLS:
+            try:
+                payload = _get(f"{base}{_MARKETS_PATH}?{query}")
+            except Exception as exc:  # next base, then a named error
+                last = f"{type(exc).__name__}: {exc}"[:200]
+                continue
+            for raw in payload.get("markets") or []:
+                if isinstance(raw, Mapping) and raw.get("ticker") in chunk:
+                    out[_join_key(raw["ticker"])] = {
+                        "result": raw.get("result"),
+                        "status": raw.get("status"),
+                        "settled_time": raw.get("settlement_ts") or raw.get("close_time"),
+                    }
+            last = ""
+            break
+        if last:
+            error = last
+    return out, error
+
+
+def _apply_exit_grade(
+    order: dict[str, Any],
+    outcome: str,
+    exit_row: Mapping[str, Any],
+    *,
+    settled_at: Any,
+    held_side: Any,
+    venue_pnl: Any = None,
+) -> str | None:
+    """Write an exit-aware grade. Returns a refusal token, or None on success."""
+    pnl, detail = exit_adjusted_pnl(order, outcome, exit_row)
+    if pnl is None:
+        return str(detail.get("refused") or "exit_refused")
+    if venue_pnl is not None:
+        # Kept for audit only: the venue's figure covers what was still HELD at
+        # settlement and is not this entry's P&L once anything was sold.
+        detail["venue_settlement_pnl_dollars"] = venue_pnl
+    order["outcome"] = outcome
+    order["pnl_dollars"] = pnl
+    order["settled_by"] = "venue"
+    order["settled_at_venue"] = settled_at
+    order["graded_at"] = _utc_now()
+    order["held_side"] = held_side
+    order["exit_applied"] = detail
+    return None
+
+
 def settle_from_venue(*, dry_run: bool = False) -> dict[str, Any]:
     """Grade every ungraded LIVE order that the venue has settled. Persists.
 
@@ -1230,6 +1481,24 @@ def settle_from_venue(*, dry_run: bool = False) -> dict[str, Any]:
         return {"status": "error", **counters}
 
     orders = [o for o in (state.get("orders") or []) if str(o.get("mode") or "") == LIVE]
+
+    # WHAT WAS SOLD BEFORE SETTLEMENT. See the "Exits" section above. Unreadable
+    # defers every Kalshi grade this tick rather than grading blind.
+    live_exits, exits_error = load_live_exits()
+    if exits_error:
+        counters["errors"]["exits"] = exits_error
+        print(f"[venue_settlement] EXITS_UNREADABLE kalshi grading deferred: {exits_error}", flush=True)
+    counters["exit_adjusted"] = 0
+    counters["exit_deferred"] = 0
+
+    def _exit_effect(venue_name: str, order: Mapping[str, Any]) -> tuple[str, Mapping[str, Any] | None]:
+        if venue_name != "kalshi":
+            return _EXIT_NONE, None  # exits are Kalshi-only
+        if exits_error:
+            return _EXIT_DEFER, None
+        return exit_for_order(order, live_exits)
+
+    left_open = 0
 
     # UNGRADED, FILLED orders only. An order that never filled has no position
     # to settle, and one already carrying an outcome is never touched again.
@@ -1325,7 +1594,17 @@ def settle_from_venue(*, dry_run: bool = False) -> dict[str, Any]:
                 continue
 
             verdict = grade(row)
-            if not verdict.get("graded"):
+            effects = [_exit_effect(venue, order) for order in targets]
+            # A position SOLD TO ZERO settles holding nothing, so the grader
+            # refuses it `no_position_held` -- correctly, about the row. The
+            # market still resolved, and every target's exit says which leg we
+            # held, so those entries grade from the sale (below).
+            sold_out = (
+                venue == "kalshi"
+                and verdict.get("reason") == "no_position_held"
+                and all(effect == _EXIT_SOLD for effect, _row in effects)
+            )
+            if not verdict.get("graded") and not sold_out:
                 reason = str(verdict.get("reason"))
                 counters["refused"][reason] = counters["refused"].get(reason, 0) + 1
                 continue
@@ -1372,7 +1651,43 @@ def settle_from_venue(*, dry_run: bool = False) -> dict[str, Any]:
             # total and still does not divide -- but each order's own fill does,
             # and a binary contract's arithmetic is exact from it.
             attributable = len(targets) == 1
-            for order in targets:
+            for order, (effect, exit_row) in zip(targets, effects):
+                if effect == _EXIT_DEFER:
+                    # The sale may have traded and we do not know yet. Grading
+                    # now would write hold-to-settle money onto a record that
+                    # is never regraded.
+                    counters["exit_deferred"] += 1
+                    left_open += 1
+                    continue
+                if effect == _EXIT_SOLD and exit_row is not None:
+                    outcome = (
+                        verdict["outcome"]
+                        if verdict.get("graded")
+                        else _kalshi_outcome_from_leg(row.get("market_result"), exit_row.get("leg"))
+                    )
+                    refusal = (
+                        "exit_outcome_unreadable"
+                        if outcome is None
+                        else _apply_exit_grade(
+                            order,
+                            outcome,
+                            exit_row,
+                            settled_at=verdict.get("settled_at_venue") or row.get("settled_time"),
+                            held_side=verdict.get("held_side") or exit_row.get("leg"),
+                            venue_pnl=verdict.get("pnl_dollars") if attributable else None,
+                        )
+                    )
+                    if refusal:
+                        counters["refused"][refusal] = counters["refused"].get(refusal, 0) + 1
+                        left_open += 1
+                        continue
+                    counters["exit_adjusted"] += 1
+                    counters["settled"] += 1
+                    per_venue["settled"] += 1
+                    graded_any = True
+                    continue
+                if not verdict.get("graded"):
+                    continue  # unreachable: `sold_out` requires every target sold
                 order["outcome"] = verdict["outcome"]
                 order["settled_by"] = "venue"
                 order["settled_at_venue"] = verdict.get("settled_at_venue")
@@ -1424,8 +1739,56 @@ def settle_from_venue(*, dry_run: bool = False) -> dict[str, Any]:
                 per_venue["settled"] += 1
                 graded_any = True
 
-    counters["awaiting"] = sum(
-        len(v) for k, v in open_by_key.items() if k not in matched_keys
+    # SOLD TO ZERO, AND NO SETTLEMENT ROW. `/portfolio/settlements` lists what
+    # we HELD at settlement, so a position fully sold may never appear there.
+    # Its money was fixed when the sale filled; only the market's result is
+    # missing, and the public market read states it. Asked ONLY for such
+    # entries -- with no live exit filled, this costs no venue call at all.
+    sold_to_zero: list[tuple[tuple[str, str], dict, Mapping[str, Any]]] = []
+    for key, waiting in open_by_key.items():
+        if key in matched_keys or key[0] != "kalshi":
+            continue
+        for order in waiting:
+            effect, exit_row = _exit_effect("kalshi", order)
+            if effect != _EXIT_SOLD or exit_row is None:
+                continue
+            # The outcome does not change the quantities; LOST is only a probe.
+            _pnl, detail = exit_adjusted_pnl(order, OUTCOME_LOST, exit_row)
+            if detail.get("contracts_settled") == 0:
+                sold_to_zero.append((key, order, exit_row))
+    if sold_to_zero:
+        results, error = fetch_kalshi_market_results(
+            [str(order.get("venue_ticker") or "") for _k, order, _r in sold_to_zero]
+        )
+        if error:
+            counters["errors"]["kalshi_market_results"] = error
+        per_venue = counters["by_venue"].setdefault("kalshi", {"rows": 0, "settled": 0})
+        for key, order, exit_row in sold_to_zero:
+            market = results.get(key[1]) or {}
+            outcome = _kalshi_outcome_from_leg(market.get("result"), exit_row.get("leg"))
+            if outcome is None:
+                continue  # not settled yet -- stays awaiting
+            refusal = _apply_exit_grade(
+                order,
+                outcome,
+                exit_row,
+                settled_at=market.get("settled_time"),
+                held_side=exit_row.get("leg"),
+            )
+            if refusal:
+                counters["refused"][refusal] = counters["refused"].get(refusal, 0) + 1
+                continue
+            counters["exit_adjusted"] += 1
+            counters["settled"] += 1
+            per_venue["settled"] += 1
+            graded_any = True
+
+    counters["awaiting"] = left_open + sum(
+        1
+        for k, v in open_by_key.items()
+        if k not in matched_keys
+        for order in v
+        if not order.get("outcome")
     )
     try:
         counters["unjoinable_split"] = split_unjoinable(unjoinable_rows)
