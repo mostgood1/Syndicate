@@ -32,7 +32,8 @@ WHY THIS IS NOT A COPY OF ANY OF THEM.
      :3842-3995) -- for Syndicate-local ports that live in
      `basketball_props_smart_sim.py` and `basketball_props_onnx.py`. So
      "the vendor import succeeded" (Level 0 below) does NOT mean vendor logic
-     computed the inputs. Only `simulate_smart_game`'s own possession/quarter
+     computed the inputs. [History: since P6 there is no vendor module and no
+     patching -- the orchestrator calls these ports directly.] Only `simulate_smart_game`'s own possession/quarter
      orchestration is genuinely vendor code; the DATA is Syndicate's. This
      checklist therefore audits the LOCAL PORTS
      (`_apply_player_priors_local`, `compute_player_priors_local`,
@@ -42,12 +43,14 @@ WHY THIS IS NOT A COPY OF ANY OF THEM.
 
   3. Level 0 (bridge reachability) is football's structural concern in a
      different shape: football's alarm is a payload never PASSED; basketball's
-     is the whole vendor module never IMPORTED, silently falling back to
-     `_simulate_smart_game_local` (sums of means, no `score`/`intervals`
-     block, no probabilities) via a bare `except Exception: module = None` in
-     `_import_real_smart_sim_module_local` (`basketball_props_smart_sim.py`
-     :739-762). `todo.md` #440 flagged this as a hypothesis; this script makes
-     it a runnable, gating check instead of a one-time artifact read.
+     is the game call never reaching the engine. Until plan P6 (2026-10-10)
+     that meant the vendored module never IMPORTED and the bridge silently
+     falling back to a flat stub (`todo.md` #440). P6 deleted both: the bridge's
+     `_call_source_simulate_smart_game_local` now imports
+     `basketball_engine.orchestrator.simulate_smart_game` and nothing vendored.
+     Level 0 checks THAT, with a positive control (see its docstring). The old
+     check called the deleted `_import_real_smart_sim_module_local` and raised
+     AttributeError, so the published report stopped on 2026-10-10.
 
 CONSUMED + UNPOPULATED is still the alarm. Exit 1 on any Level 0-2 alarm.
 Level 3 (optional calibration artifacts) is reported but does not fail the
@@ -57,10 +60,9 @@ RENDER IS THE SUBSTRATE OF RECORD (`model_engine_standard.md` Sec 3b). Levels
 1-3 here read the LOCAL mirror (`data/{wnba,nba}_source/data/processed/`)
 because that is what is reachable from this checkout; every population number
 below is a statement about the checkout, not about production, and says so.
-Level 0 (the import test) is code-path reachability, not data, so it is not
-substrate-sensitive the same way -- but note it can only prove the import
-mechanism identically to what a live worker would do; it does not prove a live
-worker's actual sys.path/venv matches this one.
+Level 0 is code-path reachability, not data, so it is not substrate-sensitive
+the same way -- but it proves only what THIS interpreter imports; it does not
+prove a live worker runs the same commit.
 
 Usage:
     py -3 scripts/basketball_sim_input_checklist.py
@@ -108,7 +110,6 @@ def _data_root() -> Path:
 # every population number below names this substrate explicitly.
 LEAGUES: dict[str, dict[str, Any]] = {
     "wnba": {
-        "package": "wnba_betting",
         # NOT data/wnba_source/data/processed/ -- its team_advanced_stats_2026*.csv
         # are 0-byte leftovers in THIS checkout (measured: both the season file
         # and the 2026-05-30 as-of file are empty). source_artifacts/ has real,
@@ -129,7 +130,6 @@ LEAGUES: dict[str, dict[str, Any]] = {
         "advanced_as_of": "2026-07-08",
     },
     "nba": {
-        "package": "nba_betting",
         # NOTE the different sub-path from wnba above (no `source_artifacts/`) --
         # that asymmetry is the checkout's, not a typo. The PUBLISH path is
         # `source_dir/source_artifacts/data/sim_input_report/` for both, because
@@ -240,28 +240,116 @@ def consumed_team_advanced_keys() -> list[str]:
 # --------------------------------------------------------------------------
 # Level 0 -- bridge reachability (the #440 hypothesis, made runnable)
 # --------------------------------------------------------------------------
-def level0_bridge_reachability() -> tuple[list[dict[str, Any]], list[str]]:
-    from syndicate.features.shared import basketball_props_smart_sim as bridge
+ORCHESTRATOR_MODULE = "syndicate.features.basketball_engine.orchestrator"
+BRIDGE_CALL_FN = "_call_source_simulate_smart_game_local"
+# Top-level names of the vendored packages (`vendor/{nba,wnba}_betting_repo/src/`).
+VENDORED_PACKAGES = ("nba_betting", "wnba_betting")
 
+
+def bridge_engine_problems(bridge_source: str) -> list[str]:
+    """Why the bridge's game call does NOT reach `orchestrator.simulate_smart_game`; [] when it does.
+
+    AST, not a substring: the call function must import `simulate_smart_game` FROM the
+    orchestrator package and call that name. A docstring that mentions the path does not count.
+    """
+    tree = ast.parse(bridge_source)
+    fn = _find_function(tree, BRIDGE_CALL_FN)
+    if fn is None:
+        return [f"bridge: {BRIDGE_CALL_FN} is gone -- the checklist no longer knows where the game call is"]
+    imported = any(
+        isinstance(n, ast.ImportFrom) and n.module == ORCHESTRATOR_MODULE
+        and any(a.name == "simulate_smart_game" and a.asname is None for a in n.names)
+        for n in ast.walk(fn)
+    )
+    called = any(
+        isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == "simulate_smart_game"
+        for n in ast.walk(fn)
+    )
+    problems = []
+    if not imported:
+        problems.append(f"bridge: {BRIDGE_CALL_FN} does not import simulate_smart_game from {ORCHESTRATOR_MODULE}")
+    if not called:
+        problems.append(f"bridge: {BRIDGE_CALL_FN} never calls simulate_smart_game")
+    return problems
+
+
+def vendored_modules_loaded(module_names: Any) -> list[str]:
+    """The loaded module names that belong to a vendored basketball package."""
+    return sorted(
+        m for m in module_names
+        if any(m == p or m.startswith(p + ".") for p in VENDORED_PACKAGES)
+    )
+
+
+def level0_bridge_reachability() -> tuple[list[dict[str, Any]], list[str]]:
+    """Does the production game call reach the native orchestrator, with no vendored module loaded?
+
+    Until plan P6 (2026-10-10) this asked whether the bridge's vendored-module import succeeded
+    (`_import_real_smart_sim_module_local`). P6 deleted that function and its flat-stub fallback;
+    the bridge now imports `basketball_engine.orchestrator.simulate_smart_game` and nothing vendored.
+    Three checks, each able to fail:
+      * the bridge's game call imports and calls the orchestrator's `simulate_smart_game` (AST);
+      * importing the bridge and the orchestrator loads no `nba_betting`/`wnba_betting` module;
+      * the orchestrator resolves each league to ITS OWN constants (`orchestrator_league` maps any
+        unknown code to NBA, so a WNBA game silently run on NBA minutes would otherwise pass).
+    Plus a positive control: the same checks run over a bridge with the orchestrator import
+    removed and a module set with a vendored module added must alarm, or Level 0 is blind.
+    """
     rows: list[dict[str, Any]] = []
     alarms: list[str] = []
-    for league, cfg in LEAGUES.items():
-        pkg = cfg["package"]
-        module = bridge._import_real_smart_sim_module_local(package_name=pkg)
-        real = module is not None
+
+    bridge_source = BRIDGE_PATH.read_text(encoding="utf-8")
+    wiring = bridge_engine_problems(bridge_source)
+    alarms.extend(f"LEVEL 0 WIRING: {p}" for p in wiring)
+
+    import_error = ""
+    try:
+        from syndicate.features.shared import basketball_props_smart_sim  # noqa: F401
+        from syndicate.features.basketball_engine import orchestrator
+    except Exception as exc:
+        orchestrator = None
+        import_error = f"{type(exc).__name__}: {exc}"
+        alarms.append(f"LEVEL 0 IMPORT: the bridge or {ORCHESTRATOR_MODULE} failed to import: {import_error}")
+    engine_callable = bool(orchestrator) and callable(getattr(orchestrator, "simulate_smart_game", None))
+    if orchestrator is not None and not engine_callable:
+        alarms.append(f"LEVEL 0 IMPORT: {ORCHESTRATOR_MODULE}.simulate_smart_game is missing or not callable")
+
+    vendored = vendored_modules_loaded(list(sys.modules))
+    if vendored:
+        alarms.append(f"LEVEL 0 VENDORED: importing the bridge + orchestrator loaded {vendored}")
+
+    for league in LEAGUES:
+        resolved = ""
+        if orchestrator is not None:
+            try:
+                resolved = orchestrator.orchestrator_league(league).code
+            except Exception as exc:
+                resolved = f"{type(exc).__name__}: {exc}"
+        league_ok = resolved == league
+        if orchestrator is not None and not league_ok:
+            alarms.append(f"LEVEL 0 LEAGUE: orchestrator_league({league!r}) resolved to {resolved!r}")
+        ok = not wiring and engine_callable and not vendored and league_ok
         rows.append({
-            "league": league, "package": pkg, "real_module_imported": real,
-            "verdict": "REAL ENGINE" if real else "FELL BACK TO STUB",
+            "league": league,
+            "engine": f"{ORCHESTRATOR_MODULE}.simulate_smart_game",
+            "bridge_calls_orchestrator": not wiring,
+            "engine_callable": engine_callable,
+            "orchestrator_league": resolved,
+            "vendored_modules_loaded": vendored,
+            "import_error": import_error,
+            "verdict": "NATIVE ORCHESTRATOR" if ok else "BROKEN",
         })
-        if not real:
-            alarms.append(
-                f"NO-SAMPLING FALLBACK ACTIVE: {league} ({pkg}) -- "
-                f"_import_real_smart_sim_module_local returned None in THIS "
-                f"process, so `_build_local_smart_sim_module` would hand back "
-                f"`_simulate_smart_game_local` (sums of means, no score/"
-                f"intervals/probabilities block). This is the #440 hypothesis, "
-                f"confirmed live in this checkout."
-            )
+
+    # Positive control (model_engine_standard.md: a check that cannot fail is not a check).
+    broken_bridge = bridge_source.replace(
+        f"from {ORCHESTRATOR_MODULE} import OrchestratorEnv, simulate_smart_game",
+        f"from {ORCHESTRATOR_MODULE} import OrchestratorEnv",
+    )
+    if broken_bridge == bridge_source or not bridge_engine_problems(broken_bridge):
+        alarms.append("LEVEL 0 BLIND: removing the orchestrator import from the bridge did not trip the wiring "
+                      "check (the import line changed shape) -- Level 0 cannot fail as written")
+    if not vendored_modules_loaded([*sys.modules, "nba_betting.sim.smart_sim"]):
+        alarms.append("LEVEL 0 BLIND: a loaded nba_betting.sim.smart_sim did not trip the vendored-module check")
     return rows, alarms
 
 
@@ -474,12 +562,12 @@ def main() -> int:
     alarms: list[str] = []
     notes: list[str] = []
 
-    print("\nLEVEL 0 -- BRIDGE REACHABILITY (the #440 no-sampling-fallback hypothesis)")
+    print("\nLEVEL 0 -- BRIDGE REACHABILITY (game call -> native orchestrator, nothing vendored)")
     print("-" * 84)
     l0_rows, l0_alarms = level0_bridge_reachability()
     alarms.extend(l0_alarms)
     for row in l0_rows:
-        print(f"  {row['league']:5s} package={row['package']:14s} {row['verdict']}")
+        print(f"  {row['league']:5s} league={row['orchestrator_league'] or '-':5s} {row['verdict']}  ({row['engine']})")
 
     print("\nLEVEL 1 -- PLAYER PRIORS PER-MINUTE RATE KEYS (dict-shaped, AST not grep)")
     print("-" * 84)
