@@ -215,16 +215,49 @@ def test_sportsbook_rows_and_rows_without_ev_are_out_of_scope(memory_state):
     assert set(out["cells"]) == {"kalshi|ncaaf|totals|regular"}
 
 
-def test_roi_t_sign_matches_stake_weighted_roi():
-    # Small stakes win, big stakes lose: equal-weighted returns are positive,
-    # the stake-weighted ROI is negative, and the t must follow the ROI.
+def _sim_sized_cell():
+    # One bet per game. 70% of bets win (+0.9 a unit) at a $10 EV-only stake;
+    # the 30% that lose carried $100 because the sim added $90 on top
+    # (sim_share_of_stake 0.9). Per bet: +33% flat. Per dollar: deeply negative.
     rows = []
-    for i in range(50):
-        big = i % 2 == 0
-        rows.append(_order(i, won=not big, clv=0.5, stake=100.0 if big else 1.0))
-        rows[-1]["pnl_dollars"] = -100.0 if big else 0.9
-    ev = T.cell_evidence(rows, trailing_events=150, clv_scopes=("same_book",))
+    for i in range(60):
+        loses = i % 10 < 3
+        stake = 100.0 if loses else 10.0
+        row = _order(i, won=not loses, clv=-2.0 - (i % 3) * 0.5, stake=stake)
+        row["pnl_dollars"] = -stake if loses else 0.9 * stake
+        row["sim_share_of_stake"] = 0.9 if loses else 0.0
+        rows.append(row)
+    return rows
+
+
+def test_dollar_basis_t_sign_matches_stake_weighted_roi():
+    ev = T.cell_evidence(_sim_sized_cell(), trailing_events=150, clv_scopes=("same_book",), roi_basis="dollars")
+    assert ev["roi_basis"] == "dollars"
     assert ev["roi_pct"] < 0 and ev["roi_t"] < 0
+    assert ev["roi_pct"] == ev["dollar_roi_pct"]
+
+
+def test_the_cut_is_graded_per_bet_not_on_the_sims_sizing(memory_state, monkeypatch):
+    # findings_2026-10-19_ev_overstatement_decomp: 58-69% of each band's dollars are
+    # sim-added stake the sim has not earned (w = -0.27). A cell lost only by that
+    # stake must not have its EV cut raised: every bet in it was worth taking.
+    rows = _sim_sized_cell()
+    flat = T.compute_proposals(rows, state={}, base_min_ev_pct=2.0)["cells"]["kalshi|ncaaf|totals|regular"]
+    assert flat["marginal"]["roi_basis"] == "flat"
+    assert flat["marginal"]["roi_pct"] > 0 and flat["marginal"]["dollar_roi_pct"] < 0
+    assert flat["marginal"]["ev_only_roi_pct"] > 0  # the EV-only dollars won too
+    assert flat["action"] != T.ACTION_RAISE
+
+    monkeypatch.setenv("SYNDICATE_MIN_EV_TUNER_ROI_BASIS", "dollars")
+    dollars = T.compute_proposals(rows, state={}, base_min_ev_pct=2.0)["cells"]["kalshi|ncaaf|totals|regular"]
+    assert dollars["action"] == T.ACTION_RAISE  # reachability: the basis switch changes the decision
+
+
+def test_roi_basis_absent_or_unknown_is_flat(monkeypatch):
+    monkeypatch.delenv("SYNDICATE_MIN_EV_TUNER_ROI_BASIS", raising=False)
+    assert T.roi_basis() == "flat"
+    monkeypatch.setenv("SYNDICATE_MIN_EV_TUNER_ROI_BASIS", "dollar")
+    assert T.roi_basis() == "flat"
 
 
 # --- the worker hook ---------------------------------------------------------

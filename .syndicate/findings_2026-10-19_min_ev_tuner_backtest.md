@@ -104,3 +104,18 @@ their band and hold only on CLV sample (18 and 28 of 30): kalshi ncaaf spreads b
 (t 4.2); polymarket ncaaf totals band [3.34, 4.34) ROI -5.3% (t -0.28), CLV +1.65 (t 4.5). Both would hold as `only_clv_significant`
 once the CLV sample fills. So the earlier "weeks, not days" estimate was too pessimistic for those two cells, and still right for
 the rest.
+
+
+## UPDATE 2026-10-19 ~20:3xZ: the cut is now graded in FLAT UNITS (per bet), not dollars
+
+`findings_2026-10-19_ev_overstatement_decomp.md` (lane ev-overstatement-decomp) found that from 10-05, 58-69% of every EV band's
+DOLLARS are sim-added stake. The sizer stakes the raw sim at full weight with no fitted profile, while the sim's fitted weight on
+these orders is w = -0.27 [-0.78, +0.18]. So a dollar ROI grades the sim's SIZING, not the cut line. Built here on that
+suggestion: `roi_pct` / `roi_t`, the numbers `decide` reads, are flat units by default (`SYNDICATE_MIN_EV_TUNER_ROI_BASIS`
+= flat | dollars; absent/unrecognised = flat). Dollar ROI and EV-only dollar ROI (net of `sim_share_of_stake`) are kept as readout.
+Tests: 24; the reachability test (dollars raises, flat does not, on a cell lost only by sim-added stake) fails if the default is
+mutated to `dollars`.
+
+Replay at base 0.0, flat basis: still 0 moves (sample-limited, as before). The basis matters where it should:
+polymarket ncaaf totals band [3.34, 4.34), 46 events: **flat +9.6%, EV-only dollars +11.6%, all dollars -5.3%**. The sim's
+stake alone turned a winning band into a losing one in dollars.

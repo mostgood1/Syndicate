@@ -103,6 +103,13 @@ _KNOBS: dict[str, tuple[str, float, float, float]] = {
 }
 _ENV_CLV_SCOPES = "SYNDICATE_MIN_EV_TUNER_CLV_SCOPES"
 _ENV_EVIDENCE_MODES = "SYNDICATE_MIN_EV_TUNER_EVIDENCE_MODES"
+# `flat` (default; absent or unrecognised) or `dollars`. See `cell_evidence`.
+_ENV_ROI_BASIS = "SYNDICATE_MIN_EV_TUNER_ROI_BASIS"
+
+
+def roi_basis() -> str:
+    raw = str(os.environ.get(_ENV_ROI_BASIS) or "").strip().lower()
+    return "dollars" if raw == "dollars" else "flat"
 _DEFAULT_CLV_SCOPES = ("same_book",)
 # Paper venue orders run the SAME code as live up to the submit (see
 # `execution_ledger`), priced at the venue's own quote; live alone is one day
@@ -250,17 +257,34 @@ def _event_id(order: Mapping[str, Any]) -> str:
     return str(order.get("event_id") or order.get("game_pk") or order.get("idempotency_key") or "")
 
 
+def _sim_share(order: Mapping[str, Any]) -> float:
+    share = _as_float(order.get("sim_share_of_stake"))
+    return min(1.0, max(0.0, share)) if share is not None else 0.0
+
+
 def cell_evidence(
     orders: Sequence[Mapping[str, Any]],
     *,
     trailing_events: int,
     clv_scopes: Sequence[str],
+    roi_basis: str = "flat",
 ) -> dict[str, Any]:
     """ROI and CLV for one cell's settled orders, clustered by event.
 
     The trailing window is the most recent `trailing_events` EVENTS (by the
     latest settle time among each event's orders), so one 12-prop game cannot
     crowd eleven other games out of the window.
+
+    **`roi_pct` / `roi_t` -- the numbers `decide` reads -- are FLAT UNITS by
+    default** (`roi_basis="flat"`): each bet counts once, whatever it was staked.
+    WHY (`findings_2026-10-19_ev_overstatement_decomp.md`, lane
+    ev-overstatement-decomp): from 10-05 the sizer stakes the raw sim
+    probability at full weight (no fitted profile on the fleet), so 58-69% of
+    every EV band's DOLLARS are sim-added stake, and the sim's fitted weight on
+    those orders is w = -0.27 [-0.78, +0.18]. A dollar ROI therefore grades the
+    sim's SIZING, not the cut line; "is a bet at this EV worth taking at all"
+    is a per-bet question. The dollar ROI and its EV-only part (dollars net of
+    `sim_share_of_stake`) are still computed, as the readout.
     """
     by_event: dict[str, list[Mapping[str, Any]]] = {}
     for order in orders:
@@ -270,20 +294,31 @@ def cell_evidence(
 
     event_pnls: list[float] = []
     event_stakes: list[float] = []
+    event_flat_returns: list[float] = []
+    event_flat_counts: list[float] = []
     event_clvs: list[float] = []
     pnl_total = stake_total = 0.0
+    ev_only_pnl_total = ev_only_stake_total = 0.0
     rows = 0
     modes: dict[str, int] = {}
     authority: dict[str, int] = {}
     ev_values: list[float] = []
     for _, group in window:
-        pnl = stake = 0.0
+        pnl = stake = flat = 0.0
+        flat_n = 0
         clvs: list[float] = []
         for order in group:
             rows += 1
             s = _stake(order) or 0.0
-            pnl += _as_float(order.get("pnl_dollars")) or 0.0
+            p = _as_float(order.get("pnl_dollars")) or 0.0
+            pnl += p
             stake += s
+            if s > 0:
+                flat += p / s
+                flat_n += 1
+                ev_only = 1.0 - _sim_share(order)
+                ev_only_pnl_total += p * ev_only
+                ev_only_stake_total += s * ev_only
             mode = order_mode(order)
             modes[mode] = modes.get(mode, 0) + 1
             who = "venue" if str(order.get("settled_by") or "") == "venue" else "inferred"
@@ -297,20 +332,36 @@ def cell_evidence(
         if stake > 0:
             event_pnls.append(pnl)
             event_stakes.append(stake)
+            event_flat_returns.append(flat)
+            event_flat_counts.append(float(flat_n))
             pnl_total += pnl
             stake_total += stake
         if clvs:
             event_clvs.append(sum(clvs) / len(clvs))
 
-    roi_t = _ratio_t(event_pnls, event_stakes)
+    dollar_t = _ratio_t(event_pnls, event_stakes)
+    flat_t = _ratio_t(event_flat_returns, event_flat_counts)
+    flat_n_total = sum(event_flat_counts)
+    flat_roi = 100.0 * sum(event_flat_returns) / flat_n_total if flat_n_total > 0 else None
+    dollar_roi = 100.0 * pnl_total / stake_total if stake_total > 0 else None
+    if roi_basis == "dollars":
+        roi, roi_t = dollar_roi, dollar_t
+    else:
+        roi_basis, roi, roi_t = "flat", flat_roi, flat_t
     clv_t = _t_stat(event_clvs)
     return {
         "events": len(event_pnls),
         "rows": rows,
+        "roi_basis": roi_basis,
+        "roi_pct": round(roi, 3) if roi is not None else None,
+        "roi_t": round(roi_t, 3) if roi_t is not None else None,
         "staked_dollars": round(stake_total, 2),
         "pnl_dollars": round(pnl_total, 2),
-        "roi_pct": round(100.0 * pnl_total / stake_total, 3) if stake_total > 0 else None,
-        "roi_t": round(roi_t, 3) if roi_t is not None else None,
+        "dollar_roi_pct": round(dollar_roi, 3) if dollar_roi is not None else None,
+        "dollar_roi_t": round(dollar_t, 3) if dollar_t is not None else None,
+        "ev_only_roi_pct": (
+            round(100.0 * ev_only_pnl_total / ev_only_stake_total, 3) if ev_only_stake_total > 0 else None
+        ),
         "clv_events": len(event_clvs),
         "avg_clv_pct": round(sum(event_clvs) / len(event_clvs), 3) if event_clvs else None,
         "clv_t": round(clv_t, 3) if clv_t is not None else None,
@@ -482,6 +533,7 @@ def compute_proposals(
     params = dict(params or knobs())
     clv_scopes = tuple(clv_scopes or _csv_env(_ENV_CLV_SCOPES, _DEFAULT_CLV_SCOPES))
     evidence_modes = tuple(evidence_modes or _csv_env(_ENV_EVIDENCE_MODES, _DEFAULT_EVIDENCE_MODES))
+    basis = roi_basis()
     cells, skipped = collect_cells(orders, evidence_modes=evidence_modes)
     prior_cells = state.get("cells") if isinstance(state.get("cells"), Mapping) else {}
 
@@ -494,7 +546,7 @@ def compute_proposals(
         override = _as_float(prior.get("min_ev_pct"))
         current = override if override is not None else float(base_min_ev_pct)
         evidence = cell_evidence(
-            group, trailing_events=int(params["trailing_events"]), clv_scopes=clv_scopes
+            group, trailing_events=int(params["trailing_events"]), clv_scopes=clv_scopes, roi_basis=basis
         )
         effective = _effective_cut(group, current)
         band_hi = effective + params["band_pct"]
@@ -504,7 +556,7 @@ def compute_proposals(
             if ev_pct is not None and effective <= ev_pct < band_hi:
                 marginal_rows.append(order)
         marginal = cell_evidence(
-            marginal_rows, trailing_events=int(params["trailing_events"]), clv_scopes=clv_scopes
+            marginal_rows, trailing_events=int(params["trailing_events"]), clv_scopes=clv_scopes, roi_basis=basis
         )
         marginal["band"] = [round(effective, 4), round(band_hi, 4)]
         # Cooldown counts the WHOLE cell's events: the band itself moves with
@@ -544,6 +596,7 @@ def compute_proposals(
         "params": params,
         "clv_scopes": list(clv_scopes),
         "evidence_modes": list(evidence_modes),
+        "roi_basis": basis,
         "base_min_ev_pct": float(base_min_ev_pct),
     }
 
@@ -614,6 +667,7 @@ def run_nightly(
         "params": result["params"],
         "clv_scopes": result["clv_scopes"],
         "evidence_modes": result["evidence_modes"],
+        "roi_basis": result["roi_basis"],
         "skipped": result["skipped"],
         "actions": result["actions"],
         "cells": dict(list(result["cells"].items())[:_PROPOSAL_CELLS_CAP]),

@@ -40,7 +40,8 @@ def _cell_lines(cells: dict, limit: int) -> list[str]:
             f"{key:52s} cut={entry.get('min_ev_pct') if entry.get('min_ev_pct') is not None else 'base':>5} "
             f"{entry.get('action'):5s} {entry.get('reason'):30s} "
             f"cell[ev={ev.get('events')} roi={ev.get('roi_pct')} t={ev.get('roi_t')} clv={ev.get('avg_clv_pct')} t={ev.get('clv_t')}] "
-            f"band{mg.get('band')}[ev={mg.get('events')} roi={mg.get('roi_pct')} t={mg.get('roi_t')} "
+            f"band{mg.get('band')}[ev={mg.get('events')} {mg.get('roi_basis', 'dollars')}_roi={mg.get('roi_pct')} t={mg.get('roi_t')} "
+            f"$roi={mg.get('dollar_roi_pct')} ev_only$={mg.get('ev_only_roi_pct')} "
             f"clv_n={mg.get('clv_events')} clv={mg.get('avg_clv_pct')} t={mg.get('clv_t')}]"
         )
     return out
