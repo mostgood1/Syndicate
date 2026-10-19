@@ -1145,6 +1145,15 @@ death, never life — do not invert it.
 - **NOT shown:** no outcomes used; and I did NOT join those 73 specific board rows back to their exact venue records — `polymarket_markets.json` is `truncated: True` (fetched 10-01, 3 spread markets) and I matched `polymarket_us_games.json` by team token, not by `event_id`. The 212 of 4,967 is a population fact, not a per-row join. The 3 rows whose sides DIFFER remain unexamined and are still the control.
 - Files: .syndicate/findings_2026-10-19_polymarket_side_price_mirroring.md (NEW)
 - Findings: `.syndicate/findings_2026-10-19_polymarket_side_price_mirroring.md`.
+
+### board-implausible-book-upper-bound — OPEN — opened 2026-10-19 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- Goal: A board row that carries a model edge but NO market fair and NO market EV is no longer ranked in the Layer 2 shortlist, it is counted under its own refusal reason, and the served NCAAF spread family that currently supplies 73 such rows drops to zero ranked rows without changing any row that has a fair -- so the coverage and model-edge censuses stop being inflated by lines nothing can act on.
+- Files: syndicate/features/shared/layer2_board.py (the implied-book-total UPPER bound refusal in select_shortlist's row loop ONLY -- DISJOINT from lane layer2-next-day-horizon's claimed 'select_shortlist horizon anchor + _within_horizon call ONLY'), tests/test_board_implausible_book_upper_bound.py (NEW)
+- Hypothesis: The existing _MIN_IMPLIED_BOOK_TOTAL_PCT refusal already excludes rows on a stated impossibility ('no real book prices a market under X') and counts them as rows_implausible_book, but it derives the implied total from ev_pct -- which is None on exactly the rows that need refusing, because ev is guarded on the same fair. So a companion refusal keyed on the ROW's usability (no fair_probability AND no ev_pct AND a numeric model_edge_pct) catches them without any new price math and without the cross-book pairing trap that already cost me a withdrawn finding.
+- Falsification test: If rows with no fair and no ev_pct are NOT the 73-row NCAAF spread family -- i.e. the predicate catches rows that do have a usable market price, or misses some of the 73 -- the predicate is wrong and must be narrowed to the de-vig reason instead. Equally, if excluding them changes any count for rows that HAVE a fair, the change is not surgical.
+- Verification: In-process over the served board payload, off vs on: ranked-row count, the new refusal counter, rows_implausible_book and no_projection as untouched controls, and the per-sport split -- the NCAAF spread family must go 73 -> 0 while every with-fair row is unchanged. Plus a test that the predicate does NOT fire when ev_pct is present.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
