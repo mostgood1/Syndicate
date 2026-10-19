@@ -46093,6 +46093,7 @@ were resolved and nine already-closed rows removed from the open tables.
     hold-to-settle by rule / mode / in_play / sport, plus the margin grid. State n and the date count. The paper sample is
     thin: ~18 open `paper:kalshi` positions per 3 days, mostly NCAAF.
   - **Polymarket in paper too (`90968e39`, landed 2026-10-19 ~22:05Z, NOT yet loaded):** one signed book read per slug; legs only from the side's name or the venue's `held_side`; team sides counted `polymarket_team_leg_unresolved`. A fleet dry run at 21:59Z found 0 watchable Polymarket positions (3 team-leg rows), so it loads at the NEXT natural live-odds-worker restart with no restart of its own. The reading is SCHEDULED: task `kalshi-exit-counterfactual-reading`, 2026-10-26 09:00 CT, read-only, output to the side-session notes folder.
+  - **Sell body VERIFIED 2026-10-19 22:42:59Z** (deploys.md 22:40:44Z): a real 1-contract sale of the Thornton NO filled at 0.87 (order 01a15655-...), holding -5 -> -4. `LIVE_BLOCKERS` is now EMPTY (280acb18). The create response does not price a fill; 280acb18 reads it back. What stands between here and live exits is the user's yes, ideally after the 10-26 reading.
   - **Before live (`SYNDICATE_EXIT_MODE=live` + `SYNDICATE_EXIT_LIVE_ARMED`):** (a) ~~`venue_settlement` must reflect a sold
     position~~ **CLEARED 2026-10-19 (lane kalshi-exit-settlement):** `settle_from_venue` reads LIVE exit rows by
     `exit_idempotency_key(entry_key)`; a `filled` exit grades from both fills (`exit_adjusted_pnl`: proceeds - exit fee +

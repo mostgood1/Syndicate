@@ -859,8 +859,7 @@ board. The loop therefore checks `budget_remaining()` BEFORE spending.
 - **Venue reads now verified on production:** batched `GET /markets?tickers=A,B,...` (public) and the signed
   `GET /portfolio/positions` (`market_positions[].position[_fp]`, signed: + = YES, - = NO). The latter matched the ledger
   on the first read (Thornton NO x5).
-- **NOT armed for live, and NOT safe to arm:** `execution_exits.LIVE_BLOCKERS` now names ONE item: the v2 sell body
-  (`reduce_only`, `immediate_or_cancel`) has never been accepted. A user yes is also required. Readout owed: todo #703.
+- **Sell body VERIFIED on a real sale** `[2026-10-19 22:42:59Z, lane kalshi-exit-path]`: v2 `POST /portfolio/events/orders` with `side=bid` YES at `1 - our NO limit`, `time_in_force=immediate_or_cancel`, `reduce_only=true`, count "1.00" was ACCEPTED and FILLED. The venue echoes the close as `side=yes action=buy outcome_side=yes book_side=bid`, and taker_fill_cost 0.13 = NO sold at 0.87. The CREATE response carries a count but NO cost, fee or status, so the fill must be READ BACK (`GET /portfolio/orders/{id}`; 280acb18 does this). `LIVE_BLOCKERS` is empty. Live exits are still NOT armed: that is the user's call, with the 10-26 counterfactual.
 - **Settlement knows about sales -- on origin/main, NOT on the fleet** `[verified by tests 2026-10-19, lane kalshi-exit-settlement]`:
   `venue_settlement.settle_from_venue` (`550a4b20`) and `paper_settlement.settle_orders`' 24h inference fallback (`f769a228`)
   read LIVE rows of execution_exits.json by `exit_idempotency_key(entry_key)`. Filled -> P&L = sale proceeds - exit fee +
