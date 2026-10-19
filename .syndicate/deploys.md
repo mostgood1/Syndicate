@@ -50911,3 +50911,25 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - WNBA: 3 (7:10).
   - Before this change they appeared only 20-90 min before each start.
 - **Still owed:** the late refetch of each game (20-90 min out); tomorrow's NBA early fetch after the 2 PM CT build; the daily alt spend at day's end.
+
+## 2026-10-19 17:29:14Z (12:29 PM CT) -- FULL FLEET down/up, ff 1db5320d -> a6c32498: MLB postponed / rescheduled games never grade as final (661539f0 + a6c32498) -- **MET on production data** (lane `mlb-postponed-grading`, session 02aa06d1)
+- **ask:** the user, in chat: "Yes, deploy 661539f0 + a6c32498 to the fleet: claim, drain until CLEAR, fast-forward only to a6c32498, restart, and record the reading in deploys.md."
+- **claims:** live-odds-worker, refresh-worker, web, holder `mlb-postponed-grading`; acquire exit 0 on all three. Released after this entry.
+- **ride-alongs (`1db5320d..a6c32498`):** the only runtime files are mine: `graded_outcomes.py`, the generated `settle_locked_policy_cards.py`, and `port_mlb_sim_engine.py`. Everything else is ledger (2a5bb5a6, 5ebf889d, 204af5f9). 661539f0 (`bet_status_mlb`, lens wrapper, `game_status`) had been on web since the 16:07:53Z `reload-web`; it was NOT in the workers, which restarted at 16:04Z on f39133f8.
+- **baseline (17:19:04Z, same read):** all three roles `RENDER_GIT_COMMIT=f39133f8`, `SYNDICATE_EXECUTION_MODE=live`, `_LIVE_ARMED=1`; supervisor `up --allow-live-execution`; `/api/health` 200.
+- **expect:** every role stamps a6c32498, still live and armed with the same supervisor flag. 849817 / 2026-10-16 is refused by every consumer, and 2026-10-18 still grades.
+- **timeline (UTC):**
+  - `check_deploy_safety --drain` (owner mlb-postponed-grading) from 17:19Z: waited out a board build and live-odds / refresh-worker odds and soccer children; CLEAR ~17:28:5xZ.
+  - Marker `watchdog_no_autostart` set; ff to a6c32498 (`--ff-only`, fleet HEAD 1db5320d -> a6c32498).
+  - `down` 17:29:14 -> "down." 17:29:32: 1 detached odds job stopped, 0 SIGKILL.
+  - `Start-ScheduledTask SyndicateLocalProduction` 17:30:16 (task was Ready); `/healthz` 200 at **17:30:23**. Web outage ~70 s.
+  - Marker cleared 17:30:35; `--undrain` -> `DRAIN_CLEARED owner=mlb-postponed-grading`.
+- **verify (17:30:23Z, /proc environ, allowlisted keys only):** web 2570242, refresh-worker 2570293, live-odds-worker 2570294, all `RENDER_GIT_COMMIT=a6c32498`, `MODE=live`, `LIVE_ARMED=1`; supervisor cmdline still `up --allow-live-execution`; `/api/health` 200.
+- **READING (17:30-17:31Z):** the deployed fleet checkout, run under refresh-worker's own environment (loaded in-process from /proc, never printed), on production data:
+  - Evaluation-ledger grader, 2026-10-16: `games_on_slate 1, games_graded 0, games_not_played_on_date 1 [849817], feeds_not_cached 0`; 0 graded rows on 849817. The 315 ledger rows stay pending, correctly.
+  - Same grader, 2026-10-18 (reachability): `games_graded 1, games_not_played_on_date 0`, 4 score rows (the makeup game, TB 3-1).
+  - Card settler, 10-16 feed on disk: `_feed_is_final=False`, `_off_slate_date=True`.
+  - Lens wrapper on the 10-16 report row (`{'abstract':'Final','detailed':'Postponed'}`): `{'abstract':'Postponed','detailed':'Postponed'}`, bucket `postponed`.
+  - Paper/portfolio resolver, 10-16 TB @ CLE total: `unavailable_reason: mlb_game_rescheduled_off_slate_date`.
+- **Not separately observed:** a live execution pass after the restart. Neither role log has an `EXECUTED mode=` line outside process-memory dumps, so the live state above rests on the per-role env plus the supervisor flag. That is the same state the 16:04:30Z go-live entry verified.
+- **Still owed:** the next REAL MLB postponement, end to end. The card settlement should list the game as unresolved, the ledger diagnostics should show `games_not_played_on_date >= 1`, paper settlement should show `mlb_game_not_played`, and the served lens should count `postponed`.
