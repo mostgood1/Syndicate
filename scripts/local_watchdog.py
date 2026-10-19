@@ -313,6 +313,27 @@ def recovery(findings: list[Finding], state: dict[str, Any], now: dt.datetime, *
 # --------------------------------------------------------------------------
 
 
+def _deliver_email(settings: lp.Settings, now: dt.datetime, findings: list[Finding], state: dict[str, Any],
+                   new_state: dict[str, Any], result: dict[str, Any], exec_readings: dict[str, Any],
+                   *, send: bool) -> dict[str, Any]:
+    """Alert + daily-digest email (scripts/alert_mailer.py). Returns a summary; never raises."""
+    try:
+        from scripts import alert_mailer as mailer
+        from scripts import execution_watchdog as xw
+
+        messages = xw.email_messages(findings, state.get("active") or {}, new_state.get("active") or {}, result, now)
+        digest = xw.digest_message(settings, now, new_state["execution"], exec_readings, new_state.get("active") or {}) \
+            if send else None
+        if digest:
+            messages.append(digest)
+        if not send:
+            return {"would_send": [m["subject"] for m in messages]}
+        summary = mailer.deliver(settings, messages, now)
+        return {k: summary.get(k) for k in ("sent", "failed", "queued", "held", "enabled", "reason")}
+    except Exception as exc:  # noqa: BLE001 -- email must never stop the fleet checks or auto-recovery
+        return {"error": f"{type(exc).__name__}: {exc}"[:200]}
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--home", help="local production home (default: as local_production.py)")
@@ -328,8 +349,21 @@ def main(argv: list[str] | None = None) -> int:
     state = _load_json(state_path)
     readings = collect(settings, now)
     findings = evaluate(readings, now, previous_restarts=state.get("restarts") or {})
+    # EXECUTION ALERTS + EMAIL (lane execution-alerts, 2026-10-19): live-money checks join the fleet's findings,
+    # so dedupe / re-alert / CLEARED are the same rules; emailable ones go out via alert_mailer. Never fatal here.
+    execution_on = os.environ.get("SYNDICATE_WATCHDOG_EXECUTION", "1").strip().lower() not in {"0", "off", "false", "no"}
+    exec_state, exec_readings = state.get("execution") or {}, {}
+    if execution_on:
+        from scripts import execution_watchdog as xw
+
+        exec_findings, exec_state, exec_readings = xw.run(settings, now, state)
+        findings.extend(exec_findings)
     result, new_state = decide(findings, state, now)
     new_state["restarts"] = readings.get("restarts") or {}
+    new_state["execution"] = exec_state
+    if execution_on:
+        result["email"] = _deliver_email(settings, now, findings, state, new_state, result, exec_readings,
+                                         send=not args.dry_run)
     decision, rec_state = recovery(findings, state, now, paused=(home / NO_AUTOSTART_NAME).exists())
     new_state.update(rec_state)
     result["recovery"] = decision
