@@ -48,6 +48,8 @@ portfolio yet.
 
 ## [portfolio-live-surface] `/portfolio` IS THE LIVE BUYING ENGINE, the venue caps BIND, and the VENUE now settles our bets `[verified 2026-08-27T00:0xZ, lanes portfolio-live-primary / portfolio-venue-caps-editable / venue-balances-on-portfolio / venue-settlement / venue-first-refusal / open-bet-live-status]`
 
+**VENUE CAPITAL FIELDS, MEASURED 2026-10-19 18:13Z (lane compounding-bankroll):** Kalshi `portfolio_value` is OPEN POSITIONS ONLY (4.50 beside $485.48 cash with one $4.50 position) -- not cash plus positions. Polymarket `buyingPower` INCLUDES a pending deposit (586.05 = `displayedCash` 36.05 + `depositReservation`/`displayedAvailableSoon` 550). `venue_capital.py` uses Kalshi cash + positions, and Polymarket buyingPower minus the pending deposit, for the dark compounding flags (todo #702).
+
 **LIVE PLACEMENT WAS FROZEN ON BOTH VENUES FROM 2026-09-04T18:27Z TO 2026-09-10T17:21Z, AND WHAT CAUSED IT
 IS NOW REFUSED BEFORE IT CAN RECUR** `[verified on production 2026-09-10T18:17:30Z, lane
 exchange-execution-unblock]`.

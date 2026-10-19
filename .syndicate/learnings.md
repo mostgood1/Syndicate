@@ -2483,3 +2483,8 @@ Nothing graded this time only because the one-shot settlement ran in the 'Schedu
   stored text and check every token I intended was present. The first instance
   cost a repair commit; the second was caught the same way but only after it had
   been pushed, so the damage stands in the history as a double space.
+
+## 2026-10-19 -- OVERTURNED: "Kalshi `portfolio_value` is cash plus open positions" (a code comment in `venue_balances.py`, trusted since 2026-08-26) `[lane compounding-bankroll, session 3927eb2e]`
+
+- **What was true:** it is OPEN POSITIONS ONLY. Stamp 2026-10-19T18:13Z: 4.50 with exactly one $4.50 position beside $485.48 cash. Likewise Polymarket `buyingPower` INCLUDES a not-yet-cleared deposit ($550 of $586.05).
+- **The rule going forward:** before a venue balance field becomes a SIZING basis, check it against a reading where you know the answer (one known position, one known deposit). Read the fields the venue already sends (`depositReservation`, `displayedAvailableSoon`) rather than inferring from the headline number.
