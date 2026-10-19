@@ -51160,3 +51160,25 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - **TWO COSTS, PAID DELIBERATELY AND RECORDED AS SUCH.** (1) `check_deploy_safety` read NOT CLEAR with a board build in flight at `layer2_shortlist_build`; I polled ~5.5 min hoping it would persist and it rolled straight into a NEW cycle instead — which matches this morning's measurement that builds run back-to-back, so waiting only changes WHICH build is discarded. (2) The check also warned **"Live games in progress — a restart interrupts live-lens ticks and live prop hydration"**, which had not appeared in any earlier check today. Monday evening, NBA/NHL/soccer live. That cost does not clear by waiting and was accepted to land a user-directed change.
 - **A FALSE NEGATIVE WAS AVOIDED BY THE PROVENANCE FIELD.** At 20:23Z, ELEVEN minutes after the restart, the served board still carried `written_at` **20:11:27Z** — the PRE-restart build — and read 2,996 edged (80.8%) with the new reason absent. Reporting that as the "after" would have been a clean-looking failure of a change that was in fact not yet serving. The reading was re-gated on `written_at` exceeding the restart rather than on elapsed time. Second time in one day that payload provenance caught this.
 - **Revert path, stated correctly** (an earlier version of this entry was wrong): the env flag needs a `REFRESH_WORKER__` line PLUS a full down/up, because role env is built once at `up` and a TERM'd role respawns with the stored dict. **The cheap revert is a CODE revert** — revert, ff, TERM.
+
+## 2026-10-19 21:01:01Z -- ENV LINE WRITTEN, CAPTURED-BUT-UNREAD: `REFRESH_WORKER__SYNDICATE_STAKED_PROBABILITY_UNFITTED=market` -- **RIDE-ALONG WARNING: the FIRST refresh-worker restart on a HEAD containing `bd9b0571` turns this staking change ON** (lane `sim-stake-unfitted-market-only`, todo #704, session 24ac7737)
+- **ask:** user 2026-10-19 in chat: "turn the fix on and schedule the read, then archive the session". My session's classifier refused the env write as a production deploy, so **the user wrote the line themselves**: `wsl -- bash /mnt/c/tmp/evd_enable_704.sh`. It printed `OK: lines 120 -> 123, 0 removed; backup .../local_production.env.bak-stakedunfitted-20261019T210101Z; key count 1; written 2026-10-19T21:01:01Z`. An earlier PowerShell attempt left one unused backup, `...bak-stakedunfitted-20261019T205935Z`, byte-identical to the pre-write env.
+- **verified read-only 21:01:39Z** (key names and byte counts only): key count 1, total keys 37.
+- **Not live, and why, in order:**
+  - Env is read only at a full `up`. The last `up` was `a6c32498`. The next planned one is compounding-bankroll's full down/up, ~21:10Z or later, ff target `854b59ed`.
+  - The code that reads the key is `bd9b0571` (profile `staked_basis` + the portfolio_commit beta seam). It is NOT on the fleet: HEAD `d4837386`, which does not contain it, and `854b59ed` does not either.
+  - **So after compounding's `up` the key sits in refresh-worker's env, unread. WHOEVER NEXT FFs THE FLEET PAST `bd9b0571` AND TERMs refresh-worker SWITCHES IT ON. List it as a ride-along.** If that `up` slips, the key waits for whichever full `up` comes first.
+- **What turns on:**
+  - In every paper AND LIVE venue plan, a model-view row in an unfitted cell is staked on its market fair (beta 0). The fleet has no staked-probability profile, so that is every cell.
+  - Stakes fall to the EV-only counterfactual, so `sim_share_of_stake` goes to 0.0.
+  - Positive-EV rows the sim used to zero-Kelly-veto get staked on price. Nothing is newly refused.
+- **expect at activation:**
+  - plan positions carry `sizing.staked_probability_version` starting `market_fair@` (`market_fair@unfitted` while no profile exists);
+  - new ledger orders show `sim_share_of_stake` 0.0 on model-edge rows;
+  - `zero_kelly_stake` refusals in plan counters drop.
+- **baseline:** sim share of paper dollars by submit date was 10-17 0.53, 10-18 0.27, 10-19 0.10 (34 orders), from the ledger read 18:50Z, `findings_2026-10-19_ev_overstatement_decomp.md`.
+- **revert:**
+  - delete the line and run a full down/up;
+  - or, cheaper on this fleet, a CODE revert: make `staked_probability_profile.unfitted_mode()` return `raw` (or `git revert bd9b0571`), ff, then a claimed refresh-worker TERM.
+- **notify:** lane `published-negative-ev` must be told before this goes live ahead of its 2026-10-21 15:00Z reading (its loan condition). It has been told the line is written. compounding-bankroll was told the line exists before its `up`.
+- **verify OWED:** scheduled task `sim-stake-activation-check` reads the fleet daily until activation and confirms the expectations above. Forward read `sim-stake-forward-read-1102` runs Mon 2026-11-02.
