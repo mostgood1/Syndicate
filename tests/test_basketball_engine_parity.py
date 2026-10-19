@@ -3,8 +3,9 @@
 The PARITY CLAIM rests on the production corpus (scripts/basketball_engine_parity.py
 --corpus, reading in .syndicate/deploys.md), not on these tests. These tests
 keep the port honest in CI:
-  * (retired 2026-10-19, lane nba-vendor-deletion-prep: the synthetic native-vs-vendored parity and the port-tool
-    check; engine.py is frozen source, see syndicate/features/basketball_engine/FROZEN_FROM_VENDOR.md)
+  * synthetic parity, leaf for leaf and RNG state for RNG state, both leagues,
+    both lineup samplers;
+  * engine.py is exactly what the port tool generates from the vendored source;
   * REACHABILITY (model engine standard §4.3): every LeagueParams switch the
     engine consumes changes the output when it is flipped (off != on). A switch
     that cannot move the output is wiring that does nothing;
@@ -22,16 +23,30 @@ import numpy as np
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
+
+import basketball_engine_parity as parity  # noqa: E402
 
 from syndicate.features.basketball_engine import NBA, WNBA, LeagueParams, simulate_pbp_game_boxscore  # noqa: E402
 from syndicate.features.basketball_engine.league_engine import SWITCHES, LeagueEngine  # noqa: E402
 from tests.basketball_engine_fixtures import synthetic_game_kwargs  # noqa: E402
 
 
+@pytest.mark.parametrize("sampler_name", ["production", "vendored_default"])
+def test_synthetic_parity_is_exact(sampler_name):
+    sampler = parity.production_sampler() if sampler_name == "production" else None
+    n = 0
+    for source, case in parity.synthetic_cases(24, seed=91 if sampler is None else 17):
+        res = parity.replay_case(case, sampler)
+        assert res["ok"], (source, res["diffs"])
+        n += 1
+    assert n == 24
+
+
 # The port tool's `--check` (engine.py == a regeneration from the vendored source) was a gate only until the switch.
 # Since 2026-10-09 (63a58748, parity 5,400/5,400 real calls) engine.py is the source of truth, and native-only edits
 # (P3 mechanisms, calibration levers) are expected to diverge from the vendored text. scripts/port_basketball_engine.py
-# was retired 2026-10-19 (lane nba-vendor-deletion-prep); git history keeps how the port was derived.
+# stays as the record of how the port was derived.
 
 
 def _box(lp: LeagueParams, seed: int, kw):

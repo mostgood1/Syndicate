@@ -13,8 +13,10 @@ tree. Before then they were generated and `--check`'d against it.
 | `nba/live_tick/` | the NBA live-lens tick (`_live_lens_tick_payload` + its closure) | `scripts/port_basketball_live_tick.py --league nba` | `--check` OK |
 | `nba/source_cli/` | the NBA source CLI commands the props refresh runs | `scripts/port_basketball_source_cli.py --league nba` | `--check` OK |
 
-The engine and orchestrator generators and their parity harnesses (`scripts/basketball_engine_parity.py`,
-`scripts/basketball_orchestrator_parity.py`) are retired; they live in git history, with their results in
+The engine and orchestrator generators are retired; the parity harnesses STAY: `scripts/basketball_engine_parity.py`
+--corpus is the gate lane basketball-scenario-calibration runs on every engine change (its reference must move off the
+vendored engine, to production's recorded outputs, before the NBA tree is deleted), and
+`scripts/basketball_orchestrator_parity.py`'s native arm and compare-outputs need no vendor tree. The generators are they live in git history, with their results in
 `.syndicate/deploys.md` and `docs/ai_context/basketball_live_native_plan.md` (P1, P6). The live-tick and source-CLI
 generators and harnesses keep their **WNBA arm only**: `syndicate/features/wnba/{live_tick,source_cli}/` are still
 generated from `vendor/wnba_betting_repo` and `--check`'d. `scripts/sync_vendor_upstream.py` no longer covers NBA.
