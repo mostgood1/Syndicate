@@ -46110,7 +46110,7 @@ were resolved and nine already-closed rows removed from the open tables.
   - **v1 limits:** the fair is the PRE-GAME model view, not a live-lens fair; the cadence is 300 s; Polymarket is not built
     (`ORDER_ACTION_SELL` exists in `polymarket_us_orders.py`).
 
-- **#701 — Per-cell min_ev learning loop: RUNNING IN SHADOW on the fleet since 2026-10-19 19:06Z (`94c97011`; fix `40640a0b` loads at the next refresh-worker restart); apply is a user decision `[2026-10-19, lane min-ev-tuner-shadow]`.**
+- **#701 — Per-cell min_ev learning loop: RUNNING IN SHADOW on the fleet since 2026-10-19 19:06Z; flat-unit grading `affc9a7b` loaded 22:43:52Z; daily readout task `min-ev-tuner-daily-readout`; apply is a user decision `[2026-10-19, lane min-ev-tuner-shadow]`.**
 
   `syndicate/features/shared/min_ev_tuner.py` runs once a day (>= 12:00Z) after settlement in refresh-worker's
   intelligence-state loop. It proposes a bounded min_ev step per venue x sport x market x season_phase cell, using
