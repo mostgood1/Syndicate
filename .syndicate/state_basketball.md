@@ -1214,3 +1214,8 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   - `recon_players_2026-10-17.csv` written.
 
 - **NBA schedule source** `[verified 2026-10-14]`: cdn.nba.com answers HTTP 403 to this host (fleet + Windows), so the NBA `fetch-schedule` (vendored and port alike) always rewrote last season's `schedule_2025_26.*` from itself (2024-10-22..2026-04-12, empty statuses). stats.nba.com `ScheduleLeagueV2` serves 2026-27 (1,274 games). The port now uses it (fleet 63631afb, 14:35:18Z) and filters a day on `date_est` (vendored date_utc-first returned day D+1). **Not yet exercised in production at 18:00Z.** `schedule_adapter`'s fallback still runs the VENDORED CLI on the fleet and rewrites the old file; its fix (a78aab9c) is on main, not on the fleet, and needs a live-odds-worker restart.
+
+- **NBA PRODUCTION RUNS NO VENDORED CODE; the NBA ports are FROZEN source** `[verified 2026-10-19, lanes nba-vendor-deletion-scope + nba-vendor-deletion-prep]`:
+  - Fleet (HEAD 94c97011): 15 production modules import 0 vendored NBA modules (fresh interpreter); 0 files written under vendor/nba_betting_repo since 10-10; no role env or PYTHONPATH points at it.
+  - Frozen at 27ef92f8 (5dba2973): basketball_engine/engine.py, basketball_engine/orchestrator/, nba/live_tick/, nba/source_cli/ -- edit directly (`syndicate/features/basketball_engine/FROZEN_FROM_VENDOR.md`). WNBA's live_tick and source_cli are still generated from vendor/wnba_betting_repo.
+  - vendor/nba_betting_repo is still in git; its deletion is a separate step (findings_2026-10-19_nba_vendor_deletion_scope.md).
