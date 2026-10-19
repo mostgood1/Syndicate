@@ -51321,3 +51321,10 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - **Served grid 10-20** (built 23:20:20Z, after a Kalshi capture at 23:09:28Z), UEFA fixtures with a Kalshi quote: **UCL 18, UEL 18, UECL 18 of 18 (h2h 18 / 18 / 18)**.
   - **Red Star Belgrade v FC Copenhagen: h2h [kalshi], totals [kalshi]** (the only UECL fixture missing at 21:48Z).
 - **Net for the day, 10-20 grid:** UCL 17 -> 18, UEL 14 -> 18, UECL 16 -> 18. The pieces: f39133f8 aliases, 71631544 per-event codes, 76ef318c + env flag (all fixtures' game lines), 81e81501 elimination aliases.
+
+
+### ADDENDUM to 2026-10-19 22:43:45Z -- #704's STAKE effect, read off the same plan pair (re-derived by session 4ab694ed, `d988eead`)
+- paper `PLAN_WRITTEN` before (22:10:53Z) -> after (23:14:18Z), activation 22:43:52Z between them: `rows_in` 19 -> 22; `sized` 11 -> **21**; positions 10 -> 18; **staked $124.36 -> $64.95 (-47.8%)**; mean stake per position $12.44 -> $3.61 (-71%); `zero_kelly_stake` 7 -> absent; `below_min_stake` 1 -> 3; `PORTFOLIO_COMMIT sim_share` 0.7841 -> 0.0.
+- **The direction is the one PREDICTED, not a reversal.** The 21:01:01Z entry wrote "Stakes fall to the EV-only counterfactual". Removing the unearned sim-added stake (w = -0.27, findings_2026-10-19_ev_overstatement_decomp.md) shrinks tickets, while lifting the zero-Kelly veto adds lines. Both mechanisms are visible: more lines, smaller tickets, about half the capital.
+- **Confounds, not glossed:** one plan pair; the row set changed across an hour of a live slate (not a controlled A/B); the 22:40:24Z plan between them is `date=2026-10-20` and not comparable. The formal reading stays published-negative-ev's 10-21 15:00Z provenance split, plus `sim-stake-forward-read-1102`.
+- **Provenance of each number:** the stake/refusal figures are from refresh-worker.log (re-derivable by anyone). The `market_fair@` 18/18 stamp count is from the keyvalue plan store, read in-process with the worker state env. `market_fair@` never appears in the logs (0 occurrences), so that count is re-derivable only from the store.
