@@ -67,6 +67,14 @@ death, never life — do not invert it.
 
 ## OPEN
 
+### mlb-web-tests-native — OPEN — opened 2026-10-19 — session 2d413211
+- Goal: Point the MLB tests that exercise functions of the VENDORED web app (vendor/mlb_bettingv2/tools/web/flask_frontend.py) at the live-lens app slice production runs (syndicate/features/mlb/live_lens_port/app_slice.py), imports and patch targets together; any test whose function is NOT in the slice is reported as testing code production does not run (user: "proceed", 2026-10-19). Per-test outcomes must not change.
+- Files: tests/test_archives.py (the vendored flask_frontend import + patch targets in the MLB live-lens reports test ONLY), tests/test_lens_first5_lane.py, tests/test_live_gameline_join.py, tests/test_live_projection_market_key.py, tests/test_mlb_pregame_baseline_lane.py, tests/test_mlb_refresh_runner.py (the vendored flask_frontend loads, imports and patch targets only), tests/test_season_betting_reader_freshness.py
+- Hypothesis: every tested web function is in the slice verbatim, so imports + patch targets move and outcomes are identical.
+- Falsification test: any per-test outcome that changes; any test that needs a function the slice does not carry.
+- Verification: JUnit before/after over the 7 files: identical per-test outcomes, and 0 vendored modules loaded by the after run.
+- Blocked by: none
+
 ### mlb-research-scripts-native — CLOSED 2026-10-19 (GOAL MET) — opened 2026-10-19 — session 2d413211
 - GOAL VERDICT `[2026-10-19 15:xxZ]`. Goal (verbatim): "Point the 22 offline MLB research scripts that import the VENDORED engine or read vendored engine data at the native engine (syndicate.features.mlb.sim_engine / native tools) and the engines/mlb data root, with no vendored sys.path entry (user: "proceed", 2026-10-19). Nothing in production runs them except publish_mlb_season_artifacts.py, whose only change is description text." -- **GOAL: MET.** Landed 80ef51c8 (21 scripts changed; build_mlb_batted_ball_artifact.py's only hit was a Windows interpreter hint in a usage message). All 96 syndicate.features.mlb imported names resolve (module + attribute), and all 22 scripts load in a fresh interpreter with 0 vendored modules. The check caught and fixed one rewrite error (mlb_starter_length_replay.ENGINE_ROOT is read cross-module by mlb_hitter_prop_replay). LIMIT: these scripts have no tests; behaviour equivalence rests on the native engine being a verbatim, --check'd copy.
 - Goal: Point the 22 offline MLB research scripts that import the VENDORED engine or read vendored engine data at the native engine (syndicate.features.mlb.sim_engine / native tools) and the engines/mlb data root, with no vendored sys.path entry (user: "proceed", 2026-10-19). Nothing in production runs them except publish_mlb_season_artifacts.py, whose only change is description text.
