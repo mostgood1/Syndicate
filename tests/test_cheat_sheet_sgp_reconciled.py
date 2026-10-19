@@ -115,3 +115,23 @@ def test_a_posted_parlay_stays_on_the_sheet_after_a_rebuild_replaces_it(tmp_path
     data = json.loads(re.search(r"const DATA = (.*?);\n", html).group(1))["nhl"]
     assert data["sgp"][0]["sgp_id"] == "sgp_0123456789ab" and data["sgp"][0]["result"]["status"] == "lost"
     assert 'data-sg="${esc(s.sgp_id' in html and "sgp_ids: [...sgps]" in html
+
+
+def test_parlay_leg_actuals_refresh_for_a_week_not_only_the_grader_window(tmp_path, monkeypatch):
+    # 2026-10-19: NFL's usage file still held only Thursday's week-6 game the morning after Sunday; the grader re-pulls
+    # 2 days, so the 10-18 parlays would have stayed pending forever once the stats landed later.
+    spec = importlib.util.spec_from_file_location("reconcile_cheat_sheets", ROOT / "scripts" / "reconcile_cheat_sheets.py")
+    rc = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(rc)
+    sheets = tmp_path / "cheatsheets"
+    (sheets / "nfl").mkdir(parents=True)
+    old, fresh_day = "2026-10-12", "2026-10-18"           # 7 days back is inside; 8 is not
+    for day in (old, fresh_day, "2026-10-11"):
+        (sheets / "nfl" / f"{day}.json").write_text(json.dumps({"sport": "nfl", "date": day, "sgp": [{"legs": []}]}), encoding="utf-8")
+        (sheets / "nfl" / f"{day}.reconciled.json").write_text(json.dumps({"sport": "nfl", "date": day, "props": {}}), encoding="utf-8")
+    monkeypatch.setattr(rc, "sgp_leg_actuals", lambda root, day, doc: {"bijanrobinson|rushing yards": 41.0})
+    assert rc.refresh_leg_actuals(tmp_path, sheets, "2026-10-19") == 2
+    for day, expect in ((old, True), (fresh_day, True), ("2026-10-11", False)):
+        rec = json.loads((sheets / "nfl" / f"{day}.reconciled.json").read_text(encoding="utf-8"))
+        assert ("leg_actuals" in rec) is expect
+    assert rc.refresh_leg_actuals(tmp_path, sheets, "2026-10-19") == 0      # nothing new: nothing rewritten

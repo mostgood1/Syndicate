@@ -467,8 +467,43 @@ def main(argv: list[str] | None = None) -> int:
                   f"explained voids {len(rec['void'])}, finals {len(rec['scores'])}) "
                   f"lines {c['lines_graded']}/{c['lines']} graded_population={len(graded)}", flush=True)
     write_record(sheets_dir, now=datetime.now(timezone.utc))
+    refresh_leg_actuals(root, sheets_dir, today)
     grade_sgp_ledger(root)
     return 0
+
+
+SGP_ACTUALS_DAYS = 7
+
+
+def refresh_leg_actuals(root: Path, sheets_dir: Path, today: str, *, days: int = SGP_ACTUALS_DAYS) -> int:
+    """Parlay legs graded from the game logs for the last `days` days -- not only the DAYS_BACK the grader re-pulls.
+    A game log can land after a day leaves that window (2026-10-19: NFL's usage file still held only Thursday's week-6
+    game the morning after Sunday, leaving 15 of 22 NFL parlays pending, and the 10-18 sheet would leave the window
+    after the 10-20 night run). Re-reads the logs only -- no grader pull -- and rewrites a reconciled file only when
+    its actuals change. Returns the number of files updated."""
+    updated = 0
+    for k in range(days, -1, -1):
+        day = (datetime.fromisoformat(today) - timedelta(days=k)).date().isoformat()
+        for sport in ("nhl", "nfl", "wnba", "nba", "mlb"):
+            path = sheets_dir / sport / f"{day}.json"
+            target = path.with_name(f"{day}.reconciled.json")
+            if not (path.is_file() and target.is_file()):
+                continue
+            try:
+                doc = json.loads(path.read_text(encoding="utf-8"))
+                rec = json.loads(target.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            if not doc.get("sgp"):
+                continue
+            acts = sgp_leg_actuals(root, day, doc)
+            merged = {**(rec.get("leg_actuals") or {}), **acts}
+            if merged != (rec.get("leg_actuals") or {}):
+                rec["leg_actuals"] = merged
+                write_atomic(target, rec)
+                updated += 1
+                print(f"RECONCILE {sport} date={day} leg actuals refreshed: {len(merged)}", flush=True)
+    return updated
 
 
 def grade_sgp_ledger(root: Path) -> None:
