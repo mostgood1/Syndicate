@@ -1142,6 +1142,14 @@ death, never life — do not invert it.
 - Verification: pytest tests/test_kalshi_event_scoped_codes.py + existing kalshi join tests pass; fleet replay before/after: matched UEFA fixtures per day and the 4 events, plus a diff of every non-UEFA match (must be 0 changed)
 - Blocked by: none
 
+### model-edge-plausibility-bound — OPEN — opened 2026-10-19 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- Goal: The measured-edge plausibility bound in _model_edge_for stops being a 15-point MAGNITUDE test and becomes the probability-space test its own docstring describes - refuse when the model's implied probability is extreme WHILE the market's is not, plus an impossible-probability guard - shipped behind a revertible flag with a reachability test proving off != on, and verified on the served board as the measured change (377 refusals -> 36, 353 rows returned, 12 newly refused) rather than as an intention.
+- Files: syndicate/features/shared/layer2_board.py (the _model_edge_for plausibility bound at the abs(edge) > _MODEL_EDGE_MAX_POINTS site ONLY - NOT the modelled-fair bound, NOT the three-way leg bound, NOT the calibrated-edge bound), tests/test_model_edge_plausibility_bound.py (NEW)
+- Hypothesis: Measured on 1,769 served rows carrying edge + model prob + market fair: the magnitude test refuses 377 (21.3%) while the probability-space test refuses 36 (2.0%); of the 377 the new rule also refuses 24 and returns 353, and it newly refuses 12 the magnitude test accepts. The market-ordinary condition is load-bearing, not decoration: 9 rows have an extreme model AND an extreme market (alt totals/spreads, batter_home_runs) and a flat extreme-model band would refuse them although both model and market agree the outcome is unlikely.
+- Falsification test: If the served refusal count does not move from 377 to ~36 after the flag is on, the bound is not the gate I measured. If turning the flag OFF does not restore the old count exactly, the change is not revertible and must not ship. And if any row with an extreme model AND an extreme market is refused, the market-ordinary condition is not working and the low-base-rate flaw is live.
+- Verification: In-process over production payloads: run the deployed _model_edge_for with the flag off and on over the same fetched rows and report both refusal counts and the diff set. Then on the served board after a restart: the count of rows carrying model_edge_pct, before and after, with the refusal-reason breakdown. Plus unit tests and mutation.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
