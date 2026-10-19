@@ -40,6 +40,60 @@ FEATURED: tuple[tuple[str, str], ...] = (
 )
 ALL = "featured"
 
+# SAME-GAME PARLAYS, kept OUT of "All featured picks" (user 2026-10-19: "make sure ... the overall scorecards and
+# scorecards by sports show all categories"). Paper only: no SGP price is published, so they carry a won-lost count and
+# what our probabilities said (the sum of `p_joint` over the settled tickets) and never units. Graded by the rule the
+# reconciled page and the paper ledger share (`cheat_sheets.sgp_results`).
+SGP = "sgp"
+SGP_LABEL = "Same-game parlays (paper)"
+SGP_SPORTS = frozenset({"nfl", "nhl", "wnba", "nba", "mlb"})   # scripts/build_cheat_sheets.SGP_SPORTS (a test holds them equal)
+
+# The sports each sport-specific category can appear for. A scorecard lists EVERY category that applies to its sport,
+# with "no bets yet" where none was featured, so a missing category reads as "none yet" rather than as not tracked.
+# Unlisted categories apply to every sport.
+CATEGORY_SPORTS: dict[str, frozenset] = {
+    "pvp_batters": frozenset({"mlb"}), "pvp_pitchers": frozenset({"mlb"}),
+    "pvp_skaters": frozenset({"nhl"}), "pvp_goalies": frozenset({"nhl"}),
+    "pvp_scorers": frozenset({"nba"}),
+    "pvp_receivers": frozenset({"nfl"}), "pvp_qbs": frozenset({"nfl"}),
+    SGP: SGP_SPORTS,
+}
+
+
+def applies(key: str, sport: str) -> bool:
+    return sport in CATEGORY_SPORTS.get(key, frozenset(cs.SPORT_ORDER))
+
+
+def _sgp_tally() -> dict[str, float]:
+    return {"w": 0, "l": 0, "expected": 0.0, "pending": 0, "void": 0}
+
+
+def sgp_tally(sheet: Mapping[str, Any], reconciled: Mapping[str, Any]) -> dict[str, float] | None:
+    """The day's parlays as the sheet showed them, graded; None when the sheet carried none."""
+    tickets = list(sheet.get("sgp") or [])
+    if not tickets:
+        return None
+    t = _sgp_tally()
+    for ticket, res in zip(tickets, cs.sgp_results(tickets, reconciled)):
+        status = res.get("status")
+        if status in ("won", "lost"):
+            t["w" if status == "won" else "l"] += 1
+            t["expected"] += float(ticket.get("p_joint") or 0.0)
+        elif status == "void":
+            t["void"] += 1
+        else:
+            t["pending"] += 1
+    return t
+
+
+def finish_sgp(t: Mapping[str, Any]) -> dict[str, Any]:
+    """{w, l, n, win_pct, expected, expected_pct, pending, void, paper: True} -- no units: nothing was priced."""
+    w, l = int(t.get("w", 0)), int(t.get("l", 0))
+    n, expected = w + l, round(float(t.get("expected") or 0.0), 2)
+    return {"w": w, "l": l, "n": n, "win_pct": round(100 * w / n, 1) if n else None, "expected": expected,
+            "expected_pct": round(100 * expected / n, 1) if n else None, "pending": int(t.get("pending", 0)),
+            "void": int(t.get("void", 0)), "paper": True}
+
 
 def _tally() -> dict[str, float]:
     return {"w": 0, "l": 0, "units": 0.0}
@@ -125,8 +179,10 @@ def day_record(sheet: Mapping[str, Any], reconciled: Mapping[str, Any],
         _add(every, res)
     day = str(sheet.get("date") or "")
     counts = reconciled.get("counts") or {}
+    parlays = sgp_tally(sheet, reconciled)
     return {"date": day, "sport": sheet.get("sport"), "beta": day < OFFICIAL_START,
             "sections": {k: finish(t) for k, t in tallies.items()}, ALL: finish(every),
+            **({SGP: finish_sgp(parlays)} if parlays else {}),
             "graded": counts.get("props_graded", 0) + counts.get("lines_graded", 0) + counts.get("picks_graded", 0),
             "bets": counts.get("props", 0) + counts.get("lines", 0) + counts.get("picks", 0)}
 
@@ -136,11 +192,18 @@ def _scope(days: list[Mapping[str, Any]]) -> dict[str, Any]:
     by_sport: dict[str, dict[str, dict[str, float]]] = {}
     per_date: dict[str, dict[str, float]] = {}
     per_date_value: dict[str, dict[str, float]] = {}
+    sgp_total: dict[str, float] = _sgp_tally()
+    sgp_by_sport: dict[str, dict[str, float]] = {}
     for d in days:
         sport = str(d.get("sport"))
         for key, t in list((d.get("sections") or {}).items()) + [(ALL, d.get(ALL) or {})]:
             _merge(total.setdefault(key, _tally()), t)
             _merge(by_sport.setdefault(sport, {}).setdefault(key, _tally()), t)
+        if d.get(SGP):
+            for into in (sgp_total, sgp_by_sport.setdefault(sport, _sgp_tally())):
+                for k in ("w", "l", "expected", "pending", "void"):
+                    into[k] += d[SGP].get(k, 0) or 0
+            by_sport.setdefault(sport, {})
         _merge(per_date.setdefault(d["date"], _tally()), d.get(ALL) or {})
         _merge(per_date_value.setdefault(d["date"], _tally()), (d.get("sections") or {}).get("value") or {})
     series, cum, cum_value = [], 0.0, 0.0
@@ -149,8 +212,14 @@ def _scope(days: list[Mapping[str, Any]]) -> dict[str, Any]:
         cum_value += per_date_value[date]["units"]
         series.append({"date": date, "featured": finish(per_date[date]), "cum_units": round(cum, 2),
                        "cum_value_units": round(cum_value, 2)})
-    return {"totals": {k: finish(t) for k, t in total.items()},
-            "by_sport": {s: {k: finish(t) for k, t in secs.items()} for s, secs in sorted(by_sport.items())},
+    totals = {k: finish(t) for k, t in total.items()}
+    if any(sgp_total[k] for k in ("w", "l", "pending", "void")):
+        totals[SGP] = finish_sgp(sgp_total)
+    sports = {s: {k: finish(t) for k, t in secs.items()} for s, secs in sorted(by_sport.items())}
+    for s, t in sgp_by_sport.items():
+        sports[s][SGP] = finish_sgp(t)
+    return {"totals": totals,
+            "by_sport": sports,
             "series": series, "days": len(per_date)}
 
 
@@ -158,7 +227,12 @@ def season_record(days: Iterable[Mapping[str, Any]], *, generated_at: str) -> di
     """The page's whole payload: the official record, the beta apart, and every day newest first."""
     days = sorted(days, key=lambda d: (str(d.get("date")), str(d.get("sport"))), reverse=True)
     return {"generated_at": generated_at, "official_start": OFFICIAL_START,
-            "sections": [{"key": k, "label": label} for k, label in FEATURED] + [{"key": ALL, "label": "All featured picks"}],
+            "sections": [{"key": k, "label": label} for k, label in FEATURED] + [{"key": ALL, "label": "All featured picks"},
+                                                                                 {"key": SGP, "label": SGP_LABEL, "paper": True}],
+            # Every sport, and which sports each category applies to: a scorecard lists every category that applies
+            # to its sport, "no bets yet" included, rather than only the ones that happen to have bets.
+            "sports": list(cs.SPORT_ORDER),
+            "applies": {k: sorted(s for s in cs.SPORT_ORDER if applies(k, s)) for k, _ in FEATURED + ((SGP, ""),)},
             "official": _scope([d for d in days if not d.get("beta")]),
             "beta": _scope([d for d in days if d.get("beta")]),
             "days": days}

@@ -49,7 +49,8 @@ def test_props_and_lines_match_on_the_graders_own_key():
     assert rec["props"][cs.prop_result_key(_sheet()["rows"][2])] == {"y": 1.0}
     assert cs.prop_result_key(_sheet()["rows"][3]) not in rec["props"]                     # never graded: no result
     assert rec["lines"] == {cs.line_result_key(_sheet()["game_lines"][0]): {"y": 0.0}}      # an ungraded h2h is absent
-    assert rec["counts"] == {"props": 4, "props_graded": 3, "props_valued": 0, "lines": 2, "lines_graded": 1, "picks": 0, "picks_graded": 0}
+    assert rec["counts"] == {"props": 4, "props_graded": 3, "props_valued": 0, "props_from_actual": 0, "lines": 2, "lines_graded": 1,
+                             "picks": 0, "picks_graded": 0}
 
 
 def test_the_page_payload_puts_a_result_and_units_on_each_bet():

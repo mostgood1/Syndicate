@@ -255,6 +255,33 @@ def graded_index(rows: list[dict[str, Any]], values: Mapping[str, Any] | None = 
     return props, lines, picks
 
 
+def actuals_index(rows: list[dict[str, Any]], values: Mapping[str, Any] | None = None) -> dict[tuple[str, str, str], float]:
+    """(player key, market, event id) -> the stat the grader settled that player's market on, read from ANY line of it
+    the grader graded (the `ValueTap` value, full game only).
+
+    WHY (user 2026-10-19: "make sure reconciliation and tracking is happening for every category by every sport").
+    The grader settles what the recorder captured, and a sheet can feature a line the recorder never held. Measured that
+    day: on the NCAAF 10-15 / 10-16 sheets 33 featured props were still open days after their games. Re-pulling the
+    grader settled none of them. In 31 of the 33, the same player was graded at OTHER lines, e.g. a receiving-yards
+    over 35.5 on the sheet against 40.5 in the population. That player's stat for the game is known, so the sheet's line
+    is graded from it (`reconcile(actuals=)`)."""
+    from syndicate.features.shared.basketball_props_availability import player_key
+
+    values = values or {}
+    out: dict[tuple[str, str, str], float] = {}
+    for g in rows:
+        if not g.get("player") or g.get("y") is None:
+            continue
+        shape = _graded_shape(g)
+        if str(shape["segment"]).lower() not in ("full", "full_game"):
+            continue
+        v = (values.get(cs.pick_result_key(shape)) or {}).get("v")
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            out.setdefault((player_key(g.get("player")), str(g.get("market") or "").strip().lower(), shape["event_id"]),
+                           float(v))
+    return out
+
+
 def merge_results(prior: Mapping[str, Any], fresh: Mapping[str, Any]) -> dict[str, Any]:
     """A settled result never changes: keep every earlier one, take the fresh ones, and never lose a value an
     earlier run captured to a run that did not."""
@@ -266,17 +293,34 @@ def merge_results(prior: Mapping[str, Any], fresh: Mapping[str, Any]) -> dict[st
 
 def reconcile(sheet: dict[str, Any], props: dict[str, Any], lines: dict[str, Any], *, now: datetime,
               reasons: Mapping[str, str] | None = None, scores: Mapping[str, Any] | None = None,
-              picks: Mapping[str, Any] | None = None) -> dict[str, Any]:
+              picks: Mapping[str, Any] | None = None,
+              actuals: Mapping[tuple[str, str, str], float] | None = None) -> dict[str, Any]:
     """The reconciled file for one sheet: the result of every prop, game line and Syndicate pick the grader settled,
     why each one it did NOT settle was left (`void` / `picks_void`: did not play, push, not final ...), and each
-    game's final score (`scores`). `reasons` is keyed by `pick_result_key`."""
+    game's final score (`scores`). `reasons` is keyed by `pick_result_key`. A prop line the grader never held is graded
+    from the player's actual stat for that game when `actuals` (`actuals_index`) has it, marked `"by": "actual"`."""
+    from syndicate.features.shared.basketball_props_availability import player_key
+
     p_out = {k: props[k] for k in (cs.prop_result_key(r) for r in sheet.get("rows") or []) if k in props}
     l_out = {k: lines[k] for k in (cs.line_result_key(g) for g in sheet.get("game_lines") or []) if k in lines}
     reasons, scores, picks = reasons or {}, scores or {}, picks or {}
     void = {}
     for r in sheet.get("rows") or []:
+        k = cs.prop_result_key(r)
+        line = r.get("line")
+        if k in p_out or not actuals or not isinstance(line, (int, float)) or isinstance(line, bool):
+            continue
+        v = actuals.get((player_key(r.get("player")), str(r.get("market") or "").strip().lower(), str(r.get("event_id") or "")))
+        if v is None:
+            continue
+        hit = cs.side_hit(v, float(line), str(r.get("side") or "").strip().lower())
+        if hit is not None:
+            p_out[k] = {"y": float(hit), "v": v, "by": "actual"}
+        elif v == float(line):
+            void[k] = "push"
+    for r in sheet.get("rows") or []:
         k, rk = cs.prop_result_key(r), cs.pick_result_key(r)
-        if k not in p_out and rk in reasons:
+        if k not in p_out and k not in void and rk in reasons:
             void[k] = reasons[rk]
     pick_keys = [cs.pick_result_key(pk) for pk in sheet.get("picks") or []]
     k_out = {k: picks[k] for k in pick_keys if k in picks}
@@ -288,6 +332,7 @@ def reconcile(sheet: dict[str, Any], props: dict[str, Any], lines: dict[str, Any
             "scores": {e: scores[e] for e in sorted(events) if e in scores},
             "counts": {"props": len({cs.prop_result_key(r) for r in sheet.get("rows") or []}), "props_graded": len(p_out),
                        "props_valued": sum(1 for v in p_out.values() if "v" in v),
+                       "props_from_actual": sum(1 for v in p_out.values() if v.get("by") == "actual"),
                        "lines": len({cs.line_result_key(g) for g in sheet.get("game_lines") or []}),
                        "lines_graded": len(l_out), "picks": len(set(pick_keys)), "picks_graded": len(k_out)}}
 
@@ -402,6 +447,11 @@ def main(argv: list[str] | None = None) -> int:
     # One marker a run, so the daily review reads only the LAST run's lines (scripts/review_cheat_sheets.py).
     print(f"RECONCILE_RUN start {datetime.now(timezone.utc).isoformat(timespec='seconds')}", flush=True)
     days = args.date or [(datetime.fromisoformat(today) - timedelta(days=k)).date().isoformat() for k in range(DAYS_BACK, -1, -1)]
+    if not args.date:
+        late = catchup_days(sheets_dir, today)
+        if late:
+            print(f"RECONCILE catch-up {late}: featured bets still open past the {DAYS_BACK}-day window", flush=True)
+        days = late + days
     wanted = {s.strip() for s in args.sports.split(",")} if args.sports else None
     cache = sheets_dir / ".reconcile_cache"
     cache.mkdir(parents=True, exist_ok=True)
@@ -420,7 +470,9 @@ def main(argv: list[str] | None = None) -> int:
                 continue
             # A row that went out on an exported graphic is graded even if no build after the post kept it.
             doc = cs.with_posted(doc, cs.load_posted(sheets_dir, sport, day))
-            if doc.get("rows") or doc.get("game_lines"):
+            # Picks count on their own: an NBA preseason sheet carried price plays and nothing else (10-15 / 10-16) and
+            # was never reconciled, so 15 published picks never got a result.
+            if doc.get("rows") or doc.get("game_lines") or doc.get("picks"):
                 sheets.append((path, doc))
         if not sheets:
             print(f"RECONCILE date={day} no sheets", flush=True)
@@ -441,6 +493,7 @@ def main(argv: list[str] | None = None) -> int:
                 continue
             graded = [json.loads(line) for line in out.read_text(encoding="utf-8").splitlines()]
         props, lines, pick_results = graded_index(graded, tap.values)
+        actuals = actuals_index(graded, tap.values)
         now = datetime.now(timezone.utc)
         for path, doc in sheets:
             target = path.with_name(f"{day}.reconciled.json")
@@ -453,7 +506,7 @@ def main(argv: list[str] | None = None) -> int:
             earlier = {**{f"p:{k}|full": v for k, v in (prior.get("void") or {}).items()}, **(prior.get("picks_void") or {})}
             rec = reconcile(doc, merge_results(prior.get("props") or {}, props), merge_results(prior.get("lines") or {}, lines),
                             now=now, reasons={**earlier, **tap.reasons}, scores={**(prior.get("scores") or {}), **tap.scores},
-                            picks=merge_results(prior.get("picks") or {}, pick_results))
+                            picks=merge_results(prior.get("picks") or {}, pick_results), actuals=actuals)
             c = rec["counts"]
             if not prior and not (c["props_graded"] or c["lines_graded"] or c["picks_graded"]):
                 # Nothing final yet: no file, so the page offers no toggle onto a sheet of dashes.
@@ -464,12 +517,54 @@ def main(argv: list[str] | None = None) -> int:
             write_atomic(target, rec)
             write_postmortem(root, path, doc, rec, day)
             print(f"RECONCILE {doc['sport']} date={day} props {c['props_graded']}/{c['props']} (values {c['props_valued']}, "
+                  f"from the actual stat {c['props_from_actual']}, "
                   f"explained voids {len(rec['void'])}, finals {len(rec['scores'])}) "
                   f"lines {c['lines_graded']}/{c['lines']} graded_population={len(graded)}", flush=True)
     write_record(sheets_dir, now=datetime.now(timezone.utc))
     refresh_leg_actuals(root, sheets_dir, today)
     grade_sgp_ledger(root)
     return 0
+
+
+CATCHUP_DAYS = 7
+
+
+def open_featured(sheet: Mapping[str, Any], rec: Mapping[str, Any] | None) -> int:
+    """How many of the bets the sheet FEATURED (the season record's sections, its picks and game-line value) have
+    neither a result nor a stated reason (void / push / not in the box score) in its reconciled file."""
+    from syndicate.features.shared import cheat_sheet_record as csr
+
+    rec = rec or {}
+    rows, lines, picks = sheet.get("rows") or [], sheet.get("game_lines") or [], sheet.get("picks") or []
+    done_props = set(rec.get("props") or {}) | set(rec.get("void") or {})
+    done_picks = set(rec.get("picks") or {}) | set(rec.get("picks_void") or {})
+    secs = cs.sections(rows)
+    keys = {cs.prop_result_key(rows[i]) for k, _ in csr.FEATURED for i in secs.get(k) or []} - done_props
+    line_keys = {cs.line_result_key(lines[i]) for i in (cs.game_line_sections(lines).get("value") if lines else [])}
+    line_keys -= set(rec.get("lines") or {})
+    pick_keys = {cs.pick_result_key(p) for p in picks} - done_picks
+    return len(keys) + len(line_keys) + len(pick_keys)
+
+
+def catchup_days(sheets_dir: Path, today: str, *, days: int = CATCHUP_DAYS) -> list[str]:
+    """Days past the regular window (`DAYS_BACK`) and within `days` whose sheets still hold an open FEATURED bet. A
+    result that lands late -- an NFL usage file, an NCAAF box score -- used to be dropped for good once its day left the
+    2-day window (user 2026-10-19: "make sure reconciliation and tracking is happening for every category by every
+    sport"). Oldest first, like the regular days."""
+    out = []
+    for k in range(days, DAYS_BACK, -1):
+        day = (datetime.fromisoformat(today) - timedelta(days=k)).date().isoformat()
+        for path in sorted(sheets_dir.glob(f"*/{day}.json")):
+            try:
+                sheet = json.loads(path.read_text(encoding="utf-8"))
+                rec_path = path.with_name(f"{day}.reconciled.json")
+                rec = json.loads(rec_path.read_text(encoding="utf-8")) if rec_path.exists() else None
+            except (OSError, ValueError):
+                continue
+            if open_featured(sheet, rec):
+                out.append(day)
+                break
+    return out
 
 
 SGP_ACTUALS_DAYS = 7

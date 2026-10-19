@@ -250,6 +250,7 @@ td.rungs { white-space: normal; }
 .xframe .ptile b { font-size: 26px; } .xframe .ptile span { font-size: 13px; } .xframe .checks li { font-size: 16px; }
 @media (max-width: 760px) { .prop.pick { grid-template-columns: 1fr; } .ptiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .rtab td.lab { font-weight: 600; } .rtab tr.all td { border-top: 2px solid var(--accent); font-weight: 700; }
+.rtab tr.none td { color: var(--muted); } .rtab tr.paper td { font-style: italic; }
 .rtab td.n.gain { color: var(--accent); } .rtab td.n.neg { color: var(--price); }
 .chart svg { width: 100%; height: auto; display: block; } .chart .key { display: flex; gap: 16px; font-size: 12.5px; color: var(--muted); }
 .chart .key i { display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: 3px; }
@@ -1067,12 +1068,21 @@ async function exportSection(btn) {
 const REC = {scope: "official", sport: "all"};
 const pctText = v => v == null ? "–" : v.toFixed(1) + "%";
 const signClass = v => v == null || v === 0 ? "" : v > 0 ? "gain" : "neg";
-function recordTable(R, totals) {
-  const keys = R.sections.filter(sec => totals[sec.key]);
-  if (!keys.length) return `<div class="empty">No graded featured picks here yet.</div>`;
+// EVERY category that applies to the scorecard's sport, with "No bets yet" where none was featured (user 2026-10-19:
+// "make sure ... the overall scorecards and scorecards by sports show all categories"). Same-game parlays are paper:
+// a won-lost count against what our probabilities said, never units, and never in "All featured picks".
+function recordTable(R, totals, sport) {
+  const applies = R.applies;
+  const shown = sec => !!totals[sec.key] || sec.key === "featured"
+    || (applies ? (sport === "all" ? !!applies[sec.key] : (applies[sec.key] || []).includes(sport)) : false);
+  const keys = R.sections.filter(shown);
+  if (!keys.some(sec => totals[sec.key])) return `<div class="empty">No graded featured picks here yet.</div>`;
+  const roi = t => t.roi_pct == null ? "–" : (t.roi_pct > 0 ? "+" : "") + t.roi_pct.toFixed(1) + "%";
   return `<div class="tbl"><table class="every rtab"><thead><tr><th>Section</th><th>Bets</th><th>W-L</th><th>Win %</th><th>Units</th><th>ROI</th></tr></thead><tbody>${
-    keys.map(sec => { const t = totals[sec.key];
-      return `<tr class="${sec.key === "featured" ? "all" : ""}"><td class="lab">${esc(sec.label)}</td><td class="n">${t.n}</td><td class="n">${t.w}-${t.l}</td><td class="n">${pctText(t.win_pct)}</td><td class="n ${signClass(t.units)}">${unitsText(t.units)}</td><td class="n ${signClass(t.roi_pct)}">${t.roi_pct == null ? "–" : (t.roi_pct > 0 ? "+" : "") + t.roi_pct.toFixed(1) + "%"}</td></tr>`; }).join("")}</tbody></table></div>`;
+    keys.map(sec => { const t = totals[sec.key], cls = sec.key === "featured" ? "all" : sec.paper ? "paper" : "";
+      if (!t || !t.n && !t.pending) return `<tr class="${cls} none"><td class="lab">${esc(sec.label)}</td><td class="n">0</td><td class="n" colspan="4">No bets yet</td></tr>`;
+      if (t.paper) return `<tr class="${cls}"><td class="lab">${esc(sec.label)}</td><td class="n">${t.n}</td><td class="n">${t.w}-${t.l}</td><td class="n">${pctText(t.win_pct)}</td><td class="n" colspan="2">${t.n ? `our probabilities said ${t.expected.toFixed(1)}` : "none settled"}${t.pending ? ` · ${t.pending} pending` : ""} · paper, no units</td></tr>`;
+      return `<tr class="${cls}"><td class="lab">${esc(sec.label)}</td><td class="n">${t.n}</td><td class="n">${t.w}-${t.l}</td><td class="n">${pctText(t.win_pct)}</td><td class="n ${signClass(t.units)}">${unitsText(t.units)}</td><td class="n ${signClass(t.roi_pct)}">${roi(t)}</td></tr>`; }).join("")}</tbody></table></div>`;
 }
 function unitsChart(series) {
   if (series.length < 2) return `<div class="empty">The running line needs two graded days; it starts with the next one.</div>`;
@@ -1113,7 +1123,8 @@ function renderRecordPage() {
   document.getElementById("asOf").textContent = lastDay ? `Through ${dayName(lastDay)} · updated ${ctDateTime(R.generated_at)}` : "";
   document.getElementById("viewbar").innerHTML = ["official", "beta"].map(k =>
     `<button type="button" class="btn ${REC.scope === k ? "on" : ""}" data-scope="${k}" aria-pressed="${REC.scope === k}">${k === "official" ? "Official" : "Beta (before " + esc(dayShort(R.official_start)) + ")"}</button>`).join("");
-  const sports = Object.keys(scope.by_sport || {});
+  // Every sport gets a scorecard, a sport with no graded day yet included (its categories read "No bets yet").
+  const sports = [...new Set([...(R.sports || []), ...Object.keys(scope.by_sport || {})])];
   if (REC.sport !== "all" && !sports.includes(REC.sport)) REC.sport = "all";
   document.getElementById("tabs").innerHTML = ["all", ...sports].map(x =>
     `<button class="tab" role="tab" data-rsport="${x}" aria-selected="${REC.sport === x}">${x === "all" ? "All sports" : esc(SPORT_NAMES[x] || x)}</button>`).join("");
@@ -1126,7 +1137,7 @@ function renderRecordPage() {
   }
   const totals = REC.sport === "all" ? scope.totals : (scope.by_sport[REC.sport] || {});
   const label = REC.sport === "all" ? "all sports" : (SPORT_NAMES[REC.sport] || REC.sport);
-  let html = sectionShell("record_totals", "Season record", `Every featured section on the cheat sheets, ${esc(label)}, ${scope.days} graded day${scope.days === 1 ? "" : "s"}. "All featured picks" counts a bet once a day even when two sections featured it. The every-prop list and price shopping hold both sides of a line, so they are not in the record.`, "", recordTable(R, totals));
+  let html = sectionShell("record_totals", "Season record", `Every featured section on the cheat sheets, ${esc(label)}, ${scope.days} graded day${scope.days === 1 ? "" : "s"}. "All featured picks" counts a bet once a day even when two sections featured it. The every-prop list and price shopping hold both sides of a line, so they are not in the record.`, "", recordTable(R, totals, REC.sport));
   if (REC.sport === "all") html += sectionShell("record_chart", "Running units", "Cumulative units, 1 unit a bet at the sheet's best price, day by day.", "", unitsChart(scope.series));
   html += sectionShell("record_days", "Day by day", "Each sheet's featured picks and its value section. Open a day to see every bet with its actual stat.", `${days.length} sheets`, dayTable(R, days));
   html += `<section class="sheet"><div class="note">Graded by Syndicate's settlement from final box scores, the same grading the platform's scorecard uses. A push, a void (did not play) or a bet still pending is not counted. ROI is units per bet. Small samples swing: read the bets column before the win rate.</div></section>`;
