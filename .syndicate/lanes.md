@@ -1102,6 +1102,14 @@ death, never life — do not invert it.
 - RESULT 2026-10-19 (b8b9f831, on origin/main): Hypothesis CONFIRMED. Before: local run died at Level 0 with `AttributeError: ... no attribute '_import_real_smart_sim_module_local'`; fleet `/api/ops/artifacts/stream` returned the nba+wnba `sim_input_report_2026-10-10.json` (generated 07:00:14Z, Level 0 'REAL ENGINE' -- the vendored path, pre-P6) and 404 for 10-11, 10-12, 10-15, 10-17, 10-18, 10-19, while nhl/nfl reports for 10-18 and 10-19 exist (the publish job runs; only basketball fails). After: local run completes, Level 0 'NATIVE ORCHESTRATOR' for wnba+nba, 1 alarm left = the pre-existing `UNFED: wnba team_advanced_stats.games 0.0%` that the 10-09/10-10 production reports also carried. tests/test_basketball_sim_input_checklist_level0.py 8 passed (positive controls: bridge without the orchestrator import, engine imported from nba_betting, call function renamed, wnba_betting in sys.modules, unknown league falling through to NBA -- each alarms).
 - NOT YET VERIFIED IN PRODUCTION: needs the fleet tree to contain b8b9f831 (fleet ff, not done by this lane), then the 07:00Z `sim-input-reports` job to write `{nba,wnba}_source/source_artifacts/data/sim_input_report/sim_input_report_<date>.json`. Close on that reading.
 
+### kalshi-maker-entry-paper — OPEN — opened 2026-10-19 — session 2636b326-71e6-4908-8692-de0d92b6f94d
+- Goal: Pre-registered READ-ONLY paper study: does a resting Kalshi bid on quadratic series yield positive realised edge vs consensus close per sport x market, where taker entry yields none? Findings doc with go/no-go.
+- Files: .syndicate/findings_2026-10-19_kalshi_maker_entry_paper.md (NEW)
+- Hypothesis: Maker fills on quadratic series (fee 0) keep a positive edge vs the consensus close after adverse selection (prior: findings_2026-10-02 says markets move away from fills).
+- Falsification test: Fill model A pooled realised edge (fair_close/b - 1), event-clustered 95% CI upper bound <= 0 => falsified; lower > 0 => H1; else inconclusive. Pre-registration in the findings doc, committed before outcomes.
+- Verification: Findings doc numbers: per-family coverage, fill rate, adverse selection, realised edge per sport x market; log entry in .syndicate/log/2026-10-19.md
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
