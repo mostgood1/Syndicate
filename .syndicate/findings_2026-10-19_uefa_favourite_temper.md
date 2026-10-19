@@ -67,9 +67,20 @@ surprising and would need a forward test before any serving decision.
 A NO-GO here says the domestic (a2) temperature does not make the model useful next to the UEFA close.
 It does not test lineups, rotation or any other information source (lane `soccer-team-strength` (c)).
 
-## 2. CODE
+## 2. CODE AND INPUTS (committed BEFORE the gate was scored)
 
-(filled after the registration commit)
+- Registration `8d6ef805`; code `63ae69e3` (`scripts/backtest_uefa_anchored.py` `--favourite-temper`,
+  `--gap-k`, `--home-term`, `--print-home-term`; `tests/test_uefa_favourite_temper.py`, 6 hermetic tests
+  incl. a reachability test, off != on). 11 passed with `tests/test_uefa_market_anchor.py`.
+- Fresh dump (`backtest_uefa_vs_close.py run --dump-features`, Idle priority): 2,474 rows,
+  **byte-identical** to the 2026-10-19 anchored-lane dump, and it reproduces step 3's top decile
+  (model 0.778 / close 0.821 / actual 0.854).
+- **Registered H = 0.27609310702396533** (`--print-home-term`: mean log(λ_h/λ_a) over the 923 joined
+  matches of seasons 2020-2022). Domestic η for comparison is ~0.25-0.3 log-goal units, so the
+  centring is plausible.
+- Gate command: `backtest_uefa_anchored.py --closes C:/tmp/uefa-closes --skip-live --favourite-temper
+  -0.066,0.271 --gap-k 1.577 --home-term 0.27609310702396533`, Idle priority. `--skip-live`: the
+  live-refit arm is not part of this registration.
 
 ## 3. RESULT
 
