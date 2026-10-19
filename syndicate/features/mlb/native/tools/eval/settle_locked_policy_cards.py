@@ -144,7 +144,7 @@ def _load_feed(date: str, game_pk: int, *, allow_fetch: bool = True) -> Dict[str
         loaded = _read_feed_file(path)
         if not isinstance(loaded, dict):
             continue
-        if _feed_is_final(loaded):
+        if _feed_is_final(loaded) and not _off_slate_date(loaded, date):  # EDIT: never the makeup game's final
             if path != primary_path:
                 try:
                     primary_path.parent.mkdir(parents=True, exist_ok=True)
@@ -163,7 +163,7 @@ def _load_feed(date: str, game_pk: int, *, allow_fetch: bool = True) -> Dict[str
 
     client = StatsApiClient.with_default_cache(ttl_seconds=15 * 60)
     fetched = fetch_game_feed_live(client, int(game_pk))
-    if isinstance(fetched, dict) and fetched:
+    if isinstance(fetched, dict) and fetched and not _off_slate_date(fetched, date):  # EDIT: never cache it here
         try:
             primary_path.parent.mkdir(parents=True, exist_ok=True)
             with gzip.open(primary_path, "wt", encoding="utf-8") as fh:
@@ -174,6 +174,12 @@ def _load_feed(date: str, game_pk: int, *, allow_fetch: bool = True) -> Dict[str
     if isinstance(stale_feed, dict) and stale_feed:
         return stale_feed
     raise FileNotFoundError(str(primary_path))
+
+
+def _off_slate_date(feed: Dict[str, Any], date: str) -> bool:  # EDIT: helper for the three guards above
+    from syndicate.features.mlb.game_status import rescheduled_off
+
+    return rescheduled_off(feed, date)
 
 
 def _team_side(feed: Dict[str, Any], team_abbr: str) -> Optional[str]:
@@ -219,6 +225,10 @@ def _is_final_game_status(status_text: Any) -> bool:
 
 
 def _feed_is_final(feed: Dict[str, Any]) -> bool:
+    from syndicate.features.mlb.game_status import not_played_reason  # EDIT: postponed is filed under "Final"
+
+    if not_played_reason(feed):  # EDIT: a game not played is never final
+        return False
     status = (feed.get("gameData") or {}).get("status") or {}
     return _is_final_game_status(status.get("abstractGameState")) or _is_final_game_status(status.get("detailedState"))
 
@@ -405,6 +415,8 @@ def _settle_card(path: Path) -> Dict[str, Any]:
                         feed = feed_cache.setdefault(game_pk, _load_feed(date, game_pk))
                         if not _feed_is_final(feed):
                             raise LookupError("game not final")
+                        if _off_slate_date(feed, date):  # EDIT: a rescheduled gamePk's feed is the makeup game
+                            raise LookupError("game rescheduled off slate date")
                         actual_value: Any
                         won: Optional[bool]
                         if market == "totals":

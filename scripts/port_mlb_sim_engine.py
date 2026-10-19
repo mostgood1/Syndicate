@@ -92,6 +92,38 @@ TOOLS_EDITS: dict[str, list[tuple[str, str]]] = {
         ('"daily_update_tool": _rel(daily_update_py),',
          '"daily_update_tool": _rel(_ROOT / "tools" / "daily_update.py"),  # EDIT: the label production records'),
     ],
+    # BEHAVIOUR, not plumbing (lane mlb-postponed-grading, user decision 2026-10-19). StatsAPI files a postponed /
+    # cancelled / suspended game under abstractGameState "Final" with a 0-0 linescore, and once a game is rescheduled
+    # the SAME gamePk's feed/live describes the makeup game (gamePk 849817: slate 2026-10-16, played 2026-10-18).
+    # Unguarded, a settle while the feed says Postponed grades it 0-0 (unders win, ML "tie" loses, props read 0), and
+    # a settle after the makeup game grades the slate's picks on the makeup game AND caches that feed under the
+    # slate's date, where graded_outcomes' score rows read it. syndicate/features/mlb/game_status.py is the mapping.
+    "tools/eval/settle_locked_policy_cards.py": [
+        ("def _feed_is_final(feed: Dict[str, Any]) -> bool:\n"
+         "    status = (feed.get(\"gameData\") or {}).get(\"status\") or {}\n",
+         "def _feed_is_final(feed: Dict[str, Any]) -> bool:\n"
+         "    from syndicate.features.mlb.game_status import not_played_reason  # EDIT: postponed is filed under \"Final\"\n"
+         "\n"
+         "    if not_played_reason(feed):  # EDIT: a game not played is never final\n"
+         "        return False\n"
+         "    status = (feed.get(\"gameData\") or {}).get(\"status\") or {}\n"),
+        ("        if _feed_is_final(loaded):\n",
+         "        if _feed_is_final(loaded) and not _off_slate_date(loaded, date):  # EDIT: never the makeup game's final\n"),
+        ("    if isinstance(fetched, dict) and fetched:\n",
+         "    if isinstance(fetched, dict) and fetched and not _off_slate_date(fetched, date):  # EDIT: never cache it here\n"),
+        ("                            raise LookupError(\"game not final\")\n",
+         "                            raise LookupError(\"game not final\")\n"
+         "                        if _off_slate_date(feed, date):  # EDIT: a rescheduled gamePk's feed is the makeup game\n"
+         "                            raise LookupError(\"game rescheduled off slate date\")\n"),
+        ("def _team_side(feed: Dict[str, Any], team_abbr: str) -> Optional[str]:\n",
+         "def _off_slate_date(feed: Dict[str, Any], date: str) -> bool:  # EDIT: helper for the three guards above\n"
+         "    from syndicate.features.mlb.game_status import rescheduled_off\n"
+         "\n"
+         "    return rescheduled_off(feed, date)\n"
+         "\n"
+         "\n"
+         "def _team_side(feed: Dict[str, Any], team_abbr: str) -> Optional[str]:\n"),
+    ],
 }
 
 _IMPORT_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<kw>from|import)[ \t]+(?P<mod>(?:sim_engine|tools)(?:\.[A-Za-z0-9_]+)*)\b",

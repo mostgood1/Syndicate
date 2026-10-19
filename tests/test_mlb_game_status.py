@@ -36,6 +36,7 @@ def _postponed_feed() -> dict:
     return {
         "gamePk": 849817,
         "gameData": {
+            "game": copy.deepcopy(final["gameData"]["game"]),
             "status": copy.deepcopy(schedule_game["status"]),
             # At the postponement the game was still filed under its slate date.
             "datetime": {"dateTime": schedule_game["gameDate"], "officialDate": SLATE},
@@ -185,3 +186,113 @@ def test_a_real_final_still_buckets_final():
     row = {"status": {"abstract": "Final", "detailed": "Final"}}
     assert live_lens._status_bucket_from_row(row) == "final"
     assert live_lens._structured_status(row, fallback_date=SLATE)["abstract"] == "Final"
+
+
+# --- card settler (generated native/tools/eval/settle_locked_policy_cards.py) ---------
+
+from syndicate.features.mlb.native.tools.eval import settle_locked_policy_cards as slp  # noqa: E402
+
+
+def _card(tmp_path: Path, date: str) -> Path:
+    card = {
+        "date": date,
+        "markets": {
+            "totals": {
+                "recommendations": [
+                    {"market": "totals", "game_pk": 849817, "selection": "under", "market_line": 7.5,
+                     "stake_u": 1.0, "odds": -110},
+                ]
+            },
+            "ml": {
+                "recommendations": [
+                    {"market": "ml", "game_pk": 849817, "selection": "away", "market_line": 0.0,
+                     "stake_u": 1.0, "odds": 120},
+                ]
+            },
+        },
+    }
+    path = tmp_path / f"daily_summary_{date.replace('-', '_')}_locked_policy.json"
+    path.write_text(json.dumps(card), encoding="utf-8")
+    return path
+
+
+def _settle_with(monkeypatch, tmp_path, date, feed):
+    monkeypatch.setattr(slp, "_load_feed", lambda d, pk, **kw: copy.deepcopy(feed))
+    return slp._settle_card(_card(tmp_path, date))
+
+
+def _reasons(out) -> list[str]:
+    return [row.get("reason") for row in out.get("unresolved_recommendations") or []]
+
+
+def test_card_settler_refuses_a_postponed_game_instead_of_grading_0_0(monkeypatch, tmp_path):
+    assert slp._feed_is_final(_postponed_feed()) is False
+    out = _settle_with(monkeypatch, tmp_path, SLATE, _postponed_feed())
+    assert out["settled_n"] == 0
+    assert _reasons(out) == ["game not final", "game not final"]
+
+
+def test_card_settler_never_grades_the_slate_on_the_makeup_game(monkeypatch, tmp_path):
+    out = _settle_with(monkeypatch, tmp_path, SLATE, _rescheduled_final_feed())
+    assert out["settled_n"] == 0
+    assert _reasons(out) == ["game rescheduled off slate date"] * 2
+
+
+def test_card_settler_reachability_grades_on_the_day_it_was_played(monkeypatch, tmp_path):
+    """off != on: the same card dated the makeup day settles (TB 3, CLE 1)."""
+    out = _settle_with(monkeypatch, tmp_path, "2026-10-18", _rescheduled_final_feed())
+    assert out["settled_n"] == 2
+    results = sorted((row["market"], row["result"]) for row in out["_settled_rows"])
+    assert results == [("ml", "win"), ("totals", "win")]
+
+
+def test_load_feed_never_caches_the_makeup_game_under_the_slate_date(monkeypatch, tmp_path):
+    stale = tmp_path / "feed_live" / SLATE / "849817.json.gz"
+    monkeypatch.setattr(slp, "_feed_live_path", lambda date, pk: tmp_path / "feed_live" / date / f"{pk}.json.gz")
+    monkeypatch.setattr(slp, "TRACKED_DATA_ROOT", tmp_path / "tracked")
+    import syndicate.features.mlb.sim_engine.data.statsapi as statsapi
+
+    monkeypatch.setattr(statsapi.StatsApiClient, "with_default_cache", classmethod(lambda cls, **kw: object()))
+    monkeypatch.setattr(statsapi, "fetch_game_feed_live", lambda client, pk: _rescheduled_final_feed())
+    with pytest.raises(FileNotFoundError):
+        slp._load_feed(SLATE, 849817)
+    assert not stale.exists()
+    # Reachability: the makeup day's own path IS written.
+    assert slp._load_feed("2026-10-18", 849817)["gameData"]["status"]["detailedState"] == "Final"
+    assert (tmp_path / "feed_live" / "2026-10-18" / "849817.json.gz").exists()
+
+
+# --- evaluation-ledger grader (shared/graded_outcomes.py) -------------------------------
+
+from syndicate.features.shared import graded_outcomes as go  # noqa: E402
+
+
+@pytest.fixture
+def ledger_slate(monkeypatch):
+    feeds: dict[str, dict] = {}
+    monkeypatch.setattr(go, "_mlb_slate_game_pks", lambda date: {849817})
+    monkeypatch.setattr(go, "_load_cached_mlb_feed", lambda date, pk: copy.deepcopy(feeds.get(date)))
+    monkeypatch.setattr(
+        go,
+        "_mlb_card_graded_rows_for_date",
+        lambda date: [{"game_pk": 849817, "market": "totals", "result": "win", "date": date}],
+    )
+    return feeds
+
+
+@pytest.mark.parametrize("feed_fn", [_postponed_feed, _rescheduled_final_feed], ids=["postponed", "makeup-game"])
+def test_ledger_grader_emits_nothing_for_a_game_not_played_on_the_slate_date(ledger_slate, feed_fn):
+    ledger_slate[SLATE] = feed_fn()
+    rows = go._mlb_graded_rows_for_date(SLATE)
+    assert rows == []  # no score rows, no box row, and the card's invented row is dropped
+    diag = go.score_row_diagnostics("mlb", SLATE)
+    assert diag["games_not_played_on_date"] == 1
+    assert diag["games_graded"] == 0
+
+
+def test_ledger_grader_reachability_grades_the_makeup_day(ledger_slate):
+    ledger_slate["2026-10-18"] = _rescheduled_final_feed()
+    rows = go._mlb_graded_rows_for_date("2026-10-18")
+    assert any(go.is_score_row(row) for row in rows)
+    assert any(row.get("market") == "totals" and row.get("result") == "win" for row in rows)
+    assert go.score_row_diagnostics("mlb", "2026-10-18")["games_not_played_on_date"] == 0

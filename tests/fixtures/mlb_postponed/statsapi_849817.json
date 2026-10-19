@@ -37,6 +37,13 @@
  "feed_live_after_reschedule_final": {
   "gamePk": 849817,
   "gameData": {
+   "game": {
+    "pk": 849817,
+    "type": "L",
+    "doubleHeader": "N",
+    "gameNumber": 1,
+    "season": "2026"
+   },
    "status": {
     "abstractGameState": "Final",
     "codedGameState": "F",

@@ -84,7 +84,14 @@ def _mlb_graded_rows_for_date(date_str: str) -> list[dict[str, Any]]:
     """
     rows = _mlb_card_graded_rows_for_date(date_str)
     card_game_pks = {row.get("game_pk") for row in rows if row.get("game_pk") is not None}
-    rows.extend(_mlb_final_score_rows_for_date(date_str, extra_game_pks=card_game_pks))
+    refused: set[int] = set()
+    score_rows = _mlb_final_score_rows_for_date(date_str, extra_game_pks=card_game_pks, refused=refused)
+    if refused:
+        # A card row on a game the slate's own feed says was NOT PLAYED on this
+        # date (postponed, or the gamePk now belongs to the makeup game) is a
+        # result invented by the card settler; drop it rather than settle on it.
+        rows = [row for row in rows if _int_or_none(row.get("game_pk")) not in refused]
+    rows.extend(score_rows)
     return rows
 
 
@@ -462,7 +469,9 @@ def _load_cached_mlb_feed(date_str: str, game_pk: int) -> Mapping[str, Any] | No
     return feed if isinstance(feed, Mapping) and feed else None
 
 
-def _mlb_final_score_rows_for_date(date_str: str, *, extra_game_pks: Any = ()) -> list[dict[str, Any]]:
+def _mlb_final_score_rows_for_date(
+    date_str: str, *, extra_game_pks: Any = (), refused: set[int] | None = None
+) -> list[dict[str, Any]]:
     """Score rows for every completed game on the slate.
 
     A game with no cached feed emits nothing -- its records stay pending -- and
@@ -470,6 +479,8 @@ def _mlb_final_score_rows_for_date(date_str: str, *, extra_game_pks: Any = ()) -
     as "not final". One feed is parsed at a time and dropped once its scalars
     are taken, so the peak is one payload (~0.8 MB of JSON), not the slate.
     """
+    from syndicate.features.mlb.game_status import grading_refusal
+
     game_pks = _mlb_slate_game_pks(date_str)
     for value in extra_game_pks or ():
         pk = _int_or_none(value)
@@ -477,6 +488,7 @@ def _mlb_final_score_rows_for_date(date_str: str, *, extra_game_pks: Any = ()) -
             game_pks.add(pk)
     rows: list[dict[str, Any]] = []
     feeds_missing: list[int] = []
+    games_refused: list[int] = []
     games_not_complete = 0
     games_graded = 0
     player_box_rows = 0
@@ -485,6 +497,16 @@ def _mlb_final_score_rows_for_date(date_str: str, *, extra_game_pks: Any = ()) -
         feed = _load_cached_mlb_feed(date_str, game_pk)
         if feed is None:
             feeds_missing.append(game_pk)
+            continue
+        # NOT PLAYED ON THIS DATE: postponed (filed under "Final", 0-0), or a
+        # rescheduled gamePk whose feed/live is now the makeup game (849817:
+        # slate 2026-10-16, played 2026-10-18). Neither may grade this slate.
+        refusal = grading_refusal(feed, date_str)
+        if refusal:
+            del feed
+            games_refused.append(game_pk)
+            if refused is not None:
+                refused.add(game_pk)
             continue
         game_rows = mlb_score_rows_from_feed(feed)
         # The SAME parsed feed: props cost no extra read.
@@ -508,6 +530,8 @@ def _mlb_final_score_rows_for_date(date_str: str, *, extra_game_pks: Any = ()) -
             "games_not_complete": games_not_complete,
             "feeds_not_cached": len(feeds_missing),
             "feeds_not_cached_sample": feeds_missing[:10],
+            "games_not_played_on_date": len(games_refused),
+            "games_not_played_on_date_sample": games_refused[:10],
             "score_rows": len(rows) - player_box_rows,
             "player_box_rows": player_box_rows,
             "players_boxed": players_boxed,
