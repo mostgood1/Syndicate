@@ -1315,6 +1315,9 @@ _ANCHOR_DEVIG_METHOD = "power"
 #: a fair that is ONE book's opinion can never be read as a market median.
 FAIR_METHOD_SHARP_ANCHOR = "sharp_anchor"
 FAIR_METHOD_EXCHANGE_MID = "exchange_mid"
+# `fair_unresolved_reason` values -- see `_FairResolution.unresolved_reason`.
+FAIR_UNRESOLVED_DEVIG_REFUSED = "two_sided_devig_refused"
+FAIR_UNRESOLVED_NO_TWO_SIDED = "no_two_sided_book"
 
 
 def _fair_anchor_mode() -> str:
@@ -1401,6 +1404,22 @@ class _FairResolution:
     #: market). None when no candidate pair was fresh or de-viggable, when the
     #: row has no consensus, and under `median`.
     anchor_median_gap_pp: float | None = None
+    #: WHY THERE IS NO FAIR, set only when `fair_by_side` is empty. Without it,
+    #: a row that could not be evaluated looks the same as one that never was:
+    #: `method` None, `anchor_refusal` None, `anchor_refusals` empty. The
+    #: anchor-refusal fields record a TIER that refused; here no tier had
+    #: anything two-sided to work with. Lane `fair-price-v2`, from peer lane
+    #: `ncaaf-skipped-no-fair`. Measured 2026-10-19 21:53Z on the served board:
+    #: 73 NCAAF `spreads|full` rows were quoted by Polymarket alone, at the same
+    #: deep-negative price on both sides (-9900 / -9900, implied sum median 1.96).
+    #: The de-vig band (0.80-1.60) correctly refused them. They were then ranked
+    #: carrying up to +/-33 points of `model_edge_pct`, with nothing on the row
+    #: saying why there was no fair. Values:
+    #: `two_sided_devig_refused`: books quote every side, and the de-vig refused
+    #: every one of those pairs (implied total outside the band, or an
+    #: unpriceable leg). `no_two_sided_book`: no book quotes every side, and no
+    #: margin-model fair either.
+    unresolved_reason: str | None = None
 
 
 @dataclass(frozen=True)
@@ -1767,8 +1786,14 @@ def _resolve_fair(row: Mapping[str, Any], sides: list[str]) -> _FairResolution:
         probability = _as_float((modelled.get(side) or {}).get("fair_probability"))
         if probability is not None:
             out[side] = probability
+    unresolved = None
+    if not out:
+        unresolved = (
+            FAIR_UNRESOLVED_DEVIG_REFUSED if _two_sided_prices_by_book(cells, sides) else FAIR_UNRESOLVED_NO_TWO_SIDED
+        )
     return _FairResolution(
-        out, "book_margin_model" if out else None, None, None, consensus, anchor_refusals=refusals
+        out, "book_margin_model" if out else None, None, None, consensus, anchor_refusals=refusals,
+        unresolved_reason=unresolved,
     )
 
 
@@ -3143,6 +3168,10 @@ def build_layer2_rows(
                     list(fair_resolution.anchor_refusals) if fair_resolution.anchor_refusals is not None else None
                 ),
                 "fair_anchor_median_gap_pp": fair_resolution.anchor_median_gap_pp,
+                # Why there is no fair, on a row that has none (see
+                # `_FairResolution.unresolved_reason`): an unevaluable row must
+                # not read like an unevaluated one.
+                "fair_unresolved_reason": fair_resolution.unresolved_reason if fair is None else None,
                 # `#382`. The margin model measures each book's hold on the GRID
                 # (which still holds every leg) and stamps it at
                 # `modelled_fair[side].assumed_hold_pct`. This fan-out copies a
