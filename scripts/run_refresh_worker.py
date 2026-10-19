@@ -3021,7 +3021,7 @@ def _run_mlb_betting_day_backfill_tick() -> dict[str, Any] | None:
     scratch_out = scratch_dir / f"mlb_betting_day_backfill_manifest_{target_date}.json"
     scratch_recap = scratch_dir / f"mlb_betting_day_backfill_recap_{target_date}.md"
 
-    # The NATIVE copy of the vendored script (lane mlb-daily-sim-native-p3, scripts/port_mlb_sim_engine.py).
+    # Syndicate's copy of the vendored script (lane mlb-daily-sim-native-p3; syndicate/features/mlb/FROZEN_FROM_VENDOR.md).
     script_path = REPO_ROOT / "syndicate" / "features" / "mlb" / "native" / "tools" / "eval" / "build_season_betting_cards_manifest.py"
     command = [
         sys.executable,

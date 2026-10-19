@@ -214,7 +214,7 @@ class MlbRefreshRunnerTests(unittest.TestCase):
 
     def test_reconcile_module_resolves_daily_sims_directory(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
-        module_path = repo_root / "vendor" / "mlb_bettingv2" / "tools" / "eval" / "reconcile_daily_sim_artifacts.py"
+        module_path = repo_root / "syndicate" / "features" / "mlb" / "native" / "tools" / "eval" / "reconcile_daily_sim_artifacts.py"  # the native copy (lane mlb-vendor-deletion-prep)
         spec = importlib.util.spec_from_file_location("test_mlb_reconcile_daily_sim_artifacts", module_path)
         assert spec is not None and spec.loader is not None
         module = importlib.util.module_from_spec(spec)
@@ -238,7 +238,7 @@ class MlbRefreshRunnerTests(unittest.TestCase):
 
     def test_reconcile_module_missing_sim_dir_writes_empty_report(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
-        module_path = repo_root / "vendor" / "mlb_bettingv2" / "tools" / "eval" / "reconcile_daily_sim_artifacts.py"
+        module_path = repo_root / "syndicate" / "features" / "mlb" / "native" / "tools" / "eval" / "reconcile_daily_sim_artifacts.py"  # the native copy (lane mlb-vendor-deletion-prep)
         spec = importlib.util.spec_from_file_location("test_mlb_reconcile_daily_sim_artifacts_missing_dir", module_path)
         assert spec is not None and spec.loader is not None
         module = importlib.util.module_from_spec(spec)
@@ -347,51 +347,6 @@ class MlbRefreshRunnerTests(unittest.TestCase):
             self.assertEqual(payload["latestReport"]["generatedAt"], "2026-06-01T21:00:00-05:00")
             self.assertEqual(payload["latestReport"]["dataRoot"], expected_data_root)
             self.assertEqual(payload["latestReport"]["liveLensDir"], expected_live_lens_dir)
-        finally:
-            sys.modules.pop(spec.name, None)
-
-    def test_api_live_lens_overrides_stale_report_metadata_on_read_path(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
-        # VENDORED-ONLY (lane mlb-web-tests-native): this test drives the vendored Flask app's /api/live-lens ROUTE,
-        # which production never serves (Syndicate's blueprints serve /mlb/...); the live-lens slice carries the
-        # functions, not the routes. Retire it with the vendored tree.
-        module_path = repo_root / "vendor" / "mlb_bettingv2" / "tools" / "web" / "flask_frontend.py"
-        spec = importlib.util.spec_from_file_location("test_mlb_flask_frontend_api_live_lens", module_path)
-        assert spec is not None and spec.loader is not None
-        module = importlib.util.module_from_spec(spec)
-        sys.modules[spec.name] = module
-
-        try:
-            with tempfile.TemporaryDirectory() as tmp_dir, patch.dict(os.environ, {}, clear=True):
-                spec.loader.exec_module(module)
-                runtime_root = Path(tmp_dir) / "source" / "data"
-                runtime_live_lens_dir = runtime_root / "live_lens"
-                runtime_root.mkdir(parents=True, exist_ok=True)
-                runtime_live_lens_dir.mkdir(parents=True, exist_ok=True)
-                report_path = runtime_live_lens_dir / "live_lens_report_2026_06_01.json"
-                report_path.write_text("{}\n", encoding="utf-8")
-                module._DATA_DIR = runtime_root
-                module._LIVE_LENS_DIR = runtime_live_lens_dir
-                module._is_live_lens_loop_enabled = lambda: False
-                module._local_timestamp_text = lambda: "2026-06-01T21:00:00-05:00"
-                module._live_lens_report_path = lambda d: report_path
-                module._load_json_file = lambda path: {
-                    "generatedAt": "1999-01-01T00:00:00-05:00",
-                    "dataRoot": "C:/stale/data",
-                    "liveLensDir": "C:/stale/data/live_lens",
-                    "counts": {"games": 1, "live": 1, "final": 0, "pregame": 0, "props": 0, "archivedLiveProps": 0},
-                }
-
-                with module.app.test_client() as client:
-                    response = client.get("/api/live-lens?date=2026-06-01")
-
-                self.assertEqual(response.status_code, 200)
-                payload = response.get_json()
-
-            self.assertIsInstance(payload, dict)
-            self.assertEqual(payload["generatedAt"], "2026-06-01T21:00:00-05:00")
-            self.assertEqual(payload["dataRoot"], module._relative_path_str(runtime_root))
-            self.assertEqual(payload["liveLensDir"], module._relative_path_str(runtime_live_lens_dir))
         finally:
             sys.modules.pop(spec.name, None)
 
@@ -650,65 +605,6 @@ class MlbRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(captured["status"].get("detailed"), "In Progress")
         self.assertEqual(captured["date_str"], "2026-06-03")
         self.assertEqual((payload.get("counts") or {}).get("games"), 1)
-
-    def test_api_live_lens_persist_bypasses_cache_and_rewrites_report(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
-        # VENDORED-ONLY (lane mlb-web-tests-native): this test drives the vendored Flask app's /api/live-lens ROUTE,
-        # which production never serves (Syndicate's blueprints serve /mlb/...); the live-lens slice carries the
-        # functions, not the routes. Retire it with the vendored tree.
-        module_path = repo_root / "vendor" / "mlb_bettingv2" / "tools" / "web" / "flask_frontend.py"
-        spec = importlib.util.spec_from_file_location("test_mlb_flask_frontend_api_live_lens_persist", module_path)
-        assert spec is not None and spec.loader is not None
-        module = importlib.util.module_from_spec(spec)
-        sys.modules[spec.name] = module
-
-        try:
-            with tempfile.TemporaryDirectory() as tmp_dir, patch.dict(os.environ, {}, clear=True):
-                spec.loader.exec_module(module)
-                runtime_root = Path(tmp_dir) / "source" / "data"
-                runtime_live_lens_dir = runtime_root / "live_lens"
-                runtime_live_lens_dir.mkdir(parents=True, exist_ok=True)
-                report_path = runtime_live_lens_dir / "live_lens_report_2026_06_01.json"
-                counter = {"value": 0}
-
-                def fake_live_lens_payload(date_str: str, *, persist: bool = False, refresh_markets: bool = False):
-                    counter["value"] += 1
-                    payload = {
-                        "date": date_str,
-                        "generatedAt": f"2026-06-01T21:00:0{counter['value']}-05:00",
-                        "dataRoot": module._relative_path_str(runtime_root),
-                        "liveLensDir": module._relative_path_str(runtime_live_lens_dir),
-                        "counts": {"games": 1, "live": 1, "final": 0, "pregame": 0, "props": 0, "archivedLiveProps": 0},
-                        "performance": {"marketsRefreshed": bool(refresh_markets), "persistMs": 0.0},
-                        "games": [],
-                    }
-                    report_path.write_text(json.dumps(payload), encoding="utf-8")
-                    return payload
-
-                module._DATA_DIR = runtime_root
-                module._LIVE_LENS_DIR = runtime_live_lens_dir
-                module._is_live_lens_loop_enabled = lambda: False
-                module._is_historical_date = lambda d: False
-                module._live_lens_report_path = lambda d: report_path
-                module._payload_cache_get_or_build = lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("cache should be bypassed for persist=on"))
-                module._live_lens_payload = fake_live_lens_payload
-
-                with module.app.test_client() as client:
-                    first_response = client.get("/api/live-lens?date=2026-06-01&persist=on")
-                    second_response = client.get("/api/live-lens?date=2026-06-01&persist=on")
-
-                first_payload = first_response.get_json()
-                second_payload = second_response.get_json()
-                report_payload = json.loads(report_path.read_text(encoding="utf-8"))
-
-            self.assertEqual(first_response.status_code, 200)
-            self.assertEqual(second_response.status_code, 200)
-            self.assertEqual(counter["value"], 2)
-            self.assertEqual(first_payload["generatedAt"], "2026-06-01T21:00:01-05:00")
-            self.assertEqual(second_payload["generatedAt"], "2026-06-01T21:00:02-05:00")
-            self.assertEqual(report_payload["generatedAt"], "2026-06-01T21:00:02-05:00")
-        finally:
-            sys.modules.pop(spec.name, None)
 
     def test_live_lens_payload_normalizes_in_progress_status_as_live(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
@@ -1687,48 +1583,6 @@ class MlbRefreshRunnerTests(unittest.TestCase):
 
             self.assertEqual(rc, 0)
             self.assertTrue((artifact_root / "data" / "daily" / "snapshots" / date_str / f"oddsapi_game_lines_{date_slug}.json").exists())
-
-    def test_render_live_lens_refresh_requests_live_lens_and_cache_only(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
-        # VENDORED-ONLY (lane mlb-web-tests-native): a vendored Render-era script nothing in Syndicate runs (no native
-        # copy, no launcher). Retire it with the vendored tree.
-        script_path = repo_root / "vendor" / "mlb_bettingv2" / "tools" / "render_live_lens_refresh.py"
-        spec = importlib.util.spec_from_file_location("test_render_live_lens_refresh", script_path)
-        assert spec is not None and spec.loader is not None
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-
-        calls: list[dict[str, object]] = []
-
-        def _fake_request(session, method, url, *, token, timeout, params=None):
-            calls.append(
-                {
-                    "method": method,
-                    "url": url,
-                    "token": token,
-                    "timeout": timeout,
-                    "params": dict(params or {}),
-                }
-            )
-            return {"ok": True, "url": url}
-
-        with patch.dict(
-            module.os.environ,
-            {
-                "MLB_CRON_TOKEN": "token",
-                "MLB_WEB_INTERNAL_BASE_URL": "http://example.test",
-                "MLB_LIVE_LENS_MARKET_REFRESH_INTERVAL_MINUTES": "999",
-            },
-            clear=False,
-        ), patch.object(module, "_request", side_effect=_fake_request):
-            rc = module.main()
-
-        self.assertEqual(rc, 0)
-        self.assertEqual([call["url"] for call in calls], [
-            "http://example.test/api/cron/live-lens-tick",
-            "http://example.test/api/cron/warm-cards-cache",
-        ])
-        self.assertEqual(calls[0]["params"], {"refreshMarkets": "off"})
 
     def test_enrich_slim_live_lens_payload_backfills_trackedprops_for_live_games_only(self) -> None:
         # 2026-08-01 board audit: the slim payload this module persists to

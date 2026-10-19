@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from vendor.mlb_bettingv2.tools.oddsapi import fetch_daily_oddsapi_markets as odds_module
+from syndicate.features.mlb.native.tools.oddsapi import fetch_daily_oddsapi_markets as odds_module  # the native copy (lane mlb-vendor-deletion-prep)
 
 
 def _game_row(event_id: str, away: str, home: str) -> dict:

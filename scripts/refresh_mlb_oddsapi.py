@@ -223,8 +223,8 @@ def _fetch_live_lens_reports_payload(*, base_url: str, token: str, date_str: str
 
 
 def _build_local_live_lens_reports_payload(*, source_root: Path, date_str: str) -> dict[str, object]:
-    # Syndicate's generated port of the vendored app's live-lens slice (lane mlb-live-lens-native-p1; parity:
-    # scripts/mlb_live_lens_parity.py). Still loaded FRESH by path under the env below, as the vendored app was: its
+    # Syndicate's live-lens app slice (lane mlb-live-lens-native-p1; frozen and maintained here, see
+    # syndicate/features/mlb/FROZEN_FROM_VENDOR.md). Still loaded FRESH by path under the env below, as the vendored app was: its
     # data-dir constants are resolved at import, from MLB_BETTING_DATA_ROOT / MLB_LIVE_LENS_DIR.
     module_path = (REPO_ROOT / "syndicate" / "features" / "mlb" / "live_lens_port" / "app_slice.py").resolve()
     if not module_path.exists() or not module_path.is_file():

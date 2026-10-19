@@ -57,8 +57,8 @@ def main() -> int:
     try:
         import pybaseball as pb
     except Exception as exc:
-        print(f"pybaseball unavailable ({type(exc).__name__}). Run under the x64 venv:")
-        print(r"  vendor\mlb_bettingv2\.venv_x64\Scripts\python.exe " + __file__)
+        print(f"pybaseball unavailable ({type(exc).__name__}). Run under a Python environment with pybaseball installed")
+        print("  (`pip install pybaseball`; it is not in requirements.txt):  python " + __file__)
         return 1
 
     df = pb.statcast_batter_exitvelo_barrels(args.season, minBBE=args.min_bbe)

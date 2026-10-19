@@ -11,15 +11,19 @@
 
 ## 1. The pipeline, file:line at each hop
 
+Line numbers re-derived 2026-10-19 against the NATIVE files the production sim runs (lane mlb-vendor-deletion-prep):
+`syndicate/features/mlb/native/tools/` and `syndicate/features/mlb/sim_engine/`, frozen from vendor/mlb_bettingv2 at
+988fa33d. Every citation in the previous version had drifted from the vendored file it named.
+
 ```
 live_refresh_loop._run_mlb_sim_tick
   -> scripts/run_mlb_daily_sim_job.py                    (detached subprocess)
-    -> vendor/mlb_bettingv2/tools/daily_update.py            (:236)
+    -> syndicate/features/mlb/native/tools/daily_update.py   (main :5239)
       -> sim_engine/data/build_roster.py
-           statcast_cache created at daily_update.py:5859
+           statcast_cache created at daily_update.py:6164
            when --statcast-starter-splits != "off"   (DEFAULT "starter")
-        -> _apply_cached_statcast_pitch_splits            (build_roster.py:75)
-             starter :2141   AND bullpen_all :2154
+        -> _apply_cached_statcast_pitch_splits            (build_roster.py:79)
+             starter :2223   AND bullpen_all :2246
           -> fetch_pitcher_pitch_splits    artifact-first, DiskCache fallback
         -> apply_batted_ball_to_batter     (gated SYNDICATE_MLB_BATTED_BALL_WEIGHT)
       -> sim_engine/simulate.py            simulate_game
@@ -111,7 +115,7 @@ a cache clear, or a build.
 | pitch-type splits | `tools/statcast/fetch_pitcher_pitch_splits_x64.py` -> artifact | **`build_roster.py`** :2141/:2154 | `--statcast-starter-splits` (default `starter`) |
 | batted-ball (batter) | `scripts/build_mlb_batted_ball_artifact.py` | **`build_roster.py`** batter loop | `SYNDICATE_MLB_BATTED_BALL_WEIGHT` (default 0.0) |
 | batted-ball (pitcher) | same artifact, `pitchers` block | **`build_roster.py`** starter + bullpen | unconditional |
-| **BVP `vs_pitcher_*`** | **computed from `data/raw/statcast/pitches/<season>/`** | **`daily_update.py:7564`** — **NOT `build_roster`** | `--bvp-hr` (default `on`) |
+| **BVP `vs_pitcher_*`** | **computed from `data/raw/statcast/pitches/<season>/`** | **`daily_update.py:7878`** — **NOT `build_roster`** | `--bvp-hr` (default `on`) |
 | position substitution | hazard table in `simulate.py` | `simulate.py` half-inning hook | `GameConfig.position_substitutions` (default False) |
 
 **The BVP row is the trap.** `build_roster.py` contains no BVP reference at all,
@@ -129,7 +133,7 @@ Four claims, each wrong, each from a different shortcut:
 3. *"BVP is cheap, just invalidate the cache"* — right conclusion, wrong
    reasoning; I had not checked that anything applies it.
 4. *"Invalidation will not help, nothing writes `vs_pitcher_*`"* — from grepping
-   **`build_roster.py`**, the wrong file. `daily_update.py:7564` applies it.
+   **`build_roster.py`**, the wrong file. `daily_update.py:7878` applies it.
 
 **Settled empirically instead:** cache moved aside, applier run directly ->
 **0 -> 6 of 9 batters populated.**
@@ -267,24 +271,24 @@ bet SIZING.
 ```
 live_refresh_loop._run_mlb_sim_tick
   -> scripts/run_mlb_daily_sim_job.py                       (detached subprocess)
-    -> vendor/mlb_bettingv2/tools/daily_update.py
-       :336  from sim_engine.joint_outcomes import ...      (the math + accumulator)
-       :344  _joint_accumulator_for(batter_ids, n_sims)     -> None when nothing to measure
+    -> syndicate/features/mlb/native/tools/daily_update.py
+       :345  from ...sim_engine.joint_outcomes import ...      (the math + accumulator)
+       :370  _joint_accumulator_for(batter_ids, n_sims)     -> None when nothing to measure
 
        -- PATH A, the DEFAULT (`--workers` = 4) ------------------------------
-       :645  _simw_chunk(start_i, n)                        (one of four processes)
-       :720    joint_acc = _joint_accumulator_for(...)
-       :833    joint_row[batter|<id>|<market>] = hitter_stat_values[<row_key>]
-       :886    joint_acc.record(i - start_i, joint_row)     (+ 8 segment scores)
-       :919    return {..., "joint": joint_acc.to_transport()}
-       :4494   joint_total.extend(res["joint"])             THE MERGE THAT DID NOT EXIST
+       :673  _simw_chunk(start_i, n)                        (one of four processes)
+       :749    joint_acc = _joint_accumulator_for(...)
+       :867    joint_row[batter|<id>|<market>] = hitter_stat_values[<row_key>]
+       :926    joint_acc.record(i - start_i, joint_row)     (+ 8 segment scores)
+       :959    return {..., "joint": joint_acc.to_transport()}
+       :4544   joint_total.extend(res["joint"])             THE MERGE THAT DID NOT EXIST
 
        -- PATH B, `--workers 1` ----------------------------------------------
-       :4595   joint_row[...] = hitter_stat_values[...]     (second copy)
-       :4632   joint_total.record(i, joint_row)
+       :4648   joint_row[...] = hitter_stat_values[...]     (second copy)
+       :4689   joint_total.record(i, joint_row)
 
-       :4705 out["joint"] = joint_total.to_payload(players=...)
-       :8237 _write_json(sim_path, record)
+       :4762 out["joint"] = joint_total.to_payload(players=...)
+       :8316 _write_json(sim_path, record)
   writes: data/daily/sims/<date>/sim_*.json  ->  record["sim"]["joint"]
 ```
 

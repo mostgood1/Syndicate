@@ -29,7 +29,7 @@ from datetime import datetime
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-# Lane mlb-engine-data-native-p4: the NATIVE copies of the two vendored scripts (scripts/port_mlb_sim_engine.py), and
+# Lane mlb-engine-data-native-p4: Syndicate's copies of the two vendored scripts (syndicate/features/mlb/FROZEN_FROM_VENDOR.md), and
 # the engine DATA root they write their default outputs under (engines/mlb, which replaced vendor/mlb_bettingv2).
 ENGINE_ROOT = REPO_ROOT / "engines" / "mlb"
 NATIVE_TOOLS = REPO_ROOT / "syndicate" / "features" / "mlb" / "native" / "tools"

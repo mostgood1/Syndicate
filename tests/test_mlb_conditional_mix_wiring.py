@@ -24,8 +24,8 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parents[1]
-VENDOR = REPO / "vendor" / "mlb_bettingv2"
-for pth in (str(REPO), str(VENDOR)):
+NATIVE_TOOLS = REPO / "syndicate" / "features" / "mlb" / "native" / "tools"  # the native copies (lane mlb-vendor-deletion-prep)
+for pth in (str(REPO),):
     if pth not in sys.path:
         sys.path.insert(0, pth)
 
@@ -65,7 +65,7 @@ def _load_helper():
     """
     import ast
 
-    src = (VENDOR / "tools" / "daily_update.py").read_text(encoding="utf-8")
+    src = (NATIVE_TOOLS / "daily_update.py").read_text(encoding="utf-8")
     tree = ast.parse(src)
     node = next(
         (n for n in tree.body
@@ -86,7 +86,7 @@ def _load_helper():
 @pytest.fixture()
 def fake_artifact(monkeypatch):
     """Make the consumer's artifact load deterministic and non-empty."""
-    import sim_engine.data.conditional_mix as cm
+    import syndicate.features.mlb.sim_engine.data.conditional_mix as cm
 
     art = {
         "pitchers": {"605488": {"ahead|R": {"FF": 0.6, "SL": 0.4}}},
@@ -143,7 +143,7 @@ def test_uncovered_pitcher_is_not_fatal_and_not_counted(fake_artifact):
 def test_absent_artifact_degrades_instead_of_losing_the_slate(monkeypatch):
     """An absent artifact must return 0, NOT raise. A raise here would take
     down the whole game build for a feature that is meant to be additive."""
-    import sim_engine.data.conditional_mix as cm
+    import syndicate.features.mlb.sim_engine.data.conditional_mix as cm
 
     monkeypatch.setattr(cm, "load_conditional_mix", lambda season: {})
     fn = _load_helper()
@@ -159,7 +159,7 @@ def test_the_production_call_site_still_exists():
     deliberate: the bug being prevented is a MISSING CALL, which no amount of
     testing the function itself can catch.
     """
-    src = (VENDOR / "tools" / "daily_update.py").read_text(encoding="utf-8")
+    src = (NATIVE_TOOLS / "daily_update.py").read_text(encoding="utf-8")
     calls = src.count("apply_conditional_mix_to_rosters(")
     assert calls >= 2, (
         f"expected the definition plus at least one call site, found {calls} "

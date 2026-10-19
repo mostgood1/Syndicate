@@ -8,8 +8,9 @@ profile ran uncalibrated through 2026-10-09 (lane mlb-game-profile-pitch-config)
 import re
 from pathlib import Path
 
-VENDOR = Path(__file__).resolve().parents[1] / "vendor" / "mlb_bettingv2"
-SRC = (VENDOR / "tools" / "daily_update_multi_profile.py").read_text(encoding="utf-8")
+# The native multi_profile and the engine DATA root its profile defaults resolve against (lane mlb-vendor-deletion-prep).
+ENGINE_ROOT = Path(__file__).resolve().parents[1] / "engines" / "mlb"
+SRC = (Path(__file__).resolve().parents[1] / "syndicate" / "features" / "mlb" / "native" / "tools" / "daily_update_multi_profile.py").read_text(encoding="utf-8")
 
 
 def _defaults():
@@ -25,7 +26,7 @@ def test_each_default_is_off_or_an_existing_file():
     for profile, value in _defaults().items():
         if value.strip().lower() in ("off", "false", "0", "none", "null", ""):
             continue
-        assert (VENDOR / value).is_file(), f"{profile} profile default points at a missing file: {value}"
+        assert (ENGINE_ROOT / value).is_file(), f"{profile} profile default points at a missing file: {value}"
 
 
 def test_game_profile_uses_forward_tuning():

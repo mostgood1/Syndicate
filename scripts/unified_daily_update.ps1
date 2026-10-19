@@ -4073,7 +4073,7 @@ $ncaabOddsApiKey = Get-ProcessEnvValue -Names @('NCAAB_THEODDS_API_KEY', 'THEODD
 
 if (Test-SportEnabled 'MLB') {
     # The NATIVE MLB daily update (lane mlb-unified-update-native): Syndicate's generated copy of the vendored script
-    # (scripts/port_mlb_sim_engine.py), run from the engine DATA root engines\mlb -- as scripts/run_mlb_daily_sim_job.py
+    # (syndicate/features/mlb/FROZEN_FROM_VENDOR.md), run from the engine DATA root engines\mlb -- as scripts/run_mlb_daily_sim_job.py
     # runs it on the fleet. The variable names, and the step's Workflow id and Name below, are kept: they key branches
     # and appear in run manifests.
     $mlbVendoredRoot = Resolve-VendoredRepoPath -RelativePath 'engines\mlb'

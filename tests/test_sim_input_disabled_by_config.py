@@ -20,8 +20,7 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-VENDOR = REPO / "vendor" / "mlb_bettingv2"
-for _p in (str(REPO), str(VENDOR)):
+for _p in (str(REPO),):  # the native engine (lane mlb-vendor-deletion-prep)
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
@@ -48,7 +47,7 @@ def test_bvp_fields_are_reported_disabled_while_the_switch_is_off():
 def test_flipping_the_switch_restores_failure(monkeypatch):
     """THE test. Turn BVP on and these fields must go back to ordinary
     accounting -- otherwise the exemption outlives the reason for it."""
-    import sim_engine.forward_tuning as ft
+    import syndicate.features.mlb.sim_engine.forward_tuning as ft
     monkeypatch.setattr(ft, "FORWARD_BVP_MATCHUP_MODE", "on", raising=False)
     out = _mod()._disabled_by_config("2026-08-20")
     assert not (BVP_FIELDS & set(out)), (
@@ -60,7 +59,7 @@ def test_a_date_before_forward_tuning_is_not_exempted():
     """Forward tuning only applies from its start date; before it, the switch
     does not govern and an empty field is NOT explained by this config."""
     m = _mod()
-    import sim_engine.forward_tuning as ft
+    import syndicate.features.mlb.sim_engine.forward_tuning as ft
     before = ft.FORWARD_TUNING_START_DATE.replace(year=ft.FORWARD_TUNING_START_DATE.year - 1)
     assert not (BVP_FIELDS & set(m._disabled_by_config(before.isoformat())))
 

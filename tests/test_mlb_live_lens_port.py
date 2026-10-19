@@ -1,10 +1,7 @@
-"""MLB live-lens port, phase 1 (lane mlb-live-lens-native-p1, 2026-10-15).
+"""The MLB live-lens app slice (syndicate/features/mlb/live_lens_port/app_slice.py).
 
-The gate of record is scripts/mlb_live_lens_parity.py on the fleet (the vendored `_live_lens_reports_payload` recorded on a
-frozen copy of production's MLB data, the port replayed on its own copy of the same snapshot; deploys.md). A committed
-replay fixture is not practical here -- one call opens ~34k files (~3 GB) -- so this pins what can be pinned in the suite:
-the package is exactly what the generator writes from the vendored source, it imports, and its one hand edit resolves the
-vendored repo root the way the vendored file did.
+Frozen from vendor/mlb_bettingv2 at 988fa33d and maintained here (syndicate/features/mlb/FROZEN_FROM_VENDOR.md).
+This pins: it imports with both entry points, and its one root edit resolves the engines/mlb data root.
 """
 from __future__ import annotations
 
@@ -15,14 +12,6 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-VENDORED = ROOT / "vendor" / "mlb_bettingv2" / "tools" / "web" / "flask_frontend.py"
-
-
-@pytest.mark.skipif(not VENDORED.exists(), reason="vendor tree absent")
-def test_generated_package_matches_the_generator():
-    r = subprocess.run([sys.executable, str(ROOT / "scripts" / "port_mlb_live_lens.py"), "--check"],
-                       capture_output=True, text=True, cwd=ROOT)
-    assert r.returncode == 0 and "CHECK OK" in r.stdout, r.stdout + r.stderr[-3000:]
 
 
 def test_port_imports_with_both_entry_points():

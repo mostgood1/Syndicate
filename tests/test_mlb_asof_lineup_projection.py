@@ -7,7 +7,6 @@ from types import SimpleNamespace
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
-sys.path.insert(0, str(REPO / "vendor" / "mlb_bettingv2"))
 
 import mlb_asof_lineup_projection as lp  # noqa: E402
 

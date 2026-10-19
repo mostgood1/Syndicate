@@ -27,12 +27,10 @@ import sys
 
 import pytest
 
-_VENDOR = pathlib.Path(__file__).resolve().parents[1] / "vendor" / "mlb_bettingv2"
-if str(_VENDOR) not in sys.path:
-    sys.path.insert(0, str(_VENDOR))
+# The native engine, imported by package (lane mlb-vendor-deletion-prep); importorskip on a vendored name would SKIP once vendor is gone.
 
-sim_models = pytest.importorskip("sim_engine.models")
-roster_artifact = pytest.importorskip("sim_engine.data.roster_artifact")
+sim_models = pytest.importorskip("syndicate.features.mlb.sim_engine.models")
+roster_artifact = pytest.importorskip("syndicate.features.mlb.sim_engine.data.roster_artifact")
 
 BatterProfile = sim_models.BatterProfile
 Handedness = sim_models.Handedness

@@ -53,7 +53,7 @@ if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
 # The engine PRODUCTION runs: Syndicate's generated copy (lanes mlb-sim-engine-native-p2 / mlb-engine-data-native-p4,
-# scripts/port_mlb_sim_engine.py --check). The vendored root is not put on sys.path, so nothing here can audit a
+# syndicate/features/mlb/FROZEN_FROM_VENDOR.md). The vendored root is not put on sys.path, so nothing here can audit a
 # different engine from the one that runs.
 ENGINE = REPO / "syndicate" / "features" / "mlb" / "sim_engine"
 
@@ -300,7 +300,7 @@ def populated(value, default) -> bool:
 # multi-bin. If a curated pitcher dict is ever introduced, add it here.
 # --------------------------------------------------------------------------
 # The daily sim production runs: the native copy (lane mlb-daily-sim-native-p3), whose specs are the vendored file's
-# verbatim (scripts/port_mlb_sim_engine.py --check).
+# as frozen (syndicate/features/mlb/FROZEN_FROM_VENDOR.md).
 DAILY_UPDATE_PY = REPO / "syndicate" / "features" / "mlb" / "native" / "tools" / "daily_update.py"
 
 

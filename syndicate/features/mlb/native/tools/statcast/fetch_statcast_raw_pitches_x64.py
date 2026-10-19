@@ -72,7 +72,8 @@ def main() -> int:
         from pybaseball import statcast  # type: ignore
     except Exception as e:
         raise RuntimeError(
-            "pybaseball import failed. Run this tool under vendor/mlb_bettingv2/.venv_x64/Scripts/python.exe."
+            "pybaseball import failed. Run this tool under a Python environment with pybaseball installed "
+            "(`pip install pybaseball`; it is not in requirements.txt)."
         ) from e
 
     start = date.fromisoformat(str(args.start_date))

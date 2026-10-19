@@ -308,7 +308,9 @@ CORPUS_END = "2026-07-14"
 #: Rebuilds the replay corpus from `statsapi.mlb.com/api/v1.1/game/<pk>/feed/live`
 #: -- public, unauthenticated, and immutable once a game is final.
 CORPUS_REBUILD_COMMAND = (
-    "py -3 vendor/mlb_bettingv2/tools/datasets/backfill_statsapi_feed_live.py "
+    # Syndicate's frozen copy of the vendored script (syndicate/features/mlb/FROZEN_FROM_VENDOR.md); its default --out
+    # is engines/mlb/data/raw/statsapi/feed_live.
+    "py -3 syndicate/features/mlb/native/tools/datasets/backfill_statsapi_feed_live.py "
     f"--start-date {CORPUS_START} --end-date {CORPUS_END} --season {CORPUS_SEASON}"
 )
 

@@ -677,12 +677,16 @@ def _guarded_mirror_roots() -> tuple[str, ...]:
     what a `git add` sweep collects) can trip the guard there.
     """
     roots = [_TRACKED_DATA_MIRROR]
-    vendor = _REPO_ROOT_FOR_GUARD / "vendor"
-    if vendor.is_dir():
-        for child in sorted(vendor.iterdir()):
-            candidate = child / "data"
-            if candidate.is_dir():
-                roots.append(os.path.normcase(str(candidate)))
+    # `engines/<engine>/data/` is the native engines' DATA root (engines/mlb replaced vendor/mlb_bettingv2's on
+    # 2026-10-16, lane mlb-engine-data-native-p4): the same profile as `vendor/*/data/` -- git-tracked engine inputs
+    # plus gitignored runtime state -- so the same guard, with the same .gitignore exemption discriminating.
+    for parent in ("vendor", "engines"):
+        base = _REPO_ROOT_FOR_GUARD / parent
+        if base.is_dir():
+            for child in sorted(base.iterdir()):
+                candidate = child / "data"
+                if candidate.is_dir():
+                    roots.append(os.path.normcase(str(candidate)))
     return tuple(roots)
 
 
