@@ -50,11 +50,36 @@ import pandas as pd
 from ..engine import EventSimConfig
 from .hooks import _apply_player_priors, _coalesce_team_player_frames, _compute_player_priors_cached, _derive_sim_minutes, _filter_team_players_against_processed_roster, _infer_game_id, _load_intervals_band_calibration, _load_intervals_time_profile, _load_player_stat_calibration, _load_smartsim_total_calibration, _market_lines_from_processed_odds, _market_player_names_for_matchup, _merge_pregame_expected_minutes_for_team, _period_lines_from_processed, _prune_pregame_rotation_pool, _rotation_sim_minutes_for_team, _team_adj_from_advanced_stats, _team_players_from_espn_boxscore, _team_players_from_processed_boxscores, _team_players_from_processed_rosters, _team_players_from_props, simulate_event_level_boxscore, simulate_pbp_game_boxscore, simulate_quarters
 from .player_priors import _norm_player_key
+
 from .prob_calibration import calibrate_prob
 from .prop_ladders import build_exact_ladder_payload
 from .quarters import GameInputs, QuarterResult, TeamContext, sample_quarter_scores
 from .roster_files import pick_rosters_file
 from .runtime import OrchestratorEnv
+
+
+def _pace_injury_drag(orch: Any, h_outs: Any, a_outs: Any) -> float:
+    """The pregame pace's injury drag, 0.3 possessions per player out per team. `nba_sim_total_inputs.json`
+    skip_outs_penalties (lane basketball-scenario-calibration, R2-d, pre-registered 42e086a1) removes the injury-count
+    penalties from the raw total; this is the same penalty on the PACE (-2.2 possessions per game on 2025-26 FIT), so
+    the key removes it here too. Key absent (production today) = unchanged."""
+    drag = 0.3 * float(max(0, h_outs)) + 0.3 * float(max(0, a_outs))
+    try:
+        from types import SimpleNamespace
+
+        if _b_smart()._nba_total_inputs_switch_local(processed_root=orch.paths.data_processed,
+                                                      league=SimpleNamespace(code=str(orch.league_code))).get("skip_outs_penalties"):
+            return 0.0
+    except Exception:
+        pass
+    return drag
+
+
+def _b_smart():
+    """basketball_props_smart_sim, imported lazily (it imports this package)."""
+    from syndicate.features.shared import basketball_props_smart_sim
+
+    return basketball_props_smart_sim
 
 
 class _NoPregamePrune(Exception):
@@ -1191,7 +1216,7 @@ def simulate_smart_game(
 
         # Mild pace drag: consistent with quarters model.
         b2b_drag = (1.0 if hb2b else 0.0) + (1.0 if ab2b else 0.0)
-        inj_drag = 0.3 * float(max(0, h_outs)) + 0.3 * float(max(0, a_outs))
+        inj_drag = _pace_injury_drag(orch, h_outs, a_outs)
         pace = float(max(orch.league.baseline_pace - 8.0, pace - b2b_drag - inj_drag))
 
         if np.isfinite(pace) and pace > 0:

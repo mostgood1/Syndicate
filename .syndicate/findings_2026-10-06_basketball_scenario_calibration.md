@@ -3399,3 +3399,42 @@ keyword of the three solver helpers and their EXACT call sites, section only.
   - the three shooting-trip rates within ±15%.
 - **Readings:** FTA, PF, foul-outs, REB, AST, total bias, the quarter shares.
 - **Then:** the non-shooting volume re-fit (FTA 22.69 / PF 19.67), s/Δ re-measured, the 12-date check, the full FIT.
+
+### R2-d — RESULT 2026-10-19 18:40Z (`R2D_vol`, done 18:37Z, 0 errors): NOT CONFIRMED by the letter, but shooting % and REB are fixed
+
+**Run:** the 12 sweep dates, the round-2 config + coherent + the pace injury drag gated by skip_outs_penalties; 166
+team-games without OT. Against `R2CC_coh2` (the same config without the drag fix).
+
+| | R2CC_coh2 | **R2D_vol** | real | rule |
+|---|---|---|---|---|
+| possessions/team-game | 100.71 | **102.82** | 102.54 (FIT; this subsample's extract 101.34) | ± 0.7 ✓ |
+| FGA | 85.96 | 87.92 | 89.08 | ± 1.0 ✗ (−1.16) |
+| **2P%** | .5636 | **.5498** | .5446 | ± .012 ✓ |
+| **3P%** | .3719 | **.3623** | .3611 | ± .008 ✓ |
+| shooting two-shot trips | 8.74 | 9.18 | 7.56 | ± 15% ✗ (+21%) |
+| and-ones | 2.47 | 2.47 | 2.34 | ✓ |
+| three-shot trips | 0.44 | 0.47 | 0.39 | ✗ (+20%) |
+| **REB** | 41.63 | **43.57** | 43.81 | (reading) fixed |
+| FTA / PF / foul-outs | 23.72 / 21.29 / 0.300 | 24.83 / 22.02 / 0.342 | 22.52 / 19.67 / 0.193 | readings |
+| AST | 23.75 | 23.73 | 27.20 | open (#5b) |
+| total bias | +1.43 | +1.70 | 0 | (s / Δ not yet re-measured) |
+
+- The quarter shares hold.
+
+**Reading:**
+- The volume fix lands the possessions. With them, EXACT no longer inflates the make rates: **2P% and 3P% sit on real,
+  and REB is fixed** (−2.18 → −0.24), the round-2 residuals R2-b and R2-c.
+- What is left: the shooting-foul trips run ~20% high across types. The mean team factor is ~1.2, so the priors'
+  FTA/FGA averages above the 0.2541 reference (the prior FTA includes non-shooting FTs).
+- That pushes FTA, PF and foul-outs up.
+
+**R2-d step 2, PRE-REGISTERED now:** re-fit the one constant `sf_team_ref` so the mean factor is 1.
+- 0.2541 × (9.18/7.56 + 0.47/0.39)/2 = **0.307**. Expect trips ≈ real, FTA −2 to −3, PF and foul-outs down, FGA up.
+- **CONFIRMED if:**
+  - the three trip rates are each within ±15%;
+  - 2P% and 3P% hold their bands;
+  - FGA within ±1.0;
+  - possessions within ±0.7.
+- **Readings:** FTA, PF, foul-outs, REB, bias.
+- **Then:** the non-shooting volume (bonus × base non-shoot) re-fit to FTA 22.69 / PF 19.67, s/Δ re-measured, the
+  12-date check (every guard, |bias| < 0.5), the full FIT.
