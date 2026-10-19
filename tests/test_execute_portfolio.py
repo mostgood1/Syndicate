@@ -806,10 +806,49 @@ def test_a_retry_is_charged_against_the_cap(monkeypatch):
     # a non-positive order count as a typo and falls back to the default, so
     # `MAX_DAY_ORDERS=0` would silently not bind — a guard that reads zero as
     # "no limit" is worth knowing about, and this test would have hidden it.
-    monkeypatch.setenv("SYNDICATE_EXECUTION_MAX_ORDER_DOLLARS", "0.01")
+    # A DAY cap since 2026-10-19 (caps-revamp): an over-cap ORDER is now
+    # trimmed to the cap rather than refused, so it can no longer block.
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MAX_DAY_DOLLARS", "0.01")
     result = runner.run_execution("2026-08-22", venue_scope="kalshi")
     assert result["placed"] == 0
-    assert "over_max_order_dollars" in result["refused"]
+    assert "over_max_day_dollars" in result["refused"]
+
+
+def _live_kalshi_run(monkeypatch, *, max_order_dollars):
+    from pipeline import execute_portfolio as runner
+
+    _write_live_plan(monkeypatch, [_row(venue_ticker=_TICKER)])
+    monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_VENUE", "kalshi")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MAX_ORDER_DOLLARS", str(max_order_dollars))
+    sent: list = []
+
+    def _submit(request):
+        sent.append(request)
+        return {"status": "filled", "fill_price": 0.46, "fill_stake_dollars": request.requested_stake_dollars}
+
+    monkeypatch.setattr(runner, "_venue_submitter", lambda venue: _submit)
+    return runner.run_execution("2026-08-22", venue_scope="kalshi"), sent
+
+
+def test_a_stake_over_the_order_cap_is_trimmed_to_the_cap_not_refused(monkeypatch):
+    """USER DECISION 2026-10-19 ("Trim to the cap"): a $28.57 NCAAF spread
+    against a $25 cap was refused every pass. It is now placed AT the cap."""
+    result, sent = _live_kalshi_run(monkeypatch, max_order_dollars=0.5)
+    assert "over_max_order_dollars" not in result["refused"]
+    assert result["trimmed"] == 1
+    assert len(sent) == 1
+    assert sent[0].requested_stake_dollars == pytest.approx(0.5)
+
+
+def test_a_stake_under_the_order_cap_is_untouched(monkeypatch):
+    # Reachability: the trim changes the stake only when the cap binds.
+    result, sent = _live_kalshi_run(monkeypatch, max_order_dollars=1000)
+    assert result["trimmed"] == 0
+    assert len(sent) == 1
+    assert sent[0].requested_stake_dollars > 0.5
 
 
 # --------------------------------------------------------------------------

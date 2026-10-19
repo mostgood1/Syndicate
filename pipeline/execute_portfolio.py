@@ -15,6 +15,7 @@ problem.
 
 from __future__ import annotations
 
+import dataclasses
 import os
 import time
 from collections.abc import Sequence
@@ -553,6 +554,8 @@ def _run_execution(
     failed = 0
     duplicates = 0
     retried = 0
+    # Orders whose stake was cut down to the per-order cap (see the trim below).
+    trimmed = 0
     skipped = 0
     # Every refusal is COUNTED BY NAME. A single `skipped` number cannot tell a
     # plan that named nothing bettable from a cap that stopped a good slate, and
@@ -623,6 +626,32 @@ def _run_execution(
         # 3-10 against 5.7 expected. A Polymarket order is now built pregame or
         # not at all: `polymarket_us_orders._refuse_after_commence`. Evidence:
         # `state_polymarket.md` [polymarket-pregame-hold-premise-falsified].
+
+        # A STAKE OVER THE PER-ORDER CAP IS TRIMMED TO THE CAP, NOT REFUSED
+        # [2026-10-19, user decision "Trim to the cap", lane caps-revamp].
+        # Measured that day: a $28.57 NCAAF spread against a $25 cap was
+        # refused `over_max_order_dollars` every pass, so the bet the plan
+        # wanted most was the one never placed. The cap is a ceiling on
+        # exposure, not a verdict on the bet. `check_order` still sees the
+        # trimmed stake and still refuses anything over cap, so the guard is
+        # unchanged. The idempotency key excludes stake, so a cap that moves
+        # with capital between passes cannot make this bet look like a new
+        # order. A zero cap (balance caps failed closed) is not trimmed to: the
+        # guard refuses it by name.
+        order_cap = float(caps.get("max_order_dollars") or 0.0)
+        asked = float(request.requested_stake_dollars)
+        if order_cap > 0 and asked > order_cap:
+            request = dataclasses.replace(request, requested_stake_dollars=round(order_cap, 2))
+            trimmed += 1
+            print(
+                f"[execute_portfolio] TRIMMED_TO_ORDER_CAP venue={venue} mode={mode}"
+                f" ticker={getattr(request, 'venue_ticker', None)!r}"
+                f" sport={getattr(request, 'sport', None)}"
+                f" market={getattr(request, 'market', None)}"
+                f" asked={asked:.2f} placed_at={request.requested_stake_dollars:.2f}"
+                f" cap={order_cap:.2f}",
+                flush=True,
+            )
 
         before = batch.status_of(request) if batch is not None else _status_of(request)
         # A REJECTED order never reached the venue, so a fresh attempt is a
@@ -749,7 +778,7 @@ def _run_execution(
         f"plan_source={plan_source} "
         f"armed={live_execution_armed()} positions={len(positions)} placed={placed} "
         f"filled={filled} failed={failed} "
-        f"duplicates={duplicates} retried={retried} skipped={skipped} refused={refused} "
+        f"duplicates={duplicates} retried={retried} trimmed={trimmed} skipped={skipped} refused={refused} "
         f"spent={used} summary={summary}",
         flush=True,
     )
@@ -775,6 +804,8 @@ def _run_execution(
         # from `placed` so a retry storm is visible rather than looking like
         # ordinary volume.
         "retried": retried,
+        # Placed at the per-order cap instead of the plan's larger stake.
+        "trimmed": trimmed,
         "skipped": skipped,
         "refused": refused,
         "spent": used,

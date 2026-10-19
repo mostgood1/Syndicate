@@ -85,16 +85,29 @@ def test_caps_flag_off_leaves_limits_untouched_key_for_key():
 
 
 def test_caps_flag_reaches_limits_off_differs_from_on(monkeypatch):
-    _write_stamp()
+    # A small account, so the percentages bind under the default ceilings.
+    _write_stamp(polymarket_numbers={"buyingPower": 36.05, "depositReservation": 0.0})
     off = guard.limits("live", venue="polymarket")
     monkeypatch.setenv(vc.BALANCE_CAPS_ENV, "on")
     on = guard.limits("live", venue="polymarket")
     assert off != on
     # defaults: order $10, polymarket day $100, all venues $150 -- now a share
-    # of $36.05 settled cash: 5% = $1.80, 25% = $9.01.
+    # of $36.05: 5% = $1.80, 25% = $9.01.
     assert on["max_order_dollars"] == pytest.approx(1.80, abs=0.01)
     assert on["max_day_dollars"] == pytest.approx(9.01, abs=0.01)
     assert on["dollar_ceilings"]["max_order_dollars"] == off["max_order_dollars"]
+
+
+def test_a_pending_polymarket_deposit_feeds_the_caps(monkeypatch):
+    # USER DECISION 2026-10-19 (caps-revamp): the pending deposit can be used.
+    # $586.05 buying power of which $550 pending: 5% = 29.30, held at the $10
+    # default order ceiling; 25% = 146.51, held at the $100 day ceiling.
+    _write_stamp()
+    monkeypatch.setenv(vc.BALANCE_CAPS_ENV, "on")
+    caps = guard.limits("live", venue="polymarket")
+    assert caps["balance_caps"]["capital"]["polymarket"]["capital"] == pytest.approx(586.05, abs=0.01)
+    assert caps["max_order_dollars"] == pytest.approx(10.0)
+    assert caps["max_day_dollars"] == pytest.approx(100.0)
 
 
 def test_caps_never_loosen_a_configured_ceiling(monkeypatch):
@@ -131,7 +144,9 @@ def test_an_unknown_capital_refuses_by_name_when_caps_are_on(monkeypatch):
 
 
 def test_a_stake_over_the_balance_derived_order_cap_is_refused(monkeypatch):
-    _write_stamp()
+    # The GUARD still refuses an over-cap stake; trimming happens before it, in
+    # execute_portfolio. 5% of $36.05 = $1.80 < the $5 stake.
+    _write_stamp(polymarket_numbers={"buyingPower": 36.05, "depositReservation": 0.0})
     monkeypatch.setenv(vc.BALANCE_CAPS_ENV, "on")
     result = guard.check_order(_order(stake=5.0), mode="live", already={"dollars": 0, "orders": 0})
     assert result["reason"] == "over_max_order_dollars"

@@ -40,13 +40,18 @@ admits.
   draw on shard 3, so sizing them against the $490 account would size as if
   money on shards 0 and 1 could fund them. It cannot.
 
-POLYMARKET: `buyingPower` MINUS THE PENDING DEPOSIT. Measured 2026-10-19:
+POLYMARKET: `buyingPower`, PENDING DEPOSIT INCLUDED. Measured 2026-10-19:
 `buyingPower` 586.05 = `displayedCash` 36.05 + `displayedAvailableSoon` 550.00,
 with `depositReservation` 550.00 and `availableToWithdraw` 36.05. **A pending
-deposit IS counted in buying power.** It is money that may still bounce, so
-it is excluded: capital = buyingPower - max(depositReservation,
-displayedAvailableSoon). If neither field is in the reading the deposit cannot
-be ruled out, and the venue is UNKNOWN (fail closed) rather than assumed clear.
+deposit IS counted in buying power**, and the venue lets it be spent.
+
+USER DECISION 2026-10-19 (lane caps-revamp): "the $500 pending on polymarket
+CAN be used". This module first subtracted the deposit as money that might
+bounce; that sized Polymarket at $36 against $586 the venue would accept.
+Capital is now `buyingPower`, the figure the venue itself spends against. The
+pending amount (max of `depositReservation`, `displayedAvailableSoon`) is
+still read and reported as `pending_deposit_dollars`, so a bounced deposit
+shows up as a drop in capital on the next stamp rather than going unseen.
 Open Polymarket positions are not added -- the venue does not tell us their
 value in a field we can prove means that -- which is the conservative error.
 
@@ -261,28 +266,26 @@ def venue_capital(
             buying_power = _number(row.get("dollars"))
         if buying_power is None:
             return {"known": False, **base, "reason": "unusable_balance_value"}
+        # The pending deposit is spendable (user decision 2026-10-19, see the
+        # module docstring), so it is REPORTED, not subtracted. An unreadable
+        # pending figure no longer blocks sizing: it only changes what we can
+        # say about the capital, not the capital itself.
         numbers = ((row.get("detail") or {}).get("numbers")) if isinstance(row.get("detail"), Mapping) else None
-        if not isinstance(numbers, Mapping):
-            return {"known": False, **base, "reason": "pending_deposit_unreadable"}
-        pending_fields = {
-            key: _number(numbers.get(key))
-            for key in ("depositReservation", "displayedAvailableSoon")
-            if key in numbers
-        }
-        if not pending_fields or all(value is None for value in pending_fields.values()):
-            # The venue did not say whether a deposit is pending. A deposit
-            # counted as capital and then reversed is a bet sized on money
-            # that never arrived, so this is UNKNOWN, not zero.
-            return {"known": False, **base, "reason": "pending_deposit_unreadable"}
-        pending = max([value for value in pending_fields.values() if value is not None] + [0.0])
-        capital = buying_power - pending
+        pending_values = [
+            value
+            for value in (
+                _number(numbers.get(key)) for key in ("depositReservation", "displayedAvailableSoon")
+            )
+            if value is not None
+        ] if isinstance(numbers, Mapping) else []
+        pending = max(pending_values + [0.0]) if pending_values else None
         return {
             "known": True,
             **base,
-            "capital": round(max(capital, 0.0), 2),
+            "capital": round(max(buying_power, 0.0), 2),
             "buying_power_dollars": round(buying_power, 2),
-            "pending_deposit_dollars": round(pending, 2),
-            "basis": "buying_power_less_pending_deposit",
+            "pending_deposit_dollars": round(pending, 2) if pending is not None else None,
+            "basis": "buying_power_incl_pending_deposit",
             "reason": None,
         }
 

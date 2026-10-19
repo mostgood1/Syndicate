@@ -86,24 +86,30 @@ def test_kalshi_without_a_positions_figure_falls_back_to_cash_only():
     assert reading["basis"] == "cash_only"
 
 
-def test_a_pending_polymarket_deposit_is_not_capital():
-    # MEASURED 2026-10-19: buyingPower counted a $550 deposit not yet cleared.
+def test_a_pending_polymarket_deposit_counts_as_capital_and_is_reported():
+    # MEASURED 2026-10-19: buyingPower counts a $550 deposit not yet cleared.
+    # USER DECISION 2026-10-19 (caps-revamp): that money CAN be used.
     reading = vc.venue_capital("polymarket", _stamp(), now=_NOW)
     assert reading["known"] is True
-    assert reading["capital"] == pytest.approx(36.05, abs=0.01)
+    assert reading["capital"] == pytest.approx(586.05, abs=0.01)
     assert reading["pending_deposit_dollars"] == pytest.approx(550.0)
+    assert reading["basis"] == "buying_power_incl_pending_deposit"
 
 
 def test_a_cleared_deposit_counts_in_full():
     numbers = {"buyingPower": 586.05, "depositReservation": 0.0, "displayedAvailableSoon": 0.0}
     reading = vc.venue_capital("polymarket", _stamp(polymarket_numbers=numbers), now=_NOW)
     assert reading["capital"] == pytest.approx(586.05)
+    assert reading["pending_deposit_dollars"] == pytest.approx(0.0)
 
 
-def test_polymarket_without_deposit_fields_is_unknown_not_clear():
-    # The venue did not say whether a deposit is pending: fail closed.
+def test_polymarket_without_deposit_fields_is_still_known():
+    # No pending figure in the reading: capital is buyingPower all the same,
+    # and the pending amount is reported as unknown rather than as zero.
     reading = vc.venue_capital("polymarket", _stamp(polymarket_numbers={"buyingPower": 586.05}), now=_NOW)
-    assert reading == {**reading, "known": False, "reason": "pending_deposit_unreadable"}
+    assert reading["known"] is True
+    assert reading["capital"] == pytest.approx(586.05)
+    assert reading["pending_deposit_dollars"] is None
 
 
 @pytest.mark.parametrize(
@@ -171,7 +177,8 @@ def test_the_ceiling_defaults_to_the_fixed_bankroll_so_on_never_sizes_above_toda
 def test_the_fraction_scales_capital(monkeypatch):
     monkeypatch.setenv("SYNDICATE_COMPOUNDING_BANKROLL_FRACTION", "0.5")
     result = vc.sizing_bankroll("polymarket", fixed_bankroll=1000.0, stamp=_stamp(), now=_NOW)
-    assert result["bankroll"] == pytest.approx(18.02, abs=0.01)
+    # 0.5 x $586.05 (the pending deposit counts since caps-revamp)
+    assert result["bankroll"] == pytest.approx(293.02, abs=0.01)
 
 
 @pytest.mark.parametrize("raw", ["", "0", "-1", "2", "abc"])
@@ -203,11 +210,25 @@ def test_caps_are_a_share_of_capital_bounded_by_the_dollar_ceilings():
     # kalshi: 25% x 489.98 = 122.50 < 200; 5% = 24.50 < 25
     assert caps["max_day_dollars_by_venue"]["kalshi"] == pytest.approx(122.5, abs=0.01)
     assert caps["max_order_dollars_by_venue"]["kalshi"] == pytest.approx(24.5, abs=0.01)
-    # polymarket on SETTLED money only: 25% x 36.05 = 9.01; 5% = 1.80
-    assert caps["max_day_dollars_by_venue"]["polymarket"] == pytest.approx(9.01, abs=0.01)
-    assert caps["max_order_dollars_by_venue"]["polymarket"] == pytest.approx(1.80, abs=0.01)
-    # all venues: 25% x 526.03 = 131.51 < 150
-    assert caps["max_day_dollars_all_venues"] == pytest.approx(131.51, abs=0.01)
+    # polymarket incl. the pending deposit: 25% x 586.05 = 146.51 > 100 ceiling;
+    # 5% = 29.30 > 25 ceiling
+    assert caps["max_day_dollars_by_venue"]["polymarket"] == pytest.approx(100.0)
+    assert caps["max_order_dollars_by_venue"]["polymarket"] == pytest.approx(25.0)
+    # all venues: 25% x 1076.03 = 269.01 > 150 ceiling
+    assert caps["max_day_dollars_all_venues"] == pytest.approx(150.0)
+
+
+def test_caps_scale_with_capital_once_ceilings_are_raised():
+    raised = {
+        "max_order_dollars": 1000.0,
+        "max_day_dollars_kalshi": 10_000.0,
+        "max_day_dollars_polymarket": 10_000.0,
+        "max_day_dollars_all_venues": 20_000.0,
+    }
+    caps = vc.balance_caps(raised, stamp=_stamp(), now=_NOW)
+    assert caps["max_day_dollars_by_venue"]["polymarket"] == pytest.approx(146.51, abs=0.01)
+    assert caps["max_order_dollars_by_venue"]["polymarket"] == pytest.approx(29.30, abs=0.01)
+    assert caps["max_day_dollars_all_venues"] == pytest.approx(269.01, abs=0.01)
 
 
 def test_a_rich_account_is_held_at_the_ceiling():
@@ -219,7 +240,9 @@ def test_a_rich_account_is_held_at_the_ceiling():
 
 
 def test_an_unknown_venue_is_closed_and_the_other_still_trades():
-    caps = vc.balance_caps(_CEILINGS, stamp=_stamp(polymarket_numbers={}), now=_NOW)
-    assert caps["fail_closed"] == {"polymarket": "pending_deposit_unreadable"}
+    stamp = _stamp()
+    stamp["venues"]["polymarket"] = {"status": "auth_error"}
+    caps = vc.balance_caps(_CEILINGS, stamp=stamp, now=_NOW)
+    assert caps["fail_closed"] == {"polymarket": "balance_auth_error"}
     assert caps["max_day_dollars_by_venue"]["polymarket"] == 0.0
     assert caps["max_day_dollars_by_venue"]["kalshi"] > 0
