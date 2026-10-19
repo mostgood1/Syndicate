@@ -3477,3 +3477,40 @@ b_type·r·(1 − q_type), the recorded fraction of each type's attempts.
 
 **Then:** the non-shooting volume re-fit (FTA 20.3 → 22.69: bonus × base non-shoot, PF held 19.67), s/Δ re-measured,
 the 12-date check (every guard, |bias| < 0.5), the full FIT.
+
+### R2-d step 3 — RESULT 2026-10-19 21:15Z (`R2D_p3`, done 21:10Z; code 45f9272b, parity 5,400/5,400): CONFIRMED
+
+| | R2D_ref | **R2D_p3** | real | rule |
+|---|---|---|---|---|
+| 3PA | 40.13 | **37.25** | 36.77 | ± 1.0 ✓ |
+| 3PM | 14.67 | **13.60** | 13.28 | ± 0.4 ✓ |
+| two-shot / and-ones / three-shot trips | 7.34 / 2.16 / 0.38 | 7.69 / 2.28 / 0.36 | 7.56 / 2.34 / 0.39 | ± 15% ✓ ✓ ✓ |
+| 2P% / 3P% | .5539 / .3656 | .5539 / .3652 | .5446 / .3611 | ✓ / ✓ |
+| FGA / possessions | 90.14 / 102.82 | **89.62** / 102.82 | 89.08 / 102.54 | ✓ / ✓ |
+| FTA / PF / foul-outs | 20.28 / 19.78 / .228 | 21.12 / 20.24 / .254 | 22.52 / 19.67 / .193 | readings |
+| REB / AST / bias | 44.21 / 24.61 / +1.33 | 43.51 / 24.68 / +1.45 | 43.81 / 27.20 / 0 | readings |
+
+- Quarter shares hold (.2547 / .2503 / .2528 / .2421).
+- **Round 2's shot-level residuals are closed on 12 dates:** 3PA, 3PM, 2P%, 3P%, REB, FGA, possessions and the
+  shooting-foul composition.
+- Left: FTA (−1.4), PF (+0.6), foul-outs (high), AST (−2.5, #5b), total bias (s/Δ are stale).
+
+### R2-d step 4 — PRE-REGISTRATION 2026-10-19 (before any run): re-fit the non-shooting volume
+
+**Why:** the shooting part of FTA is now real (trips at real rates), so the FTA gap (−1.4) is NON-shooting. Real is
+~1.9 non-shooting two-shot trips per team-game; the sim has 0.83 bonus trips + ~0.3 intentional.
+- PF is +0.6 high, so the base non-shooting PF (PF only) should FALL while the bonus rate RISES.
+
+**Grid:** bonus_nonshoot_foul_per_poss ∈ {0.045, 0.055, 0.065} × base_nonshooting_foul_per_poss ∈ {0.045, 0.055}.
+The R2D_p3 config otherwise; the 12 sweep dates.
+
+**PASS = all of these:**
+- FTA 22.69 ± 0.3 (FIT target);
+- PF 19.67 ± 0.4;
+- foul-outs [0.153, 0.233];
+- the step-3 guards hold: 3PA ± 1.0, 3PM ± 0.4, the trips ± 15%, 2P% / 3P% bands, FGA ± 1.0, possessions ± 0.7.
+
+**Pick:** the smallest |FTA − 22.69| + |PF − 19.67|. Ties go to the smaller bonus.
+
+**Then:** s/Δ re-measured on the disjoint dates (the bonus rate moves s), the 12-date check (every guard,
+|bias| < 0.5), the full FIT.
