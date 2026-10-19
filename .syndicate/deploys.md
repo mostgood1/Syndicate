@@ -51107,3 +51107,23 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - **Viktoria Plzen v Levski Sofia [] -> [h2h, totals]**.
   - All four now carry a Kalshi quote. The h2h gain is limited by the shortlist (cause B); see `SYNDICATE_KALSHI_JOIN_ALL_GAME_LINES`.
 - The scheduled re-read `uefa-kalshi-join-reread` was disabled, because this reading discharges it.
+
+
+## 2026-10-19 19:49:47Z -- ENV LINE WRITTEN (not yet live): `REFRESH_WORKER__SYNDICATE_KALSHI_JOIN_ALL_GAME_LINES=1` (lane `kalshi-join-all-game-lines`, session 436c79e2), carried live by compounding-bankroll's down/up
+- **ask:** user 2026-10-19 "checkpoint and turn on the game lines, fix the alias issue, and address 699". Lane `compounding-bankroll` (session aa5d7792) agreed by message to carry the line in its full down/up (~21:10Z or later), with its own user's approval. Its ff target `854b59ed` CONTAINS `76ef318c`, so **the flag goes live at that `up`**, not at a restart of mine.
+- **Write:** `~/syndicate-prod/local_production.env`, 117 -> 120 lines (a blank, a comment, the key), 0 lines removed. Backup `local_production.env.bak-kalshijoinall-20261019T194947Z`.
+- **The key is read only in refresh-worker** (`venue_odds_loop._maybe_kalshi_board_coverage`, hosted by intelligence_state). Env is captured at `up`, so nothing changes before that `up`.
+- **Baseline, refresh-worker.log 19:22-19:40Z:**
+  - `QUOTE_CAPTURE` 483-813 matches per join, appended 1-103 per capture;
+  - `TRIM_BY_SPORT` kept=6000 (cap), demand soccer 2000 / nba 2000 (both at the per-sport cap), mlb 186, ncaaf 637, nfl 559, nhl 601, wnba 541;
+  - served grid 19:35Z, UEFA fixtures with a Kalshi quote: UCL 17, UEL 14, UECL 14 of 18.
+- **expect** after the `up`:
+  - reachability: a `[venue_odds_loop] KALSHI_JOIN_ROWS ... all_game_lines_extra=` line with extra > 0 (replay: ~1,450-1,700 per day);
+  - `QUOTE_CAPTURE` matches per coverage join +~430-520 (replay: 570->1,088, 397->889, 511->939);
+  - `TRIM_BY_SPORT` kept still 6000 and soccer demand still 2000 (already capped);
+  - appended per capture rising for the first cycles, then settling;
+  - served grid UEL -> ~18, UECL -> ~17 of 18.
+- **revert:**
+  - cheapest is a CODE revert: make `kalshi_join_all_game_lines_enabled()` return False (or `git revert 76ef318c`), push, ff the fleet, claimed refresh-worker TERM. That is one restart, and the env line can stay.
+  - The env route (delete the line) costs a full down/up.
+- **verify OWED:** the reading above, after compounding-bankroll's `up`.
