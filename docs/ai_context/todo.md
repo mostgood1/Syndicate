@@ -46040,6 +46040,19 @@ were resolved and nine already-closed rows removed from the open tables.
 
 ## In progress
 
+- **#701 — Per-cell min_ev learning loop: SHADOW shipped (`94c97011`), NOT YET ON THE FLEET; apply is a user decision `[2026-10-19, lane min-ev-tuner-shadow]`.**
+
+  `syndicate/features/shared/min_ev_tuner.py` runs once a day (>= 12:00Z) after settlement in refresh-worker's
+  intelligence-state loop. It proposes a bounded min_ev step per venue x sport x market x season_phase cell, using
+  the MARGINAL EV band's ROI and same-book CLV, both event-clustered. Shadow by default (`SYNDICATE_MIN_EV_TUNER`); state
+  `reports/intelligence/min_ev_tuner_state.json`; readout `scripts/min_ev_tuner_readout.py state|replay`. Backtest:
+  0 moves on 17 dates of paper venue orders (`.syndicate/findings_2026-10-19_min_ev_tuner_backtest.md`).
+  OWED: (1) the fleet loads it at the next ff past `94c97011` + refresh-worker restart (not ff'd by this lane:
+  `f7d775f9` kalshi exits + `3c55e77b` MLB vendor freeze ride along); then verify a `MIN_EV_TUNER mode=shadow` line
+  after 12:00Z and readable state. (2) seven daily readouts. (3) user decision to apply, which needs
+  `effective_min_ev_pct` wired at `portfolio_commit.py:1102-1108` (lane `published-negative-ev` owns the file)
+  and `polymarket_us_orders.py:1251`.
+
 - **#235 — The Layer 2 prop lane was never enriched at all. Code shipped,
   DEPLOY PENDING (not yet verified in production).**
 
