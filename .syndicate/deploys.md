@@ -50778,3 +50778,10 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - **expect (mine):** after that restart, served Kalshi->board UEFA fixture joins of UCL 17 / UEL 18 / UECL 17 of 18 (replay over tracked branding, f39133f8's message; before: 17 / 12 / 11).
 - **verify OWED (mine):** read the served shortlist after the next refresh-worker restart: UEL/UECL h2h rows with a Kalshi venue quote, per fixture.
 - **verify OWED (optimizer-model-ev-basis, the owner reads it):** the next 11:30Z `model_scorecard_optimizer.json` shows soccer recommended model_bets restricted to model-basis rows, with soccer published model EV predicted to move from ~-56% to ~-40%.
+
+## 2026-10-19 15:54Z -- READING: live interval Actual on served cards (lane layer2-live-segment-actuals)
+
+- **Verdict: NOT MEASURED** (not a pass). Fallback task layer2-interval-actual-reading-1017, READ-ONLY; nothing restarted, reloaded or deployed. The task was meant to fire Sat 10-17 during the NCAAF early window but **ran Mon 10-19** (late dispatch), after the weekend slate had finished.
+- Method: each cycle fetched `/api/board/game-chips?sports=nfl,ncaaf,soccer`, the page's own POST `/api/intelligence/query` (`response.ranked_all`) and `/api/board/layer2-shortlist?limit=5000`. 5 cycles ~90 s apart (plus fetch time): 15:42:52Z, 15:45:05Z, 15:48:42Z, 15:51:00Z, 15:52:59Z (10:42-10:53 AM CDT, Mon).
+- Every read: chips 338 = pregame 258 / final 80, **live 0** (soccer 257 pregame / 67 final; nfl 13 final / 1 pregame = MNF; **ncaaf 0 chips**). `ranked_all` 6721-6858 rows; interval totals rows on a live game = 0. Raw shortlist 2000 rows (`limit=5000` still capped at 2000), rows with `game.segment_score` = 0 -- consistent with no live game, not evidence against d6a5ffc5.
+- Interval clause still owed. Next chance: tonight's MNF (kickoff ~00:15Z 10-20, 7:15 PM CDT) or the next live NFL/NCAAF/soccer slate.
