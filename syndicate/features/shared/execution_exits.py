@@ -5,6 +5,11 @@ buy and could cancel a resting buy, and nothing could SELL. Verified
 2026-10-19: no sell/close/take-profit code existed; `kalshi_orders._side_to_kalshi`
 is buy-only and the only venue writes outside placement were cancels.
 
+POLYMARKET IS WATCHED IN PAPER TOO `[2026-10-19]`, through one signed book read
+per market. Only legs the side's NAME or the venue states (over/under/yes/no,
+`held_side`) are mapped; team sides are counted `polymarket_team_leg_unresolved`
+and never guessed. A live Polymarket sale is NOT built (`venue_live_exit_unbuilt`).
+
 --------------------------------------------------------------------------
 PAPER FIRST, AND PAPER IS THE DEFAULT
 --------------------------------------------------------------------------
@@ -101,6 +106,12 @@ _DEFAULT_LOOKBACK_DAYS = 3
 _WATCH_RETENTION_DAYS = 14
 _MAX_TICKERS_PER_TICK = 400
 _QUOTE_CHUNK = 50
+# Polymarket books are one SIGNED read per market (5 s timeout each), so they are
+# bounded separately and much lower than Kalshi's batched public read.
+_MAX_POLYMARKET_BOOKS_PER_TICK = 40
+
+KALSHI = "kalshi"
+POLYMARKET = "polymarket"
 # The margins the readout replays against each position's high-water mark.
 COUNTERFACTUAL_MARGINS = (0.02, 0.04, 0.06, 0.08, 0.10, 0.15, 0.20, 0.30)
 
@@ -262,7 +273,7 @@ class OpenPosition:
     entry_key: str
     mode: str
     venue: str
-    ticker: str
+    ticker: str  # Kalshi ticker, or the Polymarket market slug
     leg: str  # "yes" | "no" -- the contract we HOLD
     contracts: float
     entry_price: float  # probability, our leg
@@ -276,6 +287,7 @@ class OpenPosition:
     line: float | None
     player_name: str | None
     model_probability: float | None  # raw model view at entry; None = no view
+    family: str = KALSHI  # which venue's book the position trades on
 
     @property
     def entry_cost_per_contract(self) -> float:
@@ -298,8 +310,32 @@ def _probability(value: Any) -> float | None:
     return _price_as_probability(value)
 
 
+# Polymarket legs this module may name: ONLY a leg the side's NAME states, or one
+# the venue stated (`held_side`, `POSITION_RESOLUTION_SIDE_LONG/SHORT`). A TEAM
+# side is never mapped: the venue's `outcomes` array is unordered (3 of 8 h2h
+# legs measured wrong 2026-08-28, `polymarket_us_orders.outcome_side_for_index`),
+# and a paper exit read off the other leg's bid would fabricate the counterfactual.
+_POLYMARKET_NAMED_LEGS = {"yes": "yes", "over": "yes", "long": "yes", "no": "no", "under": "no", "short": "no"}
+
+
+def exit_family(order: Mapping[str, Any]) -> str | None:
+    """`kalshi` / `polymarket` for an order this module can watch, else None."""
+    venue = str(order.get("venue") or "").strip().lower()
+    if not str(order.get("venue_ticker") or "").strip():
+        return None
+    if KALSHI in venue:
+        return KALSHI
+    if POLYMARKET in venue:
+        return POLYMARKET
+    return None
+
+
 def contract_leg(order: Mapping[str, Any]) -> str | None:
     """The contract the entry BOUGHT, through the same mapping that built it."""
+    if exit_family(order) == POLYMARKET:
+        held = str(order.get("held_side") or "").strip().lower().replace("position_resolution_side_", "")
+        named = _POLYMARKET_NAMED_LEGS.get(str(order.get("side") or "").strip().lower())
+        return _POLYMARKET_NAMED_LEGS.get(held) or named
     from syndicate.features.shared.kalshi_orders import OrderBuildError, _side_to_kalshi
 
     try:
@@ -325,15 +361,13 @@ def model_probability_at_entry(order: Mapping[str, Any], price: float) -> float 
 
 
 def _is_kalshi_order(order: Mapping[str, Any]) -> bool:
-    return "kalshi" in str(order.get("venue") or "").strip().lower() and bool(
-        str(order.get("venue_ticker") or "").strip()
-    )
+    return exit_family(order) == KALSHI
 
 
 def open_positions(
     orders: Iterable[Mapping[str, Any]], *, today: str, lookback: int | None = None
 ) -> tuple[list[OpenPosition], dict[str, int]]:
-    """Every filled, ungraded Kalshi entry inside the lookback, as a position.
+    """Every filled, ungraded Kalshi or Polymarket entry inside the lookback, as a position.
 
     LIVE rows are real contracts; PAPER rows (`paper:kalshi`) are the paper
     book's. Both are watched -- the paper book is where a week of counterfactual
@@ -352,7 +386,8 @@ def open_positions(
         skipped[reason] = skipped.get(reason, 0) + 1
 
     for order in orders:
-        if not isinstance(order, Mapping) or not _is_kalshi_order(order):
+        family = exit_family(order) if isinstance(order, Mapping) else None
+        if family is None:
             continue
         if str(order.get("status") or "") != "filled":
             continue
@@ -367,7 +402,7 @@ def open_positions(
             continue
         leg = contract_leg(order)
         if leg is None:
-            _skip("unmappable_leg")
+            _skip("polymarket_team_leg_unresolved" if family == POLYMARKET else "unmappable_leg")
             continue
         price = _probability(order.get("fill_price"))
         if price is None:
@@ -380,9 +415,10 @@ def open_positions(
             continue
         mode = str(order.get("mode") or "")
         contracts = stake / price
-        # A live fill is whole contracts; the stake/price division carries the
-        # venue's rounding of fill cost, so snap rather than floor.
-        if mode == "live":
+        # A live KALSHI fill is whole contracts; the stake/price division carries
+        # the venue's rounding of fill cost, so snap rather than floor. Polymarket
+        # quantities are fractional and stay as they are.
+        if mode == "live" and family == KALSHI:
             contracts = float(round(contracts))
             if contracts < 1:
                 _skip("below_one_contract")
@@ -390,7 +426,7 @@ def open_positions(
         fee = _as_float(order.get("fees_dollars"))
         estimated = fee is None
         if fee is None:
-            fee = estimate_kalshi_fee(str(order.get("venue_ticker")), contracts, price)
+            fee = estimate_fee(family, str(order.get("venue_ticker")), contracts, price)
         positions.append(
             OpenPosition(
                 entry_key=key,
@@ -410,9 +446,21 @@ def open_positions(
                 line=_as_float(order.get("line")),
                 player_name=order.get("player_name"),
                 model_probability=model_probability_at_entry(order, price),
+                family=family,
             )
         )
     return positions, skipped
+
+
+def estimate_fee(family: str, ticker: str, contracts: float, price: float) -> float:
+    """The venue's own fee shape: Kalshi quadratic per series, Polymarket flat on notional."""
+    if family == POLYMARKET:
+        from syndicate.features.shared.venue_fees import polymarket_fee_dollars
+
+        if not (0.0 < price < 1.0) or contracts <= 0:
+            return 0.0
+        return round(polymarket_fee_dollars(contracts, price), 4)
+    return estimate_kalshi_fee(ticker, contracts, price)
 
 
 def estimate_kalshi_fee(ticker: str, contracts: float, price: float) -> float:
@@ -465,6 +513,70 @@ def fetch_quotes(tickers: Sequence[str]) -> dict[str, Any]:
         if last_error:
             errors.append(last_error)
     return {"markets": markets, "errors": errors, "requested": len(unique)}
+
+
+def _book_price(level: Any) -> tuple[float, float] | None:
+    try:
+        px = level["px"]
+        return float(px["value"] if isinstance(px, Mapping) else px), float(level["qty"])
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def normalize_polymarket_book(slug: str, book: Mapping[str, Any]) -> dict[str, Any]:
+    """A Polymarket US book in the shape `evaluate_exit` reads off a Kalshi market.
+
+    MEASURED 2026-10-19 on the fleet: `{bids, offers, state, marketSlug, stats,
+    transactTime}`, levels `{px: {value: "0.5700"}, qty: "2983.63"}`, state
+    `MARKET_STATE_OPEN` / `MARKET_STATE_EXPIRED`. The book is YES-quoted ("price
+    is always the YES price"), so a YES holding sells into the best bid and a NO
+    holding at `1 - best offer`.
+    """
+    bids, offers = book.get("bids") or [], book.get("offers") or []
+    bid = _book_price(bids[0]) if bids else None
+    offer = _book_price(offers[0]) if offers else None
+    state = str(book.get("state") or "")
+    if state == "MARKET_STATE_OPEN":
+        status = "active"
+    else:
+        status = state.replace("MARKET_STATE_", "").lower() or "status_unread"
+    return {
+        "ticker": slug,
+        "status": status,
+        "yes_bid_dollars": bid[0] if bid else None,
+        "no_bid_dollars": round(1.0 - offer[0], 6) if offer else None,
+        "yes_bid_size_fp": bid[1] if bid else None,
+        "yes_ask_size_fp": offer[1] if offer else None,
+        "venue_state": state or None,
+    }
+
+
+def fetch_polymarket_quotes(slugs: Sequence[str]) -> dict[str, Any]:
+    """One SIGNED book read per slug, through the order module's own reader.
+
+    Same return shape as `fetch_quotes`. Bounded by `_MAX_POLYMARKET_BOOKS_PER_TICK`;
+    the rest are reported `unread_over_cap`, never as quoted.
+    """
+    from syndicate.features.shared.polymarket_us_orders import _read_book
+
+    unique = sorted({str(s).strip() for s in slugs if str(s or "").strip()})
+    markets: dict[str, dict[str, Any]] = {}
+    errors: list[str] = []
+    for slug in unique[:_MAX_POLYMARKET_BOOKS_PER_TICK]:
+        try:
+            data = _read_book(slug)
+        except Exception as exc:  # noqa: BLE001 -- one unreadable book is one unquoted slug
+            errors.append(f"{slug}: {type(exc).__name__}")
+            continue
+        book = data.get("marketData", data) if isinstance(data, Mapping) else {}
+        if isinstance(book, Mapping):
+            markets[slug] = normalize_polymarket_book(slug, book)
+    return {
+        "markets": markets,
+        "errors": errors,
+        "requested": len(unique),
+        "unread_over_cap": max(0, len(unique) - _MAX_POLYMARKET_BOOKS_PER_TICK),
+    }
 
 
 def _positions_url(cursor: str = "") -> str:
@@ -533,7 +645,7 @@ def reconcile_positions(
     contracts, capped by what the venue says is held on that leg. Paper rows are
     not compared -- the venue never held them.
     """
-    live = [p for p in positions if p.mode == "live"]
+    live = [p for p in positions if p.mode == "live" and p.family == KALSHI]
     report: dict[str, Any] = {"live_positions": len(live), "status": "skipped", "mismatches": [], "sellable": {}}
     if not live:
         report["status"] = "no_live_positions"
@@ -617,7 +729,7 @@ def evaluate_exit(
     bid = leg_bid(market, position.leg)
     if bid is None:
         return {**base, "reason": "no_bid"}
-    exit_fee = estimate_kalshi_fee(position.ticker, position.contracts, bid)
+    exit_fee = estimate_fee(position.family, position.ticker, position.contracts, bid)
     net = bid - (exit_fee / position.contracts if position.contracts else 0.0)
     cost = position.entry_cost_per_contract
     rules = []
@@ -768,6 +880,10 @@ def place_exit(
         return {"refused": "exit_mode_not_live"}
     if position.mode != "live":
         return {"refused": "paper_position"}
+    if position.family != KALSHI:
+        # Only Kalshi's sell body exists. A Polymarket close is a different
+        # contract (`ORDER_ACTION_SELL` on the held `outcomeSide`) and is not built.
+        return {"refused": "venue_live_exit_unbuilt"}
     if not exit_live_armed():
         return {"refused": "exit_not_armed"}
     switch = kill_switch_engaged()
@@ -876,6 +992,7 @@ def _exit_row_base(position: OpenPosition, decision: Mapping[str, Any]) -> dict[
         "entry_key": position.entry_key,
         "entry_mode": position.mode,
         "venue": position.venue,
+        "family": position.family,
         "ticker": position.ticker,
         "leg": position.leg,
         "sport": position.sport,
@@ -951,6 +1068,7 @@ def run_exit_tick(
     today: str,
     orders: Sequence[Mapping[str, Any]] | None = None,
     quotes: Callable[[Sequence[str]], Mapping[str, Any]] | None = None,
+    polymarket_quotes: Callable[[Sequence[str]], Mapping[str, Any]] | None = None,
     venue_positions: Callable[[], Mapping[str, Any]] | None = None,
     now: datetime | None = None,
     persist: bool = True,
@@ -978,7 +1096,7 @@ def run_exit_tick(
         positions = sorted(positions, key=lambda p: p.selected_date, reverse=True)[:_MAX_TICKERS_PER_TICK]
 
     venue_report: dict[str, Any] = {"status": "no_live_positions"}
-    if any(p.mode == "live" for p in positions):
+    if any(p.mode == "live" and p.family == KALSHI for p in positions):
         venue = (venue_positions or fetch_venue_positions)()
         venue_report = reconcile_positions(positions, venue)
         if mode == EXIT_LIVE:
@@ -987,8 +1105,17 @@ def run_exit_tick(
             except Exception as exc:  # noqa: BLE001
                 venue_report["exit_reconcile"] = {"error": f"{type(exc).__name__}: {exc}"[:200]}
 
-    quoted = (quotes or fetch_quotes)([p.ticker for p in positions]) if positions else {"markets": {}, "errors": []}
-    markets = quoted.get("markets") or {}
+    kalshi_tickers = [p.ticker for p in positions if p.family == KALSHI]
+    polymarket_slugs = [p.ticker for p in positions if p.family == POLYMARKET]
+    quoted = (quotes or fetch_quotes)(kalshi_tickers) if kalshi_tickers else {"markets": {}, "errors": []}
+    pm_quoted = (
+        (polymarket_quotes or fetch_polymarket_quotes)(polymarket_slugs)
+        if polymarket_slugs
+        else {"markets": {}, "errors": []}
+    )
+    # Keyed by venue as well as id: a wrong-venue bid is the one error to rule out.
+    markets = {(KALSHI, k): v for k, v in (quoted.get("markets") or {}).items()}
+    markets.update({(POLYMARKET, k): v for k, v in (pm_quoted.get("markets") or {}).items()})
 
     margin, buffer = take_profit_margin(), fair_margin()
     watch = state["watch"]
@@ -997,7 +1124,9 @@ def run_exit_tick(
     new_paper = 0
     live_results: dict[str, int] = {}
     for position in positions:
-        decision = evaluate_exit(position, markets.get(position.ticker), margin=margin, fair_buffer=buffer, now=stamp)
+        decision = evaluate_exit(
+            position, markets.get((position.family, position.ticker)), margin=margin, fair_buffer=buffer, now=stamp
+        )
         reasons[decision["reason"]] = reasons.get(decision["reason"], 0) + 1
         _update_watch(watch, position, decision, now_text)
         if not decision.get("rule"):
@@ -1025,7 +1154,7 @@ def run_exit_tick(
         }
         new_paper += 1
         print(
-            f"[execution_exits] EXIT_PAPER entry={position.entry_key} mode={position.mode}"
+            f"[execution_exits] EXIT_PAPER entry={position.entry_key} venue={position.family} mode={position.mode}"
             f" ticker={position.ticker} leg={position.leg} rule={decision.get('rule')}"
             f" contracts={position.contracts} entry={position.entry_price} bid={decision.get('bid')}"
             f" edge={decision.get('edge_per_contract')} fair={decision.get('fair')}"
@@ -1040,9 +1169,12 @@ def run_exit_tick(
         "at": now_text,
         "positions": len(positions),
         "live_positions": sum(1 for p in positions if p.mode == "live"),
+        "by_venue": {fam: sum(1 for p in positions if p.family == fam) for fam in (KALSHI, POLYMARKET)},
         "skipped": skipped,
         "quoted": len(markets),
-        "quote_errors": len(quoted.get("errors") or []),
+        "quote_errors": len(quoted.get("errors") or []) + len(pm_quoted.get("errors") or []),
+        "polymarket_quoted": len(pm_quoted.get("markets") or {}),
+        "polymarket_unread_over_cap": pm_quoted.get("unread_over_cap", 0),
         "reasons": dict(sorted(reasons.items())),
         "new_paper_exits": new_paper,
         "live_exits": live_results,
@@ -1064,6 +1196,7 @@ def exit_tick_line(summary: Mapping[str, Any]) -> str:
     return (
         f"[live_odds_worker] EXIT_TICK status={summary.get('status')} mode={summary.get('mode')}"
         f" positions={summary.get('positions')} live={summary.get('live_positions')}"
+        f" by_venue={summary.get('by_venue')} pm_quoted={summary.get('polymarket_quoted')}"
         f" quoted={summary.get('quoted')} quote_errors={summary.get('quote_errors')}"
         f" reasons={summary.get('reasons')} new_paper_exits={summary.get('new_paper_exits')}"
         f" live_exits={summary.get('live_exits')} venue={vr.get('status')}"
@@ -1129,6 +1262,7 @@ def exit_counterfactual(
     by_mode: dict[str, dict[str, Any]] = {}
     by_phase: dict[str, dict[str, Any]] = {}
     by_sport: dict[str, dict[str, Any]] = {}
+    by_venue: dict[str, dict[str, Any]] = {}
     for row in (state.get("exits") or {}).values():
         outcome = outcome_by_key.get(str(row.get("entry_key") or ""), "")
         if not outcome:
@@ -1148,6 +1282,7 @@ def exit_counterfactual(
             (by_mode, mode),
             (by_phase, phase),
             (by_sport, str(row.get("sport") or "?")),
+            (by_venue, str(row.get("family") or KALSHI)),
         ):
             _add(buckets.setdefault(label, _bucket()), exit_pnl, hold)
 
@@ -1162,7 +1297,7 @@ def exit_counterfactual(
         graded_watch += 1
         hold = _hold_pnl(row, outcome)
         for m in COUNTERFACTUAL_MARGINS:
-            label = f"{row.get('mode')}@{m:.2f}"
+            label = f"{row.get('family') or KALSHI}/{row.get('mode')}@{m:.2f}"
             bucket = by_margin.setdefault(label, {**_bucket(), "triggered": 0})
             if float(row["hwm_edge"]) >= m - 1e-9:
                 bucket["triggered"] += 1
@@ -1178,6 +1313,7 @@ def exit_counterfactual(
         "by_mode": _rounded(by_mode),
         "by_phase": _rounded(by_phase),
         "by_sport": _rounded(by_sport),
+        "by_venue": _rounded(by_venue),
         "watched_graded": graded_watch,
         "by_margin": _rounded(by_margin),
     }

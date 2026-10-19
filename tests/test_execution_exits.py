@@ -115,11 +115,11 @@ def test_paper_book_rows_are_watched_with_american_prices():
     [
         {"outcome": "won"},
         {"status": "submitted"},
-        {"venue": "polymarket"},
+        {"venue": "prophetx"},
         {"venue_ticker": None},
     ],
 )
-def test_graded_unfilled_and_non_kalshi_rows_are_not_positions(overrides):
+def test_graded_unfilled_and_unwatched_venue_rows_are_not_positions(overrides):
     positions, _ = ex.open_positions([_order(**overrides)], today=TODAY)
     assert positions == []
 
@@ -392,8 +392,8 @@ def test_counterfactual_grades_exit_against_hold(monkeypatch):
     assert bucket["delta"] > 0 and bucket["exit_better"] == 1
     grid = report["by_margin"]
     # Position A reached ~+0.06 net: credited at 0.04, held at 0.10.
-    assert grid["live@0.04"]["triggered"] == 2 - 1  # B never cleared 0.04
-    assert grid["live@0.10"]["triggered"] == 0
+    assert grid["kalshi/live@0.04"]["triggered"] == 2 - 1  # B never cleared 0.04
+    assert grid["kalshi/live@0.10"]["triggered"] == 0
     assert report["watched_graded"] == 2
 
 
@@ -436,3 +436,102 @@ def test_a_raising_exit_tick_does_not_stop_placement(worker, monkeypatch):
     monkeypatch.setattr("pipeline.execute_portfolio.run_execution", lambda date, **kw: placed.append(date) or {})
     worker._run_execution_tick()
     assert len(placed) == 1
+
+
+# -- Polymarket (paper only) --------------------------------------------------
+
+
+def _pm_order(**overrides):
+    base = _order(
+        idempotency_key="d" * 24,
+        mode="paper",
+        venue="paper:polymarket",
+        venue_ticker="tsc-nfl-dal-hou-2026-10-19-total-47pt5",
+        market="totals",
+        side="over",
+        line=47.5,
+        player_name=None,
+        fill_price=0.50,
+        requested_price=0.50,
+        fill_stake_dollars=5.0,
+        fees_dollars=None,
+        sport="nfl",
+    )
+    base.update(overrides)
+    return base
+
+
+def _pm_book(bid="0.6400", offer="0.6500", state="MARKET_STATE_OPEN"):
+    return {
+        "marketSlug": "tsc-nfl-dal-hou-2026-10-19-total-47pt5",
+        "state": state,
+        "bids": [{"px": {"value": bid, "currency": "USD"}, "qty": "120.00"}] if bid else [],
+        "offers": [{"px": {"value": offer, "currency": "USD"}, "qty": "90.00"}] if offer else [],
+    }
+
+
+def test_polymarket_named_legs_map_and_team_legs_are_never_guessed():
+    over, _ = ex.open_positions([_pm_order()], today=TODAY)
+    under, _ = ex.open_positions([_pm_order(side="under")], today=TODAY)
+    venue_said, _ = ex.open_positions([_pm_order(side="home", held_side="POSITION_RESOLUTION_SIDE_SHORT")], today=TODAY)
+    team, skipped = ex.open_positions([_pm_order(side="home", market="h2h")], today=TODAY)
+    assert over[0].family == "polymarket" and over[0].leg == "yes"
+    assert under[0].leg == "no"
+    assert venue_said[0].leg == "no"
+    assert team == [] and skipped == {"polymarket_team_leg_unresolved": 1}
+
+
+def test_polymarket_fee_is_flat_on_notional():
+    p, _ = ex.open_positions([_pm_order()], today=TODAY)
+    assert p[0].contracts == pytest.approx(10.0)
+    assert p[0].entry_fee_dollars == pytest.approx(0.15)  # 150 bps x 10 contracts
+
+
+def test_polymarket_book_reads_the_held_leg():
+    yes = ex.normalize_polymarket_book("s", _pm_book())
+    assert yes["status"] == "active" and yes["yes_bid_dollars"] == 0.64
+    assert yes["no_bid_dollars"] == pytest.approx(0.35)  # NO sells at 1 - best YES offer
+    expired = ex.normalize_polymarket_book("s", _pm_book(bid=None, offer=None, state="MARKET_STATE_EXPIRED"))
+    assert expired["status"] == "expired" and expired["yes_bid_dollars"] is None
+
+
+def test_polymarket_paper_exit_books_from_its_own_book(monkeypatch):
+    monkeypatch.setenv("SYNDICATE_EXIT_TAKE_PROFIT_MARGIN", "0.05")
+    pm = lambda slugs: {"markets": {s: ex.normalize_polymarket_book(s, _pm_book()) for s in slugs}, "errors": []}  # noqa: E731
+    summary = ex.run_exit_tick(
+        today=TODAY, orders=[_pm_order(), _order(mode="paper", venue="paper:kalshi")],
+        quotes=_quotes([_market(no_bid_dollars="0.9100")]), polymarket_quotes=pm, now=NOW,
+    )
+    assert summary["by_venue"] == {"kalshi": 1, "polymarket": 1}
+    assert summary["polymarket_quoted"] == 1 and summary["new_paper_exits"] == 1
+    (row,) = ex.load_state()["exits"].values()
+    assert row["family"] == "polymarket" and row["bid"] == 0.64
+    assert row["realized_pnl_dollars"] == pytest.approx(10 * (0.64 - 0.50) - 0.15 - 0.15, abs=0.01)
+
+
+def test_a_kalshi_ticker_never_prices_a_polymarket_position(monkeypatch):
+    """Quotes are keyed by venue: the same id on the other venue is not a quote."""
+    slug = "tsc-nfl-dal-hou-2026-10-19-total-47pt5"
+    kalshi_with_same_id = lambda t: {"markets": {slug: _market(ticker=slug, yes_bid_dollars="0.9900")}, "errors": []}  # noqa: E731
+    summary = ex.run_exit_tick(today=TODAY, orders=[_pm_order()], quotes=kalshi_with_same_id,
+                               polymarket_quotes=lambda s: {"markets": {}, "errors": []}, now=NOW)
+    assert summary["reasons"] == {"unquoted": 1}
+
+
+def test_a_live_polymarket_position_is_never_sold(monkeypatch):
+    _arm_live(monkeypatch)
+    positions, _ = ex.open_positions([_pm_order(mode="live", venue="polymarket")], today=TODAY)
+    out = ex.place_exit(ex._empty_state(), positions[0], {"bid": 0.64}, sellable=10.0,
+                        send=_never_send, persist=_never_send)
+    assert out["refused"] == "venue_live_exit_unbuilt"
+
+
+def test_counterfactual_splits_by_venue(monkeypatch):
+    monkeypatch.setenv("SYNDICATE_EXIT_TAKE_PROFIT_MARGIN", "0.05")
+    orders = [_pm_order()]
+    pm = lambda slugs: {"markets": {s: ex.normalize_polymarket_book(s, _pm_book()) for s in slugs}, "errors": []}  # noqa: E731
+    ex.run_exit_tick(today=TODAY, orders=orders, quotes=_quotes([]), polymarket_quotes=pm, now=NOW)
+    orders[0]["outcome"] = "lost"
+    report = ex.exit_counterfactual(ex.load_state(), orders)
+    assert report["by_venue"]["polymarket"]["n"] == 1
+    assert "polymarket/paper@0.10" in report["by_margin"]
