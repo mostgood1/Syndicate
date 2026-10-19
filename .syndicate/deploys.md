@@ -50863,3 +50863,35 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - Fleet dry run right after the ff: 7 games due EARLY today (MNF, MLB, 4 NHL, WNBA), up to 51 credits.
   - NBA 10-20 is not yet listed: its sheet is picks-only until the 2 PM CT build gives it games.
   - OWED: the first real early fetches (next 15-min run), today's NHL tiers served hours before puck drop, tomorrow's NBA early fetch after the 2 PM build, and the daily alt spend reading.
+
+## 2026-10-19 16:59:41Z (11:59 AM CT) -- READING, NO DEPLOY: FIRST REAL ORDER FROM THE LOCAL FLEET -- **MET** (Kalshi, filled and reconciled); closes the "STILL UNVERIFIED" item of the 16:04:30Z go-live entry (read-only watch session 15157abc, started by session a21617bf)
+
+- **The order:** WNBA `player_points` Kayla Thornton UNDER 9.5, `KXWNBAPTS-26OCT19ATLGS-GSKTHORNTON5-10`. Planned 0.90, live 0.90 (drift +0.0000).
+- **Log trail (`~/syndicate-prod/logs/live-odds-worker.log`, f39133f8):**
+  - 16:59:34.220Z `ORDER_PATH venue=kalshi status=ok positions=1 markets={'player_points': {'would_build': 1}}`
+  - 16:59:38.507Z `[kalshi_orders] SUBMIT url=https://external-api.kalshi.com/trade-api/v2/portfolio/events/orders ... side=ask count=5.00 price=0.1000 tif=good_till_canceled exchange_index=-1 subaccount=0`. An under is an `ask` at the complement (`kalshi_orders.py:448`), so this is NO at 0.90.
+  - 16:59:39.627Z `LIVE_ORDER status=submitted ... side=under line=9.5 price=-900.0 stake=4.53`
+  - 16:59:41.790Z `EXECUTED date=2026-10-19 mode=live venue=kalshi plan_source=live armed=True positions=1 placed=1 filled=0 failed=0 ... refused={} spent={'dollars': 4.53, 'orders': 1}`, with `unreconciled: 1`
+  - 16:59:42.236Z venue book read: `fill_count_fp='5.00' remaining_count_fp='0.00' taker_fill_cost_dollars='4.500000' taker_fees_dollars='0.031500' status='executed' yes_price_dollars='0.1000' no_price_dollars='0.9000'`
+  - 16:59:42.991Z `RECONCILED key=ce69c6fa23fb5e89aa378b43 ... submitted->filled venue_status='executed' contracts=5 fill_price=0.9 fees=0.0315`. The same pass's polymarket line reads `unreconciled: 0`.
+- **`/api/portfolio/live` (read between 16:59:44Z and 17:01:20Z, admin token, value never printed):**
+  - 1 order: `status=filled`, `mode=live`, `venue=kalshi`, `venue_ticker=KXWNBAPTS-26OCT19ATLGS-GSKTHORNTON5-10`, `venue_order_id=01a1551a-bc90-77fc-8782-0d50f65cf2b4`, `side=under`, `line=9.5`, `fill_price=0.9`, `fill_stake_dollars=4.5`, `contracts=5`, `fees_dollars=0.0315`.
+  - 0 resting, 0 `unreconciled`, 0 `unknown_submits` ($0). Armed; kill switch `clear`.
+- **Money moved by the fill:**
+  - `KALSHI_SHARD_BALANCES` went from `{'0': 170.0, '1': 75.01, '2': 0.0, '3': 245.0}` (16:59:25Z, pre-order) to `{'0': 170.0, '1': 75.01, '2': 0.0, '3': 240.47}` (17:05:57Z). That is -4.53 = 4.50 fill + 0.0315 fee, rounded.
+  - The account sum went 490.01 -> 485.48.
+  - Next pass, 17:06:05Z: `LIMITS ... already={'dollars': 4.53, 'orders': 1}`. The cap counter carries the order.
+- **FINDING: KALSHI SHARD 3 NOW CARRIES BASKETBALL.**
+  - The debit landed on shard 3, not shard 0.
+  - Public `GET /trade-api/v2/markets/<ticker>` reads `exchange_index: 3` for this WNBA market.
+  - `GET /trade-api/v2/exchange/status` now names shard 3 "Tennis, Baseball, Basketball". The 2026-08-26 enumeration said "Tennis & Baseball".
+  - So the `_classified` docstring line "`KXNFLGAME`, `KXNBA` and `KXWNBAPTS` are all index 0" (`kalshi_orders.py`) is STALE for the basketball tickers.
+  - **The guard is NOT affected:** `execution_guard._kalshi_shard_of` reads each market's own `exchange_index`, not a sport map. It charged shard 3 correctly.
+  - **Consequence is funding, not code:** MLB, WNBA and NBA (opener 10-20) all draw on shard 3 ($240.47). Shard 0 ($170.00) covers the rest. Shard 1 ($75.01, Combos) is not traded.
+- **Not exercised yet:**
+  - A Polymarket live order: every live pass to 17:06Z read `positions=0`.
+  - A Kalshi soccer `h2h|draw` order (the `-TIE` mapping).
+- **Watch-window passes before this one, all `placed=0`:**
+  - 16:05:02Z refused `{'insufficient_shard_balance': 1}` (MLB on shard 3 at $0).
+  - 16:22, 16:35, 16:41, 16:47, 16:52Z read `positions=0` on both venues.
+  - Shard 3 was funded by 16:34:49Z.
