@@ -986,6 +986,255 @@ def cmd_stage1(args) -> int:
     return 0
 
 
+# --------------------------------------------------------------------------- stage 3: systematic favourite fixes
+# Registration: `.syndicate/findings_2026-10-19_soccer_favourite_gain.md` section 1 (514826d2).
+# (a1) gain rising with |gap| in the goal link; (a2) 1X2 temperature exp(t0 + t1|g|); (b) draw term
+# exp(d0 + d1|g|). Every arm is C* exactly at its null parameters.
+
+STAGE1_CSTAR_LL = 0.9777          # stage 1's held-out C* mean log loss: the registered identity target
+CUM_CFG = (("wf", 1.0), ("h", 40), ("c", 40), ("s", 5), ("p", "fitted"))
+
+
+def gap_parts(r: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """(gh, ga, g, s) from shipped-space ratings [A_h, D_h, A_a, D_a]."""
+    gh, ga = r[:, 0] - r[:, 3], r[:, 2] - r[:, 1]
+    return gh, ga, gh - ga, 0.5 * (gh + ga)
+
+
+def probs_from_rates(lh: np.ndarray, la: np.ndarray) -> np.ndarray:
+    """1X2 from independent Poisson goal rates (score grid truncated at MAX_GOALS, renormalised)."""
+    goals = np.arange(MAX_GOALS + 1)
+    ph = poisson.pmf(goals[None, :], lh[:, None])
+    pa = poisson.pmf(goals[None, :], la[:, None])
+    grid = ph[:, :, None] * pa[:, None, :]
+    grid /= grid.sum(axis=(1, 2), keepdims=True)
+    p_home = (grid * np.tril(np.ones((MAX_GOALS + 1, MAX_GOALS + 1)), -1)[None]).sum(axis=(1, 2))
+    p_draw = (grid * np.eye(MAX_GOALS + 1)[None]).sum(axis=(1, 2))
+    return np.stack([p_home, p_draw, 1.0 - p_home - p_draw], axis=1)
+
+
+def gain_log_rates(league: np.ndarray, gh: np.ndarray, ga: np.ndarray, params: dict) -> tuple[np.ndarray, np.ndarray]:
+    """(a1): log λh = μ+η+k·gh + kγ·q, log λa = μ+k·ga − kγ·q, q = g|g|/2 (γ = 0 is C*)."""
+    g = gh - ga
+    q = 0.5 * g * np.abs(g)
+    mu, eta, k, gam = params["mu"], params["eta"], params["k"], params.get("gamma", 0.0)
+    return mu[league] + eta[league] + k * gh + k * gam * q, mu[league] + k * ga - k * gam * q
+
+
+def fit_gain(league: np.ndarray, gh: np.ndarray, ga: np.ndarray, hg: np.ndarray, ag: np.ndarray) -> dict:
+    """(a1) Poisson MLE of μ_L, η_L, k, γ on goals (the C* objective plus one parameter)."""
+    L = len(LEAGUES)
+    g = gh - ga
+    q = 0.5 * g * np.abs(g)
+    present = np.bincount(league, minlength=L) > 0
+
+    def nll(theta):
+        mu, eta, k, gam = theta[:L], theta[L:2 * L], theta[2 * L], theta[2 * L + 1]
+        lh = mu[league] + eta[league] + k * gh + k * gam * q
+        la = mu[league] + k * ga - k * gam * q
+        eh, ea = np.exp(lh), np.exp(la)
+        rh, ra = eh - hg, ea - ag
+        grad = np.concatenate([np.bincount(league, rh + ra, minlength=L), np.bincount(league, rh, minlength=L),
+                               [np.sum(rh * (gh + gam * q) + ra * (ga - gam * q))], [np.sum(k * q * (rh - ra))]])
+        return float(np.sum(eh - hg * lh + ea - ag * la)), grad
+
+    x0 = np.concatenate([np.full(L, 0.25), np.full(L, 0.25), [1.0, 0.0]])
+    res = minimize(nll, x0, jac=True, method="L-BFGS-B")
+    th = res.x
+    return {"mu": np.where(present, th[:L], np.nan), "eta": np.where(present, th[L:2 * L], np.nan),
+            "k": float(th[2 * L]), "gamma": float(th[2 * L + 1]), "converged": bool(res.success)}
+
+
+def temper(p: np.ndarray, absg: np.ndarray, t0: float, t1: float) -> np.ndarray:
+    """(a2): p_i^τ renormalised, τ = exp(t0 + t1·|g|)."""
+    tau = np.exp(t0 + t1 * absg)[:, None]
+    lp = tau * np.log(np.clip(p, 1e-300, 1.0))
+    lp -= lp.max(axis=1, keepdims=True)
+    e = np.exp(lp)
+    return e / e.sum(axis=1, keepdims=True)
+
+
+def draw_adjust(p: np.ndarray, absg: np.ndarray, d0: float, d1: float) -> np.ndarray:
+    """(b): p_D·exp(d0 + d1·|g|), home and away unchanged, renormalised."""
+    out = p.copy()
+    out[:, 1] = p[:, 1] * np.exp(d0 + d1 * absg)
+    return out / out.sum(axis=1, keepdims=True)
+
+
+def fit_post(kind: str, p: np.ndarray, absg: np.ndarray, y: np.ndarray, *, global_only: bool = False) -> tuple[float, float]:
+    """Fit (t0, t1) for `temper` or (d0, d1) for `draw_adjust` by 1X2 log loss; global_only pins the |g| term to 0."""
+    fn = temper if kind == "temper" else draw_adjust
+    idx = np.arange(len(y))
+
+    def loss(th):
+        a, b = th[0], (0.0 if global_only else th[1])
+        return float(-np.log(np.clip(fn(p, absg, a, b)[idx, y], 1e-300, 1.0)).mean())
+
+    res = minimize(loss, np.zeros(1 if global_only else 2), method="Nelder-Mead",
+                   options={"xatol": 1e-6, "fatol": 1e-10, "maxiter": 4000})
+    return float(res.x[0]), (0.0 if global_only else float(res.x[1]))
+
+
+def fav_tables(p: np.ndarray, y: np.ndarray, close: np.ndarray, *, n_boot: int = 1000, seed: int = SEED) -> dict:
+    """Favourite calibration. F1: deciles of the CLOSE's favourite prob; F2: deciles of the arm's OWN favourite prob."""
+    idx = np.arange(len(y))
+    out = {}
+    for sel, src in (("F1_by_close", close), ("F2_by_own", p)):
+        side = np.where(src[:, 0] >= src[:, 2], 0, 2)
+        key = src[idx, side]
+        won = (y == side).astype(float)
+        pa, pc = p[idx, side], close[idx, side]
+        edges = np.quantile(key, np.linspace(0, 1, 11))
+        dec = np.clip(np.searchsorted(edges, key, side="right") - 1, 0, 9)
+        rows = []
+        for d in range(10):
+            m = dec == d
+            rows.append({"decile": d + 1, "n": int(m.sum()), "arm": float(pa[m].mean()), "close": float(pc[m].mean()),
+                         "actual": float(won[m].mean())})
+        top = key >= np.quantile(key, 0.9)
+        rng = np.random.default_rng(seed)
+        wt, n = won[top], int(top.sum())
+        boots = np.array([wt[rng.integers(0, n, n)].mean() for _ in range(n_boot)])
+        out[sel] = {"deciles": rows,
+                    "top": {"n": n, "arm": float(pa[top].mean()), "close": float(pc[top].mean()), "actual": float(wt.mean()),
+                            "actual_ci": [float(np.quantile(boots, 0.025)), float(np.quantile(boots, 0.975))]}}
+    return out
+
+
+def kl_to_close(p: np.ndarray, close: np.ndarray) -> np.ndarray:
+    c = np.clip(close, 1e-12, 1.0)
+    return np.sum(c * (np.log(c) - np.log(np.clip(p, 1e-12, 1.0))), axis=1)
+
+
+def stage3_arms(league: np.ndarray, r: np.ndarray, hg: np.ndarray, ag: np.ndarray, y: np.ndarray,
+                tr: np.ndarray, te: np.ndarray) -> tuple[dict, dict]:
+    """Fit every registered arm on `tr`, return (held-out probs on `te` per arm, fitted params)."""
+    gh, ga, g, _s = gap_parts(r)
+    absg = np.abs(g)
+    d_tr = RDesign.__new__(RDesign)
+    d_tr.n, d_tr.league, d_tr.gap_h, d_tr.gap_a, d_tr.hg, d_tr.ag = int(tr.sum()), league[tr], gh[tr], ga[tr], hg[tr], ag[tr]
+    base = fit(d_tr, None)
+    p_tr = probs_from_rates(*map(np.exp, gain_log_rates(league[tr], gh[tr], ga[tr], base)))
+    p_te = probs_from_rates(*map(np.exp, gain_log_rates(league[te], gh[te], ga[te], base)))
+    for fn in (temper, draw_adjust):  # registered runtime identity: null parameters are C*
+        assert np.max(np.abs(fn(p_te, absg[te], 0.0, 0.0) - p_te)) < 1e-9, fn.__name__
+    g1 = fit_gain(league[tr], gh[tr], ga[tr], hg[tr], ag[tr])
+    p1_tr = probs_from_rates(*map(np.exp, gain_log_rates(league[tr], gh[tr], ga[tr], g1)))
+    p1_te = probs_from_rates(*map(np.exp, gain_log_rates(league[te], gh[te], ga[te], g1)))
+    t = fit_post("temper", p_tr, absg[tr], y[tr])
+    t0 = fit_post("temper", p_tr, absg[tr], y[tr], global_only=True)
+    d = fit_post("draw", p_tr, absg[tr], y[tr])
+    d0 = fit_post("draw", p_tr, absg[tr], y[tr], global_only=True)
+    dab = fit_post("draw", p1_tr, absg[tr], y[tr])
+    probs = {"ref": p_te, "a1": p1_te, "a2": temper(p_te, absg[te], *t), "a2-0": temper(p_te, absg[te], *t0),
+             "b": draw_adjust(p_te, absg[te], *d), "b-0": draw_adjust(p_te, absg[te], *d0),
+             "AB": draw_adjust(p1_te, absg[te], *dab)}
+    params = {"ref_k": base["k"], "a1_k": g1["k"], "a1_gamma": g1["gamma"], "a1_converged": g1["converged"],
+              "a2_t": t, "a2-0_t": t0, "b_d": d, "b-0_d": d0, "AB_d": dab,
+              "train_ll_ref": float(scores(p_tr, y[tr])[0].mean())}
+    return probs, params
+
+
+def cmd_stage3(args) -> int:
+    print(f"[stage3] priority={_set_idle_priority()}", flush=True)
+    root = Path(args.root)
+    prod_root = root / "prod_history" if (root / "prod_history").exists() else root.parent / "uefa-offsets" / "prod_history"
+    matches, skipped, _index = build_full(root)
+    st = Stage1(TeamStore(prod_root), matches)
+    lg_idx = {lg: i for i, lg in enumerate(LEAGUES)}
+    league = np.array([lg_idx[m["league"]] for m in matches], dtype=int)
+    hg = np.array([m["hg"] for m in matches], dtype=float)
+    ag = np.array([m["ag"] for m in matches], dtype=float)
+    tests = [S for S in TEST_SEASONS if (st.season == S).any()]
+    order_idx = np.concatenate([np.where(st.season == S)[0] for S in tests])
+    y = st.y[order_idx]
+    close = np.array([matches[i]["close"]["p"] for i in order_idx])
+    print(f"[stage3] FULL={len(matches)} held_out={len(order_idx)} skipped={dict(skipped)}", flush=True)
+
+    groups = {"main": lambda S: st.feats(_cfg(), None)["r"], "cum": lambda S: st.feats(CUM_CFG, S)["r"]}
+    report = {"registration": "514826d2", "n_held_out": int(len(order_idx)), "skipped": dict(skipped), "groups": {}}
+    for gname, rfn in groups.items():
+        probs: dict[str, list] = defaultdict(list)
+        params = {}
+        absg_te = []
+        for S in tests:
+            r = rfn(S)
+            tr, te = st.season < S, st.season == S
+            pr, pa = stage3_arms(league, r, hg, ag, st.y, tr, te)
+            for a, p in pr.items():
+                probs[a].append(p)
+            params[S] = pa
+            absg_te.append(np.abs(gap_parts(r[te])[2]))
+            print(f"[stage3] {gname} {S}: n={te.sum()} k={pa['ref_k']:.3f} gamma={pa['a1_gamma']:+.3f} "
+                  f"tau={pa['a2_t']} draw={pa['b_d']}", flush=True)
+        probs = {a: np.concatenate(v) for a, v in probs.items()}
+        ref = probs["ref"]
+        ll = {a: scores(p, y)[0] for a, p in probs.items()}
+        ll_close = scores(close, y)[0]
+        kl = {a: kl_to_close(p, close) for a, p in probs.items()}
+        mean_ll = {a: float(v.mean()) for a, v in ll.items()}
+        mean_ll["close"] = float(ll_close.mean())
+        if gname == "main" and abs(mean_ll["ref"] - STAGE1_CSTAR_LL) > 1e-4:
+            raise SystemExit(f"IDENTITY FAILED: C* held-out LL {mean_ll['ref']:.5f} vs stage 1 {STAGE1_CSTAR_LL}")
+        lg_arr = np.array([matches[i]["league"] for i in order_idx])
+        s_arr = st.season[order_idx]
+        prod_n = np.array([matches[i]["prod_n"] for i in order_idx])
+        masks = {"big5": np.isin(lg_arr, BIG5), "goals": np.isin(lg_arr, GOALS), "CORE": (prod_n >= GATE_N).all(axis=1),
+                 "PROMOTED": ~(prod_n >= GATE_N).all(axis=1), **{f"league:{lg}": lg_arr == lg for lg in LEAGUES},
+                 **{f"season:{S}": s_arr == S for S in tests}}
+        gap_c = float((ll["ref"] - ll_close).mean())
+        fav_ref = fav_tables(ref, y, close)
+        arms = {}
+        for a, p in probs.items():
+            reach = float((np.abs(p - ref) > 1e-6).any(axis=1).mean())
+            fav = fav_tables(p, y, close)
+            e = {"mean_ll": mean_ll[a], "mean_brier": float(scores(p, y)[1].mean()), "reach_share": reach,
+                 "vs_close": boot_mean_ci(ll[a] - ll_close), "kl_to_close": float(kl[a].mean()),
+                 "spread_sd": float(np.std(p[:, 0] - p[:, 2])), "favourites": fav}
+            if a != "ref":
+                e["vs_ref"] = boot_mean_ci(ll[a] - ll["ref"])
+                e["vs_ref_bonferroni"] = boot_mean_ci_level(ll[a] - ll["ref"], 0.975)
+                e["brier_vs_ref"] = boot_mean_ci(scores(p, y)[1] - scores(ref, y)[1])
+                e["kl_vs_ref"] = boot_mean_ci(kl[a] - kl["ref"])
+                e["share_gap_closed"] = 1.0 - e["vs_close"]["mean"] / gap_c
+                sh = fav_ref["F1_by_close"]["top"]
+                e["F1_shortfall_closed"] = (fav["F1_by_close"]["top"]["arm"] - sh["arm"]) / (sh["actual"] - sh["arm"])
+                f2 = fav["F2_by_own"]["top"]
+                e["F2_overconfident"] = bool(f2["arm"] > f2["actual_ci"][1])
+                ci = e["vs_ref_bonferroni"]["ci"] if a in ("a1", "a2") else e["vs_ref"]["ci"]
+                e["rule_verdict"] = ("INERT" if reach < 0.01 else "FALSIFIED" if e["vs_ref"]["mean"] >= 0
+                                     else "SUPPORTED" if ci[1] < 0 else "NOT DEMONSTRATED")
+                e["is_fix"] = bool(e["rule_verdict"] == "SUPPORTED" and e["F1_shortfall_closed"] >= 0.25
+                                   and not e["F2_overconfident"])
+                e["subsets"] = {k: {"n": int(m.sum()), **boot_mean_ci((ll[a] - ll["ref"])[m], n_boot=500)}
+                                for k, m in masks.items() if m.sum()}
+            arms[a] = e
+            line = (f"[stage3] {gname} {a:5s} LL {mean_ll[a]:.4f} vs close {e['vs_close']['mean']:+.4f} "
+                    f"KL {e['kl_to_close']:.4f} sd {e['spread_sd']:.3f} "
+                    f"F1 {fav['F1_by_close']['top']['arm']:.3f} F2 {fav['F2_by_own']['top']['arm']:.3f}/"
+                    f"{fav['F2_by_own']['top']['actual']:.3f}")
+            if a != "ref":
+                s = e["vs_ref"]
+                line += (f" | vs ref {s['mean']:+.4f} [{s['ci'][0]:+.4f},{s['ci'][1]:+.4f}] {e['rule_verdict']}"
+                         f" F1closed {e['F1_shortfall_closed']:.2f} fix={e['is_fix']}")
+            print(line, flush=True)
+        report["groups"][gname] = {"mean_ll": mean_ll, "gap_ref_close": gap_c, "arms": arms,
+                                   "close_favourites": fav_tables(close, y, close),
+                                   "params": {int(S): v for S, v in params.items()}}
+    _write_json(root / "stage3_report.json", report)
+    return 0
+
+
+def boot_mean_ci_level(diff: np.ndarray, level: float, n_boot: int = 2000, seed: int = SEED) -> dict:
+    """Bootstrap mean CI at `level` (0.975 = the registered Bonferroni interval for (a)'s two forms)."""
+    rng = np.random.default_rng(seed)
+    n = len(diff)
+    means = np.array([diff[rng.integers(0, n, n)].mean() for _ in range(n_boot)])
+    q = (1.0 - level) / 2
+    return {"n": int(n), "mean": float(diff.mean()),
+            "ci": [float(np.quantile(means, q)), float(np.quantile(means, 1 - q))]}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -1000,8 +1249,11 @@ def main() -> int:
     s1 = sub.add_parser("stage1")
     s1.add_argument("--root", required=True)
     s1.add_argument("--coverage-only", action="store_true")
+    s3 = sub.add_parser("stage3")
+    s3.add_argument("--root", required=True)
     args = parser.parse_args()
-    return {"audit": cmd_audit, "run": cmd_run, "engine": cmd_engine, "stage1": cmd_stage1}[args.cmd](args)
+    return {"audit": cmd_audit, "run": cmd_run, "engine": cmd_engine, "stage1": cmd_stage1,
+            "stage3": cmd_stage3}[args.cmd](args)
 
 
 if __name__ == "__main__":
