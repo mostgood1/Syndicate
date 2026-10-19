@@ -50963,3 +50963,41 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - **KALSHI_SHARD_BALANCES:** unchanged for the whole window: `{'0': 170.0, '1': 75.01, '2': 0.0, '3': 240.47} sum=485.48`. Last read 18:21:59Z. Kalshi daily spend stays `{'dollars': 4.53, 'orders': 1}`.
 - The window spans the 17:30:25Z worker restart (mlb-postponed-grading); execution passes resumed at 17:30:48Z.
 - **verify still OWED:** the first Polymarket placed>=1 pass, and the first Kalshi `h2h|draw` SUBMIT showing YES on the `-TIE` contract. Neither is a failure: no plan row reached execution on either.
+
+## 2026-10-19T18:40:20Z (1:40 PM CT) -- CEILING REPLACED on main (`d4837386`), NOT yet on the fleet: claim held by a peer, restart DEFERRED, baseline taken
+
+- **Change.** `d4837386` replaces `_model_edge_for`'s 15-point magnitude bound
+  with the probability-space test its own docstring describes (refuse when the
+  model's probability is extreme while the market's is not, plus an
+  impossible-probability guard). User-authorised ("replace the ceiling").
+  **Money-adjacent: it changes ranking.**
+- **NOT RESTARTED, and not by my choice of timing.** `deploy_claim.py acquire`
+  **refused, exit 1**: the refresh-worker claim is HELD by `min-ev-tuner-shadow`
+  (session b98807bc), acquired ~18:37Z, TTL ~43 min. I did not `--force`: the
+  claim is doing exactly what it exists for, and that peer is mid-deploy.
+- **The fleet is at `71631544` and does NOT carry `d4837386`.** An ff is needed
+  before any restart can verify this.
+- **RIDE-ALONG CHECKED before intending that ff** (12 commits, 63 files,
+  +3,939/-2,058): **vendor/ untouched (0 files)**. `3c55e77b` (MLB restructure)
+  deletes only porting/parity/migration harnesses -- `port_mlb_sim_engine.py`,
+  `mlb_daily_sim_parity.py`, `port_mlb_live_lens.py`,
+  `migrate_mlb_engine_data.py`, `mlb_live_lens_parity.py` -- **not runtime**,
+  and its `run_refresh_worker.py` change is a **comment only**. The peer features
+  are shadow (`min_ev` tuner), default-off (`compounding-bankroll`) or paper
+  (kalshi exit). **So the only runtime files in the whole ff are that comment and
+  my `layer2_board.py`.**
+- **BASELINE taken while the OLD bound is still live**, so the pending reading is
+  a real before/after: served board, cap defeated, 6 sports — 3,695 rows,
+  **2,992 carrying `model_edge_pct` (81.0%)**, refusals stamped:
+  `edge_exceeds_plausibility_ceiling` **407**, `no_projection` 169.
+- **verify (owed):** the same reading after a restart carrying `d4837386`.
+  Predicted from the in-process off/on run over 3,704 served rows: edges
+  produced 2,998 -> 3,357, bound refusals 394 -> 33, 273 rows returned, 4 newly
+  refused, and the stamped reason becoming
+  `model_probability_extreme_against_ordinary_market`.
+- **Revert needs no deploy:** `SYNDICATE_LAYER2_PLAUSIBILITY_BOUND=magnitude`
+  restores the old bound verbatim, refusal name included.
+- **Coordinated rather than raced:** messaged session `local_81601787` (the claim
+  holder) that an ff of theirs would ship my ranking change, with the numbers and
+  the revert switch, and asked whether they want to carry it or would rather I
+  wait for their claim to clear. Queued behind their turn.
