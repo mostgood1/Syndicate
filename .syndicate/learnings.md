@@ -2507,3 +2507,19 @@ I was one commit away from reporting **193 soccer rows as a defect** — rows wh
 - **Measured:** ranked by the MODEL's own favourite probability, its top decile is 0.835 vs actual 0.834, already calibrated. The domestic (a2) temperature pushed it to 0.877 and worsened UEFA log loss by +0.0032 [+0.0008, +0.0058].
 - **Why:** sorting by the close selects the matches where the close sits above the model, so the model looks low there whatever its calibration (regression to the mean on the ranking variable).
 - **Rule:** a calibration/bias claim needs deciles ranked by the PREDICTOR BEING JUDGED. Report the close-ranked table only beside the self-ranked one, never alone. Source: `.syndicate/findings_2026-10-19_uefa_favourite_temper.md`.
+
+## Four times in two days I built a population out of a field whose SEMANTICS I assumed `[2026-10-19, lanes mlb-strikeouts-scale-check + ncaaf-skipped-no-fair]`
+
+Each time the arithmetic was right and **the operand was not mine to combine**. Each time the result looked like a finding and would have been reported as one:
+
+1. **`edge_vs_market_pct` vs `model_edge_pct`** — measured the RAW projection edge where the consumer reads the calibrated one. 16.7x apart on the family I was flagging.
+2. **`bucket_factor`'s `None`** — read "no bucket matched" from a process whose overlay was absent, and scored 193 rows as a defect.
+3. **`established_loss_rel`** — called the calibration layer inert without checking its consumers; it is read in seven non-test modules, just not through the probability.
+4. **`other_sides`** — summed the BEST price per side ACROSS books and compared it to a fair built PER book. `_resolve_fair`'s own comment says *"It is the CROSS-book case that launders"*. 27 rows withdrawn.
+
+**Why:** the shared cause is not carelessness about values, it is treating a field's NAME as its contract. `other_sides` sounds like "the other side of this market" and is really "best price per side across the book set"; `None` sounds like "no match" and is really three-valued. A population assembled this way is self-consistent and wrong, so nothing downstream flags it — which is exactly why these reached the point of almost being written down.
+
+**How to apply:**
+- Before a field becomes the BASIS of a population, read the code that WRITES it, not just a row that has it. One `grep` for the writer is cheaper than a withdrawn finding.
+- When combining two fields, ask what grain each is at (per book? per side? per market? best-of?). If they are at different grains, the combination is not a measurement.
+- A finding whose refutation you cannot state is not ready. All four of these were refuted by evidence ALREADY in the payload or ALREADY in the docstring of the function I was measuring.

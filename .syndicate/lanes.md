@@ -1035,6 +1035,19 @@ death, never life — do not invert it.
 - No outcomes were used anywhere in this lane.
 - Files: .syndicate/findings_2026-10-19_mlb_strikeouts_scale_check.md (NEW)
 - Findings: `.syndicate/findings_2026-10-19_mlb_strikeouts_scale_check.md`.
+
+### ncaaf-skipped-no-fair — CLOSED — opened 2026-10-19 — closed 2026-10-19 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- Goal: Name WHY 59 NCAAF rows reach the board with calibration_method=skipped_no_fair and a median RAW model edge of 25.20 points, by quoting the reason the board itself already publishes for the missing fair, and state whether those rows are actually actionable (ev_pct / Suggested / staked) or already withheld -- so the lead's 'largest unshrunk magnitudes on the board' framing is either confirmed as a real exposure or corrected.
+- GOAL: MET — **the reason is that there is no market to be fair to.** All 73 (was 59 on a smaller slate; median edge unchanged at 25.2) are `ncaaf spreads|full` quoted by **Polymarket and nothing else**, which prices BOTH sides at the same deep-negative price: distinct prices −9900/−4900/−3233/−2400, implied **0.96..0.99**, **70 of 73 same book AND same price on the opposing side**, implied sums **median 1.9600 (a 96% hold), all 73 above 1.5**. Control: the 344 sibling spread rows that DO have a fair sum to **1.0238**, and **0 of those 344 are Polymarket-only**. So `_consensus_fair` correctly returns {} and `_resolve_fair` correctly yields nothing.
+- **68 of 73 sit at ±0.5** (34 at −0.5, 34 at +0.5) — a ±0.5 spread is a moneyline, so a Polymarket "who wins" market is reaching the NCAAF spreads board at an untradeable price.
+- **NOT an exposure, and the lead's framing is CORRECTED.** `ev` is guarded on the same `fair` (`:3329`) and `portfolio_commit` back-derives its fair FROM `ev_pct`, so `fair_probability` and `ev_pct` are **None on all 73** (control: present on 3,871) — unsizable. "The largest unshrunk magnitudes on the board" was true of the number and wrong about the risk. The real cost is measurement: 73 ranked `board_lane: opportunity` rows carrying up to ±33 points of `model_edge_pct` inflate every coverage census, which is what made them look worst in the 10-16 bug list.
+- **THE DEFECT IS THE SILENCE.** `fair_method`, `fair_anchor_refusal` and `fair_anchor_refusals` are None/empty on all 73. Those fields record ANCHOR-TIER refusals only; **there is no reason code for "consensus had no two-sided book"**, so an unevaluable row is indistinguishable from an unevaluated one.
+- Benign explanations RULED OUT from fields already on the row: `is_live` False, `game_state`/`market_state` `pregame`, `suspect_stale` False, on all 73 and on the 27 below. A late-game live −9900 would have been honest; these are pregame.
+- **WITHDRAWN: my own "27 rows got a fair from a degenerate pair" finding** (several with positive EV up to +2.37). `other_sides` is best-price-per-side ACROSS books while the fair is built PER book, which is the cross-book combination `_resolve_fair`'s comment calls laundering — so my sum is not the quantity any fair used. The 73 survive it only because Polymarket is the sole book there. Fourth assumed-semantics population in two days; rule written to `learnings.md`.
+- **SCOPE: `_resolve_fair`/`_consensus_fair` belong to lane `fair-price-v2` (OPEN, session 9e18a0e7). No edit made there and none proposed from here.** Handed over: (a) stamp a `no_two_sided_book` reason where `_resolve_fair` falls through; (b) an observation, with its own refutation attached, that best-of-market prices sum 1.30..1.35 on 12 pregame h2h rows.
+- No outcomes were used anywhere in this lane.
+- Files: .syndicate/findings_2026-10-19_ncaaf_skipped_no_fair.md (NEW)
+- Findings: `.syndicate/findings_2026-10-19_ncaaf_skipped_no_fair.md`.
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
