@@ -88,8 +88,13 @@ RULE_MODEL_FAIR = "model_fair"
 #
 # CLEARED 2026-10-19: "venue_settlement grades an entry from Kalshi's settlement
 # record, which does not know the position was sold first" -- settlement is now
-# exit-aware (`venue_settlement.exit_adjusted_pnl`).
+# exit-aware (`venue_settlement.exit_adjusted_pnl`). What is left of that item is
+# NARROWER and lives in another module: the 24h INFERENCE fallback.
 LIVE_BLOCKERS = (
+    "paper_settlement.settle_orders' 24h inference fallback grades a live entry with"
+    " hold-to-settle P&L and does not read execution_exits -- a sold entry the venue"
+    " path has not graded within 24h would book the wrong money (fix needs a loan of"
+    " paper_settlement.py from lane published-negative-ev)",
     "the v2 sell body (reduce_only, time_in_force=immediate_or_cancel) has never"
     " been accepted by the venue -- first live exit must be watched",
 )

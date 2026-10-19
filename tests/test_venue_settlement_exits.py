@@ -389,6 +389,6 @@ def test_reachability_a_real_exits_document_on_disk_changes_the_grade(ledger, mo
     assert state["orders"][0]["pnl_dollars"] == pytest.approx(2.38)
 
 
-def test_live_blockers_no_longer_name_settlement():
-    assert not any("settlement" in b for b in ex.LIVE_BLOCKERS)
-    assert ex.LIVE_BLOCKERS  # the sell-body blocker still stands
+def test_live_blockers_no_longer_name_venue_settlement():
+    assert not any("venue_settlement" in b for b in ex.LIVE_BLOCKERS)
+    assert any("sell body" in b for b in ex.LIVE_BLOCKERS)  # still stands
