@@ -50995,7 +50995,7 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   produced 2,998 -> 3,357, bound refusals 394 -> 33, 273 rows returned, 4 newly
   refused, and the stamped reason becoming
   `model_probability_extreme_against_ordinary_market`.
-- **Revert needs no deploy:** `SYNDICATE_LAYER2_PLAUSIBILITY_BOUND=magnitude`
+- **CORRECTION 2026-10-19 (this claim was WRONG when written):** I said the revert needed no deploy. On the LOCAL FLEET it does. `scripts/local_production.py` builds each role's env ONCE in the `up` path and stores it on the `Supervised` dataclass; `_spawn` passes `env=item.env`, the STORED dict, so a `kill -TERM` respawn reuses the env captured at `up` and `local_production.env` is never re-read. There is no per-role restart subcommand. So `SYNDICATE_LAYER2_PLAUSIBILITY_BOUND=magnitude` needs a `REFRESH_WORKER__...` line PLUS a full down/up. **The cheaper revert is a CODE revert** — revert the commit, ff the fleet, TERM the worker, since code is read at process start. Caught by session 3927eb2e (lane `compounding-bankroll`); verified by me against the supervisor source before accepting it. Original wording: `SYNDICATE_LAYER2_PLAUSIBILITY_BOUND=magnitude`
   restores the old bound verbatim, refusal name included.
 - **Coordinated rather than raced:** messaged session `local_81601787` (the claim
   holder) that an ff of theirs would ship my ranking change, with the numbers and
@@ -51035,3 +51035,13 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - **Expected movement, which is MINE:** served rows carrying `model_edge_pct` **2,992 of 3,695 (81.0%) -> ~3,357**, i.e. ~273 rows returning. Passed to them so a coverage jump is not read as a defect.
 - **Their bundle is three changes in one restart** (full down/up, a new `REFRESH_WORKER__SYNDICATE_COMPOUNDING_BANKROLL=shadow`, and my ranking change). Flagged to them against the one-change-per-deploy rule, with the note that **mine is the one to revert first** because `SYNDICATE_LAYER2_PLAUSIBILITY_BOUND=magnitude` needs no deploy.
 - **Owed:** the after-reading off their restart, against the 18:37Z baseline. Lane `model-edge-plausibility-bound` stays OPEN until it lands.
+
+## 2026-10-19T18:57:27Z — CORRECTION: "revertible without a deploy" was FALSE on this fleet; the cheaper revert is a CODE revert
+
+- **What I claimed, repeatedly:** that `d4837386` could be reverted by setting `SYNDICATE_LAYER2_PLAUSIBILITY_BOUND=magnitude`, with no deploy and no second restart. I wrote it in the code comment, the commit message, two `deploys.md` entries, the lane block, and messages to TWO peers.
+- **Why it is false.** `scripts/local_production.py` derives each role's env ONCE in the `up` path (`derive_role_env` inside the `boot` loop, ~line 1232), stores it on the `Supervised` dataclass (`env: dict[str, str]`, ~line 906), and `_spawn` launches with `env=item.env` — the STORED dict (~line 1086). A TERM'd role is respawned with the env captured at `up`; `local_production.env` is never re-read. The subcommands are `init`, `import-render-env`, `doctor`, `env`, `up`, `down`, `backup`, `ci-run`, `reload-web`, `status` — **no per-role restart**, and `reload-web` is a gunicorn HUP for web code only. `cmd_status` also calls `derive_role_env`, but only to DISPLAY the next cap.
+- **So the env switch needs a `REFRESH_WORKER__...` line plus a full down/up**, which is the same cost as any other env change here.
+- **THE CHEAPER REVERT IS A CODE REVERT:** `git revert d4837386`, push, ff the fleet, `kill -TERM` the refresh-worker. Code is read at process start, so that is ONE restart rather than a down/up. The flag earns its keep only when set BEFORE an `up`, or folded into a down/up somebody is doing anyway.
+- **Caught by session 3927eb2e** (lane `compounding-bankroll`), who had no reason to correct a claim that made their own deploy look safer. I verified it against the supervisor source before accepting it rather than taking it on their word, and they were right on every point.
+- **This raises the stakes of the deploy itself**, and that is the honest consequence: a money-adjacent ranking change whose rollback costs a restart (code revert) or a down/up (env), not a free switch. The deploy still goes ahead — user-directed, measured, and reachability-tested — but the rollback plan is now stated correctly.
+- My memory already held the Render form of this ("restart does NOT re-inject env vars"). I did not carry it across to the local fleet, which is the actual production here.

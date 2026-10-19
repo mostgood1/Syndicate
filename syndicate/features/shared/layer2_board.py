@@ -2383,8 +2383,25 @@ def _three_way_leg_edge(projection: Mapping[str, Any], row_side: str, fair: Any)
 #: Which test the MEASURED-edge plausibility bound applies in `_model_edge_for`.
 #: `"probability"` (the default since 2026-10-19) applies the probability-space
 #: test the bound's own docstring always described; `"magnitude"` restores the
-#: 15-point `_MODEL_EDGE_MAX_POINTS` test verbatim. Set the env var to revert
-#: without a deploy.
+#: 15-point `_MODEL_EDGE_MAX_POINTS` test verbatim.
+#:
+#: **THIS IS NOT A FREE REVERT ON THE LOCAL FLEET, AND AN EARLIER VERSION OF
+#: THIS COMMENT CLAIMED IT WAS** `[corrected 2026-10-19, caught by session
+#: 3927eb2e]`. `scripts/local_production.py` builds each role's env ONCE in the
+#: `up` path (`derive_role_env` at the `boot` loop), stores it on the
+#: `Supervised` dataclass, and `_spawn` passes `env=item.env` -- the STORED
+#: dict. A `kill -TERM` respawn therefore reuses the env captured at `up`, and
+#: `local_production.env` is never re-read. There is no per-role restart
+#: subcommand (`up`, `down`, `reload-web`, `status`, ... -- `reload-web` is a
+#: gunicorn HUP for web code only). So setting this variable requires a
+#: `REFRESH_WORKER__...` line in `local_production.env` **plus a full
+#: down/up**.
+#:
+#: **THE CHEAPER REVERT IS THEREFORE A CODE REVERT, NOT THIS FLAG**: revert the
+#: commit, fast-forward the fleet, and `kill -TERM` the refresh-worker -- code
+#: is read at process start, so that costs one restart instead of a down/up.
+#: This flag earns its keep only when set BEFORE an `up`, or folded into a
+#: down/up somebody is doing anyway.
 #:
 #: **THIS SCOPES TO `_model_edge_for` ONLY.** `_MODEL_EDGE_MAX_POINTS` also
 #: bounds three OTHER quantities -- `_modelled_fair_edge_for`'s modelled-fair
