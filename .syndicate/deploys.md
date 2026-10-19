@@ -51237,3 +51237,14 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - No `compounding_bankroll_unknown` refusal (shadow does not refuse).
   - Note: no live-plan build had run by 21:51:49Z (cold start; the last pre-drain build was 21:14:06Z).
 - **rollback:** remove the `REFRESH_WORKER__SYNDICATE_COMPOUNDING_BANKROLL` line + full down/up (env is captured at `up`), or a code revert + one refresh-worker TERM. Shadow places nothing different either way.
+
+
+## 2026-10-19 22:11:04Z (5:11 PM CT) -- READING: compounding-bankroll shadow, FIRST BUILD -- **MET** (lane `compounding-bankroll`, session 3927eb2e)
+- **Confirms the 21:36:25Z down/up.** This was the first `portfolio_commit` after the restart: BUILD_SPAN_ENTER 22:08:38Z. The cold-start cycle was long, and min-ev-tuner's drain held work 22:02-22:10:20Z.
+- **The code ran (branch, not outcome):** `[portfolio_commit] COMPOUNDING_BANKROLL ... mode=shadow` once per venue.
+  - kalshi: `positions=1/1 staked_fixed=$26.52 staked_compounded=$4.51 unknown={} bankrolls=[170.0]`. 170.00 = shard 0's cash in the stamp.
+  - polymarket: `0/0` (no position this build). novig and prophetx: `0/0`.
+- **Shadow placed nothing different:** live-odds-worker kept refusing that same Kalshi position (`KXNCAAFSPREAD-26OCT20MOSUDEL-DEL4` @0.47) as `refused={'over_max_order_dollars': 1}` at 22:00:25Z and 22:08:24Z, i.e. on the FIXED stake vs the stored $25 order cap.
+- **What it shows:** fixed sizing ($1,000 bankroll) currently BLOCKS the only live Kalshi position. Compounding would size it at $4.51, about 2.7% of a $170 shard.
+- **Note for `on`:** novig/prophetx have no capital rule, so they would refuse `compounding_bankroll_unknown` if they ever held live positions. They are not live venues (`SYNDICATE_EXECUTION_VENUE=kalshi,polymarket`).
+- **Still owed:** the one-day reading (scheduled task `compounding-shadow-day-read`, 2026-10-20 17:00 CT). After it: the user's decision on `on` + balance caps + ceiling.
