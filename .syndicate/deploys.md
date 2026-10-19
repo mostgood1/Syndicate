@@ -51311,3 +51311,13 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - **NOT attributable to #704 (checked, not assumed):** the live kalshi plan went 1 -> 0 positions. Its 23:14:29Z refusals are all EV gates that run BEFORE sizing (`below_min_ev_pct_net_of_fee` 9, `below_min_ev_pct` 2, `aggregator_priced` 1), on a changed row set (12 rows vs 9 at 22:11Z). #704 acts only on the stake after those gates. The previous position's only stake-side refusal was `zero_kelly_stake`.
 - **revert #704:** delete the env line + full down/up, or a code revert of bd9b0571 + a claimed refresh-worker TERM (deploys.md 21:01:01Z). **Revert tuner basis:** env `SYNDICATE_MIN_EV_TUNER_ROI_BASIS=dollars` (needs a full `up`).
 - **owed:** the 7 daily tuner readouts (scheduled task `min-ev-tuner-daily-readout`, 08:40 CT); the #704 forward read (`sim-stake-forward-read-1102`) and `sim-stake-activation-check` (it should now find this entry); the vendor verify.
+
+
+## 2026-10-19 23:21:02Z -- READING: Kalshi aliases by elimination (81e81501) on the SERVED grid -- **MET** (lane `uefa-kalshi-elim-aliases`, session 436c79e2)
+- **Load:** a ride-along on lane min-ev-tuner-shadow's ff 854b59ed -> affc9a7b (22:16:06Z, user-approved there; the owner confirmed 81e81501 is an ancestor and lists it in its own entry). The user also approved the ride-along in my chat ("you can ff it with ride along").
+  - My own no-restart ff was not needed: its claims were held, and I did not force them.
+  - refresh-worker restarted 22:43:53Z (pid 2681168), after which the coverage join loads the aliases.
+- **Ride-along review done before** (for the record): 550a4b20 venue_settlement (#703). On the fleet the exits document read OK with **0 exits** and exit mode is paper everywhere, so its "no exit -> byte-identical grade" path applies; its 19 tests pass. The rest was offline research code.
+- **Served grid 10-20** (built 23:20:20Z, after a Kalshi capture at 23:09:28Z), UEFA fixtures with a Kalshi quote: **UCL 18, UEL 18, UECL 18 of 18 (h2h 18 / 18 / 18)**.
+  - **Red Star Belgrade v FC Copenhagen: h2h [kalshi], totals [kalshi]** (the only UECL fixture missing at 21:48Z).
+- **Net for the day, 10-20 grid:** UCL 17 -> 18, UEL 14 -> 18, UECL 16 -> 18. The pieces: f39133f8 aliases, 71631544 per-event codes, 76ef318c + env flag (all fixtures' game lines), 81e81501 elimination aliases.
