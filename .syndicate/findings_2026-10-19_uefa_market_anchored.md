@@ -83,8 +83,60 @@ leagues.
 
 ## 2. Coverage
 
+- `features.json`: 2,474 rows. **Self-check PASSED:** the max |model log loss − step 3| is 0.0 and the
+  max |probs(lam) − p_model| is 6.7e-16, so the dump is step 3's model exactly.
+- ANCHORED is scored on 1,890 matches (2022-26). **The gate is scored on 1,551** (2023-26: UCL 536, UEL 553, UECL 462).
+
 ## 3. Results
+
+Run 2026-10-19 at Idle, after `515223b5` (code on main before any fit). Output `C:/tmp/uefa-closes/report_anchored.json`.
+
+### THE GATE: NO-GO / FALSIFIED in all three competitions (the primary arm and the live arm alike)
+
+| | n | Δ BLEND_A − CLOSE | verdict |
+|---|---|---|---|
+| UCL | 536 | 0.0000 | NO-GO / FALSIFIED |
+| UEL | 553 | 0.0000 | NO-GO / FALSIFIED |
+| UECL | 462 | 0.0000 | NO-GO / FALSIFIED |
+| pooled | 1,551 | 0.0000 | NO-GO / FALSIFIED |
+
+- **The walk-forward blend weight was w = 0 in EVERY season (2023-2026), for ANCHORED and ANCHORED-LIVE alike.**
+- So the blend IS the close and Δ is exactly 0. By the registered rule a point estimate of 0 or more is FALSIFIED.
+- The model carries nothing the close lacks, even after anchoring.
+
+### Secondary (no verdict)
+
+- Log loss, 2022-26 (n 1,890): MODEL 0.9519, ANCHORED 0.9527, ANCHORED-LIVE 0.9489, CLOSE 0.9192.
+- **ANCHORED − MODEL +0.0008 [−0.0022, +0.0038]: anchoring to past closes did NOT help.** In/in +0.0027,
+  involving an out-of-scope club −0.0002, both CIs including 0.
+- The inner rule chose **τ = 100, the grid's upper edge, in 2024 and 2025** (1 in 2022, 30 in 2023, 3 in
+  2026). The data mostly asked for corrections shrunk to nothing.
+- ANCHORED − CLOSE **+0.0335 [+0.0226, +0.0444]**; LIVE − CLOSE +0.0297 [+0.0193, +0.0398]. The live arm
+  helps a little (−0.003 vs MODEL) but closes about a tenth of the gap.
+- **Favourites, unchanged by anchoring** (decile of the close's favourite):
+  - top decile: close 0.823, model 0.782, anchored 0.784, actual 0.873;
+  - decile 9: close 0.725, model 0.677, anchored 0.678, actual 0.741.
+
+### Engine read
+
+- **The favourite gap is not club-specific, so a per-club correction cannot close it.**
+  - Every favourite is underrated by roughly the same 4-5 points, whoever the club.
+  - A ridge-shrunk per-club term fit to a few UEFA closes per season cannot learn a systematic, cross-club shift.
+  - That is why τ ran to the edge.
+- **The remaining candidates are SYSTEMATIC, not per club:**
+  - a favourite-dependent gain (rating gaps amplified more at the top);
+  - in-match information the close sees and the rating cannot (lineups, rotation, motivation in dead rubbers);
+  - the market itself (it is closer to the actual rate than the model in every decile).
+- **The domestic study already found the same signature** (soccer-team-strength: rating gap +0.022,
+  favourites 0.743 / 0.804 / 0.821). That points at a single cause shared across competitions, i.e. the
+  rating, not anything UEFA-specific.
 
 ## 4. What cannot be estimated
 
+- Domestic closes as an anchor for in-scope clubs (not pulled here).
+- A systematic favourite-gain term: not registered, so not tested. It is the next candidate.
+- Betting value.
+
 ## 5. Deviations from the registration
+
+- None.
