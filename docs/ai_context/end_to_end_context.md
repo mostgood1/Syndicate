@@ -636,8 +636,8 @@ or `refresh_odds_sources.py --dry-run --json` (resolve the command plan without 
   (`smartsim_*`, `ncaaf_*`, `nfl_*`, `soccersim_*`) were relocated to `docs/reports/` (substantive
   committed analysis reports, not dead code); the six `scripts/build_ncaaf_*_snapshot.py` generators
   that write those reports were repointed to `docs/reports/`.
-- **`vendor/` is live code, not legacy** — `vendor/mlb_bettingv2` is imported by
-  `syndicate/features/mlb/live_lens.py` and `scripts/run_live_odds_refresh_worker.py`; the
+- **`vendor/` is live code, not legacy** — `vendor/mlb_bettingv2` WAS (deleted 2026-10-19; MLB runs
+  `syndicate/features/mlb/{sim_engine,native/tools,live_lens_port}`, see `FROZEN_FROM_VENDOR.md`); the
   `vendor/{nba,wnba}_betting_repo` trees back `schedule_adapter.py`, `bootstrap_data_root.py`, and the
   basketball refresh scripts (models/src/schedule). Only the 2.2 MB root `app.py` inside
   `vendor/{nba,wnba}_betting_repo` is an unused legacy Flask app (`vendor/nhl_betting_repo/app.py`

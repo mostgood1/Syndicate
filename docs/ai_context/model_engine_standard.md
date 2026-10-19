@@ -76,7 +76,7 @@ MLB's, as the worked example:
 ```
 live_refresh_loop._run_mlb_sim_tick
   -> scripts/run_mlb_daily_sim_job.py            (detached subprocess)
-    -> vendor/mlb_bettingv2/tools/daily_update.py    (:236)
+    -> syndicate/features/mlb/native/tools/daily_update.py
       -> build_roster  (statcast_cache passed when --statcast-starter-splits != off)
         -> _apply_cached_statcast_pitch_splits
           -> fetch_pitcher_pitch_splits -> artifact-first, cache fallback
@@ -94,7 +94,7 @@ A model input that lives only in a local cache **cannot reach production**, and
 this is not obvious from the code.
 
 Measured failure: MLB pitch splits lived in a `DiskCache` under
-`vendor/mlb_bettingv2/data/cache/`, which is **gitignored** *and* inside Render's
+`vendor/mlb_bettingv2/data/cache/` (that tree has since been deleted), which is **gitignored** *and* inside Render's
 **ephemeral repo checkout**. It could never ship with a deploy, and anything
 written there is destroyed by the next one.
 
