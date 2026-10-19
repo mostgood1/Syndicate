@@ -391,3 +391,28 @@ and pnl permanently. **The ROI arm still needs SETTLED rows carrying a verdict,
 and none exist yet.**
 
 **THE ROI ARM NOW HAS A DENOMINATOR** `[read-only measurement 2026-09-20 12:09:02 CT / 17:09:02Z, one fetch of `/api/ops/execution/ledger-summary?days=5&mode=paper`, scheduled task `ncaaf-sim-verdict-roi-read-0920`; full working in `log/2026-09-20.md`]`. NCAAF settled 832 of 899 orders (66 pending). Within `ncaaf | game_total`, all `market_fair_only: true` so the sizing basis is held fixed — `contradicts` n=71 settled_decisions, +$15.35 on $330.02, **+4.65%**; `unpriced` n=76, +$51.79 on $349.11, **+14.83%**; `none` n=78, -$76.39 on $376.02, **-20.32%**. `ncaaf | game_line` has no `contradicts` bucket; there `none` n=144 **-3.74%**, `unpriced` n=52 **+3.39%**. Different sizing basis, stated: `agrees` `game_line` n=34 **+16.90%**, `game_total` n=17 **-37.41%**; `disagrees` n=18 **-71.72%** / n=11 **-39.61%** (also EV-conditioned). Pooled `by_verdict`, all sports: agrees n=325 +12.64%, contradicts n=102 +9.84%, unpriced n=208 +7.63%, none n=259 -8.93%, disagrees n=71 -35.01%. **DESCRIPTIVE ONLY — at n≈70-80 a bucket's ROI standard error is ~12 points and a difference's ~16, so the 10.2-point contradicts/unpriced gap is inside one SE; no staking or sim change follows from this read.** 55 of 1,300 decisions sit in more than one verdict bucket.
+
+
+## [min-ev-tuner-shadow] THE MIN_EV CUT IS TUNED PER CELL IN SHADOW -- RUNNING ON THE FLEET, ZERO MOVES, NOTHING APPLIED `[verified on production 2026-10-19 19:25:36Z, lane min-ev-tuner-shadow]`
+
+- **What runs.** `syndicate/features/shared/min_ev_tuner.py`, once a day (>= 12:00Z) right after settlement in refresh-worker's
+  intelligence-state loop.
+  - **Cells:** venue x sport x market x season_phase.
+  - **Rule:** propose +/-0.5 on a cell's EV cut only when the marginal band's ROI AND same-book CLV are both significant
+    (event-clustered).
+  - **Mode:** `SYNDICATE_MIN_EV_TUNER` is unset on the fleet, so `shadow`. Nothing at commit reads it;
+    `effective_min_ev_pct` is unwired.
+- **Verified 2026-10-19:**
+  - refresh-worker `code=94c97011` (TERM 19:06:01Z).
+  - First line `19:25:36.467Z MIN_EV_TUNER mode=shadow cells=60 actions={'hold': 60} base=0.0 moves=0`.
+  - State `reports/intelligence/min_ev_tuner_state.json` readable via `scripts/min_ev_tuner_readout.py state`, run inside WSL
+    with the worker state env.
+- **Production's base cut is 0.0**, not 2.0: refresh-worker carries `SYNDICATE_PORTFOLIO_MIN_EV_PCT=0` (user decision
+  2026-09-16), and there is no stored settings key. Rows reach the ledger at EV ~2+ because other gates bind first.
+- **Loaded vs on main:**
+  - `40640a0b` (band anchored at the cell's effective cut, floor 0.0) loads in compounding-bankroll's down/up on `854b59ed`.
+  - `affc9a7b` (cut graded in flat units, not dollars) is on main but NOT in that target. It loads at the first refresh-worker
+    start on a HEAD containing it. Until then the nightly grades in dollars.
+- **Evidence base:** settled paper venue orders only (paper:kalshi + paper:polymarket, 1,176 over 10-02..10-18). The 552 live rows
+  are `venue_rebuild` rows with no `ev_pct`. Same-book CLV on venue MLB props is near zero (kalshi 49/266, polymarket 1/95).
+- Detail: `findings_2026-10-19_min_ev_tuner_backtest.md`; deploys.md 2026-10-19 19:06:01Z; todo #701.
