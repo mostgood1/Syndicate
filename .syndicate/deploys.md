@@ -51141,3 +51141,22 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - verify: after that ff, `git ls-files vendor/mlb_bettingv2 | wc -l` = 0 on the fleet and the next MLB sim / live tick write 0 files
   under vendor/mlb_bettingv2 (find -newer the ff time). Owed by lane mlb-vendor-delete.
 - Rollback: `git revert 814f7966` + `tar -xzf` the archive in /home/amyn/Syndicate.
+
+## 2026-10-19T20:24:31Z (3:24 PM CT) — CEILING REPLACED AND SERVED — **MET**: coverage 81.0% -> 90.6%, bound refusals 407 -> 41 (lane `model-edge-plausibility-bound`, `d4837386`)
+
+- **Deploy.** fleet ff `94c97011c -> d4837386d`, `--ff-only`, exit 0 (8 files; only `layer2_board.py` is runtime). Verified the DEPLOYED file carries `_plausibility_refusal` before restarting — asserting the branch, not the outcome. TERM to pid 2601049 at **20:12:35Z**; new worker **pid 2623735, `lstart` 20:12:41Z**. Claim held from 19:34:04Z, released by token.
+- **verify, gated on PROVENANCE not elapsed time.** Served board, cap defeated, 6 sports, read 20:24:31Z off a shortlist artifact with **`written_at` 20:23:00Z > restart 20:12:41Z**:
+
+| | baseline 18:37Z | after |
+|---|---|---|
+| rows | 3,695 | 3,979 |
+| carrying `model_edge_pct` | 2,992 (**81.0%**) | 3,606 (**90.6%**) |
+| `edge_exceeds_plausibility_ceiling` | **407** | **0** |
+| `model_probability_extreme_against_ordinary_market` | 0 | **41** |
+| `no_projection` (untouched control) | 169 | 173 |
+
+- **The percentage matched the in-process prediction to two decimals.** Predicted from the off/on run over 3,704 rows: 3,357 edged = **90.63%**. Served: 3,606 of 3,979 = **90.63%**. Row counts differ because the slate grew, which is why the RATE is the comparable figure and the raw count is not.
+- **Bound refusals fell 407 -> 41, a 90% reduction**, and the old reason is **entirely absent** while the new one appears. Nothing else in the tree emits `model_probability_extreme_against_ordinary_market`, so the change is attributable to this commit alone. `no_projection` held at 169 -> 173, confirming the move is the bound's and not a coverage shift.
+- **TWO COSTS, PAID DELIBERATELY AND RECORDED AS SUCH.** (1) `check_deploy_safety` read NOT CLEAR with a board build in flight at `layer2_shortlist_build`; I polled ~5.5 min hoping it would persist and it rolled straight into a NEW cycle instead — which matches this morning's measurement that builds run back-to-back, so waiting only changes WHICH build is discarded. (2) The check also warned **"Live games in progress — a restart interrupts live-lens ticks and live prop hydration"**, which had not appeared in any earlier check today. Monday evening, NBA/NHL/soccer live. That cost does not clear by waiting and was accepted to land a user-directed change.
+- **A FALSE NEGATIVE WAS AVOIDED BY THE PROVENANCE FIELD.** At 20:23Z, ELEVEN minutes after the restart, the served board still carried `written_at` **20:11:27Z** — the PRE-restart build — and read 2,996 edged (80.8%) with the new reason absent. Reporting that as the "after" would have been a clean-looking failure of a change that was in fact not yet serving. The reading was re-gated on `written_at` exceeding the restart rather than on elapsed time. Second time in one day that payload provenance caught this.
+- **Revert path, stated correctly** (an earlier version of this entry was wrong): the env flag needs a `REFRESH_WORKER__` line PLUS a full down/up, because role env is built once at `up` and a TERM'd role respawns with the stored dict. **The cheap revert is a CODE revert** — revert, ff, TERM.
