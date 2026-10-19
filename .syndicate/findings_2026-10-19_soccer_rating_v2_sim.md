@@ -53,4 +53,30 @@ all passing).
 
 ## 3. Results
 
+**RUNNING since 2026-10-19 22:47:57Z** at Idle priority. Outputs: `C:/tmp/team-strength/v2sim/{v1,v2}.jsonl`
+(append + resume, so a killed run restarts where it stopped) and `.summary.json`. Measured throughput on the shared
+machine is about 1.2 (v1) and 0.6 (v2) matches a minute, so the expected finish is 1-2 days. **By user decision
+2026-10-19, the full registered population runs; V2 stays OFF until it finishes.**
+
+To resume after a kill: re-run each arm's command below. `--append-dump` skips the matches already written.
+
+    PYTHONHASHSEED=0 SYNDICATE_SOCCER_RATING_V2=<0|1> python scripts/backtest_soccer_h2h_calibration.py       --leagues epl,la_liga,bundesliga,serie_a,ligue_1,eredivisie,primeira_liga,belgian_pro_league --since 2025-07-01       --min-prior-matches 10 --simulations 300 --source-root <primary>/data/soccer_source       --fd-close-dir C:/tmp/soccer-lpb/fd2526 --dump-matches C:/tmp/team-strength/v2sim/<arm>.jsonl --append-dump       --out C:/tmp/team-strength/v2sim/<arm>.summary.json [--rating-v2 for the v2 arm]
+
+Run it at Idle priority: wrap it in `psutil.Process().nice(psutil.IDLE_PRIORITY_CLASS)`.
+
+**On a SHIP verdict:**
+1. Flip `_rating_v2`'s default to ON (`scripts/build_soccer_artifacts.py`) and fix the default test.
+2. Land on main.
+3. Fast-forward the fleet to that exact SHA, under a refresh-worker claim, after the ride-along check (the fleet
+   was 65 commits behind main on 2026-10-19).
+4. Verify: `rating_model = v2_h40_c40_n5` appears in a newly built `recommendations_<date>.json` for an EPL date.
+   The builder is a per-run child job and loads from disk, so no refresh-worker restart is needed. The live
+   poller's `_fill_promoted` loads at the next live-odds-worker restart.
+5. Record the measurement in `deploys.md`.
+
 ## 4. Deviations
+
+- **1. (before the run, `73ba5d79`).** `_rating_v2` was made OFF by default (ON only with
+  `SYNDICATE_SOCCER_RATING_V2=1`), so that pushing the code to main could not ship it ahead of this gate. The v2
+  arm ran with the env set to 1 and the v1 arm with it set to 0. The code under test is otherwise unchanged
+  (`839b9f1b`).
