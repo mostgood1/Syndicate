@@ -50895,3 +50895,19 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - 16:05:02Z refused `{'insufficient_shard_balance': 1}` (MLB on shard 3 at $0).
   - 16:22, 16:35, 16:41, 16:47, 16:52Z read `positions=0` on both venues.
   - Shard 3 was funded by 16:34:49Z.
+
+
+## 2026-10-19 17:10Z (12:10 PM CT) -- READING: alt ladders early + late (1db5320d) -- MET for today's slate (lanes `alt-ladders`, `basketball-sgp-builder`, session 9e18a0e7)
+- **First real early run (11:57 AM CT):** `{"due": 7, "fetched": 7, "rows": 11528, "credits": 45, "errors": 0}`.
+  - MNF: 8 credits.
+  - MLB CLE @ TB: 10 credits.
+  - 4 NHL games: 4-5 credits each.
+  - WNBA: 8 credits.
+  - Every game fetched 6-8 h before its start.
+- **Served at 12:10 PM CT** (`/api/cheatsheets/<sport>/2026-10-19`), tiered parlays:
+  - NHL: 11 (7 safer / 4 payout; games 6:10-8:10 PM CT).
+  - NFL: 3 (MNF 7:15).
+  - MLB: 3 (7:10).
+  - WNBA: 3 (7:10).
+  - Before this change they appeared only 20-90 min before each start.
+- **Still owed:** the late refetch of each game (20-90 min out); tomorrow's NBA early fetch after the 2 PM CT build; the daily alt spend at day's end.
