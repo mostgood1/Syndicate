@@ -4072,10 +4072,14 @@ $sharedOddsApiKey = Get-ProcessEnvValue -Names @('ODDS_API_KEY', 'ODDSAPI_KEY', 
 $ncaabOddsApiKey = Get-ProcessEnvValue -Names @('NCAAB_THEODDS_API_KEY', 'THEODDSAPI_KEY', 'THEODDS_API_KEY')
 
 if (Test-SportEnabled 'MLB') {
-    $mlbVendoredRoot = Resolve-VendoredRepoPath -RelativePath 'vendor\mlb_bettingv2'
-    $mlbVendoredDailyUpdate = if ($mlbVendoredRoot) { Join-Path $mlbVendoredRoot 'tools\daily_update.py' } else { $null }
-    if (-not ($mlbVendoredDailyUpdate -and (Test-Path $mlbVendoredDailyUpdate))) {
-        throw "MLB self-contained daily update is unavailable because vendor\\mlb_bettingv2\\tools\\daily_update.py was not found. The fallback Syndicate MLB refresh only materializes existing artifacts and is not equivalent to the full ui-daily workflow."
+    # The NATIVE MLB daily update (lane mlb-unified-update-native): Syndicate's generated copy of the vendored script
+    # (scripts/port_mlb_sim_engine.py), run from the engine DATA root engines\mlb -- as scripts/run_mlb_daily_sim_job.py
+    # runs it on the fleet. The variable names, and the step's Workflow id and Name below, are kept: they key branches
+    # and appear in run manifests.
+    $mlbVendoredRoot = Resolve-VendoredRepoPath -RelativePath 'engines\mlb'
+    $mlbVendoredDailyUpdate = Resolve-VendoredRepoPath -RelativePath 'syndicate\features\mlb\native\tools\daily_update.py'
+    if (-not ($mlbVendoredRoot -and $mlbVendoredDailyUpdate)) {
+        throw "MLB self-contained daily update is unavailable because engines\\mlb or syndicate\\features\\mlb\\native\\tools\\daily_update.py was not found. The fallback Syndicate MLB refresh only materializes existing artifacts and is not equivalent to the full ui-daily workflow."
     }
 
     $preferLocalMirrorArtifactsForGate = $true
@@ -4094,7 +4098,7 @@ if (Test-SportEnabled 'MLB') {
         Workflow = 'vendored_daily_update'
         Command = @(
             (Resolve-Python $repoRoot),
-            'tools\daily_update.py',
+            $mlbVendoredDailyUpdate,
             '--workflow', 'ui-daily',
             '--date', $Date,
             '--season', $season,
