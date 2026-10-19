@@ -96,6 +96,13 @@ exchange-execution-unblock]`.
 ledger's user-logged bets moved to the manual portfolio "Other books" on
 2026-09-10 (`[portfolio-sign-in-and-books]`). `/portfolio/paper` untouched.
 
+**FLEET LIVE STATE `[verified 2026-10-19, session 332cb014, lane caps-revamp]`:**
+- **Stored caps** (saved 15:14:50Z): kalshi $200/day, polymarket $100/day, $25/order, $150/day all venues, 15/15/25 orders.
+- **First fleet live order** (16:59:37Z): Kalshi WNBA points under, filled @0.90 for $4.50.
+- **KALSHI SHARD 3 = Sports: Tennis, Baseball, Basketball** (docs.kalshi.com exchange_sharding). MLB, NBA and WNBA orders draw ONLY on shard 3 cash. With shard 3 at $0 they refuse `insufficient_shard_balance`. Read 16:34Z: {0: 170.00, 1: 75.01, 3: 245.00}. Shard 1 (Combos) is not traded.
+- **An over-cap stake was REFUSED, not trimmed** (`over_max_order_dollars`, $28.57 vs $25, 22:00Z). `08f851d1` (on main, NOT yet on the fleet) trims it to the cap and counts Polymarket's pending deposit as capital (user decisions).
+- **`SYNDICATE_EXECUTION_BALANCE_CAPS=on`** is in the env file since 22:38Z and loads at the next full `up`.
+
 **THE VENUE CAPS ARE USER-EDITABLE AND THEY BIND.** Seven fields
 (`max_day_dollars_kalshi|_polymarket`, `max_day_orders_kalshi|_polymarket`,
 `max_order_dollars`, and both `_all_venues` ceilings) in

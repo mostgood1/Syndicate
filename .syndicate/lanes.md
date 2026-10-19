@@ -1062,6 +1062,9 @@ death, never life — do not invert it.
 - Findings: `.syndicate/findings_2026-10-19_ncaaf_skipped_no_fair.md`.
 
 ### caps-revamp — OPEN — opened 2026-10-19 — session 332cb014-904e-4069-b418-9283732e1e99
+- **GOAL VERDICT 2026-10-19 22:55Z:** "Live caps follow venue capital: SYNDICATE_EXECUTION_BALANCE_CAPS=on on the fleet with raised dollar ceilings; Polymarket capital counts the pending deposit (user 2026-10-19: 'the $500 pending on polymarket CAN be used'); an order over the per-order cap is trimmed to the cap instead of refused (user 2026-10-19: 'Trim to the cap')" -- **GOAL: NOT MET.**
+  - Done: the unit half (196 pass on 08f851d1) and the env flag.
+  - Left: the fleet full `up` on 08f851d1 (gated >= 23:43:52Z by the 60-min refresh-worker rule; possibly folded with compounding-bankroll's `COMPOUNDING_BANKROLL=on`, awaiting that session's "go"), then raising the stored ceilings ONLY after the up verifies, then the live reading.
 - Goal: Live caps follow venue capital: SYNDICATE_EXECUTION_BALANCE_CAPS=on on the fleet with raised dollar ceilings; Polymarket capital counts the pending deposit (user 2026-10-19: 'the $500 pending on polymarket CAN be used'); an order over the per-order cap is trimmed to the cap instead of refused (user 2026-10-19: 'Trim to the cap')
 - Files: pipeline/execute_portfolio.py (the trim-to-cap step before check_order ONLY), tests/test_execute_portfolio.py
 - **CODE LANDED `08f851d1` (196 targeted tests pass); the venue_capital loan is RETURNED to compounding-bankroll.** Fleet env `SYNDICATE_EXECUTION_BALANCE_CAPS=on` set 22:38Z (backup `local_production.env.bak-capsrevamp-20261019T223808Z`), loads at the next `up`. OWED: the restart onto 08f851d1, then the stored ceilings raised to $100/order, $1,000/day per venue, $2,000/day all, 50/50/100 orders (user: "Loose backstop"), ONLY after the restart is verified; then the live reading.
