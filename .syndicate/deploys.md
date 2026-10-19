@@ -50714,3 +50714,29 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - Every live-odds-worker since 2026-10-16 18:54Z has loaded only the native port and native sim_engine (verified at that restart: 0 vendored modules, roots at engines/mlb).
 - **Errors.** 0 `live_lens_port/app_slice.py` / native `sim_engine` traceback frames across live-odds-worker.log .. .log.5.
 - **Rate, for context, not a pass criterion.** 27/46 here; on 10-15, 40/56 (port) and 41/52 (vendored). The rate counts prop rows with a live line in that game, so it varies by game. Code equality was proven by parity (0 diffs on both entries).
+
+
+## 2026-10-19 15:04:57Z (10:04 AM CT) fleet ff b67ff316 -> e88cd098 + `reload-web` (13.5 s, **2 failed probes**, max latency 5.02 s, healthz ok last; `/healthz` 200 after): parlay-leg actuals refresh for 7 days (lane `basketball-sgp-builder`, session 9e18a0e7) -- NO worker restart
+- **ask:** the user's "Deploy now (Recommended)", after the 10-19 status check showed 15 of 22 NFL 10-18 parlays pending.
+- **claim:** web by basketball-sgp-builder (token 461464d7...), acquire exit 0.
+- **ride-alongs:** edf09a0a (basketball study script), 00ac866e, 43d30126 (ledger) -- all mine, none runtime except the reconcile change.
+- **cause:**
+  - The NFL usage file (written 10-18 22:38) holds only Thursday's week-6 game; Sunday's games are not in it. So `leg_actuals` for NFL 10-18 = 0.
+  - The grader's 2-day window would drop 10-18 after the 10-20 night run.
+- **verify:**
+  - Read-only on the fleet: `sgp_leg_actuals(NFL 10-18)` = 0 now (expected until Sunday's lines land).
+  - The refresh runs at the 11:50 PM CT reconcile.
+  - OWED: the NFL 10-18 pending count falls once the usage file carries Sunday.
+- **first tier grades (served reconciled view, 10-19 10:00 AM CT), tiered tickets only:**
+
+| sport | dates | won-lost | predicted wins |
+|---|---|---|---|
+| NHL | 10-17 | 18-9 | 16.2 |
+| NHL | 10-18 | 3-3 | 3.6 |
+| NFL | 10-18, settled so far | 4-3 | 4.6 |
+| WNBA | 10-17 | 2-1 | 1.8 |
+| MLB | 10-17 | 1-2 | 1.4 |
+| MLB | 10-18 | 3-0 | 1.5 |
+| **all** | | **31-18 (63%)** | **29.1 (59%)** |
+
+  Two days: no evidence either way yet.
