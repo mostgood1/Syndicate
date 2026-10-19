@@ -6,6 +6,12 @@ and `<closes>/report_close_step3.json` (the published step-3 report, for the sel
 
     python scripts/backtest_uefa_anchored.py --closes C:/tmp/uefa-closes
 
+`--favourite-temper T0,T1 --gap-k K --home-term H` (lane uefa-favourite-temper, registration
+`.syndicate/findings_2026-10-19_uefa_favourite_temper.md` s1) replaces `p_model` and `p_anchored` with the
+domestic (a2) temperature `temper(p, |g_hat|, T0, T1)`, `g_hat = (log(lam_h/lam_a) - H)/K`, adds the
+H-TEMPER gate (tempered-model/close blend) and writes `<closes>/report_favourite_temper.json` instead.
+`--print-home-term` prints the registered H (mean log(lam_h/lam_a) over seasons 2020-2022) and exits.
+
 Run at Idle / `nice -n 19`.
 """
 
@@ -27,11 +33,13 @@ import numpy as np  # noqa: E402
 from syndicate.features.soccer import uefa_close_backtest as ucb  # noqa: E402
 from syndicate.features.soccer import uefa_league_offsets as ulo  # noqa: E402
 from syndicate.features.soccer import uefa_market_anchor as uma  # noqa: E402
+from scripts import soccer_team_strength_experiments as tse  # noqa: E402
 
 FIRST_CLOSE_SEASON = 2020
 ANCHOR_SEASONS = range(2022, 2027)
 GATE_FIRST = 2023
 COMPETITIONS = ("ucl", "uel", "uecl")
+HOME_TERM_SEASONS = (2020, 2021, 2022)  # registered: the seasons before the first gate season
 
 
 def _write_json(path: Path, payload) -> None:
@@ -62,13 +70,115 @@ def _gate(sub, key):
     return {"n": len(sub), "d_vs_close": d, "verdict": v}
 
 
+def home_term(rows, seasons=HOME_TERM_SEASONS) -> float:
+    """Registered H: unweighted mean of log(lam_h/lam_a) over the rows of `seasons` (rates only)."""
+    vals = [np.log(r["lam"][0] / r["lam"][1]) for r in rows if r["season"] in seasons]
+    if not vals:
+        raise ValueError(f"no rows in seasons {seasons}")
+    return float(np.mean(vals))
+
+
+def tempered(rows, key, t0, t1, k, h):
+    """temper(row[key], |g_hat|, t0, t1) per row, g_hat = (log(lam_h/lam_a) - h)/k from the step-3 rates."""
+    p = np.array([r[key] for r in rows], dtype=float)
+    absg = np.abs((np.log([r["lam"][0] / r["lam"][1] for r in rows]) - h) / k)
+    return tse.temper(p, absg, t0, t1)
+
+
+def _kl(close, p):
+    c = np.clip(np.asarray(close, dtype=float), 1e-12, 1.0)
+    return float(np.sum(c * (np.log(c) - np.log(np.clip(np.asarray(p, dtype=float), 1e-12, 1.0)))))
+
+
+def _decile_table(rows, order_key, cols):
+    """Favourite deciles: sorted by max(row[order_key]); the favourite is argmax(row[order_key])."""
+    fav = sorted(rows, key=lambda r: max(r[order_key]))
+    out = []
+    for i, chunk in enumerate(np.array_split(np.arange(len(fav)), 10)):
+        sub = [fav[k] for k in chunk]
+        idx = [int(np.argmax(r[order_key])) for r in sub]
+        out.append({"decile": i + 1, "n": len(sub),
+                    **{name: float(np.mean([r[key][k] for r, k in zip(sub, idx)])) for name, key in cols},
+                    "actual": float(np.mean([1.0 if r["y"] == k else 0.0 for r, k in zip(sub, idx)]))})
+    return out
+
+
+def apply_temper(rows, t0, t1, k, h):
+    """Registered H-TEMPER (s1): temper p_model / p_anchored / p_live in place (raw kept as `<key>_raw`),
+    then gate the tempered-model/close blend, with the controls and secondary arms beside it."""
+    for key in ("p_model", "p_anchored", "p_live"):
+        sub = [r for r in rows if key in r]
+        if not sub:
+            continue
+        for r, q in zip(sub, tempered(sub, key, t0, t1, k, h)):
+            r[key + "_raw"] = r[key]
+            r[key] = [float(x) for x in q]
+    for r, q in zip(rows, tempered(rows, "p_model_raw", t0, t1, k, 0.0)):
+        r["p_model_h0"] = [float(x) for x in q]
+
+    def gate_arm(model_key):
+        w = _blend_weights(rows, model_key, GATE_FIRST)  # history = every earlier season that carries model_key
+        bkey = "p_blend__" + model_key
+        for r in rows:
+            if r["season"] in w and model_key in r:
+                r[bkey] = list(ucb.blend(r[model_key], r["p_close"], w[r["season"]]))
+        g = [r for r in rows if bkey in r and r["season"] >= GATE_FIRST]
+        return {"w": w, **{c: _gate([r for r in g if r["competition"] == c], bkey) for c in COMPETITIONS},
+                "pooled": _gate(g, bkey)}
+
+    def ll(r, key):
+        return ucb.log_loss(r[key], r["y"])
+
+    def diffs(sub, a, b):
+        return ulo.paired_bootstrap_ci([ll(r, a) - (r["ll_close"] if b == "close" else ll(r, b)) for r in sub])
+
+    gate_rows = [r for r in rows if r["season"] >= GATE_FIRST]
+    out = {"params": {"t0": t0, "t1": t1, "k": k, "h": h},
+           "H_TEMPER": gate_arm("p_model"),
+           "control_model_blend": gate_arm("p_model_raw"),
+           "sensitivity_h0": gate_arm("p_model_h0")}
+    if any("p_anchored" in r for r in rows):
+        out["secondary_anchored_tempered"] = gate_arm("p_anchored")
+        out["control_anchored_raw"] = gate_arm("p_anchored_raw")
+    for label, sub in (("all", rows), ("gate", gate_rows)):
+        out[f"tempered_minus_model_{label}"] = diffs(sub, "p_model", "p_model_raw")
+        out[f"tempered_minus_close_{label}"] = diffs(sub, "p_model", "close")
+        out[f"model_minus_close_{label}"] = diffs(sub, "p_model_raw", "close")
+        out[f"kl_close_model_{label}"] = float(np.mean([_kl(r["p_close"], r["p_model_raw"]) for r in sub]))
+        out[f"kl_close_tempered_{label}"] = float(np.mean([_kl(r["p_close"], r["p_model"]) for r in sub]))
+    out["tempered_minus_model_gate_by_comp"] = {
+        c: diffs([r for r in gate_rows if r["competition"] == c], "p_model", "p_model_raw") for c in COMPETITIONS}
+    cols = (("close", "p_close"), ("model", "p_model_raw"), ("tempered", "p_model"))
+    out["calibration_by_close"] = _decile_table(rows, "p_close", cols)
+    out["calibration_by_model"] = _decile_table(rows, "p_model_raw", cols)
+    return out
+
+
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--closes", required=True)
     p.add_argument("--skip-live", action="store_true")
+    p.add_argument("--favourite-temper", default=None, help="T0,T1 of the domestic (a2) temperature")
+    p.add_argument("--gap-k", type=float, default=None)
+    p.add_argument("--home-term", type=float, default=None)
+    p.add_argument("--print-home-term", action="store_true")
+    argv = list(sys.argv[1:] if argv is None else argv)
+    for i, a in enumerate(argv[:-1]):  # "-0.066,0.271" is not a negative number to argparse: bind it
+        if a == "--favourite-temper":
+            argv[i:i + 2] = [f"{a}={argv[i + 1]}"]
+            break
     args = p.parse_args(argv)
+    temper_args = None
+    if args.favourite_temper is not None:
+        if args.gap_k is None or args.home_term is None:
+            p.error("--favourite-temper needs --gap-k and --home-term")
+        temper_args = (*(float(x) for x in args.favourite_temper.split(",")), args.gap_k, args.home_term)
     closes = Path(args.closes)
     rows = json.loads((closes / "features.json").read_text(encoding="utf-8"))
+    if args.print_home_term:
+        n = sum(1 for r in rows if r["season"] in HOME_TERM_SEASONS)
+        print(f"H_RULE seasons={list(HOME_TERM_SEASONS)} n={n} H={home_term(rows)!r}", flush=True)
+        return 0
     step3 = {r["event_id"]: r for r in json.loads((closes / "report_close_step3.json").read_text(encoding="utf-8"))["rows"]}
     # Registered self-check: the dump must reproduce step 3's model exactly.
     worst = max(abs(r["ll_model"] - step3[r["event_id"]]["ll_model"]) for r in rows)
@@ -110,6 +220,7 @@ def main(argv=None) -> int:
             if i % 25 == 0:
                 print(f"LIVE {i + 1}/{len(by_day)} day={day} train={len(train)}", flush=True)
 
+    temper_report = apply_temper(rows, *temper_args) if temper_args else {}
     weights_a = _blend_weights(rows, "p_anchored", GATE_FIRST)
     weights_l = _blend_weights(rows, "p_live", GATE_FIRST) if not args.skip_live else {}
     for r in rows:
@@ -155,7 +266,16 @@ def main(argv=None) -> int:
                       "actual": float(np.mean([1.0 if r["y"] == k else 0.0 for r, k in zip(sub, idx)]))})
     report.update({"taus": taus, "tau_scores": tau_scores, "blend_w_anchored": weights_a, "blend_w_live": weights_l,
                    "H_ANCHOR": verdicts, "live_secondary_gate": live_verdicts, "secondary": secondary, "calibration": calib})
-    _write_json(closes / "report_anchored.json", report)
+    if temper_args:
+        report["registration"] = ".syndicate/findings_2026-10-19_uefa_favourite_temper.md s1"
+        report["favourite_temper"] = temper_report
+        _write_json(closes / "report_favourite_temper.json", report)
+        print("TEMPER", json.dumps({k: v for k, v in temper_report.items() if not k.startswith("calibration")}), flush=True)
+        for name in ("calibration_by_close", "calibration_by_model"):
+            for c in temper_report[name]:
+                print(name.upper(), c, flush=True)
+    else:
+        _write_json(closes / "report_anchored.json", report)
     print("H_ANCHOR", json.dumps(verdicts), flush=True)
     print("LIVE_GATE", json.dumps(live_verdicts), flush=True)
     print("SECONDARY", json.dumps({k: v for k, v in secondary.items() if k != "per_season"}), flush=True)
