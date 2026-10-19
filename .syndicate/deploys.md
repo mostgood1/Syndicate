@@ -51127,3 +51127,17 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - cheapest is a CODE revert: make `kalshi_join_all_game_lines_enabled()` return False (or `git revert 76ef318c`), push, ff the fleet, claimed refresh-worker TERM. That is one restart, and the env line can stay.
   - The env route (delete the line) costs a full down/up.
 - **verify OWED:** the reading above, after compounding-bankroll's `up`.
+
+## 2026-10-19T19:23:47Z -- FLEET: vendor/mlb_bettingv2 ARCHIVED, no ff, no restart (lane mlb-vendor-delete)
+- What: on /home/amyn/Syndicate (HEAD 94c97011), tarred vendor/mlb_bettingv2 (tracked + ignored, 371 files, 44M -> 6.4M) to
+  `/home/amyn/syndicate-prod/data/_archive/vendor_mlb_bettingv2_fleet_20261019T192347Z.tar.gz`; tar count 371 == find count.
+  Then `git checkout --` its 2 modified tracked files (player_features_{2026,latest}.json, last written 2026-10-09, i.e. before
+  the native switch; archived sha 6cb7809f0156). Nothing reads them: the native engine writes engines/mlb (10-17 copies differ).
+- Why: main deletes the tree (814f7966). A ff over modified tracked files that the target deletes would REFUSE; now
+  `git status --porcelain -- vendor/mlb_bettingv2` = 0 lines.
+- NOT DONE, by user decision: the ff. **For whoever runs the next fleet ff past 814f7966:** the tree goes away with it; ignored
+  leftovers (caches, .pyc) stay under vendor/mlb_bettingv2 and are archived, so `rm -rf` of them is optional. Nothing on the fleet
+  imports the tree (14 entry points checked, 0 vendored modules), so no restart is needed for this change.
+- verify: after that ff, `git ls-files vendor/mlb_bettingv2 | wc -l` = 0 on the fleet and the next MLB sim / live tick write 0 files
+  under vendor/mlb_bettingv2 (find -newer the ff time). Owed by lane mlb-vendor-delete.
+- Rollback: `git revert 814f7966` + `tar -xzf` the archive in /home/amyn/Syndicate.
