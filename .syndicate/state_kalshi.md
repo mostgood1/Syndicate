@@ -855,8 +855,7 @@ board. The loop therefore checks `budget_remaining()` BEFORE spending.
 - **Own document, own key space.** `reports/intelligence/execution_exits.json` (keyvalue). Exit keys are `x` + 23 hex, so
   `_is_our_key` is False on them. Exits are never in `execution_ledger.json`, so they never reach `spent_today` / caps,
   `unreconciled_orders`, or the entry orphan scan.
-- **Measured 19:20:07Z:** `EXIT_TICK status=ok mode=paper positions=19 live=1 quoted=12 quote_errors=0 venue=ok mismatches=0 watching=19`;
-  placement unaffected (`EXECUTED mode=live venue=kalshi` at 19:20:19Z).
+- **Measured 19:20:07Z (first tick) and 21:16:17Z (latest read 21:24Z):** `EXIT_TICK status=ok mode=paper positions=19 live=1 quoted=12 venue=ok mismatches=0`, all `below_threshold`, 0 paper exits so far; ticks every 5.7-6.7 min; placement unaffected (`EXECUTED mode=live` continues). Same live-odds pid 2605956 throughout.
 - **Venue reads now verified on production:** batched `GET /markets?tickers=A,B,...` (public) and the signed
   `GET /portfolio/positions` (`market_positions[].position[_fp]`, signed: + = YES, - = NO). The latter matched the ledger
   on the first read (Thornton NO x5).
