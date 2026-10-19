@@ -2458,3 +2458,28 @@ Nothing graded this time only because the one-shot settlement ran in the 'Schedu
   - (B) the join runs against the published SHORTLIST, so a fixture with no shortlist row for the market can never be priced.
 - Neither shows up in a name-only replay. The real-join replay (`join_kalshi_to_board` on fleet markets + `read_layer2_shortlist`, under the worker's own env from `/proc/<pid>/environ`) found both in one run.
 - **How to apply:** before predicting a served count, replay the function that produces it, on the inputs it reads, in the env it runs under. A resolver-level check is a necessary condition, never the prediction.
+
+## 2026-10-19 RULE: `git commit -m "..."` and unquoted heredocs EXECUTE backticks -- use `-F -` with `<<'EOF'` for anything containing `code spans` `[hit twice in one session]`
+
+- **Twice today, same mechanism, different shape:**
+  1. a `deploys.md` append written with `<<PY` (unquoted, so `$NOW` would
+     interpolate) ran `` `local_aa5d7792` `` as a command and wrote it as EMPTY,
+     leaving "session 3927eb2e (, lane ...". The shell printed ONE
+     "command not found" and I had to check whether more had been eaten.
+  2. a commit message passed as `git commit -m "... under \`market\` the sim's
+     zero-Kelly VETO ..."` ran `` `market` `` and left "under  the sim's", a
+     double space where the word had been.
+- **Why it keeps happening:** backticks are the natural way to write a code span
+  in this ledger's prose, and double-quoted shell contexts are the natural way to
+  pass a message. The two are incompatible and nothing warns you -- a
+  substitution DELETES text without leaving a mark where it was, so "one error
+  printed" is not "one thing broken".
+- **Rule:** any text containing backticks goes through `git commit -F -` with a
+  **quoted** heredoc (`<<'EOF'`), or is built in Python and written with
+  `ledger_io`. Never `-m "..."`, never `<<PY` unquoted. If an interpolated value
+  is needed, pass it as an argv parameter to a Python script rather than letting
+  the shell expand the document.
+- **And verify after, not just before:** both times the fix was to re-read the
+  stored text and check every token I intended was present. The first instance
+  cost a repair commit; the second was caught the same way but only after it had
+  been pushed, so the damage stands in the history as a double space.
