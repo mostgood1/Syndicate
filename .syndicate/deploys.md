@@ -51064,3 +51064,33 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - New pid env (allowlisted keys): `SYNDICATE_EXECUTION_MODE=live`, `_LIVE_ARMED=1`, `_ENABLED=1`, no `SYNDICATE_EXIT_*` key. `RENDER_GIT_COMMIT` still reads a6c32498 because the supervisor builds env once at `up`. It is NOT evidence of the code. The `EXIT_TICK` line is, since it exists only in f7d775f9+.
   - First venue reading of the new SIGNED read `GET /portfolio/positions`: ledger net == venue on the one live position (Thornton NO x5), 0 mismatches.
 - **owed:** (1) the counterfactual after >= 7 slates: `python scripts/exit_counterfactual_report.py` under live-odds-worker's env (todo `#703`). (2) Before ANY live exit, `execution_exits.LIVE_BLOCKERS` and a user yes.
+
+
+## 2026-10-19 19:06:01Z (2:06 PM CT) -- fleet ff 71631544 -> 94c97011 + refresh-worker TERM/respawn ONLY: min_ev tuner (shadow) -- **MET** (lane `min-ev-tuner-shadow`, session b98807bc)
+- **ask:** user 2026-10-19, in chat: "Ff the fleet to 94c97011 now (carrying f7d775f9 and 3c55e77b) and restart refresh-worker behind claim + preflight, then verify the MIN_EV_TUNER line."
+- **claims:** refresh-worker + web by `min-ev-tuner-shadow` (acquire exit 0 each, ~18:37Z). live-odds-worker was HELD by `kalshi-exit-path` and NOT taken. That lane (session local_646aa514) replied "go" to the ff, will not ff itself, and will restart only live-odds-worker later.
+- **ride-alongs (71631544..94c97011, read before the merge in their own call):** vendor/ 0 files.
+  - `3c55e77b`: comments/docstrings, plus deletion of port/parity/migration harnesses. No scheduled or runtime caller remains (git grep).
+  - `f7d775f9` `execution_exits.py`: imported only by live-odds-worker's main process, which was not restarted.
+  - Mine: `min_ev_tuner.py`, `season_phase.py`, the hook in `pipeline/intelligence_state.py`, the readout script.
+  - NOT carried: `d4837386` (layer2 plausibility bound) is not an ancestor of 94c97011 (merge-base checked; re-derived independently by lane model-edge-plausibility-bound).
+- **baseline (18:38:13Z):**
+  - refresh-worker pid 2570293 (up since 17:30:16Z), `RENDER_GIT_COMMIT=a6c32498`, no `SYNDICATE_MIN_EV_TUNER*` key (so shadow by default).
+  - 0 `MIN_EV_TUNER` lines in refresh-worker.log; no `min_ev_tuner_state.json` key in Redis.
+- **safety -- PROCEEDED DELIBERATELY, NOT CLEAR:** the drain (owner min-ev-tuner-shadow) ran 18:39-19:04Z and hit its 1500 s cap NOT CLEAR.
+  - The board build went idle and persisted early, and the MLB sim was finished.
+  - What remained was a continuous stream of DETACHED odds jobs (`start_new_session=True`, so they survive a role TERM) during live soccer.
+  - The fresh 19:05:02Z read was the same, plus a live-games warning.
+  - Cost taken: refresh-worker's live-lens ticks for ~7 s. Precedent: role-only TERMs with odds children in flight at 14:30:06Z and 22:06:24Z.
+- **timeline (UTC):**
+  - ff `--ff-only 94c97011` 19:05:27Z; reflog `71631544 -> 94c97011`; the 5 local data modifications were kept.
+  - `kill -TERM 2570293` 19:06:01Z. Supervisor: `exit code=0 claimed=true holder=min-ev-tuner-shadow` at 19:06:03Z (role_restarts.jsonl); new pid **2601049** at 19:06:08Z.
+  - `--undrain` -> `DRAIN_CLEARED owner=min-ev-tuner-shadow` 19:06:32Z.
+- **NEAR-MISS in my own guard:** the ff command's `[ "$(git rev-parse HEAD)" = "$(git rev-parse 71631544)" ]` was issued from Git Bash. Its `$(...)` substitutions ran on the WINDOWS side, both failed, and the guard compared "" to "", so it would have passed against ANY fleet HEAD. The merge was correct only because HEAD really was 71631544 (reflog). Every later WSL step ran from a script file via PowerShell. Rule: never put `$(...)` in a `wsl.exe -- bash -lc` string issued from Git Bash; use a script file.
+- **verify (MET):**
+  - `local_production.py status`: refresh-worker `code=94c97011`, restarts=1. web (71631544) and live-odds-worker (a6c32498) show STALE, as intended: not restarted. Web loads the ff at its next gunicorn worker recycle; the only web-reachable change is 3c55e77b docstrings.
+  - **`2026-10-19T19:25:36.467Z [min_ev_tuner] MIN_EV_TUNER mode=shadow date=2026-10-19 cells=60 actions={'hold': 60} skipped={'no_ev_pct': 552, 'not_settled': 1264, 'venue_not_tuned': 7422} base=0.0 moves=0`**. This was the first cycle past 12Z after the restart (19m35s after the respawn). The skip counts equal the backtest's.
+  - `min_ev_tuner_readout.py state` 19:31:56Z: `mode=shadow last_run_at=2026-10-19T19:25:35Z`, 60 cells, audit 0 moves. The state persisted.
+- **SURPRISE read off the verify line: `base=0.0`.** refresh-worker carries `SYNDICATE_PORTFOLIO_MIN_EV_PCT=0` (user decision 2026-09-16), not the 2.0 default. Anchored there, the tuner's band was empty by construction. Fixed in `40640a0b` (band anchored at the cell's effective cut, floor 0.0), which is on main but NOT loaded. It loads at the next refresh-worker restart (the compounding-bankroll lane plans an ff to origin/main + full down/up >= 20:06Z). Tomorrow's 12Z run is the first that can use it.
+- **released:** refresh-worker + web claims, by token, after this entry.
+- **owed:** 7 daily readouts (`MIN_EV_TUNER` line + `min_ev_tuner_readout.py state` inside WSL with the worker state env). First readout with 40640a0b loaded: confirm `effective_cut_pct` is present and bands are no longer `[0.0, 1.0]`.
