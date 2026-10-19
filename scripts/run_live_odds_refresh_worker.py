@@ -2390,6 +2390,24 @@ def _ledger_rebuild_tick() -> None:
         print(f"[live_odds_worker] LEDGER_REBUILD_FAILED {type(exc).__name__}: {exc}", flush=True)
 
 
+def _exit_tick(today: str) -> None:
+    """Watch every open Kalshi position for a sell-before-settlement exit.
+
+    `SYNDICATE_EXIT_MODE` is `paper` unless set `off` or `live`: paper sends
+    nothing and records would-be exits plus each position's best bid, for the
+    exit-vs-hold counterfactual. Never raises -- it shares a tick with the
+    placer.
+    """
+    try:
+        from syndicate.features.shared.execution_exits import exit_tick_line, run_exit_tick
+
+        summary = run_exit_tick(today=today)
+        if summary.get("status") != "off":
+            print(exit_tick_line(summary), flush=True)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[live_odds_worker] EXIT_TICK_FAILED {type(exc).__name__}: {exc}", flush=True)
+
+
 def _run_execution_tick() -> None:
     """Place today's committed plan, on this worker, on its own clock.
 
@@ -2516,6 +2534,10 @@ def _run_execution_tick() -> None:
                 f"[live_odds_worker] VENUE_SETTLEMENT_FAILED {type(exc).__name__}: {exc}",
                 flush=True,
             )
+
+        # THE EXIT PATH, after settlement so a graded position is no longer
+        # watched. Paper by default -- see `execution_exits`.
+        _exit_tick(central_today_iso())
 
         # THE VENUE-RESTRICTED PLAN, named explicitly. Without this the call
         # read the unrestricted plan and tried to place a soccer total and an

@@ -1166,6 +1166,13 @@ death, never life — do not invert it.
 - Hypothesis: n/a (build)
 - Falsification test: n/a
 - Verification: Unit tests incl. reachability (off != shadow: off writes no state, shadow writes state + logs); backtest on the fleet's production ledger with per-venue/date coverage printed (findings file); after the refresh-worker loads it, a MIN_EV_TUNER line in its log on the first cycle after 12:00Z and min_ev_tuner_state.json readable with mode=shadow; seven daily readouts recorded before the apply decision.
+
+### kalshi-exit-path — OPEN — opened 2026-10-19 — session b4e23404-e8a9-47ef-a692-2e33892ec354
+- Goal: Kalshi positions can be sold before settlement: open-position ledger reconciled vs GET /portfolio/positions, sell-to-close builder in its own key space with write-ahead + reconcile, take-profit rule (net bid >= entry cost + margin, or >= model fair; net of both fees); runs in PAPER mode by default on the live-odds-worker execution tick and logs would-be exits + per-position best-bid high-water mark; exit-vs-hold-to-settle counterfactual readout. Live exits gated behind SYNDICATE_EXIT_MODE=live + SYNDICATE_EXIT_LIVE_ARMED + the user's explicit yes
+- Files: syndicate/features/shared/execution_exits.py (NEW), tests/test_execution_exits.py (NEW), scripts/exit_counterfactual_report.py (NEW), scripts/run_live_odds_refresh_worker.py (_exit_tick + its one call inside _run_execution_tick ONLY)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit tests incl. off != on and worker-tick reachability; landed on origin/main; fleet ff + live-odds-worker restart behind claim+preflight; EXIT_TICK line on the fleet log with positions>0 quoted>0, and execution_exits.json present with watch rows; counterfactual readout after >= 7 slates
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
