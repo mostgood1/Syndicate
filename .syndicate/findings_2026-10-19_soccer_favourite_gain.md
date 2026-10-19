@@ -129,10 +129,124 @@ Run at Idle priority. Driver: `scripts/soccer_team_strength_experiments.py stage
 
 ## 2. Coverage
 
-(written after the run's population, identity and reachability checks, before any score is read)
+- Code on main before any fit: `40806207`, with 8 hermetic tests in `tests/test_soccer_team_strength_gain.py`.
+- Run 2026-10-19 ~20:27-20:36Z, `scripts/soccer_team_strength_experiments.py stage3 --root C:/tmp/team-strength`.
+  Priority read back as **64 (IDLE_PRIORITY_CLASS)**. Output: `C:/tmp/team-strength/stage3_report.json`,
+  `stage3_run.log`.
+- **FULL 32,638 matches; held out 27,285** (2016..2026, the 2026 season n 512). Skipped: 8 wrong pairings, 10
+  with no close. This is stage 1's population exactly.
+- **Identity PASSED.** `C*` held-out log loss is 0.9777, stage 1's value. The null-parameter runtime assertion
+  (temper and draw maps at 0 reproduce `C*` to 1e-9) held in every season.
+- **Reachability PASSED.** Every arm changes 100% of held-out matches, so none is INERT.
+- One family, one window: ratings, outcomes and closes come from the same matches, so the intersection is
+  the FULL set itself.
 
 ## 3. Results
 
+### Fitted parameters (walk-forward, main rating; every season fits the same sign)
+
+| season fit for | k | (a1) γ | (a2) τ0, τ1 | (b) δ0, δ1 |
+|---|---|---|---|---|
+| 2016 | 1.532 | +0.68 | −0.136, +0.370 | +0.144, −0.284 |
+| 2020 | 1.602 | +0.50 | −0.062, +0.264 | +0.145, −0.381 |
+| 2026 | 1.577 | +0.44 | −0.066, +0.271 | +0.163, −0.360 |
+
+All 11 seasons agree in sign: γ ranges +0.39..+0.68, τ1 +0.17..+0.37 and δ1 −0.22..−0.39. The data ask for a
+gain that rises with |gap| and for fewer draws in lopsided games, every season.
+
+### Verdicts (Δ held-out 1X2 log loss vs `C*`, 27,285 matches)
+
+| arm | Δ vs C\* | 95% CI | 97.5% CI (Bonferroni, (a) only) | Δ Brier | Δ KL to close [CI] | Δ vs close | F1 top decile (C\* 0.745, close 0.805, actual 0.821) | F1 shortfall closed | F2 own top decile: arm / actual [CI] | rule verdict |
+|---|---|---|---|---|---|---|---|---|---|---|
+| C\* | 0 | — | — | — | — | +0.0221 | 0.745 | 0 | 0.777 / 0.800 [0.784, 0.813] | reference |
+| **(a1) gain in the goal link** | +0.0003 | [−0.0001, +0.0006] | [−0.0002, +0.0007] | +0.0002 | +0.0004 [+0.0003, +0.0005] | +0.0224 | 0.758 | 17% | 0.794 / 0.803 | **FALSIFIED** |
+| **(a2) 1X2 temperature exp(τ0 + τ1·\|g\|)** | **−0.0005** | [−0.0010, −0.0001] | **[−0.0010, −0.00002]** | −0.0004 [−0.0006, −0.0002] | **+0.0004 [+0.0003, +0.0005]** | +0.0216 | **0.774** | **39%** | **0.810 / 0.802 [0.789, 0.816]** | **SUPPORTED; meets the FIX rule** |
+| (a2-0) global temperature only | −0.0000 | [−0.0003, +0.0003] | | +0.0000 | +0.0005 | +0.0221 | 0.759 | 18% | 0.791 / 0.799 | (decomposition) |
+| **(b) draw term exp(δ0 + δ1·\|g\|)** | **−0.0010** | **[−0.0015, −0.0005]** | | −0.0006 [−0.0009, −0.0003] | **−0.0005 [−0.0005, −0.0004]** | +0.0211 | 0.751 | 8% | 0.784 / 0.801 | **SUPPORTED; NOT a fix** |
+| (b-0) global draw rate only | −0.0005 | [−0.0009, −0.0002] | | −0.0002 | −0.0005 | +0.0216 | 0.737 | −10% | 0.770 / 0.798 | (decomposition) |
+| AB = (a1) + (b) (secondary) | −0.0006 | [−0.0012, +0.0000] | | −0.0003 | −0.0000 | +0.0215 | 0.761 | 21% | 0.798 / 0.801 | (secondary) |
+
+Spread, the sd of p(home) − p(away): C\* 0.323, a1 0.324, **a2 0.340**, b 0.324, close 0.364.
+
+**Per season** (Δ vs C\*, units of 1e-4): (a2) is below 0 in 9 of 11 seasons (2016 +2.9, 2022 +0.1), and
+(b) in 10 of 11 (2016 +0.9). By league, (a2) is −28.5 in Primeira (CI below 0), −10.3 in Serie A, and above 0
+in Eredivisie (+6.5) and Belgium (+2.5). (b) is below 0 in 7 of 8 leagues; Ligue 1 is +0.5. On PROMOTED
+matches, (a2) is +24.4 (n 1,422, CI spans 0): the temperature over-sharpens a gap that a promoted club's
+prior rating makes look bigger than it is.
+
+**On the stage-1 cumulative rating** (secondary; its own reference is 0.9754, +0.0197 vs close):
+- (a2): −0.0003 [−0.0009, +0.0002], NOT DEMONSTRATED. It is **over-confident on F2**: 0.824 against an actual
+  0.801 [0.786, 0.816]. That rating is already wider (k 1.70-1.78 against 1.53-1.62), so the same
+  temperature overshoots.
+- (b): −0.0010 [−0.0015, −0.0005], SUPPORTED. It replicates exactly.
+- (a1): +0.0002, FALSIFIED.
+
+### F2 is the finding: C\* is UNDER-confident on its own favourites
+
+Deciles of C\*'s own favourite probability (model / actual):
+
+| decile | 1 | 2 | 5 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|
+| C\* | 0.378 / 0.368 | 0.405 / 0.381 | 0.486 / 0.473 | 0.605 / 0.612 | **0.668 / 0.698** | **0.777 / 0.800** |
+| (a2) | 0.377 / 0.365 | 0.402 / 0.385 | 0.482 / 0.483 | 0.613 / 0.618 | 0.687 / 0.691 | 0.810 / 0.802 |
+
+The registered prior expected C\* to be calibrated on its own deciles. **It is not.** The top two deciles
+under-predict by 2.3-3.0 points, and the weak-favourite deciles over-predict by about a point. So part of the
+favourite gap IS systematic, and a gap-dependent 1X2 temperature removes it: (a2)'s deciles sit within about a
+point of actual all the way up.
+
+### Verdicts per candidate
+
+- **(a) favourite-dependent gain: SUPPORTED, through (a2) only**, and (a2) meets the registered FIX rule on
+  the primary rating:
+  - Δ −0.0005 with the Bonferroni CI below 0;
+  - 39% of the F1 shortfall closed (0.745 → 0.774, against an actual 0.821);
+  - not over-confident on F2.
+  - (a1) is **FALSIFIED**. The same idea fit by goal likelihood in the Poisson link stretches the goal rates
+    but loses 1X2 log loss. The goal objective is not the 1X2 objective at the extremes.
+  - **The size must be read with the verdict.** The pass is marginal: the 97.5% upper bound is −0.00002. It
+    does not replicate on the cumulative rating, where it over-sharpens. And it moves the model AWAY from the
+    close (Δ KL +0.0004, CI above 0): (a2) closes 2% of the log-loss gap to the close. It fixes calibration
+    on favourites without adding the information the close has.
+- **(b) gap-tied draw correction: SUPPORTED** (−0.0010 [−0.0015, −0.0005]). It replicates on the cumulative
+  rating, holds in 10 of 11 seasons, and moves TOWARD the close (Δ KL −0.0005, CI below 0). Half of it is a
+  global draw-rate correction (b-0 −0.0005): independent Poisson under-predicts draws. The gap term adds the
+  other half. **It is not a fix for the favourite gap:** it closes 8% of the F1 shortfall.
+- **(c) lineup or rotation input: NOT DEMONSTRATED**, untested because no such input exists in these data (as
+  registered).
+
+### Engine read
+
+1. **The favourite gap has two parts, and this study separates them.**
+   - A **systematic calibration part**: about 2-3 points on the model's own top two deciles. A gap-dependent
+     1X2 temperature removes it.
+   - An **information part**: everything else. The close's favourites are still 0.031 above (a2)'s on F1
+     (0.805 vs 0.774), and (a2) moves no closer to the close in KL. That is the part the prior reading
+     ("noisy rating") was right about.
+   - The compression study's conclusion that the shortfall is "lack of INFORMATION in the rating, not a scale
+     or clamp setting" was therefore only mostly right. A non-linear shape term exists, but a LINEAR scale
+     could never find it.
+2. **The sim cannot take (a2) as it stands.** The engine does not output a 1X2 through this link. Its 1X2 comes
+   from simulated scores, so a post-hoc temperature would have to be applied to the sim's 1X2, keyed on the
+   sim's own |rating gap|. That is a new wiring with its own reachability test, and it is out of scope here.
+   (b)'s draw term has the same shape.
+3. **Independent Poisson's draw deficit is real and stable** (δ0 +0.12..+0.16 every season, about +14% draw
+   odds at |g| = 0). It is the textbook Dixon-Coles effect. The sim's own score model may or may not share it;
+   that is unmeasured.
+
 ## 4. What cannot be estimated
 
+- **The served sim under (a2) or (b).** No sim was run. Both are post-hoc maps on a 1X2 the engine does not
+  emit through this link.
+- **Whether (a2)'s calibration gain survives the stage-2 rating.** On the cumulative rating it is NOT
+  DEMONSTRATED and over-confident. Anyone shipping both needs a joint refit, and a joint arm was not
+  registered.
+- **(a2) + (b) together.** Not registered, so not run. AB is (a1) + (b). A joint (a2) + (b) needs a new
+  registration.
+- **Lineups and rotation** (candidate c), MLS, the Championship, betting value.
+
 ## 5. Deviations from the registration
+
+- None. Arms, objectives, CIs, verdict and FIX rules ran as registered; the identity and reachability checks
+  passed.
+- The prior expectation (F2 calibrated, no FIX) was **wrong** and is left as written.
