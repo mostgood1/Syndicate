@@ -50845,3 +50845,21 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - **Not separated yet:** (a) the Kalshi quote tape / event resolution has not refreshed in the 24 min since the restart; or (b) the served path resolves Kalshi events through a different join (e.g. `pipeline/kalshi_odds_refresh.py` `_resolve_event` / `match_event_blob`, or per-league maps that exclude UEFA). (b) is the stronger lead, because fixtures whose names already resolved are missing too.
 - **No pre-restart served baseline exists:** my first grid read was after 16:04Z.
 - **Next:** a one-time re-read at ~18:45Z (scheduled task `uefa-kalshi-join-reread`). The same counts mean the gap is (b), a code path, not the tape.
+
+
+## 2026-10-19 16:51:18Z (11:51 AM CT) fleet ff fceb54c1 -> 1db5320d + `reload-web` (2.2 s, 0 failures): alt ladders EARLY + LATE (lanes `alt-ladders`, `basketball-sgp-builder`, session 9e18a0e7) -- NO worker restart
+- **ask:** user 2026-10-19 "are we sure alt line prices arent available now? is this an availability issue or an issue with odds we pull and when we pull them?" -> "Early + late (Recommended)".
+- **measured first:**
+  - A 1-credit `/markets` call on BOS @ DET (tips 2:00 PM CT 10-20): NBA alternates posted at 7 of 10 books (points / rebounds / assists), threes at 6, combos at 3-4 -- ~27 h before tip.
+  - Cause: OUR pull timing, not availability (late-only, 20-90 min before start).
+  - Alt spend before: 20 / 87 / 116 credits on 10-16 / 10-17 / 10-18.
+- **change:**
+  - Each game is fetched EARLY once (90 min - 30 h out; tomorrow's sheet read too; rows into the game's day file) and LATE once (20-90 min, as before).
+  - A later capture replaces an earlier one per book x rung.
+  - Spend is counted by the Central day it is spent; the daily cap goes 400 -> 800.
+  - Pre-change records count as late.
+- **claim:** web by basketball-sgp-builder (token b05c11c0...), acquire exit 0; ride-alongs: `docs/ai_context/todo.md` only.
+- **verify:**
+  - Fleet dry run right after the ff: 7 games due EARLY today (MNF, MLB, 4 NHL, WNBA), up to 51 credits.
+  - NBA 10-20 is not yet listed: its sheet is picks-only until the 2 PM CT build gives it games.
+  - OWED: the first real early fetches (next 15-min run), today's NHL tiers served hours before puck drop, tomorrow's NBA early fetch after the 2 PM build, and the daily alt spend reading.
