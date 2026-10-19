@@ -3287,3 +3287,42 @@ keyword of the three solver helpers and their EXACT call sites, section only.
   shooting-foul model.
 - **Round-2 config so far:** fit_f5 + quarter_targets_mode=mean + quarters_calibration.json (R2-a, CONFIRMED on 12
   dates).
+
+**USER DECISION 2026-10-19: "Build the shooting-foul model".**
+
+### R2-c' — COHERENT SHOOTING-FOUL MODEL — PRE-REGISTRATION 2026-10-19 (before any build or run)
+
+**Real targets** (ESPN pbp + box, the 816 FIT games, per team-game):
+- Shooting fouls: 10.34. Trips after a shooting foul: two-shot 7.56 (fouled missed 2PA), "1 of 1" 2.34 (and-ones:
+  ~2.22 on twos and ~0.12 on threes, from the 1.79 / 0.095 lookback attribution scaled to 2.34), three-shot 0.39.
+- Non-shooting FT trips (penalty / take / loose ball) ~1.9 two-shot.
+- Recorded 2PA 52.31 / 2PM 28.59 (2P% .5465); 3PA 36.98 / 3PM 13.27 (3P% .3589).
+- **Rates on ALL attempts** (fouled misses included):
+  - **twos:** attempts 59.87, make q2 .4775; P(fouled | missed 2) **b2 = .2417**; P(and-one | made 2) **a2 = .0776**;
+  - **threes:** attempts 37.37, q3 .3551, **b3 = .0161**, **a3 = .0090**.
+
+**Mechanism:** EventSimConfig `shooting_foul_model: str = "legacy"` (default = today, byte-identical), plus
+`"coherent"`, with league rate fields sf_a2 / sf_b2 / sf_a3 / sf_b3 (the NBA values above).
+- In coherent mode, per shot:
+  - Make with q = denet(p) × eff × q_env × score, where denet(p) = p(1 − b)/(1 − p·b). p is the player's recorded
+    2P% / 3P% (the two-point split from #5a), and b = b_type × r.
+  - If made: an and-one with probability a_type × r.
+  - If missed: fouled with probability b_type × r. The FT trip is 2 or 3 shots and is not an FGA.
+  - r = team factor (the team's foul_per_fga ÷ base_shooting_foul_per_fga, clipped [0.6, 1.6]) × the shooter FT-rate
+    multiplier.
+  - Each shooting foul charges a defender PF (as now).
+  - The legacy single draw (`foul` with 0.32 / 0.70) and foul_3pa / 2pa_mult are bypassed.
+- The EXACT solver uses the coherent points-per-possession formula in this mode.
+- Bonus, non-shooting and end-game fouling are untouched.
+- Tests: legacy byte-identical, reachability, recorded 2P%/3P% ≈ the prior on synthetic games, solver
+  consistency, corpus parity.
+- Harness counters: shooting two-shot trips, three-shot trips, and-ones, bonus trips.
+
+**Step 1 (12 sweep dates, the round-2 config + coherent):**
+- **Readings vs real:** shooting two-shot trips 7.56, and-ones 2.34, three-shot trips 0.39, 2P% / 3P% (subsample real
+  .5446 / .3611), FTA, PF, foul-outs, FGA, REB, bias, the quarter shares.
+- **CONFIRMED if:** the three shooting-trip rates are each within ±15% of real, AND 2P% within ±.012, AND 3P% within
+  ±.008.
+- **Step 2:** re-fit the non-shooting volume (bonus × base non-shoot) to FTA 22.69 ± 0.3 and PF 19.67 ± 0.4. Then s/Δ
+  re-measured on the disjoint dates, the 12-date check with every guard, and the full FIT.
+- The round-2 forward test decides adoption.
