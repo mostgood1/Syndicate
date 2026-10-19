@@ -3326,3 +3326,45 @@ keyword of the three solver helpers and their EXACT call sites, section only.
 - **Step 2:** re-fit the non-shooting volume (bonus × base non-shoot) to FTA 22.69 ± 0.3 and PF 19.67 ± 0.4. Then s/Δ
   re-measured on the disjoint dates, the 12-date check with every guard, and the full FIT.
 - The round-2 forward test decides adoption.
+
+### R2-c' step 1 — RESULT 2026-10-19 17:30Z (coherent model committed; corpus parity 5,400/5,400): NOT CONFIRMED by the letter; the trip composition is fixed, and the make-% excess now traces to SHOT VOLUME
+
+**Run 1 (`R2CC_coh`) — DISCLOSED BUG, superseded.**
+- The team factor was the legacy `foul_per_fga` ÷ base 0.095. The legacy rate is clipped at 0.20 while the league
+  FTA/FGA is ~0.25, so most teams sat at the 1.6 clip.
+- Trips came out 1.3–1.7× real (two-shot 12.52, and-ones 2.93, three-shot 0.60), with FTA 32.8 and foul-outs 0.58.
+- It did show 2P% .554 / 3P% .365 inside their bands.
+- **Fix:** the team factor = UNclipped prior FTA/FGA ÷ `sf_team_ref` 0.2541 (the real league ratio), then re-run.
+
+**Run 2 (`R2CC_coh2`, the 12 sweep dates, the round-2 config + coherent; 166 team-games, 0 errors):**
+
+| | sim | real | rule |
+|---|---|---|---|
+| shooting two-shot trips | 8.74 | 7.56 | ±15% ✗ (+15.6%) |
+| and-ones | 2.47 | 2.34 | ✓ (+5.6%) |
+| three-shot trips | 0.44 | 0.39 | ✓ (+13%) |
+| 2P% | .5636 | .5446 | ±.012 ✗ |
+| 3P% | .3719 | .3611 | ±.008 ✗ |
+| FTA / PF / foul-outs | 23.72 / 21.29 / 0.300 | 22.52 / 19.67 / 0.193 | readings |
+| FGA / 3PA / 3PM | 85.96 / 38.94 / 14.48 | 89.08 / 36.77 / 13.28 | readings |
+| REB / AST | 41.63 / 23.75 | 43.81 / 27.20 | readings |
+| total bias | +1.43 | 0 | reading |
+
+- Quarter shares hold (.2551 / .2507 / .2529 / .2412).
+
+**Reading:**
+- The composition is now near real: and-ones and three-shot trips within 15%, two-shot trips just outside.
+- The recorded % lands on the prior only when EXACT's eff = 1 (unit test). Here eff > 1, and the SAME scaling lifts
+  2P% and 3P% together, because the sim's shot VOLUME is short.
+- Real: 102.54 possessions per team-game, FGA per possession .871, OREB 11.47. Sim: 101.06 possessions, FGA per
+  possession .851 (85.96 FGA).
+- Fewer shots → EXACT raises the make rates to hit the points target.
+- So the make-% excess (in every run since #5a) is downstream of shot VOLUME: possessions −1.5%, shots per possession
+  −2.3%, i.e. OREB continuation, with REB short too. Not the foul model.
+- The first run's in-band % were a coincidence of excess FT points lowering eff.
+
+**Next (R2-d, pre-registered next):** a volume diagnostic.
+- Sim vs real possessions per team-game, OREB per own miss, and shots per possession, on the coherent config.
+- Then the volume levers (`possessions_per_game` / the pace input, `base_oreb_rate`) re-fitted on FIT.
+- Then the coherent rates re-checked; the two-shot rate gets a ×0.87 trim if it still runs over.
+- The coherent model stays default-off.
