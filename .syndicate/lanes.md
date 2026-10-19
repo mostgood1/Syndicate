@@ -1152,6 +1152,14 @@ death, never life — do not invert it.
 - Verification: In-process over production payloads: run the deployed _model_edge_for with the flag off and on over the same fetched rows and report both refusal counts and the diff set. Then on the served board after a restart: the count of rows carrying model_edge_pct, before and after, with the refusal-reason breakdown. Plus unit tests and mutation.
 - Blocked by: none
 
+### compounding-bankroll — OPEN — opened 2026-10-19 — session 3927eb2e-ef81-481e-971f-452a0768e042
+- Goal: Live Kalshi/Polymarket stake sizing and execution caps compound with the account: (1) live-plan bankroll per venue = fraction x venue capital from the venue_balances stamp (Kalshi capped by the order's exchange_index shard cash; Polymarket buyingPower minus pending deposit), hard dollar ceiling, fail-closed (named refusal) when the stamp is stale/absent; (2) limits() caps as % of venue capital (day 25%, order 5%) with the current resolved dollar caps as ceilings. Both default OFF (absent = today's behaviour), reachability-tested (off != on), paper-measured over fleet production payloads, merged to origin/main with a stated rollback; live enablement only on the user's explicit yes.
+- Files: syndicate/features/shared/venue_capital.py (NEW), tests/test_venue_capital.py (NEW), tests/test_compounding_bankroll.py (NEW), scripts/compounding_bankroll_paper.py (NEW), syndicate/features/shared/execution_guard.py (limits() balance-caps block + its check_order refusal ONLY), pipeline/portfolio_commit.py (commit_live_venue_plan / _write_live_venue_plan compounding step ONLY), syndicate/features/shared/venue_balances.py (the portfolio_value comment ONLY)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit tests incl. off != on for both flags; paper script over the fleet's live plans + balance stamp reports per-position fixed vs compounding stake and per-venue caps, with denominators; landed on origin/main
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
