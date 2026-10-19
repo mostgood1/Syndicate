@@ -3638,6 +3638,37 @@ SUGGESTED_MIN_EV_PCT = 2.0
 _SUGGESTED_ONE_SIDED_FAIRS = frozenset({"book_margin_model"})
 
 
+def _no_market_price(row: Mapping[str, Any]) -> bool:
+    """True when a row ranks on a MODEL edge with no market price behind it.
+
+    All three clauses are load-bearing and each is checked, never inferred:
+
+    - no `fair_probability` -- `_resolve_fair` produced nothing for this side,
+    - no `ev_pct` -- which follows from the first (`ev` is guarded on
+      `fair is not None`) but is read rather than assumed, because a future
+      path could fill one without the other and this must not silently widen,
+    - a numeric `model_edge_pct` -- so the row IS being ranked on something.
+      Without this clause the predicate would also swallow `no_projection`
+      rows, which carry no opinion at all and are counted separately.
+
+    UNKNOWN MUST NOT DEFAULT PERMISSIVE, and here that cuts the other way than
+    usual: an absent fair is not evidence the row is fine, so the refusal is
+    what an absent fair earns. But an absent MODEL EDGE is not evidence of a
+    problem either, so a row with neither is left to `rows_no_projection`.
+    """
+    if _as_float(row.get("model_edge_pct")) is None:
+        return False
+    if _as_float(row.get("ev_pct")) is not None:
+        return False
+    quote = row.get("quote")
+    fair = quote.get("fair_probability") if isinstance(quote, Mapping) else None
+    if fair is None:
+        # The shortlist's own rows carry it on `quote`; a candidate mid-build
+        # may still hold it at the top level. Read both rather than assume.
+        fair = row.get("fair_probability")
+    return _as_float(fair) is None
+
+
 def _suggested_min_ev_pct() -> float:
     return _env_float("SYNDICATE_SUGGESTED_MIN_EV_PCT", SUGGESTED_MIN_EV_PCT)
 
@@ -5789,6 +5820,9 @@ def select_shortlist(
     withdrawn_line = 0
     withdrawn_line_by_sport: dict[str, int] = {}
     implausible_book = 0
+    # A row carrying a MODEL edge with no market fair and no market EV.
+    # Counted, never silent, for the same reason `rows_implausible_book` is.
+    no_market_price = 0
     stale_kickoff = 0
     uninformative_ev = 0
     # A basketball prop whose player is OUT on the injury feed (board_enrichment._flag_out_player_props).
@@ -5867,6 +5901,38 @@ def select_shortlist(
         implied_total = _implied_book_total_pct(row.get("ev_pct"))
         if implied_total is not None and implied_total < _MIN_IMPLIED_BOOK_TOTAL_PCT:
             implausible_book += 1
+            continue
+        # THE MIRROR OF THE RULE ABOVE, FOR THE ROWS IT CANNOT SEE
+        # `[2026-10-19, lane board-implausible-book-upper-bound]`.
+        #
+        # `_MIN_IMPLIED_BOOK_TOTAL_PCT` catches a book whose implied total is
+        # impossibly LOW. The opposite failure -- impossibly HIGH -- never
+        # reaches that test, because both it and `ev_pct` are derived from the
+        # fair, and the fair is exactly what is missing: `ev` is guarded on
+        # `fair is not None` (`:3329`), so `_implied_book_total_pct` reads None
+        # and the branch above is skipped. The row then ranks on a MODEL edge
+        # with no market price behind it at all.
+        #
+        # MEASURED on the served board 2026-10-19T23:12:52Z, 3,706 rows: this
+        # predicate fires on 55 rows, every one `ncaaf spreads|full` and every
+        # one `calibration_method=skipped_no_fair` -- over-catch 0, under-catch
+        # 0, and not one of the 3,651 rows carrying an `ev_pct` is touched.
+        # Earlier the same day the family was 73 rows; the slate shrank as
+        # games kicked off, so the RATE is the comparable figure.
+        #
+        # WHY THOSE ROWS EXIST, and why this is not a venue quirk: Polymarket
+        # publishes both legs of an illiquid spread at the cap (0.98/0.99 each,
+        # overround ~1.96), `_consensus_fair` correctly refuses the pair
+        # against `opportunity_signals._MAX_OVERROUND = 1.60`, and nothing
+        # downstream can price the row. 212 of 4,967 spread-shaped markets in
+        # one venue capture are in that state. Detail:
+        # `.syndicate/findings_2026-10-19_polymarket_side_price_mirroring.md`.
+        #
+        # A FILTER ON SELECTION, NEVER ON FETCH (`book_shortlist`'s own rule):
+        # the price stays in `book_prices` for the CLV join and on Layer 1.
+        # This bounds only what the shortlist RANKS.
+        if _no_market_price(row):
+            no_market_price += 1
             continue
         # A0/A3, model audit 2026-08-14: AN EV THAT IS A RESTATEMENT OF THE HOLD
         # IS NOT A MEASUREMENT, AND MUST NOT SEAT A ROW.
@@ -6202,6 +6268,10 @@ def select_shortlist(
         # is alarming or routine depending entirely on the floor that produced it.
         "min_implied_book_total_pct": _MIN_IMPLIED_BOOK_TOTAL_PCT,
         "rows_implausible_book": implausible_book,
+        # Its mirror: a model edge with no market price behind it. Reported
+        # beside the count above because the two are one rule read from both
+        # ends, and a reader comparing them needs both numbers.
+        "rows_no_market_price": no_market_price,
         "rows_beyond_quote_age": beyond_quote_age,
         "rows_superseded_line": superseded_line,
         "rows_stale_quote": stale_quote,
