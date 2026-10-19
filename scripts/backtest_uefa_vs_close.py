@@ -188,7 +188,9 @@ def cmd_run(args) -> int:
         for eid, j in join.items():
             if eid in by_id:
                 m = by_id[eid]
-                p_model = ulo.outcome_probs(*fitted.rates(m))
+                rates = fitted.rates(m)
+                p_model = ulo.outcome_probs(*rates)
+                ids, day = (m.home_id, m.away_id), m.day.isoformat()
                 y = ulo.result_index(m)
                 pair = "oos_oos" if (m.home_oos and m.away_oos) else "in_oos"
                 comp = m.competition
@@ -199,13 +201,16 @@ def cmd_run(args) -> int:
                                     away_att=a["attack_rating"], away_def=a["defense_rating"],
                                     neutral=bool(flag["neutral"]), home_goals=int(r["home_score"]),
                                     away_goals=int(r["away_score"]), extra_time=bool(flag["extra_time"]))
-                p_model = ulo.outcome_probs(*const.rates(cm))
+                rates = const.rates(cm)
+                p_model = ulo.outcome_probs(*rates)
+                ids, day = (str(r["home_team_id"]), str(r["away_team_id"])), str(r["date"])[:10]
                 y = ulo.result_index(cm)
                 pair = "in_in"
                 comp = r["competition"]
             else:
                 continue
             rows.append({"event_id": eid, "season": season, "competition": comp, "pair": pair,
+                         "home_id": ids[0], "away_id": ids[1], "day": day, "lam": list(rates),
                          "phase": phases.get(eid, "league"), "source": j["source"],
                          "p_model": list(p_model), "p_close": list(j["probs"]), "y": y})
         print(f"SEASON {season} scored={len(rows) - n0} beta={const.beta:.2f} tau={taus['fitted']}", flush=True)
@@ -289,6 +294,11 @@ def cmd_run(args) -> int:
                          "source": dict(Counter(r["source"] for r in rows))},
               "rows": rows}
     _write_json(closes / "report_close.json", report)
+    if getattr(args, "dump_features", False):
+        _write_json(closes / "features.json", [
+            {k: r[k] for k in ("event_id", "season", "competition", "pair", "phase", "source", "home_id", "away_id",
+                               "day", "lam", "p_model", "p_close", "y", "ll_model", "ll_close")} for r in rows])
+        print(f"FEATURES {closes / 'features.json'} rows={len(rows)}", flush=True)
     print("WEIGHTS", weights, flush=True)
     print("VERDICTS", json.dumps(verdicts), flush=True)
     print("LOG LOSS", json.dumps(report["log_loss"]), "MODEL-CLOSE", report["d_model_close_all"], flush=True)
@@ -308,6 +318,9 @@ def main(argv=None) -> int:
         sp = sub.add_parser(name)
         sp.add_argument("--uefa-root", required=True)
         sp.add_argument("--closes", required=True)
+        if name == "run":
+            # Lane uefa-market-anchored-ratings: per-match club ids + model rates for the anchored test.
+            sp.add_argument("--dump-features", action="store_true", help="also write features.json under --closes")
     args = p.parse_args(argv)
     return cmd_join(args) if args.cmd == "join" else cmd_run(args)
 
