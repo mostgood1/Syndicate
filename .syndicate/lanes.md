@@ -65,7 +65,7 @@ id resolves to an ARCHIVED session is hard evidence the lane is orphaned. The
 markers for running sessions did NOT match any roster id, so the mapping proves
 death, never life — do not invert it.
 
-### mlb-postponed-grading — OPEN — opened 2026-10-19 — session 02aa06d1-a707-4f09-8761-06970c842750
+### mlb-postponed-grading — CLOSED 2026-10-19 (GOAL MET: live on the fleet a6c32498, refused 849817/10-16 on production data; the next real postponement is a watch item, not a blocker) — opened 2026-10-19 — session 02aa06d1-a707-4f09-8761-06970c842750
 - Goal: An MLB game StatsAPI marks postponed/cancelled/suspended, or whose officialDate is not the slate date (rescheduled), never grades as final in paper/portfolio settlement (bet_status_mlb) and never buckets as final in the served live lens; one shared reader-side mapping, tested on a postponed StatsAPI fixture (incident 849817 TB@CLE 2026-10-16)
 - Files: syndicate/features/mlb/game_status.py syndicate/features/shared/bet_status_mlb.py syndicate/features/mlb/live_lens.py tests/test_mlb_game_status.py tests/fixtures/mlb_postponed/ syndicate/features/shared/graded_outcomes.py scripts/port_mlb_sim_engine.py syndicate/features/mlb/native/tools/eval/settle_locked_policy_cards.py
 - USER OVERRIDE 2026-10-19 ~16:50Z ("add the date check and change the card settler"): graded_outcomes.py is also claimed by OPEN lane mlb-settlement-props-join (quiet 31d); port_mlb_sim_engine.py + native/ by OPEN lane mlb-vendor-deletion-prep (session P6 local_f2e03aa5, notified by message 3e4eaca0: keep the EDIT through the freeze). Edits limited to the date/not-played guards.
