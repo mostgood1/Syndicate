@@ -77,3 +77,17 @@ These are the 492 side rows of `{ucl,uel,uecl}/api/odds/game_odds_current.csv`.
 - **The served-board effect:** this is a replay of the join, not of the board.
 - **Whether more Kalshi prices on non-shortlisted rows change any recommendation:** they become price-shopping
   inputs, not picks.
+
+
+## BUILT 2026-10-19 (lane `kalshi-join-all-game-lines`, OFF by default)
+
+- `pipeline/venue_odds_loop.py`: `kalshi_join_all_game_lines_enabled()` (`SYNDICATE_KALSHI_JOIN_ALL_GAME_LINES`, absent = off), `all_game_line_rows(day)`, and `kalshi_join_rows(shortlist, day)`, used by `_maybe_kalshi_board_coverage`.
+  - Non-soccer rows come from the book-grid artifact; soccer rows from every league's `game_odds_current.csv`, UEFA included.
+  - Shortlist rows win the dedup.
+  - The `intelligence_state` fast-capture caller is unchanged (that file is held by another lane).
+- **Fleet replay of the real code** (markets 18:55:45Z, the worker's own env; the flag is unset there):
+  - matches 570 -> 1,088 / 397 -> 889 / 511 -> 939 for 10-19 / 10-20 / 10-21, i.e. **+518 / +492 / +428, 0 lost**;
+  - by market per day: h2h +319..381, totals +100..119, spreads +9..18;
+  - join time 4.4 -> 5.9 / 4.5 -> 8.8 / 3.6 -> 4.7 s; rows built in 0.08-0.29 s.
+- **That is about 3x the grid-based estimate above.** The soccer files carry every domestic fixture too, not just UEFA, and the grid had already narrowed them.
+- **Before turning it on**, read on one fleet cycle: `_record_board_demand` (series demanded / the Kalshi working-set size) and how many `book_quotes` rows `_capture_kalshi_quotes` appends per cycle.

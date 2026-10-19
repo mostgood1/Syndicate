@@ -137,6 +137,112 @@ def kalshi_board_coverage_interval_seconds() -> float:
         return 600.0
 
 
+_GAME_LINE_MARKETS = ("h2h", "totals", "spreads")
+_GRID_SPORTS = ("mlb", "nhl", "nfl", "ncaaf", "ncaab", "nba", "wnba")
+
+
+def kalshi_join_all_game_lines_enabled() -> bool:
+    """`SYNDICATE_KALSHI_JOIN_ALL_GAME_LINES`. ABSENT IS OFF.
+
+    Lane `kalshi-join-all-game-lines` `[2026-10-19]`, design note
+    `.syndicate/findings_2026-10-19_kalshi_join_board_scope.md`. The join below runs
+    against the published SHORTLIST, so a fixture the shortlist does not carry for a
+    market never gets a Kalshi price. Measured by fleet replay: adding every fixture's
+    game lines gained +131..+170 matches a day, lost 0, at no measurable join cost,
+    and took UEFA to UCL 18 / UEL 18 / UECL 17 of 18 fixtures (from 15 / 11 / 11).
+    Off until `_record_board_demand`'s effect (more series demanded) is read on the fleet.
+    """
+    return str(os.environ.get("SYNDICATE_KALSHI_JOIN_ALL_GAME_LINES") or "").strip().lower() in {"1", "true", "on", "yes"}
+
+
+def _side_label(raw: Any, home: Any, away: Any) -> str:
+    text = str(raw or "").strip()
+    if text.lower() == "draw":
+        return "draw"
+    if text and text == str(home or "").strip():
+        return "home"
+    if text and text == str(away or "").strip():
+        return "away"
+    return text.lower()
+
+
+def _line_or_none(value: Any) -> float | None:
+    try:
+        text = str(value).strip()
+        return float(text) if text not in ("", "None", "nan") else None
+    except (TypeError, ValueError):
+        return None
+
+
+def all_game_line_rows(day: str) -> list[dict[str, Any]]:
+    """One side row per fixture game line (h2h / totals / spreads), every sport. Never raises.
+
+    Non-soccer sports read the precomputed book grid for `day`. Soccer reads every
+    league's `game_odds_current.csv` (UEFA included): the grid carries UEFA rows only
+    where Kalshi already joined, which is the circularity this exists to break. Rows
+    carry exactly the identity fields the join keys on; prices are not used by it.
+    """
+    out: list[dict[str, Any]] = []
+    seen: set[tuple] = set()
+
+    def _add(row: dict[str, Any]) -> None:
+        key = (row["sport"], row["event_id"], row["market"], row["line"], row["side"], row["segment"])
+        if row["event_id"] and key not in seen:
+            seen.add(key)
+            out.append(row)
+
+    try:
+        from syndicate.features.shared.book_grid_artifact import read_book_grid_artifact
+
+        for sport in _GRID_SPORTS:
+            payload = read_book_grid_artifact(sport, day) or {}
+            for grid_row in payload.get("rows") or []:
+                if grid_row.get("market") not in _GAME_LINE_MARKETS or grid_row.get("player_name"):
+                    continue
+                for side in grid_row.get("sides") or []:
+                    _add({"sport": sport, "event_id": str(grid_row.get("event_id") or ""),
+                          "market": grid_row.get("market"), "line": _line_or_none(grid_row.get("line")),
+                          "segment": grid_row.get("segment") or "full", "side": str(side),
+                          "home_team": grid_row.get("home_team"), "away_team": grid_row.get("away_team"),
+                          "commence_time": grid_row.get("commence_time")})
+    except Exception as exc:
+        print(f"[venue_odds_loop] ALL_GAME_LINES_GRID_FAILED {type(exc).__name__}: {exc}", flush=True)
+    try:
+        from syndicate.features.soccer import sources as soccer_sources
+
+        for league in soccer_sources.LEAGUE_DISPLAY_NAMES:
+            for odds in soccer_sources.game_odds_rows(league):
+                if odds.get("market") not in _GAME_LINE_MARKETS:
+                    continue
+                _add({"sport": "soccer", "event_id": str(odds.get("event_id") or ""),
+                      "market": odds.get("market"), "line": _line_or_none(odds.get("line")),
+                      "segment": "full", "side": _side_label(odds.get("side"), odds.get("home_team"), odds.get("away_team")),
+                      "home_team": odds.get("home_team"), "away_team": odds.get("away_team"),
+                      "commence_time": odds.get("commence_time")})
+    except Exception as exc:
+        print(f"[venue_odds_loop] ALL_GAME_LINES_SOCCER_FAILED {type(exc).__name__}: {exc}", flush=True)
+    return out
+
+
+def kalshi_join_rows(shortlist_rows: list[dict[str, Any]], day: str) -> list[dict[str, Any]]:
+    """The rows the coverage join runs against: the shortlist, plus (flag ON) every
+    fixture game line the shortlist does not already carry. OFF returns the shortlist
+    list unchanged."""
+    if not kalshi_join_all_game_lines_enabled():
+        return shortlist_rows
+    have = {
+        (str(r.get("event_id") or ""), r.get("market"), _line_or_none(r.get("line")), str(r.get("side") or ""),
+         r.get("segment") or "full")
+        for r in shortlist_rows
+    }
+    extra = [
+        r for r in all_game_line_rows(day)
+        if (r["event_id"], r["market"], r["line"], r["side"], r["segment"]) not in have
+    ]
+    print(f"[venue_odds_loop] KALSHI_JOIN_ROWS day={day} shortlist={len(shortlist_rows)} all_game_lines_extra={len(extra)}", flush=True)
+    return list(shortlist_rows) + extra
+
+
 def _maybe_kalshi_board_coverage(result: Any) -> None:
     """Join Kalshi's markets to TODAY's published shortlist: coverage line, Kalshi
     quote capture into `book_quotes`, board demand. Never raises."""
@@ -164,7 +270,7 @@ def _maybe_kalshi_board_coverage(result: Any) -> None:
             day = (base + _dt.timedelta(days=offset)).isoformat()
             rows = (read_layer2_shortlist(day) or {}).get("rows") or []
             if rows:
-                join_to_board(list(markets), list(rows), selected_date=day)
+                join_to_board(list(markets), kalshi_join_rows(list(rows), day), selected_date=day)
     except Exception as exc:
         print(f"[venue_odds_loop] KALSHI_COVERAGE_FAILED {type(exc).__name__}: {exc}", flush=True)
 

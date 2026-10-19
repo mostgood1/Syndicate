@@ -1193,6 +1193,15 @@ death, never life — do not invert it.
 - Verification: Event-clustered table: claimed EV, realised ROI, same-book CLV and (ROI - claimed EV) by EV band x component (book count, fair method, side_picked_by, price_source, venue, sport/market, season phase), n rows and n events per cell, read off the fleet ledger with the coverage printout
 - Blocked by: none
 
+### kalshi-join-all-game-lines — CLOSED 2026-10-19 (GOAL MET) — opened 2026-10-19 — session 436c79e2-3793-435f-bfe6-20c830515554
+- **GOAL VERDICT:** Goal (verbatim): "pipeline/venue_odds_loop.py: behind SYNDICATE_KALSHI_JOIN_ALL_GAME_LINES (default OFF), the periodic Kalshi board-coverage join also gets one side row per fixture game line (h2h/totals/spreads) -- book-grid artifact for non-soccer sports, game_odds_rows for every soccer league incl. UEFA -- deduped against the shortlist; off is byte-identical; verified by an off!=on test and a fleet replay of the real loop function; NOT enabled" -- **GOAL: MET** -- 8 new tests + tests/test_venue_odds_loop.py pass (27); off returns the shortlist list itself and reads nothing; on reaches the join through _maybe_kalshi_board_coverage (1 -> 5 rows/day in the stub). Fleet replay (markets 18:55:45Z, real readers, worker env, flag unset there): matches 570->1,088 / 397->889 / 511->939 (+518 / +492 / +428, **0 lost**), almost all soccer; join 4.4->5.9 / 4.5->8.8 / 3.6->4.7 s; rows built in 0.08-0.29 s. NOT enabled. Before enabling: read _record_board_demand / the Kalshi working set and the book_quotes growth on one fleet cycle.
+- Goal: pipeline/venue_odds_loop.py: behind SYNDICATE_KALSHI_JOIN_ALL_GAME_LINES (default OFF), the periodic Kalshi board-coverage join also gets one side row per fixture game line (h2h/totals/spreads) -- book-grid artifact for non-soccer sports, game_odds_rows for every soccer league incl. UEFA -- deduped against the shortlist; off is byte-identical; verified by an off!=on test and a fleet replay of the real loop function; NOT enabled
+- Files: pipeline/venue_odds_loop.py (the _maybe_kalshi_board_coverage row set + a new all-game-lines helper section only), tests/test_kalshi_join_all_game_lines.py (NEW)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: pytest tests/test_kalshi_join_all_game_lines.py (off passes the shortlist only, on adds the game-line rows, shortlist rows win dedup); fleet replay of the loop's row builder + join: matches gained/lost per sport with the flag on vs off
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
