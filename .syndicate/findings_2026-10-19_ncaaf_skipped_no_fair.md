@@ -157,3 +157,26 @@ and does not propose one. Two things for that lane to judge:
   same 32 games); for the other 5 it is assumed, not shown.
 - All 32 games holding a no-fair row **also** hold a with-fair spread row
   (32 of 32), so this is per-row, never a per-game data outage.
+
+## MECHANISM CORRECTED ONE HOP, AND A NEW OPEN QUESTION
+
+`[appended 2026-10-19 22:3xZ, after lane `fair-price-v2` landed `5410d7e9`]`
+
+**I described the refusal one hop too early.** Above I wrote that `_consensus_fair` returns `{}` because no book quotes both sides. That is not what happens here. Polymarket **does** quote every side — my own measurement said so (`other_sides` carries the opposing side from the same book) and I failed to follow my own evidence. The actual refusal is the **de-vig overround band**: `opportunity_signals._MIN_OVERROUND = 0.80` / `_MAX_OVERROUND = 1.60`, enforced at `opportunity_signals.py:182`. An overround of **1.96 exceeds 1.60**, so `consensus_fair_probability` refuses the pair. `fair-price-v2` classifies these rows `two_sided_devig_refused` rather than `no_two_sided_book`, and that is correct.
+
+The conclusions above are unaffected — no fair, no `ev_pct`, unsizable, refusal unpublished — but the hop matters for anyone tracing it.
+
+### The open question this raises, which I did NOT resolve
+
+`_MAX_OVERROUND`'s own comment states what the band is for:
+
+> Above this, the two "sides" are almost certainly not the same market (a mispaired spread, a 3-way missing its draw). Refusing is better than publishing a fair price derived from unrelated bets.
+
+So the band fired on exactly the case it was written to catch — and that makes the interpretation I gave above **undetermined**. Two readings fit the same payload:
+
+1. **Polymarket genuinely prices both sides at 0.96..0.99** — a real but untradeable market, which is what I wrote.
+2. **ONE Polymarket quote is being MIRRORED onto both sides** by whatever maps venue quotes into the board's side model — i.e. a side-mapping defect upstream of the board.
+
+**The evidence now looks like (2), and I under-weighted it:** **70 of 73** carry the price **identical to the digit** on both sides, and the implied sums cluster at almost exactly `2 x implied(price)` (median 1.9600 against an implied of 0.9800). A book independently pricing two sides deep does not normally land on the same number 70 times out of 73. Reading (2) would make this a genuine upstream defect rather than a benign venue quirk, and it would also explain the ±0.5 concentration: a "who wins" contract has one price, and mirroring it onto `-0.5` and `+0.5` produces precisely this shape.
+
+**NOT TESTED HERE.** Distinguishing them needs the raw Polymarket payload for one of these events (two distinct contract/token ids at ~0.98 each would support (1); a single id read twice would prove (2)), which is venue integration territory, not this lane's. The 3 rows whose sides DIFFER are the natural control and were not examined either. Handed to `fair-price-v2` 2026-10-19 along with the band confirmation; whoever takes it should start from those 3.
