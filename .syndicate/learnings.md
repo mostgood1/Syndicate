@@ -2558,3 +2558,14 @@ The exchanges' asks are at or below the sportsbook consensus once their fee is p
 **How to apply:**
 - Before proposing any gate or cap change to get volume, count the gate-free population: every row, re-priced at the venue, net of the venue's fee. If it is ~0, no gate change helps. Look for a different edge source or more coverage instead.
 - Read the RESOLVED settings from the worker's environ (`resolve_settings()`, `limits()`). Never use the values a brief or a docstring states.
+
+## 2026-10-20 -- A grep of a fleet role log for a failure token COUNTS YOUR OWN GREP: `ALL_PROCESS_MEMORY` lines quote every process's cmdline `[lane execution-alerts, session c1dad17d]`
+
+`live-odds-worker.log` writes `ALL_PROCESS_MEMORY` about once a second, and each line carries the full cmdline of every process on the host. So any session (or watchdog) that greps for `EXECUTION_ERROR` or `[execution_self_heal]` shows up in the log it is grepping, as a match. Measured on the fleet: `grep -c EXECUTION_ERROR` returned 3, and all 3 were memory lines quoting a peer's grep at 22:41:15Z. `grep -c execution_self_heal` returned **160**, and the real count was **0**. Three quoted lines in one second is a full burst for the execution watchdog's `>= 3 per check` rule.
+
+**Why:** a failure-token count reads as evidence of failures. Here it was evidence that someone was looking for them.
+
+**How to apply:**
+- Any count of a token in a role log: `grep -v ALL_PROCESS_MEMORY` (and `MEMORY_WATCHDOG`) first. Or anchor on the emitter's prefix with a timestamp, never a bare token.
+- Any automated log scan excludes cmdline-quoting lines (`execution_watchdog._QUOTING_LINE`, a4aacc8f).
+- Heredoc edits that write a Python regex: Git Bash turned `\b` into a literal backspace (0x08) once in this session. Check the written bytes (`od -c`) or use the Edit tool for regex lines.
