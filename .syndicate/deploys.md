@@ -51849,3 +51849,35 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - ALSO READ (closes lane nba-vendor-delete's owed reading of the 2026-10-20T12:39:00Z entry): the fleet ff'd to a5f34166 (contains
   e5dabb1c) at 10:38:06 CDT; at 16:56Z 0 tracked under vendor/nba_betting_repo and 0 writes there since, while the NBA props refresh
   ran at 11:41 CDT. MET.
+
+## 2026-10-20 19:30:22Z (2:30 PM CT) -- fleet ff 72407b6c -> 22c56001 + live-odds-worker ROLE-ONLY restart: live Kalshi TICKER-DATE GUARD (lane `future-dated-live-orders-scope`, session 0ffeb586) -- **MET (exercised on 2 real live positions, both passed; 0 false refusals)**
+- **ask:** relayed user decision (session 332cb014's chat, ~18:45Z): "Guard + fix the join". The guard deploys first, on its own; the join fix belongs to the audit session. This session's user then said, in chat: "Yes: land the ticker-date guard and take it live with a live-odds-worker-only restart at >= 19:21:07Z under claim + safety gate; record in deploys.md and tell the requesting session."
+- **code:** `22c56001` (`kalshi_ticker_date_guard.py` NEW + one live-only block in `execute_portfolio`, after no_venue_ticker and before D1/trim/write-ahead).
+  - The ticker date comes from `kalshi_catalogue.game_date_from_ticker`, the join's own decoder. It must equal `commence_time`'s US/Eastern date; the UTC date or the day before is accepted only if Eastern is unavailable.
+  - Refusals `ticker_date_mismatch` / `ticker_date_unverifiable` (fail-closed). Lines `[execute_portfolio] REFUSED_TICKER_DATE_MISMATCH|_UNVERIFIABLE` carry ticker, commence_time, away/home and detail.
+  - Switch `SYNDICATE_EXECUTION_TICKER_DATE_GUARD`, absent = ON.
+  - Series enumerated on the fleet ledger: 48 live Kalshi series; 46 carry YYMONDD. KXMVE* (7 rows, Aug-Sep) have no date segment and never came via the plan executor, so they are NOT exempted.
+  - Reachability on the real pair UM @ TRO 10-24 / `KXNCAAFGAME-26OCT29TROYJMU-TROY`: off -> sent, on -> refused, nothing written. 938 tests across the 37 suites touching the executor/budget/guard.
+- **ride-alongs 72407b6c..22c56001, each read before the ff:**
+  - `6fb473e1` venue fan-in refuses a venue quote dated for another day (lane venue-fanin-game-identity). This is the BOARD-side join fix, and it runs only in the board build. live-odds-worker's environ has `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP=false` (refresh-worker `true`), and its log has 0 layer2 lines. **So this restart loads the guard ALONE, as decided. `6fb473e1` sits on the fleet disk and loads at the NEXT refresh-worker restart, whoever takes it.**
+  - `289c0b69` paper ladder: `book="ladder"`, refused in live mode; the live executor passes no `book`.
+  - `d4acdc98` ev_net_pct tag on paper venue rows (paper batch.place only).
+  - `ee87954d` live 0% EV floor and the paper ladder are opt-in: 0 `SYNDICATE_LIVE_EV_FLOOR` / `PAPER_LADDER` lines in local_production.env.
+  - `9544c2e8` / min_ev tuner / portfolio_commit / intelligence_state: refresh-worker plan build, not this process. Plus scripts and tests.
+  - 0 overlap with the 6 dirty fleet files. `git merge --ff-only 22c56001` rc 0 at 19:06:24Z.
+- **claim:** live-odds-worker, holder `future-dated-live-orders-scope`, acquire ~19:06Z, token 40b63d18b1c36256.
+- **sequencing:** 60-min rule after the 18:21:07Z down/up (compounding-bankroll) -> >= 19:21:07Z.
+- **safety:** `check_deploy_safety` at 19:06Z read NOT CLEAR, with live-odds-worker's own odds/live-state children among the items. The gate now counts in-flight as `unreconciled_orders()` + live `failed`, NOT status `submitted`: a resting order the venue just confirmed is not unknown, and counting it would have blocked on the two 18:57Z orders.
+  - The gate waited **1,412 s** for a gap between odds-refresh waves (0 children). TERM 19:30:22.876Z (`STOP_SIGNAL signal=SIGTERM pid=3000981`).
+- **SLOW STOP, measured:** the old pid exited code=0 (supervisor: "exited code=0 after 4345s"), but the respawn came at **19:33:37Z, ~3 min 15 s after the TERM**. The 15:53Z and 16:56Z TERMs respawned in ~10 s. My watcher's 180 s window reported NO_RESPAWN; the supervisor log shows a graceful exit and a normal 5 s restart. **Live execution was dark ~4 min (last old pass ~19:28Z, first new pass 19:34:49Z).** Cause unread: likely a tick or children started after the gate's check and drained during shutdown.
+- **baseline (18:59Z):**
+  - 556 live rows, 0 unreconciled, 0 submitted; 0 `REFUSED_TICKER_DATE_*` lines.
+  - The 18:57Z pass placed 2 Kalshi orders: `KXNCAAFSPREAD-26OCT23MASSCONN-CONN16` (UMass @ UConn, game 10-23: a FORWARD bet) and `KXNBAPTS-26OCT20OKCSAS-SASKJOHNSON3-10` (commence 01:30Z 10-21 = 10-20 Eastern). Both filled.
+  - Fleet-disk smoke at 19:06Z: guard ON; it passes all 4 live Kalshi rows that carry a commence_time and refuses the wrong-game pair.
+- **verify (19:35:12Z):**
+  - New pid **3025111** (lstart 19:33:37Z). MODE=live, LIVE_ARMED=1, ENABLED=1, BALANCE_CAPS=on; no guard key (= ON). Fleet HEAD 22c56001.
+  - `EXECUTED date=2026-10-20 mode=live venue=kalshi ... positions=2 placed=0 ... duplicates=2 ... refused={}` at 19:34:49Z. **The guard ran on 2 real live positions and passed both**; same-slate idempotency then counted them as the 18:57Z orders.
+  - Polymarket pass at 19:34:54Z. 0 Traceback / EXECUTION_ERROR. `REFUSED_TICKER_DATE_*` 0.
+- **owed:** the first `REFUSED_TICKER_DATE_MISMATCH` would mean the board join slipped onto an order. Its absence is the healthy reading.
+  - Separately, `REFUSED_HELD_OTHER_SLATE` (D1) should appear if UMass @ UConn (10-23) is planned again on the 10-21 or 10-22 slate. That is the first real D1 test, from 05:00Z.
+- **rollback:** `git revert 22c56001`'s guard commit, ff, gated live-odds-worker TERM. Or a `LIVE_ODDS_WORKER__SYNDICATE_EXECUTION_TICKER_DATE_GUARD=off` line + a full down/up.
