@@ -51835,3 +51835,17 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - Executor placement of these two: owed (next pass).
 
 - **Placed (18:57:23Z):** `EXECUTED mode=live venue=kalshi positions=2 placed=2 refused={}`. One shown filled: `KXNBAPTS-26OCT20OKCSAS-SASKJOHNSON3-10` Keldon Johnson over 9.5 @ +156, 1 contract at $0.39 + $0.0167 fee, `remaining 0.00`. Day spend $6.27 / 3 orders. Option C is MET end to end.
+
+## 2026-10-20T16:56:09Z -- FLEET: vendor/wnba_betting_repo ARCHIVED, no ff, no restart (lane wnba-vendor-delete)
+- What: on /home/amyn/Syndicate (HEAD 72407b6c), tarred vendor/wnba_betting_repo (tracked + ignored, 606 files) to
+  `/home/amyn/syndicate-prod/data/_archive/vendor_wnba_betting_repo_fleet_20261020T165609Z.tar.gz` (9.6M); tar count 606 == find count.
+  0 modified tracked files, so a later ff deletes the tree without conflict.
+- Why: main deletes the tree (e633f12c). NOT DONE: the ff (same rule as MLB/NBA). **For whoever runs the next fleet ff past e633f12c:**
+  the tree goes with it; ignored leftovers stay and are archived. Nothing on the fleet imports or reads it (14 modules on e491c260,
+  20 locally on e633f12c's code), so no restart is needed for this change.
+- verify: after that ff, `git ls-files vendor/wnba_betting_repo | wc -l` = 0 and a WNBA refresh writes 0 files under it. Owed by lane
+  wnba-vendor-delete.
+- Rollback: `git revert e633f12c` + `tar -xzf` the archive in /home/amyn/Syndicate.
+- ALSO READ (closes lane nba-vendor-delete's owed reading of the 2026-10-20T12:39:00Z entry): the fleet ff'd to a5f34166 (contains
+  e5dabb1c) at 10:38:06 CDT; at 16:56Z 0 tracked under vendor/nba_betting_repo and 0 writes there since, while the NBA props refresh
+  ran at 11:41 CDT. MET.
