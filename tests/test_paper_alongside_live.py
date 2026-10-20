@@ -210,8 +210,11 @@ def test_paper_rows_do_not_touch_live_accounting_or_block_live(monkeypatch):
     assert live_row["idempotency_key"] != paper_row["idempotency_key"]
     for tag in TAGS:
         assert tag not in live_row, f"live row grew a paper tag: {tag}"
-    # Live spend is the live order only.
-    assert spent_today("2026-08-22", venue="kalshi", mode="live")["orders"] == 1
+    # Live spend is the live order only. A live order is charged to the day it
+    # was PLACED (todo #707 D2, 72407b6c), and this one was placed now.
+    from syndicate.features.shared.timezone import central_today_iso
+
+    assert spent_today(central_today_iso(), venue="kalshi", mode="live")["orders"] == 1
 
 
 def test_live_first_then_paper_still_records_paper(monkeypatch):
