@@ -84,6 +84,7 @@ def main() -> int:
     ap.add_argument("--kalshi-seconds", type=float, default=10.0)
     ap.add_argument("--fleet-seconds", type=float, default=60.0)
     ap.add_argument("--books-seconds", type=float, default=60.0)
+    ap.add_argument("--regions", default="us,eu", help="OddsAPI regions; each adds 3 credits per call")
     ap.add_argument("--until", required=True, help="UTC stop time, ISO")
     ap.add_argument("--extra-tickers", default="", help="comma list of Kalshi tickers to poll as well (held positions)")
     a = ap.parse_args()
@@ -149,7 +150,7 @@ def main() -> int:
             for s in sports:
                 cfg = SPORTS[s]
                 try:
-                    q = urllib.parse.urlencode({"apiKey": key, "regions": "us,eu", "markets": "h2h,spreads,totals",
+                    q = urllib.parse.urlencode({"apiKey": key, "regions": a.regions, "markets": "h2h,spreads,totals",
                                                 "oddsFormat": "decimal", "dateFormat": "iso"})
                     d, h = get_json(ODDSAPI.format(key=cfg["odds"]) + "?" + q)
                     ts = now()

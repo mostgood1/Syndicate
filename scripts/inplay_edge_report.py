@@ -262,6 +262,7 @@ def main() -> int:
     window = [None, None]
     per_game = defaultdict(lambda: Counter())
     series = defaultdict(list)  # ticker -> [(t, kalshi_mid, book_fair, book_poll_t, spread)]
+    book_gap = defaultdict(list)  # bookmaker -> |no-vig p - Kalshi mid| on h2h, every priced sample
 
     for ev, ticks in kal.items():
         family = ev.split("-")[0]
@@ -317,6 +318,9 @@ def main() -> int:
                 yb = fnum(r.get("yb"))
                 if ya is not None and yb is not None and 0 < yb <= ya < 1:
                     series[t].append((tt, (ya + yb) / 2, fair, bt, ya - yb))
+                    if family.endswith("GAME"):
+                        for bname, bp in bk.items():
+                            book_gap[bname].append(abs(bp - (ya + yb) / 2))
                 stats["priced"][family] += 1
                 per_game[g]["priced"] += 1
                 for side, ask, p in (("yes", ya, fair), ("no", na, 1 - fair)):
@@ -377,6 +381,8 @@ def main() -> int:
         if c:
             print(f"KALSHI ASK CHANGE INTERVAL {fam}: n={len(c)} p10={c[len(c)//10]:.0f}s p50={c[len(c)//2]:.0f}s p90={c[int(len(c)*0.9)]:.0f}s")
     lead_lag(series)
+    rows = sorted(((statistics.median(v), len(v), b) for b, v in book_gap.items() if len(v) >= 20))
+    print("PER-BOOK h2h |no-vig - Kalshi mid| (median, n), closest first: " + ", ".join(f"{b} {m:.3f} ({n})" for m, n, b in rows[:12]))
     top = sorted(episodes, key=lambda e: -e["max_edge"])[:15]
     print("TOP EPISODES:")
     for e in top:
