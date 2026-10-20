@@ -1736,6 +1736,10 @@ class PaperLedgerBatch:
             _BATCH_VIEW.state = self._state
         return self._state
 
+    def rows(self) -> list[dict[str, Any]]:
+        """The loaded ledger rows, this run's placements included. Read-only use."""
+        return list(self._loaded().get("orders") or [])
+
     def status_of(self, request: OrderRequest) -> str | None:
         key = idempotency_key(request)
         for order in self._loaded().get("orders") or []:

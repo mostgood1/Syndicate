@@ -7754,6 +7754,33 @@ class IntelligenceStateService:
                             f"venue={venue_scope} error={exc}",
                             flush=True,
                         )
+
+                # THE PAPER LADDER -- paper only, after paper2 and in its own guard
+                # per venue (lane paper-alongside-live; `paper_ladder`). `book="ladder"`
+                # is refused in live mode inside `run_execution`, so this can only
+                # ever write `paper:<venue>:ladder` rows.
+                for venue_scope, ladder_plan in (commit_result.get("ladder_plans") or {}).items():
+                    if not (ladder_plan or {}).get("positions"):
+                        continue
+                    try:
+                        ladder_result = run_execution(
+                            str(selected_date or ""), inline=True, venue_scope=venue_scope, book="ladder"
+                        )
+                        print(
+                            f"[intelligence_state] PAPER_LADDER_EXECUTED date={selected_date} "
+                            f"venue={ladder_result.get('venue') or venue_scope} "
+                            f"status={ladder_result.get('status')} reason={ladder_result.get('reason')} "
+                            f"placed={ladder_result.get('placed')} "
+                            f"duplicates={ladder_result.get('duplicates')} "
+                            f"skipped={ladder_result.get('skipped')} refused={ladder_result.get('refused')}",
+                            flush=True,
+                        )
+                    except Exception as exc:
+                        print(
+                            f"[intelligence_state] PAPER_LADDER_EXECUTE_FAILED "
+                            f"venue={venue_scope} error={exc}",
+                            flush=True,
+                        )
             # GRADE WHAT IS ALREADY DECIDED. Runs regardless of whether a commit
             # happened this cycle -- yesterday's bets settle long after
             # yesterday's plan stopped being written, and gating grading on a

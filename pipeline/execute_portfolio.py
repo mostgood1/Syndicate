@@ -88,6 +88,14 @@ def _paper_selection(plan: Mapping[str, Any], normalized: str, scoped: bool) -> 
     return SELECTION_SUGGESTED_ONLY if isinstance(gate, Mapping) else None
 
 
+LADDER_TAG_FIELDS = ("ev_band", "ev_net_pct", "ladder_reason", "stake_basis", "price_source")
+
+
+def _ladder_tags(position: Mapping[str, Any]) -> dict[str, Any]:
+    """The ladder's band tags, copied from its plan position onto the paper row."""
+    return {field: position.get(field) for field in LADDER_TAG_FIELDS}
+
+
 def _paper_row_tags(request: OrderRequest, *, selection: str | None, alongside_live: bool) -> dict[str, Any]:
     """The approach tags on a PAPER row: selection rule, season phase, live context."""
     from syndicate.features.shared.season_phase import season_phase
@@ -315,8 +323,12 @@ def run_execution(
     force: bool = False,
     inline: bool = False,
     venue_scope: str | None = None,
+    book: str | None = None,
 ) -> dict[str, Any]:
     """Place today's committed plan. Returns a status payload, never raises.
+
+    `book="ladder"` books the venue's PAPER LADDER (`paper_ladder`) under
+    `paper:<venue>:ladder`: paper only, scoped only, refused in live mode.
 
     `force` bypasses only the enablement flag. It does NOT bypass the mode, the
     live arm, or the unreconciled check -- a convenience flag that can reach
@@ -358,7 +370,8 @@ def run_execution(
     batches: list[PaperLedgerBatch] = []
     try:
         return _run_execution(
-            selected_date, force=force, inline=inline, venue_scope=venue_scope, batches=batches
+            selected_date, force=force, inline=inline, venue_scope=venue_scope, batches=batches,
+            book=book,
         )
     finally:
         for batch in batches:
@@ -375,6 +388,7 @@ def _run_execution(
     inline: bool,
     venue_scope: str | None,
     batches: list[PaperLedgerBatch],
+    book: str | None = None,
 ) -> dict[str, Any]:
     normalized = str(selected_date or "").strip()
     if not normalized:
@@ -535,6 +549,15 @@ def _run_execution(
             "reason": "live_mode_requires_venue_scope",
             "date": normalized,
         }
+    # THE PAPER LADDER IS PAPER ONLY, and a scoped book (lane paper-alongside-live).
+    # Refused before any plan is read, so no configuration can route it to a venue.
+    ladder = str(book or "").strip().lower() == "ladder"
+    if ladder and (mode == LIVE or not scope):
+        return {
+            "status": "skipped",
+            "reason": "ladder_is_paper_only" if mode == LIVE else "ladder_requires_venue_scope",
+            "date": normalized,
+        }
     plan_source = "unrestricted"
     if scope:
         from pipeline import portfolio_commit as _plans
@@ -558,8 +581,12 @@ def _run_execution(
         else:
             # PAPER IS UNCHANGED: a scoped paper run books paper2's comparison
             # book, uncontracted rows included, exactly as before.
-            plan = _plans.read_portfolio_plan_for_venue(normalized, scope)
-            plan_source = "paper2"
+            if ladder:
+                plan = _plans.read_ladder_plan_for_venue(normalized, scope)
+                plan_source = "ladder"
+            else:
+                plan = _plans.read_portfolio_plan_for_venue(normalized, scope)
+                plan_source = "paper2"
     else:
         plan = read_portfolio_plan(normalized)
     if not isinstance(plan, dict):
@@ -601,6 +628,10 @@ def _run_execution(
         # tests the moment the scope was threaded through, which is the whole
         # reason they name the adapter lookup explicitly.
         venue = f"{venue}:{scope}"
+        if ladder:
+            from syndicate.features.shared.paper_ladder import ladder_venue_name
+
+            venue = ladder_venue_name(scope)
     if mode == LIVE and not venue:
         return {"status": "skipped", "reason": "live_mode_with_no_venue_configured", "date": normalized}
 
@@ -654,6 +685,17 @@ def _run_execution(
         batches.append(batch)
     # Paper rows carry their approach tags; live rows keep their exact shape.
     selection = _paper_selection(plan, normalized, bool(scope)) if batch is not None else None
+    # THE LADDER IS THE COMPLEMENT OF THE VENUE BOOK, across builds too: a bet the
+    # `paper:<venue>` book already holds for this slate is not booked again here.
+    held_by_venue_book: set[tuple[str, str]] = set()
+    if ladder and batch is not None:
+        selection = "ladder"
+        main_book = f"{PAPER_VENUE}:{scope}"
+        held_by_venue_book = {
+            (str(o.get("position_key") or ""), str(o.get("selected_date") or ""))
+            for o in batch.rows()
+            if str(o.get("venue") or "") == main_book and str(o.get("status") or "") != STATUS_REJECTED
+        }
 
     placed = 0
     filled = 0
@@ -676,6 +718,10 @@ def _run_execution(
         if request is None:
             skipped += 1
             refused["incomplete_position"] = refused.get("incomplete_position", 0) + 1
+            continue
+        if ladder and (request.position_key, normalized) in held_by_venue_book:
+            skipped += 1
+            refused["held_by_venue_book"] = refused.get("held_by_venue_book", 0) + 1
             continue
 
         # NO CONTRACT, NO ORDER -- AND NO LEDGER ROW.  [2026-09-10, user decision]
@@ -814,7 +860,10 @@ def _run_execution(
         record = (
             batch.place(
                 request,
-                tags=_paper_row_tags(request, selection=selection, alongside_live=alongside_live),
+                tags={
+                    **_paper_row_tags(request, selection=selection, alongside_live=alongside_live),
+                    **(_ladder_tags(position) if ladder else {}),
+                },
             )
             if batch is not None
             else place_order(request, submit=submitter)

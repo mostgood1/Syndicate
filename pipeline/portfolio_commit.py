@@ -82,6 +82,11 @@ def portfolio_plan_path_for_venue(selected_date: str, venue: str) -> Path:
     return reports_root() / "intelligence" / f"portfolio_plan_{token}_{suffix}.json"
 
 
+def read_ladder_plan_for_venue(selected_date: str | None, venue: str) -> dict[str, Any] | None:
+    """The paper ladder plan for one venue (`paper_ladder`); its own artifact."""
+    return read_portfolio_plan_for_venue(selected_date, f"{str(venue or '').strip().lower()}_ladder")
+
+
 def read_portfolio_plan_for_venue(
     selected_date: str | None, venue: str
 ) -> dict[str, Any] | None:
@@ -2225,6 +2230,9 @@ def run_portfolio_commit(
     # Runs AFTER the main plan is on disk, and wrapped, so the comparison can
     # never cost the portfolio it is being compared against.
     venue_plans: dict[str, Any] = {}
+    # THE PAPER LADDER (lane paper-alongside-live): one paper-only plan per
+    # LADDER_VENUES entry, built below beside that venue's paper2 book.
+    ladder_plans: dict[str, Any] = {}
     main_totals = plan.get("totals") or {}
     # THE LIVE PLANS' ROWS: Suggested-only unless the 0% net floor is on (see
     # `live_ev_floor_rows`). paper2 below keeps the Suggested rows either way.
@@ -2345,6 +2353,42 @@ def run_portfolio_commit(
                     f"error={type(exc).__name__}: {exc}",
                     flush=True,
                 )
+            # THE PAPER LADDER, PAPER ONLY  [2026-10-20, user decision relayed by
+            # session b87af0fc: "yes - but we should reconsider the floors"; lane
+            # paper-alongside-live]. AFTER the live plan and in its own guard, so it
+            # can never change or cost the live book or paper2. It prices the WHOLE
+            # shortlist's floor-refused rows with this venue's own resolvers and
+            # keeps what paper2 did not stake. See `paper_ladder`.
+            try:
+                from syndicate.features.shared import paper_ladder
+
+                if venue in paper_ladder.LADDER_VENUES and paper_ladder.ladder_enabled():
+                    eligible = paper_ladder.eligible_rows(shortlist.get("rows") or [])
+                    ladder_scoped, _ladder_scope_refusals = scope_rows_to_venue(
+                        eligible,
+                        venue,
+                        price_resolver=venue_price_resolver,
+                        ticker_resolver=venue_ticker_resolver,
+                    )
+                    ladder_plan = paper_ladder.build_ladder_plan(
+                        ladder_scoped,
+                        venue=venue,
+                        selected_date=normalized,
+                        staked_position_keys=frozenset(
+                            str(p.get("position_key") or "")
+                            for p in (venue_plan.get("positions") or [])
+                            if isinstance(p, Mapping)
+                        ),
+                    )
+                    write_json_file(portfolio_plan_path_for_venue(normalized, f"{venue}_ladder"), ladder_plan)
+                    print(paper_ladder.ladder_report_line(ladder_plan, eligible=len(eligible)), flush=True)
+                    ladder_plans[venue] = ladder_plan
+            except Exception as exc:
+                print(
+                    f"[portfolio_commit] LADDER_PLAN_FAILED date={normalized} venue={venue} "
+                    f"error={type(exc).__name__}: {exc}",
+                    flush=True,
+                )
         except Exception as exc:
             print(
                 f"[portfolio_commit] PAPER2_FAILED date={normalized} venue={venue} error={exc}",
@@ -2357,6 +2401,7 @@ def run_portfolio_commit(
         "plan": plan,
         "clv_join": clv_join,
         "venue_plans": venue_plans,
+        "ladder_plans": ladder_plans,
         "venues": sorted(venue_plans),
     }
 
