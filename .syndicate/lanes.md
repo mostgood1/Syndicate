@@ -479,7 +479,8 @@ death, never life — do not invert it.
 - **2026-10-14 (session 43e4d5fe), kept OPEN by user decision:** the 2026-10-13 04:37:10Z WSL stop took the fleet down for ~1m37s. The boot path restored it at 04:38:47Z, under the 9-min recovery threshold, so RECOVERY_START correctly did not fire, and this lane's live reading is still owed (deploys.md bd80dfdd).
 - **OWNER SESSION 43e4d5fe ARCHIVED 2026-10-16 by user decision** ("if this session is complete archive it"). This lane is FREE TO ADOPT. To resume: the only owed reading is the first real supervisor-down >= 9 min. Check `~/syndicate-prod/logs/watchdog.log` for RECOVERY_START followed by a healthy fleet, and record it in deploys.md. Claims on the watchdog files stay with this block until an adopter edits the header.
 - Goal: The local fleet recovers by itself from a supervisor that is not running: the 5-minute watchdog, on a supervisor FAIL for >= 9 min (two consecutive checks), starts SyndicateLocalProduction (capped 3 attempts/hour, then alert-only; paused by a no_autostart file for deliberate maintenance). Verified by unit tests of the decision and a fleet reading; would have ended the 2026-10-04 08:39-13:53Z outage in ~10 min (postmortem, user decision 'Watchdog auto-recovery')
-- Files: scripts/local_watchdog.py, tests/test_local_watchdog.py, deploy/local/watchdog.ps1, docs/ai_context/local_production_runbook.md (watchdog section only)
+- Files: scripts/local_watchdog.py, tests/test_local_watchdog.py, docs/ai_context/local_production_runbook.md (watchdog section only)
+- LOANED 2026-10-20 ~14:41Z (9:41 AM CT) to lane `watchdog-stale-writer` (session f490ebbb), at the request of session local_78689252 (the watchdog-unreachable-email follow-up): `deploy/local/watchdog.ps1` is OFF this block's Files line for the loan, scoped to the state read/write (stale-writer guard) and a total run deadline; the auto-recovery block (`$result.recover` / Start-ScheduledTask) and the email/heartbeat semantics untouched. Taken without asking this lane: owner 43e4d5fe archived, block says FREE TO ADOPT. On that lane's close, put the path back on this Files line.
 - LOAN RETURNED 2026-10-20 ~13:25Z by watchdog-unreachable-email (closed, 5ff3002f): unreachable-email + dormant heartbeat + -SetupEmail/-TestEmail/-Drill added; auto-recovery block untouched. Path restored to the Files line above.
 - LOANED 2026-10-20 ~12:45Z (7:45 AM CT) to lane `watchdog-unreachable-email` (session 4146db7b), on the user's go-ahead in chat 2026-10-20 (credential store + healthchecks.io + test emails answered): `deploy/local/watchdog.ps1` is OFF this block's Files line for the loan, scoped to the WSL-unreachable email, a healthchecks.io heartbeat ping and a -SetupEmail switch; the auto-recovery block (`$result.recover` / Start-ScheduledTask) untouched. Taken without asking this lane: owner 43e4d5fe archived, block says FREE TO ADOPT. On that lane's close, put the path back on this Files line.
 - LOAN RETURNED 2026-10-20 ~13:50Z by execution-alerts (closed, GOAL MET): `scripts/local_watchdog.py` keeps the execution + email hook in `main()` and `_deliver_email`; `evaluate()` / `decide()` / `recovery()` untouched.
@@ -1233,6 +1234,14 @@ death, never life — do not invert it.
 - Hypothesis: n/a (build)
 - Falsification test: n/a
 - Verification: pytest tests/test_live_stake_band.py tests/test_compounding_bankroll.py incl. reachability (band off != on); fleet read-only replay of today's live plan rows shows each sized position at $5-$10; after the user's yes, a fleet LIVE_PLAN_WRITTEN with positions>0 and a LIVE_ORDER stake in [$5, $10]
+- Blocked by: none
+
+### watchdog-stale-writer — OPEN — opened 2026-10-20 — session f490ebbb-9b7b-426a-8e00-6de44f249ca8
+- Goal: The Windows fleet watchdog (deploy/local/watchdog.ps1) cannot have its wsl_state.json clobbered by a stale run (one killed by the task's PT4M limit whose powershell.exe survives), and every run finishes inside the limit. Done = the race reproduced in a scratch -StateDir, then shown fixed (a simulated late writer cannot overwrite newer state); installed copy sha256 == repo; deploys.md entry.
+- Files: deploy/local/watchdog.ps1 (LOAN from fleet-watchdog-auto-recovery: state read/write + run deadline only)
+- Hypothesis: A run killed at PT4M leaves powershell.exe alive; it writes wsl_state.json from a state it read before a newer run wrote, wiping last_email
+- Falsification test: A scratch repro where a late writer with an older start does NOT overwrite newer state under the OLD script (then the race is not the mechanism)
+- Verification: Scratch StateDir: old script -> stale writer clobbers newer state; new script -> refused with a STATE_STALE log line; one scratch normal run OK; installed sha256 == repo; deploys.md entry
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
