@@ -196,7 +196,14 @@ def _grid_prop(player: str, home: str, away: str, sport: str = "nhl") -> dict:
     return {
         "sport": sport, "event_id": f"evt-{player}", "kind": "prop", "market": "SOG", "segment": "full", "line": 2.5,
         "player_name": player, "home_team": home, "away_team": away, "commence_time": "2026-10-15T00:30:00Z",
-        "sides": ["over", "under"], "books_quoting": 4, "cells": {},
+        # Two books' prices, so the row has a market fair. Since dd499146 a row with a model edge and NO market price is
+        # refused at selection (`rows_no_market_price`), and an empty `cells` here made this test seat nobody at all --
+        # gate or no gate (seen 2026-10-20: rows_no_market_price 4 nhl|SOG, `seated` empty).
+        "sides": ["over", "under"], "books_quoting": 4,
+        "cells": {book: {"over": {"price": over, "age_seconds": 30.0, "stale": False},
+                         "under": {"price": under, "age_seconds": 30.0, "stale": False}}
+                  # over fair ~47% (the books' median); FanDuel's +125 beats it, so the over is a value row
+                  for book, over, under in (("caesars", 105, -125), ("betmgm", 100, -120), ("fanduel", 125, -155))},
         "best": {"over": {"price": 118, "bookmaker": "fanduel", "books_quoting": 4, "age_seconds": 30.0},
                  "under": {"price": -140, "bookmaker": "draftkings", "books_quoting": 4, "age_seconds": 30.0}},
         "projection": {"edge_vs_market_pct": 6.0, "model_skill": {"status": "measured", "sample_games": 120}},
