@@ -365,6 +365,26 @@ def _is_kalshi_order(order: Mapping[str, Any]) -> bool:
     return exit_family(order) == KALSHI
 
 
+def _position_date(order: Mapping[str, Any]) -> str:
+    """The date the lookback is measured from: the GAME's, not the slate's.
+
+    Live places FORWARD bets -- the shortlist keeps NFL/NCAAF/soccer games up to
+    six days out (todo #707) -- so a fill on Monday's slate for Saturday's game
+    has `selected_date` Monday. Keyed on that, it left the watch on Thursday,
+    before kickoff, exactly when an exit matters most. The later of the two dates
+    keeps it; an unreadable `commence_time` falls back to the slate date.
+    """
+    slate = str(order.get("selected_date") or "")
+    try:
+        start = datetime.fromisoformat(str(order.get("commence_time") or "").replace("Z", "+00:00"))
+    except ValueError:
+        return slate
+    if start.tzinfo is None:
+        start = start.replace(tzinfo=timezone.utc)
+    game = start.astimezone(timezone.utc).date().isoformat()
+    return max(slate, game)
+
+
 def open_positions(
     orders: Iterable[Mapping[str, Any]], *, today: str, lookback: int | None = None
 ) -> tuple[list[OpenPosition], dict[str, int]]:
@@ -394,7 +414,7 @@ def open_positions(
             continue
         if order.get("outcome") not in (None, ""):
             continue
-        if str(order.get("selected_date") or "") < floor:
+        if _position_date(order) < floor:
             _skip("outside_lookback")
             continue
         key = str(order.get("idempotency_key") or "").strip()
@@ -1114,7 +1134,7 @@ def _prune_watch(state: dict[str, Any], today: str) -> int:
     except ValueError:
         return 0
     watch = state.get("watch") or {}
-    stale = [k for k, row in watch.items() if str(row.get("selected_date") or "") < floor]
+    stale = [k for k, row in watch.items() if _position_date(row) < floor]
     if not stale:
         return 0
     _archive([watch[k] for k in stale])  # moved, never dropped

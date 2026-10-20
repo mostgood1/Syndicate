@@ -126,7 +126,8 @@ def test_graded_unfilled_and_unwatched_venue_rows_are_not_positions(overrides):
 
 def test_lookback_and_unmappable_rows_are_counted_not_dropped():
     positions, skipped = ex.open_positions(
-        [_order(selected_date="2026-10-01"), _order(idempotency_key="b" * 24, side="sideways")],
+        [_order(selected_date="2026-10-01", commence_time="2026-10-01T23:00:00Z"),
+         _order(idempotency_key="b" * 24, side="sideways")],
         today=TODAY,
     )
     assert positions == []
@@ -642,3 +643,32 @@ def test_operator_sales_are_kept_out_of_the_rule_counterfactual(monkeypatch):
 
 def test_no_live_blockers_remain_after_the_measured_sale():
     assert ex.LIVE_BLOCKERS == ()
+
+
+# -- forward bets: the lookback is the GAME's date, not the slate's (todo #707 D4) --
+
+
+def test_a_forward_bet_stays_watched_until_its_game():
+    """Reachability: same slate date, different game dates, different answers."""
+    old_slate_future_game = _order(selected_date="2026-10-14", commence_time="2026-10-20T17:00:00Z")
+    old_slate_past_game = _order(idempotency_key="b" * 24, selected_date="2026-10-14",
+                                 commence_time="2026-10-14T23:00:00Z")
+    positions, skipped = ex.open_positions([old_slate_future_game, old_slate_past_game], today=TODAY)
+    assert [p.entry_key for p in positions] == ["a" * 24]
+    assert skipped == {"outside_lookback": 1}
+
+
+def test_an_unreadable_game_time_falls_back_to_the_slate_date():
+    recent, _ = ex.open_positions([_order(commence_time="not-a-time")], today=TODAY)
+    stale, skipped = ex.open_positions([_order(selected_date="2026-10-01", commence_time=None)], today=TODAY)
+    assert len(recent) == 1 and stale == [] and skipped == {"outside_lookback": 1}
+
+
+def test_watch_pruning_keeps_a_forward_bet_until_its_game_ages_out():
+    state = ex._empty_state()
+    state["watch"] = {
+        "fwd": {"entry_key": "fwd", "selected_date": "2026-10-01", "commence_time": "2026-10-18T17:00:00Z"},
+        "old": {"entry_key": "old", "selected_date": "2026-10-01", "commence_time": "2026-10-01T17:00:00Z"},
+    }
+    pruned = ex._prune_watch(state, TODAY)
+    assert pruned == 1 and list(state["watch"]) == ["fwd"]
