@@ -67,11 +67,12 @@ death, never life — do not invert it.
 
 ## OPEN
 
-### one-engine-alignment-audit — OPEN — opened 2026-10-20 — session e13a70a0 (side session of 332cb014's group)
+### one-engine-alignment-audit — OPEN (AUDIT DELIVERED 2026-10-20 18:3xZ; waiting on the user to pick from the proposal; todo #709) — opened 2026-10-20 — session e13a70a0 (side session of 332cb014's group)
 - Goal: AUDIT ONLY, no code (user 2026-10-20: "we def need connectivity across all of Syndicate so everything is aligned ... one cohesive betting engine"). Map every surface that recommends / sizes / places / grades a bet (fair prob, price, EV + fees, floor, sizing, grading, file:line), count forks on a real fleet shortlist with denominators, propose ONE per-line decision record computed once by the worker + a migration order. Deliverable: .syndicate/findings_2026-10-20_one_engine_audit.md; top 5 forks by money at stake.
 - Files: .syndicate/findings_2026-10-20_one_engine_audit.md
 - Hypothesis: the surfaces disagree because each recomputes fair/price/EV/floor itself; the largest money fork is board `suggested` (best-book price) vs the venue's executable price.
 - Falsification test: on a fleet shortlist, suggested-at-best-book and positive-at-venue-price agree on >= 80% of venue-quoted rows.
+- RESULT `[2026-10-20, fleet shortlist 18:10Z]`: NOT falsified -- 12/13 suggested Kalshi sides negative at Kalshi; 1/52 identity-clean Kalshi-positive sides. Larger finding: 35/87 ticker-carrying rows are joined to the WRONG GAME (findings section 0).
 - Verification: fork counts with denominators from the fleet (read-only, 127.0.0.1:10000), each with file:line of the two disagreeing computations.
 - Blocked by: none. Fleet is LIVE MONEY: read-only.
 
