@@ -1115,7 +1115,7 @@ death, never life — do not invert it.
     - EXECUTED lines carry `trimmed=` (new code loaded).
   - Left: the first live `TRIMMED_TO_ORDER_CAP` / an EXECUTED with `trimmed>=1`, which needs a live stake over the balance-derived order cap. positions=0 at 00:05Z.
 - Goal: Live caps follow venue capital: SYNDICATE_EXECUTION_BALANCE_CAPS=on on the fleet with raised dollar ceilings; Polymarket capital counts the pending deposit (user 2026-10-19: 'the $500 pending on polymarket CAN be used'); an order over the per-order cap is trimmed to the cap instead of refused (user 2026-10-19: 'Trim to the cap')
-- Files: pipeline/execute_portfolio.py (the trim-to-cap step before check_order ONLY), tests/test_execute_portfolio.py
+- Files: none held. RELEASED 2026-10-20 ~14:15Z: pipeline/execute_portfolio.py and its test went to the future-dated-live scope lane for D1 (refuse a live order already held from an earlier slate) + D3 (Kalshi orders expire at kickoff). USER DECISION in session 332cb014's chat: "Build D1 + D3 now". The trim step (08f851d1) is landed; no further edit is owed here, only the live reading.
 - **CODE LANDED `08f851d1` (196 targeted tests pass); the venue_capital loan is RETURNED to compounding-bankroll.** Fleet env `SYNDICATE_EXECUTION_BALANCE_CAPS=on` set 22:38Z (backup `local_production.env.bak-capsrevamp-20261019T223808Z`), loads at the next `up`. OWED: the restart onto 08f851d1, then the stored ceilings raised to $100/order, $1,000/day per venue, $2,000/day all, 50/50/100 orders (user: "Loose backstop"), ONLY after the restart is verified; then the live reading.
 - Hypothesis: n/a (build)
 - Falsification test: n/a
