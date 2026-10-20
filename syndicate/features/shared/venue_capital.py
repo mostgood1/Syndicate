@@ -114,6 +114,11 @@ _BASIS_VENUE_TOTAL = "venue_total"
 _MIN_STAKE_ENV = "SYNDICATE_COMPOUNDING_MIN_STAKE"
 MIN_STAKE_DOLLARS = "dollars"
 MIN_STAKE_ONE_CONTRACT = "one_contract"
+# The user's pick, 2026-10-20 ("(b) + floor"): a compounded stake under one
+# contract is ROUNDED UP to exactly one contract, fee included, instead of
+# refused -- but never past the cash that has to fund it.
+MIN_STAKE_FLOOR_ONE_CONTRACT = "floor_one_contract"
+_MIN_STAKE_VALUES = (MIN_STAKE_ONE_CONTRACT, MIN_STAKE_FLOOR_ONE_CONTRACT)
 
 # How much of a venue's capital is the sizing bankroll. 1.0 = the Kelly
 # fractions `bankroll_manager` already computes are fractions of the real
@@ -186,10 +191,13 @@ def compounding_config() -> dict[str, Any]:
             if str(os.environ.get(_BASIS_ENV) or "").strip().lower() == _BASIS_VENUE_TOTAL
             else _BASIS_SHARD
         ),
-        "min_stake": (
-            MIN_STAKE_ONE_CONTRACT
-            if str(os.environ.get(_MIN_STAKE_ENV) or "").strip().lower() == MIN_STAKE_ONE_CONTRACT
-            else MIN_STAKE_DOLLARS
+        "min_stake": next(
+            (
+                value
+                for value in _MIN_STAKE_VALUES
+                if str(os.environ.get(_MIN_STAKE_ENV) or "").strip().lower() == value
+            ),
+            MIN_STAKE_DOLLARS,
         ),
         "day_pct": _float_env(_DAY_PCT_ENV, _DEFAULT_DAY_PCT, low=0.001, high=1.0),
         "order_pct": _float_env(_ORDER_PCT_ENV, _DEFAULT_ORDER_PCT, low=0.001, high=1.0),
@@ -428,6 +436,49 @@ def one_contract_dollars(position: Mapping[str, Any]) -> float | None:
         if minimum is not None and minimum > 1.0:
             qty = minimum
     return round(each * qty, 4)
+
+
+def one_contract_floor_dollars(position: Mapping[str, Any], venue: str | None) -> dict[str, Any] | None:
+    """The stake that buys EXACTLY one contract (one increment), fee included.
+
+    `(price + taker fee per contract) x quantity`, rounded UP to the cent. The
+    executors floor dollars to contracts with no fee taken off first
+    (`kalshi_orders.contracts_for_stake`, `polymarket_us_orders.quantity_for_stake`),
+    so this buys one, never two, while the fee is below the price -- always, on
+    a $1 contract. If the live price has risen past the fee by send time, the
+    count comes out 0 and the builder refuses before anything is sent: the
+    floor cannot overbet. None when the plan cannot state a price.
+    """
+    each = one_contract_dollars({"price": position.get("price")})
+    if each is None:
+        return None
+    qty = 1.0
+    ticker = position.get("venue_ticker")
+    if isinstance(ticker, Mapping):
+        minimum = _number(ticker.get("minimum_trade_qty"))
+        if minimum is not None and minimum > 1.0:
+            qty = minimum
+        ticker_ref = ticker.get("slug")
+    else:
+        ticker_ref = ticker
+    fee_each = 0.0
+    try:
+        from syndicate.features.shared.venue_fees import taker_fee_per_contract
+
+        rate, _basis, _bound = taker_fee_per_contract(
+            venue, each, venue_ref=ticker_ref,
+            sport=position.get("sport"), market=position.get("market"), segment=position.get("segment"),
+        )
+        # Kalshi's figure is dollars per $1 contract; Polymarket's is a rate on
+        # the notional, which for one contract is its price.
+        fee_each = float(rate) * (each if str(venue or "").lower() == "polymarket" else 1.0)
+    except Exception:
+        # An unreadable fee schedule is charged the conservative way: one cent.
+        fee_each = 0.01
+    import math
+
+    dollars = math.ceil(round((each + fee_each) * qty * 100.0, 6)) / 100.0
+    return {"dollars": dollars, "price_each": each, "fee_each": round(fee_each, 4), "qty": qty}
 
 
 def balance_caps(

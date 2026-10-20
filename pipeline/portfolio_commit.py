@@ -290,6 +290,11 @@ REFUSAL_BELOW_MIN_STAKE_COMPOUNDED = "below_min_stake_compounded"
 REFUSAL_BELOW_ONE_CONTRACT_COMPOUNDED = "below_one_contract_compounded"
 # A contract price the plan cannot state -- refused, never guessed.
 REFUSAL_NO_CONTRACT_PRICE_COMPOUNDED = "no_contract_price_compounded"
+# Under `floor_one_contract` [user 2026-10-20, "(b) + floor"]: the stake was
+# under one contract and the ONE contract it would be rounded up to costs more
+# than the cash that must fund it (the order's Kalshi shard, or the venue), or
+# that cash is unknown. Refused rather than floored past what can be paid.
+REFUSAL_FLOOR_EXCEEDS_CASH = "floor_exceeds_funding_cash"
 
 
 def default_bankroll_resolver(venue: str, settings: Any):
@@ -351,14 +356,18 @@ def _apply_compounding_bankroll(
     the conservative error and is stated here rather than discovered.
     """
     from syndicate.features.shared.venue_capital import (
+        MIN_STAKE_FLOOR_ONE_CONTRACT,
         MIN_STAKE_ONE_CONTRACT,
         compounding_config,
         one_contract_dollars,
+        one_contract_floor_dollars,
     )
 
     config = compounding_config()
     mode = config["mode"]
     one_contract_minimum = config.get("min_stake") == MIN_STAKE_ONE_CONTRACT
+    floor_to_one_contract = config.get("min_stake") == MIN_STAKE_FLOOR_ONE_CONTRACT
+    floored = 0
     if mode not in {"shadow", "on"}:
         return
 
@@ -435,7 +444,29 @@ def _apply_compounding_bankroll(
             continue
 
         if mode == "on":
-            if one_contract_minimum:
+            if floor_to_one_contract:
+                floor = one_contract_floor_dollars(position, venue)
+                if floor is None:
+                    _refuse(REFUSAL_NO_CONTRACT_PRICE_COMPOUNDED, position)
+                    continue
+                stamp["floor_dollars"] = floor["dollars"]
+                if compounded is None or compounded < floor["dollars"]:
+                    # ROUNDED UP to one contract, fee included -- but only if
+                    # the cash that funds it can: the order's own shard on
+                    # Kalshi (the venue checks nothing else), the venue's
+                    # capital elsewhere. Unknown funding refuses, never floors.
+                    funding = verdict.get("shard_cash") if str(venue).lower() == "kalshi" else verdict.get("capital")
+                    if funding is None or float(funding) < floor["dollars"]:
+                        stamp["floor_refused_funding"] = funding
+                        _refuse(REFUSAL_FLOOR_EXCEEDS_CASH, position)
+                        continue
+                    stamp["floored_from"] = compounded
+                    stamp["floored_to_one_contract"] = True
+                    compounded = floor["dollars"]
+                    stamp["stake_dollars_compounded"] = compounded
+                    stamp["contracts_compounded"] = 1
+                    floored += 1
+            elif one_contract_minimum:
                 # The venue's own minimum replaces the fixed-dollar one: a $1
                 # floor does not scale with the account, one contract does.
                 if contract is None:
@@ -486,6 +517,7 @@ def _apply_compounding_bankroll(
         "staked_dollars_compounded": round(staked_compounded, 2),
         "unknown_reasons": dict(sorted(unknown_reasons.items())),
         "refused_reasons": dict(sorted(refused_reasons.items())),
+        "floored_to_one_contract": floored,
         "refused_keys": refused_keys,
     }
 
@@ -589,6 +621,7 @@ def _write_live_venue_plan(
             f"staked_compounded=${compounding.get('staked_dollars_compounded')} "
             f"unknown={compounding.get('unknown_reasons')} "
             f"refused={compounding.get('refused_reasons')} "
+            f"floored_to_one_contract={compounding.get('floored_to_one_contract')} "
             f"basis={(compounding.get('config') or {}).get('basis')} "
             f"min_stake={(compounding.get('config') or {}).get('min_stake')} "
             f"bankrolls={sorted({(p.get('compounding') or {}).get('bankroll') for p in positions if (p.get('compounding') or {}).get('bankroll') is not None})}",

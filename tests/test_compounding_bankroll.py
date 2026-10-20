@@ -329,3 +329,79 @@ def test_an_unpriceable_position_is_refused_not_guessed(monkeypatch):
     _apply_compounding_bankroll(plan, venue="kalshi", settings=_settings(), refusals=refusals,
                                 by_market={}, by_sport={}, resolver=_resolver(465.37))
     assert refusals == {"no_contract_price_compounded": 1}
+
+
+# ---- "(b) + floor" (user 2026-10-20): round UP to exactly one contract ------
+
+
+def _apply_floor(resolver, positions=None):
+    from pipeline.portfolio_commit import _apply_compounding_bankroll
+
+    plan = {"positions": positions or [_live_position("del", 0.00118, 117), _live_position("maxey", 0.00198, -203)],
+            "totals": {}}
+    refusals = {}
+    _apply_compounding_bankroll(plan, venue="kalshi", settings=_settings(min_stake_units=1.0), refusals=refusals,
+                                by_market={}, by_sport={}, resolver=resolver)
+    return plan, refusals
+
+
+def _shard_resolver(bankroll, shard_cash):
+    return lambda position: {"known": True, "bankroll": bankroll, "capital": 465.37, "shard": 0, "shard_cash": shard_cash}
+
+
+def test_floor_reaches_the_plan_off_differs_from_on(monkeypatch):
+    monkeypatch.setenv(vc.COMPOUNDING_MODE_ENV, "on")
+    off, off_refusals = _apply_floor(_shard_resolver(170.0, 170.0))   # $0.20 / $0.34 on a shard bankroll
+    monkeypatch.setenv("SYNDICATE_COMPOUNDING_MIN_STAKE", "floor_one_contract")
+    on, on_refusals = _apply_floor(_shard_resolver(170.0, 170.0))
+    assert off["positions"] == [] and off_refusals == {"below_min_stake_compounded": 2}
+    assert len(on["positions"]) == 2 and on_refusals == {}
+    assert on["compounding"]["floored_to_one_contract"] == 2
+    for position in on["positions"]:
+        assert position["compounding"]["floored_to_one_contract"] is True
+        assert position["compounding"]["contracts_compounded"] == 1
+
+
+def test_a_floored_stake_builds_exactly_one_kalshi_contract(monkeypatch):
+    from syndicate.features.shared.kalshi_orders import contracts_for_stake
+
+    monkeypatch.setenv(vc.COMPOUNDING_MODE_ENV, "on")
+    monkeypatch.setenv("SYNDICATE_COMPOUNDING_MIN_STAKE", "floor_one_contract")
+    plan, _ = _apply_floor(_shard_resolver(170.0, 170.0))
+    for position in plan["positions"]:
+        price = vc.one_contract_dollars(position)
+        stake = position["stake_dollars"]
+        assert stake > price                       # fee included, rounded up to the cent
+        assert round(stake * 100) == stake * 100   # whole cents
+        assert contracts_for_stake(stake, price) == 1
+
+
+def test_floor_never_spends_past_the_shard(monkeypatch):
+    monkeypatch.setenv(vc.COMPOUNDING_MODE_ENV, "on")
+    monkeypatch.setenv("SYNDICATE_COMPOUNDING_MIN_STAKE", "floor_one_contract")
+    plan, refusals = _apply_floor(_shard_resolver(170.0, 0.30))   # shard holds 30c
+    assert plan["positions"] == []
+    assert refusals == {"floor_exceeds_funding_cash": 2}
+
+
+def test_floor_refuses_when_the_shard_is_unknown(monkeypatch):
+    monkeypatch.setenv(vc.COMPOUNDING_MODE_ENV, "on")
+    monkeypatch.setenv("SYNDICATE_COMPOUNDING_MIN_STAKE", "floor_one_contract")
+    plan, refusals = _apply_floor(lambda position: {"known": True, "bankroll": 170.0, "capital": 465.37})
+    assert refusals == {"floor_exceeds_funding_cash": 2}
+
+
+def test_floor_does_not_touch_a_stake_already_over_one_contract(monkeypatch):
+    monkeypatch.setenv(vc.COMPOUNDING_MODE_ENV, "on")
+    monkeypatch.setenv("SYNDICATE_COMPOUNDING_MIN_STAKE", "floor_one_contract")
+    plan, refusals = _apply_floor(_shard_resolver(465.37, 245.33))  # (b): $0.55 / $0.92
+    stakes = {p["position_key"]: p["stake_dollars"] for p in plan["positions"]}
+    assert stakes == {"del": pytest.approx(0.55, abs=0.01), "maxey": pytest.approx(0.92, abs=0.01)}
+    assert plan["compounding"]["floored_to_one_contract"] == 0 and refusals == {}
+
+
+def test_floor_never_rescues_an_unknown_capital(monkeypatch):
+    monkeypatch.setenv(vc.COMPOUNDING_MODE_ENV, "on")
+    monkeypatch.setenv("SYNDICATE_COMPOUNDING_MIN_STAKE", "floor_one_contract")
+    plan, refusals = _apply_floor(_resolver(None))
+    assert refusals == {"compounding_bankroll_unknown": 2}
