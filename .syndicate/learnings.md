@@ -2523,3 +2523,21 @@ Each time the arithmetic was right and **the operand was not mine to combine**. 
 - Before a field becomes the BASIS of a population, read the code that WRITES it, not just a row that has it. One `grep` for the writer is cheaper than a withdrawn finding.
 - When combining two fields, ask what grain each is at (per book? per side? per market? best-of?). If they are at different grains, the combination is not a measurement.
 - A finding whose refutation you cannot state is not ready. All four of these were refuted by evidence ALREADY in the payload or ALREADY in the docstring of the function I was measuring.
+
+## 2026-10-20 -- A post-hoc map fit on a RESEARCH LINK is not evidence about the SERVED SIM: measure the sim's own calibration before porting it `[lane soccer-team-strength, session e44b3e73]`
+
+**The belief overturned:** a correction measured on the research Poisson link (27,285 matches, CI below 0) would transfer to the sim, the way the rating slope did.
+
+**Measured:**
+- The link's draw term wanted FEWER draws in mismatches (δ1 −0.36..−0.41).
+- The served sim already UNDER-predicts them: 0.197 vs 0.220 actual on 2,724 matches. Refit on the sim, δ1 came out POSITIVE (+0.15) and NOT DEMONSTRATED.
+- The link was under-confident on its own top decile; the sim was over-confident on its own.
+- The link's 1X2 temperature hurt UEFA (+0.0032).
+- Ported as-is, the "SUPPORTED" draw correction would have shipped a regression.
+
+**Why:** a post-hoc 1X2 map corrects one model's SHAPE errors. The sim's 1X2 comes from simulated scores with different mechanics. Rating INPUTS transfer, because the sim reads them with a measured linear gain (R² 0.87). Output maps do not.
+
+**How to apply:**
+- Before shipping any map fit on a proxy model, run a descriptive read of the TARGET's own calibration on the same axis (one tercile table is enough).
+- Then refit on the target's output under its own registration.
+- Pass-through inputs (ratings) need a real-sim do-no-harm A/B before the default flips.

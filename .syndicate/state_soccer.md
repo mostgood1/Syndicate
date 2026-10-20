@@ -5,6 +5,34 @@ The INDEX of every subject, across every part, is in `state.md`; the
 one-subject-one-section rule is global and spans these files.
 Same rules as state.md: when a fact changes, EDIT THE LINE.
 
+## [soccer-team-strength] SOCCER TEAM RATINGS: RATING V2 IS ON MAIN AND OFF PENDING A REAL-SIM A/B; THE FAVOURITE GAP IS MOSTLY INFORMATION, NOT A FIXABLE SHAPE `[verified 2026-10-19/20, lane soccer-team-strength, main 73ba5d79, NO DEPLOY]`
+
+- **RATING V2 = recency (half-life 40 rows) + current-season blend (c 40) + shrinkage n/(n+5) toward 0, or toward a
+  per-league FITTED promoted-club prior** (`loaders.RatingV2`, `build_soccer_artifacts._rating_v2`,
+  `RATING_V2_PROMOTED_PRIOR`). It replaces the hard few-match gate for the 8 measured leagues (big 5, eredivisie,
+  primeira_liga, belgian_pro_league); MLS and the Championship are unchanged. **OFF unless
+  `SYNDICATE_SOCCER_RATING_V2=1`** (`73ba5d79`): absent means OFF until the real-sim A/B passes, and the plan is
+  then to flip the code default. Verified: identity with the research CUM arm is exact (1,620 sides, max err 0),
+  and 9 hermetic tests pass (`tests/test_soccer_rating_v2.py`).
+- **Evidence for V2 (linear Poisson link, not the sim):** −0.0019 [−0.0031, −0.0009] 1X2 log loss on 27,285
+  held-out domestic matches; gap to the de-vigged close +0.0221 → +0.0202 (9% closed)
+  (`findings_2026-10-16_soccer_rating_inputs.md`). **The real-sim A/B is RUNNING**
+  (`findings_2026-10-19_soccer_rating_v2_sim.md`, outputs `C:/tmp/team-strength/v2sim`).
+- **Maps fit on the research link do NOT port to the served sim** (measured):
+  - **Draws:** the link wants FEWER draws in mismatches (δ1 −0.36..−0.41), but the sim already under-predicts
+    them (0.199 vs 0.225 actual, top tercile). Refit on the sim it is NOT DEMONSTRATED (−0.0005 [−0.0015,
+    +0.0006]), so no draw term ships (`findings_2026-10-19_soccer_sim_draw_term.md`).
+  - **Favourites:** the link is UNDER-confident on its own top decile (0.777 vs 0.800), while the sim is
+    over-confident on its own (0.768 vs 0.738, n 160, wide CI).
+- **The favourite gap (top decile by close: model 0.745, close 0.805, actual 0.821) is mostly INFORMATION.**
+  - A gap-dependent 1X2 temperature closes 39% of it on the link (−0.0005) but moves AWAY from the close in KL. The
+    user DROPPED it.
+  - On UEFA it HURTS (+0.0032), and the UEFA model's own top decile is already calibrated, so the close-sorted
+    gap there is selection (`bff25ab3`).
+  - Scale, clamp, rating inputs (9%), per-club anchoring and favourite shape are all now measured. What remains
+    is information the rating never sees: lineups, rotation, the market.
+  - `findings_2026-10-19_soccer_favourite_gain.md`.
+
 ## [soccer-uefa-competitions] UEFA CLUB COMPETITIONS (UCL / UEL / UECL): REGISTERED FOR FIXTURES, GAME ODDS, LIVE SCOREBOARD AND VENUE JOINS, WITH NO MODEL. SERVED ON THE FLEET `[verified 2026-10-15, lane soccer-uefa-competitions]`
 
 - **Cross-league offset on PRODUCTION's ratings `[verified 2026-10-16, lane uefa-offsets-recency-prod, research only, nothing wired]`:**
