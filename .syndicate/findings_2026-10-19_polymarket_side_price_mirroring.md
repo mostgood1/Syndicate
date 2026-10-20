@@ -154,3 +154,46 @@ So mirroring is falsified on **both** shapes — the two-price case because the
 legs are independently priced, and the one-price case because the adapter
 refuses it before any side is assigned. I had only tested the first and should
 have enumerated the shapes rather than the population.
+
+## Addendum 2026-10-20 — the control I twice named and twice skipped, now measured
+
+I called the markets whose sides DIFFER "the natural control" twice and never
+looked at them. Measured over the same capture (`polymarket_us_games.json`,
+21,817 records, 4,967 two-leg spread-shaped):
+
+| leg state | n | share | med sum | min | max |
+|---|---|---|---|---|---|
+| neither leg pinned (< 0.975) | 4,023 | 81.0% | 1.0100 | **0.0000** | 1.9100 |
+| **ONE leg pinned** | **732** | **14.7%** | **1.0550** | 1.0000 | 1.9600 |
+| BOTH legs pinned | 212 | 4.3% | 1.9800 | 1.9600 | 1.9800 |
+| length mismatch (adapter refuses) | 158 | — | — | — | — |
+
+**The control settles the falsification far better than the original argument
+did.** 732 markets carry one leg at the cap and the other cheap — e.g.
+`asc-nhl-pit-phi-2026-09-30-neg-2pt5` at `["0.9800", "0.04"]`, sum 1.02, which
+is an ordinary near-decided market. **Under mirroring those 732 could not
+exist**: one quote copied onto both sides can only ever produce the both-pinned
+shape. Independent pricing is now shown directly rather than inferred from the
+adapter's docstring, and the both-pinned cluster is strikingly tight
+(min 1.9600, max 1.9800) where the other states span widely.
+
+It also confirms the 158 length-mismatch records the `fair-price-v2` lane found,
+to the record — the adapter refuses those at `venue_quote_adapters.py:1273`.
+
+### But it also shows my 212 is a LOWER BOUND, which I had not said
+
+The cap-based count misses two degenerate shapes:
+
+- **`neither leg pinned` reaches a sum of 1.9100** — e.g. two legs around
+  0.95/0.96, neither at the 0.975 cap, yet as untradeable as the ones I counted.
+- **and a sum of 0.0000** at the bottom, i.e. both legs priced at zero, a state
+  I never considered at all.
+
+So "212 of 4,967 (4.3%)" understates the venue pathology, and anyone quoting it
+as the size of the problem would be quoting the subset my threshold happened to
+catch. **The board-side refusal is NOT affected and is the better instrument
+for exactly this reason:** it keys on the de-vig band
+(`opportunity_signals._MAX_OVERROUND = 1.60`) via "no fair AND no `ev_pct`", so
+it catches every pair the de-vig rejects — including the 1.91 sums the cap
+misses — rather than a hand-picked cap. That is an argument for where the guard
+lives, not a defence of the 212.
