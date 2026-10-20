@@ -45,7 +45,11 @@ Lane `paper-alongside-live`, session f8387262, 2026-10-20. Times in Central.
   - Unchanged. It selects venues by EXACT name (`paper:kalshi`, `paper:polymarket`, `kalshi`, `polymarket`; secondary `paper:prophetx`, `paper:novig`, `paper`), and no ladder venue is in any list (tested).
   - Its H1-H3 populations are what they were. The ladder adds no row to them.
 - **Paper bet optimization study.** Same exact-name selection. Unaffected.
-- **min_ev tuner.** See above. It must exclude ladder rows until its lane's own pre-registration.
+- **min_ev tuner.** Ladder rows are skipped unconditionally (`ladder_not_pre_registered`, 9676e3d0). Its reading rule is pre-registered in its own lane: `.syndicate/findings_2026-10-19_min_ev_tuner_backtest.md`, "PRE-REGISTRATION 2026-10-20T18:33Z" and "PRE-REGISTRATION AMENDMENT 2026-10-20T18:54Z" (df2a2bcb).
+  - It tunes a per-cell NET-of-fee floor.
+  - Below-floor evidence = `floor-1 <= ev_net_pct < floor`, sliced on `ev_net_pct` and never on `ev_band` or "is a ladder row".
+  - Dedupe on family + position_key + selected_date, preferring the `paper:<venue>` row.
+  - The RAISE side waits for `ev_net_pct` on main-book rows. That needs a carried position field in that lane's claimed file first, then a one-line copy here.
 
 ## Readout and decision rule (`scripts/paper_ladder_readout.py`)
 
