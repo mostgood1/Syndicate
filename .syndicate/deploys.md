@@ -51519,3 +51519,37 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - **closest to a decision:** polymarket ncaaf totals (CLV 28/30). If it fills, flat ROI is +9.6% at t 0.61, below z 2.0 in either direction, so it should hold as `only_clv_significant` rather than move. The same is true for kalshi ncaaf spreads (CLV 18/30). These numbers match the 10-19 replay exactly, so these two cells' bands gained no newly graded events overnight.
 - **verify:** this READING is the `MIN_EV_TUNER` line stamped 12:01:32Z with date=2026-10-20, plus `last_run_at=2026-10-20T12:01:31Z` read back from keyvalue. Next readout: 2/7 on 10-21.
 
+
+
+## 2026-10-20 14:23:59Z (9:23 AM CT) -- FULL FLEET down/up on e491c260 (no ff): compounding "(b) + floor" ON (lane `compounding-bankroll`, session 3927eb2e) -- deploy MET; first build reading follows
+- **ask:** the user, in chat: "(b) + floor: size Kalshi against the whole account, and round any compounded stake under one contract UP to exactly one contract (fee-inclusive, size refusals only, never past shard cash). Build, test, then deploy before 6 PM CT."
+  - The ceiling key follows the user's 10-20 ask: "make the ceiling adjust based on capital available".
+  - Not carried: eb86488f (settlement fix). A peer relayed "widen to eb86488f" and then RETRACTED it as sent in error; the user had made no choice, so the target stayed at the approved scope.
+- **code:** already on the fleet. HEAD e491c260 contains 5fd7cdfb (ceiling=capital), fe725713 (venue_total + one_contract) and 6d7f4ea7 (floor_one_contract). `git merge --ff-only e491c260` = "Already up to date".
+- **env:** 128 -> 133 lines, 0 removed; backup `local_production.env.bak-compounding-floor-20261020T142359Z`. Added:
+  - `REFRESH_WORKER__SYNDICATE_COMPOUNDING_BASIS=venue_total`
+  - `REFRESH_WORKER__SYNDICATE_COMPOUNDING_MIN_STAKE=floor_one_contract`
+  - `REFRESH_WORKER__SYNDICATE_COMPOUNDING_BANKROLL_MAX_DOLLARS=capital`
+- **folded in:** lane `kalshi-series-competition-identity` released refresh-worker at 13:45:46Z and skipped its own TERM. Its `af2c8c5a` (the Kalshi join refuses `series_competition_not_on_board`) loaded here; its reading is its own.
+- **ride-alongs loaded into live-odds-worker** (it had run d3878d69 since 12:35:30Z):
+  - `af2c8c5a` Kalshi join.
+  - `6e4f5361` maker shadow, PAPER-only. No role imports the module; the supervisor runs it as job `kalshi-maker-shadow`.
+  - `db339f24` live stake band, OFF: `SYNDICATE_LIVE_STAKE_BAND` absent from the env file and from both roles' environ.
+  - `ab4b6ffe` SGP +100 tickets.
+  - `e491c260`/`c36bdc9a`/`dd499146` board counters (already on web/refresh-worker).
+- **claims:** all three acquired 14:18:28Z, holder `compounding-bankroll`. Tokens: refresh-worker c5363a26a7b66826, live-odds-worker e4d0e4a0e179b290, web 98852ae59a173a55.
+- **baseline 14:18:41Z:**
+  - HEAD e491c260, 8 dirty data/report files, none touched; healthz 200.
+  - refresh-worker 2850549 had `COMPOUNDING_BANKROLL=on` and balance caps on; live + armed on both.
+  - The env file had no BASIS / MIN_STAKE / MAX_DOLLARS / LIVE_STAKE_BAND / EXIT_* keys.
+- **timeline (UTC):**
+  - Drain (WSL, keyvalue + `SYNDICATE_REPORTS_ROOT`) from 14:18:51Z; **CLEAR 14:23:11Z**.
+  - Marker set, env appended. `down` 14:23:59 -> 14:24:22 (1 detached odds job stopped, 0 SIGKILL).
+  - **`Start-ScheduledTask` at 14:24:38Z RETURNED WITHOUT RUNNING `up`**: LastTaskResult 0, State Ready, nothing appended to supervisor.log, no process. The fleet stayed DOWN until the retry at 14:29:40Z (State Running), and healthz returned 200 at **14:30:20Z**. **Outage ~6 min** instead of ~1. Cause not yet known.
+  - Marker cleared 14:30:44Z; `DRAIN_CLEARED owner=compounding-bankroll`.
+- **verify (14:30:44Z, /proc environ):**
+  - supervisor `up --allow-live-execution`.
+  - refresh-worker pid 2946323 (lstart 14:30:16Z): RENDER_GIT_COMMIT e491c260, `COMPOUNDING_BANKROLL=on`, `COMPOUNDING_BASIS=venue_total`, `COMPOUNDING_MIN_STAKE=floor_one_contract`, `COMPOUNDING_BANKROLL_MAX_DOLLARS=capital`, `EXECUTION_BALANCE_CAPS=on`, MODE=live, LIVE_ARMED=1.
+  - live-odds-worker pid 2946324: e491c260, live + armed, balance caps on.
+- **expect (dry run 13:02Z):** the two Kalshi positions place 1 contract each: DEL +117 at ~$0.55 (shard 0 $170) and Maxey u -203 at ~$0.92 (shard 3 $245.33). `floored_to_one_contract` > 0 only for stakes under one contract.
+- **rollback:** delete the three added lines (or restore the .bak) + full down/up. Retry `Start-ScheduledTask` if the first returns at once.
