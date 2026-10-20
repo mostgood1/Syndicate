@@ -51881,3 +51881,17 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - **owed:** the first `REFUSED_TICKER_DATE_MISMATCH` would mean the board join slipped onto an order. Its absence is the healthy reading.
   - Separately, `REFUSED_HELD_OTHER_SLATE` (D1) should appear if UMass @ UConn (10-23) is planned again on the 10-21 or 10-22 slate. That is the first real D1 test, from 05:00Z.
 - **rollback:** `git revert 22c56001`'s guard commit, ff, gated live-odds-worker TERM. Or a `LIVE_ODDS_WORKER__SYNDICATE_EXECUTION_TICKER_DATE_GUARD=off` line + a full down/up.
+
+## 2026-10-20 20:02Z (3:02 PM CT) -- games rail: live NBA/WNBA/NHL card score = sum of its periods (fleet ff 22c56001 -> 8e0ca456 + reload-web)
+
+- **Approval:** user, in chat: "the NBA compact game cards arent adding up", then "Fix + deploy now".
+  - Cross-lane write into `games-rail-full-detail` (`game_chip_scoreboard._attach_linescore` only), logged in that lane's block.
+  - Web claim held by `cheat-sheets` (token 9690f298).
+- **Cause, measured 14:51 CT:** BOS @ DET Q2 read 35-36 beside quarters 28+9 / 27+12. The score was the worker artifact's (<=180 s old; 72 s then); the quarters were ESPN's at serve time (45 s cache).
+- **ff at 20:01:29Z (3:01:29 PM CT).** `RELOAD_WEB` state done, failures 0.
+- **Ride-along:** e633f12c `wnba: delete vendor/wnba_betting_repo`.
+  - Its lane verified production read nothing from it.
+  - Same pattern as e5dabb1c (NBA), which went out at 10:38. After that, `logs/nba_gameday_props.log` shows the 11:40 NBA pull exit 0 "snapshot REWRITTEN", and the 13:40 next-day pull exit 0.
+  - With `SYNDICATE_DATA_ROOT` set, `_basketball_source_root` resolves to the data root, not `vendor/`.
+- **MEASURED 20:01:49Z:** `/api/board/game-chips?sport=nba` BOS @ DET Q2 3:10: score 47-39, quarters [28, 19] / [27, 12], sums 47 / 39, adds up True (artifact age 15.6 s).
+- 136 game-chip tests pass. An empty or suppressed live score stays as the worker left it.
