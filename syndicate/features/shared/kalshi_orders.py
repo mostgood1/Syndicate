@@ -1279,7 +1279,12 @@ def _sum_present(order: Mapping[str, Any], fields: tuple[str, ...]) -> float | N
     return round(total, 6) if seen else None
 
 
-def _order_cancel_url(order_id: str) -> str:
+def _order_cancel_url(
+    order_id: str,
+    *,
+    exchange_index: int | None = None,
+    market_ticker: str | None = None,
+) -> str:
     """DELETE hangs off the WRITE path, not the read path.
 
         POST   /portfolio/events/orders          -- create
@@ -1298,13 +1303,61 @@ def _order_cancel_url(order_id: str) -> str:
     path = (os.environ.get("KALSHI_ORDER_CANCEL_PATH") or _DEFAULT_ORDER_PATH).strip()
     if not path.startswith("/"):
         path = f"/{path}"
-    return f"{_read_base().rstrip('/')}{path}/{order_id}"
+    url = f"{_read_base().rstrip('/')}{path}/{order_id}"
+    # THE SHARD IS A QUERY PARAMETER [2026-10-20, lane compounding-bankroll].
+    # The V2 cancel docs: `exchange_index` -- "If omitted, auto-routes when
+    # market_ticker is provided, otherwise defaults to 0" -- and "An order_id
+    # alone cannot identify the exchange shard". A bare DELETE therefore looks
+    # on shard 0 only. See `cancel_order` for what that cost.
+    # `subaccount` is sent only when `KALSHI_ORDER_SUBACCOUNT` names one: its
+    # documented default is 0, which is what every submit sends.
+    params: list[tuple[str, str]] = []
+    subaccount = _v2_subaccount()
+    if os.environ.get("KALSHI_ORDER_SUBACCOUNT") and subaccount is not _SUBACCOUNT_OMITTED:
+        params.append(("subaccount", str(subaccount)))
+    if exchange_index is not None:
+        params.append(("exchange_index", str(int(exchange_index))))
+    if market_ticker:
+        params.append(("market_ticker", str(market_ticker)))
+    if params:
+        url = f"{url}?{urllib.parse.urlencode(params)}"
+    return url
 
 
-def cancel_order(order_id: Any) -> dict[str, Any]:
+def _shard_of(value: Any) -> int | None:
+    """A real shard index (>= 0), or None. -1 is "auto", not a shard."""
+    if isinstance(value, bool) or value in (None, ""):
+        return None
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return None
+    return number if number >= 0 else None
+
+
+def cancel_order(
+    order_id: Any,
+    *,
+    exchange_index: Any = None,
+    market_ticker: Any = None,
+) -> dict[str, Any]:
     """Pull one resting order off the book.
 
         DELETE /trade-api/v2/portfolio/events/orders/{order_id}
+               ?exchange_index=<the order's shard>&market_ticker=<ticker>
+
+    THE SHARD MUST BE NAMED [2026-10-20, lane compounding-bankroll]. Without
+    `exchange_index` or `market_ticker` the venue looks on shard 0 only, so
+    every order resting on any other shard came back 404 while it stayed on the
+    book. 2026-10-20 22:04Z: the SAS/OKC +20.5 order 404'd here with no shard
+    sent -- and NBA markets route to shard 3 (`venue_capital`, measured
+    2026-10-19) -- and the classic `DELETE /portfolio/orders/{id}` returned 410
+    `deprecated_v1_order_endpoint`. Both auto-cancels (stale, and kickoff)
+    call this with only an order id, so this function finds the shard itself:
+    a caller that knows it passes it, and otherwise the order is READ first
+    (`GET /portfolio/orders/{id}` needs no shard and returns `exchange_index`
+    and `ticker`). No shard and no ticker is refused by name rather than
+    guessed as 0.
 
     Note the path: the WRITE route, alongside create -- not the `/portfolio/
     orders` the reads use. The failure is still returned by NAME with the HTTP
@@ -1320,14 +1373,27 @@ def cancel_order(order_id: Any) -> dict[str, Any]:
     key = str(order_id or "").strip()
     if not key:
         return {"status": "error", "reason": "no_order_id"}
-    url = _order_cancel_url(key)
+    shard = _shard_of(exchange_index)
+    ticker = str(market_ticker or "").strip() or None
+    if shard is None:
+        read = fetch_order(key)
+        if read.get("status") != "ok":
+            return {"status": "error", "reason": f"shard_lookup_failed:{read.get('reason')}"}
+        known = read.get("order") or {}
+        shard = _shard_of(known.get("exchange_index"))
+        ticker = ticker or (str(known.get("ticker") or "").strip() or None)
+    if shard is None and ticker is None:
+        return {"status": "error", "reason": "cancel_shard_unknown"}
+    url = _order_cancel_url(key, exchange_index=shard, market_ticker=ticker)
     print(f"[kalshi_orders] CANCEL url={url}", flush=True)
     try:
         payload = signed_request("DELETE", url)
     except Exception as exc:
-        return {"status": "error", "reason": f"{type(exc).__name__}: {exc}"}
-    order = _unwrap_order(payload)
-    return {"status": "ok", "order": order or {}}
+        return {"status": "error", "reason": f"{type(exc).__name__}: {exc}", "exchange_index": shard}
+    # V2 answers `{order_id, client_order_id, reduced_by, ts_ms}` -- not an
+    # order. `reduced_by` is the contracts taken off the book.
+    order = _unwrap_order(payload) or {}
+    return {"status": "ok", "order": order, "reduced_by": order.get("reduced_by"), "exchange_index": shard}
 
 
 def venue_order_view(order: Mapping[str, Any]) -> dict[str, Any]:
