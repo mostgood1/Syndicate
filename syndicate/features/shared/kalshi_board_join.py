@@ -243,6 +243,11 @@ REASON_UNDATABLE = "no_game_date_in_ticker"
 # tickets. See `kalshi_catalogue._SERIES_SEGMENT` for the list.
 REASON_SEGMENT_MISMATCH = "segment_has_no_matching_series"
 
+# The series is ANOTHER COMPETITION than the board's, though the catalogue gave
+# it the board's sport. See `series_competition_verdict`. Reported per series in
+# `competition_refused_by_series`.
+REASON_SERIES_COMPETITION = "series_competition_not_on_board"
+
 # --------------------------------------------------------------------------
 # LADDER MONOTONICITY -- the arithmetic check, ported from Polymarket
 # --------------------------------------------------------------------------
@@ -392,6 +397,105 @@ def _series_family(series: Any) -> str:
         if text.endswith(suffix) and len(text) > len(suffix):
             return text[: -len(suffix)]
     return text
+
+
+# WHICH COMPETITION A SOCCER SERIES IS, BY EXACT FAMILY `[2026-10-20, lane
+# kalshi-series-competition-identity]`.
+#
+# `kalshi_catalogue.sport_for_series` gives soccer to any series whose NAME
+# CONTAINS a competition token, and discovery gives it to any series whose TITLE
+# STARTS WITH a competition name. Both say "soccer" for contracts on games our
+# board does not carry. Read from Kalshi's `/series` catalogue 2026-10-20:
+#
+#     KXSERIEAWGAME      'Serie A Femminile Game'          SERIEA in the name
+#     KXEREDIVISIEWGAME  'Eredivisie Vrouwen Game'         EREDIVISIE
+#     KXBUNDESLIGAWGAME  "German Women's Bundesliga Game"  BUNDESLIGA
+#     KXUCLWGAME         "Champions League Women's Game"   KXUCL
+#     KXBBLGAME          'Bundesliga Basketball Game'      title starts 'Bundesliga'
+#     KXBBSERIEAGAME     'Italy Serie A Game' (basketball) SERIEA
+#     KXBUNDESLIGA2GAME  'Bundesliga 2 Game'               BUNDESLIGA
+#     KXLALIGA2GAME      'LaLiga 2 Game'                   LALIGA
+#     KXUAEPLGAME        'UAE Pro League'                  EPL
+#     KXMLSASTGAME       'MLS All Star Game'               MLS
+#
+# Women's clubs share their men's clubs' names, so `KXSERIEAWGAME` resolved
+# onto men's Serie A games. Offline replay of this join on the fleet's
+# 09-30..10-19 data (lane kalshi-maker-entry-paper): 70% of its decision
+# instants sat more than 10pp off the sportsbook consensus fair, and its fills
+# read as +103% "edge" -- the edge is the two prices describing different
+# matches.
+#
+# THE FAMILY MUST BE THE COMPETITION EXACTLY. `_series_family` strips the market
+# tail, and what is left must be a key here: `KXSERIEAW` is not `KXSERIEA`,
+# `KXBUNDESLIGA2` is not `KXBUNDESLIGA`. An unknown family REFUSES -- it is
+# never mapped to the competition whose name it contains. Values are pinned to
+# the board's own `LEAGUE_DISPLAY_NAMES` by the competition-identity tests.
+#
+# `KXBUNDESLIGA2H` is Bundesliga's SECOND HALF, not Bundesliga 2: `_series_family`
+# strips `2H` before `GAME`/`SPREAD` and the catalogue titles it '2nd Half
+# Winner'. `KXBUNDESLIGA2SPREAD` keeps its `2` and refuses.
+_SOCCER_COMPETITION_BY_FAMILY: dict[str, str] = {
+    "KXEPL": "epl",
+    "KXLALIGA": "la_liga",
+    "KXBUNDESLIGA": "bundesliga",
+    "KXSERIEA": "serie_a",
+    "KXLIGUE1": "ligue_1",
+    "KXMLS": "mls",
+    "KXEREDIVISIE": "eredivisie",
+    "KXEFLCHAMPIONSHIP": "championship",
+    "KXBELGIANPL": "belgian_pro_league",
+    "KXUCL": "ucl",
+    "KXUEL": "uel",
+    "KXUECL": "uecl",
+}
+
+# Match-market tails `_SERIES_MARKET_SUFFIXES` does not strip (`KXLALIGABTTS`,
+# `KXUCLTEAMTOTAL`), every one read off Kalshi's soccer series 2026-10-20.
+# Stripped here only, so the club-code scope `_series_family` defines is
+# unchanged. Longest first. A tail not listed leaves the family unknown and the
+# series REFUSES -- an allowlist, so a new tail fails closed. `AST`/`SOA` (player
+# assists) are deliberately absent: `KXMLSAST` is the MLS ALL-STAR family.
+_COMPETITION_TAILS = (
+    "1HTEAMTOTAL", "2HTEAMTOTAL", "TEAMTOTAL", "FIRSTGOAL", "TCORNERS",
+    "1HSCORE", "ANYGOAL", "CORNERS", "1HBTTS", "2HBTTS", "SCORE", "BTTS",
+    "GOAL", "FTTS",
+)
+
+# NON-SOCCER SERIES THE CATALOGUE FILES UNDER A BOARD SPORT, by EXACT name.
+# `sport_for_ticker` is a substring scan: `MLB` sits inside `KXMLBB` (Mobile
+# Legends Bang Bang) and `NCAAB` inside `KXNCAABB` (college baseball), and
+# discovery registers both because their titles end in 'Game'. Exact names, not
+# prefixes: `KXNCAABBIG10` is the Big Ten MEN'S BASKETBALL tournament and is
+# NCAAB.
+_SERIES_OTHER_COMPETITION: dict[str, str] = {
+    "KXMLBBGAME": "mobile_legends_esports",
+    "KXNCAABBGAME": "college_baseball",
+    "KXNCAABBSPREAD": "college_baseball",
+    "KXNCAABBTOTAL": "college_baseball",
+}
+
+
+def soccer_competition_for_series(series: Any) -> str | None:
+    """The board league a soccer series settles on, or None if it is not one."""
+    text = str(series or "").strip().upper()
+    for tail in _COMPETITION_TAILS:
+        if text.endswith(tail) and len(text) > len(tail):
+            text = text[: -len(tail)]
+            break
+    return _SOCCER_COMPETITION_BY_FAMILY.get(_series_family(text))
+
+
+def series_competition_verdict(series: Any, sport: Any) -> str | None:
+    """None when the series is a competition the board carries for `sport`;
+    otherwise a short name for what it is instead. Per series, never per market
+    family: `KXSERIEAGAME` passes while `KXSERIEAWGAME` refuses."""
+    key = str(series or "").strip().upper()
+    other = _SERIES_OTHER_COMPETITION.get(key)
+    if other:
+        return other
+    if str(sport or "").strip().lower() == "soccer" and soccer_competition_for_series(key) is None:
+        return "unrecognised_soccer_competition"
+    return None
 
 
 # "Real Madrid wins" -> "Real Madrid". Kalshi's own moneyline wording, the same
@@ -1348,6 +1452,9 @@ def join_kalshi_to_board(
     unreadable_series: set[str] = set()
     # Complete, not sampled: which series refuse and how many each.
     unreadable_by_series: dict[str, int] = {}
+    # Series refused as another competition, by series: `{series: {"as": what
+    # it is, "n": markets}}`.
+    competition_refused_by_series: dict[str, dict[str, Any]] = {}
 
     # DOUBLEHEADER RESOLUTIONS, counted so the fix can be VERIFIED FROM THE LOGS.
     #
@@ -1599,6 +1706,19 @@ def join_kalshi_to_board(
                         }
                     )
             _refuse(reason)
+            continue
+
+        # ANOTHER COMPETITION, REFUSED BEFORE EITHER PAIRING PATH. Game lines
+        # resolve by event blob and props by player name; a women's or basketball
+        # series reaches a men's soccer row through either, so the gate sits
+        # above both. See `series_competition_verdict`.
+        other_competition = series_competition_verdict(verdict.get("series"), verdict.get("sport"))
+        if other_competition:
+            _refuse(REASON_SERIES_COMPETITION)
+            entry = competition_refused_by_series.setdefault(
+                str(verdict.get("series") or ""), {"as": other_competition, "n": 0}
+            )
+            entry["n"] += 1
             continue
 
         if verdict.get("needs_event_identity"):
@@ -2260,6 +2380,7 @@ def join_kalshi_to_board(
         "unreadable_by_series": dict(
             sorted(unreadable_by_series.items(), key=lambda kv: -kv[1])
         ),
+        "competition_refused_by_series": competition_refused_by_series,
         "board_key_sample": board_keys,
         "board_market_vocabulary": dict(
             sorted(board_markets.items(), key=lambda kv: -kv[1])[:12]

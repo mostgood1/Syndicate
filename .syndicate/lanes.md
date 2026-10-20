@@ -1199,6 +1199,14 @@ death, never life — do not invert it.
 - Verification: findings file landed on origin/main; user decision recorded
 - Blocked by: none
 
+### kalshi-series-competition-identity — OPEN — opened 2026-10-20 — session cb7650d2-2f6f-4012-a842-f55a6ed7bb2b
+- Goal: A Kalshi series for another competition than the board's (women's KXSERIEAW/KXEREDIVISIEW/KXBUNDESLIGAW/KXUCLW, basketball KXBBL/KXBBSERIEA, second tiers KXBUNDESLIGA2/KXLALIGA2, KXUAEPL, KXMLSAST, and the non-soccer KXMLBBGAME/KXNCAABB* game lines) refuses in join_kalshi_to_board with series_competition_not_on_board, named per series, before either pairing path; the board's own competitions (exact KX family) still pair
+- Files: syndicate/features/shared/kalshi_board_join.py, tests/test_kalshi_series_competition_identity.py (NEW)
+- Hypothesis: n/a (defect fix; mechanism confirmed on code: sport_for_series substring tokens + discovery title prefix give these series the soccer sport, and _resolve_event resolves women's clubs onto men's games)
+- Falsification test: n/a
+- Verification: new test fails on the pre-fix join (4 series paired) and passes after; all 34 test files importing the join green; of the 37 soccer series the fleet captured 09..11-03 exactly KXBBLGAME/KXBUNDESLIGA2GAME/KXEREDIVISIEWGAME/KXSERIEAWGAME refuse; after a fleet ff, BOARD_JOIN reasons carry series_competition_not_on_board
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
