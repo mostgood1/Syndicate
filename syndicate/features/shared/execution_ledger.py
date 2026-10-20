@@ -3566,6 +3566,16 @@ def _pregame_order_past_kickoff(row: Mapping[str, Any], now: datetime) -> bool:
     return submitted < commence <= now
 
 
+# Order ids this process has already cancelled at kickoff. The ledger moves a
+# cancelled order to `rejected` only when the NEXT reconcile reads the venue's
+# `canceled`, so a lagging read can hand the same order back as `resting` one
+# tick later. Remembering the id keeps the pass idempotent across ticks: one
+# DELETE per order, not one per tick until the venue catches up. In-process on
+# purpose -- after a restart the worst case is one extra cancel, which the venue
+# refuses harmlessly.
+_KICKOFF_CANCELLED: set[str] = set()
+
+
 def cancel_pregame_resting_at_kickoff(
     resting: Sequence[Mapping[str, Any]], *, now: datetime | None = None
 ) -> dict[str, Any]:
@@ -3599,7 +3609,12 @@ def cancel_pregame_resting_at_kickoff(
 
     moment = now or _utc_now_dt()
     limit = int(_float_env("SYNDICATE_EXECUTION_MAX_CANCELS", 3.0))
-    due = [row for row in resting or () if _pregame_order_past_kickoff(row, moment)]
+    due = [
+        row
+        for row in resting or ()
+        if _pregame_order_past_kickoff(row, moment)
+        and str(row.get("order_id") or "") not in _KICKOFF_CANCELLED
+    ]
     cancelled: list[dict[str, Any]] = []
     failed = 0
     for row in due[:limit]:
@@ -3618,6 +3633,8 @@ def cancel_pregame_resting_at_kickoff(
                 flush=True,
             )
             continue
+        if row.get("order_id"):
+            _KICKOFF_CANCELLED.add(str(row.get("order_id")))
         cancelled.append({"idempotency_key": row.get("idempotency_key"), "ticker": row.get("ticker")})
     if due:
         print(

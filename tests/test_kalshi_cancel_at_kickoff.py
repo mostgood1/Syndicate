@@ -32,6 +32,7 @@ def _isolated(tmp_path, monkeypatch):
         "SYNDICATE_REFRESH_STATE_BACKEND",
     ):
         monkeypatch.delenv(key, raising=False)
+    monkeypatch.setattr(L, "_KICKOFF_CANCELLED", set())
     yield
 
 
@@ -128,6 +129,35 @@ def test_orders_left_alone(monkeypatch, row):
     result = L.cancel_pregame_resting_at_kickoff([row], now=_NOW)
     assert calls == []
     assert result["due"] == 0
+
+
+def test_idempotent_across_ticks_while_the_venue_still_reads_resting(monkeypatch):
+    """The ledger moves a cancelled order only when the NEXT reconcile reads the
+    venue's `canceled`; a lagging read hands it back as `resting`. One DELETE
+    per order, not one per tick."""
+    calls = _recording_cancel(monkeypatch)
+    first = L.cancel_pregame_resting_at_kickoff([_resting()], now=_NOW)
+    second = L.cancel_pregame_resting_at_kickoff([_resting()], now=_NOW)
+    assert calls == ["venue-order-1"]
+    assert first["cancelled"] == 1
+    assert second["due"] == 0
+
+
+def test_a_failed_cancel_is_retried_next_tick(monkeypatch):
+    # Only a SUCCESSFUL cancel is remembered: a failed one is still resting.
+    calls = _recording_cancel(monkeypatch, status="error")
+    L.cancel_pregame_resting_at_kickoff([_resting()], now=_NOW)
+    L.cancel_pregame_resting_at_kickoff([_resting()], now=_NOW)
+    assert calls == ["venue-order-1", "venue-order-1"]
+
+
+def test_nothing_due_prints_nothing_and_calls_nothing(monkeypatch, capsys):
+    # The reconcile loop's behaviour is unchanged when nothing is past kickoff.
+    calls = _recording_cancel(monkeypatch)
+    result = L.cancel_pregame_resting_at_kickoff([_resting(commence_time="2026-10-24T20:00:00Z")], now=_NOW)
+    assert calls == []
+    assert result["due"] == 0
+    assert capsys.readouterr().out == ""
 
 
 def test_a_failed_cancel_is_counted_and_changes_nothing(monkeypatch):
