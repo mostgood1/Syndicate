@@ -101,7 +101,7 @@ carries the earlier mtime. The rules and the falsifier were not changed after th
 - **Decision:** a rule is recommended only if its out-of-sample flat ROI beats S0 by >= 2 SE AND is positive.
   Otherwise selection is NO-GO, and sizing is compared on log growth and flagged as noise-dominated.
 
-## Forward test (pre-registered 2026-10-20 ~1:15 PM CT, BEFORE any forward row was read)
+## Forward test (pre-registered 2026-10-20 1:04 PM CT, BEFORE any forward row was read)
 
 - **Why:** the first pass found the current regime (Suggested-only, from 10-13) undetermined. Paper books record
   again under live since `1006cb75` (lane `paper-alongside-live`, refresh-worker restarted 16:18:24Z). The
