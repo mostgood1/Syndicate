@@ -293,6 +293,30 @@ def commit_live_venue_plan(
             by_sport=by_sport,
         )
 
+    # TAG what the 0% floor admitted (user: "tagged live_ev_floor=0"), so a
+    # settled order can be split from the Suggested ones by its position_key.
+    floor_keys = set()
+    for row in placeable:
+        if isinstance(row, Mapping) and row.get("live_ev_floor") == 0:
+            try:
+                from syndicate.features.shared.portfolio_commit import position_key as _position_key
+
+                floor_keys.add(_position_key(row))
+            except Exception:
+                continue
+    if floor_keys:
+        for position in plan.get("positions") or []:
+            if isinstance(position, dict) and position.get("position_key") in floor_keys:
+                position["live_ev_floor"] = 0
+                position["suggested"] = False
+        plan["live_ev_floor"] = {
+            "floor": 0,
+            "extra_rows_in": len(floor_keys),
+            "extra_positions": sum(
+                1 for p in plan.get("positions") or [] if isinstance(p, Mapping) and p.get("live_ev_floor") == 0
+            ),
+        }
+
     plan["refusals"] = dict(sorted(refusals.items()))
     plan["refusals_by_market"] = _ordered(by_market)
     plan["refusals_by_sport"] = _ordered(by_sport)
@@ -324,6 +348,182 @@ REFUSAL_NO_CONTRACT_PRICE_COMPOUNDED = "no_contract_price_compounded"
 # than the cash that must fund it (the order's Kalshi shard, or the venue), or
 # that cash is unknown. Refused rather than floored past what can be paid.
 REFUSAL_FLOOR_EXCEEDS_CASH = "floor_exceeds_funding_cash"
+
+
+# ---- the LIVE EV floor at 0% net [user 2026-10-20] --------------------------
+#
+# "Build the live-only 0% net floor as shown (Suggested OR only-EV reasons, live
+# venue plans only, opt-in key, tagged live_ev_floor=0), with a stop rule: revert
+# to Suggested-only if live 0-2% rows show ROI below -5% after 100 settled bets."
+#
+# The 2% that binds live is the board's Suggested flag (`layer2_board.
+# _stamp_suggested`, lane layer2-suggested-opps, NOT edited here): +2% net at the
+# BEST book plus two-sided fair, plausible fresh quote and one side per line. A
+# row whose ONLY reasons are EV ones passes every other part of that flag; the
+# commit's own `below_min_ev_pct_net_of_fee` (EV net of the VENUE's fee > 0)
+# still applies at the venue price. paper2 and the main book stay Suggested-only.
+LIVE_EV_FLOOR_ENV = "SYNDICATE_LIVE_EV_FLOOR"
+_EV_ONLY_REASONS = frozenset({"ev_below_min", "ev_net_of_fee_below_min"})
+LIVE_EV_FLOOR_STOP_MIN_SETTLED = 100
+LIVE_EV_FLOOR_STOP_ROI = -0.05
+_LIVE_EV_FLOOR_LOG_LIMIT = 5000
+_LIVE_EV_FLOOR_STOP_CACHE: dict[str, Any] = {}
+_LIVE_EV_FLOOR_STOP_TTL_SECONDS = 1800.0
+
+
+def live_ev_floor_requested() -> bool:
+    """`SYNDICATE_LIVE_EV_FLOOR=0` turns it on; anything else (absent) is off."""
+    raw = str(os.environ.get(LIVE_EV_FLOOR_ENV) or "").strip()
+    try:
+        return raw != "" and float(raw) == 0.0
+    except ValueError:
+        return False
+
+
+def live_ev_floor_rows(raw_rows: Any) -> tuple[list, dict[str, int]]:
+    """Suggested rows, plus rows refused by the Suggested flag ONLY for EV.
+
+    The extra rows are COPIES tagged `live_ev_floor: 0`, so the shared shortlist
+    rows the paper books read are never changed.
+    """
+    kept: list = []
+    counts = {"suggested": 0, "ev_only_extra": 0, "other_reasons": 0, "flag_absent": 0}
+    for row in raw_rows or ():
+        if not isinstance(row, Mapping) or "suggested" not in row:
+            counts["flag_absent"] += 1
+            continue
+        if row.get("suggested") is True:
+            counts["suggested"] += 1
+            kept.append(row)
+            continue
+        reasons = row.get("suggested_reasons") or []
+        if reasons and set(reasons) <= _EV_ONLY_REASONS:
+            counts["ev_only_extra"] += 1
+            extra = dict(row)
+            extra["live_ev_floor"] = 0
+            kept.append(extra)
+        else:
+            counts["other_reasons"] += 1
+    return kept, counts
+
+
+def _live_ev_floor_log_path():
+    # NO DATE TOKEN: the stop rule reads weeks of entries, and a dated path is
+    # handed a 10-day TTL (`portfolio_settings._settings_path` says why).
+    return reports_root() / "intelligence" / "live_ev_floor_positions.json"
+
+
+def record_live_ev_floor_positions(plan: Mapping[str, Any], *, selected_date: str, venue: str) -> int:
+    """Append each live position the 0% floor admitted, once. Never raises."""
+    try:
+        fresh = [
+            p for p in (plan.get("positions") or [])
+            if isinstance(p, Mapping) and p.get("live_ev_floor") == 0 and p.get("position_key")
+        ]
+        if not fresh:
+            return 0
+        existing = read_json_file(_live_ev_floor_log_path())
+        entries = list(existing.get("entries") or []) if isinstance(existing, Mapping) else []
+        seen = {
+            (e.get("selected_date"), e.get("venue"), e.get("position_key"))
+            for e in entries if isinstance(e, Mapping)
+        }
+        added = 0
+        for position in fresh:
+            key = (selected_date, venue, position.get("position_key"))
+            if key in seen:
+                continue
+            seen.add(key)
+            entries.append({
+                "selected_date": selected_date,
+                "venue": venue,
+                "position_key": position.get("position_key"),
+                "ev_pct": position.get("ev_pct"),
+                "stake_dollars": position.get("stake_dollars"),
+                "sport": position.get("sport"),
+                "market": position.get("market"),
+                "recorded_at": _utc_now_iso(),
+            })
+            added += 1
+        if added:
+            write_json_file(_live_ev_floor_log_path(), {"entries": entries[-_LIVE_EV_FLOOR_LOG_LIMIT:]})
+        return added
+    except Exception as exc:
+        print(f"[portfolio_commit] LIVE_EV_FLOOR_LOG_FAILED error={type(exc).__name__}: {exc}", flush=True)
+        return 0
+
+
+def live_ev_floor_stop_state(*, force: bool = False) -> dict[str, Any]:
+    """The stop rule over SETTLED LIVE orders the floor admitted. Cached 30 min.
+
+    Tripped when >= 100 have settled and their ROI (pnl / staked) is below -5%.
+    An unreadable ledger or log does NOT trip it -- it reports `unknown` and the
+    floor keeps running, because the venue gates, caps and the band still bound
+    every order; the reading says so out loud on every build.
+    """
+    import time
+
+    now = time.time()
+    cached = _LIVE_EV_FLOOR_STOP_CACHE.get("state")
+    fresh_enough = now - float(_LIVE_EV_FLOOR_STOP_CACHE.get("at") or 0) < _LIVE_EV_FLOOR_STOP_TTL_SECONDS
+    if cached is not None and not force and fresh_enough:
+        return cached
+    state: dict[str, Any] = {"settled": 0, "staked": 0.0, "pnl": 0.0, "roi": None, "tripped": False}
+    try:
+        from syndicate.features.shared.execution_ledger import LIVE, full_history_orders
+
+        log = read_json_file(_live_ev_floor_log_path())
+        keys = set()
+        if isinstance(log, Mapping):
+            for entry in log.get("entries") or []:
+                if isinstance(entry, Mapping):
+                    keys.add((entry.get("selected_date"), entry.get("position_key")))
+        for order in full_history_orders():
+            if str(order.get("mode") or "") != LIVE:
+                continue
+            if (order.get("selected_date"), order.get("position_key")) not in keys:
+                continue
+            if str(order.get("outcome") or "") not in {"won", "lost", "push"}:
+                continue
+            state["settled"] += 1
+            state["staked"] += float(order.get("fill_stake_dollars") or order.get("requested_stake_dollars") or 0.0)
+            state["pnl"] += float(order.get("pnl_dollars") or 0.0)
+        if state["staked"] > 0:
+            state["roi"] = round(state["pnl"] / state["staked"], 4)
+        state["tripped"] = bool(
+            state["settled"] >= LIVE_EV_FLOOR_STOP_MIN_SETTLED
+            and state["roi"] is not None
+            and state["roi"] < LIVE_EV_FLOOR_STOP_ROI
+        )
+        state["staked"] = round(state["staked"], 2)
+        state["pnl"] = round(state["pnl"], 2)
+    except Exception as exc:
+        state["unknown"] = f"{type(exc).__name__}: {exc}"[:160]
+    _LIVE_EV_FLOOR_STOP_CACHE.update({"state": state, "at": now})
+    return state
+
+
+def _live_ev_floor_population(shortlist: Any, normalized: str) -> list | None:
+    """The live plans' row population for this build, or None (= Suggested-only)."""
+    if not live_ev_floor_requested() or not isinstance(shortlist, Mapping):
+        return None
+    stop = live_ev_floor_stop_state()
+    if stop.get("tripped"):
+        print(
+            f"[portfolio_commit] LIVE_EV_FLOOR_STOPPED date={normalized} settled={stop.get('settled')} "
+            f"roi={stop.get('roi')} -- stop rule (>= {LIVE_EV_FLOOR_STOP_MIN_SETTLED} settled, ROI < "
+            f"{LIVE_EV_FLOOR_STOP_ROI:.0%}); live plans are Suggested-only until the key is removed",
+            flush=True,
+        )
+        return None
+    rows, counts = live_ev_floor_rows(shortlist.get("rows"))
+    stop_summary = {k: stop.get(k) for k in ("settled", "roi", "tripped", "unknown") if k in stop}
+    print(
+        f"[portfolio_commit] LIVE_EV_FLOOR date={normalized} floor=0 rows={len(rows)} "
+        f"counts={counts} stop={stop_summary}",
+        flush=True,
+    )
+    return rows
 
 
 def _small_edge_skip(venue: str | None) -> float | None:
@@ -634,6 +834,8 @@ def _write_live_venue_plan(
         live_plan["job_state"] = dict(job_state or {})
         live_plan["paper2_generated_at"] = paper2_plan.get("generated_at")
         write_json_file(path, live_plan)
+        if live_plan.get("live_ev_floor"):
+            record_live_ev_floor_positions(live_plan, selected_date=normalized, venue=venue)
     except Exception as exc:
         print(
             f"[portfolio_commit] LIVE_PLAN_FAILED date={normalized} venue={venue} "
@@ -2024,6 +2226,9 @@ def run_portfolio_commit(
     # never cost the portfolio it is being compared against.
     venue_plans: dict[str, Any] = {}
     main_totals = plan.get("totals") or {}
+    # THE LIVE PLANS' ROWS: Suggested-only unless the 0% net floor is on (see
+    # `live_ev_floor_rows`). paper2 below keeps the Suggested rows either way.
+    live_floor_rows = _live_ev_floor_population(shortlist, normalized)
     for venue in paper2_venues():
         # Each venue in its OWN try: one venue's failure must not cost the
         # others' measurements, and the whole point is comparing across them.
@@ -2116,14 +2321,22 @@ def run_portfolio_commit(
             # must never cost the comparison book it is derived from, nor the
             # next venue's measurements.
             try:
+                live_scoped, live_scope_refusals = scoped, scope_refusals
+                if live_floor_rows is not None:
+                    live_scoped, live_scope_refusals = scope_rows_to_venue(
+                        live_floor_rows,
+                        venue,
+                        price_resolver=venue_price_resolver,
+                        ticker_resolver=venue_ticker_resolver,
+                    )
                 _write_live_venue_plan(
-                    scoped,
+                    live_scoped,
                     normalized=normalized,
                     venue=venue,
                     settings=venue_settings,
                     settled_sample_size_by_sport=settled_sample_size_by_sport,
                     paper2_plan=venue_plan,
-                    scope_refusals=scope_refusals,
+                    scope_refusals=live_scope_refusals,
                     job_state=plan.get("job_state"),
                 )
             except Exception as exc:
