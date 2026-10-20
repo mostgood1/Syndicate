@@ -67,6 +67,14 @@ death, never life — do not invert it.
 
 ## OPEN
 
+### one-engine-alignment-audit — OPEN — opened 2026-10-20 — session e13a70a0 (side session of 332cb014's group)
+- Goal: AUDIT ONLY, no code (user 2026-10-20: "we def need connectivity across all of Syndicate so everything is aligned ... one cohesive betting engine"). Map every surface that recommends / sizes / places / grades a bet (fair prob, price, EV + fees, floor, sizing, grading, file:line), count forks on a real fleet shortlist with denominators, propose ONE per-line decision record computed once by the worker + a migration order. Deliverable: .syndicate/findings_2026-10-20_one_engine_audit.md; top 5 forks by money at stake.
+- Files: .syndicate/findings_2026-10-20_one_engine_audit.md
+- Hypothesis: the surfaces disagree because each recomputes fair/price/EV/floor itself; the largest money fork is board `suggested` (best-book price) vs the venue's executable price.
+- Falsification test: on a fleet shortlist, suggested-at-best-book and positive-at-venue-price agree on >= 80% of venue-quoted rows.
+- Verification: fork counts with denominators from the fleet (read-only, 127.0.0.1:10000), each with file:line of the two disagreeing computations.
+- Blocked by: none. Fleet is LIVE MONEY: read-only.
+
 ### wnba-vendor-delete — OPEN — opened 2026-10-20 — session 2d413211
 - Goal: Delete vendor/wnba_betting_repo from Syndicate (user: "go ahead with the wnba deletion", 2026-10-20; plan steps 3-4 in findings_2026-10-20_wnba_vendor_deletion_scope.md): `git rm -r` the tree, fix the 3 tests that go stale without it (mirror guard x2, duplicate-names baseline), drop its vendor/upstream_sync.json entry, update the CLAUDE.md vendor mapping and the docs that state it is live; on the fleet archive the vendored dir; the tree leaves the fleet with the next fleet ff and is verified there.
 - Files: vendor/wnba_betting_repo/, vendor/upstream_sync.json (the wnba_betting_repo entry only), CLAUDE.md (the vendor/ directory-map line only), tests/test_data_mirror_write_guard.py, tests/conftest.py (_guarded_mirror_roots / vendored-schedule guard only), scripts/check_duplicate_module_names.py (VENDOR_BASELINE only), docs/ai_context/end_to_end_context.md (the vendor/ bullet only)
