@@ -429,3 +429,25 @@ and none exist yet.**
 - **Evidence base:** settled paper venue orders only (paper:kalshi + paper:polymarket, 1,176 over 10-02..10-18). The 552 live rows
   are `venue_rebuild` rows with no `ev_pct`. Same-book CLV on venue MLB props is near zero (kalshi 49/266, polymarket 1/95).
 - Detail: `findings_2026-10-19_min_ev_tuner_backtest.md`; deploys.md 2026-10-19 19:06:01Z; todo #701.
+
+## [live-plan-empty-funnel] THE LIVE PLAN IS EMPTY BECAUSE THE VENUE'S OWN PRICE IS <= 0 EV AFTER THE TAKER FEE -- NOT A CAP, NOT A CHOSEN GATE `[verified on the fleet 2026-10-19 22:15Z and 2026-10-20 12:33Z, read-only, session 6200a74b]`
+
+- **Funnel, median per build** (refresh-worker `LIVE_PLAN_WRITTEN` and its sibling lines):
+  - 10-19 live window, 31 builds: board 4,096 -> Suggested 21 -> Kalshi scoped 9 / Polymarket 5 -> venue-feed priced 9 / 1.5 -> live positions 0 / 0.
+    Kalshi had >0 in 6 of 30 builds; Polymarket in 0 of 30.
+  - 10-20, 130 builds 01:21Z..12:33Z: Kalshi and Polymarket live positions 0 in 130 of 130. Polymarket venue-priced 0 in every build.
+- **Whole board, re-priced at `quote.book_prices[venue]`**, 10-19:
+  - Kalshi 556 sides quoted: 0 at >= +2% net of taker fee, 23 at 0 to +2%. 41 are at >= +2% before the fee.
+  - Polymarket 324 quoted: 0 at >= +2% net, 5 at 0 to +2%.
+  - 10-20: Kalshi 488 / 1 / 9, Polymarket 230 / 0 / 2.
+- **Live settings** (refresh-worker env):
+  - commit `min_ev_pct=0`, `max_positions=25`, bankroll $1,000, slate 0.2.
+  - The effective floor is the board's Suggested flag (`SUGGESTED_MIN_EV_PCT` 2.0, net of fee, at the BEST book).
+- **Caps** (stored, read 2026-10-19 22:15Z): $25 per order, Kalshi $200, Polymarket $100, all venues $150. The combined cap did not
+  bind ($4.53 spent). These are superseded by caps-revamp's balance caps on `d3878d69` (deploys.md 23:55Z).
+- **Executor on 10-19:** one Kalshi row (NCAAF DEL -3.5, $26.52) was refused `over_max_order_dollars` 14 times.
+- **Since d3878d69** (compounding on, trim-to-cap loaded): 196 live passes from 23:50Z to about 12:38Z, all `positions=0`, so
+  trim-to-cap has not been exercised. The one row paper2 commits on 10-20 is refused `below_min_stake_compounded` in live.
+- **Polymarket balance:** the stamp's `dollars` 586.05 includes a 500.00 pending deposit (read 2026-10-19 22:15Z).
+- **Maker entry is NO-GO:** `findings_2026-10-19_kalshi_maker_entry_paper.md`.
+- Detail: `findings_2026-10-19_live_execution_empty_plan_funnel.md`.

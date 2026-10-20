@@ -2541,3 +2541,20 @@ Each time the arithmetic was right and **the operand was not mine to combine**. 
 - Before shipping any map fit on a proxy model, run a descriptive read of the TARGET's own calibration on the same axis (one tercile table is enough).
 - Then refit on the target's output under its own registration.
 - Pass-through inputs (ratings) need a real-sim do-no-harm A/B before the default flips.
+
+
+## 2026-10-19 -- OVERTURNED: "the live plan is empty because a gate or a cap is too tight" `[session 6200a74b, findings_2026-10-19_live_execution_empty_plan_funnel.md]`
+
+The brief to diagnose an empty live plan listed EV floors, MAX_POSITIONS, per-game decay, the slate cap, the in-play refusal and the executor caps as suspects. None of them was the zero.
+
+The whole board re-priced at the venue's own ask settled it:
+- **Kalshi:** 0 of 556 quoted sides at >= +2% after the taker fee (41 before the fee).
+- **Polymarket:** 0 of 324 quoted sides at >= +2% after the fee (24 before the fee).
+
+The exchanges' asks are at or below the sportsbook consensus once their fee is paid. The beliefs about the gates were stale as well: the live commit floor is 0, not 2.0, and max_positions is 25, not 12.
+
+**Why:** a funnel read only through its refusal counters names a gate for every dropped row. That made "loosen the gate" look like the fix, when the population beneath the gate was empty at any setting.
+
+**How to apply:**
+- Before proposing any gate or cap change to get volume, count the gate-free population: every row, re-priced at the venue, net of the venue's fee. If it is ~0, no gate change helps. Look for a different edge source or more coverage instead.
+- Read the RESOLVED settings from the worker's environ (`resolve_settings()`, `limits()`). Never use the values a brief or a docstring states.
