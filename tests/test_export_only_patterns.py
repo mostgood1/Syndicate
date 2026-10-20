@@ -55,6 +55,10 @@ EXPORT_ONLY_SAMPLES = (
     # NOT YET ON DISK at 2026-10-12 16:22Z: the `ncaab-player-priors` job was mid-way through its first
     # backfill. Shape is the producer's own (`scripts/build_ncaab_player_priors.py` output path).
     "ncaab_source/data/processed/player_priors_2026_asof_20260406.csv",
+    # lane ops-export-schedules: season schedules, each READ on the fleet data root 2026-10-20 (NBA 1,274 rows, WNBA 374).
+    "nba_source/data/processed/schedule_2026_27.csv",
+    "wnba_source/data/processed/schedule_2026.csv",
+    "wnba_source/data/processed/schedule_2026.json",
 )
 
 FEED_LIVE_SAMPLE = EXPORT_ONLY_SAMPLES[0]

@@ -120,9 +120,9 @@ def _production_schedule(base_url: str, token: str, league_code: str):
     import urllib.error
 
     frames = []
-    # 1) The data root on disk (run on the fleet, where production's files are). 2) The ops export -- schedule files are
-    # NOT in its allowlist today (HTTP 403 "not an allowed hot or export-only artifact", measured 2026-10-20), so remotely
-    # this degrades to schedule_missing until they are added; that allowlist change is a production decision.
+    # 1) The data root on disk (run on the fleet, where production's files are). 2) The ops export: schedule files are
+    # allowlisted READ-ONLY since 2026-10-20 (lane ops-export-schedules); a web older than that commit answers 403, and
+    # this degrades to schedule_missing.
     data_root = Path(os.environ.get("SYNDICATE_DATA_ROOT") or (REPO_ROOT / "data"))
     for name in _SCHEDULE_FILES:
         local = data_root / f"{league_code}_source" / "data" / "processed" / name

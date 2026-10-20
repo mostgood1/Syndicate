@@ -1641,6 +1641,13 @@ EXPORT_ONLY_ARTIFACT_PATTERNS: tuple[str, ...] = (
     "ncaab_source/data/processed/player_priors_*_asof_*.csv",
     "ncaab_source/data/processed/player_game_box_*.csv",
     "ncaab_source/data/processed/team_ratings_*_asof_*.csv",
+    # lane ops-export-schedules (user request 2026-10-20): the per-league season schedules the refresh's fetch-schedule rewrites
+    # (NBA schedule_2025_26 / 2026_27, WNBA schedule_2026). The offline basketball calibration builders read them over
+    # this export (they used to read a vendored copy, deleted 2026-10-19/20); a remote run got 403 without this.
+    # READ-ONLY on purpose: a schedule is rewritten in place on the data root each run, so it must not be swept or
+    # published from wherever a reader happens to run.
+    "*_source/data/processed/schedule_*.csv",
+    "*_source/data/processed/schedule_*.json",
 )
 
 
