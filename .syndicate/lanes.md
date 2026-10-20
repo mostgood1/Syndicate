@@ -1424,7 +1424,8 @@ death, never life — do not invert it.
 
 ### in-game-trading — OPEN — opened 2026-10-20 — session 15ceeb14-5d5b-47c4-9b84-e483511d5716
 - Goal: Measured in-play venue-vs-book edge on NBA/NHL (read-only) and a staged in-game trading plan (held-position loop, in-game fair price, in-play entries, Polymarket in-play rule, one-engine fit) in a findings file, each stage with its user decision
-- Files: scripts/inplay_recorder.py, scripts/inplay_edge_report.py, .syndicate/findings_2026-10-20_in_game_trading.md
+- Files: scripts/inplay_recorder.py, scripts/inplay_edge_report.py, .syndicate/findings_2026-10-20_in_game_trading.md, syndicate/features/shared/execution_exits_fast.py (NEW, stage 1 fast exit loop PAPER; imports execution_exits read-only, never edits it), tests/test_execution_exits_fast.py (NEW), scripts/run_live_odds_refresh_worker.py (`_fast_exit_background_loop` + `start_fast_exit_loop` + their one call in main() ONLY, NEW section)
+- Stage 1 user decision 2026-10-20 ~23:25Z via session 332cb014: "Build stage 1 now (Recommended)" -- paper first; going live is a separate yes.
 - Hypothesis: Kalshi/Polymarket in-play quotes lag the in-play sharp consensus long enough (>= one venue quote cadence) that fee-adjusted positive sides exist and persist
 - Falsification test: Positive-after-fee sides at venue price are rare (<~1% of side-minutes) or last less than one quote refresh
 - Verification: findings file with denominators + windows; recorder data in C:/tmp/inplay_2026-10-20
