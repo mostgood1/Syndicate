@@ -51783,3 +51783,12 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - 0 Traceback / EXECUTION_ERROR / KICKOFF_CANCEL_FAILED since the restart. D1/D3 still 0 hits (no qualifying case).
 - **owed:** the first live `REFUSED_HELD_OTHER_SLATE` / `CANCEL_AT_KICKOFF` (D1/D3, from the 15:53Z entry). D2 has no further reading: it diverges only for an order sent while a pass crosses midnight CT.
 - **rollback:** `git revert c4c1baba`, ff, gated live-odds-worker TERM. Or a `LIVE_ODDS_WORKER__SYNDICATE_EXECUTION_PLACEMENT_DAY_BUDGET=off` line + a full down/up (the supervisor freezes env at `up`).
+
+## 2026-10-20 16:57:19Z (11:57 AM CT) -- READING, NO DEPLOY: forward-bet exit lookback (e4468a14) LIVE on live-odds-worker -- **MET**, exactly as predicted (lane `kalshi-exit-path`, session b4e23404)
+- **Deploy was not mine:** e4468a14 rode lane future-dated-live-orders-scope's live-odds-worker-only restart at 16:56:17Z (fleet 72407b6c, pid 2979561). Its own entry a82cbf6c names it as a ride-along. I verified it is an ancestor of 72407b6c.
+- **prediction (10-20, same-read A/B on the fleet ledger):** old rule 19 positions, new rule 42 (+23 forward paper bets).
+- **READING (live-odds-worker.log, re-read independently at 16:59Z):**
+  - before, old pid: `16:53:06.127Z EXIT_TICK status=ok mode=paper positions=19 live=1 by_venue={'kalshi': 19, 'polymarket': 0} pm_quoted=0 quoted=12 quote_errors=0`;
+  - after, new pid: `16:57:19.703Z EXIT_TICK status=ok mode=paper positions=42 live=1 by_venue={'kalshi': 40, 'polymarket': 2} pm_quoted=2 quoted=33 quote_errors=0`.
+  - Also the FIRST production read of Polymarket books in the exit path: 2 of 2 slugs quoted.
+- **Instrument note:** a grep for `] EXIT_TICK_FAILED` returned 2 lines. Both were ALL_PROCESS_MEMORY dumps at 16:59:43Z that captured MY grep's own command line in their process list. That is a self-match, so there are 0 real failures. Exclude ALL_PROCESS_MEMORY lines before counting a log tag.
