@@ -372,6 +372,29 @@ def _run_execution(
                         f" reason={outcome.get('reason')}",
                         flush=True,
                     )
+                # A PREGAME KALSHI ORDER EXPIRES AT KICKOFF  [2026-10-20, user
+                # decision, lane future-dated-live-orders-scope, todo #707].
+                # Kalshi orders are good-till-canceled; this reconcile is the
+                # only per-tick read of what rests (`cancel_stale_resting_orders`
+                # runs from the worker's boot dump only). Kalshi's own pass only,
+                # so the Polymarket pass does not repeat the cancels; Polymarket
+                # expires at kickoff on its own (good-till-date).
+                if (
+                    reconcile_venue == "kalshi"
+                    and str(venue_scope or "").strip().lower() == "kalshi"
+                    and outcome.get("resting")
+                ):
+                    from syndicate.features.shared import execution_ledger as _ledger
+
+                    # Own guard: a failed cancel pass must not skip the
+                    # Polymarket reconcile that follows in this loop.
+                    try:
+                        _ledger.cancel_pregame_resting_at_kickoff(outcome["resting"])
+                    except Exception as exc:  # noqa: BLE001 -- never fatal, like the reconcile
+                        print(
+                            f"[execute_portfolio] KICKOFF_CANCEL_FAILED {type(exc).__name__}: {exc}",
+                            flush=True,
+                        )
         except Exception as exc:
             print(
                 f"[execute_portfolio] RECONCILE_FAILED {type(exc).__name__}: {exc}",
@@ -616,6 +639,37 @@ def _run_execution(
                 flush=True,
             )
             continue
+
+        # ONE BET, ONE ORDER, HOWEVER MANY SLATES PLAN IT  [2026-10-20, user
+        # decision, lane future-dated-live-orders-scope, todo #707]. The
+        # shortlist keeps NFL/NCAAF/soccer games up to six days out and
+        # `idempotency_key` hashes the slate date, so a forward bet already held
+        # from yesterday's slate was a NEW key today. Refused by name before the
+        # trim and before anything is written; the same slate's re-run is still
+        # `duplicates`, which `held_position_for` deliberately does not see.
+        if mode == LIVE:
+            from syndicate.features.shared.execution_ledger import (
+                REFUSAL_HELD_OTHER_SLATE,
+                held_position_for,
+            )
+
+            held = held_position_for(request)
+            if held is not None:
+                skipped += 1
+                refused[REFUSAL_HELD_OTHER_SLATE] = refused.get(REFUSAL_HELD_OTHER_SLATE, 0) + 1
+                print(
+                    f"[execute_portfolio] REFUSED_HELD_OTHER_SLATE venue={venue}"
+                    f" ticker={getattr(request, 'venue_ticker', None)!r}"
+                    f" sport={getattr(request, 'sport', None)}"
+                    f" market={getattr(request, 'market', None)}"
+                    f" side={getattr(request, 'side', None)}"
+                    f" line={getattr(request, 'line', None)}"
+                    f" held_slate={held.get('selected_date')} held_status={held.get('status')}"
+                    f" held_key={held.get('idempotency_key')}"
+                    " -- this bet is already held from another slate; nothing written",
+                    flush=True,
+                )
+                continue
 
         # THE PREGAME NEAR-EVEN HOLD IS GONE  [2026-09-11, user decision, lane
         # polymarket-e2e-review]. It held pregame Polymarket orders priced above
