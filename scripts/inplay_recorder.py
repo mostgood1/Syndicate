@@ -85,10 +85,11 @@ def main() -> int:
     ap.add_argument("--fleet-seconds", type=float, default=60.0)
     ap.add_argument("--books-seconds", type=float, default=60.0)
     ap.add_argument("--until", required=True, help="UTC stop time, ISO")
+    ap.add_argument("--extra-tickers", default="", help="comma list of Kalshi tickers to poll as well (held positions)")
     a = ap.parse_args()
     if os.name == "nt":  # Idle priority: the fleet shares this host.
         ctypes.windll.kernel32.SetPriorityClass(ctypes.windll.kernel32.GetCurrentProcess(), 0x40)
-    sports = [s.strip() for s in a.sports.split(",") if s.strip()]
+    sports = [s.strip() for s in a.sports.split(",") if s.strip() and s.strip() != "none"]
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     root = Path(a.fleet_root)
@@ -105,7 +106,8 @@ def main() -> int:
     while datetime.now(timezone.utc) < until:
         t = time.time()
         if t - tick_at > 600 or not tickers:
-            tickers, tick_at = kalshi_tickers(root, sports, a.date), t
+            extra = [x.strip() for x in a.extra_tickers.split(",") if x.strip()]
+            tickers, tick_at = sorted(set(kalshi_tickers(root, sports, a.date)) | set(extra)), t
             emit("log", {"ts": now(), "event": "tickers", "n": len(tickers)})
         if t - last_k >= a.kalshi_seconds:
             last_k = t
