@@ -3682,3 +3682,38 @@ the OT and possession terms.
 Reported, not gated: the paired shift vs R2A_mean, and P − T on the check dates (it should be ≈ 0).
 
 **Then:** on PASS, ask the user for the full FIT. On FAIL, record it and stop.
+
+### R2-d STRUCTURAL-TERM FIX — RESULT 2026-10-20 17:17Z: PASS (12/12 + 12/12 dates, 0 errors); the full FIT awaits a user go-ahead
+
+**Step 1:** SV_m (#3j measure dates, 82 games): X = **0.804 per team-game (SE 0.083)**. So
+`solver_endgame_pts_per_team = 0.804` (was Δ 0.103).
+
+**Step 2:** PKR3_check (12 sweep dates, 87 games):
+
+| gate | value | rule |
+|---|---|---|
+| total bias vs actual | **−0.07** per game, CI [−3.66, +3.89] | < 0.5 ✓ |
+| FTA/team | 22.64 (real 22.76 here) | 22.69 ± .3 ✓ |
+| team PF | 19.82 | 19.67 ± .4 ✓ |
+| foul-outs | 0.233 | ≤ .233 ✓ (at the edge) |
+| 3PA | 37.11 (real 37.10) | within CI ✓ |
+| quarter shares | .2553 / .2506 / .2528 / .2413 | all within real CI ✓ |
+
+**Reported:**
+- paired vs R2A_mean −0.21 (SE 0.26), vs PKR2_check −1.53 (SE 0.21);
+- sim − tpp·poss = −0.198 per team-game, i.e. sim − target ≈ +0.61 per team net of the 0.804 subtracted, as designed;
+- S8 total SD 18.09 (17.74), margin SD 14.56 (15.21);
+- pace proxy 113.5 (113.9);
+- P(6th | 5th) .226, closers-on .395.
+
+The readout's "closure residual −0.701" is a readout artefact: it subtracts the old Δ constant (0.103), not X. The
+gap is exactly 0.804 − 0.103.
+
+**ROUND-2 CONFIG (candidate for the full FIT):** the fit_f5 fields plus:
+- `quarter_targets_mode=mean` + the real `quarters_calibration.json`;
+- `shooting_foul_model=coherent`, `sf_team_ref=0.307` (3PA de-net in code, 45f9272b);
+- `skip_outs_penalties`, which now also removes the pace injury drag (78f73023);
+- `bonus_nonshoot_foul_per_poss=0.060`, `base_nonshooting_foul_per_poss=0.030`;
+- `solver_bonus_trip_share=0.01615`, `solver_endgame_pts_per_team=0.804`.
+
+**Risk for the full FIT:** foul-outs sit at the top of the band (the FIT gate is 0.193 ± 0.04).
