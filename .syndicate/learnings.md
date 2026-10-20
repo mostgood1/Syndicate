@@ -2569,3 +2569,17 @@ The exchanges' asks are at or below the sportsbook consensus once their fee is p
 - Any count of a token in a role log: `grep -v ALL_PROCESS_MEMORY` (and `MEMORY_WATCHDOG`) first. Or anchor on the emitter's prefix with a timestamp, never a bare token.
 - Any automated log scan excludes cmdline-quoting lines (`execution_watchdog._QUOTING_LINE`, a4aacc8f).
 - Heredoc edits that write a Python regex: Git Bash turned `\b` into a literal backspace (0x08) once in this session. Check the written bytes (`od -c`) or use the Edit tool for regex lines.
+
+## ANNOUNCE A FLEET FF: peers cut their ff targets against the fleet HEAD they last SAW, and a target cut before yours silently drops your change `[2026-10-20, lane board-implausible-book-upper-bound]`
+
+Within 25 minutes of my ff, **two** sessions messaged me with restart plans built on a fleet HEAD of `d3878d69`. It was `e491c260d` — I had ff'd twice (`c36bdc9a` for the worker, then `e491c260` for a web-only fix plus a `reload-web`). Both also believed I still held the refresh-worker claim, which I had released by token; one of them held it themselves by then.
+
+**The dangerous part is not the stale claim, it is the stale TARGET.** One peer's `--ff-only` target `6d7f4ea7` contained `c36bdc9a` but **not** `e491c260`. An `--ff-only` against it is refused, which is the SAFE outcome — but the natural response to a refusal is to re-cut onto something that merges, and anything cut from the same base drops the commits made after it. My API field-list fix would have gone back out without a single error message.
+
+**Why:** the fleet has no notification. A session reads the fleet HEAD once, plans a deploy around it, and then negotiates for minutes or hours while another session moves it. The 60-minute restart rule makes that window LONGER, not shorter, so the staler the plan the more polite the peer was being.
+
+**How to apply:**
+- **Say the new fleet HEAD in the message that announces your restart**, not just the restart time and pid. "Fleet is now `<sha>`" is the field peers actually need and the one nobody sends.
+- Before any `--ff-only`, re-read the fleet HEAD and check `git merge-base --is-ancestor <fleet HEAD> <your target>`. If it fails, re-cut ONTO the fleet HEAD — never onto your original base.
+- Re-run the dirty-file collision check against `<fleet HEAD>..<target>`, not against the range you first computed.
+- When a peer's plan quotes a fleet HEAD, CHECK IT rather than answering the question they asked. Both of these messages asked "when will you release?" when the answer they needed was "your target is now invalid".
