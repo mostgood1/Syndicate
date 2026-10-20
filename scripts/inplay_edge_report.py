@@ -83,11 +83,20 @@ def devig(a: float, b: float):
     return pa / (pa + pb)
 
 
-def book_fairs(event: dict) -> dict:
-    """{(kind, team_or_side, line): {'books': {book: p}}} for one OddsAPI event."""
+def book_fairs(event: dict, poll_t: float | None = None, max_quote_age: float | None = None) -> dict:
+    """{(kind, team_or_side, line): {book: p}} for one OddsAPI event.
+
+    A market whose own last_update is more than `max_quote_age` s before the
+    poll is dropped: in play, a book that has not moved for minutes is either
+    suspended or still showing its pregame price, and either would drag the
+    consensus toward a stale number. 3-way (draw) markets are skipped.
+    """
     out: dict = defaultdict(dict)
     for bk in event.get("bookmakers", []):
         for m in bk.get("markets", []):
+            if poll_t is not None and max_quote_age is not None and m.get("last_update"):
+                if poll_t - ts(m["last_update"]) > max_quote_age:
+                    continue
             oc = m.get("outcomes") or []
             if len(oc) != 2:
                 continue
@@ -116,11 +125,61 @@ def team_match(sub: str, name: str) -> bool:
     return n.startswith(s) or s in n
 
 
+def _corr(xs, ys):
+    n = len(xs)
+    if n < 8:
+        return None
+    mx, my = sum(xs) / n, sum(ys) / n
+    sxy = sum((x - mx) * (y - my) for x, y in zip(xs, ys))
+    sxx = sum((x - mx) ** 2 for x in xs)
+    syy = sum((y - my) ** 2 for y in ys)
+    return sxy / (sxx * syy) ** 0.5 if sxx > 0 and syy > 0 else None
+
+
+def lead_lag(series: dict) -> None:
+    """Who moves first: Kalshi mid or the book consensus?
+
+    Resampled at each book poll (the coarser clock): the Kalshi mid is the last
+    sample at or before the poll. corr(dKalshi[i], dFair[i+k]) for k in -2..2
+    polls. A peak at k>0 means Kalshi moves FIRST (books follow); k<0 means the
+    books move first and Kalshi follows. Pooled across tickers.
+    """
+    pooled = {k: ([], []) for k in (-2, -1, 0, 1, 2)}
+    gaps, spreads = [], []
+    for t, rows in series.items():
+        by_poll = {}
+        for tt, mid, fair, bt, spr in rows:
+            by_poll[bt] = (mid, fair)  # last sample per poll wins
+            spreads.append(spr)
+        polls = sorted(by_poll)
+        mids = [by_poll[p][0] for p in polls]
+        fairs = [by_poll[p][1] for p in polls]
+        gaps += [abs(m - f) for m, f in zip(mids, fairs)]
+        dk = [mids[i + 1] - mids[i] for i in range(len(mids) - 1)]
+        df = [fairs[i + 1] - fairs[i] for i in range(len(fairs) - 1)]
+        for k in pooled:
+            for i in range(len(dk)):
+                j = i + k
+                if 0 <= j < len(df):
+                    pooled[k][0].append(dk[i])
+                    pooled[k][1].append(df[j])
+    if not gaps:
+        print("LEAD_LAG: no priced series")
+        return
+    gaps.sort()
+    spreads.sort()
+    print(f"KALSHI MID vs BOOK FAIR |gap|: n={len(gaps)} p50={gaps[len(gaps)//2]:.3f} p90={gaps[int(len(gaps)*0.9)]:.3f}  "
+          f"Kalshi bid-ask spread p50={spreads[len(spreads)//2]:.3f} p90={spreads[int(len(spreads)*0.9)]:.3f}")
+    print("LEAD_LAG corr(dKalshi[i], dFair[i+k]) per book poll (k>0: Kalshi first):  " + "  ".join(
+        f"k={k:+d}: {(_corr(*pooled[k]) or float('nan')):+.2f} (n={len(pooled[k][0])})" for k in sorted(pooled)))
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--dir", required=True)
     ap.add_argument("--max-book-age", type=float, default=90.0)
     ap.add_argument("--min-books", type=int, default=3)
+    ap.add_argument("--max-quote-age", type=float, default=120.0, help="drop a book market not updated within this many s of the poll")
     ap.add_argument("--contracts", type=int, default=10)
     ap.add_argument("--thresholds", default="0,0.01,0.02,0.03")
     ap.add_argument("--json-out")
@@ -174,6 +233,7 @@ def main() -> int:
     cadence = defaultdict(list)  # family -> seconds between ask changes
     window = [None, None]
     per_game = defaultdict(lambda: Counter())
+    series = defaultdict(list)  # ticker -> [(t, kalshi_mid, book_fair, book_poll_t, spread)]
 
     for ev, ticks in kal.items():
         family = ev.split("-")[0]
@@ -188,10 +248,6 @@ def main() -> int:
             for r in rows:
                 tt = ts(r["ts"])
                 ya, na = fnum(r.get("ya")), fnum(r.get("na"))
-                if (ya, na) != last_ask:
-                    if last_change is not None:
-                        cadence[family].append(tt - last_change)
-                    last_change, last_ask = tt, (ya, na)
                 if eid is None or sport not in books:
                     stats["unpriceable"][family + ":no_book_event"] += 1
                     continue
@@ -203,12 +259,17 @@ def main() -> int:
                 if e is None:  # not live in that poll (pregame or finished)
                     continue
                 stats["samples"][family] += 1
+                # Ask-change cadence IN PLAY only (pregame books barely move).
+                if (ya, na) != last_ask:
+                    if last_change is not None:
+                        cadence[family].append(tt - last_change)
+                    last_change, last_ask = tt, (ya, na)
                 if tt - bt > a.max_book_age:
                     stats["stale_book"][family] += 1
                     continue
                 window[0] = tt if window[0] is None else min(window[0], tt)
                 window[1] = tt if window[1] is None else max(window[1], tt)
-                fairs = book_fairs(e)
+                fairs = book_fairs(e, bt, a.max_quote_age)
                 sub, fs = r.get("sub") or "", fnum(r.get("fs"))
                 if family.endswith("GAME"):
                     key = next((k for k in fairs if k[0] == "h2h" and team_match(sub, k[1])), None)
@@ -225,6 +286,9 @@ def main() -> int:
                     continue
                 fair = statistics.median(bk.values())
                 pin = bk.get("pinnacle")
+                yb = fnum(r.get("yb"))
+                if ya is not None and yb is not None and 0 < yb <= ya < 1:
+                    series[t].append((tt, (ya + yb) / 2, fair, bt, ya - yb))
                 stats["priced"][family] += 1
                 per_game[g]["priced"] += 1
                 for side, ask, p in (("yes", ya, fair), ("no", na, 1 - fair)):
@@ -278,6 +342,7 @@ def main() -> int:
         c = sorted(c)
         if c:
             print(f"KALSHI ASK CHANGE INTERVAL {fam}: n={len(c)} p10={c[len(c)//10]:.0f}s p50={c[len(c)//2]:.0f}s p90={c[int(len(c)*0.9)]:.0f}s")
+    lead_lag(series)
     top = sorted(episodes, key=lambda e: -e["max_edge"])[:15]
     print("TOP EPISODES:")
     for e in top:
