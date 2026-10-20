@@ -206,6 +206,34 @@ def main() -> int:
         kal[r["ev"]][r["t"]].append(r)
         meta[r["t"]] = r
 
+    # Score changes per Kalshi game code, from ESPN (60 s resolution): the time of
+    # the first poll showing the new score. ESPN abbreviations are matched as
+    # substrings of the Kalshi game code (TORCBJ <- TOR, CBJ; PHINYK <- PHI, NY).
+    score_changes = defaultdict(list)  # espn game key "A|B" -> [t]
+    last_score = {}
+    espn_abbrs = {}
+    for line in open(d / "espn.jsonl", encoding="utf-8"):
+        r = json.loads(line)
+        abbrs = tuple(sorted(x["abbr"] or "" for x in r["teams"]))
+        key = "|".join(abbrs)
+        espn_abbrs[key] = abbrs
+        sc = tuple(x.get("score") for x in r["teams"])
+        if key in last_score and last_score[key] != sc:
+            score_changes[key].append(ts(r["ts"]))
+        last_score[key] = sc
+
+    def game_score_key(g: str):
+        code = g[7:] if len(g) > 7 else g  # strip 26OCT20
+        best = [k for k, ab in espn_abbrs.items() if ab and all(x and x in code for x in ab)]
+        return max(best, key=lambda k: sum(len(x) for x in espn_abbrs[k])) if best else None
+
+    def secs_since_score(g: str, t: float):
+        k = game_score_key(g)
+        if k is None:
+            return None
+        prior = [c for c in score_changes[k] if c <= t + 60]  # +60: ESPN poll resolution
+        return (t - prior[-1]) if prior else float("inf")
+
     fee_cache: dict = {}
     sport_of = lambda ev: "nba" if ev.startswith("KXNBA") else ("nhl" if ev.startswith("KXNHL") else None)  # noqa: E731
 
@@ -304,6 +332,7 @@ def main() -> int:
                     if edge > 0:
                         if ep is None:
                             open_ep[side] = {"ticker": t, "side": side, "start": tt, "end": tt, "n": 1, "max_edge": edge,
+                                             "since_score": secs_since_score(g, tt),
                                              "ask0": ask, "fair0": p, "pin_edge0": pin_edge, "game": g, "family": family}
                         else:
                             ep["end"], ep["n"] = tt, ep["n"] + 1
@@ -336,6 +365,11 @@ def main() -> int:
         durs = sorted(e["dur"] for e in es)
         ends = Counter(e["ended_by"] for e in es)
         big = [e for e in es if e["max_edge"] > 0.02]
+        near = [e for e in es if e.get("since_score") is not None and e["since_score"] <= 180]
+        far = [e for e in es if e.get("since_score") is not None and e["since_score"] > 180]
+        print(f"  {fam}: near a score change (<=180s): n={len(near)} ended_by={dict(Counter(e['ended_by'] for e in near))} | "
+              f"not near: n={len(far)} ended_by={dict(Counter(e['ended_by'] for e in far))} max_edge>2%: {sum(1 for e in far if e['max_edge']>0.02)} "
+              f"| no ESPN match: {sum(1 for e in es if e.get('since_score') is None)}")
         print(f"  {fam}: n={len(es)} dur p50={durs[len(durs)//2]:.0f}s p90={durs[int(len(durs)*0.9)]:.0f}s max={durs[-1]:.0f}s "
               f"ended_by={dict(ends)}  max_edge>2%: {len(big)}  single-sample: {sum(1 for e in es if e['n']==1)}")
     for fam, c in sorted(cadence.items()):
@@ -347,7 +381,7 @@ def main() -> int:
     print("TOP EPISODES:")
     for e in top:
         print(f"  {e['ticker']} {e['side']} {iso(e['start'])} dur={e['dur']:.0f}s n={e['n']} max_edge={e['max_edge']:+.3f} "
-              f"ask0={e['ask0']} fair0={e['fair0']:.3f} pin_edge0={e['pin_edge0'] if e['pin_edge0'] is None else round(e['pin_edge0'],3)} ended_by={e['ended_by']}")
+              f"ask0={e['ask0']} fair0={e['fair0']:.3f} since_score={e.get('since_score')} pin_edge0={e['pin_edge0'] if e['pin_edge0'] is None else round(e['pin_edge0'],3)} ended_by={e['ended_by']}")
     if a.json_out:
         Path(a.json_out).write_text(json.dumps({"episodes": episodes, "stats": {k: dict(v) for k, v in stats.items()},
                                                 "pos": {str(k): dict(v) for k, v in pos.items()}}, indent=1))
