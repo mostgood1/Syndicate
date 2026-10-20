@@ -2055,7 +2055,36 @@ def _join_polymarket_to_board_impl(
         # same `_teams_match` loop and the same ambiguity refusal below, so a
         # two-legged tie that does repeat a club pair refuses as ambiguous
         # rather than guessing a leg.
-        _widen_days = _forward_horizon_days(league) if (not candidates and date) else None
+        # ...AND WHEN THE BOARD DATE HAS MARKETS, BUT NOT FOR THIS FIXTURE
+        # [2026-10-20, user decision "Fix both", lane paper-alongside-live]. The
+        # gate used to be `not candidates`: any same-league market on the slate
+        # date blocked the lookup. Measured 2026-10-20: three NCAAF games played
+        # that Tuesday, so all 414 NCAAF game-line rows (games 10-21..10-24)
+        # refused `no_matching_polymarket_market` while their markets sat in the
+        # slate under the day they are played. Replayed by game date: 0 -> 35
+        # matched. The widened set still holds the same-date candidates and
+        # every candidate passes the same fixture test and ambiguity refusal
+        # below, so the safety argument in `_forward_horizon_days` is unchanged.
+        _horizon_days = _forward_horizon_days(league) if date else None
+        # THE ROW'S OWN KICKOFF DECIDES IT WHEN IT CAN: a game whose local
+        # calendar dates exclude the board date cannot be listed under it, and
+        # its widened window is just those dates. Measured on the 2026-10-20
+        # fleet slate, testing every same-date candidate's teams AND scanning
+        # the whole 7-day window instead cost 10 s -> 48 s per join. The
+        # fixture test remains the fallback for a row with no readable kickoff.
+        # Lazy: a league that never widens (MLB) pays nothing here.
+        _game_dates: frozenset[str] = frozenset()
+        _fixture_absent = False
+        if _horizon_days and candidates:
+            _game_dates = _row_game_dates(board_row)
+            if _game_dates:
+                _fixture_absent = date not in _game_dates
+            else:
+                _fixture_absent = not _candidates_name_fixture(
+                    candidates, board_row, board_row.get("sport") or sport,
+                    board_fixtures.get((league, date)),
+                )
+        _widen_days = _horizon_days if (not candidates or _fixture_absent) else None
         if _widen_days:
             try:
                 _horizon = (
@@ -2066,11 +2095,16 @@ def _join_polymarket_to_board_impl(
             if _horizon:
                 widened: list[dict[str, Any]] = []
                 for _cand_date, _entries in by_league_market.get((league, board_market)) or ():
-                    if date <= _cand_date <= _horizon:
+                    if date <= _cand_date <= _horizon and (
+                        not (_fixture_absent and _game_dates) or _cand_date in _game_dates
+                    ):
                         widened.extend(_entries)
-                if widened:
+                # Counted only when the window ADDS a market the board date did not
+                # already offer (by identity: a narrowed window may exclude them).
+                _already = {id(c) for c in candidates}
+                if widened and any(id(w) not in _already for w in widened):
                     candidates = widened
-                    _wkey = f"{league}|{board_market}"
+                    _wkey = f"{league}|{board_market}" + ("|fixture_absent" if _fixture_absent else "")
                     forward_date_widened[_wkey] = forward_date_widened.get(_wkey, 0) + 1
         if not candidates:
             # WHY THE KEY MISSED, not just that it did.
@@ -2946,6 +2980,47 @@ def _venue_club(parsed: Mapping[str, Any], token: Any) -> str | None:
 _TEAMS_MATCH_MEMO: contextvars.ContextVar[dict | None] = contextvars.ContextVar(
     "polymarket_teams_match_memo", default=None
 )
+
+
+def _row_game_dates(board_row: Mapping[str, Any]) -> frozenset[str]:
+    """The local calendar dates this row's kickoff can carry; empty = unknown.
+
+    ONE definition with the venue fan-in's date guard (6fb473e1), imported rather
+    than restated, so the two venues' joins cannot disagree about a game's day.
+    """
+    try:
+        from syndicate.features.shared.venue_quote_fanin import _row_game_dates as _dates
+    except Exception:  # noqa: BLE001 -- unknown dates fall back to the fixture test
+        return frozenset()
+    try:
+        return frozenset(_dates(board_row))
+    except Exception:  # noqa: BLE001
+        return frozenset()
+
+
+def _candidates_name_fixture(
+    candidates: Sequence[Mapping[str, Any]],
+    board_row: Mapping[str, Any],
+    sport: Any,
+    fixtures: Any,
+) -> bool:
+    """Does any candidate's slug name this row's two clubs, in either orientation?
+
+    The same `_teams_match` the matching loop uses, plus the home/away flip that
+    loop retries -- so "this date lists our fixture" means exactly what the match
+    below would find, and nothing narrower.
+    """
+    for candidate in candidates:
+        parsed = candidate.get("parsed") if isinstance(candidate, Mapping) else None
+        if not isinstance(parsed, Mapping):
+            continue
+        if _teams_match(board_row, parsed, sport, fixtures):
+            return True
+        flipped = dict(parsed)
+        flipped["home"], flipped["away"] = parsed.get("away"), parsed.get("home")
+        if _teams_match(board_row, flipped, sport, fixtures):
+            return True
+    return False
 
 
 def _teams_match(
