@@ -51994,3 +51994,17 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - `RECONCILED ... submitted->filled contracts=1 fill_price=0.47 fees=0.0175` (22:16:08Z).
   - The market read at 22:43Z: no_ask 0.47, yes_ask 0.54. The old code would have paid $0.54 for the NO leg.
 - **rollback:** revert 17d9b4a5 + a gated live-odds-worker TERM.
+
+## 2026-10-20T21:30:59Z -- FLEET: vendor/nhl_betting_repo ARCHIVED, no ff, no restart; vendor-sync task UNREGISTERED (lane nhl-vendor-delete)
+- What: on /home/amyn/Syndicate (HEAD c60b79ee), tarred vendor/nhl_betting_repo (89 files) + vendor/upstream_sync.json to
+  `/home/amyn/syndicate-prod/data/_archive/vendor_nhl_betting_repo_fleet_20261020T213059Z.tar.gz` (652K); 90 == 90. 0 modified.
+  On THIS Windows host (not the fleet): `Unregister-ScheduledTask "Syndicate vendor-sync report"` (ran vendor_sync_daily.ps1 daily 09:20
+  from the primary checkout; last run 10-20 09:20, result 0); verified not registered. User decision ("Retire all, remove the task").
+- Why: main deletes the tree and the vendor-sync tooling (212de24a); vendor/ is empty in git. NOT DONE: the ff. **For whoever runs the
+  next fleet ff past 212de24a:** the tree, vendor/upstream_sync.json and vendor/data/nhl_source/ (2 stray tracked files) go with it;
+  nothing on the fleet imports or reads them (14 modules on 22c56001, 17 locally), so no restart is needed for this change.
+- verify: after that ff, `git ls-files vendor | wc -l` = 0 on the fleet and an NHL refresh writes 0 files under vendor/.
+- Rollback: `git revert 212de24a` + `tar -xzf` the archive in /home/amyn/Syndicate (+ re-register the task from git history's
+  scripts/vendor_sync_daily.ps1 if wanted).
+- ALSO READ (closes lane wnba-vendor-delete's owed reading of the 2026-10-20T16:56:09Z entry): fleet ff'd to 8e0ca456 (contains e633f12c)
+  at 15:01:28 CDT; on 96f97a0a 0 tracked under vendor/wnba_betting_repo and 0 writes there since, while the WNBA refresh ran (17:45 CDT). MET.
