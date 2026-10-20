@@ -51591,3 +51591,15 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - The code on disk at HEAD eb86488f carries the exit-aware partial branch. The process started after the ff, so it loaded it. `RENDER_GIT_COMMIT` still stamps e491c260: a stamp captured at `up`, not the code.
 - **owed (kalshi-exit-path):** the first VENUE_SETTLEMENT pass after 14:53:27Z grades the partly sold Thornton entry (was `refused={'both_sides_held': 1}` every pass).
 - **refresh-worker** still runs e491c260 code. The only runtime diff is venue_settlement.py, which runs on live-odds-worker, so nothing is owed there.
+
+## 2026-10-20 14:54:49Z (9:54 AM CT) -- READING, NO DEPLOY: the partly-sold Thornton entry GRADED EXIT-AWARE on the first settlement pass after eb86488f loaded -- **MET** (lane `kalshi-exit-path`, session b4e23404)
+- **Deploy was not mine:** lane balance-linked-bankroll (session aa5d7792, user-asked) ff'd the fleet e491c260 -> eb86488f and TERM'd live-odds-worker at 14:53:18Z; it respawned as pid 2952961 at 14:53:27Z. `RENDER_GIT_COMMIT` still stamps e491c260 (captured at `up`), so I verified by behaviour.
+- **baseline (every pass from ~02:30Z to 14:53Z):** `VENUE_SETTLEMENT ... awaiting=1 refused={'both_sides_held': 1}`. The entry was ungraded. Kalshi books our close as `buy yes`, so the settlement row had YES and NO counts (checkpoint 3, 2026-10-20 13:20Z).
+- **expect:** the first pass after 14:53:27Z grades the entry exit-aware: `exit_applied` with 1 sold + 4 settled, pnl = 0.87 - 0.008 + 4 x settle - 4.50 - 0.0315.
+- **READING:**
+  - `2026-10-20T14:54:49.177Z [live_odds_worker] VENUE_SETTLEMENT status=ok settled=1 already=552 awaiting=0 ... refused={} errors={}`.
+  - Entry `ce69c6fa23fb5e89aa378b43` (14:55:07Z read): `outcome=won settled_by=venue held_side=no settled_at_venue=2026-10-20T02:30:56.780272Z pnl_dollars=0.3305`, `exit_applied={contracts 5.0, contracts_sold 1.0, contracts_settled 4.0, exit_price 0.87, proceeds 0.87, exit_fee 0.008 (not estimated), entry_cost 4.5, entry_fee 0.0315 (source: order), settlement 4.0}`.
+  - Arithmetic: 0.87 - 0.008 + 4.0 - 4.5 - 0.0315 = **0.3305**, exact.
+  - Hold-to-settle counterfactual: 5 - 4.5 - 0.0315 = 0.4685, so the verification sale cost 0.138 against holding.
+- **CORRECTION I owe:** my 2026-10-19 closing message and the scheduled task `kalshi-exit-settlement-reading` said to expect "+3.33 if won". That was wrong: it left out the $4.50 cost of all 5 contracts. Correct values: +0.33 won / -3.67 lost. The task never ran (no run recorded at its 14:00Z fireAt). It is now DISABLED and its description says it is superseded.
+- **The exit path now closes end to end on a real position:** paper watch -> live sale (sell body verified 10-19 22:42Z) -> read-back pricing -> exit-aware venue grading (this reading). Live exits stay UNARMED; arming is the user's call after the 10-26 counterfactual.
