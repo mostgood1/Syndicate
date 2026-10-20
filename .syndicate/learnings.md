@@ -2607,3 +2607,18 @@ what a passive fill is. For a taker, CLV is a fair proxy: we choose the moment.
   OUTCOMES. Report `wins - close fair` separately for filled and unfilled orders: the split is the signal.
 - A CLV pass on passive fills is "not yet falsified", never "works".
 - Pre-register the outcome test alongside CLV, not as an afterthought.
+
+## "N call sites" in prose is NOT mechanically checkable, and a symbol-count sweep over it is mostly FALSE POSITIVES `[2026-10-20, lane polymarket-zip-site-enumeration]`
+
+`#379` went stale by enumerating "five rejection counters" when a sixth arrived, so I swept for sibling enumerations and counted call sites mechanically. **1 of 4 candidates was real.** The other three each failed in a different way that counting cannot see:
+
+- **COUNTERFACTUAL.** `nfl/cards.py`: "One conversion, named, rather than a sign flip inline at three call sites." The three never existed — they are what the author AVOIDED. One call site is correct.
+- **DIFFERENT SUBJECT.** `board_enrichment`: "the only placement downstream of both halves on all three call sites" counts the ENCLOSING function's call sites, not those of the symbol on the same line.
+- **NAMED BY FILE, NOT SYMBOL.** `board_enrichment`: "there are four: `intelligence.py`, `book_grid_artifact.py`, `layer2_shortlist.py`, and ..." — those files import DIFFERENT symbols (`attach_live_game_state_from_lens`, `attach_live_gamelines_for_sport`), so grepping the symbol beside the claim counts the wrong thing.
+
+**Why:** a count in prose is a claim about a POPULATION the sentence does not define. The subject may be hypothetical, scoped to an enclosing frame, or identified by file rather than symbol. A grep answers a different question and answers it confidently.
+
+**How to apply:**
+- **READ each enumeration before counting anything.** Decide what the population IS; only then count. A sweep that files findings from a symbol-count is a grep wearing a check's clothes.
+- The ones worth checking are those whose population is named by a symbol AND asserted as current. One of four here qualified — and it WAS stale (three sites claimed, four real, the omitted one being the arbitrage resolver).
+- When correcting an enumeration, **state both totals** if they differ ("4 call sites across 3 functions"). The stale number survived because "three" plus a function named "twice" in prose made `1+2+1` invisible — and that same invisibility made ME miscount it in the opposite direction.
