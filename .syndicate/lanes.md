@@ -1125,8 +1125,12 @@ death, never life — do not invert it.
 - Files: .syndicate/findings_2026-10-19_ncaaf_skipped_no_fair.md (NEW)
 - Findings: `.syndicate/findings_2026-10-19_ncaaf_skipped_no_fair.md`.
 
-### caps-revamp — OPEN — opened 2026-10-19 — session 332cb014-904e-4069-b418-9283732e1e99
-- **GOAL VERDICT 2026-10-19 22:55Z:** "Live caps follow venue capital: SYNDICATE_EXECUTION_BALANCE_CAPS=on on the fleet with raised dollar ceilings; Polymarket capital counts the pending deposit (user 2026-10-19: 'the $500 pending on polymarket CAN be used'); an order over the per-order cap is trimmed to the cap instead of refused (user 2026-10-19: 'Trim to the cap')" -- **GOAL: NOT MET (one reading left)** `[updated 2026-10-20 00:10Z]`.
+### caps-revamp — CLOSED 2026-10-20 (GOAL MET) — opened 2026-10-19 — session 332cb014-904e-4069-b418-9283732e1e99
+- **GOAL VERDICT 2026-10-20 15:50Z:** "Live caps follow venue capital: SYNDICATE_EXECUTION_BALANCE_CAPS=on on the fleet with raised dollar ceilings; Polymarket capital counts the pending deposit (user 2026-10-19: 'the $500 pending on polymarket CAN be used'); an order over the per-order cap is trimmed to the cap instead of refused (user 2026-10-19: 'Trim to the cap')" -- **GOAL: MET.**
+  - Balance caps and pending deposit: verified on the fleet (worker-env `limits(live)`, below).
+  - Trim: verified by the unit reachability tests, accepted as the verification by USER DECISION 2026-10-20: "Close caps-revamp with the unit reachability tests as its verification, since the stake band keeps stakes under the order cap." Re-run on main `8099dc05`: 15 passed (trim vs untouched, balance caps off != on, pending deposit, scaling).
+  - The trim is LOADED on the fleet (EXECUTED lines carry `trimmed=`) and unexercised live while the stake band (max $10) sits under the order cap.
+- *(superseded status, kept for the record)* -- was GOAL: NOT MET (one reading left) `[2026-10-20 00:10Z]`.
   - Done and verified:
     - Full up on `d3878d69` at 23:55:55Z (deploys.md); `BALANCE_CAPS=on` on all roles.
     - Ceilings raised 23:58:48Z.
