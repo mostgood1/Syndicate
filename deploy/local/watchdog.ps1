@@ -269,8 +269,9 @@ $psi.CreateNoWindow = $true
 $stdout = ''
 $reason = ''
 $pipeNote = ''
-# The check gets what the deadline leaves after the reserve; normally that is the full -TimeoutSeconds.
-$checkSeconds = [math]::Max(10, [math]::Min($TimeoutSeconds, (Get-SecondsLeft) - $ReserveSeconds))
+# The check gets what the deadline leaves after the reserve (normally the full -TimeoutSeconds), never under 30 s:
+# it takes ~4 s when healthy, and a too-short budget would read as a false UNREACHABLE.
+$checkSeconds = [math]::Max(30, [math]::Min($TimeoutSeconds, (Get-SecondsLeft) - $ReserveSeconds))
 try {
     $proc = [System.Diagnostics.Process]::Start($psi)
     $null = $proc.StandardError.ReadToEndAsync()   # drained, so a chatty stderr cannot fill its pipe and stall the child
