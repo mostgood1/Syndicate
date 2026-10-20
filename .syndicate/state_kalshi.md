@@ -854,7 +854,7 @@ board. The loop therefore checks `budget_remaining()` BEFORE spending.
   - First refused heavy build after boot at 14:30:34Z. The fast path then printed `QUOTE_CAPTURE matches=910 appended=87` (nfl 2) and `kalshi_capture=joined:8248:30.0s`.
   - The capture's added fast-path time is not measured (n=1: 152.9 s vs 52-166 s before). Off switch `SYNDICATE_LAYER2_FAST_KALSHI_CAPTURE=0`, plus a deploy.
 
-## [kalshi-exit-path] KALSHI POSITIONS CAN BE SOLD BEFORE SETTLEMENT -- RUNNING IN PAPER ONLY `[verified on the fleet 2026-10-19 19:20:07Z, lane kalshi-exit-path]`
+## [kalshi-exit-path] KALSHI POSITIONS ARE SOLD BEFORE SETTLEMENT -- LIVE FOR TAKE-PROFIT SINCE 2026-10-20 23:34Z, PAPER FOR THE REST `[verified on the fleet 2026-10-19 19:20:07Z, lane kalshi-exit-path]`
 
 - `syndicate/features/shared/execution_exits.py` (f7d775f9) runs on live-odds-worker's execution tick (300 s), after VENUE_SETTLEMENT.
   The fleet has run it since the 19:19:01Z live-odds-worker restart onto 94c97011.
@@ -869,6 +869,7 @@ board. The loop therefore checks `budget_remaining()` BEFORE spending.
   on the first read (Thornton NO x5).
 - **Sell body VERIFIED on a real sale** `[2026-10-19 22:42:59Z, lane kalshi-exit-path]`: v2 `POST /portfolio/events/orders` with `side=bid` YES at `1 - our NO limit`, `time_in_force=immediate_or_cancel`, `reduce_only=true`, count "1.00" was ACCEPTED and FILLED. The venue echoes the close as `side=yes action=buy outcome_side=yes book_side=bid`, and taker_fill_cost 0.13 = NO sold at 0.87. The CREATE response carries a count but NO cost, fee or status, so the fill must be READ BACK (`GET /portfolio/orders/{id}`; 280acb18 does this). `LIVE_BLOCKERS` is empty. Live exits are still NOT armed: that is the user's call, with the 10-26 counterfactual.
 - **PARTIAL-SALE GRADING: FIXED AND VERIFIED** `[2026-10-20 14:54:49Z]`: eb86488f lets `both_sides_held` through when every target is `_EXIT_SOLD` and the counts match the exit. The Thornton entry graded `won` with `exit_applied` (1 sold @ 0.87 + 4 settled), pnl +0.3305, exactly 0.87 - 0.008 + 4.0 - 4.5 - 0.0315. The full exit path is now proven on a real position; live exits remain UNARMED (user's call).
+- **LIVE TAKE-PROFIT EXITS ARMED** `[verified on the fleet 2026-10-20 23:37:00Z, user decision "Arm now"]`: live-odds-worker only: SYNDICATE_EXIT_MODE=live, EXIT_LIVE_ARMED=1, rules take_profit (model_fair stays paper), cap 5 sales / $25 notional per UTC day. First live sale: KXNCAAFSPREAD-26OCT20MOSUDEL-DEL3, 1 NO bought 0.41, sold 0.58, fee 0.0171, reconciled at 23:42:54Z. Kalshi prices a fill seconds AFTER both the create response and an immediate read-back; reconcile prices it on the next tick.
 - **Settlement knows about sales -- on origin/main, NOT on the fleet** `[verified by tests 2026-10-19, lane kalshi-exit-settlement]`:
   `venue_settlement.settle_from_venue` (`550a4b20`) and `paper_settlement.settle_orders`' 24h inference fallback (`f769a228`)
   read LIVE rows of execution_exits.json by `exit_idempotency_key(entry_key)`. Filled -> P&L = sale proceeds - exit fee +
