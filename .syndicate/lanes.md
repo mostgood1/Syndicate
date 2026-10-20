@@ -1118,8 +1118,9 @@ death, never life — do not invert it.
 - Blocked by: none
 - USER OVERRIDE 2026-10-19 ("Override, notify owner"): scripts/basketball_sim_input_checklist.py is also on nba-vendor-deletion-prep's Files line (it plans to drop the NBA arm). This lane touches Level 0 and the LEAGUES 'package' label only; owner notified.
 
-### kalshi-maker-entry-paper — OPEN — opened 2026-10-19 — session 2636b326-71e6-4908-8692-de0d92b6f94d
+### kalshi-maker-entry-paper — CLOSED — opened 2026-10-19 — closed 2026-10-19 — session 2636b326-71e6-4908-8692-de0d92b6f94d
 - Goal: Pre-registered READ-ONLY paper study: does a resting Kalshi bid on quadratic series yield positive realised edge vs consensus close per sport x market, where taker entry yields none? Findings doc with go/no-go.
+- GOAL: MET. Verdict: **NO-GO** for live maker entry (`findings_2026-10-19_kalshi_maker_entry_paper.md`). The pre-registered CLV test PASSED: fill model A, 2,695 bids, 554 filled, +3.75% [+2.62, +5.16] against the consensus close. The falsifier is BLIND, though. On settlement (unregistered), filled orders won 5.37pp below the close [-9.48, -0.91] (model B -3.24pp [-5.73, -0.80]), while the close was calibrated over all 2,676 settled orders. ROI on fills: A -9.2%, B -4.0%, edge-capped B -7.0% [-13.5, -1.2]. Where the taker never reached +2%, maker CLV was +0.79%. MLB and WNBA props (now out of season) carry the miscalibration; soccer and NCAAF are not miscalibrated but are underpowered. No env, deploy or order change.
 - Files: .syndicate/findings_2026-10-19_kalshi_maker_entry_paper.md (NEW)
 - Hypothesis: Maker fills on quadratic series (fee 0) keep a positive edge vs the consensus close after adverse selection (prior: findings_2026-10-02 says markets move away from fills).
 - Falsification test: Fill model A pooled realised edge (fair_close/b - 1), event-clustered 95% CI upper bound <= 0 => falsified; lower > 0 => H1; else inconclusive. Pre-registration in the findings doc, committed before outcomes.
