@@ -24,7 +24,16 @@ def _isolated(tmp_path, monkeypatch):
     yield
 
 
-def _request(stake=10.0, date="2026-08-24"):
+# The slate a live order is placed on IS today: the executor places only
+# `central_today_iso()`. Since D2 (todo #707) a live order is charged to the day
+# it was PLACED, so a fixture that places "now" under an old slate date would
+# read an empty budget for a reason that has nothing to do with its own test.
+from syndicate.features.shared.timezone import central_today_iso as _central_today_iso
+
+_TODAY = _central_today_iso()
+
+
+def _request(stake=10.0, date=_TODAY):
     return OrderRequest(
         position_key="p1",
         selected_date=date,
@@ -170,18 +179,18 @@ def test_an_order_within_its_own_venues_cap_can_still_be_refused_account_wide(mo
     monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
 
     execution_ledger.place_order(
-        replace(_request(stake=45.0, date="2026-08-24"), venue="kalshi"),
+        replace(_request(stake=45.0, date=_TODAY), venue="kalshi"),
         submit=lambda r: {"status": "filled", "fill_stake_dollars": 45.0},
     )
     execution_ledger.place_order(
-        replace(_request(stake=45.0, date="2026-08-24"), venue="polymarket", position_key="p2"),
+        replace(_request(stake=45.0, date=_TODAY), venue="polymarket", position_key="p2"),
         submit=lambda r: {"status": "filled", "fill_stake_dollars": 45.0},
     )
     # A third order, $10 on Polymarket (own cap $100, well within it at
     # 45+10=55, and under the $10 per-order cap) -- only the $95 account-wide
     # override (90 already spent + 10 = 100) refuses it.
     result = guard.check_order(
-        replace(_request(stake=10.0, date="2026-08-24"), venue="polymarket", position_key="p3"),
+        replace(_request(stake=10.0, date=_TODAY), venue="polymarket", position_key="p3"),
         mode="live",
     )
     assert result["allowed"] is False
@@ -212,12 +221,12 @@ def test_twenty_five_orders_across_both_venues_refuses_the_twenty_sixth(monkeypa
         # the same venue would collapse to one write instead of recording all
         # of them.
         execution_ledger.place_order(
-            replace(_request(stake=1.0, date="2026-08-24"), venue=venue, position_key=f"p{n}"),
+            replace(_request(stake=1.0, date=_TODAY), venue=venue, position_key=f"p{n}"),
             submit=lambda r: {"status": "filled", "fill_stake_dollars": 1.0},
         )
 
     result = guard.check_order(
-        replace(_request(stake=1.0, date="2026-08-24"), position_key="p15"), mode="live"
+        replace(_request(stake=1.0, date=_TODAY), position_key="p15"), mode="live"
     )
     assert result["allowed"] is False
     assert result["reason"] == "over_max_day_orders_all_venues"
@@ -335,7 +344,7 @@ def test_spent_today_counts_ambiguous_submits_not_just_confirmed_fills(monkeypat
 
     execution_ledger.place_order(_request(stake=12.0), submit=boom)
 
-    used = guard.spent_today("2026-08-24")
+    used = guard.spent_today(_TODAY)
     # A submit that raised may still have reached the venue. Counting only
     # confirmed fills would let a run of ambiguous submits spend twice.
     assert used == {"dollars": 12.0, "orders": 1}
@@ -350,7 +359,7 @@ def test_a_rejected_order_does_not_consume_the_budget(monkeypatch):
     # Unarmed -> rejected, which the ledger sets WITHOUT calling the venue.
     record = execution_ledger.place_order(_request(stake=12.0), submit=lambda r: {"status": "filled"})
     assert record["status"] == "rejected"
-    assert guard.spent_today("2026-08-24") == {"dollars": 0.0, "orders": 0}
+    assert guard.spent_today(_TODAY) == {"dollars": 0.0, "orders": 0}
 
 
 def test_paper_orders_do_not_consume_the_live_budget(monkeypatch):
@@ -358,7 +367,7 @@ def test_paper_orders_do_not_consume_the_live_budget(monkeypatch):
 
     monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "paper")
     execution_ledger.place_order(_request(stake=12.0))
-    assert guard.spent_today("2026-08-24") == {"dollars": 0.0, "orders": 0}
+    assert guard.spent_today(_TODAY) == {"dollars": 0.0, "orders": 0}
 
 
 def test_paper_spend_does_not_consume_the_live_budget_and_vice_versa(monkeypatch):
@@ -371,10 +380,10 @@ def test_paper_spend_does_not_consume_the_live_budget_and_vice_versa(monkeypatch
     # fees come out of the same budget as stake -- exactly as a live fill's do.
     fee = execution_ledger.paper_fill_fee_fields(_request(stake=12.0))["fees_dollars"]
     assert fee > 0
-    assert guard.spent_today("2026-08-24", mode="paper")["dollars"] == round(12.0 + fee, 2)
-    assert guard.spent_today("2026-08-24", mode="live")["dollars"] == 0.0
+    assert guard.spent_today(_TODAY, mode="paper")["dollars"] == round(12.0 + fee, 2)
+    assert guard.spent_today(_TODAY, mode="live")["dollars"] == 0.0
     # The default is the strictest reading, not a pooled one.
-    assert guard.spent_today("2026-08-24")["dollars"] == 0.0
+    assert guard.spent_today(_TODAY)["dollars"] == 0.0
 
 
 def test_the_two_paper_books_do_not_share_a_budget(monkeypatch):
@@ -392,8 +401,8 @@ def test_the_two_paper_books_do_not_share_a_budget(monkeypatch):
     # Kalshi's, the unrestricted `paper` book (no `book` named here) pays none.
     fee_12 = execution_ledger.paper_fill_fee_fields(replace(_request(stake=12.0), venue="paper"))["fees_dollars"]
     fee_7 = execution_ledger.paper_fill_fee_fields(replace(_request(stake=7.0), venue="paper:kalshi"))["fees_dollars"]
-    assert guard.spent_today("2026-08-24", venue="paper", mode="paper")["dollars"] == round(12.0 + fee_12, 2)
-    assert guard.spent_today("2026-08-24", venue="paper:kalshi", mode="paper")["dollars"] == round(7.0 + fee_7, 2)
+    assert guard.spent_today(_TODAY, venue="paper", mode="paper")["dollars"] == round(12.0 + fee_12, 2)
+    assert guard.spent_today(_TODAY, venue="paper:kalshi", mode="paper")["dollars"] == round(7.0 + fee_7, 2)
 
 
 def test_the_caps_are_the_ones_the_user_set():

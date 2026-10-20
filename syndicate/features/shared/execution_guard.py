@@ -511,6 +511,41 @@ def kill_switch_engaged() -> dict[str, Any]:
     return {"engaged": False, "source": "clear"}
 
 
+def placement_day_budget_enabled() -> bool:
+    """Default ON. `off`/`0`/`false` charges a live order to its slate date again."""
+    raw = str(os.environ.get("SYNDICATE_EXECUTION_PLACEMENT_DAY_BUDGET") or "").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
+def _budget_day_of(order: Mapping[str, Any], mode: str) -> str:
+    """The day an order is charged to: its PLACEMENT day for live, its slate for paper.
+
+    A LIVE ORDER IS CHARGED TO THE DAY IT WAS PLACED  [2026-10-20, lane
+    future-dated-live-orders-scope, todo #707 D2]. Live bets games up to six
+    days out, so "the day's budget" has to mean money that left the account
+    that day, not the game's slate. Today this is a NO-OP for live: the executor
+    places only `central_today_iso()`'s slate, so every live row's
+    `selected_date` already equals the Central date of its `submitted_at`. It
+    stops being one the day anything places another slate -- which is when a
+    slate-keyed budget would let two slates each spend a full day's cap.
+
+    PAPER KEEPS ITS SLATE KEY on purpose: paper places next-day slates today
+    (`intelligence_state`'s inline run), and moving those to today would change
+    the paper book's caps and break its comparability with its own history.
+
+    The Central date of `submitted_at`, falling back to `selected_date` when the
+    stamp is absent or unreadable -- the `paper_settlement._order_age_hours`
+    precedent: a malformed stamp must not drop the row from the budget.
+    """
+    slate = str(order.get("selected_date") or "")
+    if mode != "live" or not placement_day_budget_enabled():
+        return slate
+    from syndicate.features.shared.timezone import central_date_from_iso
+
+    placed = central_date_from_iso(order.get("submitted_at"))
+    return placed.isoformat() if placed is not None else slate
+
+
 def spent_today(
     selected_date: str, *, venue: str | None = None, mode: str | None = None
 ) -> dict[str, Any]:
@@ -535,7 +570,7 @@ def spent_today(
     for order in (_load().get("orders") or []):
         if str(order.get("mode")) != resolved_mode:
             continue
-        if str(order.get("selected_date") or "") != str(selected_date):
+        if _budget_day_of(order, resolved_mode) != str(selected_date):
             continue
         if venue is not None and str(order.get("venue") or "") != venue:
             continue
