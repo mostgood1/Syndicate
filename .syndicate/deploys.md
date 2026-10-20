@@ -51427,3 +51427,8 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - (d) Off-cadence OK lines (13:06:38Z, 13:07:20Z, 13:09:31Z) with no matching task run. Source not identified in a 150 s process sample.
 - **Owed:** (1) the user creates a healthchecks.io check and gives the ping URL, then `watchdog.ps1 -SetupHeartbeat <url>`; read: pings visible on healthchecks.io and no `HEARTBEAT_FAILED`. (2) The first real >= 10 min episode logs `EMAIL_SENT`.
 - **Rollback:** delete `C:\SyndicateProd\watchdog\smtp_alerts.json` (email -> `EMAIL_OFF`, toast unchanged), or re-install from `83aedac0`.
+
+## 2026-10-20 13:23Z (8:23 AM CT) -- READING: watchdog-unreachable-email emails RECEIVED; heartbeat DROPPED (lane `watchdog-unreachable-email`, session 4146db7b) -- MET
+- The user confirmed in chat that both emails from the 13:03Z entry arrived: the `[Syndicate DRILL]` UNREACHABLE email and the task-context 'reachable again after 15 min' email.
+- The healthchecks.io heartbeat was skipped by user decision ("skip this"). `C:\SyndicateProd\watchdog\heartbeat_url.txt` is absent, so `Send-Heartbeat` is a no-op. To enable it later: `watchdog.ps1 -SetupHeartbeat <url>`.
+- Still owed: the first REAL >= 10 min episode logs `EMAIL_SENT` (`C:\SyndicateProd\watchdog\watchdog.log`).
