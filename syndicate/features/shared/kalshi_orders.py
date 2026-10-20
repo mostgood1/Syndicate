@@ -51,6 +51,7 @@ purpose.
 
 from __future__ import annotations
 
+import datetime as _dt
 import math
 import os
 import urllib.parse
@@ -440,8 +441,60 @@ def _v2_exchange_index() -> int:
         return _V2_EXCHANGE_INDEX_AUTO
 
 
-def order_body_v2(request: Any, *, price_dollars: float | None = None) -> dict[str, Any]:
-    """The body `POST /portfolio/events/orders` takes. PURE -- no clock, no net.
+# EXPIRE AT KICKOFF, ON KALSHI'S SIDE  [2026-10-20, user decision "Build option C",
+# lane kalshi-cancel-alert]. Kalshi orders are good-till-canceled, so an unfilled
+# pregame order RESTS into the game and fills at its pregame price once the game
+# has moved through it. Until now the only thing standing between that order and
+# the game was OUR cancel (`execution_ledger.cancel_pregame_resting_at_kickoff`),
+# and on 2026-10-20 that cancel 404'd on every attempt (shard 0, fixed d57476ec)
+# -- so a mispriced 125-contract NO spread order sat on the book with nothing able
+# to pull it. CreateOrderV2 takes `expiration_time` (unix SECONDS, only with
+# good_till_canceled): the VENUE then expires the order at kickoff whether or not
+# any cancel of ours works. Polymarket has done the same since 2026-09-11
+# (good-till-date at `commence_time`, `polymarket_us_orders._kickoff_expiry`).
+#
+# Behind `SYNDICATE_KALSHI_EXPIRE_AT_KICKOFF` (absent = OFF = today's body,
+# byte-identical). The kickoff cancel stays: this is the backstop, not the
+# replacement. An order whose game has ALREADY started (the in-game program's
+# entries) gets no expiry -- an expiry in the past is a rejection, and in-play
+# lifetime is that program's call. An unreadable `commence_time` also gets none,
+# and says so on the SUBMIT line (`expiry=`).
+_EXPIRE_AT_KICKOFF_ENV = "SYNDICATE_KALSHI_EXPIRE_AT_KICKOFF"
+
+
+def expire_at_kickoff_enabled() -> bool:
+    raw = str(os.environ.get(_EXPIRE_AT_KICKOFF_ENV) or "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
+def kickoff_expiration(request: Any, *, now: _dt.datetime | None = None) -> tuple[int | None, str]:
+    """(`expiration_time` in unix seconds, or None; the reason by name).
+
+    Reasons: `kickoff` (set), `disabled`, `no_commence_time`,
+    `unreadable_commence_time`, `game_started` (in-play: no expiry).
+    """
+    if not expire_at_kickoff_enabled():
+        return None, "disabled"
+    text = str(getattr(request, "commence_time", None) or "").strip()
+    if not text:
+        return None, "no_commence_time"
+    try:
+        starts = _dt.datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None, "unreadable_commence_time"
+    if starts.tzinfo is None:
+        starts = starts.replace(tzinfo=_dt.timezone.utc)
+    moment = now or _dt.datetime.now(_dt.timezone.utc)
+    if starts <= moment:
+        return None, "game_started"
+    return int(starts.timestamp()), "kickoff"
+
+
+def order_body_v2(
+    request: Any, *, price_dollars: float | None = None, now: _dt.datetime | None = None
+) -> dict[str, Any]:
+    """The body `POST /portfolio/events/orders` takes. No net; reads the clock
+    only to decide the kickoff expiry, and only when that flag is on.
 
     Both sides are expressible, and neither is a guess: Kalshi quotes this
     endpoint entirely from the YES leg, so an over is a `bid` at our price and
@@ -530,6 +583,10 @@ def order_body_v2(request: Any, *, price_dollars: float | None = None) -> dict[s
     subaccount = _v2_subaccount()
     if subaccount is not _SUBACCOUNT_OMITTED:
         body["subaccount"] = subaccount
+    expiration, _reason = kickoff_expiration(request, now=now)
+    if expiration is not None:
+        # Only valid with good_till_canceled (immediate_or_cancel cannot carry it).
+        body["expiration_time"] = expiration
     return body
 
 
@@ -739,7 +796,9 @@ def submit_order(request: Any, *, price_dollars: float | None = None) -> dict[st
         f" exchange_index={body.get('exchange_index')}"
         # PRESENT OR ABSENT, on the SUBMIT. `exchange_index` had to be added to
         # this line before its fix could be read at all; this one starts there.
-        f" subaccount={body.get('subaccount', '<omitted>')}",
+        f" subaccount={body.get('subaccount', '<omitted>')}"
+        # Set, or WHY not (`disabled`, `game_started`, `no_commence_time`, ...).
+        f" expiry={body.get('expiration_time') or kickoff_expiration(request)[1]}",
         flush=True,
     )
     try:
