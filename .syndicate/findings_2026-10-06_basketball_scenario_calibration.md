@@ -3537,3 +3537,30 @@ The R2D_p3 config otherwise; the 12 sweep dates.
 - Grid: bonus ∈ {.055, .060} × base non-shoot ∈ {.030, .035}.
 - The same PASS (FTA 22.69 ± .3, PF 19.67 ± .4, foul-outs [.153, .233], step-3 guards) and the same pick rule.
 - Then s/Δ re-measured, the 12-date check, the full FIT.
+
+### R2-d step 4b — RESULT 2026-10-20 00:35Z (4 runs done 00:33Z, 0 errors): CONFIRMED, pick bonus .060 / base non-shoot .030
+
+| bonus / base | FTA (22.69 ± .3) | PF (19.67 ± .4) | foul-outs [.153, .233] | verdict |
+|---|---|---|---|---|
+| .055 / .030 | 22.23 ✗ | 19.28 | .203 | fail |
+| .055 / .035 | 22.32 ✗ | 19.76 | .230 | fail |
+| **.060 / .030** | **22.60 ✓** | **19.79 ✓** | **.232 ✓** | **PASS** |
+| .060 / .035 | 22.67 ✓ | 20.24 ✗ | .247 ✗ | fail |
+
+**At the pick, the step-3 guards hold:**
+- 3PA 36.90 and 3PM 13.48 (real 36.77 / 13.28);
+- trips 7.63 / 2.26 / 0.36;
+- 2P% .5541, 3P% .3653;
+- FGA 88.90, possessions 102.83.
+
+**Readings:** REB 43.13 (43.81), AST 24.50 (27.20, #5b open), quarter shares hold, bias +2.32 (s stale: bonus trips are
+now 1.68 against the 0.00791 frozen in the solver).
+
+**ROUND-2 CONFIG (provisional):** the fit_f5 fields plus:
+- `quarter_targets_mode=mean` + `quarters_calibration.json` (the real FIT splits);
+- `shooting_foul_model=coherent`, `sf_team_ref=0.307`;
+- `skip_outs_penalties` now also removes the pace injury drag;
+- `bonus_nonshoot_foul_per_poss=0.060`, `base_nonshooting_foul_per_poss=0.030`.
+
+**Next, chained:** s″′ and Δ″′ re-measured on the #3j disjoint dates, then the 12-date check (|bias| < 0.5 + every
+step-3/4 guard), then the full FIT, then `fit_r2_config.json` for P3 and the forward test.
