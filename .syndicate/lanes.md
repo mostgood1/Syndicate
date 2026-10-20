@@ -1203,11 +1203,12 @@ death, never life — do not invert it.
 
 ### future-dated-live-orders-scope — OPEN — opened 2026-10-20 — session 0ffeb586-0b80-4156-9b2b-edbed12088cc
 - Goal: Written scope (no code) for pregame live orders on future-dated games: every date key in the live path with file:line, a place-once design (caps charge placement day), measured forward-edge survival to kickoff with denominators and date coverage, risks + the off!=on reachability test; delivered in .syndicate/findings_2026-10-20_future_dated_live_orders.md, then stop for the user's decision
-- Files: .syndicate/findings_2026-10-20_future_dated_live_orders.md (NEW)
+- Files: .syndicate/findings_2026-10-20_future_dated_live_orders.md (NEW), docs/ai_context/todo.md (#707 section ONLY)
 - Hypothesis: n/a (scope)
 - Falsification test: n/a
 - Verification: findings file landed on origin/main; user decision recorded
 - Blocked by: none
+- **STATUS 2026-10-20 ~13:40Z: SCOPE WRITTEN, waiting on the user's decision.** Headline: live ALREADY bets games up to 6 days out and can re-order the same bet on each later slate (paper live-equivalent: 5-6% of positions, 8-9% of stake); D1 cross-slate dedupe recommended as a safety fix. Todo #707.
 
 ### kalshi-series-competition-identity — OPEN — opened 2026-10-20 — session cb7650d2-2f6f-4012-a842-f55a6ed7bb2b
 - **STATUS 2026-10-20 13:08Z (8:08 AM CT): ON MAIN af2c8c5a, NOT ON THE FLEET.** Test fails on the pre-fix join and passes; 942 green across the join's 34 test files; of the fleet's 37 captured soccer series exactly KXBBLGAME / KXBUNDESLIGA2GAME / KXEREDIVISIEWGAME / KXSERIEAWGAME refuse. Owed: the fleet ff (own deploy locks) and its BOARD_JOIN reading -- the last Verification clause. Catalogue-level hygiene (sport_for_series substring scan, discovery title prefix) left to the holder of kalshi_catalogue.py (soccer-uefa-competitions). Log: .syndicate/log/2026-10-20.md.
