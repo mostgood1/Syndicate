@@ -3600,3 +3600,25 @@ higher non-shooting volume, so the EXACT solve under-counts some point source th
 **Next (to be pre-registered):** a solver-accounting diagnostic. Dump, per game, the solver's target points vs the
 sim's mean points, split by source (FG / and-one FT / shooting trips / bonus trips / intentional), at PKR2_check, and
 find which source carries the +1.3.
+
+### R2-d SOLVER-ACCOUNTING DIAGNOSTIC — PRE-REGISTRATION 2026-10-20 12:41Z (user go-ahead in chat)
+
+**Question:** which point source carries the +1.32 (SE 0.23) per game that PKR2_check scores over R2A_mean?
+
+**Instrument** (research copy `~/bball_sc/code_r2s_diag`, never on main; diagnostic-only, under `diag_foul_outs`):
+- engine counters of points by source per side: FG, and-one FT, shooting-trip FT, bonus-trip FT, intentional FT;
+- per side, the EXACT solve's record: tpp, tpp_eff, poss, the solved eff and the coherent model's per-possession
+  split at that eff (FG / and-one / shooting FT / bonus FT).
+
+**Run:** the PKR2_check config exactly (s 0.01615, Δ 0.103), the 12 sweep dates, 200 draws.
+
+**Readout,** per team-game, mean over games:
+- (a) target = tpp·poss vs sim points;
+- (b) realised possessions (counter) vs the solver's poss;
+- (c) per source, sim points / realised poss vs model per-possession;
+- (d) the bonus-trip share and the end-game residual.
+
+**Attribution rule:** the source whose (sim − model) gap, in points per team-game, is the largest and ≥ 0.3 is named
+the carrier. The decomposition must close: sum of source gaps + possession gap ≈ total gap, within 0.2 per
+team-game. If it does not close, report that and name no carrier. No fix is chosen in this step; a fix gets its own
+pre-registration.
