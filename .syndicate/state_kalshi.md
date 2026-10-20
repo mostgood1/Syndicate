@@ -20,6 +20,14 @@ Four distinct combinations across the thirteen series this platform trades.
 **Every MLB game/total/spread/K series is `fee_multiplier: 0.5` — half rate.**
 NFL/WNBA/NBA/NCAAF game series are 1.0. A hardcoded rate is wrong on MLB by 2x.
 
+**WHICH SERIES CHARGE A MAKER FEE** `[read live 2026-10-19 23:06Z, 122 series, 0 failures, lane kalshi-maker-entry-paper]`.
+`quadratic_with_maker_fees`: every NCAAF/NFL/NBA full-game game, spread and total series; the NHL, MLB
+and WNBA game series; and the big-league soccer GAME series (Bundesliga, La Liga, Ligue 1, Serie A,
+UCL). Everything else read is `quadratic`, so a maker fill there is free: every prop and every quarter,
+half or F5 series, `KXMLBSPREAD`/`KXMLBTOTAL`, `KXNHLSPREAD`, `KXWNBASPREAD`/`KXWNBATOTAL`, soccer
+spreads/totals, and `KXUELGAME`/`KXUECLGAME`. `KXMLBBGAME` is Mobile Legends, not MLB. Re-read with
+`scripts/read_kalshi_fee_params.py --series ...`.
+
 **Base rate 0.07, MEASURED off 27 of our own fills** (21 at multiplier 0.5 imply
 0.0350; 4 at 1.0 imply 0.0700 — a discriminating 2:1). Not circular:
 `fees_dollars` comes from Kalshi's own `taker_fees_dollars` via

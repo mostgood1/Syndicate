@@ -2587,3 +2587,23 @@ Within 25 minutes of my ff, **two** sessions messaged me with restart plans buil
 ## 2026-10-20 -- A Kalshi settlement row after a partial close carries GROSS counts on BOTH legs, and its revenue omits the netted pair `[lane kalshi-exit-path]`
 - **What happened:** `550a4b20`'s tests modelled a partly sold position's settlement row as the NET remainder on one leg (sell 4 of 10 YES -> `yes_count_fp=6`). The real row (Thornton, 5 NO, 1 sold by a YES buy) reads `no_count_fp=5.00, yes_count_fp=1.00`, so `grade_kalshi_settlement` refused it `both_sides_held` and the exit-aware branch never ran. `revenue=400` covers only the 4 net contracts: the netted YES/NO pair paid its $1 at trade time, so the venue's pnl (-0.6695) is not the entry's (+0.3305).
 - **How to apply:** before writing a fixture for a venue row, copy one real row from production. Never derive an entry's P&L from Kalshi's settlement `revenue` once any contract was closed; use `exit_adjusted_pnl`.
+
+
+## CLV AGAINST THE CONSENSUS CLOSE IS BLIND FOR MAKER FILLS: the fill selects on information the close does not hold `[2026-10-19, lane kalshi-maker-entry-paper]`
+
+I pre-registered a Kalshi maker-entry study with CLV against the sportsbook consensus close as its
+falsifier. It PASSED: 554 filled resting bids at +3.75% [+2.62, +5.16]. Settlement then contradicted it.
+Over all 2,676 settled orders the close was calibrated (1,325 wins against 1,324.7 expected), but
+**filled** orders won 5.37pp below it [-9.48, -0.91] and **unfilled** orders 1.40pp above. ROI on fills
+was -9.2% (recorded-ask fills) and -4.0% (trade-print fills). Kalshi's own pre-kickoff mid over-predicted
+the fills as well.
+
+**Why:** a taker who sells into your resting bid chooses WHEN to trade, and the choice is informed. CLV
+measures the price against a later price. It cannot see selection on the OUTCOME, and that is exactly
+what a passive fill is. For a taker, CLV is a fair proxy: we choose the moment.
+
+**How to apply:**
+- Grade anything that fills passively (maker entry, resting limits, limits left after a miss) on SETTLED
+  OUTCOMES. Report `wins - close fair` separately for filled and unfilled orders: the split is the signal.
+- A CLV pass on passive fills is "not yet falsified", never "works".
+- Pre-register the outcome test alongside CLV, not as an afterthought.
