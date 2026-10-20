@@ -1,6 +1,6 @@
 """Paper bet optimization -- the pre-registered study (prereg_bet_optimization.md). Reads ledger.json only.
 
-usage: py -3 scripts/paper_bet_optimization.py LEDGER_JSON REPO_ROOT
+usage: py -3 scripts/paper_bet_optimization.py LEDGER_JSON REPO_ROOT [--forward SINCE_ISO]
 
 LEDGER_JSON = `execution_ledger.full_history_orders()` dumped read-only on the fleet (nice 19).
 Findings: .syndicate/findings_2026-10-20_paper_bet_optimization.md
@@ -14,7 +14,9 @@ from syndicate.features.shared import venue_fees  # fee imputation for rows with
 
 PRIMARY = ("paper:kalshi", "paper:polymarket")
 SECONDARY = ("paper:prophetx", "paper:novig", "paper")
-BOOK_OF = {"paper:kalshi": "kalshi", "paper:polymarket": "polymarket", "paper:prophetx": "prophetx", "paper:novig": "novig", "paper": None}
+LIVE = ("kalshi", "polymarket")
+BOOK_OF = {"paper:kalshi": "kalshi", "paper:polymarket": "polymarket", "paper:prophetx": "prophetx", "paper:novig": "novig", "paper": None,
+           "kalshi": "kalshi", "polymarket": "polymarket"}
 
 
 def dec(a):
@@ -45,7 +47,7 @@ def load():
     orders.sort(key=lambda r: str(r.get("submitted_at") or ""))
     for r in orders:
         v = str(r.get("venue"))
-        if v not in PRIMARY + SECONDARY or r.get("outcome") not in ("won", "lost") or r.get("ev_pct") is None:
+        if v not in PRIMARY + SECONDARY + LIVE or r.get("outcome") not in ("won", "lost") or r.get("ev_pct") is None:
             continue
         if r.get("fill_price") in (None, 0) or not float(r.get("fill_stake_dollars") or 0):
             continue
@@ -80,6 +82,7 @@ def load():
             "imp": 1.0 / d, "sim_view": str(r.get("sim_view") or "none"),
             "live": (sub is not None and ko is not None and sub >= ko), "fee_imputed": imputed,
             "hours": ((ko - sub).total_seconds() / 3600) if sub and ko else None,
+            "stake": stake, "pnl": float(r.get("pnl_dollars") or 0.0),
         })
     return rows
 
@@ -199,7 +202,53 @@ def segments(rows, title):
         print(f"  price     {k:12s} {fmt(rs)}")
 
 
+def diff(a, b):
+    """Flat-ROI difference a - b (points) and its SE, treating the two groups as independent."""
+    ma, sa, na, _ = clustered(a)
+    mb, sb, nb, _ = clustered(b)
+    return ma - mb, math.sqrt(sa * sa + sb * sb), na, nb
+
+
+def forward(rows, since):
+    """The FORWARD test pre-registered 2026-10-20 (findings_2026-10-20_paper_bet_optimization.md, 'Forward test')."""
+    pop = [r for r in rows if r["sub"] >= since]
+    venue = [r for r in pop if r["venue"] in PRIMARY + LIVE]
+    other = [r for r in pop if r["venue"] in SECONDARY]
+    live = [r for r in pop if r["venue"] in LIVE]
+    dates = sorted({r["date"] for r in pop})
+    print(f"FORWARD since {since}: dates {dates[0] if dates else None}..{dates[-1] if dates else None} ({len(dates)}), "
+          f"venue+live {len(venue)} (paper:kalshi {sum(r['venue']=='paper:kalshi' for r in venue)}, paper:polymarket "
+          f"{sum(r['venue']=='paper:polymarket' for r in venue)}, live {len(live)}), other books {len(other)}")
+    for name, group in (("H3 venue+live", venue), ("other books", other), ("live only", live)):
+        print(f"  {name:14s} {fmt(group)}")
+    if live:
+        st = sum(r["stake"] for r in live); pnl = sum(r["pnl"] for r in live)
+        print(f"  live dollars: staked ${st:.2f}, pnl ${pnl:+.2f}, stake ROI {100*pnl/st if st else float('nan'):+.1f}%")
+    for name, group in (("venue+live", venue), ("other books", other)):
+        d, se, na, nb = diff([r for r in group if r["live"]], [r for r in group if not r["live"]])
+        print(f"  H1 {name:11s} in-play minus pregame {d:+6.1f} ± {se:4.1f} pts (n {na} / {nb})")
+        d, se, na, nb = diff([r for r in group if r["imp"] < .5], [r for r in group if r["imp"] >= .5])
+        print(f"  H2 {name:11s} underdog minus favourite {d:+6.1f} ± {se:4.1f} pts (n {na} / {nb})")
+    m, se, n, e = clustered(venue)
+    print("  DECISION (pre-registered):")
+    if n < 300:
+        print(f"    INSUFFICIENT: {n} venue+live bets < 300 -- no decision; keep collecting")
+    elif m + 2 * se < 0:
+        print(f"    BAND: venue+live ROI {m:+.1f} ± {se:.1f} is >= 2 SE below zero -- recommend the user turn the $5-$10 band OFF")
+    elif m - 2 * se > 0:
+        print(f"    BAND: venue+live ROI {m:+.1f} ± {se:.1f} is >= 2 SE above zero -- band supported; consider widening only per cell")
+    else:
+        print(f"    BAND: venue+live ROI {m:+.1f} ± {se:.1f} straddles zero -- no change; keep collecting")
+    for name, group in (("venue+live", venue), ("other books", other)):
+        d, se, na, nb = diff([r for r in group if r["live"]], [r for r in group if not r["live"]])
+        if min(na, nb) >= 100 and d + 2 * se < 0:
+            print(f"    IN-PLAY ({name}): in-play is >= 2 SE worse than pregame -- propose a per-cell in-play EV floor via the min_ev tuner (never a ban)")
+
+
 rows = load()
+if len(sys.argv) > 4 and sys.argv[3] == "--forward":
+    forward(rows, sys.argv[4])
+    sys.exit(0)
 prim = [r for r in rows if r["venue"] in PRIMARY]
 sec = [r for r in rows if r["venue"] in SECONDARY]
 report(prim, "PRIMARY: paper:kalshi + paper:polymarket")

@@ -1288,13 +1288,13 @@ death, never life — do not invert it.
 - Verification: Scratch StateDir: old script -> stale writer clobbers newer state; new script -> refused with a STATE_STALE log line; one scratch normal run OK; installed sha256 == repo; deploys.md entry
 - Blocked by: none
 
-### paper-bet-optimization — OPEN — opened 2026-10-20 — session 6200a74b-6bc7-4ffe-9115-f725eedff2a5 — **GOAL: NOT MET — first pass DONE: NO-GO on every pre-registered selection rule (venue paper books −12.0% ± 5.1 out of sample, 807 bets); band/flat-$5 sizing ruins a $465 bankroll in the window; current Suggested regime −6.0% ± 7.0 (120) is UNDETERMINED; paper collection STOPPED at go-live 10-19 10:55 AM CT, which blocks the re-run**
+### paper-bet-optimization — OPEN — opened 2026-10-20 — session 6200a74b-6bc7-4ffe-9115-f725eedff2a5 — **GOAL: NOT MET — first pass NO-GO on selection (venue paper −12.0% ± 5.1, 807); FORWARD TEST pre-registered from 2026-10-20T16:18:24Z (paper recording resumed via 1006cb75): H3 band decision at >= 300 venue+live bets, H1 in-play vs pregame, H2 dog vs fav; weekly reading Mondays 9:00 AM CT (task paper-bet-optimization-forward)**
 - Goal: Find per-line selection and sizing rules that raise out-of-sample return on the live-tradeable population (paper:kalshi + paper:polymarket), pre-registered, walk-forward by date, event-clustered SEs; recommend a rule only if it beats taking every bet by >= 2 SE and is positive (user 2026-10-20: "once enabled start to figure out bet optimization using the paper data we have")
 - Files: scripts/paper_bet_optimization.py (NEW), .syndicate/findings_2026-10-20_paper_bet_optimization.md (NEW)
 - Hypothesis: pre-registered in the findings doc (written 9:27 AM CT, run 9:39 AM CT)
 - Falsification test: no selection rule beats S0 by >= 2 SE out of sample -> NO-GO (this is what happened)
 - Verification: findings doc with coverage, rule table and sizing replay; re-run on the current regime once paper collection resumes
-- Blocked by: no paper orders are booked while the fleet runs live (newest paper submit 2026-10-19 10:55 AM CT)
+- Blocked by: sample size only (paper:kalshi / paper:polymarket rows resume once a build commits a venue paper position; lane paper-alongside-live owes the first)
 
 ### polymarket-zip-site-enumeration — CLOSED — opened 2026-10-20 — closed 2026-10-20 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
 - Goal: The comment that enumerates every place a Polymarket outcome array is zipped positionally against its price array names the SITES THAT ACTUALLY EXIST, and a test fails if a new one appears -- so an audit of that unproven assumption cannot miss a site, in particular the Kalshi/Polymarket arbitrage path where both legs are bought.

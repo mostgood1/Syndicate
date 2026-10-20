@@ -100,3 +100,32 @@ carries the earlier mtime. The rules and the falsifier were not changed after th
 - **Validation:** walk-forward by date, with event-clustered SEs.
 - **Decision:** a rule is recommended only if its out-of-sample flat ROI beats S0 by >= 2 SE AND is positive.
   Otherwise selection is NO-GO, and sizing is compared on log growth and flagged as noise-dominated.
+
+## Forward test (pre-registered 2026-10-20 ~1:15 PM CT, BEFORE any forward row was read)
+
+- **Why:** the first pass found the current regime (Suggested-only, from 10-13) undetermined. Paper books record
+  again under live since `1006cb75` (lane `paper-alongside-live`, refresh-worker restarted 16:18:24Z). The
+  forward window is bets submitted at or after **2026-10-20T16:18:24Z**.
+- **Instrument:** `py -3 scripts/paper_bet_optimization.py <ledger.json> <repo> --forward 2026-10-20T16:18:24`.
+  The code is fixed now; the decision rules are printed by the script itself.
+- **Population:**
+  - **Primary (H3):** venue books plus live orders, `paper:kalshi`, `paper:polymarket`, `kalshi`, `polymarket`.
+    Settled, with `ev_pct`, one per `(venue, opening_key)`.
+  - **Other books:** reported apart.
+- **Hypotheses (from the first pass's segments, untested there):**
+  - **H1:** in-play minus pregame flat ROI < 0. First pass: venue −16.8 ± 19.4, other books −6.2 ± 7.1.
+  - **H2:** underdog minus favourite < 0. First pass, all dates: venue −13.7; current regime −3.8 ± 16.1.
+  - **H3:** venue+live flat ROI vs 0. This decides the band.
+- **Decision rules:**
+  - **Fewer than 300 venue+live bets:** INSUFFICIENT, no decision.
+  - **H3 ROI + 2 SE < 0:** recommend the user turn the $5-$10 band OFF.
+  - **H3 ROI − 2 SE > 0:** band supported; widen only per cell.
+  - **Otherwise:** no change.
+  - **H1, per population:** if each side has 100+ bets and in-play is 2+ SE worse than pregame, propose a per-cell
+    in-play EV floor through the min_ev tuner. Never a ban (learnings 2026-09-16).
+  - **H2:** reported, not acted on alone.
+- **Readings:** weekly on Mondays at 9:00 AM CT (scheduled task `paper-bet-optimization-forward`). Each reading
+  appends to `.syndicate/log/<date>.md`. At ~25 venue bets a day, 300 arrives in about 2 weeks.
+- **Exploratory, current regime from 10-13** (NOT part of the test; run before this section was written):
+  - Venue books −6.0% ± 7.0 (120): pregame −0.2 ± 10.4, in-play −17.0 ± 16.4.
+  - Other books +0.9% ± 4.0 (1,466): pregame +3.5 ± 5.5, in-play −2.8 ± 4.4.
