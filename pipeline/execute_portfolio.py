@@ -779,6 +779,35 @@ def _run_execution(
             )
             continue
 
+        # THE TICKER MUST BE FOR THIS GAME  [2026-10-20, user decision "Guard +
+        # fix the join", relayed from session 332cb014; lane
+        # future-dated-live-orders-scope]. 38 of 106 board Kalshi tickers on
+        # 10-20 carried another game's date; the order's ticker comes from a
+        # different join that was right today, and nothing refused it if it
+        # slipped. The ticker's date must equal the game's US/Eastern date.
+        # Fail-closed, refused by name, nothing written. See
+        # `kalshi_ticker_date_guard`.
+        if mode == LIVE and venue == "kalshi":
+            from syndicate.features.shared.kalshi_ticker_date_guard import ticker_date_refusal
+
+            date_refusal, date_detail = ticker_date_refusal(
+                request.venue_ticker, getattr(request, "commence_time", None)
+            )
+            if date_refusal is not None:
+                skipped += 1
+                refused[date_refusal] = refused.get(date_refusal, 0) + 1
+                print(
+                    f"[execute_portfolio] REFUSED_TICKER_DATE_{'MISMATCH' if date_refusal.endswith('mismatch') else 'UNVERIFIABLE'}"
+                    f" venue={venue} ticker={request.venue_ticker!r}"
+                    f" commence_time={getattr(request, 'commence_time', None)!r}"
+                    f" away={getattr(request, 'away_team', None)!r} home={getattr(request, 'home_team', None)!r}"
+                    f" sport={getattr(request, 'sport', None)} market={getattr(request, 'market', None)}"
+                    f" side={getattr(request, 'side', None)} line={getattr(request, 'line', None)}"
+                    f" detail={date_detail} -- ticker is not for this game's date; nothing written",
+                    flush=True,
+                )
+                continue
+
         # ONE BET, ONE ORDER, HOWEVER MANY SLATES PLAN IT  [2026-10-20, user
         # decision, lane future-dated-live-orders-scope, todo #707]. The
         # shortlist keeps NFL/NCAAF/soccer games up to six days out and
