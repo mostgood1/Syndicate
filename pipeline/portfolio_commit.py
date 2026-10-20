@@ -462,9 +462,9 @@ def live_ev_floor_stop_state(*, force: bool = False) -> dict[str, Any]:
     """The stop rule over SETTLED LIVE orders the floor admitted. Cached 30 min.
 
     Tripped when >= 100 have settled and their ROI (pnl / staked) is below -5%.
-    An unreadable ledger or log does NOT trip it -- it reports `unknown` and the
-    floor keeps running, because the venue gates, caps and the band still bound
-    every order; the reading says so out loud on every build.
+    An unreadable ledger or log reports `unknown`, and `_live_ev_floor_population`
+    treats that as STOPPED: unknown must not take the permissive branch
+    (learnings: "Unknown must not default permissive").
     """
     import time
 
@@ -513,6 +513,15 @@ def _live_ev_floor_population(shortlist: Any, normalized: str) -> list | None:
     if not live_ev_floor_requested() or not isinstance(shortlist, Mapping):
         return None
     stop = live_ev_floor_stop_state()
+    if stop.get("unknown"):
+        # FAIL CLOSED: a stop rule that cannot read the ledger cannot say the
+        # floor is safe, so the live plans go back to Suggested-only this build.
+        print(
+            f"[portfolio_commit] LIVE_EV_FLOOR_STOP_UNKNOWN date={normalized} error={stop.get('unknown')} "
+            f"-- live plans are Suggested-only until the stop rule can read the ledger",
+            flush=True,
+        )
+        return None
     if stop.get("tripped"):
         print(
             f"[portfolio_commit] LIVE_EV_FLOOR_STOPPED date={normalized} settled={stop.get('settled')} "

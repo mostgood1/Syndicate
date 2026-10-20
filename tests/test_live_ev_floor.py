@@ -171,3 +171,16 @@ def test_an_unreadable_ledger_does_not_trip(monkeypatch):
     monkeypatch.setattr(execution_ledger, "full_history_orders", _boom)
     state = pc.live_ev_floor_stop_state(force=True)
     assert state["tripped"] is False and "unknown" in state
+
+
+def test_an_unreadable_ledger_fails_closed_to_suggested_only(monkeypatch):
+    from syndicate.features.shared import execution_ledger
+
+    def _boom():
+        raise RuntimeError("store down")
+
+    monkeypatch.setenv(pc.LIVE_EV_FLOOR_ENV, "0")
+    monkeypatch.setattr(execution_ledger, "full_history_orders", _boom)
+    pc.live_ev_floor_stop_state(force=True)
+    shortlist = {"rows": [_shortlist_row("ev", suggested=False, reasons=["ev_below_min"])]}
+    assert pc._live_ev_floor_population(shortlist, "2026-10-20") is None
