@@ -226,6 +226,7 @@ def test_the_POLYMARKET_cancel_is_not_yet_wired_into_any_automatic_path():
     wires it up, which is when that argument needs making explicitly.
     """
     import pathlib
+    import re
 
     root = pathlib.Path(__file__).resolve().parents[1]
     callers = []
@@ -233,7 +234,10 @@ def test_the_POLYMARKET_cancel_is_not_yet_wired_into_any_automatic_path():
         if path.name == "polymarket_us_orders.py":
             continue
         text = path.read_text(encoding="utf-8", errors="ignore")
-        if "polymarket_us_orders import" in text and "cancel_order" in text:
+        # A WORD match: Kalshi's order body has a `cancel_order_on_pause` field,
+        # and `execution_exits` imports `_read_book` from this module -- a
+        # substring match called that a Polymarket cancel caller (2026-10-20).
+        if "polymarket_us_orders import" in text and re.search(r"\bcancel_order\b", text):
             callers.append(str(path.relative_to(root)))
         elif "polymarket_us_orders.cancel_order(" in text:
             callers.append(str(path.relative_to(root)))
