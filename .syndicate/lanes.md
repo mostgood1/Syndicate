@@ -1290,6 +1290,14 @@ death, never life — do not invert it.
 - Verification: Grep-verified site list: one zip in _outcome_probabilities, one in _polymarket_sides, one index-pairing in kalshi_polymarket_arb; the corrected comment names exactly those three; and a new test enumerates them from source so a fourth site fails the suite.
 - Blocked by: none
 
+### paper-alongside-live — OPEN — opened 2026-10-20 — session f8387262-598d-4012-b3ad-d1442d471263
+- Goal: Paper books (unrestricted + paper2 venue books) are recorded and graded every day on the local fleet while live execution runs, rows tagged season_phase + selection, live placement unchanged; done = next slate's paper rows recorded AND graded on the fleet with a count in deploys.md
+- Files: pipeline/execute_portfolio.py (the inline-mode branch at the top of _run_execution + the paper batch.place call ONLY; disjoint from future-dated-live-orders-scope's D1/D3 blocks), syndicate/features/shared/execution_ledger.py (PaperLedgerBatch + _place_paper_into_state ONLY), tests/test_paper_alongside_live.py (NEW)
+- Hypothesis: Paper stopped at go-live because local_production.env sets SYNDICATE_EXECUTION_MODE=live for every role and run_execution(inline=True) refuses live (REFUSED_LIVE_INLINE x634 in refresh-worker.log since 10-20 00:32Z)
+- Falsification test: With the fix on the fleet, refresh-worker still logs REFUSED_LIVE_INLINE or no new paper rows appear in the ledger on a build whose paper2 plan has positions
+- Verification: off!=on reachability test; fleet ff + refresh-worker restart; count of new mode=paper rows for the next slate recorded and graded, in deploys.md; live rows/order count unchanged
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
