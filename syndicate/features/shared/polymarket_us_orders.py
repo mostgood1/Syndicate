@@ -1251,7 +1251,28 @@ def _price_at_ask(request: Any, body: Mapping[str, Any], fields: Mapping[str, An
         min_ev = float(resolve_settings().min_ev_pct)
     except Exception as exc:  # noqa: BLE001 -- the threshold is not optional
         refuse("ask_min_ev_unknown", f"portfolio settings unreadable {type(exc).__name__}")
+    # THE SAME PER-CELL CUT THE COMMIT USED (lane min-ev-tuner-shadow): the base unless
+    # SYNDICATE_MIN_EV_TUNER=apply and the order's cell has a tuned override. Fails to the base.
+    min_ev_source = "base"
+    try:
+        from syndicate.features.shared.min_ev_tuner import MODE_APPLY, effective_min_ev_pct, load_state, tuner_mode
+
+        if tuner_mode() == MODE_APPLY:
+            cell_row = {
+                "venue": getattr(request, "venue", None) or "polymarket",
+                "sport": getattr(request, "sport", None),
+                "market": getattr(request, "market", None),
+            }
+            min_ev, min_ev_source = effective_min_ev_pct(
+                cell_row,
+                base_min_ev_pct=min_ev,
+                selected_date=str(getattr(request, "selected_date", "") or ""),
+                state=load_state(),
+            )
+    except Exception:  # noqa: BLE001 -- an unreadable tuner state means the base cut
+        min_ev_source = "base"
     facts["min_ev_pct"] = min_ev
+    facts["min_ev_source"] = min_ev_source
     if ev_at_ask < min_ev:
         refuse("ask_ev_below_min", f"ev_at_ask={ev_at_ask:.2f} < min_ev={min_ev}")
 

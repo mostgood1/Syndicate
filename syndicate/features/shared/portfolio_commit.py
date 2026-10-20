@@ -849,6 +849,35 @@ def sizing_candidate(row: Mapping[str, Any], inputs: SizingInputs) -> dict[str, 
     }
 
 
+def _min_ev_tuner_state_for_commit() -> dict[str, Any]:
+    """The per-cell min_ev overrides, read ONCE per commit -- and only in `apply` mode.
+
+    Lane `min-ev-tuner-shadow`. In `shadow` (the fleet's mode: the key is unset) and
+    `off` this returns {} without touching the store, and `_min_ev_cut` then returns
+    the base for every row, so the commit is byte-identical to before the wiring.
+    Any failure is {} too: an unreadable tuner state means the base cut, never a
+    looser one.
+    """
+    try:
+        from syndicate.features.shared.min_ev_tuner import MODE_APPLY, load_state, tuner_mode
+
+        return load_state() if tuner_mode() == MODE_APPLY else {}
+    except Exception:  # noqa: BLE001 -- fail to the base, never to a looser cut
+        return {}
+
+
+def _min_ev_cut(
+    row: Mapping[str, Any], base: float, selected_date: str, state: Mapping[str, Any]
+) -> tuple[float, str]:
+    """(cut line, `base` | `tuned_cell`) for one row. See `min_ev_tuner.effective_min_ev_pct`."""
+    try:
+        from syndicate.features.shared.min_ev_tuner import effective_min_ev_pct
+
+        return effective_min_ev_pct(row, base_min_ev_pct=base, selected_date=selected_date, state=state)
+    except Exception:  # noqa: BLE001
+        return float(base), "base"
+
+
 def _min_ev_net_of_fee_pct() -> float:
     """A venue row must beat this EV AFTER the venue's fee. 0.0 = "positive after fees".
 
@@ -1078,6 +1107,14 @@ def commit_portfolio(
     # `DEFAULT_PROFILE` == every beta 0.0 == the pre-P2 derivation, bit for bit.
     blend_profile, _blend_profile_meta = load_staked_probability_profile()
 
+    # THE PER-CELL CUT (lane min-ev-tuner-shadow). One state read per commit, and
+    # none at all unless SYNDICATE_MIN_EV_TUNER=apply. `min_ev_cut_sources` counts
+    # which cut each row was judged against and `tuned_min_ev_refusals` the refusals
+    # a TUNED cut made, so a reader can separate the two populations without guessing.
+    min_ev_state = _min_ev_tuner_state_for_commit()
+    min_ev_cut_sources: dict[str, int] = {}
+    tuned_min_ev_refusals: dict[str, int] = {}
+
     # WHAT DECIDED EACH SIM EDGE'S RIGHT TO SIZE, counted on the rows that carry
     # one (lane `sim-sizing-skill-gate`). The production reading for the gate is
     # this counter plus `sim_share_of_stake` on the positions.
@@ -1111,13 +1148,21 @@ def commit_portfolio(
             continue
 
         ev_pct = _as_float(row.get("ev_pct"))
-        if ev_pct is None or ev_pct < resolved.min_ev_pct:
+        min_ev_cut, min_ev_source = _min_ev_cut(row, resolved.min_ev_pct, selected_date, min_ev_state)
+        min_ev_cut_sources[min_ev_source] = min_ev_cut_sources.get(min_ev_source, 0) + 1
+        if ev_pct is None or ev_pct < min_ev_cut:
             refuse("below_min_ev_pct", row)
+            if min_ev_source == "tuned_cell":
+                tuned_min_ev_refusals["below_min_ev_pct"] = tuned_min_ev_refusals.get("below_min_ev_pct", 0) + 1
             continue
         # Its own refusal name, so the counter says how many bets the fair's noise alone removed.
         effective_ev = _effective_ev_pct(row)
-        if effective_ev is None or effective_ev < resolved.min_ev_pct:
+        if effective_ev is None or effective_ev < min_ev_cut:
             refuse("below_min_ev_pct_after_fair_noise", row)
+            if min_ev_source == "tuned_cell":
+                tuned_min_ev_refusals["below_min_ev_pct_after_fair_noise"] = (
+                    tuned_min_ev_refusals.get("below_min_ev_pct_after_fair_noise", 0) + 1
+                )
             continue
         # THE VENUE'S FEE COMES OFF BEFORE SUBMIT (user decision 2026-09-21: "we should
         # have the fee deduction prior to submit not at submit"). A venue-scoped row
@@ -1431,6 +1476,10 @@ def commit_portfolio(
         "generated_at": _utc_now(),
         "bankroll_units": resolved.bankroll_units,
         "settings": resolved.as_dict(),
+        # Which min-EV cut each priced row met (`base` | `tuned_cell`), and the refusals a
+        # tuned cut made. All `base` and {} unless SYNDICATE_MIN_EV_TUNER=apply.
+        "min_ev_cut_sources": dict(sorted(min_ev_cut_sources.items())),
+        "tuned_min_ev_refusals": dict(sorted(tuned_min_ev_refusals.items())),
         "positions": positions,
         "totals": {
             "positions": len(positions),
