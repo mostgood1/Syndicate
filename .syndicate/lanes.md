@@ -1200,6 +1200,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### kalshi-series-competition-identity — OPEN — opened 2026-10-20 — session cb7650d2-2f6f-4012-a842-f55a6ed7bb2b
+- **STATUS 2026-10-20 13:08Z (8:08 AM CT): ON MAIN af2c8c5a, NOT ON THE FLEET.** Test fails on the pre-fix join and passes; 942 green across the join's 34 test files; of the fleet's 37 captured soccer series exactly KXBBLGAME / KXBUNDESLIGA2GAME / KXEREDIVISIEWGAME / KXSERIEAWGAME refuse. Owed: the fleet ff (own deploy locks) and its BOARD_JOIN reading -- the last Verification clause. Catalogue-level hygiene (sport_for_series substring scan, discovery title prefix) left to the holder of kalshi_catalogue.py (soccer-uefa-competitions). Log: .syndicate/log/2026-10-20.md.
 - Goal: A Kalshi series for another competition than the board's (women's KXSERIEAW/KXEREDIVISIEW/KXBUNDESLIGAW/KXUCLW, basketball KXBBL/KXBBSERIEA, second tiers KXBUNDESLIGA2/KXLALIGA2, KXUAEPL, KXMLSAST, and the non-soccer KXMLBBGAME/KXNCAABB* game lines) refuses in join_kalshi_to_board with series_competition_not_on_board, named per series, before either pairing path; the board's own competitions (exact KX family) still pair
 - Files: syndicate/features/shared/kalshi_board_join.py, tests/test_kalshi_series_competition_identity.py (NEW)
 - Hypothesis: n/a (defect fix; mechanism confirmed on code: sport_for_series substring tokens + discovery title prefix give these series the soccer sport, and _resolve_event resolves women's clubs onto men's games)
