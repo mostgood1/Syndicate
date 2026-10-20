@@ -1278,6 +1278,14 @@ death, never life — do not invert it.
 - Verification: findings doc with coverage, rule table and sizing replay; re-run on the current regime once paper collection resumes
 - Blocked by: no paper orders are booked while the fleet runs live (newest paper submit 2026-10-19 10:55 AM CT)
 
+### polymarket-zip-site-enumeration — OPEN — opened 2026-10-20 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- Goal: The comment that enumerates every place a Polymarket outcome array is zipped positionally against its price array names the SITES THAT ACTUALLY EXIST, and a test fails if a new one appears -- so an audit of that unproven assumption cannot miss a site, in particular the Kalshi/Polymarket arbitrage path where both legs are bought.
+- Files: syndicate/features/shared/polymarket_board_join.py (the positional-zip enumeration comment only), tests/test_polymarket_zip_sites.py (NEW)
+- Hypothesis: The enumeration is stale in composition while its TOTAL is accidentally right, which is worse than being wrong: it claims three sites as _outcome_probabilities plus _polymarket_sides TWICE, but _polymarket_sides now zips ONCE and a third site exists in kalshi_polymarket_arb that is not named at all. An auditor following the list would check one function twice and never look at the arb path.
+- Falsification test: If _polymarket_sides still contains two positional zips, or if kalshi_polymarket_arb's outcomes[0]/[1] pairing is not a positional zip of the same two arrays, the enumeration is correct and only my reading is wrong.
+- Verification: Grep-verified site list: one zip in _outcome_probabilities, one in _polymarket_sides, one index-pairing in kalshi_polymarket_arb; the corrected comment names exactly those three; and a new test enumerates them from source so a fourth site fails the suite.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
