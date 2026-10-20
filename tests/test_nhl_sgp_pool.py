@@ -59,8 +59,10 @@ def _write_world(root: Path, *, sim_lambda=3.0, preseason=False):
             w.writerow({"full_name": name, "team": team, "position": "F", "line_slot": slot, "proj_toi": 18})
     alt = root / "nhl_source" / "tracking" / "alt_ladders"
     alt.mkdir(parents=True)
-    quotes = [("Alex Ovechkin", 0.5, -800), ("Alex Ovechkin", 1.5, -300), ("Alex Ovechkin", 2.5, 120),
-              ("Dylan Strome", 0.5, -600), ("Jack Hughes", 0.5, -900), ("Jack Hughes", 1.5, -450),
+    # Three legs priced just inside the 75% gate (-375 de-vigs to 75.1%): every ticket must pay +100 or better
+    # (2026-10-20), and three legs at the gate multiply to about +103 -- heavier favourites cannot reach it.
+    quotes = [("Alex Ovechkin", 0.5, -375), ("Alex Ovechkin", 1.5, -300), ("Alex Ovechkin", 2.5, 120),
+              ("Dylan Strome", 0.5, -375), ("Jack Hughes", 0.5, -380), ("Jack Hughes", 1.5, -450),
               ("Stefan Noesen", 0.5, -600)]
     with open(alt / f"{DAY}.jsonl", "w", encoding="utf-8") as fh:
         for player, line, price in quotes:

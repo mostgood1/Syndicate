@@ -27,25 +27,36 @@ LEG_MIN_HITS, LEG_GAMES = 8, 10
 LEG_MIN_SIM = 0.75
 DEFAULT_MARGIN = 1.05                          # the de-vig factor when the sheet has no main-line margin to read
 POOL_CAP = 16                                  # legs per game kept for the search, best market probability first
-# The two tiers (user 2026-10-17: "Two tiers"). On 10-17's NHL prices three ~87% legs win ~66% at about -200, and five
-# win ~50% at about +110. `min_decimal` is the legs-multiplied price floor: a ticket that pays less is not a bet.
+# The two tiers (user 2026-10-17: "Two tiers"). EVERY TICKET PAYS +100 OR BETTER (user 2026-10-20: "for SGPs we need
+# these to get to +100 or better ... for all sports"): `min_decimal` is the legs-multiplied price floor at one book, so
+# 2.00 everywhere. Before it, the safer tier won ~66% at about -200 (NBA 10-20 opener: -241..-190).
+# What +100 costs, measured that morning in memory on real sheets (NBA 10-20, NHL 10-20, NFL 10-18, WNBA 10-17,
+# MLB 10-18):
+#   - the best ticket per game wins ~42-50% (NFL 0.54-0.59);
+#   - with legs >= 75%, two legs cannot multiply to +100, so the safer tier starts at 3;
+#   - the pool is centred at 80% (`SWEET_SPOT`, was 85%), so 3-4 legs can reach +100 at all. At 85% NBA had one
+#     six-leg ticket over +100 across 3 games; at 80% it has one in each game.
+# `rank`: the safer tier takes the highest hit rate that pays +100; the payout tier takes the best value.
 TIERS = (
-    {"tier": "safer", "label": "Higher hit rate", "sizes": (2, 3), "min_joint": 0.62, "min_decimal": 1.40,
-     "per_game": 2, "per_sheet": 10,
-     "note": "Higher hit rate -- 2 or 3 legs, each one the market, the player's last 10 and our sim all make likely"},
-    {"tier": "payout", "label": "Bigger payout", "sizes": (4, 5), "min_joint": 0.45, "min_decimal": 1.70,
-     "per_game": 1, "per_sheet": 6, "note": "Bigger payout -- 4 or 5 of those legs, about half win, near even money"},
+    {"tier": "safer", "label": "Higher hit rate, +100 or better", "sizes": (3, 4, 5, 6), "min_joint": 0.40,
+     "min_decimal": 2.00, "rank": "hit_rate", "per_game": 2, "per_sheet": 10,
+     "note": "Higher hit rate at even money or better -- 3 to 6 legs, each one the market, the player's last 10 and "
+             "our sim all make likely; the legs multiply to +100 or more"},
+    {"tier": "payout", "label": "Bigger payout, +150 or better", "sizes": (4, 5, 6), "min_joint": 0.28,
+     "min_decimal": 2.50, "rank": "value", "per_game": 1, "per_sheet": 6,
+     "note": "Bigger payout -- 4 to 6 of those legs, the legs multiply to +150 or more"},
 )
 RULE = {"min_market": LEG_MIN_MARKET, "max_market": LEG_MAX_MARKET, "min_hits": LEG_MIN_HITS, "min_sim": LEG_MIN_SIM}
 # MLB (user 2026-10-17: "MLB-specific bar"): no batter alt rung reaches 75% -- 1+ hit / 1+ H+R+RBI price at 0.65-0.71
 # (10-16 TB @ CLE: 1 of 521 rungs passed the NHL gate). Legs at 65%+ that cleared 7 of 10; mostly 2-leg tickets.
 MLB_RULE = {"min_market": 0.65, "max_market": 0.95, "min_hits": 7, "min_sim": 0.65}
-MLB_TIERS = (
-    {"tier": "safer", "label": "Higher hit rate", "sizes": (2,), "min_joint": 0.45, "min_decimal": 1.60, "per_game": 2,
-     "per_sheet": 8, "note": "Higher hit rate -- 2 legs, each one the market, the player's last 10 and our sim all make "
-                             "likely; in baseball that means about half of these win"},
-    {"tier": "payout", "label": "Bigger payout", "sizes": (3,), "min_joint": 0.30, "min_decimal": 2.40, "per_game": 1,
-     "per_sheet": 4, "note": "Bigger payout -- 3 of those legs, about a third win"},
+MLB_TIERS = (   # +100 or better here too (user 2026-10-20, "for all sports"); MLB legs start at 65%, so 2 can reach it
+    {"tier": "safer", "label": "Higher hit rate, +100 or better", "sizes": (2, 3), "min_joint": 0.40, "min_decimal": 2.00,
+     "rank": "hit_rate", "per_game": 2, "per_sheet": 8,
+     "note": "Higher hit rate at even money or better -- 2 or 3 legs, each one the market, the player's last 10 and our "
+             "sim all make likely; the legs multiply to +100 or more"},
+    {"tier": "payout", "label": "Bigger payout, +150 or better", "sizes": (3, 4), "min_joint": 0.28, "min_decimal": 2.50,
+     "rank": "value", "per_game": 1, "per_sheet": 4, "note": "Bigger payout -- 3 or 4 of those legs, +150 or more"},
 )
 
 
@@ -117,7 +128,8 @@ def leg_prob(p_market: float, hits: int, games: int) -> float:
     return consistency_posterior(p_market, hits, games)
 
 
-SWEET_SPOT = 0.85     # a leg near here balances the hit rate against what it adds to the payout
+SWEET_SPOT = 0.80     # a leg near here balances the hit rate against what it adds to the payout (0.85 before the +100
+                      # floor: an 85% pool could not reach +100 in under 5-6 legs -- see TIERS)
 
 
 def cap(pool: Mapping[str, list[dict[str, Any]]]) -> dict[str, list[dict[str, Any]]]:
@@ -157,6 +169,14 @@ def together(legs: Sequence[Mapping[str, Any]]) -> dict[str, int] | None:
 
 def _value(t: Mapping[str, Any]) -> float:
     return t["p_joint"] * (core.payout(t["legs_product_odds"]) or 0)
+
+
+def _order(spec: Mapping[str, Any]):
+    """The tier's ranking: `hit_rate` = the likeliest ticket that clears the price floor first; `value` = the best
+    expected return at the legs-multiplied price."""
+    if spec.get("rank") == "hit_rate":
+        return lambda t: (-t["p_joint"], -_value(t))
+    return lambda t: (-_value(t), -t["p_joint"])
 
 
 def tickets(pool: Mapping[str, list[dict[str, Any]]], cells: Mapping[str, Any], games: Sequence[Mapping[str, Any]], *,
@@ -205,7 +225,8 @@ def tickets(pool: Mapping[str, list[dict[str, Any]]], cells: Mapping[str, Any], 
                         tk.update({"family": "hit_rate", "tier": spec["tier"], "tier_label": spec["label"],
                                    "tier_note": spec.get("note"), "show_estimate": False, "together": together(t)})
                         built.append((tk, t))
-            built.sort(key=lambda x: (-_value(x[0]), -x[0]["p_joint"]))
+            order = _order(spec)
+            built.sort(key=lambda x: order(x[0]))
             kept, kept_sets = [], []
             for tk, t in built:
                 ids = {(x["player"], x["market"]) for x in t}
@@ -218,7 +239,7 @@ def tickets(pool: Mapping[str, list[dict[str, Any]]], cells: Mapping[str, Any], 
             out += kept
     final: list[dict[str, Any]] = []
     for spec in tiers:
-        mine = sorted((t for t in out if t["tier"] == spec["tier"]), key=lambda t: (-_value(t), -t["p_joint"]))
+        mine = sorted((t for t in out if t["tier"] == spec["tier"]), key=_order(spec))
         final += mine[:spec["per_sheet"]]
     for t in final:
         for leg in t["legs"]:
