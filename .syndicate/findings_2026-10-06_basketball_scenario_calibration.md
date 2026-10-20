@@ -3622,3 +3622,41 @@ find which source carries the +1.3.
 the carrier. The decomposition must close: sum of source gaps + possession gap ≈ total gap, within 0.2 per
 team-game. If it does not close, report that and name no carrier. No fix is chosen in this step; a fix gets its own
 pre-registration.
+
+### R2-d SOLVER-ACCOUNTING DIAGNOSTIC — RESULT 2026-10-20 14:15Z (SV_check, 12/12 dates, 87 games, 0 errors)
+
+**Checks:** the counters sum exactly to the box score (116.087 = 116.087 per team-game). The decomposition is an
+algebraic identity (residual 0.000), so the pre-registered closure test is met by construction. The box-score match
+is the substantive check.
+
+| per team-game | sim | model | gap (SE) |
+|---|---|---|---|
+| **total vs target T = tpp·poss** | 116.087 | 115.474 | **+0.612** (= +1.22 per game; matches the paired +1.32) |
+| FG rate | 98.368 | 98.294 | −0.275 (0.083) |
+| and-one FT rate | 1.761 | 1.842 | −0.088 (0.010) |
+| shooting-trip FT rate | 12.841 | 12.615 | +0.182 (0.045) |
+| bonus-trip FT rate | 2.620 | 2.621 | −0.009 (0.045); s real 0.01619 vs 0.01615 |
+| **possessions (realised − solver) × model ppp** | 103.179 vs 102.814 | | **+0.410 (0.034)** |
+| intentional FT pts − Δ | 0.496 | 0.103 | +0.393 (not a clean source gap, see below) |
+
+**Carrier, by the pre-registered rule** (largest gap, ≥ 0.3): **possessions beyond the solve, +0.41.** Overtime is
+most of it: OT points are 0.327 per team-game, about 0.29 of the 0.365 extra possessions. The rest is end-game
+extension.
+
+**The coherent model is NOT the carrier:** its per-source rates net to −0.19 per team-game, each within ±0.3. The
+intentional-foul line is not a source gap: Δ is the NET on − off effect (M2 − M3 = 117.028 − 116.925), because
+intentional trips displace ordinary possessions. So "pig − Δ" double-counts the possessions they displace, and it
+and the possession line are entangled.
+
+**Believed, not measured:** R2A_mean has the same OT (0.300) and the same intentional trips (0.318), yet it lands on
+actual (+0.14). So the legacy loop must have scored about 0.6 per team-game BELOW its own solver model, which offset
+OT and the end-game. The R2-c double-netting finding predicts exactly that direction. The coherent solve removed the
+shortfall and exposed the unmodelled OT / end-game points. R2A carries no solver record, so this cannot be checked
+from it.
+
+**The target is not stale:** calibration_totals_* correct the PREGAME raw total against actual; they are
+engine-independent. The target sits on actual on these games (T 230.95 per game; actual ≈ 230.7).
+
+**No fix chosen** (per the pre-registration). Candidate to pre-register: replace Δ with ONE measured structural term,
+`solver_endgame_pts_per_team` re-measured as mean(sim − model·solver_poss) over OT + end-game on the #3j measure
+dates, at this config.
