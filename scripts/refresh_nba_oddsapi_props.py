@@ -4591,7 +4591,10 @@ def main() -> int:
     if len(states) > 1:
         state["lookahead_runs"] = states[1:]
     print(json.dumps(_json_ready(state), indent=2, sort_keys=True))
+    return _refresh_exit_code(states, state, do_edges=bool(args.do_edges), do_export=bool(args.do_export), fast_mode=fast_mode)
 
+
+def _refresh_exit_code(states: list, state: dict, *, do_edges: bool, do_export: bool, fast_mode: bool) -> int:
     snapshot_rows = int(state.get("snapshot_rows") or 0)
     alias_rows = int(state.get("snapshot_alias_rows") or 0)
     edges_rows = int(state.get("edges_rows") or 0)
@@ -4604,19 +4607,23 @@ def main() -> int:
     for extra_state in states[1:]:
         if extra_state.get("error"):
             return 1
-        if bool(args.do_export) and int(extra_state.get("snapshot_rows") or 0) > 0 and int(extra_state.get("game_cards_rows") or 0) > 0 and int(extra_state.get("cards_sim_detail_games") or 0) <= 0 and int(extra_state.get("smart_sim_files") or 0) <= 0:
+        if bool(do_export) and int(extra_state.get("snapshot_rows") or 0) > 0 and int(extra_state.get("game_cards_rows") or 0) > 0 and int(extra_state.get("cards_sim_detail_games") or 0) <= 0 and int(extra_state.get("smart_sim_files") or 0) <= 0:
             return 1
     if snapshot_rows > 0 and alias_rows <= 0:
         return 1
     # A KNOWN zero player-prop rows (game lines only) has no props to edge or
     # recommend; None (unreadable) keeps both checks.
     props_offered = state.get("player_prop_rows") != 0
-    if bool(args.do_edges) and snapshot_rows > 0 and edges_rows <= 0 and props_offered:
+    # `--mode fast` refreshes the snapshot ONLY -- predictions, edges and recommendations are `full`-mode work
+    # (`_run_refresh_via_cli`) -- so a fresh fast state carries edges_rows 0 by construction. It used to exit 0 only
+    # because the reuse gate handed back the day's full-run state; a FORCED fast pull (the NBA in-play lane, lane
+    # `nba-live-board`) wrote 8,435 rows and still exited 1 on 2026-10-20 23:18Z, failing every in-play run.
+    if bool(do_edges) and not fast_mode and snapshot_rows > 0 and edges_rows <= 0 and props_offered:
         return 1
     predictions_rows = int(state.get("predictions_rows") or 0)
-    if bool(args.do_export) and snapshot_rows > 0 and game_cards_rows > 0 and predictions_rows > 0 and recs_rows <= 0 and props_offered:
+    if bool(do_export) and snapshot_rows > 0 and game_cards_rows > 0 and predictions_rows > 0 and recs_rows <= 0 and props_offered:
         return 1
-    if bool(args.do_export) and snapshot_rows > 0 and game_cards_rows > 0 and cards_sim_detail_games <= 0 and smart_sim_files <= 0:
+    if bool(do_export) and snapshot_rows > 0 and game_cards_rows > 0 and cards_sim_detail_games <= 0 and smart_sim_files <= 0:
         return 1
     return 0
 
