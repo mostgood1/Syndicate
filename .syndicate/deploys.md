@@ -51617,3 +51617,30 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - The first live Kalshi order since 2026-10-19 16:59Z.
 - **Polymarket:** 0 positions this build (2 rows in, both `aggregator_priced`).
 - **Still open (user choice):** `commit_portfolio`'s $1 `min_stake_units` at the FIXED $1,000 bankroll refuses rows with a fraction under 0.1% (`below_min_stake` 3-4 per kalshi build at 14:16-14:21Z). Those rows never reach compounding or the band.
+
+## 2026-10-20 14:36:39Z (9:36 AM CT) -- FLEET down/up, ENV ONLY: `REFRESH_WORKER__SYNDICATE_LIVE_STAKE_BAND=on` -- **MET: first build sized $0.54 -> $5.46, first order placed at $5.46** (lane `live-stake-band`, session 6200a74b)
+- **User decision**, asked directly after two conflicting instructions: "Enable it", in its own restart. That overrides the "keep the band off" relayed by b87af0fc. The code is `db339f24` (lane live-stake-band), on the fleet since the e491c260 ff at 13:38:12Z.
+- **Locks:** all three claimed 14:33:00Z (holder live-stake-band). live-odds-worker and web were released by token at 14:43:11Z (not needed after the up); refresh-worker was released after this reading.
+- **Preflight is Render-scoped:** `deploy_preflight.py` read the frozen Render services (live commit c2049524, 09-30) and returned UNKNOWN (no sample). It cannot judge the local fleet.
+- **Gate used:** `check_deploy_safety` at 14:33:39Z showed MLB sim finished, no live games, board build idle. It was NOT CLEAR only for odds-refresh children (3 detached odds jobs). **Proceeded deliberately:** they are rewritten next cycle, and `down` stopped all 3 with 0 SIGKILL.
+- **60-MIN RULE OVERRIDDEN, knowingly:** refresh-worker had restarted at 14:30:16Z (compounding-bankroll), so this one came 7 min later. The user chose a second restart today.
+- **Steps (UTC):**
+  1. HEAD guard e491c260d. Marker `watchdog_no_autostart` set 14:35:57.
+  2. Env backup `.bak-live-stake-band-20261020T143557Z`; 133 -> 135 lines, 0 removed.
+  3. `down` 14:35:57 -> 14:36:39.
+  4. `Start-ScheduledTask SyndicateLocalProduction` 14:36:59; healthz 200 at 14:37:09.
+  5. Marker cleared 14:37:36.
+- **Environ (allowlisted keys):**
+  - Supervisor 2948959: `up --allow-live-execution`.
+  - refresh-worker 2949047 (lstart 14:37:08Z): `RENDER_GIT_COMMIT=e491c260`, MODE=live, LIVE_ARMED=1, `SYNDICATE_LIVE_STAKE_BAND=on`; compounding on / venue_total / floor_one_contract; balance caps on.
+  - live-odds-worker 2949048 and web 2948993: e491c260, live, armed.
+- **expect:** the first build's `STAKE_BAND` puts every live position in [$5, $10], and the executor places it inside the balance caps.
+- **READING:**
+  - Build: `14:58:31.336Z STAKE_BAND date=2026-10-20 venue=kalshi on=True positions=1/1 staked_before=$0.54 staked_after=$5.46 trimmed_to_funding=0 refused={} stakes=[5.46]`. `LIVE_PLAN_WRITTEN ... positions=1 staked=$5.46 paper2_placeable_missing=0`.
+  - Executor: `15:01:47.221Z LIVE_ORDER status=submitted venue=kalshi ticker=KXNCAAFTOTAL-26OCT20MTUFIU-45 side=under line=44.5 price=113.0 stake=5.46`. `EXECUTED ... positions=1 placed=1 refused={}`. Caps in force: order $23.27, Kalshi day $116.34.
+  - Fill: 11 contracts, $5.17 + $0.19 fee, per compounding-bankroll's 15:01:48Z entry.
+- **RISK, on record:** the paper study run the same morning (`findings_2026-10-20_paper_bet_optimization.md`) found the venue paper books at −12.0% ± 5.1 out of sample. At $5-$10 a $465 bankroll is ruined in the paper window; the current Suggested regime is −6.0% ± 7.0 (undetermined).
+- **Rollback:**
+  - Remove the `REFRESH_WORKER__SYNDICATE_LIVE_STAKE_BAND` line and do a full down/up (env is captured at `up`).
+  - Or revert db339f24's portfolio_commit.py hunk, ff, and TERM refresh-worker.
+- **Not mine, same window:** balance-linked-bankroll ff'd the checkout e491c260 -> eb86488f and TERM'd live-odds-worker alone at 14:53:18Z. refresh-worker still runs the e491c260 code it loaded at 14:37:08Z.
