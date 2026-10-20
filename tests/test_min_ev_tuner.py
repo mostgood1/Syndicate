@@ -215,6 +215,37 @@ def test_sportsbook_rows_and_rows_without_ev_are_out_of_scope(memory_state):
     assert set(out["cells"]) == {"kalshi|ncaaf|totals|regular"}
 
 
+def test_a_paper_twin_of_a_filled_live_bet_counts_once():
+    # Since 1006cb75 paper books record alongside live: the bet live placed on
+    # kalshi has a paper:kalshi twin with the same position_key and date.
+    live = _order(1, won=True, clv=1.0, venue="kalshi")
+    twin = _order(2, won=True, clv=1.0, venue="paper:kalshi")
+    loner = _order(3, won=False, clv=-1.0, venue="paper:kalshi")
+    other_day = _order(4, won=False, clv=-1.0, venue="paper:kalshi", date="2026-10-11")
+    live["position_key"] = twin["position_key"] = other_day["position_key"] = "pk-twin"
+    loner["position_key"] = "pk-loner"
+
+    cells, skipped = T.collect_cells([live, twin], evidence_modes=("live", "paper"))
+    assert cells == {"kalshi|ncaaf|totals|regular": [live]}
+    assert skipped == {"paper_twin_of_live": 1}
+
+    cells, skipped = T.collect_cells([live, twin, loner, other_day], evidence_modes=("live", "paper"))
+    # The loner has no live twin; other_day shares the key on a different date.
+    assert cells == {"kalshi|ncaaf|totals|regular": [live, loner, other_day]}
+    assert skipped == {"paper_twin_of_live": 1}
+
+    # With paper-only evidence the twin is the only copy, so it stays.
+    cells, skipped = T.collect_cells([live, twin], evidence_modes=("paper",))
+    assert cells == {"kalshi|ncaaf|totals|regular": [twin]}
+    assert skipped == {"mode_not_in_evidence": 1}
+
+    # A live order that never filled is not the real bet; the paper row stays.
+    unfilled = dict(live, status="rejected")
+    cells, skipped = T.collect_cells([unfilled, twin], evidence_modes=("live", "paper"))
+    assert cells == {"kalshi|ncaaf|totals|regular": [twin]}
+    assert skipped == {"not_settled": 1}
+
+
 def _sim_sized_cell():
     # One bet per game. 70% of bets win (+0.9 a unit) at a $10 EV-only stake;
     # the 30% that lose carried $100 because the sim added $90 on top

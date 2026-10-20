@@ -487,6 +487,21 @@ def collect_cells(
     def skip(reason: str) -> None:
         skipped[reason] = skipped.get(reason, 0) + 1
 
+    # Since 1006cb75 the paper books record alongside live, so a bet placed live
+    # (`venue=kalshi`) usually has a paper twin (`venue=paper:kalshi`) with the
+    # same position_key and selected_date, and `venue_family` puts both in one
+    # cell. Keep the live row (the real fill) and drop the twin, or that bet
+    # counts twice.
+    live_keys = {
+        (venue_family(order.get("venue")), str(order.get("position_key")), str(order.get("selected_date") or ""))
+        for order in orders
+        if isinstance(order, Mapping)
+        and order_mode(order) == "live"
+        and str(order.get("status") or "") == "filled"
+        and order.get("position_key")
+        and venue_family(order.get("venue")) is not None
+    }
+
     for order in orders:
         if not isinstance(order, Mapping):
             skip("not_a_mapping")
@@ -499,6 +514,20 @@ def collect_cells(
             continue
         if order_mode(order) not in evidence_modes:
             skip("mode_not_in_evidence")
+            continue
+        # Only when live counts: with paper-only evidence the twin is the sole copy.
+        if (
+            order_mode(order) == "paper"
+            and "live" in evidence_modes
+            and order.get("position_key")
+            and (
+                venue_family(order.get("venue")),
+                str(order.get("position_key")),
+                str(order.get("selected_date") or ""),
+            )
+            in live_keys
+        ):
+            skip("paper_twin_of_live")
             continue
         if _stake(order) is None or _as_float(order.get("pnl_dollars")) is None:
             skip("no_stake_or_pnl")
