@@ -94,7 +94,43 @@ def _grid_prop(player: str, **extra: object) -> dict:
     row = {
         "sport": "wnba", "event_id": f"evt-{player}", "kind": "prop", "market": "player_threes", "segment": "full",
         "line": 1.5, "player_name": player, "home_team": "Atlanta Dream", "away_team": "New York Liberty",
-        "commence_time": "2026-10-07T23:30:00Z", "sides": ["over", "under"], "books_quoting": 4, "cells": {},
+        "commence_time": "2026-10-07T23:30:00Z", "sides": ["over", "under"], "books_quoting": 4,
+        # THREE TWO-SIDED BOOKS, NOT AN EMPTY `cells`
+        # `[2026-10-20, lane no-market-price-test-fallout]`.
+        #
+        # This was `"cells": {}` with only `best` populated. Since `dd499146`
+        # that is exactly a `rows_no_market_price` row: `_resolve_fair` needs a
+        # book quoting BOTH sides (`_two_sided_prices_by_book`), an empty
+        # `cells` yields no fair, `ev` is guarded on `fair is not None`, and
+        # `select_shortlist` then refuses a model edge with no market price. So
+        # `opportunities` came back EMPTY and all five end-to-end tests read as
+        # "nobody seated" -- the gate never ran at all, which is indistinguishable
+        # from the gate working.
+        #
+        # Production props always carry book prices, so the refusal is right and
+        # the fixture was unrealistic.
+        #
+        # THE PRICES ARE NOT ARBITRARY, and a first attempt at them failed. With
+        # a SINGLE book's de-vig, `EV = fair x decimal - 1` reduces to
+        # `1/S - 1` where `S` is that book's overround -- so betting a book's own
+        # price against its own de-vig is ALWAYS minus the hold, and three
+        # tightly-matched books gave `ev_pct -2.85` and
+        # `rows_below_value_floor 4`. Value requires the best price to beat the
+        # CONSENSUS, which is real price-shopping and is what these books now
+        # describe: FanDuel is lopsided (over +118 against an expensive -140
+        # under, so its own de-vig reads 0.440), while the other two are tight.
+        # Median de-vigged `over` 0.474 against +118 (decimal 2.18) is about
+        # +3.3% EV, which clears the value floor and seats the row -- and a
+        # seated row is the precondition for these tests observing the gate at
+        # all.
+        "cells": {
+            "fanduel": {"over": {"price": 118, "age_seconds": 30.0},
+                        "under": {"price": -140, "age_seconds": 30.0}},
+            "draftkings": {"over": {"price": 100, "age_seconds": 30.0},
+                           "under": {"price": -120, "age_seconds": 30.0}},
+            "betmgm": {"over": {"price": 102, "age_seconds": 30.0},
+                       "under": {"price": -122, "age_seconds": 30.0}},
+        },
         "best": {"over": {"price": 118, "bookmaker": "fanduel", "books_quoting": 4, "age_seconds": 30.0},
                  "under": {"price": -140, "bookmaker": "draftkings", "books_quoting": 4, "age_seconds": 30.0}},
         "projection": {"edge_vs_market_pct": 6.0, "model_skill": {"status": "measured", "sample_games": 120}},
