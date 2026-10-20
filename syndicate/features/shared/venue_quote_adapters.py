@@ -787,6 +787,7 @@ def kalshi_outcome(
                 line=line,
                 fetched_at=fetched_at,
                 venue_ref=str(row.get("ticker") or "") or None,
+                venue_close_time=str(row.get("close_time") or "") or None,
             )
         )
 
@@ -848,6 +849,7 @@ def kalshi_outcome(
                         line=line,
                         fetched_at=fetched_at,
                         venue_ref=str(row.get("ticker") or "") or None,
+                        venue_close_time=str(row.get("close_time") or "") or None,
                     )
                 )
     return SourceOutcome(

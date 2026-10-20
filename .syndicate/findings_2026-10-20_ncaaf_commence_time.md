@@ -115,3 +115,45 @@ is excluded.
 
 - No change to the ticker-date guard (brief) and no Kalshi-placeholder handling (user decision, `#710`).
 - Not landed, not deployed: the fix is committed on branch `claude/priceless-mcnulty-03480a`; the fleet runs it only after a land + refresh-worker restart, on the user's yes.
+
+## 5. The narrow exception (USER DECISION 2026-10-20 ~22:20Z, "Narrow exception", re-approved in this session's chat)
+
+One predicate, `syndicate/features/shared/kalshi_placeholder_date.py:placeholder_one_day_early`,
+called by BOTH the order guard (`kalshi_ticker_date_guard.ticker_date_refusal`, keyword-only
+`away_team/home_team/sport/kalshi_time`; executor passes the first three at
+`pipeline/execute_portfolio.py:~800`, loan from lane `future-dated-live-orders-scope`) and the
+board fan-in (`venue_quote_fanin._quote_is_for_another_date` -> `_placeholder_accepts`).
+Accepts only when ALL hold: `KXNCAAF` ticker; ticker date == Eastern game date - 1 exactly;
+Kalshi's event time == (ticker date + 1)T03:00:00Z; `match_event_blob` matches away+home.
+
+Kalshi's time: `expected_expiration_time`/`occurrence_datetime` when present, else
+`close_time - 45h`. Neither caller has the stated field (`normalize_market` and the lean
+artifact keep only `close_time`), so both derive it the same way. Measured on every open
+market: close - expected = 45h on NCAAF 448/448, NFL 56/56, NHL 94/94; NBA 4 of 102 at 42h,
+hence NCAAF only. occurrence == expected 448/448. If the offset changes the exception stops
+firing (fails closed). Placeholder events at T03:00Z: NCAAF 65 open (26OCT23 -> 10-24: 29;
+26OCT30 -> 10-31: 32), so this recurs next week.
+
+Guard read: one signed `fetch_market` under `request_budget(3s)`, cached per ticker 600s,
+only on a one-day-early NCAAF mismatch with teams given. Acceptance prints
+`[kalshi_ticker_date_guard] TICKER_DATE_PLACEHOLDER_ACCEPTED`. Board: `placeholder_accepted=N`
+appended to both `CROSS_DATE_REJECTED_ROWS` / `_GRID` lines.
+
+**Replay (worktree code, live Kalshi catalogue 224 events x fleet NCAAF board 56 games):**
+one-day-early pairs -> 23 accepted, 326 `not_placeholder`, 1,256 `teams_not_matched`. All 23
+accepted games' board kickoffs equal ESPN's to the minute (0 false accepts). Not accepted
+by design: codes the matcher cannot resolve (e.g. `MOHCMU`, `NCSTSTAN`-class) stay refused.
+
+Tests: `tests/test_kalshi_placeholder_date.py` (20): ORE@ILL accepted on both paths with
+off != on; Troy/JMU 10-29, a real-time one-day-early ticker, another matchup's blob, two days
+early, non-NCAAF, GET failure/error/real time, reversed teams all refused; cache = 1 GET.
+`tests/test_kalshi_ticker_date_guard.py` unchanged and green.
+
+D3 note (from the guard's owner): the Kalshi kickoff cancel uses OUR commence_time. Today the
+board is the more accurate side (49/50 vs ESPN), so for these games it cancels at the REAL
+kickoff, not Kalshi's placeholder -- the safe direction. The residual risk is a game whose
+real kickoff is EARLIER than our time (a stale OddsAPI placeholder like Iowa@MINN's 04:00Z
+would have been LATER, so not this one). Not changed here.
+
+Deploy: NOT done. Guard needs a live-odds-worker restart, board a refresh-worker restart;
+both on the user's explicit yes.

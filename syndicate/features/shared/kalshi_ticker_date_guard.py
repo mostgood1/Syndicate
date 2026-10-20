@@ -70,8 +70,52 @@ def _eastern_date(moment: datetime) -> date | None:
         return None
 
 
-def ticker_date_refusal(ticker: Any, commence_time: Any) -> tuple[str | None, str]:
-    """`(None, detail)` when the ticker's date is the game's date; else `(reason, detail)`."""
+# THE PLACEHOLDER EXCEPTION'S KALSHI READ  [2026-10-20, user decision "Narrow
+# exception", todo #710; loaned to lane ncaaf-commence-time-wrong by this lane].
+# One signed GET per ticker, bounded, cached so a retried position in the same
+# pass adds no call. Only ever reached on a one-day-early NCAAF mismatch.
+_PLACEHOLDER_GET_SECONDS = 3.0
+_PLACEHOLDER_CACHE_SECONDS = 600.0
+_placeholder_market_cache: dict[str, tuple[float, Any]] = {}
+
+
+def _placeholder_kalshi_time(ticker: Any) -> Any:
+    import time
+
+    from syndicate.features.shared.kalshi_placeholder_date import kalshi_event_time
+
+    key = str(ticker or "").strip().upper()
+    held = _placeholder_market_cache.get(key)
+    if held is not None and time.monotonic() - held[0] < _PLACEHOLDER_CACHE_SECONDS:
+        return held[1]
+    moment = None
+    try:
+        from syndicate.features.shared.kalshi_client import fetch_market, request_budget
+
+        with request_budget(_PLACEHOLDER_GET_SECONDS):
+            result = fetch_market(key)
+        if result.get("status") == "ok":
+            moment = kalshi_event_time(result.get("market"))
+    except Exception:  # noqa: BLE001 -- an unreadable GET keeps the refusal
+        moment = None
+    _placeholder_market_cache[key] = (time.monotonic(), moment)
+    return moment
+
+
+def ticker_date_refusal(
+    ticker: Any,
+    commence_time: Any,
+    *,
+    away_team: Any = None,
+    home_team: Any = None,
+    sport: Any = None,
+    kalshi_time: Any = None,
+) -> tuple[str | None, str]:
+    """`(None, detail)` when the ticker's date is the game's date; else `(reason, detail)`.
+
+    The keyword-only arguments exist for ONE exception (`kalshi_placeholder_date`):
+    absent, behaviour is exactly as before.
+    """
     if not ticker_date_guard_enabled():
         return None, "guard_off"
     from syndicate.features.shared.kalshi_catalogue import game_date_from_ticker
@@ -86,6 +130,32 @@ def ticker_date_refusal(ticker: Any, commence_time: Any) -> tuple[str | None, st
     if eastern is not None:
         if eastern.isoformat() == ticker_date:
             return None, f"eastern={eastern.isoformat()}"
+        if (
+            away_team
+            and home_team
+            and (eastern - timedelta(days=1)).isoformat() == ticker_date
+            and str(ticker or "").strip().upper().startswith("KXNCAAF")
+        ):
+            from syndicate.features.shared.kalshi_placeholder_date import placeholder_one_day_early
+
+            moment = kalshi_time if kalshi_time is not None else _placeholder_kalshi_time(ticker)
+            accepted, why = placeholder_one_day_early(
+                ticker,
+                eastern_game_date=eastern,
+                away_team=away_team,
+                home_team=home_team,
+                sport=sport,
+                kalshi_time=moment,
+            )
+            if accepted:
+                print(
+                    "[kalshi_ticker_date_guard] TICKER_DATE_PLACEHOLDER_ACCEPTED"
+                    f" ticker={ticker!r} kalshi_time={moment.isoformat() if moment else None}"
+                    f" away={away_team!r} home={home_team!r} {why}",
+                    flush=True,
+                )
+                return None, why
+            return REFUSAL_MISMATCH, f"ticker={ticker_date} eastern={eastern.isoformat()} placeholder={why}"
         return REFUSAL_MISMATCH, f"ticker={ticker_date} eastern={eastern.isoformat()}"
     utc_day = start.astimezone(timezone.utc).date()
     allowed = {utc_day.isoformat(), (utc_day - timedelta(days=1)).isoformat()}

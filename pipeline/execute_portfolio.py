@@ -791,7 +791,11 @@ def _run_execution(
             from syndicate.features.shared.kalshi_ticker_date_guard import ticker_date_refusal
 
             date_refusal, date_detail = ticker_date_refusal(
-                request.venue_ticker, getattr(request, "commence_time", None)
+                request.venue_ticker,
+                getattr(request, "commence_time", None),
+                away_team=getattr(request, "away_team", None),
+                home_team=getattr(request, "home_team", None),
+                sport=getattr(request, "sport", None),
             )
             if date_refusal is not None:
                 skipped += 1

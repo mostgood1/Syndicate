@@ -214,6 +214,10 @@ class Quote:
     # and is the reason this change cannot regress coverage: it can only ever
     # remove a match that is provably wrong.
     game: str | None = None
+    # Kalshi's `close_time` for this contract, carried only so the date check
+    # can recognise Kalshi's PLACEHOLDER-dated NCAAF games (todo `#710`,
+    # `kalshi_placeholder_date`). In memory only; nothing persists it.
+    venue_close_time: str | None = None
 
     def age_seconds(self, *, now: float | None = None) -> float:
         return max(0.0, (time.time() if now is None else now) - float(self.fetched_at))
@@ -566,6 +570,7 @@ def apply_venue_quotes(
     # Matches refused because the venue's own contract id is dated for another
     # day (`_quote_is_for_another_date`).
     cross_date_rejected = 0
+    cross_date_counts: dict[str, int] = {}
     ambiguous_unnamed_rejected = 0
     # Quotes DETECTED pricing a different PORTION of the game than the row.
     #
@@ -670,7 +675,7 @@ def apply_venue_quotes(
             # A QUOTE DATED FOR ANOTHER DAY. The guard above needs the quote to
             # NAME a game, and on NCAAF and NHL nothing does -- see
             # `_quote_is_for_another_date` for the 35-of-87 measurement.
-            if _quote_is_for_another_date(found, row):
+            if _quote_is_for_another_date(found, row, cross_date_counts):
                 cross_date_rejected += 1
                 continue
             # `#603` second pass, SAME RULE AS THE GRID PATH. Two paths
@@ -764,6 +769,7 @@ def apply_venue_quotes(
     print(
         "[venue_quote_fanin] CROSS_DATE_REJECTED_ROWS"
         f" count={cross_date_rejected} rows_in={len(rows)} stamped={stamped}"
+        f" placeholder_accepted={cross_date_counts.get('placeholder_accepted', 0)}"
         " -- venue quotes refused because the contract id is dated for another day",
         flush=True,
     )
@@ -984,7 +990,9 @@ def _row_game_dates(row: Mapping[str, Any]) -> frozenset[str]:
         return frozenset()
 
 
-def _quote_is_for_another_date(quote: Any, row: Mapping[str, Any]) -> bool:
+def _quote_is_for_another_date(
+    quote: Any, row: Mapping[str, Any], counts: dict[str, int] | None = None
+) -> bool:
     """True when the venue's contract id is dated for a different day than the row.
 
     MEASURED on the fleet shortlist 2026-10-20 18:10Z: 35 of 87 rows carrying a
@@ -1008,7 +1016,40 @@ def _quote_is_for_another_date(quote: Any, row: Mapping[str, Any]) -> bool:
     if not quote_date:
         return False
     row_dates = _row_game_dates(row)
-    return bool(row_dates) and quote_date not in row_dates
+    if not row_dates or quote_date in row_dates:
+        return False
+    # THE ONE EXCEPTION, the same predicate the order guard calls, so the board
+    # and the order path cannot disagree (user decision 2026-10-20, todo
+    # `#710`): Kalshi's placeholder-dated NCAAF games -- one day early, Kalshi
+    # time at the 03:00Z placeholder, teams matched. Anything else: refused.
+    if _placeholder_accepts(quote, row):
+        if counts is not None:
+            counts["placeholder_accepted"] = counts.get("placeholder_accepted", 0) + 1
+        return False
+    return True
+
+
+def _placeholder_accepts(quote: Any, row: Mapping[str, Any]) -> bool:
+    if str(getattr(quote, "source", None) or "").strip().lower() != "kalshi":
+        return False
+    try:
+        from syndicate.features.shared.kalshi_placeholder_date import (
+            eastern_game_date,
+            kalshi_event_time,
+            placeholder_one_day_early,
+        )
+
+        accepted, _detail = placeholder_one_day_early(
+            getattr(quote, "venue_ref", None),
+            eastern_game_date=eastern_game_date(row.get("commence_time")),
+            away_team=row.get("away_team"),
+            home_team=row.get("home_team"),
+            sport=row.get("sport") or getattr(quote, "sport", None),
+            kalshi_time=kalshi_event_time({"close_time": getattr(quote, "venue_close_time", None)}),
+        )
+        return bool(accepted)
+    except Exception:  # noqa: BLE001 -- unknown keeps the refusal
+        return False
 
 
 def _distinct_games(
@@ -1770,6 +1811,7 @@ def apply_venue_quotes_to_grid(
     sides_seen = 0
     cross_game_rejected = 0
     cross_date_rejected = 0
+    cross_date_counts: dict[str, int] = {}
     ambiguous_unnamed_rejected = 0
     grid_claimants: dict[str, set[str]] | None = None
     grid_dh_ranks, grid_dh_unrankable = _doubleheader_ranks_for(
@@ -1917,7 +1959,7 @@ def apply_venue_quotes_to_grid(
                     continue
                 # Same rule as the candidate path: the venue's contract id is
                 # dated for another day. See `_quote_is_for_another_date`.
-                if _quote_is_for_another_date(found, row):
+                if _quote_is_for_another_date(found, row, cross_date_counts):
                     cross_date_rejected += 1
                     _shape_note(_shape, "refused_cross_date", live=row_is_live)
                     continue
@@ -2279,6 +2321,7 @@ def apply_venue_quotes_to_grid(
     print(
         "[venue_quote_fanin] CROSS_DATE_REJECTED_GRID"
         f" sport={sport_slug} count={cross_date_rejected} sides_seen={sides_seen}"
+        f" placeholder_accepted={cross_date_counts.get('placeholder_accepted', 0)}"
         " -- venue quotes refused because the contract id is dated for another day",
         flush=True,
     )
