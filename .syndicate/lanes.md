@@ -1299,6 +1299,14 @@ death, never life — do not invert it.
 - Verification: off!=on reachability test; fleet ff + refresh-worker restart; count of new mode=paper rows for the next slate recorded and graded, in deploys.md; live rows/order count unchanged
 - Blocked by: none
 
+### board-attach-projections-enumeration — OPEN — opened 2026-10-20 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- Goal: attach_projections' docstring states the number of its call sites correctly and names only real callers, and a test fails if that drifts or if a fourth caller appears -- so nobody reads the live-projection path as being covered by the #425 degeneracy check when it is not.
+- Files: syndicate/features/shared/board_enrichment.py (the attach_projections call-site enumeration docstring only), tests/test_attach_projections_enumeration.py (NEW)
+- Hypothesis: The docstring claims FOUR call sites and names attach_live_projections_for_sport as one. Anchored counting shows THREE real callers (pipeline/layer2_shortlist.py:2656, syndicate/blueprints/intelligence.py:3360, syndicate/features/shared/book_grid_artifact.py:444) and that the named fourth calls attach_live_projections instead, mentioning the wrapper only in prose.
+- Falsification test: If attach_live_projections_for_sport does call attach_projections on some path I did not find, or if a fourth caller exists outside tests, the count stands and only my reading is wrong.
+- Verification: Anchored regex count of attach_projections( excluding defs, tests and the two same-named siblings, matching the three files above; the corrected docstring naming exactly those; and a new test that fails on a changed count, a renamed caller, or a dropped live-path caveat.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
