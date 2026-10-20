@@ -1769,6 +1769,64 @@ def _blocks_a_new_attempt(order: Mapping[str, Any]) -> bool:
     return str(order.get("status") or "") != STATUS_REJECTED and not _is_retryable_venue_pause(order)
 
 
+REFUSAL_HELD_OTHER_SLATE = "already_held_other_slate"
+
+
+def cross_slate_dedupe_enabled() -> bool:
+    """Default ON. `off`/`0`/`false` restores per-slate keys as the only duplicate check."""
+    raw = str(os.environ.get("SYNDICATE_EXECUTION_CROSS_SLATE_DEDUPE") or "").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
+def held_position_for(request: OrderRequest) -> dict[str, Any] | None:
+    """A LIVE order for this same bet on ANOTHER slate that the venue may hold, or None.
+
+    ONE BET, ONE ORDER, HOWEVER MANY SLATES PLAN IT  [2026-10-20, user decision,
+    lane future-dated-live-orders-scope, todo #707]. `idempotency_key` hashes
+    `selected_date`, and the Layer 2 shortlist keeps NFL/NCAAF/soccer games up to
+    six days out, so a Saturday game Suggested on Thursday's, Friday's and
+    Saturday's slates was three keys and three live orders. Measured on paper
+    over 10-02..10-19, restricted to orders placed while their slate was today:
+    5.8% of Kalshi and 5.0% of Polymarket positions were ordered on more than one
+    slate, 8.0% / 8.8% of staked dollars (findings_2026-10-20_future_dated_live_orders).
+
+    A SEPARATE CHECK, NOT A NEW KEY. Dropping `selected_date` from
+    `idempotency_key` would re-key every open order at once -- the failure
+    `_legacy_idempotency_key` exists to prevent. This only refuses.
+
+    Matched on `position_key` (date-free and commence-free since 2026-08-30) or
+    its legacy shape, same venue, mode live, a DIFFERENT `selected_date` (the
+    same slate is `_blocking_record_for`'s job). "May be held" is
+    `_blocks_a_new_attempt`, reused rather than restated, minus any row
+    `execution_guard.is_non_position` (THE one definition) says never opened a
+    position: a venue 4xx has no contract behind it, so it holds nothing. A line move is a new `position_key`
+    and is NOT caught here, by design: a different line is a different bet.
+    """
+    if not cross_slate_dedupe_enabled():
+        return None
+    from syndicate.features.shared.execution_guard import is_non_position
+
+    keys = {str(request.position_key or "").strip()}
+    legacy = str(getattr(request, "legacy_position_key", "") or "").strip()
+    if legacy:
+        keys.add(legacy)
+    keys.discard("")
+    if not keys:
+        return None
+    venue = str(request.venue or "")
+    slate = str(request.selected_date or "")
+    for order in _load().get("orders") or []:
+        if str(order.get("mode") or "") != LIVE or str(order.get("venue") or "") != venue:
+            continue
+        if str(order.get("selected_date") or "") == slate:
+            continue
+        if str(order.get("position_key") or "").strip() not in keys:
+            continue
+        if _blocks_a_new_attempt(order) and not is_non_position(order):
+            return order
+    return None
+
+
 def _blocking_record_for(request: OrderRequest) -> dict[str, Any] | None:
     """The row `record_order` would hand back as a duplicate, found WITHOUT
     writing. The first row under the key or its legacy shape decides, as it
@@ -3149,6 +3207,8 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
                     "yes_price": seen.get("yes_price"),
                     "no_price": seen.get("no_price"),
                     "submitted_at": order.get("submitted_at"),
+                    # For the kickoff cancel in `cancel_stale_resting_orders`.
+                    "commence_time": order.get("commence_time"),
                 }
             )
             after = STATUS_SUBMITTED
@@ -3474,6 +3534,99 @@ def _resting_price_for_side(row: Mapping[str, Any]) -> float | None:
     except (TypeError, ValueError):
         return None
     return value if 0.0 < value < 1.0 else None
+
+
+def kickoff_cancel_enabled() -> bool:
+    """Default ON. `off`/`0`/`false` leaves pregame Kalshi orders resting through kickoff."""
+    raw = str(os.environ.get("SYNDICATE_EXECUTION_CANCEL_AT_KICKOFF") or "").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
+def _utc_now_dt() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _parse_instant(value: Any) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        moment = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
+
+
+def _pregame_order_past_kickoff(row: Mapping[str, Any], now: datetime) -> bool:
+    """Sent before kickoff, and kickoff has passed. False when either stamp is unreadable."""
+    commence = _parse_instant(row.get("commence_time"))
+    submitted = _parse_instant(row.get("submitted_at"))
+    if commence is None or submitted is None:
+        return False
+    return submitted < commence <= now
+
+
+def cancel_pregame_resting_at_kickoff(
+    resting: Sequence[Mapping[str, Any]], *, now: datetime | None = None
+) -> dict[str, Any]:
+    """Cancel every resting Kalshi order that was SENT PREGAME once its game has kicked off.
+
+    A PREGAME ORDER EXPIRES AT KICKOFF  [2026-10-20, user decision, lane
+    future-dated-live-orders-scope, todo #707]. Kalshi orders are
+    good-till-canceled (`kalshi_orders._V2_TIME_IN_FORCE`), so a pregame order
+    that rests -- for minutes, or for the six days a forward NFL / NCAAF / soccer
+    bet can sit -- fills after kickoff at its PREGAME price, exactly when the
+    game has moved through it. Polymarket already expires at kickoff
+    (good-till-date in `polymarket_us_orders`). The v2 body we have a contract
+    for has no expiry field, so this is a cancel.
+
+    `resting` is `reconcile_live_orders(venue="kalshi")["resting"]`, which the
+    executor reads every tick. `cancel_stale_resting_orders` is NOT that path:
+    it runs only from the worker's boot dump, so it cannot be the kickoff clock.
+
+    - An order SUBMITTED in-play (the in-play cells) is never touched: only
+      `submitted_at < commence_time <= now`.
+    - An unreadable stamp leaves the order alone -- acting on missing
+      information is the failure this layer refuses.
+    - A failed cancel changes nothing; the ledger moves only when the next
+      reconcile reads `canceled` from the venue, as for every other cancel.
+    - Bounded per pass by `SYNDICATE_EXECUTION_MAX_CANCELS` (default 3), the
+      same cap as the stale pass.
+    """
+    if not kickoff_cancel_enabled():
+        return {"status": "skipped", "reason": "disabled", "cancelled": 0}
+    from syndicate.features.shared.kalshi_orders import cancel_order
+
+    moment = now or _utc_now_dt()
+    limit = int(_float_env("SYNDICATE_EXECUTION_MAX_CANCELS", 3.0))
+    due = [row for row in resting or () if _pregame_order_past_kickoff(row, moment)]
+    cancelled: list[dict[str, Any]] = []
+    failed = 0
+    for row in due[:limit]:
+        print(
+            f"[execution_ledger] CANCEL_AT_KICKOFF key={row.get('idempotency_key')}"
+            f" ticker={row.get('ticker')} side={row.get('side')}"
+            f" submitted_at={row.get('submitted_at')} commence={row.get('commence_time')}",
+            flush=True,
+        )
+        result = cancel_order(row.get("order_id"))
+        if result.get("status") != "ok":
+            failed += 1
+            print(
+                f"[execution_ledger] CANCEL_FAILED key={row.get('idempotency_key')}"
+                f" reason={result.get('reason')} -- order left resting",
+                flush=True,
+            )
+            continue
+        cancelled.append({"idempotency_key": row.get("idempotency_key"), "ticker": row.get("ticker")})
+    if due:
+        print(
+            f"[execution_ledger] KICKOFF_CANCEL_PASS resting={len(resting or ())} due={len(due)}"
+            f" cancelled={len(cancelled)} failed={failed} deferred={max(0, len(due) - limit)}",
+            flush=True,
+        )
+    return {"status": "ok", "due": len(due), "cancelled": len(cancelled), "failed": failed,
+            "orders": cancelled}
 
 
 def cancel_stale_resting_orders(resting: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
