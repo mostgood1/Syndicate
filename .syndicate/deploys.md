@@ -51693,3 +51693,34 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - **Owed:**
   - tonight's 11:50 PM reconcile writes `cheatsheets_cross/2026-10-20.graded.json`;
   - `record.json` `official.totals.xg_hit_rate` / `xg_value` follow once tickets settle.
+
+## 2026-10-20 15:53:28Z (10:53 AM CT) -- fleet ff a5f34166 -> 8099dc05 + live-odds-worker ROLE-ONLY restart: D1 cross-slate dedupe + D3 Kalshi kickoff cancel (lane `future-dated-live-orders-scope`, session 0ffeb586, todo #707) -- **DEPLOY MET; behaviour reading OWED (no qualifying case yet)**
+- **ask:** user in chat: "Land claude/future-dated-live-orders-d1-d3 on main and take it live: baseline first, then deploy claim + preflight + live-odds-worker restart under the 60-min rule and compounding-bankroll's queue; record the reading in deploys.md and tell the caps-revamp session." The build decision was "Build D1 (cross-slate dedupe, refuse already_held_other_slate) and D3 (Kalshi pregame orders expire at kickoff)". The caps-revamp session separately relayed its own user decision, "Build D1 + D3 now".
+- **code:** `4deee004` (ledger: `held_position_for`, `cancel_pregame_resting_at_kickoff`), `4c0bb4bb` (executor: refusal after `no_venue_ticker` and BEFORE the trim; kickoff cancel inside the live Kalshi reconcile), `47ff1837` (kickoff cancel idempotent across ticks). Landed on main 15:40Z; main tip 8099dc05.
+  - Switches: `SYNDICATE_EXECUTION_CROSS_SLATE_DEDUPE` and `SYNDICATE_EXECUTION_CANCEL_AT_KICKOFF`. Neither is set on the fleet, so both are ON.
+  - Tests: T1 and T3 off != on; 270-350 targeted tests per run. One pre-existing red on main is unrelated (`test_the_POLYMARKET_cancel_is_not_yet_wired_into_any_automatic_path`, tripped by `execution_exits.py`).
+- **ride-alongs a5f34166..8099dc05:** `deploy/local/watchdog.ps1` (Windows side; not loaded by any worker) plus ledger/docs/tests. Nothing else at runtime. The earlier ones (eb86488f settlement, e5dabb1c nba vendor delete, 802bed61 min_ev tuner hook, cheat sheets) reached the fleet in the 14:53Z (compounding-bankroll) and 15:38Z (cheat-sheets) ffs, not this one.
+  - 802bed61 was read: inert, because `SYNDICATE_MIN_EV_TUNER` is absent from `local_production.env`.
+- **ff check:** `git diff --name-only a5f34166 8099dc05` vs the 6 dirty fleet files (engines/mlb statcast features, reports/*): 0 overlap. `git merge --ff-only 8099dc05` rc 0 at 15:41:33Z.
+- **claim:** live-odds-worker, holder `future-dated-live-orders-scope`, acquire rc 0 at 15:38:16Z, token 6dcdf208e4fd8dcb.
+- **sequencing:** the 60-min rule after compounding-bankroll's live-odds-worker restart (respawn lstart 14:53:27Z) put this at >= 15:53:27Z. live-stake-band (14:37:08Z down/up) confirmed by message: no further ff or restart from it today. cheat-sheets ff'd to a5f34166 at 15:38:07Z before I landed; it confirmed by message.
+- **safety:** `check_deploy_safety.py --base-url http://127.0.0.1:10000` at ~15:39Z read NOT CLEAR. Every in-flight item was refresh-worker's (run_refresh_odds_job, refresh_odds_sources, poll_ncaaf_live_state, a layer2_shortlist board build). live-odds-worker child jobs: none.
+  - PROCEEDED DELIBERATELY on the role-only gate, the kalshi-exit-path 10-19 precedent: a live-odds-worker TERM kills only its own children.
+  - A WSL loop sent TERM only when all held: now >= 15:53:27Z, fleet HEAD == 8099dc05, 0 live rows in submitted/failed, and 0 non-zombie children of the worker. It waited 670 s.
+- **baseline (14:41Z, re-read 15:37:59Z, one read each):**
+  - 554 live rows, all filled, 0 submitted, 0 failed.
+  - 1 held live row whose game had not started: Kalshi NCAAF totals under 44.5, selected_date 10-20, commence 23:00Z today, filled 15:01:44Z, $5.46.
+  - Log counts with real prefixes: `[execute_portfolio] REFUSED_HELD_OTHER_SLATE` 0, `[execution_ledger] CANCEL_AT_KICKOFF` 0, `KICKOFF_CANCEL_PASS` 0, `KICKOFF_CANCEL_FAILED` 0.
+  - A bare-word grep had read 66 for each. That was false: ALL_PROCESS_MEMORY lines quote my own probe's command line. Count these markers by prefix only.
+- **restart:** TERM 15:53:28.972Z to old pid 2952961. New pid **2965728**, lstart 15:53:36Z.
+- **verify (15:54:56Z):**
+  - New pid environ: MODE=live, LIVE_ARMED=1, ENABLED=1, BALANCE_CAPS=on. Neither new switch is set (= ON).
+  - Fleet HEAD 8099dc05.
+  - `EXECUTED date=2026-10-20 mode=live venue=kalshi plan_source=live armed=True positions=0 ... refused={}` at 15:54:40.509Z, and the polymarket pass at 15:54:43.377Z.
+  - 0 Traceback / EXECUTION_ERROR / KICKOFF_CANCEL_FAILED since the restart.
+  - The code is evidenced by the lstart being after the ff, not by RENDER_GIT_COMMIT (frozen at `up`). Plus a fleet-env smoke at 15:42Z: both functions import, both switches read ON, the kickoff pass on [] = ok/0, and `held_position_for` would refuse 2 of 554 live rows if re-planned on a later slate.
+- **expect (the behaviour reading, OWED):**
+  - (D1) the first time a held live bet reappears on a later slate's live plan: `REFUSED_HELD_OTHER_SLATE` and `refused={'already_held_other_slate': n}` on EXECUTED, with no LIVE_ORDER for it.
+  - (D3) the first pregame Kalshi order still resting at its commence_time: `CANCEL_AT_KICKOFF` then `KICKOFF_CANCEL_PASS ... cancelled=1`, and the next reconcile moves the row to rejected.
+  - Neither can fire today on the current book (0 resting; the one held bet kicks off before tomorrow's slate). Watch the forward NCAAF/NFL weekend.
+- **rollback:** a code revert is ONE live-odds-worker TERM. `git revert 47ff1837 4c0bb4bb 4deee004`, ff, gated TERM. Turning a switch off needs a `LIVE_ODDS_WORKER__SYNDICATE_EXECUTION_...=off` line plus a full down/up, because the supervisor freezes env at `up`.
