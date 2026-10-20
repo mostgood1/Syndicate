@@ -67,6 +67,7 @@ FIVE RULES, EACH FROM A FAILURE THIS REPO HAS ALREADY PAID FOR
 from __future__ import annotations
 
 import os
+import re
 import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Mapping, Sequence
@@ -562,6 +563,9 @@ def apply_venue_quotes(
     # A zero here after the adapters all name their games is the signal that
     # the cross-game bleed is actually gone; a non-zero one is the fix working.
     cross_game_rejected = 0
+    # Matches refused because the venue's own contract id is dated for another
+    # day (`_quote_is_for_another_date`).
+    cross_date_rejected = 0
     ambiguous_unnamed_rejected = 0
     # Quotes DETECTED pricing a different PORTION of the game than the row.
     #
@@ -663,6 +667,12 @@ def apply_venue_quotes(
             if found.game and row_game and found.game != row_game:
                 cross_game_rejected += 1
                 continue
+            # A QUOTE DATED FOR ANOTHER DAY. The guard above needs the quote to
+            # NAME a game, and on NCAAF and NHL nothing does -- see
+            # `_quote_is_for_another_date` for the 35-of-87 measurement.
+            if _quote_is_for_another_date(found, row):
+                cross_date_rejected += 1
+                continue
             # `#603` second pass, SAME RULE AS THE GRID PATH. Two paths
             # disagreeing about whether a quote may answer a row is a join that
             # works on whichever one you happen to read -- the exact failure
@@ -749,6 +759,15 @@ def apply_venue_quotes(
             flush=True,
         )
 
+    # UNCONDITIONAL, INCLUDING THE ZERO: a guard that prints only when it fires
+    # cannot tell "refused nothing" from "never ran".
+    print(
+        "[venue_quote_fanin] CROSS_DATE_REJECTED_ROWS"
+        f" count={cross_date_rejected} rows_in={len(rows)} stamped={stamped}"
+        " -- venue quotes refused because the contract id is dated for another day",
+        flush=True,
+    )
+
     print(
         "[venue_quote_fanin] AMBIGUOUS_UNNAMED_REJECTED_ROWS"
         f" count={ambiguous_unnamed_rejected} rows_in={len(rows)} stamped={stamped}"
@@ -778,6 +797,7 @@ def apply_venue_quotes(
         "rows_in": len(rows),
         "stamped": stamped,
         "cross_game_rejected": cross_game_rejected,
+        "cross_date_rejected": cross_date_rejected,
         # Doubleheader rows keyed to their own half (`qualified`) and rows
         # whose half could not be named (`unrankable`, left unpriced). Zero on
         # a day with no doubleheader; absence of the FIELD means undeployed.
@@ -910,6 +930,85 @@ def _quote_is_for_another_game(quote: Any, row_game: str | None) -> bool:
     """
     quote_game = getattr(quote, "game", None)
     return bool(quote_game and row_game and quote_game != row_game)
+
+
+# A Polymarket slug's fixture date: `tsc-nba-gs-lal-2026-10-21-232pt5`,
+# `aec-nhl-wpg-stl-2026-10-20`. Soccer slugs carry none (`atc-sea-liv-vil`).
+_SLUG_DATE = re.compile(r"(?:^|-)(\d{4}-\d{2}-\d{2})(?:-|$)")
+
+# The two ends of the US calendar. A game's date is its LOCAL date, and a US
+# kickoff is never local to anything east of New York or west of Honolulu, so
+# the venue's date must be one of these two -- which are the same date for any
+# start before 04:00Z and adjacent dates after it. Nothing wider is accepted.
+_US_CALENDAR_ENDS = ("America/New_York", "Pacific/Honolulu")
+
+
+def _venue_ref_game_date(quote: Any) -> str | None:
+    """The fixture date the VENUE's own identifier carries, or None.
+
+    The venue names the date in the contract id itself, which is the one piece
+    of identity that survives when neither side can name the game: NCAAF and NHL
+    get no `game_token` at all, so `Quote.game` is None on exactly the sports
+    that were mis-joined.
+    """
+    ref = str(getattr(quote, "venue_ref", None) or "").strip()
+    if not ref:
+        return None
+    source = str(getattr(quote, "source", None) or "").strip().lower()
+    if source == "kalshi":
+        from syndicate.features.shared.kalshi_catalogue import game_date_from_ticker
+
+        return game_date_from_ticker(ref)
+    if source.startswith("polymarket"):
+        match = _SLUG_DATE.search(ref.lower())
+        return match.group(1) if match else None
+    return None
+
+
+def _row_game_dates(row: Mapping[str, Any]) -> frozenset[str]:
+    """The local calendar dates this row's kickoff can carry. Empty = unknown."""
+    text = str(row.get("commence_time") or "").strip()
+    if not text:
+        return frozenset()
+    try:
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+
+        start = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        if start.tzinfo is None:
+            return frozenset()
+        return frozenset(
+            start.astimezone(ZoneInfo(zone)).date().isoformat() for zone in _US_CALENDAR_ENDS
+        )
+    except (ValueError, KeyError):
+        return frozenset()
+
+
+def _quote_is_for_another_date(quote: Any, row: Mapping[str, Any]) -> bool:
+    """True when the venue's contract id is dated for a different day than the row.
+
+    MEASURED on the fleet shortlist 2026-10-20 18:10Z: 35 of 87 rows carrying a
+    Kalshi ticker held ANOTHER game's -- `UM @ TRO` (10-24) priced from
+    `KXNCAAFGAME-26OCT29TROYJMU-TROY`, `DET @ SEA` (10-20) from
+    `KXNHLGAME-26OCT26DETEDM-DET` at +144 against a ~-110 consensus. None of the
+    game guards could see it:
+
+    * `Quote.game` is None for NCAAF and NHL (no `game_token`), so
+      `_quote_is_for_another_game` has nothing to compare.
+    * An h2h key is the CLUB, and `_key_claimants` maps role keys only, so a
+      club key always looks uncontested to `_unconfirmed_on_a_contested_key`.
+    * `kalshi_outcome` never reads `selected_date`; `kalshi_markets.json` lists
+      every open date, so the club's NEXT game answers the same club key.
+
+    Proves a mismatch or returns False. An undatable quote or an undated row is
+    UNKNOWN, which the game guards above already own; this adds a refusal only
+    where the venue's own id says, in so many words, that it is another day.
+    """
+    quote_date = _venue_ref_game_date(quote)
+    if not quote_date:
+        return False
+    row_dates = _row_game_dates(row)
+    return bool(row_dates) and quote_date not in row_dates
 
 
 def _distinct_games(
@@ -1670,6 +1769,7 @@ def apply_venue_quotes_to_grid(
     repriced = 0
     sides_seen = 0
     cross_game_rejected = 0
+    cross_date_rejected = 0
     ambiguous_unnamed_rejected = 0
     grid_claimants: dict[str, set[str]] | None = None
     grid_dh_ranks, grid_dh_unrankable = _doubleheader_ranks_for(
@@ -1814,6 +1914,12 @@ def apply_venue_quotes_to_grid(
                 if _quote_is_for_another_game(found, row_game):
                     cross_game_rejected += 1
                     _shape_note(_shape, "refused_cross_game", live=row_is_live)
+                    continue
+                # Same rule as the candidate path: the venue's contract id is
+                # dated for another day. See `_quote_is_for_another_date`.
+                if _quote_is_for_another_date(found, row):
+                    cross_date_rejected += 1
+                    _shape_note(_shape, "refused_cross_date", live=row_is_live)
                     continue
                 # `#603` second pass. A quote that names NO game may only answer
                 # a key that exactly ONE game claims. Measured: the first pass
@@ -2169,6 +2275,14 @@ def apply_venue_quotes_to_grid(
             flush=True,
         )
 
+    # UNCONDITIONAL, INCLUDING THE ZERO, with its denominator.
+    print(
+        "[venue_quote_fanin] CROSS_DATE_REJECTED_GRID"
+        f" sport={sport_slug} count={cross_date_rejected} sides_seen={sides_seen}"
+        " -- venue quotes refused because the contract id is dated for another day",
+        flush=True,
+    )
+
     # UNCONDITIONAL, INCLUDING THE ZERO. This is the line that would have
     # settled 2026-09-06 in one reading instead of a replay: `count` is the
     # defect's size, `sample` is its shape, and `matched=` names the series
@@ -2202,6 +2316,7 @@ def apply_venue_quotes_to_grid(
         # NOTHING printed, which made the mechanism unreadable in production --
         # the instrument-blindness failure this repo has on file five times.
         "cross_game_rejected": cross_game_rejected,
+        "cross_date_rejected": cross_date_rejected,
         # The per-shape funnel, carried in the payload as well as the log so the
         # shortlist artifact holds it and a reader does not have to have been
         # watching the logs at the time.

@@ -39,7 +39,7 @@ Examples:
 - The wrong game's Kalshi price lands in `quote.book_prices["kalshi"]` and `quote.best_any_book`. For DET@SEA, `best_any_book = kalshi +144` against a sportsbook consensus of about -110.
 - That cell can enter the consensus fair, because `_consensus_fair` takes the median over books (layer2_board.py:1480).
 - It also fills the "venue price" column that every venue-EV count in this file reads. 8 of the 20 "+EV at Kalshi" sides below are wrong-game prices.
-- Shape: these are team-keyed joins. The fan-in's forward-horizon date verdict admits any game of the same team up to the horizon (`_date_verdict`, venue_quote_fanin.py:1622-1645). It never compares the ticker's date to the row's own `commence_time`.
+- Shape: these are team-keyed joins, and the board's fan-in has NO date check at all. **Corrected 2026-10-20 ~19:2xZ:** this line first cited `_date_verdict` as venue_quote_fanin.py:1622-1645, but that function is in `kalshi_board_join.py`, the ORDER join, which does date-check. In the fan-in, NCAAF/NHL quotes name no game (`game_token` returns None), an h2h club key is never "contested" (`_key_claimants` maps role keys only), and `kalshi_outcome` ignores `selected_date`, so the club's next listed game answers the same key. Fixed by lane `venue-fanin-game-identity` (`_quote_is_for_another_date`).
 
 **Does it reach an order? UNDETERMINED, and it needs checking first.**
 - The executor takes its ticker from a SEPARATE join, `kalshi_board_join._match_key`/`_row_key`, keyed by board `event_id` (kalshi_board_join.py:1012-1104). It does NOT take it from `venue_ref`. So the board's join and the order's join can disagree. **That is itself a fork.**
