@@ -1047,8 +1047,6 @@ def _install_mirror_write_watcher() -> None:
     repo = Path(__file__).resolve().parents[1]
     targets = [
         repo / "data" / "mlb_source" / "source_artifacts" / "data" / "live_lens" / "live_lens_2026_06_02.jsonl",
-        repo / "vendor" / "wnba_betting_repo" / "data" / "processed" / "schedule_2026.csv",
-        repo / "vendor" / "wnba_betting_repo" / "data" / "processed" / "schedule_2026.json",
         repo / "reports" / "intelligence" / "intelligence_state.json",
         repo / "reports" / "intelligence" / "intelligence_state_history.jsonl",
         repo / "reports" / "intelligence" / "kalshi_markets.json",

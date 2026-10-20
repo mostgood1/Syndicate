@@ -638,7 +638,8 @@ or `refresh_odds_sources.py --dry-run --json` (resolve the command plan without 
   that write those reports were repointed to `docs/reports/`.
 - **`vendor/` is live code, not legacy** — `vendor/mlb_bettingv2` WAS (deleted 2026-10-19; MLB runs
   `syndicate/features/mlb/{sim_engine,native/tools,live_lens_port}`, see `FROZEN_FROM_VENDOR.md`), and so was `vendor/nba_betting_repo` (deleted 2026-10-20; frozen ports in
-  `syndicate/features/{basketball_engine,nba}`); the `vendor/wnba_betting_repo` tree and, historically, the NBA one back `schedule_adapter.py`, `bootstrap_data_root.py`, and the
+  `syndicate/features/{basketball_engine,nba}`), and so was `vendor/wnba_betting_repo` (deleted 2026-10-20; frozen ports in
+  `syndicate/features/wnba/{live_tick,source_cli}`). Historically those trees back `schedule_adapter.py`, `bootstrap_data_root.py`, and the
   basketball refresh scripts (models/src/schedule). Only the 2.2 MB root `app.py` inside
   `vendor/{nba,wnba}_betting_repo` is an unused legacy Flask app (`vendor/nhl_betting_repo/app.py`
   does not exist) — leave the vendored trees alone unless doing a deliberate, separately-reviewed

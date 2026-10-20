@@ -126,12 +126,11 @@ def test_the_guarded_roots_are_this_repos_tracked_mirrors(data_mirror_write_guar
     """
     roots = data_mirror_write_guard.mirror_roots()
     assert os.path.normcase(str(REPO_ROOT / "data")) in roots
-    vendor_wnba = REPO_ROOT / "vendor" / "wnba_betting_repo" / "data"
-    if vendor_wnba.is_dir():
-        assert os.path.normcase(str(vendor_wnba)) in roots
-    assert data_mirror_write_guard.classifies_as_mirror(
-        REPO_ROOT / "vendor" / "wnba_betting_repo" / "data" / "processed" / "schedule_2026.csv"
-    ) is True
+    # The vendored WNBA tree this used to name was deleted (lane wnba-vendor-delete); the NHL tree is the last vendor data root.
+    vendor_nhl = REPO_ROOT / "vendor" / "nhl_betting_repo" / "data"
+    if vendor_nhl.is_dir():
+        assert os.path.normcase(str(vendor_nhl)) in roots
+    assert data_mirror_write_guard.classifies_as_mirror(REPO_ROOT / "vendor/nhl_betting_repo/data/odds/team/date=2026-05-25/oddsapi.csv") is True
 
 
 def test_a_mkdir_that_creates_nothing_is_not_reported(data_mirror_write_guard):
@@ -336,13 +335,13 @@ def test_os_open_for_reading_the_mirror_is_not_reported(data_mirror_write_guard)
 @pytest.mark.parametrize(
     "relative, inside",
     [
-        ("vendor/wnba_betting_repo/data/processed/schedule_2026.csv", True),
+        ("vendor/nhl_betting_repo/data/odds/team/date=2026-05-25/oddsapi.csv", True),
         # MLB's engine data root moved off vendor (lane mlb-engine-data-native-p4); it is guarded the same way.
         ("engines/mlb/data/tuning/x.json", True),
         # Vendor SOURCE is not an artifact mirror; guarding it would fire on
         # every test that writes a scratch file beside vendored code.
-        ("vendor/wnba_betting_repo/app.py", False),
-        ("vendor/wnba_betting_repo/src/wnba_betting/cli.py", False),
+        ("vendor/nhl_betting_repo/nhl_betting/web/app.py", False),
+        ("vendor/nhl_betting_repo/nhl_betting/cli.py", False),
     ],
 )
 def test_vendor_data_trees_are_guarded_and_vendor_source_is_not(data_mirror_write_guard, relative, inside):

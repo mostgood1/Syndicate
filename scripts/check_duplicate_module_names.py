@@ -110,7 +110,6 @@ ALLOWLIST: frozenset[str] = frozenset()
 # Pinned rather than fixed: they are upstream's to reconcile.
 VENDOR_BASELINE: frozenset[str] = frozenset(
     {
-        "vendor/wnba_betting_repo/src/wnba_betting/cli.py: fetch_rosters_cmd",
     }
 )
 
