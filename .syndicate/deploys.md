@@ -51457,3 +51457,18 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 ## 2026-10-20 13:46:24Z (8:46 AM CT) -- READING: a4aacc8f is ON THE FLEET by ride-along (peer ff to e491c260 at 13:38:12Z) -- lane `execution-alerts` CLOSED, GOAL MET (session c1dad17d)
 - What: claim `web` acquired by execution-alerts (token released, rc 0), then `git merge --ff-only a4aacc8f` in `~/Syndicate` -> "Already up to date": HEAD was e491c260 (reflog: merge e491c260 fast-forward 2026-10-20 08:38:12 -0500, not mine). Nothing written by this lane.
 - Measured: `merge-base --is-ancestor a4aacc8f HEAD` true; `_QUOTING_LINE` present in the checkout's execution_watchdog.py; watchdog runs on it at 13:40:57Z and 13:46:17Z, active = exec:pending_deposit (warn), job:ci-suite, job:kalshi-maker-shadow. No role restart was needed: the watchdog loads the checkout every 5 minutes.
+
+## 2026-10-20T12:39:00Z -- FLEET: vendor/nba_betting_repo ARCHIVED, no ff, no restart (lane nba-vendor-delete)
+- What: on /home/amyn/Syndicate (HEAD d3878d69), tarred vendor/nba_betting_repo (tracked + ignored, 560 files) to
+  `/home/amyn/syndicate-prod/data/_archive/vendor_nba_betting_repo_fleet_20261020T123900Z.tar.gz` (9.3M); tar count 560 == find count.
+  0 modified tracked files under it, so nothing was restored and a later ff deletes the tree without conflict.
+- Why: main deletes the tree (e5dabb1c). NOT DONE, by the same rule as MLB: the ff. **For whoever runs the next fleet ff past e5dabb1c:**
+  the tree goes with it; its ignored leftovers stay and are archived (`rm -rf` optional). Nothing on the fleet imports it (15 modules
+  checked 2026-10-19 on 94c97011, 16 locally on e5dabb1c's code), so no restart is needed for this change. The engine gate's vendored
+  mode stops working there; `--reference recorded` (default) is the gate.
+- verify: after that ff, `git ls-files vendor/nba_betting_repo | wc -l` = 0 and an NBA refresh / live tick writes 0 files under it. Owed by
+  lane nba-vendor-delete.
+- Rollback: `git revert e5dabb1c` + `tar -xzf` the archive in /home/amyn/Syndicate.
+- ALSO READ (closes lane mlb-vendor-delete's owed reading of the 2026-10-19T19:23:47Z entry): fleet at d3878d69 (contains 814f7966, ff
+  18:54:52 CDT 10-19): 0 tracked under vendor/mlb_bettingv2, 0 writes there since 19:30 CDT while the native engine (engines/mlb, 23:12 CDT)
+  and the MLB live lens (280 files by 07:38 CDT) ran. MET.

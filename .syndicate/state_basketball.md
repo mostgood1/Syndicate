@@ -1219,4 +1219,4 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
 - **NBA PRODUCTION RUNS NO VENDORED CODE; the NBA ports are FROZEN source** `[verified 2026-10-19, lanes nba-vendor-deletion-scope + nba-vendor-deletion-prep]`:
   - Fleet (HEAD 94c97011): 15 production modules import 0 vendored NBA modules (fresh interpreter); 0 files written under vendor/nba_betting_repo since 10-10; no role env or PYTHONPATH points at it.
   - Frozen at 27ef92f8 (5dba2973): basketball_engine/engine.py, basketball_engine/orchestrator/, nba/live_tick/, nba/source_cli/ -- edit directly (`syndicate/features/basketball_engine/FROZEN_FROM_VENDOR.md`). WNBA's live_tick and source_cli are still generated from vendor/wnba_betting_repo.
-  - vendor/nba_betting_repo is still in git; its deletion is a separate step (findings_2026-10-19_nba_vendor_deletion_scope.md).
+  - **vendor/nba_betting_repo DELETED from git 2026-10-20 (e5dabb1c)**; verified with it gone (146 test files, 16 modules). The fleet checkout keeps it until the next fleet ff (archived, 0 modified). The engine gate is `basketball_engine_parity.py --corpus` against production's recorded output (6b6e4b5d).
