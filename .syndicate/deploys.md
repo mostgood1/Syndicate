@@ -51833,3 +51833,5 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - `COMPOUNDING_BANKROLL ... positions=2/2 staked_fixed=$0.58 staked_compounded=$0.91 floored_to_one_contract=2 basis=venue_total bankrolls=[464.74]`.
 - `STAKE_BAND ... config={..., 'small_edge_fraction': 0.001} positions=2/2 staked_before=$0.91 staked_after=$0.91 left_small=2 stakes=[0.5, 0.41]`. Both rows stayed at one contract, NOT lifted to the band's $5.
 - Executor placement of these two: owed (next pass).
+
+- **Placed (18:57:23Z):** `EXECUTED mode=live venue=kalshi positions=2 placed=2 refused={}`. One shown filled: `KXNBAPTS-26OCT20OKCSAS-SASKJOHNSON3-10` Keldon Johnson over 9.5 @ +156, 1 contract at $0.39 + $0.0167 fee, `remaining 0.00`. Day spend $6.27 / 3 orders. Option C is MET end to end.
