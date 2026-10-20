@@ -47,6 +47,16 @@ if str(ROOT) not in sys.path:
 _DROP_ENV_MARKERS = ("KEYVALUE", "REDIS", "VALKEY")
 
 
+def _head_commit() -> str | None:
+    import subprocess
+
+    try:
+        return subprocess.run(["git", "-C", str(ROOT), "rev-parse", "--short", "HEAD"], capture_output=True, text=True,
+                              timeout=10).stdout.strip() or None
+    except Exception:
+        return None
+
+
 def output_digest(out: Any) -> str:
     return hashlib.sha256(pickle.dumps(out, protocol=4)).hexdigest()
 
@@ -110,6 +120,10 @@ class Recorder:
                 self.game = {
                     "league": self.league,
                     "date": self.date,
+                    # The record stamp (lane basketball-engine-gate-recorded-reference): the corpus is the parity gate's REFERENCE, so
+                    # basketball_engine_parity.py reports when and from which code it was recorded.
+                    "recorded_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                    "recorded_commit": _head_commit(),
                     "entrypoint": self.entrypoint,
                     "kwargs": copy.deepcopy(body),
                     "rng_states": [],

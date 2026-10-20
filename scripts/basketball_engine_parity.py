@@ -149,8 +149,51 @@ def leaf_diffs(a: Any, b: Any, path: str = "$", out: list[str] | None = None, li
     return out
 
 
+def replay_case_recorded(case: dict[str, Any], sampler) -> dict[str, Any]:
+    """REFERENCE = PRODUCTION'S RECORDED OUTPUT (the default since 2026-10-19, lane basketball-engine-gate-recorded-reference).
+
+    Run the native engine from the recorded RNG state and compare a digest of its output with the digest production
+    computed for this call when the corpus was recorded. Bit-identical or a mismatch: the digest is a sha256 of the
+    pickled output, so it is stricter than the leaf compare (it also sees dtypes, key order and container types).
+    It needs no vendored code. Its limit: a digest says THAT outputs differ, not WHERE -- while vendor/ exists,
+    `--reference vendored` gives the leaf-level diff. The corpus records the state BEFORE each call only, so the
+    after-call RNG state is not compared here (the vendored mode compared it; output equality implies the same draws
+    in every case seen so far).
+    """
+    from scripts.record_basketball_engine_corpus import output_digest
+
+    league, entrypoint = case["league"], case["entrypoint"]
+    rng = np.random.Generator(np.random.PCG64())
+    rng.bit_generator.state = copy.deepcopy(case["rng_state"])
+    kwargs = dict(case["kwargs"])
+    kwargs["rng"] = rng
+    err = None
+    try:
+        out = call_native(league=league, entrypoint=entrypoint, kwargs=kwargs, sampler=sampler)
+    except Exception as exc:
+        out, err = None, f"{type(exc).__name__}: {exc}"
+    diffs: list[str] = []
+    if entrypoint == "simulate_event_level_boxscore":
+        if err is None or "NotImplementedError" not in err:
+            diffs.append(f"native event-level simulator did not refuse: {err!r}")
+        return {"ok": not diffs, "diffs": diffs, "raised": None, "fidelity": None}
+    recorded = case.get("production_digest")
+    if not recorded:
+        diffs.append("no recorded production output for this call: nothing to compare against (re-record the corpus)")
+        return {"ok": False, "diffs": diffs, "raised": None, "fidelity": None}
+    if err is not None:
+        diffs.append(f"native raised {err}; production returned an output")
+        return {"ok": False, "diffs": diffs, "raised": None, "fidelity": False}
+    match = output_digest(out) == recorded
+    if not match:
+        diffs.append("native output digest != production's recorded output digest (run --reference vendored for the leaf diff, "
+                     "while vendor/ exists)")
+    return {"ok": match, "diffs": diffs, "raised": None, "fidelity": match}
+
+
 def replay_case(case: dict[str, Any], sampler) -> dict[str, Any]:
-    """Run one recorded call through both engines from the recorded RNG state."""
+    """REFERENCE = THE VENDORED ENGINE (`--reference vendored`; needs vendor/). Run one recorded call through both
+    engines from the recorded RNG state."""
     league, entrypoint = case["league"], case["entrypoint"]
     results = {}
     for name, fn in (("vendored", call_vendored), ("native", call_native)):
@@ -195,6 +238,31 @@ def replay_case(case: dict[str, Any], sampler) -> dict[str, Any]:
 # ---------------------------------------------------------------------------------------------------------------
 # Corpus I/O
 # ---------------------------------------------------------------------------------------------------------------
+
+
+def corpus_stamp(corpus_dir: Path) -> dict[str, Any]:
+    """What the reference IS: when and from which code the corpus was recorded. A corpus is production's output at
+    record time, so a legitimate production engine change (a switch enabled in nba_engine_config.json) makes it stale:
+    re-record it. Games recorded before 2026-10-19 carry no stamp; their file mtimes are the best evidence left."""
+    files = sorted(Path(corpus_dir).glob("*.pkl"))
+    dates, recorded_at, commits = set(), set(), set()
+    for path in files:
+        with path.open("rb") as fh:
+            game = pickle.load(fh)
+        dates.add(f"{game.get('league')}:{game.get('date')}")
+        if game.get("recorded_at_utc"):
+            recorded_at.add(str(game["recorded_at_utc"]))
+        if game.get("recorded_commit"):
+            commits.add(str(game["recorded_commit"]))
+    mtimes = sorted(time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(f.stat().st_mtime)) for f in files)
+    return {
+        "games": len(files),
+        "slates": sorted(dates),
+        "recorded_at_utc": (sorted(recorded_at)[0], sorted(recorded_at)[-1]) if recorded_at else None,
+        "recorded_commits": sorted(commits) or None,
+        "file_mtime_utc_range": (mtimes[0], mtimes[-1]) if mtimes else None,
+        "stamp_note": None if recorded_at else "games carry no record stamp (recorded before 2026-10-19); file mtimes only",
+    }
 
 
 def iter_corpus(corpus_dir: Path) -> Iterable[tuple[str, dict[str, Any]]]:
@@ -255,7 +323,7 @@ def compare_sim_artifacts(dir_a: Path, prefix_a: str, dir_b: Path, prefix_b: str
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="Native vs vendored basketball engine parity (exit 1 on any mismatch).")
+    ap = argparse.ArgumentParser(description="Native basketball engine parity vs production's recorded output, or vs the vendored engine (exit 1 on any mismatch).")
     src = ap.add_mutually_exclusive_group(required=True)
     src.add_argument("--corpus", type=Path, help="directory of recorded *.pkl games")
     src.add_argument("--synthetic", type=int, help="number of synthetic cases")
@@ -263,6 +331,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--volatile-key", action="append", default=[], help="a key to ignore in --compare-sims (repeatable; listed in the report)")
     ap.add_argument("--data-roots", nargs=2, metavar=("ROOT_A", "ROOT_B"), help="--compare-sims: each arm's data root, normalised to one token before comparing")
     ap.add_argument("--sampler", choices=("production", "vendored_default"), default="production")
+    ap.add_argument("--reference", choices=("recorded", "vendored"), default="recorded",
+                    help="recorded (default): native vs production's recorded output digest, no vendor/ needed; "
+                         "vendored: native vs the vendored engine, leaf for leaf (needs vendor/)")
     ap.add_argument("--json-out", type=Path)
     ap.add_argument("--max-cases", type=int, default=None)
     args = ap.parse_args(argv)
@@ -278,6 +349,10 @@ def main(argv: list[str] | None = None) -> int:
         return 0 if report["verdict"] == "PASS" else 1
 
     sampler = production_sampler() if args.sampler == "production" else None
+    reference = args.reference
+    if args.synthetic and reference == "recorded":
+        reference = "vendored"  # synthetic cases have no recorded production output; the comparison is to the vendored engine
+    replay = replay_case_recorded if reference == "recorded" else replay_case
     cases = iter_corpus(args.corpus) if args.corpus else synthetic_cases(args.synthetic)
     started = time.time()
     n = n_fail = n_raised = n_fidelity = 0
@@ -287,7 +362,7 @@ def main(argv: list[str] | None = None) -> int:
     for source, case in cases:
         if args.max_cases is not None and n >= args.max_cases:
             break
-        res = replay_case(case, sampler)
+        res = replay(case, sampler)
         n += 1
         games.add(source.split("#")[0])
         tally = by_league.setdefault(f"{case['league']}:{case['entrypoint']}", {"cases": 0, "mismatch": 0})
@@ -304,6 +379,8 @@ def main(argv: list[str] | None = None) -> int:
     report = {
         "substrate": f"corpus:{args.corpus}" if args.corpus else f"synthetic:{args.synthetic}",
         "sampler": args.sampler,
+        "reference": reference,
+        "corpus_stamp": corpus_stamp(args.corpus) if args.corpus else None,
         "cases": n,
         "games": len(games),
         "mismatched_cases": n_fail,

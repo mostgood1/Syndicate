@@ -14,8 +14,8 @@ tree. Before then they were generated and `--check`'d against it.
 | `nba/source_cli/` | the NBA source CLI commands the props refresh runs | `scripts/port_basketball_source_cli.py --league nba` | `--check` OK |
 
 The engine and orchestrator generators are retired; the parity harnesses STAY: `scripts/basketball_engine_parity.py`
---corpus is the gate lane basketball-scenario-calibration runs on every engine change (its reference must move off the
-vendored engine, to production's recorded outputs, before the NBA tree is deleted), and
+--corpus is the gate lane basketball-scenario-calibration runs on every engine change (since 2026-10-19 its default reference is
+production's RECORDED output, which needs no vendor tree; `--reference vendored` gives a leaf diff while the tree exists), and
 `scripts/basketball_orchestrator_parity.py`'s native arm and compare-outputs need no vendor tree. The generators live in git history, with their results in
 `.syndicate/deploys.md` and `docs/ai_context/basketball_live_native_plan.md` (P1, P6). The live-tick and source-CLI
 generators and harnesses keep their **WNBA arm only**: `syndicate/features/wnba/{live_tick,source_cli}/` are still

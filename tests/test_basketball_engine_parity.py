@@ -20,6 +20,7 @@ from dataclasses import fields, replace
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -170,3 +171,32 @@ def test_engine_league_params_agree_with_the_shared_league_rules(code):
     assert lp.shot_clock_seconds == rules.shot_clock_seconds
     assert lp.personal_foul_limit == rules.foul_out
     assert lp.team_fouls_for_bonus == (rules.one_and_one_from or rules.two_shots_from)
+
+def _recorded_case(seed: int = 17):
+    """A synthetic pbp case whose 'production' digest is the native engine's own output (what a fresh recording gives)."""
+    import copy as _copy
+
+    from scripts.record_basketball_engine_corpus import output_digest
+
+    source, case = next((s, c) for s, c in parity.synthetic_cases(8, seed=seed) if c["entrypoint"] == parity.ENTRYPOINTS[0])
+    rng = np.random.Generator(np.random.PCG64())
+    rng.bit_generator.state = _copy.deepcopy(case["rng_state"])
+    out = parity.call_native(league=case["league"], entrypoint=case["entrypoint"], kwargs={**case["kwargs"], "rng": rng},
+                             sampler=parity.production_sampler())
+    return {**case, "production_digest": output_digest(out)}
+
+
+def test_recorded_reference_passes_on_production_output_and_fails_on_any_change():
+    """Lane basketball-engine-gate-recorded-reference: the default gate compares native output with PRODUCTION's
+    recorded digest. Positive controls: a changed input, a wrong digest and a missing digest must each FAIL."""
+    sampler = parity.production_sampler()
+    case = _recorded_case()
+    assert parity.replay_case_recorded(case, sampler)["ok"]
+    changed = dict(case, kwargs=dict(case["kwargs"]))
+    hp = changed["kwargs"]["home_players"].copy()
+    num = next(c for c in hp.columns if pd.api.types.is_float_dtype(hp[c]) and hp[c].abs().sum() > 0)
+    hp[num] = hp[num] * 1.5
+    changed["kwargs"]["home_players"] = hp
+    assert not parity.replay_case_recorded(changed, sampler)["ok"]
+    assert not parity.replay_case_recorded(dict(case, production_digest="0" * 64), sampler)["ok"]
+    assert not parity.replay_case_recorded(dict(case, production_digest=None), sampler)["ok"]
