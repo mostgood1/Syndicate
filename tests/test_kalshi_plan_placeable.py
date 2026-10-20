@@ -41,6 +41,11 @@ def _isolated(tmp_path, monkeypatch):
         "SYNDICATE_PAPER2_VENUE",
     ):
         monkeypatch.delenv(key, raising=False)
+    # These fixtures place on a FIXED historical slate (2026-08-22 kickoffs, tickers dated 26AUG22),
+    # which the live Kalshi after-kickoff block (2026-10-20) would refuse as `game_started`. That
+    # block is covered off != on in tests/test_kalshi_pregame_only.py; here it is held off so these
+    # tests keep measuring the gates they were written for.
+    monkeypatch.setenv("SYNDICATE_EXECUTION_KALSHI_PREGAME_ONLY", "off")
     yield
 
 

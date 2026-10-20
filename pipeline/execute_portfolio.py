@@ -210,6 +210,12 @@ def _as_optional_bool(value: object) -> bool | None:
     return bool(value)
 
 
+def _kalshi_pregame_only_enabled() -> bool:
+    """Default ON. `off`/`0`/`false` lets a live Kalshi entry through after kickoff again."""
+    raw = str(os.environ.get("SYNDICATE_EXECUTION_KALSHI_PREGAME_ONLY") or "").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
 def _order_from_position(position: Mapping[str, Any], selected_date: str, venue: str) -> OrderRequest | None:
     """One committed position -> one order request, or None with nothing placed.
 
@@ -808,6 +814,44 @@ def _run_execution(
                     f" sport={getattr(request, 'sport', None)} market={getattr(request, 'market', None)}"
                     f" side={getattr(request, 'side', None)} line={getattr(request, 'line', None)}"
                     f" detail={date_detail} -- ticker is not for this game's date; nothing written",
+                    flush=True,
+                )
+                continue
+
+        # NO KALSHI ENTRY AFTER KICKOFF  [2026-10-20 ~23:10Z, user decision
+        # "Block after kickoff (Recommended)", relayed from session 332cb014;
+        # lane future-dated-live-orders-scope]. Kalshi had no after-commence
+        # check at order time, only the plan-time `in_play_market_fair` judged on
+        # the row's state at BUILD. Measured: a plan built 23:02:14Z, minutes
+        # after 23:00Z kickoffs, placed KXNCAAFSPREAD-26OCT20MOSUDEL-DEL4
+        # (11 @0.50) and DEL3 (1 @0.41) at 23:07-23:09Z -- in-play, on pregame
+        # fair prices. Polymarket's rule, reused rather than restated
+        # (`polymarket_us_orders._refuse_after_commence`): at or after
+        # commence_time refuses `game_started`, an unreadable or missing
+        # commence_time refuses `commence_unknown`. ENTRIES ONLY -- exits and
+        # reconciles do not pass through here. In-play entries come back through
+        # the in-play program once it has a measured in-game fair.
+        # Switch `SYNDICATE_EXECUTION_KALSHI_PREGAME_ONLY`, absent = ON.
+        if mode == LIVE and venue == "kalshi" and _kalshi_pregame_only_enabled():
+            from syndicate.features.shared.polymarket_us_orders import (
+                OrderBuildError as _CommenceRefusal,
+                _refuse_after_commence,
+            )
+
+            try:
+                _refuse_after_commence(request)
+            except _CommenceRefusal as exc:
+                token = str(exc).split(":", 1)[0].strip() or "game_started"
+                skipped += 1
+                refused[token] = refused.get(token, 0) + 1
+                print(
+                    f"[execute_portfolio] REFUSED_AFTER_COMMENCE venue={venue} reason={token}"
+                    f" ticker={request.venue_ticker!r}"
+                    f" commence_time={getattr(request, 'commence_time', None)!r}"
+                    f" away={getattr(request, 'away_team', None)!r} home={getattr(request, 'home_team', None)!r}"
+                    f" sport={getattr(request, 'sport', None)} market={getattr(request, 'market', None)}"
+                    f" side={getattr(request, 'side', None)} line={getattr(request, 'line', None)}"
+                    f" detail={exc} -- Kalshi entries are pregame only; nothing written",
                     flush=True,
                 )
                 continue
