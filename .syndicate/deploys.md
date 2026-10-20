@@ -51982,3 +51982,15 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - `NBA_LIVE_AUTORUN_LAUNCHED` once PHI @ NYK is in play (23:00Z);
   - NBA quotes last-seen < 5 min in play;
   - the board's nba `live_gamelines`/`live_projections` supported=True with rows priced.
+
+## 2026-10-20 22:16:08Z (5:16 PM CT) -- READING: Kalshi NO-side price fix LIVE -- first NO-side spread priced at the NO ask and filled at it -- **MET** (lane `paper-alongside-live`, session f8387262)
+- **ask:** user decision relayed by session b87af0fc: "Fix the price bug now"; the user then confirmed in this session: "Fix both".
+- **defect (measured 2026-10-20 21:35:55Z):** `_kalshi_price_for` read `no_ask` only for a literal `under`/`no` side, while `order_body_v2` maps the leg with `_side_to_kalshi(side, market, line)`. OKC +20.5 (spreads_alt, side=away = NO on KXNBASPREAD-26OCT20OKCSAS-SAS21) was priced at the YES ask $0.08 and sent `side=ask count=125.00 price=0.9200` (buy NO at $0.08) instead of NO at ~$0.93 x 10. It rested. 1 of 435 live Kalshi orders was affected; the live 0% floor had just admitted NO-side spreads. That order's cancel: the bankroll lane holds it. My one attempt was blocked by this session's permission classifier before any request was sent.
+- **code:** `17d9b4a5`: `_kalshi_contract_side` uses the body's own mapping. Only positive-line spreads change. Tests: tests/test_kalshi_price_leg.py 15 (the measured order end to end through order_body_v2); the old rule as a mutation fails 3; 279 neighbours pass.
+- **load:** the nba-live-board lane took it as a ride-along. Fleet ff 900c4287 -> 17d9b4a5 at 21:55:08Z, then -> 96f97a0a at 22:12:15Z. live-odds-worker TERM 22:14:32.825Z, new pid **3072777**, lstart 5:14:42 PM CT. Fleet copy check: `_kalshi_contract_side` gives away/spreads_alt/+20.5 -> no, home/spreads/-3.5 -> yes, home/h2h -> yes, under/totals -> no.
+- **verify (the behaviour, not the deploy):** KXNCAAFSPREAD-26OCT24TXAMALA-ALA14 (Texas A&M +13.5 = NO on "Alabama wins by over 13.5"):
+  - BEFORE the fix, every pass 21:34-21:42Z read `LIVE_PRICE ... live=0.54`: the YES ask.
+  - AFTER it: `LIVE_PRICE planned=0.47 live=0.47` (22:15:40Z); `SUBMIT ... side=ask count=1.00 price=0.5300` (22:15:57Z, = buy NO at 0.47).
+  - `RECONCILED ... submitted->filled contracts=1 fill_price=0.47 fees=0.0175` (22:16:08Z).
+  - The market read at 22:43Z: no_ask 0.47, yes_ask 0.54. The old code would have paid $0.54 for the NO leg.
+- **rollback:** revert 17d9b4a5 + a gated live-odds-worker TERM.
