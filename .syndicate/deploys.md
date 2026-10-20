@@ -51553,3 +51553,23 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - live-odds-worker pid 2946324: e491c260, live + armed, balance caps on.
 - **expect (dry run 13:02Z):** the two Kalshi positions place 1 contract each: DEL +117 at ~$0.55 (shard 0 $170) and Maxey u -203 at ~$0.92 (shard 3 $245.33). `floored_to_one_contract` > 0 only for stakes under one contract.
 - **rollback:** delete the three added lines (or restore the .bak) + full down/up. Retry `Start-ScheduledTask` if the first returns at once.
+
+## 2026-10-20 14:39:17Z (9:39 AM CT) -- READING: Kalshi join refuses other-competition series (af2c8c5a) on the fleet -- **MET** (lane `kalshi-series-competition-identity`, session 7c5e0682)
+- **Load:** no deploy by this lane. af2c8c5a reached the fleet disk by the board-implausible-book-upper-bound lane's ff to `e491c260` at 13:38:12Z (8:38 AM CT). It loaded at compounding-bankroll's full down/up (`down` 14:24:00Z; refresh-worker pid 2946323, lstart 14:30:16Z = 9:30:16 AM CT; that entry names it as a ride-along). Live-stake-band then ran a down/up (`down` 14:35:58Z; pid 2949047, lstart 14:37:08Z = 9:37:08 AM CT, HEAD still e491c260). This lane held the refresh-worker claim 13:43-13:45:46Z only to hand the restart over, and released it by token.
+- **baseline (13:14:25Z, pre-fix pid 2850549):** `[kalshi_odds] BOARD_JOIN kalshi_markets=6000 ... matched=778`; `reasons` has no `series_competition_not_on_board`. The fleet's `venue_odds/kalshi__soccer__*.json` holds 31 files and 37 series. KXBBLGAME and KXBUNDESLIGA2GAME each gained 2 price points 12:00-13:22Z, so they were pairing.
+- **reading (pid 2949047, on af2c8c5a):**
+  - `BOARD_JOIN` 14:39:17Z: `kalshi_markets=6000 board_rows=7332 matched=1223`, `'series_competition_not_on_board': 36`.
+  - `BOARD_JOIN` 14:39:33Z: `board_rows=5055 matched=804`, `'series_competition_not_on_board': 36`.
+  - The two 14:32Z joins (pid 2946323) read only `kalshi_markets=2515`, and the reason is absent there. The four series were not in that partial set.
+- **The 36, attributed:** the 14:38:58Z `BY_GAME_DATE` line (126 series, 6000 markets) was replayed through `series_competition_verdict`.
+  - KXBUNDESLIGA2GAME 18, KXSERIEAWGAME 9, KXEREDIVISIEWGAME 3 and KXBBLGAME 2 (soccer by discovery title) = **32, exactly the 4 predicted series**.
+  - KXMLBBGAME (Mobile Legends) 4 = refused by name, as the lane goal lists.
+  - 32 + 4 = **36 = the logged count**. No board competition is refused.
+- **pairing, venue_odds points written after 14:30:16Z (read 14:42:25Z):**
+  - The 4 series: **0** each.
+  - Board competitions still pair: KXMLSTOTAL 23, KXLIGUE1TOTAL 17, KXLALIGATOTAL 16, KXSERIEATOTAL 15, KXBUNDESLIGATOTAL 15.
+  - Points append only when a price changes, so the 0s support the reading. The reason count is the primary evidence.
+  - `matched` 1223 vs 1174 on the last pre-fix tick with the same shape (14:20:20Z).
+- **Prediction (handover note): "exactly KXBBLGAME, KXBUNDESLIGA2GAME, KXEREDIVISIEWGAME and KXSERIEAWGAME stop pairing, and BOARD_JOIN reasons gain series_competition_not_on_board" -> confirmed.**
+- **Ride-alongs that loaded with it:** compounding (b)+floor (that lane's own env change), live-stake-band (`SYNDICATE_LIVE_STAKE_BAND` key present x1 in pid 2949047's environ = that lane's own enablement), ab4b6ffe SGP tiers, kalshi_maker_shadow. Each is recorded by its own lane.
+- **Claims:** refresh-worker free from 13:45:46Z, released by this lane. No claim held by this lane now.
