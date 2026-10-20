@@ -51674,3 +51674,22 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - The 10:05:53 CT run on d3b68ea9: `run=24344 OK status=degraded findings=2 took_s=4 startup_s=2`, LastTaskResult 0; live state `observed_at 10:05:58.39-05:00, run_pid 24344`.
 - **Not reproduced:** the hypothesis that wsl.exe exits while holding stdout open. A background sleeper in the WSL command did not keep the pipe open (EOF within 1 s), so the line-by-line read is defensive only. WHERE today's slow runs spend their time is still unexplained. Read `startup_s` and `took_s` in the log to find out.
 - **Owed:** none for this lane. Watch for the first real `STATE_STALE` / `STATE_BUSY` in `C:\SyndicateProd\watchdog\watchdog.log`. Expect none once no pre-15:01Z old-script process is left.
+
+## 2026-10-20 15:44Z (10:44 AM CT) -- cheat-sheets: cross-game parlays LIVE (fleet ff eb86488f -> a5f34166 + reload-web)
+
+- **Approval:** user, in chat: "can we do both?", then "Deploy now". Web claim held by `cheat-sheets` (token f6a5c558). No worker restart.
+- **ff at 15:38:07Z (10:38:07 AM CT).** `RELOAD_WEB` state done, failures 0.
+- **Ride-alongs:**
+  - e5dabb1c: nba vendor tree deleted. Its lane verified production ran no vendored NBA code; no runtime import references it on main.
+  - 802bed61: min_ev tuner wiring, inert unless `SYNDICATE_MIN_EV_TUNER=apply`.
+  - 4128711a: findings only.
+- Lane `future-dated-live-orders-scope` (session 0ffeb586) was told the SHA. Its live-money D1/D3 lands later and is not in a5f34166.
+- **MEASURED.**
+  - An NHL rebuild at 10:38 CT ran `attach_cross_game`: `CHEAT_SHEET cross hit_rate ... legs 138 tickets 5`, `cross value ... legs 37 tickets 5`. It wrote `cheatsheets_cross/2026-10-20.json` at 10:44:11 CT.
+  - `/api/cheatsheets/nba/2026-10-20` serves `cross.kinds` hit_rate 5 (the tickets with an NBA leg).
+  - `/api/cheatsheets/nhl/2026-10-20` serves hit_rate 5 + value 5.
+  - The page carries `crossBlock`.
+  - Hit rate: 4 legs 43-45% at +101/+103 (-9..-13% at the price). Value: 2-leg NHL 42-50% at +110..+152 (+4.9..+5.8%).
+- **Owed:**
+  - tonight's 11:50 PM reconcile writes `cheatsheets_cross/2026-10-20.graded.json`;
+  - `record.json` `official.totals.xg_hit_rate` / `xg_value` follow once tickets settle.
