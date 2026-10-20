@@ -263,6 +263,18 @@ def commit_live_venue_plan(
             by_sport=by_sport,
             resolver=bankroll_resolver,
         )
+        # THE $5-$10 BAND (lane `live-stake-band`, user 2026-10-20). After
+        # compounding, so it can bound each bet by the cash compounding stamped
+        # for it. Off unless `SYNDICATE_LIVE_STAKE_BAND=on`.
+        from syndicate.features.shared.live_stake_band import apply_live_stake_band
+
+        apply_live_stake_band(
+            plan,
+            venue=venue,
+            refusals=refusals,
+            by_market=by_market,
+            by_sport=by_sport,
+        )
 
     plan["refusals"] = dict(sorted(refusals.items()))
     plan["refusals_by_market"] = _ordered(by_market)
@@ -363,10 +375,17 @@ def _apply_compounding_bankroll(
         one_contract_floor_dollars,
     )
 
+    from syndicate.features.shared.live_stake_band import band_config
+
     config = compounding_config()
     mode = config["mode"]
-    one_contract_minimum = config.get("min_stake") == MIN_STAKE_ONE_CONTRACT
-    floor_to_one_contract = config.get("min_stake") == MIN_STAKE_FLOOR_ONE_CONTRACT
+    # THE BAND SETS THE MINIMUM when it is on (lane `live-stake-band`): every
+    # compounded stake is under $1 on today's edges, so a minimum applied here
+    # would refuse each bet before the band could size it. Unknown capital
+    # still refuses below -- that is a fact about the account, not a minimum.
+    band_sets_minimum = band_config()["on"]
+    one_contract_minimum = config.get("min_stake") == MIN_STAKE_ONE_CONTRACT and not band_sets_minimum
+    floor_to_one_contract = config.get("min_stake") == MIN_STAKE_FLOOR_ONE_CONTRACT and not band_sets_minimum
     floored = 0
     if mode not in {"shadow", "on"}:
         return
@@ -475,7 +494,7 @@ def _apply_compounding_bankroll(
                 if compounded is None or compounded < contract:
                     _refuse(REFUSAL_BELOW_ONE_CONTRACT_COMPOUNDED, position)
                     continue
-            elif compounded is None or compounded < min_stake:
+            elif not band_sets_minimum and (compounded is None or compounded < min_stake):
                 _refuse(REFUSAL_BELOW_MIN_STAKE_COMPOUNDED, position)
                 continue
             scale = (compounded / fixed_dollars) if fixed_dollars else 0.0
@@ -584,6 +603,9 @@ def _write_live_venue_plan(
     live_keys = {p.get("position_key") for p in positions}
     compounding = live_plan.get("compounding") if isinstance(live_plan.get("compounding"), Mapping) else None
     compounding_refused = set((compounding or {}).get("refused_keys") or ())
+    band = live_plan.get("stake_band") if isinstance(live_plan.get("stake_band"), Mapping) else None
+    # Refused BY NAME by the band, so not missing -- same reason as compounding's.
+    compounding_refused |= set((band or {}).get("refused_keys") or ())
     paper2_placeable = [
         p
         for p in (paper2_plan.get("positions") or [])
@@ -625,6 +647,18 @@ def _write_live_venue_plan(
             f"basis={(compounding.get('config') or {}).get('basis')} "
             f"min_stake={(compounding.get('config') or {}).get('min_stake')} "
             f"bankrolls={sorted({(p.get('compounding') or {}).get('bankroll') for p in positions if (p.get('compounding') or {}).get('bankroll') is not None})}",
+            flush=True,
+        )
+    if band:
+        # The verification line for lane `live-stake-band`: every placed stake
+        # must sit in [min, max] unless trimmed to its funding cash.
+        print(
+            f"[portfolio_commit] STAKE_BAND date={normalized} venue={venue} on={band.get('on')} "
+            f"invalid={band.get('invalid')} config={band.get('config')} "
+            f"positions={band.get('positions_out')}/{band.get('positions_in')} "
+            f"staked_before=${band.get('staked_dollars_before')} staked_after=${band.get('staked_dollars_after')} "
+            f"trimmed_to_funding={band.get('trimmed_to_funding')} refused={band.get('refused')} "
+            f"stakes={[p.get('stake_dollars') for p in positions]}",
             flush=True,
         )
     return live_plan
