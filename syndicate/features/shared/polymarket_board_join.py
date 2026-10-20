@@ -590,11 +590,49 @@ def soccer_competition_tokens(markets: Iterable[Mapping[str, Any]]) -> frozenset
 # THE ASSUMPTION UNDER TEST, WHICH NOBODY HAS EVER CHECKED
 # --------------------------------------------------------------------------
 #
-# Three call sites zip the venue's two arrays positionally --
-# `polymarket_board_join:_outcome_probabilities`, and
-# `venue_quote_adapters._polymarket_sides` twice -- so every Polymarket price
-# in this system rests on `outcomes[i]` naming the club that `outcomePrices[i]`
-# prices.
+# FOUR call sites pair the venue's two arrays positionally -- so every
+# Polymarket price in this system rests on `outcomes[i]` naming the club that
+# `outcomePrices[i]` prices:
+#
+#   1x  `polymarket_board_join._outcome_probabilities`  `zip(names, prices)`
+#   2x  `venue_quote_adapters._polymarket_sides`        `zip(outcomes, prices)`
+#       -- TWO zips in that one function, which is why four sites live in three
+#          functions and why "three" read as correct for so long
+#   1x  `kalshi_polymarket_arb` (the Kalshi/Polymarket moneyline arb resolver)
+#       `[(outcomes[0], price_a), (outcomes[1], price_b)]`
+#
+#   = 4 call sites across 3 functions. State BOTH numbers when you edit this:
+#     the original said "three" and named a function "twice" in prose, so the
+#     arithmetic was invisible and the stale total survived a reading by me.
+#
+# **THE COUNT WAS STALE: FOUR, NOT THREE**
+# `[corrected 2026-10-20, lane polymarket-zip-site-enumeration]`. The original
+# named sites 1 and 2 correctly -- `_polymarket_sides` really does zip twice --
+# and omitted site 3 entirely. Sites 1 and 2 price a row for DISPLAY and
+# ranking; **site 3 decides a TRADE across both legs**, so a misalignment there
+# buys the wrong team on one side of a position taken specifically because the
+# two sides disagreed. It is also the only one that pairs by explicit index
+# rather than `zip`, which is why grepping this assumption for `zip` misses it.
+#
+# **AND THE "UNPROVEN" FRAMING BELOW UNDERSTATES WHAT THIS PACKAGE ALREADY
+# KNOWS.** A SIBLING positional assumption on this same venue -- that
+# `outcomes[0]` is the YES leg -- has been measured **FALSE**, and the modules
+# that measured it say what it cost:
+#
+#   `polymarket_us_markets` says, in its own words:
+#       "outcomes[0] IS NOT THE YES LEG, AND IT COST REAL MONEY"
+#       "the YES leg is measurably NOT outcomes[0] (3 of 8 settled)"
+#   `polymarket_us_orders` carries `yes_outcome_index()`, whose docstring
+#       records a market where the YES leg is NOT `outcomes[0]`.
+#
+# Those are a different pairing from this one (leg identity, not club<->price),
+# so they do not settle it -- but they are the same FAMILY of claim, and on this
+# venue that family has a measured counterexample and a loss attached. Read the
+# section below as "position is demonstrably unreliable here and this particular
+# pairing has one supporting test", not as "nobody has looked".
+#
+# `tests/test_polymarket_zip_sites.py` pins this list: a FIFTH site fails the
+# suite rather than silently joining an unaudited assumption.
 #
 # **CORRECTION TO THIS COMMENT AS FIRST WRITTEN.** It said the assumption was
 # "asserted NOWHERE and proven NOWHERE". That is false and the error was mine:
