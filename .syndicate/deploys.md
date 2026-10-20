@@ -52025,3 +52025,13 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - 900c4287: `floor_one_contract` slippage bound;
   - 96f97a0a: Polymarket forward-dated join.
   - If another lane respawns first, name these, and I'll take the verify reading.
+
+
+## 2026-10-20 22:04Z / 23:05Z (5:04 / 6:05 PM CT) -- LIVE ORDER CANCEL ATTEMPTS: SAS/OKC +20.5 -- **NOT CANCELLED; BOTH KALSHI CANCEL ROUTES FAIL** (lane `compounding-bankroll`, session 3927eb2e)
+- **ask:** the user, in chat: "Yes, cancel the resting SAS/OKC +20.5 Kalshi order now (exactly one cancel through the fleet's cancel path)...", then "Yes: send exactly one cancel via DELETE /trade-api/v2/portfolio/orders/{order_id} (the read route), read back the status..."
+- **order:** `KXNBASPREAD-26OCT20OKCSAS-SAS21`, venue order id `01a15b3e-0e60-76b9-88a8-4de5d7f19c48`, client/ledger key `c7e3a42f2301eb5ab29a14d2`, exchange_index 3, sell YES $0.92 (= NO $0.08), 125 contracts (~$10), created 21:35:56Z. Placed by the band at -1329. Kickoff 01:30Z.
+- **Attempt 1, 22:04:01Z, the fleet's own `kalshi_orders.cancel_order`:** `DELETE /trade-api/v2/portfolio/events/orders/{id}` -> **`http_404 not_found`**. Read-back: `resting`, fill 0.00, remaining 125.00.
+- **Attempt 2, 23:05:25Z, the classic route:** `DELETE /trade-api/v2/portfolio/orders/{id}` -> **`http_410 deprecated_v1_order_endpoint` "Please switch to the V2 endpoints"**. Read-back: `resting`, fill 0.00, remaining 125.00.
+- Exactly one request per attempt; each was preceded by a re-read showing exactly one matching resting order. The ledger is unchanged (correctly: no venue status change to reconcile).
+- **CONSEQUENCE, system-wide:** `cancel_order` backs `cancel_stale_resting_orders` and the kickoff auto-cancel (`cancel_pregame_resting_at_kickoff`, #707 D3). Both are very likely broken for EVERY resting Kalshi order, so resting orders can ride into in-play. Fix owed: find the V2 cancel route (docs.kalshi.com, "Orders" V2) and test it on one order with the user's yes.
+- **Handed to the user:** cancel this order in the Kalshi app.
