@@ -155,3 +155,24 @@ def test_the_family_key_survives_a_missing_sport_or_market():
     idx = src.index('_family = "%s|%s"')
     window = src[idx:idx + 320]
     assert window.count('or "unknown"') == 2
+
+
+def test_the_counter_REACHES_THE_WIRE_not_just_the_summary():
+    """A field in `select_shortlist`'s return that the API does not name is
+    invisible no matter how well it works. That endpoint's own comment records
+    it happening for #373, #381 and #397 -- and then it happened to this
+    counter, which was persisted (`rows_no_market_price` 12,
+    `by_family {"ncaaf|spreads": 12}`) while the API served neither.
+
+    This test is the fourth-time guard: both keys must be forwarded in
+    `board_layer2_shortlist_api`'s hand-built payload.
+    """
+    import inspect
+
+    from syndicate.blueprints import intelligence
+
+    src = inspect.getsource(intelligence.board_layer2_shortlist_api)
+    assert '"rows_no_market_price": shortlist.get("rows_no_market_price")' in src
+    assert '"rows_no_market_price_by_family"' in src
+    # the sibling it mirrors must still be there too
+    assert '"rows_implausible_book": shortlist.get("rows_implausible_book")' in src

@@ -4180,6 +4180,26 @@ def board_layer2_shortlist_api():
                 # them would report a broken feed as a tuning choice.
                 "min_implied_book_total_pct": shortlist.get("min_implied_book_total_pct"),
                 "rows_implausible_book": shortlist.get("rows_implausible_book"),
+                # FOURTH TIME, and the comment below predicted it
+                # `[2026-10-20, lane board-implausible-book-upper-bound]`.
+                # `rows_no_market_price` is the MIRROR of the counter above: an
+                # impossibly HIGH implied book total, which the low-side test
+                # cannot see because both it and `ev_pct` derive from the fair,
+                # and the fair is exactly what is missing. I added it to
+                # `select_shortlist`, shipped it, restarted the worker, and
+                # measured it working off the PERSISTED index
+                # (`rows_no_market_price` 12, `by_family {"ncaaf|spreads": 12}`,
+                # `written_at` 13:29:22Z) -- while this endpoint served none of
+                # it, because the payload is hand-built and I had not named the
+                # field here.
+                #
+                # The by-family split is the one that matters: this refusal
+                # REMOVES the rows, so the count is the only signal left, and
+                # without the family a second family appearing would read as a
+                # bigger number rather than as something new.
+                "rows_no_market_price": shortlist.get("rows_no_market_price"),
+                "rows_no_market_price_by_family": shortlist.get(
+                    "rows_no_market_price_by_family"),
                 # `#397`. `#391`'s per-game cap and its counters existed in
                 # `select_shortlist`'s return and never reached the wire, because
                 # this endpoint hand-builds its payload from an explicit key
