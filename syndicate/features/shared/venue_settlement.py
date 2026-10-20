@@ -1348,6 +1348,43 @@ def _kalshi_outcome_from_leg(market_result: Any, leg: Any) -> str | None:
     return OUTCOME_WON if held == result else OUTCOME_LOST
 
 
+def _both_sides_is_our_partial_close(
+    row: Mapping[str, Any], effects: list[tuple[str, Mapping[str, Any] | None]]
+) -> bool:
+    """True when a `both_sides_held` row is OUR OWN PARTIAL SALE, not a real
+    two-sided holding.
+
+    Kalshi books a close as a BUY of the opposite leg (`exit_order_body`: a NO
+    holding is sold as a YES `bid`), so the settlement row of a partly sold
+    position carries BOTH counts. MEASURED 2026-10-20 on
+    `KXWNBAPTS-26OCT19ATLGS-GSKTHORNTON5-10`: 5 NO bought, 1 sold ->
+    `no_count_fp=5.00, yes_count_fp=1.00`, refused `both_sides_held` on every
+    pass while the entry sat ungraded.
+
+    Allowed through only when it can be nothing else: every target was SOLD by
+    a filled live exit, all of them on the same leg, and the row's count on the
+    OPPOSITE leg equals the contracts those exits filled. Any other shape -- no
+    exit, a deferred one, a count we did not make -- is a genuine both-sides
+    holding and still refuses.
+    """
+    if not effects or any(effect != _EXIT_SOLD or exit_row is None for effect, exit_row in effects):
+        return False
+    legs = {str(exit_row.get("leg") or "").strip().lower() for _effect, exit_row in effects}
+    if len(legs) != 1 or not legs <= {"yes", "no"}:
+        return False
+    held = next(iter(legs))
+    opposite = "no" if held == "yes" else "yes"
+    held_count = _num(row.get(f"{held}_count_fp"))
+    opposite_count = _num(row.get(f"{opposite}_count_fp"))
+    sold = [_num(exit_row.get("filled_contracts")) for _effect, exit_row in effects]
+    if held_count is None or opposite_count is None or any(s is None or s <= 0 for s in sold):
+        return False
+    total_sold = sum(sold)
+    # reduce_only: the close can never exceed what we held, so a held-leg
+    # count below the sale is not a shape our own exits produce.
+    return abs(opposite_count - total_sold) < 1e-6 and held_count + 1e-6 >= total_sold
+
+
 def fetch_kalshi_market_results(tickers: list[str]) -> tuple[dict[str, dict], str | None]:
     """`ticker -> {result, status}` for markets a fully sold position left.
 
@@ -1611,7 +1648,17 @@ def settle_from_venue(*, dry_run: bool = False) -> dict[str, Any]:
                 and verdict.get("reason") == "no_position_held"
                 and all(effect == _EXIT_SOLD for effect, _row in effects)
             )
-            if not verdict.get("graded") and not sold_out:
+            # A position PARTLY sold settles holding both legs, because the
+            # venue booked our close as a buy of the other one. Same rescue,
+            # under the stricter count check in `_both_sides_is_our_partial_close`.
+            partly_sold = (
+                venue == "kalshi"
+                and verdict.get("reason") == "both_sides_held"
+                and _both_sides_is_our_partial_close(row, effects)
+            )
+            if partly_sold:
+                counters["exit_partial_both_sides"] = counters.get("exit_partial_both_sides", 0) + 1
+            if not verdict.get("graded") and not (sold_out or partly_sold):
                 reason = str(verdict.get("reason"))
                 counters["refused"][reason] = counters["refused"].get(reason, 0) + 1
                 continue
@@ -1694,7 +1741,7 @@ def settle_from_venue(*, dry_run: bool = False) -> dict[str, Any]:
                     graded_any = True
                     continue
                 if not verdict.get("graded"):
-                    continue  # unreachable: `sold_out` requires every target sold
+                    continue  # unreachable: `sold_out`/`partly_sold` require every target sold
                 order["outcome"] = verdict["outcome"]
                 order["settled_by"] = "venue"
                 order["settled_at_venue"] = verdict.get("settled_at_venue")
