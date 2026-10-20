@@ -2622,3 +2622,15 @@ what a passive fill is. For a taker, CLV is a fair proxy: we choose the moment.
 - **READ each enumeration before counting anything.** Decide what the population IS; only then count. A sweep that files findings from a symbol-count is a grep wearing a check's clothes.
 - The ones worth checking are those whose population is named by a symbol AND asserted as current. One of four here qualified — and it WAS stale (three sites claimed, four real, the omitted one being the arbitrage resolver).
 - When correcting an enumeration, **state both totals** if they differ ("4 call sites across 3 functions"). The stale number survived because "three" plus a function named "twice" in prose made `1+2+1` invisible — and that same invisibility made ME miscount it in the opposite direction.
+
+## A CONTROL THAT REVERTS ONE OF YOUR SHIPPED CHANGES CANNOT EXONERATE THE OTHERS — and "I verified it is not mine" is the sentence to distrust `[2026-10-20, lane no-market-price-test-fallout]`
+
+A peer's test went red in a file I had just edited. I reverted MY copy of **that file** (`board_enrichment.py`, a docstring-only change), reproduced the failure, and reported it as pre-existing and "not mine". **It was mine.** The cause was `dd499146`, my refusal branch in `layer2_board.py`, shipped hours earlier: the fixture had an empty `cells` with a model edge, which is exactly a `rows_no_market_price` row, so nothing seated and the gate never ran. Proven by disabling the branch: 10 pass disabled, 4 fail live.
+
+**Why:** my control answered "did my LAST change break it" while the question was "did ANY of my changes break it". By then I had shipped `dd499146`, `c36bdc9a`, `e491c260` and a docstring edit, and the exoneration covered the smallest of them. The narrow claim was literally true, which is what made it convincing.
+
+**How to apply:**
+- **Enumerate what YOU have shipped into the area before claiming innocence**, and revert the candidate most likely to matter — which is the behaviour change, never the comment.
+- Better: don't claim innocence. Say which control you ran and what it covers. "Reverting my docstring change does not reproduce it" is honest; "it is not mine" is a conclusion that control cannot support. (`feedback_retraction_is_not_innocence` says the same from the other direction: withdrawing a bad attribution gives "not proven guilty", never "proven innocent".)
+- **Sweep the suites a behaviour change can reach, at ship time.** 44 test files drive `build_layer2_rows`/`select_shortlist`; running them takes ~2 minutes and would have found both casualties immediately instead of leaving one for a peer to debug and one undiscovered.
+- The signature to recognise: a fixture whose rows go to ZERO reads as "the feature under test withheld everything", which is indistinguishable from the feature working. An empty population is never a pass.

@@ -1308,15 +1308,13 @@ death, never life — do not invert it.
 - **SURFACED, NOT MINE:** `news-availability-gate` (session 9e18a0e7) has a failing test on `main` — `test_end_to_end_an_out_nhl_player_is_not_seated_and_off_is_not_on`, `seated` comes back EMPTY (`'Nathan MacKinnon' in set()`). Verified not mine by swapping `HEAD`'s copy of the file back in and reproducing it; my diff is docstring-only. Reported to that session.
 - Files: syndicate/features/shared/board_enrichment.py (the attach_projections call-site enumeration docstring only), tests/test_attach_projections_enumeration.py (NEW)
 
-### no-market-price-test-fallout — OPEN — opened 2026-10-20 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
-- **A BACKTICK SUBSTITUTION ATE PART OF THIS BLOCK AT OPEN TIME, FOR THE SECOND TIME TODAY.** `lane_open.py` was invoked with backticked words in `--hypothesis` through an unquoted shell argument, so the shell executed them (`line 29: cells: command not found`) and dropped them from the text. Repaired here in Python. The rule I recorded this morning (`b1e0cd3a`) says to pass such text via `-F -` with a QUOTED heredoc — it applies to every CLI argument carrying prose, not just to commit messages, which is the gap that let it recur.
+### no-market-price-test-fallout — CLOSED — opened 2026-10-20 — closed 2026-10-20 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
 - Goal: Every test broken by dd499146's rows_no_market_price refusal is found and fixed, so the suite is green and the refusal's blast radius is known rather than discovered one suite at a time by whoever runs it next.
+- GOAL: MET (`dc724f5b`). **Blast radius bounded: all 44 test files that drive `build_layer2_rows` or `select_shortlist` pass — 745 tests.** Only two casualties existed: the news gate (fixed by `fair-price-v2`, `e8a266b1`) and `test_layer2_out_player_gate` (4 failures, fixed here).
+- **CAUSE CONFIRMED, NOT ASSUMED:** refusal branch disabled -> 10 pass; live -> 6 pass / 4 fail. An empty `cells` yields no two-sided book, so no fair, so no `ev_pct`, so my refusal fires — and `opportunities` came back EMPTY, which reads as "nobody seated" and is indistinguishable from the gate working.
+- **MY FIRST FIX WAS WRONG and the arithmetic says why.** Three tightly matched books gave `ev_pct -2.85` and `rows_below_value_floor 4`, because with a SINGLE book's de-vig `EV = fair x decimal - 1` reduces to `1/S - 1` for that book's overround — betting a book's own price against its own de-vig is ALWAYS minus the hold. Value needs the best price to beat the CONSENSUS, so FanDuel is now lopsided (+118 against an expensive -140, own de-vig 0.440) while the others are tight: median 0.474 against +118 is about +3.3% EV.
+- **THE PROCESS FAILURE IS MINE AND IT IS THE POINT.** I shipped `dd499146` without sweeping the suites it could break, and then told `fair-price-v2` the news-gate red test was "not mine" — on a control that reverted `board_enrichment.py` when my change was in `layer2_board.py`. A control that reverts ONE of several shipped changes cannot exonerate the others. Rule written to `learnings.md`.
 - Files: tests/test_layer2_out_player_gate.py (the _grid_prop fixture book prices only)
-- Hypothesis: My refusal fires on any fixture that builds a board row with an EMPTY `cells` and a projection edge, because no consensus fair can form so `ev_pct` is None. test_layer2_out_player_gate's _grid_prop is exactly that shape: `cells {}` with a `best` over/under and `edge_vs_market_pct` 6.0. Giving the fixture three two-sided books restores a fair and the rows seat again.
-- Falsification test: If the four failures persist with my refusal branch disabled, the cause is not mine. (Already run: 10 pass disabled, 4 fail enabled -- so this is confirmed, not assumed.)
-- Verification: tests/test_layer2_out_player_gate.py green with the refusal LIVE, plus a repo-wide sweep of every test fixture carrying an empty cells with a projection edge, each either passing or fixed.
-- Blocked by: none
-
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
