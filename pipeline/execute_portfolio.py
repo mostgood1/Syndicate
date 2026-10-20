@@ -23,6 +23,7 @@ from typing import Any, Mapping
 
 from syndicate.features.shared.execution_ledger import (
     LIVE,
+    PAPER,
     STATUS_FAILED,
     STATUS_FILLED,
     STATUS_SUBMITTED,
@@ -43,6 +44,62 @@ PAPER_VENUE = "paper"
 def execution_enabled() -> bool:
     raw = str(os.environ.get("SYNDICATE_EXECUTION_ENABLED") or "").strip().lower()
     return raw in {"1", "true", "yes", "on"}
+
+
+def paper_alongside_live_enabled() -> bool:
+    """Default ON. `off`/`0`/`false`/`no` restores the old refusal.
+
+    THE PAPER BOOKS STOPPED AT GO-LIVE  [2026-10-20, lane paper-alongside-live].
+    The fleet's `local_production.env` sets `SYNDICATE_EXECUTION_MODE=live` for
+    EVERY role, refresh-worker included, so from 2026-10-19 10:55 AM CT the inline
+    paper harness refused every build (`REFUSED_LIVE_INLINE`, 634 lines by
+    2026-10-20 15:41Z) and no paper order was recorded. The paper venue books are
+    the only evidence the edge can be measured on (917 settled bets before the
+    stop), so live mode must not silence them.
+
+    Absent means ON because the permissive branch here spends nothing: the
+    inline caller can only ever book PAPER (`PaperLedgerBatch` refuses live), and
+    live placement stays on live-odds-worker, untouched.
+    """
+    raw = str(os.environ.get("SYNDICATE_PAPER_ALONGSIDE_LIVE") or "").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
+# WHICH SELECTION RULE PICKED A PAPER ROW, stamped on the row so a study can cut by
+# regime without inferring it from a timestamp. `suggested_only` is
+# `portfolio_commit.suggested_rows` (since 2ecf7c2e, 2026-10-13 11:35 CT); a plan
+# with no `suggested_gate` carries no claim, so the row gets None, not a guess.
+SELECTION_SUGGESTED_ONLY = "suggested_only"
+
+
+def _paper_selection(plan: Mapping[str, Any], normalized: str, scoped: bool) -> str | None:
+    gate = plan.get("suggested_gate")
+    if not isinstance(gate, Mapping) and scoped:
+        # paper2's venue plans are committed from the SAME gated rows as the
+        # unrestricted plan in the same build, and only the unrestricted plan
+        # stores the gate.
+        try:
+            from pipeline.portfolio_commit import read_portfolio_plan
+
+            main = read_portfolio_plan(normalized)
+        except Exception:
+            main = None
+        gate = (main or {}).get("suggested_gate") if isinstance(main, Mapping) else None
+    return SELECTION_SUGGESTED_ONLY if isinstance(gate, Mapping) else None
+
+
+def _paper_row_tags(request: OrderRequest, *, selection: str | None, alongside_live: bool) -> dict[str, Any]:
+    """The approach tags on a PAPER row: selection rule, season phase, live context."""
+    from syndicate.features.shared.season_phase import season_phase
+
+    return {
+        "selection": selection,
+        "season_phase": season_phase(request.sport, request.selected_date),
+        # True for a row booked while the fleet trades live, so the study can
+        # tell the regimes apart; the live order for the same bet, if any, is a
+        # SEPARATE row under the bare venue name with `mode=live`.
+        "paper_alongside_live": bool(alongside_live),
+    }
 
 
 def _venue_ticker_of(position: Mapping[str, Any]) -> str | None:
@@ -277,6 +334,11 @@ def run_execution(
     correctly" is exactly the guarantee that failed on 2026-08-22 when an
     unrecognised value for a different key silently meant something else.
 
+    **With the env live, `inline=True` books PAPER instead of refusing**
+    (`paper_alongside_live_enabled`, default on; lane paper-alongside-live). The
+    structural guarantee is unchanged: an inline run can never place a live order,
+    because its mode is forced to paper and `PaperLedgerBatch` refuses live.
+
     **`venue_scope` places `paper2`'s venue-restricted plan instead of the
     unrestricted one.** The two books must stay separable at every level or the
     comparison they exist for is destroyed, so a scoped run reads a different
@@ -321,9 +383,28 @@ def _run_execution(
         return {"status": "skipped", "reason": "disabled", "date": normalized}
 
     mode = execution_mode()
+    alongside_live = False
+    if inline and mode == LIVE and paper_alongside_live_enabled():
+        # PAPER ALONGSIDE LIVE  [2026-10-20, lane paper-alongside-live]. The env
+        # says live because live-odds-worker places real orders; THIS caller is
+        # the paper harness and books the paper books only. Every row it writes
+        # says `mode=paper` under a `paper`/`paper:<venue>` name, so it is never
+        # read as a live order -- `spent_today`, `held_position_for` and the
+        # unreconciled gate all filter on `mode=live`. Loud, once per run, so
+        # the log says which book this was.
+        mode = PAPER
+        alongside_live = True
+        print(
+            f"[execute_portfolio] PAPER_ALONGSIDE_LIVE date={normalized}"
+            f" venue_scope={str(venue_scope or '').strip().lower() or 'unrestricted'}"
+            " -- env is live; refresh-worker books the paper book only,"
+            " live placement stays on live-odds-worker",
+            flush=True,
+        )
     if inline and mode == LIVE:
         # Loud, not silent: a live-configured worker that quietly fell back to
         # paper would produce a ledger nobody could trust the `mode` field on.
+        # Reached only with SYNDICATE_PAPER_ALONGSIDE_LIVE=off.
         print(
             "[execute_portfolio] REFUSED_LIVE_INLINE date="
             f"{normalized} -- live placement must not run inside refresh-worker; "
@@ -571,6 +652,8 @@ def _run_execution(
     batch = PaperLedgerBatch(mode) if mode != LIVE else None
     if batch is not None:
         batches.append(batch)
+    # Paper rows carry their approach tags; live rows keep their exact shape.
+    selection = _paper_selection(plan, normalized, bool(scope)) if batch is not None else None
 
     placed = 0
     filled = 0
@@ -728,7 +811,14 @@ def _run_execution(
                 skipped += 1
                 continue
 
-        record = batch.place(request) if batch is not None else place_order(request, submit=submitter)
+        record = (
+            batch.place(
+                request,
+                tags=_paper_row_tags(request, selection=selection, alongside_live=alongside_live),
+            )
+            if batch is not None
+            else place_order(request, submit=submitter)
+        )
         if record.get("recorded") is False:
             # REFUSED AT BUILD -- NOTHING WAS WRITTEN.  [2026-09-10, lane
             # write-ahead-build-refusal]
@@ -844,6 +934,8 @@ def _run_execution(
         # `live`, `paper2_fallback`, `paper2` or `unrestricted` -- the book
         # these positions came from, so a caller never has to infer it.
         "plan_source": plan_source,
+        # True when the env is live and this inline run booked the paper book.
+        "paper_alongside_live": alongside_live,
         "positions": len(positions),
         "placed": placed,
         # Reported apart from `placed` because a resting order is placed and

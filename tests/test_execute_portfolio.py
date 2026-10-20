@@ -305,6 +305,10 @@ def test_inline_refuses_live_mode_structurally(monkeypatch):
     monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
     monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
     monkeypatch.setenv("SYNDICATE_EXECUTION_VENUE", "kalshi")
+    # Since 2026-10-20 the default books PAPER here instead (lane
+    # paper-alongside-live, tests/test_paper_alongside_live.py); the refusal is
+    # what the off switch restores.
+    monkeypatch.setenv("SYNDICATE_PAPER_ALONGSIDE_LIVE", "off")
     from pipeline import execute_portfolio as runner
 
     result = runner.run_execution("2026-08-22", inline=True)
@@ -1211,7 +1215,7 @@ def _placer_returns(monkeypatch, runner, row):
     paper run placing for real, and the test would be about the ledger instead.
     """
     monkeypatch.setattr(runner, "place_order", lambda request, submit=None: row)
-    monkeypatch.setattr(runner.PaperLedgerBatch, "place", lambda self, request: row)
+    monkeypatch.setattr(runner.PaperLedgerBatch, "place", lambda self, request, tags=None: row)
 
 
 def test_a_resting_order_counts_as_PLACED_not_as_nothing(monkeypatch):

@@ -1653,7 +1653,11 @@ def _complete_in_state(
 
 
 def _place_paper_into_state(
-    state: dict[str, Any], request: OrderRequest, *, mode: str
+    state: dict[str, Any],
+    request: OrderRequest,
+    *,
+    mode: str,
+    tags: Mapping[str, Any] | None = None,
 ) -> tuple[dict[str, Any], bool]:
     """`place_order`'s PAPER branch against a ledger ALREADY LOADED.
 
@@ -1661,6 +1665,11 @@ def _place_paper_into_state(
     `place_order` takes, on one state instead of two load/persist round trips.
     Returns `(row, created)`: the existing row for a duplicate, else the
     completed row, which is what `place_order` returns.
+
+    `tags` are the paper row's approach fields (`selection`, `season_phase`,
+    `paper_alongside_live`; lane paper-alongside-live), written on a NEW row
+    only. Paper only, and outside `_LEAN_FIELDS`, so a live row's shape is
+    unchanged. Not part of `idempotency_key`: a tag never makes a new bet.
     """
     record, created = _record_into_state(state, request, mode=mode)
     if not created:
@@ -1672,7 +1681,7 @@ def _place_paper_into_state(
         fill_price=request.requested_price,
         fill_stake_dollars=request.requested_stake_dollars,
         venue_order_id=None,
-        fee_fields=paper_fill_fee_fields(request),
+        fee_fields={**paper_fill_fee_fields(request), **dict(tags or {})},
     )
     return (completed or record), True
 
@@ -1734,8 +1743,8 @@ class PaperLedgerBatch:
                 return str(order.get("status") or "")
         return None
 
-    def place(self, request: OrderRequest) -> dict[str, Any]:
-        row, created = _place_paper_into_state(self._loaded(), request, mode=self.mode)
+    def place(self, request: OrderRequest, *, tags: Mapping[str, Any] | None = None) -> dict[str, Any]:
+        row, created = _place_paper_into_state(self._loaded(), request, mode=self.mode, tags=tags)
         if created:
             self._pending += 1
         return row
