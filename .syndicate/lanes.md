@@ -1123,6 +1123,7 @@ death, never life — do not invert it.
 - Verification: unit tests incl. off != on for both flags; paper script over the fleet's live plans + balance stamp reports per-position fixed vs compounding stake and per-venue caps, with denominators; landed on origin/main
 - Blocked by: none
 - **2026-10-20 Kalshi cancel fix landed `d57476ec`** (user: "find the correct Kalshi V2 cancel endpoint ... fix kalshi_orders.cancel_order with tests, and propose a one-order live test"). Not on the fleet; not proven live. Next: user's yes on a one-order live test.
+- **VERIFICATION OWED (user 2026-10-20 23:27Z: "No test order. After the next fleet ff carries d57476ec, read the first CANCEL_STALE / CANCEL_AT_KICKOFF result and confirm the order reads canceled."):** fleet at 96f97a0a2 at 23:28Z, d57476ec not fetched. Whoever ffs the fleet past d57476ec: the first `[execution_ledger] CANCEL_STALE` / `CANCEL_AT_KICKOFF` after the respawn must be followed by `[kalshi_orders] CANCEL url=...?exchange_index=` and NO `CANCEL_FAILED` for that key, then the order must read `canceled` on GET /portfolio/orders/{id}. Record it in deploys.md under this lane.
 - **CROSS-LANE NOTE 2026-10-20 18:50Z (lane paper-alongside-live):** pipeline/portfolio_commit.py gained a PAPER LADDER block AFTER `_write_live_venue_plan`'s try in run_portfolio_commit's venue loop (own guard). Your compounding step is untouched; the live plan is byte-identical with the ladder on/off (tests/test_paper_ladder.py).
 
 ### min-ev-tuner-shadow — OPEN — opened 2026-10-19 — session b98807bc-5652-4301-be8c-d5f7bf07b55f
