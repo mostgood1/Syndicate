@@ -3660,3 +3660,25 @@ engine-independent. The target sits on actual on these games (T 230.95 per game;
 **No fix chosen** (per the pre-registration). Candidate to pre-register: replace Δ with ONE measured structural term,
 `solver_endgame_pts_per_team` re-measured as mean(sim − model·solver_poss) over OT + end-game on the #3j measure
 dates, at this config.
+
+### R2-d STRUCTURAL-TERM FIX — PRE-REGISTRATION 2026-10-20 14:21Z (user go-ahead in chat)
+
+**Change:** none in code. `solver_endgame_pts_per_team` (the solver already subtracts it from the target,
+tpp_eff = tpp − X/poss, whenever the end-game is on) is re-defined as ONE measured structural term X. X is the mean
+over team-games of (sim points − tpp·solver_poss) with the term at 0. It absorbs OT, the end-game extension /
+intentional fouls and the per-source residual. It replaces Δ = 0.103, which was measured as a NET on − off and missed
+the OT and possession terms.
+
+**Step 1 (measure, the #3j disjoint dates):** SV_m = the PKR2_check config (s 0.01615, end-game ON) with
+`solver_endgame_pts_per_team=0`, on calfiles_sw_all. X = mean(P − T), with its SE, per team-game.
+
+**Step 2 (check, the 12 sweep dates):** PKR3_check = the same config with `solver_endgame_pts_per_team=X`.
+
+**PASS** (the same as the 12-date check):
+- |total bias vs actual| < 0.5 per game;
+- every step-3/4 guard: FTA 22.69 ± .3 (12-date real 22.76), PF 19.67 ± .4, foul-outs ≤ .233, 3PA within real CI,
+  quarter shares within real CI overall.
+
+Reported, not gated: the paired shift vs R2A_mean, and P − T on the check dates (it should be ≈ 0).
+
+**Then:** on PASS, ask the user for the full FIT. On FAIL, record it and stop.
