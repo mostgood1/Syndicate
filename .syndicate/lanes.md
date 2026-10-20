@@ -1309,9 +1309,10 @@ death, never life — do not invert it.
 - Files: syndicate/features/shared/board_enrichment.py (the attach_projections call-site enumeration docstring only), tests/test_attach_projections_enumeration.py (NEW)
 
 ### no-market-price-test-fallout — OPEN — opened 2026-10-20 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- **A BACKTICK SUBSTITUTION ATE PART OF THIS BLOCK AT OPEN TIME, FOR THE SECOND TIME TODAY.** `lane_open.py` was invoked with backticked words in `--hypothesis` through an unquoted shell argument, so the shell executed them (`line 29: cells: command not found`) and dropped them from the text. Repaired here in Python. The rule I recorded this morning (`b1e0cd3a`) says to pass such text via `-F -` with a QUOTED heredoc — it applies to every CLI argument carrying prose, not just to commit messages, which is the gap that let it recur.
 - Goal: Every test broken by dd499146's rows_no_market_price refusal is found and fixed, so the suite is green and the refusal's blast radius is known rather than discovered one suite at a time by whoever runs it next.
 - Files: tests/test_layer2_out_player_gate.py (the _grid_prop fixture book prices only)
-- Hypothesis: My refusal fires on any fixture that builds a board row with empty  and a projection edge, because no consensus fair can form so ev_pct is None. test_layer2_out_player_gate's _grid_prop is exactly that shape: cells {} with a best over/under and edge_vs_market_pct 6.0. Giving the fixture three two-sided books restores a fair and the rows seat again.
+- Hypothesis: My refusal fires on any fixture that builds a board row with an EMPTY `cells` and a projection edge, because no consensus fair can form so `ev_pct` is None. test_layer2_out_player_gate's _grid_prop is exactly that shape: `cells {}` with a `best` over/under and `edge_vs_market_pct` 6.0. Giving the fixture three two-sided books restores a fair and the rows seat again.
 - Falsification test: If the four failures persist with my refusal branch disabled, the cause is not mine. (Already run: 10 pass disabled, 4 fail enabled -- so this is confirmed, not assumed.)
 - Verification: tests/test_layer2_out_player_gate.py green with the refusal LIVE, plus a repo-wide sweep of every test fixture carrying an empty cells with a projection edge, each either passing or fixed.
 - Blocked by: none
