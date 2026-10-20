@@ -51825,3 +51825,11 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - live-odds pid 3000981: live + armed, balance caps on.
 - **expect:** `LIVE_PLAN_WRITTEN` refusals stop carrying `below_min_stake` for kalshi. `STAKE_BAND ... left_small=N` counts sub-0.1% rows; those place ~1 contract (`floored_to_one_contract`), and rows >= 0.1% still get $5-$10.
 - **rollback:** delete line 138 (or restore the .bak) + full down/up. C is inert without the key.
+
+
+## 2026-10-20 18:53:44Z (1:53 PM CT) -- READING: option C first build after the 18:20Z down/up -- **MET** (lane `compounding-bankroll`, session 3927eb2e)
+- `LIVE_PLAN_WRITTEN venue=kalshi rows_in=9 positions=2 staked=$0.91 refusals={'aggregator_priced': 1, 'below_min_ev_pct': 3, 'below_min_ev_pct_net_of_fee': 2, 'zero_kelly_stake': 1}`.
+  - **No `below_min_stake`.** Before C it fired in 146 of 262 kalshi builds since go-live, up to 4 per build.
+- `COMPOUNDING_BANKROLL ... positions=2/2 staked_fixed=$0.58 staked_compounded=$0.91 floored_to_one_contract=2 basis=venue_total bankrolls=[464.74]`.
+- `STAKE_BAND ... config={..., 'small_edge_fraction': 0.001} positions=2/2 staked_before=$0.91 staked_after=$0.91 left_small=2 stakes=[0.5, 0.41]`. Both rows stayed at one contract, NOT lifted to the band's $5.
+- Executor placement of these two: owed (next pass).
