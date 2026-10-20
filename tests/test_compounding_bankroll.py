@@ -269,3 +269,63 @@ def test_the_default_resolver_reads_the_stamp_and_the_orders_shard(monkeypatch):
     verdict = resolve({"venue_ticker": _TICKER})
     assert verdict["known"] is True
     assert verdict["bankroll"] == pytest.approx(240.47)
+
+
+# ---- options (a)+(b), user 2026-10-20: today's two refused positions ------
+
+
+def _live_position(key, fraction, american):
+    return {"position_key": key, "sport": "nba", "market": "player_points", "stake_fraction": fraction,
+            "stake_dollars": round(fraction * 1000.0, 2), "price": american, "venue_ticker": "KX-T"}
+
+
+def _apply(bankroll):
+    from pipeline.portfolio_commit import _apply_compounding_bankroll
+
+    plan = {"positions": [_live_position("del", 0.00118, 117), _live_position("maxey", 0.00198, -203)], "totals": {}}
+    refusals, by_market, by_sport = {}, {}, {}
+    _apply_compounding_bankroll(
+        plan, venue="kalshi", settings=_settings(min_stake_units=1.0),
+        refusals=refusals, by_market=by_market, by_sport=by_sport, resolver=_resolver(bankroll),
+    )
+    return plan, refusals
+
+
+def test_dollar_minimum_refuses_both_at_the_whole_account(monkeypatch):
+    monkeypatch.setenv(vc.COMPOUNDING_MODE_ENV, "on")
+    plan, refusals = _apply(465.37)  # (b) alone: $0.55 and $0.92, both under $1
+    assert plan["positions"] == []
+    assert refusals == {"below_min_stake_compounded": 2}
+
+
+def test_one_contract_minimum_reaches_the_plan_off_differs_from_on(monkeypatch):
+    monkeypatch.setenv(vc.COMPOUNDING_MODE_ENV, "on")
+    off, _ = _apply(465.37)
+    monkeypatch.setenv("SYNDICATE_COMPOUNDING_MIN_STAKE", "one_contract")
+    on, refusals = _apply(465.37)  # (a)+(b): $0.55 >= $0.46, $0.92 >= $0.67
+    assert off["positions"] == [] and len(on["positions"]) == 2
+    stakes = {p["position_key"]: p["stake_dollars"] for p in on["positions"]}
+    assert stakes == {"del": pytest.approx(0.55, abs=0.01), "maxey": pytest.approx(0.92, abs=0.01)}
+    assert {p["position_key"]: p["compounding"]["contracts_compounded"] for p in on["positions"]} == {"del": 1, "maxey": 1}
+    assert refusals == {}
+
+
+def test_one_contract_minimum_alone_still_refuses_on_a_shard_bankroll(monkeypatch):
+    monkeypatch.setenv(vc.COMPOUNDING_MODE_ENV, "on")
+    monkeypatch.setenv("SYNDICATE_COMPOUNDING_MIN_STAKE", "one_contract")
+    plan, refusals = _apply(170.0)  # (a) alone on shard 0: $0.20 < $0.46, $0.34 < $0.67
+    assert plan["positions"] == []
+    assert refusals == {"below_one_contract_compounded": 2}
+    assert plan["compounding"]["refused_reasons"] == {"below_one_contract_compounded": 2}
+
+
+def test_an_unpriceable_position_is_refused_not_guessed(monkeypatch):
+    from pipeline.portfolio_commit import _apply_compounding_bankroll
+
+    monkeypatch.setenv(vc.COMPOUNDING_MODE_ENV, "on")
+    monkeypatch.setenv("SYNDICATE_COMPOUNDING_MIN_STAKE", "one_contract")
+    plan = {"positions": [_live_position("x", 0.01, None)], "totals": {}}
+    refusals = {}
+    _apply_compounding_bankroll(plan, venue="kalshi", settings=_settings(), refusals=refusals,
+                                by_market={}, by_sport={}, resolver=_resolver(465.37))
+    assert refusals == {"no_contract_price_compounded": 1}

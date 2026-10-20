@@ -103,6 +103,17 @@ _ORDER_PCT_ENV = "SYNDICATE_EXECUTION_BALANCE_ORDER_PCT"
 _MAX_AGE_ENV = "SYNDICATE_COMPOUNDING_MAX_STAMP_AGE_SECONDS"
 # `SYNDICATE_COMPOUNDING_BANKROLL_MAX_DOLLARS=capital`: the ceiling follows the account.
 _CEILING_CAPITAL = "capital"
+# Option (b), user 2026-10-20: `venue_total` sizes Kalshi against the whole
+# account; absent (`shard`) keeps the shard-bounded bankroll. Opt-in by value so
+# this code cannot change live sizing at a restart before the user approves.
+_BASIS_ENV = "SYNDICATE_COMPOUNDING_BASIS"
+_BASIS_SHARD = "shard"
+_BASIS_VENUE_TOTAL = "venue_total"
+# Option (a), user 2026-10-20: `one_contract` makes the minimum for a compounded
+# stake one whole contract at the order's price; absent keeps `min_stake_units`.
+_MIN_STAKE_ENV = "SYNDICATE_COMPOUNDING_MIN_STAKE"
+MIN_STAKE_DOLLARS = "dollars"
+MIN_STAKE_ONE_CONTRACT = "one_contract"
 
 # How much of a venue's capital is the sizing bankroll. 1.0 = the Kelly
 # fractions `bankroll_manager` already computes are fractions of the real
@@ -170,6 +181,16 @@ def compounding_config() -> dict[str, Any]:
         # None = "the fixed bankroll in force today" -- see `sizing_bankroll`.
         "ceiling_dollars": ceiling if ceiling > 0 else None,
         "ceiling_env_set": bool(ceiling_raw),
+        "basis": (
+            _BASIS_VENUE_TOTAL
+            if str(os.environ.get(_BASIS_ENV) or "").strip().lower() == _BASIS_VENUE_TOTAL
+            else _BASIS_SHARD
+        ),
+        "min_stake": (
+            MIN_STAKE_ONE_CONTRACT
+            if str(os.environ.get(_MIN_STAKE_ENV) or "").strip().lower() == MIN_STAKE_ONE_CONTRACT
+            else MIN_STAKE_DOLLARS
+        ),
         "day_pct": _float_env(_DAY_PCT_ENV, _DEFAULT_DAY_PCT, low=0.001, high=1.0),
         "order_pct": _float_env(_ORDER_PCT_ENV, _DEFAULT_ORDER_PCT, low=0.001, high=1.0),
         "max_age_seconds": _float_env(_MAX_AGE_ENV, _DEFAULT_MAX_AGE_SECONDS, low=60.0, high=86_400.0),
@@ -343,7 +364,26 @@ def sizing_bankroll(
         "age_seconds": capital.get("age_seconds"),
     }
 
-    if capital.get("venue") == "kalshi":
+    result["basis"] = cfg.get("basis") or _BASIS_SHARD
+    if capital.get("venue") == "kalshi" and result["basis"] == _BASIS_VENUE_TOTAL:
+        # THE WHOLE ACCOUNT IS THE BANKROLL [user 2026-10-20, option (b)]. Kelly
+        # is a fraction of total wealth; which shard holds the cash is a FUNDING
+        # question, and the placement-time shard gate
+        # (`execution_guard._shard_available_dollars`, `insufficient_shard_balance`)
+        # already refuses an order its shard cannot cover. Bounding the bankroll
+        # by one shard instead shrank every position below one contract
+        # (10-20: DEL $0.20 on shard 0, Maxey $0.49 on shard 3, both refused).
+        # The shard is still reported when it resolves, never required.
+        shards = capital.get("shards")
+        if isinstance(shards, Mapping) and shard_of is not None:
+            try:
+                shard, _why = shard_of(ticker)
+            except Exception:
+                shard = None
+            if shard is not None and shards.get(str(shard)) is not None:
+                result["shard"] = shard
+                result["shard_cash"] = round(float(shards[str(shard)]), 2)
+    elif capital.get("venue") == "kalshi":
         shards = capital.get("shards")
         if not isinstance(shards, Mapping):
             return {"known": False, "reason": f"shards_{capital.get('shards_status') or 'absent'}", "capital": capital}
@@ -364,6 +404,30 @@ def sizing_bankroll(
 
     result["bankroll"] = round(max(bankroll, 0.0), 2)
     return result
+
+
+def one_contract_dollars(position: Mapping[str, Any]) -> float | None:
+    """What the smallest placeable order costs for this position, or None.
+
+    A contract settles at $1, so its price is the implied probability of the
+    side bought, read from the plan's American `price`. Polymarket orders come
+    in `minimum_trade_qty` increments (carried on its `venue_ticker` dict), so
+    its minimum is that many contracts. None when the price is unusable -- the
+    caller then refuses rather than guessing.
+    """
+    american = _number(position.get("price"))
+    if american is None or american == 0 or -100 < american < 100:
+        return None
+    each = 100.0 / (american + 100.0) if american > 0 else (-american) / (-american + 100.0)
+    if not 0.0 < each < 1.0:
+        return None
+    qty = 1.0
+    ticker = position.get("venue_ticker")
+    if isinstance(ticker, Mapping):
+        minimum = _number(ticker.get("minimum_trade_qty"))
+        if minimum is not None and minimum > 1.0:
+            qty = minimum
+    return round(each * qty, 4)
 
 
 def balance_caps(

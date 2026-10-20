@@ -293,3 +293,44 @@ def test_ceiling_mode_is_named(monkeypatch, raw, mode):
     if raw is not None:
         monkeypatch.setenv("SYNDICATE_COMPOUNDING_BANKROLL_MAX_DOLLARS", raw)
     assert vc.compounding_config()["ceiling_mode"] == mode
+
+
+# ---- option (b): Kalshi sized against the whole account (user 2026-10-20) ---
+
+
+def test_venue_total_basis_reaches_kalshi_sizing_off_differs_from_on(monkeypatch):
+    kwargs = dict(fixed_bankroll=1000.0, ticker="T", stamp=_stamp(), shard_of=_shard_of({"T": 0}), now=_NOW)
+    off = vc.sizing_bankroll("kalshi", **kwargs)
+    monkeypatch.setenv("SYNDICATE_COMPOUNDING_BASIS", "venue_total")
+    on = vc.sizing_bankroll("kalshi", **kwargs)
+    assert off["bankroll"] == pytest.approx(170.0)        # shard 0's cash
+    assert on["bankroll"] == pytest.approx(489.98)        # the whole account
+    assert on["shard"] == 0 and on["shard_cash"] == pytest.approx(170.0)  # still reported
+    assert on["basis"] == "venue_total" and off["basis"] == "shard"
+
+
+def test_venue_total_does_not_need_the_shard_to_resolve(monkeypatch):
+    monkeypatch.setenv("SYNDICATE_COMPOUNDING_BASIS", "venue_total")
+    result = vc.sizing_bankroll(
+        "kalshi", fixed_bankroll=1000.0, ticker="NOPE", stamp=_stamp(), shard_of=_shard_of({}), now=_NOW,
+    )
+    assert result["known"] is True and result["bankroll"] == pytest.approx(489.98)
+    assert "shard" not in result
+
+
+# ---- option (a): one contract is the minimum ------------------------------
+
+
+@pytest.mark.parametrize(
+    "position, expected",
+    [
+        ({"price": 117}, 0.4608),
+        ({"price": -203}, 0.67),
+        ({"price": -110, "venue_ticker": {"slug": "x", "minimum_trade_qty": 5}}, 2.619),
+        ({"price": None}, None),
+        ({"price": 50}, None),
+    ],
+)
+def test_one_contract_dollars(position, expected):
+    got = vc.one_contract_dollars(position)
+    assert got == (None if expected is None else pytest.approx(expected, abs=0.001))

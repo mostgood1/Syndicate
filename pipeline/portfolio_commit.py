@@ -283,6 +283,13 @@ REFUSAL_COMPOUNDING_BANKROLL_UNKNOWN = "compounding_bankroll_unknown"
 # the real account. Distinct from `below_min_stake`, which `commit_portfolio`
 # says about the fixed bankroll, so the cost of compounding is countable.
 REFUSAL_BELOW_MIN_STAKE_COMPOUNDED = "below_min_stake_compounded"
+# Under `SYNDICATE_COMPOUNDING_MIN_STAKE=one_contract` [user 2026-10-20, option
+# (a)]: the compounded stake does not buy one whole contract at the plan price.
+# The executor floors dollars to contracts and refuses a zero count anyway
+# (`kalshi_orders.contracts_for_stake`); refusing here names it in the plan.
+REFUSAL_BELOW_ONE_CONTRACT_COMPOUNDED = "below_one_contract_compounded"
+# A contract price the plan cannot state -- refused, never guessed.
+REFUSAL_NO_CONTRACT_PRICE_COMPOUNDED = "no_contract_price_compounded"
 
 
 def default_bankroll_resolver(venue: str, settings: Any):
@@ -343,10 +350,15 @@ def _apply_compounding_bankroll(
     `max_positions` slot for another row -- the cut ran before this -- which is
     the conservative error and is stated here rather than discovered.
     """
-    from syndicate.features.shared.venue_capital import compounding_config
+    from syndicate.features.shared.venue_capital import (
+        MIN_STAKE_ONE_CONTRACT,
+        compounding_config,
+        one_contract_dollars,
+    )
 
     config = compounding_config()
     mode = config["mode"]
+    one_contract_minimum = config.get("min_stake") == MIN_STAKE_ONE_CONTRACT
     if mode not in {"shadow", "on"}:
         return
 
@@ -363,6 +375,7 @@ def _apply_compounding_bankroll(
     kept: list[dict[str, Any]] = []
     refused_keys: list[str] = []
     unknown_reasons: dict[str, int] = {}
+    refused_reasons: dict[str, int] = {}
     staked_fixed = 0.0
     staked_compounded = 0.0
 
@@ -373,6 +386,7 @@ def _apply_compounding_bankroll(
         by_market.setdefault(reason, {})[market] = by_market.setdefault(reason, {}).get(market, 0) + 1
         by_sport.setdefault(reason, {})[sport] = by_sport.setdefault(reason, {}).get(sport, 0) + 1
         refused_keys.append(str(position.get("position_key") or ""))
+        refused_reasons[reason] = refused_reasons.get(reason, 0) + 1
 
     for position in list(plan.get("positions") or []):
         if not isinstance(position, dict):
@@ -390,6 +404,7 @@ def _apply_compounding_bankroll(
         fraction = float(position.get("stake_fraction") or 0.0)
         bankroll = float(verdict.get("bankroll") or 0.0) if verdict.get("known") else None
         compounded = round(fraction * bankroll, 2) if bankroll is not None else None
+        contract = one_contract_dollars(position)
         stamp = {
             "mode": mode,
             "known": bool(verdict.get("known")),
@@ -401,6 +416,12 @@ def _apply_compounding_bankroll(
             "shard_cash": verdict.get("shard_cash"),
             "stake_dollars_fixed": round(fixed_dollars, 2),
             "stake_dollars_compounded": compounded,
+            "basis": verdict.get("basis"),
+            "min_stake_rule": config.get("min_stake"),
+            "one_contract_dollars": contract,
+            "contracts_compounded": (
+                int(compounded // contract) if compounded is not None and contract else None
+            ),
         }
         position["compounding"] = stamp
 
@@ -414,7 +435,16 @@ def _apply_compounding_bankroll(
             continue
 
         if mode == "on":
-            if compounded is None or compounded < min_stake:
+            if one_contract_minimum:
+                # The venue's own minimum replaces the fixed-dollar one: a $1
+                # floor does not scale with the account, one contract does.
+                if contract is None:
+                    _refuse(REFUSAL_NO_CONTRACT_PRICE_COMPOUNDED, position)
+                    continue
+                if compounded is None or compounded < contract:
+                    _refuse(REFUSAL_BELOW_ONE_CONTRACT_COMPOUNDED, position)
+                    continue
+            elif compounded is None or compounded < min_stake:
                 _refuse(REFUSAL_BELOW_MIN_STAKE_COMPOUNDED, position)
                 continue
             scale = (compounded / fixed_dollars) if fixed_dollars else 0.0
@@ -445,13 +475,17 @@ def _apply_compounding_bankroll(
     plan["compounding"] = {
         "mode": mode,
         "venue": venue,
-        "config": {key: config[key] for key in ("fraction", "ceiling_mode", "ceiling_dollars", "max_age_seconds")},
+        "config": {
+            key: config[key]
+            for key in ("fraction", "ceiling_mode", "ceiling_dollars", "basis", "min_stake", "max_age_seconds")
+        },
         "fixed_bankroll": fixed,
         "positions_in": len(kept) + len(refused_keys),
         "positions_out": len(kept),
         "staked_dollars_fixed": round(staked_fixed, 2),
         "staked_dollars_compounded": round(staked_compounded, 2),
         "unknown_reasons": dict(sorted(unknown_reasons.items())),
+        "refused_reasons": dict(sorted(refused_reasons.items())),
         "refused_keys": refused_keys,
     }
 
@@ -554,6 +588,9 @@ def _write_live_venue_plan(
             f"/{compounding.get('positions_in')} staked_fixed=${compounding.get('staked_dollars_fixed')} "
             f"staked_compounded=${compounding.get('staked_dollars_compounded')} "
             f"unknown={compounding.get('unknown_reasons')} "
+            f"refused={compounding.get('refused_reasons')} "
+            f"basis={(compounding.get('config') or {}).get('basis')} "
+            f"min_stake={(compounding.get('config') or {}).get('min_stake')} "
             f"bankrolls={sorted({(p.get('compounding') or {}).get('bankroll') for p in positions if (p.get('compounding') or {}).get('bankroll') is not None})}",
             flush=True,
         )
