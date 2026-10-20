@@ -1245,6 +1245,14 @@ death, never life — do not invert it.
 - Verification: Scratch StateDir: old script -> stale writer clobbers newer state; new script -> refused with a STATE_STALE log line; one scratch normal run OK; installed sha256 == repo; deploys.md entry
 - Blocked by: none
 
+### paper-bet-optimization — OPEN — opened 2026-10-20 — session 6200a74b-6bc7-4ffe-9115-f725eedff2a5 — **GOAL: NOT MET — first pass DONE: NO-GO on every pre-registered selection rule (venue paper books −12.0% ± 5.1 out of sample, 807 bets); band/flat-$5 sizing ruins a $465 bankroll in the window; current Suggested regime −6.0% ± 7.0 (120) is UNDETERMINED; paper collection STOPPED at go-live 10-19 10:55 AM CT, which blocks the re-run**
+- Goal: Find per-line selection and sizing rules that raise out-of-sample return on the live-tradeable population (paper:kalshi + paper:polymarket), pre-registered, walk-forward by date, event-clustered SEs; recommend a rule only if it beats taking every bet by >= 2 SE and is positive (user 2026-10-20: "once enabled start to figure out bet optimization using the paper data we have")
+- Files: scripts/paper_bet_optimization.py (NEW), .syndicate/findings_2026-10-20_paper_bet_optimization.md (NEW)
+- Hypothesis: pre-registered in the findings doc (written 9:27 AM CT, run 9:39 AM CT)
+- Falsification test: no selection rule beats S0 by >= 2 SE out of sample -> NO-GO (this is what happened)
+- Verification: findings doc with coverage, rule table and sizing replay; re-run on the current regime once paper collection resumes
+- Blocked by: no paper orders are booked while the fleet runs live (newest paper submit 2026-10-19 10:55 AM CT)
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
