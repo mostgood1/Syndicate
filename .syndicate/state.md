@@ -498,6 +498,7 @@ once this index exists: re-splitting would orphan the parts.
 | [inplay-overlay-board-cadence] | THE BOARD'S IN-PLAY ROWS COME FROM THE BOOK GRID EVERY TICK, NOT THE SHORTLIST — LIVE ON ALL THREE SERVICES `[ | `state_board.md` |
 | [intelligence-season-evidence] | INTELLIGENCE EXPLANATIONS NAMED METRICS THEY NEVER READ, AND THE READINESS GATE COULD NOT SEE THE DATA ROOT -- | `state_board.md` |
 | [live-winpct-blank] | LIVE NFL/NCAAF ROWS SHOW NO PREGAME SIM PROBABILITY -- the Win%, the "Our sim has..." sentence and the directi | `state_board.md` |
+| [ncaaf-polymarket-spread-no-fair] | 73 NCAAF SPREAD ROWS REACH THE BOARD WITH NO FAIR AND NO REASON, BECAUSE POLYMARKET ALONE QUOTES THEM AND PRIC | `state_board.md` |
 | [nfl-model-accuracy-backtest] | NFL GAME LINES AND PROPS LOSE TO THE CLOSE IN EVERY MARKET; THE PROP PROBABILITY CARRIES NO INFORMATION AT THE | `state_football.md` |
 | [ncaaf-sim-view-coverage] | NCAAF GAME LINES CARRY A SIM VIEW ON EVERY MARKET; EDGES ARE BOUNDED BY THE 15-POINT CAP; STAKES STAY ON PRICE | `state_football.md` |
 | [nfl-live-prop-capture] | NFL PER-QUARTER PLAYER PRODUCTION IS CAPTURED AND RETRIEVABLE — the allowlist alone moved ZERO bytes `[verifie | `state_football.md` |
@@ -553,6 +554,7 @@ once this index exists: re-splitting would orphan the parts.
 | [kalshi-odds-refresh-bound] | THE VENUE FAN-OUT IS A COLD-START BURST ON A PERSISTED CLOCK, AND IT IS NOW TIME-BOUNDED `[2026-09-03, lane ka | `state_kalshi.md` |
 | [kalshi-quote-capture-coupling] | Kalshi quote capture ran ONLY inside the heavy board build — a refused heavy build stopped it for every sport  | `state_kalshi.md` |
 | [kalshi-exit-path] | KALSHI POSITIONS CAN BE SOLD BEFORE SETTLEMENT -- RUNNING IN PAPER ONLY `[verified on the fleet 2026-10-19 19: | `state_kalshi.md` |
+| [kalshi-maker-shadow] | KALSHI MAKER (RESTING-BID) SHADOW: PAPER ONLY, PRE-REGISTERED, FIRST RECORDS ON THE FLEET; HOURLY SCHEDULE NOT | `state_kalshi.md` |
 | [layer2-board-keyvalue-ceiling] | THE BOARD'S CEILING IS THE COMBINED KEY, NOT THE SHARDS — and `per_sport=3000` corrupted production for ~29 mi | `state_layer2.md` |
 | [layer2-realized-accuracy] | THE LAYER 2 BOARD'S REALIZED ACCURACY — the portfolio book is the surface, and the measurement chain is broken | `state_layer2.md` |
 | [layer2-score-outcomes] | THE BOARD'S SCORE, GRADED ON OUTCOMES AND CLOSES FOR THE FIRST TIME -- real price edge, fee-blind ranking, non | `state_layer2.md` |
@@ -638,7 +640,7 @@ once this index exists: re-splitting would orphan the parts.
 | [accuracy-autorun-rearm-state] | `#626`(h) IS ARMED, RAN, AND PASSED. The budget, not memory, is now the constraint. `[2026-09-04, lane accurac | `state_model.md` |
 | [nhl-live-resim] | NHL HAS A LIVE RE-SIM AND IT CAN NOW SEE ITS SLATE -- but no NHL game has yet reached the board with a probabi | `state_model.md` |
 | [nhl-player-props] | NHL PLAYER PROPS ARE PROJECTED AND PRICED ON THE BOARD, PER-LINE GATED -- and the engine still loses to a play | `state_model.md` |
-| [model-edge-ceiling] | **REPLACED AND SERVED 2026-10-19** (`d4837386`): the 15-point MAGNITUDE bound is now a probability-space test — served coverage 81.0% -> 90.6%, bound refusals 407 -> 41 `[measured]` | `state_model.md` |
+| [model-edge-ceiling] | THE 15-POINT MAGNITUDE BOUND IS GONE: REPLACED 2026-10-19 BY THE PROBABILITY-SPACE TEST ITS OWN DOCSTRING DESC | `state_model.md` |
 | [prop-projection-support] | NFL PROP SUPPORT IS NOW PUBLISHED AND SERVED (0 of 1,070 -> 1,067 of 1,067, `5457b428`); NHL AND MLB STILL CAR | `state_model.md` |
 | [polymarket-live-totals-quote-names-no-game] | 26 OF 28 LIVE POLYMARKET TOTALS QUOTES ON THE BOARD ARE SHARED ACROSS GAMES — one price per LINE, no game iden | `state_polymarket.md` |
 | [polymarket-fill-price-is-reported] | THE VENUE REPORTS `avgPx`. "This path has no fill price" was FALSE and cost a 12h live halt `[verified 2026-08 | `state_polymarket.md` |
@@ -719,7 +721,7 @@ once this index exists: re-splitting would orphan the parts.
 | [odds-history-segment-keys] | THE odds_history SHARD CARRIES `segment=` KEYS NOW — and three separate key builders were segment-blind, in tw | `state_worker.md` |
 | [refresh-worker-headroom-2026-09-02] | THE ~1.4GB HEADROOM FIGURE IS STALE, AND THE METRIC EVERYONE READS IS THE WRONG ONE `[2026-09-02, lane m625-en | `state_worker.md` |
 | [accuracy-autorun-OOM-2026-09-02] | THE ACCURACY AUTORUN OOM-KILLED refresh-worker. **RESOLVED — DISARMED AND VERIFIED 19:32Z.** `[2026-09-02, lan | `state_worker.md` |
-| [execution-alerts] | LIVE EXECUTION ALERTS GO TO EMAIL FROM THE 5-MIN WATCHDOG -- LIVE ON THE FLEET since 2026-10-19 23:55:58Z (d3878 | `state_worker.md` |
+| [execution-alerts] | LIVE EXECUTION ALERTS GO TO EMAIL FROM THE 5-MIN WATCHDOG -- LIVE ON THE FLEET since 2026-10-19 23:55:58Z (d38 | `state_worker.md` |
 | [local-fleet-runner] | THE THREE SERVICES RUN LOCALLY NOW — and doing it naively would have placed REAL ORDERS `[verified 2026-09-02, | `state_worker.md` |
 | [local-production-host] | PRODUCTION RUNS ON ONE MACHINE NOW — `scripts/local_production.py`, and self-publish MUST be off on a shared d | `state_worker.md` |
 | [artifact-allowlist-split] | THE ARTIFACT ALLOWLIST IS TWO LISTS NOW: READ WIDE, WRITE NARROW — and an allowlist-filtered inventory is NOT  | `state_worker.md` |
