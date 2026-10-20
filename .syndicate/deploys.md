@@ -52008,3 +52008,20 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   scripts/vendor_sync_daily.ps1 if wanted).
 - ALSO READ (closes lane wnba-vendor-delete's owed reading of the 2026-10-20T16:56:09Z entry): fleet ff'd to 8e0ca456 (contains e633f12c)
   at 15:01:28 CDT; on 96f97a0a 0 tracked under vendor/wnba_betting_repo and 0 writes there since, while the WNBA refresh ran (17:45 CDT). MET.
+
+## 2026-10-20 23:05Z (6:05 PM CT) -- nba-live-board: refresh-worker respawn STILL COMING (not abandoned); what any refresh-worker respawn loads
+
+- **First attempt ABORTED** after 30 min (22:15-22:45Z).
+  - My gate required "no child jobs AND no board build".
+  - refresh-worker always has a `run_refresh_odds_job.py` child.
+  - Measured 22:45Z: those children run in their OWN session and process group (pgid = sid = own pid), so a TERM to the worker pid never reaches them.
+  - The refresh-worker gate is now **board build NOT in flight** only.
+- **Claims:**
+  - mine expired ~22:30Z (45-min TTL);
+  - `kalshi-exit-path` took all three ~22:34Z; I asked it for its plan;
+  - I re-acquire refresh-worker when it is free, then respawn on the board-build gate.
+- **ANY refresh-worker respawn on fleet 96f97a0a loads, user-approved, as ride-alongs:**
+  - f0dd04bb: NBA live pricing ON by default;
+  - 900c4287: `floor_one_contract` slippage bound;
+  - 96f97a0a: Polymarket forward-dated join.
+  - If another lane respawns first, name these, and I'll take the verify reading.
