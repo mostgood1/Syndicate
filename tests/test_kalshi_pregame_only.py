@@ -66,7 +66,7 @@ def _row(**overrides):
     return row
 
 
-def _run(monkeypatch, row, *, switch=None, venue="kalshi"):
+def _run(monkeypatch, row, *, switch=None, venue="kalshi", position_extra=None):
     from pipeline import execute_portfolio as runner
     from pipeline import portfolio_commit as commit
 
@@ -84,6 +84,10 @@ def _run(monkeypatch, row, *, switch=None, venue="kalshi"):
     result = commit.run_portfolio_commit(_DATE)
     assert result["status"] == "ok", result
     plan = result["plan"]
+    if position_extra:
+        # The in-play program stamps the PLAN POSITION; portfolio_commit does not copy it from the row.
+        for position in plan.get("positions") or []:
+            position.update(position_extra)
     monkeypatch.setattr("pipeline.portfolio_commit.read_portfolio_plan_for_venue", lambda date, scope: plan)
     monkeypatch.setattr("pipeline.portfolio_commit.read_live_portfolio_plan_for_venue", lambda date, scope: plan)
     monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
@@ -156,3 +160,28 @@ def test_polymarket_entries_do_not_pass_through_this_block(monkeypatch, capsys):
     # Polymarket refuses after commence inside its own builder; this block is Kalshi's.
     _run(monkeypatch, _row(venue_ticker=None), venue="polymarket")
     assert "REFUSED_AFTER_COMMENCE" not in capsys.readouterr().out
+
+
+# --------------------------------------------------------------------------
+# The in-game exemption (user: "actively buying AND selling when games are live")
+# --------------------------------------------------------------------------
+
+
+def test_after_kickoff_an_IN_GAME_fair_position_is_placed(monkeypatch, capsys):
+    result, sent = _run(monkeypatch, _row(), position_extra={"fair_source": "in_game"})
+    assert len(sent) == 1
+    assert result["refused"] == {}
+    assert "AFTER_COMMENCE_IN_GAME_FAIR venue=kalshi" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("value", ["pregame", "consensus", "IN_GAME", "in-game", "", None])
+def test_after_kickoff_any_other_fair_source_is_refused(monkeypatch, value):
+    result, sent = _run(monkeypatch, _row(), position_extra={"fair_source": value})
+    assert sent == []
+    assert result["refused"] == {"game_started": 1}
+
+
+def test_an_unknown_kickoff_is_refused_even_with_an_in_game_fair(monkeypatch):
+    result, sent = _run(monkeypatch, _row(commence_time=None), position_extra={"fair_source": "in_game"})
+    assert sent == []
+    assert result["refused"] == {"commence_unknown": 1}

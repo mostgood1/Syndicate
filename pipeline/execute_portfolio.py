@@ -210,6 +210,14 @@ def _as_optional_bool(value: object) -> bool | None:
     return bool(value)
 
 
+IN_GAME_FAIR_SOURCE = "in_game"
+
+
+def _in_game_fair(position: Mapping[str, Any]) -> bool:
+    """True only when the plan position says its fair was priced from in-game data."""
+    return isinstance(position, Mapping) and str(position.get("fair_source") or "").strip() == IN_GAME_FAIR_SOURCE
+
+
 def _kalshi_pregame_only_enabled() -> bool:
     """Default ON. `off`/`0`/`false` lets a live Kalshi entry through after kickoff again."""
     raw = str(os.environ.get("SYNDICATE_EXECUTION_KALSHI_PREGAME_ONLY") or "").strip().lower()
@@ -842,19 +850,38 @@ def _run_execution(
                 _refuse_after_commence(request)
             except _CommenceRefusal as exc:
                 token = str(exc).split(":", 1)[0].strip() or "game_started"
-                skipped += 1
-                refused[token] = refused.get(token, 0) + 1
-                print(
-                    f"[execute_portfolio] REFUSED_AFTER_COMMENCE venue={venue} reason={token}"
-                    f" ticker={request.venue_ticker!r}"
-                    f" commence_time={getattr(request, 'commence_time', None)!r}"
-                    f" away={getattr(request, 'away_team', None)!r} home={getattr(request, 'home_team', None)!r}"
-                    f" sport={getattr(request, 'sport', None)} market={getattr(request, 'market', None)}"
-                    f" side={getattr(request, 'side', None)} line={getattr(request, 'line', None)}"
-                    f" detail={exc} -- Kalshi entries are pregame only; nothing written",
-                    flush=True,
-                )
-                continue
+                # THE IN-GAME EXEMPTION  [2026-10-20, user: "we should be actively
+                # buying AND selling when games are live based on smart profitable
+                # positioning"]. What this block stops is a PREGAME fair traded
+                # after kickoff. A plan position whose fair was priced from in-game
+                # data says so with `fair_source == "in_game"` -- stamped on the
+                # plan POSITION by the in-play program's entry path (lane in-play;
+                # nothing sets it today, so everything after kickoff refuses).
+                # Exact string only: any other value, or absent, is pregame.
+                # `commence_unknown` is NOT exempted -- an unknown kickoff stays
+                # refused whatever priced the fair.
+                if token == "game_started" and _in_game_fair(position):
+                    print(
+                        f"[execute_portfolio] AFTER_COMMENCE_IN_GAME_FAIR venue={venue}"
+                        f" ticker={request.venue_ticker!r}"
+                        f" commence_time={getattr(request, 'commence_time', None)!r}"
+                        f" fair_source={position.get('fair_source')!r} -- in-game fair, entry allowed",
+                        flush=True,
+                    )
+                else:
+                    skipped += 1
+                    refused[token] = refused.get(token, 0) + 1
+                    print(
+                        f"[execute_portfolio] REFUSED_AFTER_COMMENCE venue={venue} reason={token}"
+                        f" ticker={request.venue_ticker!r}"
+                        f" commence_time={getattr(request, 'commence_time', None)!r}"
+                        f" away={getattr(request, 'away_team', None)!r} home={getattr(request, 'home_team', None)!r}"
+                        f" sport={getattr(request, 'sport', None)} market={getattr(request, 'market', None)}"
+                        f" side={getattr(request, 'side', None)} line={getattr(request, 'line', None)}"
+                        f" detail={exc} -- Kalshi entries are pregame only; nothing written",
+                        flush=True,
+                    )
+                    continue
 
         # ONE BET, ONE ORDER, HOWEVER MANY SLATES PLAN IT  [2026-10-20, user
         # decision, lane future-dated-live-orders-scope, todo #707]. The
