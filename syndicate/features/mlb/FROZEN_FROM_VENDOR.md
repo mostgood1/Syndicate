@@ -16,7 +16,7 @@ The generators (`scripts/port_mlb_sim_engine.py`, `scripts/port_mlb_live_lens.py
 (`scripts/migrate_mlb_engine_data.py`, run in production 2026-10-16 18:42Z) are retired. They live in git history,
 with their results in `.syndicate/deploys.md` (lanes `mlb-live-lens-native-p1`, `mlb-sim-engine-native-p2`,
 `mlb-daily-sim-native-p3`, `mlb-engine-data-native-p4`). Nothing is pulled from upstream any more:
-`scripts/sync_vendor_upstream.py` no longer covers MLB, and the upstream repo is BEHIND this copy
+`scripts/sync_vendor_upstream.py` is retired (2026-10-20, vendor/ is empty), and the upstream repo is BEHIND this copy
 (`.syndicate/findings_2026-10-19_mlb_vendor_deletion_scope.md`).
 
 ## Conventions the copies carry (keep them when editing)

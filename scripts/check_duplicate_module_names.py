@@ -74,7 +74,9 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 # other root we do not mean.
 ROOT_LEVEL = "."
 
-DEFAULT_ROOTS = (ROOT_LEVEL, "syndicate", "pipeline", "scripts", "tests", "vendor")
+# "vendor" left the defaults 2026-10-20 (lane nhl-vendor-delete): vendor/ no longer exists, and a missing root is an
+# error by design (an unread root must not look clean). VENDOR_ROOTS stays for an explicit --roots vendor scan.
+DEFAULT_ROOTS = (ROOT_LEVEL, "syndicate", "pipeline", "scripts", "tests")
 
 # Roots whose findings are pinned rather than failed. See the two-tier note above.
 VENDOR_ROOTS = ("vendor",)

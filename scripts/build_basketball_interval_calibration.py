@@ -104,6 +104,40 @@ def _ops_export(base_url: str, token: str, *, path: str | None = None, pattern: 
         return json.loads(response.read().decode("utf-8"))
 
 
+
+#: Production's schedule files per league (the refresh's fetch-schedule rewrites them). The builder used to read the
+#: VENDORED schedule_2026.csv: frozen at 09-25 for WNBA, and never present for NBA (so NBA always hit schedule_missing).
+_SCHEDULE_FILES = ("schedule_2025_26.csv", "schedule_2026.csv", "schedule_2026_27.csv")
+
+
+def _production_schedule(base_url: str, token: str, league_code: str):
+    """Every season schedule production holds for the league, concatenated (None if it has none). lane nhl-vendor-delete."""
+    import io
+
+    import pandas as pd
+
+    import os
+    import urllib.error
+
+    frames = []
+    # 1) The data root on disk (run on the fleet, where production's files are). 2) The ops export -- schedule files are
+    # NOT in its allowlist today (HTTP 403 "not an allowed hot or export-only artifact", measured 2026-10-20), so remotely
+    # this degrades to schedule_missing until they are added; that allowlist change is a production decision.
+    data_root = Path(os.environ.get("SYNDICATE_DATA_ROOT") or (REPO_ROOT / "data"))
+    for name in _SCHEDULE_FILES:
+        local = data_root / f"{league_code}_source" / "data" / "processed" / name
+        if local.is_file():
+            frames.append(pd.read_csv(local, dtype=str))
+            continue
+        try:
+            payload = _ops_export(base_url, token, path=f"{league_code}_source/data/processed/{name}")
+        except urllib.error.HTTPError:
+            continue
+        if payload.get("count"):
+            frames.append(pd.read_csv(io.StringIO(list(payload["artifacts"].values())[0]), dtype=str))
+    return pd.concat(frames, ignore_index=True).drop_duplicates() if frames else None
+
+
 def _processed_root(league_code: str) -> Path:
     code = str(league_code or "").strip().lower()
     env_key = "WNBA_BETTING_DATA_ROOT" if code == "wnba" else "NBA_BETTING_DATA_ROOT"
@@ -213,8 +247,7 @@ def collect_paired(*, league_code: str, base_url: str, token: str, allow_fetch: 
     cache_dir = processed_root / "_espn_cache" / str(league_code).strip().lower()
     diag["espn_cache_dir"] = str(cache_dir)
 
-    schedule_path = REPO_ROOT / "vendor" / f"{league_code}_betting_repo" / "data" / "processed" / "schedule_2026.csv"
-    sched = pd.read_csv(schedule_path, dtype=str) if schedule_path.is_file() else None
+    sched = _production_schedule(base_url, token, league_code)  # production's schedules, not the deleted vendored copy (lane nhl-vendor-delete)
     if sched is None:
         diag["reason"] = "schedule_missing"
         return [], diag

@@ -4266,52 +4266,27 @@ if (Test-SportEnabled 'WNBA') {
     }
 }
 if (Test-SportEnabled 'NHL') {
-    $nhlVendoredRoot = Resolve-VendoredRepoPath -RelativePath 'vendor\nhl_betting_repo'
-    $nhlVendoredCli = if ($nhlVendoredRoot) { Join-Path $nhlVendoredRoot 'nhl_betting\cli.py' } else { $null }
-    if ($nhlVendoredCli -and (Test-Path $nhlVendoredCli)) {
-        $preferLocalMirrorArtifactsForGate = $true
-        $nhlEnvOverrides = @{}
-        if (-not [string]::IsNullOrWhiteSpace($sharedOddsApiKey)) {
-            $nhlEnvOverrides.ODDS_API_KEY = $sharedOddsApiKey
-        }
-        $sourceSteps += [pscustomobject]@{
-            Sport = 'nhl'
-            Name = 'NHL vendored daily update'
-            Workflow = 'vendored_daily_update'
-            Command = @(
-                (Resolve-Python $repoRoot),
-                'scripts\refresh_nhl_oddsapi.py',
-                '--date', $Date,
-                '--source-root', 'vendor\nhl_betting_repo',
-                '--artifact-root', 'data\nhl_source\source_artifacts',
-                '--days-ahead', '1',
-                '--props-boxscore-n-sims', [string]$runtimePolicy.NHL.propsBoxscoreNSims
-            )
-            WorkingDirectory = $repoRoot
-            EnvironmentOverrides = $nhlEnvOverrides
-            RuntimePolicy = $runtimePolicy.NHL
-        }
+    # One native step (lane nhl-vendor-delete, 2026-10-20): vendor/nhl_betting_repo is deleted, and this was already the branch
+    # taken whenever its CLI was absent. It keeps --props-boxscore-n-sims, which only the vendored branch used to pass.
+    $nhlEnvOverrides = @{}
+    if (-not [string]::IsNullOrWhiteSpace($sharedOddsApiKey)) {
+        $nhlEnvOverrides.ODDS_API_KEY = $sharedOddsApiKey
     }
-    else {
-        $nhlEnvOverrides = @{}
-        if (-not [string]::IsNullOrWhiteSpace($sharedOddsApiKey)) {
-            $nhlEnvOverrides.ODDS_API_KEY = $sharedOddsApiKey
-        }
-        $sourceSteps += [pscustomobject]@{
-            Sport = 'nhl'
-            Name = 'NHL local odds refresh'
-            Workflow = 'syndicate_refresh'
-            Command = @(
-                (Resolve-Python $repoRoot),
-                'scripts\refresh_nhl_oddsapi.py',
-                '--date', $Date,
-                '--days-ahead', '1',
-                '--artifact-root', 'data\nhl_source\source_artifacts'
-            )
-            WorkingDirectory = $repoRoot
-            EnvironmentOverrides = $nhlEnvOverrides
-            RuntimePolicy = $runtimePolicy.NHL
-        }
+    $sourceSteps += [pscustomobject]@{
+        Sport = 'nhl'
+        Name = 'NHL local odds refresh'
+        Workflow = 'syndicate_refresh'
+        Command = @(
+            (Resolve-Python $repoRoot),
+            'scripts\refresh_nhl_oddsapi.py',
+            '--date', $Date,
+            '--days-ahead', '1',
+            '--artifact-root', 'data\nhl_source\source_artifacts',
+            '--props-boxscore-n-sims', [string]$runtimePolicy.NHL.propsBoxscoreNSims
+        )
+        WorkingDirectory = $repoRoot
+        EnvironmentOverrides = $nhlEnvOverrides
+        RuntimePolicy = $runtimePolicy.NHL
     }
 }
 if (Test-SportEnabled 'NFL') {

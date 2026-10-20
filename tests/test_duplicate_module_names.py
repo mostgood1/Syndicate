@@ -175,9 +175,16 @@ def test_a_dead_NAME_can_still_have_a_live_OBJECT():
 # --- the two roots this file was extended for --------------------------------
 
 
-def test_repo_root_and_vendor_are_both_scanned_by_default():
+def test_repo_root_is_scanned_and_vendor_only_while_it_is_tracked():
     assert "." in DEFAULT_ROOTS, "repo-root *.py files (app.py, wsgi.py, ...) must be covered"
-    assert "vendor" in DEFAULT_ROOTS, "vendored sibling-repo code must be covered"
+    # vendor/ is empty since 2026-10-20 (lane nhl-vendor-delete), so it left the defaults (a missing root is an error by
+    # design). If vendored code is ever tracked again, this fails: add "vendor" back so it is scanned.
+    import subprocess
+    from pathlib import Path
+
+    tracked = subprocess.run(["git", "ls-files", "vendor"], cwd=str(Path(__file__).resolve().parents[1]),
+                             capture_output=True, text=True).stdout.split()
+    assert ("vendor" in DEFAULT_ROOTS) == bool(tracked), tracked[:3]
 
 
 def test_the_repo_root_entry_does_not_recurse(tmp_path):

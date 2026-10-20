@@ -22,7 +22,7 @@ production's RECORDED output, which needs no vendor tree; `--reference vendored`
 `.syndicate/deploys.md` and `docs/ai_context/basketball_live_native_plan.md` (P1, P6). Since 2026-10-20 (lane `wnba-vendor-deletion-prep`, user decision
 "Freeze and start prep") the WNBA ports are frozen too, and the live-tick and source-CLI generators and the source-CLI harness
 are retired (WNBA was their last arm). `scripts/basketball_live_tick_parity.py` stays: its replay arm pins the ports against
-recorded vendored output without the tree. `scripts/sync_vendor_upstream.py` covers neither league.
+recorded vendored output without the tree. `scripts/sync_vendor_upstream.py` is retired (2026-10-20, vendor/ is empty).
 
 ## What the copies carry (keep it when editing)
 

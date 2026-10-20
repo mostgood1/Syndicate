@@ -636,7 +636,7 @@ or `refresh_odds_sources.py --dry-run --json` (resolve the command plan without 
   (`smartsim_*`, `ncaaf_*`, `nfl_*`, `soccersim_*`) were relocated to `docs/reports/` (substantive
   committed analysis reports, not dead code); the six `scripts/build_ncaaf_*_snapshot.py` generators
   that write those reports were repointed to `docs/reports/`.
-- **`vendor/` is live code, not legacy** — `vendor/mlb_bettingv2` WAS (deleted 2026-10-19; MLB runs
+- **`vendor/` is EMPTY since 2026-10-20** (all four trees deleted; their code is frozen under `syndicate/features/`). History: `vendor/mlb_bettingv2` WAS (deleted 2026-10-19; MLB runs
   `syndicate/features/mlb/{sim_engine,native/tools,live_lens_port}`, see `FROZEN_FROM_VENDOR.md`), and so was `vendor/nba_betting_repo` (deleted 2026-10-20; frozen ports in
   `syndicate/features/{basketball_engine,nba}`), and so was `vendor/wnba_betting_repo` (deleted 2026-10-20; frozen ports in
   `syndicate/features/wnba/{live_tick,source_cli}`). Historically those trees back `schedule_adapter.py`, `bootstrap_data_root.py`, and the
