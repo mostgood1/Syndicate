@@ -52035,3 +52035,14 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - Exactly one request per attempt; each was preceded by a re-read showing exactly one matching resting order. The ledger is unchanged (correctly: no venue status change to reconcile).
 - **CONSEQUENCE, system-wide:** `cancel_order` backs `cancel_stale_resting_orders` and the kickoff auto-cancel (`cancel_pregame_resting_at_kickoff`, #707 D3). Both are very likely broken for EVERY resting Kalshi order, so resting orders can ride into in-play. Fix owed: find the V2 cancel route (docs.kalshi.com, "Orders" V2) and test it on one order with the user's yes.
 - **Handed to the user:** cancel this order in the Kalshi app.
+
+## 2026-10-20 -- NOT DEPLOYED, rides the next fleet ff: ops export allowlists schedule files read-only (lane ops-export-schedules, 2ec30ec8)
+- What: `*_source/data/processed/schedule_*.{csv,json}` joined EXPORT_ONLY_ARTIFACT_PATTERNS (read-only: export/stream, never swept or
+  published). Patterns load at import, so it needs WEB on >= 2ec30ec8 (an ff + web reload). User decision: no deploy of its own; the ff
+  would carry 5 other lanes' runtime commits (7752aeed execution_exits arming controls, 67aa2882 Kalshi NCAAF ticker exception, bb702016
+  book_grid ghost rows, venue_quote fan-in).
+- **For whoever next ff's the fleet past 2ec30ec8 and reloads web:** no restart beyond web is needed for this change.
+- verify (baseline read 2026-10-20 on web 96f97a0a: HTTP 403 "path is not an allowed hot or export-only artifact"):
+  `GET /api/ops/artifacts/export?path=wnba_source/data/processed/schedule_2026.csv` -> 200, count 1 (374+ rows), and the same for
+  `nba_source/data/processed/schedule_2026_27.csv`; `is_hot_artifact_relative_path` stays False for both. Owed by lane ops-export-schedules.
+- Rollback: revert 2ec30ec8 (two pattern lines).
