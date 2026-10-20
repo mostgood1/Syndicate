@@ -51895,3 +51895,35 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - With `SYNDICATE_DATA_ROOT` set, `_basketball_source_root` resolves to the data root, not `vendor/`.
 - **MEASURED 20:01:49Z:** `/api/board/game-chips?sport=nba` BOS @ DET Q2 3:10: score 47-39, quarters [28, 19] / [27, 12], sums 47 / 39, adds up True (artifact age 15.6 s).
 - 136 game-chip tests pass. An empty or suppressed live score stays as the worker left it.
+
+
+## 2026-10-20 20:45:04Z (3:45 PM CT) -- FULL FLEET down/up, ff 8e0ca456 -> c60b79ee + `REFRESH_WORKER__SYNDICATE_LIVE_EV_FLOOR=0`: the live-only 0% net EV floor ON (lane `compounding-bankroll`, session 3927eb2e) -- deploy MET; first-build reading follows
+- **ask:** the user, in chat: "Yes: deploy the live-only 0% floor at 2:21 PM CT or later, once option C's first build reads clean. ff the fleet to ee87954d (review ride-alongs), add REFRESH_WORKER__SYNDICATE_LIVE_EV_FLOOR=0, full down/up under the three locks, verify, log in deploys.md with the undo."
+  - Re-confirmed via the fleet-watcher session at ~3:15 PM CT: "yes, enable the live EV floor".
+  - Option C's first build had read clean (18:53:44Z entry).
+- **what it does:** LIVE venue plans take Suggested rows plus rows the Suggested flag refused ONLY for EV (`ev_below_min` / `ev_net_of_fee_below_min`). The commit's `EV net of the venue fee > 0` still applies. paper2 and the main paper book stay Suggested-only.
+  - Positions are tagged `live_ev_floor=0` and logged in `reports/intelligence/live_ev_floor_positions.json`.
+  - **Stop rule:** >= 100 settled live floor bets with ROI < -5% -> `LIVE_EV_FLOOR_STOPPED`, Suggested-only.
+  - **Fail closed:** an unreadable ledger -> `LIVE_EV_FLOOR_STOP_UNKNOWN`, Suggested-only (c60b79ee, the fleet-watcher session's catch).
+- **dry run (1:46 PM CT):** kalshi 1 -> 14 positions ($0.50 -> $30.70; 3 band bets $9.64 / $5.64 / $10.00 incl. two NCAAF favourites at -900 / -1150, ten one-contract); polymarket 0 -> 1 ($0.49). Caps headroom: kalshi $110.83, polymarket $140.26.
+- **ride-alongs loaded** (on disk since peers' ffs; target c60b79ee = 8e0ca456 + my fail-closed fix):
+  - `6fb473e1`: board venue fan-in refuses venue quotes dated for another day (lane venue-fanin-game-identity, user-approved; it folded its own refresh-worker restart into this one; its re-measure is its own).
+  - `22c56001`: live Kalshi ticker-date guard (already in live-odds since 19:33:37Z).
+  - `289c0b69`: paper EV ladder, default ON, paper only, `SYNDICATE_PAPER_LADDER=off`.
+  - `9544c2e8` / `d4acdc98`: net EV carried on positions / paper rows.
+  - min_ev tuner shadow commits.
+  - `dd510faa`: vendor/wnba_betting_repo deleted. No import statements remain (92 path/comment strings only); verified by its lane.
+  - `8e0ca456`: games-rail score (web).
+- **spacing:** both roles last booted 18:21:07Z, then live-odds 19:33:37Z, so go >= 20:33:37Z. Claims were taken at 19:37Z, found HEAD moved and live-odds re-booted, and RELEASED. Re-taken 20:33:54Z (rw 79cab2c0aea53bae, lo e7081847a4b01291, web ab1b9a08f5e385eb).
+- **baseline 20:34:05Z:** HEAD 8e0ca456, healthz 200, env 138 lines with no LIVE_EV_FLOOR; refresh-worker 3000980 / live-odds 3025111 live + armed.
+- **timeline (UTC):**
+  - Drain from 20:34:14Z; **CLEAR 20:44:32Z**.
+  - `--ff-only c60b79ee` clean. Env 138 -> 141, 0 removed; backup `.bak-ev-floor-20261020T204506Z`.
+  - `down` 20:45:06 -> 20:45:26 (3 odds jobs stopped, 0 SIGKILL).
+  - `Start-ScheduledTask` 20:45:32Z, **healthz 200 at 20:45:40Z** first try.
+  - Marker cleared + `DRAIN_CLEARED` 20:45:51Z. Claims released 20:46:07Z.
+- **verify (20:45:51Z, /proc environ):**
+  - refresh-worker pid 3055456 (lstart 20:45:40Z): RENDER_GIT_COMMIT c60b79ee, `SYNDICATE_LIVE_EV_FLOOR=0`, `LIVE_SMALL_EDGE_FRACTION=0.001`, `LIVE_STAKE_BAND=on`, compounding on / venue_total / floor_one_contract / capital, MODE=live, LIVE_ARMED=1.
+  - live-odds pid 3055457: c60b79ee, live + armed.
+- **expect, first build:** `[portfolio_commit] LIVE_EV_FLOOR ... counts={...} stop={'settled': 0, 'roi': None, 'tripped': False}`. kalshi `LIVE_PLAN_WRITTEN` positions above Suggested-only, with `live_ev_floor` extras.
+- **UNDO:** delete line 141 `REFRESH_WORKER__SYNDICATE_LIVE_EV_FLOOR=0` (or restore `.bak-ev-floor-20261020T204506Z`) + a full down/up; live plans return to Suggested-only. The stop rule does this by itself at ROI < -5% after 100 settled.
