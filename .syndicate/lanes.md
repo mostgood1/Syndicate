@@ -1119,6 +1119,8 @@ death, never life — do not invert it.
     - Ceilings raised 23:58:48Z.
     - Worker-env `limits(live)`: kalshi $24.38/$121.91, polymarket $29.30/$146.51 incl. the pending deposit, all $268.42.
     - EXECUTED lines carry `trimmed=` (new code loaded).
+    - 10-20 15:01Z: the first live order on the new chain filled (Kalshi, $5.17, `trimmed=0`).
+  - **Reachability caveat (10-20):** the stake band (live-stake-band, max $10) now sits below the order cap ($24.38 kalshi / $29.30 polymarket). A live trim cannot fire while the band holds. Closing this lane may need the unit reachability test accepted as the verification, or a reading after the band or the caps change. That is a user decision.
   - Left: the first live `TRIMMED_TO_ORDER_CAP` / an EXECUTED with `trimmed>=1`, which needs a live stake over the balance-derived order cap. positions=0 at 00:05Z.
 - Goal: Live caps follow venue capital: SYNDICATE_EXECUTION_BALANCE_CAPS=on on the fleet with raised dollar ceilings; Polymarket capital counts the pending deposit (user 2026-10-19: 'the $500 pending on polymarket CAN be used'); an order over the per-order cap is trimmed to the cap instead of refused (user 2026-10-19: 'Trim to the cap')
 - Files: none held. RELEASED 2026-10-20 ~14:15Z: pipeline/execute_portfolio.py and its test went to the future-dated-live scope lane for D1 (refuse a live order already held from an earlier slate) + D3 (Kalshi orders expire at kickoff). USER DECISION in session 332cb014's chat: "Build D1 + D3 now". The trim step (08f851d1) is landed; no further edit is owed here, only the live reading.

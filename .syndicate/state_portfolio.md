@@ -97,7 +97,14 @@ ledger's user-logged bets moved to the manual portfolio "Other books" on
 2026-09-10 (`[portfolio-sign-in-and-books]`). `/portfolio/paper` untouched.
 
 **FLEET LIVE STATE `[verified 2026-10-19, session 332cb014, lane caps-revamp]`:**
-- **Stored caps** (saved 15:14:50Z): kalshi $200/day, polymarket $100/day, $25/order, $150/day all venues, 15/15/25 orders.
+- **Stored caps = dollar CEILINGS** (saved 10-19 23:58:48Z): $100/order, $1,000/day per venue, $2,000/day all venues, 50/50/100 orders. The live caps are the % of capital below them.
+- **LIVE STAKE SIZING CHAIN, measured on the 10-20 15:01Z fill** `[verified 2026-10-20 from one build's COMPOUNDING_BANKROLL + STAKE_BAND lines]`:
+  - Kelly at fixed $1,000 ($1.15).
+  - -> compounding (`basis=venue_total`: Kalshi sized on the whole account, $465.37; `min_stake=floor_one_contract`) ($0.54).
+  - -> **stake band** (lane live-stake-band: min $5, max $10, max at 5% Kelly) ($5.46).
+  - -> trim to the order cap.
+  - The band, not Kelly, sets live stake size today.
+  - **The whole chain ran end to end:** Kalshi NCAAF under, 11 @0.47 = $5.17 + $0.19 fee, filled and reconciled 5 s after submit, then refused `duplicates=1` on the next pass.
 - **First fleet live order** (16:59:37Z): Kalshi WNBA points under, filled @0.90 for $4.50.
 - **KALSHI SHARD 3 = Sports: Tennis, Baseball, Basketball** (docs.kalshi.com exchange_sharding). MLB, NBA and WNBA orders draw ONLY on shard 3 cash. With shard 3 at $0 they refuse `insufficient_shard_balance`. Read 16:34Z: {0: 170.00, 1: 75.01, 3: 245.00}. Shard 1 (Combos) is not traded.
 - **LIVE CAPS ARE A SHARE OF VENUE CAPITAL** since the 23:55:55Z full up on `d3878d69` `[verified under live-odds-worker's own environ, 23:58Z]`:
