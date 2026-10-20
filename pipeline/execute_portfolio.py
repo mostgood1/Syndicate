@@ -1105,6 +1105,28 @@ def max_slippage_dollars() -> float:
     return parsed if parsed > 0 else 0.03
 
 
+def _kalshi_contract_side(request) -> str:
+    """`yes` / `no`: the Kalshi leg this order buys, by THE SAME mapping the body uses.
+
+    THE PRICE AND THE BODY MUST AGREE ON THE LEG  [2026-10-20, user decision
+    relayed by session b87af0fc, "Fix the price bug now"]. This read `no_ask`
+    only for a literal `under`/`no` side, while `kalshi_orders.order_body_v2`
+    maps the leg with `_side_to_kalshi(side, market, line)` -- so a spread taking
+    points (`side=away`, line +20.5 -> NO) was priced at the YES ask. Measured
+    2026-10-20 21:35:55Z: OKC +20.5 on KXNBASPREAD-26OCT20OKCSAS-SAS21 went out
+    as `side=ask count=125 price=0.92` (buy NO at $0.08) instead of NO at ~$0.93
+    x 10, and rested. An unmappable side keeps the old literal rule: the body
+    refuses it by name anyway.
+    """
+    from syndicate.features.shared.kalshi_orders import OrderBuildError, _side_to_kalshi
+
+    side = str(getattr(request, "side", "") or "").strip().lower()
+    try:
+        return _side_to_kalshi(side, getattr(request, "market", None), getattr(request, "line", None))
+    except OrderBuildError:
+        return "no" if side in {"under", "no"} else "yes"
+
+
 def _kalshi_price_for(request) -> float | None:
     """The price to send: the venue's CURRENT ask, bounded by slippage.
 
@@ -1132,7 +1154,7 @@ def _kalshi_price_for(request) -> float | None:
     if not ticker:
         return None
     side = str(getattr(request, "side", "") or "").strip().lower()
-    key = "no_ask_dollars" if side in {"under", "no"} else "yes_ask_dollars"
+    key = "no_ask_dollars" if _kalshi_contract_side(request) == "no" else "yes_ask_dollars"
 
     planned = _artifact_price(ticker, key)
 
