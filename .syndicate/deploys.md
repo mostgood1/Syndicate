@@ -51644,3 +51644,33 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - Remove the `REFRESH_WORKER__SYNDICATE_LIVE_STAKE_BAND` line and do a full down/up (env is captured at `up`).
   - Or revert db339f24's portfolio_commit.py hunk, ff, and TERM refresh-worker.
 - **Not mine, same window:** balance-linked-bankroll ff'd the checkout e491c260 -> eb86488f and TERM'd live-odds-worker alone at 14:53:18Z. refresh-worker still runs the e491c260 code it loaded at 14:37:08Z.
+
+## 2026-10-20 15:01:21Z (10:01 AM CT) -- Windows watchdog copy refreshed: a stale run can no longer overwrite wsl_state.json; run bounded to a deadline -- **MET** (lane `watchdog-stale-writer`, session f490ebbb)
+- **What changed:** `deploy/local/watchdog.ps1` at `6ab163ba` + `d3b68ea9` (both on origin/main), installed with `install_watchdog_task.ps1`, which printed "kept SyndicateFleetWatchdog as registered (LogonType Password ...); script refreshed".
+  - This is not a service deploy: no Render or fleet role was touched, there was no restart, and the task registration is unchanged (PT4M, IgnoreNew, Password).
+  - Installed copy == repo: sha256 `8BADCDE2...EB8235F` for `C:\SyndicateProd\watchdog\watchdog.ps1`, the worktree file and the `d3b68ea9` blob.
+  - `6ab163ba` had been installed 14:58:48Z, and its scheduled run (below) is the first task-context reading.
+- **The defect.** PT4M kills conhost.exe, not the child powershell.exe. An overrunning run lived on and wrote `wsl_state.json` late, over a newer run's state (10-20: `last_email` wiped twice).
+  - Today the runs overran routinely. I matched the WSL-side check stamps against the Windows lines. The 09:30:54 CT run's WSL check started 14:32:39Z, and its Windows line landed 09:36:08 CT (5 m 14 s after launch, past the limit). The 09:35:54 run's wsl.exe was created 09:37:00, 65 s after launch.
+  - **Those late writers are the off-cadence log lines** (13:06:38Z / 13:07:20Z / 13:09:31Z, and 14:38-14:49Z today). Only one task writes the log, and there were no power events 12:40-14:55Z. The old log had no pid, so the 08:0x CT lines cannot be split between orphans and manual runs after the fact.
+- **The fix:**
+  - The read-modify-write (including its email) holds `wsl_state.lock`. That is an exclusive handle, released by the OS when the process dies.
+  - The state carries `observed_at` (when the writer's WSL check finished) and `run_pid`. An older observation logs `STATE_STALE` and writes nothing. A lock still held after the wait logs `STATE_BUSY`.
+  - Writes are tmp + rename.
+  - `-DeadlineSeconds 200`, counted from the process start. The WSL check gets min(120, left - 70 s reserve), with a floor of 30 s. stdout is read line by line with 5 s grace after exit, and stderr is drained.
+  - `run=<pid>` is on every line, and `took_s` / `startup_s` are on the check lines.
+  - The auto-recovery block and the email/heartbeat semantics are untouched.
+- **expect:** the scratch race clobbers under 5ff3002f and is refused under 6ab163ba. The next scheduled run logs `run=<pid> OK ... took_s=<small>` and writes `observed_at` into the live state.
+- **READING, scratch StateDir** (toasts stubbed, no smtp_alerts.json, so EMAIL_OFF and no email sent). Seed: an episode in progress with last_email set. A is a reachable check that stalls 15 s after the check. B is an unreachable check started 6 s later, so it is the newer observation.
+  - OLD 5ff3002f: A wrote last and cleared B's state (`last_email: null`, `unreachable_since: null`). The next run C began a new episode at `alert=True ... down_min=0`, which in a real outage means a second UNREACHABLE toast and email.
+  - NEW: `run=54056 STATE_STALE observed_at=...09:55:10 but the state holds a newer check (observed_at=...09:55:16 run=56316) -- left it as is`. The state stayed B's, and C logged `alert=False ... down_min=15`. Reproduced again on d3b68ea9 (10:00:28 CT).
+  - Edge tests:
+    - Lock held 30 s -> `STATE_BUSY`, no write.
+    - Lock held 8 s -> waited, then wrote.
+    - WSL sleeping 60 s with -DeadlineSeconds 95 -> `no answer from WSL within 24 s`, took_s=25.
+    - Two real `--dry-run` checks -> OK, no re-alert. They used -FleetTaskName DRILL-no-such-task, so no recovery could start.
+- **READING, task context:**
+  - The 10:00:54 CT run on 6ab163ba logged `run=36048 OK status=degraded findings=2 took_s=3 startup_s=1`, with LastTaskResult 0. The live state now holds `observed_at 10:00:57.38-05:00, run_pid 36048`.
+  - The 10:05:53 CT run on d3b68ea9: `run=24344 OK status=degraded findings=2 took_s=4 startup_s=2`, LastTaskResult 0; live state `observed_at 10:05:58.39-05:00, run_pid 24344`.
+- **Not reproduced:** the hypothesis that wsl.exe exits while holding stdout open. A background sleeper in the WSL command did not keep the pipe open (EOF within 1 s), so the line-by-line read is defensive only. WHERE today's slow runs spend their time is still unexplained. Read `startup_s` and `took_s` in the log to find out.
+- **Owed:** none for this lane. Watch for the first real `STATE_STALE` / `STATE_BUSY` in `C:\SyndicateProd\watchdog\watchdog.log`. Expect none once no pre-15:01Z old-script process is left.
