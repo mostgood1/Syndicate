@@ -717,7 +717,7 @@ once this index exists: re-splitting would orphan the parts.
 | [odds-history-segment-keys] | THE odds_history SHARD CARRIES `segment=` KEYS NOW — and three separate key builders were segment-blind, in tw | `state_worker.md` |
 | [refresh-worker-headroom-2026-09-02] | THE ~1.4GB HEADROOM FIGURE IS STALE, AND THE METRIC EVERYONE READS IS THE WRONG ONE `[2026-09-02, lane m625-en | `state_worker.md` |
 | [accuracy-autorun-OOM-2026-09-02] | THE ACCURACY AUTORUN OOM-KILLED refresh-worker. **RESOLVED — DISARMED AND VERIFIED 19:32Z.** `[2026-09-02, lan | `state_worker.md` |
-| [execution-alerts] | LIVE EXECUTION ALERTS GO TO EMAIL FROM THE 5-MIN WATCHDOG -- on main, NOT yet on the fleet `[2026-10-19, lane | `state_worker.md` |
+| [execution-alerts] | LIVE EXECUTION ALERTS GO TO EMAIL FROM THE 5-MIN WATCHDOG -- LIVE ON THE FLEET since 2026-10-19 23:55:58Z (d3878 | `state_worker.md` |
 | [local-fleet-runner] | THE THREE SERVICES RUN LOCALLY NOW — and doing it naively would have placed REAL ORDERS `[verified 2026-09-02, | `state_worker.md` |
 | [local-production-host] | PRODUCTION RUNS ON ONE MACHINE NOW — `scripts/local_production.py`, and self-publish MUST be off on a shared d | `state_worker.md` |
 | [artifact-allowlist-split] | THE ARTIFACT ALLOWLIST IS TWO LISTS NOW: READ WIDE, WRITE NARROW — and an allowlist-filtered inventory is NOT  | `state_worker.md` |
