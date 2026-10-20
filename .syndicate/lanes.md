@@ -67,7 +67,8 @@ death, never life — do not invert it.
 
 ## OPEN
 
-### venue-fanin-game-identity — OPEN — opened 2026-10-20 — session e13a70a0
+### venue-fanin-game-identity — CLOSED 2026-10-20 (GOAL MET) — opened 2026-10-20 — session e13a70a0
+- GOAL VERDICT `[2026-10-20 21:08:26Z]`: **MET.** 6fb473e1 loaded in refresh-worker pid 3055456 (lstart 20:45:40Z, compounding-bankroll's full down/up on c60b79ee; my own gated TERM was never sent). First board after it (21:06:30Z): **0 of 56** Kalshi and **0 of 454** Polymarket venue tickers dated for another day (baseline 19:05Z: 58 of 134). Guard counters first build: CROSS_DATE_REJECTED_GRID ncaaf 331, soccer 576, nba 34, nhl 28, nfl 0; ROWS 581. deploys.md entry 2026-10-20 21:08:26Z. Claims: none held.
 - Goal: USER DECISION 2026-10-20 ~18:45Z (relayed by 332cb014: "Guard + fix the join"). Fix the BOARD half: the venue fan-in must not attach a venue quote for a DIFFERENT game of the same team -- the ticker/market date must equal the row's own commence_time date, so a wrong-game quote never reaches quote.book_prices / best_any_book / the consensus fair. The order-time guard is NOT this lane (future-dated-live owns pipeline/execute_portfolio.py).
 - Files: syndicate/features/shared/venue_quote_fanin.py, tests/test_venue_fanin_game_identity.py (NEW)
 - Hypothesis: _date_verdict admits any game of the team inside the forward horizon and nothing compares the ticker date to the row's commence_time, so a team-keyed h2h/total key collects the next game's quote.
