@@ -33,15 +33,9 @@ from syndicate.features.basketball_engine.league_engine import SWITCHES, LeagueE
 from tests.basketball_engine_fixtures import synthetic_game_kwargs  # noqa: E402
 
 
-@pytest.mark.parametrize("sampler_name", ["production", "vendored_default"])
-def test_synthetic_parity_is_exact(sampler_name):
-    sampler = parity.production_sampler() if sampler_name == "production" else None
-    n = 0
-    for source, case in parity.synthetic_cases(24, seed=91 if sampler is None else 17):
-        res = parity.replay_case(case, sampler)
-        assert res["ok"], (source, res["diffs"])
-        n += 1
-    assert n == 24
+# test_synthetic_parity_is_exact (native vs the VENDORED engine on synthetic cases) was retired with
+# vendor/nba_betting_repo (lane nba-vendor-delete, 2026-10-20). The gate of record is --corpus against production's recorded
+# output; test_recorded_reference_passes_on_production_output_and_fails_on_any_change pins that mode.
 
 
 # The port tool's `--check` (engine.py == a regeneration from the vendored source) was a gate only until the switch.

@@ -353,6 +353,13 @@ def main(argv: list[str] | None = None) -> int:
     reference = args.reference
     if args.synthetic and reference == "recorded":
         reference = "vendored"  # synthetic cases have no recorded production output; the comparison is to the vendored engine
+    if reference == "vendored":
+        try:
+            vendored_events_module("nba")
+        except Exception as exc:  # the vendored trees are being deleted (lane nba-vendor-delete)
+            print(f"--reference vendored / --synthetic need the vendored engine, which is not importable here ({type(exc).__name__}: {exc}). "
+                  "Use --corpus with the default --reference recorded.", file=sys.stderr)
+            return 2
     replay = replay_case_recorded if reference == "recorded" else replay_case
     cases = iter_corpus(args.corpus) if args.corpus else synthetic_cases(args.synthetic)
     started = time.time()

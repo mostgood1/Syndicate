@@ -337,7 +337,6 @@ def test_os_open_for_reading_the_mirror_is_not_reported(data_mirror_write_guard)
     "relative, inside",
     [
         ("vendor/wnba_betting_repo/data/processed/schedule_2026.csv", True),
-        ("vendor/nba_betting_repo/data/processed/x.json", True),
         # MLB's engine data root moved off vendor (lane mlb-engine-data-native-p4); it is guarded the same way.
         ("engines/mlb/data/tuning/x.json", True),
         # Vendor SOURCE is not an artifact mirror; guarding it would fire on
