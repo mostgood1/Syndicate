@@ -51386,3 +51386,18 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - Self-heal: `SYNDICATE_EXECUTION_SELF_HEAL=off`.
   - All live money: the /portfolio kill switch.
 - Claims released 00:07Z.
+
+
+## 2026-10-20 00:15:17Z (7:15 PM CT 10-19) -- READING: compounding-bankroll `on`, FIRST BUILD -- branch MET, effect NOT YET OBSERVED (lane `compounding-bankroll`, session 3927eb2e)
+- **What went live:** `REFRESH_WORKER__SYNDICATE_COMPOUNDING_BANKROLL=on`, folded into caps-revamp's merged down/up (its entry; up 23:55:55Z on `d3878d69`).
+  - User approval verbatim: "Yes: fold compounding ON into caps-revamp's single down/up at 08f851d1 (balance caps on, trim-to-cap, Polymarket capital incl. the pending deposit so compounding sizes Polymarket off ~$586). caps-revamp runs it; confirm the sell-to-close exit code stays paper before it rides along."
+  - Env flip written by me at 22:57:26Z: line 126 `=shadow` -> `=on`, 128 lines before and after; backup `local_production.env.bak-compounding-on-20261019T225726Z`.
+- **Exit code stays paper:** 0 `SYNDICATE_EXIT_MODE` / `SYNDICATE_EXIT_LIVE_ARMED` keys in the env file and in both workers' environ (22:57Z); `exit_mode()` defaults to paper. The runner re-checked independently.
+- **Verify (my own watcher):** refresh-worker respawn pid 2702035, lstart 23:55:53Z, HEAD `d3878d69`. environ: `SYNDICATE_COMPOUNDING_BANKROLL=on`, `SYNDICATE_EXECUTION_BALANCE_CAPS=on`, MODE=live, LIVE_ARMED=1.
+- **First build 00:15:17Z** (branch, not outcome): `COMPOUNDING_BANKROLL ... mode=on` for kalshi, polymarket, novig and prophetx, all `unknown={}`.
+  - **0 positions on both live venues, so no stake was re-sized yet.**
+  - kalshi: rows_in 11, refusals `below_min_ev_pct_net_of_fee` 6, `below_min_ev_pct` 2, `below_min_stake` 2 (fixed-bankroll stage), `in_play_market_fair` 1.
+  - polymarket: rows_in 8, `aggregator_priced` 6, `below_min_ev_pct_net_of_fee` 2.
+- **Capital per the worker at 23:58Z** (runner's read): kalshi 487.65, polymarket 586.05 (includes the pending deposit by user decision).
+- **Owed:** the first live position sized under `on`, and its placed stake vs the balance-derived cap. Scheduled task `compounding-shadow-day-read` (re-pointed to the `on` reading) runs 2026-10-20 17:00 CT.
+- **Rollback (mine):** flip line 126 back to `=shadow` (or delete it) + full down/up.
