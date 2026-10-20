@@ -116,6 +116,10 @@ LOG_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
 _EXECUTION_LINE = re.compile(r"\[live_odds_worker\] EXECUTION status=(\S+) reason=(\S+) mode=(\S+) venue=(\S+)"
                              r".*? refused=(\{.*?\}) spent=")
 _SELF_HEALED = re.compile(r"\[execution_self_heal\] UNKNOWN_SUBMIT_AUTO_RESOLVED .*?finding=(\S+)")
+# Lines that QUOTE other processes' command lines. ALL_PROCESS_MEMORY lists every process's cmdline once a second,
+# so a session grepping for "EXECUTION_ERROR" shows up there as a "failure line" -- measured on the fleet 2026-10-19
+# 22:41:15Z, 3 such lines in one second, which is a full burst. They are never evidence of a failure.
+_QUOTING_LINE = re.compile(r"\b(?:ALL_PROCESS_MEMORY|MEMORY_WATCHDOG|PROCESS_TREE)\b")
 _VENUE_IN_LINE = re.compile(r"\bvenue=(kalshi|polymarket)")
 
 
@@ -388,6 +392,8 @@ def configured_venues(exec_state: Mapping[str, Any] | None) -> list[str]:
 def log_hits(lines: Iterable[str]) -> dict[str, list[str]]:
     hits: dict[str, list[str]] = {}
     for line in lines:
+        if _QUOTING_LINE.search(line):
+            continue
         for group, pattern in LOG_PATTERNS:
             if pattern.search(line):
                 match = _VENUE_IN_LINE.search(line)
@@ -516,6 +522,8 @@ def accumulate(lines: Iterable[str], acc: dict[str, Any], now: dt.datetime) -> d
     acc = {k: v for k, v in (acc or {}).items()
            if k >= (central(now).date() - dt.timedelta(days=DIGEST_DAYS_KEPT)).isoformat()}
     for line in lines:
+        if _QUOTING_LINE.search(line):
+            continue
         stamp = _parse_time(line[:24].rstrip()) if line[:4].isdigit() else None
         day = central(stamp or now).date().isoformat()
         bucket = acc.setdefault(day, {"ticks": {}, "refusals": {}, "errors": {}})

@@ -250,3 +250,11 @@ def test_digest_counts_self_heal_resolutions():
             "venue_order_id=o state=filled ticker=T stake=4.5 dry_run=False error=None")
     acc = xw.accumulate([line, "2026-10-19T20:01:00.000Z [live_odds_worker] SELF_HEAL_FAILED KeyError: x"], {}, NOW)
     assert acc["2026-10-19"]["self_healed"] == {"placed": 1} and acc["2026-10-19"]["errors"] == {"tick": 1}
+
+
+def test_memory_snapshots_quoting_a_grep_are_not_failures():
+    """ALL_PROCESS_MEMORY carries every process's cmdline; a session's grep for the pattern is not a failure."""
+    quoted = ('2026-10-19T22:41:15.478Z ALL_PROCESS_MEMORY {"processes": [{"cmdline": ["grep", '
+              '"[live_odds_worker] EXECUTION_ERROR", "live-odds-worker.log"]}]}')
+    assert xw.log_hits([quoted] * 5) == {}
+    assert xw.accumulate([quoted], {}, NOW) == {}
