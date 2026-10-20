@@ -348,6 +348,17 @@ def test_job_is_due_daily_weekly_and_once_per_day():
     assert not lp.job_is_due(weekly, _utc(2026, 10, 5, 8, 59), None)
 
 
+def test_interval_job_is_due_by_its_last_start_not_by_the_day():
+    hourly = lp.ScheduledJob("h", 0, 0, ("x",), every_minutes=60)
+    now = _utc(2026, 10, 20, 13, 0)
+    assert lp.job_is_due(hourly, now, None, None)
+    assert lp.job_is_due(hourly, now, "2026-10-20", "2026-10-20T12:00:00+00:00")
+    assert not lp.job_is_due(hourly, now, "2026-10-20", "2026-10-20T12:30:00+00:00")
+    assert lp.job_is_due(hourly, now, "2026-10-20", "garbage")
+    shadow = {job.name: job for job in lp.SCHEDULED_JOBS}["kalshi-maker-shadow"]
+    assert shadow.every_minutes == 60 and shadow.argv == ("scripts/run_kalshi_maker_shadow.py",)
+
+
 def test_run_due_jobs_substitutes_home_runs_once_and_records_rc(settings):
     import json
     import time

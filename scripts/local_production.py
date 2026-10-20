@@ -918,6 +918,11 @@ class ScheduledJob:
     minute: int  # UTC
     argv: tuple[str, ...]  # after sys.executable; "{home}" is replaced with the local home
     weekday: int | None = None  # None = daily; 0 = Monday (Render cron `* * 1`)
+    # Repeating job: due whenever its last START is at least this many minutes old (hour/minute are
+    # then ignored; the first run is the first tick). Still one process at a time: a running job is
+    # never relaunched. `last_run_date` is stamped on every start, so the watchdog's "has not run
+    # today" check reads it like a daily job due at hour:minute.
+    every_minutes: int | None = None
 
 
 # Render cron jobs that were created in the dashboard, not in render.yaml, plus
@@ -1022,10 +1027,27 @@ SCHEDULED_JOBS: tuple[ScheduledJob, ...] = (
     # `research/forward_inputs/<sport>/quotes/` -- a path no retention rule matches -- so the season-long reads (H7, R1,
     # S1F, M1/M2) outlive the 120-day `book_quotes` rule. Read by nothing until a final read runs `--restore`.
     ScheduledJob("preserve-forward-inputs", 12, 5, ("scripts/preserve_forward_inputs.py",)),
+    # `kalshi-maker-shadow` (lane `kalshi-maker-shadow-paper`, 2026-10-20): the PAPER-ONLY Kalshi maker
+    # (resting-bid) shadow, pre-registered in .syndicate/findings_2026-10-20_kalshi_maker_shadow_preregistration.md.
+    # Places NO order (no order module is importable from it; a test pins that). HOURLY because venue_odds keeps
+    # only the last 48 points per ticker and game-day markets fill that in ~2h; hourly never exceeded 39.
+    # The evaluation takes its pre-registered looks once a day, after the night's results settle.
+    ScheduledJob("kalshi-maker-shadow", 0, 0, ("scripts/run_kalshi_maker_shadow.py",), every_minutes=60),
+    ScheduledJob("kalshi-maker-shadow-eval", 12, 30, ("scripts/evaluate_kalshi_maker_shadow.py",)),
 )
 
 
-def job_is_due(job: ScheduledJob, now: dt.datetime, last_run_date: str | None) -> bool:
+def job_is_due(
+    job: ScheduledJob, now: dt.datetime, last_run_date: str | None, last_started_at: str | None = None
+) -> bool:
+    if job.every_minutes:
+        try:
+            started = dt.datetime.fromisoformat(str(last_started_at))
+        except (TypeError, ValueError):
+            return True
+        if started.tzinfo is None:
+            started = started.replace(tzinfo=dt.timezone.utc)
+        return (now - started).total_seconds() >= job.every_minutes * 60
     if last_run_date == now.date().isoformat():
         return False
     if job.weekday is not None and now.weekday() != job.weekday:
@@ -1058,7 +1080,8 @@ def run_due_jobs(
             state.setdefault(name, {})["last_rc"] = proc.returncode
             state[name]["finished_at"] = now.isoformat()
             running.pop(name, None)
-        if not job_is_due(job, now, state.get(name, {}).get("last_run_date")):
+        row = state.get(name, {})
+        if not job_is_due(job, now, row.get("last_run_date"), row.get("started_at")):
             continue
         argv = [part.replace("{home}", str(settings.home)) for part in job.argv]
         log_path = settings.logs_dir / f"job-{name}.log"
@@ -2173,6 +2196,8 @@ def cmd_status(args: argparse.Namespace) -> int:
     for job in SCHEDULED_JOBS:
         row = job_state.get(job.name) or {}
         when = f"{'Mon ' if job.weekday == 0 else ''}{job.hour:02d}:{job.minute:02d}Z"
+        if job.every_minutes:
+            when = f"every {job.every_minutes}m"
         print(f"  job {job.name:21} {when:10} last_run={row.get('last_run_date', 'never')}  rc={row.get('last_rc', '-')}")
     for name in (info.get("roles") or {}):
         print(f"\n--- {name} (last {args.lines} lines) ---")
