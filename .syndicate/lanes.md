@@ -1403,6 +1403,14 @@ death, never life — do not invert it.
 - Verification: Reachability test off!=on; offline replay on fleet shards drops exactly the Iowa@Minnesota event from the 10-23 grid and nothing else
 - Blocked by: none
 
+### in-game-trading — OPEN — opened 2026-10-20 — session 15ceeb14-5d5b-47c4-9b84-e483511d5716
+- Goal: Measured in-play venue-vs-book edge on NBA/NHL (read-only) and a staged in-game trading plan (held-position loop, in-game fair price, in-play entries, Polymarket in-play rule, one-engine fit) in a findings file, each stage with its user decision
+- Files: scripts/inplay_recorder.py, scripts/inplay_edge_report.py, .syndicate/findings_2026-10-20_in_game_trading.md
+- Hypothesis: Kalshi/Polymarket in-play quotes lag the in-play sharp consensus long enough (>= one venue quote cadence) that fee-adjusted positive sides exist and persist
+- Falsification test: Positive-after-fee sides at venue price are rare (<~1% of side-minutes) or last less than one quote refresh
+- Verification: findings file with denominators + windows; recorder data in C:/tmp/inplay_2026-10-20
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
