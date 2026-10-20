@@ -366,7 +366,9 @@ def sgp_leg_actuals(root: Path, day: str, sheet: Mapping[str, Any]) -> dict[str,
                 if rec.get("date") == day:
                     tickets.append(rec)
         # Cross-game parlays (2026-10-20): this sport's legs of the day's tickets, read off the same box scores.
-        for kind_tickets in (_cross_doc(root, day).get("kinds") or {}).values():
+        cross = _cross_doc(root, day)
+        lists = list((cross.get("kinds") or {}).values()) + list(((cross.get("by_sport") or {}).get(sport) or {}).values())
+        for kind_tickets in lists:
             for t in kind_tickets or []:
                 mine = [leg for leg in t.get("legs") or [] if leg.get("sport") == sport and leg.get("kind") == "prop"]
                 if mine:
@@ -397,7 +399,7 @@ def grade_cross(root: Path, sheets_dir: Path, today: str, *, days: int = 7) -> i
     for k in range(days, -1, -1):
         day = (datetime.fromisoformat(today) - timedelta(days=k)).date().isoformat()
         doc = _cross_doc(root, day)
-        if not doc.get("kinds"):
+        if not doc.get("kinds") and not doc.get("by_sport"):
             continue
         recs = {}
         for sport in doc.get("sports") or []:
@@ -407,8 +409,14 @@ def grade_cross(root: Path, sheets_dir: Path, today: str, *, days: int = 7) -> i
                 continue
         if not recs:
             continue
-        graded = {t["xg_id"]: dict(xg.grade(t, recs), kind=kind, price=t.get("price"), p_joint=t.get("p_joint"))
-                  for kind, tickets in doc["kinds"].items() for t in tickets or [] if t.get("xg_id")}
+        graded = {t["xg_id"]: dict(xg.grade(t, recs), kind=kind, scope="multi", price=t.get("price"), p_joint=t.get("p_joint"))
+                  for kind, tickets in (doc.get("kinds") or {}).items() for t in tickets or [] if t.get("xg_id")}
+        for sport, kinds in (doc.get("by_sport") or {}).items():       # one sport across its games
+            for kind, tickets in (kinds or {}).items():
+                for t in tickets or []:
+                    if t.get("xg_id"):
+                        graded[t["xg_id"]] = dict(xg.grade(t, recs), kind=kind, scope=sport, price=t.get("price"),
+                                                  p_joint=t.get("p_joint"))
         write_atomic(root / CROSS_DIR / f"{day}.graded.json",
                      {"date": day, "graded_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "tickets": graded})
         counts = collections.Counter(g["status"] for g in graded.values())

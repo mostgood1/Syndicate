@@ -1040,14 +1040,28 @@ def attach_cross_game(data_root: Path, day: str, *, now: datetime | None = None)
         prior = json.loads(target.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         prior = {}
-    out = {"date": day, "generated_at": now.isoformat(timespec="seconds"), "sports": sorted(sheets), "kinds": {}}
+    out = {"date": day, "generated_at": now.isoformat(timespec="seconds"), "sports": sorted(sheets), "kinds": {},
+           "by_sport": {}}
+
+    def merged(kind: str, legs: list, prior_tickets: list | None, **kw) -> list:
+        frozen = [t for t in prior_tickets or [] if any(str(l.get("event_id")) in started for l in t.get("legs") or [])]
+        fresh = [t for t in xg.tickets(legs, kind, **kw) if t["xg_id"] not in {f["xg_id"] for f in frozen}]
+        return frozen + fresh[:max(0, xg.KINDS[kind]["per_sheet"] - len(frozen))]
+
     for kind, legs in (("hit_rate", hit), ("value", value)):
-        frozen = [t for t in (prior.get("kinds") or {}).get(kind) or []
-                  if any(str(l.get("event_id")) in started for l in t.get("legs") or [])]
-        fresh = [t for t in xg.tickets(legs, kind) if t["xg_id"] not in {f["xg_id"] for f in frozen}]
-        out["kinds"][kind] = frozen + fresh[:max(0, xg.KINDS[kind]["per_sheet"] - len(frozen))]
-        print(f"CHEAT_SHEET cross {kind} date={day}: legs {len(legs)} tickets {len(out['kinds'][kind])} "
-              f"(kept {len(frozen)} started)", flush=True)
+        # ACROSS SPORTS: at least two sports a ticket (a one-sport ticket is that sport's own list, below).
+        out["kinds"][kind] = merged(kind, legs, (prior.get("kinds") or {}).get(kind), min_sports=2)
+        # ONE SPORT ACROSS ITS GAMES (user 2026-10-20: "we also need single sport, cross slate plays"). A small slate
+        # cannot reach +100 one leg a game (NBA's 3-game opener: three ~-550 legs multiply to about -150).
+        singles = {}
+        for sport in sorted(sheets):
+            mine = merged(kind, [l for l in legs if l["sport"] == sport],
+                          ((prior.get("by_sport") or {}).get(sport) or {}).get(kind))
+            if mine:
+                out["by_sport"].setdefault(sport, {})[kind] = mine
+                singles[sport] = len(mine)
+        print(f"CHEAT_SHEET cross {kind} date={day}: legs {len(legs)} across sports {len(out['kinds'][kind])} "
+              f"one sport {singles}", flush=True)
     write_atomic(target, out)
     return out
 

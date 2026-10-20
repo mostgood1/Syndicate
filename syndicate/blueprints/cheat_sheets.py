@@ -111,13 +111,20 @@ def _cross(sport: str, day: str) -> dict[str, Any] | None:
         graded = json.loads((root / f"{day}.graded.json").read_text(encoding="utf-8")).get("tickets") or {}
     except (OSError, ValueError, AttributeError):
         graded = {}
+    def with_result(t: dict[str, Any]) -> dict[str, Any]:
+        return dict(t, **({"result": graded[t["xg_id"]]} if t.get("xg_id") in graded else {}))
+
     kinds = {}
     for kind, tickets in ((doc or {}).get("kinds") or {}).items():
-        mine = [dict(t, **({"result": graded[t["xg_id"]]} if t.get("xg_id") in graded else {}))
-                for t in tickets or [] if any(leg.get("sport") == sport for leg in t.get("legs") or [])]
+        mine = [with_result(t) for t in tickets or [] if any(leg.get("sport") == sport for leg in t.get("legs") or [])]
         if mine:
             kinds[kind] = mine
-    return {"generated_at": doc.get("generated_at"), "kinds": kinds} if kinds else None
+    # This sport alone, across its games (2026-10-20: "we also need single sport, cross slate plays").
+    single = {kind: [with_result(t) for t in tickets or []]
+              for kind, tickets in (((doc or {}).get("by_sport") or {}).get(sport) or {}).items() if tickets}
+    if not kinds and not single:
+        return None
+    return {"generated_at": doc.get("generated_at"), "kinds": kinds, "single": single}
 
 
 def _sports() -> list[str]:

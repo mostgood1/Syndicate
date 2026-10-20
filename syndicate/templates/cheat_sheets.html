@@ -501,13 +501,18 @@ function xgRow(t) {
   </div>`;
 }
 function crossBlock(d, game) {
-  const kinds = (d.cross && d.cross.kinds) || {};
+  const kinds = (d.cross && d.cross.kinds) || {}, single = (d.cross && d.cross.single) || {};
   const pick = ts => (ts || []).filter(t => !game || (t.legs || []).some(l => l.event_id === game.event_id));
-  const hit = pick(kinds.hit_rate), val = pick(kinds.value);
-  if (!hit.length && !val.length) return "";
+  const name = SPORT_NAMES[d.sport] || (d.sport || "").toUpperCase();
+  const groups = [[`${name} across games: built for hit rate`, "hit_rate", pick(single.hit_rate)],
+                  [`${name} across games: built for value`, "value", pick(single.value)],
+                  ["Across sports: built for hit rate", "hit_rate", pick(kinds.hit_rate)],
+                  ["Across sports: built for value", "value", pick(kinds.value)]];
+  const n = groups.reduce((a, g) => a + g[2].length, 0);
+  if (!n) return "";
   const part = (title, kind, ts) => ts.length ? `<h3 class="sub">${esc(title)}</h3><p class="note">${esc(XG_NOTE[kind])}</p><div class="cards">${ts.map(xgRow).join("")}</div>` : "";
-  return sectionShell("cross", "Cross-game parlays", "One leg from each game, across every sport on today's sheets, +100 or better at one book. Paid at the full price of the legs multiplied -- unlike a same-game parlay, which books discount.",
-    `${hit.length + val.length} parlay${hit.length + val.length === 1 ? "" : "s"}`, part("Built for hit rate", "hit_rate", hit) + part("Built for value", "value", val));
+  return sectionShell("cross", "Cross-game parlays", `One leg from each game, +100 or better at one book: ${esc(name)} on its own, and across every sport on today's sheets. Paid at the full price of the legs multiplied -- unlike a same-game parlay, which books discount.`,
+    `${n} parlay${n === 1 ? "" : "s"}`, groups.map(g => part(...g)).join(""));
 }
 function sgpBlock(d, game) {
   const sgps = (d.sgp || []).filter(s => !game || s.event_id === game.event_id);

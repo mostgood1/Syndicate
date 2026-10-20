@@ -96,13 +96,15 @@ def test_the_build_writes_the_day_beside_cheatsheets_and_keeps_a_started_ticket(
     (folder / f"{DAY}.json").write_text(json.dumps({"sport": "nba", "date": DAY, "rows": rows, "games": games}), encoding="utf-8")
     before = datetime(2026, 10, 20, 18, tzinfo=timezone.utc)
     out = bcs.attach_cross_game(tmp_path, DAY, now=before)
-    assert out["kinds"]["value"] and (tmp_path / "cheatsheets_cross" / f"{DAY}.json").is_file()
+    assert (tmp_path / "cheatsheets_cross" / f"{DAY}.json").is_file()
     assert not (tmp_path / "cheatsheets" / "cross").exists()                     # never a "sport" dir
-    first = out["kinds"]["value"][0]["xg_id"]
+    assert out["kinds"]["value"] == []                                           # one sport only: not "across sports"
+    assert out["by_sport"]["nba"]["value"]                                       # ... it is NBA's own cross-game list
+    first = out["by_sport"]["nba"]["value"][0]["xg_id"]
     rows[0]["book_prices"] = {"fanduel": -200}                                   # after tip-off the line moved: no longer value
     (folder / f"{DAY}.json").write_text(json.dumps({"sport": "nba", "date": DAY, "rows": rows, "games": games}), encoding="utf-8")
     later = bcs.attach_cross_game(tmp_path, DAY, now=datetime(2026, 10, 20, 23, 10, tzinfo=timezone.utc))
-    assert [t["xg_id"] for t in later["kinds"]["value"]] == [first]             # started: kept as built, the record
+    assert [t["xg_id"] for t in later["by_sport"]["nba"]["value"]] == [first]   # started: kept as built, the record
 
 
 def test_the_page_shows_a_sports_cross_tickets_with_their_result(tmp_path, monkeypatch):
@@ -115,24 +117,28 @@ def test_the_page_shows_a_sports_cross_tickets_with_their_result(tmp_path, monke
     cross.mkdir()
     t_nba = {"xg_id": "xg_a", "kind": "value", "legs": [{"sport": "nba", "event_id": "e1"}, {"sport": "nhl", "event_id": "h1"}]}
     t_nhl = {"xg_id": "xg_b", "kind": "value", "legs": [{"sport": "nhl", "event_id": "h1"}, {"sport": "nhl", "event_id": "h2"}]}
-    (cross / f"{DAY}.json").write_text(json.dumps({"date": DAY, "kinds": {"value": [t_nba, t_nhl]}}), encoding="utf-8")
+    t_one = {"xg_id": "xg_c", "kind": "hit_rate", "legs": [{"sport": "nba", "event_id": "e1"}, {"sport": "nba", "event_id": "e2"}]}
+    (cross / f"{DAY}.json").write_text(json.dumps({"date": DAY, "kinds": {"value": [t_nba, t_nhl]},
+                                                   "by_sport": {"nba": {"hit_rate": [t_one]}}}), encoding="utf-8")
     (cross / f"{DAY}.graded.json").write_text(json.dumps({"tickets": {"xg_a": {"status": "won", "units": 1.2}}}), encoding="utf-8")
     doc = route._read("nba", DAY)
     assert [t["xg_id"] for t in doc["cross"]["kinds"]["value"]] == ["xg_a"] and doc["cross"]["kinds"]["value"][0]["result"]["status"] == "won"
+    assert [t["xg_id"] for t in doc["cross"]["single"]["hit_rate"]] == ["xg_c"]   # NBA across its own games
     html = app.test_client().get(f"/cheatsheets?sport=nba&date={DAY}").get_data(as_text=True)
     assert "function crossBlock" in html and "crossBlock(d, game)" in html
     assert "cross" not in route._sports()
 
 
 def test_the_all_sports_scorecard_counts_cross_tickets_in_units_apart_from_featured():
-    graded = [{"date": "2026-10-18", "tickets": {"a": {"kind": "value", "status": "won", "units": 1.5},
-                                                 "b": {"kind": "value", "status": "lost", "units": -1.0},
-                                                 "c": {"kind": "hit_rate", "status": "pending", "units": None}}}]
+    graded = [{"date": "2026-10-18", "tickets": {"a": {"kind": "value", "status": "won", "units": 1.5, "scope": "multi"},
+                                                 "b": {"kind": "value", "status": "lost", "units": -1.0, "scope": "nhl"},
+                                                 "c": {"kind": "hit_rate", "status": "pending", "units": None, "scope": "nhl"}}}]
     rec = csr.season_record([], generated_at="x", cross=graded)
     assert rec["official"]["totals"]["xg_value"] == {"w": 1, "l": 1, "n": 2, "units": 0.5, "win_pct": 50.0, "roi_pct": 25.0}
     assert "xg_hit_rate" not in rec["official"]["totals"]                        # nothing settled
     assert {"key": "xg_value", "label": "Cross-game parlays: value", "cross": True} in rec["sections"]
-    assert rec["applies"]["xg_value"] == [] and rec["applies"]["xg_hit_rate"] == []   # the all-sports scorecard only
+    assert rec["official"]["by_sport"]["nhl"]["xg_value"]["n"] == 1             # the one-sport ticket: NHL's own card too
+    assert rec["applies"]["xg_value"] == list(cs.SPORT_ORDER)
 
 
 def test_the_reconcile_grades_the_cross_days_into_their_own_file(tmp_path):
@@ -150,3 +156,13 @@ def test_the_reconcile_grades_the_cross_days_into_their_own_file(tmp_path):
     assert rc.grade_cross(tmp_path, sheets, DAY) == 1
     graded = json.loads((tmp_path / "cheatsheets_cross" / f"{DAY}.graded.json").read_text(encoding="utf-8"))
     assert graded["tickets"]["xg_1"]["status"] == "won" and graded["tickets"]["xg_1"]["kind"] == "value"
+    assert graded["tickets"]["xg_1"]["scope"] == "multi"
+
+
+def test_across_sports_needs_two_sports_and_one_sport_tickets_stay_in_their_sport():
+    pool = {f"h{i}": [_hit_leg(f"h{i}", f"N{i}", 0.80, {"fanduel": -300})] for i in range(4)}
+    legs = xg.hit_rate_legs("nhl", pool, {}) + xg.hit_rate_legs("nba", {"b0": [_hit_leg("b0", "B0", 0.80, {"fanduel": -300})]}, {})
+    mixed = xg.tickets(legs, "hit_rate", min_sports=2)
+    assert mixed and all(len(t["sports"]) >= 2 for t in mixed)
+    nhl_only = xg.tickets([l for l in legs if l["sport"] == "nhl"], "hit_rate")
+    assert nhl_only and all(t["sports"] == ["nhl"] for t in nhl_only)

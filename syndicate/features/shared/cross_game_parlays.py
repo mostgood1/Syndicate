@@ -108,7 +108,7 @@ def value_legs(sheet: Mapping[str, Any], *, started: Iterable[str] = ()) -> list
         add({"sport": sport, "kind": "pick", "event_id": pick.get("event_id"), "matchup": pick.get("matchup"),
              "commence_time": pick.get("commence_time"), "player": pick.get("player_name"), "market": pick.get("market"),
              "side": pick.get("side"), "line": pick.get("line"), "p": p, "prices": prices, "ev_by_book": evs,
-             "bet": f"{pick.get('player_name') + ' ' if pick.get('player_name') else ''}{pick.get('bet') or cs.pick_bet_text(pick)}",
+             "bet": f"{pick.get('player_name') + ' ' if pick.get('player_name') else ''}{cs.pick_bet_text(pick)}",
              "result_key": cs.pick_result_key(pick)})
     for line in sheet.get("game_lines") or []:
         check = line.get("check") or {}
@@ -169,7 +169,8 @@ def _best_book(combo: Sequence[Mapping[str, Any]]) -> tuple[str, float] | None:
     return best
 
 
-def tickets(legs: Sequence[Mapping[str, Any]], kind: str, *, min_decimal: float = MIN_DECIMAL) -> list[dict[str, Any]]:
+def tickets(legs: Sequence[Mapping[str, Any]], kind: str, *, min_decimal: float = MIN_DECIMAL,
+            min_sports: int = 1) -> list[dict[str, Any]]:
     """The kind's tickets: one leg per game, every leg priced at the ticket's book, the legs multiplied >= `min_decimal`.
     Both kinds: the likeliest first (value: among tickets whose legs beat their prices, up to +300). A ticket sharing
     all but one leg with a better one is dropped."""
@@ -188,6 +189,8 @@ def tickets(legs: Sequence[Mapping[str, Any]], kind: str, *, min_decimal: float 
     built = []
     for size in spec["sizes"]:
         for gs in itertools.combinations(sorted(by_game), size):
+            if min_sports > 1 and len({g.split("|", 1)[0] for g in gs}) < min_sports:
+                continue                 # "across sports": a one-sport ticket belongs to that sport's own list
             for combo in itertools.product(*(by_game[g] for g in gs)):
                 best = _best_book(combo)
                 if not best or best[1] < min_decimal or best[1] > spec.get("max_decimal", float("inf")):
