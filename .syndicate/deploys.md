@@ -51342,3 +51342,47 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - Measured: roles up 23:56:03Z, all `code=d3878d69`. **Watchdog first run on the new code 23:55:58Z:** `watchdog_state.json` gained an `execution` block (log_cursor, digest_acc, log_holds, limits, last_digest_day=2026-10-18); finding `exec:pending_deposit` NEW ($500 inside buyingPower $586.05); `alert_mailer.log` EMAIL_SENT `[Syndicate] warning exec:pending_deposit` + EMAIL_SENT `[Syndicate] daily digest 10-18: live P&L +$0.00`. The 4 drill emails (deploys.md 23:04:45Z entry) were confirmed RECEIVED by the user. **live-odds-worker first tick on d3878d69 23:56:51Z/55Z:** EXECUTION status=ok on kalshi + polymarket, `SELF_HEAL_FAILED` 0, no `SELF_HEAL` line (0 unknown submits -> no venue call, as designed). VENUE_BALANCES kalshi=ok:461.37 polymarket=ok:586.05.
 - Defect found in the reading, FIXED on main `a4aacc8f`, NOT on the fleet: ALL_PROCESS_MEMORY lines quote other processes' cmdlines; 3 at 22:41:15Z carried a session's `grep '... EXECUTION_ERROR'`, which the log scan would count as a failure burst (worst case one false FAIL email, held 30 min). Loads at the next fleet checkout ff (watchdog-only; no restart). Not ff'd now: main past d3878d69 carries board ranking changes (dd499146/c36bdc9a) that are not this lane's to ship.
 - verify OWED: (1) next digest 10-19 arrives >= 8 AM CT 10-20; (2) self-heal's first real case is the first Kalshi unknown submit (none in the ledger); (3) a4aacc8f on the fleet.
+
+## 2026-10-19 23:55:55Z (6:55 PM CT) -- LOCAL FLEET full down/up onto d3878d69: BALANCE CAPS ON + trim-to-cap + Polymarket pending deposit counts (caps-revamp), COMPOUNDING_BANKROLL=on (compounding-bankroll), unknown-submit self-heal + watchdog alerts (execution-alerts) -- **MET for caps (enforcing, measured on the worker env); trim and compounding readings OWED** (holder `caps-revamp`, session 332cb014)
+
+- **User decisions:**
+  - Caps model: "% of balance but understand that the $500 pending on polymarket CAN be used".
+  - Over cap: "Trim to the cap".
+  - Ceilings: "Loose backstop".
+  - Restart: "Yes, restart now".
+  - Target: "Yes, use d3878d69", confirmed directly in this chat after execution-alerts relayed its user's choice. compounding-bankroll's fold was approved by its user in its own chat ("Yes: fold compounding ON into caps-revamp's single down/up").
+- **What it carried** (`affc9a7b -> d3878d69`; running code was affc9a7b on live-odds since 22:41Z and refresh since 22:43Z):
+  - `08f851d1`: Polymarket capital = buyingPower incl. pending deposit; an over-cap stake is trimmed to `max_order_dollars` before `check_order`.
+  - `38d47d75` / `90968e39` / `280acb18`: execution_exits. Partial sales, Polymarket positions watched in paper, sell body verified, LIVE_BLOCKERS empty. Exits stay PAPER: 0 `SYNDICATE_EXIT_*` keys in the env file and both workers' environ, and `exit_mode()` defaults to paper.
+  - `92339190`: watchdog email alerts (no role loads it).
+  - `d3878d69`: Kalshi unknown-submit self-heal, default ON, off switch `SYNDICATE_EXECUTION_SELF_HEAL=off`.
+  - `5dba2973`: NBA port freeze, comments/docs. `839b9f1b` / `73ba5d79`: soccer rating V2, default OFF.
+  - Ledger commits.
+- **Env** (`local_production.env`):
+  - `SYNDICATE_EXECUTION_BALANCE_CAPS=on` (22:38Z, backup `.bak-capsrevamp-20261019T223808Z`).
+  - `REFRESH_WORKER__SYNDICATE_COMPOUNDING_BANKROLL=on` (22:57:26Z, backup `.bak-compounding-on-20261019T225726Z`, written by compounding-bankroll).
+- **Sequence:**
+  - Gate: 60 min after the 22:43:52Z refresh-worker TERM.
+  - Claims on all three services, then `check_deploy_safety --drain`: GATE 23:44:15Z, CLEAR 23:54:11Z.
+  - `git merge --ff-only d3878d69` (HEAD after = d3878d693), then `down` rc=0 23:55:47Z.
+  - Task `Ready`, then `Start-ScheduledTask` 23:55:55Z. Health 200 by 23:57:53Z. `DRAIN_CLEARED owner=amyn`.
+- **verify (read 23:57-00:07Z):**
+  - **Environ on all three roles** (live-odds pid 2702036, refresh pid 2702035, web 2701982, all lstart 23:55:5xZ): `RENDER_GIT_COMMIT=d3878d69`, `MODE=live`, `LIVE_ARMED=1`, `BALANCE_CAPS=on`. refresh-worker also has `SYNDICATE_COMPOUNDING_BANKROLL=on`. Supervisor cmdline: `up --allow-live-execution`.
+  - **`/api/portfolio/live`:** health.ok=true, kill switch clear, 0 unreconciled, 0 unknown submits. Balances: kalshi 461.37 cash + 26.28 positions, shards {0: 170, 1: 50.03, 3: 241.33}; polymarket buyingPower 586.05 (500 depositReservation).
+  - **Live caps, computed with `execution_guard.limits(mode=live)` under live-odds-worker's own environ:**
+    - BEFORE raising ceilings: kalshi $24.38/order, $121.91/day (5%/25% of 487.65); polymarket $25/$100 (ceiling-bound); fail_closed {}.
+    - Stored ceilings saved 23:58:48Z (7/7 accepted, sources stored): $100/order, $1,000/day per venue, $2,000/day all, 50/50/100 orders.
+    - AFTER: kalshi **$24.38/order, $121.91/day**; polymarket **$29.30/order, $146.51/day** (5%/25% of 586.05); all venues **$268.42/day**; orders 50/50/100. Percentages bind; ceilings are the backstop.
+  - **New execute_portfolio is the one running:** EXECUTED lines at 23:56:51Z and 00:05:54Z carry `trimmed=0`, a field only 08f851d1+ prints. positions=0 on both venues, so no trim has fired yet.
+- **OWED:**
+  - (1) The first `TRIMMED_TO_ORDER_CAP` line, on the first live stake over the balance-derived order cap.
+  - (2) compounding-bankroll's first `[portfolio_commit] COMPOUNDING_BANKROLL ... mode=on` line: none yet at 00:07:20Z, no live plan built since the up.
+  - (3) execution-alerts' SELF_HEAL / watchdog readings.
+  - (4) EXIT_TICK `mismatches=0` (expected per kalshi-exit-path).
+- **Revert:**
+  - Caps: `SYNDICATE_EXECUTION_BALANCE_CAPS` -> off + full up.
+  - Ceilings: POST /api/portfolio/limits.
+  - Compounding: line 126 -> shadow + full up.
+  - Self-heal: `SYNDICATE_EXECUTION_SELF_HEAL=off`.
+  - All live money: the /portfolio kill switch.
+- Claims released 00:07Z.

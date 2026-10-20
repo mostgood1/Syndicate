@@ -100,8 +100,12 @@ ledger's user-logged bets moved to the manual portfolio "Other books" on
 - **Stored caps** (saved 15:14:50Z): kalshi $200/day, polymarket $100/day, $25/order, $150/day all venues, 15/15/25 orders.
 - **First fleet live order** (16:59:37Z): Kalshi WNBA points under, filled @0.90 for $4.50.
 - **KALSHI SHARD 3 = Sports: Tennis, Baseball, Basketball** (docs.kalshi.com exchange_sharding). MLB, NBA and WNBA orders draw ONLY on shard 3 cash. With shard 3 at $0 they refuse `insufficient_shard_balance`. Read 16:34Z: {0: 170.00, 1: 75.01, 3: 245.00}. Shard 1 (Combos) is not traded.
-- **An over-cap stake was REFUSED, not trimmed** (`over_max_order_dollars`, $28.57 vs $25, 22:00Z). `08f851d1` (on main, NOT yet on the fleet) trims it to the cap and counts Polymarket's pending deposit as capital (user decisions).
-- **`SYNDICATE_EXECUTION_BALANCE_CAPS=on`** is in the env file since 22:38Z and loads at the next full `up`.
+- **LIVE CAPS ARE A SHARE OF VENUE CAPITAL** since the 23:55:55Z full up on `d3878d69` `[verified under live-odds-worker's own environ, 23:58Z]`:
+  - `SYNDICATE_EXECUTION_BALANCE_CAPS=on`: 25%/day and 5%/order of each venue's capital, bounded by the stored dollar ceilings ($100/order, $1,000/day per venue, $2,000/day all, 50/50/100 orders; user "Loose backstop").
+  - Read: kalshi $24.38/order, $121.91/day; polymarket $29.30/order, $146.51/day; all venues $268.42/day.
+  - Polymarket capital = buyingPower INCLUDING the pending deposit (user decision).
+  - An over-cap stake is TRIMMED to the order cap (`TRIMMED_TO_ORDER_CAP`), not refused. Before this it was refused `over_max_order_dollars` ($28.57 vs $25, 22:00Z). The trim is loaded (EXECUTED lines carry `trimmed=`) and has not fired yet.
+  - **Ceilings: raise them only while balance caps are ON.** With the flag off, a raised ceiling IS the live cap.
 
 **THE VENUE CAPS ARE USER-EDITABLE AND THEY BIND.** Seven fields
 (`max_day_dollars_kalshi|_polymarket`, `max_day_orders_kalshi|_polymarket`,
