@@ -780,6 +780,23 @@ def _attach_linescore(sport: str, game: dict[str, Any], chip: dict[str, Any], da
             chip["situation"] = " · ".join(parts) or None
         if box:
             chip["linescore"] = box
+            # A LIVE basketball / hockey chip shows the score of the SAME snapshot as its periods (user 2026-10-20: "the
+            # NBA compact game cards arent adding up"). Measured that day, BOS @ DET Q2: the card read 35-36 beside
+            # quarters 28+9 / 27+12 -- the score was the worker artifact's (up to 180 s old), the quarters ESPN's at
+            # serve time (45 s cache). ESPN's score is the sum of the same payload's periods, so the sum IS the score
+            # of what the card shows. Never NHL in a shootout: the winner gets one goal, not its shootout tally.
+            if (chip.get("state") == "live" and sport in ("nba", "wnba", "nhl") and box.get("kind") == "periods"
+                    and "SO" not in (box.get("labels") or [])):
+                a_vals, h_vals = box.get("away") or [], box.get("home") or []
+                away, home = chip.get("away") or {}, chip.get("home") or {}
+                # Only a score the card already shows is replaced: an empty or suppressed live score stays as the
+                # worker left it (`test_live_game_scores_are_never_filled`).
+                shown = (away.get("score") not in (None, "") and home.get("score") not in (None, "")
+                         and not chip.get("score_suppressed"))
+                if shown and a_vals and h_vals and None not in a_vals and None not in h_vals:
+                    a_sum, h_sum = sum(a_vals), sum(h_vals)
+                    away["score"], home["score"] = str(a_sum), str(h_sum)
+                    chip["leader"] = "away" if a_sum > h_sum else "home" if h_sum > a_sum else None
             # A FINAL with no score but a complete period line takes the sum:
             # past-date NBA chips served FINAL with both scores null (measured
             # 2026-10-13 on all four 10-12 games) while their pbp quarters were
