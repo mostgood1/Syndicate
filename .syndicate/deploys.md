@@ -51603,3 +51603,17 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - Hold-to-settle counterfactual: 5 - 4.5 - 0.0315 = 0.4685, so the verification sale cost 0.138 against holding.
 - **CORRECTION I owe:** my 2026-10-19 closing message and the scheduled task `kalshi-exit-settlement-reading` said to expect "+3.33 if won". That was wrong: it left out the $4.50 cost of all 5 contracts. Correct values: +0.33 won / -3.67 lost. The task never ran (no run recorded at its 14:00Z fireAt). It is now DISABLED and its description says it is superseded.
 - **The exit path now closes end to end on a real position:** paper watch -> live sale (sell body verified 10-19 22:42Z) -> read-back pricing -> exit-aware venue grading (this reading). Live exits stay UNARMED; arming is the user's call after the 10-26 counterfactual.
+
+
+## 2026-10-20 15:01:48Z (10:01 AM CT) -- READING: compounding "(b) + floor" + band, FIRST BUILD AND FIRST ORDER -- **MET** (lane `compounding-bankroll`, session 3927eb2e)
+- **First build after the 14:23Z / 14:37Z restarts (14:58:31Z), the branch ran:**
+  - `COMPOUNDING_BANKROLL venue=kalshi mode=on positions=1/1 staked_fixed=$1.15 staked_compounded=$0.54 unknown={} refused={} floored_to_one_contract=0 basis=venue_total min_stake=floor_one_contract bankrolls=[465.37]`.
+  - The whole-account bankroll was used ($465.37); the stake already bought one contract, so there was no floor.
+  - Before (b), the same family of position was refused `below_min_stake_compounded` on every build since 23:55Z.
+- **The band then sized it** (lane `live-stake-band`, its own entry): `STAKE_BAND venue=kalshi positions=1/1 staked_before=$0.54 staked_after=$5.46`.
+- **Placed and filled:** `EXECUTED mode=live venue=kalshi positions=1 placed=1 refused={}` at 15:01:48Z.
+  - Market `KXNCAAFTOTAL-26OCT20MTUFIU-45`, under 44.5 @ +113, sent `side=ask count=11.00 price=0.5300`.
+  - Venue: `status=executed fill_count 11.00 remaining 0.00 taker_fill_cost $5.17 taker_fees $0.1919`.
+  - The first live Kalshi order since 2026-10-19 16:59Z.
+- **Polymarket:** 0 positions this build (2 rows in, both `aggregator_priced`).
+- **Still open (user choice):** `commit_portfolio`'s $1 `min_stake_units` at the FIXED $1,000 bankroll refuses rows with a fraction under 0.1% (`below_min_stake` 3-4 per kalshi build at 14:16-14:21Z). Those rows never reach compounding or the band.
