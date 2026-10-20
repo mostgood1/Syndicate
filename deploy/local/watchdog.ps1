@@ -29,6 +29,16 @@ with one GET to the healthchecks.io ping URL in <StateDir>\heartbeat_url.txt (no
 emails when the pings stop. A run that throws before the end skips the ping, so a broken watchdog alerts too.
 
   powershell -NoProfile -ExecutionPolicy Bypass -File watchdog.ps1 -SetupHeartbeat https://hc-ping.com/<uuid>
+
+ONE WRITER, NEWEST OBSERVATION WINS `[2026-10-20, lane watchdog-stale-writer]`. The task's PT4M limit kills conhost.exe
+but NOT this powershell.exe, so a slow run lives on and used to write wsl_state.json LATE, over a newer run's state
+(10-20: last_email wiped twice -- in a real outage that is a duplicate UNREACHABLE email or a lost 'reachable again').
+Now: (1) the read-modify-write of wsl_state.json holds wsl_state.lock (an exclusive file handle, released by the OS
+even when the process is killed), (2) the state carries `observed_at`, when the WSL check that wrote it finished, and
+a run whose own check finished EARLIER skips the state block (log `STATE_STALE`) instead of overwriting it, and (3)
+the run works to -DeadlineSeconds (default 200 s of the 240 s limit, counted from the process start): the WSL check gets what is left after a reserve
+for the lock, SMTP and the heartbeat, and stdout is read line by line, so a wsl.exe that exits with its pipe still
+held open no longer blocks the run. Every log line carries `run=<pid>`, so two runs' lines can be told apart.
 #>
 param(
     [string] $WslDistro = 'Ubuntu-24.04',
@@ -39,6 +49,7 @@ param(
     [int] $TimeoutSeconds = 120,
     [string] $FleetTaskName = 'SyndicateLocalProduction',
     [int] $EmailAfterMinutes = 10,
+    [int] $DeadlineSeconds = 200,
     [switch] $TestToast,
     [switch] $SetupEmail,
     [switch] $PromptPassword,
@@ -48,10 +59,16 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# The deadline counts from the PROCESS start: on 10-20 a task run took 65 s to get from launch to wsl.exe.
+$scriptStarted = Get-Date
+$runStarted = try { (Get-Process -Id $PID).StartTime } catch { $scriptStarted }
 $RealertSeconds = 6 * 3600
+# Kept free after the WSL check: lock wait + SMTP (20 s timeout; one send took 34 s on 10-20) + heartbeat (10 s).
+$ReserveSeconds = 70
 New-Item -ItemType Directory -Force -Path $StateDir | Out-Null
 $logPath = Join-Path $StateDir 'watchdog.log'
 $statePath = Join-Path $StateDir 'wsl_state.json'
+$stateLockPath = Join-Path $StateDir 'wsl_state.lock'
 $emailConfigPath = Join-Path $StateDir 'smtp_alerts.json'
 $heartbeatPath = Join-Path $StateDir 'heartbeat_url.txt'
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
@@ -60,7 +77,33 @@ function Write-Log([string] $line) {
     if ((Test-Path $logPath) -and ((Get-Item $logPath).Length -gt 5MB)) {
         Move-Item -Force $logPath "$logPath.1"
     }
-    Add-Content -Path $logPath -Value ("{0} {1}" -f (Get-Date -Format 'yyyy-MM-ddTHH:mm:ssK'), $line) -Encoding utf8
+    Add-Content -Path $logPath -Value ("{0} run={1} {2}" -f (Get-Date -Format 'yyyy-MM-ddTHH:mm:ssK'), $PID, $line) -Encoding utf8
+}
+
+function Get-Elapsed { return [int][math]::Round(((Get-Date) - $runStarted).TotalSeconds) }
+function Get-SecondsLeft { return $DeadlineSeconds - (Get-Elapsed) }
+function Get-StartupSeconds { return [int][math]::Round(($scriptStarted - $runStarted).TotalSeconds) }
+
+# An exclusive handle on wsl_state.lock; $null if another run still holds it after $WaitSeconds.
+function Enter-StateLock([int] $WaitSeconds) {
+    $until = (Get-Date).AddSeconds([math]::Max(0, $WaitSeconds))
+    while ($true) {
+        try {
+            return [IO.File]::Open($stateLockPath, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+        } catch [System.IO.IOException] {
+            if ((Get-Date) -ge $until) { return $null }
+            Start-Sleep -Milliseconds 250
+        }
+    }
+}
+
+# tmp + rename, so a reader never sees half a file (an unreadable state used to read as "no episode").
+function Save-State($State) {
+    $State.observed_at = $observedAt.ToString('o')
+    $State.run_pid = $PID
+    $tmp = "$statePath.tmp"
+    $State | ConvertTo-Json | Set-Content -Path $tmp -Encoding utf8
+    Move-Item -Force $tmp $statePath
 }
 
 function Show-Toast([string] $Title, [string] $Body) {
@@ -225,18 +268,42 @@ $psi.UseShellExecute = $false
 $psi.CreateNoWindow = $true
 $stdout = ''
 $reason = ''
+$pipeNote = ''
+# The check gets what the deadline leaves after the reserve; normally that is the full -TimeoutSeconds.
+$checkSeconds = [math]::Max(10, [math]::Min($TimeoutSeconds, (Get-SecondsLeft) - $ReserveSeconds))
 try {
     $proc = [System.Diagnostics.Process]::Start($psi)
-    $outTask = $proc.StandardOutput.ReadToEndAsync()
-    if (-not $proc.WaitForExit($TimeoutSeconds * 1000)) {
+    $null = $proc.StandardError.ReadToEndAsync()   # drained, so a chatty stderr cannot fill its pipe and stall the child
+    # Line by line, never ReadToEnd: ReadToEnd waits for EOF, which a process still holding the pipe after wsl.exe
+    # exits can postpone indefinitely -- with no timeout on it at all.
+    $checkUntil = (Get-Date).AddSeconds($checkSeconds)
+    $lines = New-Object System.Collections.Generic.List[string]
+    $pending = $null; $eof = $false; $exitedAt = $null
+    while ($true) {
+        if (-not $pending) { $pending = $proc.StandardOutput.ReadLineAsync() }
+        if ($pending.Wait(250)) {
+            $text = $pending.Result; $pending = $null
+            if ($null -eq $text) { $eof = $true; break }
+            $lines.Add($text)
+            continue
+        }
+        if ((Get-Date) -ge $checkUntil) { break }
+        if ($proc.HasExited) {
+            if (-not $exitedAt) { $exitedAt = Get-Date }
+            elseif (((Get-Date) - $exitedAt).TotalSeconds -ge 5) { break }
+        }
+    }
+    $stdout = $lines -join "`n"
+    if (-not $eof -and -not $proc.HasExited) {
         try { $proc.Kill() } catch {}
-        $reason = "no answer from WSL within $TimeoutSeconds s"
-    } else {
-        $stdout = $outTask.Result
+        $reason = "no answer from WSL within $checkSeconds s"
+    } elseif (-not $eof) {
+        $pipeNote = ' stdout_open_after_exit=1'
     }
 } catch {
     $reason = "could not start wsl.exe: $($_.Exception.Message)"
 }
+$observedAt = [DateTimeOffset]::Now
 
 $result = $null
 if (-not $reason) {
@@ -249,73 +316,95 @@ if (-not $reason) {
 }
 
 # ---- Windows-side state: only for "WSL unreachable" -------------------------
-$state = @{ unreachable_since = $null; last_alert = $null; reason = $null; last_email = $null }
-if (Test-Path $statePath) {
-    try {
-        $loaded = Get-Content $statePath -Raw | ConvertFrom-Json
-        $state.unreachable_since = $loaded.unreachable_since
-        $state.last_alert = $loaded.last_alert
-        $state.reason = $loaded.reason
-        $state.last_email = $loaded.last_email
-    } catch {}
-}
-$now = Get-Date
+# One run at a time, and never an older observation over a newer one (see the header): the whole read-modify-write,
+# including the email it may send, holds wsl_state.lock.
+$stateLock = Enter-StateLock ((Get-SecondsLeft) - 45)
+try {
+    $state = @{ unreachable_since = $null; last_alert = $null; reason = $null; last_email = $null }
+    $diskObservedAt = $null; $diskPid = $null
+    if (Test-Path $statePath) {
+        try {
+            $loaded = Get-Content $statePath -Raw | ConvertFrom-Json
+            $state.unreachable_since = $loaded.unreachable_since
+            $state.last_alert = $loaded.last_alert
+            $state.reason = $loaded.reason
+            $state.last_email = $loaded.last_email
+            if ($loaded.observed_at) { $diskObservedAt = [DateTimeOffset]$loaded.observed_at; $diskPid = $loaded.run_pid }
+        } catch {}
+    }
+    $skip = ''
+    if (-not $stateLock) {
+        $skip = "STATE_BUSY wsl_state.lock still held after the wait"
+    } elseif ($diskObservedAt -and $diskObservedAt -gt $observedAt) {
+        $skip = "STATE_STALE observed_at=$($observedAt.ToString('o')) but the state holds a newer check " +
+            "(observed_at=$($diskObservedAt.ToString('o')) run=$diskPid)"
+    }
+    $now = Get-Date
 
-if ($reason) {
-    $sendIt = $false
-    if (-not $state.unreachable_since) {
-        $state.unreachable_since = $now.ToString('o'); $sendIt = $true
-    } elseif ((-not $state.last_alert) -or (($now - [datetime]$state.last_alert).TotalSeconds -ge $RealertSeconds)) {
-        $sendIt = $true
-    }
-    $state.reason = $reason
-    if ($sendIt) {
-        $state.last_alert = $now.ToString('o')
-        Show-Toast 'Syndicate fleet: UNREACHABLE' "$reason (since $($state.unreachable_since))" | Out-Null
-    }
-    # EMAIL: after -EmailAfterMinutes of being down (short blips stay toast-only), then every 6 h. Not stamped
-    # until a send succeeds, so a failed send is retried on the next run.
-    $since = [datetime]$state.unreachable_since
-    $downMinutes = [int][math]::Floor(($now - $since).TotalMinutes)
-    $emailDue = ($downMinutes -ge $EmailAfterMinutes) -and
-        ((-not $state.last_email) -or (($now - [datetime]$state.last_email).TotalSeconds -ge $RealertSeconds))
-    if ($emailDue) {
-        $body = @(
-            "The Windows watchdog on $env:COMPUTERNAME has had no answer from WSL (distro '$WslDistro') for $downMinutes min.",
-            "",
-            "Reason: $reason",
-            "Unreachable since: $(Format-Central $since)",
-            "",
-            "While WSL is down the whole local fleet is down: odds refresh, live Kalshi/Polymarket execution, and the",
-            "WSL-side execution alerts (which cannot email while WSL is down). The watchdog's auto-recovery cannot",
-            "help either, because it needs WSL to answer.",
-            "",
-            "You will get a 'reachable again' email when WSL answers. This repeats every 6 h while it stays down.",
-            "Runbook: docs/ai_context/local_production_runbook.md, section 'Health watchdog'."
-        ) -join "`n"
-        if (Send-Email "fleet UNREACHABLE: WSL has not answered for $downMinutes min" $body) {
-            $state.last_email = $now.ToString('o')
+    if ($reason -and $skip) {
+        Write-Log "$skip -- left it as is; this run saw: $reason"
+    } elseif ($reason) {
+        $sendIt = $false
+        if (-not $state.unreachable_since) {
+            $state.unreachable_since = $now.ToString('o'); $sendIt = $true
+        } elseif ((-not $state.last_alert) -or (($now - [datetime]$state.last_alert).TotalSeconds -ge $RealertSeconds)) {
+            $sendIt = $true
         }
-    }
-    Write-Log "UNREACHABLE alert=$sendIt email_due=$emailDue down_min=$downMinutes $reason"
-    $state | ConvertTo-Json | Set-Content -Path $statePath -Encoding utf8
-    Send-Heartbeat
-    return
-}
-
-if ($state.unreachable_since) {
-    Show-Toast 'Syndicate fleet: reachable again' "WSL answered again (was unreachable since $($state.unreachable_since): $($state.reason))" | Out-Null
-    Write-Log "REACHABLE_AGAIN after $($state.unreachable_since)"
-    if ($state.last_email) {
-        # Only an episode that emailed gets a closing email; a toast-only blip stays toast-only.
+        $state.reason = $reason
+        if ($sendIt) {
+            $state.last_alert = $now.ToString('o')
+            Show-Toast 'Syndicate fleet: UNREACHABLE' "$reason (since $($state.unreachable_since))" | Out-Null
+        }
+        # EMAIL: after -EmailAfterMinutes of being down (short blips stay toast-only), then every 6 h. Not stamped
+        # until a send succeeds, so a failed send is retried on the next run.
         $since = [datetime]$state.unreachable_since
         $downMinutes = [int][math]::Floor(($now - $since).TotalMinutes)
-        Send-Email "fleet reachable again after $downMinutes min" (
-            "WSL on $env:COMPUTERNAME answered again at $(Format-Central $now).`n" +
-            "It was unreachable from $(Format-Central $since) ($downMinutes min): $($state.reason)`n`n" +
-            "The WSL-side watchdog resumes its checks (and execution alerts) from this run on.") | Out-Null
+        $emailDue = ($downMinutes -ge $EmailAfterMinutes) -and
+            ((-not $state.last_email) -or (($now - [datetime]$state.last_email).TotalSeconds -ge $RealertSeconds))
+        if ($emailDue) {
+            $body = @(
+                "The Windows watchdog on $env:COMPUTERNAME has had no answer from WSL (distro '$WslDistro') for $downMinutes min.",
+                "",
+                "Reason: $reason",
+                "Unreachable since: $(Format-Central $since)",
+                "",
+                "While WSL is down the whole local fleet is down: odds refresh, live Kalshi/Polymarket execution, and the",
+                "WSL-side execution alerts (which cannot email while WSL is down). The watchdog's auto-recovery cannot",
+                "help either, because it needs WSL to answer.",
+                "",
+                "You will get a 'reachable again' email when WSL answers. This repeats every 6 h while it stays down.",
+                "Runbook: docs/ai_context/local_production_runbook.md, section 'Health watchdog'."
+            ) -join "`n"
+            if (Send-Email "fleet UNREACHABLE: WSL has not answered for $downMinutes min" $body) {
+                $state.last_email = $now.ToString('o')
+            }
+        }
+        Write-Log "UNREACHABLE alert=$sendIt email_due=$emailDue down_min=$downMinutes took_s=$(Get-Elapsed) startup_s=$(Get-StartupSeconds) $reason"
+        Save-State $state
+    } elseif ($skip) {
+        Write-Log "$skip -- left it as is; this run saw WSL answer$pipeNote"
+    } elseif ($state.unreachable_since) {
+        Show-Toast 'Syndicate fleet: reachable again' "WSL answered again (was unreachable since $($state.unreachable_since): $($state.reason))" | Out-Null
+        Write-Log "REACHABLE_AGAIN after $($state.unreachable_since)"
+        if ($state.last_email) {
+            # Only an episode that emailed gets a closing email; a toast-only blip stays toast-only.
+            $since = [datetime]$state.unreachable_since
+            $downMinutes = [int][math]::Floor(($now - $since).TotalMinutes)
+            Send-Email "fleet reachable again after $downMinutes min" (
+                "WSL on $env:COMPUTERNAME answered again at $(Format-Central $now).`n" +
+                "It was unreachable from $(Format-Central $since) ($downMinutes min): $($state.reason)`n`n" +
+                "The WSL-side watchdog resumes its checks (and execution alerts) from this run on.") | Out-Null
+        }
+        Save-State @{ unreachable_since = $null; last_alert = $null; reason = $null; last_email = $null }
+    } else {
+        Save-State $state   # nothing changed, but observed_at is stamped: an older run can no longer write over it
     }
-    @{ unreachable_since = $null; last_alert = $null; reason = $null; last_email = $null } | ConvertTo-Json | Set-Content -Path $statePath -Encoding utf8
+} finally {
+    if ($stateLock) { $stateLock.Dispose() }
+}
+if ($reason) {
+    Send-Heartbeat
+    return
 }
 
 # AUTO-RECOVERY: the WSL-side decision (local_watchdog.recovery: supervisor down for two checks, capped 3/hour,
@@ -331,9 +420,9 @@ if ($result.recover) {
 
 if ($result.alert) {
     $shown = Show-Toast $result.title $result.message
-    Write-Log "ALERT shown=$shown status=$($result.status) $($result.title) | $($result.message -replace "`n", ' | ')"
+    Write-Log "ALERT shown=$shown status=$($result.status) took_s=$(Get-Elapsed) startup_s=$(Get-StartupSeconds)$pipeNote $($result.title) | $($result.message -replace "`n", ' | ')"
 } else {
-    Write-Log "OK status=$($result.status) findings=$(@($result.findings).Count)"
+    Write-Log "OK status=$($result.status) findings=$(@($result.findings).Count) took_s=$(Get-Elapsed) startup_s=$(Get-StartupSeconds)$pipeNote"
 }
 
 Send-Heartbeat
