@@ -1307,6 +1307,15 @@ death, never life — do not invert it.
 - **Two ambiguities that caused my own false lead, now fixed in the text:** `intelligence.py` was written bare and TWO files share that basename, and THREE functions in the tree answer to some form of `attach_projections`, so an unanchored grep conflates them.
 - **SURFACED, NOT MINE:** `news-availability-gate` (session 9e18a0e7) has a failing test on `main` — `test_end_to_end_an_out_nhl_player_is_not_seated_and_off_is_not_on`, `seated` comes back EMPTY (`'Nathan MacKinnon' in set()`). Verified not mine by swapping `HEAD`'s copy of the file back in and reproducing it; my diff is docstring-only. Reported to that session.
 - Files: syndicate/features/shared/board_enrichment.py (the attach_projections call-site enumeration docstring only), tests/test_attach_projections_enumeration.py (NEW)
+
+### no-market-price-test-fallout — OPEN — opened 2026-10-20 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- Goal: Every test broken by dd499146's rows_no_market_price refusal is found and fixed, so the suite is green and the refusal's blast radius is known rather than discovered one suite at a time by whoever runs it next.
+- Files: tests/test_layer2_out_player_gate.py (the _grid_prop fixture book prices only)
+- Hypothesis: My refusal fires on any fixture that builds a board row with empty  and a projection edge, because no consensus fair can form so ev_pct is None. test_layer2_out_player_gate's _grid_prop is exactly that shape: cells {} with a best over/under and edge_vs_market_pct 6.0. Giving the fixture three two-sided books restores a fair and the rows seat again.
+- Falsification test: If the four failures persist with my refusal branch disabled, the cause is not mine. (Already run: 10 pass disabled, 4 fail enabled -- so this is confirmed, not assumed.)
+- Verification: tests/test_layer2_out_player_gate.py green with the refusal LIVE, plus a repo-wide sweep of every test fixture carrying an empty cells with a projection edge, each either passing or fixed.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
