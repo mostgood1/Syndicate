@@ -51472,3 +51472,29 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - ALSO READ (closes lane mlb-vendor-delete's owed reading of the 2026-10-19T19:23:47Z entry): fleet at d3878d69 (contains 814f7966, ff
   18:54:52 CDT 10-19): 0 tracked under vendor/mlb_bettingv2, 0 writes there since 19:30 CDT while the native engine (engines/mlb, 23:12 CDT)
   and the MLB live lens (280 files by 07:38 CDT) ran. MET.
+
+## 2026-10-20 14:21Z (9:21 AM CT) -- cheat-sheets: +100 SGPs, tracking/scorecards, next-day horizon, NBA props tasks (session 9e18a0e7)
+
+- **How it reached the fleet: no ff of mine.**
+  - Lane `board-implausible-book-upper-bound` ffs: c36bdc9a at 8:16 AM CT (+ refresh-worker restart 8:17), then e491c260 at 8:38 AM CT.
+  - Those ffs carried b74c3cfa, 7abaf86f and ab4b6ffe as ride-alongs. The Kalshi fleet-ff session counted ab4b6ffe in its review.
+  - User approvals, all 10-19 / 10-20 in chat: "Include it" (b74c3cfa, ab4b6ffe) and "Fix it, load at next restart" (7abaf86f).
+- **ab4b6ffe (+100 SGPs), MEASURED.** NBA 10-20 rebuilt 8:44 -> served 8:52 AM CT (`generated_at` 13:51:59Z) on e491c260:
+  - 8 parlays, every one legs x +100 or better.
+  - safer 6: 41-48% at +102..+109.
+  - payout 2: 35-38% at +154 / +156.
+  - Before it, the 6:30 AM build served 7 parlays at about -190..-240.
+- **7abaf86f (next-day horizon), PARTLY MEASURED.**
+  - The first post-restart 10-21 board (written 13:43:54Z) has `rows_beyond_horizon` 93, against 908 on the pre-restart 12:20:57Z build.
+  - NBA still shows 0 rows: 8,078 candidates sit in lane `dead`, because the 10-21 props file is from 10-19 03:04, 30 h old. That is quote age, not the horizon.
+  - Late-game proof owed: the first 10-21 board after the 1:40 PM pull must carry the 6 NBA games starting 00:00Z+ 10-22.
+- **b74c3cfa (reconcile catch-up + scorecards): live since 8:16 AM; owed.** Read tonight's 11:50 PM reconcile:
+  - a `RECONCILE catch-up` line naming 10-15 / 10-16;
+  - `from the actual stat N`;
+  - `record.json` `official.totals.sgp`.
+- **Windows tasks.**
+  - `SyndicateNbaGamedayProps`: daily 7:40 / 11:40 / 3:40, today's slate. Dry run on fleet 8:23 AM: "PULL: 3 of 3 games still to start".
+  - `SyndicateNbaPreviewProps`: daily 1:40 PM, the next day's slate. User-approved 10-20; dry run 9:21 AM: "PULL: 11 of 11".
+  - Credits: about 13-20 per game per pull, not metered (no NBA line in the quota ledger).
+  - Deleted after they ran (LastTaskResult 0): `SyndicateNbaPreviewTonight` (10-19 9:05 PM), `SyndicateNbaOpenerMorning` (10-20 6:30 AM).
+- verify: the 11:40 log line in `logs/nba_gameday_props.log` (PULL, `snapshot REWRITTEN`); the 1:40 PM line; the 10-21 board's NBA games after it.
