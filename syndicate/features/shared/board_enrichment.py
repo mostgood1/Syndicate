@@ -2563,8 +2563,14 @@ NBA_LIVE_PRICED_ENV = "SYNDICATE_NBA_LIVE_PRICED"
 ENV_GATED_LIVE_SPORTS: dict[str, str] = {"nba": NBA_LIVE_PRICED_ENV}
 
 
+# ON BY DEFAULT SINCE 2026-10-20 -- AN EXPLICIT USER OVERRIDE of the rule above. THE VALID READ failed on 10-16
+# (findings_2026-10-09 §13: better than production on margin and win probability, not on totals or against
+# score + pregame line), and §14 pre-registered a forward shadow gate from 10-20. The user, told all of that in chat,
+# chose "Display + money on everything" ("this live data should feed kalshi/poly live bet decisions"). Default-on
+# rather than a new env key because the fleet derives a role's env only at `up`; a refresh-worker respawn loads this.
+# SYNDICATE_NBA_LIVE_PRICED=0 turns it off. The §14 forward read still runs on the shadow history and is still owed.
 def _nba_live_priced() -> bool:
-    return str(os.environ.get(NBA_LIVE_PRICED_ENV) or "").strip().lower() in ("1", "true", "on", "yes")
+    return str(os.environ.get(NBA_LIVE_PRICED_ENV) or "").strip().lower() not in ("0", "false", "off", "no")
 
 
 def _live_gameline_sports() -> frozenset:

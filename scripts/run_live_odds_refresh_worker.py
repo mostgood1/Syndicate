@@ -864,6 +864,102 @@ def _launch_autorun_soccer_live_refresh() -> None:
     )
 
 
+# NBA LIVE, ITS OWN FAST LANE (lane `nba-live-board`, 2026-10-20; user: "layer 2 board isnt showing actuals for NBA live
+# props or live sim projections ... this live data should feed kalshi/poly live bet decisions", then "Display + money on
+# everything").
+#
+# Measured that afternoon with BOS @ DET in play: not one BOS @ DET quote (game or prop) had been seen in 15 minutes.
+# Two causes, both fixed here:
+#   * NBA's live capture rode the loop's shared live sweep (nba,nfl,ncaaf,soccer), which runs 10+ minutes and is
+#     refused `lane_busy` meanwhile -- soccer's measured failure (`soccer-live-lane-priority`, above), now for NBA;
+#   * the live phase runs `refresh_nba_oddsapi_props.py` WITHOUT `--force-refresh`, and its reuse gate
+#     (`_existing_refresh_state`) has no age check, so a live run re-served the day's pregame snapshot.
+# So this launches an NBA-only live run on its own lane, FORCED, every `SYNDICATE_NBA_LIVE_REFRESH_INTERVAL_SECONDS`
+# (240) while `_nba_has_live_game` -- the fetcher's /events list includes games in progress.
+#
+# COST, stated: a forced pull fetches every NBA game left on the date (finished games drop off /events), about 20
+# credits a game -- ~60 a pull on 10-20's 3 games, up to ~220 early on an 11-game night. At 240 s that is ~15 pulls an
+# hour while any game is live. Scoping the pull to in-play games is the next saving (it needs the NBA snapshot to
+# merge, not replace, a partial pull).
+#
+# DEFAULT ON -- user-approved 2026-10-20 ("Display + money on everything"), the same exception the soccer lane above
+# records: the local fleet derives role env only at `up`, so a default-off switch could not be turned on without
+# restarting every role. SYNDICATE_ENABLE_NBA_LIVE_REFRESH_AUTORUN=0 turns it off.
+def _nba_live_refresh_enabled() -> bool:
+    raw_value = str(os.environ.get("SYNDICATE_ENABLE_NBA_LIVE_REFRESH_AUTORUN") or "").strip().lower()
+    return raw_value not in {"0", "false", "no", "off"}
+
+
+def _nba_live_refresh_interval_seconds() -> int:
+    raw_value = str(os.environ.get("SYNDICATE_NBA_LIVE_REFRESH_INTERVAL_SECONDS") or "").strip()
+    try:
+        value = int(raw_value or 240)
+    except ValueError:
+        value = 240
+    return max(60, value)
+
+
+def _nba_live_refresh_lane() -> str:
+    raw_value = str(os.environ.get("SYNDICATE_NBA_LIVE_REFRESH_LANE") or "").strip()
+    return raw_value or "live-odds-worker-nba-live"
+
+
+def _nba_live_autorun_status_path() -> Path:
+    return reports_root() / "refresh_status" / "latest" / "nba_live_autorun_status.json"
+
+
+def _launch_autorun_nba_live_refresh() -> None:
+    if not _nba_live_refresh_enabled():
+        return
+    selected_date = central_today_iso()
+    from syndicate.features.shared.live_refresh_loop import _nba_has_live_game
+
+    if not _nba_has_live_game(selected_date):
+        return
+    status_path = _nba_live_autorun_status_path()
+    last_status = read_json_file(status_path) or {}
+    if last_status and not last_status.get("reported"):
+        err = last_status.get("error")
+        print(f"[live_odds_worker] NBA_LIVE_AUTORUN_PREV date={last_status.get('date')} "
+              + (f"FAILED {err}" if err else f"launched=ok runStamp={last_status.get('runStamp')}"), flush=True)
+        try:
+            write_json_file(status_path, {**last_status, "reported": True})
+        except Exception:  # noqa: BLE001
+            pass
+    last_epoch = float((last_status or {}).get("epoch") or 0.0)
+    if last_epoch > 0.0 and (time.time() - last_epoch) < float(_nba_live_refresh_interval_seconds()):
+        return
+    try:
+        result = launch_refresh_run(
+            date=selected_date,
+            sports="nba",
+            phase="live",
+            execution_mode="source",
+            regions="us",
+            skip_mirror=True,
+            mode="fast",
+            launch_mode="web_process",
+            force_refresh=True,
+            force_refresh_sports="nba",
+            lane=_nba_live_refresh_lane(),
+        )
+    except Exception as exc:
+        if _is_refresh_run_contention_error(exc):
+            # The previous run is still going: keep its epoch so the next tick retries rather than waiting a full interval.
+            write_json_file(status_path, {**last_status, "sports": "nba", "date": selected_date,
+                                          "error": f"{type(exc).__name__}: {exc}", "reported": False})
+        else:
+            write_json_file(status_path, {"epoch": time.time(), "sports": "nba", "date": selected_date,
+                                          "error": f"{type(exc).__name__}: {exc}"})
+        print(f"[live_odds_worker] NBA_LIVE_AUTORUN_FAILED {type(exc).__name__}: {exc}", flush=True)
+        return
+    write_json_file(status_path, {"epoch": time.time(), "sports": "nba", "date": selected_date,
+                                  "runStamp": (result or {}).get("runStamp") or (result or {}).get("run_stamp"),
+                                  "reported": False})
+    print(f"[live_odds_worker] NBA_LIVE_AUTORUN_LAUNCHED date={selected_date} phase=live mode=fast force=nba "
+          f"lane={_nba_live_refresh_lane()} interval_s={_nba_live_refresh_interval_seconds()}", flush=True)
+
+
 def _nfl_lines_refresh_enabled() -> bool:
     # DEFAULT OFF, this file's convention for new periodic work (`#241`).
     raw_value = str(os.environ.get("SYNDICATE_ENABLE_NFL_LINES_REFRESH_AUTORUN") or "").strip().lower()
@@ -3109,6 +3205,10 @@ def _launch_inplay_capture_autoruns(source: str) -> None:
             _launch_autorun_soccer_live_refresh()
         except Exception as exc:  # noqa: BLE001
             print(f"[live_odds_worker] SOCCER_LIVE_AUTORUN_ERROR source={source} {type(exc).__name__}: {exc}", flush=True)
+        try:
+            _launch_autorun_nba_live_refresh()
+        except Exception as exc:  # noqa: BLE001
+            print(f"[live_odds_worker] NBA_LIVE_AUTORUN_ERROR source={source} {type(exc).__name__}: {exc}", flush=True)
         try:
             _launch_autorun_nfl_lines_refresh()
         except Exception as exc:  # noqa: BLE001

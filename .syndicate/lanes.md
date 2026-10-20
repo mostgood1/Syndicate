@@ -1374,6 +1374,14 @@ death, never life — do not invert it.
 - Verification: pytest tests/test_min_ev_tuner.py tests/test_min_ev_tuner_apply_wiring.py green incl. the new twin test (live+paper twin -> 1 row, skip paper_twin_of_live=1; unmatched paper kept)
 - Blocked by: none
 
+### nba-live-board — OPEN — opened 2026-10-20 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
+- Goal: NBA live games on the Layer 2 board carry fresh live prices (captured every few minutes while a game is in play), live actuals and the live re-sim's projections, and NBA live pricing feeds the Kalshi/Polymarket live decisions (user 2026-10-20: 'Display + money on everything', an explicit override of the 10-16 forward-gate rule)
+- Files: scripts/run_live_odds_refresh_worker.py (the NBA live autorun section + its call in _launch_inplay_capture_autoruns ONLY), tests/test_nba_live_autorun.py (NEW), syndicate/features/shared/board_enrichment.py (`_nba_live_priced` + its comment ONLY), tests/test_nba_live_pricing_gate.py
+- Hypothesis: NBA live prices are never re-fetched in play: the live phase runs refresh_nba_oddsapi_props without --force-refresh, so its reuse gate re-serves the day's snapshot, and the shared live sweep is refused lane_busy for 10-20 min at a time
+- Falsification test: a live NBA quote's last-seen advances within 5 min while a game is in play before any change
+- Verification: during a live NBA game: BOS@DET-style quotes seen within 5 min; the board's nba live_gamelines/live_projections supported=True with rows priced; live NBA rows on the board > 1
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

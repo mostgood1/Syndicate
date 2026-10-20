@@ -1,4 +1,5 @@
-"""NBA live pricing is admitted ONLY by SYNDICATE_NBA_LIVE_PRICED (absent = off), and when admitted the join reads
+"""NBA live pricing is ON unless SYNDICATE_NBA_LIVE_PRICED turns it off (user override 2026-10-20: "Display + money on
+everything"; before it, absent = off), and when admitted the join reads
 the native re-sim's own snapshot and indexes its `live_resim` lanes (lane nba-native-live-resim, P3)."""
 from __future__ import annotations
 
@@ -7,12 +8,12 @@ from syndicate.features.shared import board_enrichment as be
 from syndicate.features.shared.live_gameline_join import build_live_gameline_index, lens_sources_for_sport
 
 
-def test_absent_env_keeps_nba_out_of_both_pricing_sets(monkeypatch):
+def test_absent_env_prices_nba_and_zero_turns_it_off(monkeypatch):
     monkeypatch.delenv(be.NBA_LIVE_PRICED_ENV, raising=False)
-    assert "nba" not in be._live_gameline_sports()
-    assert "nba" not in be._live_prop_sports()
-    monkeypatch.setenv(be.NBA_LIVE_PRICED_ENV, "0")
-    assert "nba" not in be._live_gameline_sports()
+    assert "nba" in be._live_gameline_sports() and "nba" in be._live_prop_sports()
+    for off in ("0", "off", "false"):
+        monkeypatch.setenv(be.NBA_LIVE_PRICED_ENV, off)
+        assert "nba" not in be._live_gameline_sports() and "nba" not in be._live_prop_sports()
 
 
 def test_env_on_admits_nba_and_leaves_every_other_sport_as_it_was(monkeypatch):
