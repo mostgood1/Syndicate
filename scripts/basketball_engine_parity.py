@@ -275,6 +275,7 @@ def iter_corpus(corpus_dir: Path) -> Iterable[tuple[str, dict[str, Any]]]:
             yield f"{path.name}#{j}", {
                 "league": game["league"],
                 "entrypoint": game["entrypoint"],
+                "date": game.get("date"),
                 "kwargs": game["kwargs"],
                 "rng_state": state,
                 "production_digest": digests[j] if j < len(digests) else None,
@@ -374,8 +375,11 @@ def main(argv: list[str] | None = None) -> int:
         if not res["ok"]:
             n_fail += 1
             tally["mismatch"] += 1
+            where = {"case": source, "league": case["league"], "date": case.get("date"), "entrypoint": case["entrypoint"]}
+            if not failures:  # where to start the --reference vendored / --compare-sims diff
+                print(f"FIRST_MISMATCH {json.dumps(where)}", file=sys.stderr, flush=True)
             if len(failures) < 25:
-                failures.append({"case": source, "diffs": res["diffs"][:10]})
+                failures.append({**where, "diffs": res["diffs"][:10]})
     report = {
         "substrate": f"corpus:{args.corpus}" if args.corpus else f"synthetic:{args.synthetic}",
         "sampler": args.sampler,
