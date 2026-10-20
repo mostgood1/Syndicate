@@ -1174,6 +1174,14 @@ death, never life — do not invert it.
 - Verification: In-process over the served board payload, off vs on: ranked-row count, the new refusal counter, rows_implausible_book and no_projection as untouched controls, and the per-sport split -- the NCAAF spread family must go 73 -> 0 while every with-fair row is unchanged. Plus a test that the predicate does NOT fire when ev_pct is present.
 - Blocked by: none
 
+### kalshi-maker-shadow-paper — OPEN — opened 2026-10-20 — session f3969374-6b8f-4e01-8665-f18c43b26bee
+- Goal: A PAPER-ONLY Kalshi maker (resting-bid) shadow runs worker-owned on the fleet (hourly supervisor job), writing per-order records for soccer totals/spreads and NCAAF segment totals on quadratic series (placement, fill A+B, fair at both, consensus close, Kalshi result), plus a pre-registered evaluation script whose stop rule was committed before any shadow data existed. No live order path, no env flag that could place one.
+- Files: syndicate/features/shared/kalshi_maker_shadow.py (NEW), scripts/run_kalshi_maker_shadow.py (NEW), scripts/evaluate_kalshi_maker_shadow.py (NEW), tests/test_kalshi_maker_shadow.py (NEW), .syndicate/findings_2026-10-20_kalshi_maker_shadow_preregistration.md (NEW), scripts/local_production.py (ScheduledJob.every_minutes field + job_is_due/run_due_jobs interval branch + the kalshi-maker-shadow SCHEDULED_JOBS entry ONLY), tests/test_local_production.py (the interval-job test ONLY)
+- Hypothesis: From findings_2026-10-19_kalshi_maker_entry_paper.md: on soccer totals/spreads and NCAAF segment totals (quadratic, maker fee 0) resting-bid fills are NOT adversely selected beyond the consensus close and earn positive ROI on settled outcomes.
+- Falsification test: Pre-registered in the findings doc: per cell, filled-order (wins - close fair) CI upper bound < -1pp, or ROI CI upper bound < 0, at a look; or no GO by the maximum sample.
+- Verification: Fleet job log shows hourly runs rc=0 and the shadow store holds placed/filled/settled records; evaluate_kalshi_maker_shadow.py runs on the fleet and prints the pre-registered verdict (INSUFFICIENT until N); tests pass; a static test proves no order module is importable from the shadow.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
