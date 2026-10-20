@@ -51756,3 +51756,30 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - paper:kalshi / paper:polymarket placed 0 in this build because their paper2 plans had 0 positions (`below_min_ev_pct` / `_net_of_fee`), not because of a refusal. Earlier today the Kalshi plan was non-zero in 8-9 builds/hour (11-12Z).
 - **owed (the grading half):** these are 10-20 slate rows; their games settle tonight. Reading: count of `paper_alongside_live=True` rows with `outcome` set, per venue, after tomorrow's first settlement pass (>= 2026-10-21 13:00Z), plus the first `paper:kalshi` / `paper:polymarket` row with the tags. Script: `C:	mp\paperlive\ledger_read.py` (counts only, refresh-worker state env).
 - **rollback:** code revert of 1006cb75's two runtime files + a gated refresh-worker TERM; or `REFRESH_WORKER__SYNDICATE_PAPER_ALONGSIDE_LIVE=off` + full down/up (env is frozen at `up`).
+
+## 2026-10-20 16:56:17Z (11:56 AM CT) -- fleet ff 1006cb75 -> 72407b6c + live-odds-worker ROLE-ONLY restart: D2 live budget by PLACEMENT day (lane `future-dated-live-orders-scope`, session 0ffeb586, todo #707) + D4 rides along -- **MET (D2 as predicted: no change in today's reads; D4 loaded: exit watcher 19 -> 42)**
+- **ask:** user in chat: "Land D2 on main and take it live: live-odds-worker-only restart at >= 16:53:36Z under claim + safety gate, record in deploys.md."
+- **code:** `c4c1baba` -> main 72407b6c (landed 16:48:16Z). `execution_guard._budget_day_of`: a LIVE row is charged to the Central date of its `submitted_at`, falling back to `selected_date`; paper keeps its slate key. Switch `SYNDICATE_EXECUTION_PLACEMENT_DAY_BUDGET`, absent on the fleet = ON.
+  - Tests: T2 off != on (incl. check_order refusing differently), the midnight-straddle case, and paper unchanged. 392 tests on the rebased tree, 480 across every suite touching spent_today.
+- **NAMED AT compounding-bankroll's request:** `limits()`'s balance caps do not read `spent_today`, but `check_order`'s day-cap comparison does (the per-venue `already` the executor seeds, plus the all-venues read). So **the placement-date rule also decides when the balance-derived day caps RESET**: at midnight CT of the day the money left the account, not at the slate's.
+- **ride-alongs 1006cb75..72407b6c:** each one read before the ff.
+  - `e4468a14` D4 (kalshi-exit-path): the exit lookback keys on the game date. Paper exit watcher only. Its owner asked for it to ride the next live-odds-worker restart.
+  - `49fa4db1` compounding option C: `SYNDICATE_LIVE_SMALL_EDGE_FRACTION` is absent from local_production.env (0 lines), so inert. It runs in plan build (refresh-worker), not here.
+  - `a33d3306` board_enrichment: docstring only.
+  - `dd510faa` WNBA freeze: docstring headers in `features/wnba/live_tick` + `source_cli`; deleted port scripts; `unified_daily_update.ps1` (Windows side).
+  - No vendor/ change in range. Dirty fleet files (6, engines/mlb statcast + reports/*): 0 overlap. `git merge --ff-only 72407b6c` rc 0 at 16:49:06Z.
+- **claim:** live-odds-worker, holder `future-dated-live-orders-scope`, acquire rc 0 ~16:48Z, token 11762d9fafbe0df7.
+- **sequencing:** 60-min rule after my 15:53:36Z live-odds-worker respawn -> >= 16:53:36Z. refresh-worker was restarted 16:18:30Z by another lane (ff 8099dc05 -> 1006cb75) and was not touched here.
+- **safety:** `check_deploy_safety` ~16:48Z read NOT CLEAR. This time live-odds-worker had its OWN odds-refresh children (run_refresh_odds_job / refresh_odds_sources / refresh_nhl_oddsapi), plus refresh-worker jobs and a portfolio_commit build.
+  - The gate (now >= 16:53:36Z, HEAD == 72407b6c, 0 live submitted/failed, 0 non-zombie children) WAITED for those children to finish: 410 s. TERM 16:56:17.349Z. Nothing of live-odds-worker's was killed; refresh-worker's jobs are outside a role-only TERM.
+- **baseline 16:47Z (running code had no D2; `has_D2 False`):** live `spent_today(2026-10-20)` kalshi $5.36 / 1, polymarket $0.00 / 0, all $5.36 / 1. 554 live rows, all filled. Today's one live row (NCAAF totals, Kalshi) has slate == placement day.
+  - EXIT_TICK at 16:53:06Z (old pid): positions=19, watching=20.
+- **expect:** budget reads unchanged (every live row since 10-19 is slate == placement day), and exit watcher positions 19 -> 42 (kalshi-exit-path's same-read A/B).
+- **restart:** old pid 2965728 -> new pid **2979561**, lstart 16:56:28Z.
+- **verify (16:57:57Z):**
+  - New pid: MODE=live, LIVE_ARMED=1, ENABLED=1, BALANCE_CAPS=on; no PLACEMENT_DAY_BUDGET key (= ON). Fleet HEAD 72407b6c.
+  - `EXECUTED ... venue=kalshi ... spent={'dollars': 5.36, 'orders': 1}` 16:57:25Z and `venue=polymarket ... spent={'dollars': 0.0, 'orders': 0}` 16:57:29Z: **identical to the baseline**. The fleet-disk smoke at 16:49Z (`has_D2 True`) read the same.
+  - `EXIT_TICK status=ok mode=paper positions=42 ... watching=43` 16:57:19Z: **D4 loaded, exactly as predicted**.
+  - 0 Traceback / EXECUTION_ERROR / KICKOFF_CANCEL_FAILED since the restart. D1/D3 still 0 hits (no qualifying case).
+- **owed:** the first live `REFUSED_HELD_OTHER_SLATE` / `CANCEL_AT_KICKOFF` (D1/D3, from the 15:53Z entry). D2 has no further reading: it diverges only for an order sent while a pass crosses midnight CT.
+- **rollback:** `git revert c4c1baba`, ff, gated live-odds-worker TERM. Or a `LIVE_ODDS_WORKER__SYNDICATE_EXECUTION_PLACEMENT_DAY_BUDGET=off` line + a full down/up (the supervisor freezes env at `up`).
