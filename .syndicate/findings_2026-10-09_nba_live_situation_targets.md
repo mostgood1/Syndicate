@@ -1008,3 +1008,18 @@ FIT regular, 802-811 games per checkpoint. y = remaining regulation points − p
     - (b) 5:00 Q4: margin and ML NOT significantly worse (CI lower ≤ 0). This is a noise-proof not-worse bar, the G3 lesson.
   - **Reported only, not gated:** total |err| and bias vs pr; 80% coverage; native vs live market when a ±2-min live line exists; refusals; the real-five share.
   - Everything else unchanged: population, window, config-label stratification, read ONCE at the end, no interim peeks at pass metrics.
+
+
+## USER OVERRIDE 2026-10-20 20:47Z (3:47 PM CT) -- NBA live pricing ON before the §14 forward gate (lane `nba-live-board`)
+
+- **Override, in chat (session 9e18a0e7):** "Display + money on everything", then "yes push and deploy it before 6 PM".
+- **What the user was told first:**
+  - THE VALID READ (§13) failed;
+  - the re-sim beats production on margin and ML, but not on totals or against score + pregame line;
+  - it was never measured against the live market;
+  - §14's forward gate started today.
+- **Change:** f0dd04bb.
+  - `board_enrichment._nba_live_priced()` is ON unless `SYNDICATE_NBA_LIVE_PRICED` is 0/off/false.
+  - An NBA in-play capture lane runs in the live-odds worker.
+- **Live props stay unpriced:** the re-sim snapshot carries no `liveProps`, so there is no player-level live projection.
+- **§14 forward read:** still runs on `live_resim_history/`, still owed, and is now read AFTER live money started on these games.
