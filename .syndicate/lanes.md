@@ -67,6 +67,14 @@ death, never life — do not invert it.
 
 ## OPEN
 
+### venue-fanin-game-identity — OPEN — opened 2026-10-20 — session e13a70a0
+- Goal: USER DECISION 2026-10-20 ~18:45Z (relayed by 332cb014: "Guard + fix the join"). Fix the BOARD half: the venue fan-in must not attach a venue quote for a DIFFERENT game of the same team -- the ticker/market date must equal the row's own commence_time date, so a wrong-game quote never reaches quote.book_prices / best_any_book / the consensus fair. The order-time guard is NOT this lane (future-dated-live owns pipeline/execute_portfolio.py).
+- Files: syndicate/features/shared/venue_quote_fanin.py, tests/test_venue_fanin_game_identity.py (NEW)
+- Hypothesis: _date_verdict admits any game of the team inside the forward horizon and nothing compares the ticker date to the row's commence_time, so a team-keyed h2h/total key collects the next game's quote.
+- Falsification test: on the 18:10Z fleet shortlist inputs, the fixed join still stamps a ticker whose date != the row's game date.
+- Verification: offline replay of the fan-in against fleet inputs (read-only) -> 0 of N date mismatches; DET@SEA best_any_book back near consensus; recount of +EV-at-Kalshi sides. On the fleet only after the user approves landing + a restart.
+- Blocked by: none. Fleet is LIVE MONEY: read-only.
+
 ### one-engine-alignment-audit — OPEN (AUDIT DELIVERED 2026-10-20 18:3xZ; waiting on the user to pick from the proposal; todo #709) — opened 2026-10-20 — session e13a70a0 (side session of 332cb014's group)
 - Goal: AUDIT ONLY, no code (user 2026-10-20: "we def need connectivity across all of Syndicate so everything is aligned ... one cohesive betting engine"). Map every surface that recommends / sizes / places / grades a bet (fair prob, price, EV + fees, floor, sizing, grading, file:line), count forks on a real fleet shortlist with denominators, propose ONE per-line decision record computed once by the worker + a migration order. Deliverable: .syndicate/findings_2026-10-20_one_engine_audit.md; top 5 forks by money at stake.
 - Files: .syndicate/findings_2026-10-20_one_engine_audit.md
