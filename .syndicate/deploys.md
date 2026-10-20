@@ -51724,3 +51724,19 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - (D3) the first pregame Kalshi order still resting at its commence_time: `CANCEL_AT_KICKOFF` then `KICKOFF_CANCEL_PASS ... cancelled=1`, and the next reconcile moves the row to rejected.
   - Neither can fire today on the current book (0 resting; the one held bet kicks off before tomorrow's slate). Watch the forward NCAAF/NFL weekend.
 - **rollback:** a code revert is ONE live-odds-worker TERM. `git revert 47ff1837 4c0bb4bb 4deee004`, ff, gated TERM. Turning a switch off needs a `LIVE_ODDS_WORKER__SYNDICATE_EXECUTION_...=off` line plus a full down/up, because the supervisor freezes env at `up`.
+
+## 2026-10-20 16:14Z (11:14 AM CT) -- cheat-sheets: single-sport cross-game parlays LIVE (reload-web only; fleet already on 1006cb75)
+
+- **Approval:** user, in chat: "we also need single sport, cross slate plays", then "Deploy now". Web claim held by `cheat-sheets` (token 52573b26).
+- **Code arrival: no ff by me.**
+  - My guarded ff (8099dc05 -> 2a60ce7d) REFUSED: the fleet HEAD was already 1006cb75, a later lane's ff (`paper-alongside-live`).
+  - 1006cb75 contains 2a60ce7d.
+  - So I ran only `reload-web` at 11:07 CT: state done, 25 probes, failures 1 (a probe during the reload), last healthz ok.
+- **MEASURED.**
+  - NHL rebuild 11:07-11:14 CT on 1006cb75 logged `cross hit_rate ... across sports 5 one sport {'nhl': 4}` and `cross value ... across sports 0 one sport {'nba': 1, 'nhl': 5}`.
+  - Served `/api/cheatsheets/nba/2026-10-20`: across sports hit_rate 5, own sport value 1.
+  - Served `/api/cheatsheets/nhl/2026-10-20`: across sports hit_rate 5, own sport hit_rate 4 + value 5.
+  - The page carries "across games: built for".
+- **Owed:**
+  - tonight's 11:50 PM reconcile writes `.graded.json` with `scope`;
+  - `record.json` carries `xg_*` on the all-sports card and the NHL card.
