@@ -64,6 +64,24 @@ def _env_number(name: str, default: float) -> float | None:
     return value
 
 
+# THE SMALL-EDGE LINE [user 2026-10-20, option C]: a position whose
+# `stake_fraction` (the system's own trust-adjusted size, after the Kelly
+# multiplier, credibility, skill and price reliability) is under this is NOT put
+# in the band -- it keeps its compounded stake, which the one-contract floor
+# makes about one contract. Without it the band turns every admitted row into
+# $5+, however thin. Absent = no line (the band sizes every position, as
+# before). 0.001 is the line the fixed $1-of-$1,000 minimum used to draw.
+SMALL_EDGE_ENV = "SYNDICATE_LIVE_SMALL_EDGE_FRACTION"
+
+
+def small_edge_fraction() -> float | None:
+    """The stake-fraction line, or None when unset or unusable (0 < x < 1)."""
+    value = _env_number(SMALL_EDGE_ENV, -1.0)
+    if value is None or value <= 0 or value >= 1:
+        return None
+    return value
+
+
 def band_config() -> dict[str, Any]:
     """Resolved knobs, and `on` only when every one of them is usable."""
     requested = str(os.environ.get(MODE_ENV) or "").strip().lower() == "on"
@@ -84,6 +102,7 @@ def band_config() -> dict[str, Any]:
         "min_dollars": low,
         "max_dollars": high,
         "kelly_at_max": kelly_at_max,
+        "small_edge_fraction": small_edge_fraction(),
     }
 
 
@@ -149,7 +168,9 @@ def apply_live_stake_band(
     refused: dict[str, int] = {}
     refused_keys: list[str] = []
     trimmed = 0
+    left_small = 0
     before = 0.0
+    line = cfg.get("small_edge_fraction")
 
     def _refuse(reason: str, position: Mapping[str, Any]) -> None:
         refusals[reason] = refusals.get(reason, 0) + 1
@@ -165,6 +186,23 @@ def apply_live_stake_band(
             continue
         prior = float(position.get("stake_dollars") or 0.0)
         before += prior
+        fraction = position.get("stake_fraction")
+        try:
+            fraction = float(fraction) if fraction is not None else None
+        except (TypeError, ValueError):
+            fraction = None
+        if line is not None and fraction is not None and fraction < float(line):
+            # A small edge stays small: the compounded stake (one contract after
+            # the floor) is placed as is, not lifted to the band's $5 floor.
+            position["stake_band"] = {
+                "left_below_small_edge_fraction": True,
+                "stake_fraction": fraction,
+                "small_edge_fraction": line,
+                "stake_dollars": round(prior, 2),
+            }
+            left_small += 1
+            kept.append(position)
+            continue
         kelly = full_kelly_of(position)
         if kelly is None:
             _refuse(REFUSAL_NO_KELLY, position)
@@ -205,7 +243,8 @@ def apply_live_stake_band(
     plan["stake_band"] = {
         "on": True,
         "venue": venue,
-        "config": {k: cfg[k] for k in ("min_dollars", "max_dollars", "kelly_at_max")},
+        "config": {k: cfg.get(k) for k in ("min_dollars", "max_dollars", "kelly_at_max", "small_edge_fraction")},
+        "left_below_small_edge_fraction": left_small,
         "positions_in": len(kept) + sum(refused.values()),
         "positions_out": len(kept),
         "staked_dollars_before": round(before, 2),

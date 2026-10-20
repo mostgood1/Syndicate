@@ -218,13 +218,30 @@ def commit_live_venue_plan(
         else:
             dropped.append((reason, row))
 
+    # OPTION C [user 2026-10-20]: with `SYNDICATE_LIVE_SMALL_EDGE_FRACTION` set
+    # and compounding `on` with a one-contract minimum, the LIVE plan does not
+    # apply the fixed-bankroll `min_stake_units` ($1 of $1,000 = a 0.1% stake
+    # fraction). Those rows reach compounding, whose one-contract floor sizes
+    # them, and the band leaves them there (`live_stake_band`). paper2 and the
+    # main plan keep the $1 minimum: this changes only what live may place.
+    commit_settings = settings
+    small_edge = _small_edge_skip(venue)
+    if small_edge is not None:
+        try:
+            import dataclasses
+
+            commit_settings = dataclasses.replace(settings, min_stake_units=0.0)
+        except Exception:
+            small_edge = None
     plan = commit_portfolio(
         placeable,
         selected_date=selected_date,
-        settings=settings,
+        settings=commit_settings,
         settled_sample_size_by_sport=settled_sample_size_by_sport,
         prefer_placeable=True,
     )
+    if small_edge is not None:
+        plan["small_edge"] = {"fraction": small_edge, "fixed_min_stake_skipped": True}
 
     refusals = dict(plan.get("refusals") or {})
     by_market = {reason: dict(counts) for reason, counts in (plan.get("refusals_by_market") or {}).items()}
@@ -309,6 +326,34 @@ REFUSAL_NO_CONTRACT_PRICE_COMPOUNDED = "no_contract_price_compounded"
 REFUSAL_FLOOR_EXCEEDS_CASH = "floor_exceeds_funding_cash"
 
 
+def _small_edge_skip(venue: str | None) -> float | None:
+    """The small-edge line when option C applies to this live plan, else None.
+
+    Needs all three: the key set, compounding `on`, and a one-contract minimum
+    (`one_contract` / `floor_one_contract`). With any missing, skipping the $1
+    minimum would hand compounding rows it would size to fractions of a cent
+    and refuse anyway -- or, compounding off, place them at the fixed bankroll.
+    """
+    if venue is None:
+        return None
+    from syndicate.features.shared.live_stake_band import small_edge_fraction
+    from syndicate.features.shared.venue_capital import (
+        MIN_STAKE_FLOOR_ONE_CONTRACT,
+        MIN_STAKE_ONE_CONTRACT,
+        compounding_config,
+    )
+
+    line = small_edge_fraction()
+    if line is None:
+        return None
+    config = compounding_config()
+    if config.get("mode") != "on":
+        return None
+    if config.get("min_stake") not in (MIN_STAKE_ONE_CONTRACT, MIN_STAKE_FLOOR_ONE_CONTRACT):
+        return None
+    return line
+
+
 def default_bankroll_resolver(venue: str, settings: Any):
     """`position -> sizing_bankroll(...)` over ONE stamp read, for one venue.
 
@@ -383,9 +428,28 @@ def _apply_compounding_bankroll(
     # compounded stake is under $1 on today's edges, so a minimum applied here
     # would refuse each bet before the band could size it. Unknown capital
     # still refuses below -- that is a fact about the account, not a minimum.
-    band_sets_minimum = band_config()["on"]
-    one_contract_minimum = config.get("min_stake") == MIN_STAKE_ONE_CONTRACT and not band_sets_minimum
-    floor_to_one_contract = config.get("min_stake") == MIN_STAKE_FLOOR_ONE_CONTRACT and not band_sets_minimum
+    #
+    # PER POSITION, NOT PER PLAN [option C, user 2026-10-20]: with a small-edge
+    # line set, the band leaves positions under it at their compounded stake
+    # (`live_stake_band`), so for THOSE this step's own minimum must still run --
+    # otherwise they go out at a fraction of a contract and the order builder
+    # refuses them (measured in the 10:59 AM CT dry run: $0.20 / $0.19, floored=None).
+    band = band_config()
+    band_on = bool(band["on"])
+    small_edge_line = band.get("small_edge_fraction") if band_on else None
+
+    def _band_sizes(position: Mapping[str, Any]) -> bool:
+        if not band_on:
+            return False
+        if small_edge_line is None:
+            return True
+        try:
+            return float(position.get("stake_fraction") or 0.0) >= float(small_edge_line)
+        except (TypeError, ValueError):
+            return True
+
+    one_contract_rule = config.get("min_stake") == MIN_STAKE_ONE_CONTRACT
+    floor_rule = config.get("min_stake") == MIN_STAKE_FLOOR_ONE_CONTRACT
     floored = 0
     if mode not in {"shadow", "on"}:
         return
@@ -463,6 +527,9 @@ def _apply_compounding_bankroll(
             continue
 
         if mode == "on":
+            band_sets_minimum = _band_sizes(position)
+            floor_to_one_contract = floor_rule and not band_sets_minimum
+            one_contract_minimum = one_contract_rule and not band_sets_minimum
             if floor_to_one_contract:
                 floor = one_contract_floor_dollars(position, venue)
                 if floor is None:
@@ -658,6 +725,7 @@ def _write_live_venue_plan(
             f"positions={band.get('positions_out')}/{band.get('positions_in')} "
             f"staked_before=${band.get('staked_dollars_before')} staked_after=${band.get('staked_dollars_after')} "
             f"trimmed_to_funding={band.get('trimmed_to_funding')} refused={band.get('refused')} "
+            f"left_small={band.get('left_below_small_edge_fraction')} "
             f"stakes={[p.get('stake_dollars') for p in positions]}",
             flush=True,
         )
