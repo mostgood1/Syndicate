@@ -147,3 +147,17 @@ Test: `test_ladder_rows_are_skipped_and_never_move_the_effective_cut`, mutation-
    or market exclusion: a floor moves within its bounds and every row is still judged on its own EV. The ladder's own `$1` stakes make
    flat units and dollars identical there.
 6. **Not tuned on the ladder:** sizing, the gross cut, and anything outside Kalshi/Polymarket.
+
+
+### PRE-REGISTRATION AMENDMENT 2026-10-20T18:54Z (still before any ladder row settled; agreed with lane paper-alongside-live, session local_9c1e71e0)
+- **"Below the floor" is `ev_net_pct < floor`, NEVER "is a ladder row".** The ladder is the COMPLEMENT of the main paper book, so it also
+  holds at-or-above-floor rows the main book did not stake (`ladder_reason=suggested_not_staked`: zero Kelly, position cap). Those are
+  not lowering evidence. LOWER reads only ladder rows with `floor - 1 <= ev_net_pct < floor`.
+- **Slice on `ev_net_pct`** (4 dp), not on the 1-point `ev_band` label: the tuner moves in 0.5 steps.
+- **Dedupe** on venue family + `position_key` + `selected_date`, preferring the `paper:<venue>` (main-book) row, which is the same rule as
+  `scripts/paper_ladder_readout.py`.
+- **Naming is fixed** as `paper:<venue>:ladder` (289c0b69). Settlement buckets any `paper:*` as venue_comparison.
+- **RAISE side:** lane paper-alongside-live will stamp `ev_net_pct` on scoped main-book `paper:<venue>` rows, from its tags path. Once those
+  rows exist, RAISE of the net floor is registered as a mirror of the gross rule: taken rows' marginal band `[effective net cut, +1)`, flat
+  ROI AND same-book CLV both t <= -2, same sample minimums.
+- **Apply stays a user decision,** and the net floor is shared by paper2 AND the live plan.
