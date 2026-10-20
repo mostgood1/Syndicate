@@ -51573,3 +51573,21 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - **Prediction (handover note): "exactly KXBBLGAME, KXBUNDESLIGA2GAME, KXEREDIVISIEWGAME and KXSERIEAWGAME stop pairing, and BOARD_JOIN reasons gain series_competition_not_on_board" -> confirmed.**
 - **Ride-alongs that loaded with it:** compounding (b)+floor (that lane's own env change), live-stake-band (`SYNDICATE_LIVE_STAKE_BAND` key present x1 in pid 2949047's environ = that lane's own enablement), ab4b6ffe SGP tiers, kalshi_maker_shadow. Each is recorded by its own lane.
 - **Claims:** refresh-worker free from 13:45:46Z, released by this lane. No claim held by this lane now.
+
+
+## 2026-10-20 14:53:18Z (9:53 AM CT) -- fleet ff e491c260 -> eb86488f + live-odds-worker-only restart: Kalshi partial-sale grading fix (lane `compounding-bankroll` ran it for `kalshi-exit-path`, session 3927eb2e)
+- **ask:** the user, in chat: "Include eb86488f: ff the fleet to eb86488f in the same down/up so the partly sold Thornton bet grades; name it as a ride-along in deploys.md."
+  - It arrived after the 14:23Z down/up had completed, so it was loaded by a separate role-only restart. No env change was needed.
+  - kalshi-exit-path (local_646aa514) handed it over and stood its watchers down.
+- **also recorded:** `live-stake-band` ran its OWN full down/up at 14:37:08Z (refresh-worker 2949047, live-odds 2949048) with `REFRESH_WORKER__SYNDICATE_LIVE_STAKE_BAND=on`. The band is LIVE: $5-$10 stakes supersede compounding's dollar sizing; unknown capital still refuses. My three compounding keys carried through. That lane owns its entry.
+- **claim:** live-odds-worker acquired 14:43:46Z, token 6de95a3e61d67239; released after verify.
+- **ride-along `e491c260..eb86488f`:** runtime `syndicate/features/shared/venue_settlement.py` only (+49/-2); the rest is findings, todo, lanes and a test. The fleet's 8 dirty data files are untouched.
+- **timeline (UTC):**
+  - HEAD guard e491c260 ok; `git fetch github main`; `git merge --ff-only eb86488f` clean.
+  - Waited for live-odds-worker pid 2949048 to have zero children (1-2 odds children kept cycling 14:43-14:53). Zero at 14:53:18Z, and `kill -TERM` at once.
+  - Supervisor: "exited code=0 after 974s -- restarting in 5s". Respawn **pid 2952961, lstart 14:53:27Z**.
+- **verify:**
+  - environ `SYNDICATE_EXECUTION_MODE=live`, `LIVE_ARMED=1`, `BALANCE_CAPS=on`.
+  - The code on disk at HEAD eb86488f carries the exit-aware partial branch. The process started after the ff, so it loaded it. `RENDER_GIT_COMMIT` still stamps e491c260: a stamp captured at `up`, not the code.
+- **owed (kalshi-exit-path):** the first VENUE_SETTLEMENT pass after 14:53:27Z grades the partly sold Thornton entry (was `refused={'both_sides_held': 1}` every pass).
+- **refresh-worker** still runs e491c260 code. The only runtime diff is venue_settlement.py, which runs on live-odds-worker, so nothing is owed there.
