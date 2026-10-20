@@ -51954,3 +51954,31 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - **First live/paper twin observed:** Kalshi NCAAF h2h home (10-20) has 1 paper:kalshi twin by position_key AND 1 by opening_key+side -- the min_ev tuner's twin rule (b9c78071) matches it. The other 4 live rows have no paper twin (live 0% floor / one-contract rows paper2 does not stake).
 - **owed:** grading of the ladder and venue-book rows (games tonight) -- covered by the one-time reading 2026-10-21 8:45 AM CT, which also runs the venue-book funnel and the twin check. First weekly ladder readout: `scripts/paper_ladder_readout.py` beside the forward test, Monday 10-26.
 - **rollback:** `REFRESH_WORKER__SYNDICATE_PAPER_LADDER=off` + full down/up, or revert 289c0b69 + a gated refresh-worker TERM. Live is unaffected either way.
+
+## 2026-10-20 22:20Z (5:20 PM CT) -- nba-live-board: fleet ff c60b79ee -> 96f97a0a + live-odds-worker ROLE-ONLY respawn DONE; refresh-worker respawn PENDING
+
+- **Approval:** user, in chat: "Display + money on everything", then "yes push and deploy it before 6 PM".
+  - Claims: live-odds-worker (token 84840428), refresh-worker (token 1f9b568a), holder `nba-live-board`, acquired 21:45:5xZ.
+  - Waited for `compounding-bankroll`'s full down/up (up 20:45:40Z) and the 60-min spacing.
+- **ffs, guarded on HEAD:**
+  - c60b79ee -> 900c4287 at 21:46:19Z;
+  - -> 17d9b4a5 at 21:55:08Z;
+  - -> 96f97a0a at 22:12:15Z.
+- **Runtime contents:**
+  - **f0dd04bb (mine):**
+    - NBA in-play capture lane (live-odds-worker, forced NBA-only live run every 240 s while `_nba_has_live_game`);
+    - `_nba_live_priced()` ON by default (refresh-worker board build; user override, logged in findings_2026-10-09).
+  - **ride-along 900c4287** (`compounding-bankroll`, user-approved there): `floor_one_contract` adds the executor's slippage bound (`portfolio_commit` +9/-1, `venue_capital` +15/-3); refresh-worker.
+  - **ride-along 17d9b4a5** (paper-books lane local_9c1e71e0, user "Fix the price bug now"): `execute_portfolio._kalshi_contract_side` prices the Kalshi leg the body buys (+23/-1); live-odds-worker.
+  - **ride-along 96f97a0a** (same lane, user "Fix both"):
+    - `polymarket_board_join` forward-dated NCAAF/NFL/soccer join (+83/-5); refresh-worker;
+    - df57cbbd heavy-favourite cap, INERT unless SYNDICATE_LIVE_BAND_FAVOURITE_CAP=on (unset).
+- **Gate change, said plainly:**
+  - the fleet-wide `check_deploy_safety` held the live-odds respawn NOT CLEAR for 25 min (21:46-22:11Z), last on a refresh-worker board build in flight that a live-odds TERM cannot touch;
+  - each respawn is now gated on its OWN role: no non-zombie child of the role pid; refresh-worker also no board build in flight (`respawn_role2.sh`).
+- **live-odds-worker respawn MEASURED:** ROLE CLEAR 22:14:32Z; TERM pid 3055457 at 22:14:32.825Z; new pid **3072777** at 22:14:42Z (supervisor: "exited code=0 after 5337s -- restarting in 5s"). Carries 17d9b4a5 and the NBA lane.
+- **refresh-worker respawn:** PENDING. It carries f0dd04bb's pricing default, 900c4287 and 96f97a0a. An update follows.
+- **verify (owed):**
+  - `NBA_LIVE_AUTORUN_LAUNCHED` once PHI @ NYK is in play (23:00Z);
+  - NBA quotes last-seen < 5 min in play;
+  - the board's nba `live_gamelines`/`live_projections` supported=True with rows priced.
