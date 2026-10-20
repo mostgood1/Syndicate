@@ -353,6 +353,31 @@ def main() -> int:
                     ep["ended_by"], ep["dur"] = "open_at_end", ep["end"] - ep["start"]
                     episodes.append(ep)
 
+    # MARKOUT: the in-play stand-in for CLV (there is no valid in-play close --
+    # learnings 2026-10-02). For each episode, our leg's Kalshi MID h seconds
+    # after the episode began, minus what we would have paid (ask0 + fee). Read
+    # from the Kalshi series itself, so it needs no book at all.
+    mids = defaultdict(list)
+    for ev, ticks in kal.items():
+        for t, rows in ticks.items():
+            for r in rows:
+                ya_, yb_ = fnum(r.get("ya")), fnum(r.get("yb"))
+                if ya_ is not None and yb_ is not None and 0 < yb_ <= ya_ < 1:
+                    mids[t].append((ts(r["ts"]), (ya_ + yb_) / 2))
+    for t in mids:
+        mids[t].sort()
+
+    def mid_at(t, when):
+        xs = mids.get(t) or []
+        i = bisect.bisect_right([x[0] for x in xs], when) - 1
+        return xs[i][1] if i >= 0 and when - xs[i][0] <= 60 else None
+
+    for e in episodes:
+        fee0 = kalshi_taker_fee_dollars(a.contracts, e["ask0"], fee_multiplier=1.0) / a.contracts
+        for h in (60, 300):
+            m = mid_at(e["ticker"], e["start"] + h)
+            e[f"markout_{h}"] = None if m is None else ((m if e["side"] == "yes" else 1 - m) - e["ask0"] - fee0)
+
     tot = sum(stats["priced"].values())
     print(f"WINDOW {iso(window[0]) if window[0] else '-'}..{iso(window[1]) if window[1] else '-'}  "
           f"games mapped {len(game_to_event)}/{len(game_subs)}  fee multipliers {fee_cache}")
@@ -374,6 +399,12 @@ def main() -> int:
         print(f"  {fam}: near a score change (<=180s): n={len(near)} ended_by={dict(Counter(e['ended_by'] for e in near))} | "
               f"not near: n={len(far)} ended_by={dict(Counter(e['ended_by'] for e in far))} max_edge>2%: {sum(1 for e in far if e['max_edge']>0.02)} "
               f"| no ESPN match: {sum(1 for e in es if e.get('since_score') is None)}")
+        for label, grp in (("near-score", near), ("away-from-score", far)):
+            for h in (60, 300):
+                mk = [e[f"markout_{h}"] for e in grp if e.get(f"markout_{h}") is not None]
+                if mk:
+                    print(f"  {fam}: {label} markout +{h}s after fee: n={len(mk)} mean={sum(mk)/len(mk):+.4f} "
+                          f"positive={sum(1 for x in mk if x > 0)}/{len(mk)}")
         print(f"  {fam}: n={len(es)} dur p50={durs[len(durs)//2]:.0f}s p90={durs[int(len(durs)*0.9)]:.0f}s max={durs[-1]:.0f}s "
               f"ended_by={dict(ends)}  max_edge>2%: {len(big)}  single-sample: {sum(1 for e in es if e['n']==1)}")
     for fam, c in sorted(cadence.items()):
