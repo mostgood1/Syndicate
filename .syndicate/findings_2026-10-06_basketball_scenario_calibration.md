@@ -3564,3 +3564,39 @@ now 1.68 against the 0.00791 frozen in the solver).
 
 **Next, chained:** s″′ and Δ″′ re-measured on the #3j disjoint dates, then the 12-date check (|bias| < 0.5 + every
 step-3/4 guard), then the full FIT, then `fit_r2_config.json` for P3 and the forward test.
+
+### R2-d step 4b — 12-DATE CHECK RESULT 2026-10-20 02:43Z (chain done 02:40Z, 0 errors): FAILS on total bias; full FIT NOT launched
+
+**Re-measured on the #3j measure dates** (M1 / M2 / M3, 12/12 each):
+- s‴ = 0.01615 (was 0.00791);
+- Δ‴ = 0.103 (was 0.262).
+
+**PKR2_check** (12 sweep dates, 87 games, 17,400 draws). The guards hold:
+- FTA 22.57 (real 22.76 on these dates); team PF 19.81;
+- foul-outs .233 (FIT band [.153, .233], the edge);
+- P(6th | 5th) .226; 3PA 37.08 (37.10);
+- quarter shares inside the real CI overall;
+- S8 total SD 18.11 (17.74); pace proxy 113.4 (113.9).
+
+**FAIL: total bias vs actual** (team codes normalised; all 87 games):
+
+| run | bias | 95% CI |
+|---|---|---|
+| R2A_mean (fit_f5 + quarter mean) | +0.14 | [−3.54, +3.79] |
+| R2D_ref | +0.98 | |
+| R2CC_coh2 (coherent) | +1.05 | |
+| R2F_b060_n030 (stale s) | +1.96 | |
+| **PKR2_check** | **+1.46** | [−2.42, +5.14] |
+
+**The gate is |bias| < 0.5.** The clean signal is paired against R2A_mean on the same games: **+1.32, SE 0.23**. The
+re-measured s/Δ recovered only 0.50 of the step-4b +1.82.
+
+**Reading (believed, not measured):** the excess entered with the coherent model (R2D/R2CC, about +0.9) and with the
+higher non-shooting volume, so the EXACT solve under-counts some point source the loop now produces. Candidates:
+- and-one FT points;
+- base non-shooting trips in the bonus;
+- the coherent make-rate de-net under the solver's eff multiplier.
+
+**Next (to be pre-registered):** a solver-accounting diagnostic. Dump, per game, the solver's target points vs the
+sim's mean points, split by source (FG / and-one FT / shooting trips / bonus trips / intentional), at PKR2_check, and
+find which source carries the +1.3.
