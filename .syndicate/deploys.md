@@ -51938,3 +51938,19 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - **health since boot:** 0 stack frames in venue_quote_fanin.py / venue_quote_adapters.py; the 31 `Traceback` substrings are inside PROCESS_ENUM_DEBUG / MEMORY_WATCHDOG JSON dumps, 0 real exceptions with a repo frame.
 - **owed:** none for this lane's goal. Watch item for the order guard's lane: `REFUSED_TICKER_DATE_MISMATCH` should stay 0 now that the board no longer carries wrong-date tickers.
 - **rollback:** `git revert 6fb473e1` + ff + a gated refresh-worker TERM (there is no env switch; the refusal only fires on a proven date mismatch).
+
+## 2026-10-20 21:30:40Z (4:30 PM CT) -- READING: PAPER LADDER LIVE ON THE FLEET -- first build booked 63 EV-banded paper rows (Kalshi 36, Polymarket 27); live unchanged -- **MET (recording); grading owed** (lane `paper-alongside-live`, session f8387262)
+- **ask:** user decision relayed by session b87af0fc: "yes - but we should reconsider the floors" (to "Let Kalshi/Polymarket paper books record a wider selection, paper only?"). Pre-registration `.syndicate/findings_2026-10-20_paper_ladder.md` (written 1:44 PM CT, before any ladder row); tuner side pre-registered by lane min-ev-tuner-shadow (df2a2bcb).
+- **code:** `289c0b69` (paper ladder), plus `d4acdc98` (ev_net_pct copied onto paper:<venue> rows from 9544c2e8's position field). Tests: tests/test_paper_ladder.py 22 (off != on; live/paper2/unrestricted plans byte-identical on/off; live mode refuses book=ladder; complement; forward test cannot see ladder venues); mutations caught.
+- **how it reached the fleet (no restart of mine):** my ff 72407b6c -> 289c0b69 at 19:02:43Z under a refresh-worker claim (token 210de2effc25ef35, released at once), agreed with compounding-bankroll so ONE restart loads both. Later ffs by other lanes moved the checkout to 22c56001 / 8e0ca456 / c60b79ee (each contains 289c0b69 and d4acdc98; 6fb473e1 was shipped by its own lane). The load was compounding-bankroll's full down/up: refresh-worker **BOOTED 20:45:43Z**, pid **3055456**, HEAD c60b79ee.
+- **first build after boot (21:29Z):**
+  - `[paper_ladder] LADDER_PLAN_WRITTEN venue=kalshi eligible=2060 scoped=495 positions=37 bands={'0to1': 10, '1to2': 3, 'ge2': 1, 'm1to0': 23} refusals={'below_ladder_floor': 457, 'staked_by_venue_book': 1}`
+  - `venue=polymarket eligible=2060 scoped=277 positions=27 bands={'0to1': 9, '1to2': 1, 'm1to0': 17} refusals={'below_ladder_floor': 250}`
+  - `PAPER_LADDER_EXECUTED venue=paper:kalshi:ladder placed=36 skipped=1 refused={'held_by_venue_book': 1}`; `venue=paper:polymarket:ladder placed=27`.
+  - paper:kalshi (the Suggested venue book) had 1 position this build, a duplicate of a row booked earlier: it records again (2 rows since 16:18Z).
+- **ledger (21:30:40Z, one read, refresh-worker state env):**
+  - paper:kalshi:ladder 36 = m1to0 23 / 0to1 9 / 1to2 3 / ge2 1; paper:polymarket:ladder 27 = m1to0 17 / 0to1 9 / 1to2 1. All `selection=ladder`, `season_phase=regular`, `ev_net_pct` set, $1 each ($36 / $27).
+  - Live: 557 rows, all filled; 3 since 16:18Z, all placed by live-odds-worker. refresh-worker wrote 0 live rows. 0 `REFUSED_LIVE_INLINE`.
+  - **First live/paper twin observed:** Kalshi NCAAF h2h home (10-20) has 1 paper:kalshi twin by position_key AND 1 by opening_key+side -- the min_ev tuner's twin rule (b9c78071) matches it. The other 4 live rows have no paper twin (live 0% floor / one-contract rows paper2 does not stake).
+- **owed:** grading of the ladder and venue-book rows (games tonight) -- covered by the one-time reading 2026-10-21 8:45 AM CT, which also runs the venue-book funnel and the twin check. First weekly ladder readout: `scripts/paper_ladder_readout.py` beside the forward test, Monday 10-26.
+- **rollback:** `REFRESH_WORKER__SYNDICATE_PAPER_LADDER=off` + full down/up, or revert 289c0b69 + a gated refresh-worker TERM. Live is unaffected either way.
