@@ -26,6 +26,8 @@ WHAT IS CHECKED (key -> severity). Every `exec:` finding is emailed.
                               it may or may not be a position                               fail
   exec:log_errors:<group>     >= LOG_ERRORS_PER_CHECK failure lines from the order adapters
                               / execution tick in one check; held LOG_HOLD_MINUTES          fail
+  exec:log_errors:cancel      ONE failed cancel of a resting order (`CANCEL_FAILED`) -- the
+                              order is still resting and can still fill; no burst needed     fail
   exec:monitor                this monitor could not read the store (fails LOUD, not quiet) fail
 
 Process death is the fleet watchdog's (`role:live-odds-worker`, `heartbeat:live-odds-worker`,
@@ -106,6 +108,9 @@ STATE_ENV_KEYS = (
 # (execute_portfolio / live_odds_worker / execution_ledger); the adapter-level tokens are the ones that
 # only print on failure. Group = which alert key a line counts toward.
 LOG_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    # FIRST, because the first match wins and `[kalshi_orders] CANCEL_FAILED` also matches the `kalshi` group.
+    # A failed cancel was SILENT until 2026-10-20: the SAS spread order 404'd on every cancel and nothing alerted.
+    ("cancel", re.compile(r"\[(?:kalshi_orders|execution_ledger)\] CANCEL_FAILED")),
     ("kalshi", re.compile(r"\[kalshi_orders\] \S*(?:FAIL|ERROR)")),
     ("polymarket", re.compile(r"\[polymarket_us_orders\] \S*(?:FAIL|ERROR|IMPLAUSIBLE|ABOVE_LIMIT|OUT_OF_RANGE)")),
     ("orders", re.compile(r"\[execute_portfolio\] (?:LIVE_ORDER status=failed|RECONCILE_FAILED)")),
@@ -113,6 +118,9 @@ LOG_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("tick", re.compile(r"\[live_odds_worker\] (?:EXECUTION_ERROR|VENUE_SETTLEMENT_FAILED|ORDER_PATH_FAILED|"
                         r"LEDGER_RECONCILE_FAILED|EXECUTION_STATE_STAMP_FAILED|VENUE_BALANCES_STAMP_FAILED|SELF_HEAL_FAILED)")),
 )
+# Groups where ONE line is already an incident. The burst threshold exists to keep transient venue noise
+# out of the inbox; a resting order we tried and failed to pull is not noise -- it can fill at a stale price.
+LOG_GROUP_MIN_LINES: dict[str, float] = {"cancel": 1}
 _EXECUTION_LINE = re.compile(r"\[live_odds_worker\] EXECUTION status=(\S+) reason=(\S+) mode=(\S+) venue=(\S+)"
                              r".*? refused=(\{.*?\}) spent=")
 _SELF_HEALED = re.compile(r"\[execution_self_heal\] UNKNOWN_SUBMIT_AUTO_RESOLVED .*?finding=(\S+)")
@@ -498,7 +506,7 @@ def evaluate(readings: Mapping[str, Any], now: dt.datetime, limits: Mapping[str,
     # LOG BURSTS, held LOG_HOLD_MINUTES after the last burst so one incident is one alert, not NEW/CLEARED every 5 min.
     holds = dict(exec_state.get("log_holds") or {})
     for group, lines in log_hits(readings.get("log_lines") or []).items():
-        if len(lines) >= limits["log_errors_per_check"]:
+        if len(lines) >= LOG_GROUP_MIN_LINES.get(group, limits["log_errors_per_check"]):
             holds[group] = {"at": now.isoformat(), "count": len(lines), "sample": lines[-SAMPLE_LINES:]}
     for group, held in list(holds.items()):
         at = _parse_time(held.get("at"))

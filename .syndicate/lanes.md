@@ -1432,6 +1432,14 @@ death, never life — do not invert it.
 - Verification: findings file with denominators + windows; recorder data in C:/tmp/inplay_2026-10-20
 - Blocked by: none
 
+### kalshi-cancel-alert — OPEN — opened 2026-10-20 — session bf65f720-b233-4896-bd9a-7c746c7e685c
+- Goal: A failed Kalshi cancel (CANCEL_FAILED from kalshi_orders or execution_ledger) emails through the execution-alerts mailer on ONE line, not a 3-line burst; Kalshi V2 cancel docs recorded (side-session notes kalshi-cancel-v2.md); the IOC/FOK no-rest stopgap is put to the user as a decision, not a default. Side session of b87af0fc; the cancel_order fix itself is compounding-bankroll's d57476ec.
+- Files: scripts/execution_watchdog.py (LOG_PATTERNS cancel group + LOG_GROUP_MIN_LINES + module docstring row ONLY), tests/test_cancel_failed_alert.py (NEW)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit: one CANCEL_FAILED line -> exec:log_errors:cancel finding; fleet: alert path loads at the next checkout ff (watchdog-only, no role restart) -- the first real CANCEL_FAILED, if any, produces an email
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
