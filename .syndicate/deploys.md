@@ -51498,3 +51498,24 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - Credits: about 13-20 per game per pull, not metered (no NBA line in the quota ledger).
   - Deleted after they ran (LastTaskResult 0): `SyndicateNbaPreviewTonight` (10-19 9:05 PM), `SyndicateNbaOpenerMorning` (10-20 6:30 AM).
 - verify: the 11:40 log line in `logs/nba_gameday_props.log` (PULL, `snapshot REWRITTEN`); the 1:40 PM line; the 10-21 board's NBA games after it.
+
+## 2026-10-20 14:29Z (9:29 AM CT) -- MIN_EV TUNER READOUT 1/7 (shadow, lane min-ev-tuner-shadow)
+- **READ-ONLY.** Scheduled task `min-ev-tuner-daily-readout`. No deploy, restart, ff, env or tuner-state write.
+- **ran: YES.** `2026-10-20T12:01:32.178Z [min_ev_tuner] MIN_EV_TUNER mode=shadow date=2026-10-20 cells=60 actions={'hold': 60} skipped={'no_ev_pct': 552, 'not_settled': 1227, 'venue_not_tuned': 7459} base=0.0 moves=0`. 0 `MIN_EV_TUNER_FAILED` / `_SAVE_FAILED` / `_HOOK_FAILED` lines in refresh-worker.log.
+  - Compared with 10-19 19:25Z: not_settled 1264 -> 1227, venue_not_tuned 7422 -> 7459. no_ev_pct is still 552, the 10-02 venue_rebuild rows.
+- **code that ran the pass:** the refresh-worker process from caps-revamp's full `up` onto `d3878d69` (23:55:55Z 10-19). It exited at 13:17:22Z (CLAIMED_RESTART, board-implausible-book-upper-bound), and fleet HEAD is now `e491c260`. `affc9a7b` (flat basis) and `40640a0b` (effective-cut anchor) are both ancestors of `d3878d69` and of `e491c260`. **This is the first readout with both loaded.**
+- **fleet at read time (14:24-14:25Z):** `local_production.py status` -> `not running (no pidfile)`. role_restarts: `down` 14:24:00Z, claimed, holder `compounding-bankroll`, via cli. The fleet was DOWN on that lane's claim when I read it. That down is not this lane's, and it did not touch the 12:01Z pass.
+- **state (`min_ev_tuner_readout.py state --limit 8`, 14:24:34Z):** mode=**shadow** (no alarm). last_run_at=2026-10-20T12:01:31Z, base=0.0, actions={'hold': 60}, skipped as above. params step 0.5 / floor 0.0 / ceiling 6.0 / min_events 40 / min_clv_events 30 / z 2.0. **audit: 0 moves.**
+  - **Bands are now anchored off [0,1)** (the 40640a0b fix is visible). ROI is shown as `flat_roi`, with $roi and ev_only$ beside it (the flat basis is live).
+  - top cells (band = [effective cut, +1.0); n = band events):
+    - kalshi|ncaaf|spreads|regular: band [3.79, 4.79), n=45/40, flat ROI -10.2% (t -0.58), $ -12.6%, CLV n=**18/30**, +1.97 (t 4.21) -> hold `insufficient_clv_events`.
+    - polymarket|ncaaf|totals|regular: band [3.34, 4.34), n=46/40, flat ROI **+9.6%** (t 0.61), $ -5.3%, ev-only $ +11.6%, CLV n=**28/30**, +1.65 (t 4.52) -> hold `insufficient_clv_events`.
+    - kalshi|ncaaf|h2h: band [0.88, 1.88), n=22, flat -8.5% (t -0.63), CLV n=19, -1.60 (t -0.70) -> `insufficient_events`.
+    - kalshi|ncaaf|totals: band [2.81, 3.81), n=5, flat -33.8% (t -0.70), CLV n=1 -> `insufficient_events`.
+    - polymarket|ncaaf|h2h: band [1.88, 2.88), n=17, flat -14.7% (t -0.67), CLV n=11, +2.60 (t 3.23) -> `insufficient_events`.
+    - polymarket|ncaaf|spreads: band [3.16, 4.16), n=20, flat -28.9% (t -1.04), CLV n=12, +0.98 (t 1.66) -> `insufficient_events`.
+    - kalshi|nfl|receptions: band [3.44, 4.44), n=16, flat +36.5% (t 1.90), CLV n=13, -0.02 (t -0.05) -> `insufficient_events`.
+    - kalshi|mlb|batter_hits_runs_rbis|postseason: band [2.12, 3.12), n=7, flat +5.8% (t 0.28), CLV n=0 -> `insufficient_events`.
+  - **closest to a decision:** polymarket ncaaf totals (CLV 28/30). If it fills, flat ROI is +9.6% at t 0.61, below z 2.0 in either direction, so it should hold as `only_clv_significant` rather than move. The same is true for kalshi ncaaf spreads (CLV 18/30). These numbers match the 10-19 replay exactly, so these two cells' bands gained no newly graded events overnight.
+- **verify:** this READING is the `MIN_EV_TUNER` line stamped 12:01:32Z with date=2026-10-20, plus `last_run_at=2026-10-20T12:01:31Z` read back from keyvalue. Next readout: 2/7 on 10-21.
+
