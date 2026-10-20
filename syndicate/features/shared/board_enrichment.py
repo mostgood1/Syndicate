@@ -1484,10 +1484,41 @@ def attach_projections(grid: list, *, sport: str, selected_date: str) -> dict:
     POINT. `_attach_projections_by_sport` has THIRTEEN return sites across
     seven sports; adding the check at each is precisely the failure `#334`
     records -- three of four call paths patched and the fourth silently still
-    broken. Wrapping covers every sport, every return path, and every producer
-    wired in future, and touches ZERO call sites (there are four:
-    `intelligence.py`, `book_grid_artifact.py`, `layer2_shortlist.py`, and
-    `attach_live_projections_for_sport` below).
+    broken. Wrapping covers every sport, every return path, and every PREGAME
+    producer wired in future, and touches ZERO call sites.
+
+    THERE ARE THREE CALL SITES, with full paths because two other files share
+    a basename with one of them `[corrected 2026-10-20, lane
+    board-attach-projections-enumeration]`:
+
+        pipeline/layer2_shortlist.py:2656
+        syndicate/blueprints/intelligence.py:3360
+        syndicate/features/shared/book_grid_artifact.py:444
+
+    It previously said FOUR and listed `attach_live_projections_for_sport`
+    below. **That function is not a caller** -- it calls
+    `attach_live_projections` and names this one only in prose. The old list
+    also wrote `intelligence.py` bare, and there are two files with that
+    basename (`syndicate/blueprints/` and `syndicate/features/`); grepping the
+    wrong one is what sent a reader looking for a caller that was never there.
+    Beware also that THREE functions in this tree are called
+    `attach_projections`: this one, `prop_projections.attach_projections`
+    (locally imported inside `_attach_projections_by_sport` at the MLB branch),
+    and nothing else -- an unanchored grep conflates them.
+
+    **THE `#425` CHECK DOES NOT COVER LIVE PROJECTIONS, AND THE OLD LIST MADE
+    IT LOOK AS IF IT DID.** `detect_degenerate_projections` reads
+    `_projected_value`, i.e. `projected_raw` else `projected`. The live path
+    writes `live_projected`, so the check cannot see it from either caller
+    whatever the ordering -- and the orderings differ
+    (`book_grid_artifact` attaches live AFTER this wrapper at `:444`/`:461`;
+    `layer2_shortlist` attaches it BEFORE at `:1407`/`:2656`), so order is not
+    something to rely on either. Extending the check to the live producer is a
+    behaviour change and needs its own measurement on a LIVE slate: at the time
+    of writing the board carried ZERO rows with `live_projected`, so the gap is
+    shown by the field names and not by an observed degenerate live row.
+
+    `tests/test_attach_projections_enumeration.py` pins all of this.
     """
     coverage = _attach_projections_by_sport(grid, sport=sport, selected_date=selected_date)
     if not isinstance(coverage, dict):
