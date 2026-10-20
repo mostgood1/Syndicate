@@ -50,7 +50,7 @@ def test_the_season_keeps_the_beta_apart_and_runs_a_series():
     assert [x["date"] for x in series] == ["2026-10-15", "2026-10-16"]
     assert series[-1]["cum_units"] == round(series[0]["cum_units"] - 2, 2)            # two losses on the 16th
     assert [x["date"] for x in rec["days"]] == ["2026-10-16", "2026-10-15", "2026-10-14"]   # newest first
-    assert rec["sections"][-2] == {"key": "featured", "label": "All featured picks"}      # parlays (paper) follow it
+    assert {"key": "featured", "label": "All featured picks"} in rec["sections"]             # the parlays follow it
 
 
 def test_the_record_page_only_reads_the_file(tmp_path, monkeypatch):

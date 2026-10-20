@@ -20,6 +20,7 @@ from free box scores, cached under `cheatsheets/.reconcile_cache/`.
 from __future__ import annotations
 
 import argparse
+import collections
 import importlib.util
 import json
 import os
@@ -364,10 +365,66 @@ def sgp_leg_actuals(root: Path, day: str, sheet: Mapping[str, Any]) -> dict[str,
                     continue
                 if rec.get("date") == day:
                     tickets.append(rec)
+        # Cross-game parlays (2026-10-20): this sport's legs of the day's tickets, read off the same box scores.
+        for kind_tickets in (_cross_doc(root, day).get("kinds") or {}).values():
+            for t in kind_tickets or []:
+                mine = [leg for leg in t.get("legs") or [] if leg.get("sport") == sport and leg.get("kind") == "prop"]
+                if mine:
+                    tickets.append({"legs": mine})
         return actuals(root, day, tickets)
     except Exception as exc:  # noqa: BLE001 -- the props still reconcile; those legs stay pending
         print(f"RECONCILE {sport} date={day} leg actuals failed: {type(exc).__name__}: {exc}", flush=True)
         return {}
+
+
+CROSS_DIR = "cheatsheets_cross"
+
+
+def _cross_doc(root: Path, day: str) -> dict[str, Any]:
+    try:
+        doc = json.loads((root / CROSS_DIR / f"{day}.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return doc if isinstance(doc, dict) else {}
+
+
+def grade_cross(root: Path, sheets_dir: Path, today: str, *, days: int = 7) -> int:
+    """Grade the cross-game parlays of the last `days` days from every sport's reconciled file for the day
+    (`cross_game_parlays.grade`) into `cheatsheets_cross/<day>.graded.json`. Returns the days written."""
+    from syndicate.features.shared import cross_game_parlays as xg
+
+    written = 0
+    for k in range(days, -1, -1):
+        day = (datetime.fromisoformat(today) - timedelta(days=k)).date().isoformat()
+        doc = _cross_doc(root, day)
+        if not doc.get("kinds"):
+            continue
+        recs = {}
+        for sport in doc.get("sports") or []:
+            try:
+                recs[sport] = json.loads((sheets_dir / sport / f"{day}.reconciled.json").read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+        if not recs:
+            continue
+        graded = {t["xg_id"]: dict(xg.grade(t, recs), kind=kind, price=t.get("price"), p_joint=t.get("p_joint"))
+                  for kind, tickets in doc["kinds"].items() for t in tickets or [] if t.get("xg_id")}
+        write_atomic(root / CROSS_DIR / f"{day}.graded.json",
+                     {"date": day, "graded_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "tickets": graded})
+        counts = collections.Counter(g["status"] for g in graded.values())
+        print(f"CROSS date={day} {dict(counts)}", flush=True)
+        written += 1
+    return written
+
+
+def cross_graded(root: Path) -> list[dict[str, Any]]:
+    out = []
+    for path in sorted((root / CROSS_DIR).glob("*.graded.json")):
+        try:
+            out.append(json.loads(path.read_text(encoding="utf-8")))
+        except (OSError, ValueError):
+            continue
+    return out
 
 
 def write_record(sheets_dir: Path, *, now: datetime) -> dict[str, Any]:
@@ -384,7 +441,7 @@ def write_record(sheets_dir: Path, *, now: datetime) -> dict[str, Any]:
         except (OSError, ValueError):
             continue
         days.append(csr.day_record(sheet, reconciled, cs.load_posted(sheets_dir, rec_path.parent.name, day)))
-    record = csr.season_record(days, generated_at=now.isoformat(timespec="seconds"))
+    record = csr.season_record(days, generated_at=now.isoformat(timespec="seconds"), cross=cross_graded(sheets_dir.parent))
     write_atomic(sheets_dir / "record.json", record)
     official = record["official"]["totals"].get(csr.ALL) or {}
     print(f"RECORD days={len(days)} official featured {official.get('w', 0)}-{official.get('l', 0)} "
@@ -520,8 +577,9 @@ def main(argv: list[str] | None = None) -> int:
                   f"from the actual stat {c['props_from_actual']}, "
                   f"explained voids {len(rec['void'])}, finals {len(rec['scores'])}) "
                   f"lines {c['lines_graded']}/{c['lines']} graded_population={len(graded)}", flush=True)
-    write_record(sheets_dir, now=datetime.now(timezone.utc))
     refresh_leg_actuals(root, sheets_dir, today)
+    grade_cross(root, sheets_dir, today)
+    write_record(sheets_dir, now=datetime.now(timezone.utc))
     grade_sgp_ledger(root)
     return 0
 

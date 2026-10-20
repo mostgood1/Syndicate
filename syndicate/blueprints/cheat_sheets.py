@@ -92,7 +92,32 @@ def _read(sport: str, day: str) -> dict[str, Any] | None:
     posted = cs.load_posted(_sheet_dir(), sport, day)    # exported graphics: `cs.page_payload` pins their rows
     if posted:
         doc["posted"] = posted
+    cross = _cross(sport, day)
+    if cross:
+        doc["cross"] = cross
     return doc
+
+
+def _cross(sport: str, day: str) -> dict[str, Any] | None:
+    """The day's cross-game parlays that have a leg in `sport` (`scripts/build_cheat_sheets.attach_cross_game`), each
+    with its result once the reconcile has graded it (`<day>.graded.json`). They live beside `cheatsheets/`, in
+    `cheatsheets_cross/`, because every directory inside it is read as a sport."""
+    root = _sheet_dir().parent / "cheatsheets_cross"
+    try:
+        doc = json.loads((root / f"{day}.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    try:
+        graded = json.loads((root / f"{day}.graded.json").read_text(encoding="utf-8")).get("tickets") or {}
+    except (OSError, ValueError, AttributeError):
+        graded = {}
+    kinds = {}
+    for kind, tickets in ((doc or {}).get("kinds") or {}).items():
+        mine = [dict(t, **({"result": graded[t["xg_id"]]} if t.get("xg_id") in graded else {}))
+                for t in tickets or [] if any(leg.get("sport") == sport for leg in t.get("legs") or [])]
+        if mine:
+            kinds[kind] = mine
+    return {"generated_at": doc.get("generated_at"), "kinds": kinds} if kinds else None
 
 
 def _sports() -> list[str]:

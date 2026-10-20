@@ -26,7 +26,7 @@ import urllib.request
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
@@ -977,6 +977,81 @@ def attach_sgp(sheet: dict[str, Any], prior: dict[str, Any] | None, data_root: P
         sheet["sgp"] = list((prior or {}).get("sgp") or [])
 
 
+CROSS_DIR = "cheatsheets_cross"        # beside `cheatsheets/`, never inside it: every `cheatsheets/*` dir is read as a sport
+
+
+def sgp_leg_pool(sport: str, sheet: Mapping[str, Any], data_root: Path, day: str) -> dict[str, list[dict[str, Any]]]:
+    """The same-game parlays' hit-rate leg pool for one sport's sheet: market, last 10 and sim all agree. Empty on
+    any failure -- the cross-game hit-rate kind then has fewer games, never a failed build."""
+    try:
+        if sport == "nhl":
+            from syndicate.features.nhl import sgp as nhl_sgp
+            from syndicate.features.nhl import sgp_pool
+
+            return sgp_pool.legs_by_game(sheet, data_root, day, nhl_sgp.lineup_roles(data_root, day))[0]
+        if sport in ("nba", "wnba"):
+            from syndicate.features.shared import basketball_sgp_pool
+
+            return basketball_sgp_pool.legs_by_game(sheet, data_root, day, sport)[0]
+        if sport == "nfl":
+            from syndicate.features.nfl import sgp as nfl_sgp
+            from syndicate.features.nfl import sgp_pool as nfl_pool
+
+            return nfl_pool.legs_by_game(sheet, data_root, day, nfl_sgp.current_roles(data_root, day))[0]
+        if sport == "mlb":
+            from syndicate.features.shared import mlb_sgp_pool
+
+            return mlb_sgp_pool.legs_by_game(sheet, data_root, day)[0]
+    except Exception as exc:  # noqa: BLE001
+        print(f"CHEAT_SHEET cross {sport}: leg pool failed: {type(exc).__name__}: {exc}", flush=True)
+    return {}
+
+
+def attach_cross_game(data_root: Path, day: str, *, now: datetime | None = None) -> dict[str, Any] | None:
+    """Cross-game parlays for the day across every sport's sheet on disk (user 2026-10-20: "what about cross slate
+    SGPS?" -> "can we do both?"): the hit-rate kind from the same-game parlays' leg pools, the value kind from legs
+    that beat their own price at the ticket's book (`cross_game_parlays`).
+
+    A ticket with a leg already started is the record: kept as built, never rebuilt. Fresh tickets come only from games
+    not yet started. Written to `<data root>/cheatsheets_cross/<day>.json`; the reconcile grades it."""
+    from syndicate.features.shared import cross_game_parlays as xg
+
+    now = now or datetime.now(timezone.utc)
+    sheets = {}
+    for path in sorted((data_root / "cheatsheets").glob(f"*/{day}.json")):
+        try:
+            doc = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if isinstance(doc, dict) and doc.get("sport") == path.parent.name and doc.get("phase") != "preseason":
+            sheets[path.parent.name] = doc
+    if not sheets:
+        return None
+    started = {str(g.get("event_id")) for doc in sheets.values() for g in doc.get("games") or []
+               if (_parse_ts(g.get("commence_time")) or now) <= now}
+    value, hit = [], []
+    for sport, doc in sheets.items():
+        value += xg.value_legs(doc, started=started)
+        if sport in SGP_SPORTS:
+            games = {str(g.get("event_id")): g for g in doc.get("games") or []}
+            hit += xg.hit_rate_legs(sport, sgp_leg_pool(sport, doc, data_root, day), games, started=started)
+    target = data_root / CROSS_DIR / f"{day}.json"
+    try:
+        prior = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        prior = {}
+    out = {"date": day, "generated_at": now.isoformat(timespec="seconds"), "sports": sorted(sheets), "kinds": {}}
+    for kind, legs in (("hit_rate", hit), ("value", value)):
+        frozen = [t for t in (prior.get("kinds") or {}).get(kind) or []
+                  if any(str(l.get("event_id")) in started for l in t.get("legs") or [])]
+        fresh = [t for t in xg.tickets(legs, kind) if t["xg_id"] not in {f["xg_id"] for f in frozen}]
+        out["kinds"][kind] = frozen + fresh[:max(0, xg.KINDS[kind]["per_sheet"] - len(frozen))]
+        print(f"CHEAT_SHEET cross {kind} date={day}: legs {len(legs)} tickets {len(out['kinds'][kind])} "
+              f"(kept {len(frozen)} started)", flush=True)
+    write_atomic(target, out)
+    return out
+
+
 def alt_row_count(data_root: Path, sport: str, day: str) -> int:
     """Rows in the day's alt capture: the NHL parlays re-run when it grows (a game's rungs land 20-90 min before it)."""
     try:
@@ -1293,6 +1368,10 @@ def main_build(args: Any, data_root: Path) -> int:
         print(f"CHEAT_SHEET {sport} date={selected} groups={sheet['groups_built']}/{sheet['groups_on_board']} "
               f"rows={len(sheet['rows'])} frozen={sheet.get('rows_frozen', 0)} picks={len(sheet.get('picks') or [])} sections={counts} identity={have} "
               f"images={images} secs={sheet['build_seconds']}", flush=True)
+    try:
+        attach_cross_game(data_root, selected)
+    except Exception as exc:  # noqa: BLE001 -- the cross-game section is a gap, never a failed build
+        print(f"CHEAT_SHEET cross failed: {type(exc).__name__}: {exc}", flush=True)
     return 0
 
 

@@ -52,7 +52,7 @@ def test_the_season_and_each_sport_carry_the_parlays():
     off = rec["official"]
     assert off["totals"]["sgp"]["w"] == 2 and off["totals"]["sgp"]["n"] == 4 and off["totals"]["sgp"]["expected"] == 2.0
     assert off["by_sport"]["nhl"]["sgp"]["n"] == 2 and off["by_sport"]["mlb"]["sgp"]["n"] == 2
-    assert rec["sections"][-1] == {"key": "sgp", "label": csr.SGP_LABEL, "paper": True}
+    assert {"key": "sgp", "label": csr.SGP_LABEL, "paper": True} in rec["sections"]
 
 
 def test_every_scorecard_names_every_category_that_applies_to_its_sport():
@@ -62,7 +62,7 @@ def test_every_scorecard_names_every_category_that_applies_to_its_sport():
     assert rec["applies"]["pvp_batters"] == ["mlb"] and rec["applies"]["pvp_skaters"] == ["nhl"]
     assert rec["applies"]["pvp_scorers"] == ["nba"] and rec["applies"]["pvp_qbs"] == ["nfl"]
     assert set(rec["applies"]["sgp"]) == set(csr.SGP_SPORTS)
-    assert {k for k, _ in csr.FEATURED} | {"sgp"} == set(rec["applies"])
+    assert {k for k, _ in csr.FEATURED} | {"sgp", "xg_hit_rate", "xg_value"} == set(rec["applies"])
 
 
 def test_the_parlay_sports_are_the_builders():

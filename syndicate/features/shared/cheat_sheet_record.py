@@ -60,6 +60,26 @@ CATEGORY_SPORTS: dict[str, frozenset] = {
 }
 
 
+# CROSS-GAME PARLAYS (2026-10-20): graded by the reconcile into `cheatsheets_cross/<day>.graded.json`. They span sports,
+# so they belong to the all-sports scorecard only. A book pays the full product on them, so unlike the same-game parlays
+# they are counted in units -- and, like them, never inside "All featured picks".
+CROSS_KINDS = (("xg_hit_rate", "Cross-game parlays: hit rate", "hit_rate"), ("xg_value", "Cross-game parlays: value", "value"))
+
+
+def cross_totals(graded_docs: Iterable[Mapping[str, Any]], *, beta: bool) -> dict[str, dict[str, Any]]:
+    """{xg_hit_rate / xg_value: finish()} over the graded days on one side of OFFICIAL_START."""
+    by_kind = {kind: key for key, _label, kind in CROSS_KINDS}
+    tallies: dict[str, dict[str, float]] = {}
+    for doc in graded_docs or []:
+        if (str(doc.get("date") or "") < OFFICIAL_START) != beta:
+            continue
+        for res in (doc.get("tickets") or {}).values():
+            key = by_kind.get(res.get("kind"))
+            if key and res.get("status") in ("won", "lost"):
+                _add(tallies.setdefault(key, _tally()), {"y": 1 if res["status"] == "won" else 0, "units": res.get("units")})
+    return {k: finish(t) for k, t in tallies.items()}
+
+
 def applies(key: str, sport: str) -> bool:
     return sport in CATEGORY_SPORTS.get(key, frozenset(cs.SPORT_ORDER))
 
@@ -223,16 +243,24 @@ def _scope(days: list[Mapping[str, Any]]) -> dict[str, Any]:
             "series": series, "days": len(per_date)}
 
 
-def season_record(days: Iterable[Mapping[str, Any]], *, generated_at: str) -> dict[str, Any]:
-    """The page's whole payload: the official record, the beta apart, and every day newest first."""
+def season_record(days: Iterable[Mapping[str, Any]], *, generated_at: str,
+                  cross: Iterable[Mapping[str, Any]] | None = None) -> dict[str, Any]:
+    """The page's whole payload: the official record, the beta apart, and every day newest first. `cross`: the
+    cross-game parlays' graded days (`reconcile_cheat_sheets.cross_graded`)."""
     days = sorted(days, key=lambda d: (str(d.get("date")), str(d.get("sport"))), reverse=True)
+    cross = list(cross or [])
+    official, beta = _scope([d for d in days if not d.get("beta")]), _scope([d for d in days if d.get("beta")])
+    official["totals"].update(cross_totals(cross, beta=False))
+    beta["totals"].update(cross_totals(cross, beta=True))
     return {"generated_at": generated_at, "official_start": OFFICIAL_START,
             "sections": [{"key": k, "label": label} for k, label in FEATURED] + [{"key": ALL, "label": "All featured picks"},
-                                                                                 {"key": SGP, "label": SGP_LABEL, "paper": True}],
+                                                                                 {"key": SGP, "label": SGP_LABEL, "paper": True}]
+                        + [{"key": key, "label": label, "cross": True} for key, label, _kind in CROSS_KINDS],
             # Every sport, and which sports each category applies to: a scorecard lists every category that applies
             # to its sport, "no bets yet" included, rather than only the ones that happen to have bets.
             "sports": list(cs.SPORT_ORDER),
-            "applies": {k: sorted(s for s in cs.SPORT_ORDER if applies(k, s)) for k, _ in FEATURED + ((SGP, ""),)},
-            "official": _scope([d for d in days if not d.get("beta")]),
-            "beta": _scope([d for d in days if d.get("beta")]),
+            "applies": {**{k: sorted(s for s in cs.SPORT_ORDER if applies(k, s)) for k, _ in FEATURED + ((SGP, ""),)},
+                        **{key: [] for key, _label, _kind in CROSS_KINDS}},       # all sports' scorecard only
+            "official": official,
+            "beta": beta,
             "days": days}

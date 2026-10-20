@@ -479,6 +479,36 @@ function sgpRow(s) {
     <ul class="checks">${legs}${together || `<li class="ctx"><b>Together</b>${esc(SGP_WHY[s.family === "hit_rate" ? "hit_rate" : s.relation] || SGP_WHY[s.relation] || "")}</li>`}</ul>
   </div>`;
 }
+// Cross-game parlays (user 2026-10-20: "what about cross slate SGPS?" -> "can we do both?"): one leg per game, any
+// sport on the day's sheets, +100 or better at ONE book. A book pays the full product on a parlay across games, so the
+// price shown is the price paid. Two kinds: legs built for hit rate, and legs that each beat their own price.
+const XG_NOTE = {hit_rate: "Each leg is one the market, the player's last 10 and our sim all make likely. Across games nothing ties the legs together, so every leg carries the books' margin: read 'worth it at'.",
+  value: "Each leg beats the no-vig fair by 2% or more at this book, so the edges multiply. A lower hit rate, priced to win over time."};
+function xgRow(t) {
+  const res = t.result, rl = res && res.legs || [];
+  const legs = (t.legs || []).map((l, i) => `<li class="ctx${rl[i] ? ({lost: " leg-l", void: " leg-v", pending: " leg-p"}[rl[i].result] || "") : ""}"><b>${esc(l.bet || "")}</b>${esc((SPORT_NAMES[l.sport] || l.sport || "").toUpperCase())} · ${esc(l.matchup || "")} · ${odds(l.price)} · ${pct(l.p)} on its own${sgpLegResult(rl[i])}</li>`).join("");
+  const status = res && res.status;
+  return `<div class="prop pick sgp${status === "won" ? " rw" : status === "lost" ? " rl" : ""}" data-xg="${esc(t.xg_id || "")}">
+    <div class="who"><div class="line1"><span class="chip value">${t.kind === "value" ? "Built for value" : "Built for hit rate"}</span><span class="chip neutral">${t.size}-leg, ${t.size} games</span>${status ? `<span class="chip ${status === "won" ? "value" : "neutral"}">${status === "won" ? `Won ${unitsText(res.units)}` : status === "lost" ? "Lost -1.00u" : status}</span>` : ""}</div>
+      <div class="bet">${(t.legs || []).map(l => esc(l.bet || "")).join(" + ")}</div></div>
+    <div class="ptiles">
+      <div class="ptile"><span>All ${t.size} win</span><b>${pct(t.p_joint)}</b><i>legs taken as independent</i></div>
+      <div class="ptile"><span>Pays</span><b>${odds(t.price)}</b><i>${esc(t.book || "")} -- the legs multiplied, as a parlay pays</i></div>
+      <div class="ptile"><span>Worth it at</span><b class="gain">${odds(t.worth_it_odds)}</b><i>our probability, no vig</i></div>
+      <div class="ptile"><span>Value at that price</span><b class="${t.ev_pct > 0 ? "gain" : ""}">${t.ev_pct > 0 ? "+" : ""}${Number(t.ev_pct).toFixed(1)}%</b><i>per unit staked</i></div>
+    </div>
+    <ul class="checks">${legs}</ul>
+  </div>`;
+}
+function crossBlock(d, game) {
+  const kinds = (d.cross && d.cross.kinds) || {};
+  const pick = ts => (ts || []).filter(t => !game || (t.legs || []).some(l => l.event_id === game.event_id));
+  const hit = pick(kinds.hit_rate), val = pick(kinds.value);
+  if (!hit.length && !val.length) return "";
+  const part = (title, kind, ts) => ts.length ? `<h3 class="sub">${esc(title)}</h3><p class="note">${esc(XG_NOTE[kind])}</p><div class="cards">${ts.map(xgRow).join("")}</div>` : "";
+  return sectionShell("cross", "Cross-game parlays", "One leg from each game, across every sport on today's sheets, +100 or better at one book. Paid at the full price of the legs multiplied -- unlike a same-game parlay, which books discount.",
+    `${hit.length + val.length} parlay${hit.length + val.length === 1 ? "" : "s"}`, part("Built for hit rate", "hit_rate", hit) + part("Built for value", "value", val));
+}
 function sgpBlock(d, game) {
   const sgps = (d.sgp || []).filter(s => !game || s.event_id === game.event_id);
   if (!sgps.length) return "";
@@ -725,7 +755,7 @@ function render() {
     if (reconciledView(d)) applyResults();
     return;
   }
-  let html = picksBlock(d, game) + sgpBlock(d, game) + (game ? "" : slateBlock(d));
+  let html = picksBlock(d, game) + sgpBlock(d, game) + crossBlock(d, game) + (game ? "" : slateBlock(d));
   html += SECTIONS.map(([key, title, blurb]) => {
     const ids = secs[key] || [];
     if (!ids.length && key !== "value") return "";
@@ -761,7 +791,7 @@ function render() {
 }
 // One chip per section the page drew, in page order, with the section's own count (user 2026-10-17). Titles that
 // share a first half ("Game lines: value ...", "Game lines: shop ...") get a name of their own.
-const JUMP_LABEL = {lines_value: "Game-line value", lines_shop: "Game-line shopping", shop: "Prop price shopping"};
+const JUMP_LABEL = {cross: "Cross-game parlays", lines_value: "Game-line value", lines_shop: "Game-line shopping", shop: "Prop price shopping"};
 function buildJump() {
   const bar = document.getElementById("jump");
   if (!bar) return;
