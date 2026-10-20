@@ -1191,6 +1191,14 @@ death, never life — do not invert it.
 - Verification: Synthetic installed-copy run with -WslDistro DRILL-bogus -EmailAfterMinutes 0 logs EMAIL_SENT and the user receives it; the next scheduled run logs REACHABLE_AGAIN + EMAIL_SENT; installed copy sha256 == repo; healthchecks.io shows pings; deploys.md entry
 - Blocked by: none
 
+### future-dated-live-orders-scope — OPEN — opened 2026-10-20 — session 0ffeb586-0b80-4156-9b2b-edbed12088cc
+- Goal: Written scope (no code) for pregame live orders on future-dated games: every date key in the live path with file:line, a place-once design (caps charge placement day), measured forward-edge survival to kickoff with denominators and date coverage, risks + the off!=on reachability test; delivered in .syndicate/findings_2026-10-20_future_dated_live_orders.md, then stop for the user's decision
+- Files: .syndicate/findings_2026-10-20_future_dated_live_orders.md (NEW)
+- Hypothesis: n/a (scope)
+- Falsification test: n/a
+- Verification: findings file landed on origin/main; user decision recorded
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
