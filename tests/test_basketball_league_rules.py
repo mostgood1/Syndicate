@@ -9,45 +9,7 @@ from syndicate.features.shared import basketball_league_rules as rules
 from syndicate.features.shared.basketball_league_rules import NBA, NCAAB, WNBA, expected_free_throw_points, rules_for
 
 REPO = Path(__file__).resolve().parents[1]
-VENDORED = {
-    "nba": REPO / "vendor" / "nba_betting_repo" / "src" / "nba_betting" / "sim" / "events.py",
-    "wnba": REPO / "vendor" / "wnba_betting_repo" / "src" / "wnba_betting" / "sim" / "events.py",
-}
-
-
-def _vendored_rotation_windows(league: str):
-    """Load ONLY `_rotation_windows` from the vendored source, without importing the package.
-
-    Test-only: this is the P1 parity oracle. Nothing at runtime reads vendor/.
-    """
-    path = VENDORED[league]
-    if not path.is_file():
-        pytest.skip(f"vendored engine absent: {path}")
-    text = path.read_text(encoding="utf-8")
-    start = text.index("def _rotation_windows(")
-    end = text.index("\ndef ", start + 1)
-    namespace: dict = {"Dict": dict}
-    exec(compile(text[start:end], str(path), "exec"), namespace)  # noqa: S102 -- a pure function, read from our own tree
-    return namespace["_rotation_windows"]
-
-
-# [nba] retired 2026-10-19 (lane nba-vendor-deletion-prep): the vendored NBA function goes with its tree.
-@pytest.mark.parametrize("league", ["wnba"])
-def test_pro_windows_reproduce_the_vendored_function_exactly(league):
-    vendored = _vendored_rotation_windows(league)
-    lr = rules_for(league)
-    checked = 0
-    for q in range(0, 8):  # 0 and 5..7 cover the "not regulation" branch
-        period_seconds = lr.seconds_in_period(max(1, q))
-        for rem in range(-5, period_seconds + 6, 3):
-            for margin in (-30, -15, -14, -13, -12, -11, -10, -9, -8, -7, 0, 7, 8, 9, 10, 11, 12, 13, 14, 15, 30):
-                want = vendored(q=q, period_seconds=period_seconds, q_remaining=rem, margin=margin)
-                got = lr.rotation_window_flags(q, rem, margin)
-                assert got == want, (league, q, rem, margin)
-                checked += 1
-    assert checked > 20_000
-
-
+# The vendored `_rotation_windows` comparison (P1's parity oracle) retired with the trees: [nba] 2026-10-19, [wnba] 2026-10-20 (lane wnba-vendor-deletion-prep).
 def test_ncaab_rulebook():
     assert (NCAAB.periods, NCAAB.period_seconds, NCAAB.overtime_seconds) == (2, 1200, 300)
     assert NCAAB.regulation_seconds == 2400

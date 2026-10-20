@@ -143,7 +143,10 @@ def _load_soccer(tz: ZoneInfo, lo: date, hi: date) -> list[Series]:
 
 
 def _load_wnba(tz: ZoneInfo, lo: date, hi: date) -> Series:
-    path = REPO_ROOT / "vendor" / "wnba_betting_repo" / "data" / "processed" / "schedule_2026.json"
+    # The data root's schedule, which the WNBA refresh rewrites (the vendored copy, frozen 09-25, is gone; lane wnba-vendor-deletion-prep).
+    import os
+    data_root = Path(os.environ.get("SYNDICATE_DATA_ROOT") or (REPO_ROOT / "data"))
+    path = data_root / "wnba_source" / "data" / "processed" / "schedule_2026.json"
     series = Series("wnba", str(path.relative_to(REPO_ROOT)))
     if not path.is_file():
         series.error = "schedule artifact absent"

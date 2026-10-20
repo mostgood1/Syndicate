@@ -626,10 +626,10 @@ def run_game_phase(args) -> int:
                                        d=d, log=str(out / "seed.log"))
             info["rc_seed"] = subprocess.run([py, "-c", seed], cwd=str(code), env=env, stdout=log, stderr=log).returncode
             go = sdata / "processed" / f"game_odds_{d}.csv"
-            cmd = [py, "-m", "wnba_betting.cli", "predict-date", "--date", d]
+            cmd = [py, "-m", "syndicate.features.wnba.source_cli.cli", "predict-date", "--date", d]  # the port production runs (lane wnba-vendor-deletion-prep)
             if go.exists():
                 cmd += ["--merge-odds", str(go)]
-            info["rc_predict"] = subprocess.run(cmd, cwd=str(code / "vendor" / "wnba_betting_repo"), env=env,
+            info["rc_predict"] = subprocess.run(cmd, cwd=str(code), env=env,
                                                 stdout=log, stderr=log, timeout=1800).returncode
             info["rc_totals_cal"] = subprocess.run(
                 [py, str(code / "scripts" / "build_wnba_totals_calibration.py"), "--date", d],

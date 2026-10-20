@@ -26,7 +26,7 @@ import unittest
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-SRC = REPO_ROOT / "vendor" / "wnba_betting_repo" / "src"
+SRC = REPO_ROOT  # the PORTS production runs, not the vendored package (lane wnba-vendor-deletion-prep)
 
 
 def _run(code: str, data_root: str) -> dict:
@@ -45,7 +45,7 @@ import json, sys
 from unittest.mock import patch
 import pandas as pd
 from click.testing import CliRunner
-from wnba_betting import cli
+from syndicate.features.wnba.source_cli import cli
 
 SLATES = {
     "00": [(1, 1610612766, "CHA", 1610612751, "BKN"), (2, 1610612737, "ATL", 1610612750, "MIN")],
@@ -111,7 +111,7 @@ class PredictDateLeagueTests(unittest.TestCase):
         from unittest.mock import patch
         import pandas as pd
         from click.testing import CliRunner
-        from wnba_betting import cli
+        from syndicate.features.wnba.source_cli import cli
         slate = pd.DataFrame([{"date": pd.Timestamp("2026-10-08").date(), "home_team": "Brooklyn Nets", "visitor_team": "Philadelphia 76ers"},
                               {"date": pd.Timestamp("2026-10-08").date(), "home_team": "Atlanta Dream", "visitor_team": "New York Liberty"}])
         seen = []
@@ -136,8 +136,8 @@ class TeamHelperTests(unittest.TestCase):
     def test_from_tricode_and_league_id(self) -> None:
         out = _run("""
         import json
-        from wnba_betting.teams import from_tricode
-        from wnba_betting.league import LEAGUE
+        from syndicate.features.wnba.source_cli.teams import from_tricode
+        from syndicate.features.wnba.source_cli.league import LEAGUE
         print(json.dumps({"id": LEAGUE.stats_league_id,
                           "map": [from_tricode(t) for t in ("ATL", "PHO", "WAS", "POR", "BKN", "")]}))
         """, tempfile.gettempdir())

@@ -4210,10 +4210,11 @@ if (Test-SportEnabled 'NBA') {
     }
 }
 if (Test-SportEnabled 'WNBA') {
-    $wnbaVendoredRoot = Resolve-VendoredRepoPath -RelativePath 'vendor\wnba_betting_repo'
-    $wnbaVendoredApp = if ($wnbaVendoredRoot) { Join-Path $wnbaVendoredRoot 'app.py' } else { $null }
-    if (-not ($wnbaVendoredApp -and (Test-Path $wnbaVendoredApp))) {
-        throw "WNBA self-contained refresh is unavailable because vendor\\wnba_betting_repo\\app.py was not found. The fallback WNBA Syndicate props refresh still requires a source-root for fresh runs and is not a self-contained replacement."
+    # The WNBA refresh runs Syndicate's own source CLI and engine (lane wnba-vendor-deletion-prep, 2026-10-20); its input root is the
+    # repo's WNBA data bundle, not the vendored repo. The step's Name and Workflow ids stay: they key run manifests.
+    $wnbaSourceRoot = Join-Path $repoRoot 'data\wnba_source'
+    if (-not (Test-Path (Join-Path $wnbaSourceRoot 'data'))) {
+        throw "WNBA refresh is unavailable because data\\wnba_source\\data was not found (the repo's WNBA data bundle)."
     }
 
     $preferLocalMirrorArtifactsForGate = $true
@@ -4236,7 +4237,7 @@ if (Test-SportEnabled 'WNBA') {
             (Resolve-Python $repoRoot),
             'scripts\refresh_wnba_oddsapi_props.py',
             '--date', $Date,
-            '--source-root', 'vendor\wnba_betting_repo',
+            '--source-root', 'data\wnba_source',
             '--artifact-root', 'data\wnba_source\source_artifacts',
             '--log-file', (Join-Path $runDir 'wnba_props_refresh.log'),
             '--force-refresh',

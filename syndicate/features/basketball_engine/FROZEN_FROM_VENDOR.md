@@ -1,4 +1,4 @@
-# Basketball engine, orchestrator and NBA ports: frozen from vendor, maintained here
+# Basketball engine, orchestrator, NBA and WNBA ports: frozen from vendor, maintained here
 
 Since 2026-10-19 (lane `nba-vendor-deletion-prep`, user decision "Freeze and start prep"), four trees are Syndicate's
 own **source**: edit them directly. They began as generated ports of `vendor/nba_betting_repo`
@@ -12,18 +12,24 @@ tree. Before then they were generated and `--check`'d against it.
 | `basketball_engine/orchestrator/` | the smart-sim orchestrator (both forks; divergent functions behind a `fork` switch) | `scripts/port_basketball_orchestrator.py` (both trees) | already hand-edited: `--check` DIFFERS in `smart_sim` (78f73023) |
 | `nba/live_tick/` | the NBA live-lens tick (`_live_lens_tick_payload` + its closure) | `scripts/port_basketball_live_tick.py --league nba` | `--check` OK |
 | `nba/source_cli/` | the NBA source CLI commands the props refresh runs | `scripts/port_basketball_source_cli.py --league nba` | `--check` OK |
+| `wnba/live_tick/` (frozen 2026-10-20) | the WNBA live-lens tick | `scripts/port_basketball_live_tick.py --league wnba` | `--check` OK; carries the one FIX (below) |
+| `wnba/source_cli/` (frozen 2026-10-20) | the WNBA source CLI commands the props refresh runs | `scripts/port_basketball_source_cli.py --league wnba` | `--check` OK |
 
 The engine and orchestrator generators are retired; the parity harnesses STAY: `scripts/basketball_engine_parity.py`
 --corpus is the gate lane basketball-scenario-calibration runs on every engine change (since 2026-10-19 its default reference is
 production's RECORDED output, which needs no vendor tree; `--reference vendored` gives a leaf diff while the tree exists), and
 `scripts/basketball_orchestrator_parity.py`'s native arm and compare-outputs need no vendor tree. The generators live in git history, with their results in
-`.syndicate/deploys.md` and `docs/ai_context/basketball_live_native_plan.md` (P1, P6). The live-tick and source-CLI
-generators and harnesses keep their **WNBA arm only**: `syndicate/features/wnba/{live_tick,source_cli}/` are still
-generated from `vendor/wnba_betting_repo` and `--check`'d. `scripts/sync_vendor_upstream.py` no longer covers NBA.
+`.syndicate/deploys.md` and `docs/ai_context/basketball_live_native_plan.md` (P1, P6). Since 2026-10-20 (lane `wnba-vendor-deletion-prep`, user decision
+"Freeze and start prep") the WNBA ports are frozen too, and the live-tick and source-CLI generators and the source-CLI harness
+are retired (WNBA was their last arm). `scripts/basketball_live_tick_parity.py` stays: its replay arm pins the ports against
+recorded vendored output without the tree. `scripts/sync_vendor_upstream.py` covers neither league.
 
 ## What the copies carry (keep it when editing)
 
-- `nba/live_tick`: the one generator FIX is WNBA-only (`current_last_updates`); the NBA copy is the vendored text.
+- `wnba/live_tick`: the one deliberate departure from the vendored text, `current_last_updates` on the nested
+  `_update_registry_bucket` (marked `# FIX wnba-registry-current-last-updates`; without it the WNBA live-props registry was
+  never written). `tests/test_basketball_live_tick_fixes.py` rebuilds the unfixed text from this file and pins both
+  behaviours. `nba/live_tick` is the vendored text.
   The data root is `NBA_BETTING_DATA_ROOT`, else `data/nba_source/data`, never the vendored repo.
 - The #626(e) gate `_tick_prop_klass_line_gate` (never BET on a model line) is in `nba/live_tick/tick.py` and
   `wnba/live_tick/tick.py`; `tests/test_basketball_live_tick_reachability.py` and

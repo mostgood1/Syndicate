@@ -74,8 +74,8 @@ BASELINE_PATH = REPO_ROOT / "vendor" / "upstream_sync.json"
 # Mirrors the mapping in CLAUDE.md's directory map. NHL's default branch is
 # `master`; the other three are `main`.
 TREES: dict[str, dict[str, str]] = {
-    "wnba": {"tree": "wnba_betting_repo", "repo": "mostgood1/WNBA-Betting", "branch": "main"},
     "nhl": {"tree": "nhl_betting_repo", "repo": "mostgood1/NHL-Betting", "branch": "master"},
+    # WNBA is not synced either (lane wnba-vendor-deletion-prep, 2026-10-20): its ports are frozen, upstream had 0 files ahead.
     # NBA is not synced either (lane nba-vendor-deletion-prep, 2026-10-19): its ports are frozen into Syndicate
     # (syndicate/features/basketball_engine/FROZEN_FROM_VENDOR.md) and upstream had 0 files ahead.
     # MLB is not synced: its code was frozen into Syndicate on 2026-10-19 and is maintained there

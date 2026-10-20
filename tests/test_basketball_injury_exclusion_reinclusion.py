@@ -106,13 +106,6 @@ from syndicate.features.shared.basketball_props_smart_sim import _excluded_keys_
 _ROOT = Path(__file__).resolve().parents[1]
 
 
-def _vendor_smart_sim(repo: str, pkg: str):
-    src = str(_ROOT / "vendor" / repo / "src")
-    if src not in sys.path:
-        sys.path.insert(0, src)
-    return importlib.import_module(f"{pkg}.sim.smart_sim")
-
-
 def _dropped_by_vendor_filter(module, excluded: dict, team: str, names: list) -> list:
     """The vendored `_drop_excluded` predicate, verbatim: player kept unless _norm_player_key(name).upper() is in the
     team's ban set."""
@@ -123,7 +116,8 @@ def _dropped_by_vendor_filter(module, excluded: dict, team: str, names: list) ->
 def test_punctuated_names_reach_the_vendor_pool_filter_wnba():
     """Discriminating: production 10-07 sims kept Ny'Ceara Pryor and Ta'Niya Latson although both were excluded --
     the map key keeps the apostrophe, the vendor filter strips it. The raw map (old handoff) drops neither."""
-    m = _vendor_smart_sim("wnba_betting_repo", "wnba_betting")
+    # The native orchestrator's normaliser (frozen source, lane wnba-vendor-deletion-prep), not the vendored one.
+    from syndicate.features.basketball_engine.orchestrator import player_priors as m
     names = ["Ny'Ceara Pryor", "Ta'Niya Latson", "A'ja Wilson", "Jordin Canada"]
     excluded = {"NYL": {_norm_name_key(n).upper() for n in names[:3]}}
     assert _dropped_by_vendor_filter(m, excluded, "NYL", names) == []                       # the old handoff

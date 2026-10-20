@@ -22,13 +22,13 @@ import unittest
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-SRC = REPO_ROOT / "vendor" / "wnba_betting_repo" / "src"
+SRC = REPO_ROOT  # the PORTS production runs, not the vendored package (lane wnba-vendor-deletion-prep)
 
 _HARNESS = """
 import json
 from unittest.mock import patch
 from nba_api.stats.endpoints import scoreboardv2, commonteamroster
-from wnba_betting import league_status as ls
+from syndicate.features.wnba.source_cli import league_status as ls
 
 SLATES = {
     "00": [("ATL", "MIN"), ("GSW", "LAL")],      # NBA preseason, what league "00" (the default) returns

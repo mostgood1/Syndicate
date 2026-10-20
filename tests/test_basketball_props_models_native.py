@@ -24,18 +24,7 @@ def _sha(p: Path) -> str:
     return hashlib.sha256(p.read_bytes()).hexdigest()
 
 
-# [nba] retired 2026-10-19 (lane nba-vendor-deletion-prep): the vendored NBA models go with their tree; see the invariant below.
-@pytest.mark.parametrize("league", ["wnba"])
-def test_copies_are_byte_identical_to_the_vendored_models_they_replaced(league):
-    vendor = ROOT / "vendor" / f"{LEAGUES[league]}_repo" / "models"
-    if not vendor.is_dir():
-        pytest.skip("vendored models not present in this checkout")
-    native = sorted((NATIVE / league).iterdir())
-    assert len(native) >= 20, native
-    for p in native:
-        assert _sha(p) == _sha(vendor / p.name), p.name
-
-
+# The byte-identity check against the vendored models retired with the trees (nba 10-19, wnba 10-20, lane wnba-vendor-deletion-prep).
 @pytest.mark.parametrize("league", sorted(LEAGUES))
 def test_resolver_falls_back_to_syndicate_copies_not_vendor(league, tmp_path):
     source_root = tmp_path / f"{league}_source"
@@ -63,11 +52,12 @@ def test_the_copies_hold_every_file_the_predictor_loads(league):
     assert onnx._load_feature_columns(d), "feature columns did not load"
 
 
-def test_nba_models_are_committed_and_non_empty():
-    """Post-vendor invariant: the NBA props models production reads are git-tracked here and not empty."""
+@pytest.mark.parametrize("league", sorted(LEAGUES))
+def test_models_are_committed_and_non_empty(league):
+    """Post-vendor invariant: the props models production reads are git-tracked here and not empty."""
     import subprocess
 
-    tracked = [f for f in subprocess.run(["git", "ls-files", str((NATIVE / "nba").relative_to(ROOT))], cwd=ROOT,
+    tracked = [f for f in subprocess.run(["git", "ls-files", str((NATIVE / league).relative_to(ROOT))], cwd=ROOT,
                                          capture_output=True, text=True).stdout.split() if f]
     assert len(tracked) >= 20, tracked
     for f in tracked:

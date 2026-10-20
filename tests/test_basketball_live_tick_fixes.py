@@ -3,7 +3,7 @@
 `wnba-registry-current-last-updates` (user decision 2026-10-12): the vendored WNBA `_update_registry_bucket` lost its
 `current_last_updates` parameter, so every call raised TypeError inside a `try` and the WNBA live-props registry was
 never written. These tests pin:
-  * the fixed port and the verbatim (`--without-fixes`, parity-proven) text differ by exactly the FIXES lines;
+  * the frozen port carries the FIX exactly once (the verbatim text is that port with it reversed);
   * BEHAVIOUR, on synthetic OddsAPI responses: the fixed port writes the registry and fills the first/last-seen,
     first/last line + price and observation maps. The verbatim text -- the positive control, i.e. the bug -- writes
     nothing and leaves every one of those maps EMPTY (`out` initialises them to {}). Every other key is identical.
@@ -21,42 +21,34 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-GEN = ROOT / "scripts" / "port_basketball_live_tick.py"
+PORT = ROOT / "syndicate" / "features" / "wnba" / "live_tick"
+# The one deliberate departure from the vendored text, recorded here since the generator that carried it (FIXES in
+# scripts/port_basketball_live_tick.py) is retired (lane wnba-vendor-deletion-prep). The verbatim text is the frozen port with it reversed.
+FIX_OLD = "        current_prices: dict[str, Any],\n        default_observed_at: Any,\n    ) -> None:"
+FIX_NEW = ("        current_prices: dict[str, Any],\n        current_last_updates: dict[str, Any],  # FIX wnba-registry-current-last-updates\n"
+           "        default_observed_at: Any,\n    ) -> None:")
 REGISTRY_KEYS = {"first_seen_at_by_key", "last_seen_at_by_key", "first_line_by_key", "last_line_by_key",
                  "first_prices_by_key", "last_prices_by_key", "observations_by_key"}
 EVENT_ID = "evt0001"
 
 
-def _need_vendor():
-    if not (ROOT / "vendor" / "wnba_betting_repo" / "app.py").exists():
-        pytest.skip("vendor tree removed: the verbatim text cannot be regenerated")
-
-
 @pytest.fixture(scope="module")
 def unfixed_pkg(tmp_path_factory):
-    _need_vendor()
+    """The verbatim (vendored) text: a copy of the frozen WNBA port package with the FIX reversed."""
+    import shutil
+
     out = tmp_path_factory.mktemp("unfixed")
-    r = subprocess.run([sys.executable, str(GEN), "--league", "wnba", "--without-fixes", "--print-dir", str(out)],
-                       capture_output=True, text=True, cwd=ROOT)
-    assert r.returncode == 0, r.stdout + r.stderr
     pkg = out / "unfixed_wnba_live_tick"
-    (out / "wnba").rename(pkg)
+    shutil.copytree(PORT, pkg, ignore=shutil.ignore_patterns("__pycache__"))
+    tick = (pkg / "tick.py").read_text(encoding="utf-8").replace("\r\n", "\n")
+    assert tick.count(FIX_NEW) == 1, "the frozen port no longer carries the FIX verbatim"
+    (pkg / "tick.py").write_text(tick.replace(FIX_NEW, FIX_OLD), encoding="utf-8")
     return pkg
 
 
-def test_fixed_and_verbatim_differ_by_exactly_the_fixes(unfixed_pkg):
-    spec = importlib.util.spec_from_file_location("port_gen", GEN)
-    gen = importlib.util.module_from_spec(spec)
-    sys.modules["port_gen"] = gen  # the generator defines dataclasses
-    spec.loader.exec_module(gen)
-    fixed = (ROOT / "syndicate" / "features" / "wnba" / "live_tick" / "tick.py").read_text(encoding="utf-8").replace("\r\n", "\n")
-    verbatim = (unfixed_pkg / "tick.py").read_text(encoding="utf-8").replace("\r\n", "\n")
-    changed = [ln for ln in difflib.ndiff(verbatim.splitlines(), fixed.splitlines()) if ln[:2] in ("+ ", "- ")]
-    expected = []
-    for _name, old, new in gen.FIXES["wnba"]:
-        expected += ["- " + ln for ln in old.split("\n") if ln not in new.split("\n")]
-        expected += ["+ " + ln for ln in new.split("\n") if ln not in old.split("\n")]
-    assert sorted(changed) == sorted(expected), changed
+def test_the_frozen_port_carries_the_fix_exactly_once():
+    tick = (PORT / "tick.py").read_text(encoding="utf-8").replace("\r\n", "\n")
+    assert tick.count(FIX_NEW) == 1 and tick.count("current_last_updates: dict[str, Any],  # FIX") == 1
 
 
 def _fake_get(url, params=None, headers=None, timeout=None):

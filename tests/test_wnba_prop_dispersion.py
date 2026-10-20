@@ -19,9 +19,7 @@ from syndicate.features.shared import wnba_prop_dispersion as D
 from syndicate.features.shared.wnba_projections import _hit_prob_over
 
 ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT / "vendor" / "wnba_betting_repo" / "src") not in sys.path:
-    sys.path.insert(0, str(ROOT / "vendor" / "wnba_betting_repo" / "src"))
-from wnba_betting.prop_ladders import build_exact_ladder_payload as BUILD  # noqa: E402  (the engine's own builder)
+from syndicate.features.basketball_engine.orchestrator.prop_ladders import build_exact_ladder_payload as BUILD  # noqa: E402  (the engine's own builder, frozen; lane wnba-vendor-deletion-prep)
 _fit = importlib.util.spec_from_file_location("fit_disp", ROOT / "scripts" / "fit_wnba_prop_dispersion.py")
 FIT = importlib.util.module_from_spec(_fit)
 _fit.loader.exec_module(FIT)  # type: ignore[union-attr]

@@ -155,6 +155,9 @@ This doc is the shared plan. Each phase is a separate session with its own lane.
 `nba/live_tick/` and `nba/source_cli/` are maintained source (`syndicate/features/basketball_engine/FROZEN_FROM_VENDOR.md`); the engine and orchestrator generators
 are retired and the live-tick / source-CLI generators keep their WNBA arm only. Production ran no vendored NBA code
 before this (`.syndicate/findings_2026-10-19_nba_vendor_deletion_scope.md`).
+**WNBA FROZEN 2026-10-20** (lane `wnba-vendor-deletion-prep`, user decision): `wnba/live_tick/` and `wnba/source_cli/` are maintained
+source too, and the live-tick / source-CLI generators are retired. Production ran and read nothing from the vendored WNBA tree
+before this (`.syndicate/findings_2026-10-20_wnba_vendor_deletion_scope.md`); the two schedule rows below had already moved.
 
 **Vendored uses that REMAIN on basketball paths outside the sim** (inventory 2026-10-09, line numbers on
 `origin/main` at that date). Each needs its own decision; none is in P6's scope:

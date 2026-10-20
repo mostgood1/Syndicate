@@ -19,9 +19,7 @@ from syndicate.features.shared.basketball_props_smart_sim import _norm_name_key
 from syndicate.features.shared.wnba_projections import _hit_prob_over
 
 ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT / "vendor" / "wnba_betting_repo" / "src") not in sys.path:
-    sys.path.insert(0, str(ROOT / "vendor" / "wnba_betting_repo" / "src"))
-from wnba_betting.prop_ladders import build_exact_ladder_payload as BUILD  # noqa: E402
+from syndicate.features.basketball_engine.orchestrator.prop_ladders import build_exact_ladder_payload as BUILD  # noqa: E402  (the engine's own builder, frozen; lane wnba-vendor-deletion-prep)
 
 ON = {R.FLAG: "1"}
 P = {"b0": 0.1, "b1": 0.3, "leak": 2.0}

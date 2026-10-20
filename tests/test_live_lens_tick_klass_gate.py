@@ -25,7 +25,6 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 # The vendored WNBA app plus the ticks production RUNS: the NBA and WNBA ports (the NBA vendored app was retired,
 # lane nba-vendor-deletion-prep).
 VENDOR_APPS = [
-    REPO_ROOT / "vendor" / "wnba_betting_repo" / "app.py",
     REPO_ROOT / "syndicate" / "features" / "nba" / "live_tick" / "tick.py",
     REPO_ROOT / "syndicate" / "features" / "wnba" / "live_tick" / "tick.py",
 ]

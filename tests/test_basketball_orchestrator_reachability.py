@@ -128,10 +128,8 @@ def test_league_only_on_the_wnba_view_as_the_forks_had_it():
 def test_hooks_are_the_names_the_vendored_orchestrator_called_and_smart_sim_uses_them():
     """Every hook name existed in the vendored module (so it was a real replacement) and the generated
     orchestrator binds the hook, not a body of its own."""
-    wn = ast.parse((ROOT / "vendor" / "wnba_betting_repo" / "src" / "wnba_betting" / "sim" / "smart_sim.py").read_text(encoding="utf-8-sig"))
-    vendored = {n.name for n in wn.body if isinstance(n, ast.FunctionDef)}
-    vendored |= {a.asname or a.name for n in wn.body if isinstance(n, ast.ImportFrom) for a in n.names}
-    assert set(hooks.HOOK_NAMES) <= vendored, sorted(set(hooks.HOOK_NAMES) - vendored)
+    # The "existed in the vendored module" half was checked while vendor/ existed (2026-10-10..10-20) and retired with
+    # the WNBA tree (lane wnba-vendor-deletion-prep); the binding half below is what still matters.
     assert len(set(hooks.HOOK_NAMES)) == 29
     gen = ast.parse(Path(native_smart_sim.__file__).read_text(encoding="utf-8"))
     defined = {n.name for n in gen.body if isinstance(n, ast.FunctionDef)}
