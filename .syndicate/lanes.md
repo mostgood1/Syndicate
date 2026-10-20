@@ -1394,6 +1394,14 @@ death, never life — do not invert it.
 - Verification: during a live NBA game: BOS@DET-style quotes seen within 5 min; the board's nba live_gamelines/live_projections supported=True with rows priced; live NBA rows on the board > 1
 - Blocked by: none
 
+### ncaaf-commence-time-wrong — OPEN — opened 2026-10-20 — session 07f26684-c3bf-4a3b-80dd-4707a6ff257b
+- Goal: Explain the 10-20 ticker-guard refusal on KXNCAAFGAME-26OCT23OREILL and fix any board commence_time defect at its source; measured denominators in findings
+- Files: syndicate/features/shared/book_grid_artifact.py, tests/test_book_grid_moved_kickoff.py, .syndicate/findings_2026-10-20_ncaaf_commence_time.md
+- Hypothesis: Board commence_time for ORE@ILL is wrong (brief). MEASURED: false -- ESPN/CFBD/OddsAPI all say 10-24T19:00Z; Kalshi lists ~36 FBS wk8 games as 26OCT23 with a 10-24T03:00Z placeholder. Separate real defect: a kickoff that moves across a Central date leaves a ghost grid row in the old kickoff shard (Iowa@Minnesota 10-23 grid, 04:00Z, 3-day-old prices, servable +8.21)
+- Falsification test: ESPN/CFBD disagreeing with OddsAPI on ORE@ILL; the 10-23 shard still being written for Iowa@Minnesota
+- Verification: Reachability test off!=on; offline replay on fleet shards drops exactly the Iowa@Minnesota event from the 10-23 grid and nothing else
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

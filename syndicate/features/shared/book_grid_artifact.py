@@ -347,6 +347,180 @@ def live_gameline_build_line(
                 f"date={_log_token(date_str)} error=line_failed:{type(exc).__name__}")
 
 
+# A KICKOFF THAT MOVES ACROSS A DATE LEAVES A GHOST IN THE OLD SHARD.
+#
+# The quote log is sharded by the CENTRAL kickoff date
+# (`odds_book_quotes.kickoff_shard_date`), so when OddsAPI revises a start time
+# across midnight Central, new quotes go to the new date's shard and the old
+# shard keeps the old ones forever. Its grid still pivots them into a row: the
+# superseded `commence_time` and prices frozen at the last look before the move.
+#
+# MEASURED on the fleet 2026-10-20 ~21:55Z, NCAAF `Iowa @ Minnesota`
+# (event 6dab7d3b...): placeholder kickoff `2026-10-24T04:00Z` (23:00 CT on the
+# 23rd) until 10-17 18:32Z, then `19:30Z` on the 24th. `book_grid_2026-10-23`
+# still served it at 04:00Z with FanDuel -182 from 10-15, marked
+# `servable: True` and "+8.21 pts better than the 3-book consensus" -- while
+# the 24th's grid had the same game at -240 / +2.37 from 21 fresh books.
+# `layer1_board.merge_grid_rows_across_dates` already de-duplicates the two on
+# the Layer-1 board, but only there: `ncaaf/picks.py` keeps the LARGEST edge
+# per bet across the week's grids (so the ghost wins), and
+# `venue_odds_loop.all_game_line_rows` reads one date's grid at a time.
+# Removing it HERE fixes every reader at once.
+#
+# WHAT COUNTS AS MOVED: the event's newest look in THIS shard is old
+# (`_MOVED_KICKOFF_QUIET_SECONDS`), its kickoff here is still ahead AND falls on
+# this shard's own Central date, AND another date's shard has looked at the same
+# event MORE RECENTLY. All four. Absence
+# elsewhere never drops a row -- a quiet market is not a moved one -- and the
+# neighbour sidecars are read only when a candidate exists, so an ordinary build
+# opens no extra file.
+_MOVED_KICKOFF_QUIET_SECONDS = 6 * 3600
+_MOVED_KICKOFF_SPAN_DAYS = 7
+_MOVED_KICKOFF_ENV = "SYNDICATE_BOOK_GRID_DROP_MOVED_KICKOFF"
+
+
+def _moved_kickoff_drop_enabled() -> bool:
+    """Default ON. `off` keeps the rows but still counts them (emergency revert)."""
+    return str(os.environ.get(_MOVED_KICKOFF_ENV) or "").strip().lower() not in {"0", "off", "false", "no"}
+
+
+def _parse_utc(text: Any) -> datetime | None:
+    try:
+        parsed = datetime.fromisoformat(str(text or "").strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo is not None else None
+
+
+def drop_events_moved_to_another_date(
+    grid: list[dict[str, Any]],
+    *,
+    sport: str,
+    date_str: str,
+    last_seen: Mapping[str, str] | None,
+    now: datetime | None = None,
+    read_last_seen: Any = None,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Drop the rows of every event whose kickoff moved to another date's shard.
+
+    Returns the kept rows and a counter block. Never raises: on any failure the
+    grid is returned unchanged with the error named in the counters.
+    """
+    from datetime import date as _date, timedelta
+
+    from syndicate.features.shared.odds_book_quotes import _KEY_FIELDS, kickoff_shard_date
+
+    reader = read_last_seen or read_quote_last_seen
+    enabled = _moved_kickoff_drop_enabled()
+    counters: dict[str, Any] = {
+        "enabled": enabled,
+        "candidates": 0,
+        "events_moved": 0,
+        "rows_dropped": 0,
+        "neighbour_dates_read": 0,
+        "sample": [],
+    }
+    try:
+        now = now or datetime.now(timezone.utc)
+        event_field = _KEY_FIELDS.index("event_id")
+
+        def _event_of(key: str) -> str:
+            parts = str(key).split("|")
+            return parts[event_field] if len(parts) > event_field else ""
+
+        own_look: dict[str, datetime] = {}
+        for key, stamp in (last_seen or {}).items():
+            event_id = _event_of(key)
+            look = _parse_utc(stamp)
+            if event_id and look is not None and (event_id not in own_look or look > own_look[event_id]):
+                own_look[event_id] = look
+
+        candidates: dict[str, datetime] = {}
+        for row in grid:
+            event_id = str(row.get("event_id") or "").strip()
+            if not event_id or event_id in candidates:
+                continue
+            kickoff = _parse_utc(row.get("commence_time"))
+            look = own_look.get(event_id)
+            if kickoff is None or look is None or kickoff <= now:
+                continue
+            # ONLY A ROW THIS SHARD FILED BY ITS OWN KICKOFF. A past slate's grid
+            # can hold forward games captured under the slate date (NFL and
+            # soccer on 10-18/10-19); those are that day's view, not a moved
+            # kickoff. Replayed on the fleet without this: 28 NFL and 154 soccer
+            # events dropped from past grids, none of them a move.
+            if kickoff_shard_date(row) != str(date_str).strip():
+                continue
+            if (now - look).total_seconds() > _MOVED_KICKOFF_QUIET_SECONDS:
+                candidates[event_id] = look
+        counters["candidates"] = len(candidates)
+        if not candidates:
+            return grid, counters
+
+        anchor = _date.fromisoformat(str(date_str).strip())
+        moved: dict[str, tuple[str, datetime]] = {}
+        for offset in range(1, _MOVED_KICKOFF_SPAN_DAYS + 1):
+            for other in (anchor + timedelta(days=offset), anchor - timedelta(days=offset)):
+                other_seen = reader(sport, other.isoformat()) or {}
+                if not other_seen:
+                    continue
+                counters["neighbour_dates_read"] += 1
+                for key, stamp in other_seen.items():
+                    event_id = _event_of(key)
+                    if event_id not in candidates:
+                        continue
+                    look = _parse_utc(stamp)
+                    if look is None or look <= candidates[event_id]:
+                        continue
+                    if event_id not in moved or look > moved[event_id][1]:
+                        moved[event_id] = (other.isoformat(), look)
+            if len(moved) == len(candidates):
+                break
+
+        counters["events_moved"] = len(moved)
+        kept: list[dict[str, Any]] = []
+        for row in grid:
+            event_id = str(row.get("event_id") or "").strip()
+            if event_id in moved:
+                counters["rows_dropped"] += 1
+                if enabled:
+                    continue
+            kept.append(row)
+        for event_id, (other_date, stamp) in sorted(moved.items())[:5]:
+            sample_row = next((r for r in grid if str(r.get("event_id") or "").strip() == event_id), {})
+            counters["sample"].append(
+                {
+                    "event_id": event_id,
+                    "away_team": sample_row.get("away_team"),
+                    "home_team": sample_row.get("home_team"),
+                    "stale_commence_time": sample_row.get("commence_time"),
+                    "last_look_here": candidates[event_id].isoformat(),
+                    "moved_to": other_date,
+                    "last_look_there": stamp.isoformat(),
+                }
+            )
+        return (kept if enabled else grid), counters
+    except Exception as exc:  # instrumentation-grade guard: the grid is the product
+        counters["error"] = f"{type(exc).__name__}: {exc}"
+        return grid, counters
+
+
+def moved_kickoff_line(sport: str, date_str: str, counters: Mapping[str, Any]) -> str:
+    """UNCONDITIONAL, including the zero: a guard that prints only when it fires is unreadable."""
+    sample = [
+        f"{s.get('away_team')} @ {s.get('home_team')} {s.get('stale_commence_time')}->{s.get('moved_to')}"
+        for s in counters.get("sample") or ()
+    ]
+    return (
+        f"[book_grid_artifact] MOVED_KICKOFF_ROWS_DROPPED sport={sport} date={date_str}"
+        f" enabled={counters.get('enabled')} candidates={counters.get('candidates')}"
+        f" events_moved={counters.get('events_moved')} rows={counters.get('rows_dropped')}"
+        f" neighbour_dates_read={counters.get('neighbour_dates_read')}"
+        f" error={counters.get('error')!r} sample={sample}"
+        " -- events whose kickoff moved to another date's shard"
+    )
+
+
 def build_book_grid_artifact(
     sport: str, date_str: str, *, max_rows: int = BOOK_GRID_ARTIFACT_MAX_ROWS
 ) -> dict[str, Any] | None:
@@ -398,6 +572,10 @@ def build_book_grid_artifact(
         last_seen = {}
 
     grid = build_book_grid(rows, last_seen=last_seen)
+    grid, moved_kickoff = drop_events_moved_to_another_date(
+        grid, sport=sport, date_str=date_str, last_seen=last_seen
+    )
+    print(moved_kickoff_line(sport, date_str, moved_kickoff), flush=True)
 
     # ENRICHMENT, and the reason it is HERE rather than at serve time (#328).
     #
@@ -610,6 +788,9 @@ def build_book_grid_artifact(
         # spot that let the old collector lose seven nights unnoticed.
         "live_gameline_accuracy": live_gameline_accuracy,
         "margin_model": margin_coverage,
+        # Events dropped because their kickoff moved to another date's shard.
+        # Served so a game missing from this date's grid is attributable.
+        "moved_kickoff": moved_kickoff,
         "market_kinds": market_kinds,
         "rows": bounded,
     }
