@@ -101,6 +101,8 @@ _CEILING_ENV = "SYNDICATE_COMPOUNDING_BANKROLL_MAX_DOLLARS"
 _DAY_PCT_ENV = "SYNDICATE_EXECUTION_BALANCE_DAY_PCT"
 _ORDER_PCT_ENV = "SYNDICATE_EXECUTION_BALANCE_ORDER_PCT"
 _MAX_AGE_ENV = "SYNDICATE_COMPOUNDING_MAX_STAMP_AGE_SECONDS"
+# `SYNDICATE_COMPOUNDING_BANKROLL_MAX_DOLLARS=capital`: the ceiling follows the account.
+_CEILING_CAPITAL = "capital"
 
 # How much of a venue's capital is the sizing bankroll. 1.0 = the Kelly
 # fractions `bankroll_manager` already computes are fractions of the real
@@ -151,15 +153,23 @@ def balance_caps_enabled() -> bool:
 
 def compounding_config() -> dict[str, Any]:
     """Every knob, resolved, so a log line can state what was applied."""
-    ceiling_raw = os.environ.get(_CEILING_ENV)
+    ceiling_raw = str(os.environ.get(_CEILING_ENV) or "").strip().lower()
     ceiling = _float_env(_CEILING_ENV, -1.0, low=0.01, high=10_000_000.0)
     return {
         "mode": compounding_mode(),
         "balance_caps": balance_caps_enabled(),
         "fraction": _float_env(_FRACTION_ENV, _DEFAULT_FRACTION, low=0.01, high=1.0),
+        # THE CEILING FOLLOWS THE ACCOUNT when set to `capital` [user 2026-10-20:
+        # "make the ceiling adjust based on capital available"]: no fixed dollar
+        # figure, so the bankroll is `fraction x capital` and grows (and shrinks)
+        # with what the venue holds -- never more than all of it, since fraction
+        # is bounded at 1.0, and Kalshi is still bounded by the order's shard.
+        # Opt-in by value, not a new default: an ABSENT key keeps the fixed
+        # bankroll, so shipping this code changes nothing until the env says so.
+        "ceiling_mode": "capital" if ceiling_raw == _CEILING_CAPITAL else ("dollars" if ceiling > 0 else "fixed_bankroll"),
         # None = "the fixed bankroll in force today" -- see `sizing_bankroll`.
         "ceiling_dollars": ceiling if ceiling > 0 else None,
-        "ceiling_env_set": bool(str(ceiling_raw or "").strip()),
+        "ceiling_env_set": bool(ceiling_raw),
         "day_pct": _float_env(_DAY_PCT_ENV, _DEFAULT_DAY_PCT, low=0.001, high=1.0),
         "order_pct": _float_env(_ORDER_PCT_ENV, _DEFAULT_ORDER_PCT, low=0.001, high=1.0),
         "max_age_seconds": _float_env(_MAX_AGE_ENV, _DEFAULT_MAX_AGE_SECONDS, low=60.0, high=86_400.0),
@@ -308,7 +318,8 @@ def sizing_bankroll(
     on the order's own shard`. The ceiling defaults to `fixed_bankroll` -- the
     number sizing used before this existed -- so enabling compounding cannot
     size a single dollar above today's policy until someone raises the ceiling
-    on purpose (`SYNDICATE_COMPOUNDING_BANKROLL_MAX_DOLLARS`).
+    on purpose (`SYNDICATE_COMPOUNDING_BANKROLL_MAX_DOLLARS`). Set to `capital`,
+    the ceiling IS the venue's capital, so the bankroll tracks the account.
     """
     cfg = dict(config or compounding_config())
     capital = venue_capital(venue, stamp, now=now, max_age_seconds=cfg.get("max_age_seconds"))
@@ -316,7 +327,9 @@ def sizing_bankroll(
         return {"known": False, "reason": capital.get("reason"), "capital": capital}
 
     ceiling = cfg.get("ceiling_dollars")
-    if ceiling is None:
+    if cfg.get("ceiling_mode") == "capital":
+        ceiling = float(capital["capital"])
+    elif ceiling is None:
         ceiling = float(fixed_bankroll)
     bankroll = min(float(cfg["fraction"]) * float(capital["capital"]), float(ceiling))
     result: dict[str, Any] = {

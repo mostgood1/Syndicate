@@ -246,3 +246,50 @@ def test_an_unknown_venue_is_closed_and_the_other_still_trades():
     assert caps["fail_closed"] == {"polymarket": "balance_auth_error"}
     assert caps["max_day_dollars_by_venue"]["polymarket"] == 0.0
     assert caps["max_day_dollars_by_venue"]["kalshi"] > 0
+
+
+# ---- ceiling follows capital (user 2026-10-20) -----------------------------
+
+
+def _rich(amount):
+    return _stamp(polymarket_numbers={"buyingPower": amount, "depositReservation": 0.0})
+
+
+def test_capital_ceiling_reaches_sizing_off_differs_from_on(monkeypatch):
+    # Reachability first: the same account, the key absent vs `capital`.
+    off = vc.sizing_bankroll("polymarket", fixed_bankroll=1000.0, stamp=_rich(5000.0), now=_NOW)
+    monkeypatch.setenv("SYNDICATE_COMPOUNDING_BANKROLL_MAX_DOLLARS", "capital")
+    on = vc.sizing_bankroll("polymarket", fixed_bankroll=1000.0, stamp=_rich(5000.0), now=_NOW)
+    assert off["bankroll"] == pytest.approx(1000.0)
+    assert on["bankroll"] == pytest.approx(5000.0)
+    assert on["ceiling_dollars"] == pytest.approx(5000.0)
+
+
+def test_capital_ceiling_shrinks_with_the_account(monkeypatch):
+    monkeypatch.setenv("SYNDICATE_COMPOUNDING_BANKROLL_MAX_DOLLARS", "capital")
+    small = vc.sizing_bankroll("polymarket", fixed_bankroll=1000.0, stamp=_rich(40.0), now=_NOW)
+    assert small["bankroll"] == pytest.approx(40.0)
+
+
+def test_capital_ceiling_respects_the_fraction(monkeypatch):
+    monkeypatch.setenv("SYNDICATE_COMPOUNDING_BANKROLL_MAX_DOLLARS", "Capital")
+    monkeypatch.setenv("SYNDICATE_COMPOUNDING_BANKROLL_FRACTION", "0.5")
+    result = vc.sizing_bankroll("polymarket", fixed_bankroll=1000.0, stamp=_rich(5000.0), now=_NOW)
+    assert vc.compounding_config()["ceiling_mode"] == "capital"
+    assert result["bankroll"] == pytest.approx(2500.0)
+
+
+def test_capital_ceiling_still_bounds_kalshi_by_its_shard(monkeypatch):
+    monkeypatch.setenv("SYNDICATE_COMPOUNDING_BANKROLL_MAX_DOLLARS", "capital")
+    result = vc.sizing_bankroll(
+        "kalshi", fixed_bankroll=1000.0, ticker="T", stamp=_stamp(),
+        shard_of=_shard_of({"T": 3}), now=_NOW,
+    )
+    assert result["bankroll"] == pytest.approx(240.47)
+
+
+@pytest.mark.parametrize("raw, mode", [(None, "fixed_bankroll"), ("2500", "dollars"), ("capital", "capital"), ("bogus", "fixed_bankroll")])
+def test_ceiling_mode_is_named(monkeypatch, raw, mode):
+    if raw is not None:
+        monkeypatch.setenv("SYNDICATE_COMPOUNDING_BANKROLL_MAX_DOLLARS", raw)
+    assert vc.compounding_config()["ceiling_mode"] == mode

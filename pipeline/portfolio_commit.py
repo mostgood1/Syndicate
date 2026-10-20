@@ -445,7 +445,7 @@ def _apply_compounding_bankroll(
     plan["compounding"] = {
         "mode": mode,
         "venue": venue,
-        "config": {key: config[key] for key in ("fraction", "ceiling_dollars", "max_age_seconds")},
+        "config": {key: config[key] for key in ("fraction", "ceiling_mode", "ceiling_dollars", "max_age_seconds")},
         "fixed_bankroll": fixed,
         "positions_in": len(kept) + len(refused_keys),
         "positions_out": len(kept),
