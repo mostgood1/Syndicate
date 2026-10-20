@@ -1299,6 +1299,7 @@ death, never life — do not invert it.
 - Falsification test: With the fix on the fleet, refresh-worker still logs REFUSED_LIVE_INLINE or no new paper rows appear in the ledger on a build whose paper2 plan has positions
 - Verification: off!=on reachability test; fleet ff + refresh-worker restart; count of new mode=paper rows for the next slate recorded and graded, in deploys.md; live rows/order count unchanged
 - Blocked by: none
+- **STATUS 2026-10-20 16:38Z (11:38 AM CT): RECORDING MET, GRADING OWED.** `1006cb75` on the fleet (ff 16:04:36Z, refresh-worker TERM 16:18:24Z after a save, new pid 2971523). First build: 17 tagged paper rows (paper 9, paper:novig 3, paper:prophetx 5), 0 REFUSED_LIVE_INLINE; live unchanged (554 rows, env same). Owed: graded count after the 10-21 settlement pass + first tagged paper:kalshi/polymarket row. Follow-up (other lane's file): min_ev tuner counts a live bet and its paper twin twice -- proposed as its own session; hand-over in the b87af0fc notes folder.
 
 ### board-attach-projections-enumeration — CLOSED — opened 2026-10-20 — closed 2026-10-20 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
 - Goal: attach_projections' docstring states the number of its call sites correctly and names only real callers, and a test fails if that drifts or if a fourth caller appears -- so nobody reads the live-projection path as being covered by the #425 degeneracy check when it is not.
