@@ -676,7 +676,7 @@ once this index exists: re-splitting would orphan the parts.
 | [portfolio-settlement] | PORTFOLIO SETTLEMENT — the ledger crossed no service boundary, and the join keyed on a value that drifts `[ver | `state_portfolio.md` |
 | [portfolio-sim-sizing-gate] | ONLY A MODEL MEASURED TO BEAT THE MARKET SIZES MONEY; TODAY NONE IS, SO STAKES FOLLOW PRICE `[verified on prod | `state_portfolio.md` |
 | [order-model-attribution] | AN ORDER RECORDS THE SIM'S VERDICT — DEPLOYED AND VERIFIED ON PRODUCTION; THE COMMIT GATE MAKES FOUR OF THE NI | `state_portfolio.md` |
-| [min-ev-tuner-shadow] | THE MIN_EV CUT IS TUNED PER CELL IN SHADOW -- RUNNING ON THE FLEET, ZERO MOVES, NOTHING APPLIED `[verified on  | `state_portfolio.md` |
+| [min-ev-tuner-shadow] | THE MIN_EV CUT IS TUNED PER CELL IN SHADOW -- FULL CODE ON THE FLEET, ZERO MOVES, NOTHING APPLIED `[verified 2026-10-20 12:01:32Z]` | `state_portfolio.md` |
 | [live-plan-empty-funnel] | THE LIVE PLAN IS EMPTY BECAUSE THE VENUE'S OWN PRICE IS <= 0 EV AFTER THE TAKER FEE -- NOT A CAP, NOT A CHOSEN | `state_portfolio.md` |
 | [soccer-team-strength] | SOCCER TEAM RATINGS: RATING V2 IS ON MAIN AND OFF PENDING A REAL-SIM A/B; THE FAVOURITE GAP IS MOSTLY INFORMAT | `state_soccer.md` |
 | [soccer-uefa-competitions] | UEFA CLUB COMPETITIONS (UCL / UEL / UECL): REGISTERED FOR FIXTURES, GAME ODDS, LIVE SCOREBOARD AND VENUE JOINS | `state_soccer.md` |

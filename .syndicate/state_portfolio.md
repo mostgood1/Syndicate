@@ -422,10 +422,7 @@ and none exist yet.**
     with the worker state env.
 - **Production's base cut is 0.0**, not 2.0: refresh-worker carries `SYNDICATE_PORTFOLIO_MIN_EV_PCT=0` (user decision
   2026-09-16), and there is no stored settings key. Rows reach the ledger at EV ~2+ because other gates bind first.
-- **Loaded vs on main:**
-  - `40640a0b` (band anchored at the cell's effective cut, floor 0.0) loads in compounding-bankroll's down/up on `854b59ed`.
-  - `affc9a7b` (cut graded in flat units, not dollars) is on main but NOT in that target. It loads at the first refresh-worker
-    start on a HEAD containing it. Until then the nightly grades in dollars.
+- **Loaded (verified 2026-10-20 12:01:32Z):** the full code (effective-cut anchor `40640a0b` + flat-unit grading `affc9a7b`) has run on refresh-worker since the 2026-10-19 22:43:52Z respawn. The first nightly on it: `MIN_EV_TUNER mode=shadow cells=60 hold=60 base=0.0 moves=0`, with bands carrying `flat_roi` / `$roi` / `ev_only$`. Readouts are taken daily by scheduled task `min-ev-tuner-daily-readout`.
 - **Evidence base:** settled paper venue orders only (paper:kalshi + paper:polymarket, 1,176 over 10-02..10-18). The 552 live rows
   are `venue_rebuild` rows with no `ev_pct`. Same-book CLV on venue MLB props is near zero (kalshi 49/266, polymarket 1/95).
 - Detail: `findings_2026-10-19_min_ev_tuner_backtest.md`; deploys.md 2026-10-19 19:06:01Z; todo #701.
