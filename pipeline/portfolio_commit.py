@@ -665,6 +665,14 @@ def _apply_compounding_bankroll(
     one_contract_rule = config.get("min_stake") == MIN_STAKE_ONE_CONTRACT
     floor_rule = config.get("min_stake") == MIN_STAKE_FLOOR_ONE_CONTRACT
     floored = 0
+    # The executor builds at the LIVE ask, up to its own slippage bound, so the
+    # floor carries that bound (`one_contract_floor_dollars`).
+    try:
+        from pipeline.execute_portfolio import max_slippage_dollars
+
+        slippage = float(max_slippage_dollars())
+    except Exception:
+        slippage = 0.03
     if mode not in {"shadow", "on"}:
         return
 
@@ -745,7 +753,7 @@ def _apply_compounding_bankroll(
             floor_to_one_contract = floor_rule and not band_sets_minimum
             one_contract_minimum = one_contract_rule and not band_sets_minimum
             if floor_to_one_contract:
-                floor = one_contract_floor_dollars(position, venue)
+                floor = one_contract_floor_dollars(position, venue, slippage_dollars=slippage)
                 if floor is None:
                     _refuse(REFUSAL_NO_CONTRACT_PRICE_COMPOUNDED, position)
                     continue

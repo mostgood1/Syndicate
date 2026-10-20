@@ -438,8 +438,18 @@ def one_contract_dollars(position: Mapping[str, Any]) -> float | None:
     return round(each * qty, 4)
 
 
-def one_contract_floor_dollars(position: Mapping[str, Any], venue: str | None) -> dict[str, Any] | None:
+def one_contract_floor_dollars(
+    position: Mapping[str, Any], venue: str | None, *, slippage_dollars: float = 0.0
+) -> dict[str, Any] | None:
     """The stake that buys EXACTLY one contract (one increment), fee included.
+
+    SLIPPAGE HEADROOM [measured 2026-10-20 21:35-21:36Z: 2 of 14 floored
+    Kalshi orders refused `stake_below_one_contract` -- $0.49 vs a $0.54 ask]:
+    the plan floors at the PLAN price and the executor builds at the LIVE ask,
+    so `slippage_dollars` (the executor's own `max_slippage_dollars`) is added
+    per contract. Any ask the executor would accept still buys one contract.
+    The headroom is capped below one more contract's price, so a cheap contract
+    can never be floored into two.
 
     `(price + taker fee per contract) x quantity`, rounded UP to the cent. The
     executors floor dollars to contracts with no fee taken off first
@@ -477,8 +487,10 @@ def one_contract_floor_dollars(position: Mapping[str, Any], venue: str | None) -
         fee_each = 0.01
     import math
 
-    dollars = math.ceil(round((each + fee_each) * qty * 100.0, 6)) / 100.0
-    return {"dollars": dollars, "price_each": each, "fee_each": round(fee_each, 4), "qty": qty}
+    headroom = max(0.0, min(float(slippage_dollars or 0.0), each - fee_each - 0.01))
+    dollars = math.ceil(round((each + headroom + fee_each) * qty * 100.0, 6)) / 100.0
+    return {"dollars": dollars, "price_each": each, "fee_each": round(fee_each, 4),
+            "slippage_headroom": round(headroom, 4), "qty": qty}
 
 
 def balance_caps(

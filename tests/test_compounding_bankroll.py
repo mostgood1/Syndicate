@@ -405,3 +405,28 @@ def test_floor_never_rescues_an_unknown_capital(monkeypatch):
     monkeypatch.setenv("SYNDICATE_COMPOUNDING_MIN_STAKE", "floor_one_contract")
     plan, refusals = _apply_floor(_resolver(None))
     assert refusals == {"compounding_bankroll_unknown": 2}
+
+
+# ---- floor headroom for the executor's slippage (measured 2026-10-20 21:35Z) --
+
+
+@pytest.mark.parametrize("american", [117, -156, -203, 108])
+def test_floored_stake_survives_an_uptick_within_slippage(american):
+    """$0.49 vs a $0.54 ask was refused live: the floor now carries the slippage
+    bound, so any ask the executor would accept still buys exactly one contract."""
+    from syndicate.features.shared.kalshi_orders import contracts_for_stake
+
+    position = {"price": american, "venue_ticker": "KX-T", "sport": "ncaaf", "market": "totals"}
+    floor = vc.one_contract_floor_dollars(position, "kalshi", slippage_dollars=0.03)
+    plan_price = vc.one_contract_dollars(position)
+    for live_ask in (plan_price, round(plan_price + 0.01, 4), round(plan_price + 0.03, 4)):
+        assert contracts_for_stake(floor["dollars"], live_ask) == 1
+
+
+def test_a_cheap_contract_is_never_floored_into_two():
+    from syndicate.features.shared.kalshi_orders import contracts_for_stake
+
+    position = {"price": 1900, "venue_ticker": "KX-T", "sport": "ncaaf", "market": "h2h"}  # ~$0.05
+    floor = vc.one_contract_floor_dollars(position, "kalshi", slippage_dollars=0.03)
+    price = vc.one_contract_dollars(position)
+    assert contracts_for_stake(floor["dollars"], price) == 1
