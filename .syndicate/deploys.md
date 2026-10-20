@@ -51401,3 +51401,9 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - **Capital per the worker at 23:58Z** (runner's read): kalshi 487.65, polymarket 586.05 (includes the pending deposit by user decision).
 - **Owed:** the first live position sized under `on`, and its placed stake vs the balance-derived cap. Scheduled task `compounding-shadow-day-read` (re-pointed to the `on` reading) runs 2026-10-20 17:00 CT.
 - **Rollback (mine):** flip line 126 back to `=shadow` (or delete it) + full down/up.
+
+
+## 2026-10-20 07:09Z (2:09 AM CT) -- READING: basketball sim_input_report published again, Level 0 NATIVE ORCHESTRATOR -- **MET** (lane `basketball-checklist-level0`, session 4e40a1b5)
+- **read:** `/api/ops/artifacts/stream?path={nba,wnba}_source/source_artifacts/data/sim_input_report/sim_input_report_2026-10-20.json` -> both present (first since 2026-10-10), `generated_at 2026-10-20T07:00:43Z`, `host worker`, `resolved_root /home/amyn/syndicate-prod/data` (the fleet data root, not a checkout).
+- **Level 0:** wnba and nba `NATIVE ORCHESTRATOR`; `bridge_calls_orchestrator true`, `engine_callable true`, `orchestrator_league` = own league, `vendored_modules_loaded []`, `import_error ''`. 0 `LEVEL 0` alarms (no BLIND either, so the in-run positive control fired as designed).
+- **status fail, 1 alarm, PRE-EXISTING:** `UNFED: wnba team_advanced_stats.games populated on 0.0% of 15 teams (season=2026, as_of=2026-07-08)`. Same alarm as the 10-09/10-10 reports. Its suffix says "FROM THIS CHECKOUT" but resolved_root is the fleet's data root, so it IS a production reading. Lead, not this lane.
