@@ -967,10 +967,14 @@ def test_fees_are_charged_against_the_daily_budget(monkeypatch):
     """A cap that counts only stake is a cap the account can exceed."""
     from syndicate.features.shared import execution_guard as guard
     from syndicate.features.shared import execution_ledger as mod
+    from syndicate.features.shared.timezone import central_today_iso
+
+    # A live order is charged to the day it was PLACED (todo #707 D2); this one is placed now.
+    today = central_today_iso()
 
     key = _kalshi_order(mod, monkeypatch, key="budget", price=0.54, stake=1.58)
     mod.complete_order(key, status=mod.STATUS_FILLED, fill_stake_dollars=1.08)
-    spent = guard.spent_today("2026-08-22", mode=mod.LIVE)
+    spent = guard.spent_today(today, mode=mod.LIVE)
     assert spent["dollars"] == 1.08
 
     monkeypatch.setattr(
@@ -981,7 +985,7 @@ def test_fees_are_charged_against_the_daily_budget(monkeypatch):
                                 "taker_fees_dollars": 0.02}]),
     )
     mod.reconcile_live_orders()
-    assert guard.spent_today("2026-08-22", mode=mod.LIVE)["dollars"] == 1.10
+    assert guard.spent_today(today, mode=mod.LIVE)["dollars"] == 1.10
 
 
 def test_an_unchanged_order_is_still_marked_as_read(monkeypatch):
