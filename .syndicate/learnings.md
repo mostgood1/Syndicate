@@ -2583,3 +2583,7 @@ Within 25 minutes of my ff, **two** sessions messaged me with restart plans buil
 - Before any `--ff-only`, re-read the fleet HEAD and check `git merge-base --is-ancestor <fleet HEAD> <your target>`. If it fails, re-cut ONTO the fleet HEAD — never onto your original base.
 - Re-run the dirty-file collision check against `<fleet HEAD>..<target>`, not against the range you first computed.
 - When a peer's plan quotes a fleet HEAD, CHECK IT rather than answering the question they asked. Both of these messages asked "when will you release?" when the answer they needed was "your target is now invalid".
+
+## 2026-10-20 -- A Kalshi settlement row after a partial close carries GROSS counts on BOTH legs, and its revenue omits the netted pair `[lane kalshi-exit-path]`
+- **What happened:** `550a4b20`'s tests modelled a partly sold position's settlement row as the NET remainder on one leg (sell 4 of 10 YES -> `yes_count_fp=6`). The real row (Thornton, 5 NO, 1 sold by a YES buy) reads `no_count_fp=5.00, yes_count_fp=1.00`, so `grade_kalshi_settlement` refused it `both_sides_held` and the exit-aware branch never ran. `revenue=400` covers only the 4 net contracts: the netted YES/NO pair paid its $1 at trade time, so the venue's pnl (-0.6695) is not the entry's (+0.3305).
+- **How to apply:** before writing a fixture for a venue row, copy one real row from production. Never derive an entry's P&L from Kalshi's settlement `revenue` once any contract was closed; use `exit_adjusted_pnl`.
