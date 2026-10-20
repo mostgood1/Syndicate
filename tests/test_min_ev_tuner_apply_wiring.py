@@ -151,3 +151,12 @@ def test_polymarket_ask_uses_the_tuned_cut_only_in_apply(monkeypatch, capsys):
     sent, refused = pm._ask_build(request, monkeypatch, min_ev=2.0)
     assert sent is None and refused == "ask_ev_below_min"
     assert "min_ev_source=tuned_cell" in capsys.readouterr().out
+
+
+def test_a_position_carries_the_net_of_fee_ev_its_row_was_judged_on(tuner):
+    # The net-floor RAISE evidence needs it on the ledger; lane paper-alongside-live copies it
+    # from the position. Absent on the row -> None (an unrestricted row has no venue fee).
+    plan = _commit([_row(ev_pct_net_of_fee=4.25)])
+    assert plan["positions"][0]["ev_pct_net_of_fee"] == 4.25
+    plan = _commit([_row()])
+    assert plan["positions"][0]["ev_pct_net_of_fee"] is None

@@ -1415,6 +1415,13 @@ def commit_portfolio(
                 "unrestricted_ev_pct": _as_float(row.get("unrestricted_ev_pct")),
                 "unrestricted_bookmaker": row.get("unrestricted_bookmaker"),
                 "venue": row.get("venue"),
+                # THE EV NET OF THE VENUE'S FEE that the net-of-fee floor judged this
+                # row on (`venue_scope`). Carried so the ledger can record it (lane
+                # paper-alongside-live copies it onto paper rows): the min_ev tuner's
+                # net-floor RAISE reads it (findings_2026-10-19_min_ev_tuner_backtest.md,
+                # pre-registration amendment 2026-10-20T18:54Z). None on an
+                # unrestricted row, which has no venue fee.
+                "ev_pct_net_of_fee": _as_float(row.get("ev_pct_net_of_fee")),
                 "price_source": row.get("price_source"),
                 # The exchange contract this position would be placed on. None
                 # on an unrestricted row -- there is no single contract when the
