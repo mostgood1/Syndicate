@@ -49,6 +49,59 @@ DEFAULT_KELLY_AT_MAX = 0.05
 
 REFUSAL_NO_KELLY = "stake_band_no_kelly"
 REFUSAL_EXCEEDS_FUNDING = "stake_band_exceeds_funding_cash"
+# THE HEAVY-FAVOURITE CAP [user 2026-10-20, "C: -1000 cutoff + $5 cap"]: a tiny
+# edge on a near-certain favourite gives a large Kelly fraction, so the band put
+# $10 on SAS/OKC +20.5 at -1329 to win ~$0.75. With the cap on, a band bet
+# priced shorter than the cutoff is refused, and one shorter than the favourite
+# line is capped at a maximum loss (on these venues the stake IS the loss).
+# Near-evens and underdogs keep the band's size. Off unless `..._CAP=on`.
+REFUSAL_HEAVY_FAVOURITE = "stake_band_heavy_favourite"
+FAVOURITE_CAP_ENV = "SYNDICATE_LIVE_BAND_FAVOURITE_CAP"
+_REFUSE_SHORTER_ENV = "SYNDICATE_LIVE_BAND_REFUSE_SHORTER_THAN"
+_FAVOURITE_SHORTER_ENV = "SYNDICATE_LIVE_BAND_FAVOURITE_SHORTER_THAN"
+_FAVOURITE_MAX_LOSS_ENV = "SYNDICATE_LIVE_BAND_FAVOURITE_MAX_LOSS"
+DEFAULT_REFUSE_SHORTER_THAN = -1000.0
+DEFAULT_FAVOURITE_SHORTER_THAN = -200.0
+DEFAULT_FAVOURITE_MAX_LOSS = 5.0
+
+
+def _american_env(name: str, default: float) -> float:
+    """A negative American price from env (e.g. -1000), or the default."""
+    raw = str(os.environ.get(name) or "").strip()
+    try:
+        value = float(raw) if raw else default
+    except ValueError:
+        return default
+    return value if value <= -100 else default
+
+
+def favourite_cap_config() -> dict[str, Any]:
+    """The cap's knobs; `on` only when `SYNDICATE_LIVE_BAND_FAVOURITE_CAP=on`."""
+    on = str(os.environ.get(FAVOURITE_CAP_ENV) or "").strip().lower() in {"on", "1", "true", "yes"}
+    refuse = _american_env(_REFUSE_SHORTER_ENV, DEFAULT_REFUSE_SHORTER_THAN)
+    favourite = _american_env(_FAVOURITE_SHORTER_ENV, DEFAULT_FAVOURITE_SHORTER_THAN)
+    max_loss = _env_number(_FAVOURITE_MAX_LOSS_ENV, DEFAULT_FAVOURITE_MAX_LOSS)
+    return {
+        "on": on,
+        "refuse_shorter_than": refuse,
+        "favourite_shorter_than": favourite,
+        "favourite_max_loss": max_loss if max_loss is not None else DEFAULT_FAVOURITE_MAX_LOSS,
+    }
+
+
+def favourite_cap_verdict(position: Mapping[str, Any], stake: float, cap: Mapping[str, Any]) -> tuple[str, float]:
+    """(`band` | `capped` | `refused`, stake) for one band-sized bet."""
+    if not cap.get("on"):
+        return "band", stake
+    try:
+        american = float(position.get("price"))
+    except (TypeError, ValueError):
+        return "band", stake
+    if american <= float(cap["refuse_shorter_than"]):
+        return "refused", 0.0
+    if american <= float(cap["favourite_shorter_than"]) and stake > float(cap["favourite_max_loss"]):
+        return "capped", round(float(cap["favourite_max_loss"]), 2)
+    return "band", stake
 
 
 def _env_number(name: str, default: float) -> float | None:
@@ -169,6 +222,8 @@ def apply_live_stake_band(
     refused_keys: list[str] = []
     trimmed = 0
     left_small = 0
+    fav_cap = favourite_cap_config()
+    fav_capped = 0
     before = 0.0
     line = cfg.get("small_edge_fraction")
 
@@ -208,10 +263,21 @@ def apply_live_stake_band(
             _refuse(REFUSAL_NO_KELLY, position)
             continue
         stake = band_stake(kelly, cfg)
+        verdict, capped_stake = favourite_cap_verdict(position, stake, fav_cap)
+        if verdict == "refused":
+            position["stake_band"] = {"full_kelly": kelly, "band_stake_dollars": stake,
+                                      "heavy_favourite_refused": True, "price": position.get("price")}
+            _refuse(REFUSAL_HEAVY_FAVOURITE, position)
+            continue
+        if verdict == "capped":
+            fav_capped += 1
+        favourite_capped_from = stake if verdict == "capped" else None
+        stake = capped_stake
         funding = funding_cash_of(position, venue)
         record = {
             "full_kelly": kelly,
             "band_stake_dollars": stake,
+            "favourite_capped_from": favourite_capped_from,
             "stake_dollars_before_band": round(prior, 2),
             "funding_cash": funding,
         }
@@ -245,6 +311,8 @@ def apply_live_stake_band(
         "venue": venue,
         "config": {k: cfg.get(k) for k in ("min_dollars", "max_dollars", "kelly_at_max", "small_edge_fraction")},
         "left_below_small_edge_fraction": left_small,
+        "favourite_cap": dict(fav_cap),
+        "favourite_capped": fav_capped,
         "positions_in": len(kept) + sum(refused.values()),
         "positions_out": len(kept),
         "staked_dollars_before": round(before, 2),

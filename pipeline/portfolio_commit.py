@@ -950,6 +950,7 @@ def _write_live_venue_plan(
             f"staked_before=${band.get('staked_dollars_before')} staked_after=${band.get('staked_dollars_after')} "
             f"trimmed_to_funding={band.get('trimmed_to_funding')} refused={band.get('refused')} "
             f"left_small={band.get('left_below_small_edge_fraction')} "
+            f"favourite_cap={(band.get('favourite_cap') or {}).get('on')} favourite_capped={band.get('favourite_capped')} "
             f"stakes={[p.get('stake_dollars') for p in positions]}",
             flush=True,
         )
