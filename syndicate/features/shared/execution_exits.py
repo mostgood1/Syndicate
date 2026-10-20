@@ -164,6 +164,46 @@ def fair_margin() -> float:
     return _float_env("SYNDICATE_EXIT_FAIR_MARGIN", 0.0)
 
 
+def live_exit_rules() -> frozenset[str]:
+    """Which rules may SELL for real. Default: `take_profit` only.
+
+    User decision 2026-10-20 ~22:2xZ ("Arm take-profit tonight"): live selling for
+    the take-profit rule only. A `model_fair` trigger on a live position keeps
+    being booked as a paper exit, so its counterfactual continues.
+    """
+    raw = str(os.environ.get("SYNDICATE_EXIT_LIVE_RULES") or RULE_TAKE_PROFIT)
+    return frozenset(part.strip() for part in raw.split(",") if part.strip())
+
+
+def live_exit_daily_caps() -> tuple[int, float]:
+    """`(max live sales per UTC day, max sale notional $ per UTC day)`.
+
+    Defaults 5 sales / $25: held stakes are $0.5-$10, so the dollar cap binds
+    after a few of the larger positions and the count cap after five small ones.
+    """
+    count = int(_float_env("SYNDICATE_EXIT_LIVE_MAX_PER_DAY", 5))
+    dollars = _float_env("SYNDICATE_EXIT_LIVE_MAX_DOLLARS_PER_DAY", 25.0)
+    return max(0, count), max(0.0, dollars)
+
+
+def _live_exits_today(state: Mapping[str, Any], day: str) -> tuple[int, float]:
+    """Live sales SENT on `day` (UTC): count and notional (contracts x limit).
+
+    Every sent row counts -- submitted, failed or filled -- because a sale whose
+    outcome is unknown may have traded, the same reason `spent_today` charges an
+    entry that might have filled.
+    """
+    count, dollars = 0, 0.0
+    for row in (state.get("exits") or {}).values():
+        if row.get("mode") != EXIT_LIVE or not str(row.get("submitted_at") or "").startswith(day):
+            continue
+        if row.get("status") in {EXIT_REJECTED, EXIT_DEAD}:
+            continue
+        count += 1
+        dollars += float(row.get("requested_contracts") or 0) * float(row.get("limit_price") or row.get("bid") or 0)
+    return count, round(dollars, 4)
+
+
 def lookback_days() -> int:
     return max(1, int(_float_env("SYNDICATE_EXIT_LOOKBACK_DAYS", _DEFAULT_LOOKBACK_DAYS)))
 
@@ -904,6 +944,10 @@ def place_exit(
     exits = state.setdefault("exits", {})
     key = exit_idempotency_key(position.entry_key)
     existing = exits.get(key)
+    if existing is not None and existing.get("mode") == EXIT_PAPER:
+        # The paper decision on this entry is kept on the live row (below); it
+        # must not read as a duplicate of a sale that never happened.
+        existing = None
     if existing is not None and existing.get("status") not in {EXIT_REJECTED, EXIT_DEAD}:
         return {"refused": "duplicate", "row": existing}
     if exit_mode() != EXIT_LIVE:
@@ -941,6 +985,11 @@ def place_exit(
         "venue_order_id": None,
         "error": None,
     }
+    paper = exits.get(key)
+    if paper is not None and paper.get("mode") == EXIT_PAPER:
+        row["paper_decision"] = {
+            k: paper.get(k) for k in ("decided_at", "rule", "bid", "edge_per_contract", "realized_pnl_dollars", "in_play")
+        }
     if existing is not None:
         row["prior_attempts"] = (existing.get("prior_attempts") or []) + [
             {k: existing.get(k) for k in ("status", "submitted_at", "venue_order_id", "error")}
@@ -1215,7 +1264,22 @@ def run_exit_tick(
         if not decision.get("rule"):
             continue
         key = exit_idempotency_key(position.entry_key)
+        live_skip = None
         if position.mode == "live" and mode == EXIT_LIVE:
+            rules = set(str(decision.get("rule") or "").split("+"))
+            sold_live = (exits.get(key) or {}).get("mode") == EXIT_LIVE
+            cap_count, cap_dollars = live_exit_daily_caps()
+            used_count, used_dollars = _live_exits_today(state, _utc_now()[:10])  # same clock as submitted_at
+            notional = float(position.contracts) * float(decision.get("bid") or 0.0)
+            if sold_live:
+                live_skip = None  # place_exit answers `duplicate`
+            elif not rules & live_exit_rules():
+                live_skip = "rule_not_armed"
+            elif used_count >= cap_count:
+                live_skip = "daily_count_cap"
+            elif used_dollars + notional > cap_dollars + 1e-9:
+                live_skip = "daily_dollar_cap"
+        if position.mode == "live" and mode == EXIT_LIVE and live_skip is None:
             outcome = place_exit(
                 state,
                 position,
@@ -1225,7 +1289,18 @@ def run_exit_tick(
             )
             token = "placed" if outcome.get("placed") else str(outcome.get("refused") or "failed")
             live_results[token] = live_results.get(token, 0) + 1
+            if outcome.get("placed"):
+                row = outcome.get("row") or {}
+                print(
+                    f"[execution_exits] EXIT_LIVE entry={position.entry_key} ticker={position.ticker} leg={position.leg}"
+                    f" rule={decision.get('rule')} status={row.get('status')} contracts={row.get('requested_contracts')}"
+                    f" filled={row.get('filled_contracts')} fill_price={row.get('fill_price')}"
+                    f" fee={row.get('exit_fee_dollars')} order={row.get('venue_order_id')}",
+                    flush=True,
+                )
             continue
+        if live_skip is not None:
+            live_results[live_skip] = live_results.get(live_skip, 0) + 1
         if key in exits:
             continue  # one exit per entry: the first trigger is the paper sale
         exits[key] = {

@@ -672,3 +672,59 @@ def test_watch_pruning_keeps_a_forward_bet_until_its_game_ages_out():
     }
     pruned = ex._prune_watch(state, TODAY)
     assert pruned == 1 and list(state["watch"]) == ["fwd"]
+
+
+# -- arming: take-profit only, daily caps, paper rows never block (2026-10-20) --
+
+
+def _live_tick(monkeypatch, orders, market, sent, **env):
+    _arm_live(monkeypatch)
+    for k, v in env.items():
+        monkeypatch.setenv(k, v)
+    monkeypatch.setattr(ex, "send_exit_order", lambda body: sent.append(body) or {
+        "state": "filled", "filled_count": int(float(body["count"])), "fill_cost_dollars": 0.03 * int(float(body["count"])),
+        "fees_dollars": 0.01, "order_id": f"o{len(sent)}", "venue_status": "executed"})
+    venue = {"status": "ok", "positions": {o["venue_ticker"]: -5.0 for o in orders}}
+    return ex.run_exit_tick(today=TODAY, orders=orders, quotes=_quotes([market]),
+                            venue_positions=lambda: venue, now=NOW)
+
+
+def test_take_profit_sells_live_and_model_fair_stays_paper(monkeypatch):
+    sent = []
+    s = _live_tick(monkeypatch, [_order()], _market(), sent, SYNDICATE_EXIT_TAKE_PROFIT_MARGIN="0.05")
+    assert s["live_exits"] == {"placed": 1} and len(sent) == 1
+    row = next(iter(ex.load_state()["exits"].values()))
+    assert row["mode"] == "live" and row["status"] == "filled"
+
+    sent2 = []
+    fair_only = _order(idempotency_key="f" * 24, model_edge_pct=3.0, ev_pct=1.0, fill_price=0.5,
+                       requested_price=0.5, fill_stake_dollars=2.5, side="over")
+    s2 = _live_tick(monkeypatch, [fair_only], _market(yes_bid_dollars="0.5600"), sent2,
+                    SYNDICATE_EXIT_TAKE_PROFIT_MARGIN="0.5")
+    assert sent2 == [] and s2["live_exits"] == {"rule_not_armed": 1} and s2["new_paper_exits"] == 1
+
+
+def test_daily_count_cap_stops_live_sales(monkeypatch):
+    sent = []
+    orders = [_order(idempotency_key=c * 24) for c in "abc"]
+    s = _live_tick(monkeypatch, orders, _market(), sent, SYNDICATE_EXIT_TAKE_PROFIT_MARGIN="0.05",
+                   SYNDICATE_EXIT_LIVE_MAX_PER_DAY="1")
+    assert len(sent) == 1 and s["live_exits"] == {"placed": 1, "daily_count_cap": 2}
+
+
+def test_a_paper_exit_row_does_not_block_a_live_sale(monkeypatch):
+    monkeypatch.setenv("SYNDICATE_EXIT_TAKE_PROFIT_MARGIN", "0.05")
+    ex.run_exit_tick(today=TODAY, orders=[_order()], quotes=_quotes([_market()]),
+                     venue_positions=lambda: {"status": "ok", "positions": {}}, now=NOW)  # paper first
+    assert next(iter(ex.load_state()["exits"].values()))["mode"] == "paper"
+    sent = []
+    s = _live_tick(monkeypatch, [_order()], _market(), sent)
+    assert s["live_exits"] == {"placed": 1}
+    row = next(iter(ex.load_state()["exits"].values()))
+    assert row["mode"] == "live" and row["paper_decision"]["rule"] == "take_profit"
+
+
+def test_live_rules_default_is_take_profit_only(monkeypatch):
+    monkeypatch.delenv("SYNDICATE_EXIT_LIVE_RULES", raising=False)
+    assert ex.live_exit_rules() == frozenset({"take_profit"})
+    assert ex.live_exit_daily_caps() == (5, 25.0)
