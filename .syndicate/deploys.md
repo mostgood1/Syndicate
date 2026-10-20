@@ -51798,3 +51798,30 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - **no restart made:** the tuner is imported in refresh-worker only, and the change is SHADOW-path evidence (nothing the commit reads changes until `SYNDICATE_MIN_EV_TUNER=apply`). It rides the next refresh-worker restart that any lane makes; no claim taken.
 - **baseline (16:59:59Z, one read, fleet ledger via refresh-worker pid 2971523's state env, counts only):** 3,000 rows; 2 live filled rows with a position_key; 262 paper (family, key, date) keys; **0 live/paper twins** (paper:kalshi / paper:polymarket have booked 0 since 1006cb75). So readouts before the restart are not yet affected.
 - **verify (owed, after the next refresh-worker restart on a HEAD containing this):** the nightly `MIN_EV_TUNER` line / `min_ev_tuner_state.json` `skipped` carries `paper_twin_of_live` = the number of paper:kalshi|polymarket rows whose key+date matches a filled live row (census script `C:/tmp/minevtwin/twin_census.py`, field `shared_family_key_date`). Until a twin exists the key is absent, which is not a failure.
+
+
+## 2026-10-20 18:20:16Z (1:20 PM CT) -- FULL FLEET down/up on 72407b6c (no ff): option C, `SYNDICATE_LIVE_SMALL_EDGE_FRACTION=0.001` (lane `compounding-bankroll`, session 3927eb2e) -- deploy MET; first-build reading follows
+- **ask:** the user, in chat: "Deploy option C: ff the fleet to 49fa4db1 (review ride-alongs from 8099dc05), add REFRESH_WORKER__SYNDICATE_LIVE_SMALL_EDGE_FRACTION=0.001, full down/up behind all three claims, verify, log in deploys.md."
+- **what C does:** the live plan skips the fixed $1-of-$1,000 minimum (only with compounding `on` + a one-contract minimum). Rows under a 0.1% stake fraction keep compounding's one-contract floor (~$0.50); the band ($5-$10) sizes rows at or above 0.1%.
+  - Dry run 10:59 AM CT: two NCAAF spreads at 0.04% went from refused to $0.50 / $0.49, 1 contract each.
+  - The bug it caught is fixed in 49fa4db1: the band's plan-wide "sets the minimum" switch skipped the floor for exactly those rows.
+- **no ff needed:** fleet HEAD was already 72407b6c (the future-dated lane's D2 ff at 16:56Z), which contains 49fa4db1 and 1006cb75. `git merge --ff-only 49fa4db1` = "Already up to date", so nothing was reverted.
+- **ride-alongs that loaded into refresh-worker** (code on disk since peers' ffs):
+  - `1006cb75` paper-alongside-live, default ON, paper only. Its own lane restarted refresh-worker for it at 16:18:30Z, so it was not new here.
+  - `72407b6c` D2: spent_today keyed on placement date; live-odds already loaded it at 16:56:28Z.
+  - `e4468a14` exit lookback (paper).
+  - `2f04484f` comments only.
+  - `2a60ce7d` cheat sheets (web).
+- **spacing:** refresh-worker last booted 16:18:30Z and live-odds-worker 16:56:28Z, so the go time was >= 17:56:28Z. Claims were acquired 16:53Z, found the live-odds claim held and both gates not passed, and RELEASED; re-acquired 17:57:24Z (tokens rw e8e4c07d27925131, lo 07456f2f0c320be5, web 18a33509097c75b1).
+- **baseline 17:57:28Z:** HEAD 72407b6c, 8 dirty data files, healthz 200, no SMALL_EDGE key in the env (135 lines). refresh-worker 2971523 / live-odds 2979561 live + armed.
+- **timeline (UTC):**
+  - Drain from 17:57:40Z; **CLEAR 18:19:49Z** (waited out a board build).
+  - Env 135 -> 138 lines, 0 removed; backup `.bak-small-edge-20261020T182016Z`. `down` 18:20:16 -> 18:20:55.
+  - `Start-ScheduledTask` 18:21:03Z, **healthz 200 at 18:21:09Z** on the first attempt (web out ~54 s).
+  - Marker cleared 18:21:21Z; `DRAIN_CLEARED owner=compounding-bankroll`.
+- **verify (18:21:20Z, /proc environ):**
+  - supervisor `up --allow-live-execution`.
+  - refresh-worker pid 3000980 (lstart 18:21:07Z): RENDER_GIT_COMMIT 72407b6c, `SYNDICATE_LIVE_SMALL_EDGE_FRACTION=0.001`, `COMPOUNDING_BANKROLL=on`, `COMPOUNDING_BASIS=venue_total`, `COMPOUNDING_MIN_STAKE=floor_one_contract`, `COMPOUNDING_BANKROLL_MAX_DOLLARS=capital`, `LIVE_STAKE_BAND=on`, MODE=live, LIVE_ARMED=1.
+  - live-odds pid 3000981: live + armed, balance caps on.
+- **expect:** `LIVE_PLAN_WRITTEN` refusals stop carrying `below_min_stake` for kalshi. `STAKE_BAND ... left_small=N` counts sub-0.1% rows; those place ~1 contract (`floored_to_one_contract`), and rows >= 0.1% still get $5-$10.
+- **rollback:** delete line 138 (or restore the .bak) + full down/up. C is inert without the key.
