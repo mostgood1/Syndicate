@@ -328,3 +328,23 @@ def test_a_loader_failure_never_raises(memory_state, capsys):
     assert result["reason"] == "error"
     assert "MIN_EV_TUNER_FAILED" in capsys.readouterr().out
     assert "s" not in memory_state
+
+
+def test_ladder_rows_are_skipped_and_never_move_the_effective_cut(memory_state):
+    # Lane paper-alongside-live books `paper:<venue>:ladder` rows the current floor
+    # REFUSES ($1 flat, EV -1..2%). Counted as taken bets they would drag the cell's
+    # effective cut (p5 EV) down and land in the RAISE band.
+    main = _losing_cell(ev=2.2)
+    ladder = [
+        _order(500 + i, won=(i % 2 == 0), clv=0.5, venue="paper:kalshi:ladder", ev=-0.5 + (i % 4) * 0.5)
+        for i in range(40)
+    ]
+    for row in ladder:
+        row["ev_band"] = "m1to0"
+    alone = T.compute_proposals(main, state={}, base_min_ev_pct=0.0)["cells"]["kalshi|ncaaf|totals|regular"]
+    mixed = T.compute_proposals(main + ladder, state={}, base_min_ev_pct=0.0)
+    cell = mixed["cells"]["kalshi|ncaaf|totals|regular"]
+    assert mixed["skipped"].get("ladder_not_pre_registered") == 40
+    assert cell["effective_cut_pct"] == alone["effective_cut_pct"] == 2.2
+    assert cell["evidence"]["rows"] == alone["evidence"]["rows"] == 60
+    assert T.is_ladder_venue("paper:polymarket:ladder") and not T.is_ladder_venue("paper:kalshi")

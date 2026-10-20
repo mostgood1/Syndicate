@@ -119,3 +119,31 @@ mutated to `dollars`.
 Replay at base 0.0, flat basis: still 0 moves (sample-limited, as before). The basis matters where it should:
 polymarket ncaaf totals band [3.34, 4.34), 46 events: **flat +9.6%, EV-only dollars +11.6%, all dollars -5.3%**. The sim's
 stake alone turned a winning band into a losing one in dollars.
+
+
+## PRE-REGISTRATION 2026-10-20T18:33Z: how the tuner will read the EV-band paper LADDER (written BEFORE any ladder row settled)
+
+Source: lane paper-alongside-live books Kalshi/Polymarket rows the CURRENT floor refuses, paper only, $1 flat. They land in the ledger as
+`mode=paper`, `venue=paper:<kalshi|polymarket>:ladder`, carrying `ev_band` (ge2 | 1to2 | 0to1 | m1to0), `ev_net_pct` (net-of-fee EV),
+`ladder_reason` and `ev_pct`. User decision relayed 2026-10-20: "yes - but we should reconsider the floors".
+
+**Until a ladder reader is built, the tuner SKIPS every ladder row** (`ladder_not_pre_registered`), unconditionally and with no
+opt-in flag. Untagged, ladder rows would drag each cell's effective cut down and land in the RAISE band.
+Test: `test_ladder_rows_are_skipped_and_never_move_the_effective_cut`, mutation-checked.
+
+**The rule the reader will implement, fixed now:**
+1. **Knob.** A second per-cell setting: the NET-of-fee floor (`_min_ev_net_of_fee_pct`, default 0). It is the binding gate on the venues;
+   the 2026-10-19 23:14Z live kalshi plan refused 9 of 12 rows `below_min_ev_pct_net_of_fee`. The gross `min_ev_pct` knob is unchanged.
+   Bounds [-1.0, +3.0]; step 0.5; shadow first, applied only via `SYNDICATE_MIN_EV_TUNER=apply`.
+2. **LOWER** a cell's net floor one step only when the ladder rows in the band IMMEDIATELY BELOW it (`ev_net_pct` in [floor-1, floor))
+   have flat-unit ROI AND same-book CLV both with t >= +2.0, event-clustered, >= 40 events and >= 30 CLV events, and >= 20 new events since
+   that cell last moved.
+3. **RAISE** of the net floor is NOT pre-registered here. The ladder only holds rows BELOW the floor, and the main book does not store
+   `ev_net_pct` on orders today. It is registered once the main book carries `ev_net_pct`, from the taken rows' marginal band, mirroring
+   the gross rule.
+4. **Dedupe.** A bet in both the ladder and the main book (same venue family + `position_key` + `selected_date`) counts ONCE, in the main
+   book, since that book took it. A bet only in the ladder is below-floor evidence.
+5. **Unchanged guarantees.** Cells are venue x sport x market x season_phase; phases are never pooled and unknown is never regular. No family
+   or market exclusion: a floor moves within its bounds and every row is still judged on its own EV. The ladder's own `$1` stakes make
+   flat units and dollars identical there.
+6. **Not tuned on the ladder:** sizing, the gross cut, and anything outside Kalshi/Polymarket.

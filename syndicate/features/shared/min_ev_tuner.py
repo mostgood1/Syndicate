@@ -166,6 +166,11 @@ def venue_family(venue: Any) -> str | None:
     return None
 
 
+def is_ladder_venue(venue: Any) -> bool:
+    """`paper:kalshi:ladder` / `paper:polymarket:ladder` -- the paper EV-band ladder book."""
+    return str(venue or "").strip().lower().endswith(":ladder")
+
+
 def order_mode(order: Mapping[str, Any]) -> str:
     mode = str(order.get("mode") or "").strip().lower()
     if mode:
@@ -511,6 +516,15 @@ def collect_cells(
             continue
         if venue_family(order.get("venue")) is None:
             skip("venue_not_tuned")
+            continue
+        # THE EV-BAND LADDER BOOK (lane paper-alongside-live: `paper:<venue>:ladder`,
+        # $1 flat on rows the CURRENT floor refuses) is not evidence about the bets the
+        # cut TAKES. Left in, its -1..2% rows would drag each cell's effective cut down
+        # and land in the RAISE band. Skipped UNCONDITIONALLY until the ladder reader --
+        # pre-registered in findings_2026-10-19_min_ev_tuner_backtest.md -- is built; no
+        # opt-in flag exists before that, so no setting can mix the two populations.
+        if is_ladder_venue(order.get("venue")):
+            skip("ladder_not_pre_registered")
             continue
         if order_mode(order) not in evidence_modes:
             skip("mode_not_in_evidence")
