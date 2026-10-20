@@ -91,6 +91,16 @@ def _paper_selection(plan: Mapping[str, Any], normalized: str, scoped: bool) -> 
 LADDER_TAG_FIELDS = ("ev_band", "ev_net_pct", "ladder_reason", "stake_basis", "price_source")
 
 
+def _venue_book_tags(position: Mapping[str, Any]) -> dict[str, Any]:
+    """A `paper:<venue>` row's net-of-fee EV at the venue price, when its position carries one.
+
+    Read by the min_ev tuner's net-floor RAISE side (its pre-registration
+    2026-10-20T18:54Z). Absent stays absent: no fee figure, no field.
+    """
+    net = _as_optional_float(position.get("ev_pct_net_of_fee"))
+    return {} if net is None else {"ev_net_pct": round(net, 4)}
+
+
 def _ladder_tags(position: Mapping[str, Any]) -> dict[str, Any]:
     """The ladder's band tags, copied from its plan position onto the paper row."""
     return {field: position.get(field) for field in LADDER_TAG_FIELDS}
@@ -862,7 +872,7 @@ def _run_execution(
                 request,
                 tags={
                     **_paper_row_tags(request, selection=selection, alongside_live=alongside_live),
-                    **(_ladder_tags(position) if ladder else {}),
+                    **(_ladder_tags(position) if ladder else _venue_book_tags(position) if scope else {}),
                 },
             )
             if batch is not None

@@ -250,3 +250,28 @@ def test_a_rerun_is_a_duplicate_not_a_second_bet(monkeypatch):
     assert first["placed"] == 1
     assert second["placed"] == 0 and second["duplicates"] == 1
     assert len(_rows()) == 1
+
+
+def test_venue_book_rows_carry_net_ev_when_the_position_does(monkeypatch):
+    """The min_ev tuner's net-floor RAISE side reads `ev_net_pct` on paper:<venue> rows
+    (its pre-registration 2026-10-20T18:54Z). Copied from the position; absent stays absent."""
+    from pipeline import execute_portfolio as runner
+
+    plan = _write_plan(monkeypatch, [_row(venue_ticker=_TICKER), _row(event_id="evt-2", venue_ticker=_TICKER)])
+    positions = [dict(p) for p in plan["positions"]]
+    positions[0]["ev_pct_net_of_fee"] = 1.23456
+    positions[1].pop("ev_pct_net_of_fee", None)
+    venue_plan = {**plan, "positions": positions}
+    monkeypatch.setattr("pipeline.portfolio_commit.read_portfolio_plan_for_venue", lambda date, scope: venue_plan)
+    _live_env(monkeypatch)
+    _no_venue_contact(monkeypatch)
+
+    result = runner.run_execution("2026-08-22", inline=True, venue_scope="kalshi")
+    assert result["placed"] == 2
+    by_event = {o["event_id"]: o for o in _rows(venue="paper:kalshi")}
+    assert by_event[positions[0]["event_id"]]["ev_net_pct"] == 1.2346
+    assert "ev_net_pct" not in by_event[positions[1]["event_id"]]
+
+    # The unrestricted book never gets one (no venue price, no venue fee).
+    runner.run_execution("2026-08-22", inline=True)
+    assert all("ev_net_pct" not in o for o in _rows(venue="paper"))
