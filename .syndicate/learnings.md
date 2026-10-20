@@ -2634,3 +2634,18 @@ A peer's test went red in a file I had just edited. I reverted MY copy of **that
 - Better: don't claim innocence. Say which control you ran and what it covers. "Reverting my docstring change does not reproduce it" is honest; "it is not mine" is a conclusion that control cannot support. (`feedback_retraction_is_not_innocence` says the same from the other direction: withdrawing a bad attribution gives "not proven guilty", never "proven innocent".)
 - **Sweep the suites a behaviour change can reach, at ship time.** 44 test files drive `build_layer2_rows`/`select_shortlist`; running them takes ~2 minutes and would have found both casualties immediately instead of leaving one for a peer to debug and one undiscovered.
 - The signature to recognise: a fixture whose rows go to ZERO reads as "the feature under test withheld everything", which is indistinguishable from the feature working. An empty population is never a pass.
+
+## THE SESSION WORKTREE IS SPARSE, AND IT EXCLUDES `vendor/` AS WELL AS `data/` — four test files then fail to COLLECT, which reads as real breakage `[2026-10-20, session 4ab694ed]`
+
+I already had the rule that a worktree has no `data/`, so a failure there is not "red on main". Measured today, the exclusion is wider and the symptom is worse. `git sparse-checkout list` in a session worktree returns exactly:
+
+    .claude .syndicate docs pipeline router scripts syndicate tests
+
+so `vendor/` is absent too, and `tests/test_wnba_prop_dispersion.py`, `tests/test_wnba_prop_shape.py`, `tests/test_wnba_sim_minutes_redistribution.py` and `tests/test_wnba_sim_rate_shrink.py` die with **`ModuleNotFoundError: No module named 'wnba_betting'`** at COLLECTION, not as test failures. `pytest tests/ --collect-only` reports `4 errors during collection` and **refuses to run anything** (`Interrupted`), so an unqualified "the suite is broken" is the natural and wrong conclusion.
+
+**Why it matters more than the `data/` case:** a data-dependent FAILURE is visibly about data. A collection ERROR looks like an import or packaging defect on main, and it blocks the whole run rather than one file. The vendored tree IS tracked on `origin/main` and IS present in the fleet checkout — I checked both before attributing it.
+
+**How to apply:**
+- Before reporting ANY suite-wide result from a worktree, print `git sparse-checkout list` and say what is excluded. 517 tracked files live under `vendor/` against 34,702 under `data/`.
+- **`git sparse-checkout add vendor` is cheap and fixes it** (517 files), and the four files then collect 54 tests. Adding `data/` is not cheap and is a lossy mirror anyway, so data-dependent tests stay unrunnable here by design.
+- Neither the primary tree nor the fleet checkout is a free substitute: the primary tree was BEHIND `main` today, and running 25,103 tests in the fleet checkout risks writing into production artifacts. State which tree a result came from and what that tree lacked.
