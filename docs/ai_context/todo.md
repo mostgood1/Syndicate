@@ -19391,7 +19391,9 @@ intervention. Current: `mlb` 100 selected of 4,452 available, `nfl` 28 of 28.
 
 **The error:** I reported "EVERY FILTER REPORTS IT DROPPED NOTHING" after reading
 `rows_beyond_horizon`, `rows_below_value_floor`, and `rows_implausible_book`. The
-endpoint publishes **five** rejection counters. I never read
+endpoint publishes **five** rejection counters `[SIX since 2026-10-20 — a sixth,
+`rows_no_market_price`, was added by #708. Leaving this count stale would repeat
+this item's own lesson on the next reader.]`. I never read
 `rows_beyond_quote_age` or `rows_stale_kickoff`. On the healthy build:
 
     rows_beyond_horizon      2,670    horizon_days                 1
@@ -50232,3 +50234,60 @@ assert "live_gameline_accuracy" in served_payload, (
 HEALTHY steady state, not a failure — `previous_best` is the discriminator. Verify
 on SERVED BYTES, not on the artifact; that distinction is the whole item.
 
+
+### `#708` — DONE 2026-10-20. A board row carrying a MODEL edge with no market fair and no market EV is no longer ranked: `rows_no_market_price`, the mirror of `rows_implausible_book`
+
+**Recorded here because the `#71` check requires shipped work to reach this file
+or `todo_closed.md`, and this shipped without an item.** The ID check itself
+passed — every `#NNN` referenced in the arc's commits was already present.
+
+`_MIN_IMPLIED_BOOK_TOTAL_PCT` refuses a book whose implied total is impossibly
+LOW. The opposite failure never reached that test: both it and `ev_pct` derive
+from the fair, and the fair is exactly what is missing (`ev` is guarded on
+`fair is not None`, `layer2_board.py:3329`), so `_implied_book_total_pct` read
+None, the branch was skipped, and the row ranked on a model edge with no market
+price behind it. `_no_market_price` is the mirror; `select_shortlist` now skips
+and counts it.
+
+**Served measurement**, gated on the payload's `written_at` (13:36:24Z)
+exceeding the restart (13:17:27Z), not on elapsed time:
+
+    predicate rows STILL RANKED        20 -> 0
+    rows_no_market_price           absent -> 20
+    rows_no_market_price_by_family absent -> {"ncaaf|spreads": 20}
+    rows_implausible_book (control)    38 -> 45
+
+Attribution is narrower than it looks: the same restart activated
+`fair_unresolved_reason` and the next-day horizon anchor, so ranked-row deltas
+are not this work's alone. `rows_no_market_price` is emitted nowhere else.
+
+**Why those rows exist.** Polymarket publishes both legs of an illiquid spread
+at the cap (0.98/0.99 each, overround ~1.96) — **212 of 4,967** spread-shaped
+markets in one venue capture. `_consensus_fair` correctly refuses the pair
+against `opportunity_signals._MAX_OVERROUND = 1.60`, so nothing can price the
+row. Mirroring was hypothesised and **falsified**: the venue carries two
+distinct outcomes with two independently priced legs. Detail:
+`.syndicate/findings_2026-10-19_polymarket_side_price_mirroring.md`.
+
+**A FILTER ON SELECTION, NEVER ON FETCH.** The ask was an "ingest exclusion";
+`book_shortlist`'s own header states the opposing rule — every price stays in
+`book_prices` for the CLV join, which needs the widest book overlap. The harm
+(ranked rows nothing can act on, inflating every coverage census) lives at
+selection, so that is where the exclusion landed. A true feed drop remains a
+separate change with CLV consequences and was **not** made.
+
+**Three things worth carrying forward**
+
+1. **`#379`'s "five rejection counters" is now SIX** — annotated in place above.
+   That item exists because its author read three of five; the same list going
+   stale is how it happens again.
+2. **A new `select_shortlist` field is invisible until the API names it.**
+   The counter was persisted (index `written_at` 13:29:22Z carried it) while
+   `board_layer2_shortlist_api` served none of it, because that endpoint
+   hand-builds its payload. Its own comment records this for `#373`, `#381` and
+   `#397`; this was the **fourth**. Fixed in the same arc, with a test that
+   pins both keys to the wire.
+3. **A refusal that REMOVES its rows must be attributable, not merely counted.**
+   With the rows gone the count is the only signal, so a bare total would read a
+   second affected family as "a bigger number". Hence the `sport|market`
+   breakdown.
