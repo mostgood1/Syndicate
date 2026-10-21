@@ -52658,3 +52658,14 @@ have stopped the reload, and it did not because nothing was gating on it.
   - count of `frozen=1` lines > 0 if any full refresh ran after a tip.
   - Baseline for the same reading without the fix: 10-20, 5 after_tip builds on 3 games.
 - **undo:** `SYNDICATE_SMART_SIM_TIP_FREEZE=off` in `local_production.env` + a role restart, or revert aaa988a8 and ff.
+
+## 2026-10-21 17:35Z -- 69c1af9d (todo #718 CLI data root) LIVE on the fleet via a peer's ff, not mine (lane basketball-cli-data-root)
+- User approved "run the fleet ff" / "keep waiting for CLEAR, then ff". check_deploy_safety stayed NOT CLEAR 16:36Z..17:35Z (continuous odds
+  refreshes + board builds). When it first read CLEAR (17:35:41Z, check 251), my guarded script ABORTED on its HEAD guard before taking any
+  claim: the fleet had moved 7c7acfd6 -> d1a7ffbe (fleet reflog 11:51:22 CDT = 16:51:22Z) -> aaa988a8 (16:56:40Z) by other lanes' ffs.
+  `git merge-base --is-ancestor 69c1af9d d1a7ffbe` = yes; `_CLI_DATA_ROOT_ENV` present in both fleet scripts, unmodified. No claim taken,
+  no ff, no restart by this lane (subprocess scripts: live from 16:51:22Z).
+- Verify criterion CORRECTED: "no `Built local game_cards from game_odds fallback`" was wrong -- that line follows EVERY run, OK ones
+  included (15:50Z, 16:22Z). The reading is 0 "Cannot save file into a non-existent directory" across >= 3 NBA export-game-cards runs that
+  START after 16:51:22Z (runs land in per-slate files props_2026-10-2{1,2,3}.log). Pre-fix today: 9 runs, 1 OSError (12:41:36Z -- its
+  output carries no `Z`-stamped lines, i.e. a different launcher, consistent with the cause). No post-fix run yet at 17:37Z; reading owed.
