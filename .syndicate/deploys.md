@@ -52197,3 +52197,12 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - **verify (venue + ledger, 01:35:59Z / 01:36:00Z):** GET order -> `canceled`, exchange_index 3, fill_count 0.00, remaining 0.00, last_update 01:35:39.7069Z. Ledger row c7e3a42f -> `rejected` (reconciled from the venue's word). Nothing filled; the order never traded.
 - **population:** ONE cancel (1 of 1 due, 0 failed). The shard came from the read; the caller-passes-the-shard branch and the `cancel_shard_unknown` refusal are unit-tested only. The stale-cancel path uses the same function but has not fired live since the fix.
 - **undo:** revert `d57476ec` (restores the bare DELETE, i.e. 404 on any shard but 0).
+
+## 2026-10-21T02:14:05Z -- FLEET: vendor/ leftovers REMOVED from the fleet checkout, after a final archive (lane vendor-leftovers-fleet-cleanup)
+- What: on /home/amyn/Syndicate (HEAD 3fffb430), `rm -rf vendor` after `tar -czf` of the whole dir to
+  `/home/amyn/syndicate-prod/data/_archive/vendor_leftovers_fleet_20261021T021405Z.tar.gz` (9.7M). User request.
+- Pre-checks (02:13:18Z): `git ls-files vendor` = 0; 415 files / 60M (mlb_bettingv2 181, wnba_betting_repo 181, nba_betting_repo 53;
+  234 json, 154 pyc, 27 csv); 0 written in the last 24 h; no process with cwd or an open fd under it.
+- Result: archive 415 == 415 and readable; `vendor/` absent; `git status --porcelain` hash identical before/after (a66be8de).
+- verify: the next NHL / NBA refresh writes as before (bounded watch armed; reading below when it lands).
+- Rollback: `tar -xzf` that archive in /home/amyn/Syndicate (the per-tree archives from 10-19/20 also hold these files).
