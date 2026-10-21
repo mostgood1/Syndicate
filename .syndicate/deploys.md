@@ -52451,3 +52451,20 @@ Same applies, with far lower stakes, to my own `live_lens` postponed-bucket fix:
 ## 2026-10-21 15:10Z -- ATTRIBUTION: the four non-fleet Polymarket buyingPower moves are the USER's manual activity (parent session 34fdabd0)
 - The user confirmed in chat: "Yes, those four Polymarket moves were my own manual trades/activity." This covers the four moves in the 15:00Z entry: -25.00 (10-20 17:18Z), -62.50 (10-20 22:48Z), +70.28 (10-21 04:52Z), -25.00 (10-21 14:30Z). With the per-order matches in that entry, the Polymarket buyingPower history from go-live to 14:56Z is fully attributed.
 - **Standing consequence:** compounding and the balance-derived caps read Polymarket `buyingPower` as fleet capital, so manual trades on the same account move the fleet's Polymarket bankroll and day cap. When reconciling, attribute any round-number move with no fleet SUBMIT/SELL to manual activity only after asking the user. The 10-19 Kalshi shard-1 MVE combo buy (-$24.98) was the same pattern.
+
+## 2026-10-21 15:2xZ (10:2x AM CT) -- FLEET ff 77a1790d -> 7c7acfd6 (NO restart): SGP calibration for every sport, sheet props graded from the box, NBA in-play-only pulls (lanes cheat-sheets, nba-inplay-only-pulls)
+- **user-approved in chat** ("Deploy now (Recommended)") after "yes do all of it".
+- **claims:** live-odds-worker (692aea7c), refresh-worker (f99d7509), web (f346356b), holder `nba-inplay-only-pulls`; released after this entry.
+- **ff:** `git merge --ff-only 7c7acfd6` at 15:20:41Z, guard HEAD == 77a1790d and no incoming file among the tree's locally modified
+  runtime files. Code in the gap = exactly 358e3a83 + 7c7acfd6 (no ride-alongs); every changed script runs as a fresh subprocess
+  (reconcile_cheat_sheets / grade_sgp_paper / review_cheat_sheets; fetch_basketball_oddsapi_props_local / refresh_nba_oddsapi_props /
+  refresh_odds_sources), so nothing was restarted.
+- **verify, now (SGP calibration, `grade_sgp_paper.py --sport <s>` on the fleet at 7c7acfd6, the same call the reconcile makes):**
+  nba 38 settled / 24 pending (10-20 + 10-21 ledger): hit 0.342 vs predicted 0.506, gap -0.164 (game-clustered SE 0.163, 3 games),
+  brier 0.225, `mixed` 36 at 0.333 vs 0.498; wnba 12 settled: 0.417 vs 0.623 (SE 0.311, 2 games); mlb 11 settled: 0.727 vs 0.486
+  (SE 0.244, 3 games). First graded files for all three (were never graded). Basketball pooled 18/50 vs ~0.53 predicted -- a lead
+  for basketball-sgp-builder's shrink-toward-market fix, not a verdict (5 games).
+- **verify, owed tonight:** (1) the 11:50 PM CT reconcile's `RECONCILE ncaaf ... from the box N` > 0 and `SGP_PAPER nba/wnba/mlb`
+  lines (pre-deploy replay on 10-20 NCAAF: 91 -> 128 of 147 graded, open 47 -> 0); (2) the first NBA in-play runs after tip:
+  `IN_PLAY_ONLY league=nba ... events_in_play=N` in the props log with N below the slate's remaining games, runs ok, and the served
+  NBA board still carrying the not-yet-started games' rows.
