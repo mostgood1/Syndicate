@@ -89,7 +89,16 @@ def main() -> int:
     ap.add_argument("--extra-tickers", default="", help="comma list of Kalshi tickers to poll as well (held positions)")
     a = ap.parse_args()
     if os.name == "nt":  # Idle priority: the fleet shares this host.
-        ctypes.windll.kernel32.SetPriorityClass(ctypes.windll.kernel32.GetCurrentProcess(), 0x40)
+        k32 = ctypes.windll.kernel32
+        # HANDLE is 64-bit: without these the pseudo-handle is truncated to a
+        # 32-bit int and the call fails SILENTLY (measured 2026-10-21: every
+        # recorder ran at Normal).
+        k32.GetCurrentProcess.restype = ctypes.c_void_p
+        k32.SetPriorityClass.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
+        if not k32.SetPriorityClass(k32.GetCurrentProcess(), 0x40):
+            raise SystemExit("could not set Idle priority")
+    elif hasattr(os, "nice"):
+        os.nice(19)
     sports = [s.strip() for s in a.sports.split(",") if s.strip() and s.strip() != "none"]
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
