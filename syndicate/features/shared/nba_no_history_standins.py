@@ -307,31 +307,50 @@ def standin_rows(standins: List[StandIn], *, date_str: str) -> List[Dict[str, An
     return rows
 
 
+# The rows the run's PARENT built, by (processed root, date). The sim's workers re-read props_predictions from disk and
+# must add EXACTLY the parent's rows: the reuse branch compares the pool the parent expects
+# (`_props_pool_for_teams_local(props_df)`) with the pool each worker stamps into its sim, so a worker that saw a newer
+# odds file would make every reused sim read as stale on every refresh. The fleet's pool start method is fork, so the
+# workers inherit this dict as the parent left it; a worker that finds it empty (spawn) rebuilds and says so.
+_BUILT: Dict[Tuple[str, str], List[Dict[str, Any]]] = {}
+
+
 def add_standins(props_df, *, processed_root: Path, date_str: str, league_code: str, to_tri: Callable[[Any], str],
-                 name_key: Optional[Callable[[Any], str]] = None, env: Optional[Mapping[str, str]] = None):
+                 name_key: Optional[Callable[[Any], str]] = None, env: Optional[Mapping[str, str]] = None,
+                 reuse_built: bool = False):
     """``props_df`` with a stand-in row appended per admitted player when the switch is ``on``; unchanged otherwise.
-    Never raises: any failure returns ``props_df`` as given (the pre-change pool exactly). ``name_key`` defaults to
-    the current-roster file's own key, so roster, odds and pool names are all matched one way."""
+
+    The run's parent calls it with ``reuse_built=False`` (always builds, logs ``NBA_NO_HISTORY_STANDINS``); a sim worker
+    calls it with ``reuse_built=True`` and appends the parent's rows. Never raises: any failure returns ``props_df`` as
+    given (the pre-change pool exactly). ``name_key`` defaults to the current-roster file's own key, so roster, odds
+    and pool names are all matched one way."""
     m = mode(env)
     if m == "off" or str(league_code or "").strip().lower() != "nba":
         return props_df
     try:
         import pandas as pd
 
-        if name_key is None:
-            from syndicate.features.shared.nba_current_rosters import name_key
+        key = (str(Path(processed_root).resolve()), str(date_str)[:10])
+        if reuse_built and key in _BUILT:
+            rows = _BUILT[key]
+        else:
+            if name_key is None:
+                from syndicate.features.shared.nba_current_rosters import name_key
 
-        standins, diag = build_standins(processed_root=processed_root, date_str=date_str, props_df=props_df,
-                                        name_key=name_key, to_tri=to_tri)
-        diag["mode"] = m
-        diag["detail"] = [{k: v for k, v in asdict(s).items() if k in ("player_name", "team", "minutes", "preseason_games",
-                                                                        "preseason_mean_minutes", "start_share", "lines")}
-                          for s in standins]
-        print("[nba_no_history_standins] NBA_NO_HISTORY_STANDINS " + json.dumps(diag, default=str), flush=True)
-        if m != "on" or not standins:
+            standins, diag = build_standins(processed_root=processed_root, date_str=date_str, props_df=props_df,
+                                            name_key=name_key, to_tri=to_tri)
+            diag["mode"] = m
+            if reuse_built:
+                diag["rebuilt_in_worker"] = True  # no parent rows to reuse: the pool start method is not fork
+            diag["detail"] = [{k: v for k, v in asdict(s).items() if k in ("player_name", "team", "minutes", "preseason_games",
+                                                                            "preseason_mean_minutes", "start_share", "lines")}
+                              for s in standins]
+            print("[nba_no_history_standins] NBA_NO_HISTORY_STANDINS " + json.dumps(diag, default=str), flush=True)
+            rows = standin_rows(standins, date_str=date_str) if m == "on" else []
+            _BUILT[key] = rows
+        if m != "on" or not rows:
             return props_df
-        extra = pd.DataFrame(standin_rows(standins, date_str=date_str))
-        return pd.concat([props_df, extra], ignore_index=True, sort=False)
+        return pd.concat([props_df, pd.DataFrame(rows)], ignore_index=True, sort=False)
     except Exception as exc:  # the pool without stand-ins is the safe state
         print(f"[nba_no_history_standins] NBA_NO_HISTORY_STANDINS_FAILED {type(exc).__name__}: {exc}", flush=True)
         return props_df

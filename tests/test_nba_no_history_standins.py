@@ -291,3 +291,29 @@ def test_preseason_minutes_reads_only_this_seasons_preseason_before_the_slate(pr
     got = nhs.preseason_minutes(processed, DATE)
     assert sorted(got["6442"]) == [(22.0, 1), (25.0, 1)]
     assert "888" in got and got["888"] == [(15.0, 0)]  # the slate-day regular-season game is not counted
+
+
+def test_worker_stamp_equals_the_reuse_expectation_even_if_the_odds_file_moves(processed, monkeypatch):
+    """The reuse branch expects `_props_pool_for_teams_local(parent props_df)`; each worker stamps the same function of
+    ITS props_df. They must agree or every reused sim reads as stale on every refresh. The worker appends the parent's
+    rows, so an odds file rewritten between the two reads changes nothing."""
+    from syndicate.features.shared import basketball_props_smart_sim as bpss
+
+    monkeypatch.setenv(nhs.FLAG, "on")
+    monkeypatch.setattr(bpss, "_to_tricode_local", _to_tri, raising=False)
+    props_path = processed / f"props_predictions_{DATE}.csv"
+    _props_df().to_csv(props_path, index=False)
+    parent = nhs.add_standins(pd.read_csv(props_path), processed_root=processed, date_str=DATE, league_code="nba",
+                              to_tri=_to_tri)
+    # the odds file is rewritten mid-run: Kyrie's line is gone
+    (processed / f"oddsapi_player_props_{DATE}.csv").write_text("snapshot_ts,market\n", encoding="utf-8")
+    bpss._smart_sim_worker_init_local(DATE, 100, 1, False, str(props_path), "historical", "nba", {}, {}, {}, {}, {})
+    worker = bpss._SMARTSIM_WORKER_STATE["props_df"]
+    teams = ("HOU", "DAL")
+    assert "Kyrie Irving" in set(worker["player_name"])
+    assert bpss._props_pool_for_teams_local(worker, teams) == bpss._props_pool_for_teams_local(parent, teams)
+    # and a worker with no parent rows (spawn) rebuilds from what it sees -- logged as such
+    nhs._BUILT.clear()
+    rebuilt = nhs.add_standins(pd.read_csv(props_path), processed_root=processed, date_str=DATE, league_code="nba",
+                               to_tri=_to_tri, reuse_built=True)
+    assert "Kyrie Irving" not in set(rebuilt["player_name"])
