@@ -69,7 +69,7 @@ death, never life — do not invert it.
 
 ### live-min-stake-five â OPEN â opened 2026-10-21 â session 332cb014 (live-trading coordinator, handover from 34fdabd0)
 - Goal: every live position is at least $5 [user, confirmed directly in 332cb014's chat ~21:45Z: "Lift to $5"]. Kalshi/plan side: remove `SYNDICATE_LIVE_SMALL_EDGE_FRACTION` from the fleet env, so the $5-10 band sizes every position (option C's one-contract line goes away). Polymarket: a floor in `_price_at_ask` lifts the kelly_ratio-shrunk stake back to min($5, planned stake), behind `SYNDICATE_POLYMARKET_AT_ASK_MIN_STAKE_DOLLARS` (absent = off). Per-order cap, balance day caps and heavy-favourite cap C stay in force.
-- Files: syndicate/features/shared/polymarket_us_orders.py (`_price_at_ask` ONLY), tests/test_polymarket_at_ask_min_stake.py (NEW)
+- Files: syndicate/features/shared/polymarket_us_orders.py (LOAN from min-ev-tuner-shadow, 5244eb59; `_price_at_ask` stake floor after the Kelly check + new `_at_ask_min_stake` helper ONLY), tests/test_polymarket_at_ask_min_stake.py (NEW)
 - Hypothesis: the sub-$1 fills (49 of 63 on 10-21) come from exactly two sources, the small-edge line and the at-ask resize; falsified if a sub-$5 live order appears after the change on a non-capped row.
 - Falsification test: count live orders with stake < $5 after the restart, excluding favourite-cap and cash-trim rows, from the LIVE_ORDER lines.
 - Verification: first LIVE_PLAN_WRITTEN after the restart with no sub-$5 band position; first Polymarket POLYMARKET_PRICED_AT_ASK decision=place with stake >= min(5, planned).
