@@ -1186,6 +1186,7 @@ death, never life — do not invert it.
 - Blocked by: none
 - **2026-10-20 Kalshi cancel fix landed `d57476ec`** (user: "find the correct Kalshi V2 cancel endpoint ... fix kalshi_orders.cancel_order with tests, and propose a one-order live test"). Not on the fleet; not proven live. Next: user's yes on a one-order live test.
 - **CANCEL FIX VERIFIED LIVE 2026-10-21 01:35Z** (user: "read the first CANCEL_STALE / CANCEL_AT_KICKOFF result and confirm the order reads canceled"): kickoff cancel sent `?exchange_index=3&market_ticker=...SAS21`, KICKOFF_CANCEL_PASS cancelled=1 failed=0; venue reads `canceled` (fill 0, remaining 0); ledger row c7e3a42f `rejected`. One cancel; the stale path has not fired live since. deploys.md entry 2026-10-21 01:35Z.
+- **HEAVY-FAVOURITE CAP C LIVE 2026-10-21 16:06Z** (user yes): env-only full down/up at 7c7acfd6; first build 16:23:44Z kalshi favourite_cap=True favourite_capped=5 refused stake_band_heavy_favourite=1, polymarket favourite_capped=1. deploys.md entry 2026-10-21 16:05Z.
 - **CROSS-LANE NOTE 2026-10-20 18:50Z (lane paper-alongside-live):** pipeline/portfolio_commit.py gained a PAPER LADDER block AFTER `_write_live_venue_plan`'s try in run_portfolio_commit's venue loop (own guard). Your compounding step is untouched; the live plan is byte-identical with the ladder on/off (tests/test_paper_ladder.py).
 
 ### min-ev-tuner-shadow — OPEN — opened 2026-10-19 — session b98807bc-5652-4301-be8c-d5f7bf07b55f
