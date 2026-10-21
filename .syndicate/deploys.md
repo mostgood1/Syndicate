@@ -52468,3 +52468,57 @@ Same applies, with far lower stakes, to my own `live_lens` postponed-bucket fix:
   lines (pre-deploy replay on 10-20 NCAAF: 91 -> 128 of 147 graded, open 47 -> 0); (2) the first NBA in-play runs after tip:
   `IN_PLAY_ONLY league=nba ... events_in_play=N` in the props log with N below the slate's remaining games, runs ok, and the served
   NBA board still carrying the not-yet-started games' rows.
+
+### CORRECTION 2026-10-21T15:25Z (10:25 CDT) to the 14:38:11Z fleet-ff entry above — the "INERT" finding was WRONG, and the dedupe IS live
+
+`[lane ci-suite-four-stale-1021, session 4ab694ed]`
+
+The entry above claims the live venue-contract dedupe is inert on the running
+live-odds-worker. **That is wrong.** Not retracted and left blank — here is the
+reading that replaces it, and the error that produced it.
+
+**What is actually true, by predicate rather than by uptime:**
+
+- The live-odds-worker **self-restarted at 2026-10-21T14:48:26Z**, ten minutes
+  AFTER the ff (14:38:11Z). Old pid `3327060`, now pid **`3413037`**. Boot time
+  computed as `now_utc - etimes`, which has no timezone in it.
+- **The bytecode it loaded contains the fix.**
+  `pipeline/__pycache__/execute_portfolio.cpython-311.pyc` mtime **14:49:35Z**
+  and `syndicate/features/shared/__pycache__/execution_ledger.cpython-311.pyc`
+  mtime **14:48:29Z** — both after the ff wrote the sources (both source mtimes
+  14:38:10Z), so CPython recompiled the new source rather than reusing a cached
+  module. `strings` on those two `.pyc` files finds the dedupe symbols
+  (`held_venue_contract_for` / `REFUSAL_HELD_VENUE_CONTRACT` /
+  `already_held_venue_contract`) **2×** and **3×** respectively.
+- **That worker is executing with it.** Since 14:48:26Z its log carries 26
+  `[execute_portfolio] LIVE_PRICE`, 8 `EXECUTED`, 1 `LIVE_ORDER` and 24
+  `REFUSED_HELD_OTHER_SLATE` — the latter being the sibling refusal from the
+  same commit, so the new module's refusal paths are demonstrably running.
+
+**No restart was performed.** The user asked for one at 15:2xZ on the strength
+of the wrong finding; the restart's only purpose was to load this code, it is
+loaded, and a restart would have killed in-flight execution for no gain. Said
+back rather than done.
+
+**THE ERROR, because it is reusable.** `ps -o lstart=` prints **LOCAL** time and
+this container runs **CDT**. I piped it into `date -u -d`, which parsed that
+local string as if it were UTC and printed it back 5 hours early: I recorded the
+worker as booting `08:48:13Z` when it booted `13:48:13Z`. `ps -o etimes=` in the
+same breath said `51:58`, which contradicts it — **I had the disproof in the
+same command's output and did not read it.**
+
+Everything downstream followed from that one shift: with boot at 13:48:13Z the
+process booted **after** the 13:38:41Z/13:38:50Z duplicate orders, so it never
+placed them, so the inference "it placed them, therefore it holds the old module
+in `sys.modules`" was unfounded from the start. The duplicates were placed by a
+still-earlier process.
+
+**What IS still running pre-ff code** (stated so this correction does not
+overshoot in the other direction): refresh-worker pid `3258427` (booted
+08:43:53Z) and two of three gunicorn workers — `3158840` (02:11:54Z) and
+`3407327` (14:23:58Z); the third, `3414820`, booted 14:54:18Z and has the new
+code. Their delta across this ff is comment/docstring-only plus my own
+`live_lens` postponed-bucket fix, so the live consequence is that the MLB
+live-lens `counts.postponed` answer depends on which web worker serves the
+request — and only when a postponed game is on the slate. Not worth a restart;
+it resolves on the next natural recycle.
