@@ -1615,6 +1615,11 @@ death, never life — do not invert it.
 - Falsification test: n/a (measured); the fix is wrong if a tipped game with an existing sim is still rebuilt with the switch absent, or a pre-tip game is frozen
 - Verification: tests: off != on on the real _smart_sim_run_date_local loop (tipped + stale exclusions -> rebuilt off, kept on; pre-tip -> rebuilt either way; overwrite=True unaffected; missing file built). Production: after the fleet ff, the 10-21+ props logs show SMART_SIM_TIP_FREEZE frozen=1 for tipped games and scripts/basketball_posttip_rebuilds.py counts 0 after_tip builds for the slate; deploys.md entry.
 - Blocked by: none
+- BUILT 2026-10-21 ~12:10 PM CT: main aaa988a8 (smart_sim_tip_freeze.py + one loop block + 12 tests + scripts/basketball_posttip_rebuilds.py), NOT on the fleet.
+  - Tests: off != on on the real loop (WNBA, NBA 10-20 shape, targeted trigger). The neighbouring suites pass: 136 tests.
+  - Replay of the decision on every logged production build: post-tip kept 10/10 NBA + 1/1 WNBA, pre-tip frozen 0/193.
+  - Findings: findings_2026-10-21_post_tip_rebuilds.md. todo #720, state [basketball-smart-sim-tip-freeze].
+  - OWED: a fleet ff (user approval), then the first-slate reading named in Verification.
 
 ### live-clv-contract-units — OPEN — opened 2026-10-21 — session 3bd0b2d4
 - Goal: todo #719: CLV reads live contract fill prices (0.65) as American odds; convert at prediction_ledger._clv_pct_from_prices so order_clv / position_marks / clv_join all get it

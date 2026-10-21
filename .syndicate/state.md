@@ -484,6 +484,7 @@ once this index exists: re-splitting would orphan the parts.
 | [basketball-props-refresh-off-vendor] | BASKETBALL PROPS REFRESHES: vendored uses retired path by path; WNBA history now tracks the schedule `[verifie | `state_basketball.md` |
 | [nba-current-rosters] | THE NBA SMARTSIM RAN 2025-26 ROSTERS ON OPENING NIGHT; THE FIX (ESPN CURRENT ROSTERS) IS BUILT AND SCRATCH-VER | `state_basketball.md` |
 | [nba-no-history-standins] | NBA PRICED PLAYERS WITH NO player_logs HISTORY: A MARKET-IMPLIED STAND-IN IS ON MAIN, DEFAULT OFF, NOT ON THE  | `state_basketball.md` |
+| [basketball-smart-sim-tip-freeze] | A BASKETBALL SMARTSIM IS FROZEN AT TIP -- built and replay-verified, ON BY DEFAULT IN CODE, NOT ON THE FLEET | `state_basketball.md` |
 | [board-freshness] | BOARD FRESHNESS AND STALENESS | `state_board.md` |
 | [board-intelligence-engine] | BOARD / INTELLIGENCE ENGINE — structural facts, archived — **ARCHIVED 2026-08-19 to `state_archive_2026-08-19. | `state_board.md` |
 | [locked-cards-retuned-no-autorun] | `locked_cards_retuned` HAS NO AUTOMATIC TRIGGER, ANYWHERE `[measured 2026-08-18]` | `state_board.md` |
