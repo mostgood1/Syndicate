@@ -3755,3 +3755,30 @@ total bias held.
 foul-outs, i.e. through the bonus non-shooting rate (FT trips that go to the fouled team, PF spread over the
 lineup) rather than shooting fouls. The target is the FIT-wide real, measured on the 12 dates by the paired shift.
 Then the full FIT again.
+
+### ROUND-2 FTA FIX — PRE-REGISTRATION 2026-10-21 01:32Z (user go-ahead in chat)
+
+**Aim:** on the FIT, raise FTA by about +0.40 per team (fit_r2 22.73 vs real 23.14, non-OT), bring team PF from
+19.92 toward 19.67, and lower foul-outs below 0.2334.
+
+**Lever:** non-shooting volume only. Raise `bonus_nonshoot_foul_per_poss` (FT trips) and lower
+`base_nonshooting_foul_per_poss` (PF only), so FTA rises at constant PF. The shooting-foul model is untouched.
+
+**Targets on the 12 sweep dates, set by the paired shift** (the 12-date values move the same as the FIT values;
+PKR3_check is the base, and its FIT twin is fit_r2):
+- FTA (S6, all games) = 22.64 + 0.40 = **23.04 ± 0.15**;
+- team PF = 19.82 − 0.25 = **19.57 ± 0.3**;
+- foul-outs ≤ **0.223** (0.01 of margin under the FIT band; on 12 dates PKR3 is .233 vs FIT .2336);
+- step-3 guards (3PA within CI, trips 2-shot / and-one / 3-shot within ±10% of PKR3, quarter shares within CI).
+
+**Grid** (4 runs, the PKR3_check config otherwise, the stale s/X, total bias NOT gated here): bonus ∈ (0.065, 0.07) ×
+base ∈ (0.02, 0.025).
+
+**Pick:** among the runs that pass, the smallest |FTA − 23.04|/.15 + |PF − 19.57|/.3; ties go to the smaller bonus.
+
+**If none pass on foul-outs alone:** record it, stop, and propose a foul-trouble lever (`foul_trouble_foul_mult`) as
+its own step.
+
+**Then, at the pick:** re-measure s and X on the #3j dates, the 12-date check (|bias| < 0.5 + the gates above), and
+ask the user before the full FIT. The full FIT gates are unchanged: FTA ± 0.3 of 23.14 (non-OT), PF ± 0.4 of 19.67,
+foul-outs 0.193 ± 0.04, |bias| < 0.5.
