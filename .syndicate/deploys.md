@@ -52804,3 +52804,45 @@ have stopped the reload, and it did not because nothing was gating on it.
 - **UNDO:**
   - Back to the all-rows floor: `git revert d0f05d9f`, ff the fleet, then a gated refresh-worker TERM.
   - Floor off entirely: delete both `REFRESH_WORKER__SYNDICATE_LIVE_NET_FLOOR_*` lines from `~/syndicate-prod/local_production.env`, then a full down/up under all three claims (see the 18:12:20Z entry).
+
+## 2026-10-21 20:48:05Z (3:48 PM CT) -- FLEET ff d0f05d9f -> 6e406101 (NO restart): the NBA SmartSim's market anchor follows the market up to tip (lane `nba-sim-anchor-staleness`, session fe168a0f, todo #721)
+- **User approval, in chat (AskUserQuestion):**
+  - "Refresh, on by default (Recommended)";
+  - "Yes, ff when green";
+  - then, on the ride-along question: "Wait for its deploy (Recommended)".
+- **Ride-alongs: NONE.** The ff waited until venue-native-selection had landed d0f05d9f on the fleet: a watcher saw
+  HEAD d0f05d9f at 20:27:46Z, and that lane's claim was released before mine.
+  - The gap was exactly 6e406101: 5 files, all mine (`smart_sim_anchor_refresh.py`, the 4 hooks in
+    `basketball_props_smart_sim.py`, the test, the measurement script, and todo.md).
+  - 0 of them are among the fleet tree's dirty files.
+- **Claims (holder `nba-sim-anchor-staleness`, 20:47:43Z):**
+  - refresh-worker e0c32880;
+  - live-odds-worker 3483c9a7;
+  - web ea2800f6.
+- **Guard:** HEAD was read in a SEPARATE call == d0f05d9f, and re-checked inside the ff script. Then
+  `git merge --ff-only 6e406101` at 20:48:05Z.
+- **Why no restart:** the change is read by `_smart_sim_run_date_local`, inside the per-run props refresh
+  subprocess. The next run imports it.
+- **Switch:** `SYNDICATE_NBA_SIM_ANCHOR_REFRESH` is ABSENT, which means ON. Checked as a boolean only:
+  - from `local_production.env`;
+  - from `alerts.env`;
+  - from all 7 running python processes;
+  - and `ar.mode()` == `on` on fleet code.
+- **Smoke on fleet code (20:48Z, read-only):**
+  - 10-21: `fresh_lines` resolves 11/11 games from the 20:40:03Z snapshot, and all 11 sims are >= 1.0 pt off their
+    stored 10-19 line.
+  - 10-22: 2 games resolve; 1 sim (OKC_DEN) is off.
+- **Expect (prediction):** the first full NBA props refresh after 20:48Z, for 10-21, logs:
+  - `SMART_SIM_ANCHOR_REFRESH league=nba date=2026-10-21 mode=on games=11 ... reason=ok`;
+  - `SMART_SIM_REUSE_ANCHOR_DRIFT ... -> re-simulate` for the drifted sims, unless the tip freeze keeps them;
+  - `SMART_SIM_ANCHOR_LINE` per job.
+  The rebuilt `smart_sim_2026-10-21_*.json` then carry `market_anchor.market_line_source = props_snapshot_consensus`,
+  a `market_line_as_of` before tip, and `market_total` / `market_spread` equal to that snapshot's modal line. If
+  that refresh starts after ~5:40 PM CT, the earliest games are frozen at tip with the old line, by design.
+- **Verify (OWED):**
+  - read those log lines;
+  - count the 10-21 sims with `market_line_source` set, and read their `market_line_as_of` vs tip;
+  - `scripts/basketball_posttip_rebuilds.py --since 2026-10-21` still shows 0 `after_tip`.
+- **Undo:** `SYNDICATE_NBA_SIM_ANCHOR_REFRESH=off` (or `shadow`) in `local_production.env`, plus a role restart:
+  the env file is read at supervisor start only. Or `git revert 6e406101` and ff, with no restart.
+- **Claims:** released after this entry.
