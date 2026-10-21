@@ -11,8 +11,8 @@ Same rules as state.md: when a fact changes, EDIT THE LINE.
   per-league FITTED promoted-club prior** (`loaders.RatingV2`, `build_soccer_artifacts._rating_v2`,
   `RATING_V2_PROMOTED_PRIOR`). It replaces the hard few-match gate for the 8 measured leagues (big 5, eredivisie,
   primeira_liga, belgian_pro_league); MLS and the Championship are unchanged. **OFF unless
-  `SYNDICATE_SOCCER_RATING_V2=1`** (`73ba5d79`): absent means OFF until the real-sim A/B passes, and the plan is
-  then to flip the code default. Verified: identity with the research CUM arm is exact (1,620 sides, max err 0),
+  `SYNDICATE_SOCCER_RATING_V2=1`** (`73ba5d79`): absent means OFF. **Kept on main, switched off, by user decision
+  2026-10-21** for a possible sim-native refit; lane CLOSED. Verified: identity with the research CUM arm is exact (1,620 sides, max err 0),
   and 9 hermetic tests pass (`tests/test_soccer_rating_v2.py`).
 - **Evidence for V2 (linear Poisson link, not the sim):** −0.0019 [−0.0031, −0.0009] 1X2 log loss on 27,285
   held-out domestic matches; gap to the de-vigged close +0.0221 → +0.0202 (9% closed)
