@@ -52254,3 +52254,11 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - **restart:** gate = 0 unacknowledged live orders + 0 live-odds children; both 0 immediately (morning). TERM **12:47:25.996Z**, new pid **3307467** at 12:47:39Z, env still SYNDICATE_EXIT_MODE=live, EXIT_LIVE_ARMED=1, rules take_profit, max 5/day.
 - **READING:** `2026-10-21T12:49:12.218Z [live_odds_worker] EXIT_TICK status=ok mode=live positions=376 live=45 by_venue={'kalshi': 341, 'polymarket': 35} pm_quoted=21 quoted=237 quote_errors=0 ... live_exits={'rule_not_armed': 4} venue=ok mismatches=0`. Four model_fair-only triggers were refused live and booked paper. UTC 10-21's cap is already 5/5 ($16.17), so no live sale is possible before 00:00Z regardless.
 - **owed:** (1) a YES-leg live sale under the fixed code, recorded at the venue's price (next one after 00:00Z). (2) **DEL4 entry correction**: the graded pnl -2.0177 was computed from 0.35; truth is about +1.2823. The code fix does not regrade an already-graded row, and correcting the money record is the user's decision (asked, not yet answered).
+
+
+## 2026-10-21 13:11:45Z -- READING (matchday): UEFA Kalshi coverage on the served grid HOLDS (lanes uefa-oddsapi-club-aliases / kalshi-event-scoped-codes / kalshi-join-all-game-lines / uefa-kalshi-elim-aliases, session 436c79e2)
+- Fleet HEAD d76c85ce; refresh-worker started 2026-10-21T08:43:52Z (contains every UEFA join change: f39133f8, 71631544, 76ef318c + env flag, 81e81501).
+- **10-21 grid** (UCL matchday, built 13:03:47Z): fixtures in the current odds files with a Kalshi quote: **UCL 11 / 11, UEL 18 / 18, UECL 18 / 18** (all h2h).
+  - UCL now lists 11 fixtures because the 10-20 games finished and rolled out of `game_odds_current.csv`.
+- **10-22 grid** (UEL / UECL matchday, built 12:57:42Z): **UEL 18 / 18, UECL 18 / 18** (all h2h). UCL there reads 2 / 11, because that is not a UCL date.
+- Nothing owed. The UEFA pages stay market-only (#699 NO-GO).
