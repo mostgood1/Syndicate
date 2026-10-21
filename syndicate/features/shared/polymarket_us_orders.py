@@ -1190,6 +1190,21 @@ def _price_at_ask_enabled() -> bool:
     return str(os.environ.get(_PRICE_AT_ASK_ENV) or "").strip().lower() in ("1", "true", "yes", "on")
 
 
+_AT_ASK_MIN_STAKE_ENV = "SYNDICATE_POLYMARKET_AT_ASK_MIN_STAKE_DOLLARS"
+
+
+def _at_ask_min_stake() -> float | None:
+    """The at-ask stake floor in dollars, or None when unset or not a positive number."""
+    raw = str(os.environ.get(_AT_ASK_MIN_STAKE_ENV) or "").strip()
+    if not raw:
+        return None
+    try:
+        value = float(raw)
+    except ValueError:
+        return None
+    return value if 0 < value < float("inf") else None
+
+
 def _kelly_fraction(p_model: float, cost: float) -> float:
     """Full Kelly for a binary contract bought at `cost` that pays $1: (p - c) / (1 - c)."""
     if not 0.0 < cost < 1.0:
@@ -1284,6 +1299,17 @@ def _price_at_ask(request: Any, body: Mapping[str, Any], fields: Mapping[str, An
     facts.update(kelly_ratio=round(ratio, 4), planned_stake=planned_stake, stake=stake)
     if stake <= 0:
         refuse("ask_kelly_non_positive", f"kelly_ratio={ratio:.4f}")
+    # THE $5 MINIMUM [user 2026-10-21, "Lift to $5", lane live-min-stake-five]: the
+    # Kelly shrink above turned $5 plan stakes into sub-$1 orders, where the fee is
+    # ~2x its share at $5+. The floor lifts the stake back to min(floor, planned):
+    # never above the planned stake, which `check_order` has already charged
+    # against every cap. A refusal above still refuses. Absent = off.
+    floor = _at_ask_min_stake()
+    if floor is not None and stake < floor:
+        lifted = round(min(floor, planned_stake), 2)
+        if lifted > stake:
+            facts.update(stake=lifted, min_stake_lifted_from=stake)
+            stake = lifted
 
     priced = dict(fields)
     priced.update(price_dollars=ask[0], stake_dollars=stake, max_quantity=ask[1])
