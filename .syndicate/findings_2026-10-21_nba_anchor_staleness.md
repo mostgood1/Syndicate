@@ -146,3 +146,21 @@ The gain lands in the sim's own outputs. It reaches priced lines only through a 
    on most games.
 3. **`predictions_<D>.csv`'s market columns** (`market_home_margin`, `edge_spread`, `edge_total`) carry the same
    stale line to every reader of that file.
+
+## 8. Decision and build
+
+- **User, 2026-10-21 (AskUserQuestion):** "Refresh, on by default (Recommended)" and "Yes, ff when green".
+  - On the ride-along question that followed: "Wait for its deploy (Recommended)".
+- **Built in 6e406101:** `syndicate/features/shared/smart_sim_anchor_refresh.py` and four hooks in
+  `basketball_props_smart_sim.py`:
+  - the fresh-line load before the per-game loop;
+  - the last reuse condition;
+  - the job-line override;
+  - the worker's `market_line_source` / `market_line_as_of` stamp.
+- **Tests:** 14 new in `tests/test_smart_sim_anchor_refresh.py`, with off != on on the real loop. 193 pass across 17
+  neighbouring suites.
+- **Shadow dry run, fleet code against the fleet's 10-21 snapshot (11:14 AM CT):** 9 of 11 sims are 1 pt or more
+  off the stored line. 10-23's snapshot (6:03 AM CT) was correctly ignored, because it is not newer than its
+  predictions file (6:04 AM CT).
+- The script gained `--stale-from game_odds`, for the pre-registered regular-season reading once sims carry the
+  refreshed line.

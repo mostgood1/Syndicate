@@ -1264,3 +1264,32 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
 - **Fleet:** ff d1a7ffbe -> aaa988a8 at 16:56:40Z (11:56 AM CT), no restart (per-run subprocess). Smoke on fleet code: mode on (key absent from env file and every role), 11/11 NBA + 1/1 WNBA 10-21 tips resolve (deploys.md 2026-10-21 16:56:40Z).
 - **Production reading owed:** after the ff, the first NBA slate. Expect `SMART_SIM_TIP_FREEZE ... frozen=1` lines, `scripts/basketball_posttip_rebuilds.py --since <D>` -> 0 `after_tip`, and engine_inputs mtimes <= tip.
 - Findings: `findings_2026-10-21_post_tip_rebuilds.md`. Found on the way, not acted on: the sim's market anchor is a ~D-1 line, never refreshed (§5.1).
+
+## [nba-sim-anchor-refresh] THE NBA SMARTSIM'S MARKET ANCHOR WAS A D-2 LINE, NEVER REFRESHED; THE REFRESH IS BUILT (6e406101, switch absent = on), FLEET ff WAITING ON venue-native-selection's d0f05d9f `[2026-10-21, lane nba-sim-anchor-staleness, todo #721]`
+- **Cause (code):** the job's line is `predictions_<D>.csv`'s (fallback `game_odds_<D>.csv`).
+  - `predict-date` writes both with `consensus_lines_at_close`: the modal point across books.
+  - The props refresh's D+2 lookahead makes that line ~D-2: 10-21's was written 10-19 3:04 AM CT, ~63 h before tip.
+  - `_ensure_game_predictions_for_props_refresh` reuses any predictions file that has rows, the game_odds seeder only appends, and no reuse check compared odds.
+- **Measured (fleet, `scripts/nba_anchor_staleness.py`, read 12:47 PM CT):**
+  - Method check: the book_quotes modal consensus at write time equals the anchor on 66/74 (8 misses, 7 of them 0.5 pt). The anchor arithmetic reproduces 74/74.
+  - Staleness, preseason (56 games): spread median 1.0, p90 5.0; 25 games moved 2 pts or more.
+  - Staleness, regular season: DET_BOS -1.5 -> +1.5, SAS_OKC -2.5 -> +1.5.
+- **Accuracy, 59 graded games (56 preseason + 3 regular):** the near-close anchor cuts
+  - served margin MAE -0.97 ± 0.36;
+  - served total MAE -0.39 ± 0.18;
+  - with the close taken 30 min before tip: -0.86 ± 0.34 / -0.37 ± 0.16.
+  - Pass-through, anchored -> served mean: slope 1.03 ± 0.08 (total), 0.94 ± 0.07 (margin).
+- **Reach:** Layer 2 weights the sim 0 (spreads, h2h) / 0.05 (totals) on regular-season game lines (`nba_game_book_blend.json`), so the gain lands mostly in the sim's own outputs: cards, the live re-sim's starting state, and props (unmeasured, small).
+- **Code (6e406101):** `smart_sim_anchor_refresh.py` + 4 hooks in `basketball_props_smart_sim.py`.
+  - `fresh_lines`: this run's props snapshot through `consensus_lines_at_close`. In-play rows are dropped; a snapshot no newer than the predictions file is ignored.
+  - `anchor_current`: the last reuse condition. A pregame sim 1.0 pt or more off is rebuilt; the tip freeze runs first.
+  - `override`: the job takes the fresh line.
+  - The sim stamps `market_anchor.market_line_source` / `market_line_as_of`.
+  - Switch `SYNDICATE_NBA_SIM_ANCHOR_REFRESH`: absent = on, `shadow`, `off`. `..._MIN_PTS` default 1.0. NBA only.
+- **Verified:** 14 tests (off != on on the real loop). 193 pass across 17 neighbouring suites. Shadow dry run on the fleet's 10-21 snapshot (11:14 AM CT): 9 of 11 sims 1 pt or more off.
+- **Deploy:** user approved "ff when green". Then, on the ride-along question: "Wait for its deploy".
+  - The ff waits until venue-native-selection lands d0f05d9f (live net floor scope, `pipeline/portfolio_commit.py`) on the fleet; then aaa988a8.. -> 6e406101 with no foreign code.
+  - Cutoff for tonight's slate: ~5:30 PM CT.
+  - The key is absent from `local_production.env` and from all 7 running python processes (boolean check), i.e. on.
+- **Owed:** the ff; a first-slate reading (see todo #721); the pre-registered regular-season reading at ~100 games (`--stale-from game_odds`).
+- Findings: `findings_2026-10-21_nba_anchor_staleness.md`.
