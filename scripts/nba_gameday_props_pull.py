@@ -14,7 +14,11 @@ WHAT. On a day with NBA games still to start, make one forced NBA pregame pull t
   - when the day's snapshot is under `--min-age-minutes` old, because something else just pulled;
   - when an NBA props job is already running.
 Cost is one event call per game on the slate. ~60 credits were ESTIMATED for 3 games on 10-19; it is not metered,
-because the quota ledger carries no NBA line. The key comes from `--env-file` into the child's env only, never printed.
+because the quota ledger carries no NBA line.
+
+ENV. The pull runs with the running live-odds-worker role's env (read from /proc, never printed) -- the env that role's
+own odds jobs run this command with -- and refuses when no role is running. `--env-file` supplies ODDS_API_KEY only if
+the role env has none.
 """
 from __future__ import annotations
 
@@ -93,6 +97,34 @@ def props_job_running() -> bool:
     return bool(out.strip())
 
 
+#: The role whose odds jobs run this same orchestrator command. Its env is what `local_production.py` derived for it at
+#: boot (blueprint + live import + local file + forced keys, plus the logstamp path), so a pull made with it is the
+#: role's own pull. The scheduled tasks launch this script from a bare login shell, and with that env the props run
+#: lacked NBA_BETTING_DATA_ROOT, the local memory limit and the log stamps (lane gameday-pull-role-env, todo #718).
+ROLE = "live-odds-worker"
+ROLE_SCRIPT = "run_live_odds_refresh_worker.py"
+
+
+def role_env(proc_root: Path = Path("/proc"), role_script: str = ROLE_SCRIPT) -> dict[str, str] | None:
+    """The running role process's env, read as a dict (never printed), or None when no such process is readable."""
+    try:
+        pids = sorted((p for p in proc_root.iterdir() if p.name.isdigit()), key=lambda p: int(p.name))
+    except OSError:
+        return None
+    for pid in pids:
+        try:
+            argv = [a.decode("utf-8", "replace") for a in (pid / "cmdline").read_bytes().split(b"\0") if a]
+            if len(argv) < 2 or "python" not in Path(argv[0]).name or not any(Path(a).name == role_script for a in argv[1:3]):
+                continue
+            raw = (pid / "environ").read_bytes()
+        except OSError:
+            continue
+        env = dict(item.decode("utf-8", "replace").split("=", 1) for item in raw.split(b"\0") if b"=" in item)
+        if env:
+            return env
+    return None
+
+
 def pull_command(day: str, python: str = sys.executable) -> list[str]:
     return [python, "scripts/refresh_odds_sources.py", "--date", day, "--sports", "nba", "--phase", "pregame",
             "--force-refresh", "--json"]
@@ -102,7 +134,7 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--data-root", default=os.environ.get("SYNDICATE_DATA_ROOT") or "")
     ap.add_argument("--date", default=None, help="the slate day (default: today in Central)")
-    ap.add_argument("--env-file", default=None, help="read ODDS_API_KEY from this file into the child env (it wins)")
+    ap.add_argument("--env-file", default=None, help="read ODDS_API_KEY from this file only if the role env has none")
     ap.add_argument("--min-age-minutes", type=float, default=60.0)
     ap.add_argument("--min-lead-minutes", type=float, default=10.0)
     ap.add_argument("--dry-run", action="store_true", help="decide and print; no pull")
@@ -120,16 +152,25 @@ def main(argv: list[str] | None = None) -> int:
     print(f"NBA_GAMEDAY_PULL {stamp} day={day} {'PULL' if pull else 'SKIP'}: {why}", flush=True)
     if not pull or args.dry_run:
         return 0
-    env = dict(os.environ, SYNDICATE_DATA_ROOT=str(args.data_root))
-    if args.env_file:
+    env = role_env()
+    if env is None:
+        # Never fall back to this shell's env: that is the pull this replaced.
+        print(f"NBA_GAMEDAY_PULL REFUSING: no running {ROLE} role process to take the env from (fleet down?)", flush=True)
+        return 2
+    role_root = str(env.get("SYNDICATE_DATA_ROOT") or "").strip()
+    if Path(role_root or "/nonexistent").resolve() != Path(args.data_root).resolve():
+        print(f"NBA_GAMEDAY_PULL REFUSING: the {ROLE} role's SYNDICATE_DATA_ROOT is not --data-root", flush=True)
+        return 2
+    if not str(env.get("ODDS_API_KEY") or "").strip() and args.env_file:
         sys.path.insert(0, str(REPO_ROOT / "scripts"))
         from fetch_alt_ladders import key_from_env_file
 
         key = key_from_env_file(Path(args.env_file))
         if not key:
-            print("NBA_GAMEDAY_PULL REFUSING: no ODDS_API_KEY in --env-file", flush=True)
+            print("NBA_GAMEDAY_PULL REFUSING: the role has no ODDS_API_KEY and --env-file has none", flush=True)
             return 2
         env["ODDS_API_KEY"] = key
+    print(f"NBA_GAMEDAY_PULL env: {ROLE} role ({len(env)} keys)", flush=True)
     started = time.monotonic()
     result = subprocess.run(pull_command(day), cwd=str(REPO_ROOT), env=env, capture_output=True, text=True, timeout=1800)
     after = snapshot_age_minutes(processed, day, time.time())
