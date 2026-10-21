@@ -52447,3 +52447,7 @@ Same applies, with far lower stakes, to my own `live_lens` postponed-bucket fix:
     - 2026-10-21 14:30Z: 553.59 -> 528.59 (**-25.00**)
   - **Believed, unverified:** the four look like manual app activity, the same pattern as the 10-19 Kalshi shard-1 MVE combo buy. Not checked against Polymarket's own account history. The pending $550 deposit is not separated in `buyingPower` either.
 - **Effect on the fleet:** compounding/caps read this buyingPower as Polymarket capital, so non-fleet trades move the fleet's Polymarket bankroll and day cap.
+
+## 2026-10-21 15:10Z -- ATTRIBUTION: the four non-fleet Polymarket buyingPower moves are the USER's manual activity (parent session 34fdabd0)
+- The user confirmed in chat: "Yes, those four Polymarket moves were my own manual trades/activity." This covers the four moves in the 15:00Z entry: -25.00 (10-20 17:18Z), -62.50 (10-20 22:48Z), +70.28 (10-21 04:52Z), -25.00 (10-21 14:30Z). With the per-order matches in that entry, the Polymarket buyingPower history from go-live to 14:56Z is fully attributed.
+- **Standing consequence:** compounding and the balance-derived caps read Polymarket `buyingPower` as fleet capital, so manual trades on the same account move the fleet's Polymarket bankroll and day cap. When reconciling, attribute any round-number move with no fleet SUBMIT/SELL to manual activity only after asking the user. The 10-19 Kalshi shard-1 MVE combo buy (-$24.98) was the same pattern.
