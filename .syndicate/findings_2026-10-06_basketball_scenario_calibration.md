@@ -3810,3 +3810,23 @@ foul-outs and misses FTA by 0.03. So, per the rule, stop. No pick.
   foul-outs ≈ .215–.224);
 - (b) a foul-trouble lever (`foul_trouble_foul_mult`; P(6th | 5th) is .224 vs real .212) that lowers foul-outs at
   fixed volume, with bonus .065 / base .025 or .070 / .020.
+
+### ROUND-2 FTA FIX, INTERPOLATED GRID — PRE-REGISTRATION 2026-10-21 12:44Z (user choice in chat)
+
+**Predicted slopes** (from the first grid), per +.001:
+- bonus: FTA +.074, PF +.090, foul-outs +.0044;
+- base: FTA +.024, PF +.094, foul-outs +.0052.
+
+**Grid** (4 runs, everything else as the first grid):
+
+| bonus / base | predicted FTA | predicted PF | predicted foul-outs |
+|---|---|---|---|
+| .0675 / .0175 | 22.98 | 19.40 | .211 |
+| .0685 / .0175 | 23.06 | 19.49 | .215 |
+| .0695 / .0175 | 23.13 | 19.58 | .220 |
+| .0685 / .0150 | 23.00 | 19.26 | .202 |
+
+**Unchanged from the first grid:** the targets (FTA 23.04 ± .15, PF 19.57 ± .3, foul-outs ≤ .223, step-3 guards), the
+pick rule and the follow-on (s/X re-measured, the 12-date check, then ask the user before the full FIT).
+
+**If none pass:** record it and stop.
