@@ -3267,7 +3267,12 @@ def _fast_exit_background_loop() -> None:
     from syndicate.features.shared.execution_exits_fast import FastExitLoop, fast_loop_mode, fast_loop_seconds
     from syndicate.features.shared.timezone import central_today_iso
 
+    from syndicate.features.shared.inplay_entries_paper import PaperEntryLoop
+
     loop = FastExitLoop(today_fn=central_today_iso)
+    # In-game ENTRY rule, PAPER ONLY (user decision 2026-10-21): records would-be
+    # entries and grades them; the module has no order path (test-enforced).
+    entries = PaperEntryLoop(today_fn=central_today_iso)
     print(f"[execution_exits_fast] STARTED mode={fast_loop_mode()} interval_s={fast_loop_seconds():.0f}", flush=True)
     while not _FAST_EXIT_STOP.is_set() and not _LIVE_REFRESH_LOOP_STOP.is_set():
         try:
@@ -3275,6 +3280,11 @@ def _fast_exit_background_loop() -> None:
         except Exception as exc:  # noqa: BLE001 -- a pass must never kill the loop
             print(f"[execution_exits_fast] PASS_FAILED {type(exc).__name__}: {exc}"[:400], flush=True)
             loop.state = None  # re-read the document next pass rather than write a stale copy
+        try:
+            entries.step()
+        except Exception as exc:  # noqa: BLE001 -- paper measurement must never touch the exit loop
+            print(f"[inplay_entries_paper] PASS_FAILED {type(exc).__name__}: {exc}"[:400], flush=True)
+            entries.doc = None
         _FAST_EXIT_STOP.wait(fast_loop_seconds())
 
 

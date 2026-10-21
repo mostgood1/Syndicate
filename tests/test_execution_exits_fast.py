@@ -225,6 +225,19 @@ def test_worker_starts_the_thread_only_when_paper(monkeypatch):
             return {"status": "ok"}
 
     monkeypatch.setattr(fx, "FastExitLoop", _Stub)
+    from syndicate.features.shared import inplay_entries_paper as ip
+
+    entry_steps: list = []
+
+    class _EntryStub:
+        def __init__(self, **_kw):
+            self.doc = None
+
+        def step(self):
+            entry_steps.append(1)
+            return {"status": "idle"}
+
+    monkeypatch.setattr(ip, "PaperEntryLoop", _EntryStub)
     monkeypatch.delenv("SYNDICATE_EXIT_FAST_LOOP")  # absent = paper
     monkeypatch.setattr(worker, "_FAST_EXIT_THREAD", None)
     try:
@@ -232,6 +245,7 @@ def test_worker_starts_the_thread_only_when_paper(monkeypatch):
         assert stepped.wait(5), "the started thread never ran a pass"
         worker._FAST_EXIT_THREAD.join(5)
         assert not worker._FAST_EXIT_THREAD.is_alive()
+        assert entry_steps == [1], "the paper entry loop must run on the same thread, once per pass"
     finally:
         worker._FAST_EXIT_STOP.set()
 
