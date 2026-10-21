@@ -74,7 +74,7 @@ Same rules as state.md: when a fact changes, EDIT THE LINE.
 - **Soccer prop calls ask ten named books** (`a1d6cfea`; on the fleet, HEAD 06241083 read 2026-10-16 19:10Z): the 8 books soccer props returned 10-01..10-16 (MyBookie 7.9% of 573,710 rows, which the shared list would drop) + ballybet + betparx, billed as one region. Per-prop book counts after the change are NOT yet read.
 - **Kalshi join for UEFA: 18/18/18 fixtures** UCL/UEL/UECL on the served 10-20 grid (`cad98705`, reading by lane uefa-kalshi-elim-aliases).
 - **Stage 1 verdicts (#699):** league offsets SUPPORTED (`f84447d6`); out-of-scope club ratings SUPPORTED (`43eda5ec`); close-backtest GATE **NO-GO** for UCL/UEL/UECL (`2ca2a735`: blend vs close UCL -0.0006 [-0.0039,+0.0029]; the model alone loses to the close by +0.0286). **So no UEFA projection is served, by measurement.**
-- **Not yet read:** a UCL match IN PLAY (projection=null). The 10-20 task never dispatched; a reading is armed for the 10-21 matchday.
+- **In-play no-model branch: READ 2026-10-21** (deploys.md 16:46:59Z): UCL matches in play are served with `projection` exactly null, with 0 LEAGUE_POLL_FAILED / Tracebacks and the shared live loop unaffected. Lane `soccer-uefa-competitions` is CLOSED, goal met.
 
 ## [soccer-roster-only-players] SOCCER SIM SQUADS: ADDING ROSTER-ONLY PLAYERS (TEAM TOTALS FIXED) FAILED ITS PRE-REGISTERED TEST, AND THE ESPN ROSTERS ARE A JULY SEED `[measured 2026-10-06, lane soccer-roster-only-players, NOT SHIPPED]`
 

@@ -52610,3 +52610,12 @@ measurement I set out to take.
 a loop variable in a `set -u` script, and have a baseline PRINT a non-zero
 sentinel the caller checks before the irreversible step — a `0 MB` total should
 have stopped the reload, and it did not because nothing was gating on it.
+
+## 2026-10-21 16:46:59Z + 16:51:49Z -- MEASURED, GOAL MET: a UCL match IN PLAY is served as a no-model scoreboard entry (projection null), and the shared live loop is unaffected `[lane soccer-uefa-competitions, session 15fef1c0]`
+- **Why today, not 10-20:** the one-time task armed for 2026-10-20 17:15Z never dispatched (`list_task_runs`: 0 runs) and is now paused. The reading was taken live on the 10-21 matchday by a watcher (`C:/tmp/ucl_inplay_watch.sh`), plus a second tick.
+- **Reading 1, 16:46:59Z:** `ucl/api/live_state/live_state_2026-10-21.json`, generated 16:46:20Z (age 31 s), count 1. Lille 0-0 Galatasaray, 1': `projection` key PRESENT and exactly `null`, `goal_windows` null, `live_player_props` 0.
+- **Reading 2, 16:51:49Z:** generated 16:51:15Z (age 34 s), count 2. Como 1-0 Manchester United (4') and Lille 0-1 Galatasaray (6'): projection exactly null in BOTH, and scores update tick to tick.
+- **Failure checks since 16:30Z** (timestamped lines only): `LEAGUE_POLL_FAILED` for ucl/uel/uecl 0, for any league 0, `Traceback` 0. The shared loop rewrote mls / epl / la_liga live_state in the same tick (16:51:09-12Z). So the `_scoreboard_only_game` branch ran on a real in-play match, and `_load_team_ratings`' SystemExit was never reached.
+- **Same day, odds re-read (14:15Z):** the 10-15 thinness was round timing, as inferred. UEL 18/18 fixtures for 10-22 (median 10 books/event), UECL 18/18 (median 6), UCL all 9 of today's plus 2 of the next round (10 books). Files were 10-15 min old.
+- **No deploy, restart or env change by this lane for this reading.**
+
