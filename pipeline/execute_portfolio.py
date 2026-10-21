@@ -733,6 +733,8 @@ def _run_execution(
     # plan that named nothing bettable from a cap that stopped a good slate, and
     # those want opposite responses.
     refused: dict[str, int] = {}
+    # Live orders this loop sent, per event_id (lane live-event-concentration).
+    ec_placed: dict[str, list[dict[str, Any]]] = {}
     for position in positions:
         if not isinstance(position, Mapping):
             skipped += 1
@@ -914,6 +916,58 @@ def _run_execution(
                 )
                 continue
 
+        # ONE LEG PER GAME OUTCOME, AND A DOLLAR CAP PER GAME  [2026-10-21, user
+        # decision "Build it (Recommended)", lane live-event-concentration, todo
+        # #711]. D1 above matches the SAME bet; a line move is a new bet to it,
+        # so OKC +20.5, SAS +17.5, OKC +16.5 and OKC -3.5 went on one game from
+        # three passes. Checked against the held book (any slate) plus what this
+        # loop already sent; a refusal writes nothing. Off unless
+        # SYNDICATE_LIVE_EVENT_CONCENTRATION=shadow|on.
+        if mode == LIVE:
+            from syndicate.features.shared import event_concentration as _ec
+
+            ec_mode = _ec.mode()
+            if ec_mode != "off":
+                from syndicate.features.shared.execution_ledger import _load as _ledger_load
+
+                ec_held = _ec.held_live_orders(
+                    _ledger_load().get("orders") or [], venue=venue, event_id=request.event_id
+                )
+                ec = _ec.verdict_for(
+                    request,
+                    ec_held,
+                    cap=_ec.max_event_dollars(),
+                    placed_this_pass=ec_placed.get(request.event_id, ()),
+                )
+                ec_line = (
+                    f" venue={venue} ticker={getattr(request, 'venue_ticker', None)!r}"
+                    f" event={request.event_id} axis={ec.axis} sport={request.sport}"
+                    f" market={request.market} player={request.player_name!r} side={request.side}"
+                    f" line={request.line} price={request.requested_price}"
+                    f" asked={float(request.requested_stake_dollars):.2f} held_event={ec.held_dollars:.2f}"
+                    f" room={ec.room} cap={_ec.max_event_dollars():.2f} blocking_key={ec.blocking_key}"
+                )
+                if ec_mode == "shadow":
+                    if ec.action in ("refuse", "trim"):
+                        print(
+                            f"[execute_portfolio] CONCENTRATION_SHADOW would={ec.action}"
+                            f" reason={ec.reason} stake={ec.stake:.2f}{ec_line} -- shadow, order unchanged",
+                            flush=True,
+                        )
+                elif ec.action == "refuse":
+                    skipped += 1
+                    refused[ec.reason] = refused.get(ec.reason, 0) + 1
+                    name = "REFUSED_SAME_AXIS_HELD" if ec.reason == _ec.REFUSAL_AXIS_HELD else "REFUSED_EVENT_CAP"
+                    print(f"[execute_portfolio] {name}{ec_line} -- nothing written", flush=True)
+                    continue
+                elif ec.action == "trim":
+                    request = dataclasses.replace(request, requested_stake_dollars=ec.stake)
+                    trimmed += 1
+                    print(
+                        f"[execute_portfolio] TRIMMED_TO_EVENT_CAP placed_at={ec.stake:.2f}{ec_line}",
+                        flush=True,
+                    )
+
         # THE PREGAME NEAR-EVEN HOLD IS GONE  [2026-09-11, user decision, lane
         # polymarket-e2e-review]. It held pregame Polymarket orders priced above
         # 0.35 on a one-day sample of 11, and its own stated falsifier -- "a
@@ -1066,6 +1120,19 @@ def _run_execution(
         # Charged for anything that MAY have reached the venue, matching
         # `spent_today`'s rule. `rejected` is the one status set without a call.
         if status in {"filled", "submitted", "failed"}:
+            if mode == LIVE:
+                # What `event_concentration` must see from this pass even if the
+                # ledger read lags the write (lane live-event-concentration).
+                ec_placed.setdefault(request.event_id, []).append(
+                    {
+                        "position_key": request.position_key,
+                        "market": request.market,
+                        "segment": request.segment,
+                        "player_name": request.player_name,
+                        "side": request.side,
+                        "requested_stake_dollars": request.requested_stake_dollars,
+                    }
+                )
             used = {
                 "dollars": round(
                     float(used.get("dollars") or 0.0) + float(request.requested_stake_dollars), 2

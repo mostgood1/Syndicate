@@ -2,7 +2,7 @@
 
 Lane `live-event-concentration`, session 8ac736cb, a side session of 332cb014 (live execution monitor). Todo `#711`.
 **Design only. No code, no env change, no deploy.** Read-only reads on the WSL fleet at `nice 19`, under
-refresh-worker's `/proc` environ, fleet HEAD `3567ff3bb`, 2026-10-21 00:40-01:05Z (7:40-8:05 PM CDT 10-20).
+refresh-worker's `/proc` environ, fleet HEAD `3567ff3bb`, 2026-10-21 00:40-00:52Z (7:40-7:52 PM CDT 10-20).
 Probe scripts are in this session's scratchpad (`conc_probe2.py`, `conc_probe3.py`, `p4.py`) and in `/tmp/conc_8ac7/` on the fleet.
 
 ## Answer first
@@ -215,12 +215,13 @@ soccer 0%.
     - SAS +17.5 $9.79, OKC +16.5 $0.89 and OKC -3.5 $0.41 are refused.
     - MTSU under 45.5 $0.48 and MoSt +2.5 $0.41 are refused.
     - Total: 5 rows, $11.98.
-  - **R2 at $15, OKC@SAS:**
-    - Held reaches $12.37 by 21:42Z.
-    - Keldon Johnson threes ($6.73, 23:07Z) is trimmed to $2.63.
-    - The next 4 one-contract legs ($2.38) are refused.
+  - **R2 at $15, OKC@SAS** (held legs count their FILLED stake, new orders their requested stake; pinned by `tests/test_event_concentration.py::test_T5_replay_of_the_10_20_book`):
+    - Held reaches $12.34 filled by 21:42Z.
+    - Keldon Johnson threes ($6.73 asked, 23:07Z) is trimmed to $2.66.
+    - The next 4 one-contract legs ($2.25 filled) are refused.
     - OKC@SAS ends at $15.00, down from $32.17.
-  - **Kalshi 10-20 total:** $73.03 -> about $54.57.
+  - **Kalshi 10-20 total:** $73.03 -> $54.97.
+  - **As built:** a game's FIRST leg is never capped by R2 (concentration needs a second leg; the order cap bounds the first).
   - **Held-first keeps the WORST-EV leg on OKC@SAS:** OKC +20.5 @ -1329 at 0.9% was placed first. The plan-level R1
     only picks the best leg among the legs in one build. This is the strongest argument for doing decision 4 (the
     favourite cap) first or with it.
