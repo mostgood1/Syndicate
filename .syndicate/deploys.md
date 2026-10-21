@@ -52272,3 +52272,34 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - the execution ledger entry (compare-and-swap active): pnl_dollars 1.2823, `exit_applied` recomputed (exit_price 0.65, proceeds 7.15), `pnl_correction={before_pnl_dollars -2.0177, before_exit_applied {...}, after 1.2823, at, reason}`. outcome (won), settled_by, graded_at unchanged.
 - **verify:** read back immediately (fill 0.65, pnl 1.2823, provenance present). Re-read after the worker's next real tick (13:38:12Z, which rewrote the exit document at 13:38:05Z): unchanged.
 - **scope:** the only mis-recorded live exit. The other six live sales are NO-leg and were checked against venue costs (all correct).
+
+
+## 2026-10-21 12:55:43Z ff + 13:48:06Z live-odds-worker ROLE-ONLY restart (8:48 AM CT) -- fleet 085fe1e8 -> d76c85ce: in-game FAST EXIT LOOP running in PAPER -- **MET (running; first in-play marks OWED tonight)** (lane `in-game-trading`, session 15ceeb14)
+- **ask:** the user, in this session, 10-21: "Allow the fast-exit thread edit in run_live_odds_refresh_worker.py; ff + live-odds-worker restart with SYNDICATE_EXIT_FAST_LOOP=paper". Then, asked how to turn it on given that a role restart cannot load a new env key: "Default to paper (Recommended)".
+- **code:**
+  - `afa34580`: start_fast_exit_loop() in main() + _fast_exit_background_loop thread.
+  - `d76c85ce`: `execution_exits_fast.fast_loop_mode()` is PAPER BY DEFAULT. Absent = paper; off/0/false/no/disabled = off; there is NO live value.
+  - The module has no order/cancel/credential path (test parses it). It writes only `reports/intelligence/execution_exits_fast.json` (keyvalue) and never `execution_exits.json`.
+  - 9 tests, including the worker wiring reachability test (off -> no thread; absent -> the thread runs a pass).
+- **env:** NO change. `SYNDICATE_EXIT_FAST_LOOP` is absent from local_production.env (grep count 0), so it resolves to `paper`. The new pid still carries `SYNDICATE_EXIT_MODE=live` (the slow tick, unchanged).
+- **claims:**
+  - live-odds-worker, holder `in-game-trading`: acquired 12:55Z rc 0, re-acquired 12:5xZ ttl 7200 (token 2f5d716d...).
+  - refresh-worker: acquired 12:55Z and released 12:56Z unused; the ff needed no refresh-worker restart.
+  - The live-odds-worker claim was held to ~14:20Z, past the 45-min bound. That blocked other lanes for ~75 min, because the claim spanned the 60-min spacing wait. It is released with this entry.
+- **ride-alongs 085fe1e8..d76c85ce (runtime):**
+  - nba-no-history-admit (`6487034f`, `085561bc`, `73082de2`): `nba_no_history_standins.py`, hooks in `basketball_props_smart_sim.py` and `nba/live_resim.py`. The switch `SYNDICATE_NBA_NO_HISTORY_STANDINS` defaults to off and is absent from the env file. The live_resim hook only acts on frames carrying `pool_source`, which only `on` writes: INERT.
+  - `scripts/nba_standin_cost.py`: a script, not loaded.
+  - The rest is ledger/docs.
+  - 0 overlap with the 6 dirty fleet files. `git merge --ff-only d76c85ce` at 12:55:43Z; HEAD checked == 085fe1e8 first.
+- **restart:** a one-shot gated script with NOT_BEFORE 13:48:00Z, keeping the 60-min spacing after kalshi-exit-path's 12:47:25Z restart.
+  - The gate needed 0 non-zombie children of the old pid AND the last two RECONCILE lines with not_found=0 / unknown=0. It cleared at 13:48:06.290Z.
+  - One TERM to pid 3307467 at 13:48:06.294Z. New pid **3327060**, lstart 13:48:13Z.
+- **verify (read 14:18Z):**
+  - `13:48:21.504Z [execution_exits_fast] STARTED mode=paper interval_s=15`.
+  - FAST_EXIT_PASS every 60 s at passes=4 (15 s cadence), 30 lines, `PASS_FAILED` 0.
+  - `positions=68 marks=0 reasons={'market_finalized': 68}`. These are last night's in-play positions, not graded yet; no game is live this morning.
+  - The slow tick is unaffected: `14:14:03Z EXIT_TICK status=ok mode=live positions=400`. EXECUTION passes at 13:49Z ok (kalshi placed=1).
+- **owed:**
+  - (1) The first in-play marks (`marks>0`, FAST_EXIT_PAPER lines) tonight, and the fast-vs-slow-vs-hold counterfactual at settlement.
+  - (2) Small follow-up: skip `market_finalized` positions after one read (68 tickers re-quoted every 15 s for nothing; 2 batched public GETs per pass).
+- **rollback:** `LIVE_ODDS_WORKER__SYNDICATE_EXIT_FAST_LOOP=off` needs a full down/up. Otherwise revert d76c85ce + afa34580, ff, gated live-odds-worker TERM.
