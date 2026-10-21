@@ -52940,3 +52940,36 @@ have stopped the reload, and it did not because nothing was gating on it.
   - The UTC 10-21 exit cap was already 5/5, so no live sale is possible before 00:00Z. Until then a dispatch reads `daily_count_cap`.
 - **undo:** `LIVE_ODDS_WORKER__SYNDICATE_EXIT_FAST_LOOP=paper` (or `off`) in local_production.env + a full down/up. Without a down/up: `git revert ac248f07`, ff, gated live-odds-worker TERM (back to d76c85ce behaviour: paper).
 - **NOT in this deploy:** the capped in-game ENTRIES (NHL spreads, 1 contract, $10/day). Not built yet.
+
+## 2026-10-21T22:11:53Z ff `ac248f07a` → `9d4e742ba` + 22:15:52Z live-odds-worker ROLE-ONLY restart (17:15 CDT) — todo #722 LIVE — lane `order-sizing-provenance`, session `4ab694ed`
+
+**User instruction:** "ff the fleet and restart the live-odds-worker" (2026-10-21), to make `#722`'s sizing provenance reach the executor — it is imported in-process, so an ff alone leaves it inert.
+
+- **locks:** `web` + `refresh-worker` + `live-odds-worker` all ACQUIRED by `order-sizing-provenance` (exit code checked per service), released by `--token` afterwards. Drain requested and acked (`board_build=idle`) → **CLEAR**, undrained right after the ff so the refresh-worker resumed while the restart was handled separately.
+- **ride-along, 9 commits, AST-checked before applying:** 5 Python files, **0 comment-only, 3 with executable change** — my two (`execute_portfolio.py`, `execution_ledger.py`) plus `polymarket_us_orders.py` from lane `live-min-stake-five`. `render.yaml`, `vendor/`, `requirements.txt`, `local_production.py`, `.env`: **0 changed**. Dirty-file collisions: 0.
+- **the peer money-path change was verified default-off rather than taken on trust.** `_at_ask_min_stake()` returns `None` when `SYNDICATE_POLYMARKET_AT_ASK_MIN_STAKE_DOLLARS` is unset, and the var is absent on both workers. That is a genuine opt-in — worth contrasting with `_nba_live_priced()` (todo #713), which maps an absent value onto the PERMISSIVE branch. Same shape of flag, opposite default.
+- **ff:** `git merge --ff-only 9d4e742bad88fb5d52c898ca57286d16fbb45761`, pinned SHA not `github/main`. HEAD == the pinned SHA afterwards. All five pids unchanged by the ff, as expected.
+
+### The restart, and the rule it ran inside
+
+`SIGTERM` to the exact pid (never a `pkill -f` pattern — that can match the wrapper itself). The worker traps it (`signal.signal(SIGTERM, _handle_stop)`) and exits at its next checkpoint: TERM at **22:12:51Z**, respawn at **22:15:52Z**, ~3 min. My first poll gave up after 120 s and wrongly read "TERM did not take"; the file documents the behaviour (PEP 475 — a caught signal does not cut a sleep short; measured 2026-10-02, SIGTERM 16:38:30Z → exit 16:53:25Z).
+
+**THE 60-MINUTE RULE WAS OVERRIDDEN, deliberately and on the user's explicit instruction.** `learnings.md`'s refresh-worker restart rule says to batch non-urgent changes and **wait if a restart happened under 60 minutes ago** — a peer restarted this role at **21:51:24Z**, i.e. **21 minutes** before mine. Why I proceeded rather than waiting until 22:51Z:
+- the user asked for it directly, having been told the change was otherwise inert;
+- `check_deploy_safety` reported **live-odds-worker child jobs: none** and a whole-report **CLEAR** — a better window than the precedent at 2026-10-19 19:19:01Z, which took a role-only restart with 5-11 jobs in flight;
+- waiting 39 min meant either holding the drain across live games or running a second drain cycle, both worse than the churn the rule guards against.
+
+Recorded as an override, not as compliance.
+
+### Verify — the READINGS
+
+- **role-only confirmed:** live-odds-worker `3546826` → **`3551831`** (boot 22:15:52Z); refresh-worker `3526319` and web `3506380` / `3544887` / `3544888` all **unchanged**.
+- **both halves loaded FROM THE NEW SOURCE, by bytecode provenance rather than uptime.** `execution_ledger.cpython-311.pyc` embeds source mtime `22:11:53Z` = the source's; `execute_portfolio.cpython-311.pyc` initially still embedded the OLD `14:38:10Z`, because `run_execution` is imported LAZILY on the first execution tick — and at 22:17:00Z it embedded `22:11:53Z` with **13 `[execute_portfolio]` log lines** since respawn. Caught mid-window and re-checked rather than reported from the first reading.
+- `OrderRequest` carries both fields and `_LEAN_FIELDS` contains both, read out of the deployed tree.
+- web `GET /` → **200**; claims all free; drain cleared.
+
+### OWED, and it cannot be taken yet
+
+**No order has been submitted since the restart (0 since 22:15:54Z against 3,000 in the ledger), so the end-to-end proof — a served order row carrying `staked_probability_version` — is FORWARD and still owed.** Stated rather than implied: everything above proves the code is loaded, not that a row carries the field.
+
+Also still true after this deploy: attribution is **forward only**, so the 958 already-settled orders stay unattributable and lane `published-negative-ev`'s reading must be **RE-ARMED for a date after 2026-10-21T22:15:52Z**, with an empty pre-period. `position_key` coverage (552 of 658 live orders have none) is routed around, not repaired, and the paper-ladder path (`PaperLedgerBatch.place`, lane `paper-alongside-live`) was not touched or checked.
