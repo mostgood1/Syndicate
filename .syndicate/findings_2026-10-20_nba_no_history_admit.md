@@ -332,3 +332,10 @@ main until that lane lands): the 14 new tests plus `tests/test_nba_live_resim.py
 Fleet state when recorded: the fleet runs ac248f07, which contains 73082de2 (this lane's code), and the switch is absent
 from `local_production.env`. So the hooks are live and OFF.
 
+USER DECISION, second part, 2026-10-21 ~5:10 PM CT (typed in session 15f24a49), also before the reading: "if it passes, go
+ahead and turn it on". So a full PASS of the pre-registered rule means
+`REFRESH_WORKER__SYNDICATE_NBA_NO_HISTORY_STANDINS=on` on the fleet: env change, full down/up under all three claims,
+`deploys.md` entry. A full PASS is PRIMARY PASS, secondary (points) not FAIL, and minutes-prior MAE <= 8.0. A primary
+pass with a secondary FAIL or a sanity breach is NO-GO, as pre-registered. Expected on the first `on` refresh: one round
+of SMART_SIM_REUSE_STALE_POOL rebuilds for every game with a stand-in. Stand-ins' own props stay unpriced either way.
+

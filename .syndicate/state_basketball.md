@@ -1236,7 +1236,7 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
 - **Open:** players with NO NBA history (rookies; Lillard, Haliburton, Irving, VanVleet) cannot be admitted by a re-key -> thin pools (follow-up card). Rollback = switch off AND delete `rosters_2026-27.csv` (readers use it by file presence).
 
 ## [nba-no-history-standins] NBA PRICED PLAYERS WITH NO player_logs HISTORY: A MARKET-IMPLIED STAND-IN IS ON MAIN, DEFAULT OFF, NOT ON THE FLEET `[verified 2026-10-21 ~7:45 AM CT, lane nba-no-history-admit, main 73082de2]`
-- **Code:** `nba_no_history_standins.py` + 3 hooks in `basketball_props_smart_sim.py` + a `live_resim.resim_live_game` filter. Switch `SYNDICATE_NBA_NO_HISTORY_STANDINS` (off|shadow|on). The fleet has the code since ac248f07 (contains 73082de2, checked 2026-10-21 ~5 PM CT) and the switch is absent from local_production.env, so it is OFF. User decision: INCONCLUSIVE truth reading -> shadow.
+- **Code:** `nba_no_history_standins.py` + 3 hooks in `basketball_props_smart_sim.py` + a `live_resim.resim_live_game` filter. Switch `SYNDICATE_NBA_NO_HISTORY_STANDINS` (off|shadow|on). The fleet has the code since ac248f07 (contains 73082de2, checked 2026-10-21 ~5 PM CT) and the switch is absent from local_production.env, so it is OFF. User decisions: INCONCLUSIVE truth reading -> shadow; full PASS -> on; FAIL -> stays off.
 - **When on:** a current-roster player with a posted pre-tip line and no props row joins the sim pool.
   - Minutes come from preseason box minutes and start share (fit on 2025-26, MAE 5.26).
   - Rates are the posted line divided by those minutes.
