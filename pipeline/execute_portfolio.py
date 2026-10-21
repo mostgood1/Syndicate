@@ -312,6 +312,34 @@ def _order_from_position(position: Mapping[str, Any], selected_date: str, venue:
             if isinstance(position.get("attribution"), dict)
             else position.get("sim_share_of_stake")
         ),
+        # WHAT THE STAKE WAS COMPUTED FROM  [todo #722, 2026-10-21, lane
+        # `order-sizing-provenance`]. NESTED under `position["sizing"]`, so the
+        # same flat-read trap as `attribution` above applies: a plain
+        # `position.get("staked_probability_version")` reads None forever and
+        # the column ships inert.
+        #
+        # Why it is here at all: lane `published-negative-ev` armed a reading
+        # to split settled outcomes on this field and got **0 settled
+        # positions in every cell** out of 958 settled orders, because all 658
+        # live orders were unjoinable to a plan (552 carry no `position_key`).
+        # The field exists on the position -- verified 2026-10-21 across the
+        # kalshi, novig and prophetx venue plans, every position carrying both
+        # -- and died at this boundary.
+        #
+        # ABSENT STAYS ABSENT. `_as_optional_str` keeps a missing version from
+        # becoming the string "None"; there is no sensible default, because
+        # "unfitted" is a REAL profile and inventing it would mislabel the
+        # population this reading exists to separate.
+        staked_probability_version=_as_optional_str(
+            (position.get("sizing") or {}).get("staked_probability_version")
+            if isinstance(position.get("sizing"), dict)
+            else position.get("staked_probability_version")
+        ),
+        sizing_basis=_as_optional_str(
+            (position.get("sizing") or {}).get("basis")
+            if isinstance(position.get("sizing"), dict)
+            else position.get("sizing_basis")
+        ),
         # THE PRE-2026-08-30 KEY, and WITHOUT THIS LINE THE MIGRATION GUARD IS
         # INERT. `portfolio_commit` emits it and `record_order` checks it, but
         # the request in between never carried it -- so `_legacy_idempotency_key`

@@ -199,6 +199,13 @@ _LEAN_FIELDS = (
     "side_picked_by",
     "stake_fraction_ev_only",
     "sim_share_of_stake",
+    # WHAT THE STAKE WAS COMPUTED FROM [todo #722]. Retained for the same
+    # reason as the three above, and for a measured one: the 2026-10-21 split
+    # on `staked_probability_version` found 0 settled positions attributable to
+    # a sizing basis out of 958 settled orders. +80 B/order measured, 50% ->
+    # 53% of the 8 MB ceiling at the 3,000 cap. See `OrderRequest`.
+    "staked_probability_version",
+    "sizing_basis",
     # The sport's own game id (MLB `gamePk`), needed to look up a live feed and
     # answer "is this bet winning". `event_id` is the odds-feed id and is not
     # interchangeable with it.
@@ -417,6 +424,40 @@ class OrderRequest:
     side_picked_by: str | None = None
     stake_fraction_ev_only: float | None = None
     sim_share_of_stake: float | None = None
+    # ------------------------------------------------------------------
+    # WHAT THE STAKE WAS COMPUTED FROM  [todo #722, 2026-10-21, lane
+    # `order-sizing-provenance`].
+    #
+    # `portfolio_commit` writes both onto the plan position under
+    # `position["sizing"]` and they were dropped at this boundary -- the same
+    # failure the fields above record, with the same consequence, and this one
+    # was MEASURED: lane `published-negative-ev` armed a reading for
+    # 2026-10-21 15:00Z to split settled outcomes on
+    # `staked_probability_version`, and it returned **0 settled positions in
+    # every cell**. Not underpowered: 958 of 3,000 ledger orders ARE settled
+    # (576 of them live), and NONE could be attributed to a sizing basis,
+    # because all 658 live orders were unjoinable to a plan -- 552 of them
+    # carry no `position_key` at all.
+    #
+    # `sizing.basis`'s own comment at `portfolio_commit.py:1456` states the
+    # purpose: "Without it, model-edge and market-fair positions land in one
+    # settlement pool and their ROIs stop being separable -- two different
+    # claims averaged into one uninterpretable number." It delivered that in
+    # the PLAN and lost it at SETTLEMENT, which is the only place an ROI
+    # exists. The plan is rewritten on every board build, so nothing recovers
+    # it afterwards.
+    #
+    # SIZE COST, measured 2026-10-21 against the live ledger rather than
+    # estimated: 1,341 B/order today (the 1,094 figure above has grown), +52
+    # for the version and +80 for both -> 1,421 B/order. At `_MAX_RECORDS`
+    # 3,000 that is 4.02 MB -> 4.26 MB, i.e. **50% -> 53%** of the store's 8 MB
+    # refusal ceiling. Note the cap is already 3,000 and the ledger sits AT it,
+    # so this does not widen the document's horizon, only each record.
+    #
+    # NOT IN `idempotency_key`, same rule as every field above: a row re-sized
+    # under a new profile is the same bet.
+    staked_probability_version: str | None = None
+    sizing_basis: str | None = None
 
 
 def execution_mode() -> str:
@@ -1554,6 +1595,11 @@ def _record_into_state(
         "side_picked_by": request.side_picked_by,
         "stake_fraction_ev_only": request.stake_fraction_ev_only,
         "sim_share_of_stake": request.sim_share_of_stake,
+        # WHAT THE STAKE WAS COMPUTED FROM [todo #722]. See `OrderRequest` for
+        # the measurement that made these necessary; without them a settled
+        # outcome cannot be split by sizing basis at all.
+        "staked_probability_version": request.staked_probability_version,
+        "sizing_basis": request.sizing_basis,
         # Ungraded until something grades it. `None` rather than absent so the
         # field is present on every record and a summary cannot mistake "no such
         # key" for "not settled yet".
