@@ -209,6 +209,30 @@ failures`. So switching `on` needs no forced re-sim -- the sibling lane's pool s
 rebuilds although Dybantsa is then injury-excluded (the stamp is taken before the injury map): one wasted re-sim, no
 output change. Switching back `off` invalidates the same way (the pool shrinks).
 
+### Truth reading -- analysis choices fixed BEFORE any 10-21 truth exists
+
+`[written 2026-10-21 8:23 AM CT (13:23Z), session 89514daa (side session of 23b33819); no 10-21 game has tipped, the
+fleet has no player_checks_2026-10-21.csv and no player_logs.csv 10-21 row]`. The rule above is unchanged; these fix
+how the committed tool's output is read where it and the rule's text could differ.
+
+1. **Sides = sides where B SIMULATED a stand-in** (a non-empty `context.no_history_standins[team]`): 10 sides. B's
+   WAS_MIL carries `"WAS": []` (Dybantsa admitted, then injury-excluded; B == A to the last digit), and the tool keys
+   on the team being present, so as committed it would add WAS's teammates as exact zeros, an 11th cluster. WAS is not
+   "a side with a stand-in"; the verdict uses 10 sides. The tool's 11-cluster numbers are printed beside it, and if the
+   two give different verdicts that is said.
+2. **Sanity population = the 10 simulated stand-ins who played.** Their `minutes_prior` is recomputed from B's frozen
+   inputs (the sims predate that context field); checked just before this note that the recomputation equals the table above for
+   all 11. Dybantsa's prior error is reported separately if he plays; it does not enter the 8.0 bound.
+3. **Truth join:** box minutes by (team, `name_key`) from `player_checks_2026-10-21.csv` `season_type=regular`; points
+   by `name_key` from `player_logs.csv` `GAME_DATE` 2026-10-21. Checked on the 10-20 slate: the box file holds only
+   players who played (68 rows = 68 player_logs rows), every matched player who played has a points row, team codes are
+   the sim's tricodes (GSW/UTA/NOP/WAS). Before the verdict, every A-and-B teammate with no box row is listed against
+   his team's unmatched box rows: a DNP stays out; a name-key miss on the same player is reported, with the statistic
+   given both with and without him.
+4. If the box minutes exist and the points rows do not, the minutes verdict is recorded and the points half is owed.
+5. Instrument: `/home/amyn/nba_nohist_scratch/code_test/scripts/nba_standin_cost.py`, identical to main's
+   `scripts/nba_standin_cost.py` modulo CRLF (checked 8:20 AM CT, WSL clock); bootstrap seed 7, 10,000 resamples, as committed.
+
 ## Pipeline trace (code = `origin/claude/nba-current-rosters` + this lane's hooks)
 
 ```
