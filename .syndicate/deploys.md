@@ -52127,3 +52127,16 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   (user 23:10Z via 332cb014, "Block after kickoff") refuses Kalshi entries after commence (Polymarket already did). In-play entries
   are the in-game-trading lane's staged program now.
 - **claims:** none held by nba-live-board.
+
+## 2026-10-21 00:05Z (7:05 PM CT) -- READING, NO DEPLOY OF MINE: moved-kickoff ghost-row drop (bb702016) + Kalshi NCAAF placeholder exception (67aa2882) LIVE on both workers -- **MET** (lane `ncaaf-commence-time-wrong`, session 07f26684)
+
+- **Approval:** user in this session's chat: "Approved: build the narrow Kalshi placeholder exception ...", then "Yes: restart live-odds-worker and refresh-worker on the fleet under claim + preflight". My own restarts were NOT needed: `kalshi-exit-path`'s full down/up (role_restarts.jsonl `down` 23:32:35Z, holder `kalshi-exit-path`) followed its fleet ff 96f97a0a -> **67aa2882 at 23:32:34Z** (reflog), which carries both commits. I took no claim and sent no signal.
+- **Runtime:** refresh-worker pid 3102121 (lstart 23:34:56Z), live-odds-worker pid 3111241 (lstart 23:53:36Z; an earlier pid ran the new code from the 23:32Z up -- its 23:37Z lines are in `live-odds-worker.log.1`). Fleet HEAD now 3567ff3b (findings-only ff at 23:44:12Z), which contains 67aa2882.
+- **verify, refresh-worker (board):**
+  - `MOVED_KICKOFF_ROWS_DROPPED sport=ncaaf date=2026-10-23 enabled=True candidates=1 events_moved=1 rows=7` at 23:50:38Z and 23:59:45Z, sample `Iowa Hawkeyes @ Minnesota Golden Gophers 2026-10-24T04:00:00Z->2026-10-24` -- exactly the offline replay (1 event / 7 rows); 42 lines total, every other sport/date `candidates=0`.
+  - `CROSS_DATE_REJECTED_GRID sport=ncaaf count=265 sides_seen=3351 placeholder_accepted=12` (23:44:53Z); `CROSS_DATE_REJECTED_ROWS count=471 ... placeholder_accepted=9` (23:49:11Z); nba/nfl/nhl/soccer `placeholder_accepted=0`.
+- **verify, live-odds-worker (order guard):**
+  - `REFUSED_TICKER_DATE_*` since the guard went live (19:33Z): **14, all MISMATCH, all `KXNCAAFGAME-26OCT23OREILL-ORE`**, first 21:34:31Z, last **23:28:27Z** (old code); 0 UNVERIFIABLE; **0 since the up**.
+  - First `[kalshi_ticker_date_guard] TICKER_DATE_PLACEHOLDER_ACCEPTED ticker='KXNCAAFGAME-26OCT23OREILL-ORE' kalshi_time=2026-10-24T03:00:00+00:00 ... blob=OREILL` at **23:37:36.891Z**; `[kalshi_orders] SUBMIT ... count=8.00 price=0.7600` 23:37:42Z; `RECONCILED ... submitted->filled contracts=8 fill_price=0.76 fees=0.1022` 23:38:16Z (stake $6.83). Later passes count it `duplicates` -- one order. 5 acceptance lines through 00:01:28Z, all this ticker.
+- **watch:** `TICKER_DATE_PLACEHOLDER_ACCEPTED` on any ticker other than the 26OCT23/26OCT30 placeholder batch would be a bug; the 32 `26OCT30` placeholder events are next week's population. The game itself kicks off Sat 10-24 19:00Z (ESPN/CFBD/OddsAPI), so D3's kickoff cancel uses the right time for it.
+- **rollback:** `git revert 67aa2882` (exception) / `bb702016` (ghost drop, or `REFRESH_WORKER__SYNDICATE_BOOK_GRID_DROP_MOVED_KICKOFF=off` + refresh-worker restart), ff, gated role restart.
