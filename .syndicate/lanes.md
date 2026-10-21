@@ -1635,6 +1635,14 @@ death, never life — do not invert it.
 - Blocked by: none
 - **RESULT 2026-10-21 (code, not fleet):** hypothesis CONFIRMED -- pre-fix `_clv_pct_from_prices(0.65, -186)` = -34.3; post-fix +0.03. Fix at the choke point (`_implied_from_price`); 180 tests pass across the clv/order_clv/position_marks/prediction_ledger/min_ev_tuner/paper_settlement suites; mutation fails 5/9 new tests. Reader survey + owed decisions in todo #719. Open until the user decides on re-marking stamped live rows and on the fleet ff. **16:52Z:** user approved ff + re-mark; done (15 rows, -35.84 -> +1.14, read-back 15/15; deploys.md). Open until the refresh-worker restart decision lands.
 
+### nba-sim-anchor-staleness — OPEN — opened 2026-10-21 — session fe168a0f-ecef-45f2-b09f-4c69d00f4de6
+- Goal: Measure the NBA SmartSim market anchor's staleness (anchor line vs last pregame consensus before tip, per game since the 10-20 opener) and whether anchoring to the near-close line improves sim totals/margins vs finals; bring the numbers and a recommendation to the user. Any fix ships behind a switch with an off != on reachability test; production only on the user's explicit approval.
+- Files: scripts/nba_anchor_staleness.py (NEW), .syndicate/findings_2026-10-21_nba_anchor_staleness.md (NEW)
+- Hypothesis: game_odds_<D>.csv / predictions_<D>.csv are written by one D-1 run because the writer skips a date whose file exists (or only builds D+1); the D-1 line differs from the near-close consensus by a material amount on some games, and since total_w 0.7 / margin_w 0.95 pass most of that gap into the sim, the near-close anchor should cut totals/margin MAE vs finals.
+- Falsification test: If the median |anchor - close| is under ~1 pt on totals and spreads, or the counterfactual near-close anchor does not lower MAE beyond its own SE on the games available, the refresh is not worth a change (report and close).
+- Verification: Per-game table: anchor (line + capture time) vs last pregame book_quotes consensus (captured_at <= commence), finals; MAE of anchored sim mean vs counterfactual near-close-anchored mean, n games named.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
