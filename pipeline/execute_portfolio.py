@@ -930,9 +930,8 @@ def _run_execution(
             if ec_mode != "off":
                 from syndicate.features.shared.execution_ledger import _load as _ledger_load
 
-                ec_held = _ec.held_live_orders(
-                    _ledger_load().get("orders") or [], venue=venue, event_id=request.event_id
-                )
+                # Pooled across live venues: the same game on Kalshi and Polymarket is one risk.
+                ec_held = _ec.held_live_orders(_ledger_load().get("orders") or [], event_id=request.event_id)
                 ec = _ec.verdict_for(
                     request,
                     ec_held,

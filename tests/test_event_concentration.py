@@ -162,8 +162,61 @@ def test_T1_rejected_paper_other_venue_other_event_and_exit_rows_are_not_held():
         _row("f"),
         _row("g", status="submitted"),
     ]
-    held = EC.held_live_orders(rows, venue="kalshi", event_id=_EVENT)
-    assert [o["position_key"] for o in held] == ["f", "g"]
+    held = EC.held_live_orders(rows, event_id=_EVENT)
+    # POOLED: the Polymarket row on the same game counts too
+    assert [o["position_key"] for o in held] == ["c", "f", "g"]
+    assert [o["position_key"] for o in EC.held_live_orders(rows, event_id=_EVENT, venue="kalshi")] == ["f", "g"]
+
+
+# --------------------------------------------------------------------------
+# T6 -- the held book is POOLED across live venues (SF@ATL under 49.5, Kalshi 21:36Z + Polymarket 02:00:59Z, 10-20)
+# --------------------------------------------------------------------------
+
+
+def _sf_atl(key, *, side="under", line=49.5, stake=5.42, price=113.0):
+    return _pos(key, market="totals", side=side, line=line, price=price, stake=stake, event="evt-nfl-sf-atl",
+                ticker="KXNFLTOTAL-26OCT24SFATL-50")
+
+
+def _relabel_live_rows_as_polymarket():
+    state = L._load()
+    for order in state["orders"]:
+        if order.get("mode") == "live":
+            order["venue"] = "polymarket"
+    L._persist(state)
+
+
+def test_T6_a_bet_held_on_the_other_venue_blocks_the_same_game_outcome(monkeypatch, capsys):
+    # pass 1 places the under on one venue; it is then held as a POLYMARKET row
+    results, sent = _passes(monkeypatch, [[_sf_atl("pm-under-49.5")]], mode="on")
+    assert results[0]["placed"] == 1
+    _relabel_live_rows_as_polymarket()
+    # pass 2 on Kalshi: same game, same outcome (a different position_key, as the venue is in the key)
+    results2, sent2 = _passes(monkeypatch, [[_sf_atl("k-under-49.5", stake=0.48, price=108.0)]], mode="on")
+    assert results2[0]["refused"] == {EC.REFUSAL_AXIS_HELD: 1}
+    assert sent2 == []  # nothing sent on pass 2
+    assert "REFUSED_SAME_AXIS_HELD" in capsys.readouterr().out
+
+
+def test_T6_off_the_cross_venue_duplicate_is_sent(monkeypatch):
+    _passes(monkeypatch, [[_sf_atl("pm-under-49.5")]])
+    _relabel_live_rows_as_polymarket()
+    results2, sent2 = _passes(monkeypatch, [[_sf_atl("k-under-49.5", stake=0.48, price=108.0)]])
+    assert results2[0]["placed"] == 1
+
+
+def test_T6_opposite_sides_across_venues_and_the_cap_pool_too():
+    # OKC@SAS 02:00Z: Polymarket over 231.5 held, a Kalshi under 229.5 candidate -> same axis, refused
+    held = [_row("pm-over", venue="polymarket", market="totals", side="over", stake=0.49)]
+    under = {"position_key": "k-under", "market": "totals", "side": "under", "requested_stake_dollars": 5.0,
+             "requested_price": 108.0}
+    assert EC.verdict_for(under, EC.held_live_orders(held, event_id=_EVENT), cap=15.0).reason == EC.REFUSAL_AXIS_HELD
+    # dollars pool: $12 held on Polymarket leaves $3 for a Kalshi prop on the same game
+    held2 = [_row("pm-ml", venue="polymarket", market="h2h", stake=12.0)]
+    prop = {"position_key": "k-prop", "market": "player_points", "player_name": "X", "side": "over",
+            "requested_stake_dollars": 8.0, "requested_price": -150.0}
+    v = EC.verdict_for(prop, EC.held_live_orders(held2, event_id=_EVENT), cap=15.0)
+    assert (v.action, v.stake) == ("trim", 3.0)
 
 
 def test_T1_held_on_the_axis_refuses_any_other_line_or_side():

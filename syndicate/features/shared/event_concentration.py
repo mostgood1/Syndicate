@@ -14,12 +14,15 @@ plan's own per-game budget (`bankroll_manager.apply_exposure_budgets`) cannot
 see the passes, and the $5-10 stake band re-dollars every leg from full Kelly
 read before that budget's decay. So the check lives HERE, against the held book.
 
-THE RULE, per venue, LIVE mode only:
+THE RULE, LIVE mode only:
+
+Both rules read the held book POOLED ACROSS LIVE VENUES (Kalshi + Polymarket), by
+`event_id`: the same game is the same risk on either exchange.
 
 - R1 ONE LEG PER GAME AXIS. The axis is the outcome a leg rides on: margin
   (spreads, alt spreads, moneyline of one game), total, one team's total, or
-  one player's stat, each per segment. If a LIVE order on the same venue,
-  event and axis may be held, a new leg is refused `axis_held_live`. The held
+  one player's stat, each per segment. If a LIVE order on the same event
+  and axis may be held, on EITHER venue, a new leg is refused `axis_held_live`. The held
   leg stands because it cannot be unwound here. The same `position_key` is NOT
   this rule: that is the same bet, and the duplicate / D1 paths own it.
 - R2 A DOLLAR CAP PER GAME, held bets included: when the game already holds a
@@ -188,8 +191,17 @@ def contract_cost(american: Any) -> float | None:
     return None
 
 
-def held_live_orders(orders: Iterable[Mapping[str, Any]], *, venue: str, event_id: str) -> list[Mapping[str, Any]]:
-    """LIVE orders on this venue and event that the venue may hold, any slate.
+def held_live_orders(
+    orders: Iterable[Mapping[str, Any]], *, event_id: str, venue: str | None = None
+) -> list[Mapping[str, Any]]:
+    """LIVE orders on this event that a venue may hold, any slate, EVERY venue.
+
+    POOLED ACROSS VENUES [2026-10-21, requested by session 332cb014]: one game is
+    one risk whichever exchange holds the leg, and `event_id` is the board's own
+    id on both (measured: OKC@SAS, SF@ATL and PITT@MIA carry the same id on the
+    Kalshi and Polymarket ledger rows). Measured the same night: SF@ATL under
+    49.5 held on Kalshi (21:36Z) AND Polymarket (02:00:59Z), which D1 cannot see
+    because its key includes the venue. `venue` narrows to one venue (tests only).
 
     "May be held" is the ledger's own predicate (`_blocks_a_new_attempt`) minus
     `execution_guard.is_non_position`, exactly as D1's `held_position_for` reads
@@ -205,7 +217,9 @@ def held_live_orders(orders: Iterable[Mapping[str, Any]], *, venue: str, event_i
     for order in orders or ():
         if not isinstance(order, Mapping):
             continue
-        if str(order.get("mode") or "") != LIVE or str(order.get("venue") or "") != venue:
+        if str(order.get("mode") or "") != LIVE:
+            continue
+        if venue is not None and str(order.get("venue") or "") != venue:
             continue
         if str(order.get("event_id") or "") != event_id:
             continue

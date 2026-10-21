@@ -94,7 +94,7 @@ soccer 0%.
 
 ### 3.1 The rule
 
-- **R1: one position per game axis per venue.** The axis key is a pure function of the DecisionRecord key
+- **R1: one position per game axis (pooled across venues, section 8).** The axis key is a pure function of the DecisionRecord key
   (`event_id | market | segment | player | line | side` -> `event_id | axis(market) | segment | player`).
   - Inside one plan: keep the leg with the highest `ev_pct_net_of_fee` and refuse the others as
     `same_axis_lower_ev`. This is the same criterion Suggested uses for one side per line
@@ -102,7 +102,7 @@ soccer 0%.
   - Against the held book: if a LIVE order on the same venue and axis may be held (`_blocks_a_new_attempt`:
     filled / submitted / failed), a new leg is refused as `axis_held_live`. The executor cannot unwind the held
     leg, so the first one in stands. This generalises D1: the same `position_key` implies the same axis.
-- **R2: a per-game dollar cap per venue.** Let `held(E)` be the stake of live orders on event E that may be held
+- **R2: a per-game dollar cap (pooled across venues, section 8).** Let `held(E)` be the stake of live orders on event E that may be held
   (same predicate, open positions only, any slate) and `cap` = `SYNDICATE_LIVE_EVENT_MAX_DOLLARS` (proposed $15).
   - The order is placed at `min(band stake, cap - held(E))`.
   - If that room cannot buy one contract at the order price, the leg is refused as `event_exposure_cap`.
@@ -242,3 +242,19 @@ soccer 0%.
   -809 leg is SAS +17.5. They are opposite teams, so the pair is a middle, not a ladder.
 - The PHI@NYK six-spread stack was refused after kickoff and never reached the ledger. The live PHI@NYK positions
   are 3 props on 3 players: different axes, untouched by R1.
+
+## 8. Amendment 2026-10-21 ~02:10Z: the held book is POOLED across live venues (built, `tests/test_event_concentration.py` T6)
+
+Session 332cb014 found the same bet held on BOTH venues: SF@ATL under 49.5 on Kalshi (`KXNFLTOTAL-26OCT25SFATL-50`,
+1 @ 0.48 at 21:36Z) and on Polymarket (`tsc-nfl-sf-atl-2026-10-25-total-49pt5`, $5.42 at 02:00:59Z).
+D1's key includes the venue, and so did my first build (`held_live_orders(..., venue=)`), so neither caught it.
+Also seen: an OKC@SAS Kalshi under 229.5 candidate while the Polymarket over 231.5 was held.
+
+- **What changed:** R1 and R2 now read held LIVE orders on the event from EVERY venue.
+  - `event_id` is the board's own id on both ledgers. Measured on the fleet: OKC@SAS, SF@ATL and PITT@MIA carry
+    identical ids on their Kalshi and Polymarket rows (3 of 19 live games hold both venues).
+  - The $15 cap is per GAME, not per venue.
+- **What did not change:** a game's first leg is still never touched. Opposite sides on one axis are one axis on
+  either venue.
+- **Not affected:** `commence_time` differing across rows of one game (01:30Z / 01:40Z / 01:45Z on OKC@SAS). The
+  rule keys on `event_id`, never on the kickoff.
