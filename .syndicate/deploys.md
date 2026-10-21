@@ -52889,3 +52889,10 @@ have stopped the reload, and it did not because nothing was gating on it.
 - **MY OWN FIRST PASS WAS WRONG and is recorded as such.** It read only the MAIN plan and joined **zero** live orders; live execution reads the per-venue plan (`execute_portfolio.py:612`). It also keyed "settled" off a field that is null on most orders. Both were corrected before any verdict — the first pass would have reported the same null for the wrong reason, which is the dangerous version of a right answer.
 - **NOT reported as a result:** mean plan `ev_pct` 3.372 (post, `market_fair@unfitted`) vs 3.277 (post, `unfitted`) vs 2.219 (pre). That is PREDICTED EV — the exact number this lane was opened to explain — and presenting it as a forward-ROI improvement would reproduce the lane's own subject error.
 - **owed:** todo **#718** (stamp the version on the order, or guarantee `position_key` on every live order). Until then this reading and the lane's second owed reading are **unavailable, not underpowered**. Detail: `.syndicate/findings_2026-10-21_staked_probability_version_reading.md`.
+
+## 2026-10-21 21:37:37Z -- 9503c042 (gameday props pull uses the live-odds-worker role env) LIVE via a peer ff (lane gameday-pull-role-env)
+- User: "run the fleet ff and check the next pull", then "Wait for their deploys (Recommended)" (do not jump ahead of d0f05d9f / 6e406101).
+  My watcher waited for 6e406101 on the fleet + CLEAR; before CLEAR the soccer lane ff'd 6e406101 -> 931b1709 (fleet reflog 16:37:37 CDT),
+  which contains 9503c042. No claim, ff or restart by this lane. `def role_env` present in the fleet copy, unmodified.
+- verify (owed): the first task PULL after 21:37:37Z (SyndicateNbaGamedayProps 12:40Z 10-22, or a preview at 18:40Z) -- its props run
+  shows Z-stamped lines, memory_max_mb 3072, n_sims 100 and 0 OSError; pre-fix pulls read zlines=0 / null / 500. Watcher armed.
