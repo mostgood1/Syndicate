@@ -3782,3 +3782,31 @@ its own step.
 **Then, at the pick:** re-measure s and X on the #3j dates, the 12-date check (|bias| < 0.5 + the gates above), and
 ask the user before the full FIT. The full FIT gates are unchanged: FTA ± 0.3 of 23.14 (non-OT), PF ± 0.4 of 19.67,
 foul-outs 0.193 ± 0.04, |bias| < 0.5.
+
+### ROUND-2 FTA FIX — GRID RESULT 2026-10-21 03:14Z (4 runs × 12/12 dates, 87 games each, 0 errors): NO RUN PASSES; stopped
+
+| bonus / base | FTA (23.04 ± .15) | PF (19.57 ± .3) | foul-outs (≤ .223) | bonus trips/team | verdict |
+|---|---|---|---|---|---|
+| PKR3 base (.060 / .030) | 22.64 | 19.82 | .233 | 1.67 | — |
+| .065 / .020 | 22.86 ✗ (−.03 short) | 19.41 ✓ | **.213 ✓** | 1.77 | fail (FTA) |
+| .065 / .025 | 22.98 ✓ | 19.88 ✗ (+.01) | .239 ✗ | 1.83 | fail |
+| .070 / .020 | 23.23 ✗ (+.04) | 19.86 ✓ | .235 ✗ | 1.97 | fail |
+| .070 / .025 | 23.35 ✗ | 20.37 ✗ | .257 ✗ | 2.05 | fail |
+
+**Step-3 guards hold in every run:**
+- 3PA 36.99–37.11;
+- trips 7.65–7.68 / 2.23–2.25 / 0.36;
+- quarter shares unchanged to ±.0007.
+
+**Reading:** foul-outs track team PF, not FTA: .213 at PF 19.41, .235–.239 at PF 19.86–19.88, .257 at 20.37.
+Foul-outs ≤ .223 needs PF ≲ 19.6. Bonus +.005 adds about +0.37 FTA and +0.45 PF; base +.005 adds +0.12 FTA and
++0.47 PF.
+
+The pre-registered fallback names only a foul-outs-only failure, and this is not one: (.065 / .020) passes
+foul-outs and misses FTA by 0.03. So, per the rule, stop. No pick.
+
+**Options for the next pre-registration:**
+- (a) an interpolated point, e.g. bonus .0675 × base .015–.020 (predicted FTA ≈ 23.0–23.05, PF ≈ 19.4–19.6,
+  foul-outs ≈ .215–.224);
+- (b) a foul-trouble lever (`foul_trouble_foul_mult`; P(6th | 5th) is .224 vs real .212) that lowers foul-outs at
+  fixed volume, with bonus .065 / base .025 or .070 / .020.
