@@ -1265,7 +1265,7 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
 - **Production reading owed:** after the ff, the first NBA slate. Expect `SMART_SIM_TIP_FREEZE ... frozen=1` lines, `scripts/basketball_posttip_rebuilds.py --since <D>` -> 0 `after_tip`, and engine_inputs mtimes <= tip.
 - Findings: `findings_2026-10-21_post_tip_rebuilds.md`. Found on the way, not acted on: the sim's market anchor is a ~D-1 line, never refreshed (§5.1).
 
-## [nba-sim-anchor-refresh] THE NBA SMARTSIM'S MARKET ANCHOR WAS A D-2 LINE, NEVER REFRESHED; THE REFRESH IS BUILT (6e406101, switch absent = on), FLEET ff WAITING ON venue-native-selection's d0f05d9f `[2026-10-21, lane nba-sim-anchor-staleness, todo #721]`
+## [nba-sim-anchor-refresh] THE NBA SMARTSIM'S MARKET ANCHOR WAS A D-2 LINE, NEVER REFRESHED; THE REFRESH IS LIVE ON THE FLEET (6e406101, ff 3:48 PM CT, switch absent = on) AND READ: 11/11 10-21 SIMS RE-ANCHORED BEFORE TIP `[2026-10-21, lane nba-sim-anchor-staleness, todo #721]`
 - **Cause (code):** the job's line is `predictions_<D>.csv`'s (fallback `game_odds_<D>.csv`).
   - `predict-date` writes both with `consensus_lines_at_close`: the modal point across books.
   - The props refresh's D+2 lookahead makes that line ~D-2: 10-21's was written 10-19 3:04 AM CT, ~63 h before tip.
@@ -1291,5 +1291,6 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   - The ff waits until venue-native-selection lands d0f05d9f (live net floor scope, `pipeline/portfolio_commit.py`) on the fleet; then aaa988a8.. -> 6e406101 with no foreign code.
   - Cutoff for tonight's slate: ~5:30 PM CT.
   - The key is absent from `local_production.env` and from all 7 running python processes (boolean check), i.e. on.
-- **Owed:** the ff; a first-slate reading (see todo #721); the pre-registered regular-season reading at ~100 games (`--stale-from game_odds`).
+- **LIVE 2026-10-21 20:48:05Z (3:48 PM CT)**, ff d0f05d9f -> 6e406101 after venue-native-selection's own deploy, no ride-alongs. **READ 21:35Z:** the first refresh after the ff (21:26Z) logged 10 `SMART_SIM_REUSE_ANCHOR_DRIFT` rebuilds; all 11 10-21 sims carry `market_line_source=props_snapshot_consensus` @ 21:25:59Z and were written 21:27-21:31Z, before the 23:00Z first tip; 0 errors (deploys.md 21:35Z).
+- **Owed:** the pre-registered regular-season accuracy reading at ~100 graded games (`scripts/nba_anchor_staleness.py --stale-from game_odds`, todo #721).
 - Findings: `findings_2026-10-21_nba_anchor_staleness.md`.

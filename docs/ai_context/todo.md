@@ -7,7 +7,7 @@
 - **Blocks:** lane `published-negative-ev`'s armed reading AND its second owed reading (forward ROI under the new sizing). Any future reading that splits settled outcomes on a sizing provenance field is unavailable until this lands.
 - Detail: `.syndicate/findings_2026-10-21_staked_probability_version_reading.md`.
 
-### `#721` — **The NBA SmartSim anchored to a line written ~2 days before tip and never refreshed (10-21's: 10-19 3:04 AM CT). The near-close line cuts served margin MAE -0.97 ± 0.36 and total MAE -0.39 ± 0.18 (59 games, 56 preseason). REFRESH BUILT (user decision: on by default, kill switch; ff when green)** — lane `nba-sim-anchor-staleness`, session fe168a0f; `.syndicate/findings_2026-10-21_nba_anchor_staleness.md`
+### `#721` — **The NBA SmartSim anchored to a line written ~2 days before tip and never refreshed (10-21's: 10-19 3:04 AM CT). The near-close line cuts served margin MAE -0.97 ± 0.36 and total MAE -0.39 ± 0.18 (59 games, 56 preseason). REFRESH LIVE ON THE FLEET (6e406101, ff 3:48 PM CT, no restart) AND READ: 11/11 10-21 sims re-anchored before tip on the first refresh** — lane `nba-sim-anchor-staleness` (CLOSED), session fe168a0f; `.syndicate/findings_2026-10-21_nba_anchor_staleness.md`
 - **Cause.** The job's line is `predictions_<D>.csv`'s. `predict-date` writes it (modal consensus), and the refresh's D+2 lookahead makes it D-2.
   - `_ensure_game_predictions_for_props_refresh` reuses a predictions file that has rows.
   - The game_odds seeder only appends.
@@ -24,10 +24,8 @@
   - Switch `SYNDICATE_NBA_SIM_ANCHOR_REFRESH` (absent = on, shadow, off); `..._MIN_PTS` (default 1.0).
   - 14 tests, off != on on the real loop.
   - Shadow dry run on the fleet's 10-21 snapshot: 9 of 11 sims 1 pt or more off.
+- **Done:** the fleet ff (20:48:05Z); first refresh 21:26Z: 10 drift rebuilds + 1 exclusion rebuild, 11/11 sims with `market_line_source` and `market_line_as_of` 21:25:59Z, written before the 23:00Z first tip, 0 errors (deploys.md 21:35Z).
 - **Owed:**
-  - the fleet ff (approved);
-  - first slate: `SMART_SIM_REUSE_ANCHOR_DRIFT` + `SMART_SIM_ANCHOR_LINE` lines, and sims with
-    `market_line_source=props_snapshot_consensus` and `market_line_as_of` before tip;
   - **pre-registered regular-season reading at ~100 games:** `scripts/nba_anchor_staleness.py`, served margin and
     total MAE, anchor vs close, regular season only.
 
