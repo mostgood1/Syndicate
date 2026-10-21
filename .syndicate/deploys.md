@@ -52140,3 +52140,19 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - First `[kalshi_ticker_date_guard] TICKER_DATE_PLACEHOLDER_ACCEPTED ticker='KXNCAAFGAME-26OCT23OREILL-ORE' kalshi_time=2026-10-24T03:00:00+00:00 ... blob=OREILL` at **23:37:36.891Z**; `[kalshi_orders] SUBMIT ... count=8.00 price=0.7600` 23:37:42Z; `RECONCILED ... submitted->filled contracts=8 fill_price=0.76 fees=0.1022` 23:38:16Z (stake $6.83). Later passes count it `duplicates` -- one order. 5 acceptance lines through 00:01:28Z, all this ticker.
 - **watch:** `TICKER_DATE_PLACEHOLDER_ACCEPTED` on any ticker other than the 26OCT23/26OCT30 placeholder batch would be a bug; the 32 `26OCT30` placeholder events are next week's population. The game itself kicks off Sat 10-24 19:00Z (ESPN/CFBD/OddsAPI), so D3's kickoff cancel uses the right time for it.
 - **rollback:** `git revert 67aa2882` (exception) / `bb702016` (ghost drop, or `REFRESH_WORKER__SYNDICATE_BOOK_GRID_DROP_MOVED_KICKOFF=off` + refresh-worker restart), ff, gated role restart.
+
+## 2026-10-21 00:13:41Z (7:13 PM CT 10-20) -- READING: Polymarket NCAAF forward-date join fix LIVE -- first forward-dated NCAAF Polymarket live order placed -- **MET (placement); fill owed** (lane `paper-alongside-live`, session f8387262)
+- **ask:** the user, in this session: "Fix both: the Kalshi NO-side price in _kalshi_price_for and the Polymarket NCAAF forward-date join."
+- **defect (measured 2026-10-20 ~21:45Z, read-only):** `polymarket_board_join` widened to the 7-day football / 14-day soccer horizon only when the slate date had NO markets for the league+market. Three NCAAF games played Tuesday 10-20, so all 414 NCAAF game-line rows (games 10-21..10-24) refused `no_matching_polymarket_market`. That day, 169 Polymarket live-plan builds had 0 positions.
+- **code:** `96f97a0a`. It also widens when the slate date's candidates do not name the fixture. A row with a kickoff is decided by its own local game dates (`venue_quote_fanin._row_game_dates`, imported) and the window narrows to them; otherwise the existing `_teams_match` decides, in either orientation. MLB still never widens. The new case is counted `<league>|<market>|fixture_absent`. Tests: tests/test_polymarket_forward_fixture.py 7; the gate mutation fails 2; 859 Polymarket/commit/arb tests pass. Fleet replay before the deploy: matched 119 -> 214, join 11.6 s -> 15.7 s.
+- **load:** ride-along on the nba-live-board ff (17d9b4a5 -> 96f97a0a at 22:12:15Z), then later ffs to 67aa2882, which contains it. Loaded at refresh-worker **BOOTED 23:35:00Z**, pid **3102121**. The restart was not mine: the claims were held by nba-live-board, then kalshi-exit-path.
+- **first build after boot (00:10:57Z):**
+  - `POLYMARKET_BOARD_JOIN elapsed_s=10.51 ... board_rows=4723 matched=204` (119 on the 21:29Z pre-fix build).
+  - `LIVE_PLAN_WRITTEN venue=polymarket rows_in=280 placeable_in=186 positions=1 staked=$0.51 refusals={'aggregator_priced': 94, ...}`. The pre-fix build read placeable_in=122 and aggregator_priced=155.
+  - The position: NCAAF Pittsburgh @ Miami over 51.5, 2026-10-24, `tsc-cfb-pitt-mia-2026-10-24-total-51pt5`, venue_feed, ev 4.08% gross / +0.86% net.
+- **execution (live-odds-worker pid 3111241):**
+  - `POLYMARKET_PRICED_AT_ASK decision=place ... ask=0.47 ev_at_ask_pct=3.97`
+  - `SUBMIT ... BUY YES qty=1.04 price=0.47 tif=GOOD_TILL_DATE goodTillTime=2026-10-24T16:00` (00:13:39Z), id **D7JJFKT010JF**
+  - `LIVE_ORDER status=submitted`; `EXECUTED venue=polymarket positions=1 placed=1`.
+- **context:** the first Polymarket live order of the evening (NBA OKC-SA total 231.5, D7HMYF0G10JQ, filled 1.02 at 0.48, $0.02 commission) came from the 23:02Z plan on PRE-fix code, i.e. the live 0% floor, not this fix.
+- **owed:** the fill state of D7JJFKT010JF at the next reconcile; the 10-21 8:45 AM CT reading. Rollback: revert 96f97a0a + a gated refresh-worker TERM.
