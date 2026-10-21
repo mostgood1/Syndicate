@@ -52262,3 +52262,13 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - UCL now lists 11 fixtures because the 10-20 games finished and rolled out of `game_odds_current.csv`.
 - **10-22 grid** (UEL / UECL matchday, built 12:57:42Z): **UEL 18 / 18, UECL 18 / 18** (all h2h). UCL there reads 2 / 11, because that is not a UCL date.
 - Nothing owed. The UEFA pages stay market-only (#699 NO-GO).
+
+## 2026-10-21 13:18:34Z (8:18 AM CT) -- LEDGER CORRECTION, NO DEPLOY: DEL4 live exit fill 0.35 -> 0.65 and its entry regraded -2.0177 -> +1.2823 -- **MET** (lane `kalshi-exit-path`, session b4e23404)
+- **ask:** the user, in this session: "Yes: correct DEL4's exit fill to 0.65 and regrade its entry P&L through the exit-aware settlement math, keeping the old values as provenance, and log it."
+- **why:** the YES-leg fill-price defect (fixed in 910dfe58, live 12:47Z) recorded the NO-side 0.35 for DEL4 (KXNCAAFSPREAD-26OCT20MOSUDEL-DEL4, YES x11, venue order `sell yes`, outcome_side=no, taker cost 3.85). Settlement had graded the entry from it.
+- **method:** a one-off script under live-odds-worker's env, exit mode forced paper in-process, DRY RUN first. The fill was recomputed from the VENUE's own order through the fixed `_exit_view`/`_exit_row_from_view` (0.65). P&L through `venue_settlement.exit_adjusted_pnl`, the function settlement itself uses: 11 x 0.65 = 7.15 proceeds - 0.1752 exit fee - 5.50 cost - 0.1925 entry fee = **+1.2823** (dry run == applied).
+- **writes (13:18:34Z, 5 s after the worker's 13:18:29Z tick so no tick was mid-flight):**
+  - execution_exits.json, the DEL4 row: fill_price 0.65 + `correction={field, before 0.35, after 0.65, at, reason}`;
+  - the execution ledger entry (compare-and-swap active): pnl_dollars 1.2823, `exit_applied` recomputed (exit_price 0.65, proceeds 7.15), `pnl_correction={before_pnl_dollars -2.0177, before_exit_applied {...}, after 1.2823, at, reason}`. outcome (won), settled_by, graded_at unchanged.
+- **verify:** read back immediately (fill 0.65, pnl 1.2823, provenance present). Re-read after the worker's next real tick (13:38:12Z, which rewrote the exit document at 13:38:05Z): unchanged.
+- **scope:** the only mis-recorded live exit. The other six live sales are NO-leg and were checked against venue costs (all correct).
