@@ -52692,3 +52692,59 @@ have stopped the reload, and it did not because nothing was gating on it.
 - **audit (`nba_sim_roster_audit.py --date 2026-10-22`, ESPN live):** 4 sides, stale **0 / 56**, priced-missing **0**; the 12 missing all have no history and no posted line (rookies / deep bench).
 - **PHI (home vs CLE):** LeBron James 26.1 min / 17.0 pts, Jaylen Brown 27.1 / 23.0, Anfernee Simons 17.1 / 11.6, Kentavious Caldwell-Pope 18.1 / 8.2 now simulated for PHI; 0 stale. OBSERVATION, not measured as a defect: some moved players' minutes look off (Rayan Rupert 26.4, Caleb Love 0.0, Jabari Walker 0.0) -- the minutes model, measured biased before this lane.
 - **lane CLOSED** on this reading (verdict in lanes.md).
+
+## 2026-10-21 18:12:20Z (1:12 PM CT) -- FLEET FULL DOWN/UP: per-venue LIVE net floor ON (`REFRESH_WORKER__SYNDICATE_LIVE_NET_FLOOR_KALSHI=1.0`, `..._POLYMARKET=0.5`), no ff by me (fleet already on aaa988a8) -- **MET** (lane `venue-native-selection`, session 86c84cf4)
+- **user:** "Yes: full down/up under all three locks at 17:06Z or later, but ff to origin/main so d1a7ffbe (live CLV fix) rides along too; review ride-alongs, add the two LIVE_NET_FLOOR keys, verify, log deploys.md with the undo."
+  - This was the reply button I offered.
+  - The user's first ask was a refresh-worker-only restart. It was changed because env loads only at `up`.
+- **code:**
+  - 0ee246ca: the floor, inert without the keys.
+  - d1a7ffbe: live CLV contract-price units (lane live-clv-contract-units).
+- **No ff by me.**
+  - The fleet checkout was already at d1a7ffbe (ff 16:51Z, by a peer).
+  - It then moved to aaa988a8 (ff 16:56:40Z, by freeze-nba-pregame-sims). That lane confirmed by message that its change was ff-only and that a restart neither helps nor hurts it.
+  - origin/main beyond aaa988a8 was NOT taken. It carried only more unreviewed code, and both commits the user named were already in HEAD.
+- **ride-alongs loaded** (refresh-worker and live-odds-worker were on 7c7acfd6; web was on aaa988a8 after its bounce):
+  - 69c1af9d: basketball source-CLI data root (todo #718; its lane was waiting for this ff).
+  - d1a7ffbe: live CLV units.
+  - 0ee246ca: the floor.
+  - aaa988a8: smart-sim tip freeze (todo #720).
+  - The rest is ledger-only. Reviewed by diff stat and with the owners.
+- **gates:**
+  - Last full up 16:06Z, so this one could start no earlier than 17:06:30Z.
+  - **First attempt (17:06-17:35Z)** held all three claims. My down script was handed an unexpanded `$EXPECT` and exited before touching anything. Fleet verified untouched: healthz 200, env unchanged, no marker.
+  - **Second run:** fresh claims at 17:54:31Z (rw e04748fa13406e1f, web 6bafd5d629e2f025, lo f6f6d975a95699f1).
+  - `check_deploy_safety --drain` (owner venue-native-selection, TTL 9000 s).
+  - Gated on refresh-worker IDLE (no child job, no board build, MLB sim finished), reached at 18:12:18Z.
+  - live-odds-worker odds and soccer-poll jobs were in flight during live games. They were accepted, as in the 02:10Z / 14:36Z / 23:32Z precedent.
+- **env:** 150 -> 154 lines, 0 removed. Backup `~/syndicate-prod/local_production.env.bak-net-floor-20261021T181220Z`.
+  - Line 153: `REFRESH_WORKER__SYNDICATE_LIVE_NET_FLOOR_KALSHI=1.0`
+  - Line 154: `REFRESH_WORKER__SYNDICATE_LIVE_NET_FLOOR_POLYMARKET=0.5`
+- **restart:**
+  - Marker set; `down` 18:12:20Z -> 18:12:55Z (0 roles left); task Ready.
+  - Start-ScheduledTask 18:12:59Z; **healthz 200 at 18:13:09Z** (~49 s out).
+  - web 3482595, refresh-worker **3482646**, live-odds-worker 3482647; all code=aaa988a8, restarts=0.
+  - Marker cleared; **DRAIN_CLEARED 18:13:42Z**.
+- **env read after up** (python, allowlisted keys only):
+  - refresh-worker 3482646: RENDER_GIT_COMMIT=aaa988a8, LIVE_NET_FLOOR_KALSHI=1.0, LIVE_NET_FLOOR_POLYMARKET=0.5.
+  - Unchanged: LIVE_EV_FLOOR=0, LIVE_STAKE_BAND=on, COMPOUNDING_BANKROLL=on, LIVE_BAND_FAVOURITE_CAP=on, EXECUTION_MODE=live.
+  - live-odds-worker: floor keys absent (role-scoped, as intended).
+- **verify** (refresh-worker log, first two builds after boot):
+  - 18:32:07Z `LIVE_NET_FLOOR date=2026-10-21 venue=kalshi {"below_live_net_floor": 332, "floor_pct": 1.0, "kept": 3, "rows_checked": 335}` -> `LIVE_PLAN_WRITTEN ... positions=1 staked=$6.35`. The pre-restart 17:22Z build had 16 positions, $30.43.
+  - 18:32:10Z polymarket: floor_pct 0.5, kept 0 of 107 -> 0 positions (17:22Z: 2, $1.04).
+  - 18:38:39Z 10-22 kalshi: kept 2 of 270 -> 1 position, $6.68 (17:29Z: 6, $9.49).
+  - 10-22 polymarket: kept 0 of 144 -> 0 (17:29Z: 1, $0.67).
+  - `other_side_better_at_venue` 0, `no_venue_net_ev` 0, `live_net_floor_unreadable` 0. 0 repo-frame tracebacks since boot.
+  - **Plan positions read back:** both are Kalshi NFL TEN Ward passing TDs o0.5 (10-25), net **+1.08% / +1.34%**, both >= 1.0. It is the same bet on two slates; the D1 cross-slate dedupe handles the second.
+- **what this does NOT change:**
+  - Live orders already placed from earlier builds stand.
+  - paper2, the ladder and the main paper book never read the key. They keep recording below the floor.
+- **watch item:**
+  - Volume fell from ~16 to ~1 Kalshi position per build on this slate. That is the predicted effect (findings, Finding 4).
+  - Polymarket placed 0 in both builds.
+  - The ladder's 10-26 readout grades the 0-1 / 1-2 bands this floor removes.
+- **claims:** they EXPIRED at ~18:39:31Z (45-min TTL from 17:54:31Z) during the wait for the first builds, after the restart had completed; the release at 18:47Z found all three free. No deploy ran without a claim.
+- **UNDO:**
+  - Delete the lines `REFRESH_WORKER__SYNDICATE_LIVE_NET_FLOOR_KALSHI=1.0` and `REFRESH_WORKER__SYNDICATE_LIVE_NET_FLOOR_POLYMARKET=0.5` from `~/syndicate-prod/local_production.env`, or restore `.bak-net-floor-20261021T181220Z` if nothing else changed since.
+  - Then do a full down/up under all three claims (env loads only at `up`).
+  - To lower one venue's floor: edit its value, then the same restart.
