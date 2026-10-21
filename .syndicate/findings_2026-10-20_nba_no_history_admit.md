@@ -132,3 +132,110 @@ Population = teammates: players on a side with a stand-in, present in both arms'
 ## Results
 
 (pending -- appended below this line, never above it)
+
+### Scratch cost measurement -- read 2026-10-20 ~10:15 PM CT (arms B 9:39-9:53, A 9:53-10:03, A2 10:03-10:12 PM CT)
+
+All three arms wrote 11/11 sims, 0 failures. Production's 10-21 sims and engine inputs untouched (the arms' roots were
+forced to `/home/amyn/nba_nohist_scratch/<arm>`; production's 11 `engine_inputs/2026-10-21/*.pkl` and 11
+`smart_sim_2026-10-21_*.json` were last written 1:48-1:50 PM CT 10-20, none since the run began).
+
+**Noise floor (A vs A2, different seed, same pool):** teammates' `min_mean` moved by exactly 0.00 (median and p90 --
+the minutes layer is deterministic), `pts_mean` by a median 0.04 (p90 0.12); 11 of 158 priced main lines moved >= 3 pp.
+WAS_MIL (Dybantsa injury-excluded, so B's pool == A's pool) is identical to the last digit between A and B. Every
+on-vs-off difference below is the stand-in's.
+
+| side | stand-in (B: sim min / pts) | minutes prior | teammates | sum teammates d min | sum teammates d pts | d pts / stand-in pts |
+|---|---|---|---|---|---|---|
+| HOU | Fred VanVleet 24.3 / 15.9 | 32.5 | 14 | -24.3 | -8.3 | 0.52 |
+| DAL | Kyrie Irving 32.7 / 23.5 | 30.7 | 9 | -32.7 | -12.1 | 0.51 |
+| LAC | Keaton Wagler 19.8 / 13.7 | 22.6 | 12 | -19.8 | -7.0 | 0.51 |
+| SAC | Darius Acuff Jr. 27.7 / 18.6 | 31.0 | 10 | -27.7 | -9.7 | 0.52 |
+| GSW | Yaxel Lendeborg 28.1 / 18.8 | 30.6 | 11 | -28.1 | -10.3 | 0.55 |
+| MEM | Cameron Boozer 20.7 / 13.6 | 28.8 | 14 | -20.7 | -8.1 | 0.60 |
+| UTA | Darryn Peterson 26.2 / 14.0 | 31.9 | 14 | -26.2 | -9.7 | 0.69 |
+| IND | Tyrese Haliburton 19.7 / 15.5 | 27.6 | 13 | -19.6 | -7.7 | 0.50 |
+| POR | Damian Lillard 24.3 / 15.8 | 30.2 | 14 | -24.4 | -10.0 | 0.63 |
+| CHI | Caleb Wilson 25.6 / 15.1 | 32.5 | 13 | -25.6 | -9.1 | 0.60 |
+
+Per teammate (137 rows): |d min| median **1.74** (p90 2.77), |d pts| median **0.65** (p90 1.09). DAL's thin pool is the
+largest: P.J. Washington 39.1 -> 33.6 min (17.4 -> 15.3 pts), Cooper Flagg 34.2 -> 29.4 (21.4 -> 19.0), Moussa Cisse
+32.0 -> 27.5, Max Christie 31.1 -> 26.8. Elsewhere the minutes come off EVERY teammate about equally (HOU: -1.7 each,
+the 2.6-minute end of the bench to 0.8), not from the stand-in's position group -- the sim's minutes layer has no
+position competition.
+
+**Priced rows moved:** teammates' posted main lines (pts/reb/ast/threes, median over books, pre-tip): **91 of 158
+(58%)** move their sim P(over) by >= 3 pp, against 11 of 158 under the noise arm.
+
+**Game lines barely move** (the market anchor holds team totals): |d total| <= 2.3 (POR_PHX 231.0 -> 233.3), d
+p_home_win at most 0.062 (LAC_SAC 0.634 -> 0.572).
+
+**The player layer already over-sums the anchored team score**, and the stand-in returns the affected teams to the
+league's normal state. Sum of player `pts_mean` minus the team's score mean: unaffected sides (12) **+8.5** on
+average; affected sides without stand-ins (A) **+3.0** (DAL -7.1, LAC -6.2, SAC -4.0: the missing player's points
+were nowhere); with stand-ins (B) **+10.2**. That is why teammates give back only ~0.5-0.7 of the stand-in's points:
+the player layer is not constrained to the team score in any sim. The NBA prop calibration (book blend, own-rate
+shrink) was fitted on sims of complete pools, so B is the population it was fitted on -- this is the opposite of a new
+mechanism the calibration had been absorbing (standard: "mechanism vs estimator").
+
+**Reachability / coverage:** `nba_sim_roster_audit.py` (sibling's tool, reads `players[]`) reports priced-missing 13
+in both arms -- as it must, the stand-ins are hidden. Of B's 13, **10 are simulated stand-ins** recorded in
+`context.no_history_standins`; the **3 left are all injury exclusions** (Podziemski GSW and Nesmith IND with history,
+Dybantsa WAS without). (The lane block's "<= 2" forgot Dybantsa is also injury-excluded.) Engine inputs: B's persisted
+`engine_inputs/2026-10-21/*.pkl` carry the stand-ins with `pool_source`, so the live re-sim plays them and
+`resim_live_game` hides them (unit-tested).
+
+### Pre-registered predictions, scored
+
+- **P1 reachability -- MET.** B: `NBA_NO_HISTORY_STANDINS` admitted 11 in the parent and both workers (same list);
+  8 sims (10 sides) carry them in `context.no_history_standins`, none in `players[]`. A and A2: 0 lines, 0 sims
+  with the key.
+- **P2 conservation -- MET** (within 0.1 min on every side).
+- **P3 stand-in sim minutes within 4 of his prior -- FAILED** (4 of 10: Kyrie +2.0, Wagler -2.8, Acuff -3.3,
+  Lendeborg -2.5; misses VanVleet -8.2, Boozer -8.1, Haliburton -7.9, Wilson -6.9, Lillard -5.9, Peterson -5.7; mean
+  -4.9). Not a stand-in defect: the sim compresses EVERY high-minute player in a deep pool (A, HOU: Amen Thompson
+  roll10 39.0 -> 32.6 simulated, Jabari Smith 35.9 -> 29.1); the misses are exactly the 13-15 player pools. The prior is
+  an input like every player's roll minutes and is compressed the same way.
+- **P4 teammates' points 0.6-1.0 x the stand-in's -- FAILED** (0.50-0.69; 5 of 10 inside). Cause above: the player
+  layer is not tied to the team score.
+- **P5 P.J. Washington <= 35 -- MET** (39.1 -> 33.6).
+
+### Reuse path (the standard's "publishing is not sufficient")
+
+Arm C = a copy of A's finished tree (stand-ins OFF sims on disk), re-run with stand-ins ON and overwrite OFF, so the
+REAL reuse branch decides (10:15-10:20 PM CT). It rebuilt exactly the games whose pool changed and reused the rest:
+`SMART_SIM_REUSE_STALE_POOL ... drift=DAL:+1/-0;HOU:+1/-0 reuse=False` for HOU_DAL, LAC_SAC, LAL_GSW, MEM_UTA, NOP_IND,
+POR_PHX, TOR_CHI and WAS_MIL; `reuse=True` for BKN_CHA, MIA_MIN, ORL_ATL (md5 unchanged); `wrote 8, skipped 3, 0
+failures`. So switching `on` needs no forced re-sim -- the sibling lane's pool stamp already invalidates. WAS_MIL
+rebuilds although Dybantsa is then injury-excluded (the stamp is taken before the injury map): one wasted re-sim, no
+output change. Switching back `off` invalidates the same way (the pool shrinks).
+
+## Pipeline trace (code = `origin/claude/nba-current-rosters` + this lane's hooks)
+
+```
+refresh-worker -> scripts/refresh_odds_sources.py -> scripts/refresh_nba_oddsapi_props.py (export_props_predictions_local)
+  -> basketball_props_smart_sim.export_props_predictions_with_smart_sim_local
+       writes processed/props_predictions_<D>.csv            (unchanged: a stand-in never gets a row here)
+    -> _smart_sim_run_date_local
+         props_df = read props_predictions_<D>.csv
+         [HOOK 1] nba_no_history_standins.add_standins        reads rosters_<season>.csv (current_roster_index),
+                                                              oddsapi_player_props_<D>.csv, rotation_stints/player_checks_*,
+                                                              player_logs.csv (league per-minute rates only)
+                                                              logs NBA_NO_HISTORY_STANDINS {admitted, skipped, detail}
+         injury map / recency exclusions / reuse pool check (props_pool_verdict) all see the stand-in row
+      -> worker: _smart_sim_worker_init_local re-reads props_predictions_<D>.csv
+         [HOOK 2] add_standins again (same files, same rows)
+      -> _smart_sim_worker_run_local -> orchestrator simulate_smart_game (_team_players_from_props -> pool)
+           -> _persist_engine_inputs_once_local: engine_inputs/<D>/<HOME>_<AWAY>.pkl (pool frames WITH pool_source)
+         [HOOK 3] after the props_pool stamp: nba_no_history_standins.tag_sim_output -- removes the stand-in from
+                  players[], writes context.no_history_standins {team: [{player_name, minutes_prior, min/pts/reb/ast/threes
+                  means}]}
+       writes processed/smart_sim_<D>_<HOME>_<AWAY>.json
+live: nba live tick -> live_resim.load_engine_inputs -> resim_live_game
+         [FILTER] _hide_standin_remainders drops pool_source == SOURCE players from player_remainders
+                  (out["no_history_standins_hidden"]) -> build_live_props never sees him
+```
+
+Inputs, all disk-backed under `SYNDICATE_DATA_ROOT` and allowlisted: `rotation_stints/*.csv` and
+`oddsapi_player_props_*.csv` (HOT_ARTIFACT_PATTERNS), `rosters_*.csv` (EXPORT_ONLY, sibling lane). No engine
+dataclass field is added -- the stand-in populates columns every pool row already has -- so the basketball input
+checklists have nothing new to gate; the switch is an env flag.
