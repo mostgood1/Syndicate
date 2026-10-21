@@ -16,7 +16,7 @@ produced. MEASURED 2026-08-26 against production
 Prior seasons ran 21-31 files a month, continuously. This one stopped in May.
 
 **NOTHING IN SYNDICATE EVER PRODUCED IT.** Every caller of the vendor's
-`fetch_boxscores_for_date` lives inside `vendor/*_betting_repo/`.
+`fetch_boxscores_for_date` lived inside `vendor/*_betting_repo/` (deleted 2026-10-20).
 `scripts/artifact_freshness.py:67` MONITORS the family ("wnba boxscores") while
 nothing writes it, so the gap was being reported to nobody for three months.
 

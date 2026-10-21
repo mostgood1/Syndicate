@@ -574,10 +574,10 @@ _SOCCER: dict[str, str] = {
 # by name on opening night -- they would present as "Kalshi lists no NHL
 # props", which is false.
 #
-# THE VALUES ARE NOT INVENTED HERE. They are the keys this repo's own vendored
-# NHL module already requests and recognises
-# (`vendor/nhl_betting_repo/nhl_betting/data/player_props.py`), whose comment
-# says they are "confirmed by provider docs and our live probes" and warns that
+# THE VALUES ARE NOT INVENTED HERE. They are the keys the vendored
+# NHL module requested and recognised
+# (`vendor/nhl_betting_repo/nhl_betting/data/player_props.py`, deleted 2026-10-20; archived), whose comment
+# said they are "confirmed by provider docs and our live probes" and warns that
 # an unsupported key 422s the request. `player_points` / `player_assists` /
 # `player_goals` / `player_shots_on_goal` are the four it requests;
 # `player_saves` and `player_blocked_shots` are in the map it parses arrivals
@@ -602,7 +602,7 @@ _HOCKEY: dict[str, str] = {
     "goals": "player_goals",
     "goal": "player_goals",
     "player_goals": "player_goals",
-    # SOG is the box-score abbreviation and the vendored module's own canonical
+    # SOG is the box-score abbreviation and the vendored module's canonical
     # name for this market, so both spellings resolve.
     "shots on goal": "player_shots_on_goal",
     "shots_on_goal": "player_shots_on_goal",

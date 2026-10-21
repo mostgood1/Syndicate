@@ -6,7 +6,7 @@ WHAT THIS IS FOR. `game_shape.py` refuses to publish possession pace for
 basketball because the card-context payload has no box stats. Possessions do
 exist, in a different family: `live_pbp_stats_<date>.jsonl` carries
 `pbp_possessions` with a real `poss_est` (`FGA + TOV + 0.44*FTA - OREB`,
-`vendor/wnba_betting_repo/app.py:3572`). This reads that family and produces the
+`_live_pbp_possession_stats`, now in `syndicate/features/wnba/live_tick/tick.py`). This reads that family and produces the
 per-game series a model could actually be fitted on.
 
 **IT LEADS WITH THE DENOMINATOR AND REFUSES BELOW A FLOOR.** That is the whole

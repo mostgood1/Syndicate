@@ -618,7 +618,8 @@ def _isolate_kalshi_discovered_series():
 # nearest unexplained symptom.
 #
 # TWO ROOTS, NOT ONE `[widened after the first full-suite sweep]`. `data/` is
-# the mirror `CLAUDE.md` names; `vendor/<repo>/data/` is the second, and a test
+# the mirror `CLAUDE.md` names; `vendor/<repo>/data/` WAS the second (vendor/ is empty since 2026-10-20;
+# `engines/<engine>/data/` is guarded the same way), and a test
 # run rewrites all 114 rows of the TRACKED
 # `vendor/wnba_betting_repo/data/processed/schedule_2026.csv` -- a file
 # `wnba_fixture_identity` calls "the git-tracked master", with the
@@ -663,7 +664,7 @@ _TRACKED_DATA_MIRROR = os.path.normcase(str(_REPO_ROOT_FOR_GUARD / "data"))
 def _guarded_mirror_roots() -> tuple[str, ...]:
     """Every tracked artifact mirror in this repo, not just the obvious one.
 
-    `data/` is the mirror `CLAUDE.md` names. `vendor/<repo>/data/` is the second
+    `data/` is the mirror `CLAUDE.md` names. `vendor/<repo>/data/` WAS the second (empty since 2026-10-20)
     one, and it was found the way the rest of this guard was -- by measurement:
     a test run rewrites the TRACKED
     `vendor/wnba_betting_repo/data/processed/schedule_2026.csv`, all 114 rows of

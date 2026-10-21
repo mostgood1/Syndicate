@@ -4072,7 +4072,7 @@ $sharedOddsApiKey = Get-ProcessEnvValue -Names @('ODDS_API_KEY', 'ODDSAPI_KEY', 
 $ncaabOddsApiKey = Get-ProcessEnvValue -Names @('NCAAB_THEODDS_API_KEY', 'THEODDSAPI_KEY', 'THEODDS_API_KEY')
 
 if (Test-SportEnabled 'MLB') {
-    # The NATIVE MLB daily update (lane mlb-unified-update-native): Syndicate's generated copy of the vendored script
+    # The NATIVE MLB daily update (lane mlb-unified-update-native): Syndicate's frozen, maintained copy of the formerly vendored script
     # (syndicate/features/mlb/FROZEN_FROM_VENDOR.md), run from the engine DATA root engines\mlb -- as scripts/run_mlb_daily_sim_job.py
     # runs it on the fleet. The variable names, and the step's Workflow id and Name below, are kept: they key branches
     # and appear in run manifests.

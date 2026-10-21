@@ -42,7 +42,7 @@ except Exception:
 
 # EDIT: the app's repo root and web dir, named explicitly because this module lives in Syndicate. They are DATA roots
 # only, and since lane mlb-engine-data-native-p4 the root is Syndicate's engines/mlb (where the vendored app's
-# vendor/mlb_bettingv2 data now lives); nothing is put on sys.path, and every import below is Syndicate's own.
+# data moved); nothing is put on sys.path, and every import below is Syndicate's own.
 _ROOT = Path(__file__).resolve().parents[4] / "engines" / "mlb"
 _WEB_DIR = _ROOT / "tools" / "web"
 

@@ -3,7 +3,7 @@
 WHY IT EXISTS. `wnba_source/data/processed/boxscores_<date>.csv` stopped being
 produced after 2026-05-24 (one orphan file on 2026-08-18, then nothing), and
 NOTHING IN SYNDICATE EVER PRODUCED IT — every caller of the vendor's
-`fetch_boxscores_for_date` lives inside `vendor/*_betting_repo/`, while
+`fetch_boxscores_for_date` lived inside `vendor/*_betting_repo/` (deleted 2026-10-20), while
 `scripts/artifact_freshness.py:67` monitored the family for three months with no
 writer behind it.
 

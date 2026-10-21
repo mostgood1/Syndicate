@@ -2950,7 +2950,7 @@ def _run_mlb_betting_day_backfill_tick() -> dict[str, Any] | None:
     marker keyed to that date, and self-disables (returns None) on every
     later tick once that marker shows ok=True for the same date -- so the
     operator can leave the env var set without it silently repeating.
-    Narrowly scoped by design: passes --date so the vendored script's own
+    Narrowly scoped by design: passes --date so the manifest script's own
     full_publish path (which touches the season-wide manifest/recap
     shared across every date) never engages; only this date's own card
     and day-payload files are written. --out/--recap-md are pointed at a
@@ -7887,7 +7887,7 @@ def main() -> int:
 
     # LIVE-LENS LOOP, MOVED HERE FROM live-odds-worker.
     #
-    # Its heavy piece is MLB's vendored 120-sim-per-live-game Monte Carlo, run
+    # Its heavy piece is MLB's 120-sim-per-live-game Monte Carlo (vendored when measured; native since 2026-10-16), run
     # in-process with no batching. MEASURED 2026-08-08 with 13 MLB games live:
     #
     #     03:29:43   295.5MB   live_lens_tick_before_mlb

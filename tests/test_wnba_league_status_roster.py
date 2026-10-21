@@ -5,8 +5,8 @@ roster (~600 rows, 30 NBA teams, no WNBA player). With no processed rosters file
 to nba_api's static_teams (the NBA list) + CommonTeamRoster, and its ScoreboardV2 call had no league_id, so NBA
 ATL/GSW/... were flagged on slate.
 
-Subprocess pattern as tests/test_wnba_predict_date_league.py: the vendored package's `src` must not join this
-process's sys.path.
+Subprocess pattern as tests/test_wnba_predict_date_league.py: the WNBA ports run in a child process, so their imports
+stay out of this one.
 """
 
 from __future__ import annotations

@@ -7,8 +7,8 @@ NBA repo's categories (basketball/nba + nba-pre-season). It wrote the NBA
 preseason game Miami Heat @ Toronto Raptors (MIA@TOR) as a WNBA game, and the
 WNBA cards page and market board served it.
 
-The vendored package is exercised in a SUBPROCESS with its `src` on
-PYTHONPATH: adding that dir to this process's sys.path changes other tests'
+The ports are exercised in a SUBPROCESS (repo root on
+PYTHONPATH): adding that dir to this process's sys.path changes other tests'
 imports (see tests/test_wnba_refresh_runner.py). The fixtures are real Bovada
 responses recorded 2026-10-02, trimmed to each event's game-lines group.
 """

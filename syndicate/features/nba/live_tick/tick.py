@@ -9295,7 +9295,7 @@ def _live_lens_tick_payload(
     Extracted from api_cron_live_lens_tick's body (unchanged below this point)
     so callers in-process (e.g. Syndicate's nba/live_lens.py) can invoke the
     real pace-adjusted live projection logic directly, the same way MLB's
-    live_lens.py calls vendor.mlb_bettingv2.tools.web.flask_frontend's
+    live_lens.py calls its live-lens port's (live_lens_port/app_slice.py)
     _live_lens_payload, instead of only reaching it over HTTP via this route.
     """
     # Keep the in-memory first-BET cache bounded across long-lived processes.

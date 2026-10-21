@@ -28,7 +28,7 @@ once a lineup is posted and is empty before (verified live 2026-08-08: 15/15
 games posted for 08-07, 0/15 for 08-08).
 
 DELIBERATELY NOT A SUBPROCESS, unlike `fetch_mlb_injuries.py`. That one is
-isolated because it imports the vendored MLB client and a bug there must not
+isolated because it imported the vendored MLB client (it carries its own now) and a bug there must not
 take down the shared loop. This talks to StatsAPI over urllib with no vendored
 import at all, so the isolation buys nothing and would cost a process spawn on
 every check — on the worker whose memory ceiling is the binding constraint.

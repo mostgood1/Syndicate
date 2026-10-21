@@ -5270,7 +5270,7 @@ def _refresh_wnba_boxscores(selected_date: str) -> None:
     PLACED BESIDE `settle_orders` DELIBERATELY. `wnba_source/data/processed/
     boxscores_<date>.csv` is the only source that can tell WNBA settlement a
     game is OVER, and it had NO PRODUCER AT ALL -- every caller of the vendor's
-    fetcher lives inside `vendor/*_betting_repo/`, while
+    fetcher lived inside `vendor/*_betting_repo/` (deleted 2026-10-20), while
     `scripts/artifact_freshness.py:67` monitored the family for three months
     with nothing behind it. Coverage stopped 2026-05-24. A producer that lives
     somewhere else from its consumer is exactly how that happens, so this one

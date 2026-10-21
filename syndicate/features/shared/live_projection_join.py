@@ -6,7 +6,7 @@ model priced against a re-priced market yields the score, not an edge (`#340`,
 and the 2026-07-12 measurement behind it: a +23-point "edge" on a coin-flip).
 
 But a live-aware projection ALREADY EXISTS and nothing joins it. MLB's live lens
-runs a vendored 120-sim-per-live-game Monte Carlo on live-odds-worker's tick and
+runs a 120-sim-per-live-game Monte Carlo (vendored then; native since 2026-10-16) on live-odds-worker's tick and
 emits, per prop: `liveProjection`, `modelProbOver`, `actualSoFar`. Measured
 2026-08-10: 4 live MLB games, 862 projected rows, **0 with an edge** -- while the
 re-sim was producing live numbers for those same games on another service.

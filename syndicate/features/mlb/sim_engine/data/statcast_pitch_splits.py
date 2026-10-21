@@ -143,7 +143,7 @@ def fetch_pitcher_pitch_splits(
 
     # ARTIFACT FIRST, cache second. `#440`.
     #
-    # The DiskCache lives at `vendor/mlb_bettingv2/data/cache/statcast`, which on
+    # The DiskCache lives at `engines/mlb/data/cache/statcast` (it was `vendor/mlb_bettingv2/...`), which on
     # Render is inside the EPHEMERAL REPO CHECKOUT and is gitignored -- so it can
     # never ship with a deploy and anything written there is discarded by the
     # next one. That is the `#389` failure shape exactly. A worker therefore

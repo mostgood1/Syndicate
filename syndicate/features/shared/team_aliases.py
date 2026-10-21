@@ -236,7 +236,7 @@ _NFL_ALIAS_TO_NAME: dict[str, str] = {
 # went unjoined. Roughly 22 rows (`no_match|wnba|h2h: 7`, `|totals: 15`).
 #
 # SAFE BECAUSE THE SUPPLEMENT IS WNBA-ONLY. `_alias_map` applies it for
-# `slug == "wnba"` and the vendored map still wins where it answers, so NBA's
+# `slug == "wnba"` and the smart-sim alias map still wins where it answers, so NBA's
 # `phx -> Phoenix Suns` is untouched. Each key added here names exactly ONE
 # WNBA club -- verified against the live club list, where every one of these
 # cities fields a single WNBA team -- so nothing ambiguous is being resolved by
@@ -973,8 +973,8 @@ def _alias_map(sport: str) -> dict[str, str]:
     if slug in {"nba", "wnba"}:
         mapping = _basketball_alias_to_name(slug)
         if slug == "wnba":
-            # setdefault direction matters: the vendored map wins where it has
-            # an answer, so a future vendor fix silently takes precedence over
+            # setdefault direction matters: the smart-sim alias map wins where it has
+            # an answer, so a future fix there silently takes precedence over
             # this supplement rather than being shadowed by it.
             def _merge() -> dict[str, str]:
                 merged = dict(_WNBA_ALIAS_SUPPLEMENT)

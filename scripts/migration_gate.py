@@ -188,7 +188,7 @@ ALLOWED_PROTECTED_MIRROR_ASSET_VIOLATIONS = (
     # WHY THE TWO PREFIXES CANNOT BE SATISFIED HERE:
     #   `daily\daily_summary_` -- the data IS present and current (above). Only
     #       the manifest under-reports it, and regenerating that manifest locally
-    #       would be WORSE: `vendor/mlb_bettingv2/data/daily/` holds no
+    #       would be WORSE: `vendor/mlb_bettingv2/data/daily/` (now gone) held no
     #       `daily_summary_*.json` at all, so a local refresh would overwrite a
     #       CI-written manifest with one recording less than what is on disk.
     #   `daily\sims\` -- not in `HOT_ARTIFACT_PATTERNS`, so the export endpoint

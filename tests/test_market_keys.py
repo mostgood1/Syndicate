@@ -89,8 +89,8 @@ class MarketKeyTests(unittest.TestCase):
         requires this call to resolve before it will register a prop series --
         so NO NHL prop could ever auto-register, in season or out.
 
-        The values are this repo's own: `vendor/nhl_betting_repo/.../
-        player_props.py` requests player_points/assists/goals/shots_on_goal
+        The values came from the vendored NHL module (`vendor/nhl_betting_repo/.../
+        player_props.py`, deleted 2026-10-20), which requested player_points/assists/goals/shots_on_goal
         and its comment calls them "confirmed by provider docs and our live
         probes".
         """

@@ -1,11 +1,11 @@
-"""No ScoreboardV2 call in the vendored WNBA package may read the NBA slate (lane wnba-scoreboard-league-id).
+"""No ScoreboardV2 call in the WNBA ports may read the NBA slate (lane wnba-scoreboard-league-id; vendored package until 2026-10-20).
 
 nba_api's ScoreboardV2 defaults to league_id "00", the NBA. Called without it from the WNBA package it returns NBA
 games: predictions_<date>.csv held NBA preseason games (fixed in dfb193bb) and league_status_<date>.csv flagged NBA
 teams on slate (fc6ecc96). This file guards the whole package structurally and checks the remaining reachable
 callers (boxscores, pbp, finals) end to end.
 
-Subprocess pattern as tests/test_wnba_predict_date_league.py: the vendored package's `src` must not join this
+Subprocess pattern as tests/test_wnba_predict_date_league.py: the WNBA package's imports must not join this
 process's sys.path.
 """
 

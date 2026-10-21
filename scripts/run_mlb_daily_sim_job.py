@@ -1,4 +1,4 @@
-"""Run MLB's vendored daily Monte Carlo sim for one date, then publish results.
+"""Run MLB's daily Monte Carlo sim (the native tools, syndicate/features/mlb/native) for one date, then publish results.
 
 Invoked (detached) by syndicate/features/shared/live_refresh_loop.py's MLB
 daily-sim gate. Deliberately blocking inside this wrapper process rather than
@@ -41,7 +41,7 @@ from syndicate.features.shared.refresh_state_store import write_text_file
 
 
 def _vendor_mlb_data_dir(vendor_cwd: Path) -> Path:
-    # Mirrors vendor/mlb_bettingv2/tools/daily_update_multi_profile.py's own
+    # Mirrors daily_update_multi_profile.py's own (syndicate/features/mlb/native/tools/; formerly vendored)
     # _DATA_DIR resolution exactly. render.yaml sets MLB_BETTING_DATA_ROOT to
     # /opt/render/project/data/mlb_source/source_artifacts/data on all three
     # services -- a first attempt at this fix assumed the vendored tool read
@@ -412,7 +412,7 @@ def main() -> int:
         # for 49+ minutes with absolutely no signal whether it was making
         # progress or hung -- forcing a judgment call on whether to kill it.
         # Each poll interval writes a progress snapshot (see
-        # _write_progress_snapshot) parsed from the vendored sim's own
+        # _write_progress_snapshot) parsed from the sim's own
         # existing "[N/M] ..." per-game log lines, readable via
         # /api/ops/live-refresh/state without waiting for the run to finish.
         with tempfile.NamedTemporaryFile(prefix="mlb_daily_sim_", suffix=".log", delete=False) as out_fh:

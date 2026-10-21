@@ -10,8 +10,8 @@ mapped tricodes through `static_teams.get_teams()` -- the NBA list. Measured
 live: league "00" on 10-06 -> 4 NBA games; league "10" -> 0; league "10" on
 10-07 -> ATL/NYL/GSV/LVA.
 
-Same subprocess pattern as tests/test_wnba_bovada_league.py: the vendored
-package's `src` must not join this process's sys.path.
+Same subprocess pattern as tests/test_wnba_bovada_league.py: the WNBA source-CLI
+port runs in a child process, so its imports stay out of this one.
 """
 
 from __future__ import annotations

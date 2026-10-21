@@ -56,7 +56,7 @@ THREE DESIGN DECISIONS, each with a reason that is not stylistic.
    consumer can tell where it came from, and an absent lookup is `None` --
    never an interpolation, never a default of 1.0.
 
-3. **NO VENDOR IMPORT.** `shared/` must not depend on `vendor/mlb_bettingv2`.
+3. **NO VENDOR IMPORT.** `shared/` must not depend on vendored code (`vendor/mlb_bettingv2` was the case; deleted 2026-10-20).
    Every accessor here is duck-typed over attribute *or* mapping access, so the
    same function reads a live `LiveSituation`, a JSON round-trip of one, or a
    test fixture dict. This also keeps the module importable in contexts where

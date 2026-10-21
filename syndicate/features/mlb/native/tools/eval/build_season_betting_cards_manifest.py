@@ -705,7 +705,7 @@ def _day_token(date_str: str) -> str:
 def _odds_data_roots() -> List[Path]:
     """Every plausible location for the odds tree, best first.
 
-    `_ROOT` is the vendored package root -- i.e. the CODE CHECKOUT. On a
+    `_ROOT` is the engine root (engines/mlb) -- i.e. the CODE CHECKOUT. On a
     hosted deploy the real odds live on the mounted data disk, and the
     checkout carries only whatever happens to be committed (as of
     2026-08-04: exactly four files, all for 2026_07_10). So resolving odds

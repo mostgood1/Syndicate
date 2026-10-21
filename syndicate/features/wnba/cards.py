@@ -6161,7 +6161,7 @@ def _fallback_live_lines_game(
     # ("are you getting live odds from the live odds worker?"). The correct
     # mechanism already exists and predates this session:
     # scripts/refresh_wnba_oddsapi_props.py (its own per-game live-odds
-    # step) already calls this same vendored function on a worker's
+    # step) already runs this function's port (wnba/live_period_lines.py) on a worker's
     # schedule and is meant to write real period_totals/period_spreads into
     # the live_lines snapshot artifact this function's caller
     # (build_live_lines_payload) reads FIRST, before ever reaching this

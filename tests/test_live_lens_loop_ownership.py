@@ -1,6 +1,6 @@
 """The live-lens loop moves from live-odds-worker (2Gi) to refresh-worker (4Gi).
 
-WHY. Its heavy piece is MLB's vendored 120-sim-per-live-game Monte Carlo, run
+WHY. Its heavy piece is MLB's 120-sim-per-live-game Monte Carlo (vendored when measured; native since 2026-10-16), run
 in-process with no batching. MEASURED 2026-08-08 with 13 MLB games live:
 
     03:29:43   295.5MB   live_lens_tick_before_mlb

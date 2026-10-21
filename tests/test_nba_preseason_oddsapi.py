@@ -5,7 +5,7 @@ nothing asked for it, so every NBA preseason day read as "no games" and the
 vendored NBA repo fell back to Bovada's `nba-pre-season` scrape. The Bovada
 game-odds uses are removed (user decision 2026-10-02).
 
-The vendored NBA package runs in a SUBPROCESS with its `src` on PYTHONPATH, so
+The NBA source-CLI port runs in a SUBPROCESS (repo root on PYTHONPATH), so
 this process's sys.path/sys.modules stay untouched.
 """
 

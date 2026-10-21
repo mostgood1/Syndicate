@@ -36,7 +36,7 @@ def _load_module():
     try:
         spec.loader.exec_module(module)
     except Exception:
-        # The vendored module pulls in heavy sim-engine imports that are not
+        # The module pulls in heavy sim-engine imports that are not
         # needed for path resolution; a partially-initialised module still
         # exposes the functions under test.
         pass

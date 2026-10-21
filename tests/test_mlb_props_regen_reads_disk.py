@@ -3,7 +3,7 @@
 WHY (lane `mlb-sim-retrigger-churn`, 2026-09-18). `_mlb_props_now_available_needs_regen`
 read `daily_top_props_<date>.json` with `refresh_state_store.read_json_file`. On
 refresh-worker the state backend is keyvalue and this path is not excluded from it,
-so the read went to REDIS -- while the vendored MLB app writes the file to DISK, and
+so the read went to REDIS -- while the MLB app (vendored then) wrote the file to DISK, and
 every other top-props reader reads disk. The check therefore never saw top props and
 re-simmed the whole slate every time its cooldown expired.
 

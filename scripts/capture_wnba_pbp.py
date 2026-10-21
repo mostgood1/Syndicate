@@ -9,7 +9,8 @@ compute pbp. It reads a stored snapshot and, when there is none with games,
 returns a HARDCODED ALL-NULL SKELETON -- one entry per requested event id, with
 `ok: True`, `pbp_quarters` all null, and empty possession/attempt maps. The real
 computation (`_live_pbp_possession_stats`, `poss_est = FGA + TOV + 0.44*FTA -
-OREB`) lives in `vendor/wnba_betting_repo/app.py`, not in Syndicate.
+OREB`) lived in `vendor/wnba_betting_repo/app.py`; since 2026-10-12 it is in Syndicate's port,
+`syndicate/features/wnba/live_tick/tick.py`.
 
 Two consequences, both measured 2026-08-16:
 

@@ -1086,8 +1086,8 @@ def _odds_history_market_key(row: Mapping[str, Any]) -> str | None:
         "matchup",
         "home_team",
         "away_team",
-        # WNBA/NBA's live_lens_projections_*.jsonl rows (log_pregame_prop_signals.py,
-        # the vendored live-lens pregame signal logger) use "home"/"away" for
+        # WNBA/NBA's live_lens_projections_*.jsonl rows (written by log_pregame_prop_signals.py,
+        # the vendored live-lens pregame signal logger, while it ran) use "home"/"away" for
         # team names, not "home_team"/"away_team" -- confirmed live 2026-07-29:
         # without these, every player prop for the same game collapsed onto
         # the same history entry (every distinguishing field below silently

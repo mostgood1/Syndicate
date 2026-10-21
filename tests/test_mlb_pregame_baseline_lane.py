@@ -20,7 +20,7 @@ ledger for 2026-08-20..09-07 the field was populated on **0 of 2872 v4 rows and
 0 of 531 v5 rows**, while `progress_fraction` / `inning` / `outs` -- added in the
 SAME commit and carried over the SAME hops -- were 2872/2872.
 
-So these tests call the vendored builder for real, and one of them
+So these tests call the real builder (live_gameline_from_lens), and one of them
 (`test_the_camelcase_shape_yields_no_baseline`) exists solely to prove the suite
 can TELL THE TWO KEY NAMES APART -- without it, the assertions below could pass
 for a reason unrelated to the fix.

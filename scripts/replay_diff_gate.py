@@ -127,7 +127,7 @@ DATA_ROOT_ESCAPES: tuple[str, ...] = tuple(
     # `source_roots.py:117-120`: when set, the per-sport root wins and
     # SYNDICATE_DATA_ROOT is never consulted at all.
     [f"SYNDICATE_{sport}_SOURCE_ROOT" for sport in ("MLB", "NBA", "WNBA", "NHL", "NFL", "NCAAF", "NCAAB", "SOCCER")]
-    # Read at IMPORT time (`vendor/mlb_bettingv2/tools/web/flask_frontend.py:120-135`),
+    # Read at IMPORT time (`syndicate/features/mlb/live_lens_port/app_slice.py:152`, from the vendored flask_frontend),
     # so a value here is baked in before any test could patch it.
     + [f"{sport}_LIVE_LENS_DIR" for sport in ("MLB", "NBA", "NHL", "WNBA")]
 )
