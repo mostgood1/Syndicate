@@ -1,4 +1,4 @@
-"""PARITY GATE for plan P6: the native smart-sim orchestrator against the vendored one, game for game.
+"""PARITY GATE for plan P6: the native smart-sim orchestrator, game for game (record / replay / compare).
 
 Lane basketball-native-orchestrator. P1's tools (record_basketball_engine_corpus.py,
 basketball_engine_parity.py) gate the possession ENGINE one draw at a time. This
@@ -6,17 +6,12 @@ gates the ORCHESTRATOR one GAME at a time: the whole ``simulate_smart_game`` cal
 plus the bridge's post-processing, i.e. the dict written to
 ``smart_sim_<date>_<H>_<A>.json``.
 
-THE TWO ARMS. Both run the CURRENT bridge's ports. Only the orchestrator differs.
-  native    ``basketball_props_smart_sim._call_source_simulate_smart_game_local``
-            as it is now (syndicate/features/basketball_engine/orchestrator).
-  vendored  the pre-P6 bridge functions, read by AST from git at
-            ``VENDORED_ARM_COMMIT`` (``_vendor_smart_sim_code_root_local``,
-            ``_import_real_smart_sim_module_local``, ``_build_local_smart_sim_module``,
-            ``_call_source_simulate_smart_game_local``) and executed against the
-            current module's namespace. That is the code production ran, so it is
-            not a hand copy. It imports ``vendor/<pkg>_repo/src/<pkg>/sim/smart_sim.py``
-            and patches its 29 names exactly as production did. It refuses if the
-            vendored import fails, because the old flat fallback is not an arm.
+THE ARM: ``basketball_props_smart_sim._call_source_simulate_smart_game_local`` as it is now
+(syndicate/features/basketball_engine/orchestrator). The VENDORED arm (the pre-P6 bridge read from git at
+``VENDORED_ARM_COMMIT`` and run against vendor/) and the vendored-vs-native ``builders`` comparison were removed
+2026-10-20 (lane vendor-dead-paths-cleanup): vendor/ is empty. Parity was proven on the fleet 2026-10-10 (deploys.md). ``VENDORED_ARM_COMMIT``
+and ``BRIDGE_REL`` stay: they name the pre-P6 bridge in git history, which the orchestrator input checklist's
+positive control reads.
 
 SUBCOMMANDS
   record   Run the production entrypoint (``_smart_sim_run_date_local``, the call
@@ -43,7 +38,6 @@ keyvalue/redis keys dropped. No value is printed. Run it at ``nice -n 19``.
 from __future__ import annotations
 
 import argparse
-import ast
 import copy
 import hashlib
 import json
@@ -51,7 +45,6 @@ import math
 import os
 import pickle
 import random
-import subprocess
 import sys
 import time
 from pathlib import Path
@@ -61,15 +54,9 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-# The last commit on origin/main whose bridge still ran the VENDORED orchestrator.
+# The last commit on origin/main whose bridge still ran the VENDORED orchestrator (git history; read by the
+# orchestrator input checklist's positive control).
 VENDORED_ARM_COMMIT = "a1ee82cb"
-_VENDORED_ARM_FUNCS = (
-    "_vendor_smart_sim_code_root_local",
-    "_import_real_smart_sim_module_local",
-    "_build_local_smart_sim_module",
-    "_call_source_simulate_smart_game_local",
-    "_import_advanced_stats_builders_local",
-)
 BRIDGE_REL = "syndicate/features/shared/basketball_props_smart_sim.py"
 
 
@@ -145,49 +132,6 @@ def _bridge():
     return bps
 
 
-_VENDORED_NS: dict[str, Any] | None = None
-
-
-VENDORED_BRIDGE_FILE: Path | None = None  # --vendored-bridge: the bridge at VENDORED_ARM_COMMIT, exported (no git on the copy)
-
-
-def vendored_arm_source(commit: str = VENDORED_ARM_COMMIT) -> str:
-    if VENDORED_BRIDGE_FILE is not None:
-        raw = Path(VENDORED_BRIDGE_FILE).expanduser().read_bytes()
-        print(f"VENDORED_ARM file={VENDORED_BRIDGE_FILE} sha256={hashlib.sha256(raw).hexdigest()[:16]}", flush=True)
-        text = raw.decode("utf-8")
-    else:
-        text = subprocess.check_output(["git", "-C", str(ROOT), "show", f"{commit}:{BRIDGE_REL}"]).decode("utf-8")
-    tree = ast.parse(text)
-    lines = text.split("\n")
-    defs = {n.name: n for n in tree.body if isinstance(n, ast.FunctionDef)}
-    missing = [f for f in _VENDORED_ARM_FUNCS if f not in defs]
-    if missing:
-        raise SystemExit(f"vendored arm: {missing} not found at {commit}")
-    return "\n\n\n".join("\n".join(lines[defs[f].lineno - 1 : defs[f].end_lineno]) for f in _VENDORED_ARM_FUNCS) + "\n"
-
-
-def _vendored_ns() -> dict[str, Any]:
-    global _VENDORED_NS
-    if _VENDORED_NS is None:
-        bps = _bridge()
-        ns = dict(vars(bps))
-        ns["_REAL_SMART_SIM_MODULE_CACHE_LOCAL"] = {}
-        ns["_ADVANCED_STATS_BUILDER_MODULE_CACHE_LOCAL"] = {}
-        ns["_simulate_smart_game_local"] = None  # the deleted flat fallback: never an arm
-        exec(compile(vendored_arm_source(), f"<vendored arm {VENDORED_ARM_COMMIT}>", "exec"), ns)
-        _VENDORED_NS = ns
-    return _VENDORED_NS
-
-
-def call_vendored(*, processed_root: Path, league_code: str, kwargs: dict[str, Any]):
-    ns = _vendored_ns()
-    module = ns["_build_local_smart_sim_module"](processed_root=processed_root, league_code=league_code)
-    if not hasattr(module, "build_exact_ladder_payload") or getattr(module, "simulate_smart_game", None) is None:
-        raise SystemExit("vendored arm: the vendored smart_sim did not import (refusing the flat fallback)")
-    return ns["_call_source_simulate_smart_game_local"](smart_sim_module=module, processed_root=processed_root, league_code=league_code, kwargs=kwargs)
-
-
 def call_native(*, processed_root: Path, league_code: str, kwargs: dict[str, Any]):
     return _NATIVE_CALL(processed_root=processed_root, league_code=league_code, kwargs=kwargs)
 
@@ -199,7 +143,9 @@ def arm_fn(arm: str):
     global _NATIVE_CALL
     if _NATIVE_CALL is None:
         _NATIVE_CALL = _bridge()._call_source_simulate_smart_game_local
-    return call_vendored if arm == "vendored" else call_native
+    if arm != "native":
+        raise SystemExit(f"arm {arm!r}: only 'native' exists (the vendored arm went with vendor/, {NOTE})")
+    return call_native
 
 
 def _rng_states():
@@ -362,59 +308,6 @@ def cmd_replay(args) -> int:
     return 0 if report["verdict"] == "PASS" else 1
 
 
-def cmd_builders(args) -> int:
-    """PASS 2: the team-advanced-stats builders, vendored vs native, on one data root.
-
-    For each date it calls exactly what `_ensure_team_advanced_stats_asof_local` calls (season from
-    `_season_from_date_str_local`, as_of = compact date, min_games 10 for NBA else 1), through each arm's
-    `_import_advanced_stats_builders_local`, and compares the DataFrames: shape, columns, every cell."""
-    import pandas as pd
-
-    bps = _bridge()
-    processed_root = args.source_root.expanduser().resolve() / "data" / "processed"
-    league = bps._league_for_code_local(args.league)
-    package = "wnba_betting" if args.league != "nba" else "nba_betting"
-    v_box, v_logs = _vendored_ns()["_import_advanced_stats_builders_local"](package_name=package, processed_root=processed_root)
-    if v_box is None or v_logs is None:
-        raise SystemExit("vendored arm: advanced-stats builders did not import")
-    n_box, n_logs = bps._import_advanced_stats_builders_local(package_name=package, processed_root=processed_root)
-    min_games = 1 if args.league != "nba" else 10
-    rows, cells, bad = [], 0, 0
-    for date in [d.strip() for d in args.dates.split(",") if d.strip()]:
-        season = bps._season_from_date_str_local(date_str=date, league=league)
-        as_of = date.replace("-", "")
-        for kind, vf, nf in (
-            ("boxscores", v_box.compute_team_advanced_stats_from_boxscores, n_box.compute_team_advanced_stats_from_boxscores),
-            ("player_logs", v_logs.compute_team_advanced_stats_from_player_logs, n_logs.compute_team_advanced_stats_from_player_logs),
-        ):
-            out = {}
-            for arm, fn in (("vendored", vf), ("native", nf)):
-                try:
-                    out[arm] = fn(int(season), min_games=min_games, as_of=as_of)
-                except Exception as exc:
-                    out[arm] = f"{type(exc).__name__}: {exc}"
-            a, b = out["vendored"], out["native"]
-            if isinstance(a, pd.DataFrame) and isinstance(b, pd.DataFrame):
-                same = a.shape == b.shape and list(a.columns) == list(b.columns) and a.equals(b)
-                n = int(a.size)
-            else:
-                same = (not isinstance(a, pd.DataFrame)) and (not isinstance(b, pd.DataFrame)) and str(a) == str(b)
-                n = 0
-            cells += n
-            bad += 0 if same else 1
-            row = {"date": date, "season": season, "kind": kind, "rows": int(a.shape[0]) if isinstance(a, pd.DataFrame) else None,
-                   "cells": n, "verdict": "IDENTICAL" if same else "DIFFERS",
-                   "vendored": None if isinstance(a, pd.DataFrame) else str(a)[:200], "native": None if isinstance(b, pd.DataFrame) else str(b)[:200]}
-            print("ORCH_BUILDERS " + json.dumps(row), flush=True)
-            rows.append(row)
-    rep = {"league": args.league, "comparisons": len(rows), "non_empty": sum(1 for r in rows if r["rows"]), "cells_compared": cells, "failed": bad,
-           "verdict": "PASS" if rows and bad == 0 else "FAIL", "rows": rows}
-    if args.json_out:
-        Path(args.json_out).expanduser().write_text(json.dumps(rep, indent=2), encoding="utf-8")
-    print("ORCH_BUILDERS_PARITY " + json.dumps({k: v for k, v in rep.items() if k != "rows"}), flush=True)
-    return 0 if rep["verdict"] == "PASS" else 1
-
-
 def cmd_compare_outputs(args) -> int:
     """Two `replay --save-outputs` directories, game by game, every leaf.
 
@@ -460,7 +353,7 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--dates", required=True)
     r.add_argument("--source-root", required=True, type=Path, help="SCRATCH copy of <league>_source")
     r.add_argument("--out-dir", required=True, type=Path)
-    r.add_argument("--arm", choices=("vendored", "native"), default="vendored")
+    r.add_argument("--arm", choices=("native",), default="native")
     r.add_argument("--n-sims", type=int, default=100)
     r.add_argument("--seed", type=int, required=True)
     r.add_argument("--max-games", type=int, default=None)
@@ -468,26 +361,18 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--prod-data-root", default="~/syndicate-prod/data")
     r.add_argument("--scratch-data-root", default=None)
     r.add_argument("--out-prefix", default="smart_sim")
-    r.add_argument("--vendored-bridge", type=Path, default=None, help=f"{BRIDGE_REL} as of {VENDORED_ARM_COMMIT} (else git show)")
     p = sub.add_parser("replay")
     p.add_argument("--corpus", required=True, type=Path)
-    p.add_argument("--arm", choices=("vendored", "native"), required=True)
+    p.add_argument("--arm", choices=("native",), default="native")
     p.add_argument("--league", choices=("nba", "wnba"), default=None)
     p.add_argument("--json-out", default=None)
     p.add_argument("--env-from-pid", type=int, default=None)
     p.add_argument("--prod-data-root", default="~/syndicate-prod/data")
     p.add_argument("--scratch-data-root", default=None)
-    p.add_argument("--vendored-bridge", type=Path, default=None)
     p.add_argument("--save-outputs", default=None, help="pickle each replayed output here (for compare-outputs)")
     co = sub.add_parser("compare-outputs")
     co.add_argument("--dir-a", required=True)
     co.add_argument("--dir-b", required=True)
-    bl = sub.add_parser("builders")
-    bl.add_argument("--league", required=True, choices=("nba", "wnba"))
-    bl.add_argument("--dates", required=True)
-    bl.add_argument("--source-root", required=True, type=Path, help="SCRATCH copy of <league>_source")
-    bl.add_argument("--json-out", default=None)
-    bl.add_argument("--vendored-bridge", type=Path, default=None)
     c = sub.add_parser("compare")
     c.add_argument("--dir-a", required=True)
     c.add_argument("--prefix-a", default="smart_sim")
@@ -497,9 +382,7 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument("--root-a", default=None)
     c.add_argument("--root-b", default=None)
     args = ap.parse_args(argv)
-    global VENDORED_BRIDGE_FILE
-    VENDORED_BRIDGE_FILE = getattr(args, "vendored_bridge", None)
-    return {"record": cmd_record, "replay": cmd_replay, "compare": cmd_compare, "builders": cmd_builders, "compare-outputs": cmd_compare_outputs}[args.cmd](args)
+    return {"record": cmd_record, "replay": cmd_replay, "compare": cmd_compare, "compare-outputs": cmd_compare_outputs}[args.cmd](args)
 
 
 if __name__ == "__main__":

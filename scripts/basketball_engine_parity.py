@@ -1,38 +1,24 @@
-"""PARITY GATE: the native basketball engine against the vendored one, seed for seed.
+"""PARITY GATE: the native basketball engine against PRODUCTION's recorded output, call for call.
 
-Lane basketball-native-engine (plan P1, docs/ai_context/basketball_live_native_plan.md).
+Lane basketball-native-engine (plan P1, docs/ai_context/basketball_live_native_plan.md); reference moved off the
+vendored engine 2026-10-19 (lane basketball-engine-gate-recorded-reference); the vendored mode itself removed
+2026-10-20 (lane vendor-dead-paths-cleanup, vendor/ is empty).
 
-Every case is ONE engine call, exactly as production made it: the kwargs that
-the vendored ``smart_sim.simulate_smart_game`` passed to Syndicate's per-draw
-helper, plus the RNG state just before the call. The case is replayed twice
-from that state:
-
-  vendored  -- ``vendor/<league>_betting_repo/src/<pkg>/sim/events.py``, called
-               the way production called it (kwargs filtered to the
-               signature, ``_sample_lineup`` swapped for Syndicate's
-               ``_sample_lineup_local`` for the call). This is a frozen copy of
-               the removed ``_call_real_events_entrypoint_local``.
-  native    -- ``syndicate.features.basketball_engine`` with
-               ``league=league_params(code)`` and
-               ``sample_lineup=_sample_lineup_local``.
-
-A case passes only if every output LEAF is equal (ints exactly, floats bit for
-bit, NaN == NaN) AND the RNG state after the call is identical. The second
-condition proves that both engines drew the same number of variates, not just
-that they printed the same box.
+Every case is ONE engine call, exactly as production made it: the kwargs, the RNG state just before the call, and a
+digest of the output production computed (``scripts/record_basketball_engine_corpus.py``). The native engine
+(``syndicate.features.basketball_engine``, ``league=league_params(code)``, ``sample_lineup=_sample_lineup_local``) is
+replayed from that state and must reproduce the digest bit for bit. A default-off switch therefore changes nothing,
+and a mismatch is a behaviour change. ``--compare-sims`` compares two native arms' smart_sim artifacts leaf for leaf.
 
     py -3 scripts/basketball_engine_parity.py --corpus <dir>      # replay a recorded corpus (exit 1 on any mismatch)
-    py -3 scripts/basketball_engine_parity.py --synthetic 200     # synthetic smoke over both leagues
 
-The corpus comes from ``scripts/record_basketball_engine_corpus.py``. Report the
-corpus size with the result: a PASS over 3 cases is not a PASS over 3,000.
+Report the corpus size with the result: a PASS over 3 cases is not a PASS over 3,000.
 """
 
 from __future__ import annotations
 
 import argparse
 import copy
-import importlib
 import inspect
 import json
 import math
@@ -48,7 +34,6 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-PACKAGES = {"nba": "nba_betting", "wnba": "wnba_betting"}
 ENTRYPOINTS = ("simulate_pbp_game_boxscore", "simulate_event_level_boxscore")
 
 
@@ -56,48 +41,10 @@ ENTRYPOINTS = ("simulate_pbp_game_boxscore", "simulate_event_level_boxscore")
 # The two engines
 # ---------------------------------------------------------------------------------------------------------------
 
-_VENDORED: dict[str, Any] = {}
-
-
-def vendored_events_module(league: str):
-    """The vendored events module, imported from the repo's vendor tree (as production's loader did)."""
-    league = str(league).lower()
-    if league not in _VENDORED:
-        package = PACKAGES[league]
-        src = ROOT / "vendor" / f"{package}_repo" / "src"
-        if str(src) not in sys.path:
-            sys.path.insert(0, str(src))
-        _VENDORED[league] = importlib.import_module(f"{package}.sim.events")
-    return _VENDORED[league]
-
-
 def production_sampler():
     from syndicate.features.shared.basketball_props_smart_sim import _sample_lineup_local
 
     return _sample_lineup_local
-
-
-def call_vendored(*, league: str, entrypoint: str, kwargs: dict[str, Any], sampler) -> Any:
-    """FROZEN copy of production's `_call_real_events_entrypoint_local` (removed from basketball_props_smart_sim)."""
-    module = vendored_events_module(league)
-    fn = getattr(module, entrypoint)
-    params = inspect.signature(fn).parameters
-    if not any(p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values()):
-        kwargs = {k: v for k, v in kwargs.items() if k in params}
-    sentinel = object()
-    original = getattr(module, "_sample_lineup", sentinel)
-    if sampler is not None:
-        module._sample_lineup = sampler
-    try:
-        return fn(**kwargs)
-    finally:
-        if original is sentinel:
-            try:
-                delattr(module, "_sample_lineup")
-            except AttributeError:
-                pass
-        else:
-            module._sample_lineup = original
 
 
 def call_native(*, league: str, entrypoint: str, kwargs: dict[str, Any], sampler) -> Any:
@@ -155,10 +102,9 @@ def replay_case_recorded(case: dict[str, Any], sampler) -> dict[str, Any]:
     Run the native engine from the recorded RNG state and compare a digest of its output with the digest production
     computed for this call when the corpus was recorded. Bit-identical or a mismatch: the digest is a sha256 of the
     pickled output, so it is stricter than the leaf compare (it also sees dtypes, key order and container types).
-    It needs no vendored code. Its limit: a digest says THAT outputs differ, not WHERE -- while vendor/ exists,
-    `--reference vendored` gives the leaf-level diff. The corpus records the state BEFORE each call only, so the
-    after-call RNG state is not compared here (the vendored mode compared it; output equality implies the same draws
-    in every case seen so far).
+    Its limit: a digest says THAT outputs differ, not WHERE -- `--compare-sims` on two native arms gives the leaf
+    diff. The corpus records the state BEFORE each call only, so the after-call RNG state is not compared (output
+    equality implies the same draws in every case seen so far).
     """
     from scripts.record_basketball_engine_corpus import output_digest
 
@@ -186,53 +132,8 @@ def replay_case_recorded(case: dict[str, Any], sampler) -> dict[str, Any]:
         return {"ok": False, "diffs": diffs, "raised": None, "fidelity": False}
     match = output_digest(out) == recorded
     if not match:
-        diffs.append("native output digest != production's recorded output digest (run --reference vendored for the leaf diff, "
-                     "while vendor/ exists)")
+        diffs.append("native output digest != production's recorded output digest (leaf diff: --compare-sims on two native arms)")
     return {"ok": match, "diffs": diffs, "raised": None, "fidelity": match}
-
-
-def replay_case(case: dict[str, Any], sampler) -> dict[str, Any]:
-    """REFERENCE = THE VENDORED ENGINE (`--reference vendored`; needs vendor/). Run one recorded call through both
-    engines from the recorded RNG state."""
-    league, entrypoint = case["league"], case["entrypoint"]
-    results = {}
-    for name, fn in (("vendored", call_vendored), ("native", call_native)):
-        rng = np.random.Generator(np.random.PCG64())
-        rng.bit_generator.state = copy.deepcopy(case["rng_state"])
-        kwargs = dict(case["kwargs"])
-        kwargs["rng"] = rng
-        err = None
-        try:
-            out = fn(league=league, entrypoint=entrypoint, kwargs=kwargs, sampler=sampler)
-        except Exception as exc:  # an exception is an output too: both must raise the same thing
-            out, err = None, f"{type(exc).__name__}: {exc}"
-        results[name] = (out, err, rng.bit_generator.state)
-    (vo, ve, vs), (no, ne, ns) = results["vendored"], results["native"]
-    diffs: list[str] = []
-    if entrypoint == "simulate_event_level_boxscore":
-        # The vendored event-level simulator cannot run (NameError on its first possession); the native one refuses
-        # by name. Parity here means: both fail. If the vendored one ever SUCCEEDS, that is a mismatch to look at.
-        if ve is None:
-            diffs.append("vendored event-level simulator returned a result; the native refusal assumed it never can")
-        if ne is None or "NotImplementedError" not in ne:
-            diffs.append(f"native event-level simulator did not refuse: {ne!r}")
-        return {"ok": not diffs, "diffs": diffs, "raised": ve}
-    if ve != ne:
-        diffs.append(f"exception: vendored={ve!r} native={ne!r}")
-    else:
-        leaf_diffs(vo, no, "$", diffs)
-    if vs != ns:
-        diffs.append("rng state after the call differs (different number of draws)")
-    # Replay fidelity: the vendored replay must reproduce what PRODUCTION computed for this call, or the corpus did not
-    # capture the call faithfully and a native match would prove nothing about production.
-    fidelity = None
-    if case.get("production_digest"):
-        from scripts.record_basketball_engine_corpus import output_digest
-
-        fidelity = output_digest(vo) == case["production_digest"]
-        if not fidelity:
-            diffs.append("vendored replay does not reproduce production's recorded output (corpus fidelity)")
-    return {"ok": not diffs, "diffs": diffs, "raised": ve, "fidelity": fidelity}
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -324,17 +225,13 @@ def compare_sim_artifacts(dir_a: Path, prefix_a: str, dir_b: Path, prefix_b: str
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="Native basketball engine parity vs production's recorded output, or vs the vendored engine (exit 1 on any mismatch).")
+    ap = argparse.ArgumentParser(description="Native basketball engine parity vs production's recorded output (exit 1 on any mismatch).")
     src = ap.add_mutually_exclusive_group(required=True)
     src.add_argument("--corpus", type=Path, help="directory of recorded *.pkl games")
-    src.add_argument("--synthetic", type=int, help="number of synthetic cases")
     src.add_argument("--compare-sims", nargs=4, metavar=("DIR_A", "PREFIX_A", "DIR_B", "PREFIX_B"), help="end-to-end: compare two arms' smart_sim JSON artifacts")
     ap.add_argument("--volatile-key", action="append", default=[], help="a key to ignore in --compare-sims (repeatable; listed in the report)")
     ap.add_argument("--data-roots", nargs=2, metavar=("ROOT_A", "ROOT_B"), help="--compare-sims: each arm's data root, normalised to one token before comparing")
     ap.add_argument("--sampler", choices=("production", "vendored_default"), default="production")
-    ap.add_argument("--reference", choices=("recorded", "vendored"), default="recorded",
-                    help="recorded (default): native vs production's recorded output digest, no vendor/ needed; "
-                         "vendored: native vs the vendored engine, leaf for leaf (needs vendor/)")
     ap.add_argument("--json-out", type=Path)
     ap.add_argument("--max-cases", type=int, default=None)
     args = ap.parse_args(argv)
@@ -350,18 +247,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0 if report["verdict"] == "PASS" else 1
 
     sampler = production_sampler() if args.sampler == "production" else None
-    reference = args.reference
-    if args.synthetic and reference == "recorded":
-        reference = "vendored"  # synthetic cases have no recorded production output; the comparison is to the vendored engine
-    if reference == "vendored":
-        try:
-            vendored_events_module("nba")
-        except Exception as exc:  # the vendored trees are being deleted (lane nba-vendor-delete)
-            print(f"--reference vendored / --synthetic need the vendored engine, which is not importable here ({type(exc).__name__}: {exc}). "
-                  "Use --corpus with the default --reference recorded.", file=sys.stderr)
-            return 2
-    replay = replay_case_recorded if reference == "recorded" else replay_case
-    cases = iter_corpus(args.corpus) if args.corpus else synthetic_cases(args.synthetic)
+    reference = "recorded"  # the only reference since the vendored engine went (field kept: readouts quote it)
+    cases = iter_corpus(args.corpus)
     started = time.time()
     n = n_fail = n_raised = n_fidelity = 0
     by_league: dict[str, dict[str, int]] = {}
@@ -370,7 +257,7 @@ def main(argv: list[str] | None = None) -> int:
     for source, case in cases:
         if args.max_cases is not None and n >= args.max_cases:
             break
-        res = replay(case, sampler)
+        res = replay_case_recorded(case, sampler)
         n += 1
         games.add(source.split("#")[0])
         tally = by_league.setdefault(f"{case['league']}:{case['entrypoint']}", {"cases": 0, "mismatch": 0})
@@ -383,15 +270,15 @@ def main(argv: list[str] | None = None) -> int:
             n_fail += 1
             tally["mismatch"] += 1
             where = {"case": source, "league": case["league"], "date": case.get("date"), "entrypoint": case["entrypoint"]}
-            if not failures:  # where to start the --reference vendored / --compare-sims diff
+            if not failures:  # where to start a --compare-sims diff
                 print(f"FIRST_MISMATCH {json.dumps(where)}", file=sys.stderr, flush=True)
             if len(failures) < 25:
                 failures.append({**where, "diffs": res["diffs"][:10]})
     report = {
-        "substrate": f"corpus:{args.corpus}" if args.corpus else f"synthetic:{args.synthetic}",
+        "substrate": f"corpus:{args.corpus}",
         "sampler": args.sampler,
         "reference": reference,
-        "corpus_stamp": corpus_stamp(args.corpus) if args.corpus else None,
+        "corpus_stamp": corpus_stamp(args.corpus),
         "cases": n,
         "games": len(games),
         "mismatched_cases": n_fail,

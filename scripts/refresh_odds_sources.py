@@ -788,7 +788,7 @@ def _is_vendor_tree(path: Path) -> bool:
     return resolved == vendor_dir or vendor_dir in resolved.parents
 
 
-def _basketball_source_root(slug: str, vendor_repo_name: str) -> Path:
+def _basketball_source_root(slug: str) -> Path:
     override = str(os.environ.get(_source_root_env_var(slug)) or "").strip()
     if override:
         override_root = Path(override).expanduser().resolve()
@@ -809,9 +809,8 @@ def _basketball_source_root(slug: str, vendor_repo_name: str) -> Path:
     hosted_root = _hosted_data_source_root(slug)
     if hosted_root.exists() or _render_data_root_text():
         return hosted_root.resolve()
-    vendor_root = REPO_ROOT / "vendor" / vendor_repo_name
-    if vendor_root.exists():
-        return vendor_root.resolve()
+    # The vendor/<league>_betting_repo fallback that sat here was removed (lane vendor-dead-paths-cleanup): the trees are deleted, and on a
+    # dev checkout an ignored leftover dir would have won over the repo's own data bundle.
     return _local_source_bundle_root(slug)
 
 
@@ -830,9 +829,8 @@ def _source_root_resolution(spec: SportSpec) -> dict[str, Any]:
         chosen_root = _local_source_bundle_root("soccer")
         origin = "render_data_root" if _render_data_root_text() else "repo_data_root"
     elif spec.slug in {"nba", "wnba"}:
-        vendor_repo_name = "nba_betting_repo" if spec.slug == "nba" else "wnba_betting_repo"
-        chosen_root = _basketball_source_root(spec.slug, vendor_repo_name)
-        origin = "render_data_root" if _render_data_root_text() else ("vendor_repo" if (REPO_ROOT / "vendor" / vendor_repo_name).exists() else "repo_data_root")
+        chosen_root = _basketball_source_root(spec.slug)
+        origin = "render_data_root" if _render_data_root_text() else "repo_data_root"
     else:
         chosen_root = _source_repo_root(spec.slug, spec.source_repo_name)
         origin = "sport_env_override" if str(os.environ.get(_source_root_env_var(spec.slug)) or "").strip() else ("render_data_root" if _render_data_root_text() else "workspace_repo")
@@ -848,7 +846,7 @@ def _source_root_resolution(spec: SportSpec) -> dict[str, Any]:
 
 
 def _build_nba_steps(args: argparse.Namespace) -> list[RefreshStep]:
-    source_root = _basketball_source_root("nba", "nba_betting_repo")
+    source_root = _basketball_source_root("nba")
     python_exe = _venv_python(REPO_ROOT)
     payload = _build_nba_payload(args, env_key="NBA_BETTING_ODDSAPI_PROPS_JOB")["NBA_BETTING_ODDSAPI_PROPS_JOB"]
     payload_data = json.loads(payload)
@@ -888,7 +886,7 @@ def _build_nba_steps(args: argparse.Namespace) -> list[RefreshStep]:
 
 
 def _build_wnba_steps(args: argparse.Namespace) -> list[RefreshStep]:
-    source_root = _basketball_source_root("wnba", "wnba_betting_repo")
+    source_root = _basketball_source_root("wnba")
     python_exe = _venv_python(REPO_ROOT)
     payload = _build_nba_payload(args, env_key="WNBA_BETTING_ODDSAPI_PROPS_JOB")["WNBA_BETTING_ODDSAPI_PROPS_JOB"]
     payload_data = json.loads(payload)

@@ -344,7 +344,7 @@ def run_sim(args) -> int:
     out = Path(args.out) / f"sim_{args.league}"
     out.mkdir(parents=True, exist_ok=True)
     scratch = Path(args.scratch) / f"sc_w{args.worker}"
-    sys.path[:0] = [str(code / "scripts"), str(code), str(code / "vendor" / "nba_betting_repo" / "src")]
+    sys.path[:0] = [str(code / "scripts"), str(code)]  # vendored src entry removed (lane vendor-dead-paths-cleanup): vendor/ is empty
     import backtest_nba_lines_props as bt
     import resim_nba_availability as rs
 

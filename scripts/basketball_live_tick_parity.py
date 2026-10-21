@@ -1,28 +1,19 @@
-"""Parity gate: Syndicate basketball live-lens tick (syndicate/features/<league>/live_tick) == the vendored tick.
+"""Parity replay: Syndicate basketball live-lens tick (syndicate/features/<league>/live_tick) against RECORDED vendored output.
 
-Lane nba-live-tick-native (2026-10-12; NBA and WNBA, `--league`). Record/replay, one arm per PROCESS (each arm
-resolves its data root at import):
+Lane nba-live-tick-native (2026-10-12; NBA and WNBA, `--league`). The vendored tick was recorded against live games
+(network tape + the files it opened + its output) while vendor/ existed; the `record` arm, the vendored replay arm and
+`reduce` were removed 2026-10-20 (lane vendor-dead-paths-cleanup, vendor/ is empty). What stays, one arm per PROCESS:
 
-  record   run the VENDORED `_live_lens_tick_payload(date)` against the real network. Every `requests` call is
-           recorded to a tape (the OddsAPI key is stripped from the tape and from the replay key), every data file
-           the tick OPENS is listed (audit hook), and the output -- the return value plus every file the tick wrote
-           -- is saved.
-  replay   run either arm with the network served from the tape. A request the tape does not hold is a failure.
-  compare  leaf-compare two outputs; `--plant` first changes one leaf, which must then be reported (positive control).
-  reduce   cut a committable test fixture out of a recording (see `cmd_reduce`).
+  replay   run the PORT with the network served from a recorded tape. A request the tape does not hold is a failure.
+  compare  leaf-compare two outputs (e.g. the recorded vendored output vs the port's); `--plant` first changes one
+           leaf, which must then be reported (positive control).
 
 DETERMINISM. Nothing in the tick uses threads or randomness, so the only other inputs are the clock and the files:
-`time.time()` is a call counter (base + 1 ms per call) and `datetime.now()/utcnow()/today()` read the same counter,
-so two arms that take the same path see the same clock. The real network call in `record` runs on the real clock and
-does not advance the counter. Each arm gets its OWN copy of the data root and live-lens dir (the tick read-modify-
-writes `processed/live_lens_registry/` and appends to `player_ids.csv` and the JSONLs).
-
-The vendored arm runs with <LEAGUE>_BETTING_RECONCILE_REPO_DATA=0: the vendored app's IMPORT copies its repo data into
-the data root, which is not part of the tick (and the port does not do it; see the plan's P6 section).
+`time.time()` is a call counter (base + 1 ms per call) and `datetime.now()/utcnow()/today()` read the same counter.
+Each replay gets its OWN copy of the data root and live-lens dir (the tick read-modify-writes
+`processed/live_lens_registry/` and appends to `player_ids.csv` and the JSONLs).
 
 Usage (fleet, at Idle):
-  nice -n 19 python scripts/basketball_live_tick_parity.py record --league nba --date 2026-10-12 --data-root A/data --live-lens-dir A/ll \
-      --tape T.json --out vendored.json
   nice -n 19 python scripts/basketball_live_tick_parity.py replay --league nba --arm port --date 2026-10-12 --data-root B/data \
       --live-lens-dir B/ll --tape T.json --out port.json
   python scripts/basketball_live_tick_parity.py compare vendored.json port.json [--plant]
@@ -105,80 +96,20 @@ def _key(method: str, url: str, params: Any, data: Any, json_body: Any) -> str:
     return f"{method.upper()} {base}?{urllib.parse.urlencode(q)} {body}"
 
 
-def _scrub(url: str) -> str:
-    parts = urllib.parse.urlsplit(url)
-    q = [(k, v) for k, v in urllib.parse.parse_qsl(parts.query, keep_blank_values=True) if k.lower() not in SECRET_PARAMS]
-    return urllib.parse.urlunsplit((parts.scheme, parts.netloc, parts.path, urllib.parse.urlencode(q), ""))
-
-
-def doctor_live(url: str, content: bytes) -> bytes:
-    """`--doctor-live`: make a FINISHED slate read as in progress (3rd quarter, 5:00) in ESPN scoreboard responses.
-
-    For parity when no game is live (the WNBA between playoff games). Both arms are fed the same doctored bytes from
-    the tape, so this changes which branches run, never whether the arms agree. A doctored tape is marked as such
-    and is never evidence about live behaviour.
-    """
-    if "espn.com" not in url or "/scoreboard" not in url:
-        return content
-    try:
-        j = json.loads(content.decode("utf-8"))
-    except Exception:
-        return content
-    for ev in j.get("events") or []:
-        for comp in ev.get("competitions") or []:
-            for status in (comp.get("status"), ev.get("status")):
-                if not isinstance(status, dict):
-                    continue
-                status["period"] = 3
-                status["displayClock"] = "5:00"
-                status["clock"] = 300.0
-                t = status.setdefault("type", {})
-                t.update({"state": "in", "completed": False, "name": "STATUS_IN_PROGRESS", "description": "In Progress",
-                          "detail": "5:00 - 3rd Quarter", "shortDetail": "5:00 - 3rd"})
-    return json.dumps(j).encode("utf-8")
-
-
-DOCTOR = False
-
-
-def install_tape(mode: str, tape: dict) -> None:
+def install_tape(tape: dict) -> None:
     import requests
     from requests.structures import CaseInsensitiveDict
 
-    real_request = requests.sessions.Session.request
     entries = tape.setdefault("entries", [])
     queues: dict[str, list[dict]] = {}
-    if mode == "replay":
-        for e in entries:
-            queues.setdefault(e["key"], []).append(e)
+    for e in entries:
+        queues.setdefault(e["key"], []).append(e)
     tape.setdefault("misses", [])
 
     def fake(self, method, url, params=None, data=None, headers=None, cookies=None, files=None, auth=None,
              timeout=None, allow_redirects=True, proxies=None, hooks=None, stream=None, verify=None, cert=None,
              json=None):
         key = _key(method, url, params, data, json)
-        if mode == "record":
-            CLOCK.passthrough += 1
-            try:
-                resp = real_request(self, method, url, params=params, data=data, headers=headers, cookies=cookies,
-                                    files=files, auth=auth, timeout=timeout, allow_redirects=allow_redirects,
-                                    proxies=proxies, hooks=hooks, stream=stream, verify=verify, cert=cert, json=json)
-            except Exception as exc:  # recorded and re-raised, so the replay raises the same class
-                entries.append({"key": key, "error": [type(exc).__module__, type(exc).__name__, str(exc)[:300]]})
-                raise
-            finally:
-                CLOCK.passthrough -= 1
-            if DOCTOR:
-                resp._content = doctor_live(url, resp.content)
-            entries.append({
-                "key": key,
-                "status": resp.status_code,
-                "headers": {k: v for k, v in resp.headers.items() if k.lower() in {"content-type", "x-requests-remaining", "x-requests-used", "x-requests-last"}},
-                "encoding": resp.encoding,
-                "url": _scrub(resp.url),
-                "content": base64.b64encode(resp.content).decode("ascii"),
-            })
-            return resp
         q = queues.get(key)
         if not q:
             tape["misses"].append(key)
@@ -254,7 +185,7 @@ def snapshot_hashes(data_root: Path, live_lens_dir: Path) -> dict[str, str]:
     return snap
 
 
-def run_arm(args, mode: str, arm: str) -> int:
+def run_arm(args) -> int:
     data_root = Path(args.data_root).resolve()
     live_lens_dir = Path(args.live_lens_dir).resolve()
     league = args.league
@@ -262,34 +193,27 @@ def run_arm(args, mode: str, arm: str) -> int:
     # Both apps read <LEAGUE>_BETTING_DATA_ROOT / <LEAGUE>_LIVE_LENS_DIR first (WNBA then falls back to the NBA names).
     os.environ[f"{up}_BETTING_DATA_ROOT"] = str(data_root)
     os.environ[f"{up}_LIVE_LENS_DIR"] = str(live_lens_dir)
-    os.environ["NBA_BETTING_RECONCILE_REPO_DATA"] = "0"
-    os.environ["WNBA_BETTING_RECONCILE_REPO_DATA"] = "0"
     os.environ.pop("LIVE_LENS_DIR", None)
     tape_path = Path(args.tape)
-    tape: dict[str, Any] = load_tape(tape_path) if mode == "replay" else {"date": args.date, "league": args.league}
+    tape: dict[str, Any] = load_tape(tape_path)
     base = float(tape.get("clock_base") or _time_mod.time())
     tape["clock_base"] = base
     # Whether the OddsAPI key is SET changes the path (no key = no OddsAPI calls). The tape never holds the key; it
     # records whether the recording had one, and a replay reproduces that with a dummy, whatever its own shell holds.
-    if mode == "record":
-        tape["odds_api_key_present"] = bool((os.environ.get("ODDS_API_KEY") or "").strip())
-    elif tape.get("odds_api_key_present"):
+    if tape.get("odds_api_key_present"):
         os.environ["ODDS_API_KEY"] = "parity-replay-dummy-key"
     else:
         os.environ.pop("ODDS_API_KEY", None)
-    if mode == "record" and getattr(args, "doctor_live", False):
-        global DOCTOR
-        DOCTOR = True
-        tape["doctored"] = "finished slate rewritten to in-progress (3rd, 5:00) in ESPN scoreboards"
     install_clock(base)
-    install_tape(mode, tape)
+    install_tape(tape)
     opened: set[str] = set()
     install_open_audit({"data": data_root, "live_lens": live_lens_dir}, opened)
     before = snapshot_hashes(data_root, live_lens_dir)
     sys.path.insert(0, str(ROOT))
     import importlib
 
-    mod = f"vendor.{league}_betting_repo.app" if arm == "vendored" else f"syndicate.features.{league}.live_tick.tick"
+    arm = "port"
+    mod = f"syndicate.features.{league}.live_tick.tick"
     fn = importlib.import_module(mod)._live_lens_tick_payload
     clock_at_call = CLOCK.calls
     CLOCK.calls = 0  # import-time clock reads differ between arms; the tick itself starts at 0 in both
@@ -306,15 +230,12 @@ def run_arm(args, mode: str, arm: str) -> int:
         "result": result,
         "files": collect_outputs(data_root, live_lens_dir, before),
         "meta": {"data_root": str(data_root), "live_lens_dir": str(live_lens_dir), "clock_calls": CLOCK.calls, "import_clock_calls": clock_at_call, "seconds": round(elapsed, 2),
-                 "requests": len(tape["entries"]) if mode == "record" else None,
+                 "requests": None,
                  "misses": tape.get("misses", []), "served": tape.get("served", [])},
     }
     Path(args.out).write_text(json.dumps(out, sort_keys=True, default=str), encoding="utf-8")
-    if mode == "record":
-        tape["opened"] = sorted(opened)
-        tape_path.write_text(json.dumps(tape, sort_keys=True), encoding="utf-8")
     games = (result.get("value") or {}).get("games") if isinstance(result.get("value"), dict) else None
-    print(json.dumps({"arm": arm, "mode": mode, "ok": result["ok"], "error": result.get("error"),
+    print(json.dumps({"arm": arm, "mode": "replay", "ok": result["ok"], "error": result.get("error"),
                       "files_written": len(out["files"]), "clock_calls": CLOCK.calls,
                       "requests": out["meta"]["requests"], "misses": len(out["meta"]["misses"]),
                       "opened": len(opened), "seconds": out["meta"]["seconds"],
@@ -409,77 +330,26 @@ def cmd_compare(args) -> int:
     return 0 if not diffs else 1
 
 
-def cmd_reduce(args) -> int:
-    """Cut a COMMITTABLE fixture out of a recording.
-
-    The tick opens thousands of files per run (365 MB on 2026-10-12), so the fixture keeps only the files it opened
-    that are dated `--date` and are at most `--max-bytes`. Every other input is simply
-    absent, for BOTH arms: the fixture's golden output is the VENDORED tick replayed on this same reduced root
-    (`replay --arm vendored --allow-misses`), so the reduction changes which branches run, never whether the arms
-    agree. The tape is written gzipped and without the opened-file list.
-    """
-    tape = load_tape(Path(args.tape))
-    out = Path(args.dest)
-    roots = {"data": Path(args.pristine_data_root), "live_lens": Path(args.pristine_live_lens_dir)}
-    kept = skipped = size = 0
-    for item in tape.get("opened", []):
-        tag, _, rel = item.partition("/")
-        sp = roots[tag] / rel
-        if not sp.is_file():
-            continue
-        n = sp.stat().st_size
-        if n > args.max_bytes or args.date not in rel:
-            skipped += 1
-            continue
-        dp = out / tag / rel
-        dp.parent.mkdir(parents=True, exist_ok=True)
-        dp.write_bytes(sp.read_bytes())
-        kept += 1
-        size += n
-    (out / "data" / "processed").mkdir(parents=True, exist_ok=True)
-    (out / "live_lens").mkdir(parents=True, exist_ok=True)
-    tape.pop("opened", None)
-    tape.pop("misses", None)
-    (out / "tape.json.gz").write_bytes(gzip.compress(json.dumps(tape, sort_keys=True).encode("utf-8"), mtime=0))
-    print(json.dumps({"kept": kept, "skipped": skipped, "bytes": size, "dest": str(out)}))
-    return 0
-
-
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
-    for name in ("record", "replay"):
-        p = sub.add_parser(name)
-        p.add_argument("--league", choices=("nba", "wnba"), required=True)
-        p.add_argument("--date", required=True)
-        p.add_argument("--data-root", required=True)
-        p.add_argument("--live-lens-dir", required=True)
-        p.add_argument("--tape", required=True)
-        p.add_argument("--out", required=True)
-        if name == "record":
-            p.add_argument("--doctor-live", action="store_true", help="see doctor_live(); the tape is marked doctored")
-        if name == "replay":
-            p.add_argument("--arm", choices=("vendored", "port"), required=True)
-            p.add_argument("--allow-misses", action="store_true", help="a tape miss raises in the arm (deterministically) instead of failing the run")
+    p = sub.add_parser("replay")
+    p.add_argument("--league", choices=("nba", "wnba"), required=True)
+    p.add_argument("--date", required=True)
+    p.add_argument("--data-root", required=True)
+    p.add_argument("--live-lens-dir", required=True)
+    p.add_argument("--tape", required=True)
+    p.add_argument("--out", required=True)
+    p.add_argument("--arm", choices=("port",), default="port", help="the port; the vendored arm went with vendor/")
+    p.add_argument("--allow-misses", action="store_true", help="a tape miss raises in the arm (deterministically) instead of failing the run")
     c = sub.add_parser("compare")
     c.add_argument("a")
     c.add_argument("b")
     c.add_argument("--plant", action="store_true")
-    f = sub.add_parser("reduce")
-    f.add_argument("--tape", required=True)
-    f.add_argument("--date", required=True)
-    f.add_argument("--pristine-data-root", required=True)
-    f.add_argument("--pristine-live-lens-dir", required=True)
-    f.add_argument("--max-bytes", type=int, default=1_000_000)
-    f.add_argument("--dest", required=True)
     args = ap.parse_args(argv)
-    if args.cmd == "record":
-        return run_arm(args, "record", "vendored")
     if args.cmd == "replay":
-        return run_arm(args, "replay", args.arm)
-    if args.cmd == "compare":
-        return cmd_compare(args)
-    return cmd_reduce(args)
+        return run_arm(args)
+    return cmd_compare(args)
 
 
 if __name__ == "__main__":

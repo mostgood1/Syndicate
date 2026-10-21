@@ -544,7 +544,7 @@ class RefreshOddsSourcesTests(unittest.TestCase):
                 (Path(self._RENDER_DISK) / "nfl_source").resolve(),
             )
             self.assertEqual(
-                module._basketball_source_root("nba", "nba_betting_repo"),
+                module._basketball_source_root("nba"),
                 (Path(self._RENDER_DISK) / "nba_source").resolve(),
             )
 

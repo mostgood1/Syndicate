@@ -55,7 +55,7 @@ class OrchestratorSourceRootTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             env = {"SYNDICATE_DATA_ROOT": temp_dir, "SYNDICATE_SOURCE_ROOT_WNBA": str(VENDOR_WNBA)}
             with patch.dict(os.environ, env, clear=False):
-                root = module._basketball_source_root("wnba", "wnba_betting_repo")
+                root = module._basketball_source_root("wnba")
             self.assertEqual(root, (Path(temp_dir) / "wnba_source").resolve())
 
     def test_non_vendor_override_is_honoured(self) -> None:
@@ -64,7 +64,7 @@ class OrchestratorSourceRootTests(unittest.TestCase):
             custom = Path(temp_dir) / "elsewhere" / "wnba_source"
             env = {"SYNDICATE_DATA_ROOT": temp_dir, "SYNDICATE_SOURCE_ROOT_WNBA": str(custom)}
             with patch.dict(os.environ, env, clear=False):
-                root = module._basketball_source_root("wnba", "wnba_betting_repo")
+                root = module._basketball_source_root("wnba")
             self.assertEqual(root, custom.resolve())
 
     def test_vendor_override_allowed_without_data_root(self) -> None:
@@ -73,7 +73,7 @@ class OrchestratorSourceRootTests(unittest.TestCase):
         env = {k: v for k, v in os.environ.items() if k != "SYNDICATE_DATA_ROOT"}
         env["SYNDICATE_SOURCE_ROOT_WNBA"] = str(VENDOR_WNBA)
         with patch.dict(os.environ, env, clear=True):
-            root = module._basketball_source_root("wnba", "wnba_betting_repo")
+            root = module._basketball_source_root("wnba")
         self.assertEqual(root, VENDOR_WNBA.resolve())
 
 

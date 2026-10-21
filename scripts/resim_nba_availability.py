@@ -152,7 +152,7 @@ def run(args) -> int:
     code, pristine, asof = Path(args.code), Path(args.pristine), Path(args.asof)
     archive = Path(args.archive) / args.arm
     scratch = Path(args.scratch) / f"{args.arm}_w{args.worker}"
-    sys.path[:0] = [str(code / "scripts"), str(code), str(code / "vendor" / "nba_betting_repo" / "src")]
+    sys.path[:0] = [str(code / "scripts"), str(code)]  # vendored src entry removed (lane vendor-dead-paths-cleanup): vendor/ is empty
     import backtest_nba_lines_props as bt
 
     class BtArgs:

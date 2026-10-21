@@ -113,7 +113,7 @@ def main(argv=None) -> int:
     prod = Path("~/syndicate-prod/data").expanduser().resolve()
     if str(scratch.resolve()).startswith(str(prod)):
         raise SystemExit("REFUSED: scratch is inside the production data root")
-    sys.path[:0] = [str(code / "scripts"), str(code), str(code / "vendor" / "nba_betting_repo" / "src")]
+    sys.path[:0] = [str(code / "scripts"), str(code)]  # vendored src entry removed (lane vendor-dead-paths-cleanup): vendor/ is empty
     os.environ.update({
         "SYNDICATE_DATA_ROOT": str(scratch), "SYNDICATE_NBA_SOURCE_ROOT": str(scratch / "nba_source"),
         "NBA_BETTING_DATA_ROOT": str(scratch / "nba_source" / "data"), "SYNDICATE_REFRESH_STATE_BACKEND": "file",
