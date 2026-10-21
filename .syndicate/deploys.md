@@ -52619,3 +52619,16 @@ have stopped the reload, and it did not because nothing was gating on it.
 - **Same day, odds re-read (14:15Z):** the 10-15 thinness was round timing, as inferred. UEL 18/18 fixtures for 10-22 (median 10 books/event), UECL 18/18 (median 6), UCL all 9 of today's plus 2 of the next round (10 books). Files were 10-15 min old.
 - **No deploy, restart or env change by this lane for this reading.**
 
+
+## 2026-10-21 16:51:2xZ (11:51 AM CT) -- fleet ff 7c7acfd6 -> d1a7ffbe (NO restart) + LEDGER RE-MARK of 15 live Kalshi closing marks: CLV unit fix (todo #719) -- **re-mark MET; new marks need a refresh-worker restart (OWED, user decision)** (lane `live-clv-contract-units`, session 3bd0b2d4)
+- **ask:** the user, in this session: "Yes: fast-forward the fleet to d1a7ffbe and re-mark the already-stamped live closing_mark.clv_pct rows with a binary-mode ledger rewrite, following learnings."
+- **code:** d1a7ffbe -- `prediction_ledger._implied_from_price`: 0 < p < 1 is a contract price, else American; used by `_clv_pct_from_prices` (order_clv closing marks, position_marks, clv_join).
+- **claims:** refresh-worker (5eb43eb8...), live-odds-worker (7897890a...), web (2ee0f064...), holder `live-clv-contract-units`, acquired 16:50:4xZ, released after this entry.
+- **ride-alongs 7c7acfd6..d1a7ffbe (runtime), read before the merge:** 69c1af9d (basketball CLI data root, todo #718, user-approved; script subprocess, live at the next props run); 0ee246ca (per-venue live net floor; `LIVE_NET_FLOOR` count 0 in local_production.env -> absent -> nothing runs: INERT). Rest scripts/tests/ledger. 0 overlap with the 6 dirty fleet files (engines/mlb statcast json, reports/).
+- **ff:** HEAD read 7c7acfd6 in a separate call, then `git merge --ff-only d1a7ffbe` at ~16:51:2xZ -> d1a7ffbe7.
+- **NOT loaded by the ff:** `settle_orders` -> `stamp_closing_marks` runs in-process in refresh-worker's intelligence_state loop (pid 3433724, started 16:06Z on old code). Until that role restarts, any live row it stamps is still read as American. Nothing restarted here.
+- **re-mark (one-off script under refresh-worker's env, fleet code d1a7ffbe, DRY RUN first == applied):** rows whose entry (`fill_price` else `requested_price`) is in (0,1) and whose `closing_mark.clv_pct` is set; recomputed from the mark's OWN stored `close_price` (no re-resolution). Written through `execution_ledger._persist` (3-way merge under CAS, LEDGER_CAS_ACTIVE backend=keyvalue) at 16:52:31Z; old value kept in `closing_mark.clv_correction={field, before, after, at, reason}`.
+  - 15 rows, all kalshi/live, all same_book (1 on 10-19, 14 on 10-20); 0 in the archive. Mean clv_pct **-35.84 -> +1.14 pt**. e.g. 0.65 vs -186: -34.32 -> +0.035; 0.39 vs +127: -55.56 -> +5.05.
+  - (The findings' "+0.46 +- 0.35" was 13 rows; this is all 15 marked contract-priced rows.)
+- **verify:** read-back 15/15 corrected immediately (16:52:31Z). Re-read after later worker writes: see the line below.
+- **owed:** refresh-worker restart onto d1a7ffbe before tonight's 10-21 live rows are stamped (user decision), or re-run the script after they are; position marks (`portfolio_commit.mark_orders_to_board`) load with their role too.
