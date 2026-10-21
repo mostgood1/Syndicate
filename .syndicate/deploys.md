@@ -52371,3 +52371,14 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 **Therefore: the duplicate-live-order bug measured today is still reachable until the live-odds-worker restarts.** A restart is a separate action under its own rule (claim + idle-after-save + its own `deploys.md` entry) and was NOT part of the instruction, so it was not done. Raised to the user with that reasoning.
 
 Same applies, with far lower stakes, to my own `live_lens` postponed-bucket fix: on disk, not in the running web/worker. It only differs when a postponed game is on the slate.
+
+## 2026-10-21 14:52Z (9:52 AM CT) -- READING, NO DEPLOY: D1 cross-slate dedupe FIRST LIVE REFUSALS -- **MET** (closes the D1 reading owed by the 2026-10-20 15:53:28Z entry; lane `future-dated-live-orders-scope`, session 0ffeb586)
+- **what was owed:** the first live `[execute_portfolio] REFUSED_HELD_OTHER_SLATE`, i.e. a held forward bet planned again on a later slate and refused rather than ordered twice.
+- **read 14:52Z from `~/syndicate-prod/logs/live-odds-worker.log` (prefix-counted, so ALL_PROCESS_MEMORY quotes cannot inflate it):**
+  - First hit 2026-10-21T10:32:26.750Z.
+  - **110 refusals over 43 EXECUTED passes, on 7 distinct bets, every one held from the 2026-10-20 slate and planned again on 2026-10-21.**
+  - Kalshi: KXNCAAFTOTAL-26OCT22LIBKENN-50 (24 refusals); KXNCAAFTOTAL-26OCT24UNTNAVY-62 (21); KXNCAAFGAME-26OCT24ULMTROY-TROY (21); KXNCAAFGAME-26OCT23OREILL-ORE (15); KXNCAAFSPREAD-26OCT24MSUUCLA-UCLA14 (9); KXNFLTOTAL-26OCT25SFATL-50 (1).
+  - Polymarket: tsc-nfl-sf-atl-2026-10-25-total-49pt5 (19).
+  - **0 `LIVE_ORDER` lines for any of them since 10:32Z.** Without D1 each was a second live order (`idempotency_key` hashes the slate date): 7 extra orders.
+- **also present:** the venue-contract dedupe that 332cb014 deployed (4ffb4e64, a content-identical rebase of my 0d51e269: 0 differing lines in its 4 files) is in live-odds-worker pid 3413037 (lstart 14:48:25Z, after the 14:38:11Z ff to 77a1790d). Since then: 0 `REFUSED_HELD_VENUE_CONTRACT` (DAL@HOU is not in the current plan, positions=6), 0 errors. Its deploy entry belongs to 332cb014.
+- **still owed:** the first live `CANCEL_AT_KICKOFF` (D3) and the first `REFUSED_HELD_VENUE_CONTRACT`.
