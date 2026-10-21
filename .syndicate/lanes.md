@@ -1476,6 +1476,14 @@ death, never life — do not invert it.
 - Verification: Same-instant A/B on fleet data (old producer emulated from the same snapshot) then, after deploy, the served board's nba live_projections rows_live_projected / live prop rows during a live NBA game
 - Blocked by: none
 
+### nba-current-rosters — OPEN — opened 2026-10-20 — session 8e69dd3f-ac9b-4b3b-8d4f-ed791bd5e296
+- Goal: The NBA SmartSim's per-team player pool reflects each team's CURRENT roster: players traded or signed since 2025-26 are simulated for their new team, players on no current roster are dropped, current-roster players with a posted prop line are admitted; the current roster is a disk-backed artifact under SYNDICATE_DATA_ROOT refreshed by the props refresh. Verified by scripts/nba_sim_roster_audit.py on the production sims: 0 stale players and 0 missing prop-line players per team (ESPN current roster as truth), off != on reachability test, engine input checklist green. User request 2026-10-20.
+- Files: scripts/nba_sim_roster_audit.py (NEW), tests/test_nba_sim_roster_audit.py (NEW), syndicate/features/shared/nba_current_rosters.py (NEW), tests/test_nba_current_rosters.py (NEW), syndicate/features/shared/basketball_props_features.py (the as-of team assignment section only), scripts/refresh_nba_oddsapi_props.py (the current-roster refresh call only), syndicate/features/shared/smart_sim_reuse.py (roster drift check only)
+- Hypothesis: H1 (TRACE origin/main aa6a4e56): the sim pool per team = props_predictions_<D>.csv rows whose team is the player's LAST player_logs row (basketball_props_features.py build_features_for_date_local asof_team = group.iloc[-1]; fleet player_logs.csv ends 2026-04-12, mtime 09-30) -> orchestrator/smart_sim.py simulate_smart_game _team_players_from_props -> _filter_team_players_against_processed_roster against the newest rosters_*.csv = rosters_2025-26.csv (09-30; NOTHING on the fleet writes a 2026-27 roster; the port has no fetch-rosters). Predicts: across 10-20 + 10-21 (14 games, 28 teams) stale players (in sim, not on the team's ESPN roster) and missing players (on the ESPN roster with a prop line, not in sim) on every team with offseason moves, and each stale player's sim team == his rosters_2025-26 / last player_logs team. NBA_SIM_AVAILABILITY teams=0 is the designed opening-night no-op (no 2026-27 regular-season rows), not the cause.
+- Falsification test: H1 is wrong if a team with offseason moves shows 0 stale and 0 missing prop-line players, or if stale players' sim team differs from their 2025-26 team.
+- Verification: nba_sim_roster_audit.py per-team diff before (fleet sims as built) and after (scratch re-sim on fleet data, then production after the user-approved fleet ff); reachability test off != on; deploys.md measurement.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
