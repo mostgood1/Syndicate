@@ -52382,3 +52382,18 @@ Same applies, with far lower stakes, to my own `live_lens` postponed-bucket fix:
   - **0 `LIVE_ORDER` lines for any of them since 10:32Z.** Without D1 each was a second live order (`idempotency_key` hashes the slate date): 7 extra orders.
 - **also present:** the venue-contract dedupe that 332cb014 deployed (4ffb4e64, a content-identical rebase of my 0d51e269: 0 differing lines in its 4 files) is in live-odds-worker pid 3413037 (lstart 14:48:25Z, after the 14:38:11Z ff to 77a1790d). Since then: 0 `REFUSED_HELD_VENUE_CONTRACT` (DAL@HOU is not in the current plan, positions=6), 0 errors. Its deploy entry belongs to 332cb014.
 - **still owed:** the first live `CANCEL_AT_KICKOFF` (D3) and the first `REFUSED_HELD_VENUE_CONTRACT`.
+
+## 2026-10-21 14:48Z -- fleet live-odds-worker role restart: venue-contract dedupe `4ffb4e64` LIVE (user-approved in chat; lane future-dated-live-orders-scope, holder venue-contract-dedupe)
+- **what:** `0d51e269` (branch claude/venue-contract-dedupe) cherry-picked onto main as `4ffb4e64`, then pushed. Before placing, the executor refuses a second live order on the same (venue, ticker, venue leg), whatever plan label it carries: `REFUSED_HELD_VENUE_CONTRACT`, refusal `already_held_venue_contract`. Closes the DAL@HOU `spreads` / `spreads_alt` double buy (KXNBASPREAD-26OCT21DALHOU-HOU10, both legs filled at $0.49; 1 case in 645 live orders). 122 tests pass (venue_contract_dedupe, cross_slate_dedupe, execute_portfolio).
+- **switch:** `SYNDICATE_EXECUTION_VENUE_CONTRACT_DEDUPE` is ABSENT from the new pid's env. Absent means ON (default on; `off` disables it).
+- **ff:** none by this lane. Lane ci-suite-four-stale-1021 moved the fleet to `77a1790d` under its own 14:30Z claims. `git merge-base --is-ancestor 4ffb4e64 77a1790d` = yes. The old pid 3327060 (13:48:13Z) was still running pre-dedupe code, so only the role restart was needed.
+- **claims:** the in-play lane (`in-game-trading`) had already released live-odds-worker, so no force-release was needed. Waited for ci-suite-four-stale-1021 to release at 14:39Z, then acquired live-odds-worker at 14:39:45Z (rc 0).
+- **restart:** gated one-shot. The gate required NOT_BEFORE 14:48:10Z (60-min spacing after the 13:48:06Z restart), 0 non-zombie children of the old pid, and the last two `[execution_ledger] RECONCILE` lines at not_found=0 unknown=0. It cleared at 14:48:17.465Z. One TERM to pid 3327060 at 14:48:17.503Z. New pid **3413037**, lstart 14:48:25Z.
+- **verify (read 14:53Z):** pid 3413037 carries MODE=live, ARMED=1 and EXIT_MODE=live. 0 Tracebacks since the restart.
+  - Fast exit loop: `14:48:35Z [execution_exits_fast] STARTED mode=paper`.
+  - `14:49:50Z EXIT_TICK status=ok mode=live positions=400`.
+  - RECONCILE: kalshi 66/110 and polymarket 7/7, not_found=0 unknown=0.
+  - EXECUTED passes ran at 14:50:02Z (kalshi: positions=6, placed=0, refused already_held_other_slate=5) and 14:50:11Z (polymarket: positions=2, placed=0). These passes run through the new check, which sits before submit.
+  - No `REFUSED_HELD_VENUE_CONTRACT` has fired yet: no pass has carried a second label for a held contract. Kalshi is also at its daily order-count cap (50/50, $108.41), so it places nothing more today.
+- **owed:** the first `REFUSED_HELD_VENUE_CONTRACT` line in production. Watch for it from the 10-22 slate onward.
+- **rollback:** `LIVE_ODDS_WORKER__SYNDICATE_EXECUTION_VENUE_CONTRACT_DEDUPE=off` (needs a full down/up), or revert `4ffb4e64`, ff, then a gated live-odds-worker TERM.
