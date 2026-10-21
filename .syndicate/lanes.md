@@ -1674,6 +1674,7 @@ death, never life — do not invert it.
 
 ### soccer-uefa-followups — OPEN — opened 2026-10-21 — session 15fef1c0-6ebb-48a5-9316-c7361d76f407
 - Goal: UEFA follow-ups to closed lane soccer-uefa-competitions: (1) UEFA player props fetched ONLY for matches kicking off within 24h (user 2026-10-21: near-kickoff design), same 10-book list; (2) UEFA team branding refreshed by a weekly-gated refresh step (knockout fields change); (3) /soccer/<ucl|uel|uecl>/market-board shows odds-only rows built from the ESPN schedule + game odds/props (no model columns). All three read on the fleet.
+  **GOAL: NOT MET** (2026-10-21 22:41Z). Two of three READ on the fleet: (1) props within 24h, from the UEL file (only 10-22 kickoffs) and a zero-cost UCL empty window; (3) the odds-only board, UEL/UECL 18/18 games with odds rows. (2) Branding: the producer command is proven on the fleet; owed is the step firing by its own 7-day gate, first due for UEL/UECL on the pregame run after 2026-10-22 ~22:17Z (deploys.md 2026-10-21 22:41Z).
 - Files: scripts/refresh_odds_sources.py (_build_soccer_steps props/branding loops, _soccer_uefa_branding_step and the two UEFA constants ONLY), scripts/fetch_soccer_oddsapi_props_local.py, scripts/build_team_branding_snapshot.py, syndicate/features/soccer/market_board.py, tests/test_soccer_uefa_followups.py, tests/test_soccer_uefa_competitions.py (the step-gating test only)
 - Hypothesis: n/a
 - Falsification test: n/a

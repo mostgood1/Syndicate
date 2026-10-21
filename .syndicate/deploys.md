@@ -53041,3 +53041,14 @@ Also worth recording from the same reading: the persisted order is the
 `{k: record[k] for k in _LEAN_FIELDS}`), so a field absent from that tuple is
 never stored at all. That is why `#722`'s `_LEAN_FIELDS` hop was load-bearing
 rather than defensive.
+
+## 2026-10-21 22:41Z -- MEASURED: UEFA props near-kickoff window on the fleet + branding producer command (follow-up to 21:37Z/21:41Z) `[lane soccer-uefa-followups, session 15fef1c0]`
+- **Props, fleet pregame run ~22:24Z (first after the ff):**
+  - `uel/props/2026-10-22.csv` 22:23:59Z: 566 rows over 8 events, kickoffs ONLY 2026-10-22 16:45Z / 19:00Z (inside 24h); anytime / first goalscorer, card, red card; 2 books.
+  - `uecl/props/2026-10-22.csv` 22:24:02Z: 0 rows. Its events were in the window, but books have posted no UECL props yet.
+  - `ucl`: no props file written.
+- **UCL empty window reproduced** with the deployed fetcher against the live OddsAPI list (free event call), ~22:4xZ: `Fetched 18 events` -> `PROPS_HORIZON kept 0 of 18 events kicking off within 24h` -> `PROPS_HORIZON_EMPTY ... no per-event calls, file unchanged`. So UCL props cost 0 until its next round enters the window.
+- **Branding producer command, run on the fleet 21:42:35Z** (the step's exact argv for ucl): wrote 36 clubs to `/home/amyn/syndicate-prod/data/soccer_source/ucl/source_artifacts/.../ucl_team_branding.csv`, 0 changed paths under the repo checkout; aliases still resolve (Slavia Praha / LASK / Sabah Masazir).
+- **Instrument note:** the first watcher's "FOUND" was a SELF-MATCH. ALL_PROCESS_MEMORY lines embed every process's argv, including the watcher's own `grep PROPS_HORIZON`, so the props reading above comes from the files, not from that hit.
+- **verify (OWED):** the branding step firing by its own gate. UEL/UECL files are dated 2026-10-15 22:17Z, so the first pregame run after 2026-10-22 ~22:17Z should log `SOCCER_UEFA_BRANDING_STALE league=uel|uecl` and rewrite both files. UCL was refreshed by hand 10-21, so its gate fires about 10-28.
+
