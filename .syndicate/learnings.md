@@ -2668,3 +2668,14 @@ so `vendor/` is absent too, and `tests/test_wnba_prop_dispersion.py`, `tests/tes
 ## 2026-10-20 - A whole-file read-modify-write rewrites every line ending, and the size change looks like data loss `[lane hygiene-guards-1020, session 4ab694ed]`
 - **What happened:** appending 10 lines to `docs/ai_context/todo.md` with `io.open(...).read()` then `io.open(..., newline='').write()` shrank the file from 3,304,326 to 3,256,293 bytes. `lane-postwrite-check` reported the 48KB drop against a file claimed by 10 other lanes. Nothing was lost: reading with universal newlines turned CRLF into LF in memory and `newline=''` wrote it back unchanged, so ~48k lines each lost one byte. `git diff --numstat` said `10 0`, which is the authoritative check and settled it.
 - **Rule:** on a shared ledger file, gate on `git diff --numstat` (content), never on bytes on disk — and expect a whitespace-only working-tree churn from this pattern. The bigger point is that read-modify-write of a 50,000-line shared file is a whole-file clobber window; prefer a genuine append (`open(p, 'a')`) whenever the insertion point is the end.
+
+
+## 2026-10-21 - In play, "check the exit faster" was assumed to help; on an efficient price it sells earlier AND cheaper `[lane in-game-trading, session 15ceeb14]`
+- **Belief overturned:** the in-game program began from "the exit check runs every 5-7 min while Kalshi quotes refresh every ~23 s, so it must run faster".
+- **What was measured:**
+  - Real cadences. Kalshi's in-play ask changes every ~11 s. The FLEET polls it every 2-3 min and Polymarket every 3-5 min (venue_poll lines), not the 60 s env default.
+  - Speed costs money. Replaying the fixed take-profit on 379 settled synthetic positions, the 10 s loop lost MORE than the 6-min tick: -12.2% vs -10.3%, with hold at -6.4%.
+  - Where both cadences fired, the slow tick sold +3.1c higher. In-play markouts after fee were negative (-1.26c, CI -1.80..-0.72), so prices that cross the line keep drifting the same way. There is no overshoot to sell into.
+- **Rule:** before making a trading loop faster, replay it at both cadences against settlement. Latency only pays when the rule is right. A fixed-margin exit on an efficient price is a fee, and running it faster just pays the fee sooner.
+- **Second rule:** the sportsbook consensus is not an in-play fair against Kalshi. Kalshi moves first (corr +0.44 at +2 polls). A book "edge" is usually the book's lag, often a score Kalshi priced 30-40 s before ESPN showed it. Measure an in-play fair against Kalshi's own LATER mid (markout), never against the books.
+- Also: Windows `SetPriorityClass` through ctypes without `argtypes`/`restype` truncates the 64-bit pseudo-handle and fails SILENTLY. Every "Idle" recorder ran at Normal until a peer saw it in Task Manager. Check the return value.

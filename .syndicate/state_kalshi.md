@@ -897,3 +897,14 @@ board. The loop therefore checks `budget_remaining()` BEFORE spending.
 **Population.** Of the 37 soccer series the fleet captured (`venue_odds/kalshi__soccer__*`, 09..11-03), exactly `KXBBLGAME`, `KXBUNDESLIGA2GAME`, `KXEREDIVISIEWGAME` and `KXSERIEAWGAME` refuse. Neither worker sets a `SYNDICATE_KALSHI_SERIES` override.
 
 **Fleet, 2026-10-20 14:21Z.** The checkout `e491c260` contains the gate; it was fast-forwarded at 13:38:12Z. The running refresh-worker started at about 13:17Z, before that. Its 14:20Z `[kalshi_odds]` tick carried `KXBBLGAME` markets, and neither that `BOARD_JOIN` nor the 14:21Z `[portfolio_commit] KALSHI_BOARD_JOIN` lists `series_competition_not_on_board`. **The old join is still loaded until refresh-worker restarts.**
+
+## [kalshi-in-play-efficiency] KALSHI IN-PLAY PRICES LEAD THE SPORTSBOOKS; BOOK-CONSENSUS IN-PLAY EDGES MARK OUT NEGATIVE; FIXED TAKE-PROFIT LOSES VS HOLD `[verified on recorded data 2026-10-20 23:09Z..10-21 04:39Z, lane in-game-trading]`
+
+- **Population:** 11 NBA/NHL games. Kalshi public quotes every 10 s, OddsAPI us/eu/uk every 60 s, ESPN every 60 s. 64,688 priced side-samples.
+- **Markout after fee of book-consensus "positive" sides** (our leg's Kalshi mid later, minus ask and fee): +300 s **-1.26c** (95% CI -1.80..-0.72, n=1,613); +60 s -1.93c. No family / near-vs-away-from-score cell has CI > 0.
+- **Kalshi moves first:** corr(dKalshi_i, dFair_i+2 polls) = +0.44, n=5,218. In play, Kalshi's ask changes every ~11 s (p50); a goal is in Kalshi's ask ~34 s before ESPN shows it.
+- **The fleet's own cadence is 10-30x slower than the venue:** venue_poll Kalshi every 2-3 min, Polymarket every 3-5 min (22:53-23:10Z lines); EXIT_TICK every 5-15 min.
+- **Fixed take-profit vs hold:** synthetic book, both legs of every game line entered at the ask at tip-off, 379 settled, $1,870. At margin 0.08: hold -6.42%, 360 s cadence -10.30%, 10 s cadence -12.16%. Every margin 0.04-0.30 is below hold.
+- **NOT a statement about** our model-edge entries or pregame exits: that is kalshi-exit-path's 10-26 counterfactual.
+- **Scripts:** `scripts/inplay_edge_report.py`, `scripts/inplay_exit_replay.py`, `scripts/inplay_fair_score.py` over `scripts/inplay_recorder.py` output.
+- **Detail:** `findings_2026-10-20_in_game_trading.md`, todo #715.

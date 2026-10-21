@@ -555,6 +555,7 @@ once this index exists: re-splitting would orphan the parts.
 | [kalshi-odds-refresh-bound] | THE VENUE FAN-OUT IS A COLD-START BURST ON A PERSISTED CLOCK, AND IT IS NOW TIME-BOUNDED `[2026-09-03, lane ka | `state_kalshi.md` |
 | [kalshi-quote-capture-coupling] | Kalshi quote capture ran ONLY inside the heavy board build — a refused heavy build stopped it for every sport  | `state_kalshi.md` |
 | [kalshi-exit-path] | KALSHI POSITIONS ARE SOLD BEFORE SETTLEMENT -- LIVE FOR TAKE-PROFIT SINCE 2026-10-20 23:34Z, PAPER FOR THE RES | `state_kalshi.md` |
+| [kalshi-in-play-efficiency] | KALSHI IN-PLAY PRICES LEAD THE SPORTSBOOKS; BOOK-CONSENSUS IN-PLAY EDGES MARK OUT NEGATIVE; FIXED TAKE-PROFIT  | `state_kalshi.md` |
 | [kalshi-maker-shadow] | KALSHI MAKER (RESTING-BID) SHADOW: PAPER ONLY, PRE-REGISTERED, RUNNING HOURLY ON THE FLEET VIA A USER-APPROVED | `state_kalshi.md` |
 | [kalshi-series-competition-identity] | KALSHI SERIES FOR ANOTHER COMPETITION (WOMEN'S, BASKETBALL, SECOND TIERS) REFUSE IN THE JOIN -- ON THE FLEET C | `state_kalshi.md` |
 | [layer2-board-keyvalue-ceiling] | THE BOARD'S CEILING IS THE COMBINED KEY, NOT THE SHARDS — and `per_sport=3000` corrupted production for ~29 mi | `state_layer2.md` |

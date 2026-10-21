@@ -1465,7 +1465,14 @@ death, never life — do not invert it.
 
 ### in-game-trading — OPEN — opened 2026-10-20 — session 15ceeb14-5d5b-47c4-9b84-e483511d5716
 - Goal: Measured in-play venue-vs-book edge on NBA/NHL (read-only) and a staged in-game trading plan (held-position loop, in-game fair price, in-play entries, Polymarket in-play rule, one-engine fit) in a findings file, each stage with its user decision
-- Files: scripts/inplay_recorder.py, scripts/inplay_edge_report.py, .syndicate/findings_2026-10-20_in_game_trading.md, syndicate/features/shared/execution_exits_fast.py (NEW, stage 1 fast exit loop PAPER; imports execution_exits read-only, never edits it), tests/test_execution_exits_fast.py (NEW), scripts/run_live_odds_refresh_worker.py (`_fast_exit_background_loop` + `start_fast_exit_loop` + their one call in main() ONLY, NEW section)
+- **GOAL: MET** (2026-10-21 04:45Z).
+  - Reading: findings §6 markout +300 s -1.26c (CI -1.80..-0.72, n=1,613) over 23:09Z-04:39Z, 11 games. Plan §3 has stages 1-5, each with its user decision; todo #715. Main 796e55f5.
+  - **Hypothesis FALSIFIED** for book-consensus fairs: positive sides exist (19.7%) but mark out negative, and Kalshi leads.
+  - Kept OPEN for the owed user decisions:
+    - 1a: run stage 1 in paper on the fleet. The worker-thread edit was classifier-refused; a standalone runner exists.
+    - 2: approve the stage-2 measurement plus a nightly recorder.
+    - The take-profit verdict goes to the user and kalshi-exit-path.
+- Files: scripts/inplay_recorder.py, scripts/inplay_edge_report.py, scripts/inplay_exit_replay.py, scripts/inplay_fair_score.py, scripts/run_fast_exit_loop.py (NEW), .syndicate/findings_2026-10-20_in_game_trading.md, syndicate/features/shared/execution_exits_fast.py (NEW, stage 1 fast exit loop PAPER; imports execution_exits read-only, never edits it), tests/test_execution_exits_fast.py (NEW), scripts/run_live_odds_refresh_worker.py (`_fast_exit_background_loop` + `start_fast_exit_loop` + their one call in main() ONLY, NEW section)
 - Stage 1 user decision 2026-10-20 ~23:25Z via session 332cb014: "Build stage 1 now (Recommended)" -- paper first; going live is a separate yes.
 - Hypothesis: Kalshi/Polymarket in-play quotes lag the in-play sharp consensus long enough (>= one venue quote cadence) that fee-adjusted positive sides exist and persist
 - Falsification test: Positive-after-fee sides at venue price are rare (<~1% of side-minutes) or last less than one quote refresh
