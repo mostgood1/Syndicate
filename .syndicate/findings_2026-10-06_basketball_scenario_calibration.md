@@ -3830,3 +3830,25 @@ foul-outs and misses FTA by 0.03. So, per the rule, stop. No pick.
 pick rule and the follow-on (s/X re-measured, the 12-date check, then ask the user before the full FIT).
 
 **If none pass:** record it and stop.
+
+### ROUND-2 FTA FIX, INTERPOLATED GRID — RESULT 2026-10-21 13:47Z (4 × 12/12 dates, 0 errors): 3 PASS; pick bonus .0695 / base .0175
+
+| bonus / base | FTA (23.04 ± .15) | PF (19.57 ± .3) | foul-outs (≤ .223) | score | verdict |
+|---|---|---|---|---|---|
+| .0675 / .0175 | 22.95 | 19.40 | .212 | 1.18 | pass |
+| .0685 / .0175 | 23.02 | 19.47 | .218 | 0.43 | pass |
+| **.0695 / .0175** | **23.08** | **19.55** | **.220** | **0.32** | **PASS, pick** |
+| .0685 / .0150 | 22.91 | 19.22 ✗ | .209 | 2.02 | fail |
+
+Every value landed within ±.03 FTA, ±.03 PF and ±.004 foul-outs of the pre-registered predictions.
+
+**Guards at the pick:**
+- 3PA 37.09;
+- trips 7.64 / 2.24 / 0.36 (PKR3 7.66 / 2.25 / 0.36);
+- quarter shares .2551 / .2510 / .2524 / .2415.
+
+**Next (chained):**
+1. M1, s with both solver terms 0, on the #3j dates;
+2. X with s set and the term at 0;
+3. the 12-date check (|bias| < 0.5 + the gates);
+4. ask the user before the full FIT.
