@@ -542,7 +542,32 @@ def resim_live_game(inputs: Mapping[str, Any], game_state: Any, *, sims: int = D
         "segments": _segments(periods_h, periods_a),
         "player_remainders": _player_remainder_hists(rem, n),
     }
+    # (lane nba-no-history-admit) a no-history stand-in plays in the resumed game -- his teammates' minutes depend on
+    # it -- but his own remainder is the posted line played back, so it is never published: no live prop row can
+    # price him. The flag rides on the persisted pool frames (`pool_source`); frames without it are untouched.
+    hidden = _hide_standin_remainders(out["player_remainders"], inputs)
+    if hidden:
+        out["no_history_standins_hidden"] = hidden
     return out
+
+
+def _hide_standin_remainders(remainders: dict[str, dict[str, Any]], inputs: Mapping[str, Any]) -> list[str]:
+    from syndicate.features.shared.nba_no_history_standins import SOURCE
+
+    names: set[str] = set()
+    for key in ("home_players", "away_players"):
+        frame = inputs.get(key)
+        try:
+            if frame is not None and "pool_source" in frame.columns:
+                names |= set(frame.loc[frame["pool_source"].astype(str) == SOURCE, "player_name"].astype(str))
+        except Exception:  # noqa: BLE001 -- a frame this cannot read carries no stand-in flag
+            continue
+    hidden: list[str] = []
+    for side_rows in remainders.values():
+        for name in [n for n in side_rows if n in names]:
+            side_rows.pop(name)
+            hidden.append(name)
+    return sorted(hidden)
 
 
 # Per-player REST-OF-GAME stats. A resumed run's player box lines are the remainder only (resume.py), so the
