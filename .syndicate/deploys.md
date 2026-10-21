@@ -52973,3 +52973,71 @@ Recorded as an override, not as compliance.
 **No order has been submitted since the restart (0 since 22:15:54Z against 3,000 in the ledger), so the end-to-end proof — a served order row carrying `staked_probability_version` — is FORWARD and still owed.** Stated rather than implied: everything above proves the code is loaded, not that a row carries the field.
 
 Also still true after this deploy: attribution is **forward only**, so the 958 already-settled orders stay unattributable and lane `published-negative-ev`'s reading must be **RE-ARMED for a date after 2026-10-21T22:15:52Z**, with an empty pre-period. `position_key` coverage (552 of 658 live orders have none) is routed around, not repaired, and the paper-ladder path (`PaperLedgerBatch.place`, lane `paper-alongside-live`) was not touched or checked.
+
+### RE-ARM + TWO CORRECTIONS 2026-10-21T22:25Z (17:25 CDT) — lane `published-negative-ev`'s readings are armed for 2026-10-29T15:00:00Z, and the task that was armed for TODAY never dispatched at all
+
+`[lane order-sizing-provenance / published-negative-ev, session 4ab694ed]`
+
+**The 15:00Z task NEVER RAN.** Scheduled task `published-negative-ev-698-reading`
+still read `fireAt: 2026-10-21T15:00:00.000Z`, `enabled: true`,
+`nextRunAt` in the past and **no `lastRunAt`** — the app was closed at the slot,
+and a one-time `fireAt` only fires on the next launch. So today's reading was not
+merely 6h35m late as the 21:40Z entry says: **it was taken by hand because the
+scheduler never dispatched it.** That is the SECOND instance of this exact
+failure mode in this fleet (lane `ncaaf-segment-refusal-cost` lost its
+2026-10-17T19:00Z reading the same way).
+
+**RE-ARMED to `2026-10-29T15:00:00Z` (10:00 CDT)**, now covering BOTH of the
+lane's owed readings in one task, with a **FRAME GUARD as the first instruction**:
+read `date -u`, and if the run starts more than 6h after the slot, append a
+`NOT MEASURED` entry and re-arm instead of producing a stale reading.
+
+- **Reading A, the sizing-basis split**, newly possible because `#722` shipped.
+  Pre-registered: the cut instant is **`2026-10-21T22:15:52Z`** (the restart that
+  loaded it); **there is no pre-period** and one must not be constructed, since
+  attribution is forward-only. Power gate: **no ROI reported for any cell with
+  fewer than 60 settled orders**. Mean plan `ev_pct` is explicitly barred from
+  being reported as a result.
+- **Reading B, the `#698` staked forward ROI**, unchanged: gate is post-10-07
+  graded > 695 against the -7.8% / +3.6% baseline, with the 1-2-book band
+  reported separately against its -11.4% (n=439).
+- Date chosen from the measured accrual rate, not a round number: live orders
+  carrying a `position_key` ran **1 (10-19) → 42 (10-20) → 63 (10-21 partial)**
+  per day, and 23 live orders settled on 10-21, so ~7 days should clear 60
+  settled per cell. The prompt says what to do if it does not.
+- The prompt also carries the keyvalue-read recipe, because the ledger is NOT a
+  file: `reports/intelligence/execution_ledger.json` does not exist on disk, and
+  reading it needs the worker's own `SYNDICATE_REFRESH_STATE_BACKEND` / `_URL` /
+  `SYNDICATE_REPORTS_ROOT`. Without that a reader sees nothing and may mistake it
+  for no data.
+
+### CORRECTION 1 — "`position_key` coverage is still broken" is WRONG
+
+The 21:40Z reading entry, `findings_2026-10-21_staked_probability_version_reading.md`,
+todo `#722` and the 22:11Z ff receipt all say 552 of 658 live orders carry no
+`position_key`, framed as a present gap that `#722` routes around. **It is not a
+present gap.** Measured: all 552 have `selected_date` in **2026-08/09**
+(08-28 ×73, 08-29 ×49, 08-31 ×46, 09-19 ×41) and also carry `market: None` and
+`side_picked_by: None` — they predate the provenance fields entirely. Every
+RECENT live order has a `position_key` (10-19 ×1, 10-20 ×42, 10-21 ×63) and
+carries `side_picked_by`, so it went through `_order_from_position`.
+
+So the current live path is fully covered by `#722`, and the "84% of live orders
+are built by another path" implication of the earlier entries is false. The
+number was right and the inference from it was wrong.
+
+### CORRECTION 2 — the 3,000-record cap does NOT bound the live window
+
+I reasoned at ~870 orders/day that the ledger turns over in ~3.5 days and that a
+reading a week out would lose its early rows. Wrong on both halves:
+`_trim_to_cap` moves out **only PAPER rows**, settled first and oldest first, and
+an ungraded paper row leaves only when no settled one is left — **live rows are
+never trimmed**. Trimmed rows are not dropped either: they are appended to
+`reports/intelligence/execution_ledger_archive/`, sharded by the row's
+`selected_date` month, on disk rather than in the 8 MB-capped keyvalue store.
+
+Also worth recording from the same reading: the persisted order is the
+`_LEAN_FIELDS` projection (`execution_ledger.py:1630` writes
+`{k: record[k] for k in _LEAN_FIELDS}`), so a field absent from that tuple is
+never stored at all. That is why `#722`'s `_LEAN_FIELDS` hop was load-bearing
+rather than defensive.
