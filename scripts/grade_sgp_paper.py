@@ -1,13 +1,18 @@
 #!/usr/bin/env python
-"""Grade the NFL same-game-parlay PAPER ledger against outcomes (lane `nfl-sgp-builder`, #621 paper only).
+"""Grade a sport's same-game-parlay PAPER ledger against outcomes (lane `nfl-sgp-builder`, #621 paper only).
 
-Reads `<data root>/cheatsheets/nfl/sgp_ledger.jsonl` (each parlay as first suggested: legs, our joint probability,
+EVERY SGP SPORT (2026-10-21, lane `cheat-sheets`): NBA, WNBA and MLB ledgers were written from their first sheet but
+`--sport` accepted only nfl/nhl, so their calibration (predicted joint hit rate vs realized) was never measured --
+the +100 NBA tiers of 10-20 had no way to show whether their probabilities are honest. The record's SGP tally (the
+scorecard) was never affected; this is the per-ticket calibration ledger beside it.
+
+Reads `<data root>/cheatsheets/<sport>/sgp_ledger.jsonl` (each parlay as first suggested: legs, our joint probability,
 fair / worth-it / estimated odds) and grades every leg from that day's `<date>.reconciled.json` -- the production
 grader's own results, keyed by `cheat_sheets.prop_result_key`, so a parlay is graded exactly as the sheet's props.
 
 A parlay WINS when every leg wins, LOSES when any leg loses, is VOID when a leg is void (a player who did not play;
 books' SGP void rules vary, so a void is never counted as either), and PENDING otherwise. Writes
-`<data root>/cheatsheets/nfl/sgp_graded.jsonl` (one line per parlay, rewritten whole) and prints:
+`<data root>/cheatsheets/<sport>/sgp_graded.jsonl` (one line per parlay, rewritten whole) and prints:
   * calibration -- realized joint hit rate vs the mean predicted `p_joint` (THE claim this ledger can test);
   * paper ROI at the WORTH-IT price (what a user who only bets at that price or better would at least get) and at
     the ESTIMATED book price (an assumption: the leg prices multiplied, less 18.5%).
@@ -33,6 +38,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from syndicate.features.nfl.sgp import payout  # noqa: E402
 from syndicate.features.shared import cheat_sheets as cs  # noqa: E402
+from syndicate.features.shared.cheat_sheet_record import SGP_SPORTS  # noqa: E402
 
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -81,7 +87,8 @@ def summarize(graded: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
         pays = [(payout(g.get(field)) or 0.0) for g in settled]
         if all(pays):
             out[f"roi_at_{label}_price"] = round(sum(w * d for w, d in zip(won, pays)) / n - 1.0, 4)
-    for rel in ("same_player", "teammate", "opponent"):
+    # `mixed` is most tickets on the +100 tiers (legs across teammates and opponents); it was silently unreported.
+    for rel in ("same_player", "teammate", "opponent", "mixed"):
         sub = [(w, p) for g, w, p in zip(settled, won, pred) if g.get("relation") == rel]
         if sub:
             out[rel] = {"n": len(sub), "hit_rate": round(sum(w for w, _ in sub) / len(sub), 4),
@@ -92,7 +99,7 @@ def summarize(graded: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--data-root", default=os.environ.get("SYNDICATE_DATA_ROOT") or "")
-    ap.add_argument("--sport", default="nfl", choices=("nfl", "nhl"))
+    ap.add_argument("--sport", default="nfl", choices=tuple(sorted(SGP_SPORTS)))
     args = ap.parse_args(argv)
     if not args.data_root:
         print("REFUSING: no --data-root", flush=True)

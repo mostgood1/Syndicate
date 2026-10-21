@@ -338,6 +338,62 @@ def reconcile(sheet: dict[str, Any], props: dict[str, Any], lines: dict[str, Any
                        "lines_graded": len(l_out), "picks": len(set(pick_keys)), "picks_graded": len(k_out)}}
 
 
+# SHEET PROPS THE RECORDER NEVER HELD, GRADED BY THE PRODUCTION SETTLER ITSELF (lane `cheat-sheets`, 2026-10-21).
+# The grader settles the recorder's captured population; `actuals_index` then grades a sheet line the population never
+# held from the same player's value at another line. A player the population held at NO line stayed open forever.
+# Measured on the NCAAF 10-20 sheet: 47 of 147 props neither graded nor voided, 35 of them from Missouri State @
+# Delaware, whose box score carries every one of those players. So each still-open prop goes through
+# `population_outcomes.build_extra_settler` -- the composite every pull uses, under its own rules (team-pair game join,
+# finality, ABSENT IS NOT ZERO) -- reading ESPN's summary box. Its value is the `ValueTap` reading, like any graded row.
+BOX_SETTLED_SPORTS = frozenset({"nfl", "ncaaf", "wnba", "nba", "ncaab"})
+# Reasons that will not change on a later run: the prop is void, with that reason. Anything else (not final, a fetch
+# that failed, a game not found) leaves it open for the next run.
+_FINAL_REASONS = frozenset({"dnp_void", "player_absent_unverifiable", "player_ambiguous", "prop_market_unmapped",
+                            "prop_segment_unsupported", "non_player_prop_unsupported", "unsettleable_side_or_line"})
+
+
+def settle_open_props(sheet: Mapping[str, Any], rec: dict[str, Any], settler: Callable[..., Any],
+                      values: Mapping[str, Any]) -> int:
+    """Grade, in place, the sheet props `reconcile` left open, through `settler(shaped, view)`; returns how many it
+    graded. `values` is the live `ValueTap.values` (read after each call). Counts are rewritten to include them."""
+    if str(sheet.get("sport") or "") not in BOX_SETTLED_SPORTS:
+        return 0
+    games = {str(g.get("event_id") or ""): g for g in sheet.get("games") or [] if isinstance(g, Mapping)}
+    graded = 0
+    for r in sheet.get("rows") or []:
+        k = cs.prop_result_key(r)
+        line = r.get("line")
+        if (k in rec["props"] or k in rec["void"] or not r.get("player") or not isinstance(line, (int, float))
+                or isinstance(line, bool)):
+            continue
+        game = games.get(str(r.get("event_id") or "")) or {}
+        shaped = {"sport": sheet.get("sport"), "market": r.get("market"), "segment": "full",
+                  "player_name": r.get("player"), "side": str(r.get("side") or "").strip().lower(), "line": float(line),
+                  "event_id": str(r.get("event_id") or ""),
+                  "commence_time": r.get("commence_time") or game.get("commence_time"),
+                  "home_team": game.get("home_team"), "away_team": game.get("away_team")}
+        out = settler(shaped, {})
+        if not out:
+            continue
+        result, reason = out
+        if result in ("win", "loss"):
+            entry: dict[str, Any] = {"y": 1.0 if result == "win" else 0.0, "by": "box"}
+            tapped = values.get(cs.pick_result_key(shaped))
+            if tapped:
+                entry["v"] = tapped["v"]
+            rec["props"][k] = entry
+            graded += 1
+        elif result == "push":
+            rec["void"][k] = "push"
+        elif reason in _FINAL_REASONS:
+            rec["void"][k] = reason
+    counts = rec.setdefault("counts", {})
+    counts["props_graded"] = len(rec["props"])
+    counts["props_valued"] = sum(1 for v in rec["props"].values() if "v" in v)
+    counts["props_from_box"] = sum(1 for v in rec["props"].values() if v.get("by") == "box")
+    return graded
+
+
 def sgp_leg_actuals(root: Path, day: str, sheet: Mapping[str, Any]) -> dict[str, float]:
     """Each parlay leg's actual (the sheet's parlays and the day's paper-ledger ones) from the sport's own game log --
     NHL box scores, NFL usage lines: the high-hit-rate pool draws legs from players the sheet never graded."""
@@ -521,6 +577,7 @@ def main(argv: list[str] | None = None) -> int:
     cache = sheets_dir / ".reconcile_cache"
     cache.mkdir(parents=True, exist_ok=True)
     srb = None
+    box_settler = None
     for day in days:
         if day > today:
             continue
@@ -572,6 +629,16 @@ def main(argv: list[str] | None = None) -> int:
             rec = reconcile(doc, merge_results(prior.get("props") or {}, props), merge_results(prior.get("lines") or {}, lines),
                             now=now, reasons={**earlier, **tap.reasons}, scores={**(prior.get("scores") or {}), **tap.scores},
                             picks=merge_results(prior.get("picks") or {}, pick_results), actuals=actuals)
+            if doc.get("sport") in BOX_SETTLED_SPORTS:
+                try:
+                    if box_settler is None:
+                        from syndicate.features.shared.population_outcomes import build_extra_settler
+
+                        box_settler = build_extra_settler(cache_dir=cache / "settlers")
+                    with ValueTap() as box_tap:
+                        settle_open_props(doc, rec, box_settler, box_tap.values)
+                except Exception as exc:  # noqa: BLE001 -- the population's results still stand
+                    print(f"RECONCILE {doc['sport']} date={day} box pass failed: {type(exc).__name__}: {exc}", flush=True)
             c = rec["counts"]
             if not prior and not (c["props_graded"] or c["lines_graded"] or c["picks_graded"]):
                 # Nothing final yet: no file, so the page offers no toggle onto a sheet of dashes.
@@ -582,7 +649,7 @@ def main(argv: list[str] | None = None) -> int:
             write_atomic(target, rec)
             write_postmortem(root, path, doc, rec, day)
             print(f"RECONCILE {doc['sport']} date={day} props {c['props_graded']}/{c['props']} (values {c['props_valued']}, "
-                  f"from the actual stat {c['props_from_actual']}, "
+                  f"from the actual stat {c['props_from_actual']}, from the box {c.get('props_from_box', 0)}, "
                   f"explained voids {len(rec['void'])}, finals {len(rec['scores'])}) "
                   f"lines {c['lines_graded']}/{c['lines']} graded_population={len(graded)}", flush=True)
     refresh_leg_actuals(root, sheets_dir, today)
@@ -668,9 +735,14 @@ def refresh_leg_actuals(root: Path, sheets_dir: Path, today: str, *, days: int =
 
 
 def grade_sgp_ledger(root: Path) -> None:
-    """Grade each sport's same-game-parlay paper ledger (NFL, NHL) from the reconciled sheets just written (lanes
-    `nfl-sgp-builder`, `nhl-sgp-builder`). Never fails the reconcile."""
-    for sport in ("nfl", "nhl"):
+    """Grade each sport's same-game-parlay paper ledger from the reconciled sheets just written (lanes
+    `nfl-sgp-builder`, `nhl-sgp-builder`, `basketball-sgp-builder`). Never fails the reconcile.
+
+    EVERY SGP SPORT, from the one list the builder and the record share (2026-10-21): this looped over nfl/nhl only, so
+    the NBA, WNBA and MLB ledgers -- written daily -- were never graded."""
+    from syndicate.features.shared.cheat_sheet_record import SGP_SPORTS
+
+    for sport in sorted(SGP_SPORTS):
         if not (root / "cheatsheets" / sport / "sgp_ledger.jsonl").is_file():
             continue
         try:

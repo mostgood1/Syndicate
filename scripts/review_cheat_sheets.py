@@ -193,8 +193,12 @@ def health(sheets_dir: Path, days: list[tuple[dict, dict]], record: Mapping[str,
         for reason in (reconciled[sport][1].get("void") or {}).values():
             void[cs.void_label(reason)] += 1
         if void.get("Not in the box score", 0) >= 3:
-            add("warn", f"{sport} {yesterday} name matching", f"{void['Not in the box score']} bets 'not in the box score' -- "
-                "usually a nickname or spelling the grader cannot match")
+            # NOT "usually a nickname or spelling" (2026-10-21): on the NCAAF 10-20 sheet all 9 such bets (4 players) were
+            # on their team's ESPN roster and absent from the box -- no stat line, so a DNP void cannot be told from a
+            # zero. Check the spelling only when a player IS in the box under another name.
+            add("warn", f"{sport} {yesterday} not in the box score", f"{void['Not in the box score']} bets 'not in the box "
+                "score' -- the player has no stat line (did not play, or played without one); a spelling mismatch is the "
+                "rarer cause")
         rows = sheet.get("rows") or []
         faced = sum(1 for r in rows if r.get("headshot_url"))
         if rows and faced < 0.8 * len(rows) and sport != "soccer":

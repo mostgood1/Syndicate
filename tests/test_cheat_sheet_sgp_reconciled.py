@@ -135,3 +135,26 @@ def test_parlay_leg_actuals_refresh_for_a_week_not_only_the_grader_window(tmp_pa
         rec = json.loads((sheets / "nfl" / f"{day}.reconciled.json").read_text(encoding="utf-8"))
         assert ("leg_actuals" in rec) is expect
     assert rc.refresh_leg_actuals(tmp_path, sheets, "2026-10-19") == 0      # nothing new: nothing rewritten
+
+
+def test_every_sgp_sport_is_graded_not_only_nfl_and_nhl(tmp_path, monkeypatch):
+    """2026-10-21: the NBA/WNBA/MLB ledgers were written daily and never graded (`--sport` choices nfl/nhl, and the
+    reconcile looped over those two). Every sport in SGP_SPORTS with a ledger now gets a graded file and a line."""
+    from syndicate.features.shared.cheat_sheet_record import SGP_SPORTS
+
+    spec = importlib.util.spec_from_file_location("reconcile_cheat_sheets_sgp", ROOT / "scripts" / "reconcile_cheat_sheets.py")
+    rec = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(rec)
+    for sport in ("nba", "wnba", "mlb"):
+        base = tmp_path / "cheatsheets" / sport
+        base.mkdir(parents=True)
+        (base / "sgp_ledger.jsonl").write_text(json.dumps({
+            "sgp_id": f"{sport}-1", "date": "2026-10-20", "event_id": "e1", "relation": "mixed", "p_joint": 0.4,
+            "worth_it_odds": 120, "est_book_odds": 110,
+            "legs": [{"player": "A", "market": "player_points", "side": "over", "line": 10.5, "bet": "A over 10.5"}]}) + "\n",
+            encoding="utf-8")
+    rec.grade_sgp_ledger(tmp_path)
+    for sport in ("nba", "wnba", "mlb"):
+        assert sport in SGP_SPORTS
+        lines = (tmp_path / "cheatsheets" / sport / "sgp_graded.jsonl").read_text(encoding="utf-8").splitlines()
+        assert json.loads(lines[0])["status"] == "pending"          # no reconciled sheet yet: pending, not dropped
