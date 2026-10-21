@@ -1648,6 +1648,11 @@ EXPORT_ONLY_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # published from wherever a reader happens to run.
     "*_source/data/processed/schedule_*.csv",
     "*_source/data/processed/schedule_*.json",
+    # lane nba-current-rosters (USER OVERRIDE 2026-10-20 of ncaab-native-live-tier's claim on this file, owner archived):
+    # the ESPN current NBA rosters the props features re-key players to and the sim's roster filter reads
+    # (syndicate/features/shared/nba_current_rosters.py; model engine standard section 3: every engine input
+    # auditable). READ-ONLY: rewritten in place on the data root by the props refresh, never swept or published.
+    "nba_source/data/processed/rosters_*.csv",
 )
 
 

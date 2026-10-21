@@ -59,6 +59,9 @@ EXPORT_ONLY_SAMPLES = (
     "nba_source/data/processed/schedule_2026_27.csv",
     "wnba_source/data/processed/schedule_2026.csv",
     "wnba_source/data/processed/schedule_2026.json",
+    # lane nba-current-rosters: READ on the fleet data root 2026-10-20 (rosters_2025-26.csv, stats.nba, 30 teams); the
+    # 2026-27 file is the ESPN current roster nba_current_rosters.py writes there.
+    "nba_source/data/processed/rosters_2025-26.csv",
 )
 
 FEED_LIVE_SAMPLE = EXPORT_ONLY_SAMPLES[0]
