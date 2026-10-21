@@ -43,7 +43,23 @@ AMBIGUOUS_PATTERNS = (
     r"(?<![\w.])date_cls\.today\(\)",
     r"(?<![\w.])datetime\.today\(\)",
     r"utcnow\(\)\.date\(\)",
-    r"utcnow\(\)\.strftime\(\s*[\"']%Y-%m-%d",
+    # The format string must be EXACTLY `%Y-%m-%d`, closing quote included
+    # `[2026-10-20, lane hygiene-guards-1020]`.
+    #
+    # This was an open prefix, so it also matched `%Y-%m-%dT%H:%M:%SZ` -- a full
+    # ISO INSTANT, explicitly labelled UTC, which is the correct thing to stamp
+    # a telemetry field with and not a slate date at all. It flagged exactly
+    # that in `nba/live_tick/tick.py` and `wnba/live_tick/tick.py` (both
+    # `"utc": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")`), and a ratchet
+    # that reports correct code is how allowlisting becomes reflexive.
+    #
+    # THE TRADE, stated so it can be argued with: a format that merely STARTS
+    # with the date and continues (`%Y-%m-%d_%H%M`) is no longer flagged. Every
+    # such form is an instant rather than a date, and the date-shaped uses of
+    # `utcnow()` are still covered by `utcnow().date()` and
+    # `Timestamp.utcnow().date()` above. Verified before narrowing: it removes
+    # two hits and takes no ALLOWLIST file to zero.
+    r"utcnow\(\)\.strftime\(\s*[\"']%Y-%m-%d[\"']",
     r"Timestamp\.utcnow\(\)\.date\(\)",
 )
 
@@ -65,6 +81,36 @@ ALLOWLIST: dict[str, int] = {
     "syndicate/features/shared/basketball_props_onnx.py": 2,
     # Accuracy report's "until" bound -- an analysis window, not a slate date.
     "syndicate/features/mlb/live_lens_daily_accuracy.py": 1,
+    # ADDED 2026-10-20 (lane `hygiene-guards-1020`) -- DEBT, NOT ABSOLUTION.
+    #
+    # Three files, four call sites, all real and all owned by OTHER OPEN lanes,
+    # so they are recorded here rather than edited across a lane boundary. Each
+    # already takes an injectable `today`, so each fix is one line in the
+    # owning lane. Raised with the owners in `.syndicate/log/2026-10-20.md`.
+    #
+    # `nhl-season-inputs-in-season`: both sites are `today = today or
+    # date.today()` feeding `season_code(today)`. The stakes are a SEASON
+    # boundary rather than a slate -- the skew can only matter within a day of
+    # the enable date -- which is why this is debt and not an incident.
+    "syndicate/features/nhl/inseason_season_inputs.py": 2,
+    "syndicate/features/nhl/inseason_team_xg.py": 1,
+    # `board-interval-charts`: `self.today = today or date.today().isoformat()`.
+    #
+    # Lower-stakes than the name suggests, and the severity was checked rather
+    # than inferred from it. `self.today` is read at EXACTLY ONE site --
+    # `_keep`'s `if day < self.today and all(g.get("decided") for g in games)`,
+    # the decision to persist a day to the disk cache. Behind `all(decided)` a
+    # one-day skew can only persist an already-final day early or defer it, so
+    # it moves no slate and mis-dates no game.
+    #
+    # The finding worth passing to the owner is a DIFFERENT one on the same
+    # line: `cached_team_results` (the board's reader) builds
+    # `IntervalHistory(root, offline=True)` with no `today=` and caches it in
+    # the module-level `_READERS` dict, so `self.today` is frozen at the value
+    # the process booted with -- for a long-lived gunicorn worker, days stale.
+    # `central_today()` would not fix that on its own; the fix is to resolve
+    # "today" per call rather than per reader.
+    "syndicate/features/shared/interval_history.py": 1,
 }
 
 

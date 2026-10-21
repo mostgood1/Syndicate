@@ -105,18 +105,59 @@ def _live_prop_row():
 
 # ---------------------------------------------------------------- reachability
 
+# THE UNWIRED SPORT IS DERIVED FROM THE WIRED SET, NEVER HARDCODED
+# `[2026-10-20, lane hygiene-guards-1020]`.
+#
+# These two tests have drifted TWICE by naming a sport that was later wired.
+# `nhl` joined `_LIVE_GAMELINE_SPORTS` on 2026-09-24 (lane `nhl-live-resim`) and
+# gate 3 went red that day; it was changed to `nba`, and `nba` is in the wired
+# set too -- by DEFAULT, not by configuration, because `_nba_live_priced()` maps
+# an ABSENT `SYNDICATE_NBA_LIVE_PRICED` onto the permissive branch:
+#
+#     str(os.environ.get(...) or "").strip().lower() not in ("0", "false", ...)
+#
+# an empty string is in none of those, so absent reads as ON. Measured
+# 2026-10-20: the variable is absent on EVERY live fleet process (refresh-worker,
+# live-odds-worker and both gunicorn workers), so NBA live pricing is on in
+# production and `nba` is wired there as well as here.
+#
+# Every sport Syndicate runs is now wired for gamelines, so no hardcoded name
+# can stay unwired and the sport has to come from the implementation. The
+# ASSERTION is unchanged and is not vacuous: a sport the code does not know must
+# fail CLOSED -- `supported: False`, naming the sport -- rather than return
+# `supported: True` and render a blank live column, which is the silent failure
+# this module's docstring exists for.
+_SYNDICATE_SPORTS = ("mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "soccer")
+
+
+def _an_unwired_sport(wired) -> str:
+    """A sport outside `wired` -- a real one if there is one, else a token.
+
+    Preferring a real sport keeps the probe faithful to production input; the
+    fallback exists because all eight are currently wired for gamelines.
+    """
+    for candidate in _SYNDICATE_SPORTS:
+        if candidate not in wired:
+            return candidate
+    return "underwater-hockey"
+
+
 def test_gate3_unwired_sport_still_fails_closed():
-    # `nba`, not `nhl`: nhl joined `_LIVE_GAMELINE_SPORTS` on 2026-09-24 (lane
-    # `nhl-live-resim`) and this test went red that day without anyone noticing.
+    wired = board_enrichment._live_gameline_sports()
+    sport = _an_unwired_sport(wired)
+    assert sport not in wired, f"derivation picked a WIRED sport: {sport}"
     out = board_enrichment.attach_live_gamelines_for_sport(
-        [], sport="nba", selected_date="2026-08-21")
+        [], sport=sport, selected_date="2026-08-21")
     assert out["supported"] is False
-    assert "nba" in out["reason"]
+    assert sport in out["reason"]
 
 
 def test_gate2_unwired_sport_still_fails_closed():
+    wired = board_enrichment._live_prop_sports()
+    sport = _an_unwired_sport(wired)
+    assert sport not in wired, f"derivation picked a WIRED sport: {sport}"
     out = board_enrichment.attach_live_projections_for_sport(
-        [], sport="nhl", selected_date="2026-08-21")
+        [], sport=sport, selected_date="2026-08-21")
     assert out["supported"] is False
 
 

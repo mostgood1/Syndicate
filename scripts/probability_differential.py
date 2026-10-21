@@ -288,6 +288,22 @@ AMERICAN_TO_PROBABILITY: list[Impl] = [
     Impl("american_to_probability", "syndicate.features.wnba.source_cli.odds_api",
          "consensus_lines_at_close._implied_prob_from_american_or_prob",
          "NESTED, generated port; DUAL SCALE (a value in (0, 1) passes through) and clips to [1e-6, 1-1e-6]"),
+
+    # ADDED 2026-10-20 by the unregistered-converter sweep (lane
+    # `hygiene-guards-1020`). Seventeen converter-shaped functions had
+    # accumulated unclassified; these are the ones that really are scalar
+    # price/probability converters, so they are REGISTERED rather than excused.
+    Impl("american_to_probability",
+         "syndicate.features.mlb.native.tools.eval.eval_sim_day_vs_actual", "_implied_prob_from_american",
+         "strips a leading '+'; refuses 0, empty and None"),
+    Impl("american_to_probability", "syndicate.features.mlb.sim_engine.live_prop_ranking",
+         "american_odds_implied_prob",
+         "goes through `_safe_int`, so a FLOAT price is TRUNCATED (-110.5 -> -110)"),
+    Impl("american_to_probability", "syndicate.features.mlb.sim_engine.market_pitcher_props",
+         "american_implied_prob",
+         "goes through `_parse_american_odds`, so a FLOAT price is TRUNCATED; accepts 'EVEN'/'EV' as +100"),
+    Impl("american_to_probability", "syndicate.features.shared.kalshi_maker_shadow", "american_to_prob",
+         "keeps float precision; refuses 0 and NaN"),
 ]
 
 AMERICAN_TO_DECIMAL: list[Impl] = [
@@ -297,6 +313,13 @@ AMERICAN_TO_DECIMAL: list[Impl] = [
     Impl("american_to_decimal", "syndicate.features.shared.live_lens_local", "_american_to_decimal"),
     Impl("american_to_decimal", "syndicate.features.nhl.sim_engine.hockeysim.adapters", "american_to_decimal"),
     Impl("american_to_decimal", "scripts.build_soccer_picks", "_american_to_decimal"),
+
+    # ADDED 2026-10-20 by the unregistered-converter sweep (lane
+    # `hygiene-guards-1020`). Seventeen converter-shaped functions had
+    # accumulated unclassified; these are the ones that really are scalar
+    # price/probability converters, so they are REGISTERED rather than excused.
+    Impl("american_to_decimal", "scripts.ev_overstatement_decomp", "decimal_odds",
+         "UNGUARDED `float(american)`, so None/''/0 RAISE rather than refuse"),
     Impl("american_to_decimal", "scripts.regrade_mlb_game_markets", "_american_to_decimal",
          "int(price) then 100/abs(price) -- ZeroDivisionError at 0"),
     # ADDED 2026-09-09 by the NESTED sweep. Was nested in `_settle_game_pick`,
@@ -397,6 +420,13 @@ PROBABILITY_TO_AMERICAN: list[Impl] = [
     Impl("probability_to_american", "syndicate.features.wnba.source_cli.odds_api",
          "consensus_lines_at_close._american_from_implied_prob",
          "NESTED, generated port; strict 0<p<1; returns an UNROUNDED float"),
+
+    # ADDED 2026-10-20 by the unregistered-converter sweep (lane
+    # `hygiene-guards-1020`). Seventeen converter-shaped functions had
+    # accumulated unclassified; these are the ones that really are scalar
+    # price/probability converters, so they are REGISTERED rather than excused.
+    Impl("probability_to_american", "syndicate.features.shared.kalshi_maker_shadow", "prob_to_american",
+         "strict 0<p<1 via `num`, so the 50.0 percent-scale input is REFUSED; rounds to int"),
 ]
 
 REGISTRY: list[Impl] = AMERICAN_TO_PROBABILITY + AMERICAN_TO_DECIMAL + PROBABILITY_TO_AMERICAN
@@ -493,6 +523,38 @@ NOT_A_SCALAR_CONVERTER: dict[str, str] = {
     "syndicate/features/shared/recommendation_engine.py:_fair_probability": "takes a candidate Mapping",
     "syndicate/features/soccer/features/market_anchoring.py:devig_decimal_odds": "dict in, dict out",
     "syndicate/features/soccer/props.py:_american_odds_text": "display formatting",
+    # ADDED 2026-10-20 by the unregistered-converter sweep (lane
+    # `hygiene-guards-1020`). Seventeen converter-shaped functions had
+    # accumulated unclassified; six were registered above and these eleven are
+    # genuinely not scalar price<->probability converters. Grouped by WHY, since
+    # the shape of the excuse is the useful part when the next one lands.
+    #
+    # Two-sided de-vig: two prices (or two probabilities) in, a normalized
+    # probability out. Same shape as `opportunity_signals.devig` and
+    # `backtest_mlb_first5_vs_market.devig_home` above.
+    "scripts/ev_overstatement_decomp.py:_devig_pair": "two prices -> one normalized probability; its scalar half, `decimal_odds`, IS registered",
+    "scripts/inplay_edge_report.py:devig": "two DECIMAL odds -> one normalized probability; not american and not scalar",
+    "syndicate/features/mlb/native/tools/daily_update_multi_profile.py:_no_vig_two_way": "two prices -> a PAIR of normalized probabilities",
+    "syndicate/features/mlb/native/tools/eval/eval_sim_day_vs_actual.py:_no_vig_two_way": "two PROBABILITIES -> a pair; no price is involved at all",
+    "syndicate/features/mlb/sim_engine/market_pitcher_props.py:no_vig_over_prob": "over+under prices -> the de-vigged over probability; its scalar half, `american_implied_prob`, IS registered",
+    #
+    # Parsers and formatters: price in, price out. These coerce or render, they
+    # do not convert between a price and a probability.
+    "syndicate/features/mlb/native/tools/daily_update_multi_profile.py:_normalize_american_odds": "coerces a value to a rounded american int; a parser, not a conversion (twin of the live_lens_port entry above)",
+    "syndicate/features/mlb/native/tools/oddsapi/backfill_oddsapi_historical_2025.py:_american_str": "formats a price for display; maps 'EVEN' to '+100' (twin of the fetch_mlb_oddsapi_local entry above)",
+    "syndicate/features/mlb/sim_engine/market_pitcher_props.py:_parse_american_odds": "coerces a value to an american int and maps 'EVEN'/'EV' to 100; the GUARD in front of the registered `american_implied_prob`",
+    #
+    # Neither input nor output is a probability.
+    "syndicate/features/mlb/native/tools/eval/settle_locked_policy_cards.py:_american_profit": "price + stake -> PROFIT; raises on a missing or zero price (4th impl of that concept; see the three `_american_profit` entries above)",
+    "syndicate/features/shared/live_stake_band.py:_american_env": "reads a NEGATIVE american price out of an env var and falls back to a default; an env reader, not a conversion",
+    #
+    # A real scalar converter of a direction this harness does not carry. Worth
+    # a line of its own rather than a shrug: the harness's three concepts are
+    # american->probability, american->decimal and probability->american, so
+    # decimal->american has NO differential and a second implementation of it
+    # would land without anything to compare against. Two are already known
+    # (`intelligence.py:_decimal_to_american`, `intelligence_audit` nested).
+    "syndicate/features/shared/cross_game_parlays.py:american": "DECIMAL->american, a direction the harness carries no grid for; now the third known impl of it",
     # ADDED 2026-09-05. The tripwire had accumulated 37 unlisted functions; each
     # of these was classified from its SIGNATURE or BODY, never its name.
     "scripts/measure_game_market_option_value.py:implied": "BOUNDED variant -- refuses |price| > MAX_ABS_AMERICAN (1000.0) as a dead price, by design; registering it as the general converter makes it disagree at +10000 where 37 impls agree",

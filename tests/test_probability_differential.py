@@ -61,6 +61,25 @@ KNOWN_FAILING = {
         # price). A fix in the port is overwritten on regeneration; fix both at the
         # vendored source.
         "syndicate.features.mlb.live_lens_port.app_slice:_american_odds_implied_prob",
+        # ADDED 2026-10-20 (lane `hygiene-guards-1020`), when the 17-name
+        # backlog was classified. NOT NEW DEBT -- both have always failed this
+        # requirement; they were invisible because they were never registered,
+        # which is the whole point of the registration tripwire.
+        #
+        # Both fail `accepts_float_price` ONLY, 4/5, and in the same way as
+        # `hr_targets` / `live_lens_port.app_slice` above: an int coercion
+        # (`_safe_int`, `_parse_american_odds`) truncates -110.5 to -110, giving
+        # 0.5238095238 against the reference 0.5249406175. A wrong number rather
+        # than a refusal, but 0.11 of a percentage point of probability.
+        #
+        # RECORDED, NOT FIXED, deliberately: these are MLB SIM-ENGINE converters
+        # and prop pricing is calibrated around what they currently return, so
+        # changing them is a mechanism change owed a measurement (CLAUDE.md's
+        # model-engine standard), not a hygiene edit. Integer prices -- what
+        # books actually quote -- are unaffected; the exposure is averaged or
+        # consensus prices, which arrive as floats.
+        "syndicate.features.mlb.sim_engine.live_prop_ranking:american_odds_implied_prob",
+        "syndicate.features.mlb.sim_engine.market_pitcher_props:american_implied_prob",
         "syndicate.features.ncaab.mirror_export:_american_to_probability",
         "syndicate.features.nhl.sim_engine.hockeysim.adapters:american_to_implied",
         "syndicate.features.shared.odds_book_quotes:_implied_probability",
@@ -105,6 +124,16 @@ KNOWN_FAILING = {
         # arithmetic, so these are triaged here, not "fixed" into a new failure.
         "scripts.layer2_live_scorecard:decimal_odds",
         "scripts.score_ranking_analysis:decimal_odds",
+        # ADDED 2026-10-20 (lane `hygiene-guards-1020`): a FIFTH copy of the
+        # same unguarded one-liner, found by the 17-name classification. 2/5 --
+        # ZeroDivisionError at 0, TypeError on None, ValueError on '' -- so it
+        # fits this cluster's reasoning exactly, including the part about not
+        # "fixing" a raise into a None that the caller's arithmetic then
+        # inherits: `_devig_pair` in the same module divides by its result.
+        # It is also the instrument of lane `sim-stake-unfitted-market-only`'s
+        # pre-registered forward reading, so changing it mid-registration would
+        # move the measurement as well as the code.
+        "scripts.ev_overstatement_decomp:decimal_odds",
         "scripts.soccer_season_audit.common:dec_from_american",
         "syndicate.features.shared.model_scorecard:_decimal_odds",
         "scripts.regrade_mlb_game_markets:_american_to_decimal",
