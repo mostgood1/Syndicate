@@ -1628,7 +1628,7 @@ death, never life — do not invert it.
 - Falsification test: a live row at 0.65 vs close -186 already yields ~0 pt on current code
 - Verification: test: 0.65 vs -186 -> ~0.0 pt; paper -110 vs -130 unchanged +4.1; mutation (remove contract branch) fails the test
 - Blocked by: none
-- **RESULT 2026-10-21 (code, not fleet):** hypothesis CONFIRMED -- pre-fix `_clv_pct_from_prices(0.65, -186)` = -34.3; post-fix +0.03. Fix at the choke point (`_implied_from_price`); 180 tests pass across the clv/order_clv/position_marks/prediction_ledger/min_ev_tuner/paper_settlement suites; mutation fails 5/9 new tests. Reader survey + owed decisions in todo #719. Open until the user decides on re-marking stamped live rows and on the fleet ff.
+- **RESULT 2026-10-21 (code, not fleet):** hypothesis CONFIRMED -- pre-fix `_clv_pct_from_prices(0.65, -186)` = -34.3; post-fix +0.03. Fix at the choke point (`_implied_from_price`); 180 tests pass across the clv/order_clv/position_marks/prediction_ledger/min_ev_tuner/paper_settlement suites; mutation fails 5/9 new tests. Reader survey + owed decisions in todo #719. Open until the user decides on re-marking stamped live rows and on the fleet ff. **16:52Z:** user approved ff + re-mark; done (15 rows, -35.84 -> +1.14, read-back 15/15; deploys.md). Open until the refresh-worker restart decision lands.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
