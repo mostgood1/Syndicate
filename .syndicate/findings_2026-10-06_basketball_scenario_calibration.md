@@ -3852,3 +3852,32 @@ Every value landed within ±.03 FTA, ±.03 PF and ±.004 foul-outs of the pre-re
 2. X with s set and the term at 0;
 3. the 12-date check (|bias| < 0.5 + the gates);
 4. ask the user before the full FIT.
+
+### ROUND-2 FTA FIX — 12-DATE CHECK RESULT 2026-10-21 15:41Z: PASS (3 runs × 12/12 dates, 0 errors); the full FIT awaits the user
+
+**Re-measured on the #3j dates:**
+- s = **0.01837** (R3_m1);
+- X = **0.771** per team-game (SE 0.098, 82 games; R3_x).
+
+**PKR4_check** (12 sweep dates, 87 games):
+
+| gate | value | rule |
+|---|---|---|
+| total bias vs actual | **+0.26** per game, CI [−3.27, +4.10] | < 0.5 ✓ |
+| FTA/team | 23.10 | 23.04 ± .15 ✓ |
+| team PF | 19.57 | 19.57 ± .3 ✓ |
+| foul-outs | 0.222 | ≤ .223 ✓ (tight) |
+| 3PA | 37.03 | ✓ |
+| trips | 7.66 / 2.24 / 0.36 | ✓ |
+| quarter shares | .2554 / .2503 / .2529 / .2414 | ✓ |
+
+**Paired:** vs R2A_mean +0.13 (SE 0.26); vs PKR3_check +0.33 (SE 0.22).
+
+**ROUND-2b CONFIG** (candidate for the full FIT): the round-2 config with:
+- `bonus_nonshoot_foul_per_poss=0.0695`, `base_nonshooting_foul_per_poss=0.0175`;
+- `solver_bonus_trip_share=0.01837`, `solver_endgame_pts_per_team=0.771`.
+
+**Predicted on the FIT** (by the paired shift):
+- FTA ≈ 23.19 (gate 23.14 ± .3);
+- PF ≈ 19.67;
+- foul-outs ≈ 0.222 (upper bound 0.2334).
