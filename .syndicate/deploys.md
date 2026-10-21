@@ -52156,3 +52156,14 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - `LIVE_ORDER status=submitted`; `EXECUTED venue=polymarket positions=1 placed=1`.
 - **context:** the first Polymarket live order of the evening (NBA OKC-SA total 231.5, D7HMYF0G10JQ, filled 1.02 at 0.48, $0.02 commission) came from the 23:02Z plan on PRE-fix code, i.e. the live 0% floor, not this fix.
 - **owed:** the fill state of D7JJFKT010JF at the next reconcile; the 10-21 8:45 AM CT reading. Rollback: revert 96f97a0a + a gated refresh-worker TERM.
+
+## 2026-10-21T01:15:51Z -- READING: vendor/ gone from the fleet (nhl-vendor-delete) + schedule export live (ops-export-schedules) -- both MET
+- Fleet HEAD 3fffb430 (lane nba-live-board's ff to 3567ff3b at 2026-10-20 18:44:12 CDT carried 212de24a and 2ec30ec8; their claim, my consent).
+- nhl-vendor-delete (closes the 2026-10-20T21:30:59Z entry): `git ls-files vendor | wc -l` = 0; files written under vendor/ since the
+  ff = 0; nhl_source files written since the ff = 47, incl. the 20:15 CDT odds refresh (team + player props). vendor/ holds 415 ignored
+  leftover files on disk (archived, untracked).
+- ops-export-schedules (closes the 2ec30ec8 entry): `export?path=wnba_source/data/processed/schedule_2026.csv` -> HTTP 200 count 1, 375
+  lines; `nba_source/data/processed/schedule_2026_27.csv` -> HTTP 200 count 1, 1,275 lines (baseline 2026-10-20: 403). No explicit web
+  reload: gunicorn's recycled workers (19:40 / 20:10 CDT) run the new code.
+- Instrument note: my polling watcher (setsid + nice 19 via `wsl --exec`) logged the ff at 23:49:43Z and then DIED without a reading; this
+  reading was taken by hand. A watcher's silence is not a reading.
