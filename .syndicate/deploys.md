@@ -52773,3 +52773,34 @@ have stopped the reload, and it did not because nothing was gating on it.
   - `19:53:19Z LIVE_ORDER ... KXWNBAPTS-26OCT21GSATL-ATLAREESE5-15` under 14.5, stake 0.49.
   - The third bet was refused on DOLLARS, not count: the count cap no longer binds and the dollar cap does, as intended. 0 Tracebacks.
 - **rollback:** POST the same set with 50/50/100 (scratchpad savecaps.py), or edit on /portfolio.
+
+## 2026-10-21 20:27:32Z (3:27 PM CT) -- refresh-worker ROLE-ONLY restart, fleet ff aaa988a8 -> d0f05d9f: the live net floor now applies ONLY to the 0% floor's extra rows -- **MET** (lane `venue-native-selection`, session 86c84cf4)
+- **user:**
+  - In the fleet-watcher session ~2:25 PM CT (typed, relayed): "apply the floor to the extra rows only".
+  - Confirmed in my chat by the reply button: "Yes: change the live net floor so it applies only to the rows the 0% live EV floor added (live_ev_floor=0); Suggested rows go back to their previous rule. Tests: ... Land on main, then a refresh-worker role restart under the locks, deploys.md entry with undo, and before/after positions per build."
+  - A conflicting rollback request queued in session 332cb014 (19:16Z) was put to the user there. They chose "Extras-only scope", and 332cb014 stood down.
+- **code:** d0f05d9f (`commit_live_venue_plan`: floor and unreadable-key refusal act only on `live_ev_floor == 0` rows; stamp gains `scope`, `suggested_exempt`). 26 tests; the mutant "floor on every row" fails 4.
+  - Ride-along: `scripts/nba_anchor_staleness.py` (read-only script, not imported at runtime). The rest is ledger. ff overlap with dirty fleet files: 0.
+- **env:** unchanged (the two `LIVE_NET_FLOOR_*` keys stay; a role restart reuses the supervisor's env, loaded at the 19:24:03Z `up`).
+- **gates:**
+  - refresh-worker started 19:24:00Z (live-event-concentration's full up), so the earliest restart was 20:24:00Z. claim 7e38b1f70f3ed060 at 20:24:20Z.
+  - `--drain` acked, CLEAR (refresh-worker idle, no board build, no child job) 20:27:24Z.
+  - A first arming at 19:48Z computed the gate from `ps lstart` read as UTC (it is CDT), and would have restarted ~35 min early. It was stopped DURING the drain wait, before any ff or TERM. Drain cleared, claim released, refresh-worker 3506432 and HEAD verified untouched. Fixed and re-armed.
+- **restart:** ff --ff-only d0f05d9f 20:27:2xZ. TERM refresh-worker 3506432 at 20:27:32Z; respawned **3526319** at 20:27:40Z (code=d0f05d9f, restarts=1). healthz 200. DRAIN_CLEARED 20:27:45Z.
+  - web 3506380 and live-odds-worker 3506433 still run aaa988a8 code. Neither imports the changed function's live path, so neither needs a restart for this change.
+- **verify (first two builds after boot):**
+
+| build | venue | floor stamp | live positions | before (19:36 / 19:43Z, all-rows floor) | pre-floor (17:22 / 17:29Z) |
+|---|---|---|---|---|---|
+| 20:40:00Z 10-21 | kalshi | scope=ev_only_extra, extras checked 338, kept 2, **suggested_exempt 2** | 2, $11.35 | 2, $12.08 | 16, $30.43 |
+| 20:40:03Z 10-21 | polymarket | extras 113, kept 1, suggested_exempt 1 | 0 (both rows refused `in_play_market_fair`) | 0 | 2, $1.04 |
+| 20:46:21Z 10-22 | kalshi | extras 317, kept 1, suggested_exempt 2 | 1, $6.35 | 1, $6.68 | 6, $9.49 |
+| 20:46:23Z 10-22 | polymarket | extras 96, kept 0, suggested_exempt 0 | 0 | 0 | 1, $0.67 |
+
+  - **Suggested rows reached the commit and were judged by the previous rule:** 10-21 kalshi `below_min_ev_pct` 1 + `below_min_ev_pct_net_of_fee` 1; 10-22 kalshi `below_min_ev_pct` 2. None were refused by the floor.
+  - Plan positions read back: all are extra rows at or above the floor. TEN Ward passing TDs o0.5 at +1.08% (both slates; D1 dedupes the second). ATL Canada points u14.5 at +1.16% ($5.00).
+  - On this slate the scope change admitted no new Suggested bet: the Suggested rows quoted at the venue fail the commit's own gates. Positions are therefore about the same as under the all-rows floor. The difference shows on any build where a Suggested row is net-positive below the venue floor.
+- **claim:** released after this entry.
+- **UNDO:**
+  - Back to the all-rows floor: `git revert d0f05d9f`, ff the fleet, then a gated refresh-worker TERM.
+  - Floor off entirely: delete both `REFRESH_WORKER__SYNDICATE_LIVE_NET_FLOOR_*` lines from `~/syndicate-prod/local_production.env`, then a full down/up under all three claims (see the 18:12:20Z entry).
