@@ -52896,3 +52896,19 @@ have stopped the reload, and it did not because nothing was gating on it.
   which contains 9503c042. No claim, ff or restart by this lane. `def role_env` present in the fleet copy, unmodified.
 - verify (owed): the first task PULL after 21:37:37Z (SyndicateNbaGamedayProps 12:40Z 10-22, or a preview at 18:40Z) -- its props run
   shows Z-stamped lines, memory_max_mb 3072, n_sims 100 and 0 OSError; pre-fix pulls read zlines=0 / null / 500. Watcher armed.
+
+## 2026-10-21 21:37:37Z + 21:41:11Z (4:37 / 4:41 PM CT) -- fleet ff 6e406101 -> 931b1709 -> 7b908e02 + `reload-web` x2 (3.4 s / 2.0 s, 0 failures): UEFA follow-ups -- props within 24h of kickoff, weekly UEFA branding refresh, odds-only UEFA market board (lane `soccer-uefa-followups`, session 15fef1c0) -- NO outage, NO worker restart
+- **ask:** user 2026-10-21 "we need the follow ups". UEFA props design chosen by the user: near-kickoff only (24h).
+- **claim:** web, token cff744ff..., acquire exit 0, released exit 0 21:41:25Z.
+- **ride-alongs (checked before each ff):**
+  - ff 1 carried `9503c042` (lane gameday-pull-role-env, the NBA gameday props pull uses the role env). Its author wrote "live at the next fleet ff", and a60e9cfa records it as live via this ff.
+  - Otherwise ledger commits only; 0 `vendor/` files either time.
+- **served market boards after ff 2** (`/soccer/<l>/api/market-board`, 21:41Z):
+  - UEL 18 games, 18 with odds rows (126 rows); UECL 18 games, 18 with odds rows (126 rows); 0 sim rows on either.
+  - UCL 18 games, 0 rows: correct. Its in-window games are the 10-20/21 round, already dropped from the rolling odds file, and the next round (11-03) is beyond the 10-day lookahead.
+  - EPL (control) 15 games, 2,738 rows, 114 sim rows: the domestic path is unchanged.
+  - ff 2 was the fix: after ff 1, UECL had 15/18. Three games' home clubs matched fuzzily while the away side did not (Trabzonspor v Hearts, Inter Club d'Escaldes v Universitatea Craiova, Red Star v FC Copenhagen). The canonical fallback now runs on any fuzzy miss.
+- **verify (OWED):**
+  - (1) The first soccer pregame run after 21:41Z: `PROPS_HORIZON` lines for ucl/uel/uecl, and UEFA props files holding only matches kicking off within 24h. A watcher is armed (`C:/tmp/uefa_props_watch.sh`).
+  - (2) The UEFA branding step: the files are dated 2026-10-15, so `SOCCER_UEFA_BRANDING_STALE` + a rewritten `<l>_team_branding.csv` are due on the first pregame run after 2026-10-22 ~15:00Z (7 days).
+
