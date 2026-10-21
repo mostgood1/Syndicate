@@ -52062,3 +52062,44 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - The create response AND the immediate read-back both arrived before Kalshi priced the fill, so the row was `filled`/unpriced and blocked new live sales (designed). The next tick's reconcile priced it: `23:42:54Z EXIT_TICK ... live_exits={'rule_not_armed': 2} ... skipped={..., 'sold_live': 1}`, row `fill_price=0.58 exit_fee_dollars=0.0171 venue_status=executed`, unreconciled 0. The venue read shows `buy yes` @ 0.42 = NO sold @ 0.58.
   - Entry was 1 NO @ 0.41, so about **+$0.15** net on the contract (0.17 spread less the 0.0171 sale fee and the entry fee).
 - **owed:** (1) `exit_applied` on entry 1004ef2fe95bcd26d186da94 when MOSU@DEL settles: sold_out path, 1 sold + 0 settled. (2) The read-back race: the immediate read-back can still be unpriced. Reconcile closes it one tick later, so it costs at most one tick of blocked live exits. (3) Lane future-dated's after-kickoff block restart, after this one.
+
+## 2026-10-20 23:52:52Z (6:52 PM CT) -- fleet ff 67aa2882 -> 3567ff3b + live-odds-worker ROLE-ONLY restart: live Kalshi entries PREGAME ONLY (after-kickoff block + in-game exemption) -- 60-min rule WAIVED by the user (lane `future-dated-live-orders-scope`, session 0ffeb586) -- **MET: 6 after-kickoff entries refused on the first pass, 0 placed, 0 errors**
+- **ask:** relayed user decisions (session 332cb014): "Block after kickoff (Recommended)" (~23:10Z), then "we should be actively buying AND selling when games are live based on smart profitable positioning" -> keep the block with an in-game exemption. This session's user, in chat: "Yes: restart live-odds-worker onto current main right after kalshi-exit-path releases it (waive the 60-min rule, urgent while games are live), under claim + gate, tar the NHL vendor tree first, list every ride-along in deploys.md."
+- **why urgent (measured, baseline 23:42Z):** 4 live Kalshi orders were placed 7-8 min AFTER their 23:00Z kickoffs, on pregame fair prices:
+  - KXNCAAFSPREAD-26OCT20MOSUDEL-DEL4 $5.50 and DEL3 $0.41
+  - KXNBAPTS-26OCT20PHINYK-PHIVEDGECOMBE77-10 $0.67 and NYKOANUNOBY8-15 $0.64
+  - Kalshi had no after-commence check at order time.
+- **code:**
+  - `cd0901bf`: live Kalshi entries call `polymarket_us_orders._refuse_after_commence` (one rule, two venues). They refuse `game_started` / `commence_unknown` with a `[execute_portfolio] REFUSED_AFTER_COMMENCE` line, nothing written. Switch `SYNDICATE_EXECUTION_KALSHI_PREGAME_ONLY`, absent = ON.
+  - `150e1180`: a plan POSITION with `fair_source == "in_game"` (exact) is exempt from `game_started` (not `commence_unknown`) and logs `AFTER_COMMENCE_IN_GAME_FAIR`. Nothing sets the field yet; lane in-play (local_b14b84d0) has been told.
+  - Exits and reconciles do not pass through the block. 999 tests across 40 executor suites, both arms.
+  - Test-only edits: 4 historical-slate test fixtures hold the switch off. Two of those files are paper-alongside-live's, noted in its lane block.
+- **ride-alongs 67aa2882..3567ff3b (runtime), each read or cleared with its owner:**
+  - `212de24a` deletes vendor/nhl_betting_repo and retires the vendor-sync tooling (lane nhl-vendor-delete, "waiting on the next fleet ff").
+    - Fleet pre-check: 0 modified and 0 untracked files under the tree.
+    - **Backup:** `~/syndicate-prod/removed/nhl_betting_repo-20261020T234408Z.tar.gz` (89 files, 648K).
+    - After the ff: 0 tracked, 0 on disk.
+  - `d57476ec` kalshi cancel names the exchange shard on the V2 DELETE (lane compounding-bankroll; "No HOLD", owner reads the first CANCEL_STALE / CANCEL_AT_KICKOFF). Loaded here: both cancel passes run in live-odds-worker.
+  - `b59f2071` execution alert: one failed cancel = incident (watchdog only, no role restart needed; owner asked to be listed).
+  - `ab9d830c` nba props --mode fast exit code (subprocess script; nba-live-board needed it on disk only).
+  - `2ec30ec8` ops-export allowlist: needs a WEB reload, NOT done here.
+  - `c2191d1b` execution_exits_fast, PAPER only: "not wired into live-odds-worker; not running anywhere" (no importer, no SCHEDULED_JOBS entry).
+  - In-game-trading report scripts (8bd236b8, bc82d8d9, 441249cb, 8f375890, d7360a59, 95aae275) and the basketball calibration builders: scripts, not loaded.
+  - 0 overlap with the 6 dirty fleet files. `git merge --ff-only 3567ff3b` ok at 23:44:15Z.
+- **claim:** live-odds-worker, holder `future-dated-live-orders-scope`, acquired right after kalshi-exit-path released it (23:43:41Z), token ee3fc19cf4d0ea4b.
+- **sequencing:** kalshi-exit-path's full up respawned both workers at 23:34:56Z (fleet 67aa2882) and did not carry this. **60-min rule WAIVED by the user** (urgent while games are live). TERM ~18 min after that up.
+- **smoke (fleet code, 23:4xZ):**
+  - Switch ON; `_refuse_after_commence` on a 23:00Z kickoff -> `game_started: 45 min after commence`.
+  - `_in_game_fair({"fair_source": "in_game"})` True; the cancel shard lookup is present.
+- **restart:** the gate (HEAD == 3567ff3b, 0 unreconciled + 0 failed live orders, 0 non-zombie children) waited 492 s. TERM 23:52:52.876Z to pid 3102122. New pid **3111241**, lstart 23:53:36Z (respawn ~44 s).
+- **verify (00:01Z):**
+  - New pid MODE=live, LIVE_ARMED=1, ENABLED=1, BALANCE_CAPS=on; fleet HEAD 3567ff3b.
+  - First Kalshi pass 23:55:21Z: `positions=20 placed=0 duplicates=14 skipped=6 refused={'game_started': 6}`.
+  - The 6 `REFUSED_AFTER_COMMENCE ... reason=game_started ... 55 min after commence` include DEL4, DEL3 and both PHI/NYK props, i.e. the after-kickoff orders from the baseline. Also KXNCAAFTOTAL-26OCT20MTUFIU-46 and KXNBAAST-...NYKJHART3-4.
+  - Polymarket pass 23:55:27Z unchanged. 0 Traceback / EXECUTION_ERROR / KICKOFF_CANCEL_FAILED.
+  - Boot dump: `CANCEL_SKIPPED_NO_PRICE` on the resting KXNBASPREAD-26OCT20OKCSAS-SAS21 (pre-existing; OKC@SAS commences 01:30Z).
+- **owed:**
+  - The first `AFTER_COMMENCE_IN_GAME_FAIR`, once lane in-play stamps `fair_source`.
+  - compounding-bankroll's first post-ff cancel reading (d57476ec).
+  - A web reload for 2ec30ec8 (ops-export lane).
+- **rollback:** `git revert 150e1180 cd0901bf`, ff, gated live-odds-worker TERM. Or a `LIVE_ODDS_WORKER__SYNDICATE_EXECUTION_KALSHI_PREGAME_ONLY=off` line + a full down/up.
