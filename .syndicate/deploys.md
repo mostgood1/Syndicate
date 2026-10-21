@@ -52397,3 +52397,30 @@ Same applies, with far lower stakes, to my own `live_lens` postponed-bucket fix:
   - No `REFUSED_HELD_VENUE_CONTRACT` has fired yet: no pass has carried a second label for a held contract. Kalshi is also at its daily order-count cap (50/50, $108.41), so it places nothing more today.
 - **owed:** the first `REFUSED_HELD_VENUE_CONTRACT` line in production. Watch for it from the 10-22 slate onward.
 - **rollback:** `LIVE_ODDS_WORKER__SYNDICATE_EXECUTION_VENUE_CONTRACT_DEDUPE=off` (needs a full down/up), or revert `4ffb4e64`, ff, then a gated live-odds-worker TERM.
+
+## 2026-10-21 14:56:53Z (9:56 AM CT) -- READING: paper-alongside-live grading (lane paper-alongside-live) -- **MET** (run by hand: the 8:45 AM CT scheduled task did not fire; the app's scheduled tasks are not firing)
+- **source:** one read each at 14:55-14:57Z, refresh-worker state env (pid 3258427, BOOTED 08:43:52Z), counts only. Scripts in C:	mp\paperlive (base.sh, venue_books.sh, twins.sh, fills.sh, readout_run.sh -> scripts/paper_ladder_readout.py). Window: submitted from 2026-10-20T16:18-16:30Z.
+- **verdict MET:**
+  - Tagged paper rows ARE graded: 10-20 slate, 15 settled in the venue books + ladders.
+  - `REFUSED_LIVE_INLINE` = 0 since the 08:43:52Z boot, against `PAPER_ALONGSIDE_LIVE` = 472.
+- **recorded (tagged_since, all slates 10-20..10-22):**
+  - paper 152, paper:kalshi 10, paper:novig 22, paper:prophetx 54.
+  - paper:kalshi:ladder 355, paper:polymarket:ladder 146.
+  - Season phases: regular plus postseason (WNBA).
+- **graded so far (10-20 slate only; most 10-20 rows are later-in-week football):**
+  - paper 8W/7L, paper:kalshi 1W, paper:novig 1W/3L, paper:prophetx 4W/2L.
+  - paper:kalshi:ladder 1W/5L of 110 booked; paper:polymarket:ladder 2W/6L of 55.
+- **ladder readout (pre-registered rule, flat $1):**
+  - kalshi: venue_book 1 (+113%); 1to2 1; 0to1 3 (-103.8%); m1to0 2 (+2.8%).
+  - polymarket: 1to2 1; 0to1 4 (+0.1%); m1to0 3 (-103.1%).
+  - Every band INSUFFICIENT (max 3 events vs the 100 required). No conclusion is drawn, by rule.
+- **2a venue-book funnel (forward test population):**
+  - kalshi: 64 of 142 paper2 plans had a position; all 64 executed, 0 skipped/failed. paper:kalshi holds 10 rows.
+  - polymarket: 0 of 142 paper2 plans had a position, so it is EMPTY BY SELECTION, not a defect. Polymarket's live trades come from the live-only 0% floor; paper2 stays Suggested-only.
+- **2b twin check:** 98 live rows carry ev_pct; 7 have a paper twin, and in all 7 the position_key count equals the opening_key+side count (1 = 1). The tuner's twin rule (b9c78071) matches every observed pair.
+- **2c orders:**
+  - Polymarket D7JJFKT010JF (Pitt@Mia o51.5, 10-20 slate, the first forward NCAAF order from 96f97a0a): FILLED 1.04 @ 0.47, commission $0.02.
+  - Polymarket D7Y3D2WG10JN (Pitt@Mia o50.5, 10-21 slate): FILLED 0.55 @ 0.49, commission $0.01. A line move is a new position_key, so the cross-slate dedupe correctly does not treat it as the same bet; we now hold both lines on one game.
+  - Kalshi SAS21 (01a15b3e..., the mispriced NO-side order): ledger `rejected`, venue_status `canceled`, 0 contracts, reconciled 01:35:48Z (8:35 PM CT 10-20, at kickoff).
+- **live:** 650 live rows: 649 filled, 1 rejected (the SAS cancel).
+- **next:** first weekly ladder + forward-test readout Monday 10-26 9 AM CT. It must be run in a session, not left to the scheduler.
