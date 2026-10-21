@@ -108,6 +108,37 @@ simulated for his current team.**
 Priors fallback on the same data: 86 moved players in the 10-21 pool, own prior found for 86 / 86 (1 / 86 without
 the fallback); 236 unmoved players identical either way.
 
+### ON vs OFF on identical inputs (OFF = switch off, roster file removed, every game re-simulated)
+
+OFF reproduces production exactly in shape: props_predictions 430 rows, no re-key line, audit stale 145 / 352
+(production's as-built sims: 146 / 363; the difference is the later injury feed).
+
+Game level, 11 games: mean |d total| 1.47 pts (max 5.4, BKN_CHA 224.7 -> 219.4), mean |d margin| 1.72 (max 3.6),
+mean |d p_home_win| 0.044 (max 0.078: HOU_DAL 0.726 -> 0.668, POR_PHX 0.652 -> 0.574).
+
+Minutes vs each player's OWN 2025-26 average (>= 10 games; a PROXY, not truth -- the truth is the 10-21 box):
+
+| | OFF | ON |
+|---|---|---|
+| players compared | 326 | 278 |
+| MAE (sim - own) | 6.37 | **5.69** |
+| mean (sim - own) | -5.60 | -4.08 |
+| under-simulated by >= 8 min | **111** | 70 |
+| over-simulated by >= 8 min | 1 | **5** |
+| teams with <= 11 simulated players | 0 | 4: DAL 9, SAC 10, CHA 11, GSW 11 |
+
+**THE NEW RISK, ACCEPTED BY THE USER:** a team missing no-history rotation players gets a thin pool, and the sim
+spreads 240 minutes over fewer players: DAL (Kyrie Irving + 4 rookies no-history, 3 injury-excluded) simulates P.J.
+Washington 39.1 min (own 30.9), Moussa Cisse 32.0 (own 14.3); CHI Leonard Miller +12.9, WAS Anthony Gill +8.8, SAC
+Nique Clifford +8.8. Their props can show spurious OVER edges. Production as it stands has the opposite bias at
+larger scale (111 players under-simulated by 8+ min -> spurious UNDERS). The sim's own pregame-starters input
+(`pregame_expected_minutes_<D>.csv`, nba_starters_v1 from 2027 preseason boxes) already lists Kyrie (starter prob
+0.5) and Morez Johnson Jr.; the pool cannot take a player with no feature row. Follow-up card: "Admit no-history NBA
+players with a posted prop line".
+
+USER DECISION 2026-10-20 ~9:15 PM CT (AskUserQuestion): "Deploy as approved (Recommended)" -- with the thin-pool risk
+stated; the 5 inflated players are named here and in deploys.md.
+
 ROLLBACK NOTE: `SYNDICATE_NBA_CURRENT_ROSTERS=0` stops the refresh and the re-key, but the sim's roster filter, the
 injury scraper and the live tick read `rosters_2026-27.csv` by FILE PRESENCE. A full rollback is the switch AND
 deleting that file (or `git revert` + delete).

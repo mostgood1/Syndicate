@@ -482,6 +482,7 @@ once this index exists: re-splitting would orphan the parts.
 | [basketball-native-orchestrator] | THE BASKETBALL SMART-SIM ORCHESTRATOR IS SYNDICATE'S; the sim path imports no vendored module -- live on the f | `state_basketball.md` |
 | [nba-sim-totals-and-strength] | NBA SMART-SIM TOTALS + TEAM STRENGTH: measured defects, fixes built DEFAULT-OFF, nothing enabled `[2026-10-10, | `state_basketball.md` |
 | [basketball-props-refresh-off-vendor] | BASKETBALL PROPS REFRESHES: vendored uses retired path by path; WNBA history now tracks the schedule `[verifie | `state_basketball.md` |
+| [nba-current-rosters] | THE NBA SMARTSIM RAN 2025-26 ROSTERS ON OPENING NIGHT; THE FIX (ESPN CURRENT ROSTERS) IS BUILT AND SCRATCH-VER | `state_basketball.md` |
 | [board-freshness] | BOARD FRESHNESS AND STALENESS | `state_board.md` |
 | [board-intelligence-engine] | BOARD / INTELLIGENCE ENGINE — structural facts, archived — **ARCHIVED 2026-08-19 to `state_archive_2026-08-19. | `state_board.md` |
 | [locked-cards-retuned-no-autorun] | `locked_cards_retuned` HAS NO AUTOMATIC TRIGGER, ANYWHERE `[measured 2026-08-18]` | `state_board.md` |
@@ -553,7 +554,7 @@ once this index exists: re-splitting would orphan the parts.
 | [kalshi-execution] | Kalshi execution — session close 2026-08-26 (lane `kalshi-exchange-index`) | `state_kalshi.md` |
 | [kalshi-odds-refresh-bound] | THE VENUE FAN-OUT IS A COLD-START BURST ON A PERSISTED CLOCK, AND IT IS NOW TIME-BOUNDED `[2026-09-03, lane ka | `state_kalshi.md` |
 | [kalshi-quote-capture-coupling] | Kalshi quote capture ran ONLY inside the heavy board build — a refused heavy build stopped it for every sport  | `state_kalshi.md` |
-| [kalshi-exit-path] | KALSHI POSITIONS CAN BE SOLD BEFORE SETTLEMENT -- RUNNING IN PAPER ONLY `[verified on the fleet 2026-10-19 19: | `state_kalshi.md` |
+| [kalshi-exit-path] | KALSHI POSITIONS ARE SOLD BEFORE SETTLEMENT -- LIVE FOR TAKE-PROFIT SINCE 2026-10-20 23:34Z, PAPER FOR THE RES | `state_kalshi.md` |
 | [kalshi-maker-shadow] | KALSHI MAKER (RESTING-BID) SHADOW: PAPER ONLY, PRE-REGISTERED, RUNNING HOURLY ON THE FLEET VIA A USER-APPROVED | `state_kalshi.md` |
 | [kalshi-series-competition-identity] | KALSHI SERIES FOR ANOTHER COMPETITION (WOMEN'S, BASKETBALL, SECOND TIERS) REFUSE IN THE JOIN -- ON THE FLEET C | `state_kalshi.md` |
 | [layer2-board-keyvalue-ceiling] | THE BOARD'S CEILING IS THE COMBINED KEY, NOT THE SHARDS — and `per_sport=3000` corrupted production for ~29 mi | `state_layer2.md` |
