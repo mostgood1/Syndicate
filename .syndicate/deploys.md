@@ -52763,3 +52763,13 @@ have stopped the reload, and it did not because nothing was gating on it.
 - **claims released** by token 19:25:02Z (refresh-worker, web, live-odds-worker). 60-min gap for every role runs to 20:24:03Z.
 - **owed:** read the CONCENTRATION_SHADOW lines over a full slate (counts by would=refuse/trim, sport, $ affected, and any line that refuses a game's FIRST leg -- must be 0) before proposing `on` to the user.
 - **undo:** delete line `LIVE_ODDS_WORKER__SYNDICATE_LIVE_EVENT_CONCENTRATION=shadow` (or restore `.bak-event-conc-20261021T192338Z` if nothing changed since), then a full down/up under all three claims.
+
+## 2026-10-21 19:51:13Z (2:51 PM CT) -- LIVE CAPS: daily ORDER-COUNT caps raised 50/50/100 -> 250/250/500 (Kalshi / Polymarket / account); every dollar cap unchanged -- **MET** (session 332cb014, user-approved in chat)
+- **user:** "Yes: save daily order-count caps max_day_orders_kalshi=250, max_day_orders_polymarket=250, max_day_orders_all_venues=500 via /api/portfolio/limits, keep every dollar cap unchanged, then verify the executor places past 50." (the wording is a reply button I offered; it followed the user's own "we need to up the number of orders if we are continuing to place 1 contract orders and live trading when games are happening")
+- **why:** Kalshi hit 50/50 orders by ~14:14Z on mostly 1-contract fills (~$0.49-0.53 each), while dollars stood at $108.41 of $118.17. The count cap was binding before the dollar cap, which is the real risk control.
+- **how:** POST `/api/portfolio/limits` on 127.0.0.1:10000 with the full cap set (admin token not printed). 200, accepted all 7, rejected {}. GET read back `updated_at=2026-10-21T14:51:13-05:00`, store_error None, all 7 sourced `stored`. The dollar caps stay `max_day_dollars_kalshi=1000`, `_polymarket=1000`, `max_order_dollars=100`, `_all_venues=2000`; the binding dollar limits are still the balance caps (25%/day, 5%/order of capital: Kalshi day $118.17, order $23.63). Bounds in `execution_limits_settings.py`: 1..1000 per venue, 1..2000 account. No restart: `_stored_live_limit` is read on every executor call.
+- **verify (the READING):** `19:53:20Z EXECUTED date=2026-10-21 mode=live venue=kalshi ... placed=2 ... refused={'over_max_day_dollars': 1} spent={'dollars': 113.9, 'orders': 52}`. That is orders 51 and 52:
+  - `19:53:14Z LIVE_ORDER status=submitted venue=kalshi ticker=KXWNBAREB-26OCT21GSATL-ATLNHILLMON00-6` under 5.5, stake 5.0.
+  - `19:53:19Z LIVE_ORDER ... KXWNBAPTS-26OCT21GSATL-ATLAREESE5-15` under 14.5, stake 0.49.
+  - The third bet was refused on DOLLARS, not count: the count cap no longer binds and the dollar cap does, as intended. 0 Tracebacks.
+- **rollback:** POST the same set with 50/50/100 (scratchpad savecaps.py), or edit on /portfolio.
