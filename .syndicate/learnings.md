@@ -2696,3 +2696,12 @@ The 2026-10-20 entry said: "Rating INPUTS transfer, because the sim reads them w
 - The do-no-harm A/B through the real engine is the gate for EVERY engine change, inputs included, not only post-hoc maps.
 - Read the engine's OWN dispersion and calibration (spread vs the close, own-decile calibration) BEFORE adopting a diagnosis made on a proxy.
 - Here that one read would have shown the favourite-underrating premise did not apply to the served sim.
+
+## 2026-10-21 -- RULE: inside `wsl -d Ubuntu-24.04 -- bash -lc '...'` run from Git Bash, EVERY `$VAR` and `$(...)` is expanded ONCE, up front, by an outer shell in the WINDOWS cwd -- a guard written that way is a no-op `[lane nba-current-rosters, session 8e69dd3f]`
+- **What happened:** the fleet ff ran `cd /home/amyn/Syndicate && test "$(git rev-parse HEAD)" = "$(git rev-parse 3fffb430b)" && git merge --ff-only <sha>`. Both substitutions ran in the Windows worktree's mapped path ("fatal: not a git repository"), the test compared empty to empty, and the merge ran unguarded. It was safe only because `--ff-only` and an unchanged HEAD made it so. Earlier the same night `L=...; wc -c $L` read stdin and printed 0, which read as an EMPTY LOG.
+- **Measured:** `wsl -d Ubuntu-24.04 -- bash -lc 'cd /tmp && echo $(pwd)'` prints the Windows worktree path, not /tmp. `$HOME` looks right only because the outer shell has it too.
+- **Rule:** in a `wsl ... bash -lc` string, write no `$` that must be evaluated inside -- use literal values, escape `\$`, or put the logic in a script file (or Python) and pass paths as arguments. Never gate a production step on a `$(...)` test sent this way; read the gated value in a SEPARATE call and compare it yourself.
+
+## 2026-10-21 -- RULE: a deploy claim acquired BEFORE asking the user can expire while the answer is pending; re-check `deploy_claim.py status` after every AskUserQuestion and before the action `[lane nba-current-rosters, session 8e69dd3f]`
+- **What happened:** refresh-worker claimed at 11:28 PM CT (TTL 90) for an approved after-the-games ff; a ride-along question to the user was answered at ~7:40 AM CT; the ff ran at 7:43 AM under a claim EXPIRED 495 min. No one else held it, so nothing collided -- by luck, not by the lock.
+- **Rule:** acquire (or re-acquire) the claim immediately before the merge/restart, gate on its exit code, and treat any user wait as invalidating the earlier acquire.
