@@ -52748,3 +52748,6 @@ have stopped the reload, and it did not because nothing was gating on it.
   - Delete the lines `REFRESH_WORKER__SYNDICATE_LIVE_NET_FLOOR_KALSHI=1.0` and `REFRESH_WORKER__SYNDICATE_LIVE_NET_FLOOR_POLYMARKET=0.5` from `~/syndicate-prod/local_production.env`, or restore `.bak-net-floor-20261021T181220Z` if nothing else changed since.
   - Then do a full down/up under all three claims (env loads only at `up`).
   - To lower one venue's floor: edit its value, then the same restart.
+
+## 2026-10-21 18:49Z -- VERIFIED: 69c1af9d (todo #718) -- NBA source-CLI child gets its data root (lane basketball-cli-data-root)
+- verify: NBA props log, fleet: runs split by launcher (`zlines` = Z-stamped output lines). PRE-fix 10-20..10-21: the unstamped launcher failed 4/4 (10-20 11:30Z, 16:41Z, 18:53Z; 10-21 12:41Z), the stamped one 0/16. POST-fix (live 16:51:22Z): 17:49:31Z stamped OK, **18:41:57Z UNSTAMPED OK** (the discriminating run: that launcher's first success in the window), 18:48:21Z stamped OK -- 0 OSError in 3. n=1 for the failing launcher; a recurrence reopens.
