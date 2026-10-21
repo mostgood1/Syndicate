@@ -52204,5 +52204,5 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - Pre-checks (02:13:18Z): `git ls-files vendor` = 0; 415 files / 60M (mlb_bettingv2 181, wnba_betting_repo 181, nba_betting_repo 53;
   234 json, 154 pyc, 27 csv); 0 written in the last 24 h; no process with cwd or an open fd under it.
 - Result: archive 415 == 415 and readable; `vendor/` absent; `git status --porcelain` hash identical before/after (a66be8de).
-- verify: the next NHL / NBA refresh writes as before (bounded watch armed; reading below when it lands).
+- verify: the next NHL / NBA refresh writes as before. **READ 02:17:52Z: MET** -- 41 files written since the removal (NHL odds refresh 21:17 CDT: team + player-prop opening/movement files); vendor/ still absent.
 - Rollback: `tar -xzf` that archive in /home/amyn/Syndicate (the per-tree archives from 10-19/20 also hold these files).
