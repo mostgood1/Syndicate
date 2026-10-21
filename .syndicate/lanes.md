@@ -1452,6 +1452,14 @@ death, never life — do not invert it.
 - Verification: unit: one CANCEL_FAILED line -> exec:log_errors:cancel finding; fleet: alert path loads at the next checkout ff (watchdog-only, no role restart) -- the first real CANCEL_FAILED, if any, produces an email
 - Blocked by: none
 
+### nba-live-prop-coverage — OPEN — opened 2026-10-20 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
+- Goal: Live NBA prop rows on the board get a live re-sim projection wherever the sim has the player: combos (P+R, P+A, R+A, P+R+A) per draw, steals/blocks/turnovers, every posted line plus +-3 neighbours (user 2026-10-20: 'fix the live prop matching so more props get projections')
+- Files: syndicate/features/nba/live_resim.py (the live props section: PROP_STATS, COMBO_STATS, _player_remainder_hists, _BOX_COLUMNS/actuals_from_summary, BOARD_PROP_MARKETS, lines_from_props_csv, with_neighbour_lines, _banked, build_live_props, and the liveProps call in build_live_lens_snapshot ONLY), tests/test_nba_live_prop_coverage.py (NEW), tests/test_nba_live_resim.py (the lines and snapshot live-props tests ONLY)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: Same-instant A/B on fleet data (old producer emulated from the same snapshot) then, after deploy, the served board's nba live_projections rows_live_projected / live prop rows during a live NBA game
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

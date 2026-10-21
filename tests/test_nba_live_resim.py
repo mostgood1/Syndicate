@@ -230,7 +230,7 @@ def test_live_props_price_actual_plus_remainder_and_refuse_certainty():
     assert cov == {"players_simmed": 2, "rows": 2, "priced": 1, "no_actual": 1, "certainty_refused": 1}
 
 
-def test_lines_are_the_mode_across_books_for_this_game_only(tmp_path):
+def test_lines_are_every_posted_line_for_this_game_only(tmp_path):
     f = tmp_path / "props.csv"
     hdr = "snapshot_ts,event_id,commence_time,bookmaker,bookmaker_title,market,outcome_name,player_name,point,price,last_update,home_team,away_team\n"
     rows = [
@@ -243,7 +243,8 @@ def test_lines_are_the_mode_across_books_for_this_game_only(tmp_path):
     ]
     f.write_text(hdr + "\n".join(rows) + "\n", encoding="utf-8")
     out = lr.lines_from_props_csv(f, "Golden State Warriors", "New York Knicks")
-    assert out == {("stephen curry", "pts"): 26.5}
+    # Every line any book posts, either side (2026-10-20; it used to be the mode, 26.5, and the board joins on the line).
+    assert out == {("stephen curry", "pts"): (26.5, 27.5, 30.5)}
     assert lr.lines_from_props_csv(tmp_path / "missing.csv", "A", "B") == {}
 
 
@@ -274,7 +275,11 @@ def test_snapshot_carries_live_props_and_names_the_join_keys_on(tmp_path, monkey
     assert g["status"]["detailedState"] == "In Progress"
     assert g["livePropsCoverage"]["lines_available"] == 1
     # H1 has 0 banked in the fixture box (PTS column), 6 or 12 remaining -> half the draws clear 10.5
-    assert [(r["playerName"], r["prop"], r["liveModelProbOver"]) for r in g["liveProps"]] == [("H1", "player_points", 0.5)]
+    by_line = {r["line"]: r for r in g["liveProps"]}
+    assert (by_line[10.5]["playerName"], by_line[10.5]["prop"], by_line[10.5]["liveModelProbOver"]) == ("H1", "player_points", 0.5)
+    # The posted line and its neighbours (lines move between this tick and the board build): 7.5 .. 13.5
+    assert sorted(by_line) == [7.5, 8.5, 9.5, 10.5, 11.5, 12.5, 13.5]
+    assert by_line[13.5]["liveModelProbOver"] is None and by_line[13.5]["unpricedReason"] == "certainty_refused"
 
 
 # ------------------------------------------------------------------------------------------- pregame persist hook

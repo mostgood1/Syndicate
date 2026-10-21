@@ -41,6 +41,7 @@ RUNS ON A WORKER. NEVER IN A REQUEST HANDLER.
 from __future__ import annotations
 
 import json
+import math
 import os
 import pickle
 import time
@@ -546,7 +547,23 @@ def resim_live_game(inputs: Mapping[str, Any], game_state: Any, *, sims: int = D
 
 # Per-player REST-OF-GAME stats. A resumed run's player box lines are the remainder only (resume.py), so the
 # final for a prop is actual-so-far + this. Keyed by the engine frame's `player_name`.
-PROP_STATS: tuple[tuple[str, str], ...] = (("pts", "points"), ("reb", "rebounds"), ("ast", "assists"), ("threes", "threes"))
+#
+# STEALS / BLOCKS / TURNOVERS (2026-10-20, user: "fix the live prop matching so more props get projections"). The engine
+# box already carries `stl`/`blk`/`tov` (engine.py `finalize`) and the pregame props sim prices them off the same
+# engine (orchestrator/smart_sim.py collects all seven), so the live tier publishing only four left those board rows
+# with no live number at all.
+PROP_STATS: tuple[tuple[str, str], ...] = (("pts", "points"), ("reb", "rebounds"), ("ast", "assists"), ("threes", "threes"),
+                                           ("stl", "steals"), ("blk", "blocks"), ("tov", "turnovers"))
+# COMBINATION MARKETS, SUMMED PER DRAW. Each draw is one simulated rest-of-game, so `pra` for draw i is that draw's
+# pts + reb + ast and the correlation between them survives. Convolving the marginal histograms instead would assume a
+# player's points and rebounds independent. Measured 2026-10-20 19:35 CT (PHI @ NYK live): 73 of 166 live NBA prop rows
+# on the board were these four markets, and 0 of them could join a live projection because none was produced.
+COMBO_STATS: dict[str, tuple[str, ...]] = {
+    "pr": ("pts", "reb"),
+    "pa": ("pts", "ast"),
+    "ra": ("reb", "ast"),
+    "pra": ("pts", "reb", "ast"),
+}
 
 
 def _collect_player_remainders(rem: dict, side: str, box: Any, draw: int) -> None:
@@ -566,33 +583,40 @@ def _player_remainder_hists(rem: dict, n: int) -> dict[str, dict[str, dict[str, 
     out: dict[str, dict[str, dict[str, dict[str, int]]]] = {"home": {}, "away": {}}
     for side, players in rem.items():
         for name, stats in players.items():
-            hists = {}
-            for key, _label in PROP_STATS:
-                vals = stats[key] + [0] * (n - len(stats[key]))
-                if any(vals):
-                    hists[key] = _hist(vals)
+            # Every list padded to n draws, index = draw (`_collect_player_remainders` pads the same way), so the combo
+            # sums below line up draw for draw.
+            padded = {key: stats.get(key, []) + [0] * (n - len(stats.get(key, []))) for key, _label in PROP_STATS}
+            for combo, parts in COMBO_STATS.items():
+                padded[combo] = [sum(vals) for vals in zip(*(padded[part] for part in parts))]
+            hists = {key: _hist(vals) for key, vals in padded.items() if any(vals)}
             if hists:
                 out[side][name] = hists
     return out
 
 
+# ESPN box column -> PROP_STATS key (ESPN's NBA box: MIN PTS FG 3PT FT REB AST TO STL BLK OREB DREB PF +/-).
+_BOX_COLUMNS: tuple[tuple[str, str], ...] = (("PTS", "pts"), ("REB", "reb"), ("AST", "ast"), ("3PT", "threes"),
+                                             ("STL", "stl"), ("BLK", "blk"), ("TO", "tov"))
+
+
 def actuals_from_summary(summary: Mapping[str, Any]) -> dict[str, dict[str, int]]:
     """Banked production per player NAME from the LIVE box score (ESPN updates it in game).
 
-    `{normalized name: {"pts","reb","ast","threes"}}`. A malformed cell is skipped, never read as 0: a missing
-    actual and a genuine zero are different facts (`wnba_live_prop_rows.to_snapshot_live_props`)."""
+    `{normalized name: {"pts","reb","ast","threes","stl","blk","tov"}}`. A malformed cell is skipped, never read as 0:
+    a missing actual and a genuine zero are different facts (`wnba_live_prop_rows.to_snapshot_live_props`). Combos are
+    summed from these in `build_live_props`, never read from the box."""
     out: dict[str, dict[str, int]] = {}
     for block in ((summary or {}).get("boxscore") or {}).get("players") or []:
         for stat in block.get("statistics") or []:
             names = [str(n) for n in stat.get("names") or []]
-            idx = {k: names.index(k) for k in ("PTS", "REB", "AST", "3PT") if k in names}
+            idx = {k: names.index(k) for k, _key in _BOX_COLUMNS if k in names}
             for a in stat.get("athletes") or []:
                 nm = normalize_name(((a.get("athlete") or {}).get("displayName")) or "")
                 vals = a.get("stats") or []
                 if not nm or not vals:
                     continue
                 row: dict[str, int] = {}
-                for col, key in (("PTS", "pts"), ("REB", "reb"), ("AST", "ast"), ("3PT", "threes")):
+                for col, key in _BOX_COLUMNS:
                     i = idx.get(col)
                     if i is None or i >= len(vals):
                         continue
@@ -606,16 +630,24 @@ def actuals_from_summary(summary: Mapping[str, Any]) -> dict[str, dict[str, int]
     return out
 
 
-BOARD_PROP_MARKETS = {"pts": "player_points", "reb": "player_rebounds", "ast": "player_assists", "threes": "player_threes"}
+# Stat key -> the OddsAPI market key the board rows carry, so a liveProps row joins on its `prop` with no alias.
+BOARD_PROP_MARKETS = {
+    "pts": "player_points", "reb": "player_rebounds", "ast": "player_assists", "threes": "player_threes",
+    "stl": "player_steals", "blk": "player_blocks", "tov": "player_turnovers",
+    "pr": "player_points_rebounds", "pa": "player_points_assists", "ra": "player_rebounds_assists",
+    "pra": "player_points_rebounds_assists",
+}
 _CSV_MARKET_TO_STAT = {v: k for k, v in BOARD_PROP_MARKETS.items()}
 
 
-def lines_from_props_csv(path: Path, home_name: str, away_name: str) -> dict[tuple[str, str], float]:
-    """`(normalized player, stat) -> line` for ONE game from Syndicate's captured OddsAPI props CSV.
+def lines_from_props_csv(path: Path, home_name: str, away_name: str) -> dict[tuple[str, str], tuple[float, ...]]:
+    """`(normalized player, stat) -> every line posted` for ONE game from Syndicate's captured OddsAPI props CSV.
 
-    One line per (player, stat): the MODE across books, ties broken low (the WNBA rule,
-    `wnba/live_lens.py::_lines_from_odds_csv`). Scoped to the game by both full team names.
-    Any failure -> {} (no row is priced)."""
+    EVERY LINE, NOT THE MODE (2026-10-20). This used to return one line per (player, stat), the mode across books, and
+    the board joins on (player, market, LINE): a book posting 24.5 beside the consensus 25.5 kept its row unpriced
+    although the same remainder histogram prices any line. Measured 19:35 CT on PHI @ NYK: 18 live board rows missed
+    for exactly that, their player and market projected at another line. Over AND under count -- a line quoted on one
+    side only is still a line the board can show. Scoped to the game by both full team names. Any failure -> {}."""
     import csv
     from collections import Counter as _Counter
 
@@ -627,72 +659,102 @@ def lines_from_props_csv(path: Path, home_name: str, away_name: str) -> dict[tup
                 if teams != (home_name, away_name):
                     continue
                 stat = _CSV_MARKET_TO_STAT.get(str(row.get("market") or "").strip().lower())
-                if not stat or str(row.get("outcome_name") or "").strip().lower() != "over":
+                if not stat or str(row.get("outcome_name") or "").strip().lower() not in ("over", "under"):
                     continue
                 try:
                     line = float(row.get("point"))
                 except (TypeError, ValueError):
                     continue
+                if not math.isfinite(line):
+                    continue
                 key = (normalize_name(row.get("player_name")), stat)
                 counts.setdefault(key, _Counter())[line] += 1
     except Exception:  # noqa: BLE001
         return {}
-    out = {}
-    for key, c in counts.items():
-        top = max(c.values())
-        out[key] = min(v for v, k in c.items() if k == top)
+    return {key: tuple(sorted(c)) for key, c in counts.items()}
+
+
+# LINES MOVE BETWEEN THIS TICK AND THE BOARD BUILD. The CSV is the latest in-play pull (every ~4 min) and the board
+# joins on (player, market, LINE) at its own build time, so an exact-line producer misses every line that moved in
+# between. Measured 2026-10-20 (same-instant A/B on PHI @ NYK, board 7:35 PM vs CSV 7:44 PM): 41 of 166 live rows
+# missed on the line alone. The remainder histogram prices ANY line, so each posted line is published with its
+# neighbours, +-LIVE_LINE_WINDOW in whole steps; a neighbour only ever joins a board row that shows that line.
+LIVE_LINE_WINDOW = 3
+
+
+def with_neighbour_lines(lines: Mapping[tuple[str, str], Any], window: int = LIVE_LINE_WINDOW) -> dict[tuple[str, str], tuple[float, ...]]:
+    """Each posted line plus line +- 1..window (never below 0.5): `(player, stat) -> sorted lines`."""
+    out: dict[tuple[str, str], tuple[float, ...]] = {}
+    for key, posted in lines.items():
+        base = (posted,) if isinstance(posted, (int, float)) else tuple(posted)
+        grid = {float(line) + step for line in base for step in range(-int(window), int(window) + 1)}
+        out[key] = tuple(sorted(line for line in grid if line >= 0.5))
     return out
 
 
+def _banked(act: Optional[Mapping[str, int]], key: str) -> Optional[int]:
+    """Actual so far for a stat or a combo; None unless EVERY component is read (a missing actual is not a zero)."""
+    if act is None:
+        return None
+    parts = COMBO_STATS.get(key, (key,))
+    if any(part not in act for part in parts):
+        return None
+    return int(sum(int(act[part]) for part in parts))
+
+
 def build_live_props(result: Mapping[str, Any], actuals: Mapping[str, Mapping[str, int]],
-                     lines: Mapping[tuple[str, str], float]) -> tuple[list[dict[str, Any]], dict[str, int]]:
+                     lines: Mapping[tuple[str, str], Any]) -> tuple[list[dict[str, Any]], dict[str, int]]:
     """`liveProps` rows in the snapshot contract `live_projection_join.build_live_prop_index` reads.
 
-    A row exists only where a LINE exists (a probability needs something to be about) and the player has a
-    banked actual (a missing actual is not a zero). P(over) = share of draws whose actual + remainder exceeds
-    the line. An exact 0 or 1 is a statement about the sample, so it is published as None with the reason."""
+    A row exists for every LINE posted (a probability needs something to be about) where the player has a
+    banked actual (a missing actual is not a zero; a combo needs every component). P(over) = share of draws whose
+    actual + remainder exceeds the line. An exact 0 or 1 is a statement about the sample, so it is published as None
+    with the reason."""
     rows: list[dict[str, Any]] = []
     counts = {"players_simmed": 0, "rows": 0, "priced": 0, "no_actual": 0, "certainty_refused": 0}
+    stat_keys = tuple(key for key, _label in PROP_STATS) + tuple(COMBO_STATS)
+    sims_run = int(result.get("sims_run") or 0)
     for side in ("home", "away"):
         for name, hists in ((result.get("player_remainders") or {}).get(side) or {}).items():
             counts["players_simmed"] += 1
             nk = normalize_name(name)
             act = actuals.get(nk)
-            for key, _label in PROP_STATS:
-                line = lines.get((nk, key))
-                if line is None:
+            for key in stat_keys:
+                posted = lines.get((nk, key))
+                if posted is None:
                     continue
-                if act is None or key not in act:
-                    counts["no_actual"] += 1
-                    continue
-                hist = hists.get(key) or {"0": int(result.get("sims_run") or 0)}
+                banked = _banked(act, key)
+                hist = hists.get(key) or {"0": sims_run}
                 total = sum(int(v) for v in hist.values())
-                if total <= 0:
-                    continue
-                banked = int(act[key])
-                over = sum(int(c) for v, c in hist.items() if banked + int(v) > line)
-                mean_rem = sum(int(v) * int(c) for v, c in hist.items()) / total
-                p_over: Optional[float] = round(over / total, 4)
-                reason = None
-                if p_over in (0.0, 1.0):
-                    p_over, reason = None, "certainty_refused"
-                    counts["certainty_refused"] += 1
-                else:
-                    counts["priced"] += 1
-                row = {
-                    "playerName": name,
-                    "prop": BOARD_PROP_MARKETS[key],
-                    "line": line,
-                    "liveProjection": round(banked + mean_rem, 3),
-                    "liveModelProbOver": p_over,
-                    "actualSoFar": float(banked),
-                    "simsRun": int(result.get("sims_run") or 0),
-                    "side": side,
-                }
-                if reason:
-                    row["unpricedReason"] = reason
-                rows.append(row)
-                counts["rows"] += 1
+                for line in ((posted,) if isinstance(posted, (int, float)) else tuple(posted)):
+                    if banked is None:
+                        counts["no_actual"] += 1
+                        continue
+                    if total <= 0:
+                        continue
+                    over = sum(int(c) for v, c in hist.items() if banked + int(v) > line)
+                    mean_rem = sum(int(v) * int(c) for v, c in hist.items()) / total
+                    p_over: Optional[float] = round(over / total, 4)
+                    reason = None
+                    if p_over in (0.0, 1.0):
+                        p_over, reason = None, "certainty_refused"
+                        counts["certainty_refused"] += 1
+                    else:
+                        counts["priced"] += 1
+                    row = {
+                        "playerName": name,
+                        "prop": BOARD_PROP_MARKETS[key],
+                        "line": line,
+                        "liveProjection": round(banked + mean_rem, 3),
+                        "liveModelProbOver": p_over,
+                        "actualSoFar": float(banked),
+                        "simsRun": sims_run,
+                        "side": side,
+                    }
+                    if reason:
+                        row["unpricedReason"] = reason
+                    rows.append(row)
+                    counts["rows"] += 1
     return rows, counts
 
 
@@ -830,9 +892,11 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
         if not isinstance(result, NbaResimRefusal):
             lines = lines_from_props_csv(props_csv_path(str(date_str), root=inputs_root, league=league),
                                          row["home_name"], row["away_name"])
-            props, coverage = build_live_props(result, actuals_from_summary(summary), lines)
+            props, coverage = build_live_props(result, actuals_from_summary(summary), with_neighbour_lines(lines))
             row["liveProps"] = props
-            row["livePropsCoverage"] = {**coverage, "lines_available": len(lines)}
+            row["livePropsCoverage"] = {**coverage, "lines_available": len(lines),
+                                        "lines_posted": sum(len(v) for v in lines.values()),
+                                        "line_window": LIVE_LINE_WINDOW}
         games.append(row)
     return {
         "sport": str(league).lower(),
