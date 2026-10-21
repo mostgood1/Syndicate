@@ -2892,6 +2892,8 @@ def main() -> int:
         start_venue_boot_then_poll()
         # In-play capture on its own clock too -- see `start_inplay_capture_loop`.
         start_inplay_capture_loop()
+        # In-game fast exit loop (paper) -- see `start_fast_exit_loop`.
+        start_fast_exit_loop()
         _game_line_grade_audit_at_boot()
         _log_worker_memory("loop_start", interval_seconds=interval_seconds, max_uptime_seconds=max_uptime_seconds)
         while not _LIVE_REFRESH_LOOP_STOP.is_set():
@@ -3242,6 +3244,53 @@ def start_inplay_capture_loop() -> bool:
         daemon=True,
     )
     _INPLAY_CAPTURE_THREAD.start()
+    return True
+
+
+# ---------------------------------------------------------------------------
+# IN-GAME FAST EXIT LOOP (lane in-game-trading, stage 1, PAPER ONLY).
+#
+# The exit check rides the placer's execution tick (300 s, measured 5-15 min
+# apart). In play Kalshi re-prices every ~11 s, so this thread marks every
+# in-play Kalshi position every SYNDICATE_EXIT_FAST_LOOP_SECONDS (default 15)
+# with the slow tick's own rule, and books first triggers as FAST paper exits
+# in its own document (execution_exits_fast.json). It cannot sell:
+# `execution_exits_fast` has no order path. OFF unless
+# SYNDICATE_EXIT_FAST_LOOP=paper. Its own thread, so it never delays placement.
+# ---------------------------------------------------------------------------
+_FAST_EXIT_STOP = threading.Event()
+_FAST_EXIT_THREAD = None
+
+
+def _fast_exit_background_loop() -> None:
+    from syndicate.features.shared.execution_exits_fast import FastExitLoop, fast_loop_seconds
+    from syndicate.features.shared.timezone import central_today_iso
+
+    loop = FastExitLoop(today_fn=central_today_iso)
+    print(f"[execution_exits_fast] STARTED mode=paper interval_s={fast_loop_seconds():.0f}", flush=True)
+    while not _FAST_EXIT_STOP.is_set() and not _LIVE_REFRESH_LOOP_STOP.is_set():
+        try:
+            loop.step()
+        except Exception as exc:  # noqa: BLE001 -- a pass must never kill the loop
+            print(f"[execution_exits_fast] PASS_FAILED {type(exc).__name__}: {exc}"[:400], flush=True)
+            loop.state = None  # re-read the document next pass rather than write a stale copy
+        _FAST_EXIT_STOP.wait(fast_loop_seconds())
+
+
+def start_fast_exit_loop() -> bool:
+    """Start the fast exit thread when SYNDICATE_EXIT_FAST_LOOP=paper. Returns whether it started."""
+    global _FAST_EXIT_THREAD
+
+    from syndicate.features.shared.execution_exits_fast import FAST_PAPER, fast_loop_mode
+
+    if fast_loop_mode() != FAST_PAPER:
+        print("[execution_exits_fast] OFF (SYNDICATE_EXIT_FAST_LOOP != paper)", flush=True)
+        return False
+    if _FAST_EXIT_THREAD is not None and _FAST_EXIT_THREAD.is_alive():
+        return False
+    _FAST_EXIT_STOP.clear()
+    _FAST_EXIT_THREAD = threading.Thread(target=_fast_exit_background_loop, name="syndicate-fast-exit", daemon=True)
+    _FAST_EXIT_THREAD.start()
     return True
 
 

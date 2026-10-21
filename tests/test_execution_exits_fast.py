@@ -187,3 +187,34 @@ def test_the_module_has_no_order_path():
     forbidden = {"place_exit", "send_exit_order", "exit_order_body", "cancel_order", "kalshi_orders",
                  "kalshi_auth", "polymarket_us_orders", "reconcile_exit_orders", "_persist"}
     assert not (names & forbidden), names & forbidden
+
+
+def test_worker_starts_the_thread_only_when_paper(monkeypatch):
+    """Reachability of the worker wiring: off -> no thread; paper -> the loop's step runs."""
+    import importlib
+    import threading
+
+    worker = importlib.import_module("scripts.run_live_odds_refresh_worker")
+    assert worker.start_fast_exit_loop() is False
+
+    stepped = threading.Event()
+
+    class _Stub:
+        def __init__(self, **_kw):
+            self.state = None
+
+        def step(self):
+            stepped.set()
+            worker._FAST_EXIT_STOP.set()  # one pass, then the thread ends
+            return {"status": "ok"}
+
+    monkeypatch.setattr(fx, "FastExitLoop", _Stub)
+    monkeypatch.setenv("SYNDICATE_EXIT_FAST_LOOP", "paper")
+    monkeypatch.setattr(worker, "_FAST_EXIT_THREAD", None)
+    try:
+        assert worker.start_fast_exit_loop() is True
+        assert stepped.wait(5), "the started thread never ran a pass"
+        worker._FAST_EXIT_THREAD.join(5)
+        assert not worker._FAST_EXIT_THREAD.is_alive()
+    finally:
+        worker._FAST_EXIT_STOP.set()
