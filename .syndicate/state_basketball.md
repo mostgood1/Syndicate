@@ -1232,3 +1232,18 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
 - **Fix (not on main/fleet until the approved deploy):** `nba_current_rosters.py` writes ESPN's 30 rosters to `rosters_<season>.csv` from the props refresh (90-min throttle, complete-or-nothing, kill switch `SYNDICATE_NBA_CURRENT_ROSTERS=0`); features re-key to the current team and drop players on no roster; `PlayerPriors.latest_team` keeps a moved player's own rates; sims stamp `context.props_pool` and an unstamped NBA sim is rebuilt while the re-key is active. One read-only export pattern `nba_source/data/processed/rosters_*.csv`.
 - **Scratch reading (10-21, copy of fleet data, worktree code):** stale 146 -> 0 of 292, priced-missing 34 -> 13 (11 no-history + 2 injury-excluded); priors hit 86/86 moved players (1/86 without the fallback); minutes MAE vs own 2025-26 avg 6.37 -> 5.69, under-by-8+ 111 -> 70, over-by-8+ 1 -> 5 (thin pools: DAL 9 players, P.J. Washington 39.1 min). Findings: `findings_2026-10-20_nba_current_rosters.md`.
 - **Open:** players with NO NBA history (rookies; Lillard, Haliburton, Irving, VanVleet) cannot be admitted by a re-key -> thin pools (follow-up card). Rollback = switch off AND delete `rosters_2026-27.csv` (readers use it by file presence).
+
+## [nba-no-history-standins] NBA PRICED PLAYERS WITH NO player_logs HISTORY: A MARKET-IMPLIED STAND-IN IS ON MAIN, DEFAULT OFF, NOT ON THE FLEET `[verified 2026-10-21 ~7:45 AM CT, lane nba-no-history-admit, main 73082de2]`
+- **Code:** `nba_no_history_standins.py` + 3 hooks in `basketball_props_smart_sim.py` + a `live_resim.resim_live_game` filter. Switch `SYNDICATE_NBA_NO_HISTORY_STANDINS` (off|shadow|on). It is absent on the fleet, which is OFF. The fleet runs 085fe1e8 and does not have this code until the next ff past 73082de2.
+- **When on:** a current-roster player with a posted pre-tip line and no props row joins the sim pool.
+  - Minutes come from preseason box minutes and start share (fit on 2025-26, MAE 5.26).
+  - Rates are the posted line divided by those minutes.
+  - He is removed from `players[]` and recorded in `context.no_history_standins`.
+  - The live re-sim hides him too, so **his own props are never priced**.
+- **Scratch cost (10-21 slate, copy of fleet data):** 10 stand-ins simulated.
+  - Per teammate: -1.74 min / -0.65 pts median.
+  - 91 of 158 priced teammate main lines move >= 3 pp (noise floor: 11).
+  - Game lines barely move (market anchor).
+- **A 2024-25 `player_logs.csv` append is NO-GO for the veterans.** It admits them with pre-injury numbers (Lillard 23.0 pts vs posted 18.5) and changes other inputs. Nothing was written to the fleet's file.
+- **Engine fact measured on the way:** the sim's summed player `pts_mean` runs **+8.5 pts over the anchored team score** on the 12 unaffected 10-21 sides. The player layer is not constrained to the team score.
+- **Open:** the pre-registered truth reading after the 10-21 games (findings_2026-10-20_nba_no_history_admit.md). After that, the user decides on enabling.

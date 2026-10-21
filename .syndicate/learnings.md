@@ -2705,3 +2705,14 @@ The 2026-10-20 entry said: "Rating INPUTS transfer, because the sim reads them w
 ## 2026-10-21 -- RULE: a deploy claim acquired BEFORE asking the user can expire while the answer is pending; re-check `deploy_claim.py status` after every AskUserQuestion and before the action `[lane nba-current-rosters, session 8e69dd3f]`
 - **What happened:** refresh-worker claimed at 11:28 PM CT (TTL 90) for an approved after-the-games ff; a ride-along question to the user was answered at ~7:40 AM CT; the ff ran at 7:43 AM under a claim EXPIRED 495 min. No one else held it, so nothing collided -- by luck, not by the lock.
 - **Rule:** acquire (or re-acquire) the claim immediately before the merge/restart, gate on its exit code, and treat any user wait as invalidating the earlier acquire.
+
+## 2026-10-21 -- OVERTURNED: "adding a player to an NBA sim pool takes his points from his teammates one for one, because the team score is market-anchored" `[lane nba-no-history-admit, session 15f24a49]`
+- **Belief:** the market anchor fixes each team's score. So a player added to the pool must take his points out of
+  his teammates' totals, one for one. This was pre-registered as P4: teammates give back 0.6-1.0x his points.
+- **Measured, scratch 10-21:** teammates gave back only **0.50-0.69x** on 10 sides.
+- **Cause:** the anchor holds the TEAM score (|d total| <= 2.3), but per-player means are not constrained to it. Summed
+  player `pts_mean` minus the team's mean score is **+8.5** on the 12 unaffected sides. It was +3.0 on the affected
+  sides before the stand-ins and +10.2 after.
+- **RULE:** for an NBA sim pool change, judge the effect on prop prices from the player layer (`players[]` means and
+  ladders), never from the team score. A conserved team total says nothing about how points split among players.
+  Measure the player-sum gap on the unaffected sides first; that is the population the prop calibration was fitted on.

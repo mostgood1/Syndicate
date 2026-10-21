@@ -278,7 +278,8 @@ main until that lane lands): the 14 new tests plus `tests/test_nba_live_resim.py
 
 ## What is owed, and the decision
 
-- **Land** after `nba-current-rosters` is on main (its two commits), then sync and land these files. Pushing `.py`
+- **LANDED on main 2026-10-21 ~7:45 AM CT** (6487034f module/live filter/tool/tests, 085561bc parent-row reuse, 0cdbadf4 co-claim, 73082de2 the 3 hooks; tip 73082de2), after `nba-current-rosters` (d9b1f5ae, 085fe1e8) was on main AND on the fleet (fleet ff to 085fe1e8 seen 7:43 AM CT), per the user's "push once the fleet ff lands". NOT on the fleet: it ships with the next fleet ff past 73082de2, inert while the switch is absent. Pre-land test run (exact copy of the landing tree, fleet python): 131 passed, 1 skipped, 1 failed -- `test_nba_live_resim.py::test_league_keyword_threads_through_storage_and_names`, PRE-EXISTING (fails the same with main's live_resim.py and without this lane's tests, passes alone; todo #713's open ci-suite failure).
+- (was) Land after `nba-current-rosters` is on main (its two commits), then sync and land these files. Pushing `.py`
   changes nothing on the fleet until a fleet ff; with the switch absent the code is inert (unit-tested), and the live
   filter is a no-op for every pool built without stand-ins.
 - **The truth reading** (pre-registered rule above) after the 10-21 games are final and the fleet's
