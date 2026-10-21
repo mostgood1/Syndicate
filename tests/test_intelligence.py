@@ -7319,15 +7319,48 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         # column DEFINITION and the rendered CELL for each of the three, which
         # is what "did someone drop this column" actually means and does not
         # re-break the next time the header markup is restructured.
+        # 2026-10-21 (lane `ci-suite-four-stale-1021`): THIRD formulation, and
+        # the axis changed rather than the literals. The 2026-08-15 rewrite
+        # above moved from header markup to column DEFINITIONS, and that drifted
+        # too -- #240's columns were consolidated, so `key: "odds"` is now
+        # `key: "book"` / "Best price" and the projection was folded INTO the
+        # Sim cell (the template's own comment at `BLOTTER_COLUMNS` says
+        # "Projected + Win% + the sim tags -> Sim"). Checked before rewriting,
+        # the same way as last time: all three VALUES still render -- a price
+        # through `renderBlotterBook`, the projection as the muted "proj" line
+        # inside the Sim cell, and the live projection in its own live-only
+        # column. Nothing was dropped.
+        #
+        # So labels and column keys are no longer asserted at all: they are
+        # presentation, they have now drifted twice, and each drift read as a
+        # regression. What is pinned instead is the DATA each cell reads --
+        # `quote?.price`/`item?.odds`, `displayProjection`, `item.live_projection`
+        # -- which are the server contract the blotter consumes. Deleting a
+        # column still deletes its reader, so the guard still fires; renaming a
+        # header no longer breaks it.
         template_path = Path(__file__).resolve().parents[1] / "syndicate" / "templates" / "intelligence.html"
         source = template_path.read_text(encoding="utf-8")
-        self.assertIn('{ key: "odds", label: "Odds"', source)
-        self.assertIn('{ key: "projected", label: "Projected"', source)
-        self.assertIn('{ key: "live", label: "Live"', source)
-        self.assertIn('<td data-label="Odds">', source)
-        self.assertIn('<td data-label="Projected">', source)
-        self.assertIn('<td data-label="Live proj.">', source)
+
+        # A PRICE reaches the blotter.
+        self.assertIn("renderBlotterBook(item)", source)
+        self.assertIn("firstNumeric(quote?.price, item?.odds)", source)
+
+        # A PROJECTED value reaches the blotter (wherever it is rendered).
+        self.assertIn("displayProjection(item)", source)
+        self.assertIn("projectedDisplay", source)
+
+        # A CURRENT-LIVE value reaches the blotter, and only for a live row.
+        self.assertIn("item.live_projection", source)
+        self.assertIn("liveOnly: true", source)
         self.assertIn('itemState === "live" ? displayLiveProjection(item) : null', source)
+
+        # And the live-only columns are still declared as columns, by key, so a
+        # column removed from the list is caught as well as a reader deleted.
+        import re
+
+        blotter = source[source.index("const BLOTTER_COLUMNS = ["):]
+        keys = set(re.findall(r'\{\s*key:\s*"([a-z_]+)"', blotter[: blotter.index("];")]))
+        self.assertTrue({"live", "actual"} <= keys, sorted(keys))
 
     def test_display_line_keeps_the_decimal_on_a_whole_numbered_line(self) -> None:
         # `line` arrives as a JSON NUMBER (measured 2026-08-16 on the wire: 40

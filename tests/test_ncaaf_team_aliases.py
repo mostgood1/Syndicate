@@ -374,9 +374,58 @@ def test_match_event_blob_can_now_resolve_an_fbs_pairing() -> None:
     assert match_event_blob("TEXOSU", games, sport="ncaaf")["status"] == "ok"
     assert match_event_blob("TEXOSU", games, sport="ncaaf")["event_id"] == "g1"
     assert match_event_blob("CLEMLSU", games, sport="ncaaf")["event_id"] == "g2"
-    # An FCS visitor still refuses rather than guessing.
+
+    # FCS NOW RESOLVES, AND THAT IS THE DESIGN
+    # `[2026-10-21, lane ci-suite-four-stale-1021]`.
+    #
+    # This line used to read "an FCS visitor still refuses rather than
+    # guessing" and asserted `no_match` for Wagner @ James Madison. It went red
+    # because the FCS reach was ADDED on purpose: `match_event_blob` resolves
+    # through `kalshi_catalogue.club_key`, which is `chip_join_key` -- the CFBD
+    # registry, ALL FOUR DIVISIONS -- and not `team_aliases.canonical_team`,
+    # whose NCAAF map is FBS-only. Measured in that change (2026-10-16) over
+    # 254 Kalshi `KXNCAAFGAME` names: 118 unresolved by `canonical_team`
+    # against 7 by `chip_join_key`. Verified here 2026-10-21:
+    # `canonical_team("ncaaf", "Wagner Seahawks")` is still None while
+    # `club_key("ncaaf", "Wagner Seahawks")` is "wagner".
+    #
+    # So "FCS refuses" was only ever a PROXY for the property this test cares
+    # about -- that a ticker is never guessed onto a fixture -- and the proxy
+    # expired while the property held. The property is now asserted DIRECTLY,
+    # on the four ways a guess could happen. It is also structurally safe in a
+    # way the proxy was not: `match_event_blob` inverts the problem and looks
+    # for the blob among the AWAY+HOME pairs OUR OWN SCHEDULE generates, so a
+    # fixture we do not have cannot be named at all.
     fcs = [{"event_id": "g3", "away_team": "Wagner Seahawks", "home_team": "James Madison Dukes"}]
-    assert match_event_blob("WAGJMU", fcs, sport="ncaaf")["status"] == "no_match"
+    assert match_event_blob("WAGJMU", fcs, sport="ncaaf")["status"] == "ok"
+    assert match_event_blob("WAGJMU", fcs, sport="ncaaf")["event_id"] == "g3"
+
+    # ONE HALF IS NOT OURS -> refused, from either side. A half-match is not
+    # evidence, and this is what "rather than guessing" actually means.
+    half_away = [{"event_id": "x1", "away_team": "Wagner Seahawks", "home_team": "Nowhere State Tumbleweeds"}]
+    half_home = [{"event_id": "x2", "away_team": "Nowhere State Tumbleweeds", "home_team": "James Madison Dukes"}]
+    assert match_event_blob("WAGJMU", half_away, sport="ncaaf")["status"] == "no_match"
+    assert match_event_blob("WAGJMU", half_home, sport="ncaaf")["status"] == "no_match"
+
+    # A DECOY SHARING ONE HALF DOES NOT STEAL THE MATCH. Washington IS
+    # resolvable (`club_key` gives "washington"), so this is not refused for
+    # want of a club -- the blob simply is not the one our Washington fixture
+    # generates.
+    decoy = [
+        {"event_id": "right", "away_team": "Wagner Seahawks", "home_team": "James Madison Dukes"},
+        {"event_id": "wrong", "away_team": "Washington Huskies", "home_team": "James Madison Dukes"},
+    ]
+    assert match_event_blob("WAGJMU", decoy, sport="ncaaf")["event_id"] == "right"
+    assert match_event_blob("WASJMU", decoy, sport="ncaaf")["status"] == "no_match"
+
+    # TWO OF OUR GAMES PRODUCING THE SAME BLOB -> ambiguous, never a coin flip.
+    doubleheader = [dict(fcs[0], event_id="a"), dict(fcs[0], event_id="b")]
+    ambiguous = match_event_blob("WAGJMU", doubleheader, sport="ncaaf")
+    assert ambiguous["status"] == "ambiguous" and ambiguous["count"] == 2
+
+    # AND A BLOB NO FIXTURE OF OURS GENERATES IS STILL REFUSED.
+    assert match_event_blob("ZZZQQQ", games, sport="ncaaf")["status"] == "no_match"
+    assert match_event_blob("WAGJMU", [], sport="ncaaf")["status"] == "no_match"
 
 
 @needs_registry

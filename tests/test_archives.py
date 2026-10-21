@@ -5371,10 +5371,26 @@ class HomeBoardTests(unittest.TestCase):
         self.assertEqual(context.get("source_title"), "MLB live lens unavailable")
         self.assertTrue(_paths_match(context.get("dataRoot"), report_path.parent.parent))
         self.assertTrue(_paths_match(context.get("liveLensDir"), report_path.parent))
-        self.assertEqual(
-            context.get("counts"),
-            {"archivedLiveProps": 0, "final": 0, "games": 0, "live": 0, "pregame": 0, "props": 0},
-        )
+        # DERIVED FROM `_snapshot_counts`, NOT A PINNED LITERAL
+        # `[2026-10-21, lane ci-suite-four-stale-1021]`.
+        #
+        # This was the six-key dict written out by hand, and it went red when
+        # `postponed` was added to `_snapshot_counts` (2026-10-16) -- a correct
+        # change, since StatsAPI files a postponed game under abstract "Final"
+        # and only `detailed` says so. A hand-written key set turns every
+        # deliberate addition into a red test that looks like a regression.
+        #
+        # The SUBJECT of this test is "an empty date reports zeroes rather than
+        # inventing sample games", so that is what is asserted: the same key set
+        # the production counter produces, and every value zero. The second
+        # assertion is what keeps it from being circular -- if `_snapshot_counts`
+        # ever returned a non-zero for an empty slate, the first line alone
+        # would happily agree with it.
+        from syndicate.features.mlb.live_lens import _snapshot_counts
+
+        counts = context.get("counts")
+        self.assertEqual(counts, _snapshot_counts([]))
+        self.assertTrue(counts and all(value == 0 for value in counts.values()), counts)
         self.assertTrue(context.get("generatedAt"))
 
     def test_mlb_live_lens_reports_payload_synthesizes_from_live_builder(self) -> None:

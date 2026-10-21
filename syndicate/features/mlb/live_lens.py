@@ -1274,6 +1274,22 @@ def _card_status_bucket(card: dict[str, Any]) -> str:
     abstract = str(status.get("abstract") or status.get("abstractGameState") or "").strip().lower()
     detailed = str(status.get("detailed") or status.get("detailedState") or card.get("detail") or "").strip().lower()
     text = f"{abstract} {detailed}".strip()
+    # POSTPONED IS CHECKED FIRST, and it has to be
+    # `[2026-10-21, lane ci-suite-four-stale-1021]`.
+    #
+    # StatsAPI files a postponed game under abstract "Final" and says
+    # "Postponed" only in `detailed` (the note at `_structured_status`, 849817,
+    # 2026-10-16). So the `"final"` token below matched FIRST and this function
+    # returned "final" for a game that was never played -- the cards-backed
+    # live lens counted a postponement as a completed game. The snapshot path's
+    # `_status_bucket_from_row` has checked `not_played_reason` first since that
+    # change; this one was not updated with it.
+    #
+    # Safe at all three call sites: the `== "live"` test is unaffected, and the
+    # `.title()` fallback at `_card_to_live_lens_row` only runs when the card
+    # carries NO status dict, where `not_played_reason({})` is falsy anyway.
+    if not_played_reason(status):
+        return "postponed"
     if any(token in text for token in ("live", "in progress", "warmup")):
         return "live"
     if any(token in text for token in ("final", "game over", "completed")):
@@ -1356,6 +1372,7 @@ def _cards_backed_live_lens_report(selected_date: str) -> dict[str, Any] | None:
     live_count = 0
     final_count = 0
     pregame_count = 0
+    postponed_count = 0
     prop_count = 0
     for card in report_games:
         bucket = _card_status_bucket(card)
@@ -1363,6 +1380,12 @@ def _cards_backed_live_lens_report(selected_date: str) -> dict[str, Any] | None:
             live_count += 1
         elif bucket == "final":
             final_count += 1
+        elif bucket == "postponed":
+            # Was the `else` branch, so a postponement landed in `pregame`
+            # here and in `final` through the bucket function above
+            # `[2026-10-21, lane ci-suite-four-stale-1021]`. Counted on its
+            # own now, matching `_snapshot_counts`.
+            postponed_count += 1
         else:
             pregame_count += 1
         prop_count += len(card.get("liveProps") or card.get("props") or card.get("trackedProps") or [])
@@ -1374,10 +1397,16 @@ def _cards_backed_live_lens_report(selected_date: str) -> dict[str, Any] | None:
         "liveLensDir": str(report_path.parent),
         "optimizationRegime": None,
         "counts": {
+            # SAME KEY SET AS `_snapshot_counts`, deliberately
+            # `[2026-10-21, lane ci-suite-four-stale-1021]`. One endpoint built
+            # its counts two ways, and `postponed` was added to the snapshot
+            # path alone -- so a consumer reading `counts.postponed` got a
+            # number on one path and nothing on the other.
             "games": len(report_games),
             "live": live_count,
             "final": final_count,
             "pregame": pregame_count,
+            "postponed": postponed_count,
             "props": prop_count,
             "archivedLiveProps": 0,
         },
