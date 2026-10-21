@@ -52303,3 +52303,27 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - (1) The first in-play marks (`marks>0`, FAST_EXIT_PAPER lines) tonight, and the fast-vs-slow-vs-hold counterfactual at settlement.
   - (2) Small follow-up: skip `market_finalized` positions after one read (68 tickers re-quoted every 15 s for nothing; 2 batched public GETs per pass).
 - **rollback:** `LIVE_ODDS_WORKER__SYNDICATE_EXIT_FAST_LOOP=off` needs a full down/up. Otherwise revert d76c85ce + afa34580, ff, gated live-odds-worker TERM.
+
+## 2026-10-21 14:30Z -- READING, NO DEPLOY: first live POLYMARKET orders -- **MET**; first Kalshi soccer `h2h|draw` order -- **NOT YET OCCURRED** (closes the owed verify in the 2026-10-19 18:24Z entry; parent session 34fdabd0)
+- **Window:** `~/syndicate-prod/logs/live-odds-worker.log`, timestamped lines 2026-10-20T16:00Z..2026-10-21T14:27Z (37,850 lines), plus `/api/portfolio/live?date=2026-10-20|2026-10-21` on 127.0.0.1:10000 (admin token via scripts/_base_url.admin_token; not printed).
+- **Polymarket placements:** 4 `EXECUTED ... venue=polymarket ... placed=1` passes on 10-21, at 11:29:42Z, 12:23:10Z, 13:11:38Z and 13:39:38Z, each with a `[polymarket_us_orders] SUBMIT` + `SUBMIT_RESPONSE id=...`:
+  - `tsc-sea-gen-ven-2026-10-25-2pt5`: over 2.5, venue_order_id D7W7YCSG10JN.
+  - `aec-cfb-ore-ill-2026-10-24`: h2h away, D7X0DKEG10JE.
+  - `aec-nba-sac-lac-2026-10-21`: h2h away, D7XPJT2G10JR.
+  - `tsc-cfb-pitt-mia-2026-10-24-total-50pt5`: over 50.5, D7Y3D2WG10JN.
+  All are TIME_IN_FORCE_GOOD_TILL_DATE, with goodTillTime = the game start.
+- **`/api/portfolio/live`:** 5 Polymarket rows, all `status=filled`, each with venue_ticker, venue_order_id, fill_price and fill_stake_dollars set:
+
+  | ticker | fill_price | fill_stake_dollars |
+  |---|---|---|
+  | pitt-mia | 0.49 | 0.27 |
+  | sac-lac | 0.35 | 0.38 |
+  | ore-ill | 0.755 | 7.57 |
+  | sea-gen-ven | 0.48 | 0.24 |
+  | wnba-gsv-atl-152pt5 (D7PR8F4G10JE) | 0.47 | 0.49 |
+
+  `unreconciled: []`, `unknown_submits: []` for both dates.
+- **Size vs plan:** pitt-mia was planned at $0.52 and sent at $0.27 / 0.55 qty. `POLYMARKET_PRICED_AT_ASK ... ev_at_ask_pct=2.04 (planned 4.0) kelly_ratio=0.529` shows a deliberate re-size to the live ask. sea-gen-ven, planned $5.42 and sent $0.24, is ASSUMED to be the same mechanism; its PRICED_AT_ASK line was not read.
+- **Polymarket buyingPower:** 586.05 (10-19, unchanged all day) -> 562.21 at 10:32Z 10-21 -> 553.59 at 13:43Z, stepping down at the placements. The total drop of $32.46 is NOT reconciled to the $8.95 of these five fills; the remainder is unattributed (earlier fills such as the 10-20 NBA OKC-SA total, or settlements). It is also not separated from the $550 pending deposit.
+- **Kalshi unreconciled:** nonzero only in the pass that placed: 13:11Z placed=15 unreconciled=15, 13:39Z 5/5, 14:02Z 2/2, 14:14Z 2/2. Each cleared to 0 on the next pass, so it is the transient count of just-submitted orders, not a stuck backlog. Kalshi had placed 24 orders / $59.50 by 11:29Z against a balance-derived cap of $118.34/day; the Polymarket cap is $140.55/day.
+- **Kalshi draw:** 0 `[kalshi_orders] SUBMIT ... -TIE` and 0 `side=draw` lines in the window. The `_side_to_kalshi` draw branch is still unexercised in live. **verify still OWED.**
