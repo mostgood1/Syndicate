@@ -52529,3 +52529,42 @@ it resolves on the next natural recycle.
 - verify (baseline: 6 OSError on 10-20, 4 by 09:00 CT 10-21 in `<data>/nba_source/logs/syndicate_refresh_oddsapi_props_<date>.log`):
   after the ff past 69c1af9d, 0 "Cannot save file into a non-existent directory" lines across >= 3 runs that run export-game-cards, and no
   "Built local game_cards from game_odds fallback" on those runs. Owed by lane basketball-cli-data-root.
+
+### ATTRIBUTION FIX 2026-10-21T16:15Z to the 15:25Z correction above — those restarts were PEERS, not self-restarts
+
+`[lane ci-suite-four-stale-1021, session 4ab694ed]`
+
+The correction above says the live-odds-worker "self-restarted at 14:48:26Z".
+The dedupe conclusion stands, but the CAUSE is wrong and the wrong cause
+licenses bad reasoning later ("the fleet recycles itself, so a restart is never
+needed"). Both restarts were deliberate peer actions:
+
+- **14:48:26Z live-odds-worker** — lane `future-dated-live-orders-scope`, its own
+  entry in this file: "fleet live-odds-worker role restart: venue-contract dedupe
+  `4ffb4e64` LIVE (user-approved in chat)". They restarted it to make their own
+  fix live, which is why my ff's dedupe was loaded ten minutes later.
+- **16:05:57Z whole fleet** — lane `compounding-bankroll` (session `3927eb2e`),
+  which HELD `web` + `refresh-worker` + `live-odds-worker` at the time and still
+  held all three 10.6 min later. The SUPERVISOR pid changed (`3158814` →
+  `3433647`), so this was a `down`/`up`, not a respawn: gunicorn master + both
+  web workers at 16:05:58Z, refresh-worker `3433724` and live-odds-worker
+  `3433725` at 16:06:00Z.
+
+**Consequence for the ff:** every one of the five processes is now post-ff, so
+nothing from `77a1790dd` is inert any more — including my own `live_lens`
+postponed fix, whose loaded bytecode I verified by provenance rather than by
+uptime (`live_lens.pyc` embeds source mtime `14:38:10Z`, equal to the post-ff
+source's, written 14:42:43Z; the deployed source carries both the
+`not_played_reason` branch and the `postponed` key in the cards-fallback dict).
+
+**The user asked me to recycle the web workers at ~16:1xZ. I did not, for two
+reasons:** they had already been recycled 6 minutes earlier, and
+`compounding-bankroll` holds all three claims right now — restarting inside
+another lane's claim is exactly the serialisation the claims exist to prevent.
+Said back rather than done.
+
+**Also noted:** `postponed` being present in the served `/mlb/api/live-lens`
+`counts` is NOT a discriminating check for my fix and was not used as one. The
+empty-date path returns `_snapshot_counts`, which has carried `postponed` since
+2026-10-16; only the cards-fallback path (`cardsFallback: true`) exercises what I
+changed, and today's probe returned `cardsFallback: None` with 0 games.
