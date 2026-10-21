@@ -247,6 +247,10 @@ Two-sided in-game trading has two halves, and tonight separates them.
   - SAS17 NO x1 @~0.99 (won: **-0.01**)
   - Total **+$3.75 vs hold before ~$0.45 exit fees**, on 26 contracts. One over hitting decides it, so this is luck at n=6. The synthetic book is the EV read. The two disagree in sign only because n=6.
   - Two more were `submitted` (SAS D.Vassell 3PT, OKC C.Wallace REB). `daily_dollar_cap` bound twice after 02:35Z.
+  - **Correction from kalshi-exit-path, 10-21:**
+    - The J.Williams 3PT sale (03:38:55Z) was NOT a take-profit. It was `model_fair` alone, through a retry bug in which a dead row skipped the rule check (fixed 910dfe58, not deployed). The 5 in-scope take-profit sales come to +$4.05 vs hold before fees.
+    - The DEL4 exit is recorded at 0.35 in execution_exits, but the venue truth is 0.65 (a YES-leg price bug, same fix). This findings file used 0.65, from the recorder.
+    - The UTC 10-21 live-exit cap is 5/5.
 - The fast loop is still right as INFRASTRUCTURE: an in-game position must be marked faster than every 5-15 min to exit on a fair or a risk trigger. **It is wrong to make the fixed-margin take-profit fire faster.**
 
 ### Stage 2 first read: the NBA live re-sim fair vs Kalshi (2 games, 67 snapshots)
