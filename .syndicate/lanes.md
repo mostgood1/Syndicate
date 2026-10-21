@@ -1609,7 +1609,7 @@ death, never life — do not invert it.
 - Verification: Tonight's NBA in-play runs log IN_PLAY_ONLY with events_in_play below the slate's remaining games, odds calls per pull fall accordingly, ok rate holds, and the served NBA board still carries the pregame games' rows
 - Blocked by: none
 
-### freeze-nba-pregame-sims — OPEN — opened 2026-10-21 — session d07b749c-5be2-42dc-9c0f-970539fed236
+### freeze-nba-pregame-sims — OPEN (DEPLOYED 2026-10-21 11:56 AM CT, fleet aaa988a8; first-slate reading OWED after the 10-21 games) — opened 2026-10-21 — session d07b749c-5be2-42dc-9c0f-970539fed236
 - Goal: A basketball (NBA/WNBA) SmartSim whose game has tipped -- or whose rebuild would finish after tip -- is never rebuilt by the props refresh's reuse checks (exclusions, roster pool, calibration) or the WNBA targeted trigger: the existing pregame sim JSON and its engine_inputs pkl stay frozen. Switch SYNDICATE_SMART_SIM_TIP_FREEZE (absent=on, off=kill, shadow=log only); reachability test off != on; measured on the next NBA slate after the user-approved fleet ff (0 post-tip rebuilds, SMART_SIM_TIP_FREEZE frozen=1 lines). User decisions 2026-10-21 (AskUserQuestion): 'Freeze at tip', 'On by default, kill switch'.
 - Files: syndicate/features/shared/smart_sim_tip_freeze.py (NEW), tests/test_smart_sim_tip_freeze.py (NEW), scripts/basketball_posttip_rebuilds.py (NEW), .syndicate/findings_2026-10-21_post_tip_rebuilds.md (NEW), syndicate/features/shared/basketball_props_smart_sim.py (the tip-freeze check in _smart_sim_run_date_local's per-game loop, before the force-unlink, section only), docs/ai_context/todo.md (#720 section only)
 - Hypothesis: MEASURED before opening (fleet props logs 10-03..10-21, scripts/basketball_posttip_rebuilds.py): NBA 10 of 145 builds after scheduled tip on 7 of 74 games (6 since engine-input persistence 10-10; all 3 10-20 games, 2 of them twice); triggers 8 SMART_SIM_REUSE_STALE_EXCLUSIONS + 2 NBA_SIM_STALE calibration (10-04); odds anchor 0 (game_odds/predictions_2026-10-20 last written 10-19 1:01 AM CT); roster pool 0 (check live since 10-21 7:43 AM CT, no games since). WNBA 1 of 60 (10-04 ATL_NYL +142 min, no stale line logged). Nothing in _smart_sim_run_date_local reads commence_time.
@@ -1620,7 +1620,10 @@ death, never life — do not invert it.
   - Tests: off != on on the real loop (WNBA, NBA 10-20 shape, targeted trigger). The neighbouring suites pass: 136 tests.
   - Replay of the decision on every logged production build: post-tip kept 10/10 NBA + 1/1 WNBA, pre-tip frozen 0/193.
   - Findings: findings_2026-10-21_post_tip_rebuilds.md. todo #720, state [basketball-smart-sim-tip-freeze].
-  - OWED: a fleet ff (user approval), then the first-slate reading named in Verification.
+  - DEPLOYED 2026-10-21 16:56:40Z (11:56 AM CT): fleet ff d1a7ffbe -> aaa988a8, NO restart. User: "Deploy now, carry all three (Recommended)". The peer live-clv-contract-units had already ff'd to d1a7ffbe, so there were no ride-alongs. Claims taken and released (17:00Z).
+    - Smoke on fleet code: mode on (key absent); 11/11 NBA + 1/1 WNBA 10-21 games resolve a tip; the replay kept 5/5 of the 10-20 post-tip builds and froze 0 pre-tip.
+    - Recorded in deploys.md 2026-10-21 16:56:40Z.
+  - OWED (after the 10-21 games, ~11 PM CT): `scripts/basketball_posttip_rebuilds.py --since 2026-10-21` -> 0 after_tip; engine_inputs/2026-10-21 mtimes <= tip; `frozen=1` lines. Then close.
 
 ### live-clv-contract-units — OPEN — opened 2026-10-21 — session 3bd0b2d4
 - Goal: todo #719: CLV reads live contract fill prices (0.65) as American odds; convert at prediction_ledger._clv_pct_from_prices so order_clv / position_marks / clv_join all get it
