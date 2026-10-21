@@ -1840,6 +1840,78 @@ def held_position_for(request: OrderRequest) -> dict[str, Any] | None:
     return None
 
 
+REFUSAL_HELD_VENUE_CONTRACT = "already_held_venue_contract"
+
+
+def venue_contract_dedupe_enabled() -> bool:
+    """Default ON. `off`/`0`/`false` leaves position identity as the only duplicate key."""
+    raw = str(os.environ.get("SYNDICATE_EXECUTION_VENUE_CONTRACT_DEDUPE") or "").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
+def venue_leg_of(venue: Any, side: Any, market: Any, line: Any) -> str:
+    """The leg an order buys AT THE VENUE: Kalshi's own `yes`/`no`, else our side label.
+
+    Kalshi's is read through `kalshi_orders._side_to_kalshi` -- the mapping the
+    order body is built with -- so this can never call two orders one contract
+    that the venue would treat as opposite legs, or vice versa. An unmappable
+    side keeps its own label rather than guessing a leg.
+    """
+    raw = str(side or "").strip().lower()
+    if str(venue or "").strip().lower() == "kalshi":
+        try:
+            from syndicate.features.shared.kalshi_orders import _side_to_kalshi
+
+            return _side_to_kalshi(side, market, line)
+        except Exception:  # noqa: BLE001 -- unmappable: compare raw labels
+            return f"side:{raw}"
+    return raw
+
+
+def held_venue_contract_for(request: OrderRequest) -> dict[str, Any] | None:
+    """A LIVE order on the SAME venue contract and leg that the venue may hold, or None.
+
+    ONE CONTRACT, ONE ORDER  [2026-10-21, lane future-dated-live-orders-scope].
+    Measured on the fleet 2026-10-21: `KXNBASPREAD-26OCT21DALHOU-HOU10`, away 9.5,
+    was bought TWICE 11 s apart (13:38:41Z / 13:38:50Z, $0.49 each) because two
+    plan rows -- market `spreads` and `spreads_alt`, same side and line -- resolve
+    to the same ticker. `idempotency_key` and `position_key` both hash `market`,
+    so neither the same-slate duplicate check nor `held_position_for` (D1) saw one
+    bet. The venue contract is the identity the account actually holds.
+
+    Keyed on (venue, venue_ticker, venue leg), any `selected_date`. The request's
+    OWN key (and its legacy shape) is skipped: a re-run of the same bet is the
+    duplicate path's job and keeps its own counter. "May be held" is
+    `_blocks_a_new_attempt` minus `execution_guard.is_non_position`, as for D1.
+    A top-up of a held contract is refused here too, as D1 refuses one.
+    """
+    if not venue_contract_dedupe_enabled():
+        return None
+    ticker = str(getattr(request, "venue_ticker", "") or "").strip().upper()
+    if not ticker:
+        return None
+    from syndicate.features.shared.execution_guard import is_non_position
+
+    venue = str(request.venue or "")
+    leg = venue_leg_of(venue, request.side, request.market, request.line)
+    own = {idempotency_key(request)}
+    legacy = _legacy_idempotency_key(request)
+    if legacy:
+        own.add(legacy)
+    for order in _load().get("orders") or []:
+        if str(order.get("mode") or "") != LIVE or str(order.get("venue") or "") != venue:
+            continue
+        if str(order.get("venue_ticker") or "").strip().upper() != ticker:
+            continue
+        if order.get("idempotency_key") in own:
+            continue
+        if venue_leg_of(venue, order.get("side"), order.get("market"), order.get("line")) != leg:
+            continue
+        if _blocks_a_new_attempt(order) and not is_non_position(order):
+            return order
+    return None
+
+
 def _blocking_record_for(request: OrderRequest) -> dict[str, Any] | None:
     """The row `record_order` would hand back as a duplicate, found WITHOUT
     writing. The first row under the key or its legacy shape decides, as it

@@ -916,6 +916,34 @@ def _run_execution(
                 )
                 continue
 
+            # ONE CONTRACT, ONE ORDER  [2026-10-21, lane
+            # future-dated-live-orders-scope]. Two plan rows labelled `spreads`
+            # and `spreads_alt` (same side, same line) resolved to ONE Kalshi
+            # ticker and were bought twice, 11 s apart: KXNBASPREAD-26OCT21DALHOU-
+            # HOU10. Position identity hashes `market`, so neither the duplicate
+            # check nor D1 saw one bet. Keyed on (venue, ticker, venue leg), any
+            # slate; this bet's own key is left to the duplicate path.
+            from syndicate.features.shared.execution_ledger import (
+                REFUSAL_HELD_VENUE_CONTRACT,
+                held_venue_contract_for,
+            )
+
+            held_contract = held_venue_contract_for(request)
+            if held_contract is not None:
+                skipped += 1
+                refused[REFUSAL_HELD_VENUE_CONTRACT] = refused.get(REFUSAL_HELD_VENUE_CONTRACT, 0) + 1
+                print(
+                    f"[execute_portfolio] REFUSED_HELD_VENUE_CONTRACT venue={venue}"
+                    f" ticker={getattr(request, 'venue_ticker', None)!r}"
+                    f" market={getattr(request, 'market', None)}"
+                    f" side={getattr(request, 'side', None)} line={getattr(request, 'line', None)}"
+                    f" held_market={held_contract.get('market')} held_slate={held_contract.get('selected_date')}"
+                    f" held_status={held_contract.get('status')} held_key={held_contract.get('idempotency_key')}"
+                    " -- this venue contract is already held under another plan label; nothing written",
+                    flush=True,
+                )
+                continue
+
         # ONE LEG PER GAME OUTCOME, AND A DOLLAR CAP PER GAME  [2026-10-21, user
         # decision "Build it (Recommended)", lane live-event-concentration, todo
         # #711]. D1 above matches the SAME bet; a line move is a new bet to it,

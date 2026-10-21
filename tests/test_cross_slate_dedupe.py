@@ -130,6 +130,9 @@ def _two_slates(monkeypatch, *, switch: str | None, status="filled"):
 
 
 def test_T1_off_the_same_bet_is_ordered_again_on_the_next_slate(monkeypatch):
+    # The venue-contract dedupe (2026-10-21) would also catch this pair -- same bet,
+    # same ticker. Held off here so this arm measures D1 alone.
+    monkeypatch.setenv("SYNDICATE_EXECUTION_VENUE_CONTRACT_DEDUPE", "off")
     first, second, sent = _two_slates(monkeypatch, switch="off")
     assert first["placed"] == 1
     # THE DEFECT, reproduced: a second live order for the same bet.
