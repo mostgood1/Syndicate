@@ -320,3 +320,15 @@ main until that lane lands): the 14 new tests plus `tests/test_nba_live_resim.py
   the reading. Until then: OFF everywhere.
 - **Not done here, by scope:** unpriced no-history players (DAL's other rookies) -- no line, so no market-implied
   rate; WNBA has the same defect class for 2027 (no WNBA roster producer, sibling lane's note).
+
+### USER DECISION 2026-10-21 ~5:00 PM CT (typed in session 15f24a49), recorded before the truth reading ran
+
+"if it's inconclusive, go ahead with shadow mode". So, applied to the pre-registered rule:
+- **INCONCLUSIVE:** set `REFRESH_WORKER__SYNDICATE_NBA_NO_HISTORY_STANDINS=shadow` on the fleet. Env changes take
+  effect only at a full down/up, so this needs all three deploy claims and a `deploys.md` entry.
+- **PASS:** the numbers go to the user for an `on` decision. Nothing is enabled without it.
+- **FAIL:** NO-GO; the switch stays absent (OFF).
+
+Fleet state when recorded: the fleet runs ac248f07, which contains 73082de2 (this lane's code), and the switch is absent
+from `local_production.env`. So the hooks are live and OFF.
+
