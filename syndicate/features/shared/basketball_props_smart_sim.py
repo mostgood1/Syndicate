@@ -4920,6 +4920,14 @@ def _smart_sim_worker_init_local(
         props_df = pd.read_csv(props_path) if props_path and Path(props_path).exists() else pd.DataFrame()
     except Exception:
         props_df = pd.DataFrame()
+    # (lane nba-no-history-admit) the worker re-reads the pool from disk, so it appends the PARENT's stand-in rows
+    # (inherited at fork): the pool it stamps must equal the pool the reuse branch expects. Off returns props_df untouched.
+    if props_path and not props_df.empty:
+        from syndicate.features.shared.nba_no_history_standins import add_standins as _add_no_history_standins
+
+        props_df = _add_no_history_standins(props_df, processed_root=Path(props_path).parent, date_str=str(date_str),
+                                            league_code=str(league_code or "nba"), to_tri=_to_tricode_local,
+                                            reuse_built=True)
     _SMARTSIM_WORKER_STATE = {
         "date_str": str(date_str),
         "n_sims": int(n_sims),
@@ -5045,6 +5053,16 @@ def _smart_sim_worker_run_local(job: dict) -> dict:
         except Exception:
             pass
 
+        # (lane nba-no-history-admit) take the stand-ins out of this sim's players[] (kept in
+        # context.no_history_standins): their rates ARE the posted line, so nothing may price their own props
+        # (nba_no_history_standins docstring). Never touches context.props_pool, the reuse key stamped above.
+        try:
+            from syndicate.features.shared.nba_no_history_standins import tag_sim_output as _tag_no_history_standins
+
+            _tag_no_history_standins(out, state.get("props_df"), (home_tri, away_tri))
+        except Exception:
+            pass
+
         # P3: record the pre-sim market anchoring alongside the sim output so
         # the raw model means survive into the artifact whatever the flag state.
         try:
@@ -5160,6 +5178,15 @@ def _smart_sim_run_date_local(*, processed_root: Path, raw_root: Path, date_str:
     if not props_path.exists():
         return {"date": date_str, "wrote": 0, "skipped": 0, "failures": 0, "reason": f"missing_props:{props_path}"}
     props_df = pd.read_csv(props_path)
+    # (lane nba-no-history-admit) a current-roster player with a posted pre-tip prop line and NO player_logs history
+    # has no props_predictions row, so the sim never saw him and spread his minutes over his teammates (DAL simulated
+    # 9 players on 2026-10-21). With SYNDICATE_NBA_NO_HISTORY_STANDINS=on a market-implied stand-in joins the pool
+    # here -- before the injury map, the reuse pool check and the engine-input record, so each treats him like any
+    # pool row. Off (the default) returns props_df untouched; NBA only.
+    from syndicate.features.shared.nba_no_history_standins import add_standins as _add_no_history_standins
+
+    props_df = _add_no_history_standins(props_df, processed_root=processed_root, date_str=date_str,
+                                        league_code=league_code, to_tri=_to_tricode_local)
     excluded_map = _smart_sim_injuries_excluded_map_for_date_local(processed_root=processed_root, raw_root=raw_root, date_str=date_str, props_df=props_df)
     # Players who missed their team's recent games stay out of the pool (lane wnba-sim-availability). WNBA-only and
     # OFF unless SYNDICATE_WNBA_SIM_AVAILABILITY is set; only ADDS keys, never overrides a playing_today flag.
