@@ -52103,3 +52103,27 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - compounding-bankroll's first post-ff cancel reading (d57476ec).
   - A web reload for 2ec30ec8 (ops-export lane).
 - **rollback:** `git revert 150e1180 cd0901bf`, ff, gated live-odds-worker TERM. Or a `LIVE_ODDS_WORKER__SYNDICATE_EXECUTION_KALSHI_PREGAME_ONLY=off` line + a full down/up.
+
+## 2026-10-21 00:02Z (7:02 PM CT 10-20) -- nba-live-board: NBA live board VERIFIED on the fleet (display); fast-mode exit fix ab9d830c LIVE
+- **loaded by others, no deploy of mine:** kalshi-exit-path's full down/up ff'd 96f97a0a -> 67aa2882 and respawned every role at
+  23:34:56Z (refresh-worker 3102121, live-odds-worker 3102122): f0dd04bb / 900c4287 / 96f97a0a named as ride-alongs in their entry.
+  future-dated-live-orders-scope ff'd 67aa2882 -> 3567ff3b at 23:44:15Z (contains ab9d830c, and 212de24a -- its owner
+  nhl-vendor-delete OK'd the ride in chat); live-odds-worker respawned 23:53:36Z (pid 3111241). My claims: acquired refresh-worker +
+  web at ~23:49Z, live-odds-worker REFUSED (held by future-dated-live-orders-scope), released both with tokens before any fleet action.
+- **verify (ab9d830c, subprocess, no respawn):** NBA in-play runs (lane live-odds-worker-nba-live), `odds_refresh.json` ok/rc:
+  BEFORE the 23:44:15Z ff 4/4 failed rc=1 on `nba_oddsapi_props_job` (23:18:25, 23:31:37, 23:35:57, 23:40:15Z) though each wrote its
+  snapshot (23:18Z: 8,435 rows, 5,742 book quotes); AFTER 2/2 ok=True (23:44:34Z, 23:53:52Z). Fleet `git ls-files vendor | wc -l` = 0.
+- **verify (lane Verification, board written 23:57:24Z, first build on the new refresh-worker), `/api/board/layer2-shortlist?sport=nba`:**
+  PHI @ NYK live (20-19, Q1 2:46 at build). nba `live_gamelines` supported=True (live_resim source, 1 game indexed): 633 considered,
+  161 projected, 35 edged/priceable, 598 withheld (461 segment_is_not_full_game, 121 prob_interval_swamps_edge, 11
+  quote_older_than_live_pricing_ceiling, 5 no_two_sided_market_price). `live_projections` supported=True: 461 live prop rows
+  considered, 36 projected + edged (actualSoFar / liveProjection / liveModelProbOver from the live lens; misses: 202 no market alias,
+  111 no line match, 94 player not live, 18 no line). Live NBA rows 400 of 1,242 (was 0 at 23:01Z, "no live re-sim wired for nba");
+  35 live rows suggested. Quote last-seen age at build: median 99 s, max 99 s (book age median 135 s, max 763 s). Page renders the
+  LIVE projection + ACTUAL columns (screenshot sent to the user).
+- **read, not a defect claim:** 7 of the top 14 suggested live rows are alt-total OVERS on the same game (live re-sim P(over 219.5)
+  0.72 vs no-vig 0.58) -- one view priced seven ways; `model_skill` on live props reads "unmeasured -- never backtested".
+- **not met, by a NEWER user decision:** the lane goal's "feeds the Kalshi/Polymarket live decisions" clause -- cd0901bf
+  (user 23:10Z via 332cb014, "Block after kickoff") refuses Kalshi entries after commence (Polymarket already did). In-play entries
+  are the in-game-trading lane's staged program now.
+- **claims:** none held by nba-live-board.
