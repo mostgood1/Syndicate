@@ -1559,6 +1559,14 @@ death, never life — do not invert it.
 - Blocked by: none
 - NOT DONE: whether anything ELSE in the MLB live lens treats a postponement as completed. The three call sites of `_card_status_bucket` were checked and are safe; no wider audit was done.
 
+### venue-native-selection — OPEN — opened 2026-10-21 — session 86c84cf4-0615-418e-aa88-bddb1871568d
+- Goal: A measured design for live candidate selection on each venue's own executable net-EV price instead of the board's best-book Suggested flag: gap map vs the live 0% floor already on the fleet (ee87954d), a floor argued from same-venue CLV + settled ROI with denominators, and a paper comparison venue-native vs Suggested with per-venue/date coverage, in .syndicate/findings_2026-10-20_venue_native_selection.md; build only on the user's yes
+- Files: .syndicate/findings_2026-10-20_venue_native_selection.md, scripts/venue_native_selection_study.py
+- Hypothesis: The live candidate set is mostly the wrong set because Suggested is decided at the best book; the 0% live floor fixes most of it, leaving other_side_suggested and not_opportunity_lane as the remaining venue-blind gates
+- Falsification test: Venue-positive rows excluded from the live floor population are ~0 once the floor is on, or venue-native rows grade no better than Suggested rows on the paper ledger
+- Verification: Findings file with coverage tables, per-venue counts and ROI/CLV with event-clustered SE; read-only on the fleet
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
