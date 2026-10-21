@@ -372,6 +372,19 @@ def build_features_for_date_local(*, processed_root: Path, date: str, windows: l
 
     asof_matchup_map = _asof_matchup_map_local(processed_root=processed_root, date=date)
 
+    # CURRENT roster (lane nba-current-rosters). The as-of team below is the team of the player's LAST log row, so on
+    # 2026-10-20 every NBA player carried his 2025-26 team: 179 of 460 simulated players across the 10-20/10-21 sims
+    # were not on the team they were simulated for (LeBron James for LAL while he played for PHI). When an ESPN
+    # current roster valid for this date exists, it decides the team: a player on it is tagged with his current team,
+    # a player on no current roster is left out. None for WNBA, with the switch off, or for a date the roster was
+    # fetched more than a day after (an as-of replay must not see later moves) -- the pre-fix behaviour exactly.
+    roster_now = None
+    if "wnba" not in str(processed_root).lower():
+        from syndicate.features.shared.nba_current_rosters import current_roster_index
+
+        roster_now = current_roster_index(processed_root, str(date)[:10])
+    rekey = {"moved": 0, "departed": 0, "kept": 0, "moved_examples": [], "departed_examples": []}
+
     rows = []
     grp = hist.groupby(pid, sort=False)
     for player_id, group in grp:
@@ -429,6 +442,21 @@ def build_features_for_date_local(*, processed_root: Path, date: str, windows: l
             "usage_per_min": "_usage_per_min",
         }
         asof_team = group.iloc[-1][_find_col(hist, TEAM_COLS)] if _find_col(hist, TEAM_COLS) else None
+        if roster_now is not None:
+            asof_name = group.iloc[-1][_find_col(hist, PLAYER_NAME_COLS)] if _find_col(hist, PLAYER_NAME_COLS) else None
+            team_now = roster_now.team_for(player_id=player_id, player_name=asof_name)
+            if team_now is None:
+                rekey["departed"] += 1
+                if len(rekey["departed_examples"]) < 12:
+                    rekey["departed_examples"].append(f"{asof_name} ({asof_team})")
+                continue
+            if _matchup_team_key(asof_team) != team_now:
+                rekey["moved"] += 1
+                if len(rekey["moved_examples"]) < 12:
+                    rekey["moved_examples"].append(f"{asof_name} {asof_team}->{team_now}")
+                asof_team = team_now
+            else:
+                rekey["kept"] += 1
         # P3 input fix: the as-of row used to hardcode is_home=0.0 for every
         # player (history rows derive it from MATCHUP at the block above). Build
         # the same "TEAM vs. OPP" / "TEAM @ OPP" string from the date's slate and
@@ -468,4 +496,9 @@ def build_features_for_date_local(*, processed_root: Path, date: str, windows: l
         rows.append(rec)
     out = pd.DataFrame(rows)
     log_dataframe_memory("basketball_props_features.output", out)
+    if roster_now is not None:
+        import json
+
+        rekey.update(date=str(date)[:10], roster_season=roster_now.season, roster_fetched_at=roster_now.fetched_at.isoformat())
+        print("[basketball_props_features] NBA_CURRENT_ROSTER_REKEY " + json.dumps(rekey, default=str), flush=True)
     return out

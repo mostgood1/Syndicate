@@ -4,7 +4,7 @@ import contextlib
 import os
 import time
 import unicodedata
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -128,10 +128,24 @@ class PlayerPriors:
     config: PlayerPriorsConfig
     rates: dict[tuple[str, str], dict[str, float]]
     games: dict[tuple[str, str], int]
+    # player key -> the team of his most recent game in these priors (lane nba-current-rosters). The rates are keyed
+    # by the team a player's games were played FOR, so a player the current roster moved to a new team (LeBron James
+    # LAL -> PHI on 2026-10-20) missed (PHI, LEBRON JAMES) and fell to generic rates. `rate_for` falls back to his
+    # own most recent team's rates. Empty = the pre-fix lookup exactly.
+    latest_team: dict[str, str] = field(default_factory=dict)
 
     def rate(self, team: str, player_name: str, key: str) -> dict[str, float]:
         normalized_key = key or normalize_player_name_key(player_name, case="upper")
-        return self.rates.get((str(team or "").strip().upper(), normalized_key), {})
+        return self.rate_for(team, normalized_key)
+
+    def rate_for(self, team: str, key: str) -> dict[str, float]:
+        """(team, key) rates; when that pair is absent, the player's rates for his most recent team."""
+        team_u = str(team or "").strip().upper()
+        key_u = str(key or "").strip().upper()
+        hit = self.rates.get((team_u, key_u))
+        if hit is None and key_u in self.latest_team:
+            hit = self.rates.get((self.latest_team[key_u], key_u))
+        return hit or {}
 
 
 _PLAYER_LOGS_CACHE: dict[str, object] = {}
@@ -285,6 +299,15 @@ def compute_player_priors_local(*, processed_root: Path, date_str: str, cfg: Pla
     log_dataframe_memory("basketball_props_onnx.player_history_concat", use)
     if use.empty:
         return PlayerPriors(config=cfg, rates={}, games={})
+    latest_team: dict[str, str] = {}
+    try:
+        last_rows = use.sort_values("GAME_DATE").drop_duplicates(subset=["PLAYER_KEY"], keep="last")
+        for team_v, key_v in zip(last_rows["TEAM_ABBREVIATION"], last_rows["PLAYER_KEY"]):
+            team_s, key_s = str(team_v or "").strip().upper(), str(key_v or "").strip().upper()
+            if team_s and key_s:
+                latest_team[key_s] = team_s
+    except Exception:
+        latest_team = {}
     keep = ["TEAM_ABBREVIATION", "PLAYER_KEY"] + [column for column in stat_cols.values() if column in use.columns]
     use = use[keep].copy()
     grouped = use.groupby(["TEAM_ABBREVIATION", "PLAYER_KEY"], as_index=False)
@@ -311,7 +334,7 @@ def compute_player_priors_local(*, processed_root: Path, date_str: str, cfg: Pla
                     continue
                 stat_rates[f"{name}_pm"] = _to_float(row.get(column)) / max(min_mu, 1e-6)
         rates[(team, player_key)] = stat_rates
-    return PlayerPriors(config=cfg, rates=rates, games=games_map)
+    return PlayerPriors(config=cfg, rates=rates, games=games_map, latest_team=latest_team)
 
 
 def _predict_props_without_models_local(*, features_df, processed_root: Path):

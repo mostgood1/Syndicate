@@ -3361,9 +3361,19 @@ def _prior_rates_for_player_local(*, priors, team_tri, pkey, player_name) -> dic
 
     rates = getattr(priors, "rates", {}) or {}
     team_u = str(team_tri or "").strip().upper()
-    hit = rates.get((team_u, str(pkey or "").strip().upper()))
+    keys = (str(pkey or "").strip().upper(), basketball_props_onnx.normalize_player_name_key(player_name))
+    hit = rates.get((team_u, keys[0]))
     if hit is None:
-        hit = rates.get((team_u, basketball_props_onnx.normalize_player_name_key(player_name)))
+        hit = rates.get((team_u, keys[1]))
+    if hit is None:
+        # (lane nba-current-rosters) a player the current roster moved has no rates under his NEW team yet: use his
+        # own rates from his most recent team instead of the generic fallbacks. Empty map = the old lookup exactly.
+        latest = getattr(priors, "latest_team", {}) or {}
+        for key in keys:
+            if key in latest:
+                hit = rates.get((latest[key], key))
+                if hit is not None:
+                    break
     return hit or {}
 
 
@@ -4408,6 +4418,23 @@ def _excluded_keys_for_source_filter(excluded_map: dict, teams, smart_sim_module
     return out
 
 
+def _props_pool_for_teams_local(props_df, teams) -> dict[str, list[str]]:
+    """{team: sorted `_norm_name_key`s of the props_df rows on that team} -- the player pool a sim of these teams is
+    built from, before the sim's own pruning. Stamped into each sim (`context.props_pool`) and compared on reuse
+    (lane nba-current-rosters; `smart_sim_reuse.props_pool_verdict`)."""
+    out: dict[str, list[str]] = {str(t).strip().upper(): [] for t in teams}
+    try:
+        if props_df is None or "player_name" not in props_df.columns or "team" not in props_df.columns:
+            return out
+        tri = props_df["team"].astype(str).map(lambda v: str(_to_tricode_local(v) or str(v or "").strip().upper()).strip().upper())
+        for team in out:
+            names = props_df.loc[tri == team, "player_name"]
+            out[team] = sorted({k for k in (_norm_name_key(n) for n in names) if k})
+    except Exception:
+        return out
+    return out
+
+
 def _call_source_simulate_smart_game_local(*, processed_root: Path, league_code: str, kwargs: dict[str, Any]):
     """One game through Syndicate's smart-sim ORCHESTRATOR (plan P6), then the bridge's post-processing.
 
@@ -5009,6 +5036,15 @@ def _smart_sim_worker_run_local(job: dict) -> dict:
             out_path=out_path_s,
         )
 
+        # (lane nba-current-rosters) stamp the player pool this sim was built from, so a reuse can tell a roster change.
+        try:
+            if isinstance(out, dict):
+                if not isinstance(out.get("context"), dict):
+                    out["context"] = {}
+                out["context"]["props_pool"] = _props_pool_for_teams_local(state.get("props_df"), (home_tri, away_tri))
+        except Exception:
+            pass
+
         # P3: record the pre-sim market anchoring alongside the sim output so
         # the raw model means survive into the artifact whatever the flag state.
         try:
@@ -5138,6 +5174,13 @@ def _smart_sim_run_date_local(*, processed_root: Path, raw_root: Path, date_str:
 
     add_nba_recency_exclusions(excluded_map, processed_root=processed_root, date_str=date_str, league_code=league_code,
                                name_key=_norm_name_key, props_df=props_df)
+    # (lane nba-current-rosters) is the props_df pool re-keyed to an ESPN current roster for this date? Then an NBA
+    # sim file without a pool stamp was built from last season's teams and must not be reused.
+    current_roster_active = False
+    if str(league_code or "").strip().lower() == "nba":
+        from syndicate.features.shared.nba_current_rosters import current_roster_index
+
+        current_roster_active = current_roster_index(processed_root, str(date_str)[:10]) is not None
 
     odds_df = None
     odds_path = processed_root / f"game_odds_{date_str}.csv"
@@ -5431,8 +5474,19 @@ def _smart_sim_run_date_local(*, processed_root: Path, raw_root: Path, date_str:
             # would pass is STALE: the scoped trigger misses D+1 dates, new-date baselines, unhashed exclusion inputs and
             # launch-gate refusals, so without this a sim keeps an OUT player (or drops a returned one) until tip.
             from syndicate.features.shared.smart_sim_reuse import reuse_verdict as _exclusions_current
+            # (lane nba-current-rosters) a sim built from a different player pool than this run's props_df is STALE:
+            # a roster change moves no exclusion. Unstamped NBA files count as stale while the current-roster re-key
+            # is active (they were built from last season's teams).
+            from syndicate.features.shared.smart_sim_reuse import props_pool_verdict as _pool_current
 
-            if _smart_sim_file_has_players_local(out_path) and not _nba_calibration_stale(
+            if _smart_sim_file_has_players_local(out_path) and _pool_current(
+                out_path,
+                expected=_props_pool_for_teams_local(props_df, (home_tri, away_tri)),
+                teams=(home_tri, away_tri),
+                date_str=date_str,
+                league=league_code,
+                require_stamp=current_roster_active,
+            ) and not _nba_calibration_stale(
                 out_path, league_code=league_code, processed_root=processed_root
             ) and _exclusions_current(
                 out_path,

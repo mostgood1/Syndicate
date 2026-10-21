@@ -99,3 +99,60 @@ def reuse_verdict(path: Path, *, expected: dict[str, Iterable[Any]], teams: Iter
         flush=True,
     )
     return False
+
+
+# THE PLAYER POOL A SIM WAS BUILT FROM (lane nba-current-rosters, 2026-10-20).
+#
+# The exclusion check above cannot see a ROSTER change: on NBA opening night every reused sim had been built from a
+# props_predictions pool tagged with 2025-26 teams, and re-tagging the pool to the current roster changes no exclusion.
+# Every sim now stamps ``context.props_pool`` -- {team: sorted player keys of the props_df rows on that team}, the
+# input pool before the sim's own pruning -- and a reuse compares it with the pool this run would pass. A team whose
+# pool changed (a trade, a signing, a release, a player's first log) is a stale file.
+#
+# A file with NO stamp predates this check. It is stale only when ``require_stamp`` is set, which the caller does when
+# the current-roster re-key is active for the date (NBA, ESPN roster valid): those files were built from last season's
+# teams. Otherwise an unstamped file is reused, the pre-check behaviour.
+
+
+def stamped_props_pool(path: Path) -> dict[str, set[str]] | None:
+    """``context.props_pool`` of a sim file as ``{TEAM: {KEYS}}``; ``None`` when absent or unreadable."""
+    try:
+        payload = json.loads(Path(path).read_text(encoding="utf-8", errors="ignore"))
+    except Exception:
+        return None
+    context = payload.get("context") if isinstance(payload, dict) and isinstance(payload.get("context"), dict) else {}
+    stamp = context.get("props_pool")
+    if not isinstance(stamp, dict):
+        return None
+    return {str(team).strip().upper(): _key_set(keys) for team, keys in stamp.items()}
+
+
+def props_pool_verdict(path: Path, *, expected: dict[str, Iterable[Any]], teams: Iterable[str], date_str: str,
+                       league: str, require_stamp: bool) -> bool:
+    """True = the file was built from the player pool this run would pass (reuse it). One line per decision; never
+    raises (a failed comparison reuses, and says so)."""
+    teams = [str(team or "").strip().upper() for team in teams]
+    name = Path(path).name
+    if not check_enabled():
+        return True
+    try:
+        stamped = stamped_props_pool(path)
+        if stamped is None:
+            if require_stamp:
+                print(f"[smart_sim_reuse] SMART_SIM_REUSE_STALE_POOL league={league} date={date_str} file={name} stale=1 "
+                      f"reason=no_pool_stamp_current_roster_active reuse=False", flush=True)
+                return False
+            return True
+        drift = exclusion_drift(stamped, expected, teams)
+    except Exception as exc:
+        print(f"[smart_sim_reuse] SMART_SIM_REUSE_POOL_CHECK_FAILED league={league} date={date_str} file={name} "
+              f"{type(exc).__name__}: {exc} reuse=True", flush=True)
+        return True
+    if not drift:
+        return True
+    detail = ";".join(
+        f"{team}:+{len(item['added'])}/-{len(item['removed'])}" for team, item in sorted(drift.items())
+    )
+    print(f"[smart_sim_reuse] SMART_SIM_REUSE_STALE_POOL league={league} date={date_str} file={name} stale=1 "
+          f"teams={len(drift)} drift={detail} reuse=False", flush=True)
+    return False

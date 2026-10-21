@@ -2808,6 +2808,18 @@ def _ensure_player_logs_for_props_refresh(*, source_root: Path, date_str: str, l
                 _append_log(log_file, "nba recon refresh: " + json.dumps(recon, default=str))
         except Exception as exc:  # noqa: BLE001
             _append_log(log_file, f"nba recon refresh failed: {exc}")
+    # CURRENT rosters from ESPN -> rosters_<season>.csv (lane nba-current-rosters): nothing wrote a 2026-27 roster, so
+    # on opening night the props features and the sim's roster filter ran on 2025-26 teams (179 of 460 simulated
+    # players were not on the team they were simulated for). Runs before predict-props, which re-keys each player to
+    # his current team. Throttled 90 min; complete-or-nothing. Off: SYNDICATE_NBA_CURRENT_ROSTERS=0.
+    try:
+        from syndicate.features.shared.nba_current_rosters import refresh_current_rosters
+
+        rosters = refresh_current_rosters(source_root / "data" / "processed", date_str)
+        if not rosters.get("skipped"):
+            _append_log(log_file, "nba current rosters: " + json.dumps(rosters, default=str))
+    except Exception as exc:  # noqa: BLE001
+        _append_log(log_file, f"nba current rosters failed: {exc}")
     raw_max_age = (
         os.environ.get("REFRESH_PLAYER_LOGS_MAX_AGE_HOURS")
         or os.environ.get("DAILY_PLAYER_LOGS_MAX_AGE_HOURS")
