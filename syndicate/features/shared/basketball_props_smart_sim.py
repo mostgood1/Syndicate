@@ -5469,6 +5469,11 @@ def _smart_sim_run_date_local(*, processed_root: Path, raw_root: Path, date_str:
     except Exception:
         pass
 
+    # (lane freeze-nba-pregame-sims) tip times for the freeze below; the schedule is the fallback source.
+    from syndicate.features.shared import smart_sim_tip_freeze as _tip_freeze
+
+    tip_schedule = _tip_freeze.schedule_tips(processed_root, date_str) if _tip_freeze.mode() != "off" else {}
+
     for _, row in pdf.iterrows():
         home_tri = str(row.get("home_tri") or "").strip().upper()
         away_tri = str(row.get("away_tri") or "").strip().upper()
@@ -5486,6 +5491,20 @@ def _smart_sim_run_date_local(*, processed_root: Path, raw_root: Path, date_str:
         # rebuilt, same as overwrite=True but scoped to just this game.
         is_targeted = only_matchups is not None and (home_tri, away_tri) in only_matchups
         force_this_game = bool(overwrite) or is_targeted
+        # (lane freeze-nba-pregame-sims) a game that has tipped, or whose rebuild would finish after tip, keeps the sim
+        # it has. A rebuild rewrites the pregame artifact AND engine_inputs/<D>/<H>_<A>.pkl, which the live re-sim reloads
+        # every tick (measured: 10 of 145 NBA builds ran after tip, 10-03..10-21). This sits before the force-unlink (the
+        # WNBA targeted trigger) and before the reuse checks. overwrite=True already deleted the date and is not frozen.
+        if (not overwrite) and _tip_freeze.mode() != "off" and _tip_freeze.keep_existing(
+            out_path,
+            has_players=out_path.exists() and _smart_sim_file_has_players_local(out_path),
+            tip=_tip_freeze.tip_time(row, odds_df=odds_df, schedule=tip_schedule, home=home_tri, away=away_tri),
+            queued=len(jobs),
+            date_str=date_str,
+            league=league_code,
+        ):
+            skipped += 1
+            continue
         if force_this_game and out_path.exists():
             try:
                 out_path.unlink()
