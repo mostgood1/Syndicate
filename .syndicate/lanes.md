@@ -1616,6 +1616,15 @@ death, never life — do not invert it.
 - Verification: tests: off != on on the real _smart_sim_run_date_local loop (tipped + stale exclusions -> rebuilt off, kept on; pre-tip -> rebuilt either way; overwrite=True unaffected; missing file built). Production: after the fleet ff, the 10-21+ props logs show SMART_SIM_TIP_FREEZE frozen=1 for tipped games and scripts/basketball_posttip_rebuilds.py counts 0 after_tip builds for the slate; deploys.md entry.
 - Blocked by: none
 
+### live-clv-contract-units — OPEN — opened 2026-10-21 — session 3bd0b2d4
+- Goal: todo #719: CLV reads live contract fill prices (0.65) as American odds; convert at prediction_ledger._clv_pct_from_prices so order_clv / position_marks / clv_join all get it
+- Files: syndicate/features/prediction_ledger.py, tests/test_clv_contract_price_units.py
+- Hypothesis: Every live Kalshi/Polymarket closing_mark.clv_pct is ~-35pt because _implied_from_american(0.65) = 99.4%
+- Falsification test: a live row at 0.65 vs close -186 already yields ~0 pt on current code
+- Verification: test: 0.65 vs -186 -> ~0.0 pt; paper -110 vs -130 unchanged +4.1; mutation (remove contract branch) fails the test
+- Blocked by: none
+- **RESULT 2026-10-21 (code, not fleet):** hypothesis CONFIRMED -- pre-fix `_clv_pct_from_prices(0.65, -186)` = -34.3; post-fix +0.03. Fix at the choke point (`_implied_from_price`); 180 tests pass across the clv/order_clv/position_marks/prediction_ledger/min_ev_tuner/paper_settlement suites; mutation fails 5/9 new tests. Reader survey + owed decisions in todo #719. Open until the user decides on re-marking stamped live rows and on the fleet ff.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

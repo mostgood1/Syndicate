@@ -425,6 +425,24 @@ def _implied_from_american(price: Any) -> float | None:
     return (100.0 / (value + 100.0)) if value > 0 else (abs(value) / (abs(value) + 100.0))
 
 
+def _implied_from_price(price: Any) -> float | None:
+    """Implied probability from American odds OR a venue contract price.
+
+    THE EXECUTION LEDGER HOLDS BOTH UNITS IN ONE COLUMN: a paper fill records
+    American odds (-110), a live Kalshi/Polymarket fill records the contract
+    price (0.65). Read as American, 0.65 is +0.65 -> 99.4% implied, and every
+    live `closing_mark.clv_pct` came out ~-35 pt (todo #719, measured on the
+    2026-10-20 slate: 13 live marks, recomputed +0.46 +- 0.35 pt). The boundary
+    is the one `paper_settlement.profit_per_dollar` and
+    `execution_ledger._price_as_probability` already use: a contract price is
+    strictly inside (0, 1), and no American price is.
+    """
+    value = _coerce_float(price)
+    if value is not None and 0.0 < value < 1.0:
+        return value
+    return _implied_from_american(price)
+
+
 def _clv_pct_from_prices(original_price: Any, closing_price: Any) -> float | None:
     """CLV in probability points: how much better the price we took was than the
     price the market closed at.
@@ -442,8 +460,9 @@ def _clv_pct_from_prices(original_price: Any, closing_price: Any) -> float | Non
     same data gave [+2.48, +3.13]. CLV is the same kind of paired, low-variance
     instrument, and it is available before any game settles.
     """
-    original_implied = _implied_from_american(original_price)
-    closing_implied = _implied_from_american(closing_price)
+    # Either side may be a contract price (a live venue fill, or a venue close).
+    original_implied = _implied_from_price(original_price)
+    closing_implied = _implied_from_price(closing_price)
     if original_implied is None or closing_implied is None:
         return None
     return round((closing_implied - original_implied) * 100.0, 4)
