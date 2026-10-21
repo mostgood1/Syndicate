@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import time
 
+import json
 import os
 from pathlib import Path
 from typing import Any, Mapping
@@ -191,6 +192,111 @@ def placeable_refusal(row: Any) -> str | None:
     return None
 
 
+# ---- the LIVE NET FLOOR, per venue [user 2026-10-21, "Yes: build the per-venue
+# live net floor behind SYNDICATE_LIVE_NET_FLOOR_<VENUE> (absent = today)"] -----
+#
+# Lane `venue-native-selection`, `.syndicate/findings_2026-10-20_venue_native_selection.md`.
+# The live plans already read every row the board's Suggested flag refused for EV
+# alone (`live_ev_floor_rows`), so WHICH rows live can see is decided at the venue's
+# own price. What decides whether one is bet is the commit's net-of-fee gate, `> 0`.
+# Measured on the pre-10-13 paper venue books (which ran exactly that selection, 12
+# dates, 826 bets): Kalshi picks beat their own close by LESS than the fee they paid
+# until net EV reached ~1% (trimmed CLV 1.65 vs fee 1.64 probability points);
+# Polymarket cleared its fee from ~0-0.5%. The starting values the findings propose
+# are Kalshi 1.0, Polymarket 0.5 -- they live in the ENV, not here, and a venue with
+# no key keeps today's behaviour exactly.
+#
+# LIVE PLANS ONLY: paper2, the ladder and the main book never call
+# `commit_live_venue_plan`, so the paper forward test and the ladder keep recording
+# below the floor, which is what keeps the floor falsifiable.
+LIVE_NET_FLOOR_ENV_PREFIX = "SYNDICATE_LIVE_NET_FLOOR_"
+REFUSAL_BELOW_LIVE_NET_FLOOR = "below_live_net_floor"
+# The key is SET but not a number in range: every row is refused, by name. Unknown
+# must not take the permissive branch (learnings), and a typo that silently restored
+# the 0% floor is the failure this exists to prevent.
+REFUSAL_LIVE_NET_FLOOR_UNREADABLE = "live_net_floor_unreadable"
+# A row with no net-of-fee EV cannot be shown to clear a net floor.
+REFUSAL_NO_VENUE_NET_EV = "no_venue_net_ev"
+# Both sides of one line cleared the floor at this venue: only the higher net EV is
+# kept. The board's own one-side rule runs among SUGGESTED rows at the best book, so
+# it cannot see the rows the EV-only path adds.
+REFUSAL_OTHER_SIDE_BETTER_AT_VENUE = "other_side_better_at_venue"
+_LIVE_NET_FLOOR_RANGE = (-5.0, 20.0)
+
+
+def live_net_floor(venue: str | None) -> tuple[float | None, str | None]:
+    """`(floor_pct, None)`, `(None, None)` when the venue's key is absent, or
+    `(None, REFUSAL_LIVE_NET_FLOOR_UNREADABLE)` when it is set to something unusable."""
+    name = str(venue or "").strip().upper()
+    if not name:
+        return None, None
+    raw = os.environ.get(LIVE_NET_FLOOR_ENV_PREFIX + name)
+    if raw is None or not str(raw).strip():
+        return None, None
+    try:
+        value = float(str(raw).strip())
+    except ValueError:
+        return None, REFUSAL_LIVE_NET_FLOOR_UNREADABLE
+    lo, hi = _LIVE_NET_FLOOR_RANGE
+    if value != value or not (lo <= value <= hi):
+        return None, REFUSAL_LIVE_NET_FLOOR_UNREADABLE
+    return value, None
+
+
+def _venue_net_ev(row: Mapping[str, Any]) -> float | None:
+    try:
+        value = float(row.get("ev_pct_net_of_fee"))
+    except (TypeError, ValueError):
+        return None
+    return None if value != value else value
+
+
+def _venue_line_key(row: Mapping[str, Any]) -> tuple:
+    """One betting line, both sides -- the same key as `layer2_board._suggested_line_key`."""
+    try:
+        line = abs(float(row.get("line")))
+    except (TypeError, ValueError):
+        line = None
+    return (
+        str(row.get("sport") or "").strip().lower(),
+        str(row.get("event_id") or ""),
+        str(row.get("market") or "").strip().lower(),
+        str(row.get("segment") or "full").strip().lower() or "full",
+        str(row.get("player_name") or "").strip().lower(),
+        line,
+    )
+
+
+def _apply_live_net_floor(
+    placeable: list[Mapping[str, Any]], floor: float
+) -> tuple[list[Mapping[str, Any]], list[tuple[str, Any]]]:
+    """Keep rows whose venue net EV is >= `floor`, then one side per line (higher net EV)."""
+    kept: list[Mapping[str, Any]] = []
+    dropped: list[tuple[str, Any]] = []
+    for row in placeable:
+        net = _venue_net_ev(row)
+        if net is None:
+            dropped.append((REFUSAL_NO_VENUE_NET_EV, row))
+        elif net < floor:
+            dropped.append((REFUSAL_BELOW_LIVE_NET_FLOOR, row))
+        else:
+            kept.append(row)
+    best: dict[tuple, Mapping[str, Any]] = {}
+    for row in kept:
+        key = _venue_line_key(row)
+        incumbent = best.get(key)
+        if incumbent is None or (_venue_net_ev(row) or 0.0) > (_venue_net_ev(incumbent) or 0.0):
+            best[key] = row
+    winners = {id(row) for row in best.values()}
+    out: list[Mapping[str, Any]] = []
+    for row in kept:
+        if id(row) in winners:
+            out.append(row)
+        else:
+            dropped.append((REFUSAL_OTHER_SIDE_BETTER_AT_VENUE, row))
+    return out, dropped
+
+
 def commit_live_venue_plan(
     scoped: list[Mapping[str, Any]],
     *,
@@ -222,6 +328,23 @@ def commit_live_venue_plan(
             placeable.append(row)
         else:
             dropped.append((reason, row))
+
+    # THE PER-VENUE LIVE NET FLOOR (see `live_net_floor`). Absent key: nothing here runs.
+    net_floor, net_floor_error = live_net_floor(venue)
+    net_floor_stamp: dict[str, Any] | None = None
+    if net_floor_error is not None:
+        dropped.extend((net_floor_error, row) for row in placeable)
+        net_floor_stamp = {"venue": venue, "floor_pct": None, "error": net_floor_error,
+                           "rows_checked": len(placeable), "kept": 0}
+        placeable = []
+    elif net_floor is not None:
+        checked = len(placeable)
+        placeable, floor_dropped = _apply_live_net_floor(placeable, net_floor)
+        dropped.extend(floor_dropped)
+        net_floor_stamp = {"venue": venue, "floor_pct": net_floor, "rows_checked": checked,
+                           "kept": len(placeable)}
+        for reason, _row in floor_dropped:
+            net_floor_stamp[reason] = net_floor_stamp.get(reason, 0) + 1
 
     # OPTION C [user 2026-10-20]: with `SYNDICATE_LIVE_SMALL_EDGE_FRACTION` set
     # and compounding `on` with a one-contract minimum, the LIVE plan does not
@@ -322,6 +445,8 @@ def commit_live_venue_plan(
             ),
         }
 
+    if net_floor_stamp is not None:
+        plan["live_net_floor"] = net_floor_stamp
     plan["refusals"] = dict(sorted(refusals.items()))
     plan["refusals_by_market"] = _ordered(by_market)
     plan["refusals_by_sport"] = _ordered(by_sport)
@@ -856,6 +981,13 @@ def _write_live_venue_plan(
         live_plan["job_state"] = dict(job_state or {})
         live_plan["paper2_generated_at"] = paper2_plan.get("generated_at")
         write_json_file(path, live_plan)
+        if live_plan.get("live_net_floor"):
+            # Unconditional when the key is set, so "the floor ran and kept N" is a log reading.
+            print(
+                f"[portfolio_commit] LIVE_NET_FLOOR date={normalized} venue={venue} "
+                f"{json.dumps(live_plan['live_net_floor'], sort_keys=True)}",
+                flush=True,
+            )
         if live_plan.get("live_ev_floor"):
             record_live_ev_floor_positions(live_plan, selected_date=normalized, venue=venue)
     except Exception as exc:

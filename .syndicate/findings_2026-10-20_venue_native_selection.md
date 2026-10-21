@@ -240,6 +240,20 @@ fleet changed: no env, cap, restart or deploy. Times are Central unless marked Z
   forward test's population too.
 - So it is not recommended. It is listed because it is the one-line form of the same idea.
 
+## BUILT 2026-10-21 (user: "Yes: build the per-venue live net floor ... No fleet env change or restart until I say so")
+
+- **Code.** `pipeline/portfolio_commit.py`: `live_net_floor(venue)` reads `SYNDICATE_LIVE_NET_FLOOR_<VENUE>`, and `_apply_live_net_floor` runs inside `commit_live_venue_plan` after the placeable check.
+  - Absent or empty key: nothing runs, so the plan is today's.
+  - Refusals, each counted in the plan's `refusals` tables: `below_live_net_floor` (net < floor; the floor itself is admitted), `no_venue_net_ev`, `other_side_better_at_venue` (one side per line at the venue's price), and `live_net_floor_unreadable` (key set but not a number in [-5, 20]: every row refused).
+  - Stamp `plan["live_net_floor"]` and log line `[portfolio_commit] LIVE_NET_FLOOR date=.. venue=.. {...}`.
+- **Deviation from the design above:** the commit's GROSS 2% gate is kept, so `syndicate/features/shared/portfolio_commit.py` (min-ev-tuner-shadow) is untouched.
+  - At net floors of 1.0 / 0.5 the gross gate is nearly redundant: on 10-21 the one row it refused had net +0.35, below both floors.
+- **Tests.** `tests/test_live_net_floor.py`, 22 tests; 3 mutants (inclusive bound, the call removed, keep-last instead of keep-best) all caught.
+  - Neighbours: live_ev_floor / kalshi_plan_placeable / compounding / stake band / portfolio_commit / paper_ladder 170 pass, and execute_portfolio / in_play / checklist 107 pass. The input checklist PASSED.
+- **To enable (user decision, not done):** add `REFRESH_WORKER__SYNDICATE_LIVE_NET_FLOOR_KALSHI=1.0` and `REFRESH_WORKER__SYNDICATE_LIVE_NET_FLOOR_POLYMARKET=0.5` to the fleet env, then restart refresh-worker under the deploy locks, on a HEAD containing the build commit.
+  - Verify with the first `LIVE_NET_FLOOR` line per venue, and with live plans with `below_live_net_floor` > 0 and no position below the floor.
+  - Undo: remove the keys and restart.
+
 ## Coordination
 
 - **`min-ev-tuner-shadow`:** owner session b98807bc is not among the linked sessions, so this is written to its lane
