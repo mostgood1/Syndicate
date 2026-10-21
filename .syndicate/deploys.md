@@ -52522,3 +52522,10 @@ code. Their delta across this ff is comment/docstring-only plus my own
 live-lens `counts.postponed` answer depends on which web worker serves the
 request — and only when a postponed game is on the slate. Not worth a restart;
 it resolves on the next natural recycle.
+
+## 2026-10-21 -- NOT DEPLOYED, rides the next fleet ff: CLI child gets its data root (lane basketball-cli-data-root, 69c1af9d, todo #718)
+- What: refresh_{nba,wnba}_oddsapi_props.py set <LEAGUE>_BETTING_DATA_ROOT = <source_root>/data for the source-CLI subprocess only when
+  unset/empty. Subprocess scripts: the ff alone makes it live; no restart.
+- verify (baseline: 6 OSError on 10-20, 4 by 09:00 CT 10-21 in `<data>/nba_source/logs/syndicate_refresh_oddsapi_props_<date>.log`):
+  after the ff past 69c1af9d, 0 "Cannot save file into a non-existent directory" lines across >= 3 runs that run export-game-cards, and no
+  "Built local game_cards from game_odds fallback" on those runs. Owed by lane basketball-cli-data-root.

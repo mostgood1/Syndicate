@@ -10,6 +10,11 @@
 ### `#718` — **NBA `export-game-cards` fails every props run writing into the CODE tree (`syndicate/features/nba/source_cli/repo/data/processed`, nonexistent) and falls back to `Built local game_cards from game_odds fallback`: 6 times on 10-20, 4 by 9 AM CT 10-21** — FOUND 2026-10-21 by session 9e18a0e7 (lane `cheat-sheets` assessment), NOT acted on; owner: the NBA source-CLI ports (last touched `5dba2973`, session 2d413211, messaged)
 - Read from `<data>/nba_source/logs/syndicate_refresh_oddsapi_props_<date>.log`: `OSError: Cannot save file into a non-existent directory: '/home/amyn/Syndicate/syndicate/features/nba/source_cli/repo/data/processed'` after `python -m syndicate.features.nba.source_cli.cli export-game-cards --date <d>` (10-19 21:05, 10-20 11:30 and 16:41 CT ...). The run recovers through the game_odds fallback, so game cards are built -- from the fallback, not the CLI export.
 - Likely a repo-root default inside the CLI that should be the data root (the props script passes the data root for every other step). Unverified.
+- **FIX LANDED 69c1af9d (2026-10-21, lane `basketball-cli-data-root`, user: "fix it robustly"), NOT YET ON THE FLEET.** Cause: the CLI port's
+  `config._data_root` reads NBA_BETTING_DATA_ROOT and otherwise uses its own code tree. Every fleet role sets it and the failures are
+  intermittent (10-21 05:08 CDT clean, 12:41 failed), so SOME launcher of the props refresh runs without it (not identified). The refresh now
+  fills <LEAGUE>_BETTING_DATA_ROOT = <source_root>/data for the CLI child only when it is unset/empty (WNBA twin too). Close when the props
+  log shows 0 "Cannot save file into a non-existent directory" across >= 3 runs after the fleet ff past 69c1af9d.
 
 ### `#717` — **DATED READS register for session 9e18a0e7's long-running lanes (so no forward read depends on a one-time scheduled task: a 10-19 count found 8 that never dispatched)** — 2026-10-21, user: "do all of it"
 Each line: lane -- what is read -- when (Central). The lane block holds the method; this list holds the DATE.
