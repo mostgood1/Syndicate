@@ -275,7 +275,7 @@ def test_live_exit_is_written_ahead_then_completed(monkeypatch):
     def send(body):
         # The row must already be ON DISK when the order leaves.
         seen_at_send.append([r["status"] for r in persisted[-1].values()])
-        return {"state": "filled", "filled_count": 5, "fill_cost_dollars": 0.15,
+        return {"state": "filled", "filled_count": 5, "fill_cost_dollars": 0.15, "outcome_side": "yes",
                 "fees_dollars": 0.01, "order_id": "ord-1", "venue_status": "executed"}
 
     out = ex.place_exit(state, _position(), _decision(), sellable=5.0, send=send, persist=persist)
@@ -309,7 +309,7 @@ def test_reconcile_finds_a_lost_response_by_client_order_id(monkeypatch):
     ex.place_exit(state, _position(), _decision(), sellable=5.0,
                   send=lambda b: (_ for _ in ()).throw(TimeoutError("lost")), persist=lambda s: None)
     key = ex.exit_idempotency_key("a" * 24)
-    book = {"orders": [{"client_order_id": key, "order_id": "ord-9", "status": "executed",
+    book = {"orders": [{"client_order_id": key, "order_id": "ord-9", "status": "executed", "outcome_side": "yes",
                         "fill_count_fp": "5.00", "taker_fill_cost_dollars": "0.15",
                         "taker_fees_dollars": "0.01"}]}
     result = ex.reconcile_exit_orders(state, fetch_book=lambda: book)
@@ -548,7 +548,7 @@ def _filled_one(monkeypatch, *, limit_price=None, purpose="sell_body_verificatio
 
     def send(body):
         sent.append(body)
-        return {"state": "filled", "filled_count": 1, "fill_cost_dollars": 0.12,
+        return {"state": "filled", "filled_count": 1, "fill_cost_dollars": 0.12, "outcome_side": "yes",
                 "fees_dollars": 0.01, "order_id": "ord-1", "venue_status": "executed"}
 
     out = ex.place_exit(state, _position(), _decision(), sellable=5.0, send=send, persist=lambda s: None,
@@ -608,7 +608,7 @@ def test_an_unpriced_create_response_is_read_back(monkeypatch):
 
     def read_back(order_id):
         reads.append(order_id)
-        return {"status": "ok", "order": {"status": "executed", "fill_count_fp": "1.00",
+        return {"status": "ok", "order": {"status": "executed", "fill_count_fp": "1.00", "outcome_side": "yes",
                                           "taker_fill_cost_dollars": "0.130000", "taker_fees_dollars": "0.008000",
                                           "order_id": "ord-7"}}
 
@@ -682,7 +682,7 @@ def _live_tick(monkeypatch, orders, market, sent, **env):
     for k, v in env.items():
         monkeypatch.setenv(k, v)
     monkeypatch.setattr(ex, "send_exit_order", lambda body: sent.append(body) or {
-        "state": "filled", "filled_count": int(float(body["count"])), "fill_cost_dollars": 0.03 * int(float(body["count"])),
+        "state": "filled", "filled_count": int(float(body["count"])), "fill_cost_dollars": 0.03 * int(float(body["count"])), "outcome_side": "yes",
         "fees_dollars": 0.01, "order_id": f"o{len(sent)}", "venue_status": "executed"})
     venue = {"status": "ok", "positions": {o["venue_ticker"]: -5.0 for o in orders}}
     return ex.run_exit_tick(today=TODAY, orders=orders, quotes=_quotes([market]),
@@ -728,3 +728,46 @@ def test_live_rules_default_is_take_profit_only(monkeypatch):
     monkeypatch.delenv("SYNDICATE_EXIT_LIVE_RULES", raising=False)
     assert ex.live_exit_rules() == frozenset({"take_profit"})
     assert ex.live_exit_daily_caps() == (5, 25.0)
+
+
+# -- 2026-10-21 production defects: rule bypass on retry, YES-leg fill price ----
+
+
+def test_a_dead_live_row_does_not_let_model_fair_sell(monkeypatch):
+    """The old `sold_live` short-circuit skipped the rule check for any entry with a live row."""
+    state = ex._empty_state()
+    key = ex.exit_idempotency_key("f" * 24)
+    state["exits"][key] = {"mode": "live", "status": "dead", "entry_key": "f" * 24, "prior_attempts": []}
+    ex._persist(state)
+    sent = []
+    fair_only = _order(idempotency_key="f" * 24, model_edge_pct=3.0, ev_pct=1.0, fill_price=0.5,
+                       requested_price=0.5, fill_stake_dollars=2.5, side="over")
+    s = _live_tick(monkeypatch, [fair_only], _market(yes_bid_dollars="0.5600"), sent,
+                   SYNDICATE_EXIT_TAKE_PROFIT_MARGIN="0.5")
+    assert sent == [] and s["live_exits"] == {"rule_not_armed": 1}
+
+
+def test_unfilled_retries_are_bounded(monkeypatch):
+    state = ex._empty_state()
+    key = ex.exit_idempotency_key("a" * 24)
+    state["exits"][key] = {"mode": "live", "status": "dead", "entry_key": "a" * 24,
+                           "prior_attempts": [{"status": "dead"}, {"status": "dead"}]}
+    ex._persist(state)
+    sent = []
+    s = _live_tick(monkeypatch, [_order()], _market(), sent, SYNDICATE_EXIT_TAKE_PROFIT_MARGIN="0.05")
+    assert sent == [] and s["live_exits"] == {"unfilled_retry_limit": 1}
+
+
+@pytest.mark.parametrize(
+    "leg, outcome_side, cost, expected",
+    [
+        ("no", "yes", 0.42, 0.58),   # DEL3: buy yes @ 0.42 = NO sold @ 0.58
+        ("yes", "no", 3.85 / 11, 0.65),  # DEL4: sell yes, cost on NO 0.35 = YES sold @ 0.65
+        ("yes", None, 0.35, None),   # unknown side: unpriced, never guessed
+    ],
+)
+def test_fill_price_is_converted_from_the_venues_outcome_side(leg, outcome_side, cost, expected):
+    row = {}
+    ex._exit_row_from_view(row, {"state": "filled", "filled_count": 1, "fill_cost_dollars": cost,
+                                 "fees_dollars": 0.01, "outcome_side": outcome_side}, {"leg": leg})
+    assert row["fill_price"] == (pytest.approx(expected) if expected is not None else None)

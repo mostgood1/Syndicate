@@ -110,6 +110,8 @@ _QUOTE_CHUNK = 50
 # Polymarket books are one SIGNED read per market (5 s timeout each), so they are
 # bounded separately and much lower than Kalshi's batched public read.
 _MAX_POLYMARKET_BOOKS_PER_TICK = 40
+# Unfilled (dead) immediate-or-cancel sales per entry before it stops re-sending.
+_MAX_DEAD_RETRIES = 3
 
 KALSHI = "kalshi"
 POLYMARKET = "polymarket"
@@ -887,7 +889,16 @@ def send_exit_order(body: Mapping[str, Any]) -> dict[str, Any]:
     )
     response = signed_request("POST", url, body=dict(body))
     order = _unwrap_order(response) or {}
-    return venue_order_view(order)
+    return _exit_view(order)
+
+
+def _exit_view(order: Mapping[str, Any]) -> dict[str, Any]:
+    """`venue_order_view` plus the `outcome_side` the fill cost is quoted on."""
+    from syndicate.features.shared.kalshi_orders import venue_order_view
+
+    view = venue_order_view(order)
+    view["outcome_side"] = order.get("outcome_side")
+    return view
 
 
 def _exit_row_from_view(row: dict[str, Any], view: Mapping[str, Any], position: Mapping[str, Any]) -> None:
@@ -898,12 +909,24 @@ def _exit_row_from_view(row: dict[str, Any], view: Mapping[str, Any], position: 
     row["venue_status"] = view.get("venue_status")
     row["venue_resolved_at"] = _utc_now()
     if state == "filled" and filled:
-        # The leg price we received: Kalshi reports fill cost on the leg traded,
-        # which for a NO close is the YES bid -- convert back to our leg.
+        # THE PRICE WE RECEIVED, ON OUR LEG. Kalshi reports the fill cost on the
+        # order's `outcome_side`, which is never the leg we sold:
+        #   NO held  -> close books as `buy yes`  (outcome_side=yes): NO price = 1 - cost
+        #   YES held -> close books as `sell yes` (outcome_side=no):  YES price = 1 - cost
+        # MEASURED 2026-10-21: DEL4 (YES x11) recorded the NO-side 0.35 as our
+        # fill, so settlement understated the entry by 11 x 0.30. The conversion
+        # used to look only at our leg and was right for NO closes by accident.
+        # An unknown outcome_side leaves the fill UNPRICED (reconciled later),
+        # never guessed.
         cost = _as_float(view.get("fill_cost_dollars"))
         traded = cost / filled if cost is not None and filled else None
-        if traded is not None and position.get("leg") == "no":
-            traded = round(1.0 - traded, 4)
+        reported = str(view.get("outcome_side") or "").strip().lower()
+        leg = str(position.get("leg") or "").strip().lower()
+        if traded is not None:
+            if reported in {"yes", "no"} and leg in {"yes", "no"}:
+                traded = round(traded if reported == leg else 1.0 - traded, 4)
+            else:
+                traded = None
         row["status"] = EXIT_FILLED
         row["filled_contracts"] = filled
         row["fill_price"] = traded
@@ -1017,7 +1040,7 @@ def place_exit(
         try:
             got = (read_back or fetch_order)(str(row["venue_order_id"]))
             if got.get("status") == "ok":
-                _exit_row_from_view(row, venue_order_view(got.get("order") or {}), asdict(position))
+                _exit_row_from_view(row, _exit_view(got.get("order") or {}), asdict(position))
         except Exception as exc:  # noqa: BLE001 -- reconcile_exit_orders retries it
             row["read_back_error"] = f"{type(exc).__name__}: {exc}"[:200]
     (persist or _persist)(state)
@@ -1076,7 +1099,7 @@ def reconcile_exit_orders(
         if order is None:
             continue
         before = row.get("status")
-        _exit_row_from_view(row, venue_order_view(order), row)
+        _exit_row_from_view(row, _exit_view(order), row)
         changed += int(row.get("status") != before)
     return {"checked": len(pending), "changed": changed}
 
@@ -1267,7 +1290,13 @@ def run_exit_tick(
         live_skip = None
         if position.mode == "live" and mode == EXIT_LIVE:
             rules = set(str(decision.get("rule") or "").split("+"))
-            sold_live = (exits.get(key) or {}).get("mode") == EXIT_LIVE
+            prior = exits.get(key) or {}
+            sold_live = prior.get("mode") == EXIT_LIVE and prior.get("status") not in {EXIT_DEAD, EXIT_REJECTED}
+            # An unfilled (dead) IOC may be re-sent, but only by an ARMED rule and
+            # only `_MAX_DEAD_RETRIES` times per entry. MEASURED 2026-10-21: the old
+            # `sold_live` short-circuit skipped the rule check for any entry with a
+            # live row, so model_fair alone re-sent 5x, 9x, and filled once.
+            unfilled_tries = (1 + len(prior.get("prior_attempts") or [])) if prior.get("status") == EXIT_DEAD else 0
             cap_count, cap_dollars = live_exit_daily_caps()
             used_count, used_dollars = _live_exits_today(state, _utc_now()[:10])  # same clock as submitted_at
             notional = float(position.contracts) * float(decision.get("bid") or 0.0)
@@ -1275,6 +1304,8 @@ def run_exit_tick(
                 live_skip = None  # place_exit answers `duplicate`
             elif not rules & live_exit_rules():
                 live_skip = "rule_not_armed"
+            elif unfilled_tries >= _MAX_DEAD_RETRIES:
+                live_skip = "unfilled_retry_limit"
             elif used_count >= cap_count:
                 live_skip = "daily_count_cap"
             elif used_dollars + notional > cap_dollars + 1e-9:
