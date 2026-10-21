@@ -1,5 +1,26 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#715` — **IN-GAME TRADING (user: "PRIORITY of the whole operation"): measured 10-20 NBA/NHL in play — Kalshi LEADS the books; book-consensus "edges" mark out at -1.3c after fee; the fixed take-profit LOSES vs hold, and loses more when checked faster; stage 1 fast loop BUILT, paper, not running** — lane `in-game-trading`, session 15ceeb14, 2026-10-21
+- **Measured** (read-only recorder, 23:09Z-04:39Z, 11 games, 64,688 priced side-samples):
+  - Markout after fee: +300 s **-1.26c** (CI -1.80..-0.72, n=1,613); +60 s -1.93c.
+  - No cell's CI is above 0. NHL spreads away from a score is +0.9c [-0.6, +2.4], n=270: the cell to watch, not traded.
+  - Lead/lag: Kalshi first (k=+2 corr 0.44).
+  - Fleet eye: Kalshi poll 2-3 min, Polymarket 3-5 min, exit tick 5-15 min. Kalshi in play re-prices every ~11 s.
+- **Take-profit:** synthetic book, 379 settled, $1,870. At margin 0.08 (live today), hold -6.4%, fast-exit -12.2%, slow-exit -10.3%. Every margin 0.04-0.30 loses against holding.
+  - Tonight's 6 real live sales came to +$3.75 vs hold before ~$0.45 in fees, on 26 contracts. That is luck at n=6 (one over hit).
+  - **Decision owed (user + lane kalshi-exit-path):** keep / raise margin to >=0.30 / pregame-only / off.
+- **Built** (main c2191d1b): `execution_exits_fast.py` (PAPER, no order path, own doc), `scripts/run_fast_exit_loop.py`, 8 tests.
+  - The worker-thread wiring was refused by this session's permission classifier.
+  - **Decision 1a:** run in paper (worker thread + restart, or a standalone fleet process).
+  - Recommendation: do NOT take it live as a faster take-profit.
+- **Stage 2:** the NBA live re-sim fair does NOT beat Kalshi's mid. Totals Brier 0.189 vs Kalshi 0.163; 2 games.
+  - Pre-registered GO: Brier better than Kalshi's mid (CI) over >=300 states / >=20 games AND markout +300 s CI > 0. Stop 2026-12-31.
+  - **Decision 2:** approve the measurement, plus a nightly recorder (a scheduled task).
+- **Stage 3** (in-play entries) waits on a stage-2 GO. Entries must stamp `fair_source="in_game"` (execute_portfolio.py:213).
+- **Stage 4:** keep Polymarket pregame-only.
+- **Stage 5:** fold position decisions into #709.
+- Detail: `.syndicate/findings_2026-10-20_in_game_trading.md`. Data: `C:/tmp/inplay_2026-10-20/` (host-local, not in git).
+
 ### `#714` — **NBA SmartSim: priced players with NO player_logs history (7 rookies + Lillard/Haliburton/Irving/VanVleet on 10-21) are absent and their minutes go to teammates; market-implied STAND-IN built DEFAULT-OFF, scratch cost measured, truth reading owed after the 10-21 games** — lane `nba-no-history-admit`, session 15f24a49 (side session of `nba-current-rosters`, #712); `.syndicate/findings_2026-10-20_nba_no_history_admit.md`
 - **Measured (scratch copy of fleet data, arms on/off/noise, 10-21):** 10 stand-ins simulated; teammates' minutes exactly conserved, per teammate -1.74 min / -0.65 pts median (noise 0.00 / 0.04); **91 of 158 priced teammate main lines move >= 3 pp** (noise 11); DAL P.J. Washington 39.1 -> 33.6 min. Game lines barely move (market anchor). The 3 priced players still not simulated are all injury exclusions.
 - **Veterans via a 2024-25 append: NO-GO** -- the existing fallback admits them with PRE-INJURY numbers (Lillard 23.0 pts/34.5 min vs posted 18.5; Irving 25.4/36.0 vs 20.5), days_rest ~580, 4 unplanned admits, and the 720-day career split changes everyone. They go through the stand-in instead.

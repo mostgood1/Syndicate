@@ -2,7 +2,13 @@
 
 Lane `in-game-trading` (session 15ceeb14). This was started by session 332cb014 on the user directive *"we need the PRIORITY of the whole operation to be LIVE betting/trading"*. The goal was then sharpened at ~23:15Z: *"we should be actively buying AND selling when games are live based on smart profitable positioning"*.
 
-**Status: DRAFT 23:45Z.** The measurement runs until the last game ends. The numbers below are from **23:09-23:38Z** and are replaced by the final read in §6.
+**Status: FINAL READ 2026-10-21 ~04:50Z** (§6-7). §1 holds the first-30-minute numbers (23:09-23:38Z), kept as written. §6 supersedes them wherever the two differ.
+
+**Headline:**
+- In play, Kalshi leads the sportsbooks. Book-consensus "edges" mark out at **-1.3c** after fee (CI -1.8..-0.7, n=1,613).
+- The fixed take-profit loses against holding, and loses MORE when checked faster: -12.2% vs -10.3% vs hold -6.4%, n=379 settled.
+- The NBA live re-sim fair does not beat Kalshi's mid (2 games).
+- Nothing in-play is tradeable yet. Stage 1 (the fast loop) is built, paper-only, and should stay paper.
 
 ## 0. What was measured, and how
 
@@ -189,4 +195,81 @@ Two-sided in-game trading has two halves, and tonight separates them.
 - The synthetic exit book is a cadence comparison, not a strategy.
 - One night, 2 sports. Sample sizes are printed; nothing here is a GO.
 
-## 6. Final read (after the last game)
+## 6. Final read: 23:09Z 10-20 .. 04:39Z 10-21 (12 of 14 games final; CAR@VAN and TB@VGK still in play)
+
+**Coverage:**
+- 11 games mapped to book events: 9 NHL + PHI@NYK + OKC@SAS. BOS@DET was final before recording; 2 NHL games had no book event at the mapping time.
+- Kalshi in-play samples, book event live: 177,623.
+- Priced (exact book line, >= 3 fresh books): 32,344 samples = 64,688 side-samples.
+- 248+ book polls; ~4 Kalshi 429s across ~6 h; 0 other errors.
+- **Recorder priority:** the recorders ran at Normal until 01:5xZ. The self-set Idle call failed silently (64-bit HANDLE). They were lowered to Idle by hand on a peer's report, and the fix is on main (775f714f).
+
+### F2 final: no tradeable edge from the book consensus in play
+
+- Positive after fee at Kalshi's ask: 19.7% of side-samples > 0; 7.1% > 3%. There were 1,755 episodes.
+- **Markout after fee, pooled, excluding episodes still open at game end** (those are settlement artifacts: Kalshi resolves ahead of the books' last in-play poll, giving fake +40-50% "edges"):
+  - +60 s: **-1.93c** (95% CI -2.20 .. -1.66, n=1,664)
+  - +300 s: **-1.26c** (CI -1.80 .. -0.72, n=1,613)
+- By cell (+300 s):
+
+  | family | near a score | away from a score |
+  |---|---|---|
+  | NBA GAME | -2.2c [-3.3, -1.1] n=214 | -0.0c [-3.7, +3.6] n=13 |
+  | NBA SPREAD | -1.6c [-3.2, -0.1] n=175 | -0.8c [-5.7, +4.1] n=19 |
+  | NBA TOTAL | -0.9c [-2.5, +0.8] n=167 | -0.5c [-8.9, +7.9] n=15 |
+  | NHL GAME | -3.3c [-5.3, -1.2] n=119 | -1.0c [-1.9, -0.1] n=536 |
+  | NHL SPREAD | -4.9c [-7.6, -2.3] n=85 | **+0.9c [-0.6, +2.4] n=270** |
+
+  No cell's CI is above 0. NHL spreads away from a score is the only cell whose CI reaches above 0. It is ONE night and the episodes are not independent: it is a lead, not an edge.
+- Lead/lag over the whole night (n=5,218-5,405): k=+2 +0.44, k=+1 +0.16, k=0 +0.05, k<0 ~0. **Kalshi moves first.**
+- |mid - consensus| p50 1.7c, p90 8.3c. Bid-ask spread p50 1c, p90 4c. In-play ask changes p50 11-12 s on every family.
+
+### F5 final: the take-profit rule LOSES against holding on an efficient in-play price, and faster loses more
+
+- Synthetic book: both legs of every recorded game line, entered at the ask when ESPN shows "in", 10 contracts. 407 positions; 379 settled; $1,869.99 staked.
+
+  | margin | fast trig | slow trig (360 s) | hold ROI | fast-exit ROI | slow-exit ROI |
+  |---|---|---|---|---|---|
+  | 0.04 | 66.6% | 62.7% | -6.42% | -14.23% | -12.28% |
+  | 0.08 (live today) | 57.5% | 53.1% | -6.42% | **-12.16%** | **-10.30%** |
+  | 0.15 | 43.5% | 38.8% | -6.42% | -12.61% | -13.10% |
+  | 0.30 | 25.6% | 23.8% | -6.42% | -10.92% | -8.40% |
+  | 0.08, slow=120 s | 57.5% | 55.8% | -6.42% | -12.16% | -11.19% |
+
+- Hold -6.4% is the cost of entering at the ask with a fee. The exit adds another 4-6pp: the exit fee and half the spread, with no overshoot to sell into.
+- Where both cadences trigger, the slow tick sells **+3.1c/contract higher, ~7.6 min later**. Prices that cross the line keep drifting the same way. Faster selling sells earlier and cheaper.
+- **Real live exits tonight** (lane kalshi-exit-path, the first night armed; exit bid from this recorder, the venue fill not yet read back):
+  - DEL3 NO x1 @~0.58 (settled lost: **+0.58** vs hold)
+  - DEL4 YES x11 @~0.65 (settled won: **-3.85**)
+  - MTU@FIU-46 NO x1 @~0.62 (lost: **+0.62**)
+  - MTU@FIU-45 NO x11 @~0.61 (lost: **+6.71**)
+  - J.Williams 3PT NO x1 @~0.70 (won: **-0.30**)
+  - SAS17 NO x1 @~0.99 (won: **-0.01**)
+  - Total **+$3.75 vs hold before ~$0.45 exit fees**, on 26 contracts. One over hitting decides it, so this is luck at n=6. The synthetic book is the EV read. The two disagree in sign only because n=6.
+  - Two more were `submitted` (SAS D.Vassell 3PT, OKC C.Wallace REB). `daily_dollar_cap` bound twice after 02:35Z.
+- The fast loop is still right as INFRASTRUCTURE: an in-game position must be marked faster than every 5-15 min to exit on a fair or a risk trigger. **It is wrong to make the fixed-margin take-profit fire faster.**
+
+### Stage 2 first read: the NBA live re-sim fair vs Kalshi (2 games, 67 snapshots)
+
+- h2h, n=65 snapshots: Brier model 0.190, Kalshi mid 0.195, books 0.202.
+- totals, n=1,545 rows over 67 snapshots: Brier model **0.189**, Kalshi 0.163, books 0.160.
+- Model-says-buy sides:
+  - h2h: 51, markout +300 s -2.2c;
+  - totals: 1,150, markout -0.1c, settled -14c/contract.
+- The model runs 100 sims; |model - Kalshi| has p50 4-5c and p90 11-15c.
+- Rows are repeated snapshots of 2 games and are NOT independent. **Not a GO in any cell.** It already loses on totals by a margin that two games can show.
+
+## 7. Recommendations (what each user decision should be, given tonight)
+
+1. **Stage 1 fast loop: run it in PAPER (decision 1a), do NOT take it live as a faster take-profit (1b).** Its value is marking, and the counterfactual of a FAIR-based exit (sell when net bid > in-game fair). That waits on stage 2.
+2. **Take this to lane kalshi-exit-path and the user now:** on tonight's evidence the fixed 0.08 take-profit has negative expected value in play. Synthetic -3.9pp ROI on top of the entry cost, n=379. It sells positions at the market's own fair minus fee and half-spread. Options:
+   - (a) keep it, as a variance-reduction choice, knowing the cost;
+   - (b) raise the margin to >= 0.30, where it costs least (-2.0pp);
+   - (c) limit it to PREGAME price moves, where our model edge says the market moved TO us, not in play;
+   - (d) turn live take-profit off until the 10-26 counterfactual.
+
+   This is the exit lane's rule and the user's call. This lane does not edit it.
+3. **Stage 2 (decision 2):** approve the measurement as designed (§3). The bar is Kalshi's own mid, not the books. Add the cheap score/time baseline. Run the recorder nightly at Idle. That needs a scheduled task, which is the user's OK. The pre-registered GO stands; the stop is 2026-12-31.
+4. **Stage 3 in-play entries: NOT YET.** No fair beats Kalshi tonight. The NHL spread away-from-score cell (+0.9c, CI to -0.6c) is pre-registered here as the cell to watch, and it is not traded.
+5. **Stage 4 Polymarket:** keep pregame-only.
+6. **Stage 5:** fold position decisions into #709.
