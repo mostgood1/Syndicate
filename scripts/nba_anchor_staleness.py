@@ -28,7 +28,11 @@ arithmetic. Its counterfactual is `served + (anchored_cf - anchored_recorded)`, 
 ASSUMPTION; the anchored targets are scored on their own beside it.
 
     python scripts/nba_anchor_staleness.py --data-root /home/amyn/syndicate-prod/data --since 2026-10-03 \
-        [--until 2026-10-23] [--lead-minutes 0,30] [--json out.json]
+        [--until 2026-10-23] [--lead-minutes 0,30] [--stale-from sim|game_odds] [--json out.json]
+
+After #721 the sim records the REFRESHED line, so the regular-season reading takes the stale arm from
+`game_odds_<D>.csv` (`--stale-from game_odds`). Each served counterfactual is the served mean moved by its arm's
+anchored delta from the line the sim recorded, so the arithmetic holds whichever line that was.
 """
 
 from __future__ import annotations
@@ -220,7 +224,8 @@ def _anchor(raw_total: float, raw_margin: float, total: float | None, spread: fl
     return home_mu + away_mu, home_mu - away_mu
 
 
-def collect(data_root: Path, since: str, until: str, leads: list[int], regular_from: str, now: datetime) -> list[dict]:
+def collect(data_root: Path, since: str, until: str, leads: list[int], regular_from: str, now: datetime,
+            stale_from: str = "sim") -> list[dict]:
     processed = data_root / "nba_source" / "data" / "processed"
     quotes = Quotes(data_root / "nba_source" / "tracking" / "book_quotes")
     out: list[dict] = []
@@ -250,6 +255,8 @@ def collect(data_root: Path, since: str, until: str, leads: list[int], regular_f
                 "anchor_written": odds_mtime,
                 "anchor_total": _num(anchor.get("market_total")),
                 "anchor_spread": _num(anchor.get("market_spread")),
+                "anchor_line_source": anchor.get("market_line_source"),
+                "anchor_line_as_of": anchor.get("market_line_as_of"),
                 "game_odds_total": _num(odds_row.get("total")),
                 "game_odds_spread": _num(odds_row.get("home_spread")),
                 "w_total": _num(anchor.get("total_w")),
@@ -265,6 +272,12 @@ def collect(data_root: Path, since: str, until: str, leads: list[int], regular_f
                 "final": finals.get((home, away)),
                 "pending": tip is None or tip > now,
             }
+            # The stale arm: the line the sim recorded, or (once sims carry the refreshed line, #721) the line
+            # predict-date stored in game_odds_<D>.csv.
+            if stale_from == "game_odds":
+                rec["stale_total"], rec["stale_spread"] = rec["game_odds_total"], rec["game_odds_spread"]
+            else:
+                rec["stale_total"], rec["stale_spread"] = rec["anchor_total"], rec["anchor_spread"]
             # The consensus at the anchor's own write time: the method check (it should reproduce the anchor).
             if odds_mtime is not None:
                 rec["consensus_at_anchor_write"] = quotes.consensus(home, away, tip, odds_mtime)
@@ -341,36 +354,38 @@ def analyse(records: list[dict], lead: int) -> dict:
         stale_t, stale_s, ages, dt_signed, ds_signed = [], [], [], [], []
         for r in rows:
             close = r.get(key) or {}
-            if r["anchor_total"] is not None and close.get("total") is not None:
-                stale_t.append(abs(close["total"] - r["anchor_total"]))
-                dt_signed.append(close["total"] - r["anchor_total"])
-            if r["anchor_spread"] is not None and close.get("spread") is not None:
-                stale_s.append(abs(close["spread"] - r["anchor_spread"]))
-                ds_signed.append(close["spread"] - r["anchor_spread"])
+            if r["stale_total"] is not None and close.get("total") is not None:
+                stale_t.append(abs(close["total"] - r["stale_total"]))
+                dt_signed.append(close["total"] - r["stale_total"])
+            if r["stale_spread"] is not None and close.get("spread") is not None:
+                stale_s.append(abs(close["spread"] - r["stale_spread"]))
+                ds_signed.append(close["spread"] - r["stale_spread"])
             if r["tip"] is not None and r["anchor_written"] is not None:
                 ages.append((r["tip"] - r["anchor_written"]).total_seconds() / 3600.0)
         acc: dict = {}
         graded = [r for r in rows if r["final"] and not r["pending"] and (r.get(key) or {}).get("total") is not None
-                  and r["anchor_total"] is not None and r["anchor_spread"] is not None and (r.get(key) or {}).get("spread") is not None]
+                  and r["stale_total"] is not None and r["stale_spread"] is not None and (r.get(key) or {}).get("spread") is not None]
         if graded:
             lt_o, lt_c, ls_o, ls_c, at_o, at_c, am_o, am_c, st_o, st_c, sm_o, sm_c = ([] for _ in range(12))
             for r in graded:
                 h, a, _src = r["final"]
                 tot, mar = h + a, h - a
                 close = r[key]
-                lt_o.append(abs(r["anchor_total"] - tot))
+                lt_o.append(abs(r["stale_total"] - tot))
                 lt_c.append(abs(close["total"] - tot))
-                ls_o.append(abs(-r["anchor_spread"] - mar))
+                ls_o.append(abs(-r["stale_spread"] - mar))
                 ls_c.append(abs(-close["spread"] - mar))
                 if None in (r["raw_total"], r["raw_margin"], r["w_total"], r["w_margin"]):
                     continue
-                t_o, m_o = _anchor(r["raw_total"], r["raw_margin"], r["anchor_total"], r["anchor_spread"], r["w_total"], r["w_margin"])
+                t_o, m_o = _anchor(r["raw_total"], r["raw_margin"], r["stale_total"], r["stale_spread"], r["w_total"], r["w_margin"])
                 t_c, m_c = _anchor(r["raw_total"], r["raw_margin"], close["total"], close["spread"], r["w_total"], r["w_margin"])
                 at_o.append(abs(t_o - tot)); at_c.append(abs(t_c - tot))
                 am_o.append(abs(m_o - mar)); am_c.append(abs(m_c - mar))
                 if r["served_total"] is not None and r["served_margin"] is not None:
-                    st_o.append(abs(r["served_total"] - tot)); st_c.append(abs(r["served_total"] + (t_c - t_o) - tot))
-                    sm_o.append(abs(r["served_margin"] - mar)); sm_c.append(abs(r["served_margin"] + (m_c - m_o) - mar))
+                    # the served mean belongs to the line the sim RECORDED; each arm moves it by its anchored delta
+                    t_r, m_r = _anchor(r["raw_total"], r["raw_margin"], r["anchor_total"], r["anchor_spread"], r["w_total"], r["w_margin"])
+                    st_o.append(abs(r["served_total"] + (t_o - t_r) - tot)); st_c.append(abs(r["served_total"] + (t_c - t_r) - tot))
+                    sm_o.append(abs(r["served_margin"] + (m_o - m_r) - mar)); sm_c.append(abs(r["served_margin"] + (m_c - m_r) - mar))
             acc = {
                 "line_total": _paired(lt_o, lt_c),
                 "line_margin": _paired(ls_o, ls_c),
@@ -406,11 +421,11 @@ def print_table(records: list[dict], leads: list[int]) -> None:
         close = r.get(key) or {}
         age = (r["tip"] - r["anchor_written"]).total_seconds() / 3600 if r["tip"] and r["anchor_written"] else None
         fin = f"{r['final'][0]}-{r['final'][1]}" if r["final"] else ("pending" if r["pending"] else "-")
-        d_t = close["total"] - r["anchor_total"] if close.get("total") is not None and r["anchor_total"] is not None else None
-        d_s = close["spread"] - r["anchor_spread"] if close.get("spread") is not None and r["anchor_spread"] is not None else None
+        d_t = close["total"] - r["stale_total"] if close.get("total") is not None and r["stale_total"] is not None else None
+        d_s = close["spread"] - r["stale_spread"] if close.get("spread") is not None and r["stale_spread"] is not None else None
         print(f"{r['date']:10} {r['game']:8} {_ct(r['tip']):18} {(f'{age:5.1f}' if age is not None else '    -')} | "
-              f"{_fmt(r['anchor_total']):>7} {_fmt(close.get('total')):>7} {_fmt(d_t):>5} | "
-              f"{_fmt(r['anchor_spread']):>6} {_fmt(close.get('spread')):>6} {_fmt(d_s):>5} | "
+              f"{_fmt(r['stale_total']):>7} {_fmt(close.get('total')):>7} {_fmt(d_t):>5} | "
+              f"{_fmt(r['stale_spread']):>6} {_fmt(close.get('spread')):>6} {_fmt(d_s):>5} | "
               f"{close.get('books', 0):>2} {_ct(close.get('newest_quote')):18} | {fin:>9} "
               f"{_fmt(r['served_total']):>7} {_fmt(r['served_margin']):>7}")
 
@@ -422,12 +437,15 @@ def main() -> int:
     ap.add_argument("--until", default=None)
     ap.add_argument("--lead-minutes", default="0,30", help="consensus taken this long before tip; first one is tabled")
     ap.add_argument("--regular-from", default="2026-10-20", help="first regular-season date")
+    ap.add_argument("--stale-from", choices=("sim", "game_odds"), default="sim",
+                    help="the stale arm: the sim's recorded line (default), or game_odds_<D>.csv once sims carry the "
+                         "refreshed line (#721)")
     ap.add_argument("--json", type=Path, default=None)
     args = ap.parse_args()
     now = datetime.now(timezone.utc)
     until = args.until or now.astimezone(CT).date().isoformat()
     leads = [int(x) for x in str(args.lead_minutes).split(",") if str(x).strip()]
-    records = collect(args.data_root, args.since, until, leads, args.regular_from, now)
+    records = collect(args.data_root, args.since, until, leads, args.regular_from, now, args.stale_from)
     print(f"read at {_ct(now)}; {len(records)} surviving sims {args.since}..{until}")
     print_table(records, leads)
     reports = [analyse(records, lead) for lead in leads]

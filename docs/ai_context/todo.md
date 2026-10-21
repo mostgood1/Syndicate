@@ -1,5 +1,29 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#721` — **The NBA SmartSim anchored to a line written ~2 days before tip and never refreshed (10-21's: 10-19 3:04 AM CT). The near-close line cuts served margin MAE -0.97 ± 0.36 and total MAE -0.39 ± 0.18 (59 games, 56 preseason). REFRESH BUILT (user decision: on by default, kill switch; ff when green)** — lane `nba-sim-anchor-staleness`, session fe168a0f; `.syndicate/findings_2026-10-21_nba_anchor_staleness.md`
+- **Cause.** The job's line is `predictions_<D>.csv`'s. `predict-date` writes it (modal consensus), and the refresh's D+2 lookahead makes it D-2.
+  - `_ensure_game_predictions_for_props_refresh` reuses a predictions file that has rows.
+  - The game_odds seeder only appends.
+  - No reuse check compared odds.
+- **Staleness, abs(anchor - last pregame consensus):**
+  - preseason, 56 games: spread median 1.0, p90 5.0;
+  - regular season so far: DET_BOS -1.5 -> +1.5, SAS_OKC -2.5 -> +1.5;
+  - Layer 2 weights the sim 0 / 0.05 on regular-season game lines, so the gain lands in the sim's own outputs.
+- **Fix:** `smart_sim_anchor_refresh.py`, NBA only.
+  - It reads this run's props snapshot through `consensus_lines_at_close`, the same statistic. In-play rows are
+    dropped, and a snapshot no newer than the predictions file is ignored.
+  - A pregame sim with 1.0 pt or more of drift is rebuilt; the tip freeze still runs first.
+  - The job takes the fresh line. The sim stamps `market_anchor.market_line_source` / `market_line_as_of`.
+  - Switch `SYNDICATE_NBA_SIM_ANCHOR_REFRESH` (absent = on, shadow, off); `..._MIN_PTS` (default 1.0).
+  - 14 tests, off != on on the real loop.
+  - Shadow dry run on the fleet's 10-21 snapshot: 9 of 11 sims 1 pt or more off.
+- **Owed:**
+  - the fleet ff (approved);
+  - first slate: `SMART_SIM_REUSE_ANCHOR_DRIFT` + `SMART_SIM_ANCHOR_LINE` lines, and sims with
+    `market_line_source=props_snapshot_consensus` and `market_line_as_of` before tip;
+  - **pre-registered regular-season reading at ~100 games:** `scripts/nba_anchor_staleness.py`, served margin and
+    total MAE, anchor vs close, regular season only.
+
 ### `#720` — **Basketball SmartSims were rebuilt AFTER TIP, rewriting the pregame sim and the live re-sim's engine inputs mid-game: 10 of 145 NBA builds (7 of 74 games, all three 10-20 games), 1 of 60 WNBA. FREEZE AT TIP built (aaa988a8, on by default, user decision), NOT YET ON THE FLEET** — lane `freeze-nba-pregame-sims`, session d07b749c; `.syndicate/findings_2026-10-21_post_tip_rebuilds.md`
 - **Measured** (fleet props logs 10-03..10-21, `scripts/basketball_posttip_rebuilds.py`):
   - Triggers: 8 exclusion drift, 2 calibration stamp, 0 odds anchor, 0 roster pool (that check has run on no tipped game yet).

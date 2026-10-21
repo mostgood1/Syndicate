@@ -5071,6 +5071,10 @@ def _smart_sim_worker_run_local(job: dict) -> dict:
                 anchor_record["market_total_source"] = (
                     "job" if market_total is not None else ("period_lines_h1_total_x2" if market_total_for_quarters is not None else None)
                 )
+                # (lane nba-sim-anchor-staleness) where the job's line came from, when it is the refreshed consensus.
+                if job.get("market_line_source"):
+                    anchor_record["market_line_source"] = job.get("market_line_source")
+                    anchor_record["market_line_as_of"] = job.get("market_line_as_of")
                 out["market_anchor"] = anchor_record
         except Exception:
             pass
@@ -5474,6 +5478,19 @@ def _smart_sim_run_date_local(*, processed_root: Path, raw_root: Path, date_str:
 
     tip_schedule = _tip_freeze.schedule_tips(processed_root, date_str) if _tip_freeze.mode() != "off" else {}
 
+    # (lane nba-sim-anchor-staleness, todo #721) the market line the sim anchors to was predictions_<D>.csv's, written
+    # once about two days before tip and never again. NBA only: this run's props snapshot gives the current consensus
+    # (same modal statistic); the reuse check below rebuilds a pregame sim that drifted, and the job takes the fresh
+    # line. Switch SYNDICATE_NBA_SIM_ANCHOR_REFRESH (absent = on, shadow, off).
+    from syndicate.features.shared import smart_sim_anchor_refresh as _anchor_refresh
+
+    try:
+        _stored_line_written = pred_path.stat().st_mtime
+    except Exception:
+        _stored_line_written = None
+    fresh_anchor_lines = _anchor_refresh.fresh_lines(processed_root, date_str, league=league_code, to_tricode=to_tricode,
+                                                     stored_written=_stored_line_written)
+
     for _, row in pdf.iterrows():
         home_tri = str(row.get("home_tri") or "").strip().upper()
         away_tri = str(row.get("away_tri") or "").strip().upper()
@@ -5544,6 +5561,8 @@ def _smart_sim_run_date_local(*, processed_root: Path, raw_root: Path, date_str:
                 teams=(home_tri, away_tri),
                 date_str=date_str,
                 league=league_code,
+            ) and _anchor_refresh.anchor_current(
+                out_path, fresh_anchor_lines.get((home_tri, away_tri)), date_str=date_str, league=league_code,
             ):
                 skipped += 1
                 continue
@@ -5561,6 +5580,11 @@ def _smart_sim_run_date_local(*, processed_root: Path, raw_root: Path, date_str:
                     market_total = _num(match_row.get("total"))
                 if home_spread is None:
                     home_spread = _num(match_row.get("home_spread"))
+        # (lane nba-sim-anchor-staleness) the current pregame consensus replaces the stored line (switch on).
+        market_total, home_spread, anchor_line_stamp = _anchor_refresh.override(
+            market_total, home_spread, fresh_anchor_lines.get((home_tri, away_tri)),
+            date_str=date_str, league=league_code, home=home_tri, away=away_tri,
+        )
         pred_total = _num(row.get("totals"))
         pred_margin = _num(row.get("spread_margin"))
         home_mu = (0.5 * (pred_total + pred_margin)) if (pred_total is not None and pred_margin is not None) else None
@@ -5642,6 +5666,7 @@ def _smart_sim_run_date_local(*, processed_root: Path, raw_root: Path, date_str:
             "away_b2b": bool(away_b2b),
             "home_rest_days": home_rest_days,
             "away_rest_days": away_rest_days,
+            **anchor_line_stamp,
         })
 
     env_workers = None
