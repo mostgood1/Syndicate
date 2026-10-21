@@ -52340,3 +52340,34 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - polymarket ncaaf h2h 17/40, polymarket ncaaf spreads 20/40, kalshi nfl receptions 16/40 (flat +36.5%, t 1.90), kalshi ncaaf totals 5/40, kalshi mlb batter_hits_runs_rbis postseason 7/40: all `insufficient_events`.
 - **code:** refresh-worker code=3fffb430 (STALE vs fleet HEAD d76c85ce, 27 runtime files; restarts=1). `git merge-base --is-ancestor affc9a7b 3fffb430` = yes: flat-unit grading is loaded.
 - **verify:** this READING is the `MIN_EV_TUNER` line stamped 12:04:42Z with date=2026-10-21, plus `last_run_at=2026-10-21T12:04:41Z` read back from keyvalue. Next readout: 3/7 on 10-22.
+
+## 2026-10-21T14:38:11Z (09:38 CDT) — FLEET ff `d76c85cec` → `77a1790dd` (16 commits), NO restart — lane `ci-suite-four-stale-1021`, session `4ab694ed`
+
+**User instruction:** "ff the fleet to main" (2026-10-21).
+
+- **what:** `git merge --ff-only 77a1790dd0b3cc82fda3cb6703414ffe84f54d77` in `/home/amyn/Syndicate`. Pinned SHA, never `github/main` — the tip moved twice while I was checking it (`69768d8f7` → `77a1790dd`, 11 → 16 commits behind), and `--ff-only <sha>` is what bounds the ride-along to something I actually read.
+- **locks:** `web` + `refresh-worker` + `live-odds-worker` claims all ACQUIRED by `ci-suite-four-stale-1021` (exit 0 checked per service, not grepped), released afterwards by `--token`. All three because one checkout serves all three.
+- **`deploy_preflight.py` is INAPPLICABLE here, not skipped:** it requires `RENDER_API_KEY` and reads Render's API; production is the local WSL fleet. The applicable gate is `check_deploy_safety.py`, below.
+- **window:** `check_deploy_safety.py` was **NOT CLEAR** (exit 1) on the first read — a board build was in flight. Polled 11 times over 8 min and it never cleared on its own: the worker runs board builds back-to-back, cycling `layer2_shortlist_build` → `portfolio_commit`. So the drain was used, with the worker's OWN keyvalue env (`SYNDICATE_REFRESH_STATE_BACKEND=keyvalue` + `_URL` + `SYNDICATE_REPORTS_ROOT`; without `REPORTS_ROOT` the flag lands where nothing reads). Result: `DRAIN_REQUESTED` ttl 9000s → worker acked → `board_build=idle` → **CLEAR (exit 0)**. `DRAIN_CLEARED` after the ff, and the worker was then watched until real work was in flight again (3 child jobs) rather than assumed to have resumed.
+- **ride-along, enumerated before applying.** `render.yaml` 0, `vendor/` 0, `requirements.txt` 0, `scripts/local_production.py` 0, `.env` 0. Dirty tracked files in the fleet checkout vs the range: **0 collisions**. Of **40 Python files** in the range, **32 are comment/docstring-only** — verified by parsing both versions, stripping every docstring and comparing `ast.dump`, not by reading the diff. Only **3 non-test files carry an executable change**: `syndicate/features/mlb/live_lens.py` (mine), `pipeline/execute_portfolio.py` and `syndicate/features/shared/execution_ledger.py` (lane `future-dated-live-orders-scope`, `4ffb4e647`). The tip commit `69768d8f7` ("basketball scenario round 2 FTA fix") is **ledger and tests only** — the calibration numbers are recorded, not applied.
+- **expect / baseline** (read in a single pass at 14:37:43Z):
+  - `checkout_head` baseline `d76c85cec` → expect `77a1790dd` → **GOT `77a1790dd`** ✓
+  - `refresh_worker_pid` baseline `3258427` → expect UNCHANGED → **GOT `3258427`** ✓
+  - `live_odds_worker_pid` baseline `3327060` → expect UNCHANGED → **GOT `3327060`** ✓
+  - `web_pid` baseline `3158840` → expect UNCHANGED → **GOT `3158840`** ✓
+- **verify:** the READING is (a) `git rev-parse HEAD` = `77a1790dd` in `/home/amyn/Syndicate`, (b) the fix present by CONTENT not by SHA — `grep "POSTPONED IS CHECKED FIRST" syndicate/features/mlb/live_lens.py` hits at line 1277 and `not_played_reason(status)` appears twice, (c) `REFUSAL_HELD_VENUE_CONTRACT` present 2× in `execute_portfolio.py` and 1× in `execution_ledger.py`, (d) three unchanged pids, (e) `GET http://127.0.0.1:10000/` → **HTTP 200** three times after the undrain, (f) the worker back to real work at 14:39:01Z (`run_refresh_odds_job`, `refresh_odds_sources`, `build_soccer_artifacts` all in flight).
+
+### WHAT IS NOT LIVE, and this is the load-bearing part of this entry
+
+**The ff shipped code to disk. It did not change what any long-running process is executing.** No restart was done, so the three parents keep the modules they imported at boot. New SUBPROCESSES spawned after 14:38:11Z do read the new files.
+
+**The live-money dedupe carried by `4ffb4e647` is INERT on the running live-odds-worker.** Not inferred from "no restart" — established:
+
+- `run_execution` is **imported in-process** by `scripts/run_live_odds_refresh_worker.py:2541` and `pipeline/intelligence_state.py:7700`. There is **no subprocess spawn of `execute_portfolio` anywhere** in `scripts/`, `pipeline/` or `syndicate/`, and no such child exists in the running set.
+- live-odds-worker pid `3327060` booted **2026-10-21T08:48:13Z**. The duplicate orders that commit fixes were placed at **13:38:41Z / 13:38:50Z** — 4h50m into THIS process's life — so this process has `pipeline.execute_portfolio` in `sys.modules` already, and a cached module is not re-read from disk.
+- `/home/amyn/syndicate-prod/logs/live-odds-worker.log`: `KXNBASPREAD-26OCT21DALHOU-HOU10` appears **31×**, `REFUSED_HELD_VENUE_CONTRACT` **0×**.
+- `SYNDICATE_EXECUTION_VENUE_CONTRACT_DEDUPE` is **ABSENT** on that process, and `venue_contract_dedupe_enabled()` treats absent as **ON** — so the flag is not what is holding it back. Only the stale module is.
+
+**Therefore: the duplicate-live-order bug measured today is still reachable until the live-odds-worker restarts.** A restart is a separate action under its own rule (claim + idle-after-save + its own `deploys.md` entry) and was NOT part of the instruction, so it was not done. Raised to the user with that reasoning.
+
+Same applies, with far lower stakes, to my own `live_lens` postponed-bucket fix: on disk, not in the running web/worker. It only differs when a postponed game is on the slate.
