@@ -52846,3 +52846,27 @@ have stopped the reload, and it did not because nothing was gating on it.
 - **Undo:** `SYNDICATE_NBA_SIM_ANCHOR_REFRESH=off` (or `shadow`) in `local_production.env`, plus a role restart:
   the env file is read at supervisor start only. Or `git revert 6e406101` and ff, with no restart.
 - **Claims:** released after this entry.
+
+## 2026-10-21 21:35Z (4:35 PM CT) -- READING: the NBA SmartSim anchor refresh (6e406101) on the first refresh after the ff -- **MET** (lane `nba-sim-anchor-staleness`, todo #721)
+- **Run.** The 10-21 NBA props refresh, timestamps 21:26:15Z..21:34:23Z, is the first after the 20:48:05Z ff.
+  - It logged `SMART_SIM_ANCHOR_REFRESH league=nba date=2026-10-21 mode=on games=11 snapshot_ts=2026-10-21T21:25:59Z reason=ok`.
+- **10 `SMART_SIM_REUSE_ANCHOR_DRIFT ... -> re-simulate`**, have -> want:
+  - BKN_CHA: spread -1.5 -> +1.5 (the favourite flipped).
+  - LAL_GSW: total 230.5 -> 233.5.
+  - MIA_MIN: total 243.0 -> 240.5.
+  - LAC_SAC: 228.5/-4.5 -> 226.5/-5.5.
+  - NOP_IND: total 240.5 -> 238.5.
+  - POR_PHX: 233.0/-4.0 -> 231.5/-2.5.
+  - HOU_DAL, MEM_UTA, TOR_CHI, WAS_MIL: 1.0 pt each.
+  - The 11th, ORL_ATL, was rebuilt on exclusion drift. It took the fresh line too (234.5 -> 233.5).
+- **Sims.**
+  - 11 of 11 `smart_sim_2026-10-21_*.json` carry `market_anchor.market_line_source = props_snapshot_consensus`,
+    with `market_line_as_of` 21:25:59Z.
+  - `market_total` / `market_spread` equal the drift lines' `want` values.
+  - They were written 21:27:06Z..21:31:07Z. The first tip is WAS_MIL at 23:00Z, so every one was written before its
+    tip. 20-29 players each.
+- **Errors.** 0 Traceback / Error lines after the run's start, and no `smart_sim_failures_2026-10-21*`.
+- **Still owed:**
+  - the regular-season accuracy reading at ~100 graded games:
+    `scripts/nba_anchor_staleness.py --stale-from game_odds`, served margin and total MAE, stale vs close;
+  - the tip freeze's own 10-21 reading belongs to freeze-nba-pregame-sims.
