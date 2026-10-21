@@ -3717,3 +3717,41 @@ gap is exactly 0.804 − 0.103.
 - `solver_bonus_trip_share=0.01615`, `solver_endgame_pts_per_team=0.804`.
 
 **Risk for the full FIT:** foul-outs sit at the top of the band (the FIT gate is 0.193 ± 0.04).
+
+### ROUND-2 CONFIG — FULL FIT RESULT 2026-10-21 01:16Z (fit_r2, 109/109 dates, 791 paired games, 160,400 draws, 0 errors): FAILS on FTA and foul-outs; NOTHING enabled
+
+Graded against fit_f5, by the same gates.
+
+| reading | real FIT | fit_f5 | **fit_r2** | gate |
+|---|---|---|---|---|
+| total bias, per game | 0 | +0.12 | **−0.08** (CI [−1.31, +1.30]; paired vs f5 −0.20, SE 0.08) | < 0.5 ✓ |
+| foul-outs/game | 0.1934 | 0.2092 | **0.2336** | ± 0.04 → upper 0.2334 ✗ (by 0.0002) |
+| FTA/team, non-OT games (765) | 23.137 | 22.873 (−0.26) | **22.733 (−0.40)** | ± 0.3 ✗ |
+| FTA/team, all (S6) | 23.35 | 22.94 | 22.83 | |
+| quarter shares P1–P4 (S2) | .2546 / .2505 / .2538 / .2411 | 3 of 4 outside CI | **.2552 / .2503 / .2527 / .2417, all inside** | ✓ |
+| H1 share (S4) | .5050 | .5006 (outside) | **.5055** (inside) | |
+| pace proxy (S1) | 114.0 | 112.8 (−1.20) | 113.5 (−0.52) | |
+| S8 total / margin SD | 18.29 / 14.00 | 18.30 / 14.70 | 18.05 / 14.60 | |
+| 2P% / 3P% | .5463 / .3588 | .5525 / .3758 | **.5474 / .3632** | |
+| 3PA / 3PM | 37.00 / 13.27 | 36.22 / 13.61 | 37.27 / 13.54 | |
+| FGA | 89.29 | 88.17 | 89.09 | |
+| REB | 43.98 | 42.44 | 43.67 | |
+| AST | 26.66 | 24.54 | 24.31 (#5b open) | |
+| team PF | — | 19.66 | 19.92 | |
+| P(6th \| 5th), closers-on | .212 / .455 | .220 / .395 | .224 / .391 | |
+
+**Cause of the FTA fail (a calibration-target error, mine):** the step-4 / 4b FTA target "22.69" was the 12 SWEEP
+DATES' real FTA (n 162 team-games, findings ~:1503). It was carried forward mislabelled as a FIT target. The FIT
+real is 23.14 (non-OT) / 23.29 (all 816). Step 4b tuned non-shooting volume onto the subsample, so the FIT reads
+−0.40.
+
+**Foul-outs** sit +0.0002 over the band. That is far inside the real figure's own uncertainty (CI [.162, .226]),
+but the gate is pre-registered and co-signed, and it fails.
+
+**What round 2 fixed:** the quarter / H1 shares (all inside the CI), 3P% (−1.26 pts), 2P%, 3PA, FGA, REB, pace, and
+total bias held.
+
+**Next (to be pre-registered, not started):** raise FTA by +0.4 per team toward the FIT real WITHOUT raising
+foul-outs, i.e. through the bonus non-shooting rate (FT trips that go to the fouled team, PF spread over the
+lineup) rather than shooting fouls. The target is the FIT-wide real, measured on the 12 dates by the paired shift.
+Then the full FIT again.
