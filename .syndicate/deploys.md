@@ -52870,3 +52870,22 @@ have stopped the reload, and it did not because nothing was gating on it.
   - the regular-season accuracy reading at ~100 graded games:
     `scripts/nba_anchor_staleness.py --stale-from game_odds`, served margin and total MAE, stale vs close;
   - the tip freeze's own 10-21 reading belongs to freeze-nba-pregame-sims.
+
+## 2026-10-21T21:40Z (16:40 CDT) — READING: lane `published-negative-ev`'s armed 15:00Z `staked_probability_version` split — **NULL, structural, GOAL NOT MET** — session `4ab694ed`
+
+`[no deploy; this is the armed reading, taken 6h35m late]`
+
+- **preconditions discharged before reading.** `SYNDICATE_MIN_EV_TUNER` **ABSENT** on both workers, so the tuner is inert and no tuned-cell split was owed (the apply wiring HAD landed, `802bed61`, recorded inert — checked, not assumed). Lateness: due 15:00Z, taken ~21:35Z; irrelevant here because the blocker is structural, not a window. A retrospective split gains rows by waiting.
+- **what the split returned.** Version map **286 position keys** (main plan 158 + `novig` 50 + `prophetx` 44 + `kalshi` 30 + `polymarket` 4). Ledger **3,000 orders** — 2,342 paper / 658 live — with **958 settled** (535 lost / 422 won / 1 push), **576 of them live**. **Joined: 143 orders, all paper, 0 settled.**
+
+  | era | version | mode | n | stake $ | settled |
+  |---|---|---|---|---|---|
+  | post-#704 | `market_fair@unfitted` | paper | 27 | 66.63 | **0** |
+  | post-#704 | `unfitted` | paper | 18 | 227.60 | **0** |
+  | pre-#704 | `unfitted` | paper | 98 | 1161.54 | **0** |
+
+- **unjoinable, which IS the result.** All **658 live** orders: **552 carry no `position_key` at all**, 106 carry keys present in no readable plan. Plus 2,199 paper.
+- **verify — the READING that establishes the cause:** `staked_probability_version` is written in exactly ONE module (`portfolio_commit.py`, 5 sites) and appears **0 times** in `paper_settlement.py`, `evaluation_settlement.py`, `execution_ledger.py` and `ledger_bridge.py`. It is stamped on a plan POSITION and never travels to the order, so at settlement — the only place an ROI exists — the sizing basis is unrecoverable. The field's own comment at `portfolio_commit.py:1456` says it exists so model-edge and market-fair positions do not "land in one settlement pool"; it delivers that in the plan and loses it at settlement.
+- **MY OWN FIRST PASS WAS WRONG and is recorded as such.** It read only the MAIN plan and joined **zero** live orders; live execution reads the per-venue plan (`execute_portfolio.py:612`). It also keyed "settled" off a field that is null on most orders. Both were corrected before any verdict — the first pass would have reported the same null for the wrong reason, which is the dangerous version of a right answer.
+- **NOT reported as a result:** mean plan `ev_pct` 3.372 (post, `market_fair@unfitted`) vs 3.277 (post, `unfitted`) vs 2.219 (pre). That is PREDICTED EV — the exact number this lane was opened to explain — and presenting it as a forward-ROI improvement would reproduce the lane's own subject error.
+- **owed:** todo **#718** (stamp the version on the order, or guarantee `position_key` on every live order). Until then this reading and the lane's second owed reading are **unavailable, not underpowered**. Detail: `.syndicate/findings_2026-10-21_staked_probability_version_reading.md`.
