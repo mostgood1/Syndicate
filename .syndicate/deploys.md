@@ -52669,3 +52669,9 @@ have stopped the reload, and it did not because nothing was gating on it.
   included (15:50Z, 16:22Z). The reading is 0 "Cannot save file into a non-existent directory" across >= 3 NBA export-game-cards runs that
   START after 16:51:22Z (runs land in per-slate files props_2026-10-2{1,2,3}.log). Pre-fix today: 9 runs, 1 OSError (12:41:36Z -- its
   output carries no `Z`-stamped lines, i.e. a different launcher, consistent with the cause). No post-fix run yet at 17:37Z; reading owed.
+
+## 2026-10-21 17:42Z (12:42 PM CT) -- READING, NO RELOAD NEEDED: the NBA rosters export pattern (085fe1e8) is ALREADY served by web -- **MET** (lane `nba-current-rosters`, session 8e69dd3f)
+- **ask:** user "do the web reload for the export pattern". Measured first; the reload turned out redundant, so it was NOT run (no claim taken).
+- **predicate:** pre-fix allowlist (965a198f) `is_exportable('nba_source/data/processed/rosters_2026-27.csv')` = False; current = True, via the export-only line only (not hot). Control: player_logs.csv True before and after (it is HOT), so it is not a negative control.
+- **provenance:** web master 3433673 started 11:05:58 CT, workers 3452307 (12:06:38 CT) and 3464991 (12:30:58 CT) -- every web process imported code after the 07:43 CT ff to 085fe1e8 (the 11:25 CT memory bounce by ci-suite-four-stale-1021 and the worker recycle loaded it).
+- **reading:** `GET /api/ops/artifacts/export?path=nba_source/data/processed/rosters_2026-27.csv` -> **200, 111,235 bytes** (file 108,984 B in the JSON envelope), 17:42Z. Token read via `_base_url.admin_token`, never printed.
