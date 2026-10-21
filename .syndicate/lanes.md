@@ -1679,6 +1679,14 @@ death, never life — do not invert it.
 - Verification: Unit: props step for UEFA carries --max-hours-ahead 24 and the fetcher skips events outside the window (reachability: off != on); branding step fires only when the file is >7d old; market board for a no-model league returns games from the schedule with odds rows and no sim rows. Fleet: a UEFA props/<date>.csv written by the pregame run containing only <=24h matches; /soccer/ucl/market-board serves games with odds rows.
 - Blocked by: none
 
+### order-sizing-provenance — OPEN — opened 2026-10-21 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- Goal: todo #722: a recorded order carries the sizing provenance it was staked on - staked_probability_version and sizing basis travel from the plan position onto the OrderRequest and onto the persisted order - so that a settled outcome can be split by sizing basis without a join, verified by an off-vs-on test that the NESTED read is reachable and that a position without a sizing block records absent rather than a default.
+- Files: syndicate/features/shared/execution_ledger.py (the OrderRequest sizing-provenance fields plus their _LEAN_FIELDS entries and record-builder lines only), pipeline/execute_portfolio.py (the sizing-provenance arguments at the _order_from_position OrderRequest construction only), tests/test_order_sizing_provenance.py (NEW), .syndicate/findings_2026-10-21_order_sizing_provenance.md (NEW)
+- Hypothesis: The fields already exist on the plan position at commit time and are dropped at the OrderRequest boundary - the same failure the file documents for model_edge_pct and sim_view - so carrying them is four hops with no new computation. Byte cost measured 1341 B/order now plus 80 for both at a _MAX_RECORDS cap of 3000 = 4.02 to 4.26 MB against the 8 MB refusal ceiling.
+- Falsification test: Fails if the position does not carry sizing.staked_probability_version where the OrderRequest is built for a LIVE order - then the fix is position_key coverage instead. DID NOT FIRE: verified across the kalshi novig and prophetx venue plans 2026-10-21 with every position carrying both.
+- Verification: Unit: the nested read is reachable (off != on); absent sizing records None not a default; both fields are in _LEAN_FIELDS so a trim cannot drop them; the fields are NOT in idempotency_key. Production: FORWARD ONLY - the first live order placed after this deploys carries staked_probability_version in the served ledger row.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
