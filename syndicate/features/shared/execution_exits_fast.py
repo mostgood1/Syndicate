@@ -19,8 +19,11 @@ WHAT IT NEVER DOES. It imports no order, credential or cancel code: there is no
 only READS that document, to net out positions a live exit already sold. Going
 live is a separate change and a separate user decision.
 
-OFF BY DEFAULT. `SYNDICATE_EXIT_FAST_LOOP=paper` turns it on; absent or anything
-else is off. A typo cannot reach a mode that does not exist.
+PAPER BY DEFAULT (user decision 2026-10-21, "Default to paper"): absent means
+paper, because the supervisor derives a role's env once at `up` and a
+role-only restart could not load a new key. `off` / `0` / `false` / `no` /
+`disabled` turn it off. There is NO live value: any other text is paper, and
+paper has no order path to reach.
 
 Document: `reports/intelligence/execution_exits_fast.json`
   marks:  per entry -- samples, first/last mark, high-water net edge, last bid
@@ -58,10 +61,13 @@ _DEFAULT_POSITIONS_SECONDS = 60.0
 _DEFAULT_PERSIST_SECONDS = 60.0
 
 
+_OFF_VALUES = frozenset({"off", "0", "false", "no", "disabled"})
+
+
 def fast_loop_mode() -> str:
-    """`paper` only when explicitly set; everything else is `off`."""
+    """`off` only when explicitly turned off; otherwise `paper`. Never `live`."""
     raw = str(os.environ.get("SYNDICATE_EXIT_FAST_LOOP") or "").strip().lower()
-    return FAST_PAPER if raw == FAST_PAPER else "off"
+    return "off" if raw in _OFF_VALUES else FAST_PAPER
 
 
 def fast_loop_seconds() -> float:

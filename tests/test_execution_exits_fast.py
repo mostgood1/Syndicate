@@ -99,21 +99,25 @@ def _loop(orders, quotes, *, exits_state=None, persisted=None):
     return loop, clock
 
 
-def test_off_unless_exactly_paper(monkeypatch):
-    assert fx.fast_loop_mode() == "off"
-    for raw in ("live", "on", "1", "Paper "):
+def test_paper_by_default_off_only_when_turned_off_never_live(monkeypatch):
+    assert fx.fast_loop_mode() == "paper"  # absent = paper (user decision 2026-10-21)
+    for raw in ("off", "0", "false", "No", " disabled "):
         monkeypatch.setenv("SYNDICATE_EXIT_FAST_LOOP", raw)
-        assert fx.fast_loop_mode() == ("paper" if raw.strip().lower() == "paper" else "off")
+        assert fx.fast_loop_mode() == "off"
+    for raw in ("live", "on", "1", "paper", "LIVE"):
+        monkeypatch.setenv("SYNDICATE_EXIT_FAST_LOOP", raw)
+        assert fx.fast_loop_mode() == "paper"  # there is no live value
 
 
 def test_reachability_off_books_nothing_on_books_the_trigger(monkeypatch):
     """off != on: the same orders and quotes, a trigger only with the flag."""
     persisted: list = []
+    monkeypatch.setenv("SYNDICATE_EXIT_FAST_LOOP", "off")
     loop, _ = _loop([_order()], _quotes(), persisted=persisted)
     assert loop.step(now=IN_PLAY) == {"status": "off"}
     assert persisted == []
 
-    monkeypatch.setenv("SYNDICATE_EXIT_FAST_LOOP", "paper")
+    monkeypatch.delenv("SYNDICATE_EXIT_FAST_LOOP")
     loop, _ = _loop([_order()], _quotes(), persisted=persisted)
     out = loop.step(now=IN_PLAY)
     assert out["status"] == "ok" and out["new_exits"] == 1
@@ -195,6 +199,7 @@ def test_worker_starts_the_thread_only_when_paper(monkeypatch):
     import threading
 
     worker = importlib.import_module("scripts.run_live_odds_refresh_worker")
+    monkeypatch.setenv("SYNDICATE_EXIT_FAST_LOOP", "off")
     assert worker.start_fast_exit_loop() is False
 
     stepped = threading.Event()
@@ -209,7 +214,7 @@ def test_worker_starts_the_thread_only_when_paper(monkeypatch):
             return {"status": "ok"}
 
     monkeypatch.setattr(fx, "FastExitLoop", _Stub)
-    monkeypatch.setenv("SYNDICATE_EXIT_FAST_LOOP", "paper")
+    monkeypatch.delenv("SYNDICATE_EXIT_FAST_LOOP")  # absent = paper
     monkeypatch.setattr(worker, "_FAST_EXIT_THREAD", None)
     try:
         assert worker.start_fast_exit_loop() is True

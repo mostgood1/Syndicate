@@ -3255,8 +3255,9 @@ def start_inplay_capture_loop() -> bool:
 # in-play Kalshi position every SYNDICATE_EXIT_FAST_LOOP_SECONDS (default 15)
 # with the slow tick's own rule, and books first triggers as FAST paper exits
 # in its own document (execution_exits_fast.json). It cannot sell:
-# `execution_exits_fast` has no order path. OFF unless
-# SYNDICATE_EXIT_FAST_LOOP=paper. Its own thread, so it never delays placement.
+# `execution_exits_fast` has no order path. PAPER BY DEFAULT (user decision
+# 2026-10-21); SYNDICATE_EXIT_FAST_LOOP=off turns it off. Its own thread, so it
+# never delays placement.
 # ---------------------------------------------------------------------------
 _FAST_EXIT_STOP = threading.Event()
 _FAST_EXIT_THREAD = None
@@ -3278,13 +3279,13 @@ def _fast_exit_background_loop() -> None:
 
 
 def start_fast_exit_loop() -> bool:
-    """Start the fast exit thread when SYNDICATE_EXIT_FAST_LOOP=paper. Returns whether it started."""
+    """Start the fast exit thread unless SYNDICATE_EXIT_FAST_LOOP turns it off. Returns whether it started."""
     global _FAST_EXIT_THREAD
 
     from syndicate.features.shared.execution_exits_fast import FAST_PAPER, fast_loop_mode
 
     if fast_loop_mode() != FAST_PAPER:
-        print("[execution_exits_fast] OFF (SYNDICATE_EXIT_FAST_LOOP != paper)", flush=True)
+        print("[execution_exits_fast] OFF (SYNDICATE_EXIT_FAST_LOOP=off)", flush=True)
         return False
     if _FAST_EXIT_THREAD is not None and _FAST_EXIT_THREAD.is_alive():
         return False

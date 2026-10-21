@@ -7,8 +7,8 @@ SYNDICATE_REFRESH_STATE_BACKEND) to read the execution ledger and the slow
 tick's exit document, and nothing else: no credential is read, and the module
 it runs has no order path (`tests/test_execution_exits_fast.py` parses it).
 
-    SYNDICATE_EXIT_FAST_LOOP=paper python scripts/run_fast_exit_loop.py --until 2026-10-21T07:00:00Z
-    SYNDICATE_EXIT_FAST_LOOP=paper python scripts/run_fast_exit_loop.py --once
+    python scripts/run_fast_exit_loop.py --until 2026-10-21T07:00:00Z
+    python scripts/run_fast_exit_loop.py --once
 
 Exits by itself at --until (no persistence beyond the run).
 """
@@ -43,7 +43,7 @@ def main() -> int:
     from syndicate.features.shared.timezone import central_today_iso
 
     if fast_loop_mode() != "paper":
-        print("[execution_exits_fast] OFF: set SYNDICATE_EXIT_FAST_LOOP=paper", flush=True)
+        print("[execution_exits_fast] OFF: SYNDICATE_EXIT_FAST_LOOP turns it off", flush=True)
         return 2
     loop = FastExitLoop(today_fn=central_today_iso)
     if a.once:
