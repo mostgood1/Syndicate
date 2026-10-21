@@ -53,10 +53,33 @@ all passing).
 
 ## 3. Results
 
-**RUNNING since 2026-10-19 22:47:57Z** at Idle priority. Outputs: `C:/tmp/team-strength/v2sim/{v1,v2}.jsonl`
-(append + resume, so a killed run restarts where it stopped) and `.summary.json`. Measured throughput on the shared
-machine is about 1.2 (v1) and 0.6 (v2) matches a minute, so the expected finish is 1-2 days. **By user decision
-2026-10-19, the full registered population runs; V2 stays OFF until it finishes.**
+**RESULT: HOLD. V2 does NOT ship.** Both arms finished on 2026-10-21 (v1 at 04:56:46Z, v2 at 07:16:50Z). They
+scored the SAME 2,405 matches (identical key sets), every one with a close. Output: `C:/tmp/team-strength/v2sim/ab_report.json`.
+
+| | v1 (shipped) | v2 | Δ v2 − v1 [95% CI] |
+|---|---|---|---|
+| 1X2 log loss | 0.9969 | 1.0004 | **+0.0035 [−0.0011, +0.0077]** |
+| Brier | | | +0.0018 [−0.0008, +0.0044] |
+| vs the close (0.9720) | +0.0249 | +0.0284 | |
+| spread sd p(H) − p(A) | **0.349** | 0.335 | close 0.334 |
+| F1 top decile by close (actual 0.793, close 0.766) | 0.746 | 0.736 | |
+| F2 own top decile: predicted / actual | **0.783 / 0.749** | 0.772 / 0.744 | |
+
+- **The ship rule (point estimate < 0) fails: +0.0035.** V2 is worse in 7 of 8 leagues. Only the EPL comes out
+  below 0 (−0.0028), and every per-league CI spans 0. The worst is Primeira at +0.0106.
+- **The engine read is the important part. The served sim does not have the research link's favourite problem.**
+  - It is as dispersed as the close (0.349 vs 0.334), where the link was well short of it (0.323 vs 0.364).
+  - It is OVER-confident on its own top decile (0.783 vs 0.749), where the link was under-confident (0.777 vs
+    0.800).
+  - V2 widened the LINK, but it NARROWED the sim. Through the engine's possession mechanics, recency, blend and
+    shrinkage pull the strong clubs in.
+  - **So the stage-1/3 premise, "the ratings are under-dispersed, so favourites are underrated", is a fact about
+    the research link, not about the served sim.** The sim's +0.025 gap to the close is not a dispersion
+    shortfall. On F1 the sim is still 0.047 below actual, but that selection is the close's information (F2 shows
+    the sim over-predicting its own favourites).
+- **Caveat on the population:** these are 2025-26 matches rated from the primary tree's mirror, which holds 2
+  seasons per league (`teams_2024`, `teams_2025`) where the fleet's disk holds 3-4. The same depth applies to
+  both arms, so the contrast is fair, but the v1 level here is not the fleet's exact level.
 
 To resume after a kill: re-run each arm's command below. `--append-dump` skips the matches already written.
 

@@ -681,7 +681,7 @@ once this index exists: re-splitting would orphan the parts.
 | [order-model-attribution] | AN ORDER RECORDS THE SIM'S VERDICT — DEPLOYED AND VERIFIED ON PRODUCTION; THE COMMIT GATE MAKES FOUR OF THE NI | `state_portfolio.md` |
 | [min-ev-tuner-shadow] | THE MIN_EV CUT IS TUNED PER CELL IN SHADOW -- RUNNING ON THE FLEET, ZERO MOVES, NOTHING APPLIED `[verified on  | `state_portfolio.md` |
 | [live-plan-empty-funnel] | THE LIVE PLAN IS EMPTY BECAUSE THE VENUE'S OWN PRICE IS <= 0 EV AFTER THE TAKER FEE -- NOT A CAP, NOT A CHOSEN | `state_portfolio.md` |
-| [soccer-team-strength] | SOCCER TEAM RATINGS: RATING V2 IS ON MAIN AND OFF PENDING A REAL-SIM A/B; THE FAVOURITE GAP IS MOSTLY INFORMAT | `state_soccer.md` |
+| [soccer-team-strength] | SOCCER TEAM RATINGS: RATING V2 FAILED THE REAL-SIM A/B AND IS HELD (OFF ON MAIN); THE SERVED SIM IS NOT UNDER- | `state_soccer.md` |
 | [soccer-uefa-competitions] | UEFA CLUB COMPETITIONS (UCL / UEL / UECL): REGISTERED FOR FIXTURES, GAME ODDS, LIVE SCOREBOARD AND VENUE JOINS | `state_soccer.md` |
 | [soccer-roster-only-players] | SOCCER SIM SQUADS: ADDING ROSTER-ONLY PLAYERS (TEAM TOTALS FIXED) FAILED ITS PRE-REGISTERED TEST, AND THE ESPN | `state_soccer.md` |
 | [soccer-projection-unit-dates] | SOCCER PREGAME PROJECTIONS: MLS UNITS WERE KEYED ON THE UTC DATE, SO EVENING KICKOFFS GOT EMPTY FILES; EPL/SER | `state_soccer.md` |

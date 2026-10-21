@@ -5,7 +5,7 @@ The INDEX of every subject, across every part, is in `state.md`; the
 one-subject-one-section rule is global and spans these files.
 Same rules as state.md: when a fact changes, EDIT THE LINE.
 
-## [soccer-team-strength] SOCCER TEAM RATINGS: RATING V2 IS ON MAIN AND OFF PENDING A REAL-SIM A/B; THE FAVOURITE GAP IS MOSTLY INFORMATION, NOT A FIXABLE SHAPE `[verified 2026-10-19/20, lane soccer-team-strength, main 73ba5d79, NO DEPLOY]`
+## [soccer-team-strength] SOCCER TEAM RATINGS: RATING V2 FAILED THE REAL-SIM A/B AND IS HELD (OFF ON MAIN); THE SERVED SIM IS NOT UNDER-DISPERSED `[verified 2026-10-21, lane soccer-team-strength, main 73ba5d79, NO DEPLOY]`
 
 - **RATING V2 = recency (half-life 40 rows) + current-season blend (c 40) + shrinkage n/(n+5) toward 0, or toward a
   per-league FITTED promoted-club prior** (`loaders.RatingV2`, `build_soccer_artifacts._rating_v2`,
@@ -16,8 +16,11 @@ Same rules as state.md: when a fact changes, EDIT THE LINE.
   and 9 hermetic tests pass (`tests/test_soccer_rating_v2.py`).
 - **Evidence for V2 (linear Poisson link, not the sim):** −0.0019 [−0.0031, −0.0009] 1X2 log loss on 27,285
   held-out domestic matches; gap to the de-vigged close +0.0221 → +0.0202 (9% closed)
-  (`findings_2026-10-16_soccer_rating_inputs.md`). **The real-sim A/B is RUNNING**
-  (`findings_2026-10-19_soccer_rating_v2_sim.md`, outputs `C:/tmp/team-strength/v2sim`).
+  (`findings_2026-10-16_soccer_rating_inputs.md`). **Through the REAL SIM it is WORSE: +0.0035 [−0.0011, +0.0077]
+  on 2,405 2025-26 matches, worse in 7 of 8 leagues. HELD by the registered rule** (`findings_2026-10-19_soccer_rating_v2_sim.md`).
+- **The served sim's 1X2 is as dispersed as the close (sd 0.349 vs 0.334) and OVER-confident on its own top decile
+  (0.783 vs 0.749 actual).** V2 narrows it (0.335). The research link's "under-dispersed, favourites underrated"
+  reading does not describe the served sim.
 - **Maps fit on the research link do NOT port to the served sim** (measured):
   - **Draws:** the link wants FEWER draws in mismatches (δ1 −0.36..−0.41), but the sim already under-predicts
     them (0.199 vs 0.225 actual, top tercile). Refit on the sim it is NOT DEMONSTRATED (−0.0005 [−0.0015,

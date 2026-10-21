@@ -2679,3 +2679,20 @@ so `vendor/` is absent too, and `tests/test_wnba_prop_dispersion.py`, `tests/tes
 - **Rule:** before making a trading loop faster, replay it at both cadences against settlement. Latency only pays when the rule is right. A fixed-margin exit on an efficient price is a fee, and running it faster just pays the fee sooner.
 - **Second rule:** the sportsbook consensus is not an in-play fair against Kalshi. Kalshi moves first (corr +0.44 at +2 polls). A book "edge" is usually the book's lag, often a score Kalshi priced 30-40 s before ESPN showed it. Measure an in-play fair against Kalshi's own LATER mid (markout), never against the books.
 - Also: Windows `SetPriorityClass` through ctypes without `argtypes`/`restype` truncates the 64-bit pseudo-handle and fails SILENTLY. Every "Idle" recorder ran at Normal until a peer saw it in Task Manager. Check the return value.
+
+## 2026-10-21 -- CORRECTION to the 2026-10-20 entry above: rating INPUTS did NOT transfer either. Gate EVERY engine change on the real sim, inputs included `[lane soccer-team-strength, session e44b3e73]`
+
+The 2026-10-20 entry said: "Rating INPUTS transfer, because the sim reads them with a measured linear gain (R² 0.87). Output maps do not." **The first half is wrong.**
+
+**Measured:**
+- RATING V2 beat the shipped rating on the research link: −0.0019, CI below 0, 27,285 matches.
+- Through the real SoccerSim it was WORSE: +0.0035 [−0.0011, +0.0077], 2,405 matches, 7 of 8 leagues.
+- V2 widened the link's spread (0.323 → 0.327) but NARROWED the sim's (0.349 → 0.335).
+- The sim was never under-dispersed: it matched the close's spread (0.334) and was over-confident on its own top decile.
+
+**Why:** a linear gain on the goal-mean RATIO (R² 0.87) is not the same thing as the sim's 1X2 dispersion, which also comes from the possession mechanics. A change that helps a model that is under-dispersed hurts one that is not.
+
+**How to apply:**
+- The do-no-harm A/B through the real engine is the gate for EVERY engine change, inputs included, not only post-hoc maps.
+- Read the engine's OWN dispersion and calibration (spread vs the close, own-decile calibration) BEFORE adopting a diagnosis made on a proxy.
+- Here that one read would have shown the favourite-underrating premise did not apply to the served sim.
