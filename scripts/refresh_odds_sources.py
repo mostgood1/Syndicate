@@ -1522,6 +1522,9 @@ def _soccer_artifact_scope_args(league: str, fallback_date: str, *, pinned_date:
 #     belgian_pro_league                        -> --kind matches
 #   epl/la_liga/bundesliga/serie_a/ligue_1  <league>/team_history/teams_*.csv
 #                                             -> --kind teams (Understat-only)
+#: UEFA props window (hours before kickoff). Books post soccer props in the last day or so.
+_SOCCER_UEFA_PROPS_HORIZON_HOURS = 24
+
 _SOCCER_GOALS_BASED_RATING_LEAGUES = {"eredivisie", "primeira_liga", "championship", "belgian_pro_league"}
 _SOCCER_HISTORY_SEASON_DEPTH = {"matches": 3, "teams": 2}
 
@@ -1837,6 +1840,56 @@ def _soccer_players_step(league: str, soccer_root: Path, python_exe: str) -> Ref
 _SOCCER_ROSTER_REFRESH_ENV = "SYNDICATE_SOCCER_ROSTER_REFRESH"
 #: Refetch a league's ESPN roster once it is older than this.
 _SOCCER_ROSTER_REFRESH_DAYS = 7.0
+
+
+#: How stale a UEFA competition's branding file may be before it is refetched. The field changes only at the
+#: draw and at each knockout round, so weekly is enough; the fetch is ONE ESPN `/teams` call.
+_SOCCER_UEFA_BRANDING_REFRESH_DAYS = 7.0
+
+
+def _soccer_uefa_branding_step(league: str, soccer_root: Path, python_exe: str) -> RefreshStep | None:
+    """Refetch a UEFA competition's team branding once it goes stale (lane soccer-uefa-followups).
+
+    WHY ONLY UEFA. The UEFA branding feeds `team_aliases._soccer_alias_to_name` (club NAMES only), which is
+    what lets Kalshi/OddsAPI UEFA club spellings resolve, and a competition's field changes at the
+    knockouts. Domestic branding has never had a producer and is not touched here.
+
+    Gated on MTIME like `_soccer_rosters_step`: fresh is a no-op, absent or stale refetches. `--out-root`
+    is explicit for the same reason the roster step's is: env-based resolution can land in the repo tree.
+    """
+    if soccer_league_has_sim(league):
+        return None
+    target = (soccer_root / league / "source_artifacts" / "data" / "processed" / "team_branding"
+              / f"{league}_team_branding.csv")
+    try:
+        age_days = (time.time() - target.stat().st_mtime) / 86400.0
+    except FileNotFoundError:
+        age_days = None
+    except Exception:
+        return None  # unreadable is not stale
+    if age_days is not None and age_days < _SOCCER_UEFA_BRANDING_REFRESH_DAYS:
+        return None
+    print(
+        f"SOCCER_UEFA_BRANDING_STALE league={league} file={target} "
+        f"age_days={'absent' if age_days is None else round(age_days, 1)}",
+        file=sys.stderr,
+        flush=True,
+    )
+    return RefreshStep(
+        name=f"soccer_{league}_branding",
+        phases=("pregame",),
+        modes=("full",),
+        cwd=REPO_ROOT,
+        command=(
+            python_exe,
+            "scripts/build_team_branding_snapshot.py",
+            "--sport",
+            league,
+            "--out-root",
+            str(soccer_root),
+        ),
+        description=f"Refresh {league}'s ESPN team branding (UEFA club names for the Kalshi/OddsAPI joins).",
+    )
 
 
 def _soccer_rosters_step(league: str, soccer_root: Path, python_exe: str) -> RefreshStep | None:
@@ -2209,6 +2262,10 @@ def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
         rosters_step = _soccer_rosters_step(league, soccer_root, python_exe)
         if rosters_step is not None:
             steps.append(rosters_step)
+    for league in league_slugs:
+        branding_step = _soccer_uefa_branding_step(league, soccer_root, python_exe)
+        if branding_step is not None:
+            steps.append(branding_step)
     full_rebuild_leagues = _soccer_schedule_full_rebuild_leagues(league_slugs, soccer_root)
     for league in league_slugs:
         steps.append(
@@ -2277,7 +2334,11 @@ def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
                 description=f"Capture {league} game-level odds (h2h/totals/spreads) from The Odds API.",
             )
         )
-    for league in sim_league_slugs:
+    for league in league_slugs:
+        # UEFA competitions (no model) take props ONLY near kickoff (lane soccer-uefa-followups, user
+        # 2026-10-21): far-out UEFA events return almost nothing and every listed event costs a call on
+        # every run. Domestic leagues are unchanged.
+        horizon = () if soccer_league_has_sim(league) else ("--max-hours-ahead", str(_SOCCER_UEFA_PROPS_HORIZON_HOURS))
         steps.append(
             RefreshStep(
                 name=f"soccer_{league}_props",
@@ -2288,6 +2349,7 @@ def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
                     "scripts/fetch_soccer_oddsapi_props_local.py",
                     "--league",
                     league,
+                    *horizon,
                     "--out",
                     str(soccer_root / league / "props" / f"{args.date}.csv"),
                 ),

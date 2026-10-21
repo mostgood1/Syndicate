@@ -71,10 +71,11 @@ def _steps(leagues: str):
 
 def test_uefa_gets_only_the_model_free_steps():
     names = _steps("ucl,epl")
-    for suffix in ("schedule", "odds", "live_state", "odds_live"):
+    # `props` joined this list 2026-10-21 (lane soccer-uefa-followups): pregame UEFA props within 24h of kickoff.
+    for suffix in ("schedule", "odds", "live_state", "odds_live", "props"):
         assert f"soccer_ucl_{suffix}" in names, suffix
-    for suffix in ("artifacts", "picks", "props", "props_live", "history", "players", "rosters"):
-        assert not any(name.startswith(f"soccer_ucl_{suffix}") for name in names), suffix
+    for suffix in ("artifacts", "picks", "props_live", "history", "players", "rosters"):
+        assert not any(name == f"soccer_ucl_{suffix}" or name.startswith(f"soccer_ucl_{suffix}_") for name in names), suffix
     # Reachability: the same build still gives a domestic league its sim, so the
     # gate is the league, not a broken loop.
     assert "soccer_epl_artifacts" in names

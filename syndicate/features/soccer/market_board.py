@@ -47,7 +47,10 @@ from syndicate.features.soccer.sources import game_odds_rows
 from syndicate.features.soccer.sources import normalize_league
 from syndicate.features.soccer.sources import props_odds_path
 from syndicate.features.soccer.sources import props_odds_rows
+from syndicate.features.soccer.sources import league_has_sim
 from syndicate.features.soccer.sources import recommendations_payload
+from syndicate.features.soccer.sources import schedule_path
+from syndicate.features.soccer.sources import schedule_payload
 from syndicate.features.soccer.sources import roster_rows
 from syndicate.features.soccer.sources import team_by_name
 
@@ -74,12 +77,50 @@ def _soccer_relevant_dates(league: str, selected_date: str) -> list[str]:
     return relevant or [selected_date]
 
 
+def _schedule_week_matches(league: str, selected_date: str) -> list[dict[str, Any]]:
+    """Matches near selected_date from the ESPN SCHEDULE, shaped like a recommendations match minus every sim field.
+
+    For competitions registered with NO MODEL (the UEFA cups, `sources.UEFA_COMPETITIONS`): no recommendations
+    artifact is ever written for them, so the board had no matches and every UCL/UEL/UECL market board was empty.
+    The rest of the build is unchanged -- with no `win_probability` / `total_distribution` / player props on the
+    match, `_soccer_market_board_sim_rows_for_match` returns nothing, and the inventory is odds rows only.
+    Same date window as the sim path (`_WEEK_LOOKBACK_DAYS` .. `_WEEK_LOOKAHEAD_DAYS`).
+    """
+    try:
+        base = date.fromisoformat(selected_date)
+    except ValueError:
+        return []
+    first = (base - timedelta(days=_WEEK_LOOKBACK_DAYS)).isoformat()
+    last = (base + timedelta(days=_WEEK_LOOKAHEAD_DAYS)).isoformat()
+    payload = schedule_payload(league, default_season(league)) or {}
+    out = []
+    for row in payload.get("matches") or []:
+        if not isinstance(row, dict):
+            continue
+        kickoff = str(row.get("date") or "")
+        event_id = str(row.get("event_id") or "").strip()
+        if not event_id or not (first <= kickoff[:10] <= last):
+            continue
+        out.append({
+            "event_id": event_id,
+            "matchup": {"home_team": row.get("home_team"), "away_team": row.get("away_team")},
+            "status_state": row.get("status_state") or "pre",
+            "kickoff": kickoff,
+        })
+    out.sort(key=lambda m: (m["kickoff"], m["event_id"]))
+    return out
+
+
 def _soccer_week_matches(league: str, selected_date: str) -> list[dict[str, Any]]:
     """Every match known across recommendations snapshots near
     selected_date, deduped by event_id. Dates are scanned oldest-to-newest
     so a later (fresher) snapshot's version of a match overwrites an
     earlier one rather than the reverse.
+
+    A competition with no model reads the schedule instead (`_schedule_week_matches`).
     """
+    if not league_has_sim(league):
+        return _schedule_week_matches(league, selected_date)
     matches_by_event: dict[str, dict[str, Any]] = {}
     for date_str in _soccer_relevant_dates(league, selected_date):
         payload = recommendations_payload(league, date_str) or {}
@@ -220,7 +261,7 @@ def _soccer_odds_event_for_match(
     home_names = [pair[0] for pair in events.values()]
     matched_home = match_team_name(home_team, home_names)
     if matched_home is None:
-        return None
+        return _soccer_odds_event_by_canonical(home_team=home_team, away_team=away_team, events=events)
     candidate_event_ids = [event_id for event_id, pair in events.items() if pair[0] == matched_home]
     away_names = [events[event_id][1] for event_id in candidate_event_ids]
     matched_away = match_team_name(away_team, away_names)
@@ -230,6 +271,29 @@ def _soccer_odds_event_for_match(
         if events[event_id][1] == matched_away:
             return event_id, matched_home, matched_away
     return None
+
+
+def _soccer_odds_event_by_canonical(
+    *, home_team: str, away_team: str, events: dict[str, tuple[str, str]]
+) -> tuple[str, str, str] | None:
+    """Fallback when the fuzzy match finds no home club: the repo's club-identity map (`canonical_team`).
+
+    Map-only, no heuristics, and BOTH clubs must resolve, so it can only join the fixture whose two
+    clubs ARE these two clubs. Measured 2026-10-21 (lane soccer-uefa-followups): ESPN "Sporting CP v
+    LASK Linz" against OddsAPI "Sporting Lisbon v LASK" -- the fuzzy match misses it, and the alias map
+    names both pairs. Exactly one event must match, otherwise None.
+    """
+    from syndicate.features.shared.team_aliases import canonical_team
+
+    want = (canonical_team("soccer", home_team), canonical_team("soccer", away_team))
+    if not all(want):
+        return None
+    hits = [
+        (event_id, home, away)
+        for event_id, (home, away) in events.items()
+        if (canonical_team("soccer", home), canonical_team("soccer", away)) == want
+    ]
+    return hits[0] if len(hits) == 1 else None
 
 
 def _soccer_market_board_game_rows_for_match(
@@ -578,6 +642,11 @@ def _soccer_market_board_cache_key(league: str, selected_date: str) -> tuple[Any
         _soccer_path_signature(props_odds_path(league, date_str))
         for date_str in _soccer_relevant_dates(league, selected_date)
     )
+    # A no-model competition's matches come from the schedule, so its file is an input too (a match changing
+    # state must not wait for the odds file to move).
+    schedule_signature = (
+        0 if league_has_sim(league) else _soccer_path_signature(schedule_path(league, default_season(league)))
+    )
     return (
         "soccer_market_board",
         league,
@@ -585,6 +654,7 @@ def _soccer_market_board_cache_key(league: str, selected_date: str) -> tuple[Any
         _soccer_cache_bucket(),
         _soccer_path_signature(game_odds_path(league)),
         props_signature,
+        schedule_signature,
     )
 
 

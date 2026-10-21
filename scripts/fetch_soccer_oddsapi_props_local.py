@@ -194,6 +194,27 @@ def _pick_player_from_outcome(outcome: dict[str, Any]) -> str | None:
     return None
 
 
+def events_within_hours(events: list[dict[str, Any]], hours: float, *, now: "datetime | None" = None) -> list[dict[str, Any]]:
+    """Events whose commence_time is in [now, now + hours]. Unparseable or missing times are DROPPED:
+    the window exists to bound spend, so an event it cannot place is not fetched."""
+    from datetime import datetime, timedelta, timezone
+
+    now = now or datetime.now(timezone.utc)
+    end = now + timedelta(hours=float(hours))
+    kept = []
+    for event in events:
+        raw = str(event.get("commence_time") or "").strip()
+        try:
+            start = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if start.tzinfo is None:
+            continue
+        if now <= start <= end:
+            kept.append(event)
+    return kept
+
+
 def fetch_events(api_key: str, *, sport_key: str, region: str) -> list[dict[str, Any]]:
     url = f"{_get_base_url()}/sports/{sport_key}/events"
     response = requests.get(url, params={"apiKey": api_key, "regions": region}, timeout=20)
@@ -523,6 +544,10 @@ def main() -> int:
     parser.add_argument("--region", type=str, default=os.environ.get("ODDS_API_REGION", "us"))
     parser.add_argument("--markets", type=str, default=None, help="Comma-separated market keys")
     parser.add_argument("--max-events", type=int, default=int(os.environ.get("ODDS_API_MAX_EVENTS", "30")))
+    parser.add_argument(
+        "--max-hours-ahead", type=float, default=None,
+        help="Only fetch events kicking off within this many hours from now (default: no window).",
+    )
     parser.add_argument("--event-ids", type=str, default=None,
                         help="Comma-separated OddsAPI event ids. Player props cost ONE CALL "
                              "PER EVENT, so a 60s live refresh over a whole slate is the "
@@ -596,6 +621,20 @@ def main() -> int:
         if not events:
             print("PROPS_SCOPE_EMPTY: none of the requested event ids are in this "
                   "sport key's current event list -- no per-event calls made", flush=True)
+
+    # NEAR-KICKOFF WINDOW (lane soccer-uefa-followups, user 2026-10-21). Props bill per EVENT on every run, and
+    # books post soccer props in the last day or so: a UCL match two weeks out returned only `btts` (probe
+    # 2026-10-21, 1 credit). The UEFA steps pass `--max-hours-ahead 24`; domestic leagues pass nothing and
+    # are unchanged. An empty window makes NO per-event call and leaves the last file in place -- writing an
+    # empty CSV would erase the earlier capture of a match that has since kicked off.
+    if args.max_hours_ahead is not None and not args.event_ids:
+        before = len(events)
+        events = events_within_hours(events, args.max_hours_ahead)
+        print(f"PROPS_HORIZON kept {len(events)} of {before} events kicking off within "
+              f"{args.max_hours_ahead:g}h", flush=True)
+        if not events:
+            print("PROPS_HORIZON_EMPTY: no event inside the window -- no per-event calls, file unchanged", flush=True)
+            return 0
 
     rows: list[dict[str, Any]] = []
     game_rows: list[dict[str, Any]] = []

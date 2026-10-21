@@ -86,11 +86,21 @@ def branding_snapshot_path(sport: str) -> Path:
     return root / "source_artifacts" / "data" / "processed" / "team_branding" / f"{sport}_team_branding.csv"
 
 
-def build_snapshot(sport: str) -> dict[str, object]:
-    espn_path, _env_var, _local_dir_name = SPORT_CONFIG[sport]
+def build_snapshot(sport: str, *, out_root: Path | None = None) -> dict[str, object]:
+    """`out_root` (a soccer_source root) pins where a SOCCER league's file goes. The refresh step passes it
+    explicitly, like the roster step, because env-based resolution can land in the repo tree, which the
+    runtime does not read first."""
+    espn_path, _env_var, local_dir_name = SPORT_CONFIG[sport]
     snapshot_date = time.strftime("%Y-%m-%d", time.gmtime())
     rows = fetch_espn_teams(espn_path, snapshot_date=snapshot_date)
-    path = write_team_branding_snapshot(rows, path=branding_snapshot_path(sport))
+    if out_root is not None:
+        if not local_dir_name.startswith("soccer_source/"):
+            raise SystemExit(f"--out-root is only for soccer leagues, not {sport!r}")
+        target = (Path(out_root) / sport / "source_artifacts" / "data" / "processed" / "team_branding"
+                  / f"{sport}_team_branding.csv")
+    else:
+        target = branding_snapshot_path(sport)
+    path = write_team_branding_snapshot(rows, path=target)
     return {"sport": sport, "teams_written": len(rows), "path": str(path)}
 
 
@@ -99,11 +109,13 @@ def main() -> None:
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--sport", choices=sorted(SPORT_CONFIG), help="Build the snapshot for one sport.")
     group.add_argument("--all", action="store_true", help="Build snapshots for every configured sport.")
+    parser.add_argument("--out-root", default=None,
+                        help="soccer_source root to write a soccer league's file under (soccer leagues only).")
     args = parser.parse_args()
 
     sports = sorted(SPORT_CONFIG) if args.all else [args.sport]
     for sport in sports:
-        result = build_snapshot(sport)
+        result = build_snapshot(sport, out_root=Path(args.out_root) if args.out_root else None)
         print(result)
 
 

@@ -1656,6 +1656,14 @@ death, never life — do not invert it.
 - Verification: Per-game table: anchor (line + capture time) vs last pregame book_quotes consensus (captured_at <= commence), finals; MAE of anchored sim mean vs counterfactual near-close-anchored mean, n games named.
 - Blocked by: none
 
+### soccer-uefa-followups — OPEN — opened 2026-10-21 — session 15fef1c0-6ebb-48a5-9316-c7361d76f407
+- Goal: UEFA follow-ups to closed lane soccer-uefa-competitions: (1) UEFA player props fetched ONLY for matches kicking off within 24h (user 2026-10-21: near-kickoff design), same 10-book list; (2) UEFA team branding refreshed by a weekly-gated refresh step (knockout fields change); (3) /soccer/<ucl|uel|uecl>/market-board shows odds-only rows built from the ESPN schedule + game odds/props (no model columns). All three read on the fleet.
+- Files: scripts/refresh_odds_sources.py (_build_soccer_steps props/branding loops, _soccer_uefa_branding_step and the two UEFA constants ONLY), scripts/fetch_soccer_oddsapi_props_local.py, scripts/build_team_branding_snapshot.py, syndicate/features/soccer/market_board.py, tests/test_soccer_uefa_followups.py, tests/test_soccer_uefa_competitions.py (the step-gating test only)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: Unit: props step for UEFA carries --max-hours-ahead 24 and the fetcher skips events outside the window (reachability: off != on); branding step fires only when the file is >7d old; market board for a no-model league returns games from the schedule with odds rows and no sim rows. Fleet: a UEFA props/<date>.csv written by the pregame run containing only <=24h matches; /soccer/ucl/market-board serves games with odds rows.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
