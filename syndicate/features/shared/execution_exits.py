@@ -69,6 +69,7 @@ import json
 import math
 import os
 import re
+import threading
 import urllib.parse
 from dataclasses import asdict, dataclass, replace
 from datetime import date, datetime, timedelta, timezone
@@ -1215,7 +1216,21 @@ def _prune_watch(state: dict[str, Any], today: str) -> int:
     return len(stale)
 
 
-def run_exit_tick(
+# ONE WRITER AT A TIME for execution_exits.json (lane in-game-trading, 2026-10-21).
+# The slow tick (live-odds-worker's execution tick) and the in-game fast exit loop
+# (its own thread, `execution_exits_fast`) both run this function in the same
+# process. Each pass loads the document, mutates it and persists it whole, so two
+# unlocked passes would lose one another's exit rows and daily-cap counts.
+EXIT_STATE_LOCK = threading.RLock()
+
+
+def run_exit_tick(**kwargs: Any) -> dict[str, Any]:
+    """One pass: positions -> venue reconcile -> quotes -> rules -> exits. Serialised by `EXIT_STATE_LOCK`."""
+    with EXIT_STATE_LOCK:
+        return _run_exit_tick_unlocked(**kwargs)
+
+
+def _run_exit_tick_unlocked(
     *,
     today: str,
     orders: Sequence[Mapping[str, Any]] | None = None,

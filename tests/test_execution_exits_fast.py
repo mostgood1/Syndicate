@@ -86,8 +86,15 @@ class _Clock:
         return self.t
 
 
-def _loop(orders, quotes, *, exits_state=None, persisted=None):
+def _loop(orders, quotes, *, exits_state=None, persisted=None, dispatched=None):
     clock = _Clock()
+
+    def _dispatch(**kw):
+        if dispatched is None:
+            raise AssertionError("dispatch called in a test that forbids it")
+        dispatched.append(kw)
+        return {"status": "ok", "mode": "live", "live_exits": {"placed": 1}, "reasons": {"triggered": 1}}
+
     loop = fx.FastExitLoop(
         today_fn=lambda: TODAY,
         orders_fn=lambda: orders,
@@ -95,18 +102,22 @@ def _loop(orders, quotes, *, exits_state=None, persisted=None):
         exits_state_fn=lambda: exits_state or {"watch": {}, "exits": {}},
         persist=(persisted.append if persisted is not None else (lambda s: None)),
         clock=clock,
+        dispatch_fn=_dispatch,
     )
     return loop, clock
 
 
-def test_paper_by_default_off_only_when_turned_off_never_live(monkeypatch):
-    assert fx.fast_loop_mode() == "paper"  # absent = paper (user decision 2026-10-21)
-    for raw in ("off", "0", "false", "No", " disabled "):
+def test_mode_follows_the_slow_ticks_exit_mode_unless_pinned(monkeypatch):
+    assert fx.fast_loop_mode() == "paper"  # SYNDICATE_EXIT_MODE absent = paper, so the follower is paper
+    monkeypatch.setenv("SYNDICATE_EXIT_MODE", "live")
+    assert fx.fast_loop_mode() == "live"  # absent fast flag FOLLOWS the live exit mode
+    for raw, want in (("live", "live"), ("paper", "paper"), ("off", "off"), ("0", "off"), (" disabled ", "off"),
+                      ("on", "paper"), ("typo", "paper")):
         monkeypatch.setenv("SYNDICATE_EXIT_FAST_LOOP", raw)
-        assert fx.fast_loop_mode() == "off"
-    for raw in ("live", "on", "1", "paper", "LIVE"):
-        monkeypatch.setenv("SYNDICATE_EXIT_FAST_LOOP", raw)
-        assert fx.fast_loop_mode() == "paper"  # there is no live value
+        assert fx.fast_loop_mode() == want, raw
+    monkeypatch.setenv("SYNDICATE_EXIT_MODE", "paper")
+    monkeypatch.setenv("SYNDICATE_EXIT_FAST_LOOP", "live")
+    assert fx.fast_loop_mode() == "paper"  # "live" cannot outrank a paper slow tick
 
 
 def test_reachability_off_books_nothing_on_books_the_trigger(monkeypatch):
@@ -223,3 +234,60 @@ def test_worker_starts_the_thread_only_when_paper(monkeypatch):
         assert not worker._FAST_EXIT_THREAD.is_alive()
     finally:
         worker._FAST_EXIT_STOP.set()
+
+
+def test_live_dispatch_reachability_and_its_refusals(monkeypatch):
+    """off != on for SELLING: only a LIVE position, an ARMED rule, a live slow tick, once per entry."""
+    order = _order()
+    # paper slow tick -> the follower is paper -> no dispatch
+    loop, _ = _loop([order], _quotes(), dispatched=None)
+    assert loop.step(now=IN_PLAY)["live_dispatched"] == 0
+
+    monkeypatch.setenv("SYNDICATE_EXIT_MODE", "live")
+    sent: list = []
+    loop, clock = _loop([order], _quotes(), dispatched=sent)
+    out = loop.step(now=IN_PLAY)
+    assert out["live_dispatched"] == 1 and len(sent) == 1
+    assert sent[0]["orders"] == [order] and sent[0]["today"] == TODAY
+    assert loop.state["live_dispatch"]["b" * 24]["live_exits"] == {"placed": 1}
+    clock.t += 15
+    assert loop.step(now=IN_PLAY)["live_dispatched"] == 0 and len(sent) == 1  # never twice
+
+    # pinned paper -> marks, never dispatches
+    monkeypatch.setenv("SYNDICATE_EXIT_FAST_LOOP", "paper")
+    loop, _ = _loop([order], _quotes(), dispatched=None)
+    assert loop.step(now=IN_PLAY)["live_dispatched"] == 0
+    monkeypatch.delenv("SYNDICATE_EXIT_FAST_LOOP")
+
+    # a PAPER-book position is never handed to the live path
+    loop, _ = _loop([_order(mode="paper:kalshi", idempotency_key="c" * 24)], _quotes(), dispatched=None)
+    assert loop.step(now=IN_PLAY)["live_dispatched"] == 0
+
+    # a rule that is not armed live (model_fair only) is not dispatched
+    monkeypatch.setenv("SYNDICATE_EXIT_TAKE_PROFIT_MARGIN", "0.50")  # take_profit cannot fire
+    loop, _ = _loop([_order(model_edge_pct=1.0, ev_pct=1.0)], _quotes(yes_bid="0.9900", yes_ask="0.9950"),
+                    dispatched=None)
+    out = loop.step(now=IN_PLAY)
+    assert out["live_dispatched"] == 0
+
+
+def test_a_settled_market_is_not_requoted(monkeypatch):
+    seen: list = []
+    clock = _Clock()
+    q = _quotes()
+    q["markets"][TICKER]["status"] = "finalized"
+    loop = fx.FastExitLoop(today_fn=lambda: TODAY, orders_fn=lambda: [_order()],
+                           quotes_fn=lambda tickers: (seen.append(list(tickers)) or q),
+                           exits_state_fn=lambda: {"watch": {}, "exits": {}}, persist=lambda s: None, clock=clock)
+    assert loop.step(now=IN_PLAY)["settled"] == ["b" * 24]
+    clock.t += 120  # past the positions refresh
+    assert loop.step(now=IN_PLAY)["status"] == "idle"
+    assert len(seen) == 1
+
+
+def test_exit_tick_is_serialised_by_one_lock():
+    import threading
+
+    assert isinstance(ex.EXIT_STATE_LOCK, type(threading.RLock()))
+    with ex.EXIT_STATE_LOCK:  # re-entrant: the fast loop may dispatch while holding nothing else
+        assert ex.run_exit_tick.__name__ == "run_exit_tick"

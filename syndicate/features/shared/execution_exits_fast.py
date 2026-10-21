@@ -1,4 +1,4 @@
-"""In-game fast exit loop -- STAGE 1, PAPER ONLY (lane in-game-trading).
+"""In-game fast exit loop -- STAGE 1 (lane in-game-trading).
 
 WHY IT EXISTS. The exit check (`execution_exits.run_exit_tick`) runs inside the
 placer's execution tick: 300 s by default and measured at 5-15 min between
@@ -13,17 +13,26 @@ every IN-PLAY Kalshi position from the public batched quote and runs the SAME
 rule the slow tick runs (`execution_exits.evaluate_exit`, same margin env). The
 first trigger per entry is booked as a FAST paper exit in its own document.
 
-WHAT IT NEVER DOES. It imports no order, credential or cancel code: there is no
-`place_exit` call here, so this module cannot sell. It never writes
-`execution_exits.json` (the slow tick's document, lane kalshi-exit-path): it
-only READS that document, to net out positions a live exit already sold. Going
-live is a separate change and a separate user decision.
+HOW IT SELLS (user decision 2026-10-21 ~21:3xZ, "Exits + tiny entries live").
+It never builds or sends an order itself: there is no `place_exit` /
+`send_exit_order` call here (the test parses the module). When a LIVE in-play
+position triggers a rule in `execution_exits.live_exit_rules()`, it hands that
+position's entry order row(s) to the slow tick's own
+`execution_exits.run_exit_tick(today, orders=[...])`. That runs the same venue
+reconcile, the same live switches (`SYNDICATE_EXIT_MODE=live`,
+`SYNDICATE_EXIT_LIVE_ARMED` + the entry arm), the same daily caps
+(`live_exit_daily_caps`, 5 sales / $25) and the same `place_exit`. Both callers
+are serialised by `execution_exits.EXIT_STATE_LOCK`. Its own document is the
+only one it writes.
 
-PAPER BY DEFAULT (user decision 2026-10-21, "Default to paper"): absent means
-paper, because the supervisor derives a role's env once at `up` and a
-role-only restart could not load a new key. `off` / `0` / `false` / `no` /
-`disabled` turn it off. There is NO live value: any other text is paper, and
-paper has no order path to reach.
+MODE (`SYNDICATE_EXIT_FAST_LOOP`):
+  absent / `live` -> FOLLOW the slow tick: dispatch live sales when
+                     `execution_exits.exit_mode()` is `live`, otherwise paper.
+                     (A role-only restart cannot load a new env key, so the
+                     switch that already decides live selling decides this too.)
+  `paper`         -> mark and book paper triggers only, never dispatch.
+  off/0/false/no/disabled -> off.
+Any other text is paper.
 
 Document: `reports/intelligence/execution_exits_fast.json`
   marks:  per entry -- samples, first/last mark, high-water net edge, last bid
@@ -55,6 +64,8 @@ from syndicate.features.shared.execution_exits import (
 )
 
 FAST_PAPER = "paper"
+FAST_LIVE = "live"
+FAST_OFF = "off"
 _DEFAULT_SECONDS = 15.0
 _MIN_SECONDS = 5.0
 _DEFAULT_POSITIONS_SECONDS = 60.0
@@ -65,9 +76,15 @@ _OFF_VALUES = frozenset({"off", "0", "false", "no", "disabled"})
 
 
 def fast_loop_mode() -> str:
-    """`off` only when explicitly turned off; otherwise `paper`. Never `live`."""
+    """`off` | `paper` | `live`. `live` only by FOLLOWING the slow tick's own live exit mode."""
+    from syndicate.features.shared.execution_exits import EXIT_LIVE, exit_mode
+
     raw = str(os.environ.get("SYNDICATE_EXIT_FAST_LOOP") or "").strip().lower()
-    return "off" if raw in _OFF_VALUES else FAST_PAPER
+    if raw in _OFF_VALUES:
+        return FAST_OFF
+    if raw in ("", FAST_LIVE):
+        return FAST_LIVE if exit_mode() == EXIT_LIVE else FAST_PAPER
+    return FAST_PAPER
 
 
 def fast_loop_seconds() -> float:
@@ -134,9 +151,15 @@ def mark_pass(
     reasons: dict[str, int] = {}
     new_exits = 0
     marked = 0
+    triggered: list[tuple[str, str, str]] = []  # (entry_key, rule, position mode), EVERY trigger this pass
+    settled: list[str] = []  # entry_keys whose market is closed: nothing left to mark
     for p in positions:
         decision = evaluate_exit(p, markets.get(p.ticker), margin=margin, fair_buffer=buffer, now=now)
         reasons[decision["reason"]] = reasons.get(decision["reason"], 0) + 1
+        if decision["reason"] in ("market_finalized", "market_settled", "market_expired", "market_closed"):
+            settled.append(p.entry_key)
+        if decision.get("rule"):
+            triggered.append((p.entry_key, str(decision["rule"]), p.mode))
         edge = decision.get("edge_per_contract")
         row = state["marks"].setdefault(
             p.entry_key,
@@ -181,7 +204,7 @@ def mark_pass(
     passes["since"] = passes.get("since") or stamp
     state["updated_at"] = stamp
     return {"positions": len(positions), "marked": marked, "reasons": reasons, "new_exits": new_exits,
-            "quote_errors": len(quotes.get("errors") or [])}
+            "quote_errors": len(quotes.get("errors") or []), "triggered": triggered, "settled": settled}
 
 
 class FastExitLoop:
@@ -196,6 +219,7 @@ class FastExitLoop:
         exits_state_fn: Callable[[], Mapping[str, Any]] | None = None,
         persist: Callable[[Mapping[str, Any]], None] | None = None,
         clock: Callable[[], float] = time.monotonic,
+        dispatch_fn: Callable[..., Mapping[str, Any]] | None = None,
     ) -> None:
         self.today_fn = today_fn
         self.orders_fn = orders_fn or _ledger_orders
@@ -203,6 +227,11 @@ class FastExitLoop:
         self.exits_state_fn = exits_state_fn or load_state
         self.persist = persist or persist_fast_state
         self.clock = clock
+        # THE ONLY SELLING ROUTE: the slow tick's own pass, over just the triggered rows.
+        self.dispatch_fn = dispatch_fn or _run_exit_tick
+        self._orders_by_key: dict[str, Mapping[str, Any]] = {}
+        self._dispatched: set[str] = set()
+        self._settled: set[str] = set()
         self.state: dict[str, Any] | None = None
         self.positions: list[OpenPosition] = []
         self.slow_watch: Mapping[str, Any] = {}
@@ -213,7 +242,8 @@ class FastExitLoop:
         self._window = {"passes": 0, "marked": 0, "new_exits": 0, "quote_errors": 0}
 
     def step(self, now: datetime | None = None) -> dict[str, Any]:
-        if fast_loop_mode() != FAST_PAPER:
+        mode = fast_loop_mode()
+        if mode == FAST_OFF:
             return {"status": "off"}
         now = now or datetime.now(timezone.utc)
         t = self.clock()
@@ -222,14 +252,21 @@ class FastExitLoop:
         if self._positions_at is None or t - self._positions_at >= positions_refresh_seconds():
             exits_state = self.exits_state_fn()
             self.slow_watch = dict(exits_state.get("watch") or {})
-            self.positions = in_play_kalshi_positions(
-                list(self.orders_fn()), today=self.today_fn(), exits_state=exits_state, now=now
-            )
+            orders = list(self.orders_fn())
+            self._orders_by_key = {str(o.get("idempotency_key") or ""): o for o in orders if isinstance(o, Mapping)}
+            self.positions = [
+                p for p in in_play_kalshi_positions(orders, today=self.today_fn(), exits_state=exits_state, now=now)
+                if p.entry_key not in self._settled
+            ]
             self._positions_at = t
         if not self.positions:
             return {"status": "idle", "positions": 0}
         quotes = self.quotes_fn(sorted({p.ticker for p in self.positions}))
         summary = mark_pass(self.state, self.positions, quotes, slow_watch=self.slow_watch, now=now)
+        if summary["settled"]:  # a closed market is never re-quoted
+            self._settled.update(summary["settled"])
+            self.positions = [p for p in self.positions if p.entry_key not in self._settled]
+        summary["live_dispatched"] = self._dispatch_live(summary["triggered"], now) if mode == FAST_LIVE else 0
         self._dirty = True
         for k in self._window:
             self._window[k] += summary.get(k, 1 if k == "passes" else 0)
@@ -239,7 +276,7 @@ class FastExitLoop:
         if self._summary_at is None or t - self._summary_at >= 60:
             w = self._window
             print(
-                f"[execution_exits_fast] FAST_EXIT_PASS mode=paper positions={summary['positions']} passes={w['passes']}"
+                f"[execution_exits_fast] FAST_EXIT_PASS mode={mode} positions={summary['positions']} passes={w['passes']}"
                 f" marks={w['marked']} new_paper_exits={w['new_exits']} quote_errors={w['quote_errors']}"
                 f" reasons={summary['reasons']} interval_s={fast_loop_seconds():.0f}",
                 flush=True,
@@ -247,6 +284,44 @@ class FastExitLoop:
             self._summary_at = t
             self._window = {k: 0 for k in self._window}
         return {"status": "ok", **summary}
+
+    def _dispatch_live(self, triggered: Sequence[tuple[str, str, str]], now: datetime) -> int:
+        """Hand LIVE positions whose trigger is an ARMED live rule to the slow tick's pass. Returns how many."""
+        from syndicate.features.shared.execution_exits import live_exit_rules
+
+        armed = live_exit_rules()
+        keys = [
+            k for k, rule, pmode in triggered
+            if pmode == "live" and set(rule.split("+")) & armed and k not in self._dispatched and k in self._orders_by_key
+        ]
+        if not keys:
+            return 0
+        self._dispatched.update(keys)  # one dispatch per entry; the slow tick still watches it afterwards
+        rows = [self._orders_by_key[k] for k in keys]
+        stamp = now.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        try:
+            result = dict(self.dispatch_fn(today=self.today_fn(), orders=rows) or {})
+        except Exception as exc:  # noqa: BLE001 -- the slow tick will still see it
+            result = {"status": "error", "error": f"{type(exc).__name__}: {exc}"[:200]}
+        for k in keys:
+            self.state.setdefault("live_dispatch", {})[k] = {
+                "at": stamp, "status": result.get("status"), "live_exits": result.get("live_exits"),
+                "reasons": result.get("reasons"), "error": result.get("error"),
+            }
+        self._positions_at = None  # re-read positions next pass so a sale nets out
+        print(
+            f"[execution_exits_fast] FAST_EXIT_LIVE_DISPATCH entries={keys} status={result.get('status')}"
+            f" mode={result.get('mode')} live_exits={result.get('live_exits')} reasons={result.get('reasons')}"
+            f" error={result.get('error')}",
+            flush=True,
+        )
+        return len(keys)
+
+
+def _run_exit_tick(**kwargs: Any) -> Mapping[str, Any]:
+    from syndicate.features.shared.execution_exits import run_exit_tick
+
+    return run_exit_tick(**kwargs)
 
 
 def _ledger_orders() -> list[Mapping[str, Any]]:

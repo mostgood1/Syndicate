@@ -3248,27 +3248,27 @@ def start_inplay_capture_loop() -> bool:
 
 
 # ---------------------------------------------------------------------------
-# IN-GAME FAST EXIT LOOP (lane in-game-trading, stage 1, PAPER ONLY).
+# IN-GAME FAST EXIT LOOP (lane in-game-trading, stage 1).
 #
 # The exit check rides the placer's execution tick (300 s, measured 5-15 min
 # apart). In play Kalshi re-prices every ~11 s, so this thread marks every
 # in-play Kalshi position every SYNDICATE_EXIT_FAST_LOOP_SECONDS (default 15)
-# with the slow tick's own rule, and books first triggers as FAST paper exits
-# in its own document (execution_exits_fast.json). It cannot sell:
-# `execution_exits_fast` has no order path. PAPER BY DEFAULT (user decision
-# 2026-10-21); SYNDICATE_EXIT_FAST_LOOP=off turns it off. Its own thread, so it
-# never delays placement.
+# with the slow tick's own rule. A triggered LIVE position is handed to the slow
+# tick's own `run_exit_tick` (same switches, caps and place_exit; serialised by
+# `execution_exits.EXIT_STATE_LOCK`). It follows SYNDICATE_EXIT_MODE unless
+# SYNDICATE_EXIT_FAST_LOOP=paper (mark only) or =off. User decision 2026-10-21
+# ("Exits + tiny entries live"). Its own thread, so it never delays placement.
 # ---------------------------------------------------------------------------
 _FAST_EXIT_STOP = threading.Event()
 _FAST_EXIT_THREAD = None
 
 
 def _fast_exit_background_loop() -> None:
-    from syndicate.features.shared.execution_exits_fast import FastExitLoop, fast_loop_seconds
+    from syndicate.features.shared.execution_exits_fast import FastExitLoop, fast_loop_mode, fast_loop_seconds
     from syndicate.features.shared.timezone import central_today_iso
 
     loop = FastExitLoop(today_fn=central_today_iso)
-    print(f"[execution_exits_fast] STARTED mode=paper interval_s={fast_loop_seconds():.0f}", flush=True)
+    print(f"[execution_exits_fast] STARTED mode={fast_loop_mode()} interval_s={fast_loop_seconds():.0f}", flush=True)
     while not _FAST_EXIT_STOP.is_set() and not _LIVE_REFRESH_LOOP_STOP.is_set():
         try:
             loop.step()
@@ -3282,9 +3282,9 @@ def start_fast_exit_loop() -> bool:
     """Start the fast exit thread unless SYNDICATE_EXIT_FAST_LOOP turns it off. Returns whether it started."""
     global _FAST_EXIT_THREAD
 
-    from syndicate.features.shared.execution_exits_fast import FAST_PAPER, fast_loop_mode
+    from syndicate.features.shared.execution_exits_fast import FAST_OFF, fast_loop_mode
 
-    if fast_loop_mode() != FAST_PAPER:
+    if fast_loop_mode() == FAST_OFF:
         print("[execution_exits_fast] OFF (SYNDICATE_EXIT_FAST_LOOP=off)", flush=True)
         return False
     if _FAST_EXIT_THREAD is not None and _FAST_EXIT_THREAD.is_alive():
