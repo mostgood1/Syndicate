@@ -52424,3 +52424,26 @@ Same applies, with far lower stakes, to my own `live_lens` postponed-bucket fix:
   - Kalshi SAS21 (01a15b3e..., the mispriced NO-side order): ledger `rejected`, venue_status `canceled`, 0 contracts, reconciled 01:35:48Z (8:35 PM CT 10-20, at kickoff).
 - **live:** 650 live rows: 649 filled, 1 rejected (the SAS cancel).
 - **next:** first weekly ladder + forward-test readout Monday 10-26 9 AM CT. It must be run in a session, not left to the scheduler.
+
+## 2026-10-21 15:00Z -- CORRECTION + READING: the 14:30Z Polymarket/draw entry's window was overstated; full-history Polymarket buyingPower reconciliation (parent session 34fdabd0)
+- **Corrects** the 14:30Z entry. Its scan read only `live-odds-worker.log`, which begins 2026-10-21T10:30:36Z because the log rotates (~210MB per file), NOT "2026-10-20T16:00Z..". The per-order facts and the `/api/portfolio/live` reading in that entry stand. This entry re-scans `.log.5`..`.log` = 2026-10-19T20:48:42Z..2026-10-21T14:56:29Z. Together with the 10-19 18:24Z watch, that covers live go-live to now.
+- **Kalshi draw:** 0 `[kalshi_orders] SUBMIT ... -TIE` over the full span. Still NOT OCCURRED; verify OWED.
+- **Fleet Polymarket BUYs (all 9 since go-live):**
+  - okc-sa 231.5, 10-20 23:09Z
+  - pitt-mia 51.5, 10-21 00:13Z
+  - nhl car-van 6.5, 02:00Z
+  - nfl sf-atl 49.5 (qty 11.29), 02:00Z
+  - wnba gsv-atl 152.5, 05:05Z
+  - sea-gen-ven, 11:29Z
+  - ore-ill, 12:23Z
+  - sac-lac, 13:11Z
+  - pitt-mia 50.5, 13:39Z
+- **buyingPower vs fleet orders:**
+  - Each fleet BUY matches a step down of qty x price + fee: -0.51 at 23:12Z, -0.51 at 00:18Z, -6.13 at 02:05Z (two orders), -0.51 at 05:18Z. The 10-21 placements sum to -8.62 against $8.63 of fills + fees.
+  - **Four moves with NO fleet order** (no polymarket SUBMIT/SELL near them):
+    - 2026-10-20 17:18Z: 586.05 -> 561.05 (**-25.00**)
+    - 2026-10-20 22:48Z: 561.05 -> 498.55 (**-62.50**)
+    - 2026-10-21 04:52Z: 492.44 -> 562.72 (**+70.28**, payout-shaped; the +1.04 at 04:46Z is plausibly a fleet settlement)
+    - 2026-10-21 14:30Z: 553.59 -> 528.59 (**-25.00**)
+  - **Believed, unverified:** the four look like manual app activity, the same pattern as the 10-19 Kalshi shard-1 MVE combo buy. Not checked against Polymarket's own account history. The pending $550 deposit is not separated in `buyingPower` either.
+- **Effect on the fleet:** compounding/caps read this buyingPower as Polymarket capital, so non-fleet trades move the fleet's Polymarket bankroll and day cap.
