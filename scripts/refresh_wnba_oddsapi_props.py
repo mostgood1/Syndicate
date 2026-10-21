@@ -3766,8 +3766,17 @@ def _seed_game_odds_from_props_snapshot(*, source_root: Path, date_str: str, log
 NATIVE_WNBA_CLI_MODULE = "syndicate.features.wnba.source_cli.cli"
 
 
-def _native_cli_env() -> dict[str, str]:
+#: The CLI port resolves its data root from this variable and falls back to its OWN code tree
+#: (`syndicate/features/<league>/source_cli/repo/data`) when it is unset -- where nothing exists, so a write raised
+#: "Cannot save file into a non-existent directory" (export-game-cards, 6x on 2026-10-20; lane basketball-cli-data-root, todo #718). Some launcher of
+#: this refresh runs without it, so the refresh fills it from its own source root.
+_CLI_DATA_ROOT_ENV = "WNBA_BETTING_DATA_ROOT"
+
+
+def _native_cli_env(data_root: Path | None = None) -> dict[str, str]:
     env = dict(os.environ)
+    if data_root is not None and not str(env.get(_CLI_DATA_ROOT_ENV) or "").strip():
+        env[_CLI_DATA_ROOT_ENV] = str(data_root)  # only when unset/empty: a set value always wins
     existing = str(env.get("PYTHONPATH") or "").strip()
     env["PYTHONPATH"] = str(REPO_ROOT) if not existing else f"{REPO_ROOT}{os.pathsep}{existing}"
     for key, value in (("PYTHONUNBUFFERED", "1"), ("PYTHONUTF8", "1"), ("PYTHONIOENCODING", "utf-8"), ("OMP_NUM_THREADS", "1"),
@@ -3776,12 +3785,13 @@ def _native_cli_env() -> dict[str, str]:
     return env
 
 
-def _run_native_cli_command(command_parts: list[str], *, log_file: Path, heartbeat_cb: callable | None, timeout_s: float) -> int:
+def _run_native_cli_command(command_parts: list[str], *, log_file: Path, heartbeat_cb: callable | None, timeout_s: float,
+                            data_root: Path | None = None) -> int:
     return _run_to_file(
         [_source_python(REPO_ROOT), "-m", NATIVE_WNBA_CLI_MODULE, *command_parts],
         log_file,
         cwd=REPO_ROOT,
-        env=_native_cli_env(),
+        env=_native_cli_env(data_root),
         timeout_s=timeout_s,
         heartbeat_cb=heartbeat_cb,
         heartbeat_every_s=5.0,
@@ -3799,7 +3809,8 @@ def _run_source_subprocess_cli_command(
 ) -> int:
     if package_name != "wnba_betting":
         raise ValueError(f"the WNBA refresh runs the WNBA CLI only, got {package_name!r}")
-    return _run_native_cli_command(list(command_parts), log_file=log_file, heartbeat_cb=heartbeat_cb, timeout_s=timeout_s)
+    return _run_native_cli_command(list(command_parts), log_file=log_file, heartbeat_cb=heartbeat_cb, timeout_s=timeout_s,
+                                   data_root=Path(source_root) / "data")
 
 
 def _ensure_rotation_inputs_for_props_refresh(
@@ -4020,7 +4031,8 @@ def _run_source_predict_date(
 ) -> int:
     if package_name != "wnba_betting":
         raise ValueError(f"the WNBA refresh runs the WNBA CLI only, got {package_name!r}")
-    return _run_native_cli_command(["predict-date", "--date", date_str], log_file=log_file, heartbeat_cb=heartbeat_cb, timeout_s=20 * 60)
+    return _run_native_cli_command(["predict-date", "--date", date_str], log_file=log_file, heartbeat_cb=heartbeat_cb, timeout_s=20 * 60,
+                                   data_root=Path(source_root) / "data")
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
