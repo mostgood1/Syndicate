@@ -52912,3 +52912,31 @@ have stopped the reload, and it did not because nothing was gating on it.
   - (1) The first soccer pregame run after 21:41Z: `PROPS_HORIZON` lines for ucl/uel/uecl, and UEFA props files holding only matches kicking off within 24h. A watcher is armed (`C:/tmp/uefa_props_watch.sh`).
   - (2) The UEFA branding step: the files are dated 2026-10-15, so `SOCCER_UEFA_BRANDING_STALE` + a rewritten `<l>_team_branding.csv` are due on the first pregame run after 2026-10-22 ~15:00Z (7 days).
 
+
+
+## 2026-10-21 21:48:15Z ff + 21:51:15Z live-odds-worker ROLE-ONLY restart (4:51 PM CT) -- fleet 7b908e02 -> ac248f07: in-game FAST EXIT LOOP SELLS LIVE (dispatches to the slow tick's run_exit_tick) -- **MET (live; first in-play dispatch OWED tonight)** (lane `in-game-trading`, session 15ceeb14)
+- **ask:** the user, in THIS session, 10-21 ~21:3xZ:
+  - "Exits + tiny entries live" (asked here with the 10-20 evidence that a faster take-profit lost MORE than the slow one);
+  - "Yes, take the loan" (lock in kalshi-exit-path's file);
+  - "Yes, push and deploy".
+  - It was first relayed from session 34fdabd0 and re-asked here.
+- **code `ac248f07`:**
+  - `execution_exits_fast`: a triggered LIVE in-play Kalshi position whose rule is in `live_exit_rules()` (take_profit) goes to `execution_exits.run_exit_tick(today, orders=[its entry rows])`.
+    - That pass uses the same switches (SYNDICATE_EXIT_MODE=live, EXIT_LIVE_ARMED + the entry arm), the same caps (5 sales / $25 per UTC day, shared) and the same place_exit / IOC / reduce_only.
+    - One dispatch per entry. Settled markets are dropped from re-quoting.
+  - `SYNDICATE_EXIT_FAST_LOOP`: absent/live -> FOLLOWS SYNDICATE_EXIT_MODE; =paper -> mark only; =off -> off.
+  - **LOAN in execution_exits.py (kalshi-exit-path, owner unreachable, user-approved):** `EXIT_STATE_LOCK` (RLock) wraps `run_exit_tick`; body `_run_exit_tick_unlocked` unchanged. Noted in both lane blocks.
+  - Tests: 12 fast-loop (incl. dispatch reachability and refusals: paper pin, paper position, unarmed rule, no repeat) + 78 exit-lane pass.
+- **ride-alongs 7b908e02..ac248f07 (runtime):** only the 3 files above. 0 overlap with the 6 dirty fleet files.
+- **claim:** live-odds-worker, holder in-game-trading, rc 0 (token c8eeb87c...), ttl 2700. Released after this entry.
+- **spacing:** the prior live-odds-worker start was pid 3506433 at 19:24:00Z (another lane), so 2h27m >= 60 min.
+- **smoke (fleet code, env as live):** `mode live lock RLock rules ['take_profit']`.
+- **restart:** gate cleared 21:51:15.633Z: 0 children; RECONCILE kalshi/polymarket not_found=0 unknown=0. One TERM to 3506433. New pid **3546826**, lstart 21:51:23Z.
+- **verify (21:53Z):**
+  - `21:51:36.324Z [execution_exits_fast] STARTED mode=live interval_s=15`.
+  - First pass `positions=70 reasons={'market_finalized': 70}`; then idle (settled skip working). 0 PASS_FAILED.
+  - Slow tick `21:52:19Z EXIT_TICK status=ok mode=live positions=400`. Kalshi EXECUTION ok (refused over_max_day_dollars 5: the day cap binds, pre-existing). Polymarket ok.
+- **owed:** the first `FAST_EXIT_LIVE_DISPATCH` line in play tonight, and its EXIT_LIVE / venue fill read-back.
+  - The UTC 10-21 exit cap was already 5/5, so no live sale is possible before 00:00Z. Until then a dispatch reads `daily_count_cap`.
+- **undo:** `LIVE_ODDS_WORKER__SYNDICATE_EXIT_FAST_LOOP=paper` (or `off`) in local_production.env + a full down/up. Without a down/up: `git revert ac248f07`, ff, gated live-odds-worker TERM (back to d76c85ce behaviour: paper).
+- **NOT in this deploy:** the capped in-game ENTRIES (NHL spreads, 1 contract, $10/day). Not built yet.
