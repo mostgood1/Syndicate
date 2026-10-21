@@ -211,7 +211,44 @@ def _discover_event_markets(*, api_key: str, sport_key: str, event_id: str, regi
         return []
 
 
-def fetch_player_props_current(*, api_key: str, league: str, date_str: str, regions: str, bookmakers: str | None, markets: list[str] | None) -> pd.DataFrame | None:
+# IN-PLAY ONLY (2026-10-21, lane `nba-inplay-only-pulls`). The NBA in-play lane forces a pull every 240 s while any
+# game is live, and a full pull fetches EVERY game left on the date at ~49 credits a game -- measured 10-20: 73 pulls
+# from 6:18 to 11:22 PM CT on a 3-game night. On an 11-game night that is ~540 credits a pull early on, for games that
+# have not started and are refreshed by the pregame pulls anyway. `--in-play-only` fetches only the date's games that
+# started within IN_PLAY_WINDOW_HOURS and MERGES them into the day's snapshot (`merge_in_play_rows`): every other
+# game's rows are kept as they were, so the processed alias and the board still carry the whole slate.
+IN_PLAY_WINDOW_HOURS = 4.0
+
+
+def in_play_events(events: list[dict], now: pd.Timestamp, window_hours: float = IN_PLAY_WINDOW_HOURS) -> list[dict]:
+    """The events whose commence_time is in (now - window, now]: started and not long finished. /events drops a
+    finished game soon after the final, and the window bounds what an event the API still lists can cost."""
+    out = []
+    for event in events:
+        try:
+            start = pd.Timestamp(str(event.get("commence_time") or ""))
+        except Exception:
+            continue
+        if start.tzinfo is None:
+            start = start.tz_localize("UTC")
+        if now - pd.Timedelta(hours=float(window_hours)) < start <= now:
+            out.append(event)
+    return out
+
+
+def merge_in_play_rows(existing: pd.DataFrame | None, fresh: pd.DataFrame) -> pd.DataFrame:
+    """The day's snapshot with the freshly fetched events' rows REPLACED and every other event's rows kept.
+
+    An event replaced is one that returned rows; an in-play event whose fetch came back empty keeps its old rows
+    (a failed call must not delete a game's prices)."""
+    if existing is None or existing.empty or "event_id" not in existing.columns:
+        return fresh
+    fetched = set(fresh["event_id"].astype(str)) if "event_id" in fresh.columns else set()
+    kept = existing[~existing["event_id"].astype(str).isin(fetched)]
+    return pd.concat([kept, fresh], ignore_index=True, sort=False)
+
+
+def fetch_player_props_current(*, api_key: str, league: str, date_str: str, regions: str, bookmakers: str | None, markets: list[str] | None, in_play_only: bool = False, now: pd.Timestamp | None = None) -> pd.DataFrame | None:
     """Returns an empty DataFrame when the fetch itself was inconclusive
     (network/API failure, malformed response) -- the caller may reasonably
     fall back to a recent prior snapshot in that case, same as before.
@@ -275,6 +312,11 @@ def fetch_player_props_current(*, api_key: str, league: str, date_str: str, regi
             continue
     if not day_events:
         return pd.DataFrame() if any_listing_failed else None
+    if in_play_only:
+        day_events = in_play_events(day_events, now if now is not None else pd.Timestamp.now(tz="UTC"))
+        print(f"IN_PLAY_ONLY league={league} date={date_str} events_in_play={len(day_events)}", flush=True)
+        if not day_events:
+            return pd.DataFrame()
 
     rows: list[dict[str, object]] = []
     snapshot_ts = pd.Timestamp.utcnow().isoformat()
@@ -449,6 +491,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--regions", type=str, default="us")
     parser.add_argument("--bookmakers", type=str, default=None)
     parser.add_argument("--markets", type=str, default="")
+    parser.add_argument("--in-play-only", action="store_true",
+                        help="Fetch only the date's games in play and merge them into the existing snapshot.")
     args = parser.parse_args(argv)
 
     _load_env()
@@ -469,6 +513,7 @@ def main(argv: list[str] | None = None) -> int:
         # -- WNBA has none and keeps its widened regions). `--bookmakers all` still asks the plain region.
         bookmakers=args.bookmakers if args.bookmakers is not None else _league_prop_bookmakers(args.league),
         markets=(market_list or None),
+        in_play_only=bool(args.in_play_only),
     )
 
     if df is None:
@@ -486,6 +531,21 @@ def main(argv: list[str] | None = None) -> int:
         except Exception:
             pass
         print(f"No events scheduled for {args.date}; wrote empty snapshot at {out_path}")
+        return 0
+
+    if args.in_play_only:
+        # Never the full-pull fallbacks below: no game in play (or nothing came back) keeps the snapshot as it is.
+        if df is None or df.empty:
+            print(f"IN_PLAY_ONLY nothing fetched for {args.date}; snapshot at {out_path} kept as it was")
+            return 0
+        try:
+            existing = pd.read_csv(out_path) if out_path.exists() else None
+        except Exception:
+            existing = None
+        merged = merge_in_play_rows(existing, df)
+        atomic_write_csv(out_path, merged)
+        print(f"Wrote {out_path} with {len(merged)} rows ({len(df)} in play, merged).")
+        _append_basketball_book_quotes(league=str(args.league), date_str=str(args.date), df=df)
         return 0
 
     existing_has_rows = False

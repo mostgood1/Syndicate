@@ -595,7 +595,8 @@ def _local_worker_env() -> dict[str, str]:
     return env
 
 
-def _owned_snapshot_cli_args(*, date_str: str, out_path: Path, regions: str, bookmakers: str, markets: str) -> list[str]:
+def _owned_snapshot_cli_args(*, date_str: str, out_path: Path, regions: str, bookmakers: str, markets: str,
+                             in_play_only: bool = False) -> list[str]:
     args = [
         _local_python(),
         str(REPO_ROOT / "scripts" / "fetch_basketball_oddsapi_props_local.py"),
@@ -612,6 +613,9 @@ def _owned_snapshot_cli_args(*, date_str: str, out_path: Path, regions: str, boo
         args.extend(["--bookmakers", bookmakers])
     if markets:
         args.extend(["--markets", markets])
+    if in_play_only:
+        # Lane `nba-inplay-only-pulls` (2026-10-21): the forced live-phase pull fetches only games in play and merges.
+        args.append("--in-play-only")
     return args
 
 
@@ -3033,6 +3037,7 @@ def _run_refresh_via_cli(
     log_file: Path,
     started_at: str | None = None,
     mode: str = "full",
+    in_play_only: bool = False,
 ) -> dict[str, object]:
     refresh_mode = str(mode or "full").strip().lower() or "full"
     raw_root = source_root / "data" / "raw"
@@ -3089,6 +3094,7 @@ def _run_refresh_via_cli(
             regions=regions,
             bookmakers=bookmakers,
             markets=markets,
+            in_play_only=in_play_only,
         ),
         log_file,
         cwd=REPO_ROOT,
@@ -4515,6 +4521,8 @@ def main() -> int:
     parser.add_argument("--days-ahead", type=int, default=0)
     parser.add_argument("--started-at")
     parser.add_argument("--mode", choices=("fast", "full"), default="full")
+    parser.add_argument("--in-play-only", action="store_true",
+                        help="Snapshot fetch only the games in play, merged into the day's snapshot (the NBA in-play lane).")
     args = parser.parse_args()
     _WIN_PROB_RUN_DATE["date"] = str(getattr(args, "date", "") or "").strip() or None
 
@@ -4576,6 +4584,7 @@ def main() -> int:
                 log_file=Path(args.log_file).resolve(),
                 started_at=started_at,
                 mode=str(args.mode or "full"),
+                in_play_only=bool(args.in_play_only),
             )
         if not fast_mode and artifact_root_path and source_root is not None and not state.get("reused_existing_artifact_bundle") and not state.get("error"):
             copied = _materialize_artifact_bundle(
