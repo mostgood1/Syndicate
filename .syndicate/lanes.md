@@ -1471,7 +1471,8 @@ death, never life — do not invert it.
 - Verification: unit: one CANCEL_FAILED line -> exec:log_errors:cancel finding; fleet: alert path loads at the next checkout ff (watchdog-only, no role restart) -- the first real CANCEL_FAILED, if any, produces an email
 - Blocked by: none
 
-### nba-live-prop-coverage — OPEN — opened 2026-10-20 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
+### nba-live-prop-coverage — CLOSED 2026-10-21 01:20Z (GOAL MET) — opened 2026-10-20 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
+- GOAL VERDICT `[2026-10-21 01:20Z]`. Goal (verbatim): "Live NBA prop rows on the board get a live re-sim projection wherever the sim has the player: combos (P+R, P+A, R+A, P+R+A) per draw, steals/blocks/turnovers, every posted line plus +-3 neighbours (user 2026-10-20: 'fix the live prop matching so more props get projections')" -- GOAL: MET. Served board 01:17:11Z (PHI @ NYK live): live prop rows with a live projection 106 of 137 (was 45-48 before the respawn), lens prop rows 488 (was 37), join misses market 112 -> 15 and line 44 -> 14; every market incl. the four combos projected (deploys.md 2026-10-21 01:20Z). The remaining player misses are the stale PHI sim roster -- not this lane (task chip offered).
 - Goal: Live NBA prop rows on the board get a live re-sim projection wherever the sim has the player: combos (P+R, P+A, R+A, P+R+A) per draw, steals/blocks/turnovers, every posted line plus +-3 neighbours (user 2026-10-20: 'fix the live prop matching so more props get projections')
 - Files: syndicate/features/nba/live_resim.py (the live props section: PROP_STATS, COMBO_STATS, _player_remainder_hists, _BOX_COLUMNS/actuals_from_summary, BOARD_PROP_MARKETS, lines_from_props_csv, with_neighbour_lines, _banked, build_live_props, and the liveProps call in build_live_lens_snapshot ONLY), tests/test_nba_live_prop_coverage.py (NEW), tests/test_nba_live_resim.py (the lines and snapshot live-props tests ONLY)
 - Hypothesis: n/a

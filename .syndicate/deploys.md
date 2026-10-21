@@ -52167,3 +52167,23 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   reload: gunicorn's recycled workers (19:40 / 20:10 CDT) run the new code.
 - Instrument note: my polling watcher (setsid + nice 19 via `wsl --exec`) logged the ff at 23:49:43Z and then DIED without a reading; this
   reading was taken by hand. A watcher's silence is not a reading.
+
+## 2026-10-21 01:20Z (8:20 PM CT 10-20) -- nba-live-prop-coverage: 3fffb430 LIVE (fleet ff + live-odds-worker respawn), MEASURED
+- **user-approved in chat** ("Deploy now (Recommended)") after "fix the live prop matching so more props get projections".
+- **claims:** live-odds-worker (5741c3ab), refresh-worker (bd15c6c3), web (b5577a90), holder `nba-live-prop-coverage`, ~00:51Z;
+  refresh-worker + web released 01:07Z (ff only, not restarted); live-odds-worker released after this entry.
+- **ff:** fleet 3567ff3b -> 3fffb430 at 00:52:57Z (`git merge --ff-only 3fffb430`, guard: HEAD == 3567ff3b and no incoming file
+  among the tree's locally modified runtime files). Ride-alongs 3567ff3b..3fffb430: fceadd4b (Kalshi expire-at-kickoff, flag default
+  OFF -- `SYNDICATE_KALSHI_EXPIRE_AT_KICKOFF` absent from the live-odds-worker env, key names read only) + ledger/lanes/todo commits.
+- **respawn:** live-odds-worker TERM 3111241 at 01:06:45.8Z once it had no child job (waited out a soccer pregame full refresh);
+  new pid 3136399 at 01:06:55Z. `NBA_LIVE_RESIM_LOOP_STARTED interval_s=120.0` 01:06:55Z; first tick 01:07:20Z games=1 resimmed=1
+  bytes=87,869 written=True (the re-sim file; the lens loop merges its liveProps into nba_live_lens.json every 60 s).
+- **verify (served `/api/board/layer2-shortlist?sport=nba`, PHI @ NYK live):** BEFORE -- board 00:55:04Z: lens prop rows seen 37,
+  served live prop rows 133 with a live projection 48; board 01:08:46Z (built on the pre-respawn snapshot): 37 seen, 45 of 166.
+  AFTER -- board 01:17:11Z: lens prop rows seen **488**, enrichment projected 193 of 313 considered (misses: market 112 -> 15,
+  line 44 -> 14, player 73, no line 18), served live prop rows **106 of 137** with a live projection, every market projected
+  (pts 21/30, reb 11/15, ast 11/14, threes 10/13, P+R 16/18, P+A 12/15, R+A 10/14, P+R+A 15/18).
+- **left, not this lane:** the player misses are the stale PHI sim roster (LeBron James, Jaylen Brown, Anfernee Simons,
+  Kentavious Caldwell-Pope, Adem Bona absent from the pregame sim; Paul George, Kyle Lowry et al. present) -- task chip
+  "Fix stale NBA sim rosters after offseason moves" offered to the user. Yes/no markets (double/triple-double) stay unjoined.
+- **pre-deploy A/B (same instant, fleet data, 7:47 PM CT):** old producer emulated from the same snapshot 46 -> new 106 of 132.
