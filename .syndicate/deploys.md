@@ -52581,3 +52581,32 @@ changed, and today's probe returned `cardsFallback: None` with 0 games.
 - **population:** one build, 17 live positions (14 Kalshi, 3 Polymarket): 6 capped at $5, 1 refused (shorter than -1000). Whether refusals/caps change ROI is not measured; the band's 5-10 $ sizing for the rest is unchanged.
 - **claims released** 16:24:07Z (refresh-worker / web / live-odds-worker).
 - **undo:** delete line `REFRESH_WORKER__SYNDICATE_LIVE_BAND_FAVOURITE_CAP=on` from `~/syndicate-prod/local_production.env` (or restore `.bak-fav-cap-20261021T160510Z` if nothing else changed since), then a full down/up under all three claims (env loads only at `up`).
+
+## 2026-10-21T16:25:19Z (11:25 CDT) — WEB TIER BOUNCE for MEMORY (not code): `reload-web`, 631 MB → 143 MB — lane `ci-suite-four-stale-1021`, session `4ab694ed`
+
+**User instruction:** "watch for the release and bounce the web tier" (2026-10-21), after I reported the web workers were already post-ff so a code-driven recycle was pointless. This bounce is for MEMORY only; the code was already current.
+
+- **waited for a real release, did not force.** `compounding-bankroll` held `web` from ~16:01Z. Polled `deploy_claim.py status` (status ONLY — a poll loop that re-acquires rotates its own token and strands the holder) every 45 s; it went `free` at **16:24:41Z** after 10 polls, ~22.2 min held. Then acquired `web` under my own holder, exit code checked, token `14b9128b…`.
+- **what:** `scripts/local_production.py --home /home/amyn/syndicate-prod reload-web`. Graceful gunicorn HUP: master `3433673` kept (23 MB), old workers `[3433687, 3438858]` replaced by `[3439294, 3439295]`. The tool's own probe: `RELOAD_WEB {"elapsed_s": 2.0, "failures": 0, "healthz_ok_last": true, "max_latency_s": 0.0, "probes": 2, "state": "done"}`.
+- **verify — the READING:** web's own `CONTAINER_MEMORY.memory_current_mb` (max 2048) went **631.332 → 142.617 / 142.641 / 155.301**, i.e. **-488 MB, -77%**. Process level: new workers booted 16:25:19Z at 150 MB each, web tier total RSS 324 MB. Health after: `GET /` and `/healthz` both **200 on 4/4 probes**.
+- **code was already current before this, and the bounce did not change that.** All three web processes already predated nothing: master booted 16:05:59Z, after the 14:38:11Z ff. Verified by PROVENANCE, not uptime — `syndicate/features/mlb/__pycache__/live_lens.cpython-311.pyc` embeds source mtime `14:38:10Z`, equal to the post-ff source's, written 14:42:43Z.
+
+### MY OWN BASELINE LOOP FAILED, and this entry uses a recovered substitute
+
+The script meant to capture per-pid RSS immediately before the reload assigned
+to `PPID` — a **readonly** bash variable — so under `set -u` the assignment
+aborted the loop body and the tier total printed `0 MB`. The pre-reload
+process-level baseline is therefore GONE; I did not notice until after the
+reload had run, when it could no longer be retaken.
+
+The before/after above is recovered from the APP's own `CONTAINER_MEMORY`
+telemetry in `logs/web.log` — three consecutive identical pre-reload readings at
+631.332 MB, which is a stable baseline rather than a single sample. That is a
+better instrument than the one I lost (it is what the service reports about
+itself), but it is a recovery and is labelled as one: do not read it as the
+measurement I set out to take.
+
+**Rule for next time:** never use `PPID`, `UID`, `EUID`, `BASHPID` or `SHLVL` as
+a loop variable in a `set -u` script, and have a baseline PRINT a non-zero
+sentinel the caller checks before the irreversible step — a `0 MB` total should
+have stopped the reload, and it did not because nothing was gating on it.
