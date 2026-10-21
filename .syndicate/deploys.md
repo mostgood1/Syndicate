@@ -52686,3 +52686,9 @@ have stopped the reload, and it did not because nothing was gating on it.
 - **baseline:** 0 live closing marks stamped since 18:13:06Z (read 18:1xZ); the 15 re-marked rows still corrected (re-read after a worker write at 16:58:46Z: 15/15).
 - **expect:** the first live mark stamped after 18:13:06Z has |clv_pct| within a few points (probability points), NOT ~-30..-55 (the old-unit reading the check also prints for the same row).
 - **verify (OWED):** a background poll every 10 min prints the first live mark after 18:13:06Z with entry, close, clv_pct and the old-unit value; reading appended here when it lands.
+
+## 2026-10-21 18:43Z (1:43 PM CT) -- READING: nba-current-rosters 10-22 rebuild -- **MET: stale 0 / 56, priced-missing 0** (lane `nba-current-rosters`, session 8e69dd3f)
+- **run:** 10-22 full props refresh on fleet code: `NBA_CURRENT_ROSTER_REKEY moved 101 departed 147 kept 339`; `SMART_SIM_REUSE_STALE_POOL ... reason=no_pool_stamp_current_roster_active` for OKC_DEN and PHI_CLE -> both rebuilt 1:41 PM CT with `context.props_pool`; `SMART_SIM_MERGE_COMPLETE date=2026-10-22 rows=56`.
+- **audit (`nba_sim_roster_audit.py --date 2026-10-22`, ESPN live):** 4 sides, stale **0 / 56**, priced-missing **0**; the 12 missing all have no history and no posted line (rookies / deep bench).
+- **PHI (home vs CLE):** LeBron James 26.1 min / 17.0 pts, Jaylen Brown 27.1 / 23.0, Anfernee Simons 17.1 / 11.6, Kentavious Caldwell-Pope 18.1 / 8.2 now simulated for PHI; 0 stale. OBSERVATION, not measured as a defect: some moved players' minutes look off (Rayan Rupert 26.4, Caleb Love 0.0, Jabari Walker 0.0) -- the minutes model, measured biased before this lane.
+- **lane CLOSED** on this reading (verdict in lanes.md).

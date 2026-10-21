@@ -482,9 +482,9 @@ once this index exists: re-splitting would orphan the parts.
 | [basketball-native-orchestrator] | THE BASKETBALL SMART-SIM ORCHESTRATOR IS SYNDICATE'S; the sim path imports no vendored module -- live on the f | `state_basketball.md` |
 | [nba-sim-totals-and-strength] | NBA SMART-SIM TOTALS + TEAM STRENGTH: measured defects, fixes built DEFAULT-OFF, nothing enabled `[2026-10-10, | `state_basketball.md` |
 | [basketball-props-refresh-off-vendor] | BASKETBALL PROPS REFRESHES: vendored uses retired path by path; WNBA history now tracks the schedule `[verifie | `state_basketball.md` |
-| [nba-current-rosters] | THE NBA SMARTSIM RAN 2025-26 ROSTERS ON OPENING NIGHT; THE FIX (ESPN CURRENT ROSTERS) IS LIVE ON THE FLEET AND | `state_basketball.md` |
+| [nba-current-rosters] | THE NBA SMARTSIM RAN 2025-26 ROSTERS ON OPENING NIGHT; THE FIX (ESPN CURRENT ROSTERS) IS LIVE ON THE FLEET: ST | `state_basketball.md` |
 | [nba-no-history-standins] | NBA PRICED PLAYERS WITH NO player_logs HISTORY: A MARKET-IMPLIED STAND-IN IS ON MAIN, DEFAULT OFF, NOT ON THE  | `state_basketball.md` |
-| [basketball-smart-sim-tip-freeze] | A BASKETBALL SMARTSIM IS FROZEN AT TIP -- LIVE ON THE FLEET since 2026-10-21 11:56 AM CT (aaa988a8); first-slate reading OWED | `state_basketball.md` |
+| [basketball-smart-sim-tip-freeze] | A BASKETBALL SMARTSIM IS FROZEN AT TIP -- LIVE ON THE FLEET since 2026-10-21 11:56 AM CT (aaa988a8, switch abs | `state_basketball.md` |
 | [board-freshness] | BOARD FRESHNESS AND STALENESS | `state_board.md` |
 | [board-intelligence-engine] | BOARD / INTELLIGENCE ENGINE — structural facts, archived — **ARCHIVED 2026-08-19 to `state_archive_2026-08-19. | `state_board.md` |
 | [locked-cards-retuned-no-autorun] | `locked_cards_retuned` HAS NO AUTOMATIC TRIGGER, ANYWHERE `[measured 2026-08-18]` | `state_board.md` |
