@@ -67,6 +67,14 @@ death, never life — do not invert it.
 
 ## OPEN
 
+### live-event-concentration — OPEN — opened 2026-10-20 — session 8ac736cb-2ce0-4e2f-a6c6-66efbd351c25
+- Goal: Design (then, on the user's yes, build) a per-GAME exposure rule for the live venue plans: measure positions/stake per event per slate on paper + live ledgers 10-02..10-20, propose per-event stake/count caps + mutually-exclusive/adjacent-line family dedupe (keep best net EV per family) incl. the held book, its interaction with the stake band / compounding / 0% live EV floor, and a reachability test design. Requested by session 332cb014 (live execution monitor). DESIGN ONLY until the user says yes.
+- Files: .syndicate/findings_2026-10-20_live_event_concentration.md (NEW). No code held. A build would need loans: pipeline/portfolio_commit.py commit_live_venue_plan (compounding-bankroll holds the compounding step) and/or pipeline/execute_portfolio.py (future-dated-live-orders-scope holds D1).
+- Hypothesis: the live book's correlated stacking is structural (alt ladders + both-sides adjacent lines survive per-line Suggested + D1 cross-slate dedupe), not tonight-only; falsified if <5% of live/paper stake sits in events with >1 position.
+- Falsification test: per-event per-slate position counts and stake share on the paper + live execution ledgers 10-02..10-20, denominators and date coverage printed.
+- Verification: findings doc with counts + rule + test design; a user decision.
+- Blocked by: none
+
 ### venue-fanin-game-identity — CLOSED 2026-10-20 (GOAL MET) — opened 2026-10-20 — session e13a70a0
 - GOAL VERDICT `[2026-10-20 21:08:26Z]`: **MET.** 6fb473e1 loaded in refresh-worker pid 3055456 (lstart 20:45:40Z, compounding-bankroll's full down/up on c60b79ee; my own gated TERM was never sent). First board after it (21:06:30Z): **0 of 56** Kalshi and **0 of 454** Polymarket venue tickers dated for another day (baseline 19:05Z: 58 of 134). Guard counters first build: CROSS_DATE_REJECTED_GRID ncaaf 331, soccer 576, nba 34, nhl 28, nfl 0; ROWS 581. deploys.md entry 2026-10-20 21:08:26Z. Claims: none held.
 - Goal: USER DECISION 2026-10-20 ~18:45Z (relayed by 332cb014: "Guard + fix the join"). Fix the BOARD half: the venue fan-in must not attach a venue quote for a DIFFERENT game of the same team -- the ticker/market date must equal the row's own commence_time date, so a wrong-game quote never reaches quote.book_prices / best_any_book / the consensus fair. The order-time guard is NOT this lane (future-dated-live owns pipeline/execute_portfolio.py).
