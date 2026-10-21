@@ -52639,3 +52639,22 @@ have stopped the reload, and it did not because nothing was gating on it.
 - **audit (`scripts/nba_sim_roster_audit.py --date 2026-10-21`, production sims, ESPN live 16:53Z):** 22 sides, stale **0 / 285** (0/22 sides; was 146/363 as built), missing 95, priced-missing **12** (was 34): Mikel Brown Jr., VanVleet, Irving, Wagler, Acuff, Lendeborg, Boozer, Peterson, Haliburton, Lillard, Caleb Wilson, Dybantsa (also injury-excluded) -- every one has NO player_logs history. Priced players WITH history missing: **0**.
 - **checklist (`basketball_sim_input_checklist.py`, fleet code, SYNDICATE_DATA_ROOT=production):** NBA Level 0 native orchestrator, Level 1 priors rate keys 94.9%; FAIL on 1 alarm = WNBA team_advanced_stats.games 0.0% (as_of 2026-07-08) -- WNBA-only, no file of this lane touches it.
 - **owed:** 10-22 sims (OKC_DEN, PHI_CLE: still the 00:01 CT build, old rosters) rebuild at the next 10-22 full refresh -- the PHI game; a web reload for the rosters export pattern (085fe1e8); the no-history players are lane nba-no-history-admit's (hooks on the fleet, default off).
+
+## 2026-10-21 16:56:40Z (11:56 AM CT) -- FLEET ff d1a7ffbe -> aaa988a8 (NO restart): basketball SmartSim frozen at tip (lane `freeze-nba-pregame-sims`, session d07b749c, todo #720)
+- **user-approved in chat** (AskUserQuestion, "Deploy now, carry all three (Recommended)"). Policy "Freeze at tip" and "On by default, kill switch" were chosen earlier the same session.
+- **ride-alongs: NONE.** The question named three ride-alongs on the 7c7acfd6 base (69c1af9d, 0ee246ca, d1a7ffbe). Peer lane `live-clv-contract-units` fast-forwarded the fleet to d1a7ffbe at ~16:52Z, before mine, so my gap was exactly aaa988a8: 4 files, all new or in my section (`smart_sim_tip_freeze.py`, the loop block in `basketball_props_smart_sim.py`, `scripts/basketball_posttip_rebuilds.py`, the test).
+- **claims:** refresh-worker 6f044a0f, live-odds-worker 3e116663, web d87f6b22, holder `freeze-nba-pregame-sims`, acquired after the peer released at 16:55:57Z.
+- **guard:** HEAD read in a SEPARATE call == d1a7ffbe; 0 incoming files among the fleet tree's dirty files. Then `git merge --ff-only aaa988a89` at 16:56:40Z.
+- **why no restart:** the change is read by `_smart_sim_run_date_local` inside the per-run props refresh subprocess. A run already in flight keeps the old module; the next run imports the new one.
+- **switch:** `SYNDICATE_SMART_SIM_TIP_FREEZE` is ABSENT from `local_production.env` and from the running roles' environ (presence checked as a boolean only). Absent = ON.
+- **smoke on fleet code (16:57Z):**
+  - `tf.mode()` == `on`.
+  - Every 10-21 game resolves a tip through the loop's own `tip_time`. NBA 11/11: 5 from the predictions row, 6 from game_odds/schedule. WNBA ATL_GSV 00:10Z.
+  - `scripts/basketball_posttip_rebuilds.py --since 2026-10-20 --replay-freeze`, fleet code: the 10-20 post-tip builds kept 5/5, pre-tip frozen 0/59 NBA and 0/15 WNBA.
+- **expect (prediction):** on the 10-21 slate (first tip WAS_MIL 23:00Z = 6:00 PM CT; WNBA ATL_GSV 00:10Z), any full props refresh after a game's projected finish logs `SMART_SIM_TIP_FREEZE league=nba ... frozen=1 reuse=True` for that game instead of `SMART_SIM_REUSE_STALE_*` + a rebuild.
+- **verify (OWED, after the 10-21 games):**
+  - `python scripts/basketball_posttip_rebuilds.py --data-root /home/amyn/syndicate-prod/data --since 2026-10-21` reports **0 `after_tip`** NBA/WNBA builds for 10-21;
+  - each 10-21 game's `engine_inputs/2026-10-21/<H>_<A>.pkl` mtime <= its tip;
+  - count of `frozen=1` lines > 0 if any full refresh ran after a tip.
+  - Baseline for the same reading without the fix: 10-20, 5 after_tip builds on 3 games.
+- **undo:** `SYNDICATE_SMART_SIM_TIP_FREEZE=off` in `local_production.env` + a role restart, or revert aaa988a8 and ff.
