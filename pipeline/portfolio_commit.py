@@ -267,6 +267,11 @@ def _venue_line_key(row: Mapping[str, Any]) -> tuple:
     )
 
 
+def _is_ev_floor_extra(row: Mapping[str, Any]) -> bool:
+    """A row the 0% live EV floor added (`live_ev_floor_rows` tags its copies `live_ev_floor: 0`)."""
+    return isinstance(row, Mapping) and row.get("live_ev_floor") == 0
+
+
 def _apply_live_net_floor(
     placeable: list[Mapping[str, Any]], floor: float
 ) -> tuple[list[Mapping[str, Any]], list[tuple[str, Any]]]:
@@ -330,19 +335,27 @@ def commit_live_venue_plan(
             dropped.append((reason, row))
 
     # THE PER-VENUE LIVE NET FLOOR (see `live_net_floor`). Absent key: nothing here runs.
+    # SCOPE: ONLY the rows the 0% live EV floor ADDED (`live_ev_floor == 0`) [user
+    # 2026-10-21: "change the live net floor so it applies only to the rows the 0% live EV
+    # floor added (live_ev_floor=0); Suggested rows go back to their previous rule"]. So
+    # neither the floor nor an unreadable key can refuse a Suggested row.
     net_floor, net_floor_error = live_net_floor(venue)
     net_floor_stamp: dict[str, Any] | None = None
-    if net_floor_error is not None:
-        dropped.extend((net_floor_error, row) for row in placeable)
-        net_floor_stamp = {"venue": venue, "floor_pct": None, "error": net_floor_error,
-                           "rows_checked": len(placeable), "kept": 0}
-        placeable = []
-    elif net_floor is not None:
-        checked = len(placeable)
-        placeable, floor_dropped = _apply_live_net_floor(placeable, net_floor)
+    if net_floor_error is not None or net_floor is not None:
+        extras = [row for row in placeable if _is_ev_floor_extra(row)]
+        if net_floor_error is not None:
+            kept_extras: list[Mapping[str, Any]] = []
+            floor_dropped = [(net_floor_error, row) for row in extras]
+        else:
+            kept_extras, floor_dropped = _apply_live_net_floor(extras, net_floor)
+        kept_ids = {id(row) for row in kept_extras}
+        placeable = [row for row in placeable if not _is_ev_floor_extra(row) or id(row) in kept_ids]
         dropped.extend(floor_dropped)
-        net_floor_stamp = {"venue": venue, "floor_pct": net_floor, "rows_checked": checked,
-                           "kept": len(placeable)}
+        net_floor_stamp = {"venue": venue, "floor_pct": net_floor, "scope": "ev_only_extra",
+                           "rows_checked": len(extras), "kept": len(kept_extras),
+                           "suggested_exempt": len(placeable) - len(kept_extras)}
+        if net_floor_error is not None:
+            net_floor_stamp["error"] = net_floor_error
         for reason, _row in floor_dropped:
             net_floor_stamp[reason] = net_floor_stamp.get(reason, 0) + 1
 
