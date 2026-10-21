@@ -165,3 +165,15 @@ def test_canonical_fallback_joins_only_when_both_clubs_are_named(monkeypatch):
     events = {"e1": ("Sporting Lisbon", "LASK"), "e2": ("Someone", "Else")}
     assert mb._soccer_odds_event_by_canonical(home_team="Sporting CP", away_team="LASK Linz", events=events) == ("e1", "Sporting Lisbon", "LASK")
     assert mb._soccer_odds_event_by_canonical(home_team="Sporting CP", away_team="Nobody", events=events) is None
+
+
+def test_canonical_fallback_runs_when_home_matches_but_away_does_not(monkeypatch):
+    """Fleet 2026-10-21: home 'Trabzonspor' fuzzy-matches exactly, away 'Heart of Midlothian' vs 'Hearts' does not."""
+    from syndicate.features.soccer import market_board as mb
+    import syndicate.features.shared.team_aliases as ta
+
+    names = {"Trabzonspor": "trabzonspor", "Heart of Midlothian": "heart of midlothian", "Hearts": "heart of midlothian"}
+    monkeypatch.setattr(ta, "canonical_team", lambda sport, value: names.get(value))
+    rows = [{"event_id": "oa9", "home_team": "Trabzonspor", "away_team": "Hearts"}]
+    assert mb._soccer_odds_event_for_match(home_team="Trabzonspor", away_team="Heart of Midlothian",
+                                           game_odds_rows_all=rows) == ("oa9", "Trabzonspor", "Hearts")

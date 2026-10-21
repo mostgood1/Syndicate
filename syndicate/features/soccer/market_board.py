@@ -260,17 +260,17 @@ def _soccer_odds_event_for_match(
         return None
     home_names = [pair[0] for pair in events.values()]
     matched_home = match_team_name(home_team, home_names)
-    if matched_home is None:
-        return _soccer_odds_event_by_canonical(home_team=home_team, away_team=away_team, events=events)
-    candidate_event_ids = [event_id for event_id, pair in events.items() if pair[0] == matched_home]
-    away_names = [events[event_id][1] for event_id in candidate_event_ids]
-    matched_away = match_team_name(away_team, away_names)
-    if matched_away is None:
-        return None
-    for event_id in candidate_event_ids:
-        if events[event_id][1] == matched_away:
-            return event_id, matched_home, matched_away
-    return None
+    if matched_home is not None:
+        candidate_event_ids = [event_id for event_id, pair in events.items() if pair[0] == matched_home]
+        away_names = [events[event_id][1] for event_id in candidate_event_ids]
+        matched_away = match_team_name(away_team, away_names)
+        if matched_away is not None:
+            for event_id in candidate_event_ids:
+                if events[event_id][1] == matched_away:
+                    return event_id, matched_home, matched_away
+    # Whenever the fuzzy path ends WITHOUT an event -- home unmatched, or home matched and away not (fleet
+    # 2026-10-21: "Trabzonspor v Hearts" against ESPN's "Trabzonspor v Heart of Midlothian").
+    return _soccer_odds_event_by_canonical(home_team=home_team, away_team=away_team, events=events)
 
 
 def _soccer_odds_event_by_canonical(
