@@ -239,3 +239,59 @@ Inputs, all disk-backed under `SYNDICATE_DATA_ROOT` and allowlisted: `rotation_s
 `oddsapi_player_props_*.csv` (HOT_ARTIFACT_PATTERNS), `rosters_*.csv` (EXPORT_ONLY, sibling lane). No engine
 dataclass field is added -- the stand-in populates columns every pool row already has -- so the basketball input
 checklists have nothing new to gate; the switch is an env flag.
+
+## H1 / H2, measured (scratch, 10:35 PM CT)
+
+**H1 CONFIRMED:** none of the 11 has a `props_predictions_2026-10-21.csv` row (322 rows) or a `player_logs.csv` row in
+the ON copy.
+
+**H2 (2024-25 append), run for real** -- `H2/` = arm A's processed tree with `player_logs.csv` replaced by 2025-26 +
+the fetched 2024-25 (52,957 rows, same columns, no parquet present), worktree-branch code:
+
+- The existing fallback DOES admit all four: feature rows 435 -> 443. Lillard (POR, re-keyed from MIL) roll10 34.5 min
+  / 23.0 pts; Irving 36.0 / 25.4; Haliburton 31.2 / 19.8; VanVleet 35.5 / 13.9 -- against posted lines 18.5 / 20.5 /
+  18.5 / 13.5 -- with `days_rest` 556-597 and `season_game_number` 51-74 (far outside anything the props model saw).
+- It also admits **4 more** current-roster players who missed 2025-26: Ben Simmons, Georges Niang, Reece Beekman,
+  Trey Lyles.
+- No other player's feature row changed (435 / 435 identical, every numeric column). ONNX priors: 661 -> 989 keys
+  (+328 (2024-25 team, player) keys), 0 shared keys changed.
+- Not exercised here, by code: the 720-day career-vs-opponent split changes every player who played 2024-25 from the
+  first 2026-27 game on (it needs split rows, which no one has on opening night).
+
+So H2's first clause holds and its "nothing else changes" clause holds for features and priors but not for the sim's
+career split or the admitted population. The verdict above stands: the append admits the veterans with their
+pre-injury selves, and their own props would be priced from that.
+
+## The build (default-off)
+
+| file | what |
+|---|---|
+| `syndicate/features/shared/nba_no_history_standins.py` (NEW) | `mode()` off/shadow/on; `posted_lines`, `preseason_minutes` (this season's files only), `league_rates_pm`, `minutes_prior`, `build_standins`, `standin_rows`, `add_standins` (never raises: any failure returns the pool as given), `tag_sim_output` (hide + record), `is_standin` |
+| `syndicate/features/shared/basketball_props_smart_sim.py` | 3 hook insertions, no other line: `_smart_sim_run_date_local` after the props read; `_smart_sim_worker_init_local` after its props read; the worker after the `context.props_pool` stamp |
+| `syndicate/features/nba/live_resim.py` | `resim_live_game` hides `pool_source == SOURCE` players from `player_remainders` (`_hide_standin_remainders`); a pool without the column is untouched |
+| `scripts/nba_standin_cost.py` (NEW) | arm comparison (cost, priced lines moved, noise floor) and the pre-registered truth reading (`--truth`) |
+| `tests/test_nba_no_history_standins.py` (NEW) | 14 tests: switch states, the fitted prior, line pooling (latest pre-tip Over per book, median; post-tip / alternate / Under ignored), who is admitted and why not, off == pool untouched / shadow == logged only / on == appended row consistent with its minutes, NBA-only + never raises, no current roster -> nobody, output hiding + record, an empty sim untouched, **the real sim-worker hook off != on**, **the live re-sim off != on** (hidden remainders, same game), **no live prop row for a stand-in** |
+
+Verified on `origin/claude/nba-current-rosters` + these files (the module imports `nba_current_rosters`, which is not on
+main until that lane lands): the 14 new tests plus `tests/test_nba_live_resim.py` and
+`tests/test_nba_live_prop_coverage.py` unchanged -- 58 passed.
+
+## What is owed, and the decision
+
+- **Land** after `nba-current-rosters` is on main (its two commits), then sync and land these files. Pushing `.py`
+  changes nothing on the fleet until a fleet ff; with the switch absent the code is inert (unit-tested), and the live
+  filter is a no-op for every pool built without stand-ins.
+- **The truth reading** (pre-registered rule above) after the 10-21 games are final and the fleet's
+  `rotation_stints/player_checks_2026-10-21.csv` (minutes) and `player_logs.csv` 10-21 rows (points) exist:
+
+      cd /home/amyn/nba_nohist_scratch && python code_test/scripts/nba_standin_cost.py --date 2026-10-21 \
+          --off A/nba_source/data/processed --on B/nba_source/data/processed \
+          --noise A2/nba_source/data/processed --truth /home/amyn/syndicate-prod/data/nba_source/data/processed
+
+  Arms A, A2, B are frozen in `/home/amyn/nba_nohist_scratch` (inputs 8:28 PM CT 10-20, run 9:39-10:12 PM CT); keep
+  them until the reading. The tool is read-only on `--truth`.
+- **Enabling** `shadow` or `on` in production is an env change on the refresh-worker only (it builds the pregame
+  sims; the live filter keys on the persisted `pool_source` column, not on the switch) -- the user's decision, after
+  the reading. Until then: OFF everywhere.
+- **Not done here, by scope:** unpriced no-history players (DAL's other rookies) -- no line, so no market-implied
+  rate; WNBA has the same defect class for 2027 (no WNBA roster producer, sibling lane's note).
