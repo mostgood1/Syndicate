@@ -53814,3 +53814,10 @@ which is about the two sizing bases and not about the refusal boundary.
 - **re-stamp:** same script and safeguards as the 22:07:45Z entry (production `stamp_closing_marks` on fleet code bdc61a1d; old mark in `closing_mark.remark`; unresolved rows final). DRY RUN 22:13:13Z == applied. Archive append 22:16:36Z.
 - **verify (MEASURED):** in-process read-back 216 of 216. Fresh-process `full_history_orders()` 22:20:01Z: 216 carry remark.at=22:16:36Z, **142 with clv_pct (135 same-book)**; 74 named: quotes_unchanged_since_open 52, opened_in_play 21, quotes_no_pregame_quote 1. Matches the replay (142). Population, settled mlb/ncaaf/nfl paper (7,777): same-book marks 6,038 -> 6,173; marks reading `no_close_for_market` with no reason **216 -> 0**.
 - **undo:** append each row's `closing_mark.remark.before` back as its mark (archive last-copy-wins).
+
+## 2026-10-22 22:22Z (5:22 PM CT) -- READING: bdc61a1d (fleet ff 21:57:17Z) runs -- the stand-in hook now finds the slate's games -- **MET** (lane `nba-standins-shadow`, session 15f24a49, todo #714)
+- **first post-ff line** (`syndicate_refresh_oddsapi_props_2026-10-22.log`, found by the 5-min watcher at 22:22:46Z): `NBA_NO_HISTORY_STANDINS {"date": "2026-10-22", "admitted": [], "skipped": {}, "games_source": "slate_files", "mode": "shadow"}`. Only bdc61a1d+ emits `games_source`, and the `no_slate_games_in_pool` reason is gone.
+- **admitted []** is the expected population. Every opening-night no-history player now has `player_logs` history, as the same logic on today's files showed before the ff.
+- **0** NBA sims written since 19:03:43Z carry `context.no_history_standins`. Shadow appends nothing.
+- **switch survives restarts:** a full down/up at 22:17:06Z (another session) brought up live-odds-worker pid 3992939, which reads `SYNDICATE_NBA_NO_HISTORY_STANDINS=shadow`.
+- **state now:** shadow is live and correct on the fleet. `on` stays a user decision. The pre-registered truth rule needs fresh off/on arm pairs per slate (97 of 250 teammate rows); those cannot accrue until a no-history player is priced again.
