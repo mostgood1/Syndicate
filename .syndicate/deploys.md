@@ -53184,3 +53184,54 @@ None", which hid a 71/218 split with two completely different causes.
   - 10-21 files vs tip: 11/11 NBA and 1/1 WNBA sim JSONs and `engine_inputs/2026-10-21/*.pkl` were last written before tip. The closest was LAL_GSW, 01:28:40Z vs 02:00Z.
   - Props logs 10-21: 45 NBA `SMART_SIM_TIP_FREEZE ... mode=on ... frozen=1` lines covering all 11 games, plus 2 WNBA (ATL_GSV). Each game's first freeze is logged after its tip (e.g. ORL_ATL 23:14:39Z vs 23:10Z; BKN_CHA 23:33:32Z vs 23:30Z); the last is 04:04:21Z. 0 `tip=unknown`, 0 `built_after_tip`, 0 `CHECK_FAILED`.
 - **interaction:** the anchor refresh (6e406101, live 10-21 3:48 PM CT, session 1cc8e6fb) adds a line-move rebuild trigger. Every trigger after tip was frozen before the reuse checks ran.
+
+## 2026-10-22T14:40Z (09:40 CDT) — CONFIG: `SYNDICATE_NBA_LIVE_PRICED=1` set explicitly on the fleet (todo #713) — no behaviour change, by construction — session `4ab694ed`
+
+**User decision 2026-10-22: "set the env var explicitly on the fleet"** — the
+second of the two options `#713` offered, chosen over making the gate opt-in
+(which would have stopped NBA live pricing).
+
+- **what:** appended `SYNDICATE_NBA_LIVE_PRICED=1` to
+  `/home/amyn/syndicate-prod/local_production.env`, with a comment block stating
+  why. That file is the fleet's "explicit operator overrides, applied to every
+  role" layer (`local_production.py`), so one entry covers web, refresh-worker
+  and live-odds-worker.
+- **`render.yaml` was NOT touched.** No `blueprint_sync`, no Render blast radius.
+  The local override file is the right layer for a dashboard-style setting and it
+  is what `local_production.py` already documents as the place for one.
+- **why:** `board_enrichment._nba_live_priced()` coerces a missing var to `""`
+  and asks whether that is in `("0","false","off","no")` — it is not, so
+  **absent reads as ON**. NBA live gamelines and live props were priced in
+  production by inheritance while the neighbouring
+  `_LIVE_GAMELINE_SNAPSHOT_PATHS` comment calls the flag opt-in ("Read only when
+  `SYNDICATE_NBA_LIVE_PRICED` admits the sport"). Measured 2026-10-20: absent on
+  every live fleet process.
+- **verify:** `local_production.py env --role <role>` now returns
+  `SYNDICATE_NBA_LIVE_PRICED=1` for **all three roles** (web, refresh-worker,
+  live-odds-worker). The secrets file was edited append-only and checked without
+  printing its contents: **157 → 170 lines, 55 → 56 keys, my key present exactly
+  once, and the prior key list byte-identical** (hash of the sorted key list,
+  values never read).
+- **no behaviour change, and that is the point.** `_live_gameline_sports()` still
+  returns `['mlb','nba','ncaab','ncaaf','nfl','nhl','soccer','wnba']` with `nba`
+  admitted, exactly as before. This records a decision that was previously left
+  to a default nobody chose; setting it to `0` is now the one-line way to
+  actually turn NBA live pricing off.
+
+### It loads on a FULL `down`/`up`, NOT on a role respawn — measured, not assumed
+
+The three running processes still do **not** carry the key. That is not a
+pending-restart caveat of the usual kind: the supervisor
+(`local_production.py ... up`, pid 3506354 from 2026-10-21T19:23:59Z) builds each
+role's env **once at `up`** and its children inherit that, so a role respawn
+re-reads nothing.
+
+**Proven in the same reading:** the live-odds-worker has already respawned since
+the file was edited — it is now pid **3727746**, not the 3551831 from last
+night's restart — and it still reports the key as absent. A role restart is
+therefore NOT sufficient; only a full supervisor `down`/`up` picks this up.
+
+No restart was performed, and none is owed: because absent already resolved to
+ON, the running fleet's behaviour is already what the explicit value states. The
+value exists so the next full restart carries the decision rather than
+re-inheriting it.
