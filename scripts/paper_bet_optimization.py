@@ -20,8 +20,17 @@ BOOK_OF = {"paper:kalshi": "kalshi", "paper:polymarket": "polymarket", "paper:pr
 
 
 def dec(a):
-    a = float(a)
-    return 1 + (a / 100 if a > 0 else 100 / -a)
+    """Decimal odds from American odds OR a live venue contract price (0 < p < 1).
+
+    LIVE kalshi/polymarket rows record `fill_price` as the contract price, and read as
+    American a 0.65 fill is 1.0065 (todo #719). Unit rule: `paper_settlement.profit_per_dollar`.
+    """
+    from syndicate.features.shared.paper_settlement import profit_per_dollar
+
+    profit = profit_per_dollar(a)
+    if profit is None:
+        raise ValueError(f"unusable price {a!r}")
+    return 1 + profit
 
 
 def family(r):
@@ -69,7 +78,9 @@ def load():
         fee_frac = fee / stake
         won = r["outcome"] == "won"
         ret = (d - 1 - fee_frac) if won else (-1 - fee_frac)   # per $1 staked, net of fee
-        p_fair = (1 + float(r["ev_pct"]) / 100) / d
+        # The fair comes out of the price ev_pct was STAMPED at -- `requested_price`, American on a
+        # live row (venue_scope.py) -- not the contract fill; a paper fill copies it, so paper is unchanged.
+        p_fair = (1 + float(r["ev_pct"]) / 100) / (dec(r["requested_price"]) if r.get("requested_price") not in (None, 0) else d)
         q_cost = 1.0 / d + fee_frac / d                          # price + fee per $1 payout
         ev_net = 100 * (p_fair - q_cost) / q_cost
         wb, lb = d - 1 - fee_frac, 1 + fee_frac

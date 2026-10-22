@@ -14,8 +14,15 @@ from __future__ import annotations
 
 import pytest
 
+import json
+import sys
+from pathlib import Path
+
 from scripts import ev_overstatement_decomp as decomp
 from scripts import fit_probability_calibration as calib
+from scripts import fit_staked_probability as staked
+
+REPO = Path(__file__).resolve().parents[1]
 
 
 def _american_profit(american: float) -> float:
@@ -103,3 +110,70 @@ def test_decomp_enrich_live_row_fair_from_stamp_return_at_fill():
     assert rows["e1"]["_ret"] == pytest.approx(0.34 / 0.66)
     assert rows["e2"]["_pf"] == pytest.approx(1.03 / (1.0 + 100.0 / 110.0))
     assert rows["e2"]["_ret"] == -1.0
+
+
+# ---------------------------------------------------------------- staked-probability fitter
+
+
+def test_staked_profit_is_unit_aware():
+    assert staked._net_profit_per_unit(0.65) == pytest.approx(0.35 / 0.65)
+    for american in (-110.0, -186.0, 150.0):
+        assert staked._net_profit_per_unit(american) == pytest.approx(_american_profit(american))
+
+
+def test_staked_contract_only_row_is_kept():
+    row, reason = staked.derive_row(_order(requested_price=0.65, fill_price=0.65))
+    assert reason is None
+    assert row["fair"] == pytest.approx(1.03 * 0.65)
+    assert row["model"] == pytest.approx(1.03 * 0.65 + 0.02)
+
+
+@pytest.mark.parametrize("american", [-110.0, -186.0, 150.0])
+def test_staked_american_row_unchanged(american):
+    row, reason = staked.derive_row(_order(requested_price=american, fill_price=0.66))
+    assert reason is None
+    assert row["fair"] == pytest.approx(1.03 / (_american_profit(american) + 1.0), abs=1e-12)
+
+
+# ---------------------------------------------------------------- paper bet optimization
+
+
+def _load_bet_opt(ledger_path):
+    """The script runs on import; execute only its definitions, then call `load()`."""
+    source = (REPO / "scripts" / "paper_bet_optimization.py").read_text(encoding="utf-8")
+    head = source.split("\nrows = load()\n")[0]
+    assert head != source, "paper_bet_optimization.py no longer has its `rows = load()` entry line"
+    argv = sys.argv
+    sys.argv = ["paper_bet_optimization.py", str(ledger_path), str(REPO)]
+    try:
+        namespace = {"__name__": "paper_bet_optimization_under_test"}
+        exec(compile(head, "paper_bet_optimization.py", "exec"), namespace)
+        return namespace
+    finally:
+        sys.argv = argv
+
+
+def test_bet_opt_decimal_reads_both_units(tmp_path):
+    ns = _load_bet_opt(tmp_path / "unused.json")
+    assert ns["dec"](0.65) == pytest.approx(1.0 / 0.65)
+    assert ns["dec"](-110) == pytest.approx(1.0 + 100.0 / 110.0)
+
+
+def test_bet_opt_live_row_fair_from_stamp_return_at_fill(tmp_path):
+    base = dict(_order(), fill_stake_dollars=6.6, fees_dollars=0.1, submitted_at="2026-10-21T20:00:00Z",
+                commence_time="2026-10-21T23:00:00Z")
+    live = dict(base, venue="kalshi", requested_price=-186.0, fill_price=0.66, event_id="e1", position_key="k1")
+    paper = dict(base, venue="paper:kalshi", requested_price=-110.0, fill_price=-110.0, event_id="e2",
+                 position_key="k2", outcome="lost")
+    ledger = tmp_path / "ledger.json"
+    ledger.write_text(json.dumps([live, paper]), encoding="utf-8")
+    ns = _load_bet_opt(ledger)
+    rows = {r["event"]: r for r in ns["load"]()}
+    fee_frac = 0.1 / 6.6
+    assert rows["e1"]["imp"] == pytest.approx(0.66)
+    assert rows["e1"]["ret"] == pytest.approx(0.34 / 0.66 - fee_frac)
+    fair = 1.03 / (1.0 + 100.0 / 186.0)
+    q_cost = 0.66 + fee_frac * 0.66
+    assert rows["e1"]["ev_net"] == pytest.approx(100 * (fair - q_cost) / q_cost)
+    assert rows["e2"]["imp"] == pytest.approx(110.0 / 210.0)
+    assert rows["e2"]["ret"] == pytest.approx(-1 - fee_frac)

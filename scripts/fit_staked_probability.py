@@ -81,7 +81,14 @@ from syndicate.features.shared.calibration_profile_store import (  # noqa: E402
     save_versioned_profile,
 )
 from syndicate.features.shared.opportunity_signals import staked_probability  # noqa: E402
-from syndicate.features.shared.portfolio_commit import _net_profit_per_unit  # noqa: E402
+# UNIT-AWARE, unlike the sizer's American-only `portfolio_commit._net_profit_per_unit`:
+# the ledger holds American odds (paper) and venue contract prices 0 < p < 1 (live
+# Kalshi/Polymarket fills) in one column, and a 0.65 read as American is a profit of
+# 0.0065 -- `fair` leaves (0, 1) and the row drops silently (todo #719). Identical on
+# every American price. Loaned to lane fitter-contract-price-units 2026-10-22.
+from syndicate.features.shared.paper_settlement import (  # noqa: E402
+    profit_per_dollar as _net_profit_per_unit,
+)
 from syndicate.features.shared.staked_probability_profile import (  # noqa: E402
     DEFAULT_PROFILE,
     BlendCell,
