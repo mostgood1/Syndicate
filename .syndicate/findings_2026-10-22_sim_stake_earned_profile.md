@@ -216,3 +216,8 @@ and every live order.**
 
 **Rule:** run fleet reads with `/home/amyn/.venvs/syndicate/bin/python`, and assert
 `read_json_file_result(_ledger_path())[1] is True` before trusting a count. Recorded in `learnings.md`.
+
+
+## s8. DECISION (21:00Z, owner lane min-ev-tuner-shadow after adoption)
+
+**USER DECISION 2026-10-22 ~21:40Z (relayed verbatim by the fleet-watcher, session local_379fd729, typed in its chat ~4:40 PM CT): "go with (a)"** -- fit venue-POOLED at sport x market x segment x season_phase, with the stake reader extended to take season phase FIRST (loan from lane sim-stake-unfitted-market-only), pre-registered, shadow before any publish; nothing published without a further user yes. Order: (1) phase-aware reader, (2) pre-registration, (3) pooled fit, (4) shadow stake change, (5) user decision to publish.
