@@ -53540,3 +53540,33 @@ which is about the two sizing bases and not about the refusal boundary.
   `/intelligence?sport=nfl&period=intervals`: 9 main-line plays (12 incl. alt), each with the sim distribution and EACH TEAM's last 10
   for that interval (the interval charts' NFL clause now has rows -- board-interval-charts).
 - **owed:** live interval actuals tonight (football watcher bu9nsw6m2, 7:25 + 8:05 PM CT reads) and the slate's spend (quota tomorrow).
+
+## 2026-10-22 19:03:27Z (2:03 PM CT) -- FLEET FULL DOWN/UP, ENV ONLY (no ff): `SYNDICATE_NBA_SIM_MINUTES_PRICED_FIRST=shadow` -- **deploy MET (all three roles read `shadow`); first shadow log line OWED** (lane `nba-minutes-priced-first-shadow`, session ffb7ab00, todo #723)
+- **user, in chat (session ffb7ab00):** "turn on the priced-first switch in shadow".
+- **what shadow does:** in `_derive_sim_minutes_local` (NBA, the no-history derive path), when the base sums over 240 the priced-first fill is computed and logged as `[smart_sim] NBA_SIM_MINUTES_PRICED_FIRST mode=shadow ... engaged= moved= priced_gain= set=priced protected=`. It then RETURNS the water-fill, so no sim minute, price or order changes. `_SET` is absent, which means the registered `priced` set.
+- **code:** 8301efcd + 4b12deca (+ the inert 907e9c9c), on the fleet since the 16:29Z ff; key absent until now. No ff by me.
+- **spacing:** the last full up was 17:50:06Z (venue-prop-close-coverage); this `down` is 73 min later.
+- **claims:** all three, holder `nba-minutes-priced-first-shadow`, target 21b4bdb0, acquired 19:01:5xZ, each rc 0. Released after this entry.
+- **gates:**
+  - `check_deploy_safety --drain`: CLEAR (acked, idle, no build, no child job) after two live-odds child jobs finished.
+  - Plain check CLEAR, with the warning "Live games in progress", the same deliberate call as the 16:17Z / 14:45Z env-only restarts.
+  - `execution_watchdog.py`: 0 findings over 3000 ledger rows.
+  - HEAD guard 21b4bdb0.
+- **env:** 151 -> 152 lines. The only key-level change is `+ SYNDICATE_NBA_SIM_MINUTES_PRICED_FIRST` (global, value `shadow`). Backup `~/syndicate-prod/local_production.env.bak-priced-first-shadow-20261022T190327Z`. No other line was staged since the 16:17:46Z backup.
+- **restart:**
+  - Marker `watchdog_no_autostart` 19:03:27.672Z.
+  - `down` 19:03:27.673Z -> 19:03:33.824Z (rc 0).
+  - Start-ScheduledTask 19:03:40Z (state Running); supervisor 3942262 since 19:03:43Z; **healthz 200 at 19:03:56Z** (~29 s from down).
+  - Marker cleared 19:04:13Z; DRAIN_CLEARED.
+- **env read after up** (python, allowlisted keys, enum values only):
+  - web 3942277, refresh-worker 3942341, live-odds-worker 3942342: all `RENDER_GIT_COMMIT=21b4bdb0`, **`SYNDICATE_NBA_SIM_MINUTES_PRICED_FIRST=shadow`**, EXECUTION_MODE=live.
+  - `SYNDICATE_EXECUTION_LIVE_ARMED=1` on both workers; live-odds-worker also `SYNDICATE_EXIT_LIVE_ARMED=1` and `SYNDICATE_LIVE_EVENT_CONCENTRATION=on` (unchanged).
+- **ride-alongs loaded into the long-running roles (they ran aa06d5a1, read from each pid's environ):**
+  - a126ae95: NFL segment capture option E, user-approved, live as a subprocess since 17:53Z.
+  - 21b4bdb0: NBA injury snapshot, user-approved, live as a subprocess since 17:55Z.
+  - Both were already in effect for the work they change; nothing else is in the gap.
+- **instrument note:** `local_production.py status` printed `code=0a2986b4 ... STALE` for both workers at 19:00Z while their environ read `RENDER_GIT_COMMIT=aa06d5a1` (as the 17:49Z entry recorded). Its `code=` column is not the process's commit; read `/proc/<pid>/environ`.
+- **verify (OWED; watcher armed in session ffb7ab00):**
+  - The next NBA props refresh that BUILDS a sim logs `NBA_SIM_MINUTES_PRICED_FIRST mode=shadow` lines, and 0 `mode=on` lines.
+  - The sims it writes keep OFF minutes: `scripts/nba_sim_minutes_audit.py --replay` mechanics, OFF reproduces production `_sim_min` (shadow returned off).
+- **undo:** delete the `SYNDICATE_NBA_SIM_MINUTES_PRICED_FIRST=shadow` line (or restore the .bak if nothing else changed since), then a full down/up under all three claims. Off is the absent key.
