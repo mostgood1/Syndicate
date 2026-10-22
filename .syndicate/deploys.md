@@ -53531,3 +53531,12 @@ which is about the two sizing bases and not about the refusal boundary.
   - **Neither is in the rebuilt sims' `props_pool` (CLE 13, OKC 14), nor anywhere in either sim file, nor in `props_predictions_2026-10-22`.** So no sim minutes changed from this: the stamps lost two names nobody was simulating.
   - Rebuilt: `smart_sim_2026-10-22_OKC_DEN.json` at 1:07 PM CT and `_PHI_CLE.json` at 1:08 PM CT. CLE excludes Diop and Tomlin; OKC excludes Topic, Oweh and Sorber. Every OUT on the official report is excluded.
 - **OWED: reading (2) only**, after 12:00 AM CT 10-23. The 10-22 rows still read `source=nba_official`, with QUESTIONABLE present and no DAY-TO-DAY: the 11:30 PM ET report fetched by URL, not the fallback.
+
+## 2026-10-22 18:2xZ (1:2x PM CT) -- READING: NFL segment capture (a126ae95) -- quarter/half rows on the served board (lane nfl-segment-capture-e)
+- **quote log:** nfl_source/tracking/book_quotes 2026-10-22 first nonfull rows by 1:17 PM CT (the first pregame pull after the 1:15 PM
+  window opened): h1 48, q1 48, h2 18, q2 18, q3 18, q4 12 (162 quotes, NE @ CHI).
+- **served board** (`/api/board/layer2-shortlist?sport=nfl`, written 18:17:49Z = 1:17 PM CT): 19 NFL segment game rows -- q1 6, h1 5,
+  h2 3, q2 2, q3 2, q4 1; e.g. q1 totals under 9.5 +124 DraftKings (6 books), h1 totals under 25.5 -105 DraftKings (5 books). Page
+  `/intelligence?sport=nfl&period=intervals`: 9 main-line plays (12 incl. alt), each with the sim distribution and EACH TEAM's last 10
+  for that interval (the interval charts' NFL clause now has rows -- board-interval-charts).
+- **owed:** live interval actuals tonight (football watcher bu9nsw6m2, 7:25 + 8:05 PM CT reads) and the slate's spend (quota tomorrow).
