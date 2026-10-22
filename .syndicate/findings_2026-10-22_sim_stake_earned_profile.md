@@ -242,3 +242,72 @@ The phase-aware reader landed first (`f3bea489`): with a slate date, `commit_por
 6. **Hypothesis H-EARN-POOLED** (prior NOT expected to hold, given w = -0.27 [-0.78, +0.18] pooled on 4,876 orders): at least one
    pooled cell passes the beta > 0 write gate. A market_only cell changes nothing today, because the fleet already stakes the market fair
    on unfitted cells.
+
+## s10. RESULT 2026-10-22T21:45:48Z: the VENUE-POOLED fit -- H-EARN-POOLED FALSIFIED; one cell written market_only; shadow $0.00
+
+**Code and data.** The run used the worktree code at `0f4363b9`, the pooled writer, with the phase-aware reader `f3bea489`. It ran
+read-only on the FLEET ledger with the refresh-worker state env:
+- the live keyvalue document read OK (the s7 guard passed);
+- `execution_ledger.json`: 12,512 records, of which 2,959 usable rows on 427 events.
+
+Dropped, with denominators:
+- not_portfolio_book 6,479
+- unsettled 1,248
+- no_model_edge_pct 1,244
+- no_ev_pct 420
+- no_price 131
+- push 29
+- model_out_of_range 2
+
+**Coverage.** 95 pooled cells. Every cell is single-phase, and no unknown-phase cell appeared:
+- mlb postseason
+- wnba postseason
+- nhl preseason + regular
+- the rest regular
+
+**Verdicts.**
+
+| verdict | cells |
+|---|---|
+| refused_n_test_below_floor | 70 |
+| refused_no_chronological_split | 24 |
+| market_only | 1 |
+| **write beta > 0** | **0** |
+
+**The one written cell: `ncaaf|spreads|full|regular`.**
+- Rows: 759 orders / 139 events. Train 508 rows / 113 events, 10-02..10-12. Test 251 rows / 53 events, 10-13..10-21.
+- beta_fit 0.00, beta CI [0.00, 0.65].
+- Brier: beta0 0.24983 vs beta1 0.25306, so delta_beta1 -0.00323 [-0.02356, +0.01642]. The full sim weight is not worse than the market
+  with confidence, and not better.
+
+**Diagnostic cells** (n_test >= the diagnostic floor; never written):
+
+| cell | n_test / events | beta_fit | beta CI | delta_beta1 |
+|---|---|---|---|---|
+| ncaaf h2h | 119 / 41 | 0.00 | [0, 1.00] | -0.01591 |
+| ncaaf totals | 101 / 35 | 0.00 | [0, 1.00] | -0.00887 |
+| nfl receptions | 95 / 26 | 0.00 | [0, 1.00] | -0.00037 |
+| nhl assists | 56 / 21 | 0.00 | [0, 0.00] | -0.00674 |
+
+Every delta_beta1 is negative: the sim's full stake is not earned anywhere it can be read.
+
+**Candidate.** `reports/staked_probability/candidate_pooled_2026-10-22.json` on the fleet.
+- 993 B, one cell, version `staked_probability_pooled_v1@2026-10-22T21:45:48Z`, key `sport|market|segment|phase`.
+- Beside it: fit_pooled_*, fit_pooled_diagnostic_* and coverage_pooled_* for 2026-10-22.
+- It is NOT at the live path.
+
+**Shadow (s9 item 4).** No beta > 0 cell exists, so the s9 shadow has nothing to measure. The market_only cell was still read through
+the REAL seam: `sizing_inputs_with_provenance(..., selected_date=2026-10-24)` on four ncaaf spreads probes (prices -130..+120, edges
+2..9 pp), with the profile absent vs the candidate pinned via `SYNDICATE_STAKED_PROBABILITY_PROFILE_PATH`.
+- Under `market` (the fleet's live #704 mode): model_probability is identical on 4 of 4 probes and no refusal changes. The only
+  difference is provenance: `market_fair@staked_probability_pooled_v1@...` instead of `market_fair@unfitted`. So the candidate IS read
+  (reachable) and changes nothing.
+- Under `raw`: also identical on 4 of 4, because a market_only cell acts only under `market_only_cells`.
+- **Expected stake change if published today: $0.00, by construction.** Publishing would add a provenance label and nothing else.
+
+**What this means.** Pooling the venues did not make the sim's stake earn its way back. In 10 days of in-season data, the one cell big
+enough to judge says beta 0, which is what `market` already does.
+
+**Recommendation to the user:** do NOT publish. There is no stake to gain, and a published file would become one more artifact to keep
+in sync. Refit at the same grain on ~2026-11-01 (todo #727): the s4 arithmetic says ncaaf totals/h2h and nfl receptions should reach
+the floor by then. Re-ask then only if a cell passes the beta > 0 gate.
