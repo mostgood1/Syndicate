@@ -53109,3 +53109,56 @@ rather than defensive.
 
 ## 2026-10-22 12:42Z -- VERIFIED: 9503c042 gameday props pull runs with the live-odds-worker role env (lane gameday-pull-role-env)
 - verify: SyndicateNbaGamedayProps 2026-10-22 07:40 CT (12:40Z): task log `env: live-odds-worker role (216 keys)`, `exit=0 secs=72 snapshot REWRITTEN`; its props run (props_2026-10-22.log, start 12:40:02Z) reads memory_max_mb 3072.0, n_sims=100, 9 Z-stamped lines, export-game-cards with 0 OSError. Pre-fix task pulls (10-21 12:40Z, 18:40Z): zlines=0, memory_max_mb null, n_sims=500.
+
+## 2026-10-22T14:25Z (09:25 CDT) — READING: todo #722's forward proof is DISCHARGED — 17/17 live orders carry the sizing provenance; two subsets explained — lane `order-sizing-provenance`, session `4ab694ed`
+
+The 22:11Z ff receipt recorded a served-row proof as FORWARD and owed (0 orders
+had been placed since the 22:15:52Z restart). It is now takeable and it passes.
+
+**Population:** 578 orders submitted at or after `2026-10-21T22:15:54Z`, read
+through `execution_ledger._load()` with the worker's own keyvalue env.
+
+| subset | n | what it is |
+|---|---|---|
+| **populated** | **289** | `market_fair@unfitted` 266 + `unfitted` 23; bases `model_edge` 266 / `market_fair` 23 |
+| key present, value **null** | 218 | **all paper LADDER** (`selection: ladder`, `stake_basis: flat_1`), 02:57Z–14:10Z |
+| **no key at all** | 71 | all paper, 22:20Z–**02:27Z** only |
+
+**THE PROOF — the live path is 17/17.** Every live order placed since the
+restart carries a populated version: `market_fair@unfitted` ×16, `unfitted` ×1,
+**0 null, 0 missing the key**, each with a `position_key`. The newest is a live
+Kalshi NCAAF h2h order with `version='unfitted'`, `basis='market_fair'`. **0 of
+the 17 are settled yet**, so the ROI split itself is still waiting on grading —
+which is what the 2026-10-29 re-arm is for. This discharges "does a served row
+carry the field", not "is there enough to read".
+
+### The 218: the paper-LADDER gap is now CONFIRMED, not merely suspected
+
+The 22:11Z receipt said the paper-ladder path "was not touched and is
+unchecked". It is now checked: **all 218** are `selection: ladder` /
+`stake_basis: flat_1`, and they carry the KEY with a NULL value — so they pass
+through the record builder (hence the key) but are not built from a plan
+position with a `sizing` block (hence no value). That is correct behaviour for a
+flat-stake ladder placement, which has no sizing basis to record; it is NOT a
+bug, but it does mean **the ladder population can never enter the sizing split**
+and any future reading must exclude it by `selection` rather than discover it as
+nulls. `PaperLedgerBatch.place` belongs to lane `paper-alongside-live`.
+
+### The 71: a MIXED-CODE WINDOW, self-resolved at 02:27Z — worth generalising
+
+71 paper rows written between 22:20Z and **02:27Z** lack the key ENTIRELY,
+rather than carrying it null. A missing key and a null key are different facts:
+null means the new builder ran and had nothing to record, absent means an OLD
+builder wrote the row. The ff at 22:11:53Z updated the checkout but only the
+live-odds-worker was restarted — the refresh-worker (booted 20:27:39Z, before
+the ff) and the web workers kept their imported modules, and anything they wrote
+used the pre-#722 record shape. The window closes at 02:27Z, i.e. when that
+writer recycled and picked up the new code.
+
+**The general fact:** a partial restart makes one append-only document carry TWO
+record shapes for as long as the oldest writer survives, and the boundary is
+invisible unless you look for absent-vs-null. Anyone splitting this ledger on a
+field added by a partial deploy must treat "key absent" as a THIRD state and
+attribute it by time window, not fold it into the null bucket. My own first pass
+did fold them together — `o.get(...)` returned `None` for both and reported "289
+None", which hid a 71/218 split with two completely different causes.
