@@ -214,11 +214,39 @@ def _settled_at(order: Mapping[str, Any]) -> str:
 
 
 def _clv(order: Mapping[str, Any], scopes: Sequence[str]) -> float | None:
+    """Same-book CLV for one order, RECOMPUTED from its own prices where possible.
+
+    WHY NOT JUST READ `closing_mark.clv_pct` (todo #719): every LIVE Kalshi mark
+    was stamped with the contract fill price (0.65) read as American odds and came
+    out ~-35 pt (13 live marks recomputed +0.46 +- 0.35). The unit fix lives at
+    the shared choke point (`prediction_ledger._implied_from_price`), but marks
+    already stamped keep the wrong number. With this lane's evidence now mostly
+    LIVE fills, 30 such marks would read as a large spurious negative CLV --
+    half of a RAISE signal. So: entry price (fill, else requested -- the same
+    order as `order_clv._entry_price`) against the mark's `close_price`, through
+    the shared converter. A contract-price entry whose close cannot be recomputed
+    is dropped, never trusted.
+    """
     mark = order.get("closing_mark")
     if not isinstance(mark, Mapping):
         return None
     if str(mark.get("close_book_scope") or "") not in scopes:
         return None
+    entry = _as_float(order.get("fill_price"))
+    if entry is None:
+        entry = _as_float(order.get("requested_price"))
+    close = mark.get("close_price")
+    if entry is not None and close is not None:
+        try:
+            from syndicate.features.shared.clv_join import clv_pct_from_prices
+
+            recomputed = _as_float(clv_pct_from_prices(entry, close))
+        except Exception:  # noqa: BLE001 -- fall through to the guarded stored value
+            recomputed = None
+        if recomputed is not None:
+            return recomputed
+    if entry is not None and 0.0 < entry < 1.0:
+        return None  # a contract-price mark we cannot recompute: stamped in the wrong unit pre-#719
     return _as_float(mark.get("clv_pct"))
 
 

@@ -348,3 +348,25 @@ def test_ladder_rows_are_skipped_and_never_move_the_effective_cut(memory_state):
     assert cell["effective_cut_pct"] == alone["effective_cut_pct"] == 2.2
     assert cell["evidence"]["rows"] == alone["evidence"]["rows"] == 60
     assert T.is_ladder_venue("paper:polymarket:ladder") and not T.is_ladder_venue("paper:kalshi")
+
+
+def test_live_contract_price_clv_is_recomputed_not_read_from_the_stale_mark():
+    # todo #719: a live Kalshi fill at 0.65 against a -186 close was stamped ~-34 pt.
+    # Recomputed through the shared converter it is ~0.
+    live = _order(1, won=True, clv=-34.3, venue="kalshi")
+    live["mode"] = "live"
+    live["fill_price"] = 0.65
+    live["closing_mark"]["close_price"] = -186
+    value = T._clv(live, ("same_book",))
+    assert value is not None and abs(value) < 1.0
+
+    # Paper American fills are unchanged: -110 closing -130 is ~+4.1 pt.
+    paper = _order(2, won=True, clv=4.1)
+    paper["fill_price"] = -110
+    paper["closing_mark"]["close_price"] = -130
+    assert abs(T._clv(paper, ("same_book",)) - 4.1) < 0.2
+
+    # A contract-price mark with no close price cannot be recomputed: dropped, not trusted.
+    stale = _order(3, won=True, clv=-35.0, venue="kalshi")
+    stale["fill_price"] = 0.65
+    assert T._clv(stale, ("same_book",)) is None
