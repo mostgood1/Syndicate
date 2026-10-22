@@ -3211,6 +3211,14 @@ def _water_fill_minutes_local(base, *, total: float, caps):
 # when >= NBA_SIM_MINUTES_PRICED_FIRST_MIN_PRICED pool players are priced (a D-2 build sees few lines).
 NBA_SIM_MINUTES_PRICED_FIRST_FLAG = "SYNDICATE_NBA_SIM_MINUTES_PRICED_FIRST"
 NBA_SIM_MINUTES_PRICED_FIRST_MIN_PRICED = 5
+# WHICH priced players are shrunk last (lane nba-sim-minutes-history-path, variant V-S, pre-registered cdfe3e59 before
+# any post-10-21 box). The 10-21 development arms showed the registered set over-protecting PRICED BENCH players (bias
+# -0.34 -> +4.71 min: their last-season base is left whole). `priced_starters` protects only the priced players the
+# engine's own starter signal calls starters (>= 0.55, the threshold `_roll_minutes_unscaled` and the caps use);
+# everyone else takes the excess. Absent / `priced` = the registered design. Read only when the switch above is
+# shadow or on, so with it off nothing changes.
+NBA_SIM_MINUTES_PRICED_FIRST_SET_FLAG = "SYNDICATE_NBA_SIM_MINUTES_PRICED_FIRST_SET"
+NBA_SIM_MINUTES_STARTER_SIGNAL_MIN = 0.55
 
 
 def _nba_sim_minutes_priced_first_mode_local(env=None) -> str:
@@ -3218,6 +3226,11 @@ def _nba_sim_minutes_priced_first_mode_local(env=None) -> str:
     if raw in {"on", "1", "true", "yes"}:
         return "on"
     return "shadow" if raw == "shadow" else "off"
+
+
+def _nba_sim_minutes_priced_first_set_local(env=None) -> str:
+    raw = str((env if env is not None else os.environ).get(NBA_SIM_MINUTES_PRICED_FIRST_SET_FLAG) or "").strip().lower()
+    return "priced_starters" if raw == "priced_starters" else "priced"
 
 
 def _priced_first_fill_local(base, *, total: float, caps, priced):
@@ -3298,12 +3311,21 @@ def _nba_priced_first_minutes_local(m, team_df, mins, caps, *, total: float, dat
         keys = m._frame_series(team_df, "player_name", "").map(normalize_player_name_key)
         priced = keys.isin(priced_keys).to_numpy(dtype=bool)
         n_priced = int(priced.sum())
+        pset = _nba_sim_minutes_priced_first_set_local()
+        protected = priced
+        if pset == "priced_starters":
+            from syndicate.features.basketball_engine.orchestrator.smart_sim import _starter_signal
+
+            starter = _starter_signal(team_df).reindex(team_df.index).fillna(0.0).to_numpy(dtype=float)
+            protected = priced & (starter >= NBA_SIM_MINUTES_STARTER_SIGNAL_MIN)
         alt = None
         reason = "ok"
         if n_priced < NBA_SIM_MINUTES_PRICED_FIRST_MIN_PRICED:
             reason = f"priced_below_{NBA_SIM_MINUTES_PRICED_FIRST_MIN_PRICED}"
+        elif not protected.any():
+            reason = "none_protected"  # the fill would be the water-fill but for cap rounding: report it as off
         else:
-            alt = _priced_first_fill_local(mins.to_numpy(dtype=float), total=total, caps=caps, priced=priced)
+            alt = _priced_first_fill_local(mins.to_numpy(dtype=float), total=total, caps=caps, priced=protected)
             if alt is None:
                 reason = "fill_failed"
         moved = priced_gain = 0.0
@@ -3312,7 +3334,7 @@ def _nba_priced_first_minutes_local(m, team_df, mins, caps, *, total: float, dat
             priced_gain = float((alt - np.asarray(off, dtype=float))[priced].sum())
         print(f"[smart_sim] NBA_SIM_MINUTES_PRICED_FIRST mode={mode} date={slate} team={team_tri} "
               f"pool={len(priced)} priced={n_priced} engaged={int(alt is not None)} reason={reason} "
-              f"moved={moved:.1f} priced_gain={priced_gain:+.1f}", flush=True)
+              f"moved={moved:.1f} priced_gain={priced_gain:+.1f} set={pset} protected={int(protected.sum())}", flush=True)
         return alt if mode == "on" else None
     except Exception as exc:  # noqa: BLE001 -- the switch can never break a sim; off is the fallback
         print(f"[smart_sim] NBA_SIM_MINUTES_PRICED_FIRST mode={mode} team={team_tri} error={type(exc).__name__}: {exc}",

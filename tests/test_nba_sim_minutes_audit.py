@@ -61,6 +61,25 @@ def test_replay_rule_verdicts():
     assert a.replay_rule([_side("X", [5.0], engaged=False)])["primary"][3] == 0
 
 
+def test_variant_rule_is_its_own_verdict_and_head_to_head(tmp_path):
+    """V-S (lane nba-sim-minutes-history-path): PRIMARY-V is VAR vs OFF over VAR-engaged sides; the head-to-head is VAR
+    vs ON over sides where both engage, and VAR is preferred only when that CI is below 0. replay_rule is untouched."""
+    def side(name, off, on, var, engaged=True, engaged_var=True):
+        rows = [{"played": True, "priced": True, "box_starter": True, "actual_min": 30.0, "off": off, "on": on, "var": var}
+                for _ in range(3)]
+        return {"date": "2026-10-23", "team": name, "engaged": engaged, "engaged_var": engaged_var, "rows": rows}
+
+    sides = [side(f"T{i}", off=36.0, on=33.0, var=31.0) for i in range(6)]
+    rule = a.variant_rule(sides)
+    assert rule["verdict"] == "PASS" and rule["var_preferred"]
+    assert rule["head_to_head"][0] == pytest.approx(-2.0)
+    assert a.replay_rule(sides)["verdict"] == "PASS"                     # the registered rule reads ON, not VAR
+    tie = [side(f"T{i}", off=36.0, on=31.0, var=31.0) for i in range(6)]
+    assert a.variant_rule(tie)["verdict"] == "PASS" and not a.variant_rule(tie)["var_preferred"]
+    assert a.variant_rule(sides, min_rows=500)["verdict"] == "INCONCLUSIVE"
+    assert a.variant_rule([side("X", 36.0, 33.0, 31.0, engaged_var=False)])["primary"][3] == 0
+
+
 def test_arms_scores_only_engaged_sides_and_reads_points_truth(tmp_path):
     import json
 

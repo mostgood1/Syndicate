@@ -17,6 +17,7 @@ import pytest
 from syndicate.features.shared import basketball_props_smart_sim as b
 
 FLAG = b.NBA_SIM_MINUTES_PRICED_FIRST_FLAG
+SET_FLAG = b.NBA_SIM_MINUTES_PRICED_FIRST_SET_FLAG
 DATE = "2026-10-21"
 # 12 per team: 5 starters, 7 bench; sum 276 > 240, so the shrink always runs.
 MINUTES = [32.0, 31.0, 30.0, 29.0, 28.0, 24.0, 22.0, 20.0, 18.0, 16.0, 14.0, 12.0]
@@ -26,6 +27,7 @@ TEAMS = {"BOS": "Boston Celtics", "NYK": "New York Knicks"}
 @pytest.fixture(autouse=True)
 def _clean(monkeypatch):
     monkeypatch.delenv(FLAG, raising=False)
+    monkeypatch.delenv(SET_FLAG, raising=False)
     monkeypatch.setenv("SYNDICATE_NBA_TEAM_INPUTS", "0")
     b._MARKET_PLAYER_NAMES_CACHE_LOCAL.clear()
     prev = b._SMARTSIM_WORKER_STATE
@@ -211,6 +213,66 @@ def test_wnba_is_never_touched(tree, monkeypatch, capsys):
     assert "NBA_SIM_MINUTES_PRICED_FIRST" not in capsys.readouterr().out
 
 
+# --- V-S: priced STARTERS first (lane nba-sim-minutes-history-path, pre-registered cdfe3e59) ---------------------------
+# The fixture has no explicit starter column, so the engine's `_starter_signal` ramps the top 5 by minutes (players
+# A-E, 32-28 min) to >= 0.72. Priced = A-F. So V-S protects A-E and lets F (priced, 24 min, bench) take the excess too.
+
+
+def test_set_is_priced_unless_priced_starters():
+    assert b._nba_sim_minutes_priced_first_set_local({}) == "priced"
+    assert b._nba_sim_minutes_priced_first_set_local({SET_FLAG: "junk"}) == "priced"
+    assert b._nba_sim_minutes_priced_first_set_local({SET_FLAG: "Priced_Starters "}) == "priced_starters"
+
+
+def test_priced_starters_protects_only_the_priced_starters(tree, monkeypatch, capsys):
+    off = _derive(tree, "BOS", None, monkeypatch)
+    on = _derive(tree, "BOS", "on", monkeypatch)
+    monkeypatch.setenv(SET_FLAG, "priced_starters")
+    var = _derive(tree, "BOS", "on", monkeypatch)
+    assert var.sum() == pytest.approx(240.0)
+    assert not np.allclose(var, off) and not np.allclose(var, on)    # reachability, against both
+    assert np.allclose(var[:5], MINUTES[:5]) and np.allclose(on[:5], MINUTES[:5])
+    # F is priced but on the bench: the registered design keeps his base, V-S shares the excess with him.
+    assert on[5] == pytest.approx(MINUTES[5]) and var[5] < on[5]
+    # The 6 unpriced lose less than under the registered design (F shares the 36 excess) and more than under off.
+    assert (var[6:] - on[6:]).min() > 0.0 and (var[6:] - off[6:]).max() < 0.0
+    assert np.allclose(np.asarray(MINUTES[5:]) - var[5:], 36.0 / 7.0)
+    lines = [ln for ln in capsys.readouterr().out.splitlines() if "set=priced_starters" in ln]
+    assert lines and "team=BOS pool=12 priced=6 engaged=1" in lines[-1]
+
+
+def test_priced_starters_logs_its_set_and_protected_count(tree, monkeypatch, capsys):
+    monkeypatch.setenv(SET_FLAG, "priced_starters")
+    _derive(tree, "BOS", "shadow", monkeypatch)
+    assert "priced=6 engaged=1" in (out := capsys.readouterr().out) and "set=priced_starters protected=5" in out
+
+
+def test_priced_starters_with_no_priced_starter_does_not_engage(tree, monkeypatch, capsys):
+    """7 priced players (>= 5, so the gate opens), none of them a starter: nothing to protect -> off."""
+    raw = tree.parent / "raw"
+    with (raw / f"odds_nba_player_props_{DATE}.csv").open("w", newline="", encoding="utf-8") as fh:
+        w = csv.DictWriter(fh, fieldnames=["snapshot_ts", "event_id", "commence_time", "bookmaker", "market", "outcome_name",
+                                           "player_name", "point", "price", "home_team", "away_team"])
+        w.writeheader()
+        for i in range(5, 12):
+            w.writerow({"snapshot_ts": f"{DATE}T18:00:00+00:00", "event_id": "e1", "commence_time": f"{DATE}T23:30:00Z",
+                        "bookmaker": "draftkings", "market": "player_points", "outcome_name": "Over",
+                        "player_name": _name("BOS", i), "point": 5.5, "price": -110,
+                        "home_team": TEAMS["BOS"], "away_team": TEAMS["NYK"]})
+    off = _derive(tree, "BOS", None, monkeypatch)
+    monkeypatch.setenv(SET_FLAG, "priced_starters")
+    var = _derive(tree, "BOS", "on", monkeypatch)
+    assert np.allclose(off, var)
+    assert "priced=7 engaged=0 reason=none_protected" in capsys.readouterr().out
+
+
+def test_the_set_switch_alone_changes_nothing(tree, monkeypatch, capsys):
+    off = _derive(tree, "BOS", None, monkeypatch)
+    monkeypatch.setenv(SET_FLAG, "priced_starters")
+    assert np.allclose(off, _derive(tree, "BOS", None, monkeypatch))
+    assert "NBA_SIM_MINUTES_PRICED_FIRST" not in capsys.readouterr().out
+
+
 # --- reachability through the REAL worker ----------------------------------------------------------------------------
 
 
@@ -257,3 +319,20 @@ def test_worker_off_vs_on_reaches_the_engine_and_the_artifact(tree, monkeypatch,
             assert engine_on[side][name] < engine_off[side][name]
         assert sum(engine_on[side].values()) == pytest.approx(240.0, abs=0.5)
     assert "NBA_SIM_MINUTES_PRICED_FIRST mode=on date=2026-10-21 team=BOS" in capsys.readouterr().out
+
+
+def test_worker_priced_starters_reaches_the_engine_and_differs_from_both(tree, monkeypatch, capsys):
+    """V-S off != on through the REAL worker: the engine's _sim_min and the published min_mean differ from off AND
+    from the registered design; the priced bench player F is the one it moves (down vs the registered design)."""
+    engine_off, pub_off = _run_worker(tree, None, monkeypatch)
+    engine_on, pub_on = _run_worker(tree, "on", monkeypatch)
+    monkeypatch.setenv(SET_FLAG, "priced_starters")
+    engine_var, pub_var = _run_worker(tree, "on", monkeypatch)
+    for side, team in (("home", "BOS"), ("away", "NYK")):
+        assert engine_var[side] != engine_off[side] and engine_var[side] != engine_on[side]
+        assert pub_var[side] != pub_off[side] and pub_var[side] != pub_on[side]
+        assert engine_var[side][_name(team, 5)] < engine_on[side][_name(team, 5)]
+        for i in range(5):
+            assert engine_var[side][_name(team, i)] == pytest.approx(engine_on[side][_name(team, i)])
+        assert sum(engine_var[side].values()) == pytest.approx(240.0, abs=0.5)
+    assert "set=priced_starters protected=5" in capsys.readouterr().out

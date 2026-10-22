@@ -281,7 +281,8 @@ def run(processed: Path, raw: Optional[Path], dates: List[str]) -> Dict[str, Any
                 s.update({"date": d, "game": game, "built_utc": built.isoformat(timespec="seconds"),
                           "tip_utc": t.isoformat(timespec="seconds") if t else None,
                           "built_after_tip": bool(t is not None and built >= t),
-                          "rotation_history_applied": bool((((sim.get("rotation_minutes") or {}).get(side)) or {}).get("applied"))})
+                          "rotation_history_applied": bool((((sim.get("rotation_minutes") or {}).get(side)) or {}).get("applied")),
+                          "rotation_reason": (((sim.get("rotation_minutes") or {}).get(side)) or {}).get("reason")})
                 report["sides"].append(s)
         report["dates"][d] = cov
     return report
@@ -324,7 +325,10 @@ def priced_by_game_asof(processed: Path, raw: Path, date_str: str, to_tri) -> Li
     return out
 
 
-def replay(processed: Path, raw: Path, dates: List[str]) -> Dict[str, Any]:
+def replay(processed: Path, raw: Path, dates: List[str], *, variant: Optional[str] = None) -> Dict[str, Any]:
+    """`variant` (e.g. "priced_starters", lane nba-sim-minutes-history-path V-S) adds a third arm, `var`: the same call
+    with the switch on and SYNDICATE_NBA_SIM_MINUTES_PRICED_FIRST_SET=<variant>. The off/on arms, the drop rule and
+    `replay_rule` are untouched by it."""
     import os
     import pickle
 
@@ -332,8 +336,9 @@ def replay(processed: Path, raw: Path, dates: List[str]) -> Dict[str, Any]:
 
     from syndicate.features.shared import basketball_props_smart_sim as b
 
-    flag = b.NBA_SIM_MINUTES_PRICED_FIRST_FLAG
-    prev_flag, prev_state = os.environ.get(flag), b._SMARTSIM_WORKER_STATE
+    flag, set_flag = b.NBA_SIM_MINUTES_PRICED_FIRST_FLAG, b.NBA_SIM_MINUTES_PRICED_FIRST_SET_FLAG
+    prev_flag, prev_state, prev_set = os.environ.get(flag), b._SMARTSIM_WORKER_STATE, os.environ.get(set_flag)
+    os.environ.pop(set_flag, None)  # the off/on arms are the REGISTERED design whatever the caller's shell holds
     view = b._build_local_smart_sim_module(processed_root=Path(processed), league_code="nba")
     out: Dict[str, Any] = {"sides": [], "dropped": []}
     try:
@@ -361,6 +366,13 @@ def replay(processed: Path, raw: Path, dates: List[str]) -> Dict[str, Any]:
                         os.environ[flag] = mode
                         arms[mode] = b._derive_sim_minutes_local(smart_sim_module=view, team_df=frame, date_str=asof_date,
                                                                  team_tri=team, league_code="nba").to_numpy(dtype=float)
+                    if variant:
+                        os.environ[flag], os.environ[set_flag] = "on", variant
+                        try:
+                            arms["var"] = b._derive_sim_minutes_local(smart_sim_module=view, team_df=frame, date_str=asof_date,
+                                                                      team_tri=team, league_code="nba").to_numpy(dtype=float)
+                        finally:
+                            os.environ.pop(set_flag, None)
                     prod = frame["_sim_min"].to_numpy(dtype=float)
                     max_dev = float(np.max(np.abs(arms["off"] - prod))) if len(prod) else 0.0
                     keys = frame["player_name"].map(name_key).tolist()
@@ -370,22 +382,27 @@ def replay(processed: Path, raw: Path, dates: List[str]) -> Dict[str, Any]:
                          "priced_n": sum(k in priced for k in keys),
                          "engaged": bool(np.max(np.abs(arms["on"] - arms["off"])) > 1e-9) if len(prod) else False,
                          "rows": []}
+                    if variant:
+                        s["engaged_var"] = bool(np.max(np.abs(arms["var"] - arms["off"])) > 1e-9) if len(prod) else False
                     for i, k in enumerate(keys):
                         bx = (box.get(team) or {}).get(k)
                         s["rows"].append({"player": str(frame["player_name"].iloc[i]), "key": k, "priced": k in priced,
                                           "prod": float(prod[i]), "off": float(arms["off"][i]), "on": float(arms["on"][i]),
                                           "played": bx is not None, "actual_min": (bx or {}).get("min"),
                                           "box_starter": bool((bx or {}).get("starter"))})
+                        if variant:
+                            s["rows"][-1]["var"] = float(arms["var"][i])
                     if applied or max_dev > 0.05:
                         out["dropped"].append({k2: s[k2] for k2 in ("date", "team", "rotation_history_applied",
                                                                     "off_reproduces_production_max_dev")})
                     else:
                         out["sides"].append(s)
     finally:
-        if prev_flag is None:
-            os.environ.pop(flag, None)
-        else:
-            os.environ[flag] = prev_flag
+        for key, prev in ((flag, prev_flag), (set_flag, prev_set)):
+            if prev is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = prev
         b._SMARTSIM_WORKER_STATE = prev_state
     return out
 
@@ -445,6 +462,187 @@ def print_replay(rep: Mapping[str, Any], rule: Mapping[str, Any]) -> None:
         m, lo, hi, n = rule[name]
         print(f"  {name:18} {m:+.3f} [{lo:+.3f}, {hi:+.3f}] n={n}")
     print(f"  DNP sim min per engaged side: off {rule['dnp_sim_min_per_side_off']:.1f} -> on {rule['dnp_sim_min_per_side_on']:.1f}")
+
+
+def variant_rule(sides: List[Mapping[str, Any]], *, min_rows: int = 0) -> Dict[str, Any]:
+    """V-S, pre-registered in findings_2026-10-22_nba_sim_minutes_history_path.md §4 (cdfe3e59). PRIMARY-V: the #723
+    statistic with VAR in place of ON, over VAR-engaged sides. HEAD-TO-HEAD: |VAR - actual| - |ON - actual| over sides
+    where BOTH engage; VAR is preferred only if its CI upper < 0. Group biases are reported, not gating."""
+    key = lambda s: f"{s['date']}:{s['team']}"  # noqa: E731
+    eng = [s for s in sides if s.get("engaged_var")]
+    both = [s for s in eng if s["engaged"]]
+
+    def paired(pop, a, b_, pred=lambda r: True):
+        return {key(s): [abs(r[a] - r["actual_min"]) - abs(r[b_] - r["actual_min"]) for r in s["rows"]
+                         if r["played"] and pred(r)] for s in pop}
+
+    prim = cluster_ci(paired(eng, "var", "off"))
+    m, lo, hi, n = prim
+    verdict = "INCONCLUSIVE" if n < min_rows else ("PASS" if hi < 0 else "FAIL" if lo > 0 else "INCONCLUSIVE")
+    h2h = cluster_ci(paired(both, "var", "on"))
+    groups = {"priced_starters": lambda r: r["priced"] and r["box_starter"],
+              "priced_bench": lambda r: r["priced"] and not r["box_starter"],
+              "unpriced": lambda r: not r["priced"]}
+    bias = {g: {arm: cluster_ci({key(s): [r[arm] - r["actual_min"] for r in s["rows"] if r["played"] and pred(r)]
+                                 for s in eng}) for arm in ("off", "on", "var")} for g, pred in groups.items()}
+    return {
+        "sides": len(sides), "engaged_sides": len(eng), "both_engaged_sides": len(both), "min_rows": min_rows,
+        "primary": prim, "verdict": verdict, "head_to_head": h2h,
+        "var_preferred": bool(h2h[3] > 0 and h2h[2] < 0), "bias": bias,
+        "dnp_sim_min_per_side": {arm: sum(r[arm] for s in eng for r in s["rows"] if not r["played"]) / max(1, len(eng))
+                                 for arm in ("off", "on", "var")},
+    }
+
+
+def print_variant(name: str, rule: Mapping[str, Any]) -> None:
+    m, lo, hi, n = rule["primary"]
+    print(f"VARIANT {name} (V-S): PRIMARY-V paired |var-actual|-|off-actual|: {m:+.3f} [{lo:+.3f}, {hi:+.3f}] n={n} "
+          f"over {rule['engaged_sides']} of {rule['sides']} sides -> {rule['verdict']} (min rows {rule['min_rows']})")
+    m, lo, hi, n = rule["head_to_head"]
+    print(f"  HEAD-TO-HEAD |var-actual|-|on-actual| ({rule['both_engaged_sides']} sides both engaged): "
+          f"{m:+.3f} [{lo:+.3f}, {hi:+.3f}] n={n} -> {'VAR preferred' if rule['var_preferred'] else 'registered design keeps precedence'}")
+    for g, arms_ in rule["bias"].items():
+        print("  bias " + f"{g:16}" + "  ".join(f"{arm} {v[0]:+.2f} [{v[1]:+.2f}, {v[2]:+.2f}]" for arm, v in arms_.items())
+              + f"  n={arms_['off'][3]}")
+    d = rule["dnp_sim_min_per_side"]
+    print(f"  DNP sim min per VAR-engaged side: off {d['off']:.1f} on {d['on']:.1f} var {d['var']:.1f}")
+
+
+# --- history path: where a HISTORY side's minutes come from (lane nba-sim-minutes-history-path) ------------------------
+#
+# Replays the REAL `_rotation_sim_minutes_from_history_local` on each frozen frame with spies on the module view, and
+# splits every pool player's final minutes into MAPPED (his stint share), LEFTOVER (his share of the minutes of history
+# players missing from the pool, spread by roll weights, B:2429-2436), BLEND (the `_regularize_rotation_minutes` pull
+# toward scaled roll minutes, O:773-783) and CAPS (the cap redistribution). A side whose replay does not reproduce the
+# frame's `_sim_min` within 0.05 min is listed and left out of the split.
+
+
+def decompose_history(x, y, z, base_w, *, mapped_minutes: float, leftover_minutes: float, blend: float):
+    """(mapped, leftover, blend, caps) per player from the stage values the spies captured: `x` = the minutes handed
+    to the regularizer (after the leftover spread and the rescale), `y` = its output, `z` = the capped minutes, `base_w`
+    = the roll weights the leftover was spread by."""
+    import numpy as np
+
+    x, y, z = (np.asarray(v, dtype=float) for v in (x, y, z))
+    w = np.clip(np.asarray(base_w, dtype=float), 0.0, None)
+    lo_total = float(leftover_minutes) if float(leftover_minutes) > 1e-6 else 0.0
+    if lo_total > 0.0:
+        lo = (w / float(w.sum())) * lo_total if np.isfinite(w.sum()) and w.sum() > 0 else np.full(x.size, lo_total / max(1, x.size))
+    else:
+        lo = np.zeros(x.size)
+    total = float(mapped_minutes) + lo_total
+    r = (240.0 / total) if total > 0 else 1.0
+    lo_r = lo * r
+    keep = 1.0 - float(blend)
+    return keep * (x - lo_r), keep * lo_r, y - keep * x, z - y
+
+
+def history_replay(processed: Path, dates: List[str]) -> Dict[str, Any]:
+    import pickle
+    from types import SimpleNamespace
+
+    import numpy as np
+
+    from syndicate.features.shared import basketball_props_smart_sim as b
+
+    view = b._build_local_smart_sim_module(processed_root=Path(processed), league_code="nba")
+    out: Dict[str, Any] = {"sides": [], "dropped": []}
+    for d in dates:
+        box = load_box(processed, d)
+        sims = load_sims(processed, d)
+        for pkl in sorted((Path(processed) / "engine_inputs" / d).glob("*.pkl")):
+            rec = pickle.loads(pkl.read_bytes())
+            home, away = str(rec.get("home") or "").upper(), str(rec.get("away") or "").upper()
+            sim = (sims.get(f"{home}_{away}") or ({}, 0.0))[0]
+            for side, team, kw in (("home", home, "home_players"), ("away", away, "away_players")):
+                diag_prod = (((sim.get("rotation_minutes") or {}).get(side)) or {})
+                if not diag_prod.get("applied"):
+                    continue
+                frame = rec["kwargs"][kw]
+                asof = str(frame["asof_date"].iloc[0])[:10] if "asof_date" in frame.columns else d
+                cap: Dict[str, Any] = {}
+
+                def spy(name, store):
+                    real = getattr(view, name)
+
+                    def f(*a, **k):
+                        res = real(*a, **k)
+                        if store not in cap:
+                            cap[store] = (a, k, res)
+                        return res
+                    return f
+
+                spy_view = SimpleNamespace(**vars(view))
+                for name, store in (("_roll_minutes_unscaled", "roll"), ("_regularize_rotation_minutes", "reg"),
+                                    ("_cap_and_redistribute_minutes", "cap")):
+                    setattr(spy_view, name, spy(name, store))
+                team_df = frame.drop(columns=["_sim_min"], errors="ignore")
+                sim_min, _lu, _lw, diag = b._rotation_sim_minutes_from_history_local(
+                    smart_sim_module=spy_view, league_code="nba", team_df=team_df, date_str=asof,
+                    home_tri=home, away_tri=away, team_tri=team)
+                prod = frame["_sim_min"].to_numpy(dtype=float)
+                base = {"date": d, "game": f"{home}_{away}", "team": team, "asof": asof}
+                if sim_min is None or not {"roll", "reg", "cap"} <= set(cap):
+                    out["dropped"].append({**base, "reason": f"replay_refused:{diag.get('reason')}"})
+                    continue
+                z = sim_min.to_numpy(dtype=float)
+                max_dev = float(np.max(np.abs(z - prod))) if len(prod) else 0.0
+                if len(z) != len(prod) or max_dev > 0.05:
+                    out["dropped"].append({**base, "reason": "does_not_reproduce", "max_dev": max_dev})
+                    continue
+                x = np.asarray(cap["reg"][0][1] if len(cap["reg"][0]) > 1 else cap["reg"][1].get("sim_min"), dtype=float)
+                y_ser, reg_diag = cap["reg"][2]
+                y = np.asarray(y_ser, dtype=float)
+                mapped, left, blend, caps = decompose_history(
+                    x, y, z, np.asarray(cap["roll"][2], dtype=float), mapped_minutes=float(diag.get("mapped_minutes") or 0.0),
+                    leftover_minutes=float(diag.get("leftover_minutes") or 0.0), blend=float(reg_diag.get("blend") or 0.0))
+                keys = frame["player_name"].map(name_key).tolist()
+                rows = []
+                for i, k in enumerate(keys):
+                    bx = (box.get(team) or {}).get(k)
+                    rows.append({"player": str(frame["player_name"].iloc[i]), "key": k, "sim_min": float(z[i]),
+                                 "mapped": float(mapped[i]), "leftover": float(left[i]), "blend": float(blend[i]),
+                                 "caps": float(caps[i]), "zero_stint": bool(mapped[i] <= 1e-9),
+                                 "played": bx is not None, "actual_min": (bx or {}).get("min"),
+                                 "box_starter": bool((bx or {}).get("starter"))})
+                out["sides"].append({**base, "max_dev": max_dev, "leftover_minutes": float(diag.get("leftover_minutes") or 0.0),
+                                     "mapped_minutes_frac": diag.get("mapped_minutes_frac"),
+                                     "blend": float(reg_diag.get("blend") or 0.0), "rows": rows})
+    return out
+
+
+def history_summary(rep: Mapping[str, Any]) -> Dict[str, Any]:
+    key = lambda s: f"{s['date']}:{s['team']}"  # noqa: E731
+    sides = rep["sides"]
+    comp = {c: cluster_ci({key(s): [sum(r[c] for r in s["rows"] if not r["played"])] for s in sides})
+            for c in ("mapped", "leftover", "blend", "caps", "sim_min")}
+    returning = [dict(r, side=key(s)) for s in sides for r in s["rows"] if r["zero_stint"] and r["played"]]
+    return {"sides": len(sides), "dnp_component_per_side": comp,
+            "zero_stint_n": sum(1 for s in sides for r in s["rows"] if r["zero_stint"]),
+            "returning_n": len(returning),
+            "returning_bias": cluster_ci({key(s): [r["sim_min"] - r["actual_min"] for r in s["rows"] if r["zero_stint"] and r["played"]]
+                                          for s in sides}),
+            "returning": [{k2: r[k2] for k2 in ("side", "player", "sim_min", "actual_min", "box_starter")} for r in returning]}
+
+
+def print_history(rep: Mapping[str, Any], sm: Mapping[str, Any]) -> None:
+    print("HISTORY-PATH DECOMPOSITION (replay of _rotation_sim_minutes_from_history_local; must reproduce _sim_min within 0.05)")
+    for x in rep["dropped"]:
+        print(f"  dropped {x['date']} {x['team']}: {x['reason']}" + (f" max_dev={x['max_dev']:.3f}" if "max_dev" in x else ""))
+    for s in rep["sides"]:
+        dnp = [r for r in s["rows"] if not r["played"]]
+        print(f"  {s['date']} {s['team']:4} dev={s['max_dev']:.3f} leftover={s['leftover_minutes']:5.1f} b={s['blend']:.2f} "
+              f"DNP n={len(dnp)} sim={sum(r['sim_min'] for r in dnp):5.1f} = mapped {sum(r['mapped'] for r in dnp):5.1f}"
+              f" + leftover {sum(r['leftover'] for r in dnp):5.1f} + blend {sum(r['blend'] for r in dnp):5.1f}"
+              f" + caps {sum(r['caps'] for r in dnp):+5.1f}; zero-stint {sum(r['zero_stint'] for r in s['rows'])}"
+              f" (played {sum(r['zero_stint'] and r['played'] for r in s['rows'])})")
+    print(f"POOLED over {sm['sides']} replayed history sides (DNP sim minutes per side by component, 95% CI over sides):")
+    for c, (m, lo, hi, n) in sm["dnp_component_per_side"].items():
+        print(f"  {c:9} {m:+7.2f}  [{lo:+.2f}, {hi:+.2f}]")
+    m, lo, hi, n = sm["returning_bias"]
+    print(f"  zero-stint pool players: {sm['zero_stint_n']}; who PLAYED: {sm['returning_n']}, bias {m:+.2f} [{lo:+.2f}, {hi:+.2f}]")
+    for r in sm["returning"]:
+        print(f"    {r['side']} {r['player']}: sim {r['sim_min']:.1f} actual {r['actual_min']:.0f}{' (box starter)' if r['box_starter'] else ''}")
 
 
 # --- arms: two scratch worker runs (switch off / on) on the same frozen inputs -------------------------------------
@@ -545,8 +743,10 @@ def _fmt(x: Optional[float], nd: int = 1) -> str:
     return "  -  " if x is None else f"{x:+.{nd}f}" if nd == 1 else f"{x:.{nd}f}"
 
 
-def summarize(report: Mapping[str, Any], *, pretip_only: bool = False) -> Dict[str, Any]:
-    sides = [s for s in report["sides"] if not (pretip_only and s["built_after_tip"])]
+def summarize(report: Mapping[str, Any], *, pretip_only: bool = False, path: Optional[str] = None) -> Dict[str, Any]:
+    """`path`: "history" = sides whose minutes the rotation-history path set, "derive" = the rest; None = all."""
+    sides = [s for s in report["sides"] if not (pretip_only and s["built_after_tip"])
+             and (path is None or bool(s.get("rotation_history_applied")) == (path == "history"))]
     key = lambda s: f"{s['date']}:{s['team']}"  # noqa: E731
     starter = {key(s): [r["sim_min"] - r["actual_min"] for r in s["rows"] if r["played"] and r["box_starter"]] for s in sides}
     bench = {key(s): [r["sim_min"] - r["actual_min"] for r in s["rows"] if r["played"] and not r["box_starter"]] for s in sides}
@@ -601,8 +801,15 @@ def print_report(report: Mapping[str, Any]) -> None:
         print(f"  {s['date']} {s['team']:4} {s['pool_n']:4} {s['played_n']:4} {s['dnp_n']:3}  {s['dnp_sim_min']:6.1f}"
               f"   {_fmt(s['starter_bias']):>6} ({s['starter_n']})     {_fmt(s['bench_bias']):>6} ({s['bench_n']})"
               f"   {s['outside_min']:5.1f} ({s['outside_n']})  {_fmt(s['mae_played'], 2)}  {causes}{flag}")
-    for label, pretip in (("ALL SIDES", False), ("SIDES BUILT BEFORE TIP", True)):
-        sm = summarize(report, pretip_only=pretip)
+    for label, pretip, path in (("ALL SIDES", False, None), ("SIDES BUILT BEFORE TIP", True, None),
+                                ("BUILT BEFORE TIP, HISTORY PATH", True, "history"), ("BUILT BEFORE TIP, DERIVE PATH", True, "derive")):
+        sm = summarize(report, pretip_only=pretip, path=path)
+        if path == "derive":
+            reasons: Dict[str, int] = {}
+            for s in report["sides"]:
+                if not s["built_after_tip"] and not s.get("rotation_history_applied"):
+                    reasons[str(s.get("rotation_reason"))] = reasons.get(str(s.get("rotation_reason")), 0) + 1
+            label += " (rotation-history refusal: " + ", ".join(f"{k} {v}" for k, v in sorted(reasons.items())) + ")"
         print()
         print(f"POOLED -- {label}: {sm['sides']} sides over {len(sm['dates'])} dates {sm['dates']} (95% CI, bootstrap over sides)")
         for name in ("dnp_sim_min_per_side", "outside_min_per_side", "starter_bias", "ge28_bias", "bench_bias", "mae_played"):
@@ -628,6 +835,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--min-rows", type=int, default=0, help="replay: rows below which the verdict stays INCONCLUSIVE")
     ap.add_argument("--arms", nargs=2, type=Path, default=None, metavar=("OFF_PROCESSED", "ON_PROCESSED"),
                     help="score two scratch arms' sims; --processed is the TRUTH root (box, player_logs, props history)")
+    ap.add_argument("--variant", default=None, choices=["priced_starters"],
+                    help="replay: add the V-S arm (SYNDICATE_NBA_SIM_MINUTES_PRICED_FIRST_SET) and its own pre-registered rule")
+    ap.add_argument("--history", action="store_true",
+                    help="split each history-path side's minutes into mapped / leftover / blend / caps (replay)")
     args = ap.parse_args(argv)
     raw = args.raw or (args.processed.parent / "raw")
     if args.arms:
@@ -641,12 +852,26 @@ def main(argv: Optional[List[str]] = None) -> int:
         return 0
     dates = [d.strip() for d in args.dates.split(",") if d.strip()] if args.dates else sim_dates(args.processed, args.since)
     dates = [d for d in dates if (args.processed / "rotation_stints" / f"player_checks_{d}.csv").is_file()]
+    if args.history:
+        hrep = history_replay(args.processed, dates)
+        hsm = history_summary(hrep)
+        print_history(hrep, hsm)
+        if args.json:
+            args.json.write_text(json.dumps({"history": hrep, "summary": hsm}, indent=1, default=str), encoding="utf-8")
+            print(f"\nwrote {args.json}")
+        return 0
     if args.replay:
-        rep = replay(args.processed, raw, dates)
+        rep = replay(args.processed, raw, dates, variant=args.variant)
         rule = replay_rule(rep["sides"], min_rows=args.min_rows)
         print_replay(rep, rule)
+        vrule = None
+        if args.variant:
+            vrule = variant_rule(rep["sides"], min_rows=args.min_rows)
+            print()
+            print_variant(args.variant, vrule)
         if args.json:
-            args.json.write_text(json.dumps({"replay": rep, "rule": rule}, indent=1, default=str), encoding="utf-8")
+            args.json.write_text(json.dumps({"replay": rep, "rule": rule, "variant_rule": vrule}, indent=1, default=str),
+                                 encoding="utf-8")
             print(f"\nwrote {args.json}")
         return 0
     report = run(args.processed, raw, dates)
