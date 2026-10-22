@@ -1839,6 +1839,14 @@ death, never life — do not invert it.
 - Verification: pytest tests/test_wnba_injury_nba_report.py green and red on origin/main's injuries.py (reachability); related WNBA injury suites green; on the fleet after an ff (user's yes): the next same-day WNBA fetch-injuries on an NBA game day prints the Rotowire line and its summary has 0 QUESTIONABLE/PROBABLE/DOUBTFUL/TOR rows
 - Blocked by: none
 
+### nba-injury-snapshot-overwrite — OPEN — opened 2026-10-22 — session 6c89053f-c302-4096-8d34-a44d734b96f0
+- Goal: Measure whether NBA raw/injuries.csv keeps the official report a date's sims were built on (callers that write a date's rows, their source, how often a date's final rows are fallback; the readers of those rows) and, since it does not: fix the writer (an official snapshot is never replaced by fallback rows; a past date's last report fetched by direct URL; fallback rows replace only the day they describe) and the SmartSim partial-snapshot guard that discards a light slate's own official report; tests through update_injuries and the real excluded-map function; findings + todo entry. No fleet change without the user's yes. Side session of local_4ebfbce7 (todo #725 lead 5).
+- Files: syndicate/features/nba/source_cli/scrapers/injuries.py (NBAInjuryDatabase.update_injuries + NBAOfficialInjuryReportScraper URL lookup / get_injuries_for_date section only), syndicate/features/shared/basketball_props_smart_sim.py (the raw-feed partial-snapshot guard in _smart_sim_injuries_excluded_map_for_date_local section only), tests/test_nba_injury_snapshot_writer.py (NEW), .syndicate/findings_2026-10-22_nba_injury_snapshot_overwrite.md (NEW), docs/ai_context/todo.md (new item section only), .syndicate/state_basketball.md ([nba-injury-pdf-parser] section only)
+- Hypothesis: The fleet's final rows for every past NBA date are Rotowire/ESPN fallback, written by the live loop's central-date fetch after the season page drops the date at midnight ET; and on light slates the SmartSim's partial guard discards the day's own official report for the previous (fallback) snapshot.
+- Falsification test: A past date whose final fleet rows carry official statuses (QUESTIONABLE/PROBABLE/DOUBTFUL), or a light-slate game-day build with no INJURY_SNAPSHOT_PARTIAL line.
+- Verification: pytest on the new test file green, with the old update_injuries / guard failing the new tests; findings carry dates, sources, readers and per-reader effect; todo entry; nothing on the fleet without the user's yes.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
