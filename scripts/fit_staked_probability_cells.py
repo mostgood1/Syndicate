@@ -55,7 +55,9 @@ CELL_FIELDS = ("venue", "sport", "market", "segment", "phase")
 DIAGNOSTIC_MIN_TEST_ROWS = 50
 DIAGNOSTIC_MIN_TEST_EVENTS = 10
 GRAIN_CELL = "cell"      # venue|sport|market|segment|phase -- the fitted grain
-GRAIN_POOLED_VENUE = "pooled_venue"  # sport|market|segment|phase -- diagnostic only, phases still apart
+# sport|market|segment|phase, every venue together, phases still apart. WRITTEN since user decision (a)
+# 2026-10-22 (findings s9): its key is exactly the phase-aware reader's 4-part key (f3bea489).
+GRAIN_POOLED_VENUE = "pooled_venue"
 
 VERDICT_WRITE = "write"
 VERDICT_POINT_ONLY = "refused_point_win_ci_includes_zero"
@@ -283,7 +285,7 @@ def fit_cell(
 
 
 def pooled_venue_rows(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
-    """Same rows re-keyed without the venue. Phases stay apart. Diagnostic only."""
+    """Same rows re-keyed without the venue (`*|sport|market|segment|phase`). Phases stay apart."""
     return [{**row, "cell": "|".join(["*"] + str(row["cell"]).split("|")[1:])} for row in rows]
 
 
@@ -294,15 +296,27 @@ def fit_all(rows: Sequence[Mapping[str, Any]], *, draws: int = BOOTSTRAP_DRAWS, 
     }
 
 
-def candidate_profile(results: Mapping[str, Mapping[str, Any]], *, fitted_on: str, source: str) -> dict[str, Any]:
-    """The candidate document, in `calibration_profile_store`'s shape. Cell keys carry the
-    venue and phase: `<venue>|<sport>|<market>|<segment>|<phase>` -- the sizer's reader keys
-    `<sport>|<market>|<segment>` today, so this document is INERT until the reader learns the
-    longer key (findings s5)."""
+def candidate_profile(
+    results: Mapping[str, Mapping[str, Any]], *, fitted_on: str, source: str, grain: str = GRAIN_CELL
+) -> dict[str, Any]:
+    """The candidate document, in `calibration_profile_store`'s shape.
+
+    `grain=cell` keys `<venue>|<sport>|<market>|<segment>|<phase>` (no reader reads a venue yet).
+    `grain=pooled_venue` keys `<sport>|<market>|<segment>|<phase>` -- the phase-aware reader's
+    key, `staked_probability_profile.cell_key(sport, market, segment, phase)` -- per user decision
+    (a) and the s9 pre-registration. Either way this is a CANDIDATE: it is never written to the
+    live profile path by this script (findings s9 item 3)."""
     cells = {}
+    pooled = grain == GRAIN_POOLED_VENUE
     for cell, result in results.items():
-        if result.get("verdict") not in WRITTEN_VERDICTS or result.get("diagnostic") or cell.startswith("*|"):
+        if result.get("verdict") not in WRITTEN_VERDICTS or result.get("diagnostic"):
             continue
+        if pooled != cell.startswith("*|"):
+            continue
+        if pooled:
+            cell = cell[2:]
+            if cell.rsplit("|", 1)[-1] == UNKNOWN_PHASE:
+                continue  # never written: the reader cannot know which population it would stake
         market_only = result["verdict"] == base.VERDICT_MARKET_ONLY
         cells[cell] = {
             "beta": 0.0 if market_only else float(result["beta_fit"]),
@@ -317,10 +331,11 @@ def candidate_profile(results: Mapping[str, Mapping[str, Any]], *, fitted_on: st
             "beta_ci": result["beta_ci"],
             "source": source,
         }
-    version = f"staked_probability_cells_v1@{fitted_on}"
+    version = f"staked_probability_{'pooled' if pooled else 'cells'}_v1@{fitted_on}"
+    key = "|".join(CELL_FIELDS[1:]) if pooled else "|".join(CELL_FIELDS)
     return {"version": version, "fields": {"cells": cells}, "fit_from": {"source": source, "fitted_on": fitted_on,
             "min_test_rows": MIN_TEST_ROWS, "min_test_events": MIN_TEST_EVENTS, "bootstrap_draws": BOOTSTRAP_DRAWS,
-            "train_share": base.TRAIN_SHARE, "key": "|".join(CELL_FIELDS)}}
+            "train_share": base.TRAIN_SHARE, "key": key, "grain": grain}}
 
 
 def _fmt(value: Any, spec: str = ".5f") -> str:
@@ -355,7 +370,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--profile-out", default=None, help="write the CANDIDATE profile document here (never the live path)")
     parser.add_argument("--draws", type=int, default=BOOTSTRAP_DRAWS)
     parser.add_argument("--grain", choices=(GRAIN_CELL, GRAIN_POOLED_VENUE), default=GRAIN_CELL,
-                        help="pooled_venue is DIAGNOSTIC: never written to a profile")
+                        help="pooled_venue = sport|market|segment|phase, every venue together (written grain per findings s9)")
     parser.add_argument("--diagnostic", action="store_true",
                         help=f"also report below-floor cells with n_test >= {DIAGNOSTIC_MIN_TEST_ROWS} (never written)")
     args = parser.parse_args(argv)
@@ -408,8 +423,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.json_out:
         Path(args.json_out).write_text(json.dumps({"source": source, "fitted_on": fitted_on, "dropped": dropped,
                                                    "cells": results}, indent=2, sort_keys=True), encoding="utf-8")
-    if args.profile_out and args.grain == GRAIN_CELL:
-        doc = candidate_profile(results, fitted_on=fitted_on, source=source)
+    if args.profile_out:
+        doc = candidate_profile(results, fitted_on=fitted_on, source=source, grain=args.grain)
         Path(args.profile_out).write_text(json.dumps(doc, indent=2, sort_keys=True), encoding="utf-8")
         print(f"[fit_staked_probability_cells] candidate profile -> {args.profile_out} "
               f"cells={sorted(doc['fields']['cells'])}", flush=True)

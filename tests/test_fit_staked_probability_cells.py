@@ -162,12 +162,32 @@ def test_event_floor_refuses_a_cell_with_many_rows_on_few_events():
     assert result["verdict"] == cells.VERDICT_EVENT_FLOOR
 
 
-def test_pooled_venue_grain_is_never_written():
+def test_pooled_venue_grain_writes_the_readers_four_part_key_only_at_its_own_grain():
+    # findings s9 / user decision (a): the pooled cell is written as sport|market|segment|phase,
+    # exactly `cell_key(sport, market, segment, phase)`. Each grain writes only its own cells.
     rows, _ = cells.rows_from_records(ledger(n=1400, model="informative"))
     results = cells.fit_all(cells.pooled_venue_rows(rows), draws=200)
     (cell, result), = results.items()
-    assert cell.startswith("*|") and result["verdict"] == cells.VERDICT_WRITE
+    assert cell == "*|nba|h2h|full|regular" and result["verdict"] == cells.VERDICT_WRITE
     assert cells.candidate_profile(results, fitted_on="t", source="test")["fields"]["cells"] == {}
+    doc = cells.candidate_profile(results, fitted_on="t", source="test", grain=cells.GRAIN_POOLED_VENUE)
+    assert set(doc["fields"]["cells"]) == {cell_key("nba", "h2h", "full", "regular")}
+    assert doc["fit_from"]["key"] == "sport|market|segment|phase"
+    assert doc["version"].startswith("staked_probability_pooled_v1@")
+
+
+def test_pooled_unknown_phase_is_never_written():
+    records = ledger(n=1400, model="informative", month="2026-07", start_day=1, dates=28)
+    rows, _ = cells.rows_from_records(records)
+    results = cells.fit_all(cells.pooled_venue_rows(rows), draws=200)
+    doc = cells.candidate_profile(results, fitted_on="t", source="test", grain=cells.GRAIN_POOLED_VENUE)
+    assert doc["fields"]["cells"] == {}
+    # The writer's own guard, independent of the fit's verdict: even a WRITE verdict on an
+    # unknown-phase pooled cell is not written.
+    forged = {"*|nba|h2h|full|unknown": {**next(iter(results.values())), "verdict": cells.VERDICT_WRITE,
+                                         "beta_fit": 0.3}}
+    doc = cells.candidate_profile(forged, fitted_on="t", source="test", grain=cells.GRAIN_POOLED_VENUE)
+    assert doc["fields"]["cells"] == {}
 
 
 def test_candidate_document_loads_through_the_real_store(tmp_path):
@@ -236,6 +256,25 @@ def test_five_part_candidate_key_is_inert_to_todays_reader(tmp_path, _sizer_env)
     on, prov = _staked(_sizer_env, _profile(tmp_path, "prophetx|nba|h2h|full|regular"))
     assert off == on
     assert prov["blend_beta"] == 0.0 and prov["staked_probability_version"] == "unfitted"
+
+
+def test_pooled_candidate_is_read_by_the_phase_aware_sizer_in_its_phase_only(tmp_path, _sizer_env):
+    """Reachability of the WRITTEN pooled document through the real store and the real seam: the
+    cell stakes a regular-season nba slate and nothing in the preseason (off != on, by phase)."""
+    rows, _ = cells.rows_from_records(ledger(n=1400, model="informative"))
+    results = cells.fit_all(cells.pooled_venue_rows(rows), draws=200)
+    doc = cells.candidate_profile(results, fitted_on="t", source="test", grain=cells.GRAIN_POOLED_VENUE)
+    path = tmp_path / "candidate_pooled.json"
+    path.write_text(json.dumps(doc), encoding="utf-8")
+    _sizer_env.setenv(PROFILE_PATH_ENV, str(path))
+    clear_profile_cache()
+    beta = results["*|nba|h2h|full|regular"]["beta_fit"]
+    _, _, regular = sizing_inputs_with_provenance(_row(), selected_date="2026-10-25")
+    _, _, preseason = sizing_inputs_with_provenance(_row(), selected_date="2026-10-10")
+    _, _, dateless = sizing_inputs_with_provenance(_row())
+    assert regular["blend_beta"] == beta > 0.0
+    assert preseason["blend_beta"] == 0.0
+    assert dateless["blend_beta"] == 0.0  # the phase-blind 3-part key is not written
 
 
 def test_failed_ledger_read_refuses_instead_of_fitting_the_archive_alone(monkeypatch):
