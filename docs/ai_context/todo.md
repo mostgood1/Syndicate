@@ -56,7 +56,9 @@
   - Not chosen: gating `official_ok` on the roster filter. It would be inert on the fleet, which has no WNBA roster.
   - 6 tests through `update_injuries` and the CLI; 5 fail on `origin/main` (no roster: Hawks written as ATL; roster: day emptied; NBA page requested), 1 guard passes both.
 - **OWED (the user's yes):** a fleet ff, no restart (`fetch-injuries` is a subprocess).
-  - **Before 10-23 ~11 PM CT** to protect the 10-24 ATL v GSV game (Saturday NBA slate, sim + 1,381 prop lines already on the fleet).
+  - ~~Before 10-23 ~11 PM CT~~ **NOW: the defect is live again.** At 2:42 PM CT 10-22, the fleet (`21b4bdb0`) wrote the NBA report as the WNBA 10-22 snapshot. Read at 2:49 PM CT: 2 rows, both TOR (`Nate Raptors Bittle`, `Malachi Fracture Smith`); the file went 1,027 -> 981 rows.
+    - The 10-24 builds read 10-22 as their latest snapshot. The props OUT refusal has no partial guard; the SmartSim falls back to 10-21 (`#733`'s reading).
+    - An ff to `ae2cb646` or later carries both `#731` and `#733`.
   - Verify on the next NBA game day: a WNBA fetch summary with 0 QUESTIONABLE/PROBABLE/DOUBTFUL/TOR rows, and `readmitted_injury_return=0`.
 - **Leads:**
   - **WNBA: ESPN rows are stamped `datetime.now()`, not `--date`** (the NBA writer's copy was fixed by `#730`, `21b4bdb0`; the WNBA copy was not). A fetch for D after local midnight deletes D's snapshot: the fleet WNBA file has no 10-12. It also drove the 10-21 flapping.
