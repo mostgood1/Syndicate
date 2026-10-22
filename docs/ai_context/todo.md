@@ -1,5 +1,8 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#726` — **Interval charts have no NFL or NHL intervals to chart: NFL quarter/half lines are not captured (`SYNDICATE_NFL_SEGMENT_MARKETS` absent = OFF since 10-17) and no live fetcher requests NHL period lines** — FOUND 2026-10-22, lane `board-interval-charts` (BLOCKED on this), session 9e18a0e7
+- NFL: a USER decision -- turning segment capture on costs credits (q1-q4/h1/h2 markets per game per pull); the board, the charts and live segment actuals all wait on it. NHL: a producer to build (p1-p3 totals) -- only `scripts/backtest_nhl_game_lines.py:330` asks for `*_p1` today. The chart side is ready: an offline replay of the cache gives both sides for NFL 84/84 and NHL 36/36 game x segment pairs.
+
 ### `#725` — **The NBA official injury-report PDF parser put a reason's last word into the next player's name (971 of 5,658 rows written off-roster over 167 reports), and handed an Available player the next player's OUT. FIXED ON MAIN, NOT ON THE FLEET** — FOUND 2026-10-22 (`#723` follow-up), lane `nba-injury-pdf-parser`, session ef55f9f7 (side session of local_c0ccc55a)
 - **Two defects, both confirmed on the real 10-21 reports** (`syndicate/features/nba/source_cli/scrapers/injuries.py`, `_parse_pdf_rows`):
   - `<reason word> Last,` was taken as a two-token surname, so most reasons' last word went into the next name: `Jalen Tear Wilson`, `Mouhamed Way Gueye`, `Ben Subluxation Simmons`. The only genuine two-token surnames in 167 reports are `Lively II,` and `Butler III,`. The vendored `_NOISY_PLAYER_TOKENS` list was patching the commonest words (Strain, Surgery, Sprain), not the cause.
