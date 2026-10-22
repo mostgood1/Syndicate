@@ -4960,8 +4960,26 @@ def _smart_sim_injuries_excluded_map_for_date_local(*, processed_root: Path, raw
                         counts = day.value_counts().sort_index()
                         snapshot_day = counts.index[-1]
                         # A partial fetch would otherwise clear almost every exclusion (the permissive failure):
-                        # a latest snapshot under half the previous one's rows is not trusted.
-                        if len(counts) >= 2 and counts.iloc[-1] < 0.5 * counts.iloc[-2]:
+                        # a latest snapshot under half the previous one's rows is not trusted. EXCEPT the game
+                        # date's own NBA report: it lists only the teams playing, so its size follows the slate.
+                        # Measured 2026-10-22 (lane nba-injury-snapshot-overwrite): every game-day build of the
+                        # 3-game 10-20 and 2-game 10-22 slates dropped it for the previous day's Rotowire/ESPN
+                        # rows; on 10-20 that left DET's 4 OUT players in the pool.
+                        latest_rows = df[day == snapshot_day]
+                        own_official = (
+                            cutoff is not None
+                            and snapshot_day == cutoff.normalize()
+                            and "source" in latest_rows.columns
+                            # the NBA scraper's OFFICIAL_INJURY_SOURCE (not imported: it pulls pypdf/bs4 into the sim)
+                            and bool((latest_rows["source"].astype(str) == "nba_official").all())
+                        )
+                        if own_official and len(counts) >= 2 and counts.iloc[-1] < 0.5 * counts.iloc[-2]:
+                            print(
+                                f"[smart_sim] INJURY_SNAPSHOT_OFFICIAL date={ds_s} rows={int(counts.iloc[-1])} "
+                                f"previous={counts.index[-2].date()} rows={int(counts.iloc[-2])} -- the game date's own report, trusted",
+                                flush=True,
+                            )
+                        elif len(counts) >= 2 and counts.iloc[-1] < 0.5 * counts.iloc[-2]:
                             print(
                                 f"[smart_sim] INJURY_SNAPSHOT_PARTIAL date={ds_s} latest={snapshot_day.date()} rows={int(counts.iloc[-1])} "
                                 f"previous={counts.index[-2].date()} rows={int(counts.iloc[-2])} -- using the previous snapshot",

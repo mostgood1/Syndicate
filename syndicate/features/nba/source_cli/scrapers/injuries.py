@@ -24,6 +24,38 @@ except Exception:
         return (x or '').strip().upper()
 
 
+#: ``source`` of rows parsed from the NBA's own report; Rotowire/ESPN rows carry "rotowire" / "espn". Rows
+#: written before the column existed have none and count as not official.
+OFFICIAL_INJURY_SOURCE = "nba_official"
+
+
+def _et_today():
+    """Today in ET, the calendar the NBA names its reports by."""
+    try:
+        from zoneinfo import ZoneInfo
+
+        return datetime.now(ZoneInfo("America/New_York")).date()
+    except Exception:
+        from datetime import timedelta, timezone
+
+        return (datetime.now(timezone.utc) - timedelta(hours=5)).date()
+
+
+def _is_past_et_date(date_str: str) -> bool:
+    try:
+        return datetime.strptime(str(date_str), "%Y-%m-%d").date() < _et_today()
+    except Exception:
+        return False
+
+
+def _is_official_snapshot(df: pd.DataFrame, date_str: str) -> bool:
+    """True when the file's rows for ``date_str`` exist and all came from the NBA's report."""
+    if df is None or df.empty or "date" not in df.columns or "source" not in df.columns:
+        return False
+    day = df[df["date"].astype(str) == str(date_str)]
+    return (not day.empty) and bool((day["source"].astype(str) == OFFICIAL_INJURY_SOURCE).all())
+
+
 def _season_for_date_str(date_str: str) -> str | None:
     try:
         d = datetime.strptime(str(date_str), "%Y-%m-%d")
@@ -793,6 +825,7 @@ class NBAInjuryDatabase:
                 rw = RotowireInjuryScraper()
                 rw_df = rw.get_all_injuries()
                 if not rw_df.empty:
+                    rw_df = rw_df.assign(source="rotowire")
                     combined_new = (
                         pd.concat([combined_new, rw_df], ignore_index=True)
                         if not combined_new.empty
@@ -803,6 +836,7 @@ class NBAInjuryDatabase:
             try:
                 espn_df = self.scraper.get_all_injuries()
                 if not espn_df.empty:
+                    espn_df = espn_df.assign(source="espn")
                     combined_new = (
                         pd.concat([combined_new, espn_df], ignore_index=True)
                         if not combined_new.empty
@@ -829,11 +863,29 @@ class NBAInjuryDatabase:
         except Exception:
             pass
 
-        # Load existing data; for a date-scoped run, replace that day's rows.
+        # Load existing data. Each date's rows are ONE snapshot, and a fetch replaces the snapshot of every date
+        # its rows carry: date_str for the official report, the scrape day for Rotowire/ESPN (they stamp
+        # their own date). An official snapshot is never replaced by fallback rows. Measured 2026-10-22 (lane
+        # nba-injury-snapshot-overwrite): every past date's rows on the fleet had been replaced by Rotowire/ESPN,
+        # because after midnight ET the season page no longer lists that day's reports.
         try:
             existing = pd.read_csv(self.filepath)
             if not existing.empty and "date" in existing.columns:
-                existing = existing[existing["date"].astype(str) != str(date_str)].copy()
+                if not official_ok:
+                    new_dates = set(combined_new["date"].astype(str))
+                    kept = sorted(d for d in new_dates if _is_official_snapshot(existing, d))
+                    if kept:
+                        refused = int(combined_new["date"].astype(str).isin(kept).sum())
+                        print(
+                            f"INJURY_SNAPSHOT_KEPT_OFFICIAL date={date_str} kept={','.join(kept)} "
+                            f"fallback_rows_refused={refused}",
+                            flush=True,
+                        )
+                        combined_new = combined_new[~combined_new["date"].astype(str).isin(kept)].copy()
+                        if combined_new.empty:
+                            return pd.DataFrame()
+                replaced = set(combined_new["date"].astype(str))
+                existing = existing[~existing["date"].astype(str).isin(replaced)].copy()
             # Append new data (we will re-normalize and then de-duplicate by team/player/date)
             combined = pd.concat([existing, combined_new], ignore_index=True)
         except FileNotFoundError:
@@ -947,6 +999,11 @@ class NBAOfficialInjuryReportScraper:
     """
 
     SEASON_PAGE_TMPL = "https://official.nba.com/nba-injury-report-{season}-season/"
+    PDF_URL_TMPL = "https://ak-static.cms.nba.com/referee/injury/Injury-Report_{date}_{time}.pdf"
+    # A past date's report times tried by URL, latest first (ET). Reports come every half hour (48 on each of
+    # 10-19..10-21), so the day's last is 11:30 PM. The window is short because a date with no reports
+    # (10-10..10-18 returned 403) costs one request per entry on every call.
+    PAST_DATE_REPORT_TIMES = ("11_30PM", "11_00PM", "10_30PM", "10_00PM")
 
     _KNOWN_TRIS = {
         "ATL",
@@ -1299,11 +1356,36 @@ class NBAOfficialInjuryReportScraper:
         df = df.drop_duplicates(subset=["team", "player", "date"], keep="last")
         return df
 
+    def _direct_pdf_for_past_date(self, date_str: str) -> tuple[str, bytes] | None:
+        """The last report of a date that is over in ET, fetched by its URL.
+
+        The season page lists only TODAY's reports, so after midnight ET a fetch for the day before found
+        no PDF and fell back to Rotowire/ESPN (measured 2026-10-22, lane nba-injury-snapshot-overwrite).
+        The PDFs stay on the host: 10-19..10-21 were still fetchable by URL on 10-22.
+        """
+        if not _is_past_et_date(date_str):
+            return None
+        for report_time in self.PAST_DATE_REPORT_TIMES:
+            url = self.PDF_URL_TMPL.format(date=date_str, time=report_time)
+            pdf = self._download_pdf(url)
+            if pdf and pdf[:5] == b"%PDF-":
+                return url, pdf
+        return None
+
     def get_injuries_for_date(self, date_str: str) -> pd.DataFrame:
         url = self._latest_pdf_url_for_date(date_str)
-        if not url:
-            return pd.DataFrame()
-        pdf = self._download_pdf(url)
+        via = "page"
+        pdf = self._download_pdf(url) if url else None
         if not pdf:
-            return pd.DataFrame()
-        return self._parse_pdf_rows(pdf, date_str=date_str)
+            direct = self._direct_pdf_for_past_date(date_str)
+            if direct is None:
+                return pd.DataFrame()
+            (url, pdf), via = direct, "url"
+        df = self._parse_pdf_rows(pdf, date_str=date_str)
+        print(f"INJURY_REPORT date={date_str} report={str(url).rsplit('/', 1)[-1]} via={via} rows={len(df)}", flush=True)
+        if df.empty:
+            return df
+        # Provenance, so update_injuries never replaces an official snapshot with fallback rows. The report's
+        # NAME is not stored: it changes every half hour, and the live loop forces a re-sim whenever the file's
+        # bytes change (live_refresh_loop._basketball_lineup_injury_fingerprint).
+        return df.assign(source=OFFICIAL_INJURY_SOURCE)
