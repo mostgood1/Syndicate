@@ -53376,3 +53376,7 @@ which is about the two sizing bases and not about the refusal boundary.
   -115 DraftKings, was -105 BetOnline), recap 7-1 +4.03u. `/cheatsheets/record` -> new All featured | Shared toggle; Shared (official):
   consistency 26-14 +3.36u, 40 bets, 3 days with a graphic; All featured unchanged 626-564 +15.23u (record.json regenerated with
   write_record at 10:4x AM CT on the deployed code).
+
+## 2026-10-22 16:27Z -- FLEET DATA: MLB live_prop_ranking.py copies removed after the natural restart (lane vendor-final-leftovers)
+- User 2026-10-22: "Wait for the next natural restart, then remove them". No claim / restart by this lane.
+- verify: fleet carries 09d5795c since 15:40:40Z (peer ff 6954cb0e -> 5e734fb6 + reload-web); refresh-worker + live-odds-worker restarted 16:25:36Z (lane live-event-concentration's down at 16:17:47Z, not this lane); at 16:27:12Z all 4 cards.py-loading processes (2 gunicorn workers, both workers) post-date it, so the watcher archived <data>/mlb_source/sim_engine/live_prop_ranking.py and <data>/mlb_source/source_artifacts/sim_engine/live_prop_ranking.py to _archive/mlb_live_prop_ranking_copies_20261022T162712Z.tar.gz (2/2) and removed them; the stale __pycache__ .pyc of the first went 16:27:52Z. Fleet cards.py: 0 reads of the copy. Data disk now holds 0 vendored .py (the only .py left: 5 files of a 10-13 NHL WIP backup of Syndicate code under backfill/, not vendored).
