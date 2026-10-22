@@ -1320,9 +1320,9 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   - The NBA official-PDF parser splices reason words into names (ISAIAH WAY STEWART, BEN SUBLUXATION SIMMONS), so those
     exclusions never match the pool.
   - It gives a player marked Available the next player's OUT and drops that player's row. Reproduced through the
-    real `_parse_pdf_rows` on a synthetic token stream. Whether the 10-21 Curry/Moody swap came this way is
-    unverified: the PDF was not re-read.
-  - No lane owns this; a follow-up session is proposed.
+    real `_parse_pdf_rows` on a synthetic token stream. The 10-21 Curry/Moody swap came this way: CONFIRMED on
+    the real 11:30 PM ET report (`Curry, Stephen Available - Moody, Moses Out`).
+  - FIXED ON MAIN (36eb357b), NOT ON THE FLEET: see `[nba-injury-pdf-parser]` (todo #725).
 - **Reach:** the derive path set 22/22 sides on 10-21. The rotation-HISTORY path takes over from a team's 2nd game:
   OKC on 10-22; BOS, NYK and SAS on 10-23.
   - **History-path mechanics** `[10-22, lane nba-sim-minutes-history-path, truth-free]`: a replay of the real function

@@ -1749,12 +1749,12 @@ death, never life — do not invert it.
 - **GOAL MET 2026-10-22:** shipped `8bb7a183` on origin/main. Registered as american_to_probability, DUAL SCALE note; harness reads `[PASS] 5/5 prediction_ledger:_implied_from_price`. tests/test_probability_differential.py `10 passed` on the tree rebased onto ce509064 (low priority). No KNOWN_FAILING entry needed.
 - Blocked by: none
 
-### nba-injury-pdf-parser — OPEN — opened 2026-10-22 — session ef55f9f7-de50-48f1-af2f-3eb9e55eba86
-- Goal: The NBA official injury-report PDF parser emits no reason word inside a player name and never shifts a status across an Available row; tests through _parse_pdf_rows pin both; a before/after re-parse of recent official PDFs counts off-roster names and changed statuses
-- Files: syndicate/features/nba/source_cli/scrapers/injuries.py, syndicate/features/wnba/source_cli/scrapers/injuries.py, tests/test_nba_injury_pdf_parser.py, scripts/nba_injury_pdf_reparse.py, .syndicate/findings_2026-10-22_nba_injury_pdf_parser.md, docs/ai_context/todo.md (#725 section only), .syndicate/state_basketball.md ([nba-injury-pdf-parser] section only)
-- Hypothesis: (1) a reason that wraps onto the next line lands between the next player's first name and status, and the cleaner only repairs names its token list flags; (2) STATUS_TOKS lacks Available, so an Available row swallows the next player's tokens up to his status
-- Falsification test: re-parsing the 10-21 official PDF with the current code yields no spliced name and a separate Moses Moody OUT row
-- Verification: pytest tests/test_nba_injury_pdf_parser.py green; before/after counts on retrievable recent PDFs written to findings
+### nba-injury-pdf-parser — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session ef55f9f7-de50-48f1-af2f-3eb9e55eba86
+- Goal: The NBA official injury-report PDF parser emits no reason word inside a player name and never shifts a status across an Available row; tests through _parse_pdf_rows pin both; a before/after re-parse of recent official PDFs counts off-roster names and changed statuses -- **GOAL: MET.** Verification ran: tests/test_nba_injury_pdf_parser.py 9/9 (6/9 fail on the old parser); scripts/nba_injury_pdf_reparse.py over 167 real reports 10-19..10-22 with the fleet roster: off-roster names 971 -> 0 of 5,658, 29 players gain a missing exclusion, 12 lose a wrong one (all listed Available). Fix 36eb357b ON MAIN, NOT ON THE FLEET: the ff is the user's decision (todo #725). WNBA copy checked, not edited (follow-up proposed).
+- Files: syndicate/features/nba/source_cli/scrapers/injuries.py, syndicate/features/wnba/source_cli/scrapers/injuries.py, tests/test_nba_injury_pdf_parser.py, scripts/nba_injury_pdf_reparse.py, .syndicate/findings_2026-10-22_nba_injury_pdf_parser.md, docs/ai_context/todo.md (#725 section only), .syndicate/state_basketball.md ([nba-injury-pdf-parser] section only) -- released on close
+- Hypothesis: (1) and (2) CONFIRMED on the real 10-21 reports. (1) refined: the spliced word becomes a two-token SURNAME prefix (`Tear Wilson,` via the `Lively II,` allowance), not a token between first name and status.
+- Falsification test: did not occur -- the old parser on the 10-21 11:30 PM ET report yields `Stephen Available - Moody, Moses Surgery Curry` OUT and no Moody row.
+- Verification: pytest tests/test_nba_injury_pdf_parser.py green; before/after counts on retrievable recent PDFs written to findings -- DONE (findings_2026-10-22_nba_injury_pdf_parser.md section 3)
 - Blocked by: none
 
 ### ladder-refusal-control-arm — OPEN — opened 2026-10-22 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
