@@ -45,6 +45,13 @@ allowlist (`reports/intelligence/clv_departures/*.jsonl`). An unreadable state
 records no departures for that build and says so (`state_unreadable`), which
 undercounts; it never invents one.
 
+A SPORT WHOSE RECORDS A CEILING REFUSED IS CENSORED for the rest of the date
+(lane `clv-departures-ceiling`, 2026-10-22). Its later heartbeats move from
+`sports` to `censored`, because a heartbeat listing a sport claims every
+departure of that build is in the file, and `layer2_live_scorecard.look_after`
+reads a missing departure under a listed build as "kept". Censored, the scorecard
+reads those sightings as `unobserved`, which is true.
+
 Builds are assumed sequential per date. Two interleaved builds would race on
 the state file the same way `record_openings` races on its `seen` set.
 """
@@ -74,7 +81,31 @@ DEPARTURE_LEDGER_SUBDIR = "clv_departures"
 # openings across sports; at ~350 B per departure a full Saturday is a few MB.
 # A state bug that re-fires every tracked market every build is what this
 # bounds: one truncated file, not a disk.
-_MAX_LEDGER_BYTES = 8 * 1024 * 1024
+#
+# RE-SIZED AND SPLIT BY SPORT 2026-10-22 (lane `clv-departures-ceiling`,
+# `.syndicate/findings_2026-10-22_clv_departures_ceiling.md`), the sibling of
+# `clv_opening_ledger`'s `22e3a0aa`. The 8 MiB tripwire had not fired yet, but
+# 10-17 reached 7,938,374 B (94.6%) before NBA's season began, and NBA alone
+# wrote 2.35 MiB on Wednesday 10-21. The old loop `break`s at the first
+# oversized record, so the first sport to fill the file would cost EVERY sport
+# its evening, with the heartbeat dropped as well, while the state moved on and
+# the departures were gone for good. Measured on the fleet, 24 dates 09-30..10-23:
+#   * largest sport-day: NCAAF 10-10 at 3.80 MiB (10-17: 3.64 MiB);
+#   * largest day: 10-17 at 7.57 MiB; a Saturday plus 10-21's NBA is ~10 MiB.
+# So, still tripwires against a state bug and not budgets:
+#   * `_MAX_SPORT_BYTES` 16 MiB per (date, sport): ~4x the largest sport-day,
+#     and a runaway sport costs only its own records;
+#   * `_MAX_LEDGER_BYTES` 32 MiB per date: ~4x the largest day, ~3x a projected
+#     NBA Saturday;
+#   * heartbeats are refused only past `_MAX_LEDGER_BYTES` plus
+#     `_HEARTBEAT_RESERVE_BYTES`, so the builds that ran stay visible after a
+#     day ceiling fires (the largest day measured carried 59 KB of heartbeats).
+# Readers take the bigger file: the scorecard fetches `?path=` (no per-file
+# cap; the bulk export's 8 MB cap does not apply) and the weekly backtests
+# stream.
+_MAX_LEDGER_BYTES = 32 * 1024 * 1024
+_MAX_SPORT_BYTES = 16 * 1024 * 1024
+_HEARTBEAT_RESERVE_BYTES = 1024 * 1024
 
 _IDENTITY_FIELDS = ("event_id", "market", "segment", "side", "line", "player_name")
 
@@ -182,6 +213,50 @@ def _write_state(path: Path, state: Mapping[str, Any]) -> None:
     os.replace(tmp, path)
 
 
+def _record_sport(record: Mapping[str, Any]) -> str:
+    """The ceiling slot a record counts against. Heartbeats are "" (no sport)."""
+    if record.get("type") == "build":
+        return ""
+    return str(record.get("sport") or "").strip().lower()
+
+
+def _ledger_tally(path: Path, saved: Any) -> tuple[int, dict[str, int], dict[str, str], bool]:
+    """(bytes on disk, bytes per sport, censored sports, ends without a newline).
+
+    The state sidecar carries the per-sport bytes it last wrote, so a build does
+    not re-read the day's file. They are trusted only while the file is exactly
+    the size the state recorded. Anything else -- a first build on this code, an
+    unreadable state, a crash between the append and the state write -- re-reads
+    the file once, and recovers the censored sports from the heartbeats too.
+    """
+    try:
+        size = path.stat().st_size
+    except OSError:
+        return 0, {}, {}, False
+    torn = False
+    if size:
+        with path.open("rb") as handle:
+            handle.seek(size - 1)
+            torn = handle.read(1) != b"\n"
+    if isinstance(saved, dict) and saved.get("bytes") == size and isinstance(saved.get("sport_bytes"), dict):
+        censored = saved.get("censored") if isinstance(saved.get("censored"), dict) else {}
+        return size, {str(k): int(v) for k, v in saved["sport_bytes"].items()}, dict(censored), torn
+    sport_bytes: dict[str, int] = {}
+    censored: dict[str, str] = {}
+    with path.open("rb") as handle:
+        for raw in handle:
+            try:
+                parsed = json.loads(raw)
+            except (ValueError, TypeError):
+                parsed = None
+            slot = _record_sport(parsed) if isinstance(parsed, dict) else ""
+            sport_bytes[slot] = sport_bytes.get(slot, 0) + len(raw)
+            if isinstance(parsed, dict) and parsed.get("type") == "build" and isinstance(parsed.get("censored"), dict):
+                for sport in parsed["censored"]:
+                    censored.setdefault(str(sport), str(parsed.get("at") or ""))
+    return size, sport_bytes, censored, torn
+
+
 def record_departures(
     rows: Iterable[Mapping[str, Any]],
     *,
@@ -231,6 +306,12 @@ def record_departures(
         "returned": 0,
         "records_written": 0,
         "truncated_at_ceiling": False,
+        # How many records a ceiling refused this build, and whose. A count,
+        # not just the flag: a fired tripwire has to say what it cost.
+        "dropped_at_ceiling": 0,
+        "dropped_by_sport": {},
+        "bytes_on_disk": None,
+        "censored_sports": [],
         "state_unreadable": False,
     }
     if not present:
@@ -292,28 +373,107 @@ def record_departures(
         tracked += len(markets)
         sports_state[sport] = {"build_at": build_at, "markets": markets}
 
-    records.append({"type": "build", "at": build_at, "sports": {s: len(present[s]) for s in sorted(present)}})
     report["tracked"] = tracked
 
-    path.parent.mkdir(parents=True, exist_ok=True)
-    existing_bytes = path.stat().st_size if path.exists() else 0
+    saved_ledger = state.get("ledger") if isinstance(state.get("ledger"), dict) else None
+    bytes_on_disk, sport_bytes, censored, torn = _ledger_tally(path, saved_ledger)
+    chunks: list[str] = []
+    # A torn final line would swallow the first record appended after it.
+    if torn:
+        chunks.append("\n")
+        bytes_on_disk += 1
+        sport_bytes[""] = sport_bytes.get("", 0) + 1
     written = 0
     moved = 0
-    with path.open("a", encoding="utf-8") as handle:
-        for record in records:
-            line = json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n"
-            size = len(line.encode("utf-8"))
-            if existing_bytes + size > _MAX_LEDGER_BYTES:
-                report["truncated_at_ceiling"] = True
-                break
-            handle.write(line)
-            existing_bytes += size
-            written += 1
-            if record["type"] != "build":
-                moved += 1
-    report["records_written"] = written
+    dropped: dict[tuple[str, str], int] = {}  # (scope, sport) -> records refused at a ceiling
+    for record in records:
+        line = json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n"
+        size = len(line.encode("utf-8"))
+        sport = _record_sport(record)
+        # Refuse PER RECORD, never `break`: a runaway sport costs its own
+        # records, then the day's, and never another sport's evening.
+        if bytes_on_disk + size > _MAX_LEDGER_BYTES:
+            scope = "day"
+        elif sport_bytes.get(sport, 0) + size > _MAX_SPORT_BYTES:
+            scope = "sport"
+        else:
+            scope = None
+        if scope is not None:
+            dropped[(scope, sport)] = dropped.get((scope, sport), 0) + 1
+            censored.setdefault(sport, build_at)
+            if record["type"] == "departure" and departed_today.get(record["identity"]) == build_at:
+                # Its departure is not in the file, so a return must not be either.
+                departed_today.pop(record["identity"], None)
+            continue
+        chunks.append(line)
+        bytes_on_disk += size
+        sport_bytes[sport] = sport_bytes.get(sport, 0) + size
+        written += 1
+        moved += 1
 
-    _write_state(state_path, {"sports": sports_state, "departed": departed_today})
+    # The heartbeat lists only sports whose every record of the date is in the
+    # file; a censored sport is named apart, so a reader sees the gap instead of
+    # reading a refused departure as a market still on the board.
+    heartbeat: dict[str, Any] = {
+        "type": "build",
+        "at": build_at,
+        "sports": {s: len(present[s]) for s in sorted(present) if s not in censored},
+    }
+    censored_now = {s: len(present[s]) for s in sorted(present) if s in censored}
+    if censored_now:
+        heartbeat["censored"] = censored_now
+    line = json.dumps(heartbeat, sort_keys=True, separators=(",", ":")) + "\n"
+    size = len(line.encode("utf-8"))
+    if bytes_on_disk + size > _MAX_LEDGER_BYTES + _HEARTBEAT_RESERVE_BYTES:
+        dropped[("day", "")] = dropped.get(("day", ""), 0) + 1
+    else:
+        chunks.append(line)
+        bytes_on_disk += size
+        sport_bytes[""] = sport_bytes.get("", 0) + size
+        written += 1
+
+    if written:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        # One write per build, so a crash tears at most one line. Binary, so the
+        # bytes on disk are the bytes counted (text mode writes CRLF on Windows).
+        with path.open("ab") as handle:
+            handle.write("".join(chunks).encode("utf-8"))
+    elif torn:
+        bytes_on_disk -= 1  # the closing newline was never written
+        sport_bytes[""] -= 1
+    report["records_written"] = written
+    report["truncated_at_ceiling"] = bool(dropped)
+    report["dropped_at_ceiling"] = sum(dropped.values())
+    dropped_by_sport: dict[str, int] = {}
+    for (scope, sport), count in sorted(dropped.items()):
+        dropped_by_sport[sport or "heartbeat"] = dropped_by_sport.get(sport or "heartbeat", 0) + count
+        # LOUD, on every build it fires. The openings tripwire fired on 6 of 24
+        # days with only `truncated=True` in a summary line to say so.
+        print(
+            "[clv_departure_ledger] DEPARTURES_CEILING_HIT date=%s scope=%s sport=%s dropped=%d "
+            "bytes_on_disk=%d ceiling=%d"
+            % (
+                date,
+                scope,
+                sport or "heartbeat",
+                count,
+                bytes_on_disk,
+                _MAX_SPORT_BYTES if scope == "sport" else _MAX_LEDGER_BYTES,
+            ),
+            flush=True,
+        )
+    report["dropped_by_sport"] = dropped_by_sport
+    report["bytes_on_disk"] = bytes_on_disk
+    report["censored_sports"] = sorted(censored)
+
+    _write_state(
+        state_path,
+        {
+            "sports": sports_state,
+            "departed": departed_today,
+            "ledger": {"bytes": bytes_on_disk, "sport_bytes": sport_bytes, "censored": censored},
+        },
+    )
 
     # Pushed only when a market actually left or came back. A heartbeat-only
     # build has nothing a reader needs yet, and re-pushing a growing file every
@@ -334,10 +494,11 @@ def record_departures(
 def _print_report(report: Mapping[str, Any]) -> None:
     print(
         "[clv_departure_ledger] DEPARTURES date=%s rows_in=%d sports=%d tracked=%d departed=%d "
-        "returned=%d written=%d truncated=%s state_unreadable=%s"
+        "returned=%d written=%d truncated=%s dropped=%d bytes=%s censored=%s state_unreadable=%s"
         % (
             report["date"], report["rows_in"], report["sports"], report["tracked"], report["departed"],
             report["returned"], report["records_written"], report["truncated_at_ceiling"],
+            report["dropped_at_ceiling"], report["bytes_on_disk"], ",".join(report["censored_sports"]) or "-",
             report["state_unreadable"],
         ),
         flush=True,
