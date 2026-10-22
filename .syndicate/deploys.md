@@ -53273,3 +53273,46 @@ re-inheriting it.
 - **undo:**
   - Before the next `up`: delete the line. No restart is needed.
   - After the next `up`: delete the line, or restore the backup if nothing else changed since. Then a full down/up under all three claims.
+
+## 2026-10-22T15:10Z (10:10 CDT) — RESOLVED: the paper-ladder "sizing gap" is NOT a defect; the ladder is the book of rows the sizer REFUSED — session `4ab694ed`
+
+The 22:11Z ff receipt flagged the paper-ladder path as untouched and unchecked,
+and the 14:25Z proof reading found **218 of 578** post-cut orders carrying
+`staked_probability_version` as a PRESENT key with a NULL value, all
+`selection: ladder` / `stake_basis: flat_1`. Taken as a gap worth closing. It is
+not one.
+
+**MEASURED:** `read_ladder_plan_for_venue` positions carry **no `sizing` block at
+all** — `sizing=None` on **0 of 104** positions across four plans (10-21 and
+10-22 × kalshi and polymarket; 27 / 12 / 50 / 15). Every one carries
+`stake_basis: 'flat_1'` and `ladder_reason: 'below_suggested_floor'`.
+
+**So the null is CORRECT and the code is behaving as designed.** The ladder is
+the book of rows that fell BELOW the suggested stake floor — rows the sizer
+DECLINED to stake. A row that was never sized has no sizing basis to record, and
+`_order_from_position`'s `_as_optional_str((position.get("sizing") or {}).get(...))`
+returns `None` rather than inventing one. That is the "absent stays absent" rule
+from `#722` doing exactly its job. **No code change, and none owed to lane
+`paper-alongside-live`** (which owns the `book=ladder` plumbing) — there is
+nothing for them to fix.
+
+**WHAT DID CHANGE — the reading definition, not the code.** The 2026-10-29 armed
+task now EXCLUDES ladder rows **by rule** (`selection == "ladder"`, equivalently
+`stake_basis == "flat_1"`) before grouping, and must state the count it dropped.
+Leaving them in gives every cell a large null bucket that reads as a broken
+field. The prompt also now separates **"key absent" from "key null"** as distinct
+states with their own exclusion counts, since the 71 key-absent rows have an
+entirely different cause (pre-#722 writers between 22:20Z and 02:27Z).
+
+So the reading's denominator is now auditable: post-cut total, minus ladder,
+minus key-absent, minus pre-cut.
+
+**A LEAD THIS TURNED UP, recorded and not taken.** The ladder book is the
+population the staking policy REFUSED. Its realised ROI is therefore a natural
+control arm for the policy itself — "what would have happened on the rows we
+declined to stake" — which is a question `published-negative-ev` has never been
+able to ask, because the refused rows were previously indistinguishable from
+unsized noise. `ladder_reason` already names WHY each was refused
+(`below_suggested_floor`), and the ladder is paper-only so the counterfactual
+costs nothing. Logged in `leads.md`; deliberately kept OUT of the 10-29 split,
+which is about the two sizing bases and not about the refusal boundary.
