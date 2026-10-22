@@ -688,6 +688,7 @@ once this index exists: re-splitting would orphan the parts.
 | [min-ev-tuner-shadow] | THE MIN_EV CUT IS TUNED PER CELL IN SHADOW -- RUNNING ON THE FLEET, ZERO MOVES, NOTHING APPLIED `[verified on  | `state_portfolio.md` |
 | [live-plan-empty-funnel] | THE LIVE PLAN IS EMPTY BECAUSE THE VENUE'S OWN PRICE IS <= 0 EV AFTER THE TAKER FEE -- NOT A CAP, NOT A CHOSEN | `state_portfolio.md` |
 | [ledger-price-units] | THE EXECUTION LEDGER HOLDS TWO PRICE UNITS; EVERY KNOWN READER NOW HANDLES BOTH `[verified 2026-10-22, code +  | `state_portfolio.md` |
+| [order-clv-opening-less] | AN ORDER WITH NO RECORDED CLV OPENING IS GRADED FROM THE QUOTE LOG ON ITS OWN IDENTITY -- ON MAIN, NOT ON T | `state_portfolio.md` |
 | [soccer-team-strength] | SOCCER TEAM RATINGS: RATING V2 FAILED THE REAL-SIM A/B AND IS HELD (OFF ON MAIN); THE SERVED SIM IS NOT UNDER- | `state_soccer.md` |
 | [soccer-uefa-competitions] | UEFA CLUB COMPETITIONS (UCL / UEL / UECL): REGISTERED FOR FIXTURES, GAME ODDS, LIVE SCOREBOARD AND VENUE JOINS | `state_soccer.md` |
 | [soccer-roster-only-players] | SOCCER SIM SQUADS: ADDING ROSTER-ONLY PLAYERS (TEAM TOTALS FIXED) FAILED ITS PRE-REGISTERED TEST, AND THE ESPN | `state_soccer.md` |

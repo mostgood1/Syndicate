@@ -478,3 +478,13 @@ and none exist yet.**
   either drops silently or skews a fit with no error.
 
 ---
+
+## [order-clv-opening-less] AN ORDER WITH NO RECORDED CLV OPENING IS GRADED FROM THE QUOTE LOG ON ITS OWN IDENTITY -- ON MAIN, NOT ON THE FLEET `[verified 2026-10-22, fleet ledger + replay, lane venue-order-opening-gap]`
+
+- **The openings file has a ceiling and hits it.** `clv_opening_ledger._MAX_LEDGER_BYTES` = 32 MiB, ONE file per date for ALL sports. Fleet 09-30..10-23: full on 6 of 24 dates (10-04, 10-10, 10-11, 10-17, 10-18, 10-21; 10-11 stopped at 19:03Z). Every bet first sighted after the cut has no opening -- in the CLV report AND for orders. NOT FIXED.
+- **Venue orders key on the venue's book.** `venue_scope` rewrites `quote.bookmaker`; the board records an opening only for its best book. So a venue order often has no opening of its own key.
+- **Before the fix:** 523 of 7,777 settled mlb/ncaaf/nfl paper orders had no opening (330 ceiling, 193 venue-scoped), every one `no_close_for_market`/None.
+- **Fix `f5113511` (origin/main, NOT on the fleet):** `order_clv` resolves an order the resolver never saw from the quote log (submitted_at = open, same in-play/not-started/arrow-of-time rules); failures `no_opening:<reason>`; marks carry `opening_source=order`. Replay: 0 -> 149 resolved (75 same-book); residual 374, of which 318 are in-play bets (no pregame close by definition).
+- Detail: `.syndicate/findings_2026-10-22_venue_order_opening_gap.md`; todo #729.
+
+---
