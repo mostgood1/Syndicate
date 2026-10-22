@@ -1356,12 +1356,12 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   - Enabling is the user's decision.
 - Findings: `findings_2026-10-22_nba_sim_minutes_allocation.md`, `findings_2026-10-22_nba_sim_minutes_history_path.md`.
 
-## [nba-injury-pdf-parser] THE NBA OFFICIAL INJURY-PDF PARSER WROTE 17% OF ITS ROWS UNDER NAMES NO POOL MATCHES AND GAVE AVAILABLE PLAYERS THE NEXT PLAYER'S OUT; THE FIX IS ON MAIN, NOT ON THE FLEET `[measured 2026-10-22, lane nba-injury-pdf-parser, todo #725, main 3e3c3a37]`
+## [nba-injury-pdf-parser] THE NBA OFFICIAL INJURY-PDF PARSER WROTE 17% OF ITS ROWS UNDER NAMES NO POOL MATCHES AND GAVE AVAILABLE PLAYERS THE NEXT PLAYER'S OUT; THE FIX IS ON MAIN, NOT ON THE FLEET `[measured 2026-10-22, lane nba-injury-pdf-parser, todo #725, main 36eb357b]`
 - **Feeds:** `raw/injuries.csv`, the SmartSim exclusion map, the props OUT refusal, and the Layer 2 OUT gate. Written by `fetch-injuries` -> `NBAInjuryDatabase.update_injuries` -> `NBAOfficialInjuryReportScraper._parse_pdf_rows` -> `_clean_injury_player_names` (`syndicate/features/nba/source_cli/scrapers/injuries.py`).
 - **Defects (real 10-21 reports):**
   - A reason's last word went into the next player's surname: `Jalen Tear Wilson`, `Mouhamed Way Gueye`. `<word> Last,` was accepted as a two-token surname, which in practice is only ever `Lively II,` / `Butler III,`.
   - `Available` was not a status, so `Curry ... Available - Moody, Moses Out` became one OUT row, mapped to Curry, and Moody's row was lost.
-- **Fix `3e3c3a37`:**
+- **Fix `36eb357b`:**
   - Available ends its row and is dropped.
   - The status scan stops at the next `Last,`.
   - Unknown names are repaired against the current roster: drop interior words until exactly one player on that team matches, and never guess. The cleaner does the same and refuses comma-merged names.

@@ -4,7 +4,7 @@
 - **Two defects, both confirmed on the real 10-21 reports** (`syndicate/features/nba/source_cli/scrapers/injuries.py`, `_parse_pdf_rows`):
   - `<reason word> Last,` was taken as a two-token surname, so most reasons' last word went into the next name: `Jalen Tear Wilson`, `Mouhamed Way Gueye`, `Ben Subluxation Simmons`. The only genuine two-token surnames in 167 reports are `Lively II,` and `Butler III,`. The vendored `_NOISY_PLAYER_TOKENS` list was patching the commonest words (Strain, Surgery, Sprain), not the cause.
   - `Available` was not a status. `Curry, Stephen Available - Moody, Moses Out ...` parsed as one row, OUT, which the cleaner mapped to Curry, and Moody's row was lost. Same for `Awaka, Tobe Available - Claxton, Nic Out`.
-- **Fix `3e3c3a37`:**
+- **Fix `36eb357b`:**
   - Available ends its row and is dropped (never written, as before).
   - The status scan stops at the next `Last,`.
   - A name the roster does not know is repaired by dropping interior words until it is exactly ONE roster player on that team. Dropped surname-prefix words go back to the previous reason. Off-roster names are never guessed.
