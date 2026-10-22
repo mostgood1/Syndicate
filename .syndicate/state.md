@@ -477,7 +477,7 @@ once this index exists: re-splitting would orphan the parts.
 | [nba-layer2-projections] | NBA LINES CARRY THE MODEL ON LAYER 2 -- game lines LIVE and VERIFIED; props wired but no NBA prop quote exists | `state_basketball.md` |
 | [wnba-props-model-skill] | WNBA PROPS: NO MARKET BEATS THE BOOK; ALL FOUR ESTIMATORS (AVAILABILITY, RATE SHRINK, SHAPE, DISPERSION) + INJ | `state_basketball.md` |
 | [basketball-native-live-state] | SYNDICATE OWNS BASKETBALL PLAY-BY-PLAY: typed LiveGameState + the rotation-stints producer (P2) -- built, back | `state_basketball.md` |
-| [nba-live-native-p3] | NBA LIVE (P3): native resumed re-sim LIVE IN SHADOW MODE on the fleet (served lens reads `live_resim`, nba NOT | `state_basketball.md` |
+| [nba-live-native-p3] | NBA LIVE: native re-sim PRICES live game lines + props (user 10-20); props combos/stl/blk/tov + lines +-3; in-play-only pulls (3 h); gate NOT PASSED `[verified 2026-10-22, session 9e18a0e7]` | `state_basketball.md` |
 | [basketball-native-engine] | THE BASKETBALL POSSESSION ENGINE IS SYNDICATE'S -- live on the fleet, parity-proven on 5,400 real production c | `state_basketball.md` |
 | [basketball-native-orchestrator] | THE BASKETBALL SMART-SIM ORCHESTRATOR IS SYNDICATE'S; the sim path imports no vendored module -- live on the f | `state_basketball.md` |
 | [nba-sim-totals-and-strength] | NBA SMART-SIM TOTALS + TEAM STRENGTH: measured defects, fixes built DEFAULT-OFF, nothing enabled `[2026-10-10, | `state_basketball.md` |
@@ -586,7 +586,7 @@ once this index exists: re-splitting would orphan the parts.
 | [layer2-history-charts] | LAYER 2 + ASK HISTORY CHARTS: DATED PROP FORM, TEAM TRENDS VS TODAY'S LINE, NO GOAL HISTORY ON CORNERS -- LIVE | `state_layer2.md` |
 | [layer2-suggested-opps] | SUGGESTED OPPS -- a per-line bet flag on top of the full board; the paper book stakes only it `[2026-10-13, la | `state_layer2.md` |
 | [layer2-likelihood-shadow] | SHADOW LIKELIHOOD -- the measured under tilt stamped beside the fair on NBA and NCAAF prop rows; nothing consu | `state_layer2.md` |
-| [forward-inputs-mirror] | FORWARD-TEST QUOTE LOGS ARE MIRRORED OUT OF RETENTION'S REACH -- seeded by hand; the daily job is on the fleet | `state_layer2.md` |
+| [forward-inputs-mirror] | FORWARD-TEST QUOTE LOGS MIRRORED OUT OF RETENTION'S REACH -- daily job rc 0 10-19/20/21 `[verified 2026-10-21, session 9e18a0e7]` | `state_layer2.md` |
 | [news-collectors] | FREE NEWS COLLECTORS (ESPN injuries NBA/NHL/NFL/WNBA/MLB, NBA referee crews, NHL officials + scratches) -- acc | `state_layer2.md` |
 | [cheat-sheets] | CHEAT SHEETS + PLAY CARDS -- served in the app, scheduled daily; 10-14 is BETA, 10-15 the first official day ` | `state_layer2.md` |
 | [segment-misgrade-regrade] | 53 OF 173 SETTLED SEGMENT ORDERS WERE GRADED AGAINST THE WRONG ACTUAL — 30.6%, AND THE ERRORS NEARLY CANCEL `[ | `state_ledger.md` |
