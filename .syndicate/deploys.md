@@ -53674,3 +53674,20 @@ which is about the two sizing bases and not about the refusal boundary.
 
   - Before the re-marks, the paper:novig and paper:prophetx counts were 38 and 48. Now 38 of 38 and 47 of 48 are at the fill's own book.
 - **undo:** append each row's `closing_mark.remark.before` back as its mark (archive last-copy-wins).
+
+## 2026-10-22 20:43:10Z (3:43 PM CT) -- READING, NO DEPLOY BY THIS LANE: CLV openings ceilings (22e3a0aa) LIVE on refresh-worker -- **deploy MET; busy-day forward reading OWED (scheduled 10-26 9:00 AM CT)** (lane `clv-openings-ceiling`, session 366eb355, todo #732)
+- **user, in this session:** "Load 22e3a0aa on the fleet: fast-forward plus a refresh-worker restart, under the deploy claim rules, then take the forward reading on the next busy day."
+- **no ff needed:** fleet HEAD was already ae2cb646, which contains 22e3a0aa (lane wnba-injury-fleet-ff's 19:59:11Z ff).
+- **restart was NOT mine, by agreement:** lane min-ev-tuner-shadow (session local_81601787) held the same user approval for the same refresh-worker restart. So one restart served both, instead of a second cold board rebuild.
+  - Claimed TERM at 20:35:12.684Z (`role_restarts.jsonl`: exit 20:35:15Z, holder `min-ev-tuner-shadow`, ran_s 3629).
+  - Respawned as pid 3969372, lstart 20:35:18Z, code ae2cb646. That lane's own entry covers the restart.
+- **baseline (old code), last line before the restart:** `20:25:59.975Z OPENINGS date=2026-10-22 rows_in=5321 written=52 already=22042 ... truncated=False`. There was no `dropped=`/`bytes=`, and `OPENINGS_CEILING_HIT` had fired 0 times.
+- **verify (MEASURED, watcher on refresh-worker.log):**
+  - The first new-format line: `2026-10-22T20:43:10.121Z [clv_opening_ledger] OPENINGS date=2026-10-22 rows_in=5282 written=146 already=22094 duplicate=5136 unkeyable=0 truncated=False dropped=0 bytes=22736558`.
+  - `OPENINGS_CEILING_HIT` lines: 0.
+  - `already=22094` equals the file's prior record count, so the incremental index rebuilt from byte 0 on the cold start and dedup holds.
+- **owed:** the busy-day reading.
+  - Dates: Sat 10-24 / Sun 10-25. A file past 33,554,432 B with `dropped=0`, 0 CEILING_HIT, and trail combos == openings keys.
+  - Scheduled task `clv-openings-ceiling-forward-reading`: one-time, 2026-10-26 9:00 AM CT.
+  - The instrument is `clv_openings_forward_reading.py` in the side-session notes folder. On 10-20 it reads PASS; on 10-21 it reads FAIL with missing 3,939, reproducing the findings.
+- **undo:** in ~/Syndicate, `git checkout 21b4bdb0 -- syndicate/features/shared/clv_opening_ledger.py` (the pre-fix copy; 22e3a0aa touched only that runtime file), then a claimed refresh-worker restart after a save.
