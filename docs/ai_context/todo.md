@@ -25,6 +25,24 @@
   2. The points secondary on scratch arms.
   3. Before any `on`: the k / book-blend re-fit check, and a reuse stamp for the priced set.
   4. A reading of the rotation-HISTORY path, which takes over from a team's 2nd game and is not covered by this switch.
+- **Lane `nba-sim-minutes-history-path` (OPEN 2026-10-22, session 1215cb2f; side session of local_c0ccc55a) holds owed items 1 and 4:**
+  - **PRE-REGISTERED `cdfe3e59` (10:34 AM CT 10-22), before any post-10-21 box:**
+    - The history-path reading, with its fix gate (G-LEFTOVER / G-OTHER / G-BIAS / NO-GO).
+    - Variant **V-S**, priced STARTERS first: its own PRIMARY-V rule, plus a head-to-head against the registered design.
+      It is read only on slates after 10-21.
+  - **Built, DEFAULT OFF:** `SYNDICATE_NBA_SIM_MINUTES_PRICED_FIRST_SET` (absent/`priced` | `priced_starters`), read only
+    when the main switch is shadow or on. The audit gains `--variant priced_starters` and `--history`. +10 tests,
+    including V-S off != on through the real worker.
+  - **Truth-free mechanics, no box compared:**
+    - The history replay reproduces production `_sim_min` to 0.0000 on 4/4 sides. LEFTOVER is 0 on all of them, so
+      zero-stint pool players hold only the 10% blend share (0.5-2.0 min).
+    - V-S engages on all three 10-22 derive sides.
+  - **OWED (time-gated):** run once the boxes for 10-22..10-27 are in (`player_checks_<D>.csv` lands ~6:45 AM CT the next
+    day):
+    - `--replay --min-rows 150 [--variant priced_starters]`;
+    - the non-replay audit split by path;
+    - `--history`.
+  - Findings: `.syndicate/findings_2026-10-22_nba_sim_minutes_history_path.md`.
 - **Follow-ups found:** the NBA official injury-PDF parser splices reason words into names (`ISAIAH WAY STEWART`, `BEN SUBLUXATION SIMMONS`), and probably hands an Available player the next player's OUT (Curry excluded and played 21; Moody simulated 32.9 and DNP).
 - Detail: `.syndicate/findings_2026-10-22_nba_sim_minutes_allocation.md`.
 

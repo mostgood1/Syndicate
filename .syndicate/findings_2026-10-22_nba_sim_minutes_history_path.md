@@ -204,3 +204,44 @@ confirmatory slate, must not FAIL.
 ## Results
 
 (appended below this line, never above it)
+
+### Correction to the header (not to the rule)
+
+The header says "Written ~10:35-11:15 AM CT". That is wrong. The file was committed as `cdfe3e59` at 10:34:23 AM CT
+(15:34:23Z) on 10-22. No post-10-21 box existed then.
+
+### Built, DEFAULT OFF, and a truth-free mechanics check `[10-22 ~10:40 AM CT, no box compared]`
+
+**Code (this lane).**
+- `SYNDICATE_NBA_SIM_MINUTES_PRICED_FIRST_SET` (absent/`priced` | `priced_starters`) is in `_nba_priced_first_minutes_local`.
+  It is read only when the main switch is shadow or on. With no protected player it reports `reason=none_protected`
+  and does not engage.
+- The log line gains `set=` and `protected=`.
+- `scripts/nba_sim_minutes_audit.py` gains `--replay --variant priced_starters` (a third arm, VAR, plus
+  `variant_rule`; `replay_rule` is untouched) and `--history` (the §2 split, by spies on the module view).
+
+**Tests.**
+- `tests/test_nba_sim_minutes_allocation.py` +6, including V-S off != on through the REAL worker, against both off and
+  the registered design.
+- `tests/test_nba_sim_minutes_history_path.py` (NEW, 3): the split closes to the real function's output; a history player
+  missing from the pool feeds LEFTOVER minutes to a zero-stint pool player; a non-reproducing side is dropped.
+- `tests/test_nba_sim_minutes_audit.py` +1 (`variant_rule`).
+- Mutant check: with `protected = priced`, 4 of the 5 V-S tests fail.
+- 28 pass in the three files, and 59 pass across 8 neighbouring suites (orchestrator reachability, props smart sim,
+  minutes model, pregame lineup pools, rotation-history league code, reuse exclusions, tip freeze, season phase).
+
+**Mechanics on the fleet's production files** (worktree code, `nice 19`, read-only). These are 10-22 / 10-23 sims, and
+no box is compared.
+- **History replay** reproduces production `_sim_min` with max deviation **0.0000** on 4/4 history sides (10-22 OKC;
+  10-23 BOS, NYK, SAS). The split closes to 0.
+  - On every side: MAPPED 216.0 + LEFTOVER 0.0 + BLEND 24.0 + CAPS 0.0 = 240.
+  - Zero-stint pool players hold only the blend share:
+    - BOS: Conley 1.80, Harper Jr. 1.42, A. Williams 0.51.
+    - NYK: Wiseman 1.14, Diawara 1.26, Dadiet 0.88, Kolek 0.74, McCullar 0.72.
+    - SAS: T. Harris 2.03, McLaughlin 0.51.
+    - OKC: none.
+- **Variant replay.**
+  - On 10-22's 3 derive sides (DEN 5 priced, PHI 7, CLE 6), the OFF arm reproduces production 0.0000, and ON and VAR both
+    engage. VAR = ON on DEN, which means its 5 priced players all carry the starter signal. VAR differs from ON on PHI and CLE.
+  - 10-23's derive sides are D-1 builds with 0 priced: neither engages, the registered no-op.
+  - The 4 history sides are dropped by #723's own rule.
