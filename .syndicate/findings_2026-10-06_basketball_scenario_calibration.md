@@ -3881,3 +3881,113 @@ Every value landed within ±.03 FTA, ±.03 PF and ±.004 foul-outs of the pre-re
 - FTA ≈ 23.19 (gate 23.14 ± .3);
 - PF ≈ 19.67;
 - foul-outs ≈ 0.222 (upper bound 0.2334).
+
+### ROUND-2b CONFIG — FULL FIT RESULT 2026-10-22 20:38Z (fit_r2b, ran 2026-10-21 15:46Z–18:36Z, 109/109 dates, 791 paired games, 0 errors): PASSES every gate
+
+Graded at nice 19; the user's go-ahead was given in this chat on 2026-10-21.
+
+| reading | real FIT | fit_f5 | fit_r2 | **fit_r2b** | gate |
+|---|---|---|---|---|---|
+| total bias, per game | 0 | +0.12 | −0.08 | **−0.03** (CI [−1.33, +1.25]) | < 0.5 ✓ |
+| FTA/team, non-OT | 23.128 | 22.867 | 22.703 | **23.154 (+0.03)** | ± 0.3 ✓ |
+| team PF | 19.67 | 19.66 | 19.91 | **19.66** | ± 0.4 ✓ |
+| foul-outs/game | 0.1934 | 0.2094 | 0.2335 | **0.2227** | 0.193 ± 0.04 ✓ |
+| quarter shares (S2) | .2546 / .2505 / .2538 / .2411 | 3 of 4 outside | all inside | **.2552 / .2505 / .2526 / .2416, all inside** | ✓ |
+| H1 share (S4) | .5050 | .5006 ✗ | .5055 | **.5058** | ✓ |
+| S8 total / margin SD | 18.29 / 14.00 | 18.30 / 14.70 | 18.05 / 14.60 | 18.06 / 14.61 | inside CI ✓ |
+| FTA all (S6) / 3PA (S9) | 23.35 / 37.00 | 22.94 / 36.22 | 22.83 / 37.27 | 23.29 / 37.18 | inside CI |
+| 2P% / 3P% | .5463 / .3588 | .5525 / .3758 | .5474 / .3632 | .5471 / .3625 | |
+| FGA / REB / AST | 89.29 / 43.98 / 26.66 | 88.17 / 42.44 / 24.54 | 89.09 / 43.67 / 24.31 | 88.90 / 43.61 / 24.24 | AST open (#5b) |
+| pace proxy (S1) | 114.0 | 112.8 | 113.5 | 113.5 (−0.55, outside its CI) | not gated |
+
+**Paired totals:** r2b − f5 −0.15 (SE 0.08); r2b − r2 +0.04 (SE 0.06).
+
+**Every reading landed within a few hundredths of the 12-date paired-shift prediction:** FTA 23.19 predicted /
+23.15 measured; PF 19.67 / 19.66; foul-outs .223 / .2227.
+
+**Nothing is enabled.** Production still requires the pre-registered forward test (3020b556: the 2026-27 regular
+season from 11-01, read once at ≥ 250 period-line games / ≥ 400 full-game, with the same gates). It reaches
+production only through `nba_engine_config.json` (the P3 rule).
+
+**fit_r2b_config.json** (machine-readable, for P3; also at C:/tmp/bball_sc/fit_r2b_config.json):
+
+```json
+{
+ "_what": "basketball-scenario-calibration ROUND-2b config fit_r2b (full FIT 2026-10-21 15:46Z-18:36Z, PASS graded 2026-10-22); supersedes fit_f5_config.json",
+ "harness": "scripts/basketball_scenario_rates.py sim (levers -> _lever_cfg rebuilds the frozen EventSimConfig per engine call, ~:252/:338/:359; engine flags -> setattr on the native engine module, ~:535-545)",
+ "engine_code": "origin/main native engine incl. 361a5286, 85d0bca3 (quarter_targets_mode), abd8967e (shooting_foul_model), 45f9272b (coherent 3PA de-net) + orchestrator 78f73023 (skip_outs_penalties also drops the pace injury drag) (+ research-only outcome-neutral diag counters; omit them)",
+ "env": {
+  "SYNDICATE_NBA_TEAM_INPUTS": "1"
+ },
+ "engine_module_flags": {
+  "SHOOTER_FT_RATE": true,
+  "FOULED_MISS_NOT_FGA": true,
+  "EXACT_TARGET_CALIBRATION": true,
+  "TOV_PER_ATTEMPT": true,
+  "PLAYER_REBOUND_CREDIT": true,
+  "BLOCK_MODE": "team_prior",
+  "BLOCK_ALLOC_BY_RATE": true
+ },
+ "event_sim_config": {
+  "possession_alternation": 1.0,
+  "possessions_jitter": 0.0,
+  "team_prior_stacks_on_target": false,
+  "score_effect_k": 0.002,
+  "blowout_bench_rest": true,
+  "bench_weight_boost": 3.0,
+  "foul_out_in_sim": true,
+  "foul_trouble_thresholds": [
+   2,
+   3,
+   4,
+   5
+  ],
+  "foul_trouble_bench_mult": 0.05,
+  "foul_trouble_release_s": 240,
+  "fouler_per_minute": true,
+  "foul_trouble_foul_mult": 0.5,
+  "bonus_free_throws": true,
+  "bonus_nonshoot_foul_per_poss": 0.0695,
+  "base_nonshooting_foul_per_poss": 0.0175,
+  "endgame_foul_window_s": 120,
+  "endgame_foul_max_deficit": 10,
+  "endgame_foul_p_by_deficit": [
+   0.2,
+   0.2,
+   0.3
+  ],
+  "endgame_foul_seconds": 5.0,
+  "endgame_extend_possessions": true,
+  "endgame_foul_p": 0.0,
+  "solver_bonus_trip_share": 0.01837,
+  "solver_endgame_pts_per_team": 0.771,
+  "record_events": true,
+  "diag_foul_outs": true,
+  "fg2_from_two_point_split": true,
+  "quarter_targets_mode": "mean",
+  "shooting_foul_model": "coherent",
+  "sf_team_ref": 0.307
+ },
+ "data_files_in_scratch_processed_root": {
+  "nba_sim_total_inputs.json": {
+   "skip_def_subtraction": true,
+   "skip_outs_penalties": true
+  },
+  "nba_sim_availability.json": "fleet copy (enabled, k=2, readmit_with_prop_line)",
+  "nba_prop_calibration.json": "fleet copy",
+  "calibration_totals_<date>.json": "walk-forward, C:/tmp/bball_sc/calfiles_sw_all, 105 files 2025-11-02..2026-02-27 (FIT ONLY; switched raw, both total-input keys)",
+  "quarters_calibration.json": "C:/tmp/bball_sc/qcal_real/quarters_calibration.json (real FIT quarter splits)"
+ },
+ "replay_inputs": "scripts/resim_nba_availability.py prepare_scratch as-of: player_checks < slate, rotation_stints_history truncated as-of; lineup_teammate_effects REMOVED (known gap)",
+ "sims": 200,
+ "window": "2025-11-01..2026-02-28 regular season",
+ "known_residuals": [
+  "AST ~-2.4/team (#5b, open)",
+  "3P% +0.37 pts (.3625 vs .3588)",
+  "foul-outs +0.029 (inside the band)",
+  "pace proxy -0.55 (outside its CI)",
+  "S8 margin SD +0.62 (inside its CI)"
+ ],
+ "production_path_note": "P3 rule: every field reaches production ONLY via nba_engine_config.json, never by flipping a code default. diag_foul_outs/record_events are research-only."
+}
+```
