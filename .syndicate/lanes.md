@@ -1577,8 +1577,8 @@ death, never life — do not invert it.
     - A LIVE entry path was refused by the permission classifier and is NOT built.
   - Kept OPEN for:
     - (a) the paper-entry read after enough nights (pre-registered: >=200 booked, markout +300 s CI > 0, else stop);
-    - (b) stage-2 measurement + a nightly recorder (proposal card, user's OK);
-    - (c) the take-profit verdict (user + kalshi-exit-path);
+    - (b) stage-2 measurement + a nightly recorder. The user said "Start stage 2" (relayed by 332cb014, 10-22 ~17Z); the card task_2ae479d3 needs the user's own click here;
+    - (c) take-profit: the user chose "Raise margin to >=0.30" (relayed). The coordinator 332cb014 owns the change; NOT live at 17:19Z (env key absent);
     - (d) the fast-vs-slow settled counterfactual from execution_exits_fast.json.
 - 2026-10-21 ~21:3xZ user decisions (asked here): "Exits + tiny entries live", then "Yes, take the loan" -- fast loop dispatches live sales via the slow tick's run_exit_tick; capped NHL-spread in-game entries (1 contract, $10/day) to follow.
 - Files: syndicate/features/shared/execution_exits.py (`EXIT_STATE_LOCK` + the `run_exit_tick` lock wrapper ONLY -- LOAN from kalshi-exit-path approved by the user 2026-10-21 ~21:45Z, owner session unreachable; body unchanged), scripts/inplay_recorder.py, scripts/inplay_edge_report.py, scripts/inplay_exit_replay.py, scripts/inplay_fair_score.py, scripts/run_fast_exit_loop.py (NEW), .syndicate/findings_2026-10-20_in_game_trading.md, syndicate/features/shared/execution_exits_fast.py (NEW, stage 1 fast exit loop PAPER; imports execution_exits read-only, never edits it), tests/test_execution_exits_fast.py (NEW), syndicate/features/shared/inplay_entries_paper.py (NEW, in-game entry rule PAPER ONLY, no order path), tests/test_inplay_entries_paper.py (NEW), scripts/run_live_odds_refresh_worker.py (`_fast_exit_background_loop` + `start_fast_exit_loop` + their one call in main() ONLY, NEW section)
