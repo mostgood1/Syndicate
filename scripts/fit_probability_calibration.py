@@ -27,7 +27,8 @@ INPUTS -- two shapes, one row contract:
      (`execution_ledger.py`). Rows with `outcome in {won, lost}` and a
      `model_edge_pct` + `ev_pct` are usable; the model probability is recovered
      exactly the way the sizer recovers it (`portfolio_commit.sizing_inputs_from_row`):
-         profit = net profit per unit at the fill price
+         profit = net profit per unit at the requested price (fill if absent),
+                  American odds or a venue contract price (0 < p < 1)
          fair   = (ev_pct/100 + 1) / (profit + 1)
          p      = fair + model_edge_pct/100
      A push is neither outcome and is dropped.
@@ -63,6 +64,7 @@ from typing import Any, Iterable, Mapping, Sequence
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from syndicate.features.shared import probability_calibration as pc  # noqa: E402
+from syndicate.features.shared.paper_settlement import profit_per_dollar  # noqa: E402
 
 EXIT_OK = 0
 EXIT_REFUSED = 2
@@ -85,10 +87,16 @@ def _as_float(value: Any) -> float | None:
     return out if out == out else None
 
 
-def _net_profit_per_unit(american: float) -> float | None:
-    if american == 0:
-        return None
-    return (american / 100.0) if american > 0 else (100.0 / abs(american))
+def _net_profit_per_unit(price: float) -> float | None:
+    """Net profit per unit at `price`, in WHICHEVER unit the ledger recorded it.
+
+    The execution ledger holds both units in one column: paper fills record
+    American odds (-110), live Kalshi/Polymarket fills record the contract price
+    (0.65). Read as American, 0.65 gives 0.0065, `fair` lands outside (0, 1) and
+    the row drops silently (todo #719). The boundary is
+    `paper_settlement.profit_per_dollar`'s, not a new one.
+    """
+    return profit_per_dollar(price)
 
 
 def _outcome_to_y(value: Any) -> int | None:
@@ -111,9 +119,14 @@ def row_from_order(order: Mapping[str, Any], *, artifact_root: str) -> dict[str,
         return None
     edge = _as_float(order.get("model_edge_pct"))
     ev = _as_float(order.get("ev_pct"))
-    price = _as_float(order.get("fill_price"))
+    # REQUESTED FIRST: it is the price `ev_pct` was stamped against (the plan's
+    # venue price, `venue_scope.py`), so it is the one `fair` must be backed out
+    # of. A paper fill copies it (`execution_ledger` fill_price=requested_price),
+    # so paper rows are unchanged; a live fill is the venue's contract price and
+    # can differ from the stamp's by slippage.
+    price = _as_float(order.get("requested_price"))
     if price is None:
-        price = _as_float(order.get("requested_price"))
+        price = _as_float(order.get("fill_price"))
     if edge is None or ev is None or price is None:
         return None
     profit = _net_profit_per_unit(price)

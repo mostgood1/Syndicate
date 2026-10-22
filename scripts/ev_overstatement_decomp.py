@@ -22,7 +22,8 @@ counterfactual "same row with model_edge_pct = 0" (`portfolio_commit.stake_attri
 Conventions: flat ROI is one unit per order (push excluded); stake ROI is pnl / stake over dollars; the sim's
 dollars are `stake * sim_share_of_stake` and their pnl is pro rata (pnl is linear in stake for one bet).
 Every +- is one event-clustered standard error. A row's market fair is backed out of the stamp itself:
-`p_fair = (1 + ev_pct/100) / decimal(fill_price)`.
+`p_fair = (1 + ev_pct/100) / decimal(requested_price)` -- the price the stamp was taken at, fill if absent.
+Prices are American odds or, on a live venue row, a contract price in (0, 1); `decimal_odds` reads both.
 """
 
 from __future__ import annotations
@@ -61,9 +62,19 @@ def _ts(value):
         return None
 
 
-def decimal_odds(american) -> float:
-    a = float(american)
-    return 1.0 + a / 100.0 if a > 0 else 1.0 + 100.0 / abs(a)
+def decimal_odds(price) -> float:
+    """Decimal odds from American odds OR a live venue contract price (0 < p < 1).
+
+    The ledger holds both units in one `fill_price` column (todo #719); read as
+    American, a live 0.65 fill is 1.0065. The unit rule is
+    `paper_settlement.profit_per_dollar`'s.
+    """
+    from syndicate.features.shared.paper_settlement import profit_per_dollar
+
+    profit = profit_per_dollar(price)
+    if profit is None:
+        raise ValueError(f"unusable price {price!r}")
+    return 1.0 + profit
 
 
 def _devig_pair(price_us, price_them) -> float:
@@ -115,7 +126,11 @@ def enrich(orders):
     for r in rows:
         d = decimal_odds(r["fill_price"])
         r["_dec"] = d
-        r["_pf"] = (1 + r["ev_pct"] / 100) / d
+        # The fair is backed out of the price `ev_pct` was STAMPED against -- the
+        # plan's requested price. A paper fill copies it; a live fill is the venue
+        # contract price and can differ by slippage. The return is at the fill.
+        stamp = r.get("requested_price")
+        r["_pf"] = (1 + r["ev_pct"] / 100) / (decimal_odds(stamp) if stamp is not None else d)
         r["_ret"] = d - 1 if r["outcome"] == "won" else -1.0
         r["_y"] = 1.0 if r["outcome"] == "won" else 0.0
         r["_band"] = band_of(r["ev_pct"])
