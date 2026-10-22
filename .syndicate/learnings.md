@@ -2761,3 +2761,9 @@ The 2026-10-20 entry said: "Rating INPUTS transfer, because the sim reads them w
   - `_norm_name_key` keeps periods and apostrophes: props_predictions "Jabari Smith Jr." never meets the books' "Jabari Smith Jr".
   - On 10-21 that hid 2 of 6 priced MIL players.
 
+
+
+## 2026-10-22 - A claim watcher must treat EXPIRED as released, not wait for "free" `[lane in-game-trading, session 15ceeb14]`
+- **What happened:** I waited on another lane's live-odds-worker claim with a loop that exited on `*free*`. `deploy_claim.py status` printed `EXPIRED (does not block)` from 23:37Z onward. The loop ran on to its 70-min timeout, and an in-game paper measurement started ~1 h into the NHL slate.
+- **Rule:** a watcher on `deploy_claim.py status` exits on `free` OR `EXPIRED`. Better, it asks `acquire` (exit code 0) instead of parsing prose. The claim tool's own word for "not blocking" is not "free".
+- **Also from this lane:** when this session's permission classifier refuses a money-moving step, a peer session's offer to "do that step here, where the user approved it" is declined. The decision goes back to this session's user, who chose paper-only. That path worked; the refused live module was never built anywhere.

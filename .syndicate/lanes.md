@@ -1542,10 +1542,15 @@ death, never life — do not invert it.
 - **GOAL: MET** (2026-10-21 04:45Z).
   - Reading: findings §6 markout +300 s -1.26c (CI -1.80..-0.72, n=1,613) over 23:09Z-04:39Z, 11 games. Plan §3 has stages 1-5, each with its user decision; todo #715. Main 796e55f5.
   - **Hypothesis FALSIFIED** for book-consensus fairs: positive sides exist (19.7%) but mark out negative, and Kalshi leads.
-  - Kept OPEN for the owed user decisions:
-    - 1a: run stage 1 in paper on the fleet. The worker-thread edit was classifier-refused; a standalone runner exists.
-    - 2: approve the stage-2 measurement plus a nightly recorder.
-    - The take-profit verdict goes to the user and kalshi-exit-path.
+  - STATUS 2026-10-22 15:17Z:
+    - Stage 1 fast exits are LIVE (ac248f07; first 4 live sales 00:02-00:07Z 10-22).
+    - The in-game entry rule runs PAPER on NHL (09e86a9d; 5 booked on night 1).
+    - A LIVE entry path was refused by the permission classifier and is NOT built.
+  - Kept OPEN for:
+    - (a) the paper-entry read after enough nights (pre-registered: >=200 booked, markout +300 s CI > 0, else stop);
+    - (b) stage-2 measurement + a nightly recorder (proposal card, user's OK);
+    - (c) the take-profit verdict (user + kalshi-exit-path);
+    - (d) the fast-vs-slow settled counterfactual from execution_exits_fast.json.
 - 2026-10-21 ~21:3xZ user decisions (asked here): "Exits + tiny entries live", then "Yes, take the loan" -- fast loop dispatches live sales via the slow tick's run_exit_tick; capped NHL-spread in-game entries (1 contract, $10/day) to follow.
 - Files: syndicate/features/shared/execution_exits.py (`EXIT_STATE_LOCK` + the `run_exit_tick` lock wrapper ONLY -- LOAN from kalshi-exit-path approved by the user 2026-10-21 ~21:45Z, owner session unreachable; body unchanged), scripts/inplay_recorder.py, scripts/inplay_edge_report.py, scripts/inplay_exit_replay.py, scripts/inplay_fair_score.py, scripts/run_fast_exit_loop.py (NEW), .syndicate/findings_2026-10-20_in_game_trading.md, syndicate/features/shared/execution_exits_fast.py (NEW, stage 1 fast exit loop PAPER; imports execution_exits read-only, never edits it), tests/test_execution_exits_fast.py (NEW), syndicate/features/shared/inplay_entries_paper.py (NEW, in-game entry rule PAPER ONLY, no order path), tests/test_inplay_entries_paper.py (NEW), scripts/run_live_odds_refresh_worker.py (`_fast_exit_background_loop` + `start_fast_exit_loop` + their one call in main() ONLY, NEW section)
 - Stage 1 user decision 2026-10-20 ~23:25Z via session 332cb014: "Build stage 1 now (Recommended)" -- paper first; going live is a separate yes.

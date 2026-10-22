@@ -908,3 +908,14 @@ board. The loop therefore checks `budget_remaining()` BEFORE spending.
 - **NOT a statement about** our model-edge entries or pregame exits: that is kalshi-exit-path's 10-26 counterfactual.
 - **Scripts:** `scripts/inplay_edge_report.py`, `scripts/inplay_exit_replay.py`, `scripts/inplay_fair_score.py` over `scripts/inplay_recorder.py` output.
 - **Detail:** `findings_2026-10-20_in_game_trading.md`, todo #715.
+- **IN-GAME FAST EXIT LOOP IS LIVE** `[verified on fleet logs 2026-10-22 15:15Z]`
+  - `execution_exits_fast` runs every 15 s on its own thread in live-odds-worker (ac248f07, live since 21:51Z 10-21).
+  - It hands triggered LIVE in-play positions to kalshi-exit-path's `run_exit_tick`: same rules (take_profit), same shared caps (5 sales / $25 per UTC day), same place_exit. Both passes are serialised by `execution_exits.EXIT_STATE_LOCK`.
+  - First live sales came at 00:02-00:07Z 10-22 (4 placed); 32 later dispatches were refused by the caps.
+  - `SYNDICATE_EXIT_FAST_LOOP` absent FOLLOWS `SYNDICATE_EXIT_MODE`; `paper` pins it to paper; `off` turns it off.
+  - The 10-20 replay says faster take-profit costs ~2pp vs the slow tick. The user chose it anyway, knowing that.
+- **IN-GAME ENTRY RULE IS PAPER ONLY** (`inplay_entries_paper.py`, 09e86a9d)
+  - Scope: NHL spreads away from a score change, >=3% book edge, 1 contract, $10/day would-be.
+  - It records and grades (markout +60/+300 s, settlement) to `inplay_entries_paper.json`. It has no order path.
+  - First night: 5 booked. That is too few to judge.
+  - **No live in-game entry path exists.** Live Kalshi entries after kickoff stay refused (`REFUSED_AFTER_COMMENCE`) unless a position carries `fair_source="in_game"`, and nothing stamps it.
