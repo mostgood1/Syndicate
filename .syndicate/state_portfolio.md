@@ -460,3 +460,19 @@ and none exist yet.**
 - **Polymarket balance:** the stamp's `dollars` 586.05 includes a 500.00 pending deposit (read 2026-10-19 22:15Z).
 - **Maker entry is NO-GO:** `findings_2026-10-19_kalshi_maker_entry_paper.md`.
 - Detail: `findings_2026-10-19_live_execution_empty_plan_funnel.md`.
+
+
+## [ledger-price-units] THE EXECUTION LEDGER HOLDS TWO PRICE UNITS; EVERY KNOWN READER NOW HANDLES BOTH `[verified 2026-10-22, code + fleet ledger, lane fitter-contract-price-units]`
+
+- **The rule:** a price strictly inside (0, 1) is a venue CONTRACT price; anything else is American odds. One implementation each:
+  `paper_settlement.profit_per_dollar` (profit), `execution_ledger._price_as_probability`, `prediction_ledger._implied_from_price` (CLV).
+- **Which column is which on a LIVE order:** `requested_price` = the plan's venue price in AMERICAN, and `ev_pct` is stamped against it
+  (`venue_scope.py`); `fill_price` = contract price paid. A paper fill copies requested into fill. So back `fair` out of `requested_price`, and
+  take profit/return at `fill_price`.
+- **Readers fixed:** CLV (`d1a7ffbe`, #719); offline fitters `fit_probability_calibration`, `fit_staked_probability`, `ev_overstatement_decomp`,
+  `paper_bet_optimization` (`4c7134a7`, `97dca15b`). Fleet ledger 2026-10-22 (12,111 orders): calibration live rows kept 6 -> 72, decomp 6 -> 73 of 73,
+  paper rows byte-identical. Already unit-aware before: P&L, `venue_settlement`, `execution_exits._probability`.
+- **A NEW reader of `fill_price` must use one of the three functions above.** Read as American, 0.65 is a 0.65% profit / 99.4% implied, and the row
+  either drops silently or skews a fit with no error.
+
+---
