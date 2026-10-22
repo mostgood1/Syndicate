@@ -1396,7 +1396,7 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   - Findings: `findings_2026-10-22_nba_injury_snapshot_overwrite.md`.
 - Findings: `findings_2026-10-22_nba_injury_pdf_parser.md`.
 
-## [wnba-injury-nba-report] THE WNBA INJURY FETCH TOOK THE NBA'S OFFICIAL REPORT; ON 10-20 AND 10-21 THE DAY'S WNBA SNAPSHOT WAS THE NBA'S ROWS. FIXED ON MAIN (ESPN WNBA ONLY), NOT ON THE FLEET `[measured 2026-10-22, lane wnba-injury-nba-report, todo #731, main 066c2158]`
+## [wnba-injury-nba-report] THE WNBA INJURY FETCH TOOK THE NBA'S OFFICIAL REPORT; ON 10-20 AND 10-21 THE DAY'S WNBA SNAPSHOT WAS THE NBA'S ROWS. FIXED (ESPN WNBA ONLY), ON THE FLEET SINCE 2026-10-22 19:59:11Z (ff to ae2cb646) `[measured 2026-10-22, lane wnba-injury-nba-report, todo #731, main 066c2158; ff lane wnba-injury-fleet-ff]`
 - **Writer:** `NBAInjuryDatabase.update_injuries` (`syndicate/features/wnba/source_cli/scrapers/injuries.py`) is the only writer of `wnba_source/data/raw/injuries.csv`. It is called by:
   - the WNBA props refresh (`refresh_wnba_oddsapi_props.py:3989`, logged);
   - `live_refresh_loop._fetch_injuries` (output captured, never logged).
@@ -1411,9 +1411,9 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   - **No minutes moved.** The readmitted five had no pool slot.
 - **Overlap (April–June 2026): no damage.** No Syndicate WNBA injury writer existed until 07-14 / 07-17, and no injury file existed in May–June.
 - **Fix:** `update_injuries` reads ESPN's WNBA page only. The WNBA copies of the NBA official-PDF scraper and Rotowire's `/basketball/` scraper are deleted. 6 tests, 5 red on the old file.
-- **NOT ON THE FLEET.** It needs an ff (the user's yes), no restart.
+- **ON THE FLEET since 2026-10-22 19:59:11Z (2:59 PM CT):** ff 21b4bdb0 -> ae2cb646, no restart (lane wnba-injury-fleet-ff, deploys.md). The first-write reading is owed.
   - **Next WNBA game: 10-24 ATL v GSV**, exposed from 10-23 ~11 PM CT.
   - Verify: the next NBA-game-day WNBA fetch summary has 0 QUESTIONABLE/PROBABLE/DOUBTFUL/TOR rows, and `readmitted_injury_return=0`.
   - **Fleet reading 2026-10-22 2:37 PM CT (lane wnba-injury-snapshot-overwrite, read-only):** the exposure is ALREADY open. The fleet (`21b4bdb0`, no `066c2158`) wrote the NBA's 10-22 report as the WNBA 10-22 snapshot: 2 TOR rows with spliced names, 46 ESPN rows deleted (1,027 -> 981). Every 10-24 build reads 10-22 as its latest snapshot. The props OUT refusal has no partial guard; the SmartSim, `wnba_sim_availability` and `league_status` fall back to 10-21. The last 10-24 build (4:08 AM CT) still read the ESPN rows (48 OUT, 0 lines refused).
-- **Lead FIXED ON MAIN by `#733` (`ae2cb646`), NOT ON THE FLEET:** a fetch for D run after midnight deleted D's snapshot (no 10-12), and a prefetch merged its scrape into today's. A fetch now replaces only the dates its rows carry, and ESPN rows carry the scrape's Central day, stamped once per scrape. An ff to `ae2cb646` or later carries `#731` too. `findings_2026-10-22_wnba_injury_snapshot_overwrite.md`.
+- **Lead FIXED by `#733` (`ae2cb646`), ON THE FLEET since 19:59:11Z 10-22:** a fetch for D run after midnight deleted D's snapshot (no 10-12), and a prefetch merged its scrape into today's. A fetch now replaces only the dates its rows carry, and ESPN rows carry the scrape's Central day, stamped once per scrape. An ff to `ae2cb646` or later carries `#731` too. `findings_2026-10-22_wnba_injury_snapshot_overwrite.md`.
 - Findings: `findings_2026-10-22_wnba_injury_nba_report.md`.

@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#733` — **WNBA `raw/injuries.csv` lost whole snapshots: a fetch for D run after Central midnight deleted D (the fleet file has no 10-12), and a prefetch for D+1 merged its scrape into D. FIXED ON MAIN `ae2cb646`, NOT ON THE FLEET (ff = the user's yes; it can ride with `#731`'s)** — FOUND 2026-10-22 (`#731` lead), lane `wnba-injury-snapshot-overwrite`, session f4ebcf5f (side session of local_154af8e3); `.syndicate/findings_2026-10-22_wnba_injury_snapshot_overwrite.md`
+### `#733` — **WNBA `raw/injuries.csv` lost whole snapshots: a fetch for D run after Central midnight deleted D (the fleet file has no 10-12), and a prefetch for D+1 merged its scrape into D. FIXED (`ae2cb646`) AND ON THE FLEET since 19:59:11Z 10-22 (ff with `#731`, lane `wnba-injury-fleet-ff`); first-write reading owed** — FOUND 2026-10-22 (`#731` lead), lane `wnba-injury-snapshot-overwrite`, session f4ebcf5f (side session of local_154af8e3); `.syndicate/findings_2026-10-22_wnba_injury_snapshot_overwrite.md`
 - **Defect** (`syndicate/features/wnba/source_cli/scrapers/injuries.py`, `update_injuries`). Every fetch deleted `--date`'s rows, while ESPN stamped each row `datetime.now()`. The NBA copy was fixed by `#730` (`21b4bdb0`); this copy was not.
   - **Late fetch for D** (after midnight CT): D's rows deleted, the scrape written as D+1's. Fleet: no 10-12 snapshot (the last 10-12 fetch ran 10-13 12:00:03 AM CT). A reader for 10-12 now reads 10-11's snapshot.
   - **Prefetch for D+1 on D**: nothing of D's deleted, the scrape MERGED into D (dedupe keep-last). A player who left ESPN's page stayed listed for D until a same-day fetch. With `#731`'s NBA rows in the file, this drove the 10-21 flapping (13 rebuilds).
@@ -20,7 +20,7 @@
   - 10-22 now holds 2 TOR rows with spliced names (`Nate Raptors Bittle`, `Malachi Fracture Smith`); 46 ESPN rows were deleted (1,027 -> 981 rows).
   - The last 10-24 build (4:08 AM CT) still read the ESPN 10-22 snapshot: 48 OUT, 0 lines refused.
   - So `#731`'s exposure for the 10-24 game is open NOW for any 10-24 build, not only from 10-23 11 PM CT. The props refusal has no partial guard and would read the 2 rows. The other three readers fall back to 10-21 (2 < half of 48).
-- **OWED (the user's yes):** fleet ff, no restart (`fetch-injuries` is a subprocess per call).
+- **ON THE FLEET since 2026-10-22 19:59:11Z (2:59 PM CT):** user, in chat (session f4ebcf5f): "ff the fleet to ae2cb646", then "ae2cb646, all of it" after the ride-alongs were listed. ff 21b4bdb0 -> ae2cb646, no restart (`fetch-injuries` is a subprocess per call); deploys.md 19:59:11Z. **OWED:** the first write after the ff (10-22 back to ESPN rows, an `INJURY_SNAPSHOT` line), then the overnight reading below.
   - Verify: a late fetch prints `INJURY_SNAPSHOT requested=D replaced=D+1`, and D's rows are still present the next morning. A prefetch prints `replaced=<today>`.
 - Not recoverable: 10-12's rows. The logs keep only the per-team status counts.
 ### `#732` — **The CLV openings ledger stopped at 32 MiB per date for ALL sports: full on 6 of 24 fleet dates 09-30..10-23 (10-11 at 19:03Z), >= 36,228 openings lost (10-21 exact: 3,939 of 36,710), dropped from the CLV report, min-ev tuner and sizing reads. FIXED ON MAIN `22e3a0aa`, NOT ON THE FLEET** — FOUND 2026-10-22 (`#729` residual), lane `clv-openings-ceiling`, session 366eb355 (side session of local_25799b04); `.syndicate/findings_2026-10-22_clv_openings_ceiling.md`
@@ -29,7 +29,7 @@
 - **User decision owed:** fleet ff + refresh-worker restart. **Forward reading owed after load:** on the next busy day (Sat 10-24 / Sun 10-25) the openings file passes 33,554,432 B with `dropped=0`, no `OPENINGS_CEILING_HIT`, and trail (mk, line, book) combos == openings keys for that date.
 - Past days are not recoverable as openings (first price never written). Sibling: `clv_departure_ledger` 8 MiB cap reached 95% on 10-17 (7,938,374 B), same all-sports shape.
 
-### `#731` — **The WNBA injury fetch took the NBA's official injury report: on 10-20 and 10-21 the day's WNBA snapshot WAS the NBA's rows (no WNBA roster on the fleet, so nothing filtered them), and the 10-21 ATL v GSV sim took 9 Hawks/Magic players as ATL exclusions and read 13 OUT WNBA players as returned. FIXED ON MAIN `066c2158` (ESPN WNBA only), NOT ON THE FLEET; next WNBA game 10-24** — FOUND 2026-10-22 (`#725` follow-up), lane `wnba-injury-nba-report`, session 898e35dc (side session of local_4ebfbce7)
+### `#731` — **The WNBA injury fetch took the NBA's official injury report: on 10-20 and 10-21 the day's WNBA snapshot WAS the NBA's rows (no WNBA roster on the fleet, so nothing filtered them), and the 10-21 ATL v GSV sim took 9 Hawks/Magic players as ATL exclusions and read 13 OUT WNBA players as returned. FIXED ON MAIN `066c2158` (ESPN WNBA only), ON THE FLEET since 19:59:11Z 10-22 (ff to `ae2cb646`, lane `wnba-injury-fleet-ff`); first-write reading owed; next WNBA game 10-24** — FOUND 2026-10-22 (`#725` follow-up), lane `wnba-injury-nba-report`, session 898e35dc (side session of local_4ebfbce7)
 - **The writer.** `NBAInjuryDatabase.update_injuries` (`syndicate/features/wnba/source_cli/scrapers/injuries.py`) is the only writer of the WNBA `raw/injuries.csv`. Two callers run it as `cli fetch-injuries --date D`:
   - the WNBA props refresh (`refresh_wnba_oddsapi_props.py:3989`), which is logged;
   - `live_refresh_loop._fetch_injuries`, whose output is captured and never logged.
@@ -55,7 +55,7 @@
   - Deleted: the WNBA copy of the NBA official-PDF scraper, and Rotowire's `/basketball/` (NBA) scraper.
   - Not chosen: gating `official_ok` on the roster filter. It would be inert on the fleet, which has no WNBA roster.
   - 6 tests through `update_injuries` and the CLI; 5 fail on `origin/main` (no roster: Hawks written as ATL; roster: day emptied; NBA page requested), 1 guard passes both.
-- **OWED (the user's yes):** a fleet ff, no restart (`fetch-injuries` is a subprocess).
+- **ON THE FLEET since 2026-10-22 19:59:11Z (2:59 PM CT):** ff 21b4bdb0 -> ae2cb646 with `#733`, no restart, the user's yes in session f4ebcf5f; deploys.md 19:59:11Z. It was owed as a fleet ff:
   - ~~Before 10-23 ~11 PM CT~~ **NOW: the defect is live again.** At 2:42 PM CT 10-22, the fleet (`21b4bdb0`) wrote the NBA report as the WNBA 10-22 snapshot. Read at 2:49 PM CT: 2 rows, both TOR (`Nate Raptors Bittle`, `Malachi Fracture Smith`); the file went 1,027 -> 981 rows.
     - The 10-24 builds read 10-22 as their latest snapshot. The props OUT refusal has no partial guard; the SmartSim falls back to 10-21 (`#733`'s reading).
     - An ff to `ae2cb646` or later carries both `#731` and `#733`.
