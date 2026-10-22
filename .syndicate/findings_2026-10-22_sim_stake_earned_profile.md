@@ -221,3 +221,24 @@ and every live order.**
 ## s8. DECISION (21:00Z, owner lane min-ev-tuner-shadow after adoption)
 
 **USER DECISION 2026-10-22 ~21:40Z (relayed verbatim by the fleet-watcher, session local_379fd729, typed in its chat ~4:40 PM CT): "go with (a)"** -- fit venue-POOLED at sport x market x segment x season_phase, with the stake reader extended to take season phase FIRST (loan from lane sim-stake-unfitted-market-only), pre-registered, shadow before any publish; nothing published without a further user yes. Order: (1) phase-aware reader, (2) pre-registration, (3) pooled fit, (4) shadow stake change, (5) user decision to publish.
+
+
+## s9. PRE-REGISTRATION 2026-10-22T21:37Z: the VENUE-POOLED fit, written grain (user decision (a); committed BEFORE any pooled `fit` with `--profile-out`)
+
+The phase-aware reader landed first (`f3bea489`): with a slate date, `commit_portfolio` reads ONLY `sport|market|segment|phase`.
+
+1. **Cell** = `<sport>|<market>|<segment>|<phase>`, which is `--grain pooled_venue` with every venue's rows together and phases still apart.
+   This is exactly the reader's 4-part key (`staked_probability_profile.cell_key(sport, market, segment, phase)`). An unknown phase is
+   reported and NEVER written.
+2. **Rows, split, floors, fit, gates, beta CI, bootstrap draws and seed** = s1 items 2-7, UNCHANGED. In particular:
+   - floors n_test >= 200 rows and >= 30 events;
+   - WRITE beta > 0 only when the held-out Brier delta's event-bootstrap 95% lower bound > 0;
+   - market_only by the base rule.
+3. **Output** = a CANDIDATE document only: `reports/staked_probability/candidate_pooled_<UTC date>.json` plus the fit table.
+   It is NEVER written to the live path `calibration/staked_probability_profile.json`, so the sizer cannot read it.
+4. **Shadow** = for a written beta > 0 cell, the expected stake change over that cell's recent plans: the stake on the blended probability
+   vs the market fair the fleet stakes today (#704 `market`). Report it with n.
+5. **Publish** = only on the user's explicit yes after the shadow, behind claim + restart, with a deploys.md entry.
+6. **Hypothesis H-EARN-POOLED** (prior NOT expected to hold, given w = -0.27 [-0.78, +0.18] pooled on 4,876 orders): at least one
+   pooled cell passes the beta > 0 write gate. A market_only cell changes nothing today, because the fleet already stakes the market fair
+   on unfitted cells.
