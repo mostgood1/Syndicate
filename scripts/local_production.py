@@ -1893,16 +1893,22 @@ def run_state_janitor(settings: Settings, *, run=subprocess.run) -> int | None:
 
 
 def cmd_ci_run(args: argparse.Namespace) -> int:
-    """The `ci-suite` cron, then the state-store janitor. The janitor runs in a
-    `finally` so a suite that fails or refuses to start still gets its
-    leftovers swept; it never changes the returned code."""
+    """The `ci-suite` cron, bracketed by the state-store janitor. It runs BEFORE
+    the suite too: a `finally` does not survive the supervisor killing this
+    process at the job's time cap, so the previous night's leftovers are swept
+    at the start of the next run. Neither sweep changes the returned code."""
+    _janitor_quietly(args)
     try:
         return _ci_run_suite(args)
     finally:
-        try:
-            run_state_janitor(settings_from_args(args))
-        except Exception as exc:  # noqa: BLE001 -- never mask the suite's own result
-            print(f"janitor: skipped ({type(exc).__name__})", flush=True)
+        _janitor_quietly(args)
+
+
+def _janitor_quietly(args: argparse.Namespace) -> None:
+    try:
+        run_state_janitor(settings_from_args(args))
+    except Exception as exc:  # noqa: BLE001 -- never mask the suite's own result
+        print(f"janitor: skipped ({type(exc).__name__})", flush=True)
 
 
 def _ci_run_suite(args: argparse.Namespace) -> int:

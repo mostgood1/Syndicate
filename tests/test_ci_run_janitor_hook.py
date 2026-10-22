@@ -27,7 +27,7 @@ def test_janitor_runs_after_a_passing_suite_and_keeps_its_code(monkeypatch, tmp_
     monkeypatch.setattr(lp, "_ci_run_suite", lambda a: 0)
     monkeypatch.setattr(lp, "run_state_janitor", lambda s, **k: calls.append(s) or 0)
     assert lp.cmd_ci_run(_args(tmp_path)) == 0
-    assert len(calls) == 1
+    assert len(calls) == 2   # once before the suite, once after
 
 
 def test_janitor_runs_after_a_failing_suite_and_does_not_change_its_code(monkeypatch, tmp_path):
@@ -35,7 +35,15 @@ def test_janitor_runs_after_a_failing_suite_and_does_not_change_its_code(monkeyp
     monkeypatch.setattr(lp, "_ci_run_suite", lambda a: 1)
     monkeypatch.setattr(lp, "run_state_janitor", lambda s, **k: calls.append(s) or 4)
     assert lp.cmd_ci_run(_args(tmp_path)) == 1   # the janitor's 4 must not replace the suite's 1
-    assert len(calls) == 1
+    assert len(calls) == 2
+
+
+def test_the_pre_sweep_happens_before_the_suite_starts(monkeypatch, tmp_path):
+    order = []
+    monkeypatch.setattr(lp, "_ci_run_suite", lambda a: order.append("suite") or 0)
+    monkeypatch.setattr(lp, "run_state_janitor", lambda s, **k: order.append("janitor"))
+    lp.cmd_ci_run(_args(tmp_path))
+    assert order == ["janitor", "suite", "janitor"]
 
 
 def test_janitor_runs_when_the_suite_raises(monkeypatch, tmp_path):
@@ -48,7 +56,7 @@ def test_janitor_runs_when_the_suite_raises(monkeypatch, tmp_path):
     monkeypatch.setattr(lp, "run_state_janitor", lambda s, **k: calls.append(s))
     with pytest.raises(RuntimeError, match="clone exploded"):
         lp.cmd_ci_run(_args(tmp_path))
-    assert len(calls) == 1
+    assert len(calls) == 2
 
 
 def test_a_broken_janitor_never_masks_the_suite_result(monkeypatch, tmp_path):
