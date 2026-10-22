@@ -578,7 +578,7 @@ def fetch_and_write_live_odds_for_date(
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Fetch current-day live OddsAPI markets into canonical MLB-BettingV2 market files.")
+    ap = argparse.ArgumentParser(description="Fetch current-day live OddsAPI markets into the MLB engine data root's canonical market files.")
     ap.add_argument("--date", required=True, help="YYYY-MM-DD")
     ap.add_argument("--regions", default="us")
     ap.add_argument("--bookmakers", default=None)

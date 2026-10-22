@@ -15,7 +15,7 @@ from zoneinfo import ZoneInfo
 
 import requests
 
-# Ensure the project root (MLB-BettingV2/) is importable.
+# The MLB engine DATA root (engines/mlb): .env and data/ are read under it.
 _ROOT = Path(_ENGINE_FILE).resolve().parents[2]
 if _SYNDICATE_ROOT not in sys.path:
     sys.path.insert(0, _SYNDICATE_ROOT)
@@ -1149,7 +1149,7 @@ def fetch_historical_game_lines_for_date(
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Backfill 2025 OddsAPI historical lines into MLB-BettingV2 (pitcher props, hitter props, game lines)")
+    ap = argparse.ArgumentParser(description="Backfill 2025 OddsAPI historical lines into the MLB engine data root (pitcher props, hitter props, game lines)")
     ap.add_argument("--start-date", required=True, help="YYYY-MM-DD")
     ap.add_argument("--end-date", required=True, help="YYYY-MM-DD")
     ap.add_argument(
@@ -1180,7 +1180,7 @@ def main() -> int:
     load_dotenv_if_present(_ROOT / ".env")
     api_key = os.environ.get("ODDS_API_KEY") or os.environ.get("ODDSAPI_KEY")
     if not api_key:
-        print("ERROR: ODDS_API_KEY not set (use MLB-BettingV2/.env or environment)")
+        print("ERROR: ODDS_API_KEY not set (use engines/mlb/.env or the environment)")
         return 2
 
     start = datetime.fromisoformat(args.start_date).date()
