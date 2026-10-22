@@ -53722,3 +53722,31 @@ which is about the two sizing bases and not about the refusal boundary.
   - the ledger reading for f5113511 at the next settlement (owner);
   - the busy-day openings reading 10-24/25 (owner).
 - **released:** refresh-worker claim, by token, after this entry.
+
+## 2026-10-22 21:15:11Z -- FLEET ff ae2cb646 -> ce1e4a19 + FULL DOWN/UP: Kalshi round-up to the $5 minimum (holder `kalshi-round-up`, lane `live-min-stake-five`, session 332cb014) -- **MET (env + restart); first rounded-up order OWED**
+- **user (332cb014's chat 2026-10-22):**
+  - Raised the problem: "Kalshi is still placing a number of single contract orders".
+  - "Yes, round up".
+  - "Approve the loan" (`contracts_for_stake` from kalshi-cancel-alert, whose owner session was unreachable).
+  - "Deploy now", accepting that a $5 favourite-capped order can lose up to one contract more.
+- **finding behind it:** all 6 single-contract Kalshi orders on 10-22 ($0.43-0.65) were placed 06:19-13:29Z, BEFORE the 14:45:30Z $5 restart. The 3 since were $4.48-5.39. The real residual: $5 band orders filled $4.45-4.76, because `contracts_for_stake` floors.
+- **code:** `ce1e4a19`.
+  - With `SYNDICATE_KALSHI_ROUND_UP_MIN_DOLLARS` set, a stake >= that minimum whose floored count costs less than it gains exactly ONE contract. Stakes under it stay floored. Absent = floored.
+  - 13 tests, including off != on on the 4 measured fills; 815 pass across the Kalshi order suites.
+- **ride-alongs ae2cb646..ce1e4a19 (runtime):**
+  - `a77077a2`: clv_departure_ledger per-sport and per-day ceilings (todo #734).
+  - `c4a8aa8f`: local_production `ci-run` runs the janitor before the suite as well (ci cron only).
+  - The rest is ledger.
+- **env:** 173 -> 174, +`LIVE_ODDS_WORKER__SYNDICATE_KALSHI_ROUND_UP_MIN_DOLLARS=5`. Backup `.bak-kalshi-round-up-<stamp>`.
+- **restart:**
+  - Claims at 21:00Z.
+  - Drain waited out a board build.
+  - HEAD == ae2cb646, then ff to ce1e4a19 at 21:15:11Z.
+  - `down` 21:15:11-21:15:16Z.
+  - healthz 200 at 21:15:22Z. live-odds-worker pid 3980564.
+  - Undrained; claims released at ~21:16Z.
+- **env read after up (live-odds-worker):**
+  - New: KALSHI_ROUND_UP_MIN_DOLLARS=5.
+  - Unchanged: EXIT_TAKE_PROFIT_MARGIN=0.30, POLYMARKET_AT_ASK_MIN_STAKE_DOLLARS=5, LIVE_EVENT_CONCENTRATION=on, EXECUTION_MODE=live, ARMED=1, EXIT_MODE=live.
+- **owed:** the first Kalshi LIVE_ORDER after 21:15:22Z with a $5 stake whose filled cost is >= $5 (fill_stake_dollars on /api/portfolio/live).
+- **rollback:** delete the env line, then a full down/up.
