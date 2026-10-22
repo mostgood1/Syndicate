@@ -2791,3 +2791,15 @@ The 2026-10-20 entry said: "Rating INPUTS transfer, because the sim reads them w
   - Fleet reads use `/home/amyn/.venvs/syndicate/bin/python` (what the supervisor runs).
   - Any ledger reader asserts `read_json_file_result(_ledger_path())[1] is True` before trusting a count. `fit_staked_probability_cells.py` now exits 4 otherwise.
   - The older fitters (`fit_staked_probability`, `fit_probability_calibration`, `ev_overstatement_decomp`) do NOT check this yet.
+
+## 2026-10-22 - A reader's fallback can be load-bearing on the writer's defect: before fixing a writer, read what each reader's fallback path reads `[lane nba-injury-snapshot-overwrite, session 6c89053f]`
+- **Belief overturned:** I believed the fix for "a past date's official injury rows get replaced by Rotowire/ESPN" was writer-only: keep the official snapshot.
+- **What was true:** the SmartSim's partial-snapshot guard compares a day's row count with the previous day's (< 50% -> use the previous snapshot). That guard assumes every snapshot has the same SCOPE.
+  - The official report lists only the slate's teams; the fallback lists all 30. So on every light slate the day's own report counted as "partial" (10-20: 6 of 10 builds; 10-22: 2 of 2).
+  - The guard then read last night's snapshot. That snapshot was all-team ONLY BECAUSE of the writer defect.
+  - Fixing the writer alone would have handed those builds yesterday's OFFICIAL report, which speaks only for yesterday's teams. A team on today's slate missing from it would get no exclusions: the permissive failure the guard exists to prevent.
+- **Also overturned, same session:** `#723`'s audit docstring says a date's rows are "the last report of the day". On the fleet they were last night's fallback, missing 11 OUT players on 10-21.
+- **Rules:**
+  - A cross-day size guard must compare like with like (same source, same scope). Size is not completeness when the scope moves.
+  - Before changing what a writer leaves behind, list every reader's FALLBACK path and ask what it reads after the change, not only its main path.
+  - Do not store a field that changes on every fetch in a file whose bytes are fingerprinted (`live_refresh_loop._basketball_lineup_injury_fingerprint` re-sims on any byte change). The report name would have forced a re-sim every 30 min; it is printed instead, and a test pins it.
