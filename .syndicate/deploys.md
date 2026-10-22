@@ -53807,3 +53807,10 @@ which is about the two sizing bases and not about the refusal boundary.
 - **verify (my read 22:16:30Z):** fleet HEAD b3279e52; `def axis_min_held_dollars` present; source mtime 22:15:34Z < process start 22:15:41Z (the process loaded the new module). Live orders since load: 0; same-axis-behind-tiny placements: 0; REFUSED_SAME_AXIS_HELD since load: 0.
 - **owed reading:** the first LIVE order on an event+axis whose only prior held legs are < $1 (probe `C:\tmp\lec\tiny_pairs.py`, session watcher armed), and no REFUSED_SAME_AXIS_HELD whose blocking leg is < $1.
 - **undo:** `LIVE_ODDS_WORKER__SYNDICATE_LIVE_EVENT_AXIS_MIN_HELD_DOLLARS=0` + full down/up, or revert b3279e52 + live-odds-worker role restart.
+
+## 2026-10-22 22:16:36Z (5:16 PM CT) -- LEDGER RE-STAMP of the other 216 settled paper closing marks whose opening sat only in another date's file (todo #729 residual) -- **MET** (lane `venue-order-opening-gap`, session 70a0dbdf)
+- **ask:** the user, in this session, answering whether to re-stamp the 216: "yes".
+- **targets:** every settled filled mlb/ncaaf/nfl paper order still stamped `no_close_for_market` with no `no_close_reason` and clv_pct None, outside the 22:07:45Z set: 216 (ncaaf 185, nfl 31; 0 mlb), all in the archive, 0 with a prior remark. `compute_clv_for_date` reads only `selected_date`'s openings file, so these openings were never seen.
+- **re-stamp:** same script and safeguards as the 22:07:45Z entry (production `stamp_closing_marks` on fleet code bdc61a1d; old mark in `closing_mark.remark`; unresolved rows final). DRY RUN 22:13:13Z == applied. Archive append 22:16:36Z.
+- **verify (MEASURED):** in-process read-back 216 of 216. Fresh-process `full_history_orders()` 22:20:01Z: 216 carry remark.at=22:16:36Z, **142 with clv_pct (135 same-book)**; 74 named: quotes_unchanged_since_open 52, opened_in_play 21, quotes_no_pregame_quote 1. Matches the replay (142). Population, settled mlb/ncaaf/nfl paper (7,777): same-book marks 6,038 -> 6,173; marks reading `no_close_for_market` with no reason **216 -> 0**.
+- **undo:** append each row's `closing_mark.remark.before` back as its mark (archive last-copy-wins).
