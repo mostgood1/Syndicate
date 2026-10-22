@@ -1985,7 +1985,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### clv-departures-ceiling — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
-- **GOAL VERDICT 2026-10-22 20:34Z (3:34 PM CT): GOAL MET.** Readings:
+- **GOAL VERDICT 2026-10-22 20:34Z (3:34 PM CT):** "The CLV departures ledger no longer silently drops departures for every sport once a busy date's file reaches 8 MiB: per-date and per-sport bytes/records and any truncated=True measured on the fleet (read-only, nice 19) before; fix on origin/main with per-(date,sport) and per-date ceilings sized from the measured max, a loud log line and dropped counts on the report, with the state.json sidecar, layer2_live_scorecard and the HOT_ARTIFACT_PATTERNS entry still working; a test that fails on the old behaviour; findings file. Fleet load is the user's decision. Side session of local_802cdcc8." GOAL: MET. Readings:
   - findings `.syndicate/findings_2026-10-22_clv_departures_ceiling.md`: per-date and per-sport bytes and records for 24 fleet dates; 0 of 2,184 refresh-worker DEPARTURES lines (10-16..10-22) `truncated=True`; peak 10-17 7,938,374 B (94.6%); largest sport-day NCAAF 10-10 3.80 MiB;
   - fix `a77077a2` is on origin/main: 16 MiB per (date, sport), 32 MiB per date, `DEPARTURES_CEILING_HIT`, dropped counts, heartbeats kept, refused sports censored;
   - 9 new tests: all fail on origin/main's module (7 on the defect, 2 guard the new mechanisms), all pass on the fix; 215 passed across 10 reader suites;

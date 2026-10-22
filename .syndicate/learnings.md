@@ -2851,3 +2851,17 @@ The 2026-10-20 entry said: "Rating INPUTS transfer, because the sim reads them w
 ## 2026-10-22 - My own push loop discards an uncommitted lane block; `lane_open` must run INSIDE the retry, not before it `[session 4ab694ed]`
 - **What happened:** twice today the retry loop I use for contended ledger pushes (`git fetch; git reset --hard origin/main; re-apply; commit; push`) silently destroyed the lane block `lane_open.py` had just written, because the block was in the working tree and not yet committed. The second time the failure surfaced as `AssertionError: hdr 0` when the verdict could not find its own header — after the deploys entry had already been pushed, so the two halves landed in separate commits.
 - **Rule:** anything created before a `reset --hard` loop must be either committed first or re-created inside the loop. For lanes specifically: run `lane_open.py` AFTER the reset (it refuses a duplicate slug, so it is safe to re-run), or commit the block on its own immediately. The loop is correct — resetting to upstream is what stops me clobbering peers — so the fix belongs in what I hand it, not in the loop.
+
+### 2026-10-22 -- Keeping heartbeats after a refused record turns a ceiling into a FALSE "kept": censor the sport (lane clv-departures-ceiling)
+- **What we believed:** the departures fix only had to copy the openings fix (`22e3a0aa`): ceilings per sport and per day, refuse per record, log it loudly.
+- **What was actually true:** the departure log's heartbeat is a completeness claim.
+  - `layer2_live_scorecard.look_after` reads a market with no departure under a listed build as `kept`.
+  - The OLD all-or-nothing cut was safe by accident: the `break` dropped the heartbeat too, so sightings read `unobserved`.
+  - Refusing per record while keeping heartbeats would have turned every refused departure into a price "still on the board".
+- **How we found out:** before writing the fix, read what the reader does with a build record.
+- **Rule:**
+  - Before a ceiling or filter starts dropping records from an append-only log, find the record that asserts completeness (a heartbeat, a manifest, a watermark).
+  - Make that record stop asserting it for whatever was dropped. Here a refused sport moves to `censored` for the rest of the date.
+- **Side fact, same session:**
+  - The side-session notes folder (`%APPDATA%\Claude\side-session-notes`) is NOT visible from WSL. The Claude app's AppData is virtualized.
+  - Stage fleet scripts in `C:	mp\...` and pass `/mnt/c/tmp/...`, with `MSYS_NO_PATHCONV=1` from Git Bash.
