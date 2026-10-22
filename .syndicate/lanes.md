@@ -1751,7 +1751,7 @@ death, never life — do not invert it.
 
 ### nba-injury-pdf-parser — OPEN — opened 2026-10-22 — session ef55f9f7-de50-48f1-af2f-3eb9e55eba86
 - Goal: The NBA official injury-report PDF parser emits no reason word inside a player name and never shifts a status across an Available row; tests through _parse_pdf_rows pin both; a before/after re-parse of recent official PDFs counts off-roster names and changed statuses
-- Files: syndicate/features/nba/source_cli/scrapers/injuries.py, syndicate/features/wnba/source_cli/scrapers/injuries.py, tests/test_nba_injury_pdf_parser.py, scripts/nba_injury_pdf_reparse.py, .syndicate/findings_2026-10-22_nba_injury_pdf_parser.md
+- Files: syndicate/features/nba/source_cli/scrapers/injuries.py, syndicate/features/wnba/source_cli/scrapers/injuries.py, tests/test_nba_injury_pdf_parser.py, scripts/nba_injury_pdf_reparse.py, .syndicate/findings_2026-10-22_nba_injury_pdf_parser.md, docs/ai_context/todo.md (#725 section only), .syndicate/state_basketball.md ([nba-injury-pdf-parser] section only)
 - Hypothesis: (1) a reason that wraps onto the next line lands between the next player's first name and status, and the cleaner only repairs names its token list flags; (2) STATUS_TOKS lacks Available, so an Available row swallows the next player's tokens up to his status
 - Falsification test: re-parsing the 10-21 official PDF with the current code yields no spliced name and a separate Moses Moody OUT row
 - Verification: pytest tests/test_nba_injury_pdf_parser.py green; before/after counts on retrievable recent PDFs written to findings

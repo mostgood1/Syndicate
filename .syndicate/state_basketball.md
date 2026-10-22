@@ -1355,3 +1355,22 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   - Before any `on`: the k / book-blend re-fit check, and a reuse stamp for the priced set.
   - Enabling is the user's decision.
 - Findings: `findings_2026-10-22_nba_sim_minutes_allocation.md`, `findings_2026-10-22_nba_sim_minutes_history_path.md`.
+
+## [nba-injury-pdf-parser] THE NBA OFFICIAL INJURY-PDF PARSER WROTE 17% OF ITS ROWS UNDER NAMES NO POOL MATCHES AND GAVE AVAILABLE PLAYERS THE NEXT PLAYER'S OUT; THE FIX IS ON MAIN, NOT ON THE FLEET `[measured 2026-10-22, lane nba-injury-pdf-parser, todo #725, main 3e3c3a37]`
+- **Feeds:** `raw/injuries.csv`, the SmartSim exclusion map, the props OUT refusal, and the Layer 2 OUT gate. Written by `fetch-injuries` -> `NBAInjuryDatabase.update_injuries` -> `NBAOfficialInjuryReportScraper._parse_pdf_rows` -> `_clean_injury_player_names` (`syndicate/features/nba/source_cli/scrapers/injuries.py`).
+- **Defects (real 10-21 reports):**
+  - A reason's last word went into the next player's surname: `Jalen Tear Wilson`, `Mouhamed Way Gueye`. `<word> Last,` was accepted as a two-token surname, which in practice is only ever `Lively II,` / `Butler III,`.
+  - `Available` was not a status, so `Curry ... Available - Moody, Moses Out` became one OUT row, mapped to Curry, and Moody's row was lost.
+- **Fix `3e3c3a37`:**
+  - Available ends its row and is dropped.
+  - The status scan stops at the next `Last,`.
+  - Unknown names are repaired against the current roster: drop interior words until exactly one player on that team matches, and never guess. The cleaner does the same and refuses comma-merged names.
+  - 9 tests; 6 fail on the old parser.
+- **Re-parse, 167 real reports 10-19..10-22 (local run, fleet roster):**
+  - Off-roster rows 971 -> 0 (of 5,658).
+  - 29 players gain a missing exclusion; 12 lose a wrong one, all listed Available.
+- **NOT ON THE FLEET** (`5e734fb6` runs the old parser). An ff needs the user's yes, and any later ff to a newer SHA carries it along.
+  - Verify by the next `raw/injuries.csv` snapshot (0 off-roster names) and `SMART_SIM_REUSE_STALE_EXCLUSIONS`.
+  - The defect is live today: the 10-22 snapshot holds `Khalifa Tendinopathy Diop` OUT and `Dean Tear Wade`.
+- **WNBA copy:** same parser, NOT edited. Its "official" source is the NBA's report (follow-up proposed).
+- Findings: `findings_2026-10-22_nba_injury_pdf_parser.md`.

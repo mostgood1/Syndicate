@@ -1,5 +1,30 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#725` — **The NBA official injury-report PDF parser put a reason's last word into the next player's name (971 of 5,658 rows written off-roster over 167 reports), and handed an Available player the next player's OUT. FIXED ON MAIN, NOT ON THE FLEET** — FOUND 2026-10-22 (`#723` follow-up), lane `nba-injury-pdf-parser`, session ef55f9f7 (side session of local_c0ccc55a)
+- **Two defects, both confirmed on the real 10-21 reports** (`syndicate/features/nba/source_cli/scrapers/injuries.py`, `_parse_pdf_rows`):
+  - `<reason word> Last,` was taken as a two-token surname, so most reasons' last word went into the next name: `Jalen Tear Wilson`, `Mouhamed Way Gueye`, `Ben Subluxation Simmons`. The only genuine two-token surnames in 167 reports are `Lively II,` and `Butler III,`. The vendored `_NOISY_PLAYER_TOKENS` list was patching the commonest words (Strain, Surgery, Sprain), not the cause.
+  - `Available` was not a status. `Curry, Stephen Available - Moody, Moses Out ...` parsed as one row, OUT, which the cleaner mapped to Curry, and Moody's row was lost. Same for `Awaka, Tobe Available - Claxton, Nic Out`.
+- **Fix `3e3c3a37`:**
+  - Available ends its row and is dropped (never written, as before).
+  - The status scan stops at the next `Last,`.
+  - A name the roster does not know is repaired by dropping interior words until it is exactly ONE roster player on that team. Dropped surname-prefix words go back to the previous reason. Off-roster names are never guessed.
+  - The cleaner does the same and no longer maps comma-merged names.
+  - 9 tests through `_parse_pdf_rows` and `update_injuries`. 6 of 9 fail on the old parser.
+- **Before / after** (`scripts/nba_injury_pdf_reparse.py`; 167 real reports 10-19..10-22, the fleet's current roster):
+  - Off-roster names written: **971 -> 0**.
+  - **29 players gain a missing exclusion** (781 report-rows).
+  - **12 lose a wrong one** (111). All 12 were listed Available: Curry, Awaka, Miller, Collins, Kessler, Simons, Bona, Slawson, Brown, Avdija, Potter, Harkless.
+  - On the last 10-21 pre-tip report: 14 -> 0 off-roster, +16 exclusions, -4.
+  - Live today: the fleet's 10-22 snapshot holds `Khalifa Tendinopathy Diop` OUT and `Dean Tear Wade`.
+- **WNBA copy: same parser text, NOT edited.** Its "official" source is the NBA's report.
+  - On an NBA PDF it emits 33 NBA rows under WNBA tricodes, and `official_ok` then skips the ESPN WNBA fallback.
+  - A wrong-league source is a separate defect (season overlap, NBA playoffs May-June). Proposed as its own session.
+- **OWED (the user's yes):**
+  1. A fleet ff. No restart: `fetch-injuries` is a subprocess. Any later ff to a newer SHA carries it along.
+  2. Then read the next `raw/injuries.csv` snapshot for 0 off-roster names, and the next props refresh's `SMART_SIM_REUSE_STALE_EXCLUSIONS`.
+- **Lead:** a D-1 fetch after midnight finds no official PDF (the season page lists only today's) and REPLACES D-1's rows with the fallback. The fleet's 10-21 rows are fallback-shaped now.
+- Detail: `.syndicate/findings_2026-10-22_nba_injury_pdf_parser.md`.
+
 ### `#724` — **The paper ladder is a control arm for the staking policy, and its first read says the refused rows' edge is entirely eaten by FEES** — OPEN 2026-10-22, lane `ladder-refusal-control-arm`, session 4ab694ed
 - **What it is.** The ladder books rows the sizer REFUSED (`ladder_reason: below_suggested_floor` 839 of 878, `suggested_not_staked` 39) and places them flat at $1, paper-only — so its realised ROI answers "what would have happened on the bets we declined", which `#698` has no other way to ask. Verified: ladder plan positions carry no `sizing` block at all (0 of 104), because a refused row was never sized.
 - **First read 2026-10-22, n=80 settled, NO VERDICT CLAIMED (pre-registered):** overall ROI **−17.19% ±22.14** — spans zero. `below_suggested_floor` −13.00% ±23.15 (spans zero); bands `m1to0` −4.66% ±32.17 and `0to1` −25.98% ±35.30 both span zero. The only intervals excluding zero are n=5 and n=8 and are explicitly not relied on. H1 ("the floor is doing its job") is NOT falsified — falsification needed a POSITIVE ROI with an interval excluding zero.

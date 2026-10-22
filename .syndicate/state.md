@@ -484,9 +484,10 @@ once this index exists: re-splitting would orphan the parts.
 | [basketball-props-refresh-off-vendor] | BASKETBALL PROPS REFRESHES: vendored uses retired path by path; WNBA history now tracks the schedule `[verifie | `state_basketball.md` |
 | [nba-current-rosters] | THE NBA SMARTSIM RAN 2025-26 ROSTERS ON OPENING NIGHT; THE FIX (ESPN CURRENT ROSTERS) IS LIVE ON THE FLEET: ST | `state_basketball.md` |
 | [nba-no-history-standins] | NBA PRICED PLAYERS WITH NO player_logs HISTORY: A MARKET-IMPLIED STAND-IN IS ON MAIN, DEFAULT OFF, NOT ON THE  | `state_basketball.md` |
-| [basketball-smart-sim-tip-freeze] | A BASKETBALL SMARTSIM IS FROZEN AT TIP -- LIVE ON THE FLEET (aaa988a8) AND VERIFIED: 10-21 slate 0 post-tip rebuilds | `state_basketball.md` |
-| [nba-sim-anchor-refresh] | THE NBA SMARTSIM'S MARKET ANCHOR WAS A D-2 LINE, NEVER REFRESHED; THE REFRESH IS LIVE ON THE FLEET (6e406101, f | `state_basketball.md` |
+| [basketball-smart-sim-tip-freeze] | A BASKETBALL SMARTSIM IS FROZEN AT TIP -- LIVE ON THE FLEET since 2026-10-21 11:56 AM CT (aaa988a8, switch abs | `state_basketball.md` |
+| [nba-sim-anchor-refresh] | THE NBA SMARTSIM'S MARKET ANCHOR WAS A D-2 LINE, NEVER REFRESHED; THE REFRESH IS LIVE ON THE FLEET (6e406101,  | `state_basketball.md` |
 | [nba-sim-minutes-allocation] | THE NBA SMARTSIM GIVES ~38 MIN/SIDE TO POOL PLAYERS WHO DNP AND RUNS STARTERS -4.2 MIN; A PRICED-FIRST SHRINK  | `state_basketball.md` |
+| [nba-injury-pdf-parser] | THE NBA OFFICIAL INJURY-PDF PARSER WROTE 17% OF ITS ROWS UNDER NAMES NO POOL MATCHES AND GAVE AVAILABLE PLAYER | `state_basketball.md` |
 | [board-freshness] | BOARD FRESHNESS AND STALENESS | `state_board.md` |
 | [board-intelligence-engine] | BOARD / INTELLIGENCE ENGINE — structural facts, archived — **ARCHIVED 2026-08-19 to `state_archive_2026-08-19. | `state_board.md` |
 | [locked-cards-retuned-no-autorun] | `locked_cards_retuned` HAS NO AUTOMATIC TRIGGER, ANYWHERE `[measured 2026-08-18]` | `state_board.md` |
@@ -683,7 +684,7 @@ once this index exists: re-splitting would orphan the parts.
 | [portfolio-settlement] | PORTFOLIO SETTLEMENT — the ledger crossed no service boundary, and the join keyed on a value that drifts `[ver | `state_portfolio.md` |
 | [portfolio-sim-sizing-gate] | ONLY A MODEL MEASURED TO BEAT THE MARKET SIZES MONEY; TODAY NONE IS, SO STAKES FOLLOW PRICE `[verified on prod | `state_portfolio.md` |
 | [order-model-attribution] | AN ORDER RECORDS THE SIM'S VERDICT — DEPLOYED AND VERIFIED ON PRODUCTION; THE COMMIT GATE MAKES FOUR OF THE NI | `state_portfolio.md` |
-| [min-ev-tuner-shadow] | THE MIN_EV CUT IS TUNED PER CELL IN SHADOW -- FULL CODE + INERT APPLY WIRING ON THE FLEET, 0 MOVES `[verified 2026-10-22]` | `state_portfolio.md` |
+| [min-ev-tuner-shadow] | THE MIN_EV CUT IS TUNED PER CELL IN SHADOW -- RUNNING ON THE FLEET, ZERO MOVES, NOTHING APPLIED `[verified on  | `state_portfolio.md` |
 | [live-plan-empty-funnel] | THE LIVE PLAN IS EMPTY BECAUSE THE VENUE'S OWN PRICE IS <= 0 EV AFTER THE TAKER FEE -- NOT A CAP, NOT A CHOSEN | `state_portfolio.md` |
 | [ledger-price-units] | THE EXECUTION LEDGER HOLDS TWO PRICE UNITS; EVERY KNOWN READER NOW HANDLES BOTH `[verified 2026-10-22, code +  | `state_portfolio.md` |
 | [soccer-team-strength] | SOCCER TEAM RATINGS: RATING V2 FAILED THE REAL-SIM A/B AND IS HELD (OFF ON MAIN); THE SERVED SIM IS NOT UNDER- | `state_soccer.md` |
