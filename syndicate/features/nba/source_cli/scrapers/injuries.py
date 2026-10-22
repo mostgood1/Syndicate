@@ -159,6 +159,53 @@ def _roster_player_indexes(date_str: str | None) -> tuple[dict[tuple[str, str], 
     return exact_by_team, exact_any_unique, short_by_team
 
 
+def _roster_tokens_by_team(exact_by_team: dict[tuple[str, str], str]) -> dict[str, list[tuple[list[str], str]]]:
+    by_team: dict[str, list[tuple[list[str], str]]] = {}
+    for (tri, name_key), canonical in exact_by_team.items():
+        tokens = name_key.split()
+        if len(tokens) >= 2:
+            by_team.setdefault(tri, []).append((tokens, canonical))
+    return by_team
+
+
+def _roster_repair_name(
+    words: list[str],
+    team_tri: str,
+    roster_by_team: dict[str, list[tuple[list[str], str]]],
+) -> tuple[Optional[str], set[int]]:
+    """Repair a name by DROPPING interior words until it is exactly one roster player on ``team_tri``.
+
+    The official-PDF parser can splice a word of the previous player's reason into a name
+    ("Jalen Tear Wilson", "Mouhamed Way Gueye"). The first and last words are kept and only words
+    between them may go. Anything other than a single roster match returns (None, set()): a name
+    that is not on the roster is never guessed. Also returns the indices of ``words`` that were kept.
+    """
+    norm = [(i, _norm_player_name_key(word)) for i, word in enumerate(words)]
+    norm = [(i, key) for i, key in norm if key]
+    if len(norm) < 3 or not team_tri:
+        return None, set()
+    keys = [key for _, key in norm]
+    matches: dict[str, set[int]] = {}
+    for tokens, canonical in roster_by_team.get(team_tri, []):
+        if len(tokens) >= len(keys) or tokens[0] != keys[0] or tokens[-1] != keys[-1]:
+            continue
+        kept = [0]
+        pos = 1
+        for want in tokens[1:-1]:
+            while pos < len(keys) - 1 and keys[pos] != want:
+                pos += 1
+            if pos >= len(keys) - 1:
+                break
+            kept.append(pos)
+            pos += 1
+        else:
+            kept.append(len(keys) - 1)
+            matches[canonical] = {norm[k][0] for k in kept}
+    if len(matches) != 1:
+        return None, set()
+    return next(iter(matches.items()))
+
+
 def _looks_noisy_player_name(raw_name: str, name_key: str) -> bool:
     raw_upper = str(raw_name or "").upper()
     tokens = [token for token in str(name_key or "").upper().split() if token]
@@ -178,6 +225,7 @@ def _clean_injury_player_names(df: pd.DataFrame, *, date_str: str | None) -> pd.
     exact_by_team, exact_any_unique, short_by_team = _roster_player_indexes(date_str)
     if not exact_by_team and not exact_any_unique and not short_by_team:
         return df
+    roster_by_team = _roster_tokens_by_team(exact_by_team)
 
     out = df.copy()
     keep_mask: list[bool] = []
@@ -186,9 +234,14 @@ def _clean_injury_player_names(df: pd.DataFrame, *, date_str: str | None) -> pd.
         raw_player = str(row.get("player") or "").strip()
         team_tri = str(_to_tri(str(row.get("team") or "")) or "").strip().upper()
         name_key = _norm_player_name_key(raw_player)
+        # A comma means two report rows were merged into one name; mapping it to either player
+        # hands one player's status to the other (10-21: Curry excluded, Moody simulated).
+        merged = "," in raw_player
         canonical = exact_by_team.get((team_tri, name_key)) if name_key and team_tri else None
         if canonical is None and name_key:
             canonical = exact_any_unique.get(name_key)
+        if canonical is None and name_key and team_tri and not merged:
+            canonical, _ = _roster_repair_name(raw_player.split(), team_tri, roster_by_team)
         if canonical:
             cleaned_players.append(canonical)
             keep_mask.append(True)
@@ -197,7 +250,7 @@ def _clean_injury_player_names(df: pd.DataFrame, *, date_str: str | None) -> pd.
         noisy = _looks_noisy_player_name(raw_player, name_key)
         short_key = _short_name_key_from_norm(name_key)
         candidates = short_by_team.get(team_tri, {}).get(short_key, set()) if short_key and team_tri else set()
-        if noisy and len(candidates) == 1:
+        if noisy and len(candidates) == 1 and not merged:
             cleaned_players.append(next(iter(candidates)))
             keep_mask.append(True)
             continue
@@ -1047,7 +1100,9 @@ class NBAOfficialInjuryReportScraper:
         DATE_RE = re.compile(r"\d{2}/\d{2}/\d{4}")
         TIME_RE = re.compile(r"\d{2}:\d{2}")
         MATCHUP_RE = re.compile(r"[A-Z]{2,3}@[A-Z]{2,3}")
-        STATUS_TOKS = {"Out", "Questionable", "Doubtful", "Probable"}
+        # "Available" ends a row like any status. Without it, "Curry, Stephen Available - Moody, Moses Out"
+        # parsed as ONE row and gave Moody's OUT to Curry (10-21 report).
+        STATUS_TOKS = {"Out", "Questionable", "Doubtful", "Probable", "Available"}
 
         def norm_status(s: str) -> str:
             s = str(s or "").strip()
@@ -1058,8 +1113,12 @@ class NBAOfficialInjuryReportScraper:
                 "Questionable": "QUESTIONABLE",
                 "Doubtful": "DOUBTFUL",
                 "Probable": "PROBABLE",
+                "Available": "AVAILABLE",
             }
             return m.get(s, s.upper())
+
+        exact_by_team, exact_any_unique, _ = _roster_player_indexes(date_str)
+        roster_by_team = _roster_tokens_by_team(exact_by_team)
 
         def match_team_at(pos: int) -> tuple[Optional[str], int]:
             for n in (4, 3, 2, 1):
@@ -1082,14 +1141,17 @@ class NBAOfficialInjuryReportScraper:
                 return True, pos
             if pos + 1 < len(toks) and toks[pos + 1].endswith(","):
                 # Allow multi-token last names like "Moore Jr.," or "Van Vleet,"
-                # but avoid false positives on headers.
-                if t0 not in {"Game", "Date", "Time", "Matchup", "Team", "Player", "Name", "Current", "Status", "Reason"}:
+                # but avoid false positives on headers. The first token is often the last word of the
+                # previous player's reason instead ("Tear Wilson,"); the roster repair below decides.
+                if t0 not in {"Game", "Date", "Time", "Matchup", "Team", "Player", "Name", "Current", "Status", "Reason"} and re.search(r"[A-Za-z]", t0):
                     return True, pos + 1
             return False, -1
 
         out_rows: list[dict[str, str]] = []
         current_team: Optional[str] = None
         current_matchup: Optional[str] = None
+        # (token position, row index) of the last row whose reason stopped at a player start.
+        open_reason: Optional[tuple[int, int]] = None
 
         i = 0
         while i < len(toks):
@@ -1143,6 +1205,10 @@ class NBAOfficialInjuryReportScraper:
                 if tj in STATUS_TOKS:
                     st_j = j
                     break
+                if tj.endswith(","):
+                    # The next player's "Last," came first: this row has no status we know. Never let
+                    # one row run into the next and take its status.
+                    break
                 if MATCHUP_RE.fullmatch(tj):
                     break
                 tri2, n2 = match_team_at(j)
@@ -1163,9 +1229,29 @@ class NBAOfficialInjuryReportScraper:
             player = (" ".join(first_tokens) + " " + " ".join(last_tokens)).strip()
             status = norm_status(toks[st_j])
 
+            # A name the roster does not know may carry a spliced reason word: drop interior words
+            # until it is one roster player on this team. Words dropped from the front of the last
+            # name were the end of the previous player's reason, so they go back there.
+            name_key = _norm_player_name_key(player)
+            if name_key and (current_team, name_key) not in exact_by_team and name_key not in exact_any_unique:
+                first_words = " ".join(first_tokens).split()
+                words = first_words + " ".join(last_tokens).split()
+                repaired, kept = _roster_repair_name(words, current_team, roster_by_team)
+                if repaired:
+                    player = repaired
+                    spill: list[str] = []
+                    for w in range(len(first_words), len(words)):
+                        if w in kept:
+                            break
+                        spill.append(words[w])
+                    if spill and open_reason is not None and open_reason[0] == i:
+                        prev = out_rows[open_reason[1]]
+                        prev["injury"] = f"{prev['injury']} {' '.join(spill)}".strip()
+
             # Collect reason tokens until the next player/team/matchup boundary.
             k = st_j + 1
             reason_tokens: list[str] = []
+            stopped_at_player = False
             while k < len(toks):
                 tk = toks[k]
                 if MATCHUP_RE.fullmatch(tk) or DATE_RE.fullmatch(tk) or TIME_RE.fullmatch(tk):
@@ -1175,6 +1261,7 @@ class NBAOfficialInjuryReportScraper:
                     break
                 is_next_player, _ = looks_like_player_start(k)
                 if is_next_player:
+                    stopped_at_player = True
                     break
                 # Page-break boilerplate shouldn't become part of the reason.
                 if tk in {"Injury", "Report:", "Page", "of"}:
@@ -1192,6 +1279,7 @@ class NBAOfficialInjuryReportScraper:
                     "date": str(date_str),
                 }
             )
+            open_reason = (k, len(out_rows) - 1) if stopped_at_player else None
 
             i = k
 
@@ -1205,6 +1293,9 @@ class NBAOfficialInjuryReportScraper:
         df["date"] = df.get("date", str(date_str)).astype(str)
         df = df[df["team"].isin(sorted(self._KNOWN_TRIS))].copy()
         df = df[df["player"].astype(str).str.len() > 0].copy()
+        # Available is not an injury: the file has never carried such rows, and its readers count
+        # rows per team (injuries_total), so they are parsed only to end the row, then dropped.
+        df = df[df["status"] != "AVAILABLE"].copy()
         df = df.drop_duplicates(subset=["team", "player", "date"], keep="last")
         return df
 
