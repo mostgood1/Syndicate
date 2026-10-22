@@ -1,5 +1,11 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#729` — **Kalshi/Polymarket MLB prop orders had almost no same-book close (kalshi 39 of 266 own-book, polymarket 0 of 95) because the quote log, which held the venue's own close, was never asked for a prop. FIXED ON MAIN (`aa06d5a1`), NOT ON THE FLEET; replay 218 of 266 / 72 of 95** — FOUND 2026-10-22, lane `venue-prop-close-coverage`, session aba784f3 (side session of local_81601787); `.syndicate/findings_2026-10-22_venue_prop_close_coverage.md`
+- Also fixed: `order_clv` called a close at another book than the fill `same_book` (110 of 5,729 fleet marks; novig MLB 33 of 38). `min_ev_tuner` reads that label.
+- **User decisions owed:** (1) fleet ff `36eb357b` -> `aa06d5a1` + refresh-worker restart (settlement stamps closing marks); (2) re-mark the 361 stamped MLB venue rows, since stamped marks are final (clv_pct set, or 4 attempts).
+- **Forward reading owed:** same-book coverage on MLB venue orders that settle after the load (World Series, 10-23 on; 17 `paper:kalshi:ladder` pending for 10-23), with denominators.
+- **Residual (separate mechanism):** 78 settled MLB orders have no recorded opening in any openings file within +-3 days (paper 33, kalshi 20, polymarket 16, prophetx 9; 36 on 10-11). The venue book placed a (market, line, book) the board never recorded as an opening.
+
 ### `#728` — **The live book is nearly invisible to every fitter that derives `fair` from `ev_pct`: of 626 settled LIVE orders, 420 carry no `ev_pct` and 131 no price -- only 74 usable** — FOUND 2026-10-22, lane `sim-stake-earned-profile` (lead, not taken), session bde77672
 - Measured on the fleet ledger read 2026-10-22T16:46Z (12,175 orders, 675 live). Every fitter using the sizer's derivation (`fit_staked_probability`, `fit_probability_calibration`, `ev_overstatement_decomp`) drops these orders silently under a named reason. The 74 that survive are mostly kalshi nba spreads_alt (29) and nba props.
 - Next step: find which live write path omits `ev_pct` (ladder? exits? pre-`#722` builders?) BY TIME WINDOW, since a missing key is an old builder (learnings 2026-10-22, "KEY ABSENT").
