@@ -204,6 +204,25 @@ def league_rates_pm(processed_root: Path) -> Dict[str, float]:
     return {stat: tot[stat] / mins for stat in LOGS_STAT_COLS}
 
 
+def slate_games(processed_root: Path, date_str: str, *, to_tri: Callable[[Any], str]) -> set:
+    """{(home, away)} for the date, from the files the sim itself iterates: ``predictions_<D>.csv`` (home_team /
+    visitor_team), then ``game_odds_<D>.csv``. The props pool cannot be used for this: the pool the sim reads is written
+    BEFORE the sim merge and carries no ``opponent`` column -- measured 2026-10-22, the first production shadow run
+    logged ``no_slate_games_in_pool`` on a 2-game slate."""
+    games: set = set()
+    for name in (f"predictions_{str(date_str)[:10]}.csv", f"game_odds_{str(date_str)[:10]}.csv"):
+        for r in _read_csv(Path(processed_root) / name):
+            home = to_tri(r.get("home_team"))
+            away = to_tri(r.get("visitor_team") or r.get("away_team"))
+            home = str(home or "").strip().upper()
+            away = str(away or "").strip().upper()
+            if home and away and home != away and home != "NAN" and away != "NAN":
+                games.add((home, away))
+        if games:
+            break
+    return games
+
+
 def build_standins(*, processed_root: Path, date_str: str, props_df, name_key: Callable[[Any], str],
                    to_tri: Callable[[Any], str], roster=None) -> Tuple[List[StandIn], Dict[str, Any]]:
     """Every stand-in for the slate's games, and a diagnostic of who was considered and why each was not admitted."""
@@ -238,7 +257,13 @@ def build_standins(*, processed_root: Path, date_str: str, props_df, name_key: C
                     vote = 0
                 home_votes[(t, o)] = home_votes.get((t, o), 0) + vote
                 home_votes[(o, t)] = home_votes.get((o, t), 0) - vote
-    games = {(t, o) if v >= 0 else (o, t) for (t, o), v in home_votes.items() if t < o}
+    games = slate_games(processed_root, date_s, to_tri=to_tri)
+    diag["games_source"] = "slate_files"
+    if not games:
+        # No slate file: pair teams from the pool itself. Only a POST-merge pool carries `opponent` (the sim merge adds
+        # it); the pool the sim reads is pre-merge, which is why the slate files come first.
+        games = {(t, o) if v >= 0 else (o, t) for (t, o), v in home_votes.items() if t < o}
+        diag["games_source"] = "pool_opponent"
     if not games:
         diag["reason"] = "no_slate_games_in_pool"
         return [], diag

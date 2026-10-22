@@ -317,3 +317,50 @@ def test_worker_stamp_equals_the_reuse_expectation_even_if_the_odds_file_moves(p
     rebuilt = nhs.add_standins(pd.read_csv(props_path), processed_root=processed, date_str=DATE, league_code="nba",
                                to_tri=_to_tri, reuse_built=True)
     assert "Kyrie Irving" not in set(rebuilt["player_name"])
+
+
+# ------------------------------------------------------------------------------------------- the pre-merge pool
+
+def _premerge_pool():
+    """The pool the sim READS: written before the sim merge, so it has `team` and `is_home` but NO `opponent` column
+    (2026-10-22: the first production shadow run logged no_slate_games_in_pool on a 2-game slate)."""
+    return _props_df().drop(columns=["opponent"])
+
+
+def test_premerge_pool_finds_its_games_from_the_slate_file(processed):
+    from syndicate.features.shared.nba_current_rosters import name_key
+
+    _write_csv(processed / f"predictions_{DATE}.csv", [{"home_team": "Houston Rockets", "visitor_team": "Dallas Mavericks"}])
+    standins, diag = nhs.build_standins(processed_root=processed, date_str=DATE, props_df=_premerge_pool(),
+                                        name_key=name_key, to_tri=_to_tri)
+    assert [s.player_name for s in standins] == ["Kyrie Irving"]
+    assert (standins[0].team, standins[0].opponent, standins[0].is_home) == ("DAL", "HOU", False)
+    assert diag["games_source"] == "slate_files"
+
+
+def test_premerge_pool_without_a_slate_file_reports_no_games(processed):
+    from syndicate.features.shared.nba_current_rosters import name_key
+
+    standins, diag = nhs.build_standins(processed_root=processed, date_str=DATE, props_df=_premerge_pool(),
+                                        name_key=name_key, to_tri=_to_tri)
+    assert standins == [] and diag["reason"] == "no_slate_games_in_pool"
+
+
+def test_game_odds_is_the_second_slate_source(processed):
+    _write_csv(processed / f"game_odds_{DATE}.csv", [{"home_team": "Houston Rockets", "away_team": "Dallas Mavericks"}])
+    assert nhs.slate_games(processed, DATE, to_tri=_to_tri) == {("HOU", "DAL")}
+
+
+def test_sim_worker_hook_admits_from_a_premerge_pool(processed, monkeypatch):
+    """Reachability on the production shape: the worker reads a pre-merge pool file and still adds the stand-in."""
+    from syndicate.features.shared import basketball_props_smart_sim as bpss
+
+    _write_csv(processed / f"predictions_{DATE}.csv", [{"home_team": "Houston Rockets", "visitor_team": "Dallas Mavericks"}])
+    props_path = processed / f"props_predictions_{DATE}.csv"
+    _premerge_pool().to_csv(props_path, index=False)
+    monkeypatch.setattr(bpss, "_to_tricode_local", _to_tri, raising=False)
+    nhs._BUILT.clear()
+    monkeypatch.setenv(nhs.FLAG, "on")
+    bpss._smart_sim_worker_init_local(DATE, 100, 1, False, str(props_path), "historical", "nba", {}, {}, {}, {}, {})
+    pool = bpss._SMARTSIM_WORKER_STATE["props_df"]
+    assert "Kyrie Irving" in set(pool["player_name"])

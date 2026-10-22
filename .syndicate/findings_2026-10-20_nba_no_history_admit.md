@@ -452,3 +452,26 @@ ahead and turn it on". So a full PASS of the pre-registered rule means
 pass with a secondary FAIL or a sanity breach is NO-GO, as pre-registered. Expected on the first `on` refresh: one round
 of SMART_SIM_REUSE_STALE_POOL rebuilds for every game with a stand-in. Stand-ins' own props stay unpriced either way.
 
+
+### First PRODUCTION shadow line (2026-10-22 4:18 PM CT) exposed a defect the scratch arms could not: no slate games on the pre-merge pool
+
+- **The switch loaded** at the 21:15:19Z full down/up. The live-odds-worker (pid 3980564) reads `shadow`.
+- **The first line,** 21:18Z, `syndicate_refresh_oddsapi_props_2026-10-22.log`:
+  `NBA_NO_HISTORY_STANDINS {"date": "2026-10-22", "admitted": [], "reason": "no_slate_games_in_pool", "mode": "shadow"}`.
+  The slate had 2 games.
+- **Cause:** `build_standins` paired games from the pool's `team`/`opponent`. The pool the sim reads is written BEFORE the
+  sim merge, and `basketball_props_features` emits no `opponent` column; the merge adds it. The 10-20 scratch arms
+  called `_smart_sim_run_date_local` on post-merge files that had `opponent`, so they admitted 11. In production `on`
+  would have admitted NOBODY.
+- **Fix** (lane `nba-standins-shadow`): games come from the files the sim itself iterates, `predictions_<D>.csv`
+  (home_team / visitor_team) and then `game_odds_<D>.csv`. Pool `opponent` pairs remain as a fallback, and
+  `diag.games_source` says which was used.
+  - 4 new tests run on the pre-merge pool shape, including the real worker hook. Against the old module, 3 of them fail;
+    the 4th is a guard that passes either way.
+  - 66 passed across the stand-in, live re-sim, live prop and smart-sim suites.
+- **Population after opening night:** with today's files, 10-22 (56 rows) and 10-23 (384 rows) both find their games
+  and admit nobody. All 11 of the 10-21 no-history players played that night and now have `player_logs` history.
+  - So the mechanism matters on opening nights and for players with no NBA rows at all: rookies held out, returns from a
+    full-season absence, call-ups. It does not matter for the bulk of the season.
+  - The rule's "fresh arm pair per slate until >= 250 teammate rows" therefore cannot accrue rows until such a player
+    is priced again.
