@@ -429,7 +429,12 @@ and none exist yet.**
     with the worker state env.
 - **Production's base cut is 0.0**, not 2.0: refresh-worker carries `SYNDICATE_PORTFOLIO_MIN_EV_PCT=0` (user decision
   2026-09-16), and there is no stored settings key. Rows reach the ledger at EV ~2+ because other gates bind first.
-- **Loaded (verified 2026-10-20 12:01:32Z):** the full code (effective-cut anchor `40640a0b` + flat-unit grading `affc9a7b`) has run on refresh-worker since the 2026-10-19 22:43:52Z respawn. The first nightly on it: `MIN_EV_TUNER mode=shadow cells=60 hold=60 base=0.0 moves=0`, with bands carrying `flat_roi` / `$roi` / `ev_only$`. Readouts are taken daily by scheduled task `min-ev-tuner-daily-readout`.
+- **Loaded (verified 2026-10-22 readout 3/7):**
+  - The full code runs on refresh-worker: effective-cut anchor, flat-unit grading, live-twin dedup, ladder skip and net-EV carry.
+  - Daily pass: `mode=shadow`, 73 cells, all hold, 0 moves; `ladder_not_pre_registered` skipped 80.
+  - Apply wiring is on main and INERT: `SYNDICATE_MIN_EV_TUNER` is unset on the fleet and no cell holds an override.
+  - Taken-bet evidence is now mostly LIVE fills (~50/day); the EV-band ladder adds ~200/day below the floor, for the pre-registered LOWER rule.
+  - Readouts are started by hand: the app scheduler does not fire on this host.
 - **Evidence base:** settled paper venue orders only (paper:kalshi + paper:polymarket, 1,176 over 10-02..10-18). The 552 live rows
   are `venue_rebuild` rows with no `ev_pct`. Same-book CLV on venue MLB props is near zero (kalshi 49/266, polymarket 1/95).
 - Detail: `findings_2026-10-19_min_ev_tuner_backtest.md`; deploys.md 2026-10-19 19:06:01Z; todo #701.
