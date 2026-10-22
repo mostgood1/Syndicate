@@ -1899,6 +1899,14 @@ death, never life — do not invert it.
 - Verification: census script on the fleet venv with read_json_file_result()[1] asserted True; counts by window x builder sum to 420/131
 - Blocked by: none
 
+### nba-injury-snapshot-fleet-ff — OPEN — opened 2026-10-22 — session 6c89053f-c302-4096-8d34-a44d734b96f0
+- Goal: The fleet checkout runs the NBA injury-snapshot fix 21b4bdb0 (todo #730; user 2026-10-22 in this chat: 'Yes, after their release'): after lane venue-prop-close-coverage releases its claims, git merge --ff-only 21b4bdb0 under all three deploy claims held by this lane (no restart unless a ride-along needs one), ride-alongs listed (a126ae95 NFL segment capture named), and a deploys.md entry whose verify reading is the next NBA raw/injuries.csv write carrying source=nba_official on today's rows.
+- Files: .syndicate/deploys.md (one append-only entry; the change itself is a git ff of the fleet checkout ~/Syndicate, outside the repo), docs/ai_context/todo.md (#730 section only), .syndicate/state_basketball.md ([nba-injury-pdf-parser] section only)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: Fleet HEAD == 21b4bdb0 and injuries.py / basketball_props_smart_sim.py on disk match it; the first injuries.csv write after the ff carries a source column with nba_official on today's NBA rows; deploys.md entry with ride-alongs and the undo.
+- Blocked by: venue-prop-close-coverage (holds web, refresh-worker, live-odds-worker for its aa06d5a1 down/up)
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
