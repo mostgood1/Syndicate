@@ -53591,3 +53591,37 @@ which is about the two sizing bases and not about the refusal boundary.
   - 0 Tracebacks on either worker.
 - **owed:** the first `EXIT_LIVE` sale after 19:34:49Z, with a round trip >= $0.30/contract.
 - **rollback:** delete that env line (default 0.08), or set another value, then a full down/up under all three claims.
+
+## 2026-10-22 19:59:11Z (2:59 PM CT) -- FLEET ff 21b4bdb0 -> ae2cb646 (NO restart): WNBA injuries.csv reads ESPN WNBA only (#731) and keeps each date's snapshot (#733) (lane wnba-injury-fleet-ff)
+- **user, in chat (session f4ebcf5f):**
+  - "ff the fleet to ae2cb646".
+  - Shown the ride-along list below, the user then chose "ae2cb646, all of it".
+- **claims:** live-odds-worker, refresh-worker and web acquired at 19:58:30Z (web; the other two seconds earlier), holder `wnba-injury-fleet-ff`, target ae2cb646. Each acquire returned rc=0, checked one by one. Released after this entry.
+- **ff:** `git merge --ff-only ae2cb646` at 19:59:11Z, rc=0, after `git fetch github`.
+  - Guard: HEAD == 21b4bdb0. None of the incoming files are among the checkout's 8 locally modified or untracked paths.
+  - Only to the fix SHA, not the github/main tip.
+  - sha256 on disk == ae2cb646 for `wnba/source_cli/scrapers/injuries.py`, `scripts/local_production.py`, `shared/clv_opening_ledger.py` and `shared/order_clv.py`.
+  - No `fetch-injuries`, WNBA props refresh or ci-suite process was running (pgrep empty).
+- **code in the gap: 42 commits, 16 non-test code files.** No `vendor/`, no `render.yaml`.
+  - **Wanted:**
+    - `066c2158` (#731): the WNBA fetch reads ESPN's WNBA page only.
+    - `ae2cb646` (#733): a fetch replaces only the dates its rows carry; rows are dated with the scrape's Central day.
+    - Both live now: `fetch-injuries` is a subprocess per call (the live loop and the props refresh).
+  - **Ride-alongs, user-approved after listing:**
+    - `f2bf4d47` (lane fleet-redis-test-pollution, OPEN): the `ci-run` cron runs `scripts/keyvalue_janitor.py --apply` after the suite. **Live at tonight's ci-suite**, no restart. The pytest loopback-Redis guard in `refresh_state_store` is inert outside pytest. That lane's owed reading is its own: `janitor: exit 0`, and candidates=0 the next day.
+    - `22e3a0aa` (lane clv-openings-ceiling, todo #732): CLV openings ceilings of 64 MiB per sport and 128 MiB per day. In-process in the workers: **live at the next restart** by anyone.
+    - `f5113511` (lane venue-order-opening-gap): `order_clv` grades an opening-less order from the quote log, and `paper_settlement` gains the `opening_source` field. **Live at the next restart.**
+  - **Inert:**
+    - `c90af851`: in-game scripts, not scheduled on the fleet by this ff;
+    - `cd7a2de5`: MLB odds-tool help text;
+    - `e0f22300`: a research script.
+- **restart: none.**
+- **baseline (read 19:58:50Z, before the ff):**
+  - `wnba_source/data/raw/injuries.csv`: mtime 19:42:39Z, 981 rows, 21 dates, no 10-12.
+  - **10-22 = 2 rows, both TOR OUT, with NBA splice names**: the NBA's report, written at 2:37 PM CT by the pre-#731 writer. 10-18..10-21 = 48 rows each.
+- **expect:**
+  - (1) The next WNBA `fetch-injuries`, whether the props refresh for 10-22/23/24 or the live loop, replaces 10-22 with ESPN's WNBA rows: about 48, OUT / DAY-TO-DAY only, no TOR. File rows go 981 -> about 1,027.
+  - (2) The props-refresh log prints `INJURY_SNAPSHOT requested=<D> replaced=2026-10-22 rows=<n>`, and no NBA-page request (no "Headless Rotowire" line).
+  - (3) After 12:00 AM CT 10-23, the 10-22 rows are still present: a late fetch writes 10-23 and leaves 10-22.
+- **verify:** reading (1)+(2) is OWED. A watcher is armed for the first write after the ff, polling mtime every 30 s for up to 2 h.
+- **undo:** `git checkout 21b4bdb0 -- syndicate/features/wnba/source_cli/scrapers/injuries.py` in `~/Syndicate` reverts the WNBA writer only. A full undo is `git reset --keep 21b4bdb0`, which also drops the ride-alongs. No restart is needed for the writer.
