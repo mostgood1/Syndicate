@@ -53691,3 +53691,34 @@ which is about the two sizing bases and not about the refusal boundary.
   - Scheduled task `clv-openings-ceiling-forward-reading`: one-time, 2026-10-26 9:00 AM CT.
   - The instrument is `clv_openings_forward_reading.py` in the side-session notes folder. On 10-20 it reads PASS; on 10-21 it reads FAIL with missing 3,939, reproducing the findings.
 - **undo:** in ~/Syndicate, `git checkout 21b4bdb0 -- syndicate/features/shared/clv_opening_ledger.py` (the pre-fix copy; 22e3a0aa touched only that runtime file), then a claimed refresh-worker restart after a save.
+
+
+## 2026-10-22 20:35:12Z (3:35 PM CT) -- refresh-worker TERM/respawn ONLY (no ff): load f5113511 (order CLV, no-opening grading) + 22e3a0aa (openings ceilings) -- **MET** (lane `min-ev-tuner-shadow`, session b98807bc / local_81601787)
+- **ask:** user, in chat: "Yes: fast-forward the fleet to a commit containing f5113511 and 22e3a0aa and restart refresh-worker behind claim + drain, after reviewing ride-alongs; coordinate with the lanes that own them."
+- **no ff needed:** the fleet checkout was already at `ae2cb646`, which contains both (merge-base checked); roles ran `21b4bdb0`.
+- **ride-alongs loaded with this restart (21b4bdb0..ae2cb646, reviewed):**
+  - the two fixes;
+  - `066c2158` + `ae2cb646` WNBA injury scraper (todos #731/#733);
+  - `f2bf4d47` loopback-Redis refusal, gated on `PYTEST_CURRENT_TEST`; verified ABSENT from the refresh-worker environ at the baseline, so it cannot fire in production;
+  - research scripts (loaded per run); `local_production.py` (supervisor; full up only).
+- **coordination:** venue-order-opening-gap (local_25799b04) and clv-openings-ceiling (local_802cdcc8) agreed; neither restarted.
+- **claim:** refresh-worker by `min-ev-tuner-shadow`, acquire exit 0 at 20:27:07Z (token 24639bf9...).
+- **drain:** CLEAR at 20:28:23Z (acked, idle).
+- **60-min gap:** the previous respawn was 19:34Z, so the TERM waited for >= 20:35:00Z. The watcher script fired only with no build in flight: last build entered 20:23:01, timed 20:26:38, persisted loop 20:34:15.
+- **baseline (20:27:22Z):**
+  - pid 3951544, code 21b4bdb0.
+  - Last ORDER_CLV `no_close={'not_started': 431, 'opening_not_in_resolver': 145}`, 0 `no_opening:` keys.
+  - Last OPENINGS line (20:25:59Z) has no `dropped=`/`bytes=`. 0 OPENINGS_CEILING_HIT today.
+- **timeline:**
+  - `kill -TERM 3951544` at **20:35:12.684Z**; supervisor exit code=0 claimed=true holder=min-ev-tuner-shadow at 20:35:15Z.
+  - New **pid 3969372, lstart 20:35:20Z**; `status` code=ae2cb646.
+  - Drain cleared 20:35:3xZ.
+  - live-odds-worker NOT restarted (still 21b4bdb0).
+- **verify (MET, read from refresh-worker.log after the respawn):**
+  - 22e3a0aa: `2026-10-22T20:43:10.121Z [clv_opening_ledger] OPENINGS date=2026-10-22 rows_in=5282 written=146 already=22094 duplicate=5136 unkeyable=0 truncated=False dropped=0 bytes=22736558`. The new fields are present; OPENINGS_CEILING_HIT since the respawn: 0.
+  - f5113511: `2026-10-22T20:47:27.121Z [order_clv] ORDER_CLV ... no_close={'no_opening:not_started': 144, 'not_started': 433}`. The 145 `opening_not_in_resolver` rows are now classified `no_opening:`.
+- **owed:**
+  - the 523-row re-stamp (user: "restamp them"), applied by local_25799b04 now that this passed;
+  - the ledger reading for f5113511 at the next settlement (owner);
+  - the busy-day openings reading 10-24/25 (owner).
+- **released:** refresh-worker claim, by token, after this entry.
