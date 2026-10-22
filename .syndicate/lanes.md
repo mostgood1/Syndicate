@@ -1962,6 +1962,14 @@ death, never life — do not invert it.
 - Verification: pytest tests/test_wnba_injury_snapshot_writer.py green, and red on origin/main's injuries.py (reachability); tests/test_wnba_injury_nba_report.py and related WNBA injury suites green; readers checked file:line in findings
 - Blocked by: none
 
+### wnba-injury-fleet-ff — OPEN — opened 2026-10-22 — session f4ebcf5f-001f-4807-9f8b-72a0ab2ef9df
+- Goal: The fleet checkout runs ae2cb646 (todo #733 + #731; user 2026-10-22 in this chat: 'ff the fleet to ae2cb646', then 'ae2cb646, all of it' after the ride-along list): git merge --ff-only ae2cb646 under all three deploy claims held by this lane (no restart: fetch-injuries is a subprocess), ride-alongs listed (f2bf4d47 janitor hook live at tonight's ci-suite; 22e3a0aa CLV ceilings and f5113511 order_clv at the next restart), and a deploys.md entry whose verify reading is the next WNBA raw/injuries.csv write: an INJURY_SNAPSHOT line, and the 10-22 snapshot back to ESPN rows with 0 TOR/QUESTIONABLE/PROBABLE/DOUBTFUL rows.
+- Files: .syndicate/deploys.md (one append-only entry; the change itself is a git ff of the fleet checkout ~/Syndicate, outside the repo), docs/ai_context/todo.md (#733 and #731 sections only), .syndicate/state_basketball.md ([wnba-injury-nba-report] section only)
+- Hypothesis: n/a (deploy of a tested fix)
+- Falsification test: the next WNBA fetch-injuries write after the ff leaves NBA rows in 10-22 or prints no INJURY_SNAPSHOT line
+- Verification: fleet HEAD == ae2cb646 and injuries.py sha256 on disk == ae2cb646's; the next WNBA fetch-injuries writes 10-22 as ESPN rows (~48, OUT/DAY-TO-DAY only, no TOR) and its props log prints INJURY_SNAPSHOT requested=<D> replaced=2026-10-22; deploys.md entry with the undo
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
