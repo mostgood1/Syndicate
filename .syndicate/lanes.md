@@ -1848,6 +1848,14 @@ death, never life — do not invert it.
 - Verification: pytest on the new test file green, with the old update_injuries / guard failing the new tests; findings carry dates, sources, readers and per-reader effect; todo entry; nothing on the fleet without the user's yes.
 - Blocked by: none
 
+### nba-minutes-priced-first-shadow — OPEN — opened 2026-10-22 — session ffb7ab00-4a20-4c1b-8afe-0175450f1082
+- Goal: SYNDICATE_NBA_SIM_MINUTES_PRICED_FIRST=shadow is live on the fleet (user 2026-10-22: 'turn on the priced-first switch in shadow'): one env line added to local_production.env (backup kept) and loaded by a full down/up under all three claims with check_deploy_safety CLEAR and the 60-min role spacing; verified by the new refresh-worker pid reading the key as shadow (enum only), the first NBA props refresh after the up logging NBA_SIM_MINUTES_PRICED_FIRST mode=shadow lines, and the sims it writes keeping OFF minutes (replay off_dev 0.000); deploys.md entry with the undo.
+- Files: .syndicate/deploys.md (one append-only entry; the change itself is one line in ~/syndicate-prod/local_production.env on the fleet, outside the repo), .syndicate/state_basketball.md ([nba-sim-minutes-allocation] section only)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: env read on the new refresh-worker pid (key name + enum only) = shadow; nba_source/logs/syndicate_refresh_oddsapi_props_<D>.log shows NBA_SIM_MINUTES_PRICED_FIRST mode=shadow after the up and no mode=on; scripts/nba_sim_minutes_audit.py --replay mechanics on the sims written after the up: OFF reproduces production _sim_min (shadow returned off).
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
