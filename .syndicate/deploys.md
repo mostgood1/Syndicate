@@ -53441,3 +53441,42 @@ which is about the two sizing bases and not about the refusal boundary.
   is 2026-10-23 >= 12:00Z.
 - **Owed:** the supervisor job's first unattended readout artifact (2026-10-23 13:15Z) read back, which closes lane min-ev-tuner-readout-fleet (handed over to
   this lane). 332cb014's planned bf14f920 down/up is now redundant for this code (told it).
+
+## 2026-10-22 17:49:25Z (12:49 PM CT) -- FLEET ff 0a2986b4 -> aa06d5a1 + FULL DOWN/UP + LEDGER RE-MARK of 361 settled MLB Kalshi/Polymarket closing marks: venue closes from the venue's own quotes (todo #729) -- **deploy MET, re-mark MET; forward reading OWED** (lane `venue-prop-close-coverage`, session aba784f3)
+- **ask:** the user, in this session: "Yes: ff the fleet 36eb357b -> aa06d5a1, restart refresh-worker after a save (claim + deploys.md entry), and re-mark the 361 stamped MLB venue rows." Then, asked about the ride-alongs (below): "Full down/up (Recommended)". Lane `min-ev-tuner-readout-fleet` records that an ff without a full down/up makes the watchdog warn `job:min-ev-tuner-readout`.
+- **code:** aa06d5a1. `clv_join` ranks closes (own book > another book we priced > biased) and asks the quote log whenever history's best is below own-book. `order_clv` labels a close at another book than the fill `different_book_close`. Findings: `.syndicate/findings_2026-10-22_venue_prop_close_coverage.md`.
+- **claims:** all three, holder `venue-prop-close-coverage`, acquired 17:02:2xZ (ttl 5400 s), released by token 17:53:31Z (peer nfl-segment-capture-e and 332cb014 queued). 60-min gap for every role runs to 18:50:10Z.
+- **ride-alongs 0a2986b4..aa06d5a1 (runtime), read before the merge in a separate call:**
+  - 7f6f7b1c + 1da26316 + c11423ec min_ev tuner CLV recompute, partial pooling (SHADOW by default) and the watch's pooling-mode check. **Contains c11423ec**, as lane min-ev-tuner-shadow asked.
+  - bf14f920 supervisor job `min-ev-tuner-readout` (13:15Z) + watchdog alert.
+  - a61332bf / 67ddb949 standalone fit harness (inert).
+  - 49468c99 a removed sys.path line.
+  - The rest is ledger.
+- **gates:**
+  - The 60-min gap after the 16:18:39Z up passed at 17:18:39Z.
+  - The polling loop saw only short post-save windows (61 checks NOT CLEAR), so it was replaced with the designed drain: `check_deploy_safety.py --drain --drain-owner venue-prop-close-coverage`, requested 17:37Z, CLEAR 17:49:23Z (acked, idle, no build, no child job).
+  - HEAD guard read 0a2986b4.
+  - `git merge --ff-only aa06d5a1` 17:49:25Z.
+- **restart:**
+  - down 17:49:25Z -> 17:49:58Z (rc 0, `watchdog_no_autostart` held across it).
+  - Start-ScheduledTask 17:50:04Z; healthz 200 17:50:10Z; undrain 17:50:10Z.
+  - New pids: supervisor 3920046 (17:50:06Z); web 3920061 (17:50:04Z); refresh-worker 3920125 (17:50:06Z); live-odds-worker 3920126 (17:50:06Z). All `RENDER_GIT_COMMIT=aa06d5a1`, restarts 0.
+  - `local_production.py status` lists `job min-ev-tuner-readout 13:15Z`.
+- **re-mark** (one-off script under refresh-worker's env, fleet code aa06d5a1; DRY RUN 17:50:5xZ == applied):
+  - Targets: every settled filled MLB order with venue `paper:kalshi` / `paper:polymarket`, 361 (266 + 95), all in the disk archive, 0 in the live document.
+  - Each was re-stamped with production's own `paper_settlement.stamp_closing_marks`. 270 changed (kalshi 197, polymarket 73) and 91 were unchanged.
+  - Changed rows were appended to the archive through `execution_ledger._archive_rows` (readers keep the last copy per identity) at 17:51:31Z.
+  - The old mark is kept in `closing_mark.remark={before, at, reason}`.
+- **verify (MEASURED):**
+  - Read-back 270 of 270 at 17:51:31Z.
+  - Independent fresh-process re-read of `full_history_orders()` 17:52Z, settled MLB same-book `clv_pct`:
+    - **paper:kalshi 49 -> 218 of 266**.
+    - **paper:polymarket 1 -> 72 of 95**.
+    - Matches the pre-registered replay in the findings exactly.
+  - Remaining kalshi: no opening recorded 20 (todo #729 residual; fix f5113511 on main, NOT on the fleet), opened_in_play 7, quotes_unchanged_since_open 5, no_pregame_observation 2, and 14 resolved non-same-book.
+- **owed:**
+  - Forward reading: same-book coverage on MLB venue orders settled after 17:50:06Z (World Series, 10-23 on; 17 `paper:kalshi:ladder` pending for 10-23), with denominators.
+  - Not re-marked: the cross-book "same-book" game rows on other venues (MLB paper 36, novig 33, prophetx 26), which keep their old labels. New marks are labelled correctly.
+- **undo:**
+  - Code: `git merge`-free. Check out 0a2986b4 in ~/Syndicate, then a full down/up under all three claims.
+  - Re-mark: append each row's `closing_mark.remark.before` back as its mark (archive last-copy-wins).
