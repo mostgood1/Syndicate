@@ -2823,3 +2823,9 @@ The 2026-10-20 entry said: "Rating INPUTS transfer, because the sim reads them w
   - On 18 pseudo-cut days it undercounted at a median of 1.34x.
 - **How we found out:** the price trail carries line and book per point. On every non-full date it reproduced the openings keys exactly, both ways, so it gave 10-21's exact loss to compare against.
 - **Rule:** before estimating a lost record set from a sibling ledger, check that the sibling's key carries every field of the lost key. Then validate the instrument on days where the truth is known (here, non-full dates and pseudo-cuts) before quoting it. If it cannot be validated, report it as a bound, never as a count.
+
+### 2026-10-22 -- An exposure window keyed on the game date's own snapshot misses lookahead builds: they read TODAY's (lane wnba-injury-snapshot-overwrite)
+- **What we believed (`#731`):** the 10-24 WNBA game was exposed to NBA rows only from 10-23 ~11 PM CT, once the 10-24 snapshot could be written. An ff before then would protect it.
+- **What was actually true:** every reader takes the latest snapshot ON OR BEFORE the game date. Until a 10-24 snapshot exists, a 10-24 build reads TODAY's. At 2:37 PM CT 10-22 the fleet wrote the NBA's 10-22 report as the WNBA 10-22 snapshot: 2 TOR rows, with 46 ESPN rows deleted. Every 10-24 build from then reads it. The props OUT refusal has no partial guard, so it takes those rows; the other three readers fall back to 10-21.
+- **How we found out:** a read-only per-date count of the fleet file while checking this lane's readers, then the 10-24 props log (`snapshot=2026-10-22`).
+- **Rule:** for a stacked-snapshot feed, a game's exposure starts at the first corrupted snapshot dated on or before the game, and that includes today's whenever builds run ahead. Derive the window from the readers' "on or before" rule and the build schedule, not from the game date.
