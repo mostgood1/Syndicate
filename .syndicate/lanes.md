@@ -1790,6 +1790,14 @@ death, never life — do not invert it.
 - Verification: Fleet HEAD == 36eb357b (or a descendant carrying it) and injuries.py on disk matches; the next fetch-injuries writes an NBA snapshot with 0 off-roster names (scripts/nba_injury_pdf_reparse.py or a direct roster check), and Khalifa Diop / Dean Wade appear under their own names; deploys.md entry with the undo.
 - Blocked by: none
 
+### venue-prop-close-coverage — OPEN — opened 2026-10-22 — session aba784f3-f76a-4a4a-bede-45c50dfa2d70
+- Goal: Settled Kalshi/Polymarket MLB prop orders get a same-book closing mark: find the first stage losing the close (venue prop odds capture / opening key join / close resolution), fix with tests, measure same-book clv_pct coverage on newly settled MLB venue orders (baseline 2026-10-19: kalshi 49/266, polymarket 1/95)
+- Files: syndicate/features/shared/order_clv.py, syndicate/features/shared/clv_join.py, tests/test_order_clv.py, tests/test_clv_join_venue_props.py, .syndicate/findings_2026-10-22_venue_prop_close_coverage.md
+- Hypothesis: UNTESTED: the close is lost at close RESOLUTION, not capture -- venue prop quotes exist in book_quotes/odds history but the join's prop key for kalshi/polymarket rows does not match the shape the close source is keyed on (cf. learnings 2026-09-21 WNBA: 0 resolved with data present). Test: closing_mark.reason distribution on settled MLB venue orders, then probe one no_close row's key against the close source.
+- Falsification test: If the reason distribution is dominated by no_close_for_market AND the venue's prop quotes are absent from every close source for those games, the loss is at CAPTURE and the fix belongs in odds capture.
+- Verification: same-book clv_pct coverage on MLB paper:kalshi/paper:polymarket orders settled after the fix loads, with denominators, vs 49/266 and 1/95
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
