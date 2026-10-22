@@ -1879,6 +1879,12 @@ death, never life — do not invert it.
 - Hypothesis: UNTESTED: venue/paper orders are planned from book rows that never pass through layer2_shortlist.record_openings (the only opening writer), so their (market,line,book) key has no opening; the quote log still holds the bet's own book quotes
 - Falsification test: the 78 orders' own-book quote-log rows are absent too (capture gap), or their keys exist in an openings file for another date (a date-attribution bug, not a missing writer)
 - Verification: pytest new test file red on origin/main order_clv.py and green on the fix; fleet replay over settled MLB/NCAAF/NFL paper orders: count with no opening that still lack a close, before vs after, with denominators
+### live-order-ev-pct-gap — OPEN — opened 2026-10-22 — session c75c910c-314d-46df-a05d-54ebf00d1e00
+- Goal: todo #728: name the write path(s) that leave settled LIVE execution-ledger orders without ev_pct/price, counted by time window and builder (key absent vs null); propose a default-off, reachability-tested fix if warranted
+- Files: .syndicate/findings_2026-10-22_live_order_ev_pct_gap.md scripts/ledger_live_ev_pct_census.py
+- Hypothesis: the missing ev_pct rows are written by a live path that builds OrderRequest without ev_pct (venue rebuild / exits / ladder) or by pre-ev_pct builders (key absent)
+- Falsification test: missing-ev_pct live rows all carry the key from the current builder AND come from portfolio_commit with ev_pct on the position
+- Verification: census script on the fleet venv with read_json_file_result()[1] asserted True; counts by window x builder sum to 420/131
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
