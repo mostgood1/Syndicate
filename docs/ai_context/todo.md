@@ -3,7 +3,7 @@
 ### `#726` — **Interval charts have no NFL or NHL intervals to chart: NFL quarter/half lines are not captured (`SYNDICATE_NFL_SEGMENT_MARKETS` absent = OFF since 10-17) and no live fetcher requests NHL period lines** — FOUND 2026-10-22, lane `board-interval-charts` (BLOCKED on this), session 9e18a0e7
 - NFL: a USER decision -- turning segment capture on costs credits (q1-q4/h1/h2 markets per game per pull); the board, the charts and live segment actuals all wait on it. NHL: a producer to build (p1-p3 totals) -- only `scripts/backtest_nhl_game_lines.py:330` asks for `*_p1` today. The chart side is ready: an offline replay of the cache gives both sides for NFL 84/84 and NHL 36/36 game x segment pairs.
 
-### `#725` — **The NBA official injury-report PDF parser put a reason's last word into the next player's name (971 of 5,658 rows written off-roster over 167 reports), and handed an Available player the next player's OUT. FIXED ON MAIN, NOT ON THE FLEET** — FOUND 2026-10-22 (`#723` follow-up), lane `nba-injury-pdf-parser`, session ef55f9f7 (side session of local_c0ccc55a)
+### `#725` — **The NBA official injury-report PDF parser put a reason's last word into the next player's name (971 of 5,658 rows written off-roster over 167 reports), and handed an Available player the next player's OUT. FIXED ON MAIN AND LIVE ON THE FLEET (16:29:00Z, read 16:30:45Z: 0 off-roster)** — FOUND 2026-10-22 (`#723` follow-up), lane `nba-injury-pdf-parser`, session ef55f9f7 (side session of local_c0ccc55a)
 - **Two defects, both confirmed on the real 10-21 reports** (`syndicate/features/nba/source_cli/scrapers/injuries.py`, `_parse_pdf_rows`):
   - `<reason word> Last,` was taken as a two-token surname, so most reasons' last word went into the next name: `Jalen Tear Wilson`, `Mouhamed Way Gueye`, `Ben Subluxation Simmons`. The only genuine two-token surnames in 167 reports are `Lively II,` and `Butler III,`. The vendored `_NOISY_PLAYER_TOKENS` list was patching the commonest words (Strain, Surgery, Sprain), not the cause.
   - `Available` was not a status. `Curry, Stephen Available - Moody, Moses Out ...` parsed as one row, OUT, which the cleaner mapped to Curry, and Moody's row was lost. Same for `Awaka, Tobe Available - Claxton, Nic Out`.
@@ -23,7 +23,7 @@
   - On an NBA PDF it emits 33 NBA rows under WNBA tricodes, and `official_ok` then skips the ESPN WNBA fallback.
   - A wrong-league source is a separate defect (season overlap, NBA playoffs May-June). Proposed as its own session.
 - **OWED (the user's yes):**
-  1. A fleet ff. No restart: `fetch-injuries` is a subprocess. Any later ff to a newer SHA carries it along.
+  1. ~~A fleet ff.~~ **DONE 2026-10-22 16:29:00Z** (user: "ff the fleet to the injury parser fix"; ff 5e734fb6 -> 36eb357b, no restart, lane nba-injury-parser-fleet-ff). **READ 16:30:45Z:** 0 off-roster names in the first rewrite; Diop / Wade clean. Only the props-refresh drift-line read in (2) remains.
   2. Then read the next `raw/injuries.csv` snapshot for 0 off-roster names, and the next props refresh's `SMART_SIM_REUSE_STALE_EXCLUSIONS`.
 - **Lead:** a D-1 fetch after midnight finds no official PDF (the season page lists only today's) and REPLACES D-1's rows with the fallback. The fleet's 10-21 rows are fallback-shaped now.
 - Detail: `.syndicate/findings_2026-10-22_nba_injury_pdf_parser.md`.

@@ -1356,7 +1356,8 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   - Enabling is the user's decision.
 - Findings: `findings_2026-10-22_nba_sim_minutes_allocation.md`, `findings_2026-10-22_nba_sim_minutes_history_path.md`.
 
-## [nba-injury-pdf-parser] THE NBA OFFICIAL INJURY-PDF PARSER WROTE 17% OF ITS ROWS UNDER NAMES NO POOL MATCHES AND GAVE AVAILABLE PLAYERS THE NEXT PLAYER'S OUT; THE FIX IS ON MAIN, NOT ON THE FLEET `[measured 2026-10-22, lane nba-injury-pdf-parser, todo #725, main 36eb357b]`
+## [nba-injury-pdf-parser] THE NBA OFFICIAL INJURY-PDF PARSER WROTE 17% OF ITS ROWS UNDER NAMES NO POOL MATCHES AND GAVE AVAILABLE PLAYERS THE NEXT PLAYER'S OUT; THE FIX IS LIVE ON THE FLEET since 2026-10-22 16:29:00Z (ff 5e734fb6 -> 36eb357b, no restart) AND READ: 0 off-roster names `[measured 2026-10-22, lane nba-injury-pdf-parser, todo #725, main 36eb357b; ff lane nba-injury-parser-fleet-ff]`
+- **On the fleet `[verified 2026-10-22 16:30:45Z]`:** the first `raw/injuries.csv` rewrite after the ff (production's own fetch, 16:30:45Z) holds 12 rows for 10-22, 0 off-roster; `Khalifa Diop` OUT and `Dean Wade` QUESTIONABLE under their own names (15:59Z, old parser: `Khalifa Tendinopathy Diop`, `Dean Tear Wade`). Undo: `git checkout 5e734fb6 -- syndicate/features/nba/source_cli/scrapers/injuries.py` in `~/Syndicate`, no restart (deploys.md 16:29:00Z).
 - **Feeds:** `raw/injuries.csv`, the SmartSim exclusion map, the props OUT refusal, and the Layer 2 OUT gate. Written by `fetch-injuries` -> `NBAInjuryDatabase.update_injuries` -> `NBAOfficialInjuryReportScraper._parse_pdf_rows` -> `_clean_injury_player_names` (`syndicate/features/nba/source_cli/scrapers/injuries.py`).
 - **Defects (real 10-21 reports):**
   - A reason's last word went into the next player's surname: `Jalen Tear Wilson`, `Mouhamed Way Gueye`. `<word> Last,` was accepted as a two-token surname, which in practice is only ever `Lively II,` / `Butler III,`.
