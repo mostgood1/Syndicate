@@ -1828,6 +1828,14 @@ death, never life — do not invert it.
 - Verification: pytest: job registered + due at 13:15Z; alert fires on a fixture log missing today's line, on FAILED/SAVE_FAILED/HOOK_FAILED, on mode=apply with no decision file, silent on shadow + line present. Fleet: after a claimed full down/up, reports/intelligence/min_ev_tuner_readout/<date>.json written by the job with no session involved, and scheduled_jobs.json last_rc=0
 - Blocked by: none
 
+### wnba-injury-nba-report — OPEN — opened 2026-10-22 — session 898e35dc-a0f2-480c-af48-51c7cc5731fe
+- Goal: The WNBA fetch-injuries never takes the NBA's official injury report: NBAInjuryDatabase.update_injuries (wnba source_cli) writes no NBA rows and its Rotowire/ESPN fallback runs on a day with an NBA report; tests through update_injuries cover the NBA-report day and the no-report day; findings + todo #727 carry the writer, the overlap verdict and its window
+- Files: syndicate/features/wnba/source_cli/scrapers/injuries.py, tests/test_wnba_injury_nba_report.py (NEW), .syndicate/findings_2026-10-22_wnba_injury_nba_report.md (NEW), docs/ai_context/todo.md (#727 section only), .syndicate/state_basketball.md (one new [wnba-injury-nba-report] section + index row)
+- Hypothesis: MEASURED before opening (fleet logs, read-only): the props refresh's fetch-injuries took the official path (no Rotowire line) on every same-day WNBA run from 10-20 18:07Z to 10-22 03:48Z; the whole-file summaries carry NBA-PDF statuses (QUESTIONABLE/PROBABLE/DOUBTFUL up to 19 rows, TOR up to 2) that no WNBA fallback row has; the fleet WNBA processed/ has no rosters_*.csv, so the roster filter is a no-op and the NBA rows were WRITTEN. On 10-21 (ATL v GSV played) the WNBA sim readmitted 13 OUT players (Nye, Winterburn, Villa, Rupert, Mwenentanda among them; none in the 10-21 box) and took NBA names as ATL exclusions.
+- Falsification test: The fix is inert if, with the official scraper stubbed to return NBA rows, update_injuries still writes a row with an NBA-only status or skips the ESPN fallback; or if the no-report day's output differs from before the fix.
+- Verification: pytest tests/test_wnba_injury_nba_report.py green and red on origin/main's injuries.py (reachability); related WNBA injury suites green; on the fleet after an ff (user's yes): the next same-day WNBA fetch-injuries on an NBA game day prints the Rotowire line and its summary has 0 QUESTIONABLE/PROBABLE/DOUBTFUL/TOR rows
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
