@@ -121,7 +121,6 @@ def main(argv=None) -> int:
     for k in [k for k in os.environ if any(m in k.upper() for m in ("KEYVALUE", "REDIS", "VALKEY", "ODDS_API", "ODDSAPI"))]:
         os.environ.pop(k, None)
     os.environ["SYNDICATE_REFRESH_STATE_BACKEND"] = "file"
-    sys.path[:0] = [str(scratch / "wnba_source" / "src")]
 
     from syndicate.features.nba import live_resim as lr
     from syndicate.features.shared import basketball_props_smart_sim as bpss
