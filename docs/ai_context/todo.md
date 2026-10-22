@@ -1,5 +1,21 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#723` — **The NBA SmartSim's minutes layer gives pool players who then DNP 37.7 sim min/side [26.4, 49.4] and runs starters -4.21 [-6.41, -1.87] (10-21, 22 pre-tip production sides). A default-off priced-first shrink is BUILT; the confirmatory reading is OWED** — FOUND 2026-10-22, lane `nba-sim-minutes-allocation`, session ffb7ab00 (side session of local_d458ff9c; `#714` follow-up)
+- **Measured (production sims vs `player_checks` box, `scripts/nba_sim_minutes_audit.py`).**
+  - Pool players who DNP hold 829 sim min on 22 sides: 68% unlisted deep bench, 20% OUT on the final report but not at build, 12% excluded under a broken name.
+  - No DNP pool player had a pre-tip prop line, and all 137 priced pool players played.
+  - Against the points line: starters -1.27 pts, bench +1.37.
+  - 10-20 is excluded: its sims were post-tip rebuilds whose `lag1_min` equals the 10-20 box (fixed going forward by `#720`).
+- **Cause (traced file:line in the findings).** When no same-phase rotation history applies, `_derive_sim_minutes_local` gives every props_predictions row (NBA pool never pruned) last season's roll minutes, then `_water_fill_minutes_local` takes the excess equally off all ~13. Starters lose as much as the 13th man.
+- **Built, DEFAULT OFF:** `SYNDICATE_NBA_SIM_MINUTES_PRICED_FIRST` (off|shadow|on). With it on, the excess comes off unpriced pool players first. It engages only with >= 5 priced players. 12 tests, including off != on through the real worker.
+- **OWED:**
+  1. The pre-registered CONFIRMATORY minutes reading. `--replay` on slates after 10-21, >= 150 played rows on engaged sides.
+  2. The points secondary on scratch arms.
+  3. Before any `on`: the k / book-blend re-fit check, and a reuse stamp for the priced set.
+  4. A reading of the rotation-HISTORY path, which takes over from a team's 2nd game and is not covered by this switch.
+- **Follow-ups found:** the NBA official injury-PDF parser splices reason words into names (`ISAIAH WAY STEWART`, `BEN SUBLUXATION SIMMONS`), and probably hands an Available player the next player's OUT (Curry excluded and played 21; Moody simulated 32.9 and DNP).
+- Detail: `.syndicate/findings_2026-10-22_nba_sim_minutes_allocation.md`.
+
 ### `#722` — **A sizing provenance field cannot be settled on: `staked_probability_version` never reaches the order, and 552 of 658 live orders carry no `position_key`** — FOUND 2026-10-21, lane `published-negative-ev`, session 4ab694ed
 - **What blocked.** The armed 2026-10-21 reading (split staked positions on `sizing.staked_probability_version` across #704's activation) returned **0 settled positions in every cell** — not underpowered, UNAVAILABLE. Joined 143 orders, all paper, none settled; **all 658 live orders unjoinable** (552 with no `position_key` at all, 106 with keys in no readable plan), while 958 of 3,000 ledger orders ARE settled (576 of them live).
 - **Why.** The field is written in ONE module (`portfolio_commit.py`, 5 sites) onto a plan POSITION, and appears **0 times** in `paper_settlement.py`, `evaluation_settlement.py`, `execution_ledger.py`, `ledger_bridge.py`. Its own comment says it exists so "model-edge and market-fair positions" do not "land in one settlement pool ... two different claims averaged into one uninterpretable number" — it delivers that in the plan and loses it at settlement, the only place an ROI exists.

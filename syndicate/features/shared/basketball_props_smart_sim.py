@@ -3200,6 +3200,119 @@ def _water_fill_minutes_local(base, *, total: float, caps):
     return out * (float(total) / s) if s > 0 else None
 
 
+# PRICED-FIRST SHRINK -- DEFAULT OFF (lane nba-sim-minutes-allocation, todo #723).
+# Measured on the 22 pre-tip production sides of 2026-10-21: the NBA pool is every props_predictions row on the team
+# (never pruned, unlike WNBA), its minutes are last season's rolling minutes, and the water-fill above takes the same
+# number of minutes off every one of ~13 players -- so pool players who then did not play held 37.7 sim min/side and
+# starters ran -4.2 min. All 137 pool players with a posted pre-tip prop line played; 60 of the 140 without one did
+# not, and none of those 60 had a line. With the switch on, the excess comes off the players the market does not
+# price before it comes off the ones it does. Switch SYNDICATE_NBA_SIM_MINUTES_PRICED_FIRST: absent/off = the
+# water-fill above, unchanged; shadow = compute and log, return the water-fill; on = return it. NBA only; engages only
+# when >= NBA_SIM_MINUTES_PRICED_FIRST_MIN_PRICED pool players are priced (a D-2 build sees few lines).
+NBA_SIM_MINUTES_PRICED_FIRST_FLAG = "SYNDICATE_NBA_SIM_MINUTES_PRICED_FIRST"
+NBA_SIM_MINUTES_PRICED_FIRST_MIN_PRICED = 5
+
+
+def _nba_sim_minutes_priced_first_mode_local(env=None) -> str:
+    raw = str((env if env is not None else os.environ).get(NBA_SIM_MINUTES_PRICED_FIRST_FLAG) or "").strip().lower()
+    if raw in {"on", "1", "true", "yes"}:
+        return "on"
+    return "shadow" if raw == "shadow" else "off"
+
+
+def _priced_first_fill_local(base, *, total: float, caps, priced):
+    """`_water_fill_minutes_local` with the market-priced players shrunk LAST: the excess over `total` comes off the
+    unpriced players first (the same equal-subtraction fill among them, floored at 0); only once they are all at 0 is
+    the rest taken off the priced players. None when there is no excess or the fill cannot reach `total`."""
+    import numpy as np
+
+    b = np.maximum(0.0, np.where(np.isfinite(np.asarray(base, dtype=float)), np.asarray(base, dtype=float), 0.0))
+    cap = np.asarray(caps, dtype=float) if caps is not None else np.full(b.size, np.inf)
+    cap = np.where(np.isfinite(cap) & (cap > 0.0), cap, np.inf)
+    b = np.minimum(b, cap)
+    p = np.asarray(priced, dtype=bool)
+    if b.size == 0 or p.size != b.size or float(b.sum()) <= float(total):
+        return None
+    excess = float(b.sum()) - float(total)
+    out = b.copy()
+    un_sum = float(b[~p].sum())
+    if un_sum > excess:
+        filled = _water_fill_minutes_local(b[~p], total=un_sum - excess, caps=cap[~p])
+        if filled is None:
+            return None
+        out[~p] = filled
+    else:
+        out[~p] = 0.0
+        filled = _water_fill_minutes_local(b[p], total=float(total), caps=cap[p])
+        if filled is None:
+            return None
+        out[p] = filled
+    s = float(out.sum())
+    return out * (float(total) / s) if s > 0 else None
+
+
+def _market_priced_keys_for_team_local(*, processed_root, raw_root, date_str, team_tri) -> set[str]:
+    """`_norm_name_key`s of every player with a posted player-prop line on TEAM's game, from the date's props snapshot
+    (the one the WNBA pool prune protects). Empty when the snapshot has no line for that game."""
+    out: set[str] = set()
+    if not (processed_root and date_str and team_tri):
+        return out
+    try:
+        by_game = _load_market_player_names_by_matchup_local(processed_root=Path(processed_root), raw_root=Path(raw_root),
+                                                              date_str=str(date_str)[:10])
+    except Exception:
+        return out
+    team = str(team_tri).strip().upper()
+    for (home, away), names in (by_game or {}).items():
+        if team in (str(home).strip().upper(), str(away).strip().upper()):
+            out.update(k for k in (_norm_name_key(n) for n in names) if k)
+    return out
+
+
+def _nba_priced_first_minutes_local(m, team_df, mins, caps, *, total: float, date_str, team_tri, league_code, off):
+    """The switch. Returns the priced-first minutes ONLY in mode `on` when it engages; logs one
+    `NBA_SIM_MINUTES_PRICED_FIRST` line in `shadow` and `on`; None otherwise (the caller keeps `off`)."""
+    import numpy as np
+
+    if str(league_code or "").strip().lower() != "nba":
+        return None
+    mode = _nba_sim_minutes_priced_first_mode_local()
+    if mode == "off":
+        return None
+    try:
+        # The SLATE date: in pregame mode the orchestrator hands this function the AS-OF date (slate - 1), which would
+        # read the previous day's props snapshot. The worker state carries the slate's own date.
+        slate = str((_SMARTSIM_WORKER_STATE or {}).get("date_str") or date_str or "")[:10]
+        paths = getattr(m, "paths", None)
+        processed = getattr(paths, "data_processed", None)
+        raw = getattr(paths, "data_raw", None) or (Path(processed).parent / "raw" if processed else None)
+        priced_keys = _market_priced_keys_for_team_local(processed_root=processed, raw_root=raw, date_str=slate,
+                                                         team_tri=team_tri)
+        keys = m._frame_series(team_df, "player_name", "").map(_norm_name_key)
+        priced = keys.isin(priced_keys).to_numpy(dtype=bool)
+        n_priced = int(priced.sum())
+        alt = None
+        reason = "ok"
+        if n_priced < NBA_SIM_MINUTES_PRICED_FIRST_MIN_PRICED:
+            reason = f"priced_below_{NBA_SIM_MINUTES_PRICED_FIRST_MIN_PRICED}"
+        else:
+            alt = _priced_first_fill_local(mins.to_numpy(dtype=float), total=total, caps=caps, priced=priced)
+            if alt is None:
+                reason = "fill_failed"
+        moved = priced_gain = 0.0
+        if alt is not None and off is not None:
+            moved = float(np.abs(alt - np.asarray(off, dtype=float)).sum())
+            priced_gain = float((alt - np.asarray(off, dtype=float))[priced].sum())
+        print(f"[smart_sim] NBA_SIM_MINUTES_PRICED_FIRST mode={mode} date={slate} team={team_tri} "
+              f"pool={len(priced)} priced={n_priced} engaged={int(alt is not None)} reason={reason} "
+              f"moved={moved:.1f} priced_gain={priced_gain:+.1f}", flush=True)
+        return alt if mode == "on" else None
+    except Exception as exc:  # noqa: BLE001 -- the switch can never break a sim; off is the fallback
+        print(f"[smart_sim] NBA_SIM_MINUTES_PRICED_FIRST mode={mode} team={team_tri} error={type(exc).__name__}: {exc}",
+              flush=True)
+        return None
+
+
 def _smart_sim_league_local(smart_sim_module, league_code: str | None):
     """The league config for a vendored smart_sim module.
 
@@ -3254,7 +3367,12 @@ def _derive_sim_minutes_local(*, smart_sim_module, team_df, date_str=None, team_
         mins = pd.Series([24.0] * len(team_df), index=team_df.index, dtype=float)
     if float(mins.sum()) > total:
         caps = m._minutes_caps_from_team_df(team_df, base_minutes=mins)
-        filled = _water_fill_minutes_local(mins.to_numpy(dtype=float), total=total, caps=pd.Series(caps, index=mins.index).to_numpy(dtype=float) if caps is not None else None)
+        caps_arr = pd.Series(caps, index=mins.index).to_numpy(dtype=float) if caps is not None else None
+        filled = _water_fill_minutes_local(mins.to_numpy(dtype=float), total=total, caps=caps_arr)
+        priced_first = _nba_priced_first_minutes_local(m, team_df, mins, caps_arr, total=total, date_str=date_str,
+                                                       team_tri=team_tri, league_code=league_code, off=filled)
+        if priced_first is not None:
+            return pd.Series(priced_first, index=mins.index, dtype=float)
         if filled is not None:
             return pd.Series(filled, index=mins.index, dtype=float)
     mins = m._scale_minutes_to_target(mins, total_target=total)
