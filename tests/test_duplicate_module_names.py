@@ -20,7 +20,6 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from scripts import check_duplicate_module_names as checker  # noqa: E402
 from scripts.check_duplicate_module_names import DEFAULT_ROOTS  # noqa: E402
 from scripts.check_duplicate_module_names import duplicates_in_source  # noqa: E402
 from scripts.check_duplicate_module_names import classify  # noqa: E402
@@ -206,47 +205,13 @@ def test_a_duplicate_in_a_repo_root_file_is_owned_and_fails(tmp_path):
     findings, _ = scan(["."], repo_root=tmp_path)
     tiers = classify(findings, ["."])
     assert [f["key"] for f in tiers["owned"]] == ["app.py: f"]
-    assert tiers["vendor_new"] == []
-
-
-def test_a_NEW_duplicate_under_vendor_fails_even_though_vendor_is_pinned(tmp_path):
-    """The pin freezes the KNOWN vendored set; it is not a blanket exemption. A
-    vendor sync is exactly how a new one would arrive, so this is the case the
-    tier exists for."""
-    vendored = tmp_path / "vendor" / "some_repo"
-    vendored.mkdir(parents=True)
-    (vendored / "mod.py").write_text(SHADOWED, encoding="utf-8")
-    findings, _ = scan(["vendor"], repo_root=tmp_path)
-    tiers = classify(findings, ["vendor"])
-    assert [f["key"] for f in tiers["vendor_new"]] == ["vendor/some_repo/mod.py: f"]
-    assert tiers["owned"] == [], "a vendored finding must not be reported as owned"
-
-
-def test_a_pinned_entry_that_no_longer_exists_is_reported_stale(monkeypatch, tmp_path):
-    """Otherwise the pin rots into the general-purpose allowlist this check
-    deliberately does not have. If upstream fixes one, we must delete the entry."""
-    monkeypatch.setattr(checker, "VENDOR_BASELINE", frozenset({"vendor/gone/mod.py: f"}))
-    (tmp_path / "vendor").mkdir()
-    findings, _ = scan(["vendor"], repo_root=tmp_path)
-    assert classify(findings, ["vendor"])["stale"] == ["vendor/gone/mod.py: f"]
-
-
-def test_a_narrowed_run_does_not_report_the_whole_pin_as_stale(monkeypatch, tmp_path):
-    """`--roots syndicate` must not fail with 12 stale entries just because it
-    never looked at vendor/. A check that cries wolf on a narrowed run gets run
-    with `|| true`."""
-    monkeypatch.setattr(checker, "VENDOR_BASELINE", frozenset({"vendor/gone/mod.py: f"}))
-    (tmp_path / "syndicate").mkdir()
-    findings, _ = scan(["syndicate"], repo_root=tmp_path)
-    assert classify(findings, ["syndicate"])["stale"] == []
 
 
 # --- the invariant itself ----------------------------------------------------
 
 
 def test_no_module_level_name_is_defined_twice_anywhere():
-    """Over the repo root, `syndicate/`, `pipeline/`, `scripts/`, `tests/` and
-    `vendor/` -- vendored findings only count if they are not in the pin."""
+    """Over the repo root, `syndicate/`, `pipeline/`, `scripts/` and `tests/`."""
     findings, errors = scan(list(DEFAULT_ROOTS), repo_root=REPO_ROOT)
     assert not errors, "files the duplicate check could not parse: %r" % (errors,)
     tiers = classify(findings, list(DEFAULT_ROOTS))
@@ -257,12 +222,4 @@ def test_no_module_level_name_is_defined_twice_anywhere():
     assert not tiers["owned"], (
         "module-level names defined more than once (Python keeps the LAST "
         "binding, so every earlier definition is dead code): " + render(tiers["owned"])
-    )
-    assert not tiers["vendor_new"], (
-        "NEW duplicate(s) under vendor/ that are not in VENDOR_BASELINE -- diff "
-        "the two definitions, then pin with a note: " + render(tiers["vendor_new"])
-    )
-    assert not tiers["stale"], (
-        "VENDOR_BASELINE names duplicate(s) that no longer exist; delete these "
-        "entries: " + "; ".join(tiers["stale"])
     )

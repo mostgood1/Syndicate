@@ -2501,7 +2501,7 @@ REGISTRY: dict[str, SportSpec] = {
     ),
     "nba": SportSpec(
         slug="nba",
-        source_repo_name="Syndicate/vendor/nba_betting_repo",
+        source_repo_name="nba_source",
         mirror_script_name="refresh_nba_source_mirror.ps1",
         step_builder=_build_nba_steps,
         ingest_contract_kind="artifact_bundle_or_existing_mirror",
@@ -2528,7 +2528,7 @@ REGISTRY: dict[str, SportSpec] = {
     ),
     "wnba": SportSpec(
         slug="wnba",
-        source_repo_name="Syndicate/vendor/wnba_betting_repo",
+        source_repo_name="wnba_source",
         mirror_script_name="refresh_wnba_source_mirror.ps1",
         step_builder=_build_wnba_steps,
         ingest_contract_kind="artifact_bundle_or_existing_mirror",

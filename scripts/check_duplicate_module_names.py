@@ -32,22 +32,10 @@ assignment. Only the module's own top level is scanned (`tree.body`), so the
 ordinary conditional-definition patterns (`try: import x / except ImportError:`,
 `if TYPE_CHECKING:`, `if sys.platform == ...:`) are nested and never flagged.
 
-TWO TIERS, because `vendor/` is not ours to rewrite
----------------------------------------------------
-Owned code (`.`, `syndicate/`, `pipeline/`, `scripts/`, `tests/`) must be clean;
-any finding fails. `ALLOWLIST` is empty and should stay that way.
-
-`vendor/` is sibling-repo code pulled in verbatim. It had 12 findings; the five
-that were genuinely dead have been deleted, five more turned out not to be
-duplicates at all (see `duplicates_in_source`), and the two that remain are
-upstream's to reconcile rather than ours. Those are PINNED in `VENDOR_BASELINE`:
-exactly that set passes, anything NEW fails. Failing on them instead would leave
-a permanently-red gate, and a permanently-red gate gets muted -- which would cost
-the owned-code coverage that is the whole point. Pinning also means a vendor
-sync, which is precisely how a new one would arrive, cannot slip one in.
-
-A baseline entry that no longer matches anything is reported as STALE and also
-fails, so the pin cannot quietly rot into a general-purpose allowlist.
+ONE TIER. Code here (`.`, `syndicate/`, `pipeline/`, `scripts/`, `tests/`) must be clean; any finding fails.
+`ALLOWLIST` is empty and should stay that way. There used to be a second, PINNED tier for `vendor/` (sibling-repo
+code we did not rewrite); vendor/ is gone (lane nhl-vendor-delete, 2026-10-20) and its pin was empty, so the tier
+was removed (lane vendor-final-leftovers, 2026-10-22). Anything scanned is owned code now.
 
 Usage:
     python scripts/check_duplicate_module_names.py
@@ -75,11 +63,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 ROOT_LEVEL = "."
 
 # "vendor" left the defaults 2026-10-20 (lane nhl-vendor-delete): vendor/ no longer exists, and a missing root is an
-# error by design (an unread root must not look clean). VENDOR_ROOTS stays for an explicit --roots vendor scan.
+# error by design (an unread root must not look clean).
 DEFAULT_ROOTS = (ROOT_LEVEL, "syndicate", "pipeline", "scripts", "tests")
-
-# Roots whose findings are pinned rather than failed. See the two-tier note above.
-VENDOR_ROOTS = ("vendor",)
 
 # `<posix path>: <name>` entries in OWNED code that are known-good and exempt.
 #
@@ -89,32 +74,6 @@ VENDOR_ROOTS = ("vendor",)
 # entries in it is a place for the next real one to hide -- if you are about to
 # add a line here, prefer deleting the duplicate, and if you cannot, say why.
 ALLOWLIST: frozenset[str] = frozenset()
-
-# What is left of the vendored set after 2026-09-06.
-#
-# Twelve were found. FIVE were genuinely dead and were DELETED from vendor/ --
-# `_ev_from_prob_and_american` x2, `props_collect`, `props_project_all`, and
-# `__all__` in `shifts_api.py` -- verified by comparing each file's OBSERVABLE
-# surface before and after (EV results over 13 inputs, all 89 Typer commands with
-# their callbacks and params, the `__all__` value): identical.
-#
-# FIVE more were never duplicates at all and are no longer reported, because
-# `duplicates_in_source` now requires the earlier binding to be DEAD: `out` x2 and
-# `cols_subset` x2 are sequential rebindings whose successor consumes them, and
-# `backtest_daily_summary.py`'s `main` is read at module level by an
-# `if __name__ == '__main__':` block sitting between the two definitions.
-#
-# These TWO remain, and they are the interesting shape: the module-level NAME is
-# dead, but the OBJECT is not. Click registers each function when it is decorated,
-# and here the two decorators give DIFFERENT command names, so both survive --
-# verified against click 8.1.7, the group ends up with `fetch-rosters-cmd` AND
-# `fetch-rosters`. Deleting the shadowed def would delete a working CLI command.
-# Pinned rather than fixed: they are upstream's to reconcile.
-VENDOR_BASELINE: frozenset[str] = frozenset(
-    {
-    }
-)
-
 
 def module_level_names(tree: ast.Module) -> list[tuple[str, int, int]]:
     """Every name bound at the module's own top level, as (name, start, end).
@@ -238,8 +197,6 @@ def duplicates_in_source(source: str, filename: str) -> dict[str, list[int]]:
     return reported
 
 
-def is_vendor(rel_path: str) -> bool:
-    return any(rel_path == root or rel_path.startswith(root + "/") for root in VENDOR_ROOTS)
 
 
 def iter_python_files(base: Path, root: str):
@@ -284,23 +241,8 @@ def scan(roots: list[str], repo_root: Path | None = None) -> tuple[list[dict[str
 
 
 def classify(findings: list[dict[str, object]], roots: list[str]) -> dict[str, list]:
-    """Split findings into the tiers that decide the exit code."""
-    owned: list[dict[str, object]] = []
-    vendor_new: list[dict[str, object]] = []
-    vendor_pinned: list[dict[str, object]] = []
-    for finding in findings:
-        key = str(finding["key"])
-        if is_vendor(str(finding["path"])):
-            (vendor_pinned if key in VENDOR_BASELINE else vendor_new).append(finding)
-        elif key not in ALLOWLIST:
-            owned.append(finding)
-
-    # Only judge the pin for completeness when vendor was actually scanned --
-    # `--roots syndicate` must not report all 12 as stale.
-    vendor_scanned = any(root in VENDOR_ROOTS for root in roots)
-    seen = {str(f["key"]) for f in vendor_pinned}
-    stale = sorted(VENDOR_BASELINE - seen) if vendor_scanned else []
-    return {"owned": owned, "vendor_new": vendor_new, "vendor_pinned": vendor_pinned, "stale": stale}
+    """The findings that decide the exit code: every one not in ALLOWLIST."""
+    return {"owned": [f for f in findings if str(f["key"]) not in ALLOWLIST]}
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -321,7 +263,7 @@ def main(argv: list[str] | None = None) -> int:
     tiers = classify(findings, args.roots)
 
     if args.as_json:
-        ok = not errors and not tiers["owned"] and not tiers["vendor_new"] and not tiers["stale"]
+        ok = not errors and not tiers["owned"]
         print(json.dumps({"ok": ok, "roots": args.roots, **tiers, "errors": errors}, indent=2))
         if errors:
             return 2
@@ -331,10 +273,6 @@ def main(argv: list[str] | None = None) -> int:
         print("ERROR  %s -- %s" % (error["path"], error["error"]))
     for finding in tiers["owned"]:
         print(_render(finding, "DUPLICATE"))
-    for finding in tiers["vendor_new"]:
-        print(_render(finding, "NEW-IN-VENDOR"))
-    for key in tiers["stale"]:
-        print("STALE-PIN  %s -- in VENDOR_BASELINE but no longer present; delete the entry" % key)
 
     if tiers["owned"]:
         print()
@@ -342,19 +280,12 @@ def main(argv: list[str] | None = None) -> int:
         print("binding, so every definition but the last is dead code. Diff them before")
         print("deleting: they may be identical, or the shadowed one may hold a fix that")
         print("has silently not been running.")
-    if tiers["vendor_new"]:
-        print()
-        print("%d NEW duplicate(s) under vendor/, not in VENDOR_BASELINE. If a vendor" % len(tiers["vendor_new"]))
-        print("sync brought this in, diff the two definitions and add it to the pin with")
-        print("a note saying which is live and how they differ.")
 
-    if tiers["owned"] or tiers["vendor_new"] or tiers["stale"]:
+    if tiers["owned"]:
         return 1
     if errors:
         return 2
     print("ok  no module-level name is defined twice in %s" % ", ".join(args.roots))
-    if tiers["vendor_pinned"]:
-        print("    (%d known vendored duplicate(s) pinned in VENDOR_BASELINE, unchanged)" % len(tiers["vendor_pinned"]))
     return 0
 
 

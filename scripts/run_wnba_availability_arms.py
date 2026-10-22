@@ -80,7 +80,6 @@ def main(argv: Optional[List[str]] = None) -> int:
         os.environ.pop(k, None)
     os.environ["SYNDICATE_REFRESH_STATE_BACKEND"] = "file"
     os.environ["SYNDICATE_WNBA_SIM_AVAILABILITY_RULE"] = args.rule
-    sys.path[:0] = [str(scratch / "wnba_source" / "src")]
 
     from syndicate.features.shared.basketball_props_predictions import export_props_predictions_local
 

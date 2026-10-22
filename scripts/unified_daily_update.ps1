@@ -2447,7 +2447,7 @@ function Resolve-WorkspaceRepoPath {
     return $null
 }
 
-function Resolve-VendoredRepoPath {
+function Resolve-RepoPath {
     param([string]$RelativePath)
 
     if ([string]::IsNullOrWhiteSpace($RelativePath)) {
@@ -4075,9 +4075,9 @@ if (Test-SportEnabled 'MLB') {
     # (syndicate/features/mlb/FROZEN_FROM_VENDOR.md), run from the engine DATA root engines\mlb -- as scripts/run_mlb_daily_sim_job.py
     # runs it on the fleet. The variable names, and the step's Workflow id and Name below, are kept: they key branches
     # and appear in run manifests.
-    $mlbVendoredRoot = Resolve-VendoredRepoPath -RelativePath 'engines\mlb'
-    $mlbVendoredDailyUpdate = Resolve-VendoredRepoPath -RelativePath 'syndicate\features\mlb\native\tools\daily_update.py'
-    if (-not ($mlbVendoredRoot -and $mlbVendoredDailyUpdate)) {
+    $mlbEngineRoot = Resolve-RepoPath -RelativePath 'engines\mlb'
+    $mlbDailyUpdateScript = Resolve-RepoPath -RelativePath 'syndicate\features\mlb\native\tools\daily_update.py'
+    if (-not ($mlbEngineRoot -and $mlbDailyUpdateScript)) {
         throw "MLB self-contained daily update is unavailable because engines\\mlb or syndicate\\features\\mlb\\native\\tools\\daily_update.py was not found. The fallback Syndicate MLB refresh only materializes existing artifacts and is not equivalent to the full ui-daily workflow."
     }
 
@@ -4094,10 +4094,11 @@ if (Test-SportEnabled 'MLB') {
     $sourceSteps += [pscustomobject]@{
         Sport = 'mlb'
         Name = 'MLB vendored daily update'
+        # A run-manifest KEY, not a description: earlier manifests' eventSimExecution records match on it (Get-EventSimExecution*).
         Workflow = 'vendored_daily_update'
         Command = @(
             (Resolve-Python $repoRoot),
-            $mlbVendoredDailyUpdate,
+            $mlbDailyUpdateScript,
             '--workflow', 'ui-daily',
             '--date', $Date,
             '--season', $season,
@@ -4107,7 +4108,7 @@ if (Test-SportEnabled 'MLB') {
             '--validate-render-frontend', 'off',
             '--build-next-day', 'on'
         )
-        WorkingDirectory = $mlbVendoredRoot
+        WorkingDirectory = $mlbEngineRoot
         EnvironmentOverrides = $mlbEnvOverrides
         RuntimePolicy = $runtimePolicy.MLB
     }
@@ -4602,9 +4603,9 @@ try {
             $step = $sourceSteps[$stepIndex]
             $sportKey = [string]$step.Sport
             $startedAt = (Get-Date).ToString('o')
-            $isMlbVendoredStep = ($step.Sport -eq 'mlb' -and $step.Workflow -eq 'vendored_daily_update')
+            $isMlbDailyUpdateStep = ($step.Sport -eq 'mlb' -and $step.Workflow -eq 'vendored_daily_update')
             $mlbDataRootForStep = $null
-            if ($isMlbVendoredStep -and $step.EnvironmentOverrides -and $step.EnvironmentOverrides.ContainsKey('MLB_BETTING_DATA_ROOT')) {
+            if ($isMlbDailyUpdateStep -and $step.EnvironmentOverrides -and $step.EnvironmentOverrides.ContainsKey('MLB_BETTING_DATA_ROOT')) {
                 $mlbDataRootForStep = [string]$step.EnvironmentOverrides.MLB_BETTING_DATA_ROOT
             }
             $currentEventInputFingerprint = Get-EventInputFingerprint -RepoRoot $repoRoot -DateValue $Date -Sport $step.Sport -Workflow $step.Workflow
@@ -4753,7 +4754,7 @@ try {
                 continue
             }
 
-            if (-not $DryRun -and $isMlbVendoredStep) {
+            if (-not $DryRun -and $isMlbDailyUpdateStep) {
                 $preRemovedLocks = Clear-StaleMlbUiDailyLocks -MlbDataRoot $mlbDataRootForStep -DateValue $Date -SeasonValue $season
                 if ($preRemovedLocks -gt 0) {
                     Write-Host ("    cleaned stale MLB ui-daily locks before run: {0}" -f $preRemovedLocks) -ForegroundColor Yellow
@@ -4767,10 +4768,10 @@ try {
                 $stepSucceeded = $true
             }
             catch {
-                if (-not $DryRun -and $isMlbVendoredStep) {
+                if (-not $DryRun -and $isMlbDailyUpdateStep) {
                     $retryRemovedLocks = Clear-StaleMlbUiDailyLocks -MlbDataRoot $mlbDataRootForStep -DateValue $Date -SeasonValue $season
                     if ($retryRemovedLocks -gt 0) {
-                        Write-Host '    retrying MLB vendored daily update after stale-lock cleanup' -ForegroundColor Yellow
+                        Write-Host '    retrying the MLB daily update after stale-lock cleanup' -ForegroundColor Yellow
                         Invoke-Step -Name $step.Name -Command $step.Command -WorkingDirectory $step.WorkingDirectory -EnvironmentOverrides $step.EnvironmentOverrides
                         $stepSucceeded = $true
                     }

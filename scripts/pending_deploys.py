@@ -39,13 +39,12 @@ PATH_OWNERS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("pipeline/", ("refresh-worker",)),
     ("syndicate/features/shared/", ("web", "refresh-worker", "live-odds-worker")),
     ("syndicate/features/", ("web", "refresh-worker", "live-odds-worker")),
-    ("vendor/", ("refresh-worker",)),
     # `scripts/` is resolved by `_owners` via `_executed_scripts` below; this
     # row is the FALLBACK owner set, used when reachability cannot be computed.
     ("scripts/", ("refresh-worker", "live-odds-worker")),
 )
 #: Where runtime code lives. A script NAMED anywhere in here is executed.
-_RUNTIME_ROOTS = ("syndicate", "pipeline", "vendor")
+_RUNTIME_ROOTS = ("syndicate", "pipeline")
 #: Seeds for the reachability closure: what Render actually starts.
 _RUNTIME_SEED_FILES = (
     "wsgi.py",
