@@ -53750,3 +53750,10 @@ which is about the two sizing bases and not about the refusal boundary.
   - Unchanged: EXIT_TAKE_PROFIT_MARGIN=0.30, POLYMARKET_AT_ASK_MIN_STAKE_DOLLARS=5, LIVE_EVENT_CONCENTRATION=on, EXECUTION_MODE=live, ARMED=1, EXIT_MODE=live.
 - **owed:** the first Kalshi LIVE_ORDER after 21:15:22Z with a $5 stake whose filled cost is >= $5 (fill_stake_dollars on /api/portfolio/live).
 - **rollback:** delete the env line, then a full down/up.
+
+
+## 2026-10-22 21:28Z -- NO DEPLOY (superseded): the user-approved a77077a2 load was already done by lane kalshi-round-up's 21:15:11Z full down/up -- departures fix LIVE (lane `min-ev-tuner-shadow`, session b98807bc)
+- **ask:** user, in chat: "Yes: fast-forward the fleet to a77077a2 and restart refresh-worker behind claim + drain after 21:35Z ...".
+- **What happened:** I claimed refresh-worker + live-odds-worker (21:27:10Z, exit 0 each). My guarded ff script ABORTED, failing closed as designed: fleet HEAD was `ce1e4a19`, not the expected `ae2cb646`. Lane kalshi-round-up had ff'd ae2cb646 -> ce1e4a19 and done a full down/up at 21:15:11Z (supervisor `LOCAL PRODUCTION UP ... commit=ce1e4a19`). `a77077a2` is an ancestor of `ce1e4a19` (merge-base checked).
+- **Load proof (the departures lane's own criterion):** `2026-10-22T21:24:25.855Z [clv_departure_ledger] DEPARTURES date=2026-10-22 ... truncated=False dropped=0 bytes=2526151 censored=- state_unreadable=False`, with the new fields present. DEPARTURES_CEILING_HIT today: 0. refresh-worker pid 3980563.
+- **No restart by me.** Both claims released by token at ~21:28Z. The state.json `ledger`-key check and the Saturday (10-24) forward reading belong to lane clv-departures-ceiling (local_fbe9e831).
