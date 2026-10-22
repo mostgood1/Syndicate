@@ -53082,3 +53082,20 @@ rather than defensive.
 - **check by hand:** -280 = 280/380 = 73.68% implied; entry 0.66 = 66.0%; 73.68 - 66.0 = **+7.68 pt**. Matches the stamped value.
 - Stamped by refresh-worker pid 3482646 (booted 18:13:06Z on aaa988a8). The 15 re-marked rows were not touched by it (they carry `clv_correction` and `_needs_closing_mark` skips a set `clv_pct`).
 - **owed:** none for #719. One poll read errored (22:35:48Z, WSL `WSAETIMEDOUT`), retried on the next cycle.
+
+## 2026-10-22 05:0xZ (12:0x AM CT) -- READINGS for the 7c7acfd6 deploy (fleet ff 2026-10-21 15:20Z): box-graded sheet props + SGP calibration MET; NBA in-play-only pulls working, saving smaller than hoped
+- **reconcile 11:50 PM CT 10-21 (`cheat_sheets_reconcile.log`, the run after the ff):** `RECONCILE ncaaf date=2026-10-20 props 128/147 (... from the
+  box 37, explained voids 19)` -- exactly the pre-deploy replay (was 91/147, 47 open); catch-up days closed too: ncaaf 10-15 154/159 (from
+  the box 31), ncaaf 10-16 103/109 (6), nfl 10-15 2 from the box. Same-night: nba 10-21 153/184 from the box (late games not final),
+  ncaaf 10-21 46/46, wnba 10-21 225/225 -- the population pass grades a day only the next night, so these are the box pass alone
+  (finality = ESPN `status.type.completed`). `SGP_PAPER nba / wnba / mlb` now print nightly: nba 38 settled 0.342 vs 0.506, wnba 24
+  settled 0.583 vs 0.510, mlb 11 at 0.727 vs 0.486. CROSS 10-21 1-1 (12 pending). RECORD 598-530 +10.09u over 34 days.
+- **NBA in-play-only (props log 10-21 + migration_runs):** 104 NBA-only live runs 6:18-11:55 PM CT, **104 ok**; `IN_PLAY_ONLY` events
+  per pull 0-8 on an 11-game slate; merge kept the rest of the slate (last write 1,585 rows, 481 in play). Games fetched over the 90
+  evening pulls: **461 in-play-only vs 634 the old pull would have fetched** (all unfinished games, ESPN tips + 2h30 per game) --
+  **27% fewer** (~22.6k vs ~31.1k credits at ~49/game, an estimate). Small because tonight's 11 tips sat inside 3.5 h: until 8:30 PM
+  the in-play count tracked live games exactly (7:45 PM 8 = 8), after ~8:45 PM it ran ABOVE live (8:47 PM 8 vs 6; 11:34 PM 3 vs 1):
+  OddsAPI keeps a finished game on /events and the window is 4 h. Those calls likely return no markets (cheap: markets discovery +
+  one empty odds call) -- NOT measured per call.
+- **not measured:** the served board's pregame rows while games were live (the 11:49 PM board holds only SAC @ LAC). Owed on 10-22
+  (CLE @ PHI 6 PM live while DEN @ OKC 8:30 PM is pregame). OddsAPI remaining 2,186,337 at 8:12 PM CT 10-21 (2,254,542 at 7:40 AM).
