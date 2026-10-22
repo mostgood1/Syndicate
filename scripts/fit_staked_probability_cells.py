@@ -364,6 +364,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         records = base.load_jsonl_records(Path(args.rows_jsonl))
         source = f"jsonl:{args.rows_jsonl}"
     else:
+        # findings s7: `read_json_file` turns a FAILED keyvalue read (e.g. an interpreter with no
+        # `redis`) into an empty live document, and `full_history_orders()` then returns the archive
+        # alone -- a fit that looks complete and is missing the newest ~3,000 orders. Refuse instead.
+        from syndicate.features.shared.execution_ledger import _ledger_path
+        from syndicate.features.shared.refresh_state_store import read_json_file_result
+
+        _payload, read_ok = read_json_file_result(_ledger_path())
+        if not read_ok:
+            print("[fit_staked_probability_cells] LEDGER READ FAILED (live document unreadable; not an empty "
+                  "ledger) -- refusing to fit the archive alone (exit 4)", flush=True)
+            return 4
         records, ledger_path = base.load_ledger_records()
         source = f"execution_ledger:{ledger_path}"
     rows, dropped = rows_from_records(records)

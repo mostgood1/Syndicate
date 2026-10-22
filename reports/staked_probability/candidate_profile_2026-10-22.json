@@ -1,0 +1,15 @@
+{
+  "fields": {
+    "cells": {}
+  },
+  "fit_from": {
+    "bootstrap_draws": 1000,
+    "fitted_on": "2026-10-22T16:46:29Z",
+    "key": "venue|sport|market|segment|phase",
+    "min_test_events": 30,
+    "min_test_rows": 200,
+    "source": "execution_ledger:/home/amyn/syndicate-prod/data/reports/intelligence/execution_ledger.json",
+    "train_share": 0.7
+  },
+  "version": "staked_probability_cells_v1@2026-10-22T16:46:29Z"
+}

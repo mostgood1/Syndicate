@@ -1,0 +1,87 @@
+{
+  "cells": {
+    "prophetx|ncaaf|spreads|full|regular": {
+      "beta_ci": [
+        0.0,
+        1.0
+      ],
+      "beta_fit": 0.0,
+      "brier_beta0": 0.251456118506807,
+      "brier_beta1": 0.2622504717136028,
+      "brier_fit": 0.251456118506807,
+      "delta_beta1": -0.010794353206795781,
+      "delta_beta1_ci": [
+        -0.032838351358734516,
+        0.012275114110912455
+      ],
+      "delta_fit": 0.0,
+      "delta_fit_ci": [
+        0.0,
+        0.0
+      ],
+      "diagnostic": true,
+      "n_events": 120,
+      "n_rows": 504,
+      "n_test": 189,
+      "n_test_events": 45,
+      "n_train": 315,
+      "n_train_events": 97,
+      "test_dates": [
+        "2026-10-13",
+        "2026-10-21"
+      ],
+      "train_dates": [
+        "2026-10-02",
+        "2026-10-12"
+      ],
+      "verdict": "refused_n_test_below_floor"
+    },
+    "prophetx|ncaaf|totals|full|regular": {
+      "beta_ci": [
+        0.0,
+        1.0
+      ],
+      "beta_fit": 0.0,
+      "brier_beta0": 0.24863957584331722,
+      "brier_beta1": 0.24522093831797556,
+      "brier_fit": 0.24863957584331722,
+      "delta_beta1": 0.003418637525341661,
+      "delta_beta1_ci": [
+        -0.026037006064932925,
+        0.0314351412896285
+      ],
+      "delta_fit": 0.0,
+      "delta_fit_ci": [
+        0.0,
+        0.0
+      ],
+      "diagnostic": true,
+      "n_events": 68,
+      "n_rows": 202,
+      "n_test": 68,
+      "n_test_events": 28,
+      "n_train": 134,
+      "n_train_events": 50,
+      "test_dates": [
+        "2026-10-14",
+        "2026-10-21"
+      ],
+      "train_dates": [
+        "2026-10-02",
+        "2026-10-13"
+      ],
+      "verdict": "refused_n_test_below_floor"
+    }
+  },
+  "dropped": {
+    "model_out_of_range": 2,
+    "no_ev_pct": 420,
+    "no_model_edge_pct": 1243,
+    "no_price": 131,
+    "not_portfolio_book": 6222,
+    "push": 29,
+    "unsettled": 1169
+  },
+  "fitted_on": "2026-10-22T16:46:35Z",
+  "source": "execution_ledger:/home/amyn/syndicate-prod/data/reports/intelligence/execution_ledger.json"
+}

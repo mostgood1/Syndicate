@@ -1,0 +1,2582 @@
+{
+  "source": "execution_ledger:/home/amyn/syndicate-prod/data/reports/intelligence/execution_ledger.json",
+  "dropped": {
+    "no_model_edge_pct": 1243,
+    "not_portfolio_book": 6222,
+    "push": 29,
+    "unsettled": 1169,
+    "model_out_of_range": 2,
+    "no_ev_pct": 420,
+    "no_price": 131
+  },
+  "cells": [
+    {
+      "cell": "betmgm|mlb|batter_hits_runs_rbis|full|postseason",
+      "rows": 17,
+      "events": 11,
+      "dates": 7,
+      "first": "2026-10-03",
+      "last": "2026-10-15"
+    },
+    {
+      "cell": "betmgm|mlb|batter_hits|full|postseason",
+      "rows": 19,
+      "events": 12,
+      "dates": 9,
+      "first": "2026-10-03",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "betmgm|mlb|batter_rbis|full|postseason",
+      "rows": 4,
+      "events": 3,
+      "dates": 3,
+      "first": "2026-10-03",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "betmgm|mlb|batter_total_bases|full|postseason",
+      "rows": 7,
+      "events": 4,
+      "dates": 4,
+      "first": "2026-10-05",
+      "last": "2026-10-13"
+    },
+    {
+      "cell": "betmgm|mlb|earned_runs|full|postseason",
+      "rows": 2,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-05",
+      "last": "2026-10-12"
+    },
+    {
+      "cell": "betmgm|mlb|h2h_3_way|first1|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-07",
+      "last": "2026-10-07"
+    },
+    {
+      "cell": "betmgm|mlb|hits_allowed|full|postseason",
+      "rows": 2,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-05",
+      "last": "2026-10-11"
+    },
+    {
+      "cell": "betmgm|mlb|outs|full|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-15",
+      "last": "2026-10-15"
+    },
+    {
+      "cell": "betmgm|mlb|strikeouts|full|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-07",
+      "last": "2026-10-07"
+    },
+    {
+      "cell": "betmgm|mlb|totals|full|postseason",
+      "rows": 2,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-10",
+      "last": "2026-10-14"
+    },
+    {
+      "cell": "betmgm|ncaaf|h2h|full|regular",
+      "rows": 10,
+      "events": 8,
+      "dates": 5,
+      "first": "2026-10-09",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "betmgm|ncaaf|h2h|h1|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-09",
+      "last": "2026-10-09"
+    },
+    {
+      "cell": "betmgm|ncaaf|h2h|q1|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-10",
+      "last": "2026-10-10"
+    },
+    {
+      "cell": "betmgm|ncaaf|spreads|full|regular",
+      "rows": 21,
+      "events": 18,
+      "dates": 7,
+      "first": "2026-10-05",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "betmgm|ncaaf|spreads|q1|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-09",
+      "last": "2026-10-09"
+    },
+    {
+      "cell": "betmgm|ncaaf|totals|full|regular",
+      "rows": 10,
+      "events": 9,
+      "dates": 6,
+      "first": "2026-10-08",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "betmgm|ncaaf|totals|q1|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-10",
+      "last": "2026-10-10"
+    },
+    {
+      "cell": "betmgm|nfl|anytime td|full|regular",
+      "rows": 6,
+      "events": 2,
+      "dates": 3,
+      "first": "2026-10-05",
+      "last": "2026-10-07"
+    },
+    {
+      "cell": "betmgm|nfl|h2h|full|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-07",
+      "last": "2026-10-07"
+    },
+    {
+      "cell": "betmgm|nfl|interceptions|full|regular",
+      "rows": 9,
+      "events": 4,
+      "dates": 5,
+      "first": "2026-10-02",
+      "last": "2026-10-09"
+    },
+    {
+      "cell": "betmgm|nfl|passing attempts|full|regular",
+      "rows": 7,
+      "events": 4,
+      "dates": 6,
+      "first": "2026-10-02",
+      "last": "2026-10-11"
+    },
+    {
+      "cell": "betmgm|nfl|passing yards|full|regular",
+      "rows": 3,
+      "events": 2,
+      "dates": 3,
+      "first": "2026-10-03",
+      "last": "2026-10-11"
+    },
+    {
+      "cell": "betmgm|nfl|receiving yards|full|regular",
+      "rows": 3,
+      "events": 2,
+      "dates": 3,
+      "first": "2026-10-03",
+      "last": "2026-10-18"
+    },
+    {
+      "cell": "betmgm|nfl|receptions|full|regular",
+      "rows": 30,
+      "events": 17,
+      "dates": 13,
+      "first": "2026-10-02",
+      "last": "2026-10-18"
+    },
+    {
+      "cell": "betmgm|nfl|rushing attempts|full|regular",
+      "rows": 7,
+      "events": 5,
+      "dates": 7,
+      "first": "2026-10-04",
+      "last": "2026-10-18"
+    },
+    {
+      "cell": "betmgm|nhl|assists|full|regular",
+      "rows": 25,
+      "events": 15,
+      "dates": 5,
+      "first": "2026-10-17",
+      "last": "2026-10-21"
+    },
+    {
+      "cell": "betmgm|nhl|points|full|regular",
+      "rows": 32,
+      "events": 18,
+      "dates": 4,
+      "first": "2026-10-17",
+      "last": "2026-10-21"
+    },
+    {
+      "cell": "betmgm|nhl|sog|full|regular",
+      "rows": 12,
+      "events": 9,
+      "dates": 5,
+      "first": "2026-10-17",
+      "last": "2026-10-21"
+    },
+    {
+      "cell": "betmgm|nhl|spreads|full|regular",
+      "rows": 2,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-15",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "betmgm|soccer|h2h|full|regular",
+      "rows": 8,
+      "events": 8,
+      "dates": 5,
+      "first": "2026-10-10",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "betmgm|soccer|totals|full|regular",
+      "rows": 9,
+      "events": 9,
+      "dates": 4,
+      "first": "2026-10-10",
+      "last": "2026-10-18"
+    },
+    {
+      "cell": "betmgm|wnba|totals_alt|full|postseason",
+      "rows": 3,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-04",
+      "last": "2026-10-04"
+    },
+    {
+      "cell": "betonlineag|mlb|batter_hits_runs_rbis|full|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-04",
+      "last": "2026-10-04"
+    },
+    {
+      "cell": "betonlineag|mlb|batter_hits|full|postseason",
+      "rows": 2,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-13",
+      "last": "2026-10-15"
+    },
+    {
+      "cell": "betonlineag|mlb|totals|first1|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-12",
+      "last": "2026-10-12"
+    },
+    {
+      "cell": "betonlineag|mlb|totals|first5|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-15",
+      "last": "2026-10-15"
+    },
+    {
+      "cell": "betonlineag|mlb|totals|full|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-18",
+      "last": "2026-10-18"
+    },
+    {
+      "cell": "betonlineag|ncaaf|h2h|full|regular",
+      "rows": 3,
+      "events": 3,
+      "dates": 2,
+      "first": "2026-10-03",
+      "last": "2026-10-10"
+    },
+    {
+      "cell": "betonlineag|ncaaf|h2h|h1|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-10",
+      "last": "2026-10-10"
+    },
+    {
+      "cell": "betonlineag|ncaaf|h2h|q1|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-09",
+      "last": "2026-10-09"
+    },
+    {
+      "cell": "betonlineag|ncaaf|spreads|full|regular",
+      "rows": 3,
+      "events": 3,
+      "dates": 3,
+      "first": "2026-10-05",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "betonlineag|ncaaf|totals|full|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-09",
+      "last": "2026-10-09"
+    },
+    {
+      "cell": "betonlineag|ncaaf|totals|q1|regular",
+      "rows": 2,
+      "events": 2,
+      "dates": 1,
+      "first": "2026-10-10",
+      "last": "2026-10-10"
+    },
+    {
+      "cell": "betonlineag|nfl|h2h|full|regular",
+      "rows": 2,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-06",
+      "last": "2026-10-11"
+    },
+    {
+      "cell": "betonlineag|nfl|interceptions|full|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-03",
+      "last": "2026-10-03"
+    },
+    {
+      "cell": "betonlineag|nfl|passing attempts|full|regular",
+      "rows": 3,
+      "events": 2,
+      "dates": 3,
+      "first": "2026-10-03",
+      "last": "2026-10-11"
+    },
+    {
+      "cell": "betonlineag|nfl|receiving yards|full|regular",
+      "rows": 3,
+      "events": 2,
+      "dates": 3,
+      "first": "2026-10-15",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "betonlineag|nfl|receptions|full|regular",
+      "rows": 17,
+      "events": 11,
+      "dates": 10,
+      "first": "2026-10-03",
+      "last": "2026-10-18"
+    },
+    {
+      "cell": "betonlineag|nfl|rushing attempts|full|regular",
+      "rows": 3,
+      "events": 2,
+      "dates": 3,
+      "first": "2026-10-11",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "betonlineag|nfl|rushing yards|full|regular",
+      "rows": 3,
+      "events": 2,
+      "dates": 3,
+      "first": "2026-10-03",
+      "last": "2026-10-11"
+    },
+    {
+      "cell": "betonlineag|nhl|h2h|full|regular",
+      "rows": 2,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-06",
+      "last": "2026-10-11"
+    },
+    {
+      "cell": "betonlineag|nhl|points|full|regular",
+      "rows": 20,
+      "events": 12,
+      "dates": 4,
+      "first": "2026-10-17",
+      "last": "2026-10-20"
+    },
+    {
+      "cell": "betonlineag|nhl|saves|full|regular",
+      "rows": 3,
+      "events": 3,
+      "dates": 2,
+      "first": "2026-10-20",
+      "last": "2026-10-21"
+    },
+    {
+      "cell": "betonlineag|nhl|sog|full|regular",
+      "rows": 13,
+      "events": 11,
+      "dates": 5,
+      "first": "2026-10-16",
+      "last": "2026-10-21"
+    },
+    {
+      "cell": "betonlineag|nhl|totals|full|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-11",
+      "last": "2026-10-11"
+    },
+    {
+      "cell": "betonlineag|soccer|h2h|full|regular",
+      "rows": 5,
+      "events": 5,
+      "dates": 2,
+      "first": "2026-10-10",
+      "last": "2026-10-11"
+    },
+    {
+      "cell": "betonlineag|soccer|spreads|full|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-17",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "betonlineag|soccer|totals|full|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-10",
+      "last": "2026-10-10"
+    },
+    {
+      "cell": "betonlineag|wnba|player_points|full|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-04",
+      "last": "2026-10-04"
+    },
+    {
+      "cell": "betrivers|mlb|batter_hits|full|postseason",
+      "rows": 9,
+      "events": 5,
+      "dates": 4,
+      "first": "2026-10-11",
+      "last": "2026-10-15"
+    },
+    {
+      "cell": "betrivers|mlb|batter_rbis|full|postseason",
+      "rows": 6,
+      "events": 2,
+      "dates": 1,
+      "first": "2026-10-12",
+      "last": "2026-10-12"
+    },
+    {
+      "cell": "betrivers|mlb|h2h_3_way|first3|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-15",
+      "last": "2026-10-15"
+    },
+    {
+      "cell": "betrivers|mlb|h2h|first3|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-15",
+      "last": "2026-10-15"
+    },
+    {
+      "cell": "betrivers|mlb|h2h|full|postseason",
+      "rows": 2,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-03",
+      "last": "2026-10-15"
+    },
+    {
+      "cell": "betrivers|mlb|spreads_alt|first5|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-15",
+      "last": "2026-10-15"
+    },
+    {
+      "cell": "betrivers|mlb|totals_alt|first5|postseason",
+      "rows": 3,
+      "events": 3,
+      "dates": 3,
+      "first": "2026-10-14",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "betrivers|mlb|totals|first1|postseason",
+      "rows": 2,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-04",
+      "last": "2026-10-12"
+    },
+    {
+      "cell": "betrivers|mlb|totals|full|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-12",
+      "last": "2026-10-12"
+    },
+    {
+      "cell": "betrivers|ncaaf|h2h|full|regular",
+      "rows": 29,
+      "events": 16,
+      "dates": 14,
+      "first": "2026-10-02",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "betrivers|ncaaf|h2h|h1|regular",
+      "rows": 2,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-08",
+      "last": "2026-10-15"
+    },
+    {
+      "cell": "betrivers|ncaaf|h2h|q1|regular",
+      "rows": 4,
+      "events": 4,
+      "dates": 2,
+      "first": "2026-10-03",
+      "last": "2026-10-08"
+    },
+    {
+      "cell": "betrivers|ncaaf|spreads|q1|regular",
+      "rows": 4,
+      "events": 4,
+      "dates": 4,
+      "first": "2026-10-03",
+      "last": "2026-10-20"
+    },
+    {
+      "cell": "betrivers|ncaaf|totals|full|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-05",
+      "last": "2026-10-05"
+    },
+    {
+      "cell": "betrivers|ncaaf|totals|h1|regular",
+      "rows": 2,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-10",
+      "last": "2026-10-21"
+    },
+    {
+      "cell": "betrivers|ncaaf|totals|q1|regular",
+      "rows": 2,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-17",
+      "last": "2026-10-20"
+    },
+    {
+      "cell": "betrivers|nfl|anytime td|full|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-06",
+      "last": "2026-10-06"
+    },
+    {
+      "cell": "betrivers|nfl|h2h|full|regular",
+      "rows": 6,
+      "events": 5,
+      "dates": 4,
+      "first": "2026-10-08",
+      "last": "2026-10-18"
+    },
+    {
+      "cell": "betrivers|nfl|h2h|h1|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-11",
+      "last": "2026-10-11"
+    },
+    {
+      "cell": "betrivers|nfl|h2h|q1|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-11",
+      "last": "2026-10-11"
+    },
+    {
+      "cell": "betrivers|nfl|interceptions|full|regular",
+      "rows": 19,
+      "events": 6,
+      "dates": 12,
+      "first": "2026-10-02",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "betrivers|nfl|passing tds|full|regular",
+      "rows": 7,
+      "events": 4,
+      "dates": 5,
+      "first": "2026-10-02",
+      "last": "2026-10-18"
+    },
+    {
+      "cell": "betrivers|nfl|receptions|full|regular",
+      "rows": 46,
+      "events": 19,
+      "dates": 13,
+      "first": "2026-10-03",
+      "last": "2026-10-18"
+    },
+    {
+      "cell": "betrivers|nhl|h2h|full|regular",
+      "rows": 6,
+      "events": 6,
+      "dates": 4,
+      "first": "2026-10-08",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "betrivers|nhl|spreads|full|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-17",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "betrivers|soccer|h2h|full|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-10",
+      "last": "2026-10-10"
+    },
+    {
+      "cell": "betrivers|soccer|totals|full|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-14",
+      "last": "2026-10-14"
+    },
+    {
+      "cell": "betrivers|wnba|player_assists|full|postseason",
+      "rows": 7,
+      "events": 6,
+      "dates": 5,
+      "first": "2026-10-02",
+      "last": "2026-10-21"
+    },
+    {
+      "cell": "betrivers|wnba|player_points_assists|full|postseason",
+      "rows": 2,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-21",
+      "last": "2026-10-21"
+    },
+    {
+      "cell": "betrivers|wnba|player_points_rebounds_assists|full|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-21",
+      "last": "2026-10-21"
+    },
+    {
+      "cell": "betrivers|wnba|player_points_rebounds|full|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-21",
+      "last": "2026-10-21"
+    },
+    {
+      "cell": "betrivers|wnba|player_points|full|postseason",
+      "rows": 10,
+      "events": 7,
+      "dates": 6,
+      "first": "2026-10-02",
+      "last": "2026-10-21"
+    },
+    {
+      "cell": "betrivers|wnba|player_rebounds|full|postseason",
+      "rows": 2,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-09",
+      "last": "2026-10-19"
+    },
+    {
+      "cell": "betrivers|wnba|player_threes|full|postseason",
+      "rows": 3,
+      "events": 3,
+      "dates": 2,
+      "first": "2026-10-07",
+      "last": "2026-10-09"
+    },
+    {
+      "cell": "betrivers|wnba|spreads_alt|full|postseason",
+      "rows": 24,
+      "events": 8,
+      "dates": 5,
+      "first": "2026-10-04",
+      "last": "2026-10-21"
+    },
+    {
+      "cell": "bovada|mlb|batter_hits_runs_rbis|full|postseason",
+      "rows": 8,
+      "events": 5,
+      "dates": 5,
+      "first": "2026-10-11",
+      "last": "2026-10-18"
+    },
+    {
+      "cell": "bovada|mlb|outs|full|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-18",
+      "last": "2026-10-18"
+    },
+    {
+      "cell": "bovada|mlb|spreads_alt|first5|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-15",
+      "last": "2026-10-15"
+    },
+    {
+      "cell": "bovada|mlb|spreads|full|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-13",
+      "last": "2026-10-13"
+    },
+    {
+      "cell": "bovada|mlb|strikeouts|full|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-07",
+      "last": "2026-10-07"
+    },
+    {
+      "cell": "bovada|mlb|totals_alt|first5|postseason",
+      "rows": 2,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-15",
+      "last": "2026-10-15"
+    },
+    {
+      "cell": "bovada|mlb|totals|full|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-14",
+      "last": "2026-10-14"
+    },
+    {
+      "cell": "bovada|mlb|walks_allowed|full|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-18",
+      "last": "2026-10-18"
+    },
+    {
+      "cell": "bovada|ncaaf|h2h|full|regular",
+      "rows": 8,
+      "events": 7,
+      "dates": 5,
+      "first": "2026-10-04",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "bovada|ncaaf|h2h|h1|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-10",
+      "last": "2026-10-10"
+    },
+    {
+      "cell": "bovada|ncaaf|spreads|full|regular",
+      "rows": 6,
+      "events": 5,
+      "dates": 3,
+      "first": "2026-10-10",
+      "last": "2026-10-13"
+    },
+    {
+      "cell": "bovada|ncaaf|spreads|q1|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-06",
+      "last": "2026-10-06"
+    },
+    {
+      "cell": "bovada|ncaaf|totals|full|regular",
+      "rows": 2,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-10",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "bovada|nfl|h2h|full|regular",
+      "rows": 7,
+      "events": 6,
+      "dates": 4,
+      "first": "2026-10-09",
+      "last": "2026-10-18"
+    },
+    {
+      "cell": "bovada|nfl|h2h|h1|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-11",
+      "last": "2026-10-11"
+    },
+    {
+      "cell": "bovada|nfl|interceptions|full|regular",
+      "rows": 5,
+      "events": 4,
+      "dates": 4,
+      "first": "2026-10-10",
+      "last": "2026-10-18"
+    },
+    {
+      "cell": "bovada|nfl|passing tds|full|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-11",
+      "last": "2026-10-11"
+    },
+    {
+      "cell": "bovada|nfl|passing yards|full|regular",
+      "rows": 9,
+      "events": 6,
+      "dates": 2,
+      "first": "2026-10-11",
+      "last": "2026-10-18"
+    },
+    {
+      "cell": "bovada|nfl|receiving yards|full|regular",
+      "rows": 27,
+      "events": 13,
+      "dates": 6,
+      "first": "2026-10-04",
+      "last": "2026-10-19"
+    },
+    {
+      "cell": "bovada|nfl|receptions|full|regular",
+      "rows": 10,
+      "events": 4,
+      "dates": 5,
+      "first": "2026-10-10",
+      "last": "2026-10-18"
+    },
+    {
+      "cell": "bovada|nfl|rushing attempts|full|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-18",
+      "last": "2026-10-18"
+    },
+    {
+      "cell": "bovada|nfl|rushing yards|full|regular",
+      "rows": 6,
+      "events": 6,
+      "dates": 2,
+      "first": "2026-10-08",
+      "last": "2026-10-11"
+    },
+    {
+      "cell": "bovada|nfl|totals|h1|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-11",
+      "last": "2026-10-11"
+    },
+    {
+      "cell": "bovada|nhl|h2h|full|regular",
+      "rows": 2,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-10",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "bovada|nhl|spreads|full|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-17",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "bovada|soccer|h2h|full|regular",
+      "rows": 5,
+      "events": 5,
+      "dates": 4,
+      "first": "2026-10-10",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "bovada|soccer|h2h|h1|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-11",
+      "last": "2026-10-11"
+    },
+    {
+      "cell": "bovada|soccer|spreads|full|regular",
+      "rows": 3,
+      "events": 3,
+      "dates": 3,
+      "first": "2026-10-11",
+      "last": "2026-10-18"
+    },
+    {
+      "cell": "bovada|soccer|totals|full|regular",
+      "rows": 20,
+      "events": 20,
+      "dates": 7,
+      "first": "2026-10-06",
+      "last": "2026-10-18"
+    },
+    {
+      "cell": "draftkings|mlb|batter_hits_runs_rbis|full|postseason",
+      "rows": 11,
+      "events": 5,
+      "dates": 4,
+      "first": "2026-10-10",
+      "last": "2026-10-15"
+    },
+    {
+      "cell": "draftkings|mlb|batter_hits|full|postseason",
+      "rows": 12,
+      "events": 8,
+      "dates": 6,
+      "first": "2026-10-03",
+      "last": "2026-10-15"
+    },
+    {
+      "cell": "draftkings|mlb|batter_rbis|full|postseason",
+      "rows": 9,
+      "events": 7,
+      "dates": 5,
+      "first": "2026-10-06",
+      "last": "2026-10-12"
+    },
+    {
+      "cell": "draftkings|mlb|batter_runs_scored|full|postseason",
+      "rows": 3,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-07",
+      "last": "2026-10-18"
+    },
+    {
+      "cell": "draftkings|mlb|earned_runs|full|postseason",
+      "rows": 5,
+      "events": 5,
+      "dates": 5,
+      "first": "2026-10-03",
+      "last": "2026-10-13"
+    },
+    {
+      "cell": "draftkings|mlb|hits_allowed|full|postseason",
+      "rows": 2,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-11",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "draftkings|mlb|totals_alt|first1|postseason",
+      "rows": 2,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-03",
+      "last": "2026-10-10"
+    },
+    {
+      "cell": "draftkings|mlb|totals_alt|first3|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-07",
+      "last": "2026-10-07"
+    },
+    {
+      "cell": "draftkings|mlb|walks_allowed|full|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-11",
+      "last": "2026-10-11"
+    },
+    {
+      "cell": "draftkings|ncaaf|h2h|full|regular",
+      "rows": 7,
+      "events": 6,
+      "dates": 5,
+      "first": "2026-10-04",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "draftkings|ncaaf|h2h|h1|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-08",
+      "last": "2026-10-08"
+    },
+    {
+      "cell": "draftkings|ncaaf|h2h|q1|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-03",
+      "last": "2026-10-03"
+    },
+    {
+      "cell": "draftkings|ncaaf|spreads|full|regular",
+      "rows": 5,
+      "events": 5,
+      "dates": 3,
+      "first": "2026-10-10",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "draftkings|ncaaf|totals|full|regular",
+      "rows": 3,
+      "events": 3,
+      "dates": 3,
+      "first": "2026-10-07",
+      "last": "2026-10-10"
+    },
+    {
+      "cell": "draftkings|ncaaf|totals|q1|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-17",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "draftkings|nfl|anytime td|full|regular",
+      "rows": 8,
+      "events": 6,
+      "dates": 3,
+      "first": "2026-10-05",
+      "last": "2026-10-07"
+    },
+    {
+      "cell": "draftkings|nfl|h2h|full|regular",
+      "rows": 6,
+      "events": 6,
+      "dates": 5,
+      "first": "2026-10-04",
+      "last": "2026-10-15"
+    },
+    {
+      "cell": "draftkings|nfl|interceptions|full|regular",
+      "rows": 8,
+      "events": 5,
+      "dates": 7,
+      "first": "2026-10-03",
+      "last": "2026-10-12"
+    },
+    {
+      "cell": "draftkings|nfl|passing tds|full|regular",
+      "rows": 2,
+      "events": 2,
+      "dates": 1,
+      "first": "2026-10-11",
+      "last": "2026-10-11"
+    },
+    {
+      "cell": "draftkings|nfl|receptions|full|regular",
+      "rows": 15,
+      "events": 10,
+      "dates": 7,
+      "first": "2026-10-04",
+      "last": "2026-10-18"
+    },
+    {
+      "cell": "draftkings|nfl|rushing attempts|full|regular",
+      "rows": 6,
+      "events": 3,
+      "dates": 5,
+      "first": "2026-10-03",
+      "last": "2026-10-11"
+    },
+    {
+      "cell": "draftkings|nfl|totals|h2|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-11",
+      "last": "2026-10-11"
+    },
+    {
+      "cell": "draftkings|nhl|assists|full|regular",
+      "rows": 23,
+      "events": 17,
+      "dates": 9,
+      "first": "2026-10-07",
+      "last": "2026-10-19"
+    },
+    {
+      "cell": "draftkings|nhl|points|full|regular",
+      "rows": 5,
+      "events": 5,
+      "dates": 5,
+      "first": "2026-10-11",
+      "last": "2026-10-18"
+    },
+    {
+      "cell": "draftkings|nhl|saves|full|regular",
+      "rows": 3,
+      "events": 3,
+      "dates": 2,
+      "first": "2026-10-13",
+      "last": "2026-10-20"
+    },
+    {
+      "cell": "draftkings|nhl|sog|full|preseason",
+      "rows": 3,
+      "events": 3,
+      "dates": 3,
+      "first": "2026-10-03",
+      "last": "2026-10-05"
+    },
+    {
+      "cell": "draftkings|nhl|sog|full|regular",
+      "rows": 48,
+      "events": 36,
+      "dates": 12,
+      "first": "2026-10-06",
+      "last": "2026-10-20"
+    },
+    {
+      "cell": "draftkings|soccer|h2h|full|regular",
+      "rows": 30,
+      "events": 29,
+      "dates": 7,
+      "first": "2026-10-10",
+      "last": "2026-10-18"
+    },
+    {
+      "cell": "draftkings|soccer|h2h|h1|regular",
+      "rows": 5,
+      "events": 5,
+      "dates": 2,
+      "first": "2026-10-10",
+      "last": "2026-10-11"
+    },
+    {
+      "cell": "draftkings|wnba|player_assists|full|postseason",
+      "rows": 2,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-07",
+      "last": "2026-10-21"
+    },
+    {
+      "cell": "draftkings|wnba|player_points|full|postseason",
+      "rows": 3,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-09",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "draftkings|wnba|player_threes|full|postseason",
+      "rows": 3,
+      "events": 3,
+      "dates": 3,
+      "first": "2026-10-09",
+      "last": "2026-10-21"
+    },
+    {
+      "cell": "fanatics|mlb|batter_hits|full|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-14",
+      "last": "2026-10-14"
+    },
+    {
+      "cell": "fanatics|mlb|batter_total_bases|full|postseason",
+      "rows": 2,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-07",
+      "last": "2026-10-15"
+    },
+    {
+      "cell": "fanatics|mlb|earned_runs|full|postseason",
+      "rows": 3,
+      "events": 3,
+      "dates": 3,
+      "first": "2026-10-03",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "fanatics|mlb|hits_allowed|full|postseason",
+      "rows": 2,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-04",
+      "last": "2026-10-07"
+    },
+    {
+      "cell": "fanatics|ncaaf|h2h|full|regular",
+      "rows": 6,
+      "events": 6,
+      "dates": 2,
+      "first": "2026-10-10",
+      "last": "2026-10-12"
+    },
+    {
+      "cell": "fanatics|ncaaf|spreads|full|regular",
+      "rows": 11,
+      "events": 9,
+      "dates": 3,
+      "first": "2026-10-04",
+      "last": "2026-10-10"
+    },
+    {
+      "cell": "fanatics|ncaaf|totals|full|regular",
+      "rows": 8,
+      "events": 8,
+      "dates": 3,
+      "first": "2026-10-09",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "fanatics|nfl|anytime td|full|regular",
+      "rows": 7,
+      "events": 5,
+      "dates": 2,
+      "first": "2026-10-06",
+      "last": "2026-10-07"
+    },
+    {
+      "cell": "fanatics|nfl|h2h|full|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-11",
+      "last": "2026-10-11"
+    },
+    {
+      "cell": "fanatics|nfl|passing attempts|full|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-11",
+      "last": "2026-10-11"
+    },
+    {
+      "cell": "fanatics|nfl|receiving yards|full|regular",
+      "rows": 2,
+      "events": 1,
+      "dates": 2,
+      "first": "2026-10-03",
+      "last": "2026-10-04"
+    },
+    {
+      "cell": "fanatics|nfl|receptions|full|regular",
+      "rows": 2,
+      "events": 1,
+      "dates": 2,
+      "first": "2026-10-10",
+      "last": "2026-10-11"
+    },
+    {
+      "cell": "fanatics|nfl|rushing attempts|full|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-11",
+      "last": "2026-10-11"
+    },
+    {
+      "cell": "fanatics|nfl|rushing yards|full|regular",
+      "rows": 5,
+      "events": 3,
+      "dates": 4,
+      "first": "2026-10-03",
+      "last": "2026-10-18"
+    },
+    {
+      "cell": "fanatics|soccer|h2h|full|regular",
+      "rows": 13,
+      "events": 13,
+      "dates": 5,
+      "first": "2026-10-10",
+      "last": "2026-10-18"
+    },
+    {
+      "cell": "fanatics|wnba|spreads_alt|full|postseason",
+      "rows": 12,
+      "events": 5,
+      "dates": 3,
+      "first": "2026-10-07",
+      "last": "2026-10-19"
+    },
+    {
+      "cell": "fanatics|wnba|totals_alt|full|postseason",
+      "rows": 27,
+      "events": 6,
+      "dates": 4,
+      "first": "2026-10-07",
+      "last": "2026-10-21"
+    },
+    {
+      "cell": "fanduel|mlb|h2h_3_way|first1|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-07",
+      "last": "2026-10-07"
+    },
+    {
+      "cell": "fanduel|mlb|spreads_alt|first5|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-17",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "fanduel|mlb|totals_alt|first1|postseason",
+      "rows": 2,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-03",
+      "last": "2026-10-07"
+    },
+    {
+      "cell": "fanduel|mlb|totals_alt|first5|postseason",
+      "rows": 2,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-14",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "fanduel|mlb|totals|first1|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-17",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "fanduel|mlb|totals|first5|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-15",
+      "last": "2026-10-15"
+    },
+    {
+      "cell": "fanduel|mlb|totals|full|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-15",
+      "last": "2026-10-15"
+    },
+    {
+      "cell": "fanduel|ncaaf|h2h|full|regular",
+      "rows": 17,
+      "events": 10,
+      "dates": 9,
+      "first": "2026-10-05",
+      "last": "2026-10-15"
+    },
+    {
+      "cell": "fanduel|ncaaf|h2h|q1|regular",
+      "rows": 7,
+      "events": 7,
+      "dates": 3,
+      "first": "2026-10-03",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "fanduel|ncaaf|h2h|q2|regular",
+      "rows": 2,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-03",
+      "last": "2026-10-10"
+    },
+    {
+      "cell": "fanduel|ncaaf|h2h|q3|regular",
+      "rows": 5,
+      "events": 5,
+      "dates": 2,
+      "first": "2026-10-03",
+      "last": "2026-10-10"
+    },
+    {
+      "cell": "fanduel|ncaaf|spreads|full|regular",
+      "rows": 17,
+      "events": 16,
+      "dates": 8,
+      "first": "2026-10-05",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "fanduel|ncaaf|spreads|q4|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-10",
+      "last": "2026-10-10"
+    },
+    {
+      "cell": "fanduel|ncaaf|totals|full|regular",
+      "rows": 5,
+      "events": 5,
+      "dates": 3,
+      "first": "2026-10-10",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "fanduel|ncaaf|totals|h1|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-03",
+      "last": "2026-10-03"
+    },
+    {
+      "cell": "fanduel|ncaaf|totals|q1|regular",
+      "rows": 7,
+      "events": 7,
+      "dates": 7,
+      "first": "2026-10-03",
+      "last": "2026-10-21"
+    },
+    {
+      "cell": "fanduel|ncaaf|totals|q3|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-02",
+      "last": "2026-10-02"
+    },
+    {
+      "cell": "fanduel|nfl|anytime td|full|regular",
+      "rows": 5,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-05",
+      "last": "2026-10-06"
+    },
+    {
+      "cell": "fanduel|nfl|h2h|full|regular",
+      "rows": 6,
+      "events": 6,
+      "dates": 4,
+      "first": "2026-10-08",
+      "last": "2026-10-18"
+    },
+    {
+      "cell": "fanduel|nfl|h2h|h1|regular",
+      "rows": 3,
+      "events": 3,
+      "dates": 1,
+      "first": "2026-10-11",
+      "last": "2026-10-11"
+    },
+    {
+      "cell": "fanduel|nfl|h2h|h2|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-08",
+      "last": "2026-10-08"
+    },
+    {
+      "cell": "fanduel|nfl|h2h|q1|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-11",
+      "last": "2026-10-11"
+    },
+    {
+      "cell": "fanduel|nfl|h2h|q2|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-18",
+      "last": "2026-10-18"
+    },
+    {
+      "cell": "fanduel|nfl|h2h|q3|regular",
+      "rows": 3,
+      "events": 3,
+      "dates": 3,
+      "first": "2026-10-08",
+      "last": "2026-10-18"
+    },
+    {
+      "cell": "fanduel|nfl|passing tds|full|regular",
+      "rows": 9,
+      "events": 4,
+      "dates": 5,
+      "first": "2026-10-03",
+      "last": "2026-10-10"
+    },
+    {
+      "cell": "fanduel|nfl|receptions|full|regular",
+      "rows": 8,
+      "events": 7,
+      "dates": 5,
+      "first": "2026-10-07",
+      "last": "2026-10-18"
+    },
+    {
+      "cell": "fanduel|nfl|rushing yards|full|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-11",
+      "last": "2026-10-11"
+    },
+    {
+      "cell": "fanduel|nfl|spreads|q2|regular",
+      "rows": 2,
+      "events": 2,
+      "dates": 1,
+      "first": "2026-10-18",
+      "last": "2026-10-18"
+    },
+    {
+      "cell": "fanduel|nfl|spreads|q3|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-11",
+      "last": "2026-10-11"
+    },
+    {
+      "cell": "fanduel|nfl|totals|h1|regular",
+      "rows": 3,
+      "events": 3,
+      "dates": 2,
+      "first": "2026-10-11",
+      "last": "2026-10-18"
+    },
+    {
+      "cell": "fanduel|nfl|totals|h2|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-18",
+      "last": "2026-10-18"
+    },
+    {
+      "cell": "fanduel|nfl|totals|q2|regular",
+      "rows": 4,
+      "events": 4,
+      "dates": 2,
+      "first": "2026-10-11",
+      "last": "2026-10-18"
+    },
+    {
+      "cell": "fanduel|nfl|totals|q3|regular",
+      "rows": 2,
+      "events": 2,
+      "dates": 1,
+      "first": "2026-10-11",
+      "last": "2026-10-11"
+    },
+    {
+      "cell": "fanduel|nhl|sog|full|preseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-03",
+      "last": "2026-10-03"
+    },
+    {
+      "cell": "fanduel|nhl|sog|full|regular",
+      "rows": 21,
+      "events": 18,
+      "dates": 8,
+      "first": "2026-10-06",
+      "last": "2026-10-21"
+    },
+    {
+      "cell": "fanduel|nhl|spreads|full|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-17",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "fanduel|soccer|h2h|full|regular",
+      "rows": 38,
+      "events": 33,
+      "dates": 7,
+      "first": "2026-10-10",
+      "last": "2026-10-18"
+    },
+    {
+      "cell": "fanduel|soccer|h2h|h1|regular",
+      "rows": 8,
+      "events": 8,
+      "dates": 3,
+      "first": "2026-10-10",
+      "last": "2026-10-12"
+    },
+    {
+      "cell": "fanduel|soccer|h2h|h2|regular",
+      "rows": 12,
+      "events": 12,
+      "dates": 3,
+      "first": "2026-10-10",
+      "last": "2026-10-12"
+    },
+    {
+      "cell": "fanduel|wnba|player_assists|full|postseason",
+      "rows": 5,
+      "events": 3,
+      "dates": 3,
+      "first": "2026-10-07",
+      "last": "2026-10-21"
+    },
+    {
+      "cell": "fanduel|wnba|player_points_rebounds|full|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-17",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "fanduel|wnba|player_points|full|postseason",
+      "rows": 4,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-09",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "fanduel|wnba|player_rebounds|full|postseason",
+      "rows": 9,
+      "events": 4,
+      "dates": 3,
+      "first": "2026-10-04",
+      "last": "2026-10-09"
+    },
+    {
+      "cell": "fanduel|wnba|player_threes|full|postseason",
+      "rows": 2,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-07",
+      "last": "2026-10-09"
+    },
+    {
+      "cell": "fanduel|wnba|totals_alt|full|postseason",
+      "rows": 2,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-07",
+      "last": "2026-10-07"
+    },
+    {
+      "cell": "kalshi|mlb|batter_hits_runs_rbis|full|postseason",
+      "rows": 32,
+      "events": 16,
+      "dates": 12,
+      "first": "2026-10-03",
+      "last": "2026-10-18"
+    },
+    {
+      "cell": "kalshi|mlb|batter_hits|full|postseason",
+      "rows": 23,
+      "events": 13,
+      "dates": 10,
+      "first": "2026-10-03",
+      "last": "2026-10-18"
+    },
+    {
+      "cell": "kalshi|mlb|batter_rbis|full|postseason",
+      "rows": 22,
+      "events": 10,
+      "dates": 6,
+      "first": "2026-10-05",
+      "last": "2026-10-18"
+    },
+    {
+      "cell": "kalshi|mlb|batter_total_bases|full|postseason",
+      "rows": 9,
+      "events": 9,
+      "dates": 8,
+      "first": "2026-10-03",
+      "last": "2026-10-15"
+    },
+    {
+      "cell": "kalshi|mlb|h2h|full|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-12",
+      "last": "2026-10-12"
+    },
+    {
+      "cell": "kalshi|mlb|outs|full|postseason",
+      "rows": 2,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-11",
+      "last": "2026-10-15"
+    },
+    {
+      "cell": "kalshi|mlb|spreads_alt|first5|postseason",
+      "rows": 8,
+      "events": 7,
+      "dates": 5,
+      "first": "2026-10-07",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "kalshi|mlb|strikeouts|full|postseason",
+      "rows": 2,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-12",
+      "last": "2026-10-14"
+    },
+    {
+      "cell": "kalshi|mlb|totals_alt|first5|postseason",
+      "rows": 6,
+      "events": 5,
+      "dates": 5,
+      "first": "2026-10-10",
+      "last": "2026-10-15"
+    },
+    {
+      "cell": "kalshi|mlb|totals|full|postseason",
+      "rows": 5,
+      "events": 5,
+      "dates": 5,
+      "first": "2026-10-06",
+      "last": "2026-10-15"
+    },
+    {
+      "cell": "kalshi|nba|h2h|full|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-21",
+      "last": "2026-10-21"
+    },
+    {
+      "cell": "kalshi|nba|player_assists|full|regular",
+      "rows": 4,
+      "events": 4,
+      "dates": 2,
+      "first": "2026-10-20",
+      "last": "2026-10-21"
+    },
+    {
+      "cell": "kalshi|nba|player_points|full|regular",
+      "rows": 9,
+      "events": 7,
+      "dates": 2,
+      "first": "2026-10-20",
+      "last": "2026-10-21"
+    },
+    {
+      "cell": "kalshi|nba|player_rebounds|full|regular",
+      "rows": 3,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-20",
+      "last": "2026-10-21"
+    },
+    {
+      "cell": "kalshi|nba|player_steals|full|regular",
+      "rows": 3,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-20",
+      "last": "2026-10-21"
+    },
+    {
+      "cell": "kalshi|nba|player_threes|full|regular",
+      "rows": 4,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-20",
+      "last": "2026-10-21"
+    },
+    {
+      "cell": "kalshi|nba|spreads_alt|full|regular",
+      "rows": 29,
+      "events": 10,
+      "dates": 2,
+      "first": "2026-10-20",
+      "last": "2026-10-21"
+    },
+    {
+      "cell": "kalshi|nba|spreads|full|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-21",
+      "last": "2026-10-21"
+    },
+    {
+      "cell": "kalshi|nba|totals_alt|full|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-21",
+      "last": "2026-10-21"
+    },
+    {
+      "cell": "kalshi|nba|totals|full|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-20",
+      "last": "2026-10-20"
+    },
+    {
+      "cell": "kalshi|ncaaf|h2h|full|regular",
+      "rows": 41,
+      "events": 26,
+      "dates": 11,
+      "first": "2026-10-04",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "kalshi|ncaaf|spreads|full|regular",
+      "rows": 26,
+      "events": 19,
+      "dates": 9,
+      "first": "2026-10-06",
+      "last": "2026-10-20"
+    },
+    {
+      "cell": "kalshi|ncaaf|totals|full|regular",
+      "rows": 9,
+      "events": 7,
+      "dates": 5,
+      "first": "2026-10-10",
+      "last": "2026-10-20"
+    },
+    {
+      "cell": "kalshi|nfl|passing tds|full|regular",
+      "rows": 8,
+      "events": 3,
+      "dates": 5,
+      "first": "2026-10-08",
+      "last": "2026-10-12"
+    },
+    {
+      "cell": "kalshi|nfl|receptions|full|regular",
+      "rows": 47,
+      "events": 18,
+      "dates": 6,
+      "first": "2026-10-03",
+      "last": "2026-10-12"
+    },
+    {
+      "cell": "kalshi|soccer|totals|full|regular",
+      "rows": 13,
+      "events": 12,
+      "dates": 5,
+      "first": "2026-10-06",
+      "last": "2026-10-12"
+    },
+    {
+      "cell": "kalshi|wnba|player_points|full|postseason",
+      "rows": 4,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-07",
+      "last": "2026-10-21"
+    },
+    {
+      "cell": "kalshi|wnba|player_rebounds|full|postseason",
+      "rows": 5,
+      "events": 3,
+      "dates": 3,
+      "first": "2026-10-09",
+      "last": "2026-10-21"
+    },
+    {
+      "cell": "kalshi|wnba|spreads_alt|full|postseason",
+      "rows": 4,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-21",
+      "last": "2026-10-21"
+    },
+    {
+      "cell": "kalshi|wnba|totals|full|postseason",
+      "rows": 2,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-21",
+      "last": "2026-10-21"
+    },
+    {
+      "cell": "novig|mlb|h2h|full|postseason",
+      "rows": 4,
+      "events": 4,
+      "dates": 4,
+      "first": "2026-10-03",
+      "last": "2026-10-12"
+    },
+    {
+      "cell": "novig|mlb|spreads|full|postseason",
+      "rows": 3,
+      "events": 3,
+      "dates": 2,
+      "first": "2026-10-04",
+      "last": "2026-10-05"
+    },
+    {
+      "cell": "novig|mlb|totals|first5|postseason",
+      "rows": 2,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-14",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "novig|mlb|totals|full|postseason",
+      "rows": 5,
+      "events": 4,
+      "dates": 3,
+      "first": "2026-10-04",
+      "last": "2026-10-07"
+    },
+    {
+      "cell": "novig|ncaaf|h2h|full|regular",
+      "rows": 124,
+      "events": 61,
+      "dates": 18,
+      "first": "2026-10-02",
+      "last": "2026-10-19"
+    },
+    {
+      "cell": "novig|ncaaf|spreads|full|regular",
+      "rows": 147,
+      "events": 75,
+      "dates": 18,
+      "first": "2026-10-02",
+      "last": "2026-10-21"
+    },
+    {
+      "cell": "novig|ncaaf|totals|full|regular",
+      "rows": 34,
+      "events": 16,
+      "dates": 11,
+      "first": "2026-10-02",
+      "last": "2026-10-13"
+    },
+    {
+      "cell": "novig|wnba|player_assists|full|postseason",
+      "rows": 8,
+      "events": 7,
+      "dates": 5,
+      "first": "2026-10-04",
+      "last": "2026-10-21"
+    },
+    {
+      "cell": "novig|wnba|player_points_rebounds_assists|full|postseason",
+      "rows": 3,
+      "events": 3,
+      "dates": 3,
+      "first": "2026-10-02",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "novig|wnba|player_points|full|postseason",
+      "rows": 13,
+      "events": 8,
+      "dates": 6,
+      "first": "2026-10-02",
+      "last": "2026-10-21"
+    },
+    {
+      "cell": "novig|wnba|player_rebounds_assists|full|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-09",
+      "last": "2026-10-09"
+    },
+    {
+      "cell": "novig|wnba|player_rebounds|full|postseason",
+      "rows": 4,
+      "events": 4,
+      "dates": 4,
+      "first": "2026-10-02",
+      "last": "2026-10-19"
+    },
+    {
+      "cell": "novig|wnba|player_threes|full|postseason",
+      "rows": 4,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-07",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "novig|wnba|spreads_alt|full|postseason",
+      "rows": 2,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-04",
+      "last": "2026-10-07"
+    },
+    {
+      "cell": "novig|wnba|spreads|full|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-07",
+      "last": "2026-10-07"
+    },
+    {
+      "cell": "novig|wnba|spreads|h1|postseason",
+      "rows": 2,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-17",
+      "last": "2026-10-21"
+    },
+    {
+      "cell": "novig|wnba|totals_alt|full|postseason",
+      "rows": 6,
+      "events": 4,
+      "dates": 3,
+      "first": "2026-10-04",
+      "last": "2026-10-09"
+    },
+    {
+      "cell": "pinnacle|ncaaf|h2h|full|regular",
+      "rows": 4,
+      "events": 4,
+      "dates": 3,
+      "first": "2026-10-05",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "pinnacle|ncaaf|spreads|full|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-10",
+      "last": "2026-10-10"
+    },
+    {
+      "cell": "pinnacle|ncaaf|totals|full|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-15",
+      "last": "2026-10-15"
+    },
+    {
+      "cell": "pinnacle|nhl|assists|full|regular",
+      "rows": 28,
+      "events": 17,
+      "dates": 8,
+      "first": "2026-10-06",
+      "last": "2026-10-21"
+    },
+    {
+      "cell": "pinnacle|nhl|points|full|regular",
+      "rows": 2,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-17",
+      "last": "2026-10-20"
+    },
+    {
+      "cell": "pinnacle|nhl|sog|full|regular",
+      "rows": 14,
+      "events": 14,
+      "dates": 9,
+      "first": "2026-10-06",
+      "last": "2026-10-19"
+    },
+    {
+      "cell": "polymarket|mlb|batter_hits_runs_rbis|full|postseason",
+      "rows": 10,
+      "events": 6,
+      "dates": 5,
+      "first": "2026-10-07",
+      "last": "2026-10-15"
+    },
+    {
+      "cell": "polymarket|mlb|batter_hits|full|postseason",
+      "rows": 12,
+      "events": 7,
+      "dates": 6,
+      "first": "2026-10-04",
+      "last": "2026-10-12"
+    },
+    {
+      "cell": "polymarket|mlb|batter_home_runs|full|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-06",
+      "last": "2026-10-06"
+    },
+    {
+      "cell": "polymarket|mlb|batter_total_bases|full|postseason",
+      "rows": 2,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-15",
+      "last": "2026-10-15"
+    },
+    {
+      "cell": "polymarket|mlb|earned_runs|full|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-12",
+      "last": "2026-10-12"
+    },
+    {
+      "cell": "polymarket|mlb|h2h|full|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-07",
+      "last": "2026-10-07"
+    },
+    {
+      "cell": "polymarket|mlb|totals|full|postseason",
+      "rows": 2,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-06",
+      "last": "2026-10-07"
+    },
+    {
+      "cell": "polymarket|nba|h2h|full|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-21",
+      "last": "2026-10-21"
+    },
+    {
+      "cell": "polymarket|nba|totals|full|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-20",
+      "last": "2026-10-20"
+    },
+    {
+      "cell": "polymarket|ncaaf|h2h|full|regular",
+      "rows": 17,
+      "events": 11,
+      "dates": 5,
+      "first": "2026-10-10",
+      "last": "2026-10-14"
+    },
+    {
+      "cell": "polymarket|ncaaf|spreads|full|regular",
+      "rows": 6,
+      "events": 4,
+      "dates": 4,
+      "first": "2026-10-06",
+      "last": "2026-10-10"
+    },
+    {
+      "cell": "polymarket|ncaaf|totals|full|regular",
+      "rows": 15,
+      "events": 8,
+      "dates": 6,
+      "first": "2026-10-05",
+      "last": "2026-10-15"
+    },
+    {
+      "cell": "polymarket|nfl|h2h|full|regular",
+      "rows": 10,
+      "events": 10,
+      "dates": 4,
+      "first": "2026-10-08",
+      "last": "2026-10-18"
+    },
+    {
+      "cell": "polymarket|nhl|totals|full|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-20",
+      "last": "2026-10-20"
+    },
+    {
+      "cell": "polymarket|soccer|h2h|full|regular",
+      "rows": 5,
+      "events": 5,
+      "dates": 2,
+      "first": "2026-10-10",
+      "last": "2026-10-11"
+    },
+    {
+      "cell": "polymarket|soccer|totals|full|regular",
+      "rows": 10,
+      "events": 10,
+      "dates": 3,
+      "first": "2026-10-10",
+      "last": "2026-10-12"
+    },
+    {
+      "cell": "polymarket|wnba|player_points|full|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-09",
+      "last": "2026-10-09"
+    },
+    {
+      "cell": "polymarket|wnba|totals|full|postseason",
+      "rows": 2,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-21",
+      "last": "2026-10-21"
+    },
+    {
+      "cell": "prophetx|mlb|h2h|first5|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-05",
+      "last": "2026-10-05"
+    },
+    {
+      "cell": "prophetx|mlb|h2h|full|postseason",
+      "rows": 4,
+      "events": 4,
+      "dates": 4,
+      "first": "2026-10-03",
+      "last": "2026-10-13"
+    },
+    {
+      "cell": "prophetx|mlb|spreads_alt|first5|postseason",
+      "rows": 2,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-11",
+      "last": "2026-10-14"
+    },
+    {
+      "cell": "prophetx|mlb|totals_alt|first5|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-15",
+      "last": "2026-10-15"
+    },
+    {
+      "cell": "prophetx|mlb|totals|full|postseason",
+      "rows": 12,
+      "events": 11,
+      "dates": 11,
+      "first": "2026-10-03",
+      "last": "2026-10-18"
+    },
+    {
+      "cell": "prophetx|ncaaf|h2h|full|regular",
+      "rows": 70,
+      "events": 43,
+      "dates": 15,
+      "first": "2026-10-02",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "prophetx|ncaaf|spreads|full|regular",
+      "rows": 504,
+      "events": 120,
+      "dates": 20,
+      "first": "2026-10-02",
+      "last": "2026-10-21"
+    },
+    {
+      "cell": "prophetx|ncaaf|totals|full|regular",
+      "rows": 202,
+      "events": 68,
+      "dates": 16,
+      "first": "2026-10-02",
+      "last": "2026-10-21"
+    },
+    {
+      "cell": "prophetx|wnba|player_assists|full|postseason",
+      "rows": 3,
+      "events": 3,
+      "dates": 3,
+      "first": "2026-10-07",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "prophetx|wnba|player_points_rebounds_assists|full|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-09",
+      "last": "2026-10-09"
+    },
+    {
+      "cell": "prophetx|wnba|player_points|full|postseason",
+      "rows": 5,
+      "events": 5,
+      "dates": 3,
+      "first": "2026-10-02",
+      "last": "2026-10-09"
+    },
+    {
+      "cell": "prophetx|wnba|player_rebounds_assists|full|postseason",
+      "rows": 2,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-07",
+      "last": "2026-10-07"
+    },
+    {
+      "cell": "prophetx|wnba|player_rebounds|full|postseason",
+      "rows": 5,
+      "events": 5,
+      "dates": 5,
+      "first": "2026-10-02",
+      "last": "2026-10-21"
+    },
+    {
+      "cell": "prophetx|wnba|player_threes|full|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-04",
+      "last": "2026-10-04"
+    },
+    {
+      "cell": "prophetx|wnba|spreads_alt|full|postseason",
+      "rows": 2,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-09",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "prophetx|wnba|spreads|full|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-17",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "prophetx|wnba|totals_alt|full|postseason",
+      "rows": 3,
+      "events": 3,
+      "dates": 3,
+      "first": "2026-10-04",
+      "last": "2026-10-09"
+    },
+    {
+      "cell": "prophetx|wnba|totals|full|postseason",
+      "rows": 2,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-04",
+      "last": "2026-10-09"
+    },
+    {
+      "cell": "williamhill_us|mlb|batter_total_bases|full|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-05",
+      "last": "2026-10-05"
+    },
+    {
+      "cell": "williamhill_us|mlb|h2h|full|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-07",
+      "last": "2026-10-07"
+    },
+    {
+      "cell": "williamhill_us|mlb|spreads|full|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-14",
+      "last": "2026-10-14"
+    },
+    {
+      "cell": "williamhill_us|mlb|totals|full|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-12",
+      "last": "2026-10-12"
+    },
+    {
+      "cell": "williamhill_us|ncaaf|h2h|full|regular",
+      "rows": 8,
+      "events": 8,
+      "dates": 4,
+      "first": "2026-10-05",
+      "last": "2026-10-15"
+    },
+    {
+      "cell": "williamhill_us|ncaaf|spreads|full|regular",
+      "rows": 12,
+      "events": 9,
+      "dates": 7,
+      "first": "2026-10-02",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "williamhill_us|ncaaf|totals|full|regular",
+      "rows": 2,
+      "events": 2,
+      "dates": 2,
+      "first": "2026-10-08",
+      "last": "2026-10-10"
+    },
+    {
+      "cell": "williamhill_us|ncaaf|totals|h1|regular",
+      "rows": 3,
+      "events": 3,
+      "dates": 3,
+      "first": "2026-10-08",
+      "last": "2026-10-17"
+    },
+    {
+      "cell": "williamhill_us|ncaaf|totals|q1|regular",
+      "rows": 2,
+      "events": 2,
+      "dates": 1,
+      "first": "2026-10-10",
+      "last": "2026-10-10"
+    },
+    {
+      "cell": "williamhill_us|nfl|h2h|full|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-15",
+      "last": "2026-10-15"
+    },
+    {
+      "cell": "williamhill_us|nfl|spreads|full|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-16",
+      "last": "2026-10-16"
+    },
+    {
+      "cell": "williamhill_us|nfl|totals|full|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-11",
+      "last": "2026-10-11"
+    },
+    {
+      "cell": "williamhill_us|nhl|totals|full|regular",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-06",
+      "last": "2026-10-06"
+    },
+    {
+      "cell": "williamhill_us|wnba|player_points|full|postseason",
+      "rows": 1,
+      "events": 1,
+      "dates": 1,
+      "first": "2026-10-09",
+      "last": "2026-10-09"
+    },
+    {
+      "cell": "williamhill_us|wnba|totals|full|postseason",
+      "rows": 2,
+      "events": 2,
+      "dates": 1,
+      "first": "2026-10-09",
+      "last": "2026-10-09"
+    }
+  ]
+}

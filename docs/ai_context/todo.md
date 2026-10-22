@@ -1,5 +1,17 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#728` — **The live book is nearly invisible to every fitter that derives `fair` from `ev_pct`: of 626 settled LIVE orders, 420 carry no `ev_pct` and 131 no price -- only 74 usable** — FOUND 2026-10-22, lane `sim-stake-earned-profile` (lead, not taken), session bde77672
+- Measured on the fleet ledger read 2026-10-22T16:46Z (12,175 orders, 675 live). Every fitter using the sizer's derivation (`fit_staked_probability`, `fit_probability_calibration`, `ev_overstatement_decomp`) drops these orders silently under a named reason. The 74 that survive are mostly kalshi nba spreads_alt (29) and nba props.
+- Next step: find which live write path omits `ev_pct` (ladder? exits? pre-`#722` builders?) BY TIME WINDOW, since a missing key is an old builder (learnings 2026-10-22, "KEY ABSENT").
+
+### `#727` — **No staked-probability cell earns stake yet: fitted per venue x sport x market x segment x phase on the fleet ledger, 0 of 321 cells reach the 200-held-out floor, and the candidate profile is EMPTY (nothing published, $0.00 stake change). Every measurable cell picked beta 0; the reader cannot see venue or phase** — lane `sim-stake-earned-profile`, session bde77672; `.syndicate/findings_2026-10-22_sim_stake_earned_profile.md`
+- **Result** (pre-registered in `a61332bf`): 2,959 usable settled portfolio rows / 427 events, 10-02..10-21 (2,885 paper, 74 live). 195 cells below the floor and 126 with no chronological split; the largest held-out set is 189 rows. In 7 diagnostic cells (never written), the train fit picked beta 0 in all 7 and the raw sim lost on the hold-out in 6 of 7, with no CI excluding 0. Venue-pooled ncaaf spreads regular (251 held out / 53 events) is market_only, beta 0 [0, 0.65], delta beta1 -0.0032 [-0.0236, +0.0164].
+- **Refit:** about 2026-11-01, after the 10-31 NCAAF slate settles. Run `py -3 scripts/fit_staked_probability_cells.py coverage` on the fleet venv first. Only prophetx/ncaaf/spreads/regular is close (504 settled + 81 pending, ~667 needed).
+- **User decision owed (findings s4/s5):**
+  - Fit grain: per venue (as asked; most cells never fill) vs venues pooled with phases apart.
+  - Either way, the sizer's reader (`staked_probability_profile.lookup`, 3-part key) must learn the season phase before ANY phase-correct cell can apply. That needs a loan from lane `sim-stake-unfitted-market-only` and the `portfolio_commit` seam.
+- **Tooling fix in the harness:** it refuses (exit 4) when the ledger's keyvalue read fails. With the WSL system `python3` (no `redis`), that failure read as an empty live document, and a fit ran on the archive alone (findings s7).
+
 ### `#726` — **Interval charts have no NFL or NHL intervals to chart: NFL quarter/half lines are not captured (`SYNDICATE_NFL_SEGMENT_MARKETS` absent = OFF since 10-17) and no live fetcher requests NHL period lines** — FOUND 2026-10-22, lane `board-interval-charts` (BLOCKED on this), session 9e18a0e7
 - NFL: a USER decision -- turning segment capture on costs credits (q1-q4/h1/h2 markets per game per pull); the board, the charts and live segment actuals all wait on it. NHL: a producer to build (p1-p3 totals) -- only `scripts/backtest_nhl_game_lines.py:330` asks for `*_p1` today. The chart side is ready: an offline replay of the cache gives both sides for NFL 84/84 and NHL 36/36 game x segment pairs.
 

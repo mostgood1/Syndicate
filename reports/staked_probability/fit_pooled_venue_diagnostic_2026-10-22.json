@@ -1,0 +1,194 @@
+{
+  "cells": {
+    "*|ncaaf|h2h|full|regular": {
+      "beta_ci": [
+        0.0,
+        1.0
+      ],
+      "beta_fit": 0.0,
+      "brier_beta0": 0.22174123231236745,
+      "brier_beta1": 0.23765121410880144,
+      "brier_fit": 0.22174123231236745,
+      "delta_beta1": -0.015909981796433992,
+      "delta_beta1_ci": [
+        -0.038684073711233495,
+        0.003910785011229435
+      ],
+      "delta_fit": 0.0,
+      "delta_fit_ci": [
+        0.0,
+        0.0
+      ],
+      "diagnostic": true,
+      "n_events": 93,
+      "n_rows": 344,
+      "n_test": 119,
+      "n_test_events": 41,
+      "n_train": 225,
+      "n_train_events": 74,
+      "test_dates": [
+        "2026-10-13",
+        "2026-10-19"
+      ],
+      "train_dates": [
+        "2026-10-02",
+        "2026-10-12"
+      ],
+      "verdict": "refused_n_test_below_floor"
+    },
+    "*|ncaaf|spreads|full|regular": {
+      "beta_ci": [
+        0.0,
+        0.65
+      ],
+      "beta_fit": 0.0,
+      "brier_beta0": 0.2498349769585119,
+      "brier_beta1": 0.25306473280898834,
+      "brier_fit": 0.2498349769585119,
+      "delta_beta1": -0.00322975585047644,
+      "delta_beta1_ci": [
+        -0.023558961823429803,
+        0.01642097594941871
+      ],
+      "delta_fit": 0.0,
+      "delta_fit_ci": [
+        0.0,
+        0.0
+      ],
+      "n_events": 139,
+      "n_rows": 759,
+      "n_test": 251,
+      "n_test_events": 53,
+      "n_train": 508,
+      "n_train_events": 113,
+      "test_dates": [
+        "2026-10-13",
+        "2026-10-21"
+      ],
+      "train_dates": [
+        "2026-10-02",
+        "2026-10-12"
+      ],
+      "verdict": "market_only"
+    },
+    "*|ncaaf|totals|full|regular": {
+      "beta_ci": [
+        0.0,
+        1.0
+      ],
+      "beta_fit": 0.0,
+      "brier_beta0": 0.24589382022622225,
+      "brier_beta1": 0.25476666875068815,
+      "brier_fit": 0.24589382022622225,
+      "delta_beta1": -0.008872848524465904,
+      "delta_beta1_ci": [
+        -0.03871235581841998,
+        0.01687683179930603
+      ],
+      "delta_fit": 0.0,
+      "delta_fit_ci": [
+        0.0,
+        0.0
+      ],
+      "diagnostic": true,
+      "n_events": 85,
+      "n_rows": 293,
+      "n_test": 101,
+      "n_test_events": 35,
+      "n_train": 192,
+      "n_train_events": 63,
+      "test_dates": [
+        "2026-10-13",
+        "2026-10-21"
+      ],
+      "train_dates": [
+        "2026-10-02",
+        "2026-10-12"
+      ],
+      "verdict": "refused_n_test_below_floor"
+    },
+    "*|nfl|receptions|full|regular": {
+      "beta_ci": [
+        0.0,
+        1.0
+      ],
+      "beta_fit": 0.0,
+      "brier_beta0": 0.239592744576825,
+      "brier_beta1": 0.23996404269772367,
+      "brier_fit": 0.239592744576825,
+      "delta_beta1": -0.0003712981208986721,
+      "delta_beta1_ci": [
+        -0.02281721517426231,
+        0.021999308748754446
+      ],
+      "delta_fit": 0.0,
+      "delta_fit_ci": [
+        0.0,
+        0.0
+      ],
+      "diagnostic": true,
+      "n_events": 40,
+      "n_rows": 175,
+      "n_test": 95,
+      "n_test_events": 26,
+      "n_train": 80,
+      "n_train_events": 26,
+      "test_dates": [
+        "2026-10-11",
+        "2026-10-18"
+      ],
+      "train_dates": [
+        "2026-10-02",
+        "2026-10-10"
+      ],
+      "verdict": "refused_n_test_below_floor"
+    },
+    "*|nhl|assists|full|regular": {
+      "beta_ci": [
+        0.0,
+        0.0
+      ],
+      "beta_fit": 0.0,
+      "brier_beta0": 0.19948005307898825,
+      "brier_beta1": 0.20622265699943135,
+      "brier_fit": 0.19948005307898825,
+      "delta_beta1": -0.0067426039204430965,
+      "delta_beta1_ci": [
+        -0.023274332477500295,
+        0.009260343412331286
+      ],
+      "delta_fit": 0.0,
+      "delta_fit_ci": [
+        0.0,
+        0.0
+      ],
+      "diagnostic": true,
+      "n_events": 37,
+      "n_rows": 76,
+      "n_test": 56,
+      "n_test_events": 21,
+      "n_train": 20,
+      "n_train_events": 16,
+      "test_dates": [
+        "2026-10-17",
+        "2026-10-21"
+      ],
+      "train_dates": [
+        "2026-10-06",
+        "2026-10-16"
+      ],
+      "verdict": "refused_n_test_below_floor"
+    }
+  },
+  "dropped": {
+    "model_out_of_range": 2,
+    "no_ev_pct": 420,
+    "no_model_edge_pct": 1243,
+    "no_price": 131,
+    "not_portfolio_book": 6222,
+    "push": 29,
+    "unsettled": 1169
+  },
+  "fitted_on": "2026-10-22T16:46:45Z",
+  "source": "execution_ledger:/home/amyn/syndicate-prod/data/reports/intelligence/execution_ledger.json"
+}
