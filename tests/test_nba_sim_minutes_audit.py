@@ -59,3 +59,33 @@ def test_replay_rule_verdicts():
     assert a.replay_rule(better, min_rows=500)["verdict"] == "INCONCLUSIVE"
     # Sides where ON did not engage never enter the primary.
     assert a.replay_rule([_side("X", [5.0], engaged=False)])["primary"][3] == 0
+
+
+def test_arms_scores_only_engaged_sides_and_reads_points_truth(tmp_path):
+    import json
+
+    date = "2026-10-21"
+    truth = tmp_path / "truth" / "processed"
+    (truth / "rotation_stints").mkdir(parents=True)
+    (truth / "rotation_stints" / f"player_checks_{date}.csv").write_text(
+        "season_type,team,player_name,starter,box_minutes\n"
+        "regular,BOS,A Star,1,36\nregular,BOS,B Bench,0,18\nregular,NYK,C One,1,30\n", encoding="utf-8")
+    (truth / "player_logs.csv").write_text("GAME_DATE,TEAM_ABBREVIATION,PLAYER_NAME,PTS\n"
+                                           f"{date},BOS,A Star,30\n{date},BOS,B Bench,8\n{date},NYK,C One,20\n", encoding="utf-8")
+
+    def sim(a_min, a_pts):
+        return {"players": {"home": [{"player_name": "A Star", "min_mean": a_min, "pts_mean": a_pts, "pts_sd": 6.0},
+                                     {"player_name": "B Bench", "min_mean": 48 - a_min, "pts_mean": 10.0, "pts_sd": 4.0},
+                                     {"player_name": "D Dnp", "min_mean": 5.0, "pts_mean": 2.0, "pts_sd": 2.0}],
+                            "away": [{"player_name": "C One", "min_mean": 30.0, "pts_mean": 19.0, "pts_sd": 5.0}]}}
+
+    for arm, s in (("off", sim(28.0, 22.0)), ("on", sim(33.0, 26.0))):
+        d = tmp_path / arm
+        d.mkdir()
+        (d / f"smart_sim_{date}_BOS_NYK.json").write_text(json.dumps(s), encoding="utf-8")
+    res = a.arms(tmp_path / "off", tmp_path / "on", truth, tmp_path / "raw", date)
+    assert (res["engaged_sides"], res["sides"]) == (1, 2)          # NYK identical in both arms -> not engaged
+    m, lo, hi, n = res["points_paired"]
+    assert n == 2                                                   # A Star + B Bench (D Dnp did not play)
+    assert m == pytest.approx(((4 - 8) + 0) / 2)                    # |26-30|-|22-30| = -4; bench unchanged
+    assert res["secondary_verdict"] == "NOT FAIL"

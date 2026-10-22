@@ -14,7 +14,7 @@ The fleet code is `09e86a9d`. `git diff 09e86a9d origin/main` is empty for every
 python scripts/nba_sim_minutes_audit.py --processed /home/amyn/syndicate-prod/data/nba_source/data/processed --since 2026-10-20
 ```
 
-**Coverage (printed first by the tool, read 2026-10-22 ~9:30 AM CT):**
+**Coverage (printed first by the tool, run 2026-10-22 9:27:52 AM CT / 14:27:52Z):**
 
 | date | sims | box teams / rows | sides joined | built after tip | pre-tip prop rows | players with a points line |
 |---|---|---|---|---|---|---|
@@ -159,9 +159,15 @@ Javon Small 17.0, Jett Howard 13.8, Isaiah Stewart 10.1. `_clean_injury_player_n
 when `_looks_noisy_player_name` (`:162`) flags it. Its token list (`:86`) has no WAY, TENDINOPATHY, SUBLUXATION,
 BURSITIS, TEAR or BRUISE.
 
-*Wrong player marked OUT (hypothesis, not yet reproduced on a PDF).* `STATUS_TOKS` (`:1050`) lacks "Available". If a
-player marked Available is followed by one marked Out, the parser gives the first player the second player's OUT, and
-the second player's row disappears. The 10-21 logs show exactly that swap:
+*Wrong player marked OUT (reproduced through the real `_parse_pdf_rows` on a synthetic token stream, with `PdfReader`
+stubbed; not yet on the 10-21 PDF).* `STATUS_TOKS` (`:1050`) lacks "Available".
+- The token stream `Curry, Stephen Available Moody, Moses Out Injury/Illness - Left Calf; Strain` parses to ONE row:
+  player `Stephen Available Moody, Moses Curry`, status OUT. Moody's own row is gone.
+- `_clean_injury_player_names` then flags it noisy (AVAILABLE, a comma) and maps it by last name + first initial to
+  Stephen Curry.
+- A wrapped `G League - Two-` / `Way` reason yields `Isaiah Way Two- Stewart` the same way.
+
+The 10-21 logs show exactly that swap:
 - `GSW:+STEPHEN CURRY/-MOSES MOODY`: Curry was excluded and played 21 min; Moody was simulated for 32.9 min and did
   not play.
 - `CHI:+LEONARD MILLER,TOBE AWAKA,ZACH COLLINS/-...NIC CLAXTON`: Miller played 26, Awaka 14, Collins 9; Claxton was
@@ -339,3 +345,113 @@ minutes:
 ## Results
 
 (appended below this line, never above it)
+
+### DEVELOPMENT minutes reading, 10-21 (`--replay`): PASS in development; does not count toward enabling
+
+`[pre-registration 8301efcd committed 9:47:54 AM CT; run 1 written 9:48:26 AM CT (14:48:26Z), run 2 9:50:35 AM CT on a
+bridge file byte-identical to 4b12deca, committed 9:55:44]`
+
+**Run 1, on 8301efcd as committed.**
+- Primary -0.570 [-1.268, +0.123], n=163 over 16 of 22 sides: INCONCLUSIVE.
+- Run 1 exposed a matching bug, not a design change. The priced set was keyed by `_norm_name_key`, which keeps
+  periods and apostrophes. So props_predictions' "Jabari Smith Jr." / "Jaime Jaquez Jr." / "De'Anthony Melton" never
+  matched the books' "Jabari Smith Jr" / "Jaime Jaquez Jr" / "DeAnthony Melton". MIL logged 4 priced instead of 6 and
+  did not engage; HOU logged 5 of 6.
+- Fixed in 4b12deca: both sides use the orchestrator's `normalize_player_name_key`, with a regression test. That
+  implements the registered design ("players with a posted line"). Both runs are reported.
+
+**Run 2, on the 4b12deca bridge (the code the verdicts are read on).**
+- Production frames: 22/22 sides on the derive path; the OFF replay reproduces production `_sim_min` with max deviation
+  **0.000** on all 22.
+- **17 of 22 sides engage.** The other 5 are CHA, DAL, LAC and SAC (thin pools whose base sums below 240, so there is
+  nothing to shrink) and GSW (4 priced).
+
+| (played pool players, engaged sides) | OFF | ON | paired ON - OFF |
+|---|---|---|---|
+| **PRIMARY** \|err\|, n=173 | MAE 6.877 [6.03, 7.82] | MAE 5.981 [5.27, 6.73] | **-0.895 [-1.552, -0.278] -> PASS (development)** |
+| priced, n=110 | | | -1.444 [-2.307, -0.695] |
+| unpriced, n=63 | | | +0.062 [-0.871, +1.048] |
+| box starters, n=77 | bias -5.53 [-7.73, -3.17] | bias -1.11 [-2.73, +0.56] | -2.557 [-3.629, -1.474] |
+| bench, n=96 | bias +1.11 [-0.63, +2.67] | bias +0.07 [-1.35, +1.34] | |
+| DNP sim minutes per engaged side | 42.7 | 28.5 | |
+
+Per side (paired mean):
+- BKN -4.07, MIN -2.90, WAS -2.33, IND -2.22, LAL -1.56, MIL -1.51, UTA -1.36, PHX -0.71, ORL -0.71, MIA -0.61,
+  NOP -0.45, MEM -0.05.
+- ATL +0.08, TOR +0.24, CHI +0.42, HOU +1.12, POR +1.21.
+
+**Where ON did nothing.**
+- The DNP minutes it cannot remove belong to OUT players with broken names on sides that were all-but-unpriced:
+  CHI 75.5 -> 74.0 and POR 51.0 -> 47.7.
+- It also does nothing about the starters missing from thin pools (DAL, LAC, SAC: the no-history stand-ins of `#714`).
+
+**Reading.** On the one slate the design was drawn from, the priced-first shrink:
+- takes 14 of 43 DNP minutes per side off players who did not play;
+- removes ~80% of the starter compression;
+- cuts played-player minutes MAE by 0.9;
+- leaves unpriced players who played no worse.
+
+This is development evidence only. The CONFIRMATORY reading is owed on slates after 10-21.
+
+### DEVELOPMENT points secondary, 10-21 scratch worker arms: NOT FAIL
+
+`[arms OFF 14:53:18-14:58:38Z, ON 14:58:41-15:03:18Z (9:53-10:03 AM CT); scored 10:03:38 AM CT (15:03:38Z)]`
+
+**Substrate.**
+- Both arms are copies of `/home/amyn/nba_minutes_scratch/BASE`: the `#714` lane's truth-free tree (fleet data 8:28 PM CT
+  10-20), with the raw props file replaced by 10-21's last pre-tip snapshot (22:33:56Z, 43,526 rows, 155 players; first
+  tip 23:00Z).
+- Code: the bridge as 4b12deca.
+- Run: the real `_smart_sim_run_date_local` under `env -i`, with only `SYNDICATE_DATA_ROOT`=arm,
+  `SYNDICATE_NBA_NO_HISTORY_STANDINS=off` and the switch set. `PYTHONHASHSEED=0`, seed 20261021, `n_sims` 500,
+  workers 2, overwrite.
+- Both arms wrote 11/11, 0 failures. The ON run logged 19 `NBA_SIM_MINUTES_PRICED_FIRST ... engaged=1` lines.
+- **Production untouched:** md5 and mtime of the 11 production `smart_sim_2026-10-21_*.json` and 11
+  `engine_inputs/2026-10-21/*.pkl` match the pre-run fingerprints.
+- Truth: fleet `player_checks_2026-10-21.csv` (minutes) and `player_logs.csv` `GAME_DATE` 10-21 (points).
+- Tool: `scripts/nba_sim_minutes_audit.py --arms`.
+
+19 of 22 sides engaged. This tree's pools were built 10-20 evening, so they differ from production's.
+
+| played pool players, engaged sides | value |
+|---|---|
+| **SECONDARY: paired \|ON-actual\| - \|OFF-actual\|, served pts (n=196)** | **-0.076 [-0.321, +0.140] -> NOT FAIL** |
+| the same, priced players (n=124) | +0.023 [-0.330, +0.378] |
+| minutes, paired (n=196) | -0.802 [-1.597, -0.053] (agrees with the replay on another vintage) |
+| starters' points bias | -2.57 [-3.68, -1.35] -> -0.72 [-1.83, +0.50] |
+| starters' served pts - points line (n=88) | -1.94 [-2.45, -1.43] -> **-0.09** [-0.71, +0.47] |
+| bench served pts - points line (n=36) | +0.95 [+0.26, +1.67] -> **+2.55** [+1.77, +3.30] |
+| served pts width IQR(z)/1.349, priced (n=124) | 1.028 -> 1.020 |
+
+**By group (means; minutes and points bias = sim - actual):**
+
+| group | n | min bias off -> on | min \|err\| off -> on | pts bias off -> on | pts \|err\| off -> on |
+|---|---|---|---|---|---|
+| priced starters | 88 | -6.01 -> **-1.05** | 6.97 -> **4.44** | -2.57 -> -0.72 | 5.88 -> 5.61 |
+| priced bench | 36 | -0.34 -> **+4.71** | 4.63 -> 6.07 | +2.04 -> +3.63 | 4.21 -> 4.97 |
+| unpriced bench | 72 | +0.72 -> -3.51 | 7.70 -> 7.88 | +1.62 -> +0.18 | 3.97 -> 3.72 |
+
+**What this says.**
+- **The design over-protects PRICED BENCH players.**
+  - Their base is last season's roll minutes, and priced-first leaves it whole.
+  - Examples: AJ Green 25.1 -> 34.2 sim, 15 actual; Tari Eason 18.5 -> 25.0, 3 actual; Derik Queen 22.7 -> 29.8, 18
+    actual; Reed Sheppard 16.7 -> 23.2, 16 actual.
+- **The gains and losses cancel in points.**
+  - The minutes gain concentrates on priced starters, who move to within 0.1 pt of the market.
+  - Priced bench players move 1.6 pts further above it.
+  - The served points' 55% own-average blend dilutes both.
+- **The registered design stands as registered.** A refinement drawn from this table would be tuned on the evaluation
+  slate. For example, protect only priced STARTERS (`starter_prob >= 0.55`), or protect priced players down to a
+  role level rather than to their full base. Any such variant is a NEW design: it is pre-registered in its own entry
+  and read only on the confirmatory slates, beside this one.
+
+**Mechanism-vs-estimator check (2), as pre-registered.** The served width under ON is 1.020 (OFF 1.028), not below
+1.0. So on this slate the k scale is not shown too wide, and no re-fit is triggered by this check (one slate, n=124).
+Check (3), the book-blend weight, is owed with any enablement.
+
+**Development verdicts on 10-21.**
+- Minutes primary: PASS, -0.895 [-1.552, -0.278].
+- Points secondary: NOT FAIL.
+- Neither counts toward enabling.
+- **The CONFIRMATORY reading is owed:** `--replay --min-rows 150` over slates after 10-21. The first candidates are 10-22's
+  DEN, PHI and CLE (derive path, 5-7 priced at build); their box lands ~6:45 AM CT 10-23.

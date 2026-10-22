@@ -1714,6 +1714,17 @@ death, never life — do not invert it.
 - Falsification test: Across all final slates the DNP sim mass is small (< 15 min/side median) or the starter bias is inside +-2 min with a CI covering 0 -> no allocation fix; or a default-off allocation change does not reduce minutes MAE / starter bias on scratch re-sims by more than its own SE -> NO-GO recorded.
 - Verification: Findings file with per-date coverage, per-side table, market comparison and file:line trace; a pre-registered rule committed before any re-sim; if built: tests incl. off != on through _smart_sim_worker_run_local, a scratch arm pair on copies of fleet data read against the rule; todo #723 + deploys/state entries. No fleet change without the user's yes.
 - Blocked by: none
+- PROGRESS 2026-10-22 ~10:10 AM CT (session ffb7ab00):
+  - MEASURED: 22 pre-tip production sides (10-21; 10-20 unusable, post-tip rebuilds that read the box). DNP pool minutes 37.7/side [26.4, 49.4]; starters -4.21 [-6.41, -1.87].
+  - TRACED file:line in the findings. Hypothesis HELD: (a) injury-name splicing, (b) recency exclusions inert at opening, and (c) last season's roll minutes plus an equal water-fill over a never-pruned NBA pool.
+  - PRE-REGISTERED 8301efcd, before any ON number.
+  - BUILT default-off `SYNDICATE_NBA_SIM_MINUTES_PRICED_FIRST` (8301efcd + name-key fix 4b12deca). 13+5 tests, off != on through the real worker. Not on the fleet.
+  - DEVELOPMENT (10-21) readings:
+    - Minutes replay PASS, -0.895 [-1.552, -0.278].
+    - Points arms NOT FAIL, -0.076 [-0.321, +0.140].
+    - Priced bench are over-protected: +4.7 min.
+    - Width 1.02, so no k re-fit is triggered.
+  - GOAL: Verification MET for the delivered clauses (findings + rule + default-off build + scratch reading). The lane stays OPEN for the CONFIRMATORY reading (`--replay --min-rows 150`, slates after 10-21; the first box lands ~6:45 AM CT 10-23). Enabling is the user's.
 
 ### fitter-contract-price-units — CLOSED — opened 2026-10-22 — session 2f9bdfe9 — **GOAL MET 2026-10-22**
 - RESULT: fitter-contract-price-units 2026-10-22 (session 2f9bdfe9): `4c7134a7` + `97dca15b` on main. All four offline readers now read a live contract fill (0<p<1) via `paper_settlement.profit_per_dollar` and back `fair` out of `requested_price` (American on every live row: `venue_scope.py` stamps `ev_pct` at it; paper copies it into fill). Fleet ledger, 12,111 orders (read-only dump 14:21Z, user-approved): `fit_probability_calibration` live rows kept 6 -> 72; `fit_staked_probability` 72 -> 72 (already requested-first, fix is latent); `ev_overstatement_decomp` live fair in (0,1) 6 -> 73 of 73; `paper_bet_optimization` never dropped its 73 live rows but read them wrong -- mean implied 0.9936 -> 0.6466, mean return/$ -0.431 -> -0.135, so any venue+live ROI it printed before `97dca15b` UNDERSTATES live wins. Paper/American rows identical in all four (6,559 / 6,559 / 6,102 / 8,788). 18 tests, 7 mutations each fail 1-2.

@@ -8,6 +8,10 @@
   - 10-20 is excluded: its sims were post-tip rebuilds whose `lag1_min` equals the 10-20 box (fixed going forward by `#720`).
 - **Cause (traced file:line in the findings).** When no same-phase rotation history applies, `_derive_sim_minutes_local` gives every props_predictions row (NBA pool never pruned) last season's roll minutes, then `_water_fill_minutes_local` takes the excess equally off all ~13. Starters lose as much as the 13th man.
 - **Built, DEFAULT OFF:** `SYNDICATE_NBA_SIM_MINUTES_PRICED_FIRST` (off|shadow|on). With it on, the excess comes off unpriced pool players first. It engages only with >= 5 priced players. 12 tests, including off != on through the real worker.
+- **Development readings, 10-21 (do not count toward enabling):**
+  - Minutes replay on production engine_inputs: PASS, -0.895 [-1.552, -0.278] (17 sides). Starters -5.53 -> -1.11.
+  - Points on scratch worker arms: NOT FAIL, -0.076 [-0.321, +0.140]. Starters reach the points line (-0.09), and the served width is unchanged (1.02).
+  - But priced BENCH players are over-protected: +4.7 min, +3.6 pts. Any variant is a new design, pre-registered and read on the confirmatory slates only.
 - **OWED:**
   1. The pre-registered CONFIRMATORY minutes reading. `--replay` on slates after 10-21, >= 150 played rows on engaged sides.
   2. The points secondary on scratch arms.

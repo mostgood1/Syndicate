@@ -1300,3 +1300,43 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
 - **LIVE 2026-10-21 20:48:05Z (3:48 PM CT)**, ff d0f05d9f -> 6e406101 after venue-native-selection's own deploy, no ride-alongs. **READ 21:35Z:** the first refresh after the ff (21:26Z) logged 10 `SMART_SIM_REUSE_ANCHOR_DRIFT` rebuilds; all 11 10-21 sims carry `market_line_source=props_snapshot_consensus` @ 21:25:59Z and were written 21:27-21:31Z, before the 23:00Z first tip; 0 errors (deploys.md 21:35Z).
 - **Owed:** the pre-registered regular-season accuracy reading at ~100 graded games (`scripts/nba_anchor_staleness.py --stale-from game_odds`, todo #721).
 - Findings: `findings_2026-10-21_nba_anchor_staleness.md`.
+
+## [nba-sim-minutes-allocation] THE NBA SMARTSIM GIVES ~38 MIN/SIDE TO POOL PLAYERS WHO DNP AND RUNS STARTERS -4.2 MIN; A PRICED-FIRST SHRINK IS ON MAIN, DEFAULT OFF, NOT ENABLED `[measured 2026-10-22, lane nba-sim-minutes-allocation, todo #723, main 8301efcd + 4b12deca]`
+- **Measured (production 10-21 sims vs the `player_checks` box, 22 pre-tip sides; `scripts/nba_sim_minutes_audit.py`):**
+  - DNP pool players hold 37.7 sim min/side [26.4, 49.4].
+  - Box starters -4.21 [-6.41, -1.87], bench +1.86, played-player MAE 6.87.
+  - Against the points line: starters -1.27 pts, bench +1.37.
+  - No DNP pool player had a pre-tip prop line, and all 137 priced pool players played.
+  - 10-20 is unusable: its 3 sims are post-tip rebuilds whose `lag1_min` equals the 10-20 box.
+- **Cause (file:line in the findings):**
+  - On the no-history derive path, every props_predictions row is in the pool (NBA is never pruned).
+  - Each player's base is last season's roll minutes.
+  - `_water_fill_minutes_local` takes the excess equally off ~13 players.
+  - Of the DNP minutes: 68% go to unlisted deep bench, 20% to players OUT on the final report but not at build, and
+    12% to players excluded under broken names.
+- **Injury feed:**
+  - The NBA official-PDF parser splices reason words into names (ISAIAH WAY STEWART, BEN SUBLUXATION SIMMONS), so those
+    exclusions never match the pool.
+  - It probably also gives an Available player the next player's OUT (hypothesis: Curry was excluded and played 21;
+    Moody was simulated 32.9 and DNP).
+  - No lane owns this; a follow-up session is proposed.
+- **Reach:** the derive path set 22/22 sides on 10-21. The rotation-HISTORY path takes over from a team's 2nd game:
+  OKC on 10-22; BOS, NYK and SAS on 10-23. Its own leftover spread is unmeasured.
+- **Built:** `SYNDICATE_NBA_SIM_MINUTES_PRICED_FIRST` (absent = off | shadow | on).
+  - NBA only, derive path only, engages with >= 5 priced pool players. The excess comes off unpriced players first.
+  - 13 tests (+5 audit), including off != on through the real worker.
+  - Not on the fleet (fleet 6954cb0e); off is byte-identical anyway.
+- **Development reading on 10-21** (`--replay` on production engine_inputs; the off replay reproduces production to
+  0.000):
+  - Paired minutes -0.895 [-1.552, -0.278], 173 rows over 17 sides.
+  - Starters -5.53 -> -1.11; unpriced players +0.06 [-0.87, +1.05].
+  - It does not count toward enabling.
+  - Points on scratch worker arms: NOT FAIL, -0.076 [-0.321, +0.140].
+  - Priced starters reach the points line (-1.94 -> -0.09 pts).
+  - But priced BENCH players are over-protected: +4.7 min / +3.6 pts. Their last-season base is left whole.
+  - Served width is unchanged (IQR(z)/1.349 1.03 -> 1.02), so no k re-fit is triggered.
+- **Owed (todo #723):**
+  - The CONFIRMATORY reading: >= 150 played rows on engaged sides after 10-21 (`--replay --min-rows 150`).
+  - Before any `on`: the k / book-blend re-fit check, and a reuse stamp for the priced set.
+  - Enabling is the user's decision.
+- Findings: `findings_2026-10-22_nba_sim_minutes_allocation.md`.
