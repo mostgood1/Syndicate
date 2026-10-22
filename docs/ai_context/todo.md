@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#731` — **The WNBA injury fetch took the NBA's official injury report: on 10-20 and 10-21 the day's WNBA snapshot WAS the NBA's rows (no WNBA roster on the fleet, so nothing filtered them), and the 10-21 ATL v GSV sim took 9 Hawks/Magic players as ATL exclusions and read 13 OUT WNBA players as returned. FIXED ON MAIN (ESPN WNBA only), NOT ON THE FLEET; next WNBA game 10-24** — FOUND 2026-10-22 (`#725` follow-up), lane `wnba-injury-nba-report`, session 898e35dc (side session of local_4ebfbce7)
+### `#731` — **The WNBA injury fetch took the NBA's official injury report: on 10-20 and 10-21 the day's WNBA snapshot WAS the NBA's rows (no WNBA roster on the fleet, so nothing filtered them), and the 10-21 ATL v GSV sim took 9 Hawks/Magic players as ATL exclusions and read 13 OUT WNBA players as returned. FIXED ON MAIN `066c2158` (ESPN WNBA only), NOT ON THE FLEET; next WNBA game 10-24** — FOUND 2026-10-22 (`#725` follow-up), lane `wnba-injury-nba-report`, session 898e35dc (side session of local_4ebfbce7)
 - **The writer.** `NBAInjuryDatabase.update_injuries` (`syndicate/features/wnba/source_cli/scrapers/injuries.py`) is the only writer of the WNBA `raw/injuries.csv`. Two callers run it as `cli fetch-injuries --date D`:
   - the WNBA props refresh (`refresh_wnba_oddsapi_props.py:3989`), which is logged;
   - `live_refresh_loop._fetch_injuries`, whose output is captured and never logged.

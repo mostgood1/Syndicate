@@ -110,7 +110,7 @@ From the 10-21 refresh log (`SIM_AVAILABILITY`, `SMART_SIM_REUSE_*`) and the fin
   ATL, CHI, DAL, IND, MIN, PHX, POR, TOR, WAS. GSW does not map, because `golden state` -> GSV is not in the NBA
   set. The window runs from that day's first report until midnight ET. The WNBA season is still running.
 
-## 4. The fix (`syndicate/features/wnba/source_cli/scrapers/injuries.py`)
+## 4. The fix (`syndicate/features/wnba/source_cli/scrapers/injuries.py`, main `066c2158`)
 
 - `update_injuries` reads ESPN's WNBA page **only**.
 - The two other sources it used are deleted, because both are the NBA's report:

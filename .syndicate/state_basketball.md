@@ -1392,7 +1392,7 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   - Findings: `findings_2026-10-22_nba_injury_snapshot_overwrite.md`.
 - Findings: `findings_2026-10-22_nba_injury_pdf_parser.md`.
 
-## [wnba-injury-nba-report] THE WNBA INJURY FETCH TOOK THE NBA'S OFFICIAL REPORT; ON 10-20 AND 10-21 THE DAY'S WNBA SNAPSHOT WAS THE NBA'S ROWS. FIXED ON MAIN (ESPN WNBA ONLY), NOT ON THE FLEET `[measured 2026-10-22, lane wnba-injury-nba-report, todo #731]`
+## [wnba-injury-nba-report] THE WNBA INJURY FETCH TOOK THE NBA'S OFFICIAL REPORT; ON 10-20 AND 10-21 THE DAY'S WNBA SNAPSHOT WAS THE NBA'S ROWS. FIXED ON MAIN (ESPN WNBA ONLY), NOT ON THE FLEET `[measured 2026-10-22, lane wnba-injury-nba-report, todo #731, main 066c2158]`
 - **Writer:** `NBAInjuryDatabase.update_injuries` (`syndicate/features/wnba/source_cli/scrapers/injuries.py`) is the only writer of `wnba_source/data/raw/injuries.csv`. It is called by:
   - the WNBA props refresh (`refresh_wnba_oddsapi_props.py:3989`, logged);
   - `live_refresh_loop._fetch_injuries` (output captured, never logged).
