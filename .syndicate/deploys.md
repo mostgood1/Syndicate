@@ -53570,3 +53570,24 @@ which is about the two sizing bases and not about the refusal boundary.
   - The next NBA props refresh that BUILDS a sim logs `NBA_SIM_MINUTES_PRICED_FIRST mode=shadow` lines, and 0 `mode=on` lines.
   - The sims it writes keep OFF minutes: `scripts/nba_sim_minutes_audit.py --replay` mechanics, OFF reproduces production `_sim_min` (shadow returned off).
 - **undo:** delete the `SYNDICATE_NBA_SIM_MINUTES_PRICED_FIRST=shadow` line (or restore the .bak if nothing else changed since), then a full down/up under all three claims. Off is the absent key.
+
+## 2026-10-22 19:34:05Z -- FLEET FULL DOWN/UP: exit TAKE-PROFIT margin 0.08 -> 0.30 on live-odds-worker (holder `exit-take-profit-margin`, session 332cb014, live-trading coordinator) -- **MET (env + exit tick); first live sale under the new margin OWED**
+- **user:** in 332cb014's chat 2026-10-22, asked about take-profit with the replay evidence (hold -6.4%, 6-min -10.3%, 10-s fast loop -12.2%); picked "Raise margin to >=0.30". Ride-alongs, each approved in the same chat: "Disk + bf14f920" (min-EV tuner readout job + watchdog; tuner resolves to shadow, SYNDICATE_MIN_EV_TUNER absent), then "Yes, load it" for 21b4bdb0 (NBA injury snapshots, todo #730), which another lane had ff'd onto the fleet while my claims were held.
+- **attempts:**
+  - 17:26Z: refused, claims held by venue-prop-close-coverage.
+  - 18:50Z: HEAD moved a126ae95 -> 21b4bdb0 under my claims, so stopped at the HEAD check, undrained and released; nothing changed.
+  - Third run: HEAD == 21b4bdb0. No ff by me (21b4bdb0 contains bf14f920 and c11423ec).
+- **env:** +1 line `LIVE_ODDS_WORKER__SYNDICATE_EXIT_TAKE_PROFIT_MARGIN=0.30`, after a backup `local_production.env.bak-tp-margin-<stamp>`. Nothing else changed.
+- **restart:** claims, then `check_deploy_safety --drain` CLEAR; marker set; `down` -> 19:34:41Z; Start-ScheduledTask 19:34:48Z.
+  - healthz 200 at 19:34:49Z. refresh-worker pid 3951544, live-odds-worker 3951545.
+  - Marker cleared, DRAIN_CLEARED. Claims released at 19:35:08Z.
+- **env read after up:**
+  - live-odds-worker: EXIT_TAKE_PROFIT_MARGIN=0.30, EXIT_LIVE_RULES=take_profit, EXIT_MODE=live, POLYMARKET_AT_ASK_MIN_STAKE_DOLLARS=5, LIVE_EVENT_CONCENTRATION=on, EXECUTION_MODE=live, ARMED=1.
+  - refresh-worker: STAKE_BAND=on, FAVOURITE_CAP=on, LIVE_NET_FLOOR_KALSHI=1.0, LIVE_EV_FLOOR=0.
+- **verify (READING to 19:40Z):**
+  - `19:34:54Z [execution_exits_fast] STARTED mode=live`.
+  - `19:35:35Z EXIT_TICK status=ok mode=live positions=400 quoted=291 quote_errors=0`.
+  - EXECUTED passes at 19:35:42Z (kalshi) and 19:35:49Z (polymarket).
+  - 0 Tracebacks on either worker.
+- **owed:** the first `EXIT_LIVE` sale after 19:34:49Z, with a round trip >= $0.30/contract.
+- **rollback:** delete that env line (default 0.08), or set another value, then a full down/up under all three claims.
