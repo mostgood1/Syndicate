@@ -1782,6 +1782,14 @@ death, never life — do not invert it.
 - Verification: Findings file with per-date coverage, per-side history vs derive table, the file:line trace and the leftover/mapped split of DNP minutes; #723 confirmatory verdict appended (or INCONCLUSIVE with its row count); any fix: pre-registration committed before its reading, tests incl. off != on through _smart_sim_worker_run_local, a replay/scratch reading on fleet copies; todo #723 updated. No fleet or env change without the user's yes.
 - Blocked by: none (time-gated: the slates 10-22..10-27 land their boxes ~6:45 AM CT the next day)
 
+### nba-injury-parser-fleet-ff — OPEN — opened 2026-10-22 — session ffb7ab00-4a20-4c1b-8afe-0175450f1082
+- Goal: The fleet checkout runs the NBA injury-PDF parser fix 36eb357b (todo #725; user 2026-10-22: 'ff the fleet to the injury parser fix'): git merge --ff-only 36eb357b under all three deploy claims (no restart: fetch-injuries is a subprocess), ride-alongs listed, and a deploys.md entry whose verify reading is the next NBA raw/injuries.csv snapshot with 0 off-roster names and no reason word inside a player name.
+- Files: .syndicate/deploys.md (one append-only entry; the change itself is a git ff of the fleet checkout ~/Syndicate, outside the repo)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: Fleet HEAD == 36eb357b (or a descendant carrying it) and injuries.py on disk matches; the next fetch-injuries writes an NBA snapshot with 0 off-roster names (scripts/nba_injury_pdf_reparse.py or a direct roster check), and Khalifa Diop / Dean Wade appear under their own names; deploys.md entry with the undo.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
