@@ -1,5 +1,29 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#730` — **NBA `raw/injuries.csv` keeps no past date's official report: the final rows of 10-19, 10-20 and 10-21 (3 of 3 dates that had reports) are Rotowire/ESPN, written after midnight ET. On light slates the SmartSim never read its own day's report either (10-20: 6 of 10 builds, 10-22: 2 of 2 used last night's fallback; 10-20 left DET's 4 OUT players in the pool). FIXED ON MAIN (`21b4bdb0`), NOT ON THE FLEET** — FOUND 2026-10-22 (`#725` lead 5), lane `nba-injury-snapshot-overwrite`, session 6c89053f (side session of local_4ebfbce7); `.syndicate/findings_2026-10-22_nba_injury_snapshot_overwrite.md`
+- **How the rows get replaced:**
+  - The season page lists only today's (ET) reports.
+  - From 11 PM to midnight CT the live loop still fetches its Central date, finds no PDF, and the Rotowire/ESPN rows (stamped `datetime.now()`) replace the day's rows. On 10-21: 74 OUT (official) at 8:35 PM, then 65 (fallback) at 11:04 PM.
+  - Separately, a lookahead fetch MERGES its scrape into TODAY's snapshot and never writes the future date. The fleet has no 10-23 rows, although `--date 2026-10-23` ran 10-21 6:04 AM.
+- **Readers:**
+  - SmartSim (partial guard: the day's own report is rejected as "partial" against last night's 30-team fallback).
+  - Props OUT refusal / Layer 2 / board, which read the day's own report. On light slates they disagree with the SmartSim.
+  - `#723`'s `injury_listed`. On 10-21 the fleet rows miss 11 players OUT on the 11:30 PM ET report, 9 of them in the sims' `props_pool`, so its "unlisted deep bench" bucket can hold OUT players.
+  - The live-loop fingerprint changes every night at 11 PM CT.
+  - No grading path reads the file.
+- **Fix `21b4bdb0`:**
+  - Rows carry `source`; fallback never replaces an official date.
+  - A fetch replaces only the dates its rows carry.
+  - A date over in ET gets its last report by URL (11:30 PM .. 10:00 PM ET, at most 4 GETs).
+  - The SmartSim trusts the game date's own official snapshot whatever its size.
+  - The report name is printed, not stored: the live loop re-sims whenever the file's bytes change.
+  - 14 tests; 4 behaviour mutants each fail theirs.
+- **OWED (the user's yes): a fleet ff** (no restart; `fetch-injuries` is a subprocess). Any later ff to a newer SHA carries it, so the ride-along check must name it. Expect one forced NBA re-sim when the file gains the column. Then:
+  1. After midnight CT, the previous day's rows carry `source=nba_official` with official statuses.
+  2. On the next light slate, the props log prints `INJURY_SNAPSHOT_OFFICIAL` and no `INJURY_SNAPSHOT_PARTIAL` on game-day builds.
+- **For `#723` (not this lane's file):** its confirmatory reading of 10-22..10-27 reads those dates' rows as they stand then: fallback without this ff, the final official report with it.
+- **Leads:** NOT-YET-SUBMITTED teams are dropped by the parser (no exclusions for them until they submit). Every write re-cleans ALL dates with today's roster, so past snapshots still mutate. WNBA's copy of the writer is unchanged.
+
 ### `#729` — **Kalshi/Polymarket MLB prop orders had almost no same-book close (kalshi 39 of 266 own-book, polymarket 0 of 95) because the quote log, which held the venue's own close, was never asked for a prop. FIXED ON MAIN (`aa06d5a1`), NOT ON THE FLEET; replay 218 of 266 / 72 of 95** — FOUND 2026-10-22, lane `venue-prop-close-coverage`, session aba784f3 (side session of local_81601787); `.syndicate/findings_2026-10-22_venue_prop_close_coverage.md`
 - Also fixed: `order_clv` called a close at another book than the fill `same_book` (110 of 5,729 fleet marks; novig MLB 33 of 38). `min_ev_tuner` reads that label.
 - **User decisions owed:** (1) fleet ff `36eb357b` -> `aa06d5a1` + refresh-worker restart (settlement stamps closing marks); (2) re-mark the 361 stamped MLB venue rows, since stamped marks are final (clv_pct set, or 4 attempts).

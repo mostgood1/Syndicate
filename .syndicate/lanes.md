@@ -1849,7 +1849,14 @@ death, never life — do not invert it.
 - Verification: pytest tests/test_wnba_injury_nba_report.py green and red on origin/main's injuries.py (reachability); related WNBA injury suites green; on the fleet after an ff (user's yes): the next same-day WNBA fetch-injuries on an NBA game day prints the Rotowire line and its summary has 0 QUESTIONABLE/PROBABLE/DOUBTFUL/TOR rows
 - Blocked by: none
 
-### nba-injury-snapshot-overwrite — OPEN — opened 2026-10-22 — session 6c89053f-c302-4096-8d34-a44d734b96f0
+### nba-injury-snapshot-overwrite — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session 6c89053f-c302-4096-8d34-a44d734b96f0
+- GOAL VERDICT `[2026-10-22 17:10Z / 12:10 PM CT]`: **MET.** HYPOTHESIS HELD.
+  - Measured: the final rows of 3 of 3 past dates with official reports (10-19/20/21) are Rotowire/ESPN, replaced by the live loop's fetch between 11 PM and midnight CT (10-21: 74 OUT at 8:35 PM, 65 at 11:04 PM).
+  - On light slates the SmartSim's partial guard rejected the day's own report: 10-20 6 of 10 builds (DET's 4 OUT players kept in the pool), 10-22 2 of 2.
+  - Readers named with per-reader effect, including `#723`'s `injury_listed` (10-21: 11 OUT players missing, 9 in pools).
+  - Fix `21b4bdb0` on main (writer + guard): 14 tests; 4 behaviour mutants each fail theirs.
+  - Findings `findings_2026-10-22_nba_injury_snapshot_overwrite.md`, todo `#730`.
+  - NOT ON THE FLEET: the ff is the user's. Files released on close.
 - Goal: Measure whether NBA raw/injuries.csv keeps the official report a date's sims were built on (callers that write a date's rows, their source, how often a date's final rows are fallback; the readers of those rows) and, since it does not: fix the writer (an official snapshot is never replaced by fallback rows; a past date's last report fetched by direct URL; fallback rows replace only the day they describe) and the SmartSim partial-snapshot guard that discards a light slate's own official report; tests through update_injuries and the real excluded-map function; findings + todo entry. No fleet change without the user's yes. Side session of local_4ebfbce7 (todo #725 lead 5).
 - Files: syndicate/features/nba/source_cli/scrapers/injuries.py (NBAInjuryDatabase.update_injuries + NBAOfficialInjuryReportScraper URL lookup / get_injuries_for_date section only), syndicate/features/shared/basketball_props_smart_sim.py (the raw-feed partial-snapshot guard in _smart_sim_injuries_excluded_map_for_date_local section only), tests/test_nba_injury_snapshot_writer.py (NEW), .syndicate/findings_2026-10-22_nba_injury_snapshot_overwrite.md (NEW), docs/ai_context/todo.md (new item section only), .syndicate/state_basketball.md ([nba-injury-pdf-parser] section only)
 - Hypothesis: The fleet's final rows for every past NBA date are Rotowire/ESPN fallback, written by the live loop's central-date fetch after the season page drops the date at midnight ET; and on light slates the SmartSim's partial guard discards the day's own official report for the previous (fallback) snapshot.

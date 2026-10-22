@@ -1374,4 +1374,9 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   - Verify by the next `raw/injuries.csv` snapshot (0 off-roster names) and `SMART_SIM_REUSE_STALE_EXCLUSIONS`.
   - The defect is live today: the 10-22 snapshot holds `Khalifa Tendinopathy Diop` OUT and `Dean Tear Wade`.
 - **WNBA copy:** same parser, NOT edited. Its "official" source is the NBA's report (follow-up proposed).
+- **Past dates keep no official snapshot; light slates skip their own report** `[measured 2026-10-22 on the fleet, lane nba-injury-snapshot-overwrite, todo #730]`:
+  - The final rows of 10-19/10-20/10-21 are Rotowire/ESPN. From 11 PM to midnight CT the live loop's fetch finds no PDF (the page lists only today's ET reports), and the fallback replaces the day.
+  - The SmartSim's partial guard rejected the day's own report on 10-20 (6 of 10 builds) and 10-22 (2 of 2), and read last night's fallback. On 10-20 DET's 4 OUT players stayed in the pool.
+  - FIXED ON MAIN `21b4bdb0`, NOT ON THE FLEET: `source` column; fallback never replaces an official date; a past date's last report fetched by URL; the SmartSim trusts the game date's own official report. Any later ff carries it, and the file then gains a column (one forced NBA re-sim).
+  - Findings: `findings_2026-10-22_nba_injury_snapshot_overwrite.md`.
 - Findings: `findings_2026-10-22_nba_injury_pdf_parser.md`.
