@@ -36,6 +36,10 @@ recorded vendored output without the tree. `scripts/sync_vendor_upstream.py` is 
   `tests/test_live_lens_tick_klass_gate.py` pin it on these files.
 - `nba/source_cli`: models are byte-identical copies in `source_cli/repo/models`; `predict-date` carries upstream's
   `_build_slate_from_game_odds` fallback.
+- `wnba/source_cli/scrapers/injuries.py`: the WNBA `fetch-injuries` reads ESPN's WNBA page only (2026-10-22, lane
+  `wnba-injury-nba-report`). The vendored text preferred the NBA's official report PDF and Rotowire's `/basketball/`
+  page, both the NBA's, and wrote NBA rows as the WNBA day's snapshot; both scrapers are deleted from this copy.
+  `tests/test_wnba_injury_nba_report.py` pins it. Do not port the NBA copy's official scraper back.
 
 ## The engine standard still applies
 

@@ -1,5 +1,38 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#731` — **The WNBA injury fetch took the NBA's official injury report: on 10-20 and 10-21 the day's WNBA snapshot WAS the NBA's rows (no WNBA roster on the fleet, so nothing filtered them), and the 10-21 ATL v GSV sim took 9 Hawks/Magic players as ATL exclusions and read 13 OUT WNBA players as returned. FIXED ON MAIN (ESPN WNBA only), NOT ON THE FLEET; next WNBA game 10-24** — FOUND 2026-10-22 (`#725` follow-up), lane `wnba-injury-nba-report`, session 898e35dc (side session of local_4ebfbce7)
+- **The writer.** `NBAInjuryDatabase.update_injuries` (`syndicate/features/wnba/source_cli/scrapers/injuries.py`) is the only writer of the WNBA `raw/injuries.csv`. Two callers run it as `cli fetch-injuries --date D`:
+  - the WNBA props refresh (`refresh_wnba_oddsapi_props.py:3989`), which is logged;
+  - `live_refresh_loop._fetch_injuries`, whose output is captured and never logged.
+- **The official path returned rows.** 102 logged writes took it:
+  - date 10-20, from 1:07 PM to 11:10 PM CT;
+  - date 10-21, from 12:05 AM to 11:05 PM CT.
+  - Their whole-file summaries carry up to 19 QUESTIONABLE/PROBABLE/DOUBTFUL and 2 TOR rows. No WNBA row has those.
+  - The fallback re-wrote each day after midnight ET, which is why today's file looks clean.
+  - 10-22: no official write through 11:31 AM CT.
+- **10-21 effect (a WNBA game).**
+  - The final pregame sim's 23 ATL exclusions include 9 NBA names (`MOUHAMED WAY GUEYE`, `RAYJ HAWKS DENNIS` ...).
+  - `readmitted_injury_return` went 0 -> 13. On the ATL/GSV histories that is Villa, Nye, Winterburn, Rupert and Mwenentanda, and none of them played.
+  - The sim was rebuilt 13 times between 12:35 and 7:48 AM CT. The cause: hourly prefetches for 10-22/23 put the WNBA rows back, because ESPN stamps them `now()`.
+  - **No minutes moved.** The five appear nowhere in the final sim: no pool slot, no prop line.
+  - Game-level injury features counted the Hawks into WNBA ATL. Whether the model reads them is not measured.
+- **Overlap verdict: NO damage in April–June 2026.** No Syndicate WNBA injury writer existed then:
+  - the live loop's fetch dates from 07-14 (`61ee0b0d`), the props refresh's from 07-17 (`ee363b8f`);
+  - every mirrored May–June WNBA run logs `No injury data found` (the file did not exist).
+  - The exposed window is every NBA game day with a shared-city team (ATL CHI DAL IND MIN PHX POR TOR WAS) from **10-20** on.
+  - Not covered: the separate WNBA source app's own fetch.
+- **Fix (this lane):**
+  - `update_injuries` reads ESPN's WNBA page only.
+  - Deleted: the WNBA copy of the NBA official-PDF scraper, and Rotowire's `/basketball/` (NBA) scraper.
+  - Not chosen: gating `official_ok` on the roster filter. It would be inert on the fleet, which has no WNBA roster.
+  - 6 tests through `update_injuries` and the CLI; 5 fail on `origin/main` (no roster: Hawks written as ATL; roster: day emptied; NBA page requested), 1 guard passes both.
+- **OWED (the user's yes):** a fleet ff, no restart (`fetch-injuries` is a subprocess).
+  - **Before 10-23 ~11 PM CT** to protect the 10-24 ATL v GSV game (Saturday NBA slate, sim + 1,381 prop lines already on the fleet).
+  - Verify on the next NBA game day: a WNBA fetch summary with 0 QUESTIONABLE/PROBABLE/DOUBTFUL/TOR rows, and `readmitted_injury_return=0`.
+- **Leads:**
+  - **WNBA: ESPN rows are stamped `datetime.now()`, not `--date`** (the NBA writer's copy was fixed by `#730`, `21b4bdb0`; the WNBA copy was not). A fetch for D after local midnight deletes D's snapshot: the fleet WNBA file has no 10-12. It also drove the 10-21 flapping.
+  - The fleet has no WNBA `rosters_*.csv`, so the injury name cleaner and roster filter never run there.
+- Detail: `.syndicate/findings_2026-10-22_wnba_injury_nba_report.md`.
 ### `#730` — **NBA `raw/injuries.csv` keeps no past date's official report: the final rows of 10-19, 10-20 and 10-21 (3 of 3 dates that had reports) are Rotowire/ESPN, written after midnight ET. On light slates the SmartSim never read its own day's report either (10-20: 6 of 10 builds, 10-22: 2 of 2 used last night's fallback; 10-20 left DET's 4 OUT players in the pool). FIXED ON MAIN (`21b4bdb0`), NOT ON THE FLEET** — FOUND 2026-10-22 (`#725` lead 5), lane `nba-injury-snapshot-overwrite`, session 6c89053f (side session of local_4ebfbce7); `.syndicate/findings_2026-10-22_nba_injury_snapshot_overwrite.md`
 - **How the rows get replaced:**
   - The season page lists only today's (ET) reports.

@@ -488,6 +488,7 @@ once this index exists: re-splitting would orphan the parts.
 | [nba-sim-anchor-refresh] | THE NBA SMARTSIM'S MARKET ANCHOR WAS A D-2 LINE, NEVER REFRESHED; THE REFRESH IS LIVE ON THE FLEET (6e406101,  | `state_basketball.md` |
 | [nba-sim-minutes-allocation] | THE NBA SMARTSIM GIVES ~38 MIN/SIDE TO POOL PLAYERS WHO DNP AND RUNS STARTERS -4.2 MIN; A PRICED-FIRST SHRINK  | `state_basketball.md` |
 | [nba-injury-pdf-parser] | THE NBA OFFICIAL INJURY-PDF PARSER WROTE 17% OF ITS ROWS UNDER NAMES NO POOL MATCHES AND GAVE AVAILABLE PLAYER | `state_basketball.md` |
+| [wnba-injury-nba-report] | THE WNBA INJURY FETCH TOOK THE NBA'S OFFICIAL REPORT; ON 10-20 AND 10-21 THE DAY'S WNBA SNAPSHOT WAS THE NBA'S | `state_basketball.md` |
 | [board-freshness] | BOARD FRESHNESS AND STALENESS | `state_board.md` |
 | [board-intelligence-engine] | BOARD / INTELLIGENCE ENGINE — structural facts, archived — **ARCHIVED 2026-08-19 to `state_archive_2026-08-19. | `state_board.md` |
 | [locked-cards-retuned-no-autorun] | `locked_cards_retuned` HAS NO AUTOMATIC TRIGGER, ANYWHERE `[measured 2026-08-18]` | `state_board.md` |

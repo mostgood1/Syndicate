@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 1395 rules `[generated]`
+## Index — 1470 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -2803,3 +2803,8 @@ The 2026-10-20 entry said: "Rating INPUTS transfer, because the sim reads them w
   - A cross-day size guard must compare like with like (same source, same scope). Size is not completeness when the scope moves.
   - Before changing what a writer leaves behind, list every reader's FALLBACK path and ask what it reads after the change, not only its main path.
   - Do not store a field that changes on every fetch in a file whose bytes are fingerprinted (`live_refresh_loop._basketball_lineup_injury_fingerprint` re-sims on any byte change). The report name would have forced a re-sim every 30 min; it is printed instead, and a test pins it.
+
+## 2026-10-22 - A filter that returns its input when its reference file is missing is not a guard where that file is missing: check the reference exists on the fleet before predicting what the filter does `[lane wnba-injury-nba-report, session 898e35dc]`
+- **Belief overturned:** the WNBA injury fetch's NBA rows would be dropped by `_filter_to_roster_players`, so an NBA game day would leave the WNBA day with NO rows ("replaced by nothing", `#725` findings section 4). A local run with a roster showed exactly that.
+- **Measured on the fleet:** the WNBA `processed/` has no `rosters_*.csv`. `pick_rosters_file` returns None and the name cleaner, the team correction and the roster filter all return their input, so the NBA's rows were WRITTEN as the WNBA snapshot (10-20 and 10-21, 102 logged writes) and the 10-21 sim took 9 Hawks/Magic players as WNBA ATL exclusions. The proposed fix "gate `official_ok` on rows surviving the roster filter" would have been inert in production for the same reason.
+- **Rule:** before predicting a defect's effect THROUGH a filter, or proposing a gate built ON one, read the filter's reference input on the substrate that runs it (here: does the roster file exist on the fleet?). A filter that degrades to pass-through on a missing reference is a no-op there, silently. Prefer a fix that removes the wrong input over one that relies on a downstream filter to catch it.

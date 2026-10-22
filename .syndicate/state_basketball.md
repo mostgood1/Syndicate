@@ -1384,10 +1384,31 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
 - **NOT ON THE FLEET** (`5e734fb6` runs the old parser). An ff needs the user's yes, and any later ff to a newer SHA carries it along.
   - Verify by the next `raw/injuries.csv` snapshot (0 off-roster names) and `SMART_SIM_REUSE_STALE_EXCLUSIONS`.
   - The defect is live today: the 10-22 snapshot holds `Khalifa Tendinopathy Diop` OUT and `Dean Tear Wade`.
-- **WNBA copy:** same parser, NOT edited. Its "official" source is the NBA's report (follow-up proposed).
+- **WNBA copy:** same parser, NOT edited. Its "official" source was the NBA's report: now deleted, see `[wnba-injury-nba-report]`.
 - **Past dates keep no official snapshot; light slates skip their own report** `[measured 2026-10-22 on the fleet, lane nba-injury-snapshot-overwrite, todo #730]`:
   - The final rows of 10-19/10-20/10-21 are Rotowire/ESPN. From 11 PM to midnight CT the live loop's fetch finds no PDF (the page lists only today's ET reports), and the fallback replaces the day.
   - The SmartSim's partial guard rejected the day's own report on 10-20 (6 of 10 builds) and 10-22 (2 of 2), and read last night's fallback. On 10-20 DET's 4 OUT players stayed in the pool.
   - FIXED ON MAIN `21b4bdb0`, NOT ON THE FLEET: `source` column; fallback never replaces an official date; a past date's last report fetched by URL; the SmartSim trusts the game date's own official report. Any later ff carries it, and the file then gains a column (one forced NBA re-sim).
   - Findings: `findings_2026-10-22_nba_injury_snapshot_overwrite.md`.
 - Findings: `findings_2026-10-22_nba_injury_pdf_parser.md`.
+
+## [wnba-injury-nba-report] THE WNBA INJURY FETCH TOOK THE NBA'S OFFICIAL REPORT; ON 10-20 AND 10-21 THE DAY'S WNBA SNAPSHOT WAS THE NBA'S ROWS. FIXED ON MAIN (ESPN WNBA ONLY), NOT ON THE FLEET `[measured 2026-10-22, lane wnba-injury-nba-report, todo #731]`
+- **Writer:** `NBAInjuryDatabase.update_injuries` (`syndicate/features/wnba/source_cli/scrapers/injuries.py`) is the only writer of `wnba_source/data/raw/injuries.csv`. It is called by:
+  - the WNBA props refresh (`refresh_wnba_oddsapi_props.py:3989`, logged);
+  - `live_refresh_loop._fetch_injuries` (output captured, never logged).
+- **Defect:** the WNBA fetch preferred `official.nba.com/nba-injury-report-<season>`, the NBA's report.
+  - A non-empty result skipped the ESPN WNBA fallback.
+  - The fleet has **no WNBA `rosters_*.csv`**, so the name cleaner, the team correction and the roster filter are all no-ops there. The NBA rows were written under the shared-city tricodes: ATL CHI DAL IND MIN PHX POR TOR WAS.
+- **Measured on the fleet:** 102 logged official writes:
+  - date 10-20, from 1:07 PM to 11:10 PM CT;
+  - date 10-21, from 12:05 AM to 11:05 PM CT.
+  - The fallback re-wrote each day after midnight ET, so today's file looks clean.
+  - 10-21 was a WNBA game (ATL v GSV). The final sim's ATL exclusions held 9 NBA names. `readmitted_injury_return` went 0 -> 13, and 13 re-sims were caused by flapping.
+  - **No minutes moved.** The readmitted five had no pool slot.
+- **Overlap (April–June 2026): no damage.** No Syndicate WNBA injury writer existed until 07-14 / 07-17, and no injury file existed in May–June.
+- **Fix:** `update_injuries` reads ESPN's WNBA page only. The WNBA copies of the NBA official-PDF scraper and Rotowire's `/basketball/` scraper are deleted. 6 tests, 5 red on the old file.
+- **NOT ON THE FLEET.** It needs an ff (the user's yes), no restart.
+  - **Next WNBA game: 10-24 ATL v GSV**, exposed from 10-23 ~11 PM CT.
+  - Verify: the next NBA-game-day WNBA fetch summary has 0 QUESTIONABLE/PROBABLE/DOUBTFUL/TOR rows, and `readmitted_injury_return=0`.
+- **Leads:** WNBA ESPN rows are stamped `now()`, not `--date` (fixed for NBA by `#730`, not for WNBA): a late fetch for D deletes D's snapshot, and the WNBA file has no 10-12.
+- Findings: `findings_2026-10-22_wnba_injury_nba_report.md`.
