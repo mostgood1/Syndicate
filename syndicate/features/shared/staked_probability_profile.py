@@ -123,13 +123,23 @@ def _as_float(value: Any) -> float | None:
     return out
 
 
-def cell_key(sport: Any, market: Any, segment: Any) -> str:
-    """``"<sport>|<market>|<segment>"``, normalised the way the sizer reads rows."""
-    parts = (
+def cell_key(sport: Any, market: Any, segment: Any, phase: Any = None) -> str:
+    """``"<sport>|<market>|<segment>"``, normalised the way the sizer reads rows.
+
+    With a ``phase`` (``season_phase``'s preseason / regular / postseason) the key is
+    ``"<sport>|<market>|<segment>|<phase>"``. PHASE-AWARE READ (lane
+    `sim-stake-earned-profile`, user decision (a) 2026-10-22): a cell fitted on one
+    season phase must never apply in another (findings_2026-10-22_sim_stake_earned_profile.md
+    s5; learnings, season-phase models), so a phase-aware lookup matches ONLY the 4-part key
+    and never falls back to the phase-blind 3-part one.
+    """
+    parts = [
         str(sport or "").strip().lower(),
         str(market or "").strip().lower(),
         str(segment or "").strip().lower(),
-    )
+    ]
+    if phase is not None:
+        parts.append(str(phase or "").strip().lower() or "unknown")
     return "|".join(parts)
 
 
@@ -211,20 +221,26 @@ class StakedProbabilityProfile:
         # truth the loader would then have to reconcile.
         return {"cells": {key: dict(value) for key, value in self.cells.items()}}
 
-    def lookup(self, sport: Any, market: Any, segment: Any) -> BlendCell | None:
-        """The cell for one (sport, market, segment), or None. EXACT match only."""
+    def lookup(self, sport: Any, market: Any, segment: Any, *, phase: Any = None) -> BlendCell | None:
+        """The cell for one (sport, market, segment[, phase]), or None. EXACT match only.
+
+        ``phase=None`` reads the 3-part key, as before. A phase (``"unknown"`` included) reads
+        ONLY the 4-part key -- see `cell_key` for why there is no fallback.
+        """
         if not isinstance(self.cells, Mapping):
             return None
-        return BlendCell.from_mapping(self.cells.get(cell_key(sport, market, segment)))
+        return BlendCell.from_mapping(self.cells.get(cell_key(sport, market, segment, phase)))
 
-    def beta_for(self, sport: Any, market: Any, segment: Any) -> float:
+    def beta_for(self, sport: Any, market: Any, segment: Any, *, phase: Any = None) -> float:
         """0.0 unless a FITTED cell exists. This is what the sizer reads."""
-        cell = self.lookup(sport, market, segment)
+        cell = self.lookup(sport, market, segment, phase=phase)
         return cell.beta if cell is not None and cell.fitted else 0.0
 
-    def staked_basis(self, sport: Any, market: Any, segment: Any, *, mode: str | None = None) -> str:
+    def staked_basis(
+        self, sport: Any, market: Any, segment: Any, *, mode: str | None = None, phase: Any = None
+    ) -> str:
         """Which probability a model-view row in this cell is staked on. See `UNFITTED_MODE_ENV`."""
-        cell = self.lookup(sport, market, segment)
+        cell = self.lookup(sport, market, segment, phase=phase)
         if cell is not None and cell.fitted:
             return STAKED_BASIS_BLEND
         resolved = mode if mode in _UNFITTED_MODES else unfitted_mode()

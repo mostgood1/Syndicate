@@ -679,7 +679,10 @@ def _empty_provenance() -> dict[str, Any]:
 
 
 def sizing_inputs_with_provenance(
-    row: Mapping[str, Any], *, profile: StakedProbabilityProfile | None = None
+    row: Mapping[str, Any],
+    *,
+    profile: StakedProbabilityProfile | None = None,
+    selected_date: str | None = None,
 ) -> tuple[SizingInputs | None, str | None, dict[str, Any]]:
     """`sizing_inputs_from_row`, plus HOW the model probability was derived.
 
@@ -774,9 +777,20 @@ def sizing_inputs_with_provenance(
             return None, refusal, provenance
 
         resolved_profile = profile if profile is not None else load_staked_probability_profile()[0]
-        basis = resolved_profile.staked_basis(row.get("sport"), row.get("market"), row.get("segment"))
+        # PHASE-AWARE PROFILE READ (lane sim-stake-earned-profile, user decision (a) 2026-10-22).
+        # With a slate date the profile is read on the 4-part `sport|market|segment|phase` key
+        # ONLY, so a cell fitted on one season phase never stakes another. An unplaceable phase
+        # reads as "unknown", which no fit writes, so it finds no fitted cell (the safe
+        # direction). Without a date the read is the 3-part key, exactly as before.
+        phase = None
+        if selected_date:
+            from syndicate.features.shared.season_phase import season_phase
+
+            phase = season_phase(row.get("sport"), selected_date) or "unknown"
+            provenance["staked_probability_phase"] = phase
+        basis = resolved_profile.staked_basis(row.get("sport"), row.get("market"), row.get("segment"), phase=phase)
         if basis == STAKED_BASIS_BLEND:
-            beta = resolved_profile.beta_for(row.get("sport"), row.get("market"), row.get("segment"))
+            beta = resolved_profile.beta_for(row.get("sport"), row.get("market"), row.get("segment"), phase=phase)
             blended = staked_probability(fair, raw_model, beta=beta)
             if blended is not None and 0.0 < blended < 1.0:
                 model_probability = blended
@@ -1142,7 +1156,9 @@ def commit_portfolio(
         if _refuses_in_play_market_fair(row):
             refuse("in_play_market_fair", row)
             continue
-        inputs, reason, provenance = sizing_inputs_with_provenance(row, profile=blend_profile)
+        inputs, reason, provenance = sizing_inputs_with_provenance(
+            row, profile=blend_profile, selected_date=selected_date
+        )
         if inputs is None:
             refuse(reason or "unknown", row)
             continue

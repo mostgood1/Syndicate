@@ -316,7 +316,17 @@ def test_profile_absent_means_beta_zero_and_the_raw_model(tmp_path):
 def test_a_fitted_cell_moves_the_probability_toward_the_market_and_is_stamped(tmp_path, monkeypatch):
     path = tmp_path / "profile.json"
     monkeypatch.setenv(PROFILE_PATH_ENV, str(path))
-    _write_profile(path, {cell_key("mlb", "h2h", "full_game"): {"beta": 0.3, "n_test": 400}}, version="sp1-2026-09-08")
+    # The dateless call below reads the 3-part key; `commit_portfolio` passes its slate date, and
+    # since the phase-aware read (lane sim-stake-earned-profile, 2026-10-22) it reads ONLY the
+    # 4-part key for that date's season phase -- 2026-08-22 is MLB regular season.
+    _write_profile(
+        path,
+        {
+            cell_key("mlb", "h2h", "full_game"): {"beta": 0.3, "n_test": 400},
+            cell_key("mlb", "h2h", "full_game", "regular"): {"beta": 0.3, "n_test": 400},
+        },
+        version="sp1-2026-09-08",
+    )
 
     inputs, reason, prov = sizing_inputs_with_provenance(_row())
     assert reason is None
