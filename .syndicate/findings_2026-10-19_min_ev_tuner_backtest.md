@@ -197,3 +197,23 @@ toward its family, so a cell with little data borrows strength and a cell with a
    - All of this is still under the tuner's own shadow/apply mode: nothing reaches a commit gate unless SYNDICATE_MIN_EV_TUNER=apply.
 7. **Shadow read, reported, not a gate:** after 7 daily readouts with pooling in shadow, report pooled vs unpooled proposals per cell, and for
    each pooled RAISE the removed band's subsequent flat ROI and CLV with n.
+
+
+## RESULT 2026-10-22T16:34Z: partial pooling, first replay on the production ledger (built to the 16:27Z pre-registration)
+
+**Data.** Fleet ledger read-only 2026-10-22 16:33Z: 12,175 rows. The replay covers 21 nights (night D sees orders graded before D 12:00Z) at the fleet's
+base 0.0. Tuned evidence: paper venue rows 10-02..10-21; live venue rows WITH `ev_pct` only since 10-19 (kalshi nba 56 / 2 dates, wnba 10 / 2,
+ncaaf 4 / 1); ladder rows skipped (80). CLV is recomputed from prices (7f6f7b1c, todo #719).
+
+**Outcome. Pooled and unpooled both propose 0 moves; pooling changes WHY.**
+- More cells now reach a verdict. kalshi ncaaf h2h is judged on its family (73 band events), no longer held as `insufficient_events`.
+- Shrinkage behaves as designed. polymarket ncaaf (83 family events): ROI shrink 0.34-0.53, CLV z 3.7-5.2. kalshi ncaaf: ROI tau^2 = 0, so every cell
+  takes the family mean (-3.47%, z -0.46).
+- **The binding reason is disagreement, not sample size.** Across both NCAAF families, pooled CLV is strongly positive (z 3.7-5.2) while pooled flat
+  ROI is negative and not significant (z -0.1 to -1.9). The AND rule holds them as `only_clv_significant`. This is the same reading as
+  the 10-19 backtest, now at family strength: we beat the close by about 1.5-2 points, and the results have not followed on these samples.
+- polymarket ncaaf spreads is the closest to a pooled RAISE: pooled flat ROI -30.5% (z -1.88), but CLV +1.48 (z 3.74), so the CLV
+  contradicts the raise.
+
+**Status.** `SYNDICATE_MIN_EV_TUNER_POOLING` defaults to shadow, so the nightly line will carry `pooled_actions=` and each cell a `pooled` verdict;
+nothing changes. Switching it on is the user's decision after the readouts.

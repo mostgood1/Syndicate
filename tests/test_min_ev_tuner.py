@@ -370,3 +370,64 @@ def test_live_contract_price_clv_is_recomputed_not_read_from_the_stale_mark():
     stale = _order(3, won=True, clv=-35.0, venue="kalshi")
     stale["fill_price"] = 0.65
     assert T._clv(stale, ("same_book",)) is None
+
+
+# --- partial pooling (pre-registered 2026-10-22T16:27Z) ---------------------
+
+
+def _pool_family():
+    # Same family kalshi|ncaaf|regular. "totals" alone has only 12 band events (unpooled:
+    # insufficient_events); "spreads" has 45 and is strongly negative on ROI and CLV. Pooling
+    # lends "totals" the family's strength. Event ids are disjoint across the two markets.
+    small = [_order(i, won=(i % 6 == 0), clv=-2.0 - (i % 3) * 0.5, market="totals") for i in range(12)]
+    big = [_order(100 + i, won=(i % 6 == 0), clv=-2.0 - (i % 3) * 0.5, market="spreads") for i in range(45)]
+    return small + big
+
+
+def test_pooling_off_adds_nothing(memory_state, monkeypatch):
+    monkeypatch.setenv("SYNDICATE_MIN_EV_TUNER_POOLING", "off")
+    out = T.compute_proposals(_pool_family(), state={}, base_min_ev_pct=2.0)
+    assert out["pooling"] == "off" and out["pooled_actions"] == {}
+    assert all("pooled" not in c for c in out["cells"].values())
+
+
+def test_pooling_shadow_is_the_default_and_never_changes_an_action(memory_state, monkeypatch):
+    monkeypatch.setenv("SYNDICATE_MIN_EV_TUNER_POOLING", "off")
+    off = T.compute_proposals(_pool_family(), state={}, base_min_ev_pct=2.0)
+    monkeypatch.delenv("SYNDICATE_MIN_EV_TUNER_POOLING", raising=False)
+    shadow = T.compute_proposals(_pool_family(), state={}, base_min_ev_pct=2.0)
+    assert shadow["pooling"] == "shadow"
+    small = "kalshi|ncaaf|totals|regular"
+    assert shadow["cells"][small]["action"] == off["cells"][small]["action"] == "hold"
+    assert shadow["cells"][small]["reason"] == "insufficient_events"
+    assert shadow["cells"][small]["pooled"]["action"] == "raise"  # computed, not applied
+    assert shadow["actions"] == off["actions"]
+
+
+def test_pooling_on_lets_the_pooled_verdict_drive_the_cell(memory_state, monkeypatch):
+    monkeypatch.setenv("SYNDICATE_MIN_EV_TUNER_POOLING", "on")
+    out = T.compute_proposals(_pool_family(), state={}, base_min_ev_pct=2.0)
+    small = out["cells"]["kalshi|ncaaf|totals|regular"]
+    assert (small["action"], small["min_ev_pct"]) == ("raise", 2.5)
+    assert small["reason"].startswith("pooled:")
+    assert 0 < small["pooled"]["roi_shrink"] <= 1
+
+
+def test_pooling_needs_a_minimum_of_own_events(memory_state, monkeypatch):
+    monkeypatch.setenv("SYNDICATE_MIN_EV_TUNER_POOLING", "on")
+    rows = [r for r in _pool_family() if not (r["market"] == "totals" and int(r["idempotency_key"][1:]) >= 6)]
+    out = T.compute_proposals(rows, state={}, base_min_ev_pct=2.0)
+    small = out["cells"]["kalshi|ncaaf|totals|regular"]
+    assert small["pooled"]["reason"] == "pool_insufficient_events" and small["action"] == "hold"
+
+
+def test_a_single_cell_family_does_not_pool_and_phases_never_pool(memory_state, monkeypatch):
+    monkeypatch.setenv("SYNDICATE_MIN_EV_TUNER_POOLING", "on")
+    # Same market twice, different phases: two families of one cell each.
+    rows = [_order(i, won=False, clv=-2.0, market="batter_hits", sport="mlb", date="2026-09-20") for i in range(15)]
+    rows += [_order(50 + i, won=False, clv=-2.0, market="batter_hits", sport="mlb", date="2026-10-10") for i in range(15)]
+    out = T.compute_proposals(rows, state={}, base_min_ev_pct=2.0)
+    for phase in ("regular", "postseason"):
+        cell = out["cells"][f"kalshi|mlb|batter_hits|{phase}"]
+        assert cell["pooled"]["reason"] == "pool_single_cell"
+        assert cell["pooled"]["family"] == f"kalshi|mlb|{phase}"

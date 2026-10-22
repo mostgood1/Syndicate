@@ -29,6 +29,16 @@ if str(ROOT) not in sys.path:
 from syndicate.features.shared import min_ev_tuner as T  # noqa: E402
 
 
+def _pooled_text(pooled) -> str:
+    if not isinstance(pooled, dict):
+        return ""
+    return (
+        f" POOLED[{pooled.get('action')} {pooled.get('reason')} fam_ev={pooled.get('family_events')} "
+        f"roi={pooled.get('roi_theta_pct')} z={pooled.get('roi_z')} shrink={pooled.get('roi_shrink')} "
+        f"clv={pooled.get('clv_theta')} z={pooled.get('clv_z')}]"
+    )
+
+
 def _cell_lines(cells: dict, limit: int) -> list[str]:
     def size(item):
         return -((item[1].get("evidence") or {}).get("events") or 0)
@@ -43,6 +53,7 @@ def _cell_lines(cells: dict, limit: int) -> list[str]:
             f"band{mg.get('band')}[ev={mg.get('events')} {mg.get('roi_basis', 'dollars')}_roi={mg.get('roi_pct')} t={mg.get('roi_t')} "
             f"$roi={mg.get('dollar_roi_pct')} ev_only$={mg.get('ev_only_roi_pct')} "
             f"clv_n={mg.get('clv_events')} clv={mg.get('avg_clv_pct')} t={mg.get('clv_t')}]"
+            + _pooled_text(entry.get("pooled"))
         )
     return out
 
@@ -54,7 +65,8 @@ def cmd_state(args) -> int:
         return 1
     print(
         f"mode={state.get('mode')} last_run_at={state.get('last_run_at')} base={state.get('base_min_ev_pct')} "
-        f"actions={state.get('actions')} skipped={state.get('skipped')}"
+        f"actions={state.get('actions')} skipped={state.get('skipped')} "
+        f"pooling={state.get('pooling')} pooled_actions={state.get('pooled_actions')}"
     )
     print(f"params={state.get('params')} clv_scopes={state.get('clv_scopes')} evidence={state.get('evidence_modes')}")
     for line in _cell_lines(state.get("cells") or {}, args.limit):
@@ -89,7 +101,7 @@ def cmd_replay(args) -> int:
     first = date.fromisoformat(graded[0][:10]) + timedelta(days=1)
     last = date.fromisoformat(graded[-1][:10]) + timedelta(days=1)
     state: dict = {}
-    nights = moves = 0
+    nights = moves = pooled_moves = 0
     day = first
     while day <= last:
         cutoff = datetime(day.year, day.month, day.day, 12, tzinfo=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -97,6 +109,10 @@ def cmd_replay(args) -> int:
         result = T.compute_proposals(seen, state=state, base_min_ev_pct=args.base)
         nights += 1
         for key, entry in result["cells"].items():
+            pooled = entry.get("pooled") or {}
+            if pooled.get("action") in (T.ACTION_RAISE, T.ACTION_LOWER):
+                pooled_moves += 1
+                print(f"{day} POOLED-SHADOW {key} {pooled.get('action')} -> {pooled.get('min_ev_pct')}{_pooled_text(pooled)}")
             if entry.get("action") in (T.ACTION_RAISE, T.ACTION_LOWER):
                 moves += 1
                 mg = entry.get("marginal") or {}
@@ -108,6 +124,8 @@ def cmd_replay(args) -> int:
         state = {"cells": result["cells"]}
         day += timedelta(days=1)
     print(f"REPLAY nights={nights} moves={moves} final actions={result['actions']} skipped={result['skipped']}")
+    print(f"pooling={result.get('pooling')} final pooled_actions={result.get('pooled_actions')} "
+          f"pooled moves over the replay={pooled_moves}")
     reasons = Counter(e.get("reason") for e in result["cells"].values())
     print(f"final hold reasons={dict(reasons.most_common())}")
     for line in _cell_lines(result["cells"], args.limit):

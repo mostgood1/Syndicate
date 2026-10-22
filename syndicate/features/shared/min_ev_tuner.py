@@ -107,6 +107,27 @@ _ENV_EVIDENCE_MODES = "SYNDICATE_MIN_EV_TUNER_EVIDENCE_MODES"
 _ENV_ROI_BASIS = "SYNDICATE_MIN_EV_TUNER_ROI_BASIS"
 
 
+# PARTIAL POOLING (pre-registered 2026-10-22T16:27Z in findings_2026-10-19_min_ev_tuner_backtest.md;
+# user: "let the tuner borrow strength across markets within venue x sport x phase ... run it in shadow
+# first"). `off` | `shadow` (absent / unrecognised) | `on`. In shadow the pooled verdict is computed and
+# stored per cell as `pooled` but never changes the cell's action; `on` (a user decision) lets it drive.
+POOLING_OFF = "off"
+POOLING_SHADOW = "shadow"
+POOLING_ON = "on"
+_ENV_POOLING = "SYNDICATE_MIN_EV_TUNER_POOLING"
+_POOL_MIN_CELL_EVENTS = 10
+_POOL_MIN_FAMILY_EVENTS = 40
+_POOL_MIN_CELL_CLV_EVENTS = 8
+_POOL_MIN_FAMILY_CLV_EVENTS = 30
+
+
+def pooling_mode() -> str:
+    raw = str(os.environ.get(_ENV_POOLING) or "").strip().lower()
+    if raw in {POOLING_OFF, POOLING_ON}:
+        return raw
+    return POOLING_SHADOW
+
+
 def roi_basis() -> str:
     raw = str(os.environ.get(_ENV_ROI_BASIS) or "").strip().lower()
     return "dollars" if raw == "dollars" else "flat"
@@ -591,6 +612,140 @@ def collect_cells(
     return cells, skipped
 
 
+def _band_event_values(
+    orders: Sequence[Mapping[str, Any]], *, trailing_events: int, clv_scopes: Sequence[str]
+) -> tuple[list[float], list[float]]:
+    """Per EVENT, in `cell_evidence`'s own trailing window: mean flat return, and mean same-book CLV."""
+    by_event: dict[str, list[Mapping[str, Any]]] = {}
+    for order in orders:
+        by_event.setdefault(_event_id(order), []).append(order)
+    ordered = sorted(by_event.items(), key=lambda kv: max(_settled_at(o) for o in kv[1]))
+    window = ordered[-trailing_events:] if trailing_events > 0 else ordered
+    flats: list[float] = []
+    clvs: list[float] = []
+    for _, group in window:
+        returns = []
+        event_clvs = []
+        for order in group:
+            stake = _stake(order)
+            pnl = _as_float(order.get("pnl_dollars"))
+            if stake and pnl is not None:
+                returns.append(pnl / stake)
+            clv = _clv(order, clv_scopes)
+            if clv is not None:
+                event_clvs.append(clv)
+        if returns:
+            flats.append(sum(returns) / len(returns))
+        if event_clvs:
+            clvs.append(sum(event_clvs) / len(event_clvs))
+    return flats, clvs
+
+
+def _random_effects_pool(values_by_cell: Mapping[str, Sequence[float]]) -> dict[str, Any] | None:
+    """DerSimonian-Laird random effects over cells with >= 2 events. None when fewer than 2 such cells."""
+    stats: dict[str, tuple[float, float, int]] = {}
+    for key, xs in values_by_cell.items():
+        n = len(xs)
+        if n >= 2:
+            mean = sum(xs) / n
+            var = sum((x - mean) ** 2 for x in xs) / (n - 1)
+            stats[key] = (mean, var, n)
+    if len(stats) < 2:
+        return None
+    dof = sum(n - 1 for _, _, n in stats.values())
+    pooled_within = sum(var * (n - 1) for _, var, n in stats.values()) / dof if dof > 0 else 0.0
+    v = {k: ((var if var > 0 else pooled_within) / n) for k, (_, var, n) in stats.items()}
+    if any(val <= 0 for val in v.values()):
+        return None
+    w = {k: 1.0 / v[k] for k in v}
+    sw = sum(w.values())
+    fixed_mean = sum(w[k] * stats[k][0] for k in w) / sw
+    q = sum(w[k] * (stats[k][0] - fixed_mean) ** 2 for k in w)
+    c = sw - sum(x * x for x in w.values()) / sw
+    tau2 = max(0.0, (q - (len(w) - 1)) / c) if c > 0 else 0.0
+    wr = {k: 1.0 / (v[k] + tau2) for k in v}
+    family_mean = sum(wr[k] * stats[k][0] for k in wr) / sum(wr.values())
+    var_mean = 1.0 / sum(wr.values())
+    cells: dict[str, dict[str, Any]] = {}
+    for key in v:
+        mean, vc = stats[key][0], v[key]
+        if tau2 > 0:
+            shrink = vc / (vc + tau2)
+            theta = shrink * family_mean + (1.0 - shrink) * mean
+            var = (1.0 - shrink) * vc + shrink * shrink * var_mean
+        else:
+            shrink, theta, var = 1.0, family_mean, var_mean
+        cells[key] = {
+            "theta": theta,
+            "z": theta / math.sqrt(var) if var > 0 else None,
+            "shrink": round(shrink, 4),
+            "n": stats[key][2],
+        }
+    return {"cells": cells, "tau2": tau2, "mean": family_mean, "k": len(v)}
+
+
+def _pooled_verdicts(
+    contexts: Mapping[str, Mapping[str, Any]], params: Mapping[str, float]
+) -> dict[str, dict[str, Any]]:
+    """The pre-registered pooled decision for every cell, per venue x sport x phase family."""
+    families: dict[str, list[str]] = {}
+    for key in contexts:
+        venue, sport, _market, phase = key.split("|")
+        families.setdefault(f"{venue}|{sport}|{phase}", []).append(key)
+    out: dict[str, dict[str, Any]] = {}
+    for family, keys in families.items():
+        flats = {k: contexts[k]["flats"] for k in keys}
+        clvs = {k: contexts[k]["clvs"] for k in keys}
+        family_n = sum(len(x) for x in flats.values())
+        family_clv_n = sum(len(x) for x in clvs.values())
+        roi_pool = _random_effects_pool(flats)
+        clv_pool = _random_effects_pool(clvs)
+        for key in keys:
+            ctx = contexts[key]
+            verdict: dict[str, Any] = {
+                "family": family,
+                "family_events": family_n,
+                "family_clv_events": family_clv_n,
+                "cell_events": len(ctx["flats"]),
+                "cell_clv_events": len(ctx["clvs"]),
+            }
+            current = ctx["current"]
+            roi_cell = (roi_pool or {}).get("cells", {}).get(key)
+            clv_cell = (clv_pool or {}).get("cells", {}).get(key)
+            if roi_pool is None or clv_pool is None:
+                reason = "pool_single_cell"
+            elif len(ctx["flats"]) < _POOL_MIN_CELL_EVENTS or family_n < _POOL_MIN_FAMILY_EVENTS:
+                reason = "pool_insufficient_events"
+            elif len(ctx["clvs"]) < _POOL_MIN_CELL_CLV_EVENTS or family_clv_n < _POOL_MIN_FAMILY_CLV_EVENTS:
+                reason = "pool_insufficient_clv_events"
+            elif roi_cell is None or clv_cell is None or roi_cell["z"] is None or clv_cell["z"] is None:
+                reason = "pool_no_variance"
+            else:
+                reason = None
+            if roi_cell:
+                verdict.update(roi_theta_pct=round(100.0 * roi_cell["theta"], 3), roi_z=round(roi_cell["z"], 3)
+                               if roi_cell["z"] is not None else None, roi_shrink=roi_cell["shrink"])
+            if clv_cell:
+                verdict.update(clv_theta=round(clv_cell["theta"], 3), clv_z=round(clv_cell["z"], 3)
+                               if clv_cell["z"] is not None else None, clv_shrink=clv_cell["shrink"])
+            if roi_pool:
+                verdict["roi_tau2"] = round(roi_pool["tau2"], 6)
+            if clv_pool:
+                verdict["clv_tau2"] = round(clv_pool["tau2"], 4)
+            if reason is not None:
+                verdict.update(action=ACTION_HOLD, min_ev_pct=current, reason=reason)
+            else:
+                # Same step, bounds, cooldown and cut-binding rule as unpooled: only the z's differ.
+                evidence = {"events": 10 ** 9, "clv_events": 10 ** 9, "roi_t": roi_cell["z"], "clv_t": clv_cell["z"]}
+                action, proposed, why = decide(
+                    evidence, current_pct=current, events_since_move=ctx["since"], params=params,
+                    effective_pct=ctx["effective"],
+                )
+                verdict.update(action=action, min_ev_pct=proposed, reason=why)
+            out[key] = verdict
+    return out
+
+
 def compute_proposals(
     orders: Sequence[Mapping[str, Any]],
     *,
@@ -610,6 +765,7 @@ def compute_proposals(
 
     out_cells: dict[str, dict[str, Any]] = {}
     actions: dict[str, int] = {}
+    pool_contexts: dict[str, dict[str, Any]] = {}
     for key, group in sorted(cells.items()):
         prior = prior_cells.get(key) if isinstance(prior_cells.get(key), Mapping) else {}
         # The OVERRIDE, or None for a cell that has never moved -- which keeps
@@ -653,6 +809,33 @@ def compute_proposals(
         if action == ACTION_HOLD and prior.get("moved_at"):
             entry["moved_at"] = prior.get("moved_at")
         out_cells[key] = entry
+        flats, band_clvs = _band_event_values(
+            marginal_rows, trailing_events=int(params["trailing_events"]), clv_scopes=clv_scopes
+        )
+        pool_contexts[key] = {
+            "current": current, "effective": effective, "since": since,
+            "flats": flats, "clvs": band_clvs, "total_events": total_events, "override": override,
+            "prior_moved_at": moved_at_events,
+        }
+    pooling = pooling_mode()
+    pooled_actions: dict[str, int] = {}
+    if pooling != POOLING_OFF and pool_contexts:
+        for key, verdict in _pooled_verdicts(pool_contexts, params).items():
+            pooled_actions[verdict["action"]] = pooled_actions.get(verdict["action"], 0) + 1
+            out_cells[key]["pooled"] = verdict
+            if pooling == POOLING_ON:
+                entry = out_cells[key]
+                ctx = pool_contexts[key]
+                moved = verdict["action"] != ACTION_HOLD
+                actions[entry["action"]] -= 1
+                actions[verdict["action"]] = actions.get(verdict["action"], 0) + 1
+                entry.update(
+                    action=verdict["action"],
+                    reason="pooled:" + verdict["reason"],
+                    min_ev_pct=verdict["min_ev_pct"] if moved else ctx["override"],
+                    moved_at_total_events=ctx["total_events"] if moved else ctx["prior_moved_at"],
+                )
+        actions = {k: v for k, v in actions.items() if v}
     # A cell with no settled rows tonight keeps its threshold: absence of
     # evidence is not evidence for moving it back.
     for key, prior in (prior_cells or {}).items():
@@ -668,6 +851,8 @@ def compute_proposals(
         "clv_scopes": list(clv_scopes),
         "evidence_modes": list(evidence_modes),
         "roi_basis": basis,
+        "pooling": pooling,
+        "pooled_actions": dict(sorted(pooled_actions.items())),
         "base_min_ev_pct": float(base_min_ev_pct),
     }
 
@@ -739,6 +924,8 @@ def run_nightly(
         "clv_scopes": result["clv_scopes"],
         "evidence_modes": result["evidence_modes"],
         "roi_basis": result["roi_basis"],
+        "pooling": result["pooling"],
+        "pooled_actions": result["pooled_actions"],
         "skipped": result["skipped"],
         "actions": result["actions"],
         "cells": dict(list(result["cells"].items())[:_PROPOSAL_CELLS_CAP]),
@@ -755,6 +942,7 @@ def run_nightly(
         "[min_ev_tuner] MIN_EV_TUNER"
         f" mode={mode} date={today} cells={len(result['cells'])}"
         f" actions={result['actions']} skipped={result['skipped']}"
+        f" pooling={result['pooling']} pooled_actions={result['pooled_actions']}"
         f" base={result['base_min_ev_pct']} moves={len(moves)}",
         flush=True,
     )
