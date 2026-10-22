@@ -159,7 +159,7 @@ def test_markers_inside_another_line_are_not_tuner_lines(tmp_path):
 
 def test_the_fleets_stamped_lines_parse_and_a_stamp_dates_a_failure(tmp_path):
     stamped_pass = "2026-10-22T12:01:51.256Z " + PASS.format(mode="shadow", date=DAY)
-    assert tw.parse_pass_line(stamped_pass) == {"mode": "shadow", "date": DAY}
+    assert tw.parse_pass_line(stamped_pass) == {"mode": "shadow", "date": DAY, "pooling": None}
     _write_log(tmp_path, "2026-10-21T12:00:01.000Z " + FAILED + "2026-10-22T12:00:01.000Z " + HOOK_FAILED)
     findings, row = _check(tmp_path, AT_1155)
     assert row["failures_today"] == 1 and "HOOK_FAILED" in row["failures"][0]
@@ -191,6 +191,29 @@ def test_a_non_shadow_mode_without_a_recorded_decision_fails(tmp_path):
     assert _keys(_check(tmp_path, AT_1305)[0]) == {"exec:min_ev_tuner:mode": tw.FAIL}
     (tmp_path / tw.DECISION_NAME).write_text(json.dumps({"mode": "apply", "decided_by": "user"}), encoding="utf-8")
     assert _check(tmp_path, AT_1305)[0] == []
+
+
+POOLED = ("2026-10-23T12:01:51.256Z [min_ev_tuner] MIN_EV_TUNER mode=shadow date={date} cells=73 actions={{'hold': 73}} "
+          "skipped={{'no_ev_pct': 552}} pooling={pooling} pooled_actions={{'hold': 9, 'raise': 1}} base=0.0 moves=0\n")
+
+
+def test_pooling_must_read_shadow_unless_the_user_decided(tmp_path):
+    """1da26316: the pass line gains `pooling=` after `skipped=`; the prefix match still finds the pass."""
+    assert tw.parse_pass_line(POOLED.format(date=DAY, pooling="shadow"))["pooling"] == "shadow"
+    _write_log(tmp_path, POOLED.format(date=DAY, pooling="shadow"))
+    assert _check(tmp_path, AT_1305)[0] == []
+    _write_log(tmp_path, POOLED.format(date=DAY, pooling="on"))
+    assert _keys(_check(tmp_path, AT_1305)[0]) == {"exec:min_ev_tuner:pooling": tw.FAIL}
+    _write_log(tmp_path, POOLED.format(date=DAY, pooling="off"))
+    assert _keys(_check(tmp_path, AT_1305)[0]) == {"exec:min_ev_tuner:pooling": tw.WARN}
+    (tmp_path / tw.DECISION_NAME).write_text(json.dumps({"pooling": "off", "decided_by": "user"}), encoding="utf-8")
+    assert _check(tmp_path, AT_1305)[0] == []
+
+
+def test_a_pass_line_from_before_pooling_is_not_a_pooling_finding(tmp_path):
+    _write_log(tmp_path, PASS.format(mode="shadow", date=DAY))
+    findings, row = _check(tmp_path, AT_1305)
+    assert findings == [] and row["pass_pooling"] is None
 
 
 def test_the_readout_artifact_mode_is_checked_too(tmp_path):

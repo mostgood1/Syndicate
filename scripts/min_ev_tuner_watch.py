@@ -20,8 +20,13 @@ toasted -- `execution_watchdog.emailable`):
 
 RECORDING A DECISION. When the user decides to switch modes, write
 `<home>/min_ev_tuner_mode_decision.json`:
-    {"mode": "apply", "decided_by": "user", "decided_at": "<UTC>", "note": "<their words>"}
-It covers that mode only; any other non-shadow mode still alerts.
+    {"mode": "apply", "pooling": "on", "decided_by": "user", "decided_at": "<UTC>", "note": "<their words>"}
+Each key covers that one value only; any other non-shadow value still alerts.
+
+POOLING (1da26316, lane min-ev-tuner-shadow): the pass line carries `pooling=<off|shadow|on>`
+after `skipped=`. Not `shadow` and not the recorded `pooling` -> `exec:min_ev_tuner:pooling`,
+fail for `on` (pooled cuts would feed an apply), warn otherwise. A line without the field
+(code before 1da26316) is not checked.
 
 HOW THE LOG IS READ. Incrementally: the byte offset of the last read is kept in
 the watchdog state, so each 5-minute check reads only what the worker wrote
@@ -52,6 +57,7 @@ DUE_HOUR_UTC = 13  # the pass runs at >= 12:00Z; an hour of grace
 # read as a tuner failure.
 _STAMP = r"^(?:(?P<stamp>\d{4}-\d\d-\d\d)T\S+ )?"
 _PASS = re.compile(_STAMP + r"\[min_ev_tuner\] MIN_EV_TUNER mode=(?P<mode>\S+) date=(?P<date>\d{4}-\d\d-\d\d)\b")
+_POOLING = re.compile(r" pooling=(?P<pooling>[a-z]+)\b")
 _FAILURE = re.compile(
     _STAMP + r"\[(?:min_ev_tuner|intelligence_state)\] (?P<marker>MIN_EV_TUNER_(?:FAILED|SAVE_FAILED|HOOK_FAILED))\b"
 )
@@ -61,7 +67,10 @@ _MAX_FAILURES_KEPT = 5
 def parse_pass_line(line: str) -> dict[str, str] | None:
     """`{"mode", "date"}` for a pass line, else None. `MIN_EV_TUNER_MOVE` lines are not passes."""
     match = _PASS.match(line)
-    return {"mode": match["mode"], "date": match["date"]} if match else None
+    if not match:
+        return None
+    pooling = _POOLING.search(line, match.end())
+    return {"mode": match["mode"], "date": match["date"], "pooling": pooling["pooling"] if pooling else None}
 
 
 def parse_failure_line(line: str) -> dict[str, str | None] | None:
@@ -86,7 +95,7 @@ def scan_log(logs_dir: Path, row: Mapping[str, Any], now: dt.datetime) -> dict[s
     today = now.date().isoformat()
     new = dict(row or {})
     if new.get("date") != today:
-        new.update(date=today, pass_mode=None, pass_line=None, failures=[], failures_today=0)
+        new.update(date=today, pass_mode=None, pass_pooling=None, pass_line=None, failures=[], failures_today=0)
     path = logs_dir / LOG_NAME
     if not path.is_file():
         new["log_missing"] = True
@@ -114,6 +123,7 @@ def scan_log(logs_dir: Path, row: Mapping[str, Any], now: dt.datetime) -> dict[s
             new["last_pass_mode"] = parsed["mode"]
             if parsed["date"] == today:
                 new["pass_mode"] = parsed["mode"]
+                new["pass_pooling"] = parsed["pooling"]
                 new["pass_line"] = line.strip()[:300]
             if first_scan or parsed["date"] == today:
                 # A pass after a failure means the retry worked (the hook retries every cycle until one
@@ -179,6 +189,19 @@ def evaluate(row: Mapping[str, Any], readout: Mapping[str, Any], decision: Mappi
             out.append((PREFIX + "mode", FAIL,
                         f"min_ev tuner mode={mode} ({source}) and no recorded user decision for it "
                         f"(<home>/{DECISION_NAME} says {decided or 'nothing'}). Non-shadow modes move live min_ev cuts."))
+            break
+    pooling_seen = {}
+    if row.get("pass_pooling"):
+        pooling_seen["today's pass line"] = str(row["pass_pooling"])
+    if readout.get("pooling"):
+        pooling_seen[f"readout {readout.get('date')}"] = str(readout["pooling"])
+    decided_pooling = str(decision.get("pooling") or "").strip().lower()
+    for source, pooling in pooling_seen.items():
+        value = pooling.strip().lower()
+        if value != "shadow" and value != decided_pooling:
+            out.append((PREFIX + "pooling", FAIL if value == "on" else WARN,
+                        f"min_ev tuner pooling={pooling} ({source}) and no recorded user decision for it "
+                        f"(<home>/{DECISION_NAME} pooling says {decided_pooling or 'nothing'}); expected shadow."))
             break
     return out
 
