@@ -1248,7 +1248,7 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   - Game lines barely move (market anchor).
 - **A 2024-25 `player_logs.csv` append is NO-GO for the veterans.** It admits them with pre-injury numbers (Lillard 23.0 pts vs posted 18.5) and changes other inputs. Nothing was written to the fleet's file.
 - **Engine fact measured on the way:** the sim's summed player `pts_mean` runs **+8.5 pts over the anchored team score** on the 12 unaffected 10-21 sides. The player layer is not constrained to the team score.
-- **Open:** the pre-registered truth reading after the 10-21 games (findings_2026-10-20_nba_no_history_admit.md). After that, the user decides on enabling.
+- **Truth reading 10-21 (pre-registered rule): INCONCLUSIVE.** Minutes +0.080 [-0.455, +0.601] (97 teammates, 10 sides). Points NOT FAIL: -0.127 [-0.256, -0.009]. Minutes-prior MAE 3.93. `on` is NOT supported. By user decision `shadow` is to go on the refresh-worker (not yet applied at 2026-10-22 9:40 AM CT). The rule continues with fresh off/on arm pairs per slate until >= 250 teammate rows. The binding constraint per the reading is the sim's minutes layer: it gives minutes to bench players who did not play and squeezes starters by about 5.6 min.
 - **Truth reading `[verified 2026-10-22 6:56 AM CT, session 89514daa, 2ab3aaf5]`: INCONCLUSIVE -- minutes inconclusive, points not FAIL.**
   - Paired |on - actual| - |off - actual| teammate minutes: +0.080, 95% CI [-0.455, +0.601], n=97 over 10 sides.
   - Stand-ins: minutes-prior MAE 3.93; all 10 played.
