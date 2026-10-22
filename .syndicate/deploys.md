@@ -53052,3 +53052,27 @@ rather than defensive.
 - **Instrument note:** the first watcher's "FOUND" was a SELF-MATCH. ALL_PROCESS_MEMORY lines embed every process's argv, including the watcher's own `grep PROPS_HORIZON`, so the props reading above comes from the files, not from that hit.
 - **verify (OWED):** the branding step firing by its own gate. UEL/UECL files are dated 2026-10-15 22:17Z, so the first pregame run after 2026-10-22 ~22:17Z should log `SOCCER_UEFA_BRANDING_STALE league=uel|uecl` and rewrite both files. UCL was refreshed by hand 10-21, so its gate fires about 10-28.
 
+
+
+## 2026-10-22 00:33:55Z ff + 00:35:04Z live-odds-worker ROLE-ONLY restart (7:35 PM CT 10-21) -- fleet 9d4e742b -> 09e86a9d: in-game ENTRY rule running PAPER ONLY on NHL -- **MET (running; first signals/markouts OWED)** (lane `in-game-trading`, session 15ceeb14)
+- **ask:** the user, in THIS session: "Build the in-game entry module PAPER-ONLY (decides and records would-be entries, sends nothing), so tonight's NHL games measure the exact rule before any live money."
+- **context:** the live entry module was refused by this session's permission classifier at ~22:2xZ and was NOT built. I declined the coordinator session's offer to build that step in its session.
+- **code `09e86a9d`:** `syndicate/features/shared/inplay_entries_paper.py` (NEW) + 10 lines in the fast-exit thread (its own try/except).
+  - Rule: NHL `KXNHLSPREAD` rungs; ESPN in progress; >180 s since the last score change (the first sight of a live game counts as a change); Kalshi mid moved <=3c over 60 s; >=3 books on the exact line, <=120 s fresh, poll <=90 s; edge >=3% after fee.
+  - Would-be order: 1 contract at the ask, once per (ticker, leg) per day, $10/day would-be.
+  - Graded on the same thread: markout +60/+300 s after fee, and settled P&L per contract.
+  - Writes ONLY `reports/intelligence/inplay_entries_paper.json` + `[inplay_entries_paper]` lines.
+  - No order/ledger/guard/credential import: `tests/test_inplay_entries_paper.py` parses the module. 17 tests incl. thread wiring reachability.
+- **ride-alongs 9d4e742b..09e86a9d (runtime):** only the 2 files above.
+- **claim:** live-odds-worker, holder in-game-trading (token adeb8a60...). It replaced `live-min-stake-five`'s claim, which had EXPIRED at 23:37Z unused (fleet HEAD and pid unchanged). Released after this entry.
+- **spacing:** the prior live-odds-worker start was pid 3551831 at 22:15:51Z, so 2h19m.
+- **restart:** gate clear 00:35:04.340Z (0 children; RECONCILE kalshi/polymarket not_found=0 unknown=0). One TERM to 3551831. New pid **3587786**, 00:35:16Z.
+- **verify (00:38Z):**
+  - `00:35:24Z [execution_exits_fast] STARTED mode=live`.
+  - `00:35:27.776Z [inplay_entries_paper] ENTRY_PASS live_games=2 {passes 1, considered 14, signals 0, booked 0}`. 0 PASS_FAILED in either loop.
+- **ALSO READ (fast exits, live since 21:51Z):** the live path works end to end.
+  - `FAST_EXIT_LIVE_DISPATCH ... live_exits={'daily_count_cap': 3}` 00:35:27Z, then {'daily_count_cap': 1} x2.
+  - The UTC 10-22 live-exit cap (5 sales) was ALREADY used by 00:35Z, so the fast loop is handing off and the shared cap is refusing, as designed.
+  - The slow tick and EXECUTION are status=ok.
+- **owed:** the first WOULD_ENTER lines; then markout300_mean / pnl_1c_sum from ENTRY_PASS once games settle (findings §6 update).
+- **undo:** `LIVE_ODDS_WORKER__SYNDICATE_INPLAY_ENTRIES_PAPER=off` + a full down/up. Or `git revert 09e86a9d`, ff, gated TERM.
