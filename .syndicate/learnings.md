@@ -2815,3 +2815,11 @@ The 2026-10-20 entry said: "Rating INPUTS transfer, because the sim reads them w
 - How we found out: `ls -la` on the fleet's clv_openings dir -- five files at 33,553,6xx B -- then last captured_at per file against each order's submitted_at.
 - The rule going forward: before explaining a MISSING record by its content, check whether the writer stopped: file size against any ceiling, and the last record's timestamp against the missing item's time. A ceiling sized as a tripwire ("kilobytes", then 16, then 32 MiB) must log loudly when it fires and be re-sized from the max of a WEEK, not one measured day.
 - Cost: every opening after the cut on 6 days is missing from the CLV report too; 523 order marks stamped None.
+
+### 2026-10-22 -- A same-identity sibling ledger is not a stand-in for a lost one: the population estimate undercounted lost openings 3.9x on 10-21 (lane clv-openings-ceiling)
+- **What we believed:** `opportunity_population` records every candidate first-sighted per (event, market, player, segment, side, line), so identities first seen after the openings cut, times the day's openings-per-identity ratio, would estimate the openings lost.
+- **What was actually true:** an opening is keyed with the BOOK as well. After a cut, much of the loss is a new best book on an identity the population already holds, and the population cannot see that.
+  - On 10-21 the estimate was 1,009 against 3,939 exact, a ratio of 3.9.
+  - On 18 pseudo-cut days it undercounted at a median of 1.34x.
+- **How we found out:** the price trail carries line and book per point. On every non-full date it reproduced the openings keys exactly, both ways, so it gave 10-21's exact loss to compare against.
+- **Rule:** before estimating a lost record set from a sibling ledger, check that the sibling's key carries every field of the lost key. Then validate the instrument on days where the truth is known (here, non-full dates and pseudo-cuts) before quoting it. If it cannot be validated, report it as a bound, never as a count.
