@@ -2829,3 +2829,11 @@ The 2026-10-20 entry said: "Rating INPUTS transfer, because the sim reads them w
 - **What was actually true:** every reader takes the latest snapshot ON OR BEFORE the game date. Until a 10-24 snapshot exists, a 10-24 build reads TODAY's. At 2:37 PM CT 10-22 the fleet wrote the NBA's 10-22 report as the WNBA 10-22 snapshot: 2 TOR rows, with 46 ESPN rows deleted. Every 10-24 build from then reads it. The props OUT refusal has no partial guard, so it takes those rows; the other three readers fall back to 10-21.
 - **How we found out:** a read-only per-date count of the fleet file while checking this lane's readers, then the 10-24 props log (`snapshot=2026-10-22`).
 - **Rule:** for a stacked-snapshot feed, a game's exposure starts at the first corrupted snapshot dated on or before the game, and that includes today's whenever builds run ahead. Derive the window from the readers' "on or before" rule and the build schedule, not from the game date.
+
+## 2026-10-22 -- RULE: before choosing a role prefix for a fleet env key, read WHICH ROLE'S PROCESS TREE runs the code; the NBA props refresh (every pregame NBA SmartSim) is a child of the LIVE-ODDS-WORKER `[lane nba-standins-shadow, session 15f24a49]`
+- **What happened:** I staged `REFRESH_WORKER__SYNDICATE_NBA_NO_HISTORY_STANDINS=shadow`. Three full down/ups loaded it, and the refresh-worker read `shadow`. But 0 stand-in lines appeared in 4.5 h of NBA props refreshes. The refresh is `run_live_odds_refresh_worker.py -> run_refresh_odds_job.py -> refresh_odds_sources.py -> refresh_nba_oddsapi_props.py`, by the ppid chain in an ALL_PROCESS_MEMORY snapshot.
+- **Why I got it wrong:** a sibling lane's trace began "refresh-worker -> scripts/refresh_odds_sources.py". I wrote it into my findings as "env change on the refresh-worker only" without re-reading it. The env read confirmed the key had LOADED. It could not show the key had REACHED the code, because I read the wrong process. This is the same class as the memory "loop ownership is an env flag that moves with no diff".
+- **RULE:**
+  - Name the process that runs the code by its ppid chain: an ALL_PROCESS_MEMORY snapshot carries pid, ppid and cmdline for every process.
+  - Prefer an unprefixed key for a switch that only logs (shadow).
+  - Verify on the code's OWN output line, not on the env of a role you assumed.

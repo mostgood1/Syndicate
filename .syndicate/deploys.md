@@ -53625,3 +53625,22 @@ which is about the two sizing bases and not about the refusal boundary.
   - (3) After 12:00 AM CT 10-23, the 10-22 rows are still present: a late fetch writes 10-23 and leaves 10-22.
 - **verify:** reading (1)+(2) is OWED. A watcher is armed for the first write after the ff, polling mtime every 30 s for up to 2 h.
 - **undo:** `git checkout 21b4bdb0 -- syndicate/features/wnba/source_cli/scrapers/injuries.py` in `~/Syndicate` reverts the WNBA writer only. A full undo is `git reset --keep 21b4bdb0`, which also drops the ride-alongs. No restart is needed for the writer.
+
+## 2026-10-22 20:03:53Z (3:03 PM CT) -- CORRECTION + RE-STAGE: the 14:51:33Z staged stand-in switch was INERT (wrong role); now staged UNPREFIXED, loads at the NEXT full down/up (lane `nba-standins-shadow`, session 15f24a49, todo #714)
+- **What was wrong:** I staged `REFRESH_WORKER__SYNDICATE_NBA_NO_HISTORY_STANDINS=shadow`. The NBA props refresh, and so every pregame NBA SmartSim build, runs under the **live-odds-worker**. Verified by the ppid chain in the 19:11Z ALL_PROCESS_MEMORY snapshot: `refresh_nba_oddsapi_props.py` <- `refresh_odds_sources.py` <- `run_refresh_odds_job.py` <- `run_live_odds_refresh_worker.py` (pid 3942342) <- `local_production.py`.
+  - The three full down/ups since then (16:18Z, 19:03Z, 19:34Z) loaded the key into the refresh-worker only. The refresh-worker read `shadow`, but nothing there runs a sim.
+  - The live-odds-worker never saw it: 0 `NBA_NO_HISTORY_STANDINS` lines in the props logs, though `SMART_SIM_RETURNED` ran after each up.
+  - Production behaviour was unchanged throughout. My findings and state said "refresh-worker" because I followed a trace I didn't re-read.
+- **Re-stage:** line 170 of `~/syndicate-prod/local_production.env` changed from `REFRESH_WORKER__SYNDICATE_NBA_NO_HISTORY_STANDINS=shadow` to `SYNDICATE_NBA_NO_HISTORY_STANDINS=shadow`. That reaches every role, like the minutes lane's `SYNDICATE_NBA_SIM_MINUTES_PRICED_FIRST`.
+  - The file stays at 174 lines; exactly 1 line changed.
+  - Backup: `.bak-nba-standins-restage-20261022T200353Z`.
+  - All three claims were held 20:02-20:04:05Z, for the edit only. No restart.
+- **Other role-scoped NBA keys:** only `LIVE_ODDS_WORKER__SYNDICATE_PREGAME_SWEEP_INTERVAL_SECONDS_NBA`, a schedule rather than a sim input. So the 10-20 scratch arms, built from refresh-worker keys, ran the same sim inputs production uses.
+- **FOR THE NEXT SESSION THAT DOES A FULL DOWN/UP:** this line rides along. It only logs (`"mode": "shadow"`).
+- **verify (OWED, at that `up`):**
+  - The live-odds-worker pid reads the key as `shadow` (enum only).
+  - The first NBA props refresh logs `NBA_NO_HISTORY_STANDINS` with `"mode": "shadow"`.
+  - NBA sims carry no `context.no_history_standins`.
+  - The background watcher in session 15f24a49 now reads the live-odds-worker.
+- **undo:** delete line 170. If that happens after the next up, a full down/up is also needed.
+- **Unrelated, for the record:** the user's "ff the fleet to the WNBA fix" (this session, ~2:2x PM CT) needed no action from me. Lane `wnba-injury-fleet-ff` had already done it at 19:59:11Z (ae2cb646 contains 066c2158 and the f5113511 ride-along the user approved here).

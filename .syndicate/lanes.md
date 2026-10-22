@@ -1770,6 +1770,7 @@ death, never life — do not invert it.
 - Verification: After the full down/up: refresh-worker env read (key name + enum value only) shows shadow; the first NBA props refresh logs NBA_NO_HISTORY_STANDINS with mode=shadow and an admitted list; NBA sims written after it carry no context.no_history_standins and no players[] change vs off (shadow appends nothing).
 - Blocked by: none
 - STAGED 2026-10-22 9:51 AM CT (user: "stage it for the next full down/up"): env line added (150 -> 151, 0 removed, backup .bak-nba-standins-shadow-20261022T145133Z); NOT loaded -- loads at the next full down/up by any session. GOAL: NOT MET until that up + the first shadow log line (deploys.md 2026-10-22 14:51:33Z). Claims: none held.
+- CORRECTION 2026-10-22 3:03 PM CT: the 9:51 AM line (REFRESH_WORKER__ prefix) was INERT -- the NBA props refresh runs under live-odds-worker (ppid chain), so 3 ups loaded it where no sim runs (0 shadow lines). Re-staged UNPREFIXED (SYNDICATE_NBA_NO_HISTORY_STANDINS=shadow, line 170, backup .bak-nba-standins-restage-20261022T200353Z; claims 20:02-20:04Z). GOAL: NOT MET until the next full down/up + the first shadow line (deploys.md 20:03:53Z).
 
 ### register-implied-from-price — CLOSED 2026-10-22 — opened 2026-10-22 — closed 2026-10-22 — session 36a5a820-aaa2-4a15-868e-bd8b90d5d331
 - Goal: tests/test_probability_differential.py::test_every_converter_is_registered_or_excused passes on origin/main with prediction_ledger._implied_from_price registered (dual-scale) in probability_differential REGISTRY

@@ -426,7 +426,9 @@ main until that lane lands): the 14 new tests plus `tests/test_nba_live_resim.py
 
   Arms A, A2, B are frozen in `/home/amyn/nba_nohist_scratch` (inputs 8:28 PM CT 10-20, run 9:39-10:12 PM CT); keep
   them until the reading. The tool is read-only on `--truth`.
-- **Enabling** `shadow` or `on` in production is an env change on the refresh-worker only (it builds the pregame
+- **Enabling** `shadow` or `on` in production is an env change [CORRECTED 2026-10-22: the pregame sims are built by
+  the LIVE-ODDS-WORKER (the NBA props refresh runs under it), so the key must be unprefixed or LIVE_ODDS_WORKER__; the
+  original text said refresh-worker and the first staging was inert -- deploys.md 2026-10-22 20:03:53Z] (it builds the pregame
   sims; the live filter keys on the persisted `pool_source` column, not on the switch) -- the user's decision, after
   the reading. Until then: OFF everywhere.
 - **Not done here, by scope:** unpriced no-history players (DAL's other rookies) -- no line, so no market-implied
