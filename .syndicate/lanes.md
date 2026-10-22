@@ -1709,6 +1709,14 @@ death, never life — do not invert it.
 - Verification: Findings file with per-date coverage, per-side table, market comparison and file:line trace; a pre-registered rule committed before any re-sim; if built: tests incl. off != on through _smart_sim_worker_run_local, a scratch arm pair on copies of fleet data read against the rule; todo #723 + deploys/state entries. No fleet change without the user's yes.
 - Blocked by: none
 
+### fitter-contract-price-units — OPEN — opened 2026-10-22 — session 2f9bdfe9
+- Goal: Offline fitters read live venue CONTRACT prices (0<p<1) via paper_settlement.profit_per_dollar and recover fair from requested_price (the price ev_pct is stamped against, venue_scope.py); live rows stop silently dropping (todo #719 follow-up)
+- Files: scripts/fit_probability_calibration.py, scripts/ev_overstatement_decomp.py, tests/test_fitter_contract_price_units.py
+- Hypothesis: live rows with fill_price 0<p<1 are dropped by fit_probability_calibration (fill-first, American-only profit); fit_staked_probability (requested-first) keeps live rows whose requested_price is American. LOAN REQUESTED for scripts/fit_staked_probability.py (lane sim-stake-unfitted-market-only) and scripts/paper_bet_optimization.py (lane paper-bet-optimization)
+- Falsification test: n/a
+- Verification: new tests pass; mutation of the unit branch fails them; before/after kept-row counts on the ledger
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
