@@ -53429,3 +53429,15 @@ which is about the two sizing bases and not about the refusal boundary.
 - **reading:** DEN@OKC already held $24.45 live (above the cap, placed before the rule was on), so a further $6.37 leg on a different player was refused and NO ledger row was written. A game's first leg was not touched (held_event > 0). Other orders in the same pass were placed normally (1 Kalshi, 1 Polymarket).
 - **window 16:18Z..16:50:38Z (live-odds-worker log, ALL_PROCESS_MEMORY excluded):** 8 executed live passes, 2 live orders, 1 `REFUSED_EVENT_CAP`, 0 `REFUSED_SAME_AXIS_HELD`, 0 `TRIMMED_TO_EVENT_CAP`, **0 `CONCENTRATION_SHADOW`** (the mode really is on), 0 tracebacks. Polymarket also refused 2 `already_held_other_slate` (D1, unchanged).
 - **still owed:** R1 (`axis_held_live`) has not fired live -- the first NCAAF/NFL weekend with alt ladders is the population that should exercise it. No P&L read; one day.
+
+
+## 2026-10-22 17:50Z -- READING, NO DEPLOY: min_ev tuner pieces LIVE on the fleet after lane venue-prop-close-coverage's down/up to aa06d5a1 -- **MET** (lane `min-ev-tuner-shadow`, session b98807bc)
+- **Carried by that deploy (verified with `merge-base --is-ancestor`):** `1da26316` (partial pooling, shadow), `7f6f7b1c` (CLV recomputed from prices, todo #719), `bf14f920`
+  (supervisor job `min-ev-tuner-readout` 13:15Z + watchdog checks), `c11423ec` (watchdog pooling-mode check). The fleet went 0a2986b4 -> aa06d5a1; down
+  17:49:25-17:49:58Z; all three roles `code=aa06d5a1` at 17:50:21Z (refresh-worker pid 3920125).
+- **Reading:** a read-only forced pass (`persist=False`) on the deployed checkout over the production ledger:
+  `MIN_EV_TUNER mode=shadow date=2026-10-22 cells=73 actions={'hold': 73} skipped={'ladder_not_pre_registered': 88, ...} pooling=shadow pooled_actions={'hold': 73} base=0.0 moves=0`.
+  73/73 cells carry `effective_cut_pct`; 0 bands at [0,1); the persisted state is untouched (last run 12:01:50Z). The first nightly with pooling in the line
+  is 2026-10-23 >= 12:00Z.
+- **Owed:** the supervisor job's first unattended readout artifact (2026-10-23 13:15Z) read back, which closes lane min-ev-tuner-readout-fleet (handed over to
+  this lane). 332cb014's planned bf14f920 down/up is now redundant for this code (told it).
