@@ -25,6 +25,8 @@ WHAT IS CHECKED (each a `fail` or a `warn`):
                   or its last run exited non-zero                            warn
   backup          newest complete snapshot younger than 30 h                 warn
   disk:<path>     < 10 GB free on the data root or the off-disk archive      warn
+  exec:min_ev_tuner:*  the tuner's daily pass missing by 13:00Z / failed (warn), or a
+                  non-shadow mode with no recorded user decision (fail) -- scripts/min_ev_tuner_watch.py
 
 ALERTING. A finding alerts when it is NEW, again while it persists (fail every
 6 h, warn every 24 h), and once when it clears. State lives in
@@ -358,9 +360,18 @@ def main(argv: list[str] | None = None) -> int:
 
         exec_findings, exec_state, exec_readings = xw.run(settings, now, state)
         findings.extend(exec_findings)
+    # MIN_EV TUNER (lane min-ev-tuner-readout-fleet, 2026-10-22): the shadow tuner's daily pass, failures and mode,
+    # read from refresh-worker.log + the readout artifact (scripts/min_ev_tuner_watch.py). Never fatal here.
+    tuner_row = state.get("min_ev_tuner") or {}
+    if os.environ.get("SYNDICATE_WATCHDOG_MIN_EV_TUNER", "1").strip().lower() not in {"0", "off", "false", "no"}:
+        from scripts import min_ev_tuner_watch as tw
+
+        tuner_findings, tuner_row = tw.run(home, settings.logs_dir, settings.data_root, state, now)
+        findings.extend(Finding(key, severity, message) for key, severity, message in tuner_findings)
     result, new_state = decide(findings, state, now)
     new_state["restarts"] = readings.get("restarts") or {}
     new_state["execution"] = exec_state
+    new_state["min_ev_tuner"] = tuner_row
     if execution_on:
         result["email"] = _deliver_email(settings, now, findings, state, new_state, result, exec_readings,
                                          send=not args.dry_run)

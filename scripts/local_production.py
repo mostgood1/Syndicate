@@ -1034,6 +1034,11 @@ SCHEDULED_JOBS: tuple[ScheduledJob, ...] = (
     # The evaluation takes its pre-registered looks once a day, after the night's results settle.
     ScheduledJob("kalshi-maker-shadow", 0, 0, ("scripts/run_kalshi_maker_shadow.py",), every_minutes=60),
     ScheduledJob("kalshi-maker-shadow-eval", 12, 30, ("scripts/evaluate_kalshi_maker_shadow.py",)),
+    # `min-ev-tuner-readout` (lane `min-ev-tuner-readout-fleet`, 2026-10-22): the min_ev tuner's daily shadow
+    # readout as a dated artifact, reports/intelligence/min_ev_tuner_readout/<date>.json, with no Claude session
+    # involved (the app's scheduled-task timer never fired here: 0 automatic runs 10-20..10-22). 13:15Z: after the
+    # worker's >= 12:00Z pass. rc 2 = the state is not today's. The watchdog checks the pass itself (min_ev_tuner_watch).
+    ScheduledJob("min-ev-tuner-readout", 13, 15, ("scripts/min_ev_tuner_daily_readout.py",)),
 )
 
 
