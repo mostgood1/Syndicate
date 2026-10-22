@@ -1943,6 +1943,14 @@ death, never life — do not invert it.
 - Verification: findings file with per-date lost counts before/after; new tests fail on origin/main's clv_opening_ledger.py and pass on the fix; clv/layer2/order_clv suites green; commit on origin/main
 - Blocked by: none
 
+### wnba-injury-snapshot-overwrite — OPEN — opened 2026-10-22 — session f4ebcf5f-001f-4807-9f8b-72a0ab2ef9df
+- Goal: The WNBA injury writer keeps each date's snapshot intact, as #730 (21b4bdb0) did for the NBA writer: NBAInjuryDatabase.update_injuries (wnba source_cli) replaces only the dates its rows carry, so a prefetch for D+1 never deletes or merges into another date and a late fetch for D (run after Central midnight) never deletes D; tests through update_injuries red on origin/main; the three WNBA readers (wnba_sim_availability, basketball_props_availability, features_enhanced.add_injury_features) checked; findings + todo entry. No fleet change without the user's yes. Side session of local_154af8e3 (todo #731 lead).
+- Files: syndicate/features/wnba/source_cli/scrapers/injuries.py (NBAInjuryDatabase.update_injuries + ESPNInjuryScraper row-date stamp section only), tests/test_wnba_injury_snapshot_writer.py (NEW), .syndicate/findings_2026-10-22_wnba_injury_snapshot_overwrite.md (NEW), docs/ai_context/todo.md (new item section only), .syndicate/state_basketball.md ([wnba-injury-nba-report] section only)
+- Hypothesis: update_injuries deletes the --date rows on every fetch (existing[date != date_str]) while ESPN stamps its rows datetime.now(): a fetch for D run on another Central day deletes D and writes/merges into today's snapshot; a prefetch for D+1 on D MERGES the scrape into D (dedupe keep-last), so a player who dropped off ESPN stays listed in D until a same-day fetch. Fleet evidence: no 10-12 snapshot (last 10-12 fetch ran 10-13 00:00:03 CDT).
+- Falsification test: a test through update_injuries on origin/main's file where a late fetch for D keeps D's rows and a D+1 prefetch replaces (not unions) D's rows would refute it
+- Verification: pytest tests/test_wnba_injury_snapshot_writer.py green, and red on origin/main's injuries.py (reachability); tests/test_wnba_injury_nba_report.py and related WNBA injury suites green; readers checked file:line in findings
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
