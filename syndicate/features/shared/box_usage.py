@@ -13,6 +13,10 @@ Free, keyless sources the cheat sheets already use (no OddsAPI):
   NFL  the nflverse play-by-play already on the data root (`nfl_source/tracking/nflverse/pbp/pbp_<season>.csv`,
        refreshed daily) -> TARGETS for a receiving prop, CARRIES for a rushing prop, PASS ATTEMPTS (sacks out) for a
        passing prop; the usual from the season's earlier games. No network.
+  NBA / WNBA  Syndicate's own player game logs on the data root (`<league>_source/data/processed/player_game_log_<season
+       >.csv`) -> MINUTES (2026-10-22: NBA prop losses carried no usage at all, 0 of 63). The usual comes from the SAME
+       phase as the graded game -- regular vs playoffs are different populations and are never mixed; a playoff game with
+       under three playoff games before it falls back to the regular season. No network.
 
 The usual is the mean over the `USUAL_GAMES` games before the graded one, across the season boundary (early in a
 season a player has three or four games). Every miss is reported as None -- a blank line on the card, never a guess.
@@ -155,12 +159,69 @@ def nfl_usage(data_root: Path, player: Any, date: str, market: Any) -> dict[str,
             "games": len(before), "count": True, "source": "nflverse play-by-play"}
 
 
+def _hoops_key(name: Any) -> str | None:
+    """Full name, lower-cased, punctuation and suffixes dropped ('Kelly Oubre Jr.' == 'kelly oubre')."""
+    parts = [p for p in re.sub(r"[^a-z ]", "", str(name or "").lower().replace("-", " ").replace(".", "")).split()
+             if p not in _SUFFIX]
+    return " ".join(parts) or None
+
+
+@lru_cache(maxsize=8)
+def _hoops_index(path: str, mtime: float) -> dict[str, dict[str, tuple[float, str]]]:
+    """player key -> {date: (minutes, season_type)} from one season's game log; `mtime` keys the cache."""
+    import csv
+
+    out: dict[str, dict[str, tuple[float, str]]] = {}
+    with open(path, encoding="utf-8", newline="") as fh:
+        for row in csv.DictReader(fh):
+            key, day = _hoops_key(row.get("PLAYER_NAME")), str(row.get("date") or "")
+            try:
+                minutes = float(row.get("MIN"))
+            except (TypeError, ValueError):
+                continue
+            if key and day:
+                out.setdefault(key, {})[day] = (minutes, str(row.get("season_type") or "regular").lower())
+    return out
+
+
+def hoops_usage(data_root: Path, league: str, player: Any, date: str) -> dict[str, Any] | None:
+    """Minutes in the graded game against the player's usual, from the league's own game logs (any season file that
+    exists around the date). None when he has no row that day (did not play) or too few earlier games."""
+    key = _hoops_key(player)
+    if not key or len(date) < 10:
+        return None
+    games: dict[str, tuple[float, str]] = {}
+    year = int(date[:4])
+    for season in (year - 1, year, year + 1):
+        path = Path(data_root) / f"{league}_source" / "data" / "processed" / f"player_game_log_{season}.csv"
+        if path.is_file():
+            games.update(_hoops_index(str(path), path.stat().st_mtime).get(key) or {})
+    if date not in games:
+        return None
+    actual, phase = games[date]
+    before = sorted(((d, m, t) for d, (m, t) in games.items() if d < date), reverse=True)
+    usual_from = [m for _d, m, t in before if t == phase][:USUAL_GAMES]
+    if len(usual_from) < MIN_USUAL_GAMES and phase != "regular":
+        usual_from = [m for _d, m, t in before if t == "regular"][:USUAL_GAMES]
+    usual = _usual(usual_from)
+    if usual is None:
+        return None
+    return {"metric": "Minutes", "unit": " min", "per": "minute", "actual": round(actual, 1), "usual": round(usual, 1),
+            "games": len(usual_from), "source": f"Syndicate {league.upper()} game log"}
+
+
 def usage_for(card: Mapping[str, Any], item: Mapping[str, Any], *, cache: Path, fetch: Any = None,
               data_root: Path | None = None) -> dict[str, Any] | None:
     """The graded game's usage for a player prop, or None (not a prop, an unsupported sport, a goalie, no id)."""
     sport = str(card.get("sport") or "").lower()
-    if (item.get("kind") or "prop") != "prop" or sport not in ("nhl", "mlb", "nfl"):
+    if (item.get("kind") or "prop") != "prop" or sport not in ("nhl", "mlb", "nfl", "nba", "wnba"):
         return None
+    if sport in ("nba", "wnba"):
+        try:
+            return hoops_usage(Path(data_root), sport, card.get("player") or item.get("player") or item.get("player_name"),
+                               str(card.get("date") or "")) if data_root else None
+        except Exception:  # noqa: BLE001 -- usage is a line on a card, never a failed grade
+            return None
     if sport == "nfl":
         try:
             return nfl_usage(Path(data_root), card.get("player") or item.get("player") or item.get("player_name"),

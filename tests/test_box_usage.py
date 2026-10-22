@@ -86,3 +86,31 @@ def test_two_players_sharing_a_key_are_never_guessed(tmp_path):
     (pbp / "pbp_2026.csv").write_text(head + "\n".join(rows) + "\n", encoding="utf-8")
     card = {"sport": "nfl", "date": "2026-10-15", "market": "Receptions", "player": "Jaxon Smith"}
     assert bu.usage_for(card, {"kind": "prop"}, cache=tmp_path, data_root=tmp_path) is None
+
+
+def _hoops_log(tmp_path, league, season, rows):
+    folder = tmp_path / f"{league}_source" / "data" / "processed"
+    folder.mkdir(parents=True, exist_ok=True)
+    lines = ["game_id,date,season,season_type,TEAM_ABBREVIATION,PLAYER_ID,PLAYER_NAME,MIN"]
+    lines += [f"g{i},{d},{season},{t},PHI,1,{name},{m}" for i, (d, t, name, m) in enumerate(rows)]
+    (folder / f"player_game_log_{season}.csv").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def test_nba_minutes_against_the_same_phase_usual_across_the_season_boundary(tmp_path):
+    """2026-10-22: NBA prop losses carried no usage (0 of 63). Minutes from the league's own game log; the usual from the
+    SAME phase -- last season's playoff minutes never set a regular-season usual."""
+    _hoops_log(tmp_path, "nba", 2025, [("2026-04-10", "regular", "Kelly Oubre Jr.", 30), ("2026-04-12", "regular", "Kelly Oubre Jr.", 32),
+                                       ("2026-05-01", "playoffs", "Kelly Oubre Jr.", 44), ("2026-05-03", "playoffs", "Kelly Oubre Jr.", 46)])
+    _hoops_log(tmp_path, "nba", 2026, [("2026-10-20", "regular", "Kelly Oubre Jr.", 28), ("2026-10-22", "regular", "Kelly Oubre Jr.", 18)])
+    card = {"sport": "nba", "date": "2026-10-22", "market": "player_points", "player": "Kelly Oubre"}
+    u = bu.usage_for(card, {"kind": "prop"}, cache=tmp_path, data_root=tmp_path)
+    assert u["metric"] == "Minutes" and u["actual"] == 18.0 and u["games"] == 3 and u["usual"] == 30.0   # (28+32+30)/3
+    assert bu.usage_for(dict(card, date="2026-10-21"), {"kind": "prop"}, cache=tmp_path, data_root=tmp_path) is None  # no game
+    assert bu.usage_for(dict(card, player="Somebody Else"), {"kind": "prop"}, cache=tmp_path, data_root=tmp_path) is None
+
+
+def test_a_playoff_game_with_few_playoff_games_falls_back_to_the_regular_season(tmp_path):
+    _hoops_log(tmp_path, "wnba", 2026, [("2026-08-01", "regular", "A Wilson", 34), ("2026-08-03", "regular", "A Wilson", 36),
+                                        ("2026-08-05", "regular", "A Wilson", 35), ("2026-09-20", "playoffs", "A Wilson", 40)])
+    u = bu.hoops_usage(tmp_path, "wnba", "A. Wilson", "2026-09-20")
+    assert u["games"] == 3 and u["usual"] == 35.0 and u["source"] == "Syndicate WNBA game log"
