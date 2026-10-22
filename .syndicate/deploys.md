@@ -53821,3 +53821,28 @@ which is about the two sizing bases and not about the refusal boundary.
 - **0** NBA sims written since 19:03:43Z carry `context.no_history_standins`. Shadow appends nothing.
 - **switch survives restarts:** a full down/up at 22:17:06Z (another session) brought up live-odds-worker pid 3992939, which reads `SYNDICATE_NBA_NO_HISTORY_STANDINS=shadow`.
 - **state now:** shadow is live and correct on the fleet. `on` stays a user decision. The pre-registered truth rule needs fresh off/on arm pairs per slate (97 of 250 teammate rows); those cannot accrue until a no-history player is priced again.
+
+## 2026-10-22 22:17Z (5:17 PM CT) -- PUBLISHED the pooled staked-probability profile + ff bdc61a1d -> f3bea489 + refresh-worker restart (lane `sim-stake-earned-profile`; user in chat: "Publish the pooled candidate profile behind claim + restart, with a deploys.md entry.")
+- **what:** the fleet's FIRST live staked-probability profile.
+  - `~/syndicate-prod/data/calibration/staked_probability_profile.json`, copied from `reports/staked_probability/candidate_pooled_2026-10-22.json` at 22:16:59.797Z (sha256 match, 993 B).
+  - Version `staked_probability_pooled_v1@2026-10-22T21:45:48Z`, one cell: `ncaaf|spreads|full|regular`, market_only, beta 0 (findings s10).
+  - Published against this lane's recommendation not to (shadow $0.00); the user chose to publish.
+- **locks:** claim refresh-worker 22:00:00Z (holder sim-stake-earned-profile). Drain CLEAR (worker idle, no board build), TERM, then undrain (DRAIN_CLEARED).
+- **ff:** guarded `bdc61a1d -> f3bea489` at 22:14:31Z (the phase-aware reader; it changes only `portfolio_commit.py` and `staked_probability_profile.py`).
+  - Not before 22:14:30Z: the 60-min gap after kalshi-round-up's 21:14Z respawn.
+- **RIDE-ALONG, not mine:** lane live-event-concentration ff'd the fleet to `b3279e52` at 22:15:34Z (#711 tiny-held-leg R1), between my ff and my TERM, and restarted live-odds-worker at 22:15:41Z.
+  - My respawn therefore loaded `b3279e52` in refresh-worker: status `code=b3279e52`, pid 3993359, lstart 22:17:05Z.
+  - That lane confirms it is INERT there: `SYNDICATE_LIVE_EVENT_CONCENTRATION` is set for live-odds-worker only.
+  - Told the lane by message.
+- **expect:**
+  - Stakes unchanged. Under the live `market` mode a market_only cell takes the same branch as an unfitted one, so model_probability = market fair (seam probe: 4 of 4 identical).
+  - Only the provenance label changes: `market_fair@unfitted` -> `market_fair@staked_probability_pooled_v1@...`.
+- **verify (MET 22:32:10Z), fleet ledger read through the live keyvalue document:**
+  - 38 orders submitted after the 22:17:05Z respawn.
+  - **9 carry `staked_probability_version = market_fair@staked_probability_pooled_v1@2026-10-22T21:45:48Z`.** The profile is read by refresh-worker.
+  - The other 29: 27 with no version (rows with no sizing provenance) and 2 `unfitted` (no model view).
+  - 11 of the 38 are ncaaf spreads full.
+  - Loader read on the fleet with the role's data root: source=artifact, the same version and cell.
+- **not measured:** a per-order stake comparison against an unpublished twin. "Stakes unchanged" rests on the code path and the seam probe.
+- **revert:** `rm ~/syndicate-prod/data/calibration/staked_probability_profile.json`. The loader is mtime-cached, so the next commit reads the absent file as `unfitted`; no restart needed.
+
