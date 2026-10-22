@@ -53256,3 +53256,20 @@ re-inheriting it.
 - Still on the data disk, deliberately: `<data>/mlb_source/sim_engine/live_prop_ranking.py` (byte-identical to the repo
   module; the DEPLOYED cards.py still execs it until 09d5795c is loaded) and `<data>/mlb_source/source_artifacts/
   sim_engine/live_prop_ranking.py` (stale copy, unread). Both go after 09d5795c is on the fleet AND web + workers loaded it.
+
+## 2026-10-22 14:51:33Z (9:51 AM CT) -- STAGED, NOT LOADED: `REFRESH_WORKER__SYNDICATE_NBA_NO_HISTORY_STANDINS=shadow` added to the fleet env; it loads at the NEXT full down/up by any session (lane `nba-standins-shadow`, session 15f24a49, todo #714)
+- **user:** the standing decision is "if it's inconclusive, go ahead with shadow mode" (2026-10-21). The 10-22 truth reading was INCONCLUSIVE (findings_2026-10-20_nba_no_history_admit.md). The user's choice in this session, 2026-10-22 ~9:50 AM CT: "stage it for the next full down/up". So no dedicated restart was done.
+- **code:** 73082de2 (stand-in module + 3 sim hooks + live filter). It has been on the fleet since the 10-21 7:55 AM CT ff (d76c85ce); the fleet is at 09e86a9d.
+- **what shadow does:** the props refresh logs `[nba_no_history_standins] NBA_NO_HISTORY_STANDINS {... "mode": "shadow", "admitted": [...]}`. It appends nothing to the pool and changes no sim, price or order.
+- **env:** 150 -> 151 nonblank lines, 0 removed. The only added key is `REFRESH_WORKER__SYNDICATE_NBA_NO_HISTORY_STANDINS` (value `shadow`). Backup: `~/syndicate-prod/local_production.env.bak-nba-standins-shadow-20261022T145133Z`.
+- **claim:** the refresh-worker claim was held only for the edit, 14:51:2xZ-14:51:53Z, then released. No down, no TERM, no drain.
+- **running roles unchanged:** supervisor 3860384 (up since 14:45:28Z, live-min-stake-five's down/up). The refresh-worker (pid 3860450) still reads the key as absent, by design: the env loads only at `up`.
+- **FOR THE NEXT SESSION THAT DOES A FULL DOWN/UP:** this line rides along. It is not yours to measure, but please list it under ride-alongs. Its effect is logging only.
+- **verify (OWED, at that `up`):**
+  - The new refresh-worker pid reads the key as `shadow` (enum only).
+  - The first NBA props refresh after it logs `NBA_NO_HISTORY_STANDINS` with `"mode": "shadow"` (`nba_source/logs/syndicate_refresh_oddsapi_props_<date>.log`).
+  - NBA sims written after it carry no `context.no_history_standins`.
+  - A background watcher in session 15f24a49 polls for the next `up`.
+- **undo:**
+  - Before the next `up`: delete the line. No restart is needed.
+  - After the next `up`: delete the line, or restore the backup if nothing else changed since. Then a full down/up under all three claims.

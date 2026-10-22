@@ -1732,6 +1732,7 @@ death, never life — do not invert it.
 - Falsification test: n/a
 - Verification: After the full down/up: refresh-worker env read (key name + enum value only) shows shadow; the first NBA props refresh logs NBA_NO_HISTORY_STANDINS with mode=shadow and an admitted list; NBA sims written after it carry no context.no_history_standins and no players[] change vs off (shadow appends nothing).
 - Blocked by: none
+- STAGED 2026-10-22 9:51 AM CT (user: "stage it for the next full down/up"): env line added (150 -> 151, 0 removed, backup .bak-nba-standins-shadow-20261022T145133Z); NOT loaded -- loads at the next full down/up by any session. GOAL: NOT MET until that up + the first shadow log line (deploys.md 2026-10-22 14:51:33Z). Claims: none held.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
