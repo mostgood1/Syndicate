@@ -1414,5 +1414,6 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
 - **NOT ON THE FLEET.** It needs an ff (the user's yes), no restart.
   - **Next WNBA game: 10-24 ATL v GSV**, exposed from 10-23 ~11 PM CT.
   - Verify: the next NBA-game-day WNBA fetch summary has 0 QUESTIONABLE/PROBABLE/DOUBTFUL/TOR rows, and `readmitted_injury_return=0`.
-- **Leads:** WNBA ESPN rows are stamped `now()`, not `--date` (fixed for NBA by `#730`, not for WNBA): a late fetch for D deletes D's snapshot, and the WNBA file has no 10-12.
+  - **Fleet reading 2026-10-22 2:37 PM CT (lane wnba-injury-snapshot-overwrite, read-only):** the exposure is ALREADY open. The fleet (`21b4bdb0`, no `066c2158`) wrote the NBA's 10-22 report as the WNBA 10-22 snapshot: 2 TOR rows with spliced names, 46 ESPN rows deleted (1,027 -> 981). Every 10-24 build reads 10-22 as its latest snapshot. The props OUT refusal has no partial guard; the SmartSim, `wnba_sim_availability` and `league_status` fall back to 10-21. The last 10-24 build (4:08 AM CT) still read the ESPN rows (48 OUT, 0 lines refused).
+- **Lead FIXED ON MAIN by `#733` (`ae2cb646`), NOT ON THE FLEET:** a fetch for D run after midnight deleted D's snapshot (no 10-12), and a prefetch merged its scrape into today's. A fetch now replaces only the dates its rows carry, and ESPN rows carry the scrape's Central day, stamped once per scrape. An ff to `ae2cb646` or later carries `#731` too. `findings_2026-10-22_wnba_injury_snapshot_overwrite.md`.
 - Findings: `findings_2026-10-22_wnba_injury_nba_report.md`.
