@@ -1889,9 +1889,10 @@ death, never life — do not invert it.
 - Verification: pytest new test file red on origin/main order_clv.py and green on the fix; fleet replay over settled MLB/NCAAF/NFL paper orders: count with no opening that still lack a close, before vs after, with denominators
 - Blocked by: none
 
-### live-order-ev-pct-gap — OPEN — opened 2026-10-22 — session c75c910c-314d-46df-a05d-54ebf00d1e00
+### live-order-ev-pct-gap — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session c75c910c-314d-46df-a05d-54ebf00d1e00
+- GOAL VERDICT `[2026-10-22 17:21Z / 12:21 PM CT]`: MET. The write path is named: no live placement path omits `ev_pct`. All 552 unusable settled live rows are `venue_ledger_rebuild` (`ev_pct` null by design; kalshi 420 priced by fill_price, polymarket 132 unpriced). 125 of 125 fleet-placed live orders carry `ev_pct` and a price, and 0 rows have the key absent. Census verified on the fleet venv with the keyvalue read asserted (17:12:56Z). No write-path fix is warranted; the reader-side drop-name lead goes to the fitter lanes. Findings: `.syndicate/findings_2026-10-22_live_order_ev_pct_gap.md`; todo #728 closed.
 - Goal: todo #728: name the write path(s) that leave settled LIVE execution-ledger orders without ev_pct/price, counted by time window and builder (key absent vs null); propose a default-off, reachability-tested fix if warranted
-- Files: .syndicate/findings_2026-10-22_live_order_ev_pct_gap.md scripts/ledger_live_ev_pct_census.py
+- Files: .syndicate/findings_2026-10-22_live_order_ev_pct_gap.md, scripts/ledger_live_ev_pct_census.py, docs/ai_context/todo.md (#728 section ONLY), docs/ai_context/todo_closed.md (#728 entry ONLY)
 - Hypothesis: the missing ev_pct rows are written by a live path that builds OrderRequest without ev_pct (venue rebuild / exits / ladder) or by pre-ev_pct builders (key absent)
 - Falsification test: missing-ev_pct live rows all carry the key from the current builder AND come from portfolio_commit with ev_pct on the position
 - Verification: census script on the fleet venv with read_json_file_result()[1] asserted True; counts by window x builder sum to 420/131

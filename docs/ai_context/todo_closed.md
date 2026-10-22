@@ -17,6 +17,13 @@ work takes the next free number (see the counter at the top of `todo.md`).
 ---
 
 
+### `#728` — **CLOSED 2026-10-22: no live write path omits `ev_pct`. All 552 unusable settled live orders are `venue_ledger_rebuild` rows (the 2026-10-02 reconstruction of the Render-era book, slates 08-06..09-27), which carry `ev_pct=None` by design; 125 of 125 live orders placed on the fleet (10-19..10-22) carry `ev_pct` and a price** — lane `live-order-ev-pct-gap`, session c75c910c; `.syndicate/findings_2026-10-22_live_order_ev_pct_gap.md`
+- Opened by lane `sim-stake-earned-profile` (session bde77672): of 626 settled live orders, 420 had no `ev_pct` and 131 no price, so only 74 were usable by the fitters.
+- **Census** (fleet ledger, read-only 17:12:56Z, keyvalue read asserted, `scripts/ledger_live_ev_pct_census.py`): 627 settled live. The `ev_pct` key is absent on 0 rows, so no old builder survives. It is null on 552 rows, all `source=venue_rebuild` (kalshi 420 priced by `fill_price`, polymarket 132 with no price at all). It has a value on 75 rows, all fleet `place_order` rows. The fitter drop order reproduces #728's 132 / 420 / 75.
+- **Unrecoverable, and must stay null:** decision-time `ev_pct` lived only in Render's suspended keyvalue. The fleet's openings and plans start 09-30, and git tracks none. The rebuild rows carry no market, line or event id to join on anyway.
+- **What #728 measured is a short history:** the measurable live book began 10-19 (settled 1 / 15 / 59 on 10-19 / 10-20 / 10-21).
+- **Follow-up (peer lanes' files):** the fitters report the rebuild rows as `no_ev_pct` / `no_price`. Naming that drop `venue_rebuild` would stop it reading as a leak. It changes no fitted number.
+
 ### `#720` — **Basketball SmartSims were rebuilt AFTER TIP, rewriting the pregame sim and the live re-sim's engine inputs mid-game: 10 of 145 NBA builds (7 of 74 games, all three 10-20 games), 1 of 60 WNBA. FREEZE AT TIP built (aaa988a8, on by default, user decision)** — lane `freeze-nba-pregame-sims`, session d07b749c; `.syndicate/findings_2026-10-21_post_tip_rebuilds.md` — **CLOSED 2026-10-22: live on the fleet since 2026-10-21 11:56 AM CT; the 10-21 slate had 0 post-tip rebuilds and 47 `frozen=1` lines (deploys.md 2026-10-22)**
 - **Measured** (fleet props logs 10-03..10-21, `scripts/basketball_posttip_rebuilds.py`):
   - Triggers: 8 exclusion drift, 2 calibration stamp, 0 odds anchor, 0 roster pool (that check has run on no tipped game yet).
