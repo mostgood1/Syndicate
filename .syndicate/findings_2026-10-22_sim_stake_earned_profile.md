@@ -201,6 +201,11 @@ market-only. Its beta upper bound of 0.65 rules out the old full-weight sizing (
   staked-probability fit, and to any other fitter using the sizer's derivation.
 - The 74 usable live rows are mostly kalshi nba spreads_alt (29) and nba player props.
 - Not investigated here; recorded as a lead.
+- **RESOLVED 2026-10-22 (`e0f22300`, `findings_2026-10-22_live_order_ev_pct_gap.md`, todo #728 closed):**
+  no live write path drops `ev_pct`. All 552 unusable settled live rows come from the 2026-10-02 venue rebuild
+  of the Render-era book, which carries `ev_pct` null by design and cannot be recovered. All 125 live orders
+  placed on the fleet carry `ev_pct` and a price. So the live book is fittable from 10-02 on, and it is
+  simply young.
 
 ## s7. Tooling defect found on the way
 
