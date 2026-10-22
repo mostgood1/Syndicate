@@ -53162,3 +53162,16 @@ field added by a partial deploy must treat "key absent" as a THIRD state and
 attribute it by time window, not fold it into the null bucket. My own first pass
 did fold them together — `o.get(...)` returned `None` for both and reported "289
 None", which hid a 71/218 split with two completely different causes.
+
+## 2026-10-22 14:28Z (9:28 AM CT) -- MIN_EV TUNER READOUT 3/7 (shadow, lane min-ev-tuner-shadow)
+- **READ-ONLY.** Scheduled task `min-ev-tuner-daily-readout`. No deploy, restart, ff, env or tuner-state write.
+- **ran: YES.** `2026-10-22T12:01:51.256Z [min_ev_tuner] MIN_EV_TUNER mode=shadow date=2026-10-22 cells=73 actions={'hold': 73} skipped={'ladder_not_pre_registered': 80, 'no_ev_pct': 552, 'not_settled': 2514, 'paper_twin_of_live': 2, 'venue_not_tuned': 7578} base=0.0 moves=0`. 0 `MIN_EV_TUNER_FAILED` / `_SAVE_FAILED` / `_HOOK_FAILED` lines in refresh-worker.log (current file, rotated 10-22 07:48Z) or refresh-worker.log.1 (which holds only the 10-21 12:04:42Z tuner line).
+- **state (`min_ev_tuner_readout.py state --limit 8`, 14:23Z):** mode=**shadow** (no alarm). last_run_at=2026-10-22T12:01:50Z, base=0.0, actions={'hold': 73} (73 of 73 cells; 68 on 10-21, 60 on 10-20). Params unchanged: step 0.5 / floor 0.0 / ceiling 6.0 / trailing 150 / min_events 40 / min_clv_events 30 / min_new 20 / z 2.0 / band 1.0; CLV scope same_book; evidence live,paper. **audit: 0 moves.**
+- **day-over-day skips:** `ladder_not_pre_registered` 14 -> 80 (ladder rows are flowing and are skipped as pre-registered), `not_settled` 1811 -> 2514, `paper_twin_of_live` 1 -> 2, `venue_not_tuned` 7497 -> 7578, `no_ev_pct` 552 unchanged.
+- **top cells (band = marginal [effective cut, +1); ROI basis FLAT):**
+  - kalshi ncaaf spreads: band [3.79, 4.79) 46 events (45 yesterday), flat ROI -6.9% (t -0.39), $ROI -10.7%, EV-only $ -6.9%; CLV 18/30 events, +1.97 (t 4.21). hold `insufficient_clv_events`.
+  - polymarket ncaaf totals: band [3.34, 4.34) 46 events, flat +9.6% (t 0.61), $ROI -5.3%, EV-only $ +11.6%; CLV 28/30 events, +1.65 (t 4.52). hold `insufficient_clv_events`. **Still the closest cell, still 2 CLV events short, and no new rows since 10-21.** Once filled it would hold `only_clv_significant` (ROI t 0.61, far from +/-2).
+  - kalshi ncaaf h2h: band [0.88, 1.88) 22/40 events, flat -8.5% (t -0.63), CLV 19 events -1.60 (t -0.70). `insufficient_events`.
+  - kalshi ncaaf totals 5/40, polymarket ncaaf h2h 17/40, polymarket ncaaf spreads 20/40 (flat -28.9%, t -1.04), kalshi nfl receptions 16/40 (flat +36.5%, t 1.90), kalshi mlb batter_hits_runs_rbis postseason 7/40: all `insufficient_events`. Bands barely moved in a day: the NCAAF marginal bands gain about 0-1 event a night.
+- **code:** `local_production.py status` at 14:23Z: refresh-worker code=09e86a9d (= fleet HEAD 09e86a9db, not stale; restarts=3). `git merge-base --is-ancestor affc9a7b 09e86a9d` = yes: flat-unit grading is loaded (also loaded at readout 2).
+- **verify:** this READING is the `MIN_EV_TUNER` line stamped 12:01:51Z with date=2026-10-22, plus `last_run_at=2026-10-22T12:01:50Z` read back from keyvalue. Next readout: 4/7 on 10-23.
