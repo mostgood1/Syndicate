@@ -773,6 +773,9 @@ _CLOSE_FIELDS = (
     "close_book_scope",
     "matched_bookmaker",
     "no_close_reason",
+    # `order` when no opening was recorded and the fill itself was the open
+    # (`order_clv.OPENING_FROM_ORDER`); absent on every other mark.
+    "opening_source",
 )
 
 

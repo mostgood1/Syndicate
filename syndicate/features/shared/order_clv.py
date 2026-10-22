@@ -119,6 +119,113 @@ def _order_scope(order: Mapping[str, Any], row: Mapping[str, Any]) -> str:
     return scope
 
 
+# AN ORDER WITH NO RECORDED OPENING IS STILL A BET WITH A CLOSE.
+#
+# `compute_clv_for_date` resolves OPENINGS, and an order joins it by
+# `opening_key`. An order whose opening was never recorded therefore got no row
+# at all and was stamped `no_close_for_market` with no reason, however much of
+# its own book's pregame quoting the quote log held. MEASURED on the fleet
+# ledger 2026-10-22 (lane `venue-order-opening-gap`): 523 of 7,777 settled
+# MLB / NCAAF / NFL paper orders (MLB 78 of 901) had no opening in any file
+# within +-3 days. Two mechanisms put them there:
+#
+#   * `clv_opening_ledger._MAX_LEDGER_BYTES` stops a date's file at 32 MiB, and
+#     6 of 24 dates 09-30..10-23 hit it (10-11's last write was 19:03Z, before
+#     that night's games). 330 of the 523 were placed after their date's file
+#     had stopped growing.
+#   * The rest name a (line, book) no file recorded. Openings are keyed on the
+#     board's best book at first sighting, while `venue_scope` rewrites
+#     `quote.bookmaker` to the venue and an unrestricted order takes whichever
+#     book is best when it is placed.
+#
+# The order itself carries every field the quote log is keyed on, and its own
+# submit time is the honest opening clock: it is when WE took the price. So such
+# an order is resolved straight from the quote log, through the same resolver
+# and the same arrow-of-time rule as an opening, and named apart when it fails
+# (`no_opening:<reason>`) so the residual is attributable rather than None.
+OPENING_FROM_ORDER = "order"
+_NO_OPENING_PREFIX = "no_opening:"
+
+
+def _opening_from_order(order: Mapping[str, Any], key: str, entry: float) -> dict[str, Any]:
+    """The opening-shaped record the quote resolver reads, built from the order."""
+    return {
+        "key": key,
+        "sport": str(order.get("sport") or "").strip().lower(),
+        "event_id": str(order.get("event_id") or "").strip() or None,
+        "market": str(order.get("market") or "").strip().lower() or None,
+        "segment": order.get("segment"),
+        "side": str(order.get("side") or "").strip().lower() or None,
+        "player_name": order.get("player_name"),
+        "line": order.get("line"),
+        "bookmaker": _book_name(order.get("book")) or None,
+        "price": entry,
+        # WHEN WE TOOK THE PRICE. A close must be observed after it, exactly as
+        # it must be observed after an opening's first sighting.
+        "captured_at": order.get("submitted_at"),
+        "commence_time": order.get("commence_time"),
+    }
+
+
+def _quote_closes_for_orders(
+    pending: Sequence[tuple[Mapping[str, Any], str, float]],
+    *,
+    loader: Any,
+    state_reader: Any,
+    now: Any,
+) -> dict[int, dict[str, Any]]:
+    """id(order) -> a close row (as `compute_clv_for_date` shapes one) or `{"reason": ...}`."""
+    from syndicate.features.shared.clv_join import (
+        BOOK_QUOTES_CLOSE_SOURCE,
+        _parse_ts,
+        _quote_closes_for_openings,
+    )
+
+    out: dict[int, dict[str, Any]] = {}
+    by_sport: dict[str, list[tuple[Mapping[str, Any], dict[str, Any]]]] = {}
+    for order, key, entry in pending:
+        opening = _opening_from_order(order, key, entry)
+        if not opening["event_id"] or not opening["commence_time"] or not opening["captured_at"]:
+            out[id(order)] = {"reason": "order_lacks_identity"}
+            continue
+        by_sport.setdefault(opening["sport"], []).append((order, opening))
+
+    for sport, items in sorted(by_sport.items()):
+        try:
+            resolved_rows, _stats = _quote_closes_for_openings(
+                [opening for _, opening in items], sport, loader, now=now, state_reader=state_reader
+            )
+        except Exception as exc:  # noqa: BLE001 -- one sport failing must not lose the others
+            for order, _ in items:
+                out[id(order)] = {"reason": f"quotes_failed:{type(exc).__name__}"}
+            continue
+        for (order, opening), resolved in zip(items, resolved_rows):
+            if resolved.get("close_price") is None:
+                out[id(order)] = {"reason": str(resolved.get("unresolved_reason") or "quotes_no_close")}
+                continue
+            # The arrow of time, as `compute_clv_for_date` applies it to a quote
+            # close: a last change at or before our fill is "unchanged since we
+            # took it" -- or a pulled market -- and the log cannot tell which.
+            open_at = _parse_ts(opening.get("captured_at"))
+            close_at = _parse_ts(resolved.get("close_captured_at"))
+            if open_at and close_at and close_at <= open_at:
+                out[id(order)] = {"reason": "quotes_unchanged_since_open"}
+                continue
+            out[id(order)] = {
+                "key": opening["key"],
+                "close_price": resolved.get("close_price"),
+                "close_source": resolved.get("close_source") or BOOK_QUOTES_CLOSE_SOURCE,
+                "close_captured_at": resolved.get("close_captured_at"),
+                "close_book_scope": resolved.get("close_book_scope"),
+                "close_bookmaker": resolved.get("close_bookmaker"),
+                "matched_bookmaker": resolved.get("matched_bookmaker") or opening["bookmaker"],
+                "bookmaker": opening["bookmaker"],
+                # No opening, so no opening CLV: None, never a stand-in.
+                "clv_pct": None,
+            }
+    return out
+
+
 def clv_for_orders(
     orders: Sequence[Mapping[str, Any]],
     *,
@@ -126,13 +233,25 @@ def clv_for_orders(
     clv_rows: Sequence[Mapping[str, Any]] | None = None,
     unresolved_rows: Sequence[Mapping[str, Any]] | None = None,
     root: Any = None,
+    quote_rows: Any = None,
+    quote_state: Any = None,
+    now: Any = None,
 ) -> dict[str, Any]:
     """Grade each order against the close. Per order, then per market, per scope.
 
     `clv_rows` is injectable so a caller that already ran `compute_clv_for_date`
     (or a test) does not recompute; absent, it is computed for every sport the
     orders touch.
+
+    An order whose opening the resolver never saw is resolved from the quote log
+    on its own identity (see `OPENING_FROM_ORDER`). The quote log is read from
+    disk only when this function computed `clv_rows` itself; a caller that
+    injects `clv_rows` has chosen its close source and gets the quote pass only
+    if it injects `quote_rows` too -- `compute_clv_for_date`'s rule for
+    `history_payload`, for the same reason. `now` is the instant a game counts
+    as started; tests pin it.
     """
+    computed_rows = clv_rows is None
     from syndicate.features.shared.clv_join import clv_pct_from_prices
     from syndicate.features.shared.clv_opening_ledger import FAIR_PROVENANCE_FIELDS
     from syndicate.features.shared.clv_position_join import opening_key_for_position
@@ -182,6 +301,32 @@ def clv_for_orders(
         if isinstance(key, str) and key:
             unresolved_by_key.setdefault(key, str(row.get("reason") or ""))
 
+    # The orders the resolver never saw an opening for, resolved in one quote
+    # pass per sport before grading so a shard is streamed once, not per order.
+    loader, state_reader = quote_rows, quote_state
+    if loader is None and computed_rows:
+        from syndicate.features.shared.clv_join import (
+            read_quote_rows_for_events,
+            read_quote_state_for_keys,
+        )
+
+        loader = read_quote_rows_for_events
+        state_reader = state_reader or read_quote_state_for_keys
+    from_orders: dict[int, dict[str, Any]] = {}
+    if loader is not None:
+        pending: list[tuple[Mapping[str, Any], str, float]] = []
+        for order in orders:
+            key = order.get("opening_key")
+            key = key if isinstance(key, str) and key else opening_key_for_position(order)
+            entry = _entry_price(order)
+            if entry is None or key is None or key in by_key or key in unresolved_by_key:
+                continue
+            pending.append((order, key, entry))
+        if pending:
+            from_orders = _quote_closes_for_orders(
+                pending, loader=loader, state_reader=state_reader, now=now
+            )
+
     graded: list[dict[str, Any]] = []
     reasons: dict[str, int] = {}
 
@@ -220,6 +365,19 @@ def clv_for_orders(
             _row(REASON_UNKEYABLE, close_price=None, clv_pct=None, close_book_scope=None)
             continue
         row = by_key.get(key)
+        opening_source = None
+        if row is None and id(order) in from_orders:
+            found = from_orders[id(order)]
+            if found.get("close_price") is None:
+                _row(
+                    REASON_NO_CLOSE,
+                    close_price=None,
+                    clv_pct=None,
+                    close_book_scope=None,
+                    no_close_reason=_NO_OPENING_PREFIX + str(found.get("reason")),
+                )
+                continue
+            row, opening_source = found, OPENING_FROM_ORDER
         if row is None:
             # No close for this market -- and WHY, when the resolver told us.
             # `no_close_reason` distinguishes `no_market_in_history` (this
@@ -264,6 +422,9 @@ def clv_for_orders(
             # The opening's fair-price provenance, so placed orders split by
             # anchor tier and book the same way the openings do (P1d).
             **{field: row.get(field) for field in FAIR_PROVENANCE_FIELDS},
+            # `order` when no opening was recorded and the order's own fill was
+            # the open (see `OPENING_FROM_ORDER`); absent otherwise.
+            **({"opening_source": opening_source} if opening_source else {}),
         )
 
     resolved = [row for row in graded if row["reason"] == REASON_RESOLVED]
