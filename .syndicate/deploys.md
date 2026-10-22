@@ -53630,6 +53630,11 @@ which is about the two sizing bases and not about the refusal boundary.
   - 10-22 is now 48 rows, all OUT, over 13 WNBA teams (ATL 8, SEA 7, PHX 6, CHI 5 ...), with **0 TOR rows** and no QUESTIONABLE/PROBABLE/DOUBTFUL. The 2 NBA rows are gone.
   - The file went 981 -> 1,027 rows over 21 dates. No 10-23 rows. 10-18..10-21 are unchanged at 48 each.
 - **OWED:** reading (3), after 12:00 AM CT 10-23. 10-22's 48 rows are still present, and the first fetch after midnight prints `replaced=2026-10-23`. Also `#731`'s 10-24 reading: `SIM_AVAILABILITY ... readmitted_injury_return=0` and `PROPS_OUT_PLAYER_REFUSED ... snapshot=2026-10-2x out_on_feed` near 48.
+- **READ (#731's 10-24 reading) 23:04:02Z (6:04 PM CT) -- MET.** A watcher caught the first 10-24 WNBA props build after the ff, after the log's 23:03:37Z timestamp (log lines 366 and 377; the log had stood at 350 lines since 04:08 AM CT).
+  - It printed `SIM_AVAILABILITY applied date=2026-10-24 k=1 rule=k added=86 readmitted_injury_return=0 (ok)`.
+  - It printed `PROPS_OUT_PLAYER_REFUSED league=wnba date=2026-10-24 ... snapshot=2026-10-22 out_on_feed=48 lines_considered=690 lines_refused=0`.
+  - So the 10-24 builds read the ESPN 10-22 snapshot, not the NBA rows.
+  - **Still OWED: reading (3)**, after midnight CT. A watcher is armed until 12:00 PM CDT 10-23.
 
 ## 2026-10-22 20:03:53Z (3:03 PM CT) -- CORRECTION + RE-STAGE: the 14:51:33Z staged stand-in switch was INERT (wrong role); now staged UNPREFIXED, loads at the NEXT full down/up (lane `nba-standins-shadow`, session 15f24a49, todo #714)
 - **What was wrong:** I staged `REFRESH_WORKER__SYNDICATE_NBA_NO_HISTORY_STANDINS=shadow`. The NBA props refresh, and so every pregame NBA SmartSim build, runs under the **live-odds-worker**. Verified by the ppid chain in the 19:11Z ALL_PROCESS_MEMORY snapshot: `refresh_nba_oddsapi_props.py` <- `refresh_odds_sources.py` <- `run_refresh_odds_job.py` <- `run_live_odds_refresh_worker.py` (pid 3942342) <- `local_production.py`.

@@ -50,7 +50,7 @@
 - **Loaded 2026-10-22** (user-approved; no ff needed, HEAD ae2cb646; restart by lane min-ev-tuner-shadow 20:35:12Z; deploys.md 20:43:10Z). **Forward reading owed (scheduled task `clv-openings-ceiling-forward-reading`, 10-26 9:00 AM CT):** on the next busy day (Sat 10-24 / Sun 10-25) the openings file passes 33,554,432 B with `dropped=0`, no `OPENINGS_CEILING_HIT`, and trail (mk, line, book) combos == openings keys for that date.
 - Past days are not recoverable as openings (first price never written). Sibling: `clv_departure_ledger` 8 MiB cap reached 95% on 10-17 (7,938,374 B), same all-sports shape.
 
-### `#731` — **The WNBA injury fetch took the NBA's official injury report: on 10-20 and 10-21 the day's WNBA snapshot WAS the NBA's rows (no WNBA roster on the fleet, so nothing filtered them), and the 10-21 ATL v GSV sim took 9 Hawks/Magic players as ATL exclusions and read 13 OUT WNBA players as returned. FIXED ON MAIN `066c2158` (ESPN WNBA only), ON THE FLEET since 19:59:11Z 10-22 (ff to `ae2cb646`, lane `wnba-injury-fleet-ff`); READ 20:04Z: 10-22 back to 48 ESPN rows, 0 TOR; 10-24 reading owed** — FOUND 2026-10-22 (`#725` follow-up), lane `wnba-injury-nba-report`, session 898e35dc (side session of local_4ebfbce7)
+### `#731` — **The WNBA injury fetch took the NBA's official injury report: on 10-20 and 10-21 the day's WNBA snapshot WAS the NBA's rows (no WNBA roster on the fleet, so nothing filtered them), and the 10-21 ATL v GSV sim took 9 Hawks/Magic players as ATL exclusions and read 13 OUT WNBA players as returned. FIXED ON MAIN `066c2158` (ESPN WNBA only), ON THE FLEET since 19:59:11Z 10-22 (ff to `ae2cb646`, lane `wnba-injury-fleet-ff`); READ 20:04Z: 10-22 back to 48 ESPN rows, 0 TOR; READ 23:04Z: the first post-ff 10-24 build printed `readmitted_injury_return=0`, `out_on_feed=48`** — FOUND 2026-10-22 (`#725` follow-up), lane `wnba-injury-nba-report`, session 898e35dc (side session of local_4ebfbce7)
 - **The writer.** `NBAInjuryDatabase.update_injuries` (`syndicate/features/wnba/source_cli/scrapers/injuries.py`) is the only writer of the WNBA `raw/injuries.csv`. Two callers run it as `cli fetch-injuries --date D`:
   - the WNBA props refresh (`refresh_wnba_oddsapi_props.py:3989`), which is logged;
   - `live_refresh_loop._fetch_injuries`, whose output is captured and never logged.
@@ -81,6 +81,9 @@
     - The 10-24 builds read 10-22 as their latest snapshot. The props OUT refusal has no partial guard; the SmartSim falls back to 10-21 (`#733`'s reading).
     - An ff to `ae2cb646` or later carries both `#731` and `#733`.
   - Verify on the next NBA game day: a WNBA fetch summary with 0 QUESTIONABLE/PROBABLE/DOUBTFUL/TOR rows, and `readmitted_injury_return=0`.
+  - **READ, MET (lane wnba-injury-fleet-ff, deploys.md 19:59:11Z entry):**
+    - 20:04:03Z: 10-22 holds 48 ESPN rows, all OUT, with 0 TOR rows.
+    - 23:04:02Z: the first 10-24 WNBA build after the ff printed `SIM_AVAILABILITY ... readmitted_injury_return=0 (ok)` and `PROPS_OUT_PLAYER_REFUSED ... snapshot=2026-10-22 out_on_feed=48 lines_refused=0`.
 - **Leads:**
   - **WNBA: ESPN rows are stamped `datetime.now()`, not `--date`** (the NBA writer's copy was fixed by `#730`, `21b4bdb0`; the WNBA copy was not). A fetch for D after local midnight deletes D's snapshot: the fleet WNBA file has no 10-12. It also drove the 10-21 flapping.
   - The fleet has no WNBA `rosters_*.csv`, so the injury name cleaner and roster filter never run there.
