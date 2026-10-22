@@ -1798,6 +1798,14 @@ death, never life — do not invert it.
 - Verification: same-book clv_pct coverage on MLB paper:kalshi/paper:polymarket orders settled after the fix loads, with denominators, vs 49/266 and 1/95
 - Blocked by: none
 
+### sim-stake-earned-profile — OPEN — opened 2026-10-22 — session bde77672-7909-4d6b-90de-92ea0ad88f7b
+- Goal: A staked-probability profile fitted per venue x sport x market x season_phase cell on the fleet's settled ledger (chronological hold-out, event-clustered CIs, criterion pre-registered in the findings before fitting): fitted beta>0 written only where the held-out Brier beats market-only, best-beta-0 cells written market_only; findings file with per-cell beta, CIs, hold-out deltas and denominators, a shadow stake-change report, and a candidate profile artifact ready to publish -- switch-on is the user's decision
+- Files: scripts/fit_staked_probability_cells.py, tests/test_fit_staked_probability_cells.py, .syndicate/findings_2026-10-22_sim_stake_earned_profile.md, reports/staked_probability/ (NEW dir), docs/ai_context/todo.md (new item section only)
+- Hypothesis: PRE-REGISTERED before fitting, in the findings file: few or no cells earn beta>0 on the hold-out (pooled w was -0.27 [-0.78,+0.18], 10-19)
+- Falsification test: a cell whose event-clustered 95% CI of (Brier_beta0 - Brier_fit) on the hold-out excludes 0 from above, at n_test >= 200 rows
+- Verification: fitter tests incl. reachability (profile off != on through sizing_inputs_with_provenance); per-cell table from the fleet ledger with denominators; shadow stake delta from a fleet plan re-sized with the candidate profile pinned via SYNDICATE_STAKED_PROBABILITY_PROFILE_PATH
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
