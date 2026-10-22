@@ -1909,7 +1909,13 @@ death, never life — do not invert it.
 - Verification: census script on the fleet venv with read_json_file_result()[1] asserted True; counts by window x builder sum to 420/131
 - Blocked by: none
 
-### nba-injury-snapshot-fleet-ff — OPEN — opened 2026-10-22 — session 6c89053f-c302-4096-8d34-a44d734b96f0
+### nba-injury-snapshot-fleet-ff — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session 6c89053f-c302-4096-8d34-a44d734b96f0
+- GOAL VERDICT `[2026-10-22 18:09Z / 1:09 PM CT]`. Goal (verbatim): "The fleet checkout runs the NBA injury-snapshot fix 21b4bdb0 (todo #730; user 2026-10-22 in this chat: 'Yes, after their release'): after lane venue-prop-close-coverage releases its claims, git merge --ff-only 21b4bdb0 under all three deploy claims held by this lane (no restart unless a ride-along needs one), ride-alongs listed (a126ae95 NFL segment capture named), and a deploys.md entry whose verify reading is the next NBA raw/injuries.csv write carrying source=nba_official on today's rows." -- **GOAL: MET.**
+  - The ff ran at 17:55:33Z. HEAD == 21b4bdb0, and the files' sha256 match. There was no ride-along: a126ae95 was already live from lane nfl-segment-capture-e's 17:53Z ff.
+  - Claims were acquired rc=0 and released at ~17:58Z.
+  - **READ 18:06:33Z:** the first write after the ff has a `source` column, with all 12 rows for 10-22 `nba_official`.
+  - **READ 18:07:15Z:** `INJURY_SNAPSHOT_OFFICIAL` in the 10-22 props build.
+  - The overnight reading is owed and tracked in todo #730 and deploys.md. Files released.
 - Goal: The fleet checkout runs the NBA injury-snapshot fix 21b4bdb0 (todo #730; user 2026-10-22 in this chat: 'Yes, after their release'): after lane venue-prop-close-coverage releases its claims, git merge --ff-only 21b4bdb0 under all three deploy claims held by this lane (no restart unless a ride-along needs one), ride-alongs listed (a126ae95 NFL segment capture named), and a deploys.md entry whose verify reading is the next NBA raw/injuries.csv write carrying source=nba_official on today's rows.
 - Files: .syndicate/deploys.md (one append-only entry; the change itself is a git ff of the fleet checkout ~/Syndicate, outside the repo), docs/ai_context/todo.md (#730 section only), .syndicate/state_basketball.md ([nba-injury-pdf-parser] section only)
 - Hypothesis: n/a

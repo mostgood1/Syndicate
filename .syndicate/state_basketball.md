@@ -1388,7 +1388,8 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
 - **Past dates keep no official snapshot; light slates skip their own report** `[measured 2026-10-22 on the fleet, lane nba-injury-snapshot-overwrite, todo #730]`:
   - The final rows of 10-19/10-20/10-21 are Rotowire/ESPN. From 11 PM to midnight CT the live loop's fetch finds no PDF (the page lists only today's ET reports), and the fallback replaces the day.
   - The SmartSim's partial guard rejected the day's own report on 10-20 (6 of 10 builds) and 10-22 (2 of 2), and read last night's fallback. On 10-20 DET's 4 OUT players stayed in the pool.
-  - FIXED ON MAIN `21b4bdb0`, NOT ON THE FLEET: `source` column; fallback never replaces an official date; a past date's last report fetched by URL; the SmartSim trusts the game date's own official report. Any later ff carries it, and the file then gains a column (one forced NBA re-sim).
+  - FIX `21b4bdb0`, ON THE FLEET since 17:55:33Z 10-22 (ff, no restart): `source` column; fallback never replaces an official date; a past date's last report fetched by URL; the SmartSim trusts the game date's own official report.
+  - `[verified 2026-10-22 18:06-18:07Z]`: 10-22 rows are `nba_official`, and the 10-22 build printed `INJURY_SNAPSHOT_OFFICIAL`. The overnight reading (10-22 still official after midnight CT) is owed.
   - Findings: `findings_2026-10-22_nba_injury_snapshot_overwrite.md`.
 - Findings: `findings_2026-10-22_nba_injury_pdf_parser.md`.
 

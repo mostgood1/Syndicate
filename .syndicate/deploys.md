@@ -53523,3 +53523,11 @@ which is about the two sizing bases and not about the refusal boundary.
 - **OWED:**
   - Reading (2): after 12:00 AM CT 10-23, the 10-22 rows still read `nba_official`. Fleet-file read: `source` by date, and 10-22's statuses include QUESTIONABLE/PROBABLE with no DAY-TO-DAY.
   - Reading (3): the next 10-22 props build prints `[smart_sim] INJURY_SNAPSHOT_OFFICIAL date=2026-10-22` instead of `INJURY_SNAPSHOT_PARTIAL`. Log: `nba_source/logs/syndicate_refresh_oddsapi_props_2026-10-22.log`. A watcher is armed from its line 548; the last build was at 16:40Z.
+- **READ (3) 18:07:15Z (1:07 PM CT) -- MET.** The first 10-22 NBA props build after the write was forced by the lineup fingerprint, as expected (1).
+  - It printed `[smart_sim] INJURY_SNAPSHOT_OFFICIAL date=2026-10-22 rows=12 previous=2026-10-21 rows=70 -- the game date's own report, trusted`.
+  - Every earlier game-day build of 10-22 had printed `INJURY_SNAPSHOT_PARTIAL`.
+  - Exclusion drift: `OKC:-BRANDEN CARLSON` and `CLE:-MAX STRUS`, both `reuse=False`, so both games re-simulated.
+  - The two names came from last night's Rotowire rows under their current teams (Strus `LAC`, Carlson `POR`), and they are absent from the 10-22 official report.
+  - **Neither is in the rebuilt sims' `props_pool` (CLE 13, OKC 14), nor anywhere in either sim file, nor in `props_predictions_2026-10-22`.** So no sim minutes changed from this: the stamps lost two names nobody was simulating.
+  - Rebuilt: `smart_sim_2026-10-22_OKC_DEN.json` at 1:07 PM CT and `_PHI_CLE.json` at 1:08 PM CT. CLE excludes Diop and Tomlin; OKC excludes Topic, Oweh and Sorber. Every OUT on the official report is excluded.
+- **OWED: reading (2) only**, after 12:00 AM CT 10-23. The 10-22 rows still read `source=nba_official`, with QUESTIONABLE present and no DAY-TO-DAY: the 11:30 PM ET report fetched by URL, not the fallback.

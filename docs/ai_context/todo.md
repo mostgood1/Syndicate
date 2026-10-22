@@ -33,7 +33,7 @@
   - **WNBA: ESPN rows are stamped `datetime.now()`, not `--date`** (the NBA writer's copy was fixed by `#730`, `21b4bdb0`; the WNBA copy was not). A fetch for D after local midnight deletes D's snapshot: the fleet WNBA file has no 10-12. It also drove the 10-21 flapping.
   - The fleet has no WNBA `rosters_*.csv`, so the injury name cleaner and roster filter never run there.
 - Detail: `.syndicate/findings_2026-10-22_wnba_injury_nba_report.md`.
-### `#730` — **NBA `raw/injuries.csv` keeps no past date's official report: the final rows of 10-19, 10-20 and 10-21 (3 of 3 dates that had reports) are Rotowire/ESPN, written after midnight ET. On light slates the SmartSim never read its own day's report either (10-20: 6 of 10 builds, 10-22: 2 of 2 used last night's fallback; 10-20 left DET's 4 OUT players in the pool). FIXED ON MAIN (`21b4bdb0`), NOT ON THE FLEET** — FOUND 2026-10-22 (`#725` lead 5), lane `nba-injury-snapshot-overwrite`, session 6c89053f (side session of local_4ebfbce7); `.syndicate/findings_2026-10-22_nba_injury_snapshot_overwrite.md`
+### `#730` — **NBA `raw/injuries.csv` keeps no past date's official report: the final rows of 10-19, 10-20 and 10-21 (3 of 3 dates that had reports) are Rotowire/ESPN, written after midnight ET. On light slates the SmartSim never read its own day's report either (10-20: 6 of 10 builds, 10-22: 2 of 2 used last night's fallback; 10-20 left DET's 4 OUT players in the pool). FIXED (`21b4bdb0`) AND LIVE ON THE FLEET since 17:55:33Z 10-22 (read 18:06-18:07Z: rows `nba_official`, `INJURY_SNAPSHOT_OFFICIAL`); overnight reading owed** — FOUND 2026-10-22 (`#725` lead 5), lane `nba-injury-snapshot-overwrite`, session 6c89053f (side session of local_4ebfbce7); `.syndicate/findings_2026-10-22_nba_injury_snapshot_overwrite.md`
 - **How the rows get replaced:**
   - The season page lists only today's (ET) reports.
   - From 11 PM to midnight CT the live loop still fetches its Central date, finds no PDF, and the Rotowire/ESPN rows (stamped `datetime.now()`) replace the day's rows. On 10-21: 74 OUT (official) at 8:35 PM, then 65 (fallback) at 11:04 PM.
@@ -51,9 +51,10 @@
   - The SmartSim trusts the game date's own official snapshot whatever its size.
   - The report name is printed, not stored: the live loop re-sims whenever the file's bytes change.
   - 14 tests; 4 behaviour mutants each fail theirs.
-- **OWED (the user's yes): a fleet ff** (no restart; `fetch-injuries` is a subprocess). Any later ff to a newer SHA carries it, so the ride-along check must name it. Expect one forced NBA re-sim when the file gains the column. Then:
-  1. After midnight CT, the previous day's rows carry `source=nba_official` with official statuses.
-  2. On the next light slate, the props log prints `INJURY_SNAPSHOT_OFFICIAL` and no `INJURY_SNAPSHOT_PARTIAL` on game-day builds.
+- **ON THE FLEET since 2026-10-22 17:55:33Z** (user, in chat: "Yes, after their release"). ff a126ae95 -> 21b4bdb0, no restart, lane `nba-injury-snapshot-fleet-ff`; see deploys.md.
+  - **READ 18:06:33Z:** the first write gained `source`, and all 12 rows for 10-22 are `nba_official`.
+  - **READ 18:07:15Z:** the 10-22 props build printed `INJURY_SNAPSHOT_OFFICIAL` (12 vs 70), where earlier builds printed PARTIAL. The re-sim dropped Carlson/Strus from the stamps; neither is in either pool, so no minutes changed.
+  - **OWED:** after 12:00 AM CT 10-23, 10-22's rows still read `nba_official`: the 11:30 PM ET report fetched by URL, not the fallback.
 - **For `#723` (not this lane's file):** its confirmatory reading of 10-22..10-27 reads those dates' rows as they stand then: fallback without this ff, the final official report with it.
 - **Leads:** NOT-YET-SUBMITTED teams are dropped by the parser (no exclusions for them until they submit). Every write re-cleans ALL dates with today's roster, so past snapshots still mutate. WNBA's copy of the writer is unchanged.
 
