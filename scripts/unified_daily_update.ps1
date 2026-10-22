@@ -3344,8 +3344,7 @@ function Get-ForcedPublishArtifactPaths {
                 "$rootRelative/live_lens/prop_registry/live_prop_registry_${dateSlug}.json",
                 "$rootRelative/live_lens/prop_registry/live_prop_registry_${dateSlug}.jsonl",
                 "$rootRelative/live_lens/prop_registry/live_prop_observations_${dateSlug}.jsonl",
-                "$rootRelative/tuning/live_prop_ranking/default.json",
-                "$rootRelative/../sim_engine/live_prop_ranking.py"
+                "$rootRelative/tuning/live_prop_ranking/default.json"
             )) {
                 Add-PathIfPresent -RelativePath $relativePath
             }

@@ -1310,7 +1310,6 @@ class MlbRefreshRunnerTests(unittest.TestCase):
                 source_root / "data" / "eval" / "seasons" / season / "season_eval_manifest.json",
                 source_root / "data" / "live_lens" / "prop_registry" / f"live_prop_registry_{date_slug}.json",
                 source_root / "data" / "tuning" / "live_prop_ranking" / "default.json",
-                source_root / "sim_engine" / "live_prop_ranking.py",
             )
             for path in ready_paths:
                 path.parent.mkdir(parents=True, exist_ok=True)
@@ -1353,7 +1352,6 @@ class MlbRefreshRunnerTests(unittest.TestCase):
                 source_root / "data" / "eval" / "seasons" / season / "season_eval_manifest.json",
                 source_root / "data" / "live_lens" / "prop_registry" / f"live_prop_registry_{date_slug}.json",
                 source_root / "data" / "tuning" / "live_prop_ranking" / "default.json",
-                source_root / "sim_engine" / "live_prop_ranking.py",
             )
             for path in ready_paths:
                 path.parent.mkdir(parents=True, exist_ok=True)
@@ -1409,7 +1407,6 @@ class MlbRefreshRunnerTests(unittest.TestCase):
                 source_root / "data" / "eval" / "seasons" / season / "season_eval_manifest.json",
                 source_root / "data" / "live_lens" / "prop_registry" / f"live_prop_registry_{date_slug}.json",
                 source_root / "data" / "tuning" / "live_prop_ranking" / "default.json",
-                source_root / "sim_engine" / "live_prop_ranking.py",
             )
             for path in ready_paths:
                 path.parent.mkdir(parents=True, exist_ok=True)
@@ -1463,7 +1460,6 @@ class MlbRefreshRunnerTests(unittest.TestCase):
                 source_root / "data" / "live_lens" / "prop_registry" / f"live_prop_registry_{date_slug}.json": "{}\n",
                 source_root / "data" / "live_lens" / "prop_registry" / f"live_prop_observations_{date_slug}.jsonl": "{}\n",
                 source_root / "data" / "tuning" / "live_prop_ranking" / "default.json": "{}\n",
-                source_root / "sim_engine" / "live_prop_ranking.py": "def rank():\n    return []\n",
                 source_root / "data" / "eval" / "seasons" / season / "season_eval_manifest.json": "{}\n",
             }
             for path, content in required_files.items():
@@ -1513,7 +1509,8 @@ class MlbRefreshRunnerTests(unittest.TestCase):
             self.assertTrue((artifact_root / "data" / "live_lens" / "prop_registry" / f"live_prop_registry_{date_slug}.json").exists())
             self.assertTrue((artifact_root / "data" / "daily" / "snapshots" / date_str / f"oddsapi_game_lines_{date_slug}.json").exists())
             self.assertTrue((artifact_root / "data" / "market" / "oddsapi" / "refresh_history" / date_slug / "20260522T120000_000000Z" / "refresh_meta.json").exists())
-            self.assertTrue((artifact_root / "sim_engine" / "live_prop_ranking.py").exists())
+            # The predictor is repo code (syndicate.features.mlb.sim_engine.live_prop_ranking), never copied into a bundle.
+            self.assertFalse((artifact_root / "sim_engine" / "live_prop_ranking.py").exists())
             self.assertTrue((artifact_root / "data" / "eval" / "seasons" / season / "season_eval_manifest.json").exists())
 
     def test_main_overwrites_existing_bundle_tree_without_deleting_root_first(self) -> None:
@@ -1534,7 +1531,6 @@ class MlbRefreshRunnerTests(unittest.TestCase):
                 source_root / "data" / "live_lens" / "prop_registry" / f"live_prop_registry_{date_slug}.json": "{}\n",
                 source_root / "data" / "live_lens" / "prop_registry" / f"live_prop_observations_{date_slug}.jsonl": "{}\n",
                 source_root / "data" / "tuning" / "live_prop_ranking" / "default.json": "{}\n",
-                source_root / "sim_engine" / "live_prop_ranking.py": "def rank():\n    return []\n",
                 source_root / "data" / "eval" / "seasons" / season / "season_eval_manifest.json": "{}\n",
             }
             for path, content in required_files.items():

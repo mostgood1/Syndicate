@@ -789,19 +789,31 @@ class DateArchiveHelperTests(unittest.TestCase):
         self.assertNotIn("miniLadderBadges", probable["away"])
         self.assertEqual(probable["away"]["ladderBadges"][0]["label"], probable["away"]["pregameLadderBadges"][0]["label"])
 
-    def test_mlb_live_prop_ranking_scores_can_load_from_local_mirror_only(self) -> None:
-        module_name = "syndicate_mlb_source_live_prop_ranking"
-        sys.modules.pop(module_name, None)
-        try:
-            with TemporaryDirectory() as temp_dir:
-                mirror_root = Path(temp_dir)
-                cfg_path = mirror_root / "data" / "tuning" / "live_prop_ranking" / "default.json"
-                cfg_path.parent.mkdir(parents=True, exist_ok=True)
-                cfg_path.write_text(
-                    json.dumps(
-                        {
-                            "enabled": True,
-                            "default": {
+    def test_mlb_live_prop_ranking_uses_the_repo_predictor_and_the_mirror_config(self) -> None:
+        # The predictor is the repo's own module (lane vendor-final-leftovers); only the tuning config is data.
+        from syndicate.features.mlb.cards import _load_source_live_prop_ranking_predictor
+        from syndicate.features.mlb.sim_engine import live_prop_ranking
+
+        self.assertIs(_load_source_live_prop_ranking_predictor(), live_prop_ranking.predict_live_prop_win_probability)
+        row = {
+            "pitcher_name": "Test Pitcher",
+            "prop": "outs",
+            "market": "pitcher",
+            "selection": "over",
+            "live_edge": 0.12,
+            "market_line": 15.5,
+            "model_prob_over": 0.61,
+        }
+        with TemporaryDirectory() as temp_dir:
+            mirror_root = Path(temp_dir)
+            cfg_path = mirror_root / "data" / "tuning" / "live_prop_ranking" / "default.json"
+            cfg_path.parent.mkdir(parents=True, exist_ok=True)
+            cfg_path.write_text(
+                json.dumps(
+                    {
+                        "enabled": True,
+                        "props": {
+                            "pitcher:outs": {
                                 "enabled": True,
                                 "mode": "logistic_linear",
                                 "intercept": 0.0,
@@ -810,40 +822,21 @@ class DateArchiveHelperTests(unittest.TestCase):
                                 "probability_floor": 0.03,
                                 "probability_ceiling": 0.9,
                             },
-                        }
-                    ),
-                    encoding="utf-8",
-                )
-                predictor_path = mirror_root / "sim_engine" / "live_prop_ranking.py"
-                predictor_path.parent.mkdir(parents=True, exist_ok=True)
-                predictor_path.write_text(
-                    "from __future__ import annotations\n"
-                    "def predict_live_prop_win_probability(row, cfg, *, prop_key=None):\n"
-                    "    return 0.77\n",
-                    encoding="utf-8",
-                )
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with patch("syndicate.features.mlb.cards._source_live_prop_ranking_roots", return_value=[mirror_root]):
+                rows = _apply_source_live_prop_ranking_scores([dict(row)])
+                cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
 
-                with patch("syndicate.features.mlb.cards._source_live_prop_ranking_roots", return_value=[mirror_root]):
-                    rows = _apply_source_live_prop_ranking_scores(
-                        [
-                            {
-                                "pitcher_name": "Test Pitcher",
-                                "prop": "outs",
-                                "market": "pitcher",
-                                "selection": "over",
-                                "live_edge": 0.12,
-                                "market_line": 15.5,
-                                "model_prob_over": 0.61,
-                            }
-                        ]
-                    )
-
-            self.assertEqual(len(rows), 1)
-            self.assertAlmostEqual(rows[0]["ranking_score"], 0.77)
-            self.assertAlmostEqual(rows[0]["estimated_win_prob"], 0.77)
-            self.assertEqual(rows[0]["rank"], 1)
-        finally:
-            sys.modules.pop(module_name, None)
+        expected = live_prop_ranking.predict_live_prop_win_probability(dict(row), cfg, prop_key="outs")
+        self.assertIsNotNone(expected)
+        self.assertEqual(len(rows), 1)
+        self.assertAlmostEqual(rows[0]["ranking_score"], expected)
+        self.assertAlmostEqual(rows[0]["estimated_win_prob"], expected)
+        self.assertEqual(rows[0]["rank"], 1)
 
     def test_mlb_daily_artifact_path_does_not_fall_back_to_sibling_repo(self) -> None:
         with TemporaryDirectory() as temp_dir:

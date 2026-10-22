@@ -54,7 +54,6 @@ FILE_TEMPLATES = (
     ("data/live_lens/prop_registry/live_prop_registry_{date_slug}.jsonl", "data/live_lens/prop_registry/live_prop_registry_{date_slug}.jsonl"),
     ("data/live_lens/prop_registry/live_prop_observations_{date_slug}.jsonl", "data/live_lens/prop_registry/live_prop_observations_{date_slug}.jsonl"),
     ("data/tuning/live_prop_ranking/default.json", "data/tuning/live_prop_ranking/default.json"),
-    ("sim_engine/live_prop_ranking.py", "sim_engine/live_prop_ranking.py"),
 )
 
 DIRECTORY_TEMPLATES = (

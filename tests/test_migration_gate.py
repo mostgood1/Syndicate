@@ -213,20 +213,17 @@ class MigrationGateRuntimeDependencyTests(unittest.TestCase):
             violations = evaluate_protected_mirror_assets(repo_root)
 
         mlb_violations = [item for item in violations if item["slug"] == "mlb"]
-        self.assertEqual(len(mlb_violations), 2)
-        self.assertEqual({item["description"] for item in mlb_violations}, {"live prop ranking predictor", "daily mirror manifest breadth"})
+        # The ranking predictor is repo code now, not a protected mirror asset (lane vendor-final-leftovers).
+        self.assertEqual({item["description"] for item in mlb_violations}, {"daily mirror manifest breadth"})
 
     def test_evaluate_protected_mirror_assets_flags_missing_mlb_manifest_artifact_families(self) -> None:
         with TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)
             cfg_path = repo_root / "data" / "mlb_source" / "data" / "tuning" / "live_prop_ranking" / "default.json"
-            predictor_path = repo_root / "data" / "mlb_source" / "sim_engine" / "live_prop_ranking.py"
             manifest_path = repo_root / "data" / "mlb_source" / "manifests" / "mirror_refresh_latest.json"
             cfg_path.parent.mkdir(parents=True, exist_ok=True)
-            predictor_path.parent.mkdir(parents=True, exist_ok=True)
             manifest_path.parent.mkdir(parents=True, exist_ok=True)
             cfg_path.write_text("{}\n", encoding="utf-8")
-            predictor_path.write_text("# stub\n", encoding="utf-8")
             manifest_path.write_text(
                 json.dumps(
                     {

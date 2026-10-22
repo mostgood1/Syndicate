@@ -127,11 +127,6 @@ PROTECTED_MIRROR_ASSETS = (
     },
     {
         "slug": "mlb",
-        "description": "live prop ranking predictor",
-        "path": "data/mlb_source/sim_engine/live_prop_ranking.py",
-    },
-    {
-        "slug": "mlb",
         "description": "daily mirror manifest breadth",
         "path": "data/mlb_source/manifests/mirror_refresh_latest.json",
         "required_artifact_prefixes": (

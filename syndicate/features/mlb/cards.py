@@ -6,13 +6,11 @@ from collections import OrderedDict
 from datetime import date
 from datetime import datetime, timedelta
 from functools import lru_cache
-import importlib.util
 import json
 import os
 from math import exp
 from pathlib import Path
 import re
-import sys
 import unicodedata
 import time
 from typing import Any
@@ -378,26 +376,12 @@ def _load_source_live_prop_ranking_cfg() -> dict[str, Any] | None:
 
 
 def _load_source_live_prop_ranking_predictor() -> Any | None:
-    module_name = "syndicate_mlb_source_live_prop_ranking"
-    cached = sys.modules.get(module_name)
-    if cached is not None:
-        return getattr(cached, "predict_live_prop_win_probability", None)
-    for root in _source_live_prop_ranking_roots():
-        candidate = root / "sim_engine" / "live_prop_ranking.py"
-        if not candidate.exists() or not candidate.is_file():
-            continue
-        try:
-            spec = importlib.util.spec_from_file_location(module_name, candidate)
-            if spec is None or spec.loader is None:
-                continue
-            module = importlib.util.module_from_spec(spec)
-            sys.modules[module_name] = module
-            spec.loader.exec_module(module)
-            return getattr(module, "predict_live_prop_win_probability", None)
-        except Exception:
-            sys.modules.pop(module_name, None)
-            continue
-    return None
+    # The repo's own module (lane vendor-final-leftovers, 2026-10-22). This used to exec a copy of the vendored MLB
+    # app's sim_engine/live_prop_ranking.py from the data root, which nothing refreshed after vendor/ went away; that
+    # copy was byte-identical to this module (sha256 daffb085, 2026-10-22). The tuning config stays data.
+    from syndicate.features.mlb.sim_engine.live_prop_ranking import predict_live_prop_win_probability
+
+    return predict_live_prop_win_probability
 
 
 def _apply_source_live_prop_ranking_scores(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:

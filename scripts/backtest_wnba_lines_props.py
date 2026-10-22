@@ -455,12 +455,12 @@ def load_book(odds_dir: Path, games: Dict[str, Dict]) -> Tuple[Dict[str, Dict], 
 #   phase "game" (sequential, because the game-bias calibration reads the prior 30 days' predictions):
 #     truncate every history input to games strictly before D; write D's pregame odds snapshot in the production
 #     schema; seed game_odds_D with production's own `_seed_game_odds_from_props_snapshot`;
-#     `wnba_betting.cli predict-date --date D --merge-odds game_odds_D.csv` (production runs it without
+#     the WNBA CLI port's `predict-date --date D --merge-odds game_odds_D.csv` (production runs it without
 #     --merge-odds and lets it fetch CURRENT odds -- which at D-pregame were these odds; here the key is unset so
 #     it CANNOT fetch today's); `build_wnba_totals_calibration.py --date D`.
 #   phase "sim" (parallel workers, each on its own scratch tree): restore the phase-1 outputs dated <= D, then
 #     `export_props_predictions_local` with production's arguments (refresh_wnba_oddsapi_props.py:4981-4999).
-# NOT AS-OF, stated in the report: the model weights (`vendor/.../models/*.onnx`, single commit 2026-05-25,
+# NOT AS-OF, stated in the report: the model weights (`syndicate/features/wnba/source_cli/repo/models/*.onnx`, single commit 2026-05-25,
 # ~867 pre-2026 games, never retrained in production); the code is TODAY's, not the SHA production ran per date.
 # ABSENT, as for most of production's season: pregame injuries, expected minutes, rotation/lineup history,
 # league_status/rosters -- each has a production fallback, which is what runs here.
@@ -514,8 +514,6 @@ def prepare_scratch(pristine: Path, scratch: Path, date: str, archive: Optional[
     info: Dict = {"date": date}
     for sub in ("raw", "processed"):
         (sdata / sub).mkdir(parents=True, exist_ok=True)
-    if not (scratch / "wnba_source" / "src").exists():
-        shutil.copytree(pristine / "wnba_source" / "src", scratch / "wnba_source" / "src")
     for p in (pdata / "processed").glob("schedule_*"):
         shutil.copy2(p, sdata / "processed" / p.name)
     for rel, col in HISTORY_FILES.items():
@@ -575,7 +573,7 @@ def _env_for(scratch: Path, code: Path) -> Dict[str, str]:
     env = {k: v for k, v in os.environ.items() if k not in ("ODDS_API_KEY", "ODDSAPI_KEY")}
     env.update({"WNBA_BETTING_DATA_ROOT": str(scratch / "wnba_source" / "data"),
                 "SYNDICATE_DATA_ROOT": str(scratch), "SYNDICATE_WNBA_SOURCE_ROOT": str(scratch / "wnba_source"),
-                "PYTHONPATH": f"{scratch / 'wnba_source' / 'src'}:{code}", "OMP_NUM_THREADS": "1",
+                "PYTHONPATH": str(code), "OMP_NUM_THREADS": "1",
                 "OPENBLAS_NUM_THREADS": "1", "MKL_NUM_THREADS": "1", "PYTHONUNBUFFERED": "1"})
     return env
 
@@ -660,7 +658,7 @@ def run_sim_phase(args) -> int:
     prepare_scratch(pristine, scratch, dates[0] if dates else "2026-01-01", None, False)
     for k, v in _env_for(scratch, code).items():
         os.environ[k] = v
-    sys.path[:0] = [str(scratch / "wnba_source" / "src"), str(code)]
+    sys.path[:0] = [str(code)]
     from syndicate.features.shared.basketball_props_predictions import export_props_predictions_local
     import time
     for d in dates:
@@ -734,10 +732,10 @@ def _rebuild_main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("phase", choices=("game", "sim"))
     ap.add_argument("--espn-dir", required=True)
     ap.add_argument("--odds-dir", required=True)
-    ap.add_argument("--pristine", required=True, help="root holding wnba_source/{data,src}: a COPY of the fleet tree")
+    ap.add_argument("--pristine", required=True, help="root holding wnba_source/data: a COPY of the fleet tree")
     ap.add_argument("--scratch", required=True)
     ap.add_argument("--archive", required=True)
-    ap.add_argument("--code", required=True, help="a checkout of the code to run (its vendor/ and scripts/)")
+    ap.add_argument("--code", required=True, help="a checkout of the code to run (its syndicate/ and scripts/)")
     ap.add_argument("--dates", default="", help="lo..hi")
     ap.add_argument("--worker", type=int, default=0)
     ap.add_argument("--workers", type=int, default=1)
