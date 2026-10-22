@@ -53515,3 +53515,11 @@ which is about the two sizing bases and not about the refusal boundary.
   - (3) The next light slate's game-day builds print `[smart_sim] INJURY_SNAPSHOT_OFFICIAL` instead of `INJURY_SNAPSHOT_PARTIAL`. 10-22 is a 2-game slate, so the next props refresh for 10-22 should already show it.
 - **verify:** reading (1) is OWED. A watcher is armed for the first write after the ff (live-loop lineup check, 30 min).
 - **undo:** `git checkout a126ae95 -- syndicate/features/nba/source_cli/scrapers/injuries.py syndicate/features/shared/basketball_props_smart_sim.py` in `~/Syndicate`. No restart is needed, for the same subprocess reason. The `source` column already written stays in the file, and the old writer ignores it.
+- **READ (1) 18:06:33Z (1:06 PM CT) -- MET.** This was the first `raw/injuries.csv` write after the ff, by production's own fetch, 11 min after the ff.
+  - The header is now `team,player,status,injury,date,source`.
+  - 2026-10-22: 12 rows, all `source=nba_official` (OUT 9, QUESTIONABLE 3).
+  - 2026-10-21: 70 rows, `source` blank (legacy, as expected).
+  - Total rows 2,184, unchanged.
+- **OWED:**
+  - Reading (2): after 12:00 AM CT 10-23, the 10-22 rows still read `nba_official`. Fleet-file read: `source` by date, and 10-22's statuses include QUESTIONABLE/PROBABLE with no DAY-TO-DAY.
+  - Reading (3): the next 10-22 props build prints `[smart_sim] INJURY_SNAPSHOT_OFFICIAL date=2026-10-22` instead of `INJURY_SNAPSHOT_PARTIAL`. Log: `nba_source/logs/syndicate_refresh_oddsapi_props_2026-10-22.log`. A watcher is armed from its line 548; the last build was at 16:40Z.
