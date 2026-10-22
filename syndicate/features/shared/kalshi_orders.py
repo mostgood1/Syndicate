@@ -115,6 +115,21 @@ class OrderBuildError(ValueError):
     venue_contacted = False
 
 
+_ROUND_UP_MIN_ENV = "SYNDICATE_KALSHI_ROUND_UP_MIN_DOLLARS"
+
+
+def _round_up_min_dollars() -> float | None:
+    """The dollar minimum a floored order is rounded up to, or None when unset or unusable."""
+    raw = str(os.environ.get(_ROUND_UP_MIN_ENV) or "").strip()
+    if not raw:
+        return None
+    try:
+        value = float(raw)
+    except ValueError:
+        return None
+    return value if 0 < value < float("inf") else None
+
+
 def contracts_for_stake(stake_dollars: float, price_dollars: float) -> int:
     """How many contracts `stake_dollars` buys at `price_dollars`. FLOORED.
 
@@ -127,6 +142,20 @@ def contracts_for_stake(stake_dollars: float, price_dollars: float) -> int:
     if stake_dollars <= 0:
         raise OrderBuildError(f"non_positive_stake: {stake_dollars}")
     count = math.floor(stake_dollars / price_dollars)
+    # ROUND UP TO THE MINIMUM [user 2026-10-22, "Yes, round up", lane
+    # live-min-stake-five]: flooring made every $5 band order fill $4.45-$4.76.
+    # With `SYNDICATE_KALSHI_ROUND_UP_MIN_DOLLARS` set, a stake of at least that
+    # minimum whose floored count costs less than it gains ONE contract --
+    # never more, so the order spends at most one contract over the stake the
+    # caps were checked against. A stake under the minimum (a cash trim) stays
+    # floored. Absent = floored, as before.
+    round_up_min = _round_up_min_dollars()
+    if (
+        round_up_min is not None
+        and stake_dollars >= round_up_min - 1e-9
+        and count * price_dollars < round_up_min - 1e-9
+    ):
+        count += 1
     if count < _MIN_CONTRACTS:
         raise OrderBuildError(
             f"stake_below_one_contract: ${stake_dollars:.2f} at ${price_dollars:.2f}"
