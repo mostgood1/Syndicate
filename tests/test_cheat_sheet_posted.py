@@ -209,3 +209,34 @@ def test_the_reconciled_page_reads_the_shared_sections():
     body = html[html.index("function sectionsFor(d)"):][:300]
     assert "sharedOf(d) || d" in body
     assert "sh.sgp_ids.includes(s.sgp_id)" in html and "const ls = sharedOf(d) || d;" in html
+
+
+def test_the_record_keeps_all_and_adds_a_shared_value():
+    """User 2026-10-22: "actually we should create a new value for shared record vs all". ALL keeps every featured row
+    (posted ones pinned in); SHARED is only what went out on a graphic, at the posted price."""
+    lacombe = _row("Jackson LaCombe", "under", 1.5, price=-103, ev=-1.85, hits=7)
+    newcomer = _row("Late Add", "under", 0.5, price=-150, ev=-1.0, hits=8)        # lost, and was never shared
+    sheet = _sheet([lacombe, newcomer])
+    rec = {"props": {cs.prop_result_key(lacombe): {"y": 1.0}, cs.prop_result_key(newcomer): {"y": 0.0}},
+           "lines": {}, "counts": {}}
+    assert "shared" not in csr.day_record(sheet, rec)                              # nothing posted: no shared value
+    posted = _post(_sheet([lacombe]), "consistency", [lacombe], price=-110)         # the graphic showed -110
+    day = csr.day_record(sheet, rec, posted)
+    alls = day["sections"]["consistency"]
+    assert (alls["w"], alls["l"], alls["n"]) == (1, 1, 2)                           # ALL: both rows
+    shared = day["shared"]["sections"]["consistency"]
+    assert (shared["w"], shared["l"], shared["n"]) == (1, 0, 1) and shared["units"] == round(100 / 110, 2)
+    assert day["shared"]["featured"]["n"] == 1
+    season = csr.season_record([day], generated_at="t")
+    scope = season["beta"] if day["beta"] else season["official"]
+    assert scope["totals"]["consistency"]["n"] == 2 and scope["shared"]["totals"]["consistency"]["n"] == 1
+    assert scope["shared"]["by_sport"]["nhl"]["featured"]["n"] == 1
+
+
+def test_the_record_page_toggles_all_and_shared():
+    from pathlib import Path
+
+    html = (Path(__file__).resolve().parents[1] / "syndicate" / "templates" / "cheat_sheets.html").read_text(encoding="utf-8")
+    assert 'const REC = {scope: "official", sport: "all", basis: "all"};' in html
+    assert 'const scope = shared ? (base.shared || empty) : base;' in html
+    assert '[["all", "All featured"], ["shared", "Shared"]]' in html and 'REC.basis = ba.dataset.basis' in html

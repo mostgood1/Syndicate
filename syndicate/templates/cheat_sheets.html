@@ -200,6 +200,7 @@ details.dropped { margin-top: 10px; border-top: 1px dashed var(--edge); padding-
 details.dropped > summary { cursor: pointer; color: var(--muted); font: 700 13px var(--display); text-transform: uppercase; letter-spacing: .05em; }
 details.dropped .rowlist { opacity: .72; margin-top: 8px; }
 .viewbar .vnote { color: var(--muted); font-size: 13px; }
+.viewbar .sep { width: 1px; height: 22px; background: var(--edge); }
 .res { font: 700 13px var(--mono); white-space: nowrap; } td.act, .res.act { font-weight: 700; color: var(--ink); } .res.w { color: var(--accent); } .res.l { color: var(--price); } .res.p { color: var(--muted); }
 tr.rw td:first-child { box-shadow: inset 3px 0 0 var(--accent); } tr.rl td:first-child { box-shadow: inset 3px 0 0 var(--price); }
 .prop.rw { box-shadow: inset 3px 0 0 var(--accent); padding-left: 10px; } .prop.rl { box-shadow: inset 3px 0 0 var(--price); padding-left: 10px; }
@@ -1107,7 +1108,9 @@ async function exportSection(btn) {
 
 // ---- Season record (user 2026-10-15: "add a running season record page for the cheat sheets"). DATA is
 // `cheatsheets/record.json` (syndicate/features/shared/cheat_sheet_record.py), rebuilt by every reconcile run.
-const REC = {scope: "official", sport: "all"};
+// basis: "all" = every featured bet; "shared" = only what went out on an exported graphic, at the posted price
+// (user 2026-10-22: "we should create a new value for shared record vs all"; cheat_sheet_record.shared_day).
+const REC = {scope: "official", sport: "all", basis: "all"};
 const pctText = v => v == null ? "–" : v.toFixed(1) + "%";
 const signClass = v => v == null || v === 0 ? "" : v > 0 ? "gain" : "neg";
 // EVERY category that applies to the scorecard's sport, with "No bets yet" where none was featured (user 2026-10-19:
@@ -1159,18 +1162,28 @@ function renderRecordPage() {
     document.getElementById("sheet").innerHTML = `<section class="sheet"><div class="empty">The record publishes after the first graded day.</div></section>`;
     return;
   }
-  const scope = R[REC.scope] || {totals: {}, by_sport: {}, series: [], days: 0};
+  const empty = {totals: {}, by_sport: {}, series: [], days: 0};
+  const base = R[REC.scope] || empty;
+  const shared = REC.basis === "shared";
+  const scope = shared ? (base.shared || empty) : base;
   const lastDay = (scope.series[scope.series.length - 1] || {}).date;
   document.getElementById("dayLabel").innerHTML = esc(REC.scope === "beta" ? `Beta record · before ${dayShort(R.official_start)}` : `Official record · since ${dayShort(R.official_start)}`);
   document.getElementById("asOf").textContent = lastDay ? `Through ${dayName(lastDay)} · updated ${ctDateTime(R.generated_at)}` : "";
   document.getElementById("viewbar").innerHTML = ["official", "beta"].map(k =>
-    `<button type="button" class="btn ${REC.scope === k ? "on" : ""}" data-scope="${k}" aria-pressed="${REC.scope === k}">${k === "official" ? "Official" : "Beta (before " + esc(dayShort(R.official_start)) + ")"}</button>`).join("");
+    `<button type="button" class="btn ${REC.scope === k ? "on" : ""}" data-scope="${k}" aria-pressed="${REC.scope === k}">${k === "official" ? "Official" : "Beta (before " + esc(dayShort(R.official_start)) + ")"}</button>`).join("")
+    + `<span class="sep"></span>` + [["all", "All featured"], ["shared", "Shared"]].map(([k, lab]) =>
+    `<button type="button" class="btn ${REC.basis === k ? "on" : ""}" data-basis="${k}" aria-pressed="${REC.basis === k}" title="${k === "shared" ? "Only the bets that went out on an exported graphic, graded at the price the graphic showed" : "Every bet the cheat sheets featured"}">${lab}</button>`).join("");
   // Every sport gets a scorecard, a sport with no graded day yet included (its categories read "No bets yet").
   const sports = [...new Set([...(R.sports || []), ...Object.keys(scope.by_sport || {})])];
   if (REC.sport !== "all" && !sports.includes(REC.sport)) REC.sport = "all";
   document.getElementById("tabs").innerHTML = ["all", ...sports].map(x =>
     `<button class="tab" role="tab" data-rsport="${x}" aria-selected="${REC.sport === x}">${x === "all" ? "All sports" : esc(SPORT_NAMES[x] || x)}</button>`).join("");
-  const days = (R.days || []).filter(x => (REC.scope === "beta") === !!x.beta && (REC.sport === "all" || x.sport === REC.sport));
+  const days = (R.days || []).filter(x => (REC.scope === "beta") === !!x.beta && (REC.sport === "all" || x.sport === REC.sport))
+    .filter(x => !shared || x.shared).map(x => shared ? {...x, featured: x.shared.featured, sections: x.shared.sections} : x);
+  if (shared && !scope.days) {
+    document.getElementById("sheet").innerHTML = `<section class="sheet"><div class="empty">Nothing shared yet here: the shared record counts the bets on graphics exported from the sheets, once they are graded.</div></section>`;
+    return;
+  }
   if (!scope.days) {
     document.getElementById("sheet").innerHTML = `<section class="sheet"><div class="empty">${REC.scope === "official"
       ? `The official record starts with the ${esc(dayName(R.official_start))} sheets. Results post after the games are final (graded 7:45 AM and 11:50 PM CT).`
@@ -1179,7 +1192,9 @@ function renderRecordPage() {
   }
   const totals = REC.sport === "all" ? scope.totals : (scope.by_sport[REC.sport] || {});
   const label = REC.sport === "all" ? "all sports" : (SPORT_NAMES[REC.sport] || REC.sport);
-  let html = sectionShell("record_totals", "Season record", `Every featured section on the cheat sheets, ${esc(label)}, ${scope.days} graded day${scope.days === 1 ? "" : "s"}. "All featured picks" counts a bet once a day even when two sections featured it. The every-prop list and price shopping hold both sides of a line, so they are not in the record.`, "", recordTable(R, totals, REC.sport));
+  let html = sectionShell("record_totals", shared ? "Shared record" : "Season record", shared
+    ? `Only the bets that went out on an exported graphic, ${esc(label)}, ${scope.days} day${scope.days === 1 ? "" : "s"} with a graphic -- each graded at the price the graphic showed. "All featured picks" counts a shared bet once a day.`
+    : `Every featured section on the cheat sheets, ${esc(label)}, ${scope.days} graded day${scope.days === 1 ? "" : "s"}. "All featured picks" counts a bet once a day even when two sections featured it. The every-prop list and price shopping hold both sides of a line, so they are not in the record.`, "", recordTable(R, totals, REC.sport));
   if (REC.sport === "all") html += sectionShell("record_chart", "Running units", "Cumulative units, 1 unit a bet at the sheet's best price, day by day.", "", unitsChart(scope.series));
   html += sectionShell("record_days", "Day by day", "Each sheet's featured picks and its value section. Open a day to see every bet with its actual stat.", `${days.length} sheets`, dayTable(R, days));
   html += `<section class="sheet"><div class="note">Graded by Syndicate's settlement from final box scores, the same grading the platform's scorecard uses. A push, a void (did not play) or a bet still pending is not counted. ROI is units per bet. Small samples swing: read the bets column before the win rate.</div></section>`;
@@ -1188,6 +1203,8 @@ function renderRecordPage() {
 document.addEventListener("click", ev => {
   if (META.page !== "record") return;
   const sc = ev.target.closest("[data-scope]"), sp = ev.target.closest("[data-rsport]");
+  const ba = ev.target.closest("[data-basis]");
+  if (ba) { REC.basis = ba.dataset.basis; renderRecordPage(); }
   if (sc) { REC.scope = sc.dataset.scope; renderRecordPage(); }
   if (sp) { REC.sport = sp.dataset.rsport; renderRecordPage(); }
 });

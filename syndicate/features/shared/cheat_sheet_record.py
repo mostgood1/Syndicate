@@ -98,9 +98,13 @@ def _sgp_tally() -> dict[str, float]:
     return {"w": 0, "l": 0, "expected": 0.0, "pending": 0, "void": 0}
 
 
-def sgp_tally(sheet: Mapping[str, Any], reconciled: Mapping[str, Any]) -> dict[str, float] | None:
-    """The day's parlays as the sheet showed them, graded; None when the sheet carried none."""
+def sgp_tally(sheet: Mapping[str, Any], reconciled: Mapping[str, Any],
+              posted: Mapping[str, Any] | None = None) -> dict[str, float] | None:
+    """The day's parlays as the sheet showed them, graded; None when the sheet carried none. With `posted`, the posted
+    ones only (the SHARED value, `shared_day`)."""
     tickets = list(sheet.get("sgp") or [])
+    if cs.posted_sgps(posted):
+        tickets = [t for t in cs.with_posted_sgps(tickets, posted) if t.get("posted")]
     if not tickets:
         return None
     t = _sgp_tally()
@@ -158,7 +162,12 @@ def day_record(sheet: Mapping[str, Any], reconciled: Mapping[str, Any],
                posted: Mapping[str, Any] | None = None) -> dict[str, Any]:
     """One sport's day: a tally per featured section, and all featured picks counted once. A row or game line that went
     out on an exported graphic (`posted`, user 2026-10-17) counts in its section whatever later builds made of the
-    section, graded at the price the graphic showed."""
+    section, graded at the price the graphic showed.
+
+    TWO VALUES (user 2026-10-22: "actually we should create a new value for shared record vs all"): this day's `sections` /
+    `featured` are ALL -- every featured bet, posted rows pinned in; `shared` (`shared_day`) is only what went out on a
+    graphic, graded at the posted price. Over the 5 export days to 10-21 consistency is 39-25 +2.25u all vs 26-14 +3.36u
+    shared."""
     from syndicate.features.shared import play_cards as pc
 
     if posted:
@@ -210,11 +219,60 @@ def day_record(sheet: Mapping[str, Any], reconciled: Mapping[str, Any],
     day = str(sheet.get("date") or "")
     counts = reconciled.get("counts") or {}
     parlays = sgp_tally(sheet, reconciled)
+    shared = shared_day(sheet, reconciled, posted)
     return {"date": day, "sport": sheet.get("sport"), "beta": day < OFFICIAL_START,
             "sections": {k: finish(t) for k, t in tallies.items()}, ALL: finish(every),
             **({SGP: finish_sgp(parlays)} if parlays else {}),
+            **({"shared": shared} if shared else {}),
             "graded": counts.get("props_graded", 0) + counts.get("lines_graded", 0) + counts.get("picks_graded", 0),
             "bets": counts.get("props", 0) + counts.get("lines", 0) + counts.get("picks", 0)}
+
+
+# The record key a posted GAME LINE section counts under (the page's line sections -> FEATURED); others count in ALL only.
+_SHARED_LINE_KEYS = {"value": "lines_value"}
+
+
+def shared_day(sheet: Mapping[str, Any], reconciled: Mapping[str, Any],
+               posted: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    """The SHARED value for one sport's day: only the rows, game lines and parlays that went out on an exported graphic
+    (`<sport>/<date>.posted.json`), each graded at the price the graphic showed -- per posted section (a featured key),
+    every posted bet once (`featured`), and the posted parlays (`sgp`). None when nothing was posted. Syndicate picks are
+    their own record and are never recorded as posted (`blueprints/cheat_sheets._NOT_POSTED`)."""
+    from syndicate.features.shared import play_cards as pc
+
+    if not posted:
+        return None
+    sheet = cs.with_posted(sheet, posted)
+    sport, day_key = str(sheet.get("sport")), str(sheet.get("date"))
+    featured_keys = {k for k, _label in FEATURED}
+    tallies: dict[str, dict[str, float]] = {}
+    once: dict[str, Mapping[str, Any] | None] = {}
+    for kind, field, result_key, results in (("rows", "rows", cs.prop_result_key, reconciled.get("props") or {}),
+                                             ("lines", "game_lines", cs.line_result_key, reconciled.get("lines") or {})):
+        items = list(sheet.get(field) or [])
+        index = {}
+        for i, it in enumerate(items):
+            index.setdefault(pc.card_id(sport, day_key, it), i)
+        first = cs.posted_first(posted, kind)
+        for e in cs.posted_entries(posted, kind):
+            i = index.get(e["card_id"])
+            if i is None:
+                continue
+            item, info = items[i], first.get(e["card_id"]) or {}
+            price = info.get("price") if info.get("price") is not None else (item.get("check") or {}).get("price")
+            res = cs.result_for(price, results.get(result_key(item)))
+            key = e["section"] if kind == "rows" else _SHARED_LINE_KEYS.get(e["section"], "")
+            if key in featured_keys:
+                _add(tallies.setdefault(key, _tally()), res)
+            once[cs.pick_result_key(item)] = res
+    every = _tally()
+    for res in once.values():
+        _add(every, res)
+    parlays = sgp_tally(sheet, reconciled, posted) if cs.posted_sgps(posted) else None
+    if not once and not parlays:
+        return None
+    return {"sections": {k: finish(t) for k, t in tallies.items()}, ALL: finish(every),
+            **({SGP: finish_sgp(parlays)} if parlays else {})}
 
 
 def _scope(days: list[Mapping[str, Any]]) -> dict[str, Any]:
@@ -248,9 +306,14 @@ def _scope(days: list[Mapping[str, Any]]) -> dict[str, Any]:
     sports = {s: {k: finish(t) for k, t in secs.items()} for s, secs in sorted(by_sport.items())}
     for s, t in sgp_by_sport.items():
         sports[s][SGP] = finish_sgp(t)
-    return {"totals": totals,
-            "by_sport": sports,
-            "series": series, "days": len(per_date)}
+    out = {"totals": totals,
+           "by_sport": sports,
+           "series": series, "days": len(per_date)}
+    shared_days = [dict(d["shared"], date=d["date"], sport=d.get("sport")) for d in days if d.get("shared")]
+    if shared_days and not any(d.get("_shared_scope") for d in days):
+        # The same roll-up over the SHARED value (`shared_day`): one more scope inside this one.
+        out["shared"] = _scope([dict(d, _shared_scope=True) for d in shared_days])
+    return out
 
 
 def season_record(days: Iterable[Mapping[str, Any]], *, generated_at: str,
