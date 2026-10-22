@@ -53851,3 +53851,18 @@ which is about the two sizing bases and not about the refusal boundary.
 - **not measured:** a per-order stake comparison against an unpublished twin. "Stakes unchanged" rests on the code path and the seam probe.
 - **revert:** `rm ~/syndicate-prod/data/calibration/staked_probability_profile.json`. The loader is mtime-cached, so the next commit reads the absent file as `unfitted`; no restart needed.
 
+
+## 2026-10-22 23:24:39Z -- FLEET FULL DOWN/UP: per-game cap (R2) $15 -> $50 on live-odds-worker (holder `event-max-dollars`, session 332cb014, coordinator) -- **MET (env + restart); first cap=50.00 line OWED**
+- **user (332cb014's chat):** asked "Change the per-game cap?", after ~39 Kalshi REFUSED_EVENT_CAP since the 16:18Z on-switch, including all 3 in the 22:17Z pass. With every order now >= $5, a game fit about 3 bets. The user picked "Raise to $30", then typed "raise it to $50".
+- **env:** 174 -> 175, +`LIVE_ODDS_WORKER__SYNDICATE_LIVE_EVENT_MAX_DOLLARS=50`. Backup `.bak-event-max-dollars-20261022T232439Z`. No code change: `max_event_dollars()` takes any positive finite number, and an unparseable value falls back to $15 (confirmed by lane live-event-concentration).
+- **restart:**
+  - Gate >= 23:18:00Z, after the 22:17Z refresh-worker restart by sim-stake-earned-profile.
+  - Claims at 23:18:11Z; drain CLEAR at 23:24:37Z.
+  - HEAD == b3279e52, no ff.
+  - `down` 23:24:39-23:25:11Z; healthz 200 at 23:25:18Z. refresh-worker pid 4018263, live-odds-worker 4018264.
+  - Undrained; claims released at 23:25:39Z.
+- **env read after up (live-odds-worker):**
+  - New: LIVE_EVENT_MAX_DOLLARS=50.
+  - Unchanged: LIVE_EVENT_CONCENTRATION=on, KALSHI_ROUND_UP_MIN_DOLLARS=5, EXECUTION_MODE=live, ARMED=1.
+- **owed:** the first REFUSED_EVENT_CAP / TRIMMED_TO_EVENT_CAP line reading `cap=50.00`, and a fall in R2 refusals per pass. R1 (same-axis, $1 tiny-leg rule) is unchanged.
+- **rollback:** delete that env line ($15 default), then a full down/up.
