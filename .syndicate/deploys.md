@@ -53316,3 +53316,36 @@ unsized noise. `ladder_reason` already names WHY each was refused
 (`below_suggested_floor`), and the ladder is paper-only so the counterfactual
 costs nothing. Logged in `leads.md`; deliberately kept OUT of the 10-29 split,
 which is about the two sizing bases and not about the refusal boundary.
+
+## 2026-10-22 14:44:45Z -- FLEET FULL DOWN/UP: live $5 minimum (lane `live-min-stake-five`, session 332cb014) -- **MET on the plan side; first live orders under it OWED**
+- **user:** confirmed directly in 332cb014's chat 2026-10-21 ~21:45Z, "Lift to $5", after a handover from 34fdabd0. The question I wrote: "Raise every live position to at least $5 ... Keep the per-order cap, balance day caps and favourite cap."
+- **code:** `bdc689ce`, a Polymarket at-ask floor. `_price_at_ask` lifts a Kelly-shrunk stake to min(floor, planned stake) behind `SYNDICATE_POLYMARKET_AT_ASK_MIN_STAKE_DOLLARS`, absent = off. It was lent by min-ev-tuner-shadow (5244eb59, returned d49b8c6b). 6 tests, plus 118 across the order and tuner suites.
+- **No ff by me.** in-game-trading moved the fleet to 09e86a9d at 00:35Z; that already contained bdc689ce and its own paper-only entry rule.
+  - The first attempt (10-21 22:51Z) stopped at its HEAD check, because a peer had ff'd to 9d4e742b and restarted live-odds at 22:15:51Z.
+  - The second was stopped by me at 23:23Z to take the in-play ride-along; the user approved carrying it in my chat. The claims expired unused overnight, and the peer then deployed 09e86a9d itself.
+- **env:** 170 -> 170 lines. Backup `local_production.env.bak-min-stake-five-20261022T144445Z`.
+  - REMOVED `REFRESH_WORKER__SYNDICATE_LIVE_SMALL_EDGE_FRACTION=0.001`. This was option C's small-edge line, the source of the one-contract sub-$1 positions.
+  - ADDED `LIVE_ODDS_WORKER__SYNDICATE_POLYMARKET_AT_ASK_MIN_STAKE_DOLLARS=5`.
+  - `LIVE_ODDS_WORKER__SYNDICATE_LIVE_EVENT_CONCENTRATION=shadow` is untouched. live-event-concentration asked to fold its `=on` into this restart; declined, because its approval is in its own chat and the two changes stay separately measurable. It re-armed for 15:45:45Z.
+- **gates:**
+  - Claims: all three acquired at 14:09:30Z.
+  - `check_deploy_safety --drain`: CLEAR after waiting out two refresh-worker odds jobs.
+  - HEAD == 09e86a9d.
+  - Spacing: live-odds last up 12:09:13Z, refresh-worker 06:21:38Z.
+- **restart:** marker set; `down` 14:44:45Z -> 14:45:22Z (rc 0); Start-ScheduledTask 14:45:30Z.
+  - healthz 200 at 14:45:30Z. refresh-worker pid 3860450, live-odds-worker 3860451.
+  - Marker cleared; DRAIN_CLEARED.
+  - Claims released at 14:45:53Z.
+- **env read after up** (allowlisted keys):
+  - refresh-worker: SMALL_EDGE_FRACTION ABSENT; LIVE_STAKE_BAND=on, LIVE_BAND_FAVOURITE_CAP=on, LIVE_NET_FLOOR_KALSHI=1.0, LIVE_EV_FLOOR=0, EXECUTION_MODE=live, ARMED=1.
+  - live-odds-worker: POLYMARKET_AT_ASK_MIN_STAKE_DOLLARS=5, POLYMARKET_PRICE_AT_ASK=1, EXIT_MODE=live, EVENT_CONCENTRATION=shadow, EXECUTION_MODE=live, ARMED=1.
+- **verify (READING, first builds 15:02Z):**
+  - `STAKE_BAND venue=kalshi ... small_edge_fraction=None positions=1/1 staked_before=$0.65 staked_after=$5.56 left_small=0`.
+  - `STAKE_BAND venue=polymarket ... positions=2/2 staked_before=$3.07 staked_after=$10.42 left_small=0`.
+  - Before this change, the band left sub-line rows at about one contract.
+  - `14:45:39Z [execution_exits_fast] STARTED mode=live`. 0 Tracebacks on either worker through 15:02Z.
+  - Executor passes 14:46-14:58Z placed 0: every planned position was already held (`duplicates`), so no new-order sizing has been observed yet.
+- **owed:**
+  - (1) The first NEW live order after 14:45:30Z: stake >= $5 unless the favourite cap (max loss $5) or a cash trim applies.
+  - (2) The first `POLYMARKET_PRICED_AT_ASK decision=place` with `min_stake_lifted_from=` or stake >= min(5, planned).
+- **rollback:** re-add `REFRESH_WORKER__SYNDICATE_LIVE_SMALL_EDGE_FRACTION=0.001` and delete the AT_ASK_MIN_STAKE line (or restore the backup if nothing else changed), then a full down/up under all three claims.
