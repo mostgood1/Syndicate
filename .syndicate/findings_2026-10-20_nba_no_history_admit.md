@@ -233,6 +233,82 @@ how the committed tool's output is read where it and the rule's text could diffe
 5. Instrument: `/home/amyn/nba_nohist_scratch/code_test/scripts/nba_standin_cost.py`, identical to main's
    `scripts/nba_standin_cost.py` modulo CRLF (checked 8:20 AM CT, WSL clock); bootstrap seed 7, 10,000 resamples, as committed.
 
+### Truth reading -- MINUTES: INCONCLUSIVE; points OWED (read 2026-10-22 6:56 AM CT)
+
+`[session 89514daa; tool run 6:56:11-6:56:14 AM CT 10-22 on the frozen arms, read-only on the fleet data root]`
+
+**Truth used.** Fleet `rotation_stints/player_checks_2026-10-21.csv`, written 6:45:07 AM CT 10-22: 254 rows, all
+`season_type=regular`, 11 events, 22 teams (every game on the slate). `player_logs.csv` holds **0 rows for 10-21**: it
+was last written 6:49 PM CT 10-21, the refresh attempt before the first tip (marker `attempted_at` 23:49Z; 6 h
+throttle, it runs inside the props refresh). **So the points half is owed.** It is read when those rows land.
+
+**PRIMARY: paired |B - actual| - |A - actual| minutes, over 97 teammates who played on the 10 sides with a simulated
+stand-in, cluster bootstrap by side (10,000 resamples, seed 7): mean +0.080, 95% CI [-0.455, +0.601] -> INCONCLUSIVE.**
+Neither bound is on the PASS side (upper < 0) or the FAIL side (lower > 0). Teammates' minutes MAE: A 6.32, B 6.40.
+The tool as committed counts WAS's all-zero cluster (11 clusters, n=107): +0.072 [-0.417, +0.554] -> INCONCLUSIVE.
+That is the same verdict, so choice 1 above did not decide anything.
+
+**SECONDARY (points): not readable.** 0 truth rows (above). Owed.
+
+**SANITY: minutes-prior MAE over the 10 simulated stand-ins who played = 3.93 (bound 8.0) -> OK.**
+
+| stand-in | team | minutes prior | B sim min | actual min |
+|---|---|---|---|---|
+| Kyrie Irving | DAL | 30.7 | 32.7 | 24 |
+| Fred VanVleet | HOU | 32.5 | 24.3 | 30 |
+| Keaton Wagler | LAC | 22.6 | 19.8 | 29 |
+| Darius Acuff Jr. | SAC | 31.0 | 27.7 | 35 |
+| Yaxel Lendeborg | GSW | 30.6 | 28.1 | 29 |
+| Cameron Boozer | MEM | 28.8 | 20.7 | 33 |
+| Darryn Peterson | UTA | 31.9 | 26.2 | 31 |
+| Tyrese Haliburton | IND | 27.6 | 19.7 | 34 |
+| Damian Lillard | POR | 30.2 | 24.3 | 24 |
+| Caleb Wilson | CHI | 32.5 | 25.6 | 32 |
+| AJ Dybantsa | WAS | 29.6 | injury-excluded | not in the box (did not play) |
+
+All 10 simulated stand-ins played, a mean of 30.1 min. Their minutes were predicted three ways:
+
+- The prior: MAE 3.93, inside the fit's 5.26.
+- The B sim's own minutes: MAE 6.99, mean -5.2. That is P3's compression.
+- Arm A, which leaves them out entirely: error 30.1.
+
+None of this enters the rule, because a stand-in's own props are never priced.
+
+**Join check (choice 3): 0 name-key misses.**
+
+- 27 A-and-B teammates on the 10 sides have no box row. All are DNPs or inactive (e.g. Steven Adams, Brandon Ingram,
+  Malik Monk, Nic Claxton, Patrick Williams).
+- The box rows on those sides that match nobody are 11 different players, outside BOTH arms' pools, 117 min in total.
+  GSW: Georges Niang 20, Graham Ike 12. CHI: Jaylin Sellers 14, Tobe Awaka 14. SAC: Emanuel Sharp 17, Alex Karaban 5.
+  DAL: Morez Johnson 14, Sergio de Larrea 7. LAC: Baba Miller 9, Nick Martinelli 2. HOU: Bruce Thornton 3.
+- These are the unpriced no-history players this lane left out of scope. Niang is one of H2's four unplanned admits.
+
+**Engine read -- why a correct stand-in leaves teammates no better.**
+
+- **The stand-in's minutes come off the pool pro rata, so mostly off the teammates who played.** Teammates' signed
+  minutes bias (sim - actual) goes from -0.36 in A to -2.43 in B.
+  - Starters (actual >= 28, n=24): -5.57 -> -7.91. Paired +1.29, worse.
+  - Everyone else (n=73): +1.35 -> -0.63. Paired -0.32, better.
+- **The pool gives minutes to players who did not play.** In A, pool players who then did not play hold 13.8 to 89.2
+  sim minutes per side (MEM 89.2, IND 72.6, CHI 63.2, LAC 53.7). Adding a stand-in takes back only about 5 of those
+  per side.
+- **Where B hurt:** sides where A already UNDER-predicted the played teammates. MEM +1.43, HOU +0.97, LAC +0.75.
+- **Where B helped:** sides where the pool missed real players and A OVER-predicted the played teammates. DAL -1.32
+  (A +3.53), GSW -1.29 (A +4.30).
+- **The binding constraint is the minutes layer, not the stand-in.** That layer has no position or starter structure:
+  it spreads minutes onto bench players who DNP and squeezes starters by ~5.6 min. Another slate on the same engine
+  should be expected to stay near zero. That is a forecast, not a measurement.
+
+**Decision per the rule:** INCONCLUSIVE.
+
+- `shadow` in production is allowed only if the user approves. It changes nothing: it logs who would be admitted. The
+  fleet checkout (09e86a9d) contains 73082de2, and the switch key is absent on the refresh-worker (pid 3658328, started
+  1:21 AM CT 10-22), so the switch is OFF.
+- The rule is then re-run with a NEW pair of arms per slate (off/on, built before tip, frozen inputs) until >= 250
+  teammate rows. This slate gave 97.
+- `on` is NOT supported by this reading.
+- The points secondary for this slate is owed. It cannot turn INCONCLUSIVE into a PASS; it can only flag a FAIL.
+
 ## Pipeline trace (code = `origin/claude/nba-current-rosters` + this lane's hooks)
 
 ```
