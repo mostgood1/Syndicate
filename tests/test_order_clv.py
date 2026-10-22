@@ -340,3 +340,46 @@ def test_a_resolver_row_without_stamps_grades_with_None_not_absent():
     row = report["rows"][0]
     assert row["reason"] == REASON_RESOLVED
     assert "fair_method" in row and row["fair_method"] is None
+
+
+# --------------------------------------------------------------------------
+# The ORDER's book decides same-book, not the opening's pairing.
+# Lane `venue-prop-close-coverage`: 110 of 5,729 same-book marks on the fleet
+# ledger (2026-10-22) paired a fill at one book with another book's close.
+# --------------------------------------------------------------------------
+
+
+def test_a_close_at_another_book_than_the_fill_is_not_same_book_for_the_order():
+    """The opening paired OUR DraftKings price with DraftKings' close -- same-book
+    for the opening. The order filled at Kalshi, so for the order it is not."""
+    order = _order(book="kalshi", venue="paper:kalshi", market="h2h", fill_price=-120)
+    row = _clv_row(market="h2h", bookmaker="kalshi", matched_bookmaker="draftkings",
+                   close_book_scope="same_book")
+    report = clv_for_orders([order], date=DATE, clv_rows=[row])
+    graded = report["rows"][0]
+    assert graded["close_book_scope"] == "different_book_close", "was same_book"
+    assert all(e["close_book_scope"] != SCOPE_SAME_BOOK for e in report["by_scope"])
+
+
+def test_a_quote_log_close_names_its_book_and_matches_the_fill():
+    order = _order(book="kalshi", venue="paper:kalshi")
+    row = _clv_row(bookmaker="kalshi", matched_bookmaker="kalshi", close_bookmaker="Kalshi",
+                   close_book_scope="same_book")
+    assert clv_for_orders([order], date=DATE, clv_rows=[row])["rows"][0][
+        "close_book_scope"] == SCOPE_SAME_BOOK
+
+
+def test_a_quote_log_close_at_another_book_is_caught_by_close_bookmaker():
+    order = _order(book="polymarket", venue="paper:polymarket")
+    row = _clv_row(bookmaker="polymarket", matched_bookmaker="betonlineag",
+                   close_bookmaker="betonlineag", close_book_scope="same_book")
+    assert clv_for_orders([order], date=DATE, clv_rows=[row])["rows"][0][
+        "close_book_scope"] == "different_book_close"
+
+
+def test_a_biased_scope_is_never_promoted_by_a_matching_book():
+    order = _order(book="kalshi")
+    row = _clv_row(bookmaker="kalshi", matched_bookmaker="kalshi",
+                   close_book_scope="book_agnostic_close")
+    assert clv_for_orders([order], date=DATE, clv_rows=[row])["rows"][0][
+        "close_book_scope"] == "book_agnostic_close"

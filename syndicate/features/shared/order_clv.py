@@ -60,6 +60,7 @@ REASON_NO_ENTRY_PRICE = "no_entry_price"
 REASON_CLV_UNCOMPUTABLE = "clv_uncomputable"
 
 SCOPE_SAME_BOOK = "same_book"
+SCOPE_DIFFERENT_BOOK = "different_book_close"
 
 
 def _as_float(value: Any) -> float | None:
@@ -89,6 +90,33 @@ def _scope_of(row: Mapping[str, Any]) -> str:
     defaulting it to anything else would relabel the cleanest rows as the
     dirtiest."""
     return str(row.get("close_book_scope") or SCOPE_SAME_BOOK)
+
+
+def _book_name(value: Any) -> str:
+    return str(value or "").strip().lower()
+
+
+def _order_scope(order: Mapping[str, Any], row: Mapping[str, Any]) -> str:
+    """The scope of the close FOR THIS ORDER, which is not always the opening's.
+
+    The opening is same-book when it can pair OUR price at some book with that
+    book's close (`book_prices` -> `matched_bookmaker`, `open_price_override`).
+    But the entry graded here is the order's own fill, at the order's own book,
+    so a DraftKings close against a Kalshi fill is a cross-book pair whatever
+    the opening's row says. MEASURED on the fleet ledger 2026-10-22: 110 of 5,729
+    same-book marks were exactly that (paper:kalshi 11 of 313, paper:novig 33 of
+    1,089, paper:prophetx 26 of 1,730), and `min_ev_tuner` counts every
+    same-book mark as unbiased evidence. A book that cannot be read on either
+    side leaves the opening's scope as it was: nothing contradicts it.
+    """
+    scope = _scope_of(row)
+    if scope != SCOPE_SAME_BOOK:
+        return scope
+    close_book = _book_name(row.get("close_bookmaker") or row.get("matched_bookmaker"))
+    order_book = _book_name(order.get("book") or row.get("bookmaker"))
+    if close_book and order_book and close_book != order_book:
+        return SCOPE_DIFFERENT_BOOK
+    return scope
 
 
 def clv_for_orders(
@@ -217,7 +245,7 @@ def clv_for_orders(
         clv = clv_pct_from_prices(entry, close_price)
         if clv is None:
             _row(REASON_CLV_UNCOMPUTABLE, close_price=close_price, clv_pct=None,
-                 close_book_scope=_scope_of(row))
+                 close_book_scope=_order_scope(order, row))
             continue
 
         _row(
@@ -225,7 +253,7 @@ def clv_for_orders(
             close_price=close_price,
             close_source=row.get("close_source"),
             close_captured_at=row.get("close_captured_at"),
-            close_book_scope=_scope_of(row),
+            close_book_scope=_order_scope(order, row),
             matched_bookmaker=row.get("matched_bookmaker"),
             clv_pct=clv,
             beat_close=clv > 0,

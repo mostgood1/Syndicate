@@ -541,6 +541,95 @@ def resolve_close(
 # its own measurement.
 BOOK_QUOTES_CLOSE_SOURCE = "book_quotes_last_pregame"
 _QUOTE_FALLBACK_REASONS = frozenset({"no_market_in_history"})
+
+# THE QUOTE LOG IS ASKED WHENEVER HISTORY'S BEST IS NOT OUR OWN BOOK'S CLOSE.
+#
+# The fallback rule above assumes history's answer is the better one whenever
+# history holds the market. Two cases where it is not, both MEASURED on the fleet
+# ledger 2026-10-22 (lane `venue-prop-close-coverage`), settled MLB orders:
+#
+# PROPS. The prop series is keyed `player_name|market|selection` -- no event,
+# no book -- so its best case is `book_agnostic_close` and the headline never
+# counts it. paper:kalshi 209 prop orders: history gave 62 book-agnostic closes,
+# 5 same-book, and refused 97 as `no_pregame_observation` (2026-10-03's Ozzie
+# Albies hits series starts at 22:13Z, two hours after first pitch). The quote
+# log held a same-book KALSHI pregame close for 97 of those 97 and 55 of the 62;
+# Polymarket 89 orders, 2 same-book, and the quote log held 31 of 33 and 34 of
+# 36. The close was captured all along and lost at resolution.
+#
+# GAME MARKETS AT A BOOK HISTORY DOES NOT TRACK. History follows a few
+# mainstream books, so a Novig or Kalshi opening resolves "same-book" through
+# `book_prices` -- our DraftKings price against DraftKings' close. That pair is
+# unbiased for the OPENING, but a placed order filled at Novig, and against its
+# fill the DraftKings close is another book's (`order_clv._order_scope`). The
+# quote log usually holds the venue's own close.
+#
+# So the closes are RANKED, and the quote log replaces history's only with a
+# higher rank: the opening's own book > another book we priced > any biased
+# scope. A history refusal of a prop is asked too, except the clock refusals
+# decided before any source (`opened_in_play`, `not_started`).
+_NOT_ASKED_OF_QUOTES = frozenset({"opened_in_play", "not_started"})
+
+
+def _is_prop(opening: Mapping[str, Any]) -> bool:
+    return bool(str(opening.get("player_name") or "").strip())
+
+
+def _close_rank(opening: Mapping[str, Any], resolved: Mapping[str, Any]) -> int:
+    """2 = same-book at the opening's own book, 1 = same-book elsewhere, 0 = biased or none."""
+    if resolved.get("close_price") is None or resolved.get("close_book_scope") != "same_book":
+        return 0
+    own = str(opening.get("bookmaker") or "").strip().lower()
+    close_book = str(
+        resolved.get("close_bookmaker") or resolved.get("matched_bookmaker") or own
+    ).strip().lower()
+    return 2 if own and close_book == own else 1
+
+
+def _wants_quote_close(opening: Mapping[str, Any], resolved: Mapping[str, Any]) -> bool:
+    if resolved.get("close_price") is None:
+        reason = resolved.get("unresolved_reason")
+        if reason in _QUOTE_FALLBACK_REASONS:
+            return True
+        return (
+            _is_prop(opening)
+            and bool(str(opening.get("event_id") or "").strip())
+            and reason not in _NOT_ASKED_OF_QUOTES
+        )
+    if not str(opening.get("event_id") or "").strip():
+        return False
+    return _close_rank(opening, resolved) < 2
+
+
+def _quote_close_choice(
+    opening: Mapping[str, Any], history: dict[str, Any], quote: dict[str, Any]
+) -> dict[str, Any]:
+    """History's close or the quote log's, for one opening history could not settle best.
+
+    A market history does not hold (`no_market_in_history`) takes the quote
+    log's answer whole, reason included -- unchanged from before. Otherwise the
+    quote log's close is taken only when it OUTRANKS history's and was observed
+    after the opening: a same-book close whose last sighting precedes the
+    opening is refused downstream (`quotes_unchanged_since_open`), and taking it
+    would trade a usable close for a refusal. Failing that, history's close
+    stands; then any quote-log close (labelled by its own scope); and with
+    neither, HISTORY's reason -- it holds the market, so its diagnosis is the one
+    with a remedy attached.
+    """
+    if history.get("close_price") is None and history.get("unresolved_reason") in _QUOTE_FALLBACK_REASONS:
+        return quote
+    if _close_rank(opening, quote) > _close_rank(opening, history):
+        open_at = _parse_ts(opening.get("captured_at"))
+        close_at = _parse_ts(quote.get("close_captured_at"))
+        if open_at is None or close_at is None or close_at > open_at:
+            return quote
+    if history.get("close_price") is not None:
+        return history
+    if quote.get("close_price") is not None:
+        return quote
+    return history
+
+
 _QUOTE_EVENT_ID_RE = re.compile(r'"event_id"\s*:\s*"([^"]*)"')
 
 # (sport, central kickoff date, event ids wanted) -> that shard's rows, or None
@@ -1212,10 +1301,8 @@ def compute_clv_for_date(
         state_reader = state_reader or read_quote_state_for_keys
     pending_at = [
         index
-        for index, (_opening, key, resolved) in enumerate(resolutions)
-        if key is not None
-        and resolved.get("close_price") is None
-        and resolved.get("unresolved_reason") in _QUOTE_FALLBACK_REASONS
+        for index, (opening, key, resolved) in enumerate(resolutions)
+        if key is not None and _wants_quote_close(opening, resolved)
     ]
     quotes_fallback: dict[str, Any]
     if loader is None:
@@ -1227,9 +1314,21 @@ def compute_clv_for_date(
             [resolutions[index][0] for index in pending_at], sport, loader, now=now,
             state_reader=state_reader,
         )
-        for index, resolved in zip(pending_at, quote_resolved):
-            opening, key, _history = resolutions[index]
-            resolutions[index] = (opening, key, resolved)
+        # How many closes the quote log took FROM history, by what history had
+        # given: a refusal, a biased close, or a same-book pair at another book.
+        replaced: dict[str, int] = {}
+        for index, quote in zip(pending_at, quote_resolved):
+            opening, key, history = resolutions[index]
+            chosen = _quote_close_choice(opening, history, quote)
+            if chosen is quote and history.get("unresolved_reason") not in _QUOTE_FALLBACK_REASONS:
+                was = (
+                    "refused" if history.get("close_price") is None
+                    else str(history.get("close_book_scope") or "none")
+                    if _close_rank(opening, history) == 0 else "same_book_other_book"
+                )
+                replaced[was] = replaced.get(was, 0) + 1
+            resolutions[index] = (opening, key, chosen)
+        quotes_fallback["replaced_history"] = dict(sorted(replaced.items()))
 
     for opening, key, resolved in resolutions:
         if key is None:
@@ -1505,10 +1604,10 @@ def compute_clv_for_date(
     )
     print(
         "[clv_join] CLV_QUOTES_FALLBACK date=%s sport=%s attempted=%s resolved=%s not_started=%s opened_in_play=%s confirmed_by_last_seen=%s "
-        "shards_read=%s shards_absent=%s shards_failed=%s rows_parsed=%s seconds=%s skipped=%s"
+        "replaced_history=%s shards_read=%s shards_absent=%s shards_failed=%s rows_parsed=%s seconds=%s skipped=%s"
         % (date, sport, quotes_fallback.get("attempted"), quotes_fallback.get("resolved"),
            quotes_fallback.get("not_started"), quotes_fallback.get("opened_in_play"),
-           quotes_fallback.get("confirmed_by_last_seen"),
+           quotes_fallback.get("confirmed_by_last_seen"), quotes_fallback.get("replaced_history"),
            quotes_fallback.get("shards_read"), quotes_fallback.get("shards_absent"),
            quotes_fallback.get("shards_failed"), quotes_fallback.get("rows_parsed"),
            quotes_fallback.get("seconds"), quotes_fallback.get("skipped")),
