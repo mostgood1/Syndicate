@@ -1226,6 +1226,17 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   - Fleet (HEAD e491c260): 14 production modules import 0 vendored WNBA modules; 0 writes under vendor/wnba_betting_repo since 10-10 while the WNBA refresh wrote 207 files; no env/PYTHONPATH points at it.
   - Frozen (dd510faa): wnba/live_tick/ (carries the registry FIX) and wnba/source_cli/. No generator is left for any basketball port.
   - **vendor/wnba_betting_repo DELETED from git 2026-10-20 (e633f12c)**; verified with it gone (172 test files, 20 modules), and gone from the fleet since the ff to 8e0ca456 (15:01 CDT): 0 tracked, 0 writes while the WNBA refresh ran. **vendor/ is EMPTY since 212de24a** (NHL tree + vendor-sync tooling retired); the basketball calibration builders now read production's schedules.
+- **The props refreshes give the source-CLI child its data root** `[verified 2026-10-22, lane basketball-cli-data-root, 69c1af9d]`:
+  `refresh_{nba,wnba}_oddsapi_props.py` set <LEAGUE>_BETTING_DATA_ROOT = <source_root>/data for the CLI subprocess only when unset/empty
+  (todo #718 closed). Without it `export-game-cards` resolved `source_cli/repo/data` and raised OSError: 4/4 runs from the unstamped
+  launcher pre-fix, 0/16 stamped; the first post-fix unstamped run (10-21 18:41:57Z) succeeded.
+- **That launcher was the Windows tasks SyndicateNbaGamedayProps / SyndicateNbaPreviewProps** (`scripts/nba_gameday_props_pull.py`,
+  run from a bare `bash -lc`). Since 9503c042 the pull runs with the RUNNING live-odds-worker's env (read from /proc, never printed) and
+  REFUSES with no role running `[verified 2026-10-22 12:40Z pull, lane gameday-pull-role-env]`: memory_max_mb 3072, n_sims=100,
+  Z-stamped lines, 0 OSError (pre-fix task pulls: null / 500 / unstamped).
+- **No vendored WNBA package on the data disk** `[verified 2026-10-22, lane vendor-final-leftovers]`: `<data>/wnba_source/src` (135 files)
+  archived to `<data>/_archive/vendor_wnba_src_fleet_20261022T142838Z.tar.gz` and removed 14:28:39Z; no script on main adds a
+  `wnba_source/src` path any more (09d5795c, 7a3cf4cf, 49468c99).
 
 ## [nba-current-rosters] THE NBA SMARTSIM RAN 2025-26 ROSTERS ON OPENING NIGHT; THE FIX (ESPN CURRENT ROSTERS) IS LIVE ON THE FLEET: STALE 0 ON 10-21 (285) AND 10-22 (56) `[verified 2026-10-21 1:43 PM CT, lane nba-current-rosters CLOSED, d9b1f5ae + 085fe1e8]`
 

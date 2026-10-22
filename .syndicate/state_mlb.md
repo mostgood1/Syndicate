@@ -847,6 +847,12 @@ misdiagnoses on 2026-08-20.
 - **FROZEN 2026-10-19 (3c55e77b):** the three trees are no longer generated. Edit them directly; conventions and the one post-freeze behaviour edit (a6c32498, postponed-game guards in the card settler) are in `syndicate/features/mlb/FROZEN_FROM_VENDOR.md`. The generators, parity harnesses and migration script are retired; `sync_vendor_upstream.py` no longer covers MLB.
 - **DELETED from git 2026-10-19 (814f7966)**; tests (2,757 outcomes) and 14 entry points verified with it physically absent. Gone from the fleet too since the ff to d3878d69 (2026-10-19 18:54 CDT): 0 tracked, 0 writes while the native engine and live lens ran (read 2026-10-20 12:37Z); ignored leftovers archived. The daily-update stage table above describes the vendored `daily_update.py`; the native copy runs the same stages.
 
+- **MLB live-prop ranking predictor is repo code** `[verified 2026-10-22, lane vendor-final-leftovers, 09d5795c]`: `cards.py` imports
+  `syndicate.features.mlb.sim_engine.live_prop_ranking` instead of exec'ing `<mlb source root>/sim_engine/live_prop_ranking.py`
+  (byte-identical then). Both data-disk copies archived (`_archive/mlb_live_prop_ranking_copies_20261022T162712Z.tar.gz`) and removed
+  16:27Z after every cards.py-loading process restarted on the new code; only the tuning config `data/tuning/live_prop_ranking/default.json`
+  stays data. The fleet data disk holds 0 vendored .py.
+
 ## [mlb-ladders-native-builder] MLB LADDERS — NATIVE BUILDER SHIPPED TO THE TREE `[2026-08-19]`
 
 
