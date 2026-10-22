@@ -277,3 +277,55 @@ Two-sided in-game trading has two halves, and tonight separates them.
 4. **Stage 3 in-play entries: NOT YET.** No fair beats Kalshi tonight. The NHL spread away-from-score cell (+0.9c, CI to -0.6c) is pre-registered here as the cell to watch, and it is not traded.
 5. **Stage 4 Polymarket:** keep pregame-only.
 6. **Stage 5:** fold position decisions into #709.
+
+## 8. Stage 2 measurement BUILT + nightly task (2026-10-22, session f7ccc844, side session of b14b84d0)
+
+**User decision 2026-10-22 ~12:35 PM CT (asked in chat):** "Yes, all 4 sports". A Windows scheduled task records NBA, NHL, NFL and NCAAF every game night and writes the scoreboard.
+
+**What runs each night** (`scripts/inplay_nightly.py`, scheduled task `Syndicate inplay nightly`, daily 09:00 CT, Idle priority, from a runner copy in `C:/tmp/inplay_runner/` that re-syncs from `origin/main` via `git show` at each start):
+1. ESPN slate for the date (`dates=`). No game -> exit, 0 credits.
+2. Wait until 30 min before the first scheduled start.
+3. `inplay_recorder.py --regions us,eu,uk --stop-after-final-minutes 30` into `C:/tmp/inplay_<date>/`. Hard cap: last start + 6 h.
+   - OddsAPI is now polled for a sport ONLY while ESPN shows one of its games in play: 9 credits/min per live sport. A 10-22 midday smoke run made 0 OddsAPI calls.
+   - Finalized Kalshi tickers are polled once for their result, then dropped. The Kalshi cycle stretches to <= 2.5 req/s, because an NCAAF Saturday is ~3,400 tickers.
+4. Copy the NBA re-sim ledger (`wsl -- cp`), then run `inplay_edge_report.py`, `inplay_fair_score.py` and `inplay_scoreboard.py`.
+   - Nightly table: `<dir>/scoreboard.md`.
+   - Cumulative table: `C:/tmp/inplay_scoreboard.md` / `.json`.
+   - Log: `C:/tmp/inplay_nightly.log`.
+
+**The score/time baseline** (`inplay_fair_score.py`). Its constants were fixed 2026-10-22 BEFORE any scoring and are not to be tuned on recorded nights:
+- **Basketball/football: a Brownian margin and total.** This is the probit form of "logistic in score diff x time remaining".
+  - margin ~ N(d + mu*tau, SIG_M^2*tau), with mu = SIG_M*PhiInv(p0).
+  - total ~ N(S + T0*tau, SIG_T^2*tau).
+  - SIG_M / SIG_T per full game: NBA 13.0 / 19.0; NFL 13.5 / 13.5; NCAAF 16.0 / 16.5.
+  - p0 = the pregame Kalshi home GAME mid. T0 = where the pregame Kalshi TOTAL ladder crosses 0.5.
+- **NHL: Poisson regulation goals.** The total is 5.9 goals; the home share is solved to reproduce p0. OT is sudden death by share, a shootout is 0.5, and an OT win never covers 1.5+.
+- **Anchor:** the last Kalshi sample <= min(scheduled start, first ESPN "in" - 60 s), within 45 min. With no anchor the game is NOT priced, and the reason is counted.
+- **Scored the same way:** the NBA re-sim (h2h + totals; spreads are not scored because the line sign is unverified) and the book consensus (reference).
+- **Rows:** one per (ESPN poll of a live game x ticker). Only the home GAME ticker is scored. Settlement is Kalshi's own `result`.
+- **CIs:** bootstrap over GAMES. With fewer than ~10 games a CI is too narrow to read.
+
+**First read, 10-20 only** (2 NBA + 9 NHL games; 24,455 rows). Every cell is COLLECTING; none is near the >= 20-game bar.
+
+| fair | cell | dBrier vs Kalshi mid | markout +300 s (c) |
+|---|---|---|---|
+| score_time | NBA GAME | -0.0006 [-0.024, +0.021] | -1.42 [-2.47, -0.35] |
+| score_time | NBA SPREAD | -0.0007 [-0.007, +0.005] | -1.81 |
+| score_time | NBA TOTAL | -0.0023 [-0.010, +0.005] | -1.22 |
+| score_time | NHL GAME | **+0.0128 [+0.0006, +0.0248]** (worse) | -2.29 [-3.18, -1.20] |
+| score_time | NHL SPREAD | -0.0122 [-0.0240, +0.0032] | -2.53 [-3.05, -2.02] |
+| nba_resim | NBA TOTAL | **+0.0248 [+0.0105, +0.0365]** (worse) | -0.25 |
+
+- The baseline TIES Kalshi on NBA Brier, but every side it calls positive marks out negative.
+- On NHL spreads it is better on Brier while marking out -2.5c. The rungs it gets right are not the ones it would buy at the ask after fee.
+- So the second GO clause (markout) is the binding one, as designed.
+
+**Watch cell re-read** (NHL spreads, away from a score, book-consensus episodes, +300 s): **+1.06c [-1.01, +3.23], 274 episodes, 9 games.**
+- The CI is now clustered by game. The 10-20 figure, +0.9c [-0.6, +2.4], n=270, was not clustered.
+- n moved by 4 because the 10-20 recorder ran to 04:44Z, past the 04:39Z cut used in §6.
+- It is still a lead, not an edge. The scoreboard re-reads it every night.
+
+**Owed:**
+- A findings update once >= 20 games per sport are in (NHL ~2 nights; NBA ~6-10 nights; NFL ~2 weekends).
+- The 2026-12-31 stop.
+- If the host sleeps (Modern Standby), a night is lost silently. Read `C:/tmp/inplay_nightly.log` for a `DONE <date>` per game night.

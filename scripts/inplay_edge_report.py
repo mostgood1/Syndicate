@@ -235,7 +235,8 @@ def main() -> int:
         return (t - prior[-1]) if prior else float("inf")
 
     fee_cache: dict = {}
-    sport_of = lambda ev: "nba" if ev.startswith("KXNBA") else ("nhl" if ev.startswith("KXNHL") else None)  # noqa: E731
+    def sport_of(ev):
+        return next((s for p, s in (("KXNCAAF", "ncaaf"), ("KXNBA", "nba"), ("KXNHL", "nhl"), ("KXNFL", "nfl")) if ev.startswith(p)), None)
 
     # Map Kalshi game key (ticker middle, e.g. 26OCT20ANANYI) -> OddsAPI event id via h2h subs.
     game_subs = defaultdict(set)
