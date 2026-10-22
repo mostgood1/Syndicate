@@ -2746,3 +2746,18 @@ The 2026-10-20 entry said: "Rating INPUTS transfer, because the sim reads them w
 ## 2026-10-22 - A commit gate must tell "deleted someone else's line" from "replaced my own" `[session 4ab694ed]`
 - **What happened:** the deletion gate I wrote on 10-21 (refuse to commit if any shared ledger file shows a deletion) correctly caught a retry loop that would have dropped 360 lines of a peer's soccer work. The next day it blocked **my own correct edit**: replacing one line of todo `#722` is 1 deletion + 1 insertion, and the gate saw only the deletion.
 - **Rule:** gate on deletions of lines you did not write, not on the deletion count. Cheapest usable form: allow deletions only in files you are intentionally editing in place, assert the exact count you expect, and PRINT the deleted lines so the operator confirms they are their own. A gate that blocks correct work gets switched off, which is how the 360-line case comes back.
+
+## 2026-10-22 - Two NBA files are NOT what their names say after tip: the processed props snapshot and pre-freeze production sims `[lane nba-sim-minutes-allocation, session ffb7ab00]`
+- **Belief overturned (1):** `processed/oddsapi_player_props_<D>.csv` holds the slate's pre-tip lines.
+  - Each pull overwrites it.
+  - Read after 10-21's games, it held IN-PLAY rows only, so a pre-tip points-line join returned 0 of 157 players.
+  - **Rule:** a post-hoc reading of pre-tip lines reads `raw/odds_nba_player_props_history_<D>.csv`, filtered to snapshot < commence. That file has no home/away columns; take event teams from the raw or opening snapshot.
+- **Belief overturned (2):** a `smart_sim_<D>_*.json` on the fleet is a pregame prediction.
+  - All three 10-20 sims were rebuilt 11:08 PM CT, after the games, and their frames carry the game's own box minutes as `lag1_min` (Cunningham 35/35).
+  - Their minutes MAE was 0.6-3.0, against 4.5-11.0 on honest sides.
+  - **Rule:** before scoring any production NBA/WNBA sim built before the tip freeze went live (2026-10-21 11:56 AM CT), compare its mtime with the tip and DROP post-tip builds.
+  - `scripts/nba_sim_minutes_audit.py` does this and tags them `[built after tip]`.
+- **Same session, smaller:** match player names ACROSS sources with `normalize_player_name_key` (orchestrator), never `_norm_name_key`.
+  - `_norm_name_key` keeps periods and apostrophes: props_predictions "Jabari Smith Jr." never meets the books' "Jabari Smith Jr".
+  - On 10-21 that hid 2 of 6 priced MIL players.
+
