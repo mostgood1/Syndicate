@@ -53415,3 +53415,11 @@ which is about the two sizing bases and not about the refusal boundary.
 - **verify:** the first `injuries.csv` rewrite after 16:29:00Z holds 0 off-roster NBA names for its date, and Diop and Wade appear under their own names. Also owed: the next NBA props refresh's `SMART_SIM_REUSE_STALE_EXCLUSIONS` drift lines carry no reason word inside a name. **READ 16:30:45Z (11:30 AM CT), first rewrite after the ff (production's own fetch, 1 min 45 s later): 12 rows for 2026-10-22, 0 off-roster (team, name), 0 off any roster; `CLE 'Khalifa Diop' OUT`, `PHI 'Dean Wade' QUESTIONABLE` -- the same two players the old parser had spliced at 15:59Z. MET.** The props-refresh drift-line half stays owed (next NBA refresh).
 - **undo:** `git merge --ff-only` cannot go back. To revert, check out the old file: `git checkout 5e734fb6 -- syndicate/features/nba/source_cli/scrapers/injuries.py` in `~/Syndicate`. No restart is needed, for the same subprocess reason.
 
+## 2026-10-22 16:37Z (11:37 AM CT) -- FLEET ff 36eb357b -> 0a2986b4 (NO restart): result cards get NBA / WNBA minutes usage (lane result-cards)
+- **user-approved in chat:** "Deploy now (Recommended)".
+- **claims:** waited out nba-injury-parser-fleet-ff's (target 36eb357b); then live-odds-worker (d9d8f5aa), refresh-worker (822ed21e), web
+  (bc2e08a2), holder `result-cards`; released after this entry.
+- **ff:** `ff_to.sh` (fetch github, guard HEAD == 36eb357b, no incoming file locally modified) -> 0a2986b4 at 16:37:03Z. Code in the gap =
+  0a2986b4 only (box_usage.py + its test). Read by the reconcile and grade_play_cards as subprocesses: no restart, no web reload.
+- **verify, owed:** the 11:50 PM CT reconcile's nba postmortem records carry usage (pre-deploy replay: 116 of 118 nba props, 62 of 63
+  losses; wnba 128 of 128). Then close result-cards.
