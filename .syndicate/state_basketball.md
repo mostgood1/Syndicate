@@ -1314,7 +1314,7 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
 - **Owed:** the pre-registered regular-season accuracy reading at ~100 graded games (`scripts/nba_anchor_staleness.py --stale-from game_odds`, todo #721).
 - Findings: `findings_2026-10-21_nba_anchor_staleness.md`.
 
-## [nba-sim-minutes-allocation] THE NBA SMARTSIM GIVES ~38 MIN/SIDE TO POOL PLAYERS WHO DNP AND RUNS STARTERS -4.2 MIN; A PRICED-FIRST SHRINK IS ON MAIN, DEFAULT OFF, NOT ENABLED `[measured 2026-10-22, lane nba-sim-minutes-allocation, todo #723, main 8301efcd + 4b12deca]`
+## [nba-sim-minutes-allocation] THE NBA SMARTSIM GIVES ~38 MIN/SIDE TO POOL PLAYERS WHO DNP AND RUNS STARTERS -4.2 MIN; A PRICED-FIRST SHRINK IS ON THE FLEET IN SHADOW SINCE 2026-10-22 19:03Z (logs only, minutes unchanged) `[measured 2026-10-22, lane nba-sim-minutes-allocation, todo #723, main 8301efcd + 4b12deca]`
 - **Measured (production 10-21 sims vs the `player_checks` box, 22 pre-tip sides; `scripts/nba_sim_minutes_audit.py`):**
   - DNP pool players hold 37.7 sim min/side [26.4, 49.4].
   - Box starters -4.21 [-6.41, -1.87], bench +1.86, played-player MAE 6.87.
@@ -1333,7 +1333,7 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   - It gives a player marked Available the next player's OUT and drops that player's row. Reproduced through the
     real `_parse_pdf_rows` on a synthetic token stream. The 10-21 Curry/Moody swap came this way: CONFIRMED on
     the real 11:30 PM ET report (`Curry, Stephen Available - Moody, Moses Out`).
-  - FIXED ON MAIN (36eb357b), NOT ON THE FLEET: see `[nba-injury-pdf-parser]` (todo #725).
+  - FIXED (36eb357b) and LIVE ON THE FLEET since the 16:29:00Z ff; first rewrite 16:30:45Z had 0 off-roster names. See `[nba-injury-pdf-parser]` (todo #725).
 - **Reach:** the derive path set 22/22 sides on 10-21. The rotation-HISTORY path takes over from a team's 2nd game:
   OKC on 10-22; BOS, NYK and SAS on 10-23.
   - **History-path mechanics** `[10-22, lane nba-sim-minutes-history-path, truth-free]`: a replay of the real function
@@ -1344,12 +1344,15 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
 - **Built:** `SYNDICATE_NBA_SIM_MINUTES_PRICED_FIRST` (absent = off | shadow | on).
   - NBA only, derive path only, engages with >= 5 priced pool players. The excess comes off unpriced players first.
   - 13 tests (+5 audit), including off != on through the real worker.
-  - Not on the fleet (fleet 5e734fb6); off is byte-identical anyway.
+  - On the fleet checkout since the 16:29Z ff. **SHADOW LIVE since the 19:03:27Z full down/up** (user: "turn on the priced-first switch in shadow").
+    All three roles read `SYNDICATE_NBA_SIM_MINUTES_PRICED_FIRST=shadow` (global key; `_SET` absent = `priced`).
+    Each derive-path build logs `NBA_SIM_MINUTES_PRICED_FIRST mode=shadow ...` and returns the water-fill.
+    Undo: delete the line, then a full down/up (deploys.md 19:03:27Z).
 - **Variant V-S also on main, default off (`907e9c9c`):** `SYNDICATE_NBA_SIM_MINUTES_PRICED_FIRST_SET=priced_starters`
   protects only priced players with `_starter_signal >= 0.55`.
   - Read only when the main switch is shadow or on.
   - Pre-registered `cdfe3e59` before any post-10-21 box, and read only on slates after 10-21.
-  - Off != on through the real worker. Not on the fleet.
+  - Off != on through the real worker. On the fleet checkout since the 16:29Z ff, and inert: `_SET` is absent.
 - **Development reading on 10-21** (`--replay` on production engine_inputs; the off replay reproduces production to
   0.000):
   - Paired minutes -0.895 [-1.552, -0.278], 173 rows over 17 sides.
