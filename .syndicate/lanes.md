@@ -1872,6 +1872,14 @@ death, never life — do not invert it.
 - Verification: TNF 10-22: SEGMENT_PLAN segments=h1..q4 markets=18 in the NFL fetch log from ~1:15 PM CT, nonfull NFL rows in nfl_source/tracking/book_quotes, NFL segment rows on the served board, and the OddsAPI spend for the slate near the estimate
 - Blocked by: none
 
+### venue-order-opening-gap — OPEN — opened 2026-10-22 — session 70a0dbdf-e516-45e7-ae50-934c8e893bcf
+- Goal: Settled paper/venue orders with no recorded CLV opening are graded against the close: measure on the fleet ledger (read-only, nice 19) why venue books place a (market,line,book) the board never records as an opening, why 10-11 concentrates, whether NCAAF/NFL share it; fix with a test that fails on the old code; findings with denominators before/after; fix on origin/main; residual count after a fleet replay. Side session of local_7f1cc8f8 (residual 1 of venue-prop-close-coverage)
+- Files: tests/test_order_clv_opening_less.py, .syndicate/findings_2026-10-22_venue_order_opening_gap.md, docs/ai_context/todo.md (#729 section only), syndicate/features/shared/order_clv.py (LOAN from venue-prop-close-coverage, which delegated this residual)
+- Hypothesis: UNTESTED: venue/paper orders are planned from book rows that never pass through layer2_shortlist.record_openings (the only opening writer), so their (market,line,book) key has no opening; the quote log still holds the bet's own book quotes
+- Falsification test: the 78 orders' own-book quote-log rows are absent too (capture gap), or their keys exist in an openings file for another date (a date-attribution bug, not a missing writer)
+- Verification: pytest new test file red on origin/main order_clv.py and green on the fix; fleet replay over settled MLB/NCAAF/NFL paper orders: count with no opening that still lack a close, before vs after, with denominators
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
