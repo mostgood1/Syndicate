@@ -309,6 +309,41 @@ None of this enters the rule, because a stand-in's own props are never priced.
 - `on` is NOT supported by this reading.
 - The points secondary for this slate is owed. It cannot turn INCONCLUSIVE into a PASS; it can only flag a FAIL.
 
+### Truth reading -- POINTS (secondary): NOT FAIL (read 2026-10-22 7:49 AM CT); overall verdict unchanged, INCONCLUSIVE
+
+`[session 89514daa; tool re-run 7:49:14-7:49:18 AM CT on the same frozen arms]` The fleet `player_logs.csv` gained 254
+rows for 10-21 at 7:40:05 AM CT (refresh marker 12:40Z). That equals the box's 254. All 97 population rows have a
+points row. The box file is unchanged (6:45:07, 22,720 bytes), and the minutes numbers re-read identical.
+
+**SECONDARY: paired |B - actual| - |A - actual| points, same 97 teammates / 10 sides: mean -0.127, 95% CI [-0.256,
+-0.009] -> NOT FAIL.** The CI's lower bound is not > 0. The interval sits on the PASS side, though the secondary only
+has to avoid FAIL. Teammates' points MAE: A 4.98, B 4.85. The tool as committed (11 clusters, n=107) gives
+-0.115 [-0.237, -0.006].
+
+How solid it is (reported, not part of the rule):
+
+- **Above the noise floor.** The noise arm under the same statistic (|A2 - actual| - |A - actual|, A2 = off with
+  another seed) is +0.012 [-0.004, +0.028]. -0.127 is about 10x that.
+- **Fragile at the edge.** Leave one side out: the mean stays negative in all 10 drops (-0.088 to -0.154). The upper
+  bound crosses 0 when DAL, SAC, UTA, POR or CHI is dropped (5 of 10).
+- **Signed points bias (sim - actual) goes from +0.76 in A to -0.03 in B.**
+  - B helps where A over-predicted the played teammates: DAL -0.50, UTA -0.46, SAC -0.23, CHI -0.20, POR -0.18,
+    GSW -0.06.
+  - B is neutral to slightly worse where A under-predicted: HOU +0.09, IND +0.08, MEM +0.07, LAC +0.06.
+  - Same shape as minutes. Points improve and minutes do not because the stand-in takes usage, not only minutes.
+
+**Stand-ins' actual points** (their own props are never priced; for the record, B sim / actual): Irving 23.5 / 15;
+VanVleet 15.9 / 6; Wagler 13.7 / 15; Acuff 18.6 / 12; Lendeborg 18.8 / 12; Boozer 13.6 / 7; Peterson 14.0 / 9;
+Haliburton 15.5 / 23; Lillard 15.8 / 25; Wilson 15.1 / 16.
+
+**Decision per the rule, now complete for this slate.** PRIMARY INCONCLUSIVE, secondary not FAIL, sanity OK ->
+INCONCLUSIVE.
+
+- `on` is not supported.
+- `shadow` in production is allowed only if the user approves.
+- The rule is re-run with new off/on arm pairs per slate until >= 250 teammate rows. This slate gave 97.
+- The points signal is the reason to keep collecting rather than record a NO-GO.
+
 ## Pipeline trace (code = `origin/claude/nba-current-rosters` + this lane's hooks)
 
 ```
