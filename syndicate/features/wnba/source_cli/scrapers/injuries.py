@@ -5,11 +5,15 @@ copied verbatim except for the import header and the EDITS listed in the generat
 
 EDIT 2026-10-22 (lane wnba-injury-nba-report): the WNBA fetch reads ESPN's WNBA page only. The NBA official-report
 PDF scraper and the Rotowire /basketball/ scraper are deleted: both are NBA sources (see update_injuries).
+
+EDIT 2026-10-22 (lane wnba-injury-snapshot-overwrite): a fetch replaces only the dates its rows carry, and ESPN rows
+carry the Central day of the scrape, computed once per scrape (see update_injuries).
 """
 import re
 from pathlib import Path
 from typing import List, Dict, Optional
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
@@ -24,6 +28,15 @@ try:
 except Exception:
     def _to_tri(x: str) -> str:
         return (x or '').strip().upper()
+
+
+def _scrape_day() -> str:
+    """The Central calendar day a scrape describes: the slate calendar the live loop asks with (central_today_iso).
+
+    Not the process clock's day: the fleet's clock is CDT, but a UTC process would date every scrape after 7 PM CDT
+    to tomorrow, so the evening's scrapes would never reach a reader for today.
+    """
+    return datetime.now(ZoneInfo("America/Chicago")).strftime("%Y-%m-%d")
 
 
 def _season_for_date_str(date_str: str) -> str | None:
@@ -297,6 +310,9 @@ class ESPNInjuryScraper:
             soup = BeautifulSoup(response.content, 'html.parser')
 
             injuries: List[Dict[str, str]] = []
+            # ONE date for the whole scrape. It used to be datetime.now() per row, so a scrape parsed across midnight
+            # split into two dates, and update_injuries replaces every date its rows carry.
+            scrape_day = _scrape_day()
 
             # ESPN often renders each team's injuries as a titled table block.
             # Pair the nearest preceding team title (Table__Title) with each ResponsiveTable.
@@ -402,13 +418,12 @@ class ESPNInjuryScraper:
                                 if key in txt:
                                     status_norm = key
                                     break
-                        date_str = datetime.now().strftime('%Y-%m-%d')
                         injuries.append({
                             'team': team_abbr,
                             'player': player,
                             'status': status_norm,
                             'injury': injury,
-                            'date': date_str,
+                            'date': scrape_day,
                         })
                     except Exception:
                         continue
@@ -437,7 +452,14 @@ class NBAInjuryDatabase:
         self.scraper = ESPNInjuryScraper()
 
     def update_injuries(self, date_str: Optional[str] = None) -> pd.DataFrame:
-        """Fetch the WNBA injury report and write it as date_str's snapshot (that date's rows are replaced).
+        """Fetch the WNBA injury report and write it as the snapshot of the day it was scraped.
+
+        ESPN's page describes NOW, so its rows carry the Central day of the scrape, and a fetch replaces the snapshot
+        of exactly the dates its rows carry. ``date_str`` names the caller's slate (and the roster season); it never
+        selects which date is replaced. It used to: every fetch deleted date_str's rows and kept ESPN's date, so a
+        fetch for D run after midnight deleted D's snapshot (the fleet file has no 10-12: the last 10-12 fetch ran
+        10-13 00:00:03 CDT), and a prefetch for D+1 MERGED its scrape into today's (a player who left the report
+        stayed listed until a same-day fetch). Lane wnba-injury-snapshot-overwrite; the NBA writer's copy is #730.
 
         The only source is ESPN's WNBA page. The vendored copy preferred the NBA's official injury-report PDF and
         fell back to Rotowire's /basketball/ page, and both are the NBA's report. On a day with an NBA report the
@@ -446,7 +468,7 @@ class NBAInjuryDatabase:
         10-20..10-21: the 10-21 WNBA sim readmitted 13 OUT players (lane wnba-injury-nba-report).
         """
         if not date_str:
-            date_str = datetime.now().strftime("%Y-%m-%d")
+            date_str = _scrape_day()
 
         combined_new = pd.DataFrame()
         try:
@@ -460,25 +482,32 @@ class NBAInjuryDatabase:
             print("No new injury data fetched from ESPN")
             return pd.DataFrame()
 
-        # Ensure a deterministic date column for availability gating.
+        # Ensure a deterministic date column for availability gating. A row with no date is dated the scrape day,
+        # not date_str: a prefetch for a future date must not create that date's snapshot from today's page.
         try:
             combined_new = combined_new.copy()
             if "date" not in combined_new.columns:
-                combined_new["date"] = str(date_str)
+                combined_new["date"] = _scrape_day()
             else:
                 combined_new["date"] = combined_new["date"].fillna("").astype(str)
-                # If upstream returned an empty date, force to date_str.
                 combined_new["date"] = combined_new["date"].where(
-                    combined_new["date"].astype(str).str.len() > 0, other=str(date_str)
+                    combined_new["date"].astype(str).str.len() > 0, other=_scrape_day()
                 )
         except Exception:
             pass
 
-        # Load existing data; for a date-scoped run, replace that day's rows.
+        # Load existing data. Each date's rows are ONE snapshot, and a fetch replaces the snapshot of every date its
+        # rows carry, and only those (see the docstring). No other rule from the NBA copy (#730) applies: its
+        # official-never-replaced-by-fallback rule protects one source from another, and this writer has one.
+        replaced = sorted(set(combined_new["date"].astype(str)))
+        print(
+            f"INJURY_SNAPSHOT requested={date_str} replaced={','.join(replaced)} rows={len(combined_new)}",
+            flush=True,
+        )
         try:
             existing = pd.read_csv(self.filepath)
             if not existing.empty and "date" in existing.columns:
-                existing = existing[existing["date"].astype(str) != str(date_str)].copy()
+                existing = existing[~existing["date"].astype(str).isin(replaced)].copy()
             # Append new data (we will re-normalize and then de-duplicate by team/player/date)
             combined = pd.concat([existing, combined_new], ignore_index=True)
         except FileNotFoundError:
