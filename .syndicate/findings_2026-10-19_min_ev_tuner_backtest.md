@@ -161,3 +161,39 @@ Test: `test_ladder_rows_are_skipped_and_never_move_the_effective_cut`, mutation-
   rows exist, RAISE of the net floor is registered as a mirror of the gross rule: taken rows' marginal band `[effective net cut, +1)`, flat
   ROI AND same-book CLV both t <= -2, same sample minimums.
 - **Apply stays a user decision,** and the net floor is shared by paper2 AND the live plan.
+
+
+## PRE-REGISTRATION 2026-10-22T16:27Z: PARTIAL POOLING across markets within venue x sport x season_phase (user-approved; written BEFORE any pooling code)
+
+User, 2026-10-22: "Yes: let the tuner borrow strength across markets within venue x sport x phase (partial pooling), keeping a separate threshold
+per cell. Pre-register it and run it in shadow first."
+
+**Why:** about 50 live fills a day spread over 73 cells means most cells need weeks to reach 40 band events. Pooling shrinks each market cell
+toward its family, so a cell with little data borrows strength and a cell with a lot keeps its own verdict.
+
+**The rule, fixed now:**
+1. **Family** = venue x sport x season_phase. Cells = venue x sport x market x season_phase, unchanged. Each cell keeps its OWN threshold, and
+   no family-wide threshold exists. Phases are never pooled, and an unknown phase forms no family.
+2. **Inputs per cell:** its marginal band only (`[effective cut, +band)`, as today), aggregated to EVENTS. Per event: the flat return (the mean
+   of its bets' pnl/stake) and the same-book CLV (the mean over its bets, recomputed from prices as of 7f6f7b1c).
+3. **Estimator, separately for flat ROI and for CLV:** a random-effects (DerSimonian-Laird) normal model over the family's cells that have
+   >= 2 events in their band.
+   - Per cell: mean `m_c` and sampling variance `v_c` = s^2 / n. A cell with s^2 = 0 uses the family's pooled within-cell variance.
+   - Between-cell variance `tau^2` = max(0, (Q - (k-1)) / (sum w - sum w^2 / sum w)) with fixed-effect weights w = 1 / v_c.
+   - Family mean `M` = the random-effects weighted mean, weights 1 / (v_c + tau^2), with var(M) = 1 / sum(1 / (v_c + tau^2)).
+   - Shrunk cell estimate `theta_c = B M + (1 - B) m_c` with `B = v_c / (v_c + tau^2)`, and var(theta_c) = (1 - B) v_c + B^2 var(M).
+     If tau^2 = 0, theta_c = M and var = var(M).
+   - z_c = theta_c / sqrt(var(theta_c)).
+4. **Decision:** the same rule as unpooled, on the pooled z's. RAISE when z_ROI <= -2 and z_CLV <= -2; LOWER when both >= +2 and the configured cut
+   binds. Step 0.5, bounds and cooldown unchanged.
+5. **Minimums:**
+   - cell band events >= 10 and family band events >= 40;
+   - cell CLV events >= 8 and family CLV events >= 30;
+   - a family with fewer than 2 qualifying cells does not pool (`pool_single_cell`) and falls back to the unpooled verdict.
+6. **Mode `SYNDICATE_MIN_EV_TUNER_POOLING` = off | shadow | on.** Absent or unrecognised = **shadow**.
+   - In shadow the pooled verdict is computed, stored per cell as `pooled`, and counted in the nightly line (`pooled_actions=`), but it does NOT
+     change the cell's action or override.
+   - `on` makes the pooled verdict drive the cell. Switching to `on` is a USER decision after the shadow readouts.
+   - All of this is still under the tuner's own shadow/apply mode: nothing reaches a commit gate unless SYNDICATE_MIN_EV_TUNER=apply.
+7. **Shadow read, reported, not a gate:** after 7 daily readouts with pooling in shadow, report pooled vs unpooled proposals per cell, and for
+   each pooled RAISE the removed band's subsequent flat ROI and CLV with n.
