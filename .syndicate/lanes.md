@@ -1933,6 +1933,14 @@ death, never life — do not invert it.
 - Verification: Janitor dry-run on the live Redis reports 0 test-origin keys after --apply with 0 prod-path keys touched and the quota doc still the single non-temp match; guard and janitor tests green; the next nightly ci-run log shows the janitor step and the count stays 0 the following day.
 - Blocked by: none
 
+### clv-openings-ceiling — OPEN — opened 2026-10-22 — session 366eb355-d5e9-442a-8b77-e5d6b325dc5c
+- Goal: The clv_openings ledger no longer silently drops openings first sighted after a busy date's file fills: per-day lost-opening counts measured on the fleet (read-only, nice 19) before, fix on origin/main with a test that fails on the old 32 MiB one-file behaviour, every reader (load_openings, clv_join, clv_position_join, layer2 movement, departures, hot publish, template readers) still working
+- Files: syndicate/features/shared/clv_opening_ledger.py, tests/test_clv_opening_ledger_ceiling.py, .syndicate/findings_2026-10-22_clv_openings_ceiling.md, docs/ai_context/todo.md (new item only)
+- Hypothesis: UNTESTED: an uncapped busy day is < 2x the cap; the cut loses thousands of openings per full day across all sports; per-tick dedup re-read cost, not disk, is what bounds a larger single file
+- Falsification test: lost-opening counts after the last write are ~0 (the cap only clipped duplicates), or the projected uncapped day is > 4x the cap (a single-file raise is then the wrong fix)
+- Verification: findings file with per-date lost counts before/after; new tests fail on origin/main's clv_opening_ledger.py and pass on the fix; clv/layer2/order_clv suites green; commit on origin/main
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
