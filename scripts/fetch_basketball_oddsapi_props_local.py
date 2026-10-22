@@ -217,7 +217,12 @@ def _discover_event_markets(*, api_key: str, sport_key: str, event_id: str, regi
 # have not started and are refreshed by the pregame pulls anyway. `--in-play-only` fetches only the date's games that
 # started within IN_PLAY_WINDOW_HOURS and MERGES them into the day's snapshot (`merge_in_play_rows`): every other
 # game's rows are kept as they were, so the processed alias and the board still carry the whole slate.
-IN_PLAY_WINDOW_HOURS = 4.0
+#
+# 3 HOURS, NOT 4 (user 2026-10-22, "tighten the window to 3 hours and deploy"). Measured on the 11-game 10-21 slate: until
+# 8:30 PM CT the in-play count tracked live games exactly, then ran ABOVE them (8:47 PM 8 fetched vs 6 live; 11:34 PM 3 vs 1)
+# because OddsAPI keeps a finished game on /events and 4 h outlasted it. An NBA game runs ~2h15-2h30; 3 h still covers
+# overtime, and a game past it simply keeps its last in-play rows (the merge never deletes a game).
+IN_PLAY_WINDOW_HOURS = 3.0
 
 
 def in_play_events(events: list[dict], now: pd.Timestamp, window_hours: float = IN_PLAY_WINDOW_HOURS) -> list[dict]:

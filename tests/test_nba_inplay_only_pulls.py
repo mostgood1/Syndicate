@@ -38,6 +38,13 @@ def test_in_play_is_started_within_the_window_never_pregame_or_long_finished():
     assert [e["id"] for e in fetch.in_play_events(events, NOW)] == ["live", "tipping"]
 
 
+def test_the_window_is_three_hours_so_a_finished_game_drops_out():
+    # 10-21: a 4 h window kept finished games OddsAPI still listed (8:47 PM 8 fetched vs 6 live)
+    assert fetch.IN_PLAY_WINDOW_HOURS == 3.0
+    events = [_ev("ot", "2026-10-20T22:05:00Z"), _ev("finished", "2026-10-20T21:30:00Z")]   # 2h55 and 3h30 before NOW
+    assert [e["id"] for e in fetch.in_play_events(events, NOW)] == ["ot"]
+
+
 def test_merge_replaces_only_the_events_that_came_back():
     existing = pd.DataFrame([{"event_id": "a", "price": -110}, {"event_id": "a", "price": -115},
                              {"event_id": "b", "price": 120}])
