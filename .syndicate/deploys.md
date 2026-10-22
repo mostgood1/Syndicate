@@ -53625,6 +53625,11 @@ which is about the two sizing bases and not about the refusal boundary.
   - (3) After 12:00 AM CT 10-23, the 10-22 rows are still present: a late fetch writes 10-23 and leaves 10-22.
 - **verify:** reading (1)+(2) is OWED. A watcher is armed for the first write after the ff, polling mtime every 30 s for up to 2 h.
 - **undo:** `git checkout 21b4bdb0 -- syndicate/features/wnba/source_cli/scrapers/injuries.py` in `~/Syndicate` reverts the WNBA writer only. A full undo is `git reset --keep 21b4bdb0`, which also drops the ride-alongs. No restart is needed for the writer.
+- **READ (1)+(2) 20:04:03Z (3:04 PM CT) -- MET.** This is the first `raw/injuries.csv` write after the ff, by production's own WNBA props refresh for 10-22, 4m50s after the ff.
+  - The log printed `INJURY_SNAPSHOT requested=2026-10-22 replaced=2026-10-22 rows=48` and no "Headless Rotowire" line: no NBA page was requested.
+  - 10-22 is now 48 rows, all OUT, over 13 WNBA teams (ATL 8, SEA 7, PHX 6, CHI 5 ...), with **0 TOR rows** and no QUESTIONABLE/PROBABLE/DOUBTFUL. The 2 NBA rows are gone.
+  - The file went 981 -> 1,027 rows over 21 dates. No 10-23 rows. 10-18..10-21 are unchanged at 48 each.
+- **OWED:** reading (3), after 12:00 AM CT 10-23. 10-22's 48 rows are still present, and the first fetch after midnight prints `replaced=2026-10-23`. Also `#731`'s 10-24 reading: `SIM_AVAILABILITY ... readmitted_injury_return=0` and `PROPS_OUT_PLAYER_REFUSED ... snapshot=2026-10-2x out_on_feed` near 48.
 
 ## 2026-10-22 20:03:53Z (3:03 PM CT) -- CORRECTION + RE-STAGE: the 14:51:33Z staged stand-in switch was INERT (wrong role); now staged UNPREFIXED, loads at the NEXT full down/up (lane `nba-standins-shadow`, session 15f24a49, todo #714)
 - **What was wrong:** I staged `REFRESH_WORKER__SYNDICATE_NBA_NO_HISTORY_STANDINS=shadow`. The NBA props refresh, and so every pregame NBA SmartSim build, runs under the **live-odds-worker**. Verified by the ppid chain in the 19:11Z ALL_PROCESS_MEMORY snapshot: `refresh_nba_oddsapi_props.py` <- `refresh_odds_sources.py` <- `run_refresh_odds_job.py` <- `run_live_odds_refresh_worker.py` (pid 3942342) <- `local_production.py`.
