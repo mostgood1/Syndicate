@@ -113,6 +113,19 @@ DEFAULT_PREGAME_WINDOW_SECONDS = 6 * 3600
 #: a first-half market, not the life of the game.
 DEFAULT_LIVE_WINDOW_SECONDS = 105 * 60
 
+#: PER-SPORT CODE DEFAULTS, used only when the sport's env key is unset (user 2026-10-22, NFL option E: "go with E and
+#: deploy" -- every segment, the pregame tier every 30 min, the live tier for the whole game; the live tier is still
+#: gated to 10 min by `DEFAULT_LIVE_INTERVAL_SECONDS`). Code, not env, so it ships with a fast-forward: the local fleet
+#: derives role env only at `up`. Estimated from week 7's real pull times and kickoffs (14 games): ~8k credits a week
+#: with both gates (upper bound: every requested market billed). `SYNDICATE_NFL_SEGMENT_MARKETS=off` turns NFL off.
+#: Every other sport keeps "absent means OFF".
+DEFAULT_SEGMENT_MARKETS: dict[str, str] = {"nfl": "all"}
+#: 3h30: a quarter / second-half market lives the whole game, not the first half's 1h45.
+DEFAULT_LIVE_WINDOW_BY_SPORT: dict[str, int] = {"nfl": 210 * 60}
+#: Pregame quarter / half lines move slowly; the bulk of the bill was re-buying them every 2-3 minutes for 6 hours.
+DEFAULT_PREGAME_INTERVAL_BY_SPORT: dict[str, int] = {"nfl": 1800}
+_OFF_VALUES = frozenset({"off", "none", "0", "false", "no"})
+
 #: A circuit breaker, not a tuning knob. The cost of this tier is linear in
 #: events and the slate is supplied by a vendor; a bad slate response must not
 #: be able to spend an unbounded number of credits. Trips loudly.
@@ -154,6 +167,8 @@ def configured_segments(sport: str, *, env: Mapping[str, str] | None = None) -> 
     """
     raw = _env_get(f"{env_prefix(sport)}_MARKETS", env).lower()
     if not raw:
+        raw = DEFAULT_SEGMENT_MARKETS.get(str(sport or "").strip().lower(), "")
+    if not raw or raw in _OFF_VALUES:
         return ()
     declared = tuple(
         seg for seg, _ in
@@ -234,7 +249,8 @@ def events_in_window(
     """
     moment = now or datetime.now(tz=timezone.utc)
     pregame_window = _env_int(f"{env_prefix(sport)}_PREGAME_WINDOW_SECONDS", DEFAULT_PREGAME_WINDOW_SECONDS, env)
-    live_window = _env_int(f"{env_prefix(sport)}_LIVE_WINDOW_SECONDS", DEFAULT_LIVE_WINDOW_SECONDS, env)
+    live_window = _env_int(f"{env_prefix(sport)}_LIVE_WINDOW_SECONDS",
+                           DEFAULT_LIVE_WINDOW_BY_SPORT.get(str(sport or "").strip().lower(), DEFAULT_LIVE_WINDOW_SECONDS), env)
     max_events = _env_int(f"{env_prefix(sport)}_MAX_EVENTS", DEFAULT_MAX_EVENTS, env)
 
     scoped: list[tuple[float, Mapping[str, Any], str]] = []
@@ -294,7 +310,8 @@ def pregame_interval_seconds(sport: str, *, env: Mapping[str, str] | None = None
     interval line moves slowly, so fetching that tier on its own slower cadence
     is what lets the in-play tier run every ~150 s at about today's spend.
     """
-    return _env_int(f"{env_prefix(sport)}_PREGAME_INTERVAL_SECONDS", 0, env)
+    default = DEFAULT_PREGAME_INTERVAL_BY_SPORT.get(str(sport or "").strip().lower(), 0)
+    return _env_int(f"{env_prefix(sport)}_PREGAME_INTERVAL_SECONDS", default, env)
 
 
 #: Per-sport default for `live_interval_seconds`. NCAAF by user decision

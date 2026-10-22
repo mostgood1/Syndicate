@@ -1856,6 +1856,14 @@ death, never life — do not invert it.
 - Verification: env read on the new refresh-worker pid (key name + enum only) = shadow; nba_source/logs/syndicate_refresh_oddsapi_props_<D>.log shows NBA_SIM_MINUTES_PRICED_FIRST mode=shadow after the up and no mode=on; scripts/nba_sim_minutes_audit.py --replay mechanics on the sims written after the up: OFF reproduces production _sim_min (shadow returned off).
 - Blocked by: none
 
+### nfl-segment-capture-e — OPEN — opened 2026-10-22 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
+- Goal: NFL quarter and half lines (h1 h2 q1-q4 x h2h/spreads/totals) are captured by default: pregame tier every 30 min within 6 h of kickoff, live tier every 10 min for the whole game (user 2026-10-22 option E, est ~8k credits/week); verified on the next NFL slate (SEGMENT_PLAN lines, segment rows in the quote log and on the board, credits)
+- Files: syndicate/features/shared/segment_odds_fetch.py (the per-sport code defaults ONLY), tests/test_nfl_segment_capture_default.py (NEW)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: TNF 10-22: SEGMENT_PLAN segments=h1..q4 markets=18 in the NFL fetch log from ~1:15 PM CT, nonfull NFL rows in nfl_source/tracking/book_quotes, NFL segment rows on the served board, and the OddsAPI spend for the slate near the estimate
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
