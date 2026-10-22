@@ -173,6 +173,11 @@ AMERICAN_TO_PROBABILITY: list[Impl] = [
     Impl("american_to_probability", "syndicate.features.shared.intelligence_evaluation", "_implied_probability_from_american"),
     Impl("american_to_probability", "syndicate.features.shared.prop_projections", "_implied"),
     Impl("american_to_probability", "syndicate.features.prediction_ledger", "_implied_from_american"),
+    # ADDED 2026-10-22 (lane `register-implied-from-price`): d1a7ffbe (todo #719, live CLV unit fix).
+    Impl("american_to_probability", "syndicate.features.prediction_ledger", "_implied_from_price",
+         "DUAL SCALE: a value strictly inside (0, 1) is a venue contract price, passed through as a "
+         "probability; anything else goes to `_implied_from_american`. Same boundary as "
+         "paper_settlement.profit_per_dollar and execution_ledger._price_as_probability"),
     Impl("american_to_probability", "syndicate.features.bankroll_manager", "_implied_probability_from_odds",
          "NO zero guard"),
     Impl("american_to_probability", "syndicate.features.intelligence", "odds_to_implied_probability",

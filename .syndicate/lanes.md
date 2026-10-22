@@ -1740,6 +1740,14 @@ death, never life — do not invert it.
 - Blocked by: none
 - STAGED 2026-10-22 9:51 AM CT (user: "stage it for the next full down/up"): env line added (150 -> 151, 0 removed, backup .bak-nba-standins-shadow-20261022T145133Z); NOT loaded -- loads at the next full down/up by any session. GOAL: NOT MET until that up + the first shadow log line (deploys.md 2026-10-22 14:51:33Z). Claims: none held.
 
+### register-implied-from-price — OPEN — opened 2026-10-22 — session 36a5a820-aaa2-4a15-868e-bd8b90d5d331
+- Goal: tests/test_probability_differential.py::test_every_converter_is_registered_or_excused passes on origin/main with prediction_ledger._implied_from_price registered (dual-scale) in probability_differential REGISTRY
+- Files: scripts/probability_differential.py (the prediction_ledger._implied_from_price REGISTRY entry ONLY), tests/test_probability_differential.py (a KNOWN_FAILING entry for that converter ONLY, if needed)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: tests/test_probability_differential.py green at low priority
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
