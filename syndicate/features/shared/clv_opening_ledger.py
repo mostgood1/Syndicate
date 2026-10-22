@@ -53,7 +53,10 @@ from __future__ import annotations
 
 import json
 import os
+import threading
+from collections import Counter, OrderedDict
 from collections.abc import Iterable, Mapping
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -96,7 +99,28 @@ FAIR_PROVENANCE_FIELDS: tuple[str, ...] = (
 # evening openings, i.e. the tripwire would have eaten the exact rows the
 # sharp-anchor CLV reading needs. 32 MiB keeps ~2.5x headroom over the largest
 # measured day while still bounding an append-always failure to one file.
-_MAX_LEDGER_BYTES = 32 * 1024 * 1024
+#
+# RE-SIZED AND SPLIT BY SPORT 2026-10-22 (lane `clv-openings-ceiling`,
+# `.syndicate/findings_2026-10-22_clv_openings_ceiling.md`). The 32 MiB
+# tripwire WAS eating the evening: on the fleet it fired on 6 of 24 dates
+# 09-30..10-23 (10-04, 10-10, 10-11, 10-17, 10-18, 10-21), and on 10-11 the
+# file stopped at 19:03Z. 10-21, the one full date the price trail still
+# covers, lost 3,939 openings of 36,710 (exact: the trail reproduces every
+# other date's openings key for key). And the cut was CROSS-SPORT: NFL's
+# Sunday props filled the shared file and MLB's LCS night lost its openings.
+#
+# So two ceilings, both tripwires for the dedup failing, neither a budget:
+#   * `_MAX_SPORT_BYTES` per (date, sport). The largest sport-day measured is
+#     NFL on 10-11: 20.0 MiB by the cut plus >= 8.6k openings after it, about
+#     29-32 MiB uncapped. 64 MiB is ~2x that, and a runaway sport now costs
+#     ITS OWN rows only -- every other sport keeps recording.
+#   * `_MAX_LEDGER_BYTES` per date, all sports. The largest day measured is
+#     10-11 at >= 43.5k openings, ~46 MiB with the pseudo-cut calibration;
+#     128 MiB is ~2.75x that and still bounds a total failure to one file.
+# Raising the ceiling was only affordable because dedup no longer re-reads the
+# whole file each build -- see `_LedgerIndex`.
+_MAX_LEDGER_BYTES = 128 * 1024 * 1024
+_MAX_SPORT_BYTES = 64 * 1024 * 1024
 
 
 def _reports_root() -> Path:
@@ -279,6 +303,108 @@ def load_openings(date: str, *, root: Path | str | None = None) -> list[dict[str
     return records
 
 
+# ---------------------------------------------------------------------------
+# WHAT IS ALREADY ON DISK, READ INCREMENTALLY (lane `clv-openings-ceiling`).
+#
+# Dedup used to call `load_openings` on every build: every record of the day
+# parsed into a dict, just to collect the keys. Measured on the fleet
+# 2026-10-22 at nice 19 on the 33,145-record 10-11 file: 9.9 s and a 155 MiB
+# peak, per build, and that cost grows with the very ceiling this lane raised.
+# The index keeps the keys and per-sport bytes per file and on each call reads
+# only the bytes appended since the last one -- by this process or any other.
+#
+# It is trusted only while the file is provably the one it indexed: same
+# device and inode, not shorter than what was consumed, and the bytes just
+# before the consumed offset unchanged. Anything else (a replaced, truncated or
+# rewritten file) rebuilds from byte 0, so a stale index can cost a re-read but
+# never a wrong dedup answer.
+# ---------------------------------------------------------------------------
+_INDEX_TAIL_BYTES = 64
+_INDEX_MAX_FILES = 4
+
+
+@dataclass
+class _LedgerIndex:
+    identity: tuple[int, int] = (0, 0)
+    offset: int = 0
+    tail: bytes = b""
+    keys: set[str] = field(default_factory=set)
+    sport_bytes: Counter = field(default_factory=Counter)
+    # Bytes after `offset` that do not end in a newline: a torn final write.
+    pending_partial: bool = False
+
+
+_INDEX: "OrderedDict[str, _LedgerIndex]" = OrderedDict()
+_INDEX_LOCK = threading.Lock()
+
+
+def _sport_slot(value: Any) -> str:
+    return str(value or "").strip().lower()
+
+
+def _index_for(path: Path) -> _LedgerIndex:
+    """The index of `path` brought up to its current end. Caller holds `_INDEX_LOCK`."""
+    cache_key = str(path)
+    try:
+        stat = path.stat()
+    except OSError:
+        _INDEX.pop(cache_key, None)
+        return _LedgerIndex()
+    identity = (stat.st_dev, stat.st_ino)
+    index = _INDEX.get(cache_key)
+    if index is not None and (index.identity != identity or stat.st_size < index.offset):
+        index = None
+    try:
+        handle = path.open("rb")
+    except OSError:
+        _INDEX.pop(cache_key, None)
+        return _LedgerIndex()
+    with handle:
+        if index is not None and index.tail:
+            handle.seek(index.offset - len(index.tail))
+            if handle.read(len(index.tail)) != index.tail:
+                index = None
+        if index is None:
+            index = _LedgerIndex(identity=identity)
+        handle.seek(index.offset)
+        offset = index.offset
+        partial = False
+        for raw in handle:
+            if not raw.endswith(b"\n"):
+                # Left unconsumed: it is either a torn write or one still in
+                # flight, and the next call re-reads it from here.
+                partial = True
+                break
+            offset += len(raw)
+            text = raw.strip()
+            if not text:
+                continue
+            try:
+                parsed = json.loads(text)
+            except (ValueError, TypeError):
+                index.sport_bytes[""] += len(raw)
+                continue
+            if not isinstance(parsed, dict):
+                index.sport_bytes[""] += len(raw)
+                continue
+            index.sport_bytes[_sport_slot(parsed.get("sport"))] += len(raw)
+            key = parsed.get("key")
+            if isinstance(key, str) and key:
+                index.keys.add(key)
+        index.offset = offset
+        index.pending_partial = partial
+        if offset:
+            handle.seek(max(0, offset - _INDEX_TAIL_BYTES))
+            index.tail = handle.read(offset - max(0, offset - _INDEX_TAIL_BYTES))
+        else:
+            index.tail = b""
+    _INDEX[cache_key] = index
+    _INDEX.move_to_end(cache_key)
+    while len(_INDEX) > _INDEX_MAX_FILES:
+        _INDEX.popitem(last=False)
+    return index
+
+
 def record_openings(
     rows: Iterable[Mapping[str, Any]],
     *,
@@ -307,48 +433,90 @@ def record_openings(
     # consumed by the first pass.
     rows = list(rows)
 
-    seen: set[str] = set()
-    for record in load_openings(date, root=root):
-        key = record.get("key")
-        if isinstance(key, str) and key:
-            seen.add(key)
-    already = len(seen)
-
     rows_in = 0
     unkeyable = 0
     duplicate = 0
-    pending: list[dict[str, Any]] = []
-    for row in rows:
-        rows_in += 1
-        if not isinstance(row, Mapping):
-            unkeyable += 1
-            continue
-        key = _opening_key(row)
-        if key is None:
-            unkeyable += 1
-            continue
-        if key in seen:
-            duplicate += 1
-            continue
-        seen.add(key)
-        pending.append(_opening_record(row, key, captured_at))
-
     written = 0
-    truncated = False
-    if pending:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        existing_bytes = path.stat().st_size if path.exists() else 0
-        with path.open("a", encoding="utf-8") as handle:
+    dropped: Counter = Counter()  # (scope, sport) -> rows refused at a ceiling
+    bytes_on_disk = 0
+    with _INDEX_LOCK:
+        index = _index_for(path)
+        on_disk = index.keys
+        already = len(on_disk)
+        batch_seen: set[str] = set()
+        pending: list[dict[str, Any]] = []
+        for row in rows:
+            rows_in += 1
+            if not isinstance(row, Mapping):
+                unkeyable += 1
+                continue
+            key = _opening_key(row)
+            if key is None:
+                unkeyable += 1
+                continue
+            if key in on_disk or key in batch_seen:
+                duplicate += 1
+                continue
+            batch_seen.add(key)
+            pending.append(_opening_record(row, key, captured_at))
+
+        try:
+            bytes_on_disk = path.stat().st_size
+        except OSError:
+            bytes_on_disk = 0
+        if pending:
+            sport_bytes = Counter(index.sport_bytes)
+            chunks: list[str] = []
+            # A torn final line would swallow the first record appended after
+            # it, so close it off: the fragment stays unreadable, as before, and
+            # the opening behind it does not join it.
+            if index.pending_partial:
+                chunks.append("\n")
+                bytes_on_disk += 1
             for record in pending:
                 line = json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n"
-                # Stop at the tripwire rather than growing without bound. A
-                # silent dedup failure must cost one truncated file, not a disk.
-                if existing_bytes + len(line.encode("utf-8")) > _MAX_LEDGER_BYTES:
-                    truncated = True
-                    break
-                handle.write(line)
-                existing_bytes += len(line.encode("utf-8"))
+                size = len(line.encode("utf-8"))
+                sport = _sport_slot(record.get("sport"))
+                # Refuse at a tripwire rather than growing without bound. A
+                # silent dedup failure must cost one sport's rows, then one
+                # file -- never a disk, and never ANOTHER sport's evening. A
+                # refused row is not marked seen, so it is retried next build.
+                if bytes_on_disk + size > _MAX_LEDGER_BYTES:
+                    dropped[("day", sport)] += 1
+                    continue
+                if sport_bytes[sport] + size > _MAX_SPORT_BYTES:
+                    dropped[("sport", sport)] += 1
+                    continue
+                chunks.append(line)
+                bytes_on_disk += size
+                sport_bytes[sport] += size
                 written += 1
+            if written:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                # One write per build, so a crash tears at most one line.
+                with path.open("a", encoding="utf-8") as handle:
+                    handle.write("".join(chunks))
+
+    truncated = bool(dropped)
+    dropped_by_sport: Counter = Counter()
+    for (scope, sport), count in sorted(dropped.items()):
+        dropped_by_sport[sport or "unknown"] += count
+        # LOUD, on every build it fires: this is a tripwire, and the last one
+        # fired on 6 of 24 days for a month with only `truncated=True` buried
+        # in a summary line to say so.
+        print(
+            "[clv_opening_ledger] OPENINGS_CEILING_HIT date=%s scope=%s sport=%s dropped=%d "
+            "bytes_on_disk=%d ceiling=%d"
+            % (
+                date,
+                scope,
+                sport or "unknown",
+                count,
+                bytes_on_disk,
+                _MAX_LEDGER_BYTES if scope == "day" else _MAX_SPORT_BYTES,
+            ),
+            flush=True,
+        )
 
     # PUSH IT TO WEB, because the worker's disk is not readable from anywhere a
     # person can look. `#208`: allowlisting in `HOT_ARTIFACT_PATTERNS` only
@@ -382,6 +550,11 @@ def record_openings(
         "duplicate_in_batch": duplicate,
         "unkeyable_rows": unkeyable,
         "truncated_at_ceiling": truncated,
+        # How many openings a ceiling refused this build, and whose. A count,
+        # not just the flag: a fired tripwire has to say what it cost.
+        "dropped_at_ceiling": sum(dropped.values()),
+        "dropped_by_sport": dict(dropped_by_sport),
+        "bytes_on_disk": bytes_on_disk,
         "total_openings": already + written,
     }
     # WHICH +EV PRICES LEFT THE BOARD SINCE THE LAST BUILD (lane
@@ -406,8 +579,8 @@ def record_openings(
         report["departures"] = {"error": f"{type(exc).__name__}: {exc}"}
     print(
         "[clv_opening_ledger] OPENINGS date=%s rows_in=%d written=%d already=%d "
-        "duplicate=%d unkeyable=%d truncated=%s"
-        % (date, rows_in, written, already, duplicate, unkeyable, truncated),
+        "duplicate=%d unkeyable=%d truncated=%s dropped=%d bytes=%d"
+        % (date, rows_in, written, already, duplicate, unkeyable, truncated, sum(dropped.values()), bytes_on_disk),
         flush=True,
     )
     return report
