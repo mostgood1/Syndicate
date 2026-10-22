@@ -65,6 +65,7 @@
     - The history replay reproduces production `_sim_min` to 0.0000 on 4/4 sides. LEFTOVER is 0 on all of them, so
       zero-stint pool players hold only the 10% blend share (0.5-2.0 min).
     - V-S engages on all three 10-22 derive sides.
+  - **SCHEDULED:** the one-time task `nba-sim-minutes-723-readings` (2026-10-28 8:00 AM CT) runs the readings below and records them.
   - **OWED (time-gated):** run once the boxes for 10-22..10-27 are in (`player_checks_<D>.csv` lands ~6:45 AM CT the next
     day):
     - `--replay --min-rows 150 [--variant priced_starters]`;
