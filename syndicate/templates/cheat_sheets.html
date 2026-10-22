@@ -411,10 +411,10 @@ function picksBlock(d, game) {
   if (!all.length) return "";
   const picks = all.filter(([p]) => !droppedEarly(p)), dropped = all.filter(([p]) => droppedEarly(p));
   const plays = picks.filter(([p]) => isPricePlay(p)).length, sims = picks.length - plays;
-  const fold = dropped.length ? `<details class="dropped no-export"><summary>${dropped.length} pick${dropped.length === 1 ? "" : "s"} the board dropped before the game -- still graded</summary><div class="rowlist">${dropped.map(([p, i]) => pickRow(p, i)).join("")}</div></details>` : "";
+  const fold = dropped.length ? `<details class="dropped no-export"><summary>${dropped.length} pick${dropped.length === 1 ? "" : "s"} dropped before the game -- still graded</summary><div class="rowlist">${dropped.map(([p, i]) => pickRow(p, i)).join("")}</div></details>` : "";
   return sectionShell("picks", "Syndicate picks", "Our featured plays for these games: the best price beats the no-vig fair by 2% or more, net of any exchange fee, on a fresh quote. A SYNDICATE PICK is one our sim backs too; a PRICE PLAY is the same price edge without the sim's backing. Each is promoted at the price shown and stays on the record at that price.",
     [sims ? `${sims} pick${sims === 1 ? "" : "s"}` : "", plays ? `${plays} price play${plays === 1 ? "" : "s"}` : ""].filter(Boolean).join(" · ") || "0 picks",
-    (picks.length ? `<div class="rowlist">${picks.map(([p, i]) => pickRow(p, i)).join("")}</div>` : `<div class="empty">The board backs none of today's picks right now.</div>`) + fold);
+    (picks.length ? `<div class="rowlist">${picks.map(([p, i]) => pickRow(p, i)).join("")}</div>` : `<div class="empty">None of today's picks is backed right now.</div>`) + fold);
 }
 // The consistency ladder (user 2026-10-16: "has hit 30 yds 10/10 40 yds 8/10 etc"): how often each player cleared every
 // rung around his line in his last 10 games; where the books' alternate lines were captured, the best price sits on the
@@ -515,7 +515,8 @@ function crossBlock(d, game) {
     `${n} parlay${n === 1 ? "" : "s"}`, groups.map(g => part(...g)).join(""));
 }
 function sgpBlock(d, game) {
-  const sgps = (d.sgp || []).filter(s => !game || s.event_id === game.event_id);
+  const sh = sharedOf(d);
+  const sgps = (d.sgp || []).filter(s => (!game || s.event_id === game.event_id) && (!sh || !sh.sgp_ids || sh.sgp_ids.includes(s.sgp_id)));
   if (!sgps.length) return "";
   return sectionShell("sgp", "Same-game parlays", `Built for the chance the whole ticket wins: every leg is a line the market prices as likely, the player has cleared in at least 8 of his last 10, and our sim agrees -- with how the legs move together measured on ${esc(d.sgp_basis || "past seasons")}. Heavy favourites carry vig, so the legs multiplied often pay LESS than the ticket is worth: the number to use is <b>worth it at</b> -- take it only if your book's same-game-parlay price is that or better. A book price shown on a pair is an estimate -- the legs multiplied, less an assumed discount -- not a quote. Tracked on paper; no edge is claimed yet.`,
     `${sgps.length} parlay${sgps.length === 1 ? "" : "s"}`, (() => {
@@ -734,8 +735,13 @@ function gameHref(id) {
   if (STATE.view === "reconciled") q.set("view", "reconciled");
   return "?" + q.toString();
 }
+// RECONCILED = WHAT WAS SHARED (user 2026-10-22: "after reconciling I need the exported image to only reflect what was
+// shared ... consistency with what I'm promoting on X"). `d.shared` (cheat_sheets.page_payload) holds the sections as
+// posted -- a posted section is exactly its posted rows; the pregame view keeps the full sections.
+const sharedOf = d => (reconciledView(d) && d.shared) ? d.shared : null;
 function sectionsFor(d) {
-  return STATE.game ? ((d.game_sections || {})[STATE.game] || {}) : (d.sections || {});
+  const s = sharedOf(d) || d;
+  return STATE.game ? ((s.game_sections || {})[STATE.game] || {}) : (s.sections || {});
 }
 function render() {
   const sport = STATE.sport, d = DATA[sport];
@@ -776,7 +782,8 @@ function render() {
   if ((secs.pvp_scorers || []).length) html += sectionShell("pvp_scorers", "Defender matchups", "Who guarded him: NBA.com tracking credits every stretch of a possession to the defender on the ball. His points and shooting against today's opponent's current defenders over the last three regular seasons -- the two who guarded him most -- and his points per 100 of those possessions against them vs against everyone. Small samples the price already knows: context, not a pick.", `${secs.pvp_scorers.length} players`, pvpTable(d, secs.pvp_scorers, ["Guarded most by", "Pts / 100 poss: them vs all"]));
   if ((secs.pvp_receivers || []).length) html += sectionShell("pvp_receivers", "Defenders on his targets", "Plays today's opposing defenders made on this receiver's targets over the last three seasons -- breakups, interceptions and tackles after the catch -- from nflverse play-by-play. NOT coverage: no free source charts who covered whom, and a catch that scores or goes out of bounds credits no defender, so this undercounts what they gave up.", `${secs.pvp_receivers.length} receivers`, pvpTable(d, secs.pvp_receivers, ["Plays they made on his targets", "All of today's defenders"]));
   if ((secs.pvp_qbs || []).length) html += sectionShell("pvp_qbs", "QB vs this secondary", "Interceptions and breakups by today's opposing defenders on his throws over the last three seasons, and that defense's leading ball hawks this season (interceptions and pass breakups, nflverse play-by-play).", `${secs.pvp_qbs.length} quarterbacks`, pvpTable(d, secs.pvp_qbs, ["On his throws", "Their ball hawks this season"]));
-  const lineSecs = game ? ((d.game_line_sections_by_game || {})[STATE.game] || {}) : (d.game_line_sections || {});
+  const ls = sharedOf(d) || d;
+  const lineSecs = game ? ((ls.game_line_sections_by_game || {})[STATE.game] || {}) : (ls.game_line_sections || {});
   if (game) {
     if ((lineSecs.all || []).length) html += sectionShell("lines", "Game lines", "Spread, moneyline and total for this game: the best price against the no-vig fair, net of any exchange fee, with the model and the sim's projection as context.", `${lineSecs.all.length} lines`, linesTable(d, lineSecs.all, false));
   } else {
@@ -941,7 +948,7 @@ function sortBy(th) {
   const col = th.dataset.sort, cur = SORT.every;
   SORT.every = {col, dir: cur && cur.col === col && cur.dir === "desc" ? "asc" : "desc"};
   const section = th.closest("section.sheet"), d = DATA[STATE.sport];
-  const ids = STATE.game ? (((d.game_sections || {})[STATE.game] || {}).every_prop || []) : ((d.sections || {}).every_prop || []);
+  const ids = sectionsFor(d).every_prop || [];
   section.querySelector(".tbl").outerHTML = everyTable(d, ids);
   applyResults();
 }

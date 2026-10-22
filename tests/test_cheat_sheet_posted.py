@@ -164,3 +164,48 @@ def test_export_records_the_rows_from_the_sheet_and_the_page_pins_them(http):
                                                         "card_ids": ids}).status_code == 400
     assert client.post("/api/cheatsheets/posted", json={"sport": "nhl", "date": DAY, "section": "consistency",
                                                         "card_ids": ["0123456789ab"]}).status_code == 404
+
+
+def test_reconciled_shared_view_is_exactly_what_was_posted_as_it_was_posted():
+    """User 2026-10-22: "after reconciling I need the exported image to only reflect what was shared ... consistency with
+    what I'm promoting on X". NHL 10-21: 8 consistency props posted at 11:51 AM CT; the reconciled section led with them
+    and then listed what the last build added, and Seth Jones SOG o1.5 showed the last build's -105 BetOnline, not the
+    -115 DraftKings on the graphic."""
+    lacombe = _row("Jackson LaCombe", "under", 1.5, price=-103, ev=-1.85, hits=7)
+    karl = _row("Erik Karlsson", "under", 2.5, price=-180, ev=-3.6, hits=7, event="pit")
+    newcomer = _row("Late Add", "under", 0.5, price=-150, ev=-1.0, hits=8)        # entered the section after the post
+    sheet = _sheet([lacombe, karl, newcomer])
+    import copy
+
+    snap = copy.deepcopy([lacombe, karl])                                          # the graphic is a snapshot
+    sheet["posted"] = _post(_sheet(snap), "consistency", snap)
+    sheet["reconciled"] = {"props": {cs.prop_result_key(r): {"y": 1.0} for r in sheet["rows"]}, "lines": {}, "counts": {}}
+    karl["check"]["price"] = -250                                                  # the price moved after the post
+    doc = cs.page_payload([sheet])["nhl"]
+    rows = doc["rows"]
+    assert ("Late Add", "under") in _consistency_players(rows, doc["sections"]["consistency"])       # pregame view: the build's
+    assert _consistency_players(rows, doc["shared"]["sections"]["consistency"]) == [("Jackson LaCombe", "under"), ("Erik Karlsson", "under")]
+    assert rows[1]["check"]["price"] == -180                                       # shown as posted, graded as posted
+    assert _consistency_players(rows, doc["shared"]["game_sections"]["ana"]["consistency"]) == [("Jackson LaCombe", "under")]
+    for key, ids in doc["sections"].items():                                       # a section never posted keeps its rows
+        if key != "consistency":
+            assert doc["shared"]["sections"].get(key) == ids, key
+
+
+def test_no_shared_view_before_the_day_is_reconciled_and_rows_show_the_build():
+    lacombe = _row("Jackson LaCombe", "under", 1.5, price=-103, ev=-1.85, hits=7)
+    sheet = _sheet([lacombe])
+    sheet["posted"] = _post(_sheet([lacombe]), "consistency", [lacombe])
+    lacombe["check"]["price"] = -130
+    doc = cs.page_payload([sheet])["nhl"]
+    assert "shared" not in doc and doc["rows"][0]["check"]["price"] == -130
+
+
+def test_the_reconciled_page_reads_the_shared_sections():
+    from pathlib import Path
+
+    html = (Path(__file__).resolve().parents[1] / "syndicate" / "templates" / "cheat_sheets.html").read_text(encoding="utf-8")
+    assert "const sharedOf = d => (reconciledView(d) && d.shared) ? d.shared : null;" in html
+    body = html[html.index("function sectionsFor(d)"):][:300]
+    assert "sharedOf(d) || d" in body
+    assert "sh.sgp_ids.includes(s.sgp_id)" in html and "const ls = sharedOf(d) || d;" in html

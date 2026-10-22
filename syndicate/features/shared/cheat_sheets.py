@@ -612,9 +612,14 @@ def with_posted_sgps(tickets: Sequence[Mapping[str, Any]], posted: Mapping[str, 
 
 
 def pin_posted(secs: Mapping[str, Sequence[int]], cids: Sequence[str], entries: Sequence[Mapping[str, Any]], *,
-               events: Sequence[Any] | None = None, event: Any = None) -> dict[str, list[int]]:
+               events: Sequence[Any] | None = None, event: Any = None, only: bool = False) -> dict[str, list[int]]:
     """`secs` with each section's posted items leading it, earliest post first, then the section's own order (an item
-    the section would pick anyway is not repeated). `event` (with `events`, each item's event) narrows to one game."""
+    the section would pick anyway is not repeated). `event` (with `events`, each item's event) narrows to one game.
+
+    `only` -- a section that went out on a graphic is EXACTLY its posted items, nothing a later build added (user
+    2026-10-22: "after reconciling I need the exported image to only reflect what was shared"). NHL 10-21: the
+    consistency graphic at 11:51 AM CT carried 8 props; the reconciled section led with those 8 and then listed whatever
+    the last build put in the section. A section never posted (in this scope) keeps its own rows."""
     index: dict[str, int] = {}
     for i, cid in enumerate(cids):
         index.setdefault(cid, i)
@@ -628,7 +633,15 @@ def pin_posted(secs: Mapping[str, Sequence[int]], cids: Sequence[str], entries: 
         if i not in ids:
             ids.append(i)
     for key, ids in lead.items():
-        out[key] = ids + [i for i in out.get(key) or [] if i not in ids]
+        out[key] = list(ids) if only else ids + [i for i in out.get(key) or [] if i not in ids]
+    return out
+
+
+def posted_items(posted: Mapping[str, Any] | None, kind: str) -> dict[str, dict[str, Any]]:
+    """card_id -> the item AS IT WAS POSTED (its first posting): what the graphic showed -- price, book, fair, form."""
+    out: dict[str, dict[str, Any]] = {}
+    for e in posted_entries(posted, kind):
+        out.setdefault(e["card_id"], dict(e["item"]))
     return out
 
 
@@ -1629,10 +1642,15 @@ def page_payload(sheets: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any
         graded_lines = (rec or {}).get("lines") or {}
         rows = []
         faces = brand_kit.faces_allowed(sport)          # college: logos, never faces (user 2026-10-16)
+        as_posted = posted_items(posted, "rows") if rec is not None else {}
         for r in sheet.get("rows") or []:
-            row = {k: v for k, v in r.items() if k not in _ROW_DROP and (faces or k not in brand_kit.FACE_FIELDS)}
-            row["card_id"] = pc.card_id(sport, day, r)
-            row["card_ok"] = pc.eligible(r)
+            cid = pc.card_id(sport, day, r)
+            # RECONCILED: a row that went out on a graphic shows the copy that went out (2026-10-22: Seth Jones SOG o1.5
+            # was posted at -115 DraftKings; the last build showed -105 BetOnline). Same bet -- the card id is the bet.
+            src = dict(r, **{k: v for k, v in as_posted[cid].items() if k not in ("event_id",)}) if cid in as_posted else r
+            row = {k: v for k, v in src.items() if k not in _ROW_DROP and (faces or k not in brand_kit.FACE_FIELDS)}
+            row["card_id"] = cid
+            row["card_ok"] = pc.eligible(src)
             first = posted_rows.get(row["card_id"])
             if first:
                 row["posted"] = first
@@ -1657,7 +1675,14 @@ def page_payload(sheets: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any
         doc["games"] = [dict(g, props=len(by_game.get(g.get("event_id"), [])),
                              **({"final": finals[str(g.get("event_id"))]} if str(g.get("event_id")) in finals else {}))
                         for g in sheet.get("games") or []]
-        lines = [dict(line, card_id=pc.card_id(sport, day, line)) for line in sheet.get("game_lines") or []]
+        lines_posted = posted_items(posted, "lines") if rec is not None else {}
+        lines = []
+        for line in sheet.get("game_lines") or []:
+            cid = pc.card_id(sport, day, line)
+            shown = dict(line)
+            shown.update(lines_posted.get(cid) or {})
+            shown["card_id"] = cid
+            lines.append(shown)
         for line in lines:
             if line["card_id"] in posted_lines:
                 line["posted"] = posted_lines[line["card_id"]]
@@ -1698,6 +1723,23 @@ def page_payload(sheets: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any
             str(event): pin_posted({k: [idx[j] for j in ids] for k, ids in sections([rows[i] for i in idx]).items()},
                                    row_ids, row_entries, events=row_events, event=event)
             for event, idx in by_game.items()}
+        if rec is not None and posted:
+            # WHAT WAS SHARED, ONLY (user 2026-10-22). The reconciled view and its exported graphics read these; the
+            # pregame view keeps the full sections above. A section never posted in a scope keeps its own rows there.
+            sgp_ids = list(posted_sgps(posted))
+            doc["shared"] = {
+                "sections": pin_posted(sections(rows), row_ids, row_entries, only=True),
+                "game_sections": {
+                    str(event): pin_posted({k: [idx[j] for j in ids] for k, ids in sections([rows[i] for i in idx]).items()},
+                                           row_ids, row_entries, events=row_events, event=event, only=True)
+                    for event, idx in by_game.items()},
+                "game_line_sections": pin_posted(game_line_sections(lines), line_ids, line_entries, only=True),
+                "game_line_sections_by_game": {
+                    str(event): pin_posted({k: [idx[j] for j in ids] for k, ids in game_line_sections([lines[i] for i in idx]).items()},
+                                           line_ids, line_entries, events=line_events, event=event, only=True)
+                    for event, idx in lines_by_game.items()},
+                **({"sgp_ids": sgp_ids} if sgp_ids else {}),
+            }
         out[sport] = doc
     return out
 
