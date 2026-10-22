@@ -1324,11 +1324,21 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
     unverified: the PDF was not re-read.
   - No lane owns this; a follow-up session is proposed.
 - **Reach:** the derive path set 22/22 sides on 10-21. The rotation-HISTORY path takes over from a team's 2nd game:
-  OKC on 10-22; BOS, NYK and SAS on 10-23. Its own leftover spread is unmeasured.
+  OKC on 10-22; BOS, NYK and SAS on 10-23.
+  - **History-path mechanics** `[10-22, lane nba-sim-minutes-history-path, truth-free]`: a replay of the real function
+    reproduces production `_sim_min` to 0.0000 on those 4 sides.
+  - LEFTOVER is 0.0 on all 4 (mapped_frac 1.00), so the split there is mapped 216 + 10% blend 24.
+  - Zero-stint pool players hold only the blend share, 0.5-2.0 min each.
+  - Its outcome against the box is unmeasured until the 10-22..10-27 boxes land.
 - **Built:** `SYNDICATE_NBA_SIM_MINUTES_PRICED_FIRST` (absent = off | shadow | on).
   - NBA only, derive path only, engages with >= 5 priced pool players. The excess comes off unpriced players first.
   - 13 tests (+5 audit), including off != on through the real worker.
-  - Not on the fleet (fleet 6954cb0e); off is byte-identical anyway.
+  - Not on the fleet (fleet 5e734fb6); off is byte-identical anyway.
+- **Variant V-S also on main, default off (`907e9c9c`):** `SYNDICATE_NBA_SIM_MINUTES_PRICED_FIRST_SET=priced_starters`
+  protects only priced players with `_starter_signal >= 0.55`.
+  - Read only when the main switch is shadow or on.
+  - Pre-registered `cdfe3e59` before any post-10-21 box, and read only on slates after 10-21.
+  - Off != on through the real worker. Not on the fleet.
 - **Development reading on 10-21** (`--replay` on production engine_inputs; the off replay reproduces production to
   0.000):
   - Paired minutes -0.895 [-1.552, -0.278], 173 rows over 17 sides.
@@ -1338,8 +1348,10 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   - Priced starters reach the points line (-1.94 -> -0.09 pts).
   - But priced BENCH players are over-protected: +4.7 min / +3.6 pts. Their last-season base is left whole.
   - Served width is unchanged (IQR(z)/1.349 1.03 -> 1.02), so no k re-fit is triggered.
-- **Owed (todo #723):**
+- **Owed (todo #723, lane nba-sim-minutes-history-path, time-gated to ~6:45 AM CT 10-28):**
   - The CONFIRMATORY reading: >= 150 played rows on engaged sides after 10-21 (`--replay --min-rows 150`).
+  - The V-S reading (`--variant priced_starters`).
+  - The history-path reading against its pre-registered gate (`--history`, plus the HISTORY / DERIVE split).
   - Before any `on`: the k / book-blend re-fit check, and a reuse stamp for the priced set.
   - Enabling is the user's decision.
-- Findings: `findings_2026-10-22_nba_sim_minutes_allocation.md`.
+- Findings: `findings_2026-10-22_nba_sim_minutes_allocation.md`, `findings_2026-10-22_nba_sim_minutes_history_path.md`.
