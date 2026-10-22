@@ -25,6 +25,12 @@ Both rules read the held book POOLED ACROSS LIVE VENUES (Kalshi + Polymarket), b
   and axis may be held, on EITHER venue, a new leg is refused `axis_held_live`. The held
   leg stands because it cannot be unwound here. The same `position_key` is NOT
   this rule: that is the same bet, and the duplicate / D1 paths own it.
+  A TINY held leg does not claim its axis [user 2026-10-22 ~21:40Z, relayed by
+  332cb014: "Ignore tiny held legs"]: a held leg staked under
+  `SYNDICATE_LIVE_EVENT_AXIS_MIN_HELD_DOLLARS` (default $1) does not block a new
+  leg on that axis. Measured the first live R1 refusal: a 1-contract $0.48 UConn
+  -15.5 spread from 10-20 blocked a $5 UConn moneyline. Tiny legs still count
+  toward R2's dollars.
 - R2 A DOLLAR CAP PER GAME, held bets included: when the game already holds a
   leg, the order is placed at `min(stake, cap - held)`. It is refused
   `event_exposure_cap` when that room cannot buy one contract at the order's
@@ -39,6 +45,7 @@ own decision", learnings.md). A leg competes only with legs on the same game.
 shadow (logs the verdict, changes nothing) | on. Any other value is OFF and
 says so: a typo must not silently arm a rule that moves real stakes.
 `SYNDICATE_LIVE_EVENT_MAX_DOLLARS` (default 15 = one max band leg plus one min).
+`SYNDICATE_LIVE_EVENT_AXIS_MIN_HELD_DOLLARS` (default 1; 0 = every held leg blocks its axis).
 """
 
 from __future__ import annotations
@@ -50,6 +57,8 @@ from typing import Any, Iterable, Mapping
 MODE_ENV = "SYNDICATE_LIVE_EVENT_CONCENTRATION"
 MAX_DOLLARS_ENV = "SYNDICATE_LIVE_EVENT_MAX_DOLLARS"
 DEFAULT_MAX_DOLLARS = 15.0
+AXIS_MIN_HELD_ENV = "SYNDICATE_LIVE_EVENT_AXIS_MIN_HELD_DOLLARS"
+DEFAULT_AXIS_MIN_HELD_DOLLARS = 1.0
 
 REFUSAL_AXIS_HELD = "axis_held_live"
 REFUSAL_EVENT_CAP = "event_exposure_cap"
@@ -92,6 +101,22 @@ def max_event_dollars() -> float:
         return DEFAULT_MAX_DOLLARS
     if value != value or value <= 0 or value == float("inf"):
         return DEFAULT_MAX_DOLLARS
+    return value
+
+
+def axis_min_held_dollars() -> float:
+    """Held legs staked below this do not claim their axis for R1. 0 = all do.
+
+    Unparseable, negative, NaN or infinite -> the $1 default, never "ignore
+    everything": an unknown must not widen what gets through.
+    """
+    raw = str(os.environ.get(AXIS_MIN_HELD_ENV) or "").strip()
+    try:
+        value = float(raw) if raw else DEFAULT_AXIS_MIN_HELD_DOLLARS
+    except ValueError:
+        return DEFAULT_AXIS_MIN_HELD_DOLLARS
+    if value != value or value < 0 or value == float("inf"):
+        return DEFAULT_AXIS_MIN_HELD_DOLLARS
     return value
 
 
@@ -247,6 +272,7 @@ def verdict_for(
     *,
     cap: float,
     placed_this_pass: Iterable[Mapping[str, Any]] = (),
+    axis_min_held: float | None = None,
 ) -> Verdict:
     """R1 then R2 for one order request against what is held on its game.
 
@@ -254,6 +280,7 @@ def verdict_for(
     `{position_key, market, segment, player_name, side, requested_stake_dollars}`.
     It is counted even if the ledger read has not caught up yet, and de-duplicated
     against the ledger by `position_key`.
+    `axis_min_held` = the R1 tiny-leg line; None reads the env (default $1).
     """
     stake = float(_get(request, "requested_stake_dollars") or 0.0)
     own_keys = {str(_get(request, "position_key") or "").strip(), str(_get(request, "legacy_position_key") or "").strip()}
@@ -267,8 +294,9 @@ def verdict_for(
         # The same bet: the duplicate path (same slate) or D1 (other slate) owns it.
         return Verdict(VERDICT_SAME_BET, None, stake, 0.0, None, axis)
     held_dollars = round(sum(_stake(o) for o in by_key.values()), 2)
+    min_held = axis_min_held_dollars() if axis_min_held is None else float(axis_min_held)
     for key, order in by_key.items():
-        if axis_key(order) == axis:
+        if axis_key(order) == axis and _stake(order) >= min_held:
             return Verdict("refuse", REFUSAL_AXIS_HELD, 0.0, held_dollars, None, axis, blocking_key=key)
     if held_dollars <= 0:
         # The game's ONLY leg: concentration needs a second one. Never touched.

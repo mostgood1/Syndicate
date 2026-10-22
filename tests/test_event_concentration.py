@@ -28,6 +28,7 @@ def _isolated(tmp_path, monkeypatch):
         "SYNDICATE_EXECUTION_BALANCE_CAPS",
         EC.MODE_ENV,
         EC.MAX_DOLLARS_ENV,
+        EC.AXIS_MIN_HELD_ENV,
     ):
         monkeypatch.delenv(key, raising=False)
     yield
@@ -210,7 +211,9 @@ def test_T6_opposite_sides_across_venues_and_the_cap_pool_too():
     held = [_row("pm-over", venue="polymarket", market="totals", side="over", stake=0.49)]
     under = {"position_key": "k-under", "market": "totals", "side": "under", "requested_stake_dollars": 5.0,
              "requested_price": 108.0}
-    assert EC.verdict_for(under, EC.held_live_orders(held, event_id=_EVENT), cap=15.0).reason == EC.REFUSAL_AXIS_HELD
+    # (that 10-21 held leg was $0.49, under the $1 tiny-leg line, so pin the line to 0 to test the pooling itself)
+    assert EC.verdict_for(under, EC.held_live_orders(held, event_id=_EVENT), cap=15.0,
+                          axis_min_held=0).reason == EC.REFUSAL_AXIS_HELD
     # dollars pool: $12 held on Polymarket leaves $3 for a Kalshi prop on the same game
     held2 = [_row("pm-ml", venue="polymarket", market="h2h", stake=12.0)]
     prop = {"position_key": "k-prop", "market": "player_points", "player_name": "X", "side": "over",
@@ -222,7 +225,7 @@ def test_T6_opposite_sides_across_venues_and_the_cap_pool_too():
 def test_T1_held_on_the_axis_refuses_any_other_line_or_side():
     request = {"position_key": "new", "market": "spreads", "side": "home", "requested_stake_dollars": 5.0,
                "requested_price": 117.0}
-    v = EC.verdict_for(request, [_row("held", market="spreads_alt", side="away", stake=0.5)], cap=15.0)
+    v = EC.verdict_for(request, [_row("held", market="spreads_alt", side="away", stake=0.5)], cap=15.0, axis_min_held=0)
     assert (v.action, v.reason, v.blocking_key) == ("refuse", EC.REFUSAL_AXIS_HELD, "held")
 
 
@@ -381,3 +384,73 @@ def test_T5_replay_of_the_10_20_book():
     assert round(total, 2) == 43.73
     assert round(kept, 2) == 25.67
     # the 17 other 10-20 live Kalshi positions ($29.30) are single-leg games: the day goes $73.03 -> $54.97
+
+
+# --------------------------------------------------------------------------
+# T7 -- a TINY held leg does not claim its axis [user 2026-10-22 "Ignore tiny held legs"]
+# The real CONN shape (first live R1, 21:29:18Z): held Kalshi UConn -15.5 spread, 1 contract,
+# filled $0.48; the refused order was the UConn moneyline at -525 for $5.00.
+# --------------------------------------------------------------------------
+
+_CONN = "evt-ncaaf-umass-uconn"
+
+
+def _conn_held():
+    return [
+        {**_row("57a100443e429173", event=_CONN, market="spreads", side="home", stake=0.50), "fill_stake_dollars": 0.48},
+        {**_row("pm-total", venue="polymarket", event=_CONN, market="totals", side="under", stake=5.42),
+         "fill_stake_dollars": 5.42},
+    ]
+
+
+_CONN_ML = {"position_key": "k-conn-ml", "market": "h2h", "side": "home", "requested_stake_dollars": 5.00,
+            "requested_price": -525.0}
+
+
+def test_T7_off_the_tiny_held_spread_blocks_the_moneyline():
+    v = EC.verdict_for(_CONN_ML, EC.held_live_orders(_conn_held(), event_id=_CONN), cap=15.0, axis_min_held=0)
+    assert (v.action, v.reason, v.blocking_key) == ("refuse", EC.REFUSAL_AXIS_HELD, "57a100443e429173")
+
+
+def test_T7_on_the_default_1_dollar_line_lets_the_moneyline_through(monkeypatch):
+    # absent env -> $1 default; the $0.48 spread is ignored for R1 but still counted in R2's dollars
+    v = EC.verdict_for(_CONN_ML, EC.held_live_orders(_conn_held(), event_id=_CONN), cap=15.0)
+    assert (v.action, v.reason, v.stake) == ("pass", None, 5.00)
+    assert v.held_dollars == 5.90  # 0.48 + 5.42, both pooled into the per-game cap
+    assert v.room == 9.10
+
+
+def test_T7_the_line_is_a_knob_and_a_leg_at_or_over_it_still_blocks(monkeypatch):
+    monkeypatch.setenv(EC.AXIS_MIN_HELD_ENV, "0.40")
+    v = EC.verdict_for(_CONN_ML, EC.held_live_orders(_conn_held(), event_id=_CONN), cap=15.0)
+    assert v.reason == EC.REFUSAL_AXIS_HELD  # $0.48 >= $0.40
+    monkeypatch.setenv(EC.AXIS_MIN_HELD_ENV, "1")
+    big = [{**_row("big", event=_CONN, market="spreads", side="home", stake=1.00), "fill_stake_dollars": 1.00}]
+    assert EC.verdict_for(_CONN_ML, big, cap=15.0).reason == EC.REFUSAL_AXIS_HELD  # exactly at the line blocks
+
+
+@pytest.mark.parametrize("raw", ["", "abc", "-3", "nan", "inf"])
+def test_T7_an_unusable_line_is_the_1_dollar_default_never_ignore_everything(monkeypatch, raw):
+    monkeypatch.setenv(EC.AXIS_MIN_HELD_ENV, raw)
+    assert EC.axis_min_held_dollars() == 1.0
+
+
+def test_T7_through_the_executor_off_vs_on(monkeypatch, tmp_path):
+    """Reachability through the real loop: a $0.48 leg placed first, then a $5 moneyline on the same axis."""
+    tiny = _pos("k-conn-spread", event=_CONN, market="spreads", side="home", line=-15.5, price=108.0, stake=0.48,
+                ticker="KXNCAAFSPREAD-26OCT24MASSCONN-CONN16")
+    ml = _pos("k-conn-ml", event=_CONN, market="h2h", side="home", line=None, price=-525.0, stake=5.00,
+              ticker="KXNCAAFGAME-26OCT24MASSCONN-CONN")
+    out = {}
+    for label, line in (("every_leg_blocks", "0"), ("ignore_tiny", None)):
+        root = tmp_path / label
+        root.mkdir()
+        monkeypatch.setenv("SYNDICATE_REPORTS_ROOT", str(root))
+        if line is None:
+            monkeypatch.delenv(EC.AXIS_MIN_HELD_ENV, raising=False)
+        else:
+            monkeypatch.setenv(EC.AXIS_MIN_HELD_ENV, line)
+        results, sent = _passes(monkeypatch, [[tiny], [ml]], mode="on")
+        out[label] = (results[1]["refused"], [r.position_key for r in sent])
+    assert out["every_leg_blocks"] == ({EC.REFUSAL_AXIS_HELD: 1}, ["k-conn-spread"])
+    assert out["ignore_tiny"] == ({}, ["k-conn-spread", "k-conn-ml"])
