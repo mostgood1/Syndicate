@@ -1722,6 +1722,14 @@ death, never life — do not invert it.
 - Verification: new tests pass; mutation of the unit branch fails them; before/after kept-row counts on the ledger
 - Blocked by: none
 
+### nba-standins-shadow — OPEN — opened 2026-10-22 — session 15f24a49-f7db-4e95-9863-43d1149e4d8f
+- Goal: SYNDICATE_NBA_NO_HISTORY_STANDINS=shadow is live on the fleet refresh-worker (user decision 2026-10-21: an INCONCLUSIVE truth reading -> shadow; the 10-22 reading was INCONCLUSIVE), verified by an NBA_NO_HISTORY_STANDINS line carrying mode=shadow in the first NBA props refresh after the full down/up, 0 fleet NBA sims carrying context.no_history_standins, and a deploys.md entry with the undo. Follow-up of nba-no-history-admit (CLOSED), todo #714.
+- Files: .syndicate/deploys.md (one append-only entry; the change itself is one line in ~/syndicate-prod/local_production.env on the fleet, outside the repo)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: After the full down/up: refresh-worker env read (key name + enum value only) shows shadow; the first NBA props refresh logs NBA_NO_HISTORY_STANDINS with mode=shadow and an admitted list; NBA sims written after it carry no context.no_history_standins and no players[] change vs off (shadow appends nothing).
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
