@@ -53175,3 +53175,12 @@ None", which hid a 71/218 split with two completely different causes.
   - kalshi ncaaf totals 5/40, polymarket ncaaf h2h 17/40, polymarket ncaaf spreads 20/40 (flat -28.9%, t -1.04), kalshi nfl receptions 16/40 (flat +36.5%, t 1.90), kalshi mlb batter_hits_runs_rbis postseason 7/40: all `insufficient_events`. Bands barely moved in a day: the NCAAF marginal bands gain about 0-1 event a night.
 - **code:** `local_production.py status` at 14:23Z: refresh-worker code=09e86a9d (= fleet HEAD 09e86a9db, not stale; restarts=3). `git merge-base --is-ancestor affc9a7b 09e86a9d` = yes: flat-unit grading is loaded (also loaded at readout 2).
 - **verify:** this READING is the `MIN_EV_TUNER` line stamped 12:01:51Z with date=2026-10-22, plus `last_run_at=2026-10-22T12:01:50Z` read back from keyvalue. Next readout: 4/7 on 10-23.
+
+## 2026-10-22 14:26Z (9:26 AM CT) -- READING: freeze-nba-pregame-sims (fleet aaa988a8, deployed 2026-10-21 16:56:40Z) -- **MET** (lane CLOSED, todo #720 closed)
+- **substrate:** production data root on the fleet, read-only. Fleet HEAD contains aaa988a8 (`git merge-base --is-ancestor`).
+- **prediction (deploys.md 2026-10-21 16:56:40Z):** 0 `after_tip` builds for 10-21; engine_inputs mtimes <= tip; `frozen=1` lines if any full refresh ran after a tip.
+- **reading:**
+  - `scripts/basketball_posttip_rebuilds.py --since 2026-10-21`: NBA 89 builds / 17 games, all `before_tip`; WNBA 17 builds / 2 games, all `before_tip`. **0 after_tip.** Baseline 10-20 without the fix: 5 after_tip on 3 games.
+  - 10-21 files vs tip: 11/11 NBA and 1/1 WNBA sim JSONs and `engine_inputs/2026-10-21/*.pkl` were last written before tip. The closest was LAL_GSW, 01:28:40Z vs 02:00Z.
+  - Props logs 10-21: 45 NBA `SMART_SIM_TIP_FREEZE ... mode=on ... frozen=1` lines covering all 11 games, plus 2 WNBA (ATL_GSV). Each game's first freeze is logged after its tip (e.g. ORL_ATL 23:14:39Z vs 23:10Z; BKN_CHA 23:33:32Z vs 23:30Z); the last is 04:04:21Z. 0 `tip=unknown`, 0 `built_after_tip`, 0 `CHECK_FAILED`.
+- **interaction:** the anchor refresh (6e406101, live 10-21 3:48 PM CT, session 1cc8e6fb) adds a line-move rebuild trigger. Every trigger after tip was frozen before the reuse checks ran.

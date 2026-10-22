@@ -17,6 +17,23 @@ work takes the next free number (see the counter at the top of `todo.md`).
 ---
 
 
+### `#720` — **Basketball SmartSims were rebuilt AFTER TIP, rewriting the pregame sim and the live re-sim's engine inputs mid-game: 10 of 145 NBA builds (7 of 74 games, all three 10-20 games), 1 of 60 WNBA. FREEZE AT TIP built (aaa988a8, on by default, user decision)** — lane `freeze-nba-pregame-sims`, session d07b749c; `.syndicate/findings_2026-10-21_post_tip_rebuilds.md` — **CLOSED 2026-10-22: live on the fleet since 2026-10-21 11:56 AM CT; the 10-21 slate had 0 post-tip rebuilds and 47 `frozen=1` lines (deploys.md 2026-10-22)**
+- **Measured** (fleet props logs 10-03..10-21, `scripts/basketball_posttip_rebuilds.py`):
+  - Triggers: 8 exclusion drift, 2 calibration stamp, 0 odds anchor, 0 roster pool (that check has run on no tipped game yet).
+  - The post-tip drift is churn: the 10-20 11:07 PM CT rebuild reversed every change made by the 6:54 PM CT one.
+- **Fix:** `smart_sim_tip_freeze.keep_existing` runs before the force-unlink and the reuse checks.
+  - It keeps an existing sim when the rebuild would finish at or after tip, projected as now + (queued + 1) x 90 s.
+  - Not frozen: `overwrite=True`, a missing sim, an unknown tip.
+  - Switch `SYNDICATE_SMART_SIM_TIP_FREEZE` (absent = on, off = kill, shadow = log only).
+  - 12 tests, off != on. Production replay: kept 10/10 + 1/1 post-tip builds, froze 0/193 pre-tip.
+- **Owed:**
+  - the fleet ff past aaa988a8 (user approval; per-run subprocess, no restart);
+  - on the first slate after it: `frozen=1` lines, 0 `after_tip` builds from the script, `engine_inputs` mtimes <= tip.
+- **Found, not acted on** (findings §5):
+  - the NBA sim's market anchor is a ~D-1 line, never refreshed (`game_odds_<D>`/`predictions_<D>` written once) -- TAKEN by session 1cc8e6fb, 6e406101 live on the fleet 2026-10-21 3:48 PM CT;
+  - jobs queue alphabetically, not by tip;
+  - pregame exclusion churn, with name-key noise.
+
 ### `#718` — **NBA `export-game-cards` fails every props run writing into the CODE tree (`syndicate/features/nba/source_cli/repo/data/processed`, nonexistent) and falls back to `Built local game_cards from game_odds fallback`: 6 times on 10-20, 4 by 9 AM CT 10-21** — FOUND 2026-10-21 by session 9e18a0e7 (lane `cheat-sheets` assessment), NOT acted on; owner: the NBA source-CLI ports (last touched `5dba2973`, session 2d413211, messaged)
 - Read from `<data>/nba_source/logs/syndicate_refresh_oddsapi_props_<date>.log`: `OSError: Cannot save file into a non-existent directory: '/home/amyn/Syndicate/syndicate/features/nba/source_cli/repo/data/processed'` after `python -m syndicate.features.nba.source_cli.cli export-game-cards --date <d>` (10-19 21:05, 10-20 11:30 and 16:41 CT ...). The run recovers through the game_odds fallback, so game cards are built -- from the fallback, not the CLI export.
 - Likely a repo-root default inside the CLI that should be the data root (the props script passes the data root for every other step). Unverified.

@@ -30,23 +30,6 @@
   - **pre-registered regular-season reading at ~100 games:** `scripts/nba_anchor_staleness.py`, served margin and
     total MAE, anchor vs close, regular season only.
 
-### `#720` — **Basketball SmartSims were rebuilt AFTER TIP, rewriting the pregame sim and the live re-sim's engine inputs mid-game: 10 of 145 NBA builds (7 of 74 games, all three 10-20 games), 1 of 60 WNBA. FREEZE AT TIP built (aaa988a8, on by default, user decision), NOT YET ON THE FLEET** — lane `freeze-nba-pregame-sims`, session d07b749c; `.syndicate/findings_2026-10-21_post_tip_rebuilds.md`
-- **Measured** (fleet props logs 10-03..10-21, `scripts/basketball_posttip_rebuilds.py`):
-  - Triggers: 8 exclusion drift, 2 calibration stamp, 0 odds anchor, 0 roster pool (that check has run on no tipped game yet).
-  - The post-tip drift is churn: the 10-20 11:07 PM CT rebuild reversed every change made by the 6:54 PM CT one.
-- **Fix:** `smart_sim_tip_freeze.keep_existing` runs before the force-unlink and the reuse checks.
-  - It keeps an existing sim when the rebuild would finish at or after tip, projected as now + (queued + 1) x 90 s.
-  - Not frozen: `overwrite=True`, a missing sim, an unknown tip.
-  - Switch `SYNDICATE_SMART_SIM_TIP_FREEZE` (absent = on, off = kill, shadow = log only).
-  - 12 tests, off != on. Production replay: kept 10/10 + 1/1 post-tip builds, froze 0/193 pre-tip.
-- **Owed:**
-  - the fleet ff past aaa988a8 (user approval; per-run subprocess, no restart);
-  - on the first slate after it: `frozen=1` lines, 0 `after_tip` builds from the script, `engine_inputs` mtimes <= tip.
-- **Found, not acted on** (findings §5):
-  - the NBA sim's market anchor is a ~D-1 line, never refreshed (`game_odds_<D>`/`predictions_<D>` written once);
-  - jobs queue alphabetically, not by tip;
-  - pregame exclusion churn, with name-key noise.
-
 ### `#719` — **Live selection on the venue's own price: the population gap is CLOSED by the live 0% floor (0 venue-native candidates excluded, 10-21/10-22); the evidence argues a per-venue NET floor Kalshi 1.0% / Polymarket 0.5%, not 0 -- PROPOSED, user decision owed. Separately: every LIVE Kalshi `closing_mark.clv_pct` is ~ -35 pt (unit defect), unfixed** — lane `venue-native-selection`, session 86c84cf4; `.syndicate/findings_2026-10-20_venue_native_selection.md`
 - **Population.** `SYNDICATE_LIVE_EV_FLOOR=0` (ee87954d, live 10-20 20:45:40Z) admits every row the Suggested flag refused for EV alone; scoping the whole shortlist at each venue's own feed found 7/9 Kalshi and 3/3 Polymarket venue-native candidates on 10-21/10-22, 0 of them outside the live population. The one venue-blind gate left is the commit's gross 2% (`below_min_ev_pct`).
 - **Floor.** R1 = the pre-10-13 paper venue books, which ran exactly this selection at net > 0: -13.8% +- 5.0 (826 bets, 201 events, 12 dates); without MLB -6.3% +- 5.4 (500/182). Same-venue CLV vs fee (both in probability points): Kalshi trimmed CLV clears the fee only from net >= 1% (1.65 vs 1.64; at >= 0 it is -0.78 pt per pick); Polymarket from 0-0.5% (+0.35/+0.55). No floor has an ROI distinguishable from 0 -- the floor is a minimum, not an edge.

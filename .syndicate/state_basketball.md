@@ -1256,7 +1256,7 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   - The sim's minutes layer gives the stand-in's minutes back pro rata, including from players who DNP.
   - `on` is not supported. `shadow` is the user's call.
 
-## [basketball-smart-sim-tip-freeze] A BASKETBALL SMARTSIM IS FROZEN AT TIP -- LIVE ON THE FLEET since 2026-10-21 11:56 AM CT (aaa988a8, switch absent = on); first-slate reading OWED `[2026-10-21, lane freeze-nba-pregame-sims]`
+## [basketball-smart-sim-tip-freeze] A BASKETBALL SMARTSIM IS FROZEN AT TIP -- LIVE ON THE FLEET since 2026-10-21 11:56 AM CT (aaa988a8, switch absent = on) AND VERIFIED on the 10-21 slate: 0 post-tip rebuilds `[2026-10-22, lane freeze-nba-pregame-sims, CLOSED]`
 - **Measured (fleet props logs 10-03..10-21):** 10 of 145 NBA SmartSim builds ran after the scheduled tip, on 7 of 74 games. That includes all three 10-20 games, two of them twice. WNBA: 1 of 60.
   - Each rebuild rewrote the pregame `smart_sim_<D>_<H>_<A>.json` AND `engine_inputs/<D>/<H>_<A>.pkl`. The NBA live re-sim reloads that pkl every tick.
   - Triggers: 8 exclusion drift, 2 calibration stamp, 0 odds anchor, 0 roster pool.
@@ -1268,7 +1268,7 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   - Switch `SYNDICATE_SMART_SIM_TIP_FREEZE`: absent = ON (user decision), `off` = kill, `shadow` = log only.
 - **Verified:** 12 tests (off != on on the real loop). A replay over every logged production build kept 10/10 + 1/1 post-tip builds and froze 0 of 193 pre-tip.
 - **Fleet:** ff d1a7ffbe -> aaa988a8 at 16:56:40Z (11:56 AM CT), no restart (per-run subprocess). Smoke on fleet code: mode on (key absent from env file and every role), 11/11 NBA + 1/1 WNBA 10-21 tips resolve (deploys.md 2026-10-21 16:56:40Z).
-- **Production reading owed:** after the ff, the first NBA slate. Expect `SMART_SIM_TIP_FREEZE ... frozen=1` lines, `scripts/basketball_posttip_rebuilds.py --since <D>` -> 0 `after_tip`, and engine_inputs mtimes <= tip.
+- **Production reading (10-21 slate):** READING 2026-10-22 ~14:30Z (9:30 AM CT), fleet aaa988a8 in HEAD, substrate = production data root, read-only: `scripts/basketball_posttip_rebuilds.py --since 2026-10-21` -> 0 after_tip of 89 NBA + 17 WNBA builds (baseline 10-20: 5 after_tip on 3 games); 11/11 NBA + 1/1 WNBA 10-21 sims AND engine_inputs pkls last written before tip (latest margin LAL_GSW 31 min); 47 `SMART_SIM_TIP_FREEZE ... frozen=1` lines (45 NBA on all 11 games, 2 WNBA), every one logged after its game's tip; 0 tip=unknown, 0 built_after_tip, 0 CHECK_FAILED.
 - Findings: `findings_2026-10-21_post_tip_rebuilds.md`. Found on the way, not acted on: the sim's market anchor is a ~D-1 line, never refreshed (§5.1).
 
 ## [nba-sim-anchor-refresh] THE NBA SMARTSIM'S MARKET ANCHOR WAS A D-2 LINE, NEVER REFRESHED; THE REFRESH IS LIVE ON THE FLEET (6e406101, ff 3:48 PM CT, switch absent = on) AND READ: 11/11 10-21 SIMS RE-ANCHORED BEFORE TIP `[2026-10-21, lane nba-sim-anchor-staleness, todo #721]`
