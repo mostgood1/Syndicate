@@ -53649,3 +53649,28 @@ which is about the two sizing bases and not about the refusal boundary.
   - The background watcher in session 15f24a49 now reads the live-odds-worker.
 - **undo:** delete line 170. If that happens after the next up, a full down/up is also needed.
 - **Unrelated, for the record:** the user's "ff the fleet to the WNBA fix" (this session, ~2:2x PM CT) needed no action from me. Lane `wnba-injury-fleet-ff` had already done it at 19:59:11Z (ae2cb646 contains 066c2158 and the f5113511 ride-along the user approved here).
+
+## 2026-10-22 20:19:09Z (3:19 PM CT) -- LEDGER RE-MARK (no code, no restart): 96 settled MLB game-market closing marks labelled same_book against ANOTHER book's close -- **re-mark MET: 0 cross-book same_book marks left on any MLB paper venue** (lane `venue-prop-close-coverage`, session aba784f3, todo #729)
+- **ask:** the user's reply, relayed verbatim by session local_81601787 (lane min-ev-tuner-shadow): "restamp them". That answers option (a) of my question: re-mark the ~95 older MLB game marks on other venues that were labelled same_book but paired a DraftKings/FanDuel close against the venue's fill.
+  - Correction from that lane: `min_ev_tuner` tunes only kalshi/polymarket (novig/prophetx/paper are `venue_not_tuned`), so these feed the other same-book CLV readers, not the tuner.
+- **code:** none changed. The fleet runs ae2cb646 (a peer's ff), which contains aa06d5a1. No claims taken: an archive append touches no service.
+- **pass 2, 20:19:09Z:**
+  - Targets: settled filled MLB orders on venue `paper` / `paper:novig` / `paper:prophetx` whose mark was same_book with `matched_bookmaker` != the order's `book`. That gave 95 (36 / 33 / 26), all in the disk archive.
+  - Each was re-stamped with production's `paper_settlement.stamp_closing_marks`. DRY RUN == applied.
+  - 94 changed: 92 are now same_book against the VENUE'S OWN quote-log close (`book_quotes_last_pregame`), and 2 are now `no_close_for_market` (paper 1, prophetx 1), whose old cross-book number is kept in `remark.before`.
+  - Appended through `execution_ledger._archive_rows`. The old mark is kept in `closing_mark.remark={before, at, reason}`.
+- **pass 3, 20:21:09Z:** 2 rows (paper 1, paper:polymarket 1; both Polymarket fills, totals over 7.5 on 10-06).
+  - The fixed code gives them Polymarket's OWN close at the SAME price (-104) and the same clv_pct. Passes 1 and 2 had skipped them as "unchanged", because the scripts' change key held no bookmaker or source. The label still said `fanduel / last_pregame_quote`.
+  - Re-stamped with the key widened to bookmaker + source. Read-back 2/2.
+- **verify (MEASURED, fresh process, 20:21:13Z):** pass 2 read back 94 of 94 rows carrying its `remark.at`. Settled MLB, same_book (and same_book whose close book != the fill's book):
+
+  | venue | settled | same_book | cross-book same_book |
+  |---|---|---|---|
+  | paper | 420 | 95 | **0** |
+  | paper:kalshi | 266 | 218 | **0** |
+  | paper:novig | 54 | 38 | **0** |
+  | paper:polymarket | 95 | 72 | **0** |
+  | paper:prophetx | 66 | 47 | **0** |
+
+  - Before the re-marks, the paper:novig and paper:prophetx counts were 38 and 48. Now 38 of 38 and 47 of 48 are at the fill's own book.
+- **undo:** append each row's `closing_mark.remark.before` back as its mark (archive last-copy-wins).
