@@ -53423,3 +53423,9 @@ which is about the two sizing bases and not about the refusal boundary.
   0a2986b4 only (box_usage.py + its test). Read by the reconcile and grade_play_cards as subprocesses: no restart, no web reload.
 - **verify, owed:** the 11:50 PM CT reconcile's nba postmortem records carry usage (pre-deploy replay: 116 of 118 nba props, 62 of 63
   losses; wnba 128 of 128). Then close result-cards.
+
+## 2026-10-22 16:51Z (11:51 AM CT) -- READING: per-game concentration ON -- **first enforcement line MET** (closes the 16:17:46Z entry's owed verify; lane `live-event-concentration`, session 8ac736cb, todo #711)
+- **line:** `2026-10-22T16:49:19.050Z [execute_portfolio] REFUSED_EVENT_CAP venue=kalshi ticker='KXNBAAST-26OCT22DENOKC-DENJMURRAY27-6' event=223b2883... axis=prop|player_assists|jamal murray|full sport=nba market=player_assists player='Jamal Murray' side=over line=5.5 price=-117.0 asked=6.37 held_event=24.45 room=-9.45 cap=15.00 blocking_key=None -- nothing written`. The pass ended `venue=kalshi placed=1 refused={'event_exposure_cap': 1}` at 16:49:28Z.
+- **reading:** DEN@OKC already held $24.45 live (above the cap, placed before the rule was on), so a further $6.37 leg on a different player was refused and NO ledger row was written. A game's first leg was not touched (held_event > 0). Other orders in the same pass were placed normally (1 Kalshi, 1 Polymarket).
+- **window 16:18Z..16:50:38Z (live-odds-worker log, ALL_PROCESS_MEMORY excluded):** 8 executed live passes, 2 live orders, 1 `REFUSED_EVENT_CAP`, 0 `REFUSED_SAME_AXIS_HELD`, 0 `TRIMMED_TO_EVENT_CAP`, **0 `CONCENTRATION_SHADOW`** (the mode really is on), 0 tracebacks. Polymarket also refused 2 `already_held_other_slate` (D1, unchanged).
+- **still owed:** R1 (`axis_held_live`) has not fired live -- the first NCAAF/NFL weekend with alt ladders is the population that should exercise it. No P&L read; one day.
