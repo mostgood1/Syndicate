@@ -53772,3 +53772,18 @@ which is about the two sizing bases and not about the refusal boundary.
 - **pooling confirmed live:** held_event $5.90 = $0.48 Kalshi spread + $5.42 Polymarket `tsc-cfb-umass-uconn-2026-10-23-total-49pt5` under 49.5 (a different axis, counted toward R2 dollars only).
 - **design point surfaced (findings section 4, decision 3):** a ONE-CONTRACT held leg ($0.48, small-edge line) blocked a band-size ($5.00) leg on the same axis. As built, any held leg blocks its axis, which is what decision 3 recommended.
 - **since the on-switch (16:18Z..21:31Z):** R1 1, REFUSED_EVENT_CAP 36+ lines, TRIMMED_TO_EVENT_CAP 1, shadow 0. The detached watcher exited on the hit, as designed.
+
+## 2026-10-22 21:57:17Z (4:57 PM CT) -- FLEET ff ce1e4a19 -> bdc61a1d (NO restart): the stand-in hook takes the slate's games from predictions/game_odds -- **fleet is now bdc61a1d** (lane `nba-standins-shadow`, session 15f24a49, todo #714)
+- **user, in this session:** "ff now (Recommended)". After the 12-min CLEAR wait timed out on a board build in flight, they chose "ff now, deliberately (Recommended)".
+- **gates:**
+  - First attempt: claims 21:32Z. `check_deploy_safety` (refresh-worker env) was NOT CLEAR for 12 min, first on a soccer odds refresh plus a board build, at the end on the board build only. No ff was done; claims released 21:46:41Z.
+  - Second, deliberate: claims re-taken; ancestry and dirty-file collisions re-checked immediately before the merge (none). An ff restarts nothing. The board build runs inside the long-lived refresh-worker, which does not re-import this module.
+- **ride-alongs:**
+  - 10 commits ce1e4a19..bdc61a1d. The only runtime file is `syndicate/features/shared/nba_no_history_standins.py`.
+  - The rest is ledger, docs and tests: 11 files, +333 / -7.
+- **on disk:** `def slate_games` count 1. No process restarted. The props refresh is a fresh subprocess per run, so it loads the fix on its next run.
+- **claims:** released 21:57:29Z (refresh-worker, live-odds-worker, web).
+- **verify (OWED):**
+  - The next NBA props refresh logs `NBA_NO_HISTORY_STANDINS` with `"games_source": "slate_files"` and no `no_slate_games_in_pool` reason. Only bdc61a1d+ emits `games_source`.
+  - The watcher in session 15f24a49 polls every 5 min. Expected `admitted []`, since every opening-night no-history player now has history.
+- **undo:** `git merge --ff-only` cannot go back. Revert bdc61a1d on main and ff to the revert, or set `SYNDICATE_NBA_NO_HISTORY_STANDINS` absent (the line is in `local_production.env`) and do a full down/up.
