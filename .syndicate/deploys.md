@@ -53495,3 +53495,23 @@ which is about the two sizing bases and not about the refusal boundary.
   first pregame pull after ~1:15 PM CT (SEGMENT_PLAN segments=h1..q4 markets=18), then NFL segment rows on the served board; tonight's
   football watcher reads live interval actuals on them. Spend for the slate vs the estimate (~18 credits/pull: 12 pregame pulls + ~21
   live) once tomorrow's quota reading lands.
+
+## 2026-10-22 17:55:33Z (12:55 PM CT) -- FLEET ff a126ae95 -> 21b4bdb0 (NO restart): NBA injuries.csv keeps each date's official snapshot; SmartSim trusts the game date's own report (lane nba-injury-snapshot-fleet-ff, todo #730)
+- **user, in chat (session 6c89053f):** answered "Yes, after their release" to: ff the fleet to a SHA containing 21b4bdb0 once lane venue-prop-close-coverage releases. (A relayed yes from the fleet-watcher session was NOT acted on; the user then answered in this session.)
+- **claims:** waited for venue-prop-close-coverage (all three free at 17:54:54Z). Acquired live-odds-worker, refresh-worker and web at ~17:55Z, holder `nba-injury-snapshot-fleet-ff`, target 21b4bdb0; each acquire rc=0. Released after this entry.
+- **ff:** `git merge --ff-only 21b4bdb0` at 17:55:33Z.
+  - Guard: HEAD == a126ae95 (lane nfl-segment-capture-e's 17:53Z ff had landed first), and none of the incoming files are among the checkout's 8 locally modified files.
+  - Only to the fix SHA, not the github/main tip.
+  - sha256 on disk == 21b4bdb0 for `injuries.py`, `basketball_props_smart_sim.py`, and `segment_odds_fetch.py` (unchanged).
+- **code in the gap:** 21b4bdb0 only: `syndicate/features/nba/source_cli/scrapers/injuries.py`, `syndicate/features/shared/basketball_props_smart_sim.py`, and tests. No `vendor/`, no `render.yaml`. a126ae95 (NFL segments) was already live from the previous entry; it is not this ff's ride-along.
+- **restart: none.**
+  - `fetch-injuries` runs as a subprocess per call: the live loop's `_fetch_injuries` and the props refresh.
+  - The changed SmartSim guard is reached only through `_smart_sim_run_date_local` (`basketball_props_smart_sim.py:6165`), inside the per-run props-refresh subprocess.
+  - No NBA props refresh or `fetch-injuries` was running at the ff (pgrep empty).
+- **baseline (read 17:55Z, before the ff):** `raw/injuries.csv` mtime 17:35:51Z; header `team,player,status,injury,date` (no `source` column); 2026-10-22 = 12 rows, 10-21 = 70 fallback rows.
+- **expect:**
+  - (1) The first write after 17:55:33Z adds a `source` column, with `nba_official` on all 2026-10-22 rows. Earlier dates are blank. This changes the file's bytes once, so the live loop's lineup fingerprint forces one NBA re-sim.
+  - (2) After 12:00 AM CT 10-23, the 10-22 rows are still `nba_official`: the 11:30 PM ET report fetched by URL, not the Rotowire/ESPN fallback.
+  - (3) The next light slate's game-day builds print `[smart_sim] INJURY_SNAPSHOT_OFFICIAL` instead of `INJURY_SNAPSHOT_PARTIAL`. 10-22 is a 2-game slate, so the next props refresh for 10-22 should already show it.
+- **verify:** reading (1) is OWED. A watcher is armed for the first write after the ff (live-loop lineup check, 30 min).
+- **undo:** `git checkout a126ae95 -- syndicate/features/nba/source_cli/scrapers/injuries.py syndicate/features/shared/basketball_props_smart_sim.py` in `~/Syndicate`. No restart is needed, for the same subprocess reason. The `source` column already written stays in the file, and the old writer ignores it.
