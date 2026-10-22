@@ -46328,6 +46328,12 @@ were resolved and nine already-closed rows removed from the open tables.
   after 12:00Z and readable state. (2) seven daily readouts. (3) user decision to apply, which needs
   `effective_min_ev_pct` wired at `portfolio_commit.py:1102-1108` (lane `published-negative-ev` owns the file)
   and `polymarket_us_orders.py:1251`.
+  **UPDATE 2026-10-22 (lane `min-ev-tuner-readout-fleet`, `bf14f920` on main, NOT LOADED yet):** the Claude scheduled task
+  `min-ev-tuner-daily-readout` never fired by itself (0 automatic runs 10-20..10-22), so readouts move to the fleet:
+  supervisor job `min-ev-tuner-readout` 13:15Z -> `reports/intelligence/min_ev_tuner_readout/<date>.json`, and the
+  watchdog alerts (email, `exec:min_ev_tuner:*`) on a missing-by-13:00Z / failed pass or a non-shadow mode with no
+  `<home>/min_ev_tuner_mode_decision.json`. **The user's apply decision must also write that file**, or apply alerts.
+  Loads at the next full down/up; then delete session b98807bc's session-only cron (job 0a7c5e1e).
 
 - **#235 — The Layer 2 prop lane was never enriched at all. Code shipped,
   DEPLOY PENDING (not yet verified in production).**
