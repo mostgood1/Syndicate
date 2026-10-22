@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#734` — **The CLV departures ledger stopped at 8 MiB per date for ALL sports. It has not fired yet, but 10-17 reached 7,938,374 B (94.6%) before NBA's season, and NBA wrote 2.35 MiB on Wednesday 10-21, so the next NCAAF + NBA Saturday (10-24) will likely fire it. FIXED ON MAIN `a77077a2`, NOT ON THE FLEET** — FOUND 2026-10-22 (`#732` sibling), lane `clv-departures-ceiling`, session d0d9f2f7 (side session of local_802cdcc8); `.syndicate/findings_2026-10-22_clv_departures_ceiling.md`
+### `#734` — **The CLV departures ledger stopped at 8 MiB per date for ALL sports. It has not fired yet, but 10-17 reached 7,938,374 B (94.6%) before NBA's season, and NBA wrote 2.35 MiB on Wednesday 10-21, so the next NCAAF + NBA Saturday (10-24) will likely fire it. FIXED ON MAIN `a77077a2`, ON THE FLEET since 21:15:11Z 10-22; forward reading owed (Sat 10-24)** — FOUND 2026-10-22 (`#732` sibling), lane `clv-departures-ceiling`, session d0d9f2f7 (side session of local_802cdcc8); `.syndicate/findings_2026-10-22_clv_departures_ceiling.md`
 - **Measured on the fleet** (read-only, refresh-worker env, nice 19, 24 dates 09-30..10-23):
   - 0 of 2,184 refresh-worker `DEPARTURES` lines (dates 10-16..10-22) say `truncated=True`, and no file ever reached the cap.
   - Largest day: 10-17 at 7.57 MiB. Largest sport-day: NCAAF 10-10 at 3.80 MiB.
@@ -17,7 +17,7 @@
   - The byte tally lives in `state.json` and is re-read from the file when its size disagrees.
   - Readers are unchanged: the scorecard's `?path=` export is uncapped and the backtests stream.
 - **Tests:** 9 new, all fail on origin/main (7 on the defect, 2 guard the new mechanisms); 215 passed across 10 reader suites.
-- **User decision owed:** a fleet ff past `a77077a2` plus a refresh-worker restart. The fleet checkout (`ae2cb646`) already carries `#732`'s `22e3a0aa`, which waits for the same restart.
+- **ON THE FLEET since the 21:15:11Z full down/up (lane `kalshi-round-up`, ff ae2cb646 -> ce1e4a19, which contains `a77077a2`). LOAD READ 21:28Z (4:28 PM CT), read-only: the DEPARTURES line changed shape between 21:01:46Z (`truncated=False state_unreadable=False`) and 21:21:37Z (`... dropped=0 bytes=2496238 censored=-`); 10-22 `state.json` `ledger.bytes` 2,526,151 == file size, `sport_bytes` sums to it, `censored` {}; 0 CEILING_HIT lines today; OPENINGS line carries `dropped=0 bytes=23421612` (#732 loaded too).** User's yes relayed by local_81601787 ("fast-forward the fleet to a77077a2 and restart refresh-worker").
 - **Forward reading owed after load:** on the next busy day, the file passes 8,388,608 B with `dropped=0` and no `DEPARTURES_CEILING_HIT`, and `state.json`'s `ledger.bytes` equals the file size.
 - **If NOT loaded by 10-24:** read 10-24 for the first `truncated=True` and a file at about 8,388,608 B. That would be the first measured loss.
 
