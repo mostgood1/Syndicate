@@ -53359,3 +53359,20 @@ which is about the two sizing bases and not about the refusal boundary.
 - **the finding that needs NO significance:** admitted EV is **+2.90% gross against -0.04% net** across all 80, and the pattern holds in every band (`m1to0` +2.26% -> -0.63%). That is a statement about PREDICTED values, so no sample is needed: the floor is refusing rows whose gross edge is real and whose NET edge is about zero. The refusal boundary is set almost entirely by the FEE term. Reframes the question from "does the floor cost us money" to "is the fee model right" -- and Kalshi rows carry `fee_is_upper_bound: true`, so the true net edge may be BETTER than the ledger states.
 - **METHOD NOTE, and it nearly produced a false finding.** The live document alone shows **0 settled ladder rows**, and every paper venue at 0% settled (paper 963, paper:kalshi:ladder 664, paper:prophetx 163, paper:novig 141, paper:kalshi 146) against **live kalshi 93% and polymarket 92%**. That contrast reads exactly like a paper-grading gap. It is an artifact of `_trim_to_cap`, which moves SETTLED PAPER rows out FIRST -- settling is what removes a paper row from the document. All 80 settled ladder rows live in `reports/intelligence/execution_ledger_archive/orders_2026-10.jsonl` (9,166 rows, 8,866 settled = 97%, grading lag median 25.5h / p75 79.4h / p90 121.2h). **Any ledger reading over paper MUST union the archive**, keyed on `idempotency_key` with the document copy winning.
 - **owed:** re-read at **>=400 settled** ladder rows, additionally split by `fee_is_upper_bound` and compared against `ev_net_pct` rather than `ev_pct`. Armed frame-guarded as scheduled task `ladder-refusal-control-arm-reading` for **2026-10-29T18:00Z**. Detail: `.syndicate/findings_2026-10-22_ladder_refusal_control_arm.md`, todo `#724`.
+
+## 2026-10-22 15:40Z (10:40 AM CT) -- FLEET ff 6954cb0e -> 5e734fb6 + WEB RELOAD: reconciled cheat-sheet graphics show only what was shared; record gains a SHARED value (lane cheat-sheets)
+- **user-approved in chat:** "Deploy now (Recommended)" for the reconciled-graphic fix (bdde29d3); then "actually we should create a new
+  value for shared record vs all" -> 5e734fb6 (the earlier "record = shared" change reverted into a separate value before landing).
+- **claims:** live-odds-worker (396eff72), refresh-worker (38a80789), web (1adfd3ad), holder `cheat-sheets`; released after this entry.
+- **ff:** `git fetch github` then `git merge --ff-only 5e734fb6` at 15:40:41Z, guard HEAD == 6954cb0e. Then `local_production.py
+  reload-web`: RELOAD_WEB done, 2 probes, 0 failures, healthz ok. Workers NOT restarted.
+- **ride-alongs (6954cb0e..5e734fb6, other lanes' code, all landed on main by their owners):** 09d5795c + 7a3cf4cf vendor-final-leftovers
+  (MLB cards import the repo's live_prop_ranking -- that lane's block says its data-disk copies wait on exactly this ff + web);
+  4c7134a7 + 97dca15b fitter-contract-price-units (CLOSED, offline fitters); 8301efcd + 4b12deca nba-sim-minutes (priced-first shrink
+  `SYNDICATE_NBA_SIM_MINUTES_PRICED_FIRST`, absent = off -- key absent on refresh-worker, live-odds-worker and web, names read only);
+  8bb7a183 probability_differential registry.
+- **verify (served pages, browser):** `/cheatsheets?date=2026-10-21&sport=nhl&view=reconciled` -> the consistency section holds exactly
+  the 8 rows posted at 11:51 AM CT 10-21 (was 12: Norris x2, Greig, Quinn added later), shown at the posted prices (Seth Jones SOG o1.5
+  -115 DraftKings, was -105 BetOnline), recap 7-1 +4.03u. `/cheatsheets/record` -> new All featured | Shared toggle; Shared (official):
+  consistency 26-14 +3.36u, 40 bets, 3 days with a graphic; All featured unchanged 626-564 +15.23u (record.json regenerated with
+  write_record at 10:4x AM CT on the deployed code).
