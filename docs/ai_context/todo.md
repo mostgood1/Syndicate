@@ -1,5 +1,26 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#734` — **The CLV departures ledger stopped at 8 MiB per date for ALL sports. It has not fired yet, but 10-17 reached 7,938,374 B (94.6%) before NBA's season, and NBA wrote 2.35 MiB on Wednesday 10-21, so the next NCAAF + NBA Saturday (10-24) will likely fire it. FIXED ON MAIN `a77077a2`, NOT ON THE FLEET** — FOUND 2026-10-22 (`#732` sibling), lane `clv-departures-ceiling`, session d0d9f2f7 (side session of local_802cdcc8); `.syndicate/findings_2026-10-22_clv_departures_ceiling.md`
+- **Measured on the fleet** (read-only, refresh-worker env, nice 19, 24 dates 09-30..10-23):
+  - 0 of 2,184 refresh-worker `DEPARTURES` lines (dates 10-16..10-22) say `truncated=True`, and no file ever reached the cap.
+  - Largest day: 10-17 at 7.57 MiB. Largest sport-day: NCAAF 10-10 at 3.80 MiB.
+- **What firing would have cost** (old loop):
+  - It `break`s, so every later sport is cut for the rest of the date.
+  - The heartbeat is dropped.
+  - The state still advances, so the departures are never written.
+  - A later return can be written without its departure.
+- **Fix:**
+  - Ceilings: 16 MiB per (date, sport) and 32 MiB per date, refused per record.
+  - Heartbeats kept (1 MiB reserve).
+  - A refused sport is CENSORED for the rest of the date (`censored` in the heartbeat), so the scorecard's `look_after` reads `unobserved`, not `kept`.
+  - Loud: a `DEPARTURES_CEILING_HIT` line, plus `dropped_at_ceiling` / `dropped_by_sport` / `bytes_on_disk` / `censored_sports` on the report.
+  - The byte tally lives in `state.json` and is re-read from the file when its size disagrees.
+  - Readers are unchanged: the scorecard's `?path=` export is uncapped and the backtests stream.
+- **Tests:** 9 new, all fail on origin/main (7 on the defect, 2 guard the new mechanisms); 215 passed across 10 reader suites.
+- **User decision owed:** a fleet ff past `a77077a2` plus a refresh-worker restart. The fleet checkout (`ae2cb646`) already carries `#732`'s `22e3a0aa`, which waits for the same restart.
+- **Forward reading owed after load:** on the next busy day, the file passes 8,388,608 B with `dropped=0` and no `DEPARTURES_CEILING_HIT`, and `state.json`'s `ledger.bytes` equals the file size.
+- **If NOT loaded by 10-24:** read 10-24 for the first `truncated=True` and a file at about 8,388,608 B. That would be the first measured loss.
+
 ### `#733` — **WNBA `raw/injuries.csv` lost whole snapshots: a fetch for D run after Central midnight deleted D (the fleet file has no 10-12), and a prefetch for D+1 merged its scrape into D. FIXED (`ae2cb646`) AND ON THE FLEET since 19:59:11Z 10-22 (ff with `#731`, lane `wnba-injury-fleet-ff`); READ 20:04Z: 10-22 = 48 ESPN rows, `INJURY_SNAPSHOT` printed; overnight reading owed** — FOUND 2026-10-22 (`#731` lead), lane `wnba-injury-snapshot-overwrite`, session f4ebcf5f (side session of local_154af8e3); `.syndicate/findings_2026-10-22_wnba_injury_snapshot_overwrite.md`
 - **Defect** (`syndicate/features/wnba/source_cli/scrapers/injuries.py`, `update_injuries`). Every fetch deleted `--date`'s rows, while ESPN stamped each row `datetime.now()`. The NBA copy was fixed by `#730` (`21b4bdb0`); this copy was not.
   - **Late fetch for D** (after midnight CT): D's rows deleted, the scrape written as D+1's. Fleet: no 10-12 snapshot (the last 10-12 fetch ran 10-13 12:00:03 AM CT). A reader for 10-12 now reads 10-11's snapshot.

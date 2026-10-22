@@ -1984,7 +1984,14 @@ death, never life — do not invert it.
 - Verification: fleet HEAD == ae2cb646 and injuries.py sha256 on disk == ae2cb646's; the next WNBA fetch-injuries writes 10-22 as ESPN rows (~48, OUT/DAY-TO-DAY only, no TOR) and its props log prints INJURY_SNAPSHOT requested=<D> replaced=2026-10-22; deploys.md entry with the undo
 - Blocked by: none
 
-### clv-departures-ceiling — OPEN — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
+### clv-departures-ceiling — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
+- **GOAL VERDICT 2026-10-22 20:34Z (3:34 PM CT): GOAL MET.** Readings:
+  - findings `.syndicate/findings_2026-10-22_clv_departures_ceiling.md`: per-date and per-sport bytes and records for 24 fleet dates; 0 of 2,184 refresh-worker DEPARTURES lines (10-16..10-22) `truncated=True`; peak 10-17 7,938,374 B (94.6%); largest sport-day NCAAF 10-10 3.80 MiB;
+  - fix `a77077a2` is on origin/main: 16 MiB per (date, sport), 32 MiB per date, `DEPARTURES_CEILING_HIT`, dropped counts, heartbeats kept, refused sports censored;
+  - 9 new tests: all fail on origin/main's module (7 on the defect, 2 guard the new mechanisms), all pass on the fix; 215 passed across 10 reader suites;
+  - fleet rescan check: the state tally reproduces all 24 real files byte-exact.
+  NOT on the fleet: the ff + refresh-worker restart is the user's decision (todo `#734`).
+- **RESULT:** hypothesis CONFIRMED except 'already fired' (it has not). The old loop's `break`, the dropped heartbeat, the state advancing past refused departures and the orphan return were each reproduced by a test on origin/main.
 - Goal: The CLV departures ledger no longer silently drops departures for every sport once a busy date's file reaches 8 MiB: per-date and per-sport bytes/records and any truncated=True measured on the fleet (read-only, nice 19) before; fix on origin/main with per-(date,sport) and per-date ceilings sized from the measured max, a loud log line and dropped counts on the report, with the state.json sidecar, layer2_live_scorecard and the HOT_ARTIFACT_PATTERNS entry still working; a test that fails on the old behaviour; findings file. Fleet load is the user's decision. Side session of local_802cdcc8.
 - Files: syndicate/features/shared/clv_departure_ledger.py, tests/test_clv_departure_ledger_ceiling.py (NEW), .syndicate/findings_2026-10-22_clv_departures_ceiling.md (NEW), docs/ai_context/todo.md (new item only)
 - Hypothesis: UNTESTED: the 8 MiB departures cap has not fired yet (10-17 peak 95%) but the next big Sat/Sun crosses it; when it fires, the old loop breaks for every sport, drops the build heartbeat, and still writes state so the dropped departures are lost for good (not retried)
