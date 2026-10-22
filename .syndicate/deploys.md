@@ -53235,3 +53235,13 @@ No restart was performed, and none is owed: because absent already resolved to
 ON, the running fleet's behaviour is already what the explicit value states. The
 value exists so the next full restart carries the decision rather than
 re-inheriting it.
+
+## 2026-10-22 14:47Z (9:47 AM CT) -- FLEET ff 09e86a9d -> 6954cb0e (NO restart): NBA in-play window 4 h -> 3 h (lane nba-inplay-only-pulls)
+- **user-approved in chat:** "tighten the window to 3 hours and deploy".
+- **claims:** waited out live-min-stake-five's (all three, target 09e86a9d; free 14:46:43Z), then live-odds-worker (6194a9ad), refresh-worker
+  (27153e08), web (c8a0c9a9), holder `nba-inplay-only-pulls`; released after this entry.
+- **ff:** `git merge --ff-only 6954cb0e` at 14:47:22Z (guard HEAD == 09e86a9d, no incoming file among locally modified runtime files). Code
+  in the gap = 6954cb0e only (fetch_basketball_oddsapi_props_local.py + its test). Subprocess script: no restart.
+- **verify:** on disk `IN_PLAY_WINDOW_HOURS = 3.0` (fleet line 225). Live reading owed tonight (10-22: CLE @ PHI 6 PM CT, DEN @ OKC 8:30 PM):
+  `IN_PLAY_ONLY events_in_play` drops CLE @ PHI by 9:00 PM CT (3 h after its tip) and never exceeds the games actually live; and the
+  board's DEN @ OKC (pregame) rows stay on the board while CLE @ PHI is in play (the owed clause from 10-21).
