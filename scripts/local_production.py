@@ -1864,8 +1864,49 @@ def reset_ci_home(home: Path) -> Path:
     return home
 
 
+JANITOR_SCRIPT = "scripts/keyvalue_janitor.py"
+
+
+def run_state_janitor(settings: Settings, *, run=subprocess.run) -> int | None:
+    """Sweep test-fixture keys out of the fleet's Redis. Runs in the PARENT
+    env (not the scrubbed ci env), because it has to reach the fleet Redis.
+    Never raises: the suite's verdict must not depend on the cleanup. The URL
+    goes through the child's env, not argv, so it is never in a process list.
+    Returns the janitor's exit code, or None when it did not run."""
+    script = REPO_ROOT / JANITOR_SCRIPT
+    if not script.is_file():
+        print(f"janitor: {JANITOR_SCRIPT} missing at this checkout; skipped", flush=True)
+        return None
+    command = [sys.executable, str(script), "--apply", "--backup-dir", str(settings.run_dir / "janitor-backups"),
+               "--min-idle-seconds", "300"]
+    if shutil.which("nice") and not IS_WINDOWS:
+        command = ["nice", "-n", "15"] + command
+    env = dict(os.environ)
+    env["SYNDICATE_JANITOR_REDIS_URL"] = settings.redis_url
+    try:
+        rc = run(command, cwd=str(REPO_ROOT), env=env).returncode
+    except Exception as exc:  # noqa: BLE001 -- cleanup must not fail the cron
+        print(f"janitor: could not run ({type(exc).__name__})", flush=True)
+        return None
+    print(f"janitor: exit {rc}", flush=True)
+    return rc
+
+
 def cmd_ci_run(args: argparse.Namespace) -> int:
-    """The `ci-suite` cron: run_ci_suite.py at this checkout's HEAD, in a
+    """The `ci-suite` cron, then the state-store janitor. The janitor runs in a
+    `finally` so a suite that fails or refuses to start still gets its
+    leftovers swept; it never changes the returned code."""
+    try:
+        return _ci_run_suite(args)
+    finally:
+        try:
+            run_state_janitor(settings_from_args(args))
+        except Exception as exc:  # noqa: BLE001 -- never mask the suite's own result
+            print(f"janitor: skipped ({type(exc).__name__})", flush=True)
+
+
+def _ci_run_suite(args: argparse.Namespace) -> int:
+    """run_ci_suite.py at this checkout's HEAD, in a
     SEPARATE clone (<home>/ci-checkout) so test output never dirties the
     checkout the fleet runs from, with a scrubbed env so no test can reach the
     fleet's Redis, data root or venue keys. Render ran it on its own instance

@@ -26,6 +26,7 @@ import time
 import uuid
 from pathlib import Path
 from typing import Any, Callable, NamedTuple
+from urllib.parse import urlsplit
 
 from syndicate.features.shared.timezone import normalize_timestamped_payload
 from syndicate.features.shared.source_roots import repo_root_from
@@ -80,12 +81,51 @@ def _state_namespace() -> str:
 _KEYVALUE_SOCKET_TIMEOUT_SECONDS = 5.0
 _KEYVALUE_SOCKET_CONNECT_TIMEOUT_SECONDS = 5.0
 
+# Root-caused 2026-10-22 (lane fleet-redis-test-pollution): a pytest process can
+# select the fleet's Redis -- on the fleet host `redis://127.0.0.1:6379` IS the
+# live store -- and every fixture it writes there sits under its own temp
+# directory, so nothing ever reads it again and about half of them never expire.
+# 426 such keys were found in the live Redis (262 under a Windows temp dir, 164
+# under WSL /tmp), 28 of them extra `oddsapi_quota.json` documents; the off-fleet
+# quota forwarder writes only when exactly ONE such key matches, so a polluted
+# store can silently stop attributing research spend. The suite's own fixtures
+# patch this function or use the filesystem backend, so refusing here costs them
+# nothing; what it stops is a test that reaches the real client through the
+# environment.
+#
+# Gated on PYTEST_CURRENT_TEST (pytest sets it around every setup/call/teardown
+# and a subprocess a test spawns inherits it), NOT on "pytest" being importable:
+# the fleet never has that variable, so this cannot refuse a production process.
+_ALLOW_TEST_LOOPBACK_ENV = "SYNDICATE_ALLOW_TEST_LOOPBACK_REDIS"
+
+
+def _refuse_loopback_redis_under_pytest(url: str) -> None:
+    if not str(os.environ.get("PYTEST_CURRENT_TEST") or "").strip():
+        return
+    if str(os.environ.get(_ALLOW_TEST_LOOPBACK_ENV) or "").strip().lower() in {"1", "true", "yes", "on"}:
+        return
+    try:
+        host = (urlsplit(url).hostname or "").lower()
+    except ValueError:
+        return  # unparseable: redis.Redis.from_url rejects it on its own
+    if host not in {"localhost", "::1", "0.0.0.0"} and not host.startswith("127."):
+        return
+    source = "SYNDICATE_REFRESH_STATE_URL" if str(os.environ.get("SYNDICATE_REFRESH_STATE_URL") or "").strip() else "REDIS_URL"
+    # The URL itself is never put in the message: it can carry credentials.
+    raise RuntimeError(
+        f"Refusing to open the keyvalue state store at a loopback Redis (host {host!r}, from {source}) "
+        "inside a pytest run: on the fleet host that is the LIVE store, and fixtures written there are never read again. "
+        f"Patch refresh_state_store._get_keyvalue_client with a fake, use the filesystem backend, or set "
+        f"{_ALLOW_TEST_LOOPBACK_ENV}=1 for a throwaway Redis."
+    )
+
 
 @lru_cache(maxsize=1)
 def _get_keyvalue_client() -> Any:
     url = str(os.environ.get("SYNDICATE_REFRESH_STATE_URL") or os.environ.get("REDIS_URL") or "").strip()
     if not url:
         raise RuntimeError("SYNDICATE_REFRESH_STATE_URL or REDIS_URL must be set when SYNDICATE_REFRESH_STATE_BACKEND uses keyvalue.")
+    _refuse_loopback_redis_under_pytest(url)
     try:
         import redis
     except ImportError as exc:
