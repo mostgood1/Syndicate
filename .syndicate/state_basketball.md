@@ -1249,6 +1249,12 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
 - **A 2024-25 `player_logs.csv` append is NO-GO for the veterans.** It admits them with pre-injury numbers (Lillard 23.0 pts vs posted 18.5) and changes other inputs. Nothing was written to the fleet's file.
 - **Engine fact measured on the way:** the sim's summed player `pts_mean` runs **+8.5 pts over the anchored team score** on the 12 unaffected 10-21 sides. The player layer is not constrained to the team score.
 - **Open:** the pre-registered truth reading after the 10-21 games (findings_2026-10-20_nba_no_history_admit.md). After that, the user decides on enabling.
+- **Truth reading `[verified 2026-10-22 6:56 AM CT, session 89514daa, 2ab3aaf5]`: minutes INCONCLUSIVE, points owed.**
+  - Paired |on - actual| - |off - actual| teammate minutes: +0.080, 95% CI [-0.455, +0.601], n=97 over 10 sides.
+  - Stand-ins: minutes-prior MAE 3.93; all 10 played.
+  - Points wait on `player_logs.csv` 10-21 rows.
+  - The sim's minutes layer gives the stand-in's minutes back pro rata, including from players who DNP.
+  - `on` is not supported. `shadow` is the user's call.
 
 ## [basketball-smart-sim-tip-freeze] A BASKETBALL SMARTSIM IS FROZEN AT TIP -- LIVE ON THE FLEET since 2026-10-21 11:56 AM CT (aaa988a8, switch absent = on); first-slate reading OWED `[2026-10-21, lane freeze-nba-pregame-sims]`
 - **Measured (fleet props logs 10-03..10-21):** 10 of 145 NBA SmartSim builds ran after the scheduled tip, on 7 of 74 games. That includes all three 10-20 games, two of them twice. WNBA: 1 of 60.
