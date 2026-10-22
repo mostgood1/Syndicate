@@ -2779,3 +2779,15 @@ The 2026-10-20 entry said: "Rating INPUTS transfer, because the sim reads them w
 - **Measured on 167 real reports:** the parser took `<word> Last,` as a two-token surname (an allowance meant for `Lively II,`), so the LAST WORD OF NEARLY EVERY REASON became the next player's surname prefix. The tokens right before a `Last,` were `Strain` 759, `Surgery` 759, `Way` 456, `Sprain` 334 and so on. The only genuine two-token surnames were `Lively II,` and `Butler III,`. The vendored token list held exactly the commonest of those words: it had been masking a systematic defect one word at a time. 971 of 5,658 rows were still written under names no pool matches.
 - **Rule:** when a cleaner carries a hand-grown list of "noise" words, tabulate where each listed word comes from on the real input before extending it. If the list keeps growing, the defect is upstream. Fix the producer, and decide ambiguous cases against an authority (here the roster), not against a longer list.
 - **Smaller, same session:** I wrote a commit SHA into the ledger before `land`. The rebase changed it (3e3c3a37 -> 36eb357b) and the ledger had to be corrected. Cite a SHA only after the push, read from `git log origin/main` (memory rule "never write an unseen SHA").
+
+## 2026-10-22 - The WSL system `python3` reads the fleet's keyvalue ledger as EMPTY, silently: run fleet reads on the fleet venv `[lane sim-stake-earned-profile, session bde77672]`
+- **Belief overturned:** I believed `PYTHONPATH=~/Syndicate` plus the refresh-worker state env was enough to read the fleet's execution ledger read-only.
+  - It is not, under `/usr/bin/python3`, which has no `redis`.
+  - `read_json_file_result` returns ok=False, and `read_json_file` (`#658`) turns that into an EMPTY live document.
+  - `full_history_orders()` then returns the disk archive alone: 9,178 of 12,175 orders, no live order, and newest 03:40Z instead of 16:15Z.
+- **What it produced:** a coverage table, a fit and a fake "orders collapsed after 10-18" finding, all on a substrate missing the newest 3,000 orders. Nothing errored.
+- **Caught by:** comparing the order count against a peer lane's number from the same day (12,111). The memory rule "re-derive cross-lane numbers" fired, the other way round.
+- **Rules:**
+  - Fleet reads use `/home/amyn/.venvs/syndicate/bin/python` (what the supervisor runs).
+  - Any ledger reader asserts `read_json_file_result(_ledger_path())[1] is True` before trusting a count. `fit_staked_probability_cells.py` now exits 4 otherwise.
+  - The older fitters (`fit_staked_probability`, `fit_probability_calibration`, `ev_overstatement_decomp`) do NOT check this yet.
