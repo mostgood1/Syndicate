@@ -53480,3 +53480,18 @@ which is about the two sizing bases and not about the refusal boundary.
 - **undo:**
   - Code: `git merge`-free. Check out 0a2986b4 in ~/Syndicate, then a full down/up under all three claims.
   - Re-mark: append each row's `closing_mark.remark.before` back as its mark (archive last-copy-wins).
+
+## 2026-10-22 17:53Z (12:53 PM CT) -- FLEET ff aa06d5a1 -> a126ae95 (NO restart): NFL quarter / half capture ON by code default, option E (lane nfl-segment-capture-e)
+- **user-approved in chat:** "go with E and deploy" (after the cost table; E = every segment, pregame every 30 min, live whole game).
+- **claims:** waited for venue-prop-close-coverage (released 17:53:31Z after its 17:50:06Z down/up); then live-odds-worker (495aa710),
+  refresh-worker (34bfd4c2), web (e30570b4), holder `nfl-segment-capture-e`; released after this entry. 332cb014 (live-min-stake-five,
+  queued env-only down/up) told the new HEAD.
+- **ff:** `ff_to.sh` (fetch github, guard HEAD == aa06d5a1) -> a126ae95 at 17:53:49Z. Code in the gap = a126ae95 only
+  (segment_odds_fetch.py per-sport defaults + its test). The NFL fetch runs as a subprocess of every NFL refresh: no restart.
+- **cost, modelled on week 7's real pull times and kickoffs (14 games), both per-sport gates:** ~8.2k credits/week (pregame 2,970 +
+  live 5,220), an upper bound. (The user was first shown ~31k for E; that model ran the live tier on every pull and ignored the code's
+  existing 10-min live gate -- corrected before the deploy and stated to the user.)
+- **verify, owed today (session watcher bjgg64vq2):** NE @ CHI 7:15 PM CT -- nonfull NFL rows in nfl_source/tracking/book_quotes from the
+  first pregame pull after ~1:15 PM CT (SEGMENT_PLAN segments=h1..q4 markets=18), then NFL segment rows on the served board; tonight's
+  football watcher reads live interval actuals on them. Spend for the slate vs the estimate (~18 credits/pull: 12 pregame pulls + ~21
+  live) once tomorrow's quota reading lands.
