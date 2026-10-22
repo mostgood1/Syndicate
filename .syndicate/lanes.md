@@ -1973,6 +1973,14 @@ death, never life — do not invert it.
 - Verification: fleet HEAD == ae2cb646 and injuries.py sha256 on disk == ae2cb646's; the next WNBA fetch-injuries writes 10-22 as ESPN rows (~48, OUT/DAY-TO-DAY only, no TOR) and its props log prints INJURY_SNAPSHOT requested=<D> replaced=2026-10-22; deploys.md entry with the undo
 - Blocked by: none
 
+### clv-departures-ceiling — OPEN — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
+- Goal: The CLV departures ledger no longer silently drops departures for every sport once a busy date's file reaches 8 MiB: per-date and per-sport bytes/records and any truncated=True measured on the fleet (read-only, nice 19) before; fix on origin/main with per-(date,sport) and per-date ceilings sized from the measured max, a loud log line and dropped counts on the report, with the state.json sidecar, layer2_live_scorecard and the HOT_ARTIFACT_PATTERNS entry still working; a test that fails on the old behaviour; findings file. Fleet load is the user's decision. Side session of local_802cdcc8.
+- Files: syndicate/features/shared/clv_departure_ledger.py, tests/test_clv_departure_ledger_ceiling.py (NEW), .syndicate/findings_2026-10-22_clv_departures_ceiling.md (NEW), docs/ai_context/todo.md (new item only)
+- Hypothesis: UNTESTED: the 8 MiB departures cap has not fired yet (10-17 peak 95%) but the next big Sat/Sun crosses it; when it fires, the old loop breaks for every sport, drops the build heartbeat, and still writes state so the dropped departures are lost for good (not retried)
+- Falsification test: any date already over 8 MiB with truncated=True in the worker log (then it is a loss count, not a projection), or the busiest measured day < 50% of the cap (then the risk is overstated)
+- Verification: findings file with per-date/per-sport bytes+records and truncated grep; new tests fail on origin/main's clv_departure_ledger.py and pass on the fix; departure/layer2 scorecard/run_weekly_backtests suites green; commit on origin/main
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
