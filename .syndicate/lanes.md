@@ -1650,7 +1650,8 @@ death, never life — do not invert it.
     - Recorded in deploys.md 2026-10-21 16:56:40Z.
   - OWED (after the 10-21 games, ~11 PM CT): `scripts/basketball_posttip_rebuilds.py --since 2026-10-21` -> 0 after_tip; engine_inputs/2026-10-21 mtimes <= tip; `frozen=1` lines. Then close.
 
-### live-clv-contract-units — OPEN — opened 2026-10-21 — session 3bd0b2d4
+### live-clv-contract-units — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-21 — session 3bd0b2d4
+- GOAL VERDICT `[2026-10-22 02:36Z]`: MET. Fix d1a7ffbe on main and in refresh-worker (loaded 18:13:06Z by a peer's claimed down/up); 15 stamped live marks re-marked (-35.84 -> +1.14 pt, user-approved); first new live mark 02:27:58Z reads +7.68 pt (old unit -25.66); reader survey in todo #719. Left open elsewhere: offline scripts fit_probability_calibration.py / fit_staked_probability.py still read fill_price as American (listed in #719).
 - Goal: todo #719: CLV reads live contract fill prices (0.65) as American odds; convert at prediction_ledger._clv_pct_from_prices so order_clv / position_marks / clv_join all get it
 - Files: syndicate/features/prediction_ledger.py, tests/test_clv_contract_price_units.py
 - Hypothesis: Every live Kalshi/Polymarket closing_mark.clv_pct is ~-35pt because _implied_from_american(0.65) = 99.4%

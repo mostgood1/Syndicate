@@ -53076,3 +53076,9 @@ rather than defensive.
   - The slow tick and EXECUTION are status=ok.
 - **owed:** the first WOULD_ENTER lines; then markout300_mean / pnl_1c_sum from ENTRY_PASS once games settle (findings §6 update).
 - **undo:** `LIVE_ODDS_WORKER__SYNDICATE_INPLAY_ENTRIES_PAPER=off` + a full down/up. Or `git revert 09e86a9d`, ff, gated TERM.
+
+## 2026-10-22 02:36Z (9:36 PM CT 10-21) -- READING: first live closing mark on the fixed CLV code reads in PROBABILITY POINTS -- **MET** (closes the 18:13:06Z entry's owed verify; lane `live-clv-contract-units`, session 3bd0b2d4, todo #719)
+- **read (background poll, refresh-worker env, ledger as stored):** `NEW_LIVE_MARKS n=1 since=2026-10-21T18:13:06Z` -- `checked_at=2026-10-22T02:27:58Z venue=kalshi market=player_points entry=0.66 close=-280.0 clv_pct=7.6842 scope=same_book`. The old-unit reading of the same row would have been **-25.6601**.
+- **check by hand:** -280 = 280/380 = 73.68% implied; entry 0.66 = 66.0%; 73.68 - 66.0 = **+7.68 pt**. Matches the stamped value.
+- Stamped by refresh-worker pid 3482646 (booted 18:13:06Z on aaa988a8). The 15 re-marked rows were not touched by it (they carry `clv_correction` and `_needs_closing_mark` skips a set `clv_pct`).
+- **owed:** none for #719. One poll read errored (22:35:48Z, WSL `WSAETIMEDOUT`), retried on the next cycle.
