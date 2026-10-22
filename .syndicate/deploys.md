@@ -53392,3 +53392,26 @@ which is about the two sizing bases and not about the refusal boundary.
 - **claims released** by token 16:27:5xZ (all three). 60-min gap for every role runs to 17:18:39Z.
 - **verify (owed, watcher armed):** the first `REFUSED_SAME_AXIS_HELD` / `TRIMMED_TO_EVENT_CAP` / `REFUSED_EVENT_CAP` line in live-odds-worker.log; 0 `CONCENTRATION_SHADOW` lines after 16:18Z; 0 enforcement on a game's first leg (held_event > 0 on every line).
 - **undo:** set line 156 back to `LIVE_ODDS_WORKER__SYNDICATE_LIVE_EVENT_CONCENTRATION=shadow` (or delete it for off; or restore `.bak-event-conc-on-20261022T161746Z` if nothing changed since), then a full down/up under all three claims.
+
+## 2026-10-22 16:29:00Z (11:29 AM CT) -- FLEET ff 5e734fb6 -> 36eb357b (NO restart): NBA injury-report PDF parser fix (lane nba-injury-parser-fleet-ff, todo #725)
+- **user, in chat (session ffb7ab00):** "ff the fleet to the injury parser fix".
+- **claims:**
+  - Waited out `live-event-concentration` (all three; free at 16:28:04Z, after its 16:17Z env-only down/up on 5e734fb6).
+  - Then acquired live-odds-worker, refresh-worker and web, holder `nba-injury-parser-fleet-ff`, target 36eb357b, at 16:28Z.
+  - Released after this entry.
+- **ff:** `git merge --ff-only 36eb357b` at 16:29:00Z.
+  - Guard: HEAD == 5e734fb6, and no incoming file among the checkout's locally modified files (6 data/report files).
+  - `injuries.py` on disk == 36eb357b.
+  - Only to the fix SHA, not the github/main tip.
+- **code in the gap**, listed and reviewed in a separate call before the merge; no `vendor/`:
+  - **36eb357b** `syndicate/features/nba/source_cli/scrapers/injuries.py`, the fix.
+  - **907e9c9c** `basketball_props_smart_sim.py`: lane nba-sim-minutes-history-path's V-S set. It is read only inside `_nba_priced_first_minutes_local`, after its `mode == "off"` return. `SYNDICATE_NBA_SIM_MINUTES_PRICED_FIRST` is absent from the fleet env, so it is inert.
+  - Research scripts no role runs: `scripts/nba_sim_minutes_audit.py`, `scripts/nba_injury_pdf_reparse.py`.
+  - Tests.
+- **restart: none.** `fetch-injuries` always runs as a subprocess. Callers: the NBA props refresh (`refresh_nba_oddsapi_props.py`:2599) and the live refresh loop (`live_refresh_loop._fetch_injuries`). Each new run imports the new parser.
+- **baseline (read before the ff):**
+  - Fleet `raw/injuries.csv`, written 15:59:24Z, held 12 rows for 2026-10-22, 2 of them off the current roster.
+  - `CLE 'Khalifa Tendinopathy Diop' OUT` and `PHI 'Dean Tear Wade' QUESTIONABLE`.
+- **verify:** the first `injuries.csv` rewrite after 16:29:00Z holds 0 off-roster NBA names for its date, and Diop and Wade appear under their own names. Also owed: the next NBA props refresh's `SMART_SIM_REUSE_STALE_EXCLUSIONS` drift lines carry no reason word inside a name. **READ 16:30:45Z (11:30 AM CT), first rewrite after the ff (production's own fetch, 1 min 45 s later): 12 rows for 2026-10-22, 0 off-roster (team, name), 0 off any roster; `CLE 'Khalifa Diop' OUT`, `PHI 'Dean Wade' QUESTIONABLE` -- the same two players the old parser had spliced at 15:59Z. MET.** The props-refresh drift-line half stays owed (next NBA refresh).
+- **undo:** `git merge --ff-only` cannot go back. To revert, check out the old file: `git checkout 5e734fb6 -- syndicate/features/nba/source_cli/scrapers/injuries.py` in `~/Syndicate`. No restart is needed, for the same subprocess reason.
+
