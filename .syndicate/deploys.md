@@ -53245,3 +53245,14 @@ re-inheriting it.
 - **verify:** on disk `IN_PLAY_WINDOW_HOURS = 3.0` (fleet line 225). Live reading owed tonight (10-22: CLE @ PHI 6 PM CT, DEN @ OKC 8:30 PM):
   `IN_PLAY_ONLY events_in_play` drops CLE @ PHI by 9:00 PM CT (3 h after its tip) and never exceeds the games actually live; and the
   board's DEN @ OKC (pregame) rows stay on the board while CLE @ PHI is in play (the owed clause from 10-21).
+
+## 2026-10-22 14:28:39Z -- FLEET DATA: vendored WNBA package removed from the data disk (lane vendor-final-leftovers)
+- User 2026-10-22: "do all four in that order" (group 2). `<data>/wnba_source/src/` (135 files, 5.8 MB, the old vendored
+  wnba_betting package, last copied 10-12 and read by nothing in production) archived to
+  `<data>/_archive/vendor_wnba_src_fleet_20261022T142838Z.tar.gz` (135/135 files, readable) and removed. Before removal:
+  0 open handles under it, no live python with it on PYTHONPATH (readable /proc only), the fleet's deployed code names it
+  only in research scripts (now fixed on main, 09d5795c / 7a3cf4cf). The git mirror tracks 0 `.py` under data/, so the
+  boot seed cannot recreate it. No claim / restart: a data-dir removal on no reader.
+- Still on the data disk, deliberately: `<data>/mlb_source/sim_engine/live_prop_ranking.py` (byte-identical to the repo
+  module; the DEPLOYED cards.py still execs it until 09d5795c is loaded) and `<data>/mlb_source/source_artifacts/
+  sim_engine/live_prop_ranking.py` (stale copy, unread). Both go after 09d5795c is on the fleet AND web + workers loaded it.
