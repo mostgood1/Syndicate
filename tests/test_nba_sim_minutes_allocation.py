@@ -186,6 +186,24 @@ def test_the_slate_date_not_the_asof_date_picks_the_snapshot(tree, monkeypatch):
     assert np.allclose(on_wrong_date, _derive(tree, "BOS", None, monkeypatch))
 
 
+def test_priced_match_ignores_punctuation_and_suffixes(tree, monkeypatch, capsys):
+    """The books write "Jabari Smith Jr" / "DeAnthony Melton" where props_predictions has "Jabari Smith Jr." /
+    "De'Anthony Melton" -- measured 10-21, the exact-key match counted MIL 4 priced instead of 6."""
+    props = pd.DataFrame(_props_rows())
+    props.loc[props["player_name"] == _name("BOS", 0), "player_name"] = "Jabari Smith Jr."
+    props.loc[props["player_name"] == _name("BOS", 1), "player_name"] = "De'Anthony Melton"
+    props.to_csv(tree / f"props_predictions_{DATE}.csv", index=False)
+    snap = tree.parent / "raw" / f"odds_nba_player_props_{DATE}.csv"
+    text = snap.read_text(encoding="utf-8").replace(_name("BOS", 0), "Jabari Smith Jr").replace(_name("BOS", 1), "DeAnthony Melton")
+    snap.write_text(text, encoding="utf-8")
+    monkeypatch.setenv(FLAG, "on")
+    b._SMARTSIM_WORKER_STATE = {"date_str": DATE}
+    view = b._build_local_smart_sim_module(processed_root=tree, league_code="nba")
+    team_df = props[props["team"] == "BOS"].reset_index(drop=True)
+    b._derive_sim_minutes_local(smart_sim_module=view, team_df=team_df, date_str="2026-10-20", team_tri="BOS", league_code="nba")
+    assert "team=BOS pool=12 priced=6 engaged=1" in capsys.readouterr().out
+
+
 def test_wnba_is_never_touched(tree, monkeypatch, capsys):
     off = _derive(tree, "BOS", None, monkeypatch, league="wnba")
     on = _derive(tree, "BOS", "on", monkeypatch, league="wnba")

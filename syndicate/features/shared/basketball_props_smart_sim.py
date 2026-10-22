@@ -3252,8 +3252,13 @@ def _priced_first_fill_local(base, *, total: float, caps, priced):
 
 
 def _market_priced_keys_for_team_local(*, processed_root, raw_root, date_str, team_tri) -> set[str]:
-    """`_norm_name_key`s of every player with a posted player-prop line on TEAM's game, from the date's props snapshot
-    (the one the WNBA pool prune protects). Empty when the snapshot has no line for that game."""
+    """Keys of every player with a posted player-prop line on TEAM's game, from the date's props snapshot (the one the
+    WNBA pool prune protects). Empty when the snapshot has no line for that game. The key is the orchestrator's
+    punctuation- and suffix-blind `normalize_player_name_key`, not `_norm_name_key`: the books write "Jabari Smith Jr"
+    and "DeAnthony Melton" where props_predictions has "Jabari Smith Jr." and "De'Anthony Melton" (10-21: 2 of 6
+    priced MIL players and 1 of 6 HOU missed under `_norm_name_key`)."""
+    from syndicate.features.basketball_engine.orchestrator.player_names import normalize_player_name_key
+
     out: set[str] = set()
     if not (processed_root and date_str and team_tri):
         return out
@@ -3265,7 +3270,7 @@ def _market_priced_keys_for_team_local(*, processed_root, raw_root, date_str, te
     team = str(team_tri).strip().upper()
     for (home, away), names in (by_game or {}).items():
         if team in (str(home).strip().upper(), str(away).strip().upper()):
-            out.update(k for k in (_norm_name_key(n) for n in names) if k)
+            out.update(k for k in (normalize_player_name_key(n) for n in names) if k)
     return out
 
 
@@ -3288,7 +3293,9 @@ def _nba_priced_first_minutes_local(m, team_df, mins, caps, *, total: float, dat
         raw = getattr(paths, "data_raw", None) or (Path(processed).parent / "raw" if processed else None)
         priced_keys = _market_priced_keys_for_team_local(processed_root=processed, raw_root=raw, date_str=slate,
                                                          team_tri=team_tri)
-        keys = m._frame_series(team_df, "player_name", "").map(_norm_name_key)
+        from syndicate.features.basketball_engine.orchestrator.player_names import normalize_player_name_key
+
+        keys = m._frame_series(team_df, "player_name", "").map(normalize_player_name_key)
         priced = keys.isin(priced_keys).to_numpy(dtype=bool)
         n_priced = int(priced.sum())
         alt = None

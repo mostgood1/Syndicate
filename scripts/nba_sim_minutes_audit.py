@@ -447,6 +447,100 @@ def print_replay(rep: Mapping[str, Any], rule: Mapping[str, Any]) -> None:
     print(f"  DNP sim min per engaged side: off {rule['dnp_sim_min_per_side_off']:.1f} -> on {rule['dnp_sim_min_per_side_on']:.1f}")
 
 
+# --- arms: two scratch worker runs (switch off / on) on the same frozen inputs -------------------------------------
+
+
+def truth_points(processed: Path, date_str: str) -> Dict[str, float]:
+    """{name_key: points} from player_logs.csv rows of the date (keyed by name, as the #714 reading joined them)."""
+    out: Dict[str, float] = {}
+    path = Path(processed) / "player_logs.csv"
+    if not path.is_file():
+        return out
+    with path.open(encoding="utf-8", errors="replace", newline="") as fh:
+        for r in csv.DictReader(fh):
+            if str(r.get("GAME_DATE") or "")[:10] == date_str:
+                try:
+                    out[name_key(r.get("PLAYER_NAME"))] = float(r.get("PTS") or 0.0)
+                except ValueError:
+                    pass
+    return out
+
+
+def _iqr_sd(z: List[float]) -> float:
+    if len(z) < 4:
+        return float("nan")
+    s = sorted(z)
+    q = lambda p: s[min(len(s) - 1, max(0, int(round(p * (len(s) - 1)))))]  # noqa: E731
+    return (q(0.75) - q(0.25)) / 1.349
+
+
+def arms(off_processed: Path, on_processed: Path, truth_processed: Path, raw: Path, date_str: str) -> Dict[str, Any]:
+    """The pre-registered SECONDARY: served pts_mean, OFF vs ON, against player_logs points, over pool players who
+    played on ENGAGED sides (a side where any player's ON min_mean differs from OFF). Also the minutes, the points
+    line and the served width (IQR(z)/1.349, z = (actual - pts_mean) / pts_sd, played priced players)."""
+    box, pts = load_box(truth_processed, date_str), truth_points(truth_processed, date_str)
+    props = list(pretip_prop_rows(truth_processed, raw, date_str))
+    lines, priced = main_points_lines(props), {name_key(r.get("player_name")) for r in props}
+    off_sims, on_sims = load_sims(off_processed, date_str), load_sims(on_processed, date_str)
+    rows: List[Dict[str, Any]] = []
+    for game, (on_sim, _m) in on_sims.items():
+        off_sim = (off_sims.get(game) or (None, 0))[0]
+        if off_sim is None:
+            continue
+        home, away = game.split("_", 1)
+        for side, team in (("home", home), ("away", away)):
+            on_p = {name_key(r.get("player_name")): r for r in (on_sim.get("players") or {}).get(side) or []}
+            off_p = {name_key(r.get("player_name")): r for r in (off_sim.get("players") or {}).get(side) or []}
+            engaged = any(abs(float(on_p[k].get("min_mean") or 0) - float(off_p[k].get("min_mean") or 0)) > 1e-6
+                          for k in on_p if k in off_p)
+            for k in sorted(set(on_p) & set(off_p)):
+                bx = (box.get(team) or {}).get(k)
+                rows.append({"side": f"{date_str}:{team}", "key": k, "engaged": engaged, "played": bx is not None,
+                             "box_starter": bool((bx or {}).get("starter")), "priced": k in priced,
+                             "actual_min": (bx or {}).get("min"), "actual_pts": pts.get(k) if bx is not None else None,
+                             "line_pts": lines.get(k),
+                             **{f"{arm}_{f}": float(p[k].get(f) or 0.0) for arm, p in (("off", off_p), ("on", on_p))
+                                for f in ("min_mean", "pts_mean", "pts_sd")}})
+    use = [r for r in rows if r["engaged"] and r["played"] and r["actual_pts"] is not None]
+
+    def by_side(f, pred=lambda r: True):
+        out: Dict[str, List[float]] = {}
+        for r in use:
+            if pred(r):
+                out.setdefault(r["side"], []).append(f(r))
+        return out
+
+    res = {
+        "rows": len(rows), "engaged_sides": len({r["side"] for r in rows if r["engaged"]}), "sides": len({r["side"] for r in rows}),
+        "points_paired": cluster_ci(by_side(lambda r: abs(r["on_pts_mean"] - r["actual_pts"]) - abs(r["off_pts_mean"] - r["actual_pts"]))),
+        "points_paired_priced": cluster_ci(by_side(lambda r: abs(r["on_pts_mean"] - r["actual_pts"]) - abs(r["off_pts_mean"] - r["actual_pts"]), lambda r: r["priced"])),
+        "minutes_paired": cluster_ci(by_side(lambda r: abs(r["on_min_mean"] - r["actual_min"]) - abs(r["off_min_mean"] - r["actual_min"]))),
+        "pts_bias_off_starters": cluster_ci(by_side(lambda r: r["off_pts_mean"] - r["actual_pts"], lambda r: r["box_starter"])),
+        "pts_bias_on_starters": cluster_ci(by_side(lambda r: r["on_pts_mean"] - r["actual_pts"], lambda r: r["box_starter"])),
+        "line_gap_off_starters": cluster_ci(by_side(lambda r: r["off_pts_mean"] - r["line_pts"], lambda r: r["box_starter"] and r["line_pts"] is not None)),
+        "line_gap_on_starters": cluster_ci(by_side(lambda r: r["on_pts_mean"] - r["line_pts"], lambda r: r["box_starter"] and r["line_pts"] is not None)),
+        "line_gap_off_bench": cluster_ci(by_side(lambda r: r["off_pts_mean"] - r["line_pts"], lambda r: not r["box_starter"] and r["line_pts"] is not None)),
+        "line_gap_on_bench": cluster_ci(by_side(lambda r: r["on_pts_mean"] - r["line_pts"], lambda r: not r["box_starter"] and r["line_pts"] is not None)),
+        "width_off": _iqr_sd([(r["actual_pts"] - r["off_pts_mean"]) / r["off_pts_sd"] for r in use if r["priced"] and r["off_pts_sd"] > 0]),
+        "width_on": _iqr_sd([(r["actual_pts"] - r["on_pts_mean"]) / r["on_pts_sd"] for r in use if r["priced"] and r["on_pts_sd"] > 0]),
+        "width_n": sum(1 for r in use if r["priced"]),
+    }
+    m, lo, hi, n = res["points_paired"]
+    res["secondary_verdict"] = "FAIL" if lo > 0 else "NOT FAIL"
+    res["detail"] = rows
+    return res
+
+
+def print_arms(res: Mapping[str, Any]) -> None:
+    print(f"ARMS: {res['engaged_sides']} of {res['sides']} sides engaged; {res['rows']} player rows")
+    for name in ("points_paired", "points_paired_priced", "minutes_paired", "pts_bias_off_starters", "pts_bias_on_starters",
+                 "line_gap_off_starters", "line_gap_on_starters", "line_gap_off_bench", "line_gap_on_bench"):
+        m, lo, hi, n = res[name]
+        print(f"  {name:22} {m:+.3f} [{lo:+.3f}, {hi:+.3f}] n={n}")
+    print(f"  SECONDARY (points, must not FAIL): {res['secondary_verdict']}")
+    print(f"  served pts width IQR(z)/1.349, played priced (n={res['width_n']}): off {res['width_off']:.3f} on {res['width_on']:.3f}")
+
+
 def _fmt(x: Optional[float], nd: int = 1) -> str:
     return "  -  " if x is None else f"{x:+.{nd}f}" if nd == 1 else f"{x:.{nd}f}"
 
@@ -532,8 +626,19 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--json", type=Path, default=None)
     ap.add_argument("--replay", action="store_true", help="OFF vs priced-first ON on production engine_inputs")
     ap.add_argument("--min-rows", type=int, default=0, help="replay: rows below which the verdict stays INCONCLUSIVE")
+    ap.add_argument("--arms", nargs=2, type=Path, default=None, metavar=("OFF_PROCESSED", "ON_PROCESSED"),
+                    help="score two scratch arms' sims; --processed is the TRUTH root (box, player_logs, props history)")
     args = ap.parse_args(argv)
     raw = args.raw or (args.processed.parent / "raw")
+    if args.arms:
+        for d in ([x.strip() for x in args.dates.split(",")] if args.dates else []):
+            res = arms(args.arms[0], args.arms[1], args.processed, raw, d)
+            print(f"DATE {d}")
+            print_arms(res)
+            if args.json:
+                args.json.write_text(json.dumps(res, indent=1, default=str), encoding="utf-8")
+                print(f"\nwrote {args.json}")
+        return 0
     dates = [d.strip() for d in args.dates.split(",") if d.strip()] if args.dates else sim_dates(args.processed, args.since)
     dates = [d for d in dates if (args.processed / "rotation_stints" / f"player_checks_{d}.csv").is_file()]
     if args.replay:
