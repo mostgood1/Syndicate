@@ -54031,3 +54031,17 @@ which is about the two sizing bases and not about the refusal boundary.
 - **reading:** `CHEAT_SHEET nhl date=2026-10-23 groups=30/170 sticky=0 locked=31 rows=48 frozen=0 picks=12 secs=108.2` at 21:33:02Z. Sheet `generated_at` 21:32:59Z: 47 of 48 rows carry `pool` {rank, of, cap, sticky} (the 48th has none), `primary_lock` 31 entries = 31 rows `primary_locked`, pool record 30 groups all `built_on` 2026-10-23. Consistency 4 rows, **all 4 locked**, pool ranks 5 / 9 / 10 (+1 without a pool).
 - `sticky=0` was PREDICTED: no earlier pool existed for 10-23 (this was the day's first build on the new code). Build time 108 s, against 142-193 s for the 30-group NHL builds of 10-21/22 -- no cost from the change.
 - **owed (2 of 2):** 10-24 12:30 PM CT build: NHL `sticky=` > 0 (groups the 8:30 AM build chose and the 12:30 PM top 30 dropped), and the 8:30 AM consistency rows still in the section unless their line was pulled. Scheduled task `cheat-sheet-stable-day-reading-1024` reads it.
+
+## 2026-10-23 21:39:03Z -- FLEET ff db292883 -> 5ec0f1a0 + live-odds-worker ROLE restart: all-sports in-game entry CODE loaded, switch OFF (holder `inplay-all-sports-code`, session 332cb014, coordinator) -- **MET (code loaded); the live switch is the user's step**
+- **user (332cb014's chat):** "we need to turn it on and test", then "ok we need to turn it on for all sports". in-game-trading built `5ec0f1a0` (NHL/NBA/NFL/NCAAF/MLB x spreads/totals/h2h, 1 contract IOC, $50/day; 33 tests).
+- **Turning it ON is refused** by both sessions' permission checks on a relay. It is the user's step: run the env-append + down/up commands themselves, or add a permission rule in session 15ceeb14.
+- **runtime diff db292883..5ec0f1a0:** worker +6/-3, inplay_entries_live +6/-6, inplay_entries_paper +202/-65. Nothing else.
+- **restart:**
+  - ff at 21:39:03Z.
+  - Gate: 0 children and the last 2 RECONCILE lines clean. It cleared at 21:46:41Z, and one TERM went to pid 335936.
+  - `STOP_SIGNAL` was logged at 21:46:41.271Z. The worker took ~2 min to stop cleanly; the supervisor logged "exited code=0 after 6642s".
+  - New pid **400520**, lstart 21:48:58Z. My script's 2-min pid wait expired just before it (exit 6, NO_NEW_PID); re-read at 21:49:10Z.
+  - Claim released at 21:49:22Z.
+- **env (role restart, unchanged):** EXECUTION_MODE=live, ARMED=1, LIVE_EVENT_CONCENTRATION=on. INPLAY_ENTRIES absent = OFF, so only the all-sports PAPER rule runs. OddsAPI cost: ~9 credits/live sport/min, up to ~2.7k/h on a full slate.
+- **owed:** in-game-trading's confirmation that the multi-sport paper loop books, and an OddsAPI credits/h reading.
+- **lesson:** a live-odds-worker TERM can take ~2 min to stop. Role-restart scripts should wait >= 4 min for the new pid.
