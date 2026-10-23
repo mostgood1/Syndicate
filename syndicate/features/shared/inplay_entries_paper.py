@@ -95,14 +95,17 @@ def team_match(sub: str, name: str) -> bool:
     return bool(s) and (n.startswith(s) or s in n)
 
 
-def book_fair(event: Mapping[str, Any], team: str, line: float, poll_t: float) -> tuple[float | None, int]:
+def book_fair(
+    event: Mapping[str, Any], team: str, line: float, poll_t: float, *,
+    min_books: int = MIN_BOOKS, max_quote_age_s: float = MAX_BOOK_QUOTE_AGE_S,
+) -> tuple[float | None, int]:
     """Median no-vig P(`team` covers -`line`) over fresh books with that EXACT line -> (fair, n_books)."""
     ps = []
     for bk in event.get("bookmakers") or []:
         for m in bk.get("markets") or []:
             if m.get("key") != "spreads":
                 continue
-            if poll_t - (_ts(m.get("last_update")) or 0.0) > MAX_BOOK_QUOTE_AGE_S:
+            if poll_t - (_ts(m.get("last_update")) or 0.0) > max_quote_age_s:
                 continue
             oc = m.get("outcomes") or []
             if len(oc) != 2:
@@ -116,7 +119,7 @@ def book_fair(event: Mapping[str, Any], team: str, line: float, poll_t: float) -
                 pt = _float(o.get("point"))
                 if pt is not None and abs(pt + line) < 1e-9 and team_match(team, o.get("name")):
                     ps.append(p)
-    return (statistics.median(ps) if len(ps) >= MIN_BOOKS else None), len(ps)
+    return (statistics.median(ps) if len(ps) >= min_books else None), len(ps)
 
 
 def decide(
@@ -127,13 +130,20 @@ def decide(
     since_score_s: float | None,
     mid_move_60s: float | None,
     now_t: float,
+    params: Mapping[str, Any] | None = None,
 ) -> dict[str, Any] | None:
-    """The entry rule for ONE Kalshi spread rung. PURE. The best qualifying leg, or None."""
-    if event is None or poll_t is None or now_t - poll_t > MAX_BOOK_POLL_AGE_S:
+    """The entry rule for ONE Kalshi spread rung. PURE. The best qualifying leg, or None.
+
+    `params` overrides the module constants (min_edge, min_books, score_quiet_s,
+    mid_max_move, max_book_quote_age_s, max_book_poll_age_s, legs, ask_lo, ask_hi)
+    so `scripts/inplay_rule_sweep.py` replays THIS function, not a copy. Absent = today's rule.
+    """
+    pr = dict(params or {})
+    if event is None or poll_t is None or now_t - poll_t > pr.get("max_book_poll_age_s", MAX_BOOK_POLL_AGE_S):
         return None
-    if since_score_s is None or since_score_s <= SCORE_QUIET_S:
+    if since_score_s is None or since_score_s <= pr.get("score_quiet_s", SCORE_QUIET_S):
         return None
-    if mid_move_60s is None or mid_move_60s > MID_STABLE_MAX_MOVE:
+    if mid_move_60s is None or mid_move_60s > pr.get("mid_max_move", MID_STABLE_MAX_MOVE):
         return None
     if str(market.get("status") or "") != "active":
         return None
@@ -142,16 +152,20 @@ def decide(
     if " wins by" not in sub or line is None:
         return None
     team = sub.split(" wins by")[0]
-    fair, n = book_fair(event, team, line, poll_t)
+    fair, n = book_fair(event, team, line, poll_t, min_books=int(pr.get("min_books", MIN_BOOKS)),
+                        max_quote_age_s=float(pr.get("max_book_quote_age_s", MAX_BOOK_QUOTE_AGE_S)))
     if fair is None:
         return None
     best = None
+    legs = pr.get("legs", ("yes", "no"))
+    lo, hi = float(pr.get("ask_lo", 0.05)), float(pr.get("ask_hi", 0.95))
+    min_edge = float(pr.get("min_edge", MIN_EDGE))
     for leg, ask, p in (("yes", _float(market.get("yes_ask_dollars")), fair),
                         ("no", _float(market.get("no_ask_dollars")), 1 - fair)):
-        if ask is None or not (0.05 <= ask <= 0.95):
+        if leg not in legs or ask is None or not (lo <= ask <= hi):
             continue
         edge = p - ask - taker_fee_one(ask)
-        if edge >= MIN_EDGE and (best is None or edge > best["edge"]):
+        if edge >= min_edge and (best is None or edge > best["edge"]):
             best = {"leg": leg, "ask": ask, "fair": round(p, 4), "edge": round(edge, 4), "n_books": n,
                     "team": team, "line": line}
     return best

@@ -360,3 +360,32 @@ Two-sided in-game trading has two halves, and tonight separates them.
 - On NBA TOTAL the baseline reads -0.0125 [-0.028, +0.0003] with markout -0.5c. It is the only cell leaning the right way on both clauses. 4 games, so it is not a lead yet.
 
 **Known gap:** the book consensus mapped 1 of 3 NCAAF games: team-name matching against OddsAPI's college names. The books are the reference row only. The score/time and Kalshi rows for all 3 games are complete.
+
+
+## 9. Entry-rule optimisation loop (2026-10-23, lane in-game-trading; user: "Leave it off; first work on faster optimization of the entry rule, then revisit")
+
+**Tool:** `scripts/inplay_rule_sweep.py` replays `inplay_entries_paper.decide` over every recorded night (C:/tmp/inplay_<date>/).
+- Grid: 2,160 configs = edge 0.02-0.12 x score-quiet 60-600 s x books 3-8 x Kalshi 60 s move 0.01-0.05 x legs x ask band.
+- Books the first qualifying sample per (ticker, leg). Scores markout +300 s and settled P&L per contract.
+- Selects WALK-FORWARD BY NIGHT.
+- `tests/test_inplay_rule_sweep.py` proves its fast filter equals `decide()` sample by sample (64 configs, both branches).
+- A rule change now costs a replay (~2 min), not a night.
+
+**Nights:** 10-20 (my recorder) and 10-22 (stage-2 nightly). Read 2026-10-23 ~13:30Z.
+
+| sport | deployed rule, pooled | walk-forward pick: in-sample -> unseen night | configs positive on BOTH nights |
+|---|---|---|---|
+| NHL (20 games) | n=32, pnl -5.6c/ct, mk300 -5.6c | +22.7c -> **-9.8c** (deployed rule: -8.2c that night) | **0 of 324** with >= 20 settled |
+| NBA (4 games) | n=8, pnl -7.7c, mk300 +0.8c | +13.5c -> **-17.1c** | **0 of 33** |
+| NCAAF+NFL (4 games, 1 night) | n=41, pnl -7.5c, mk300 -2.7c | no out-of-sample night yet | n/a |
+
+**VERDICT:**
+- No threshold setting of this rule is positive out of sample.
+- In-sample "winners" flip sign between nights (e.g. +50c then -9c). That is fitting noise.
+- The defect is the FAIR, not the gates. The book consensus lags Kalshi (F1: Kalshi moves first), so its "edges" are mostly Kalshi already having moved. Stage 2's score/time fair is also a NO-GO on NHL (§8, 0eb66ed0).
+- **Live entries stay OFF** (437a6249 is on the fleet with SYNDICATE_INPLAY_ENTRIES absent).
+
+**Next levers, in order:**
+- (1) A different FAIR, not new thresholds: a sharper/faster in-play source, or a model that beats Kalshi's mid on the stage-2 scoreboard.
+- (2) Run this sweep nightly beside the scoreboard, so any cell that turns consistently positive out of sample is seen the morning after.
+- (3) Re-run the walk-forward at >= 5 nights before any rule change ships.
