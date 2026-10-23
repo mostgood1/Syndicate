@@ -4050,3 +4050,24 @@ mean of the prior ratio. PASS: Step A's gates, plus team-game |AST − actual| M
   30 teams, so the spread is real (condition 1 met).
 - Condition 2 (priors' team ratio r ≥ 0.3) is NOT measured. `--dump-priors` writes neither `_prior_ast_pm` nor
   the team, so measuring it needs a harness change.
+
+### #5b STEP-B PRECONDITION — RESULT 2026-10-23 16:04Z: MET (r = 0.515 ≥ 0.3); step B launched as pre-registered
+
+**Measured:** priors dump on the 12 sweep dates (P5b_priors, 12/12, 0 errors; 149 lineup frames, 1,615 player rows,
+0 missing ast/fgm priors; harness 001c6abe). Each team's prior AST/FGM = Σ ast_pm·sim_min / Σ fgm_pm·sim_min,
+pooled over its frames, against its real FIT season AST/FGM.
+
+**Result:**
+- 30/30 teams;
+- **Pearson r = 0.515**;
+- the minutes-weighted league ref = **0.6286**.
+
+**Caution (measured):**
+- The slope of real on prior is **0.31**, and the prior team ratio's sd is 0.069 against the real 0.041. So the
+  priors spread teams about 1.7× wider than reality.
+- The pre-registered mechanism scales by the full ratio (clip 0.8–1.25), so it may over-disperse.
+- A shrink toward the league was NOT pre-registered. If step B loses on team-game MAE, that is the likely reason,
+  and a shrink parameter would be its own pre-registration.
+
+**Step B run:** B5b_team, assisted_make_rate 0.6368, assist_team_prior on, ref 0.6286. It is graded against
+A5b_0637 (team-game AST MAE 4.47) and the step-A gates.
