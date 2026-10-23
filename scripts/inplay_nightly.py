@@ -15,6 +15,9 @@ Run by the Windows scheduled task "Syndicate inplay nightly" (user-approved
      fails for it), then run inplay_edge_report.py, inplay_fair_score.py and
      inplay_scoreboard.py: <dir>/scoreboard.md for the night and
      <root>/inplay_scoreboard.md for every night so far.
+  6. replay the in-game ENTRY rule over every recorded night
+     (inplay_rule_sweep.py, walk-forward by night), NHL then NBA spreads:
+     <root>/inplay_rule_sweep.md.
 
 It sends no order, writes nothing on the fleet, and reads only ODDS_API_KEY.
 """
@@ -36,7 +39,8 @@ HERE = Path(__file__).resolve().parent
 RUNNER = HERE.parent
 REPO = r"C:\Users\tempadmin\OneDrive\Coding\Syndicate"
 RUNNER_FILES = ["scripts/inplay_recorder.py", "scripts/inplay_edge_report.py", "scripts/inplay_fair_score.py",
-                "scripts/inplay_scoreboard.py", "scripts/inplay_nightly.py", "syndicate/features/shared/venue_fees.py"]
+                "scripts/inplay_scoreboard.py", "scripts/inplay_nightly.py", "scripts/inplay_rule_sweep.py",
+                "syndicate/features/shared/venue_fees.py", "syndicate/features/shared/inplay_entries_paper.py"]
 ESPN = "https://site.api.espn.com/apis/site/v2/sports/{path}/scoreboard?dates={ymd}{q}"
 ESPN_PATH = {"nba": ("basketball/nba", ""), "nhl": ("hockey/nhl", ""), "nfl": ("football/nfl", ""),
              "ncaaf": ("football/college-football", "&groups=80&limit=400")}
@@ -178,6 +182,18 @@ def main():
     run(root, [py, str(RUNNER / "scripts" / "inplay_scoreboard.py"), "--root", str(root),
                "--out", str(root / "inplay_scoreboard.md"), "--json-out", str(root / "inplay_scoreboard.json")],
         root / "inplay_scoreboard.stdout", timeout=3600)
+    nights = sorted(str(p.parent) for p in root.glob("inplay_*/kalshi.jsonl"))
+    parts = []
+    for sport in ("nhl", "nba"):
+        so = root / f"inplay_rule_sweep_{sport}.stdout"
+        run(root, [py, str(RUNNER / "scripts" / "inplay_rule_sweep.py"), "--nights", *nights, "--sports", sport],
+            so, timeout=3 * 3600)
+        body = so.read_text(encoding="utf-8", errors="replace")
+        parts.append(f"## {sport.upper()} spreads\n\n```\n{body}```\n")
+    names = ", ".join(Path(n).name.replace("inplay_", "") for n in nights)
+    (root / "inplay_rule_sweep.md").write_text(
+        f"# In-game entry-rule sweep (walk-forward by night)\n\nNights: {len(nights)} ({names}). Written by the {date} run.\n\n"
+        + "\n".join(parts), encoding="utf-8")
     log(root, f"DONE {date}")
     return 0
 
