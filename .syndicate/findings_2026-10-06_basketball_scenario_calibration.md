@@ -4094,3 +4094,24 @@ give about 0.06.
 - Step A fails by rule (gate referenced the subsample).
 - Step B is not proven at 12 dates.
 - The decision rests on the full FIT (real AST/FGM 0.6368), which needs the user.
+
+### #5b FULL FITs (A and B) — PRE-REGISTRATION 2026-10-23 17:00Z (user choice in chat: "Two full FITs, A and B")
+
+**Runs:** fit_5bA (`assisted_make_rate=0.6368`) and fit_5bB (+ `assist_team_prior=1`, `assist_team_ref=0.6286`). The
+fit_r2b config otherwise; 109 FIT dates; 3 workers each at nice 19; research copy `code_r5b` (main 3152b1e2 engine +
+outcome-neutral diag counters).
+
+**Gates** (on the games paired across fit_r2b / A / B):
+- (1) AST/FGM within **0.6368 ± 0.010** (the FIT real);
+- (2) unmoved vs fit_r2b (assists touch no points or fouls; tolerances are noise-sized):
+  - total paired |Δ| < 0.2 per game;
+  - FTA ± 0.15, PF ± 0.2, foul-outs ± 0.01 (and still inside 0.193 ± 0.04), 3PA ± 0.2;
+  - quarter shares inside the real CI;
+- (3) **B adopted over A only if** team-game |AST − actual| MAE(B) − MAE(A) < 0, with its 95% CI (paired by
+  team-game, 2,000-resample bootstrap clustered by game) excluding 0.
+
+Reported: r(sim, real team-game AST/FGM) per arm; and the per-player served AST mean |mean − actual| per arm, if the
+actual player boxes join.
+
+**Outcome:** the passing arm (B if gate 3 holds, else A) becomes the round-2b + #5b candidate config. Production only
+via nba_engine_config.json, after the forward test.
