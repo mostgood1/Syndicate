@@ -329,3 +329,34 @@ Two-sided in-game trading has two halves, and tonight separates them.
 - A findings update once >= 20 games per sport are in (NHL ~2 nights; NBA ~6-10 nights; NFL ~2 weekends).
 - The 2026-12-31 stop.
 - If the host sleeps (Modern Standby), a night is lost silently. Read `C:/tmp/inplay_nightly.log` for a `DONE <date>` per game night.
+
+## 9. Night 2 (10-22) and the first 20-game read: NHL (2026-10-23, session f7ccc844)
+
+**The run.** The first scheduled night ran end to end:
+- The recorder ran 22:30Z-05:24Z and stopped by itself 30 min after the last final (`slate_final games=18`). `DONE 2026-10-22` was logged at 05:26:56Z.
+- 18 games: 2 NBA, 12 NHL, 1 NFL, 3 NCAAF. 63,794 rows were scored.
+- OddsAPI: 1,098 calls x 9 = **~9.9k credits** for the night. The x-requests-used header moved 60.9k over the same window, but that key is shared with the fleet.
+- Book polling began at the first tip (23:03:31Z). There was 1 Kalshi 429, which was backed off and recovered.
+
+**Cumulative, 2 nights (10-20 + 10-22), 88,249 rows.** NHL is the first sport past the bar.
+
+| fair | cell | games | states | dBrier vs Kalshi mid | markout +300 s (c) | verdict |
+|---|---|---|---|---|---|---|
+| score_time | NHL GAME | 21 | 3,006 | +0.0036 [-0.0041, +0.0114] | -1.91 [-2.71, -1.18] | **NO-GO** |
+| score_time | NHL SPREAD | 21 | 3,115 | -0.0012 [-0.0093, +0.0079] | -2.41 [-2.74, -2.09] | **NO-GO** |
+| books | NHL GAME | 18 | 2,527 | +0.0010 [-0.0020, +0.0037] | -1.05 [-1.55, -0.43] | collecting |
+| books | NHL SPREAD | 18 | 2,612 | +0.0037 [-0.0013, +0.0086] | -2.27 [-3.25, -1.21] | collecting |
+
+- **The NHL score/time baseline is a pre-registered NO-GO on both cells.**
+  - Its Brier is indistinguishable from Kalshi's mid.
+  - The sides it calls positive lose 1.9-2.4c at +300 s, with CIs well below 0.
+- The 10-20 hint that it beat Kalshi on NHL spreads (-0.012) has shrunk to -0.001 at twice the games.
+- This is the bar a sim-based NHL fair must clear. It shows that score and clock carry no information Kalshi has not already priced.
+
+**Watch cell** (NHL spreads away from a score, book-consensus episodes, +300 s): **-0.93c [-2.63, +0.80], 545 episodes, 20 games**, down from +1.06c on 10-20 alone. The lead did not hold. Untraded, as before.
+
+**Other sports at 2 nights:** NBA 4 games, NCAAF 3, NFL 1. All are collecting.
+- The NBA re-sim and the baseline are both worse than Kalshi on NBA GAME (+0.07 / +0.05, CIs touching 0).
+- On NBA TOTAL the baseline reads -0.0125 [-0.028, +0.0003] with markout -0.5c. It is the only cell leaning the right way on both clauses. 4 games, so it is not a lead yet.
+
+**Known gap:** the book consensus mapped 1 of 3 NCAAF games: team-name matching against OddsAPI's college names. The books are the reference row only. The score/time and Kalshi rows for all 3 games are complete.

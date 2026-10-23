@@ -286,6 +286,7 @@ The four signal-engine / near-miss lanes stay OPEN on purpose: their file claims
   - Pre-registered GO: Brier better than Kalshi's mid (CI) over >=300 states / >=20 games AND markout +300 s CI > 0. Stop 2026-12-31.
   - **Decision 2:** approve the measurement, plus a nightly recorder (a scheduled task).
   - **BUILT 2026-10-22 (session f7ccc844; user "Yes, all 4 sports"):** nightly scheduled task `Syndicate inplay nightly` (09:00 CT, Idle, runner `C:/tmp/inplay_runner/` synced from origin/main) records NBA/NHL/NFL/NCAAF and writes `C:/tmp/inplay_scoreboard.md`. Score/time baseline (constants fixed before scoring) + per-(fair, sport, market) scoreboard, game-clustered CIs. 10-20 read: baseline ties Kalshi on NBA Brier, worse on NHL GAME, every positive side marks out -1.2..-2.5c; watch cell +1.06c [-1.01, +3.23], 9 games. **Owed:** findings update at >= 20 games per sport; stop 2026-12-31. Findings §8.
+  - **NHL 20-game read 2026-10-23 (§9): score/time baseline NO-GO on NHL GAME and SPREAD** (21 games; dBrier ~0, markout +300 s -1.9 / -2.4c, CIs < 0). Watch cell now -0.93c [-2.63, +0.80], 20 games: the lead did not hold. NBA 4 / NCAAF 3 / NFL 1 games: collecting.
 - **Stage 3** (in-play entries) waits on a stage-2 GO. Entries must stamp `fair_source="in_game"` (execute_portfolio.py:213).
 - **Stage 4:** keep Polymarket pregame-only.
 - **Stage 5:** fold position decisions into #709.
