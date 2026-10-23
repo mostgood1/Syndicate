@@ -167,3 +167,19 @@ a scope keeps its live rows.
 - Template assertion: the after-post block carries `no-export`.
 - Reachability: the same sheet with no posted file gives the section all 3 qualifiers, so the freeze is what changed
   the result.
+
+## Fix landed (2026-10-23 11:34 AM CT, 9260ea0b on origin/main; NOT deployed)
+
+The user chose "Freeze + separate block" (relayed by lane `cheat-sheets`; files lent in 9feba3f6, returned on landing).
+- `page_payload`: `pin_posted(..., only=True)` in EVERY view, for sections, game sections and both game-line section
+  maps. The posted copy (price, book, form) is shown live too. `sections_after_post` and its game and line twins
+  hold what qualifies now but was not on the graphic, minus any player + stat (or game + market) already on it.
+  `doc.shared` stays as a reconciled-view alias for a template from before the change.
+- Template: a `no-export` "Qualified after the graphic -- not on it" block under every frozen section and the parlay
+  section. `buildExport` strips it before the capture, so `recordPosted` never records it.
+- Through the new payload (fleet files, read-only), posted + after: NHL 10-21 8 + 4, 10-22 6 + 6, NFL 10-18 12 + 16,
+  MLB 10-18 12 + 2 (the duplicate line dropped), NHL 10-18 7 + 0. A headless render of NHL 10-22 showed no page
+  errors, and its export frame held 6 rows and no after-graphic block.
+- Tests: `tests/test_cheat_sheet_posted.py` 15 passed, and 4 of them fail on the old code. 11 cheat-sheet test files
+  passed 162 after rebasing over 2b897d0d.
+- Owed (lane `cheat-sheets`): the user's yes, the web reload, and the served reading.
