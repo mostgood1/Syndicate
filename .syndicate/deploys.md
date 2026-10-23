@@ -53954,3 +53954,27 @@ which is about the two sizing bases and not about the refusal boundary.
 - **ride-alongs (4eafd1d5..9260ea0b, other lanes, on main by their owners):** d1c3f7c3 live price band (`SYNDICATE_LIVE_PRICE_BAND`, absent = off; in-process, not loaded until a worker restart); 3152b1e2 basketball engine #5b (default 0.58 = the old constant, team prior off: byte-identical); 50be8ca9 / 5a54f3ba / 7ce27cb3 in-play nightly sweep + research scripts (nightly task syncs from origin/main itself); 001c6abe scenario harness; dbbf3ebe / 044e2634 findings + `price_bucket_audit.py`. No `vendor/` change.
 - **verify (served, `/cheatsheets?date=...` inlined DATA, 1:58 PM CT):** every posted section is exactly its posted rows, later qualifiers listed apart -- NHL 10-22 consistency **6 + 6** below the divider (was 12 served), NHL 10-21 **8 + 4** (was 12), NFL 10-18 **12 + 16** (was 28), NHL 10-18 **7 + 0**, MLB 10-18 **12 + 2** (the Mesa duplicate drops). `doc.shared` alias = the same 6 / 8 / 12 / 7 / 12. Matches the sub-session's offline prediction on all five.
 - **owed (stable day, 2b897d0d):** (1) the **4:30 PM CT** build is the first on the new code: the `CHEAT_SHEET nhl date=2026-10-23` line must read `locked=` > 0 and every row a `pool` {rank, of, cap, sticky}; `sticky=0` is EXPECTED there (no earlier pool today). (2) **10-24 12:30 PM CT** build: `sticky=` > 0 for NHL, and the 8:30 AM consistency rows still in the section unless their line was pulled. Re-grade by pool rank: scheduled task `cheat-sheet-consistency-pool-regrade-1109` (11-09 10 AM CT).
+
+## 2026-10-23 19:58:00Z -- FLEET ff 9260ea0b -> 80edc2aa + FULL DOWN/UP: live price band 0.40-0.75 + Polymarket filed fee (holder `live-price-band`, session 332cb014, coordinator) -- **MET (env + restart); first REFUSED_PRICE_BAND and the fee readings OWED**
+- **user (332cb014's chat 10-23):**
+  - "Band: 40c-75c only (Recommended)", on in-game-trading's price_bucket_audit (dbbf3ebe), confirmed in 15ceeb14 as "yes refuse both now".
+  - Polymarket fee "(A) Build + deploy (Recommended)" (lane polymarket-fee-quadratic).
+- **code:**
+  - `d1c3f7c3`: live entry price band, `REFUSED_PRICE_BAND` / `outside_price_band`. Loans of the new block from paper-alongside-live and live-event-concentration, user-approved. 13 tests + 174 across the executor suites.
+  - `80edc2aa`: Polymarket taker fee = 0.0695*C*p*(1-p), from lane polymarket-fee-quadratic; 782 tests.
+  - Ride-along: cheat-sheets `9260ea0b`. 2b897d0d and the in-game-trading research scripts are already behind 9260ea0b.
+- **env:** 177 -> 178, +`LIVE_ODDS_WORKER__SYNDICATE_LIVE_PRICE_BAND=0.40,0.75`. Backup `.bak-price-band-20261023T195800Z`.
+- **restart:**
+  - Claims from 19:17:15Z, after the cheat-sheets lane released.
+  - `check_deploy_safety --drain` was NOT CLEAR at its 40-min cap: live-odds-worker odds jobs cycle continuously during live games.
+  - The refresh-worker was idle throughout ("child jobs: none", board build idle), so this ACCEPTED the in-flight live-odds odds jobs, on the 02:10Z / 14:36Z / 23:32Z precedent. Down stopped 3 detached odds jobs cleanly; they restart next cycle.
+  - ff 19:58:00Z; `down` 19:58:00-19:58:05Z; healthz 200 at 19:58:15Z.
+  - refresh-worker pid 335935, live-odds-worker 335936. Undrained; claims released at 19:58:29Z.
+- **env read after up (live-odds-worker):**
+  - New: LIVE_PRICE_BAND=0.40,0.75.
+  - Unchanged: EXIT_HOLD_AT_OR_ABOVE_BID=0.90, EXIT_TAKE_PROFIT_MARGIN=0.10, EXIT caps 50/250, LIVE_EVENT_MAX_DOLLARS=50, LIVE_EVENT_CONCENTRATION=on, POLYMARKET_AT_ASK_MIN_STAKE_DOLLARS=5, EXECUTION_MODE=live, ARMED=1. INPLAY_ENTRIES ABSENT.
+- **owed:**
+  - (1) The first `REFUSED_PRICE_BAND` line on a live pass.
+  - (2) The fee lane's three readings: the fee_basis split after a Layer 2 rebuild, Polymarket live candidates falling, and COMMISSION lines within 1c of the formula.
+- **next:** `db292883` (#709 step 2 shadow DecisionRecord), a refresh-worker role restart armed for >= 20:58:30Z.
+- **rollback:** delete the band env line (band off), revert 80edc2aa for the fee, then a full down/up.
