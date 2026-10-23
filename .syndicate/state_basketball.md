@@ -1195,6 +1195,16 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
 - **Production today is right on totals only because errors cancel:** target −4.5 plus engine overshoot +6.
   Enabling EXACT_TARGET_CALIBRATION alone would lower NBA totals ~5.
 
+- **ROUND 2b (2026-10-17..22): the full FIT PASSES every gate; NOTHING ENABLED** `[verified 2026-10-23 14:55Z, d04aaa25]`. fit_r2b (791 games):
+  - bias −0.03; FTA 23.15 (real 23.13, non-OT); PF 19.66 (19.67); foul-outs 0.2227 (0.193 ± 0.04);
+  - quarter and H1 shares inside the real CI (fit_f5 had 3 of 4 outside); 3P% .3625 (.3588, was .3758);
+  - AST 24.24 vs 26.66 still open.
+  - The mechanisms (on main, default off): `quarter_targets_mode=mean` (85d0bca3; production quarter targets never
+    ran before), `shooting_foul_model=coherent` (abd8967e + 45f9272b), and `skip_outs_penalties` also dropping the
+    pace injury drag (78f73023). New rates: bonus 0.0695, base 0.0175; s 0.01837; one structural solver term
+    X 0.771 (OT + end-game).
+  - The config JSON is in the findings. Production waits on the forward test (3020b556, 2026-27 from 11-01) via
+    nba_engine_config.json only.
 ## [basketball-props-refresh-off-vendor] BASKETBALL PROPS REFRESHES: vendored uses retired path by path; WNBA history now tracks the schedule `[verified 2026-10-14, lanes nba-source-cli-native + basketball-games-history-freshness]`
 
 - **Off vendor and on the fleet** (each A/B'd on production data, 0 differences unless noted):
