@@ -53635,6 +53635,16 @@ which is about the two sizing bases and not about the refusal boundary.
   - It printed `PROPS_OUT_PLAYER_REFUSED league=wnba date=2026-10-24 ... snapshot=2026-10-22 out_on_feed=48 lines_considered=690 lines_refused=0`.
   - So the 10-24 builds read the ESPN 10-22 snapshot, not the NBA rows.
   - **Still OWED: reading (3)**, after midnight CT. A watcher is armed until 12:00 PM CDT 10-23.
+- **READ (3) 05:06:16Z 10-23 (12:06 AM CT) -- MET.** The watcher polled `raw/injuries.csv` every 60 s across midnight.
+  - Last write before midnight (04:58:49Z): 10-22 = 48 rows.
+  - First write after midnight (05:05:34Z): `INJURY_SNAPSHOT requested=2026-10-23 replaced=2026-10-23 rows=48`.
+  - Afterwards: 10-21 = 48, 10-22 = 48, 10-23 = 48, no 10-24 rows, 1,075 rows in all.
+  - Every logged line since 04:30Z, in order:
+    - `requested=2026-10-22 replaced=2026-10-22` (04:32Z, 04:58:10Z);
+    - `requested=2026-10-23 replaced=2026-10-22` (04:58:49Z: the prefetch replaced that day's snapshot and created no 10-23 rows);
+    - `requested=2026-10-23 replaced=2026-10-23` (05:05:34Z).
+  - Not observed: a logged fetch FOR 10-22 after midnight (0 lines), which was the 10-12 path. It is covered by tests.
+  - **All three expectations MET. Nothing owed on this entry.**
 
 ## 2026-10-22 20:03:53Z (3:03 PM CT) -- CORRECTION + RE-STAGE: the 14:51:33Z staged stand-in switch was INERT (wrong role); now staged UNPREFIXED, loads at the NEXT full down/up (lane `nba-standins-shadow`, session 15f24a49, todo #714)
 - **What was wrong:** I staged `REFRESH_WORKER__SYNDICATE_NBA_NO_HISTORY_STANDINS=shadow`. The NBA props refresh, and so every pregame NBA SmartSim build, runs under the **live-odds-worker**. Verified by the ppid chain in the 19:11Z ALL_PROCESS_MEMORY snapshot: `refresh_nba_oddsapi_props.py` <- `refresh_odds_sources.py` <- `run_refresh_odds_job.py` <- `run_live_odds_refresh_worker.py` (pid 3942342) <- `local_production.py`.
