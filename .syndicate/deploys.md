@@ -54045,3 +54045,18 @@ which is about the two sizing bases and not about the refusal boundary.
 - **env (role restart, unchanged):** EXECUTION_MODE=live, ARMED=1, LIVE_EVENT_CONCENTRATION=on. INPLAY_ENTRIES absent = OFF, so only the all-sports PAPER rule runs. OddsAPI cost: ~9 credits/live sport/min, up to ~2.7k/h on a full slate.
 - **owed:** in-game-trading's confirmation that the multi-sport paper loop books, and an OddsAPI credits/h reading.
 - **lesson:** a live-odds-worker TERM can take ~2 min to stop. Role-restart scripts should wait >= 4 min for the new pid.
+
+## 2026-10-23 23:35Z -- USER-RUN FLEET FULL DOWN/UP: live IN-GAME ENTRIES ON, all sports (NHL/NBA/NFL/NCAAF/MLB), $50/day, 1 contract IOC -- **MET: first live entries at 23:38:39Z**
+- **user (332cb014's chat 10-23):** "we need to turn it on and test", "ok we need to turn it on for all sports", "turn it on". Both sessions' permission checks refused the switch-on, so the user ran the commands themselves (claims as `user-inplay-on`, watchdog pause, env backup `.bak-inplay-entries`, append, `down`). Their `Start-ScheduledTask` did not take: the task's last run was still 19:58Z and the fleet was DOWN (health 000) at 23:37:43Z. The coordinator ran Start-ScheduledTask at 23:38:03Z. **Outage ~23:35-23:38Z.**
+- **env:** +`LIVE_ODDS_WORKER__SYNDICATE_INPLAY_ENTRIES=on`, +`LIVE_ODDS_WORKER__SYNDICATE_INPLAY_ENTRY_DAY_DOLLARS=50`. Code is `5ec0f1a0`, already on the fleet since the 21:48:58Z role restart.
+- **after up:**
+  - healthz 200; live-odds-worker pid 445806 and refresh-worker 445805, lstart 23:37:59Z.
+  - live-odds reads INPLAY_ENTRIES=on, DAY_DOLLARS=50, EXECUTION_MODE=live, ARMED=1, LIVE_PRICE_BAND=0.40,0.75, EXIT_TAKE_PROFIT_MARGIN=0.10.
+  - Watchdog marker removed.
+- **verify (READING):**
+  - `23:38:39.928Z LIVE_ENTRY KXNBATOTAL-26OCT23DALIND-249 no ask=0.42 stake=0.43 ... placed=True submitted`.
+  - `23:39:19Z KXNBASPREAD-26OCT23ATLCHA-ATL9 yes ask=0.46`.
+  - `23:39:22Z KXNBATOTAL-26OCT23DALIND-251 no ask=0.44`.
+- **open questions, sent to in-game-trading:** fills per IOC; day_spend fell 0.46 -> 0.42 between entries; paper PASS_FAILED HTTP 429 (OddsAPI rate limit); two adjacent DAL@IND unders in 43 s, so it looks like the executor's per-game R1 does not cover this path.
+- **evidence going in:** paper about -8c/contract over 25 settled, and no positive out-of-sample sweep setting. This is a paid test capped at $50/day.
+- **rollback:** remove the two env lines (or set INPLAY_ENTRIES=off), then a full down/up. Start-ScheduledTask must run in WINDOWS PowerShell.
