@@ -14,8 +14,9 @@ import pytest
 
 from syndicate.features.shared.venue_fees import (
     FEE_TYPE_QUADRATIC,
-    POLYMARKET_MEASURED_SAMPLE,
+    POLYMARKET_ASSUMED_WORST_CASE_RATE,
     POLYMARKET_MEASURED_NOTIONAL_RATE,
+    POLYMARKET_TAKER_THETA,
     ceil_to_cent,
     FEE_TYPE_QUADRATIC_WITH_MAKER,
     KALSHI_BASE_TAKER_RATE,
@@ -26,7 +27,9 @@ from syndicate.features.shared.venue_fees import (
     kalshi_maker_fee_dollars,
     kalshi_taker_fee_dollars,
     polymarket_fee_dollars,
+    polymarket_fill_fee_dollars,
     polymarket_worst_case_fee_dollars,
+    taker_fee_per_contract,
 )
 
 # (ticker, contracts, fill_price, fee_multiplier, observed_fees_dollars)
@@ -183,63 +186,103 @@ def test_maker_refuses_on_maker_fee_series_without_the_flag():
     assert 0 < allowed < taker
 
 
-# (order_id, contracts, fill_price, commissionNotionalTotalCollected)
+# (order_id, contracts, fill_price, commissionNotionalTotalCollected) -- every
+# live Polymarket fill with a recorded commission since go-live, 2026-10-20..23,
+# read off the fleet execution ledger and the `COMMISSION` log lines (they agree).
 REAL_POLYMARKET_FILLS = [
+    ("D7HMYF0G10JQ", 1.02, 0.48, 0.02),
+    ("D7JJFKT010JF", 1.04, 0.47, 0.02),
+    ("D7M3K12050JE", 11.29, 0.48, 0.20),
+    ("D7M3G08030JV", 1.04, 0.47, 0.02),
+    ("D7PR8F4G10JE", 1.04, 0.47, 0.02),
+    ("D7W7YCSG10JN", 0.50, 0.48, 0.01),
+    ("D7X0DKEG10JE", 10.02, 0.755, 0.13),
+    ("D7XPJT2G10JR", 1.08, 0.35, 0.02),
+    ("D7Y3D2WG10JN", 0.55, 0.49, 0.01),
+    ("D7ZHM82010JR", 1.08, 0.48, 0.02),
+    ("D816C6F010JF", 11.51, 0.47, 0.19),  # a cent UNDER: multi-fill rounding
+    ("D816DSB010JF", 1.05, 0.53, 0.02),
+    ("D81C2CEG10JH", 0.44, 0.49, 0.01),
+    ("D89HER7090JK", 11.29, 0.48, 0.20),
+    ("D8K1DNA011MV", 11.29, 0.48, 0.20),
+    ("D8K1E8FG11MQ", 1.08, 0.48, 0.02),
+    ("D8NDJJDG11MC", 11.48, 0.49, 0.20),
+    ("D8ZE2ABG11MQ", 11.24, 0.49, 0.20),
+]
+
+# The 08-30 fills that fitted "150 bps flat", charged under theta 0.06 (in force
+# 2026-07-01 per QCX's filing). They sit at 0.43-0.47, where 0.06*p(1-p) ~ 1.5c.
+AUGUST_POLYMARKET_FILLS = [
     ("C60RZVXYJKDG", 4.93, 0.43, 0.07),
     ("C60JWBG0WKDK", 3.91, 0.47, 0.06),
     ("C5Y0GHE4MKDE", 2.38, 0.44, 0.04),
     ("C5Y08RVP8KDK", 18.70, 0.47, 0.28),
     ("C5SM8P8S4KDC", 3.40, 0.47, 0.05),
+    ("C65VD0R72KDG", 13.13, 0.235, 0.14),  # the 0.235 fill that broke "flat"
 ]
 
 
 def test_polymarket_fee_reproduces_the_REAL_commissions():
-    """The measurement that replaced a RETRACTED zero.
+    """The filed parabola against what the venue actually booked.
 
-    An earlier version of this file asserted the fee was 0.0, inferred from the
-    venue's realized P&L at settlement. That method is FEE-BLIND: realized P&L
-    is `(exit - entry)` on the position, so a commission taken at FILL is
-    invisible to it by construction, and it returns zero whether or not one was
-    charged. Disproven on the same orders it was measured from --
-    `C60JWBG0WKDK` implied -0.0023 there while the venue charged $0.06.
-
-    These are `commissionNotionalTotalCollected`, the venue's own figure.
+    17 of 18 to the cent. The 18th is one cent UNDER: an order that sweeps
+    several resting orders is never charged more than the rounded cumulative
+    fee, so the venue can come in under the single-fill rounding and never over.
     """
-    failures = []
+    exact, over, misses = 0, [], []
     for order, contracts, price, actual in REAL_POLYMARKET_FILLS:
-        modelled = polymarket_fee_dollars(contracts, price)
-        if abs(modelled - actual) > 0.005:
-            failures.append(f"{order}: modelled {modelled:.4f} vs actual {actual:.2f}")
-    assert not failures, "fee model disagrees with real commissions: " + "; ".join(failures)
+        modelled = polymarket_fill_fee_dollars(contracts, price)
+        if modelled == pytest.approx(actual, abs=1e-9):
+            exact += 1
+        elif actual > modelled:
+            over.append(order)
+        elif modelled - actual > 0.010001:
+            misses.append(f"{order}: modelled {modelled:.2f} vs actual {actual:.2f}")
+    assert not over, f"venue charged MORE than the filed fee on {over}"
+    assert not misses, "; ".join(misses)
+    assert exact >= 17
 
 
-def test_the_polymarket_fee_is_NOT_zero_and_NOT_quadratic():
-    """Both retracted properties, pinned so neither can come back quietly.
+def test_the_off_mid_fill_DISCRIMINATES_the_shapes():
+    """10.02 contracts at 0.755, charged $0.13: the one fill that separates them.
 
-    Zero came from the fee-blind method. Quadratic came from copying Kalshi's
-    shape -- but Polymarket charges a flat proportion, so unlike Kalshi's it
-    does NOT vanish at the tails, which is where in-play pairs live.
+    Flat 1.5c predicts $0.15, the parabola at 0.06 predicts $0.11, at 0.0695 $0.13.
     """
-    assert polymarket_fee_dollars(100, 0.5) > 0
-    tail = polymarket_fee_dollars(100, 0.94)
+    contracts, price, actual = 10.02, 0.755, 0.13
+    assert polymarket_fill_fee_dollars(contracts, price) == pytest.approx(actual)
+    assert polymarket_fill_fee_dollars(contracts, price, theta=0.06) == pytest.approx(0.11)
+    assert round(POLYMARKET_MEASURED_NOTIONAL_RATE * contracts, 2) == pytest.approx(0.15)
+
+
+def test_the_august_fills_fit_the_theta_then_in_force():
+    for order, contracts, price, actual in AUGUST_POLYMARKET_FILLS:
+        assert polymarket_fill_fee_dollars(contracts, price, theta=0.06) == pytest.approx(actual), order
+
+
+def test_the_polymarket_fee_is_NOT_zero_and_IS_quadratic():
+    """Zero came from a fee-blind method; FLAT came from five fills at the mid.
+
+    The filed shape vanishes toward the tails like Kalshi's, so a 0.94 contract
+    costs ~0.39c, not the 1.5c the flat model charged.
+    """
+    assert POLYMARKET_TAKER_THETA == 0.0695
     mid = polymarket_fee_dollars(100, 0.50)
-    # A quadratic would collapse at the tail (0.94 -> 0.0564 of the mid). Flat
-    # means IDENTICAL, which is the property that makes tails expensive here
-    # and cheap on Kalshi.
-    assert tail == mid, f"tail {tail} != mid {mid} -- shape is not flat"
-    assert POLYMARKET_MEASURED_NOTIONAL_RATE == 0.015
-    assert "notional" in POLYMARKET_MEASURED_SAMPLE["basis"]
+    tail = polymarket_fee_dollars(100, 0.94)
+    assert mid == pytest.approx(1.7375)
+    assert tail == pytest.approx(0.0695 * 100 * 0.94 * 0.06, abs=1e-4)
+    assert 0 < tail < mid / 4
 
 
-def test_polymarket_is_the_DOMINANT_leg_cost_after_all():
-    """The original claim was right and my inversion of it was wrong.
+def test_the_board_rate_is_the_unrounded_parabola():
+    fee, basis, bound = taker_fee_per_contract("polymarket", 0.48)
+    assert fee == pytest.approx(0.0695 * 0.48 * 0.52)
+    assert basis == "polymarket_filed_quadratic"
+    assert bound is False
 
-    I inverted this test to assert Kalshi-dominant on the strength of the
-    retracted zero. Measured properly, Polymarket at 150 bps of notional is
-    0.0150/contract flat while Kalshi's MLB half-rate peaks at 0.00875 and
-    falls away at the tails. Polymarket dominates, and by MORE at the tails.
-    """
-    for price in (0.50, 0.94):
+
+def test_polymarket_is_dearer_than_kalshi_mlb_at_every_price():
+    """Same parabola, larger coefficient: 0.0695 against MLB's 0.07 x 0.5."""
+    for price in (0.05, 0.50, 0.94):
         poly = polymarket_fee_dollars(1, price)
         kalshi = kalshi_taker_fee_dollars(1, price, fee_multiplier=0.5)
         assert poly > kalshi, f"at p={price}: poly {poly} !> kalshi {kalshi}"
@@ -266,10 +309,24 @@ def test_the_bound_is_ABOVE_the_measurement_at_every_price():
     against 1.50 per hundred contracts at even money. A "worst case" cheaper
     than the real cost is the exact direction this module exists to prevent.
     """
-    for price in (0.05, 0.30, 0.50, 0.80, 0.95):
+    for price in (0.01, 0.05, 0.30, 0.50, 0.80, 0.95, 0.99):
         bound = polymarket_worst_case_fee_dollars(100, price)
         measured = polymarket_fee_dollars(100, price)
         assert bound > measured, f"at p={price}: bound {bound} !> measured {measured}"
+    assert POLYMARKET_ASSUMED_WORST_CASE_RATE >= POLYMARKET_TAKER_THETA
+
+
+def test_the_arb_worst_case_leg_is_ABOVE_the_filed_fee():
+    """The arb path applied the 0.02 bound as a theta: 0.5c at even money, under
+    a real 1.74c. A bound below the fee makes fake arbs."""
+    from syndicate.features.shared.kalshi_polymarket_arb import net_edge_per_contract
+
+    for price in (0.05, 0.30, 0.50, 0.80, 0.95):
+        bounded = net_edge_per_contract(1.0 - price - 0.01, price, kalshi_fee_multiplier=1.0)
+        filed = net_edge_per_contract(
+            1.0 - price - 0.01, price, kalshi_fee_multiplier=1.0, polymarket_fee_bound=False)
+        assert bounded["polymarket_fee_per_contract"] > filed["polymarket_fee_per_contract"]
+        assert filed["polymarket_fee_per_contract"] == pytest.approx(0.0695 * price * (1 - price))
 
 
 # --------------------------------------------------------------------------

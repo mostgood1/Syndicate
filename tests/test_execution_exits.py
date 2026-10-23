@@ -482,10 +482,10 @@ def test_polymarket_named_legs_map_and_team_legs_are_never_guessed():
     assert team == [] and skipped == {"polymarket_team_leg_unresolved": 1}
 
 
-def test_polymarket_fee_is_flat_on_notional():
+def test_polymarket_fee_is_the_filed_quadratic():
     p, _ = ex.open_positions([_pm_order()], today=TODAY)
     assert p[0].contracts == pytest.approx(10.0)
-    assert p[0].entry_fee_dollars == pytest.approx(0.15)  # 150 bps x 10 contracts
+    assert p[0].entry_fee_dollars == pytest.approx(0.1738)  # 0.0695 x 10 x 0.5 x 0.5, 4dp up
 
 
 def test_polymarket_book_reads_the_held_leg():
@@ -507,7 +507,8 @@ def test_polymarket_paper_exit_books_from_its_own_book(monkeypatch):
     assert summary["polymarket_quoted"] == 1 and summary["new_paper_exits"] == 1
     (row,) = ex.load_state()["exits"].values()
     assert row["family"] == "polymarket" and row["bid"] == 0.64
-    assert row["realized_pnl_dollars"] == pytest.approx(10 * (0.64 - 0.50) - 0.15 - 0.15, abs=0.01)
+    # entry 0.0695*10*0.25 = 0.1738, exit 0.0695*10*0.64*0.36 = 0.1602 (filed quadratic)
+    assert row["realized_pnl_dollars"] == pytest.approx(10 * (0.64 - 0.50) - 0.1738 - 0.1602, abs=0.01)
 
 
 def test_a_kalshi_ticker_never_prices_a_polymarket_position(monkeypatch):

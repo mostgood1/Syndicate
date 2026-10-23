@@ -127,7 +127,29 @@ Nothing in the arb path should be resting orders anyway -- see the two-leg note
 in `kalshi_polymarket_arb` -- so the refusal costs nothing today.
 
 --------------------------------------------------------------------------
-POLYMARKET CHARGES 150 BPS OF NOTIONAL, FLAT. AND THE RETRACTION THAT GOT HERE
+POLYMARKET US CHARGES THE FILED PARABOLA: 0.0695 * C * p * (1-p)
+`[2026-10-23, lane polymarket-fee-quadratic]`
+--------------------------------------------------------------------------
+
+**THE "150 BPS FLAT" SECTION BELOW IS RETRACTED. It is kept because the way it
+was wrong is the useful part, the same as the zero before it.**
+
+QCX (Polymarket US) files its fee schedule with the CFTC: `Fee = THETA * C * p *
+(1-p)`, theta 0.05 -> 0.06 on 2026-07-01, 0.0695 for straight trades by
+2026-09-25, table tennis 0.10 from 10-07; rounded half-even to the cent per fill.
+The maker rebate (theta -0.0125) became volume-tiered on 10-19 13:00 ET, and
+below $10M a month it is nothing. All 18 live commissions since go-live
+(10-20..10-23) fit 0.0695: 17 to the cent, one a cent under (multi-fill
+rounding). The flat 1.5c matched 11. The five 08-30 fills below sat at
+0.43-0.47, where 0.06 * p(1-p) is also ~1.5c -- the crossover argument below
+called exactly this, and the 0.235 and 0.755 fills are the off-mid points that
+broke it. `.syndicate/findings_2026-10-23_polymarket_fee_model.md`.
+
+So the shape IS Kalshi's, and the tails are CHEAP on Polymarket too: at 0.94
+the fee is 0.39c, not 1.5c. The prose below that says otherwise is history.
+
+--------------------------------------------------------------------------
+RETRACTED: "POLYMARKET CHARGES 150 BPS OF NOTIONAL, FLAT"
 --------------------------------------------------------------------------
 
 **A PRIOR VERSION OF THIS DOCSTRING SAID THE FEE WAS ZERO, MEASURED. IT WAS
@@ -259,16 +281,17 @@ than its exact RATE; a caller pricing a much larger order or a different market
 type should re-measure rather than lean on this.
 
 `POLYMARKET_ASSUMED_WORST_CASE_RATE` is kept for callers that want a bound
-rather than a measurement. It is 0.02 -- FLAT, matching the measured SHAPE, and
-strictly above the measured 0.015 at every price. It was briefly 0.01 while the
-fee was believed to be zero, which made the "bound" CHEAPER than the truth; a
-bound that undercuts the measurement is not conservative, it is just a second
-wrong number. `test_venue_fees` asserts `bound > measured` so that cannot recur.
+rather than a measurement. It is now a THETA on the filed parabola, at the
+dearest filed straight-trade coefficient (0.10). It was 0.02, briefly 0.01 while
+the fee was believed zero -- and the arb path applied 0.02 as a theta, 0.5c at
+even money under a real 1.74c. A bound that undercuts the fee is not
+conservative; `test_venue_fees` asserts `bound > fee` at every price.
 """
 
 from __future__ import annotations
 
 import math
+from decimal import ROUND_HALF_EVEN, Decimal
 from typing import Any
 
 __all__ = [
@@ -282,6 +305,9 @@ __all__ = [
     "kalshi_fee_multiplier_for_series",
     "MAKER_FRACTION",
     "POLYMARKET_ASSUMED_WORST_CASE_RATE",
+    "POLYMARKET_MAX_FILED_TAKER_THETA",
+    "POLYMARKET_TAKER_THETA",
+    "POLYMARKET_TAKER_THETA_EFFECTIVE",
     "POLYMARKET_MEASURED_NOTIONAL_RATE",
     "POLYMARKET_REJECTED_COST_RATE",
     "POLYMARKET_MEASURED_SAMPLE",
@@ -293,6 +319,7 @@ __all__ = [
     "kalshi_taker_fee_dollars",
     "kalshi_maker_fee_dollars",
     "polymarket_fee_dollars",
+    "polymarket_fill_fee_dollars",
     "polymarket_worst_case_fee_dollars",
 ]
 
@@ -423,11 +450,25 @@ def kalshi_fee_multiplier_for_series(series: Any) -> float | None:
 # refuses rather than apply it silently.
 MAKER_FRACTION = 0.25
 
-# RETRACTED VALUE WAS 0.0. See the docstring: that came from a FEE-BLIND
-# method and is disproven on the same orders it was measured from.
-#
-# MEASURED from `commissionNotionalTotalCollected` on five real fills:
-# **150 bps of NOTIONAL** (contracts x $1), i.e. 0.015 per contract, flat.
+# THE FILED POLYMARKET US TAKER FEE `[2026-10-23, lane polymarket-fee-quadratic]`:
+# `Fee = THETA * C * p * (1-p)` on straight trades, rounded to the cent per fill
+# (banker's rounding). QCX CFTC filings: theta 0.05 -> 0.06 effective 2026-07-01
+# (rules0707269057), and 0.0695 for straight trades by 2026-09-25 (rules09292630356
+# says it "remains"). Our own fills: 17 of the 18 live commissions 10-20..10-23
+# match 0.0695 to the cent, and the 18th is one cent UNDER it (the venue's
+# multi-fill rounding can only lower a charge). The six 08-30 commissions fit 0.06,
+# the rate in force then. `.syndicate/findings_2026-10-23_polymarket_fee_model.md`.
+POLYMARKET_TAKER_THETA = 0.0695
+POLYMARKET_TAKER_THETA_EFFECTIVE = "2026-09-25 (by; straight trades)"
+# Table tennis is 0.10 since 2026-10-07 (rules10142633348) -- the dearest filed
+# straight-trade theta, and so the worst-case bound below.
+POLYMARKET_MAX_FILED_TAKER_THETA = 0.10
+
+# RETRACTED 2026-10-23. Was the active rate: "150 bps of NOTIONAL, flat",
+# $0.015 per contract at any price. It was fitted on five fills at 0.43-0.47,
+# where the filed parabola at 0.06 is also ~1.5c, and it failed off the mid
+# (0.235 in August; 0.755 on 10-21: $0.13 charged, flat predicts $0.15). Kept
+# only so the retraction is legible; nothing prices with it.
 POLYMARKET_MEASURED_NOTIONAL_RATE = 0.015
 
 # A cost basis (3.247% of contracts x price) fits the same five fills almost as
@@ -459,10 +500,12 @@ POLYMARKET_MEASURED_SAMPLE = {
     "measured_at": "2026-08-30",
 }
 
-# A bound for callers that want one. RAISED BACK from 0.01 -- that value was set
-# on the strength of the retracted zero and sat BELOW the true fee, which is the
-# one direction this module exists to prevent.
-POLYMARKET_ASSUMED_WORST_CASE_RATE = 0.02
+# A bound for callers that want one: a THETA on the same parabola, at the dearest
+# filed straight-trade coefficient. It was 0.02, and `kalshi_polymarket_arb`
+# applied it as a theta -- 0.5c at even money against a real 1.74c. A bound below
+# the fee it bounds is the one direction this module exists to prevent;
+# `test_venue_fees` asserts bound > fee at every price.
+POLYMARKET_ASSUMED_WORST_CASE_RATE = POLYMARKET_MAX_FILED_TAKER_THETA
 
 
 # Decimal places Kalshi rounds a fee to. FOUR -- a hundredth of a cent -- not
@@ -652,42 +695,47 @@ def kalshi_maker_fee_dollars(
 
 
 def polymarket_fee_dollars(contracts: float, price: float) -> float:
-    """The MEASURED Polymarket fee. **NOT zero, and NOT quadratic.**
+    """The Polymarket US taker fee as a COST MODEL: `THETA * C * p * (1-p)`.
 
-    **150 bps of NOTIONAL** (contracts x $1), flat -- independent of price.
-    Reproduces all five real commissions within a cent. A cost basis was
-    considered and REJECTED: see `POLYMARKET_REJECTED_COST_RATE` for the
-    discriminating comparison on the largest fill.
+    The filed schedule (see `POLYMARKET_TAKER_THETA`). Rounded UP to a hundredth
+    of a cent like every modelled fee here, so a per-contract figure (C=1) stays
+    the rate rather than a whole cent; `polymarket_fill_fee_dollars` is what the
+    venue actually books on one fill.
 
-    THE SHAPE IS DIFFERENT FROM KALSHI'S AND THAT MATTERS. Kalshi charges
-    `rate * C * P * (1-P)` -- a parabola that vanishes at the tails. Polymarket
-    charges a flat proportion, so it does NOT vanish: at P=0.94 Kalshi's MLB fee
-    is 0.0020/contract and Polymarket's is 0.0150, seven times larger. Modelling
-    this as a quadratic (as the first version of `net_edge_per_contract` did)
-    understates the tails by an order of magnitude -- and the tails are exactly
-    where in-play pairs live.
+    THE FLAT 1.5c THIS REPLACED was right only near even money, where the two
+    shapes cross (p = 0.315 and 0.685 at theta 0.0695). Inside that band the real
+    fee is dearer (1.74c at 0.50); outside it is cheaper (0.33c at 0.95).
     """
-    _quadratic_base(contracts, price)  # an impossible input is still a refusal
-    return ceil_to_fee_precision(POLYMARKET_MEASURED_NOTIONAL_RATE * float(contracts))
+    return ceil_to_fee_precision(POLYMARKET_TAKER_THETA * _quadratic_base(contracts, price))
+
+
+def polymarket_fill_fee_dollars(
+    contracts: float, price: float, *, theta: float = POLYMARKET_TAKER_THETA,
+) -> float:
+    """What the venue books on ONE fill: the parabola rounded half-even to the cent.
+
+    docs.polymarket.us/fees: "rounded to the nearest $0.01 using banker's
+    rounding", per fill. An order that sweeps several resting orders is never
+    charged more than the rounded cumulative fee, so a multi-fill order can come
+    in a cent UNDER this (measured once in 18, `D816C6F010JF`) and never over it.
+    `theta` is a parameter so the 08-30 fills can be checked at the 0.06 then in force.
+    """
+    exact = float(theta) * _quadratic_base(contracts, price)
+    return float(Decimal(repr(round(exact, 9))).quantize(Decimal("0.01"), rounding=ROUND_HALF_EVEN))
 
 
 def polymarket_worst_case_fee_dollars(contracts: float, price: float) -> float:
     """A deliberately pessimistic bound on the Polymarket leg, in dollars.
 
-    FLAT PER CONTRACT, matching the measured shape at a higher rate.
+    The same parabola at the dearest FILED straight-trade theta
+    (`POLYMARKET_MAX_FILED_TAKER_THETA`, table tennis). Report it as a bound
+    wherever it is used, so no reader mistakes it for the fee.
 
-    IT WAS A QUADRATIC, copied from Kalshi's form while Polymarket's fee was
-    unobserved. Once the real shape turned out to be flat, that quadratic sat
-    BELOW the measured fee at EVERY price -- 0.50 against 1.50 per hundred
-    contracts at even money. **A bound cheaper than the thing it bounds is not
-    conservative, it is a trap**, and it survived the shape correction because
-    nothing asserted the relationship between the two.
-
-    Report it as a bound wherever it is used, so no reader mistakes it for the
-    measurement.
+    **A bound cheaper than the thing it bounds is not conservative, it is a
+    trap** -- this one has been one twice: a quadratic at 0.02 under a fee then
+    believed flat, and the 0.02 theta the arb path applied under the filed 0.0695.
     """
-    _quadratic_base(contracts, price)  # an impossible input is still a refusal
-    return ceil_to_fee_precision(POLYMARKET_ASSUMED_WORST_CASE_RATE * float(contracts))
+    return ceil_to_fee_precision(POLYMARKET_ASSUMED_WORST_CASE_RATE * _quadratic_base(contracts, price))
 
 
 # THE KALSHI SERIES A BOARD ROW WOULD TRADE, BY (sport, market, segment).
@@ -777,7 +825,7 @@ def taker_fee_per_contract(
                     * p * (1.0 - p), "kalshi_assumed_full_rate", True)
         return KALSHI_BASE_TAKER_RATE * multiplier * p * (1.0 - p), basis, False
     if book == "polymarket":
-        return POLYMARKET_MEASURED_NOTIONAL_RATE, "polymarket_measured_notional", False
+        return POLYMARKET_TAKER_THETA * p * (1.0 - p), "polymarket_filed_quadratic", False
     if book == "prophetx":
         # Charged only on a win: the expected cost per contract at the price's own probability.
         return PROPHETX_WIN_COMMISSION * p * (1.0 - p), "prophetx_expected_win_commission", False

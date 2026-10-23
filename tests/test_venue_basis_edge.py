@@ -208,24 +208,24 @@ def test_the_FEE_actually_moves_the_verdict():
     not. A module that computed the same answer with and without the fee would
     not be pricing it at all.
     """
-    # Polymarket: flat 0.015/contract. Consensus 0.5238; venue 0.5100 ->
-    # raw gap +1.38 pts, but +0.5100 + 0.0150 = 0.5250 -> -0.12 pts, inside the floor.
+    # Polymarket: the filed 0.0695*p*(1-p). Consensus 0.5238; venue 0.5074 ->
+    # raw gap +1.64 pts, but 0.5074 + 0.0174 = 0.5248 -> -0.10 pts, inside the floor.
     out = venue_basis_edge(
-        _side(), venue="polymarket", venue_price=-104,
+        _side(), venue="polymarket", venue_price=-103,
         venue_quote_age_seconds=5.0, book_quote_age_seconds=60.0, is_live=True, now=NOW,
     )
-    raw_gap = (0.5238 - 0.5100) * 100
+    raw_gap = (0.5238 - 0.5074) * 100
     assert raw_gap > MIN_EDGE_PCT_TO_DISPLAY, "fixture must clear the floor BEFORE fees"
     assert out.edge_pct is None, "the commission must have eaten it"
     assert "noise floor" in out.reason
 
 
 def test_polymarket_and_kalshi_price_the_same_row_DIFFERENTLY():
-    """The two fee SHAPES differ and it shows at the tails.
+    """Same parabola, different coefficient, so the same quote costs differently.
 
-    Kalshi's is a parabola that vanishes at the tails; Polymarket's is flat and
-    does not. At a tail price Polymarket costs several times more, so the same
-    venue quote is a different effective price depending on where it is taken.
+    Both vanish toward the tails (Polymarket's was modelled FLAT until
+    2026-10-23, which made its tails ~4x too dear). At 0.9375 Polymarket's filed
+    0.0695 is about double Kalshi's MLB half rate (0.035).
     """
     tail = dict(venue_price=-1500, venue_quote_age_seconds=5.0,
                 book_quote_age_seconds=60.0, is_live=True, now=NOW)
@@ -234,10 +234,10 @@ def test_polymarket_and_kalshi_price_the_same_row_DIFFERENTLY():
     # Both must REPORT the fee even where the verdict differs -- the refusal
     # path carries it too, which is what makes this comparison possible at all.
     assert k.venue_fee_per_contract is not None and p.venue_fee_per_contract is not None
-    assert p.venue_fee_per_contract > k.venue_fee_per_contract * 3, (
-        f"polymarket {p.venue_fee_per_contract} should dwarf kalshi {k.venue_fee_per_contract} "
-        "at a tail price"
+    assert p.venue_fee_per_contract > k.venue_fee_per_contract * 1.5, (
+        f"polymarket {p.venue_fee_per_contract} should be ~2x kalshi {k.venue_fee_per_contract}"
     )
+    assert p.venue_fee_per_contract < 0.005, "a tail Polymarket fee is ~0.4c, not the old flat 1.5c"
 
 
 def test_the_payload_carries_what_makes_it_auditable():

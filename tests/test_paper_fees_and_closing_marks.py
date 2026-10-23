@@ -126,8 +126,8 @@ def test_a_kalshi_mlb_total_is_charged_the_half_rate_series():
 
 def test_a_scoped_shadow_book_takes_its_venue_from_the_prefix_when_book_is_absent():
     fields = paper_fill_fee_fields(_request(book=None, venue="paper:polymarket", price=0.5, stake=10.0))
-    assert fields["fee_basis"] == "polymarket_measured_notional"
-    assert fields["fees_dollars"] == pytest.approx(0.3)  # 20 contracts * 0.015
+    assert fields["fee_basis"] == "polymarket_filed_quadratic"
+    assert fields["fees_dollars"] == pytest.approx(0.3475)  # 20 contracts * 0.0695 * 0.25
 
 
 def test_an_unpriceable_fill_records_unknown_not_zero():

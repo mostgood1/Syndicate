@@ -84,7 +84,19 @@ The board read was the fleet Redis Layer 2 shortlists for 10-23, 10-24 and 10-25
 - **Realised P&L is already correct.** `fees_dollars` records what the venue charged. The error is in SELECTION and SIZING: we pick and size mid-price Polymarket bets as if they cost 1.50¢ when they cost 1.73¢.
 - The 10-19 rebate change matters only if we ever rest maker orders on Polymarket. We now earn no rebate (Tier 1), where before we earned about 0.31¢ at the mid.
 
-## 5. Proposed refit (lane `polymarket-fee-quadratic`, NOT built; it waits for the user)
+## 5. Refit — BUILT 2026-10-23 ~16:55Z on the user's option (A), relayed by coordinator 332cb014
+
+As built:
+- `venue_fees`: `POLYMARKET_TAKER_THETA = 0.0695`.
+  - `polymarket_fee_dollars` = theta·C·p(1−p), rounded up to 4 dp.
+  - New `polymarket_fill_fee_dollars`: the same fee rounded half-even to the cent, per fill.
+  - `taker_fee_per_contract("polymarket")` now returns basis `polymarket_filed_quadratic`.
+  - The worst-case bound is the parabola at θ 0.10.
+- `kalshi_polymarket_arb`: both branches use the parabola.
+- Tests: the 18 fills, the 0.755 discriminator, the August fills at 0.06, and the bound check at prices 0.01-0.99. 782 tests across 23 files pass.
+- **Not built:** the 0.5% floor change (a separate decision), and the combo refusal (out of scope). The rounding in step 1 below changed in the build: the model rounds up to 4 dp, and the per-fill function rounds half-even.
+
+The original proposal follows.
 
 1. `venue_fees.py`:
    - Add `POLYMARKET_TAKER_THETA = 0.0695` and `POLYMARKET_TAKER_THETA_EFFECTIVE`, with the filing citations.

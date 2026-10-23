@@ -59,15 +59,16 @@ def test_a_plausible_venue_row_carries_its_fee_and_net_ev_and_keeps_gross_ev():
     assert row["ev_pct_net_of_fee"] < row["ev_pct"]
 
 
-def test_polymarket_rows_pay_the_measured_flat_fee():
+def test_polymarket_rows_pay_the_filed_quadratic_fee():
     (row,), _ = scope_rows_to_venue([_row()], "polymarket")
-    assert row["venue_fee_basis"] == "polymarket_measured_notional"
-    assert row["venue_fee_per_contract"] == pytest.approx(0.015)
+    P = _p(-110)
+    assert row["venue_fee_basis"] == "polymarket_filed_quadratic"
+    assert row["venue_fee_per_contract"] == pytest.approx(0.0695 * P * (1 - P), abs=1e-6)
 
 
 def test_a_row_that_is_positive_only_before_the_fee_is_refused_by_its_own_name():
     # -116 -> -110 on Polymarket: gross venue EV ~2.5% passes the 2% minimum; the
-    # 1.5c/contract fee takes it NEGATIVE (~-0.3%), so it is not a +EV bet at all.
+    # ~1.7c/contract fee takes it NEGATIVE, so it is not a +EV bet at all.
     scoped, _ = scope_rows_to_venue([_row(best=-116, ev_pct=0.0)], "polymarket")
     (row,) = scoped
     assert row["ev_pct"] >= 2.0 and row["ev_pct_net_of_fee"] <= 0.0, (row["ev_pct"], row["ev_pct_net_of_fee"])

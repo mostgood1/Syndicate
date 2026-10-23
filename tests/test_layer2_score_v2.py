@@ -44,9 +44,10 @@ def test_an_unknown_kalshi_series_is_charged_the_full_rate_and_says_so():
     assert row["fee_is_upper_bound"] is True
 
 
-def test_polymarket_fee_is_flat_per_contract_and_sportsbooks_pay_none():
+def test_polymarket_fee_is_the_filed_quadratic_and_sportsbooks_pay_none():
     poly = _v2(113, 0.4935, "polymarket")
-    assert poly["fee_per_contract"] == pytest.approx(0.015)
+    p = 100 / 213
+    assert poly["fee_per_contract"] == pytest.approx(0.0695 * p * (1 - p), abs=1e-6)
     book = _v2(113, 0.4935, "draftkings")
     assert book["fee_per_contract"] == 0.0 and book["fee_basis"] == "none"
     assert book["ev_net_pct"] == pytest.approx(OS.expected_value_pct(113, 0.4935), abs=1e-3)

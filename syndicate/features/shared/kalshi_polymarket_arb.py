@@ -436,14 +436,14 @@ def net_edge_per_contract(
     THE POLYMARKET LEG IS A BOUND, NOT A COST
     --------------------------------------------------------------------------
 
-    `fees_dollars` is null on all 13 of our filled Polymarket orders, and the
-    per-market `feeCoefficient` has never had its units observed. So the
-    Polymarket half uses `venue_fees.polymarket_worst_case_fee_dollars`, which
-    is deliberately more expensive than the venue we HAVE measured. An
+    The Polymarket fee is the filed `0.0695 * p * (1-p)` (verified on our own
+    fills 2026-10-23), but by default the Polymarket half uses
+    `venue_fees.polymarket_worst_case_fee_dollars` -- the same parabola at the
+    dearest filed theta, deliberately more expensive than the real fee. An
     opportunity that survives it is real even if Polymarket turns out to cost
     more than we think; one that only appears with a cheaper number is not
-    evidence of anything. `polymarket_fee_bound=False` refuses instead, for a
-    caller that would rather have no number than a bound.
+    evidence of anything. `polymarket_fee_bound=False` prices the filed fee
+    itself, for a caller that wants the cost rather than a bound.
     """
     from syndicate.features.shared.venue_fees import (
         kalshi_taker_fee_dollars,
@@ -458,7 +458,7 @@ def net_edge_per_contract(
         polymarket_fee = polymarket_worst_case_fee_dollars(1.0, polymarket_price)
         polymarket_fee_basis = "worst_case_bound"
     else:
-        polymarket_fee = polymarket_fee_dollars(1.0, polymarket_price)  # raises
+        polymarket_fee = polymarket_fee_dollars(1.0, polymarket_price)
         polymarket_fee_basis = "measured"
 
     # Fees at a single contract round up to a full grain each, which at C=1
@@ -467,7 +467,7 @@ def net_edge_per_contract(
     from syndicate.features.shared.venue_fees import (
         KALSHI_BASE_TAKER_RATE,
         POLYMARKET_ASSUMED_WORST_CASE_RATE,
-        POLYMARKET_MEASURED_NOTIONAL_RATE,
+        POLYMARKET_TAKER_THETA,
     )
 
     kalshi_rate_cost = (
@@ -479,17 +479,13 @@ def net_edge_per_contract(
     # net edge identical to the bounded one, because the rate below was always
     # the worst case. A flag whose name says "measured" and whose behaviour says
     # "bound" is worse than no flag.
-    # POLYMARKET'S FEE IS NOT A PARABOLA. Kalshi's vanishes at the tails;
-    # Polymarket's is a flat proportion and does not. Modelling it quadratically
-    # -- as this line did -- understates the tails by an order of magnitude, and
-    # the tails are exactly where in-play pairs live. Measured: at P=0.94
-    # Kalshi's MLB fee is 0.0020/contract and Polymarket's 0.0150.
+    # BOTH ARE THE FILED PARABOLA `theta * p * (1-p)` (QCX's CFTC fee schedule,
+    # 17/18 of our live commissions to the cent -- `venue_fees`). The measured
+    # branch was a flat 1.5c until 2026-10-23, and the bound was a 0.02 theta that
+    # sat UNDER the real 0.0695 at every price.
     pmp = float(polymarket_price)
-    if polymarket_fee_bound:
-        polymarket_rate_cost = POLYMARKET_ASSUMED_WORST_CASE_RATE * pmp * (1.0 - pmp)
-    else:
-        # Flat per contract, independent of price -- the measured shape.
-        polymarket_rate_cost = POLYMARKET_MEASURED_NOTIONAL_RATE
+    theta = POLYMARKET_ASSUMED_WORST_CASE_RATE if polymarket_fee_bound else POLYMARKET_TAKER_THETA
+    polymarket_rate_cost = theta * pmp * (1.0 - pmp)
     total_rate_cost = kalshi_rate_cost + polymarket_rate_cost
 
     return {
