@@ -760,6 +760,28 @@ def _is_in_play(commence_time: Any, now: datetime) -> bool | None:
     return now >= start
 
 
+_HOLD_AT_OR_ABOVE_ENV = "SYNDICATE_EXIT_HOLD_AT_OR_ABOVE_BID"
+_DEFAULT_HOLD_AT_OR_ABOVE = 0.90
+
+
+def _hold_at_or_above_bid() -> float | None:
+    """The bid at or above which a position is held to settlement; None = guard off.
+
+    Absent or 0 = off (the pre-guard behaviour). A value that is SET but unusable
+    means the 0.90 default -- an unknown must not land on "sell anything".
+    """
+    raw = str(os.environ.get(_HOLD_AT_OR_ABOVE_ENV) or "").strip()
+    if not raw:
+        return None
+    try:
+        value = float(raw)
+    except ValueError:
+        return _DEFAULT_HOLD_AT_OR_ABOVE
+    if value != value or value < 0 or value >= 1:
+        return _DEFAULT_HOLD_AT_OR_ABOVE
+    return None if value == 0 else value
+
+
 def evaluate_exit(
     position: OpenPosition,
     market: Mapping[str, Any] | None,
@@ -793,6 +815,14 @@ def evaluate_exit(
     bid = leg_bid(market, position.leg)
     if bid is None:
         return {**base, "reason": "no_bid"}
+    # HOLD NEAR SETTLEMENT [user 2026-10-23, "guard against in game exits where
+    # the prop has been achieved", design "Price guard (fast)"]: on 10-23 00:07Z
+    # a won "over 0.5 blocks" was sold at ~$0.94 when it settles at $1. A bid
+    # this high means the outcome is (nearly) locked, so never sell: hold to
+    # settlement. `SYNDICATE_EXIT_HOLD_AT_OR_ABOVE_BID` (e.g. 0.90; absent/0 = off).
+    hold_at = _hold_at_or_above_bid()
+    if hold_at is not None and bid >= hold_at - 1e-9:
+        return {**base, "reason": "near_settlement_hold", "bid": bid, "hold_at_or_above": hold_at}
     exit_fee = estimate_fee(position.family, position.ticker, position.contracts, bid)
     net = bid - (exit_fee / position.contracts if position.contracts else 0.0)
     cost = position.entry_cost_per_contract
