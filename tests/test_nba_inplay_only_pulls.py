@@ -141,3 +141,72 @@ def test_the_nba_refresh_passes_it_to_the_fetcher():
                                                                 bookmakers="", markets="")
     source = (ROOT / "scripts" / "refresh_nba_oddsapi_props.py").read_text(encoding="utf-8")
     assert "in_play_only=bool(args.in_play_only)" in source and "in_play_only=in_play_only," in source
+
+
+def test_pregame_games_are_due_every_30_minutes_while_others_are_live():
+    # 10-23: from CHI @ MIL's 3:10 PM CT tip every NBA props pull was in-play only, and DET @ MIA (7:10 PM) carried 4
+    # board rows at 6:22 PM. A not-yet-started game is now due when it was never pulled or pulled 30+ minutes ago.
+    assert fetch.PREGAME_REFRESH_MINUTES == 30.0
+    events = [_ev("live", "2026-10-21T00:10:00Z"), _ev("never", "2026-10-21T02:00:00Z"),
+              _ev("stale", "2026-10-21T02:30:00Z"), _ev("fresh", "2026-10-21T03:00:00Z")]
+    last = {"stale": "2026-10-21T00:30:00+00:00", "fresh": "2026-10-21T00:50:00+00:00"}   # 30 and 10 min before NOW
+    assert [e["id"] for e in fetch.upcoming_events_due(events, NOW, last)] == ["never", "stale"]
+
+
+def _fake_odds_api(calls):
+    class Resp:
+        def __init__(self, payload):
+            self._p = payload
+
+        def json(self):
+            return self._p
+
+    events = [_ev("live", "2026-10-21T00:10:00Z"), _ev("pregame", "2026-10-21T01:30:00Z")]
+
+    def fake_get(url, params):
+        calls.append(url)
+        if url.endswith("/events"):
+            return Resp(events)
+        if url.endswith("/markets"):
+            return Resp({"bookmakers": [{"markets": [{"key": "player_points"}]}]})
+        eid = url.split("/events/")[1].split("/")[0]
+        start = next(e["commence_time"] for e in events if e["id"] == eid)
+        return Resp({"id": eid, "commence_time": start, "home_team": "H", "away_team": "A", "bookmakers": [
+            {"key": "dk", "title": "DK", "markets": [{"key": "player_points", "outcomes": [
+                {"name": "Over", "description": "P", "point": 10.5, "price": -110}]}]}]})
+
+    return fake_get
+
+
+def test_the_in_play_pull_takes_a_due_pregame_game_and_records_it(tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setattr(fetch, "_get", _fake_odds_api(calls))
+    monkeypatch.setattr(fetch, "league_sport_keys", lambda league: ("basketball_nba",))
+    kw = dict(api_key="k", league="nba", date_str="2026-10-20", regions="us", bookmakers=None,
+              markets=["player_points"], in_play_only=True, now=NOW)
+    # Reachability: no pull record (None) is the old in-play-only pull -- the pregame game is never asked.
+    assert set(fetch.fetch_player_props_current(**kw)["event_id"]) == {"live"}
+    assert not any("/events/pregame/" in u for u in calls)
+    # A record (even empty) also takes the due pregame game; pulled 10 min ago it waits.
+    calls.clear()
+    assert set(fetch.fetch_player_props_current(**kw, pregame_last={})["event_id"]) == {"live", "pregame"}
+    calls.clear()
+    recent = {"pregame": (NOW - pd.Timedelta(minutes=10)).isoformat()}
+    assert set(fetch.fetch_player_props_current(**kw, pregame_last=recent)["event_id"]) == {"live"}
+    assert not any("/events/pregame/" in u for u in calls)
+
+    # main: the record beside the snapshot gets the pregame game, never the live one; the next pull skips it.
+    out = tmp_path / "props.csv"
+    pd.DataFrame([{"event_id": "live", "commence_time": "2026-10-21T00:10:00Z", "price": -110}]).to_csv(out, index=False)
+    monkeypatch.setenv("ODDS_API_KEY", "k")
+    monkeypatch.setattr(fetch, "_load_env", lambda: None)
+    monkeypatch.setattr(fetch, "_append_basketball_book_quotes", lambda **kw: None)
+    monkeypatch.setattr(fetch, "_utc_now", lambda: NOW)
+    calls.clear()
+    assert fetch.main(["--league", "nba", "--date", "2026-10-20", "--out", str(out), "--in-play-only"]) == 0
+    record = fetch.json.loads(fetch._pregame_pulls_path(out).read_text())
+    assert set(record) == {"pregame"} and pd.Timestamp(record["pregame"]) == NOW
+    assert sorted(set(pd.read_csv(out)["event_id"])) == ["live", "pregame"]
+    calls.clear()
+    assert fetch.main(["--league", "nba", "--date", "2026-10-20", "--out", str(out), "--in-play-only"]) == 0
+    assert not any("/events/pregame/" in u for u in calls)                      # pulled at NOW: not due again yet

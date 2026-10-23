@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 from pathlib import Path
+from typing import Mapping
 
 import pandas as pd
 import requests
@@ -241,6 +243,65 @@ def in_play_events(events: list[dict], now: pd.Timestamp, window_hours: float = 
     return out
 
 
+# PREGAME GAMES STILL GET A PULL WHILE OTHERS ARE LIVE (2026-10-23, user: "NBA games are live but nothing on layer 2 board
+# is updating"). Measured 10-23: from CHI @ MIL's 3:10 PM CT tip every NBA props pull was this forced in-play one, so the
+# 6 PM and later games got no props refresh until they tipped -- at 6:22 PM DET @ MIA carried 4 board rows, its last game
+# quote 11:00 AM. The full pull this replaced had refreshed them every 4 minutes as a side effect. So the in-play pull
+# also takes each not-yet-started game of the date at most once every PREGAME_REFRESH_MINUTES (the last pull per game is
+# kept beside the snapshot, `_pregame_pulls_path`): pregame props stay <= 30 min old at a fraction of the full cost.
+PREGAME_REFRESH_MINUTES = 30.0
+
+
+def upcoming_events_due(events: list[dict], now: pd.Timestamp, last_pulled: Mapping[str, str],
+                        every_minutes: float = PREGAME_REFRESH_MINUTES) -> list[dict]:
+    """The events that have not started and were last pulled `every_minutes` or more ago (or never)."""
+    out = []
+    for event in events:
+        try:
+            start = pd.Timestamp(str(event.get("commence_time") or ""))
+        except Exception:
+            continue
+        if start.tzinfo is None:
+            start = start.tz_localize("UTC")
+        if start <= now:
+            continue
+        last = last_pulled.get(str(event.get("id") or ""))
+        try:
+            due = last is None or now - pd.Timestamp(last) >= pd.Timedelta(minutes=float(every_minutes))
+        except Exception:
+            due = True
+        if due:
+            out.append(event)
+    return out
+
+
+def _utc_now() -> pd.Timestamp:
+    return pd.Timestamp.now(tz="UTC")
+
+
+def _pregame_pulls_path(out_path: Path) -> Path:
+    return out_path.with_name(f"{out_path.stem}.pregame_pulls.json")
+
+
+def _record_pregame_pulls(out_path: Path, last: Mapping[str, str] | None, fresh: pd.DataFrame, pulled_at: pd.Timestamp) -> None:
+    """Stamp the pull time on every not-yet-started game that came back with rows (a game whose call failed stays due)."""
+    if last is None or fresh.empty or "event_id" not in fresh.columns or "commence_time" not in fresh.columns:
+        return
+    record = dict(last)
+    for event_id, commence in fresh[["event_id", "commence_time"]].drop_duplicates().itertuples(index=False):
+        try:
+            start = pd.Timestamp(str(commence))
+            start = start.tz_localize("UTC") if start.tzinfo is None else start
+        except Exception:
+            continue
+        if start > pulled_at:
+            record[str(event_id)] = pulled_at.isoformat()
+    try:
+        _pregame_pulls_path(out_path).write_text(json.dumps(record, sort_keys=True), encoding="utf-8")
+    except OSError:
+        pass                         # a lost record only makes the next pull take the pregame games again
+
+
 def merge_in_play_rows(existing: pd.DataFrame | None, fresh: pd.DataFrame) -> pd.DataFrame:
     """The day's snapshot with the freshly fetched events' rows REPLACED and every other event's rows kept.
 
@@ -253,7 +314,7 @@ def merge_in_play_rows(existing: pd.DataFrame | None, fresh: pd.DataFrame) -> pd
     return pd.concat([kept, fresh], ignore_index=True, sort=False)
 
 
-def fetch_player_props_current(*, api_key: str, league: str, date_str: str, regions: str, bookmakers: str | None, markets: list[str] | None, in_play_only: bool = False, now: pd.Timestamp | None = None) -> pd.DataFrame | None:
+def fetch_player_props_current(*, api_key: str, league: str, date_str: str, regions: str, bookmakers: str | None, markets: list[str] | None, in_play_only: bool = False, now: pd.Timestamp | None = None, pregame_last: Mapping[str, str] | None = None) -> pd.DataFrame | None:
     """Returns an empty DataFrame when the fetch itself was inconclusive
     (network/API failure, malformed response) -- the caller may reasonably
     fall back to a recent prior snapshot in that case, same as before.
@@ -318,8 +379,13 @@ def fetch_player_props_current(*, api_key: str, league: str, date_str: str, regi
     if not day_events:
         return pd.DataFrame() if any_listing_failed else None
     if in_play_only:
-        day_events = in_play_events(day_events, now if now is not None else pd.Timestamp.now(tz="UTC"))
-        print(f"IN_PLAY_ONLY league={league} date={date_str} events_in_play={len(day_events)}", flush=True)
+        now_ts = now if now is not None else pd.Timestamp.now(tz="UTC")
+        live = in_play_events(day_events, now_ts)
+        # `pregame_last` None = in play only; a mapping (even empty) = also the pregame games that are due.
+        upcoming = upcoming_events_due(day_events, now_ts, pregame_last) if pregame_last is not None else []
+        day_events = live + upcoming
+        print(f"IN_PLAY_ONLY league={league} date={date_str} events_in_play={len(live)} pregame_due={len(upcoming)}",
+              flush=True)
         if not day_events:
             return pd.DataFrame()
 
@@ -509,6 +575,13 @@ def main(argv: list[str] | None = None) -> int:
     out_path = Path(args.out).resolve()
     out_path.parent.mkdir(parents=True, exist_ok=True)
     market_list = [market.strip() for market in str(args.markets or "").split(",") if market.strip()]
+    pregame_last: dict[str, str] | None = None
+    if args.in_play_only:
+        try:
+            pregame_last = dict(json.loads(_pregame_pulls_path(out_path).read_text(encoding="utf-8")))
+        except Exception:
+            pregame_last = {}
+    pulled_at = _utc_now()
     df = fetch_player_props_current(
         api_key=api_key,
         league=args.league,
@@ -519,6 +592,8 @@ def main(argv: list[str] | None = None) -> int:
         bookmakers=args.bookmakers if args.bookmakers is not None else _league_prop_bookmakers(args.league),
         markets=(market_list or None),
         in_play_only=bool(args.in_play_only),
+        now=pulled_at,
+        pregame_last=pregame_last,
     )
 
     if df is None:
@@ -551,6 +626,7 @@ def main(argv: list[str] | None = None) -> int:
         atomic_write_csv(out_path, merged)
         print(f"Wrote {out_path} with {len(merged)} rows ({len(df)} in play, merged).")
         _append_basketball_book_quotes(league=str(args.league), date_str=str(args.date), df=df)
+        _record_pregame_pulls(out_path, pregame_last, df, pulled_at)
         return 0
 
     existing_has_rows = False
