@@ -123,3 +123,9 @@ The original proposal follows.
 Recommendation: **(A)**. The fee is filed, and 17 of 18 of our own fills confirm it.
 
 Raw extracts are in `C:\tmp\pmfee\`: filing PDFs and text, `comm.json`, `ledger_live.json`, `board_pm_v3.json`.
+
+## 6. Live reading after the 19:58:00Z up (deploys.md 20:07:29Z)
+- 28 rebuilt rows carry `polymarket_filed_quadratic`; the fee is exactly 0.0695·p(1−p).
+- Rows above the 0.5% floor, on the same rows with fair held fixed: **2 under flat → 1 under filed.**
+  - §4's 7 → 0 was this morning's board. The mid-price shift (−0.48 pp) matches; the count depends on the day's fairs.
+- Commissions: 19/20 exact and none above, including 2 out-of-sample fills at 0.52 and 0.46 that flat gets wrong.

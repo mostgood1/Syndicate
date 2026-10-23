@@ -53978,3 +53978,23 @@ which is about the two sizing bases and not about the refusal boundary.
   - (2) The fee lane's three readings: the fee_basis split after a Layer 2 rebuild, Polymarket live candidates falling, and COMMISSION lines within 1c of the formula.
 - **next:** `db292883` (#709 step 2 shadow DecisionRecord), a refresh-worker role restart armed for >= 20:58:30Z.
 - **rollback:** delete the band env line (band off), revert 80edc2aa for the fee, then a full down/up.
+
+## 2026-10-23 20:07:29Z -- READING for the 19:58:00Z fleet up (80edc2aa, Polymarket filed fee): owed item (2), lane polymarket-fee-quadratic, session 9333b297 -- **MET on all three; the size of the floor effect is SMALLER than predicted**
+- **(a) fee_basis split -- MET.**
+  - Baseline at 19:58:46Z (+31 s, before any rebuild): 53 unique Polymarket rows across 46 `layer2_shortlist_2026_10_2[3-6]*` keys, all `polymarket_measured_notional`.
+  - At 20:06:40Z (watcher) / 20:06:50Z: 28 rows `polymarket_filed_quadratic`, 24 still `polymarket_measured_notional`. That is a partial rebuild: some keys had not been rewritten yet.
+  - Fee on a new row: 0.017349 at p=0.481, exactly 0.0695*p*(1-p).
+- **(b) Polymarket candidates above the 0.5% live floor fall -- MET, but by 2 -> 1, NOT the predicted 7 -> 0.**
+  - Method: on the same 28 rebuilt rows, hold each row's fair fixed (recovered from ev_net + fee) and recompute ev_net under the old flat 0.015.
+  - Result: 2 rows pass under flat, 1 under filed. Mean shift -0.34 pp, from -0.48 pp at the mid to +1.30 pp on a tail row.
+  - The survivor is an NCAAF total at +108 with ev_net 0.837, which would be 1.315 under flat.
+  - **The 7 -> 0 in the findings note was a 10-23 morning board.** Today's fairs differ, and one row has enough margin to survive.
+  - **A naive before/after on the same row misleads:** the +108 NCAAF total read 0.8534 -> 0.8373 (-0.016 pp) because its fair moved 0.5000 -> 0.5023 between reads.
+- **(c) COMMISSION lines within 1c, never above -- MET.**
+  - The reconcile at 19:59:06Z re-read 14 orders: 13 exact, plus D816C6F010JF at -1c (already known: multi-fill rounding).
+  - Two fills that were NOT in the 18-fill fit (out of sample) are both exact, and both separate the models:
+    - D9BHV1M011M3: 9.98 @ 0.52 -> $0.17. Flat would give $0.15.
+    - D9BQVXJG11TB: 12.10 @ 0.46 -> $0.21. Flat would give $0.18.
+  - Running total: 19/20 exact, 0 above.
+  - No order has been PLACED since the up yet, so this verifies the formula, not a behaviour change of the deploy. Commissions are the venue's own number either way.
+- **Not yet observed:** a live Polymarket pass refusing a row on `ev_net_of_fee_below_min` that would have passed under flat. That needs a live pass with such a row on the board; the 1 -> 0 margin row above is the candidate.

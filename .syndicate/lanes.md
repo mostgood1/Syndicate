@@ -2033,7 +2033,12 @@ death, never life — do not invert it.
 - Verification: findings file with per-day, per-section counts from the fleet files (export time vs final sheet, CT), named writer, and a proposed fix with its test sent to session 9e18a0e7
 - Blocked by: none
 
-### polymarket-fee-quadratic — OPEN — opened 2026-10-23 — session 9333b297-2d6c-4fdc-8f27-9dc7d7ebe699
+### polymarket-fee-quadratic — CLOSED 2026-10-23 (GOAL MET) — opened 2026-10-23 — session 9333b297-2d6c-4fdc-8f27-9dc7d7ebe699
+- **CLOSED 2026-10-23 20:08Z, GOAL MET.** The user chose (A). Built `80edc2aa`; live from the 19:58:00Z full up (coordinator 332cb014). Verification ran (deploys.md 20:07:29Z):
+  - 28 rebuilt rows carry `polymarket_filed_quadratic`.
+  - Rows above the 0.5% floor: flat 2 -> filed 1, inputs held fixed. That is smaller than the morning board's 7 -> 0.
+  - COMMISSION: 19/20 exact, 0 above, including 2 new out-of-sample fills that separate the models.
+  - Not done: the combo refusal; the 0.5% floor (a separate decision); `execution_exits.estimate_fee` docstring still says "flat" (that lane's file).
 - Goal: Decision request to the user: refit venue_fees Polymarket US taker fee from flat $0.015/contract to the filed 0.0695*C*p*(1-p) (verified 17/18 exact on all post-go-live fills). Build only on the user's yes; no deploy without a separate yes.
 - Files: .syndicate/findings_2026-10-23_polymarket_fee_model.md, syndicate/features/shared/venue_fees.py, syndicate/features/shared/kalshi_polymarket_arb.py, tests/test_layer2_score_v2.py, tests/test_venue_basis_edge.py, tests/test_execution_exits.py (LOAN from kalshi-exit-path: expected fee values in test_polymarket_fee_is_the_filed_quadratic + test_polymarket_paper_exit_books_from_its_own_book ONLY), tests/test_venue_fees.py, tests/test_arb_net_edge.py, tests/test_paper_fees_and_closing_marks.py, tests/test_venue_order_fee_ceiling.py
 - Hypothesis: Polymarket US straight-trade taker fee is 0.0695*C*p*(1-p), banker's-rounded to the cent per fill; our flat 0.015/contract understates mid-price fees by ~0.23c and overstates the tails (p<0.315 or >0.685)
