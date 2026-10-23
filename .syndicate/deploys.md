@@ -53908,3 +53908,21 @@ which is about the two sizing bases and not about the refusal boundary.
 - **behind:** the held Kalshi UConn -15.5 spread (`57a100443e429173`, 1 contract, $0.48) -- the same blocker as the 21:29:18Z `REFUSED_SAME_AXIS_HELD`. Under b3279e52 a held leg < $1 no longer claims the margin axis; it still counts toward the per-game dollars.
 - **game exposure now:** UMass@UConn $0.48 (Kalshi spread) + $5.42 (Polymarket under 49.5) + $5.10 (Kalshi ML) = $11.00 against the $50 cap (raised by the coordinator 23:25Z).
 - **window 22:15:41Z .. 03:41Z (live-odds-worker log + ledger probe `tiny_pairs.py`):** 6 live orders since the load; placed-behind-tiny 1; `REFUSED_SAME_AXIS_HELD` 0. The `REFUSED_EVENT_CAP` lines in the window are all before the 23:25Z cap raise and carry `cap=15.00`; 0 cap lines since 23:25Z (first `cap=50.00` line still owed, session watcher armed).
+
+## 2026-10-23 05:10Z (12:10 AM CT) -- READING, NO DEPLOY: priced-first SHADOW (19:03Z env-only up) -- **MET: logs on every derive-path build, changes no minute** (lane `nba-minutes-priced-first-shadow`, session ffb7ab00, todo #723)
+- **log lines** (fleet `nba_source/logs/syndicate_refresh_oddsapi_props_<D>.log`, counted 05:09Z):
+  - 10-22: 12 `[smart_sim] NBA_SIM_MINUTES_PRICED_FIRST mode=shadow`, 0 `mode=on`, 0 `error=`.
+  - 10-20 / 10-21 / 10-23 / 10-24: 0 of each. Nothing on the derive path was BUILT there after the up (10-23's sims are D-1 builds, reused).
+  - The 12 lines are 4 builds after the up: PHI_CLE at 20:40Z and 22:34Z, OKC_DEN at ~23:59Z and 01:03Z. Each team is logged twice per build, once for the engine's minutes and once for the published `min_mean`; both calls return off.
+  - OKC has no line: it is on the rotation-HISTORY path, which the switch does not touch.
+- **minutes unchanged** (`scripts/nba_sim_minutes_audit.py` replay, the current engine_inputs: PHI_CLE written 22:34:16Z, OKC_DEN 01:03:34Z, both after the up):
+  - Production `_sim_min` == the OFF replay, max deviation **0.0000** on DEN, PHI and CLE.
+  - Published `min_mean` == engine `_sim_min`, max deviation **0.0** on all four sides.
+  - So shadow changed nothing that the engine or a reader sees.
+- **the shadow numbers are the replay's ON, exactly:**
+  - DEN moved 48.2 / priced +24.1 (log `moved=48.2 priced_gain=+24.1`).
+  - PHI 68.6 / +34.3.
+  - CLE 37.0 / +18.5.
+  - Priced 7 of 12 on each side; `set=priced protected=7`.
+  - The log line is the replay's arithmetic at build time, with no drift between the two.
+- **what the size means, no decision owed:** `moved` sums |ON - OFF| over the pool, so half of it is the minutes that would shift onto priced players (24-34 per side). That is in line with the 10-21 development replay (14 of 43 DNP minutes per side removed). Switching to `on` stays behind the pre-registered CONFIRMATORY reading (>= 150 played rows after 10-21; scheduled task `nba-sim-minutes-723-readings`, 2026-10-28 8:00 AM CT), the k/book-blend check and a reuse stamp. The user decides.

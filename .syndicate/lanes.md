@@ -1894,7 +1894,14 @@ death, never life — do not invert it.
 - Verification: pytest on the new test file green, with the old update_injuries / guard failing the new tests; findings carry dates, sources, readers and per-reader effect; todo entry; nothing on the fleet without the user's yes.
 - Blocked by: none
 
-### nba-minutes-priced-first-shadow — OPEN — opened 2026-10-22 — session ffb7ab00-4a20-4c1b-8afe-0175450f1082
+### nba-minutes-priced-first-shadow — CLOSED 2026-10-23 (GOAL MET) — opened 2026-10-22 — session ffb7ab00-4a20-4c1b-8afe-0175450f1082
+- GOAL VERDICT `[2026-10-23 05:11Z / 12:11 AM CT]`. Goal (verbatim): "SYNDICATE_NBA_SIM_MINUTES_PRICED_FIRST=shadow is live on the fleet (user 2026-10-22: 'turn on the priced-first switch in shadow'): one env line added to local_production.env (backup kept) and loaded by a full down/up under all three claims with check_deploy_safety CLEAR and the 60-min role spacing; verified by the new refresh-worker pid reading the key as shadow (enum only), the first NBA props refresh after the up logging NBA_SIM_MINUTES_PRICED_FIRST mode=shadow lines, and the sims it writes keeping OFF minutes (replay off_dev 0.000); deploys.md entry with the undo." -- **GOAL: MET.**
+  - One env line was added (151 -> 152, backup `.bak-priced-first-shadow-20261022T190327Z`) and loaded by a full down/up 19:03:27Z under all three claims. Gates: drain CLEAR, safety CLEAR, watchdog 0 findings, spacing 73 min.
+  - All three new pids read `shadow`, and live stayed armed.
+  - First post-up NBA builds: 12 `mode=shadow` lines, 0 `mode=on`.
+  - The off replay reproduces production `_sim_min` to 0.0000 (DEN/PHI/CLE).
+  - deploys.md 19:03:27Z (undo) + 05:10Z (reading).
+  - `on` stays behind #723's confirmatory reading (scheduled 2026-10-28 8:00 AM CT) and the user's decision.
 - Goal: SYNDICATE_NBA_SIM_MINUTES_PRICED_FIRST=shadow is live on the fleet (user 2026-10-22: 'turn on the priced-first switch in shadow'): one env line added to local_production.env (backup kept) and loaded by a full down/up under all three claims with check_deploy_safety CLEAR and the 60-min role spacing; verified by the new refresh-worker pid reading the key as shadow (enum only), the first NBA props refresh after the up logging NBA_SIM_MINUTES_PRICED_FIRST mode=shadow lines, and the sims it writes keeping OFF minutes (replay off_dev 0.000); deploys.md entry with the undo.
 - Files: .syndicate/deploys.md (one append-only entry; the change itself is one line in ~/syndicate-prod/local_production.env on the fleet, outside the repo), .syndicate/state_basketball.md ([nba-sim-minutes-allocation] section only)
 - Hypothesis: n/a

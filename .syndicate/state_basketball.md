@@ -1348,6 +1348,7 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
     All three roles read `SYNDICATE_NBA_SIM_MINUTES_PRICED_FIRST=shadow` (global key; `_SET` absent = `priced`).
     Each derive-path build logs `NBA_SIM_MINUTES_PRICED_FIRST mode=shadow ...` and returns the water-fill.
     Undo: delete the line, then a full down/up (deploys.md 19:03:27Z).
+    **READ 2026-10-23 05:10Z: MET.** 12 shadow lines on 4 post-up 10-22 builds, 0 `mode=on`, 0 errors. Production `_sim_min` == the off replay (0.0000, DEN/PHI/CLE), and published `min_mean` == engine (0.0). The logged moved/priced_gain equal the replay's ON exactly (DEN 48.2/+24.1, PHI 68.6/+34.3, CLE 37.0/+18.5) (deploys.md 05:10Z).
 - **Variant V-S also on main, default off (`907e9c9c`):** `SYNDICATE_NBA_SIM_MINUTES_PRICED_FIRST_SET=priced_starters`
   protects only priced players with `_starter_signal >= 0.55`.
   - Read only when the main switch is shadow or on.
