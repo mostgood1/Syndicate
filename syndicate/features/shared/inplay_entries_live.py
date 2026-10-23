@@ -62,9 +62,23 @@ def day_budget_dollars() -> float:
     return DAY_DOLLARS_CEILING if not (v >= 0) else min(v, DAY_DOLLARS_CEILING)
 
 
+def game_axis(ticker: str) -> tuple[str, str]:
+    """(game code, axis) of a full-game Kalshi ticker, the executor's R1 axes: moneyline and spread are
+    the MARGIN axis, a total is the TOTAL axis. `KXNBATOTAL-26OCT23DALIND-249` -> ("26OCT23DALIND", "total")."""
+    parts = str(ticker or "").split("-")
+    game = parts[1] if len(parts) > 1 else ""
+    return game, ("total" if parts[0].endswith("TOTAL") else "margin")
+
+
 def in_game_spend(orders: Sequence[Mapping[str, Any]], day: str) -> dict[str, Any]:
-    """Today's live in-game stake and order count, from the ledger (submitted + filled)."""
-    dollars, count, keys = 0.0, 0, set()
+    """Today's live in-game stake and order count, from the ledger (submitted + filled).
+
+    Stake plus the recorded fee, so the $ cap is a cap on cash out. `held_axes` = the (game, axis) pairs
+    holding a submitted or filled in-game order today: ONE entry per game axis (user/coordinator
+    2026-10-23, after two DAL@IND unders on adjacent lines in 43 s). An IOC that did not fill
+    (rejected) holds nothing, so a later signal on that axis may try again.
+    """
+    dollars, count, keys, axes = 0.0, 0, set(), set()
     for o in orders:
         pk = str(o.get("position_key") or "")
         if not pk.startswith(POSITION_PREFIX) or str(o.get("selected_date") or "") != day:
@@ -72,8 +86,10 @@ def in_game_spend(orders: Sequence[Mapping[str, Any]], day: str) -> dict[str, An
         keys.add(pk)
         if str(o.get("status") or "") in {"filled", "submitted"}:
             dollars += float(o.get("fill_stake_dollars") or o.get("requested_stake_dollars") or 0.0)
+            dollars += float(o.get("fees_dollars") or 0.0)
             count += 1
-    return {"dollars": round(dollars, 4), "orders": count, "position_keys": keys}
+            axes.add(game_axis(str(o.get("venue_ticker") or pk[len(POSITION_PREFIX):].rsplit(":", 1)[0])))
+    return {"dollars": round(dollars, 4), "orders": count, "position_keys": keys, "held_axes": axes}
 
 
 class LivePrice:
@@ -148,6 +164,8 @@ class LiveEntryPlacer:
         stake = round(ask + MAX_PRICE_MOVE, 4)  # floors to exactly 1 contract at any live ask within 1c
         if pk in spend["position_keys"]:
             result = {"placed": False, "reason": "already_in_ledger_today"}
+        elif game_axis(ticker) in spend["held_axes"]:
+            result = {"placed": False, "reason": "same_game_axis_held", "axis": "/".join(game_axis(ticker))}
         elif spend["dollars"] + stake > day_budget_dollars() + 1e-9:
             result = {"placed": False, "reason": "in_game_day_budget", "spend": spend["dollars"]}
         else:

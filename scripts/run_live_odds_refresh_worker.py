@@ -3288,7 +3288,11 @@ def _fast_exit_background_loop() -> None:
         try:
             entries.step()
         except Exception as exc:  # noqa: BLE001 -- paper measurement must never touch the exit loop
-            print(f"[inplay_entries_paper] PASS_FAILED {type(exc).__name__}: {exc}"[:400], flush=True)
+            # HOST ONLY: an OddsAPI URL carries the apiKey, so the full URL must never be printed.
+            from urllib.parse import urlparse
+
+            host = urlparse(str(getattr(exc, "url", None) or getattr(exc, "filename", None) or "")).netloc or "?"
+            print(f"[inplay_entries_paper] PASS_FAILED {type(exc).__name__}: {exc} host={host}"[:400], flush=True)
             entries.doc = None
         _FAST_EXIT_STOP.wait(fast_loop_seconds())
 

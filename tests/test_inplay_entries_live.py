@@ -169,3 +169,27 @@ def test_the_paper_rule_hands_its_booked_entry_to_the_hook(monkeypatch):
     assert advance2(2)["booked"] == 1  # the paper record survives a raising hook
     (e2,) = loop2.doc["entries"].values()
     assert e2["live"]["placed"] is False and "venue down" in e2["live"]["reason"]
+
+
+def test_one_entry_per_game_axis_per_day():
+    """Two DAL@IND unders on adjacent total lines must not both go out (live 2026-10-23 23:38-23:39Z)."""
+    held = {"position_key": "ingame:KXNBATOTAL-26OCT23DALIND-249:no", "venue_ticker": "KXNBATOTAL-26OCT23DALIND-249",
+            "selected_date": DAY, "status": "filled", "fill_stake_dollars": 0.42, "fees_dollars": 0.0171}
+    p, calls = _placer(orders=[held])
+    same_axis = {**ENTRY, "ticker": "KXNBATOTAL-26OCT23DALIND-251", "leg": "no", "ask": 0.44}
+    out = p(same_axis)
+    assert out["placed"] is False and out["reason"] == "same_game_axis_held" and not calls
+    other_axis = {**ENTRY, "ticker": "KXNBASPREAD-26OCT23DALIND-IND5", "leg": "yes", "ask": 0.40}
+    assert p(other_axis)["placed"] is True  # margin axis of the same game is a different axis
+    other_game = {**ENTRY, "ticker": "KXNBATOTAL-26OCT23ATLCHA-226", "leg": "yes", "ask": 0.45}
+    assert p(other_game)["placed"] is True
+
+
+def test_an_unfilled_ioc_does_not_hold_its_axis_and_fees_count():
+    dead = {"position_key": "ingame:KXNBATOTAL-26OCT23ATLCHA-226:yes", "venue_ticker": "KXNBATOTAL-26OCT23ATLCHA-226",
+            "selected_date": DAY, "status": "rejected", "requested_stake_dollars": 0.46}
+    filled = {"position_key": "ingame:KXNBATOTAL-26OCT23DALIND-249:no", "venue_ticker": "KXNBATOTAL-26OCT23DALIND-249",
+              "selected_date": DAY, "status": "filled", "fill_stake_dollars": 0.42, "fees_dollars": 0.0171}
+    s = live.in_game_spend([dead, filled], DAY)
+    assert s["dollars"] == round(0.42 + 0.0171, 4) and s["orders"] == 1
+    assert ("26OCT23ATLCHA", "total") not in s["held_axes"] and ("26OCT23DALIND", "total") in s["held_axes"]
