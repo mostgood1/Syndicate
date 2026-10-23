@@ -53998,3 +53998,12 @@ which is about the two sizing bases and not about the refusal boundary.
   - Running total: 19/20 exact, 0 above.
   - No order has been PLACED since the up yet, so this verifies the formula, not a behaviour change of the deploy. Commissions are the venue's own number either way.
 - **Not yet observed:** a live Polymarket pass refusing a row on `ev_net_of_fee_below_min` that would have passed under flat. That needs a live pass with such a row on the board; the 1 -> 0 margin row above is the candidate.
+
+## 2026-10-23 20:18Z -- READING, NO DEPLOY: per-game cap $50 -- first live R2 decision at cap=50 -- **MET** (coordinator 332cb014, owed reading taken over from archived lane live-event-concentration)
+- **Line:** `2026-10-23T20:17:08.771Z [execute_portfolio] TRIMMED_TO_EVENT_CAP placed_at=3.42 venue=kalshi ticker='KXMLBRBI-26OCT232000TBMIL-MILWCONTRERAS24-1' ... sport=mlb market=batter_rbis player='William Contreras' side=under line=0.5 price=-213.0`.
+- **What it shows:**
+  - The $50 env (since the 10-22 23:25:18Z up, and kept through the 10-23 19:58Z up) is the cap enforced: the game held about $46.58, so the leg was trimmed to the $3.42 of room.
+  - It is the 1st REFUSED/TRIMMED_TO_EVENT_CAP line since 23:25:18Z, against about 39 under $15 the previous evening.
+  - The trimmed $3.42 is under $5, so the Kalshi round-up (stake >= $5 only) correctly leaves it floored.
+  - -213 is a 0.68 probability, inside the 0.40-0.75 band.
+- **Still owed:** the settled P&L counterfactual of refused and trimmed legs. Probes are in C:\tmp\lec\.
