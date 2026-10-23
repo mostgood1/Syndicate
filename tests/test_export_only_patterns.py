@@ -62,6 +62,9 @@ EXPORT_ONLY_SAMPLES = (
     # lane nba-current-rosters: READ on the fleet data root 2026-10-20 (rosters_2025-26.csv, stats.nba, 30 teams); the
     # 2026-27 file is the ESPN current roster nba_current_rosters.py writes there.
     "nba_source/data/processed/rosters_2025-26.csv",
+    # lane decision-record-shadow (#709 step 2): written by the refresh-worker's build hook;
+    # the record set (gzip JSON, read via /stream) and its daily agreement report.
+    "reports/intelligence/decision_records/2026-10-23.json.gz",
 )
 
 FEED_LIVE_SAMPLE = EXPORT_ONLY_SAMPLES[0]

@@ -7875,6 +7875,24 @@ class IntelligenceStateService:
         except Exception as exc:
             print(f"[intelligence_state] PORTFOLIO_COMMIT_FAILED error={exc}", flush=True)
 
+        # DECISION RECORD, SHADOW (`#709` step 2, lane `decision-record-shadow`). One
+        # record per board line, written to disk beside the shortlist, then compared
+        # with the plans the commit above just wrote. NOTHING READS IT for placement,
+        # sizing or the board. After the commit so the agreement compares the same
+        # tick's plans; its own guard so it can never cost the build anything but time.
+        # `SYNDICATE_DECISION_RECORD=off` stops it. Measured cost: ~13.6 MB of records
+        # per 2,000 rows, transient; the floor is several times that, with its OWN token
+        # so no other guard's counter moves (`_abort_if_memory_critical`'s docstring).
+        try:
+            from syndicate.features.shared.decision_record import run_shadow
+
+            if not _abort_if_memory_critical(
+                "decision_record", 300 * 1024 * 1024, token="DECISION_RECORD_GUARD_SKIP"
+            ):
+                run_shadow(str(selected_date or ""), layer2_shortlist)
+        except Exception as exc:
+            print(f"[intelligence_state] DECISION_RECORD_FAILED error={type(exc).__name__}: {exc}", flush=True)
+
         pool = {
             "selected_date": selected_date,
             "source_fingerprint": source_fingerprint,

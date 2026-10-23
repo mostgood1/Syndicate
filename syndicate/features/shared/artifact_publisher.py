@@ -1653,6 +1653,10 @@ EXPORT_ONLY_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # (syndicate/features/shared/nba_current_rosters.py; model engine standard section 3: every engine input
     # auditable). READ-ONLY: rewritten in place on the data root by the props refresh, never swept or published.
     "nba_source/data/processed/rosters_*.csv",
+    # `#709` step 2 (lane `decision-record-shadow`): the per-line DecisionRecord
+    # (`<date>.json.gz`, use /stream) and its agreement report. READ-ONLY: nothing on
+    # web serves it, it must only be auditable.
+    "reports/intelligence/decision_records/*",
 )
 
 
