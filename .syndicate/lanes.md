@@ -2014,6 +2014,14 @@ death, never life — do not invert it.
 - Verification: findings file with per-date/per-sport bytes+records and truncated grep; new tests fail on origin/main's clv_departure_ledger.py and pass on the fix; departure/layer2 scorecard/run_weekly_backtests suites green; commit on origin/main
 - Blocked by: none
 
+### cheat-sheet-section-growth — OPEN — opened 2026-10-23 — session 474f66e0-85e0-4990-b17d-ec569ed5176e
+- Goal: Diagnose why cheat-sheet sections (NHL consistency first, then other sports) gain rows after a graphic of that section was exported, over 10-16..10-23: which writer, when, why, per view (live pregame / reconciled / export); propose the fix to lane cheat-sheets (session 9e18a0e7). READ-ONLY on the fleet; no edits to cheat-sheets lane files.
+- Files: .syndicate/findings_2026-10-23_cheat_sheet_section_growth.md
+- Hypothesis: H1 (code read, not yet measured): the PREGAME page recomputes sections(rows) per request from the sheet's CURRENT rows; pin_posted(only=False) puts posted rows first and appends every current row that meets the rule (consistency: form10.games>=8 and rate>=0.7, cap 25), so anything a later full build or 15-min picks merge adds or re-forms shows up below the posted rows. H2: the sheet is a RECORD (a game a later build stops pricing keeps its last rows), so the row set only grows within a day and section membership grows with it. H3: a RE-EXPORT appends a second post to posted.json and posted_entries unions every post, so even the reconciled only=True view grows after a re-export. H4 (across days): more NHL players reach form10.games>=8 as the season ages, so daily consistency sections get longer day over day.
+- Falsification test: H1/H2 falsified for a day if the consistency membership computed from the sheet as it stood at the export time equals the membership from the final sheet (no row added after the export). H3 falsified if no posted.json carries 2+ posts for the same section. H4 falsified if the per-day count of rows passing games>=8 is flat 10-16..10-23.
+- Verification: findings file with per-day, per-section counts from the fleet files (export time vs final sheet, CT), named writer, and a proposed fix with its test sent to session 9e18a0e7
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
