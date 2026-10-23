@@ -1580,15 +1580,18 @@ death, never life — do not invert it.
 - **GOAL: MET** (2026-10-21 04:45Z).
   - Reading: findings §6 markout +300 s -1.26c (CI -1.80..-0.72, n=1,613) over 23:09Z-04:39Z, 11 games. Plan §3 has stages 1-5, each with its user decision; todo #715. Main 796e55f5.
   - **Hypothesis FALSIFIED** for book-consensus fairs: positive sides exist (19.7%) but mark out negative, and Kalshi leads.
-  - STATUS 2026-10-22 15:17Z:
-    - Stage 1 fast exits are LIVE (ac248f07; first 4 live sales 00:02-00:07Z 10-22).
-    - The in-game entry rule runs PAPER on NHL (09e86a9d; 5 booked on night 1).
-    - A LIVE entry path was refused by the permission classifier and is NOT built.
+  - STATUS 2026-10-23 12:54Z:
+    - Fast exits are LIVE (6 live sales on 10-22 night).
+    - The paper entry rule is LOSING (markout -5.2c, settled ~-8c/ct, n=24).
+    - LIVE entries are BUILT (437a6249) and OFF (switch absent; switch-on refused by the classifier; the user chose to leave it off).
+    - The entry-rule sweep (5a54f3ba) finds no config positive out of sample.
+    - Stage 2 is running nightly (local_8d3e969b); NHL score/time fair is NO-GO (0eb66ed0).
+    - Take-profit margin is now 0.10 with a hold at bid >= 0.90 (coordinator, 00:28Z 10-23).
   - Kept OPEN for:
-    - (a) the paper-entry read after enough nights (pre-registered: >=200 booked, markout +300 s CI > 0, else stop);
-    - (b) stage-2 measurement + a nightly recorder. The user said "Start stage 2" (relayed by 332cb014, 10-22 ~17Z); the card task_2ae479d3 needs the user's own click here;
-    - (c) take-profit: the user chose "Raise margin to >=0.30" (relayed). The coordinator 332cb014 owns the change; NOT live at 17:19Z (env key absent);
-    - (d) the fast-vs-slow settled counterfactual from execution_exits_fast.json.
+    - (a) a better FAIR (the gates are not the problem; findings §9);
+    - (b) the nightly sweep beside the scoreboard (asked of local_8d3e969b);
+    - (c) re-running the walk-forward at >= 5 nights before any rule change ships or the switch is revisited;
+    - (d) the fast-vs-slow-vs-hold settled read (first 4 sales: ~-$1.29 vs hold).
 - 2026-10-21 ~21:3xZ user decisions (asked here): "Exits + tiny entries live", then "Yes, take the loan" -- fast loop dispatches live sales via the slow tick's run_exit_tick; capped NHL-spread in-game entries (1 contract, $10/day) to follow.
 - Files: syndicate/features/shared/execution_exits.py (`EXIT_STATE_LOCK` + the `run_exit_tick` lock wrapper ONLY -- LOAN from kalshi-exit-path approved by the user 2026-10-21 ~21:45Z, owner session unreachable; body unchanged), scripts/inplay_recorder.py, scripts/inplay_edge_report.py, scripts/inplay_exit_replay.py, scripts/inplay_fair_score.py, scripts/run_fast_exit_loop.py (NEW), .syndicate/findings_2026-10-20_in_game_trading.md, syndicate/features/shared/execution_exits_fast.py (NEW, stage 1 fast exit loop PAPER; imports execution_exits read-only, never edits it), tests/test_execution_exits_fast.py (NEW), syndicate/features/shared/inplay_entries_paper.py (NEW, in-game entry rule PAPER ONLY, no order path), tests/test_inplay_entries_paper.py (NEW), syndicate/features/shared/inplay_entries_live.py (NEW, LIVE in-game entries behind SYNDICATE_INPLAY_ENTRIES, default off; user 2026-10-23), tests/test_inplay_entries_live.py (NEW), scripts/inplay_rule_sweep.py (NEW, entry-rule optimisation loop), tests/test_inplay_rule_sweep.py (NEW), syndicate/features/shared/kalshi_orders.py (`order_body_v2` allowlisted time_in_force=IOC seam ONLY -- LOAN from kalshi-cancel-alert, user-approved 2026-10-21 + permission rule 2026-10-23), scripts/run_live_odds_refresh_worker.py (`_fast_exit_background_loop` + `start_fast_exit_loop` + their one call in main() ONLY, NEW section), scripts/inplay_scoreboard.py (NEW, stage 2), scripts/inplay_nightly.py (NEW, stage 2), tests/test_inplay_fair_score.py (NEW, stage 2)
 - STAGE 2 BUILT 2026-10-22 (side session f7ccc844 of b14b84d0, working under this lane): score/time baseline in inplay_fair_score.py, per-(fair, sport, market) scoreboard inplay_scoreboard.py, nightly wrapper inplay_nightly.py; Windows scheduled task `Syndicate inplay nightly` (user in chat ~12:35 PM CT: "Yes, all 4 sports"). Read-only; no fleet change. Findings §8, todo #715.

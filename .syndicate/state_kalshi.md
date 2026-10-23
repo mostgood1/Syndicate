@@ -917,5 +917,12 @@ board. The loop therefore checks `budget_remaining()` BEFORE spending.
 - **IN-GAME ENTRY RULE IS PAPER ONLY** (`inplay_entries_paper.py`, 09e86a9d)
   - Scope: NHL spreads away from a score change, >=3% book edge, 1 contract, $10/day would-be.
   - It records and grades (markout +60/+300 s, settlement) to `inplay_entries_paper.json`. It has no order path.
-  - First night: 5 booked. That is too few to judge.
-  - **No live in-game entry path exists.** Live Kalshi entries after kickoff stay refused (`REFUSED_AFTER_COMMENCE`) unless a position carries `fair_source="in_game"`, and nothing stamps it.
+  - Its paper budget is now $50/day.
+  - **It is LOSING** `[verified 2026-10-23]`: 10-22 night markout +300 s -5.17c (n=23); 24 settled, -$1.97 (~-8c/contract).
+- **LIVE in-game entries exist but are OFF** `[verified on the fleet 2026-10-23 12:38Z]`
+  - `inplay_entries_live.py` (437a6249) is on the fleet (HEAD 4eafd1d5). It places only what the paper rule books: 1 contract, IOC via `order_body_v2` honouring `time_in_force`, $50/day.
+  - It is live only with `SYNDICATE_INPLAY_ENTRIES=on`. That key is ABSENT on the fleet, so the code is inert. Turning it on needs an env line + a full down/up; this session's classifier refused that step.
+- **Entry-rule sweep (5a54f3ba, findings §9):** no setting of the rule is positive on an unseen night.
+  - NHL walk-forward: +22.7c -> -9.8c. NBA: +13.5c -> -17.1c.
+  - 0 of 324 / 0 of 33 configs positive on both nights.
+  - The defect is the fair (book consensus lags Kalshi), not the gates.
