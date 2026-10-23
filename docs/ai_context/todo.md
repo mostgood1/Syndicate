@@ -117,6 +117,7 @@
   - **OWED:** after 12:00 AM CT 10-23, 10-22's rows still read `nba_official`: the 11:30 PM ET report fetched by URL, not the fallback.
 - **For `#723` (not this lane's file):** its confirmatory reading of 10-22..10-27 reads those dates' rows as they stand then: fallback without this ff, the final official report with it.
 - **Leads:** NOT-YET-SUBMITTED teams are dropped by the parser (no exclusions for them until they submit). Every write re-cleans ALL dates with today's roster, so past snapshots still mutate. WNBA's copy of the writer is unchanged.
+- **READINGS (2)+(3) MET 2026-10-23 7:41 AM CT** (backstop read by overseer 15f24a49; the owner's overnight watcher never reported): 10-22 = 92 rows all `nba_official` after midnight, 0 fallback; 10-22 builds logged `INJURY_SNAPSHOT_OFFICIAL` x4. deploys.md 2026-10-23 12:41Z.
 
 ### `#729` — **Kalshi/Polymarket MLB prop orders had almost no same-book close (kalshi 39 of 266 own-book, polymarket 0 of 95) because the quote log, which held the venue's own close, was never asked for a prop. FIXED AND LIVE ON THE FLEET (`aa06d5a1`, full down/up 17:50:06Z) + 361 rows RE-MARKED: ledger now 218 of 266 / 72 of 95** — FOUND 2026-10-22, lane `venue-prop-close-coverage`, session aba784f3 (side session of local_81601787); `.syndicate/findings_2026-10-22_venue_prop_close_coverage.md`
 - Also fixed: `order_clv` called a close at another book than the fill `same_book` (110 of 5,729 fleet marks; novig MLB 33 of 38). `min_ev_tuner` reads that label.
