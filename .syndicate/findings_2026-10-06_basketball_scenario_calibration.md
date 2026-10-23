@@ -4021,3 +4021,32 @@ priors' team ratio correlates with it (Pearson r ≥ 0.3 across the 30 teams, FI
 mean of the prior ratio. PASS: Step A's gates, plus team-game |AST − actual| MAE better than Step A's, beyond its SE.
 
 **Then:** a full FIT on the user's go-ahead. Production only via nba_engine_config.json, with the forward test.
+
+### #5b ASSISTS — STEP A RESULT 2026-10-23 15:34Z: FAILS by rule on the 12-date AST/FGM gate (−0.012 vs ±0.010); the mechanism lands exactly
+
+**Code:** 3152b1e2 on main (default 0.58; corpus parity `--reference recorded` 5,400/5,400 PASS; 3 tests).
+
+**Runs:** two arms, 12/12 dates each, 87 paired games, 0 errors; the fit_r2b config, research copy `code_r5b`.
+
+| reading | real (12 dates) | 0.58 arm | 0.6368 arm | gate |
+|---|---|---|---|---|
+| AST/FGM | 0.6501 | 0.5797 | **0.6378** | ± 0.010 of real ✗ (−0.012) |
+| AST/team | 27.25 (27.20 as pre-registered) | 24.36 | **26.80** | ± 0.4 of 27.20 ✓ (exactly 0.40) |
+| paired total | | | −0.04 (SE 0.19) | \|Δ\| < 0.2 ✓ |
+| FTA / PF / 3PA | | 23.11 / 19.57 / 37.06 | 23.16 / 19.61 / 37.01 | ✓ |
+| foul-outs | | 0.221 | 0.228 | +0.007 (RNG stream only; assists touch no foul) |
+| team-game AST MAE vs actual (reported) | | 4.98 | **4.47** | |
+
+**Why it fails:**
+- The pre-registration set the VALUE from the FIT-wide real (0.6368), but gated against the 12-date subsample's real
+  (0.6501).
+- A league-constant rate cannot follow a subsample, and the sim's 0.6378 sits on its set value.
+- The subsample sits 0.013 above the FIT. This is the same subsample-versus-FIT trap as the round-2 FTA target,
+  mirrored.
+- Recorded as a FAIL by rule. The deciding reading for a constant is the full FIT (real 0.6368).
+
+**Step B precondition, half measured:**
+- The real per-team season AST/FGM on the FIT has sd **0.041** against binomial noise **0.010**. Range 0.577–0.711,
+  30 teams, so the spread is real (condition 1 met).
+- Condition 2 (priors' team ratio r ≥ 0.3) is NOT measured. `--dump-priors` writes neither `_prior_ast_pm` nor
+  the team, so measuring it needs a harness change.
