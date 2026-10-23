@@ -2031,6 +2031,14 @@ death, never life — do not invert it.
 - Verification: findings file with per-day, per-section counts from the fleet files (export time vs final sheet, CT), named writer, and a proposed fix with its test sent to session 9e18a0e7
 - Blocked by: none
 
+### polymarket-fee-quadratic — OPEN — opened 2026-10-23 — session 9333b297-2d6c-4fdc-8f27-9dc7d7ebe699
+- Goal: Decision request to the user: refit venue_fees Polymarket US taker fee from flat $0.015/contract to the filed 0.0695*C*p*(1-p) (verified 17/18 exact on all post-go-live fills). Build only on the user's yes; no deploy without a separate yes.
+- Files: .syndicate/findings_2026-10-23_polymarket_fee_model.md, syndicate/features/shared/venue_fees.py, tests/test_venue_fees.py, tests/test_arb_net_edge.py, tests/test_paper_fees_and_closing_marks.py, tests/test_venue_order_fee_ceiling.py
+- Hypothesis: Polymarket US straight-trade taker fee is 0.0695*C*p*(1-p), banker's-rounded to the cent per fill; our flat 0.015/contract understates mid-price fees by ~0.23c and overstates the tails (p<0.315 or >0.685)
+- Falsification test: A post-09-29 live fill whose commissionNotionalTotalCollected exceeds round_half_even(0.0695*C*p*(1-p)), or falls more than 1 cent below it
+- Verification: After build: every fleet COMMISSION log line within 1c (never above) of the model; board ev_net shift matches the findings note
+- Blocked by: user decision
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
