@@ -54025,3 +54025,9 @@ which is about the two sizing bases and not about the refusal boundary.
   - Live orders on the slate: the record agrees with 1 of 29. Causes: `gate:min_ev_floor` 15, `no_record_for_line` 12, `negative_at_venue_price` 10, `sim_opposes` 7, `gate:price_band` 6.
 - **Caveat:** all 29 live orders were submitted 05:05Z-20:17Z, BEFORE the first record existed, so a LATER record judged them. From tonight on, each order is judged by the first build at or after its submit.
 - **Production behaviour unchanged by construction:** nothing imports the record outside the lane (a test enforces it).
+
+## 2026-10-23 21:33Z (4:33 PM CT) -- READING (1 of 2) for the 9260ea0b ff: the first full build on the stable-day code -- **MET** (lane cheat-sheets)
+- **instrument:** `~/syndicate-prod/logs/cheat_sheets.log`, the first NHL line carrying `sticky=` (printed only by the new code), then the written `cheatsheets/nhl/2026-10-23.json`.
+- **reading:** `CHEAT_SHEET nhl date=2026-10-23 groups=30/170 sticky=0 locked=31 rows=48 frozen=0 picks=12 secs=108.2` at 21:33:02Z. Sheet `generated_at` 21:32:59Z: 47 of 48 rows carry `pool` {rank, of, cap, sticky} (the 48th has none), `primary_lock` 31 entries = 31 rows `primary_locked`, pool record 30 groups all `built_on` 2026-10-23. Consistency 4 rows, **all 4 locked**, pool ranks 5 / 9 / 10 (+1 without a pool).
+- `sticky=0` was PREDICTED: no earlier pool existed for 10-23 (this was the day's first build on the new code). Build time 108 s, against 142-193 s for the 30-group NHL builds of 10-21/22 -- no cost from the change.
+- **owed (2 of 2):** 10-24 12:30 PM CT build: NHL `sticky=` > 0 (groups the 8:30 AM build chose and the 12:30 PM top 30 dropped), and the 8:30 AM consistency rows still in the section unless their line was pulled. Scheduled task `cheat-sheet-stable-day-reading-1024` reads it.
