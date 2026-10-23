@@ -3267,12 +3267,15 @@ def _fast_exit_background_loop() -> None:
     from syndicate.features.shared.execution_exits_fast import FastExitLoop, fast_loop_mode, fast_loop_seconds
     from syndicate.features.shared.timezone import central_today_iso
 
+    from syndicate.features.shared.inplay_entries_live import LiveEntryPlacer
     from syndicate.features.shared.inplay_entries_paper import PaperEntryLoop
 
     loop = FastExitLoop(today_fn=central_today_iso)
-    # In-game ENTRY rule, PAPER ONLY (user decision 2026-10-21): records would-be
-    # entries and grades them; the module has no order path (test-enforced).
-    entries = PaperEntryLoop(today_fn=central_today_iso)
+    # In-game ENTRY rule: the paper loop decides and records (no order path,
+    # test-enforced); each NEWLY booked entry goes to LiveEntryPlacer, which places
+    # it ONLY with SYNDICATE_INPLAY_ENTRIES=on AND the executor live + armed
+    # (user decision 2026-10-23: 1 contract, IOC, $50/day). Off by default.
+    entries = PaperEntryLoop(today_fn=central_today_iso, on_book=LiveEntryPlacer(today_fn=central_today_iso))
     print(f"[execution_exits_fast] STARTED mode={fast_loop_mode()} interval_s={fast_loop_seconds():.0f}", flush=True)
     while not _FAST_EXIT_STOP.is_set() and not _LIVE_REFRESH_LOOP_STOP.is_set():
         try:

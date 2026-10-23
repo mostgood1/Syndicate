@@ -18,7 +18,7 @@ away from a score change, markout +0.9c [-0.6, +2.4], n=270):
     OddsAPI poll that is <= 90 s old; fair = median multiplicative no-vig;
   * edge = fair - ask - Kalshi taker fee (1 contract) >= 0.03 on that leg;
   * would-be order: 1 contract at the ask; at most one per (ticker, leg) per
-    day; at most $10 of would-be stake per day.
+    day; at most $50 of would-be stake per day.
 
 GRADING, on the same thread: each would-be entry's leg mid at +60 s and +300 s
 (markout after fee, the in-play CLV stand-in) and, once Kalshi finalises the
@@ -48,7 +48,7 @@ MAX_BOOK_POLL_AGE_S = 90.0
 SCORE_QUIET_S = 180.0
 MID_STABLE_WINDOW_S = 60.0
 MID_STABLE_MAX_MOVE = 0.03
-DAY_BUDGET_DOLLARS = 10.0
+DAY_BUDGET_DOLLARS = 50.0  # >= the live cap (user 2026-10-23: $50/day), so live never starves
 BOOKS_EVERY_S = 60.0
 ESPN_EVERY_S = 30.0
 MARKOUT_HORIZONS_S = (60, 300)
@@ -183,11 +183,16 @@ class PaperEntryLoop:
         tickers_fn: Callable[[str], list[str]] | None = None,
         load: Callable[[], dict[str, Any]] | None = None,
         persist: Callable[[Mapping[str, Any]], None] | None = None,
+        on_book: Callable[[Mapping[str, Any]], Mapping[str, Any] | None] | None = None,
     ) -> None:
         self.today_fn, self.clock, self.get = today_fn, clock, get
         self.tickers_fn = tickers_fn or _nhl_spread_tickers
         self.load = load or _load_doc
         self.persist = persist or _persist_doc
+        # Called with each NEWLY booked entry. This module never sends anything;
+        # a caller that does (inplay_entries_live, behind its own switch) receives
+        # exactly the entries this rule booked, so the two cannot drift apart.
+        self.on_book = on_book
         self.doc: dict[str, Any] | None = None
         self.books: dict[str, Any] = {}
         self.books_t: float | None = None
@@ -339,6 +344,11 @@ class PaperEntryLoop:
                 spent += d["ask"]
                 out["booked"] += 1
                 self.window["booked"] += 1
+                if self.on_book is not None:
+                    try:
+                        entries[key]["live"] = dict(self.on_book(dict(entries[key], key=key)) or {})
+                    except Exception as exc:  # noqa: BLE001 -- the paper record must survive the hook
+                        entries[key]["live"] = {"placed": False, "reason": f"{type(exc).__name__}: {exc}"[:200]}
             print(
                 f"[inplay_entries_paper] WOULD_ENTER ticker={tk} leg={d['leg']} ask={d['ask']} fair={d['fair']}"
                 f" edge={d['edge']} books={d['n_books']} since_score_s={since if since is None else round(min(since, 1e9))}"

@@ -612,11 +612,22 @@ def order_body_v2(
     subaccount = _v2_subaccount()
     if subaccount is not _SUBACCOUNT_OMITTED:
         body["subaccount"] = subaccount
+    # IN-GAME ENTRIES ARE IOC (lane in-game-trading, LOAN approved by the user
+    # 2026-10-21): only a request that NAMES an allowlisted time_in_force gets it,
+    # and an IOC order carries no kickoff expiry (it cannot rest). Every other
+    # request -- no attribute, or any other value -- builds exactly as before.
+    requested_tif = str(getattr(request, "time_in_force", "") or "").strip().lower()
+    if requested_tif in _REQUEST_TIME_IN_FORCE_ALLOWED:
+        body["time_in_force"] = requested_tif
+        return body
     expiration, _reason = kickoff_expiration(request, now=now)
     if expiration is not None:
         # Only valid with good_till_canceled (immediate_or_cancel cannot carry it).
         body["expiration_time"] = expiration
     return body
+
+
+_REQUEST_TIME_IN_FORCE_ALLOWED = frozenset({"immediate_or_cancel"})
 
 
 def build_order_body(request: Any, *, price_dollars: float | None = None) -> dict[str, Any]:
