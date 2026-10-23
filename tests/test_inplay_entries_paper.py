@@ -224,3 +224,56 @@ def test_event_match_refuses_an_ambiguous_single_name():
     assert loop._event_for("nhl", {"New York", "Boston"})["id"] == "a"
     assert loop._event_for("nhl", {"Detroit"})["id"] == "b"
     assert loop._event_for("nhl", set()) is None
+
+
+def test_default_oddsapi_calls_are_metered_by_quota_telemetry(monkeypatch):
+    """The paper loop's OddsAPI spend must reach oddsapi_quota (coordinator ask 2026-10-23)."""
+    from syndicate.features.shared import oddsapi_quota
+
+    recorded: list = []
+    monkeypatch.setattr(oddsapi_quota, "record_oddsapi_quota",
+                        lambda headers, sport=None, endpoint=None: recorded.append((headers, sport, endpoint)))
+
+    class _Resp:
+        headers = {"x-requests-used": "3079320", "x-requests-remaining": "1920680", "x-requests-last": "9"}
+
+        def read(self):
+            return b"[]"
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    monkeypatch.setattr(ip.urllib.request, "urlopen", lambda req, timeout=10.0: _Resp())
+    loop = ip.PaperEntryLoop(today_fn=lambda: "d", tickers_fn=lambda d, s="nhl": [],
+                             load=lambda: {"entries": {}}, persist=lambda d: None)  # real default get
+    assert loop.get_odds is ip._get_odds
+    loop._refresh_books("nba", T0)
+    (h, sport, endpoint), = recorded
+    assert sport == "nba" and h["x-requests-last"] == "9" and endpoint.startswith(ip.oddsapi_url("nba"))
+
+
+def test_metering_failure_never_breaks_the_fetch(monkeypatch):
+    from syndicate.features.shared import oddsapi_quota
+
+    def boom(*a, **k):
+        raise RuntimeError("store down")
+
+    monkeypatch.setattr(oddsapi_quota, "record_oddsapi_quota", boom)
+
+    class _Resp:
+        headers = {}
+
+        def read(self):
+            return b'[{"id": "e1"}]'
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    monkeypatch.setattr(ip.urllib.request, "urlopen", lambda req, timeout=10.0: _Resp())
+    assert ip._get_odds("https://api.the-odds-api.com/v4/sports/x/odds?apiKey=k", "nhl") == [{"id": "e1"}]

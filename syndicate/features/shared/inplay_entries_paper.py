@@ -239,6 +239,26 @@ def _get(url: str, timeout: float = 10.0) -> Any:
         return json.loads(r.read().decode("utf-8"))
 
 
+def _get_odds(url: str, sport: str, timeout: float = 10.0) -> Any:
+    """An OddsAPI call that the fleet's quota telemetry SEES (coordinator ask 2026-10-23).
+
+    Same request as `_get`, plus `oddsapi_quota.record_oddsapi_quota(headers, sport, endpoint=url)`:
+    the fleet's per-sport / per-hour / per-family attribution (compare-and-swap, never raises).
+    The endpoint is redacted centrally there (`_sanitize_endpoint` strips apiKey).
+    """
+    req = urllib.request.Request(url, headers={"User-Agent": "syndicate-inplay-entries-paper/1"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:  # noqa: S310 -- fixed https host
+        body = json.loads(r.read().decode("utf-8"))
+        headers = dict(r.headers.items())
+    try:
+        from syndicate.features.shared.oddsapi_quota import record_oddsapi_quota
+
+        record_oddsapi_quota(headers, sport=sport, endpoint=url)
+    except Exception:  # noqa: BLE001 -- metering must never break the measurement it meters
+        pass
+    return body
+
+
 class PaperEntryLoop:
     """Polled from the fast exit thread. Per sport: ESPN every 30 s, books every 60 s, Kalshi every pass.
 
@@ -255,9 +275,12 @@ class PaperEntryLoop:
         load: Callable[[], dict[str, Any]] | None = None,
         persist: Callable[[Mapping[str, Any]], None] | None = None,
         on_book: Callable[[Mapping[str, Any]], Mapping[str, Any] | None] | None = None,
+        get_odds: Callable[[str, str], Any] | None = None,
         sports: Sequence[str] = ("nhl",),
     ) -> None:
         self.today_fn, self.clock, self.get = today_fn, clock, get
+        # OddsAPI calls are METERED by default. An injected `get` (tests) keeps its own odds path unmetered.
+        self.get_odds = get_odds or (_get_odds if get is _get else (lambda url, sport: get(url)))
         self.sports = tuple(s for s in sports if s in SPORTS)
         self.tickers_fn = tickers_fn or _sport_tickers
         self.load = load or _load_doc
@@ -310,7 +333,7 @@ class PaperEntryLoop:
             return
         q = urllib.parse.urlencode({"apiKey": key, "regions": "us,eu,uk", "markets": ",".join(KINDS),
                                     "oddsFormat": "decimal"})
-        rows = self.get(f"{oddsapi_url(sport)}?{q}") or []
+        rows = self.get_odds(f"{oddsapi_url(sport)}?{q}", sport) or []
         now_iso = _iso(t)
         self.books[sport] = {e["id"]: e for e in rows if str(e.get("commence_time") or "") <= now_iso}
 
