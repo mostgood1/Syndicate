@@ -388,13 +388,21 @@ def primary_lines(rows: Sequence[Mapping[str, Any]]) -> set[int]:
     picks (`alt_primaries`): most books quoting, then nearest the group's median, then the lower -- among the rungs a
     featured section could show (price in the band); of its two sides, the one whose price beats its no-vig fair by
     more (a one-sided market's EV is not comparable, so a two-sided quote wins). Not the best-EV rung across the
-    ladder: that favours alt rungs, whose fair rests on fewer books."""
+    ladder: that favours alt rungs, whose fair rests on fewer books.
+
+    A row the build flagged `primary_locked` wins its group outright while it is still featurable: the line and side
+    the day's first build chose stay put (user 2026-10-23, after NHL 10-16 Karlsson SOG u2.5 at 7/10 became the over
+    at 3/10 when the prices moved -- `build_cheat_sheets.lock_primaries`)."""
     groups: dict[tuple[str, str], list[int]] = {}
     for i, r in enumerate(rows):
         if featurable(r):
             groups.setdefault(_stat_key(r), []).append(i)
     keep = set()
     for ids in groups.values():
+        locked = [i for i in ids if rows[i].get("primary_locked")]
+        if locked:
+            keep.add(locked[0])
+            continue
         books: dict[Any, int] = {}
         for i in ids:
             line = rows[i].get("line")

@@ -774,3 +774,83 @@ def test_a_preview_build_reads_the_boards_build_for_its_own_day(monkeypatch):
     m.fetch_rows("http://x", "nba", "2026-10-19")
     m.fetch_rows("http://x", "nba")
     assert seen[0].endswith("&date=2026-10-20") and "date=" not in seen[1] and "date=" not in seen[2]
+
+
+def _nhl_board(ev_by_player):
+    """One SOG group per player, main line 2.5 both sides, the over carrying the player's EV (the build's priority)."""
+    rows = []
+    for player, ev in ev_by_player.items():
+        for side in ("over", "under"):
+            rows.append({"kind": "prop", "game_state": "pregame", "segment": "full", "event_id": "g1",
+                         "home_team": "OTT", "away_team": "BUF", "market": "SOG", "player_name": player,
+                         "commence_time": "2026-10-21T23:00:00Z", "line": 2.5, "side": side,
+                         "ev_pct": ev if side == "over" else -5.0,
+                         "quote": {"price": -110, "fair_probability": 0.5, "book_prices": {"fd": -110, "dk": -112}}})
+    return rows
+
+
+def test_a_group_built_earlier_today_stays_on_the_sheet_and_a_preview_does_not_hold_one(monkeypatch):
+    # User 2026-10-23: NHL consistency went 8 -> 17 -> 12 on 10-21 because each build re-picked its top 30 groups by
+    # EV, and 6 of the 8 posted rows fell out of the final build. A group a build TODAY chose is kept; the cap still
+    # decides what joins.
+    m = _script()
+    monkeypatch.setattr(m, "evidence_facts", lambda row, selected_date: {"recent_form": {"values": [3, 3, 1, 2, 4]}})
+    day = "2026-10-21"
+    first = m.build_sport("nhl", _nhl_board({"Batherson": 6.0, "Stutzle": 1.0}), selected_date=day, cap=1, dvp={})
+    assert {r["player"] for r in first["rows"]} == {"Batherson"}
+    pool = m.pool_record(first, None, today=day, at="2026-10-21T13:30:00Z")
+    assert pool["g1|Batherson|SOG"]["built_on"] == day and pool["g1|Batherson|SOG"]["first_rank"] == 1
+
+    moved = _nhl_board({"Batherson": 1.0, "Stutzle": 6.0})                 # prices moved: Stutzle ranks first now
+    kept = m.build_sport("nhl", moved, selected_date=day, cap=1, dvp={}, sticky=m.sticky_groups({"pool": pool}, day))
+    by_player = {r["player"]: r["pool"] for r in kept["rows"]}
+    assert set(by_player) == {"Batherson", "Stutzle"} and kept["groups_sticky"] == 1
+    assert by_player["Stutzle"] == {"rank": 1, "of": 2, "cap": 1, "sticky": False}
+    assert by_player["Batherson"] == {"rank": 2, "of": 2, "cap": 1, "sticky": True}
+    again = m.pool_record(kept, {"pool": pool}, today=day, at="2026-10-21T17:30:00Z")
+    assert again["g1|Batherson|SOG"]["first_rank"] == 1 and again["g1|Batherson|SOG"]["rank"] == 2
+
+    # Reachability: the day-ahead preview (built 10-20 for 10-21) holds nothing on 10-21 -- and no stickiness at all
+    # gives the old reshuffle.
+    preview = m.pool_record(first, None, today="2026-10-20", at="2026-10-20T19:00:00Z")
+    assert m.sticky_groups({"pool": preview}, day) == set()
+    plain = m.build_sport("nhl", moved, selected_date=day, cap=1, dvp={})
+    assert {r["player"] for r in plain["rows"]} == {"Stutzle"} and plain["groups_sticky"] == 0
+
+
+def test_the_line_and_side_the_days_first_build_showed_stay_put_when_prices_move():
+    # NHL 10-16, Karlsson: the 12:34 PM consistency graphic showed SOG under 2.5 (7 of his last 10); by 8:27 PM the
+    # over's price beat its fair by more, the sheet showed the over (3/10) and he left the section.
+    m = _script()
+
+    def row(side, ev, rate, line=2.5):
+        f = {"games": 10, "hits": int(rate * 10), "rate": rate}
+        return {"event_id": "g1", "player": "Erik Karlsson", "market": "SOG", "line": line, "side": side,
+                "books_quoting": 5, "check": {"verdict": "neutral", "ev_market": ev, "price": -110, "form5": f, "form10": f}}
+
+    day = "2026-10-16"
+    morning = [row("under", 3.0, 0.7), row("over", 1.0, 0.3)]
+    lock = m.lock_primaries(morning, None, selected=day, today=day, at="2026-10-16T13:30:00Z")
+    assert lock["Erik Karlsson|sog"] == {"line": 2.5, "side": "under", "built_on": day, "at": "2026-10-16T13:30:00Z"}
+    assert [r.get("primary_locked") for r in morning] == [True, None]
+
+    evening = [row("under", 1.0, 0.7), row("over", 3.0, 0.3)]               # the prices flipped
+    held = m.lock_primaries(evening, lock, selected=day, today=day, at="2026-10-17T01:27:00Z")
+    assert held == lock and cs.primary_lines(evening) == {0}
+    assert cs.sections(evening)["consistency"] == [0]                         # still in the section, still the under
+
+    # Reachability: without the lock the evening build shows the over, and the under leaves the section.
+    unlocked = [row("under", 1.0, 0.7), row("over", 3.0, 0.3)]
+    assert cs.primary_lines(unlocked) == {1} and cs.sections(unlocked)["consistency"] == []
+
+    # The books pulled the locked line: the usual rule picks again, and the lock waits in case it returns.
+    pulled = [row("under", 1.0, 0.6, line=3.5), row("over", 3.0, 0.4, line=3.5)]
+    assert m.lock_primaries(pulled, lock, selected=day, today=day, at="2026-10-17T01:27:00Z") == lock
+    assert cs.primary_lines(pulled) == {1} and not any(r.get("primary_locked") for r in pulled)
+
+    # A day-ahead preview locks nothing, and a preview's lock is not honoured on the day.
+    preview = [row("under", 3.0, 0.7), row("over", 1.0, 0.3)]
+    assert m.lock_primaries(preview, None, selected=day, today="2026-10-15", at="2026-10-15T19:00:00Z") == {}
+    stale = {"Erik Karlsson|sog": dict(lock["Erik Karlsson|sog"], built_on="2026-10-15")}
+    fresh = m.lock_primaries(evening, stale, selected=day, today=day, at="2026-10-16T13:30:00Z")
+    assert fresh["Erik Karlsson|sog"]["side"] == "over"                       # re-chosen by the day's own first build

@@ -26,7 +26,7 @@ import urllib.request
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
@@ -532,7 +532,8 @@ def player_vs_player(sport: str, rows: list[dict[str, Any]], date: str, cache: P
 
 def build_sport(sport: str, rows: list[dict[str, Any]], *, selected_date: str, cap: int,
                 dvp: dict[str, Any], context: dict[str, Any] | None = None,
-                positions: dict[str, Any] | None = None, pvp_cache: Path | None = None) -> dict[str, Any]:
+                positions: dict[str, Any] | None = None, pvp_cache: Path | None = None,
+                sticky: set[tuple] | None = None) -> dict[str, Any]:
     from syndicate.features.shared.team_logos import logo_url
 
     t0 = time.time()
@@ -540,7 +541,15 @@ def build_sport(sport: str, rows: list[dict[str, Any]], *, selected_date: str, c
     # current day only". Sunday's NFL props wait for Sunday's sheet.
     rows = [r for r in rows if central_day(r.get("commence_time")) == selected_date]
     groups = group_rows(rows)
-    ordered = sorted(groups.items(), key=lambda kv: priority(kv[1]), reverse=True)[:cap]
+    ranked = sorted(groups.items(), key=lambda kv: priority(kv[1]), reverse=True)
+    rank = {key: i + 1 for i, (key, _) in enumerate(ranked)}
+    ordered = ranked[:cap]
+    # A group an earlier build TODAY put on the sheet stays on it (user 2026-10-23, `sticky_groups`): EV moves with
+    # every price, so the top `cap` reshuffled at every build and rows came and went (NHL 10-21 consistency 8 -> 17 ->
+    # 12; 6 of the 8 posted rows fell out of the final build). The top `cap` still chooses what joins; a group already
+    # chosen today is only kept, never re-ranked out.
+    top = {key for key, _ in ordered}
+    ordered += [(key, grp) for key, grp in ranked[cap:] if key in (sticky or set())]
     out_rows: list[dict[str, Any]] = []
     games: dict[str, dict[str, Any]] = {}
     # Game lines: every pregame full-game spread / moneyline / total the board prices today (user 2026-10-15: "we also
@@ -625,6 +634,11 @@ def build_sport(sport: str, rows: list[dict[str, Any]], *, selected_date: str, c
                 "projected": (r.get("projection") or {}).get("projected"),
                 "projected_sd": (r.get("projection") or {}).get("projected_sd"),
                 "check": check.as_dict(),
+                # Where the group stood in the build's priority (1 = first) out of every group on the board; `sticky`
+                # = kept from an earlier build today rather than chosen by this one. The record can split by it
+                # (2026-10-23: NHL consistency won +20.2% inside the 30-group pool and -2.7% outside it).
+                "pool": {"rank": rank[(event_id, player, market)], "of": len(groups), "cap": cap,
+                         "sticky": (event_id, player, market) not in top},
             })
     # Player vs player (user 2026-10-15: "add player vs player matchups like batter vs pitcher"): MLB batter vs the
     # probable starter, pitcher vs the opposing roster -- StatsAPI, cached for the day on the data root.
@@ -647,7 +661,8 @@ def build_sport(sport: str, rows: list[dict[str, Any]], *, selected_date: str, c
     sheet = {
         "schema": "cheat_sheet_v1", "sport": sport, "date": selected_date,
         "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "groups_on_board": len(groups), "groups_built": len(ordered), "rows": out_rows,
+        "groups_on_board": len(groups), "groups_built": len(ordered), "groups_sticky": len(ordered) - len(top),
+        "rows": out_rows,
         "games": list(games.values()), "sections": cs.sections(out_rows), "game_lines": game_lines,
         "dvp_file": dvp.get("_file") if sport == "nfl" else None,
         "method": {"prior_strength_k": cs.PRIOR_STRENGTH, "k_is_provisional": cs.K_IS_PROVISIONAL, "streak_rate": cs.STREAK_RATE,
@@ -917,6 +932,61 @@ def merge_with_record(sheet: dict[str, Any], prior: dict[str, Any] | None, *, no
     merged["sections"] = cs.sections(merged["rows"])
     merged["rows_frozen"] = len(kept_rows)
     return merged
+
+
+# ----------------------------------------------------------------------------- a stable day
+# User 2026-10-23 ("proceed"), after `findings_2026-10-23_cheat_sheet_section_growth.md` and
+# `findings_2026-10-23_nhl_consistency_hit_rate_first.md`: keep the pool's selection (it is where NHL consistency
+# earns: +20.2% inside the 30 groups, -2.7% outside), but stop it moving within a day. Only a build ON the sheet's day
+# counts -- the day-ahead previews (`--date tomorrow`, 2 PM and 9 PM) choose from thin early lines and lock nothing.
+
+
+def _pool_key(key: Sequence[Any]) -> str:
+    return "|".join(str(part) for part in key)
+
+
+def sticky_groups(prior: Mapping[str, Any] | None, day: str) -> set[tuple]:
+    """(event, player, market) groups a build on `day` already put on `day`'s sheet."""
+    pool = (prior or {}).get("pool") or {}
+    return {tuple(e["key"]) for e in pool.values() if e.get("built_on") == day and len(e.get("key") or ()) == 3}
+
+
+def pool_record(sheet: Mapping[str, Any], prior: Mapping[str, Any] | None, *, today: str, at: str) -> dict[str, Any]:
+    """Every group this build ranked, by key: the day it was first built ON (`built_on`, Central), its rank then, and
+    its rank now. A group first seen in a preview is re-stamped by the day's first own build."""
+    out = {k: dict(v) for k, v in ((prior or {}).get("pool") or {}).items()}
+    for r in sheet.get("rows") or []:
+        pool = r.get("pool") or {}
+        if not pool.get("rank"):
+            continue
+        key = [r.get("event_id"), r.get("player"), r.get("market")]
+        entry = out.get(_pool_key(key))
+        if entry is None or entry.get("built_on") != today:
+            entry = out[_pool_key(key)] = {"key": key, "built_on": today, "first_rank": pool["rank"], "first_at": at}
+        entry["rank"], entry["at"] = pool["rank"], at
+    return out
+
+
+def lock_primaries(rows: list[dict[str, Any]], prior_lock: Mapping[str, Any] | None, *, selected: str, today: str,
+                   at: str) -> dict[str, Any]:
+    """The line and side each player + stat shows, fixed at the day's first build that featured it (Karlsson, NHL
+    10-16: SOG u2.5 at 7/10 became the over at 3/10 when prices moved, and left the consistency section). Flags the
+    matching row `primary_locked`, which `cs.primary_lines` honours while the row is still featurable; a locked line
+    the books pulled falls back to the usual rule and keeps its lock in case it returns. Returns the lock."""
+    lock = {k: dict(v) for k, v in (prior_lock or {}).items() if v.get("built_on") == selected}
+    stat = lambda r: _pool_key(cs._stat_key(r))
+    for r in rows:
+        r.pop("primary_locked", None)
+        held = lock.get(stat(r))
+        if held and r.get("line") == held.get("line") and r.get("side") == held.get("side"):
+            r["primary_locked"] = True
+    if today == selected:
+        for i in cs.primary_lines(rows):
+            r = rows[i]
+            if stat(r) not in lock:
+                lock[stat(r)] = {"line": r.get("line"), "side": r.get("side"), "built_on": today, "at": at}
+                r["primary_locked"] = True
+    return lock
 
 
 SGP_SPORTS = ("nfl", "nhl", "wnba", "nba", "mlb")
@@ -1340,17 +1410,23 @@ def main_build(args: Any, data_root: Path) -> int:
         except Exception as exc:  # noqa: BLE001
             print(f"CHEAT_SHEET {sport} fetch failed: {type(exc).__name__}: {exc}", flush=True)
             continue
+        today = central_today()
         sheet = build_sport(sport, rows, selected_date=selected, cap=args.cap or DEFAULT_CAPS.get(sport, 80), dvp=dvp,
                             context=context, positions=positions,
-                            pvp_cache=data_root / "cheatsheets" / f".{sport}_cache" / selected)
+                            pvp_cache=data_root / "cheatsheets" / f".{sport}_cache" / selected,
+                            sticky=sticky_groups(prior, selected))
         sheet = merge_with_record(sheet, prior, now=datetime.now(timezone.utc))
         posted = cs.load_posted(data_root / "cheatsheets", sport, selected)
         if posted:                               # rows that went out on a graphic stay on the sheet (2026-10-17)
             sheet = cs.with_posted(sheet, posted, prior=prior)
             if sheet.get("posted_kept"):
-                sheet["sections"] = cs.sections(sheet["rows"])
                 print(f"CHEAT_SHEET {sport} date={selected} posted rows kept {sheet['posted_kept']} (the board read no longer "
                       f"carries them)", flush=True)
+        # A stable day (2026-10-23): the line + side lock, then the pool record; sections last, so they honour both.
+        sheet["primary_lock"] = lock_primaries(sheet["rows"], (prior or {}).get("primary_lock"), selected=selected,
+                                               today=today, at=sheet["generated_at"])
+        sheet["pool"] = pool_record(sheet, prior, today=today, at=sheet["generated_at"])
+        sheet["sections"] = cs.sections(sheet["rows"])
         try:
             pending = dict((prior or {}).get("pick_pending") or {})
             sheet["picks"] = merge_picks(build_picks(board_cards, sheet, sport=sport, day=selected, now=datetime.now(timezone.utc)),
@@ -1380,6 +1456,7 @@ def main_build(args: Any, data_root: Path) -> int:
         counts = {k: len(v) for k, v in sheet["sections"].items()}
         have = {k: sum(1 for r in sheet["rows"] if r.get(k)) for k in ("team", "pos", "headshot_url", "team_logo")}
         print(f"CHEAT_SHEET {sport} date={selected} groups={sheet['groups_built']}/{sheet['groups_on_board']} "
+              f"sticky={sheet.get('groups_sticky', 0)} locked={sum(1 for r in sheet['rows'] if r.get('primary_locked'))} "
               f"rows={len(sheet['rows'])} frozen={sheet.get('rows_frozen', 0)} picks={len(sheet.get('picks') or [])} sections={counts} identity={have} "
               f"images={images} secs={sheet['build_seconds']}", flush=True)
     try:
