@@ -53892,3 +53892,9 @@ which is about the two sizing bases and not about the refusal boundary.
   - The first EXIT_LIVE sale under the 0.10 margin, at a bid < 0.90.
   - The Kalshi day spend passing the old ~$118 limit.
 - **rollback:** restore the backup (or reverse each line), then a full down/up.
+
+## 2026-10-23 03:41Z (10:41 PM CT 10-22) -- READING: R1 "ignore tiny held legs" (b3279e52) -- **MET: the exact order R1 refused at 21:29Z is now PLACED behind the $0.48 held leg** (closes the 22:16Z entry's owed verify; lane `live-event-concentration`, session 8ac736cb, todo #711)
+- **order:** `2026-10-23T03:33:41.396Z [execute_portfolio] LIVE_ORDER status=submitted venue=kalshi ticker=KXNCAAFGAME-26OCT23MASSCONN-CONN sport=ncaaf market=h2h side=home price=-567.0 stake=5.0`; ledger (read 03:41Z): position_key dabe92f059dc20a9, status filled, fill_stake_dollars 5.10.
+- **behind:** the held Kalshi UConn -15.5 spread (`57a100443e429173`, 1 contract, $0.48) -- the same blocker as the 21:29:18Z `REFUSED_SAME_AXIS_HELD`. Under b3279e52 a held leg < $1 no longer claims the margin axis; it still counts toward the per-game dollars.
+- **game exposure now:** UMass@UConn $0.48 (Kalshi spread) + $5.42 (Polymarket under 49.5) + $5.10 (Kalshi ML) = $11.00 against the $50 cap (raised by the coordinator 23:25Z).
+- **window 22:15:41Z .. 03:41Z (live-odds-worker log + ledger probe `tiny_pairs.py`):** 6 live orders since the load; placed-behind-tiny 1; `REFUSED_SAME_AXIS_HELD` 0. The `REFUSED_EVENT_CAP` lines in the window are all before the 23:25Z cap raise and carry `cap=15.00`; 0 cap lines since 23:25Z (first `cap=50.00` line still owed, session watcher armed).
