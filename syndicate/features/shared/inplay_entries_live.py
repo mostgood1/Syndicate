@@ -152,6 +152,7 @@ class LiveEntryPlacer:
             result = {"placed": False, "reason": "in_game_day_budget", "spend": spend["dollars"]}
         else:
             result = dict(self.place_fn(ticker=ticker, leg=leg, ask=ask, stake=stake, line=entry.get("line"),
+                                        sport=str(entry.get("sport") or "nhl"), market=str(entry.get("kind") or "spreads"),
                                         day=day, spend=spend) or {})
         print(f"[inplay_entries_live] LIVE_ENTRY ticker={ticker} leg={leg} ask={ask} stake={stake}"
               f" edge={entry.get('edge')} day_spend={spend['dollars']}/{day_budget_dollars()} result={result}"[:500],
@@ -166,14 +167,15 @@ def _ledger_orders() -> list[Mapping[str, Any]]:
 
 
 def _place_live(*, ticker: str, leg: str, ask: float, stake: float, line: Any, day: str,
+                sport: str = "nhl", market: str = "spreads",
                 spend: Mapping[str, Any]) -> dict[str, Any]:
     from syndicate.features.shared.execution_guard import check_order, guarded_submit
     from syndicate.features.shared.execution_ledger import LIVE, OrderRequest, place_order
     from syndicate.features.shared.kalshi_orders import kalshi_submitter
 
     request = OrderRequest(
-        position_key=f"{POSITION_PREFIX}{ticker}:{leg}", selected_date=day, venue="kalshi", sport="nhl",
-        event_id=ticker.rsplit("-", 1)[0], market="spreads", side=leg, requested_price=ask,
+        position_key=f"{POSITION_PREFIX}{ticker}:{leg}", selected_date=day, venue="kalshi", sport=sport,
+        event_id=ticker.rsplit("-", 1)[0], market=market, side=leg, requested_price=ask,
         requested_stake_dollars=stake, line=None if line is None else float(line), book="kalshi",
         venue_ticker=ticker,
     )

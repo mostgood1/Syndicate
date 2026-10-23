@@ -52,8 +52,33 @@ DAY_BUDGET_DOLLARS = 50.0  # >= the live cap (user 2026-10-23: $50/day), so live
 BOOKS_EVERY_S = 60.0
 ESPN_EVERY_S = 30.0
 MARKOUT_HORIZONS_S = (60, 300)
-ODDSAPI = "https://api.the-odds-api.com/v4/sports/icehockey_nhl/odds"
-ESPN = "https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard"
+# ALL-SPORTS EXTENSION (user 2026-10-23, via coordinator 332cb014: "turn it on for all sports").
+# Per sport: OddsAPI key, ESPN path, and the score-quiet window. The 180 s window was designed on NHL
+# (findings section 6). Basketball scores every ~30 s, so "away from a score" cannot apply there (0 = no
+# gate); football and baseball use 120 s. THESE WINDOWS ARE UNTESTED ASSUMPTIONS outside NHL -- the nightly
+# sweep (scripts/inplay_rule_sweep.py) is how they get measured. Soccer is NOT included: its moneyline is
+# 3-way (draw), which this 2-way no-vig does not price.
+SPORTS: dict[str, dict[str, Any]] = {
+    "nhl": {"odds": "icehockey_nhl", "espn": "hockey/nhl", "score_quiet_s": 180.0},
+    "nba": {"odds": "basketball_nba", "espn": "basketball/nba", "score_quiet_s": 0.0},
+    "nfl": {"odds": "americanfootball_nfl", "espn": "football/nfl", "score_quiet_s": 120.0},
+    "ncaaf": {"odds": "americanfootball_ncaaf", "espn": "football/college-football", "score_quiet_s": 120.0},
+    "mlb": {"odds": "baseball_mlb", "espn": "baseball/mlb", "score_quiet_s": 120.0},
+}
+ENTRY_SPORTS = tuple(SPORTS)
+KINDS = ("spreads", "totals", "h2h")
+
+
+def oddsapi_url(sport: str) -> str:
+    return f"https://api.the-odds-api.com/v4/sports/{SPORTS[sport]['odds']}/odds"
+
+
+def espn_url(sport: str) -> str:
+    return f"https://site.api.espn.com/apis/site/v2/sports/{SPORTS[sport]['espn']}/scoreboard"
+
+
+ODDSAPI = oddsapi_url("nhl")
+ESPN = espn_url("nhl")
 KALSHI_MARKETS = "https://external-api.kalshi.com/trade-api/v2/markets"
 
 
@@ -96,14 +121,18 @@ def team_match(sub: str, name: str) -> bool:
 
 
 def book_fair(
-    event: Mapping[str, Any], team: str, line: float, poll_t: float, *,
-    min_books: int = MIN_BOOKS, max_quote_age_s: float = MAX_BOOK_QUOTE_AGE_S,
+    event: Mapping[str, Any], team: str, line: float | None, poll_t: float, *,
+    kind: str = "spreads", min_books: int = MIN_BOOKS, max_quote_age_s: float = MAX_BOOK_QUOTE_AGE_S,
 ) -> tuple[float | None, int]:
-    """Median no-vig P(`team` covers -`line`) over fresh books with that EXACT line -> (fair, n_books)."""
+    """Median no-vig P(outcome) over fresh books quoting the EXACT same market -> (fair, n_books).
+
+    kind=spreads: P(`team` covers -`line`); kind=totals: P(`team` = "Over"/"Under" at `line`);
+    kind=h2h: P(`team` wins), 2-way markets only (a 3-way market with a draw is skipped).
+    """
     ps = []
     for bk in event.get("bookmakers") or []:
         for m in bk.get("markets") or []:
-            if m.get("key") != "spreads":
+            if m.get("key") != kind:
                 continue
             if poll_t - (_ts(m.get("last_update")) or 0.0) > max_quote_age_s:
                 continue
@@ -117,9 +146,34 @@ def book_fair(
             ia, ib = 1 / pa, 1 / pb
             for o, p in ((a, ia / (ia + ib)), (b, ib / (ia + ib))):
                 pt = _float(o.get("point"))
-                if pt is not None and abs(pt + line) < 1e-9 and team_match(team, o.get("name")):
+                if kind == "spreads":
+                    ok = pt is not None and line is not None and abs(pt + line) < 1e-9 and team_match(team, o.get("name"))
+                elif kind == "totals":
+                    ok = (pt is not None and line is not None and abs(pt - line) < 1e-9
+                          and str(o.get("name") or "").strip().lower() == team.strip().lower())
+                else:
+                    ok = team_match(team, o.get("name"))
+                if ok:
                     ps.append(p)
     return (statistics.median(ps) if len(ps) >= min_books else None), len(ps)
+
+
+def classify(market: Mapping[str, Any]) -> tuple[str, str, float | None] | None:
+    """(kind, label, line) for a full-game Kalshi market, or None.
+
+    `X wins by over L` -> spreads (X, L); `Over L ...` on a ...TOTAL family -> totals ("Over", L);
+    a ...GAME family whose subtitle names a team -> h2h (team, None). A tie/draw leg is never h2h.
+    """
+    sub = str(market.get("yes_sub_title") or "")
+    line = _float(market.get("floor_strike"))
+    fam = str(market.get("ticker") or "").split("-")[0]
+    if " wins by" in sub and line is not None:
+        return "spreads", sub.split(" wins by")[0], line
+    if sub.lower().startswith("over") and line is not None and fam.endswith("TOTAL"):
+        return "totals", "Over", line
+    if fam.endswith("GAME") and sub and "tie" not in sub.lower() and "draw" not in sub.lower():
+        return "h2h", sub, None
+    return None
 
 
 def decide(
@@ -132,7 +186,8 @@ def decide(
     now_t: float,
     params: Mapping[str, Any] | None = None,
 ) -> dict[str, Any] | None:
-    """The entry rule for ONE Kalshi spread rung. PURE. The best qualifying leg, or None.
+    """The entry rule for ONE Kalshi full-game market (spread rung, total rung or moneyline). PURE.
+    The best qualifying leg, or None.
 
     `params` overrides the module constants (min_edge, min_books, score_quiet_s,
     mid_max_move, max_book_quote_age_s, max_book_poll_age_s, legs, ask_lo, ask_hi)
@@ -147,12 +202,11 @@ def decide(
         return None
     if str(market.get("status") or "") != "active":
         return None
-    sub = str(market.get("yes_sub_title") or "")
-    line = _float(market.get("floor_strike"))
-    if " wins by" not in sub or line is None:
+    cls = classify(market)
+    if cls is None or cls[0] not in pr.get("kinds", KINDS):
         return None
-    team = sub.split(" wins by")[0]
-    fair, n = book_fair(event, team, line, poll_t, min_books=int(pr.get("min_books", MIN_BOOKS)),
+    kind, team, line = cls
+    fair, n = book_fair(event, team, line, poll_t, kind=kind, min_books=int(pr.get("min_books", MIN_BOOKS)),
                         max_quote_age_s=float(pr.get("max_book_quote_age_s", MAX_BOOK_QUOTE_AGE_S)))
     if fair is None:
         return None
@@ -167,7 +221,7 @@ def decide(
         edge = p - ask - taker_fee_one(ask)
         if edge >= min_edge and (best is None or edge > best["edge"]):
             best = {"leg": leg, "ask": ask, "fair": round(p, 4), "edge": round(edge, 4), "n_books": n,
-                    "team": team, "line": line}
+                    "team": team, "line": line, "kind": kind}
     return best
 
 
@@ -186,7 +240,10 @@ def _get(url: str, timeout: float = 10.0) -> Any:
 
 
 class PaperEntryLoop:
-    """Polled from the fast exit thread. ESPN every 30 s, books every 60 s, Kalshi every pass."""
+    """Polled from the fast exit thread. Per sport: ESPN every 30 s, books every 60 s, Kalshi every pass.
+
+    `sports` defaults to NHL only (the original cell); the worker passes ENTRY_SPORTS.
+    """
 
     def __init__(
         self,
@@ -198,9 +255,11 @@ class PaperEntryLoop:
         load: Callable[[], dict[str, Any]] | None = None,
         persist: Callable[[Mapping[str, Any]], None] | None = None,
         on_book: Callable[[Mapping[str, Any]], Mapping[str, Any] | None] | None = None,
+        sports: Sequence[str] = ("nhl",),
     ) -> None:
         self.today_fn, self.clock, self.get = today_fn, clock, get
-        self.tickers_fn = tickers_fn or _nhl_spread_tickers
+        self.sports = tuple(s for s in sports if s in SPORTS)
+        self.tickers_fn = tickers_fn or _sport_tickers
         self.load = load or _load_doc
         self.persist = persist or _persist_doc
         # Called with each NEWLY booked entry. This module never sends anything;
@@ -208,10 +267,10 @@ class PaperEntryLoop:
         # exactly the entries this rule booked, so the two cannot drift apart.
         self.on_book = on_book
         self.doc: dict[str, Any] | None = None
-        self.books: dict[str, Any] = {}
-        self.books_t: float | None = None
-        self.espn: dict[str, Any] = {}
-        self.espn_t: float | None = None
+        self.books: dict[str, dict[str, Any]] = {}  # sport -> {event id: event}
+        self.books_t: dict[str, float] = {}
+        self.espn: dict[str, dict[str, Any]] = {}  # sport -> {game key: {...}}
+        self.espn_t: dict[str, float] = {}
         self.last_score: dict[str, tuple] = {}
         self.score_change_t: dict[str, float] = {}
         self.mids: dict[str, list[tuple[float, float]]] = defaultdict(list)
@@ -219,17 +278,17 @@ class PaperEntryLoop:
         self.window = {"passes": 0, "considered": 0, "signals": 0, "booked": 0}
 
     # -- inputs ---------------------------------------------------------------
-    def _refresh_espn(self, t: float) -> None:
-        if self.espn_t is not None and t - self.espn_t < ESPN_EVERY_S:
+    def _refresh_espn(self, sport: str, t: float) -> None:
+        if sport in self.espn_t and t - self.espn_t[sport] < ESPN_EVERY_S:
             return
-        d = self.get(ESPN) or {}
-        self.espn_t = t
+        d = self.get(espn_url(sport)) or {}
+        self.espn_t[sport] = t
         games = {}
         for ev in d.get("events") or []:
             comp = (ev.get("competitions") or [{}])[0]
             st = ((comp.get("status") or ev.get("status") or {}).get("type") or {}).get("state")
             teams = {(x.get("team") or {}).get("abbreviation"): x.get("score") for x in comp.get("competitors") or []}
-            key = "|".join(sorted(k or "" for k in teams))
+            key = sport + ":" + "|".join(sorted(k or "" for k in teams))
             score = tuple(sorted((k or "", v) for k, v in teams.items()))
             if key in self.last_score and self.last_score[key] != score:
                 self.score_change_t[key] = t
@@ -239,33 +298,41 @@ class PaperEntryLoop:
                 self.score_change_t[key] = t
             self.last_score[key] = score
             games[key] = {"state": st, "abbrs": [k for k in teams if k]}
-        self.espn = games
+        self.espn[sport] = games
 
-    def _refresh_books(self, t: float) -> None:
-        if self.books_t is not None and t - self.books_t < BOOKS_EVERY_S:
+    def _refresh_books(self, sport: str, t: float) -> None:
+        if sport in self.books_t and t - self.books_t[sport] < BOOKS_EVERY_S:
             return
-        self.books_t = t
+        self.books_t[sport] = t
         key = os.environ.get("ODDS_API_KEY") or ""
         if not key:
-            self.books = {}
+            self.books[sport] = {}
             return
-        q = urllib.parse.urlencode({"apiKey": key, "regions": "us,eu,uk", "markets": "spreads", "oddsFormat": "decimal"})
-        rows = self.get(f"{ODDSAPI}?{q}") or []
+        q = urllib.parse.urlencode({"apiKey": key, "regions": "us,eu,uk", "markets": ",".join(KINDS),
+                                    "oddsFormat": "decimal"})
+        rows = self.get(f"{oddsapi_url(sport)}?{q}") or []
         now_iso = _iso(t)
-        self.books = {e["id"]: e for e in rows if str(e.get("commence_time") or "") <= now_iso}
+        self.books[sport] = {e["id"]: e for e in rows if str(e.get("commence_time") or "") <= now_iso}
 
-    def _game_key(self, ticker: str) -> str | None:
+    def _game_key(self, sport: str, ticker: str) -> str | None:
         parts = ticker.split("-")
         code = parts[1][7:] if len(parts) > 1 else ""
-        hits = [k for k, g in self.espn.items() if g["abbrs"] and all(a in code for a in g["abbrs"])]
+        games = (self.espn.get(sport) or {}).items()
+        hits = [k for k, g in games if g["abbrs"] and all(a in code for a in g["abbrs"])]
         return max(hits, key=len) if hits else None
 
-    def _event_for(self, subs: set[str]) -> Mapping[str, Any] | None:
-        for e in self.books.values():
-            names = (e.get("home_team"), e.get("away_team"))
-            if len(subs) >= 2 and all(any(team_match(s, n) for n in names) for s in subs):
-                return e
-        return None
+    def _event_for(self, sport: str, subs: set[str]) -> Mapping[str, Any] | None:
+        """The ONE live book event every known team name of this game matches, else None.
+
+        One name is enough (a game where Kalshi listed a single moneyline side, or a totals-only game
+        whose spread rungs name one team), but only when it picks out exactly one live event: "New York"
+        can be two different games, and an ambiguous match is a refusal, not a guess.
+        """
+        if not subs:
+            return None
+        hits = [e for e in (self.books.get(sport) or {}).values()
+                if all(any(team_match(s, n) for n in (e.get("home_team"), e.get("away_team"))) for s in subs)]
+        return hits[0] if len(hits) == 1 else None
 
     def _quotes(self, tickers: Sequence[str]) -> dict[str, Mapping[str, Any]]:
         out: dict[str, Mapping[str, Any]] = {}
@@ -303,24 +370,33 @@ class PaperEntryLoop:
         day = self.today_fn()
         entries = self.doc.setdefault("entries", {})
         open_tickers = sorted({e["ticker"] for e in entries.values() if e.get("settled") is None})
-        self._refresh_espn(t)
-        live_games = {k for k, g in self.espn.items() if g["state"] == "in"}
-        tickers = [tk for tk in self.tickers_fn(day) if self._game_key(tk) in live_games] if live_games else []
+        live_games: set[str] = set()
+        tickers: list[tuple[str, str]] = []  # (sport, ticker)
+        for sport in self.sports:
+            self._refresh_espn(sport, t)
+            live = {k for k, g in (self.espn.get(sport) or {}).items() if g["state"] == "in"}
+            if not live:
+                continue
+            live_games |= live
+            tickers += [(sport, tk) for tk in self.tickers_fn(day, sport) if self._game_key(sport, tk) in live]
+            self._refresh_books(sport, t)
         if not tickers and not open_tickers:
-            return {"status": "idle", "reason": "no_live_nhl_game"}
-        if live_games:
-            self._refresh_books(t)
-        markets = self._quotes(sorted(set(tickers) | set(open_tickers)))
+            return {"status": "idle", "reason": "no_live_game"}
+        markets = self._quotes(sorted({tk for _, tk in tickers} | set(open_tickers)))
         self._grade(entries, markets, t)
-        subs_by_event: dict[str, set] = defaultdict(set)
+        # Team names per GAME (ticker game code), from moneyline and spread subtitles: a total's subtitle
+        # names no team, so it finds its book event through its game's other markets.
+        subs_by_game: dict[str, set] = defaultdict(set)
         for m in markets.values():
-            sub = str(m.get("yes_sub_title") or "")
-            if " wins by" in sub:
-                subs_by_event[str(m.get("event_ticker"))].add(sub.split(" wins by")[0])
+            cls = classify(m)
+            if cls and cls[0] in ("h2h", "spreads"):
+                parts = str(m.get("ticker") or "").split("-")
+                if len(parts) > 1:
+                    subs_by_game[parts[1]].add(cls[1])
         spent = sum(e["ask"] for e in entries.values() if e.get("day") == day)
         self.window["passes"] += 1
         out = {"status": "ok", "tickers": len(tickers), "signals": 0, "booked": 0}
-        for tk in tickers:
+        for sport, tk in tickers:
             m = markets.get(tk)
             if m is None:
                 continue
@@ -331,11 +407,13 @@ class PaperEntryLoop:
                 del xs[:-16]
             win = [v for (tt, v) in self.mids[tk] if t - tt <= MID_STABLE_WINDOW_S]
             move = (max(win) - min(win)) if len(win) >= 2 else None
-            gk = self._game_key(tk)
+            gk = self._game_key(sport, tk)
             since = (t - self.score_change_t[gk]) if gk in self.score_change_t else (float("inf") if gk else None)
             self.window["considered"] += 1
-            d = decide(market=m, event=self._event_for(subs_by_event.get(str(m.get("event_ticker")), set())),
-                       poll_t=self.books_t if self.books else None, since_score_s=since, mid_move_60s=move, now_t=t)
+            game_code = tk.split("-")[1] if "-" in tk else ""
+            d = decide(market=m, event=self._event_for(sport, subs_by_game.get(game_code, set())),
+                       poll_t=self.books_t.get(sport) if self.books.get(sport) else None, since_score_s=since,
+                       mid_move_60s=move, now_t=t, params={"score_quiet_s": SPORTS[sport]["score_quiet_s"]})
             if d is None:
                 continue
             out["signals"] += 1
@@ -350,7 +428,8 @@ class PaperEntryLoop:
                 entries[key] = {
                     "day": day, "t": t, "at": _iso(t), "ticker": tk, "leg": d["leg"], "ask": d["ask"],
                     "fee": round(taker_fee_one(d["ask"]), 4), "fair": d["fair"], "edge": d["edge"],
-                    "n_books": d["n_books"], "line": d["line"], "team": d["team"],
+                    "n_books": d["n_books"], "line": d["line"], "team": d["team"], "kind": d["kind"],
+                    "sport": sport,
                     "since_score_s": None if since is None else round(min(since, 1e9)),
                     "mid_move_60s": None if move is None else round(move, 4),
                     "markout_60": None, "markout_300": None, "settled": None, "pnl_1c": None,
@@ -364,7 +443,7 @@ class PaperEntryLoop:
                     except Exception as exc:  # noqa: BLE001 -- the paper record must survive the hook
                         entries[key]["live"] = {"placed": False, "reason": f"{type(exc).__name__}: {exc}"[:200]}
             print(
-                f"[inplay_entries_paper] WOULD_ENTER ticker={tk} leg={d['leg']} ask={d['ask']} fair={d['fair']}"
+                f"[inplay_entries_paper] WOULD_ENTER sport={sport} kind={d['kind']} ticker={tk} leg={d['leg']} ask={d['ask']} fair={d['fair']}"
                 f" edge={d['edge']} books={d['n_books']} since_score_s={since if since is None else round(min(since, 1e9))}"
                 f" mid_move_60s={move} booked={refused is None} refused={refused} day_spend={round(spent, 2)}",
                 flush=True,
@@ -410,14 +489,15 @@ def _persist_doc(doc: Mapping[str, Any]) -> None:
     write_json_file(_doc_path(), dict(doc))
 
 
-def _nhl_spread_tickers(day: str) -> list[str]:
+def _sport_tickers(day: str, sport: str = "nhl") -> list[str]:
+    """Full-game Kalshi tickers (spreads, totals, h2h) of `sport` on `day`, from the fleet's venue_odds file."""
     from pathlib import Path
 
     from syndicate.features.shared.refresh_state_store import reports_root
 
-    p = Path(reports_root()) / "intelligence" / "venue_odds" / f"kalshi__nhl__{day.replace('-', '_')}.json"
+    p = Path(reports_root()) / "intelligence" / "venue_odds" / f"kalshi__{sport}__{day.replace('-', '_')}.json"
     try:
         payload = json.loads(p.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return []
-    return sorted(t for t, v in (payload.get("markets") or {}).items() if v.get("market") == "spreads")
+    return sorted(t for t, v in (payload.get("markets") or {}).items() if v.get("market") in KINDS)

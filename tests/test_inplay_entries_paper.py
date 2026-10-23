@@ -70,14 +70,14 @@ def _loop(markets_by_pass, espn_states, clock_ts, persisted):
 
     clock = {"t": clock_ts[0]}
     loop = ip.PaperEntryLoop(today_fn=lambda: "2026-10-21", clock=lambda: clock["t"], get=get,
-                             tickers_fn=lambda d: [TICKER, "KXNHLSPREAD-26OCT21TORCBJ-CBJ2"],
+                             tickers_fn=lambda d, s="nhl": [TICKER, "KXNHLSPREAD-26OCT21TORCBJ-CBJ2"],
                              load=lambda: {"entries": {}}, persist=persisted.append)
 
     def advance(i):
         calls["i"] = i
         clock["t"] = clock_ts[i]
-        loop.books_t = None  # force a fresh poll each simulated pass
-        loop.espn_t = None
+        loop.books_t = {}  # force a fresh poll each simulated pass
+        loop.espn_t = {}
         return loop.step()
 
     return loop, advance
@@ -117,7 +117,7 @@ def test_once_per_ticker_leg_per_day_and_budget():
 
 def test_off_switch(monkeypatch):
     monkeypatch.setenv("SYNDICATE_INPLAY_ENTRIES_PAPER", "off")
-    loop = ip.PaperEntryLoop(today_fn=lambda: "2026-10-21", get=lambda u: {}, tickers_fn=lambda d: [],
+    loop = ip.PaperEntryLoop(today_fn=lambda: "2026-10-21", get=lambda u: {}, tickers_fn=lambda d, s="nhl": [],
                              load=lambda: {"entries": {}}, persist=lambda d: None)
     assert loop.step() == {"status": "off"}
 
@@ -140,3 +140,87 @@ def test_the_module_cannot_trade():
                  "place_exit", "cancel_order", "execute_portfolio", "OrderRequest"}
     hits = {n for n in names if any(f in (n or "") for f in forbidden)}
     assert not hits, hits
+
+
+# -- all-sports extension (user 2026-10-23) ------------------------------------------------------
+
+
+def test_classify_every_full_game_shape():
+    assert ip.classify({"ticker": "KXNHLSPREAD-26OCT21TORCBJ-TOR2", "yes_sub_title": "Toronto wins by over 1.5 goals",
+                        "floor_strike": 1.5}) == ("spreads", "Toronto", 1.5)
+    assert ip.classify({"ticker": "KXNBATOTAL-26OCT22CHIMIL-215", "yes_sub_title": "Over 214.5 points",
+                        "floor_strike": 214.5}) == ("totals", "Over", 214.5)
+    assert ip.classify({"ticker": "KXNBAGAME-26OCT22CHIMIL-MIL", "yes_sub_title": "Milwaukee",
+                        "floor_strike": None}) == ("h2h", "Milwaukee", None)
+    assert ip.classify({"ticker": "KXEPLGAME-26OCT25ARSCHE-TIE", "yes_sub_title": "Tie"}) is None
+    assert ip.classify({"ticker": "KXNBAPTS-26OCT22CHIMIL-X", "yes_sub_title": "Giannis: 30+"}) is None
+
+
+def _two_way(key, outs, upd):
+    return {"key": key, "last_update": upd, "outcomes": outs}
+
+
+def test_book_fair_totals_and_h2h_and_skips_three_way():
+    upd = ip._iso(T0 - 10)
+    ev = {"bookmakers": [{"key": f"b{i}", "markets": [
+        _two_way("totals", [{"name": "Over", "price": 1 / 0.55, "point": 214.5},
+                            {"name": "Under", "price": 1 / 0.45, "point": 214.5}], upd),
+        _two_way("h2h", [{"name": "Milwaukee Bucks", "price": 1 / 0.62}, {"name": "Chicago Bulls", "price": 1 / 0.38}], upd),
+    ]} for i in range(3)] + [{"key": "eu3way", "markets": [{"key": "h2h", "last_update": upd, "outcomes": [
+        {"name": "Milwaukee Bucks", "price": 2.0}, {"name": "Chicago Bulls", "price": 3.0}, {"name": "Draw", "price": 9.0}]}]}]}
+    fair, n = ip.book_fair(ev, "Over", 214.5, T0, kind="totals")
+    assert n == 3 and abs(fair - 0.55) < 1e-9
+    fair, n = ip.book_fair(ev, "Milwaukee", None, T0, kind="h2h")
+    assert n == 3 and abs(fair - 0.62) < 1e-9  # the 3-way market is not counted
+
+
+def test_nba_moneyline_books_through_the_multi_sport_loop():
+    """Reachability for a non-NHL sport: its own ESPN + OddsAPI URLs, h2h, score gate 0 for basketball."""
+    tick = "KXNBAGAME-26OCT22CHIMIL-MIL"
+    upd = ip._iso(T0 - 10)
+    book = {"id": "nba1", "home_team": "Milwaukee Bucks", "away_team": "Chicago Bulls",
+            "commence_time": ip._iso(T0 - 3600),
+            "bookmakers": [{"key": f"b{i}", "markets": [_two_way("h2h", [
+                {"name": "Milwaukee Bucks", "price": 1 / 0.62}, {"name": "Chicago Bulls", "price": 1 / 0.38}], upd)]}
+                for i in range(4)]}
+    seen_urls: list = []
+
+    def get(url):
+        seen_urls.append(url)
+        if url.startswith(ip.espn_url("nba")):
+            return {"events": [{"competitions": [{"status": {"type": {"state": "in"}}, "competitors": [
+                {"team": {"abbreviation": "MIL"}, "score": "50"}, {"team": {"abbreviation": "CHI"}, "score": "48"}]}]}]}
+        if url.startswith(ip.espn_url("nhl")):
+            return {"events": []}
+        if url.startswith(ip.oddsapi_url("nba")):
+            return [book]
+        return {"markets": [{"ticker": tick, "event_ticker": "KXNBAGAME-26OCT22CHIMIL", "status": "active",
+                             "yes_sub_title": "Milwaukee", "yes_ask_dollars": "0.5500", "yes_bid_dollars": "0.5400",
+                             "no_ask_dollars": "0.4600", "result": ""}]}
+
+    clock = {"t": T0}
+    hooked: list = []
+    loop = ip.PaperEntryLoop(today_fn=lambda: "2026-10-22", clock=lambda: clock["t"], get=get,
+                             tickers_fn=lambda d, s: [tick] if s == "nba" else [],
+                             load=lambda: {"entries": {}}, persist=lambda d: None, sports=("nhl", "nba"),
+                             on_book=lambda e: hooked.append(e) or {"placed": False, "reason": "test"})
+    loop.step()
+    clock["t"] = T0 + 20
+    loop.books_t, loop.espn_t = {}, {}
+    out = loop.step()
+    assert out["booked"] == 1, out
+    (e,) = loop.doc["entries"].values()
+    assert e["sport"] == "nba" and e["kind"] == "h2h" and e["leg"] == "yes"  # fair 0.62 vs ask 0.55
+    assert hooked and hooked[0]["sport"] == "nba" and hooked[0]["kind"] == "h2h"
+    assert any(u.startswith(ip.oddsapi_url("nba")) and "h2h" in u for u in seen_urls)
+
+
+def test_event_match_refuses_an_ambiguous_single_name():
+    loop = ip.PaperEntryLoop(today_fn=lambda: "d", get=lambda u: {}, tickers_fn=lambda d, s="nhl": [],
+                             load=lambda: {"entries": {}}, persist=lambda d: None)
+    loop.books["nhl"] = {"a": {"id": "a", "home_team": "New York Rangers", "away_team": "Boston Bruins"},
+                         "b": {"id": "b", "home_team": "New York Islanders", "away_team": "Detroit Red Wings"}}
+    assert loop._event_for("nhl", {"New York"}) is None  # two games: refuse
+    assert loop._event_for("nhl", {"New York", "Boston"})["id"] == "a"
+    assert loop._event_for("nhl", {"Detroit"})["id"] == "b"
+    assert loop._event_for("nhl", set()) is None
