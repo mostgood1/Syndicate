@@ -512,8 +512,10 @@ EVERY_PROP_CAP = 200
 # consistency graphic at 12:34 PM CT showed LaCombe SOG u1.5 and Karlsson SOG u2.5; the 8:27 PM build's section held
 # LaCombe and four others, Karlsson gone -- a section shows the main line's better-EV side, and that became his over
 # (3/10). An exported section is now recorded beside the sheet (`<sport>/<date>.posted.json`, written by the
-# blueprint) and what it recorded stays: every build keeps those rows, they lead their section on the page and in the
-# reconciled view, and the record grades them at the price the graphic showed.
+# blueprint) and what it recorded stays: every build keeps those rows, and the record grades them at the price the
+# graphic showed. From 2026-10-23 a posted section IS its posted rows, as posted, in every view -- live and reconciled
+# (user: "Freeze + separate block"; lane cheat-sheet-section-growth found the live section re-derived from each build,
+# NHL 10-21 8 posted -> 17 -> 12 served). What qualifies after the graphic is listed apart (`sections_after_post`).
 POSTED_SUFFIX = ".posted.json"
 # The page's section keys -> the payload's, where the two differ (every other key is the same word).
 POSTED_ROW_SECTIONS = {"matchups": "matchup_spots", "shop": "shop_gaps", "every": "every_prop"}
@@ -627,7 +629,9 @@ def pin_posted(secs: Mapping[str, Sequence[int]], cids: Sequence[str], entries: 
     `only` -- a section that went out on a graphic is EXACTLY its posted items, nothing a later build added (user
     2026-10-22: "after reconciling I need the exported image to only reflect what was shared"). NHL 10-21: the
     consistency graphic at 11:51 AM CT carried 8 props; the reconciled section led with those 8 and then listed whatever
-    the last build put in the section. A section never posted (in this scope) keeps its own rows."""
+    the last build put in the section. A section never posted (in this scope) keeps its own rows. `page_payload` uses
+    `only` in EVERY view since 2026-10-23 (user: "Freeze + separate block"); what qualifies later is
+    `sections_after_post`."""
     index: dict[str, int] = {}
     for i, cid in enumerate(cids):
         index.setdefault(cid, i)
@@ -642,6 +646,26 @@ def pin_posted(secs: Mapping[str, Sequence[int]], cids: Sequence[str], entries: 
             ids.append(i)
     for key, ids in lead.items():
         out[key] = list(ids) if only else ids + [i for i in out.get(key) or [] if i not in ids]
+    return out
+
+
+def sections_after_post(secs: Mapping[str, Sequence[int]], frozen: Mapping[str, Sequence[int]], *,
+                        group: Any = None) -> dict[str, list[int]]:
+    """Per POSTED section, what qualifies now but was not on its graphic: `secs` as the rows give it, `frozen` the same
+    sections pinned to their posted items (`pin_posted(..., only=True)`). User 2026-10-23, "Freeze + separate block": a
+    posted section stays exactly what went out, in every view, and a row that qualifies later is listed apart, below
+    it -- never in its export. Measured first: NHL 10-22's consistency graphic carried 6 props at 11:41 AM CT; the
+    12:30 PM build re-picked the slate's top 30 groups and the live section read 12. A row whose `group` (a player +
+    stat; a game + market for game lines) is already on the graphic is left out -- the same bet at another rung or side
+    (MLB 10-18: Victor Mesa Jr. posted o0.5, the later build's main line u1.5). A section never posted has nothing here:
+    its frozen list IS its own list."""
+    out: dict[str, list[int]] = {}
+    for key, ids in frozen.items():
+        on = set(ids)
+        taken = {group(i) for i in ids} if group else set()
+        later = [i for i in secs.get(key) or [] if i not in on and not (group and group(i) in taken)]
+        if later:
+            out[key] = later
     return out
 
 
@@ -1625,7 +1649,8 @@ def page_payload(sheets: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any
 
     Every row is kept (a game's own sheet needs all of its props), minus the fields the page never reads. Each row
     carries its card id and whether its price check passes (only those get a pick graphic). `game_sections` holds,
-    per game, the same sections the full sheet has, as indexes into `rows`."""
+    per game, the same sections the full sheet has, as indexes into `rows`. A section that went out on a graphic holds
+    exactly its posted items, in every view; each `*_after_post` twin holds what qualifies after it (2026-10-23)."""
     from syndicate.features.shared import brand_kit
     from syndicate.features.shared import play_cards as pc
 
@@ -1650,11 +1675,12 @@ def page_payload(sheets: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any
         graded_lines = (rec or {}).get("lines") or {}
         rows = []
         faces = brand_kit.faces_allowed(sport)          # college: logos, never faces (user 2026-10-16)
-        as_posted = posted_items(posted, "rows") if rec is not None else {}
+        as_posted = posted_items(posted, "rows")
         for r in sheet.get("rows") or []:
             cid = pc.card_id(sport, day, r)
-            # RECONCILED: a row that went out on a graphic shows the copy that went out (2026-10-22: Seth Jones SOG o1.5
-            # was posted at -115 DraftKings; the last build showed -105 BetOnline). Same bet -- the card id is the bet.
+            # A row that went out on a graphic shows the copy that went out, in every view (reconciled 2026-10-22: Seth
+            # Jones SOG o1.5 was posted at -115 DraftKings, the last build showed -105 BetOnline; live too from
+            # 2026-10-23, "Freeze + separate block"). Same bet -- the card id is the bet.
             src = dict(r, **{k: v for k, v in as_posted[cid].items() if k not in ("event_id",)}) if cid in as_posted else r
             row = {k: v for k, v in src.items() if k not in _ROW_DROP and (faces or k not in brand_kit.FACE_FIELDS)}
             row["card_id"] = cid
@@ -1674,16 +1700,29 @@ def page_payload(sheets: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any
             by_game.setdefault(r.get("event_id"), []).append(i)
         doc = dict(sheet)
         doc["rows"] = rows
-        row_ids = [r["card_id"] for r in rows]
+        row_ids, row_events = [r["card_id"] for r in rows], [r.get("event_id") for r in rows]
         row_entries = posted_entries(posted, "rows")
-        doc["sections"] = pin_posted(sections(rows), row_ids, row_entries)
+        row_group = lambda i: _stat_key(rows[i])
+        # FROZEN ONCE POSTED (user 2026-10-23): a section that went out on a graphic is exactly its posted rows in every
+        # view; what qualifies after it is listed apart, never exported. A section never posted keeps its own rows.
+        own = sections(rows)
+        doc["sections"] = pin_posted(own, row_ids, row_entries, only=True)
+        doc["sections_after_post"] = sections_after_post(own, doc["sections"], group=row_group)
+        doc["game_sections"], doc["game_sections_after_post"] = {}, {}
+        for event, idx in by_game.items():
+            own = {k: [idx[j] for j in ids] for k, ids in sections([rows[i] for i in idx]).items()}
+            frozen = pin_posted(own, row_ids, row_entries, events=row_events, event=event, only=True)
+            doc["game_sections"][str(event)] = frozen
+            later = sections_after_post(own, frozen, group=row_group)
+            if later:
+                doc["game_sections_after_post"][str(event)] = later
         if posted:
             doc["posted"] = {"posts": len(posted.get("posts") or []), "rows": len(posted_rows), "lines": len(posted_lines)}
         finals = (rec or {}).get("scores") or {}
         doc["games"] = [dict(g, props=len(by_game.get(g.get("event_id"), [])),
                              **({"final": finals[str(g.get("event_id"))]} if str(g.get("event_id")) in finals else {}))
                         for g in sheet.get("games") or []]
-        lines_posted = posted_items(posted, "lines") if rec is not None else {}
+        lines_posted = posted_items(posted, "lines")
         lines = []
         for line in sheet.get("game_lines") or []:
             cid = pc.card_id(sport, day, line)
@@ -1721,33 +1760,28 @@ def page_payload(sheets: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any
             lines_by_game.setdefault(line.get("event_id"), []).append(i)
         doc["game_lines"] = lines
         line_ids, line_entries = [line["card_id"] for line in lines], posted_entries(posted, "lines")
-        line_events, row_events = [line.get("event_id") for line in lines], [r.get("event_id") for r in rows]
-        doc["game_line_sections"] = pin_posted(game_line_sections(lines), line_ids, line_entries)
-        doc["game_line_sections_by_game"] = {
-            str(event): pin_posted({k: [idx[j] for j in ids] for k, ids in game_line_sections([lines[i] for i in idx]).items()},
-                                   line_ids, line_entries, events=line_events, event=event)
-            for event, idx in lines_by_game.items()}
-        doc["game_sections"] = {
-            str(event): pin_posted({k: [idx[j] for j in ids] for k, ids in sections([rows[i] for i in idx]).items()},
-                                   row_ids, row_entries, events=row_events, event=event)
-            for event, idx in by_game.items()}
+        line_events = [line.get("event_id") for line in lines]
+        line_group = lambda i: (str(lines[i].get("event_id")), str(lines[i].get("market")))
+        own = game_line_sections(lines)
+        doc["game_line_sections"] = pin_posted(own, line_ids, line_entries, only=True)
+        doc["game_line_sections_after_post"] = sections_after_post(own, doc["game_line_sections"], group=line_group)
+        doc["game_line_sections_by_game"], doc["game_line_sections_by_game_after_post"] = {}, {}
+        for event, idx in lines_by_game.items():
+            own = {k: [idx[j] for j in ids] for k, ids in game_line_sections([lines[i] for i in idx]).items()}
+            frozen = pin_posted(own, line_ids, line_entries, events=line_events, event=event, only=True)
+            doc["game_line_sections_by_game"][str(event)] = frozen
+            later = sections_after_post(own, frozen, group=line_group)
+            if later:
+                doc["game_line_sections_by_game_after_post"][str(event)] = later
         if rec is not None and posted:
-            # WHAT WAS SHARED, ONLY (user 2026-10-22). The reconciled view and its exported graphics read these; the
-            # pregame view keeps the full sections above. A section never posted in a scope keeps its own rows there.
+            # WHAT WAS SHARED (user 2026-10-22) is now every view's sections. Kept as an alias for a template from
+            # before 2026-10-23: the template is read per request and this payload needs a web reload, so the two can
+            # meet in either order.
             sgp_ids = list(posted_sgps(posted))
-            doc["shared"] = {
-                "sections": pin_posted(sections(rows), row_ids, row_entries, only=True),
-                "game_sections": {
-                    str(event): pin_posted({k: [idx[j] for j in ids] for k, ids in sections([rows[i] for i in idx]).items()},
-                                           row_ids, row_entries, events=row_events, event=event, only=True)
-                    for event, idx in by_game.items()},
-                "game_line_sections": pin_posted(game_line_sections(lines), line_ids, line_entries, only=True),
-                "game_line_sections_by_game": {
-                    str(event): pin_posted({k: [idx[j] for j in ids] for k, ids in game_line_sections([lines[i] for i in idx]).items()},
-                                           line_ids, line_entries, events=line_events, event=event, only=True)
-                    for event, idx in lines_by_game.items()},
-                **({"sgp_ids": sgp_ids} if sgp_ids else {}),
-            }
+            doc["shared"] = {"sections": doc["sections"], "game_sections": doc["game_sections"],
+                             "game_line_sections": doc["game_line_sections"],
+                             "game_line_sections_by_game": doc["game_line_sections_by_game"],
+                             **({"sgp_ids": sgp_ids} if sgp_ids else {})}
         out[sport] = doc
     return out
 

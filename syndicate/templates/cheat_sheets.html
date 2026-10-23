@@ -66,6 +66,9 @@ section.sheet { background: linear-gradient(180deg, color-mix(in srgb, var(--bg2
 .sheet header p { margin: 0; color: var(--muted); font-size: 13px; max-width: 70ch; }
 .count { font: 500 12.5px var(--mono); color: var(--muted); }
 .rowlist { display: grid; }
+.after-post { display: grid; gap: 6px; margin-top: 4px; }
+.after-post .divider { font: 700 12px var(--display); letter-spacing: .06em; text-transform: uppercase; color: var(--muted);
+  border-top: 2px dashed var(--edge); padding-top: 10px; }
 .prop { display: grid; grid-template-columns: minmax(180px, 1.35fr) minmax(220px, 1.25fr) minmax(150px, .8fr); gap: 6px 18px;
   padding: 11px 0; border-top: 1px solid var(--rule); align-items: center; }
 .prop > div { min-width: 0; }
@@ -516,8 +519,14 @@ function crossBlock(d, game) {
     `${n} parlay${n === 1 ? "" : "s"}`, groups.map(g => part(...g)).join(""));
 }
 function sgpBlock(d, game) {
+  // Frozen once posted, like every section (2026-10-23): the parlays on a graphic ARE the section in every view (each
+  // carries `posted`, cheat_sheets.with_posted_sgps); the rest sit below the divider. `sh.sgp_ids` is the alias a
+  // payload from before then carries in the reconciled view.
   const sh = sharedOf(d);
-  const sgps = (d.sgp || []).filter(s => (!game || s.event_id === game.event_id) && (!sh || !sh.sgp_ids || sh.sgp_ids.includes(s.sgp_id)));
+  const scope = (d.sgp || []).filter(s => !game || s.event_id === game.event_id);
+  const isPosted = s => !!s.posted || !!(sh && sh.sgp_ids && sh.sgp_ids.includes(s.sgp_id));
+  const frozen = scope.some(isPosted);
+  const sgps = frozen ? scope.filter(isPosted) : scope, later = frozen ? scope.filter(s => !isPosted(s)) : [];
   if (!sgps.length) return "";
   return sectionShell("sgp", "Same-game parlays", `Built for the chance the whole ticket wins: every leg is a line the market prices as likely, the player has cleared in at least 8 of his last 10, and our sim agrees -- with how the legs move together measured on ${esc(d.sgp_basis || "past seasons")}. Heavy favourites carry vig, so the legs multiplied often pay LESS than the ticket is worth: the number to use is <b>worth it at</b> -- take it only if your book's same-game-parlay price is that or better. A book price shown on a pair is an estimate -- the legs multiplied, less an assumed discount -- not a quote. Tracked on paper; no edge is claimed yet.`,
     `${sgps.length} parlay${sgps.length === 1 ? "" : "s"}`, (() => {
@@ -528,7 +537,8 @@ function sgpBlock(d, game) {
         + (safer.length ? head(safer[0].tier_note || "Higher hit rate -- 2 or 3 legs, each one the market, the player's last 10 and our sim all make likely") + `<div class="rowlist">${safer.map(sgpRow).join("")}</div>` : "")
         + (payout.length ? head(payout[0].tier_note || "Bigger payout -- 4 or 5 of those legs, about half win, near even money") + `<div class="rowlist">${payout.map(sgpRow).join("")}</div>` : "")
         + (hr.length ? head("Built for hit rate -- lines they have been clearing, the chance the whole ticket wins first") + `<div class="rowlist">${hr.map(sgpRow).join("")}</div>` : "")
-        + (corr.length ? head("Built on correlation -- legs that win together more often than apart") + `<div class="rowlist">${corr.map(sgpRow).join("")}</div>` : "");
+        + (corr.length ? head("Built on correlation -- legs that win together more often than apart") + `<div class="rowlist">${corr.map(sgpRow).join("")}</div>` : "")
+        + afterPost(later, ts => `<div class="rowlist">${ts.map(sgpRow).join("")}</div>`);
     })());
 }
 // The reconciled parlays against what our probabilities said: paper only, so wins and losses, never units.
@@ -739,11 +749,24 @@ function gameHref(id) {
 // RECONCILED = WHAT WAS SHARED (user 2026-10-22: "after reconciling I need the exported image to only reflect what was
 // shared ... consistency with what I'm promoting on X"). `d.shared` (cheat_sheets.page_payload) holds the sections as
 // posted -- a posted section is exactly its posted rows; the pregame view keeps the full sections.
+// From 2026-10-23 every view's sections are that copy (user: "Freeze + separate block"); `d.shared` stays as an alias
+// for a payload from before then, which this template may meet until the web reloads.
 const sharedOf = d => (reconciledView(d) && d.shared) ? d.shared : null;
 function sectionsFor(d) {
   const s = sharedOf(d) || d;
   return STATE.game ? ((s.game_sections || {})[STATE.game] || {}) : (s.sections || {});
 }
+// FROZEN ONCE POSTED (user 2026-10-23): a posted section shows exactly what went out on its graphic, in every view.
+// What qualifies after the graphic (cheat_sheets.sections_after_post) sits below a divider that never reaches an image
+// (`no-export`: buildExport strips it before the capture, so recordPosted never records its rows).
+function afterFor(d) {
+  return STATE.game ? ((d.game_sections_after_post || {})[STATE.game] || {}) : (d.sections_after_post || {});
+}
+function linesAfterFor(d) {
+  return STATE.game ? ((d.game_line_sections_by_game_after_post || {})[STATE.game] || {}) : (d.game_line_sections_after_post || {});
+}
+const afterPost = (ids, draw) => (ids || []).length
+  ? `<div class="after-post no-export"><div class="divider">Qualified after the graphic -- not on it · ${ids.length}</div>${draw(ids)}</div>` : "";
 function render() {
   const sport = STATE.sport, d = DATA[sport];
   document.getElementById("brandLogo").src = logoFor(sport);
@@ -755,7 +778,9 @@ function render() {
        : `Prices as of ${ctTime(d.generated_at)} · lines move, check before betting`) : "");
   const game = STATE.game ? (d.games || []).find(g => g.event_id === STATE.game) : null;
   if (STATE.game && !game) STATE.game = null;
-  const secs = sectionsFor(d);
+  const secs = sectionsFor(d), after = afterFor(d);
+  // A section's own rows, then -- when it went out on a graphic -- what qualified after it, below the divider.
+  const withAfter = (key, draw) => draw(secs[key] || []) + afterPost(after[key], draw);
   document.getElementById("gamebar").innerHTML = game
     ? `<div class="gamebar"><a class="btn" href="${gameHref(null)}" data-game="">← Full ${esc(SPORT_NAMES[sport] || sport)} slate</a><div class="gm">${matchupLine(game)}</div><div class="kick">${esc(game.kickoff_ct || "")}${game.frozen_at ? ` · prices frozen at ${esc(ctTime(game.frozen_at))}` : ""}</div></div>` : "";
   if (d.picks_only) {
@@ -771,29 +796,31 @@ function render() {
   html += SECTIONS.map(([key, title, blurb]) => {
     const ids = secs[key] || [];
     if (!ids.length && key !== "value") return "";
-    return sectionShell(key, title, blurb, `${ids.length} rows`, `<div class="rowlist">${ids.length ? ids.map(i => propRow(d.rows[i], i)).join("") : `<div class="empty">Nothing qualifies on this ${game ? "game" : "slate"}.</div>`}</div>`);
+    return sectionShell(key, title, blurb, `${ids.length} rows`, `<div class="rowlist">${ids.length ? ids.map(i => propRow(d.rows[i], i)).join("") : `<div class="empty">Nothing qualifies on this ${game ? "game" : "slate"}.</div>`}</div>`
+      + afterPost(after[key], later => `<div class="rowlist">${later.map(i => propRow(d.rows[i], i)).join("")}</div>`));
   }).join("");
   html += ladderBlock(d, game);
-  if ((secs.consistency || []).length) html += sectionShell("consistency", "Consistency: recent hit rates", "Every prop with a full 10-game sample that cleared its line 70% of the time or more, with the trend (last 5 against last 10). We tested consistency across NFL, NBA and MLB: the price already accounts for it, so read the EV column, not the streak.", `${secs.consistency.length} props`, consistencyTable(d, secs.consistency));
-  if ((secs.matchup_spots || []).length) html += sectionShell("matchups", "Matchups: where the defense gives it up", "Overs facing a defense in the softest fifth at allowing that stat, unders facing the toughest fifth, and players who have cleared this exact line in two-thirds or more of their games against this opponent. Matchups are mostly priced in too -- context next to the price, not a pick.", `${secs.matchup_spots.length} props`, matchupTable(d, secs.matchup_spots));
-  if ((secs.pvp_batters || []).length) html += sectionShell("pvp_batters", "Batter vs pitcher", "Each hitter's career line against today's probable starter (3+ plate appearances), from MLB, shown with his best-priced prop. Small samples the price already knows: context next to the price, not a pick.", `${secs.pvp_batters.length} props`, pvpTable(d, secs.pvp_batters));
-  if ((secs.pvp_skaters || []).length) html += sectionShell("pvp_skaters", "Skater vs goalie", "Each skater's shots on goal and goals against the opposing likely starter (unconfirmed until warmups), over every game they have met in the last four seasons -- counted shot by shot from the NHL's play-by-play. Small samples the price already knows: context, not a pick.", `${secs.pvp_skaters.length} skaters`, pvpTable(d, secs.pvp_skaters, ["Vs this goalie", "Per game"]));
-  if ((secs.pvp_goalies || []).length) html += sectionShell("pvp_goalies", "Goalie vs this team", "Each goalie's record against today's opponent over the last four seasons: saves per game and save percentage.", `${secs.pvp_goalies.length} goalies`, pvpTable(d, secs.pvp_goalies, ["Vs this team", "Save %"]));
-  if ((secs.pvp_pitchers || []).length) html += sectionShell("pvp_pitchers", "Pitcher vs lineup", "Each starter against the opposing roster's hitters combined -- career lines from MLB -- shown with his strikeout line.", `${secs.pvp_pitchers.length} pitchers`, pvpTable(d, secs.pvp_pitchers, ["Vs these hitters", "AVG · K%"]));
-  if ((secs.pvp_scorers || []).length) html += sectionShell("pvp_scorers", "Defender matchups", "Who guarded him: NBA.com tracking credits every stretch of a possession to the defender on the ball. His points and shooting against today's opponent's current defenders over the last three regular seasons -- the two who guarded him most -- and his points per 100 of those possessions against them vs against everyone. Small samples the price already knows: context, not a pick.", `${secs.pvp_scorers.length} players`, pvpTable(d, secs.pvp_scorers, ["Guarded most by", "Pts / 100 poss: them vs all"]));
-  if ((secs.pvp_receivers || []).length) html += sectionShell("pvp_receivers", "Defenders on his targets", "Plays today's opposing defenders made on this receiver's targets over the last three seasons -- breakups, interceptions and tackles after the catch -- from nflverse play-by-play. NOT coverage: no free source charts who covered whom, and a catch that scores or goes out of bounds credits no defender, so this undercounts what they gave up.", `${secs.pvp_receivers.length} receivers`, pvpTable(d, secs.pvp_receivers, ["Plays they made on his targets", "All of today's defenders"]));
-  if ((secs.pvp_qbs || []).length) html += sectionShell("pvp_qbs", "QB vs this secondary", "Interceptions and breakups by today's opposing defenders on his throws over the last three seasons, and that defense's leading ball hawks this season (interceptions and pass breakups, nflverse play-by-play).", `${secs.pvp_qbs.length} quarterbacks`, pvpTable(d, secs.pvp_qbs, ["On his throws", "Their ball hawks this season"]));
+  if ((secs.consistency || []).length) html += sectionShell("consistency", "Consistency: recent hit rates", "Every prop with a full 10-game sample that cleared its line 70% of the time or more, with the trend (last 5 against last 10). We tested consistency across NFL, NBA and MLB: the price already accounts for it, so read the EV column, not the streak.", `${secs.consistency.length} props`, withAfter("consistency", ids => consistencyTable(d, ids)));
+  if ((secs.matchup_spots || []).length) html += sectionShell("matchups", "Matchups: where the defense gives it up", "Overs facing a defense in the softest fifth at allowing that stat, unders facing the toughest fifth, and players who have cleared this exact line in two-thirds or more of their games against this opponent. Matchups are mostly priced in too -- context next to the price, not a pick.", `${secs.matchup_spots.length} props`, withAfter("matchup_spots", ids => matchupTable(d, ids)));
+  if ((secs.pvp_batters || []).length) html += sectionShell("pvp_batters", "Batter vs pitcher", "Each hitter's career line against today's probable starter (3+ plate appearances), from MLB, shown with his best-priced prop. Small samples the price already knows: context next to the price, not a pick.", `${secs.pvp_batters.length} props`, withAfter("pvp_batters", ids => pvpTable(d, ids)));
+  if ((secs.pvp_skaters || []).length) html += sectionShell("pvp_skaters", "Skater vs goalie", "Each skater's shots on goal and goals against the opposing likely starter (unconfirmed until warmups), over every game they have met in the last four seasons -- counted shot by shot from the NHL's play-by-play. Small samples the price already knows: context, not a pick.", `${secs.pvp_skaters.length} skaters`, withAfter("pvp_skaters", ids => pvpTable(d, ids, ["Vs this goalie", "Per game"])));
+  if ((secs.pvp_goalies || []).length) html += sectionShell("pvp_goalies", "Goalie vs this team", "Each goalie's record against today's opponent over the last four seasons: saves per game and save percentage.", `${secs.pvp_goalies.length} goalies`, withAfter("pvp_goalies", ids => pvpTable(d, ids, ["Vs this team", "Save %"])));
+  if ((secs.pvp_pitchers || []).length) html += sectionShell("pvp_pitchers", "Pitcher vs lineup", "Each starter against the opposing roster's hitters combined -- career lines from MLB -- shown with his strikeout line.", `${secs.pvp_pitchers.length} pitchers`, withAfter("pvp_pitchers", ids => pvpTable(d, ids, ["Vs these hitters", "AVG · K%"])));
+  if ((secs.pvp_scorers || []).length) html += sectionShell("pvp_scorers", "Defender matchups", "Who guarded him: NBA.com tracking credits every stretch of a possession to the defender on the ball. His points and shooting against today's opponent's current defenders over the last three regular seasons -- the two who guarded him most -- and his points per 100 of those possessions against them vs against everyone. Small samples the price already knows: context, not a pick.", `${secs.pvp_scorers.length} players`, withAfter("pvp_scorers", ids => pvpTable(d, ids, ["Guarded most by", "Pts / 100 poss: them vs all"])));
+  if ((secs.pvp_receivers || []).length) html += sectionShell("pvp_receivers", "Defenders on his targets", "Plays today's opposing defenders made on this receiver's targets over the last three seasons -- breakups, interceptions and tackles after the catch -- from nflverse play-by-play. NOT coverage: no free source charts who covered whom, and a catch that scores or goes out of bounds credits no defender, so this undercounts what they gave up.", `${secs.pvp_receivers.length} receivers`, withAfter("pvp_receivers", ids => pvpTable(d, ids, ["Plays they made on his targets", "All of today's defenders"])));
+  if ((secs.pvp_qbs || []).length) html += sectionShell("pvp_qbs", "QB vs this secondary", "Interceptions and breakups by today's opposing defenders on his throws over the last three seasons, and that defense's leading ball hawks this season (interceptions and pass breakups, nflverse play-by-play).", `${secs.pvp_qbs.length} quarterbacks`, withAfter("pvp_qbs", ids => pvpTable(d, ids, ["On his throws", "Their ball hawks this season"])));
   const ls = sharedOf(d) || d;
   const lineSecs = game ? ((ls.game_line_sections_by_game || {})[STATE.game] || {}) : (ls.game_line_sections || {});
+  const lineAfter = linesAfterFor(d), linesWithAfter = (key, slate) => linesTable(d, lineSecs[key] || [], slate) + afterPost(lineAfter[key], ids => linesTable(d, ids, slate));
   if (game) {
-    if ((lineSecs.all || []).length) html += sectionShell("lines", "Game lines", "Spread, moneyline and total for this game: the best price against the no-vig fair, net of any exchange fee, with the model and the sim's projection as context.", `${lineSecs.all.length} lines`, linesTable(d, lineSecs.all, false));
+    if ((lineSecs.all || []).length) html += sectionShell("lines", "Game lines", "Spread, moneyline and total for this game: the best price against the no-vig fair, net of any exchange fee, with the model and the sim's projection as context.", `${lineSecs.all.length} lines`, linesWithAfter("all", false));
   } else {
-    if ((d.game_lines || []).length) html += sectionShell("lines_value", "Game lines: value at the best price", "Spreads, moneylines and totals where the best price beats the no-vig fair by 2% or more, net of exchange fees. Pick a game for its full line card.", `${(lineSecs.value || []).length} lines`, linesTable(d, lineSecs.value || [], true));
-    if ((lineSecs.shop || []).length) html += sectionShell("lines_shop", "Game lines: shop the number", "Same game line, same side: the books disagree by 2 points or more of implied probability.", `${lineSecs.shop.length} lines`, linesTable(d, lineSecs.shop, true));
+    if ((d.game_lines || []).length) html += sectionShell("lines_value", "Game lines: value at the best price", "Spreads, moneylines and totals where the best price beats the no-vig fair by 2% or more, net of exchange fees. Pick a game for its full line card.", `${(lineSecs.value || []).length} lines`, linesWithAfter("value", true));
+    if ((lineSecs.shop || []).length) html += sectionShell("lines_shop", "Game lines: shop the number", "Same game line, same side: the books disagree by 2 points or more of implied probability.", `${lineSecs.shop.length} lines`, linesWithAfter("shop", true));
   }
-  if (!game) html += sectionShell("every", "Every prop on the sheet", "Every prop priced on this sheet. Click any column to sort -- L5 / L10 rank by hit rate, and a short sample sorts below a full one.", `${(secs.every_prop || []).length} props`, everyTable(d, secs.every_prop || []));
-  if (game) html += sectionShell("every", "Every prop on the sheet", "Everything priced for this game: the best price, what it implies, the no-vig fair where both sides are quoted, the model, and recent form.", `${(secs.every_prop || []).length} props`, everyTable(d, secs.every_prop || []));
-  if ((secs.shop_gaps || []).length) html += sectionShell("shop", "Price shopping", "Same line, same side: what betting the median book gives away against the best one.", "", shopTable(d, secs.shop_gaps));
+  if (!game) html += sectionShell("every", "Every prop on the sheet", "Every prop priced on this sheet. Click any column to sort -- L5 / L10 rank by hit rate, and a short sample sorts below a full one.", `${(secs.every_prop || []).length} props`, withAfter("every_prop", ids => everyTable(d, ids)));
+  if (game) html += sectionShell("every", "Every prop on the sheet", "Everything priced for this game: the best price, what it implies, the no-vig fair where both sides are quoted, the model, and recent form.", `${(secs.every_prop || []).length} props`, withAfter("every_prop", ids => everyTable(d, ids)));
+  if ((secs.shop_gaps || []).length) html += sectionShell("shop", "Price shopping", "Same line, same side: what betting the median book gives away against the best one.", "", withAfter("shop_gaps", ids => shopTable(d, ids)));
   html += gamesBlock(d, game ? [game] : (d.games || []));
   if (!game) html += newsBlock(d);
   const rec = reconciledView(d);

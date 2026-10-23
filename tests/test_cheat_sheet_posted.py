@@ -183,8 +183,12 @@ def test_reconciled_shared_view_is_exactly_what_was_posted_as_it_was_posted():
     karl["check"]["price"] = -250                                                  # the price moved after the post
     doc = cs.page_payload([sheet])["nhl"]
     rows = doc["rows"]
-    assert ("Late Add", "under") in _consistency_players(rows, doc["sections"]["consistency"])       # pregame view: the build's
-    assert _consistency_players(rows, doc["shared"]["sections"]["consistency"]) == [("Jackson LaCombe", "under"), ("Erik Karlsson", "under")]
+    posted = [("Jackson LaCombe", "under"), ("Erik Karlsson", "under")]
+    # Every view is the posted copy since 2026-10-23 ("Freeze + separate block"); `shared` is its alias for a template
+    # from before then.
+    assert _consistency_players(rows, doc["sections"]["consistency"]) == posted
+    assert _consistency_players(rows, doc["shared"]["sections"]["consistency"]) == posted
+    assert _consistency_players(rows, doc["sections_after_post"]["consistency"]) == [("Late Add", "under")]
     assert rows[1]["check"]["price"] == -180                                       # shown as posted, graded as posted
     assert _consistency_players(rows, doc["shared"]["game_sections"]["ana"]["consistency"]) == [("Jackson LaCombe", "under")]
     for key, ids in doc["sections"].items():                                       # a section never posted keeps its rows
@@ -192,13 +196,94 @@ def test_reconciled_shared_view_is_exactly_what_was_posted_as_it_was_posted():
             assert doc["shared"]["sections"].get(key) == ids, key
 
 
-def test_no_shared_view_before_the_day_is_reconciled_and_rows_show_the_build():
+def test_before_the_day_is_reconciled_a_posted_row_already_shows_as_posted():
+    """No reconciled file yet: the live page is the posted copy too (user 2026-10-23, "Freeze + separate block") -- the
+    10-22 rule showed the build's later price here. `shared` is only the reconciled alias."""
+    import copy
+
     lacombe = _row("Jackson LaCombe", "under", 1.5, price=-103, ev=-1.85, hits=7)
+    snap = copy.deepcopy(lacombe)                                                   # the graphic is a snapshot
     sheet = _sheet([lacombe])
-    sheet["posted"] = _post(_sheet([lacombe]), "consistency", [lacombe])
-    lacombe["check"]["price"] = -130
+    sheet["posted"] = _post(_sheet([snap]), "consistency", [snap])
+    lacombe["check"]["price"] = -130                                                # a later build's price
     doc = cs.page_payload([sheet])["nhl"]
-    assert "shared" not in doc and doc["rows"][0]["check"]["price"] == -130
+    assert "shared" not in doc and doc["rows"][0]["check"]["price"] == -103
+    assert doc["rows"][0]["posted"]["price"] == -103 and doc["sections"]["consistency"] == [0]
+
+
+def test_a_posted_section_is_frozen_in_every_view_and_later_qualifiers_sit_apart():
+    """User 2026-10-23, "Freeze + separate block". Measured first (findings_2026-10-23_cheat_sheet_section_growth): NHL
+    10-21's consistency graphic carried 8 props at 11:51 AM CT; each later build re-picked the slate's top 30 groups,
+    and the LIVE section read 17 after 12:30 PM and 12 by the evening -- the posted rows leading, the build's below.
+    Now the section is exactly what went out, live and reconciled; a later qualifier sits apart, and the same player +
+    stat at another rung (MLB 10-18: Victor Mesa Jr. o0.5 posted, u1.5 later) is not listed again."""
+    import copy
+
+    dvorak = _row("Christian Dvorak", "under", 0.5, price=-150, ev=-1.2, hits=8)
+    jones = _row("Seth Jones", "over", 1.5, price=-115, ev=-0.8, hits=7, event="pit")
+    snap = copy.deepcopy([dvorak, jones])                                           # the 11:51 AM graphic
+    norris = _row("Josh Norris", "under", 0.5, price=-160, ev=-1.5, hits=9)         # quoted after the graphic
+    jones_main = _row("Seth Jones", "over", 2.5, price=150, ev=-2.0, hits=7, event="pit", books=9)   # his main line now
+    later = [dict(dvorak, posted_kept=True), jones, norris, jones_main]             # the 4:30 PM build's sheet
+    jones["check"]["price"] = -105                                                  # and his price moved
+    cid = lambda r: pc.card_id("nhl", DAY, r)
+
+    bare = cs.page_payload([_sheet(copy.deepcopy(later))])["nhl"]                   # reachability: no graphic, no freeze
+    assert _consistency_players(bare["rows"], bare["sections"]["consistency"]) == [
+        ("Josh Norris", "under"), ("Christian Dvorak", "under"), ("Seth Jones", "over")]
+    assert bare["sections_after_post"] == {} and bare["game_sections_after_post"] == {}
+
+    for reconciled in (False, True):
+        sheet = _sheet(copy.deepcopy(later))
+        sheet["posted"] = _post(_sheet(snap), "consistency", snap)
+        if reconciled:
+            sheet["reconciled"] = {"props": {}, "lines": {}, "counts": {}}
+        doc = cs.page_payload([sheet])["nhl"]
+        rows = doc["rows"]
+        assert [rows[i]["card_id"] for i in doc["sections"]["consistency"]] == [cid(dvorak), cid(jones)], reconciled
+        shown = {rows[i]["card_id"]: rows[i] for i in doc["sections"]["consistency"]}
+        assert shown[cid(jones)]["check"]["price"] == -115 and shown[cid(jones)]["posted"]["price"] == -115   # as posted
+        assert _consistency_players(rows, doc["sections_after_post"]["consistency"]) == [("Josh Norris", "under")]
+        assert [rows[i]["line"] for i in doc["sections_after_post"]["consistency"]] == [0.5]            # not Jones o2.5
+        assert _consistency_players(rows, doc["game_sections"]["ana"]["consistency"]) == [("Christian Dvorak", "under")]
+        assert _consistency_players(rows, doc["game_sections_after_post"]["ana"]["consistency"]) == [("Josh Norris", "under")]
+        assert [rows[i]["line"] for i in doc["game_sections"]["pit"]["consistency"]] == [1.5]
+        assert "pit" not in doc["game_sections_after_post"]
+        for key, ids in bare["sections"].items():                                   # a section never posted is unchanged
+            if key != "consistency":
+                assert [bare["rows"][i]["card_id"] for i in ids] == [rows[i]["card_id"] for i in doc["sections"][key]], key
+        assert ("shared" in doc) == reconciled and (not reconciled or doc["shared"]["sections"] is doc["sections"])
+
+
+def test_posted_game_lines_are_frozen_and_later_value_lines_sit_apart():
+    def line(event, market, side, value_line, ev):
+        return {"event_id": event, "market": market, "side": side, "line": value_line, "commence_time": "2026-10-17T02:10:00Z",
+                "check": {"verdict": "value", "ev_market": ev, "price": -110, "book": "fanduel"}}
+
+    total = line("ana", "totals", "over", 6.5, 3.0)
+    sheet = _sheet([])
+    sheet["game_lines"] = [total, line("ana", "totals", "under", 7.5, 4.0), line("pit", "h2h", "home", None, 2.5)]
+    sheet["posted"] = {"sport": "nhl", "date": DAY, "posts": [{"section": "lines_value", "posted_at": "2026-10-16T17:34:00Z", "rows": [],
+                       "lines": [{"card_id": pc.card_id("nhl", DAY, total), "price": -110, "book": "fanduel", "item": dict(total)}]}]}
+    doc = cs.page_payload([sheet])["nhl"]
+    lines = doc["game_lines"]
+    assert doc["game_line_sections"]["value"] == [0]
+    assert [(lines[i]["event_id"], lines[i]["market"]) for i in doc["game_line_sections_after_post"]["value"]] == [("pit", "h2h")]
+    assert doc["game_line_sections_by_game"]["ana"]["value"] == [0] and "ana" not in doc["game_line_sections_by_game_after_post"]
+
+
+def test_the_page_lists_later_qualifiers_apart_and_never_exports_them():
+    from pathlib import Path
+
+    html = (Path(__file__).resolve().parents[1] / "syndicate" / "templates" / "cheat_sheets.html").read_text(encoding="utf-8")
+    assert '<div class="after-post no-export"><div class="divider">Qualified after the graphic -- not on it' in html
+    build = html[html.index("async function buildExport(section)"):][:2000]
+    assert build.index('body.querySelectorAll(".no-export").forEach(n => n.remove());') < build.index("recountExport(body, d);")
+    assert 'const withAfter = (key, draw) => draw(secs[key] || []) + afterPost(after[key], draw);' in html
+    for key in ("consistency", "matchup_spots", "pvp_skaters", "every_prop", "shop_gaps"):
+        assert f'withAfter("{key}", ids =>' in html, key
+    assert 'afterPost(after[key], later =>' in html and 'linesWithAfter("value", true)' in html
+    assert "afterPost(later, ts =>" in html                                       # parlays, frozen the same way
 
 
 def test_the_reconciled_page_reads_the_shared_sections():
