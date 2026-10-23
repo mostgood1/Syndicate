@@ -2041,6 +2041,14 @@ death, never life — do not invert it.
 - Verification: After build: every fleet COMMISSION log line within 1c (never above) of the model; board ev_net shift matches the findings note
 - Blocked by: user decision
 
+### decision-record-shadow — OPEN — opened 2026-10-23 — session e54f22d3-da88-48d6-ba18-66ba77e0f761
+- Goal: #709 step 2: the refresh-worker writes ONE DecisionRecord per board line per heavy build in SHADOW (identity, p_market, p_model, form/posterior, p_decision blend, per-venue price/fee/net EV, named gates, verdict per destination, size layers) to <data root>/reports/intelligence/decision_records/, plus a per-build agreement vs the board, paper and live plans and a daily agreement report naming each disagreement's cause. Nothing reads the record for placement, sizing or the board.
+- Files: syndicate/features/shared/decision_record.py (NEW), syndicate/features/shared/decision_agreement.py (NEW), scripts/decision_record_checklist.py (NEW), scripts/decision_record_agreement_report.py (NEW), tests/test_decision_record.py (NEW), docs/ai_context/decision_record.md (NEW), pipeline/intelligence_state.py (the DECISION_RECORD shadow hook block right after the PORTFOLIO_COMMIT try/except ONLY), syndicate/features/shared/artifact_publisher.py (one decision_records EXPORT_ONLY_ARTIFACT_PATTERNS line ONLY), docs/ai_context/todo.md (#709 section ONLY)
+- Hypothesis: n/a (build); the agreement report should reproduce the audit's forks (F1 suggested-but-negative-at-venue, F3 board suggests a side the sim opposes, full-Kelly band) as named disagreement causes
+- Falsification test: the record is not written on a real fleet build, or the checklist finds a consumed field unpopulated beyond EXPECTED_SPARSE
+- Verification: reachability test (off != shadow through the real hook); checklist over dataclasses.fields() exits 0 on the first fleet record file; first daily agreement report produced from fleet records
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
