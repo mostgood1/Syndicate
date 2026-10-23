@@ -2827,3 +2827,26 @@ still ships **13.71 MB**, because the limit slices `top_opportunities` and NOT
 interchangeable duplicates** — 3,317 of 3,914 rows match and **597 differ** — so
 they cannot be aliased away; slicing them is the fix, and it is a contract
 change.
+
+## [fleet-redis-test-pollution] THE FLEET REDIS HELD 426 TEST-FIXTURE KEYS; A PYTEST GUARD AND A JANITOR ARE LIVE AND THE COUNT IS 0 `[verified 2026-10-23, lane fleet-redis-test-pollution, f2bf4d47 + c4a8aa8f]`
+
+**What was wrong `[measured 2026-10-22]`.** The state store (`SYNDICATE_REFRESH_STATE_BACKEND=keyvalue`, `127.0.0.1:6379`, keys `syndicate:refresh-state:<abs path>`) held
+426 keys whose embedded path is a temp dir: 262 Windows (`C:/Users/<u>/AppData/Local/Temp/...`) and 164 WSL `/tmp`, 243 with no TTL, 28 of them extra
+`odds_control_plane/oddsapi_quota.json` documents (the off-fleet quota forwarder writes only when EXACTLY ONE such key matches). They came from four pytest runs
+(one Windows xdist run `pytest-of-Amyn/pytest-14194`, three WSL runs `pytest-of-amyn/pytest-119/141/147`), 2026-10-20..22. 15,563 other keys were fleet keys under `/home/amyn/syndicate-prod/`.
+
+**What is live `[verified]`.** (1) `refresh_state_store._get_keyvalue_client` raises under pytest (`PYTEST_CURRENT_TEST`) for a loopback host; `SYNDICATE_ALLOW_TEST_LOOPBACK_REDIS=1` allows a throwaway Redis.
+(2) `scripts/keyvalue_janitor.py`: dry run by default; only `<ns>:refresh-state:` keys whose path is a temp signature; `/home/<u>/syndicate-prod` and `/opt/render` are protected and always win;
+idle gate, `--max-keys` tripwire, restorable backup before `--apply`, EXPIRE with a 60 s grace. (3) `cmd_ci_run` runs it BEFORE and AFTER the nightly suite (post in a `finally`, never changes the suite's return code).
+Landed f2bf4d47 / c4a8aa8f on main; the fleet checkout carries all of it (file presence checked 10-22 and 10-23).
+
+**Readings `[verified]`.** Live cleanup 10-22 19:22Z: candidates=426 expired=426 remaining=0, DBSIZE 16,034 -> 15,608, exactly one key matches `*:refresh-state:*odds_control_plane/oddsapi_quota.json`
+(the real one). Nightly 10-23 (commit 4eafd1d5, which contains the guard): `JANITOR mode=apply ... candidates=0` + `janitor: exit 0` at 08:00:01Z (before) and 09:11:19Z (after, 71 min later). A dry run at 14:18Z 10-23: candidates=0, scanned=15,895.
+
+**NOT established.** WHO wrote the 426. The nightly is a candidate only (stray timestamps 08:28-08:40Z fall in its window) and the 10-23 reading does not discriminate: 0 strays is what both
+'the nightly never wrote them' and 'the guard stopped it' predict. The guard covers pytest processes only; a non-pytest writer is still cleaned (daily) but not blocked.
+The window of the 0 is ONE nightly and ~19 h; recurrence would show as `candidates>0` in the `JANITOR` line of `<home>/logs/job-ci-suite.log`.
+
+**Separate and unfixed.** The nightly's pytest-vs-baseline step is RED and getting worse: 29 new failures 10-22, 60 on 10-23. `tests/test_refresh_state_store.py` filesystem-backend tests are among them and
+PASS in isolation in the ci-checkout under the scrubbed env (so: order leakage inside a chunk, leaking test unidentified; the log carries no tracebacks). Redis memory (930 MB, `maxmemory` unset)
+is a bounded steady state: 923 of 973 MB is soccer `layer2_shortlist` shards (8.4 MB each, two builds per date, ~9-day TTL), daily backup rdb flat at 252-288 MB over 10-16..10-22.
