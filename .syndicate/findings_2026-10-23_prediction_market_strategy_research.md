@@ -103,3 +103,40 @@ They were also checked against the ledger's earlier measurements:
 
 ## Sources (from the two agent reports; full lists in the session transcript)
 Bürgi, Deng & Whelan, *Makers and Takers* (karlwhelan.com/Papers/Kalshi.pdf); Whelan, *Agreeing to Disagree* (MPRA 126351); Whelan, *The Truth about CLV* (karlwhelan.com/?p=2595); Moskowitz (2021) JF 76; Croxson & Reade (2014) EJ 124; Choi & Hui (2014) JEBO 107B; Angelini, De Angelis & Singleton (2022) IJF 38; Norton, Gray & Faff (2015) JBF 61; Page (2012) Applied Econ 44; Brown (2012) Applied Econ 44; Moshrefi (2026) arXiv 2607.14430; Clegg et al. (2026) arXiv 2605.16066; Akey et al. CEPR DP21615; Galaxy Research 2026-10-01; Saguillo et al. AFT 2025 (arXiv 2508.03474); QCX CFTC filing 2026-09-29 (cftc.gov/filings/orgrules/rules09292630356.pdf); docs.kalshi.com; docs.polymarket.com; help.kalshi.com Liquidity Incentive Program.
+
+
+## 5. Pregame longshot audit, by entry price (user ask 2026-10-23)
+
+`scripts/price_bucket_audit.py` over the execution-ledger ARCHIVE `orders_2026-10.jsonl` (fleet, read-only copy). 11,713 graded paper orders, 10-02..10-22, every paper book (paper, paper:kalshi, paper:polymarket, paper:novig, paper:prophetx, ladders). PREGAME only. ROI = pnl/stake with a GAME-clustered 95% CI.
+
+**Below 15c is a non-issue:** 24 orders / 17 games, **0.1% of stake**, ROI −88%. A 15c floor is harmless but saves ~$55 of paper stake in 3 weeks.
+
+**The real losses are wider, at BOTH ends** (all books):
+
+| entry price | stake share | ROI [game-clustered CI] |
+|---|---|---|
+| 15-25c | 0.6% | −22.8% [−64, +18] |
+| **25-40c** | 3.1% | **−37.3% [−55, −19]** |
+| 40-60c | 69.4% | −2.4% [−9.5, +4.8] |
+| 60-75c | 11.2% | +9.7% [−4.9, +24] |
+| **75-90c** | 14.4% | **−17.1% [−33, −1]** |
+| **90c+** | 1.2% | **−58.0% [−93, −23]** |
+
+**Every week, three bands:**
+
+| band | wk1 | wk2 | wk3 |
+|---|---|---|---|
+| under 40c | −36.6% [−58, −15] | −35.7% [−64, −7] | −35.7% [−71, −1] |
+| 40-75c | −2.7% | −1.6% | +6.1% |
+| 75c+ | −37.1% [−64, −10] | −13.1% [−33, +7] | −14.9% [−55, +25] |
+
+- **Reading:** the model is overconfident at extreme prices. Its "edges" on longshots and on heavy favourites are not real, while the 40-75c core is roughly break-even to slightly positive. This is a calibration problem, not only a longshot one.
+- It agrees with the market evidence on longshots (§1). It contradicts the market-level "favourites earn small positive returns": OUR favourite picks lose, because our model selects favourites it overrates.
+- **LIVE exposure** (LIVE_LEDGER_ROW lines 10-20..10-23, filled, latest row per order): 75c+ = **36.8% of live stake** ($151 / 32 fills), 40-75c = 61%, under 40c = 2%. Only 25 graded live rows, too few to judge live alone.
+
+**Options (user decision):**
+- (A) **Entry price band** for pregame buys, e.g. refuse < 0.40 and >= 0.75 (or start with < 0.40 only: strong in every week, ~4% of stake).
+- (B) **Fix the cause:** shrink model probabilities toward the market at the extremes (the daily optimizer already fits a calibration shrink w*; check whether it is applied to the live sizing path).
+- (C) **Shadow first:** count what the band would have refused on the live book for 1-2 weeks.
+
+Owners: live sizing and gates sit with the coordinator lane (332cb014); the model calibration sits with the optimizer/scorecard lanes.
