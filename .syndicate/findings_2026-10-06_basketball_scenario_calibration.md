@@ -4071,3 +4071,26 @@ pooled over its frames, against its real FIT season AST/FGM.
 
 **Step B run:** B5b_team, assisted_make_rate 0.6368, assist_team_prior on, ref 0.6286. It is graded against
 A5b_0637 (team-game AST MAE 4.47) and the step-A gates.
+
+### #5b STEP B — RESULT 2026-10-23 16:49Z (B5b_team, 12/12 dates, 87 paired games, 0 errors): NOT PROVEN on 12 dates (improvement inside its SE)
+
+| arm | AST/team | AST/FGM | team-game AST MAE | r(sim, real team-game AST/FGM) | FTA / PF / foul-outs / 3PA |
+|---|---|---|---|---|---|
+| 0.58 (legacy) | 24.36 | 0.5797 | 4.983 | −0.003 | 23.11 / 19.57 / .221 / 37.06 |
+| A: league 0.6368 | 26.80 | 0.6378 | 4.474 | −0.102 | 23.16 / 19.61 / .228 / 37.01 |
+| **B: team prior** (ref .6286) | 26.79 | 0.6384 | **4.348** | **0.227** | 23.10 / 19.57 / .226 / 37.09 |
+| real (12 dates) | 27.25 | 0.6501 | — | — | — |
+
+**B − A:**
+- team-game MAE **−0.126, SE 0.192** (174 team-games): better, but NOT beyond its SE, so it fails the
+  pre-registered step-B rule;
+- paired total −0.23 (SE 0.18), noise;
+- B is the only arm whose per-team-game assist RATE correlates with real (0.23 vs ≈ 0).
+
+**Power:** 174 team-games give an SE of about 0.19 on the MAE difference. The FIT (about 1,580 team-games) would
+give about 0.06.
+
+**Status:**
+- Step A fails by rule (gate referenced the subsample).
+- Step B is not proven at 12 dates.
+- The decision rests on the full FIT (real AST/FGM 0.6368), which needs the user.
