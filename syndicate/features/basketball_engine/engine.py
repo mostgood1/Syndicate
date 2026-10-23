@@ -177,6 +177,13 @@ class EventSimConfig:
     # its players' per-minute priors x minutes, UNclipped (the legacy foul_per_fga is clipped at 0.20, which most teams
     # hit -- measured 2026-10-19: normalising that by base_shooting_foul_per_fga inflated every trip ~1.3-1.7x).
     sf_team_ref: float = 0.2541
+    # ASSISTED MAKES (#5b, pre-registered be8a644b). P(a made shot is assisted); 0.58 = today (byte-identical, the draw
+    # consumes the same RNG either way). Real NBA 2025-26 FIT AST/FGM = 0.6368 (1,632 team-games).
+    assisted_make_rate: float = 0.58
+    # Team variant: when on and assist_team_ref > 0, a side's rate = assisted_make_rate x clip(team prior AST/FGM
+    # (sum ast_pm.min / sum fgm_pm.min) / assist_team_ref, 0.8, 1.25), capped at 0.95. Off = the league rate.
+    assist_team_prior: bool = False
+    assist_team_ref: float = 0.0
 
     # Outcome priors (fallbacks when player priors are missing)
     base_tov_per_poss: float = 0.125
@@ -996,6 +1003,23 @@ def simulate_pbp_game_boxscore(
 
     sf_team_r_h = _sf_team_factor(home_players, h_mins, foul_mult_h) if sf_coherent else 1.0
     sf_team_r_a = _sf_team_factor(away_players, a_mins, foul_mult_a) if sf_coherent else 1.0
+
+    # #5b: per-side P(a make is assisted). Default = the old hard-coded 0.58 exactly.
+    ast_base = float(getattr(cfg, "assisted_make_rate", 0.58))
+    ast_ref = float(getattr(cfg, "assist_team_ref", 0.0) or 0.0)
+
+    def _assist_rate(players: pd.DataFrame, mins: np.ndarray) -> float:
+        if not (bool(getattr(cfg, "assist_team_prior", False)) and ast_ref > 0.0):
+            return ast_base
+        m = np.maximum(0.0, np.where(np.isfinite(mins), mins, 0.0))
+        ast = float(np.nansum(np.maximum(0.0, _safe_series(players, "_prior_ast_pm").to_numpy(dtype=float)) * m))
+        fgm = float(np.nansum(np.maximum(0.0, _safe_series(players, "_prior_fgm_pm").to_numpy(dtype=float)) * m))
+        if fgm <= 0.0:
+            return ast_base
+        return float(min(0.95, ast_base * float(np.clip((ast / fgm) / ast_ref, 0.8, 1.25))))
+
+    ast_rate_h = _assist_rate(home_players, h_mins)
+    ast_rate_a = _assist_rate(away_players, a_mins)
     sf_a = sf_b = 0.0
 
     # Player shooting pcts
@@ -1931,7 +1955,7 @@ def simulate_pbp_game_boxscore(
                         _add_q_seg(home_q_seg_pts, q, seg, int(points_if_make))
                         _add_q_min(home_q_min_pts, q, minute_idx, int(points_if_make))
 
-                        if rng.random() < 0.58:
+                        if rng.random() < ast_rate_h:
                             ast_w = _usage_w(home_players, "_prior_ast_pm", [i for i in h_line if i != sh])
                             aidx = _pick_weighted(rng, list(range(len(home_players))), ast_w)
                             if aidx is not None:
@@ -2061,7 +2085,7 @@ def simulate_pbp_game_boxscore(
                         _add_q_seg(away_q_seg_pts, q, seg, int(points_if_make))
                         _add_q_min(away_q_min_pts, q, minute_idx, int(points_if_make))
 
-                        if rng.random() < 0.58:
+                        if rng.random() < ast_rate_a:
                             ast_w = _usage_w(away_players, "_prior_ast_pm", [i for i in a_line if i != sh])
                             aidx = _pick_weighted(rng, list(range(len(away_players))), ast_w)
                             if aidx is not None:
