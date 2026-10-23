@@ -54007,3 +54007,21 @@ which is about the two sizing bases and not about the refusal boundary.
   - The trimmed $3.42 is under $5, so the Kalshi round-up (stake >= $5 only) correctly leaves it floored.
   - -213 is a 0.68 probability, inside the 0.40-0.75 band.
 - **Still owed:** the settled P&L counterfactual of refused and trimmed legs. Probes are in C:\tmp\lec\.
+
+## 2026-10-23 21:14Z -- READING for the 20:59:00Z refresh-worker role restart (ff 80edc2aa -> db292883, coordinator 332cb014): DecisionRecord #709 step 2 in SHADOW, lane decision-record-shadow, session e54f22d3 -- **MET: the record is written on a real build, the checklist exits 0, and the first agreement report exists**
+- **Restart:** done by the coordinator. TERM to 335935 at 20:58:53.969Z; the new refresh-worker pid 374219 started 20:59:00Z. No env change: `SYNDICATE_DECISION_RECORD` is absent, which means shadow. Fleet HEAD is db292883d.
+- **Line (first heavy build after the restart):** `2026-10-23T21:12:58.682Z [decision_record] DECISION_RECORD_WRITTEN date=2026-10-23 mode=shadow records=5496 bets={'board': 349, 'paper': 607, 'live:kalshi': 71, 'live:polymarket': 55} form_lines=817 calibration_cells=217 ... elapsed_s=6.26`.
+- **Files written** under `~/syndicate-prod/data/reports/intelligence/decision_records/`:
+  - `2026-10-23.json.gz`, 1,262,258 B;
+  - `.agreement.jsonl`, `.agreement_report.json` and `.md`.
+  - No `DECISION_RECORD_FAILED` and no `DECISION_RECORD_GUARD_SKIP` line.
+- **Checklist** (`scripts/decision_record_checklist.py --file <that gz>`): **exit 0.** 84/105 fields OK, the rest are SPARSE_OK, ZERO_OK or informational, and there are no alarms. Context inputs are all fed: 217 w* cells, 817 cheat-sheet form lines, and the paper bankroll. 515 records carry form.
+- **First agreement (one build, so these are latest-build counts):**
+  - Board agrees on 5190 of 5496 lines. 294 are bet by the record and not suggested by the board; the top cause is `model_weight_lifted_over_floor` (268). 12 are suggested by the board and not bet by the record, mostly `gate:min_ev_floor` together with `sim_opposes`.
+  - F3, the board suggesting a side its sim opposes: 20/46.
+  - F1, suggested but negative net at the venue's own price: Kalshi 6/10, Polymarket 7/7.
+  - Paper plan: of its 15 positions, the record agrees on 13. Live Kalshi plan: 1 of 3; size disagrees on that one with causes `full_kelly_band` and `favourite_cap`.
+  - The overall membership rates (paper 13/609, live Kalshi 1/73) are dominated by `record_bets_plan_no` (594, 70). The cause is mostly `plan_requires_suggested`: the record has no max_positions cut and gives the sim a weight, so it bets many more lines than a 12-position plan holds. Read the plan-side numbers above, not these rates.
+  - Live orders on the slate: the record agrees with 1 of 29. Causes: `gate:min_ev_floor` 15, `no_record_for_line` 12, `negative_at_venue_price` 10, `sim_opposes` 7, `gate:price_band` 6.
+- **Caveat:** all 29 live orders were submitted 05:05Z-20:17Z, BEFORE the first record existed, so a LATER record judged them. From tonight on, each order is judged by the first build at or after its submit.
+- **Production behaviour unchanged by construction:** nothing imports the record outside the lane (a test enforces it).
