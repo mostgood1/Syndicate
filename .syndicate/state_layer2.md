@@ -986,6 +986,7 @@ After web `cc5bdfb1` (20:11:20Z): placeholder starts **43 -> 0**, "TBD" tokens *
 - **NOT a withhold:** every criterion is a line property; All still serves every line (PRIME DIRECTIVE, learnings 2026-10-05). A first-draft "drop model-against rows / EV floor 0 where no model" was withdrawn for exactly that reason.
 - **First reading (16:59:10Z build):** 43 of 5,096 suggested (0.8%); reasons ev_below_min 1,909 / one_sided_fair 601 / ev_net_of_fee_below_min 292.
 - **Caveat that travels with it:** pregame EV 2-5.27% graded -21.2% [-37, -3] over 09-01..09-20 (`[layer2-score-outcomes]`); the weekend's pregame EV >= 2 was -7.5% (n.s.). Live and exchange are the strongest cells. One weekend: re-grade on `sg` before moving the threshold.
+- **Graded on `sg` (verified 2026-10-23):** 10-17/18 +3.9% [-7.7, +15.4] (339 / 105); 10-17..10-22 -0.8% [-7.9, +8.2] (973 / 176), ladders counted once +1.5% [-5.4, +8.6]; all priced -12.5%. Props carry it (+4.3%; NHL props +14.0% [-0.0, +27.4]). Every interval spans 0. `findings_2026-10-23_suggested_six_day_grade.md`.
 
 ## [layer2-likelihood-shadow] SHADOW LIKELIHOOD -- the measured under tilt stamped beside the fair on NBA and NCAAF prop rows; nothing consumes it yet `[verified 2026-10-14 00:47Z served + 12:48Z fleet, lanes signal-engine-nba / signal-engine-football, session 9e18a0e7]`
 
