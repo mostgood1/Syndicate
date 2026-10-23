@@ -3991,3 +3991,33 @@ production only through `nba_engine_config.json` (the P3 rule).
  "production_path_note": "P3 rule: every field reaches production ONLY via nba_engine_config.json, never by flipping a code default. diag_foul_outs/record_events are research-only."
 }
 ```
+
+### #5b ASSISTS — PRE-REGISTRATION 2026-10-23 14:57Z (user: "start on the assists gap")
+
+**Measured defect:**
+- Real FIT: AST/FGM = **0.6368** (1,632 team-games; AST 26.66, FGM 41.86).
+- fit_r2b sim: AST/FGM = **0.5802** (161,200 draws; AST 24.24, FGM 41.77).
+- FGM matches. The engine draws "assisted" on every make at a HARD-CODED 0.58 (engine.py ~:1934 / ~:2064), so
+  the whole −2.4 AST/team is that constant. The assister is then picked by `_prior_ast_pm` usage among the other
+  four on the floor.
+
+**Mechanism** (engine, default-off, byte-identical at default; the draw consumes the same RNG either way):
+- `assisted_make_rate: float = 0.58`;
+- `assist_team_prior: bool = False`, `assist_team_ref: float = 0.0`. When on and ref > 0, the side's rate =
+  assisted_make_rate × clip((Σ ast_pm·min / Σ fgm_pm·min) / ref, 0.8, 1.25), capped at 0.95.
+
+**Proofs:** corpus parity (`--reference recorded`) 5,400/5,400 at default; a reachability test (off ≠ on).
+
+**Step A** (league rate; 12 sweep dates; the fit_r2b config otherwise; `assisted_make_rate=0.6368`). PASS:
+- AST/FGM within ±0.010 of the 12-date real;
+- AST/team within ±0.4 of the 12-date real (27.20);
+- paired total shift vs a same-config 0.58 arm |Δ| < 0.2 per game (assists move no points);
+- FTA, PF, foul-outs, 3PA within their step-4 tolerances of that arm.
+
+Reported, not gated: the per-player served AST mean |mean − actual| vs the 0.58 arm.
+
+**Step B** (team prior). Run ONLY IF the real per-team season AST/FGM spread exceeds its sampling noise AND the
+priors' team ratio correlates with it (Pearson r ≥ 0.3 across the 30 teams, FIT). ref = the minutes-weighted league
+mean of the prior ratio. PASS: Step A's gates, plus team-game |AST − actual| MAE better than Step A's, beyond its SE.
+
+**Then:** a full FIT on the user's go-ahead. Production only via nba_engine_config.json, with the forward test.
