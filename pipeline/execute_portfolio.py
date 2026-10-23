@@ -972,6 +972,31 @@ def _run_execution(
                 )
                 continue
 
+        # ENTRY PRICE BAND  [user 2026-10-23, "Band: 40c-75c only", lane
+        # live-min-stake-five]. price_bucket_audit (dbbf3ebe), 11,713 graded
+        # paper orders 10-02..22: under 40c lost ~36% EVERY week, 75-90c lost
+        # 17.1% [-33,-1] and 90c+ 58%, while 40-75c was ~breakeven; 36.8% of live
+        # stake sat at 75c+. A live entry whose price, as a probability, is
+        # outside [low, high) is refused and writes nothing.
+        # SYNDICATE_LIVE_PRICE_BAND="0.40,0.75"; absent = off.
+        if mode == LIVE:
+            band = live_price_band()
+            if band is not None:
+                prob = planned_probability(getattr(request, "requested_price", None))
+                if prob is not None and not (band[0] - 1e-9 <= prob < band[1] - 1e-9):
+                    skipped += 1
+                    refused[REFUSAL_PRICE_BAND] = refused.get(REFUSAL_PRICE_BAND, 0) + 1
+                    print(
+                        f"[execute_portfolio] REFUSED_PRICE_BAND venue={venue}"
+                        f" ticker={getattr(request, 'venue_ticker', None)!r}"
+                        f" sport={getattr(request, 'sport', None)} market={getattr(request, 'market', None)}"
+                        f" side={getattr(request, 'side', None)} line={getattr(request, 'line', None)}"
+                        f" price={getattr(request, 'requested_price', None)} prob={prob:.3f}"
+                        f" band=[{band[0]:.2f},{band[1]:.2f}) -- outside the live price band; nothing written",
+                        flush=True,
+                    )
+                    continue
+
         # ONE LEG PER GAME OUTCOME, AND A DOLLAR CAP PER GAME  [2026-10-21, user
         # decision "Build it (Recommended)", lane live-event-concentration, todo
         # #711]. D1 above matches the SAME bet; a line move is a new bet to it,
@@ -1430,6 +1455,34 @@ def _artifact_price(ticker: str, key: str) -> float | None:
         if str(market.get("ticker") or "") == ticker:
             return dollars_to_probability(market.get(key))
     return None
+
+
+REFUSAL_PRICE_BAND = "outside_price_band"
+_PRICE_BAND_ENV = "SYNDICATE_LIVE_PRICE_BAND"
+_PRICE_BAND_WARNED = False
+
+
+def live_price_band() -> tuple[float, float] | None:
+    """(low, high) implied-probability band for live entries, or None when off.
+
+    `SYNDICATE_LIVE_PRICE_BAND="0.40,0.75"`. Absent = off. A value that is set but
+    unusable (not two numbers, low >= high, outside [0, 1]) is OFF and says so once
+    per process: a guessed band would refuse or admit real orders on a typo.
+    """
+    global _PRICE_BAND_WARNED
+    raw = str(os.environ.get(_PRICE_BAND_ENV) or "").strip()
+    if not raw:
+        return None
+    try:
+        low, high = (float(x) for x in raw.split(","))
+    except ValueError:
+        low = high = -1.0
+    if not (0.0 <= low < high <= 1.0):
+        if not _PRICE_BAND_WARNED:
+            print(f"[execute_portfolio] PRICE_BAND_UNUSABLE raw={raw!r} -- band OFF", flush=True)
+            _PRICE_BAND_WARNED = True
+        return None
+    return (low, high)
 
 
 def planned_probability(value: Any) -> float | None:
