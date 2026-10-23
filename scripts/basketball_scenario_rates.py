@@ -572,7 +572,8 @@ def run_sim(args) -> int:
 
         def _dump_priors(kwargs) -> None:
             # Phase 2 #5c: the per-player shooting priors exactly as they reach the engine, one row set per distinct lineup frame.
-            cols = ("_sim_min", "_prior_fga_pm", "_prior_fgm_pm", "_prior_threes_pm", "_prior_threes_att_pm", "_prior_fta_pm", "_prior_ftm_pm")
+            cols = ("_sim_min", "_prior_fga_pm", "_prior_fgm_pm", "_prior_threes_pm", "_prior_threes_att_pm", "_prior_fta_pm", "_prior_ftm_pm",
+                    "_prior_ast_pm")  # #5b: assists
             for side in ("home_players", "away_players"):
                 df = kwargs.get(side)
                 if df is None or not hasattr(df, "columns") or "player_name" not in df.columns:
@@ -589,7 +590,9 @@ def run_sim(args) -> int:
                     qs.append([get("home_pts_mu"), get("away_pts_mu")])
                 with open(args.dump_priors, "a", encoding="utf-8") as fh:
                     # R2-a: the per-quarter targets exactly as they reach the engine, beside the priors.
-                    fh.write(json.dumps({"side": side, "rows": rows, "quarters": qs}, default=float) + "\n")
+                    # #5b: the game, so a side's priors can be joined to its team.
+                    fh.write(json.dumps({"side": side, "rows": rows, "quarters": qs, "game": dict(cur.get("game") or {})},
+                                        default=float) + "\n")
 
         def real_probe(*, entrypoint_name, league_code, kwargs):
             lever_seen["calls"] += 1
