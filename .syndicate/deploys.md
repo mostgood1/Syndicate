@@ -53866,3 +53866,29 @@ which is about the two sizing bases and not about the refusal boundary.
   - Unchanged: LIVE_EVENT_CONCENTRATION=on, KALSHI_ROUND_UP_MIN_DOLLARS=5, EXECUTION_MODE=live, ARMED=1.
 - **owed:** the first REFUSED_EVENT_CAP / TRIMMED_TO_EVENT_CAP line reading `cap=50.00`, and a fall in R2 refusals per pass. R1 (same-axis, $1 tiny-leg rule) is unchanged.
 - **rollback:** delete that env line ($15 default), then a full down/up.
+
+## 2026-10-23 00:27:19Z -- FLEET ff b3279e52 -> 4eafd1d5 + FULL DOWN/UP: live-volume package (holder `live-volume-caps`, session 332cb014, coordinator) -- **MET (env + restart); first held-at-0.90 decision and first 0.10-margin sale OWED**
+- **user (332cb014's chat, 10-22 23:55Z to 10-23 00:15Z):**
+  - "we need in game entires AND exits live".
+  - Exit margin: ".10 is fine but we should be very active in buying and selling ... We may need to eliminate caps".
+  - Caps: "Exit cap 5/$25 -> 50/$250", "Day limit 25% -> 50%", "In-game entry $10 -> $50/day".
+  - "we need to guard against in game exits where the prop has been achieved", design "Price guard (fast)". This came after the 00:07:28Z live sale of Allen o0.5 blocks (7 contracts bought at 0.64) at ~0.94, on a prop that settles at $1.
+- **code:** `4eafd1d5`, exits hold near settlement. `evaluate_exit` never sells at a bid >= `SYNDICATE_EXIT_HOLD_AT_OR_ABOVE_BID`; absent/0 = off, set-but-unusable = 0.90. Lent by kalshi-exit-path (user-requested). 6 tests + 78 across the exit suites.
+- **ride-alongs b3279e52..4eafd1d5 (runtime):**
+  - `437a6249`: in-game-trading's LIVE in-game entries, inert. `SYNDICATE_INPLAY_ENTRIES` is ABSENT. My permission check refused my session setting that switch, so it is in-game-trading's to flip under its own approval, >= 01:28:35Z.
+  - `0f4363b9`: staked-probability fit script.
+- **env:** 175 -> 177. Backup `.bak-live-volume-20261023T002805Z`.
+  - Values changed: `LIVE_ODDS_WORKER__SYNDICATE_EXIT_TAKE_PROFIT_MARGIN` 0.30 -> 0.10, `..._EXIT_LIVE_MAX_PER_DAY` 5 -> 50, `..._EXIT_LIVE_MAX_DOLLARS_PER_DAY` 25 -> 250.
+  - Added: `SYNDICATE_EXECUTION_BALANCE_DAY_PCT=0.50` (all roles), `LIVE_ODDS_WORKER__SYNDICATE_EXIT_HOLD_AT_OR_ABOVE_BID=0.90`.
+  - The first scripted attempt stopped at its env check: the exit caps already existed explicitly at 5/25, after the ff and before any env write. The finishing script changed those values in place, under the same claims and drain.
+- **restart:**
+  - Claims and drain from the 00:25:30Z gate.
+  - `down` 00:28:05-00:28:29Z. One detached odds job was stopped cleanly.
+  - healthz 200 at 00:28:35Z. refresh-worker pid 4041861, live-odds-worker 4041862.
+  - Undrained; claims released at 00:28:50Z.
+- **env read after up (live-odds-worker):** HOLD_AT_OR_ABOVE_BID=0.90, EXIT_TAKE_PROFIT_MARGIN=0.10, EXIT_LIVE_MAX_PER_DAY=50, EXIT_LIVE_MAX_DOLLARS_PER_DAY=250, BALANCE_DAY_PCT=0.50, LIVE_EVENT_MAX_DOLLARS=50, INPLAY_ENTRIES ABSENT, EXECUTION_MODE=live, ARMED=1, EXIT_MODE=live.
+- **owed:**
+  - The first EXIT_TICK `reasons` carrying `near_settlement_hold`.
+  - The first EXIT_LIVE sale under the 0.10 margin, at a bid < 0.90.
+  - The Kalshi day spend passing the old ~$118 limit.
+- **rollback:** restore the backup (or reverse each line), then a full down/up.
