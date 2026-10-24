@@ -20,7 +20,7 @@ ENTRY = {"key": f"{DAY}:KXNHLSPREAD-26OCT22TORCBJ-TOR2:yes", "ticker": "KXNHLSPR
 def _env(monkeypatch, tmp_path):
     monkeypatch.setenv("SYNDICATE_REPORTS_ROOT", str(tmp_path))
     for k in ("SYNDICATE_INPLAY_ENTRIES", "SYNDICATE_INPLAY_ENTRY_DAY_DOLLARS", "SYNDICATE_EXECUTION_MODE",
-              "SYNDICATE_EXECUTION_LIVE_ARMED", "SYNDICATE_KALSHI_EXPIRE_AT_KICKOFF", "SYNDICATE_LIVE_PRICE_BAND"):
+              "SYNDICATE_EXECUTION_LIVE_ARMED", "SYNDICATE_KALSHI_EXPIRE_AT_KICKOFF", "SYNDICATE_LIVE_PRICE_BAND", "SYNDICATE_LIVE_CELL_GATE"):
         monkeypatch.delenv(k, raising=False)
 
 
@@ -271,3 +271,46 @@ def test_live_price_reads_the_leg_not_the_human_side(monkeypatch):
     assert live.LivePrice(0.41, "no")(req) == 0.41
     assert live.LivePrice(0.60, "yes")(SimpleNamespace(venue_ticker="T", side="over")) == 0.60
     assert live.LivePrice(0.41, "yes")(req) is None  # the other leg's ask is a price move, refused
+
+
+def _gated_placer(gate, clock=None):
+    calls, reads = [], []
+
+    def gate_fn():
+        reads.append(1)
+        return gate() if callable(gate) else gate
+
+    p = live.LiveEntryPlacer(today_fn=lambda: DAY, orders_fn=lambda: [], enabled_fn=lambda: True,
+                             place_fn=lambda **kw: calls.append(kw) or {"placed": True, "status": "submitted"},
+                             gate_fn=gate_fn, clock=clock or (lambda: 0.0))
+    return p, calls, reads
+
+
+def test_live_cell_gate_off_reads_nothing_and_places():
+    p, calls, reads = _gated_placer({"cells": {"kalshi|nhl|spread|in_game": {"status": "tripped"}}, "unknown": None})
+    assert p({**ENTRY, "sport": "nhl", "kind": "spreads"})["placed"] is True and len(calls) == 1 and not reads
+
+
+def test_live_cell_gate_refuses_its_tripped_cell_only(monkeypatch):
+    monkeypatch.setenv("SYNDICATE_LIVE_CELL_GATE", "on")
+    gate = {"cells": {"kalshi|nba|spread|in_game": {"status": "tripped"},
+                      "kalshi|nba|total|in_game": {"status": "armed"}}, "unknown": None}
+    p, calls, _ = _gated_placer(gate)
+    tk = "KXNBASPREAD-26OCT24AAABBB-AAA3"
+    out = p({**ENTRY, "ticker": tk, "sport": "nba", "kind": "spreads"})
+    assert out == {"placed": False, "reason": "live_cell_tripped"} and not calls
+    assert p({**ENTRY, "ticker": "KXNBATOTAL-26OCT24CCCDDD-220", "sport": "nba", "kind": "totals"})["placed"] is True
+    assert p({**ENTRY, "ticker": "KXNHLSPREAD-26OCT24EEEFFF-EEE2", "sport": "nhl", "kind": "spreads"})["placed"] is True
+
+
+def test_live_cell_gate_unknown_fails_closed_and_the_read_is_cached(monkeypatch):
+    monkeypatch.setenv("SYNDICATE_LIVE_CELL_GATE", "on")
+    t = {"now": 0.0}
+    p, calls, reads = _gated_placer({"cells": {}, "unknown": "state read not ok"}, clock=lambda: t["now"])
+    for i in range(3):
+        out = p({**ENTRY, "ticker": f"KXNHLSPREAD-26OCT24G{i}H{i}I{i}-X2"})
+        assert out == {"placed": False, "reason": "live_cell_gate_unknown"}
+    assert not calls and len(reads) == 1  # one store read per CELL_GATE_CACHE_S
+    t["now"] = live.CELL_GATE_CACHE_S
+    p({**ENTRY, "ticker": "KXNHLSPREAD-26OCT24JJJKKK-J2"})
+    assert len(reads) == 2

@@ -17,7 +17,11 @@ OFF BY DEFAULT. Live only when ALL hold, re-read on every entry:
   * the decision ask, as a probability, is inside the pregame executor's live price
     band `[low, high)` (`execute_portfolio.live_price_band()`, the same
     `SYNDICATE_LIVE_PRICE_BAND`; absent/unusable = off, exactly as pregame). User
-    2026-10-23 via coordinator 332cb014: "Yes, same band", after a 12c h2h longshot.
+    2026-10-23 via coordinator 332cb014: "Yes, same band", after a 12c h2h longshot;
+  * when `SYNDICATE_LIVE_CELL_GATE=on`, the entry's cell (`kalshi|<sport>|<family>|in_game`) is not
+    tripped in the persisted `live_cell_gate` state (READ only: the refresh-worker evaluates; an
+    unreadable state refuses `live_cell_gate_unknown`, fail closed; the read is cached 60 s). User
+    "Per-cell trip only (C)" via coordinator 332cb014, lane live-cell-scorecard (d57baa09), 2026-10-24.
 
 THE ORDER: 1 contract, `immediate_or_cancel` (`kalshi_orders.order_body_v2`
 honours `time_in_force` on the request; IOC orders carry no kickoff expiry and
@@ -37,11 +41,13 @@ Ledger rows: `position_key = "ingame:<ticker>:<leg>"`, market `spreads`, side = 
 from __future__ import annotations
 
 import os
+import time
 from typing import Any, Callable, Mapping, Sequence
 
 POSITION_PREFIX = "ingame:"
 DAY_DOLLARS_CEILING = 50.0
 MAX_PRICE_MOVE = 0.01
+CELL_GATE_CACHE_S = 60.0
 _ON = {"on", "live"}
 
 
@@ -158,11 +164,29 @@ class LiveEntryPlacer:
         orders_fn: Callable[[], Sequence[Mapping[str, Any]]] | None = None,
         place_fn: Callable[..., Mapping[str, Any]] | None = None,
         enabled_fn: Callable[[], bool] = live_entries_enabled,
+        gate_fn: Callable[[], Mapping[str, Any]] | None = None,
+        clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self.today_fn = today_fn
         self.orders_fn = orders_fn or _ledger_orders
         self.place_fn = place_fn or _place_live
         self.enabled_fn = enabled_fn
+        self.gate_fn = gate_fn or _cell_gate_state
+        self.clock = clock
+        self._gate: tuple[float, Mapping[str, Any]] | None = None
+
+    def _cell_refusal(self, entry: Mapping[str, Any]) -> str | None:
+        from syndicate.features.shared import live_cell_gate as lcg
+
+        if not lcg.enabled():
+            return None
+        now = self.clock()
+        if self._gate is None or now - self._gate[0] >= CELL_GATE_CACHE_S:
+            self._gate = (now, dict(self.gate_fn() or {}))
+        fam = lcg.family_of({"market": str(entry.get("kind") or "spreads")})
+        cell = lcg.cell_key("kalshi", str(entry.get("sport") or "nhl").lower(), fam, "in_game")
+        ok, why = lcg.allows(cell, self._gate[1])
+        return None if ok else str(why)
 
     def __call__(self, entry: Mapping[str, Any]) -> dict[str, Any]:
         if not self.enabled_fn():
@@ -173,8 +197,11 @@ class LiveEntryPlacer:
         spend = in_game_spend(self.orders_fn(), day)
         stake = round(ask + MAX_PRICE_MOVE, 4)  # floors to exactly 1 contract at any live ask within 1c
         band = _price_band()
+        cell_refusal = self._cell_refusal(entry)
         if band is not None and not (band[0] - 1e-9 <= ask < band[1] - 1e-9):
             result = {"placed": False, "reason": "outside_price_band", "band": f"[{band[0]:.2f},{band[1]:.2f})"}
+        elif cell_refusal is not None:
+            result = {"placed": False, "reason": cell_refusal}
         elif pk in spend["position_keys"]:
             result = {"placed": False, "reason": "already_in_ledger_today"}
         elif game_axis(ticker) in spend["held_axes"]:
@@ -189,6 +216,12 @@ class LiveEntryPlacer:
               f" edge={entry.get('edge')} day_spend={spend['dollars']}/{day_budget_dollars()} result={result}"[:500],
               flush=True)
         return result
+
+
+def _cell_gate_state() -> Mapping[str, Any]:
+    from syndicate.features.shared.live_cell_gate import _read_only_gate
+
+    return _read_only_gate()
 
 
 def _price_band() -> tuple[float, float] | None:
