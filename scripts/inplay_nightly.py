@@ -10,7 +10,7 @@ Run by the Windows scheduled task "Syndicate inplay nightly" (user-approved
   3. wait (Idle priority) until 30 min before the first scheduled start.
   4. run scripts/inplay_recorder.py into <root>/inplay_<date>/ until 30 min
      after the last final (hard cap: last start + 6 h). OddsAPI is polled for a
-     sport only while one of its games is in play (9 credits/min/sport).
+     sport only while one of its games is in play (6 credits/min/sport, regions us,eu).
   5. copy the fleet's NBA live re-sim ledger in (`wsl -- cp`; the UNC path
      fails for it), then run inplay_edge_report.py, inplay_fair_score.py and
      inplay_scoreboard.py: <dir>/scoreboard.md for the night and
@@ -18,6 +18,8 @@ Run by the Windows scheduled task "Syndicate inplay nightly" (user-approved
   6. replay the in-game ENTRY rule over every recorded night
      (inplay_rule_sweep.py, walk-forward by night), NHL then NBA spreads:
      <root>/inplay_rule_sweep.md.
+  7. Test C, late-game cells (pre-registered, findings_2026-10-20_in_game_trading.md section 11):
+     inplay_late_cells.py over every recorded night -> <root>/inplay_late_cells.txt / .json.
 
 It sends no order, writes nothing on the fleet, and reads only ODDS_API_KEY.
 """
@@ -40,7 +42,8 @@ RUNNER = HERE.parent
 REPO = r"C:\Users\tempadmin\OneDrive\Coding\Syndicate"
 RUNNER_FILES = ["scripts/inplay_recorder.py", "scripts/inplay_edge_report.py", "scripts/inplay_fair_score.py",
                 "scripts/inplay_scoreboard.py", "scripts/inplay_nightly.py", "scripts/inplay_rule_sweep.py",
-                "syndicate/features/shared/venue_fees.py", "syndicate/features/shared/inplay_entries_paper.py"]
+                "syndicate/features/shared/venue_fees.py", "syndicate/features/shared/inplay_entries_paper.py",
+                "scripts/inplay_dip_study.py", "scripts/inplay_late_cells.py"]
 ESPN = "https://site.api.espn.com/apis/site/v2/sports/{path}/scoreboard?dates={ymd}{q}"
 ESPN_PATH = {"nba": ("basketball/nba", ""), "nhl": ("hockey/nhl", ""), "nfl": ("football/nfl", ""),
              "ncaaf": ("football/college-football", "&groups=80&limit=400")}
@@ -194,6 +197,9 @@ def main():
     (root / "inplay_rule_sweep.md").write_text(
         f"# In-game entry-rule sweep (walk-forward by night)\n\nNights: {len(nights)} ({names}). Written by the {date} run.\n\n"
         + "\n".join(parts), encoding="utf-8")
+    if (RUNNER / "scripts" / "inplay_late_cells.py").exists():
+        run(root, [py, str(RUNNER / "scripts" / "inplay_late_cells.py"), "--nights", *nights,
+                   "--json-out", str(root / "inplay_late_cells.json")], root / "inplay_late_cells.txt", timeout=3 * 3600)
     log(root, f"DONE {date}")
     return 0
 
