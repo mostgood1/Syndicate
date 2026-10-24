@@ -1,5 +1,14 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#735` — **Maker vs taker on our own live/paper picks (Kalshi + Polymarket US): maker does NOT beat taker out of sample in any cell; no go-live. Re-run when CONFIRM has >= 30 games per cell** — 2026-10-24, lane `maker-vs-taker-shadow`, session 78880f41 (side session of local_a21617bf); `.syndicate/findings_2026-10-24_maker_vs_taker_shadow.md`
+- **Counterfactual:** resting bid (one tick inside / join) on every live fill (106, 10-19..10-24) and paper-plan fill (505, 10-02..10-24), filled only when Kalshi's public prints trade THROUGH the bid. Polymarket fills read from the recorded asks. Pre-registration `cda4cfc6`, deviation D1 `05247538`.
+- **Result:** no cell passes the pre-registered OOS rule. Live Kalshi spreads FALSIFIED: -$2.50/pos [-3.51, -1.49].
+- **Pregame, resting to kickoff:** about 45% fill. Saves 4-5% of stake on the fills (a tick plus the fee). No measurable adverse selection before kickoff (paper +3.2c [-4.0, +10.4]).
+- **In play:** fills are adversely selected, -16.6c/contract [-31, -0.1]. Do not rest bids in play.
+- **Ceiling:** 4-5% of stake on about 45% of positions cannot fix a live taker book at -17..-21%. Selection is the problem, not execution.
+- **Unreachable:** 551 of 704 settled live fills (all Aug-Sep) are `venue_rebuild` rows with no order instant.
+- **Owed:** re-run `scripts/maker_vs_taker_shadow.py` (`dump` + `simulate --population live|paper`, fleet, nice 19) once CONFIRM holds >= 30 games per cell; it needs no forward recorder. Design if a cell ever passes: findings §Recommendation 3.
+
 ### `#734` — **The CLV departures ledger stopped at 8 MiB per date for ALL sports. It has not fired yet, but 10-17 reached 7,938,374 B (94.6%) before NBA's season, and NBA wrote 2.35 MiB on Wednesday 10-21, so the next NCAAF + NBA Saturday (10-24) will likely fire it. FIXED ON MAIN `a77077a2`, ON THE FLEET since 21:15:11Z 10-22; forward reading owed (Sat 10-24)** — FOUND 2026-10-22 (`#732` sibling), lane `clv-departures-ceiling`, session d0d9f2f7 (side session of local_802cdcc8); `.syndicate/findings_2026-10-22_clv_departures_ceiling.md`
 - **Measured on the fleet** (read-only, refresh-worker env, nice 19, 24 dates 09-30..10-23):
   - 0 of 2,184 refresh-worker `DEPARTURES` lines (dates 10-16..10-22) say `truncated=True`, and no file ever reached the cap.
