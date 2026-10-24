@@ -939,11 +939,32 @@ def _has_segment(modifiers: Sequence[str]) -> bool:
     the BTTS admission earlier the same day and was invisible until the census
     printed the venue's own vocabulary -- the token set was ASSUMED to be
     digit-led because every previously-read sport's was.
+
+    AND THEN THE VENUE WROTE THEM LETTER-FIRST, and nothing here noticed. Read
+    from the fleet slate 2026-10-24T00:3xZ (21,624 markets), every period
+    market in the in-season leagues is `<letter><digit>`, and ZERO slugs still
+    carried a digit-led token:
+
+        nba  q1..q4   321 totals + 202 spreads  tsc-nba-dal-ind-2026-10-23-q2-60pt5
+        nhl  p1..p3   396 totals + 396 spreads  asc-nhl-mon-chi-2026-10-23-p1-neg-1pt5
+        mlb  i1..     34 totals                 tsc-mlb-tb-mil-2026-10-23-i1-1pt5
+
+    The old pattern returned False on all of them, so they were indexed as
+    FULL-GAME lines. Where a rung collides that is a wrong price, not a miss:
+    NHL's first-period `p1-pos-1pt5` sits beside the game's own `pos-1pt5`,
+    and TB @ COL `spreads away 1.5` refused `ambiguous_polymarket_match` --
+    the visible half. A game whose full-game rung was absent would have priced
+    the period contract instead.
+
+    TEAM TOTALS ARE THE SAME ERROR ONE LEVEL OVER. `tt-<club>` (and `tt1h`,
+    `tt2h`) is ONE club's points, typed `SPORTS_MARKET_TYPE_TOTAL` exactly like
+    the game total: 441 nba, 476 + 447 nfl, 1,427 + 1,278 cfb on the same
+    slate. An NCAAF team total of 24.5 and a game total of 24.5 are both live
+    rungs, and the board's `totals` means the game. Screened HERE so every
+    consumer of this predicate (this join, `venue_quote_adapters`, the slate
+    tiering in `polymarket_us_markets`) refuses them together.
     """
-    return any(
-        re.fullmatch(r"(?:[1-4](?:q|h|p)|f[357]|fh|sh)", str(m).lower())
-        for m in modifiers or []
-    )
+    return any(_SEGMENT_TOKEN.fullmatch(str(m).lower()) for m in modifiers or [])
 
 
 # Board markets whose match REQUIRES the line to agree. `alternate_totals_corners`
@@ -954,7 +975,12 @@ def _has_segment(modifiers: Sequence[str]) -> bool:
 _LINE_BEARING_BOARD_MARKETS = frozenset({"spreads", "totals", "alternate_totals_corners"})
 
 
-_SEGMENT_TOKEN = re.compile(r"(?:[1-4](?:q|h|p)|f[357]|fh|sh)")
+# Digit-led (`1q`, `2h`, `1p`), letter-led (`q2`, `p1`, `h1`, `i1`), MLB first
+# -N (`f5`), soccer halves (`fh`, `sh`) and team totals (`tt`, `tt1h`). See
+# `_has_segment` for where each was read.
+_SEGMENT_TOKEN = re.compile(
+    r"(?:[1-4](?:q|h|p)|q[1-4]|p[1-3]|h[12]|i[1-9]|f[357]|fh|sh|tt(?:[12]h)?)"
+)
 
 # The board sides that name a ROLE rather than an outcome. Only these reach the
 # subject logic below: `btts` and `totals` name their own outcome (`yes`/`no`,
@@ -962,6 +988,72 @@ _SEGMENT_TOKEN = re.compile(r"(?:[1-4](?:q|h|p)|f[357]|fh|sh)")
 # resolves them. Routing those through a subject test would break a working
 # family to fix a broken one.
 _ROLE_SIDES = frozenset({"home", "away", "draw"})
+
+
+# ---------------------------------------------------------------------------
+# SIGNED SPREADS -- whose handicap each outcome is, MEASURED rather than assumed
+# ---------------------------------------------------------------------------
+#
+# The venue names a spread's outcomes by HANDICAP (`["-12.50","+12.50"]`), so
+# neither the literal compare nor `teams_match` can place a board side on them
+# and every one refused `side_not_an_outcome_of_this_market`. That refusal was
+# deliberate while nothing said which club owns which number (state_polymarket
+# `STILL FAILING, deliberately: MLB spreads`).
+#
+# THE VENUE'S OWN CATALOGUE SAYS. `web.polymarket.us ... EventsService/
+# GetEvents` returns `marketSides[i].team` and the `question` the slate drops:
+#
+#     asc-nba-min-orl-2026-10-23-pos-14pt5
+#       "Will the MIN Timberwolves cover 14.5 vs the ORL Magic ...?"
+#       marketSides ("+14.50", team=min, long), ("-14.50", team=orl)
+#
+# Read 2026-10-24T00:4xZ over 10 events: 1,442 of 1,442 spread sides (nba 950,
+# nfl 246, cfb 154, nhl 72, mlb 20; full game and periods) put `outcomes[0]` on
+# the slug's FIRST club at the slug's signed line and `outcomes[1]` on the
+# second club at the opposite sign. `pos-12pt5` and `neg-12pt5` are BOTH
+# listed, so the rule also decides WHICH market a row needs: a second-club row
+# at +12.5 lives in `neg-12pt5` (first club -12.5), never in `pos-12pt5`,
+# where +12.5 is the other club's handicap.
+#
+# Per league, from that measurement: soccer slugs are home-first
+# (`_slug_is_home_first`) and ncaab/wnba were not in the sample, so they keep
+# refusing until read.
+_SIGNED_SPREAD_LEAGUES = frozenset({"mlb", "nba", "nhl", "nfl", "ncaaf"})
+
+_SIGNED_HANDICAP = re.compile(r"^[+-]\d+(?:\.\d+)?$")
+
+
+def _signed_spread_applies(league: Any, outcomes: Any) -> bool:
+    """A measured league's spread whose two outcomes are signed handicaps."""
+    if _norm(league) not in _SIGNED_SPREAD_LEAGUES:
+        return False
+    names = [str(name).strip() for name, _ in (outcomes or ())]
+    return len(names) == 2 and all(_SIGNED_HANDICAP.match(n) for n in names)
+
+
+def _signed_spread_slot(side: Any, board_row: Mapping[str, Any]) -> int | None:
+    """0 if the board side is the slug's FIRST club, 1 if the second, else None.
+
+    Non-soccer slugs are `<away>-<home>` and `_teams_match` has already
+    required the slug's away token to name the row's away club, so the role is
+    the slot. A side spelled as a club name is translated through the row's
+    own clubs; anything else refuses.
+    """
+    wanted = str(side or "").strip()
+    role = wanted.lower()
+    if role not in {"home", "away"}:
+        role = ""
+        for candidate_role in ("away", "home"):
+            if _norm(board_row.get(f"{candidate_role}_team") or board_row.get(candidate_role)) == _norm(wanted):
+                role = candidate_role
+        if not role:
+            return None
+    return 0 if role == "away" else 1
+
+
+def _signed_spread_slug_line(board_line: float, slot: int) -> float:
+    """The slug line of the market quoting this club at `board_line`."""
+    return board_line if slot == 0 else -board_line
 
 
 _GT_TOKEN = re.compile(r"^gt(?P<num>\d+(?:pt\d+)?)$", re.IGNORECASE)
@@ -2170,7 +2262,18 @@ def _join_polymarket_to_board_impl(
             elif board_market in _LINE_BEARING_BOARD_MARKETS:
                 if board_line is None or candidate["line"] is None:
                     continue
-                if abs(float(candidate["line"]) - float(board_line)) > 1e-9:
+                wanted_line = float(board_line)
+                # A SIGNED SPREAD'S SLUG STATES THE FIRST CLUB'S LINE, so a
+                # second-club row needs the market at the OPPOSITE sign. See
+                # `_SIGNED_SPREAD_LEAGUES` for the measurement.
+                if board_market == "spreads" and _signed_spread_applies(
+                    league, candidate["outcomes"]
+                ):
+                    slot = _signed_spread_slot(side, board_row)
+                    if slot is None:
+                        continue
+                    wanted_line = _signed_spread_slug_line(wanted_line, slot)
+                if abs(float(candidate["line"]) - wanted_line) > 1e-9:
                     continue
             # THE LEG, for a venue that splits a 3-way into three binaries.
             # Without this every leg of a soccer h2h matches the same board row
@@ -3309,6 +3412,24 @@ def _probability_for_side(
     wanted = str(side or "").strip()
     if not wanted:
         return None
+
+    # A SIGNED SPREAD: the outcome is the HANDICAP and its SLOT names the club
+    # (`_SIGNED_SPREAD_LEAGUES`). Position AND number must both agree with the
+    # row -- the board line in the club's slot, and the slug stating the line
+    # that slot implies -- so a reordered array refuses instead of buying the
+    # other club's handicap.
+    if _signed_spread_applies(sport, candidate.get("outcomes")):
+        board_line = None if board_row is None else _as_float(board_row.get("line"))
+        slot = _signed_spread_slot(side, board_row or {})
+        slug_line = _as_float(candidate.get("line"))
+        if board_line is None or slot is None or slug_line is None:
+            return None
+        if abs(slug_line - _signed_spread_slug_line(board_line, slot)) > 1e-9:
+            return None
+        name, probability = list(candidate.get("outcomes"))[slot]
+        if abs(float(str(name).strip()) - board_line) > 1e-9:
+            return None
+        return probability
 
     # A YES/NO CONTRACT PRICES ITS SUBJECT, NOT A NAMED TEAM.
     #

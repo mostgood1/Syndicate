@@ -992,6 +992,11 @@ def _alias_map(sport: str) -> dict[str, str]:
     return {}
 
 
+#: Sports whose clubs are "<City> <Nickname>", so a multi-word nickname is the
+#: tail of exactly one club name ("Trail Blazers" -> Portland Trail Blazers).
+_MULTI_WORD_NICKNAME_SPORTS = frozenset({"nba", "nhl", "mlb", "nfl", "wnba"})
+
+
 @lru_cache(maxsize=16)
 def _nickname_alias_map(sport: str) -> dict[str, str]:
     """Bare nicknames -> canonical club, DERIVED from the sport's own map.
@@ -1198,6 +1203,25 @@ def _canonical_team_uncached(
         nicknames = _nickname_alias_map(normalize(sport))
     if token in nicknames:
         return nicknames[token]
+    # A MULTI-WORD NICKNAME -- "Trail Blazers", "Blue Jackets", "Red Wings",
+    # "Maple Leafs", "Golden Knights" -- which `_nickname_alias_map` cannot hold
+    # because it keys on the LAST word. Measured 2026-10-24 on the fleet's
+    # Polymarket slate: those five NBA/NHL moneyline outcomes all returned None,
+    # so POR @ SAC refused `side_not_an_outcome_of_this_market`.
+    #
+    # Resolved at LOOKUP, as the unique club whose name ends with the token,
+    # rather than derived into the map: the map sizes are pinned
+    # (`test_the_other_sports_maps_are_the_same_size_as_before`) because a map
+    # key flips other lookups from heuristic to authoritative. Two owners
+    # resolve to neither, the same rule the map applies.
+    sport_slug = normalize(sport)
+    if " " in token and sport_slug in _MULTI_WORD_NICKNAME_SPORTS:
+        owners = [
+            club for club in _alias_values(sport_slug, mapping)
+            if club.endswith(" " + token)
+        ]
+        if len(owners) == 1:
+            return owners[0]
     return None
 
 
