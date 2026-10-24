@@ -54178,3 +54178,31 @@ which is about the two sizing bases and not about the refusal boundary.
 - **already confirmed live today (in-game-trading):** in-game outside_price_band x6 (first 16:14:43Z, LSU-AUB ML @0.19); new in-game rows carry home/away/commence/event_id/side.
 - **owed tonight:** no refused=day_budget; NO-leg entries placed; live in-game spend able to reach $50; paper polls x-requests-last=6; the recorder at us,eu.
 - **armed:** refresh-worker LOCAL_MEMORY_LIMIT_MB 6144 -> 7168, full down/up >= 06:30Z 10-25 (user "Yes, overnight lull"; diagnosis by lane fleet-refresh-worker-early-recycle).
+
+## 2026-10-24 22:10Z (5:10 PM CT) -- #704 ACTIVATION READING -- MET (scheduled task `sim-stake-activation-check`, lane `sim-stake-unfitted-market-only`, read-only)
+
+`[no deploy, no restart, no env change; the readings below were taken on the fleet in WSL at nice 19]`
+
+- **Activation time = 2026-10-19 22:43:52Z** (refresh-worker pid 2681168, the first start on a HEAD containing `bd9b0571`; recorded in the 2026-10-19 22:43:45Z entry). This entry is the reading that task owed. It is filed under its own heading so the task's step 0 stops.
+- **Still live now (all three re-read 21:49Z-21:55Z 10-24):**
+  - (a) supervisor's last `LOCAL PRODUCTION UP` is `commit=5766e562`. The fleet reflog ff'd to 5766e562 at 2026-10-24T02:21:34Z, so that `up` is later than the 10-19 21:01:01Z env-line write.
+  - (b) fleet HEAD `5f32d9c4` (ff 20:51:29Z): `merge-base --is-ancestor bd9b0571 HEAD` = true. refresh-worker pid 1164450, `etimes` 852 at 21:49:48Z, so it started ~21:35:36Z, after that ff. role_restarts.jsonl shows its predecessor exiting at 21:35:30Z (code 0, unclaimed).
+  - (c) pid 1164450 environ, parsed in Python (NUL split, key name + booleans only): `SYNDICATE_STAKED_PROBABILITY_UNFITTED` present x1, equals `market` = True.
+- **(i) Plans (keyvalue store, worker state env).** Every position with a `model_edge_pct` is stamped `market_fair@`:
+  - post-activation plan dates 10-19, 10-22, 10-23, 10-24 and 10-25: main + 4 venues x paper/live.
+  - Since 10-22 the stamp is `market_fair@staked_probability_pooled_v1@2026-10-22T21:45:48Z` (a fitted version), no longer `market_fair@unfitted`. The prefix holds.
+  - The 10-24 main paper plan (generated 21:03:04Z) is 21/21 `market_fair@`. live:kalshi is 2/2.
+  - The only `unfitted` stamps after activation are 6 positions (10-22 x3, 10-23 x1, 10-24 novig x1 / prophetx x1). All 6 have `model_edge_pct=None` and already show `sizing.basis=market_fair`, so they are EV-only rows. No sim probability was there to replace, so they are not exceptions to #704.
+  - Before activation, 10-17 and 10-18 plans: 5/5 and 2/2 + novig 1/1 `unfitted`.
+- **(ii) Execution ledger** (`full_history_orders()`, 15,136 orders): **3,995** orders submitted at or after 22:43:52Z carry a `model_edge_pct`.
+  - **1,812** carry `sim_share_of_stake`, and all **1,812 = 0.0 (0 nonzero)**. 162 of them are live.
+  - **2,183 carry `sim_share_of_stake=None`.** They are neither 0.0 nor a contradiction:
+    - 2,179 are `paper:kalshi:ladder` (1,619) / `paper:polymarket:ladder` (560). The paper_ladder path writes no stake attribution.
+    - 4 are live kalshi, 2026-10-21 13:10Z-14:14Z (spreads_alt x2, spreads, totals; filled; `sizing_basis=None`, position_key present). Their submit path dropped the attribution. Not chased further here.
+  - So it is 0 mismatches against an attributed stake, out of 1,812, with 2,183 unattributable.
+- **(iii) `zero_kelly_stake` refusals.**
+  - Before: baseline 10-19 22:01Z paper 5 / live kalshi 1 (from the 22:43:45Z entry); plan 10-17 = 1; 10-18 = 0 + prophetx 1.
+  - After: 10-19 final 0; 10-22 0; 10-23 0; 10-24 main 1, venues 0; 10-25 0.
+  - The sim's zero-Kelly veto is gone. The single 10-24 refusal is on a market-fair basis and was not investigated.
+- **Not claimed:** this reading does not touch forward ROI. That is `sim-stake-forward-read-1102`. The settlement-side split is gated on #718/#722, and orders only began carrying `staked_probability_version` (960 + 428 of the 3,995) after #722.
+- **The scheduled task `sim-stake-activation-check` can be deleted.**
