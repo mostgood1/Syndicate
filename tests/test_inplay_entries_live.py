@@ -259,3 +259,15 @@ def test_the_live_price_band_refuses_outside_and_writes_nothing(monkeypatch):
             monkeypatch.setenv("SYNDICATE_LIVE_PRICE_BAND", raw)
         p, calls = _placer()
         assert p(ENTRY)["placed"] is True and len(calls) == 1
+
+
+def test_live_price_reads_the_leg_not_the_human_side(monkeypatch):
+    # 2026-10-24: a NO leg labelled "under" read the YES ask and was refused no_live_price.
+    from syndicate.features.shared import kalshi_client
+
+    market = {"yes_ask_dollars": "0.6000", "no_ask_dollars": "0.4100"}
+    monkeypatch.setattr(kalshi_client, "fetch_market", lambda t: {"status": "ok", "market": market})
+    req = SimpleNamespace(venue_ticker="KXNBATOTAL-26OCT23DALIND-249", side="under")
+    assert live.LivePrice(0.41, "no")(req) == 0.41
+    assert live.LivePrice(0.60, "yes")(SimpleNamespace(venue_ticker="T", side="over")) == 0.60
+    assert live.LivePrice(0.41, "yes")(req) is None  # the other leg's ask is a price move, refused

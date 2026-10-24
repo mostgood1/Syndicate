@@ -97,10 +97,16 @@ def in_game_spend(orders: Sequence[Mapping[str, Any]], day: str) -> dict[str, An
 
 
 class LivePrice:
-    """`price_for(request)`: the LIVE ask of our leg, or None (refuse). No artifact fallback."""
+    """`price_for(request)`: the LIVE ask of our leg, or None (refuse). No artifact fallback.
 
-    def __init__(self, decision_ask: float):
+    The LEG is given, never read off `request.side`: since 2b7a29c4 the side is the human label
+    (`under`, a team's home/away), so `side == "no"` read the YES ask for every NO leg and refused it
+    `no_live_price` (7 of 7 NO legs on 2026-10-24 16:18-17:20Z).
+    """
+
+    def __init__(self, decision_ask: float, leg: str = "yes"):
         self.decision_ask = float(decision_ask)
+        self.leg = "no" if str(leg).strip().lower() == "no" else "yes"
 
     def __call__(self, request: Any) -> float | None:
         from syndicate.features.shared.kalshi_client import dollars_to_probability, fetch_market
@@ -108,11 +114,11 @@ class LivePrice:
         result = fetch_market(str(getattr(request, "venue_ticker", "") or ""))
         if result.get("status") != "ok":
             return None
-        key = "no_ask_dollars" if str(getattr(request, "side", "")) == "no" else "yes_ask_dollars"
+        key = f"{self.leg}_ask_dollars"
         live = dollars_to_probability((result.get("market") or {}).get(key))
         if live is None or abs(live - self.decision_ask) > MAX_PRICE_MOVE + 1e-9:
             print(f"[inplay_entries_live] PRICE_MOVED ticker={getattr(request, 'venue_ticker', None)}"
-                  f" leg={getattr(request, 'side', None)} decision={self.decision_ask} live={live}", flush=True)
+                  f" leg={self.leg} decision={self.decision_ask} live={live}", flush=True)
             return None
         return live
 
@@ -229,7 +235,7 @@ def _place_live(*, ticker: str, leg: str, ask: float, stake: float, line: Any, d
     verdict = check_order(request, mode=LIVE, already={"dollars": spend["dollars"], "orders": spend["orders"]})
     if not verdict.get("allowed"):
         return {"placed": False, "reason": verdict.get("reason")}
-    submit = guarded_submit(ioc_submitter(kalshi_submitter(LivePrice(ask))))
+    submit = guarded_submit(ioc_submitter(kalshi_submitter(LivePrice(ask, leg))))
     try:
         record = place_order(request, submit=submit, mode=LIVE)
     except Exception as exc:  # noqa: BLE001 -- a raised send is kept as failed by the ledger
