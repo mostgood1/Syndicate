@@ -54083,3 +54083,21 @@ which is about the two sizing bases and not about the refusal boundary.
 - **B (d28cff0d) MET:** `odds_nba_player_props_2026-10-23.pregame_pulls.json` written by the first in-play pull after the ff, stamping the 5 not-yet-started games at 00:15:22Z (HOU @ SAS, NOP @ UTA, MEM @ GSW, LAC @ LAL, POR @ SAC); their last quotes moved from 11:00 AM (game lines) / 12:58-6:22 PM (props) to 7:15-7:18 PM CT in the quote log.
 - **owed A (9d665aff):** watcher `watch_nba_tips.py` to 9:25 PM CT: per late game, ESPN in-progress time vs served chip live time, and the snapshot's `generated_at` at tip (A is only EXERCISED if a fresh pre-tip snapshot exists; otherwise the 20-min rule already sends the read to ESPN -- say which). DET @ MIA (7:10 tip) read live Q1 at 00:17:54Z chips.
 - **owed C (f311d37f):** tonight's 11:50 PM CT reconcile: 10-22 NBA postmortem keeps its closes (56, not 0) after its shard is gzipped ~9:09 PM CT; 10-20 / 10-21 regain closes on any re-reconcile.
+
+## 2026-10-24 01:12:51Z -- FLEET ff 2ea0f929 -> be2c79e6 + FULL DOWN/UP, code only: NBA live prop status on /portfolio + in-game Kalshi 429 backoff (holder `nba-live-status`, session 332cb014) -- **MET (restart); readings OWED by lane nba-portfolio-live-prop-status**
+- **user (332cb014's chat):**
+  - "we also need, when games are live, something that is tracking status of the prop on the portfolio page. nba is missing that ability". Built by session local_f71e23b5 as `be2c79e6`.
+  - "Yes, same as others": NBA paper orders now grade at final through the shared resolver; live orders still wait the 24h venue grace.
+  - "Yes, restart now".
+- **carries:** `87b89d74`, the in-game entry loop's Kalshi pacing (30 s passes, batch spacing, 60 s cool-down after a 429), plus the commits already ff'd by peers up to 2ea0f929.
+- **restart:**
+  - Claims; refresh-worker idle at 01:12:46Z (live-odds odds jobs accepted, the precedent); reconcile clean.
+  - ff at 01:12:51Z; `down` 01:12:51-01:13:23Z; healthz 200 at 01:13:30Z.
+  - refresh-worker pid 492201, live-odds-worker 492202.
+  - Undrained; claims released at 01:13:46Z.
+  - The armed 87b89d74 role restart was stopped unfired at 01:07:31Z and superseded by this.
+- **env unchanged:** INPLAY_ENTRIES=on, LIVE_PRICE_BAND, EXIT settings, LIVE_EVENT_MAX_DOLLARS=50, live+armed.
+- **owed:**
+  - nba-portfolio-live-prop-status: NBA_LIVE_BOX_CAPTURED written=True; BET_STATUS without no_resolver_for_nba; live_status.current_value + as_of on open NBA rows.
+  - in-game-trading: the first 30 s pass and no 429 after cool-down.
+- **open defect, sent to in-game-trading:** live in-game entry ledger rows lack home/away/commence_time, and carry side yes/no plus a ticker-stem event_id. The portfolio shows no detail, and the $50 per-game cap does not pool them with pregame bets.
