@@ -171,7 +171,7 @@ class LiveEntryPlacer:
         else:
             result = dict(self.place_fn(ticker=ticker, leg=leg, ask=ask, stake=stake, line=entry.get("line"),
                                         sport=str(entry.get("sport") or "nhl"), market=str(entry.get("kind") or "spreads"),
-                                        day=day, spend=spend) or {})
+                                        day=day, spend=spend, game=_game_fields(entry)) or {})
         print(f"[inplay_entries_live] LIVE_ENTRY ticker={ticker} leg={leg} ask={ask} stake={stake}"
               f" edge={entry.get('edge')} day_spend={spend['dollars']}/{day_budget_dollars()} result={result}"[:500],
               flush=True)
@@ -184,19 +184,35 @@ def _ledger_orders() -> list[Mapping[str, Any]]:
     return list(_load().get("orders") or [])
 
 
+def _game_fields(entry: Mapping[str, Any]) -> dict[str, Any]:
+    """What the paper rule matched: the OddsAPI event (= the board's event_id), teams, commence, and the
+    human side/line (`inplay_entries_paper.human_selection`). Absent fields stay absent."""
+    return {k: entry.get(k) for k in ("event_id", "home_team", "away_team", "commence_time", "order_side", "order_line")
+            if entry.get(k) is not None}
+
+
 def _place_live(*, ticker: str, leg: str, ask: float, stake: float, line: Any, day: str,
                 sport: str = "nhl", market: str = "spreads",
-                spend: Mapping[str, Any]) -> dict[str, Any]:
+                spend: Mapping[str, Any], game: Mapping[str, Any] | None = None) -> dict[str, Any]:
     from syndicate.features.shared.execution_guard import check_order, guarded_submit
     from syndicate.features.shared.execution_ledger import LIVE, OrderRequest, place_order
     from syndicate.features.shared.kalshi_orders import kalshi_submitter
 
+    g = dict(game or {})
+    side = str(g.get("order_side") or leg)
+    order_line = g.get("order_line", line) if "order_side" in g else line
     request = OrderRequest(
         position_key=f"{POSITION_PREFIX}{ticker}:{leg}", selected_date=day, venue="kalshi", sport=sport,
-        event_id=ticker.rsplit("-", 1)[0], market=market, side=leg, requested_price=ask,
-        requested_stake_dollars=stake, line=None if line is None else float(line), book="kalshi",
-        venue_ticker=ticker,
+        event_id=str(g.get("event_id") or ticker.rsplit("-", 1)[0]), market=market, side=side,
+        requested_price=ask, requested_stake_dollars=stake,
+        line=None if order_line is None else float(order_line), book="kalshi", venue_ticker=ticker,
+        home_team=g.get("home_team"), away_team=g.get("away_team"), commence_time=g.get("commence_time"),
     )
+    # The contract must not change because the label did: refuse if the human side maps to another leg.
+    from syndicate.features.shared.kalshi_orders import _side_to_kalshi
+
+    if _side_to_kalshi(request.side, request.market, request.line) != leg:
+        return {"placed": False, "reason": f"side_relabel_mismatch: {request.side}/{request.line} != {leg}"}
     verdict = check_order(request, mode=LIVE, already={"dollars": spend["dollars"], "orders": spend["orders"]})
     if not verdict.get("allowed"):
         return {"placed": False, "reason": verdict.get("reason")}

@@ -213,6 +213,8 @@ def test_nba_moneyline_books_through_the_multi_sport_loop():
     assert out["booked"] == 1, out
     (e,) = loop.doc["entries"].values()
     assert e["sport"] == "nba" and e["kind"] == "h2h" and e["leg"] == "yes"  # fair 0.62 vs ask 0.55
+    assert (e["event_id"], e["home_team"], e["away_team"]) == ("nba1", "Milwaukee Bucks", "Chicago Bulls")
+    assert (e["order_side"], e["order_line"]) == ("home", None)  # YES on Milwaukee = the home moneyline
     assert hooked and hooked[0]["sport"] == "nba" and hooked[0]["kind"] == "h2h"
     assert any(u.startswith(ip.oddsapi_url("nba")) and "h2h" in u for u in seen_urls)
 

@@ -193,3 +193,49 @@ def test_an_unfilled_ioc_does_not_hold_its_axis_and_fees_count():
     s = live.in_game_spend([dead, filled], DAY)
     assert s["dollars"] == round(0.42 + 0.0171, 4) and s["orders"] == 1
     assert ("26OCT23ATLCHA", "total") not in s["held_axes"] and ("26OCT23DALIND", "total") in s["held_axes"]
+
+
+EVENT = {"id": "oddsapi-ev-1", "home_team": "Boston Celtics", "away_team": "New York Knicks",
+         "commence_time": "2026-10-23T23:30:00Z"}
+
+
+def test_human_selection_maps_back_to_the_same_kalshi_contract():
+    """The portfolio label must never change the bet: every kind x leg round-trips through _side_to_kalshi."""
+    cases = [("spreads", "New York", 5.5), ("spreads", "Boston", 3.5), ("totals", "Over", 214.5),
+             ("h2h", "Boston", None), ("h2h", "New York", None)]
+    for kind, team, line in cases:
+        for leg in ("yes", "no"):
+            side, ln = ip.human_selection(kind, team, line, leg, EVENT)
+            assert ko._side_to_kalshi(side, kind, ln) == leg, (kind, team, leg, side, ln)
+    assert ip.human_selection("spreads", "New York", 5.5, "yes", EVENT) == ("away", -5.5)  # NYK -5.5
+    assert ip.human_selection("spreads", "New York", 5.5, "no", EVENT) == ("home", 5.5)   # BOS +5.5
+    assert ip.human_selection("totals", "Over", 214.5, "no", EVENT) == ("under", 214.5)
+    assert ip.human_selection("h2h", "Boston", None, "yes", EVENT) == ("home", None)
+
+
+def test_place_live_stamps_the_game_and_the_human_side(monkeypatch):
+    from syndicate.features.shared import execution_guard, execution_ledger
+
+    seen = {}
+    monkeypatch.setattr(execution_guard, "check_order", lambda r, **kw: seen.update(req=r) or {"allowed": True})
+    monkeypatch.setattr(execution_ledger, "place_order", lambda req, **k: {"status": "submitted", "idempotency_key": "k"})
+    game = {"event_id": "oddsapi-ev-1", "home_team": "Boston Celtics", "away_team": "New York Knicks",
+            "commence_time": "2026-10-23T23:30:00Z", "order_side": "away", "order_line": -5.5}
+    out = live._place_live(ticker="KXNBASPREAD-26OCT23NYKBOS-NYK6", leg="yes", ask=0.44, stake=0.45, line=5.5,
+                           day=DAY, sport="nba", market="spreads", spend={"dollars": 0.0, "orders": 0}, game=game)
+    assert out["placed"] is True
+    r = seen["req"]
+    assert (r.event_id, r.home_team, r.away_team, r.commence_time) == (
+        "oddsapi-ev-1", "Boston Celtics", "New York Knicks", "2026-10-23T23:30:00Z")
+    assert (r.side, r.line, r.market, r.sport) == ("away", -5.5, "spreads", "nba")
+
+
+def test_a_label_that_would_change_the_leg_is_refused(monkeypatch):
+    from syndicate.features.shared import execution_guard, execution_ledger
+
+    monkeypatch.setattr(execution_guard, "check_order", lambda r, **kw: pytest.fail("checked a mislabelled order"))
+    monkeypatch.setattr(execution_ledger, "place_order", lambda *a, **k: pytest.fail("sent a mislabelled order"))
+    bad = {"event_id": "e", "order_side": "home", "order_line": 5.5}  # +5.5 -> NO, but the decision was YES
+    out = live._place_live(ticker="KXNBASPREAD-26OCT23NYKBOS-NYK6", leg="yes", ask=0.44, stake=0.45, line=5.5,
+                           day=DAY, sport="nba", market="spreads", spend={"dollars": 0.0, "orders": 0}, game=bad)
+    assert out["placed"] is False and out["reason"].startswith("side_relabel_mismatch")

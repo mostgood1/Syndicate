@@ -183,6 +183,26 @@ def classify(market: Mapping[str, Any]) -> tuple[str, str, float | None] | None:
     return None
 
 
+def human_selection(kind: str, team: str, line: float | None, leg: str, event: Mapping[str, Any]) -> tuple[str, float | None]:
+    """(side, line) the way PREGAME orders carry them, so the portfolio can say what was bought. PURE.
+
+    Must map back to the SAME Kalshi contract through kalshi_orders._side_to_kalshi:
+      totals : YES -> ("over", L)            NO -> ("under", L)
+      spreads: YES -> (named team home/away, -L)   NO -> (OTHER team home/away, +L)
+               (`_spread_side_from_line`: negative line -> YES, positive -> NO)
+      h2h    : YES -> (named team home/away, None)  NO -> ("no", None) -- home/away on a moneyline
+               ALWAYS means YES on the ticker's team, so a NO leg cannot be relabelled without
+               buying the opposite contract; it stays "no" and the row's teams say which game.
+    """
+    is_home = team_match(team, event.get("home_team")) and not team_match(team, event.get("away_team"))
+    named, other = ("home", "away") if is_home else ("away", "home")
+    if kind == "totals":
+        return ("over" if leg == "yes" else "under"), line
+    if kind == "spreads":
+        return (named, -abs(float(line))) if leg == "yes" else (other, abs(float(line)))
+    return (named, None) if leg == "yes" else ("no", None)
+
+
 def decide(
     *,
     market: Mapping[str, Any],
@@ -459,7 +479,8 @@ class PaperEntryLoop:
             since = (t - self.score_change_t[gk]) if gk in self.score_change_t else (float("inf") if gk else None)
             self.window["considered"] += 1
             game_code = tk.split("-")[1] if "-" in tk else ""
-            d = decide(market=m, event=self._event_for(sport, subs_by_game.get(game_code, set())),
+            ev = self._event_for(sport, subs_by_game.get(game_code, set()))
+            d = decide(market=m, event=ev,
                        poll_t=self.books_t.get(sport) if self.books.get(sport) else None, since_score_s=since,
                        mid_move_60s=move, now_t=t, params={"score_quiet_s": SPORTS[sport]["score_quiet_s"]})
             if d is None:
@@ -478,6 +499,12 @@ class PaperEntryLoop:
                     "fee": round(taker_fee_one(d["ask"]), 4), "fair": d["fair"], "edge": d["edge"],
                     "n_books": d["n_books"], "line": d["line"], "team": d["team"], "kind": d["kind"],
                     "sport": sport,
+                    # The game, the way pregame orders carry it (portfolio display + R2 per-game pooling):
+                    # event_id IS the OddsAPI event id, which the board keys on.
+                    "event_id": (ev or {}).get("id"), "home_team": (ev or {}).get("home_team"),
+                    "away_team": (ev or {}).get("away_team"), "commence_time": (ev or {}).get("commence_time"),
+                    "order_side": human_selection(d["kind"], d["team"], d["line"], d["leg"], ev or {})[0],
+                    "order_line": human_selection(d["kind"], d["team"], d["line"], d["leg"], ev or {})[1],
                     "since_score_s": None if since is None else round(min(since, 1e9)),
                     "mid_move_60s": None if move is None else round(move, 4),
                     "markout_60": None, "markout_300": None, "settled": None, "pnl_1c": None,
