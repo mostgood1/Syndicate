@@ -1134,6 +1134,12 @@ def _default_resolver(selected_date: str):
         # degrades to a named reason; see `bet_status_nhl` for the measured feed facts
         # (shootout credit in the final, full names only in play-by-play, split squads).
         "nhl": lambda: _build("syndicate.features.shared.bet_status_nhl", "nhl_status_resolver", selected_date),
+        # Wired 2026-10-24, three days into the regular season: every open NBA order
+        # on the portfolio page read `no_resolver_for_nba` (113 NBA orders in the
+        # book). Reads the live box the NBA live-lens tick captures
+        # (`nba/live_player_box.py`), which carries per-game state, so an NBA
+        # under grades only once ESPN says the game is over.
+        "nba": lambda: _build("syndicate.features.shared.bet_status_nba", "nba_status_resolver", selected_date),
     }
     cache: dict[str, Any] = {}
 

@@ -802,6 +802,30 @@ def _run_live_lens_tick_for_sport(sport: str, date_str: str) -> dict[str, Any]:
 		path_fn = _LIVE_LENS_SNAPSHOT_PATHS[sport]
 		snapshot = builder(date_str)
 		log_and_persist_process_memory(f"live_lens_tick_after_build_{sport}", append_to_ring=False, sport=sport, date=date_str)
+		if sport == "nba":
+			# NBA LIVE BOX CAPTURE, for `bet_status_nba` (the portfolio's live
+			# stat-vs-line column and settlement). AFTER the build, not before as
+			# WNBA's is: this reuses the live tick's own ESPN summary fetch, whose
+			# 15 s cache the build has just warmed. It does not go through web --
+			# web's NBA box endpoint returns no players on a web dyno (measured on
+			# the fleet 2026-10-24); see `nba/live_player_box.py`.
+			#
+			# NEVER FATAL, and `capture` never raises; this guard is for the import.
+			# No `write_json_file` import here: see the UnboundLocalError note above.
+			try:
+				from syndicate.features.nba.live_player_box import capture as _nba_box_capture
+
+				_box = _nba_box_capture(date_str)
+				print(
+					f"[live_lens_loop] NBA_LIVE_BOX_CAPTURED date={date_str} written={_box.get('written')} "
+					f"games={_box.get('games')} live={_box.get('live')} final={_box.get('final')} "
+					f"players={_box.get('players')} fetched={_box.get('fetched')} carried={_box.get('carried')}"
+					f"{' reason=' + str(_box['reason']) if _box.get('reason') else ''}"
+					f"{' error=' + str(_box['error']) if _box.get('error') else ''}",
+					flush=True,
+				)
+			except Exception as exc:
+				print(f"[live_lens_loop] NBA_LIVE_BOX_FAILED date={date_str} {type(exc).__name__}: {exc}", flush=True)
 		if not validator(snapshot):
 			meta["ok"] = False
 			meta["skipped"] = True

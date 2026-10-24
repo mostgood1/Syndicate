@@ -408,6 +408,10 @@ def statuses_for_orders(
                 or _as_float(order.get("requested_stake_dollars")),
                 **status,
                 "projected": resolved.get("projected"),
+                # When the resolver last READ the game, where it says. The plan
+                # is written minutes apart, and the page must not present a
+                # number from an old box as "now".
+                "as_of": resolved.get("as_of"),
             }
         )
 
