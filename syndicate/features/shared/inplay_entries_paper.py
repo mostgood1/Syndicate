@@ -52,6 +52,13 @@ DAY_BUDGET_DOLLARS = 50.0  # >= the live cap (user 2026-10-23: $50/day), so live
 BOOKS_EVERY_S = 60.0
 ESPN_EVERY_S = 30.0
 MARKOUT_HORIZONS_S = (60, 300)
+# KALSHI PUBLIC RATE LIMIT IS SHARED with the live path (LivePrice at submit, the exit loops' quotes, the
+# fleet's own Kalshi polling): measured 2026-10-24 00:18Z, this loop's PASS_FAILED 429s came from
+# external-api.kalshi.com. So this loop is a polite neighbour: one pass per PASS_EVERY_S (not every 15 s
+# thread tick), BATCH_GAP_S between its 50-ticker batches, and a cool-down after any 429.
+PASS_EVERY_S = 30.0
+BATCH_GAP_S = 0.35
+RATE_LIMIT_COOLDOWN_S = 60.0
 # ALL-SPORTS EXTENSION (user 2026-10-23, via coordinator 332cb014: "turn it on for all sports").
 # Per sport: OddsAPI key, ESPN path, and the score-quiet window. The 180 s window was designed on NHL
 # (findings section 6). Basketball scores every ~30 s, so "away from a score" cannot apply there (0 = no
@@ -298,6 +305,9 @@ class PaperEntryLoop:
         self.score_change_t: dict[str, float] = {}
         self.mids: dict[str, list[tuple[float, float]]] = defaultdict(list)
         self.summary_t: float | None = None
+        self.last_pass_t: float | None = None
+        self.cooldown_until: float = 0.0
+        self.sleep: Callable[[float], None] = time.sleep
         self.window = {"passes": 0, "considered": 0, "signals": 0, "booked": 0}
 
     # -- inputs ---------------------------------------------------------------
@@ -359,7 +369,9 @@ class PaperEntryLoop:
 
     def _quotes(self, tickers: Sequence[str]) -> dict[str, Mapping[str, Any]]:
         out: dict[str, Mapping[str, Any]] = {}
-        for i in range(0, len(tickers), 50):
+        for n, i in enumerate(range(0, len(tickers), 50)):
+            if n:
+                self.sleep(BATCH_GAP_S)  # spread the burst: the public limit is shared with the live path
             d = self.get(KALSHI_MARKETS + "?limit=100&tickers=" + ",".join(tickers[i:i + 50])) or {}
             for m in d.get("markets") or []:
                 out[str(m.get("ticker"))] = m
@@ -388,6 +400,19 @@ class PaperEntryLoop:
         if not paper_entries_enabled():
             return {"status": "off"}
         t = self.clock()
+        if t < self.cooldown_until:
+            return {"status": "cooldown", "until": self.cooldown_until}
+        if self.last_pass_t is not None and t - self.last_pass_t < PASS_EVERY_S:
+            return {"status": "waiting"}
+        self.last_pass_t = t
+        try:
+            return self._step(t)
+        except Exception as exc:
+            if getattr(exc, "code", None) == 429:
+                self.cooldown_until = t + RATE_LIMIT_COOLDOWN_S
+            raise
+
+    def _step(self, t: float) -> dict[str, Any]:
         if self.doc is None:
             self.doc = self.load()
         day = self.today_fn()

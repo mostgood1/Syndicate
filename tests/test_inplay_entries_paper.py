@@ -78,6 +78,8 @@ def _loop(markets_by_pass, espn_states, clock_ts, persisted):
         clock["t"] = clock_ts[i]
         loop.books_t = {}  # force a fresh poll each simulated pass
         loop.espn_t = {}
+        loop.last_pass_t = None
+        loop.sleep = lambda s: None
         return loop.step()
 
     return loop, advance
@@ -206,7 +208,7 @@ def test_nba_moneyline_books_through_the_multi_sport_loop():
                              on_book=lambda e: hooked.append(e) or {"placed": False, "reason": "test"})
     loop.step()
     clock["t"] = T0 + 20
-    loop.books_t, loop.espn_t = {}, {}
+    loop.books_t, loop.espn_t, loop.last_pass_t = {}, {}, None
     out = loop.step()
     assert out["booked"] == 1, out
     (e,) = loop.doc["entries"].values()
@@ -277,3 +279,41 @@ def test_metering_failure_never_breaks_the_fetch(monkeypatch):
 
     monkeypatch.setattr(ip.urllib.request, "urlopen", lambda req, timeout=10.0: _Resp())
     assert ip._get_odds("https://api.the-odds-api.com/v4/sports/x/odds?apiKey=k", "nhl") == [{"id": "e1"}]
+
+
+def test_pass_spacing_batch_gap_and_429_cooldown():
+    """The Kalshi public limit is shared with the live path (429s from external-api.kalshi.com, 2026-10-24)."""
+    import urllib.error
+
+    clock = {"t": T0}
+    gaps: list = []
+    calls = {"n": 0, "fail": False}
+
+    def get(url):
+        if url.startswith(ip.ESPN):
+            return {"events": [{"competitions": [{"status": {"type": {"state": "in"}}, "competitors": [
+                {"team": {"abbreviation": "TOR"}, "score": "1"}, {"team": {"abbreviation": "CBJ"}, "score": "0"}]}]}]}
+        if url.startswith(ip.ODDSAPI):
+            return []
+        calls["n"] += 1
+        if calls["fail"]:
+            raise urllib.error.HTTPError(url, 429, "Too Many Requests", {}, None)
+        return {"markets": []}
+
+    tickers = [f"KXNHLSPREAD-26OCT21TORCBJ-T{i}" for i in range(120)]  # 3 batches of 50
+    loop = ip.PaperEntryLoop(today_fn=lambda: "d", clock=lambda: clock["t"], get=get,
+                             tickers_fn=lambda d, s="nhl": tickers, load=lambda: {"entries": {}}, persist=lambda d: None)
+    loop.sleep = gaps.append
+    assert loop.step()["status"] == "ok" and calls["n"] == 3 and gaps == [ip.BATCH_GAP_S] * 2
+    clock["t"] += 15
+    assert loop.step() == {"status": "waiting"} and calls["n"] == 3  # one pass per PASS_EVERY_S
+    clock["t"] += 20
+    calls["fail"] = True
+    import pytest as _pt
+    with _pt.raises(urllib.error.HTTPError):
+        loop.step()
+    clock["t"] += 31
+    assert loop.step()["status"] == "cooldown"  # backs off instead of hammering the shared limit
+    clock["t"] += 31
+    calls["fail"] = False
+    assert loop.step()["status"] == "ok"
