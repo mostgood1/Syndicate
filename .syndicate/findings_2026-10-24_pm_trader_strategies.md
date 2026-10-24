@@ -86,7 +86,7 @@ Edge sizes are per dollar staked unless stated. Capacity means for us: about $5-
 | 1 Market making | `kalshi-maker-shadow` (3 cells, outcome-graded); maker-orders-study (a resting bid in place of each live fill); Kalshi public trade prints with `taker_side`, for any market and back to the venue's history cutoff; the in-play recorder (Kalshi quotes every 10 s) | Order-book DEPTH and queue position (recorder and `venue_odds` keep top-of-book only, 48 points per ticker). Polymarket US public trade history does not exist. Any live maker fill on our own account |
 | 1b Reward farming | The live LIP list (read today, §0) | A Kalshi LIP program on a market we trade (there are none). Polymarket US eligibility (ask the venue) |
 | 2 Cross-venue arb | The board joins Kalshi and Polymarket US to sportsbooks on one identity; both venues captured every few minutes | Same-instant quotes: our venue polls are 2-5 min apart, too slow to see a gap that lasts seconds. A settlement-rule diff table per market type (postponement, OT, ties). Measured 0/12 already; low priority |
-| 3 Sharp anchoring | OddsAPI us,eu (Pinnacle is in eu); the execution ledger with `fair_source` and price per order; `order_clv` (closing marks from the quote log); paper books, ladders, live-cell-scorecard | **The Pinnacle quote AGE at the decision instant is not recorded on the order.** The live `closing_mark.clv_pct` is broken (about -35pt, `order_clv._entry_price` passes a contract price into American-odds CLV; venue_native_selection). Pinnacle prop coverage is thin |
+| 3 Sharp anchoring | OddsAPI us,eu (Pinnacle is in eu); the execution ledger with `fair_source` and price per order; `order_clv` (closing marks from the quote log); paper books, ladders, live-cell-scorecard | **The Pinnacle quote AGE at the decision instant is not recorded on the order.** The live `closing_mark.clv_pct` defect (about -35pt, venue_native_selection 10-20) does NOT show in today's ledger: profit-program read 70 live Kalshi same-book marks at 22:02Z 10-24, mean +0.28, and 15 carry `clv_correction` (a re-stamp ran). Spot-check rows against the quote log before relying on it. Pinnacle prop coverage is thin |
 | 4 Latency / news | The ESPN injury collector and `news_price_follow.py` (27 h read: no stale-price edge); the in-play recorder with ESPN state | A sub-minute feed. Usage weighting for injury events. We cannot be fast at a 2-5 min cadence, by design |
 | 5 Favourite-longshot | The 044e2634 price-band audit (11,713 paper orders); the live ledger by price bucket; **Kalshi's public settled-market and trade history, market-wide, for the series we trade** | Nothing. This is the cheapest test available |
 | 5b Late-game | The in-play recorder: 5+ nights, about 70 NBA/NHL/NCAAF/NFL games, Kalshi every 10 s plus ESPN clock; `inplay_price_buckets.py` | More games (the cell needs about 60 per sport); Polymarket in play (we do not trade it) |
@@ -188,7 +188,8 @@ Test A is new. Test B is a new axis for the scorecard. Test C pre-registers a ce
 - Step 2: at 150 bets the ROI CI upper bound < 0.
 
 **Fixes that step 1 also measures:**
-- the broken live `clv_pct` (venue_native_selection) has to be fixed or bypassed. Step 1 recomputes CLV itself;
+- live same-book `clv_pct` looks usable after the re-stamp (profit-program, 10-24; see §2). If the decile split leans on CLV, recompute it from the quote log anyway;
+- the baseline the top decile has to beat: live Kalshi pregame since 10-20 is -17.6% per bet [-29, -7], 129 bets (profit-program). A forward cell graduates through the per-cell live gate (4584fbe9);
 - the per-feed staleness rule (one_book_staleness, fix option 1).
 
 ### Test C: late-game structural cells in play (pre-registration of 044e2634 §4(b), extended)
