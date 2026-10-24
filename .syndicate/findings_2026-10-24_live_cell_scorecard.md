@@ -432,10 +432,18 @@ Its last untripped build, 03:46Z 10-24, had **133 Suggested vs 2,175 EV-only ext
 the gate on brings the extras back under every existing cap (band, per-game R1/R2, per-venue
 net floor, compounding, day caps).
 
-**Not covered: in-game entries** (`inplay_entries_live.LiveEntryPlacer`, live-odds-worker).
-In-game cells ARE evaluated and can trip, but nothing in that path asks the gate yet. That file
-belongs to lane `in-game-trading`, whose session was sent the exact check:
-`live_cell_gate.allows(cell_key("kalshi", sport, family, "in_game"))`, read-only and fail closed.
+**In-game entries are COVERED as of `e01524f6`** (lane in-game-trading, on main, verified in the
+diff):
+
+- `LiveEntryPlacer` refuses `live_cell_tripped` / `live_cell_gate_unknown` for
+  `kalshi|<sport>|<family>|in_game`. It reads the persisted state (`_read_only_gate`), cached 60 s,
+  and runs right after the price band check. With the gate off it makes no read at all.
+- **It runs on the live-odds-worker, so the env key is needed on BOTH roles:**
+  `REFRESH_WORKER__SYNDICATE_LIVE_CELL_GATE=on` (it evaluates and persists) and
+  `LIVE_ODDS_WORKER__SYNDICATE_LIVE_CELL_GATE=on` (it reads).
+- If only the live-odds-worker has the key, there is never a persisted state. Its read then
+  returns ok + absent, which counts as "all armed": in-game entries go ungated, not blocked.
+- If only the refresh-worker has the key, the pregame plans are gated and in-game is not.
 
 ## s5. Running it
 
