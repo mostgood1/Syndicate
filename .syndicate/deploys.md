@@ -54101,3 +54101,19 @@ which is about the two sizing bases and not about the refusal boundary.
   - nba-portfolio-live-prop-status: NBA_LIVE_BOX_CAPTURED written=True; BET_STATUS without no_resolver_for_nba; live_status.current_value + as_of on open NBA rows.
   - in-game-trading: the first 30 s pass and no 429 after cool-down.
 - **open defect, sent to in-game-trading:** live in-game entry ledger rows lack home/away/commence_time, and carry side yes/no plus a ticker-stem event_id. The portfolio shows no detail, and the $50 per-game cap does not pool them with pregame bets.
+
+### 2026-10-24T01:35:42Z — READING for be2c79e6 (nba-portfolio-live-prop-status, session 4aafc5d6) — MET, all three owed readings
+- **live-odds-worker:** `NBA_LIVE_BOX_CAPTURED date=2026-10-23 written=True games=12 live=6 final=1 players=149 fetched=7 carried=0` at 01:14:09Z, the first tick after the 01:13 restart. It has written roughly every 90 s since; at 01:34:55Z it read `live=5 final=2 players=154 carried=2`, so finished games are carried rather than fetched again.
+- **refresh-worker BET_STATUS:**
+  - Before, 01:10:14Z: `orders=1062 resolved=544 decided=1`, including `no_resolver_for_nba: 397`.
+  - After, 01:34:51Z: `orders=1075 resolved=790 decided=47 won=23 lost=24`, with **no `no_resolver_for_nba` at all**.
+  - New NBA refusals that are not regressions:
+    - `unknown_side` 20 -> 142. NBA spreads/h2h reach the shared `statuses_for_orders` side gap (it ignores the resolver's restated side/line; settlement honours it). This is the follow-up.
+    - `no_matchup_on_order` 34: the in-game entry rows lacking teams (the defect already sent to in-game-trading).
+    - `no_line` 7 -> 20: h2h.
+- **web `/api/portfolio/live?on=all` at 01:35:29Z:** 39 open NBA rows (2026-10-23).
+  - Live totals carry the current value and as_of: an over 219.5 reads `live_behind 185.0 vs 219.5 as_of 2026-10-24T01:33:10Z`, an under 238.5 reads `live_ahead 208.0`.
+  - 7 later-game rows read `not_started`, including the only open NBA prop (a player_threes).
+  - 25 in-game rows read `no_matchup_on_order`.
+  - A read at 01:35:10Z, 19 s after the plan write, still showed the old plan, then cleared.
+- **not yet seen on the fleet:** an open NBA player prop mid-game. Tonight's open props are pregame or already settled; the prop path was verified locally on a live ESPN capture (Gafford over 0.5 blk -> WON 2.0 vs 0.5).
