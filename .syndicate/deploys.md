@@ -54151,3 +54151,8 @@ which is about the two sizing bases and not about the refusal boundary.
   - decided 91 -> 239 is not all this fix: games finished in between. resolved 738 -> 973 on the same 1099 orders is the fix.
 - **web `/api/portfolio/live?on=all`, 02:43:02Z:** the 4 open NBA spread rows that read `unknown_side` at 01:37Z now read `live_ahead`. An NCAAF h2h reads `live_tied 0.0 vs 0.0`.
 - **ALSO CLOSES be2c79e6's owed prop reading:** held NBA props seen mid-game on the fleet. Donovan Clingan threes over 0.5 and Tari Eason threes over 0.5 read `live_behind 0.0 vs 0.5`, as_of 02:16:08Z, then 02:41:57Z. The live box is `NBA_LIVE_BOX_CAPTURED ... live=5 final=7 players=272` at 02:41:57Z.
+
+## 2026-10-24 04:56Z (11:56 PM CT 10-23) -- READING for the 2ea0f929 ff: fix C (closing fairs read gzipped day logs) -- **MET** (lane result-cards)
+- **instrument:** `~/syndicate-prod/logs/cheat_sheets_reconcile.log`, every `POSTMORTEM` line of the 11:50 PM CT run (`watch_reconcile_closes.sh`); the 10-22 NBA day log read `2026-10-22.jsonl` at 7:22 PM CT and `2026-10-22.jsonl.gz` at the end.
+- **reading:** NBA 10-22 kept its closes on the gzipped log: cashed_against_close 18 / good_bet_bad_result 17 / right_side 16 / wrong_side 5 / no_close 1 (57 graded). RESTORED by the same run: NBA 10-20 58 of 58 no_close -> 0; NBA 10-21 61 of 61 -> 1; WNBA 10-21 48 of 48 -> 2. **MET.**
+- **not this fix:** soccer reads `closes=0` on every date (lead, below); NBA 10-16 (preseason) 11 no_close -- the NBA quote logs begin 10-20.
