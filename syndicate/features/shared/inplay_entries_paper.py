@@ -48,7 +48,12 @@ MAX_BOOK_POLL_AGE_S = 90.0
 SCORE_QUIET_S = 180.0
 MID_STABLE_WINDOW_S = 60.0
 MID_STABLE_MAX_MOVE = 0.03
-DAY_BUDGET_DOLLARS = 50.0  # >= the live cap (user 2026-10-23: $50/day), so live never starves
+# NO PAPER DOLLAR BUDGET. User 2026-10-24 via coordinator 332cb014: "Decouple, live gets $50". A $50 paper
+# budget starved live on 10-23: it counted paper bookings live had refused (same game axis held), ran out at
+# 01:11:02Z, and live stopped at $12.70 of its $50. Paper only records; real money is capped by
+# inplay_entries_live's own day budget. This is a SANITY cap on rows, not a stake budget: it bounds the
+# keyvalue doc (~0.6 KB per entry) and the open-ticker quotes each pass (10-23 booked 146 in total).
+DAY_BOOKINGS_CAP = 500
 BOOKS_EVERY_S = 60.0
 ESPN_EVERY_S = 30.0
 MARKOUT_HORIZONS_S = (60, 300)
@@ -462,6 +467,7 @@ class PaperEntryLoop:
                 if len(parts) > 1:
                     subs_by_game[parts[1]].add(cls[1])
         spent = sum(e["ask"] for e in entries.values() if e.get("day") == day)
+        booked_today = sum(1 for e in entries.values() if e.get("day") == day)
         self.window["passes"] += 1
         out = {"status": "ok", "tickers": len(tickers), "signals": 0, "booked": 0}
         for sport, tk in tickers:
@@ -491,8 +497,8 @@ class PaperEntryLoop:
             refused = None
             if key in entries:
                 refused = "already_today"
-            elif spent + d["ask"] > DAY_BUDGET_DOLLARS + 1e-9:
-                refused = "day_budget"
+            elif booked_today >= DAY_BOOKINGS_CAP:
+                refused = "day_bookings_cap"
             if refused is None:
                 entries[key] = {
                     "day": day, "t": t, "at": _iso(t), "ticker": tk, "leg": d["leg"], "ask": d["ask"],
@@ -510,6 +516,7 @@ class PaperEntryLoop:
                     "markout_60": None, "markout_300": None, "settled": None, "pnl_1c": None,
                 }
                 spent += d["ask"]
+                booked_today += 1
                 out["booked"] += 1
                 self.window["booked"] += 1
                 if self.on_book is not None:

@@ -319,3 +319,45 @@ def test_pass_spacing_batch_gap_and_429_cooldown():
     clock["t"] += 31
     calls["fail"] = False
     assert loop.step()["status"] == "ok"
+
+
+def _seed(n, day="2026-10-21", ask=0.30):
+    """n settled entries of today on other tickers: $ = n * ask of paper stake already booked."""
+    return {f"{day}:KXNHLSPREAD-26OCT21AAABBB-X{i}:yes": {
+        "day": day, "t": T0 - 5000, "ticker": f"KXNHLSPREAD-26OCT21AAABBB-X{i}", "leg": "yes", "ask": ask, "fee": 0.01,
+        "settled": "yes", "pnl_1c": 0.0, "markout_60": 0.0, "markout_300": 0.0} for i in range(n)}
+
+
+def test_paper_has_no_dollar_budget_so_live_is_not_starved(monkeypatch):
+    # 10-23: a $50 paper budget ran out and the live hook (fed only by NEW bookings) stopped at $12.70.
+    persisted: list = []
+    ts = [T0, T0 + 200, T0 + 220]
+    m = [_market(), _other()]
+    loop, advance = _loop([m] * 3, [("in", ("1", "0"))], ts, persisted)
+    hooked: list = []
+    loop.on_book = lambda e: hooked.append(e["key"]) or {"placed": True}
+    loop.doc = {"entries": _seed(200)}  # $60 of paper already today
+    for i in range(3):
+        out = advance(i)
+    assert out["booked"] == 1 and len(hooked) == 1  # still books past $50, and the live hook sees it
+    assert not hasattr(ip, "DAY_BUDGET_DOLLARS")
+
+
+def test_paper_row_sanity_cap(monkeypatch):
+    persisted: list = []
+    ts = [T0, T0 + 200, T0 + 220]
+    m = [_market(), _other()]
+    loop, advance = _loop([m] * 3, [("in", ("1", "0"))], ts, persisted)
+    hooked: list = []
+    loop.on_book = lambda e: hooked.append(e["key"]) or {"placed": True}
+    monkeypatch.setattr(ip, "DAY_BOOKINGS_CAP", 5)
+    loop.doc = {"entries": _seed(5)}
+    for i in range(3):
+        out = advance(i)
+    assert out["booked"] == 0 and out["signals"] >= 1 and not hooked
+    # yesterday's rows do not count toward today's cap
+    loop2, advance2 = _loop([m] * 3, [("in", ("1", "0"))], ts, [])
+    loop2.doc = {"entries": _seed(5, day="2026-10-20")}
+    for i in range(3):
+        out2 = advance2(i)
+    assert out2["booked"] == 1
