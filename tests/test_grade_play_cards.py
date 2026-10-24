@@ -150,3 +150,24 @@ def test_a_syndicate_pick_card_grades_on_its_own_segment(monkeypatch, tmp_path):
     card = _card(card_id="l2_129acb8c9c927fb9", pick_id="l2_129acb8c9c927fb9", sport="mlb", event_id="e7", player=None,
                  market="h2h", side="away", line=None, segment="first3", price=138, commence_time="2026-10-16T00:00:00Z")
     assert m.results_for([card], work=tmp_path) == {"l2_129acb8c9c927fb9": {"y": 1.0, "units": 1.38, "graded_game": "mlb|e7"}}
+
+
+def test_closes_are_read_from_a_gzipped_day_log_too(tmp_path):
+    # 10-23: the NBA day log is gzipped the next evening, and reading only `.jsonl` turned every later reconcile's closes
+    # into `no_close` (10-21: 60 closes -> 0). Plain, gzipped, and neither.
+    import gzip
+
+    m = _module()
+    quotes = [_q("dk", "under", -160, "2026-10-18T19:00:00Z"), _q("dk", "over", 130, "2026-10-18T19:00:00Z")]
+    book = tmp_path / "nfl_source" / "tracking" / "book_quotes"
+    book.mkdir(parents=True)
+    body = "".join(json.dumps(q) + "\n" for q in quotes)
+    card = _card(date="2026-10-18")
+    (book / "2026-10-18.jsonl").write_text(body, encoding="utf-8")
+    plain = m.closing_fairs(tmp_path, "nfl", "2026-10-18", [card])
+    (book / "2026-10-18.jsonl").unlink()
+    assert m.closing_fairs(tmp_path, "nfl", "2026-10-18", [card]) == {}            # off: no file, no close
+    with gzip.open(book / "2026-10-18.jsonl.gz", "wt", encoding="utf-8") as fh:
+        fh.write(body)
+    packed = m.closing_fairs(tmp_path, "nfl", "2026-10-18", [card])
+    assert packed and packed == plain and packed["abc123"]["books"] == 1

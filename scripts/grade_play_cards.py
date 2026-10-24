@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import gzip
 import html
 import importlib.util
 import json
@@ -125,10 +126,17 @@ def closing_fairs(root: Path, sport: str, day: str, cards: list[dict[str, Any]])
     nxt = (datetime.fromisoformat(day) + timedelta(days=1)).date().isoformat()
     quotes: list[dict[str, Any]] = []
     for name in (day, nxt):
+        # A day's log is gzipped the next evening (NBA ~9:09 PM CT). Reading only `.jsonl` made every LATER reconcile
+        # find no close and rewrite each graded verdict as `no_close` (10-20 58 of 58, 10-21 60 -> 0, measured 10-23).
         path = directory / f"{name}.jsonl"
-        if not path.is_file():
+        packed = directory / f"{name}.jsonl.gz"
+        if path.is_file():
+            opener = lambda p=path: p.open(encoding="utf-8")                      # noqa: E731
+        elif packed.is_file():
+            opener = lambda p=packed: gzip.open(p, "rt", encoding="utf-8")       # noqa: E731
+        else:
             continue
-        with path.open(encoding="utf-8") as fh:
+        with opener() as fh:
             for line in fh:
                 if not any(e in line for e in events):
                     continue
