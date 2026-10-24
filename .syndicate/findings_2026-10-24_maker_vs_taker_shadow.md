@@ -82,6 +82,38 @@ At t0 = the live order's `submitted_at`, on the same ticker and leg, same contra
 - A go-live design is proposed ONLY for cells that pass. It is a recommendation to the user via the
   coordinator; nothing reads it.
 
+## DEVIATION D1 (2026-10-24 ~22:40Z, written BEFORE the full run; outcome-blind)
+
+**What forced it.** A 77-row smoke run of the code showed that every Aug–Sep live row is
+`source == venue_rebuild`. That is 551 of the 704 settled live fills: Kalshi 420, Polymarket 131.
+Those rows were rebuilt from venue settlements on 10-02, and their `submitted_at` is the SETTLEMENT
+instant. At that instant the book is dead: Kalshi candles show bid 0 / ask 1. They have no
+`commence_time` and no `requested_price`. **They carry no order instant, so no counterfactual bid can be
+placed for them.** Only **153** settled live fills have a real instant: Kalshi 136, Polymarket 17, all
+from 10-19 to 10-24. The pre-registered 10-01 split leaves nothing in DISCOVER.
+
+What was seen from the smoke: those 45 simulated rows (35 rebuilt and junk). Of the 10 valid pregame
+Kalshi rows, the bid filled 0 of 10 under THROUGH. No other maker number was looked at.
+
+**Amendments (fixed now):**
+
+1. **Drop** `source == venue_rebuild`, and any row without `commence_time`. Count both in the drops.
+2. **Instant validity:** a row counts only if the venue ask on its leg at t0 is within 2c of the price we
+   paid. Otherwise drop it as `instant_quote_mismatch`. This filter is blind to the outcome. It removes
+   rows whose t0 is not when that price was available.
+3. **Two populations, each reported and decided on its own:**
+   - `live`: the pre-registered one, after drops 1-2.
+   - `paper`: `paper:kalshi` and `paper:polymarket` plan rows with a `venue_ticker`, deduped by
+     `position_key`. These are the same plan's picks, recorded at the instant the plan priced them;
+     955 are settled, 10-02 to 10-24. The `:ladder` books are excluded, because they come from a
+     different selection.
+4. **Split rule, applied per population:** if DISCOVER (before 10-01) holds less than 30% of the
+   population's simulated positions, the split moves to the first date D (00:00Z) such that at
+   least 50% of those positions were submitted before D. D is computed from submission dates
+   alone, and the report prints it.
+5. Everything else stands as pre-registered: policy I, rests, THROUGH, fees, the statistics and the
+   decision rule.
+
 ## Results
 
 (not yet run)
