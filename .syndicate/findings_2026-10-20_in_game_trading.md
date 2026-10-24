@@ -389,3 +389,24 @@ Two-sided in-game trading has two halves, and tonight separates them.
 - (1) A different FAIR, not new thresholds: a sharper/faster in-play source, or a model that beats Kalshi's mid on the stage-2 scoreboard.
 - (2) Run this sweep nightly beside the scoreboard, so any cell that turns consistently positive out of sample is seen the morning after.
 - (3) Re-run the walk-forward at >= 5 nights before any rule change ships.
+
+## 10. First LIVE in-game night (10-23, read 2026-10-24T06:36Z, lane in-game-trading)
+
+Read-only from the fleet keyvalue ledger (`ingame:` rows, selected_date 2026-10-23), after the late games.
+
+- 34 rows: 30 filled, 4 rejected (unfilled IOC). Staked $12.21 + $0.50 fees. Live spend stopped at
+  ~$12.70 of the $50 cap because the PAPER rule's own $50 budget ran out at 01:11:02Z, and live
+  is a hook on newly booked paper entries (coupling defect; the decision is the user's, raised with
+  coordinator 332cb014).
+- Settled 25/30: **-$2.53 on $10.12 staked (-25% ROI), 8 wins.** By kind: NBA spreads 11, -$1.82
+  (-39%); NBA totals 10, -$0.39 (-9%); NBA h2h 3, +$0.09; MLB total 1, -$0.41. Paper, same night:
+  -5.1c/contract settled (n=139); live is about -10c/contract. Small n, but the sign matches every
+  out-of-sample read in 1-9.
+- 5 filled rows UNGRADED (no pnl, venue_status executed): ATLCHA ATL9 yes+no, ATLCHA 230 yes+no
+  (both legs of one contract, bought before the `same_game_axis_held` fix 81aaf6e5; each pair pays
+  $1 for ~$0.85 cost), NYKBOS 220 yes. The grader leaves them open; check before reading a total.
+- No in-game row yet carries home_team (2b7a29c4 and the band 8cb85aea went live at 02:22Z, after the
+  paper budget had stopped feeding live). Both readings are owed from the first booked entry on 10-24.
+- 429s from external-api.kalshi.com: 1-2/min before 01:12Z, then 1 every 4-12 min (87b89d74 pacing).
+- OddsAPI account: 3,079,823 -> 3,177,204 used from 21:53Z to 06:23Z (97,381 in 8.5h, ~11.5k/h,
+  every caller). 1,822,796 left of the 5M cap. The per-caller split is not in this meter.
