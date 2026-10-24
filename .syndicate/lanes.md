@@ -1444,6 +1444,14 @@ death, never life — do not invert it.
 - Verification: Script runs on the fleet (nice 19) over the live execution ledger + Kalshi public prints/candles + recorded Polymarket quotes; findings file reports coverage, per-cell table and the OOS verdict; coordinator receives the decision
 - Blocked by: none
 
+### pm-trader-strategies — OPEN — opened 2026-10-24 — session dbda2142-f3b3-4a69-af99-bbe43fa9a406
+- Goal: Land .syndicate/findings_2026-10-24_pm_trader_strategies.md: graded survey of documented Kalshi/Polymarket profit methods, each mapped to Syndicate data, plus top-3 pre-registered shadow-test designs (research only; no fleet, env or order change)
+- Files: .syndicate/findings_2026-10-24_pm_trader_strategies.md
+- Hypothesis: n/a (survey)
+- Falsification test: n/a
+- Verification: findings file on origin/main; coordinator a21617bf messaged with summary and owed user decisions
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
