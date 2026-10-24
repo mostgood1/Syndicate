@@ -54117,3 +54117,9 @@ which is about the two sizing bases and not about the refusal boundary.
   - 25 in-game rows read `no_matchup_on_order`.
   - A read at 01:35:10Z, 19 s after the plan write, still showed the old plan, then cleared.
 - **not yet seen on the fleet:** an open NBA player prop mid-game. Tonight's open props are pregame or already settled; the prop path was verified locally on a live ESPN capture (Gafford over 0.5 blk -> WON 2.0 vs 0.5).
+
+## 2026-10-24 02:15Z (9:15 PM CT 10-23) -- READING for the 2ea0f929 ff: fixes B (board) and A (tips) -- **B MET on the board; A NOT EXERCISED (chips flipped on time through the old 20-min rule)** (lanes nba-inplay-only-pulls, nba-live-state-overdue)
+- **instrument:** `watch_nba_tips.py` (read-only, 1-min polls 7:21-9:15 PM CT): ESPN scoreboard state vs served `/api/board/game-chips` per late game; the keyvalue live-state snapshot's `generated_at` through the refresh-worker's own env (values never printed); one board read after the restart.
+- **B on the board (7:36 PM CT build, `index_written_at` 00:35:28Z):** rows per not-yet-started game HOU @ SAS 158, LAC @ LAL 156, MEM @ GSW 122, POR @ SAC 114, NOP @ UTA 104 (vs 11-15 each at 6:22 PM). **MET.**
+- **Tips:** chip live vs ESPN in progress -- NOP @ UTA 8:44:55 vs 8:44:55; HOU @ SAS 8:50:01 vs 8:46:57 (chips published 8:49:22); POR @ SAC + LAC @ LAL 9:12:35 vs 9:11:34; MEM @ GSW 9:15:42 vs 9:14:39. Every late game live within ~3 min of ESPN.
+- **A NOT EXERCISED:** the snapshot was last written 7:23:08 PM CT, 77 min before the 8:40 tips, so the existing 20-min staleness rule already sent every read to ESPN. A's branch (fresh snapshot calling a started game pregame) needs a snapshot written just before a tip. **Owed:** the next tip wave that follows a fresh snapshot -- watch `_payload_has_overdue_pregame` turning the read (a one-line log on that branch would make it readable; not built).
