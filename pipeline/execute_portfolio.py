@@ -1833,6 +1833,79 @@ def _readable_leg_index(value: Any) -> int | None:
         return None
 
 
+def _polymarket_spread_orders_enabled() -> bool:
+    """Place Polymarket signed spreads? OFF unless `SYNDICATE_POLYMARKET_SPREAD_ORDERS`
+    is on -- absent keeps `spread_side_needs_verified_team_mapping`, today's
+    refusal. Built 2026-10-24 on the user's "Build and turn on" (relayed by
+    coordinator 332cb014); a switch so the rule comes off in minutes, not a deploy."""
+    raw = (os.environ.get("SYNDICATE_POLYMARKET_SPREAD_ORDERS") or "").strip().lower()
+    return raw in {"1", "on", "true", "yes"}
+
+
+def _polymarket_signed_spread_index(request, slug: str, outcomes: list) -> tuple[int | None, str | None]:
+    """`(outcome_index, None)` for our club's handicap on a signed spread, or
+    `(None, refusal)`.
+
+    THE JOIN'S RULE, read from the venue's own catalogue (`polymarket_board_join`
+    `_SIGNED_SPREAD_LEAGUES`: 1,442 of 1,442 sides): `outcomes[0]` is the slug's
+    FIRST club at the slug's signed line, `outcomes[1]` the second club at the
+    opposite sign. Every part of that is CHECKED against this order rather than
+    assumed, and any disagreement refuses -- never flips to the other leg:
+
+      * the slug's league is a measured one and both outcomes are handicaps;
+      * the slug's clubs ARE our away/home clubs, in that order;
+      * the slug's line is the one our slot implies (our line, or its negative
+        for the second club) -- so a +12.5 order can never take the market
+        whose +12.5 belongs to the other club;
+      * the outcome in our slot carries OUR line.
+
+    The venue's `yesLegIndex` is checked by the caller as a separate witness.
+    """
+    from syndicate.features.shared.polymarket_board_join import (
+        _has_segment,
+        _line_from_modifiers,
+        _signed_spread_applies,
+        _signed_spread_slot,
+        _signed_spread_slug_line,
+        parse_slug,
+    )
+    from syndicate.features.shared.team_aliases import teams_match
+
+    parsed = parse_slug(slug)
+    if parsed is None:
+        return None, "spread_slug_unparseable"
+    if _has_segment(parsed.get("modifiers") or []):
+        return None, "spread_slug_is_a_segment"
+    league = {"cfb": "ncaaf"}.get(str(parsed.get("league") or ""), parsed.get("league"))
+    sport = getattr(request, "sport", None) or league
+    if not _signed_spread_applies(league, [(name, None) for name in outcomes]):
+        return None, "spread_side_needs_verified_team_mapping"
+    away = getattr(request, "away_team", None)
+    home = getattr(request, "home_team", None)
+    if not (
+        away and home
+        and teams_match(sport, parsed.get("away"), away)
+        and teams_match(sport, parsed.get("home"), home)
+    ):
+        return None, "spread_slug_clubs_are_not_our_away_home"
+    slot = _signed_spread_slot(getattr(request, "side", None), {"home_team": home, "away_team": away})
+    if slot is None:
+        return None, "spread_side_not_home_or_away"
+    our_line = _as_line(getattr(request, "line", None))
+    slug_line = _line_from_modifiers(parsed.get("modifiers") or [])
+    if our_line is None or slug_line is None:
+        return None, "spread_line_unreadable"
+    if abs(slug_line - _signed_spread_slug_line(our_line, slot)) > 1e-9:
+        return None, "spread_slug_line_is_not_our_clubs_line"
+    try:
+        slot_line = float(str(outcomes[slot]).strip())
+    except (TypeError, ValueError, IndexError):
+        return None, "spread_outcome_unreadable"
+    if abs(slot_line - our_line) > 1e-9:
+        return None, "spread_outcome_in_our_slot_is_not_our_line"
+    return slot, None
+
+
 def _polymarket_resolve_market(request) -> tuple | None:
     """`(slug, price, tick_size, min_qty)` for one Polymarket US position, or
     `None` to refuse cleanly -- which `polymarket_us_submitter` turns into an
@@ -2075,6 +2148,9 @@ def _polymarket_resolve_market(request) -> tuple | None:
     # One shared index with one hardcoded reason would have logged all three
     # as the prop rule.
     yes_by_name_reason = "gte_prop_yes_by_name"
+    # Set when a signed SPREAD resolves: our slot in `outcomes`. Its YES leg is
+    # checked against the venue's `yesLegIndex` below.
+    signed_spread_index = None
     prop = _polymarket_gte_prop(slug, market)
 
     if market in _TOTAL_MARKETS:
@@ -2101,7 +2177,25 @@ def _polymarket_resolve_market(request) -> tuple | None:
         # the wrong team once today at a real cost. The slug's `pos`/`neg`
         # token is a candidate answer and it is UNVERIFIED against the
         # outcomes array, so it stays a candidate.
+        #
+        # VERIFIED 2026-10-24 for the measured leagues, and placed only behind
+        # `SYNDICATE_POLYMARKET_SPREAD_ORDERS`: the venue catalogue's own
+        # `marketSides` put `outcomes[0]` on the slug-first club at the slug's
+        # signed line, 1,442 of 1,442 sides. `_polymarket_signed_spread_index`
+        # checks that against THIS order, and the venue's `yesLegIndex` must
+        # then name the slug-first leg (below) or the order refuses.
         refusal = "spread_side_needs_verified_team_mapping"
+        if _polymarket_spread_orders_enabled():
+            spread_index, refusal = _polymarket_signed_spread_index(request, slug, outcomes)
+            if spread_index is not None:
+                try:
+                    price = float(prices[spread_index])
+                except (TypeError, ValueError, IndexError):
+                    price = None
+                    refusal = "spread_side_unpriced"
+                else:
+                    outcome_index = spread_index
+                    signed_spread_index = spread_index
     elif prop is not None:
         # A `gte<N>` PLAYER PROP -- "will Michael Soroka record at least 5
         # strikeouts?" -- with outcomes literally `Yes`/`No`. There was NO
@@ -2582,6 +2676,33 @@ def _polymarket_resolve_market(request) -> tuple | None:
             return None
         yes_leg_index = prop_yes_index
         yes_leg_reason = yes_by_name_reason
+    elif signed_spread_index is not None:
+        # THE SECOND WITNESS. The catalogue put the YES (`long`) side on the
+        # slug-first club in every sampled spread, so the venue's own
+        # `yesLegIndex` for THIS market must be 0. Anything else -- absent,
+        # unreadable, or 1 -- means the slot rule and the venue disagree about
+        # which leg is which, and the order REFUSES. Never flipped: taking the
+        # other leg on a disagreement is a guess at which witness is wrong.
+        venue_yes = _readable_leg_index(yes_leg_index)
+        agree = venue_yes == 0
+        print(
+            f"[execute_portfolio] POLYMARKET_YES_LEG slug={slug}"
+            f" yes_leg_index={yes_leg_index!r} slug_first_leg=0"
+            f" our_index={outcome_index} agree={agree}"
+            f" reason='signed_spread_slot' outcomes={outcomes!r}",
+            flush=True,
+        )
+        if not agree:
+            print(
+                f"[execute_portfolio] POLYMARKET_SIDE_REFUSED slug={slug}"
+                f" market={market!r} side={our_side!r}"
+                " reason=spread_yes_leg_is_not_the_slug_first_leg"
+                f" venue_yes_leg_index={yes_leg_index!r} venue_reason={yes_leg_reason!r}",
+                flush=True,
+            )
+            return None
+        yes_leg_index = 0
+        yes_leg_reason = "signed_spread_slot"
     elif market not in _TOTAL_MARKETS and market not in _SPREAD_MARKETS:
         agree = (
             yes_leg_index is not None
