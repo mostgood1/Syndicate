@@ -410,3 +410,30 @@ Read-only from the fleet keyvalue ledger (`ingame:` rows, selected_date 2026-10-
 - 429s from external-api.kalshi.com: 1-2/min before 01:12Z, then 1 every 4-12 min (87b89d74 pacing).
 - OddsAPI account: 3,079,823 -> 3,177,204 used from 21:53Z to 06:23Z (97,381 in 8.5h, ~11.5k/h,
   every caller). 1,822,796 left of the 5M cap. The per-caller split is not in this meter.
+
+## 11. PRE-REGISTRATION: Test C, late-game cells (locked 2026-10-24T23:55Z, before any result was computed)
+
+User chose "C: Late-game in-play cells" (via coordinator 332cb014) from pm-trader-research's
+findings_2026-10-24_pm_trader_strategies.md, Test C. Paper/shadow only; no live change. This section
+fixes my exact reading of that design. Nothing below changes after the first run.
+
+- **Data:** the nightly recorder nights `C:/tmp/inplay_<date>/` (Kalshi every ~10 s, ESPN period + clock
+  every ~60 s), sports nhl, nba, nfl, ncaaf; full-game families GAME/SPREAD/TOTAL; settled markets only.
+- **Window W (<= 10 game-minutes left, from ESPN's latest row at or before the quote):** NHL period 3
+  with clock <= 10:00; NBA period 4 with clock <= 6:00; NFL/NCAAF period 4 with clock <= 8:00; any
+  overtime period counts.
+- **C2, buy:** per (ticker, leg), the FIRST quote inside W whose ask is in [0.85, 0.97): buy at the ask,
+  hold to settlement. Return = won - ask - taker fee 0.07*p*(1-p).
+- **C1, avoid/sell**, per (ticker, leg), the FIRST quote inside W whose ask is < 0.25:
+  - (a) population buy check: won - ask - fee (expected negative);
+  - (b) the EXIT value of holding it: sell at the bid after the taker fee vs hold, = (bid - 0.07*bid*(1-bid)) - won (positive = selling beats holding);
+  - (c) the same as (b), restricted to (ticker, leg) we actually held live at that point
+    (Kalshi ledger rows, filled, leg via kalshi_orders._side_to_kalshi). Reported, not decided on (n is small).
+- **Unit:** one mean per GAME; the CI is a game-clustered bootstrap (resample games; 2,000 draws, seed 20261024), 95%.
+- **Decision unit:** each cell pooled across sports. Per-sport rows are reported, and given a per-sport verdict only at >= 60 games in that sport.
+- **GO:** pooled CI lower > 0 at >= 60 games, AND the mean is positive in at least 2 of the 3 sports with >= 20 games.
+- **KILL:**
+  - pooled CI upper < 0 at >= 60 games;
+  - C2 tail flag: any single game's loss > 10x the cell's mean gain within the first 60 games, ordered by game date. Reported, not decided on.
+- **Fewer than 60 games:** the verdict is INSUFFICIENT; keep accruing. The study joins the nightly task, so it accrues until 2026-12-31 (calendar stop).
+- **If C1 GOes:** the proposed exit rule ("sell a held leg under 25c inside W at the bid") goes to the coordinator as a user decision, with its measured per-game value. Nothing ships without that decision.
