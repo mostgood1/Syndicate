@@ -2118,6 +2118,8 @@ death, never life — do not invert it.
   - Many short boots with no RECYCLE_EXIT are claimed deploy restarts (10-19..10-22); not part of this defect.
   - Supervisor respawn reuses `item.env` (`scripts/local_production.py` `_spawn`), so an env-file edit needs a supervisor `up`, not a role respawn.
   - Proposed fix (awaiting user decision): `REFRESH_WORKER__SYNDICATE_LOCAL_MEMORY_LIMIT_MB` 6144 -> 7168 in `~/syndicate-prod/local_production.env` (fleet config, not git). Keep the 1,900 MB floor and threshold 3. Would have passed all 140 refusals (max refused 4,661 < 5,268).
+- **USER DECISION 2026-10-24 ~3:55 PM CT (verbatim):** "Approved: set REFRESH_WORKER__SYNDICATE_LOCAL_MEMORY_LIMIT_MB=7168 and apply it with a supervisor up at the overnight lull, under claims on all three services, the post-save idle check and a deploys.md entry."
+  - Plan: window opens 05:40Z 10-25 (12:40 AM CT). Gate = check_deploy_safety with the worker's env (allowlisted output). Wait for full CLEAR; after 06:20Z accept only live-odds odds-refresh children, and only with refresh-worker idle after a save, no refresh-worker child, no MLB sim, no live games. Abort if no window by 06:45Z (sim-input-reports runs at 07:00Z). Recipe as 10-08: claims on web, refresh-worker and live-odds-worker (holder `fleet-refresh-worker-early-recycle`, exit-code gated), env backup, edit one key, `watchdog_no_autostart` marker, `down`, `Start-ScheduledTask SyndicateLocalProduction`, clear marker. Ride-along known now: 5f32d9c4 (inplay_entries_live.py, already on live-odds-worker); re-list it before the up. `down` restarts Redis too, so the first build is cold (~34 min on 10-08).
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
