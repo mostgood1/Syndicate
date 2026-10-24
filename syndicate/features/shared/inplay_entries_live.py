@@ -13,7 +13,11 @@ OFF BY DEFAULT. Live only when ALL hold, re-read on every entry:
   * `SYNDICATE_INPLAY_ENTRIES` is `on` or `live` (absent / anything else = off);
   * `execution_ledger.execution_mode()` is live AND `live_execution_armed()`;
   * the day's in-game stake + this order <= `SYNDICATE_INPLAY_ENTRY_DAY_DOLLARS`
-    (default 50, and 50 is a CEILING the env cannot raise).
+    (default 50, and 50 is a CEILING the env cannot raise);
+  * the decision ask, as a probability, is inside the pregame executor's live price
+    band `[low, high)` (`execute_portfolio.live_price_band()`, the same
+    `SYNDICATE_LIVE_PRICE_BAND`; absent/unusable = off, exactly as pregame). User
+    2026-10-23 via coordinator 332cb014: "Yes, same band", after a 12c h2h longshot.
 
 THE ORDER: 1 contract, `immediate_or_cancel` (`kalshi_orders.order_body_v2`
 honours `time_in_force` on the request; IOC orders carry no kickoff expiry and
@@ -162,7 +166,10 @@ class LiveEntryPlacer:
         pk = f"{POSITION_PREFIX}{ticker}:{leg}"
         spend = in_game_spend(self.orders_fn(), day)
         stake = round(ask + MAX_PRICE_MOVE, 4)  # floors to exactly 1 contract at any live ask within 1c
-        if pk in spend["position_keys"]:
+        band = _price_band()
+        if band is not None and not (band[0] - 1e-9 <= ask < band[1] - 1e-9):
+            result = {"placed": False, "reason": "outside_price_band", "band": f"[{band[0]:.2f},{band[1]:.2f})"}
+        elif pk in spend["position_keys"]:
             result = {"placed": False, "reason": "already_in_ledger_today"}
         elif game_axis(ticker) in spend["held_axes"]:
             result = {"placed": False, "reason": "same_game_axis_held", "axis": "/".join(game_axis(ticker))}
@@ -176,6 +183,12 @@ class LiveEntryPlacer:
               f" edge={entry.get('edge')} day_spend={spend['dollars']}/{day_budget_dollars()} result={result}"[:500],
               flush=True)
         return result
+
+
+def _price_band() -> tuple[float, float] | None:
+    from pipeline.execute_portfolio import live_price_band
+
+    return live_price_band()
 
 
 def _ledger_orders() -> list[Mapping[str, Any]]:

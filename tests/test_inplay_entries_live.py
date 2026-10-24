@@ -20,7 +20,7 @@ ENTRY = {"key": f"{DAY}:KXNHLSPREAD-26OCT22TORCBJ-TOR2:yes", "ticker": "KXNHLSPR
 def _env(monkeypatch, tmp_path):
     monkeypatch.setenv("SYNDICATE_REPORTS_ROOT", str(tmp_path))
     for k in ("SYNDICATE_INPLAY_ENTRIES", "SYNDICATE_INPLAY_ENTRY_DAY_DOLLARS", "SYNDICATE_EXECUTION_MODE",
-              "SYNDICATE_EXECUTION_LIVE_ARMED", "SYNDICATE_KALSHI_EXPIRE_AT_KICKOFF"):
+              "SYNDICATE_EXECUTION_LIVE_ARMED", "SYNDICATE_KALSHI_EXPIRE_AT_KICKOFF", "SYNDICATE_LIVE_PRICE_BAND"):
         monkeypatch.delenv(k, raising=False)
 
 
@@ -239,3 +239,23 @@ def test_a_label_that_would_change_the_leg_is_refused(monkeypatch):
     out = live._place_live(ticker="KXNBASPREAD-26OCT23NYKBOS-NYK6", leg="yes", ask=0.44, stake=0.45, line=5.5,
                            day=DAY, sport="nba", market="spreads", spend={"dollars": 0.0, "orders": 0}, game=bad)
     assert out["placed"] is False and out["reason"].startswith("side_relabel_mismatch")
+
+
+def test_the_live_price_band_refuses_outside_and_writes_nothing(monkeypatch):
+    # Same env and parser as the pregame executor; [low, high) on the ask as a probability.
+    monkeypatch.setenv("SYNDICATE_LIVE_PRICE_BAND", "0.40,0.75")
+    for ask, placed in ((0.12, False), (0.399, False), (0.40, True), (0.749, True), (0.75, False), (0.90, False)):
+        p, calls = _placer()
+        result = p({**ENTRY, "ask": ask})
+        assert result["placed"] is placed, ask
+        assert len(calls) == (1 if placed else 0)
+        if not placed:
+            assert result["reason"] == "outside_price_band"
+    # absent or unusable = off, exactly as pregame: the 0.30 entry is placed
+    for raw in (None, "junk", "0.8,0.4"):
+        if raw is None:
+            monkeypatch.delenv("SYNDICATE_LIVE_PRICE_BAND", raising=False)
+        else:
+            monkeypatch.setenv("SYNDICATE_LIVE_PRICE_BAND", raw)
+        p, calls = _placer()
+        assert p(ENTRY)["placed"] is True and len(calls) == 1
