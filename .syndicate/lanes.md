@@ -2101,6 +2101,24 @@ death, never life — do not invert it.
 - Verification: unit + reachability tests (off != on: no_resolver_for_nba -> a status); run-syndicate render of /portfolio with fixture data; on the fleet after restarts: NBA_LIVE_BOX_CAPTURED lines on live-odds-worker and BET_STATUS reasons with no no_resolver_for_nba, NBA open rows showing N vs line
 - Blocked by: none
 
+### fleet-refresh-worker-early-recycle — OPEN — opened 2026-10-24 — session 20868885-0b2e-4194-896d-46988a0df4eb
+- Goal: Explain, with denominators from fleet logs, why local-fleet refresh-worker recycles on heavy_build_refused at 1.3-2.5h, and land a user-approved fix that stops the early recycles without removing OOM protection
+- Files: syndicate/features/shared/memory_observability.py (local-limit section only), syndicate/features/shared/worker_recycle.py, scripts/local_production.py (refresh-worker env only), tests/test_worker_recycle.py
+- Hypothesis: H1 (knife-edge): every refusal is the fleet worker's own RssAnon (98.6% of RSS, measured live 4381/4445 MB) sitting at the guard's implicit ceiling 6144-1900=4244 MB; the declared 6144 limit was copied from the Render plan and the 1900 floor from Render's 4GiB overview transient, so normal weekend heap puts the worker within tens of MB of the line and threshold=3 (Render value since 09-17) recycles on any 3-refusal cluster. H2 (ratchet): the floor climbs within each boot so the recycle is the correct response and the leak is the defect.
+- Falsification test: H1 is wrong if, per boot, the post-first-build anon floor is well below 4244 MB and rises steadily to it (then H2: ratchet). H2 is wrong if the floor reaches ~4.2-4.4 GB within the first builds and stays flat until exit.
+- Verification: Per-boot table (boot, first-build floor, floor at exit, completed builds, refusals, uptime) from refresh-worker.log*; after an approved fix, 24h of fleet logs with RECYCLE_EXIT count and no OOM/MEMORY_GUARD_ABORT at post_build_overview
+- Blocked by: none
+- **RESULT 2026-10-24 ~14:30 CT (read-only, fleet refresh-worker.log..log.5 = 10-18 21:45Z..10-24 19:00Z, nice 19):**
+  - Denominator: 140 refusals at `pre_source_state_fingerprint` of 1,724 fingerprint calls (8.1%); 1,568-1,570 builds completed; 4 mid-build refusals (3 at `post_build_overview`). 29 `RECYCLE_EXIT` lines, all `heavy_build_refused`, all `children: 0`, threshold 3 (live env read in Python, int only).
+  - Every refusal: basis `reclaimable_cache` with no breakdown, so headroom = 6144 - role-tree RSS; refused `current_mb` 4,244.7-4,661.1 against the implicit 4,244 MB line. Many within 0-60 MB of it (head 1899.3, 1898.4, 1897.6).
+  - The RSS is real heap: live worker RssAnon 4,381 of 4,445 MB (98.6%), file 64, shmem 0. NOT a cache artefact.
+  - Per-boot (47 boots): RSS@30m rose 2.3-2.6 GB (10-19) -> 3.0-3.4 GB (10-23/24); climbs ~+0.7-1.0 GB to a plateau in 1-2 h; long boots plateau (18.3 h flat ~3.9 GB on 10-18/19; 9.9 h max 4,673 last 4,110). **H2 (unbounded ratchet) REFUTED in this window; H1 CONFIRMED with nuance:** a slate-sized warm-up working set whose weekend plateau (4.0-4.7 GB) straddles a fixed 4,244 MB line.
+  - Build transient on the fleet (checkpoint-sampled, misses sub-checkpoint spikes): p50 +25, p90 +346, p99 +802, max +1,061 MB; role-tree peak p50 3.80, p90 4.19, max 5.04 GB. Below Render's ~1.9 GB measured transient.
+  - VM: 15.7 GB + 4 GB swap; all-process accounted RSS p50 6.2, p99 9.3, max 13.2 GB (10-21 00:55Z). Kernel OOM grep returned 0 (journalctl may be absent; NOT proven).
+  - Many short boots with no RECYCLE_EXIT are claimed deploy restarts (10-19..10-22); not part of this defect.
+  - Supervisor respawn reuses `item.env` (`scripts/local_production.py` `_spawn`), so an env-file edit needs a supervisor `up`, not a role respawn.
+  - Proposed fix (awaiting user decision): `REFRESH_WORKER__SYNDICATE_LOCAL_MEMORY_LIMIT_MB` 6144 -> 7168 in `~/syndicate-prod/local_production.env` (fleet config, not git). Keep the 1,900 MB floor and threshold 3. Would have passed all 140 refusals (max refused 4,661 < 5,268).
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
