@@ -54060,3 +54060,17 @@ which is about the two sizing bases and not about the refusal boundary.
 - **open questions, sent to in-game-trading:** fills per IOC; day_spend fell 0.46 -> 0.42 between entries; paper PASS_FAILED HTTP 429 (OddsAPI rate limit); two adjacent DAL@IND unders in 43 s, so it looks like the executor's per-game R1 does not cover this path.
 - **evidence going in:** paper about -8c/contract over 25 settled, and no positive out-of-sample sweep setting. This is a paid test capped at $50/day.
 - **rollback:** remove the two env lines (or set INPLAY_ENTRIES=off), then a full down/up. Start-ScheduledTask must run in WINDOWS PowerShell.
+
+## 2026-10-23 23:51:33Z / 00:06:48Z -- FLEET ff 5ec0f1a0 -> 81aaf6e5 + live-odds-worker ROLE restart: one live in-game entry per (game, axis) per day (holder `inplay-axis-fix`, session 332cb014) -- **MET (loaded); first same_game_axis refusal OWED**
+- **why:** in-game entries went live at 23:38Z and stacked three DAL@IND total legs: 249 NO, 251 NO, 253 YES by 23:42:22Z. The in-game path places via check_order/place_order and bypasses the executor's R1/R2.
+  - `81aaf6e5`: one entry per (game, axis), margin = h2h+spread, total = total; fees count toward the $50 cap; 429 lines log host=. 22 tests.
+  - Rides with `a77b1297`: the paper loop's OddsAPI calls are now metered.
+- **user (332cb014's chat):** "Load now (Recommended)", overriding the 60-min spacing after the 23:37:59Z up; "No, keep trading" (no pause).
+- **restart:**
+  - ff at 23:51:33Z, after a peer's live-odds claim cleared.
+  - The gate (0 children of pid 445806) never cleared: odds-refresh jobs run continuously during live games.
+  - My permission check refused a direct TERM ([Blind Apply]), so the USER ran `kill -TERM 445806`. The stop was logged 00:06:48Z.
+  - New pid **462667**, lstart 00:06:55Z. Claim released at 00:07:22Z.
+- **env after (role restart keeps env):** INPLAY_ENTRIES=on, DAY_DOLLARS=50, EXECUTION_MODE=live, ARMED=1, LIVE_PRICE_BAND=0.40,0.75, EXIT_TAKE_PROFIT_MARGIN=0.10. healthz 200.
+- **owed (in-game-trading):** the first `same_game_axis` refusal; the 429 host= line; paper-loop credits attributed in oddsapi_quota.
+- **lesson:** during live games a live-odds-worker "0 children" gate never clears. Role-restart scripts need the drain-precedent exception (refresh-worker idle + reconcile clean), or a user-run TERM.
