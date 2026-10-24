@@ -633,6 +633,53 @@ def _payload_has_live_progress(payload: dict[str, Any] | None) -> bool:
     return False
 
 
+# ESPN's scheduled-game status text, e.g. "10/23 - 7:00 PM EDT" -- the only start time a snapshot written before
+# `start_time` was stamped carries.
+_SCHEDULED_STATUS_RE = re.compile(r"(\d{1,2})/(\d{1,2})\s*-\s*(\d{1,2}):(\d{2})\s*([AP]M)\s*([ECMP])([DS])T\b", re.IGNORECASE)
+_US_ZONE_OFFSET_HOURS = {"E": -5, "C": -6, "M": -7, "P": -8}
+
+
+def _snapshot_game_start(game: dict[str, Any], year: int) -> datetime | None:
+    """A snapshot game's scheduled start (UTC): its `start_time`, else the date and time in its ESPN status text."""
+    stamped = _parse_payload_timestamp(game.get("start_time") or game.get("commence_time"))
+    if stamped is not None:
+        return stamped
+    match = _SCHEDULED_STATUS_RE.search(str(game.get("status") or ""))
+    if not match:
+        return None
+    month, day, hour, minute, half, zone, daylight = match.groups()
+    hour_24 = int(hour) % 12 + (12 if half.upper() == "PM" else 0)
+    offset = _US_ZONE_OFFSET_HOURS[zone.upper()] + (1 if daylight.upper() == "D" else 0)
+    try:
+        local = datetime(year, int(month), int(day), hour_24, int(minute), tzinfo=timezone(timedelta(hours=offset)))
+    except ValueError:
+        return None
+    return local.astimezone(timezone.utc)
+
+
+def _payload_has_overdue_pregame(payload: dict[str, Any] | None, now: datetime) -> bool:
+    """A game the snapshot still calls pregame although its scheduled start has passed (lane `nba-live-state-overdue`).
+
+    10-23: the snapshot written at 6:09 PM CT held the six 6 PM games as "7:00 PM EDT", not started, while CHI @ MIL read
+    Final -- which counts as progress -- so for its first 20 minutes `_best_live_state_payload` never asked ESPN and every
+    6 PM chip, and every board row joined to it, stayed pregame until ~6:34 PM. A started game is never answered from a
+    snapshot that predates its tip."""
+    games = payload.get("games") if isinstance(payload, dict) and isinstance(payload.get("games"), list) else []
+    try:
+        year = parse_iso_date(str(payload.get("date") or "")).year if isinstance(payload, dict) else now.year
+    except Exception:
+        year = now.year
+    for game in games:
+        if not isinstance(game, dict) or game.get("in_progress") or game.get("final"):
+            continue
+        if int(_safe_float(game.get("status_id")) or 0) > 1:
+            continue
+        start = _snapshot_game_start(game, year)
+        if start is not None and start <= now:
+            return True
+    return False
+
+
 def _espn_live_state_payload(selected_date: str) -> dict[str, Any] | None:
     date_value = str(selected_date or "").strip()
     if not date_value:
@@ -705,6 +752,7 @@ def _espn_live_state_payload(selected_date: str) -> dict[str, Any] | None:
                 "in_progress": in_progress,
                 "final": final,
                 "periods": [],
+                "start_time": str(event.get("date") or "").strip() or None,
             }
         )
 
@@ -724,12 +772,14 @@ def _best_live_state_payload(selected_date: str) -> dict[str, Any] | None:
     is_recent_day = parsed_selected_date in {today, (today - timedelta(days=1))}
     local_timestamp = _parse_payload_timestamp((local_payload or {}).get("generated_at"))
     local_stale = bool(local_timestamp and (datetime.now(timezone.utc) - local_timestamp) > timedelta(minutes=20))
+    overdue = _payload_has_overdue_pregame(local_payload, datetime.now(timezone.utc))
 
-    should_try_espn = bool(is_recent_day and (local_payload is None or local_stale or not _payload_has_live_progress(local_payload)))
+    should_try_espn = bool(is_recent_day and (local_payload is None or local_stale or overdue
+                                              or not _payload_has_live_progress(local_payload)))
     if should_try_espn:
         espn_payload = _espn_live_state_payload(selected_date)
         if isinstance(espn_payload, dict):
-            if not isinstance(local_payload, dict):
+            if not isinstance(local_payload, dict) or overdue:
                 return espn_payload
             if _payload_has_live_progress(espn_payload) and not _payload_has_live_progress(local_payload):
                 return espn_payload
