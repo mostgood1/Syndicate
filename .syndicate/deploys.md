@@ -54206,3 +54206,21 @@ which is about the two sizing bases and not about the refusal boundary.
   - The sim's zero-Kelly veto is gone. The single 10-24 refusal is on a market-fair basis and was not investigated.
 - **Not claimed:** this reading does not touch forward ROI. That is `sim-stake-forward-read-1102`. The settlement-side split is gated on #718/#722, and orders only began carrying `staked_probability_version` (960 + 428 of the 3,995) after #722.
 - **The scheduled task `sim-stake-activation-check` can be deleted.**
+
+### 2026-10-24T22:12Z (5:12 PM CT) — READING for d9928700 + 26a0c74d in the 02:21:34Z ff (lane polymarket-nba-join, session 85cc08af) — MET
+- **Join, POLYMARKET_BOARD_JOIN on refresh-worker.** 159 joins after boot (02:43:18Z..22:09:44Z) against 122 joins on 10-23 12:00..02:21Z (medians):
+  - matched 147 -> 244 (min 41, max 292).
+  - segment_market_not_full_game 532 -> 2,172 (min 1,332, max 3,288). This is the screen biting: letter-first periods and team totals.
+  - ambiguous_polymarket_match 9 -> 0 (max 1).
+  - side_not_an_outcome_of_this_market 26 -> 2 (max 5).
+  - Per-sport split, from the pre-deploy per-row replay (board 10-23, slate 01:15Z): NBA full game 24 -> 33 of 35; NHL 1 -> 2 of 2; NFL 42 -> 52 of 67; NCAAF 41 -> 64 of 296; 0 previously-matched rows changed slug.
+- **Placer, live-odds-worker.** `POLYMARKET_YES_LEG ... reason='signed_spread_slot'` 31 times, **31 of 31 agree=True**. 0 `spread_*` refusals of any kind; no `spread_yes_leg_is_not_the_slug_first_leg`.
+  - First at 03:20:01Z: `asc-cfb-ore-ill-2026-10-24-neg-8pt5`, our side home +8.5 (Illinois). our_index=1, outcome '+8.50', so a NO on Oregon -8.5, at 0.48.
+  - Second slug: `asc-cfb-utsa-tulane-2026-10-24-neg-2pt5`, home +2.5, index 1.
+  - Both slugs produced `ORDER_PATH ... spreads would_build` every pass.
+  - Every pass was then refused by `REFUSED_SAME_AXIS_HELD axis=margin|full` (live-event-concentration R1: that game's margin axis was already held). **So NO Polymarket spread order has been sent yet, and that is the concentration rule working as designed, not this code.**
+- **Why so few PM spreads reach the plan** (fleet replay at 22:0xZ, board 10-24):
+  - The live EV-floor stop rule is tripped (`LIVE_EV_FLOOR_STOPPED settled=125 roi=-0.1697`), so the live plans are Suggested-only: 130 of 5,527 rows.
+  - The Suggested set holds 4 full-game `spreads` rows, all NCAAF rungs Polymarket does not price. The 34 Polymarket-priced full-game spreads on the shortlist are all outside the Suggested set (EV -2..+3%).
+  - 23 of the 130 Suggested rows are NBA `spreads_alt` (16) / `totals_alt` (7). The join does not admit those market names (`board_market_not_a_game_line`). Treated as spreads/totals they pair 13 of 23 (271 of 568 across the whole NBA alt shortlist), because Polymarket lists the whole ladder as single-rung markets. **This is the NBA lever. Not built; it is a decision.**
+- verify: met for the join (refusal mix moved as predicted) and for the placer's side mapping (31/31). OWED: the first sent and filled Polymarket spread, which waits on a game whose margin axis is not already held.
