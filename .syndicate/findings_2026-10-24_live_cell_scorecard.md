@@ -184,7 +184,7 @@ traded cells, enlarges the stake and widens admission.
 - On paper, model-backed rows average $14.22 a bet against $1.98 for market-only. This is
   confounded by the pre-#704 sim sizing.
 
-## s3b. The live EV-floor stop, and attribution after the live filters `[added 2026-10-24 ~23:20Z, coordinator request]`
+## s3b. The live EV-floor stop, and attribution after the live filters `[added 2026-10-24 between 22:02Z and 22:37Z, coordinator request; an earlier "~23:20Z" stamp was an estimate, corrected]`
 
 **How the stop works** (`pipeline/portfolio_commit.py:510-670`, read on origin/main `3798acef`).
 
@@ -354,6 +354,88 @@ on the same ledger read.
   count; that is the planned addition.
 - **Fix, not this lane's:** backfill-grade the 10-20..10-22 NBA paper orders from final box
   scores. `paper_settlement` is shared, so this was brought back to the coordinator.
+
+## s4d. THE PER-CELL LIVE GATE -- BUILT (user decision "Per-cell trip only (C)", relayed by the coordinator 2026-10-24)
+
+The coordinator's message quoted the user's answer to the question "The tripped EV-floor stop is
+stuck (no re-arm), keeping live at Suggested-only. What should it do?". The answer was **"Per-cell
+trip only (C)"**, described as *"Replace the one global stop with per-cell trips: a cell pauses
+only if its own record is significantly negative or loses $75; all else stays live. Adds the
+missing re-arm."*
+
+**Code.**
+
+- `syndicate/features/shared/live_cell_gate.py`, NEW, holds the gate and its classifiers. The
+  scorecard now imports them, so the two cannot disagree about which cell a bet is in.
+- `pipeline/portfolio_commit.py` changes in two places, behind `SYNDICATE_LIVE_CELL_GATE=on`:
+  1. `_live_ev_floor_population` no longer consults the global stop. It returns the floor
+     population (Suggested + EV-only extras).
+  2. The venue loop's live try runs `live_cell_gate.refresh()` (evaluate + persist, cached 30
+     min) and then `filter_rows` on `live_scoped`, before `_write_live_venue_plan`. Refusals
+     are counted with the scope refusals.
+- Off (absent / anything but `on`): byte-identical, and the global stop still gates.
+
+**Rules (as decided):**
+
+- **Cell:** venue x sport x family x phase.
+- **Trip:** >= 40 bets AND >= 15 games with a game-clustered CI90 on flat ROI wholly < 0, OR
+  pnl since `armed_since` <= -$75.
+- **Re-arm:** the paper twin since `tripped_at` (paper:<venue> + paper:<venue>:ladder,
+  deduplicated by position) with >= 150 bets, >= 40 games and >= 14 days, and a CI95 lower
+  bound on flat ROI net of fees > 0. Re-arming sets `armed_since` = now, so the old record
+  cannot re-trip the cell.
+- **Start:** every cell starts armed, evaluated on its WHOLE live record.
+- **Fail closed:** a ledger or state read that is not ok gives `CELL_GATE_UNKNOWN`, and every
+  row is refused for that build. A confirmed-absent state file means first run.
+- **State:** `intelligence/live_cell_gate_state.json` in the refresh-state store.
+- **Log lines:** `[live_cell_gate] CELL_TRIP` / `CELL_REARM` / `LIVE_CELL_GATE cells= tripped=` /
+  `CELL_GATE_UNKNOWN`, and `[portfolio_commit] LIVE_CELL_GATE_APPLIED venue= kept= refused=`.
+
+**Tests.** `tests/test_live_cell_gate.py` has 14:
+
+- trip by CI, and trip by loss;
+- the CI needs 40 bets and 15 games;
+- re-arm only on the FORWARD twin, refused when too soon / pre-trip record / too few games /
+  not positive;
+- no re-trip after re-arm;
+- fail closed on state and on the ledger;
+- **reachability off != on, including the stuck-trip migration:** the global stop tripped,
+  then off -> Suggested-only, on -> floor population;
+- the hook is placed before the live plan is written.
+
+Also run: `test_live_ev_floor.py`, `test_live_net_floor.py`, `test_portfolio_commit*.py` (59 +
+81 pass) and the scorecard (13).
+
+**What trips at once on today's ledger** (fleet ledger read 2026-10-24 22:37Z, 15,178 orders,
+whole record, `evaluate(orders, None, now)`): **2 of 43 cells.**
+
+| cell | bets | games | pnl | flat ROI | why |
+|---|---|---|---|---|---|
+| `kalshi\|mlb\|prop\|pregame` | 141 | 72 | -$177.90 | -12.0% | loss rule |
+| `kalshi\|parlay\|parlay\|pregame` | 7 | 6 | -$92.47 | -105% | loss rule |
+
+**Armed but close:**
+
+| cell | bets | games | pnl | flat ROI | note |
+|---|---|---|---|---|---|
+| `kalshi\|nba\|prop\|pregame` | 35 | 13 | -$30.55 | -34.8% | under 40 bets; the scorecard's CI90 is [-63, -13] |
+| `kalshi\|mlb\|total\|pregame` | 66 | 58 | -$60.36 | | -$14.64 from the loss trip |
+| `polymarket\|mlb\|h2h\|pregame` | 33 | — | -$71.51 | | -$3.49 from it |
+| `kalshi\|nba\|spread\|pregame` | 40 | 19 | +$9.50 | +7.0% | |
+| `kalshi\|ncaaf\|spread\|pregame` | 33 | 32 | +$7.64 | | |
+
+If cells started from a FRESH clock (`armed_since` = now), nothing would trip today. That is
+not what was built: "start armed" was read as "judged on its own record".
+
+**What the replacement does to volume.** The global stop's trip had cut live to Suggested rows.
+Its last untripped build, 03:46Z 10-24, had **133 Suggested vs 2,175 EV-only extras**. Turning
+the gate on brings the extras back under every existing cap (band, per-game R1/R2, per-venue
+net floor, compounding, day caps).
+
+**Not covered: in-game entries** (`inplay_entries_live.LiveEntryPlacer`, live-odds-worker).
+In-game cells ARE evaluated and can trip, but nothing in that path asks the gate yet. That file
+belongs to lane `in-game-trading`, whose session was sent the exact check:
+`live_cell_gate.allows(cell_key("kalshi", sport, family, "in_game"))`, read-only and fail closed.
 
 ## s5. Running it
 

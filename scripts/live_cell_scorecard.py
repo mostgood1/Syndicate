@@ -59,24 +59,12 @@ LADDER_VENUES = ("paper:kalshi:ladder", "paper:polymarket:ladder")
 BUCKETS = ((0.0, 0.40, "<40c"), (0.40, 0.55, "40-55c"), (0.55, 0.75, "55-75c"), (0.75, 1.01, "75c+"))
 SETTLED = ("won", "lost", "push")
 
-KALSHI_SPORT = (
-    ("KXWNBA", "wnba"), ("KXNBA", "nba"), ("KXMLB", "mlb"), ("KXNFL", "nfl"), ("KXNCAAF", "ncaaf"),
-    ("KXNCAAB", "ncaab"), ("KXNHL", "nhl"), ("KXATP", "tennis"), ("KXWTA", "tennis"), ("KXITF", "tennis"),
-    ("KXCOD", "esports"), ("KXMVE", "parlay"), ("KXMLS", "soccer"), ("KXBUNDESLIGA", "soccer"),
-    ("KXEREDIVISIE", "soccer"), ("KXLALIGA", "soccer"), ("KXLIGUE1", "soccer"), ("KXSERIEA", "soccer"),
-    ("KXEPL", "soccer"), ("KXUCL", "soccer"),
+# The cell classifiers live in the gate, so the gate and the report that justifies it can never disagree.
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from syndicate.features.shared.live_cell_gate import (  # noqa: E402
+    family_of, game_of, parse_ts as _ts, phase_of, sport_of,
 )
-PM_FAMILY = {"aec": "h2h", "atc": "h2h", "asc": "spread", "tsc": "total", "astatc": "prop"}
-
-
-def _ts(value: Any) -> datetime | None:
-    text = str(value or "").replace("Z", "+00:00")
-    # venue timestamps carry nanoseconds; fromisoformat takes at most microseconds
-    text = re.sub(r"(\.\d{6})\d+", r"\1", text)
-    try:
-        return datetime.fromisoformat(text)
-    except ValueError:
-        return None
 
 
 def contract_price(price: Any) -> float | None:
@@ -104,73 +92,6 @@ def bucket(p: float | None) -> str:
         if lo <= p < hi:
             return name
     return "?"
-
-
-def _kalshi_sport_series(ticker: str) -> tuple[str, str]:
-    series = ticker.split("-")[0].upper()
-    for prefix, sport in KALSHI_SPORT:
-        if series.startswith(prefix):
-            return sport, series[len(prefix):]
-    return "other", series
-
-
-def family_of(r: Mapping[str, Any]) -> str:
-    market = str(r.get("market") or "").lower()
-    if market:
-        if str(r.get("player_name") or "").strip() or market.startswith(("player_", "batter_", "pitcher_")) \
-                or market in ("strikeouts", "outs", "receptions"):
-            return "prop"
-        for key, fam in (("total", "total"), ("spread", "spread"), ("h2h", "h2h")):
-            if key in market:
-                return fam
-        return "other"
-    ticker = str(r.get("venue_ticker") or "")
-    if r.get("venue") == "polymarket" or ticker[:3] in ("aec", "atc", "asc", "tsc", "ast"):
-        return PM_FAMILY.get(ticker.split("-")[0].lower(), "other")
-    sport, rest = _kalshi_sport_series(ticker)
-    if sport == "parlay":
-        return "parlay"
-    if rest in ("GAME", "MATCH", "WMATCH", "DOUBLES") or rest.endswith("GAME"):
-        return "h2h"
-    if "SPREAD" in rest:
-        return "spread"
-    if "TOTAL" in rest:
-        return "total"
-    return "prop" if rest else "other"
-
-
-def sport_of(r: Mapping[str, Any]) -> str:
-    sport = str(r.get("sport") or "").lower().strip()
-    if sport and sport != "none":
-        return sport
-    ticker = str(r.get("venue_ticker") or "")
-    if ticker.upper().startswith("KX"):
-        return _kalshi_sport_series(ticker)[0]
-    parts = ticker.split("-")
-    return parts[1].lower() if len(parts) > 1 else "?"
-
-
-def game_of(r: Mapping[str, Any]) -> str:
-    if r.get("event_id"):
-        return str(r["event_id"])
-    ticker = str(r.get("venue_ticker") or "")
-    parts = ticker.split("-")
-    if ticker.upper().startswith("KX") and len(parts) > 1:
-        return "k:" + parts[1]          # date+teams token, shared by every series on the game
-    m = re.match(r"^[a-z]+-(.+?-\d{4}-\d{2}-\d{2})", ticker)
-    return "p:" + (m.group(1) if m else ticker)
-
-
-def phase_of(r: Mapping[str, Any]) -> str:
-    venue = str(r.get("venue"))
-    if venue in LIVE_VENUES:
-        # Live phase is the PATH that placed the order: the in-game entry path stamps no ev_pct. Four
-        # pregame-plan orders filled 7 min after a 23:00Z kickoff on 10-20 stay pregame (they carry ev).
-        return "in_game" if r.get("source") != "venue_rebuild" and r.get("ev_pct") is None else "pregame"
-    sub, ko = _ts(r.get("submitted_at")), _ts(r.get("commence_time"))
-    if sub and ko and sub >= ko:
-        return "in_game"
-    return "pregame"
 
 
 def book_of(venue: str) -> str | None:

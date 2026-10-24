@@ -650,6 +650,19 @@ def _live_ev_floor_population(shortlist: Any, normalized: str) -> list | None:
     """The live plans' row population for this build, or None (= Suggested-only)."""
     if not live_ev_floor_requested() or not isinstance(shortlist, Mapping):
         return None
+    from syndicate.features.shared import live_cell_gate
+
+    if live_cell_gate.enabled():
+        # THE PER-CELL GATE REPLACES THIS GLOBAL STOP [user 2026-10-24, "Per-cell trip only (C)"]. The
+        # global stop's trip (cumulative, no re-arm) no longer gates the live plans; every live row --
+        # floor extras and Suggested alike -- is admitted or refused by its own cell in the venue loop.
+        rows, counts = live_ev_floor_rows(shortlist.get("rows"))
+        print(
+            f"[portfolio_commit] LIVE_EV_FLOOR date={normalized} floor=0 rows={len(rows)} counts={counts} "
+            f"stop=replaced_by_live_cell_gate",
+            flush=True,
+        )
+        return rows
     stop = live_ev_floor_stop_state()
     if stop.get("unknown"):
         # FAIL CLOSED: a stop rule that cannot read the ledger cannot say the
@@ -2499,6 +2512,20 @@ def run_portfolio_commit(
                         venue,
                         price_resolver=venue_price_resolver,
                         ticker_resolver=venue_ticker_resolver,
+                    )
+                # THE PER-CELL LIVE GATE (`live_cell_gate`, off unless SYNDICATE_LIVE_CELL_GATE=on). A row
+                # whose venue x sport x family x phase cell is tripped -- or every row, when the gate
+                # cannot read (fail closed) -- is refused and counted with the scope refusals.
+                from syndicate.features.shared import live_cell_gate
+
+                if live_cell_gate.enabled():
+                    gate = live_cell_gate.refresh()
+                    live_scoped, gate_refusals = live_cell_gate.filter_rows(live_scoped, venue=venue, gate=gate)
+                    live_scope_refusals = {**(live_scope_refusals or {}), **gate_refusals}
+                    print(
+                        f"[portfolio_commit] LIVE_CELL_GATE_APPLIED date={normalized} venue={venue} "
+                        f"kept={len(live_scoped)} refused={gate_refusals} unknown={gate.get('unknown')}",
+                        flush=True,
                     )
                 _write_live_venue_plan(
                     live_scoped,
