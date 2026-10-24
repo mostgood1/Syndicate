@@ -184,7 +184,88 @@ traded cells, enlarges the stake and widens admission.
 - On paper, model-backed rows average $14.22 a bet against $1.98 for market-only. This is
   confounded by the pre-#704 sim sizing.
 
+## s3b. The live EV-floor stop, and attribution after the live filters `[added 2026-10-24 ~23:20Z, coordinator request]`
+
+**How the stop works** (`pipeline/portfolio_commit.py:510-670`, read on origin/main `3798acef`).
+
+- **Population.** Only the live positions the 0% floor ADMITTED: rows the Suggested flag
+  refused for EV reasons alone (`live_ev_floor_rows`, `:526`). They are logged once each to
+  `intelligence/live_ev_floor_positions.json` in keyvalue, capped at 5,000 entries, and
+  joined to settled live orders on `(selected_date, position_key)`. **Suggested rows are not
+  in it, and no realised-ROI rule gates them at all.**
+- **Window.** Cumulative from the first floor position (10-20 21:29Z). There is no rolling
+  window.
+- **Threshold.** >= 100 settled AND dollar ROI < -5%. Cached 30 min. An unreadable ledger or
+  log fails closed (Suggested-only).
+- **Effect when tripped.** The live plans take Suggested rows only. It is not a stop on live
+  trading.
+- **Re-arm.** None. The log message says *"until the key is removed"*
+  (`SYNDICATE_LIVE_EV_FLOOR`). Once tripped, no new floor positions are logged, so its ROI is
+  frozen and it cannot un-trip by itself.
+
+**Measured on the fleet** (keyvalue log read ok=True, 332 entries, 10-20 21:29Z..10-24 03:37Z;
+refresh-worker log):
+
+- Last untripped read: 03:46:10Z 10-24, settled 93, ROI -18.6%. That build's floor admitted
+  2,175 EV-only extras against **133 Suggested** rows, so the floor WAS the live book.
+- **First trip: 03:56:03Z 10-24, settled 103, ROI -19.2%.**
+- My join reproduces the coordinator's figure: 125 settled, -$67.20 on $396.10 = **-17.0%**.
+
+**What the trip handed live back to.** Suggested-only is the population live traded before the
+floor existed. **Before 10-20, live Kalshi pregame was 421 bets, -$361.07, -16.0%**. The
+config was different then (sub-$1 stakes, no band, no net floors), but it lost either way.
+Since 10-20 the Suggested rows are 18 bets, -$1.11 on $59 (-2%, CI [-35, +24] on Kalshi),
+which says nothing either way.
+
+**By filter regime** (live pregame since 10-20, by submit time, env-backup timestamps):
+
+| regime | bets | games | flat ROI | CI90 |
+|---|---|---|---|---|
+| floor 0, before the net floor (10-20 20:45Z) | 83 | 25 | -11.5% | [-28, +5] |
+| + per-venue net floor (10-21 18:12Z) | 19 | 9 | -42.8% | [-70, -8] |
+| + R1/R2 per-game (10-22 16:17Z / 23:24Z) | 35 | 20 | -11.5% | [-27, +3] |
+| + 40-75c band (10-23 19:58Z) | **2** | 2 | both lost | — |
+| stop tripped, Suggested only (10-24 03:56Z) | **1** | 1 | won | — |
+
+**Under the full current filter stack there are 3 settled live pregame bets. Its record is
+unmeasured.** No regime shows an improvement, and every regime has too few games to show one.
+
+**The 40-75c band as a counterfactual over all live pregame since 10-20.** Inside the band,
+Kalshi is **-20.3% [-32, -8]** on 90 bets; outside it is -9.6% [-33, +13] on 37 bets. On this
+evidence the band selects nothing good on live. (On paper and the ladder, 55-75c was the only
+non-negative bucket, see s1.)
+
+**Cells after the band** (live pregame since 10-20, inside 40-75c):
+
+| cell | flat ROI | CI90 | bets / games |
+|---|---|---|---|
+| Kalshi NBA props | **-38.3%** | **[-64, -15] LOSES** | 33 / 13 |
+| Kalshi NBA spreads | +16.0% | [-11, +40] | 17 / 12 |
+| Kalshi NCAAF spreads | -5.3% | [-48, +28] | 8 |
+| Kalshi NCAAF totals | -11.8% | — | 6 |
+| Polymarket NCAAF totals | +45% flat, -21% $ | — | 7 |
+
+Everything else is under 10 games.
+
 ## s4. Proposed gate policy (for the USER, via the coordinator; nothing is changed by this lane)
+
+**FOLDED INTO THE EXISTING STOP (coordinator, 10-24): no parallel gate.** The policy below is the
+stop's own mechanism — same ledger join, same fail-closed read, same 30-min cache — changed in
+three ways:
+
+1. **Population.** EVERY live row (Suggested included) is keyed by cell
+   (venue x sport x family x phase), not only the floor extras.
+2. **Trip rule, per cell.** A cell trips at >= 40 settled bets / 15 games with CI90 upper < 0,
+   OR a cumulative live loss >= $75, OR the stop's own global rule (>= 100 settled, ROI < -5%)
+   over its whole population.
+3. **Re-arm rule (missing today).** The forward paper record below, read off the paper twin,
+   which keeps recording at the live price while a cell is tripped. It replaces "until the
+   key is removed".
+
+Option A below is that stop with every cell starting TRIPPED. B is it with three cells
+starting armed. C is it with the trip rule only.
+
+**The pre-registered rule, as first written:**
 
 **Pre-registered rule.**
 
@@ -214,6 +295,9 @@ traded cells, enlarges the stake and widens admission.
     look at 200) is the most plausible route to a GO.
   - Run-rate saved: ~ -$71 over 10-20..10-24 (Kalshi -54.22, Polymarket -14.10, in-game
     -2.75), about **-$100/week**.
+  - **Why A even though the floor stop has already tripped:** the trip moved live back to the
+    Suggested-only population, which lost -16.0% on 421 bets before 10-20 and is gated by no
+    realised-ROI rule.
 - **B: a live canary.** Keep only Kalshi pregame NBA spreads, NCAAF spreads and NCAAF totals
   live at the $5 floor, $25/day total; everything else goes paper.
   - It keeps the order, fill, cancel and settle paths exercised.
