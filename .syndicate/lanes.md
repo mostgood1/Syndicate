@@ -1430,7 +1430,7 @@ death, never life — do not invert it.
 ### live-cell-scorecard — OPEN — opened 2026-10-24 — session d57baa09-9d62-4c73-8217-209222a4ed62
 - **STATUS 2026-10-24 ~22:40Z: DELIVERABLES 1-4 DONE, USER DECISION OWED (via coordinator a21617bf).** Scorecard `30b5daba` reproduces the coordinator headline to the cent; no cell has edge (live Kalshi pregame -11.8% flat [-20,-4], Polymarket -18.2% [-34,-2]); w* does NOT reach live stakes (#704 market basis discards it; no wiring proposed); W43 live -$70.74 on $466.64. Gate options A/B/C in `.syndicate/findings_2026-10-24_live_cell_scorecard.md` s4. Next: weekly report Mon, rerun on demand.
 - Goal: Reproducible live+paper cell scorecard (venue x sport x family x price bucket x phase; ROI, CLV, n, game-clustered bootstrap CI, date coverage) on the fleet ledger; proposed gate policy taken to the coordinator as a user decision with numbers; w* -> live sizing reachability answered; weekly P&L report sent. No live behaviour change.
-- Files: scripts/live_cell_scorecard.py tests/test_live_cell_scorecard.py .syndicate/findings_2026-10-24_live_cell_scorecard.md
+- Files: scripts/live_cell_scorecard.py tests/test_live_cell_scorecard.py .syndicate/findings_2026-10-24_live_cell_scorecard.md, scripts/local_production.py (the SCHEDULED_JOBS live-cell-scorecard entry section only)
 - Hypothesis: Most live cells have no measurable edge; a few (NBA/NCAAF spreads) may
 - Falsification test: A cell whose game-clustered 90% CI on ROI excludes 0 on the positive side is real edge; none excluding 0 means no cell has earned money
 - Verification: scorecard runs on the fleet ledger and reproduces the coordinator's 10-24 headline totals within rounding
