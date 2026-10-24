@@ -70,6 +70,7 @@ KALSHI_SPORT = (
     ("KXEREDIVISIE", "soccer"), ("KXLALIGA", "soccer"), ("KXLIGUE1", "soccer"), ("KXSERIEA", "soccer"),
     ("KXEPL", "soccer"), ("KXUCL", "soccer"),
 )
+PAPER_VENUES = ("paper:kalshi", "paper:polymarket")
 PM_FAMILY = {"aec": "h2h", "atc": "h2h", "asc": "spread", "tsc": "total", "astatc": "prop"}
 
 
@@ -410,6 +411,10 @@ def price_of(r: Mapping[str, Any]) -> float | None:
         p = _f(r.get(key))
         if p is not None and 0.0 < p < 1.0:
             return p
+        if p is not None and abs(p) >= 100:
+            # paper plan rows price in American odds (live-cell-scorecard's contract_price does the same)
+            profit = p / 100.0 if p > 0 else 100.0 / -p
+            return round(1.0 / (1.0 + profit), 4)
     return None
 
 
@@ -445,7 +450,8 @@ def taker_hold_pnl(r: Mapping[str, Any]) -> tuple[float, float]:
 
 def simulate_order(r: Mapping[str, Any], *, kalshi: KalshiPublic | None, poly_points: Mapping[str, list],
                    fee_cache: dict) -> dict[str, Any]:
-    venue = r["venue"]
+    venue = str(r["venue"]).split(":")[-1] if str(r["venue"]).startswith("paper:") else r["venue"]
+    r = {**r, "venue": venue}
     ticker = str(r.get("venue_ticker") or "")
     t0, ko = ts(r.get("submitted_at")), ts(r.get("commence_time"))
     p = price_of(r)
@@ -453,7 +459,7 @@ def simulate_order(r: Mapping[str, Any], *, kalshi: KalshiPublic | None, poly_po
     base = {
         "venue": venue, "sport": sport_of(r), "family": family_of(r), "bucket": bucket(p),
         "phase": phase_of(r), "game": game_of(r), "date": str(r.get("selected_date") or ""),
-        "submitted_at": r.get("submitted_at"), "split": "confirm" if str(r.get("submitted_at")) >= SPLIT_AT else "discover",
+        "submitted_at": r.get("submitted_at"), "split": None,
         "ticker": ticker, "fill_price": p, "contracts": c, "win": r["outcome"] == "won",
     }
     taker_pnl, stake = taker_hold_pnl(r)
@@ -502,7 +508,9 @@ def simulate_order(r: Mapping[str, Any], *, kalshi: KalshiPublic | None, poly_po
             cb, ca = poly_quote(pts, ko, leg)
             if cb is not None and ca is not None:
                 close_mid = (cb + ca) / 2.0
-    mid0 = (bid + ask) / 2.0 if ask is not None else None
+    if ask is None or abs(ask - p) > 0.02 + 1e-9:
+        return {**base, "bid0": bid, "ask0": ask, "drop": "instant_quote_mismatch"}
+    mid0 = (bid + ask) / 2.0
     base.update(bid0=bid, ask0=ask, mid0=mid0, close_mid=close_mid,
                 ask_mismatch=None if ask is None else round(p - ask, 4))
 
@@ -568,6 +576,23 @@ def clustered(rows: list[dict], stat, reps: int = REPS, seed: int = SEED, level:
 
 def _mean(xs: list[float]) -> float | None:
     return sum(xs) / len(xs) if xs else None
+
+
+def apply_split(sims: list[dict]) -> str:
+    """Deviation D1 item 4: DISCOVER/CONFIRM at 10-01, unless DISCOVER would hold < 30% of the
+    simulated positions; then at the first date D (00:00Z) with >= 50% of positions before it.
+    Computed from submission dates alone."""
+    ok = [s for s in sims if "sims" in s]
+    split = SPLIT_AT
+    if ok and sum(1 for s in ok if str(s["submitted_at"]) < SPLIT_AT) < 0.30 * len(ok):
+        dates = sorted(str(s["submitted_at"])[:10] for s in ok)
+        for d in sorted(set(dates)):
+            if sum(1 for x in dates if x < d) >= 0.5 * len(dates):
+                split = d + "T00:00:00Z"
+                break
+    for s in sims:
+        s["split"] = "confirm" if str(s.get("submitted_at")) >= split else "discover"
+    return split
 
 
 def summarise(rows: list[dict], key: str) -> dict[str, Any]:
@@ -703,7 +728,8 @@ def _num(x) -> str:
 
 def markdown(report: Mapping[str, Any]) -> str:
     lines = [f"# Maker vs taker shadow -- generated {report['generated_at']}", "",
-             f"Pre-registration: {report['preregistration']}. Simulated positions: {report['n_simulated']}.",
+             f"Pre-registration: {report['preregistration']}. Population: {report.get('population')}. "
+             f"Split (D1): {report.get('split_at')}. Simulated positions: {report['n_simulated']}.",
              f"Drops: {json.dumps(report['drops'])}", "", "## Coverage", ""]
     for v, c in report["coverage"].items():
         lines.append(f"- {v}: {c['positions']} positions / {c['games']} games on {c['dates']} dates "
@@ -748,9 +774,12 @@ def markdown(report: Mapping[str, Any]) -> str:
 
 def cmd_dump(args) -> int:
     from syndicate.features.shared.execution_ledger import full_history_orders  # read-only loader
-    rows = [r for r in full_history_orders() if r.get("mode") == "live"]
+    every = full_history_orders()
+    rows = [r for r in every if r.get("mode") == "live"]
     Path(args.out).write_text(json.dumps(rows, default=str))
-    print(f"live rows {len(rows)} -> {args.out}", flush=True)
+    paper = [r for r in every if r.get("venue") in PAPER_VENUES]
+    Path(args.paper_out).write_text(json.dumps(paper, default=str))
+    print(f"live rows {len(rows)} -> {args.out}; paper plan rows {len(paper)} -> {args.paper_out}", flush=True)
     return 0
 
 
@@ -758,10 +787,24 @@ def cmd_simulate(args) -> int:
     orders = json.loads(Path(args.orders).read_text())
     drops: dict[str, int] = defaultdict(int)
     todo = []
-    for r in orders:
-        if r.get("mode") != "live" or r.get("venue") not in ("kalshi", "polymarket"):
+    seen: set = set()
+    venues = ("kalshi", "polymarket") if args.population == "live" else PAPER_VENUES
+    for r in sorted(orders, key=lambda o: str(o.get("submitted_at") or "")):
+        if r.get("venue") not in venues or (args.population == "live" and r.get("mode") != "live"):
             continue
-        if r.get("status") != "filled":
+        if args.population == "paper":
+            key = (r.get("venue"), r.get("position_key") or r.get("idempotency_key"))
+            if key in seen:
+                drops["paper_duplicate_position"] += 1
+                continue
+            seen.add(key)
+        if r.get("source") == "venue_rebuild":
+            drops["venue_rebuild_no_order_instant"] += 1
+        elif not r.get("commence_time"):
+            drops["no_commence_time"] += 1
+        elif not r.get("venue_ticker"):
+            drops["no_venue_ticker"] += 1
+        elif r.get("status") != "filled":
             drops["not_filled"] += 1
         elif r.get("outcome") not in ("won", "lost"):
             drops[f"outcome_{r.get('outcome')}"] += 1
@@ -782,8 +825,11 @@ def cmd_simulate(args) -> int:
         sims.append(s)
         if (i + 1) % 50 == 0:
             print(f"  {i + 1}/{len(todo)} simulated, kalshi calls {kalshi.calls}, failures {kalshi.failures}", flush=True)
+    split_at = apply_split(sims)
     Path(args.rows_out).write_text(json.dumps(sims, default=str))
     report = build_report(sims, drops)
+    report["population"] = args.population
+    report["split_at"] = split_at
     report["kalshi_http"] = {"calls": kalshi.calls, "failures": kalshi.failures}
     Path(args.out).write_text(json.dumps(report, indent=1, default=str))
     Path(args.md).write_text(markdown(report))
@@ -796,8 +842,10 @@ def main(argv: list[str] | None = None) -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
     d = sub.add_parser("dump")
     d.add_argument("--out", required=True)
+    d.add_argument("--paper-out", required=True)
     s = sub.add_parser("simulate")
     s.add_argument("--orders", required=True)
+    s.add_argument("--population", choices=("live", "paper"), default="live")
     s.add_argument("--cache", default=os.path.expanduser("~/maker_vs_taker_cache"))
     s.add_argument("--venue-odds", default=os.path.expanduser("~/syndicate-prod/data/reports/intelligence/venue_odds"))
     s.add_argument("--rows-out", required=True)

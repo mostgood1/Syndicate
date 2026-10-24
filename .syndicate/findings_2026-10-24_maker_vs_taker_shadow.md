@@ -114,6 +114,106 @@ Kalshi rows, the bid filled 0 of 10 under THROUGH. No other maker number was loo
 5. Everything else stands as pre-registered: policy I, rests, THROUGH, fees, the statistics and the
    decision rule.
 
-## Results
+## Results (run 2026-10-24 22:26-22:40Z on the fleet, nice 19; code = this lane's `scripts/maker_vs_taker_shadow.py`)
 
-(not yet run)
+### Answer
+
+**Maker does NOT beat taker out of sample in any cell, so no go-live design is proposed.** No cell
+passes the pre-registered rule in either population. One cell is FALSIFIED: live Kalshi spreads,
+CONFIRM delta -$2.50/position [-3.51, -1.49], 10 games. Every other cell has a CI that spans 0.
+
+Before kickoff, a resting bid that fills is cheaper than the ask by about 4-5% of stake (one tick plus
+the taker fee). No measurable adverse selection was found before kickoff.
+
+In play, fills are adversely selected.
+
+**The cap that matters:** even a fill on every position saves only about 4-5% of stake, and the live
+taker book loses about 17-21%. Execution cannot turn these picks profitable. The selection is the
+problem.
+
+### Date coverage (stated first, as pre-registered)
+
+| population | positions simulated | games | dates | window | split (D1) | discover / confirm |
+|---|---|---|---|---|---|---|
+| live Kalshi | 101 | 39 | 6 | 10-19..10-24 | 2026-10-22 | 60 / 41 |
+| live Polymarket | 9 | 8 | 4 | 10-20..10-23 | 2026-10-22 | 5 / 4 |
+| paper Kalshi | 384 | 139 | 22 | 10-02..10-24 | 2026-10-11 | 231 / 153 |
+| paper Polymarket | 121 | 54 | 18 | 10-02..10-24 | 2026-10-11 | 64 / 57 |
+
+- **Live drops:** venue_rebuild with no order instant 552; no commence 34; unsettled 30; leg unresolved 22;
+  no quote at t0 16; instant/quote mismatch 5.
+- **Paper drops:** duplicate position 342; no ticker 259; unsettled 184; no quote 111; leg unresolved 35;
+  mismatch 20.
+- **Quote sanity:** at t0 the ask on our leg was within 1c of the price we paid for 110 of 110 live
+  and 500 of 505 paper positions.
+- **Fee types on Kalshi:** quadratic 49 / 258; quadratic_with_maker_fees 52 / 126. The maker fee on the
+  latter is priced at 0.25 x taker, a third-party figure.
+- **The -18% live record is mostly unreachable here.** 551 of 704 settled live fills, all of Aug-Sep,
+  are venue-rebuilt and carry no order instant.
+
+### Primary configuration (inside one tick, rest 60 min pregame / 2 min in play, THROUGH fills)
+
+| cell | split | n | games | fill | taker ROI | delta $/pos [90% CI] | verdict |
+|---|---|---|---|---|---|---|---|
+| live Kalshi pregame | confirm | 39 | 18 | 10% | -23.4% | +0.84 [-0.53, +1.95] (discover +0.11) | NOT SHOWN |
+| live Kalshi spread | confirm | 10 | 10 | | | **-2.50 [-3.51, -1.49]** | **FALSIFIED** |
+| paper Kalshi pregame | confirm | 115 | 52 | 9% | +7.2% | -0.31 [-2.26, +1.67] (discover +0.67) | NOT SHOWN |
+| paper Kalshi in play (2 min) | confirm | 38 | 18 | 13% | -20.2% | +3.41 [-0.09, +8.09] (discover +6.61) | NOT SHOWN |
+| paper Polymarket pregame | confirm | 36 | 13 | 6% | +5.0% | -0.44 [-3.86, +2.35] (discover +2.77) | NOT SHOWN |
+
+Every sport, family, bucket and full-cell row in `report_{live,paper}.md` is INSUFFICIENT (fewer than 10
+CONFIRM games) or NOT SHOWN, apart from the falsified row above.
+
+**Delta is mostly "did not bet".** At 60 minutes the bid fills only 7-10% of the time. The positive
+deltas come from unfilled positions, where the counterfactual is "no bet" on picks that lose as taker.
+That is a selection effect, not an execution one, and the pre-registered delta cannot tell the two apart.
+
+### What execution alone is worth (pregame, resting to kickoff: the fill-rate ceiling)
+
+| population | fill | saved on filled positions, % of stake | maker book ROI [90% CI] | taker ROI [90% CI] |
+|---|---|---|---|---|
+| live, both venues | 48/106 (45%) | +4.0% | -15.3% [-40.4, +15.7] | -20.8% [-37.4, -1.2] |
+| paper Kalshi | 142/321 (44%) | +4.5% | +2.2% [-18.2, +22.1] | -0.8% [-15.7, +13.2] |
+| paper Polymarket | 15/87 (17%) | +5.7% | +5.7% [-51.8, +63.3] | -23.5% [-49.8, +1.3] |
+
+- **The saving is mechanical, not a finding.** It is a tick plus the fee: Kalshi's taker fee is about
+  1.75c at 50c, and Polymarket's 0.0695·p(1-p) about 1.7c. So its tight CI is not evidence about outcomes.
+- **Adverse selection before kickoff.** The quantity is the taker per-contract result (win - price) on
+  positions the bid WOULD fill, minus the same on positions it would not:
+
+  | population | difference [90% CI] |
+  |---|---|
+  | live | -2.2c [-18.2, +17.9] |
+  | paper | +3.2c [-4.0, +10.4] |
+
+  Neither is measurable.
+- **In play (2-min rest, paper):** maker fills lost -16.6c per contract, win - bid [-31.1, -0.1],
+  17 fills. This
+  replicates the in-game-trading and 10-19 findings: do not rest bids in play.
+- **CLV is uninformative.** Taker -0.8 to -1.2c, maker fills -0.1 to -1.5c, both against the Kalshi
+  mid at kickoff.
+
+### Recommendation (taken to the coordinator as a user decision)
+
+1. **Do not build live maker entry now.** It fails the pre-registered out-of-sample rule, and its
+   ceiling (about 4-5% of stake on about 45% of positions) cannot cover a book that loses about 17-21%
+   on selection.
+2. **Keep it cheap to re-decide.** Kalshi prints are public and permanent, and Polymarket quotes are
+   already recorded. So this counterfactual re-runs on any later window with no forward recorder and no
+   fleet job: `run.sh` = `dump` + `simulate`. Re-run when CONFIRM reaches >= 30 games per cell.
+3. **If a future run passes a cell,** the design to bring is:
+   - an env switch defaulting to off;
+   - pregame only;
+   - post `min(bid + 1c, ask - 1c)` with `expiration_ts = commence` (`order_body_v2` already
+     supports this) and the existing kickoff cancel;
+   - never re-price, no taker fallback (hybrid H added nothing: +$0.03/pos [-0.00, +0.06] live);
+   - no in-play resting bids.
+
+### Caveats
+
+- **THROUGH is conservative on queue position.** TOUCH changed fill rates by 0-6 points. Our sizes are
+  1-20 contracts, so print volume was rarely the limit.
+- **Polymarket fills come from asks recorded every 3-5 min and capped at the last 48 points.** That
+  undercounts fills and drops early points (no_quote 42 + 6).
+- **The paper population is the plan's picks under its 10-02..10-24 configurations,** which are not
+  today's live gates.
