@@ -1426,6 +1426,14 @@ death, never life — do not invert it.
 - Verdict: GOAL MET. 65 of 85 CLOSED blocks moved to `lanes_closed.md` with one pointer each; 20 deferred (owner idle < 240m, or a transcript not found). Gate reading, deferrals and the dormant-OPEN report are in `log/2026-10-24.md`.
 - Moved: the 65 SAFE_SLUGS of `owner_liveness.py --idle-min 240` at 21:47Z; each now has a pointer under the heading below.
 
+### live-cell-scorecard — OPEN — opened 2026-10-24 — session d57baa09-9d62-4c73-8217-209222a4ed62
+- Goal: Reproducible live+paper cell scorecard (venue x sport x family x price bucket x phase; ROI, CLV, n, game-clustered bootstrap CI, date coverage) on the fleet ledger; proposed gate policy taken to the coordinator as a user decision with numbers; w* -> live sizing reachability answered; weekly P&L report sent. No live behaviour change.
+- Files: scripts/live_cell_scorecard.py tests/test_live_cell_scorecard.py .syndicate/findings_2026-10-24_live_cell_scorecard.md
+- Hypothesis: Most live cells have no measurable edge; a few (NBA/NCAAF spreads) may
+- Falsification test: A cell whose game-clustered 90% CI on ROI excludes 0 on the positive side is real edge; none excluding 0 means no cell has earned money
+- Verification: scorecard runs on the fleet ledger and reproduces the coordinator's 10-24 headline totals within rounding
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
