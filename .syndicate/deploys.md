@@ -54144,3 +54144,10 @@ which is about the two sizing bases and not about the refusal boundary.
   - nba-portfolio-live-prop-status: unknown_side 142 -> ~0.
   - in-game-trading: the first in-game outside_price_band, and new ingame: rows carrying teams/event_id/side.
 - **rollback:** remove the SPREAD_ORDERS line (spreads stop), then a full down/up; or revert the commits.
+
+### 2026-10-24T02:43:30Z — READING for 5766e562 (live column honours restated side/line; nba-portfolio-live-prop-status, session 4aafc5d6) — MET
+- **refresh-worker BET_STATUS, last plan before the 02:21:34Z ff (02:17:25Z):** `orders=1099 resolved=738`, `unknown_side: 202`, `no_line: 27`.
+- **First plan after (02:42:22Z):** `orders=1099 resolved=973 decided=239 won=131 lost=108 ahead=135 behind=114`. **`unknown_side` and `no_line` are both absent (0).** The remaining reasons are unrelated to this change: `no_matchup_on_order: 34`, the in-game rows' missing teams; `unmapped_market: 38`; the ncaaf/soccer reasons.
+  - decided 91 -> 239 is not all this fix: games finished in between. resolved 738 -> 973 on the same 1099 orders is the fix.
+- **web `/api/portfolio/live?on=all`, 02:43:02Z:** the 4 open NBA spread rows that read `unknown_side` at 01:37Z now read `live_ahead`. An NCAAF h2h reads `live_tied 0.0 vs 0.0`.
+- **ALSO CLOSES be2c79e6's owed prop reading:** held NBA props seen mid-game on the fleet. Donovan Clingan threes over 0.5 and Tari Eason threes over 0.5 read `live_behind 0.0 vs 0.5`, as_of 02:16:08Z, then 02:41:57Z. The live box is `NBA_LIVE_BOX_CAPTURED ... live=5 final=7 players=272` at 02:41:57Z.
