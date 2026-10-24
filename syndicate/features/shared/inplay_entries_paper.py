@@ -25,8 +25,9 @@ GRADING, on the same thread: each would-be entry's leg mid at +60 s and +300 s
 market, its settled P&L for one contract.
 
 MODE (`SYNDICATE_INPLAY_ENTRIES_PAPER`): absent/on -> run; off/0/false/no -> off.
-Cost: one OddsAPI NHL spreads call per minute while an NHL game is live,
-regions us,eu,uk = 3 credits/call -> ~180 credits/h.
+Cost: one OddsAPI call per live sport every BOOKS_EVERY_S, markets x regions credits each:
+3 x 2 (us,eu) = 6 credits per 90 s = 240 credits/h per live sport (was 9 per 60 s = 540/h, before
+2026-10-24). 10-23 had ~1,270 live sport-minutes -> ~5.1k credits/night (was ~11.4k).
 """
 
 from __future__ import annotations
@@ -54,7 +55,15 @@ MID_STABLE_MAX_MOVE = 0.03
 # inplay_entries_live's own day budget. This is a SANITY cap on rows, not a stake budget: it bounds the
 # keyvalue doc (~0.6 KB per entry) and the open-ticker quotes each pass (10-23 booked 146 in total).
 DAY_BOOKINGS_CAP = 500
-BOOKS_EVERY_S = 60.0
+# OddsAPI THROTTLE  [user 2026-10-24 via coordinator 332cb014, "Throttle paper loop": halve its credits].
+# Was 9 credits (3 markets x us,eu,uk) every 60 s per live sport = 540/h; now 6 (us,eu) every 90 s =
+# 240/h, -56%. Why regions + interval rather than the interval alone (120 s): fresher books matter more
+# than deeper ones (Kalshi leads the books in play), and UK books add depth, not coverage. Measured on
+# 10-23's in-play books (1,087 polls): share of event x kind snapshots with >=3 books, all -> us,eu:
+# spreads 0.997 -> 0.997, totals 0.989 -> 0.983, h2h 0.984 -> 0.972. The refresh runs in the same pass
+# before `decide`, so poll age at decision stays < BOOKS_EVERY_S <= MAX_BOOK_POLL_AGE_S.
+BOOKS_EVERY_S = 90.0
+BOOK_REGIONS = "us,eu"
 ESPN_EVERY_S = 30.0
 MARKOUT_HORIZONS_S = (60, 300)
 # KALSHI PUBLIC RATE LIMIT IS SHARED with the live path (LivePrice at submit, the exit loops' quotes, the
@@ -366,7 +375,7 @@ class PaperEntryLoop:
         if not key:
             self.books[sport] = {}
             return
-        q = urllib.parse.urlencode({"apiKey": key, "regions": "us,eu,uk", "markets": ",".join(KINDS),
+        q = urllib.parse.urlencode({"apiKey": key, "regions": BOOK_REGIONS, "markets": ",".join(KINDS),
                                     "oddsFormat": "decimal"})
         rows = self.get_odds(f"{oddsapi_url(sport)}?{q}", sport) or []
         now_iso = _iso(t)

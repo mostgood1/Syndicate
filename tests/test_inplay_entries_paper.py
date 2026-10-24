@@ -361,3 +361,20 @@ def test_paper_row_sanity_cap(monkeypatch):
     for i in range(3):
         out2 = advance2(i)
     assert out2["booked"] == 1
+
+
+def test_oddsapi_throttle_halves_credits_and_keeps_polls_fresh(monkeypatch):
+    # user 2026-10-24 "Throttle paper loop": credits/h per live sport = markets x regions x polls/h.
+    credits_h = len(ip.KINDS) * len(ip.BOOK_REGIONS.split(",")) * 3600 / ip.BOOKS_EVERY_S
+    assert credits_h <= 0.5 * (3 * 3 * 60)  # was 540/h
+    assert ip.BOOKS_EVERY_S <= ip.MAX_BOOK_POLL_AGE_S  # a fresh poll always satisfies the age gate
+    monkeypatch.setenv("ODDS_API_KEY", "test-key-not-real")
+    urls: list = []
+    loop = ip.PaperEntryLoop(today_fn=lambda: "d", tickers_fn=lambda d, s="nhl": [],
+                             load=lambda: {"entries": {}}, persist=lambda d: None,
+                             get=lambda url: urls.append(url) or [])
+    loop.get_odds = lambda url, sport: urls.append(url) or []
+    for dt in (0, 30, 60, 89, 90, 120, 180):
+        loop._refresh_books("nba", T0 + dt)
+    assert len(urls) == 3  # T0, +90, +180
+    assert all("regions=us%2Ceu&" in u for u in urls)
