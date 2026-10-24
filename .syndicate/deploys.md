@@ -54123,3 +54123,24 @@ which is about the two sizing bases and not about the refusal boundary.
 - **B on the board (7:36 PM CT build, `index_written_at` 00:35:28Z):** rows per not-yet-started game HOU @ SAS 158, LAC @ LAL 156, MEM @ GSW 122, POR @ SAC 114, NOP @ UTA 104 (vs 11-15 each at 6:22 PM). **MET.**
 - **Tips:** chip live vs ESPN in progress -- NOP @ UTA 8:44:55 vs 8:44:55; HOU @ SAS 8:50:01 vs 8:46:57 (chips published 8:49:22); POR @ SAC + LAC @ LAL 9:12:35 vs 9:11:34; MEM @ GSW 9:15:42 vs 9:14:39. Every late game live within ~3 min of ESPN.
 - **A NOT EXERCISED:** the snapshot was last written 7:23:08 PM CT, 77 min before the 8:40 tips, so the existing 20-min staleness rule already sent every read to ESPN. A's branch (fresh snapshot calling a started game pregame) needs a snapshot written just before a tip. **Owed:** the next tip wave that follows a fresh snapshot -- watch `_payload_has_overdue_pregame` turning the read (a one-line log on that branch would make it readable; not built).
+
+## 2026-10-24 02:21:34Z -- FLEET ff be2c79e6 -> 5766e562 + FULL DOWN/UP: Polymarket spreads LIVE + Polymarket NBA/NHL join + in-game band and order fields + bet-status margin (holder `pm-spreads-ingame-band`, session 332cb014) -- **MET (env + restart); readings OWED by the three lanes**
+- **user (332cb014's chat):**
+  - "we need an NBA resolver for the portfolio endpoint", built as d9928700 (lane polymarket-nba-join); loan "Approve loan".
+  - Polymarket spreads "Build and turn on", built as 26a0c74d.
+  - In-game band "Yes, same band", built as 8cb85aea (contains the order-fields fix 2b7a29c4).
+  - The bet-status unknown_side display fix 5766e562 (lane nba-portfolio-live-prop-status) rides along.
+- **runtime diff be2c79e6..5766e562:** execute_portfolio (+121, the PM spread placer), inplay_entries_live/paper, polymarket_board_join (+133), team_aliases (+24), bet_status (+17), the intelligence blueprint (+1), portfolio.html.
+- **env:** 181 -> 182, +`LIVE_ODDS_WORKER__SYNDICATE_POLYMARKET_SPREAD_ORDERS=on`. Backup `.bak-pm-spreads-20261024T022134Z`.
+- **restart:**
+  - Gate >= 02:13:30Z; claims at 02:13:45Z.
+  - refresh-worker idle at 02:21:31Z (live-odds odds jobs accepted); reconcile clean.
+  - ff at 02:21:34Z; `down` 02:21:34-02:22:03Z; healthz 200 at 02:22:10Z.
+  - refresh-worker pid 523250, live-odds-worker 523251.
+  - Undrained; claims released.
+- **env read after up (live-odds-worker):** POLYMARKET_SPREAD_ORDERS=on, INPLAY_ENTRIES=on, LIVE_PRICE_BAND=0.40,0.75, EXECUTION_MODE=live, ARMED=1.
+- **owed:**
+  - polymarket-nba-join: segment_market_not_full_game ~5k and side/ambiguous ~0, plus the first POLYMARKET_YES_LEG signed_spread_slot agree=True. STOP on any spread_yes_leg_is_not_the_slug_first_leg.
+  - nba-portfolio-live-prop-status: unknown_side 142 -> ~0.
+  - in-game-trading: the first in-game outside_price_band, and new ingame: rows carrying teams/event_id/side.
+- **rollback:** remove the SPREAD_ORDERS line (spreads stop), then a full down/up; or revert the commits.
