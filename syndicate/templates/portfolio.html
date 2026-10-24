@@ -1237,7 +1237,7 @@
                   {# THE CURRENT NUMBER AGAINST THE LINE -- the thing a person
                      watching a slate is actually looking for. #}
                   {% if ls.get('current_value') is not none %}
-                    <span class="sub">{{ ls.get('current_value') }} vs {{ ls.get('line') }}{% if ls.get('as_of') %} · as of {{ ls.get('as_of')|central }} CT{% endif %}</span>
+                    <span class="sub">{% if ls.get('value_kind') == 'margin' %}margin {{ "%+g"|format(ls.get('current_value')) }} vs {{ "%+g"|format(ls.get('line')) }}{% else %}{{ ls.get('current_value') }} vs {{ ls.get('line') }}{% endif %}{% if ls.get('as_of') %} · as of {{ ls.get('as_of')|central }} CT{% endif %}</span>
                   {% elif ls.get('unavailable_reason') %}
                     {# NAMED, NOT BLANK. This feature raised UnboundLocalError
                        every cycle for months and nobody saw it, because an

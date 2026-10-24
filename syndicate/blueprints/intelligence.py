@@ -5142,6 +5142,7 @@ def _attach_open_bet_status(orders: list) -> list:
                 "margin": status.get("margin"),
                 "unavailable_reason": status.get("unavailable_reason"),
                 "as_of": status.get("as_of"),
+                "value_kind": status.get("value_kind"),
             }
         if mark:
             row["live_mark"] = {

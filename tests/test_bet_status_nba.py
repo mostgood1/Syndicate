@@ -140,13 +140,62 @@ def test_game_lines_read_team_scores_oriented_to_the_order(_isolated):
     _write_box(_isolated, [_game(away_score=77.0, home_score=47.0)])
     total = _status(_order(market="totals", side="over", line=230.5, player_name=None))
     assert total["current_value"] == 124.0 and total["status"] == "live_behind"
-    # A spread is restated by `game_line_view` (side over, value = the side's
-    # margin); settlement reads that restatement, the live column does not yet --
-    # a shared gap in `statuses_for_orders` for every sport, so assert the resolver.
-    from syndicate.features.shared.paper_settlement import _default_resolver
+    spread = _status(_order(market="spreads", side="Dallas Mavericks", line=-5.5, player_name=None))
+    assert spread["status"] == "live_ahead" and spread["current_value"] == 30.0 and spread["line"] == 5.5
+    assert spread["value_kind"] == "margin"
 
-    spread = _default_resolver(DATE)(_order(market="spreads", side="Dallas Mavericks", line=-5.5, player_name=None))
-    assert spread["current_value"] == 30.0 and spread["is_final"] is False
+
+# ---------------------------------------------------------------------------
+# The live column honours the resolver's restated side/line, as settlement does
+# ---------------------------------------------------------------------------
+
+# A REAL fleet ledger row (`/api/portfolio/live`, 2026-10-24 01:37Z), read as
+# `unknown_side` on the live column while settlement could grade it.
+_REAL_SPREAD_ROW = {
+    "sport": "nba", "market": "spreads_alt", "side": "home", "line": 3.5, "player_name": None,
+    "event_id": "0d34c898f6cbb990077ae9f0a2773513", "away_team": "New York Knicks",
+    "home_team": "Boston Celtics", "selected_date": "2026-10-23", "segment": "full",
+    "status": "filled", "venue": "kalshi", "mode": "live", "idempotency_key": "13a19205299eec095b02b271",
+}
+
+
+def _nyk_at_bos(away_score, home_score, state="in", final=False):
+    # Scores as the 00:31Z capture read them (NYK 54 @ BOS 60, 3rd quarter).
+    return _game(event_id="401909095", away="NYK", home="BOS", state=state, final=final,
+                 away_score=away_score, home_score=home_score, players=[])
+
+
+def test_real_spread_row_before_and_after(_isolated):
+    from syndicate.features.shared.bet_status import resolve_bet_status
+
+    _write_box(_isolated, [_nyk_at_bos(54.0, 60.0)])
+    # BEFORE: the order's own side reaches the grader, which has no direction for "home".
+    before = resolve_bet_status(market="spreads_alt", side="home", line=3.5, current_value=6.0)
+    assert before["unavailable_reason"] == "unknown_side"
+    # AFTER: Boston +3.5, up 6 -> margin +6 against -3.5 -> ahead, not yet decided.
+    after = _status(dict(_REAL_SPREAD_ROW))
+    assert after["unavailable_reason"] is None
+    assert (after["status"], after["current_value"], after["line"]) == ("live_ahead", 6.0, -3.5)
+    assert after["decided"] is False and after["value_kind"] == "margin"
+    assert after["side"] == "home"  # the row still records what was bet
+
+
+def test_real_spread_row_decides_only_at_final(_isolated):
+    _write_box(_isolated, [_nyk_at_bos(110.0, 104.0, state="post", final=True)])
+    row = _status(dict(_REAL_SPREAD_ROW))
+    assert row["status"] == "lost" and row["current_value"] == -6.0 and row["decided"] is True
+
+
+def test_moneyline_on_a_team_name(_isolated):
+    _write_box(_isolated, [_nyk_at_bos(54.0, 60.0)])
+    row = _status(dict(_REAL_SPREAD_ROW, market="h2h", side="New York Knicks", line=None))
+    assert row["status"] == "live_behind" and row["current_value"] == -6.0 and row["line"] == 0.0
+
+
+def test_a_prop_is_not_restated(_isolated):
+    _write_box(_isolated, [_game(players=[_player(blk=1)])])
+    row = _status(_order())
+    assert row["value_kind"] is None and row["side"] == "over" and row["line"] == 0.5
 
 
 def test_unmapped_market_is_permanent_and_checked_before_the_box(_isolated):

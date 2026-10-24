@@ -382,10 +382,19 @@ def statuses_for_orders(
             )
             continue
 
+        # THE RESOLVER MAY RESTATE `side` AND `line` -- the same rule
+        # `paper_settlement._our_verdict` applies. A spread arrives as
+        # `side="home", line=3.5`, a moneyline as `side="Boston Celtics"`;
+        # `game_line_bet` turns those into "margin over a number", and without
+        # this the live column read the raw team side and refused every one as
+        # `unknown_side` (fleet BET_STATUS 2026-10-24 01:34Z: 142) while
+        # settlement graded the same rows. Props never restate, so they are
+        # untouched.
+        restated = "side" in resolved or "line" in resolved
         status = resolve_bet_status(
             market=order.get("market"),
-            side=order.get("side"),
-            line=order.get("line"),
+            side=resolved.get("side", order.get("side")),
+            line=resolved.get("line", order.get("line")),
             current_value=resolved.get("current_value"),
             is_final=bool(resolved.get("is_final")),
             started=bool(resolved.get("started", True)),
@@ -412,6 +421,10 @@ def statuses_for_orders(
                 # is written minutes apart, and the page must not present a
                 # number from an old box as "now".
                 "as_of": resolved.get("as_of"),
+                # `current_value`/`line` are then the bet team's MARGIN and the
+                # margin it must beat, not the order's own number; the page
+                # labels them so "-2.0 vs -3.5" is not read as a score.
+                "value_kind": "margin" if restated else None,
             }
         )
 
