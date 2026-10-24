@@ -128,7 +128,7 @@ def main():
     ap.add_argument("--sports", default="nba,nhl,nfl,ncaaf")
     ap.add_argument("--root", default="C:/tmp")
     ap.add_argument("--repo", default=REPO)
-    ap.add_argument("--regions", default="us,eu,uk")
+    ap.add_argument("--regions", default="us,eu")  # user 2026-10-24 via coordinator 332cb014: "Yes, us,eu" (drop uk: 9 -> 6 credits/poll)
     ap.add_argument("--lead-minutes", type=float, default=30.0)
     ap.add_argument("--tail-minutes", type=float, default=30.0)
     ap.add_argument("--no-sync", action="store_true")

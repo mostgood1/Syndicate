@@ -14,10 +14,10 @@ It sends no order, reads no credential except ODDS_API_KEY, and writes only to
 --out. Every row carries its own UTC receive time. Analysis lives in
 scripts/inplay_edge_report.py.
 
-Cost: OddsAPI charges markets x regions = 3 x 3 = 9 credits per call (regions
-us,eu,uk). Books are polled for a sport only while ESPN shows one of its games
-in play (--books-when pre-or-in widens that), so a sport costs ~540 credits per
-LIVE hour, 0.011%/h of the 5M monthly cap.
+Cost: OddsAPI charges markets x regions = 3 x 2 = 6 credits per call (regions
+us,eu; the nightly passed us,eu,uk = 9 until 2026-10-24). Books are polled for a sport only while ESPN shows one of its games
+in play (--books-when pre-or-in widens that), so a sport costs ~360 credits per
+LIVE hour, 0.007%/h of the 5M monthly cap.
 
 Stop: --until is a hard cap. --stop-after-final-minutes N also stops N minutes
 after every ESPN game of the slate (ESPN `dates=<date>`) is final/postponed.
