@@ -52,7 +52,7 @@
       <div class="board-filter-group"><span class="board-filter-label">Opps</span><div class="board-tabs cards-tabs" id="board-suggested-tabs" role="tablist" aria-label="All or suggested opportunities"></div></div>
       <div class="board-filter-group"><span class="board-filter-label">State</span><div class="board-tabs cards-tabs" id="board-state-tabs" role="tablist" aria-label="Game state filter"></div></div>
       <div class="board-filter-group"><span class="board-filter-label">Market</span><div class="board-tabs cards-tabs" id="board-market-tabs" role="tablist" aria-label="Market family filter"></div></div>
-      <div class="board-filter-group"><span class="board-filter-label">Period</span><div class="board-tabs cards-tabs" id="board-period-tabs" role="tablist" aria-label="Full game or game intervals"></div></div>
+      <div class="board-filter-group board-filter-group--wide"><span class="board-filter-label">Period</span><div class="board-tabs cards-tabs board-tabs--wrap" id="board-period-tabs" role="tablist" aria-label="Full game, game intervals, or one specific interval"></div></div>
       <div class="board-filter-group"><span class="board-filter-label">Edge</span><div class="board-tabs cards-tabs" id="board-edge-tabs" role="tablist" aria-label="Minimum edge filter"></div></div>
       <div class="board-filter-group"><span class="board-filter-label">Lines</span><div class="board-tabs cards-tabs" id="board-alt-tabs" role="tablist" aria-label="Alternate line filter"></div></div>
       <div class="board-filter-group"><span class="board-filter-label">Show</span><div class="board-tabs cards-tabs" id="board-lane-tabs" role="tablist" aria-label="Board lane"></div></div>
@@ -234,12 +234,86 @@
   const FULL_GAME_SEGMENTS = new Set(["", "full", "full_game", "game", "fg"]);
   const SEGMENT_SUFFIX_RE = /_(?:1st_\d+_innings?|1st_inning|q[1-4]|h[12]|[12]h|p[1-3]|first_?\d+)$/;
 
-  function isIntervalRow(item) {
-    if (!item || typeof item !== "object") return false;
+  // SPECIFIC INTERVALS `[user 2026-10-24: "we need to add a selector for the
+  // specific game intervals"]`: the Period group also offers one tab per
+  // interval present on the board (`?period=first5`, `?period=q1`, ...).
+  //
+  // One canonical token per interval, because the two vocabularies spell the
+  // same slice differently -- `segment: "h1"` vs `h2h_1h` (and Kalshi's
+  // `_MARKET_SUFFIX_SEGMENT` maps to "1h"). Without folding them, "1st half"
+  // would appear as two tabs that each show half the rows.
+  const INTERVAL_ORDER = ["first1", "first3", "first5", "first7", "h1", "h2", "q1", "q2", "q3", "q4", "p1", "p2", "p3"];
+  const INTERVAL_LABELS = {
+    first1: "1st inning", first3: "1st 3 innings", first5: "1st 5 innings", first7: "1st 7 innings",
+    h1: "1st half", h2: "2nd half",
+    q1: "1st quarter", q2: "2nd quarter", q3: "3rd quarter", q4: "4th quarter",
+    p1: "1st period", p2: "2nd period", p3: "3rd period",
+  };
+
+  function canonicalInterval(token) {
+    const t = String(token || "").trim().toLowerCase().replace(/^_+/, "");
+    if (FULL_GAME_SEGMENTS.has(t)) return "";
+    let m = t.match(/^1st_(\d+)_innings?$/) || t.match(/^first_?(\d+)$/);
+    if (m) return `first${Number(m[1])}`;
+    if (t === "1st_inning") return "first1";
+    m = t.match(/^([12])h$/);
+    if (m) return `h${m[1]}`;
+    return t;
+  }
+
+  // "" = full game; otherwise the canonical interval token. An explicit
+  // `segment` wins over the market suffix, as in `segment_for_board_row`.
+  function intervalKey(item) {
+    if (!item || typeof item !== "object") return "";
     const segment = String(item.segment || "").trim().toLowerCase();
-    if (!FULL_GAME_SEGMENTS.has(segment)) return true;
+    if (!FULL_GAME_SEGMENTS.has(segment)) return canonicalInterval(segment);
     const market = String(item.market || item.market_key || "").trim().toLowerCase();
-    return SEGMENT_SUFFIX_RE.test(market);
+    const m = market.match(SEGMENT_SUFFIX_RE);
+    return m ? canonicalInterval(m[0]) : "";
+  }
+
+  function isIntervalRow(item) {
+    return intervalKey(item) !== "";
+  }
+
+  // An unknown token is shown, not swallowed (same rule as `_segment_label`).
+  function intervalLabel(key) {
+    return INTERVAL_LABELS[key] || String(key || "").toUpperCase();
+  }
+
+  function periodLabel(value) {
+    const fixed = PERIOD_TABS.find((tab) => tab.value === value);
+    return fixed ? fixed.label : intervalLabel(value);
+  }
+
+  // The fixed three, then one tab per interval actually present under every
+  // OTHER active filter (one pass, like betTypeTabs). The current selection is
+  // kept at zero so an emptied board still says why.
+  function periodTabs() {
+    const fixed = withCounts(PERIOD_TABS, (v) => ({ period: v }));
+    const counts = new Map();
+    for (const item of lastRenderItems) {
+      if (!matchesFilters(item) || !matchesLane(item)) continue;
+      if (!matchesClientFilters(item, { ignorePeriod: true })) continue;
+      const key = intervalKey(item);
+      if (key) counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    if (!PERIOD_TABS.some((tab) => tab.value === state.period) && !counts.has(state.period)) {
+      counts.set(state.period, 0);
+    }
+    const rank = (key) => { const i = INTERVAL_ORDER.indexOf(key); return i < 0 ? INTERVAL_ORDER.length : i; };
+    const intervals = [...counts.entries()]
+      .sort((a, b) => rank(a[0]) - rank(b[0]) || a[0].localeCompare(b[0]))
+      .map(([key, n]) => ({ value: key, label: intervalLabel(key), count: n }));
+    return [...fixed, ...intervals];
+  }
+
+  function matchesPeriod(item) {
+    if (state.period === "all") return true;
+    const key = intervalKey(item);
+    if (state.period === "full") return key === "";
+    if (state.period === "intervals") return key !== "";
+    return key === state.period;
   }
 
   // `item.suggested === true` only: a row built before the flag existed is NOT suggested.
@@ -552,8 +626,14 @@
     gameState: urlParams.get("game_state") || "all",
     marketFamily: urlParams.get("market_family") || "all",
     minEdge: Number(urlParams.get("min_edge") || 0) || 0,
-    // Full game vs game intervals (PERIOD_TABS). "all" by default.
-    period: ["full", "intervals"].includes(String(urlParams.get("period") || "")) ? urlParams.get("period") : "all",
+    // Full game vs game intervals (PERIOD_TABS), or one specific interval
+    // (canonical token, e.g. "first5" / "q1"). "all" by default.
+    period: (() => {
+      const raw = String(urlParams.get("period") || "").trim().toLowerCase();
+      if (raw === "full" || raw === "intervals") return raw;
+      const key = /^[a-z0-9_]{1,24}$/.test(raw) ? canonicalInterval(raw) : "";
+      return key || "all";
+    })(),
     // An explicit ?view= always wins. Otherwise the default is
     // viewport-dependent: the blotter is an 11-column table with a
     // min-width of 880px, which on a 390px phone is a 2.3x horizontal
@@ -898,7 +978,7 @@
       state.marketFamily = value;
       rerenderAfterFilter();
     });
-    renderTabs("board-period-tabs", withCounts(PERIOD_TABS, (v) => ({ period: v })), state.period, (value) => {
+    renderTabs("board-period-tabs", periodTabs(), state.period, (value) => {
       state.period = value;
       rerenderAfterFilter();
     });
@@ -951,7 +1031,7 @@
     if (state.game !== "all") out.push({ key: "game", text: "One game", open: { game: "all" } });
     if (state.gameState !== "all") out.push({ key: "state", text: label(STATE_TABS, state.gameState), open: { gameState: "all" } });
     if (state.marketFamily !== "all") out.push({ key: "market", text: label(MARKET_TABS, state.marketFamily), open: { marketFamily: "all" } });
-    if (state.period !== "all") out.push({ key: "period", text: label(PERIOD_TABS, state.period), open: { period: "all" } });
+    if (state.period !== "all") out.push({ key: "period", text: periodLabel(state.period), open: { period: "all" } });
     if (state.minEdge > 0) out.push({ key: "edge", text: label(EDGE_TABS, String(state.minEdge)), open: { minEdge: 0 } });
     if (state.altLines !== "all") out.push({ key: "alt", text: label(ALT_LINE_TABS, state.altLines), open: { altLines: "all" } });
     if (state.lane !== "all") out.push({ key: "lane", text: label(LANE_TABS, state.lane), open: { lane: "all" } });
@@ -1899,11 +1979,7 @@
     // "Steam moves only", which is the one view where they must never
     // disappear.
     if (state.minEdge > 0 && !isSteamCandidate(item) && edgeValue(item) * 100 < state.minEdge) return false;
-    if (state.period !== "all") {
-      const interval = isIntervalRow(item);
-      if (state.period === "full" && interval) return false;
-      if (state.period === "intervals" && !interval) return false;
-    }
+    if (!(options && options.ignorePeriod) && !matchesPeriod(item)) return false;
     if (state.steamOnly && !isSteamCandidate(item)) return false;
     if (state.suggestedOnly && item.suggested !== true) return false;
     if (state.altLines !== "all") {

@@ -76,9 +76,14 @@ class FiltersAllVisible(unittest.TestCase):
 
     def test_every_filter_group_carries_counts(self) -> None:
         for tab_id in ("board-day-tabs", "board-sport-tabs", "board-state-tabs", "board-market-tabs",
-                       "board-period-tabs", "board-edge-tabs", "board-lane-tabs", "board-alt-tabs",
+                       "board-edge-tabs", "board-lane-tabs", "board-alt-tabs",
                        "board-steam-tabs"):
             self.assertRegex(self.text, rf'renderTabs\("{tab_id}", withCounts\(', tab_id)
+        # Period adds one counted tab per specific interval (lane
+        # layer2-interval-selector), so it goes through periodTabs(), which
+        # counts the fixed three with withCounts and the intervals in one pass.
+        self.assertIn('renderTabs("board-period-tabs", periodTabs()', self.text)
+        self.assertIn("withCounts(PERIOD_TABS, (v) => ({ period: v }))", self.text)
 
     def test_hidden_rows_are_attributed_to_named_filters(self) -> None:
         # The default Opportunities and Main-lines filters hide rows; the results

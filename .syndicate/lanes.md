@@ -1416,7 +1416,7 @@ death, never life — do not invert it.
 
 ### layer2-interval-selector — OPEN — opened 2026-10-24 — session 4b29d941-3df8-4b0d-b2d0-f5ec0f49d3a3
 - Goal: Layer 2 board Period filter offers each specific game interval present on the board (1st half, Q1, 1st 5 innings, P2...) beside All / Full game / Game intervals; ?period=<segment> deep-links
-- Files: syndicate/templates/intelligence.html (PERIOD_TABS / isIntervalRow / state.period / period filter + its tab render ONLY), tests/test_layer2_period_interval_selector.py (NEW)
+- Files: syndicate/templates/intelligence.html (PERIOD_TABS / isIntervalRow / state.period / period filter + its tab render ONLY), tests/js/board_period_filter.test.mjs, tests/test_layer2_board_ui_redesign.py (`test_every_filter_group_carries_counts` ONLY)
 - Hypothesis: n/a
 - Falsification test: n/a
 - Verification: served board: picking an interval tab leaves only rows whose canonical segment equals it, count on the tab equals rows shown; existing period tests pass

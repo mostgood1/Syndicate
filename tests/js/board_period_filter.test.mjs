@@ -34,11 +34,20 @@ function extract(name) {
   throw new Error(`unbalanced ${name}`);
 }
 
-const isIntervalRow = (new Function(
+// PERIOD_TABS / INTERVAL_LABELS are multi-line literals: grabbed up to `];` / `};`.
+const lib = (new Function(
   `${grab(/const FULL_GAME_SEGMENTS = [^\n]+/, 'FULL_GAME_SEGMENTS')}\n`
   + `${grab(/const SEGMENT_SUFFIX_RE = [^\n]+/, 'SEGMENT_SUFFIX_RE')}\n`
-  + `${extract('isIntervalRow')}\nreturn isIntervalRow;`
+  + `${grab(/const PERIOD_TABS = \[[\s\S]*?\];/, 'PERIOD_TABS')}\n`
+  + `${grab(/const INTERVAL_ORDER = [^\n]+/, 'INTERVAL_ORDER')}\n`
+  + `${grab(/const INTERVAL_LABELS = \{[\s\S]*?\};/, 'INTERVAL_LABELS')}\n`
+  + `${extract('canonicalInterval')}\n${extract('intervalKey')}\n${extract('isIntervalRow')}\n`
+  + `${extract('intervalLabel')}\n${extract('periodLabel')}\n`
+  + `const state = { period: "all" };\n${extract('matchesPeriod')}\n`
+  + 'return { isIntervalRow, intervalKey, intervalLabel, periodLabel, canonicalInterval,'
+  + ' matchesPeriod: (item, period) => { state.period = period; return matchesPeriod(item); } };'
 ))();
+const { isIntervalRow, intervalKey, intervalLabel, periodLabel, canonicalInterval, matchesPeriod } = lib;
 
 let failures = 0;
 function eq(label, got, want) {
@@ -63,6 +72,39 @@ eq('suffix _p3 with no segment', isIntervalRow({ market: 'totals_p3' }), true);
 eq('an alt market is not an interval', isIntervalRow({ market: 'totals_alt' }), false);
 eq('a player prop is not an interval', isIntervalRow({ market: 'player_pass_tds', segment: 'full' }), false);
 eq('batter_hits is not an interval', isIntervalRow({ market: 'batter_hits' }), false);
+
+// SPECIFIC INTERVALS `[user 2026-10-24, lane layer2-interval-selector]`: one
+// canonical token per slice, whichever vocabulary the row used.
+eq('segment h1 -> h1', intervalKey({ segment: 'h1' }), 'h1');
+eq('suffix _1h folds into h1', intervalKey({ market: 'h2h_1h' }), 'h1');
+eq('segment "1h" folds into h1', intervalKey({ segment: '1h' }), 'h1');
+eq('suffix _h2 -> h2', intervalKey({ market: 'totals_h2' }), 'h2');
+eq('suffix _2h folds into h2', intervalKey({ market: 'spreads_2h' }), 'h2');
+eq('suffix _1st_5_innings -> first5', intervalKey({ market: 'totals_1st_5_innings' }), 'first5');
+eq('segment first5 -> first5', intervalKey({ segment: 'first5', market: 'totals' }), 'first5');
+eq('suffix _1st_1_innings -> first1', intervalKey({ market: 'h2h_1st_1_innings' }), 'first1');
+eq('suffix _1st_inning -> first1', intervalKey({ market: 'totals_1st_inning' }), 'first1');
+eq('suffix _q3 -> q3', intervalKey({ market: 'spreads_q3' }), 'q3');
+eq('suffix _p2 -> p2', intervalKey({ market: 'totals_p2' }), 'p2');
+eq('explicit segment wins over the market suffix', intervalKey({ segment: 'q2', market: 'totals_h1' }), 'q2');
+eq('full game is ""', intervalKey({ market: 'totals' }), '');
+eq('unknown segment kept, not swallowed', intervalKey({ segment: 'ot' }), 'ot');
+eq('label first5', intervalLabel('first5'), '1st 5 innings');
+eq('label q1', intervalLabel('q1'), '1st quarter');
+eq('label unknown is upper-cased', intervalLabel('ot'), 'OT');
+eq('periodLabel fixed tab', periodLabel('intervals'), 'Game intervals');
+eq('periodLabel interval', periodLabel('h2'), '2nd half');
+eq('URL ?period=1h canonicalises', canonicalInterval('1h'), 'h1');
+eq('URL ?period=full_game is full game', canonicalInterval('full_game'), '');
+eq('period h1 keeps a _1h suffix row', matchesPeriod({ market: 'h2h_1h' }, 'h1'), true);
+eq('period h1 keeps a segment h1 row', matchesPeriod({ segment: 'h1', market: 'totals' }, 'h1'), true);
+eq('period h1 drops a q1 row', matchesPeriod({ market: 'spreads_q1' }, 'h1'), false);
+eq('period h1 drops a full-game row', matchesPeriod({ market: 'totals' }, 'h1'), false);
+eq('period full keeps full game', matchesPeriod({ market: 'totals' }, 'full'), true);
+eq('period full drops an interval', matchesPeriod({ segment: 'first5' }, 'full'), false);
+eq('period intervals keeps any interval', matchesPeriod({ segment: 'p3' }, 'intervals'), true);
+eq('period all keeps everything', matchesPeriod({ segment: 'p3' }, 'all'), true);
+eq('a prop never matches an interval', matchesPeriod({ market: 'player_points', segment: 'full' }, 'q1'), false);
 
 console.log(failures ? `\n${failures} FAILED` : '\nALL PASS');
 process.exit(failures ? 1 : 0);
