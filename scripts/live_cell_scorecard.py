@@ -6,6 +6,9 @@ Read-only. Two steps:
     # 1. FLEET (inside WSL, fleet venv, refresh-worker state env, nice 19) -- writes only --out
     python scripts/live_cell_scorecard.py dump --out /mnt/c/tmp/lcs/ledger.json
 
+    # nightly (the `live-cell-scorecard` job in scripts/local_production.py; fleet env, renices itself to 19)
+    python scripts/live_cell_scorecard.py nightly   # -> $SYNDICATE_REPORTS_ROOT/intelligence/live_cell_scorecard/<date>.{json,md}
+
     # 2. anywhere
     py -3 scripts/live_cell_scorecard.py report --ledger C:/tmp/lcs/ledger.json [--since 2026-10-20] \
         [--until ...] [--out-json PATH] [--out-md PATH] [--min-n 5] [--reps 2000]
@@ -46,7 +49,7 @@ import random
 import re
 import sys
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
@@ -399,19 +402,108 @@ def markdown(report: Mapping[str, Any], min_n: int) -> str:
     return "\n".join(lines)
 
 
-def cmd_dump(args) -> int:
+def fleet_orders() -> list | None:
+    """`full_history_orders()`, or None when the live document did not read (#658)."""
     from syndicate.features.shared import execution_ledger
     from syndicate.features.shared.refresh_state_store import read_json_file_result
 
     ok = read_json_file_result(execution_ledger._ledger_path())[1]
-    print(f"live_document_read_ok={ok}")
+    print(f"live_document_read_ok={ok}", flush=True)
     if ok is not True:
-        print("REFUSED: the live ledger document did not read; a count now would be the archive alone (#658)")
+        print("REFUSED: the live ledger document did not read; a count now would be the archive alone (#658)", flush=True)
+        return None
+    return execution_ledger.full_history_orders()
+
+
+def cmd_dump(args) -> int:
+    orders = fleet_orders()
+    if orders is None:
         return 2
-    orders = execution_ledger.full_history_orders()
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     Path(args.out).write_text(json.dumps(orders, default=str), encoding="utf-8")
     print(f"rows {len(orders)} newest {max(str(o.get('submitted_at') or '') for o in orders)} -> {args.out}")
+    return 0
+
+
+# NIGHTLY: the `live-cell-scorecard` SCHEDULED_JOBS entry (scripts/local_production.py). Read-only on the
+# ledger; writes only <reports root>/intelligence/live_cell_scorecard/. The windows are fixed so nights compare.
+NIGHTLY_SUBDIR = Path("intelligence") / "live_cell_scorecard"
+NIGHTLY_WINDOWS = (("all", None), ("since_2026-10-20", "2026-10-20"), ("last_7d", 7))
+FLAG_SECTIONS = ("headline", "by_family", "cells")
+
+
+def flags_of(reports: Mapping[str, Mapping[str, Any]]) -> list[dict]:
+    """Every scored group whose CI90 excludes 0 (verdict EDGE or LOSES), per window -- the user's revisit list."""
+    out = []
+    for window, report in reports.items():
+        for section in FLAG_SECTIONS:
+            for s in report.get(section) or ():
+                if s.get("verdict") in ("EDGE", "LOSES"):
+                    key = "|".join(str(s[k]) for k in ("book", "venue", "sport", "family", "bucket", "phase") if k in s)
+                    out.append({"window": window, "section": section, "key": key, "verdict": s["verdict"],
+                                "n": s["n"], "games": s["games"], "roi_flat": s["roi_flat"], "ci90_flat": s["ci90_flat"]})
+    return out
+
+
+def flag_changes(today: list[dict], previous: list[dict] | None) -> dict[str, list[dict]]:
+    """Flags that appeared or cleared since the previous night (None = no previous night: all are new)."""
+    ident = lambda f: (f["window"], f["section"], f["key"], f["verdict"])
+    before = {ident(f) for f in previous or ()}
+    now = {ident(f) for f in today}
+    return {"new": [f for f in today if ident(f) not in before],
+            "cleared": [f for f in previous or () if ident(f) not in now]}
+
+
+def run_nightly(orders: list[Mapping[str, Any]], out_dir: Path, now: datetime, reps: int = 2000, min_n: int = 5) -> dict:
+    from datetime import timedelta
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    reports = {}
+    for name, since in NIGHTLY_WINDOWS:
+        if isinstance(since, int):
+            since = (now - timedelta(days=since)).strftime("%Y-%m-%dT%H:%M:%S")
+        reports[name] = build_report(orders, since, None, reps, min_n)
+    flags = flags_of(reports)
+    previous = None
+    earlier = sorted(p for p in out_dir.glob("20*.json") if p.stem < now.date().isoformat())
+    if earlier:
+        try:
+            previous = json.loads(earlier[-1].read_text(encoding="utf-8")).get("flags")
+        except (ValueError, OSError):
+            previous = None
+    summary = {"generated_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"), "flags": flags,
+               "flag_changes": flag_changes(flags, previous), "previous_file": earlier[-1].name if earlier else None,
+               "windows": reports}
+    stem = now.date().isoformat()
+    (out_dir / f"{stem}.json").write_text(json.dumps(summary, indent=1), encoding="utf-8")
+    md = [f"# Live cell scorecard {stem}", "", "## Flags (CI90 excludes 0)", ""]
+    md += [f"- {'NEW ' if f in summary['flag_changes']['new'] else ''}{f['verdict']} {f['window']} {f['key']}: "
+           f"{f['roi_flat']:+.1f}% {f['ci90_flat']} n {f['n']} games {f['games']}" for f in flags] or ["- none"]
+    md += [f"- CLEARED {f['verdict']} {f['window']} {f['key']}" for f in summary["flag_changes"]["cleared"]]
+    for name, report in reports.items():
+        md += ["", f"# window {name}", markdown(report, min_n)]
+    (out_dir / f"{stem}.md").write_text("\n".join(md), encoding="utf-8")
+    return summary
+
+
+def cmd_nightly(args) -> int:
+    import os
+
+    try:
+        os.nice(19)   # research job: the fleet shares the host with the live workers
+    except (AttributeError, OSError):
+        pass
+    orders = fleet_orders()
+    if orders is None:
+        return 2
+    root = Path(args.reports_root or os.environ.get("SYNDICATE_REPORTS_ROOT") or "reports")
+    now = datetime.now(timezone.utc)
+    summary = run_nightly(orders, root / NIGHTLY_SUBDIR, now, reps=args.reps)
+    changes = summary["flag_changes"]
+    print(f"LIVE_CELL_SCORECARD date={now.date().isoformat()} orders={len(orders)} flags={len(summary['flags'])} "
+          f"new={len(changes['new'])} cleared={len(changes['cleared'])} out={root / NIGHTLY_SUBDIR}", flush=True)
+    for f in changes["new"]:
+        print(f"  NEW_FLAG {f['verdict']} {f['window']} {f['key']} roi_flat={f['roi_flat']} ci90={f['ci90_flat']} n={f['n']}", flush=True)
     return 0
 
 
@@ -442,8 +534,11 @@ def main(argv: list[str] | None = None) -> int:
     rp.add_argument("--min-n", type=int, default=5)
     rp.add_argument("--out-json", default=None)
     rp.add_argument("--out-md", default=None)
+    nt = sub.add_parser("nightly", help="fleet: dump + all windows + flags -> <reports root>/intelligence/live_cell_scorecard/")
+    nt.add_argument("--reports-root", default=None, help="default: $SYNDICATE_REPORTS_ROOT")
+    nt.add_argument("--reps", type=int, default=2000)
     args = parser.parse_args(argv)
-    return cmd_dump(args) if args.cmd == "dump" else cmd_report(args)
+    return {"dump": cmd_dump, "report": cmd_report, "nightly": cmd_nightly}[args.cmd](args)
 
 
 if __name__ == "__main__":

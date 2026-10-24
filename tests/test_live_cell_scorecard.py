@@ -102,3 +102,46 @@ def test_report_reconciles_totals():
     head = report["headline"][0]
     assert (head["n"], head["staked"], head["pnl"]) == (12, 60.0, -3.0)
     assert report["weekly"][0]["week"] == "2026-W43"
+
+
+def _flagged_orders():
+    # 12 games, every bet loses: the live cell's CI90 sits wholly below 0
+    return [_order(event_id=f"e{i}", outcome="lost", pnl_dollars=-5.0) for i in range(12)]
+
+
+def test_nightly_writes_dated_files_and_flags_a_losing_cell(tmp_path):
+    from datetime import datetime, timezone
+
+    now = datetime(2026, 10, 25, 13, 30, tzinfo=timezone.utc)
+    summary = lcs.run_nightly(_flagged_orders(), tmp_path, now, reps=100)
+    assert (tmp_path / "2026-10-25.json").is_file() and (tmp_path / "2026-10-25.md").is_file()
+    assert set(summary["windows"]) == {"all", "since_2026-10-20", "last_7d"}
+    losing = [f for f in summary["flags"] if f["section"] == "headline" and f["window"] == "all"]
+    assert losing and losing[0]["verdict"] == "LOSES" and losing[0]["key"] == "live|kalshi|pregame"
+    assert summary["previous_file"] is None and summary["flag_changes"]["new"] == summary["flags"]
+
+
+def test_nightly_diffs_flags_against_the_previous_night(tmp_path):
+    from datetime import datetime, timezone
+
+    lcs.run_nightly(_flagged_orders(), tmp_path, datetime(2026, 10, 25, 13, 30, tzinfo=timezone.utc), reps=100)
+    mixed = [_order(event_id=f"e{i}", outcome="won" if i % 2 else "lost", pnl_dollars=5.0 if i % 2 else -5.0)
+             for i in range(12)]
+    summary = lcs.run_nightly(mixed, tmp_path, datetime(2026, 10, 26, 13, 30, tzinfo=timezone.utc), reps=100)
+    assert summary["previous_file"] == "2026-10-25.json"
+    assert summary["flag_changes"]["new"] == []
+    assert any(f["key"] == "live|kalshi|pregame" for f in summary["flag_changes"]["cleared"])
+
+
+def test_nightly_refuses_when_the_live_document_does_not_read(monkeypatch, tmp_path):
+    monkeypatch.setattr(lcs, "fleet_orders", lambda: None)
+    assert lcs.main(["nightly", "--reports-root", str(tmp_path)]) == 2
+    assert not any(tmp_path.rglob("*.json"))
+
+
+def test_the_scheduled_job_runs_the_nightly_subcommand():
+    from scripts import local_production as lp
+
+    job = {j.name: j for j in lp.SCHEDULED_JOBS}["live-cell-scorecard"]
+    assert job.argv == ("scripts/live_cell_scorecard.py", "nightly")
+    assert (job.hour, job.minute, job.weekday, job.every_minutes) == (13, 30, None, None)
