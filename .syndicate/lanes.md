@@ -2076,6 +2076,14 @@ death, never life — do not invert it.
 - Verification: unit tests (overdue snapshot -> ESPN; fresh live snapshot kept; no start field and unparseable status -> unchanged); on the fleet at the next tip wave the NBA chips read live within ~2 min of the ESPN state and LIVE_GAMELINE_JOIN sport=nba considered > 0 in the first board build after tip
 - Blocked by: none
 
+### polymarket-nba-join — OPEN — opened 2026-10-23 — session 85cc08af-c9c8-4880-b140-f07e6c824a2a
+- Goal: NBA board game-line rows (h2h/spreads/totals, full game) resolve to their Polymarket US markets in polymarket_board_join; NHL too if same defect; per-sport matched/refusals measured on the fleet board+slate before->after; reachability-tested (before != after); landed on origin/main; no deploy (coordinator 332cb014 restarts)
+- Files: syndicate/features/shared/polymarket_board_join.py, tests/test_polymarket_board_join_nba.py (NEW)
+- Hypothesis: NBA rows miss because of team tri-code aliasing / market-type mapping / outcome ordering never verified out of season
+- Falsification test: fleet replay shows NBA rows already match at a rate comparable to MLB, or misses are absent-from-slate
+- Verification: fleet replay of join over current board+slate: NBA matched before->after, refusals by reason
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
