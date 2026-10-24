@@ -308,7 +308,72 @@ starting armed. C is it with the trip rule only.
   everywhere, MVE parlays and Polymarket soccer h2h. Everything else stays live.
   - The remaining book is still -10% to -17% flat, so this cuts the bleed by perhaps a third.
 
+## s4b. USER DECISION 2026-10-24 (relayed by the coordinator 332cb014): "Keep everything live"
+
+Quoted from the coordinator's message: the user, *"shown your numbers and options A/B/C. Their
+answer: 'Keep everything live' (no change; keep trading to gather live data)."* **No cell moves to
+paper.** What this lane owes now:
+
+- the weekly scorecard (W44 next), with a flag on any cell whose CI90 turns significantly negative
+  or positive;
+- watching the maker shadow alongside session maker-orders-study;
+- the nightly job (s5);
+- the two leads below.
+
+## s4c. Leads
+
+**L1. Under market mode, a model-backed row skips the fair-noise penalty.** s3 has the detail.
+No change is proposed until a measurement shows that it costs money. The comparison owed is
+model-backed rows staked at the raw fair, against the same rows at `fair - 5/sqrt(books)`, on
+the live and paper books.
+
+**L2. The unsettled paper rows DO bias the scorecard, for NBA only.** Measured 2026-10-24 23:5xZ
+on the same ledger read.
+
+| NBA paper orders, by commence date (UTC) | settled |
+|---|---|
+| 10-04..10-14 (preseason) | 0 of 50 |
+| 10-20 | 0 of 19 |
+| 10-21 | 0 of 144 |
+| 10-22 | 0 of 249 |
+| 10-23 | 117 of 204 |
+| 10-24 | 194 of 255 |
+
+- Grading starts with the 10-22 US-evening slate, when `bet_status_nba` gave
+  `paper_settlement._default_resolver` an `nba` entry (notes: nba-portfolio-live-prop-status).
+- No NBA `live_player_box_<date>` file exists on the fleet disk for 10-20..10-22, and no
+  refresh-worker or live-odds-worker log line `NBA_LIVE_BOX_CAPTURED` exists either. **So
+  those orders will not grade on their own.**
+- Other sports: NCAAF paper is 13-21% stuck and soccer 20-54%; MLB, NFL and NCAAF totals are
+  4-9%.
+- **Consequence:** every paper and ladder NBA cell covers only games from 10-23 UTC. The first
+  ~2.5 nights of the NBA season, when live NBA spreads/props were placed, have NO paper twin.
+  Any paper-vs-live NBA comparison, and any future re-arm on an NBA paper record, rests on a
+  shorter window than the live one.
+- The scorecard prints the window per book (s0). It does not yet print the per-cell stuck
+  count; that is the planned addition.
+- **Fix, not this lane's:** backfill-grade the 10-20..10-22 NBA paper orders from final box
+  scores. `paper_settlement` is shared, so this was brought back to the coordinator.
+
 ## s5. Running it
+
+**NIGHTLY JOB (built 2026-10-24, NOT LIVE until the coordinator's restart).**
+
+- `ScheduledJob("live-cell-scorecard", 13, 30, ("scripts/live_cell_scorecard.py", "nightly"))`
+  in `scripts/local_production.py`. It runs with the refresh-worker env, like every job, and
+  renices itself to 19.
+- It writes `<SYNDICATE_REPORTS_ROOT>/intelligence/live_cell_scorecard/<date>.{json,md}`: three
+  windows (all, since 10-20, last 7 days), plus flags for every headline, sport x family and
+  full cell whose CI90 excludes 0, diffed against the previous night (`NEW_FLAG` / `CLEARED`).
+- It prints `LIVE_CELL_SCORECARD date=... flags=N new=N cleared=N`. rc 2 means the live
+  document did not read, and nothing was written.
+- **Measured on the fleet ledger 2026-10-24** (worktree code, fleet venv and env, scratch output
+  root): rc 0, 11.8 s wall, 188 MB max RSS, 15,177 orders, 31 flags.
+- 2 of the 31 flags are EDGE: paper NCAAF h2h 55-75c on Kalshi (+27% [+2, +49], n 14) and on
+  Polymarket (+31% [0, +57], n 12). With ~100 groups x 3 windows scored, about that many clear
+  a one-sided 5% bar by chance. **A flag is a reason to look again, not a result.**
+
+**On-demand dump, as before (WSL):**
 
 **Fleet dump (WSL):**
 

@@ -1039,6 +1039,12 @@ SCHEDULED_JOBS: tuple[ScheduledJob, ...] = (
     # involved (the app's scheduled-task timer never fired here: 0 automatic runs 10-20..10-22). 13:15Z: after the
     # worker's >= 12:00Z pass. rc 2 = the state is not today's. The watchdog checks the pass itself (min_ev_tuner_watch).
     ScheduledJob("min-ev-tuner-readout", 13, 15, ("scripts/min_ev_tuner_daily_readout.py",)),
+    # `live-cell-scorecard` (lane `live-cell-scorecard`, 2026-10-24; coordinator: read-only reporting, no user
+    # decision needed): the live + paper Kalshi/Polymarket cell scorecard with game-clustered CIs, three windows,
+    # and FLAGS for every cell whose CI90 excludes 0, diffed against the previous night. READ-ONLY on the ledger;
+    # writes only reports/intelligence/live_cell_scorecard/<date>.{json,md}. Renices itself to 19. rc 2 = the
+    # live ledger document did not read (#658), so no count was written. 13:30Z: after the night's settlement.
+    ScheduledJob("live-cell-scorecard", 13, 30, ("scripts/live_cell_scorecard.py", "nightly")),
 )
 
 
