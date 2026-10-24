@@ -1434,6 +1434,14 @@ death, never life — do not invert it.
 - Verification: scorecard runs on the fleet ledger and reproduces the coordinator's 10-24 headline totals within rounding
 - Blocked by: none
 
+### maker-vs-taker-shadow — OPEN — opened 2026-10-24 — session 78880f41-ba0e-410c-aaac-d6cbeb02b884
+- Goal: Shadow-only (no orders) counterfactual over every live Kalshi/Polymarket US fill: would a resting bid (join / one tick inside, rest limit, cancel at kickoff) have filled (conservative: venue prints trade THROUGH our price), and does maker beat taker per cell (venue x sport x family x price bucket x phase) on net P&L after fees, fill rate, CLV and adverse selection, out of sample, with game-clustered CIs and date coverage; recommendation (+ env-gated default-off go-live design only if maker wins OOS) taken to the coordinator as a user decision
+- Files: scripts/maker_vs_taker_shadow.py (NEW), tests/test_maker_vs_taker_shadow.py (NEW), .syndicate/findings_2026-10-24_maker_vs_taker_shadow.md (NEW)
+- Hypothesis: Research (044e2634) says makers beat takers on these venues; our live book is -18% as taker. H: on our own picks, a resting bid's fee saving + price improvement outweighs non-fill and adverse selection. Prior from findings_2026-10-19_kalshi_maker_entry_paper: filled bids won 5.37pp below the close (adverse).
+- Falsification test: Per cell, confirm-period (later dates) maker-minus-taker net P&L per position has a game-clustered 90% CI upper bound <= 0, or filled-subset taker P&L is worse than the unfilled subset (adverse selection eats the improvement)
+- Verification: Script runs on the fleet (nice 19) over the live execution ledger + Kalshi public prints/candles + recorded Polymarket quotes; findings file reports coverage, per-cell table and the OOS verdict; coordinator receives the decision
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
