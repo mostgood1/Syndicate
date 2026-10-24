@@ -1452,6 +1452,7 @@ death, never life — do not invert it.
 - Falsification test: n/a
 - Verification: findings file on origin/main; coordinator a21617bf messaged with summary and owed user decisions
 - Blocked by: none
+- **STATUS 2026-10-24 ~22:45Z — FINDINGS DELIVERED.** 13 methods graded with sources; Kalshi LIP read live (7,454 active programs, 0 on any game/spread/total series we trade). Top 3: (A) market-wide Kalshi sports price-bucket x maker/taker returns on public history; (B) fresh-Pinnacle edge-decile retrospective then paper cell; (C) late-game in-play cells pre-registered. Waiting on the user (via coordinator) for which to build; nothing built.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
