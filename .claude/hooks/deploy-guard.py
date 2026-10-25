@@ -352,6 +352,285 @@ def _script_file_deploy(cmd, bases):
     return None, ""
 
 
+def _script_texts(cmd, bases):
+    """[(path, contents)] of every readable script file the command runs."""
+    out = []
+    for raw in _script_paths(cmd):
+        path = _resolve_script(raw, bases)
+        if not path:
+            continue
+        try:
+            if os.path.getsize(path) > _SCRIPT_MAX_BYTES:
+                continue
+            with open(path, encoding="utf-8", errors="replace") as fh:
+                out.append((path, fh.read()))
+        except Exception:
+            continue
+    return out
+
+
+# FLEET DEPLOYS `[2026-10-25, lane deploy-guard-fleet; user: "make deploy-guard
+# require a claim + CLEAR fleet preflight for fleet ff / reload-web / role
+# restarts"]`.
+#
+# Render has been billing-suspended since 2026-09-30, so every check above
+# guards a production nobody deploys to, and the deploys that DO happen --
+# `git merge --ff-only <sha>` in the fleet checkout, `local_production.py
+# reload-web`, a `kill -TERM` the supervisor respawns -- matched nothing and ran
+# unchecked. They held the locks only by habit. `deploy_preflight.py` reads the
+# fleet since `0b93cbe8`, so the same two locks now apply:
+#
+#   ff of the fleet checkout  claim on ANY fleet service held by your lane + a
+#                             fresh CLEAR receipt for THAT exact SHA on one of
+#                             them. An ff loads nothing by itself, but it is the
+#                             step that chooses what every later reload and
+#                             respawn will run -- and a ref (`github/main`) is
+#                             refused: the tip can carry another lane's commits
+#                             (memory `feedback_ff_only_own_sha`).
+#   reload-web, HUP/TERM of gunicorn          -> web
+#   TERM/KILL of a worker role                -> that role
+#   `local_production.py down`, kill of the supervisor -> all three
+#
+# A kill of a NUMERIC pid is resolved against the fleet's process table: killing
+# your own job is not a deploy and stays allowed; a pid that cannot be resolved
+# is ignorance and is allowed (the fail-open rule). Path restores
+# (`git checkout -- <file>`) and a plain `git reset` (unstage) are not moves.
+FLEET_ROLES = ("web", "refresh-worker", "live-odds-worker")
+FLEET_CHECKOUT = re.compile(r"(?:~|\$HOME|\$\{HOME\}|/home/[^/\s'\"]+)/Syndicate(?![\w.-])")
+_GIT_GLOBAL_OPTS = r"(?:-C\s+\S+\s+|-c\s+\S+\s+|--[\w-]+(?:=\S+)?\s+)*"
+FLEET_GIT_MOVE = re.compile(
+    r"\bgit\s+" + _GIT_GLOBAL_OPTS + r"(merge|pull|reset|rebase|switch|checkout|cherry-pick|revert)(?![\w-])"
+    r"([^;&|\n'\"`)]*)", re.I)
+FLEET_RELOAD_WEB = re.compile(r"local_production\.py\b[^;&|\n]*\sreload-web\b")
+FLEET_DOWN = re.compile(r"local_production\.py\b[^;&|\n]*\sdown\b")
+FLEET_KILL = re.compile(r"(?:^|[|;&`(\s'\"])(kill|pkill|killall)\b([^;&|\n'\"`]*)")
+_SHA = re.compile(r"^[0-9a-f]{7,40}$", re.I)
+_ROLE_BY_NAME = (
+    ("run_live_odds_refresh_worker", ("live-odds-worker",)),
+    ("run_refresh_worker", ("refresh-worker",)),
+    ("gunicorn", ("web",)),
+    ("wsgi:application", ("web",)),
+    ("local_production", FLEET_ROLES),
+)
+
+
+def _roles_named(text):
+    found = []
+    for token, roles in _ROLE_BY_NAME:
+        if token in text:
+            found.extend(r for r in roles if r not in found)
+    return found
+
+
+def _fleet_ps(pids):
+    """{pid: args} on the fleet host, or None when it cannot be read (ignorance).
+
+    `SYNDICATE_FLEET_PS_FIXTURE` (a file of `pid args` lines) replaces `ps`, for tests.
+    """
+    fixture = os.environ.get("SYNDICATE_FLEET_PS_FIXTURE")
+    try:
+        if fixture:
+            with open(fixture, encoding="utf-8") as fh:
+                text = fh.read()
+        else:
+            command = ["ps", "-o", "pid=,args=", "-p", ",".join(pids)]
+            if os.name == "nt":
+                command = ["wsl", "--"] + command
+            proc = subprocess.run(command, capture_output=True, timeout=10)
+            text = proc.stdout.decode("utf-8", "replace")
+    except Exception:
+        return None
+    rows = {}
+    for line in text.splitlines():
+        parts = line.strip().split(None, 1)
+        if len(parts) == 2 and parts[0].isdigit():
+            rows[parts[0]] = parts[1]
+    return rows
+
+
+# QUOTED TEXT IS NOT A DEPLOY. The ledger quotes fleet commands verbatim
+# (deploys.md: "`git merge --ff-only 9260ea0b` at 18:56:50Z", "`local_production.py
+# reload-web` 2.6 s"), and so do commit messages and greps of it. A guard that
+# blocks the write recording a deploy is one people disable. So: heredoc and
+# PowerShell here-string BODIES are dropped unless an interpreter consumes them
+# (`bash -s <<EOF` executes; `cat >> deploys.md <<EOF` does not), and a match is
+# skipped when the words before it in its segment start with a text tool.
+_HEREDOC = re.compile(r"(?m)^([^\n]*?)<<-?\s*(['\"]?)(\w+)\2[^\n]*\n(.*?)\n[ \t]*\3[ \t]*$", re.S)
+_HERE_STRING = re.compile(r"@(['\"])\r?\n.*?\r?\n\1@", re.S)
+# Shells only: a heredoc fed to `py -` is PYTHON, and its string literals are not commands.
+_EXEC_FIRST = {"bash", "sh", "zsh", "wsl", "wsl.exe", "ssh"}
+_TEXT_FIRST = {"grep", "rg", "egrep", "sed", "awk", "cat", "echo", "printf", "head", "tail", "less",
+               "findstr", "select-string", "write-output", "write-host", "git", "gh", "tee"}
+
+
+def _first_word(text):
+    words = re.findall(r"[A-Za-z0-9_.:-]+", text)
+    return words[0].lower() if words else ""
+
+
+def _executed_text(cmd):
+    """`cmd` minus the quoted bodies that are data rather than commands."""
+    def heredoc(match):
+        if _first_word(match.group(1).rsplit("|", 1)[-1]) in _EXEC_FIRST:
+            return match.group(0)
+        return match.group(1) + "<<HEREDOC-DATA"
+    return _HERE_STRING.sub("@'HERE-STRING-DATA'@", _HEREDOC.sub(heredoc, cmd))
+
+
+def _is_text(cmd, pos):
+    """True when the match at `pos` is an argument of a text tool, not a command.
+
+    The segment starts after the last `;&|` or newline OUTSIDE quotes: `grep
+    'restart.*\\|kill.*refresh'` is one grep, not a grep and a kill (found by the
+    transcript sweep run before enabling this), while `wsl -- bash -lc 'cd
+    ~/Syndicate && git merge ...'` is one `wsl` segment whose quoted body runs.
+    """
+    start, quote, i = 0, "", 0
+    while i < pos:
+        ch = cmd[i]
+        if quote:
+            if ch == quote:
+                quote = ""
+            elif ch == "\\" and quote == '"':
+                i += 1
+        elif ch in "'\"":
+            quote = ch
+        elif ch in ";&|\n":
+            start = i + 1
+        i += 1
+    return _first_word(cmd[start:pos]) in _TEXT_FIRST
+
+
+_CD = re.compile(r"(?:^|[\s;&|('\"])(?:cd|--cd)\s+['\"]?([^\s'\";&|)]+)")
+_GIT_C = re.compile(r"\s-C\s+['\"]?([^\s'\";&|)]+)")
+
+
+def _git_dir(cmd, match):
+    """The directory a git command runs in: its own `-C`, else the nearest `cd` before it."""
+    own = _GIT_C.search(match.group(0))
+    if own:
+        return own.group(1)
+    cds = list(_CD.finditer(cmd, 0, match.start()))
+    return cds[-1].group(1) if cds else ""
+
+
+def _fleet_deploy(cmd):
+    """{"roles": [...], "ff": ref-or-None, "what": [...]} when `cmd` deploys to the fleet, else None."""
+    cmd = _executed_text(cmd)
+    roles, what, ff_ref = [], [], None
+
+    def add(names, label):
+        for name in names:
+            if name not in roles:
+                roles.append(name)
+        if label not in what:
+            what.append(label)
+
+    if FLEET_CHECKOUT.search(cmd):
+        for match in FLEET_GIT_MOVE.finditer(cmd):
+            # BOUND TO ITS DIRECTORY, not to the command: the sweep found ledger
+            # worktree ffs (`cd /c/tmp/ledger-1002 && git merge --ff-only
+            # origin/main`) sharing a command with a later `~/Syndicate` read.
+            if _is_text(cmd, match.start()) or not FLEET_CHECKOUT.search(_git_dir(cmd, match)):
+                continue
+            verb, rest = match.group(1).lower(), match.group(2)
+            tokens = rest.split()
+            if verb in ("checkout", "switch") and "--" in tokens:
+                continue                                   # a path restore, not a move
+            if verb == "reset" and not any(t in ("--hard", "--keep", "--merge") for t in tokens):
+                continue                                   # unstage, not a move
+            refs = [t for t in tokens if not t.startswith("-") and not re.search(r"[<>]", t)]
+            ff_ref = refs[-1] if refs else "<no ref>"
+            what.append("a move of the fleet checkout (`git %s %s`)" % (verb, ff_ref))
+            break
+    if any(not _is_text(cmd, m.start()) for m in FLEET_RELOAD_WEB.finditer(cmd)):
+        add(("web",), "`local_production.py reload-web`")
+    if any(not _is_text(cmd, m.start()) for m in FLEET_DOWN.finditer(cmd)):
+        add(FLEET_ROLES, "`local_production.py down`")
+    for match in FLEET_KILL.finditer(cmd):
+        if _is_text(cmd, match.start(1)):
+            continue
+        args = match.group(2)
+        if re.search(r"(?:^|\s)-(?:0|s\s*0)(?:\s|$)", args):
+            continue                                       # signal 0 only probes
+        # Names are read to the end of the SEGMENT, not of `args`: the target is
+        # often a substitution, `kill -HUP $(pgrep -f "gunicorn ..." | head -1)`,
+        # whose quote and pipe would otherwise hide the role.
+        segment = re.split(r"[;&\n]", cmd[match.start(2):], maxsplit=1)[0]
+        named = _roles_named(segment)
+        if named:
+            add(named, "a %s of a fleet role (%s)" % (match.group(1), ", ".join(named)))
+            continue
+        pids = [t for t in args.split() if t.isdigit()]
+        if not pids or (os.name == "nt" and "wsl" not in cmd):
+            continue                                       # a Windows pid is not the fleet
+        table = _fleet_ps(pids)
+        if not table:
+            continue                                       # cannot resolve: ignorance, allow
+        for pid in pids:
+            named = _roles_named(table.get(pid, ""))
+            if named:
+                add(named, "a %s of fleet pid %s (%s)" % (match.group(1), pid, ", ".join(named)))
+    if not roles and ff_ref is None:
+        return None
+    return {"roles": roles, "ff": ff_ref, "what": what}
+
+
+def _claim_problem(root, service, lane):
+    claim = _claim(root, service, lane)
+    if claim is None:
+        return "NOT HELD by anyone -- take it"
+    if claim.get("corrupt"):
+        return "file exists but does not parse (%s.json) -- re-acquire with --force" % claim.get("_alias")
+    if lane and str(claim.get("holder") or "") == lane:
+        return ""
+    return "held by %s for %.0f min -- not yours" % (
+        claim.get("holder") or "<unnamed>", claim.get("_age_min") or 0.0)
+
+
+def _check_fleet(root, lane, fleet):
+    """0 to allow, or the refusal's exit code. Same two locks as a Render deploy."""
+    kind = "a FLEET deploy: " + "; ".join(fleet["what"])
+    ff = fleet["ff"]
+    if ff is not None and not _SHA.match(ff):
+        sys.stderr.write(
+            "BLOCKED: this command is %s.\n"
+            "Move the fleet checkout to an EXACT SHA you have read, not `%s`: a ref's tip\n"
+            "can carry another lane's commits you never reviewed. Then take the locks:\n"
+            "  git merge --ff-only <sha>        # in ~/Syndicate, after git fetch\n"
+            % (kind, ff))
+        return 2
+    state, blocked = [], False
+    for service in fleet["roles"]:
+        claim_problem = _claim_problem(root, service, lane)
+        ok, why = _preflight(root, service, ff)
+        if claim_problem or not ok:
+            blocked = True
+        state.append((service, claim_problem, "" if ok else why))
+    if ff is not None and not fleet["roles"]:
+        # An ff alone: ONE fleet service of yours must vouch for this SHA.
+        rows = []
+        for service in FLEET_ROLES:
+            claim_problem = _claim_problem(root, service, lane)
+            ok, why = _preflight(root, service, ff)
+            if not claim_problem and ok:
+                rows = []
+                break
+            rows.append((service, claim_problem, "" if ok else why))
+        if rows:
+            blocked = True
+            kind += (" -- needs YOUR claim + a CLEAR preflight for %s on ANY ONE fleet service"
+                     " (web is the usual one for an ff + reload-web)" % ff[:8])
+            state = rows
+    if blocked:
+        return _refuse(kind, lane, state)
+    sys.stderr.write(
+        "DEPLOY GUARD: clear -- %s under `%s`.\n"
+        "Record the MEASUREMENT in .syndicate/deploys.md, then release the claim(s).\n"
+        % ("; ".join(fleet["what"]), lane))
+    return 0
+
+
 def _commits_agree(receipt_sha, deploy_sha):
     """True when the receipt vouches for the SHA actually being deployed.
 
@@ -574,6 +853,25 @@ def main():
     root = _root()
 
     script_path, script_text = None, ""
+    fleet = _fleet_deploy(cmd)
+    if fleet is None:
+        for _path, _text in _script_texts(cmd, [str(payload.get("cwd") or ""), root, os.getcwd()]):
+            fleet = _fleet_deploy(_text)
+            if fleet is not None:
+                fleet["what"].append("run from the script %s" % _path)
+                break
+    if fleet is not None:
+        session_id = re.sub(r"[^A-Za-z0-9._-]", "", str(payload.get("session_id") or ""))[:128]
+        grant = _grant(root, session_id)
+        if grant:
+            sys.stderr.write(
+                "BREAK-GLASS GRANT IN EFFECT for this session (service=%s; note: %s).\n"
+                "The claim/preflight locks were NOT checked for this FLEET deploy. Record\n"
+                "in .syndicate/deploys.md why it was needed.\n"
+                % (grant.get("service", "any"), grant.get("note", "no note recorded")))
+            return 0
+        return _check_fleet(root, _lane(root, session_id), fleet)
+
     if RENDER_DEPLOY_SCRIPT.search(cmd):
         kind, shape = "a Render deploy (the sanctioned entrypoint)", "deploy"
     elif DEPLOYS_ENDPOINT.search(cmd) and POST_INTENT.search(cmd):
