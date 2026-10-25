@@ -74,7 +74,7 @@ Edge sizes are per dollar staked unless stated. Capacity means for us: about $5-
 
 **The fact that reorders everything: our live book IS a sharp-anchoring strategy already.**
 - Live stakes use market mode: `model_probability = fair` (`portfolio_commit.py:800-806`, todo #704). The model's view is discarded and we buy wherever the venue price sits below the consensus fair by more than the fee.
-- The fair is Pinnacle-first when Pinnacle is present (`SYNDICATE_FAIR_ANCHOR=sharp_only`, deploy 4, 2026-09-09; `layer2_board.py:1140-1160`), otherwise the Shin-devigged median.
+- The fair is Pinnacle-first when Pinnacle is present (`SYNDICATE_FAIR_ANCHOR=sharp_only`, deploy 4, 2026-09-09; `layer2_board.py:1140-1160`), otherwise the Shin-devigged median. **CORRECTION 2026-10-24 (profit-program's count):** the fleet quote log holds NO Pinnacle quotes for NBA, NFL, soccer or WNBA (0 in 2.1M / 1.55M / 2.97M October quotes). Pinnacle is captured only for NCAAF (33k), NHL (28k) and MLB (13k). So outside those three sports the live fair is the books' consensus, not Pinnacle. Test B runs a Pinnacle arm on NCAAF/NHL/MLB and a fresh-consensus arm everywhere; the consensus arm is the design Kaunitz et al. actually tested.
 - That book is the one losing -11.8% on Kalshi pregame [-20, -4]. So "trade toward Pinnacle" is not a new idea for us; it is the thing to FIX.
 - **The literature says how it fails:**
   - a small edge over consensus is not profit (Whelan's 9th decile: +5% CLV, +0.2% profit);
