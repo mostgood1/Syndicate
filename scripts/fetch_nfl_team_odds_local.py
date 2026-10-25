@@ -14,6 +14,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from syndicate.features.shared.oddsapi_quota import record_oddsapi_quota
+from syndicate.features.shared.odds_regions import sport_game_line_regions
 
 
 
@@ -164,7 +165,8 @@ def fetch_odds(
         f"{get_base_url()}/sports/{sport_key}/odds",
         params={
             "apiKey": api_key,
-            "regions": region,
+            # `SYNDICATE_NFL_GAME_LINE_REGIONS` (e.g. `eu` = Pinnacle) widens; unset = `region` as before.
+            "regions": sport_game_line_regions("nfl", region),
             "markets": markets,
             "oddsFormat": odds_format,
         },

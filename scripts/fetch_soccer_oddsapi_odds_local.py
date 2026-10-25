@@ -106,6 +106,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from syndicate.features.shared.oddsapi_quota import record_oddsapi_quota
+from syndicate.features.shared.odds_regions import sport_game_line_regions
 
 
 # Kept as an independent copy rather than imported from
@@ -262,7 +263,9 @@ def fetch_game_odds(api_key: str, *, sport_key: str, region: str, markets: list[
     url = f"{_get_base_url()}/sports/{sport_key}/odds"
     response = requests.get(
         url,
-        params={"apiKey": api_key, "regions": region, "markets": ",".join(markets), "oddsFormat": "american"},
+        # `SYNDICATE_SOCCER_GAME_LINE_REGIONS` (e.g. `eu` = Pinnacle) widens; unset = `region` as before.
+        params={"apiKey": api_key, "regions": sport_game_line_regions("soccer", region), "markets": ",".join(markets),
+                "oddsFormat": "american"},
         timeout=20,
     )
     # response.url, not url: the markets= the attribution buckets read live in

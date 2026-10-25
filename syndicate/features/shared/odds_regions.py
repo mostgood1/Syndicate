@@ -151,6 +151,16 @@ PROP_BOOKMAKERS = {
     for sport in ("nfl", "ncaaf", "mlb", "nba")
 }       # NBA (2026-10-16, before its props start 10-20): its props ask plain `us` -- WNBA, which widens to the `us_ex`
         # exchanges through `wnba_regions`, gets no list, so ProphetX / Novig there are untouched.
+# NBA TAKES PINNACLE IN BETONLINE'S SLOT (lane live-cell-scorecard, user 2026-10-25 "Add it now" via the coordinator:
+# "Include Pinnacle for NBA/NFL/soccer/WNBA in the odds fetch"). NBA's game lines -- h2h, spreads, totals and the alt
+# ladders -- ride this per-event call, so this list is the ONLY place NBA can see Pinnacle, and the fleet's NBA quote
+# log held 0 Pinnacle quotes in 2.1M (October). An 11th book would bill a second region on every NBA event and market;
+# a swap costs nothing. Measured 10-20..10-24 (fleet NBA book_quotes): betonlineag was 1.3% of NBA quotes and the ONLY
+# sportsbook on 0-45 lines a day out of 5.5k-29k (~0.15%). Whether Pinnacle prices NBA PROPS through OddsAPI is
+# unmeasured; its game lines are the point.
+PROP_BOOKMAKERS["nba"] = (
+    "draftkings,fanduel,betmgm,williamhill_us,betrivers,fanatics,bovada,pinnacle,espnbet,hardrockbet"
+)
 # SOCCER (lane soccer-uefa-competitions, at props-book-coverage's invitation, 2026-10-16). NOT the shared list: soccer's
 # prop call has returned 8 books since 10-01 (fleet props shards, 573,710 rows), and MyBookie is 7.9% of them -- the
 # shared list would drop it. So: all 8 seen, plus the two `us2` books an EPL probe showed adding coverage (ballybet,
@@ -174,6 +184,21 @@ def prop_bookmakers(sport: str, *, env: "dict[str, str] | None" = None) -> "str 
     raw = environ.get(PROP_BOOKMAKERS_ENV_TEMPLATE.format(sport=key.upper()))
     value = PROP_BOOKMAKERS.get(key) if raw is None else raw
     return str(value or "").strip() or None
+
+
+#: PER-SPORT GAME-LINE REGIONS (lane live-cell-scorecard, 2026-10-25, user "Add it now" via the coordinator).
+#: `GAME_LINE_REGIONS_ENV` has two readers, MLB and NCAAF, and is `eu,us_ex` on the fleet -- which is why those two
+#: sports' quote logs carry Pinnacle and NFL's and soccer's (whose game-line calls read `ODDS_API_REGION`, unset ->
+#: `us`) carry none. A per-sport knob rather than a third and fourth reader of the shared one, because the cost is
+#: per sport: game-line calls bill per REQUEST, markets x regions, so `eu` adds 3 credits per call, and soccer makes
+#: ~4x NFL's calls (one per league per launch). Unset is exactly today's behaviour.
+GAME_LINE_REGIONS_SPORT_ENV_TEMPLATE = "SYNDICATE_{sport}_GAME_LINE_REGIONS"
+
+
+def sport_game_line_regions(sport: str, regions: str, *, env: "dict[str, str] | None" = None) -> str:
+    """`regions` widened by `SYNDICATE_<SPORT>_GAME_LINE_REGIONS`. Never narrowed; unset = unchanged."""
+    return widened_regions(regions, GAME_LINE_REGIONS_SPORT_ENV_TEMPLATE.format(sport=str(sport or "").strip().upper()),
+                           env=env)
 
 
 def game_line_regions(regions: str, *, env: "dict[str, str] | None" = None) -> str:
