@@ -946,9 +946,22 @@ def _pool_key(key: Sequence[Any]) -> str:
 
 
 def sticky_groups(prior: Mapping[str, Any] | None, day: str) -> set[tuple]:
-    """(event, player, market) groups a build on `day` already put on `day`'s sheet."""
+    """(event, player, market) groups a build on `day` already put on `day`'s sheet AND that a featured section of
+    that sheet showed. Measured 10-24 keeping every group built earlier: the pool only grew through the day (NHL 30 ->
+    67 groups, NBA 150 -> 216) and the builds with it (NHL 148 -> 273 s, NBA 184 -> 463 s), mostly for groups no
+    section ever showed. What a reader could have seen is what must not move; the rest re-ranks as before."""
     pool = (prior or {}).get("pool") or {}
-    return {tuple(e["key"]) for e in pool.values() if e.get("built_on") == day and len(e.get("key") or ()) == 3}
+    built = {tuple(e["key"]) for e in pool.values() if e.get("built_on") == day and len(e.get("key") or ()) == 3}
+    rows = (prior or {}).get("rows") or []
+    shown: set[tuple] = set()
+    for key, ids in ((prior or {}).get("sections") or {}).items():
+        if key == "every_prop":
+            continue
+        for i in ids or []:
+            if isinstance(i, int) and 0 <= i < len(rows):
+                r = rows[i]
+                shown.add((r.get("event_id"), r.get("player"), r.get("market")))
+    return built & shown
 
 
 def pool_record(sheet: Mapping[str, Any], prior: Mapping[str, Any] | None, *, today: str, at: str) -> dict[str, Any]:

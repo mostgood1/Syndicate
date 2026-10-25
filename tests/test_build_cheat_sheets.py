@@ -802,7 +802,11 @@ def test_a_group_built_earlier_today_stays_on_the_sheet_and_a_preview_does_not_h
     assert pool["g1|Batherson|SOG"]["built_on"] == day and pool["g1|Batherson|SOG"]["first_rank"] == 1
 
     moved = _nhl_board({"Batherson": 1.0, "Stutzle": 6.0})                 # prices moved: Stutzle ranks first now
-    kept = m.build_sport("nhl", moved, selected_date=day, cap=1, dvp={}, sticky=m.sticky_groups({"pool": pool}, day))
+    # Only a group a featured section SHOWED is kept (10-24: keeping every built group took NBA builds 184 -> 463 s).
+    assert m.sticky_groups(dict(first, pool=pool, sections={"consistency": []}), day) == set()
+    shown = dict(first, pool=pool, sections={"consistency": [0], "every_prop": [0, 1]})
+    assert m.sticky_groups(dict(shown, sections={"every_prop": [0, 1]}), day) == set()   # "every prop" is not featured
+    kept = m.build_sport("nhl", moved, selected_date=day, cap=1, dvp={}, sticky=m.sticky_groups(shown, day))
     by_player = {r["player"]: r["pool"] for r in kept["rows"]}
     assert set(by_player) == {"Batherson", "Stutzle"} and kept["groups_sticky"] == 1
     assert by_player["Stutzle"] == {"rank": 1, "of": 2, "cap": 1, "sticky": False}
