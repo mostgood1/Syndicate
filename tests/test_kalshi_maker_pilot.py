@@ -168,6 +168,32 @@ def test_the_ledger_row_carries_the_tag():
     assert row2["execution_style"] is None
 
 
+def test_a_position_already_held_as_taker_is_neither_routed_nor_logged(capsys):
+    req = _req()
+    taker_row = {**_pilot_row(req, "filled"), "execution_style": None}
+    assert mp.refusal(req, now=NOW, orders=[taker_row], enabled_fn=_on) == "held_as_taker"
+    assert _route(req, orders=[taker_row]) is None
+    assert "MAKER_PILOT" not in capsys.readouterr().out
+    rejected_taker = {**_pilot_row(req, "rejected"), "execution_style": None}
+    assert _route(req, orders=[rejected_taker]) is not None      # a never-sent taker retry may be posted
+
+
+def test_fill_line_names_the_role_from_the_venue_split():
+    base = {"execution_style": "maker_pilot", "idempotency_key": "k", "ticker": TICKER, "from": "submitted", "to": "filled"}
+    assert "filled_as=maker" in mp.reconcile_line({**base, "maker_fill_cost_dollars": 2.25, "taker_fill_cost_dollars": 0.0})
+    assert "filled_as=TAKER" in mp.reconcile_line({**base, "maker_fill_cost_dollars": 0.0, "taker_fill_cost_dollars": 2.3})
+    assert "filled_as=unknown" in mp.reconcile_line(base)
+
+
+def test_venue_view_carries_the_maker_taker_split():
+    from syndicate.features.shared.kalshi_orders import venue_order_view
+
+    view = venue_order_view({"order_id": "o", "status": "executed", "fill_count_fp": "11.00",
+                             "maker_fill_cost_dollars": "4.950000", "taker_fill_cost_dollars": "0.000000",
+                             "maker_fees_dollars": "0.000000", "taker_fees_dollars": "0.000000"})
+    assert view["maker_fill_cost_dollars"] == 4.95 and view["taker_fill_cost_dollars"] == 0.0
+
+
 def test_reconcile_lines():
     base = {"execution_style": "maker_pilot", "idempotency_key": "k", "ticker": TICKER, "from": "submitted"}
     assert "MAKER_PILOT FILL" in mp.reconcile_line({**base, "to": "filled"})

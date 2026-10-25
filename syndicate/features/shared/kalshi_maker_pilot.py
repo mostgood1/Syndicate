@@ -146,6 +146,15 @@ def held_by_pilot(request: Any, orders: Sequence[Mapping[str, Any]]) -> bool:
                for row in orders)
 
 
+def held_as_taker(request: Any, orders: Sequence[Mapping[str, Any]]) -> bool:
+    """The ledger already holds this position from a TAKER entry (resting or filled): the executor's
+    own duplicate check will place nothing, so the pilot neither routes nor logs it. Measured on the
+    fleet 2026-10-25 15:23Z: PUR@PSU, filled as taker before the pilot shipped, logged
+    `ROUTE routed=1` every pass and then `duplicates=1`."""
+    key = _key(request)
+    return any(row.get("idempotency_key") == key and row.get("status") in _SPENDING for row in orders)
+
+
 def _spent_with_routes(orders: Sequence[Mapping[str, Any]], day: str) -> float:
     seen = {row.get("idempotency_key") for row in orders if row.get("execution_style") == EXECUTION_STYLE}
     extra = sum(stake for key, d, stake in _routed_here if d == day and key not in seen)
@@ -231,6 +240,8 @@ def maker_submitter(price_for: Callable[[Any], float | None] = maker_price):
 
 
 HELD = "maker_pilot_held"
+TAKER_HELD = "held_as_taker"
+_QUIET = {"pilot_off", TAKER_HELD}
 
 
 @dataclasses.dataclass(frozen=True)
@@ -276,6 +287,8 @@ def refusal(request: Any, *, now: _dt.datetime | None = None,
     book = _ledger_orders() if orders is None else orders
     if held_by_pilot(request, book):
         return HELD
+    if held_as_taker(request, book):
+        return TAKER_HELD
     day = _central_day(moment.isoformat()) or central_today_iso()
     spent = _spent_with_routes(book, day)
     if spent + order_dollars() > day_budget_dollars() + 1e-9:
@@ -292,7 +305,7 @@ def route(request: Any, *, now: _dt.datetime | None = None,
     if why == HELD:
         return Routed(request=request, submitter=None, skip=HELD)
     if why is not None:
-        if why != "pilot_off":
+        if why not in _QUIET:
             print(f"[kalshi_maker_pilot] MAKER_PILOT ROUTE routed=0 reason={why}"
                   f" ticker={getattr(request, 'venue_ticker', None)}", flush=True)
         return None
@@ -317,6 +330,11 @@ def reconcile_line(row: Mapping[str, Any]) -> str | None:
         kind = "EXPIRE"
     else:
         return None
+    maker_cost, taker_cost = row.get("maker_fill_cost_dollars"), row.get("taker_fill_cost_dollars")
+    role = ("maker" if (maker_cost or 0) > 0 and not (taker_cost or 0) > 0 else
+            "TAKER" if (taker_cost or 0) > 0 and not (maker_cost or 0) > 0 else
+            "mixed" if (maker_cost or 0) > 0 else "unknown")
     return (f"[kalshi_maker_pilot] MAKER_PILOT {kind} key={row.get('idempotency_key')} ticker={row.get('ticker')}"
             f" {row.get('from')}->{to} venue_status={row.get('venue_status')!r}"
+            f" filled_as={role if kind == 'FILL' else '-'} maker_cost={maker_cost} taker_cost={taker_cost}"
             f" contracts={row.get('contracts')} fill_price={row.get('fill_price')} fees={row.get('fees_dollars')}")

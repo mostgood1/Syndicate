@@ -3423,6 +3423,8 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
                 "fill_price": order.get("fill_price"),
                 "fees_dollars": order.get("fees_dollars"),
                 "execution_style": order.get("execution_style"),
+                "maker_fill_cost_dollars": seen.get("maker_fill_cost_dollars"),
+                "taker_fill_cost_dollars": seen.get("taker_fill_cost_dollars"),
             }
         )
 

@@ -1615,6 +1615,12 @@ def venue_order_view(order: Mapping[str, Any]) -> dict[str, Any]:
         "order_id": order.get("order_id") or order.get("id"),
         "client_order_id": order.get("client_order_id"),
         "ticker": order.get("ticker"),
+        # WHO WE WERE ON THE FILL, in the venue's own words [lane kalshi-maker-pilot]:
+        # the maker pilot's FILL line reads these to say whether a post filled as maker.
+        "maker_fill_cost_dollars": _float_or_none(order.get("maker_fill_cost_dollars")),
+        "taker_fill_cost_dollars": _float_or_none(order.get("taker_fill_cost_dollars")),
+        "maker_fees_dollars": _float_or_none(order.get("maker_fees_dollars")),
+        "taker_fees_dollars": _float_or_none(order.get("taker_fees_dollars")),
     }
 
 
