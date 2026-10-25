@@ -146,6 +146,11 @@ def lower_priority() -> str:
     if os.name == "nt":
         import ctypes
         k = ctypes.windll.kernel32
+        # The pseudo-handle is (HANDLE)-1; with ctypes' default c_int it is passed truncated
+        # and SetPriorityClass fails silently (measured: ok=False, class=0x0 on the first run).
+        k.GetCurrentProcess.restype = ctypes.c_void_p
+        k.SetPriorityClass.argtypes = (ctypes.c_void_p, ctypes.c_uint32)
+        k.GetPriorityClass.argtypes = (ctypes.c_void_p,)
         h = k.GetCurrentProcess()
         ok = k.SetPriorityClass(h, 0x40)  # IDLE_PRIORITY_CLASS
         return f"SetPriorityClass ok={bool(ok)} class=0x{k.GetPriorityClass(h):x}"
