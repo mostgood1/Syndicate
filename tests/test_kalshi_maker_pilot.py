@@ -259,3 +259,32 @@ def test_executor_on_posts_instead_of_taking_then_holds(monkeypatch):
     mp._cache.update(at=None, orders=[])
     again = runner.run_execution("2026-08-22", venue_scope="kalshi")
     assert len(maker) == 1 and not taker
+
+
+# --------------------------------------------------------------------- the stale-cancel pass must not kill a post
+
+def test_stale_cancel_leaves_a_pilot_post_and_still_cancels_a_stale_taker(monkeypatch):
+    """Measured 2026-10-25 16:29:44Z: the first pilot post (resting 0.46, market 0.47, age 2759 s) was
+    cancelled as stale six days before kickoff. A pilot post rests below the ask by construction."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    cancels = []
+    monkeypatch.setattr(mod, "_market_price_for_side", lambda ticker, side: 0.47)
+    monkeypatch.setattr("syndicate.features.shared.kalshi_orders.cancel_order",
+                        lambda order_id: (cancels.append(order_id) or {"status": "ok", "order": {}}))
+    base = {"ticker": TICKER, "side": "over", "yes_price": 0.46, "no_price": 0.54,
+            "submitted_at": "2020-01-01T00:00:00Z"}
+    pilot = {**base, "idempotency_key": "p", "order_id": "ord-pilot", "execution_style": "maker_pilot"}
+    taker = {**base, "idempotency_key": "t", "order_id": "ord-taker", "execution_style": None}
+    result = mod.cancel_stale_resting_orders([pilot, taker])
+    assert cancels == ["ord-taker"]
+    assert result["maker_pilot"] == 1 and result["cancelled"] == 1
+
+
+def test_the_resting_row_carries_the_style_from_the_ledger():
+    import inspect
+    from syndicate.features.shared import execution_ledger as mod
+
+    src = inspect.getsource(mod.reconcile_live_orders)
+    block = src[src.index("resting.append("):src.index("after = STATUS_SUBMITTED", src.index("resting.append("))]
+    assert '"execution_style": order.get("execution_style")' in block

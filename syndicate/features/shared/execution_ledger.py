@@ -3350,6 +3350,9 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
                     "submitted_at": order.get("submitted_at"),
                     # For the kickoff cancel in `cancel_stale_resting_orders`.
                     "commence_time": order.get("commence_time"),
+                    # A maker-pilot post is MEANT to rest below the ask; the stale
+                    # pass must not read that as a dead price [lane kalshi-maker-pilot].
+                    "execution_style": order.get("execution_style"),
                 }
             )
             after = STATUS_SUBMITTED
@@ -3845,8 +3848,17 @@ def cancel_stale_resting_orders(resting: Sequence[Mapping[str, Any]]) -> dict[st
     at_market = 0
     unreadable = 0
     failed = 0
+    maker_pilot = 0
 
     for row in resting:
+        # THE MAKER PILOT RESTS BELOW THE ASK ON PURPOSE [2026-10-24 user decision
+        # "C: Small live pilot", lane kalshi-maker-pilot]. Its lifetime is the venue
+        # expiry at commence plus the kickoff cancel, never this pass. Measured
+        # 2026-10-25 16:29:44Z: the first pilot post (resting 0.46, market 0.47,
+        # age 2759 s) was cancelled here as stale six days before its kickoff.
+        if row.get("execution_style") == "maker_pilot":
+            maker_pilot += 1
+            continue
         if len(cancelled) >= limit:
             print(
                 f"[execution_ledger] CANCEL_CAPPED limit={limit}"
@@ -3912,7 +3924,7 @@ def cancel_stale_resting_orders(resting: Sequence[Mapping[str, Any]]) -> dict[st
         print(
             f"[execution_ledger] CANCEL_PASS resting={len(resting)}"
             f" cancelled={len(cancelled)} failed={failed} unreadable={unreadable}"
-            f" too_young={too_young} at_market={at_market}",
+            f" too_young={too_young} at_market={at_market} maker_pilot={maker_pilot}",
             flush=True,
         )
     return {
@@ -3922,6 +3934,7 @@ def cancel_stale_resting_orders(resting: Sequence[Mapping[str, Any]]) -> dict[st
         "unreadable": unreadable,
         "too_young": too_young,
         "at_market": at_market,
+        "maker_pilot": maker_pilot,
         "orders": cancelled,
     }
 
