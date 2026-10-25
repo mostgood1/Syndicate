@@ -437,3 +437,24 @@ fixes my exact reading of that design. Nothing below changes after the first run
   - C2 tail flag: any single game's loss > 10x the cell's mean gain within the first 60 games, ordered by game date. Reported, not decided on.
 - **Fewer than 60 games:** the verdict is INSUFFICIENT; keep accruing. The study joins the nightly task, so it accrues until 2026-12-31 (calendar stop).
 - **If C1 GOes:** the proposed exit rule ("sell a held leg under 25c inside W at the bid") goes to the coordinator as a user decision, with its measured per-game value. Nothing ships without that decision.
+
+## 12. Test C RESULT, first read (2026-10-25T00:00Z; 9fc09183 scripts/inplay_late_cells.py, rules from section 11)
+
+Nights 10-20, 10-22, 10-23, 10-24. The 10-24 night was read mid-slate, so only its settled games count. 69 games pooled (NCAAF 29, NHL 25, NBA 14, NFL 1). Per-game means, game-clustered bootstrap 95% CI:
+
+| cell | games | mean / game | 95% CI | verdict |
+|---|---|---|---|---|
+| C2 buy the favourite 85-97c, hold | 69 | -1.7c | [-4.6, +1.1] | **NO-GO** (NBA +1.0c, NHL -0.0c, NCAAF -4.7c [-9.9, -0.1]) |
+| C1(a) buy under 25c (population check) | 69 | -4.4c | [-6.3, -2.3] | **the bias is real**: CI below 0 (NBA -5.4c, NHL -5.5c, NCAAF -2.7c) |
+| C1(b) EXIT: sell an under-25c leg at the bid vs hold | 69 | -0.4c | [-2.5, +1.5] | **NO-GO**: selling at the bid captures none of it |
+| C1(c) the same, legs we actually held | 14 | +5.4c | [-2.1, +10.7] | INSUFFICIENT (14/60); reported, not decided on |
+
+With the 1-contract round-up fee, C2 is -2.1c and C1(b) -1.0c: worse, same verdicts.
+
+What it means:
+- **The late longshot overpricing is in the ASK, not the bid.** Buying under-25c late loses 4.4c per game, which confirms 044e2634 section 2b (-5.0c on 29 games). The bid sits about at fair: the exit gains nothing after the fee, because the spread IS the mispricing.
+- **"Avoid" is already live.** The in-game price band (8cb85aea, [0.40, 0.75)) refuses every entry under 40c. No new rule is needed.
+- **No exit-rule change to propose.** The pre-registered GO for C1 as an exit failed: the CI spans 0 and only NBA is positive.
+- **C2 does not reproduce the Betfair late-favourite edge on Kalshi after the fee.** NCAAF is significantly negative.
+- **C1(c)** (+5.4c over 14 games, 13 of 14 positive) is a post-hoc slice of our own fills and reads only on demand: it needs a ledger export, which the nightly does not do. Re-read when n >= 60. A positive reading would be a user decision then, not a rule now.
+- The nightly task re-runs the study over every recorded night from the 10-26 run (`<root>/inplay_late_cells.txt`), to the 12-31 calendar stop. The pooled verdicts can still move; the per-sport ones need 60 games each.
