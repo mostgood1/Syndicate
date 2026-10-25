@@ -1454,6 +1454,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### pm-trader-strategies — CLOSED — opened 2026-10-24 — closed 2026-10-25 — session dbda2142-f3b3-4a69-af99-bbe43fa9a406
+- VERDICT: "Land .syndicate/findings_2026-10-24_pm_trader_strategies.md: graded survey of documented Kalshi/Polymarket profit methods, each mapped to Syndicate data, plus top-3 pre-registered shadow-test designs (research only; no fleet, env or order change)" -- GOAL: MET. Reading: the survey is on origin/main (6420cfcb), and the coordinator was messaged and acked. The scope then widened by user decision to building Test A (done, 8147d6a6) and drafting email D (done); both are recorded below.
 - Goal: Land .syndicate/findings_2026-10-24_pm_trader_strategies.md: graded survey of documented Kalshi/Polymarket profit methods, each mapped to Syndicate data, plus top-3 pre-registered shadow-test designs (research only; no fleet, env or order change)
 - Files: .syndicate/findings_2026-10-24_pm_trader_strategies.md, .syndicate/findings_2026-10-24_kalshi_market_price_map.md, scripts/kalshi_market_price_map.py, tests/test_kalshi_market_price_map.py, docs/drafts/polymarket_us_liquidity_incentive_inquiry.md
 - **SCOPE WIDENED 2026-10-24 ~23:00Z, user decision via coordinator 332cb014 ("A: Market-wide price map, B: Edge-over-Pinnacle deciles, C: Late-game in-play cells, D: Email Polymarket US"):** this lane builds and runs Test A (public Kalshi data, research only, Idle priority) and DRAFTS email D (the user sends it). B -> profit-program, C -> in-play-program.

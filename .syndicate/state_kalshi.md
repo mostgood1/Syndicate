@@ -926,3 +926,12 @@ board. The loop therefore checks `budget_remaining()` BEFORE spending.
   - NHL walk-forward: +22.7c -> -9.8c. NBA: +13.5c -> -17.1c.
   - 0 of 324 / 0 of 33 configs positive on both nights.
   - The defect is the fair (book consensus lags Kalshi), not the gates.
+
+## [kalshi-structural-price-map] KALSHI SPORTS HAS NO PREGAME STRUCTURAL PRICE EDGE UNDER TODAY'S FEES; ONLY 95-99c IN-PLAY FAVOURITES SURVIVE; LIP REWARDS REACH NONE OF OUR SERIES `[verified 2026-10-25 on public Kalshi data, lane pm-trader-strategies]`
+- **LIP:** 7,454 active Kalshi liquidity-incentive programs (read 2026-10-24 ~22:30Z), **0** on any game, spread or total series. Sports rewards are on futures and novelty markets only. The Volume Incentive Program is terminated (CFTC filing, effective >= 10-13).
+- **Price map (Test A, pre-registered 34250434):** 3,566 sampled games (MLB, NBA, NCAAF, NFL, NHL, soccer; 2025-07..2026-10-24), 3.51M public prints, returns net of today's fees.
+  - Every pregame cell is OPEN or INSUFFICIENT.
+  - Longshots under 10c are FALSIFIED in every phase.
+  - The registered 55-95c in-play "passes" were look-ahead (phases anchored on the game's end). Re-sampled from the scheduled start (`expected_expiration_time - 3h`) they go to about 0, and in-play-program's real-time Test C agrees.
+  - Survivor: 95-99c in-play favourites, taker and maker, +1.1..+1.6c per contract, positive in 5 of 6 sports. NFL is weakest: 2.7% of 95c+ buys lost.
+- **Detail:** `findings_2026-10-24_kalshi_market_price_map.md`, `findings_2026-10-24_pm_trader_strategies.md`. **Script:** `scripts/kalshi_market_price_map.py` (`fetch`, `report`, `recheck`, `recheck-report`).
