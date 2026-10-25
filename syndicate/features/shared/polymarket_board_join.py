@@ -112,6 +112,39 @@ _JOINABLE_BOARD_MARKETS: frozenset[str] = frozenset(MARKET_TYPE_TO_BOARD.values(
     "alternate_totals_corners",
 }
 
+# ALTERNATE GAME LINES -- the board's name for a rung, not the venue's. The
+# board splits a game's spreads/totals into the main line and its alternates
+# (`spreads_alt` / `totals_alt`); Polymarket lists EVERY rung as its own
+# single-line SPREAD/TOTAL market and has no "alt" type. So an alt row is a
+# `spreads`/`totals` row at another line, and it pairs by the same line-bearing
+# rule: the slug's line must equal the row's line exactly (signed-spread slot
+# rule included), never a nearby rung.
+#
+# MEASURED 2026-10-24 (fleet, board 10-24): treated as spreads/totals, 13 of the
+# 23 NBA alt rows in the live Suggested set pair, 271 of 568 NBA full-game alt
+# rows on the shortlist. PER LEAGUE, from measurement: that board carried alts
+# for NBA and for MLB segments only -- no NHL/NFL/NCAAF alt rows existed to
+# replay -- so only NBA is admitted. Another league's alt row refuses by name
+# (`alt_line_league_not_measured`) until its rows are replayed against its rungs.
+_ALT_GAME_LINE_TO_BASE: dict[str, str] = {
+    "spreads_alt": "spreads",
+    "totals_alt": "totals",
+}
+_ALT_GAME_LINE_LEAGUES: frozenset[str] = frozenset({"nba"})
+
+
+def _alt_game_line_base(market: Any, league: Any) -> str | None:
+    """`spreads_alt` -> `spreads` (likewise totals) in an admitted league, else None.
+
+    ONE function for both halves -- the join's board gate and `_resolver_key` --
+    so a row the join admits is a row the resolvers can find, and an alt row in
+    an unadmitted league can never resolve to a main-line match at the same rung.
+    """
+    base = _ALT_GAME_LINE_TO_BASE.get(str(market or "").strip().lower())
+    if base is None or _norm(league) not in _ALT_GAME_LINE_LEAGUES:
+        return None
+    return base
+
 # ---------------------------------------------------------------------------
 # MLB PLAYER PROPS -- admitted per FAMILY, per LEAGUE, from measurement.
 # ---------------------------------------------------------------------------
@@ -2037,6 +2070,14 @@ def _join_polymarket_to_board_impl(
         board_market = str(board_row.get("market") or "").strip().lower()
         is_prop = False
         prop_token: str | None = None
+        _alt_base = _alt_game_line_base(board_market, board_row.get("sport") or sport)
+        if _alt_base is not None:
+            # An alt rung IS a spreads/totals row to the venue; from here on it
+            # takes the main line's path, line agreement and all.
+            board_market = _alt_base
+        elif board_market in _ALT_GAME_LINE_TO_BASE:
+            refuse("alt_line_league_not_measured")
+            continue
         if board_market not in _JOINABLE_BOARD_MARKETS:
             # THE PROP GATE. Canonicalised first (`pitcher_strikeouts` and
             # `strikeouts` are one market, `#224`), then bounded exactly the
@@ -2704,7 +2745,11 @@ def _join_polymarket_to_board_impl(
             # READABLE in the artifact rather than needing a second join to spot.
             "home_team": board_row.get("home_team"),
             "away_team": board_row.get("away_team"),
+            # The VENUE's market: an alt rung is recorded as `spreads`/`totals`,
+            # and `_resolver_key` canonicalises the board row the same way.
             "market": board_market,
+            "board_market": str(board_row.get("market") or "").strip().lower(),
+            "sport": board_row.get("sport") or sport,
             "side": side,
             "line": board_line,
             "player_name": board_row.get("player_name"),
@@ -3594,9 +3639,14 @@ def _resolver_key(record: Mapping[str, Any]) -> tuple[str, str, str, float | Non
     # dedupe key (`layer2_board.py:623`) has always counted `segment` as part of
     # a row's identity and both venue resolvers dropped it.
     segment = str(record.get("segment") or FULL_GAME_SEGMENT).strip().lower()
+    # AN ALT RUNG KEYS AS ITS BASE MARKET, because the join recorded its match
+    # that way. Only in an admitted league: elsewhere `spreads_alt` stays its
+    # own name and cannot find a main-line match that merely shares the rung.
+    market = str(record.get("market") or "").strip().lower()
+    market = _alt_game_line_base(market, record.get("sport")) or market
     return (
         event_id,
-        str(record.get("market") or "").strip().lower(),
+        market,
         normalize_person(record.get("player_name")),
         _as_float(record.get("line")),
         str(record.get("side") or "").strip().lower(),
