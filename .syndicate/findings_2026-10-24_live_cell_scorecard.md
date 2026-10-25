@@ -569,6 +569,66 @@ Options (recommendation first):
   testable.
 - **(c)** Keep <= 120 s as approved; with today's capture it yields almost nothing.
 
+## s9. Test B step 1, second arm -- CROSS-BOOK CONSENSUS (Kaunitz-style) vs Pinnacle `[2026-10-25 00:30Z, fleet]`
+
+The arm was proposed by lane pm-trader-strategies, after Kaunitz, Zhong & Kreiner (arXiv 1710.02824), and covers the
+sports Pinnacle misses.
+
+**Definitions.**
+
+- Consensus fair = MEDIAN of the per-book de-vigged two-way fair at our line. Every book counts except our own venues
+  (Kalshi, Polymarket).
+- A book is FRESH when its two-way at our line is still its latest capture of that market, i.e. it has not moved off
+  the number.
+- Age = the stalest leg among the books.
+
+**Data and substrate.**
+
+- Same script, `scripts/pinnacle_edge_deciles.py`; both arms are read on the same orders.
+- 3,097 eligible settled venue-priced orders, all sports. Soccer h2h is excluded because it is 3-way.
+- Consensus at submit for **3,009 (97%)**; Pinnacle for 721.
+- Fleet ledger read 00:04:44Z. The join took 74 s, 882 MB RSS, at nice 19. It is a one-off and is not to be
+  scheduled at that size.
+
+**Consensus edge carries NO ROI gradient.**
+
+- The decile cuts are -2.4 .. +1.9 pp.
+- Every decile is negative: D01 -6.4%, D05 -12.5%, D10 -5.7%. No CI90 is above 0.
+- Closing edge vs the consensus close DOES rise, -5.1 -> +1.8 pp. The consensus edge predicts where the consensus goes,
+  and the money still does not follow.
+- **The predicted winner, the top decile with >= 3 fresh books, is -8.2% [-21.9, +6.5] (164 bets / 81 games).**
+- >= 3 fresh books overall: -7.3% [-12.3, -2.5].
+- 0 fresh books: -30.5% [-42, -17].
+
+By sport, consensus edge >= 0.4 pp:
+
+| sport | flat ROI | CI90 | bets |
+|---|---|---|---|
+| NBA | -7.5% | [-20, +6] | 146 |
+| NCAAF | -4.0% | [-16, +7] | 450 |
+| MLB | **-20.9%** | **[-35, -7]** | 286 |
+| NFL | +11.0% | [-12, +33] | 82 |
+| soccer | -1.3% | — | 44 |
+
+**On the same 721 orders, Pinnacle carries information the consensus does not.**
+
+| split | bets | flat ROI | CI90 |
+|---|---|---|---|
+| Pinnacle >= 0.4 | 202 | +11.2% | [-7, +28] |
+| consensus >= 0.4 | 175 | +3.0% | [-15, +22] |
+| Pinnacle < 0 | 438 | -13.8% | [-25, -3.5] |
+| consensus < 0 | 405 | -10.0% | [-20, +0.3] |
+| **where they disagree:** Pinnacle >= 0.4 & consensus < 0.4 | 65 | +6.0% | — |
+| **where they disagree:** consensus >= 0.4 & Pinnacle < 0.4 | 38 | **-35.6%** | **[-65, -3]** |
+
+A consensus "edge" that Pinnacle does not share is the losing kind.
+
+**Reading.** On venue prices, the averaging rule that worked in Kaunitz et al. (soft books vs their own average) does
+not work here: our venues are not soft books lagging the average. The Pinnacle split is the one that discriminates.
+That makes the 10-25 Pinnacle capture for NBA/NFL/soccer (`bbc90e69`) the precondition for testing it where live
+actually trades. **Recommendation for step 2 is unchanged: (a), the Pinnacle >= 0.4 pp forward arm.** Add the
+consensus arm only as a control.
+
 ## s5. Running it
 
 **NIGHTLY JOB (built 2026-10-24, NOT LIVE until the coordinator's restart).**
