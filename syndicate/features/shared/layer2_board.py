@@ -5832,6 +5832,7 @@ def select_shortlist(
     # future change that costs some other market its fair would read as "the
     # number went up" without it. Same shape as `withdrawn_line_by_sport`.
     no_market_price_by_family: dict[str, int] = {}
+    no_market_price_by_reason: dict[str, int] = {}
     stale_kickoff = 0
     uninformative_ev = 0
     # A basketball prop whose player is OUT on the injury feed (board_enrichment._flag_out_player_props).
@@ -5948,6 +5949,13 @@ def select_shortlist(
             )
             no_market_price_by_family[_family] = (
                 no_market_price_by_family.get(_family, 0) + 1)
+            # WHY it has no fair (lane fair-price-v2, 2026-10-23): the served
+            # board can never show `quote.fair_unresolved_reason`, because
+            # exactly these rows are dropped here -- measured 0 of 4,757 served
+            # rows without a fair while this counter read 1. So the reason is
+            # counted where the row is refused.
+            _reason = str(((row.get("quote") or {}).get("fair_unresolved_reason")) or "none")
+            no_market_price_by_reason[_reason] = no_market_price_by_reason.get(_reason, 0) + 1
             continue
         # A0/A3, model audit 2026-08-14: AN EV THAT IS A RESTATEMENT OF THE HOLD
         # IS NOT A MEASUREMENT, AND MUST NOT SEAT A ROW.
@@ -6289,6 +6297,8 @@ def select_shortlist(
         "rows_no_market_price": no_market_price,
         "rows_no_market_price_by_family": dict(
             sorted(no_market_price_by_family.items())),
+        "rows_no_market_price_by_reason": dict(
+            sorted(no_market_price_by_reason.items())),
         "rows_beyond_quote_age": beyond_quote_age,
         "rows_superseded_line": superseded_line,
         "rows_stale_quote": stale_quote,
