@@ -217,6 +217,115 @@ def test_wsl_cd_flag_then_cd_in_the_body_is_the_fleet(root):
     assert run_hook(root, command).returncode == BLOCK
 
 
+# ---- GAPS closed 2026-10-25 (lane deploy-guard-fleet-gaps), real shapes -----
+
+def _mnt(path: Path) -> str:
+    """`C:\\x\\y` -> `/mnt/c/x/y`, the WSL spelling of a Windows file."""
+    posix = path.resolve().as_posix()
+    return f"/mnt/{posix[0].lower()}{posix[2:]}" if posix[1:2] == ":" else posix
+
+
+def test_a_git_command_built_from_a_variable_is_guarded(root):
+    # 2026-10-17, session 9e18a0e7 -- ran unchecked before this lane
+    command = ("MSYS_NO_PATHCONV=1 wsl -d Ubuntu-24.04 --cd ~ -- bash -lc 'G=\"git -C /home/amyn/Syndicate\"; "
+               "h=$($G rev-parse --short=8 HEAD); [ \"$h\" = \"5d277bcc\" ] && $G merge --ff-only 24e00269 "
+               ">/dev/null && echo done'")
+    result = run_hook(root, command)
+    assert result.returncode == BLOCK, result.stderr.decode()
+    assert b"24e00269" in result.stderr
+
+
+def test_a_variable_built_git_in_another_worktree_stays_allowed(root):
+    command = "D=/c/tmp/syndicate-sessions/x; cd $D && git merge --ff-only -q origin/main"
+    assert run_hook(root, command).returncode == ALLOW
+
+
+def test_a_printf_built_script_run_under_another_spelling_is_guarded(root):
+    # 2026-10-16: written as C:/.../web_ff16.sh, run as /mnt/c/.../web_ff16.sh
+    target = root / "web_ff16.sh"
+    command = (
+        "printf '%s\\n' 'cd /home/amyn/Syndicate' "
+        "'[ \"$(git rev-parse --short=8 HEAD)\" = \"6087b5e2\" ] || { echo \"HEAD moved\"; exit 3; }' "
+        "'git merge --ff-only 652f6589 2>&1 | tail -1' "
+        f"> \"{target.as_posix()}\" && cd /c && MSYS_NO_PATHCONV=1 wsl --cd /home/amyn -- bash {_mnt(target)}")
+    result = run_hook(root, command)
+    assert result.returncode == BLOCK, result.stderr.decode()
+    assert b"652f6589" in result.stderr
+    give_claim(root, "web")
+    give_receipt(root, "web", target_commit="652f6589")
+    assert run_hook(root, command).returncode == ALLOW
+
+
+def test_a_script_copied_to_wsl_tmp_then_run_is_read_from_its_source(root):
+    # 2026-10-24, this lane's own web deploy: `tr < /mnt/c/.../ff.sh > /tmp/x.sh && bash /tmp/x.sh`
+    source = root / "ff_reload_web.sh"
+    source.write_text(f"TARGET={SHA}\ncd ~/Syndicate || exit 10\ngit merge --ff-only \"$TARGET\" || exit 14\n"
+                      "~/.venvs/syndicate/bin/python scripts/local_production.py --home ~/syndicate-prod reload-web\n",
+                      encoding="utf-8")
+    command = (f"wsl -- bash -lc 'tr -d \"\\r\" < {_mnt(source)} > /tmp/ff_reload_web_l2i.sh "
+               "&& bash /tmp/ff_reload_web_l2i.sh'")
+    result = run_hook(root, command)
+    assert result.returncode == BLOCK, result.stderr.decode()
+    assert SHA.encode() in result.stderr and b"reload-web" in result.stderr
+    give_claim(root, "web")
+    give_receipt(root, "web")
+    assert run_hook(root, command).returncode == ALLOW
+
+
+def test_a_scripts_positional_sha_is_bound_from_the_command(root):
+    # 9e18a0e7's ff_reload.sh: `FROM=$1; TO=$2 ... git merge --ff-only "$TO"`, run 58 times
+    script = root / "ff_reload.sh"
+    script.write_text("set -u\nFROM=$1; TO=$2\ncd ~/Syndicate || exit 3\n"
+                      "git merge --ff-only \"$TO\" >/dev/null || exit 5\n"
+                      "~/.venvs/syndicate/bin/python scripts/local_production.py reload-web\n", encoding="utf-8")
+    command = f"wsl -- bash {_mnt(script)} 6954cb0e 5e734fb6 2>&1 | tail -5"
+    result = run_hook(root, command)
+    assert result.returncode == BLOCK and b"5e734fb6" in result.stderr, result.stderr.decode()
+    give_claim(root, "web")
+    give_receipt(root, "web", target_commit="6954cb0e")        # the FROM, not the TO
+    assert run_hook(root, command).returncode == BLOCK
+    give_receipt(root, "web", target_commit="5e734fb6")
+    assert run_hook(root, command).returncode == ALLOW
+
+
+def test_a_redirect_after_the_script_is_not_an_argument(root):
+    script = root / "deploy_gated.sh"
+    script.write_text("TO=${1:?target sha}\ncd ~/Syndicate && git merge --ff-only \"$TO\"\n", encoding="utf-8")
+    result = run_hook(root, f"wsl -- bash -l {_mnt(script)} 2>&1 | tail -3")
+    assert result.returncode == BLOCK
+    assert b"git merge 2`" not in result.stderr and b"not resolvable" in result.stderr, result.stderr.decode()
+
+
+def test_a_commit_message_naming_a_deploy_script_is_not_a_run(root):
+    script = root / "ff_reload.sh"
+    script.write_text(f"cd ~/Syndicate && git merge --ff-only {SHA}\n", encoding="utf-8")
+    command = f"git commit -q -m \"deploys: ran bash {_mnt(script)} {SHA} on the fleet\""
+    assert run_hook(root, command).returncode == ALLOW
+
+
+def test_an_unresolvable_ref_is_still_gated_without_sha_binding(root):
+    script = root / "ff_env.sh"
+    script.write_text("cd ~/Syndicate && git merge --ff-only \"$DEPLOY_SHA\"\n", encoding="utf-8")
+    command = f"wsl -- bash {_mnt(script)}"
+    result = run_hook(root, command)
+    assert result.returncode == BLOCK and b"not resolvable" in result.stderr, result.stderr.decode()
+    give_claim(root, "web")
+    give_receipt(root, "web", target_commit="0123abcd")
+    assert run_hook(root, command).returncode == ALLOW
+
+
+def test_a_heredoc_written_script_then_run_is_guarded(root):
+    command = (f"cat > /tmp/ff_x.sh <<'EOF'\ncd ~/Syndicate && git merge --ff-only {SHA}\nEOF\n"
+               "wsl -- bash /tmp/ff_x.sh")
+    assert run_hook(root, command).returncode == BLOCK
+
+
+def test_a_produced_script_with_only_reads_stays_allowed(root):
+    command = ("printf '%s\\n' 'cd /home/amyn/Syndicate' 'git log --oneline -3' > /tmp/rd.sh "
+               "&& wsl -- bash /tmp/rd.sh")
+    assert run_hook(root, command).returncode == ALLOW
+
+
 def test_a_heredoc_fed_to_bash_is_executed_and_guarded(root):
     command = f"wsl -- bash -s <<'EOF'\ncd ~/Syndicate && git merge --ff-only {SHA}\nEOF"
     assert run_hook(root, command).returncode == BLOCK

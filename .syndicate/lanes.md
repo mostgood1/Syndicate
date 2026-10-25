@@ -1500,6 +1500,14 @@ death, never life — do not invert it.
 - Verification: unit tests on real command shapes from deploys.md (block without locks, allow with them, allow reads); hook run on live fleet pids resolves refresh-worker / gunicorn / an odds job correctly; existing test_deploy_guard.py passes
 - Blocked by: none
 
+### deploy-guard-fleet-gaps — OPEN — opened 2026-10-25 — session 4b29d941-3df8-4b0d-b2d0-f5ec0f49d3a3
+- Goal: deploy-guard catches the two fleet-deploy shapes it missed: a git command built from a shell variable (G="git -C ~/Syndicate"; $G merge ...) and a shell script that lives on the WSL side or is written by the same command (printf/cat/tr into /tmp/x.sh, then bash /tmp/x.sh)
+- Files: .claude/hooks/deploy-guard.py (fleet classification helpers ONLY), tests/test_deploy_guard_fleet.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: regression tests for both shapes (block without locks, allow with them); transcript re-sweep shows the previously missed real deploys now matched and no new false positives; live proof on the installed primary hook
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

@@ -361,17 +361,149 @@ def _script_texts(cmd, bases):
     """
     out = []
     for raw in _script_paths(cmd):
-        path = _resolve_script(raw, bases)
-        if not path or not path.lower().endswith((".sh", ".ps1")):
+        if not raw.lower().endswith((".sh", ".ps1")):
             continue
-        try:
-            if os.path.getsize(path) > _SCRIPT_MAX_BYTES:
-                continue
-            with open(path, encoding="utf-8", errors="replace") as fh:
-                out.append((path, fh.read()))
-        except Exception:
+        # A run that is only QUOTED (a commit message naming `bash .../ff.sh`)
+        # is not a run -- same text-tool rule as the inline shapes.
+        spots = [m.start() for m in re.finditer(re.escape(raw), cmd)]
+        if spots and all(_is_text(cmd, pos) for pos in spots):
             continue
+        # WRITTEN BY THIS SAME COMMAND FIRST (lane deploy-guard-fleet-gaps): at
+        # hook time the file is missing or stale, so what runs is what the
+        # command writes -- `printf '%s\n' 'cd /home/amyn/Syndicate' ... 'git
+        # merge --ff-only 652f6589' > C:/.../web_ff16.sh && wsl ... bash
+        # /mnt/c/.../web_ff16.sh` (2026-10-16) and `tr -d "\r" < /mnt/c/.../ff.sh
+        # > /tmp/x.sh && bash /tmp/x.sh` (2026-10-24) both ran unchecked.
+        produced = _produced_in_command(cmd, raw, bases)
+        if produced is not None:
+            out.append((raw + " (written by this command)", produced))
+            continue
+        text = _read_any(raw, cmd, bases)
+        if text is not None:
+            out.append((raw, _bind_positionals(text, _script_args(cmd, raw))))
     return out
+
+
+def _script_args(cmd, raw):
+    """The words after `raw` in the command that runs it: `bash ff_reload.sh 6954cb0e 5e734fb6`."""
+    match = re.search(re.escape(raw) + r"['\"]?([^;&|\n'`)]*)", cmd)
+    if not match:
+        return []
+    # Stop at the first redirect: `deploy_gated.sh 2>&1` has NO argument, and
+    # binding the `2` made the sweep read an ff to `2`.
+    words = re.split(r"(?:^|\s)\d*[<>]", match.group(1), maxsplit=1)[0]
+    return [a.strip("\"") for a in words.split()]
+
+
+def _bind_positionals(text, args):
+    """`$1`..`$9` (and `${1}`, `${1:?msg}`) -> the invoking command's arguments.
+
+    The SHA a deploy script ships usually arrives this way -- `FROM=$1; TO=$2 ...
+    git merge --ff-only "$TO"` was run 58 times in one session's transcript --
+    and leaving it unbound would make every such run look like an ff to `$TO`.
+    """
+    def sub(match):
+        index = int(match.group(1) or match.group(2)) - 1
+        return args[index] if 0 <= index < len(args) else match.group(0)
+    return re.sub(r"\$\{([1-9])(?::?[-?=+][^}]*)?\}|\$([1-9])(?![0-9])", sub, text)
+
+
+_SAFE_POSIX_PATH = re.compile(r"^[\w./~+-]+$")
+_QUOTED = re.compile(r"'([^']*)'|\"((?:\\.|[^\"\\])*)\"")
+
+
+def _read_any(raw, cmd, bases):
+    """A script's text by whichever host holds it, or None (ignorance, allow).
+
+    `/mnt/<d>/...` is that Windows drive; any other POSIX path in a command that
+    goes through `wsl` lives on the WSL side (its `/tmp` is not `C:\\tmp`), and
+    is read with `cat` over stdin -- never as a `-c` argument, which `wsl`
+    re-splits (measured 2026-10-25, deploy_preflight `_fleet_shell`).
+    """
+    raw = str(raw).strip("'\"")
+    mnt = re.match(r"^/mnt/([a-zA-Z])/(.*)$", raw)
+    if mnt and os.name == "nt":
+        raw = mnt.group(1).upper() + ":/" + mnt.group(2)
+    elif os.name == "nt" and raw.startswith(("/", "~")) and "wsl" in cmd \
+            and not re.match(r"^/[a-zA-Z]/", raw):
+        if not _SAFE_POSIX_PATH.match(raw):
+            return None
+        try:
+            proc = subprocess.run(["wsl", "--", "bash", "-s"], input=("head -c %d -- %s" % (
+                _SCRIPT_MAX_BYTES, raw)).encode(), capture_output=True, timeout=10)
+        except Exception:
+            return None
+        return proc.stdout.decode("utf-8", "replace") if proc.returncode == 0 else None
+    path = _resolve_script(raw, bases)
+    if not path:
+        return None
+    try:
+        if os.path.getsize(path) > _SCRIPT_MAX_BYTES:
+            return None
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            return fh.read()
+    except Exception:
+        return None
+
+
+def _in_quotes(text, pos):
+    """True when `pos` sits inside a '...' or "..." span of `text`."""
+    quote, i = "", 0
+    while i < pos:
+        ch = text[i]
+        if quote:
+            if ch == quote:
+                quote = ""
+            elif ch == "\\" and quote == '"':
+                i += 1
+        elif ch in "'\"":
+            quote = ch
+        i += 1
+    return bool(quote)
+
+
+def _basename(path):
+    return re.split(r"[\\/]", str(path).strip("'\""))[-1].lower()
+
+
+def _produced_in_command(cmd, run_path, bases):
+    """The text this command writes to `run_path` before running it, else None.
+
+    Matched by FILE NAME, not path: the writer and the runner spell one file
+    differently (`C:/Users/TEMPAD~1/...` vs `/mnt/c/Users/tempadmin/...`). The
+    producer is the input redirect / `cp` source, a heredoc body, or the quoted
+    arguments of `printf` / `echo` -- the shapes the transcripts actually hold.
+    """
+    name = _basename(run_path)
+    for match in re.finditer(r"(?<![<>])>{1,2}\s*(['\"]?)([^\s'\";&|<>]+)\1", cmd):
+        if _basename(match.group(2)) != name:
+            continue
+        before = cmd[:match.start()]
+        line_start = before.rfind("\n") + 1
+        cut = max(before.rfind("&&"), before.rfind(";"), line_start - 1)
+        head = before[cut + 1:] if cut >= 0 else before
+        src = re.search(r"(?<!<)<(?!<)\s*(['\"]?)([^\s'\";&|<>]+)\1", head + cmd[match.end():match.end() + 200].split("&&")[0])
+        if src:
+            return _read_any(src.group(2), cmd, bases)
+        doc = re.search(r"<<-?\s*(['\"]?)(\w+)\1", cmd[line_start:cmd.find("\n", match.end()) if "\n" in cmd[match.end():] else len(cmd)])
+        if doc:
+            body = re.search(r"\n(.*?)\n[ \t]*" + re.escape(doc.group(2)) + r"[ \t]*(?:\n|$)",
+                             cmd[match.end():], re.S)
+            return body.group(1) if body else None
+        # The writer is the last printf/echo OUTSIDE quotes: the real 10-16 script
+        # carried `{ echo "HEAD moved"; exit 3; }` inside a printf argument.
+        writers = [w for w in re.finditer(r"(?:^|[\s;&|('\"])(printf|echo)\b", cmd[:match.start()])
+                   if not _in_quotes(cmd, w.start(1))]
+        writer = writers[-1] if writers else None
+        if writer:
+            pieces = [a or b for a, b in _QUOTED.findall(cmd[writer.end():match.start()])]
+            if writer.group(1) == "printf" and pieces and "%" in pieces[0]:
+                pieces = pieces[1:]
+            return "\n".join(p.replace("\\n", "\n") for p in pieces)
+    for match in re.finditer(r"\bcp\s+(?:-\w+\s+)*(['\"]?)([^\s'\";&|<>]+)\1\s+(['\"]?)([^\s'\";&|<>]+)\3", cmd):
+        if _basename(match.group(4)) == name:
+            return _read_any(match.group(2), cmd, bases)
+    return None
 
 
 # FLEET DEPLOYS `[2026-10-25, lane deploy-guard-fleet; user: "make deploy-guard
@@ -405,7 +537,7 @@ FLEET_CHECKOUT = re.compile(r"(?:~|\$HOME|\$\{HOME\}|/home/[^/\s'\"]+)/Syndicate
 _GIT_GLOBAL_OPTS = r"(?:-C\s+\S+\s+|-c\s+\S+\s+|--[\w-]+(?:=\S+)?\s+)*"
 FLEET_GIT_MOVE = re.compile(
     r"\bgit\s+" + _GIT_GLOBAL_OPTS + r"(merge|pull|reset|rebase|switch|checkout|cherry-pick|revert)(?![\w-])"
-    r"([^;&|\n'\"`)]*)", re.I)
+    r"([^;&|\n'`)]*)", re.I)   # `"` allowed: `git merge --ff-only "$TARGET"` (the ref is unquoted below)
 FLEET_RELOAD_WEB = re.compile(r"local_production\.py\b[^;&|\n]*\sreload-web\b")
 FLEET_DOWN = re.compile(r"local_production\.py\b[^;&|\n]*\sdown\b")
 FLEET_KILL = re.compile(r"(?:^|[|;&`(\s'\"])(kill|pkill|killall)\b([^;&|\n'\"`]*)")
@@ -510,6 +642,28 @@ _CD = re.compile(r"(?:^|[\s;&|('\"])(?:cd|--cd)\s+['\"]?([^\s'\";&|)]+)")
 _GIT_C = re.compile(r"\s-C\s+['\"]?([^\s'\";&|)]+)")
 
 
+# SHELL VARIABLES ASSIGNED IN THE TEXT ARE EXPANDED before classifying (lane
+# deploy-guard-fleet-gaps). Measured 2026-10-17: `G="git -C
+# /home/amyn/Syndicate"; ... $G merge --ff-only 24e00269` read as no git command
+# at all. Literal values only -- `h=$(git rev-parse ...)` is not resolvable and
+# is left as written; two passes resolve one level of nesting.
+_ASSIGN = re.compile(
+    r"(?:^|[\s;&|('\"])(?:export\s+|local\s+|readonly\s+)?([A-Za-z_][A-Za-z0-9_]*)="
+    r"(?:\"([^\"$`]*)\"|'([^']*)'|([^\s;&|'\"`()$]+))")
+_VAR_REF = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)")
+
+
+def _expand_vars(text):
+    values = {}
+    for match in _ASSIGN.finditer(text):
+        values[match.group(1)] = next(v for v in match.group(2, 3, 4) if v is not None)
+    if not values:
+        return text
+    for _ in range(2):
+        text = _VAR_REF.sub(lambda m: values.get(m.group(1) or m.group(2), m.group(0)), text)
+    return text
+
+
 def _git_dir(cmd, match):
     """The directory a git command runs in: its own `-C`, else the nearest `cd` before it."""
     own = _GIT_C.search(match.group(0))
@@ -521,7 +675,7 @@ def _git_dir(cmd, match):
 
 def _fleet_deploy(cmd):
     """{"roles": [...], "ff": ref-or-None, "what": [...]} when `cmd` deploys to the fleet, else None."""
-    cmd = _executed_text(cmd)
+    cmd = _expand_vars(_executed_text(cmd))
     roles, what, ff_ref = [], [], None
 
     def add(names, label):
@@ -544,8 +698,12 @@ def _fleet_deploy(cmd):
                 continue                                   # a path restore, not a move
             if verb == "reset" and not any(t in ("--hard", "--keep", "--merge") for t in tokens):
                 continue                                   # unstage, not a move
-            refs = [t for t in tokens if not t.startswith("-") and not re.search(r"[<>]", t)]
-            ff_ref = refs[-1] if refs else "<no ref>"
+            # The FIRST positional is the ref (`merge --ff-only <sha>`, `reset
+            # --hard <sha>`); later words can belong to an outer command once a
+            # double quote is allowed in `rest`.
+            refs = [t.strip("\"") for t in tokens if not t.startswith("-") and not re.search(r"[<>]", t)]
+            refs = [t for t in refs if t]
+            ff_ref = refs[0] if refs else "<no ref>"
             what.append("a move of the fleet checkout (`git %s %s`)" % (verb, ff_ref))
             break
     if any(not _is_text(cmd, m.start()) for m in FLEET_RELOAD_WEB.finditer(cmd)):
@@ -597,7 +755,14 @@ def _check_fleet(root, lane, fleet):
     """0 to allow, or the refusal's exit code. Same two locks as a Render deploy."""
     kind = "a FLEET deploy: " + "; ".join(fleet["what"])
     ff = fleet["ff"]
-    if ff is not None and not _SHA.match(ff):
+    if ff is not None and ff.startswith("$"):
+        # A ref the guard cannot resolve (a variable set at run time). Still
+        # GATED -- claim + a fresh CLEAR -- but the receipt cannot be bound to a
+        # SHA it does not know. Refusing would block every argument-driven
+        # deploy script; allowing would ungate them.
+        kind += " -- ref %s is not resolvable here, so the receipt is not SHA-bound" % ff
+        ff = ""
+    if ff and not _SHA.match(ff):
         sys.stderr.write(
             "BLOCKED: this command is %s.\n"
             "Move the fleet checkout to an EXACT SHA you have read, not `%s`: a ref's tip\n"
