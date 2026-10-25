@@ -488,3 +488,16 @@ USER DECISION (via coordinator 332cb014): R3 from findings_2026-10-24_kalshi_mar
 - **KILL:** CI upper < 0 at >= 150 games, OR a realised loss rate (share of games whose entry lost) above 3% at >= 150 games.
 - **Fewer than 150 games:** INSUFFICIENT; keep accruing. It runs nightly inside scripts/inplay_late_cells.py, to the 12-31 calendar stop.
 - **A GO changes nothing live.** The price-map lane sizes it at about 1.5% of a small stake; any live use is a new user decision.
+
+## 15. R3 first read + Test C update (2026-10-25, 8a01eccc, all four nights with 10-24 complete)
+
+- **R3, 95-99c in-play moneyline favourites (paper):** 67 games, -3.2c/game [-10.5, +2.7]. ex-NFL: 66 games, -3.3c [-9.5, +2.7]. 62 of 67 positive.
+  - **Loss rate 7.5% (5 of 67).** The pre-registered kill line is 3%, judged only at >= 150 games.
+  - 1-contract fee: -3.9c.
+  - By sport: NHL +0.5c (27 games), NCAAF -1.4c (18), NBA -9.8c (21), NFL 1 game.
+  - Verdict: **INSUFFICIENT (67/150)**. Keeps accruing nightly.
+  - Read: five losses at about -96c each outweigh 62 wins at about +1-4c. The price-map lane's +1.1-1.6c came from public prints; at our real-time first-qualifying ask it is negative so far. This is the tail the lane warned of.
+- **Test C with 10-24 complete, 102 games:**
+  - C2 (favourites 85-97c late) -1.5c [-3.8, +0.7]: NO-GO.
+  - C1(b) (sell under-25c at the bid) +0.2c [-1.3, +1.8]: NO-GO.
+  - Both verdicts are unchanged from section 12.
