@@ -445,6 +445,130 @@ diff):
   returns ok + absent, which counts as "all armed": in-game entries go ungated, not blocked.
 - If only the refresh-worker has the key, the pregame plans are gated and in-game is not.
 
+## s6. NBA paper backfill -- DONE `[2026-10-24 23:57Z..2026-10-25 00:06Z, fleet; user "Yes, backfill" via the coordinator]`
+
+The fix was paper only. `paper_settlement` was not edited, and the live ledger document was not
+written by this lane. Script: `scripts/backfill_nba_paper_grades.py`, 2 tests; it previews by
+default and writes only with `--commit`.
+
+**1. Box artifacts.** `live_player_box.capture(date)` -- the live loop's own capture, pointed at a
+past date -- wrote 10-20 / 10-21 / 10-22:
+
+| date | games | final | players |
+|---|---|---|---|
+| 10-20 | 3 | 3 | 68 |
+| 10-21 | 11 | 11 | 254 |
+| 10-22 | 2 | 2 | 45 |
+
+**2. Archive-only rows.** These were rows `dates_needing_settlement` never sees, because it walks
+the live document only. They were graded with `paper_settlement._our_verdict` (the reading
+`settle_orders` uses) and their graded copies were APPENDED to
+`execution_ledger_archive/orders_2026-10.jsonl`. Readers keep the last copy per identity.
+
+- Result: **333 graded, 0 refused, 219 won / 114 lost, -$5.09 on $384.19.** Tagged
+  `graded_by=archive_backfill/live-cell-scorecard/2026-10-24`.
+- Spot check of 6 rows against final scores: all correct, and P&L = price less fee.
+
+**3. Live-document rows: the worker's own straggler pass graded them** once the boxes existed.
+
+- 00:04:09Z `SETTLED date=2026-10-22 graded=320`.
+- 00:05:30Z `SETTLED date=2026-10-21 graded=139`. Before this, the same date showed
+  `no_live_box_for_date: 136`, now 0.
+
+**Read-back (ledger 00:04:44Z), NBA paper on 10-20 / 10-21 / 10-22:** 77 / 382 / 300 graded,
+**0 stuck.** (Earlier counts of 413 were by UTC commence date and three books only; by selected
+date across all paper books the total was 759.)
+
+**What the complete window says** (since 10-20, scorecard):
+
+| cell | flat ROI | CI90 | bets / games | verdict |
+|---|---|---|---|---|
+| ladder Kalshi NBA props | **-13.1%** | **[-24, -4]** | 263 / 29 | LOSES; agrees with live NBA props -34.8% [-63, -13] |
+| ladder NBA spreads | -0.7% | [-11, +9] | 335 | |
+| ladder NBA totals | +12.6% | [+1, +26] | 141 / 26 | EDGE flag, chance-level among ~100 groups; re-check |
+
+**Not done:** NBA preseason paper rows (10-04..10-16, about 60) are still ungraded. That was out
+of scope.
+
+## s7. Test B step 1 -- edge over Pinnacle at the decision, by decile x quote age `[2026-10-25 00:03Z, fleet]`
+
+Script: `scripts/pinnacle_edge_deciles.py`, 4 tests. Definitions are in its docstring: edge =
+de-vigged Pinnacle two-way fair at our line, minus (contract price + fee per contract), in
+probability points. The CLV is recomputed against the Pinnacle close; the ledger's live
+`clv_pct` is not used.
+
+**Coverage, measured first, and it bounds the test.** October `book_quotes` shards hold
+Pinnacle for:
+
+| sport | Pinnacle quotes | dates |
+|---|---|---|
+| NCAAF | 33,061 | 18 |
+| NHL | 27,577 | 24 |
+| MLB | 13,164 | 19 |
+| NBA (2.1M quotes) | **0** | 0 |
+| NFL (1.55M) | **0** | 0 |
+| soccer (2.97M) | **0** | 0 |
+| WNBA | **0** | 0 |
+
+- **This test says nothing about NBA, NFL or soccer.**
+- Eligible orders: 1,712 settled venue-priced orders in NCAAF/NHL/MLB.
+- **675 have a Pinnacle two-way at our line before submit** (NCAAF 641, MLB 34). Live MLB from
+  Aug-Sep has no market or event, so it cannot join.
+
+**Results (flat ROI net of fees, CI90 clustered by game):**
+
+| edge over Pinnacle at submit | bets | games | flat ROI | CI90 | Pinnacle-close edge |
+|---|---|---|---|---|---|
+| **< 0 (60% of the joined book)** | 404 | 102 | **-10.6%** | **[-20.6, -0.6]** | **-2.6 pp** |
+| 0 .. 0.4 pp | 72 | 45 | +5.2% | [-21, +31] | -0.5 pp |
+| >= 0.4 pp (top 3 deciles) | 199 | 89 | +13.0% | [-4.5, +30] | +0.7 pp |
+| >= 0.4 pp, NCAAF only | 177 | 77 | +18.2% | [-0.4, +35] | +1.0 pp |
+| no Pinnacle quote | 1,037 | 160 | -13.8% | [-21.5, -6.8] | — |
+
+**The robust part is the gradient, not any one decile.** Mean Pinnacle-CLOSE edge rises nearly
+monotonically by decile: -3.9 / -3.3 / -3.7 / -2.5 / -1.5 / -0.5 / -0.5 / -0.2 / +0.1 / +2.2 pp.
+Edge over Pinnacle at the decision predicts where the close goes. And **most of the book is bought
+ABOVE Pinnacle's fair: 60% of joined orders have negative edge, and that group loses
+significantly.** The single-decile ROIs are noisy (D08 +29.7% [+4, +54], D09 -7.3%, D10 +21.6%);
+read them as one pre-specified split (>= 0.4 pp), not as ten findings.
+
+**Quote age: the freshness condition is not testable on today's capture.** Median Pinnacle age at
+the decision is **68 min** (deciles 4.6 min .. 45 h). Only **11 of 675** were <= 2 min old.
+
+| age at decision | flat ROI | CI90 | bets |
+|---|---|---|---|
+| > 15 min | +4.4% | [-7, +17] | 481 |
+| 2-15 min | -19.1% | [-31, -6] | 183 |
+
+On this capture, fresher is not better. The reason is plausibly that the most active markets are
+re-priced, so the recent quotes cluster where the line is moving against us. That is a reading,
+not a test.
+
+**This is a retrospective on ~3 weeks of mostly NCAAF**, with cut points chosen after seeing the
+data. Step 2 is what decides it.
+
+## s8. Test B step 2 -- design question back to the user (not built)
+
+The approved forward cell ("Pinnacle <= 120 s, edge >= fee + H, depth >= stake") meets three facts:
+
+1. Pinnacle <= 120 s held for 11 of 675 orders. The forward cell would accrue ~1 bet every 2 days
+   and could not reach 150 bets / 40 games inside a season.
+2. No Pinnacle is captured for NBA, NFL or soccer.
+3. Depth at decision is not in the quote log.
+
+**It also needs no new paper-row fields:** the join above grades any FUTURE settled order after
+the fact. So step 2 can be "rerun this script on orders submitted after the pre-registration
+time", with the rule and the bar frozen now.
+
+Options (recommendation first):
+
+- **(a)** Pre-register edge >= 0.4 pp (no freshness gate), NCAAF/NHL/MLB, graded forward by this
+  script against the scorecard bar. Nothing is built; the clock starts at the registration commit.
+- **(b)** As (a), plus a fresher Pinnacle capture and Pinnacle for NBA/NFL/soccer (EU region on
+  their odds fetch). That is an OddsAPI credit decision, and only then is the <= 120 s rule
+  testable.
+- **(c)** Keep <= 120 s as approved; with today's capture it yields almost nothing.
+
 ## s5. Running it
 
 **NIGHTLY JOB (built 2026-10-24, NOT LIVE until the coordinator's restart).**
