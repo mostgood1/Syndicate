@@ -54232,3 +54232,28 @@ which is about the two sizing bases and not about the refusal boundary.
 - **first attempt aborted, nothing changed:** no `LOOP_ITERATION` within 30 min (23:36-00:06Z; that pass's layer2_shortlist_build alone ran 579.6 s). Second attempt: `LOOP_ITERATION` 00:08:31Z, ff 00:08:36Z, `reload-web` 2.0 s, healthz 200, 0 failures. **No worker restarted.**
 - **ride-alongs (5f32d9c4..b2cdb6ed, other lanes, on main by their owners):** 4584fbe9 / e01524f6 per-cell live gate (`live_cell_gate.py`, portfolio_commit + inplay_entries_live hooks) -- OFF unless `SYNDICATE_LIVE_CELL_GATE=on`; the key is ABSENT from `local_production.env` (grep count 0), and in-process worker code is not loaded until a worker restart anyway. 1a9eb4a5 inplay recorder regions us,eu (user-approved). e8453cc5 / bac2f99b live-cell-scorecard nightly job (new SCHEDULED_JOBS entry; loads at the next supervisor up). maker_vs_taker_shadow.py research script. No `vendor/` change.
 - **verify (served, unpatched `/intelligence`, Playwright, 00:09Z):** `function periodTabs` in served HTML 0 -> **1**; fleet HEAD **b2cdb6ed**. Period group: All 2,545 / Full game 2,124 / Game intervals 421, then 1st inning 3, 1st 3 innings 1, 1st 5 innings 24, 1st half 181, 2nd half 3, Q1 70, Q2 49, Q3 29, Q4 61 -- **sum 421 = Game intervals**. Each tab shows only its own segment chip; `?period=1h` lands on 1st half (181); 0 page errors.
+
+## 2026-10-25 13:13Z (8:13 AM CT) -- READING: CLV departures ledger past the old 8 MiB cap -- **#734 forward reading MET** (fix `a77077a2`; read by lane min-ev-tuner-shadow / session b98807bc, which took this reading over when the user archived the departures session)
+- **what was owed:** on a busy day, the departures file passes 8,388,608 B (the old per-date cap) with `dropped=0`, no `DEPARTURES_CEILING_HIT`, and `state.json` `ledger.bytes` equal to the file size.
+- **reading, read-only on the fleet:**
+  - Fleet HEAD `b2cdb6ed`; refresh-worker pid 1467610, code=b2cdb6ed.
+  - `reports/intelligence/clv_departures/2026-10-24.jsonl`: **9,442,668 B** (23,500 rows), last written 06:00:18Z 10-25.
+  - That is 1,054,060 B (12.6%) past the old cap. Under the old code, every row after the first 8,388,608 B would have been dropped.
+  - Per sport (B), well under the new caps of 16 MiB per sport and 32 MiB per day:
+    - nba 3,039,981
+    - ncaaf 2,657,750
+    - soccer 1,792,352
+    - nfl 915,682
+    - nhl 541,569
+    - wnba 301,708
+    - mlb 162,975
+    - unlabelled 30,651
+- **state:** `2026-10-24.state.json` `ledger.bytes` = 9,442,668, equal to the file size. The per-sport bytes sum to it, and `censored` = {}.
+- **log**, refresh-worker.log*, patterns anchored to real `[clv_departure_ledger]` lines:
+  - 240 `DEPARTURES date=2026-10-24` lines, 240 of 240 in the new format.
+  - **0 of 240 with a nonzero `dropped=`.**
+  - **0 `DEPARTURES_CEILING_HIT date=2026-10-24`.**
+  - The largest logged `bytes=` (9,442,668) equals the file size. The last line, 06:00:18Z, reads `truncated=False dropped=0`.
+- **verdict: MET.** The busiest day so far, NBA + NCAAF + soccer, wrote past the old 8 MiB ceiling and lost nothing. Todo #734's forward reading is closed by this entry.
+- **seen in passing, not investigated:** the refresh-worker status line reads `restarts=10`, the supervisor's count since its own start. Not part of this reading.
+
