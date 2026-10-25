@@ -427,6 +427,148 @@ def cmd_report(args) -> int:
     return 0
 
 
+# ---------------------------------------------------------------- recheck (NOT pre-registered)
+#
+# The registered design anchors its in-play windows and phases on the game's ACTUAL end.
+# That is look-ahead: "this game ends within 15 minutes" is unknown in real time, and it
+# selects games with no comeback, overtime or extra innings, i.e. games the leader wins.
+# The recheck re-samples MONEYLINES only, at windows anchored on the SCHEDULED start,
+# `expected_expiration_time - 3h` (set before the game; MLB tickers carry the start time and
+# agree), and keeps only windows whose anchor is before the market closed. So every print
+# is one a trader could have seen while the game was still undecided, at a known elapsed time.
+
+SCHEDULE_OFFSET = timedelta(hours=3)
+RECHECK_FRACTIONS = (0.25, 0.5, 0.75, 0.9, 1.0, 1.1)
+
+
+def elapsed_phase(t: datetime, start: datetime, sport: str) -> str | None:
+    e = (t - start) / timedelta(hours=DURATION_H[sport])
+    if t < start - timedelta(minutes=45):
+        return "pregame"
+    if e < 0.1:
+        return None
+    if e < 0.5:
+        return "early"
+    if e < 0.85:
+        return "mid"
+    return "late"
+
+
+def cmd_recheck(args) -> int:
+    out = Path(args.out)
+    rdir = out / "recheck"
+    rdir.mkdir(exist_ok=True)
+    print(f"[price_map] recheck {lower_priority()}", flush=True)
+    c = Client()
+    trades_cutoff = parse_ts(c.get("/historical/cutoff")["trades_created_ts"])
+    files = sorted((out / "games").glob("*.json"))
+    for i, f in enumerate(files):
+        dest = rdir / f.name
+        if dest.exists():
+            continue
+        rec = json.loads(f.read_text())
+        m = next(x for x in rec["markets"] if x["family"] == "game")
+        meta = (c.get(f"/markets/{m['ticker']}").get("market")
+                or c.get(f"/historical/markets/{m['ticker']}").get("market") or {})
+        exp = meta.get("expected_expiration_time")
+        row = {"sport": rec["sport"], "game": rec["game"], "half": rec["half"], "ticker": m["ticker"],
+               "result": m["result"], "fee_type": m["fee_type"], "mult": m["mult"],
+               "close_time": m["close_time"], "expected_expiration_time": exp, "windows": []}
+        if exp and m["result"] in ("yes", "no") and m["fee_type"]:
+            start = parse_ts(exp) - SCHEDULE_OFFSET
+            close = parse_ts(m["close_time"])
+            d = timedelta(hours=DURATION_H[rec["sport"]])
+            for fr in RECHECK_FRACTIONS:
+                at = start + d * fr
+                if at >= close:
+                    continue
+                row["windows"].append({"at": at.isoformat(), "fraction": fr,
+                                       "prints": fetch_window(c, m["ticker"], at, trades_cutoff)})
+        tmp = dest.with_suffix(".tmp")
+        tmp.write_text(json.dumps(row))
+        tmp.replace(dest)
+        if i % 100 == 0:
+            print(f"[price_map] recheck {i + 1}/{len(files)} req={c.n} 429={c.n429}", flush=True)
+    print(f"[price_map] recheck DONE req={c.n} 429={c.n429}", flush=True)
+    return 0
+
+
+def recheck_cells(row: dict, maker_fee_on: bool = True):
+    cells: dict = defaultdict(lambda: [0.0, 0, 0.0, 0.0, 0.0])
+    if not row.get("expected_expiration_time") or row["result"] not in ("yes", "no"):
+        return cells
+    start = parse_ts(row["expected_expiration_time"]) - SCHEDULE_OFFSET
+    seen = set()
+    for w in row["windows"]:
+        for p in w["prints"]:
+            if p["id"] in seen or p.get("block"):
+                continue
+            seen.add(p["id"])
+            ph = elapsed_phase(parse_ts(p["t"]), start, row["sport"])
+            if ph is None:
+                continue
+            for side, q, r in positions(p, row["result"], row["fee_type"], row["mult"] or 1.0, maker_fee_on):
+                b = bucket_of(q)
+                if b is None:
+                    continue
+                s = cells[(side, b, ph)]
+                s[0] += r
+                s[1] += 1
+                s[2] += r * p["count"]
+                s[3] += p["count"]
+                s[4] += q * p["count"]
+    return cells
+
+
+def end_anchored_moneyline_cells(rec: dict):
+    """The registered (end-anchored) cells restricted to the moneyline, for a like-for-like comparison."""
+    only_ml = dict(rec, markets=[m for m in rec["markets"] if m["family"] == "game"])
+    cells, _ = accumulate(only_ml)
+    return {k: v for k, v in cells.items() if len(k) == 3}
+
+
+def cmd_recheck_report(args) -> int:
+    out = Path(args.out)
+    arms = {"end-anchored (registered), moneyline": defaultdict(lambda: defaultdict(dict)),
+            "start-anchored (recheck), moneyline": defaultdict(lambda: defaultdict(dict))}
+    durations = defaultdict(list)
+    for f in sorted((out / "recheck").glob("*.json")):
+        row = json.loads(f.read_text())
+        gid = f"{row['sport']}_{row['game']}"
+        rec = json.loads((out / "games" / f.name).read_text())
+        if row.get("expected_expiration_time"):
+            durations[row["sport"]].append(
+                (parse_ts(row["close_time"]) - (parse_ts(row["expected_expiration_time"]) - SCHEDULE_OFFSET)) / timedelta(hours=1))
+        for key, s in end_anchored_moneyline_cells(rec).items():
+            arms["end-anchored (registered), moneyline"][rec["half"]][key][gid] = s
+        for key, s in recheck_cells(row).items():
+            arms["start-anchored (recheck), moneyline"][row["half"]][key][gid] = s
+    import statistics
+    lines = ["# Recheck: end-anchored vs start-anchored phases (moneyline only; NOT pre-registered)", "",
+             "Hours from scheduled start (expected_expiration_time - 3h) to moneyline close, per sport (p10 / median / p90):", ""]
+    for sp, v in sorted(durations.items()):
+        v = sorted(v)
+        lines.append(f"- {sp}: n={len(v)} p10={v[len(v) // 10]:.2f} median={statistics.median(v):.2f} p90={v[9 * len(v) // 10]:.2f}")
+    c = lambda x: "" if x is None else f"{x * 100:+.2f}"
+    for arm, halves in arms.items():
+        lines += ["", f"## {arm}", "",
+                  "| side | bucket | phase | DISC games | DISC mean c | CONF games | CONF mean c [95% CI] | verdict |",
+                  "|---|---|---|---|---|---|---|---|"]
+        keys = sorted(set(halves["discover"]) | set(halves["confirm"]), key=lambda k: (k[2], k[0], k[1]))
+        for key in keys:
+            res = {}
+            for half in ("discover", "confirm"):
+                vals = list(halves[half].get(key, {}).values())
+                res[half] = (len(vals),) + (bootstrap_ci([v[0] for v in vals], [v[1] for v in vals]) if vals else (None, None, None))
+            (dg, dm, _, _), (cg, cm, clo, chi) = res["discover"], res["confirm"]
+            v = verdict(dg, cg, dm, clo, chi)
+            lines.append(f"| {key[0]} | {key[1]} | {key[2]} | {dg} | {c(dm)} | {cg} | {c(cm)} [{c(clo)}, {c(chi)}] | {v} |")
+    text = "\n".join(lines) + "\n"
+    (out / "recheck_report.md").write_text(text, encoding="utf-8")
+    print(text)
+    return 0
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -436,8 +578,11 @@ def main(argv=None) -> int:
     r = sub.add_parser("report")
     r.add_argument("--out", required=True)
     r.add_argument("--maker-fee-zero", action="store_true")
+    for name in ("recheck", "recheck-report"):
+        sub.add_parser(name).add_argument("--out", required=True)
     a = ap.parse_args(argv)
-    return cmd_fetch(a) if a.cmd == "fetch" else cmd_report(a)
+    return {"fetch": cmd_fetch, "report": cmd_report, "recheck": cmd_recheck,
+            "recheck-report": cmd_recheck_report}[a.cmd](a)
 
 
 if __name__ == "__main__":

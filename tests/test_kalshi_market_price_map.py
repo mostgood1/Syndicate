@@ -109,3 +109,22 @@ def test_the_script_has_no_order_or_credential_path():
     assert not any(m and m.startswith("syndicate") for m in mods)
     src = _PATH.read_text(encoding="utf-8")
     assert "method=\"POST\"" not in src and "Authorization" not in src and "KALSHI-ACCESS" not in src
+
+
+def test_recheck_phase_is_elapsed_from_the_scheduled_start_not_the_end():
+    start = datetime(2026, 10, 23, 0, 15, tzinfo=timezone.utc)
+    d = timedelta(hours=pm.DURATION_H["nfl"])
+    assert pm.elapsed_phase(start - timedelta(hours=1), start, "nfl") == "pregame"
+    assert pm.elapsed_phase(start + d * 0.05, start, "nfl") is None
+    assert pm.elapsed_phase(start + d * 0.3, start, "nfl") == "early"
+    assert pm.elapsed_phase(start + d * 0.6, start, "nfl") == "mid"
+    assert pm.elapsed_phase(start + d * 1.05, start, "nfl") == "late"
+
+
+def test_recheck_cells_dedupe_prints_across_windows():
+    row = {"sport": "nfl", "result": "yes", "fee_type": "quadratic", "mult": 1.0,
+           "expected_expiration_time": "2026-10-23T03:15:00Z", "windows": [
+               {"prints": [{"id": "a", "t": "2026-10-23T02:00:00Z", "yes_price": 0.8, "count": 1, "taker_side": "yes"}]},
+               {"prints": [{"id": "a", "t": "2026-10-23T02:00:00Z", "yes_price": 0.8, "count": 1, "taker_side": "yes"}]}]}
+    cells = pm.recheck_cells(row)
+    assert cells[("taker", "70-85", "mid")][1] == 1
