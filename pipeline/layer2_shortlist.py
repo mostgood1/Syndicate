@@ -1946,6 +1946,18 @@ def build_layer2_shortlist(
         print(f"[layer2_shortlist] VENUE_REPRICE_FAILED {type(exc).__name__}: {exc}", flush=True)
 
     try:
+        # News again, right before selection (lane news-availability-gate, 2026-10-25): the build read it in its NHL
+        # slot minutes ago, and a scratch posted since must not be seated by THIS build (10-23: 7:41 PM COL scratch,
+        # read at 7:40:25, missed the 7:46 PM shortlist and its portfolio_commit).
+        from syndicate.features.shared import news_availability
+
+        restamped = news_availability.restamp_out_players(opportunities)
+        if restamped:
+            print(f"[layer2_shortlist] NEWS_RESTAMP_AT_SELECT {restamped}", flush=True)
+    except Exception as exc:  # noqa: BLE001 -- the earlier stamp still stands; never fatal to the build
+        print(f"[layer2_shortlist] NEWS_RESTAMP_FAILED {type(exc).__name__}: {exc}", flush=True)
+
+    try:
         # The board's own date anchors the horizon (lane `layer2-next-day-horizon`): a next-day board built before 7 PM CT
         # otherwise drops every game of that day starting after 7 PM CT. See `select_shortlist`.
         anchor = _date_start_central(selected_date)

@@ -258,3 +258,52 @@ def test_flagged_rows_are_counted_per_sport_by_the_layer2_gate(root):
     assert result["rows_player_out_on_feed_by_sport"] == {"nfl": 1, "nhl": 1}
     sample = {row["player_name"]: row["availability"] for row in result["rows_player_out_on_feed_sample"]}
     assert sample["Cale Makar"]["status"] == "OUT" and sample["Rashee Rice"]["feed_team"] == "Kansas City Chiefs"
+
+
+def test_scratches_do_not_wait_on_the_injury_feed(root):
+    # 2026-10-25: an absent, stale or unreadable `_state/nhl_injuries.json` dropped every NHL scratch with it, silently.
+    _write_gameinfo(root, "2026-10-14", [
+        {"game_id": "2026020100", "captured_at": "2026-10-14T00:11:16Z", "start_utc": "2026-10-14T00:30:00Z",
+         "away": "COL", "home": "DAL", "away_scratches": [{"id": 1, "name": "Cale Makar"}], "home_scratches": []}])
+    row = _prop("Cale Makar", "Dallas Stars", "Colorado Avalanche", "nhl", commence="2026-10-14T00:40:00Z")
+    absent = na.flag_out_player_props([row], sport="nhl", now=NOW)["out_player_props"]
+    assert absent["feed_status"] == "absent" and absent["rows_flagged"] == 1 and _status(row) == "INACTIVE"
+    path = _write_state(root, "nhl", [])
+    os.utime(path, (NOW.timestamp() - 25 * 3600,) * 2)
+    assert len(na.out_index("nhl", now=NOW)["scratches"]) == 1                      # stale injuries, scratch kept
+
+
+def test_restamp_at_select_flags_a_scratch_posted_after_the_first_read(root, monkeypatch):
+    # 10-23: a 7:41 PM COL scratch missed the 7:46 PM shortlist because the build had read news at 7:40:25.
+    _write_state(root, "nhl", [])
+    late = _prop("Cale Makar", "Dallas Stars", "Colorado Avalanche", "nhl", commence="2026-10-14T00:40:00Z")
+    other = _prop("Nathan MacKinnon", "Dallas Stars", "Colorado Avalanche", "nhl", commence="2026-10-14T00:40:00Z")
+    already = _prop("Rashee Rice", "Kansas City Chiefs", "Las Vegas Raiders", "nfl",
+                    player_availability={"status": "OUT", "source": "espn_injuries"})
+    assert na.restamp_out_players([late, other, already], now=NOW) == {}          # nothing posted yet: nothing stamped
+    _write_gameinfo(root, "2026-10-14", [
+        {"game_id": "2026020100", "captured_at": "2026-10-14T00:11:16Z", "start_utc": "2026-10-14T00:30:00Z",
+         "away": "COL", "home": "DAL", "away_scratches": [{"id": 1, "name": "Cale Makar"}], "home_scratches": []}])
+    assert na.restamp_out_players([late, other, already], now=NOW) == {"nhl": 1}
+    assert _status(late) == "INACTIVE" and late["player_availability"]["stamped_at"] == "select"
+    assert _status(other) is None and late["projection"] == {"edge_vs_market_pct": 5.0}   # the stamp only
+    assert already["player_availability"] == {"status": "OUT", "source": "espn_injuries"}
+    monkeypatch.setenv(na.SWITCH_ENV, "off")
+    assert na.restamp_out_players([_prop("Cale Makar", "Dallas Stars", "Colorado Avalanche", "nhl",
+                                         commence="2026-10-14T00:40:00Z")], now=NOW) == {}
+
+
+def test_the_pool_count_shows_flagged_rows_an_earlier_rule_removed(root):
+    # 10-23: six flagged NHL rows left before the gate (quote age, uninformative EV) and the gate's count read no nhl.
+    from syndicate.features.shared.layer2_board import select_shortlist
+
+    def scored(player: str, age_s: float) -> dict:
+        return _prop(player, "Colorado Avalanche", "Dallas Stars", "nhl", side="over", event_id=f"evt-{player}",
+                     ev_pct=2.5, model_edge_pct=4.1, score={"score": 2.5, "value_pct": 2.5},
+                     player_availability={"status": "INACTIVE", "source": "nhl_gameinfo"},
+                     quote={"price": 118, "fair_probability": 0.44, "fair_method": "consensus_no_vig", "books_quoting": 4,
+                            "quote_seen_age_seconds": age_s})
+
+    result = select_shortlist([scored("Cale Makar", 60.0), scored("Devon Toews", 50_000.0)], now=NOW)
+    assert result["rows_player_out_in_pool_by_sport"] == {"nhl": 2}
+    assert result["rows_player_out_on_feed_by_sport"] == {"nhl": 1}                 # the stale one went to quote age first

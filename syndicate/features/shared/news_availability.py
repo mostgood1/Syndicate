@@ -183,17 +183,20 @@ def out_index(sport: str, *, root: Path | None = None, now: datetime | None = No
     root = root if root is not None else news_root()
     if root is None:
         return {"feed_status": "absent", "out": {}, "scratches": {}}
+    # Scratches come from the gameinfo feed, not the injury state, so they never wait on it (2026-10-25: an absent,
+    # stale or unreadable `_state/<sport>_injuries.json` used to drop every NHL scratch with it, silently).
+    scratches = _scratches(root, sport, now)
     state_path = root / "_state" / f"{sport}_injuries.json"
     if not state_path.is_file():
-        return {"feed_status": "absent", "out": {}, "scratches": {}}
+        return {"feed_status": "absent", "out": {}, "scratches": scratches}
     age = now - datetime.fromtimestamp(state_path.stat().st_mtime, timezone.utc)
     age_minutes = round(age.total_seconds() / 60, 1)
     if age > STATE_MAX_AGE:
-        return {"feed_status": "stale", "state_age_minutes": age_minutes, "out": {}, "scratches": {}}
+        return {"feed_status": "stale", "state_age_minutes": age_minutes, "out": {}, "scratches": scratches}
     try:
         state = json.loads(state_path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        return {"feed_status": "unreadable", "state_age_minutes": age_minutes, "out": {}, "scratches": {}}
+        return {"feed_status": "unreadable", "state_age_minutes": age_minutes, "out": {}, "scratches": scratches}
     out: dict[tuple[str, str], dict[str, Any]] = {}
     for item in (state.values() if isinstance(state, Mapping) else []):
         if not isinstance(item, Mapping):
@@ -205,7 +208,60 @@ def out_index(sport: str, *, root: Path | None = None, now: datetime | None = No
                 "status": status, "feed_status_text": item.get("status"), "team": item.get("team"),
                 "source": "espn_injuries", "source_updated_at": item.get("source_updated_at"),
             }
-    return {"feed_status": "ok", "state_age_minutes": age_minutes, "out": out, "scratches": _scratches(root, sport, now)}
+    return {"feed_status": "ok", "state_age_minutes": age_minutes, "out": out, "scratches": scratches}
+
+
+def _entry_for(row: Mapping[str, Any], sport: str, out: Mapping, scratches: Mapping) -> dict[str, Any] | None:
+    """The OUT / scratch entry for a prop row (team + name, a scratch only for its own game day), or None. The season
+    gate applies: a row outside its sport's window is never matched."""
+    from syndicate.features.shared.basketball_props_availability import player_key
+
+    name = player_key(row.get("player_name"))
+    if not name:
+        return None
+    game_day = _game_day(row.get("commence_time"))
+    if season_window(sport, game_day) not in ("open", "ungated"):
+        return None
+    for team in (team_key(sport, row.get(side)) for side in ("home_team", "away_team")):
+        if team:
+            entry = (scratches.get((game_day, team, name)) if game_day else None) or out.get((team, name))
+            if entry:
+                return entry
+    return None
+
+
+def restamp_out_players(rows: list, *, now: datetime | None = None, root: Path | None = None) -> dict[str, int]:
+    """Re-read the feeds and stamp `player_availability` on prop rows that do not carry it yet -- run on the shortlist's
+    candidates right before `select_shortlist` (2026-10-25). The board reads news once per build in its NHL slot, 3-6
+    min before the shortlist is written; on 10-23 a 7:41 PM scratch missed the 7:46 PM shortlist (read at 7:40:25) and
+    its portfolio_commit, and landed on the 7:56 PM one. Only the stamp: no projection edits, no log line. Returns
+    {sport: rows stamped}."""
+    from syndicate.features.shared.basketball_props_availability import REFUSAL_REASON
+
+    if not enabled():
+        return {}
+    by_sport: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        sport = str(row.get("sport") or "").strip().lower() if isinstance(row, dict) else ""
+        if sport in SPORTS and str(row.get("kind") or "") == "prop" and not row.get("player_availability"):
+            by_sport.setdefault(sport, []).append(row)
+    stamped: dict[str, int] = {}
+    for sport, group in by_sport.items():
+        index = out_index(sport, root=root, now=now)
+        out, scratches = index.get("out") or {}, index.get("scratches") or {}
+        if not out and not scratches:
+            continue
+        for row in group:
+            entry = _entry_for(row, sport, out, scratches)
+            if entry:
+                row["player_availability"] = {
+                    "status": entry["status"], "reason": REFUSAL_REASON,
+                    "feed_date": entry.get("captured_at") or entry.get("source_updated_at"),
+                    "feed_team": entry.get("team"), "feed_status_text": entry.get("feed_status_text"),
+                    "source": entry.get("source"), "stamped_at": "select",
+                }
+                stamped[sport] = stamped.get(sport, 0) + 1
+    return stamped
 
 
 def flag_out_player_props(grid: list, *, sport: str, now: datetime | None = None,

@@ -5846,6 +5846,16 @@ def select_shortlist(
     if horizon_anchor is not None:
         anchor = horizon_anchor if horizon_anchor.tzinfo else horizon_anchor.replace(tzinfo=timezone.utc)
         horizon_now = max(reference_now, anchor.astimezone(timezone.utc))
+    # Every flagged-OUT row the pool HOLDS, before any rule removes it (lane news-availability-gate, 2026-10-25). The
+    # gate's own count only sees rows that survived every earlier `continue` (quote age, uninformative EV ...): on
+    # 10-23 six flagged NHL rows went before reaching it and `rows_player_out_on_feed_by_sport` read no `nhl` at all,
+    # which a reader cannot tell from a broken gate. in_pool minus on_feed = removed by an earlier rule.
+    player_out_in_pool_by_sport: dict[str, int] = {}
+    for row in opportunities:
+        availability = row.get("player_availability") if isinstance(row, Mapping) else None
+        if isinstance(availability, Mapping) and str(availability.get("status") or "").strip().upper() in {"OUT", "SUSPENDED", "INACTIVE"}:
+            pool_sport = str(row.get("sport") or "").strip().lower() or "unknown"
+            player_out_in_pool_by_sport[pool_sport] = player_out_in_pool_by_sport.get(pool_sport, 0) + 1
     for row in opportunities:
         if not _within_horizon(row, horizon_now, horizon_days):
             beyond_horizon += 1
@@ -6276,6 +6286,7 @@ def select_shortlist(
         "rows_uninformative_ev": uninformative_ev,
         "rows_player_out_on_feed": player_out_on_feed,
         "rows_player_out_on_feed_by_sport": dict(sorted(player_out_on_feed_by_sport.items())),
+        "rows_player_out_in_pool_by_sport": dict(sorted(player_out_in_pool_by_sport.items())),
         "rows_player_out_on_feed_sample": player_out_on_feed_sample,
         # `[2026-09-11, user decision]`: one-sided rows withheld because their
         # ONLY value was an unmeasured model's edge. Counter, per-market
