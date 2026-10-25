@@ -166,3 +166,18 @@ def test_the_venue_loop_filters_live_rows_before_the_live_plan_is_written():
     hook = src.index("live_cell_gate.filter_rows(live_scoped, venue=venue, gate=gate)")
     write = src.index("_write_live_venue_plan(\n                    live_scoped,")
     assert src.index("live_scoped, live_scope_refusals = scoped, scope_refusals") < hook < write
+
+
+def test_the_read_only_path_fails_closed_on_absent_or_stale_state():
+    fresh = {"evaluated_at": "2026-10-25T13:30:00Z", "cells": {"kalshi|nba|spread|in_game": {"status": "tripped"}}}
+    ok = g._read_only_gate(now=NOW, read_state_fn=lambda: (fresh, True))
+    assert ok["unknown"] is None and g.allows("kalshi|nba|spread|in_game", ok)[0] is False
+    assert g.allows("kalshi|nba|total|in_game", ok) == (True, None)
+    # absent: the evaluator has not reached the state -> refuse, never "all armed"
+    absent = g._read_only_gate(now=NOW, read_state_fn=lambda: (None, True))
+    assert absent["unknown"] and g.allows("kalshi|nba|total|in_game", absent) == (False, g.REFUSAL_UNKNOWN)
+    # stale: older than READ_ONLY_MAX_AGE_SECONDS
+    stale = g._read_only_gate(now=NOW + timedelta(hours=4), read_state_fn=lambda: (fresh, True))
+    assert stale["unknown"] and g.allows("kalshi|nba|total|in_game", stale)[0] is False
+    undated = g._read_only_gate(now=NOW, read_state_fn=lambda: ({"cells": {}}, True))
+    assert undated["unknown"]

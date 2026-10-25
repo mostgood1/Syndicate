@@ -367,13 +367,30 @@ def allows(cell: str, gate: Mapping[str, Any] | None = None) -> tuple[bool, str 
     return True, None
 
 
-def _read_only_gate() -> dict[str, Any]:
-    """For a process that does not evaluate (the in-game path): the persisted state, fail closed."""
+#: How old the persisted evaluation may be before a READ-ONLY consumer treats the gate as unknown. The refresh-worker
+#: re-evaluates on every portfolio commit with live plans (cached EVAL_TTL_SECONDS), many times an hour on a slate.
+READ_ONLY_MAX_AGE_SECONDS = 3 * 3600.0
+
+
+def _read_only_gate(*, now: datetime | None = None, read_state_fn=None) -> dict[str, Any]:
+    """For a process that does not evaluate (the in-game path): the persisted state, FAIL CLOSED.
+
+    ABSENT IS NOT "ALL ARMED" HERE [2026-10-25, raised by lane in-game-trading 4 min after the first fleet up]. For the
+    evaluator a confirmed-absent state is its first run. For a reader it means the evaluator has not reached the state
+    -- never run, or not since READ_ONLY_MAX_AGE_SECONDS -- and reading that as "every cell armed" would make the gate
+    silently inert while looking on. So absent, undated or stale -> unknown -> `allows` refuses.
+    """
     try:
-        state, ok = _read_state()
+        state, ok = (read_state_fn or _read_state)()
         if ok is not True:
             return {"cells": {}, "unknown": "state read not ok"}
-        return {"cells": (state or {}).get("cells") or {}, "unknown": None}
+        if not state:
+            return {"cells": {}, "unknown": "state absent (the refresh-worker has not evaluated)"}
+        evaluated = parse_ts(state.get("evaluated_at"))
+        age = None if evaluated is None else ((now or datetime.now(timezone.utc)) - evaluated).total_seconds()
+        if age is None or age > READ_ONLY_MAX_AGE_SECONDS:
+            return {"cells": {}, "unknown": f"state stale (evaluated_at={state.get('evaluated_at')})"}
+        return {"cells": state.get("cells") or {}, "unknown": None}
     except Exception as exc:
         return {"cells": {}, "unknown": f"{type(exc).__name__}: {exc}"[:160]}
 
