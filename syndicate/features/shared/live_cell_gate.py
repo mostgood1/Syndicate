@@ -368,8 +368,11 @@ def allows(cell: str, gate: Mapping[str, Any] | None = None) -> tuple[bool, str 
 
 
 #: How old the persisted evaluation may be before a READ-ONLY consumer treats the gate as unknown. The refresh-worker
-#: re-evaluates on every portfolio commit with live plans (cached EVAL_TTL_SECONDS), many times an hour on a slate.
-READ_ONLY_MAX_AGE_SECONDS = 3 * 3600.0
+#: re-evaluates on every portfolio commit with live plans (cached EVAL_TTL_SECONDS). MEASURED 2026-10-25 over 1,733
+#: Kalshi live-plan writes, 10-18..10-25 (refresh-worker logs): the longest gaps between commits were 166 and 160 min,
+#: both INSIDE evening slates (10-21 23:16Z->02:01Z, 10-24 23:57Z->02:37Z) -- a 3 h bound left 14 min of margin
+#: exactly when in-game entries trade (raised by lane in-game-trading). 6 h is ~2x the worst gap measured.
+READ_ONLY_MAX_AGE_SECONDS = 6 * 3600.0
 
 
 def _read_only_gate(*, now: datetime | None = None, read_state_fn=None) -> dict[str, Any]:

@@ -177,7 +177,8 @@ def test_the_read_only_path_fails_closed_on_absent_or_stale_state():
     absent = g._read_only_gate(now=NOW, read_state_fn=lambda: (None, True))
     assert absent["unknown"] and g.allows("kalshi|nba|total|in_game", absent) == (False, g.REFUSAL_UNKNOWN)
     # stale: older than READ_ONLY_MAX_AGE_SECONDS
-    stale = g._read_only_gate(now=NOW + timedelta(hours=4), read_state_fn=lambda: (fresh, True))
+    assert g._read_only_gate(now=NOW + timedelta(hours=4), read_state_fn=lambda: (fresh, True))["unknown"] is None
+    stale = g._read_only_gate(now=NOW + timedelta(hours=7), read_state_fn=lambda: (fresh, True))
     assert stale["unknown"] and g.allows("kalshi|nba|total|in_game", stale)[0] is False
     undated = g._read_only_gate(now=NOW, read_state_fn=lambda: ({"cells": {}}, True))
     assert undated["unknown"]
