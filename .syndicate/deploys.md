@@ -54281,3 +54281,13 @@ which is about the two sizing bases and not about the refusal boundary.
 - verify (READ 15:34:31Z, /proc/<pid>/environ): refresh-worker pid 1826730 LIVE_CELL_GATE=on, MAKER_PILOT absent; live-odds pid 1826731 LIVE_CELL_GATE=on, MAKER_PILOT=on; HEAD 6753375b. All prior live keys unchanged (price band 0.40,0.75, hold 0.90, exits 50/$250, event cap 50, PM at-ask floor 5, inplay entries on).
 - NOT IN THIS UP: bbc90e69 (Pinnacle NBA/NFL/soccer/WNBA + 3 env keys), 29d2cfc8 + 3210958e (live_cell_gate in-game path fails closed on absent/stale eval -- until loaded, the in-game cell gate is INERT). Need the next full down/up.
 - owed: first maker ROUTE/POST line (maker-orders-study); gate tripped cells read (profit-program).
+
+## 2026-10-25 16:29Z (11:29 AM CT) -- FLEET full down/up: ff 6753375b -> f1e0794e + Pinnacle region keys (coordinator 332cb014)
+- user approvals (this chat): Pinnacle "Add it now"; restart timing "Now (>=16:22Z)".
+- carries: bbc90e69 (Pinnacle into NBA 10-book list; NFL/soccer per-sport game-line regions), 29d2cfc8 + 3210958e (in-game cell-gate read fails closed on absent / >6 h stale state), f1e0794e (maker pilot: quiet skip for held-as-taker; FILL line filled_as=maker|TAKER). Ride-alongs: scripts/tests only (deploy_preflight fleet target, backfill/decile/price-map scripts); no vendor/.
+- claims (holder pinnacle-cellgate-up) acquired 16:22:33Z, released 16:40Z. Refresh side idle 16:29:17Z.
+- env 185 -> 188 (backup local_production.env.bak-pinnacle-20261025T162920Z): +SYNDICATE_NFL_GAME_LINE_REGIONS=eu, +SYNDICATE_SOCCER_GAME_LINE_REGIONS=eu, +SYNDICATE_WNBA_ODDS_REGIONS=us_ex,eu. Expected cost per profit-program: ~+136-146k OddsAPI credits/month (soccer ~106k; revert soccer alone by setting its key empty).
+- down rc=0 16:29:32Z; task start 16:29:39Z; health=200 16:29:40Z; drain cleared.
+- verify (READ ~16:30Z, /proc/<pid>/environ): HEAD f1e0794e, bbc90e69/29d2cfc8/3210958e/f1e0794e all ancestors. Both workers: NFL/SOCCER regions=eu, WNBA=us_ex,eu, LIVE_CELL_GATE=on. Live-odds pid 1866308: MAKER_PILOT=on, INPLAY_ENTRIES=on, EXECUTION_MODE=live, price band 0.40,0.75, hold 0.90, event cap 50.
+- correction to the 15:22Z entry: the in-game cell gate was not inert once the refresh-worker wrote a state (first evaluation 15:39:11Z, 45 cells, tripped=2 as predicted, per profit-program); only the never-evaluated case read as allow-all.
+- OWED: Pinnacle rows in nba/nfl/soccer book_quotes shards (0 before) and one NFL game-line call reading x-requests-last=6 (from 3) -- profit-program reads them.
