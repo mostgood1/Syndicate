@@ -1458,6 +1458,7 @@ death, never life — do not invert it.
 - Verification: findings file on origin/main; coordinator a21617bf messaged with summary and owed user decisions
 - Blocked by: none
 - **STATUS 2026-10-24 ~22:45Z — FINDINGS DELIVERED.** 13 methods graded with sources; Kalshi LIP read live (7,454 active programs, 0 on any game/spread/total series we trade). Top 3: (A) market-wide Kalshi sports price-bucket x maker/taker returns on public history; (B) fresh-Pinnacle edge-decile retrospective then paper cell; (C) late-game in-play cells pre-registered. Waiting on the user (via coordinator) for which to build; nothing built.
+- **STATUS 2026-10-25 ~10:40Z — TEST A DONE; D DRAFTED.** `findings_2026-10-24_kalshi_market_price_map.md`. Registered: KILL not met (14/48 cells), but the 55-95c favourite passes are look-ahead (end-anchored phases). Start-anchored recheck plus in-play-program's Test C: only 95-99c in-play favourites survive (+1.1..+1.6c per contract), and no pregame cell passes. R3 (95-99c paper cell, in-play-program) is a user decision. Email D draft at docs/drafts/ (the user sends it). Lane can close once the coordinator acks.
 
 ### polymarket-nba-alt-lines — OPEN — opened 2026-10-24 — session 6be345a0-e307-4384-84b8-2c5c5cdfc626
 - Goal: NBA spreads_alt/totals_alt board rows pair with Polymarket per-rung markets through the board join + resolvers (user-approved 'Yes, build it' in coordinator 332cb014 chat 2026-10-24); never a different line or a segment market

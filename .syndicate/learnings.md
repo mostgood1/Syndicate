@@ -2873,3 +2873,16 @@ The 2026-10-20 entry said: "Rating INPUTS transfer, because the sim reads them w
   - When a money-moving step is refused, stop and tell the user which action type needs a standing rule (Edit on file X, Bash/PowerShell for the deploy), or hand them the commands to run themselves.
   - Never route it through a peer session: the coordinator's checker refused the same switch as a bypass.
   - Releasing the claims taken for the refused step is part of stopping.
+
+## 2026-10-25 - A real-time cell anchored on an OUTCOME-TIME quantity is look-ahead: the game's end time made late favourites look like +6..+18c `[lane pm-trader-strategies, session dbda2142]`
+- **What we believed:** Test A's pre-registration phased in-play prints by time before the moneyline CLOSE ("final" = the last 15 min before the game ended), and that looked like a neutral clock.
+- **What was actually true:** the close time is only known after the game.
+  - Conditioning on "ends within 15 minutes" drops comebacks, overtime and extra innings, i.e. it keeps games the leader wins.
+  - 10 of the 14 registered passes (55-95c favourites) were that bias.
+  - Re-sampled from the SCHEDULED start (`expected_expiration_time - 3h`), every 55-95c cell went to about 0. Example: taker 85-95c late, +7.2c [+4.5, +9.1] -> +1.2c [-2.0, +4.3].
+  - in-play-program's real-time ESPN-clock cell agreed independently: -1.7c per game.
+- **How we found out:** the passes were largest exactly where the conditioning was strongest (the final 15 min), and both sides of the 95c+ bucket were positive at once. Both are signatures of a selected sample, not of a mispriced market.
+- **Rule:**
+  - Every timestamp a cell is defined by, or sampled at, must be knowable at the decision instant: a scheduled start, a live clock, an elapsed time. Never the event's end, settlement time, or the market's close.
+  - This applies to sampling windows as well as labels. A window anchored on the end leaks even if each print is relabelled afterwards.
+  - Check it in the pre-registration: for each time anchor, write down when it becomes known.
