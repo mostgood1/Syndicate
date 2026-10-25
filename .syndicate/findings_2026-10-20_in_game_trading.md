@@ -475,3 +475,16 @@ What it means:
   - 29 placed.
 - **NO-leg fix (5f32d9c4) confirmed:** 15 NO legs placed on the night. Before the fix, 22 NO legs had been refused no_live_price (16:18-20:39Z).
 - **Order fields (2b7a29c4) confirmed:** 34 of 34 rows carry home_team / away_team / commence_time / event_id.
+
+## 14. PRE-REGISTRATION: R3, 95-99c in-play moneyline favourites, PAPER (locked 2026-10-25, before any result)
+
+USER DECISION (via coordinator 332cb014): R3 from findings_2026-10-24_kalshi_market_price_map.md (8147d6a6), owned by this lane. Paper only; never live from this registration.
+
+- **Data:** the nightly recorder nights (Kalshi ask every ~10 s, ESPN state every ~60 s); sports nba, nhl, ncaaf, nfl; Kalshi MONEYLINE tickers only (KX*GAME); settled only.
+- **In play:** the latest ESPN row at or before the quote has state "in" (real-time; never the game's end time).
+- **Rule:** buy the favourite at the ask when its ask is in [0.95, 0.99), in play. At most ONE entry per game: the first qualifying quote across the game's moneyline tickers and legs (YES on one team and NO on the other are the same bet). Held to settlement.
+- **Metric:** per-game net return = won - ask - fee. Fee = 0.07*p*(1-p), the formula. The 1-contract round-up-to-1c fee is reported as a sensitivity row (at 0.97: 0.2c vs 1c).
+- **GO:** >= 150 games AND game-clustered 95% bootstrap CI lower bound > 0 (2,000 draws, seed 20261024), AND the CI lower bound is still > 0 with NFL excluded; NFL alone reported.
+- **KILL:** CI upper < 0 at >= 150 games, OR a realised loss rate (share of games whose entry lost) above 3% at >= 150 games.
+- **Fewer than 150 games:** INSUFFICIENT; keep accruing. It runs nightly inside scripts/inplay_late_cells.py, to the 12-31 calendar stop.
+- **A GO changes nothing live.** The price-map lane sizes it at about 1.5% of a small stake; any live use is a new user decision.
