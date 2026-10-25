@@ -229,6 +229,20 @@ Test A is new. Test B is a new axis for the scorecard. Test C pre-registers a ce
 - **Hold-vs-trade:** already measured (take-profit loses vs hold).
 - **Sizing:** downstream of a proven edge.
 
+### Test B, first read (profit-program, d0714600, findings s9; 2026-10-24)
+
+- **Consensus arm:** 3,009 settled venue-priced orders. All ten consensus-edge deciles are negative (D01 -6.4% .. D10 -5.7%), and no 90% CI is above 0.
+  - The predicted winner, top decile with >= 3 fresh books, is -8.2% [-21.9, +6.5] on 164 bets.
+  - The edge predicts the consensus CLOSE (-5.1 to +1.8 pp) but not the money.
+- **Pinnacle arm, same 721 orders:** Pinnacle edge >= 0.4 is +11.2%, against +3.0% for consensus edge >= 0.4.
+  - Consensus >= 0.4 with Pinnacle < 0.4: -35.6% [-65, -3] on 38 bets.
+  - Pinnacle >= 0.4 with consensus < 0.4: +6.0% on 65 bets.
+- **Correction to my §1 row 3:** Kaunitz's alpha of about 0.05 is NOT an edge threshold.
+  - It is each outcome's average vig: the regression intercept of results on the raw consensus, -0.034 / -0.057 / -0.037.
+  - Their rule is an edge > 0 over the margin-removed consensus. Their profit came from outlier SOFT-book prices.
+  - So profit-program's arm is the faithful test, and it fails on exchange prices: there is no soft-book outlier to harvest.
+  - The surviving lead is a sharp book's information (Pinnacle), which a soft-book average does not carry.
+
 ## 4. Decisions owed to the user
 
 1. **Build Test A?** It is a new research lane: one script and public data. It is the cheapest way to learn whether ANY structural edge exists in our markets under today's fees.
