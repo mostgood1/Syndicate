@@ -763,6 +763,66 @@ def sanitize_book_quotes_shard(path: Path) -> dict[str, Any] | None:
     return {"path": str(target), "dropped": dropped, "kept": kept, "bytes_before": size, "bytes_after": int(after.st_size)}
 
 
+# THE FETCH HEARTBEAT [2026-10-25, lane live-cell-scorecard, on LOAN from book-quotes-splice-repair; user "F0 only"
+# via the coordinator 332cb014]. The change log above records when a price MOVED, and the state sidecar's last-seen
+# slot records when we last LOOKED -- but only the latest look, overwritten every cycle. So "how old was our copy of
+# Pinnacle when this order was placed" is unrecoverable afterwards, which is what a freshness rule (Test B, pre-
+# registered 80ee76dd) needs. One compact line per fetch that observed anything: when, which events, which books
+# answered, and which events Pinnacle answered for. Its OWN DIRECTORY, `tracking/book_quotes_heartbeat/`, not a
+# sibling in `book_quotes/`: a dozen readers glob `book_quotes/*.jsonl` as quote shards, the hot-artifact allowlist
+# among them (`artifact_publisher` "*_source/tracking/book_quotes/*.jsonl"), and none must see this. Local to the
+# fleet disk (not published). Zero OddsAPI credits. Never raises into the refresh.
+HEARTBEAT_DIRNAME = "book_quotes_heartbeat"
+
+
+def heartbeat_path(sport: str, date_str: str) -> Path:
+    return book_quotes_path(sport, date_str).parent.parent / HEARTBEAT_DIRNAME / f"{str(date_str).strip()}.jsonl"
+
+
+def _heartbeat_note(heartbeat: dict[str, set], row: Mapping[str, Any]) -> None:
+    event = str(row.get("event_id") or "")
+    book = str(row.get("bookmaker") or "")
+    if event:
+        heartbeat["events"].add(event)
+    if book:
+        heartbeat["books"].add(book)
+    if event and book == "pinnacle":
+        heartbeat["pinnacle_events"].add(event)
+
+
+def _append_heartbeat(*, sport: str, date_str: str, captured_at: str, heartbeat: Mapping[str, set]) -> None:
+    try:
+        path = heartbeat_path(sport, date_str)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        line = json.dumps({"captured_at": captured_at, "sport": sport, "date": date_str,
+                           "events": sorted(heartbeat["events"]), "books": sorted(heartbeat["books"]),
+                           "pinnacle_events": sorted(heartbeat["pinnacle_events"])}, separators=(",", ":"))
+        with shard_append_lock(path):
+            with path.open("a", encoding="utf-8") as handle:
+                handle.write(line + "\n")
+    except Exception as exc:
+        print(f"[odds_book_quotes] HEARTBEAT_FAILED sport={sport} date={date_str} error={type(exc).__name__}: {exc}",
+              flush=True)
+
+
+def read_fetch_heartbeats(sport: str, date_str: str) -> list[dict[str, Any]]:
+    """Every heartbeat line for one shard date, oldest first; [] when absent or unreadable (unknown, not stale)."""
+    path = heartbeat_path(sport, date_str)
+    out: list[dict[str, Any]] = []
+    try:
+        with path.open("r", encoding="utf-8", errors="replace") as handle:
+            for line in handle:
+                try:
+                    row = json.loads(line)
+                except ValueError:
+                    continue
+                if isinstance(row, dict):
+                    out.append(row)
+    except OSError:
+        return []
+    return out
+
+
 def append_book_quotes(
     *,
     sport: str,
@@ -788,6 +848,7 @@ def append_book_quotes(
 
         appended: list[dict[str, Any]] = []
         seen_this_call: set[str] = set()
+        heartbeat: dict[str, set] = {"events": set(), "books": set(), "pinnacle_events": set()}
         considered = 0
         observed = 0
         for raw in rows or ():
@@ -806,6 +867,7 @@ def append_book_quotes(
                 continue
             seen_this_call.add(key)
             observed += 1
+            _heartbeat_note(heartbeat, normalized)
             previous = state.get(key) or []
             current = [normalized.get("line"), normalized.get("price")]
             # LAST-SEEN, third slot. This log is a CHANGE log by design: a price
@@ -853,6 +915,8 @@ def append_book_quotes(
         # precisely the evidence needed to tell "stable" from "stopped looking".
         if appended or observed:
             _write_state(state_path, state)
+        if observed:
+            _append_heartbeat(sport=sport, date_str=date_str, captured_at=captured_at, heartbeat=heartbeat)
 
         result = {
             "path": str(path),
