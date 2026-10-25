@@ -1490,7 +1490,7 @@ death, never life — do not invert it.
 - Verification: live run against the fleet for web and refresh-worker prints CLEAR/HOLD with the fleet's loaded commits and no Render request; existing preflight tests pass
 - Blocked by: none
 
-### deploy-guard-fleet — OPEN — opened 2026-10-25 — session 4b29d941-3df8-4b0d-b2d0-f5ec0f49d3a3
+### deploy-guard-fleet — CLOSED 2026-10-25 (GOAL MET: fleet ff / reload-web / role TERM / down need claim + CLEAR preflight; 016eef3d installed in the PRIMARY tree hooks-only (backups C:/tmp/primary-tree-backup-2026-10-25-deploy-guard{,-2}); live proof 6/6 on the primary hook; 104 tests; sweep 35/36,628 commands, all real deploys) — opened 2026-10-25 — session 4b29d941-3df8-4b0d-b2d0-f5ec0f49d3a3
 - Goal: deploy-guard requires the lane's deploy claim + a fresh CLEAR fleet preflight for fleet deploys: an ff of the fleet checkout (receipt bound to the exact SHA), reload-web / a gunicorn HUP, a TERM of a worker role, and local_production down; reads, status and kills of non-role pids stay allowed
 - Files: .claude/hooks/deploy-guard.py (fleet shapes + their check ONLY), tests/test_deploy_guard_fleet.py (NEW)
 - Hypothesis: n/a
