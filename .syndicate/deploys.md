@@ -54271,3 +54271,13 @@ which is about the two sizing bases and not about the refusal boundary.
 - **code:** `local_production.py status` 14:24Z: refresh-worker code=b2cdb6ed (= fleet HEAD), restarts=10, supervisor up since 08:57:52Z (the overnight full down/up), i.e. before the 12:03Z pass. `git merge-base --is-ancestor affc9a7b b2cdb6ed` = yes: flat-unit grading loaded (readouts 2-6).
 - **housekeeping note:** this session ran `git worktree prune` in the primary repo after a failed `worktree add` (index reset failed); it printed 25 `Permission denied` on stale `.git/worktrees/*` entries. Prune only touches entries whose checkout path no longer exists. Ledger commit built with a temp index (plumbing), not the shared index.
 - **verify:** this READING is the `MIN_EV_TUNER` line stamped 12:03:11Z with date=2026-10-25, plus `last_run_at=2026-10-25T12:03:11Z` read back from keyvalue. Next readout: 7/7 on 10-26 (the last; it writes the WEEK OF READOUTS section and hands the apply decision to the user).
+
+## 2026-10-25 15:22Z (10:22 AM CT) -- FLEET full down/up: ff b2cdb6ed -> 6753375b + per-cell gate + Kalshi maker pilot (coordinator 332cb014)
+- user approvals (this chat): per-cell gate "Per-cell trip only (C)", maker "C: Small live pilot", "Yes, run overnight".
+- gate: armed for >=07:30Z; check_deploy_safety read NOT CLEAR until 15:19:08Z (refresh-side children all night), so the restart ran at 15:21Z, not overnight.
+- claims: all three acquired 15:19Z (holder overnight-gate-scorecard-maker), released 15:35Z.
+- env 182 -> 185 keys (backup local_production.env.bak-overnight-20261025T152123Z): +REFRESH_WORKER__SYNDICATE_LIVE_CELL_GATE=on, +LIVE_ODDS_WORKER__SYNDICATE_LIVE_CELL_GATE=on, +LIVE_ODDS_WORKER__SYNDICATE_KALSHI_MAKER_PILOT=on.
+- down rc=0 15:22:01Z (3 odds jobs stopped, 0 SIGKILL); task start 15:22:09Z; health=200 at 15:22:10Z; drain cleared.
+- verify (READ 15:34:31Z, /proc/<pid>/environ): refresh-worker pid 1826730 LIVE_CELL_GATE=on, MAKER_PILOT absent; live-odds pid 1826731 LIVE_CELL_GATE=on, MAKER_PILOT=on; HEAD 6753375b. All prior live keys unchanged (price band 0.40,0.75, hold 0.90, exits 50/$250, event cap 50, PM at-ask floor 5, inplay entries on).
+- NOT IN THIS UP: bbc90e69 (Pinnacle NBA/NFL/soccer/WNBA + 3 env keys), 29d2cfc8 + 3210958e (live_cell_gate in-game path fails closed on absent/stale eval -- until loaded, the in-game cell gate is INERT). Need the next full down/up.
+- owed: first maker ROUTE/POST line (maker-orders-study); gate tripped cells read (profit-program).
