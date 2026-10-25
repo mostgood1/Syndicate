@@ -1453,7 +1453,7 @@ death, never life — do not invert it.
 - Verification: Script runs on the fleet (nice 19) over the live execution ledger + Kalshi public prints/candles + recorded Polymarket quotes; findings file reports coverage, per-cell table and the OOS verdict; coordinator receives the decision
 - Blocked by: none
 
-### pm-trader-strategies — OPEN — opened 2026-10-24 — session dbda2142-f3b3-4a69-af99-bbe43fa9a406
+### pm-trader-strategies — CLOSED — opened 2026-10-24 — closed 2026-10-25 — session dbda2142-f3b3-4a69-af99-bbe43fa9a406
 - Goal: Land .syndicate/findings_2026-10-24_pm_trader_strategies.md: graded survey of documented Kalshi/Polymarket profit methods, each mapped to Syndicate data, plus top-3 pre-registered shadow-test designs (research only; no fleet, env or order change)
 - Files: .syndicate/findings_2026-10-24_pm_trader_strategies.md, .syndicate/findings_2026-10-24_kalshi_market_price_map.md, scripts/kalshi_market_price_map.py, tests/test_kalshi_market_price_map.py, docs/drafts/polymarket_us_liquidity_incentive_inquiry.md
 - **SCOPE WIDENED 2026-10-24 ~23:00Z, user decision via coordinator 332cb014 ("A: Market-wide price map, B: Edge-over-Pinnacle deciles, C: Late-game in-play cells, D: Email Polymarket US"):** this lane builds and runs Test A (public Kalshi data, research only, Idle priority) and DRAFTS email D (the user sends it). B -> profit-program, C -> in-play-program.
@@ -1463,6 +1463,7 @@ death, never life — do not invert it.
 - Blocked by: none
 - **STATUS 2026-10-24 ~22:45Z — FINDINGS DELIVERED.** 13 methods graded with sources; Kalshi LIP read live (7,454 active programs, 0 on any game/spread/total series we trade). Top 3: (A) market-wide Kalshi sports price-bucket x maker/taker returns on public history; (B) fresh-Pinnacle edge-decile retrospective then paper cell; (C) late-game in-play cells pre-registered. Waiting on the user (via coordinator) for which to build; nothing built.
 - **STATUS 2026-10-25 ~10:40Z — TEST A DONE; D DRAFTED.** `findings_2026-10-24_kalshi_market_price_map.md`. Registered: KILL not met (14/48 cells), but the 55-95c favourite passes are look-ahead (end-anchored phases). Start-anchored recheck plus in-play-program's Test C: only 95-99c in-play favourites survive (+1.1..+1.6c per contract), and no pregame cell passes. R3 (95-99c paper cell, in-play-program) is a user decision. Email D draft at docs/drafts/ (the user sends it). Lane can close once the coordinator acks.
+- **CLOSED 2026-10-25 (coordinator 332cb014 acked 8147d6a6).** Verification ran: survey findings on main (6420cfcb, plus corrections), Test A findings + recheck on main (8147d6a6), email D drafted, coordinator messaged. Outcome: no pregame structural edge; only 95-99c in-play favourites survive; R1-R3 are with the user via the coordinator, and R3's owner is in-play-program. Raw data in C:/tmp/kalshi_price_map/.
 
 ### polymarket-nba-alt-lines — OPEN — opened 2026-10-24 — session 6be345a0-e307-4384-84b8-2c5c5cdfc626
 - Goal: NBA spreads_alt/totals_alt board rows pair with Polymarket per-rung markets through the board join + resolvers (user-approved 'Yes, build it' in coordinator 332cb014 chat 2026-10-24); never a different line or a segment market
