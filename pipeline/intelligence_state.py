@@ -2261,6 +2261,7 @@ def _refresh_layer2_live_state(
             card["market_state"] = "live"
             if not has_state_text:
                 card["status_context"] = "live"
+            _withhold_pregame_probability_on_live_card(card)
             restated += 1
         elif state in {"final", "post", "completed"}:
             card["is_live"] = False
@@ -2275,6 +2276,43 @@ def _refresh_layer2_live_state(
         if attach_actual:
             _attach_layer2_live_actual(card, chip)
     return restated
+
+
+_PREGAME_WITHHELD_SPORTS = frozenset({"nfl", "ncaaf"})
+
+
+def _withhold_pregame_probability_on_live_card(card: dict[str, Any]) -> None:
+    """A card the scoreboard turns live HERE gets the build's pregame-probability rule (lane live-winpct-blank).
+
+    The build withholds a pregame sim probability on in-play NFL / NCAAF rows (`board_enrichment.
+    _withhold_pregame_probability`, user decision "Blank the live Win%"), but a card written while its game was still
+    pregame is restated live by this serve-time join and kept its Win% until the next build. Measured 10-25: at 12:14
+    PM CT 501 of 648 live NFL cards carried `model_probability` and "Our sim has"; at 3:10 PM DEN @ ARI rendered
+    "SIM: 55%" five minutes after kickoff. Same outcome as the build, card-shaped: the probability moves to
+    `sim_model_probability`, the card is labelled `pregame_on_live` (the page reads "pregame proj"), and the sim's
+    verdict becomes "sim, pregame" -- never an agree / disagree / contradicts read against an in-play line. A live-aware
+    card (a live re-sim) and every other sport are left as they are."""
+    sport = str(card.get("sport") or card.get("sport_slug") or "").strip().lower()
+    if sport not in _PREGAME_WITHHELD_SPORTS or card.get("live_aware") or card.get("pregame_on_live"):
+        return
+    card["pregame_on_live"] = True
+    probability = card.get("model_probability")
+    if probability is not None:
+        card.setdefault("sim_model_probability", probability)
+        card["model_probability"] = None
+    if card.get("sim_view") not in (None, "none"):
+        card["sim_view"] = "unpriced"
+        card["sim_unpriced_reason"] = "live"
+        for key in ("sim_line_gap", "sim_view_basis", "sim_disagreement_pct"):
+            card.pop(key, None)
+    # The explainer was written at build time from the pregame probability ("Our sim has X at Y%; the no-vig market
+    # says Z%."): that sentence goes; the rest of the paragraph stays.
+    detail = card.get("detail")
+    if isinstance(detail, str) and detail.startswith("Our sim has "):
+        import re
+
+        card["detail"] = re.sub(r"^Our sim has [^;]*; the no-vig market[^;]*? says \d+(?:\.\d+)?%\.\s*", "", detail,
+                                count=1).strip() or None
 
 
 def _prune_decided_layer2_cards(cards: list[dict[str, Any]]) -> int:
@@ -2313,6 +2351,14 @@ def _attach_layer2_live_actual(card: dict[str, Any], chip: Mapping[str, Any]) ->
     if str(card.get("kind") or "").strip().lower() != "game":
         return
     if card.get("actual") is not None:
+        return
+    # FULL-GAME CARDS ONLY (lane layer2-live-segment-actuals, 2026-10-25). The chip score is the GAME's: on a q3 / h2
+    # total it is a number about something else. A started period's own score arrives as the card's `actual` from
+    # `segment_actuals`; a period not started (or not yet stamped) stays blank. The 10-25 live read caught this filling
+    # NOT-STARTED NFL periods with the full-game score (12:49 PM CT 13 of 13) -- and `_mark_layer2_decided` then pruned
+    # them as settled (1:34 PM: 11 of 14 gone; "total already reached: 39 scored vs line 9.5" on a q3 9.5).
+    segment = str(card.get("segment") or "full").strip().lower()
+    if segment not in ("full", "full_game", "game"):
         return
 
     def _score(side: str) -> float | None:
