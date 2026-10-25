@@ -451,7 +451,7 @@ class TooSoonVerdictTests(unittest.TestCase):
                                                      deploy_id="dep-recent")["deploy"]
                                              if last_deploy_minutes_ago is not None else {})), \
              mock.patch.object(deploy_preflight, "_write_receipt", side_effect=fake_write_receipt), \
-             mock.patch.object(deploy_preflight.sys, "argv", ["deploy_preflight.py", *argv]), \
+             mock.patch.object(deploy_preflight.sys, "argv", ["deploy_preflight.py", "--target", "render", *argv]), \
              mock.patch.dict(os.environ, env or {}), \
              _claim(claim) as claim_stub:
             code = deploy_preflight.main()
@@ -516,7 +516,7 @@ class TooSoonVerdictTests(unittest.TestCase):
                                return_value=_deploy(minutes_ago=2)["deploy"]), \
              mock.patch.object(deploy_preflight, "_write_receipt"), \
              mock.patch.object(deploy_preflight.sys, "argv",
-                               ["deploy_preflight.py", "--service", "refresh-worker"]), \
+                               ["deploy_preflight.py", "--target", "render", "--service", "refresh-worker"]), \
              _claim():
             code = deploy_preflight.main()
         self.assertEqual(code, deploy_preflight.EXIT_TOO_SOON,

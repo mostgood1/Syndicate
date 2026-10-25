@@ -86,6 +86,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -473,25 +474,164 @@ def is_defunct(proc: dict) -> bool:
 BOARD_BUILD_HOLD_SERVICE = "refresh-worker"
 
 
-def read_board_build_state() -> tuple[bool | None, dict]:
+def _safety_module():
+    """`check_deploy_safety`, loaded BY PATH from this script's own directory.
+
+    This file is run as `py -3 scripts/deploy_preflight.py` from the repo root,
+    from a session worktree, and imported by tests, and only the path is the
+    same in all three.
+    """
+    import importlib.util
+
+    module_path = Path(__file__).resolve().parent / "check_deploy_safety.py"
+    spec = importlib.util.spec_from_file_location("deploy_preflight_board_build", module_path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def read_board_build_state(base_url: str | None = None) -> tuple[bool | None, dict]:
     """(in_flight, facts) from `check_deploy_safety.board_build_state()`.
 
-    Loaded BY PATH from this script's own directory rather than by name: this
-    file is run as `py -3 scripts/deploy_preflight.py` from the repo root, from
-    a session worktree, and imported by tests, and only the path is the same in
-    all three. Any failure returns UNKNOWN, never "idle".
+    `base_url` on the fleet reads the fleet refresh-worker log; None reads
+    Render's logs API as before. Any failure returns UNKNOWN, never "idle".
     """
     try:
-        import importlib.util
-
-        module_path = Path(__file__).resolve().parent / "check_deploy_safety.py"
-        spec = importlib.util.spec_from_file_location("deploy_preflight_board_build", module_path)
-        module = importlib.util.module_from_spec(spec)
-        sys.modules[spec.name] = module
-        spec.loader.exec_module(module)
-        return module.board_build_state()
+        module = _safety_module()
+        return module.board_build_state(base_url) if base_url else module.board_build_state()
     except Exception as exc:  # noqa: BLE001 -- unreadable is UNKNOWN, which blocks
         return None, {"reason": f"{type(exc).__name__}: {exc}"}
+
+
+# THE FLEET PATH `[2026-10-25, lane preflight-fleet-path]`. All three Render
+# services have been billing-suspended since 2026-09-30 and production runs on
+# the WSL fleet (`local_production.py up`), yet every read below main() went to
+# api.render.com: on 2026-10-24 23:35Z a web preflight died on `/v1/logs` HTTP
+# 503 and the deploy was gated by hand instead. A preflight that cannot run is a
+# preflight nobody runs.
+#
+# Each Render instrument has a fleet equivalent, and each keeps its rule:
+#   live commit  -> `local_production.py status` `code=` per role (what the role
+#                   LOADED, not the checkout's HEAD -- a ff without a restart
+#                   changes HEAD and nothing that runs);
+#   jobs         -> the worker's live descendants from one `ps` snapshot
+#                   (`check_deploy_safety.fleet_worker_children`); unreadable
+#                   is UNKNOWN, never "none";
+#   board build  -> the fleet refresh-worker log (`board_build_state(fleet)`);
+#   spacing      -> the worker process's age = time since its last restart.
+# Web on the fleet loads code by `reload-web` (gunicorn HUP: rolling, the
+# listener is kept, nothing in flight is killed -- state_worker
+# `[WEB RELOADS BY HUP]`), so web has no job set to HOLD on.
+FLEET_ROLE = {"web": "web", "syndicate": "web",
+              "refresh-worker": "refresh-worker", "live-odds-worker": "live-odds-worker"}
+FLEET_CHECKOUT_DEFAULT = "~/Syndicate"
+FLEET_HOME_DEFAULT = "~/syndicate-prod"
+FLEET_PYTHON_DEFAULT = "~/.venvs/syndicate/bin/python"
+FLEET_BASE_URL = "http://127.0.0.1:10000"  # any local host routes check_deploy_safety to the fleet readers
+WEB_RELOAD_NOTE = "fleet web loads code by reload-web (rolling gunicorn HUP); nothing in flight is killed"
+
+
+def target_is_fleet(choice: str) -> bool:
+    """Which production this preflight reads. `auto` follows the operator
+    scripts' default base URL (`_base_url.default_base_url`): the fleet unless
+    an env var points elsewhere."""
+    if choice in ("fleet", "render"):
+        return choice == "fleet"
+    try:
+        module = _safety_module()
+        return bool(module._is_fleet_base_url(module.DEFAULT_BASE_URL))
+    except Exception:  # noqa: BLE001 -- Render is suspended; the fleet is the safer guess
+        return True
+
+
+def _fleet_shell(script: str, timeout: int = 120) -> str:
+    """Run a bash snippet on the fleet host (through `wsl` from Windows).
+
+    The script goes on STDIN, never as a `-c` argument: `wsl -- bash -lc "<s>"`
+    re-splits the joined command line, so bash got `cd` alone and the rest ran
+    in the CALLER's directory (measured 2026-10-25: PWD=/mnt/c/tmp/...worktree,
+    HEAD empty) -- a status read of the wrong checkout that still looked valid.
+    """
+    command = ["bash", "-ls"]
+    if sys.platform.startswith("win"):
+        command = ["wsl", "--"] + command
+    done = subprocess.run(command, input=script.encode("utf-8"), capture_output=True, timeout=timeout)
+    if done.returncode != 0:
+        raise RuntimeError(f"fleet shell rc={done.returncode}: "
+                           f"{done.stderr.decode('utf-8', 'replace').strip()[:200]}")
+    return done.stdout.decode("utf-8", errors="replace")
+
+
+_STATUS_ROLE_RE = re.compile(
+    r"^\s+(web|refresh-worker|live-odds-worker)\s+pid=(\S+)\s+(up|DOWN)\b"
+    r"(?:.*?\brestarts=(\d+))?(?:.*?\bcode=([0-9a-f]{7,40}))?")
+
+
+def parse_fleet_status(text: str) -> dict[str, dict]:
+    """`local_production.py status` role lines -> {role: {pid, up, restarts, live_commit}}."""
+    out: dict[str, dict] = {}
+    for line in text.splitlines():
+        match = _STATUS_ROLE_RE.match(line)
+        if match:
+            role, pid, state, restarts, code = match.groups()
+            out[role] = {"pid": pid, "up": state == "up",
+                         "restarts": int(restarts) if restarts else None,
+                         "live_commit": code[:8] if code else None}
+    return out
+
+
+def fleet_status() -> tuple[str, dict[str, dict]]:
+    """(checkout HEAD, per-role status) read on the fleet host."""
+    checkout = os.environ.get("SYNDICATE_FLEET_CHECKOUT") or FLEET_CHECKOUT_DEFAULT
+    home = os.environ.get("SYNDICATE_LOCAL_HOME") or FLEET_HOME_DEFAULT
+    python = os.environ.get("SYNDICATE_FLEET_PYTHON") or FLEET_PYTHON_DEFAULT
+    text = _fleet_shell(
+        f"cd {checkout} && echo HEAD=$(git rev-parse HEAD) && "
+        f"{python} scripts/local_production.py --home {home} status --lines 0")
+    head = ""
+    for line in text.splitlines():
+        if line.startswith("HEAD="):
+            head = line[5:].strip()
+    return head, parse_fleet_status(text)
+
+
+def fleet_live_commits_from(status: dict[str, dict]) -> dict[str, dict]:
+    """`fleet_live_commits`' shape from the fleet status, so the D5 block prints the same."""
+    out: dict[str, dict] = {}
+    for name in FLEET:
+        row = status.get(name)
+        if row is None:
+            out[name] = {"service_id": SERVICE_IDS[name], "live_commit": None, "finished_at": None,
+                         "error": "role not in `local_production.py status`"}
+        else:
+            out[name] = {"service_id": SERVICE_IDS[name], "live_commit": row.get("live_commit"),
+                         "finished_at": None, "source": "fleet",
+                         **({} if row.get("up") else {"error": "role DOWN"})}
+    return out
+
+
+def fleet_role_processes(role: str, now: datetime) -> tuple[list[dict] | None, dict, dict]:
+    """(jobs, sample facts, last_deploy) for a fleet WORKER from one `ps` snapshot.
+
+    jobs None = UNKNOWN. last_deploy is shaped like a Render deploy row so the
+    spacing code reads it unchanged: the worker root's start is its restart.
+    """
+    module = _safety_module()
+    rows = module._fleet_process_table()
+    script = module._FLEET_WORKER_SCRIPTS[role]
+    root, children = module._worker_children(rows, script)
+    if root is None:
+        return None, {"reason": f"no {role} process under the supervisor"}, {}
+    age_s = next((age for pid, _ppid, age, _args in rows if pid == root), None)
+    last: dict = {}
+    if age_s is not None:
+        started = datetime.fromtimestamp(now.timestamp() - float(age_s), tz=timezone.utc)
+        last = {"id": f"fleet pid {root}", "status": "live", "trigger": "fleet role start",
+                "createdAt": started.isoformat().replace("+00:00", "Z")}
+    jobs = [{"pid": c["pid"], "ppid": c["ppid"], "rss_mb": None, "cmdline": str(c["args"]).split()}
+            for c in children]
+    return jobs, {"worker_pid": root, "worker_age_seconds": age_s}, last
 
 
 def board_build_verdict(service: str, allow_mid_build: bool, state: tuple[bool | None, dict]) -> tuple[str, int, str] | None:
@@ -953,19 +1093,41 @@ def main() -> int:
         help="your lane/session name. If another holder owns this service's deploy claim, "
              "preflight returns CLAIMED (exit 3) instead of CLEAR.",
     )
+    parser.add_argument("--target", choices=("auto", "fleet", "render"), default="auto",
+                        help="which production to read. auto = the fleet unless the operator "
+                             "base URL points elsewhere (Render is suspended since 2026-09-30).")
     args = parser.parse_args()
 
-    key = _api_key()
+    on_fleet = target_is_fleet(args.target)
+    key = "" if on_fleet else _api_key()
     service_id = SERVICE_IDS[args.service]
     now = datetime.now(timezone.utc)
-    report: dict = {"service": args.service, "service_id": service_id, "checked_at": now.isoformat()}
+    report: dict = {"service": args.service, "service_id": service_id, "checked_at": now.isoformat(),
+                    "platform": "fleet" if on_fleet else "render"}
 
-    deploy = live_deploy(service_id, key)
-    live_commit = str((deploy.get("commit") or {}).get("id") or "")
+    fleet_role = FLEET_ROLE.get(args.service) if on_fleet else None
+    fleet_error = ""
+    if on_fleet:
+        # The fleet has no deploy object: "live" is the commit the role LOADED.
+        # An unreadable status leaves live_commit empty, which skips the
+        # redundancy check (as on Render) and never reads as CLEAR by itself --
+        # the job sample below decides, and it has its own UNKNOWN.
+        deploy = {}
+        try:
+            fleet_head, status = fleet_status()
+        except Exception as exc:  # noqa: BLE001
+            fleet_head, status, fleet_error = "", {}, f"{type(exc).__name__}: {exc}"
+        live_commit = str((status.get(fleet_role) or {}).get("live_commit") or "") if fleet_role else ""
+        report["fleet_head"] = fleet_head[:8] or None
+        if fleet_error:
+            report["fleet_status_error"] = fleet_error
+        report["fleet"] = fleet_live_commits_from(status)
+    else:
+        deploy = live_deploy(service_id, key)
+        live_commit = str((deploy.get("commit") or {}).get("id") or "")
+        report["fleet"] = fleet_live_commits(key)
     report["live_commit"] = live_commit[:8]
     report["live_finished_at"] = deploy.get("finishedAt")
-
-    report["fleet"] = fleet_live_commits(key)
 
     redundant = False
     if args.target_commit and live_commit:
@@ -1005,7 +1167,36 @@ def main() -> int:
     sample_source = "log:ALL_PROCESS_MEMORY"
     is_cron = args.service in CRON_SERVICES
     cron_in_flight: bool | None = None
-    if is_cron:
+    fleet_last_deploy: dict = {}
+    if on_fleet and is_cron:
+        # Render cron services are suspended; on the fleet these are supervisor
+        # SCHEDULED_JOBS, which load code from disk when they fire -- there is
+        # nothing here to deploy, and nothing this script can sample. UNKNOWN.
+        report["cron_run"] = {"error": "Render cron services are suspended; on the fleet this is a "
+                                       "local_production.py scheduled job (loads code at its next run)"}
+        report["cron_run_in_flight"] = None
+        sample_source = "fleet: not applicable to a cron"
+    elif on_fleet and fleet_role == "web":
+        if fleet_error or not (status.get("web") or {}).get("up"):
+            sample_source = "fleet: web role status " + ("unreadable" if fleet_error else "DOWN")
+        else:
+            sample, parsed = (now.isoformat().replace("+00:00", "Z"), ""), {"processes": []}
+            sample_source = "fleet: " + WEB_RELOAD_NOTE
+    elif on_fleet:
+        try:
+            fleet_jobs, fleet_facts, fleet_last_deploy = fleet_role_processes(fleet_role, now)
+        except Exception as exc:  # noqa: BLE001 -- unreadable is UNKNOWN below
+            fleet_jobs, fleet_facts = None, {"reason": f"{type(exc).__name__}: {exc}"}
+        report["fleet_worker"] = fleet_facts
+        sample_source = "fleet: ps snapshot of the worker's descendants"
+        if fleet_jobs is not None:
+            sample = (now.isoformat().replace("+00:00", "Z"), "")
+            # Every live descendant of a fleet worker is a job a restart kills:
+            # the worker root itself is the only infrastructure, and it is
+            # excluded by `_worker_children`.
+            parsed = {"processes": [], "process_count": len(fleet_jobs)}
+            report["_fleet_jobs"] = fleet_jobs
+    elif is_cron:
         # A cron has no process list to sample. Asking for one would return
         # nothing and read as UNKNOWN forever; see CRON_SERVICE_IDS above.
         cron_in_flight, cron_detail = cron_run_in_flight(service_id, key)
@@ -1022,7 +1213,7 @@ def main() -> int:
             # NEGATIVE age is a receipt nobody should trust the rest of.
             sample, parsed = (now.isoformat().replace("+00:00", "Z"), ""), {"processes": processes}
             sample_source = "api:/api/ops/memory"
-    if parsed is None and not is_cron:
+    if parsed is None and not is_cron and not on_fleet:
         sample = newest_log(service_id, key, "ALL_PROCESS_MEMORY")
         parsed = parse_processes(sample[1]) if sample else None
         sample_source = "log:ALL_PROCESS_MEMORY"
@@ -1040,6 +1231,8 @@ def main() -> int:
     unidentifiable: list[dict] = []
     if parsed:
         infra, jobs, defunct, unidentifiable = classify(parsed.get("processes") or [])
+    if "_fleet_jobs" in report:
+        jobs = report.pop("_fleet_jobs")
     report["process_count"] = (parsed or {}).get("process_count")
     fmt = lambda p: {
         "pid": p.get("pid"), "ppid": p.get("ppid"), "rss_mb": p.get("rss_mb"),
@@ -1055,7 +1248,7 @@ def main() -> int:
     # went ahead can be checked against what was in flight when it fired.
     board_build_pair: tuple[bool | None, dict] = (False, {})
     if args.service == BOARD_BUILD_HOLD_SERVICE:
-        board_build_pair = read_board_build_state()
+        board_build_pair = read_board_build_state(FLEET_BASE_URL if on_fleet else None)
     board_build_hold = board_build_verdict(args.service, bool(getattr(args, "allow_mid_build", False)), board_build_pair)
     report["board_build"] = {
         "in_flight": board_build_pair[0],
@@ -1093,7 +1286,9 @@ def main() -> int:
     last_deploy: dict = {}
     since_last_deploy: float | None = None
     try:
-        last_deploy = last_restarting_deploy(service_id, key)
+        # On the fleet: the worker root's start (web: unknown -- a HUP keeps the
+        # master, so its age is not the last reload; recorded, not refused).
+        last_deploy = fleet_last_deploy if on_fleet else last_restarting_deploy(service_id, key)
         since_last_deploy = _age_seconds(_deploy_restart_moment(last_deploy), now) if last_deploy else None
     except Exception as exc:  # noqa: BLE001
         report["last_deploy_error"] = f"{type(exc).__name__}: {exc}"
@@ -1191,6 +1386,10 @@ def main() -> int:
             reason = ("cannot read this cron's run history ("
                       + str((report.get("cron_run") or {}).get("error") or "unknown")
                       + "), so whether a run is executing is unknown")
+        elif on_fleet:
+            reason = ("cannot read the fleet (" + str(report.get("fleet_status_error")
+                      or (report.get("fleet_worker") or {}).get("reason") or sample_source)
+                      + "), so whether a job is running is unknown")
         else:
             reason = "no ALL_PROCESS_MEMORY sample" if age is None else f"sample is {age:.0f}s old (limit {args.max_sample_age_seconds}s)"
     elif is_cron and cron_in_flight:
@@ -1237,8 +1436,13 @@ def main() -> int:
         print(json.dumps(report, indent=2, sort_keys=True))
         return code
 
-    print(f"service        {args.service}  ({service_id})")
-    print(f"live commit    {live_commit[:8] or '?'}   finished {deploy.get('finishedAt') or '?'}")
+    print(f"service        {args.service}  ({'FLEET' if on_fleet else service_id})")
+    if on_fleet:
+        print(f"live commit    {live_commit[:8] or '?'}   (loaded by the role)   "
+              f"fleet HEAD {report.get('fleet_head') or '?'}"
+              + (f"   STATUS UNREADABLE: {fleet_error}" if fleet_error else ""))
+    else:
+        print(f"live commit    {live_commit[:8] or '?'}   finished {deploy.get('finishedAt') or '?'}")
     # PRINTED ON EVERY RUN, INCLUDING WHEN THE LIMIT IS OFF. A spacing rule that
     # only appears when it fires is one nobody knows the shape of until it blocks
     # them, and "not rate-limited" needs to be a thing a reader can SEE -- two of

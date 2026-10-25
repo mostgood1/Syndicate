@@ -1480,6 +1480,14 @@ death, never life — do not invert it.
 - Verification: unit tests: off routes nothing and the body is byte-identical; on routes an eligible pregame request with stake 5, execution_style maker_pilot, post_only and expiration_time; caps refuse; reconcile prints FILL/EXPIRE. On the fleet after the coordinator's restart: the first MAKER_PILOT ROUTE/POST line and a ledger row with execution_style=maker_pilot
 - Blocked by: none
 
+### preflight-fleet-path — CLOSED 2026-10-25 (GOAL MET: preflight reads the fleet by default -- live 15:27Z web/refresh-worker/live-odds-worker returned verdicts with fleet HEAD 6753375b, per-role loaded commits, worker spacing and the fleet board build, 0 Render calls; 74 tests) — opened 2026-10-25 — session 4b29d941-3df8-4b0d-b2d0-f5ec0f49d3a3
+- Goal: deploy_preflight.py returns a real verdict on the fleet (Render suspended since 09-30): live commit per role from the fleet, jobs from the fleet ps scan, board build from the fleet log, restart spacing from the worker's process age; no api.render.com call when the target is the fleet
+- Files: scripts/deploy_preflight.py, tests/test_deploy_preflight_fleet.py (NEW), tests/test_deploy_preflight.py (argv of the two Render-path harnesses ONLY: `--target render`)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: live run against the fleet for web and refresh-worker prints CLEAR/HOLD with the fleet's loaded commits and no Render request; existing preflight tests pass
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
