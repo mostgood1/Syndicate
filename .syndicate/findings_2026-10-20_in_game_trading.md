@@ -458,3 +458,20 @@ What it means:
 - **C2 does not reproduce the Betfair late-favourite edge on Kalshi after the fee.** NCAAF is significantly negative.
 - **C1(c)** (+5.4c over 14 games, 13 of 14 positive) is a post-hoc slice of our own fills and reads only on demand: it needs a ledger export, which the nightly does not do. Re-read when n >= 60. A positive reading would be a user decision then, not a rule now.
 - The nightly task re-runs the study over every recorded night from the 10-26 run (`<root>/inplay_late_cells.txt`), to the 12-31 calendar stop. The pooled verdicts can still move; the per-sport ones need 60 games each.
+
+## 13. Second LIVE in-game night (10-24, read 2026-10-25 ~07:00Z from the ledger and live-odds-worker.log.1)
+
+- 38 in-game rows: 34 filled, 4 rejected; all 34 settled. Cash out $15.67 (stake + fees) of the $50 cap.
+- **-$1.34 on $15.09 staked (-8.9%).** By kind:
+  - NCAAF spreads 10, +$0.03; NCAAF totals 8, +$0.19;
+  - NBA spreads 5, -$1.15 (-52%); NBA totals 6, -$0.32;
+  - NHL spreads 2, -$0.43; one each NBA h2h / NHL h2h / MLB total, all positive.
+- Two live nights together: **-$3.87 on $25.21 settled (-15%)**. NBA spreads are the worst cell on both nights (16 bets, -$2.97).
+- **Decoupling works.** Zero day_budget refusals after the 19:41Z up. Spend stopped at $15.67 because of signal supply, not the cap.
+- Live refusals after the 20:51:37Z up, out of 162 hook calls:
+  - 69 same_game_axis_held;
+  - 61 outside_price_band;
+  - 3 no_live_price, all genuine PRICE_MOVED;
+  - 29 placed.
+- **NO-leg fix (5f32d9c4) confirmed:** 15 NO legs placed on the night. Before the fix, 22 NO legs had been refused no_live_price (16:18-20:39Z).
+- **Order fields (2b7a29c4) confirmed:** 34 of 34 rows carry home_team / away_team / commence_time / event_id.
