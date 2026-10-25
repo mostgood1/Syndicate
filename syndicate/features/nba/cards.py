@@ -680,6 +680,21 @@ def _payload_has_overdue_pregame(payload: dict[str, Any] | None, now: datetime) 
     return False
 
 
+_OVERDUE_NOTED: set[tuple[str, str]] = set()
+
+
+def _note_overdue_bypass(selected_date: str, snapshot: dict[str, Any] | None, *, decided: bool) -> None:
+    """One line per (date, snapshot) when a started game held pregame sent the read to ESPN. `decided=True` is the case
+    the 20-minute rule alone would have missed -- a fresh snapshot with progress -- so its first appearance in the
+    worker log is the first real use of the overdue branch (deployed 10-23 9d665aff, unobserved through 10-25)."""
+    key = (str(selected_date), str((snapshot or {}).get("generated_at")))
+    if key in _OVERDUE_NOTED:
+        return
+    _OVERDUE_NOTED.add(key)
+    print(f"[nba_live_state] LIVE_STATE_OVERDUE_BYPASS date={key[0]} snapshot_generated_at={key[1]} "
+          f"decided_by_overdue={decided}", flush=True)
+
+
 def _espn_live_state_payload(selected_date: str) -> dict[str, Any] | None:
     date_value = str(selected_date or "").strip()
     if not date_value:
@@ -780,6 +795,9 @@ def _best_live_state_payload(selected_date: str) -> dict[str, Any] | None:
         espn_payload = _espn_live_state_payload(selected_date)
         if isinstance(espn_payload, dict):
             if not isinstance(local_payload, dict) or overdue:
+                if overdue:
+                    _note_overdue_bypass(selected_date, local_payload, decided=not local_stale
+                                         and _payload_has_live_progress(local_payload))
                 return espn_payload
             if _payload_has_live_progress(espn_payload) and not _payload_has_live_progress(local_payload):
                 return espn_payload

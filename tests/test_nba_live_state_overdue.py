@@ -89,3 +89,15 @@ def test_espn_rows_carry_their_scheduled_start(monkeypatch):
     monkeypatch.setattr(c.urllib_request, "urlopen", lambda req, timeout=5: _Resp(json.dumps(body).encode()))
     payload = c._espn_live_state_payload("2026-10-23")
     assert payload["games"][0]["start_time"] == "2026-10-23T23:00Z"
+
+
+def test_the_bypass_is_logged_once_per_snapshot_and_says_when_it_decided(monkeypatch, capsys):
+    now = datetime.now(timezone.utc)
+    c._OVERDUE_NOTED.clear()
+    monkeypatch.setattr(c, "_espn_live_state_payload", lambda day: _espn(now))
+    snap = _snapshot(now, tip_offset_min=-10)                         # fresh, has progress, a started game pregame
+    monkeypatch.setattr(c, "_local_live_state_payload", lambda day: snap)
+    c._best_live_state_payload(now.date().isoformat())
+    c._best_live_state_payload(now.date().isoformat())
+    lines = [l for l in capsys.readouterr().out.splitlines() if "LIVE_STATE_OVERDUE_BYPASS" in l]
+    assert len(lines) == 1 and "decided_by_overdue=True" in lines[0]
