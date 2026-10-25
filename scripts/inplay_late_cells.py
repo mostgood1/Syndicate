@@ -15,6 +15,12 @@ commit 03741657) from pm-trader-research's Test C. The rules below are that sect
   KILL: pooled CI upper < 0 at >= 60 games. C2 tail flag: a game loss > 10x the cell mean gain inside
   the first 60 games by date (reported, not decided on). < 60 games: INSUFFICIENT.
 
+R3 (findings section 14, locked 2026-10-25, commit 679bd119; user decision via coordinator 332cb014): PAPER cell,
+  95-99c in-play MONEYLINE favourites. In play = ESPN's latest row at or before the quote has state "in".
+  ONE entry per game: the first quote across the game's KX*GAME tickers and legs with ask in [0.95, 0.99).
+  Return = won - ask - fee (formula; 1-contract round-up as sensitivity). GO: >= 150 games, CI lower > 0,
+  and CI lower > 0 with NFL excluded (NFL alone reported). KILL: CI upper < 0 or loss rate > 3% at >= 150 games.
+
 Usage:  py -3 scripts/inplay_late_cells.py --nights C:/tmp/inplay_2026-10-2* [--held held.json] [--json-out x.json]
 """
 
@@ -40,6 +46,9 @@ spec.loader.exec_module(dip)
 
 FINAL = {"nhl": (3, 600), "nba": (4, 360), "nfl": (4, 480), "ncaaf": (4, 480)}  # (final period, seconds left)
 C2_BAND = (0.85, 0.97)
+R3_BAND = (0.95, 0.99)
+R3_MIN_GAMES = 150
+R3_MAX_LOSS_RATE = 0.03
 C1_MAX = 0.25
 MIN_GAMES = 60
 SPORT_MIN = 20
@@ -64,6 +73,39 @@ def clock_s(raw) -> float | None:
         return float(s)
     except ValueError:
         return None
+
+
+def espn_state(d: Path, sports):
+    """(sport, abbr-set) -> sorted [(t, in_play)] over EVERY ESPN row (pre / in / post)."""
+    out = defaultdict(list)
+    for line in open(d / "espn.jsonl", encoding="utf-8"):
+        r = json.loads(line)
+        if r.get("sport") not in sports:
+            continue
+        ab = tuple(sorted((x.get("abbr") or "") for x in r.get("teams") or []))
+        out[(r["sport"], ab)].append((dip.ts(r["ts"]), r.get("state") == "in"))
+    for k in out:
+        out[k].sort()
+    return out
+
+
+def in_play(states, t) -> bool:
+    if not states:
+        return False
+    i = bisect.bisect_right([x[0] for x in states], t) - 1
+    return i >= 0 and states[i][1]
+
+
+def r3_verdict(s: dict) -> str:
+    p = s["pooled"]
+    if p["games"] < R3_MIN_GAMES or p["ci95"] is None:
+        return f"INSUFFICIENT ({p['games']}/{R3_MIN_GAMES} games)"
+    if p["ci95"][1] < 0 or s.get("loss_rate", 0) > R3_MAX_LOSS_RATE:
+        return f"KILL (CI upper {p['ci95'][1]:+.4f}, loss rate {s.get('loss_rate', 0):.3f})"
+    ex = s.get("ex_nfl") or {}
+    if p["ci95"][0] > 0 and ex.get("ci95") and ex["ci95"][0] > 0:
+        return "GO (paper only)"
+    return "NO-GO (CI spans 0, or not with NFL excluded)"
 
 
 def espn_clock(d: Path, sports):
@@ -177,7 +219,7 @@ def main():
         for r in json.loads(Path(a.held).read_text(encoding="utf-8")):
             if r.get("leg") in ("yes", "no") and r.get("submitted_at"):
                 held[(r["ticker"], r["leg"])].append(datetime.fromisoformat(r["submitted_at"].replace("Z", "+00:00")).timestamp())
-    c2, c1 = [], []
+    c2, c1, r3 = [], [], []
     nights = []
     for n in sorted(a.nights):
         d = Path(n)
@@ -185,12 +227,25 @@ def main():
             continue
         nights.append(d.name)
         clk = espn_clock(d, sports)
+        states = espn_state(d, sports)
+        r3_first: dict = {}
         for m in dip.load(d, sports):
             if m["res"] not in ("yes", "no"):
                 continue
             key = next((k for k in clk if k[0] == m["sport"] and m["game"].endswith("|".join(k[1]))), None)
             if key is None:
                 continue
+            if m["fam"].endswith("GAME"):
+                for leg in ("yes", "no"):
+                    for t, mid, ask, bid in dip.leg_view(m["rows"], leg):
+                        if R3_BAND[0] <= ask < R3_BAND[1] and in_play(states.get(key), t):
+                            if m["game"] not in r3_first or t < r3_first[m["game"]][0]:
+                                won = 1.0 if m["res"] == leg else 0.0
+                                r3_first[m["game"]] = (t, {"game": m["game"], "sport": m["sport"], "date": d.name,
+                                                           "ticker": m["ticker"], "leg": leg, "ask": ask, "won": won,
+                                                           "ret": won - ask - fee_formula(ask),
+                                                           "ret_1c": won - ask - fee_one_contract(ask)})
+                            break
             for leg in ("yes", "no"):
                 won = 1.0 if m["res"] == leg else 0.0
                 got_c2 = got_c1 = False
@@ -212,6 +267,7 @@ def main():
                                    "buy": won - ask - fee_formula(ask),
                                    "exit": None if b is None else (b - fee_formula(b)) - won,
                                    "exit_1c": None if b is None else (b - fee_one_contract(b)) - won})
+        r3.extend(row for _t, row in r3_first.values())
     c1x = [r for r in c1 if r["exit"] is not None]
     res = {
         "nights": nights,
@@ -220,14 +276,23 @@ def main():
         "C1b_exit_under_25": summarise(c1x, "exit"), "C1b_exit_under_25_fee_1c": summarise(c1x, "exit_1c"),
         "C1c_exit_held": summarise([r for r in c1x if r["held"]], "exit"),
     }
+    for name, value in (("R3_fav_95_99_ml", "ret"), ("R3_fav_95_99_ml_fee_1c", "ret_1c")):
+        s3 = summarise(r3, value)
+        s3["loss_rate"] = round(sum(r["won"] == 0 for r in r3) / len(r3), 4) if r3 else None
+        s3["ex_nfl"] = summarise([r for r in r3 if r["sport"] != "nfl"], value)["pooled"]
+        res[name] = s3
     print(f"Test C late-game cells (pre-registered, findings section 11). nights={nights}\n")
     for name, s in res.items():
         if name == "nights":
             continue
         p = s["pooled"]
         tail = name.startswith("C2")
+        v = (r3_verdict(s) if name.startswith("R3") else verdict(s, tail)) if p["games"] else "no data"
         print(f"{name:28s} games={p['games']:3d} entries={p['entries']:4d} mean/game={p['mean']} ci95={p['ci95']}"
-              f" games+={p['games_positive']}  -> {verdict(s, tail) if p['games'] else 'no data'}")
+              f" games+={p['games_positive']}  -> {v}")
+        if name.startswith("R3"):
+            print(f"    loss_rate={s.get('loss_rate')}  ex-NFL: games={s['ex_nfl']['games']} mean={s['ex_nfl']['mean']}"
+                  f" ci95={s['ex_nfl']['ci95']}")
         for sp, b in s["by_sport"].items():
             print(f"    {sp:6s} games={b['games']:3d} entries={b['entries']:4d} mean/game={b['mean']} ci95={b['ci95']} games+={b['games_positive']}")
     if a.json_out:

@@ -48,3 +48,24 @@ def test_verdicts_follow_the_pre_registration():
     assert lc.verdict(kill).startswith("KILL")
     tail = lc.summarise(_rows({"nba": [0.05] * 29 + [-0.9], "nhl": [0.05] * 30}), "v")
     assert "TAIL FLAG" in lc.verdict(tail, tail_check=True)
+
+
+def test_r3_in_play_is_the_live_state_at_the_quote():
+    states = [(0.0, False), (10.0, True), (50.0, False)]
+    assert not lc.in_play(states, 5.0) and lc.in_play(states, 10.0) and lc.in_play(states, 49.0)
+    assert not lc.in_play(states, 60.0) and not lc.in_play([], 1.0)
+
+
+def test_r3_verdicts_follow_section_14():
+    def s3(nba, nfl, loss_rate):
+        s = lc.summarise(_rows({"nba": nba, "nfl": nfl}), "v")
+        s["loss_rate"] = loss_rate
+        s["ex_nfl"] = lc.summarise(_rows({"nba": nba}), "v")["pooled"]
+        return s
+
+    assert lc.r3_verdict(s3([0.012, 0.014] * 70, [], 0.0)).startswith("INSUFFICIENT")
+    assert lc.r3_verdict(s3([0.012, 0.014] * 80, [], 0.01)) == "GO (paper only)"
+    assert lc.r3_verdict(s3([0.012, 0.014] * 80, [], 0.031)).startswith("KILL")  # loss rate > 3%
+    # positive only because of NFL: not a GO
+    assert lc.r3_verdict(s3([0.03, -0.03] * 70, [0.5] * 20, 0.01)).startswith("NO-GO")
+    assert lc.r3_verdict(s3([-0.012, -0.014] * 80, [], 0.01)).startswith("KILL")
