@@ -1,6 +1,7 @@
 <#
-Register the free news collector (injuries, referee crews, NHL scratches) to run every 10 minutes.
+Register the free news collector (injuries, referee crews, NHL scratches) to run every 5 minutes.
 Lane `news-collectors-backfill` [2026-10-13]. Script: scripts/collect_news_snapshots.py (no keys, no OddsAPI, no spend).
+5, not 10 (user 2026-10-25, lane news-availability-gate): an NHL scratch could sit up to 10 min before the board saw it.
 
   powershell -ExecutionPolicy Bypass -File deploy\local\install_news_collector_task.ps1
   powershell -ExecutionPolicy Bypass -File deploy\local\install_news_collector_task.ps1 -Uninstall
@@ -18,7 +19,7 @@ param(
     [string] $WslRepo = '~/Syndicate',
     [string] $WslPython = '~/.venvs/syndicate/bin/python',
     [string] $LocalHome = '~/syndicate-prod',
-    [int] $EveryMinutes = 10,
+    [int] $EveryMinutes = 5,
     [string] $TaskName = 'SyndicateNewsCollector',
     [switch] $Uninstall
 )
