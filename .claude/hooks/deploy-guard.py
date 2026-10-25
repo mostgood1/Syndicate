@@ -353,11 +353,16 @@ def _script_file_deploy(cmd, bases):
 
 
 def _script_texts(cmd, bases):
-    """[(path, contents)] of every readable script file the command runs."""
+    """[(path, contents)] of every readable SHELL script file the command runs.
+
+    Shell only: a `.py` that holds fleet commands as STRING LITERALS (a test
+    fixture, a proof harness) is not running them, and reading Python as shell
+    blocked exactly that on 2026-10-25, the first time the installed hook ran.
+    """
     out = []
     for raw in _script_paths(cmd):
         path = _resolve_script(raw, bases)
-        if not path:
+        if not path or not path.lower().endswith((".sh", ".ps1")):
             continue
         try:
             if os.path.getsize(path) > _SCRIPT_MAX_BYTES:

@@ -197,6 +197,13 @@ def test_sweep_false_positives_stay_allowed(root, command):
     assert result.returncode == ALLOW, result.stderr.decode()
 
 
+def test_a_python_file_holding_fleet_commands_as_strings_is_not_a_deploy(root):
+    script = root / "proof.py"
+    script.write_text(f"CASES = [\"cd ~/Syndicate && git merge --ff-only {SHA}\", "
+                      "\"python scripts/local_production.py reload-web\"]\n", encoding="utf-8")
+    assert run_hook(root, f"py -3 {script.as_posix()}").returncode == ALLOW
+
+
 def test_a_redirect_after_the_sha_is_not_read_as_the_ref(root):
     give_claim(root, "web")
     give_receipt(root, "web")
