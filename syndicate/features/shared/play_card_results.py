@@ -186,15 +186,20 @@ def facts(item: Mapping[str, Any], *, sport: str, actual: float | None, score: M
 
 
 def verdict(res: str | None, close: Mapping[str, Any] | None, label: str, sim: Mapping[str, Any] | None,
-            usage: Mapping[str, Any] | None) -> dict[str, Any]:
-    """THE VERDICT: the close x result quadrant, then what the sim got wrong (picks only), then time vs rate."""
+            usage: Mapping[str, Any] | None, *, one_sided: bool = False) -> dict[str, Any]:
+    """THE VERDICT: the close x result quadrant, then what the sim got wrong (picks only), then time vs rate.
+
+    `one_sided`: the market is quoted on one side only (soccer player props: 0 of 5,948 book/line groups two-sided on
+    10-23), so no two-sided close CAN exist -- `no_two_sided_close`, kept apart from `no_close` (a close we failed to
+    find)."""
     beat = close_verdict(close)
     if res in ("win", "loss") and beat is not None:
         key, tone, head = QUADRANTS[(res, beat)]
     elif res == "push":
         key, tone, head = "push", "neutral", "A push: stake returned"
     else:
-        key, tone, head = "no_close", "neutral", ("It cashed" if res == "win" else "It lost" if res == "loss" else "Pending") + \
+        key, tone, head = ("no_two_sided_close" if one_sided else "no_close"), "neutral", \
+            ("It cashed" if res == "win" else "It lost" if res == "loss" else "Pending") + \
             ": with no two-sided close, the result is all we can judge"
     lines = [head]
     if sim:
@@ -312,7 +317,11 @@ def classify(item: Mapping[str, Any], card: Mapping[str, Any], *, label: str, en
     actual = actual_value(item, entry, score)
     sim = sim_judgement(item, label, actual)
     use = usage_split(usage, str(item.get("side") or "").lower(), res)
-    v = verdict(res, close, label, sim, use)
+    from syndicate.features.shared.cheat_sheets import ONE_SIDED_FAIR_METHODS
+
+    one_sided = (str(item.get("fair_method") or "") in ONE_SIDED_FAIR_METHODS
+                 or (item.get("check") or {}).get("verdict") == "one_sided_fair")
+    v = verdict(res, close, label, sim, use, one_sided=one_sided)
     over_under = is_over_under(item)
     return {"outcome": res, "verdict": v["key"], "tone": v["tone"], "beat_close": close_verdict(close),
             "ev_close_pct": _num(close.get("ev_close_pct")), "clv_pp": _num(close.get("clv_pp")), "actual": actual,
@@ -396,7 +405,8 @@ def sheet_postmortem(sheet: Mapping[str, Any], reconciled: Mapping[str, Any] | N
                 "kind": "game", "market": line.get("market"), "line": line.get("line"), "side": line.get("side"),
                 "price": chk.get("price"), "book": chk.get("book"), "books_quoting": line.get("books_quoting"),
                 "p_market": chk.get("p_market"), "p_model": chk.get("p_model"), "ev_market": chk.get("ev_market"),
-                "result": None if y is None else {"y": y, "units": _units(chk.get("price"), y)}, "close": {}}
+                "result": None if y is None else {"y": y, "units": _units(chk.get("price"), y)},
+                "close": (closes or {}).get(f"line:{cs.line_result_key(line)}") or {}}
         add(dict(line, p_model=chk.get("p_model"), p_market=chk.get("p_market")), card,
             label=cs.pick_label({"sport": sport, "market": line.get("market"), "p_model": chk.get("p_model"),
                                  "p_market": chk.get("p_market")}), entry=entry, sections=["lines_value"])

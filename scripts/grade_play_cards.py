@@ -75,18 +75,48 @@ def central_date(ts: datetime) -> str:
     return central(ts).date().isoformat()
 
 
+def _line(value: Any) -> float | None:
+    """A quote or card line as a float; None for no line -- and for NaN, which the quote log writes on h2h rows."""
+    try:
+        out = float(value)
+    except (TypeError, ValueError):
+        return None
+    return None if out != out else out
+
+
+def _same_side_line(q: dict[str, Any], side: str, line: float | None, spread: bool) -> bool:
+    """Does this quote price the card's market AT the card's line? A spread stores each side's OWN signed line (home
+    +0.25 / away -0.25), so the other side of the card's pair sits at -line; every other market shares one line."""
+    ql = _line(q.get("line"))
+    if not spread or line is None:
+        return ql == line
+    return ql == (line if str(q.get("selection") or "").lower() == side else -line)
+
+
 def closing_fair(quotes: list[dict[str, Any]], card: dict[str, Any]) -> dict[str, Any] | None:
-    """Median per-book Shin fair of the card's side from each book's last two-sided quote at or before kickoff."""
+    """Median per-book Shin fair of the card's side from each book's last quote on EVERY outcome of the card's market,
+    line and segment at or before kickoff.
+
+    Game lines reach this since 2026-10-25 (lane result-cards: every game pick in every sport had been `no_close`,
+    soccer 68 of 68), and four things only game lines exercise are handled: a 3-way market (soccer h2h) de-vigs all three
+    outcomes, never two of them; a spread pairs the card's side at `line` with the other side at `-line`; the segment
+    must match (q1 / h1 quotes share the market key); a NaN line (h2h) is no line. A book counts only when its last
+    pre-kick quotes cover the whole outcome set the books show, and that set needs two or more outcomes."""
     npf = _npf()
     commence = npf.parse_ts(card.get("commence_time"))
     if commence is None:
         return None
-    pkey, line, market = player_key(card.get("player")), card.get("line"), card.get("market")
+    pkey, market = player_key(card.get("player")), card.get("market")
+    line, side = _line(card.get("line")), str(card.get("side") or "").lower()
+    segment = str(card.get("segment") or "full").lower()
+    spread = "spread" in str(market or "").lower()
     latest: dict[tuple[str, str], dict[str, Any]] = {}
     for q in quotes:
         if str(q.get("event_id")) != str(card.get("event_id")) or q.get("market") != market:
             continue
-        if player_key(q.get("player_name")) != pkey or q.get("line") != line:
+        if str(q.get("segment") or "full").lower() != segment or player_key(q.get("player_name")) != pkey:
+            continue
+        if not _same_side_line(q, side, line, spread):
             continue
         ts = npf.parse_ts(q.get("captured_at"))
         if ts is None or ts > commence:
@@ -97,15 +127,16 @@ def closing_fair(quotes: list[dict[str, Any]], card: dict[str, Any]) -> dict[str
     by_book: dict[str, dict[str, float]] = defaultdict(dict)
     for (book, sel), q in latest.items():
         by_book[book][sel] = float(q["price"])
-    side = str(card.get("side") or "").lower()
+    outcomes = sorted({sel for sides in by_book.values() for sel in sides})
+    if len(outcomes) < 2 or side not in outcomes:
+        return None
     fairs, best = [], None
     for book, sides in by_book.items():
-        if len(sides) != 2 or side not in sides:
+        if set(sides) != set(outcomes):
             continue
-        names = sorted(sides)
-        probs = devig([sides[n] for n in names], method="shin")
+        probs = devig([sides[n] for n in outcomes], method="shin")
         if probs:
-            fairs.append(dict(zip(names, probs))[side])
+            fairs.append(dict(zip(outcomes, probs))[side])
             best = sides[side] if best is None or decimal(sides[side]) > decimal(best) else best
     if not fairs:
         return None

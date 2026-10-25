@@ -532,11 +532,14 @@ def write_postmortem(root: Path, path: Path, sheet: dict[str, Any], rec: dict[st
         gpc = _load("grade_play_cards")
         sport = str(sheet.get("sport"))
         records = pcr.sheet_postmortem(sheet, rec)                   # first pass: which bets are graded
+        # EVERY priced bet, game lines too (2026-10-25: props only had left every game pick in every sport `no_close`
+        # -- soccer 68 of 68, NCAAF 52 since 10-17); `closing_fair` pairs 3-way, spread and segment lines itself.
         cards = [{"card_id": r["card_id"], "event_id": r.get("event_id"), "market": r.get("market"), "player": r.get("player"),
-                  "line": r.get("line"), "side": r.get("side"), "price": r.get("price"), "p_market": r.get("p_market"),
+                  "line": r.get("line"), "side": r.get("side"), "segment": r.get("segment"), "price": r.get("price"),
+                  "p_market": r.get("p_market"),
                   "commence_time": next((g.get("commence_time") for g in sheet.get("games") or []
                                          if g.get("event_id") == r.get("event_id")), None)}
-                 for r in records if r.get("kind") == "prop"]
+                 for r in records if r.get("price") is not None]
         closes = gpc.closing_fairs(root, sport, day, cards)
         cache = root / "cheatsheets" / ".usage_cache"
         records = pcr.sheet_postmortem(sheet, rec, closes=closes,

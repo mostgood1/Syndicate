@@ -171,3 +171,61 @@ def test_closes_are_read_from_a_gzipped_day_log_too(tmp_path):
         fh.write(body)
     packed = m.closing_fairs(tmp_path, "nfl", "2026-10-18", [card])
     assert packed and packed == plain and packed["abc123"]["books"] == 1
+
+
+def _gq(sel, price, line=None, t="2026-10-18T19:00:00Z", book="dk", market="h2h", segment="full"):
+    return {"event_id": "e1", "market": market, "player_name": None, "line": line, "bookmaker": book,
+            "selection": sel, "price": price, "captured_at": t, "segment": segment}
+
+
+def _gcard(market, side, line=None, segment=None, price=150):
+    return {"card_id": "g1", "event_id": "e1", "market": market, "player": None, "line": line, "side": side,
+            "segment": segment, "price": price, "p_market": None, "commence_time": "2026-10-18T20:05:00Z"}
+
+
+def test_a_three_way_market_devigs_all_three_outcomes_never_two():
+    # 2026-10-25: soccer h2h has home / draw / away; de-vigging two of the three made 0.086 out of a 0.047 close.
+    m = _module()
+    nan = float("nan")
+    quotes = [_gq("home", 150, nan), _gq("draw", 240, nan), _gq("away", 210, nan),
+              _gq("home", 155, nan, book="fd"), _gq("away", 205, nan, book="fd")]            # fd shows 2 of 3: skipped
+    close = m.closing_fair(quotes, _gcard("h2h", "draw"))
+    want = dict(zip(["away", "draw", "home"], devig([210, 240, 150], method="shin")))["draw"]
+    assert close["books"] == 1 and close["p_close"] == round(want, 4)
+
+
+def test_a_spread_pairs_the_card_side_with_the_other_side_at_minus_line():
+    # The quote log stores each side's own signed line (home +1.5 / away -1.5); NHL away +1.5 had been paired with home +1.5.
+    m = _module()
+    quotes = [_gq("away", -110, 1.5, market="spreads"), _gq("home", -110, -1.5, market="spreads"),
+              _gq("home", 300, 1.5, market="spreads"), _gq("away", -450, -1.5, market="spreads")]   # the OTHER pair
+    close = m.closing_fair(quotes, _gcard("spreads", "away", line=1.5, price=-105))
+    assert close["books"] == 1 and close["p_close"] == round(devig([-110, -110], method="shin")[0], 4)
+
+
+def test_segment_quotes_never_mix_into_a_full_game_close():
+    m = _module()
+    quotes = [_gq("over", -110, 44.5, market="totals"), _gq("under", -110, 44.5, market="totals"),
+              _gq("over", 300, 44.5, market="totals", segment="q1"), _gq("under", -500, 44.5, market="totals", segment="q1")]
+    full = m.closing_fair(quotes, _gcard("totals", "over", line=44.5, price=-105))
+    assert full["books"] == 1 and full["p_close"] == round(devig([-110, -110], method="shin")[0], 4)
+    assert m.closing_fair(quotes, _gcard("totals", "over", line=44.5, segment="q1"))["p_close"] < 0.3
+
+
+def test_a_nan_line_reads_as_no_line_and_a_one_sided_market_has_no_close():
+    m = _module()
+    nan = float("nan")
+    two = [_gq("home", -150, nan), _gq("away", 130, nan)]
+    assert m.closing_fair(two, _gcard("h2h", "home", price=-140))["books"] == 1      # NaN != None used to block this
+    over_only = [_gq("over", 120, 1.5, market="player_shots"), _gq("over", 115, 1.5, market="player_shots", book="fd")]
+    assert m.closing_fair(over_only, _gcard("player_shots", "over", line=1.5)) is None
+
+
+def test_a_one_sided_row_without_a_close_is_no_two_sided_close():
+    from syndicate.features.shared import play_card_results as pcr
+
+    assert pcr.verdict("loss", {}, "PRICE PLAY", None, None, one_sided=True)["key"] == "no_two_sided_close"
+    assert pcr.verdict("loss", {}, "PRICE PLAY", None, None)["key"] == "no_close"                 # off: the old label
+    row = {"side": "over", "line": 1.5, "fair_method": "book_margin_model", "check": {"verdict": "one_sided_fair"}}
+    card = {"result": {"y": 0}, "close": {}}
+    assert pcr.classify(row, card, label="PRICE PLAY", entry=None, score=None)["verdict"] == "no_two_sided_close"
