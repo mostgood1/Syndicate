@@ -206,6 +206,9 @@ _LEAN_FIELDS = (
     # 53% of the 8 MB ceiling at the 3,000 cap. See `OrderRequest`.
     "staked_probability_version",
     "sizing_basis",
+    # TAKER (None) vs the Kalshi maker pilot ("maker_pilot") [lane kalshi-maker-pilot]:
+    # without it the scorecard cannot split the pilot's fills from taker fills.
+    "execution_style",
     # The sport's own game id (MLB `gamePk`), needed to look up a live feed and
     # answer "is this bet winning". `event_id` is the odds-feed id and is not
     # interchangeable with it.
@@ -458,6 +461,11 @@ class OrderRequest:
     # under a new profile is the same bet.
     staked_probability_version: str | None = None
     sizing_basis: str | None = None
+    # HOW THE ORDER WAS ENTERED [2026-10-24, user decision "C: Small live pilot",
+    # lane kalshi-maker-pilot]. None = the normal taker entry; "maker_pilot" = a
+    # resting post-only bid (`kalshi_maker_pilot`). Not in `idempotency_key`: the
+    # same bet entered another way is still the same bet.
+    execution_style: str | None = None
 
 
 def execution_mode() -> str:
@@ -1600,6 +1608,8 @@ def _record_into_state(
         # outcome cannot be split by sizing basis at all.
         "staked_probability_version": request.staked_probability_version,
         "sizing_basis": request.sizing_basis,
+        # TAKER (None) vs the maker pilot, so the scorecard can split them.
+        "execution_style": request.execution_style,
         # Ungraded until something grades it. `None` rather than absent so the
         # field is present on every record and a summary cannot mistake "no such
         # key" for "not settled yet".
@@ -3412,6 +3422,7 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
                 "contracts": order.get("contracts"),
                 "fill_price": order.get("fill_price"),
                 "fees_dollars": order.get("fees_dollars"),
+                "execution_style": order.get("execution_style"),
             }
         )
 
@@ -3435,6 +3446,12 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
                 f" fees={row['fees_dollars']}",
                 flush=True,
             )
+            if row.get("execution_style"):
+                from syndicate.features.shared.kalshi_maker_pilot import reconcile_line
+
+                pilot = reconcile_line(row)
+                if pilot:
+                    print(pilot, flush=True)
     # ------------------------------------------------------------------
     # THE OTHER DIRECTION: A POSITION THE VENUE HOLDS AND WE DO NOT.
     # ------------------------------------------------------------------

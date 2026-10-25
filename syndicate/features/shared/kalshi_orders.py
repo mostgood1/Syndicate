@@ -604,7 +604,9 @@ def order_body_v2(
         "price": f"{quote_price:.4f}",
         "time_in_force": _V2_TIME_IN_FORCE,
         "self_trade_prevention_type": _V2_SELF_TRADE_PREVENTION,
-        "post_only": False,
+        # A maker-pilot request carries `post_only = True` (kalshi_maker_pilot._Maker):
+        # the venue refuses it rather than let it take. Every other request: False.
+        "post_only": bool(getattr(request, "post_only", False) is True),
         "cancel_order_on_pause": False,
         "reduce_only": False,
         "exchange_index": _v2_exchange_index(),

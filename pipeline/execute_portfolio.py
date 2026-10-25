@@ -1084,6 +1084,27 @@ def _run_execution(
                 flush=True,
             )
 
+        # THE KALSHI MAKER PILOT [2026-10-24, user decision "C: Small live pilot",
+        # lane kalshi-maker-pilot]. A live Kalshi pregame position may be POSTED
+        # (post-only, at min(bid+1c, ask-1c), expiring at commence, $5) instead of
+        # taken. `route` returns None -- and the order goes on as a taker exactly as
+        # before -- unless SYNDICATE_KALSHI_MAKER_PILOT is on and every pilot gate
+        # holds. Routed AFTER the order cap and BEFORE `check_order`, so the guard
+        # sees the pilot's stake.
+        order_submit = submitter
+        if batch is None and str(venue).strip().lower() == "kalshi" and submitter is not None:
+            from syndicate.features.shared.kalshi_maker_pilot import route as _maker_route
+
+            routed = _maker_route(request)
+            if routed is not None and routed.skip:
+                # ONE POST PER POSITION: it already has a pilot row (resting,
+                # filled, expired or refused). Never re-posted, never taken.
+                skipped += 1
+                refused[routed.skip] = refused.get(routed.skip, 0) + 1
+                continue
+            if routed is not None:
+                request, order_submit = routed.request, routed.submitter
+
         before = batch.status_of(request) if batch is not None else _status_of(request)
         # A REJECTED order never reached the venue, so a fresh attempt is a
         # PLACEMENT, not a duplicate. Measured 2026-08-24T12:58Z: the retry
@@ -1114,7 +1135,7 @@ def _run_execution(
                 },
             )
             if batch is not None
-            else place_order(request, submit=submitter)
+            else place_order(request, submit=order_submit)
         )
         if record.get("recorded") is False:
             # REFUSED AT BUILD -- NOTHING WAS WRITTEN.  [2026-09-10, lane
