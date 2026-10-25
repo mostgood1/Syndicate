@@ -629,6 +629,13 @@ That makes the 10-25 Pinnacle capture for NBA/NFL/soccer (`bbc90e69`) the precon
 actually trades. **Recommendation for step 2 is unchanged: (a), the Pinnacle >= 0.4 pp forward arm.** Add the
 consensus arm only as a control.
 
+**Faithfulness check (lane pm-trader-strategies, from the paper text, arXiv 1710.02824).** Kaunitz's alpha is NOT an
+edge threshold. p_cons is the mean raw 1/odds (Eq. 4). Their regression of results on p_cons gives slope ~1.00 with
+intercepts -0.034 / -0.057 / -0.037, so alpha is each outcome's average margin. The bet rule (Eq. 6) is "best odds >
+1/(p_cons - alpha)": any positive edge over a margin-removed consensus. That is what this arm tests, so the negative
+result stands as a test of their rule, not of a mis-set threshold. Their profit came from soft-book outliers in soccer
+1X2; exchange-style venue prices offer no such outlier.
+
 ## s5. Running it
 
 **NIGHTLY JOB (built 2026-10-24, NOT LIVE until the coordinator's restart).**
