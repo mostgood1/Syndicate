@@ -105,6 +105,48 @@ def test_a_rung_scaled_under_the_min_stake_is_held_at_the_min() -> None:
     assert report["floored_at_min"] == 5
 
 
+def _held(line, dollars, *, key, market="totals_alt", side="over", event="evt-1"):
+    return {"sport": "nba", "event_id": event, "market": market, "segment": "full", "player_name": None,
+            "side": side, "line": line, "position_key": key, "fill_stake_dollars": dollars, "status": "filled"}
+
+
+def _keyed(line, dollars, key, **kw):
+    position = _position(line, dollars, **kw)
+    position["position_key"] = key
+    return position
+
+
+def test_a_rung_held_from_an_earlier_build_spends_the_budget_first() -> None:
+    # 220.5 was ordered at $6.44 in an earlier build; 231.5 appears now at $4.62.
+    plan = _plan([_keyed(220.5, 6.44, "a"), _keyed(231.5, 4.62, "b")])
+    report = cap_alt_ladder_stakes(plan, [_held(220.5, 6.44, key="a")])
+    a, b = plan["positions"]
+    assert a["stake_dollars"] == 6.44  # held: its order keeps its stake, the plan row is left alone
+    assert b["stake_dollars"] == 1.0  # no room left: held at the min, not dropped
+    assert (report["ladders"], report["rungs"], report["held_rungs"], report["floored_at_min"]) == (1, 1, 1, 1)
+    assert b["sizing"]["alt_ladder_held_dollars"] == 6.44
+
+
+def test_a_new_bigger_rung_gets_the_room_the_held_rungs_left() -> None:
+    plan = _plan([_keyed(231.5, 6.0, "b")])
+    cap_alt_ladder_stakes(plan, [_held(220.5, 2.0, key="a")])
+    assert plan["positions"][0]["stake_dollars"] == 4.0  # budget $6 (largest rung), $2 already held
+
+
+def test_held_orders_on_another_ladder_change_nothing() -> None:
+    plan = _plan([_keyed(231.5, 6.0, "b")])
+    report = cap_alt_ladder_stakes(plan, [_held(220.5, 9.0, key="a", side="under"), _held(220.5, 9.0, key="c", event="evt-2")])
+    assert plan["positions"][0]["stake_dollars"] == 6.0
+    assert report["ladders"] == 0
+
+
+def test_a_ladder_whose_planned_rungs_are_all_held_is_left_alone() -> None:
+    plan = _plan([_keyed(220.5, 6.44, "a"), _keyed(231.5, 4.62, "b")])
+    report = cap_alt_ladder_stakes(plan, [_held(220.5, 6.44, key="a"), _held(231.5, 4.62, key="b")])
+    assert [p["stake_dollars"] for p in plan["positions"]] == [6.44, 4.62]
+    assert report["ladders"] == 0
+
+
 def _rows():
     def row(line, market="totals_alt", event="evt-nba-1", price=110):
         return {
@@ -157,3 +199,32 @@ def test_reachability_the_runner_caps_the_main_plan_and_a_bare_commit_does_not(t
     assert on["alt_ladder_cap"]["ladders"] == 1
     single = [p["stake_dollars"] for p in on["positions"] if p["event_id"] == "evt-nba-2"]
     assert single == [p["stake_dollars"] for p in off["positions"] if p["event_id"] == "evt-nba-2"]
+    assert on["alt_ladder_cap"]["held_source"] == "ledger"
+
+
+def test_reachability_the_runner_counts_the_main_books_held_orders(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("SYNDICATE_REPORTS_ROOT", str(tmp_path))
+    monkeypatch.setenv("SYNDICATE_PORTFOLIO_COMMIT_ENABLED", "1")
+    for key in ("SYNDICATE_EXECUTION_ENABLED", "SYNDICATE_REFRESH_STATE_BACKEND", "SYNDICATE_PAPER2_VENUES"):
+        monkeypatch.delenv(key, raising=False)
+    settings = PortfolioSettings(
+        bankroll_units=1000.0, max_slate_exposure_fraction=1.0, min_ev_pct=-100.0, max_positions=50, min_stake_units=1.0
+    )
+    monkeypatch.setattr("syndicate.features.shared.portfolio_commit.resolve_settings", lambda: settings)
+    monkeypatch.setattr("pipeline.portfolio_commit.resolve_settings", lambda: settings)
+    single_rung = [r for r in _rows() if r["line"] == 222.5]
+    monkeypatch.setattr("pipeline.intelligence_state.read_layer2_shortlist", lambda date: {"rows": single_rung})
+    held = {**_held(220.5, 50.0, key="held-earlier", event="evt-nba-1"), "selected_date": "2026-10-26",
+            "mode": "paper", "venue": "paper"}
+    other_book = {**held, "venue": "paper:kalshi", "position_key": "other-book"}
+    monkeypatch.setattr("syndicate.features.shared.execution_ledger._load", lambda: {"orders": [held, other_book]})
+    from pipeline import portfolio_commit as commit
+
+    result = commit.run_portfolio_commit("2026-10-26", settled_sample_size_by_sport={})
+    assert result["status"] == "ok", result
+    plan = result["plan"]
+    (rung,) = [p for p in plan["positions"] if p["event_id"] == "evt-nba-1"]
+    # A $50 rung already held on this ladder in the main book: the new rung is held at the $1 min.
+    # The paper2 order on the same ladder is another book's and is not counted.
+    assert rung["stake_dollars"] == 1.0
+    assert (plan["alt_ladder_cap"]["held_rungs"], plan["alt_ladder_cap"]["floored_at_min"]) == (1, 1)

@@ -2125,7 +2125,26 @@ def _alt_ladder_key(position: Mapping[str, Any]) -> tuple:
     )
 
 
-def cap_alt_ladder_stakes(plan: dict[str, Any]) -> dict[str, Any]:
+def _held_ladder_stakes(held_orders: Any) -> dict[tuple, dict[str, float]]:
+    """{ladder key: {position_key: stake}} over orders already in the book."""
+    held: dict[tuple, dict[str, float]] = {}
+    for order in held_orders or ():
+        if not isinstance(order, Mapping):
+            continue
+        stake = order.get("fill_stake_dollars")
+        if stake is None:
+            stake = order.get("requested_stake_dollars")
+        try:
+            stake = float(stake or 0.0)
+        except (TypeError, ValueError):
+            continue
+        rungs = held.setdefault(_alt_ladder_key(order), {})
+        key = str(order.get("position_key") or "")
+        rungs[key] = max(rungs.get(key, 0.0), stake)
+    return held
+
+
+def cap_alt_ladder_stakes(plan: dict[str, Any], held_orders: Any = ()) -> dict[str, Any]:
     """Cap each alt ladder's total paper stake at its largest single rung.
 
     `[user decision 2026-10-26, "keep 2%, and cap paper stake per alt ladder"]`,
@@ -2138,6 +2157,13 @@ def cap_alt_ladder_stakes(plan: dict[str, Any]) -> dict[str, Any]:
     normal stake. A rung the scaling would put under the plan's min stake is held
     at the min, and counted, rather than dropped.
 
+    `held_orders` ARE THE LADDER TOO. Rungs reach the plan build by build, and an
+    order keeps the stake it was placed at: measured 10-17..10-26, 56 of the main
+    book's 63 multi-rung ladders got their rungs in more than one build, so a cap
+    over one build's positions alone missed most of them. With held orders, the
+    budget is the largest rung held or planned, the stake already held is spent
+    first, and only the NEW rungs are scaled into what is left.
+
     MAIN PAPER PLAN ONLY. The paper2 venue books and the live plans are built by
     their own `commit_portfolio` calls and are not touched.
     """
@@ -2145,6 +2171,7 @@ def cap_alt_ladder_stakes(plan: dict[str, Any]) -> dict[str, Any]:
     report = {
         "ladders": 0,
         "rungs": 0,
+        "held_rungs": 0,
         "floored_at_min": 0,
         "staked_dollars_before": 0.0,
         "staked_dollars_after": 0.0,
@@ -2153,33 +2180,45 @@ def cap_alt_ladder_stakes(plan: dict[str, Any]) -> dict[str, Any]:
         return report
     bankroll = float(plan.get("bankroll_units") or 0.0)
     min_stake = float((plan.get("settings") or {}).get("min_stake_units") or 0.0)
+    held = _held_ladder_stakes(held_orders)
     ladders: dict[tuple, list[dict[str, Any]]] = {}
     for position in positions:
         if isinstance(position, dict):
             ladders.setdefault(_alt_ladder_key(position), []).append(position)
 
-    for rungs in ladders.values():
-        total = sum(float(p.get("stake_dollars") or 0.0) for p in rungs)
-        cap = max((float(p.get("stake_dollars") or 0.0) for p in rungs), default=0.0)
-        if len(rungs) < 2 or total <= 0 or not bankroll:
+    for key, rungs in ladders.items():
+        held_here = held.get(key) or {}
+        new = [p for p in rungs if str(p.get("position_key") or "") not in held_here]
+        stakes = [float(p.get("stake_dollars") or 0.0) for p in new]
+        total = sum(stakes)
+        if held_here:
+            budget = max([*held_here.values(), *stakes], default=0.0)
+            room = max(budget - sum(held_here.values()), 0.0)
+        else:
+            if len(new) < 2:
+                continue
+            room = max(stakes, default=0.0)
+        if not new or total <= 0 or total <= room + 0.005 or not bankroll:
             continue
         report["ladders"] += 1
-        report["rungs"] += len(rungs)
+        report["rungs"] += len(new)
+        report["held_rungs"] += len(held_here)
         report["staked_dollars_before"] += total
-        scale = cap / total
-        for position in rungs:
+        scale = room / total
+        for position in new:
             fraction = float(position.get("stake_fraction") or 0.0)
             capped = fraction * scale
             dollars = round(capped * bankroll, 2)
-            if dollars < min_stake:
-                dollars = min_stake
-                capped = min_stake / bankroll
+            if dollars < min_stake or dollars <= 0:
+                dollars = max(min_stake, 0.01)
+                capped = dollars / bankroll
                 report["floored_at_min"] += 1
             rung_scale = (capped / fraction) if fraction else 0.0
             sizing = position.get("sizing")
             if isinstance(sizing, dict):
                 sizing["stake_dollars_pre_ladder_cap"] = position.get("stake_dollars")
-                sizing["alt_ladder_rungs"] = len(rungs)
+                sizing["alt_ladder_rungs"] = len(new) + len(held_here)
+                sizing["alt_ladder_held_dollars"] = round(sum(held_here.values()), 2)
                 sizing["alt_ladder_scale"] = round(rung_scale, 6)
             position["stake_dollars"] = dollars
             position["stake_fraction"] = round(capped, 6)
@@ -2327,11 +2366,30 @@ def run_portfolio_commit(
         settled_sample_size_by_sport=settled_sample_size_by_sport,
     )
     # One stake per alt ladder -- see `cap_alt_ladder_stakes`. This plan only.
-    ladder_cap = cap_alt_ladder_stakes(plan)
+    # The main book's own orders for this slate count against the cap. Unreadable,
+    # the cap still runs over this build's rungs, and the log line says so.
+    held_source = "ledger"
+    try:
+        from syndicate.features.shared.execution_ledger import _load as _load_ledger_for_cap
+
+        held_orders = [
+            order
+            for order in (_load_ledger_for_cap().get("orders") or [])
+            if order.get("selected_date") == normalized
+            and order.get("mode") == "paper"
+            and order.get("venue") == "paper"
+            and order.get("status") not in ("failed", "cancelled", "canceled", "rejected")
+        ]
+    except Exception as exc:
+        held_orders, held_source = [], f"unreadable:{type(exc).__name__}"
+    ladder_cap = cap_alt_ladder_stakes(plan, held_orders)
+    ladder_cap["held_source"] = held_source
     print(
-        "[portfolio_commit] ALT_LADDER_CAP date=%s ladders=%d rungs=%d floored_at_min=%d staked_before=%.2f staked_after=%.2f"
-        % (normalized, ladder_cap["ladders"], ladder_cap["rungs"], ladder_cap["floored_at_min"],
-           ladder_cap["staked_dollars_before"], ladder_cap["staked_dollars_after"]),
+        "[portfolio_commit] ALT_LADDER_CAP date=%s ladders=%d rungs=%d held_rungs=%d floored_at_min=%d "
+        "staked_before=%.2f staked_after=%.2f held_source=%s"
+        % (normalized, ladder_cap["ladders"], ladder_cap["rungs"], ladder_cap["held_rungs"],
+           ladder_cap["floored_at_min"], ladder_cap["staked_dollars_before"], ladder_cap["staked_dollars_after"],
+           held_source),
         flush=True,
     )
 
