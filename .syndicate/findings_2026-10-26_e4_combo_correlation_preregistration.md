@@ -232,3 +232,31 @@ hits over 0.5 was DraftKings -222 and the under was ESPN Bet +190. So it is a be
   `book_quotes`.
 
 `closing_lines` is not used. Window, cells, arms, metric and gates are unchanged.
+
+## Amendment A2 -- 2026-10-26, before any join (implementation choices the text left open; committed with the code)
+
+1. **(b-pooled) is computed per (cell, stat pair)**, not per whole cell. It is the leave-one-date-out mean sim
+   `rho` over the same stat pair in the same cell. A mixed cell such as MLB SP-other holds pairs of opposite sign:
+   hits x RBI is positive, strikeouts x hits is negative. Pooling across those would test a meaningless average,
+   not the sim's structural correlation.
+2. **Holm always runs over all 7 primary cells (m = 7).** A cell that is INSUFFICIENT, or whose mean `D_ba` is
+   >= 0, enters with p = 1. The p-value is two-sided normal on `D_ba / SE`. A cell PASSES when its CI upper
+   bound is < 0 AND Holm rejects at 0.05. A cell whose CI upper bound is < 0 but which Holm does not reject is a
+   LEAD.
+3. **Identity rules:**
+   - **Players:** an exact normalised name, else a UNIQUE first-initial + last-name match within the game. Two
+     candidates means unmatched, never a guess.
+   - **MLB games:** full team names, within ±6 h of the StatsAPI `game_date`.
+   - **NBA games:** the sim's ESPN `game_id` gives the ESPN teams and start time, then the `book_quotes` event is
+     matched on team nicknames within ±6 h.
+   - **Soccer:** the sim's ESPN event id gives ESPN's team names. The `book_quotes` event must be within ±3 h of
+     kickoff with token Jaccard >= 0.34 on BOTH home and away; the unique best match wins, and a tie is dropped
+     as ambiguous.
+   - ESPN `AET` / `PEN` / not completed -> void.
+4. **NBA by draw count** (`n_sims` 100 vs 500) is reported as a secondary split of the NBA cells.
+5. **c-ledger's market product** uses only tickets whose every leg is an `over` with a recorded `p_market`. The
+   count is reported.
+6. Stat-pair sub-cells are reported when they have >= 30 pairs.
+7. **Code:** `scripts/e4_combo_correlation.py`. Tests: `tests/test_e4_combo_correlation.py`, 23 hermetic tests,
+   including a reachability test (`off != on`) and recovery of a known NBA covariance through the real calibration
+   widening.
