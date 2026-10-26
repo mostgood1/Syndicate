@@ -205,3 +205,30 @@ These 7 are the **PRIMARY** cells.
 - Every line remains its own decision. Nothing here proposes switching a market, family or sport on or off. A
   pass means "the sim-shape expert may earn weight on that pair type in the skill registry". A kill means "its
   weight there stays 0".
+
+## Amendment A1 -- 2026-10-26 ~22:45Z, before any join (market source)
+
+**Found while writing the reader, before any pair was formed.** `settlement_inputs/closing_lines_<date>.csv` holds
+one row per SELECTION, priced at one book. That book is often a different one for each side: on 10-18 Yandy Diaz's
+hits over 0.5 was DraftKings -222 and the under was ESPN Bet +190. So it is a best-price-per-side ledger. §3's
+"per-book two-sided pair, de-vig, median" cannot be computed from it.
+
+**Replacement, same estimator:**
+
+- **Source.** `<sport>_source/tracking/book_quotes/<date>.jsonl[.gz]`, the L0 per-book change log. It carries
+  `bookmaker`, `market`, `selection`, `line`, `player_name`, `price`, `captured_at` and `commence_time`. Every file
+  in the window is read and indexed by `event_id`. A game's quotes can sit in the previous date's file.
+- **Close per book.** For each (book, market, player, line, selection), take the LAST record with
+  `captured_at < commence_time`. The log has in-play rows: e.g. an MLB record captured 23:15Z for a 21:11Z start.
+  Both sides of a pair must come from the same book at the same line.
+- **Then as registered:** multiplicative de-vig per book, the median across books, the §3 main-line rule, and
+  (0.02, 0.98).
+- **Exchanges and venues are excluded from the market marginal:** kalshi, polymarket*, novig*, prophetx*,
+  betfair_ex*, matchbook, sporttrade. Stage 2 prices against the venue, so the venue must not set the fair it is
+  tested against.
+- The median quote age at commence (`commence_time - captured_at`) is reported per sport. No staleness cut is
+  applied, because the log records changes and an unchanged quote has no new row.
+- **The pregame reference time** for the NBA and soccer leakage gate (§2) is the game's `commence_time` in
+  `book_quotes`.
+
+`closing_lines` is not used. Window, cells, arms, metric and gates are unchanged.
