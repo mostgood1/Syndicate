@@ -1045,6 +1045,15 @@ SCHEDULED_JOBS: tuple[ScheduledJob, ...] = (
     # writes only reports/intelligence/live_cell_scorecard/<date>.{json,md}. Renices itself to 19. rc 2 = the
     # live ledger document did not read (#658), so no count was written. 13:30Z: after the night's settlement.
     ScheduledJob("live-cell-scorecard", 13, 30, ("scripts/live_cell_scorecard.py", "nightly")),
+    # `decision-policy-paper` (lane `decision-policy-paper`, Decision Engine Phase 2, #736, 2026-10-26): decision
+    # policy v1 as a PAPER-ONLY track, pre-registered in .syndicate/findings_2026-10-26_decision_policy_v1_
+    # preregistration.md. Every 15 min it books from the newest heavy builds' DecisionRecords into its own book
+    # (reports/intelligence/decision_policy_paper/); no order module is importable from it (a test pins that).
+    # INERT until SYNDICATE_DECISION_POLICY_PAPER=paper is in the env: absent = off, and off writes nothing.
+    # Enabling is the user's decision. The nightly pass grades on the Pinnacle close + final scores (13:45Z, after
+    # the night's finals) and takes the pre-registered gate looks.
+    ScheduledJob("decision-policy-paper", 0, 0, ("scripts/run_decision_policy_paper.py", "book"), every_minutes=15),
+    ScheduledJob("decision-policy-paper-nightly", 13, 45, ("scripts/run_decision_policy_paper.py", "nightly")),
 )
 
 
