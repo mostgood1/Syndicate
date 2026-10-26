@@ -1,5 +1,13 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#738` — **DECISION POLICY v1 as a PAPER track (Decision Engine Phase 2, `#736`, D2 paper2-first): pre-registered `8d16ab07` before any data; z fitted (z_S1 1.012, z_S2 0.677); built with 41 hermetic tests; NOT RUNNING — a guard-test loan and enabling the fleet job are user decisions** — 2026-10-26, lane `decision-policy-paper` (side session of local_898e5510); `.syndicate/findings_2026-10-26_decision_policy_v1.md`
+- **Policy:** EV_lb = p_market − z·σ at the venue's ask + `venue_fees` fee; σ = `sigma_fair_v1` where recorded, else book dispersion + a fitted residual, else inflated; Kelly on p_lb × Baker–McHale (≤ 2% a bet, ≤ 5% a game); one bet per (event, axis) per strategy (`#711` R1). `p_fair_v1` is never read.
+- **Strategies:** P1 EV_lb > 0 and P2 the `#719` floors (Kalshi 1.0 / Polymarket 0.5) are the candidates; C0 = today's Suggested + 2%, booked at the venue's ask on the same lines, is the comparator.
+- **Gate:** fee-net CLV vs the Pinnacle close, game-clustered Z. Looks at 400 / 800 / 1,200 sharp-graded bets (100 / 200 / 300 games), O'Brien–Fleming boundaries 3.935 / 2.783 / 2.272 (one-sided α 0.0125 per candidate). Final read 2027-01-31 = the plan §9 kill rule. ROI is read at a pass; a pass whose ROI CI is wholly below 0 is a contradiction for the user.
+- **Fit note:** against the Pinnacle-only close z would be 1.28 (S1) / 1.32 (S2), so the registered bound is looser against the gate's own truth. If P1 fails, refitting z on the sharp close is the first lever.
+- **First real-data read** (scratch copies of the 10-26 fleet records; not the test): P1 0 / P2 6 / C0 15 qualifying; C0's median EV at the venue's own ask −6.07%. P1 needs an ask about 2.8 pp under the consensus, so L1's volume is a stated risk.
+- **Owed:** (D-A) a loan of `tests/test_decision_record.py`'s reader guard, so the paper reader can land (asked 10-26); (D-B) enabling the job on the fleet: ff + `SYNDICATE_DECISION_POLICY_PAPER=paper` + one full down/up, ride-along recommended. Then the dated reads in `#717`.
+
 ### `#737` — **SYNDICATE FAIR v1 (Decision Engine Phase 1, `#736`): learned sharpness-weighted fair + σ_fair, OFFLINE. Stage 1 by the registered rule: 4 of 13 families PASS (NCAAF game, NHL game, NHL props [mechanical], soccer game), NCAAF props FAIL, 8 UNDERPOWERED; gains are 2–4% of the Shin fair's KL to the close and v1 is slightly WORSE in absolute pp. Stage-2 forward read owed ON OR AFTER 2026-11-24** — 2026-10-26, lane `syndicate-fair-v1`, session 7c8317e7 (side session of local_898e5510); `.syndicate/findings_2026-10-26_syndicate_fair_v1.md`
 - **Pre-registered before any fit:** `be3fcf23`. Amendment A1 `7786ab1e` adds a stage-2 lower-λ arm. Code `d1ff922d`, on branch `claude/frosty-chandrasekhar-997092`, for review. Fleet `book_quotes` 09-30..10-26 08:00Z, read-only, nice 19. No OddsAPI call.
 - **Gate:** held-out cross-entropy vs the `_consensus_fair` Shin median (parity 0/3,125), against the sharp (Pinnacle, power) close, else the Shin close. Game-clustered CI. Outcome log loss is a harm guard. Per family, never pooled.
@@ -300,6 +308,7 @@ Each line: lane -- what is read -- when (Central). The lane block holds the meth
 - `signal-engine-nba` -- forward graders **2027-04-11** and **2027-09-30**.
 - `signal-engine-football` -- F9/F10 fade grader final read after **NFL week 18 / NCAAF week 16** (early Jan 2027).
 - `mlb-nearmiss-forward` -- the read after **2027-10-03**.
+- `decision-policy-paper` (`#738`) -- the Phase-2 edge gate (fee-net CLV vs the Pinnacle close; looks at 400 / 800 / 1,200 sharp-graded bets) -- weekly **Mondays** from the first Monday after the job is enabled, until L1; the first read also reports the booking rate; final read **2027-01-31** (plan §9 kill rule).
 The four signal-engine / near-miss lanes stay OPEN on purpose: their file claims hold the graders against edits until these dates.
 
 ### `#716` — DONE 2026-10-21. The cards-backed MLB live lens counted a POSTPONED game as FINAL; found behind a "stale test", and the seven ci-suite failures of 2026-10-21 are now closed

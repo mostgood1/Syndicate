@@ -196,6 +196,8 @@ class Candidate:
     side: str = ""
     line: float | None = None
     commence_time: str | None = None
+    home_team: str | None = None
+    away_team: str | None = None
     axis: str = ""
     decided_at: str | None = None
     seconds_to_start: float | None = None
@@ -259,7 +261,8 @@ def evaluate(rec: Any, venue: str, decided_at: str, sigma_info: tuple[float | No
     ident = rec.identity
     cand = Candidate(line_key=rec.key or ident.line_key, venue=venue, sport=ident.sport, event_id=ident.event_id,
                      kind=ident.kind, market=ident.market, segment=ident.segment, player=ident.player,
-                     side=ident.side, line=ident.line, commence_time=ident.commence_time, decided_at=decided_at,
+                     side=ident.side, line=ident.line, commence_time=ident.commence_time,
+                     home_team=ident.home_team, away_team=ident.away_team, decided_at=decided_at,
                      price_prob=quote.price_prob, fee=quote.fee_per_contract, fee_is_bound=quote.fee_is_bound,
                      board_suggested=rec.board_suggested, board_ev_pct=rec.board_ev_pct)
     try:
