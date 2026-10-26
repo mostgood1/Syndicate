@@ -163,6 +163,7 @@ with less margin against the gate's own truth than the name "lower bound" sugges
   - (C) Hold the paper track.
   - **Until the answer arrives, the paper module, its scripts, its tests and the two job entries stay
     committed on this lane's branch and are NOT on main**, so the guard stays green.
+- **D-A RESOLVED 2026-10-26 20:00:18Z.** The user approved option A, verbatim: "Approve the loan (Recommended)". Landed: reader `03f29ac4` + guard entry `9e85b605`, both on main; the loan is returned (both lane blocks).
 - **D-B: enable the paper job on the fleet.**
   - Steps: a fleet ff to a HEAD with this lane's code; `SYNDICATE_DECISION_POLICY_PAPER=paper` in the
     refresh-worker env; one full supervisor down/up, because `SCHEDULED_JOBS` and the env load only at `up`.
