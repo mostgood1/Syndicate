@@ -54433,3 +54433,20 @@ which is about the two sizing bases and not about the refusal boundary.
 - **Recorder (fleet `~/syndicate-prod/data`):** `opportunity_population/2026-10-26__nba__part*.jsonl` 2 files, 14,800 records, `lk` 14,800 / `lke` 14,800; 10-25: 4 files, 32,160 / 32,160 / 32,160.
 - **`nba-signals` job:** `scheduled_jobs.json` last_run_date 2026-10-26, last_rc 0 (11:50:01Z -> 11:50:03Z); log `NBA_SIGNALS_AS_OF season=2026-27 date=2026-10-26 logs=967 players=398 fired={'nba.b2b': 54}`; daily since 10-22 with players rising 322 -> 398.
 - **verify:** MET -- every NBA counting-market prop row with a two-sided fair carries the shadow stamp with `nba.under_bias` and the registered +/-0.0123 by side; non-counting markets carry none; recorder records carry `lk` / `lke`. `[layer2-likelihood-shadow]` NOT-verified (NBA) line rewritten as Verified (NBA).
+
+## 2026-10-26 17:30Z (12:30 PM CT) -- FLEET CONFIG: nightly off-disk backup archive -> OneDrive (lane syndicate-decision-engine, user decision) -- **VERIFIED**
+- **What:** one line appended to `~/syndicate-prod/local_production.env`: `SYNDICATE_LOCAL_BACKUP_OFFDISK_DIR=/mnt/c/Users/tempadmin/OneDrive/SyndicateBackup`, with a comment line.
+  - The key was absent before (count 0, read by key name only; no value printed).
+  - The file was copied first to `local_production.env.bak-<UTC>`.
+  - Nothing was restarted. `cmd_backup` re-reads the env file on every run, so the 09:15Z `data-backup` job uses it from 10-27.
+- **Why:** the user chose OneDrive (plan #736, D8: off-host backup now). Since 09-30 the fleet data root has been the only copy of production. The old off-disk archive (`C:\SyndicateBackup`) is the same physical disk.
+- **Expectation (stated before the run):** a manual `local_production.py backup` writes a complete `<ts>.tar.gz` of about 4.6 GB into the OneDrive folder, rc 0.
+- **Reading:** a manual run 17:18:09Z..~17:30Z, nice 19 / ionice idle.
+  - Snapshot `20261026T171809Z`: 253,791 files / 32.49 GB (source at start 253,789 / 32.48 GB), redis ok, rsync rc=0.
+  - Off-disk archive `/mnt/c/Users/tempadmin/OneDrive/SyndicateBackup/20261026T171809Z.tar.gz`: 4,711,172,219 B in 571 s. Exit 0.
+- **Not verified here:** that OneDrive UPLOADED the archive. The user has to confirm via the OneDrive icon or onedrive.com; the account's quota is unreadable from this host.
+- **Side effects:**
+  - The `C:\SyndicateBackup` archives (20261025, 20261026) stop rotating. C: has 39 GB free (96% full); the user can delete them once OneDrive shows synced.
+  - Kept off-disk archives in the new folder: 2 (`--offdisk-keep` default), about 9.4 GB.
+- **Rollback:** delete the two appended lines (or restore the .bak copy). The next run writes to `/mnt/c/SyndicateBackup` again.
+- **verify:** MET -- the archive exists at the new path with the expected size, and the run exited 0. Owed: tomorrow's 09:15Z scheduled run writes there too (`status` shows data-backup rc=0 and a `20261027T0915*.tar.gz` in the folder).
