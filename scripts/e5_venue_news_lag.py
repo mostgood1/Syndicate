@@ -115,16 +115,37 @@ def minutes(delta: timedelta) -> float:
 # ============================================================================= 1. events
 
 
-def collector_runs(root: Path) -> list[datetime]:
-    """The observable collector runs: the union of `captured_at` over EVERY news log (amendment A2). Each log is
-    append-on-change, so one sport's records mark only the runs where that sport changed."""
+def collector_runs(root: Path, log_path: Path | None = None) -> tuple[dict[str, list[datetime]], str]:
+    """Collector run times per feed key (`nba_injuries`, ..., `nhl_gameinfo`).
+
+    Amendment A3: from the collector's own log (`NEWS_COLLECT {json}` per run, quiet runs included); a run counts for
+    a feed when its `results` carry the feed and its `errors` do not name it. Fallback (A2): the union of `captured_at`
+    over every news log, for every feed -- each log is append-on-change, so it misses quiet runs."""
+    runs: dict[str, set[datetime]] = defaultdict(set)
+    if log_path and log_path.exists():
+        with log_path.open(encoding="utf-8", errors="replace") as handle:
+            for line in handle:
+                if not line.startswith("NEWS_COLLECT "):
+                    continue
+                try:
+                    doc = json.loads(line[len("NEWS_COLLECT "):])
+                except ValueError:
+                    continue
+                t = parse_ts(doc.get("captured_at"))
+                errors = doc.get("errors") or {}
+                for feed in (doc.get("results") or {}):
+                    if t and feed not in errors:
+                        runs[feed].add(t)
+        if runs:
+            return {k: sorted(v) for k, v in runs.items()}, "collector_log"
     stamps: set[datetime] = set()
     for path in (root / "news").glob("*/*/*.jsonl"):
         for rec in _read_jsonl(path):
             t = parse_ts(rec.get("captured_at"))
             if t:
                 stamps.add(t)
-    return sorted(stamps)
+    union = sorted(stamps)
+    return defaultdict(lambda: union), "union_of_news_logs"
 
 
 def _next_run(runs: list[datetime], t: datetime) -> datetime | None:
@@ -791,27 +812,32 @@ def nba_official_out(root: Path) -> set[tuple[str, str]]:
     return out
 
 
-def analyze(root: Path, kalshi: Kalshi, sports: Iterable[str] = SPORTS, log: Callable[[str], None] = print) -> dict[str, Any]:
+def analyze(root: Path, kalshi: Kalshi, sports: Iterable[str] = SPORTS, log: Callable[[str], None] = print,
+            collector_log: Path | None = None) -> dict[str, Any]:
     report: dict[str, Any] = {"prereg": "d9ce947f + A1 0a9b9fed", "window": [WINDOW_START.isoformat(), WINDOW_END.isoformat()],
                               "coverage": {}, "counts": {}, "rows": []}
     lo = (WINDOW_START - timedelta(days=1)).date().isoformat()
     hi = (WINDOW_END + timedelta(days=2)).date().isoformat()
     official = nba_official_out(root)
-    all_runs = collector_runs(root)
-    gaps = [b - a for a, b in zip(all_runs, all_runs[1:])]
-    report["coverage"]["collector_runs"] = {"n": len(all_runs), "first": all_runs[0].isoformat() if all_runs else None,
-                                            "last": all_runs[-1].isoformat() if all_runs else None,
-                                            "gaps_over_25min": sum(1 for g in gaps if g > T0_GAP_MAX)}
+    feed_runs, run_source = collector_runs(root, collector_log)
+    report["coverage"]["collector_runs"] = {"source": run_source}
+    for feed in [f"{s}_injuries" for s in sports] + (["nhl_gameinfo"] if "nhl" in sports else []):
+        rr = feed_runs[feed]
+        gaps = [b - a for a, b in zip(rr, rr[1:])]
+        report["coverage"]["collector_runs"][feed] = {
+            "n": len(rr), "first": rr[0].isoformat() if rr else None, "last": rr[-1].isoformat() if rr else None,
+            "gaps_over_25min": sum(1 for g in gaps if g > T0_GAP_MAX),
+            "minutes_in_gaps_over_25min": round(sum(minutes(g) for g in gaps if g > T0_GAP_MAX))}
     log(f"E5_RUNS {json.dumps(report['coverage']['collector_runs'])}")
     run_time = datetime.now(UTC)
     for sport in sports:
         inj_files = sorted((root / "news" / sport / "injuries").glob("*.jsonl"))
         records = [r for f in inj_files for r in _read_jsonl(f)]
-        events, c_inj = injury_events(records, sport, all_runs)
+        events, c_inj = injury_events(records, sport, feed_runs[f"{sport}_injuries"])
         c_scr: dict[str, int] = {}
         if sport == "nhl":
             gi = [r for f in sorted((root / "news" / "nhl" / "gameinfo").glob("*.jsonl")) for r in _read_jsonl(f)]
-            scr, c_scr = scratch_events(gi, all_runs)
+            scr, c_scr = scratch_events(gi, feed_runs["nhl_gameinfo"])
             events += scr
         books = Books(sport)
         books.load(root, lo, hi, {e["player_key"] for e in events})
@@ -1014,13 +1040,16 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--out", required=True)
     ap.add_argument("--cache", default="")
     ap.add_argument("--offline", action="store_true", help="read the Kalshi cache only")
+    ap.add_argument("--collector-log", default="", help="default: <data-root>/../logs/news_collector.log")
     args = ap.parse_args(argv)
     if not args.data_root:
         print("REFUSING: no --data-root", flush=True)
         return 2
+    root = Path(os.path.expanduser(args.data_root))
+    collector_log = Path(args.collector_log) if args.collector_log else root.parent / "logs" / "news_collector.log"
     kalshi = Kalshi(Path(args.cache) if args.cache else None, offline=args.offline)
-    report = analyze(Path(os.path.expanduser(args.data_root)), kalshi, args.sports.split(","),
-                     log=lambda line: print(line, flush=True))
+    report = analyze(root, kalshi, args.sports.split(","), log=lambda line: print(line, flush=True),
+                     collector_log=collector_log)
     Path(args.out).write_text(json.dumps(report, indent=1, default=str), encoding="utf-8")
     print(f"E5_DONE rows={len(report['rows'])} kalshi_calls={kalshi.calls} cache_hits={kalshi.cache_hits} out={args.out}", flush=True)
     return 0

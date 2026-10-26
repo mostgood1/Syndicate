@@ -181,3 +181,13 @@ of collector runs, which poll all sports together. Then:
   state still holds;
 - `t0_uncertain` if the previous union run is > 25 min before t0.
 The population's "commenced by the run time" bound is the script's wall clock at the run.
+
+### AMENDMENT A3 (2026-10-26 19:42Z, before any result; the first shakedown was STOPPED after its coverage lines)
+
+**True run times.** The first shakedown printed `E5_RUNS n=1450, gaps_over_25min=106` from the A2 union, and the
+collector's own log `~/syndicate-prod/logs/news_collector.log` holds 1,980 `NEWS_COLLECT` lines -- one per run,
+quiet runs included. The union therefore misses ~530 quiet runs and would mark many events `t0_uncertain` without
+a host sleep. Runs now come from that log, per feed: a run counts for a feed (`<sport>_injuries`, `nhl_gameinfo`)
+when its `results` carry the feed and its `errors` do not name it (an errored fetch did not observe that sport).
+A2's union stays as the fallback if the log is unreadable, and the report states which source was used. The
+shakedown was stopped before any venue or book measure printed; its Kalshi cache holds raw API responses only.

@@ -279,3 +279,17 @@ def test_burst_merges_same_kind_and_drops_mixed():
 def test_units_wait_for_the_game_to_commence():
     units, counts = e5.build_units([_ev(0, "to_out")], _FakeBooks(), _ts(200))
     assert units == [] and counts["not_commenced"] == 1
+
+
+def test_collector_runs_come_from_the_log_and_skip_errored_feeds(tmp_path):
+    log = tmp_path / "news_collector.log"
+    log.write_text("\n".join([
+        'NEWS_COLLECT {"captured_at": "2026-10-20T15:00:00Z", "errors": {}, "results": {"nba_injuries": {}, "nhl_gameinfo": {}}}',
+        "some other line",
+        'NEWS_COLLECT {"captured_at": "2026-10-20T15:10:00Z", "errors": {"nba_injuries": "HTTP 503"}, "results": {"nba_injuries": {}}}',
+        'NEWS_COLLECT {"captured_at": "2026-10-20T15:20:00Z", "errors": {}, "results": {"nba_injuries": {}}}',
+    ]), encoding="utf-8")
+    runs, source = e5.collector_runs(tmp_path, log)
+    assert source == "collector_log"
+    assert runs["nba_injuries"] == [_ts(0), _ts(20)]
+    assert runs["nhl_gameinfo"] == [_ts(0)]
