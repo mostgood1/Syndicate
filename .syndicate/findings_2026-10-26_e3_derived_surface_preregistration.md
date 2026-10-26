@@ -183,3 +183,39 @@ contracts / games / dates every number rests on.
 
 Any change after this commit is a dated AMENDMENT below, with its reason, written before the result it affects is
 read. Script bugs that change no definition above are listed in the findings.
+
+### AMENDMENT A1 (2026-10-26 ~23:05Z, before any surface x venue x outcome join; no result read)
+
+Interpretations forced by the data while building the pipeline. None changes an arm, a measure, a threshold or the
+verdict rule.
+
+1. **More derived series than the board captures.** Kalshi's listing of the captured events includes team totals
+   (NBA, WNBA, NFL 1H, NHL, MLB), NBA / NFL / NCAAF 1H-2H spreads and NHL period spreads. They are in the registered
+   population (the §1 series pattern already admits them). Basketball / football team totals: home points =
+   (total + margin) / 2, located at (mu_T + mu_M) / 2 of the same segment, sigma_team = RMS of team points about that
+   location in the same history (`fit_normal_params`). Sim arm: no team-total histogram is stored -> **not
+   available**. Count sports: team totals and period margins come from the solved team pair (§3).
+2. **Overtime follows each SERIES' own rules text.** WNBA's 2nd half EXCLUDES overtime while NBA's includes it.
+   A 2nd-half series whose rules say "not including / excluding overtime" is priced on q3 + q4 (`h2reg`); the sim
+   stores h2 with OT, so the sim arm is not available for those series. Any other contract whose rules exclude
+   overtime from a quantity the model counts with it is excluded and counted (`ot_definition_mismatch`). Every
+   series' rules text is stored in the fetch output and quoted in the findings.
+3. **Candle resolution.** Kalshi pages event candlesticks by market x period, so "1-minute candles over
+   [commence - 7 d, commence]" cost ~60 pages per event. Replaced by HOURLY candles over [commence - 4 d, commence]
+   plus 1-minute candles over [commence - 180 min, commence - 10 min]. The book at t_d is the last 1-minute candle at
+   or before t_d, else the last hourly candle ending at or before t_d; any change after that hour and before t_d
+   would have produced a later candle, so the state at t_d is the same. A market unchanged for > 4 days before t_d
+   becomes `no_quote`.
+4. **Identity candidates** are the book games on the ticker's own ET date (a +/-1 day window made postseason repeat
+   match-ups ambiguous: MLB 16 of 34, WNBA 2 of 15).
+5. **History choices made by the loaders** (reported in the findings with n):
+   - NCAAF 2025 has no consensus provider in CFBD: DraftKings closing spread / total where quoted, else the median
+     of the other providers.
+   - NBA 2025-26 lines are `asof/game_odds` `oddsapi_consensus`: the last capture before the slate's first tip.
+   - NFL uses all 2022-2025 games, regular season and postseason.
+   - Soccer's first-half share pools 9 leagues, 2023-2025.
+   - WNBA and MLB LODO use the tier anchor's t60 full-game lines in place of closing lines.
+6. **Result validation** (§1) is run wherever a window score exists. Soccer and 26 NBA preseason games have none:
+   their contracts are kept unvalidated, and the findings say so.
+7. **Loader code.** The fleet loaders for sims, history and window scores are committed beside the script:
+   `scripts/e3_sim_loaders.py`, `scripts/e3_history_loaders.py` and `scripts/e3_window_loaders.py` (NEW).
