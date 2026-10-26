@@ -1,0 +1,207 @@
+# PRE-REGISTRATION -- E4: does the sims' JOINT distribution predict same-game co-occurrence better than independence? (lane `e4-combo-correlation`, 2026-10-26)
+
+Decision Engine plan §4 **E4** and §2 **P7** (the sims supply shape and correlation, never the mean). OFFLINE and
+read-only on production: fleet `~/syndicate-prod/data` at nice 19, plus unauthenticated public GETs for outcomes
+(and for Stage 2, Kalshi's public API). No deploy, no restart, no env edit, no LLM.
+
+**Written 2026-10-26 ~22:40Z, BEFORE any sim x market x outcome join.** What was read before writing this
+(structure and coverage only; no pair was formed or scored):
+- file listings and date coverage per source, listed in §2;
+- one file of each artifact type, read for its keys only;
+- the prior MLB study `.syndicate/findings_2026-09-09_joint_pricer_scored.md`. It used June-July backfilled joints,
+  the sim's own marginals and an edge-selected population. Same-player: the joint beat independence by
+  -0.042 nats. Cross-player: null. Team dimensions: never scored.
+
+Every constant below is the registered one. A change goes in a dated amendment in this file, committed before
+the result it affects is read.
+
+## 1. The question and the arms
+
+**Unit.** A *pair*: two binary legs on priced markets in the SAME game, both graded, never the same
+(player, market). Each leg's marginal is anchored to the market (§3). The pair's outcome is the 4-cell cell
+(A&B, A&notB, notA&B, notA&notB). That partition does not depend on how the legs are oriented, so over/under
+orientation is irrelevant to the score.
+
+**Arms.** All three arms use the SAME marginals `p_A, p_B` and the SAME functional form, a Gaussian copula:
+`p11 = Phi2(Phi^-1(p_A), Phi^-1(p_B); rho)`, with each leg written as its over/yes event. The arms differ ONLY in
+`rho`. So a log-loss difference between arms is purely a difference in correlation.
+
+| Arm | rho |
+|---|---|
+| **(a) independence** | 0 |
+| **(b) sim** | The sport's persisted sim joint, re-anchored: the sim supplies the dependence and the market supplies the marginals (§4) |
+| **(c) SGP measured copula** | `nfl.sgp.rho_for(cells, mkt_a, mkt_b, relation)` on the CURRENT fleet file `<sport>_source/sgp/<sport>_sgp_correlations.json`, market cells; `type` cells are used where the file has them. It exists for player-prop pairs in MLB and NBA only. |
+
+**(c-ledger), descriptive only.** This arm reads the SGP builders' consistency posterior as recorded. On the graded
+`cheatsheets/<sport>/sgp_graded.jsonl` tickets, it gives the log loss and Brier of the binary "every leg won"
+outcome under three probabilities:
+1. the ledger's `p_joint` (the consistency-posterior marginals times the copula);
+2. the ledger's `p_independent`;
+3. the product of the legs' `p_market`.
+
+The output is per sport, with n, games and a game-clustered SE. It is not a dependence-only comparison, because the
+marginals differ between rows 1-2 and row 3. It is reported, not gated.
+
+## 2. Sources and window (coverage is printed first, with the intersection and the n each result rests on)
+
+| Source | Path (fleet data root) | Coverage seen 2026-10-26 |
+|---|---|---|
+| MLB sim joint, frozen pregame | `mlb_source/source_artifacts/data/daily/sims_pregame/<date>/sim_pk<gamePk>_g<n>.json` -> `sim.joint` (Spearman, 1,000 sims) | 10-03 .. 10-26, 20 dates (postseason) |
+| NBA sim | `nba_source/data/processed/smart_sim_<date>_<HOME>_<AWAY>.json` (`prop_ladders`, `<stat>_sd`, `nba_prop_calibration`; `n_sims` 100 on the file read) | 10-03 .. 10-26, 109 files; regular season from 10-20 |
+| Soccer sim, frozen pre-kickoff | `soccer_source/<league>/api/recommendations/recommendations_prekickoff_<date>.*.json` -> `matches[*].scoreline_probabilities` | 10 leagues; MLS 09-30.., others 10-09/10 .. |
+| Market close | `settlement_inputs/closing_lines_<date>.csv` (per book: `closing_line`, `closing_price`, `selection`) | mlb 09-30..10-24 (20 dates), nba 10-03..10-25 (20), soccer 09-30..10-25 (26) |
+| SGP cells (c) | `<sport>_source/sgp/<sport>_sgp_correlations.json` | mlb, nba (and nfl / nhl / wnba, not used: no (b)) |
+| SGP ledger (c-ledger) | `cheatsheets/<sport>/sgp_graded.jsonl` | nhl 740, nba 233, nfl 192, wnba 32, mlb 25 rows |
+| Outcomes | MLB: StatsAPI `feed_live` on the fleet, else the public `statsapi.mlb.com/api/v1/game/<pk>/boxscore`. NBA: public ESPN summary box. Soccer: the public ESPN scoreboard, full-time (90 min) score. | GET only, cached to `C:\tmp\e4\` |
+
+**Window:** games with a market close dated 2026-09-30 .. 2026-10-25 and a pregame sim of the type above. The
+intersection rule is fixed: a pair exists only where sim, market and outcome all exist for the game.
+
+**Pregame-ness (leakage gate):**
+- **MLB:** `_freeze` must exist; a game whose freeze record is after first pitch is excluded.
+- **NBA:** the file must be written before `commence_time`. Before the 10-21 tip freeze, a file's mtime at or after
+  `commence_time` excludes the game.
+- **Soccer:** the pre-kickoff record's own `updated_at` / last build must be before kickoff.
+- Exclusions are counted and reported.
+
+## 3. Legs and marginals (identical in every arm)
+
+- **Close:** per book, the two-sided pair at the same `closing_line` (both selections). Multiplicative de-vig, then
+  the median across books. Soccer 1X2 (`h2h`, 3 outcomes): per-book normalisation of the three, then the median.
+- **Main line:** per (game, player, market) or (game, market), keep ONE line: the line with the most books quoting
+  both sides; ties go to the line with the median `p` closest to 0.5. A leg needs >= 1 two-sided book.
+  Legs with `p` outside (0.02, 0.98) are dropped.
+- **Grading:**
+  - Pushes and voids are dropped: integer lines that land exactly, a batter with 0 PA, a basketball player with
+    0 minutes, a match not completed in 90 min.
+  - Soccer totals use only x.5 lines.
+- **Markets:**
+  - **MLB:** `batter_hits`, `batter_total_bases`, `batter_home_runs`, `batter_rbis`, `batter_strikeouts`, which are
+    the joint's `hits / total_bases / home_runs / rbi / strikeouts`. For the secondary composed types: game
+    `h2h` and `totals`.
+  - **NBA:** `player_points`, `player_rebounds`, `player_assists`, `player_points_rebounds`,
+    `player_points_assists`, `player_rebounds_assists`, `player_points_rebounds_assists`.
+  - **Soccer:** `h2h` (home / draw / away), `totals` (main x.5 line), `btts`.
+- **Identity:**
+  - Players match by accent-stripped, suffix-stripped name within the game's two teams. MLB uses the joint's
+    `players{pid:{name,team}}`.
+  - Games match on (date, home, away) after team normalisation.
+  - Unmatched rows are counted, never guessed.
+
+## 4. Arm (b): what each sim supplies, and how it is re-anchored
+
+- **MLB:**
+  - `rho_S` comes from `sim.joint.corr_lower`. `undefined` (-32768) pairs are dropped and counted.
+  - Converted with the platform's own map, `rho = 2*sin(pi*rho_S/6)` (`mlb/threshold_correlation.py`), into the
+    Gaussian copula at the market marginals. That is exactly SEC2 for n = 2.
+  - **Secondary, composed types.** These use latent equal-variance composition from the joint's
+    `team|full|{home,away}` labels:
+    - batter x game total over: `rho = (r_XH + r_XA)/sqrt(2(1 + r_HA))`;
+    - batter x own-team moneyline: `rho = (r_X,own - r_X,opp)/sqrt(2(1 - r_HA))`, each `r` converted as above.
+- **NBA:**
+  - The three within-player covariances are backed out of the ladders built from the same draws:
+    `cov(P,R) = (Var_raw(PR) - Var_raw(P) - Var_raw(R))/2`, and likewise for PA and RA.
+  - `Var_raw(P) = (pts_sd / sd_scale.pts)^2`. `Var_raw(PR)` is the variance of the `prop_ladders.pr.distribution`
+    over `combo_scale(("pts","reb"), orig_sd, k)^2`. That undoes the calibration's widening
+    (`nba_prop_calibration.py:425-449`); `k` and `sd_scale` are read from the file's stamps, and an unstamped row
+    uses scale 1.
+  - Any within-player pair among the seven markets gets `rho = cov(X,Y)/(sd_X sd_Y)` from that 3x3 matrix, and
+    `rho` is clipped to [-0.95, 0.95].
+  - **Consistency gate:** a player-game is excluded from (b) if the reconstructed `Var(P+R+A)` differs from
+    `(pra_sd / sd_scale.pra)^2` by more than 25%, or if any variance is <= 0. Exclusions are counted.
+- **Soccer:**
+  - From the sim's scoreline table, compute the sim's own 2x2 table for the two events at the market's line.
+  - Solve for the tetrachoric `rho`, the Gaussian-copula `rho` that reproduces the sim's `p11` at the SIM's
+    marginals, by bisection on [-0.999, 0.999].
+  - Apply it at the MARKET marginals.
+  - Secondary: the odds-ratio-preserving re-anchor, which rakes the sim's 2x2 to the market marginals.
+- **Not testable, stated now:**
+  - NHL, NFL, NCAAF: no persisted joint for any marketed pair. NHL saves none; smartsim2 saves only
+    `margin_stdev` and `total_stdev`.
+  - WNBA: 13 playoff files with different transforms.
+  - Side x total in any sport: no persisted (margin, total) joint, and MLB keeps only 50 score samples.
+  - NBA cross-player pairs and NBA player x team: none persisted.
+  - The engine read names these as gaps for the sim owners. They are not results.
+
+## 5. Pair types (cells)
+
+| Sport | Cell | Pairs |
+|---|---|---|
+| MLB | **SP-nested** | same batter; one event implies the other at any line: hits x TB, HR x hits, HR x TB, HR x RBI |
+| MLB | **SP-other** | same batter, the rest: hits x RBI, TB x RBI, strikeouts x any |
+| MLB | **TM** | teammate batters |
+| MLB | **OP** | opposing batters |
+| NBA (regular season, 10-20 on) | **SP-disjoint** | same player, no shared component: P x R, P x A, R x A, P x RA, R x PA, A x PR |
+| NBA (regular season) | **SP-nested** | same player, sharing a component (e.g. P x PR, PR x PRA) |
+| Soccer | **GL** | result x total, result x BTTS, BTTS x total (home/draw/away each paired; never result x result) |
+
+These 7 are the **PRIMARY** cells.
+
+**SECONDARY cells (reported, not gated):**
+- MLB composed: batter x game total, batter x own-team moneyline.
+- NBA preseason, 10-03..10-16, a different population.
+- Soccer by kind, and the odds-ratio variant.
+- Each sport x stat pair.
+- (b-pooled): (b) with `rho` replaced by the cell's leave-one-date-out mean sim `rho`. It separates the sim's
+  STRUCTURAL correlation from per-game variation.
+- Game-weighted means: per-game mean first, then the mean over games.
+
+## 6. Metric, inference and the gate
+
+- **Score.** Per pair, the 4-cell log loss of the realised cell; cell probabilities are clipped at 1e-6.
+  Differences: `D_ba = LL_b - LL_a`, `D_ca = LL_c - LL_a`, `D_bc = LL_b - LL_c`. Negative means the first arm is
+  better. 4-cell (multi-class) Brier differences are reported beside them.
+- **Common support.** Within a cell, every arm is scored on the SAME pairs. Pairs where (b) is undefined are
+  dropped and counted. `D_ca` and `D_bc` are reported on the subset where (c) exists.
+- **Inference.** The mean over pairs, with a game-clustered SE: CR1, the SGP studies' `clustered_se` formula. The
+  95% CI is mean ± 1.96 SE.
+- **Minimum n.** A cell needs >= 20 games and >= 200 pairs for a verdict. Otherwise it reads **INSUFFICIENT**,
+  which is never a kill.
+- **Stage 2 gate (the brief's rule).** A primary cell PASSES when the upper bound of the 95% CI on `D_ba` is
+  below 0, **Holm-adjusted across the 7 primary cells**. A cell that passes only unadjusted is a LEAD, not a pass.
+- **Kill rule (plan §4).**
+  - Per primary cell: if the CI on `D_ba` does not exclude 0 on the better side (upper bound >= 0), the sim's
+    correlation is not shown better than independence in that cell at this n. E4 is KILLED there.
+  - **E4 overall** is **KILLED** when no primary cell passes Holm.
+- **What a pass does NOT mean, stated now.**
+  - In a NESTED cell, beating independence is close to guaranteed, because independence ignores logical
+    implication. Books and venues price nested legs from the same identity.
+  - So for nested cells, the decision-relevant read is `D_bc` (sim vs the measured copula) and Stage 2's price
+    test, not `D_ba`.
+  - The recommendation will weigh `D_bc`. Where `D_bc`'s CI is above 0, the measured copula beats the sim, and the
+    sim adds nothing a combo price needs.
+- **Engine read (reported, not gated).** Per cell and per stat pair:
+  - the mean sim `rho`;
+  - the realised `rho`, by MLE: the 4-cell likelihood at the market marginals, a single `rho` per cell, with a
+    game-cluster bootstrap CI of 500 resamples;
+  - the SGP `rho`.
+
+  For NBA, it also gives the spread of per-game sim `rho` against its expected sampling noise at the file's
+  `n_sims`.
+
+## 7. Stage 2 (runs ONLY for cells that pass §6 under Holm)
+
+- **Price source.** Kalshi single-game combo (multivariate) markets for the passing sport, found through the
+  PUBLIC API: multivariate event collections, then their markets and trade prints.
+  - A combo counts only if its legs map onto the passing cell's pair type and its game settled in the window.
+  - The executable evidence is the public trade print, at its price and taker side.
+  - Polymarket: no combo capture exists, so it reads NOT RUNNABLE.
+- **EV.** `EV = p_b / (q + fee(q)) - 1`.
+  - `q` is the print price.
+  - `fee` is `venue_fees.taker_fee_per_contract`, i.e. Kalshi 0.07·q(1-q) with any series multiplier. The maker
+    fee is reported beside it.
+  - Bands of `p_b - p_a` (pp): < 1, 1-3, 3-5, >= 5, per sign.
+  - Game-clustered CI. Realised return at the print is reported beside it.
+- **If no combo prints with leg composition are publicly retrievable for the window, Stage 2 reads NOT RUNNABLE.**
+  The recommendation is then a capture, not a strategy.
+
+## 8. What will be reported regardless of outcome
+
+- Per-source coverage, the intersection, and every exclusion count.
+- Every primary and secondary cell, with n pairs / n games.
+- The engine read.
+- The c-ledger table.
+- A recommendation.
+- Every line remains its own decision. Nothing here proposes switching a market, family or sport on or off. A
+  pass means "the sim-shape expert may earn weight on that pair type in the skill registry". A kill means "its
+  weight there stays 0".
