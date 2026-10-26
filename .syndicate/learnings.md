@@ -2913,3 +2913,14 @@ The 2026-10-20 entry said: "Rating INPUTS transfer, because the sim reads them w
   3. Report a held or expired message to the user as NOT delivered.
   4. Never resend while held.
   5. A user decision a peer needs must be typed in THAT chat by the user (see `button-text-is-not-a-decision`).
+
+## 2026-10-26 -- A fair can WIN on log loss and LOSE on absolute error to the close: gate a fair for EV on both `[lane syndicate-fair-v1, session 7c8317e7]`
+
+- **Believed:** a held-out log-loss (cross-entropy) win against the Shin consensus is enough to prefer a fair (the `fair-price-v2` and Decision Engine gates are written that way).
+- **Measured 2026-10-26** (stage 1, `findings_2026-10-26_syndicate_fair_v1.md` §6a): Syndicate Fair v1 passed the registered log-loss gate in NCAAF game, NHL game and soccer game, removing 2.4% / 2.6% / 3.9% of the Shin fair's KL to the close. In **all three** it sat FURTHER from the close in mean absolute pp: 0.594 vs 0.560, 0.770 vs 0.754, 1.206 vs 1.177.
+  - The logit pool wins in the tails (confident lines, 1X2 draws), where log loss is most sensitive.
+  - The median is the more robust estimate in the middle, and EV is linear in p.
+- **Rule:**
+  1. Any gate that decides which fair an EV uses reports **|fair − close| in pp beside the log loss**.
+  2. A fair that wins on log loss but loses on pp may carry sigma or tail information. It must not replace the EV's p.
+  3. **Scale a ridge to the loss differences it arbitrates.** Between two fairs those differences are ~1e-5 nats per row, and a 1e-5 penalty per unit weight² pins the weights near equal. λ landing on the grid's edge is the tell. (A post-hoc 1e-8 run found no hidden signal here, but that was luck, not design.)

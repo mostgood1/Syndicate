@@ -554,7 +554,24 @@ lines on 2026-09-02 with `markets_dropped=0` and a `status=ok` book. `#638`
 remains correct, unit-tested both directions, and is now DORMANT: the safety net
 if `venue_odds` ever returns to keyvalue.
 
-## [sharp-reference-price] SHARP REFERENCE PRICE — WE HAVE ONE. The audit's caveat is STALE.
+## [sharp-reference-price] SHARP REFERENCE PRICE — WE HAVE ONE, BUT NOT IN EVERY SPORT. `[re-read on the FLEET 2026-10-26 17:4xZ, lane syndicate-fair-v1]`
+
+**CURRENT, fleet `book_quotes` (production data root), kickoffs 09-30..10-26 08:00Z** (`.syndicate/findings_2026-10-26_syndicate_fair_v1_preregistration.md`, coverage table):
+
+| sport | books per day | Pinnacle on GAME lines | Pinnacle on PROPS |
+|---|---|---|---|
+| MLB | 38–40 | every event, all window | no |
+| NCAAF | 30–33 | every event, all window | no |
+| NFL | 12–14; 34 from 10-25 | 10-25/26 only (11 events) | no |
+| NBA | 6–12 | 10-25/26 only (7 events) | 10-25/26 only |
+| soccer | 10–15; 34–38 from 10-25 | 10-25/26 only (11 events) | no (soccer props are one-sided) |
+| NHL | 12–14 | **none** | **yes, all window** (`PROPS_ODDSAPI_BOOKMAKERS` includes pinnacle) |
+| WNBA | 14–16 | none | no |
+
+- A "sharp close" exists all window only for MLB and NCAAF game lines and NHL props. Before 10-25, every other cell's close is a soft-book consensus and must be labelled so.
+- Against the consensus close, Pinnacle LEADS NHL props (beta 0.18 [0.15, 0.22] at T-6h) but not NCAAF game lines (0.09 [-0.05, 0.22]). There the exchanges lead (Matchbook 0.28, Novig 0.38 at T-24h). `findings_2026-10-26_syndicate_fair_v1.md` section 5.
+
+**History, kept for the record (08-15, read from the git mirror, superseded by the table above):**
 
 **The models audit's "no Pinnacle, Circa or exchange in the feed" was true when
 measured and is FALSE now.** The feed widened between 08-05 and 08-09 and nobody
@@ -568,9 +585,7 @@ re-read it. `[measured 08-15 from data/mlb_source/tracking/book_quotes/]`
 - **Sharp coverage on MLB GAME LINES is 102 of 102 markets = 100%** on 08-09.
   Sharp set present: `pinnacle`, `betfair_ex_eu`, `matchbook`, `novig`,
   `prophetx` (plus `kalshi` / `polymarket` as prediction markets).
-- **Sharp coverage on PROPS is 0%.** Prop CLV therefore stays a soft-consensus
-  measurement and **must be labelled as such**; game-line CLV can be taken
-  against a genuine sharp close.
+- *(08-15)* Sharp coverage on props was 0% then. **Superseded:** NHL props carry Pinnacle all window (table above). Other sports' prop CLV stays a soft-consensus measurement and must be labelled as such.
 - **THERE IS ALREADY A PER-SPORT LEVER FOR THE PROP GAP, and NHL uses it.**
   `syndicate/local_nhl_odds.py:542` defaults
   `PROPS_ODDSAPI_BOOKMAKERS = "fanduel,draftkings,pinnacle"` — Pinnacle is
@@ -589,10 +604,7 @@ re-read it. `[measured 08-15 from data/mlb_source/tracking/book_quotes/]`
   explains the 13 MB → 217 MB/day jump. That cost is real and it is what the
   storage-format work (delta/columnar) exists to absorb — **do not "fix" it by
   narrowing the book set again; price shopping was measured at +2.79 ROI pts.**
-- **Caveats, stated:** read from the git-tracked mirror, which is lossy, and
-  only ONE post-widening date exists locally (08-09). **Confirm against
-  production before publishing a sharp-referenced CLV number**, and re-read
-  whether the 37-book set is still current.
+- *(08-15 caveat, now answered)* The 08-15 read came from the lossy mirror. The 2026-10-26 fleet re-read above replaces it. The book set varies by sport (6-40 per day), not one 37-book set.
 
 ---
 

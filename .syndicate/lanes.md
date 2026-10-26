@@ -1422,7 +1422,7 @@ death, never life — do not invert it.
     4. The paper no-outcome count by GAME date (1,896 by submit time). The paper-settlement owner has been asked; none is named yet.
     5. The `#732` third condition and the `#729` forward reading. These stay with their owner lanes.
   - Phases 1+: Phase 1 is in lane `syndicate-fair-v1` (session local_6d29e826, started by the user 10-26).
-  - **PHASE 1 STAGE-1 RESULT `[2026-10-26 ~18:30Z, written by lane syndicate-fair-v1]`:** `.syndicate/findings_2026-10-26_syndicate_fair_v1.md` (todo `#737`; prereg `be3fcf23`, A1 `7786ab1e`). 4 of 13 families PASS by the registered rule (NCAAF game, NHL game, NHL props = mechanical, soccer game), NCAAF props FAIL, 8 UNDERPOWERED. The gains are 2–4% of the Shin fair's KL to the close, and v1 is slightly worse in absolute pp. Recommendation: shadow-wire `σ_fair_v1` (+ `p_fair_v1`) via `decision-record-shadow` for the 4 families; never let `p_fair_v1` into EV/price/stake on this evidence. Stage-2 forward read owed on/after 2026-11-24.
+  - **PHASE 1 STAGE-1 RESULT `[2026-10-26 ~18:14Z, written by lane syndicate-fair-v1]`:** `.syndicate/findings_2026-10-26_syndicate_fair_v1.md` (todo `#737`; prereg `be3fcf23`, A1 `7786ab1e`). 4 of 13 families PASS by the registered rule (NCAAF game, NHL game, NHL props = mechanical, soccer game), NCAAF props FAIL, 8 UNDERPOWERED. The gains are 2–4% of the Shin fair's KL to the close, and v1 is slightly worse in absolute pp. Recommendation: shadow-wire `σ_fair_v1` (+ `p_fair_v1`) via `decision-record-shadow` for the 4 families; never let `p_fair_v1` into EV/price/stake on this evidence. Stage-2 forward read owed on/after 2026-11-24.
 - Goal: Carry the ADOPTED Decision Engine plan (todo #736, user 2026-10-26, D1-D8 as recommended). Phase 0 done = every Phase-0 item is either verified on the fleet with a dated reading in deploys.md or handed to a named owner lane with the hand-off recorded here; later phases each open under their owner and pass their pre-registered gate
 - Files: docs/ai_context/plan_syndicate_decision_engine.md, docs/ai_context/todo.md (#736 section only), .syndicate/state.md ([user-decisions] 2026-10-26 entry only), .syndicate/brief_2026-10-26_decision_engine_owners.md (NEW), docs/ai_context/local_production_runbook.md (the backups paragraph: one fleet off-disk-dir sentence ONLY)
 - Hypothesis: n/a (program lane; each edge hypothesis E1-E7 is pre-registered in its owner lane before data)
@@ -1442,15 +1442,17 @@ death, never life — do not invert it.
 - Verdict: GOAL MET. owner_liveness --idle-min 240 gave SAFE_SLUGS=caps-revamp; archived `caps-revamp`. Other 26 CLOSED blocks waited (owners live or blocks touched < 240m). Table + Part B in `log/2026-10-26.md`.
 
 ### syndicate-fair-v1 — OPEN — opened 2026-10-26 — session 7c8317e7-d9b9-4861-b461-7da2f9f796bf
-- **STATUS `[2026-10-26 ~18:30Z]`: STAGE 1 READ; stays OPEN to hold the stage-2 forward read (on/after 2026-11-24).**
-  - Pre-registered before any fit: `be3fcf23`. Amendment A1 `7786ab1e` (18:07Z) adds a stage-2 lower-λ arm.
-  - Code `d1ff922d`, rebased as `3041ec78` (identical blobs `acdc917b` / `17bb127f`; stage 2 must run these blobs), on branch `claude/frosty-chandrasekhar-997092`, for review, NOT on main: library, fit/eval script, 46 hermetic tests.
-  - Findings `.syndicate/findings_2026-10-26_syndicate_fair_v1.md`, todo `#737`.
-  - Result: 4 of 13 gated families PASS. NCAAF game −0.43e−5 [−0.90, −0.08]; NHL game −0.77e−5 [−1.30, −0.29]; NHL props −17.4e−5, mechanical, and +2.1e−5 WORSE against the consensus close; soccer game −3.12e−5 [−5.13, −1.23]. NCAAF props FAIL; 8 UNDERPOWERED (MLB, NBA regular, NFL, WNBA: < 30 held-out games).
-  - Post-hoc: v1 has lower KL to the close but a larger absolute pp distance from it; a looser ridge finds no hidden signal.
-  - Recommendation: shadow-wire σ_fair_v1 (+ p_fair_v1) via `decision-record-shadow`; never p_fair_v1 in EV.
-  - LEAD for `fair-price-v2`: `fair_price_eval.group_key` keeps `"line": NaN` as a key part (NaN ≠ NaN).
-  - Scratch data, not in git: `C:\tmp\sfv1` on the host (extract, chips, report.json, diag/*.npz).
+- **GOAL VERDICT `[2026-10-26 18:20Z checkpoint]`:** Goal, verbatim: "Decision Engine Phase 1 (#736), OFFLINE research build: Syndicate Fair v1 -- a learned sharpness-weighted fair (logit pool, weights by book x sport x market family x time-to-start x quote age, ridge-shrunk to equal) with sigma_fair -- pre-registered and committed BEFORE any fit, then walk-forward evaluated on fleet book_quotes (from 2026-09-30) against the Shin consensus (layer2_board._consensus_fair) per sport family with game-clustered CIs; findings with weights, sigma calibration, an engine read and a shadow-wiring recommendation. Nothing wired into the board, DecisionRecord or any order path." -- **GOAL: MET (stage 1)**.
+  - The lane's Verification ran. Readings: findings `f31754a5` on main, carrying:
+    - the prereg SHA `be3fcf23` (committed ~17:59Z, before the first fit at ~18:00Z);
+    - per-family n/games/CI for 13 gated families;
+    - weights, sigma (+/-1 coverage 0.70-0.74 in the game families), the engine read and the shadow-wiring recommendation.
+  - Todo `#737` and the `syndicate-decision-engine` pointer were pushed in the same commit. Nothing is wired anywhere.
+  - **Result:** 4 of 13 PASS (NCAAF game, NHL game, NHL props = mechanical, soccer game), NCAAF props FAIL, 8 UNDERPOWERED. The gains are 2-4% of the Shin fair's KL to the close, and v1 is slightly WORSE in absolute pp (post-hoc).
+  - **Stays OPEN** to hold the registered stage-2 forward read: on/after **2026-11-24**, kickoffs 10-26 08:00Z..11-23 08:00Z, arms A + B (amendment A1 `7786ab1e`).
+  - Code `d1ff922d`, rebased as `fd187e98`, file blobs `acdc917b` / `17bb127f`: stage 2 must run these blobs. It sits on branch `claude/frosty-chandrasekhar-997092` for review, NOT on main.
+  - Scratch, not in git: `C:	mp\sfv1` (extract, chips, report.json, diag/*.npz).
+  - Lead for `fair-price-v2`: NaN line keys, in `leads.md`.
 - Goal: Decision Engine Phase 1 (#736), OFFLINE research build: Syndicate Fair v1 -- a learned sharpness-weighted fair (logit pool, weights by book x sport x market family x time-to-start x quote age, ridge-shrunk to equal) with sigma_fair -- pre-registered and committed BEFORE any fit, then walk-forward evaluated on fleet book_quotes (from 2026-09-30) against the Shin consensus (layer2_board._consensus_fair) per sport family with game-clustered CIs; findings with weights, sigma calibration, an engine read and a shadow-wiring recommendation. Nothing wired into the board, DecisionRecord or any order path.
 - Files: syndicate/features/shared/syndicate_fair.py (NEW), scripts/syndicate_fair_fit.py (NEW), tests/test_syndicate_fair.py (NEW), tests/test_syndicate_fair_fit.py (NEW), .syndicate/findings_2026-10-26_syndicate_fair_v1_preregistration.md (NEW), .syndicate/findings_2026-10-26_syndicate_fair_v1.md (NEW)
 - Hypothesis: PRE-REGISTERED in .syndicate/findings_2026-10-26_syndicate_fair_v1_preregistration.md (committed before any fit: be3fcf23 on main, 2026-10-26 ~17:59Z; amendment A1 7786ab1e).

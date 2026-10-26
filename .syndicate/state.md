@@ -729,7 +729,7 @@ once this index exists: re-splitting would orphan the parts.
 | [venue-candidate-key-ambiguity] | BOARD JOIN KEYS: a bare token could name another fixture's team, and the guard's own counter cannot see it fir | `state_venues.md` |
 | [odds-cadence] | ODDS CADENCE AND CAPTURE | `state_venues.md` |
 | [venue-odds-storage] | `venue_odds` LIVES ON DISK, NOT IN THE SHARED KEYVALUE `[measured + deployed 2026-09-02, lane venue-odds-byte- | `state_venues.md` |
-| [sharp-reference-price] | SHARP REFERENCE PRICE — WE HAVE ONE. The audit's caveat is STALE. | `state_venues.md` |
+| [sharp-reference-price] | SHARP REFERENCE PRICE — WE HAVE ONE, BUT NOT IN EVERY SPORT (fleet re-read 2026-10-26: Pinnacle game lines all window only MLB/NCAAF; NHL props yes) | `state_venues.md` |
 | [board-quote-staleness] | Board freshness vs QUOTE staleness — verified 2026-08-26 (lane `board-staleness-visibility`) | `state_venues.md` |
 | [exchange-refresh-cadence] | — VERIFIED 2026-08-27, live-odds-worker `34b4d4b4` | `state_venues.md` |
 | [exchange-venues] | Crypto.com is NOT a third venue — VERIFIED 2026-08-28, local full-egress session | `state_venues.md` |
