@@ -562,6 +562,7 @@ once this index exists: re-splitting would orphan the parts.
 | [kalshi-quote-capture-coupling] | Kalshi quote capture ran ONLY inside the heavy board build — a refused heavy build stopped it for every sport  | `state_kalshi.md` |
 | [kalshi-exit-path] | KALSHI POSITIONS ARE SOLD BEFORE SETTLEMENT -- LIVE FOR TAKE-PROFIT SINCE 2026-10-20 23:34Z, PAPER FOR THE RES | `state_kalshi.md` |
 | [kalshi-maker-shadow] | KALSHI MAKER (RESTING-BID) SHADOW: PAPER ONLY, PRE-REGISTERED, RUNNING HOURLY ON THE FLEET VIA A USER-APPROVED | `state_kalshi.md` |
+| [kalshi-maker-pilot] | KALSHI MAKER PILOT: LIVE, $5/ORDER $10/DAY, PREGAME POST-ONLY BIDS ON EXISTING LIVE-PLAN POSITIONS; FIRST FILL VERIFIED MAKER | `state_kalshi.md` |
 | [kalshi-series-competition-identity] | KALSHI SERIES FOR ANOTHER COMPETITION (WOMEN'S, BASKETBALL, SECOND TIERS) REFUSE IN THE JOIN -- ON THE FLEET C | `state_kalshi.md` |
 | [kalshi-in-play-efficiency] | KALSHI IN-PLAY PRICES LEAD THE SPORTSBOOKS; BOOK-CONSENSUS IN-PLAY EDGES MARK OUT NEGATIVE; FIXED TAKE-PROFIT  | `state_kalshi.md` |
 | [kalshi-structural-price-map] | KALSHI SPORTS HAS NO PREGAME STRUCTURAL PRICE EDGE UNDER TODAY'S FEES; ONLY 95-99c IN-PLAY FAVOURITES SURVIVE; | `state_kalshi.md` |

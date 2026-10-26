@@ -217,3 +217,19 @@ That is a selection effect, not an execution one, and the pre-registered delta c
   undercounts fills and drops early points (no_quote 42 + 6).
 - **The paper population is the plan's picks under its 10-02..10-24 configurations,** which are not
   today's live gates.
+
+## Live pilot (user decision C, 2026-10-24) -- built, live, verified
+
+The user chose **"C: Small live pilot"** (relayed verbatim by coordinator 332cb014), against recommendation A.
+
+- **Built:**
+  - `6753375b`: env `SYNDICATE_KALSHI_MAKER_PILOT`, default off; design = Recommendation 3 above.
+  - `f1e0794e`: FILL carries `filled_as`, from Kalshi's own maker/taker fill-cost split.
+  - `ac502ea6`: the stale-resting cancel skips pilot posts.
+- **Live:** on live-odds-worker since 10-25 15:22:09Z.
+- **Measured** (state ledger `[kalshi-maker-pilot]` has the lines):
+  - The default-on stale-resting cancel (15 min, 1c from the market) cancelled the first post six days early. It is fixed (`ac502ea6`), and a post now survives (MINCLE, resting at 28 min).
+  - First fill: Pollard u1.5, `filled_as=maker`, 12 @ 0.44, $0 fee.
+  - 5 posts: 1 maker fill, 2 resting, 1 expired at kickoff, 1 lost to the old stale cancel.
+- **Caveat:** pilot positions are exited in play by the exit lane (Pollard: outcome lost, P&L +$1.39). This study's numbers are hold-to-settlement, so a pilot-vs-taker read must hold the exit treatment equal.
+- **Ongoing reads belong to profit-program** (live-cell-scorecard, `execution_style` split).

@@ -2886,3 +2886,12 @@ The 2026-10-20 entry said: "Rating INPUTS transfer, because the sim reads them w
   - Every timestamp a cell is defined by, or sampled at, must be knowable at the decision instant: a scheduled start, a live clock, an elapsed time. Never the event's end, settlement time, or the market's close.
   - This applies to sampling windows as well as labels. A window anchored on the end leaks even if each print is relabelled afterwards.
   - Check it in the pre-registration: for each time anchor, write down when it becomes known.
+
+## 2026-10-25 - A new ORDER LIFECYCLE must be checked against every periodic pass that writes to the venue: the stale-resting cancel killed the maker pilot's first post `[lane kalshi-maker-pilot, session 78880f41]`
+- **What we believed:** the pilot was verified. 21 tests passed, including executor off != on and a second pass that neither re-posts nor takes, and its first post was live and `resting` on Kalshi.
+- **What was actually true:** `cancel_stale_resting_orders` is default-on in run_live_odds_refresh_worker. It cancels any resting order 15 min old or more that sits 1c or more from the market. A maker post sits at least 1c under the ask BY CONSTRUCTION, so every post would die on its first stale pass. Measured 2026-10-25 16:29:44Z: `CANCEL_STALE ... resting=0.46 market=0.47 age_s=2759`, six days before the kickoff expiry the design relied on. No money was lost, but the pilot's defining property did not hold.
+- **How we found out:** the first read after the next restart showed `MAKER_PILOT EXPIRE ... venue_status='canceled'` at 16:30:20Z, long before commence. The cause was found by grepping the order id across the log.
+- **Rule:**
+  - When a change makes orders LIVE LONGER, or rest where they never rested before, list every loop that reads or writes resting orders before shipping: reconcile, stale cancel, kickoff cancel, exits, orphan scans. State what each does to the new order.
+  - The executor's own tests cannot see a separate worker loop. A reachability test proves the order is PLACED, not that it SURVIVES.
+  - The first live reading of a new lifecycle must be taken past the oldest timer in those loops (here 900 s), not at submit.
