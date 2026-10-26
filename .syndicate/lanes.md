@@ -1440,6 +1440,14 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness --idle-min 240 gave SAFE_SLUGS=caps-revamp; archived `caps-revamp`. Other 26 CLOSED blocks waited (owners live or blocks touched < 240m). Table + Part B in `log/2026-10-26.md`.
 
+### syndicate-fair-v1 — OPEN — opened 2026-10-26 — session 7c8317e7-d9b9-4861-b461-7da2f9f796bf
+- Goal: Decision Engine Phase 1 (#736), OFFLINE research build: Syndicate Fair v1 -- a learned sharpness-weighted fair (logit pool, weights by book x sport x market family x time-to-start x quote age, ridge-shrunk to equal) with sigma_fair -- pre-registered and committed BEFORE any fit, then walk-forward evaluated on fleet book_quotes (from 2026-09-30) against the Shin consensus (layer2_board._consensus_fair) per sport family with game-clustered CIs; findings with weights, sigma calibration, an engine read and a shadow-wiring recommendation. Nothing wired into the board, DecisionRecord or any order path.
+- Files: syndicate/features/shared/syndicate_fair.py (NEW), scripts/syndicate_fair_fit.py (NEW), tests/test_syndicate_fair.py (NEW), tests/test_syndicate_fair_fit.py (NEW), .syndicate/findings_2026-10-26_syndicate_fair_v1_preregistration.md (NEW), .syndicate/findings_2026-10-26_syndicate_fair_v1.md (NEW)
+- Hypothesis: PRE-REGISTERED in .syndicate/findings_2026-10-26_syndicate_fair_v1_preregistration.md (committed before any fit; SHA recorded here when committed).
+- Falsification test: Per sport family: held-out walk-forward log loss (fair_v1 - shin_consensus) vs the pre-registered target with a game-clustered 95% CI below 0 = PASS for that family; otherwise FAIL for that family. Families are never pooled into a pass.
+- Verification: findings file committed with the prereg SHA, per-family n/games/CI, fitted weights, sigma calibration (share of closes inside +/-1 sigma), engine read, and a shadow-wiring recommendation; todo item + decision-engine lane pointer pushed to main
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
