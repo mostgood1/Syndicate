@@ -1,5 +1,26 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#737` — **SYNDICATE FAIR v1 (Decision Engine Phase 1, `#736`): learned sharpness-weighted fair + σ_fair, OFFLINE. Stage 1 by the registered rule: 4 of 13 families PASS (NCAAF game, NHL game, NHL props [mechanical], soccer game), NCAAF props FAIL, 8 UNDERPOWERED; gains are 2–4% of the Shin fair's KL to the close and v1 is slightly WORSE in absolute pp. Stage-2 forward read owed ON OR AFTER 2026-11-24** — 2026-10-26, lane `syndicate-fair-v1`, session 7c8317e7 (side session of local_898e5510); `.syndicate/findings_2026-10-26_syndicate_fair_v1.md`
+- **Pre-registered before any fit:** `be3fcf23`. Amendment A1 `7786ab1e` adds a stage-2 lower-λ arm. Code `d1ff922d`, on branch `claude/frosty-chandrasekhar-997092`, for review. Fleet `book_quotes` 09-30..10-26 08:00Z, read-only, nice 19. No OddsAPI call.
+- **Gate:** held-out cross-entropy vs the `_consensus_fair` Shin median (parity 0/3,125), against the sharp (Pinnacle, power) close, else the Shin close. Game-clustered CI. Outcome log loss is a harm guard. Per family, never pooled.
+- **Passes, in 10⁻⁵ nats:**
+  - NCAAF game −0.43 [−0.90, −0.08], 168 games; mostly sharp-target rows.
+  - NHL game −0.77 [−1.30, −0.29], 98 games; the equal-weight pool alone gives −0.64.
+  - NHL props −17.4 on sharp rows but **+2.1 [+0.9, +3.2] against the consensus close**: mechanical.
+  - Soccer game −3.12 [−5.13, −1.23], 268 games; the only non-mechanical learned-weight gain. Outcome +17.8 [−5.0, +40.8].
+- **σ_fair:** ±1σ coverage 0.70–0.74 in the game families (calibrated); ±2σ short (0.90–0.94).
+- **Engine read** (β = share of a book's gap to the consensus that the close realises):
+  - Pinnacle leads NHL props.
+  - DraftKings leads soccer (0.55 at T−24h).
+  - Bovada leads NFL/NHL at T−6h.
+  - Matchbook/Novig/Betfair lead NCAAF.
+  - FanDuel, BetRivers and Polymarket are ~0 in soccer.
+- **Post-hoc** (§6): lowering λ to 1e−8 finds no hidden signal, only more mechanical Pinnacle weight and NFL overfit.
+- **Recommendation**, routed to the decision-engine session:
+  - **Shadow-wire `σ_fair_v1`** (+ `p_fair_v1`) in the DecisionRecord for the 4 passing families. Owner: `decision-record-shadow`.
+  - **Never let `p_fair_v1` replace Shin's p in EV/price/stake on this evidence.**
+- **OWED:** the stage-2 read on/after **2026-11-24** for kickoffs 10-26 08:00Z..11-23 08:00Z. Both arms; same code and constants. Add |fair − close| pp beside the gate. It is the first NBA regular-season read and the first with Pinnacle on NBA/NFL/soccer.
+
 ### `#736` — **SYNDICATE DECISION ENGINE: one learning decision engine behind Layer 2 Suggested + the Kalshi/Polymarket Portfolio. ADOPTED 2026-10-26 with D1-D8 as recommended; PHASE 0 STARTED (lane `syndicate-decision-engine`)** — 2026-10-26, session loving-einstein-b3c45e; `docs/ai_context/plan_syndicate_decision_engine.md` (reading copy https://claude.ai/artifact/4umLu5SHUzhPUFLKqpieRe)
 - **ADOPTED 2026-10-26** (user, verbatim: "Adopt the decision-engine plan with the recommended D1-D8. Open the umbrella lane, brief the owner sessions, and start Phase 0."). Decisions as recorded in `state.md` [user-decisions]. Phase 0 owner map and progress: lane `syndicate-decision-engine` in `lanes.md`.
 - **Thesis:** integration is not the main gap. No measured edge exists at the executable venue price (live Kalshi pregame -11.8% [-20, -4], 548 bets / 300 games; Polymarket -18.2%; fees only 2.8% of stake, so it is selection). Build ON DecisionRecord `#709`, not beside it: one Syndicate Fair (learned sharpness-weighted, with sigma), signal experts with earned per-cell weights (default 0), a venue-native lower-bound-EV policy, a three-clock learning loop (sharp CLV / calibration / fee-net P&L).
