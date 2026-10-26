@@ -166,3 +166,18 @@ rule; each narrows or fixes an eligibility test that, as written, could not be e
 5. **Book early bound** = the previous distinct h2h `snapshot_ts` for that sport before the move's snapshot.
 6. **Book files:** where both `<date>.jsonl` and `<date>.jsonl.gz` exist, their records are unioned and de-duplicated
    (a superset of `news_price_follow`'s "fuller file" rule).
+
+(Timestamp correction: A1 was committed at 19:31Z, not "~19:45Z" as its heading says.)
+
+### AMENDMENT A2 (2026-10-26 19:36Z, before the script's first run; no result read)
+
+**Collector runs.** Every news log is append-on-change, so one sport's records mark only the runs in which that
+sport changed; "the previous / next run of that sport" cannot be read from them. Runs are taken instead from the
+union of `captured_at` over every news log (all sports' injuries, NHL gameinfo, NBA referees) -- the observable set
+of collector runs, which poll all sports together. Then:
+- a flip is compared with the name's last CONFIRMED state (not with a transient one-run state), so a flap and its
+  reversal never make an event;
+- it persists if, at the next union run after t0, the sport's log has no record (nothing changed) or the name's
+  state still holds;
+- `t0_uncertain` if the previous union run is > 25 min before t0.
+The population's "commenced by the run time" bound is the script's wall clock at the run.
