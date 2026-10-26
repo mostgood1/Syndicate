@@ -1473,6 +1473,14 @@ death, never life — do not invert it.
 - Verification: findings file committed with the prereg SHA, per-family n/games/CI, fitted weights, sigma calibration (share of closes inside +/-1 sigma), engine read, and a shadow-wiring recommendation; todo item + decision-engine lane pointer pushed to main
 - Blocked by: none
 
+### e5-venue-news-lag — OPEN — opened 2026-10-26 — session ce4dfadf-df79-4dbe-8940-70f92ba3ffc1
+- Goal: Decision Engine E5 (#736), OFFLINE and read-only on production: pre-register (committed before any join) and run the venue news-lag measurement -- after an official availability event (OUT / back IN / NHL scratch / lineup), do Kalshi and Polymarket prices on the player's props and his team's game lines move later than the first sportsbook move, and is the venue's executable price at t0+1/+5/+15 min fee-net mispriced against the eventual book consensus -- with per-source coverage, game-clustered CIs, an engine read and a Phase 4 bus recommendation (build as cancel-protection, as a timing strategy, or not)
+- Files: scripts/e5_venue_news_lag.py (NEW), tests/test_e5_venue_news_lag.py (NEW), .syndicate/findings_2026-10-26_e5_venue_news_lag_preregistration.md (NEW), .syndicate/findings_2026-10-26_e5_venue_news_lag.md (NEW)
+- Hypothesis: PRE-REGISTERED in .syndicate/findings_2026-10-26_e5_venue_news_lag_preregistration.md (committed before any news x venue join)
+- Falsification test: Plan kill rule: median venue lag vs the first sportsbook move < 2 min, or the venue move is symmetric (signed-by-news drift CI includes 0) -> timing, not edge; plus the registered fee-net EV test at the venue's executable price
+- Verification: findings file with the prereg SHA, per-source date coverage + intersection + n, per-venue lag and fee-net EV with game-clustered CIs, engine read, Phase 4 recommendation; todo item + syndicate-decision-engine lane line pushed to main
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
