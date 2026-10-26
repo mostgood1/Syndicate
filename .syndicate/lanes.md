@@ -1435,11 +1435,28 @@ death, never life — do not invert it.
 
 ### syndicate-decision-engine — OPEN — opened 2026-10-26 — session e32fef1a-01e8-4afe-a284-01acd3728545
 - Goal: Carry the ADOPTED Decision Engine plan (todo #736, user 2026-10-26, D1-D8 as recommended). Phase 0 done = every Phase-0 item is either verified on the fleet with a dated reading in deploys.md or handed to a named owner lane with the hand-off recorded here; later phases each open under their owner and pass their pre-registered gate
-- Files: docs/ai_context/plan_syndicate_decision_engine.md, docs/ai_context/todo.md (#736 section only), .syndicate/state.md ([user-decisions] 2026-10-26 entry only)
+- Files: docs/ai_context/plan_syndicate_decision_engine.md, docs/ai_context/todo.md (#736 section only), .syndicate/state.md ([user-decisions] 2026-10-26 entry only), .syndicate/brief_2026-10-26_decision_engine_owners.md (NEW)
 - Hypothesis: n/a (program lane; each edge hypothesis E1-E7 is pre-registered in its owner lane before data)
 - Falsification test: n/a at program level; the Phase-2 edge gate is the program's own kill rule (plan section 9)
 - Verification: Phase 0: #722 provenance on the fleet + first settled live order carrying staked_probability_version; #732/#729 forward readings recorded; unsettled paper/ladder backlog counted with an owner; D3 landed in shadow by decision-record-shadow; off-host backup copy exists off this machine with age < 30h; a missed-dispatch check exists and has caught one known-past run
 - Blocked by: none
+- **PHASE 0 STATUS `[2026-10-26 16:31Z, fleet, read-only]`:**
+  - `#722` provenance (`966e0b5f`) is LOADED on every role: web and refresh-worker `6dd8a536`, live-odds-worker `1a841c91`.
+    - Since 10-21 22:00Z, 117/241 live orders carry `staked_probability_version`. The other 124 are all `ingame:` in-play entries, which bypass the plan sizer and are attributable by prefix.
+    - Paper: 2,332/6,119 carry it, and 3,787 paper orders have none (source unidentified).
+    - The prefixes confirm `#704` market mode: `market_fair@staked_probability_pooled_v1@2026-10-22T21`.
+    - Settled live orders carrying it: 1 won + 2 lost on market_fair-basis rows, 41 won + 40 lost on model_edge-basis rows (of the 117 stamped live orders, 114 read market_fair@... and 3 read plain 'unfitted'). **The verification's 'first settled live order carrying the field' is MET.**
+  - `#732` openings: `22e3a0aa` is loaded. 10-24 = 52,704,926 B and 10-25 = 54,860,643 B, both past the old 33,554,432 B cap, with 0 `OPENINGS_CEILING_HIT` lines in the current logs. That is 2 of the 3 pre-registered conditions. The third (trail combos == openings keys) stays with lane `clv-openings-ceiling`, whose scheduled reading never fired.
+  - `#729` venue-prop closes: `aa06d5a1` is loaded. The forward reading stays with `venue-prop-close-coverage`. NOT read here.
+  - Paper backlog: 1,896 FILLED paper orders with no outcome > 48h after submit (NCAAF 1,102, soccer 478, NFL 123, MLB 104, NBA 76, NHL 7); live: 5 NBA `ingame:` + 1 soccer. It must be counted by GAME date (forward bets). The owner was asked: which lane owns paper settlement?
+  - Live in-play entries 10-23..10-26: 124 orders, 102 fills, $44.37 staked, -$4.55 P&L, $1.73 fees.
+  - **Missed dispatch, measured:** three enabled one-time tasks past fireAt with no run (`layer2-suggested-grade-1026`, `clv-openings-ceiling-forward-reading`, `uefa-branding-autorefresh-reading-1022`), and `nba-standin-admission-watch` last ran 10-24 21:47Z.
+    - **BUILT: scheduled task `syndicate-dispatch-watchdog`**, at 09:15/13:15/17:15/21:15 CT. It is read-only, pushes a notification on NEW misses, and never runs a task.
+    - It starts in DEFAULT permission mode: the user must Run-now once to pre-approve its tools. Its first run must report the three misses above, which is this lane's 'caught a known-past run' check.
+  - Run state lives in the app's private storage; no script can read it, so the watchdog has to be a scheduled task itself. The healthchecks.io dead-man's switch (`watchdog.ps1`) covers host sleep.
+  - **Off-host backup:** `data-backup` writes a nightly ~4.6 GB `tar.gz` to `C:\SyndicateBackup` (keep 2): `20261026T091501Z` = 4,626,175,115 B. That is the SAME physical disk. An off-machine destination is a user choice, asked 10-26.
+  - D3 is handed to `decision-record-shadow` (`decision_record.py` is theirs).
+- **HAND-OFFS `[2026-10-26 ~16:40Z]`:** six cross-session briefs were sent and ALL SIX were HELD (different permission mode, not delivered). The durable copy, one section per owner, is `.syndicate/brief_2026-10-26_decision_engine_owners.md`.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
