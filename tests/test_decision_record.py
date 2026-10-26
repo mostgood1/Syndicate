@@ -88,11 +88,20 @@ def test_worker_hook_calls_run_shadow_after_the_portfolio_commit_with_the_shortl
     assert len(calls) == 1
 
 
+# The ONE reader allowed outside the lane (user-approved loan to lane `decision-policy-paper`, 2026-10-26, todo #738):
+# the Decision Engine Phase 2 PAPER track. It reads the record and writes only its own paper book;
+# tests/test_decision_policy_paper.py pins that it imports no order module, statically and at run time, and nothing
+# reads that book for placement, sizing or the board. Matched by full path, so a same-named file elsewhere still fails.
+_PAPER_READERS = frozenset({"syndicate/features/shared/decision_policy_paper.py"})
+
+
 def test_nothing_outside_the_lane_reads_the_record():
-    """SHADOW means no reader: no placement, sizing or board module imports it."""
+    """SHADOW means no reader: no placement, sizing or board module imports it (one paper-only reader, above)."""
     readers = []
     for path in list((REPO / "pipeline").glob("*.py")) + list((REPO / "syndicate").rglob("*.py")):
         if path.name in {"decision_record.py", "decision_agreement.py", "intelligence_state.py"}:
+            continue
+        if path.relative_to(REPO).as_posix() in _PAPER_READERS:
             continue
         text = path.read_text(encoding="utf-8", errors="ignore")
         if "shared.decision_record" in text or "shared.decision_agreement" in text or "import decision_record" in text:
