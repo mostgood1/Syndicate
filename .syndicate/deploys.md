@@ -54414,3 +54414,12 @@ which is about the two sizing bases and not about the refusal boundary.
 - **first live use:** the 2026-10-27 13:15Z readout job writes the first artifact carrying `proposed`. Until then the check reads the action counts of the older artifacts.
 - **seen in passing, not this lane's:** watchdog.log has `ci-suite last run (2026-10-26) exited rc=1` (warn, NEW 09:00:55Z).
 
+
+## 2026-10-20 12:01Z -- READING: MNF 2026-10-19 settlement (lane nfl-mnf-settlement-lag)
+- **read at:** 2026-10-26 15:57Z (scheduled task `nfl-mnf-settle-reading-1020` fired late, on 10-26; every number below is a timestamped record from 10-20, not today's state). Read-only; nothing restarted or deployed.
+- **host/fleet:** WSL up since 2026-10-14 12:42:52Z; refresh-worker log continuous through 10-20 (`refresh-worker.log.5` spans 10-20 00:29Z..10-21 04:05Z). No outage in the 10:00-12:00Z window.
+- **MNF game:** `2026_06_WAS_SF` (Commanders @ 49ers) -- the only game_id with game_date 2026-10-19 in today's pbp_2026.csv (168 rows; file mtime 2026-10-26 10:00:24Z, i.e. today's fetch -- the 10-20 copy's mtime is no longer readable).
+- **fetch:** 2026-10-20T10:00:25.364Z `NFL_PBP_FETCH_LAUNCHING last_attempt_age_s=86409` (5:00 AM CT). No `MORNING_DUE` line that day: the 24 h interval itself now lands at ~10:00Z (re-anchored by the morning fetch), so the interval branch fired first. `MORNING_DUE` + `LAUNCHING` both seen 10-21 10:00:20Z. One fetch/day, no extra nflverse cost.
+- **settlement:** 2026-10-20T12:01:51.487Z `SETTLE_PERSIST date=2026-10-19 records=4686` (7:01 AM CT). Ledger chunk `evaluation_ledger_chunks/2026-10-19.jsonl` mtime = 2026-10-20 12:01:51Z (untouched since), NFL records: **win 794 / loss 764 / pending 29 -> 1,558 of 1,587 settled (98.2%), every one `settled_at` 2026-10-20T12.** The 29 pending are props only (Receiving Yards 23, Receptions 4, Anytime TD 2) -- player-level grading misses, not the game.
+- **pending BEFORE the run:** not recoverable -- `/api/ops/evaluation-settlement/status` now carries the 10-26 run (state=completed, epoch 1793016127 = 10-26 12:02:07Z, no `nfl:2026-10-19` key). The settled_at stamps stand in for it.
+- **verify:** GOAL MET -- MNF 10-19 picks settled in the 10-20 7 AM CT run (1,558 / 1,587), not a day later. Falsification clauses not triggered.
