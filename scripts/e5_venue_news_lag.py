@@ -684,6 +684,8 @@ def measure_venue(series: list[tuple[datetime, float | None]], exec_price: Calla
     v1, vend = value_at(series, t0 + timedelta(minutes=1)), value_at(series, t_end)
     out["drift"] = None if v1 is None or vend is None else round(s * (vend - v1), 4)
     vpre = value_at(series, t0 - timedelta(minutes=60))
+    # DIAGNOSTIC (post hoc, not a registered measure): the team-side price at t0-60 / t0+1 / t_end.
+    out.update(v_pre60=vpre, v_1=v1, v_end=vend)
     if vpre is not None and vend is not None and s * (vend - vpre) >= VENUE_MOVE:
         out["pre_share"] = round(s * (v0 - vpre) / (s * (vend - vpre)), 3)
     q = truth(t_end)
@@ -890,6 +892,9 @@ def analyze(root: Path, kalshi: Kalshi, sports: Iterable[str] = SPORTS, log: Cal
             bc1, bce = consensus_at(tl, b0, t0 + timedelta(minutes=1)), consensus_at(tl, b0, unit["t_end"])
             if bc1 is not None and bce is not None:
                 base["book_drift"] = round(s * (bce - bc1), 4)
+            # DIAGNOSTIC (post hoc): the team-side book consensus at t0-60 / t0 / t0+1 / t_end, and the sign.
+            base.update(s=s, b_pre60=consensus_at(tl, b0, t0 - timedelta(minutes=60)), b_t0=consensus_at(tl, b0, t0),
+                        b_1=bc1, b_end=bce)
             # ---- Kalshi
             kev = kalshi_ml_markets(root, sport, g["commence"])
             hit = match_kalshi_event(kev, g["home"], g["away"])
