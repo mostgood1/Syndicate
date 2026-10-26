@@ -22,6 +22,7 @@ import time
 
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -2104,6 +2105,117 @@ def suggested_rows(rows: list) -> tuple[list, dict[str, int]]:
     return kept, gate
 
 
+def _alt_ladder_key(position: Mapping[str, Any]) -> tuple:
+    """One ladder: same game, market without its alt marker, segment, player, side.
+
+    `totals` and `totals_alt` are one ladder, and so are soccer's
+    `alternate_totals_corners` rungs. The same key as the ladders-once grade view
+    (`findings_2026-10-23_suggested_six_day_grade.md` §3), less its `phase`: one
+    plan is built at one instant, so a game is pregame or live, never both.
+    """
+    market = str(position.get("market") or "")
+    market = re.sub(r"_(alt|alternate)$", "", re.sub(r"^alternate_", "", market))
+    return (
+        position.get("sport"),
+        position.get("event_id"),
+        market,
+        position.get("segment"),
+        position.get("player_name"),
+        position.get("side"),
+    )
+
+
+def cap_alt_ladder_stakes(plan: dict[str, Any]) -> dict[str, Any]:
+    """Cap each alt ladder's total paper stake at its largest single rung.
+
+    `[user decision 2026-10-26, "keep 2%, and cap paper stake per alt ladder"]`,
+    lane `layer2-suggested-opps`. One final score settles every rung of a ladder
+    on the same side together, so five rungs staked independently were one
+    outcome at five stakes: the 10-20 NBA opener put 23 rungs on 5 ladders.
+
+    Every rung stays staked -- every line is its own decision. The rungs are
+    scaled TOGETHER, preserving their ratios, so the ladder's total equals one
+    normal stake. A rung the scaling would put under the plan's min stake is held
+    at the min, and counted, rather than dropped.
+
+    MAIN PAPER PLAN ONLY. The paper2 venue books and the live plans are built by
+    their own `commit_portfolio` calls and are not touched.
+    """
+    positions = plan.get("positions") if isinstance(plan, dict) else None
+    report = {
+        "ladders": 0,
+        "rungs": 0,
+        "floored_at_min": 0,
+        "staked_dollars_before": 0.0,
+        "staked_dollars_after": 0.0,
+    }
+    if not isinstance(positions, list):
+        return report
+    bankroll = float(plan.get("bankroll_units") or 0.0)
+    min_stake = float((plan.get("settings") or {}).get("min_stake_units") or 0.0)
+    ladders: dict[tuple, list[dict[str, Any]]] = {}
+    for position in positions:
+        if isinstance(position, dict):
+            ladders.setdefault(_alt_ladder_key(position), []).append(position)
+
+    for rungs in ladders.values():
+        total = sum(float(p.get("stake_dollars") or 0.0) for p in rungs)
+        cap = max((float(p.get("stake_dollars") or 0.0) for p in rungs), default=0.0)
+        if len(rungs) < 2 or total <= 0 or not bankroll:
+            continue
+        report["ladders"] += 1
+        report["rungs"] += len(rungs)
+        report["staked_dollars_before"] += total
+        scale = cap / total
+        for position in rungs:
+            fraction = float(position.get("stake_fraction") or 0.0)
+            capped = fraction * scale
+            dollars = round(capped * bankroll, 2)
+            if dollars < min_stake:
+                dollars = min_stake
+                capped = min_stake / bankroll
+                report["floored_at_min"] += 1
+            rung_scale = (capped / fraction) if fraction else 0.0
+            sizing = position.get("sizing")
+            if isinstance(sizing, dict):
+                sizing["stake_dollars_pre_ladder_cap"] = position.get("stake_dollars")
+                sizing["alt_ladder_rungs"] = len(rungs)
+                sizing["alt_ladder_scale"] = round(rung_scale, 6)
+            position["stake_dollars"] = dollars
+            position["stake_fraction"] = round(capped, 6)
+            # Same quantisation as `commit_portfolio`'s own attribution block.
+            attribution = position.get("attribution")
+            if isinstance(attribution, dict):
+                ev_only = round(float(attribution.get("stake_fraction_ev_only") or 0.0) * rung_scale, 5)
+                sim_delta = round(capped - ev_only, 6)
+                attribution["stake_fraction_ev_only"] = ev_only
+                attribution["stake_fraction_sim_delta"] = sim_delta
+                attribution["sim_share_of_stake"] = round(sim_delta / capped, 4) if capped else None
+                attribution["stake_dollars_ev_only"] = round(ev_only * bankroll, 2)
+                attribution["stake_dollars_sim_delta"] = round(sim_delta * bankroll, 2)
+            report["staked_dollars_after"] += dollars
+
+    report["staked_dollars_before"] = round(report["staked_dollars_before"], 2)
+    report["staked_dollars_after"] = round(report["staked_dollars_after"], 2)
+    totals = plan.get("totals")
+    if report["ladders"] and isinstance(totals, dict):
+        staked = round(sum(float(p.get("stake_dollars") or 0.0) for p in positions if isinstance(p, dict)), 2)
+        sim_dollars = round(
+            sum(
+                float(((p.get("attribution") or {}).get("stake_dollars_sim_delta")) or 0.0)
+                for p in positions
+                if isinstance(p, dict)
+            ),
+            2,
+        )
+        totals["staked_dollars"] = staked
+        totals["staked_fraction"] = round(staked / bankroll, 6) if bankroll else 0.0
+        totals["staked_dollars_sim_attributed"] = sim_dollars
+        totals["sim_share_of_staked"] = round(sim_dollars / staked, 4) if staked else None
+    plan["alt_ladder_cap"] = report
+    return report
+
+
 def run_portfolio_commit(
     selected_date: str,
     *,
@@ -2213,6 +2325,14 @@ def run_portfolio_commit(
         selected_date=normalized,
         settings=settings,
         settled_sample_size_by_sport=settled_sample_size_by_sport,
+    )
+    # One stake per alt ladder -- see `cap_alt_ladder_stakes`. This plan only.
+    ladder_cap = cap_alt_ladder_stakes(plan)
+    print(
+        "[portfolio_commit] ALT_LADDER_CAP date=%s ladders=%d rungs=%d floored_at_min=%d staked_before=%.2f staked_after=%.2f"
+        % (normalized, ladder_cap["ladders"], ladder_cap["rungs"], ladder_cap["floored_at_min"],
+           ladder_cap["staked_dollars_before"], ladder_cap["staked_dollars_after"]),
+        flush=True,
     )
 
     # Run the CLV join BEFORE the write, so its summary lands in the artifact the
