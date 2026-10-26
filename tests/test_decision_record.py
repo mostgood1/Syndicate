@@ -115,11 +115,46 @@ def test_blend_anchors_on_market_and_uses_measured_w_star():
 
 def test_blend_default_weight_and_zero_when_skill_loses_to_market():
     rec = dr.build_record(_row(), _ctx())
-    assert rec.blend.w_model == dr.DEFAULT_MODEL_WEIGHT and rec.blend.w_model_source == "default_unmeasured"
+    # D3 (user 2026-10-26, plan #736): an unmeasured cell's model moves nothing.
+    assert dr.DEFAULT_MODEL_WEIGHT == 0.0
+    assert rec.blend.w_model == 0.0 and rec.blend.w_model_source == "default_unmeasured"
+    assert rec.blend.model_shift_pp == 0.0 and rec.blend.p_decision == pytest.approx(0.50, abs=1e-6)
     loses = _row(projection={"model_prob_over": 0.70, "model_skill": {"status": "measured", "verdict": "loses to the closing line"}},
                  model_probability_cal=0.70)
     rec = dr.build_record(loses, _ctx())
     assert rec.blend.w_model == 0.0 and rec.blend.p_decision == pytest.approx(0.50, abs=1e-6)
+
+
+@pytest.mark.parametrize("verdict", ["not_proven", "overconfident"])
+def test_fitted_w_star_whose_ci_reaches_zero_moves_nothing(verdict):
+    # D3: a fit only earns weight when its ci95 LOWER bound is above 0.
+    row = _row()
+    ctx = _ctx()
+    cell = dr._calibration_cell(row, ctx.now)
+    ctx.calibration = {cell: {"cell": cell, "w": 0.4, "ci95": [-0.12, 0.81], "verdict": verdict, "games": 120}}
+    rec = dr.build_record(row, ctx)
+    assert rec.model.w_star == 0.4 and rec.model.w_star_ci_lower == -0.12 and rec.model.w_star_ci_upper == 0.81
+    assert rec.blend.w_model == 0.0 and rec.blend.w_model_source == f"optimizer_w_ci_spans_0:{verdict}"
+    assert rec.blend.p_decision == pytest.approx(0.50, abs=1e-6)
+
+
+def test_insufficient_fit_is_not_a_fit_even_with_a_positive_ci():
+    row = _row()
+    ctx = _ctx()
+    cell = dr._calibration_cell(row, ctx.now)
+    ctx.calibration = {cell: {"cell": cell, "w": 0.6, "ci95": [0.2, 0.9], "verdict": "insufficient", "games": 12}}
+    rec = dr.build_record(row, ctx)
+    assert rec.blend.w_model == 0.0 and rec.blend.w_model_source == "default_unmeasured"
+
+
+def test_w_star_ci_lower_survives_the_on_disk_round_trip():
+    row = _row()
+    ctx = _ctx()
+    cell = dr._calibration_cell(row, ctx.now)
+    ctx.calibration = {cell: {"cell": cell, "w": 0.5, "ci95": [0.3, 0.7], "verdict": "overconfident", "games": 90}}
+    rec = dr.build_record(row, ctx)
+    back = dr.expand_record(json.loads(json.dumps(dr._compact(rec))))
+    assert back.model.w_star_ci_lower == 0.3 and back.blend.w_model == 0.5
 
 
 def test_form_posterior_recorded_but_moves_nothing_until_measured():
@@ -175,8 +210,9 @@ def test_in_play_and_wrong_date_contract_block_live():
 
 
 def test_concentration_keeps_one_bet_per_game_axis():
-    a = _row(line=220.5, quote={"book_prices": {"draftkings": 105, "kalshi": 105}})
-    b = _row(line=221.5, quote={"book_prices": {"draftkings": 105, "kalshi": 110}})
+    # Both rungs are +EV at the MARKET fair (no model weight since D3), so only concentration separates them.
+    a = _row(line=220.5, quote={"book_prices": {"draftkings": 105, "kalshi": 112}})
+    b = _row(line=221.5, quote={"book_prices": {"draftkings": 105, "kalshi": 115}})
     recs = dr.build_records([a, b], _ctx())
     bets = [r for r in recs if _verdict(r, "live:kalshi").bet]
     assert len(bets) == 1 and bets[0].identity.line == 221.5
@@ -237,16 +273,35 @@ def test_records_file_is_gzip_json_and_export_allowlisted(tmp_path):
 # ----------------------------------------------------------------------------- agreement
 
 
+def _sim_opposes_row():
+    return _row(model_probability_cal=0.40, ev_pct=2.5,
+                projection={"model_prob_over": 0.40, "model_skill": {"status": "measured", "verdict": "beats"}},
+                quote={"price": 110, "book_prices": {"draftkings": 110, "kalshi": -110}})
+
+
 def test_board_disagreement_names_sim_opposes_and_venue_negative():
-    row = _row(model_probability_cal=0.40, ev_pct=2.5,
-               projection={"model_prob_over": 0.40, "model_skill": {"status": "measured", "verdict": "beats"}},
-               quote={"price": 110, "book_prices": {"draftkings": 110, "kalshi": -110}})
-    recs = dr.build_records([row], _ctx())
+    # The sim only moves the record where its weight is EARNED (D3), so give the cell an earned w*.
+    row = _sim_opposes_row()
+    ctx = _ctx()
+    cell = dr._calibration_cell(row, ctx.now)
+    ctx.calibration = {cell: {"cell": cell, "w": 0.5, "ci95": [0.3, 0.7], "verdict": "overconfident", "games": 90}}
+    recs = dr.build_records([row], ctx)
     result = da.build_agreement(recs, [row], {}, [])
     board = result["by_destination"]["board"]
     assert board["disagree"] == 1 and board["causes"].get("sim_opposes") == 1
     assert result["forks"]["F3_suggested_sim_opposes"]["count"] == 1
     assert result["forks"]["F1_suggested_negative_at_venue_price"]["kalshi"]["count"] == 1
+
+
+def test_unearned_sim_no_longer_overrules_the_board_but_the_fork_is_still_counted():
+    # D3: with no earned weight the record follows the market and agrees with the board's
+    # Suggested; the F3 fork (a Suggested side the sim opposes) is still counted as information.
+    row = _sim_opposes_row()
+    recs = dr.build_records([row], _ctx())
+    assert recs[0].blend.w_model == 0.0 and recs[0].blend.w_model_source == "default_unmeasured"
+    result = da.build_agreement(recs, [row], {}, [])
+    assert result["by_destination"]["board"]["disagree"] == 0
+    assert result["forks"]["F3_suggested_sim_opposes"]["count"] == 1
 
 
 def test_live_plan_size_disagreement_names_full_kelly_band():

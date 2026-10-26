@@ -39,7 +39,7 @@ Log lines: `[decision_record] DECISION_RECORD_WRITTEN ... elapsed_s=`,
 | venue contract | `venue_ref` + `price_source`, dated by `venue_quote_fanin._quote_is_for_another_date` | `no_contract` (gate UNKNOWN, advisory: the Kalshi executor joins its own ticker) |
 | `p_market` | `quote.fair_probability` (Shin consensus) | every verdict no-bet (`market_fair` gate) |
 | `p_model` | `model_probability_cal` → `_raw` → side-adjusted `projection.model_prob_over` | w_model 0 |
-| w* | `<data root>/reports/model_scorecard/model_scorecard_optimizer.json` `calibration[]`, cell = `optimizer_overlay.cell_of_row` | default 0.25, or 0 when the skill line says the model loses to the close |
+| w* | `<data root>/reports/model_scorecard/model_scorecard_optimizer.json` `calibration[]`, cell = `optimizer_overlay.cell_of_row` | applied only where the fit is not `insufficient` and its ci95 LOWER bound is > 0; else 0 (`optimizer_w_ci_spans_0:<verdict>` for a fit that reaches 0, `default_unmeasured` for no fit, `skill_loses_to_market`). Was a 0.25 default for unmeasured cells until 2026-10-26 (D3, plan #736) |
 | form + posterior | `<data root>/cheatsheets/<sport>/<date>.json` rows' `check.form5/form10`, re-anchored on this build's `p_market` (k = `cheat_sheets.PRIOR_STRENGTH`, provisional) | weight 0 by default anyway |
 | fees | `venue_fees.taker_fee_per_contract` (Kalshi series multiplier; Polymarket 0.0695·p(1−p)) | recorded unknown, never 0 |
 | price band | `execute_portfolio.live_price_band` (`SYNDICATE_LIVE_PRICE_BAND`) | evaluated at 0.40–0.75, `enforced_live=false` |

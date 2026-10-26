@@ -22,8 +22,8 @@ The record, per line:
 * form -- the cheat sheet's last-5 / last-10 record and the market-anchored
   beta-binomial posterior (`cheat_sheets.consistency_posterior`, k provisional);
 * `p_decision` -- ONE probability, anchored on `p_market`; the model and form move it
-  only by their measured weight (w* where the optimizer has measured the cell, else a
-  conservative default), and the weights are recorded;
+  only by their measured weight (w* where the optimizer's fit has a ci95 lower bound
+  above 0, else 0), and the weights are recorded;
 * prices -- best bettable book and each venue, priced by ONE formula
   `ev_net = p / (price + fee) - 1` with `venue_fees.taker_fee_per_contract`;
 * gates by name, verdict per destination, and the size chain with each layer's effect.
@@ -51,11 +51,15 @@ MODE_SHADOW = "shadow"
 # THE BLEND'S DEFAULTS, used only where nothing has been measured.
 #
 # Model: the daily optimizer's w* is the measured weight (`daily_optimizer.fit_calibration`,
-# the least-squares weight on the model's departure from the market). Where a cell has
-# no measured w*, the model gets a QUARTER of its departure -- research 2026-10-23 found
-# the sim overconfident at extreme prices -- and NONE when its own skill line says it
-# loses to the closing market.
-DEFAULT_MODEL_WEIGHT = 0.25
+# the least-squares weight on the model's departure from the market). The model moves
+# p_decision ONLY where that weight is EARNED: a fitted cell (not `insufficient`) whose w*
+# ci95 LOWER bound is above 0. Everywhere else it gets NONE -- unmeasured cells included.
+# Was 0.25 for unmeasured cells until 2026-10-26 (user decision D3, plan #736): the sim's
+# fitted weight on 4,876 settled orders was -0.27 [-0.78, +0.18] and every venue-pooled fit
+# picked beta 0, so a quarter of its departure was a weight nothing had earned.
+DEFAULT_MODEL_WEIGHT = 0.0
+# The optimizer verdicts whose w* is a fit (not `insufficient` games or dates).
+_FITTED_W_VERDICTS = frozenset({"overconfident", "not_proven"})
 # Form: no measurement of form's weight exists, and the same research says form is
 # mostly already priced. Its posterior is recorded and moves nothing until measured.
 DEFAULT_FORM_WEIGHT = 0.0
@@ -137,6 +141,7 @@ class ModelView:
     skill_loses_to_market: bool | None = None
     calibration_cell: str | None = None
     w_star: float | None = None
+    w_star_ci_lower: float | None = None
     w_star_ci_upper: float | None = None
     w_star_verdict: str | None = None
     w_star_games: int | None = None
@@ -659,6 +664,7 @@ def _model(row: Mapping[str, Any], ctx: RecordContext) -> ModelView:
     if entry:
         view.w_star = _f(entry.get("w"))
         ci = entry.get("ci95") or []
+        view.w_star_ci_lower = _f(ci[0]) if len(ci) > 1 else None
         view.w_star_ci_upper = _f(ci[1]) if len(ci) > 1 else None
         view.w_star_verdict = entry.get("verdict")
         view.w_star_games = int(entry.get("games") or 0)
@@ -690,11 +696,15 @@ def _blend(market: MarketFair, model: ModelView, form: FormView) -> Blend:
     if p is None:
         blend.w_model_source = blend.w_form_source = "no_market_fair"
         return blend
-    measured = model.w_star is not None and model.w_star_verdict in {"overconfident", "not_proven"}
+    fitted = model.w_star is not None and model.w_star_verdict in _FITTED_W_VERDICTS
+    earned = fitted and model.w_star_ci_lower is not None and model.w_star_ci_lower > 0.0
     if model.p_model is None:
         blend.w_model, blend.w_model_source = 0.0, "no_model"
-    elif measured:
+    elif earned:
         blend.w_model, blend.w_model_source = min(1.0, max(0.0, float(model.w_star))), f"optimizer_w:{model.w_star_verdict}"
+    elif fitted:
+        # A fit whose CI reaches 0 has not shown the model adds anything: record it, weigh it 0.
+        blend.w_model, blend.w_model_source = 0.0, f"optimizer_w_ci_spans_0:{model.w_star_verdict}"
     elif model.skill_loses_to_market:
         blend.w_model, blend.w_model_source = 0.0, "skill_loses_to_market"
     else:
