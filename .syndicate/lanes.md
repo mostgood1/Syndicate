@@ -1121,28 +1121,6 @@ death, never life — do not invert it.
 - Verification: pytest on the blend + fit tests incl. a reachability test (flag off = today's raw additive model bit for bit; flag on = market fair for an unfitted cell; a fitted beta>0 cell unchanged either way); the forward verdict line from a fleet ledger dump; switch-on only on the user's decision, then a plan read showing sim_share_of_stake 0.0 on unfitted cells
 - Blocked by: the forward read (>= 300 model-edge events, about 2026-11-02) and the user's switch-on decision; the seam loan is GRANTED (64642abc)
 
-### caps-revamp — CLOSED 2026-10-20 (GOAL MET) — opened 2026-10-19 — session 332cb014-904e-4069-b418-9283732e1e99
-- **GOAL VERDICT 2026-10-20 15:50Z:** "Live caps follow venue capital: SYNDICATE_EXECUTION_BALANCE_CAPS=on on the fleet with raised dollar ceilings; Polymarket capital counts the pending deposit (user 2026-10-19: 'the $500 pending on polymarket CAN be used'); an order over the per-order cap is trimmed to the cap instead of refused (user 2026-10-19: 'Trim to the cap')" -- **GOAL: MET.**
-  - Balance caps and pending deposit: verified on the fleet (worker-env `limits(live)`, below).
-  - Trim: verified by the unit reachability tests, accepted as the verification by USER DECISION 2026-10-20: "Close caps-revamp with the unit reachability tests as its verification, since the stake band keeps stakes under the order cap." Re-run on main `8099dc05`: 15 passed (trim vs untouched, balance caps off != on, pending deposit, scaling).
-  - The trim is LOADED on the fleet (EXECUTED lines carry `trimmed=`) and unexercised live while the stake band (max $10) sits under the order cap.
-- *(superseded status, kept for the record)* -- was GOAL: NOT MET (one reading left) `[2026-10-20 00:10Z]`.
-  - Done and verified:
-    - Full up on `d3878d69` at 23:55:55Z (deploys.md); `BALANCE_CAPS=on` on all roles.
-    - Ceilings raised 23:58:48Z.
-    - Worker-env `limits(live)`: kalshi $24.38/$121.91, polymarket $29.30/$146.51 incl. the pending deposit, all $268.42.
-    - EXECUTED lines carry `trimmed=` (new code loaded).
-    - 10-20 15:01Z: the first live order on the new chain filled (Kalshi, $5.17, `trimmed=0`).
-  - **Reachability caveat (10-20):** the stake band (live-stake-band, max $10) now sits below the order cap ($24.38 kalshi / $29.30 polymarket). A live trim cannot fire while the band holds. Closing this lane may need the unit reachability test accepted as the verification, or a reading after the band or the caps change. That is a user decision.
-  - Left: the first live `TRIMMED_TO_ORDER_CAP` / an EXECUTED with `trimmed>=1`, which needs a live stake over the balance-derived order cap. positions=0 at 00:05Z.
-- Goal: Live caps follow venue capital: SYNDICATE_EXECUTION_BALANCE_CAPS=on on the fleet with raised dollar ceilings; Polymarket capital counts the pending deposit (user 2026-10-19: 'the $500 pending on polymarket CAN be used'); an order over the per-order cap is trimmed to the cap instead of refused (user 2026-10-19: 'Trim to the cap')
-- Files: none held. RELEASED 2026-10-20 ~14:15Z: pipeline/execute_portfolio.py and its test went to the future-dated-live scope lane for D1 (refuse a live order already held from an earlier slate) + D3 (Kalshi orders expire at kickoff). USER DECISION in session 332cb014's chat: "Build D1 + D3 now". The trim step (08f851d1) is landed; no further edit is owed here, only the live reading.
-- **CODE LANDED `08f851d1` (196 targeted tests pass); the venue_capital loan is RETURNED to compounding-bankroll.** Fleet env `SYNDICATE_EXECUTION_BALANCE_CAPS=on` set 22:38Z (backup `local_production.env.bak-capsrevamp-20261019T223808Z`), loads at the next `up`. OWED: the restart onto 08f851d1, then the stored ceilings raised to $100/order, $1,000/day per venue, $2,000/day all, 50/50/100 orders (user: "Loose backstop"), ONLY after the restart is verified; then the live reading.
-- Hypothesis: n/a (build)
-- Falsification test: n/a
-- Verification: pytest tests/test_venue_capital.py tests/test_compounding_bankroll.py tests/test_execute_portfolio.py tests/test_execution_guard_balance.py incl. reachability (balance caps off != on; an over-cap stake trims, not refuses); then on the fleet a live EXECUTED/EXECUTION line whose limits carry balance_caps-derived per-venue caps, and a LIVE_ORDER whose stake equals the cap when the plan asked for more
-- Blocked by: none
-
 ### layer2-next-day-horizon — CLOSED 2026-10-21 (GOAL MET) — opened 2026-10-19 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
 - GOAL VERDICT `[2026-10-21 ~10:00 AM CT]`. Goal (verbatim): "A next-day (future-date) Layer 2 shortlist keeps every game on its own Central day: the horizon is counted from the selected date, not the build's UTC wall clock, so a 10-20 board built at 5 PM CT 10-19 carries OKC @ SAS (01:30Z 10-21)" -- GOAL MET. The 10-22 board written 14:06Z (9:06 AM CT 10-21, before 7 PM) carries every game ESPN lists on Central 10-22 that has quotes: NBA 2 of 2 incl. DEN @ OKC 8:30 PM (01:30Z 10-23 -- the case the fix is for), NFL 1 of 1 (NE @ CHI 7:15 PM = 00:15Z), NCAAF 3 of 3. NHL 0 on the board = 0 NHL quotes captured yet for 10-22 games (book_quotes 10-21.jsonl holds none), so nothing is dropped. Also 10-20's 6:57 PM CT board showed TOMORROW 941 NBA rows. The quote shards carry no 10-22 game for any sport (by_game_date is the run date's), so ESPN was the reference.
 - Goal: A next-day (future-date) Layer 2 shortlist keeps every game on its own Central day: the horizon is counted from the selected date, not the build's UTC wall clock, so a 10-20 board built at 5 PM CT 10-19 carries OKC @ SAS (01:30Z 10-21)
@@ -1458,6 +1436,11 @@ death, never life — do not invert it.
   - D3 is handed to `decision-record-shadow` (`decision_record.py` is theirs).
 - **HAND-OFFS `[2026-10-26 ~16:40Z]`:** six cross-session briefs were sent and ALL SIX were HELD (different permission mode, not delivered). The durable copy, one section per owner, is `.syndicate/brief_2026-10-26_decision_engine_owners.md`.
 
+### closed-lane-archive-20261026-1153 — CLOSED 2026-10-26 (GOAL MET: 1 blocks archived) — opened 2026-10-26 — session cb7f41b9-82ec-4d29-aba8-379d9807746b
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness --idle-min 240 gave SAFE_SLUGS=caps-revamp; archived `caps-revamp`. Other 26 CLOSED blocks waited (owners live or blocks touched < 240m). Table + Part B in `log/2026-10-26.md`.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
@@ -1497,6 +1480,7 @@ death, never life — do not invert it.
 - `candidate-trace-no-empty-sport` — CLOSED 2026-10-01 — opened 2026-10-01 — session 0bafeeeb-4766-4142-9294-a51e7591d647
 - `candidate-trace-scoped-bound` — CLOSED 2026-10-01 — opened 2026-10-01 — session 0bafeeeb-4766-4142-9294-a51e7591d647
 - `candidate-trace-unscoped-refusal` — CLOSED 2026-10-01 — opened 2026-10-01 — session 0bafeeeb-4766-4142-9294-a51e7591d647
+- `caps-revamp` — CLOSED 2026-10-20 (GOAL MET) — opened 2026-10-19 — session 332cb014-904e-4069-b418-9283732e1e99
 - `card-status-dict-label` — CLOSED — opened 2026-10-01, closed 2026-10-01 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
 - `census-rescue-0910` — CLOSED 2026-09-10 — opened 2026-09-10 — session 78cad512 — **GOAL: MET: census rescue landed (`ab43454d`), three shipped lanes closed, unmeasured-deploy count 3 -> 1**
 - `chip-key-test-no-data-blind` — CLOSED 2026-09-16 — opened 2026-09-16 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77 — **GOAL: MET** (`f9040bb3`). Data-less worktree: 4 passed, 2 SKIPPED with the stated reason; with the primary tree's `data/`: 6 passed; mutation (map present, `canonical_team` -> None): both data tests FAIL. Body in `lanes_history.md`.**

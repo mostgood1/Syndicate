@@ -12259,3 +12259,25 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Falsification test: n/a
 - Verification: regression tests for both shapes (block without locks, allow with them); transcript re-sweep shows the previously missed real deploys now matched and no new false positives; live proof on the installed primary hook
 - Blocked by: none
+
+### caps-revamp — CLOSED 2026-10-20 (GOAL MET) — opened 2026-10-19 — session 332cb014-904e-4069-b418-9283732e1e99
+- **GOAL VERDICT 2026-10-20 15:50Z:** "Live caps follow venue capital: SYNDICATE_EXECUTION_BALANCE_CAPS=on on the fleet with raised dollar ceilings; Polymarket capital counts the pending deposit (user 2026-10-19: 'the $500 pending on polymarket CAN be used'); an order over the per-order cap is trimmed to the cap instead of refused (user 2026-10-19: 'Trim to the cap')" -- **GOAL: MET.**
+  - Balance caps and pending deposit: verified on the fleet (worker-env `limits(live)`, below).
+  - Trim: verified by the unit reachability tests, accepted as the verification by USER DECISION 2026-10-20: "Close caps-revamp with the unit reachability tests as its verification, since the stake band keeps stakes under the order cap." Re-run on main `8099dc05`: 15 passed (trim vs untouched, balance caps off != on, pending deposit, scaling).
+  - The trim is LOADED on the fleet (EXECUTED lines carry `trimmed=`) and unexercised live while the stake band (max $10) sits under the order cap.
+- *(superseded status, kept for the record)* -- was GOAL: NOT MET (one reading left) `[2026-10-20 00:10Z]`.
+  - Done and verified:
+    - Full up on `d3878d69` at 23:55:55Z (deploys.md); `BALANCE_CAPS=on` on all roles.
+    - Ceilings raised 23:58:48Z.
+    - Worker-env `limits(live)`: kalshi $24.38/$121.91, polymarket $29.30/$146.51 incl. the pending deposit, all $268.42.
+    - EXECUTED lines carry `trimmed=` (new code loaded).
+    - 10-20 15:01Z: the first live order on the new chain filled (Kalshi, $5.17, `trimmed=0`).
+  - **Reachability caveat (10-20):** the stake band (live-stake-band, max $10) now sits below the order cap ($24.38 kalshi / $29.30 polymarket). A live trim cannot fire while the band holds. Closing this lane may need the unit reachability test accepted as the verification, or a reading after the band or the caps change. That is a user decision.
+  - Left: the first live `TRIMMED_TO_ORDER_CAP` / an EXECUTED with `trimmed>=1`, which needs a live stake over the balance-derived order cap. positions=0 at 00:05Z.
+- Goal: Live caps follow venue capital: SYNDICATE_EXECUTION_BALANCE_CAPS=on on the fleet with raised dollar ceilings; Polymarket capital counts the pending deposit (user 2026-10-19: 'the $500 pending on polymarket CAN be used'); an order over the per-order cap is trimmed to the cap instead of refused (user 2026-10-19: 'Trim to the cap')
+- Files: none held. RELEASED 2026-10-20 ~14:15Z: pipeline/execute_portfolio.py and its test went to the future-dated-live scope lane for D1 (refuse a live order already held from an earlier slate) + D3 (Kalshi orders expire at kickoff). USER DECISION in session 332cb014's chat: "Build D1 + D3 now". The trim step (08f851d1) is landed; no further edit is owed here, only the live reading.
+- **CODE LANDED `08f851d1` (196 targeted tests pass); the venue_capital loan is RETURNED to compounding-bankroll.** Fleet env `SYNDICATE_EXECUTION_BALANCE_CAPS=on` set 22:38Z (backup `local_production.env.bak-capsrevamp-20261019T223808Z`), loads at the next `up`. OWED: the restart onto 08f851d1, then the stored ceilings raised to $100/order, $1,000/day per venue, $2,000/day all, 50/50/100 orders (user: "Loose backstop"), ONLY after the restart is verified; then the live reading.
+- Hypothesis: n/a (build)
+- Falsification test: n/a
+- Verification: pytest tests/test_venue_capital.py tests/test_compounding_bankroll.py tests/test_execute_portfolio.py tests/test_execution_guard_balance.py incl. reachability (balance caps off != on; an over-cap stake trims, not refuses); then on the fleet a live EXECUTED/EXECUTION line whose limits carry balance_caps-derived per-venue caps, and a LIVE_ORDER whose stake equals the cap when the plan asked for more
+- Blocked by: none
