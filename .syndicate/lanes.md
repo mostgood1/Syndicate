@@ -1525,6 +1525,14 @@ death, never life — do not invert it.
 - Verification: findings file with the prereg SHA, per-source date coverage + intersection + n, per sport x market type log loss and fee-net EV by band with game-clustered CIs, engine read (sim shape vs parametric shape), recommendation; todo item + syndicate-decision-engine lane line pushed to main
 - Blocked by: none
 
+### e4-combo-correlation — OPEN — opened 2026-10-26 — session b566f51c-27f6-456c-b2ac-99f33cb133d4
+- Goal: Decision Engine E4 (#736), OFFLINE and read-only on production: pre-register (committed before any join) and run the combo-correlation test -- Stage 1 on settled games, with each leg's marginal anchored to the de-vigged market, score the joint outcome of same-game leg pairs under (a) independence, (b) the sport's sim joint distribution re-anchored to the market marginals, (c) the SGP builders' measured copula / ledger posterior, by log loss and Brier with game-clustered CIs per sport x leg-pair type; Stage 2 (only if (b) beats (a) with a CI below 0) join captured venue combo prices and compute fee-net EV at the executable price by deviation band
+- Files: scripts/e4_combo_correlation.py (NEW), tests/test_e4_combo_correlation.py (NEW), .syndicate/findings_2026-10-26_e4_combo_correlation_preregistration.md (NEW), .syndicate/findings_2026-10-26_e4_combo_correlation.md (NEW)
+- Hypothesis: PRE-REGISTERED in .syndicate/findings_2026-10-26_e4_combo_correlation_preregistration.md (committed before any sim x market x outcome join)
+- Falsification test: Plan s4 E4 kill rule: the sim's re-anchored joint is no better than independence on realised same-game co-occurrence (game-clustered CI of the log-loss difference (b)-(a) not below 0)
+- Verification: findings file with the prereg SHA, per-source date coverage + intersection + n, per sport x pair-type log loss / Brier with game-clustered CIs for (a)/(b)/(c), engine read (which correlations the sims get right or wrong), recommendation; todo item + syndicate-decision-engine lane line pushed to main
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
