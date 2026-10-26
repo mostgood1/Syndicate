@@ -143,3 +143,26 @@ units / games / dates the result rests on.
 
 Any change after this commit is written as a dated AMENDMENT below with its reason, before the result it affects is
 read. Bugs fixed in the script that do not change a definition above are listed in the findings.
+
+### AMENDMENT A1 (2026-10-26 ~19:45Z, before the script's first run; no result read)
+
+Interpretations forced by the logs' shapes while writing the script. None changes a measure, threshold or verdict
+rule; each narrows or fixes an eligibility test that, as written, could not be evaluated.
+
+1. **Book freshness.** `book_quotes` is append-on-change, so an unchanged price has no record inside any window.
+   "An h2h pair ... within the 120 min before t0" is evaluated as: the book's pair exists at or before t0, AND the
+   sport's h2h capture was alive (some h2h snapshot for that sport) within the 120 min before t0.
+2. **Polymarket eligibility.** Same reason: "a recorded point in [t0 - 30 min, t0]" would drop every stable market.
+   Evaluated as: a point at or before t0; the first RETAINED point at or before t0 - 30 min (the pre-t0 history
+   survived the 48-point cap); and `last_seen` at or after t0 + 15 min (still being captured).
+3. **Polymarket identity.** Our points store no outcome labels and no team names; the slug carries venue team codes.
+   A Polymarket moneyline joins a unit only when its slug's two codes, concatenated, equal the team-code part of the
+   Kalshi event ticker that already passed the identity check for that book game (e.g. `aec-nba-lal-uta-2026-10-25`
+   <-> `KXNBAGAME-26OCT25LALUTA`). So Polymarket units exist only where Kalshi identity was established; anything
+   else is `identity_refused`.
+4. **Placebo truth.** "The same rules started at p0" gives t_end_placebo = p0 + 60 min = t0, so the placebo EV's
+   truth is the book consensus at t0. If the source published inside the hour before our capture, the placebo absorbs
+   part of the news, which biases the increment DOWN (conservative).
+5. **Book early bound** = the previous distinct h2h `snapshot_ts` for that sport before the move's snapshot.
+6. **Book files:** where both `<date>.jsonl` and `<date>.jsonl.gz` exist, their records are unioned and de-duplicated
+   (a superset of `news_price_follow`'s "fuller file" rule).
