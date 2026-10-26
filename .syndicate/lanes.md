@@ -1431,6 +1431,11 @@ death, never life — do not invert it.
 - Falsification test: n/a at program level; the Phase-2 edge gate is the program's own kill rule (plan section 9)
 - Verification: Phase 0: #722 provenance on the fleet + first settled live order carrying staked_probability_version; #732/#729 forward readings recorded; unsettled paper/ladder backlog counted with an owner; D3 landed in shadow by decision-record-shadow; off-host backup copy exists off this machine with age < 30h; a missed-dispatch check exists and has caught one known-past run
 - Blocked by: none
+- **ARMED `[2026-10-26 19:13Z]` -- tonight, after the slate (not before 04:45Z 10-27), run LIVE in this session.** User, verbatim: "Yes: after tonight's slate, fast-forward the fleet to a main SHA containing 636ba4ff and restart the refresh-worker under the deploy locks (claim, preflight, drain, env sha guard, ride-along check of everything else the fast-forward carries), then take the owed FAIR_V1 and checklist readings and rec[ord them in deploys.md]".
+  - Plan: ff the fleet to EXACTLY 636ba4ff, after re-running the ride-along list. At arm time, 84767601..636ba4ff carried runtime files from THIS lane only.
+  - Then claim refresh-worker (plus web and live-odds-worker for the ff); `check_deploy_safety.py --drain` in the worker env; `deploy_preflight.py --expect code=636ba4ff --baseline code=6dd8a536`; TERM the refresh-worker; undrain; read FAIR_V1 and the checklist; deploys.md; release with --token.
+  - Arm baselines: env sha256 `33a7e457...` (74 keys), fleet HEAD 84767601, refresh-worker 6dd8a536, last restart 14:51:46Z, all claims free.
+  - **If this session is gone, nothing runs.** No unattended job was armed for the deploy steps (learnings 2026-10-26).
 - **FAIR V1 IN SHADOW `[2026-10-26 18:5xZ]`** (user-directed; loan of `decision-record-shadow`'s files RETURNED):
   - v1 code d757b599 and the record wiring 636ba4ff are on main.
   - The params were published on the fleet at `reports/syndicate_fair/syndicate_fair_v1_params.json`: version `syndicate_fair_v1@2026-10-26@18ed2e2c`, sha256 `1bf197f1...`. deploys.md 18:50Z.
