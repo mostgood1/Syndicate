@@ -15,9 +15,13 @@ from syndicate.features.shared import execution_ledger as L
 from syndicate.features.shared.execution_ledger import ledger_summary
 from syndicate.features.shared.portfolio_settings import PortfolioSettings
 
-_TICKER = "KXNCAAFSPREAD-26OCT24AAABBB-AAA14"
-_DAY1 = "2026-10-22"
-_DAY2 = "2026-10-23"
+# Far-future, so the ticker-date guard (ticker 99OCT24 == Eastern date of the
+# commence) and the Kalshi after-kickoff block both pass on any day this runs.
+# The 2026 dates failed every T1 test from 10-24 19:00Z on: `game_started`.
+_TICKER = "KXNCAAFSPREAD-99OCT24AAABBB-AAA14"
+_COMMENCE = "2099-10-24T19:00:00Z"  # 3 PM ET 10-24
+_DAY1 = "2099-10-22"
+_DAY2 = "2099-10-23"
 
 
 @pytest.fixture(autouse=True)
@@ -49,7 +53,7 @@ def _row(**overrides):
         "player_name": None,
         "home_team": "AAA",
         "away_team": "BBB",
-        "commence_time": "2026-10-24T19:00:00Z",
+        "commence_time": _COMMENCE,
         "side": "home",
         "quote": {"price": 108, "bookmaker": "kalshi"},
         "ev_pct": 3.5,
@@ -185,7 +189,7 @@ def _request(**overrides):
         requested_stake_dollars=5.0,
         line=-14.5,
         venue_ticker=_TICKER,
-        commence_time="2026-10-24T19:00:00Z",
+        commence_time=_COMMENCE,
     )
     fields.update(overrides)
     return L.OrderRequest(**fields)
