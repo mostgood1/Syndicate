@@ -2304,6 +2304,11 @@ outlier cold reading. Three paired replications erased it: **cold 31.32s vs warm
   - The worker exits (Render restarts it) after >= N consecutive refusals (env, now 1; 0 disables), uptime >= 30 min, no live child, no drain.
   - On `fb0c91cf`, refusals came back 50m45s after live (14:30:34Z). They were then reset by an admitted build at 15:22Z before any recycle.
   - The later boots (15:38Z, 17:29Z, 19:07Z, 21:03Z) logged 0 refusals before the next deploy. No `RECYCLE_EXIT` has ever been observed.
+- **ON THE LOCAL FLEET THE LINE IS THE DECLARED CAP, NOT MEMORY PRESSURE** `[verified 2026-10-24, fleet refresh-worker.log..log.5 for 10-18 21:45Z..10-24 19:00Z, lane fleet-refresh-worker-early-recycle]`.
+  - No cgroup, so the snapshot basis is `reclaimable_cache` and headroom = `REFRESH_WORKER__SYNDICATE_LOCAL_MEMORY_LIMIT_MB` (6144) - role-tree RSS. The 1,900 floor therefore refuses above **4,244 MB**.
+  - **Rate:** 140 refusals at `pre_source_state_fingerprint` / 1,724 fingerprint calls (8.1%); 1,568 builds completed. 29 `RECYCLE_EXIT heavy_build_refused`, all with children=0, at env threshold **3**. Boots ended at 1.3-2.5 h on 10-23/24.
+  - **Composition:** RssAnon 4,381 of 4,445 MB RSS (98.6%), so it is real heap. Per boot, RSS plateaus within 1-2 h at a slate-dependent level (4.0-4.7 GB on weekends); long boots level off, so there is no unbounded ratchet in that window.
+  - **Fix not applied:** 6144 -> 7168 is user-approved; two overnight attempts aborted with nothing changed. The refresh-worker builds back to back overnight, so the window needs `check_deploy_safety --drain`.
 
 ## [refresh-run-lanes] Refresh-run lane topology, and refusals are now LOGGED [verified 2026-09-25/26]
 
