@@ -1517,6 +1517,14 @@ death, never life — do not invert it.
 - Verification: Prereg committed first (SHA in findings); hermetic tests pass incl. off != on reachability and a no-order-path test; z fit reported with n; findings file + #738 + a #717 dated-read line on main; enabling the job on the fleet is the user's decision
 - Blocked by: none
 
+### e3-derived-surface — OPEN — opened 2026-10-26 — session d266ae46-93f0-45d3-9528-b0f6b150c5a6
+- Goal: Decision Engine E3 (#736), OFFLINE and read-only on production: pre-register (committed before any join) and run the derived-market surface test -- price Kalshi and Polymarket derived contracts (alternate ladder rungs, alt spreads/totals, quarter/half segments, team totals) off the SHARP main line plus a distribution shape, two arms (a) parametric surface located on the sharp main line with variance from history, (b) the sport's sim distribution re-located to the sharp main line (shape only, never the mean) -- and grade each vs the venue mid (held-out log loss on outcomes) and vs the venue's executable ask (fee-net EV by deviation band, game-clustered CIs), with per-source coverage, an engine read for the sim owners and a per-line recommendation
+- Files: scripts/e3_derived_surface.py (NEW), tests/test_e3_derived_surface.py (NEW), .syndicate/findings_2026-10-26_e3_derived_surface_preregistration.md (NEW), .syndicate/findings_2026-10-26_e3_derived_surface.md (NEW)
+- Hypothesis: PRE-REGISTERED in .syndicate/findings_2026-10-26_e3_derived_surface_preregistration.md (committed before any surface x venue x outcome join)
+- Falsification test: Plan s4 E3 kill rule: surface log loss not below the venue mid on held-out derived contracts (game-clustered CI), OR no fee-net-positive deviation band at the venue ask with a game-clustered CI above 0
+- Verification: findings file with the prereg SHA, per-source date coverage + intersection + n, per sport x market type log loss and fee-net EV by band with game-clustered CIs, engine read (sim shape vs parametric shape), recommendation; todo item + syndicate-decision-engine lane line pushed to main
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
