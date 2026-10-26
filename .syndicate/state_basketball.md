@@ -1205,6 +1205,17 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
     X 0.771 (OT + end-game).
   - The config JSON is in the findings. Production waits on the forward test (3020b556, 2026-27 from 11-01) via
     nba_engine_config.json only.
+- **ASSISTS (#5b), engine field on main, default off** `[verified 2026-10-26 12:55Z, 3152b1e2]`:
+  - The engine hard-coded P(assisted | make) = 0.58; the real FIT AST/FGM is 0.6368, and FGM matches. That constant
+    is the whole −2.4 AST/team.
+  - `assisted_make_rate` (default 0.58 = byte-identical; parity 5,400/5,400 `--reference recorded`) +
+    `assist_team_prior` / `assist_team_ref`.
+  - Results on 12 dates:
+    - league 0.6368 lands at 0.6378, AST 26.80, team-game AST MAE 4.98 → 4.47;
+    - the team prior (priors' team ratio r = 0.515 vs real; the priors over-disperse, slope 0.31) gives MAE 4.35
+      (−0.126 vs league, SE 0.192, not proven).
+  - Full FITs fit_5bA / fit_5bB COMPLETE 2026-10-23 (109/109 each, 0 errors), NOT YET GRADED (gates pre-registered
+    ce11b4e8). NOT enabled.
 ## [basketball-props-refresh-off-vendor] BASKETBALL PROPS REFRESHES: vendored uses retired path by path; WNBA history now tracks the schedule `[verified 2026-10-14, lanes nba-source-cli-native + basketball-games-history-freshness]`
 
 - **Off vendor and on the fleet** (each A/B'd on production data, 0 differences unless noted):
