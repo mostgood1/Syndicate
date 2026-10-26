@@ -219,3 +219,5 @@ verdict rule.
    their contracts are kept unvalidated, and the findings say so.
 7. **Loader code.** The fleet loaders for sims, history and window scores are committed beside the script:
    `scripts/e3_sim_loaders.py`, `scripts/e3_history_loaders.py` and `scripts/e3_window_loaders.py` (NEW).
+
+(Timestamp correction: A1 was committed at 22:55:53Z, not "~23:05Z" as its heading says; the heading was written before the clock was read.)
