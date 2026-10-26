@@ -1433,6 +1433,14 @@ death, never life — do not invert it.
 - Verdict: GOAL MET. owner_liveness --idle-min 240 read 10 SAFE / 23 WAIT at 13:15Z (08:15 CDT); all 10 moved to lanes_closed.md with one pointer each. Table and WAIT reasons: log/2026-10-26.md.
 - Moved: venue-order-opening-gap, polymarket-nba-join, layer2-interval-selector, closed-lane-archive-20261024-1641, maker-vs-taker-shadow, pm-trader-strategies, kalshi-maker-pilot, preflight-fleet-path, deploy-guard-fleet, deploy-guard-fleet-gaps.
 
+### syndicate-decision-engine — OPEN — opened 2026-10-26 — session e32fef1a-01e8-4afe-a284-01acd3728545
+- Goal: Carry the ADOPTED Decision Engine plan (todo #736, user 2026-10-26, D1-D8 as recommended). Phase 0 done = every Phase-0 item is either verified on the fleet with a dated reading in deploys.md or handed to a named owner lane with the hand-off recorded here; later phases each open under their owner and pass their pre-registered gate
+- Files: docs/ai_context/plan_syndicate_decision_engine.md, docs/ai_context/todo.md (#736 section only), .syndicate/state.md ([user-decisions] 2026-10-26 entry only)
+- Hypothesis: n/a (program lane; each edge hypothesis E1-E7 is pre-registered in its owner lane before data)
+- Falsification test: n/a at program level; the Phase-2 edge gate is the program's own kill rule (plan section 9)
+- Verification: Phase 0: #722 provenance on the fleet + first settled live order carrying staked_probability_version; #732/#729 forward readings recorded; unsettled paper/ladder backlog counted with an owner; D3 landed in shadow by decision-record-shadow; off-host backup copy exists off this machine with age < 30h; a missed-dispatch check exists and has caught one known-past run
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

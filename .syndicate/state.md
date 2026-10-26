@@ -198,6 +198,11 @@ Product decisions, not engineering ones. Do not re-take them.
      enough**, not because the data is missing. That is a different and more
      honest reason than the one decision 3 was taken under.
 
+- **2026-10-26 — ADOPT THE SYNDICATE DECISION ENGINE PLAN (`#736`) WITH D1–D8 AS RECOMMENDED.** User, verbatim: "Adopt the decision-engine plan with the recommended D1-D8. Open the umbrella lane, brief the owner sessions, and start Phase 0." Plan: `docs/ai_context/plan_syndicate_decision_engine.md`; umbrella lane `syndicate-decision-engine`. What each decision commits to:
+  D1 the plan is the program, carried by one umbrella lane that absorbs rather than adds; D2 DecisionRecord step 3 (`#719`) -- select and size on venue-native net EV, PAPER2 FIRST, then canary live; D3 `DEFAULT_MODEL_WEIGHT` 0.25 -> 0 on unmeasured cells (shadow-only effect today); D4 NO LLM in the decision path yet -- rules-based official feeds first, revisit at Phase 4 (the 2026-08-14 Ask decision is untouched); D5 widen sharp-book coverage within the 5M OddsAPI budget first; D6 live capital stays at CANARY until a strategy passes the Phase-2 edge gate (fee-net CLV vs the sharp close > 0, game-clustered CI, >= 400 bets / >= 100 games) -- do not widen the stake bands; D7 a pre-registered capital ladder is written before Phase 2 ends; D8 off-host backup and a dispatch watchdog now, the host decision at Phase 7.
+  Same day, the user's scope note: this is NOT a product to sell; the bar is market-grade success with our own capital.
+  Unchanged by this: every line is its own decision (no market-level switches); `#704`'s 11-02 keep/revert read, which nothing may pre-empt.
+
 **Nothing is currently owed by the user.**
 
 ## [open-problems] OPEN PROBLEMS
