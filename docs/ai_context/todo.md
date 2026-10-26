@@ -1,5 +1,16 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#739` — **E5 VENUE NEWS-LAG (Decision Engine `#736`, plan §4 E5): KILLED on Kalshi by the registered rule; Polymarket "cancel-protection only" by the letter at a 0.2c drift. No timing edge: on the events the books repriced, Kalshi had moved BEFORE our collector saw the news. Phase 4 = cancel-protection plumbing, gated on Phase 3 and an official-schedule t0 (decision owed)** — 2026-10-26, lane `e5-venue-news-lag`, session ce4dfadf (side session of local_898e5510); `.syndicate/findings_2026-10-26_e5_venue_news_lag.md`
+- **Pre-registered before any join:** `d9ce947f`. Amendments A1 `0a9b9fed`, A2 `0bfcc8bc`, A3 `e3fd2e2a` cover eligibility and run times. A3 takes run times from `logs/news_collector.log`, which holds 1,983 runs; the change logs alone imply 106 false sleep gaps.
+- **Script and data:** `scripts/e5_venue_news_lag.py` with 31 hermetic tests. Read-only on the fleet. Kalshi's public 1-min candles are the venue clock.
+- **Kalshi:** 197 primary units / 93 games / 14 dates. KILLED: signed drift +0.04pp [-0.05, +0.13]. Fee-net EV at +1 min is -4.32% [-4.58, -4.07]; the increment over placebo is -0.22pp [-0.52, +0.05]. The 39-min median "lag" is 82% censored: the venue never needed to move.
+- **Polymarket:** 39 / 27 games, mostly NHL, at our board-loop clock. Drift +0.21pp [+0.07, +0.35]; EV -4.31%.
+- **Post hoc** (books moved >= 2pp after t0; 9 units): Kalshi was already 1.6pp ahead of the books at our t0. The gap left at +1 min (1.8pp) is below the fee plus spread.
+- **Own props:** Kalshi settles an inactive player's prop at a fair price. Books re-quote a ruled-out player's props LESS after news (2.3% vs 5.4% placebo), i.e. they pull them.
+- **OWED:**
+  - **(a)** A user decision, routed to the decision-engine session: Phase 4 becomes cancel-protection plumbing, gated on the Phase 3 maker engine and an official-schedule t0; no paid feed on E5's evidence.
+  - **(b)** Re-run the same script once an official-source t0 exists (NBA report time, NHL gameinfo near puck drop, NFL inactives, EPL XI), or after a month of the NBA regular season. Same constants.
+
 ### `#738` — **DECISION POLICY v1 as a PAPER track (Decision Engine Phase 2, `#736`, D2 paper2-first): pre-registered `8d16ab07` before any data; z fitted (z_S1 1.012, z_S2 0.677); built with 41 hermetic tests; NOT RUNNING — a guard-test loan and enabling the fleet job are user decisions** — 2026-10-26, lane `decision-policy-paper` (side session of local_898e5510); `.syndicate/findings_2026-10-26_decision_policy_v1.md`
 - **Policy:** EV_lb = p_market − z·σ at the venue's ask + `venue_fees` fee; σ = `sigma_fair_v1` where recorded, else book dispersion + a fitted residual, else inflated; Kelly on p_lb × Baker–McHale (≤ 2% a bet, ≤ 5% a game); one bet per (event, axis) per strategy (`#711` R1). `p_fair_v1` is never read.
 - **Strategies:** P1 EV_lb > 0 and P2 the `#719` floors (Kalshi 1.0 / Polymarket 0.5) are the candidates; C0 = today's Suggested + 2%, booked at the venue's ask on the same lines, is the comparator.
