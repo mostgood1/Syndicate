@@ -54392,3 +54392,25 @@ which is about the two sizing bases and not about the refusal boundary.
 - **interval rows (h1/q1..q4), 267:** ALSO carry `team_recent` (267/267) with per-period scores (e.g. ATL@HOU q1 `[2026-10-24, 26, 30]`, h1 `[2026-10-24, 48, 59]`). The brief expected none (state said interval history is NCAAF-only); this is newer behaviour, not a failure. Per-period values NOT verified in this reading.
 - **spot-check:** every full-game entry (4,020) matches a (date, for, against) game in the log's PTS sums, 0 mismatches. Against ESPN's 10-25 scoreboard: UTA 123 LAL 132 (board UTA `[2026-10-25, 123, 132]`) and SAC 112 MEM 123 (board MEM `[2026-10-25, 123, 112]`) -- both match.
 - **verdict:** **MET** -- every NBA team on the served board has played >= 1 2026-27 regular-season game and every one carries team history; the reading owed since 2026-10-09 (0/170) is closed.
+
+## 2026-10-26 15:46:49Z (10:46 AM CT) -- FLEET ff 6dd8a536 -> 84767601, NO restart: min_ev tuner proposed-move DECISION CUE (lane min-ev-tuner-shadow) -- **LOADED; verify MET**
+- **user-approved in chat:** "Yes: fast-forward the fleet checkout from 6dd8a536 to 84767601 (no restart) behind the claim, verify the watchdog imports it, and record it in deploys.md."
+- **what:** `exec:min_ev_tuner:proposed_move`. It fires when the newest readout artifact (today's or yesterday's) has a cell whose own or pooled verdict is raise or lower. The message carries the cell's numbers.
+  - Per the user's 2026-10-26 decision, the tuner stays in shadow and the apply question comes back only then.
+  - Severity `warn`, labelled "DECISION CUE (not a fault)": `local_watchdog.decide` knows only fail/warn. The finding is emailed (it has an `exec:` key) and re-alerts at most once a day.
+- **claim:** refresh-worker, holder min-ev-tuner-shadow, 15:41:47Z.
+- **preflight:** SHA-bound to 84767601d0c9. First reads were HOLD: a board build in flight, then 2 odds-refresh jobs in flight.
+  - Re-run with `--allow-mid-build`, because this ff restarts nothing and its runtime diff is two scripts no build imports.
+  - Polled with the baseline re-read each try (code=6dd8a536). **CLEAR 15:46:30Z** ("only infrastructure processes running").
+- **ff:** guarded, HEAD must equal 6dd8a536, target SHA written literally. Landed 15:46:49Z.
+  - Runtime files changed: `scripts/min_ev_tuner_watch.py` and `scripts/min_ev_tuner_daily_readout.py` only. The rest is ledger and tests.
+  - **Nothing else rides along.** `bdc61a1d..` are already on the fleet, and this is 6 commits with no vendor or render.yaml change.
+- **No restart:** the watchdog imports the watch module fresh every 5 minutes, and the readout job is a fresh subprocess at 13:15Z. `status` reports the roles STALE by 2 runtime files; neither file is imported by a role.
+- **verify (MET 15:50:55Z), on the fleet with the fleet venv:**
+  - The checkout's module has `proposed_move_message` and `proposed_moves`.
+  - A synthetic readout with one raise cell gives `[('exec:min_ev_tuner:proposed_move', 'warn')]`.
+  - Today's real artifact (2026-10-26, 78/78 holds, written before the new `proposed` field) gives None.
+  - The next real watchdog run, `last_check` 15:50:55Z, came after the ff: no `exec:min_ev_tuner*` finding active and no `watch_error`.
+- **first live use:** the 2026-10-27 13:15Z readout job writes the first artifact carrying `proposed`. Until then the check reads the action counts of the older artifacts.
+- **seen in passing, not this lane's:** watchdog.log has `ci-suite last run (2026-10-26) exited rc=1` (warn, NEW 09:00:55Z).
+
