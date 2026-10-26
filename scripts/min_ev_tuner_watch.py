@@ -17,6 +17,18 @@ toasted -- `execution_watchdog.emailable`):
                               says a mode other than `shadow`, and
                               `<home>/min_ev_tuner_mode_decision.json` does not
                               record the user's decision for that mode             fail
+  exec:min_ev_tuner:proposed_move
+                              the newest readout artifact (today's or yesterday's)
+                              has a cell whose own or pooled verdict is `raise` /
+                              `lower` -- a DECISION CUE, not a fault: the message
+                              carries that cell's numbers                          warn
+
+PROPOSED MOVES (user 2026-10-26: "keep the min_ev tuner in shadow", and bring the
+apply question back only when a cell proposes a move). The readout job writes
+`proposed` (`min_ev_tuner_daily_readout.proposed_moves`); an artifact from before
+that field is read from its `actions` / `pooled_actions` counts instead. `warn` is
+the lowest level `local_watchdog.decide` knows: it is emailed (`exec:` key) and
+re-alerted at most once a day, which is the readout's own cadence.
 
 RECORDING A DECISION. When the user decides to switch modes, write
 `<home>/min_ev_tuner_mode_decision.json`:
@@ -203,7 +215,71 @@ def evaluate(row: Mapping[str, Any], readout: Mapping[str, Any], decision: Mappi
                         f"min_ev tuner pooling={pooling} ({source}) and no recorded user decision for it "
                         f"(<home>/{DECISION_NAME} pooling says {decided_pooling or 'nothing'}); expected shadow."))
             break
+    cue = proposed_move_message(readout, now)
+    if cue:
+        out.append((PREFIX + "proposed_move", WARN, cue))
     return out
+
+
+_CELLS_IN_MESSAGE = 3
+
+
+def _num(value: Any, fmt: str = "+.2f") -> str:
+    return "-" if value is None else format(value, fmt)
+
+
+def _describe(move: Mapping[str, Any]) -> str:
+    m = move.get("marginal") or {}
+    band = m.get("band") or [None, None]
+    cut = _num(move.get("previous_min_ev_pct"), ".2f")
+    if move.get("action") == "hold":
+        own = f"own verdict hold ({move.get('reason')})"
+    else:
+        own = f"{move.get('action')} {cut}->{_num(move.get('proposed_min_ev_pct'), '.2f')} ({move.get('reason')})"
+    text = (f"{move.get('cell')}: {own}; band [{_num(band[0], '.2f')}, {_num(band[1], '.2f')}) "
+            f"{m.get('events')} events, flat ROI {_num(m.get('roi_pct'))}% (t {_num(m.get('roi_t'))}), "
+            f"CLV {_num(m.get('avg_clv_pct'))} (t {_num(m.get('clv_t'))}, {m.get('clv_events')} events)")
+    pooled = move.get("pooled") or {}
+    if pooled:
+        text += (f"; pooled {pooled.get('action')}")
+        if pooled.get("action") not in (None, "hold"):
+            text += f" {cut}->{_num(pooled.get('min_ev_pct'), '.2f')}"
+        text += (f" ({pooled.get('reason')}), ROI z {_num(pooled.get('roi_z'))}, CLV z {_num(pooled.get('clv_z'))}, "
+                 f"family {pooled.get('family_events')} events")
+    return text
+
+
+def proposed_move_message(readout: Mapping[str, Any], now: dt.datetime) -> str | None:
+    """The decision cue for a readout that proposes a move, or None (pure). Only today's or yesterday's readout
+    counts (the job runs at 13:15Z, so before then the newest one is yesterday's); an older one is the
+    `job:min-ev-tuner-readout` check's business, not a cue."""
+    date = str(readout.get("date") or "")
+    try:
+        age = (now.date() - dt.date.fromisoformat(date)).days
+    except ValueError:
+        return None
+    if not 0 <= age <= 1:
+        return None
+    mode = readout.get("mode") or "?"
+    tail = (f" Tuner mode={mode}: in shadow nothing moved. Per the user's 2026-10-26 decision the apply question "
+            f"goes back to the user now (findings_2026-10-19_min_ev_tuner_backtest.md, DECISION 2026-10-26).")
+    if "proposed" in readout:
+        moves = [m for m in (readout.get("proposed") or []) if isinstance(m, Mapping)]
+        if not moves:
+            return None
+        shown = "; ".join(_describe(m) for m in moves[:_CELLS_IN_MESSAGE])
+        more = f" (+{len(moves) - _CELLS_IN_MESSAGE} more in the artifact)" if len(moves) > _CELLS_IN_MESSAGE else ""
+        return (f"min_ev tuner DECISION CUE (not a fault): readout {date} proposes {len(moves)} move(s). "
+                f"{shown}{more}.{tail}")[:1500]
+    counts = {}
+    for field in ("actions", "pooled_actions"):
+        moved = {k: v for k, v in (readout.get(field) or {}).items() if k != "hold" and v}
+        if moved:
+            counts[field] = moved
+    if not counts:
+        return None
+    return (f"min_ev tuner DECISION CUE (not a fault): readout {date} proposes moves {counts} (an artifact "
+            f"without per-cell numbers; read the tuner state).{tail}")
 
 
 def run(home: Path, logs_dir: Path, data_root: Path, state: Mapping[str, Any], now: dt.datetime

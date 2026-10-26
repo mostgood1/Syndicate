@@ -224,6 +224,91 @@ def test_the_readout_artifact_mode_is_checked_too(tmp_path):
     assert _keys(_check(tmp_path, AT_1305)[0]) == {"exec:min_ev_tuner:mode": tw.FAIL}
 
 
+# ---- proposed moves: the decision cue (user 2026-10-26: keep shadow; re-ask only when a cell proposes a move) -------
+
+
+def _cell(action="hold", reason="only_clv_significant", pooled_action="hold", **extra):
+    cell = {
+        "action": action, "reason": reason, "previous_min_ev_pct": 0.0, "effective_cut_pct": 3.16,
+        "min_ev_pct": 0.5 if action == "raise" else None,
+        "marginal": {"band": [3.16, 4.16], "events": 44, "clv_events": 33, "roi_pct": -28.9, "roi_t": -2.4,
+                     "dollar_roi_pct": -30.1, "avg_clv_pct": -1.05, "clv_t": -2.2},
+        "pooled": {"action": pooled_action, "reason": "roi_and_clv_significantly_negative" if pooled_action != "hold"
+                   else "not_significant", "min_ev_pct": 0.5 if pooled_action != "hold" else 0.0,
+                   "family": "polymarket|ncaaf|regular", "family_events": 120, "cell_events": 44,
+                   "roi_theta_pct": -30.6, "roi_z": -2.1, "clv_theta": -1.0, "clv_z": -2.3},
+    }
+    cell.update(extra)
+    return cell
+
+
+def _readout(tmp_path, payload):
+    readouts = tmp_path / "data" / "reports" / "intelligence" / "min_ev_tuner_readout"
+    readouts.mkdir(parents=True, exist_ok=True)
+    (readouts / f"{payload['date']}.json").write_text(json.dumps(payload), encoding="utf-8")
+
+
+def test_proposed_moves_lists_own_and_pooled_only_moves_and_skips_holds():
+    state = {"cells": {
+        "polymarket|ncaaf|spreads|regular": _cell("raise", "roi_and_clv_significantly_negative"),
+        "kalshi|ncaaf|totals|regular": _cell(pooled_action="lower"),
+        "kalshi|nfl|h2h|regular": _cell(),
+    }}
+    moves = dr.proposed_moves(state)
+    assert [(m["cell"], m["action"], (m["pooled"] or {}).get("action")) for m in moves] == [
+        ("kalshi|ncaaf|totals|regular", "hold", "lower"),
+        ("polymarket|ncaaf|spreads|regular", "raise", "hold"),
+    ]
+    assert moves[1]["proposed_min_ev_pct"] == 0.5 and moves[1]["marginal"]["roi_t"] == -2.4
+    assert dr.summarize(state, DAY)["proposed"] == moves
+
+
+def test_a_readout_proposing_a_move_raises_the_decision_cue_with_the_cells_numbers(tmp_path):
+    _write_log(tmp_path, PASS.format(mode="shadow", date=DAY))
+    move = dr.proposed_moves({"cells": {"polymarket|ncaaf|spreads|regular": _cell("raise", "roi_and_clv_significantly_negative")}})
+    _readout(tmp_path, {"date": DAY, "mode": "shadow", "proposed": move})
+    findings, _ = _check(tmp_path, AT_1305)
+    assert _keys(findings) == {"exec:min_ev_tuner:proposed_move": tw.WARN}
+    message = findings[0][2]
+    assert "DECISION CUE" in message and "polymarket|ncaaf|spreads|regular: raise 0.00->0.50" in message
+    assert "flat ROI -28.90% (t -2.40)" in message and "44 events" in message and "mode=shadow" in message
+
+
+def test_holds_an_empty_list_and_a_stale_readout_raise_no_cue(tmp_path):
+    _write_log(tmp_path, PASS.format(mode="shadow", date=DAY))
+    _readout(tmp_path, {"date": DAY, "mode": "shadow", "proposed": [], "actions": {"hold": 78}})
+    assert _check(tmp_path, AT_1305)[0] == []
+    stale = {"date": "2026-10-19", "mode": "shadow", "proposed": dr.proposed_moves({"cells": {"c": _cell("raise")}})}
+    assert tw.proposed_move_message(stale, AT_1305) is None
+    yesterday = dict(stale, date="2026-10-21")
+    assert "DECISION CUE" in tw.proposed_move_message(yesterday, AT_1305)
+
+
+def test_an_artifact_from_before_the_proposed_field_is_read_from_its_counts():
+    legacy = {"date": DAY, "mode": "shadow", "actions": {"hold": 77, "lower": 1}, "pooled_actions": {"hold": 78}}
+    message = tw.proposed_move_message(legacy, AT_1305)
+    assert message and "{'actions': {'lower': 1}}" in message
+    assert tw.proposed_move_message(dict(legacy, actions={"hold": 78}), AT_1305) is None
+
+
+def test_reachability_the_readout_job_writes_the_moves_the_watch_reads(tmp_path, monkeypatch):
+    """dr.main -> artifact on disk -> tw.run: a raise in the tuner state becomes the cue; all holds do not."""
+    from syndicate.features.shared import min_ev_tuner as T
+
+    now = dt.datetime.now(dt.timezone.utc)
+    today = now.date().isoformat()
+    state = {"mode": "shadow", "last_run_date": today, "cells": {
+        "polymarket|ncaaf|spreads|regular": _cell("raise", "roi_and_clv_significantly_negative"),
+        "kalshi|nfl|h2h|regular": _cell(),
+    }}
+    monkeypatch.setattr(T, "load_state", lambda: state)
+    assert dr.main(["--reports-root", str(tmp_path / "data" / "reports")]) == 0
+    assert "exec:min_ev_tuner:proposed_move" in _keys(_check(tmp_path, now)[0])
+    state["cells"] = {"kalshi|nfl|h2h|regular": _cell()}
+    assert dr.main(["--reports-root", str(tmp_path / "data" / "reports")]) == 0
+    assert "exec:min_ev_tuner:proposed_move" not in _keys(_check(tmp_path, now)[0])
+
+
 def test_a_crash_in_the_check_is_a_warning_not_an_exception(tmp_path, monkeypatch):
     monkeypatch.setattr(tw, "scan_log", lambda *a, **k: 1 / 0)
     assert _keys(_check(tmp_path, AT_1305)[0]) == {"exec:min_ev_tuner:watch_error": tw.WARN}

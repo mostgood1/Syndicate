@@ -42,6 +42,38 @@ def readout_dir(reports_root: Path) -> Path:
     return reports_root.joinpath(*READOUT_SUBDIR)
 
 
+_MARGINAL_FIELDS = ("band", "events", "clv_events", "roi_pct", "roi_t", "dollar_roi_pct", "avg_clv_pct", "clv_t")
+_POOLED_FIELDS = ("action", "reason", "min_ev_pct", "family", "family_events", "cell_events", "roi_theta_pct",
+                  "roi_z", "clv_theta", "clv_z")
+
+
+def proposed_moves(state: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Every cell whose own or pooled verdict is not `hold`, with the numbers the user decides on (pure).
+
+    The watchdog's `exec:min_ev_tuner:proposed_move` reads this list (user 2026-10-26: keep the tuner in
+    shadow, and bring the apply question back only when a cell proposes a move)."""
+    out = []
+    for key, cell in sorted((state.get("cells") or {}).items()):
+        if not isinstance(cell, Mapping):
+            continue
+        pooled = cell.get("pooled") if isinstance(cell.get("pooled"), Mapping) else {}
+        action = str(cell.get("action") or "hold")
+        if action == "hold" and str(pooled.get("action") or "hold") == "hold":
+            continue
+        marginal = cell.get("marginal") if isinstance(cell.get("marginal"), Mapping) else {}
+        out.append({
+            "cell": key,
+            "action": action,
+            "reason": cell.get("reason"),
+            "previous_min_ev_pct": cell.get("previous_min_ev_pct"),
+            "proposed_min_ev_pct": cell.get("min_ev_pct") if action != "hold" else None,
+            "effective_cut_pct": cell.get("effective_cut_pct"),
+            "marginal": {f: marginal.get(f) for f in _MARGINAL_FIELDS},
+            "pooled": {f: pooled.get(f) for f in _POOLED_FIELDS} if pooled else None,
+        })
+    return out
+
+
 def summarize(state: Mapping[str, Any], today: str) -> dict[str, Any]:
     """The structured fields of one readout (pure)."""
     audit = list(state.get("audit") or [])
@@ -60,6 +92,7 @@ def summarize(state: Mapping[str, Any], today: str) -> dict[str, Any]:
         "cells": len(state.get("cells") or {}),
         "audit_moves_total": len(audit),
         "moves_today": moves_today,
+        "proposed": proposed_moves(state),
     }
 
 
