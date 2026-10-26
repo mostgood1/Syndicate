@@ -54371,3 +54371,8 @@ which is about the two sizing bases and not about the refusal boundary.
 - **deploy:** guarded ff 465aec84 -> 6dd8a536 at 14:51:43Z; TERM old pid 2444187 -> `CLAIMED_RESTART holder=layer2-suggested-opps`, new pid 2655262; `DRAIN_CLEARED` 14:52:29Z; `status` refresh-worker code=6dd8a536; healthz 200.
 - **ride-alongs (scripts/tests only, nothing scheduled runs them):** scripts/basketball_player_distribution_read.py (NEW, lane basketball-player-distribution), scripts/basketball_scenario_rates.py `--record-player-draws` (default off; imported only by the offline build_wnba_live_checkpoint_corpus.py), tests. No vendor/.
 - **verify (OWED, `watch_ladder_cap.sh`):** the first `ALT_LADDER_CAP ... held_rungs=N held_source=ledger` line after 14:52:28Z, and for each ladder with held rungs: held stake + new rungs <= the largest rung (or new rungs at the $1 min).
+
+## 2026-10-26 15:04:12Z (10:04 AM CT) -- READING for 6dd8a536 (alt-ladder cap counts held orders) -- **MET** (lane layer2-suggested-opps)
+- **instrument:** `watch_ladder_cap.sh` + `held_check.py` (worker env: the persisted plan joined to today's main-book orders).
+- **reading:** first post-restart line `ALT_LADDER_CAP date=2026-10-26 ladders=1 rungs=1 held_rungs=1 floored_at_min=0 staked_before=4.45 staked_after=1.22 held_source=ledger`; plan block identical. The ladder: NCAAF spreads home -7.5, held $3.23 (ordered 06:17:29Z, another book's quote of the same line), new rung $4.45 -> **$1.22**; held + new = **$4.45** = the largest rung. The main book then ORDERED that rung at **$1.22** (15:04:27Z): execution reads the capped stake. **MET.**
+- First full capped slate is 10-27: today's NBA totals ladders were ordered at 12:45:42Z, before either deploy, and keep their stakes.
