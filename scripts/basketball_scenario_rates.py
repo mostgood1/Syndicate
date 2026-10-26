@@ -378,10 +378,30 @@ def run_sim(args) -> int:
     def call(**kw):
         k = kw.get("kwargs") or {}
         cur.update(game={"date": str(k.get("date_str")), "home": str(k.get("home_tri")), "away": str(k.get("away_tri"))},
-                   draws=[], minutes=None)
+                   draws=[], minutes=None, pnames=None)
         result = orig_call(**kw)
-        games.append({**cur["game"], "draws": cur["draws"], "minutes": cur["minutes"]})
+        rec_ = {**cur["game"], "draws": cur["draws"], "minutes": cur["minutes"]}
+        if cur.get("pnames") is not None:
+            rec_["pnames"] = cur["pnames"]   # basketball-player-distribution: the order of each draw's "pl" rows
+        games.append(rec_)
         return result
+
+    pl_track = bool(getattr(args, "record_player_draws", False))
+
+    def _player_lines(h_box: Dict[str, Any], a_box: Dict[str, Any]) -> Dict[str, Any]:
+        """basketball-player-distribution: per draw, per player (game-fixed order) [pts, reb, ast, threes, on-floor
+        possessions or -1]. On-floor counts come from a research-only engine counter (box "fo_on"); absent -> -1."""
+        if cur.get("pnames") is None:
+            cur["pnames"] = {s: [str(p.get("player_name") or "") for p in (b.get("players") or [])]
+                             for s, b in (("h", h_box), ("a", a_box))}
+        on = h_box.get("fo_on") or {}
+        out: Dict[str, Any] = {"pl": {}, "on_n": int(on.get("n", -1)), "otn": len(h_box.get("ot_pts") or [])}
+        for s, b in (("h", h_box), ("a", a_box)):
+            by = {str(p.get("player_name") or ""): p for p in (b.get("players") or [])}
+            cnt = on.get(s) or {}
+            out["pl"][s] = [[int(by.get(n, {}).get(k) or 0) for k in ("pts", "reb", "ast", "threes")] + [int(cnt.get(n, -1))]
+                            for n in cur["pnames"][s]]
+        return out
 
     def rec(simulate_draw, recorded_draws):
         inner = orig_rec(simulate_draw, recorded_draws)
@@ -400,6 +420,8 @@ def run_sim(args) -> int:
                 cur["draws"].append(_compact_draw(h_box, a_box, hq, aq, FOUL_LIMIT[args.league]))
                 if oc_track:
                     cur["draws"][-1].update(_oc_finish())
+                if pl_track:
+                    cur["draws"][-1].update(_player_lines(h_box, a_box))
                 if cur.get("minutes") is None:   # minutes are INPUTS (constant across draws): keep them once
                     cur["minutes"] = {side: [[str(p.get("player_name") or ""), float(p.get("min") or 0.0)]
                                              for p in (b.get("players") or [])] for side, b in (("home", h_box), ("away", a_box))}
@@ -914,6 +936,8 @@ def main(argv=None) -> int:
     ap.add_argument("--lever", action="append", help="EventSimConfig field=value applied to every draw (Phase 2 sweeps)")
     ap.add_argument("--engine-flag", action="append", help="module-level engine switch NAME=VALUE on the real events module (Phase 2 #1d)")
     ap.add_argument("--track-oncourt", action="store_true", help="record per-draw simulated minutes of the top-5 (Phase 2 #4)")
+    ap.add_argument("--record-player-draws", action="store_true",
+                    help="record per draw each player's pts/reb/ast/threes (+ on-floor possessions when the engine reports them)")
     ap.add_argument("--dump-priors", help="append the per-player shooting priors reaching the engine to this JSONL (Phase 2 #5c)")
     ap.add_argument("--dates-file", default="", help="only these dates (one per line)")
     args = ap.parse_args(argv)
