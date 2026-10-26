@@ -172,6 +172,24 @@ class Blend:
 
 
 @dataclass(slots=True)
+class FairV1View:
+    """Syndicate Fair v1 (`syndicate_fair_runtime`), RECORDED ONLY: nothing in the blend, prices, gates or size
+    reads it (user 2026-10-26: "Never use p_fair_v1 for EV, pricing or staking"). `sigma_fair_v1` is on the
+    one-vs-rest LOGIT scale of this side; `p_shin_median` is the same books' Shin median at the same instant,
+    the comparison base. `reason` says why the numbers are absent."""
+
+    p_fair_v1: float | None = None
+    sigma_fair_v1: float | None = None
+    p_shin_median: float | None = None
+    family: str | None = None
+    tts: str | None = None
+    books_used: int | None = None
+    books_dropped: int | None = None
+    version: str | None = None
+    reason: str | None = None
+
+
+@dataclass(slots=True)
 class PriceQuote:
     book: str = ""
     role: str = ""  # best_bettable | venue
@@ -238,6 +256,7 @@ class DecisionRecord:
     model: ModelView = field(default_factory=ModelView)
     form: FormView = field(default_factory=FormView)
     blend: Blend = field(default_factory=Blend)
+    fair_v1: FairV1View = field(default_factory=FairV1View)
     prices: list[PriceQuote] = field(default_factory=list)
     gates: list[Gate] = field(default_factory=list)
     verdicts: list[Verdict] = field(default_factory=list)
@@ -248,7 +267,7 @@ class DecisionRecord:
 
 
 COMPONENT_CLASSES = (
-    DecisionRecord, Identity, VenueContract, MarketFair, ModelView, FormView, Blend,
+    DecisionRecord, Identity, VenueContract, MarketFair, ModelView, FormView, Blend, FairV1View,
     PriceQuote, Gate, Verdict, Size, SizeLayer,
 )
 
@@ -422,6 +441,8 @@ class RecordContext:
     max_order_dollars: dict[str, float | None] = field(default_factory=dict)
     band_config: dict[str, Any] = field(default_factory=dict)
     favourite_cap: dict[str, Any] = field(default_factory=dict)
+    # Syndicate Fair v1 (`syndicate_fair_runtime.Runtime`): params + book-grid index, recorded only.
+    fair_v1: Any = None
 
 
 def _data_root() -> Path:
@@ -543,8 +564,21 @@ def load_context(selected_date: str, rows: Sequence[Mapping[str, Any]], plans: M
         ctx.favourite_cap = dict(favourite_cap_config())
     except Exception:  # noqa: BLE001
         pass
+    ctx.fair_v1 = load_fair_v1(selected_date)
     context_from_plans(ctx, plans or {})
     return ctx
+
+
+def load_fair_v1(selected_date: str, root: Path | None = None) -> Any:
+    """Syndicate Fair v1's runtime for this build, or one whose `load_error` names why not. Never raises."""
+    try:
+        from syndicate.features.shared import syndicate_fair_runtime as sfr
+
+        return sfr.load_runtime(selected_date, root or _data_root())
+    except Exception as exc:  # noqa: BLE001 -- shadow: a v1 failure must never cost the record
+        from syndicate.features.shared.syndicate_fair_runtime import Runtime
+
+        return Runtime(load_error=f"error:{type(exc).__name__}")
 
 
 # --------------------------------------------------------------------------- the record
@@ -963,7 +997,26 @@ def build_record(row: Mapping[str, Any], ctx: RecordContext) -> DecisionRecord:
         gates = _gates_for(dest, rec, q, ctx)
         rec.gates.extend(gates)
         rec.verdicts.append(_verdict(dest, gates, q))
+    # Recorded AFTER every decision above, and read by none of them.
+    rec.fair_v1 = _fair_v1(identity, ctx)
     return rec
+
+
+def _fair_v1(identity: Identity, ctx: RecordContext) -> FairV1View:
+    rt = ctx.fair_v1
+    if rt is None:
+        return FairV1View(reason="no_runtime")
+    try:
+        from syndicate.features.shared import syndicate_fair_runtime as sfr
+
+        s = sfr.score(rt, sport=identity.sport, kind=identity.kind, event_id=identity.event_id,
+                      market=identity.market, segment=identity.segment, player=identity.player,
+                      side=identity.side, line=identity.line, commence_time=identity.commence_time, now=ctx.now)
+    except Exception as exc:  # noqa: BLE001
+        return FairV1View(version=getattr(rt, "version", None), reason=f"error:{type(exc).__name__}")
+    return FairV1View(p_fair_v1=s.p_fair_v1, sigma_fair_v1=s.sigma_fair_v1, p_shin_median=s.p_shin_median,
+                      family=s.family, tts=s.tts, books_used=s.books_used, books_dropped=s.books_dropped,
+                      version=getattr(rt, "version", None), reason=s.reason)
 
 
 def build_records(rows: Sequence[Mapping[str, Any]], ctx: RecordContext) -> list[DecisionRecord]:
@@ -1046,7 +1099,8 @@ def _compact(obj: Any) -> Any:
     return obj
 
 
-_NESTED = {"identity": Identity, "market": MarketFair, "model": ModelView, "form": FormView, "blend": Blend}
+_NESTED = {"identity": Identity, "market": MarketFair, "model": ModelView, "form": FormView, "blend": Blend,
+           "fair_v1": FairV1View}
 _LISTS = {"contracts": VenueContract, "prices": PriceQuote, "verdicts": Verdict, "sizes": Size}
 
 
@@ -1156,7 +1210,15 @@ def run_shadow(selected_date: str, shortlist: Mapping[str, Any] | None, *, root:
     if root is not None:
         ctx.calibration = ctx.calibration or load_calibration(root / "reports" / "model_scorecard" / "model_scorecard_optimizer.json")
         ctx.form_index = ctx.form_index or load_form_index(selected_date, {r.get("sport") for r in rows}, root=root)
+        ctx.fair_v1 = load_fair_v1(selected_date, root)
     records = build_records(rows, ctx)
+    fair_v1_reasons: dict[str, int] = {}
+    for rec in records:
+        key = "computed" if rec.fair_v1.p_fair_v1 is not None else str(rec.fair_v1.reason)
+        fair_v1_reasons[key] = fair_v1_reasons.get(key, 0) + 1
+    print(f"[decision_record] FAIR_V1 date={selected_date} version={getattr(ctx.fair_v1, 'version', None)} "
+          f"grid_files={len(getattr(ctx.fair_v1, 'grid_files', None) or [])} "
+          f"lines={len(getattr(ctx.fair_v1, 'grid', None) or {})} outcomes={fair_v1_reasons}", flush=True)
     build_id = f"{shortlist.get('written_at') or ''}|{int(started)}"
     bets = {d: sum(1 for r in records for v in r.verdicts if v.destination == d and v.bet) for d in DESTINATIONS}
     path = write_records(selected_date, records, build_id=build_id, root=root, extra={
@@ -1167,6 +1229,8 @@ def run_shadow(selected_date: str, shortlist: Mapping[str, Any] | None, *, root:
             "band_on": bool((ctx.band_config or {}).get("on")), "paper_bankroll": ctx.paper_bankroll,
             "live_capital": ctx.live_capital, "calibration_cells": len(ctx.calibration),
             "form_lines": len(ctx.form_index),
+            "fair_v1_version": getattr(ctx.fair_v1, "version", None),
+            "fair_v1_grid_files": len(getattr(ctx.fair_v1, "grid_files", None) or []),
         },
         "bets": bets,
     })

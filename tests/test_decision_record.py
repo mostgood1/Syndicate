@@ -342,8 +342,10 @@ def test_daily_report_judges_each_order_once(tmp_path):
 # ----------------------------------------------------------------------------- the checklist gates
 
 
-def test_checklist_alarms_when_an_input_is_unfed_and_passes_when_fed(tmp_path):
+def test_checklist_alarms_when_an_input_is_unfed_and_passes_when_fed(tmp_path, monkeypatch):
     import importlib.util
+
+    from syndicate.features.shared import syndicate_fair_runtime as sfr
 
     spec = importlib.util.spec_from_file_location("drc", REPO / "scripts" / "decision_record_checklist.py")
     drc = importlib.util.module_from_spec(spec)
@@ -356,14 +358,86 @@ def test_checklist_alarms_when_an_input_is_unfed_and_passes_when_fed(tmp_path):
     cell = dr._calibration_cell(rows[0], ctx.now)
     ctx.calibration = {cell: {"cell": cell, "w": 0.4, "ci95": [0.2, 0.6], "verdict": "overconfident", "games": 80}}
     ctx.form_index = {dr.line_key(rows[6]): {"form5": {"games": 5, "hits": 3}, "form10": {"games": 10, "hits": 6}, "sheet": "s"}}
+    # Fair v1 fed on one line (its math is tested in test_syndicate_fair_runtime.py; this is the checklist).
+    ctx.fair_v1 = sfr.Runtime(version="v1-test")
+    monkeypatch.setattr(sfr, "score", lambda rt, **kw: (
+        sfr.Score(p_fair_v1=0.51, sigma_fair_v1=0.08, p_shin_median=0.5, family="nba|regular|game", tts="t6h",
+                  books_used=4, books_dropped=0) if kw["event_id"] == "e0"
+        else sfr.Score(family="nba|regular|game", reason="not_a_v1_family")))
     recs = dr.build_records(rows, ctx)
     payload = {"records": [dr._compact(r) for r in recs],
-               "context": {"calibration_cells": 1, "form_lines": 1, "paper_bankroll": 1000.0}}
+               "context": {"calibration_cells": 1, "form_lines": 1, "paper_bankroll": 1000.0, "fair_v1_version": "v1-test"}}
     fed = drc.run(payload)
     assert fed["alarms"] == [], fed["alarms"]
     unfed = drc.run({**payload, "context": {"calibration_cells": 0, "form_lines": 1, "paper_bankroll": 1000.0}})
-    assert "context.calibration_cells" in unfed["alarms"]
+    assert "context.calibration_cells" in unfed["alarms"] and "context.fair_v1_version" in unfed["alarms"]
+    # v1 recorded nowhere: its numbers are unfed, which the checklist must say.
+    no_v1 = drc.run({**payload, "records": [{k: v for k, v in dr._compact(r).items() if k != "fair_v1"} for r in recs]})
+    assert "FairV1View.p_fair_v1" in no_v1["alarms"] and "FairV1View.sigma_fair_v1" in no_v1["alarms"]
     field_names = {r["field"] for r in fed["fields"]}
     import dataclasses
 
     assert {f"ModelView.{f.name}" for f in dataclasses.fields(dr.ModelView)} <= field_names
+
+
+# ----------------------------------------------------------------------------- Syndicate Fair v1 (recorded only)
+
+
+def test_fair_v1_is_recorded_and_never_moves_a_decision(monkeypatch):
+    # User 2026-10-26: "Never use p_fair_v1 for EV, pricing or staking." An extreme v1 must change nothing else.
+    from syndicate.features.shared import syndicate_fair_runtime as sfr
+
+    rows = [_row(), _row(event_id="ev2", line=221.5, quote={"book_prices": {"draftkings": 105, "kalshi": 112}})]
+    base = [dr._compact(r) for r in dr.build_records(rows, _ctx())]
+    monkeypatch.setattr(sfr, "score", lambda rt, **kw: sfr.Score(p_fair_v1=0.97, sigma_fair_v1=2.5, p_shin_median=0.02,
+                                                                  family="nba|regular|game", tts="t2h", books_used=9,
+                                                                  books_dropped=0))
+    recs = dr.build_records(rows, _ctx(fair_v1=sfr.Runtime(version="v1-test")))
+    assert all(r.fair_v1.p_fair_v1 == 0.97 and r.fair_v1.version == "v1-test" for r in recs)
+    with_v1 = [{k: v for k, v in dr._compact(r).items() if k != "fair_v1"} for r in recs]
+    without = [{k: v for k, v in r.items() if k != "fair_v1"} for r in base]
+    assert with_v1 == without
+    back = dr.expand_record(json.loads(json.dumps(dr._compact(recs[0]))))
+    assert back.fair_v1.p_fair_v1 == 0.97 and back.fair_v1.sigma_fair_v1 == 2.5
+
+
+def test_fair_v1_reachability_through_run_shadow_with_real_params_and_grid(tmp_path):
+    # off != on through the real hook: no params -> a reason; params + a grid line -> numbers on the written record.
+    from datetime import datetime, timedelta, timezone
+
+    from syndicate.features.shared import season_phase
+    from syndicate.features.shared import syndicate_fair as sf
+    from syndicate.features.shared import syndicate_fair_runtime as sfr
+
+    now = datetime.now(timezone.utc)
+    commence = now + timedelta(hours=6)
+    iso = lambda t: t.isoformat().replace("+00:00", "Z")  # noqa: E731
+    day = sfr._central_date(now.timestamp())
+    row = _row(sport="nhl", kind="game", market="h2h", side="home", line=None, event_id="ev1",
+               commence_time=iso(commence))
+    shortlist = {"rows": [row], "written_at": "t"}
+    off = dr.run_shadow(day, shortlist, root=tmp_path, plans={}, live_orders=[])
+    rec = dr.expand_record(dr.read_records(day, tmp_path)["records"][0])
+    assert off["status"] == "ok" and rec.fair_v1.p_fair_v1 is None and rec.fair_v1.reason == "no_params"
+
+    books = ["draftkings", "fanduel", "pinnacle"]
+    fam = f"nhl|{season_phase.season_phase('nhl', sfr._central_date(commence.timestamp()))}|game"
+    params = {"version": "v1-test", "families": {fam: {"books": books, "r2": {"h2h|t6h": 0.01},
+                                                       "theta": [0.0] * sf.WeightModel(books).n_params}}}
+    (tmp_path / "reports" / "syndicate_fair").mkdir(parents=True)
+    (tmp_path / sfr.PARAMS_RELPATH).write_text(json.dumps(params), encoding="utf-8")
+    cells = {b: {"home": {"price": p, "observed_at": iso(now)}, "away": {"price": q, "observed_at": iso(now)}}
+             for b, (p, q) in zip(books, [(-125, 105), (-130, 110), (-128, 116)])}
+    grid = {"rows": [{"event_id": "ev1", "kind": "game", "market": "h2h", "segment": "full", "player_name": None,
+                      "line": None, "sides": ["away", "home"], "commence_time": iso(commence), "cells": cells,
+                      "updated_at": iso(now)}]}
+    (tmp_path / "nhl_source" / "data" / "book_grid").mkdir(parents=True)
+    (tmp_path / "nhl_source" / "data" / "book_grid" / f"book_grid_{day}.json").write_text(json.dumps(grid), encoding="utf-8")
+    on = dr.run_shadow(day, shortlist, root=tmp_path, plans={}, live_orders=[])
+    payload = dr.read_records(day, tmp_path)
+    rec = dr.expand_record(payload["records"][0])
+    assert on["status"] == "ok" and rec.fair_v1.reason is None and rec.fair_v1.books_used == 3
+    assert 0.5 < rec.fair_v1.p_fair_v1 < 0.6 and rec.fair_v1.sigma_fair_v1 > 0.1 and rec.fair_v1.version == "v1-test"
+    assert payload["context"]["fair_v1_version"] == "v1-test" and payload["context"]["fair_v1_grid_files"] == 1
+    # ...and the decision is the market's: p_decision anchors on p_market, never on p_fair_v1.
+    assert rec.blend.p_decision == pytest.approx(rec.market.p_market, abs=1e-6)

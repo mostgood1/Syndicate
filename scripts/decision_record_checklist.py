@@ -93,6 +93,13 @@ EXPECTED_SPARSE: dict[tuple[str, str], str] = {
     ("DecisionRecord", "board_model_edge_pct"): "rows without a model view",
     ("DecisionRecord", "form"): "props on a cheat sheet only",
     ("DecisionRecord", "sizes"): "sized only where a paper/live verdict is bet",
+    ("FairV1View", "p_fair_v1"): "only the four stage-1 PASS families (ncaaf/nhl game, nhl prop, soccer game), pregame within 36h, with >=2 fitted books on the book grid",
+    ("FairV1View", "sigma_fair_v1"): "only the four stage-1 PASS families (ncaaf/nhl game, nhl prop, soccer game), pregame within 36h, with >=2 fitted books on the book grid",
+    ("FairV1View", "p_shin_median"): "only the four stage-1 PASS families (ncaaf/nhl game, nhl prop, soccer game), pregame within 36h, with >=2 fitted books on the book grid",
+    ("FairV1View", "tts"): "only v1 families, pregame within 36h",
+    ("FairV1View", "books_used"): "only v1 families with a two-sided book-grid line",
+    ("FairV1View", "books_dropped"): "only v1 families with a two-sided book-grid line",
+    ("FairV1View", "reason"): "set wherever v1 has no number; a fully-computed slate leaves it sparse",
 }
 
 # (Class, field) that may be zero everywhere on a given day, with the reason.
@@ -132,7 +139,7 @@ def _consumed_names() -> set[str]:
 
 def _walk(rec: dr.DecisionRecord):
     yield rec
-    for name in ("identity", "market", "model", "form", "blend"):
+    for name in ("identity", "market", "model", "form", "blend", "fair_v1"):
         yield getattr(rec, name)
     yield from rec.contracts
     yield from rec.prices
@@ -195,6 +202,7 @@ def run(payload: dict) -> dict:
         "calibration_cells": (context.get("calibration_cells") or 0) > 0,
         "form_lines": (context.get("form_lines") or 0) > 0,
         "paper_bankroll": context.get("paper_bankroll") is not None,
+        "fair_v1_version": context.get("fair_v1_version") is not None,
     }
     for name, ok in context_checks.items():
         if not ok:

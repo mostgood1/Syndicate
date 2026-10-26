@@ -873,6 +873,9 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     "reports/model_scorecard/measured_bucket_skill_overlay.json",
     "reports/model_scorecard/state/scorecard_state.json.gz",
     "reports/model_scorecard/weekly/weekly_backtests_*",
+    # Syndicate Fair v1 params (`#736` Phase 1, lane `syndicate-decision-engine`): the DecisionRecord reads them to
+    # RECORD sigma_fair_v1 / p_fair_v1 in shadow (never for EV, pricing or staking). One file, explicit name.
+    "reports/syndicate_fair/syndicate_fair_v1_params.json",
     # The PROJECTED evaluation ledger (`evaluation_ledger_projection.py`). This
     # is the only form of the ledger that can cross to web at all: the RAW
     # chunks are 95-332 MB/day against the 12 MiB `_PUBLISH_MAX_BYTES` below,

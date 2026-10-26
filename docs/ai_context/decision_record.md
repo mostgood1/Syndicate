@@ -46,6 +46,7 @@ Log lines: `[decision_record] DECISION_RECORD_WRITTEN ... elapsed_s=`,
 | net floor | `portfolio_commit.live_net_floor(venue)` | > 0 |
 | order cap | `execution_guard.limits("live", venue)` | no cap layer |
 | band / favourite cap | `live_stake_band.band_config` / `favourite_cap_config` | no band layer |
+| fair_v1 (RECORDED ONLY) | `syndicate_fair_runtime.score`: params `<data root>/reports/syndicate_fair/syndicate_fair_v1_params.json` (`scripts/publish_syndicate_fair_params.py`, the stage-1 walk-forward's last fold, the four PASS families) + every book's two-sided price from `<sport>_source/data/book_grid/book_grid_<date>.json` (selected date and the next) | `p_fair_v1` / `sigma_fair_v1` (one-vs-rest logit) / `p_shin_median` absent with a `reason` (`no_params`, `not_a_v1_family`, `in_play`, `outside_fitted_window`, `no_grid_line`, `under_min_books`, ...). Nothing in the blend, prices, gates or size reads it (user 2026-10-26, #736) |
 | bankroll, settled sample | the plans this tick wrote (`bankroll_units`, `compounding.capital`, `sizing.settled_sample_size`) | `bankroll_unknown`, credibility layer unapplied |
 
 **Reuse flag:** none. Nothing is cached across builds except the cheat-sheet form index
