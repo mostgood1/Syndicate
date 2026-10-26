@@ -122,3 +122,10 @@ omitted. The first run of this measurement was wrong in a way that produced a
 *plausible* answer — the lesson is in the findings rather than only in the
 learning: **a predicate whose fields have been renamed returns a clean zero, and
 a clean zero that agrees with your prior is the hardest kind to catch.**
+
+## 2026-10-26 16:09Z: scheduled Saturday reading NOT MEASURED (run started 45h late)
+
+- Slot: `2026-10-24T19:00:00Z`. Dispatch: `2026-10-26T16:08:40Z` (from `list_task_runs`, read 16:09Z). Late by **45h09m**, more than the 6h guard allows, so the run stopped. **No numbers were taken.** It did not read the board as it stood: Monday's board is not the Saturday in-play population this lane needs, the same reason it rejects a midweek MACtion frame.
+- Not checked by this run, so no claim either way: whether `venue_basis.venue`/`book_prices` are still absent, and the `SEGMENT_MISMATCH_GRID sport=ncaaf` counter.
+- Re-arm to `2026-10-31T14:00:00-05:00` was **refused**: the scheduler needs a person's approval for an unattended run. The prompt's guard date (10-24) also needs changing. Direct SKILL.md writes are blocked in auto mode; the working route is `update_scheduled_task` with a full `prompt`.
+- **Pattern:** two armed Saturday slots in a row (10-17 and 10-24) were lost to late dispatch on this host. A one-time `fireAt` fires only while the app is up and the host awake. Before arming a third, a human should confirm the host will be awake at that time, or take the reading by hand.
