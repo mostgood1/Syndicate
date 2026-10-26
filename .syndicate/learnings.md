@@ -2924,3 +2924,10 @@ The 2026-10-20 entry said: "Rating INPUTS transfer, because the sim reads them w
   1. Any gate that decides which fair an EV uses reports **|fair − close| in pp beside the log loss**.
   2. A fair that wins on log loss but loses on pp may carry sigma or tail information. It must not replace the EV's p.
   3. **Scale a ridge to the loss differences it arbitrates.** Between two fairs those differences are ~1e-5 nats per row, and a 1e-5 penalty per unit weight² pins the weights near equal. λ landing on the grid's edge is the tell. (A post-hoc 1e-8 run found no hidden signal here, but that was luck, not design.)
+
+## 2026-10-26 -- An append-on-change log marks only the runs where something CHANGED: never read run times or "the next run" from it `[lane e5-venue-news-lag, session ce4dfadf]`
+- **Measured 2026-10-26:** the news collector's change logs (all sports' injuries, NHL gameinfo, NBA referees), unioned, show **1,450** runs and **106** gaps over 25 min.
+  - The collector's own log (`logs/news_collector.log`, one `NEWS_COLLECT` line per run) shows **1,983** runs and **ONE** gap: the real 390-min 10-14 host sleep.
+  - The difference is quiet runs, which write nothing.
+- **Cost if missed:** a "t0 uncertain after a sleep" rule built on the change logs would have dropped events in quiet periods as uncertain. Persistence checks would also have waited for the next CHANGE instead of the next run. Caught by a shakedown's coverage line and fixed by amendment A3, before any result was read.
+- **Rule:** before measuring time-to-anything off an append-on-change log, find the run log or status history that records EVERY poll. Use it for cadence, gaps and the next / previous run. The change log is for what changed, never for when you looked. The same holds for `book_quotes` (an unchanged price has no record) and `venue_odds` points.

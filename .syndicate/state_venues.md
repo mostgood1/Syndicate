@@ -554,6 +554,14 @@ lines on 2026-09-02 with `markets_dropped=0` and a `status=ok` book. `#638`
 remains correct, unit-tested both directions, and is now DORMANT: the safety net
 if `venue_odds` ever returns to keyvalue.
 
+**THE 48-POINT CAP KEEPS THE NEWEST POINTS, SO THESE FILES CANNOT TIME A PREGAME EVENT**
+`[verified 2026-10-26 on the fleet, lane e5-venue-news-lag]`. `record_daily_odds`
+drops the oldest points first. On `kalshi__nba__2026_10_25.json`, 1,671 of 3,822
+markets sat at 48 points, and the retained points started on game day; in-play churn
+pushes pregame history out. For Kalshi timing, use the public 1-min candlesticks
+(`scripts/e5_venue_news_lag.py`, `scripts/maker_vs_taker_shadow.py`). Polymarket US
+has no public history, and its points carry no outcome labels.
+
 ## [sharp-reference-price] SHARP REFERENCE PRICE — WE HAVE ONE, BUT NOT IN EVERY SPORT. `[re-read on the FLEET 2026-10-26 17:4xZ, lane syndicate-fair-v1]`
 
 **CURRENT, fleet `book_quotes` (production data root), kickoffs 09-30..10-26 08:00Z** (`.syndicate/findings_2026-10-26_syndicate_fair_v1_preregistration.md`, coverage table):

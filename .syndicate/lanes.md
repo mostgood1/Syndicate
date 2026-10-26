@@ -1479,7 +1479,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### e5-venue-news-lag — CLOSED — opened 2026-10-26 — closed 2026-10-26 — session ce4dfadf-df79-4dbe-8940-70f92ba3ffc1
-- **GOAL VERDICT `[2026-10-26 20:16Z]`: GOAL: MET.** The goal is quoted verbatim in the Goal line below.
+- **GOAL VERDICT `[2026-10-26 20:16Z; checkpoint 20:2xZ]`:** Goal, verbatim: "Decision Engine E5 (#736), OFFLINE and read-only on production: pre-register (committed before any join) and run the venue news-lag measurement -- after an official availability event (OUT / back IN / NHL scratch / lineup), do Kalshi and Polymarket prices on the player's props and his team's game lines move later than the first sportsbook move, and is the venue's executable price at t0+1/+5/+15 min fee-net mispriced against the eventual book consensus -- with per-source coverage, game-clustered CIs, an engine read and a Phase 4 bus recommendation (build as cancel-protection, as a timing strategy, or not)" -- **GOAL: MET.** The lane's Verification ran: the reading is `.syndicate/findings_2026-10-26_e5_venue_news_lag.md` on main (`6f0e90cc`).
   - Prereg `d9ce947f` was committed before any join, then A1 `0a9b9fed`, A2 `0bfcc8bc` and A3 `e3fd2e2a`, each before any result.
   - Script `scripts/e5_venue_news_lag.py` has 31 hermetic tests.
   - The findings carry: per-source coverage and the funnel; per-venue lag at three book bounds; drift and fee-net EV at +1/+5/+15 with game-clustered CIs; the engine read; the Phase 4 recommendation.
