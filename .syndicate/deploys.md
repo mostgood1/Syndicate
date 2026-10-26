@@ -54450,3 +54450,19 @@ which is about the two sizing bases and not about the refusal boundary.
   - Kept off-disk archives in the new folder: 2 (`--offdisk-keep` default), about 9.4 GB.
 - **Rollback:** delete the two appended lines (or restore the .bak copy). The next run writes to `/mnt/c/SyndicateBackup` again.
 - **verify:** MET -- the archive exists at the new path with the expected size, and the run exited 0. Owed: tomorrow's 09:15Z scheduled run writes there too (`status` shows data-backup rc=0 and a `20261027T0915*.tar.gz` in the folder).
+
+## 2026-10-26 18:50Z (1:50 PM CT) -- FLEET DATA: Syndicate Fair v1 params published for the DecisionRecord's SHADOW fields (lane syndicate-decision-engine, user decision) -- **WRITTEN; LOAD READING OWED**
+- **What:** NEW file `~/syndicate-prod/data/reports/syndicate_fair/syndicate_fair_v1_params.json` (61,471 B, sha256 `1bf197f1f0d048eb7b02336432ef481e244c16ad23a82ef33b97c3bc6dc1bfc9`, version `syndicate_fair_v1@2026-10-26@18ed2e2c`).
+  - It holds the stage-1 walk-forward's last fold for ncaaf|regular|game, nhl|regular|game, nhl|regular|prop and soccer|regular|game.
+  - Written by `scripts/publish_syndicate_fair_params.py` from the stage-1 extract.
+  - New file only (the script refuses to overwrite). No restart. No env change.
+- **Who reads it:** only the DecisionRecord code on main at 636ba4ff, to RECORD `fair_v1` (never for EV, pricing or staking, per the user). The running refresh-worker (6dd8a536) does not import it. Effect today: none.
+- **Expectation, measured offline on the 10-26 lines with this code:**
+  - load 0.25 s, +45 MB maxrss while the grids parse; 4,582 records scored in 0.36 s.
+  - Outcomes: computed 329 (nhl prop 263, soccer game 45, ncaaf game 14, nhl game 7), not_a_v1_family 3,231, outside_fitted_window 852, one_sided_line 129, under_min_books 28, no_grid_line 9, in_play 4.
+  - |p_fair_v1 - p_market| median 0.42 pp, p90 1.59 pp. sigma_fair_v1 median 0.058 logit.
+- **verify (OWED, after a refresh-worker restart on a HEAD containing 636ba4ff):**
+  - the heavy build logs `[decision_record] FAIR_V1 ... outcomes={'computed': N>0 ...}`;
+  - `scripts/decision_record_checklist.py --date <D>` exits 0 on that day's file (this also clears D3's `w_star_ci_lower` alarm);
+  - DECISION_RECORD_WRITTEN `elapsed_s` rises by less than ~1 s against the prior build.
+- **Rollback:** delete the params file. Records then carry `fair_v1.reason = no_params`, and nothing else changes.
