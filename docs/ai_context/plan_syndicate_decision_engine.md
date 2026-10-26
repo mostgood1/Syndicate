@@ -1,6 +1,7 @@
-# Syndicate Decision Engine — the plan `[2026-10-26, proposal, NO CODE until the user decides D1–D8]`
+# Syndicate Decision Engine — the plan `[2026-10-26, ADOPTED with D1–D8 as recommended; see the decision log, section 12]`
 
-**Status: PROPOSAL.** Nothing in here is built, switched on, or claimed by a lane.
+**Status: ADOPTED 2026-10-26** (umbrella lane `syndicate-decision-engine`, todo `#736`). Progress lives in the lane
+and the decision log at the end of section 12; this document is the design. It was first written as a proposal.
 It is written for the user to decide on and for the sessions that would carry it out.
 Every measured number below is cited with its window, n and source. Substrate is the
 local fleet (production since Render was suspended 2026-09-30) unless marked.
@@ -377,7 +378,7 @@ lane the work belongs to, if one exists.
 | **E2** | **Maker with news-cancel.** Rest at fair minus margin, earn the spread instead of paying it, and cancel on news. | Pregame fills ~45% and save 4–5% of stake. Polymarket US makers pay no fee and Kalshi maker fees are ¼ of taker. In-play is adversely selected (−16.6c), so stay pregame. | The maker shadow's pre-registered looks at 200/400/600 orders. Add a news-cancel arm once L4 exists. | The shadow's own rule; calendar stop 2027-01-31 | `kalshi-maker-shadow-paper` |
 | **E3** | **Derived-market surface.** Ladder rungs, alt lines, segments and thin props priced off the sharp main line plus a distribution shape beat the venue's quotes. | The venues list many rungs. One-sided prop holds are 6–8%. The sim's *shape* is unmeasured, while its mean is measured useless. | Offline: price every Kalshi rung from a surface fitted to the sharp main line (parametric vs sim-shaped), then grade vs the venue price and the outcome over the stored quote log. | Surface log loss not below the venue mid on held-out rungs | new lane |
 | **E4** | **Combos and correlation.** Combos are about ⅔ of Kalshi weekend notional, and Kalshi pays maker incentives on prop-combo legs. The sims' joint distributions can price correlation better than the independence-plus-haircut a venue or casual maker uses. | Sims are built for joint outcomes. The 18.5% SGP price haircut is unmeasured. | Grade the sim-implied correlation (anchored marginals) vs realised co-occurrence on settled games, then vs the combo prices captured. | Sim correlation no better than independence on realised outcomes | new lane |
-| **E5** | **Availability timing.** Official status events reach us before some venue prices move, especially on props. | Official schedules are fixed: NBA reports every 15 min, NFL inactives at T−90, EPL XI at T−75, NHL scratches at T−24..29. Books reprice game lines in about 15 min. Venue lag is unmeasured. | Join the news collector to the Kalshi and Polymarket quote logs, and measure time-to-move after OUT/IN events by market type. | Median venue lag under 2 min, or the move is symmetric (timing, not edge) | `news-availability-gate` (+ re-read 11-04) |
+| **E5** | **Availability timing.** Official status events reach us before some venue prices move, especially on props. | Official schedules are fixed: NBA reports every 15 min, NFL inactives at T−90, EPL XI at T−75, NHL scratches at T−24..29. Books reprice game lines in about 15 min. Venue lag is unmeasured. | Join the news collector to the Kalshi and Polymarket quote logs, and measure time-to-move after OUT/IN events by market type. | Median venue lag under 2 min, or the move is symmetric (timing, not edge) | **KILLED 2026-10-26** (lane `e5-venue-news-lag`, prereg `d9ce947f`, findings `6f0e90cc`, todo `#739`). Kalshi: move after our capture +0.04pp [−0.05, +0.13], 197 units / 93 games; fee-net EV at +1 min −4.32%. Polymarket survives only by the letter (+0.21pp, 39 units). Where books did move, Kalshi had moved BEFORE our 10-min collector saw the news. |
 | **E6** | **Small residuals:** under-tilt, referee, weather, rest. They improve the fair; they are not bets on their own. | Under-tilt is measured. The rest are collected but untested. | Each one in the skill registry as a per-cell Δ with a CI | Weight lower bound ≤ 0 → it stays at 0 (it never gets "turned off" for a market) | registry |
 | **E7** | **In-play fair beats the Kalshi mid.** | Hard: Kalshi leads the books in play. NBA re-sim Brier 0.189 vs Kalshi 0.163 (2 games). | Owned by the in-play program; NBA forward read after 12-15 | That program's rules | `in-game-trading`, `#700` |
 
@@ -400,7 +401,7 @@ the first test.
 | **Lower-bound EV instead of a fixed 2% floor** | The floor becomes per-line uncertainty, so thin cells get less money without being excluded | σ from book dispersion | **P0, as a challenger to 2%** |
 | **Ladders count once** | Correlation-aware sizing on game axes | `#711` R1, alt-ladder cap (10-26) | **P0** |
 | **Maker engine with news-cancel** | Earn the spread pregame; the event bus protects resting orders | maker pilot and shadow | **P1** |
-| **Availability event bus** | Official-schedule-driven `AvailabilityEvent`s that trigger cancel, stale-gate, re-sim and re-score | collector since 10-13 | **P1** |
+| **Availability event bus** | Cancel-protection plumbing ONLY (E5 killed the timing use, 2026-10-26): cancel resting maker orders and stale-gate takers on official status changes | collector since 10-13 | **P3, gated** on the Phase 3 maker engine + an official-source event time |
 | **Price surface for rungs and segments** | Price ladders and segments off the sharp main line; the sim gives shape | quote logs, sims | **P1** |
 | **Bet-timing model** | Predict drift toward the close, to choose take now, rest, or wait | openings → closes | **P1** |
 | **Hierarchical skill registry** | Automatic per-cell weights with CIs; replaces the hand-curated registry and the 0.25 default | optimizer w*, overlay | **P1** |
@@ -417,7 +418,18 @@ the first test.
 
 ## 6. News, injuries, lineups and sentiment
 
-**Design: an availability event bus driven by official schedules.**
+**DECIDED 2026-10-26, after E5 (user, verbatim): "Yes, adopt E5's recommendation: Phase 4 becomes cancel-protection plumbing only, gated on the Phase 3 maker engine and an earlier official-source event time; no paid news feed. Update the plan and #736 accordingly."**
+- E5 found no timing edge at either venue (findings `6f0e90cc`). The bus below is therefore **cancel-protection
+  plumbing only**, never a timing strategy.
+- It is **built only once both exist**:
+  1. the Phase 3 maker engine (no resting orders, nothing to protect);
+  2. an official-source event time earlier than the 10-minute collector. Fed by today's collector, the bus would cancel a
+     resting order after Kalshi had already moved.
+- When an official event time exists, re-run E5 (`#739`) on it before building.
+- E5's engine read is CORRECTNESS work for the sim owners, independent of the bus: NFL, NCAAF and soccer sims read no
+  status, and NBA keeps day-to-day players at full minutes.
+
+**Design (for when the gate opens): an availability event bus driven by official schedules.**
 - **Schema:** `AvailabilityEvent{sport, game, team, player, status, p_play, source,
   source_tier, observed_at, supersedes}`.
 - **Sources, by when they publish:**
@@ -466,7 +478,8 @@ is breakage, not legality:
 - the terms of ESPN (Disney ToU §2(B)) and MLBAM both discourage automated pulls.
 
 Prefer official sources (league injury PDFs, NFL inactives, EPL team sheets, NHL
-scratches). Buy a paid feed only if E5 shows that minutes of latency are worth money:
+scratches). **No paid news feed** (user, 2026-10-26, after E5: minutes of latency are not worth money at these venues).
+Rejected options, for the record:
 - SportsDataIO, median buyer about $16.5k/year;
 - RotoWire via OpticOdds.
 
@@ -507,7 +520,7 @@ when its date arrives.
 | **1. Syndicate Fair v1** (→ ~11-30) | Learned sharpness weights and σ_fair, written into the DecisionRecord in shadow. Game-line forward preservation. Pinnacle coverage widened within the OddsAPI budget (about 0.3–0.7M credits of headroom). | Held-out log loss below Shin with a CI below 0 per sport family. Pinnacle forward-test read. | `fair-price-v2` |
 | **2. Decision policy v1, paper2** (→ ~12-14) | Venue-native EV_lb selection (D2), correlation-aware shrunk Kelly, the challenger Suggested flag, per-order fill/slippage logs. | **The edge gate:** forward fee-net CLV vs the sharp close above 0 (game-clustered CI) at ≥400 bets / ≥100 games for at least one strategy. Then canary live. | `venue-native-selection`, `decision-record-shadow` |
 | **3. Execution intelligence** (Dec → Jan) | General maker engine with news-cancel, timing model, depth-aware pricing. | Maker shadow looks pass. Adverse selection measured below the spread captured. | `kalshi-maker-shadow-paper`, new |
-| **4. Availability event bus** (parallel from Phase 1) | Event schema, official-schedule ingestion, cancel/stale/re-sim triggers, E5 venue-lag measurement. | Reachability (`off != on`), then the E5 test. | `news-availability-gate` |
+| **4. Availability event bus -- CANCEL-PROTECTION ONLY** (decided 2026-10-26 after E5; starts only when the Phase 3 maker engine exists AND an official-source event time earlier than the 10-min collector exists) | Event schema, official-source ingestion, cancel and stale-gate triggers. No timing strategy, no paid feed. | An E5 re-run (`#739`) on the official-source time; then reachability (`off != on`). | `news-availability-gate` |
 | **5. Derived markets and combos** (Dec → Feb) | Price surface (E3), combo correlation (E4), sim-shape tests. | E3/E4 kill rules. | new lanes |
 | **6. Autonomy** (Jan → Feb) | Nightly refits, champion/challenger on replay, strategy allocator, drift alarms, engine-read queue. | Allocator in shadow for 4 weeks, agreeing with the hand-run decisions. | new |
 | **7. Professional-grade operations and capital scaling** (backup and watchdog now; the rest gated on the Phase 2 result) | Production that survives host sleep (or moves to a cloud host). Venue-status kill switch. Hash-chained record. A pre-registered capital ladder: stake bands widen only after N more bets keep the CLV and ROI CIs above 0. | Each rung of the ladder is its own pre-registered read. | new |
@@ -594,7 +607,7 @@ minutes without touching the decision logic.
 | min-EV tuner | `min-ev-tuner-shadow` | stays in shadow (user, 10-26) | — |
 | `#704` staked probability | `sim-stake-unfitted-market-only` | nothing before 11-02 | staked-probability code |
 | Concentration | `live-event-concentration` (coordinator holds readings) | folded into L3 as `size.concentration` | `pipeline/portfolio_commit.py`, `execute_portfolio.py` (loan chains) |
-| News | `news-availability-gate` | Phase 4 bus; E5 | — |
+| News | `news-availability-gate` | Phase 4 bus (cancel-protection only, gated); E5 closed (`#739`) | — |
 | Layer 2 grading | the "Layer 2 board assessment" session (closed `layer2-suggested-opps`) | challenger Suggested in the 10-31/11-01 re-grade | the 2% floor |
 
 **Process.**
@@ -618,6 +631,16 @@ minutes without touching the decision logic.
 | **D6** | Live capital posture until the Phase 2 gate | Canary only. Do not widen the bands. |
 | **D7** | Capital ladder: pre-register how stake bands grow once a strategy passes the edge gate. Example: double the band after each further 400 bets with the CLV and ROI CIs still above 0, with a drawdown stop that drops back one rung. | Yes, write it before Phase 2 ends |
 | **D8** | Reliability: off-host backup and a dispatch watchdog now; production off the single home host (or kept from sleeping) | Backup and watchdog now; the host decision at Phase 7 |
+
+**Decision log** (each one is the user's own words in the session "Syndicate AI decision engine"; detail in lane `syndicate-decision-engine`):
+- 2026-10-26: D1–D8 adopted as recommended.
+- 2026-10-26: not a product to sell; the bar is market-grade success with our own capital.
+- 2026-10-26: D3 landed on a loan (`46fba654`); the backup goes to OneDrive.
+- 2026-10-26: Fair v1 shadow wiring (`636ba4ff`).
+- 2026-10-26: Phase 2's paper reader may read the DecisionRecord (guard-test loan).
+- 2026-10-26: "Widen tonight's window": the fleet ff goes to `0fca3f2b`, with the Phase 2 paper key and one full down/up.
+- 2026-10-26: **E5 adopted**. Phase 4 becomes cancel-protection plumbing only, gated on the Phase 3 maker engine and an
+  earlier official-source event time; no paid news feed.
 
 ---
 
