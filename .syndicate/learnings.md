@@ -2902,3 +2902,14 @@ The 2026-10-20 entry said: "Rating INPUTS transfer, because the sim reads them w
 - **Believed: a full `up` applies my one-key env edit.** It applies the WHOLE `local_production.env`. Three keys (maker pilot, cell gate) had been staged in it 2 minutes before I armed, under another holder. **Rule:** take a sha256 of the env file when you arm; abort if it differs at execution; and diff any backup against it by KEY NAME before deciding what rides along (values only for short non-secret flags). The fleet's role respawn reuses `item.env`, so a role restart does not pick up an env edit.
 - **Believed: an unattended background job may run the down/up.** Once deploy-guard covered the fleet (ac502ea6 batch), it refused the script, and rightly so: a claim plus a CLEAR preflight within 15 min, for the exact SHA, cannot exist for a job armed 12 h ahead. **Rule:** arm only read-only timers and gates; the claims, preflight and `down` run live, where the guard sees them. Never set `SYNDICATE_DEPLOY_GUARD=off` for this.
 - **Also measured:** `local_production.py status` counts `.claude/hooks/*` as "runtime" files (its list is exclusion-based), so its STALE count can exceed what any role imports. Read the file list before treating STALE as a code ride-along.
+
+## 2026-10-26 -- A cross-session brief to a Desktop session in another permission mode is HELD, then EXPIRES undelivered: brief through the LEDGER first `[lane syndicate-decision-engine, session e32fef1a]`
+
+- **Believed:** "brief the owner sessions" is done once `SendMessage` returns `success: true`.
+- **Measured 2026-10-26 ~16:40Z:** 6 of 6 briefs (DecisionRecord shadow, portfolio coordinator, profitability, in-play, Layer 2, outcome-feedback) came back `held by that session`. All six then EXPIRED, "not approved before expiry". A Claude Desktop session cannot prompt its user to approve, so the hold never resolves while the modes differ.
+- **Rule:**
+  1. Put an owner brief in the ledger FIRST: a `.syndicate/brief_<date>_<topic>.md` with one section per owner lane, pointed to from your lane block and the todo item.
+  2. Treat `SendMessage` as a nudge, never as the delivery.
+  3. Report a held or expired message to the user as NOT delivered.
+  4. Never resend while held.
+  5. A user decision a peer needs must be typed in THAT chat by the user (see `button-text-is-not-a-decision`).

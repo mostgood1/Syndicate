@@ -39472,3 +39472,35 @@ Slugs: basketball-schedule-adapter-native, coverage-gate-inactive-sports, deploy
 - **USER DECISION 2026-10-26 ~7:45 AM CT (verbatim):** "Yes: tonight from 05:40Z, request a drain with check_deploy_safety --drain, and once it reads CLEAR take the claims, run the preflights and do the down/up, then undrain. Same rules otherwise: no live games, no MLB sim, never force claims."
   - Attempt 3, 05:40Z 10-27. Only a timer is armed; every mutating step runs live, so deploy-guard sees it. Sequence: precheck.sh (ride-along: every role on HEAD, else review; env sha vs baseline 262d154b..., else diff and decide; claims; safety report with no live games and MLB sim finished; coordinator: no World Series sim) -> drainctl.py drain, run with refresh-worker's own env as news-availability-gate did on 10-25 18:52Z -> on CLEAR: claims on all three (never forced) -> deploy_preflight --target fleet per service with stated expectations -> on all CLEAR: deploy_now.sh -> drainctl.py undrain (also if anything aborts after the drain) -> verify cap 7168 and the live-odds flags -> deploys.md, release, report. The coordinator has no objection and asked for a short drain and an explicit undrain confirmation.
   - Added at the fleet-watcher's request (session local_379fd729 relayed the same user decision, ~7:10 AM CT): a STUCK-DRAIN check. The drain flag lives in keyvalue, which survives `down` (Redis comes back durable), so a new worker can boot into a live drain and defer every build (the 10-21 freeze). After undrain, postcheck.py must show 0 lines anchored on `<ts> [intelligence_state] DEFERRED_BOARD_BUILD reason=deploy_drain_requested` (the string from `deploy_drain.drain_hold_reason`) after the up, and a first STATE_PERSIST_BEGIN on the new worker.
+
+### syndicate-decision-engine — superseded status lines, moved VERBATIM at the 2026-10-26 checkpoint
+
+- **PHASE 0 STATUS `[2026-10-26 16:31Z, fleet, read-only]`:**
+  - `#722` provenance (`966e0b5f`) is LOADED on every role: web and refresh-worker `6dd8a536`, live-odds-worker `1a841c91`.
+    - Since 10-21 22:00Z, 117/241 live orders carry `staked_probability_version`. The other 124 are all `ingame:` in-play entries, which bypass the plan sizer and are attributable by prefix.
+    - Paper: 2,332/6,119 carry it, and 3,787 paper orders have none (source unidentified).
+    - The prefixes confirm `#704` market mode: `market_fair@staked_probability_pooled_v1@2026-10-22T21`.
+    - Settled live orders carrying it: 1 won + 2 lost on market_fair-basis rows, 41 won + 40 lost on model_edge-basis rows (of the 117 stamped live orders, 114 read market_fair@... and 3 read plain 'unfitted'). **The verification's 'first settled live order carrying the field' is MET.**
+  - `#732` openings: `22e3a0aa` is loaded. 10-24 = 52,704,926 B and 10-25 = 54,860,643 B, both past the old 33,554,432 B cap, with 0 `OPENINGS_CEILING_HIT` lines in the current logs. That is 2 of the 3 pre-registered conditions. The third (trail combos == openings keys) stays with lane `clv-openings-ceiling`, whose scheduled reading never fired.
+  - `#729` venue-prop closes: `aa06d5a1` is loaded. The forward reading stays with `venue-prop-close-coverage`. NOT read here.
+  - Paper backlog: 1,896 FILLED paper orders with no outcome > 48h after submit (NCAAF 1,102, soccer 478, NFL 123, MLB 104, NBA 76, NHL 7); live: 5 NBA `ingame:` + 1 soccer. It must be counted by GAME date (forward bets). The owner was asked: which lane owns paper settlement?
+  - Live in-play entries 10-23..10-26: 124 orders, 102 fills, $44.37 staked, -$4.55 P&L, $1.73 fees.
+  - **Missed dispatch, measured:** three enabled one-time tasks past fireAt with no run (`layer2-suggested-grade-1026`, `clv-openings-ceiling-forward-reading`, `uefa-branding-autorefresh-reading-1022`), and `nba-standin-admission-watch` last ran 10-24 21:47Z.
+    - **BUILT: scheduled task `syndicate-dispatch-watchdog`**, at 09:15/13:15/17:15/21:15 CT. It is read-only, pushes a notification on NEW misses, and never runs a task.
+    - It starts in DEFAULT permission mode: the user must Run-now once to pre-approve its tools. Its first run must report the three misses above, which is this lane's 'caught a known-past run' check.
+  - Run state lives in the app's private storage; no script can read it, so the watchdog has to be a scheduled task itself. The healthchecks.io dead-man's switch (`watchdog.ps1`) covers host sleep.
+  - **Off-host backup:** `data-backup` writes a nightly ~4.6 GB `tar.gz` to `C:\SyndicateBackup` (keep 2): `20261026T091501Z` = 4,626,175,115 B. That is the SAME physical disk. An off-machine destination is a user choice, asked 10-26.
+  - D3 is handed to `decision-record-shadow` (`decision_record.py` is theirs).
+- **HAND-OFFS `[2026-10-26 ~16:40Z]`:** six cross-session briefs were sent and ALL SIX were HELD (different permission mode, not delivered). The durable copy, one section per owner, is `.syndicate/brief_2026-10-26_decision_engine_owners.md`.
+- **D3 LANDED `[2026-10-26 17:3xZ]` 46fba654** on a user-directed LOAN from `decision-record-shadow`; the loan is RETURNED, and the claims were dropped from Files above.
+  - The decision record now moves p_decision by the sim only where the optimizer's w* has a ci95 lower bound > 0; the unmeasured default is 0.
+  - Measured effect on the fleet's 10-26 records (4,629, read-only): p_decision changes on 2,126 (1,553 default 0.25 -> 0, 573 fits whose CI reaches 0); 811 keep an earned w*.
+  - 25/25 tests pass.
+  - **NOT LOADED:** no restart, per the user. It loads at the next refresh-worker restart by whoever restarts. Until then the checklist from main ALARMS on `ModelView.w_star_ci_lower` (0/4629 on the 10-26 file, old writer).
+  - **Owed reading:** the first record file written after a refresh-worker restart on a HEAD containing 46fba654 shows `w_star_ci_lower` populated on the fitted cells, `optimizer_w_ci_spans_0:*` sources present, `default_unmeasured` rows at w_model 0, and the checklist at exit 0.
+- **OFF-HOST BACKUP VERIFIED `[2026-10-26 17:30Z]`** (user choice: OneDrive).
+  - The fleet `local_production.env` gained `SYNDICATE_LOCAL_BACKUP_OFFDISK_DIR=/mnt/c/Users/tempadmin/OneDrive/SyndicateBackup`. It was the only line added; the file was backed up first as `local_production.env.bak-<UTC>`. No restart: `cmd_backup` reads the file on each run.
+  - A manual run at nice 19 / ionice idle, rc 0: snapshot 253,791 files / 32.49 GB, redis ok, rsync rc 0, archive `20261026T171809Z.tar.gz` 4.71 GB in 571 s into OneDrive.
+  - Upload to the cloud is for the user to confirm (OneDrive icon). The old `C:\SyndicateBackup` archives (2 x ~4.5 GB) no longer rotate, and C: is 96% full (39 GB free); the user can delete them once OneDrive shows synced.
+  - deploys.md entry 2026-10-26 17:30Z.
+
