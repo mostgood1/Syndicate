@@ -1444,7 +1444,7 @@ death, never life — do not invert it.
 ### syndicate-fair-v1 — OPEN — opened 2026-10-26 — session 7c8317e7-d9b9-4861-b461-7da2f9f796bf
 - **STATUS `[2026-10-26 ~18:30Z]`: STAGE 1 READ; stays OPEN to hold the stage-2 forward read (on/after 2026-11-24).**
   - Pre-registered before any fit: `be3fcf23`. Amendment A1 `7786ab1e` (18:07Z) adds a stage-2 lower-λ arm.
-  - Code `d1ff922d`, on branch `claude/frosty-chandrasekhar-997092`, for review, NOT on main: library, fit/eval script, 46 hermetic tests.
+  - Code `d1ff922d`, rebased as `3041ec78` (identical blobs `acdc917b` / `17bb127f`; stage 2 must run these blobs), on branch `claude/frosty-chandrasekhar-997092`, for review, NOT on main: library, fit/eval script, 46 hermetic tests.
   - Findings `.syndicate/findings_2026-10-26_syndicate_fair_v1.md`, todo `#737`.
   - Result: 4 of 13 gated families PASS. NCAAF game −0.43e−5 [−0.90, −0.08]; NHL game −0.77e−5 [−1.30, −0.29]; NHL props −17.4e−5, mechanical, and +2.1e−5 WORSE against the consensus close; soccer game −3.12e−5 [−5.13, −1.23]. NCAAF props FAIL; 8 UNDERPOWERED (MLB, NBA regular, NFL, WNBA: < 30 held-out games).
   - Post-hoc: v1 has lower KL to the close but a larger absolute pp distance from it; a looser ridge finds no hidden signal.

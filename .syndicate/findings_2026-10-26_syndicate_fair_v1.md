@@ -5,7 +5,7 @@ Decision Engine Phase 1 (`#736`; todo `#737`). Plan: `docs/ai_context/plan_syndi
 | | |
 |---|---|
 | **Pre-registration** | `be3fcf23` on `main`, committed ~17:59Z before any fit. Amendment A1 `7786ab1e` (18:07Z): adds a stage-2 lower-λ arm. It was committed after the stage-1 verdicts but before the post-hoc diagnostic returned, and it changes no stage-1 verdict. |
-| **Code that produced these numbers** | `d1ff922d` on branch `claude/frosty-chandrasekhar-997092`: `scripts/syndicate_fair_fit.py`, `syndicate/features/shared/syndicate_fair.py`, 46 tests. For review; not on `main`. |
+| **Code that produced these numbers** | `d1ff922d`, rebased onto main as `3041ec78` with byte-identical files (blobs: `syndicate_fair_fit.py` `acdc917b`, `syndicate_fair.py` `17bb127f`), on branch `claude/frosty-chandrasekhar-997092`: `scripts/syndicate_fair_fit.py`, `syndicate/features/shared/syndicate_fair.py`, 46 tests. For review; not on `main`. |
 | **Substrate** | Fleet data root `~/syndicate-prod/data` (production since 09-30), read-only at nice 19 / ionice idle. Outcomes from the fleet web's public `game-chips` GET. **No OddsAPI call.** |
 | **Window** | Kickoffs 2026-09-30T00:00Z ≤ commence < 2026-10-26T08:00Z |
 | **Run** | Extract 17:46–17:51Z, outcomes ~17:55Z, fit ~18:00–18:04Z (Windows, Idle priority, off the fleet VM). Post-hoc diagnostic 18:05–18:2xZ (same code, scratch driver). |
