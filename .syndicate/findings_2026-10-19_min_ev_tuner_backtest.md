@@ -229,3 +229,22 @@ nothing changes. Switching it on is the user's decision after the readouts.
 - **The binding reason all week is disagreement, not sample size.** In every NCAAF cell, same-book CLV is +1.3..+2.0 points (t 4-6), while flat ROI is -9..+11% and never significant. This is the 10-19 backtest's reading, unchanged after a week. On the AND rule no cell can RAISE while it beats the close this clearly.
 - **Volume note:** the top NCAAF marginal bands gained about 0-7 events over the whole week. Most new settled volume was ladder rows (14 -> 2,986 skipped as `ladder_not_pre_registered`). The ladder reader that would use them for LOWER of the net floor is pre-registered and not built.
 - **Decision owed by the user:** whether to APPLY (`SYNDICATE_MIN_EV_TUNER=apply`). On this week's evidence apply would change nothing, because there are 0 proposals. Apply is also inert until `effective_min_ev_pct` is wired, since it is called nowhere today. It needs wiring at `syndicate/features/shared/portfolio_commit.py:1102-1108` (owned by lane `published-negative-ev`, needs a loan) and at `polymarket_us_orders.py:1251`. Switching pooling from shadow to `on` is a separate user decision.
+
+## DECISION 2026-10-26 ~15:10Z (10:10 AM CT): KEEP THE TUNER IN SHADOW (user)
+
+- **The decision, verbatim:** "keep the min_ev tuner in shadow". The user typed it in the fleet-watcher session's chat (local_379fd729, ~10:10 AM CT), which relayed it to this lane's session, in reply to readout 7/7 (`31ebf770`).
+- **What it rests on:** the week of readouts, 2026-10-20..26.
+  - 7 of 7 nightly passes ran, 0 failed.
+  - **0 proposed moves**, unpooled or pooled. On 10-26 all 78 of 78 cells held, both ways.
+  - Closest to a move: Polymarket NCAAF spreads, pooled ROI z -1.94, 0.06 short of the RAISE threshold; its own band was 20/40 events, so `insufficient_events`.
+  - The Kalshi and Polymarket NCAAF totals/spreads cells show significant positive CLV (t 4.4..5.3) with flat ROI that is not significant: `only_clv_significant` or `insufficient_clv_events`.
+- **What stays as it is:**
+  - `SYNDICATE_MIN_EV_TUNER=shadow` and `SYNDICATE_MIN_EV_TUNER_POOLING=shadow`.
+  - No `<home>/min_ev_tuner_mode_decision.json` is written, so the watchdog still FAILs any non-shadow mode.
+  - Live cuts keep coming from the configured base (`SYNDICATE_PORTFOLIO_MIN_EV_PCT=0`) and the per-venue floors. Nothing changes on the fleet.
+- **Re-raise rule (user, via the fleet-watcher):** put the apply question to the user again **only when a cell actually proposes a move** (`raise` or `lower`, unpooled or pooled), with that cell's numbers.
+- **Gap in that rule:** nothing alerts on a proposed move today.
+  - `scripts/min_ev_tuner_watch.py` `evaluate()` flags only a missing pass, a failed pass, and a non-shadow mode or pooling with no recorded decision.
+  - The supervisor job still writes the daily readout artifact (`reports/intelligence/min_ev_tuner_readout/<date>.json`, `actions` / `pooled_actions`), but no one reads it unprompted.
+  - Closing the gap is a small watch check: an INFO finding when `actions` or `pooled_actions` holds anything but `hold`. That is a code change; the user is asked.
+
