@@ -1506,6 +1506,14 @@ death, never life — do not invert it.
 - Verification: regression tests for both shapes (block without locks, allow with them); transcript re-sweep shows the previously missed real deploys now matched and no new false positives; live proof on the installed primary hook
 - Blocked by: none
 
+### basketball-player-distribution — OPEN — opened 2026-10-26 — session e0a3e383-4fa1-4669-8740-c9a46b681c7a
+- Goal: The NBA native engine's PLAYER outcome distributions (min, pts, reb, ast, threes; raw engine output before the props calibration layer) are measured against real player boxes on the 2025-26 FIT window with the round-2b+#5b config (coverage of the 10/50/90% quantiles, PIT, width ratio, split starters/bench and close/blowout), the error is decomposed into minutes vs per-minute rate vs width, and each flagged part gets a pre-registered, default-off, byte-identical mechanism built from play-by-play and rotation stints (coordinated with the nba-sim-minutes lanes for minutes), adopted only on a full-FIT pass.
+- Files: scripts/basketball_player_distribution_read.py (NEW), tests/test_basketball_player_distribution_read.py (NEW), .syndicate/findings_2026-10-26_basketball_player_distribution.md (NEW)
+- Hypothesis: Served prop widths are 1.4-1.9x too narrow (2026-10-03) because the engine's per-player outcomes vary too little across draws: minutes are near-deterministic (no rotation/foul/blowout variance at the player level) and per-minute rates are fixed priors with no game-to-game form or lineup-context variance.
+- Falsification test: If the raw engine's player quantile coverage is already within +/-5 pts of nominal (10/50/90) for every stat on the FIT, the narrowness is in the downstream layer, not the engine, and this lane closes EXONERATING the engine.
+- Verification: Findings: Phase 1 table per stat x role x script with CIs; per mechanism a corpus-parity proof (--reference recorded) + reachability test; full-FIT read of coverage/PIT and served-mean MAE; nothing enabled without the user.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
