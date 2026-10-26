@@ -19,7 +19,11 @@
 - **Recommendation**, routed to the decision-engine session:
   - **Shadow-wire `σ_fair_v1`** (+ `p_fair_v1`) in the DecisionRecord for the 4 passing families. Owner: `decision-record-shadow`.
   - **Never let `p_fair_v1` replace Shin's p in EV/price/stake on this evidence.**
-- **OWED:** the stage-2 read on/after **2026-11-24** for kickoffs 10-26 08:00Z..11-23 08:00Z. Both arms; same code and constants. Add |fair − close| pp beside the gate. It is the first NBA regular-season read and the first with Pinnacle on NBA/NFL/soccer.
+- **OWED:** the stage-2 read on/after **2026-11-24** for kickoffs 10-26 08:00Z..11-23 08:00Z. Both arms; same code and constants; |fair − close| pp beside the gate. It is the first NBA regular-season read and the first with Pinnacle on NBA/NFL/soccer.
+  - **The driver is BUILT** (`scripts/syndicate_fair_stage2.py`, 14 tests). It refuses to run unless the stage-1 blobs `acdc917b` / `17bb127f` are unchanged; it scores only the stage-2 window, runs arms A + B, and reports |fair − close| pp and ±2σ. Before 11-24, or with `--window`, it labels itself PREVIEW. Arm A reproduced the stage-1 per-row predictions exactly on 10-19..10-25 (3 families, 15,492 rows). Three commands:
+    1. On the fleet: `nice -n 19 ionice -c3 python3 scripts/syndicate_fair_stage2.py extract --out /mnt/c/tmp/sfv1_stage2`
+    2. `py -3 scripts/syndicate_fair_stage2.py outcomes --out C:/tmp/sfv1_stage2`
+    3. `py -3 scripts/syndicate_fair_stage2.py read --out C:/tmp/sfv1_stage2 --report C:/tmp/sfv1_stage2/stage2.json` (Idle priority)
 
 ### `#736` — **SYNDICATE DECISION ENGINE: one learning decision engine behind Layer 2 Suggested + the Kalshi/Polymarket Portfolio. ADOPTED 2026-10-26 with D1-D8 as recommended; PHASE 0 STARTED (lane `syndicate-decision-engine`)** — 2026-10-26, session loving-einstein-b3c45e; `docs/ai_context/plan_syndicate_decision_engine.md` (reading copy https://claude.ai/artifact/4umLu5SHUzhPUFLKqpieRe)
 - **ADOPTED 2026-10-26** (user, verbatim: "Adopt the decision-engine plan with the recommended D1-D8. Open the umbrella lane, brief the owner sessions, and start Phase 0."). Decisions as recorded in `state.md` [user-decisions]. Phase 0 owner map and progress: lane `syndicate-decision-engine` in `lanes.md`.
