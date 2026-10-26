@@ -217,3 +217,15 @@ ncaaf 4 / 1); ladder rows skipped (80). CLV is recomputed from prices (7f6f7b1c,
 
 **Status.** `SYNDICATE_MIN_EV_TUNER_POOLING` defaults to shadow, so the nightly line will carry `pooled_actions=` and each cell a `pooled` verdict;
 nothing changes. Switching it on is the user's decision after the readouts.
+
+
+## WEEK OF READOUTS 2026-10-20..2026-10-26 (7 of 7, lane min-ev-tuner-shadow, scheduled task `min-ev-tuner-daily-readout`)
+
+- **Ran 7 of 7. 0 FAILED readouts.** Each nightly pass logged a `MIN_EV_TUNER` line between 12:00 and 12:05Z on its date, and `last_run_at` read back from keyvalue matched it every time. 0 `MIN_EV_TUNER_FAILED` / `_SAVE_FAILED` / `_HOOK_FAILED` lines all week. Mode was `shadow` at every read (no alarm). Base 0.0 throughout.
+- **Proposed moves: 0 of 7 nights, unpooled AND pooled.** Cells grew 60 -> 68 -> 73 -> 74 -> 74 -> 74 -> 78, and every cell held every night.
+- **Flat-unit grading (affc9a7b) was live for 7 of 7.** Readout 1's pass ran on d3878d69, which contains it. Partial pooling (shadow) was live for 4 of 7 (readouts 4-7, from 10-23).
+- **Cells that reached a full unpooled verdict:** polymarket ncaaf totals (from 10-23) and kalshi ncaaf totals (from 10-25). Both hold `only_clv_significant`. kalshi ncaaf spreads ended at 27/30 CLV events and would read the same.
+- **Closest to a decision: polymarket ncaaf spreads, pooled.** Pooled flat ROI -30.6%, z -1.94 on 10-25/10-26 (-1.87..-1.94 all week), is 0.06 from the RAISE threshold. Pooled CLV is +1.52 (z +4.15), so the AND rule holds it. The unpooled cell has only 20/40 band events and did not grow all week. Second: kalshi nfl receptions, flat +36.2% (t 1.93) but CLV -0.02 and 17/40 events, so it is nowhere near a LOWER, which also needs the configured cut to bind.
+- **The binding reason all week is disagreement, not sample size.** In every NCAAF cell, same-book CLV is +1.3..+2.0 points (t 4-6), while flat ROI is -9..+11% and never significant. This is the 10-19 backtest's reading, unchanged after a week. On the AND rule no cell can RAISE while it beats the close this clearly.
+- **Volume note:** the top NCAAF marginal bands gained about 0-7 events over the whole week. Most new settled volume was ladder rows (14 -> 2,986 skipped as `ladder_not_pre_registered`). The ladder reader that would use them for LOWER of the net floor is pre-registered and not built.
+- **Decision owed by the user:** whether to APPLY (`SYNDICATE_MIN_EV_TUNER=apply`). On this week's evidence apply would change nothing, because there are 0 proposals. Apply is also inert until `effective_min_ev_pct` is wired, since it is called nowhere today. It needs wiring at `syndicate/features/shared/portfolio_commit.py:1102-1108` (owned by lane `published-negative-ev`, needs a loan) and at `polymarket_us_orders.py:1251`. Switching pooling from shadow to `on` is a separate user decision.
