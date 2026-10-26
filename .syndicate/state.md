@@ -571,6 +571,7 @@ once this index exists: re-splitting would orphan the parts.
 | [kalshi-series-competition-identity] | KALSHI SERIES FOR ANOTHER COMPETITION (WOMEN'S, BASKETBALL, SECOND TIERS) REFUSE IN THE JOIN -- ON THE FLEET C | `state_kalshi.md` |
 | [kalshi-in-play-efficiency] | KALSHI IN-PLAY PRICES LEAD THE SPORTSBOOKS; BOOK-CONSENSUS IN-PLAY EDGES MARK OUT NEGATIVE; FIXED TAKE-PROFIT  | `state_kalshi.md` |
 | [kalshi-structural-price-map] | KALSHI SPORTS HAS NO PREGAME STRUCTURAL PRICE EDGE UNDER TODAY'S FEES; ONLY 95-99c IN-PLAY FAVOURITES SURVIVE; | `state_kalshi.md` |
+| [kalshi-combo-public-data] | KALSHI COMBOS (MVE) ARE PUBLIC WITH THEIR LEGS; SAME-GAME LEGS SIT INSIDE MULTI-LEG PARLAYS; THE VOLUME DEFEATS RE | `state_kalshi.md` |
 | [layer2-board-keyvalue-ceiling] | THE BOARD'S CEILING IS THE COMBINED KEY, NOT THE SHARDS — and `per_sport=3000` corrupted production for ~29 mi | `state_layer2.md` |
 | [layer2-realized-accuracy] | THE LAYER 2 BOARD'S REALIZED ACCURACY — the portfolio book is the surface, and the measurement chain is broken | `state_layer2.md` |
 | [layer2-score-outcomes] | THE BOARD'S SCORE, GRADED ON OUTCOMES AND CLOSES FOR THE FIRST TIME -- real price edge, fee-blind ranking, non | `state_layer2.md` |

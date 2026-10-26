@@ -958,3 +958,19 @@ board. The loop therefore checks `budget_remaining()` BEFORE spending.
   - The registered 55-95c in-play "passes" were look-ahead (phases anchored on the game's end). Re-sampled from the scheduled start (`expected_expiration_time - 3h`) they go to about 0, and in-play-program's real-time Test C agrees.
   - Survivor: 95-99c in-play favourites, taker and maker, +1.1..+1.6c per contract, positive in 5 of 6 sports. NFL is weakest: 2.7% of 95c+ buys lost.
 - **Detail:** `findings_2026-10-24_kalshi_market_price_map.md`, `findings_2026-10-24_pm_trader_strategies.md`. **Script:** `scripts/kalshi_market_price_map.py` (`fetch`, `report`, `recheck`, `recheck-report`).
+
+## [kalshi-combo-public-data] KALSHI COMBOS (MVE) ARE PUBLIC WITH THEIR LEGS; SAME-GAME LEGS SIT INSIDE MULTI-LEG PARLAYS; THE VOLUME DEFEATS RETROSPECTIVE PAGING `[verified on public Kalshi data 2026-10-26 22:50-23:47Z, lane e4-combo-correlation]`
+- **What is public:**
+  - `/multivariate_event_collections` lists 1,406 collections: `KXMVENBASINGLEGAME` 1,113, `KXMVENFLSINGLEGAME` 223, cross-category and multi-game.
+  - Every combo market carries `mve_selected_legs` (event, market and side per leg), its `result` and `volume_fp`.
+  - Trade prints are public through `/markets/trades`.
+- **Single-game collections:**
+  - There is **no MLB or soccer single-game collection**.
+  - The October 2026 NBA single-game collections are preseason (10-03..10-07) with 3 events (winner, spread, total) and no player props. They held 569 same-game combos: spread x total 345, winner x total 204, the rest mixed.
+- **Cross-category combos (`KXMVECROSSCATEGORY`, reissued 10-26 16:40Z):**
+  - About **35,000** markets close per hour.
+  - In the 6 hours enumerated (10-26 06:23-12:00Z, 210,984 markets), tickets with a same-game pair: NBA 2,353, NFL 1,939, Liga MX 787, NHL 599, MLB 557, La Liga 414, EPL 251, Serie A 202.
+  - Only 20 were 2-leg same-game combos, all WTA tennis.
+- **Trades:** one 10-minute Sunday slice (10-18 18:00Z) held more than 30,000 trades, about 28% combos. Rebuilding weeks after the fact is infeasible by paging; capture forward.
+- **The listing is NEWEST-FIRST by close time:** read the close-time range of what you retrieved before claiming an absence.
+- **Detail:** `findings_2026-10-26_e4_combo_correlation.md` (Stage 2).

@@ -1,5 +1,24 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#740` — **E4 COMBO CORRELATION (Decision Engine `#736`, plan §4 E4): the sims' joint beats independence ONLY where dependence is structural (same-batter, NBA nested combos, soccer BTTS x total); KILLED for cross-player and NBA P x R / P x A / R x A; the measured SGP copula beats or ties the sim wherever both exist; Stage 2 (Kalshi combo prices) NOT RUN — public but infeasible to rebuild after the fact** — 2026-10-26, lane `e4-combo-correlation`, session b566f51c (side session of local_898e5510); `.syndicate/findings_2026-10-26_e4_combo_correlation.md`
+- **Pre-registered before any join:** `9f8d759e`. A1 `83f2e460` (marginals from `book_quotes`; `closing_lines` is best-price-per-side), A2 `f5a503c6` (implementation choices).
+- **Script and tests:** `scripts/e4_combo_correlation.py` with 23 hermetic tests. Read-only on the fleet, plus public outcome GETs.
+- **Result, 4-cell log loss with marginals anchored to the market, game-clustered CIs:**
+  - MLB same-batter nested -0.258 nats/pair and other -0.077 (22 games). Copula vs sim: copula better on nested (+0.0052 [+0.0009, +0.0095]), tie on other.
+  - MLB teammates +0.00002 [-0.0016, +0.0016] and opponents +0.0005: KILLED (underpowered for ~1e-4 effects).
+  - NBA P x R / P x A / R x A +0.0009 [-0.0028, +0.0046] (40 games): KILLED, POWERED. The copula finds the correlation (-0.0105), the sim does not.
+  - Soccer result/total/BTTS -0.031 [-0.039, -0.024] (289 matches): the scoreline sim's dependence is calibrated.
+- **Engine read (to the sim owners):**
+  - NBA smart-sim P / R / A are INDEPENDENT within a player: Var(PRA)/sum of parts = 0.997 over 846 player-games, against 1.20 real. Likely cause: minutes are held fixed across draws.
+  - MLB `sim.joint` understates HR pairs (the Spearman map on zero-inflated counts) and puts +0.014 on opposing batters (realised -0.04).
+  - No sport persists a (margin, total) joint. NHL persists no joint at all.
+- **Ledger:** the SGP consistency posterior is not better than the market product in any sport, and over-predicts the hit rate by 3-6 pts (NHL / NBA / NFL). The 18.5% haircut stays unmeasured.
+- **OWED:**
+  - **(a)** A user decision (routed to the decision-engine session): a forward Kalshi combo capture (public GETs, ~1,000/day). It is the only way Stage 2 becomes runnable.
+  - **(b)** A user decision: rescope Phase 5 E4. Combo correlation comes from the measured copula, and the sims supply it only for soccer scorelines. Correlation-expert weight stays 0 on MLB TM/OP and NBA SP-disjoint. Every line stays its own decision.
+  - **(c)** Engine items for the sim owners: NBA per-draw minutes; MLB threshold-correct same-batter correlation plus `team|full|margin/total` labels; a persisted (margin, total) joint for all sports.
+  - **(d)** Re-run with the same script and constants after a month of combo capture or the NBA minutes fix.
+
 ### `#739` — **E5 VENUE NEWS-LAG (Decision Engine `#736`, plan §4 E5): KILLED on Kalshi by the registered rule; Polymarket "cancel-protection only" by the letter at a 0.2c drift. No timing edge: on the events the books repriced, Kalshi had moved BEFORE our collector saw the news. Phase 4 = cancel-protection plumbing, gated on Phase 3 and an official-schedule t0 (decision owed)** — 2026-10-26, lane `e5-venue-news-lag`, session ce4dfadf (side session of local_898e5510); `.syndicate/findings_2026-10-26_e5_venue_news_lag.md`
 - **Pre-registered before any join:** `d9ce947f`. Amendments A1 `0a9b9fed`, A2 `0bfcc8bc`, A3 `e3fd2e2a` cover eligibility and run times. A3 takes run times from `logs/news_collector.log`, which holds 1,983 runs; the change logs alone imply 106 false sleep gaps.
 - **Script and data:** `scripts/e5_venue_news_lag.py` with 31 hermetic tests. Read-only on the fleet. Kalshi's public 1-min candles are the venue clock.

@@ -2931,3 +2931,18 @@ The 2026-10-20 entry said: "Rating INPUTS transfer, because the sim reads them w
   - The difference is quiet runs, which write nothing.
 - **Cost if missed:** a "t0 uncertain after a sleep" rule built on the change logs would have dropped events in quiet periods as uncertain. Persistence checks would also have waited for the next CHANGE instead of the next run. Caught by a shakedown's coverage line and fixed by amendment A3, before any result was read.
 - **Rule:** before measuring time-to-anything off an append-on-change log, find the run log or status history that records EVERY poll. Use it for cadence, gaps and the next / previous run. The change log is for what changed, never for when you looked. The same holds for `book_quotes` (an unchanged price has no record) and `venue_odds` points.
+
+## 2026-10-26 -- A paged listing your own cap stopped is a SAMPLE: print the range it covers before claiming an absence `[lane e4-combo-correlation, session b566f51c]`
+- **Believed:** an enumeration of Kalshi combo markets "closing 09-30..10-26" that found 0 same-match soccer combos, plus a collection catalogue with no MLB collection, meant Kalshi offered neither in the window. The E4 findings draft said so twice.
+- **Measured 2026-10-26 ~23:45Z:**
+  - The listing is newest-first. All 210,984 rows retrieved closed within 6 hours (10-26 06:23Z..12:00Z), and my 50-minute timeout stopped it there.
+  - In those 6 hours alone, 557 tickets held a same-game MLB pair, 414 La Liga, 251 EPL and 202 Serie A.
+  - The claim was wrong in substance, not merely unproven.
+- **Rule:**
+  1. Before an absence claim from a paged API, print the min/max of its ORDER KEY over what you retrieved, and compare it with the window you claim.
+  2. A catalogue of containers (collections) is not the list of instruments (markets): MLB legs sat inside cross-category combos.
+  3. If the volume defeats paging, say NOT RUN, never NOT RUNNABLE, and name the forward capture that would make it run.
+
+## 2026-10-26 -- `settlement_inputs/closing_lines_<date>.csv` is one row per SELECTION at one book, not a per-book two-sided close `[lane e4-combo-correlation, session b566f51c]`
+- **Measured 2026-10-26:** on 10-18, Yandy Diaz hits o0.5 was DraftKings -222 and the under was ESPN Bet +190. The two sides of one prop come from different books.
+- **Rule:** never de-vig a side pair from `closing_lines`. That is a best-price-like ledger, and de-vigging it understates the vig, sometimes to an arb. For a per-book close, take each book's last pre-`commence_time` record in `<sport>_source/tracking/book_quotes` (E4 amendment A1). Its rows include IN-PLAY captures, so filter `captured_at < commence_time`.
