@@ -167,3 +167,20 @@ material only for MLB, NCAAF and NHL props in stage 1. Every other family is jud
 NaN ≠ NaN, so as a key part it made every quote row its own line (667,804 NHL h2h "lines" for 179 events). Fixed here
 by reading NaN as no line. `fair_price_eval.group_key` (lane `fair-price-v2`) has the same shape (`_f` returns nan);
 recorded as a lead for that lane, not edited.
+
+## Amendment A1 — `[2026-10-26 18:07Z, after the stage-1 verdicts, BEFORE any stage-2 data is read and BEFORE the post-hoc lambda diagnostic returned]`
+
+**Why:** at stage 1 the inner validation chose λ = 1e−5, the registered grid's LOWER EDGE, at nearly every refit
+(NCAAF game 13/13, NHL props 15/15, NFL 7/7), and every family's fitted weights except NHL props sit within about
+0.7–1.3× an equal vote. A boundary choice says the grid was too strong for this loss scale: per-row cross-entropy
+differences are ~1e−5 nats, so a ridge of 1e−5·θ² prices a weight change at the size of the whole achievable gain.
+That is a defect in this registration, found by its own output.
+
+**Change, stage 2 only. Stage 1's verdicts stand as read.** Stage 2 reads TWO arms on the same rows, each with its own
+per-family verdict by §7, never pooled with each other:
+- **Arm A, primary: v1 exactly as registered** (λ ∈ {1e−5, 1e−4, 1e−3, 1e−2}). This is the gate.
+- **Arm B, secondary: v1.1**, identical except λ ∈ {1e−8, 1e−7, 1e−6, 1e−5}. It may pass a family only alongside
+  A's read, and a B-only pass is reported as a lead for a v2 registration, not as a gate pass.
+
+Nothing else changes: targets, population, families, snapshots, σ, the 30-game / 3-date floors, the window
+(`2026-10-26T08:00Z <= commence < 2026-11-23T08:00Z`) and the read date (on or after 2026-11-24).
