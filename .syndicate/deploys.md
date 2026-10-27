@@ -54699,3 +54699,24 @@ which is about the two sizing bases and not about the refusal boundary.
 - **verify (OWED):**
   - The first full forward settlement day after the backfill catches up: kept and traded > 0 by sport in `runs.jsonl`, the day's GETs, and `result` filled on the stored rows (`report --date`).
   - Plus the date where kept-traded / kept drops from ~1.0 to ~0.1, which is where Kalshi stops purging.
+
+## 2026-10-27 22:24Z (5:24 PM CT) -- READING: Kalshi combo capture bridge on `6872eb2c`, first 6 runs incl. the NFL Sunday 10-05 (lane kalshi-combo-capture, #742) -- **MET for memory: peak 217-825 MB, against 2.5 GB under `c21abdea`; backfill at 10-07 03:55Z**
+- **instrument:** a per-run watcher on the fleet. It took each capture process's VmHWM every 3 s, and the runs.jsonl row as each run finished. Read-only.
+
+  | run (Z) | pages | sec | settlements swept to (Z) | rows listed | kept | kept traded | peak RSS |
+  |---|---|---|---|---|---|---|---|
+  | 21:36:16 | 891 | 422.5 | 10-03 17:47 | 814,572 | 98,809 | 98,752 | 217 MB |
+  | 21:44:19 | 861 | 400.6 | 10-04 01:27 | 845,986 | 140,193 | 140,191 | 288 MB |
+  | 21:52:00 | 900 | 458.9 | 10-04 20:12 | 702,273 | 227,723 | 227,706 | 649 MB |
+  | 22:00:40 | 878 | 468.9 | 10-05 03:40 | 864,119 | 582,636 | 582,627 | 825 MB |
+  | 22:09:29 | 900 | 405.3 | 10-06 03:34 | 702,006 | 296,927 | 296,897 | 566 MB |
+  | 22:17:15 | 888 | 413.8 | 10-07 03:55 | 840,070 | 347,628 | 347,571 | 678 MB |
+
+  - All six ended `budget_stopped`, with 0 errors and 0 splits.
+  - The host had 8.2 GB available at 22:24Z. The store was 354 MB, covering 09-27 20:51Z -> 10-07 03:55Z.
+- **The listing is still traded-only 20 days back.** Kept-traded / kept is 0.9998 or above in every run.
+  - So Kalshi drops untraded combos sooner than 20 days after settlement. The 10-26/27 dry run listed them at 0-1 day.
+  - The date where the share falls is still to be read; the backfill will cross it.
+- **Pace:** ~1 settlement day per run (7-8 min, plus a 60 s gap) in the purged region; 06:00Z..20:00Z Saturdays are denser.
+- **Peak bound:** ~1 GB at nice 19. The worst case is a 300-page slice that keeps every row, at ~2 KB a row plus the base process.
+- **verify still OWED:** the first full forward settlement day, and the supervisor job (see the 20:56:16Z entry).
