@@ -10,11 +10,18 @@ lane's probes:
     global trades    65,191 in the same 10 minutes (66 pages); 11.5% of them combo prints
     kept here        677 of those 22,147 (3%) hold a same-game pair in a sport we model; 9 had volume
 
+A Monday morning is the quiet end. The 24-hour dry run (2026-10-26 15:03Z -> 10-27 03:33Z, NFL Sunday + NBA)
+settled 5.48M cross-category combos in 12.5 h (7,909 pages, 3.7 GB wire); 3.36M (61%) held a same-game pair
+because a long multi-game parlay almost always does, and 485k of those had volume.
+
 A FINALIZED combo still lists its legs (`mve_selected_legs`), `result`, `last_price_dollars` and
 `volume_fp`, but its quote is ZEROED (`yes_bid_dollars`/`yes_ask_dollars` 0.0000 on settled untraded
-combos). The executable prices are therefore the TRADE PRINTS, read per kept combo with volume > 0
-(`kalshi_maker_shadow.read_trade_prints`). Snapshotting every creation would cost ~8k GETs a day and
-reading the global trade stream ~9.5k. Listing SETTLEMENTS sees every combo exactly once, already resolved.
+combos). An untraded kept combo therefore carries no price: it is COUNTED in runs.jsonl and not stored
+(`--store-untraded` keeps it). The executable prices are the TRADE PRINTS, read per traded kept combo
+(`kalshi_maker_shadow.read_trade_prints`) only up to DEFAULT_TRADES_MAX_LEGS legs: one GET per combo is
+unaffordable across 485k a Sunday evening, and a long ticket's pair price cannot be backed out anyway.
+Snapshotting every creation would cost ~8k GETs a day and reading the global trade stream ~9.5k on a
+Monday morning. Listing SETTLEMENTS sees every combo exactly once, already resolved.
 
 HOW A RUN WORKS. Per combo series, settlement time is swept in contiguous integer-second slices [lo, hi]
 from a persisted watermark (`state.json`) up to now - SETTLE_LAG_S. `min_settled_ts`/`max_settled_ts`
@@ -34,16 +41,16 @@ INERT UNTIL `SYNDICATE_KALSHI_COMBO_CAPTURE=on`. Absent means OFF: no request an
 fleet is the user's decision (`#742`). `--enable` exists for a manual dry run only.
 
 Writes only `<data root>/reports/intelligence/kalshi_combo_capture/` (no retention rule matches it):
-    combos_<settled UTC date>.jsonl.gz   one row per kept combo, gzip members appended per slice
-    runs.jsonl                           one row per run: GETs, pages, bytes, windows, kept by sport
+    combos_<settled UTC date>.jsonl.gz   one row per TRADED kept combo, gzip members appended per slice
+    runs.jsonl                           one row per run: GETs, pages, bytes, windows, kept (all) by sport
     collections_<UTC date>.json          the daily `/multivariate_event_collections` snapshot
     state.json                           per-series settlement watermark
 Nothing on the request path reads it. Runs at nice 19.
 
 Usage:
     python scripts/kalshi_combo_capture.py run                          # the scheduled job (inert when off)
-    python scripts/kalshi_combo_capture.py run --enable --lookback-hours 24 --max-pages 6000   # dry run
-    python scripts/kalshi_combo_capture.py report --days 2
+    python scripts/kalshi_combo_capture.py run --enable --lookback-hours 24 --max-pages 12000  # dry run
+    python scripts/kalshi_combo_capture.py report --days 2           # streams; never loads a date into memory
 """
 from __future__ import annotations
 
@@ -57,7 +64,7 @@ import os
 import sys
 import time
 from pathlib import Path
-from typing import Any, Callable, Iterable, Mapping, Sequence
+from typing import Any, Callable, Iterable, Iterator, Mapping, Sequence
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
@@ -76,7 +83,7 @@ from syndicate.features.shared.kalshi_catalogue import (  # noqa: E402
 )
 from syndicate.features.shared.kalshi_client import is_combinatorial_series, series_from_ticker  # noqa: E402
 
-RULE_VERSION = "combo-capture-v1"
+RULE_VERSION = "combo-capture-v2"
 ENV_FLAG = "SYNDICATE_KALSHI_COMBO_CAPTURE"
 STORE_SUBDIR = ("reports", "intelligence", "kalshi_combo_capture")
 MODELLED_SPORTS = frozenset({"mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "soccer"})
@@ -106,6 +113,10 @@ MAX_PAGES_PER_RUN = 900
 MAX_RUN_S = 1800
 LOCK_STALE_S = 2 * 3600
 TRADE_PAUSE_S = 0.12
+# One trade-read GET per traded kept combo of at most this many legs (None = all). OFF by default: the listing's
+# `last_price` IS the last print (3,774 of 3,778) and 81% of traded combos print once, while a Sunday evening has
+# 21.7k traded two-leg combos and 122k of <= 4 legs in 12.5 h, 3-15x the listing's own pages. See attach_trades.
+DEFAULT_TRADES_MAX_LEGS: int | None = 0
 DAY = 86400
 
 
@@ -360,15 +371,36 @@ def sweep_window(get: Callable[..., Any], series: str, lo: int, hi: int, *, budg
         return rows_a + rows_b, stats_a
 
 
-def attach_trades(get: Callable[..., Any], rows: Iterable[dict[str, Any]], pause: float = TRADE_PAUSE_S) -> collections.Counter:
-    """Public trade prints for each kept combo with volume; `trades_status` says what came back."""
+def attach_trades(get: Callable[..., Any], rows: Iterable[dict[str, Any]], pause: float = TRADE_PAUSE_S,
+                  max_legs: int | None = None, budget: RunBudget | None = None) -> collections.Counter:
+    """Public trade prints for each kept combo with volume; `trades_status` says what came back.
+
+    `max_legs` bounds the one-GET-per-combo trade read to tickets of at most that many legs (0 = none, None = all).
+    Every trade GET is charged to `budget`, so a run stays bounded; a row the budget cannot reach says
+    `skipped_budget`. Measured 2026-10-26 15:03Z -> 10-27 03:33Z: 485k traded kept combos, 122k of them <= 4 legs.
+    On the 3,778 read 14:35-18:34Z, `last_price` equalled the last print in 3,774, the prints summed to `volume`
+    in all, 81% had one print, and the first print came a median 24 s (p90 113 s) after `created_time`. A
+    skipped row keeps `last_price`, `volume` and `created_time`."""
     stats: collections.Counter[str] = collections.Counter()
+    charged = get
+    if budget is not None:
+        def charged(path: str, params: Mapping[str, Any] | None = None) -> Any:
+            budget.spend()
+            return get(path, params)
     for row in rows:
         if not row.get("traded"):
             continue
+        if max_legs is not None and int(row.get("n_legs") or 0) > max_legs:
+            row["trades_status"] = "skipped"
+            stats["trades_skipped"] += 1
+            continue
+        if budget is not None and not budget.allow():
+            row["trades_status"] = "skipped_budget"
+            stats["trades_skipped_budget"] += 1
+            continue
         hi = ms.ts(row.get("settlement_ts")) or ms.ts(row.get("close_time")) or time.time()
         lo = ms.ts(row.get("created_time")) or ms.ts(row.get("open_time")) or hi - 30 * DAY
-        prints = ms.read_trade_prints(row["ticker"], lo, hi, get=get, pause=pause)
+        prints = ms.read_trade_prints(row["ticker"], lo, hi, get=charged, pause=pause)
         if prints is None:
             row["trades_status"] = "unreadable"
             stats["trades_unreadable"] += 1
@@ -404,26 +436,36 @@ def append_rows(root: Path, rows: Sequence[Mapping[str, Any]]) -> dict[str, int]
     return {date: len(date_rows) for date, date_rows in by_date.items()}
 
 
+def iter_combos(root: Path, date: str) -> Iterator[dict[str, Any]]:
+    """Stored combos of one settlement date, STREAMED, one per ticker (a crash between write and watermark can
+    repeat a slice; the first row wins). Never collect a date into memory: the 2026-10-26 Sunday kept 3.36M
+    combos in 12.5 h, and holding them took 9 GB."""
+    path = combos_path(root, date)
+    if not path.is_file():
+        return
+    seen: set[str] = set()
+    try:
+        with gzip.open(path, "rt", encoding="utf-8") as fh:
+            for line in fh:
+                try:
+                    row = json.loads(line)
+                except ValueError:
+                    continue
+                if isinstance(row, dict) and row.get("ticker") and row["ticker"] not in seen:
+                    seen.add(row["ticker"])
+                    yield row
+    except (OSError, EOFError):
+        return
+
+
 def load_combos(root: Path, dates: Iterable[str]) -> list[dict[str, Any]]:
-    """Kept combos for the settlement dates, one per ticker (a crash between write and watermark can repeat a
-    slice; the later row wins)."""
-    out: dict[str, dict[str, Any]] = {}
-    for date in dates:
-        path = combos_path(root, date)
-        if not path.is_file():
-            continue
-        try:
-            with gzip.open(path, "rt", encoding="utf-8") as fh:
-                for line in fh:
-                    try:
-                        row = json.loads(line)
-                    except ValueError:
-                        continue
-                    if isinstance(row, dict) and row.get("ticker"):
-                        out[row["ticker"]] = row
-        except (OSError, EOFError):
-            continue
-    return list(out.values())
+    """`iter_combos` collected, for a consumer that needs the rows (Stage 2 on a traded-only store)."""
+    return [row for date in dates for row in iter_combos(root, date)]
+
+
+def legs_bucket(n_legs: Any) -> str:
+    n = int(n_legs or 0)
+    return f"{n:02d}" if n <= 10 else ("11-15" if n <= 15 else "16+")
 
 
 @contextlib.contextmanager
@@ -511,7 +553,8 @@ def run(root: Path, *, get: Callable[..., Any] = ms.public_get_json, now: float 
         enabled: bool | None = None, lookback_s: int = DEFAULT_LOOKBACK_S, max_pages: int = MAX_PAGES_PER_RUN,
         max_seconds: float = MAX_RUN_S, series: Mapping[str, tuple[int, int]] = SWEEP_SERIES,
         invoker: str = "cli", trade_pause: float = TRADE_PAUSE_S, page_cap: int = SLICE_PAGE_CAP,
-        snapshot: bool = True) -> dict[str, Any]:
+        snapshot: bool = True, trades_max_legs: int | None = DEFAULT_TRADES_MAX_LEGS,
+        store_untraded: bool = False) -> dict[str, Any]:
     if not (capture_enabled() if enabled is None else enabled):
         print(f"[kalshi_combo_capture] OFF ({ENV_FLAG} is not on): no request, no file", flush=True)
         return {"status": "off"}
@@ -523,11 +566,12 @@ def run(root: Path, *, get: Callable[..., Any] = ms.public_get_json, now: float 
             return {"status": "locked"}
         return _run_locked(root, get=get, now=now, lookback_s=lookback_s, max_pages=max_pages,
                            max_seconds=max_seconds, series=series, invoker=invoker, trade_pause=trade_pause,
-                           page_cap=page_cap, snapshot=snapshot)
+                           page_cap=page_cap, snapshot=snapshot, trades_max_legs=trades_max_legs,
+                           store_untraded=store_untraded)
 
 
 def _run_locked(root: Path, *, get, now, lookback_s, max_pages, max_seconds, series, invoker, trade_pause,
-                page_cap, snapshot) -> dict[str, Any]:
+                page_cap, snapshot, trades_max_legs, store_untraded) -> dict[str, Any]:
     started = time.monotonic()
     store = store_dir(root)
     state_path = store / "state.json"
@@ -540,8 +584,9 @@ def _run_locked(root: Path, *, get, now, lookback_s, max_pages, max_seconds, ser
     bytes_before = _http_bytes()
     captured_at = ms.iso(now)
     summary: dict[str, Any] = {"run_at": captured_at, "rule_version": RULE_VERSION, "invoker": invoker,
-                               "series": {}, "kept_by_sport": collections.Counter(),
-                               "kept_traded_by_sport": collections.Counter(), "kept_by_league": collections.Counter(),
+                               "trades_max_legs": trades_max_legs, "store_untraded": store_untraded, "series": {},
+                               "kept_by_sport": collections.Counter(), "kept_traded_by_sport": collections.Counter(),
+                               "kept_traded_by_legs": collections.Counter(), "kept_by_league": collections.Counter(),
                                "trades": collections.Counter(), "written": collections.Counter(), "errors": []}
 
     today = utc_date(now)
@@ -575,11 +620,15 @@ def _run_locked(root: Path, *, get, now, lookback_s, max_pages, max_seconds, ser
             except (SliceUnreadable, SliceTooLarge) as exc:
                 summary["errors"].append(f"{type(exc).__name__}: {exc}")
                 break
-            trade_stats = attach_trades(counting, rows, pause=trade_pause)
+            trade_stats = attach_trades(counting, rows, pause=trade_pause, max_legs=trades_max_legs, budget=budget)
             summary["trades"].update(trade_stats)
-            for date, n in append_rows(root, rows).items():
+            # An untraded finalized combo's quote is zeroed: it carries no price, so it is counted, not stored.
+            stored = rows if store_untraded else [row for row in rows if row["traded"]]
+            for date, n in append_rows(root, stored).items():
                 summary["written"][date] += n
             for row in rows:
+                if row["traded"]:
+                    summary["kept_traded_by_legs"][legs_bucket(row["n_legs"])] += 1
                 for sport in row["sports"]:
                     summary["kept_by_sport"][sport] += 1
                     if row["traded"]:
@@ -611,7 +660,7 @@ def _run_locked(root: Path, *, get, now, lookback_s, max_pages, max_seconds, ser
     summary["seconds"] = round(time.monotonic() - started, 1)
     summary["finished_at"] = ms.iso(time.time())
     summary["status"] = "errors" if summary["errors"] else ("budget_stopped" if budget.stopped else "ok")
-    for key in ("kept_by_sport", "kept_traded_by_sport", "kept_by_league", "trades", "written"):
+    for key in ("kept_by_sport", "kept_traded_by_sport", "kept_traded_by_legs", "kept_by_league", "trades", "written"):
         summary[key] = dict(sorted(summary[key].items()))
     with (store / "runs.jsonl").open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(summary, sort_keys=True) + "\n")
@@ -641,46 +690,56 @@ def read_runs(root: Path) -> list[dict[str, Any]]:
 
 
 def report(root: Path, dates: Sequence[str]) -> dict[str, Any]:
-    """Cost per covered day (from runs.jsonl) and kept combos per settlement date and sport."""
+    """Cost and kept combos per covered day (from runs.jsonl, which counts what a run did not store), and the
+    STORED combos per settlement date (streamed)."""
     runs = read_runs(root)
     gets = collections.Counter()
     covered = 0
     wire = decoded = pages = 0
+    kept = {key: collections.Counter() for key in ("kept_by_sport", "kept_traded_by_sport", "kept_traded_by_legs")}
     for r in runs:
         gets.update(r.get("gets") or {})
         pages += int(r.get("pages") or 0)
         wire += int((r.get("http_bytes") or {}).get("wire_bytes_external") or 0)
         decoded += int((r.get("http_bytes") or {}).get("decoded_bytes_external") or 0)
         covered += int(((r.get("series") or {}).get("KXMVECROSSCATEGORY") or {}).get("seconds_covered") or 0)
+        for key, counter in kept.items():
+            counter.update(r.get(key) or {})
     days_covered = covered / DAY if covered else 0.0
     per_day = (lambda x: round(x / days_covered, 1) if days_covered else None)
     by_date: dict[str, Any] = {}
     for date in dates:
-        rows = load_combos(root, [date])
-        sport = collections.Counter()
-        traded = collections.Counter()
-        league = collections.Counter()
-        two_leg = collections.Counter()
-        prints = 0
-        status = collections.Counter(r.get("trades_status") for r in rows)
-        for row in rows:
+        n = prints = pure_traded = 0
+        sport, traded, league, two_leg, status, traded_legs = (collections.Counter() for _ in range(6))
+        for row in iter_combos(root, date):
+            n += 1
+            status[row.get("trades_status")] += 1
+            legs = int(row.get("n_legs") or 0)
+            if row.get("traded"):
+                traded_legs[legs] += 1
+                pure_traded += sum(len(g.get("legs") or ()) for g in row.get("same_game") or ()) == legs
             for s in row.get("sports") or ():
                 sport[s] += 1
                 traded[s] += bool(row.get("traded"))
-                two_leg[s] += row.get("n_legs") == 2
+                two_leg[s] += legs == 2
             for g in row.get("same_game") or ():
                 if g.get("league"):
                     league[g["league"]] += 1
             prints += len(row.get("trades") or ())
-        by_date[date] = {"kept": len(rows), "by_sport": dict(sport.most_common()), "traded_by_sport": dict(traded.most_common()),
+        # What a trade read costs at each `--trades-max-legs`: one GET per traded combo at or under the bound.
+        traded_at_most = {k: sum(c for legs, c in traded_legs.items() if legs <= k) for k in (2, 3, 4, 5, 6, 8, 10)}
+        by_date[date] = {"stored": n, "by_sport": dict(sport.most_common()), "traded_by_sport": dict(traded.most_common()),
                          "two_leg_by_sport": dict(two_leg.most_common()), "soccer_by_league": dict(league.most_common()),
-                         "prints": prints, "trades_status": dict(status)}
+                         "prints": prints, "trades_status": dict(status),
+                         "traded_total": sum(traded_legs.values()), "traded_at_most_legs": traded_at_most,
+                         "traded_every_leg_same_game": pure_traded}
     return {
         "runs": len(runs),
         "cross_category_days_covered": round(days_covered, 3),
         "gets": dict(gets), "gets_total": sum(gets.values()), "pages": pages,
         "gets_per_day": per_day(sum(gets.values())), "pages_per_day": per_day(pages),
         "wire_mb_per_day": per_day(wire / 1e6), "decoded_mb_per_day": per_day(decoded / 1e6),
+        **{f"{key}_per_day": {k: per_day(v) for k, v in sorted(counter.items())} for key, counter in kept.items()},
         "by_settlement_date": by_date,
     }
 
@@ -697,6 +756,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     r.add_argument("--max-pages", type=int, default=MAX_PAGES_PER_RUN)
     r.add_argument("--max-seconds", type=float, default=MAX_RUN_S)
     r.add_argument("--invoker", default="cli")
+    r.add_argument("--trades-max-legs", type=int, default=DEFAULT_TRADES_MAX_LEGS,
+                   help=f"read trade prints only for traded combos of at most N legs (0 = none, -1 = all; "
+                        f"default {DEFAULT_TRADES_MAX_LEGS})")
+    r.add_argument("--store-untraded", action="store_true",
+                   help="also store kept combos with no volume (their finalized quote is zeroed; default: count only)")
     p = sub.add_parser("report", help="GETs per covered day and kept combos per settlement date / sport")
     p.add_argument("--data-root", default=None)
     p.add_argument("--days", type=int, default=2)
@@ -706,7 +770,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.cmd == "run":
         _nice()
         summary = run(root, enabled=True if args.enable else None, lookback_s=int(args.lookback_hours * 3600),
-                      max_pages=args.max_pages, max_seconds=args.max_seconds, invoker=args.invoker)
+                      max_pages=args.max_pages, max_seconds=args.max_seconds, invoker=args.invoker,
+                      trades_max_legs=None if args.trades_max_legs < 0 else args.trades_max_legs,
+                      store_untraded=args.store_untraded)
         return 1 if summary.get("status") == "errors" else 0
     today = dt.datetime.now(dt.timezone.utc).date()
     dates = args.date or [(today - dt.timedelta(days=d)).isoformat() for d in range(args.days - 1, -1, -1)]

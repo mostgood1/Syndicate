@@ -191,6 +191,7 @@ ONE_SERIES = {"KXMVECROSSCATEGORY": (900, 0)}
 def _run(tmp_path, fake, now, **kw):
     kw.setdefault("series", ONE_SERIES)
     kw.setdefault("snapshot", False)
+    kw.setdefault("store_untraded", True)  # the sweep tests read every kept row back; the default is pinned below
     return cc.run(tmp_path, get=fake, now=now, enabled=True, trade_pause=0, **kw)
 
 
@@ -205,7 +206,7 @@ def _stored(tmp_path):
 # ------------------------------------------------------------------ reachability: off != on
 def test_off_by_default_makes_no_request_and_writes_nothing(tmp_path, monkeypatch):
     monkeypatch.delenv(cc.ENV_FLAG, raising=False)
-    fake = FakeKalshi([_combo("KXMVECROSSCATEGORY-S1-A", NBA_SGP_LEGS, T0 - 1000)])
+    fake = FakeKalshi([_combo("KXMVECROSSCATEGORY-S1-A", NBA_SGP_LEGS, T0 - 1000, volume="1.00")])
     assert cc.run(tmp_path, get=fake, now=T0)["status"] == "off"
     assert fake.calls == [] and not cc.store_dir(tmp_path).exists()
 
@@ -307,7 +308,7 @@ def test_trades_are_read_only_for_kept_traded_combos(tmp_path):
         {"created_time": _iso(end - 3000), "yes_price_dollars": "0.2630", "no_price_dollars": "0.7370",
          "count_fp": "36.15", "taker_side": "yes", "ticker": "KXMVECROSSCATEGORY-S1-T"}]}
     fake = FakeKalshi(combos, trades=trades, page_size=10)
-    summary = _run(tmp_path, fake, T0, lookback_s=900)
+    summary = _run(tmp_path, fake, T0, lookback_s=900, trades_max_legs=None)
     trade_calls = [c for c in fake.calls if c[0] == "/markets/trades"]
     assert [c[1]["ticker"] for c in trade_calls] == ["KXMVECROSSCATEGORY-S1-T"]
     assert trade_calls[0][1]["min_ts"] <= end - 4000 and trade_calls[0][1]["max_ts"] >= end - 50
@@ -320,6 +321,78 @@ def test_trades_are_read_only_for_kept_traded_combos(tmp_path):
     assert summary["kept_traded_by_sport"] == {"nba": 1}
 
 
+def test_trades_max_legs_bounds_the_trade_reads(tmp_path):
+    end = T0 - cc.SETTLE_LAG_S
+    short = [_leg("KXEPLGAME-26OCT25ARSCRY"), _leg("KXEPLBTTS-26OCT25ARSCRY"), _leg("KXNBAGAME-26OCT27BKNBOS")]
+    combos = [_combo("KXMVECROSSCATEGORY-S1-S", short, end - 50, volume="2.00"),
+              _combo("KXMVECROSSCATEGORY-S1-L", NBA_SGP_LEGS, end - 60, volume="2.00")]
+    trades = {t: [{"created_time": _iso(end - 3000), "yes_price_dollars": "0.30", "no_price_dollars": "0.70",
+                   "count_fp": "2.00", "taker_side": "yes"}] for t in ("KXMVECROSSCATEGORY-S1-S", "KXMVECROSSCATEGORY-S1-L")}
+    fake = FakeKalshi(combos, trades=trades, page_size=10)
+    summary = _run(tmp_path, fake, T0, lookback_s=900, trades_max_legs=3)
+    assert [c[1]["ticker"] for c in fake.calls if c[0] == "/markets/trades"] == ["KXMVECROSSCATEGORY-S1-S"]
+    rows = {r["ticker"]: r for r in _stored(tmp_path)}
+    assert rows["KXMVECROSSCATEGORY-S1-S"]["trades_status"] == "ok"
+    assert rows["KXMVECROSSCATEGORY-S1-L"]["trades_status"] == "skipped" and rows["KXMVECROSSCATEGORY-S1-L"]["traded"]
+    assert summary["trades_max_legs"] == 3 and summary["trades"]["trades_skipped"] == 1
+    rep = cc.report(tmp_path, [cc.utc_date(end - 50)])["by_settlement_date"][cc.utc_date(end - 50)]
+    assert rep["traded_total"] == 2 and rep["traded_at_most_legs"][3] == 1 and rep["traded_at_most_legs"][10] == 2
+    assert rep["traded_every_leg_same_game"] == 0
+
+    fake0 = FakeKalshi(combos, trades=trades, page_size=10)
+    _run(tmp_path / "none", fake0, T0, lookback_s=900, trades_max_legs=0)
+    assert not [c for c in fake0.calls if c[0] == "/markets/trades"]
+
+
+def test_by_default_untraded_combos_are_counted_not_stored_and_no_trade_is_read(tmp_path):
+    end = T0 - cc.SETTLE_LAG_S
+    short = [_leg("KXEPLGAME-26OCT25ARSCRY"), _leg("KXEPLBTTS-26OCT25ARSCRY"), _leg("KXNBAGAME-26OCT27BKNBOS")]
+    combos = [_combo("KXMVECROSSCATEGORY-S1-S", short, end - 50, volume="2.00"),
+              _combo("KXMVECROSSCATEGORY-S1-L", NBA_SGP_LEGS, end - 60, volume="2.00"),
+              _combo("KXMVECROSSCATEGORY-S1-U", NBA_SGP_LEGS, end - 70)]
+    fake = FakeKalshi(combos, page_size=10)
+    summary = cc.run(tmp_path, get=fake, now=T0, enabled=True, series=ONE_SERIES, snapshot=False, lookback_s=900,
+                     trade_pause=0)
+    assert cc.DEFAULT_TRADES_MAX_LEGS == 0 and summary["trades_max_legs"] == 0
+    assert summary["store_untraded"] is False and summary["gets"] == {"markets": 1}
+    stored = {r["ticker"]: r for r in _stored(tmp_path)}
+    assert sorted(stored) == ["KXMVECROSSCATEGORY-S1-L", "KXMVECROSSCATEGORY-S1-S"]
+    # the price survives without a trade read: last_price, volume and created_time are on the row
+    assert stored["KXMVECROSSCATEGORY-S1-S"]["trades_status"] == "skipped"
+    assert stored["KXMVECROSSCATEGORY-S1-S"]["quote_at_capture"]["last_price"] == 0.263
+    assert stored["KXMVECROSSCATEGORY-S1-S"]["volume_fp"] == 2.0 and stored["KXMVECROSSCATEGORY-S1-S"]["created_time"]
+    # the untraded one is still counted: the run row is the kept-per-day instrument
+    assert summary["kept_by_sport"] == {"nba": 2, "soccer": 1} and summary["kept_traded_by_sport"] == {"nba": 1, "soccer": 1}
+    assert summary["kept_traded_by_legs"] == {"03": 1, "07": 1} and sum(summary["written"].values()) == 2
+    rep = cc.report(tmp_path, [cc.utc_date(end - 50)])
+    assert rep["kept_by_sport_per_day"] == {"nba": round(2 * 96, 1), "soccer": round(96, 1)}  # 900 s covered
+    assert rep["by_settlement_date"][cc.utc_date(end - 50)]["stored"] == 2
+
+
+def test_trade_reads_are_charged_to_the_run_budget(tmp_path):
+    end = T0 - cc.SETTLE_LAG_S
+    combos = [_combo(f"KXMVECROSSCATEGORY-S1-{i}", NBA_SGP_LEGS, end - 50 - i, volume="1.00") for i in range(5)]
+    fake = FakeKalshi(combos, page_size=10)
+    summary = _run(tmp_path, fake, T0, lookback_s=900, trades_max_legs=None, max_pages=3)
+    assert summary["status"] == "budget_stopped" and summary["pages"] == 3
+    assert summary["gets"] == {"markets": 1, "trades": 2}
+    assert summary["trades"]["trades_skipped_budget"] == 3
+    rows = _stored(tmp_path)
+    assert len(rows) == 5 and sum(r["trades_status"] == "skipped_budget" for r in rows) == 3
+    # the slice's listing was complete, so its watermark advances; the rows keep last_price and volume
+    assert json.loads((cc.store_dir(tmp_path) / "state.json").read_text())["series"]["KXMVECROSSCATEGORY"]["swept_to"] == end
+
+
+def test_the_cli_maps_minus_one_to_every_trade_read(tmp_path, monkeypatch):
+    seen = {}
+    monkeypatch.setattr(cc, "_nice", lambda: None)
+    monkeypatch.setattr(cc, "run", lambda root, **kw: seen.update(kw) or {"status": "ok"})
+    assert cc.main(["run", "--data-root", str(tmp_path), "--trades-max-legs", "-1"]) == 0
+    assert seen["trades_max_legs"] is None and seen["store_untraded"] is False
+    cc.main(["run", "--data-root", str(tmp_path)])
+    assert seen["trades_max_legs"] == cc.DEFAULT_TRADES_MAX_LEGS
+
+
 def test_unreadable_trades_are_named_not_dropped(tmp_path):
     end = T0 - cc.SETTLE_LAG_S
     combos = [_combo("KXMVECROSSCATEGORY-S1-T", NBA_SGP_LEGS, end - 50, volume="5.00")]
@@ -327,7 +400,7 @@ def test_unreadable_trades_are_named_not_dropped(tmp_path):
     real = fake.__call__
     fake_get = lambda path, params=None: None if path == "/markets/trades" else real(path, params)  # noqa: E731
     summary = cc.run(tmp_path, get=fake_get, now=T0, enabled=True, series=ONE_SERIES, snapshot=False,
-                     lookback_s=900, trade_pause=0)
+                     lookback_s=900, trade_pause=0, trades_max_legs=None)
     (row,) = _stored(tmp_path)
     assert row["trades_status"] == "unreadable" and row["trades"] is None
     assert summary["trades"] == {"trades_unreadable": 1}
@@ -362,7 +435,7 @@ def test_load_combos_dedups_a_repeated_slice_and_report_counts_per_sport(tmp_pat
     date = cc.utc_date(end - 50)
     assert len(cc.load_combos(tmp_path, [date])) == 2
     rep = cc.report(tmp_path, [date])["by_settlement_date"][date]
-    assert rep["kept"] == 2 and rep["by_sport"] == {"nba": 1, "soccer": 1}
+    assert rep["stored"] == 2 and rep["by_sport"] == {"nba": 1, "soccer": 1}
     assert rep["traded_by_sport"] == {"nba": 1, "soccer": 0} and rep["two_leg_by_sport"] == {"nba": 0, "soccer": 1}
     assert rep["soccer_by_league"] == {"epl": 1}
 
