@@ -241,3 +241,41 @@ Scratch: `C:\tmp\peg\` (`dryrun.sh`, `dryrun.log`, `report_20261027T163701Z.json
 - **Inert until** the first full down/up whose commit contains `2ec80fe0`. At 20:56Z the last UP was `0fca3f2b7af4` and the checkout was `84967f755`; neither contains it.
 - **Check:** the daily read-only scheduled task `paper-archived-grading-first-line` records the first anchored `[paper_settlement] ARCHIVED_SETTLED` line, then disables itself (hard stop 2026-11-10).
 - **Still open:** the 953 rows behind the named grader gaps (above) need the lane re-scoped. Not started.
+
+## Re-scope: the grader gaps -- pre-registration `[2026-10-27 23:20Z, lane paper-evicted-grading, session 7833a791, written BEFORE any code change; user, verbatim: "we need to solve for those"]`
+
+**The population.** 981 stale paper rows: the game started more than 48 h ago and there is no outcome. Read-only on the fleet at 23:15Z, with main `2c8ba8be` from a scratch extract and every write suppressed (0 reached). The count is up from 953 at 17:27Z as more games crossed 48 h. 0 of the 981 grade with today's resolvers.
+
+| sport | refusal | rows | what the rows are |
+|---|---|---|---|
+| soccer | `unmapped_market` | 322 | `alternate_totals_corners` 233 and `btts` 89, mostly FORWARD bets (slate 10-04, game 10-09/10) |
+| soccer | `match_not_in_soccer_live_state` + `no_soccer_live_state_for_date` | 170 | game lines; the slate is days before the game |
+| soccer | `no_soccer_player_box_for_match` | 5 | props |
+| ncaaf | `ncaaf_team_not_in_registry_or_ambiguous` | 171 | only FIVE pairs: four San Jose State games (147) and LSU v McNeese State (24) |
+| ncaaf | `ncaaf_props_not_gradeable_from_scoreboard` | 59 | Receptions 34, Passing TDs 23, Receiving Yards 2 |
+| mlb | `no_live_feed` | 122 | two game dates only: 10-08 (50) and 10-24 (72) |
+| mlb | tails | 11 | stat 5, not decided 4, rescheduled 2 |
+| nba | `no_live_box_for_date` | 72 | ALL game lines, preseason 10-04..10-16; the live box capture starts later |
+| nba | tails | 14 | player not in box 7, segment 6, `player_double_double` 1 |
+| nfl | `nfl_player_not_in_final_box` | 28 | Receptions 21, Rushing Attempts 5, other 2; e.g. Troy Franklin, Jeremy Ruckert |
+| nhl | tails | 7 | ambiguous 4, unmatched 2, `dnp_void` 1 |
+
+**Root causes, as read from the code** (each a hypothesis until the dry run reads it):
+- **Soccer binds to the slate date.** It reads match state for `selected_date` only (props: plus or minus 1 day). A forward bet's game is days later. On the fleet, every league's `live_state_<date>.json` for 09-30..10-27 is still on disk. Each holds a `match_box` with `final`, `score_home`/`score_away`, linescores, and `teams.{home,away}.stats.Corners`.
+- **Soccer has no corners or btts rule.** Both are readable from the same match box.
+- **NCAAF names:** the registry has "San José State" with the accent unfolded, and "McNeese" while OddsAPI sends "McNeese State Cowboys".
+- **MLB never fetches.** It reads only the cached `feed_live` (`fetch_if_missing=False`), and nothing captured those two dates.
+- **NBA has no source before the live box existed.** Its only source is the live-lens box, which did not run in the preseason.
+
+**Pre-registered predictions and falsification** (the share of each group that grades in a fleet dry run with the fixed code):
+- **H1, soccer kickoff-date binding:** at least 85% of the 175 soccer match-state refusals bind to a match-box record within kickoff (UTC date) -1..+1. FALSIFIED below 50%.
+- **H2, corners and btts:** with H1's binding, at least 85% of the 322 grade (match final; for corners, both teams' Corners present). FALSIFIED below 50%.
+- **H3, NCAAF names:** accent folding (both sides) plus a McNeese State alias resolves all 5 pairs. The registry's unambiguous key set may only GROW; any key that becomes ambiguous falsifies it. At least 90% of the 171 grade.
+- **H4, MLB:** a settlement-only fetch of the StatsAPI feed, for games that started more than 6 h ago and memoised per resolver, grades at least 90% of the 122. The board never fetches.
+- **H5, NBA preseason:** for a date with no live box, a final-score source grades at least 90% of the 72 game lines.
+- **H6, football props (NCAAF 59, NFL 28):** diagnose first. No prediction is made. Absent from a box must never read as zero.
+- **Tails** (NBA 14, MLB 11, NHL 7) are not in scope unless they fall out of the above.
+
+**Every fix lands in the per-sport resolver** that `settle_orders`, its straggler dates and the archived pass all share. So each one also closes the gap for the LIVE book going forward. Today, a forward-dated soccer order, any corners or btts order, and any NBA preseason order can never grade.
+
+**What would make this re-scope wrong:** if the dry run grades fewer than 50% of the 981 with all fixes in, the gaps are not what the code reading says.
