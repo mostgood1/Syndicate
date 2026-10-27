@@ -217,3 +217,53 @@ The n behind every number is printed beside it.
 - Code: `scripts/sgp_pjoint_calibration.py`, with hermetic tests, including a reachability test that the clean filter
   changes the population on a fixture with a void leg. Committed before the run. Any change to a choice above after
   this commit is an amendment, committed before the join.
+
+## Amendment A1 -- committed with the code, BEFORE the run (2026-10-27)
+
+No outcome had been read when this was written. The code and its 13 hermetic tests were all that existed.
+
+1. **A factual correction to §1.** The graded snapshot is the **2026-10-27 13:09:39Z** write, not ~04:56Z.
+   - Snapshot taken 14:25:16Z to `C:\tmp\sgpcal\snap\`. The manifest is `C:\tmp\sgpcal\snap_manifest.txt`.
+   - sha256 prefixes:
+
+     | Sport | Ledger | Graded |
+     |---|---|---|
+     | nhl | `fbd09bab` | `eae64fe8` |
+     | nba | `fda6aa74` | `b766ab09` |
+     | nfl | `f801734b` | `ec86aeb4` |
+     | wnba | `302ecd7e` | `464d8fa2` |
+     | mlb | `b8ef400b` | `8863bfa0` |
+
+   - The correlations files date from 10-16 20:30Z (NFL), 10-17 00:49Z (NHL) and 10-17 18:39-19:09Z
+     (MLB / NBA / WNBA). NHL's first ledger date is 10-16, so its earliest tickets may predate the file. §6c's
+     reconstruction gate reports this by date.
+2. **SE forms.**
+   - §3 and §6a's `G_A` / `G_B` / `G_C` use the registered UNCENTERED form (`grade_sgp_paper.summarize`). A test
+     asserts the equality.
+   - §6's paired differences (`D_nudge`, `D_copula`, the log-loss differences, `g_m`, `g_q`, the pair excesses, `D_K`)
+     use the CENTERED CR1 sandwich.
+   - Both forms carry G/(G-1).
+3. **Populations of §6b and §6c.**
+   - Leg and pair tables use every resolved leg of every graded ticket dated <= the freeze, whatever the ticket's
+     status. A leg's own result does not depend on its siblings.
+   - The reconstruction gate runs over every graded ticket that has a `p_joint`.
+4. **Shares (§6e.7):** sum(component) / sum(`C - y`) over §6a's tickets, with a CI from a game-cluster bootstrap of that
+   ratio.
+5. **§7 composition:**
+   - de-vig alone: the candidate leg probability is `devig(m)`. The fit predicts the outcome from `m` directly.
+   - nudge alone: `posterior(m, k)`.
+   - both: `posterior(devig(m), k)`, with `k` chosen on raw `m` in the same fold.
+   - `lambda` is fitted on pairs at market marginals.
+   - Check (ii), the served subset re-priced out of fold, needs the sport to pass §6c's reconstruction gate. Otherwise
+     it is not computed, and the candidate stays "fitted, not validated".
+   - A POOLED rejection flags its components for every sport, and §7 runs per sport.
+6. **§6b reproduction check:** the share of legs where `(40 m + hits) / (40 + games)` is within 0.002 of `q` is
+   printed. It shows whether §7's `k` refit applies to the legs as built.
+7. **Basketball type labels** use `basketball_sgp_pool.SHEET_TO_CODE`, as the builder does.
+8. **Code and tests:** `scripts/sgp_pjoint_calibration.py` and `tests/test_sgp_pjoint_calibration.py` (13 hermetic).
+   The tests include:
+   - §2 reachability: a void-leg LOSS is in as-graded and out of clean;
+   - the §3 SE equalling `grade_sgp_paper.summarize`'s;
+   - §6d: `pair_legs` returns identical `p_joint`, tickets and order at discounts 0, 0.185 and 0.5;
+   - reconstruction against `core._ticket` / `ledger_records` records;
+   - leave-one-date-out never seeing its held-out date.
