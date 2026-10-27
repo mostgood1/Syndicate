@@ -32,18 +32,37 @@ Standing constraints on every item:
 
 ## `basketball-player-distribution` and `basketball-scenario-calibration` (session e0a3e383); FYI `nba-sim-minutes-history-path`
 
-1. **NBA within-player P / R / A are INDEPENDENT in the smart-sim** (E4). This is the largest item.
+1. **NBA within-player P / R / A are INDEPENDENT in the PRODUCTION smart-sim output** (E4). This is the largest item.
    - Post hoc, over 846 player-games with >= 15 sim minutes: the sim's `Var(PRA) / [Var(P) + Var(R) + Var(A)]` has
      median **0.997** (p10-p90 0.90-1.11). Real boxes read **1.196**.
    - Backed out of the ladders: PTS x REB sim +0.014 vs realised +0.27 [+0.16, +0.38] (copula +0.236); PA x REB
      +0.021 vs +0.33; PTS x RA -0.016 vs +0.28.
-   - Likely mechanism: minutes are an INPUT held constant across draws (S10 in
+   - Mechanism as first written: minutes are an INPUT held constant across draws (S10 in
      `findings_2026-10-06_basketball_scenario_calibration.md`). Minutes are the common driver of a player's points,
      boards and assists, so holding them fixed leaves the three independent.
-   - Fix to test: minutes drawn per draw, or a per-draw usage/pace shock. This matches
-     `basketball-player-distribution`'s own hypothesis (near-deterministic minutes), and its Phase 1 (`0050a741`,
-     10-27) independently found minutes the dominant defect in the player distributions. E4's covariance read is a
-     second symptom of the same cause, so one minutes fix should move both.
+   - **CORRECTED 2026-10-27, after `843c5d40`. The loss is not in the engine's mechanics.**
+     - `basketball-player-distribution` measured the RAW engine (`843c5d40`; fit_pd draws, candidate config, 13,317
+       player-games with >= 15 sim min). Its ratio is **1.142** against real 1.196. Simulated minutes do vary by
+       draw: corr(sim minutes, pts) median 0.41.
+     - E4's 0.997 is NOT downstream calibration. `C:\tmp\e4\nbachk.py` divides each `<stat>_sd` by that row's own
+       `nba_prop_calibration.sd_scale`, so it reads the pre-calibration spread. The production engine also builds PRA
+       per draw (`syndicate/features/basketball_engine/orchestrator/smart_sim.py:2026-2043`), not from marginals.
+       Calibration's own fit agrees independently. It found served PRA too narrow by MORE than its parts (IQR(z)/1.349
+       of 1.85 vs 1.39-1.52, `nba_prop_calibration.py:8`), which is what missing within-player covariance looks like.
+     - **So the leading candidate is the PRODUCTION path's inputs or config.** Either its minutes are held fixed
+       (S10), or its config differs from fit_pd's candidate config. This is a code and method read, NOT a
+       measurement.
+     - Downstream, two consumers ASSUME independence and need revisiting once production draws carry covariance:
+       - the calibration widens pr/pa/ra ladders by `k_combo = sqrt(sum (k_i sd_i)^2) / sqrt(sum sd_i^2)`
+         (`nba_prop_calibration.py:19-21`);
+       - the SGP pool's PR/PA/RA Normal (item 1's knock-on below).
+     - **Owed (to `basketball-player-distribution`, offered):** compute the same ratio on production-config engine
+       draws (same games as fit_pd), to locate where 1.142 becomes 0.997.
+   - **Size of the target** (E4 follow-up `ddf36727`, 246 players, 2025-26): real Var(PRA)/sum is 1.216 [1.189,
+     1.244]. With minutes removed it is 1.039, so minutes carry ~82% of the covariance.
+   - Fix: whatever makes PRODUCTION draws carry varying minutes. An engine minutes-variance mechanism (Phase 2 step 1
+     of `basketball-player-distribution`) helps the WIDTH (its Phase 1 found minutes 1.57x too narrow). It moves E4
+     only if the serving path keeps the joint draws.
    - Re-test: `scripts/e4_combo_correlation.py`, `off != on` on the SP-disjoint cell, then `D_bc` against the copula.
    - Knock-on: the SGP pool's `p_sim` gate for PR/PA/RA uses a Normal that assumes independent parts. It is wrong in
      the same direction.
