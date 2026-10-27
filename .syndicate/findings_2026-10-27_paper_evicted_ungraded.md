@@ -110,3 +110,38 @@ pre-register:
 
 Any fleet write (the backfill, or enabling the pass) is a user decision under the deploy locks. Build it default-off,
 with a reachability test before correctness.
+
+## Pre-registration: grading the archived rows `[2026-10-27 16:2xZ, lane paper-evicted-grading, session 7833a791, written BEFORE any code or data read]`
+
+**Hypothesis** (the lane's): the stale backlog is eviction, not grading failure. Most stale paper rows sit in the
+archive, which `settle_orders` never reads; graded by the same code they would mostly grade.
+
+**Population.** Re-derived at the dry run's own read time, with the 16:06Z definition: `full_history_orders()`,
+`mode == paper`, `status == filled`, no `outcome`, `commence_time` more than 48 h before the read. The 16:06Z list was
+not saved as identities, so the 1,834 is quoted beside the new count and the gap is stated, not reconciled row by row.
+Split by where each row sits: the LIVE document (owned by `settle_orders`, not this pass) vs ARCHIVE ONLY.
+
+**Primary arm, the verdict.** Each archive-only stale row (the last archived copy per identity, identity absent from
+the live document) is asked exactly what `settle_orders(selected_date)` would ask had the row stayed in the document:
+`_default_resolver(selected_date)`, then `_our_verdict` -> `resolve_bet_status` -> `grade_order`. "Would grade" means a
+verdict comes back. Paper rows skip the live-only venue grace and Kalshi-exit steps, exactly as in `settle_orders`.
+
+**Falsification, threshold fixed now.** If FEWER than 50% of the archive-only stale rows would grade under the primary
+arm, eviction is not the cause for most of them: the lane re-scopes to the dominant named reasons, and the backfill is
+not proposed as the fix. At 50% or more, eviction is confirmed as the dominant cause, and the remainder is reported by
+reason as a second mechanism.
+
+**Diagnostic arm, reported separately and NOT part of the verdict.** Rows the primary arm refuses are re-asked with the
+resolver bound to the game's kickoff date (Central) instead of the slate date. Why, known before any data: the soccer,
+MLB and NBA resolvers read only the slate date's state, while NFL and NCAAF search the kickoff date first
+(`bet_status_nfl.order_capture_dates`); and 995 of the 1,834 were booked 3 or more days ahead.
+
+**Read-only.** The dry run writes no ledger and no archive. Resolver side-writes are suppressed and COUNTED: soccer's
+`_remember_finals`, the NFL/NCAAF lazy capture (forced to `persist=False`), and any `refresh_state_store` write. External
+GETs still happen (ESPN scoreboards on a capture miss, NHL api-web): the same reads settlement already makes.
+
+**Reporting.** Counts by sport and Central game date, every refusal by name, and every rate with its n.
+
+**Mechanism checked in code before building on it.** `archived_orders` keeps the last copy per identity in shard order,
+and a graded copy appends to the same month shard (keyed by `selected_date`), so it wins. `_with_archive` lets the live
+document beat any archived copy. Both are pinned by tests rather than taken on trust.
