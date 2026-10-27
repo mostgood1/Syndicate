@@ -206,3 +206,28 @@ paired comparison; the FIT-wide 1.142 is context only.
 - Anything else → **AMBIGUOUS.** Report it as such, with no attribution.
 - Also reported: the corr(sim min, pts) median, and the per-minute ratio. In each arm, a draw count
   (on_n ≥ 0 share) proves the counter ran.
+
+**E4 LOCATION CHECK — RESULT 2026-10-27 15:06Z (10:06 CDT). VERDICT: CONFIG** (the rule pre-registered b497373a).
+Both arms ran on 87 games / 17,400 draws over the 12 sweep dates, with 0 errors and on-floor counts present in
+100% of draws:
+
+| arm | player-games | Var(PRA)/sum median | per-minute | corr(sim min, pts) |
+|---|---|---|---|---|
+| PDPROD (production config) | 1,342 | **1.002** | 0.968 | **0.178** |
+| fit_pd candidate, same 12 dates | 1,415 | 1.138 | 0.956 | 0.412 |
+| E4, production served | 846 | 0.997 | — | — |
+| real | — | 1.196 | — | — |
+
+**Reading:**
+- The production ENGINE CONFIG alone reproduces E4's near-independence (1.002 vs 0.997). The serving path needs no
+  separate explanation. The candidate config restores most of the real covariance.
+- Per minute, the two arms match (0.968 vs 0.956). The difference is how much the draw's playing time co-moves with
+  production: corr 0.18 vs 0.41.
+- **Believed, not tested:** the candidate's playing-time levers produce that co-movement (bench_weight_boost=3,
+  blowout_bench_rest, foul trouble / foul-out in sim, score_effect_k). Which field is owed if anyone needs it; it is
+  not needed for the decision.
+- **Consequence:** E4's covariance rides with the forward test (3020b556) via nba_engine_config.json. No separate
+  serving fix exists to make.
+- **Owed once production draws carry the covariance:** k_combo for pr/pa/ra (`nba_prop_calibration.py:19-21`) and
+  the SGP pool's PR/PA/RA Normal assume independence. Both must be re-read when the config goes live.
+- Artifacts: `C:/tmp/bball_sc/r2s/pra_paired.{py,json}`, `run_pdprod.sh`, draws `C:/tmp/bball_sc/sweep/PD_prod`.
