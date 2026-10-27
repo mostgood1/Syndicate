@@ -54554,3 +54554,23 @@ which is about the two sizing bases and not about the refusal boundary.
   - NFL: 30.1% vs 32.8% (195).
   - Earlier right-player check (replay): 1,265 / 1,265 NHL and 246 / 246 NFL.
 - **OWED:** the nightly `SGP_PAPER` lines in `~/syndicate-prod/logs/cheat_sheets_reconcile.log` after the 11:50 PM CT reconcile. They are the first to carry `unresolved_leg`. A session-side read-only watcher is waiting for them.
+
+## 2026-10-27 16:30Z -- READING: clv openings ceiling (todo #732) -- **MET**
+
+- **What:** the forward reading owed on `22e3a0aa` (lane clv-openings-ceiling). The fix was loaded by the 20:35:12Z 10-22 refresh-worker restart. The scheduled task was due 10-26 and fired 10-27.
+- **How:** read-only on the fleet, refresh-worker derived env, `nice -n 19`, 16:25Z 10-27. No restart, no ff, no writes.
+  - The original `clv_openings_forward_reading.py` was gone (its side-session-notes folder no longer exists). I rebuilt it with the findings file's instrument: trail (movement key, line, book) combos vs. the openings' (movement key, line, book) set. It is at `C:/tmp/clv_dep/clv_openings_forward_reading.py`. `fleet_run.py` came from `C:/tmp/clv_dep/`.
+  - Log counts are over `refresh-worker.log*` + `live-odds-worker.log*` (.0-.5), on lines with `[clv_opening_ledger]` and `date=<D>`.
+- **Per date** (old cap 33,554,432 B; new caps 64 MiB per sport, 128 MiB per day):
+
+| date | bytes | records | trail combos | missing_from_openings | OPENINGS lines (new format) | CEILING_HIT | dropped>0 | verdict |
+|---|---|---|---|---|---|---|---|---|
+| 10-23 Fri | 43,676,307 | 42,293 | **trail pruned (0 files)** | not measurable | 302 (286) | 0 | 0 | no drop signal |
+| 10-24 Sat | 52,704,926 | 50,693 | 50,693 | **0** | 240 (240) | 0 | 0 | PASS |
+| 10-25 Sun | **54,860,643** | 53,380 | 53,380 | **0** | 275 (275) | 0 | 0 | PASS |
+| 10-26 Mon | 45,764,807 | 44,358 | 44,358 | **0** | 349 (349) | 0 | 0 | PASS |
+
+- **Key result:** all four dates passed the old 32 MiB cap. Three of them are proven complete: trail combos == openings combos in both directions, `only_in_openings=0`. The largest is **10-25 at 54,860,643 B (1.63x the old cap)**: nba 21.2 MB, nfl 18.5 MB, soccer 11.5 MB. /Under the old code it would have stopped at 32 MiB and lost about 20,000 openings across every sport.
+  - The largest sport-day is nba 10-26 at 22,751,011 B (34% of the 64 MiB per-sport ceiling). The largest day is 41% of the 128 MiB per-day ceiling.
+- **10-23 caveat:** its trail was pruned (`_RETAIN_DAYS`=4) before this late run, so exact completeness for 10-23 is not measurable and never will be. It has 0 CEILING_HIT and 0 dropped>0 lines. Its 16 old-format OPENINGS lines are all from before the restart: the last was at 07:34:43Z 10-22, in `refresh-worker.log.4`/`.5`. The first new-format line for date 10-23 was at 20:52:11Z 10-22 (`dropped=0 bytes=11281204`).
+- **Verdict: MET.** Ceiling hits: 0. dropped>0 lines: 0. Missing openings on the 3 trail-covered dates: 0, out of 148,431 trail combos. Nothing missing in any sport.
