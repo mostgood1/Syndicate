@@ -10,9 +10,14 @@
     - right-player check: 1,265 / 1,265 NHL and 246 / 246 NFL id-less legs match the value the sheet graded itself;
     - `SGP_PAPER` NHL 19.4% vs 22.1% -> **22.3% vs 22.0%** (799 tickets);
     - NFL 29.4% vs 34.5% -> 30.1% vs 32.8%.
-  - **Owed, both user decisions:**
-    - a fleet ff to `84967f75`;
-    - a one-off `refresh_leg_actuals` back to 10-16. The nightly refresh only reaches 7 days back, so the 10-16..10-19 NHL legs (171 of the 493) stay pending without it.
+  - **DECIDED 2026-10-27 ~10:45 AM CT** (user, verbatim): "Don't ff the fleet yourself. Let the fix ride the next fleet ff (the one that ships 06378fa9), then do the one-off leg-actuals backfill to 10-16 and read the next nightly SGP_PAPER."
+    - **The premise moved before the decision arrived.** The `06378fa9` ff ran at 14:59:41Z, two minutes after `84967f75` landed. It stopped at `06378fa9`, by the own-SHA rule, so the fix did NOT ride it. The fleet is at `06378fa9`.
+    - **So the fix rides the NEXT fleet ff to any SHA at or after `84967f75`.** From `06378fa9`, that ff adds only `84967f75` plus the read-only `149936fe`.
+    - **To the next fleet-ff shipper:** this lane consents to `84967f75` riding along. It touches the nightly reconcile's SGP grading only, and no service loads it.
+  - **Backfill, ready and user-approved:** `C:\tmp\sgpcal\backfill_apply.sh` runs the reconcile's own `refresh_leg_actuals` back to 10-16, with the fleet's code.
+    - It REFUSES unless fleet HEAD contains `84967f75` and no reconcile is running.
+    - Dry run, writes intercepted: 15 reconciled files gain leg actuals and none loses a key. Six of them lie outside the nightly 7-day window (NHL 10-16..10-19, NFL 10-18 / 10-19).
+  - **Then:** read the next nightly `SGP_PAPER`.
   - **(d) LEAD, not fixed (shared helper, outside this lane):** `prop_evidence.common.initial_key("V. Trocheck")` returns `"trocheck"`, because `name_key_loose` drops a "v" token as a roman-numeral suffix.
     - So every NHL player with a V first initial never matches the NHL game log, in the hit-rate pool as well.
     - It accounts for 5 of the 8 NHL legs that still do not resolve.
