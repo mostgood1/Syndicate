@@ -273,6 +273,22 @@ def test_a_slice_over_the_page_cap_is_split(tmp_path):
     summary = _run(tmp_path, FakeKalshi(combos, page_size=5), T0, lookback_s=900, page_cap=4)
     s = summary["series"]["KXMVECROSSCATEGORY"]
     assert s["splits"] >= 1 and s["kept"] == 59 and len(_stored(tmp_path)) == 59
+    # a split re-reads both halves: the thrown-away pages are counted, and the budget paid for them
+    assert s["discarded_pages"] == 4 * s["splits"] and summary["pages"] == s["pages"] + s["discarded_pages"]
+
+
+def test_slices_are_sized_from_the_last_slices_page_density(tmp_path, monkeypatch):
+    monkeypatch.setattr(cc, "TARGET_SLICE_PAGES", 2)
+    end = T0 - cc.SETTLE_LAG_S
+    combos = [_combo(f"KXMVECROSSCATEGORY-S1-{i}", NBA_SGP_LEGS, end - 10 - i) for i in range(6)]
+    fake = FakeKalshi(combos, page_size=1)
+    _run(tmp_path, fake, T0, lookback_s=900)
+    state = json.loads((cc.store_dir(tmp_path) / "state.json").read_text())["series"]["KXMVECROSSCATEGORY"]
+    assert state["pages_per_s"] == pytest.approx(6 / 900)
+    fake.calls.clear()
+    _run(tmp_path, fake, T0 + 900)
+    spans = [c[1]["max_settled_ts"] - c[1]["min_settled_ts"] for c in fake.calls if c[0] == "/markets"]
+    assert spans[0] == 300 and sum(spans) == 900  # 2 pages / (6 pages / 900 s); then the empty slice widens it
 
 
 def test_the_budget_stops_between_slices_and_the_next_run_resumes(tmp_path):

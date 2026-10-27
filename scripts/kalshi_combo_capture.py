@@ -107,8 +107,11 @@ NON_GAME_SERIES_TOKENS = ("MENTION",)
 SETTLE_LAG_S = 300
 DEFAULT_LOOKBACK_S = 3600
 PAGE_LIMIT = 1000
-SLICE_PAGE_CAP = 300  # a slice needing more is split in half (down to MIN_SLICE_S)
+SLICE_PAGE_CAP = 300  # a slice needing more is split in half (down to MIN_SLICE_S); its pages are DISCARDED
 MIN_SLICE_S = 60
+# A slice is sized from the last one's page density to need about this many pages. Fixed 900 s slices hit the cap
+# 14 times in the 26-hour dry run and threw away 4,200 of 13,467 pages (a split re-reads both halves).
+TARGET_SLICE_PAGES = 100
 MAX_PAGES_PER_RUN = 900
 MAX_RUN_S = 1800
 LOCK_STALE_S = 2 * 3600
@@ -396,6 +399,7 @@ def sweep_window(get: Callable[..., Any], series: str, lo: int, hi: int, *, budg
                                        page_cap=page_cap, keep_untraded=keep_untraded)
         stats_a.update(stats_b)
         stats_a["splits"] += 1
+        stats_a["discarded_pages"] += page_cap
         return rows_a + rows_b, stats_a
 
 
@@ -636,7 +640,11 @@ def _run_locked(root: Path, *, get, now, lookback_s, max_pages, max_seconds, ser
         swept = int(st.get("swept_to") or (end - int(lookback_s)))
         record["from"] = ms.iso(swept + 1)
         while swept < end and not budget.stopped:
-            lo, hi = swept + 1, min(swept + int(slice_s), end)
+            span = int(slice_s)
+            density = float(st.get("pages_per_s") or 0.0)
+            if density > 0:
+                span = max(MIN_SLICE_S, min(span, int(TARGET_SLICE_PAGES / density)))
+            lo, hi = swept + 1, min(swept + span, end)
             # Stop BEFORE a slice the budget cannot finish: a slice cut short is discarded, pages and all.
             if not budget.allow(int(st.get("last_slice_pages") or 1)):
                 break
@@ -663,6 +671,7 @@ def _run_locked(root: Path, *, get, now, lookback_s, max_pages, max_seconds, ser
             swept = hi
             st["swept_to"] = hi
             st["last_slice_pages"] = int(stats["pages"])
+            st["pages_per_s"] = int(stats["pages"]) / (hi - lo + 1)
             ms.save_json(state_path, state)
         if swept >= end:
             st["last_sweep_at"] = now
