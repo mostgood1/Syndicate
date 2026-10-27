@@ -123,3 +123,40 @@ and ESPN cache; the classification is per team, per game.
 
 **Use:** JOIN is a readout defect, so fix the join and re-read Phase 1. DNP_LISTED / ABSENT are minutes-allocation
 inputs (pool / injury feed), so hand them to the nba-sim-minutes lanes with the numbers. Real-only are pool omissions.
+
+## PHASE 2 STEP 1 — RESULT 2026-10-27 12:59Z
+
+Data: fit_pd, 1,604 team-games; `--gaps` mode of the readout; JSON at C:/tmp/bball_sc/r2s/phase2_gaps.json.
+
+| class | player-games | sim min per team-game | mean sim min per player | note |
+|---|---|---|---|---|
+| JOIN | 5 | 0.1 | 31.6 | **all 5 false positives** (Giannis~Thanasis, Stephen~Seth Curry, LeBron~Bronny): real join misses ≈ 0 |
+| DNP_LISTED (coach's decision) | 1,243 | 7.1 | 9.1 | rotation / depth: the sim plays them |
+| DNP_LISTED (other: injury / rest / suspension) | 295 | 4.5 | **24.3** | injury feed: listed injured, sim gives starter-like minutes |
+| ABSENT (not on the box) | 1,978 | **19.8** | 16.1 | inactive / injured / not with the team |
+| REAL_ONLY (played, not simulated) | 2,983 | **29.6 actual min** per team-game | 15.9 actual | 67% played ≥ 10 min |
+
+**Reading:**
+- **The Phase-1 join is sound.** The readout is not the source of the 3,513 / 2,980.
+- **About 31 sim minutes per team-game go to players who do not play, and about 30 real minutes go to players the
+  sim never had.** That is about 12–13% of a team's 240 minutes on the wrong people, before any distribution
+  question.
+  - This matches the production finding of the nba-sim-minutes-allocation lane (10-21: 37.7 DNP sim min/side).
+- The ABSENT examples show two patterns:
+  - (a) **equal water-filled minutes:** IND 2025-11-01 had 8 absent players at ≈ 12.5 sim min each;
+  - (b) **players the sim placed on a team whose box does not list them at all.** IND 2025-11-01 lists Ivica Zubac
+    (12.6 sim min).
+  - REAL_ONLY includes high-minute players: SAC 2025-11-01 Dennis Schröder, 37 min, not simulated.
+  - Both point to the backtest's as-of ROSTER / pool inputs: stale or leaked rosters, the injury feed, the
+    equal-split fill. **Believed, not verified:** whether (b) is a leak from a later roster or a real early-season
+    transaction. Owed: a per-example roster check.
+- **Phase-1 consequence:** the 14,291 matched player-games are the players BOTH sides had. The minutes-distribution
+  defect (miss .43) is measured on them alone; the misallocation above is on top of it.
+
+**Hand-off:** the misallocation is input (pool / roster / injury) territory, owned by the nba-sim-minutes-allocation /
+-history-path lanes. Numbers above; examples in the JSON.
+
+**Next for this lane:**
+- (i) the roster check on the ABSENT / REAL_ONLY examples (leak vs transaction);
+- (ii) the minutes-variance mechanism (Phase 2 step 2), measured on the matched population so it is separable from
+  the pool fix.

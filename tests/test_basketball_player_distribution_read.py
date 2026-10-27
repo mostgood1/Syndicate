@@ -35,3 +35,12 @@ def test_narrow_sim_is_flagged_with_width_above_one():
 
 def test_norm_strips_suffixes_and_accents():
     assert r.norm("Hugo González Jr.") == "hugo gonzalez"
+
+
+def test_join_rule_matches_name_variants():
+    assert r.names_match(r.norm("Nicolas Claxton"), r.norm("Nic Claxton"))
+    assert r.names_match(r.norm("Herb Jones"), r.norm("Herbert Jones"))
+    assert not r.names_match(r.norm("Jalen Williams"), r.norm("Kenrich Williams"))
+    # Known limitation of the pre-registered rule (bf73ce71): same last name + first initial also matches real
+    # teammates. It can only misfire when one is sim-only and the other real-only in the same game.
+    assert r.names_match(r.norm("Jalen Williams"), r.norm("Jaylin Williams"))
