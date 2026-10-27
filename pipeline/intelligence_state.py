@@ -7899,6 +7899,23 @@ class IntelligenceStateService:
             except Exception as exc:
                 print(f"[intelligence_state] SETTLEMENT_FAILED error={exc}", flush=True)
 
+            # ROWS THE RECORD CAP MOVED OUT UNGRADED (`#744`, lane
+            # `paper-evicted-grading`). `settle_orders` reads only the live
+            # document; this grades archive-only paper rows with the same
+            # resolver. DEFAULT OFF (`SYNDICATE_PAPER_ARCHIVED_GRADING`), at most
+            # hourly, bounded to 14 days / 6 slates, behind its own memory token.
+            try:
+                from syndicate.features.shared.paper_settlement import maybe_settle_archived
+
+                maybe_settle_archived(
+                    today=str(selected_date or "").strip(),
+                    guard=lambda: _abort_if_memory_critical(
+                        "archived_settlement", 300 * 1024 * 1024, token="ARCHIVED_SETTLEMENT_GUARD_SKIP"
+                    ),
+                )
+            except Exception as exc:
+                print(f"[intelligence_state] ARCHIVED_SETTLEMENT_FAILED error={type(exc).__name__}: {exc}", flush=True)
+
             # THE LEARNING LOOP: per-cell min_ev proposals from what just
             # settled. Once a day (its own gate), never raises, and in the
             # default `shadow` mode it changes nothing the commit reads.

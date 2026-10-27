@@ -53,8 +53,11 @@ from typing import Any
 
 __all__ = [
     "american_profit",
+    "archived_grading_enabled",
     "dates_needing_settlement",
     "grade_order",
+    "maybe_settle_archived",
+    "settle_archived_orders",
     "settle_orders",
     "settled_decisions_by_sport",
     "settlement_summary",
@@ -408,6 +411,31 @@ def _check_venue_grade(
     return "agrees" if agrees else "conflict"
 
 
+def _stamp_grade(order: dict[str, Any], verdict: Mapping[str, Any], resolved: Mapping[str, Any]) -> None:
+    """Write a verdict onto its order. Mutates `order`.
+
+    ONE COPY, shared by `settle_orders` (the live document) and
+    `settle_archived_orders` (the archive), so a row graded after eviction
+    carries exactly the fields a row graded before it does.
+    """
+    order["outcome"] = verdict["outcome"]
+    order["pnl_dollars"] = verdict["pnl_dollars"]
+    order["pnl_gross_dollars"] = verdict["pnl_gross_dollars"]
+    order["settled_value"] = verdict["settled_value"]
+    # THE SCOREBOARD, where the resolver supplied one. `settled_value` is
+    # the margin, and a margin is self-consistent under an inverted sign
+    # convention -- so it can never falsify one. The two raw scores can,
+    # and storing them is what makes the grade audit self-service instead
+    # of a request for someone to go and look a game up.
+    for field in ("home_score", "away_score", "home_name", "away_name"):
+        if resolved.get(field) is not None:
+            order[field] = resolved[field]
+    # NOT `settled_at` -- that is the venue's clock and is already stamped.
+    # See the module docstring; conflating them is the whole reason this
+    # number read as zero.
+    order["graded_at"] = _utc_now()
+
+
 def settle_orders(
     selected_date: str,
     *,
@@ -573,22 +601,7 @@ def settle_orders(
             }
             order["exit_applied"] = exit_detail
 
-        order["outcome"] = verdict["outcome"]
-        order["pnl_dollars"] = verdict["pnl_dollars"]
-        order["pnl_gross_dollars"] = verdict["pnl_gross_dollars"]
-        order["settled_value"] = verdict["settled_value"]
-        # THE SCOREBOARD, where the resolver supplied one. `settled_value` is
-        # the margin, and a margin is self-consistent under an inverted sign
-        # convention -- so it can never falsify one. The two raw scores can,
-        # and storing them is what makes the grade audit self-service instead
-        # of a request for someone to go and look a game up.
-        for field in ("home_score", "away_score", "home_name", "away_name"):
-            if resolved.get(field) is not None:
-                order[field] = resolved[field]
-        # NOT `settled_at` -- that is the venue's clock and is already stamped.
-        # See the module docstring; conflating them is the whole reason this
-        # number read as zero.
-        order["graded_at"] = _utc_now()
+        _stamp_grade(order, verdict, resolved)
         graded += 1
         outcomes[verdict["outcome"]] = outcomes.get(verdict["outcome"], 0) + 1
 
@@ -983,6 +996,355 @@ def dates_needing_settlement(
         {"date": e["date"], "orders": e["orders"], "sports": sorted(e["sports"])}
         for e in ordered[: max(0, int(max_dates))]
     ]
+
+
+# ---------------------------------------------------------------------------
+# ARCHIVED ROWS  [2026-10-27, lane paper-evicted-grading, todo #744]
+# ---------------------------------------------------------------------------
+#
+# THE GRADER COULD NOT SEE A ROW THE CAP HAD MOVED. The live ledger document is
+# capped at `execution_ledger._MAX_RECORDS` (3,000), and `_trim_to_cap` moves
+# SETTLED paper rows out first, then UNGRADED ones once no settled row is left.
+# `settle_orders` reads only the document, so a row that left ungraded stayed
+# ungraded for good -- the trim's own docstring says so.
+#
+# MEASURED 2026-10-27 16:06Z on the fleet (`.syndicate/findings_2026-10-27_
+# paper_evicted_ungraded.md`): 1,834 filled paper orders whose game started
+# more than 48 h earlier had no outcome, and 1,807 of them (98.5%) were in the
+# archive only. Not at random: NCAAF game lines, soccer corners, and bets
+# booked days ahead, because ~600 paper rows a day pass through a 3,000-row
+# document.
+#
+# So this grades them where they are. Same resolver, same `_our_verdict`, same
+# `grade_order` and the same fields (`_stamp_grade`) as `settle_orders`. The
+# graded copy is APPENDED to the archive, where `archived_orders` keeps the
+# last copy per identity, so it supersedes the ungraded one without rewriting a
+# line.
+#
+# THE RULES `settle_orders` KEEPS, KEPT HERE:
+#   * grade once -- a row whose last archived copy carries an outcome is not a
+#     candidate, and graded copies are appended once, under a lock;
+#   * the live document wins -- a row whose identity is in the document is
+#     `settle_orders`' to grade, never this pass's. `_with_archive` serves the
+#     document's copy over any archived one, so grading the archived copy
+#     would be invisible at best and a second, different grade at worst;
+#   * a push is not a loss -- `grade_order` decides that, not this code.
+#
+# PAPER ONLY. `_trim_to_cap` never moves anything else out, and a live row's
+# venue-first grace and exit handling mean nothing for a row nobody holds.
+#
+# DEFAULT OFF (`SYNDICATE_PAPER_ARCHIVED_GRADING`, absent = off). Turning it on
+# is a fleet decision under the deploy locks, and so is the one-off backfill
+# (`scripts/backfill_archived_paper_grades.py`, a dry run by default).
+ARCHIVED_GRADING_ENV = "SYNDICATE_PAPER_ARCHIVED_GRADING"
+GRADED_FROM_ARCHIVE = "archive"
+REASON_GAME_NOT_STARTED = "game_not_started"
+
+# The worker's bounds, the straggler sweep's shape (`#241`): a window on the
+# slate date and a cap on resolver builds per pass. Plus an hourly cadence,
+# because a row that never grades (an unmapped market) would otherwise cost a
+# resolver build on every tick for as long as it sits in the window.
+_ARCHIVED_MAX_AGE_DAYS = 14
+_ARCHIVED_MAX_DATES = 6
+_ARCHIVED_WORKER_INTERVAL_SECONDS = 3600.0
+_ARCHIVED_WORKER_STATE: dict[str, Any] = {"last_run": None, "announced_off": False}
+
+
+def archived_grading_enabled() -> bool:
+    """`SYNDICATE_PAPER_ARCHIVED_GRADING` in {1, true, on, yes}. ABSENT IS OFF."""
+    import os
+
+    return str(os.environ.get(ARCHIVED_GRADING_ENV) or "").strip().lower() in {"1", "true", "on", "yes"}
+
+
+def _archived_grading_lock():
+    """Exclusive and non-blocking across processes; yields False when held.
+
+    Two graders appending at once (the worker pass and the backfill, say) could
+    each grade one row and append two copies -- two grades of one bet, the
+    later one winning by file position. The lock makes it one.
+    """
+    from contextlib import contextmanager
+
+    from syndicate.features.shared.execution_ledger import _archive_dir
+
+    @contextmanager
+    def held():
+        directory = _archive_dir()
+        directory.mkdir(parents=True, exist_ok=True)
+        with open(directory / ".archived_grading.lock", "a", encoding="utf-8") as handle:
+            try:
+                import fcntl
+            except ImportError:  # Windows dev box: one process, no lock needed
+                yield True
+                return
+            try:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError:
+                yield False
+                return
+            try:
+                yield True
+            finally:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+    return held()
+
+
+def _months_between(floor: str, today: str) -> list[str]:
+    """Every "YYYY-MM" from `floor`'s month to `today`'s, inclusive."""
+    from datetime import date as _date
+
+    start, end = _date.fromisoformat(floor), _date.fromisoformat(today)
+    months, cursor = [], _date(start.year, start.month, 1)
+    while cursor <= end:
+        months.append(cursor.strftime("%Y-%m"))
+        cursor = _date(cursor.year + cursor.month // 12, cursor.month % 12 + 1, 1)
+    return months
+
+
+def settle_archived_orders(
+    *,
+    today: str,
+    enabled: bool | None = None,
+    dry_run: bool = False,
+    max_age_days: int | None = _ARCHIVED_MAX_AGE_DAYS,
+    max_dates: int | None = _ARCHIVED_MAX_DATES,
+    resolver_factory: Callable[[str], Callable[[Mapping[str, Any]], dict[str, Any]]] | None = None,
+    closer: Callable[[Sequence[Mapping[str, Any]], str], Mapping[str, Any]] | None = None,
+    now: datetime | None = None,
+    include_rows: bool = False,
+) -> dict[str, Any]:
+    """Grade archive-only, ungraded, filled PAPER rows whose game has started.
+
+    Candidates: the last archived copy per identity, `mode == paper`, filled,
+    no `outcome`, `selected_date` in [today - max_age_days, today], identity NOT
+    in the live document, and `commence_time` in the past (a row without one
+    goes to the resolver, which decides). Grouped by `selected_date` and graded
+    with that date's resolver -- the binding `settle_orders(selected_date)`
+    would have used had the row stayed in the document. Newest dates first, at
+    most `max_dates` of them; the rest are reported as deferred, not dropped.
+
+    `dry_run` grades in memory and writes nothing: no append, no closing-mark
+    read, no lock file. `include_rows` returns one record per candidate (and per
+    not-yet-started row) for the backfill's report.
+    """
+    from datetime import date as _date
+
+    from syndicate.features.shared.execution_ledger import (
+        PAPER,
+        LedgerError,
+        _archive_rows,
+        _order_identity,
+        _read_for_merge,
+        archived_orders,
+    )
+
+    if enabled is None:
+        enabled = archived_grading_enabled()
+    if not enabled:
+        return {"status": "skipped", "reason": "disabled"}
+
+    day = str(today or "").strip()
+    try:
+        today_date = _date.fromisoformat(day)
+    except ValueError:
+        # An unreadable `today` must not widen the window to the whole archive.
+        return {"status": "skipped", "reason": "bad_today"}
+    floor = None if max_age_days is None else (today_date - timedelta(days=int(max_age_days))).isoformat()
+    current = now or datetime.now(timezone.utc)
+
+    if dry_run:
+        from contextlib import nullcontext
+
+        lock = nullcontext(True)
+    else:
+        lock = _archived_grading_lock()
+
+    with lock as acquired:
+        if not acquired:
+            print("[paper_settlement] ARCHIVED_SETTLE_BUSY -- another process holds the archived-grading lock", flush=True)
+            return {"status": "skipped", "reason": "busy"}
+
+        # THE STRICT READ. `_load` turns a failed store read into an EMPTY
+        # document, and an empty document would make every archived row look
+        # archive-only -- including the ones `settle_orders` owns.
+        try:
+            live = _read_for_merge()
+        except LedgerError as exc:
+            print(f"[paper_settlement] ARCHIVED_SETTLE_REFUSED reason=live_document_unreadable {exc}", flush=True)
+            return {"status": "skipped", "reason": "live_document_unreadable"}
+        live_orders = [o for o in (live.get("orders") or []) if isinstance(o, Mapping)]
+        archived = archived_orders(None if floor is None else _months_between(floor, day))
+        if archived and not live_orders:
+            # The trim keeps 3,000 rows, so an archive beside an EMPTY document
+            # is a read that lied, not a ledger that emptied. Same refusal.
+            print("[paper_settlement] ARCHIVED_SETTLE_REFUSED reason=live_document_empty", flush=True)
+            return {"status": "skipped", "reason": "live_document_empty"}
+        live_ids = {_order_identity(o) for o in live_orders}
+
+        in_live = 0
+        not_started = 0
+        rows_out: list[dict[str, Any]] = []
+        by_date: dict[str, list[Mapping[str, Any]]] = {}
+
+        def _record(row: Mapping[str, Any], *, outcome: str | None = None, reason: str | None = None) -> None:
+            if include_rows:
+                rows_out.append(
+                    {
+                        "identity": _order_identity(row),
+                        "sport": str(row.get("sport") or ""),
+                        "selected_date": str(row.get("selected_date") or ""),
+                        "commence_time": row.get("commence_time"),
+                        "market": row.get("market"),
+                        "venue": row.get("venue"),
+                        "outcome": outcome,
+                        "reason": reason,
+                    }
+                )
+
+        for row in archived:
+            if str(row.get("mode") or "") != PAPER or row.get("outcome"):
+                continue
+            if str(row.get("status") or "") != "filled":
+                continue
+            slate = str(row.get("selected_date") or "").strip()
+            if not slate or slate > day or (floor is not None and slate < floor):
+                continue
+            if _order_identity(row) in live_ids:
+                in_live += 1
+                continue
+            start = _parse_utc(row.get("commence_time"))
+            if start is not None and start > current:
+                not_started += 1
+                _record(row, reason=REASON_GAME_NOT_STARTED)
+                continue
+            by_date.setdefault(slate, []).append(row)
+
+        dates = sorted(by_date, reverse=True)
+        deferred: list[str] = []
+        if max_dates is not None:
+            dates, deferred = dates[: max(0, int(max_dates))], dates[max(0, int(max_dates)):]
+        factory = resolver_factory or _default_resolver
+
+        reasons: dict[str, int] = {}
+        outcomes: dict[str, int] = {}
+        unmapped: dict[str, int] = {}
+        by_sport: dict[str, dict[str, int]] = {}
+        graded_rows: list[dict[str, Any]] = []
+        marks_total = {"stamped": 0, "resolved": 0}
+        for slate in dates:
+            resolver = factory(slate)
+            graded_here: list[dict[str, Any]] = []
+            for row in by_date[slate]:
+                # A COPY: `archived_orders` shares its rows with the parse cache.
+                copy = dict(row)
+                sport = str(copy.get("sport") or "").strip().lower() or "unknown"
+                tally = by_sport.setdefault(sport, {"graded": 0, "ungraded": 0})
+                verdict, resolved, refusal = _our_verdict(copy, resolver)
+                if verdict is None:
+                    reasons[refusal] = reasons.get(refusal, 0) + 1
+                    if refusal == "unmapped_market":
+                        name = str(copy.get("market") or "<absent>")
+                        unmapped[name] = unmapped.get(name, 0) + 1
+                    tally["ungraded"] += 1
+                    _record(copy, reason=refusal)
+                    continue
+                _stamp_grade(copy, verdict, resolved)
+                copy["graded_from"] = GRADED_FROM_ARCHIVE
+                graded_here.append(copy)
+                outcomes[verdict["outcome"]] = outcomes.get(verdict["outcome"], 0) + 1
+                tally["graded"] += 1
+                _record(copy, outcome=verdict["outcome"])
+            if graded_here and not dry_run:
+                # The close, on the row, exactly as `settle_orders` stamps it on
+                # the rows it grades. Never raises (see `stamp_closing_marks`).
+                marks = stamp_closing_marks(graded_here, slate, closer=closer, now=current)
+                marks_total["stamped"] += int(marks.get("stamped") or 0)
+                marks_total["resolved"] += int(marks.get("resolved") or 0)
+            graded_rows.extend(graded_here)
+
+        appended = 0
+        archive_error = None
+        if graded_rows and not dry_run:
+            try:
+                _archive_rows(graded_rows)
+                appended = len(graded_rows)
+            except Exception as exc:  # noqa: BLE001
+                # Nothing was claimed: the ungraded copies are still the last
+                # ones, so the next pass simply tries again.
+                archive_error = f"{type(exc).__name__}: {exc}"
+
+    candidates = sum(len(rows) for rows in by_date.values())
+    print(
+        "[paper_settlement] ARCHIVED_SETTLED"
+        f" dry_run={dry_run} today={day} floor={floor}"
+        f" candidates={candidates} graded={len(graded_rows)} appended={appended}"
+        f" outcomes={outcomes} ungraded={reasons}"
+        f" in_live_document={in_live} not_started={not_started}"
+        f" dates={len(dates)} deferred_dates={len(deferred)}"
+        f" by_sport={dict(sorted(by_sport.items()))}"
+        f" closing_marks={marks_total}"
+        + (f" ARCHIVE_APPEND_FAILED={archive_error}" if archive_error else ""),
+        flush=True,
+    )
+    if unmapped:
+        print(
+            f"[paper_settlement] ARCHIVED_UNMAPPED_MARKETS {dict(sorted(unmapped.items(), key=lambda kv: -kv[1]))}",
+            flush=True,
+        )
+    result: dict[str, Any] = {
+        "status": "ok" if archive_error is None else "error",
+        "dry_run": dry_run,
+        "today": day,
+        "floor": floor,
+        "candidates": candidates,
+        "graded": len(graded_rows),
+        "appended": appended,
+        "outcomes": outcomes,
+        "ungraded": reasons,
+        "unmapped_markets": dict(sorted(unmapped.items(), key=lambda kv: -kv[1])),
+        "in_live_document": in_live,
+        "game_not_started": not_started,
+        "dates": dates,
+        "deferred_dates": deferred,
+        "by_sport": by_sport,
+        "closing_marks": marks_total,
+        "archive_error": archive_error,
+    }
+    if include_rows:
+        result["rows"] = rows_out
+    return result
+
+
+def maybe_settle_archived(*, today: str, guard: Callable[[], bool] | None = None) -> dict[str, Any]:
+    """The refresh-worker's entry point: off unless enabled, at most hourly.
+
+    `guard` returns True to skip this tick (the worker's memory guard); it is
+    asked only once the pass is enabled and due, so a disabled or
+    not-yet-due pass costs no memory snapshot.
+    """
+    import time
+
+    if not archived_grading_enabled():
+        if not _ARCHIVED_WORKER_STATE["announced_off"]:
+            # ONCE PER PROCESS, so "off" is readable in the log and is never
+            # mistaken for "on and finding nothing".
+            _ARCHIVED_WORKER_STATE["announced_off"] = True
+            print(
+                f"[paper_settlement] ARCHIVED_GRADING_OFF {ARCHIVED_GRADING_ENV} is unset or false"
+                " -- archived ungraded paper rows are not graded on this process",
+                flush=True,
+            )
+        return {"status": "skipped", "reason": "disabled"}
+    clock = time.monotonic()
+    last = _ARCHIVED_WORKER_STATE["last_run"]
+    if last is not None and clock - last < _ARCHIVED_WORKER_INTERVAL_SECONDS:
+        return {"status": "skipped", "reason": "interval"}
+    if guard is not None and guard():
+        return {"status": "skipped", "reason": "memory_guard"}
+    _ARCHIVED_WORKER_STATE["last_run"] = clock
+    return settle_archived_orders(today=today, enabled=True)
 
 
 def audit_game_line_grades(selected_date: str, *, limit: int = 25) -> dict[str, Any]:
