@@ -1522,6 +1522,22 @@ death, never life — do not invert it.
 - Verification: after the coordinator's fleet restart, /api/portfolio/live?on=2026-10-23 shows all 5 graded, each pair netting ~+0.12..+0.16 less fees
 - Blocked by: none
 
+### sgp-leg-grading — OPEN — opened 2026-10-27 — session 138eb1d7-e336-42da-986e-fafe0233f896
+- **STATUS `[2026-10-27 14:55Z]`: BUILT and measured, on main as `84967f75`, NOT on the fleet.**
+  - The Verification ran: a read-only replay on the fleet ledgers (<= 10-26).
+    - Pending legs: NHL 493 -> 32, NFL 46 -> 6.
+    - Right-player check: 1,265 / 1,265 NHL and 246 / 246 NFL match the sheet's own value, 0 mismatches. The falsification test did not fire.
+    - `SGP_PAPER` NHL 19.4% vs 22.1% -> 22.3% vs 22.0%.
+  - Tests: `test_sgp_leg_grading` (6) plus the SGP suites, 62 passed.
+  - **Open for user decisions:** a fleet ff, and a one-off leg-actuals backfill to 10-16. Then one nightly reading.
+  - The `Files` entry for `nfl/sgp_pool.py` covers its grading section: `leg_actuals`, plus the new `ANYTIME_TD` / `touchdowns` beside it.
+- Goal: Todo #743 (a)+(b): the nightly SGP_PAPER calibration and ROI count only tickets whose every leg resolved, and correlation-family legs with no player_id are graded from the NHL / NFL game logs by name + team (ambiguous -> stays pending); measured on a read-only fleet snapshot (pending legs resolved, the calibration read before/after), tests pass, landed on main; the fleet ff is a user decision
+- Files: scripts/grade_sgp_paper.py, syndicate/features/nhl/sgp_pool.py (leg_actuals only), syndicate/features/nfl/sgp_pool.py (leg_actuals only), tests/test_sgp_leg_grading.py (NEW), docs/ai_context/todo.md (#743 section only)
+- Hypothesis: n/a (fix of a measured defect: findings_2026-10-27_sgp_pjoint_calibration.md)
+- Falsification test: On the snapshot, resolving player_id by name + team grades fewer than half of the pending NHL correlation-family legs, or resolves any leg to a different player than the sheet's -> the grading-side fix is wrong; move it to the builders
+- Verification: snapshot replay: pending NHL/NFL legs before vs after, ambiguity count, SGP_PAPER summary before vs after; new tests + test_nfl_sgp + test_cheat_sheet_sgp_reconciled pass
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

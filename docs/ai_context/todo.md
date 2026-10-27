@@ -1,6 +1,21 @@
 # Syndicate TODO — canonical cross-session list
 
 ### `#743` — **SGP `p_joint` CALIBRATION (from E4 `#740` c-ledger): NOT SHOWN miscalibrated — pooled +1.7 pts [-3.1, +6.4] on 971 clean tickets / 139 games. The lead's 3-6 pt over-prediction was mostly the GRADER: a ticket with an unresolved leg can be LOST but never WON (+2.4 pts [+1.3, +3.5] pooled, +4.3 [+2.6, +6.3] NHL), and 34% of NHL sheet-row SGP legs never grade (no `player_id`). Fix the calibration read + leg grading; keep `p_joint` as built** — 2026-10-27, lane `sgp-pjoint-calibration`, session 138eb1d7 (side session of local_668211d5); `.syndicate/findings_2026-10-27_sgp_pjoint_calibration.md`
+- **STATUS 2026-10-27 9:55 AM CT (14:55Z): (a) and (b) are BUILT and on main, NOT on the fleet** (`84967f75`, lane `sgp-leg-grading`, user: "proceed next action").
+  - **What changed:**
+    - `grade_sgp_paper.summarize` calibrates on resolved parlays only and adds `unresolved_leg`.
+    - `nhl` / `nfl` `sgp_pool.leg_actuals` resolve an id-less leg by name and its own team. Ambiguous names stay pending. NFL anytime TD reads rush + receiving TDs.
+  - **Read-only replay on the fleet ledgers (<= 10-26):**
+    - pending legs NHL 493 -> 32 and NFL 46 -> 6;
+    - right-player check: 1,265 / 1,265 NHL and 246 / 246 NFL id-less legs match the value the sheet graded itself;
+    - `SGP_PAPER` NHL 19.4% vs 22.1% -> **22.3% vs 22.0%** (799 tickets);
+    - NFL 29.4% vs 34.5% -> 30.1% vs 32.8%.
+  - **Owed, both user decisions:**
+    - a fleet ff to `84967f75`;
+    - a one-off `refresh_leg_actuals` back to 10-16. The nightly refresh only reaches 7 days back, so the 10-16..10-19 NHL legs (171 of the 493) stay pending without it.
+  - **(d) LEAD, not fixed (shared helper, outside this lane):** `prop_evidence.common.initial_key("V. Trocheck")` returns `"trocheck"`, because `name_key_loose` drops a "v" token as a roman-numeral suffix.
+    - So every NHL player with a V first initial never matches the NHL game log, in the hit-rate pool as well.
+    - It accounts for 5 of the 8 NHL legs that still do not resolve.
 - **Pre-registered** `1e7793e3` before any outcome join; A1 `cfee6f28` with the code before the run. Code: `scripts/sgp_pjoint_calibration.py` with 13 hermetic tests. Read-only snapshot of the fleet ledgers (graded 13:09Z 10-27, tickets dated <= 10-26).
 - **Primary result.** The test is calibration-in-the-large = mean `p_joint` - realised, game-clustered, Holm over {pooled, NHL, NBA, NFL}, on CLEAN tickets (every leg won or lost):
   - pooled +1.7 [-3.1, +6.4], MDE80 6.8;
