@@ -42,8 +42,10 @@ the Portfolio can keep trading.
    - (E2) being the maker rather than the taker;
    - (E3/E4) pricing what the sharp market does not quote directly (ladders,
      segments, props, combos), where the sims' *shape and correlation* matter more
-     than their mean;
-   - (E5) reacting to official availability news before the venue does.
+     than their mean. **Tested 2026-10-26: neither is a venue edge** (E3 `#741`,
+     E4 `#740`); Phase 5 was rescoped 2026-10-27;
+   - (E5) reacting to official availability news before the venue does. **Killed
+     2026-10-26** (`#739`).
 4. **The spine already exists: DecisionRecord (`#709`), in shadow since 10-23.**
    This plan extends it. It does not fork it. The engine is one per-line record:
    - one fair, the **Syndicate Fair**;
@@ -137,7 +139,10 @@ The principles that make that loop trustworthy:
   showed positive *same-book* CLV alongside negative ROI, so the CLV used must be
   against a **sharp** close, net of fees.
 - **P7. Sims do the jobs the market cannot.** Those jobs are:
-  - **shape and correlation:** ladders, segments, alt lines, combos;
+  - **shape and correlation:** ladders, segments, alt lines, combos. **Measured
+    2026-10-26 (E3, E4): not a venue edge.** The sims' shape does not beat Kalshi's mid
+    or a Normal/count surface, and their joint ties or loses to the measured SGP copula.
+    The job stands only where history is thin (WNBA) and for soccer scorelines;
   - **shock propagation:** who absorbs an absent player's role;
   - **engine diagnosis:** the graded disagreements the market won become the engine
     owners' work list.
@@ -185,7 +190,8 @@ The principles that make that loop trustworthy:
   2. **Preserve game lines and venue order books.** Today only prop forward inputs
      survive retention.
   3. **Store Kalshi trade prints.** The public history API reaches back to 2025-07. It
-     was pulled once, 3.51M prints, for research, and is not stored.
+     was pulled once, 3.51M prints, for research, and is not stored. The combo slice is
+     lane `kalshi-combo-capture` (`#742`, opened 2026-10-27).
   4. **Put the per-(date, sport) openings cap on the fleet.** 36,228+ openings were
      lost to the old cap.
   5. **Off-host backup.** The fleet data root is the only copy of everything since
@@ -213,12 +219,17 @@ The principles that make that loop trustworthy:
     2. weighted consensus;
     3. a two-sided venue mid, used only after an identity check;
     4. the margin model, flagged one-sided.
-- **New: a price surface for derived markets.**
+- **New: a price surface for derived markets. KILLED by E3 (2026-10-26, `#741`); dropped
+  from Phase 5 (user, 2026-10-27).**
+  - For a derived Kalshi rung, the L1 fair is the venue's own two-sided mid (fallback 3).
+    E3's identity check held on 66,815 of 66,838 settled results.
+  - The design below is kept for the record.
   - Fit the distribution of margin, total and player stat to the *sharp main quotes*,
     then price ladder rungs, alt lines, quarters/halves and props off that surface.
   - Where history is thin, the sim supplies the *shape* (variance, skew, tail, joint
     distribution), with its location pinned to the market.
-  - This is the sim's most defensible job, and it is unmeasured today. The test is E3.
+  - This was the sim's most defensible job on paper. E3 measured it: both surfaces lose to
+    Kalshi's mid on held-out rungs.
 - **Gate:** held-out log loss below the Shin consensus with a CI below 0, per sport
   family, plus the pre-registered Pinnacle forward test. It lives in the
   `fair-price-v2` lane (Shin is live, H6 soccer margin fair scores from 10-30).
@@ -232,7 +243,7 @@ Each expert outputs a shift on the log-odds scale (Δlogit) with its own σ.
 | Expert | Δ it proposes | Evidence today | Starting weight |
 |---|---|---|---|
 | Sim, mean | sim vs fair | loses or parity everywhere; w = −0.27 | 0 (earn per cell) |
-| Sim, shape | rung/segment/combo price vs surface | unmeasured | 0 until E3 |
+| Sim, shape | rung/segment/combo price vs surface | E3: loses to Kalshi's mid (+0.005..+0.007 nats); E4: the SGP copula ties or beats the sim's joint | 0. Correlation from the sim only for soccer scorelines (E4), with weight only after a venue-price test |
 | Prop under-tilt (likelihood shadow) | +1.0..+2.4pp toward the under | NBA +1.0/+1.6, NCAAF +2.35/+2.42, MLB hits +0.99 [+0.21, +1.79]; blind unders lose after hold | prior shift only |
 | Availability shock | status change → fair move | price-follow: books reprice game lines in ~15 min; venue lag unmeasured | 0 until E5 |
 | Referee / umpire crew | total and foul-rate shift | collected (NBA, NHL), consumed by nothing | 0, test |
@@ -376,8 +387,8 @@ lane the work belongs to, if one exists.
 |---|---|---|---|---|---|
 | **E1** | **Sharp–venue gap (taker).** Kalshi and Polymarket are retail-heavy, so their pregame prices sometimes trail the sharp books. Taking the gap fee-net at the venue's own ask pays. | Pinnacle-edge lead +13.0% vs −10.6% below 0 (post hoc). Kaunitz consensus-outlier result. When the consensus disagrees with Pinnacle the bet loses −35.6% (38 bets). | Pinnacle forward test (registered 10-25), plus venue-native paper2 (D2) ranked on EV_lb vs the sharp fair. | Forward fee-net CLV vs the sharp close not above 0 (game-clustered CI) at ≥400 bets / ≥100 games | `live-cell-scorecard`, `venue-native-selection` |
 | **E2** | **Maker with news-cancel.** Rest at fair minus margin, earn the spread instead of paying it, and cancel on news. | Pregame fills ~45% and save 4–5% of stake. Polymarket US makers pay no fee and Kalshi maker fees are ¼ of taker. In-play is adversely selected (−16.6c), so stay pregame. | The maker shadow's pre-registered looks at 200/400/600 orders. Add a news-cancel arm once L4 exists. | The shadow's own rule; calendar stop 2027-01-31 | `kalshi-maker-shadow-paper` |
-| **E3** | **Derived-market surface.** Ladder rungs, alt lines, segments and thin props priced off the sharp main line plus a distribution shape beat the venue's quotes. | The venues list many rungs. One-sided prop holds are 6–8%. The sim's *shape* is unmeasured, while its mean is measured useless. | Offline: price every Kalshi rung from a surface fitted to the sharp main line (parametric vs sim-shaped), then grade vs the venue price and the outcome over the stored quote log. | Surface log loss not below the venue mid on held-out rungs | new lane |
-| **E4** | **Combos and correlation.** Combos are about ⅔ of Kalshi weekend notional, and Kalshi pays maker incentives on prop-combo legs. The sims' joint distributions can price correlation better than the independence-plus-haircut a venue or casual maker uses. | Sims are built for joint outcomes. The 18.5% SGP price haircut is unmeasured. | Grade the sim-implied correlation (anchored marginals) vs realised co-occurrence on settled games, then vs the combo prices captured. | Sim correlation no better than independence on realised outcomes | new lane |
+| **E3** | **Derived-market surface.** Ladder rungs, alt lines, segments and thin props priced off the sharp main line plus a distribution shape beat the venue's quotes. | The venues list many rungs. One-sided prop holds are 6–8%. The sim's *shape* is unmeasured, while its mean is measured useless. | Offline: price every Kalshi rung from a surface fitted to the sharp main line (parametric vs sim-shaped), then grade vs the venue price and the outcome over the stored quote log. | Surface log loss not below the venue mid on held-out rungs | **KILLED 2026-10-26** (lane `e3-derived-surface`, prereg `f9ee12af`, findings `.syndicate/findings_2026-10-26_e3_derived_surface.md`, todo `#741`). Priced off Pinnacle's main line, both surfaces lose to Kalshi's own mid: +0.0051 / +0.0069 nats, 26,708 rungs / 243 games. No predicted-EV band is fee-net positive. |
+| **E4** | **Combos and correlation.** Combos are about ⅔ of Kalshi weekend notional, and Kalshi pays maker incentives on prop-combo legs. The sims' joint distributions can price correlation better than the independence-plus-haircut a venue or casual maker uses. | Sims are built for joint outcomes. The 18.5% SGP price haircut is unmeasured. | Grade the sim-implied correlation (anchored marginals) vs realised co-occurrence on settled games, then vs the combo prices captured. | Sim correlation no better than independence on realised outcomes | **Sim correlation KILLED except on structural pairs; the venue test is OPEN** (lane `e4-combo-correlation`, prereg `9f8d759e`, findings `.syndicate/findings_2026-10-26_e4_combo_correlation.md`, todo `#740`). The measured SGP copula ties or beats the sim wherever both exist. The NBA sim carries 0 within-player correlation against +0.22 realised. Stage 2 (Kalshi combo prices) waits on a forward capture: lane `kalshi-combo-capture` (`#742`). |
 | **E5** | **Availability timing.** Official status events reach us before some venue prices move, especially on props. | Official schedules are fixed: NBA reports every 15 min, NFL inactives at T−90, EPL XI at T−75, NHL scratches at T−24..29. Books reprice game lines in about 15 min. Venue lag is unmeasured. | Join the news collector to the Kalshi and Polymarket quote logs, and measure time-to-move after OUT/IN events by market type. | Median venue lag under 2 min, or the move is symmetric (timing, not edge) | **KILLED 2026-10-26** (lane `e5-venue-news-lag`, prereg `d9ce947f`, findings `6f0e90cc`, todo `#739`). Kalshi: move after our capture +0.04pp [−0.05, +0.13], 197 units / 93 games; fee-net EV at +1 min −4.32%. Polymarket survives only by the letter (+0.21pp, 39 units). Where books did move, Kalshi had moved BEFORE our 10-min collector saw the news. |
 | **E6** | **Small residuals:** under-tilt, referee, weather, rest. They improve the fair; they are not bets on their own. | Under-tilt is measured. The rest are collected but untested. | Each one in the skill registry as a per-cell Δ with a CI | Weight lower bound ≤ 0 → it stays at 0 (it never gets "turned off" for a market) | registry |
 | **E7** | **In-play fair beats the Kalshi mid.** | Hard: Kalshi leads the books in play. NBA re-sim Brier 0.189 vs Kalshi 0.163 (2 games). | Owned by the in-play program; NBA forward read after 12-15 | That program's rules | `in-game-trading`, `#700` |
@@ -402,10 +413,10 @@ the first test.
 | **Ladders count once** | Correlation-aware sizing on game axes | `#711` R1, alt-ladder cap (10-26) | **P0** |
 | **Maker engine with news-cancel** | Earn the spread pregame; the event bus protects resting orders | maker pilot and shadow | **P1** |
 | **Availability event bus** | Cancel-protection plumbing ONLY (E5 killed the timing use, 2026-10-26): cancel resting maker orders and stale-gate takers on official status changes | collector since 10-13 | **P3, gated** on the Phase 3 maker engine + an official-source event time |
-| **Price surface for rungs and segments** | Price ladders and segments off the sharp main line; the sim gives shape | quote logs, sims | **P1** |
+| **Price surface for rungs and segments** | **DROPPED** (E3 killed it 2026-10-26; user 2026-10-27). A derived Kalshi rung's fair is the venue's own mid; the spread there belongs to the maker (E2) | quote logs, sims | — |
 | **Bet-timing model** | Predict drift toward the close, to choose take now, rest, or wait | openings → closes | **P1** |
 | **Hierarchical skill registry** | Automatic per-cell weights with CIs; replaces the hand-curated registry and the 0.25 default | optimizer w*, overlay | **P1** |
-| **Combo correlation engine** | Sim joint distributions price combos and prop-combo legs | sims, settled outcomes | **P2** |
+| **Combo correlation by pair type** (rescoped 2026-10-27 after E4) | The measured SGP copula for same-player pairs; the soccer scoreline sim for result/total/BTTS; independence for cross-player. No sim-based combo pricing | SGP copula files, soccer sims, the forward Kalshi combo capture (`#742`) | **P5, gated** on E4 Stage 2 |
 | **Venue-flow signal** | Kalshi taker imbalance as a free public-money proxy, in place of paid public-% splits | Kalshi trade API (not stored) | **P2** |
 | **Strategy allocator** | A Bayesian bandit across strategies with a canary floor | needs E1–E5 arms | **P2** |
 | **Engine-read queue** | The nightly list of "market won" disagreements goes to the sim owners | scorecard | **P1** (it is the secret-sauce loop) |
@@ -521,7 +532,7 @@ when its date arrives.
 | **2. Decision policy v1, paper2** (→ ~12-14) | Venue-native EV_lb selection (D2), correlation-aware shrunk Kelly, the challenger Suggested flag, per-order fill/slippage logs. | **The edge gate:** forward fee-net CLV vs the sharp close above 0 (game-clustered CI) at ≥400 bets / ≥100 games for at least one strategy. Then canary live. | `venue-native-selection`, `decision-record-shadow` |
 | **3. Execution intelligence** (Dec → Jan) | General maker engine with news-cancel, timing model, depth-aware pricing. | Maker shadow looks pass. Adverse selection measured below the spread captured. | `kalshi-maker-shadow-paper`, new |
 | **4. Availability event bus -- CANCEL-PROTECTION ONLY** (decided 2026-10-26 after E5; starts only when the Phase 3 maker engine exists AND an official-source event time earlier than the 10-min collector exists) | Event schema, official-source ingestion, cancel and stale-gate triggers. No timing strategy, no paid feed. | An E5 re-run (`#739`) on the official-source time; then reachability (`off != on`). | `news-availability-gate` |
-| **5. Derived markets and combos** (Dec → Feb) | Price surface (E3), combo correlation (E4), sim-shape tests. | E3/E4 kill rules. | new lanes |
+| **5. Derived markets and combos -- RESCOPED 2026-10-27 after E3/E4** (Dec → Feb) | No derived-line taker and no sim-based combo pricing. Derived Kalshi rungs take the venue's two-sided mid as their fair; any edge there is the maker's spread (Phase 3, `#735`). Combos take correlation by pair type: the measured SGP copula for same-player pairs, the soccer scoreline sim for result/total/BTTS, independence for cross-player. A forward Kalshi combo capture feeds E4 Stage 2. | E4 Stage 2 (same script and constants) after a month of capture or the NBA minutes fix, whichever is first: fee-net EV at the executable combo price, and whether Kalshi prices same-game correlation. | `kalshi-combo-capture` (`#742`); engine fixes with the sim owners (`.syndicate/brief_2026-10-27_engine_reads.md`) |
 | **6. Autonomy** (Jan → Feb) | Nightly refits, champion/challenger on replay, strategy allocator, drift alarms, engine-read queue. | Allocator in shadow for 4 weeks, agreeing with the hand-run decisions. | new |
 | **7. Professional-grade operations and capital scaling** (backup and watchdog now; the rest gated on the Phase 2 result) | Production that survives host sleep (or moves to a cloud host). Venue-status kill switch. Hash-chained record. A pre-registered capital ladder: stake bands widen only after N more bets keep the CLV and ROI CIs above 0. | Each rung of the ladder is its own pre-registered read. | new |
 
@@ -609,11 +620,14 @@ minutes without touching the decision logic.
 | Concentration | `live-event-concentration` (coordinator holds readings) | folded into L3 as `size.concentration` | `pipeline/portfolio_commit.py`, `execute_portfolio.py` (loan chains) |
 | News | `news-availability-gate` | Phase 4 bus (cancel-protection only, gated); E5 closed (`#739`) | — |
 | Layer 2 grading | the "Layer 2 board assessment" session (closed `layer2-suggested-opps`) | challenger Suggested in the 10-31/11-01 re-grade | the 2% floor |
+| Sim engines | `basketball-player-distribution` / `basketball-scenario-calibration`, `football-scenario-calibration`, `nhl-game-any-line-pricing` (unowned); MLB has no lane (2027) | the E3/E4/E5 engine reads in `.syndicate/brief_2026-10-27_engine_reads.md`, each fix default-off with an `off != on` test | the engines themselves |
+| Kalshi combo capture | `kalshi-combo-capture` (`#742`, opened for pickup 2026-10-27) | the forward capture behind E4 Stage 2 | — |
 
 **Process.**
 - One umbrella lane, `syndicate-decision-engine`, carries this plan and its gates.
 - Each phase item goes to the owner above. New lanes are opened only for new
-  components (fair v1 model, event bus, price surface, combo engine, allocator).
+  components (fair v1 model, event bus, combo capture, allocator). The price surface and
+  the sim-based combo engine were dropped on 2026-10-27.
 - With 78 OPEN/BLOCKED lanes against a cap of 3, the umbrella lane should *absorb*
   dormant ones rather than add to the count.
 
@@ -641,6 +655,12 @@ minutes without touching the decision logic.
 - 2026-10-26: "Widen tonight's window": the fleet ff goes to `0fca3f2b`, with the Phase 2 paper key and one full down/up.
 - 2026-10-26: **E5 adopted**. Phase 4 becomes cancel-protection plumbing only, gated on the Phase 3 maker engine and an
   earlier official-source event time; no paid news feed.
+- 2026-10-27: **E3 and E4 adopted** (user, verbatim: "Yes, adopt E3 and E4's recommendations: Phase 5 drops the derived-line taker and sim-based combos (Kalshi's mid prices derived lines; measured SGP correlation prices combos, sim only for soccer scorelines). Route the engine reads to the sim owners and open a lane for a forward Kalshi combo capture.").
+  - Phase 5 has no derived-line taker and no sim-based combo pricing.
+  - Kalshi's mid is the fair on derived rungs. Measured SGP correlation prices combos; the sim supplies
+    correlation only for soccer scorelines.
+  - The engine reads went to the sim owners (`.syndicate/brief_2026-10-27_engine_reads.md`).
+  - Lane `kalshi-combo-capture` (`#742`) was opened for a forward capture.
 
 ---
 
