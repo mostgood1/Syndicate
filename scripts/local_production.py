@@ -1055,11 +1055,11 @@ SCHEDULED_JOBS: tuple[ScheduledJob, ...] = (
     ScheduledJob("decision-policy-paper", 0, 0, ("scripts/run_decision_policy_paper.py", "book"), every_minutes=15),
     ScheduledJob("decision-policy-paper-nightly", 13, 45, ("scripts/run_decision_policy_paper.py", "nightly")),
     # `kalshi-combo-capture` (lane `kalshi-combo-capture`, #742; E4 Stage 2, #740): a forward, read-only capture of
-    # Kalshi combo (MVE) markets holding a same-game pair in a sport we model -- legs, result, volume and the public
-    # trade prints of traded ones -- swept by settlement time from a watermark, so a missed hour is caught up, not
-    # lost. Public unauthenticated GETs only; writes reports/intelligence/kalshi_combo_capture/. INERT until
-    # SYNDICATE_KALSHI_COMBO_CAPTURE=on is in the env: absent = off, and off sends no request. Enabling is the
-    # user's decision.
+    # Kalshi combo (MVE) markets holding a same-game pair in a sport we model -- legs, result, volume and last price
+    # of TRADED ones (no per-combo trade reads by default) -- swept by settlement time from a watermark, so a missed
+    # hour is caught up, not lost. Public unauthenticated GETs only; writes reports/intelligence/kalshi_combo_capture/.
+    # INERT until SYNDICATE_KALSHI_COMBO_CAPTURE=on is in the env: absent = off, and off sends no request. The user
+    # approved enabling it (2026-10-27); a checkout older than 6872eb2c must never run with the key set.
     ScheduledJob("kalshi-combo-capture", 0, 0, ("scripts/kalshi_combo_capture.py", "run", "--invoker", "supervisor"),
                  every_minutes=60),
 )
