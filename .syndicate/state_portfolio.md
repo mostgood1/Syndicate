@@ -253,7 +253,7 @@ real evaluation records: the ledger is worker-local and not in
 
 **CORRECTION 2026-10-19 (lane `ev-overstatement-decomp`, substrate: local fleet ledger, read-only): this title is no longer true. From 2026-10-05 (lane `stop-market-withholding`) the sim SIZES paper stakes again: its share of paper dollars by submit date was 0.00 on 10-02..10-04, 0.71-0.83 on 10-06..10-13, 0.52-0.62 on 10-14..10-17 and 0.27 on 10-18. Stakes rest on `portfolio_commit.py:761` (`fair + model_edge_pct/100`, shrunk only by `_sizing_skill_factor` >= 0.25). No staked-probability profile exists on the fleet (`<data root>/calibration/` is absent), so every cell is unfitted and sizes on the raw sim. On 4,876 settled EV>=2 orders the sim's fitted weight is -0.27 [-0.78, +0.18]. Its added dollars returned -12.2 +- 8.4% at EV>=4 against -3.3 +- 4.3% for the EV-only dollars, and pooled over EV>=2 they are no worse (-2.9 vs -3.2): unearned stake, amplifying noise. `findings_2026-10-19_ev_overstatement_decomp.md`; proposal in lane `sim-stake-unfitted-market-only` (todo #704).**
 
-**STAKED-PROBABILITY PROFILE, verified 2026-10-22T16:46Z (lane `sim-stake-earned-profile`, fleet ledger read-only, fleet venv):** still NO profile on the fleet (`/home/amyn/syndicate-prod/data/calibration/` absent), and none can be fitted yet: per venue x sport x market x segment x phase, 0 of 321 cells reach 200 held-out rows (largest 189; 2,959 usable rows / 427 events, 10-02..10-21). Every measurable cell picks beta 0. The candidate profile is empty, so nothing was published. The reader keys `sport|market|segment` only, with no venue or phase (`portfolio_commit.py` ~776). `findings_2026-10-22_sim_stake_earned_profile.md`, todo #727.
+**STAKED-PROBABILITY PROFILE, verified 2026-10-22T22:32Z (lane `sim-stake-earned-profile`, fleet):** the fleet HAS a live profile. `/home/amyn/syndicate-prod/data/calibration/staked_probability_profile.json` was published 22:16:59Z on the user's "publish anyway". It is version `staked_probability_pooled_v1@2026-10-22T21:45:48Z`, with ONE cell: `ncaaf|spreads|full|regular`, market_only, beta 0. **Grain (user decision (a)):** venue-pooled sport|market|segment|season_phase. The reader is phase-aware (`f3bea489`): with a slate date, only the 4-part key matches, with no fallback to the 3-part key. **Fit:** 95 pooled cells; 0 earn beta>0, 70 refused below the floor, 24 have no chronological split. **Effect:** stakes are unchanged, because a market_only cell takes the same `market` branch as an unfitted one. Only the provenance label changes; 9 orders after the 22:17Z restart carry `market_fair@staked_probability_pooled_v1@...`. Per-venue grain: 0 of 321 cells reached the floor. Revert = delete the file (mtime-cached, no restart). `findings_2026-10-22_sim_stake_earned_profile.md` s9-s10; deploys `6304800e`; refit about 11-01, todo #727.
 
 USER 2026-09-19: "All sports". `portfolio_commit._sizing_model_edge` returns None
 for a sim edge unless the row's `projection.model_skill` is `measured` +
@@ -415,7 +415,7 @@ and none exist yet.**
 **THE ROI ARM NOW HAS A DENOMINATOR** `[read-only measurement 2026-09-20 12:09:02 CT / 17:09:02Z, one fetch of `/api/ops/execution/ledger-summary?days=5&mode=paper`, scheduled task `ncaaf-sim-verdict-roi-read-0920`; full working in `log/2026-09-20.md`]`. NCAAF settled 832 of 899 orders (66 pending). Within `ncaaf | game_total`, all `market_fair_only: true` so the sizing basis is held fixed — `contradicts` n=71 settled_decisions, +$15.35 on $330.02, **+4.65%**; `unpriced` n=76, +$51.79 on $349.11, **+14.83%**; `none` n=78, -$76.39 on $376.02, **-20.32%**. `ncaaf | game_line` has no `contradicts` bucket; there `none` n=144 **-3.74%**, `unpriced` n=52 **+3.39%**. Different sizing basis, stated: `agrees` `game_line` n=34 **+16.90%**, `game_total` n=17 **-37.41%**; `disagrees` n=18 **-71.72%** / n=11 **-39.61%** (also EV-conditioned). Pooled `by_verdict`, all sports: agrees n=325 +12.64%, contradicts n=102 +9.84%, unpriced n=208 +7.63%, none n=259 -8.93%, disagrees n=71 -35.01%. **DESCRIPTIVE ONLY — at n≈70-80 a bucket's ROI standard error is ~12 points and a difference's ~16, so the 10.2-point contradicts/unpriced gap is inside one SE; no staking or sim change follows from this read.** 55 of 1,300 decisions sit in more than one verdict bucket.
 
 
-## [min-ev-tuner-shadow] THE MIN_EV CUT IS TUNED PER CELL IN SHADOW -- RUNNING ON THE FLEET, ZERO MOVES, NOTHING APPLIED `[verified on production 2026-10-19 19:25:36Z, lane min-ev-tuner-shadow]`
+## [min-ev-tuner-shadow] THE MIN_EV CUT IS TUNED PER CELL IN SHADOW -- RUNNING ON THE FLEET, ZERO MOVES, NOTHING APPLIED `[verified on production 2026-10-19 19:25:36Z; re-verified 2026-10-26 (readout 7/7 + user decision), lane min-ev-tuner-shadow]`
 
 - **What runs.** `syndicate/features/shared/min_ev_tuner.py`, once a day (>= 12:00Z) right after settlement in refresh-worker's
   intelligence-state loop.
@@ -437,6 +437,15 @@ and none exist yet.**
   - Apply wiring is on main and INERT: `SYNDICATE_MIN_EV_TUNER` is unset on the fleet and no cell holds an override.
   - Taken-bet evidence is now mostly LIVE fills (~50/day); the EV-band ladder adds ~200/day below the floor, for the pre-registered LOWER rule.
   - Readouts are started by hand: the app scheduler does not fire on this host.
+- **Week of readouts and the user's decision (verified 2026-10-26):**
+  - 7 of 7 nightly passes ran (10-20..10-26), 0 failed. **0 proposed moves**, unpooled or pooled. 10-26: 78/78 cells hold.
+  - Closest: polymarket ncaaf spreads, pooled ROI z -1.94, 0.06 short of RAISE (own band 20/40 events).
+  - **User decision 2026-10-26: "keep the min_ev tuner in shadow".** `SYNDICATE_MIN_EV_TUNER` and `_POOLING` stay shadow, and there is no decision file.
+  - Re-raise only when a cell proposes a move (`findings_2026-10-19_min_ev_tuner_backtest.md`, DECISION 2026-10-26; `6709331c`).
+- **Proposed-move alert (live, verified 2026-10-26 15:50:55Z):** `exec:min_ev_tuner:proposed_move` (warn, emailed).
+  - It fires when today's or yesterday's readout artifact has a cell whose own or pooled verdict is raise or lower, and quotes the cell's numbers.
+  - The readout job writes `proposed` from 2026-10-27 13:15Z. Fleet ff 6dd8a536 -> 84767601 at 15:46:49Z, no restart.
+  - Verified: a synthetic raise fires it; the real 10-26 artifact does not; the next watchdog run was clean (deploys `1ed8bb4f`).
 - **Evidence base:** settled paper venue orders only (paper:kalshi + paper:polymarket, 1,176 over 10-02..10-18). The 552 live rows
   are `venue_rebuild` rows with no `ev_pct`. Same-book CLV on venue MLB props is near zero (kalshi 49/266, polymarket 1/95).
 - Detail: `findings_2026-10-19_min_ev_tuner_backtest.md`; deploys.md 2026-10-19 19:06:01Z; todo #701.

@@ -2958,3 +2958,13 @@ The 2026-10-20 entry said: "Rating INPUTS transfer, because the sim reads them w
   3. Stream with `json.dump(obj, fh)` per slice.
   4. Check `free -m` before and after any extract that touches more than one day of `venue_odds` or `book_quotes`.
   5. Run the heavy compute on Windows, as Fair v1 and E3 did.
+
+## 2026-10-22 -- A per-SERVICE claim does not lock the shared fleet CHECKOUT: a peer's ff landed between my ff and my restart, and my restart loaded it `[lane sim-stake-earned-profile, session b98807bc]`
+- **What happened:**
+  - I held the refresh-worker claim and ff'd the fleet to `f3bea489` at 22:14:31Z, deliberately stopping short of `b3279e52` (another lane's #711 change).
+  - At 22:15:34Z that lane ff'd the SAME checkout to `b3279e52` under its own live-odds-worker claim, and restarted live-odds-worker.
+  - My claimed refresh-worker TERM at 22:17:00Z then respawned on HEAD `b3279e52`, so refresh-worker loaded a change I had excluded.
+  - It was inert there (its flag is set for live-odds-worker only), so there was no harm, by luck of configuration.
+- **Why:** there is one checkout, `~/Syndicate`, for all three roles. A claim serialises restarts of ONE service. Nothing serialises moves of the checkout itself, and a restart loads whatever HEAD is at respawn time.
+- **Rule:** read fleet HEAD in the SAME script as the TERM, immediately before it, and abort if it is not the SHA you ff'd to. (`pub_restart.sh` checked HEAD before the ff, not before the TERM.) In deploys.md, record what the respawn actually loaded (`status` code=), not what you ff'd to.
+
