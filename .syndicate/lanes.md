@@ -1474,7 +1474,7 @@ death, never life — do not invert it.
 - Verification: findings file with the prereg SHA, per-source date coverage + intersection + n, per sport x pair-type log loss / Brier with game-clustered CIs for (a)/(b)/(c), engine read (which correlations the sims get right or wrong), recommendation; todo item + syndicate-decision-engine lane line pushed to main
 - Blocked by: Stage 2 -- user decision #740 (a) (Kalshi combo capture), then about a month of capture
 
-### kalshi-combo-capture — OPEN — opened 2026-10-27 — session unowned (opened at user request 2026-10-27 by session e32fef1a for pickup; not worked there)
+### kalshi-combo-capture — OPEN — opened 2026-10-27 — session a48b0f49-3a6b-4105-b194-5804a934487c (picked up 2026-10-27 as a side session of local_668211d5; opened by e32fef1a for pickup)
 - Goal: A forward, read-only capture of Kalshi same-game combo markets runs daily on the fleet: every combo whose legs include a same-game pair in a sport the platform prices is stored under the fleet data root (legs, quotes, volume_fp, result, and public trade prints for kept combos with volume > 0) within about 1,000 public GETs a day at nice 19, so E4 Stage 2 (#740 (d)) can run after a month of capture
 - Files: scripts/kalshi_combo_capture.py (NEW), tests/test_kalshi_combo_capture.py (NEW), scripts/local_production.py (SCHEDULED_JOBS kalshi-combo-capture entry ONLY), docs/ai_context/todo.md (#742 section only), .syndicate/findings_2026-10-27_kalshi_combo_capture.md (NEW)
 - Hypothesis: n/a (a capture, not a test; E4's registered Stage 2 is the test)
