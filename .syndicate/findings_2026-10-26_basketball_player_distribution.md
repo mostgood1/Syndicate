@@ -231,3 +231,42 @@ Both arms ran on 87 games / 17,400 draws over the 12 sweep dates, with 0 errors 
 - **Owed once production draws carry the covariance:** k_combo for pr/pa/ra (`nba_prop_calibration.py:19-21`) and
   the SGP pool's PR/PA/RA Normal assume independence. Both must be re-read when the config goes live.
 - Artifacts: `C:/tmp/bball_sc/r2s/pra_paired.{py,json}`, `run_pdprod.sh`, draws `C:/tmp/bball_sc/sweep/PD_prod`.
+
+## PHASE 2 STEP 1b — ROSTER CHECK, PRE-REGISTERED 2026-10-27 23:18Z (18:18 CDT), before any classification is computed
+
+**Question.** Step 1's ABSENT (1,978) and REAL_ONLY (2,983) player-games: are they backtest-input artifacts (a
+roster leaked from LATER in the season, or one left STALE from earlier) or real-world absence (injury, inactive)?
+Example from step 1: Zubac on IND, 2025-11-01.
+
+**Evidence.**
+- Every cached ESPN NBA summary (1,042 games; regular season only, `season.type == 2`). Each box lists the team's
+  active list, DNPs included, so it is a per-game record of which team a player belonged to. Game date = header UTC
+  minus 6 h.
+- The fit_pd sim records (`pnames` per team-game) give the sim's roster.
+- Population: exactly step 1's (fit_pd, the same gaps() keying and the same `names_match` join).
+
+**ABSENT** (the sim put player X on team T on date d; T's box on d does not list X). The class is decided by X's
+real box appearances:
+- **LEAK_FUTURE**: X appears for T only AFTER d, and for another team on or before d.
+- **STALE_PAST**: X appears for T only BEFORE d, and for another team after d.
+- **T_AROUND**: X appears for T both before and after d, but not on d. Real absence (an injured or inactive player
+  left off the active list).
+- **T_ONLY_AFTER_NO_OTHER / T_ONLY_BEFORE_NO_OTHER**: one side only, with no other team. A late arrival or departure
+  with no observed box elsewhere: signing, waiver, G-League, season-ending injury.
+- **NEVER_T**: X never appears for T. Split by whether X appears for any team at all.
+- **NO_BOX**: X appears on no box.
+
+**REAL_ONLY** (X played for T on d; the sim's T roster on d lacks X):
+- **SIM_NEVER_T**: the sim never lists X for T on any date. A pool hole: two-way, rookie, or signing never
+  ingested.
+- **SIM_LATER_ONLY**: the sim lists X for T only after d. Roster lag.
+- **SIM_EARLIER_ONLY**: the sim lists X for T only before d. The sim dropped him.
+- **SIM_AROUND**: the sim lists X for T before and after d. An availability call: the injury feed had him out and
+  he played.
+
+**What it decides (no thresholds; this is a census):**
+- LEAK_FUTURE > 0 is a backtest look-ahead defect. The minutes lanes own the fix. Count it, with its sim
+  min/team-game.
+- STALE_PAST and SIM_LATER_ONLY measure as-of roster lag.
+- T_AROUND and SIM_AROUND are availability (injury-feed) errors, not roster errors.
+- **Reported per class:** player-games, sim (or real) min per team-game, and month. Twelve examples per class.
