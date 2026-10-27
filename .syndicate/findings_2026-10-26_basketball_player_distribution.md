@@ -180,3 +180,29 @@ player-games), against **1.196** in real boxes. Its attribution: minutes held fi
   - or production calls whose lineup / minutes inputs are fixed.
 - This narrows E4's fix: a minutes-variance mechanism in the engine helps the WIDTH (Phase 1); the covariance loss is
   to be located in the serving path.
+
+## E4 LOCATION CHECK — PRE-REGISTERED 2026-10-27 14:15Z (09:15 CDT), before any draw exists
+
+**Question.** Code reading already rules out the calibration layer (decision-engine a136e7f6). E4 read `pra_sd` with
+`sd_scale` divided out, and production builds PRA per draw (`smart_sim.py:2026-2043`). Does the production ENGINE
+CONFIG, as opposed to the candidate (fit_pd) config, produce E4's near-independence?
+
+**Arm PDPROD:**
+- the production config as P3 defined it for valid_prod: no levers, no engine flags, total-inputs
+  {skip_def_subtraction} only, no calibration files, no quarters calibration;
+- plus `diag_foul_outs=1`, a research-only counter with no RNG draws (needed for the on-floor counts);
+- shared with fit_pd: the same availability and prop-calibration files, `code_pd`, 200 draws, the 12 sweep dates,
+  SYNDICATE_NBA_TEAM_INPUTS=1, nice 19 in WSL.
+
+**Statistic.** The fit_pd / E4 statistic: per player-game with ≥ 15 mean sim min, Var(P+R+A) / [Var P + Var R +
+Var A] over draws, taken as the median. The CONTROL is fit_pd's median restricted to the same 12 dates. That is the
+paired comparison; the FIT-wide 1.142 is context only.
+
+**Decision rule (fixed now):**
+- PDPROD ≤ 1.05 → **CONFIG.** The production config drops the covariance, and the candidate config restores it.
+  E4 rides with the forward test. Next: which field.
+- PDPROD within 0.05 of the 12-date control → **NOT CONFIG.** The loss is in the production serving path or inputs
+  (for example E4's population or the minutes inputs live), not the engine config.
+- Anything else → **AMBIGUOUS.** Report it as such, with no attribution.
+- Also reported: the corr(sim min, pts) median, and the per-minute ratio. In each arm, a draw count
+  (on_n ≥ 0 share) proves the counter ran.
