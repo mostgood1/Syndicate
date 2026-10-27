@@ -76,6 +76,10 @@ with less margin against the gate's own truth than the name "lower bound" sugges
   would be a new registration.
 - It also tells us that **if P1 fails the gate, a refit of z on the sharp close is the first lever**, ahead of
   any change to the policy.
+- **Scope of that lever `[2026-10-27]`:** it applies when P1 reaches a look and misses it on CLV. It does not fix
+  VOLUME. The 10-27 funnel (`.syndicate/findings_2026-10-27_ev_lb_funnel.md`) found 97.9% of eligible lines fail on
+  the ask plus the fee before σ enters, and a sharp-close refit RAISES z (1.28 / 1.32), so it books fewer. Prereg §8
+  already rules on volume: a candidate that never reaches L1 by 2027-01-31 has not passed.
 
 ## 3. First reachability read on REAL fleet data (scratch copy; not part of the forward test)
 
@@ -182,3 +186,32 @@ with less margin against the gate's own truth than the name "lower bound" sugges
 - The final read is **2027-01-31** (plan Phase 3 end; the §9 kill rule).
 - The first Monday read also reports the booking rate per strategy, so the volume risk in section 3 is
   measured, not guessed.
+
+### Section 6 update
+
+- **D-B RESOLVED 2026-10-27 05:20:04Z.** The user chose "Widen tonight's window" (10-26, asked in the session
+  "Syndicate AI decision engine", which ran it): ff to `0fca3f2b`, `REFRESH_WORKER__SYNDICATE_DECISION_POLICY_PAPER=paper`,
+  one full supervisor down/up. `.syndicate/deploys.md` has the 05:20Z and 06:20Z entries.
+
+### Section 7 dated reads
+
+- **2026-10-27 15:12:52Z (fleet, read-only) -- the verify reading.**
+  - `job-decision-policy-paper.log`: 48 `PAPER_BOOKED`, 0 `MODE_OFF`. The first booking on post-restart code is
+    build |1793079152 (deploys.md 06:20Z); `sigma` has carried `S1_fair_v1` since then.
+  - `bets.jsonl`: 35 rows on 19 distinct record build_ids. ev_lb 3 (all MLB World Series props on Kalshi:
+    batter_rbis, outs, batter_hits; S2), net_floor_719 13 (Kalshi 12, Polymarket 1), suggested_2pct 19.
+  - The 13:45Z nightly wrote `reads/2026-10-27.json` and `looks.json`: every look `waiting`, n = 0. It wrote
+    no `grades.json` and printed no `PAPER_GRADED`. That is correct: the earliest bet starts 17:30Z, and
+    `run_grade` returns without a line when no bet is 30 min past its start. A night with nothing due is
+    therefore silent; read `reads/<date>.json` for proof that the nightly ran.
+  - **Next reading owed:** the 10-28 13:45Z nightly's first `PAPER_GRADED bets=.. sharp_close=.. outcome=..`
+    and `grades.json`.
+- **ev_lb funnel 2026-10-27 (decision-engine lane, user-asked, post hoc):**
+  `.syndicate/findings_2026-10-27_ev_lb_funnel.md`, `scripts/ev_lb_funnel_read.py` (`149936fe`). It re-runs this
+  job's own path (`load_grid` -> `sigma_for_record` -> `evaluate` -> `qualifies`) without writing. Of 1,312
+  eligible candidate-sides: 74.0% have the ask at or above the consensus, 23.9% have a raw edge the taker fee
+  eats, 2.1% are held back by the haircut, and 0 qualify. See section 2's lever scope.
+- **For the 11-02 read (the first Monday):** run `scripts/evaluate_decision_policy_paper.py` for the gate read and
+  the booking rate per strategy, and re-run the funnel:
+  `nice -n 19 python scripts/ev_lb_funnel_read.py --data-root ~/syndicate-prod/data --out <dir>`.
+  Read buckets C/D on that morning's current record files only: replaying an older file falls back to S3.
