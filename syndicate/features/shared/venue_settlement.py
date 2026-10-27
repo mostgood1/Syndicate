@@ -1072,6 +1072,105 @@ def repair_impossible_venue_pnl(*, dry_run: bool = False) -> dict[str, Any]:
     return {"status": "ok", **counters}
 
 
+def _order_side_key(venue: str, order: Mapping[str, Any]) -> str:
+    """The side an order holds, in a vocabulary where equal means SAME BET.
+
+    A Kalshi order's `side` is OUR label (`over`, `home`, `yes`, ...), and two
+    labels can name one leg. MEASURED 2026-10-23 on
+    `KXNBATOTAL-26OCT23NYKBOS-220`: a pregame `over` and a live in-game `yes`,
+    both YES, read as two sides and refused `ambiguous_multi_side` forever. So
+    Kalshi labels go through `_side_to_kalshi` -- the SAME mapping the order
+    builder used to choose the leg we bought -- and come out `yes`/`no`.
+
+    A label it refuses stays raw: two unmappable labels that differ still count
+    as two sides, which keeps the refusal. Polymarket is untouched; its sides
+    name outcomes and have no leg to collapse onto.
+    """
+    raw = str(order.get("side") or "").strip().lower()
+    if venue != "kalshi" or not raw:
+        return raw
+    try:
+        from syndicate.features.shared.kalshi_orders import _side_to_kalshi
+
+        return _side_to_kalshi(raw, order.get("market"), order.get("line"))
+    except Exception:
+        return raw
+
+
+def _kalshi_legs_consistent(outcomes_by_leg: Mapping[str, set[str]]) -> bool:
+    """Can these per-leg outcomes all be true of ONE Kalshi market?
+
+    The 08-27 invariant, stated per leg: a market resolves YES or NO, so every
+    order on one leg shares an outcome, and the two legs' outcomes are
+    OPPOSITE. Both legs `won` -- "both teams won" -- is the shape this refuses;
+    so is anything that is not won/lost, or a leg that is not yes/no.
+    """
+    if not outcomes_by_leg or not set(outcomes_by_leg) <= {"yes", "no"}:
+        return False
+    for outcomes in outcomes_by_leg.values():
+        if len(outcomes) != 1 or not outcomes <= {OUTCOME_WON, OUTCOME_LOST}:
+            return False
+    if len(outcomes_by_leg) == 2:
+        return outcomes_by_leg["yes"] != outcomes_by_leg["no"]
+    return True
+
+
+def _both_legs_grades(
+    row: Mapping[str, Any],
+    targets: list[dict],
+    key_orders: list[Mapping[str, Any]],
+) -> dict[int, tuple[str, str]] | None:
+    """Per-target `(leg, outcome)` for a GENUINE both-legs Kalshi holding, or None.
+
+    MEASURED 2026-10-23: live in-game entries bought YES and NO of one ticker
+    (`KXNBASPREAD-26OCT23ATLCHA-ATL9`, `KXNBATOTAL-26OCT23ATLCHA-230`), before
+    the one-entry-per-game-axis fix. The settlement row carries both counts, so
+    `grade_kalshi_settlement` refuses `both_sides_held` -- correctly, because
+    the ROW's revenue is the pair's total and names no single order. But the
+    row's `market_result` grades each LEG exactly, and each order's money comes
+    from its own fill (`_derived_pnl`), so nothing has to be apportioned.
+
+    Allowed only when it can be nothing else:
+      * every one of our orders on this ticker maps to yes/no;
+      * the row's yes/no counts EQUAL the contracts our filled orders hold on
+        each leg (a count we did not make is not ours to explain);
+      * the outcomes -- these, plus any already graded on the ticker -- pass
+        `_kalshi_legs_consistent`, so two legs can never share a WON.
+    """
+    result = str(row.get("market_result") or "").strip().lower()
+    if result not in {"yes", "no"}:
+        return None
+    held: dict[str, float] = {"yes": 0.0, "no": 0.0}
+    outcomes_by_leg: dict[str, set[str]] = {}
+    for order in key_orders:
+        if str(order.get("status") or "") == "rejected":
+            continue
+        leg = _order_side_key("kalshi", order)
+        if leg not in {"yes", "no"}:
+            return None
+        contracts = _num(order.get("contracts"))
+        if contracts is None or contracts <= 0:
+            return None
+        held[leg] += contracts
+        if order.get("outcome"):
+            outcomes_by_leg.setdefault(leg, set()).add(str(order.get("outcome")))
+    for leg in ("yes", "no"):
+        count = _num(row.get(f"{leg}_count_fp"))
+        if count is None or abs(count - held[leg]) > 1e-6:
+            return None
+    grades: dict[int, tuple[str, str]] = {}
+    for order in targets:
+        leg = _order_side_key("kalshi", order)
+        outcome = _kalshi_outcome_from_leg(result, leg)
+        if outcome is None:
+            return None
+        grades[id(order)] = (leg, outcome)
+        outcomes_by_leg.setdefault(leg, set()).add(outcome)
+    if not _kalshi_legs_consistent(outcomes_by_leg):
+        return None
+    return grades
+
+
 def repair_multi_side_grades(*, dry_run: bool = False) -> dict[str, Any]:
     """Un-grade rows this module wrongly settled by sharing one verdict across
     OPPOSITE SIDES of a market. Runs before grading, on the worker.
@@ -1123,12 +1222,23 @@ def repair_multi_side_grades(*, dry_run: bool = False) -> dict[str, Any]:
     for (_venue, ticker), rows in groups.items():
         if len(rows) < 2:
             continue
-        sides = {str(o.get("side") or "").strip().lower() for o in rows}
+        sides = {_order_side_key(_venue, o) for o in rows}
         if len(sides) < 2:
             continue
         venue_graded = [o for o in rows if str(o.get("settled_by") or "") == "venue"]
         if not venue_graded:
             continue
+        if _venue == "kalshi":
+            # A KALSHI TICKER IS ONE YES/NO MARKET, so per-leg grades that can
+            # all be true together (`settle_from_venue`'s both-legs path) are
+            # not the 08-27 defect. Clearing them would re-grade them next tick
+            # and fight forever. Both legs WON still fails this and is cleared.
+            by_leg: dict[str, set[str]] = {}
+            for o in rows:
+                if o.get("outcome"):
+                    by_leg.setdefault(_order_side_key(_venue, o), set()).add(str(o.get("outcome")))
+            if _kalshi_legs_consistent(by_leg):
+                continue
         counters["markets"] += 1
         counters["tickers"].append(ticker)
         for order in venue_graded:
@@ -1565,11 +1675,18 @@ def settle_from_venue(*, dry_run: bool = False) -> dict[str, Any]:
     # The question the guard has to ask is "does this MARKET carry more than
     # one of our sides", which has nothing to do with which rows happen to be
     # graded right now.
+    #
+    # Kalshi sides are compared as LEGS (`_order_side_key`): `over` and `yes`
+    # on one totals ticker are the same bet, and counting them as two refused
+    # `KXNBATOTAL-26OCT23NYKBOS-220` for days.
     sides_by_key: dict[tuple[str, str], set[str]] = {}
+    orders_by_key: dict[tuple[str, str], list[dict]] = {}
     for order in orders:
         venue_all = str(order.get("venue") or "").strip().lower()
         key_all = _join_key(order.get("venue_ticker"))
-        side_all = str(order.get("side") or "").strip().lower()
+        side_all = _order_side_key(venue_all, order)
+        if venue_all and key_all:
+            orders_by_key.setdefault((venue_all, key_all), []).append(order)
         if venue_all and key_all and side_all:
             sides_by_key.setdefault((venue_all, key_all), set()).add(side_all)
 
@@ -1658,6 +1775,33 @@ def settle_from_venue(*, dry_run: bool = False) -> dict[str, Any]:
             )
             if partly_sold:
                 counters["exit_partial_both_sides"] = counters.get("exit_partial_both_sides", 0) + 1
+            # WE GENUINELY HELD BOTH LEGS, with no sale involved: each order
+            # grades on its own leg from the row's result, at its own fill.
+            # See `_both_legs_grades` for the shape checks and the 08-27 guard.
+            both_legs = (
+                None
+                if partly_sold or venue != "kalshi" or verdict.get("reason") != "both_sides_held"
+                or any(effect != _EXIT_NONE for effect, _r in effects)
+                else _both_legs_grades(row, targets, orders_by_key.get(key) or [])
+            )
+            if both_legs is not None:
+                matched_keys.add(key)
+                for order in targets:
+                    leg, outcome = both_legs[id(order)]
+                    order["outcome"] = outcome
+                    order["settled_by"] = "venue"
+                    order["settled_at_venue"] = row.get("settled_time")
+                    order["graded_at"] = _utc_now()
+                    order["held_side"] = leg
+                    derived = _derived_pnl(order, outcome)
+                    if derived is not None:
+                        order["pnl_dollars"] = derived
+                    counters["pnl_derived"] += 1
+                    counters["both_legs_graded"] = counters.get("both_legs_graded", 0) + 1
+                    counters["settled"] += 1
+                    per_venue["settled"] += 1
+                    graded_any = True
+                continue
             if not verdict.get("graded") and not (sold_out or partly_sold):
                 reason = str(verdict.get("reason"))
                 counters["refused"][reason] = counters["refused"].get(reason, 0) + 1
@@ -1690,9 +1834,7 @@ def settle_from_venue(*, dry_run: bool = False) -> dict[str, Any]:
             # ALL our sides on this market, not just the ungraded ones -- see
             # `sides_by_key` above for the sequencing that defeated the
             # ungraded-only version.
-            sides = sides_by_key.get(key) or {
-                str(o.get("side") or "").strip().lower() for o in targets
-            }
+            sides = sides_by_key.get(key) or {_order_side_key(venue, o) for o in targets}
             if len(sides) > 1:
                 counters["refused"]["ambiguous_multi_side"] = (
                     counters["refused"].get("ambiguous_multi_side", 0) + 1

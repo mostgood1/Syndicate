@@ -1514,6 +1514,14 @@ death, never life — do not invert it.
 - Verification: findings file with the prereg SHA, ledger coverage + n per result, the verdict per sport, the decomposition (if any test rejects) and a per-line correction validated out of fold; todo item with a free ID
 - Blocked by: none
 
+### kalshi-both-leg-grading — OPEN — opened 2026-10-27 — session a7978a13-a882-425f-bedf-41b4299704ff
+- Goal: The 5 ungraded 10-23 live in-game Kalshi orders (ATL9 yes+no, ATLCHA-230 yes+no, NYKBOS-220 yes) grade per leg on the fleet; the 08-27 both-teams-won guard still refuses a shared winning outcome
+- Files: syndicate/features/shared/venue_settlement.py (LOAN from kalshi-exit-path, user-approved 2026-10-24 'Build the fix' in coordinator 332cb014 chat; settle_from_venue sides_by_key + new both-legs rescue, repair_multi_side_grades side grouping, new _kalshi_leg/_kalshi_legs_consistent helpers ONLY), tests/test_venue_settlement_both_legs.py (NEW)
+- Hypothesis: sides_by_key compares raw labels (over vs yes) and a true both-legs holding has no per-leg path; both fixable without letting two legs share a WON
+- Falsification test: a test where both legs would grade WON still grades; or repair_multi_side_grades clears the new per-leg grades on the next tick
+- Verification: after the coordinator's fleet restart, /api/portfolio/live?on=2026-10-23 shows all 5 graded, each pair netting ~+0.12..+0.16 less fees
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
