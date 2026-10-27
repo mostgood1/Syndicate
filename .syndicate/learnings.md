@@ -2946,3 +2946,15 @@ The 2026-10-20 entry said: "Rating INPUTS transfer, because the sim reads them w
 ## 2026-10-26 -- `settlement_inputs/closing_lines_<date>.csv` is one row per SELECTION at one book, not a per-book two-sided close `[lane e4-combo-correlation, session b566f51c]`
 - **Measured 2026-10-26:** on 10-18, Yandy Diaz hits o0.5 was DraftKings -222 and the under was ESPN Bet +190. The two sides of one prop come from different books.
 - **Rule:** never de-vig a side pair from `closing_lines`. That is a best-price-like ledger, and de-vigging it understates the vig, sometimes to an arb. For a per-book close, take each book's last pre-`commence_time` record in `<sport>_source/tracking/book_quotes` (E4 amendment A1). Its rows include IN-PLAY captures, so filter `captured_at < commence_time`.
+
+## 2026-10-26 -- A research dump on the FLEET hit `Cannot allocate memory`: build big extracts per slice and stream them, never one `json.dumps` `[lane e3-derived-surface, session d266ae46]`
+- **What happened:** `e3_derived_surface.py venue-extract` collected every Polymarket spread / total market with all its points into one list, then wrote it with `json.dumps`, at nice 19 on the production fleet host.
+  - The write failed with `OSError: [Errno 12] Cannot allocate memory`.
+  - `free -m` right after showed 7,092 MB available of 15,746, so it recovered with no visible harm.
+  - Production services share that host's memory, and nice / ionice protect CPU and IO, not RAM.
+- **Rule:** a read-only research job on the fleet must bound its own memory.
+  1. Process per sport or date.
+  2. Filter to the window before materialising.
+  3. Stream with `json.dump(obj, fh)` per slice.
+  4. Check `free -m` before and after any extract that touches more than one day of `venue_odds` or `book_quotes`.
+  5. Run the heavy compute on Windows, as Fair v1 and E3 did.

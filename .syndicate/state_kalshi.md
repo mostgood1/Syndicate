@@ -974,3 +974,15 @@ board. The loop therefore checks `budget_remaining()` BEFORE spending.
 - **Trades:** one 10-minute Sunday slice (10-18 18:00Z) held more than 30,000 trades, about 28% combos. Rebuilding weeks after the fact is infeasible by paging; capture forward.
 - **The listing is NEWEST-FIRST by close time:** read the close-time range of what you retrieved before claiming an absence.
 - **Detail:** `findings_2026-10-26_e4_combo_correlation.md` (Stage 2).
+
+## [kalshi-derived-rung-pricing] KALSHI'S MID ON DERIVED RUNGS (ALT LADDERS, SEGMENTS, TEAM TOTALS) IS AT LEAST AS GOOD AS A SHARP-ANCHORED SURFACE; NO PREGAME TAKER EDGE AT THE ASK `[verified on fleet + public Kalshi data 2026-10-26 22:20Z..10-27 00:21Z, lane e3-derived-surface]`
+- **Population:** 71,823 Kalshi derived contracts in 5,809 events, games 09-30..10-26. 66,815 of 66,838 settled results agree with the joined game's score.
+- **Pinnacle-anchored (mostly NCAAF + MLB):** both surfaces LOSE to Kalshi's own mid at t60, 26,708 rungs / 243 games:
+  - Normal / count shape: +0.0051 nats [+0.0026, +0.0075];
+  - sim shape: +0.0069 [+0.0036, +0.0102].
+- **Consensus-anchored (NHL, soccer, NBA, NFL, WNBA):** the parametric surface ties the mid (+0.0006 [-0.0013, +0.0026], 611 games).
+- **Fees:** no predicted-EV band is fee-net positive at the ask.
+- **Pinnacle's own alt price** for the same rung does not beat Kalshi's mid either (+0.011 [-0.003, +0.033], 166 rungs / 30 games).
+- **Book width at t60:** median 1c on full-game ladders, 3c on segments. The surfaces sit a median 0.9-2.1pp from the mid; crossing costs 1.9-2.7c.
+- **Overtime differs by series:** WNBA 2nd-half series EXCLUDE overtime, NBA's include it, quarters exclude it, full game includes it. Read each series' `rules_primary`.
+- **Detail:** `findings_2026-10-26_e3_derived_surface.md`, todo `#741`. **Script:** `scripts/e3_derived_surface.py` (`extract`, `venue-extract`, `kalshi-fetch`, `score`).
