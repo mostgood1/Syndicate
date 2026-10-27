@@ -12338,3 +12338,9 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Falsification test: Plan s4 E3 kill rule: surface log loss not below the venue mid on held-out derived contracts (game-clustered CI), OR no fee-net-positive deviation band at the venue ask with a game-clustered CI above 0
 - Verification: findings file with the prereg SHA, per-source date coverage + intersection + n, per sport x market type log loss and fee-net EV by band with game-clustered CIs, engine read (sim shape vs parametric shape), recommendation; todo item + syndicate-decision-engine lane line pushed to main
 - Blocked by: none
+
+### closed-lane-archive-20261027-0755 — CLOSED 2026-10-27 (GOAL MET: 6 blocks archived) — opened 2026-10-27 — session 2d142fa3-064a-4b28-ae29-71b5da605a50
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. 6 of 34 CLOSED blocks moved to `lanes_closed.md` with one pointer each; 28 deferred (owner idle < 240m, or a transcript not found). Gate reading, deferrals and the dormant-OPEN report are in `log/2026-10-27.md`.
+- Moved: nfl-kalshi-clv-pooled, nfl-mnf-settlement-lag, closed-lane-archive-20261026-0812, closed-lane-archive-20261026-1153, e5-venue-news-lag, e3-derived-surface.

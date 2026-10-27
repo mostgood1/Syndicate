@@ -1502,12 +1502,6 @@ death, never life — do not invert it.
 - Verification: synthetic ff-then-spawn loop on the fleet host: psutil start misattributes some spawns, precise start misattributes 0; unit tests pass; status on the fleet names the right commit after the next ff
 - Blocked by: none
 
-### closed-lane-archive-20261027-0755 — CLOSED 2026-10-27 (GOAL MET: 6 blocks archived) — opened 2026-10-27 — session 2d142fa3-064a-4b28-ae29-71b5da605a50
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. 6 of 34 CLOSED blocks moved to `lanes_closed.md` with one pointer each; 28 deferred (owner idle < 240m, or a transcript not found). Gate reading, deferrals and the dormant-OPEN report are in `log/2026-10-27.md`.
-- Moved: nfl-kalshi-clv-pooled, nfl-mnf-settlement-lag, closed-lane-archive-20261026-0812, closed-lane-archive-20261026-1153, e5-venue-news-lag, e3-derived-surface.
-
 ### sgp-pjoint-calibration — CLOSED — opened 2026-10-27 — closed 2026-10-27 — session 138eb1d7-e336-42da-986e-fafe0233f896
 - **GOAL VERDICT `[2026-10-27 14:37Z checkpoint]`.** Goal, verbatim: "Pre-register (committed before any outcome join) and run a calibration test of the SGP builders' p_joint on the settled paper-ledger tickets: calibration-in-the-large and slope, game-clustered CIs, per sport and by leg count / ticket type; if miscalibrated, decompose the gap (leg marginals p_market + de-vig, consistency nudge, copula correlation, the 18.5% haircut) and propose a per-line correction. OFFLINE, read-only on the fleet ledger" -- **GOAL: MET.** The reading is in `.syndicate/findings_2026-10-27_sgp_pjoint_calibration.md`. Prereg `1e7793e3`, A1 `cfee6f28`, run 14:31Z on a read-only snapshot. Clean-ticket calibration-in-the-large was NOT SHOWN in any gated cell: pooled +1.7 pts [-3.1, +6.4] (971 / 139 games), NHL -1.6, NBA +4.8, NFL +3.6, every Holm p = 1.0, MDE80 6.8 pooled. Since nothing rejected, the decomposition and correction clauses did not trigger. The decomposition is reported descriptively: marginals calibrated, the nudge not worse than the market, the copula better than independence, the haircut never in `p_joint`. The lead's gap was the grader's asymmetric censoring (+2.4 [+1.3, +3.5] pooled; NHL +4.3) from permanently pending, `player_id`-less correlation-family legs. Measurement fixes and the forward read are owed under `#743` to lane `cheat-sheets`. Findings `.syndicate/findings_2026-10-27_sgp_pjoint_calibration.md`. Also touched: `todo.md` `#740`, one inserted "superseded by `#743`" line.
 - Goal: Pre-register (committed before any outcome join) and run a calibration test of the SGP builders' p_joint on the settled paper-ledger tickets: calibration-in-the-large and slope, game-clustered CIs, per sport and by leg count / ticket type; if miscalibrated, decompose the gap (leg marginals p_market + de-vig, consistency nudge, copula correlation, the 18.5% haircut) and propose a per-line correction. OFFLINE, read-only on the fleet ledger
@@ -1555,6 +1549,12 @@ death, never life — do not invert it.
 - Verification: Hermetic tests incl. off != on and grade-once on archived rows; built default-off on main; after a user-approved fleet window under the deploy locks, the stale count re-read on the fleet with denominators by sport and game date, recorded in deploys.md
 - Result 2026-10-27 16:45Z: built default-off (`2ec80fe0`: settle_archived_orders + maybe_settle_archived hook + scripts/backfill_archived_paper_grades.py, 18 hermetic tests incl. off != on first). Fleet dry run (read-only, archive sha256 unchanged): 908 / 1,820 archive-only stale rows would grade = 49.9% -> FALSIFIED as pre-registered (< 50%, by 2 rows). NCAAF/NFL grade; soccer/MLB/NBA/NHL are grader gaps by name. Awaiting USER: apply the partial backfill (981 rows; no sizing or live-cell-gate change measured), enable the pass, and/or re-scope to the named reasons.
 - Blocked by: none
+
+### closed-lane-archive-20261027-1209 — CLOSED 2026-10-27 (GOAL MET: 1 block archived) — opened 2026-10-27 — session 96c5c1ee-dc48-4da9-950c-86fb91926cf6
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. 1 of 34 CLOSED blocks moved to `lanes_closed.md` with one pointer; 33 deferred (owner idle < 240m, or a transcript not found). Gate reading, deferrals and the dormant-OPEN report are in `log/2026-10-27.md`.
+- Moved: closed-lane-archive-20261027-0755.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1637,6 +1637,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261024-1641` — CLOSED 2026-10-24 (GOAL MET: 65 blocks archived) — opened 2026-10-24 — session c6b7ed6a-2288-40d8-85da-dcb5c2af5daf
 - `closed-lane-archive-20261026-0812` — CLOSED 2026-10-26 (GOAL MET: 10 blocks archived) — opened 2026-10-26 — session 15b943db-0c0d-4db8-a52c-1b882dd8f079
 - `closed-lane-archive-20261026-1153` — CLOSED 2026-10-26 (GOAL MET: 1 blocks archived) — opened 2026-10-26 — session cb7f41b9-82ec-4d29-aba8-379d9807746b
+- `closed-lane-archive-20261027-0755` — CLOSED 2026-10-27 (GOAL MET: 6 blocks archived) — opened 2026-10-27 — session 2d142fa3-064a-4b28-ae29-71b5da605a50
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
