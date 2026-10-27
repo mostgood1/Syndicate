@@ -365,3 +365,16 @@ Median per-player correlations, >= 15 MIN vs trailing-10:
 - **Caveat:** OLS on realised minutes credits to minutes any co-movement where minutes RESPOND to performance (foul trouble, a hot night, blowouts). The sim reproduces that share only if its minutes draw is tied to game script; an independent minutes draw gets the rest.
 - **No lane opened for the fix.** It belongs to `basketball-player-distribution` (session e0a3e383, OPEN). It was routed there in `.syndicate/brief_2026-10-27_engine_reads.md`, the NBA section.
 - **Script and output:** `C:/tmp/e4/pra_minutes_decomp.py` and `C:/tmp/e4/pra_minutes_decomp.out.jsonl` (scratch, not in git).
+- **LOCATED 2026-10-27 15:06Z by the owner lane (`a6e470f0`, rule pre-registered `b497373a`): CONFIG.**
+  - On the same 12 dates the production engine config reads **1.002** (corr(sim min, pts) 0.18). The candidate
+    round-2b + #5b-A config reads **1.138** (0.41). Real is 1.196.
+  - So the fix is not a new minutes draw. It is the candidate config, whose playing-time levers (bench boost, blowout
+    rest, foul trouble and foul-outs in sim, score effect) are believed, not tested, to carry the co-movement.
+  - It reaches production only via `nba_engine_config.json`, after its forward test (`3020b556`, 2026-27 regular
+    season from 11-01, read once at >= 250 period-line games) and a user decision. Phase 2's minutes draw is for the
+    widths.
+  - My 'minutes fixed across draws' attribution was too strong. The production config's playing time does vary by
+    draw; it barely co-moves with production.
+  - Owed when the config is live: E4's served statistic (predicted 0.997 -> ~1.14), the `k_combo` pr/pa/ra
+    (`nba_prop_calibration.py:19-21`) and SGP pool PR/PA/RA Normal re-reads, and `#740` (d)'s NBA cells. Tracked
+    weekly by scheduled task `nba-pra-covariance-watch` (user 2026-10-27: "keep it where it is but stay on top of it").
