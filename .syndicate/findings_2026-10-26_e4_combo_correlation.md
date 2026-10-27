@@ -326,3 +326,40 @@ ways.**
   2025-26 (NBA) data, before this window, so (c) is out of sample here.
 - **NBA (b) back-out** relies on the calibration stamps (`sd_scale`, file `k`). 89 player-games failed the 25% PRA
   identity gate and were dropped. The independence finding does not depend on the back-out (the post-hoc ratio).
+
+## POST-HOC ADDENDUM 2026-10-27 13:0xZ — how much of the REAL within-player P/R/A covariance is minutes (NOT pre-registered)
+
+Asked in this session after E4 closed: if the NBA sim drew minutes per draw, how far would that move its 0.997?
+
+- **Data:** ESPN summary boxes from the 2025-26 NBA regular season, 824 games. Read-only from `C:/tmp/bball_sc/cache/nba`, the `basketball-player-distribution` cache.
+- **Population:** players with >= 20 qualifying games.
+- **Ratio:** `Var(PRA) / [Var(P) + Var(R) + Var(A)]`, pooled across players, with a player-bootstrap 95% CI (2,000 resamples, seed 20261027).
+- **"vs trailing-10":** each game minus the player's own trailing-10-game mean. This removes role drift that a pregame sim already knows.
+- **"minutes removed":** residuals of each stat on that game's minutes (OLS per player).
+
+| Population | Players | Raw | Minutes removed |
+|---|---|---|---|
+| All games | 398 | 1.358 [1.334, 1.382] | 1.042 [1.024, 1.060] |
+| All games, vs trailing-10 | 342 | 1.333 [1.306, 1.359] | 1.043 [1.020, 1.065] |
+| >= 15 MIN | 310 | 1.233 [1.211, 1.255] | 1.038 [1.018, 1.057] |
+| **>= 15 MIN, vs trailing-10** | **246** | **1.216 [1.189, 1.244]** | **1.039 [1.015, 1.064]** |
+
+Median per-player correlations, >= 15 MIN vs trailing-10:
+
+| | P x R | P x A | R x A |
+|---|---|---|---|
+| Raw | +0.20 | +0.11 | +0.16 |
+| Minutes removed | +0.07 | 0.00 | +0.06 |
+
+**Read:**
+- **Minutes carry 82% to 87% of the real excess over 1.0** (82% at >= 15 MIN vs trailing-10; 87% on all games vs trailing-10).
+  - A per-player, per-game minutes draw should take most of the sim's 0.997 toward the real value. That draw is `basketball-player-distribution`'s planned Phase 2 (1); its Phase 1 (`0050a741`) found the sim's minutes 1.57x too narrow (bench 2.03x).
+  - The remainder, about 0.04, is per-minute co-movement (P x R, R x A). It is second-order.
+- **E4's real 1.196 rested on 17 players.** The same filter on 246 players reads 1.216.
+- **Acceptance check offered to the owner lane:**
+  - At >= 15 sim minutes, the sim's ratio should rise from 0.997 toward 1.216 [1.189, 1.244].
+  - A minutes draw alone should land near 1.18. That figure is by subtraction, not simulated.
+  - Then re-run E4's NBA SP-disjoint cell (`#740` (d)).
+- **Caveat:** OLS on realised minutes credits to minutes any co-movement where minutes RESPOND to performance (foul trouble, a hot night, blowouts). The sim reproduces that share only if its minutes draw is tied to game script; an independent minutes draw gets the rest.
+- **No lane opened for the fix.** It belongs to `basketball-player-distribution` (session e0a3e383, OPEN). It was routed there in `.syndicate/brief_2026-10-27_engine_reads.md`, the NBA section.
+- **Script and output:** `C:/tmp/e4/pra_minutes_decomp.py` and `C:/tmp/e4/pra_minutes_decomp.out.jsonl` (scratch, not in git).
