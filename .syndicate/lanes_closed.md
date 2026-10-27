@@ -12726,3 +12726,9 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Files: none (ledger-only)
 - Verdict: GOAL MET. 1 of 34 CLOSED blocks moved to `lanes_closed.md` with one pointer; 33 deferred (owner idle < 240m, or a transcript not found). Gate reading, deferrals and the dormant-OPEN report are in `log/2026-10-27.md`.
 - Moved: closed-lane-archive-20261027-0755.
+
+### closed-lane-archive-20261027-1331 — CLOSED 2026-10-27 (GOAL MET: 26 blocks archived) — opened 2026-10-27 — session f46dd5db-583d-477e-9fda-d858ff926bd2
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: MET. owner_liveness.py --idle-min 240 at 18:32Z (13:32 CDT) returned 26 SAFE of 34 CLOSED; all 26 moved to lanes_closed.md with one pointer each. Table, deferrals and Part B are in log/2026-10-27.md 18:45Z.
+- Moved: layer2-live-segment-actuals, signal-engine-nba, signal-engine-football, signal-engine-nhl, mlb-nearmiss-forward, forward-input-preservation, news-availability-gate, news-price-follow, sim-gap-ev-study, live-winpct-blank, props-book-coverage, nfl-sgp-builder, nhl-lineup-status, alt-ladders, alt-ladder-consistency, nhl-sgp-builder, basketball-sgp-builder, layer2-next-day-horizon, nba-live-board, nba-live-prop-coverage, nba-inplay-only-pulls, nfl-segment-capture-e, cheat-sheet-section-growth, decision-record-shadow, nba-live-state-overdue, status-clock-skew

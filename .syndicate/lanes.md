@@ -1188,12 +1188,6 @@ death, never life — do not invert it.
 - Re-scope 2026-10-27 23:20Z (user, verbatim: \"we need to solve for those\"): the 981 stale rows (23:15Z read) are grader gaps, pre-registered in the findings file as H1-H6. H1: soccer binds to the slate date, not the game. H2: soccer has no corners/btts rule (322). H3: NCAAF names San José State / McNeese State (171). H4: MLB never fetches a missing feed (122). H5: NBA preseason has no box (72). H6: football props, diagnosed first (87). Falsified if a fleet dry run with all fixes grades < 50% of the 981.
 - Blocked by: none
 
-### closed-lane-archive-20261027-1331 — CLOSED 2026-10-27 (GOAL MET: 26 blocks archived) — opened 2026-10-27 — session f46dd5db-583d-477e-9fda-d858ff926bd2
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: MET. owner_liveness.py --idle-min 240 at 18:32Z (13:32 CDT) returned 26 SAFE of 34 CLOSED; all 26 moved to lanes_closed.md with one pointer each. Table, deferrals and Part B are in log/2026-10-27.md 18:45Z.
-- Moved: layer2-live-segment-actuals, signal-engine-nba, signal-engine-football, signal-engine-nhl, mlb-nearmiss-forward, forward-input-preservation, news-availability-gate, news-price-follow, sim-gap-ev-study, live-winpct-blank, props-book-coverage, nfl-sgp-builder, nhl-lineup-status, alt-ladders, alt-ladder-consistency, nhl-sgp-builder, basketball-sgp-builder, layer2-next-day-horizon, nba-live-board, nba-live-prop-coverage, nba-inplay-only-pulls, nfl-segment-capture-e, cheat-sheet-section-growth, decision-record-shadow, nba-live-state-overdue, status-clock-skew
-
 ### closed-lane-archive-20261027-1456 — CLOSED 2026-10-27 (GOAL MET: 1 block archived) — opened 2026-10-27 — session 8c9220b9-af5d-42ab-b91c-dd549e672791
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
@@ -1204,6 +1198,12 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: MET. owner_liveness.py --idle-min 240 at 21:41Z (16:41 CDT) returned 4 SAFE of 9 CLOSED; all 4 moved to lanes_closed.md with one pointer each. Table and deferrals are in log/2026-10-27.md 21:43Z.
 - Moved: min-ev-tuner-readout-fleet, sgp-pjoint-calibration, kalshi-both-leg-grading, closed-lane-archive-20261027-1209
+
+### closed-lane-archive-20261027-1841 — CLOSED 2026-10-27 (GOAL MET: 1 block archived) — opened 2026-10-27 — session 9281bbf2-25d0-4318-a6fa-e48979e594b3
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: MET. owner_liveness.py --idle-min 240 at 23:42Z (18:42 CDT) returned 1 SAFE of 6 CLOSED; moved to lanes_closed.md with one pointer. Table and deferrals are in log/2026-10-27.md 23:44Z.
+- Moved: closed-lane-archive-20261027-1331
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1292,6 +1292,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261026-1153` — CLOSED 2026-10-26 (GOAL MET: 1 blocks archived) — opened 2026-10-26 — session cb7f41b9-82ec-4d29-aba8-379d9807746b
 - `closed-lane-archive-20261027-0755` — CLOSED 2026-10-27 (GOAL MET: 6 blocks archived) — opened 2026-10-27 — session 2d142fa3-064a-4b28-ae29-71b5da605a50
 - `closed-lane-archive-20261027-1209` — CLOSED 2026-10-27 (GOAL MET: 1 block archived) — opened 2026-10-27 — session 96c5c1ee-dc48-4da9-950c-86fb91926cf6
+- `closed-lane-archive-20261027-1331` — CLOSED 2026-10-27 (GOAL MET: 26 blocks archived) — opened 2026-10-27 — session f46dd5db-583d-477e-9fda-d858ff926bd2
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
