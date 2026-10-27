@@ -1135,6 +1135,10 @@ death, never life — do not invert it.
 - Blocked by: Stage 2 -- user decision #740 (a) (Kalshi combo capture), then about a month of capture
 
 ### kalshi-combo-capture — OPEN (RUNNING on the fleet via a bridge; supervisor job owed at the next fleet ff) — opened 2026-10-27 — session a48b0f49-3a6b-4105-b194-5804a934487c (picked up 2026-10-27 as a side session of local_668211d5; opened by e32fef1a for pickup)
+- **Reading armed `[2026-10-27 23:20Z]`:** Claude scheduled task `kalshi-combo-capture-first-forward-day`, user-approved, runs daily at ~8:40 AM CT, read-only.
+  - It runs `scripts/kalshi_combo_capture.py status` (`25485432`) on the fleet store, via `C:\tmp\kalshi_combo_status\cc_status.sh`.
+  - Once `met`, it appends the first-full-forward-day + purge-age reading to `deploys.md`, adds a line here and in `#742`, and disables itself. Hard stop 2026-11-03.
+  - It flags BRIDGE DOWN, STUCK (2 of the last 3 runs `errors`), and the key set on an old checkout.
 - **GOAL VERDICT `[2026-10-27 21:39Z]`.**
   - Goal, verbatim: "A forward, read-only capture of Kalshi same-game combo markets runs daily on the fleet: every combo whose legs include a same-game pair in a sport the platform prices is stored under the fleet data root (legs, quotes, volume_fp, result, and public trade prints for kept combos with volume > 0) within about 1,000 public GETs a day at nice 19, so E4 Stage 2 (#740 (d)) can run after a month of capture".
   - **GOAL: NOT MET** (running; Verification owed).

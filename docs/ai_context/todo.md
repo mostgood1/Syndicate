@@ -81,6 +81,9 @@
   - The `0` shard and the per-sport collections settled 0.
   - Corrected along the way: the first 4-h sample's "no two-leg or pure SGP tickets trade" was a window artifact.
 - **DECIDED 2026-10-27 (user, verbatim, session a48b0f49):** "Yes: launch the kalshi combo-capture bridge on the fleet now at nice 19 with a ~30-day backfill and no trade reads, then enable the hourly supervisor job at the next fleet ff under the deploy locks."
+- **STATUS 2026-10-27 23:20Z:** the reading is armed. The scheduled task `kalshi-combo-capture-first-forward-day` (user-approved: "schedule a read-only check tomorrow morning that records the capture's first full forward day and the purge-horizon date in deploys.md") runs daily from 10-28.
+  - It reads `kalshi_combo_capture.py status` (`25485432`) and records the reading once `met`. Hard stop 11-03.
+  - At 22:46Z one bridge run ended `errors` (`SliceUnreadable`, a page GET returned None after 4 tries). The watermark held; the bridge retries the slice an hour later.
 - **Running (2026-10-27):**
   - The bridge was launched 20:56:16Z from `~/combo_capture_checkout`, a git archive, with `LOOKBACK_HOURS=720`. Its log is `~/syndicate-prod/logs/job-kalshi-combo-capture.bridge.log`.
   - It was paused at 21:24Z for a memory fix (`6872eb2c`) and relaunched at 21:36:16Z on `6872eb2c`.
