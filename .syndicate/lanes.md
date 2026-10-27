@@ -1016,17 +1016,6 @@ death, never life — do not invert it.
 - Verification: fitter tests incl. reachability (profile off != on through sizing_inputs_with_provenance); per-cell table from the fleet ledger with denominators; shadow stake delta from a fleet plan re-sized with the candidate profile pinned via SYNDICATE_STAKED_PROBABILITY_PROFILE_PATH
 - Blocked by: data volume (refit ~2026-11-01) + user decision on grain/reader (findings s4/s5)
 
-### min-ev-tuner-readout-fleet — CLOSED 2026-10-22 — opened 2026-10-22 — session 8469dba9-64c3-4580-a633-8feac3b593af
-- **CLOSED 19:36Z 2026-10-22, GOAL MET (verified by lane min-ev-tuner-shadow, which owned the verify after the handover):** the supervisor job `min-ev-tuner-readout` ran UNATTENDED: supervisor.log `[job:min-ev-tuner-readout] started pid=3920127` ... `finished rc=0`, as a catch-up at the 17:49Z up. Its log line was `MIN_EV_TUNER_READOUT date=2026-10-22 mode=shadow state_is_today=True moves_today=0 wrote=.../intelligence/min_ev_tuner_readout/2026-10-22.json`. The artifact was read back on the fleet: 7,462 B, written 17:50:06Z, mode=shadow, actions {hold: 73}, base 0.0. `c11423ec` is on the fleet checkout (HEAD 21b4bdb0, the 19:34Z up). `pooling` reads None in today's artifact because the state is from the 12:01Z pre-pooling pass; tomorrow's carries it.
-- **HANDOVER 2026-10-22 17:19Z (user decision in session b98807bc's chat: "archive ... the fleet-supervisor readout session; you take over confirming the first unattended readout on the fleet"):** this lane's owner session (local_e5ad81b0) is ARCHIVED. The remaining verify -- `bf14f920` (readout job + watchdog checks) loaded by session 332cb014's 17:26Z full down/up, then the first unattended readout artifact read back on the fleet, and `c11423ec`'s pooling check live -- is OWNED by lane `min-ev-tuner-shadow` (session b98807bc). 332cb014 was asked to report the fleet-up to b98807bc. **Correction 17:2xZ:** 332cb014 lands HEAD `bf14f920` (user-approved target), which carries 1da26316 / 7f6f7b1c / 9544c2e8 / 802bed61 but NOT `c11423ec` (the pooling check, only scripts/min_ev_tuner_watch.py + test). local_watchdog.py imports min_ev_tuner_watch fresh every 5-min run, so a later fleet checkout ff past c11423ec loads it with NO restart -- owned by min-ev-tuner-shadow: claim + ride-along review, and the user asked first if other lanes' unloaded runtime changes ride along. Close this lane when the first unattended readout artifact reads back AND c11423ec is on the fleet checkout.
-- **STATUS 2026-10-22 ~16:55Z: LANDED `bf14f920` on origin/main, NOT LOADED.** 17 tests pass (+ 38 watchdog/execution neighbours); off != on mutation read (main() test FAILS with the check off). Read-only fleet dry runs: the log scan finds today's `2026-10-22T12:01:51.256Z ... MIN_EV_TUNER mode=shadow` pass, 0 findings, 0.6 s over 62 MB; the job off the real keyvalue state gives rc=0, state_is_today=True. Finding while doing it: refresh-worker's ALL_PROCESS_MEMORY line embeds peers' grep cmdlines for these markers, so the patterns are line-ANCHORED (test pinned). LOAD: full down/up, asked to ride along on session 332cb014's armed take-profit restart (its tp_gate.sh expects HEAD 36eb357b; the fleet is on 0a2986b4, so it will abort at its HEAD check). Until loaded an ff alone would make the watchdog warn `job:min-ev-tuner-readout` not run, so ff + up go together.
-- Goal: The min_ev tuner's daily readout and alerting run on the fleet with no Claude session: a supervisor ScheduledJob (13:15Z) writes a dated readout artifact under reports/intelligence/min_ev_tuner_readout/, and the 5-min watchdog alerts on a missing (by 13:00Z) or failed MIN_EV_TUNER pass, or a non-shadow mode without a recorded user decision. Done = on main, reachability-tested, loaded by a full down/up, and the first unattended readout artifact read back on the fleet
-- Files: scripts/local_production.py (SCHEDULED_JOBS min-ev-tuner-readout entry ONLY), scripts/min_ev_tuner_daily_readout.py (NEW), scripts/min_ev_tuner_watch.py (NEW), tests/test_min_ev_tuner_watch.py (NEW), scripts/local_watchdog.py (LOAN from fleet-watchdog-auto-recovery: the min_ev_tuner hook in main() + its docstring rows ONLY)
-- Hypothesis: n/a (build)
-- Falsification test: n/a
-- Verification: pytest: job registered + due at 13:15Z; alert fires on a fixture log missing today's line, on FAILED/SAVE_FAILED/HOOK_FAILED, on mode=apply with no decision file, silent on shadow + line present. Fleet: after a claimed full down/up, reports/intelligence/min_ev_tuner_readout/<date>.json written by the job with no session involved, and scheduled_jobs.json last_rc=0
-- Blocked by: none
-
 ### fleet-refresh-worker-early-recycle — OPEN — opened 2026-10-24 — session 20868885-0b2e-4194-896d-46988a0df4eb
 - Goal: Explain, with denominators from fleet logs, why local-fleet refresh-worker recycles on heavy_build_refused at 1.3-2.5h, and land a user-approved fix that stops the early recycles without removing OOM protection
 - **STATUS 2026-10-27 06:32Z: GOAL: NOT MET -- the fix is APPLIED and live; only its Verification reading is left.** The diagnosis is done (the declared 6144 cap set an implicit 4,244 MB refusal line under a slate-sized 4.0-4.7 GB heap; 140/1,724 refusals; see `state_worker.md` [refresh-worker-heavy-build-refusal]). Attempt 3 landed: drained full down/up 06:20:21Z, refresh-worker pid 2983218 reads SYNDICATE_LOCAL_MEMORY_LIMIT_MB=7168, undrained 06:21:11Z, 0 drain deferrals, first build persisted 06:30:56Z, claims released (deploys.md, two entries 2026-10-27 06:20:21Z / 06:31:35Z).
@@ -1162,24 +1151,6 @@ death, never life — do not invert it.
 - Verification: Hermetic tests incl. off != on for the job; built default-off and landed on main; after a user-approved fleet window under the deploy locks, the first full day's capture file on the fleet shows kept combos > 0 by sport, the day's GET count within budget, and results filled for settled combos, recorded in deploys.md
 - Blocked by: none for the bridge. The supervisor job waits for the next fleet ff to >= `0d73eb92` and a full drained down/up (the same down/up `#744`'s key needs).
 
-### sgp-pjoint-calibration — CLOSED — opened 2026-10-27 — closed 2026-10-27 — session 138eb1d7-e336-42da-986e-fafe0233f896
-- **GOAL VERDICT `[2026-10-27 14:37Z checkpoint]`.** Goal, verbatim: "Pre-register (committed before any outcome join) and run a calibration test of the SGP builders' p_joint on the settled paper-ledger tickets: calibration-in-the-large and slope, game-clustered CIs, per sport and by leg count / ticket type; if miscalibrated, decompose the gap (leg marginals p_market + de-vig, consistency nudge, copula correlation, the 18.5% haircut) and propose a per-line correction. OFFLINE, read-only on the fleet ledger" -- **GOAL: MET.** The reading is in `.syndicate/findings_2026-10-27_sgp_pjoint_calibration.md`. Prereg `1e7793e3`, A1 `cfee6f28`, run 14:31Z on a read-only snapshot. Clean-ticket calibration-in-the-large was NOT SHOWN in any gated cell: pooled +1.7 pts [-3.1, +6.4] (971 / 139 games), NHL -1.6, NBA +4.8, NFL +3.6, every Holm p = 1.0, MDE80 6.8 pooled. Since nothing rejected, the decomposition and correction clauses did not trigger. The decomposition is reported descriptively: marginals calibrated, the nudge not worse than the market, the copula better than independence, the haircut never in `p_joint`. The lead's gap was the grader's asymmetric censoring (+2.4 [+1.3, +3.5] pooled; NHL +4.3) from permanently pending, `player_id`-less correlation-family legs. Measurement fixes and the forward read are owed under `#743` to lane `cheat-sheets`. Findings `.syndicate/findings_2026-10-27_sgp_pjoint_calibration.md`. Also touched: `todo.md` `#740`, one inserted "superseded by `#743`" line.
-- Goal: Pre-register (committed before any outcome join) and run a calibration test of the SGP builders' p_joint on the settled paper-ledger tickets: calibration-in-the-large and slope, game-clustered CIs, per sport and by leg count / ticket type; if miscalibrated, decompose the gap (leg marginals p_market + de-vig, consistency nudge, copula correlation, the 18.5% haircut) and propose a per-line correction. OFFLINE, read-only on the fleet ledger
-- Files: scripts/sgp_pjoint_calibration.py (NEW), tests/test_sgp_pjoint_calibration.py (NEW), .syndicate/findings_2026-10-27_sgp_pjoint_calibration_preregistration.md (NEW), .syndicate/findings_2026-10-27_sgp_pjoint_calibration.md (NEW), docs/ai_context/todo.md (one new item section only, insert-only)
-- Hypothesis: PRE-REGISTERED in .syndicate/findings_2026-10-27_sgp_pjoint_calibration_preregistration.md (committed before any outcome join)
-- Falsification test: Holm over {pooled, NHL, NBA, NFL}: no calibration-in-the-large test of p_joint rejects at alpha 0.05 (game-clustered) -> the 3-6 pt lead is not a measured miscalibration; report the minimum detectable gap
-- Verification: findings file with the prereg SHA, ledger coverage + n per result, the verdict per sport, the decomposition (if any test rejects) and a per-line correction validated out of fold; todo item with a free ID
-- Blocked by: none
-
-### kalshi-both-leg-grading — CLOSED 2026-10-27 — opened 2026-10-27 — session a7978a13-a882-425f-bedf-41b4299704ff
-- **CLOSED `[2026-10-27 15:16Z]` (GOAL MET):** `06378fa9` live on live-odds-worker 14:59:51Z; all 5 rows venue-graded 15:01:08Z, ATL9 pair +0.1158, ATLCHA-230 pair +0.1258, NYKBOS-220 yes -0.4168; unchanged at 15:14Z (repair did not clear). Loan of venue_settlement.py returned to kalshi-exit-path. Reading in deploys.md (2026-10-27 14:59:41Z entry).
-- Goal: The 5 ungraded 10-23 live in-game Kalshi orders (ATL9 yes+no, ATLCHA-230 yes+no, NYKBOS-220 yes) grade per leg on the fleet; the 08-27 both-teams-won guard still refuses a shared winning outcome
-- Files: syndicate/features/shared/venue_settlement.py (LOAN from kalshi-exit-path, user-approved 2026-10-24 'Build the fix' in coordinator 332cb014 chat; settle_from_venue sides_by_key + new both-legs rescue, repair_multi_side_grades side grouping, new _kalshi_leg/_kalshi_legs_consistent helpers ONLY), tests/test_venue_settlement_both_legs.py (NEW)
-- Hypothesis: sides_by_key compares raw labels (over vs yes) and a true both-legs holding has no per-leg path; both fixable without letting two legs share a WON
-- Falsification test: a test where both legs would grade WON still grades; or repair_multi_side_grades clears the new per-leg grades on the next tick
-- Verification: after the coordinator's fleet restart, /api/portfolio/live?on=2026-10-23 shows all 5 graded, each pair netting ~+0.12..+0.16 less fees
-- Blocked by: none
-
 ### sgp-leg-grading — OPEN — opened 2026-10-27 — session 138eb1d7-e336-42da-986e-fafe0233f896
 - **STATUS `[2026-10-27 14:55Z]`: BUILT and measured, on main as `84967f75`, NOT on the fleet.**
   - The Verification ran: a read-only replay on the fleet ledgers (<= 10-26).
@@ -1212,12 +1183,6 @@ death, never life — do not invert it.
 - Env 2026-10-27 20:54:32Z (user, verbatim in this lane's chat; NO restart): `REFRESH_WORKER__SYNDICATE_PAPER_ARCHIVED_GRADING=on` added to the fleet env file (sha256 b9431eb1 -> 67adbf4e, backup kept; refresh-worker's derived env reads `on`). INERT until a full down/up on a commit containing 2ec80fe0 (last UP 0fca3f2b, checkout 84967f75). Daily read-only scheduled task `paper-archived-grading-first-line` records the first ARCHIVED_SETTLED line in deploys.md and disables itself (hard stop 11-10). deploys.md 20:54:32Z. Released the `pipeline/intelligence_state.py` claim at 21:02Z: the hook landed in 2ec80fe0, and `check_lane_invariants.py` listed the claim as contested with paper-alongside-live.
 - Blocked by: none
 
-### closed-lane-archive-20261027-1209 — CLOSED 2026-10-27 (GOAL MET: 1 block archived) — opened 2026-10-27 — session 96c5c1ee-dc48-4da9-950c-86fb91926cf6
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. 1 of 34 CLOSED blocks moved to `lanes_closed.md` with one pointer; 33 deferred (owner idle < 240m, or a transcript not found). Gate reading, deferrals and the dormant-OPEN report are in `log/2026-10-27.md`.
-- Moved: closed-lane-archive-20261027-0755.
-
 ### closed-lane-archive-20261027-1331 — CLOSED 2026-10-27 (GOAL MET: 26 blocks archived) — opened 2026-10-27 — session f46dd5db-583d-477e-9fda-d858ff926bd2
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
@@ -1228,6 +1193,12 @@ death, never life — do not invert it.
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness --idle-min 240 at 19:57Z returned SAFE for 1 of 9 CLOSED; moved `min-ev-tuner-shadow`. 8 deferred; table and Part B in log/2026-10-27.md.
+
+### closed-lane-archive-20261027-1640 — CLOSED 2026-10-27 (GOAL MET: 4 blocks archived) — opened 2026-10-27 — session 0c3f7e57-ab40-4e18-aaec-1979f260089d
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: MET. owner_liveness.py --idle-min 240 at 21:41Z (16:41 CDT) returned 4 SAFE of 9 CLOSED; all 4 moved to lanes_closed.md with one pointer each. Table and deferrals are in log/2026-10-27.md 21:43Z.
+- Moved: min-ev-tuner-readout-fleet, sgp-pjoint-calibration, kalshi-both-leg-grading, closed-lane-archive-20261027-1209
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1315,6 +1286,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261026-0812` — CLOSED 2026-10-26 (GOAL MET: 10 blocks archived) — opened 2026-10-26 — session 15b943db-0c0d-4db8-a52c-1b882dd8f079
 - `closed-lane-archive-20261026-1153` — CLOSED 2026-10-26 (GOAL MET: 1 blocks archived) — opened 2026-10-26 — session cb7f41b9-82ec-4d29-aba8-379d9807746b
 - `closed-lane-archive-20261027-0755` — CLOSED 2026-10-27 (GOAL MET: 6 blocks archived) — opened 2026-10-27 — session 2d142fa3-064a-4b28-ae29-71b5da605a50
+- `closed-lane-archive-20261027-1209` — CLOSED 2026-10-27 (GOAL MET: 1 block archived) — opened 2026-10-27 — session 96c5c1ee-dc48-4da9-950c-86fb91926cf6
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
@@ -1373,6 +1345,7 @@ death, never life — do not invert it.
 - `hygiene-guards-1020` — CLOSED 2026-10-21 — opened 2026-10-20 — closed 2026-10-21 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
 - `inplay-cadence-block-trim` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `intelligence-idle-poll` — CLOSED 2026-09-18 (GOAL MET: an untouched post-deploy /intelligence tab stopped POSTing at minute 14; resume unit-tested only) — opened 2026-09-18 — session f26bba3b-72ee-4f8c-9721-3f8c7e4678f1
+- `kalshi-both-leg-grading` — CLOSED 2026-10-27 — opened 2026-10-27 — session a7978a13-a882-425f-bedf-41b4299704ff
 - `kalshi-line-aware-rungs` — ORPHANED, **UNOWNED** [ownership sweep 2026-08-31: owning session gone, no live session on this machine] — — **CLAIMS RELEASED 2026-08-26 03:3xZ, sess
 - `kalshi-maker-entry-paper` — CLOSED — opened 2026-10-19 — closed 2026-10-19 — session 2636b326-71e6-4908-8692-de0d92b6f94d
 - `kalshi-maker-pilot` — CLOSED (GOAL MET) — opened 2026-10-24 — closed 2026-10-26 — session 78880f41-ba0e-410c-aaac-d6cbeb02b884
@@ -1439,6 +1412,7 @@ death, never life — do not invert it.
 - `maker-vs-taker-shadow` — CLOSED (GOAL MET) — opened 2026-10-24 — closed 2026-10-26 — session 78880f41-ba0e-410c-aaac-d6cbeb02b884
 - `market-history-index-memo` — CLOSED 2026-09-18 (GOAL: MET) — opened 2026-09-18 — session a1e40980-cceb-493f-adf9-5a5ca879acf6 — body in `lanes_history.md`.
 - `min-ev-paper-twin-dedup` — CLOSED 2026-10-20 — opened 2026-10-20 — session 5a76143c-2ec5-4c1e-96b3-cafbafb68664
+- `min-ev-tuner-readout-fleet` — CLOSED 2026-10-22 — opened 2026-10-22 — session 8469dba9-64c3-4580-a633-8feac3b593af
 - `min-ev-tuner-shadow` — CLOSED 2026-10-27 — opened 2026-10-19 — session b98807bc-5652-4301-be8c-d5f7bf07b55f
 - `mlb-feed-live-terminal-refresh` — CLOSED 2026-09-10 — opened 2026-09-04 — session b9013cf2 — **refresh + post-roll reachability verified in production; served-outcome residual transferred to OPEN `mlb-final-state-mapping`; closed by `census-rescue-0910` on user decision**
 - `mlb-final-state-mapping` — CLOSED 2026-09-10 — opened 2026-09-04 — session 218b778c (adopted) — **GOAL: MET for refresh-worker's board build (a frozen live-lens row overwrote the feed's Final in `_merge_live_lens_row_into_game`, `mlb/cards.py:3026`); CORRECTED 20:07Z: on WEB there is no feed Final at all, the lens row is the only status source; recurs nightly (9 games / 7 of 9 dates); follow-up is lane `mlb-lens-final-status`**
@@ -1634,6 +1608,7 @@ death, never life — do not invert it.
 - `sept-spike-captures` — CLOSED 2026-09-11 — opened 2026-09-11 — session 92a71e78-b21c-4366-a900-f7a3f6fc434d — **ALL NINE CAPTURED CLEAN, AND EVERY ONE METERED BELOW ITS SERVED TRAFFIC (m/app 0.17-0.66). The pre-registered test resolved to its second branch: the 09-08 run stands alone.**
 - `session-scope-drift-guard` — **CLOSED 2026-09-08 — falsification test RAN: rate passes (0.50 firings/session, 73% silent), precision does NOT (6 of 11 firings were in-goal). Kept,
 - `settled-sample-nfl-reconcile` — CLOSED 2026-09-10 — opened 2026-09-04 — session none recorded — **GOAL: MET: the consumer counted order rows, not decisions (`53d8f9c9`); prod `nfl: 12` / credibility 0.25 on 09-04 and 09-10**
+- `sgp-pjoint-calibration` — CLOSED — opened 2026-10-27 — closed 2026-10-27 — session 138eb1d7-e336-42da-986e-fafe0233f896
 - `signal-engine-football` — CLOSED — opened 2026-10-13 — closed 2026-10-23 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
 - `signal-engine-nba` — CLOSED — opened 2026-10-13 — closed 2026-10-23 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
 - `signal-engine-nhl` — CLOSED — opened 2026-10-13 — closed 2026-10-23 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
