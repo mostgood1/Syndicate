@@ -54582,7 +54582,7 @@ which is about the two sizing bases and not about the refusal boundary.
   - No code deploy, no ff, no restart, no env change. So no preflight: no SHA loaded anywhere.
 - **what ran:** code `2ec80fe0` (on origin/main), from the scratch extract `~/peg-dryrun/2ec80fe0`. The fleet checkout (`84967f75`) was not touched.
   - Command: `scripts/backfill_archived_paper_grades.py --since 2026-10-02 --fleet-home ~/syndicate-prod --apply`, at `nice -n 19`, with the refresh-worker's derived env.
-  - Runner: `C:	mp\pegpply.sh`; log `C:	mp\pegpply.log`.
+  - Runner: `C:\tmp\peg\apply.sh`; log `C:\tmp\peg\apply.log`.
 - **expectation, stated before the run:** about 908 stale rows graded; the stale count falls from about 1,850 to about 940; NCAAF and NFL fall; soccer, MLB, NBA and NHL do not move.
 - **the write:** `orders_2026-10.jsonl`.
   - Lines 18,403 -> 19,385: +982, which is the 981 graded copies plus 1 concurrent worker trim.
@@ -54609,3 +54609,41 @@ which is about the two sizing bases and not about the refusal boundary.
 - **NOT DONE: the hourly pass.** It was approved via relay, but on this fleet it cannot be turned on by a role restart.
   - `SYNDICATE_PAPER_ARCHIVED_GRADING` is read from the role env. The supervisor derives that env only at `up` (`local_production.py` `cmd_up`, `derive_role_env`), and a role restart reuses it.
   - Enabling it therefore takes a fleet ff to >= `2ec80fe0`, the `REFRESH_WORKER__SYNDICATE_PAPER_ARCHIVED_GRADING=on` line, and a FULL drained down/up of all three roles. This is put to the user.
+
+## 2026-10-27 20:54:32Z (3:54 PM CT) -- FLEET ENV EDIT, NO RESTART: `REFRESH_WORKER__SYNDICATE_PAPER_ARCHIVED_GRADING=on` (lane paper-evicted-grading, #744) -- **APPLIED; INERT until a full down/up on a commit containing `2ec80fe0`; first-line reading OWED**
+- **user, verbatim (this lane's chat):** "Yes: back up the fleet env, add REFRESH_WORKER__SYNDICATE_PAPER_ARCHIVED_GRADING=on (inert until a full down/up on a SHA containing 2ec80fe0), record old/new sha256 in deploys.md, and create the self-discharging daily ARCHIVED_SETTLED check. No restart."
+  - The decision-engine session relayed the same choice at about 12:40 PM CT. It was acted on only after the user's own yes here.
+- **no claim, no preflight:** nothing was restarted, deployed or fast-forwarded, and no process re-read the file.
+  - Role env is derived only at `local_production.py up` (`cmd_up` -> `derive_role_env`).
+- **the file:** `~/syndicate-prod/local_production.env` (WSL `Ubuntu-24.04`).
+  - **Old sha256 `b9431eb1290bb97089026e107a7cbeee4bbe8dea476e370180994a6b8aca198c`**, 11,179 B, 192 lines. It was unchanged since the 17:35Z read; the runner refused on any other sha.
+  - Backup: `local_production.env.bak-archived-grading-20261027T205432Z`, same sha, mode 600.
+  - Appended 2 LF lines: a `#` comment naming #744 and the inert condition, then `REFRESH_WORKER__SYNDICATE_PAPER_ARCHIVED_GRADING=on`.
+  - **New sha256 `67adbf4e519592c3630b667bd25b5777e2df3b12b69f9d4352051ec32054f5ef`**, 11,383 B, 194 lines, mode 600.
+  - Runner: `C:\tmp\peg\env_add.sh`.
+- **reading** (20:54Z, read-only; `local_production.py env --role <r>` on the fleet checkout, printing only this key):
+  - refresh-worker derives `SYNDICATE_PAPER_ARCHIVED_GRADING=on`.
+  - live-odds-worker and web derive it `<absent>`, because the key is role-scoped, as intended.
+  - Runner: `C:\tmp\peg\env_verify.sh`.
+- **why it is inert now:**
+  - The supervisor's last `LOCAL PRODUCTION UP` was on `0fca3f2b7af4`, and the checkout HEAD is `84967f755`. Neither contains `2ec80fe0` (`merge-base --is-ancestor`).
+  - So the running refresh-worker has neither the code nor the key.
+- **what turns it on:** the first FULL drained down/up whose commit contains `2ec80fe0`.
+  - A role restart reuses the env stored at `up`, so it will not load the key.
+  - If the checkout has moved past `2ec80fe0`, a role restart loads the code without the key. The log then says `ARCHIVED_GRADING_OFF` once.
+  - An `up` on a commit without `2ec80fe0` loads a key that nothing reads, which is harmless.
+  - **Off switch:** delete the line (absent = off, `archived_grading_enabled`). That also takes a full down/up.
+- **what it does once live:** at most hourly, in the refresh-worker's intelligence-state tick after `settle_orders`:
+  - It grades archive-only stale paper rows in a 14-day / 6-slate window and appends the graded copies to the archive.
+  - It is the same code that applied the 981-row backfill at 17:20Z.
+  - It has its own memory-guard token, `ARCHIVED_SETTLEMENT_GUARD_SKIP`, with a 300 MB floor.
+- **for the next deployer doing a full down/up:**
+  - The env baseline changed at 20:54:32Z: refresh-worker gains one key.
+  - On a commit containing `2ec80fe0`, expect `<ts>Z [paper_settlement] ARCHIVED_SETTLED dry_run=False ...` on the first intelligence-state tick after the up.
+- **baseline (20:54Z):** `refresh-worker.log` holds 0 timestamped lines of each `ARCHIVED_*` token.
+- **the check:** Claude scheduled task `paper-archived-grading-first-line`, daily at about 8:20 AM CT, read-only.
+  - It reads the last UP commit, plus the anchored `^<ts>Z \[(paper_settlement|intelligence_state)\] ARCHIVED_*` lines in `refresh-worker.log` and `.1` since 20:54:32Z.
+  - On the first `ARCHIVED_SETTLED` line, it records a MET reading here, adds a line to the lane and to `#744`, and disables itself.
+  - Hard stop 2026-11-10: it records NOT MET and disables itself.
+  - Unattended runs may be refused permission to disable the task; it says so if that happens. Its first step makes repeat runs no-ops once a reading is recorded.
+- **verify:** the first timestamped `[paper_settlement] ARCHIVED_SETTLED dry_run=False` line in refresh-worker's log, after a full up on a commit containing `2ec80fe0`. **OWED.**

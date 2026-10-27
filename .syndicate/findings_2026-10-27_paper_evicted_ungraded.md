@@ -213,7 +213,7 @@ the 981 graded copies.
 5. NBA preseason `no_live_box_for_date`, 72.
 6. NCAAF props 58, NFL `player_not_in_final_box` 20, NHL 7.
 
-Scratch: `C:	mp\peg\` (`dryrun.sh`, `dryrun.log`, `report_20261027T163701Z.json`, `reader_deltas.py`/`.log`).
+Scratch: `C:\tmp\peg\` (`dryrun.sh`, `dryrun.log`, `report_20261027T163701Z.json`, `reader_deltas.py`/`.log`).
 
 ## Applied `[2026-10-27 17:20-17:27Z, user-approved, refresh-worker claim; deploys.md has the full entry]`
 
@@ -233,3 +233,11 @@ Scratch: `C:	mp\peg\` (`dryrun.sh`, `dryrun.log`, `report_20261027T163701Z.json`
   - plus small tails
 - **The threshold flipped between reads:** the same instrument read 50.8% at the apply's own read (17:20Z), against 49.9% at 16:39Z. The pre-registered verdict (the first reading) stands. It sits on the threshold, so the split by sport is the finding, not the verdict.
 - **Hourly pass NOT enabled:** its env key loads only at a full supervisor down/up, not at a refresh-worker role restart.
+
+## Enabled, inert until a full up `[2026-10-27 20:54:32Z (3:54 PM CDT), user-approved in this lane's chat; deploys.md has the full entry]`
+- `REFRESH_WORKER__SYNDICATE_PAPER_ARCHIVED_GRADING=on` was appended to the fleet env file. Nothing was restarted.
+  - sha256 `b9431eb1...198c` -> `67adbf4e...f5ef`. The backup is `local_production.env.bak-archived-grading-20261027T205432Z`.
+  - refresh-worker's derived env reads `on`. live-odds-worker and web do not get the key.
+- **Inert until** the first full down/up whose commit contains `2ec80fe0`. At 20:56Z the last UP was `0fca3f2b7af4` and the checkout was `84967f755`; neither contains it.
+- **Check:** the daily read-only scheduled task `paper-archived-grading-first-line` records the first anchored `[paper_settlement] ARCHIVED_SETTLED` line, then disables itself (hard stop 2026-11-10).
+- **Still open:** the 953 rows behind the named grader gaps (above) need the lane re-scoped. Not started.
