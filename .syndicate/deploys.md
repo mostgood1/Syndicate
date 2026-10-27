@@ -54574,3 +54574,38 @@ which is about the two sizing bases and not about the refusal boundary.
   - The largest sport-day is nba 10-26 at 22,751,011 B (34% of the 64 MiB per-sport ceiling). The largest day is 41% of the 128 MiB per-day ceiling.
 - **10-23 caveat:** its trail was pruned (`_RETAIN_DAYS`=4) before this late run, so exact completeness for 10-23 is not measurable and never will be. It has 0 CEILING_HIT and 0 dropped>0 lines. Its 16 old-format OPENINGS lines are all from before the restart: the last was at 07:34:43Z 10-22, in `refresh-worker.log.4`/`.5`. The first new-format line for date 10-23 was at 20:52:11Z 10-22 (`dropped=0 bytes=11281204`).
 - **Verdict: MET.** Ceiling hits: 0. dropped>0 lines: 0. Missing openings on the 3 trail-covered dates: 0, out of 148,431 trail combos. Nothing missing in any sport.
+
+## 2026-10-27 17:20:32Z / 17:27:18Z (12:20 / 12:27 PM CT) -- FLEET DATA BACKFILL: 981 archived paper rows graded (lane paper-evicted-grading, #744) -- **APPLIED; stale-count reading MET**
+- **user, verbatim (this lane's chat):** "Yes: take the refresh-worker claim and apply the partial backfill (981 graded copies, --since 2026-10-02), then re-read the stale count and record it in deploys.md."
+  - The decision-engine session also relayed "backfill yes, hourly grading yes". The hourly half is NOT done here; see the last bullet.
+- **claim:** refresh-worker, holder `paper-evicted-grading`, acquired 17:20:03Z (it was free) and released 17:28Z.
+  - No code deploy, no ff, no restart, no env change. So no preflight: no SHA loaded anywhere.
+- **what ran:** code `2ec80fe0` (on origin/main), from the scratch extract `~/peg-dryrun/2ec80fe0`. The fleet checkout (`84967f75`) was not touched.
+  - Command: `scripts/backfill_archived_paper_grades.py --since 2026-10-02 --fleet-home ~/syndicate-prod --apply`, at `nice -n 19`, with the refresh-worker's derived env.
+  - Runner: `C:	mp\pegpply.sh`; log `C:	mp\pegpply.log`.
+- **expectation, stated before the run:** about 908 stale rows graded; the stale count falls from about 1,850 to about 940; NCAAF and NFL fall; soccer, MLB, NBA and NHL do not move.
+- **the write:** `orders_2026-10.jsonl`.
+  - Lines 18,403 -> 19,385: +982, which is the 981 graded copies plus 1 concurrent worker trim.
+  - Bytes 29,684,595 -> 31,296,413. `"graded_from":"archive"` 0 -> **981**.
+  - Outcomes: 512 won, 462 lost, 7 push.
+  - Closing marks stamped on 981 rows, 941 of them with a CLV.
+  - One new file: `.archived_grading.lock` in the archive dir.
+- **reading** (a read-only dry run right after, 17:27:19Z). Stale paper means the game started more than 48 h ago and there is no outcome.
+  - **Total: 1,906 -> 953.** Archive only: 1,875 -> 922. Live document: 31 -> 31. Rows still gradeable: 0.
+  - Archive-only, by sport: NCAAF 1,092 -> 224, NFL 110 -> 25, soccer 472 -> 472, MLB 115 -> 115, NBA 79 -> 79, NHL 7 -> 7.
+  - Largest Central game dates: NCAAF 10-24 495 -> 77, 10-17 240 -> 42, 10-10 191 -> 8, 10-23 56 -> 3, 10-09 48 -> 34, 10-03 56 -> 56 (registry); NFL 10-25 57 -> 5; soccer 10-24 102 -> 102 and 10-25 89 -> 89; MLB 10-24 54 -> 54 and 10-08 50 -> 50.
+- **verdict MET.**
+  - The drop (953) equals the archive-only would-grade count at the apply's own read (953).
+  - Soccer, MLB, NBA and NHL are unchanged, and nothing gradeable remains.
+  - Why the counts beat the expectation: the stale population grew from 1,850 to 1,906 between 16:39Z and 17:20Z. NFL's 10-25 games crossed 48 h in between (57 rows, 52 now graded).
+- **the pre-registered verdict, restated:** the same instrument read 953 / 1,875 = **50.8%** at 17:20Z, against 49.9% at 16:39Z.
+  - The verdict of record stays the pre-registered first reading: FALSIFIED.
+  - But it sits on the threshold and flips with the read time, so neither direction is a finding.
+  - The robust finding is the split: NCAAF and NFL were eviction; soccer, MLB, NBA and NHL are grader gaps by name (findings file).
+- **blast radius**, as measured read-only at 16:41Z:
+  - No stake-sizing change: every sport was already at credibility 1.000.
+  - `live_cell_gate.evaluate` is unchanged.
+  - Readers that now see the 981 rows: paper PNL/ROI, CLV, the min-ev tuner (shadow), `#727`'s refit, and `#724`'s ladder count (+219).
+- **NOT DONE: the hourly pass.** It was approved via relay, but on this fleet it cannot be turned on by a role restart.
+  - `SYNDICATE_PAPER_ARCHIVED_GRADING` is read from the role env. The supervisor derives that env only at `up` (`local_production.py` `cmd_up`, `derive_role_env`), and a role restart reuses it.
+  - Enabling it therefore takes a fleet ff to >= `2ec80fe0`, the `REFRESH_WORKER__SYNDICATE_PAPER_ARCHIVED_GRADING=on` line, and a FULL drained down/up of all three roles. This is put to the user.

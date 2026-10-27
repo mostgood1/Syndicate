@@ -214,3 +214,22 @@ the 981 graded copies.
 6. NCAAF props 58, NFL `player_not_in_final_box` 20, NHL 7.
 
 Scratch: `C:	mp\peg\` (`dryrun.sh`, `dryrun.log`, `report_20261027T163701Z.json`, `reader_deltas.py`/`.log`).
+
+## Applied `[2026-10-27 17:20-17:27Z, user-approved, refresh-worker claim; deploys.md has the full entry]`
+
+- **What was written:** 981 graded copies appended to the archive (512 won, 462 lost, 7 push), with a closing mark on all 981 (941 with a CLV).
+- **Stale paper count:** **1,906 -> 953**. Archive only 1,875 -> 922; live document 31.
+- **By sport (archive only):**
+  - NCAAF 1,092 -> 224 and NFL 110 -> 25.
+  - Soccer 472, MLB 115, NBA 79 and NHL 7 are unchanged.
+- **The 953 that remain are all grader gaps, by name:**
+  - soccer `unmapped_market` 314
+  - NCAAF registry 166
+  - MLB `no_live_feed` 104
+  - soccer not-found / no-state 153
+  - NBA preseason box 72
+  - NCAAF props 58
+  - NFL player not in the final box 25
+  - plus small tails
+- **The threshold flipped between reads:** the same instrument read 50.8% at the apply's own read (17:20Z), against 49.9% at 16:39Z. The pre-registered verdict (the first reading) stands. It sits on the threshold, so the split by sport is the finding, not the verdict.
+- **Hourly pass NOT enabled:** its env key loads only at a full supervisor down/up, not at a refresh-worker role restart.
