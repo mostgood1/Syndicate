@@ -291,6 +291,17 @@ def test_slices_are_sized_from_the_last_slices_page_density(tmp_path, monkeypatc
     assert spans[0] == 300 and sum(spans) == 900  # 2 pages / (6 pages / 900 s); then the empty slice widens it
 
 
+def test_a_short_remainder_is_folded_into_the_last_slice_and_does_not_set_the_density(tmp_path):
+    fake = FakeKalshi([])
+    _run(tmp_path, fake, T0, lookback_s=1830)  # 2 x 900 s + 30 s: the 30 s are read with the second slice
+    spans = [c[1]["max_settled_ts"] - c[1]["min_settled_ts"] for c in fake.calls if c[0] == "/markets"]
+    assert spans == [900, 930]
+    fake.calls.clear()
+    _run(tmp_path, fake, T0 + 20)  # 20 s of new settlement time: one slice, too short to re-estimate density
+    state = json.loads((cc.store_dir(tmp_path) / "state.json").read_text())["series"]["KXMVECROSSCATEGORY"]
+    assert state["pages_per_s"] == pytest.approx(1 / 930) and state["swept_to"] == T0 + 20 - cc.SETTLE_LAG_S
+
+
 def test_the_budget_stops_between_slices_and_the_next_run_resumes(tmp_path):
     end = T0 - cc.SETTLE_LAG_S
     combos = [_combo(f"KXMVECROSSCATEGORY-S1-{i}", NBA_SGP_LEGS, end - 300 * i - 1) for i in range(12)]

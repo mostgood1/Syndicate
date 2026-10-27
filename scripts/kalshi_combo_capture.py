@@ -645,6 +645,8 @@ def _run_locked(root: Path, *, get, now, lookback_s, max_pages, max_seconds, ser
             if density > 0:
                 span = max(MIN_SLICE_S, min(span, int(TARGET_SLICE_PAGES / density)))
             lo, hi = swept + 1, min(swept + span, end)
+            if end - hi < MIN_SLICE_S:  # fold a short remainder in rather than read it as its own slice
+                hi = end
             # Stop BEFORE a slice the budget cannot finish: a slice cut short is discarded, pages and all.
             if not budget.allow(int(st.get("last_slice_pages") or 1)):
                 break
@@ -671,7 +673,8 @@ def _run_locked(root: Path, *, get, now, lookback_s, max_pages, max_seconds, ser
             swept = hi
             st["swept_to"] = hi
             st["last_slice_pages"] = int(stats["pages"])
-            st["pages_per_s"] = int(stats["pages"]) / (hi - lo + 1)
+            if hi - lo + 1 >= MIN_SLICE_S:  # a slice costs >= 1 page, so a seconds-long one overstates density
+                st["pages_per_s"] = int(stats["pages"]) / (hi - lo + 1)
             ms.save_json(state_path, state)
         if swept >= end:
             st["last_sweep_at"] = now
