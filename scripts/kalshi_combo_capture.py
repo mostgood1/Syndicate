@@ -64,7 +64,7 @@ import os
 import sys
 import time
 from pathlib import Path
-from typing import Any, Callable, Iterable, Iterator, Mapping, Sequence
+from typing import Any, Callable, Iterable, Iterator, Mapping, NamedTuple, Sequence
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
@@ -317,7 +317,28 @@ class BudgetStop(Exception):
 
 # `sweep_slice` tallies every kept combo into its stats under "<kind>:<name>" keys; a run unpacks them here.
 TALLY_KEYS = {"sport": "kept_by_sport", "sport_traded": "kept_traded_by_sport", "legs_traded": "kept_traded_by_legs",
-              "league": "kept_by_league"}
+              "league": "kept_by_league", "trades": "trades"}
+
+
+class EncodedRow(NamedTuple):
+    """A kept row already serialised for the store, with the settlement date it is filed under. As a dict a
+    stored row took 8.9 KB of Python memory against 1.9 KB of JSON (20,000 rows settled 09-28, measured on the
+    fleet 2026-10-27). That is why the first backfill run peaked at 2.5 GB: Kalshi's listing a month back holds
+    traded combos only (379,393 of 379,410 kept), so every kept row was held whole until its slice ended."""
+    date: str
+    line: str
+
+
+def encode_row(row: Mapping[str, Any]) -> str:
+    return json.dumps(row, sort_keys=True, separators=(",", ":"))
+
+
+def store_date(row: Mapping[str, Any]) -> str:
+    return utc_date(ms.ts(row.get("settlement_ts")) or ms.ts(row.get("close_time")) or time.time())
+
+
+def wants_trade_read(row: Mapping[str, Any], max_legs: int | None) -> bool:
+    return bool(row.get("traded")) and (max_legs is None or int(row.get("n_legs") or 0) <= max_legs)
 
 
 def tally(stats: collections.Counter, row: Mapping[str, Any]) -> None:
@@ -334,12 +355,14 @@ def tally(stats: collections.Counter, row: Mapping[str, Any]) -> None:
 
 
 def sweep_slice(get: Callable[..., Any], series: str, lo: int, hi: int, *, budget: RunBudget,
-                captured_at: str, page_cap: int = SLICE_PAGE_CAP,
-                keep_untraded: bool = True) -> tuple[list[dict[str, Any]], collections.Counter]:
+                captured_at: str, page_cap: int = SLICE_PAGE_CAP, keep_untraded: bool = True,
+                trades_max_legs: int | None = None) -> tuple[list[dict[str, Any] | EncodedRow], collections.Counter]:
     """Every kept combo of `series` settled in the integer seconds [lo, hi]. All or nothing: raises rather
     than return a partial slice. Every kept combo is TALLIED; an untraded one is returned only with
-    `keep_untraded` (holding a peak slice's 180k untraded rows took 1.25 GB)."""
-    kept: dict[str, dict[str, Any]] = {}
+    `keep_untraded` (holding a peak slice's 180k untraded rows took 1.25 GB). Only a row that may get a trade
+    read (`trades_max_legs`, as in `attach_trades`) stays a dict; every other one is returned as its
+    EncodedRow, its `trades_status` already final."""
+    kept: dict[str, dict[str, Any] | EncodedRow] = {}
     seen: set[str] = set()
     stats: collections.Counter[str] = collections.Counter()
     cursor: str | None = None
@@ -373,8 +396,15 @@ def sweep_slice(get: Callable[..., Any], series: str, lo: int, hi: int, *, budge
                 continue
             seen.add(row["ticker"])
             tally(stats, row)
-            if row["traded"] or keep_untraded:
+            if not (row["traded"] or keep_untraded):
+                continue
+            if wants_trade_read(row, trades_max_legs):
                 kept[row["ticker"]] = row
+                continue
+            if row["traded"]:
+                row["trades_status"] = "skipped"
+                stats["trades:trades_skipped"] += 1
+            kept[row["ticker"]] = EncodedRow(store_date(row), encode_row(row))
         cursor = doc.get("cursor") or None
         if not cursor or not markets:
             break
@@ -383,27 +413,26 @@ def sweep_slice(get: Callable[..., Any], series: str, lo: int, hi: int, *, budge
 
 
 def sweep_window(get: Callable[..., Any], series: str, lo: int, hi: int, *, budget: RunBudget,
-                 captured_at: str, page_cap: int = SLICE_PAGE_CAP,
-                 keep_untraded: bool = True) -> tuple[list[dict[str, Any]], collections.Counter]:
+                 captured_at: str, page_cap: int = SLICE_PAGE_CAP, keep_untraded: bool = True,
+                 trades_max_legs: int | None = None) -> tuple[list[dict[str, Any] | EncodedRow], collections.Counter]:
     """`sweep_slice`, halving a slice that needs more than `page_cap` pages."""
+    kw = {"budget": budget, "captured_at": captured_at, "page_cap": page_cap, "keep_untraded": keep_untraded,
+          "trades_max_legs": trades_max_legs}
     try:
-        return sweep_slice(get, series, lo, hi, budget=budget, captured_at=captured_at, page_cap=page_cap,
-                           keep_untraded=keep_untraded)
+        return sweep_slice(get, series, lo, hi, **kw)
     except SliceTooLarge:
         if hi - lo + 1 < 2 * MIN_SLICE_S:
             raise
         mid = lo + (hi - lo) // 2
-        rows_a, stats_a = sweep_window(get, series, lo, mid, budget=budget, captured_at=captured_at, page_cap=page_cap,
-                                       keep_untraded=keep_untraded)
-        rows_b, stats_b = sweep_window(get, series, mid + 1, hi, budget=budget, captured_at=captured_at,
-                                       page_cap=page_cap, keep_untraded=keep_untraded)
+        rows_a, stats_a = sweep_window(get, series, lo, mid, **kw)
+        rows_b, stats_b = sweep_window(get, series, mid + 1, hi, **kw)
         stats_a.update(stats_b)
         stats_a["splits"] += 1
         stats_a["discarded_pages"] += page_cap
         return rows_a + rows_b, stats_a
 
 
-def attach_trades(get: Callable[..., Any], rows: Iterable[dict[str, Any]], pause: float = TRADE_PAUSE_S,
+def attach_trades(get: Callable[..., Any], rows: Iterable[dict[str, Any] | EncodedRow], pause: float = TRADE_PAUSE_S,
                   max_legs: int | None = None, budget: RunBudget | None = None) -> collections.Counter:
     """Public trade prints for each kept combo with volume; `trades_status` says what came back.
 
@@ -420,7 +449,7 @@ def attach_trades(get: Callable[..., Any], rows: Iterable[dict[str, Any]], pause
             budget.spend()
             return get(path, params)
     for row in rows:
-        if not row.get("traded"):
+        if isinstance(row, EncodedRow) or not row.get("traded"):  # an EncodedRow's trades_status is final
             continue
         if max_legs is not None and int(row.get("n_legs") or 0) > max_legs:
             row["trades_status"] = "skipped"
@@ -453,19 +482,22 @@ def combos_path(root: Path, date: str) -> Path:
     return store_dir(root) / f"combos_{date}.jsonl.gz"
 
 
-def append_rows(root: Path, rows: Sequence[Mapping[str, Any]]) -> dict[str, int]:
-    """Append rows to their settlement date's file, one gzip member per call (readers see one stream)."""
-    by_date: dict[str, list[Mapping[str, Any]]] = collections.defaultdict(list)
+def append_rows(root: Path, rows: Sequence[Mapping[str, Any] | EncodedRow]) -> dict[str, int]:
+    """Append rows to their settlement date's file, one gzip member per call (readers see one stream). Written
+    in chunks, so a slice's text is never joined into one more copy."""
+    by_date: dict[str, list[str]] = collections.defaultdict(list)
     for row in rows:
-        settled = ms.ts(row.get("settlement_ts")) or ms.ts(row.get("close_time")) or time.time()
-        by_date[utc_date(settled)].append(row)
-    for date, date_rows in by_date.items():
+        if isinstance(row, EncodedRow):
+            by_date[row.date].append(row.line)
+        else:
+            by_date[store_date(row)].append(encode_row(row))
+    for date, lines in by_date.items():
         path = combos_path(root, date)
         path.parent.mkdir(parents=True, exist_ok=True)
-        payload = "".join(json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n" for row in date_rows)
         with gzip.open(path, "at", encoding="utf-8") as fh:
-            fh.write(payload)
-    return {date: len(date_rows) for date, date_rows in by_date.items()}
+            for i in range(0, len(lines), 5000):
+                fh.write("".join(line + "\n" for line in lines[i:i + 5000]))
+    return {date: len(lines) for date, lines in by_date.items()}
 
 
 def iter_combos(root: Path, date: str) -> Iterator[dict[str, Any]]:
@@ -653,7 +685,8 @@ def _run_locked(root: Path, *, get, now, lookback_s, max_pages, max_seconds, ser
             try:
                 # An untraded finalized combo's quote is zeroed: it carries no price, so it is tallied, not stored.
                 rows, stats = sweep_window(counting, name, lo, hi, budget=budget, captured_at=captured_at,
-                                           page_cap=page_cap, keep_untraded=store_untraded)
+                                           page_cap=page_cap, keep_untraded=store_untraded,
+                                           trades_max_legs=trades_max_legs)
             except BudgetStop:
                 break
             except (SliceUnreadable, SliceTooLarge) as exc:

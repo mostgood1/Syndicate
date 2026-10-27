@@ -400,6 +400,36 @@ def test_by_default_untraded_combos_are_counted_not_stored_and_no_trade_is_read(
     assert len(rows) == 2 and stats["kept"] == 3 and stats["kept_traded"] == 2 and stats["sport:nba"] == 2
 
 
+def test_a_row_that_gets_no_trade_read_is_held_encoded_and_stored_byte_for_byte(tmp_path):
+    end = T0 - cc.SETTLE_LAG_S
+    short = [_leg("KXEPLGAME-26OCT25ARSCRY"), _leg("KXEPLBTTS-26OCT25ARSCRY"), _leg("KXNBAGAME-26OCT27BKNBOS")]
+    long_raw = _combo("KXMVECROSSCATEGORY-S1-L", NBA_SGP_LEGS, end - 60, volume="2.00")
+    combos = [_combo("KXMVECROSSCATEGORY-S1-S", short, end - 50, volume="2.00"), long_raw,
+              _combo("KXMVECROSSCATEGORY-S1-U", NBA_SGP_LEGS, end - 70)]
+
+    def sweep(max_legs):
+        return cc.sweep_slice(FakeKalshi(combos, page_size=10), "KXMVECROSSCATEGORY", end - 899, end,
+                              budget=cc.RunBudget(10, 60), captured_at="t", trades_max_legs=max_legs)
+
+    rows, stats = sweep(3)
+    by = {(r["ticker"] if isinstance(r, dict) else json.loads(r.line)["ticker"]): r for r in rows}
+    assert isinstance(by["KXMVECROSSCATEGORY-S1-S"], dict)  # may get a trade read, so attach_trades needs the dict
+    encoded = by["KXMVECROSSCATEGORY-S1-L"]
+    assert isinstance(encoded, cc.EncodedRow) and encoded.date == cc.utc_date(end - 60)
+    assert json.loads(by["KXMVECROSSCATEGORY-S1-U"].line)["trades_status"] == "not_traded"
+    assert stats["trades:trades_skipped"] == 1
+    direct = cc.combo_row(long_raw, "t")
+    direct["trades_status"] = "skipped"
+    assert encoded.line == cc.encode_row(direct)  # one serialiser: the stored text does not depend on the path
+
+    rows0, stats0 = sweep(0)  # the default: no row is held as a dict
+    assert all(isinstance(r, cc.EncodedRow) for r in rows0) and stats0["trades:trades_skipped"] == 2
+    assert cc.append_rows(tmp_path, rows0) == {cc.utc_date(end - 50): 3}
+    assert {r["ticker"]: r["trades_status"] for r in _stored(tmp_path)} == {
+        "KXMVECROSSCATEGORY-S1-S": "skipped", "KXMVECROSSCATEGORY-S1-L": "skipped",
+        "KXMVECROSSCATEGORY-S1-U": "not_traded"}
+
+
 def test_trade_reads_are_charged_to_the_run_budget(tmp_path):
     end = T0 - cc.SETTLE_LAG_S
     combos = [_combo(f"KXMVECROSSCATEGORY-S1-{i}", NBA_SGP_LEGS, end - 50 - i, volume="1.00") for i in range(5)]
