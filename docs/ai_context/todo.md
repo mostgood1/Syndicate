@@ -1,5 +1,29 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#741` — **E3 DERIVED-MARKET SURFACE (Decision Engine `#736`, plan §4 E3): KILLED by the registered rule on Kalshi, both tiers x both arms x t60 / t15, and on Polymarket (indicative). Priced off Pinnacle's main line plus a shape, both surfaces LOSE to Kalshi's own mid on held-out rungs (parametric +0.0051 nats [+0.0026, +0.0075], sim-shaped +0.0069; 26,708 rungs / 243 games); consensus-anchored the parametric ties it. No predicted-EV band makes money at the ask after fees. Even Pinnacle's own alt price does not beat Kalshi's mid** — 2026-10-26, lane `e3-derived-surface`, session d266ae46 (side session of local_898e5510); `.syndicate/findings_2026-10-26_e3_derived_surface.md`
+- **Pre-registered before any join:** `f9ee12af`. A1 `ba4f9d79` covers team totals, per-series OT rules, two-resolution candles, same-date identity and the loaders' history choices.
+- **Code:** `50ec3f30`. `scripts/e3_derived_surface.py` plus three fleet loaders, 23 hermetic tests. Read-only; 31k Kalshi public GETs.
+- **Population:** 71,823 Kalshi derived contracts in 5,809 events. 66,815 of 66,838 results agree with the joined game's score; 3 games are excluded (a bad CFBD line score, a Kalshi MLB postponement re-map, one NHL game). Tier S is mostly NCAAF (204 games) plus MLB (28).
+- **Mechanism:** the surfaces sit a median 0.9-2.1pp from the Kalshi mid, and crossing costs 1.9-2.7c (half the spread plus the fee). Where they disagree, the venue is at least as right.
+- **Engine read** (sim shape vs Normal / count shape, same contracts):
+  - the sim never wins where history exists;
+  - NBA margins are 8-27% too wide (loses on segments, significant);
+  - NCAAF / NFL totals are 7-16% too narrow;
+  - NHL stores no distribution; NBA stores 100 draws on 67 of 92 games; MLB team totals have only 50 samples;
+  - the sim beats the parametric surface only where history is thin (WNBA, 11 games).
+- **Leads, not promotions** (each needs a forward pre-registered read; the script re-runs on a later window with the same constants):
+  - (a) NHL period spreads: the Poisson surface beats Kalshi's mid on log loss in preseason (fails the Bonferroni correction across cells), and leans that way in the regular season;
+  - (b) MLB F5 spreads: one EV band at +19% on 33 contracts / 20 games, but log loss fails;
+  - (c) for E1 / `fair-price-v2`: on NCAAF totals, Kalshi's ladder just around the line beats a Pinnacle-t60-anchored price (+10.7 x10⁻³ nats [+2.5, +20.4]). Is Pinnacle's NCAAF total stale in our capture?
+- **Recommendation:**
+  - no derived-market taker strategy;
+  - the L1 fair for a derived Kalshi rung = the venue's own two-sided mid (plan fallback 3), not a surface;
+  - the spread is the only structural edge on derived rungs (E2 maker shadow `#735`).
+- **OWED:**
+  - **(a)** The sim owners' work list above (each item its own).
+  - **(b)** Forward re-reads: NHL period spreads after 30 more regular-season days; MLB F5 next season; a Tier S re-run once Pinnacle has covered NBA / NFL / soccer for a month.
+  - **(c)** No user decision is required by E3. Phase 5's E3 half is closed by the kill rule.
+
 ### `#740` — **E4 COMBO CORRELATION (Decision Engine `#736`, plan §4 E4): the sims' joint beats independence ONLY where dependence is structural (same-batter, NBA nested combos, soccer BTTS x total); KILLED for cross-player and NBA P x R / P x A / R x A; the measured SGP copula beats or ties the sim wherever both exist; Stage 2 (Kalshi combo prices) NOT RUN — public but infeasible to rebuild after the fact** — 2026-10-26, lane `e4-combo-correlation`, session b566f51c (side session of local_898e5510); `.syndicate/findings_2026-10-26_e4_combo_correlation.md`
 - **Pre-registered before any join:** `9f8d759e`. A1 `83f2e460` (marginals from `book_quotes`; `closing_lines` is best-price-per-side), A2 `f5a503c6` (implementation choices).
 - **Script and tests:** `scripts/e4_combo_correlation.py` with 23 hermetic tests. Read-only on the fleet, plus public outcome GETs.
