@@ -101,3 +101,25 @@ errors, finished 2026-10-26 15:27Z. Readout 4466540a; JSON at C:/tmp/bball_sc/r2
   Coordinate with the nba-sim-minutes lanes, which own the pool / allocation.
 - (2) **The 3,513 / 2,980 population gaps:** first separate join misses from real DNP / unsimulated players.
 - (3) **The pts / reb residual shape:** after (1).
+
+## PHASE 2 STEP 1 — POPULATION GAPS — PRE-REGISTRATION 2026-10-27 12:50Z (user: "start on step 1")
+
+**Question:** what are the 3,513 sim-only and 2,980 real-only player-games? Descriptive, no gate. Same fit_pd draws
+and ESPN cache; the classification is per team, per game.
+
+**Sim-only** (simulated, no MIN > 0 in the box), first matching class wins:
+- **JOIN:** a real-only player on the same team whose normalised name matches, by difflib ratio ≥ 0.80 OR same last
+  name + same first initial.
+- **DNP_LISTED:** on the box with didNotPlay. Reason split: COACH'S DECISION vs other.
+- **ABSENT:** not on the box at all (inactive / injured / not with the team).
+
+**Real-only** (played, not simulated), excluding JOIN.
+
+**Reported:**
+- counts and shares;
+- the sim minutes held by each sim-only class per team-game (mean sim minutes, on-floor counter);
+- the actual minutes held by real-only players per team-game, with a ≥ 10 min share;
+- per-month counts (a season drift check).
+
+**Use:** JOIN is a readout defect, so fix the join and re-read Phase 1. DNP_LISTED / ABSENT are minutes-allocation
+inputs (pool / injury feed), so hand them to the nba-sim-minutes lanes with the numbers. Real-only are pool omissions.
