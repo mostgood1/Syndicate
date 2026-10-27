@@ -592,3 +592,57 @@ cand-prod: L1 Brier -0.0021 [-0.0051, +0.0005], L2 margin -0.170 [-0.282, -0.062
 the v4.1 candidate (input levers via cand_task); the 2026 live read (scheduled task `ncaaf-2026-refit-v41-validation`,
 Mon 2026-10-26 09:00 CT) MAY run L1-L3. Report: `C:\tmp\football_scenarios\ncaaf\refit_v41\live_replay_2024_every4.report.json`.
 Private-root override for that read landed as be3b2cf7 (`FOOTBALL_SCENARIO_NCAAF_ROOT`).
+
+### NCAAF v4.1 VALIDATION 2026 — NOT SHIPPABLE (read ONCE 2026-10-27, scheduled task `ncaaf-2026-refit-v41-validation`)
+
+**Data (private root; shared mirror untouched):** fresh CFBD pull 2026-10-27 ~12:55Z into
+`C:\tmp\football_scenarios\ncaaf_root_2026` (games via `refresh_games_cache(force=True)`: 888 rows, completed 260 -> 566;
+drives; plays wk1-8) + `/lines` wk1-8 into `C:\tmp\football_scenarios\ncaaf_lines_2026` (`fetch_cfbd_lines.fetch_week_lines`,
+renamed `cfbd_lines_wk<N>.json`) + PPA 2026 wk1-8 (`football_scenario_rates.py fetch --sport ncaaf --seasons 2026`, 14 calls;
+the empty wk9-14 PPA files it cached were deleted afterwards). Weeks 1-8 complete, wk9 entirely future. **Count gate:** 344
+completed FBS-vs-FBS regular games weeks 3-8, all 344 with drives (>= 300 MET); 335 survive the harness's prior/index filter
+and are what both reads rest on (gate f: all 335 have a 2026 CFBD close). Both reads ran at Idle, concurrently,
+no `--resume`, no restarts.
+
+**Pregame (gates a-f), 335 games x 300 seeds — FAIL (gate b)** (`refit_v41\validation_report_2026.json`):
+```
+  PASS  a_objective_20pct_lower      prod 428.26 cand 340.90
+  FAIL  b_no_moment_z_grows_gt_1     worst abs z growth +1.52
+  PASS  c_margin_mae                 delta -0.2375 [-0.4209, -0.0510] n=335
+  PASS  d_total_mae                  delta -0.1046 [-0.3074, +0.1156] n=335
+  PASS  e_home_win_brier             delta -0.0054 [-0.0097, -0.0014] n=335
+  PASS  f_close_margin               delta -0.446 [-0.611, -0.283] n=335
+  PASS  f_close_total                delta -0.703 [-0.897, -0.502] n=335
+```
+Per-moment z, production -> candidate: mean_total -2.12 -> -1.03; mean_margin -1.85 -> -1.64; total_sd_gap -6.25 -> -5.16;
+margin_sd_gap -1.40 -> -0.85; p_td +2.43 -> +0.68; p_fg -8.33 -> -8.21; p_punt +0.60 -> +0.95; **p_to +2.17 -> +3.14 (+0.97)**;
+plays_per_drive +7.41 -> +5.97; **drives_per_team_game +0.63 -> +2.15 (+1.52, the gate-b failure)**; p_td_rz +13.55 -> +12.07;
+**ppd_weak -1.80 -> -2.58 (+0.78)**; ppd_strong +2.63 -> +1.37; margin_slope -3.88 -> -3.49; total_slope -5.11 -> -4.75;
+bias_tier_early +2.89 -> +1.24; bias_conf_early +0.62 -> +0.69.
+Reading: the out-of-sample accuracy gates (c, e, f) all improve with CIs clear of zero and the early tier bias halves, but the
+candidate buys it with too many (shorter) drives -- `drives_per_team_game` was already +1.37 on FIT (inside the +1.0 rule only
+because production sat at -0.40 there); on 2026 production sits at +0.63 and the growth is +1.52.
+
+**Live mid-drive (L1-L3), 335 games / 1340 states, refused {} — PASS** (`refit_v41\live_replay_2026.report.json`; production
+magnitudes plausible, total abs err 8.85 < 20):
+```
+  PASS  L1_brier             production 0.1574  cand-prod -0.0018 [-0.0038, +0.0000]  (tol < +0.003)
+  PASS  L2_margin_abs_err    production 8.7361  cand-prod -0.0631 [-0.1403, +0.0110]  (tol < +0.15)
+  PASS  L3_total_abs_err     production 8.8493  cand-prod -0.0134 [-0.0928, +0.0694]  (tol < +0.15)
+     Q1: brier -0.0041 (n=335)  margin -0.1022 (n=335)  total -0.0621 (n=335)
+     Q2: brier -0.0028 (n=335)  margin -0.1100 (n=335)  total +0.0248 (n=335)
+     Q3: brier -0.0003 (n=335)  margin -0.0519 (n=335)  total +0.0044 (n=335)
+     Q4: brier -0.0001 (n=335)  margin +0.0116 (n=335)  total -0.0209 (n=335)
+```
+
+**VERDICT: NOT SHIPPABLE — pre-registered rule is every gate; gate (b) failed.** Nothing promoted; candidate stays at
+`C:\tmp\football_scenarios\ncaaf\refit_v41\descent_result.json` as a record. **NCAAF 2026 was the last clean held-out season;
+it is now spent for pregame AND live.** Any further NCAAF re-fit needs a new held-out design (e.g. 2027) decided by the user.
+Lead for a successor: the drive-count / turnover side (`drives_per_team_game`, `p_to`) and `ppd_weak` are what the levers
+trade away; the unmoved structural misses (p_fg -8.2, p_td_rz +12, total_sd_gap -5.2, total_slope -4.7) still need engine
+mechanisms, not levers.
+
+**Harness defect found (no read was repeated):** `football_scenario_replay.py` `VALIDATION_SEASONS = {"nfl": 2026, "ncaaf":
+2025}` -- for NCAAF 2026 the replay treated the season as non-validation, so it did NOT require
+`FOOTBALL_SCENARIO_READ_VALIDATION` and did NOT write `LIVE_VALIDATION_READ_2026`. The marker was written by hand afterwards
+(`refit_v41\LIVE_VALIDATION_READ_2026`) so a second live read is now refused. Engine code was not edited (task rule).
