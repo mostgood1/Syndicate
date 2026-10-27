@@ -54534,3 +54534,23 @@ which is about the two sizing bases and not about the refusal boundary.
 - **reads 15:00:06Z:** `status` live-odds-worker code=06378fa9 (web 187afc4b, refresh-worker 0fca3f2b, both STALE by design); environ INPLAY_ENTRIES=on, LIVE_PRICE_BAND=0.40,0.75, LIVE_CELL_GATE=on, KALSHI_MAKER_PILOT=on, POLYMARKET_SPREAD_ORDERS=on, cap 3072; 0 Traceback/ERROR lines since 15:00Z; ledger reads resumed (LIVE_LEDGER_ROW, ORDERS_READ).
 - **verify (OWED, lane kalshi-both-leg-grading):** the 5 10-23 rows grade: ATL9 pair net +0.1158, ATLCHA-230 pair net +0.1258, NYKBOS-220 yes -0.4168; repair_multi_side_grades does not clear them on later ticks.
 - **MEASURED `[2026-10-27 15:03:33Z + 15:14:16Z]` (fleet web /api/portfolio/live?on=2026-10-23&show=all, lane kalshi-both-leg-grading): MET.** All 5 graded `settled_by=venue` at 15:01:08Z (first settle tick after the 14:59:51Z respawn): ATL9 yes WON +0.5326 / no LOST -0.4168 -> pair **+0.1158**; ATLCHA-230 yes LOST -0.4472 / no WON +0.5730 -> pair **+0.1258**; NYKBOS-220 yes LOST **-0.4168** (`held_side=yes`; the pregame `over` row untouched at -6.2406). Re-read 15:14:16Z: identical, `graded_at` unchanged -- ~2 further settle ticks at the 300 s default, each running repair_multi_side_grades first, cleared nothing. No pair has both legs WON.
+
+## 2026-10-27 16:16:15Z (11:16 AM CT) -- FLEET ff 06378fa9 -> 84967f75, NO RESTART, + one-off SGP leg-actuals BACKFILL to 10-16: #743 SGP grading fix (lane sgp-leg-grading) -- **DEPLOYED; backfill MET; nightly SGP_PAPER reading OWED**
+- **User-approved in chat:** "Go ahead: ff the fleet to 84967f75 yourself under the deploy locks (claim + preflight), no restart, then run the backfill and read tonight's SGP_PAPER."
+- **Claim:** web, holder `sgp-leg-grading`, acquired 16:15:11Z (exit 0), released after this entry. No role was restarted.
+- **Ride-alongs, diff read:**
+  - `06378fa9..84967f75` holds only `84967f75`: `scripts/grade_sgp_paper.py`, `syndicate/features/{nhl,nfl}/sgp_pool.py`, a new test file.
+  - It also carries the ledger commit `607b6a38`.
+  - grep: only `scripts/build_cheat_sheets.py` and `scripts/reconcile_cheat_sheets.py` import the changed files (plus `nhl` / `nfl` `sgp.py` inside the build). No role loads them.
+  - The fleet tree's locally modified data / report files are not in the diff.
+- **Preflight:** web `--target fleet --target-commit 84967f75` **CLEAR 16:15:24Z**, no processes in flight. Expectation WAIVED: ff only, no restart.
+- **Deploy:** `git merge --ff-only 84967f75` in `~/Syndicate`, reflog 16:16:15Z. The script refused unless HEAD == `06378fa9` and no cheat-sheet build or reconcile was running.
+- **Backfill (user-approved):** the reconcile's own `refresh_leg_actuals(days=11)` with the fleet's code, 16:16:26Z -> 16:17:18Z.
+  - **15 reconciled files** gained leg actuals: NHL 10-16..10-26, NFL 10-18 / 19 / 22 / 25. Keys were added only.
+  - These are exactly the files and counts of the dry run.
+- **Verify MET (read-only regrade in memory with the fleet's code, 16:17:36Z, nothing written):**
+  - NHL ledger legs <= 10-26: pending **493 -> 32**. NFL: **46 -> 6**.
+  - `summarize` NHL: **22.3% vs 22.0% predicted** (799 settled, 31 left out for an unresolved leg, 67 games). It was 19.4% vs 22.1% on 666.
+  - NFL: 30.1% vs 32.8% (195).
+  - Earlier right-player check (replay): 1,265 / 1,265 NHL and 246 / 246 NFL.
+- **OWED:** the nightly `SGP_PAPER` lines in `~/syndicate-prod/logs/cheat_sheets_reconcile.log` after the 11:50 PM CT reconcile. They are the first to carry `unresolved_leg`. A session-side read-only watcher is waiting for them.
