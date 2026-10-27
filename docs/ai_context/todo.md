@@ -87,7 +87,7 @@
   - NBA smart-sim P / R / A are INDEPENDENT within a player: Var(PRA)/sum of parts = 0.997 over 846 player-games, against 1.20 real. Likely cause: minutes are held fixed across draws.
   - MLB `sim.joint` understates HR pairs (the Spearman map on zero-inflated counts) and puts +0.014 on opposing batters (realised -0.04).
   - No sport persists a (margin, total) joint. NHL persists no joint at all.
-- **Ledger:** the SGP consistency posterior is not better than the market product in any sport, and over-predicts the hit rate by 3-6 pts (NHL / NBA / NFL). The 18.5% haircut stays unmeasured.
+- **Ledger:** the SGP consistency posterior is not better than the market product in any sport, and ~~over-predicts the hit rate by 3-6 pts (NHL / NBA / NFL)~~: CORRECTED 2026-10-27, that gap is grader censoring; on clean tickets `p_joint` is not shown miscalibrated (`cbf05bec`, `#743`). The 18.5% haircut stays unmeasured.
   - **Superseded by `#743` (2026-10-27, pre-registered):** the 3-6 pts was mostly the grader's censoring, since a ticket with an unresolved leg can lose but never win. On clean tickets, `p_joint` is +1.7 pts [-3.1, +6.4] pooled, NOT SHOWN miscalibrated.
 - **OWED:**
   - **(a)** A user decision (routed to the decision-engine session): a forward Kalshi combo capture (public GETs, ~1,000/day). It is the only way Stage 2 becomes runnable.

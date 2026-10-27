@@ -166,9 +166,11 @@ Binary "every leg won" outcome. `D` is the log-loss difference; negative means t
 | WNBA | 32 / 4 | 43.8% vs 48.4% | +0.0010 [-0.0067, +0.0086] | +0.0014 [-0.0925, +0.0953] (32) |
 | MLB | 22 / 5 | 54.5% vs 46.7% | -0.029 [-0.083, +0.026] | -0.031 [-0.113, +0.051] |
 
+**CORRECTED 2026-10-27** (lane `sgp-pjoint-calibration`, `cbf05bec`, prereg `1e7793e3`): the 3-6 point gap is NOT a `p_joint` miscalibration. It is grader censoring. `grade_sgp_paper` scores a ticket with an unresolved leg as lost when another leg lost, but never as won. Censoring alone adds +2.4 [+1.3, +3.5] points pooled and +4.3 in NHL (488 of 493 pending legs carry no `player_id`). On tickets where every leg resolved (971 / 139 games), `p_joint` is NOT shown miscalibrated: pooled +1.7 points [-3.1, +6.4], and Holm rejects nothing. The table above is as-graded and inherits the censoring. Fixes: `#743`.
+
 **Read:**
 - The posterior is not shown better than plain market independence in any sport.
-- It over-predicts the joint hit rate by 3-6 points in NHL, NBA and NFL.
+- ~~It over-predicts the joint hit rate by 3-6 points in NHL, NBA and NFL.~~ Grader censoring; see CORRECTED above.
 - The copula adds nothing measurable on these tickets, which are mostly cross-player.
 - This agrees with E4's primary cells: cross-player correlation is too small to see at these n.
 
