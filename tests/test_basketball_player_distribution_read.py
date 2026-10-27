@@ -44,3 +44,21 @@ def test_join_rule_matches_name_variants():
     # Known limitation of the pre-registered rule (bf73ce71): same last name + first initial also matches real
     # teammates. It can only misfire when one is sim-only and the other real-only in the same game.
     assert r.names_match(r.norm("Jalen Williams"), r.norm("Jaylin Williams"))
+
+
+def test_absent_classes_by_real_box_timeline():
+    # Step 1b (7eaaa4ef): the sim put the player on IND on 11-01.
+    assert r.classify_absent([("2025-10-25", "LAC"), ("2026-02-10", "IND")], "IND", "2025-11-01") == "LEAK_FUTURE"
+    assert r.classify_absent([("2025-10-25", "IND"), ("2025-11-05", "LAC")], "IND", "2025-11-01") == "STALE_PAST"
+    assert r.classify_absent([("2025-10-25", "IND"), ("2025-11-05", "IND")], "IND", "2025-11-01") == "T_AROUND"
+    assert r.classify_absent([("2026-01-05", "IND")], "IND", "2025-11-01") == "T_ONLY_AFTER_NO_OTHER"
+    assert r.classify_absent([("2025-10-25", "IND")], "IND", "2025-11-01") == "T_ONLY_BEFORE_NO_OTHER"
+    assert r.classify_absent([("2025-11-01", "LAC")], "IND", "2025-11-01") == "NEVER_T_OTHER_TEAM"
+    assert r.classify_absent([], "IND", "2025-11-01") == "NO_BOX"
+
+
+def test_real_only_classes_by_sim_roster_dates():
+    assert r.classify_real_only([], "2025-11-10") == "SIM_NEVER_T"
+    assert r.classify_real_only(["2025-12-01"], "2025-11-10") == "SIM_LATER_ONLY"
+    assert r.classify_real_only(["2025-11-01"], "2025-11-10") == "SIM_EARLIER_ONLY"
+    assert r.classify_real_only(["2025-11-01", "2025-12-01"], "2025-11-10") == "SIM_AROUND"

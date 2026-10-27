@@ -230,19 +230,15 @@ def names_match(a: str, b: str) -> bool:
     return len(pa) >= 2 and len(pb) >= 2 and pa[-1] == pb[-1] and pa[0][0] == pb[0][0]
 
 
-def gaps(sim_dir: Path, cache: Path) -> Dict[str, Any]:
-    """Phase 2 step 1 (pre-registered bf73ce71): classify sim-only and real-only player-games."""
+def gap_rows(sim_dir: Path, cache: Path) -> Iterable[Dict[str, Any]]:
+    """Step 1's population: one row per sim-only / real-only player-game, plus a `cls: None` row per team-game
+    (carrying the sim's roster). Keys: date, team, cls, name (display), nn (norm), min (sim min for the sim-side
+    classes, real min for REAL_ONLY), label (the step-1 example text)."""
     real = {}
     for ln in open(sim_dir / "real_nba.jsonl", encoding="utf-8"):
         x = json.loads(ln)
         if x.get("season_type") == 2:
             real[(x["date"], tri(x["home"]), tri(x["away"]))] = x
-    cls: Dict[str, int] = defaultdict(int)
-    sim_min: Dict[str, List[float]] = defaultdict(list)
-    real_only_min: List[float] = []
-    by_month: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
-    examples: Dict[str, List[str]] = defaultdict(list)
-    team_games = 0
     for f in sorted((sim_dir / "sim_nba").glob("*.jsonl")):
         for ln in open(f, encoding="utf-8"):
             g = json.loads(ln)
@@ -256,18 +252,17 @@ def gaps(sim_dir: Path, cache: Path) -> Dict[str, Any]:
             box = box_roster(cache, str(r["event_id"]))
             if not box:
                 continue
-            month = g["date"][:7]
             for s, team in (("h", key[1]), ("a", key[2])):
                 roster = box.get(team)
                 if roster is None:
-                    cls["team_missing_in_box"] += 1
+                    yield {"date": g["date"], "team": team, "cls": "team_missing_in_box"}
                     continue
-                team_games += 1
                 names = g["pnames"][s]
+                sim_norm = [norm(n) for n in names]
+                yield {"date": g["date"], "team": team, "cls": None, "sim_names": sim_norm}
                 on_n = np.array([float(d.get("on_n", -1)) for d in draws])
                 gm = np.array([48.0 + 5.0 * float(d.get("otn", 0)) for d in draws])
                 played = {nn: v for nn, v in roster.items() if (v["min"] or 0) > 0}
-                sim_norm = [norm(n) for n in names]
                 real_only = [nn for nn in played if nn not in set(sim_norm)]
                 matched_ro: set = set()
                 for j, nn in enumerate(sim_norm):
@@ -276,31 +271,48 @@ def gaps(sim_dir: Path, cache: Path) -> Dict[str, Any]:
                     on = np.array([float(d["pl"][s][j][4]) for d in draws])
                     m = float(np.mean(np.where(on_n > 0, gm * on / np.maximum(on_n, 1), 0.0)))
                     hit = next((ro for ro in real_only if ro not in matched_ro and names_match(nn, ro)), None)
+                    row = {"date": g["date"], "team": team, "name": names[j], "nn": nn, "min": m}
                     if hit is not None:
-                        c = "JOIN"
                         matched_ro.add(hit)
-                        if len(examples[c]) < 12:
-                            examples[c].append(f"{names[j]} ~ {played[hit]['name']}")
+                        row.update(cls="JOIN", label=f"{names[j]} ~ {played[hit]['name']}")
                     elif nn in roster:
                         rs = roster[nn]["reason"].upper()
-                        c = "DNP_LISTED_COACH" if "COACH" in rs else "DNP_LISTED_OTHER"
-                        if c == "DNP_LISTED_OTHER" and len(examples[c]) < 12:
-                            examples[c].append(f"{names[j]}: {roster[nn]['reason']}")
+                        row.update(cls="DNP_LISTED_COACH" if "COACH" in rs else "DNP_LISTED_OTHER",
+                                   label=f"{names[j]}: {roster[nn]['reason']}")
                     else:
-                        c = "ABSENT"
-                        if len(examples[c]) < 12:
-                            examples[c].append(f"{g['date']} {team} {names[j]} ({m:.1f} sim min)")
-                    cls[c] += 1
-                    sim_min[c].append(m)
-                    by_month[month][c] += 1
+                        row.update(cls="ABSENT", label=f"{g['date']} {team} {names[j]} ({m:.1f} sim min)")
+                    yield row
                 for ro in real_only:
                     if ro in matched_ro:
                         continue
-                    cls["REAL_ONLY"] += 1
-                    real_only_min.append(float(played[ro]["min"]))
-                    by_month[month]["REAL_ONLY"] += 1
-                    if len(examples["REAL_ONLY"]) < 12:
-                        examples["REAL_ONLY"].append(f"{g['date']} {team} {played[ro]['name']} ({played[ro]['min']:.0f} min)")
+                    yield {"date": g["date"], "team": team, "cls": "REAL_ONLY", "name": played[ro]["name"], "nn": ro,
+                           "min": float(played[ro]["min"]),
+                           "label": f"{g['date']} {team} {played[ro]['name']} ({played[ro]['min']:.0f} min)"}
+
+
+def gaps(sim_dir: Path, cache: Path) -> Dict[str, Any]:
+    """Phase 2 step 1 (pre-registered bf73ce71): classify sim-only and real-only player-games."""
+    cls: Dict[str, int] = defaultdict(int)
+    sim_min: Dict[str, List[float]] = defaultdict(list)
+    real_only_min: List[float] = []
+    by_month: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    examples: Dict[str, List[str]] = defaultdict(list)
+    team_games = 0
+    for row in gap_rows(sim_dir, cache):
+        c = row["cls"]
+        if c is None:
+            team_games += 1
+            continue
+        cls[c] += 1
+        if c == "team_missing_in_box":
+            continue
+        by_month[row["date"][:7]][c] += 1
+        if c == "REAL_ONLY":
+            real_only_min.append(row["min"])
+        else:
+            sim_min[c].append(row["min"])
+        if c != "DNP_LISTED_COACH" and len(examples[c]) < 12:
+            examples[c].append(row["label"])
     ro = np.array(real_only_min) if real_only_min else np.zeros(0)
     return {
         "team_games": team_games, "counts": dict(cls),
@@ -313,15 +325,126 @@ def gaps(sim_dir: Path, cache: Path) -> Dict[str, Any]:
     }
 
 
+def box_timeline(cache: Path, teams: Optional[set] = None) -> Dict[str, List[Tuple[str, str]]]:
+    """Step 1b (pre-registered 7eaaa4ef): every regular-season box's active list, as {norm name: sorted [(date, team)]}.
+    Date = header UTC minus 6 h (the US game day)."""
+    from datetime import datetime, timedelta
+
+    out: Dict[str, set] = defaultdict(set)
+    for f in sorted(cache.glob("summary_*.json.gz")):
+        hdr = json.load(gzip.open(f)).get("header") or {}
+        if int((hdr.get("season") or {}).get("type") or 0) != 2:
+            continue
+        try:
+            ts = str((hdr.get("competitions") or [{}])[0].get("date") or "")
+            day = (datetime.strptime(ts[:16], "%Y-%m-%dT%H:%M") - timedelta(hours=6)).strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+        for team, roster in box_roster(cache, f.name[len("summary_"):-len(".json.gz")]).items():
+            if teams is not None and team not in teams:
+                continue  # ESPN files the All-Star game (WORLD / STRIPES) as season type 2
+            for nn in roster:
+                out[nn].add((day, team))
+    return {k: sorted(v) for k, v in out.items()}
+
+
+def classify_absent(apps: Sequence[Tuple[str, str]], team: str, d: str) -> str:
+    """The sim put the player on `team` on `d` and that box does not list him. `apps`: his real (date, team) listings."""
+    if not apps:
+        return "NO_BOX"
+    t_before = any(x < d and t == team for x, t in apps)
+    t_after = any(x > d and t == team for x, t in apps)
+    if t_before and t_after:
+        return "T_AROUND"
+    if t_after:
+        return "LEAK_FUTURE" if any(x <= d and t != team for x, t in apps) else "T_ONLY_AFTER_NO_OTHER"
+    if t_before:
+        return "STALE_PAST" if any(x >= d and t != team for x, t in apps) else "T_ONLY_BEFORE_NO_OTHER"
+    return "NEVER_T_OTHER_TEAM"
+
+
+def classify_real_only(sim_dates: Sequence[str], d: str) -> str:
+    """The player played for the team on `d` and the sim's roster that day lacks him. `sim_dates`: the dates the sim
+    listed him for that team."""
+    before = any(x < d for x in sim_dates)
+    after = any(x > d for x in sim_dates)
+    if before and after:
+        return "SIM_AROUND"
+    if after:
+        return "SIM_LATER_ONLY"
+    if before:
+        return "SIM_EARLIER_ONLY"
+    return "SIM_NEVER_T"
+
+
+def rosters(sim_dir: Path, cache: Path) -> Dict[str, Any]:
+    """Phase 2 step 1b: leak / stale / availability census of step 1's ABSENT and REAL_ONLY player-games."""
+    rows = list(gap_rows(sim_dir, cache))
+    sim_on: Dict[Tuple[str, str], List[str]] = defaultdict(list)
+    team_games = 0
+    for r in rows:
+        if r["cls"] is None:
+            team_games += 1
+            for nn in r["sim_names"]:
+                sim_on[(r["team"], nn)].append(r["date"])
+    tl = box_timeline(cache, teams={r["team"] for r in rows if r["cls"] is None})
+    out: Dict[str, Any] = {"team_games": team_games}
+    # Descriptive, post-hoc (disclosed, not pre-registered): is each team's sim roster ONE snapshot across the window?
+    by_team: Dict[str, Dict[str, set]] = defaultdict(dict)
+    for r in rows:
+        if r["cls"] is None:
+            by_team[r["team"]][r["date"]] = set(r["sim_names"])
+    jac = []
+    for t, dd in by_team.items():
+        ks = sorted(dd)
+        a, b = dd[ks[0]], dd[ks[-1]]
+        jac.append(len(a & b) / max(1, len(a | b)))
+    out["sim_roster_first_vs_last_jaccard"] = {"median": float(np.median(jac)), "min": float(np.min(jac)), "teams": len(jac)}
+    sens = {"T_ONLY_AFTER_NO_OTHER_first_listed_elsewhere": 0, "SIM_NEVER_T_last_listed_elsewhere": 0,
+            "SIM_NEVER_T_last_listed_on_T": 0}
+    for src in ("ABSENT", "REAL_ONLY"):
+        n: Dict[str, int] = defaultdict(int)
+        mins: Dict[str, float] = defaultdict(float)
+        by_month: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+        ex: Dict[str, List[str]] = defaultdict(list)
+        for r in rows:
+            if r["cls"] != src:
+                continue
+            if src == "ABSENT":
+                apps = tl.get(r["nn"], [])
+                c = classify_absent(apps, r["team"], r["date"])
+                near = [f"{x} {t}" for x, t in apps
+                        if abs(int((np.datetime64(x) - np.datetime64(r["date"])) / np.timedelta64(1, "D"))) <= 21]
+                note = f"{r['label']} | real boxes +/-21d: {', '.join(near[:6]) or 'none'}"
+                if c == "T_ONLY_AFTER_NO_OTHER" and apps and apps[0][1] != r["team"]:
+                    sens["T_ONLY_AFTER_NO_OTHER_first_listed_elsewhere"] += 1  # window-start leak (traded TO the team later)
+            else:
+                c = classify_real_only(sim_on.get((r["team"], r["nn"]), []), r["date"])
+                note = r["label"]
+                apps = tl.get(r["nn"], [])
+                if c == "SIM_NEVER_T" and apps:
+                    sens["SIM_NEVER_T_last_listed_elsewhere" if apps[-1][1] != r["team"] else "SIM_NEVER_T_last_listed_on_T"] += 1
+            n[c] += 1
+            mins[c] += r["min"]
+            by_month[r["date"][:7]][c] += 1
+            if len(ex[c]) < 12:
+                ex[c].append(note)
+        out[src] = {"counts": dict(n), "min_per_team_game": {c: v / max(1, team_games) for c, v in mins.items()},
+                    "by_month": {k: dict(v) for k, v in sorted(by_month.items())}, "examples": dict(ex)}
+    out["post_hoc_sensitivity"] = sens
+    return out
+
+
 def main(argv: Optional[Iterable[str]] = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--sim", required=True, type=Path)
     ap.add_argument("--cache", required=True, type=Path)
     ap.add_argument("--json-out", type=Path)
     ap.add_argument("--gaps", action="store_true", help="Phase 2 step 1: classify the sim-only / real-only player-games")
+    ap.add_argument("--rosters", action="store_true", help="Phase 2 step 1b: leak / stale / availability census")
     a = ap.parse_args(list(argv) if argv is not None else None)
-    if a.gaps:
-        res_g = gaps(a.sim, a.cache)
+    if a.gaps or a.rosters:
+        res_g = rosters(a.sim, a.cache) if a.rosters else gaps(a.sim, a.cache)
         print(json.dumps(res_g, indent=1))
         if a.json_out:
             a.json_out.write_text(json.dumps(res_g, indent=1), encoding="utf-8")

@@ -270,3 +270,62 @@ real box appearances:
 - STALE_PAST and SIM_LATER_ONLY measure as-of roster lag.
 - T_AROUND and SIM_AROUND are availability (injury-feed) errors, not roster errors.
 - **Reported per class:** player-games, sim (or real) min per team-game, and month. Twelve examples per class.
+
+**STEP 1b ROSTER CHECK — RESULT 2026-10-27 23:28Z (18:28 CDT).**
+- Population: step 1's own (fit_pd, 1,604 team-games). Step-1 output is byte-identical after the refactor (md5
+  da9499…).
+- Code: `basketball_player_distribution_read.py --rosters`; output `C:/tmp/bball_sc/r2s/phase2_rosters_final.json`;
+  post-hoc check `r2s/mirror_check.py`.
+
+**Two disclosed deviations from the pre-registration** (both found by spot checks before reading the census):
+- **(1) The All-Star game is excluded from the timeline.** ESPN files 2026-02-15 WORLD / STRIPES as season type 2;
+  that produced 4 false STALE_PAST rows (Giannis, Curry). It moved 4 rows, STALE_PAST → T_ONLY_BEFORE_NO_OTHER.
+- **(2) The cache covers only 2025-11-01..03-01**, so the window edges truncate "before" and "after". The edge
+  classes (T_ONLY_AFTER / T_ONLY_BEFORE_NO_OTHER) partly hold T_AROUND and leak cases. Measured window-start leak
+  inside T_ONLY_AFTER: 4 of 150.
+
+**ABSENT** (1,978 player-games; 19.8 sim min per team-game):
+
+| class | player-games | sim min / team-game | reading |
+|---|---|---|---|
+| T_AROUND | 1,128 | 13.94 | real absence: on the team before and after, not on the active list that day (LaMelo, Luka, Reaves, Zion) |
+| LEAK_FUTURE | 411 | 2.74 | listed on a team he joined LATER (CHI 11-02: Sexton, Simons, Yabusele, Richards, Dillingham, McClung, L. Miller) |
+| NEVER_T_OTHER_TEAM | 29 | 0.16 | also leak: Zubac on IND in Nov (LAC through 02-02); Garland on LAC; AD / Russell / Trae on WAS |
+| T_ONLY_AFTER_NO_OTHER | 150 | 1.03 | mostly early-season injury returns (Monk, McConnell) at the window start |
+| T_ONLY_BEFORE_NO_OTHER | 123 | 1.11 | mostly season-ending injuries (Beal, Prince, Lively); 93 in Feb = window end |
+| NO_BOX | 137 | 0.87 | never on an active list (Haliburton, out for the season; CHI two-ways) |
+| STALE_PAST | 0 | — | — |
+
+**REAL_ONLY** (2,983 player-games; 29.6 real min per team-game):
+
+| class | player-games | real min / team-game | reading |
+|---|---|---|---|
+| SIM_NEVER_T | 2,277 | 24.97 | the sim never lists him for the team he played for |
+| SIM_AROUND | 581 | 3.88 | availability: the sim had him out that day and he played |
+| SIM_LATER_ONLY | 106 | 0.73 | roster lag |
+| SIM_EARLIER_ONLY | 19 | 0.06 | — |
+
+**SIM_NEVER_T decomposed** (post-hoc, disclosed):
+- 1,712 player-games (20.1 real min / team-game) belong to players whose LAST real listing is another team.
+- 1,544 of them (18.2 min / team-game): the sim lists the player on that final team.
+- **614: the sim lists him there on or before this date**, while he was still playing for his original team. These
+  are certain look-ahead.
+- Examples: CHA → CHI, UTA → MEM, BOS / NYK / PHX / MIN / IND → CHI, all on 2025-11-02/03. The real first box on the
+  new team is 2026-02-05..07 (the trade deadline).
+- 565 player-games (last listed on the team, never in the sim) are pool holes: signings, two-ways.
+- Each team's sim roster is not one fixed snapshot: first-vs-last-date Jaccard median 0.61 (min 0.42) over 30 teams.
+
+**VERDICT:**
+- **(a) The step-1 misallocation is mainly a LOOK-AHEAD LEAK in the backtest's player→team assignment.** Players are
+  placed on their END-of-window (post-trade-deadline) team for the whole window. Two faces of it:
+  - wrong players simulated: LEAK_FUTURE + NEVER_T_OTHER, 440 pg, 2.9 sim min / team-game;
+  - real players missing: SIM_NEVER_T, traded away, about 18–20 real min / team-game.
+- **(b) The second component is AVAILABILITY:** players simulated on days they were out. T_AROUND is 13.9 sim
+  min / team-game, plus the SIM_AROUND mirror at 3.9.
+- **Not located:** which backtest input carries the team map or availability (pristine resim inputs / player pool).
+- **Believed, NOT verified:** production is unaffected because live dates use current rosters. The leak is
+  historical-resim-only, so it contaminates the FIT/VALID research sims, not served picks.
+- **Consequence for the calibration lane:** team totals are calibrated to targets, so the team-level effect is
+  muted, but rotation and player-level reads on FIT carry it. The Phase-1 matched population excludes these
+  player-games by construction.
+- **Hand-off:** the nba-sim-minutes-allocation / -history-path lanes own the pool fix. Nothing is changed here.
