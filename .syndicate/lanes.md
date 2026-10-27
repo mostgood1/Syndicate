@@ -1411,7 +1411,7 @@ death, never life — do not invert it.
     1. ~~The D3 LOAD reading~~ **MET 2026-10-27 05:30Z**: checklist exit 0, alarms none; `default_unmeasured` 1,264 at w=0 (deploys.md 06:20Z).
     2. ~~The watchdog's first run~~ **MET 2026-10-27 12:46Z**: run local_107750d8 reported 6 misses incl. the three known one-time readings (`clv-openings-ceiling-forward-reading`, `layer2-suggested-grade-1026`, `uefa-branding-autorefresh-reading-1022`) and `nba-standin-admission-watch`; runs at 13:11Z and 14:26Z found none overdue (each ran or was disabled).
     3. The OneDrive upload, confirmed by the user. The scheduled run is MET: `data-backup` 10-27 09:15Z, rc 0, snapshot 259,063 files / 33.13 GB, off-disk archive `OneDrive/SyndicateBackup/20261027T091500Z.tar.gz` 4.80 GB in 429 s (job-data-backup.log). Off-HOST still needs the user to see it uploaded.
-    4. The paper no-outcome count by GAME date (1,896 by submit time). The paper-settlement owner has been asked; none is named yet.
+    4. ~~The paper no-outcome count by GAME date~~ **HANDED OFF 2026-10-27 16:1xZ**: 1,834 filled paper orders whose game started > 48 h ago have no outcome; 1,807 (98.5%) were evicted to the archive ungraded by `_trim_to_cap`, which the grader never reads. Owner: lane `paper-evicted-grading` (`#744`), opened for pickup. `.syndicate/findings_2026-10-27_paper_evicted_ungraded.md`.
     5. The `#732` third condition and the `#729` forward reading. These stay with their owner lanes.
   - Phases 1+: Phase 1 is in lane `syndicate-fair-v1` (session local_6d29e826, started by the user 10-26).
   - **PHASE 1 STAGE-1 RESULT `[2026-10-26 ~18:14Z, written by lane syndicate-fair-v1]`:** `.syndicate/findings_2026-10-26_syndicate_fair_v1.md` (todo `#737`; prereg `be3fcf23`, A1 `7786ab1e`). 4 of 13 families PASS by the registered rule (NCAAF game, NHL game, NHL props = mechanical, soccer game), NCAAF props FAIL, 8 UNDERPOWERED. The gains are 2–4% of the Shin fair's KL to the close, and v1 is slightly worse in absolute pp. Recommendation: shadow-wire `σ_fair_v1` (+ `p_fair_v1`) via `decision-record-shadow` for the 4 families; never let `p_fair_v1` into EV/price/stake on this evidence. Stage-2 forward read owed on/after 2026-11-24.
@@ -1543,6 +1543,14 @@ death, never life — do not invert it.
 - Hypothesis: n/a (fix of a measured defect: findings_2026-10-27_sgp_pjoint_calibration.md)
 - Falsification test: On the snapshot, resolving player_id by name + team grades fewer than half of the pending NHL correlation-family legs, or resolves any leg to a different player than the sheet's -> the grading-side fix is wrong; move it to the builders
 - Verification: snapshot replay: pending NHL/NFL legs before vs after, ambiguity count, SGP_PAPER summary before vs after; new tests + test_nfl_sgp + test_cheat_sheet_sgp_reconciled pass
+- Blocked by: none
+
+### paper-evicted-grading — OPEN — opened 2026-10-27 — session unowned (opened 2026-10-27 by session e32fef1a for pickup; Phase 0 item 4 of #736)
+- Goal: Every filled PAPER order whose game is decided gets an outcome even after _trim_to_cap moved it to the archive: a default-off grading pass over archived ungraded paper rows (graded copy appended to the archive), a one-off backfill from 10-02, and the stale count (game started > 48 h ago, no outcome; 1,834 on 2026-10-27 16:06Z) read near 0 on the fleet afterwards
+- Files: syndicate/features/shared/paper_settlement.py (settle_orders + a NEW archived-rows grading pass ONLY), syndicate/features/shared/execution_ledger.py (_trim_to_cap + the archive read/append helpers ONLY), tests/test_paper_settlement_archived.py (NEW), scripts/backfill_archived_paper_grades.py (NEW), docs/ai_context/todo.md (#744 section only), .syndicate/findings_2026-10-27_paper_evicted_ungraded.md (append a section only)
+- Hypothesis: The stale backlog is eviction, not grading failure: 1,807 of 1,834 stale paper orders are in the archive, which settle_orders never reads (findings_2026-10-27_paper_evicted_ungraded.md)
+- Falsification test: If grading the archived rows with the same resolver leaves most of them ungraded (named reasons such as no feed or unmapped market), eviction is not the cause and the lane re-scopes to those reasons
+- Verification: Hermetic tests incl. off != on and grade-once on archived rows; built default-off on main; after a user-approved fleet window under the deploy locks, the stale count re-read on the fleet with denominators by sport and game date, recorded in deploys.md
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
