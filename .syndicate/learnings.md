@@ -2968,3 +2968,15 @@ The 2026-10-20 entry said: "Rating INPUTS transfer, because the sim reads them w
 - **Why:** there is one checkout, `~/Syndicate`, for all three roles. A claim serialises restarts of ONE service. Nothing serialises moves of the checkout itself, and a restart loads whatever HEAD is at respawn time.
 - **Rule:** read fleet HEAD in the SAME script as the TERM, immediately before it, and abort if it is not the SHA you ff'd to. (`pub_restart.sh` checked HEAD before the ff, not before the TERM.) In deploys.md, record what the respawn actually loaded (`status` code=), not what you ff'd to.
 
+
+## 2026-10-27 -- A calibration read over "settled" tickets is CENSORED when the settle rule is any-leg-lost => LOST: an unresolved leg lets a ticket lose but never win `[lane sgp-pjoint-calibration, session 138eb1d7]`
+
+- **The belief:** the SGP builders' `p_joint` over-predicts by 3-6 points. E4's descriptive table said so (NHL 19.5% vs 22.8%), and so did the nightly `SGP_PAPER` line.
+- **What was true:**
+  - `grade_sgp_paper` counts a ticket as settled when it is WON or LOST. A ticket with a pending or void leg becomes LOST as soon as any other leg loses, but it can never become WON.
+  - So the population is selected on the outcome. That alone is +2.4 pts [+1.3, +3.5] pooled and +4.3 in NHL. 34% of NHL sheet-row legs never grade, because they carry no `player_id`.
+  - On tickets whose every leg resolved, the gap is +1.7 [-3.1, +6.4] pooled, and NHL flips to -1.6. Pre-registered as `1e7793e3`.
+- **Rule:**
+  - Before reading calibration (or ROI) off a graded population, ask whether the INCLUSION rule depends on the outcome.
+  - For multi-leg tickets, calibrate only on tickets whose every leg resolved, or drop the unresolved legs and re-price, as books do.
+  - Count unresolved legs by source first. A big pending share is a grading defect, not noise.

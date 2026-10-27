@@ -1,5 +1,26 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#743` — **SGP `p_joint` CALIBRATION (from E4 `#740` c-ledger): NOT SHOWN miscalibrated — pooled +1.7 pts [-3.1, +6.4] on 971 clean tickets / 139 games. The lead's 3-6 pt over-prediction was mostly the GRADER: a ticket with an unresolved leg can be LOST but never WON (+2.4 pts [+1.3, +3.5] pooled, +4.3 [+2.6, +6.3] NHL), and 34% of NHL sheet-row SGP legs never grade (no `player_id`). Fix the calibration read + leg grading; keep `p_joint` as built** — 2026-10-27, lane `sgp-pjoint-calibration`, session 138eb1d7 (side session of local_668211d5); `.syndicate/findings_2026-10-27_sgp_pjoint_calibration.md`
+- **Pre-registered** `1e7793e3` before any outcome join; A1 `cfee6f28` with the code before the run. Code: `scripts/sgp_pjoint_calibration.py` with 13 hermetic tests. Read-only snapshot of the fleet ledgers (graded 13:09Z 10-27, tickets dated <= 10-26).
+- **Primary result.** The test is calibration-in-the-large = mean `p_joint` - realised, game-clustered, Holm over {pooled, NHL, NBA, NFL}, on CLEAN tickets (every leg won or lost):
+  - pooled +1.7 [-3.1, +6.4], MDE80 6.8;
+  - NHL -1.6 [-7.1, +4.0] (482 / 65);
+  - NBA +4.8 [-7.2, +16.9] (262 / 39);
+  - NFL +3.6 [-5.5, +12.7] (160 / 24);
+  - every Holm p = 1.0;
+  - slope pooled 0.92 [0.66, 1.18].
+- **Where the lead came from.** As-graded pooled +4.0 [+0.0, +8.1], which reproduces E4's table. 488 of the 493 pending NHL legs are correlation-family legs with no `player_id`, which `leg_actuals` cannot grade, and they date back to 10-17. Post hoc, the "book rule" (drop unresolved legs, re-price the resolved sub-ticket) gives pooled +2.0 [-2.2, +6.2] over 1,290 tickets.
+- **Components (descriptive; nothing rejected, so no attribution):**
+  - **Leg marginals are calibrated:** `p_market` - realised = -0.4 pts [-2.4, +1.7] over 1,703 legs; the de-vig slope is about 1.
+  - **The k=40 nudge is not worse than the market:** leg log loss -0.0039 [-0.0071, -0.0007].
+  - **The copula beats independence on pairs:** `D_K` -0.0061 [-0.0102, -0.0020], same-player -0.070, with no excess co-occurrence.
+  - **The 18.5% haircut never enters `p_joint`.** A test shows `pair_legs` is identical at discounts 0, 0.185 and 0.5.
+- **OWED (owner: lane `cheat-sheets`, session 9e18a0e7; this lane edited none of its files). Each change is per ticket or per leg:**
+  - **(a)** `scripts/grade_sgp_paper.py` `summarize`: calibrate only on tickets whose every leg resolved, or by the book rule. Keep `cheat_sheets.sgp_results`' WON / LOST / VOID status for the record and P&L.
+  - **(b)** Carry the game-log `player_id` on correlation-family legs (`nfl/sgp.py` `_leg` / `rung_leg`, `nhl/sgp.py` `_leg`), so `leg_actuals` can grade them.
+  - **(c)** The registered forward read (prereg §8): same script, tickets >= 10-27, at >= 30 new clean games each in NHL / NBA / NFL, or on 2026-11-24. Watch NBA: its nudge adds +4.7 pts per ticket, its MDE80 is 17, and 10-26 read 26% vs 46% on 42 tickets.
+- **Until (a) lands,** read the nightly `SGP_PAPER` calibration line as biased toward over-prediction by about +2 pts pooled and +4 in NHL.
+
 ### `#742` — **KALSHI COMBO CAPTURE (Decision Engine `#736`, E4 Stage 2): a forward, read-only capture of Kalshi same-game combo markets, so E4's venue-price test becomes runnable. Lane `kalshi-combo-capture` OPENED FOR PICKUP 2026-10-27; nothing built** — 2026-10-27, session loving-einstein-b3c45e (lane opened at user request); `.syndicate/findings_2026-10-26_e4_combo_correlation.md` (Stage 2 section, Recommendation 3)
 - **User, verbatim (2026-10-27):** "Yes, adopt E3 and E4's recommendations: Phase 5 drops the derived-line taker and sim-based combos (Kalshi's mid prices derived lines; measured SGP correlation prices combos, sim only for soccer scorelines). Route the engine reads to the sim owners and open a lane for a forward Kalshi combo capture."
 - **Why:** E4 Stage 1 passed 4 cells (MLB same-batter nested / other, NBA same-player nested, soccer result/total/BTTS) but has no price test. Kalshi's combo prints are public, but the past window cannot be rebuilt by paging (more than 30,000 trades in one 10-minute slice). Same-game legs from MLB, NBA, NHL and soccer already appear inside Kalshi combos.
@@ -52,6 +73,7 @@
   - MLB `sim.joint` understates HR pairs (the Spearman map on zero-inflated counts) and puts +0.014 on opposing batters (realised -0.04).
   - No sport persists a (margin, total) joint. NHL persists no joint at all.
 - **Ledger:** the SGP consistency posterior is not better than the market product in any sport, and over-predicts the hit rate by 3-6 pts (NHL / NBA / NFL). The 18.5% haircut stays unmeasured.
+  - **Superseded by `#743` (2026-10-27, pre-registered):** the 3-6 pts was mostly the grader's censoring, since a ticket with an unresolved leg can lose but never win. On clean tickets, `p_joint` is +1.7 pts [-3.1, +6.4] pooled, NOT SHOWN miscalibrated.
 - **OWED:**
   - **(a)** A user decision (routed to the decision-engine session): a forward Kalshi combo capture (public GETs, ~1,000/day). It is the only way Stage 2 becomes runnable.
   - **(b)** A user decision: rescope Phase 5 E4. Combo correlation comes from the measured copula, and the sims supply it only for soccer scorelines. Correlation-expert weight stays 0 on MLB TM/OP and NBA SP-disjoint. Every line stays its own decision.
