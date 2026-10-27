@@ -1,0 +1,718 @@
+"""FORWARD CAPTURE of Kalshi same-game combo (MVE) markets: E4 Stage 2's price data (lane
+`kalshi-combo-capture`, todo `#742`; E4 is `#740`). Public, unauthenticated GETs only. Places NO order.
+
+WHY FORWARD, AND WHY BY SETTLEMENT TIME. E4 Stage 2 needs executable combo prices joined to legs and
+outcomes, and the past is expensive to rebuild. Measured 2026-10-27 between 13:13Z and 14:25Z by this
+lane's probes:
+
+    combos CREATED   ~1,000 per 11 s (~330k/h), 97% `is_provisional`: RFQ lookups, almost none traded
+    combos SETTLED   22,147 in one 10-min window on KXMVECROSSCATEGORY (~133k/h), 23 pages of 1,000
+    global trades    65,191 in the same 10 minutes (66 pages); 11.5% of them combo prints
+    kept here        677 of those 22,147 (3%) hold a same-game pair in a sport we model; 9 had volume
+
+A FINALIZED combo still lists its legs (`mve_selected_legs`), `result`, `last_price_dollars` and
+`volume_fp`, but its quote is ZEROED (`yes_bid_dollars`/`yes_ask_dollars` 0.0000 on settled untraded
+combos). The executable prices are therefore the TRADE PRINTS, read per kept combo with volume > 0
+(`kalshi_maker_shadow.read_trade_prints`). Snapshotting every creation would cost ~8k GETs a day and
+reading the global trade stream ~9.5k. Listing SETTLEMENTS sees every combo exactly once, already resolved.
+
+HOW A RUN WORKS. Per combo series, settlement time is swept in contiguous integer-second slices [lo, hi]
+from a persisted watermark (`state.json`) up to now - SETTLE_LAG_S. `min_settled_ts`/`max_settled_ts`
+filter exactly (0 of 414 rows outside a probed window). The query asks for hi + 1, and a row belongs to the
+slice that holds floor(settlement_ts), so a sub-second settlement on a boundary is neither lost nor counted
+twice. A slice is ALL OR NOTHING: an unreadable page writes nothing and leaves the watermark where it was,
+because a partial listing read as complete is the failure this repo keeps refusing.
+
+SAME GAME. Two legs are the same game when their event tickers share the game segment (`26OCT27SACSAS`)
+inside one scope. The scope is the sport for US leagues (`kalshi_catalogue.sport_for_ticker`) and the
+COMPETITION for soccer (`kalshi_board_join.soccer_competition_for_series`, which refuses women's and
+second-tier families whose club codes collide with the men's). A segment that is not a dated game
+(`game_date_from_ticker` and `event_blob_from_ticker`) never pairs, so two futures legs cannot pass as one
+game. The whole combo is stored; Stage 2 picks the pair types it tests.
+
+INERT UNTIL `SYNDICATE_KALSHI_COMBO_CAPTURE=on`. Absent means OFF: no request and no file. Enabling it on the
+fleet is the user's decision (`#742`). `--enable` exists for a manual dry run only.
+
+Writes only `<data root>/reports/intelligence/kalshi_combo_capture/` (no retention rule matches it):
+    combos_<settled UTC date>.jsonl.gz   one row per kept combo, gzip members appended per slice
+    runs.jsonl                           one row per run: GETs, pages, bytes, windows, kept by sport
+    collections_<UTC date>.json          the daily `/multivariate_event_collections` snapshot
+    state.json                           per-series settlement watermark
+Nothing on the request path reads it. Runs at nice 19.
+
+Usage:
+    python scripts/kalshi_combo_capture.py run                          # the scheduled job (inert when off)
+    python scripts/kalshi_combo_capture.py run --enable --lookback-hours 24 --max-pages 6000   # dry run
+    python scripts/kalshi_combo_capture.py report --days 2
+"""
+from __future__ import annotations
+
+import argparse
+import collections
+import contextlib
+import datetime as dt
+import gzip
+import json
+import os
+import sys
+import time
+from pathlib import Path
+from typing import Any, Callable, Iterable, Mapping, Sequence
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from syndicate.features.shared import kalshi_maker_shadow as ms  # noqa: E402
+from syndicate.features.shared.kalshi_board_join import (  # noqa: E402
+    series_competition_verdict,
+    soccer_competition_for_series,
+)
+from syndicate.features.shared.kalshi_catalogue import (  # noqa: E402
+    SERIES_OUT_OF_SCOPE,
+    event_blob_from_ticker,
+    game_date_from_ticker,
+    sport_for_ticker,
+)
+from syndicate.features.shared.kalshi_client import is_combinatorial_series, series_from_ticker  # noqa: E402
+
+RULE_VERSION = "combo-capture-v1"
+ENV_FLAG = "SYNDICATE_KALSHI_COMBO_CAPTURE"
+STORE_SUBDIR = ("reports", "intelligence", "kalshi_combo_capture")
+MODELLED_SPORTS = frozenset({"mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "soccer"})
+
+# Combo series swept -> (slice seconds, minimum seconds between sweeps). The two cross-category series settle
+# continuously (the `0` shard ~1,000+ a week); the per-sport collections settled nothing over 10-20..10-27
+# but list open markets, so they are read four times a day for one page each.
+SWEEP_SERIES: dict[str, tuple[int, int]] = {
+    "KXMVECROSSCATEGORY": (900, 0),
+    "KXMVECROSSCATEGORY0": (3600, 0),
+    "KXMVENBASINGLEGAME": (21600, 21600),
+    "KXMVENFLSINGLEGAME": (21600, 21600),
+    "KXMVESPORTSMULTIGAMEEXTENDED": (21600, 21600),
+    "KXMVENBAMULTIGAMEEXTENDED": (21600, 21600),
+    "KXMVENFLMULTIGAMEEXTENDED": (21600, 21600),
+    "KXMVENFLMULTIGAME": (21600, 21600),
+}
+# Leg series that carry a game segment but are not a game outcome the platform prices (broadcast mentions).
+NON_GAME_SERIES_TOKENS = ("MENTION",)
+
+SETTLE_LAG_S = 300
+DEFAULT_LOOKBACK_S = 3600
+PAGE_LIMIT = 1000
+SLICE_PAGE_CAP = 300  # a slice needing more is split in half (down to MIN_SLICE_S)
+MIN_SLICE_S = 60
+MAX_PAGES_PER_RUN = 900
+MAX_RUN_S = 1800
+LOCK_STALE_S = 2 * 3600
+TRADE_PAUSE_S = 0.12
+DAY = 86400
+
+
+# ------------------------------------------------------------------ small helpers
+def _f(value: Any) -> float | None:
+    try:
+        out = float(value)
+    except (TypeError, ValueError):
+        return None
+    return out if out == out else None
+
+
+def capture_enabled(environ: Mapping[str, str] | None = None) -> bool:
+    raw = str((os.environ if environ is None else environ).get(ENV_FLAG) or "").strip().lower()
+    return raw in {"1", "on", "true", "yes"}
+
+
+def data_root() -> Path:
+    override = str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip()
+    return Path(override).expanduser().resolve() if override else REPO_ROOT / "data"
+
+
+def store_dir(root: Path) -> Path:
+    return Path(root).joinpath(*STORE_SUBDIR)
+
+
+def utc_date(epoch: float) -> str:
+    return dt.datetime.fromtimestamp(epoch, dt.timezone.utc).date().isoformat()
+
+
+def _nice() -> None:
+    try:
+        os.nice(19)
+    except (AttributeError, OSError):
+        pass
+
+
+# ------------------------------------------------------------------ same-game filter
+def leg_scope(ticker: Any) -> tuple[str, str | None] | None:
+    """(sport, soccer competition or None) for a leg in a sport we model, else None."""
+    series = series_from_ticker(str(ticker or "").strip().upper())
+    if not series or series.startswith("KXMVE") or is_combinatorial_series(series):
+        return None
+    if series in SERIES_OUT_OF_SCOPE or any(token in series for token in NON_GAME_SERIES_TOKENS):
+        return None
+    league = soccer_competition_for_series(series)
+    if league:
+        return "soccer", league
+    sport = sport_for_ticker(series)
+    if sport in MODELLED_SPORTS and series_competition_verdict(series, sport) is None:
+        return sport, None
+    return None
+
+
+def leg_game(ticker: Any) -> str | None:
+    """The game segment (`26OCT27SACSAS`) when it is a dated game, else None."""
+    text = str(ticker or "").strip().upper()
+    if game_date_from_ticker(text) is None or event_blob_from_ticker(text) is None:
+        return None
+    return text.split("-")[1]
+
+
+def annotate_leg(leg: Mapping[str, Any]) -> dict[str, Any]:
+    event = str(leg.get("event_ticker") or "").strip()
+    market = str(leg.get("market_ticker") or "").strip()
+    key = event or market
+    scope = leg_scope(key)
+    return {
+        "event_ticker": event,
+        "market_ticker": market,
+        "side": leg.get("side"),
+        "sport": scope[0] if scope else None,
+        "league": scope[1] if scope else None,
+        "game": leg_game(key) if scope else None,
+    }
+
+
+def groups_of(legs: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """Same-game groups of two or more annotated legs, one per (sport, league, game)."""
+    by_game: dict[tuple[str, str, str], list[int]] = {}
+    for index, leg in enumerate(legs):
+        if leg.get("sport") and leg.get("game"):
+            by_game.setdefault((leg["sport"], leg.get("league") or "", leg["game"]), []).append(index)
+    return [
+        {"sport": sport, "league": league or None, "game": game, "legs": indexes}
+        for (sport, league, game), indexes in sorted(by_game.items())
+        if len(indexes) >= 2
+    ]
+
+
+def same_game_groups(raw_legs: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    return groups_of([annotate_leg(leg) for leg in raw_legs if isinstance(leg, Mapping)])
+
+
+def combo_row(raw: Mapping[str, Any], captured_at: str) -> dict[str, Any] | None:
+    """The stored row for a combo holding a same-game pair in a sport we model, else None."""
+    raw_legs = raw.get("mve_selected_legs")
+    if not isinstance(raw_legs, list) or len(raw_legs) < 2:
+        return None
+    legs = [annotate_leg(leg) for leg in raw_legs if isinstance(leg, Mapping)]
+    groups = groups_of(legs)
+    if not groups:
+        return None
+    ticker = str(raw.get("ticker") or "")
+    volume = _f(raw.get("volume_fp"))
+    traded = bool(volume and volume > 0)
+    return {
+        "rule_version": RULE_VERSION,
+        "captured_at": captured_at,
+        "ticker": ticker,
+        "event_ticker": raw.get("event_ticker"),
+        "series": series_from_ticker(ticker),
+        "collection": raw.get("mve_collection_ticker"),
+        "status": raw.get("status"),
+        "result": raw.get("result"),
+        "is_provisional": raw.get("is_provisional"),
+        "created_time": raw.get("created_time"),
+        "open_time": raw.get("open_time"),
+        "close_time": raw.get("close_time"),
+        "expected_expiration_time": raw.get("expected_expiration_time"),
+        "settlement_ts": raw.get("settlement_ts"),
+        "volume_fp": volume,
+        "open_interest_fp": _f(raw.get("open_interest_fp")),
+        # As listed at capture. Kalshi zeroes these on a finalized combo; the prices are `trades`.
+        "quote_at_capture": {
+            "yes_bid": _f(raw.get("yes_bid_dollars")),
+            "yes_ask": _f(raw.get("yes_ask_dollars")),
+            "no_bid": _f(raw.get("no_bid_dollars")),
+            "no_ask": _f(raw.get("no_ask_dollars")),
+            "yes_bid_size": _f(raw.get("yes_bid_size_fp")),
+            "yes_ask_size": _f(raw.get("yes_ask_size_fp")),
+            "last_price": _f(raw.get("last_price_dollars")),
+            "previous_yes_bid": _f(raw.get("previous_yes_bid_dollars")),
+            "previous_yes_ask": _f(raw.get("previous_yes_ask_dollars")),
+            "previous_price": _f(raw.get("previous_price_dollars")),
+        },
+        "n_legs": len(legs),
+        "legs": legs,
+        "same_game": groups,
+        "sports": sorted({group["sport"] for group in groups}),
+        "traded": traded,
+        "trades_status": "pending" if traded else "not_traded",
+        "trades": None,
+    }
+
+
+# ------------------------------------------------------------------ requests
+class CountingGet:
+    """Wraps the PUBLIC transport and counts every request by kind: the dry run's GETs/day instrument."""
+
+    def __init__(self, transport: Callable[..., Any]):
+        self.transport = transport
+        self.calls: collections.Counter[str] = collections.Counter()
+
+    def __call__(self, path: str, params: Mapping[str, Any] | None = None) -> Any:
+        if path.startswith("/markets/trades"):
+            kind = "trades"
+        elif path.startswith("/multivariate_event_collections"):
+            kind = "collections"
+        else:
+            kind = "markets"
+        self.calls[kind] += 1
+        return self.transport(path, params)
+
+
+class RunBudget:
+    def __init__(self, max_pages: int, max_seconds: float, clock: Callable[[], float] = time.monotonic):
+        self.max_pages = int(max_pages)
+        self.clock = clock
+        self.deadline = clock() + float(max_seconds)
+        self.pages = 0
+        self.stopped = False
+
+    def allow(self, pages: int = 1) -> bool:
+        if self.pages + pages > self.max_pages or self.clock() >= self.deadline:
+            self.stopped = True
+            return False
+        return True
+
+    def spend(self) -> None:
+        self.pages += 1
+
+
+class SliceUnreadable(Exception):
+    pass
+
+
+class SliceTooLarge(Exception):
+    pass
+
+
+class BudgetStop(Exception):
+    pass
+
+
+def sweep_slice(get: Callable[..., Any], series: str, lo: int, hi: int, *, budget: RunBudget,
+                captured_at: str, page_cap: int = SLICE_PAGE_CAP) -> tuple[list[dict[str, Any]], collections.Counter]:
+    """Every kept combo of `series` settled in the integer seconds [lo, hi]. All or nothing: raises rather
+    than return a partial slice."""
+    kept: dict[str, dict[str, Any]] = {}
+    stats: collections.Counter[str] = collections.Counter()
+    cursor: str | None = None
+    while True:
+        if stats["pages"] >= page_cap:
+            raise SliceTooLarge(f"{series} [{lo},{hi}] > {page_cap} pages")
+        if not budget.allow():
+            raise BudgetStop(f"{series} [{lo},{hi}] after {budget.pages} pages")
+        params: dict[str, Any] = {"series_ticker": series, "min_settled_ts": int(lo), "max_settled_ts": int(hi) + 1,
+                                  "limit": PAGE_LIMIT}
+        if cursor:
+            params["cursor"] = cursor
+        doc = get("/markets", params)
+        budget.spend()
+        stats["pages"] += 1
+        markets = doc.get("markets") if isinstance(doc, dict) else None
+        if not isinstance(markets, list):
+            raise SliceUnreadable(f"{series} [{lo},{hi}] page {stats['pages']}: {type(doc).__name__}")
+        for raw in markets:
+            if not isinstance(raw, Mapping):
+                continue
+            stats["rows"] += 1
+            settled = ms.ts(raw.get("settlement_ts"))
+            if settled is None:
+                stats["no_settlement_ts"] += 1
+            elif not lo <= int(settled) <= hi:
+                stats["outside_slice"] += 1
+                continue
+            row = combo_row(raw, captured_at)
+            if row is not None:
+                kept[row["ticker"]] = row
+        cursor = doc.get("cursor") or None
+        if not cursor or not markets:
+            break
+    stats["kept"] = len(kept)
+    return list(kept.values()), stats
+
+
+def sweep_window(get: Callable[..., Any], series: str, lo: int, hi: int, *, budget: RunBudget,
+                 captured_at: str, page_cap: int = SLICE_PAGE_CAP) -> tuple[list[dict[str, Any]], collections.Counter]:
+    """`sweep_slice`, halving a slice that needs more than `page_cap` pages."""
+    try:
+        return sweep_slice(get, series, lo, hi, budget=budget, captured_at=captured_at, page_cap=page_cap)
+    except SliceTooLarge:
+        if hi - lo + 1 < 2 * MIN_SLICE_S:
+            raise
+        mid = lo + (hi - lo) // 2
+        rows_a, stats_a = sweep_window(get, series, lo, mid, budget=budget, captured_at=captured_at, page_cap=page_cap)
+        rows_b, stats_b = sweep_window(get, series, mid + 1, hi, budget=budget, captured_at=captured_at,
+                                       page_cap=page_cap)
+        stats_a.update(stats_b)
+        stats_a["splits"] += 1
+        return rows_a + rows_b, stats_a
+
+
+def attach_trades(get: Callable[..., Any], rows: Iterable[dict[str, Any]], pause: float = TRADE_PAUSE_S) -> collections.Counter:
+    """Public trade prints for each kept combo with volume; `trades_status` says what came back."""
+    stats: collections.Counter[str] = collections.Counter()
+    for row in rows:
+        if not row.get("traded"):
+            continue
+        hi = ms.ts(row.get("settlement_ts")) or ms.ts(row.get("close_time")) or time.time()
+        lo = ms.ts(row.get("created_time")) or ms.ts(row.get("open_time")) or hi - 30 * DAY
+        prints = ms.read_trade_prints(row["ticker"], lo, hi, get=get, pause=pause)
+        if prints is None:
+            row["trades_status"] = "unreadable"
+            stats["trades_unreadable"] += 1
+            continue
+        row["trades"] = [
+            {"t": ms.iso(p["t"]), "yes": p.get("yes"), "no": p.get("no"), "count": _f(p.get("count")),
+             "taker_side": p.get("taker_side")}
+            for p in prints
+        ]
+        row["trades_status"] = "ok" if prints else "empty"
+        stats["trades_ok" if prints else "trades_empty"] += 1
+        stats["prints"] += len(prints)
+    return stats
+
+
+# ------------------------------------------------------------------ store
+def combos_path(root: Path, date: str) -> Path:
+    return store_dir(root) / f"combos_{date}.jsonl.gz"
+
+
+def append_rows(root: Path, rows: Sequence[Mapping[str, Any]]) -> dict[str, int]:
+    """Append rows to their settlement date's file, one gzip member per call (readers see one stream)."""
+    by_date: dict[str, list[Mapping[str, Any]]] = collections.defaultdict(list)
+    for row in rows:
+        settled = ms.ts(row.get("settlement_ts")) or ms.ts(row.get("close_time")) or time.time()
+        by_date[utc_date(settled)].append(row)
+    for date, date_rows in by_date.items():
+        path = combos_path(root, date)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        payload = "".join(json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n" for row in date_rows)
+        with gzip.open(path, "at", encoding="utf-8") as fh:
+            fh.write(payload)
+    return {date: len(date_rows) for date, date_rows in by_date.items()}
+
+
+def load_combos(root: Path, dates: Iterable[str]) -> list[dict[str, Any]]:
+    """Kept combos for the settlement dates, one per ticker (a crash between write and watermark can repeat a
+    slice; the later row wins)."""
+    out: dict[str, dict[str, Any]] = {}
+    for date in dates:
+        path = combos_path(root, date)
+        if not path.is_file():
+            continue
+        try:
+            with gzip.open(path, "rt", encoding="utf-8") as fh:
+                for line in fh:
+                    try:
+                        row = json.loads(line)
+                    except ValueError:
+                        continue
+                    if isinstance(row, dict) and row.get("ticker"):
+                        out[row["ticker"]] = row
+        except (OSError, EOFError):
+            continue
+    return list(out.values())
+
+
+@contextlib.contextmanager
+def run_lock(store: Path):
+    """One run at a time on one store (the supervisor and a manual run must not share a watermark). Ages are
+    wall clock, never a run's injected `now`."""
+    store.mkdir(parents=True, exist_ok=True)
+    path = store / ".lock"
+    held = False
+    for _ in range(2):
+        try:
+            fd = os.open(str(path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            try:
+                age = time.time() - path.stat().st_mtime
+            except OSError:
+                age = 0.0
+            if age > LOCK_STALE_S:
+                with contextlib.suppress(OSError):
+                    path.unlink()
+                continue
+            break
+        with os.fdopen(fd, "w") as fh:
+            fh.write(json.dumps({"pid": os.getpid(), "at": ms.iso(time.time())}))
+        held = True
+        break
+    try:
+        yield held
+    finally:
+        if held:
+            with contextlib.suppress(OSError):
+                path.unlink()
+
+
+def snapshot_collections(get: Callable[..., Any], root: Path, date: str, max_pages: int = 40) -> dict[str, Any]:
+    """`/multivariate_event_collections` once a day: which combo series exist and which this job sweeps."""
+    items: list[dict[str, Any]] = []
+    cursor: str | None = None
+    complete = False
+    for _ in range(max_pages):
+        params: dict[str, Any] = {"limit": 200}
+        if cursor:
+            params["cursor"] = cursor
+        doc = get("/multivariate_event_collections", params)
+        page = doc.get("multivariate_contracts") if isinstance(doc, dict) else None
+        if not isinstance(page, list):
+            break
+        for c in page:
+            if isinstance(c, Mapping):
+                items.append({
+                    "collection_ticker": c.get("collection_ticker"),
+                    "series_ticker": c.get("series_ticker"),
+                    "open_date": c.get("open_date"),
+                    "close_date": c.get("close_date"),
+                    "associated_event_tickers": c.get("associated_event_tickers") or [],
+                })
+        cursor = doc.get("cursor") or None
+        if not cursor or not page:
+            complete = True
+            break
+    series = collections.Counter(str(c.get("series_ticker")) for c in items)
+    snapshot = {
+        "date": date,
+        "complete": complete,
+        "collections": len(items),
+        "by_series": dict(sorted(series.items())),
+        "unswept_series": sorted(s for s in series if s not in SWEEP_SERIES),
+        "items": items,
+    }
+    ms.save_json(store_dir(root) / f"collections_{date}.json", snapshot)
+    return {k: v for k, v in snapshot.items() if k != "items"}
+
+
+def _http_bytes() -> dict[str, int]:
+    try:
+        from syndicate.features.shared import http_compression
+    except Exception:
+        return {}
+    stats = http_compression.stats()
+    return {k: int(stats.get(k) or 0) for k in ("wire_bytes_external", "decoded_bytes_external")}
+
+
+# ------------------------------------------------------------------ run
+def run(root: Path, *, get: Callable[..., Any] = ms.public_get_json, now: float | None = None,
+        enabled: bool | None = None, lookback_s: int = DEFAULT_LOOKBACK_S, max_pages: int = MAX_PAGES_PER_RUN,
+        max_seconds: float = MAX_RUN_S, series: Mapping[str, tuple[int, int]] = SWEEP_SERIES,
+        invoker: str = "cli", trade_pause: float = TRADE_PAUSE_S, page_cap: int = SLICE_PAGE_CAP,
+        snapshot: bool = True) -> dict[str, Any]:
+    if not (capture_enabled() if enabled is None else enabled):
+        print(f"[kalshi_combo_capture] OFF ({ENV_FLAG} is not on): no request, no file", flush=True)
+        return {"status": "off"}
+    now = time.time() if now is None else float(now)
+    store = store_dir(root)
+    with run_lock(store) as held:
+        if not held:
+            print(f"[kalshi_combo_capture] LOCKED: another run holds {store / '.lock'}", flush=True)
+            return {"status": "locked"}
+        return _run_locked(root, get=get, now=now, lookback_s=lookback_s, max_pages=max_pages,
+                           max_seconds=max_seconds, series=series, invoker=invoker, trade_pause=trade_pause,
+                           page_cap=page_cap, snapshot=snapshot)
+
+
+def _run_locked(root: Path, *, get, now, lookback_s, max_pages, max_seconds, series, invoker, trade_pause,
+                page_cap, snapshot) -> dict[str, Any]:
+    started = time.monotonic()
+    store = store_dir(root)
+    state_path = store / "state.json"
+    state = ms.load_json(state_path, {})
+    if not isinstance(state, dict):
+        state = {}
+    state.setdefault("series", {})
+    counting = CountingGet(get)
+    budget = RunBudget(max_pages, max_seconds)
+    bytes_before = _http_bytes()
+    captured_at = ms.iso(now)
+    summary: dict[str, Any] = {"run_at": captured_at, "rule_version": RULE_VERSION, "invoker": invoker,
+                               "series": {}, "kept_by_sport": collections.Counter(),
+                               "kept_traded_by_sport": collections.Counter(), "kept_by_league": collections.Counter(),
+                               "trades": collections.Counter(), "written": collections.Counter(), "errors": []}
+
+    today = utc_date(now)
+    if snapshot and state.get("collections_date") != today:
+        snap = snapshot_collections(counting, root, today)
+        summary["collections"] = snap
+        if snap.get("complete"):
+            state["collections_date"] = today
+
+    end = int(now) - SETTLE_LAG_S
+    for name, (slice_s, interval_s) in series.items():
+        st = state["series"].setdefault(name, {})
+        info = collections.Counter()
+        record: dict[str, Any] = {"from": None, "to": None}
+        if interval_s and now - float(st.get("last_sweep_at") or 0) < interval_s:
+            record["skipped"] = "interval"
+            summary["series"][name] = record
+            continue
+        swept = int(st.get("swept_to") or (end - int(lookback_s)))
+        record["from"] = ms.iso(swept + 1)
+        while swept < end and not budget.stopped:
+            lo, hi = swept + 1, min(swept + int(slice_s), end)
+            # Stop BEFORE a slice the budget cannot finish: a slice cut short is discarded, pages and all.
+            if not budget.allow(int(st.get("last_slice_pages") or 1)):
+                break
+            try:
+                rows, stats = sweep_window(counting, name, lo, hi, budget=budget, captured_at=captured_at,
+                                           page_cap=page_cap)
+            except BudgetStop:
+                break
+            except (SliceUnreadable, SliceTooLarge) as exc:
+                summary["errors"].append(f"{type(exc).__name__}: {exc}")
+                break
+            trade_stats = attach_trades(counting, rows, pause=trade_pause)
+            summary["trades"].update(trade_stats)
+            for date, n in append_rows(root, rows).items():
+                summary["written"][date] += n
+            for row in rows:
+                for sport in row["sports"]:
+                    summary["kept_by_sport"][sport] += 1
+                    if row["traded"]:
+                        summary["kept_traded_by_sport"][sport] += 1
+                for league in {g["league"] for g in row["same_game"] if g.get("league")}:
+                    summary["kept_by_league"][league] += 1
+            info.update(stats)
+            info["slices"] += 1
+            info["kept_traded"] += sum(1 for row in rows if row["traded"])
+            swept = hi
+            st["swept_to"] = hi
+            st["last_slice_pages"] = int(stats["pages"])
+            ms.save_json(state_path, state)
+        if swept >= end:
+            st["last_sweep_at"] = now
+            ms.save_json(state_path, state)
+        record["to"] = ms.iso(swept)
+        record["seconds_covered"] = max(0, swept + 1 - int(ms.ts(record["from"]) or swept + 1))
+        record.update(dict(info))
+        summary["series"][name] = record
+
+    ms.save_json(state_path, state)
+    bytes_after = _http_bytes()
+    summary["http_bytes"] = {k: bytes_after.get(k, 0) - bytes_before.get(k, 0) for k in bytes_after}
+    summary["gets"] = dict(counting.calls)
+    summary["gets_total"] = sum(counting.calls.values())
+    summary["pages"] = budget.pages
+    summary["budget_stopped"] = budget.stopped
+    summary["seconds"] = round(time.monotonic() - started, 1)
+    summary["finished_at"] = ms.iso(time.time())
+    summary["status"] = "errors" if summary["errors"] else ("budget_stopped" if budget.stopped else "ok")
+    for key in ("kept_by_sport", "kept_traded_by_sport", "kept_by_league", "trades", "written"):
+        summary[key] = dict(sorted(summary[key].items()))
+    with (store / "runs.jsonl").open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(summary, sort_keys=True) + "\n")
+    print(f"[kalshi_combo_capture] {summary['status']} gets={summary['gets_total']} pages={summary['pages']} "
+          f"kept={summary['kept_by_sport']} traded={summary['kept_traded_by_sport']} "
+          f"prints={summary['trades'].get('prints', 0)} errors={len(summary['errors'])} {summary['seconds']}s",
+          flush=True)
+    return summary
+
+
+# ------------------------------------------------------------------ report
+def read_runs(root: Path) -> list[dict[str, Any]]:
+    path = store_dir(root) / "runs.jsonl"
+    rows: list[dict[str, Any]] = []
+    try:
+        with path.open(encoding="utf-8") as fh:
+            for line in fh:
+                try:
+                    row = json.loads(line)
+                except ValueError:
+                    continue
+                if isinstance(row, dict):
+                    rows.append(row)
+    except OSError:
+        pass
+    return rows
+
+
+def report(root: Path, dates: Sequence[str]) -> dict[str, Any]:
+    """Cost per covered day (from runs.jsonl) and kept combos per settlement date and sport."""
+    runs = read_runs(root)
+    gets = collections.Counter()
+    covered = 0
+    wire = decoded = pages = 0
+    for r in runs:
+        gets.update(r.get("gets") or {})
+        pages += int(r.get("pages") or 0)
+        wire += int((r.get("http_bytes") or {}).get("wire_bytes_external") or 0)
+        decoded += int((r.get("http_bytes") or {}).get("decoded_bytes_external") or 0)
+        covered += int(((r.get("series") or {}).get("KXMVECROSSCATEGORY") or {}).get("seconds_covered") or 0)
+    days_covered = covered / DAY if covered else 0.0
+    per_day = (lambda x: round(x / days_covered, 1) if days_covered else None)
+    by_date: dict[str, Any] = {}
+    for date in dates:
+        rows = load_combos(root, [date])
+        sport = collections.Counter()
+        traded = collections.Counter()
+        league = collections.Counter()
+        two_leg = collections.Counter()
+        prints = 0
+        status = collections.Counter(r.get("trades_status") for r in rows)
+        for row in rows:
+            for s in row.get("sports") or ():
+                sport[s] += 1
+                traded[s] += bool(row.get("traded"))
+                two_leg[s] += row.get("n_legs") == 2
+            for g in row.get("same_game") or ():
+                if g.get("league"):
+                    league[g["league"]] += 1
+            prints += len(row.get("trades") or ())
+        by_date[date] = {"kept": len(rows), "by_sport": dict(sport.most_common()), "traded_by_sport": dict(traded.most_common()),
+                         "two_leg_by_sport": dict(two_leg.most_common()), "soccer_by_league": dict(league.most_common()),
+                         "prints": prints, "trades_status": dict(status)}
+    return {
+        "runs": len(runs),
+        "cross_category_days_covered": round(days_covered, 3),
+        "gets": dict(gets), "gets_total": sum(gets.values()), "pages": pages,
+        "gets_per_day": per_day(sum(gets.values())), "pages_per_day": per_day(pages),
+        "wire_mb_per_day": per_day(wire / 1e6), "decoded_mb_per_day": per_day(decoded / 1e6),
+        "by_settlement_date": by_date,
+    }
+
+
+# ------------------------------------------------------------------ cli
+def main(argv: Sequence[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    r = sub.add_parser("run", help="sweep newly settled combos (inert unless the env flag is on)")
+    r.add_argument("--data-root", default=None, help="defaults to SYNDICATE_DATA_ROOT")
+    r.add_argument("--enable", action="store_true", help=f"manual dry run: ignore {ENV_FLAG}")
+    r.add_argument("--lookback-hours", type=float, default=DEFAULT_LOOKBACK_S / 3600,
+                   help="first run only: how far back the watermark starts")
+    r.add_argument("--max-pages", type=int, default=MAX_PAGES_PER_RUN)
+    r.add_argument("--max-seconds", type=float, default=MAX_RUN_S)
+    r.add_argument("--invoker", default="cli")
+    p = sub.add_parser("report", help="GETs per covered day and kept combos per settlement date / sport")
+    p.add_argument("--data-root", default=None)
+    p.add_argument("--days", type=int, default=2)
+    p.add_argument("--date", action="append", default=None, help="settlement date(s), repeatable")
+    args = ap.parse_args(argv)
+    root = Path(args.data_root).expanduser().resolve() if args.data_root else data_root()
+    if args.cmd == "run":
+        _nice()
+        summary = run(root, enabled=True if args.enable else None, lookback_s=int(args.lookback_hours * 3600),
+                      max_pages=args.max_pages, max_seconds=args.max_seconds, invoker=args.invoker)
+        return 1 if summary.get("status") == "errors" else 0
+    today = dt.datetime.now(dt.timezone.utc).date()
+    dates = args.date or [(today - dt.timedelta(days=d)).isoformat() for d in range(args.days - 1, -1, -1)]
+    print(json.dumps(report(root, dates), indent=1, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
