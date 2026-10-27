@@ -239,17 +239,37 @@ def tickets(pool: Mapping[str, list[dict[str, Any]]], cells: Mapping[str, Any], 
 
 
 # ----------------------------------------------------------------------------- grading
+def leg_player_id(log: GameLog, leg: Mapping[str, Any]) -> str | None:
+    """A correlation-family leg (built off the sheet's rows or ladder) carries no game-log id: the one player with this
+    initial + surname whose latest team is the leg's own, team names compared canonically ('St Louis Blues' vs
+    'St. Louis Blues', 'NJD' vs 'New Jersey Devils'). 0 or 2+ -> None: a wrong player's line is worse than none.
+    Measured 2026-10-27 (todo #743): 488 of 493 pending NHL ledger legs had no id; this resolves 153 of the 163 unique
+    (day, player, stat) with an actual."""
+    from syndicate.features.shared.team_aliases import canonical_team
+
+    want = canonical_team("nhl", leg.get("team")) if leg.get("team") else None
+    if not want:
+        return None
+    hits = [pid for pid in log.by_key.get(_initial_key(leg.get("player")), [])
+            if canonical_team("nhl", log.team_of(pid)) == want]
+    return hits[0] if len(hits) == 1 else None
+
+
 def leg_actuals(data_root: Path, day: str, tickets_: Iterable[Mapping[str, Any]], *, log: GameLog | None = None) -> dict[str, float]:
     """`prop_result_key` prefix (player|market) -> the player's stat in `day`'s game, from the box-score log, for
-    every leg that carries a game-log `player_id` -- the legs the sheet itself never graded."""
+    every leg -- the legs the sheet itself never graded. A leg without a game-log `player_id` is resolved by name and
+    team (`leg_player_id`)."""
     from syndicate.features.shared.cheat_sheets import prop_result_key
 
     log = log if log is not None else GameLog.load(data_root)
     out: dict[str, float] = {}
     for t in tickets_:
         for leg in t.get("legs") or []:
-            pid, market = str(leg.get("player_id") or ""), str(leg.get("market") or "").upper()
-            if not pid or market not in STAT_COLUMNS:
+            market = str(leg.get("market") or "").upper()
+            if market not in STAT_COLUMNS:
+                continue
+            pid = str(leg.get("player_id") or "") or leg_player_id(log, leg)
+            if not pid:
                 continue
             value = log.actual(pid, market, day)
             if value is not None:

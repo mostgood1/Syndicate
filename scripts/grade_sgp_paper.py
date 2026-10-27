@@ -13,7 +13,11 @@ grader's own results, keyed by `cheat_sheets.prop_result_key`, so a parlay is gr
 A parlay WINS when every leg wins, LOSES when any leg loses, is VOID when a leg is void (a player who did not play;
 books' SGP void rules vary, so a void is never counted as either), and PENDING otherwise. Writes
 `<data root>/cheatsheets/<sport>/sgp_graded.jsonl` (one line per parlay, rewritten whole) and prints:
-  * calibration -- realized joint hit rate vs the mean predicted `p_joint` (THE claim this ledger can test);
+  * calibration -- realized joint hit rate vs the mean predicted `p_joint` (THE claim this ledger can test), over the
+    settled parlays whose EVERY leg won or lost. A parlay with a pending or void leg can be LOST (another leg lost) but
+    never WON, so counting it biased the hit rate down: +2.4 pts pooled, +4.3 NHL, measured 2026-10-27 (todo #743,
+    `.syndicate/findings_2026-10-27_sgp_pjoint_calibration.md`). `settled` still counts every won/lost parlay, and
+    `unresolved_leg` says how many of them the calibration left out;
   * paper ROI at the WORTH-IT price (what a user who only bets at that price or better would at least get) and at
     the ESTIMATED book price (an assumption: the leg prices multiplied, less 18.5%).
 Neither ROI is an edge claim. PRE-REGISTERED (findings_2026-10-16_nfl_sgp_correlations.md): no edge label until
@@ -64,11 +68,19 @@ def grade_one(record: Mapping[str, Any], reconciled: Mapping[str, Any] | None) -
             "est_book_odds": record.get("est_book_odds"), "status": graded["status"], "legs": graded["legs"]}
 
 
+def resolved(graded_one: Mapping[str, Any]) -> bool:
+    """Every leg won or lost -- the only parlays whose outcome does not depend on which leg went unresolved."""
+    return all(str(leg.get("result")) in ("won", "lost") for leg in graded_one.get("legs") or [])
+
+
 def summarize(graded: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
-    """Calibration and paper ROI over the settled parlays, with a game-clustered SE on the hit-rate gap."""
+    """Calibration and paper ROI over the settled parlays whose every leg resolved, with a game-clustered SE on the
+    hit-rate gap."""
     graded = list(graded)
-    settled = [g for g in graded if g["status"] in ("won", "lost") and g.get("p_joint") is not None]
-    out: dict[str, Any] = {"settled": len(settled), "void": sum(1 for g in graded if g["status"] == "void"),
+    every = [g for g in graded if g["status"] in ("won", "lost") and g.get("p_joint") is not None]
+    settled = [g for g in every if resolved(g)]
+    out: dict[str, Any] = {"settled": len(every), "unresolved_leg": len(every) - len(settled),
+                           "void": sum(1 for g in graded if g["status"] == "void"),
                            "pending": sum(1 for g in graded if g["status"] == "pending")}
     if not settled:
         return out

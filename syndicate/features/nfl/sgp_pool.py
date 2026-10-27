@@ -270,9 +270,27 @@ def tickets(pool: Mapping[str, list[dict[str, Any]]], cells: Mapping[str, Any], 
 
 
 # ----------------------------------------------------------------------------- grading
-def leg_actuals(data_root: Path, day: str, tickets_: Iterable[Mapping[str, Any]], *, log: GameLog | None = None) -> dict[str, float]:
+ANYTIME_TD = "Anytime TD"
+
+
+def touchdowns(log: GameLog, pid: str, season: int, week: int) -> float | None:
+    """Rushing + receiving TDs in that week's game -- what an anytime-TD leg pays on (the usage lines carry no return
+    TDs, which are rare)."""
+    for line in log.games.get(pid) or []:
+        if int(line.get("season") or 0) == season and int(line.get("week") or 0) == week:
+            try:
+                return float(line.get("rush_tds") or 0.0) + float(line.get("rec_tds") or 0.0)
+            except (TypeError, ValueError):
+                return None
+    return None
+
+
+def leg_actuals(data_root: Path, day: str, tickets_: Iterable[Mapping[str, Any]], *, log: GameLog | None = None,
+                roster: Roster | None = None) -> dict[str, float]:
     """`prop_result_key` prefix (player|market) -> the player's stat in `day`'s week, from the usage file, for every
-    leg with a gsis id -- the legs the sheet itself never graded."""
+    leg -- the legs the sheet itself never graded. A leg without a gsis id (the correlation family, built off the
+    sheet's rows) is resolved by name and its own team through the roster; anytime-TD legs read the week's TDs.
+    Measured 2026-10-27 (todo #743): every pending NFL ledger leg had no id, and 20 of the 27 were anytime TDs."""
     from syndicate.features.shared.cheat_sheets import prop_result_key
 
     week = week_of(data_root, day)
@@ -283,10 +301,16 @@ def leg_actuals(data_root: Path, day: str, tickets_: Iterable[Mapping[str, Any]]
     out: dict[str, float] = {}
     for t in tickets_:
         for leg in t.get("legs") or []:
-            pid, market = str(leg.get("player_id") or ""), str(leg.get("market") or "")
-            if not pid or market not in STATS:
+            market = str(leg.get("market") or "")
+            if market not in STATS and market != ANYTIME_TD:
                 continue
-            value = log.actual(pid, market, season, week)
+            pid = str(leg.get("player_id") or "")
+            if not pid and leg.get("team"):
+                roster = roster if roster is not None else Roster.load(data_root, season)
+                pid = str((roster.resolve(leg.get("player"), (leg.get("team"),)) or {}).get("gsis_id") or "")
+            if not pid:
+                continue
+            value = touchdowns(log, pid, season, week) if market == ANYTIME_TD else log.actual(pid, market, season, week)
             if value is not None:
                 parts = prop_result_key(leg).split("|")
                 out[f"{parts[0]}|{parts[1]}"] = value
