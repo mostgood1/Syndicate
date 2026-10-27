@@ -1145,24 +1145,22 @@ death, never life — do not invert it.
 - Verification: findings file with the prereg SHA, per-source date coverage + intersection + n, per sport x pair-type log loss / Brier with game-clustered CIs for (a)/(b)/(c), engine read (which correlations the sims get right or wrong), recommendation; todo item + syndicate-decision-engine lane line pushed to main
 - Blocked by: Stage 2 -- user decision #740 (a) (Kalshi combo capture), then about a month of capture
 
-### kalshi-combo-capture — OPEN (built + measured; user decision owed) — opened 2026-10-27 — session a48b0f49-3a6b-4105-b194-5804a934487c (picked up 2026-10-27 as a side session of local_668211d5; opened by e32fef1a for pickup)
-- **GOAL VERDICT `[2026-10-27 18:58Z checkpoint]`.**
+### kalshi-combo-capture — OPEN (RUNNING on the fleet via a bridge; supervisor job owed at the next fleet ff) — opened 2026-10-27 — session a48b0f49-3a6b-4105-b194-5804a934487c (picked up 2026-10-27 as a side session of local_668211d5; opened by e32fef1a for pickup)
+- **GOAL VERDICT `[2026-10-27 21:39Z]`.**
   - Goal, verbatim: "A forward, read-only capture of Kalshi same-game combo markets runs daily on the fleet: every combo whose legs include a same-game pair in a sport the platform prices is stored under the fleet data root (legs, quotes, volume_fp, result, and public trade prints for kept combos with volume > 0) within about 1,000 public GETs a day at nice 19, so E4 Stage 2 (#740 (d)) can run after a month of capture".
-  - **GOAL: NOT MET.** The capture is built, default OFF, and runs nowhere. The code is on main (`b994e9cf`, `ce5c467c`, `da6dbdc3`, `af6e4c14`, `883edd96`; 51 tests), and the reading is in the findings (`a8a1e7e7`).
-  - **Left:** the user's decisions in `#742`:
-    - (1) the fleet supervisor job at the next ff, and/or the drafted bridge now;
-    - (2) trade reads;
-    - (3) a ~30-day backfill.
-  - **Then:** run it under the deploy locks, and measure the first fleet day in `deploys.md`.
-  - **Two goal clauses are MEASURED WRONG, and the user must restate them before Verification can pass:**
-    - "about 1,000 public GETs a day": it is ~8,500 on a heavy day.
-    - "stored ... quotes ... and public trade prints": v2 stores TRADED kept combos only, because a finalized quote is zeroed. Untraded ones are counted in runs.jsonl. Trade reads are off by default, because `last_price` equals the last print on 3,774 of 3,778.
+  - **GOAL: NOT MET** (running; Verification owed).
+  - The user approved verbatim: "launch the kalshi combo-capture bridge on the fleet now at nice 19 with a ~30-day backfill and no trade reads, then enable the hourly supervisor job at the next fleet ff under the deploy locks".
+  - The bridge has run since 20:56:16Z. It was paused 21:24Z for the memory fix `6872eb2c` (2.5 GB -> 653 MB, same rows) and relaunched 21:36:16Z on `6872eb2c`. Its backfill starts at settlements of 09-27 20:51Z.
+  - **Left:**
+    - (1) The Verification reading: the first full forward day in `deploys.md`.
+    - (2) The supervisor job at the next fleet ff to >= `0d73eb92`: under the locks, add the env key, then a FULL down/up. Never on a checkout older than `6872eb2c`; the fleet's `84967f75` holds v1.
+  - **Goal clauses restated by the user's decision:** no trade reads. The GET clause is superseded by the measured ~8,500 a day on a heavy day (purged history ~900 per day). The user approved the run knowing that number.
 - Goal: A forward, read-only capture of Kalshi same-game combo markets runs daily on the fleet: every combo whose legs include a same-game pair in a sport the platform prices is stored under the fleet data root (legs, quotes, volume_fp, result, and public trade prints for kept combos with volume > 0) within about 1,000 public GETs a day at nice 19, so E4 Stage 2 (#740 (d)) can run after a month of capture
 - Files: scripts/kalshi_combo_capture.py (NEW), tests/test_kalshi_combo_capture.py (NEW), scripts/local_production.py (SCHEDULED_JOBS kalshi-combo-capture entry ONLY), docs/ai_context/todo.md (#742 section + one appended OWED line in #740 only), .syndicate/findings_2026-10-27_kalshi_combo_capture.md (NEW), .syndicate/state_kalshi.md ([kalshi-combo-capture] section + one appended line in [kalshi-combo-public-data] only), .syndicate/state.md (one kalshi-combo-capture index row only)
 - Hypothesis: n/a (a capture, not a test; E4's registered Stage 2 is the test)
 - Falsification test: n/a
 - Verification: Hermetic tests incl. off != on for the job; built default-off and landed on main; after a user-approved fleet window under the deploy locks, the first full day's capture file on the fleet shows kept combos > 0 by sport, the day's GET count within budget, and results filled for settled combos, recorded in deploys.md
-- Blocked by: the USER's decision on `#742` (1)-(3) (asked 2026-10-27 in session a48b0f49). Nothing persistent was launched.
+- Blocked by: none for the bridge. The supervisor job waits for the next fleet ff to >= `0d73eb92` and a full drained down/up (the same down/up `#744`'s key needs).
 
 ### sgp-pjoint-calibration — CLOSED — opened 2026-10-27 — closed 2026-10-27 — session 138eb1d7-e336-42da-986e-fafe0233f896
 - **GOAL VERDICT `[2026-10-27 14:37Z checkpoint]`.** Goal, verbatim: "Pre-register (committed before any outcome join) and run a calibration test of the SGP builders' p_joint on the settled paper-ledger tickets: calibration-in-the-large and slope, game-clustered CIs, per sport and by leg count / ticket type; if miscalibrated, decompose the gap (leg marginals p_market + de-vig, consistency nudge, copula correlation, the 18.5% haircut) and propose a per-line correction. OFFLINE, read-only on the fleet ledger" -- **GOAL: MET.** The reading is in `.syndicate/findings_2026-10-27_sgp_pjoint_calibration.md`. Prereg `1e7793e3`, A1 `cfee6f28`, run 14:31Z on a read-only snapshot. Clean-ticket calibration-in-the-large was NOT SHOWN in any gated cell: pooled +1.7 pts [-3.1, +6.4] (971 / 139 games), NHL -1.6, NBA +4.8, NFL +3.6, every Holm p = 1.0, MDE80 6.8 pooled. Since nothing rejected, the decomposition and correction clauses did not trigger. The decomposition is reported descriptively: marginals calibrated, the nudge not worse than the market, the copula better than independence, the haircut never in `p_joint`. The lead's gap was the grader's asymmetric censoring (+2.4 [+1.3, +3.5] pooled; NHL +4.3) from permanently pending, `player_id`-less correlation-family legs. Measurement fixes and the forward read are owed under `#743` to lane `cheat-sheets`. Findings `.syndicate/findings_2026-10-27_sgp_pjoint_calibration.md`. Also touched: `todo.md` `#740`, one inserted "superseded by `#743`" line.

@@ -54647,3 +54647,55 @@ which is about the two sizing bases and not about the refusal boundary.
   - Hard stop 2026-11-10: it records NOT MET and disables itself.
   - Unattended runs may be refused permission to disable the task; it says so if that happens. Its first step makes repeat runs no-ops once a reading is recorded.
 - **verify:** the first timestamped `[paper_settlement] ARCHIVED_SETTLED dry_run=False` line in refresh-worker's log, after a full up on a commit containing `2ec80fe0`. **OWED.**
+
+## 2026-10-27 20:56:16Z (3:56 PM CT) -- FLEET BRIDGE LAUNCHED: Kalshi combo capture, 30-day backfill, no trade reads (lane kalshi-combo-capture, #742) -- **RUNNING on `6872eb2c` since the 21:36:16Z relaunch; supervisor job OWED at the next fleet ff; first-forward-day reading OWED**
+- **user, verbatim (this lane's chat, session a48b0f49):** "Yes: launch the kalshi combo-capture bridge on the fleet now at nice 19 with a ~30-day backfill and no trade reads, then enable the hourly supervisor job at the next fleet ff under the deploy locks."
+- **no claim, no preflight.** Nothing was deployed, fast-forwarded or restarted, and no env file was edited.
+  - The bridge runs from its own git-archive checkout and writes only a NEW directory that nothing reads.
+  - The fleet checkout `~/Syndicate` (`84967f75`) and the supervisor were not touched.
+- **what runs:**
+  - The loop `~/combo_capture_checkout/combo_capture_bridge.sh`: `setsid -f nice -n 19 nohup`, `LOOKBACK_HOURS=720`, `MAX_PAGES=900`.
+  - Each run calls `scripts/kalshi_combo_capture.py run --invoker bridge` with `SYNDICATE_KALSHI_COMBO_CAPTURE=on`, `SYNDICATE_DATA_ROOT=~/syndicate-prod/data`, and trade reads at the default (0).
+  - The next run starts 60 s after a `budget_stopped` run, otherwise hourly.
+  - Log: `~/syndicate-prod/logs/job-kalshi-combo-capture.bridge.log`. Store: `~/syndicate-prod/data/reports/intelligence/kalshi_combo_capture/`.
+  - The draft and runners live in session a48b0f49's side-session-notes folder and scratchpad (`fleet/launch.sh`, `pause.sh`, `relaunch.sh`).
+  - Before launch, an import check with the flag absent printed `OFF ... no request, no file`, and the store stayed absent.
+- **readings, runs 1-4 (code `c21abdea`, a git archive of origin/main, capture script identical to `883edd96`):**
+
+  | run (Z) | pages | sec | settlements swept (Z) | rows listed | kept | kept traded |
+  |---|---|---|---|---|---|---|
+  | 20:56:17 | 900 (+8 collections) | 456.5 | 09-27 20:51 -> 09-29 00:31 | 836,306 | 379,410 | 379,393 |
+  | 21:04:54 | 860 | 424.7 | 09-29 00:31 -> 09-30 00:52 | 808,034 | 344,777 | 344,775 |
+  | 21:12:59 | 897 | 427.1 | 09-30 00:52 -> 10-01 05:22 | 835,966 | 331,446 | 331,446 |
+  | 21:21:07 | 833 | 396.0 | 10-01 05:22 -> 10-02 04:19 | 788,255 | 322,136 | 322,072 |
+
+  - All four ended `budget_stopped`, with 0 errors and 0 splits.
+  - Disk: 73 MB after 2 runs.
+- **FINDING: a month back, Kalshi's listing holds TRADED combos only** (379,393 of 379,410 kept).
+  - So the purged region costs ~900 GETs per day of history (the estimate was 150k-250k GETs for the whole backfill).
+  - And every kept row is stored, not 1 in 7 as on 10-26.
+- **DEFECT FOUND AND FIXED: peak RSS 2.5 GB** (VmHWM over runs 1-2, sampled at 15 s).
+  - **Not a leak:** run 3, sampled at 20 s, returned to ~290 MB between slices and rose with each slice's pages (537 MB at a 33-page slice).
+  - **Cause:** a stored row took 8.9 KB as a dict against 1.9 KB as JSON (20,000 rows of 09-28), held until its slice ended.
+  - **Fix `6872eb2c` (on main):** a row that gets no trade read is held as its encoded line. Tests: 52 pass.
+  - **Paused** at 21:24:33Z: the loop was killed between runs, and run 4 finished and released its lock.
+- **A/B on the fleet (21:28-21:35Z):**
+  - `6872eb2c` re-swept 09-28 11:55Z -> 09-29 18:16Z into a scratch root (876 pages, 278,390 rows): **peak 653 MB** (`ru_maxrss`), against 2.5 GB under `c21abdea` over the same Sunday.
+  - **The rows are identical:** 278,390 / 278,390, with 0 differing and 0 missing on either side, comparing everything except `captured_at`.
+  - The scratch root was deleted. Cost: 884 public GETs.
+- **relaunched 21:36:16Z** on `6872eb2c` (`~/combo_capture_checkout`; the old checkout is kept as `~/combo_capture_checkout.c21abdea`).
+  - It resumed from the watermark (10-02 04:19Z); no window was lost or re-read.
+- **supervisor job: OWED, and NOT safe yet.**
+  - The fleet checkout `84967f75` holds capture v1 (`b994e9cf`). v1 stores untraded rows and reads trades without charging the run budget.
+  - **The key must never be set on a checkout older than `6872eb2c`.**
+  - The steps, at the next fleet ff to >= `0d73eb92`, under `deploy_claim` + `deploy_preflight`:
+    1. Back up `~/syndicate-prod/local_production.env`.
+    2. Append `REFRESH_WORKER__SYNDICATE_KALSHI_COMBO_CAPTURE=on` and record the old and new sha256.
+    3. A FULL drained down/up loads it. It is the same down/up `#744`'s key needs; `0d73eb92` contains `2ec80fe0`.
+  - The bridge exits by itself once a `"invoker": "supervisor"` row exists and the newest run is `ok`.
+- **risks:**
+  - The bridge does not survive a WSL or host restart. The watermark catches up later, as long as it is inside the ~30-day listing edge.
+  - Wire is about 300 MB per backfill run.
+- **verify (OWED):**
+  - The first full forward settlement day after the backfill catches up: kept and traded > 0 by sport in `runs.jsonl`, the day's GETs, and `result` filled on the stored rows (`report --date`).
+  - Plus the date where kept-traded / kept drops from ~1.0 to ~0.1, which is where Kalshi stops purging.

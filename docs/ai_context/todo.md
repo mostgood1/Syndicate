@@ -57,7 +57,7 @@
   - **(c)** The registered forward read (prereg §8): same script, tickets >= 10-27, at >= 30 new clean games each in NHL / NBA / NFL, or on 2026-11-24. Watch NBA: its nudge adds +4.7 pts per ticket, its MDE80 is 17, and 10-26 read 26% vs 46% on 42 tickets.
 - **Until (a) lands,** read the nightly `SGP_PAPER` calibration line as biased toward over-prediction by about +2 pts pooled and +4 in NHL.
 
-### `#742` — **KALSHI COMBO CAPTURE (Decision Engine `#736`, E4 Stage 2): a forward, read-only capture of Kalshi same-game combo markets, so E4's venue-price test becomes runnable. BUILT on main, default OFF, RUNS NOWHERE. MEASURED over 26 h of settlements (NFL Sunday + Monday): ~8,500 GETs a day, not ~1,000; 508k traded same-game combos a day. USER DECISION OWED: where it runs, trade reads, and a ~30-day backfill** — 2026-10-27, session loving-einstein-b3c45e (lane opened at user request); built by session a48b0f49 (lane `kalshi-combo-capture`); `.syndicate/findings_2026-10-27_kalshi_combo_capture.md`; `.syndicate/findings_2026-10-26_e4_combo_correlation.md` (Stage 2 section, Recommendation 3)
+### `#742` — **KALSHI COMBO CAPTURE (Decision Engine `#736`, E4 Stage 2): a forward, read-only capture of Kalshi same-game combo markets, so E4's venue-price test becomes runnable. RUNNING on the fleet since 2026-10-27 20:56Z as a self-exiting bridge (user-approved), with a 30-day backfill and no trade reads; the hourly supervisor job is OWED at the next fleet ff to >= `0d73eb92`. MEASURED over 26 h of settlements (NFL Sunday + Monday): ~8,500 GETs a day, not ~1,000; 508k traded same-game combos a day** — 2026-10-27, session loving-einstein-b3c45e (lane opened at user request); built by session a48b0f49 (lane `kalshi-combo-capture`); `.syndicate/findings_2026-10-27_kalshi_combo_capture.md`; `.syndicate/findings_2026-10-26_e4_combo_correlation.md` (Stage 2 section, Recommendation 3)
 - **User, verbatim (2026-10-27):** "Yes, adopt E3 and E4's recommendations: Phase 5 drops the derived-line taker and sim-based combos (Kalshi's mid prices derived lines; measured SGP correlation prices combos, sim only for soccer scorelines). Route the engine reads to the sim owners and open a lane for a forward Kalshi combo capture."
 - **Why:** E4 Stage 1 passed 4 cells (MLB same-batter nested / other, NBA same-player nested, soccer result/total/BTTS) but has no price test. Kalshi's combo prints are public, but the past window cannot be rebuilt by paging (more than 30,000 trades in one 10-minute slice). Same-game legs from MLB, NBA, NHL and soccer already appear inside Kalshi combos.
 - **What (E4 Recommendation 3):**
@@ -80,10 +80,19 @@
   - Traded per day: NFL 274.5k, NBA 187.8k, MLB 52.7k, soccer 37.5k, NHL 13.6k, WNBA 11.7k. 24.2k a day are two-leg.
   - The `0` shard and the per-sport collections settled 0.
   - Corrected along the way: the first 4-h sample's "no two-leg or pure SGP tickets trade" was a window artifact.
-- **OWED (user, choices in the findings):**
-  - **(1)** Where it runs: the fleet supervisor job at the next ff (key + `down`/`up` under the locks), and/or the drafted self-exiting bridge now.
-  - **(2)** Trade reads: none, recommended; `--trades-max-legs 2` would add ~24k GETs a day.
-  - **(3)** Backfill: none, or ~30 days (150k-250k GETs once). It would make `#740` (d) runnable in about two days. The ~30-day edge moves forward daily.
+- **DECIDED 2026-10-27 (user, verbatim, session a48b0f49):** "Yes: launch the kalshi combo-capture bridge on the fleet now at nice 19 with a ~30-day backfill and no trade reads, then enable the hourly supervisor job at the next fleet ff under the deploy locks."
+- **Running (2026-10-27):**
+  - The bridge was launched 20:56:16Z from `~/combo_capture_checkout`, a git archive, with `LOOKBACK_HOURS=720`. Its log is `~/syndicate-prod/logs/job-kalshi-combo-capture.bridge.log`.
+  - It was paused at 21:24Z for a memory fix (`6872eb2c`) and relaunched at 21:36:16Z on `6872eb2c`.
+  - The store starts at settlements of 09-27 20:51Z. Readings are in `deploys.md`.
+- **Overturned by the backfill:** Kalshi's listing a month back holds TRADED combos only: 379,393 of 379,410 kept on 09-27/28.
+  - So the purged region costs about 900 GETs per day of history, not the ~5-8k estimated.
+  - And every kept row is stored, which pushed a run to 2.5 GB. Fixed by `6872eb2c`: 653 MB on the same window, with identical rows (278,390 / 278,390).
+- **OWED:**
+  - At the next fleet ff to >= `0d73eb92`: under the locks, back up `~/syndicate-prod/local_production.env`, append `REFRESH_WORKER__SYNDICATE_KALSHI_COMBO_CAPTURE=on`, and record both sha256s. A FULL drained down/up loads it (a role restart does not).
+  - **NEVER add the key while the fleet checkout is older than `6872eb2c`.** `84967f75` holds v1 (`b994e9cf`), which stores untraded rows and reads trades without charging the budget.
+  - The bridge exits by itself once a `"invoker": "supervisor"` row exists and the newest run is `ok`.
+  - It does not survive a WSL or host restart. The watermark catches up any gap, as long as it stays inside the ~30-day listing edge.
 
 ### `#741` — **E3 DERIVED-MARKET SURFACE (Decision Engine `#736`, plan §4 E3): KILLED by the registered rule on Kalshi, both tiers x both arms x t60 / t15, and on Polymarket (indicative). Priced off Pinnacle's main line plus a shape, both surfaces LOSE to Kalshi's own mid on held-out rungs (parametric +0.0051 nats [+0.0026, +0.0075], sim-shaped +0.0069; 26,708 rungs / 243 games); consensus-anchored the parametric ties it. No predicted-EV band makes money at the ask after fees. Even Pinnacle's own alt price does not beat Kalshi's mid** — 2026-10-26, lane `e3-derived-surface`, session d266ae46 (side session of local_898e5510); `.syndicate/findings_2026-10-26_e3_derived_surface.md`
 - **DECIDED 2026-10-27** (user, in the decision-engine session; `#736`): the recommendation is adopted, and Phase 5 has no derived-line taker. OWED (a) is routed in `.syndicate/brief_2026-10-27_engine_reads.md`; (b) the forward re-reads stay owed.
@@ -131,7 +140,7 @@
   - **(b)** A user decision: rescope Phase 5 E4. Combo correlation comes from the measured copula, and the sims supply it only for soccer scorelines. Correlation-expert weight stays 0 on MLB TM/OP and NBA SP-disjoint. Every line stays its own decision.
   - **(c)** Engine items for the sim owners: NBA per-draw minutes; MLB threshold-correct same-batter correlation plus `team|full|margin/total` labels; a persisted (margin, total) joint for all sports.
   - **(d)** Re-run with the same script and constants after a month of combo capture or the NBA minutes fix.
-  - **(d) capture clock, OWED (`#742`, 2026-10-27):** NOT STARTED. The capture is built and measured but runs nowhere until the user chooses where. A ~30-day backfill would start it about 09-27, retroactively.
+  - **(d) capture clock STARTED 2026-10-27 20:56Z (`#742`):** the fleet bridge's backfill begins at settlements of **2026-09-27 20:51Z**, so a month of capture exists once the backfill reaches the present. Stage 2 can run then, against `scripts/kalshi_combo_capture.py`'s `iter_combos` store.
 
 ### `#739` — **E5 VENUE NEWS-LAG (Decision Engine `#736`, plan §4 E5): KILLED on Kalshi by the registered rule; Polymarket "cancel-protection only" by the letter at a 0.2c drift. No timing edge: on the events the books repriced, Kalshi had moved BEFORE our collector saw the news. Phase 4 = cancel-protection plumbing, gated on Phase 3 and an official-schedule t0 (decision owed)** — 2026-10-26, lane `e5-venue-news-lag`, session ce4dfadf (side session of local_898e5510); `.syndicate/findings_2026-10-26_e5_venue_news_lag.md`
 - **Pre-registered before any join:** `d9ce947f`. Amendments A1 `0a9b9fed`, A2 `0bfcc8bc`, A3 `e3fd2e2a` cover eligibility and run times. A3 takes run times from `logs/news_collector.log`, which holds 1,983 runs; the change logs alone imply 106 false sleep gaps.

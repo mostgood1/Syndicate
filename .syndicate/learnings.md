@@ -2996,3 +2996,21 @@ The 2026-10-20 entry said: "Rating INPUTS transfer, because the sim reads them w
   - State the measured window beside the number; a weekday-morning rate is a floor, not a budget.
   - Any one-GET-per-item step inside a run (trade prints, detail fetches) must be charged to the run's page and time budget.
   - Adaptive slice sizing beats split-on-overflow whenever a split discards what it already read.
+
+## 2026-10-27 -- A memory bound that rests on how much a filter DROPS fails when the population changes: bound the representation, not the expected selectivity `[lane kalshi-combo-capture, session a48b0f49]`
+
+- **The belief:**
+  - `da6dbdc3` fixed the capture's 1.25 GB slice by dropping untraded rows in the stream.
+  - On the 26-h dry run (10-26/27), 1 kept combo in 7 traded, so a slice held ~15% of its kept rows: 176-213 MB.
+- **What was true:**
+  - Kalshi's listing a month back holds TRADED combos only (379,393 of 379,410 kept).
+  - The first fleet backfill run therefore held every kept row, and peaked at 2.5 GB.
+  - It was not a leak: RSS rose with each slice's pages (~7 MB a page) and fell back between slices.
+  - A row was 8.9 KB as a Python dict, against 1.9 KB as its JSON line.
+- **Rule:**
+  - When a memory fix works by filtering, write its bound as "rows the filter keeps x bytes per row". Then ask which population keeps them all: a backfill, a replay, another venue window.
+  - Bound the representation instead: hold the encoded line and write in chunks.
+  - `6872eb2c` does this: 653 MB on the same window, with byte-identical rows (278,390 / 278,390).
+- **The same mistake, in cost:**
+  - The backfill estimate (150k-250k GETs) assumed the old listing looks like today's. The purged region costs ~900 GETs per day of history.
+  - Size on the population the job will actually read, and read a page of it before sizing.
