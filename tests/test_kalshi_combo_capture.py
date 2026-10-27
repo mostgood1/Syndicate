@@ -367,6 +367,10 @@ def test_by_default_untraded_combos_are_counted_not_stored_and_no_trade_is_read(
     rep = cc.report(tmp_path, [cc.utc_date(end - 50)])
     assert rep["kept_by_sport_per_day"] == {"nba": round(2 * 96, 1), "soccer": round(96, 1)}  # 900 s covered
     assert rep["by_settlement_date"][cc.utc_date(end - 50)]["stored"] == 2
+    # the sweep itself drops the untraded row after tallying it, so a peak slice never holds them
+    rows, stats = cc.sweep_slice(FakeKalshi(combos, page_size=10), "KXMVECROSSCATEGORY", end - 899, end,
+                                 budget=cc.RunBudget(10, 60), captured_at="t", keep_untraded=False)
+    assert len(rows) == 2 and stats["kept"] == 3 and stats["kept_traded"] == 2 and stats["sport:nba"] == 2
 
 
 def test_trade_reads_are_charged_to_the_run_budget(tmp_path):

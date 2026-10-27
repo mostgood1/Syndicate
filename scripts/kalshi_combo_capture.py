@@ -312,11 +312,32 @@ class BudgetStop(Exception):
     pass
 
 
+# `sweep_slice` tallies every kept combo into its stats under "<kind>:<name>" keys; a run unpacks them here.
+TALLY_KEYS = {"sport": "kept_by_sport", "sport_traded": "kept_traded_by_sport", "legs_traded": "kept_traded_by_legs",
+              "league": "kept_by_league"}
+
+
+def tally(stats: collections.Counter, row: Mapping[str, Any]) -> None:
+    traded = bool(row.get("traded"))
+    stats["kept_traded"] += traded
+    if traded:
+        stats[f"legs_traded:{legs_bucket(row.get('n_legs'))}"] += 1
+    for sport in row.get("sports") or ():
+        stats[f"sport:{sport}"] += 1
+        if traded:
+            stats[f"sport_traded:{sport}"] += 1
+    for league in {g["league"] for g in row.get("same_game") or () if g.get("league")}:
+        stats[f"league:{league}"] += 1
+
+
 def sweep_slice(get: Callable[..., Any], series: str, lo: int, hi: int, *, budget: RunBudget,
-                captured_at: str, page_cap: int = SLICE_PAGE_CAP) -> tuple[list[dict[str, Any]], collections.Counter]:
+                captured_at: str, page_cap: int = SLICE_PAGE_CAP,
+                keep_untraded: bool = True) -> tuple[list[dict[str, Any]], collections.Counter]:
     """Every kept combo of `series` settled in the integer seconds [lo, hi]. All or nothing: raises rather
-    than return a partial slice."""
+    than return a partial slice. Every kept combo is TALLIED; an untraded one is returned only with
+    `keep_untraded` (holding a peak slice's 180k untraded rows took 1.25 GB)."""
     kept: dict[str, dict[str, Any]] = {}
+    seen: set[str] = set()
     stats: collections.Counter[str] = collections.Counter()
     cursor: str | None = None
     while True:
@@ -345,27 +366,34 @@ def sweep_slice(get: Callable[..., Any], series: str, lo: int, hi: int, *, budge
                 stats["outside_slice"] += 1
                 continue
             row = combo_row(raw, captured_at)
-            if row is not None:
+            if row is None or row["ticker"] in seen:
+                continue
+            seen.add(row["ticker"])
+            tally(stats, row)
+            if row["traded"] or keep_untraded:
                 kept[row["ticker"]] = row
         cursor = doc.get("cursor") or None
         if not cursor or not markets:
             break
-    stats["kept"] = len(kept)
+    stats["kept"] = len(seen)
     return list(kept.values()), stats
 
 
 def sweep_window(get: Callable[..., Any], series: str, lo: int, hi: int, *, budget: RunBudget,
-                 captured_at: str, page_cap: int = SLICE_PAGE_CAP) -> tuple[list[dict[str, Any]], collections.Counter]:
+                 captured_at: str, page_cap: int = SLICE_PAGE_CAP,
+                 keep_untraded: bool = True) -> tuple[list[dict[str, Any]], collections.Counter]:
     """`sweep_slice`, halving a slice that needs more than `page_cap` pages."""
     try:
-        return sweep_slice(get, series, lo, hi, budget=budget, captured_at=captured_at, page_cap=page_cap)
+        return sweep_slice(get, series, lo, hi, budget=budget, captured_at=captured_at, page_cap=page_cap,
+                           keep_untraded=keep_untraded)
     except SliceTooLarge:
         if hi - lo + 1 < 2 * MIN_SLICE_S:
             raise
         mid = lo + (hi - lo) // 2
-        rows_a, stats_a = sweep_window(get, series, lo, mid, budget=budget, captured_at=captured_at, page_cap=page_cap)
+        rows_a, stats_a = sweep_window(get, series, lo, mid, budget=budget, captured_at=captured_at, page_cap=page_cap,
+                                       keep_untraded=keep_untraded)
         rows_b, stats_b = sweep_window(get, series, mid + 1, hi, budget=budget, captured_at=captured_at,
-                                       page_cap=page_cap)
+                                       page_cap=page_cap, keep_untraded=keep_untraded)
         stats_a.update(stats_b)
         stats_a["splits"] += 1
         return rows_a + rows_b, stats_a
@@ -613,8 +641,9 @@ def _run_locked(root: Path, *, get, now, lookback_s, max_pages, max_seconds, ser
             if not budget.allow(int(st.get("last_slice_pages") or 1)):
                 break
             try:
+                # An untraded finalized combo's quote is zeroed: it carries no price, so it is tallied, not stored.
                 rows, stats = sweep_window(counting, name, lo, hi, budget=budget, captured_at=captured_at,
-                                           page_cap=page_cap)
+                                           page_cap=page_cap, keep_untraded=store_untraded)
             except BudgetStop:
                 break
             except (SliceUnreadable, SliceTooLarge) as exc:
@@ -622,22 +651,15 @@ def _run_locked(root: Path, *, get, now, lookback_s, max_pages, max_seconds, ser
                 break
             trade_stats = attach_trades(counting, rows, pause=trade_pause, max_legs=trades_max_legs, budget=budget)
             summary["trades"].update(trade_stats)
-            # An untraded finalized combo's quote is zeroed: it carries no price, so it is counted, not stored.
-            stored = rows if store_untraded else [row for row in rows if row["traded"]]
-            for date, n in append_rows(root, stored).items():
+            for date, n in append_rows(root, rows).items():
                 summary["written"][date] += n
-            for row in rows:
-                if row["traded"]:
-                    summary["kept_traded_by_legs"][legs_bucket(row["n_legs"])] += 1
-                for sport in row["sports"]:
-                    summary["kept_by_sport"][sport] += 1
-                    if row["traded"]:
-                        summary["kept_traded_by_sport"][sport] += 1
-                for league in {g["league"] for g in row["same_game"] if g.get("league")}:
-                    summary["kept_by_league"][league] += 1
-            info.update(stats)
+            for key, n in stats.items():
+                kind, _, label = key.partition(":")
+                if label:
+                    summary[TALLY_KEYS[kind]][label] += n
+                else:
+                    info[key] += n
             info["slices"] += 1
-            info["kept_traded"] += sum(1 for row in rows if row["traded"])
             swept = hi
             st["swept_to"] = hi
             st["last_slice_pages"] = int(stats["pages"])
