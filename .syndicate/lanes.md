@@ -1424,10 +1424,10 @@ death, never life — do not invert it.
 ### syndicate-decision-engine — OPEN — opened 2026-10-26 — session e32fef1a-01e8-4afe-a284-01acd3728545
 - **E3 -> lane `e3-derived-surface`** `[2026-10-27 00:3xZ, side session d266ae46]` (todo `#741`): prereg `f9ee12af`, A1 `ba4f9d79`, code `50ec3f30`. **KILLED** by the registered rule on Kalshi (both tiers x both arms x t60/t15) and Polymarket (indicative). Pinnacle-anchored surfaces LOSE to Kalshi's own mid on held-out derived rungs (+0.0051 / +0.0069 nats, 26,708 rungs / 243 games); consensus-anchored the parametric ties; no fee-net-positive EV band; even Pinnacle's own alt price does not beat Kalshi's mid. Recommendation: no derived-market taker; L1 fair for a derived Kalshi rung = the venue's two-sided mid; the spread (E2) is the only structural edge there. No user decision owed. Engine work list (NBA margins too wide, football totals too narrow, NHL stores no draws) in the findings. Findings `.syndicate/findings_2026-10-26_e3_derived_surface.md`.
 - **E4 -> lane `e4-combo-correlation`** `[2026-10-26 ~23:50Z, side session b566f51c]` (todo `#740`): prereg `9f8d759e`. The sims' joint beats independence only on STRUCTURAL pairs: same batter, NBA nested combos, soccer BTTS x total. It is KILLED for cross-player and NBA P x R / P x A / R x A, where the NBA sim carries zero within-player correlation. The measured SGP copula beats or ties the sim wherever both exist. Stage 2 was NOT RUN: Kalshi combo prints are public, but the window is millions of trades. Decisions owed: (a) a forward Kalshi combo capture; (b) rescope Phase 5 E4 so the copula is the correlation source and the sim covers soccer only. Findings `.syndicate/findings_2026-10-26_e4_combo_correlation.md`.
-- **PHASE 2 -> lane `decision-policy-paper`** `[2026-10-26, side session dfa0a827]` (todo `#738`): decision policy v1 as a PAPER track, prereg `8d16ab07`. Built, NOT running. Two user decisions are owed: the guard-test loan and enabling the fleet job. Findings `.syndicate/findings_2026-10-26_decision_policy_v1.md`.
+- **PHASE 2 -> lane `decision-policy-paper`** `[2026-10-26, side session dfa0a827]` (todo `#738`): decision policy v1 as a PAPER track, prereg `8d16ab07`. RUNNING on the fleet since 05:20Z 10-27 (both user decisions taken: the loan, and "Widen tonight's window"); `ev_lb` qualified 0 on all 7 bookings to 06:05Z (deploys.md 06:20Z). Findings `.syndicate/findings_2026-10-26_decision_policy_v1.md`.
 - **GOAL VERDICT `[2026-10-26 17:4xZ checkpoint]`: GOAL: NOT MET.** Goal, verbatim: "Carry the ADOPTED Decision Engine plan (todo #736, user 2026-10-26, D1-D8 as recommended). Phase 0 done = every Phase-0 item is either verified on the fleet with a dated reading in deploys.md or handed to a named owner lane with the hand-off recorded here; later phases each open under their owner and pass their pre-registered gate".
   - Phase 0 is partly done. Still owed:
-    1. The D3 LOAD reading. 46fba654 is on main, not loaded; it needs a refresh-worker restart by whoever restarts. Then the first record file must show `w_star_ci_lower` populated on the fitted cells, and the checklist must exit 0.
+    1. ~~The D3 LOAD reading~~ **MET 2026-10-27 05:30Z**: checklist exit 0, alarms none; `default_unmeasured` 1,264 at w=0 (deploys.md 06:20Z).
     2. The watchdog's first run. The user must Run-now `syndicate-dispatch-watchdog` once to pre-approve its tools, and the run must report the three known misses.
     3. The OneDrive upload, confirmed by the user, and the 10-27 09:15Z scheduled `data-backup` run writing to the new folder.
     4. The paper no-outcome count by GAME date (1,896 by submit time). The paper-settlement owner has been asked; none is named yet.
@@ -1441,25 +1441,14 @@ death, never life — do not invert it.
 - Falsification test: n/a at program level; the Phase-2 edge gate is the program's own kill rule (plan section 9)
 - Verification: Phase 0: #722 provenance on the fleet + first settled live order carrying staked_probability_version; #732/#729 forward readings recorded; unsettled paper/ladder backlog counted with an owner; D3 landed in shadow by decision-record-shadow; off-host backup copy exists off this machine with age < 30h; a missed-dispatch check exists and has caught one known-past run
 - Blocked by: none
-- **ARMED, WIDENED `[2026-10-26 20:3xZ]` -- tonight, after the slate (not before 04:45Z 10-27), run LIVE in this session.**
-  - User, first approval, verbatim: "Yes: after tonight's slate, fast-forward the fleet to a main SHA containing 636ba4ff and restart the refresh-worker under the deploy locks (claim, preflight, drain, env sha guard, ride-along check of everything else the fast-forward carries), then take the owed FAIR_V1 and checklist readings and rec[ord them]".
-  - Then, for Phase 2's D-B, the user's selected answer, verbatim: "Widen tonight's window". The option read: "Skip the narrow restart: update straight to 0fca3f2b with the env line and one full stop-and-start."
-  - **Plan:**
-    1. Run `a_precheck.py 0fca3f2b`. At arm, 84767601..0fca3f2b carried runtime files from this program's lanes only: decision-engine, syndicate-fair-v1, e5-venue-news-lag (offline script), decision-policy-paper; local_production.py +9 for Phase 2's jobs.
-    2. Claim all three services (holder syndicate-decision-engine), then run `b_safety.py --drain`.
-    3. Run `deploy_preflight` for each service: --expect code=0fca3f2b, --baseline from the live code.
-    4. Run `c_env_and_marker.sh`. It adds `REFRESH_WORKER__SYNDICATE_DECISION_POLICY_PAPER=paper` and refuses if the env sha differs from the arm baseline `33a7e457`.
-    5. Guarded ff to exactly 0fca3f2b, then `down`, then `Start-ScheduledTask` in WINDOWS PowerShell; wait for healthz 200.
-    6. Remove the marker and undrain.
-    7. Run `d_after_up.py`: FAIR_V1, the checklist, PAPER_BOOKED.
-    8. Write deploys.md, then release the claims with --token.
-  - The scripts are in `C:	mp	onight\`.
-  - **If this session is gone, nothing runs.** No unattended deploy job was armed (learnings 2026-10-26).
+- **TONIGHT'S WINDOW: DONE `[2026-10-27 05:20Z]`** (user: the first approval + "Widen tonight's window"): fleet ff 84767601 -> 0fca3f2b,
+  `REFRESH_WORKER__SYNDICATE_DECISION_POLICY_PAPER=paper`, one full down/up; all three roles code=0fca3f2b; claims released 05:21Z.
+  The drain does not stop odds refreshes (back-to-back jobs), so preflight was polled for the gap. deploys.md 05:20Z + 06:20Z.
+  Scripts kept in `C:/tmp/tonight/`.
 - **FAIR V1 IN SHADOW `[2026-10-26 18:5xZ]`** (user-directed; loan of `decision-record-shadow`'s files RETURNED):
   - v1 code d757b599 and the record wiring 636ba4ff are on main.
   - The params were published on the fleet at `reports/syndicate_fair/syndicate_fair_v1_params.json`: version `syndicate_fair_v1@2026-10-26@18ed2e2c`, sha256 `1bf197f1...`. deploys.md 18:50Z.
-  - NOT LOADED: no restart, per the user.
-  - **Owed reading:** the first heavy build after a refresh-worker restart on a HEAD containing 636ba4ff logs `[decision_record] FAIR_V1 ... outcomes={'computed': N ...}` with N > 0 (10-26 offline: 329 of 4,582). That record file must also pass the checklist at exit 0, which clears both the `w_star_ci_lower` alarm (D3) and the `fair_v1` rows.
+  - **LOADED AND VERIFIED 2026-10-27 05:29:58Z:** `computed` 289 of 1,928 lines (nhl prop 179, nhl game 54, soccer 45, ncaaf 11); checklist exit 0. Phase 2's sigma now draws `S1_fair_v1` on ~60 lines per booking. Never used for EV, pricing or staking.
 - **DONE `[2026-10-26]`** (detail: `.syndicate/log/2026-10-26.md`):
   - The adoption is recorded in `state.md` `[user-decisions]` and `#736`.
   - D3 landed 46fba654; the loan is returned.
