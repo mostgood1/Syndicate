@@ -551,6 +551,81 @@ def test_role_code_prefers_the_reflog_over_a_stale_env_stamp(git_repo, monkeypat
     assert lp.role_code(123, "live-odds-worker", repo) == (old, "env")
 
 
+def test_proc_stat_start_ticks_splits_after_the_last_paren():
+    rest = "S 1 4242 4242 0 -1 4194560 100 0 0 0 1 2 0 0 20 0 1 0 987654 123 456"
+    assert lp.proc_stat_start_ticks(f"4242 (gunicorn: worker) x (y) {rest}") == 987654
+
+
+class _FakeProc:
+    def __init__(self, pid, created, kids=()):
+        self.pid, self._created, self._kids = pid, created, list(kids)
+
+    def create_time(self):
+        return self._created
+
+    def children(self):
+        return self._kids
+
+
+def _fake_psutil(monkeypatch, procs):
+    import sys
+    import types
+
+    monkeypatch.setitem(sys.modules, "psutil", types.SimpleNamespace(Process=lambda pid: procs[pid]))
+
+
+def test_role_start_epoch_prefers_the_precise_linux_start(monkeypatch):
+    """psutil's create_time rides on whole-second btime (0.992 s early on the
+    fleet, 2026-10-27); the precise start replaces it wherever it can be read."""
+    kids = [_FakeProc(11, 1700000099.2), _FakeProc(12, 1700000105.0)]
+    _fake_psutil(monkeypatch, {10: _FakeProc(10, 1600000000.0, kids), 20: _FakeProc(20, 1700000099.2)})
+    monkeypatch.setattr(lp, "linux_start_epoch", lambda pid: None)
+    assert lp.role_start_epoch(10, "web") == 1700000099.2
+    assert lp.role_start_epoch(20, "refresh-worker") == 1700000099.2
+    monkeypatch.setattr(lp, "linux_start_epoch", lambda pid: {11: 1700000100.19, 12: 1700000105.9, 20: 1700000100.19}[pid])
+    assert lp.role_start_epoch(10, "web") == 1700000100.19  # oldest worker, not the master
+    assert lp.role_start_epoch(20, "refresh-worker") == 1700000100.19
+
+
+def test_a_role_started_just_after_an_ff_reads_the_new_commit(git_repo, monkeypatch):
+    """2026-10-26: web's workers came up 07:49:13 by psutil after an ff stamped
+    07:49:14, and `status` named the commit before the ff."""
+    repo, commit = git_repo
+    monkeypatch.setenv("GIT_COMMITTER_DATE", "1700000000 +0000")
+    old = commit("syndicate/app.py", "v1\n")
+    monkeypatch.setenv("GIT_COMMITTER_DATE", "1700000100 +0000")
+    new = commit("syndicate/app.py", "v2\n")
+    _fake_psutil(monkeypatch, {30: _FakeProc(30, 1700000099.2)})
+    monkeypatch.setattr(lp, "linux_start_epoch", lambda pid: None)
+    assert lp.role_code(30, "live-odds-worker", repo) == (old, "reflog")  # the defect, psutil alone
+    monkeypatch.setattr(lp, "linux_start_epoch", lambda pid: 1700000100.19)
+    assert lp.role_code(30, "live-odds-worker", repo) == (new, "reflog")
+
+
+@pytest.mark.skipif(not Path("/proc/self/stat").exists(), reason="needs Linux /proc")
+def test_linux_start_epoch_brackets_a_real_spawn():
+    import subprocess
+    import sys
+    import time
+
+    before = time.time()
+    child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(5)"])
+    after = time.time()
+    try:
+        started = lp.linux_start_epoch(child.pid)
+    finally:
+        child.kill()
+        child.wait()
+    assert started is not None and before - 0.02 <= started <= after + 0.02
+
+
+@pytest.mark.skipif(Path("/proc/self/stat").exists(), reason="Linux reads /proc")
+def test_linux_start_epoch_is_none_off_linux():
+    import os
+
+    assert lp.linux_start_epoch(os.getpid()) is None
+
+
 def test_a_ledger_only_gap_is_not_stale(git_repo):
     repo, commit = git_repo
     loaded = commit("syndicate/app.py", "v1\n")

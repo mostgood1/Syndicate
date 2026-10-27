@@ -2032,21 +2032,52 @@ def head_at(epoch: float, repo: Path = REPO_ROOT) -> str | None:
     return None
 
 
+def proc_stat_start_ticks(stat_text: str) -> int:
+    """`starttime` (field 22, clock ticks since boot) from a /proc/<pid>/stat
+    line. Split after the LAST ')': the command name may hold spaces and ')'."""
+    return int(stat_text.rsplit(")", 1)[1].split()[19])
+
+
+def linux_start_epoch(pid: int) -> float | None:
+    """A process's start as a wall-clock epoch, to the clock tick; None off Linux.
+
+    psutil's `create_time` adds the boot-relative start to /proc/stat `btime`,
+    which is WHOLE seconds, so it reads up to 1 s early. Measured 2026-10-27 on
+    the fleet: btime sat 0.992 s before the true boot, and a process spawned
+    just after a commit read as started BEFORE its reflog stamp in 58 of 60
+    tries (0 of 60 with this). That is how `status` named web's previous commit
+    after the 2026-10-26 HUP of 7c9a2772 (workers 07:49:13 CT, ff 07:49:14)."""
+    try:
+        ticks = proc_stat_start_ticks(Path(f"/proc/{int(pid)}/stat").read_text())
+        boot = time.time() - time.clock_gettime(time.CLOCK_BOOTTIME)
+        return boot + ticks / os.sysconf("SC_CLK_TCK")
+    except Exception:
+        return None
+
+
 def role_start_epoch(pid: int | None, role: str = "") -> float | None:
     """When the role's CODE was loaded. For web, gunicorn's OLDEST worker: a HUP
     replaces the workers (which import the app) and keeps the master. For the
-    workers, the process itself; its children are sims, started later."""
+    workers, the process itself; its children are sims, started later.
+
+    `head_at` compares this with whole-second reflog stamps, so a role started
+    in the same second as an ff but BEFORE it still reads as after it. A deploy
+    restarts after its ff, never before."""
     if not pid:
         return None
     try:
         import psutil
 
+        def started(proc) -> float:
+            precise = linux_start_epoch(proc.pid)
+            return precise if precise is not None else proc.create_time()
+
         proc = psutil.Process(int(pid))
         if role == "web":
-            kids = [c.create_time() for c in proc.children()]
+            kids = [started(c) for c in proc.children()]
             if kids:
                 return min(kids)
-        return proc.create_time()
+        return started(proc)
     except Exception:
         return None
 
