@@ -1500,6 +1500,14 @@ death, never life — do not invert it.
 - Verdict: GOAL MET. 6 of 34 CLOSED blocks moved to `lanes_closed.md` with one pointer each; 28 deferred (owner idle < 240m, or a transcript not found). Gate reading, deferrals and the dormant-OPEN report are in `log/2026-10-27.md`.
 - Moved: nfl-kalshi-clv-pooled, nfl-mnf-settlement-lag, closed-lane-archive-20261026-0812, closed-lane-archive-20261026-1153, e5-venue-news-lag, e3-derived-surface.
 
+### sgp-pjoint-calibration — OPEN — opened 2026-10-27 — session 138eb1d7-e336-42da-986e-fafe0233f896
+- Goal: Pre-register (committed before any outcome join) and run a calibration test of the SGP builders' p_joint on the settled paper-ledger tickets: calibration-in-the-large and slope, game-clustered CIs, per sport and by leg count / ticket type; if miscalibrated, decompose the gap (leg marginals p_market + de-vig, consistency nudge, copula correlation, the 18.5% haircut) and propose a per-line correction. OFFLINE, read-only on the fleet ledger
+- Files: scripts/sgp_pjoint_calibration.py (NEW), tests/test_sgp_pjoint_calibration.py (NEW), .syndicate/findings_2026-10-27_sgp_pjoint_calibration_preregistration.md (NEW), .syndicate/findings_2026-10-27_sgp_pjoint_calibration.md (NEW), docs/ai_context/todo.md (one new item section only, insert-only)
+- Hypothesis: PRE-REGISTERED in .syndicate/findings_2026-10-27_sgp_pjoint_calibration_preregistration.md (committed before any outcome join)
+- Falsification test: Holm over {pooled, NHL, NBA, NFL}: no calibration-in-the-large test of p_joint rejects at alpha 0.05 (game-clustered) -> the 3-6 pt lead is not a measured miscalibration; report the minimum detectable gap
+- Verification: findings file with the prereg SHA, ledger coverage + n per result, the verdict per sport, the decomposition (if any test rejects) and a per-line correction validated out of fold; todo item with a free ID
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
