@@ -2980,3 +2980,19 @@ The 2026-10-20 entry said: "Rating INPUTS transfer, because the sim reads them w
   - Before reading calibration (or ROI) off a graded population, ask whether the INCLUSION rule depends on the outcome.
   - For multi-leg tickets, calibrate only on tickets whose every leg resolved, or drop the unresolved legs and re-price, as books do.
   - Count unresolved legs by source first. A big pending share is a grading defect, not noise.
+
+## 2026-10-27 -- A recurring job's budget sized from an off-peak probe was 8-12x low: measure the HEAVIEST part of its cycle, and charge every per-item enrichment GET to the same run budget `[lane kalshi-combo-capture, session a48b0f49]`
+
+- **The belief:**
+  - The Kalshi combo capture fits "about 1,000 public GETs a day" (E4, sized from ~35k cross-category closes an hour on a Sunday morning).
+  - This lane's own Monday 13Z probe read 133k an hour.
+- **What was true:**
+  - An NFL Sunday evening settled 5.48M combos in 12.5 h, 438k an hour on average and about 2M at the 02Z peak.
+  - 26.2 contiguous hours cost ~8,500 GETs a day, and 12.3k with fixed-size slices that re-read 31% of their pages on every split.
+  - Per-combo trade reads would have added 122k (tickets of 4 legs or fewer) to 485k (all) a Sunday evening. They were not charged to the run budget, so one run could have overrun its time limit and its lock's stale age.
+  - A 4-h sample before any NFL game ended also showed "0 two-leg / 0 pure SGP traded"; the whole window has 21,737 and 245,556.
+- **Rule:**
+  - Before sizing a recurring capture, read its peak period: the end of an NFL Sunday and the NBA late slate, for anything settled by game.
+  - State the measured window beside the number; a weekday-morning rate is a floor, not a budget.
+  - Any one-GET-per-item step inside a run (trade prints, detail fetches) must be charged to the run's page and time budget.
+  - Adaptive slice sizing beats split-on-overflow whenever a split discards what it already read.
