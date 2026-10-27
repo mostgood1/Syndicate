@@ -1539,6 +1539,14 @@ death, never life — do not invert it.
 - Verification: Hermetic tests incl. off != on for the job; built default-off and landed on main; after a user-approved fleet window under the deploy locks, the first full day's capture file on the fleet shows kept combos > 0 by sport, the day's GET count within budget, and results filled for settled combos, recorded in deploys.md
 - Blocked by: none (turning it on in the fleet is a separate user decision)
 
+### status-clock-skew — OPEN — opened 2026-10-27 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
+- Goal: local_production.py status names the commit a role actually loaded when the role started within a second after a fast-forward (no false previous-commit reading)
+- Files: scripts/local_production.py (the role_start_epoch / head_at section ONLY), tests/test_local_production.py (role start / head_at tests ONLY)
+- Hypothesis: psutil's Linux create_time adds the process's boot-relative start to /proc/stat btime, which is truncated to whole seconds, so a role started up to 1 s after an ff can read as started before the ff's reflog stamp (10-26: workers 07:49:13 vs ff 07:49:14)
+- Falsification test: on the fleet, precise boot (time.time() - CLOCK_BOOTTIME) minus btime is ~0, or a synthetic ff-then-spawn loop misattributes as often with a precise start time as with psutil's
+- Verification: synthetic ff-then-spawn loop on the fleet host: psutil start misattributes some spawns, precise start misattributes 0; unit tests pass; status on the fleet names the right commit after the next ff
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
