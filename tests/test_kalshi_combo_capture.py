@@ -501,6 +501,63 @@ def test_load_combos_dedups_a_repeated_slice_and_report_counts_per_sport(tmp_pat
     assert rep["soccer_by_league"] == {"epl": 1}
 
 
+def _run_row(at, lo, hi, *, status="ok", kept=0, traded=0, gets=0, sports=None):
+    return {"run_at": _iso(at), "status": status, "invoker": "bridge", "gets_total": gets, "pages": gets,
+            "kept_by_sport": sports or {}, "kept_traded_by_sport": sports or {},
+            "series": {"KXMVECROSSCATEGORY": {"from": _iso(lo), "to": _iso(hi), "kept": kept, "kept_traded": traded}}}
+
+
+def _status_store(tmp_path, rows):
+    store = cc.store_dir(tmp_path)
+    store.mkdir(parents=True, exist_ok=True)
+    (store / "runs.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+
+
+D0 = T0 - T0 % cc.DAY  # midnight UTC of T0's date
+BACKFILL = [
+    _run_row(D0 + 3600, D0 - 20 * cc.DAY, D0 - 10 * cc.DAY, status="budget_stopped", kept=5000, traded=5000),  # purged
+    _run_row(D0 + 3600, D0 - 10 * cc.DAY, D0 - cc.DAY, status="budget_stopped", kept=10, traded=10),  # too few kept
+    _run_row(D0 + 7200, D0 - cc.DAY + 1, D0 - 2 * 3600, status="budget_stopped", kept=5000, traded=500),  # unpurged
+    _run_row(D0 + 3 * 3600, D0 - 2 * 3600 + 1, D0 + 10500, kept=2000, traded=1400),  # first ok run: caught up
+]
+
+
+def test_status_brackets_the_purge_age_and_reads_the_first_full_forward_day(tmp_path):
+    forward = [
+        _run_row(D0 + cc.DAY, D0 + 10501, D0 + cc.DAY - 1, gets=7),
+        _run_row(D0 + cc.DAY + 43500, D0 + cc.DAY, D0 + cc.DAY + 43199, gets=40, sports={"nfl": 100}),
+        _run_row(D0 + 2 * cc.DAY + 3900, D0 + cc.DAY + 43200, D0 + 2 * cc.DAY + 3599, gets=13, sports={"nfl": 13}),
+    ]
+    _status_store(tmp_path, BACKFILL + forward)
+    day = D0 + cc.DAY
+    cc.append_rows(tmp_path, [
+        cc.combo_row(_combo("KXMVECROSSCATEGORY-S1-Y", NBA_SGP_LEGS, day + 100, volume="1.00", result="yes"), "t"),
+        cc.combo_row(_combo("KXMVECROSSCATEGORY-S1-N", NBA_SGP_LEGS, day + 200, volume="1.00", result="no"), "t")])
+    st = cc.forward_status(tmp_path, now=D0 + 2 * cc.DAY + 4000)
+    purge = st["purge"]
+    # the youngest purged row was 10 days + 1 h old; the youngest still-listed untraded rows were 2 h + 2 h old
+    assert purge["age_hours_at_most"] == 241.0 and purge["age_hours_above"] == 4.0
+    assert purge["purged_runs"] == 1 and purge["unpurged_runs"] == 1 and len(purge["boundary_runs"]) == 1
+    assert st["caught_up"]["swept_to"] == _iso(D0 + 10500)
+    assert st["first_full_forward_day"] == cc.utc_date(day) and st["met"] is True
+    d = st["day"]
+    # the third run straddles midnight: 43,200 of its 46,800 settlement seconds are on the day, so 12 of its 13 GETs
+    assert d["runs_overlapping"] == 2 and d["gets_prorated"] == 52 and d["kept_by_sport_prorated"] == {"nfl": 112}
+    assert d["stored"] == 2 and d["results"] == {"yes": 1, "no": 1} and d["traded_total"] == 2
+    assert st["last_run"]["swept_to"] == _iso(D0 + 2 * cc.DAY + 3599) and st["invokers"] == {"bridge": 7}
+
+
+def test_status_is_not_met_until_a_whole_forward_day_is_swept(tmp_path):
+    _status_store(tmp_path, BACKFILL + [_run_row(D0 + cc.DAY + 43500, D0 + 10501, D0 + cc.DAY + 43199)])
+    st = cc.forward_status(tmp_path, now=D0 + cc.DAY + 43600)
+    assert st["first_full_forward_day"] is None and "day" not in st and st["met"] is False
+    assert st["caught_up"]["run_at"] == _iso(D0 + 3 * 3600)
+    _status_store(tmp_path, BACKFILL[:1])  # still backfilling: no run has ended ok, nothing is unpurged yet
+    st = cc.forward_status(tmp_path, now=D0 + 4000)
+    assert "caught_up" not in st and st["purge"]["age_hours_above"] is None and st["met"] is False
+    assert cc.forward_status(tmp_path / "empty", now=D0)["runs"] == 0
+
+
 def test_report_normalises_gets_by_the_settlement_time_covered(tmp_path):
     end = T0 - cc.SETTLE_LAG_S
     combos = [_combo(f"KXMVECROSSCATEGORY-S1-{i}", NBA_SGP_LEGS, end - 100 * i - 1) for i in range(9)]

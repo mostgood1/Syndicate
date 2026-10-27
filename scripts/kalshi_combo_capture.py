@@ -777,10 +777,11 @@ def report(root: Path, dates: Sequence[str]) -> dict[str, Any]:
     by_date: dict[str, Any] = {}
     for date in dates:
         n = prints = pure_traded = 0
-        sport, traded, league, two_leg, status, traded_legs = (collections.Counter() for _ in range(6))
+        sport, traded, league, two_leg, status, traded_legs, results = (collections.Counter() for _ in range(7))
         for row in iter_combos(root, date):
             n += 1
             status[row.get("trades_status")] += 1
+            results[row.get("result") or "unset"] += 1
             legs = int(row.get("n_legs") or 0)
             if row.get("traded"):
                 traded_legs[legs] += 1
@@ -797,7 +798,7 @@ def report(root: Path, dates: Sequence[str]) -> dict[str, Any]:
         traded_at_most = {k: sum(c for legs, c in traded_legs.items() if legs <= k) for k in (2, 3, 4, 5, 6, 8, 10)}
         by_date[date] = {"stored": n, "by_sport": dict(sport.most_common()), "traded_by_sport": dict(traded.most_common()),
                          "two_leg_by_sport": dict(two_leg.most_common()), "soccer_by_league": dict(league.most_common()),
-                         "prints": prints, "trades_status": dict(status),
+                         "prints": prints, "trades_status": dict(status), "results": dict(results.most_common()),
                          "traded_total": sum(traded_legs.values()), "traded_at_most_legs": traded_at_most,
                          "traded_every_leg_same_game": pure_traded}
     return {
@@ -809,6 +810,92 @@ def report(root: Path, dates: Sequence[str]) -> dict[str, Any]:
         **{f"{key}_per_day": {k: per_day(v) for k, v in sorted(counter.items())} for key, counter in kept.items()},
         "by_settlement_date": by_date,
     }
+
+
+# A run whose kept combos were (nearly) all traded read a listing Kalshi had already purged of untraded combos;
+# one where most were untraded read rows still listed. Runs keeping fewer combos than this are not evidence.
+PURGED_SHARE = 0.99
+UNPURGED_SHARE = 0.5
+MIN_KEPT_FOR_SHARE = 1000
+
+
+def forward_status(root: Path, now: float | None = None) -> dict[str, Any]:
+    """The two readings `#742` owes, read-only from runs.jsonl and the store.
+
+    `purge`: untraded combos leave the listing some age after settlement. Every run that kept only traded
+    combos bounds that age from ABOVE by its youngest row's age (run time - newest settlement swept); every run
+    that still saw mostly untraded ones bounds it from BELOW the same way. Measured 10-27: all-traded 20 days back.
+
+    `first_full_forward_day`: the first UTC settlement date that starts after the sweep first caught up (its first
+    run ending `ok`) and that the watermark has passed, with its stored rows and results, and the GETs and
+    kept counts of the runs whose windows overlap it, prorated by settlement seconds."""
+    now = time.time() if now is None else float(now)
+    windows = []
+    for r in sorted(read_runs(root), key=lambda r: str(r.get("run_at"))):
+        s = (r.get("series") or {}).get("KXMVECROSSCATEGORY") or {}
+        lo, hi, at = ms.ts(s.get("from")), ms.ts(s.get("to")), ms.ts(r.get("run_at"))
+        if lo is None or hi is None or at is None or hi < lo:
+            continue
+        windows.append((r, s, int(lo), int(hi), at))
+    invokers = collections.Counter(str(r.get("invoker")) for r, *_ in windows)
+    out: dict[str, Any] = {"now": ms.iso(now), "runs": len(windows), "invokers": dict(invokers), "met": False}
+    if not windows:
+        return out
+    last_r, last_s, _, last_hi, _ = windows[-1]
+    swept_to = max(hi for *_, hi, _ in windows)
+    out["last_run"] = {"run_at": last_r.get("run_at"), "status": last_r.get("status"), "invoker": last_r.get("invoker"),
+                       "swept_to": ms.iso(swept_to), "lag_hours": round((now - swept_to) / 3600, 2)}
+
+    upper, lower, boundary = [], [], []
+    for r, s, lo, hi, at in windows:
+        kept = int(s.get("kept") or 0)
+        if kept < MIN_KEPT_FOR_SHARE:
+            continue
+        share = int(s.get("kept_traded") or 0) / kept
+        youngest = (at - hi) / 3600
+        if share >= PURGED_SHARE:
+            upper.append((youngest, hi))
+        elif share <= UNPURGED_SHARE:
+            lower.append((youngest, hi))
+        else:
+            boundary.append({"run_at": r.get("run_at"), "settled": [ms.iso(lo), ms.iso(hi)], "share": round(share, 3),
+                             "age_hours": [round(youngest, 1), round((at - lo) / 3600, 1)]})
+    purge = {"purged_runs": len(upper), "unpurged_runs": len(lower), "boundary_runs": boundary,
+             "age_hours_above": round(max(lower)[0], 1) if lower else None,
+             "age_hours_at_most": round(min(upper)[0], 1) if upper else None}
+    out["purge"] = purge
+
+    ok = [(r, hi) for r, _, _, hi, _ in windows if r.get("status") == "ok"]
+    day = None
+    if ok:
+        caught_r, caught_hi = ok[0]
+        out["caught_up"] = {"run_at": caught_r.get("run_at"), "swept_to": ms.iso(caught_hi)}
+        start = (caught_hi // DAY + 1) * DAY
+        if swept_to >= start + DAY - 1:
+            day = utc_date(start)
+            gets = pages = 0.0
+            kept_sport, traded_sport = collections.Counter(), collections.Counter()
+            overlapping = 0
+            for r, s, lo, hi, _ in windows:
+                overlap = min(hi, start + DAY - 1) - max(lo, start) + 1
+                if overlap <= 0:
+                    continue
+                share = overlap / (hi - lo + 1)
+                overlapping += 1
+                gets += share * int(r.get("gets_total") or 0)
+                pages += share * int(r.get("pages") or 0)
+                for k, v in (r.get("kept_by_sport") or {}).items():
+                    kept_sport[k] += share * v
+                for k, v in (r.get("kept_traded_by_sport") or {}).items():
+                    traded_sport[k] += share * v
+            out["day"] = {"date": day, "runs_overlapping": overlapping, "gets_prorated": round(gets),
+                          "pages_prorated": round(pages),
+                          "kept_by_sport_prorated": {k: round(v) for k, v in kept_sport.most_common()},
+                          "kept_traded_by_sport_prorated": {k: round(v) for k, v in traded_sport.most_common()},
+                          **report(root, [day])["by_settlement_date"][day]}
+    out["first_full_forward_day"] = day
+    out["met"] = bool(day and purge["age_hours_above"] is not None and purge["age_hours_at_most"] is not None)
+    return out
 
 
 # ------------------------------------------------------------------ cli
@@ -832,6 +919,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     p.add_argument("--data-root", default=None)
     p.add_argument("--days", type=int, default=2)
     p.add_argument("--date", action="append", default=None, help="settlement date(s), repeatable")
+    st = sub.add_parser("status", help="read-only: purge-age bracket and the first full forward day (#742 readings)")
+    st.add_argument("--data-root", default=None)
     args = ap.parse_args(argv)
     root = Path(args.data_root).expanduser().resolve() if args.data_root else data_root()
     if args.cmd == "run":
@@ -841,6 +930,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                       trades_max_legs=None if args.trades_max_legs < 0 else args.trades_max_legs,
                       store_untraded=args.store_untraded)
         return 1 if summary.get("status") == "errors" else 0
+    if args.cmd == "status":
+        print(json.dumps(forward_status(root), indent=1, sort_keys=True))
+        return 0
     today = dt.datetime.now(dt.timezone.utc).date()
     dates = args.date or [(today - dt.timedelta(days=d)).isoformat() for d in range(args.days - 1, -1, -1)]
     print(json.dumps(report(root, dates), indent=1, sort_keys=True))
