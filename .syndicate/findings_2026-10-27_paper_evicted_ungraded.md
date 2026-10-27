@@ -145,3 +145,72 @@ GETs still happen (ESPN scoreboards on a capture miss, NHL api-web): the same re
 **Mechanism checked in code before building on it.** `archived_orders` keeps the last copy per identity in shard order,
 and a graded copy appends to the same month shard (keyed by `selected_date`), so it wins. `_with_archive` lets the live
 document beat any archived copy. Both are pinned by tests rather than taken on trust.
+
+## Result: the dry run `[2026-10-27 16:37-16:41Z (11:37-11:41 AM CDT), READ-ONLY, fleet; code 2ec80fe0 from a scratch extract, fleet checkout 84967f75 untouched]`
+
+**Verdict: FALSIFIED as pre-registered, by 2 rows.** 908 of 1,820 archive-only stale rows would grade: 49.9%, against a
+threshold of 50% (910). Taken at its word, the rule says eviction is not the cause for most of them, so the backfill is
+NOT proposed as the fix.
+
+**Population.** Stale at 16:39Z: 1,850 (1,834 at 16:06Z, net +16). In the live document: 30. Archive only: 1,820
+(1,807 at 16:06Z).
+
+**It splits by sport, not at random within each sport:**
+
+| sport | would grade / archive-only stale | why the rest do not |
+|---|---|---|
+| NCAAF | 868 / 1,092 | `ncaaf_team_not_in_registry_or_ambiguous` 166, `ncaaf_props_not_gradeable_from_scoreboard` 58 |
+| NFL | 40 / 60 | `nfl_player_not_in_final_box` 20 |
+| soccer | 0 / 467 | `unmapped_market` 310 (`alternate_totals_corners`, `btts`), `match_not_in_soccer_live_state` 102, `no_soccer_live_state_for_date` 50, `no_soccer_player_box_for_match` 5 |
+| MLB | 0 / 115 | `no_live_feed` 104, `stat_not_in_feed` 5, `not_decided_yet` 4, `mlb_game_rescheduled_off_slate_date` 2 |
+| NBA | 0 / 79 | `no_live_box_for_date` 72 (preseason 10-05..10-12), `player_not_in_box` 3, others 4 |
+| NHL | 0 / 7 | player name unmatched or ambiguous 6, `dnp_void` 1 |
+
+For NCAAF and NFL, eviction is the whole story. Soccer, MLB, NBA and NHL would not grade even back in the document: the
+refusals are grader coverage gaps, the same names the 27 live-document rows carried at 16:06Z.
+
+**Largest Central game dates** (would grade / stale):
+- NCAAF: 10-24 418/495; 10-17 198/240; 10-10 183/191; 10-23 53/56; 10-09 14/48; 10-03 0/56 (54 registry).
+- NFL: 10-11 22/24; 10-18 11/20; 10-25 7/7; 10-04 0/8.
+- soccer: 10-24 0/102; 10-25 0/84; 10-17 0/71; 10-10 0/55.
+- MLB: 10-24 0/54 and 10-08 0/50, all `no_live_feed`.
+
+**Diagnostic arm, reported and NOT used in the verdict.** Re-binding the refused rows to the kickoff date recovers 117,
+all soccer, out of soccer's 152 `match_not_in_soccer_live_state` / `no_soccer_live_state_for_date`. So most of soccer's
+not-found is a slate-date binding defect: the soccer resolver reads only the slate date's state, and a forward bet's
+match is on a later date. No other sport moves. With the arm, the share would be 1,025 / 1,820 = 56.3%; it is not
+counted, because the pre-registration put it outside the verdict.
+
+**Read-only, checked.**
+- The archive shard's sha256 was identical before and after.
+- No lock file was created.
+- Suppressed writes: `nfl_capture_persist` 11 and `ncaaf_capture_persist` 5. These are lazy scoreboard captures that a
+  real run would persist, as settlement does. Nothing else was suppressed.
+
+**The whole pass**, not only stale rows (`--since 2026-10-02`):
+- 1,933 candidates, of which 981 would grade (512 won, 462 lost, 7 push).
+- 144 games had not started; 76 rows were left to the live document.
+
+**Blast radius of an apply.** Measured by a second read-only probe at 16:41Z, comparing the full history before and after
+the 981 graded copies.
+- Writes: 981 graded copies appended to `orders_2026-10.jsonl`. By book: `paper` 384, `paper:novig` 143,
+  `paper:prophetx` 134, `paper:kalshi:ladder` 116, `paper:polymarket:ladder` 103, `paper:kalshi` 70,
+  `paper:polymarket` 31.
+- Stake sizing: no change. `settled_decisions_by_sport` moves NCAAF 1,499 -> 1,586, NFL 862 -> 884, MLB 726 -> 728 and
+  NHL 521 -> 523. Every sport was already at credibility 1.000.
+- `live_cell_gate`: `evaluate()` is identical before and after. There are no trip or re-arm events, and the 3 tripped
+  cells' paper-twin samples do not move: the graded rows predate their `tripped_at`.
+- What does change is the analysis readers: paper PNL/ROI lines, CLV, the min-ev tuner (shadow), `#727`'s refit (the
+  NCAAF cells) and `#724`'s ladder count (+219 settled ladder rows).
+- The remaining gap stays NON-random: after an apply, the missing stale rows are soccer, MLB, NBA and NHL, plus
+  NCAAF's registry and prop refusals.
+
+**Re-scope candidates, from the named reasons, by size:**
+1. Soccer `unmapped_market` 310: there is no corners or btts mapping.
+2. The NCAAF team registry, 166: 10-03 accounts for 54 of 56 and 10-09 for 34 of 48.
+3. Soccer slate-date binding, 152: 117 of them are recoverable by kickoff-date binding.
+4. MLB `no_live_feed`, 104.
+5. NBA preseason `no_live_box_for_date`, 72.
+6. NCAAF props 58, NFL `player_not_in_final_box` 20, NHL 7.
+
+Scratch: `C:	mp\peg\` (`dryrun.sh`, `dryrun.log`, `report_20261027T163701Z.json`, `reader_deltas.py`/`.log`).

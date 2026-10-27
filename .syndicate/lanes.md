@@ -1553,6 +1553,7 @@ death, never life — do not invert it.
 - Hypothesis: The stale backlog is eviction, not grading failure: 1,807 of 1,834 stale paper orders are in the archive, which settle_orders never reads (findings_2026-10-27_paper_evicted_ungraded.md)
 - Falsification test: If grading the archived rows with the same resolver leaves most of them ungraded (named reasons such as no feed or unmapped market), eviction is not the cause and the lane re-scopes to those reasons
 - Verification: Hermetic tests incl. off != on and grade-once on archived rows; built default-off on main; after a user-approved fleet window under the deploy locks, the stale count re-read on the fleet with denominators by sport and game date, recorded in deploys.md
+- Result 2026-10-27 16:45Z: built default-off (`2ec80fe0`: settle_archived_orders + maybe_settle_archived hook + scripts/backfill_archived_paper_grades.py, 18 hermetic tests incl. off != on first). Fleet dry run (read-only, archive sha256 unchanged): 908 / 1,820 archive-only stale rows would grade = 49.9% -> FALSIFIED as pre-registered (< 50%, by 2 rows). NCAAF/NFL grade; soccer/MLB/NBA/NHL are grader gaps by name. Awaiting USER: apply the partial backfill (981 rows; no sizing or live-cell-gate change measured), enable the pass, and/or re-scope to the named reasons.
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
