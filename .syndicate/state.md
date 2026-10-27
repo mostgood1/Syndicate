@@ -572,6 +572,7 @@ once this index exists: re-splitting would orphan the parts.
 | [kalshi-in-play-efficiency] | KALSHI IN-PLAY PRICES LEAD THE SPORTSBOOKS; BOOK-CONSENSUS IN-PLAY EDGES MARK OUT NEGATIVE; FIXED TAKE-PROFIT  | `state_kalshi.md` |
 | [kalshi-structural-price-map] | KALSHI SPORTS HAS NO PREGAME STRUCTURAL PRICE EDGE UNDER TODAY'S FEES; ONLY 95-99c IN-PLAY FAVOURITES SURVIVE; | `state_kalshi.md` |
 | [kalshi-combo-public-data] | KALSHI COMBOS (MVE) ARE PUBLIC WITH THEIR LEGS; SAME-GAME LEGS SIT INSIDE MULTI-LEG PARLAYS; THE VOLUME DEFEATS RE | `state_kalshi.md` |
+| [kalshi-combo-capture] | KALSHI COMBO CAPTURE: BUILT AND MEASURED, DEFAULT OFF, NOT RUNNING; AN NFL SUNDAY SETTLES ~5.5M COMBOS IN 12.5 H | `state_kalshi.md` |
 | [kalshi-derived-rung-pricing] | KALSHI'S MID ON DERIVED RUNGS IS AT LEAST AS GOOD AS A SHARP-ANCHORED SURFACE; NO PREGAME TAKER EDGE | `state_kalshi.md` |
 | [layer2-board-keyvalue-ceiling] | THE BOARD'S CEILING IS THE COMBINED KEY, NOT THE SHARDS — and `per_sport=3000` corrupted production for ~29 mi | `state_layer2.md` |
 | [layer2-realized-accuracy] | THE LAYER 2 BOARD'S REALIZED ACCURACY — the portfolio book is the surface, and the measurement chain is broken | `state_layer2.md` |

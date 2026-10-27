@@ -974,6 +974,35 @@ board. The loop therefore checks `budget_remaining()` BEFORE spending.
 - **Trades:** one 10-minute Sunday slice (10-18 18:00Z) held more than 30,000 trades, about 28% combos. Rebuilding weeks after the fact is infeasible by paging; capture forward.
 - **The listing is NEWEST-FIRST by close time:** read the close-time range of what you retrieved before claiming an absence.
 - **Detail:** `findings_2026-10-26_e4_combo_correlation.md` (Stage 2).
+- **Amended 2026-10-27 (lane `kalshi-combo-capture`):**
+  - SETTLED combos list exactly by `min_settled_ts`/`max_settled_ts`, back about 30 days. Only TRADES defeat paging back.
+  - An NFL Sunday evening settles about 438k cross-category combos an hour, 12x the 35k above. 61% hold a same-game pair; there are 21.7k traded two-leg tickets and 246k traded pure same-game tickets.
+  - See `[kalshi-combo-capture]`.
+
+## [kalshi-combo-capture] KALSHI COMBO CAPTURE: BUILT AND MEASURED, DEFAULT OFF, NOT RUNNING; AN NFL SUNDAY SETTLES ~5.5M COMBOS IN 12.5 H `[measured on public Kalshi data 2026-10-27 13:13Z-18:23Z, lane kalshi-combo-capture]`
+- **Code (on main):** `scripts/kalshi_combo_capture.py`; commits `b994e9cf`, `ce5c467c`, `da6dbdc3`, `af6e4c14` and `883edd96`; 51 hermetic tests.
+  - Fleet job `kalshi-combo-capture` runs hourly in `local_production.SCHEDULED_JOBS`.
+  - It is **INERT until `SYNDICATE_KALSHI_COMBO_CAPTURE=on`**; absent means OFF, with no request and no file.
+  - It reuses `kalshi_maker_shadow.public_get_json` / `read_trade_prints`, the `kalshi_catalogue` sport and game parsers, and `kalshi_board_join`'s soccer competition. There is no second client.
+- **Method:**
+  - Sweep SETTLEMENT time from a watermark, in all-or-nothing integer-second slices.
+  - Keep a combo when two legs share a dated game in one modelled scope.
+  - Store TRADED kept combos with legs, `last_price`, `volume_fp`, `created_time` and `result`. Untraded ones are counted in `runs.jsonl` only: their finalized quote is zeroed.
+  - Trade reads are off by default (`--trades-max-legs`). `last_price` equalled the last print on 3,774 of 3,778 combos, and the prints summed to volume on all of them.
+- **Cost (dry run, this dev host, Idle):**
+  - Sunday 10-26 15:03Z -> 10-27 03:33Z: **7,909 pages in 12.5 h**, 3.68 GB wire, 0.91 s CPU per page.
+  - Monday 10-27 03:33Z -> 17:17Z: 3,750 pages needed in 13.7 h, 0.62 s CPU per page.
+  - Over the 26.2-h window, **~8,500 GETs a day** once fixed splits stopped re-reading pages (12.3k were spent); ~3.7 GB wire; ~63 MB of disk (traded only).
+  - E4's "about 1,000 GETs a day" does not hold: the listing alone is 8-12x that on a heavy day. No quiet weekday was measured.
+  - Peak memory: 1.25 GB on a Sunday slice before `da6dbdc3`, 176 MB sampled after it (on a lighter Monday hour).
+- **Same-game combos per day (that window):**
+  - Kept: NFL 2.52M, NBA 2.37M, MLB 416k, soccer 331k, NHL 125k, WNBA 121k, NCAAF 4.3k.
+  - Traded: NFL 274.5k, NBA 187.8k, MLB 52.7k, soccer 37.5k, NHL 13.6k, WNBA 11.7k. 24.2k are two-leg, and 246k pure SGP tickets traded on the Sunday leg.
+- **Two defects found and fixed before any fleet use:**
+  - `report` held a date in memory (9 GB, stopped);
+  - trade reads were not charged to the run budget.
+- **Owed:** where and how it runs, trade-read scope, and backfill depth are user decisions (`#742`). The `#740` capture clock has not started.
+- **Detail:** `findings_2026-10-27_kalshi_combo_capture.md`.
 
 ## [kalshi-derived-rung-pricing] KALSHI'S MID ON DERIVED RUNGS (ALT LADDERS, SEGMENTS, TEAM TOTALS) IS AT LEAST AS GOOD AS A SHARP-ANCHORED SURFACE; NO PREGAME TAKER EDGE AT THE ASK `[verified on fleet + public Kalshi data 2026-10-26 22:20Z..10-27 00:21Z, lane e3-derived-surface]`
 - **Population:** 71,823 Kalshi derived contracts in 5,809 events, games 09-30..10-26. 66,815 of 66,838 settled results agree with the joined game's score.

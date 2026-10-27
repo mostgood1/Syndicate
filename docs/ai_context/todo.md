@@ -56,7 +56,7 @@
   - **(c)** The registered forward read (prereg §8): same script, tickets >= 10-27, at >= 30 new clean games each in NHL / NBA / NFL, or on 2026-11-24. Watch NBA: its nudge adds +4.7 pts per ticket, its MDE80 is 17, and 10-26 read 26% vs 46% on 42 tickets.
 - **Until (a) lands,** read the nightly `SGP_PAPER` calibration line as biased toward over-prediction by about +2 pts pooled and +4 in NHL.
 
-### `#742` — **KALSHI COMBO CAPTURE (Decision Engine `#736`, E4 Stage 2): a forward, read-only capture of Kalshi same-game combo markets, so E4's venue-price test becomes runnable. Lane `kalshi-combo-capture` OPENED FOR PICKUP 2026-10-27; nothing built** — 2026-10-27, session loving-einstein-b3c45e (lane opened at user request); `.syndicate/findings_2026-10-26_e4_combo_correlation.md` (Stage 2 section, Recommendation 3)
+### `#742` — **KALSHI COMBO CAPTURE (Decision Engine `#736`, E4 Stage 2): a forward, read-only capture of Kalshi same-game combo markets, so E4's venue-price test becomes runnable. BUILT on main, default OFF, RUNS NOWHERE. MEASURED over 26 h of settlements (NFL Sunday + Monday): ~8,500 GETs a day, not ~1,000; 508k traded same-game combos a day. USER DECISION OWED: where it runs, trade reads, and a ~30-day backfill** — 2026-10-27, session loving-einstein-b3c45e (lane opened at user request); built by session a48b0f49 (lane `kalshi-combo-capture`); `.syndicate/findings_2026-10-27_kalshi_combo_capture.md`; `.syndicate/findings_2026-10-26_e4_combo_correlation.md` (Stage 2 section, Recommendation 3)
 - **User, verbatim (2026-10-27):** "Yes, adopt E3 and E4's recommendations: Phase 5 drops the derived-line taker and sim-based combos (Kalshi's mid prices derived lines; measured SGP correlation prices combos, sim only for soccer scorelines). Route the engine reads to the sim owners and open a lane for a forward Kalshi combo capture."
 - **Why:** E4 Stage 1 passed 4 cells (MLB same-batter nested / other, NBA same-player nested, soccer result/total/BTTS) but has no price test. Kalshi's combo prints are public, but the past window cannot be rebuilt by paging (more than 30,000 trades in one 10-minute slice). Same-game legs from MLB, NBA, NHL and soccer already appear inside Kalshi combos.
 - **What (E4 Recommendation 3):**
@@ -67,6 +67,22 @@
 - **Reuse:** `syndicate/features/shared/kalshi_client.py` (`_COMBINATORIAL_SERIES_PREFIXES`), the public-trades fetch in `kalshi_maker_shadow.py:347` and `scripts/maker_vs_taker_shadow.py`, E4's probes in `C:\tmp\e4\` (`kprobe*.py`, `kenum*.py`).
 - **Gate to use it:** after a month of capture or the NBA minutes fix, whichever is first, re-run `scripts/e4_combo_correlation.py` with the same constants (`#740` (d)). It reads fee-net EV at the executable combo price, and whether Kalshi prices same-game correlation or independence plus a haircut (the SGP ledger assumes 18.5%).
 - **Fleet:** build it default-off and land it on main first. Turning it on (ff + key + restart under the deploy locks) is a separate user decision.
+- **Built (2026-10-27):**
+  - `scripts/kalshi_combo_capture.py` with 51 hermetic tests; commits `b994e9cf`, `ce5c467c`, `da6dbdc3`, `af6e4c14` and `883edd96`.
+  - The hourly fleet job `kalshi-combo-capture` is INERT until `SYNDICATE_KALSHI_COMBO_CAPTURE=on`.
+  - It sweeps by SETTLEMENT time (exact, and listable about 30 days back) in adaptive all-or-nothing slices.
+  - It stores TRADED same-game combos only, with legs, `last_price`, `volume_fp`, `created_time` and `result`. Untraded ones are counted in `runs.jsonl`: their finalized quote is zeroed.
+  - Trade reads are off by default: `last_price` equalled the last print on 3,774 of 3,778.
+- **Measured (dry run, public GETs from a dev host, 10-26 15:03Z -> 10-27 18:17Z):**
+  - Per heavy day: ~8,500 GETs once the split re-reads are fixed; 12.3k were spent. ~3.7 GB wire, ~1.5 h of nice-19 CPU, ~63 MB of disk.
+  - Kept per day: NFL 2.52M, NBA 2.37M, MLB 416k, soccer 331k, NHL 125k, WNBA 121k.
+  - Traded per day: NFL 274.5k, NBA 187.8k, MLB 52.7k, soccer 37.5k, NHL 13.6k, WNBA 11.7k. 24.2k a day are two-leg.
+  - The `0` shard and the per-sport collections settled 0.
+  - Corrected along the way: the first 4-h sample's "no two-leg or pure SGP tickets trade" was a window artifact.
+- **OWED (user, choices in the findings):**
+  - **(1)** Where it runs: the fleet supervisor job at the next ff (key + `down`/`up` under the locks), and/or the drafted self-exiting bridge now.
+  - **(2)** Trade reads: none, recommended; `--trades-max-legs 2` would add ~24k GETs a day.
+  - **(3)** Backfill: none, or ~30 days (150k-250k GETs once). It would make `#740` (d) runnable in about two days. The ~30-day edge moves forward daily.
 
 ### `#741` — **E3 DERIVED-MARKET SURFACE (Decision Engine `#736`, plan §4 E3): KILLED by the registered rule on Kalshi, both tiers x both arms x t60 / t15, and on Polymarket (indicative). Priced off Pinnacle's main line plus a shape, both surfaces LOSE to Kalshi's own mid on held-out rungs (parametric +0.0051 nats [+0.0026, +0.0075], sim-shaped +0.0069; 26,708 rungs / 243 games); consensus-anchored the parametric ties it. No predicted-EV band makes money at the ask after fees. Even Pinnacle's own alt price does not beat Kalshi's mid** — 2026-10-26, lane `e3-derived-surface`, session d266ae46 (side session of local_898e5510); `.syndicate/findings_2026-10-26_e3_derived_surface.md`
 - **DECIDED 2026-10-27** (user, in the decision-engine session; `#736`): the recommendation is adopted, and Phase 5 has no derived-line taker. OWED (a) is routed in `.syndicate/brief_2026-10-27_engine_reads.md`; (b) the forward re-reads stay owed.
@@ -114,6 +130,7 @@
   - **(b)** A user decision: rescope Phase 5 E4. Combo correlation comes from the measured copula, and the sims supply it only for soccer scorelines. Correlation-expert weight stays 0 on MLB TM/OP and NBA SP-disjoint. Every line stays its own decision.
   - **(c)** Engine items for the sim owners: NBA per-draw minutes; MLB threshold-correct same-batter correlation plus `team|full|margin/total` labels; a persisted (margin, total) joint for all sports.
   - **(d)** Re-run with the same script and constants after a month of combo capture or the NBA minutes fix.
+  - **(d) capture clock, OWED (`#742`, 2026-10-27):** NOT STARTED. The capture is built and measured but runs nowhere until the user chooses where. A ~30-day backfill would start it about 09-27, retroactively.
 
 ### `#739` — **E5 VENUE NEWS-LAG (Decision Engine `#736`, plan §4 E5): KILLED on Kalshi by the registered rule; Polymarket "cancel-protection only" by the letter at a 0.2c drift. No timing edge: on the events the books repriced, Kalshi had moved BEFORE our collector saw the news. Phase 4 = cancel-protection plumbing, gated on Phase 3 and an official-schedule t0 (decision owed)** — 2026-10-26, lane `e5-venue-news-lag`, session ce4dfadf (side session of local_898e5510); `.syndicate/findings_2026-10-26_e5_venue_news_lag.md`
 - **Pre-registered before any join:** `d9ce947f`. Amendments A1 `0a9b9fed`, A2 `0bfcc8bc`, A3 `e3fd2e2a` cover eligibility and run times. A3 takes run times from `logs/news_collector.log`, which holds 1,983 runs; the change logs alone imply 106 false sleep gaps.
