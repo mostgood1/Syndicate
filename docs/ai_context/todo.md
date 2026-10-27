@@ -25,6 +25,11 @@
     - It REFUSES unless fleet HEAD contains `84967f75` and no reconcile is running.
     - Dry run, writes intercepted: 15 reconciled files gain leg actuals and none loses a key. Six of them lie outside the nightly 7-day window (NHL 10-16..10-19, NFL 10-18 / 10-19).
   - **Then:** read the next nightly `SGP_PAPER`.
+  - **DEPLOYED 2026-10-27 11:16 AM CT (16:16:15Z).** The user then said: "Go ahead: ff the fleet to 84967f75 yourself under the deploy locks (claim + preflight), no restart, then run the backfill and read tonight's SGP_PAPER." See deploys.md 16:16:15Z.
+    - Fleet ff `06378fa9` -> `84967f75`, no restart; claim on web, preflight CLEAR 16:15:24Z.
+    - Backfill done: 15 files, keys added only.
+    - Verified by a read-only regrade with the fleet's code: NHL pending legs 493 -> 32, NFL 46 -> 6, `summarize` NHL 22.3% vs 22.0%.
+    - **OWED:** the 11:50 PM CT reconcile's `SGP_PAPER` lines in `~/syndicate-prod/logs/cheat_sheets_reconcile.log`, after the `RECONCILE_RUN start 2026-10-28T04:5x` header. A session watcher is waiting.
   - **(d) LEAD, not fixed (shared helper, outside this lane):** `prop_evidence.common.initial_key("V. Trocheck")` returns `"trocheck"`, because `name_key_loose` drops a "v" token as a roman-numeral suffix.
     - So every NHL player with a V first initial never matches the NHL game log, in the hit-rate pool as well.
     - It accounts for 5 of the 8 NHL legs that still do not resolve.

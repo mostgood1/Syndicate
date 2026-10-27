@@ -1537,6 +1537,8 @@ death, never life — do not invert it.
     - The `06378fa9` ff (14:59:41Z) stopped short of `84967f75`, so the fix rides the next ff to any SHA at or after `84967f75`. **This lane consents to that ride-along.**
     - The backfill script `C:\tmp\sgpcal\backfill_apply.sh` is dry-run clean: 15 files, keys added only.
     - A session-side watcher polls fleet HEAD, read-only.
+  - **DEPLOYED `[16:16:15Z]`** with the user's go-ahead: fleet ff to `84967f75`, no restart; backfill done; the read-only regrade is MET (deploys.md 16:16:15Z). The claim is released.
+    - **Left:** tonight's 11:50 PM CT `SGP_PAPER` reading, then close.
   - The `Files` entry for `nfl/sgp_pool.py` covers its grading section: `leg_actuals`, plus the new `ANYTIME_TD` / `touchdowns` beside it.
 - Goal: Todo #743 (a)+(b): the nightly SGP_PAPER calibration and ROI count only tickets whose every leg resolved, and correlation-family legs with no player_id are graded from the NHL / NFL game logs by name + team (ambiguous -> stays pending); measured on a read-only fleet snapshot (pending legs resolved, the calibration read before/after), tests pass, landed on main; the fleet ff is a user decision
 - Files: scripts/grade_sgp_paper.py, syndicate/features/nhl/sgp_pool.py (leg_actuals only), syndicate/features/nfl/sgp_pool.py (leg_actuals only), tests/test_sgp_leg_grading.py (NEW), docs/ai_context/todo.md (#743 section only)
