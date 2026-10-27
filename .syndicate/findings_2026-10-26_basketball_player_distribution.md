@@ -160,3 +160,23 @@ Data: fit_pd, 1,604 team-games; `--gaps` mode of the readout; JSON at C:/tmp/bba
 - (i) the roster check on the ABSENT / REAL_ONLY examples (leak vs transaction);
 - (ii) the minutes-variance mechanism (Phase 2 step 2), measured on the matched population so it is separable from
   the pool fix.
+
+## CROSS-CHECK WITH E4 (decision-engine brief ac91362d) — 2026-10-27 13:03Z
+
+**E4 (production served P/R/A):** within-player Var(PRA) / [Var(P) + Var(R) + Var(A)] median **0.997** (846
+player-games), against **1.196** in real boxes. Its attribution: minutes held fixed across draws.
+
+**The raw engine** (fit_pd draws, the same statistic, 13,317 player-games with ≥ 15 sim min):
+- median **1.142**;
+- the per-minute version **0.959**;
+- corr(sim minutes, pts) median **0.410**.
+
+**Reading:**
+- The raw engine's simulated playing time already varies by draw (the on-floor counter) and induces most of the real
+  P/R/A covariance: 1.142 vs real 1.196.
+- So E4's near-independence (0.997) is introduced DOWNSTREAM of the engine, or by a production path whose minutes do
+  not vary. **Not yet checked which:**
+  - candidates are per-stat calibration / ladder construction from marginals;
+  - or production calls whose lineup / minutes inputs are fixed.
+- This narrows E4's fix: a minutes-variance mechanism in the engine helps the WIDTH (Phase 1); the covariance loss is
+  to be located in the serving path.
