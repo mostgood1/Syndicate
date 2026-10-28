@@ -1212,11 +1212,12 @@ death, never life — do not invert it.
 
 ### scheduled-task-registry-alert — OPEN — opened 2026-10-28 — session 9af4433f-62e0-4e4f-a082-92522092d7f8
 - Goal: An alert that does NOT live in the Claude desktop app's task registry fires (Windows toast + non-zero exit) when the registry is lost or the dispatch watchdog stops running while the machine is awake: checker + hermetic test on main, one reading (fresh -> silent, simulated stale -> alert) in deploys.md; the Windows Task Scheduler job created ONLY on the user's explicit yes.
-- Files: scripts/check_scheduled_task_registry.py (NEW), tests/test_check_scheduled_task_registry.py (NEW), deploy/local/install_task_registry_check.ps1 (NEW)
+- Files: scripts/check_scheduled_task_registry.py (NEW), tests/test_check_scheduled_task_registry.py (NEW), deploy/local/install_task_registry_check.ps1 (NEW), docs/ai_context/todo.md (ONE status line under `#736`, 252c0542 -- that item belongs to lane `syndicate-decision-engine`, whose session started this one; reported to it, no other line touched)
 - Hypothesis: n/a
 - Falsification test: n/a
 - Verification: py -3 -m pytest tests/test_check_scheduled_task_registry.py; live run against the real state.json + registry file (expect OK, exit 0, no toast); --now override past the next due time (expect STALE, exit 1, toast shown)
 - Blocked by: none
+- STATUS 2026-10-28 8:20 AM CT: checker + 28 hermetic tests on main (`084db263`); drills recorded in `deploys.md` (`edd86e1f`): live UNJUDGED (app restarted 06:44Z after the last due time), fresh drill OK, stale drill ALERT + toast read back from Action Center, registry-lost drill ALERT. OWED: (1) Windows job `SyndicateTaskRegistryCheck` (installer committed, NOT run) only on the user's explicit yes; (2) the first REAL OK reading after 10:45 CT.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
