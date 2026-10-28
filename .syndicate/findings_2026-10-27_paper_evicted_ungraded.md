@@ -414,3 +414,24 @@ Scratch: `C:\tmp\peg\` (`dryrun.sh`, `dryrun.log`, `report_20261027T163701Z.json
   - FALSIFIED on any other count change.
 
 **The apply is NOT authorised by this.** "Yes, build it" covers the code. Superseding the 10 on the fleet archive is a separate decision, asked with the dry run's numbers.
+
+## Kalshi fair-price re-scope: result `[2026-10-28 16:07Z-16:10Z, READ-ONLY fleet dry run; main a0d23665 extract + the new paper_settlement.py; 0 writes; code on main 3f9be985]`
+
+**The fleet moved under this lane.** Coordinator 332cb014's ff to `5f813c4d` at 15:12:28Z named `a0d23665` as a ride-along to the user, so the void rule went live there.
+- Since then the hourly archived pass has appended 5 more voids: 2 more Kalshi-ladder rows (Chet Holmgren assists and Cason Wallace threes, 10-26) and 3 book rows.
+- The archive now holds 23 voids: Kalshi 12, book 11. The live document holds 0 (read 16:10Z).
+
+| hypothesis | prediction | read | verdict |
+|---|---|---|---|
+| H9 fair price | all 10 Kalshi-ladder voids re-grade `fair_price`; gross +0.596 / net +0.225; each row within $0.001 of its hand figure | **10 / 10**, every row within $0.001, **+0.596 gross / +0.225 net**. The 2 new Kalshi voids grade `fair_price` too (Holmgren -0.0356 gross, Wallace +0.1289). All 12: **+$0.690 gross / +$0.250 net on $12** | **CONFIRMED** |
+| H10 nothing else moves | candidates 37, graded 10, the 27 refusals unchanged, book voids not candidates | candidates **41**, graded **12**. The +2 graded are the 2 new Kalshi voids. The other +2 candidates are `actual_is_full_game_not_h1` rows that left the live document (stale there 2 -> 0, archive-only 27 -> 29). The 27 pre-registered refusals have identical counts. The 11 book voids are not candidates: outcomes are `{fair_price: 12}` only | **FALSIFIED AS WRITTEN, by the population moving, not by the rule.** Restated on the pre-registered population, it holds |
+
+**Added after the dry run:** `settle_orders` also re-grades a stale Kalshi void sitting in the LIVE document, once. There are 0 there today; a test pins it.
+
+**Regression:** 871 passed across the 28 test files that touch the changed modules, plus `tests/test_venue_settlement.py` and the new `tests/test_paper_kalshi_dnp_fair_price.py` (reachability first).
+
+**No manual apply is needed once the code is on the fleet.** The archived pass has been armed since 14:02Z (`PAPER_ARCHIVED_GRADING=on`). On its first tick after an up it supersedes every Kalshi void in its 14-day window: today, the 12 above. The fleet window that carries the code is lane `syndicate-decision-engine`'s held one, whose trigger is this fix on main. A Kalshi DNP it settles from then on gets the fair price directly.
+
+**Also fixed by this:** a LIVE Kalshi order on a player who did not play. `venue_settlement.grade_kalshi_settlement` refuses `scalar`, so before this the 24 h fallback had nothing to settle it with. Now it settles at the same fair price from the order's own fill. A SOLD exit refuses by name (`exit_fair_price_unsupported`).
+
+**Still unread:** the DNP rules of Polymarket, ProphetX and Novig. Those venues keep the void. Today none of the 23 voids is on them.
