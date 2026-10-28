@@ -93,8 +93,22 @@ def _odds_name_supplement() -> list[tuple[str, str]]:
         return []
 
 
+# DIACRITICS FOLD TO THEIR BASE LETTER, on both sides, for the same reason.
+# The registry writes "San José State" and OddsAPI "San Jose State Spartans":
+# measured 2026-10-27 on the fleet, 147 stale paper orders on four San Jose State
+# games refused `ncaaf_team_not_in_registry_or_ambiguous` (lane
+# paper-evicted-grading, #744). `oddsapi_lines.fold` already folds this way for
+# the odds join; settlement did not. A fold that made two teams share a key
+# drops that key in the ambiguity pass, so it can only merge, never mis-join.
+def _fold_diacritics(text: str) -> str:
+    import unicodedata
+
+    return "".join(ch for ch in unicodedata.normalize("NFKD", text) if not unicodedata.combining(ch))
+
+
 def _norm(value: Any) -> str:
-    return " ".join(str(value or "").translate(_IGNORED_CHARACTERS).strip().lower().split())
+    text = _fold_diacritics(str(value or "")).translate(_IGNORED_CHARACTERS)
+    return " ".join(text.strip().lower().split())
 
 
 def registry_path() -> Path | None:

@@ -33,12 +33,32 @@ the SAME id means the vocabulary collapsed two teams together -- which would be
 a registry bug, and is refused rather than graded.
 
 --------------------------------------------------------------------------
-PROPS REFUSE, BY NAME
+PROPS ARE GRADED OFF ESPN'S COLLEGE SUMMARY BOX (since 2026-10-27, #744 H6)
 --------------------------------------------------------------------------
 
-The scoreboard capture carries team scores and nothing per-player. Permanent
-refusal, reported separately from "the capture is not there yet", which is
-transient -- so the market check runs BEFORE the artifact read.
+The scoreboard capture carries team scores and nothing per-player, so until
+2026-10-27 every prop refused as `ncaaf_props_not_gradeable_from_scoreboard`.
+ESPN's college-football `summary?event=` carries the SAME
+`boxscore.players[].statistics[].keys/athletes` shape as the NFL one, and the
+capture already stores ESPN's `event_id`. Measured on the fleet 2026-10-27 over
+the 59 stale prop rows (44 player-games): 43 of 44 matched a box row by
+`bet_status_nfl._player_key`, every one in a final game.
+
+The game is found exactly as the game lines find it -- the registry join, both
+sides resolved to DIFFERENT ids -- and the market map, name fold, row matcher
+and box parser are NFL's, imported rather than copied.
+
+  * PERMANENT BEFORE TRANSIENT: an unmapped player market or a non-full segment
+    refuses before any read.
+  * SETTLEMENT-ONLY READ: the summary is fetched only once the kickoff is more
+    than `bet_status_nfl.SETTLEMENT_MIN_HOURS_AFTER_KICKOFF` hours old, once
+    per game per resolver, on a timeout. Earlier it is a named, transient
+    refusal, so `portfolio_commit`'s per-tick resolve never reaches the network.
+  * ABSENT IS NOT ZERO, AND HERE IT STAYS A REFUSAL. NFL answers an absence from
+    ESPN's core game roster; the college roster cannot -- measured on USC @
+    Wisconsin (401858500): 242 rows, every one `didNotPlay: false`, statistics
+    on exactly the 66 already in the box. Mark Bowman (USC) is on it with
+    neither, so he refuses as `ncaaf_player_not_in_final_box`.
 """
 
 from __future__ import annotations
@@ -59,8 +79,24 @@ REASON_NOT_NCAAF = "not_an_ncaaf_order"
 REASON_NO_MATCHUP = "no_home_away_teams_on_order"
 REASON_NO_LIVE_STATE = "no_ncaaf_live_state_for_date"
 REASON_GAME_NOT_FOUND = "game_not_in_ncaaf_live_state"
-REASON_PROPS = "ncaaf_props_not_gradeable_from_scoreboard"
 REASON_UNKNOWN_MARKET = "unmapped_market"
+# PLAYER PROPS, graded off ESPN's college summary box since 2026-10-27; until
+# then every one refused as `ncaaf_props_not_gradeable_from_scoreboard`.
+# PERMANENT: this market or segment can never be graded here.
+REASON_PROP_MARKET = "ncaaf_prop_market_not_mapped"
+REASON_PROP_SEGMENT = "ncaaf_prop_needs_full_game"
+# TRANSIENT: not yet, or not this time.
+REASON_NO_EVENT_ID = "ncaaf_game_has_no_espn_event_id"
+REASON_BOX_NOT_YET = "ncaaf_player_box_waits_for_settlement_window"
+REASON_NO_BOX = "ncaaf_player_box_unavailable"
+# ABSENT FROM A FINAL BOX: inactive or active-with-nothing, which this source
+# cannot tell apart (see the docstring), so never a zero.
+REASON_PLAYER_NOT_IN_BOX = "ncaaf_player_not_in_final_box"
+REASON_PLAYER_NOT_IN_BOX_YET = "ncaaf_player_not_in_live_box_yet"
+REASON_PLAYER_AMBIGUOUS = "ncaaf_player_ambiguous_in_box"
+REASON_PROP_READ_FAILED = "ncaaf_player_box_read_failed"
+# Set on a resolved prop by this path only, so a reading can say what graded it.
+VALUE_SOURCE_SUMMARY_BOX = "espn_college_summary_box"
 REASON_TEAM_TOTAL = "team_totals_needs_a_per_team_score"
 # PREFIXED, unlike `bet_status_nfl`'s otherwise-identical constant, and that
 # asymmetry is deliberate. Both files defined the SAME string, so the first
@@ -136,11 +172,24 @@ def _load_games(selected_date: str) -> list[dict[str, Any]] | None:
 
 def ncaaf_status_resolver(selected_date: str):
     """A resolver `paper_settlement` can inject, for NCAAF orders."""
-    from syndicate.features.shared.bet_status_nfl import order_capture_dates
+    from syndicate.features.shared.bet_status_nfl import (
+        EspnSettlementFeed,
+        match_box_player,
+        order_capture_dates,
+        prop_field,
+        prop_view,
+        settlement_memo_get,
+        settlement_memo_key,
+        settlement_memo_put,
+        settlement_window_open,
+    )
     from syndicate.features.shared.game_line_bet import game_line_view, is_game_line_market
     from syndicate.features.shared.ncaaf_team_registry import resolve_ncaaf_team_id
 
     cache: dict[str, Any] = {}
+    # Props only. Constructing it reads nothing; each game's summary is read
+    # at most once per resolver.
+    feed = EspnSettlementFeed("ncaaf")
 
     def games(capture_date: str) -> list[dict[str, Any]] | None:
         # ONE READ PER CAPTURE DATE PER RESOLVER: a Saturday slate committed
@@ -149,6 +198,86 @@ def ncaaf_status_resolver(selected_date: str):
         if slot not in cache:
             cache[slot] = _load_games(capture_date)
         return cache[slot]
+
+    def locate_for_prop(order: Mapping[str, Any]) -> tuple[Mapping[str, Any] | None, str | None]:
+        """`(record, None)` or `(None, refusal)` -- the game-line join below,
+        refusal for refusal: registry ids for BOTH sides and different, then
+        the kickoff date's capture before the plan date's."""
+        home_team, away_team = order.get("home_team"), order.get("away_team")
+        if not home_team or not away_team:
+            return None, REASON_NO_MATCHUP
+        home_id = resolve_ncaaf_team_id(home_team)
+        away_id = resolve_ncaaf_team_id(away_team)
+        if not home_id or not away_id or home_id == away_id:
+            return None, REASON_TEAM_UNRESOLVED
+        capture_dates = order_capture_dates(order, selected_date)
+        if not capture_dates:
+            return None, REASON_NO_LIVE_STATE
+        for capture_date in capture_dates:
+            for candidate in games(capture_date) or ():
+                cand_home = next(
+                    (r for r in (resolve_ncaaf_team_id(candidate.get(f))
+                                 for f in ("home_team", "home_abbr")) if r), None)
+                cand_away = next(
+                    (r for r in (resolve_ncaaf_team_id(candidate.get(f))
+                                 for f in ("away_team", "away_abbr")) if r), None)
+                if cand_home == home_id and cand_away == away_id:
+                    return candidate, None
+        if games(capture_dates[0]) is None:
+            return None, REASON_NO_LIVE_STATE
+        return None, REASON_GAME_NOT_FOUND
+
+    def resolve_prop(order: Mapping[str, Any], canonical: str, segment: str) -> dict[str, Any]:
+        # PERMANENT REFUSALS FIRST, before any read.
+        field = prop_field(canonical)
+        if field is None:
+            return {"unavailable_reason": REASON_PROP_MARKET}
+        if segment != FULL_GAME_SEGMENT:
+            # ESPN's box is whole-game; a quarter prop off it is the wrong quantity.
+            return {"unavailable_reason": REASON_PROP_SEGMENT}
+
+        record, refusal = locate_for_prop(order)
+        if refusal:
+            return {"unavailable_reason": refusal}
+        is_final = bool(record.get("final"))
+        if not (bool(record.get("in_progress")) or is_final):
+            # Not unanswerable -- not yet asked.
+            return {"current_value": None, "is_final": False, "started": False}
+        event_id = str(record.get("event_id") or "").strip()
+        if not event_id:
+            return {"unavailable_reason": REASON_NO_EVENT_ID}
+        if not settlement_window_open(record, order):
+            # The live slate stays off the network; settlement asks later.
+            return {"unavailable_reason": REASON_BOX_NOT_YET}
+
+        # A REFUSAL ON A FINAL BOX IS REMEMBERED ACROSS RESOLVERS: 6 h for a
+        # fact about the player, 1 h for a summary that could not be read.
+        # `bet_status_nfl`'s memo, and its reasoning: a refused row is re-asked
+        # every settlement tick, then hourly for 14 days once archived.
+        memo_key = settlement_memo_key("ncaaf", event_id, order.get("player_name")) if is_final else None
+        remembered = settlement_memo_get(feed, memo_key)
+        if remembered is not None:
+            return remembered
+
+        rows = feed.summary_rows(event_id)
+        if rows is None:
+            refusal = {"unavailable_reason": REASON_NO_BOX}
+            settlement_memo_put(feed, memo_key, refusal, definitive=False)
+            return refusal
+        row, why = match_box_player(rows, order.get("player_name"))
+        if why == "ambiguous":
+            refusal = {"unavailable_reason": REASON_PLAYER_AMBIGUOUS}
+            settlement_memo_put(feed, memo_key, refusal, definitive=True)
+            return refusal
+        if row is None:
+            if not is_final:
+                return {"unavailable_reason": REASON_PLAYER_NOT_IN_BOX_YET}
+            refusal = {"unavailable_reason": REASON_PLAYER_NOT_IN_BOX}
+            settlement_memo_put(feed, memo_key, refusal, definitive=True)
+            return refusal
+        resolved = prop_view(row, field, order, is_final=is_final)
+        resolved["value_source"] = VALUE_SOURCE_SUMMARY_BOX
+        return resolved
 
     def resolve(order: Mapping[str, Any]) -> dict[str, Any]:
         if _norm(order.get("sport")) != "ncaaf":
@@ -172,10 +301,18 @@ def ncaaf_status_resolver(selected_date: str):
         canonical = _norm(market)
         if canonical in _TEAM_TOTAL_MARKETS:
             return {"unavailable_reason": REASON_TEAM_TOTAL}
+        if order.get("player_name"):
+            # A PLAYER PROP, graded off ESPN's college summary box. Routed
+            # before the game-line test, as `bet_status_nfl` does, so a prop is
+            # never reported as an unmapped game market.
+            try:
+                return resolve_prop(order, canonical, segment)
+            except Exception:  # never raise into the settlement loop
+                return {"unavailable_reason": REASON_PROP_READ_FAILED}
         is_total = canonical in _GAME_TOTAL_MARKETS
         is_line = is_game_line_market("ncaaf", market)
         if not (is_total or is_line):
-            return {"unavailable_reason": REASON_PROPS if order.get("player_name") else REASON_UNKNOWN_MARKET}
+            return {"unavailable_reason": REASON_UNKNOWN_MARKET}
 
         home_team, away_team = order.get("home_team"), order.get("away_team")
         if not home_team or not away_team:

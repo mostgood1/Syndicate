@@ -72,11 +72,61 @@ through the capture's own `event_id`. The rules that stay:
     them apart, so it refuses. A player who appears in ANY stat group played,
     so his zeros are real zeros and settle.
   * ONE READ PER GAME. The box is cached per resolver, like the live state.
+
+--------------------------------------------------------------------------
+ABSENT FROM THE BOX IS ANSWERED BY THE GAME ROSTER (2026-10-27, #744 H6)
+--------------------------------------------------------------------------
+
+ESPN's summary lists a player only in a stat group he recorded something in.
+A receiver with no catch and no carry is in NO group, so "absent" was the
+refusal for every quiet game. Measured on the fleet 2026-10-27 over the 28
+stale rows (11 player-games) refused `nfl_player_not_in_final_box`:
+
+    8 played and recorded zero    ESPN core game roster `didNotPlay: false`
+                                  + per-player `gamesPlayed: 1`, receptions 0
+                                  (Troy Franklin, Jeremy Ruckert, Jonnu Smith,
+                                  Ted Hurst III, Cam Skattebo -- "on the field
+                                  for six snaps", 0 carries, per ESPN's own
+                                  recap -- Foster Moreau, Pierre Strong Jr.,
+                                  Christian Kirk)
+    2 inactive                    `didNotPlay: true`, no stats (Tyler Warren,
+                                  Tyjae Spears)
+    1 name form                   the board's "Zonovan Knight" is ESPN's "Bam
+                                  Knight" (no "Zonovan" anywhere in ESPN's
+                                  athlete record), and he IS in the box
+
+So a final-box absence now asks ESPN's core API for that game's roster:
+
+  * PLAYED is proved only when the roster says `didNotPlay: false` AND his
+    per-player game statistics say `gamesPlayed >= 1`. The value is then read
+    from those statistics -- ESPN's explicit zero, never a zero inferred from
+    absence -- and a stat missing there refuses.
+  * DID NOT PLAY is `didNotPlay: true` with no statistics. Books void that; this
+    module refuses it BY NAME (`REASON_DNP_VOID`), as `bet_status_nhl`
+    (`dnp_void`) and `bet_status_soccer` do. No new outcome type.
+  * Anything else refuses by name: the two flags disagreeing, not on either
+    roster, two candidates. Measured over the 1,237 roster rows of those 11
+    games: 2 carry `didNotPlay: true` WITH statistics (`gamesPlayed: 1`), and
+    49 carry `didNotPlay: false` with no statistics at all. Neither proves
+    anything, so neither grades.
+
+THE READ IS SETTLEMENT-ONLY. It happens for a FINAL game whose kickoff is more
+than `SETTLEMENT_MIN_HOURS_AFTER_KICKOFF` hours old, so `portfolio_commit`'s
+per-tick resolve on a live slate never reaches it; each URL is read once per
+resolver, on a timeout, and every failure is a named refusal.
+
+College football has no equivalent signal -- measured 2026-10-27 on USC @
+Wisconsin: the college game roster is the whole 128-man roster, every row
+`didNotPlay: false`, with statistics only for the players already in the box
+-- so `bet_status_ncaaf` grades in-box players only and refuses the rest.
 """
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+import collections
+import threading
+from datetime import datetime, timedelta, timezone
+from typing import Any, Callable, Mapping
 
 from syndicate.features.shared.segment_actuals import (
     FULL_GAME_SEGMENT,
@@ -86,7 +136,18 @@ from syndicate.features.shared.segment_actuals import (
     segment_periods,
 )
 
-__all__ = ["nfl_status_resolver"]
+__all__ = [
+    "EspnSettlementFeed",
+    "match_box_player",
+    "nfl_status_resolver",
+    "prop_field",
+    "prop_view",
+    "roster_participation",
+    "settlement_memo_get",
+    "settlement_memo_key",
+    "settlement_memo_put",
+    "settlement_window_open",
+]
 
 REASON_NOT_NFL = "not_an_nfl_order"
 REASON_NO_MATCHUP = "no_home_away_teams_on_order"
@@ -104,10 +165,27 @@ REASON_NO_EVENT_ID = "nfl_game_has_no_espn_event_id"
 REASON_NO_BOX = "nfl_player_box_unavailable"
 # A player absent from a FINAL box may have been inactive -- which books VOID --
 # or active with no touch in any stat group. Those settle differently and this
-# box cannot tell them apart, so it refuses rather than grading a zero.
+# box cannot tell them apart, so it refuses rather than grading a zero. Since
+# 2026-10-27 the game roster answers it once the settlement window opens; this
+# reason now means "absent, and the roster not yet asked" (inside the window,
+# or no readable kickoff to open it).
 REASON_PLAYER_NOT_IN_BOX = "nfl_player_not_in_final_box"
 REASON_PLAYER_NOT_IN_BOX_YET = "nfl_player_not_in_live_box_yet"
 REASON_PLAYER_AMBIGUOUS = "nfl_player_ambiguous_in_box"
+# THE GAME-ROSTER READ behind a final-box absence (2026-10-27). Each names what
+# stopped it, so the counter says which job is left. Only the DNP one is a
+# fact about the PLAYER; the rest are facts about the read.
+REASON_DNP_VOID = "nfl_player_did_not_play_void"
+REASON_ROSTER_UNAVAILABLE = "nfl_game_roster_unavailable"
+REASON_NOT_ON_GAME_ROSTER = "nfl_player_not_on_game_roster"
+REASON_ROSTER_AMBIGUOUS = "nfl_player_ambiguous_on_game_roster"
+REASON_PARTICIPATION_UNKNOWN = "nfl_player_participation_unproven"
+REASON_GAME_STATS_UNAVAILABLE = "nfl_player_game_stats_unavailable"
+REASON_STAT_NOT_IN_GAME_STATS = "nfl_stat_not_in_player_game_stats"
+REASON_PARTICIPATION_READ_FAILED = "nfl_game_roster_read_failed"
+# Set on a resolved prop ONLY by the roster path, so a reading can say which
+# path graded it -- and a test can prove that path was reached.
+VALUE_SOURCE_CORE_GAME_STATS = "espn_core_player_game_stats"
 # A team total is ONE side's points. Grading it off the combined score would
 # roughly double the value and settle overs that lost, so it refuses until the
 # side token is read properly. Same refusal soccer makes, same reason.
@@ -193,6 +271,393 @@ def _player_key(value: Any) -> str:
     if initials:
         merged.append(initials)
     return " ".join(merged)
+
+
+# A NAME FORM NO FOLD CAN BRIDGE: the board's legal first name against ESPN's
+# chosen one. `_player_key` form on both sides, board -> ESPN. Each entry is a
+# MEASUREMENT, not a guess -- an alias that is wrong grades the wrong player.
+#   zonovan knight -> bam knight   ESPN athlete 4427728 is "Bam Knight" in its
+#       fullName, displayName and firstName alike; ARI @ DEN 2026-10-25 box.
+_PLAYER_NAME_ALIASES: Mapping[str, tuple[str, ...]] = {
+    "zonovan knight": ("bam knight",),
+}
+
+
+def _player_keys(value: Any) -> frozenset[str]:
+    """Every `_player_key` form this name may appear under in ESPN's data."""
+    key = _player_key(value)
+    if not key:
+        return frozenset()
+    return frozenset((key, *_PLAYER_NAME_ALIASES.get(key, ())))
+
+
+def prop_field(canonical_market: str) -> str | None:
+    """The box field that settles this (normalised) player market, or None.
+
+    Shared with `bet_status_ncaaf`: ESPN's college box is the same shape, so the
+    same market reads the same field."""
+    return _PROP_FIELDS.get(canonical_market)
+
+
+def match_box_player(rows: list[Mapping[str, Any]], player_name: Any) -> tuple[Mapping[str, Any] | None, str | None]:
+    """`(row, None)`, or `(None, "absent" | "ambiguous")`. Never a guess."""
+    keys = _player_keys(player_name)
+    matches = [row for row in rows if keys and _player_key(row.get("player_name")) in keys]
+    if len(matches) > 1:
+        return None, "ambiguous"
+    if not matches:
+        return None, "absent"
+    return matches[0], None
+
+
+def prop_view(row: Mapping[str, Any], field: str, order: Mapping[str, Any], *, is_final: bool) -> dict[str, Any]:
+    """The resolved value of one player's field, with Anytime TD's implicit line."""
+    resolved: dict[str, Any] = {
+        "current_value": _as_float(row.get(field)),
+        "is_final": is_final,
+        "started": True,
+    }
+    if field == _ANYTIME_TD_FIELD and _as_float(order.get("line")) is None:
+        resolved["line"] = _ANYTIME_TD_LINE
+    return resolved
+
+
+# ---------------------------------------------------------------------------
+# SETTLEMENT-ONLY ESPN READS (2026-10-27). See the module docstring.
+# ---------------------------------------------------------------------------
+
+_ESPN_SUMMARY_URLS: Mapping[str, str] = {
+    "nfl": "https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary",
+    "ncaaf": "https://site.api.espn.com/apis/site/v2/sports/football/college-football/summary",
+}
+_ESPN_CORE_EVENTS_URLS: Mapping[str, str] = {
+    "nfl": "https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/events",
+    "ncaaf": "https://sports.core.api.espn.com/v2/sports/football/leagues/college-football/events",
+}
+# The core API answers with `$ref` links to itself. Only that host is followed,
+# and always over https (the links come back as http://).
+_ESPN_CORE_HOST = "sports.core.api.espn.com"
+_SETTLEMENT_FETCH_TIMEOUT_SECONDS = 6.0
+# A game is read for settlement only once its kickoff is this old. The live
+# slate is resolved every `portfolio_commit` tick; this keeps those ticks off
+# the network, and a game that started six hours ago is over.
+SETTLEMENT_MIN_HOURS_AFTER_KICKOFF = 6.0
+# More surname matches than this on two game rosters is not a lookup any more.
+_MAX_ROSTER_NAME_CANDIDATES = 4
+
+# Per-player game statistics (`category.name`) -> the box field it settles.
+# Measured on 401872975 (Troy Franklin) and 401873019 (Bam Knight: 7 rushes,
+# 3 catches for 15 -- identical to the summary box).
+_CORE_STAT_FIELDS: Mapping[str, str] = {
+    "passing.passingYards": "pass_yards",
+    "passing.passingAttempts": "pass_attempts",
+    "passing.completions": "completions",
+    "passing.passingTouchdowns": "pass_td",
+    "passing.interceptions": "pass_int",
+    "rushing.rushingYards": "rush_yards",
+    "rushing.rushingAttempts": "rush_attempts",
+    "rushing.rushingTouchdowns": "rush_td",
+    "receiving.receptions": "receptions",
+    "receiving.receivingYards": "rec_yards",
+    "receiving.receivingTouchdowns": "rec_td",
+}
+_CORE_GAMES_PLAYED = "general.gamesPlayed"
+
+
+def _default_fetch_json(url: str) -> Any:
+    """GET -> parsed JSON, or None. Never raises.
+
+    NO CUSTOM HEADERS, deliberately: ESPN 403s browser-spoof User-Agents from a
+    datacentre IP (`nfl/live_player_box`'s docstring carries the probes)."""
+    import json
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen(  # noqa: S310 -- fixed https hosts only
+            urllib.request.Request(url), timeout=_SETTLEMENT_FETCH_TIMEOUT_SECONDS
+        ) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except Exception:
+        return None
+
+
+def _utcnow() -> datetime:
+    """A seam, so a test can fix the clock the settlement window reads."""
+    return datetime.now(timezone.utc)
+
+
+def _parse_kickoff(value: Any) -> datetime | None:
+    """An ISO stamp WITH an hour, or None. A bare date cannot open a 6 h window."""
+    text = str(value or "").strip()
+    if len(text) <= 10:
+        return None
+    try:
+        moment = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return moment if moment.tzinfo is not None else moment.replace(tzinfo=timezone.utc)
+
+
+def settlement_window_open(record: Mapping[str, Any] | None, order: Mapping[str, Any]) -> bool:
+    """True only when a READABLE kickoff is more than six hours in the past.
+
+    ESPN's own start (`start_time` on the capture record) first, the order's
+    OddsAPI `commence_time` second. Neither readable means False: an unknown
+    kickoff must not default to "long enough ago" and put a live tick on the
+    network."""
+    for stamp in ((record or {}).get("start_time"), order.get("commence_time")):
+        moment = _parse_kickoff(stamp)
+        if moment is not None:
+            return (_utcnow() - moment).total_seconds() > SETTLEMENT_MIN_HOURS_AFTER_KICKOFF * 3600.0
+    return False
+
+
+class EspnSettlementFeed:
+    """Settlement-only reads of ESPN for ONE league, one per path per instance.
+
+    `bet_status_nhl.NhlFeed`'s shape: `fetch_json(url) -> payload | None`, and
+    None means the module default, RESOLVED AT CALL TIME so a test substitutes
+    it without network. Construction reads nothing; a failed read is
+    remembered for this instance only and retried by the next resolver."""
+
+    def __init__(self, league: str, *, fetch_json: Callable[[str], Any] | None = None) -> None:
+        self.league = league
+        self._fetch_json = fetch_json
+        self._memo: dict[str, Any] = {}
+        self.counters: collections.Counter[str] = collections.Counter()
+
+    @property
+    def memoisable(self) -> bool:
+        """Only a feed on the real fetch writes the process-wide refusal memo.
+        An injected `fetch_json` is a test's private world and must not leak
+        into the next test, or into the process."""
+        return self._fetch_json is None
+
+    def _get(self, url: str) -> Any:
+        if url in self._memo:
+            return self._memo[url]
+        fetch = self._fetch_json or _default_fetch_json
+        self.counters["espn_requests"] += 1
+        try:
+            payload = fetch(url)
+        except Exception:
+            payload = None
+        if payload is None:
+            self.counters["espn_failures"] += 1
+        self._memo[url] = payload
+        return payload
+
+    def _follow(self, link: Any) -> Any:
+        from urllib.parse import urlsplit, urlunsplit
+
+        url = link.get("$ref") if isinstance(link, Mapping) else None
+        parts = urlsplit(str(url or ""))
+        if parts.hostname != _ESPN_CORE_HOST:
+            return None
+        return self._get(urlunsplit(parts._replace(scheme="https")))
+
+    def summary_rows(self, event_id: str) -> list[dict[str, Any]] | None:
+        """Every athlete in the game's summary box (unfiltered), or None = NOT READ."""
+        from urllib.parse import quote
+
+        from syndicate.features.nfl.live_player_box import player_stat_rows_from_summary
+
+        base = _ESPN_SUMMARY_URLS.get(self.league)
+        event_id = str(event_id or "").strip()
+        if not base or not event_id:
+            return None
+        payload = self._get(f"{base}?event={quote(event_id)}")
+        try:
+            return player_stat_rows_from_summary(payload)
+        except Exception:
+            return None
+
+    def game_roster(self, event_id: str) -> list[Mapping[str, Any]] | None:
+        """Both teams' game-roster entries, or None when either could not be read.
+
+        Half a roster is not a roster: a player missing from the half that was
+        read says nothing about the half that was not."""
+        base = _ESPN_CORE_EVENTS_URLS.get(self.league)
+        event_id = str(event_id or "").strip()
+        if not base or not event_id:
+            return None
+        competition = f"{base}/{event_id}/competitions/{event_id}"
+        competitors = self._get(f"{competition}/competitors")
+        items = competitors.get("items") if isinstance(competitors, Mapping) else None
+        if not isinstance(items, list) or len(items) != 2:
+            return None
+        entries: list[Mapping[str, Any]] = []
+        for item in items:
+            team_id = str(item.get("id") or "").strip() if isinstance(item, Mapping) else ""
+            if not team_id:
+                return None
+            roster = self._get(f"{competition}/competitors/{team_id}/roster")
+            rows = roster.get("entries") if isinstance(roster, Mapping) else None
+            if not isinstance(rows, list) or not rows:
+                return None
+            entries.extend(row for row in rows if isinstance(row, Mapping))
+        return entries
+
+    def athlete_names(self, entry: Mapping[str, Any]) -> list[str] | None:
+        """The athlete's full-name forms. The roster row itself carries only a surname."""
+        athlete = self._follow(entry.get("athlete"))
+        if not isinstance(athlete, Mapping):
+            return None
+        first, last = str(athlete.get("firstName") or "").strip(), str(athlete.get("lastName") or "").strip()
+        names = [athlete.get("fullName"), athlete.get("displayName"), f"{first} {last}".strip()]
+        return [str(name).strip() for name in names if str(name or "").strip()]
+
+    def game_stats(self, entry: Mapping[str, Any]) -> dict[str, float] | None:
+        """`{"category.stat": value}` for this player in this game, or None."""
+        payload = self._follow(entry.get("statistics"))
+        splits = payload.get("splits") if isinstance(payload, Mapping) else None
+        categories = splits.get("categories") if isinstance(splits, Mapping) else None
+        if not isinstance(categories, list):
+            return None
+        out: dict[str, float] = {}
+        for category in categories:
+            if not isinstance(category, Mapping):
+                continue
+            for stat in category.get("stats") or ():
+                if not isinstance(stat, Mapping):
+                    continue
+                value = _as_float(stat.get("value"))
+                if value is not None:
+                    out[f"{category.get('name')}.{stat.get('name')}"] = value
+        return out or None
+
+
+# ---------------------------------------------------------------------------
+# PROCESS-WIDE REFUSAL MEMO (2026-10-27)
+# ---------------------------------------------------------------------------
+# A refused row is RE-ASKED: every settlement tick while it sits in the live
+# ledger document (`settle_orders` re-runs its straggler dates), then hourly by
+# the archived pass for 14 days after eviction. Each pass builds a NEW resolver,
+# so the per-instance memo above does not survive it, and one refused player
+# would cost ~8 ESPN reads (summary, competitors, two rosters, athletes, stats)
+# per tick, indefinitely. This remembers the REFUSAL across resolvers:
+#
+#   key      (league, ESPN event_id, `_player_key(player_name)`)
+#   value    the refusal dict, until an expiry on `_utcnow()`
+#   TTL      6 h for a DEFINITIVE answer about the player (did not play, not on
+#            the game roster, ambiguous, participation unproven, not in the
+#            final box); 1 h for a READ FAILURE, which is retried after it
+#   bound    `SETTLEMENT_MEMO_MAX` entries, oldest written evicted first
+#
+# A "played" answer is not remembered: that row grades and is never asked again.
+# Only a final game inside the settlement window can reach it, so a live tick
+# never reads or writes it.
+_SETTLEMENT_MEMO: dict[tuple[str, str, str], tuple[datetime, dict[str, Any]]] = {}
+_SETTLEMENT_MEMO_LOCK = threading.Lock()
+SETTLEMENT_MEMO_MAX = 512
+SETTLEMENT_MEMO_DEFINITIVE_TTL = timedelta(hours=6)
+SETTLEMENT_MEMO_READ_FAILURE_TTL = timedelta(hours=1)
+
+# Facts about the PLAYER (6 h) versus facts about the READ (1 h). A reason in
+# neither is never remembered.
+_DEFINITIVE_ROSTER_REFUSALS = frozenset(
+    {REASON_DNP_VOID, REASON_NOT_ON_GAME_ROSTER, REASON_ROSTER_AMBIGUOUS, REASON_PARTICIPATION_UNKNOWN}
+)
+_READ_FAILURE_ROSTER_REFUSALS = frozenset(
+    {REASON_ROSTER_UNAVAILABLE, REASON_PARTICIPATION_READ_FAILED, REASON_GAME_STATS_UNAVAILABLE}
+)
+
+
+def settlement_memo_key(league: str, event_id: Any, player_name: Any) -> tuple[str, str, str] | None:
+    """`(league, event_id, player key)`, or None when either part is empty."""
+    event_id = str(event_id or "").strip()
+    key = _player_key(player_name)
+    if not event_id or not key:
+        return None
+    return (str(league), event_id, key)
+
+
+def settlement_memo_get(feed: EspnSettlementFeed, key: tuple[str, str, str] | None) -> dict[str, Any] | None:
+    """The remembered refusal (a copy), or None: no key, a test's feed, a miss, or expired."""
+    if key is None or not feed.memoisable:
+        return None
+    now = _utcnow()
+    with _SETTLEMENT_MEMO_LOCK:
+        hit = _SETTLEMENT_MEMO.get(key)
+        if hit is None:
+            return None
+        if hit[0] <= now:
+            _SETTLEMENT_MEMO.pop(key, None)
+            return None
+    feed.counters["settlement_memo_hits"] += 1
+    return dict(hit[1])
+
+
+def settlement_memo_put(
+    feed: EspnSettlementFeed, key: tuple[str, str, str] | None, refusal: Mapping[str, Any], *, definitive: bool
+) -> None:
+    """Remember a REFUSAL for 6 h (`definitive`) or 1 h (a read failure)."""
+    if key is None or not feed.memoisable or not refusal.get("unavailable_reason"):
+        return
+    ttl = SETTLEMENT_MEMO_DEFINITIVE_TTL if definitive else SETTLEMENT_MEMO_READ_FAILURE_TTL
+    with _SETTLEMENT_MEMO_LOCK:
+        # Re-inserted at the END, so eviction stays oldest-WRITTEN first.
+        _SETTLEMENT_MEMO.pop(key, None)
+        _SETTLEMENT_MEMO[key] = (_utcnow() + ttl, dict(refusal))
+        while len(_SETTLEMENT_MEMO) > SETTLEMENT_MEMO_MAX:
+            _SETTLEMENT_MEMO.pop(next(iter(_SETTLEMENT_MEMO)))
+
+
+def roster_participation(feed: EspnSettlementFeed, event_id: str, player_name: Any) -> dict[str, Any]:
+    """`{"played": row}` -- the player's own game line -- or `{"unavailable_reason": ...}`.
+
+    For a player ABSENT from a final box. Identity is the athlete record behind
+    a game-roster row (the row carries a surname only), so a surname shared
+    with a teammate or an opponent cannot stand in for him. Played is proved by
+    BOTH `didNotPlay: false` and `gamesPlayed >= 1`; did-not-play by
+    `didNotPlay: true` with no statistics. See the module docstring."""
+    entries = feed.game_roster(event_id)
+    if entries is None:
+        return {"unavailable_reason": REASON_ROSTER_UNAVAILABLE}
+    keys = _player_keys(player_name)
+    surnames = {key.split()[-1] for key in keys}
+    candidates = []
+    for entry in entries:
+        roster_key = _player_key(entry.get("displayName"))
+        if roster_key and roster_key.split()[-1] in surnames:
+            candidates.append(entry)
+    if len(candidates) > _MAX_ROSTER_NAME_CANDIDATES:
+        return {"unavailable_reason": REASON_ROSTER_AMBIGUOUS}
+
+    matched = []
+    for entry in candidates:
+        names = feed.athlete_names(entry)
+        if names is None:
+            # An unreadable candidate may be him, so "not on the roster" would
+            # be a claim this read cannot make.
+            return {"unavailable_reason": REASON_ROSTER_UNAVAILABLE}
+        if any(_player_key(name) in keys for name in names):
+            matched.append(entry)
+    if not matched:
+        return {"unavailable_reason": REASON_NOT_ON_GAME_ROSTER}
+    if len(matched) > 1:
+        return {"unavailable_reason": REASON_ROSTER_AMBIGUOUS}
+
+    entry = matched[0]
+    did_not_play = entry.get("didNotPlay")
+    has_stats = isinstance(entry.get("statistics"), Mapping)
+    if did_not_play is True and not has_stats:
+        return {"unavailable_reason": REASON_DNP_VOID}
+    if did_not_play is not False or not has_stats:
+        return {"unavailable_reason": REASON_PARTICIPATION_UNKNOWN}
+    stats = feed.game_stats(entry)
+    if stats is None:
+        return {"unavailable_reason": REASON_GAME_STATS_UNAVAILABLE}
+    games_played = stats.get(_CORE_GAMES_PLAYED)
+    if games_played is None or games_played < 1:
+        return {"unavailable_reason": REASON_PARTICIPATION_UNKNOWN}
+
+    # ONLY THE FIELDS ESPN STATED. A missing one stays missing, and the caller
+    # refuses on it rather than reading it as zero.
+    row: dict[str, Any] = {field: stats[key] for key, field in _CORE_STAT_FIELDS.items() if key in stats}
+    if "rush_td" in row and "rec_td" in row:
+        row["td_scored"] = row["rush_td"] + row["rec_td"]
+    return {"played": row}
 
 
 def _fetch_box(event_id: str) -> list[dict[str, Any]] | None:
@@ -363,6 +828,9 @@ def nfl_status_resolver(selected_date: str):
     from syndicate.features.shared.team_aliases import teams_match
 
     cache: dict[str, Any] = {}
+    # Settlement-only reads behind a final-box absence. Constructing it reads
+    # nothing; every URL is read at most once per resolver.
+    feed = EspnSettlementFeed("nfl")
 
     def games(capture_date: str) -> list[dict[str, Any]] | None:
         # ONE READ PER CAPTURE DATE PER RESOLVER. A Sunday card committed on a
@@ -418,7 +886,7 @@ def nfl_status_resolver(selected_date: str):
     def resolve_prop(order: Mapping[str, Any], canonical: str, segment: str) -> dict[str, Any]:
         # PERMANENT REFUSALS FIRST, before any read -- the rule the game-line
         # path below already follows, for the same reason.
-        field = _PROP_FIELDS.get(canonical)
+        field = prop_field(canonical)
         if field is None:
             return {"unavailable_reason": REASON_PROP_MARKET}
         if segment != FULL_GAME_SEGMENT:
@@ -437,25 +905,48 @@ def nfl_status_resolver(selected_date: str):
         if not event_id:
             return {"unavailable_reason": REASON_NO_EVENT_ID}
 
+        # A REMEMBERED ROSTER REFUSAL ends it before ANY read, the box
+        # included: an entry exists only for a player already found absent
+        # from this game's final box. Final games in the window only.
+        memo_key = None
+        if is_final and settlement_window_open(record, order):
+            memo_key = settlement_memo_key("nfl", event_id, order.get("player_name"))
+            remembered = settlement_memo_get(feed, memo_key)
+            if remembered is not None:
+                return remembered
+
         rows = box(event_id)
         if rows is None:
             return {"unavailable_reason": REASON_NO_BOX}
-        key = _player_key(order.get("player_name"))
-        matches = [row for row in rows if _player_key(row.get("player_name")) == key]
-        if len(matches) > 1:
+        row, why = match_box_player(rows, order.get("player_name"))
+        if why == "ambiguous":
             return {"unavailable_reason": REASON_PLAYER_AMBIGUOUS}
-        if not matches:
-            return {
-                "unavailable_reason": REASON_PLAYER_NOT_IN_BOX if is_final else REASON_PLAYER_NOT_IN_BOX_YET
-            }
+        if row is not None:
+            return prop_view(row, field, order, is_final=is_final)
+        if not is_final:
+            return {"unavailable_reason": REASON_PLAYER_NOT_IN_BOX_YET}
 
-        resolved: dict[str, Any] = {
-            "current_value": _as_float(matches[0].get(field)),
-            "is_final": is_final,
-            "started": True,
-        }
-        if field == _ANYTIME_TD_FIELD and _as_float(order.get("line")) is None:
-            resolved["line"] = _ANYTIME_TD_LINE
+        # ABSENT FROM A FINAL BOX: inactive, or active with nothing to record.
+        # Only the game roster can tell them apart, and it is read only once
+        # the game is safely in the settlement window (see the docstring).
+        if memo_key is None:
+            return {"unavailable_reason": REASON_PLAYER_NOT_IN_BOX}
+        try:
+            found = roster_participation(feed, event_id, order.get("player_name"))
+        except Exception:  # never raise into the settlement loop
+            found = {"unavailable_reason": REASON_PARTICIPATION_READ_FAILED}
+        line = found.get("played")
+        if line is None:
+            refusal = {"unavailable_reason": found.get("unavailable_reason") or REASON_PARTICIPATION_UNKNOWN}
+            reason = refusal["unavailable_reason"]
+            if reason in _DEFINITIVE_ROSTER_REFUSALS or reason in _READ_FAILURE_ROSTER_REFUSALS:
+                settlement_memo_put(feed, memo_key, refusal, definitive=reason in _DEFINITIVE_ROSTER_REFUSALS)
+            return refusal
+        if field not in line:
+            # He played, but ESPN did not state THIS number. Not a zero.
+            return {"unavailable_reason": REASON_STAT_NOT_IN_GAME_STATS}
+        resolved = prop_view(line, field, order, is_final=True)
+        resolved["value_source"] = VALUE_SOURCE_CORE_GAME_STATS
         return resolved
 
     def resolve(order: Mapping[str, Any]) -> dict[str, Any]:

@@ -66,15 +66,22 @@ def _games(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_paper_settlement_DISPATCHES_ncaaf_to_a_real_resolver():
-    """Fails with the one-line `paper_settlement` wiring removed, and only then."""
+def test_paper_settlement_DISPATCHES_ncaaf_to_a_real_resolver(monkeypatch):
+    """Fails with the one-line `paper_settlement` wiring removed, and only then.
+
+    The capture is stubbed unreadable so this stays offline: since props became
+    gradeable (2026-10-27), a mapped prop proceeds to the live-state read, which
+    would otherwise poll ESPN's scoreboard from inside a unit test -- the same
+    change `test_bet_status_nfl`'s dispatch test took on 2026-09-10."""
     from syndicate.features.shared.paper_settlement import _default_resolver
 
+    monkeypatch.setattr(bet_status_ncaaf, "_load_games", lambda _d: None)
     verdict = _default_resolver("2026-08-29")(
         _order(market="player_pass_yds", player_name="Josh Hoover")
     )
 
     assert verdict.get("unavailable_reason") != "no_resolver_for_ncaaf"
+    assert verdict.get("unavailable_reason") == bet_status_ncaaf.REASON_NO_LIVE_STATE
 
 
 # ---------------------------------------------------------------------------
@@ -179,11 +186,12 @@ def test_the_join_resolves_the_ABBREVIATION_form_too(_games):
 def test_the_MARKET_check_runs_BEFORE_the_artifact_read(monkeypatch):
     monkeypatch.setattr(bet_status_ncaaf, "_load_games", lambda _d: None)
 
+    # An UNMAPPED prop market: `player_rush_yds` is graded since 2026-10-27.
     view = ncaaf_status_resolver("2026-08-29")(
-        _order(market="player_rush_yds", player_name="Cam Cook")
+        _order(market="player_tackles_assists", player_name="Cam Cook")
     )
 
-    assert view["unavailable_reason"] == bet_status_ncaaf.REASON_PROPS
+    assert view["unavailable_reason"] == bet_status_ncaaf.REASON_PROP_MARKET
 
 
 def test_a_pregame_game_does_not_settle_a_total(_games):

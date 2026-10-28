@@ -19,6 +19,16 @@ pipeline -- which is the shape `#506` removed from the web service (15 live
 statsapi calls per request, 3318-8400ms). A missing feed is a NAMED absence
 here, not something to go and fetch.
 
+**ONE EXCEPTION: A GAME THAT IS LONG OVER** `[2026-10-27, lane
+paper-evicted-grading, #744]`. The capture never cached the postseason: measured
+on the fleet, 122 paper orders on two games (Division Series 849832 on 10-08,
+World Series 849802 on 10-24) read `no_live_feed` for weeks while statsapi held
+both as Final. `_may_fetch_finished` allows one fetch per game per resolver,
+only once its first pitch is `_FETCH_AFTER_START_HOURS` behind us, at most
+`_FETCH_LIMIT_PER_RESOLVER` games per build, and not again within
+`_FETCH_RETRY_SECONDS` of the last attempt. An in-progress game is never fetched, so
+the live path above is unchanged.
+
 **MARKET NAMES ARE MAPPED EXPLICITLY.** The board's market vocabulary
 (`batter_total_bases`) and the box score's stat vocabulary (`total_bases`) are
 different namespaces that happen to look similar. Stripping a `batter_` prefix
@@ -28,7 +38,9 @@ An unmapped market is refused by name rather than guessed at.
 
 from __future__ import annotations
 
+import time
 from collections.abc import Mapping
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from syndicate.features.mlb.game_status import grading_refusal, not_played_reason
@@ -46,6 +58,36 @@ __all__ = ["mlb_status_resolver"]
 # `market_segments.SPORT_SEGMENTS["mlb"]` is the vocabulary; a segment absent
 # here (any other sport's) falls to `segment_refusal` unchanged.
 _SEGMENT_INNINGS: dict[str, int] = {"first1": 1, "first3": 3, "first5": 5}
+
+# The finished-game fetch (module docstring). A process-wide memo of EVERY
+# attempt, success or not: a fetched feed is not kept beyond its resolver, so a
+# game whose leftover orders stay ungradable would otherwise be downloaded again
+# on every settlement tick.
+_FETCH_AFTER_START_HOURS = 6.0
+_FETCH_LIMIT_PER_RESOLVER = 12
+_FETCH_RETRY_SECONDS = 3600.0
+_FETCH_ATTEMPTED_AT: dict[int, float] = {}
+
+
+def _may_fetch_finished(game_pk: int, order: Mapping[str, Any], fetches: dict[str, int]) -> bool:
+    """True when this game is safely over, unfetched lately, and within the per-build cap."""
+    raw = str(order.get("commence_time") or "").strip()
+    try:
+        start = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if start.tzinfo is None:
+        start = start.replace(tzinfo=timezone.utc)
+    if datetime.now(timezone.utc) - start < timedelta(hours=_FETCH_AFTER_START_HOURS):
+        return False
+    last = _FETCH_ATTEMPTED_AT.get(int(game_pk))
+    if last is not None and time.monotonic() - last < _FETCH_RETRY_SECONDS:
+        return False
+    if fetches["n"] >= _FETCH_LIMIT_PER_RESOLVER:
+        return False
+    fetches["n"] += 1
+    _FETCH_ATTEMPTED_AT[int(game_pk)] = time.monotonic()
+    return True
 
 REASON_NO_GAME_PK = "no_game_pk"
 REASON_NO_FEED = "no_live_feed"
@@ -368,8 +410,9 @@ def mlb_status_resolver(selected_date: str):
         return _schedule_cache["index"]
 
     cache: dict[int, Mapping[str, Any] | None] = {}
+    fetches = {"n": 0}
 
-    def _feed(game_pk: int) -> Mapping[str, Any] | None:
+    def _feed(game_pk: int, order: Mapping[str, Any]) -> Mapping[str, Any] | None:
         if game_pk not in cache:
             try:
                 # fetch_if_missing=False -- see the module docstring.
@@ -378,6 +421,13 @@ def mlb_status_resolver(selected_date: str):
                 )
             except Exception:
                 cache[game_pk] = None
+            if cache[game_pk] is None and _may_fetch_finished(game_pk, order, fetches):
+                # A FINISHED game the capture never cached -- see
+                # `_may_fetch_finished`. Never raises; None stays `no_live_feed`.
+                try:
+                    cache[game_pk] = load_final_feed(selected_date, game_pk, fetch_if_missing=True)
+                except Exception:
+                    cache[game_pk] = None
         return cache[game_pk]
 
     def _resolve_segment(order, segment, innings_needed, market):
@@ -386,7 +436,7 @@ def mlb_status_resolver(selected_date: str):
         game_pk, reason = _resolve_game_pk(order, schedule())
         if game_pk is None:
             return {"unavailable_reason": reason or REASON_NO_GAME_PK}
-        feed = _feed(game_pk)
+        feed = _feed(game_pk, order)
         if not isinstance(feed, Mapping) or not feed:
             return {"unavailable_reason": REASON_NO_FEED}
         refusal = grading_refusal(feed, selected_date)
@@ -481,7 +531,7 @@ def mlb_status_resolver(selected_date: str):
             # wrong stat produces a confident wrong verdict.
             return {"unavailable_reason": REASON_UNMAPPED_MARKET}
 
-        feed = _feed(game_pk)
+        feed = _feed(game_pk, order)
         if not isinstance(feed, Mapping) or not feed:
             return {"unavailable_reason": REASON_NO_FEED}
         refusal = grading_refusal(feed, selected_date)

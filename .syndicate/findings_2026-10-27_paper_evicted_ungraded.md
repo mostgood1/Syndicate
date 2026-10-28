@@ -279,3 +279,34 @@ Scratch: `C:\tmp\peg\` (`dryrun.sh`, `dryrun.log`, `report_20261027T163701Z.json
 **Every fix lands in the per-sport resolver** that `settle_orders`, its straggler dates and the archived pass all share. So each one also closes the gap for the LIVE book going forward. Today, a forward-dated soccer order, any corners or btts order, and any NBA preseason order can never grade.
 
 **What would make this re-scope wrong:** if the dry run grades fewer than 50% of the 981 with all fixes in, the gaps are not what the code reading says.
+
+## Re-scope result: the grader gaps, dry run `[2026-10-27 23:51Z (6:51 PM CDT), READ-ONLY, fleet; main 2c8ba8be extract + the six fixed files; every write suppressed and counted (3 NCAAF capture persists, none reached disk); archive sha256 unchanged]`
+
+**868 of 981 stale rows grade (88.5%)**, up from 0. The re-scope's falsification line was 50%, so it is NOT falsified. Outcomes: soccer 229 won / 263 lost / 2 push, NCAAF 107 / 120, MLB 66 / 56, NFL 1 / 24.
+
+| hypothesis | prediction | read | verdict |
+|---|---|---|---|
+| H1 soccer kickoff-date binding | >= 85% of 175 | **172 / 175** (98%) | CONFIRMED |
+| H2 soccer corners + btts | >= 85% of 322 | **322 / 322** | CONFIRMED |
+| H3 NCAAF names | >= 90% of 171, no new ambiguous key | **171 / 171**; index 2,237 -> 2,239 keys, 0 lost, 0 re-owned | CONFIRMED |
+| H4 MLB finished-game fetch | >= 90% of 122 | **122 / 122** (Division Series 849832, World Series 849802; both Final on statsapi) | CONFIRMED |
+| H5 NBA preseason | >= 90% of 72 | not run: needs a box write (below) | OPEN |
+| H6 football props | diagnose first | NFL **25 / 28**, NCAAF **56 / 59** | see below |
+
+**What H1 actually was: a second cause under the first.** Binding to the kickoff date alone graded 25 of 497. The per-league `live_state_<date>.json` files are written to DISK by the poller (`poll_soccer_live_state.py`, `out_path.write_text`). On the fleet's keyvalue backend, though, `read_json_file` asks Redis only, where a dated key lives ten days at most. Reading them through `soccer.sources.live_state_payload` (the store, then the poller's own file) took soccer to 494 / 497. `_load_player_boxes` uses the same reader, so this also explains why fleet soccer props mostly could not grade either.
+
+**Binding audit** (all 151 distinct soccer order matches): 86 matched with exact names and 64 through an alias, every one of them the same club (e.g. Inter Milan -> Internazionale, New York Red Bulls -> Red Bull New York). 0 bound to two records. 1 had no record at all: Rayo Vallecano v Athletic Bilbao, 10-10 12:00Z, 3 rows.
+
+**H6, as diagnosed** (by a subagent; code reviewed here):
+- **NFL.** ESPN's summary box lists a player only in a stat group he recorded something in. ESPN's core game roster answered all 11 player-games: 8 played with zeros (`didNotPlay: false` and `gamesPlayed: 1`), 2 were inactive (Tyler Warren, Tyjae Spears: `nfl_player_did_not_play_void`, refused by name as NHL and soccer do), and 1 was a name form ("Zonovan Knight" is ESPN's "Bam Knight").
+- **NCAAF.** ESPN's college summary has the NFL box shape, and the capture stores ESPN's `event_id`. 56 graded. The college roster cannot prove who played, so 3 rows still refuse: Beau Pribula 1 and Mark Bowman 2.
+- **Network bounds.** Reads happen only for games whose kickoff is more than 6 h old, with a 6 s timeout, never raising. A refusal is memoised process-wide: 6 h for a fact about the player, 1 h for a failed read, 512 entries.
+
+**Still refused, 113 rows, every one by name:**
+- **NBA preseason 72** (`no_live_box_for_date`). The live box capture never ran in the preseason. `scripts/backfill_nba_paper_grades.py boxes`, previewed read-only at 23:32Z, found all 57 games on the 11 dates final in ESPN. Writing those 11 files is a fleet data write, so it waits on the user.
+- **NBA tails 14.** These include props attached to a game the player was NOT in: LeBron James on 76ers v Bucks, Kawhi Leonard on Timberwolves v Raptors. That is a candidate-join defect upstream of grading, not a grader gap. A follow-up.
+- **MLB tails 11:** stat not in the feed 5, not decided 4, rescheduled 2.
+- **NHL 7:** two Elias Petterssons, Zack Bolduc traded, 1 DNP.
+- **Soccer 3** (Rayo v Athletic), and football 6 (above).
+
+**The fixes go live for the LIVE book as well,** since `settle_orders`, its straggler dates and the archived pass share these resolvers. Until a fleet run of this code: a forward-dated soccer order, any corners or btts order, an NCAAF San José State or McNeese State order, an uncached MLB game, an NFL prop on a player with no catch, and every NCAAF prop cannot grade.

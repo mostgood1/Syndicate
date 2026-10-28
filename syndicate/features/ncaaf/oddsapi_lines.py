@@ -140,6 +140,11 @@ _ODDSAPI_NAME_SUPPLEMENT: Mapping[str, str] = {
     "citadel bulldogs": "The Citadel",
     "nicholls state": "Nicholls",
     "nicholls state colonels": "Nicholls",
+    # Read off 24 paper orders on LSU v McNeese State (2026-10-03), whose
+    # `away_team` is OddsAPI's "McNeese State Cowboys"; the registry's school
+    # is "McNeese" (FCS, Southland). Lane paper-evicted-grading, #744.
+    "mcneese state": "McNeese",
+    "mcneese state cowboys": "McNeese",
 
     # THE SCHOOL WAS RENAMED and the feed still carries the old name. The
     # registry is current; OddsAPI is not.

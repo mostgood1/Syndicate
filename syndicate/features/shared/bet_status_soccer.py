@@ -161,6 +161,16 @@ _ANYTIME_MARKETS = frozenset({
 })
 _SCORER_RACE_MARKETS = frozenset({"player_first_goal_scorer", "player_last_goal_scorer"})
 _ANYTIME_LINE = 0.5
+# MATCH CORNERS AND BOTH-TEAMS-TO-SCORE `[2026-10-27, lane paper-evicted-grading,
+# #744]`. Both refused `unmapped_market` forever -- 233 corners and 89 btts paper
+# orders on the fleet, corners being the LARGEST soccer board market
+# (`market_keys`). Both read off the per-league `match_box`: corners from ESPN's
+# own team stat line (`teams.{home,away}.stats.Corners`), btts from the score.
+# Full match only: no half-time corners count is kept.
+_CORNERS_MARKETS = frozenset({"alternate_totals_corners", "totals_corners"})
+_BTTS_MARKETS = frozenset({"btts"})
+_BTTS_LINE = 0.5
+REASON_NO_CORNERS = "soccer_box_carries_no_corners"
 
 
 def _norm(value: Any) -> str:
@@ -195,10 +205,60 @@ def soccer_status_resolver(selected_date: str):
         cache["matches"] = _load_matches(selected_date)
         return cache["matches"]
 
-    def boxes() -> list[dict[str, Any]]:
-        if "boxes" not in cache:
-            cache["boxes"] = _load_player_boxes(selected_date)
-        return cache["boxes"]
+    def boxes(order: Mapping[str, Any] | None = None) -> list[dict[str, Any]]:
+        """The match-box records for the order's GAME dates, else the slate's."""
+        dates = _game_dates(order, selected_date) if order is not None else []
+        if not dates:
+            if "boxes" not in cache:
+                cache["boxes"] = _load_player_boxes(selected_date)
+            return cache["boxes"]
+        out: list[dict[str, Any]] = []
+        for day in dates:
+            key = f"box:{day}"
+            if key not in cache:
+                cache[key] = _load_match_box_records([day])
+            out.extend(cache[key])
+        return out
+
+    def locate(order: Mapping[str, Any], *, need_box: bool) -> tuple[dict[str, Any] | None, str | None]:
+        """The match record for this order, or a named reason.
+
+        THE GAME'S OWN DATE, NOT THE SLATE'S `[2026-10-27, #744]`. A forward
+        bet is placed on one slate and played days later -- measured on the
+        fleet, 170 soccer game lines and most of the 322 corners/btts orders
+        were dated 10-04 for matches on 10-09..11 -- and every read here was
+        keyed on `selected_date`, so those orders could NEVER find their match.
+        The slate-date state still answers first whenever the game is on (or
+        beside) its slate, so in-play grading is unchanged; otherwise, and for
+        corners (which only the box carries), the per-league `match_box` files
+        are read around the kickoff date.
+        """
+        home_team, away_team = order.get("home_team"), order.get("away_team")
+        dates = _game_dates(order, selected_date)
+        on_slate = not dates or _within_a_day(dates[0], selected_date)
+        found = None
+        if on_slate and not need_box:
+            found = matches()
+            if found is not None:
+                for candidate in found:
+                    if teams_match("soccer", home_team, candidate.get("home_team")) and teams_match(
+                        "soccer", away_team, candidate.get("away_team")
+                    ):
+                        return candidate, None
+        records = boxes(order)
+        paired = [
+            r for r in records
+            if teams_match("soccer", home_team, r.get("home_team"))
+            and teams_match("soccer", away_team, r.get("away_team"))
+        ]
+        if paired:
+            # Dates are read nearest-the-kickoff first; a finished copy beats an
+            # in-play one, since a file can hold a match the poller left mid-game.
+            final = [r for r in paired if r.get("final") or str(r.get("status_state") or "").lower() == "post"]
+            return _box_as_match((final or paired)[0]), None
+        if on_slate and not need_box and found is None and not records:
+            return None, REASON_NO_LIVE_STATE
+        return None, REASON_MATCH_NOT_FOUND
 
     def resolve(order: Mapping[str, Any]) -> dict[str, Any]:
         if _norm(order.get("sport")) != "soccer":
@@ -237,11 +297,15 @@ def soccer_status_resolver(selected_date: str):
             stat = "goals" if anytime else _PROP_STATS.get(canonical)
             if stat is None or segment != FULL_GAME_SEGMENT:
                 return {"unavailable_reason": REASON_PROP_MARKET}
-            return _resolve_prop(order, stat, anytime, boxes())
+            return _resolve_prop(order, stat, anytime, boxes(order))
         is_total = canonical in _GAME_TOTAL_MARKETS
+        is_corners = canonical in _CORNERS_MARKETS
+        is_btts = canonical in _BTTS_MARKETS
         is_line = is_game_line_market("soccer", market)
-        if not (is_total or is_line):
+        if not (is_total or is_line or is_corners or is_btts):
             return {"unavailable_reason": REASON_UNKNOWN_MARKET}
+        if (is_corners or is_btts) and segment != FULL_GAME_SEGMENT:
+            return {"unavailable_reason": f"{REASON_UNSUPPORTED_SEGMENT_PREFIX}{segment}"}
 
         home_team, away_team = order.get("home_team"), order.get("away_team")
         if not home_team or not away_team:
@@ -250,19 +314,32 @@ def soccer_status_resolver(selected_date: str):
             # here that would be anything but a guess.
             return {"unavailable_reason": REASON_NO_MATCHUP}
 
-        found = matches()
-        if found is None:
-            return {"unavailable_reason": REASON_NO_LIVE_STATE}
-
-        record = None
-        for candidate in found:
-            if teams_match("soccer", home_team, candidate.get("home_team")) and teams_match(
-                "soccer", away_team, candidate.get("away_team")
-            ):
-                record = candidate
-                break
+        record, refusal = locate(order, need_box=is_corners)
         if record is None:
-            return {"unavailable_reason": REASON_MATCH_NOT_FOUND}
+            return {"unavailable_reason": refusal}
+        if str(record.get("status_state") or "").strip().lower() == "pre":
+            return {"current_value": None, "is_final": False, "started": False}
+
+        if is_corners or is_btts:
+            home = _as_float(record.get("home_score"))
+            away = _as_float(record.get("away_score"))
+            is_final = bool(record.get("final"))
+            if is_btts:
+                if home is None or away is None:
+                    return {"unavailable_reason": REASON_NO_SCORES}
+                # 1 when both teams have scored, against a 0.5 line: "yes" is an
+                # over and "no" an under in the grader's own vocabulary.
+                return {
+                    "current_value": 1.0 if home > 0 and away > 0 else 0.0,
+                    "line": _BTTS_LINE,
+                    "is_final": is_final,
+                    "started": True,
+                }
+            corners = record.get("corners")
+            if not corners or corners[0] is None or corners[1] is None:
+                # Both teams' counts or nothing: a missing count is not zero.
+                return {"unavailable_reason": REASON_NO_CORNERS}
+            return {"current_value": corners[0] + corners[1], "is_final": is_final, "started": True}
 
         if segment == FULL_GAME_SEGMENT:
             home = _as_float(record.get("home_score"))
@@ -349,25 +426,99 @@ def _load_player_boxes(selected_date: str) -> list[dict[str, Any]]:
     """
     from datetime import date, timedelta
 
+    try:
+        day = date.fromisoformat(str(selected_date)[:10])
+    except ValueError:
+        return []
+    return _load_match_box_records([(day + timedelta(days=offset)).isoformat() for offset in (0, -1, 1)])
+
+
+def _load_match_box_records(dates: list[str]) -> list[dict[str, Any]]:
+    """Every per-league `match_box` record filed under each date, in the order given.
+
+    The one reader of those files for both props and game lines. Never raises.
+
+    READ THROUGH `soccer.sources.live_state_payload`, which tries the state
+    store and then the poller's own file on disk. The poller writes these files
+    straight to disk (`poll_soccer_live_state.py`, `out_path.write_text`), while
+    a bare `read_json_file` on the keyvalue backend asks Redis only, where a
+    dated key lives ten days at most. Measured on the fleet 2026-10-27 over
+    the 497 stale soccer paper orders, with kickoff-date binding in both runs:
+    the Redis-only read graded 25, this read 494; every league's file for
+    09-30..10-27 was on disk (lane paper-evicted-grading, #744).
+    """
     out: list[dict[str, Any]] = []
     try:
-        from syndicate.features.shared.refresh_state_store import data_root, read_json_file
-        from syndicate.features.soccer.sources import LEAGUE_DISPLAY_NAMES
+        from syndicate.features.soccer.sources import LEAGUE_DISPLAY_NAMES, live_state_payload
 
-        day = date.fromisoformat(str(selected_date)[:10])
-        root = data_root()
-        for offset in (0, -1, 1):
-            stamp = (day + timedelta(days=offset)).isoformat()
+        for stamp in dates:
             for league in list(LEAGUE_DISPLAY_NAMES):
-                payload = read_json_file(
-                    root / "soccer_source" / str(league) / "api" / "live_state" / f"live_state_{stamp}.json"
-                )
+                payload = live_state_payload(str(league), stamp)
                 match_box = payload.get("match_box") if isinstance(payload, Mapping) else None
                 if isinstance(match_box, Mapping):
                     out.extend(dict(r) for r in match_box.values() if isinstance(r, Mapping))
     except Exception:
         return out
     return out
+
+
+def _game_dates(order: Mapping[str, Any] | None, selected_date: str) -> list[str]:
+    """The UTC kickoff date, then the day before and after, or [] with no kickoff.
+
+    ESPN files a match under its own (US) date, which can sit a day either side
+    of the UTC kickoff; the kickoff date is read first so a match is never
+    answered from a neighbouring day while its own day has it.
+    """
+    from datetime import datetime, timedelta
+
+    raw = str((order or {}).get("commence_time") or "").strip()
+    if not raw:
+        return []
+    try:
+        kickoff = datetime.fromisoformat(raw.replace("Z", "+00:00")).date()
+    except ValueError:
+        return []
+    return [(kickoff + timedelta(days=offset)).isoformat() for offset in (0, -1, 1)]
+
+
+def _within_a_day(one: str, two: str) -> bool:
+    from datetime import date
+
+    try:
+        return abs((date.fromisoformat(one[:10]) - date.fromisoformat(str(two)[:10])).days) <= 1
+    except ValueError:
+        return False
+
+
+def _box_as_match(record: Mapping[str, Any]) -> dict[str, Any]:
+    """A `match_box` record in `_load_matches`' shape, plus both teams' corners.
+
+    Scores are `score_home` / `score_away` here; final is the poller's own
+    `final` boolean or ESPN's `post` state, never the clock.
+    """
+    state = str(record.get("status_state") or "").strip().lower()
+    stats = record.get("teams") if isinstance(record.get("teams"), Mapping) else {}
+
+    def corners(side: str) -> float | None:
+        block = stats.get(side) if isinstance(stats.get(side), Mapping) else {}
+        line = block.get("stats") if isinstance(block.get("stats"), Mapping) else {}
+        return _as_float(line.get("Corners"))
+
+    return {
+        "home_team": record.get("home_team"),
+        "away_team": record.get("away_team"),
+        "home_score": record.get("score_home"),
+        "away_score": record.get("score_away"),
+        "final": bool(record.get("final")) or state == "post",
+        "in_progress": state == "in",
+        "status_state": state,
+        "status_detail": record.get("status_detail"),
+        "home_linescores": record.get("home_linescores"),
+        "away_linescores": record.get("away_linescores"),
+        "period": record.get("status_period"),
+        "corners": (corners("home"), corners("away")),
+        "source": "soccer_match_box",
+    }
 
 
 def _name_keys(name: Any) -> tuple[str, str]:
