@@ -1211,7 +1211,7 @@ death, never life — do not invert it.
 
 ### scheduled-task-registry-alert — OPEN — opened 2026-10-28 — session 9af4433f-62e0-4e4f-a082-92522092d7f8
 - Goal: An alert that does NOT live in the Claude desktop app's task registry fires (Windows toast + non-zero exit) when the registry is lost or the dispatch watchdog stops running while the machine is awake: checker + hermetic test on main, one reading (fresh -> silent, simulated stale -> alert) in deploys.md; the Windows Task Scheduler job created ONLY on the user's explicit yes.
-- Files: scripts/check_scheduled_task_registry.py (NEW), tests/test_check_scheduled_task_registry.py (NEW)
+- Files: scripts/check_scheduled_task_registry.py (NEW), tests/test_check_scheduled_task_registry.py (NEW), deploy/local/install_task_registry_check.ps1 (NEW)
 - Hypothesis: n/a
 - Falsification test: n/a
 - Verification: py -3 -m pytest tests/test_check_scheduled_task_registry.py; live run against the real state.json + registry file (expect OK, exit 0, no toast); --now override past the next due time (expect STALE, exit 1, toast shown)
