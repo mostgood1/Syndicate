@@ -12758,3 +12758,21 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Files: none (ledger-only)
 - Verdict: MET. owner_liveness.py --idle-min 240 at 23:42Z (18:42 CDT) returned 1 SAFE of 6 CLOSED; moved to lanes_closed.md with one pointer. Table and deferrals are in log/2026-10-27.md 23:44Z.
 - Moved: closed-lane-archive-20261027-1331
+
+### closed-lane-archive-20261027-2046 — CLOSED 2026-10-27 (GOAL MET: 1 block archived) — opened 2026-10-27 — session 77c27c5c-ab6e-4679-8370-bd8e164ff28c
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: MET. owner_liveness.py --idle-min 240 at 01:41Z (20:41 CDT) returned 1 SAFE of 6 CLOSED; moved to lanes_closed.md with one pointer. Table and deferrals are in log/2026-10-27.md 01:41Z.
+- Moved: closed-lane-archive-20261027-1456
+
+### closed-lane-archive-20261027-2240 — CLOSED 2026-10-27 (GOAL MET: 2 blocks archived) — opened 2026-10-27 — session d4ef7aae-2abd-48dc-baaf-bd231e874d31
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 read SAFE for 2 of 6 CLOSED blocks; both moved to lanes_closed.md with one pointer each. Reading in log/2026-10-27.md.
+- Moved: e4-combo-correlation, closed-lane-archive-20261027-1640
+
+### closed-lane-archive-20261028-0040 — CLOSED 2026-10-28 (GOAL MET: 1 block archived) — opened 2026-10-28 — session 91200a57-f194-475e-9d7c-4b8815303421
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 1 of 6 CLOSED SAFE; dry run, invariant baseline (4 pre-existing contests, unchanged) and --apply all clean.
+- Moved: closed-lane-archive-20261027-1841. Table and WAIT reasons: log/2026-10-28.md.
