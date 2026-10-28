@@ -125,8 +125,134 @@ def void_order(order: Mapping[str, Any], reason: str) -> dict[str, Any]:
 
 
 def _outcome_key(verdict: Mapping[str, Any]) -> str:
-    """The tally key: a void is counted as a void, not hidden among the pushes."""
-    return "void" if verdict.get("void_reason") else str(verdict.get("outcome"))
+    """The tally key: a void or a fair-price settlement is counted as itself, not hidden among the pushes."""
+    if verdict.get("void_reason"):
+        return "void"
+    if verdict.get("fair_price_reason"):
+        return "fair_price"
+    return str(verdict.get("outcome"))
+
+
+# ON KALSHI, A PLAYER WHO DID NOT PLAY IS NOT A VOID [user decision 2026-10-28,
+# `#744`: "Yes, build it"]. Kalshi's rule on its player markets: "If a player is
+# inactive, or active but never takes the court, the market settles to a fair
+# price." MEASURED 14:41Z on the 9 tickers that 10 `paper:kalshi:ladder` voids
+# priced against: every one `finalized`, result `scalar`, settled at $0.41-$0.65.
+# Voided, those 10 read $0.00 with their stake out of ROI; at Kalshi's prices
+# they were +$0.60 gross on $10. So a Kalshi venue settles at the market's fair
+# price, a push (neither won nor lost, so out of hit rate) with its stake IN the
+# ROI denominator, as the Kalshi account shows it. Books, and the exchanges
+# whose rule nobody has read, keep the void.
+REASON_KALSHI_FAIR_PRICE = "kalshi_dnp_fair_price"
+REASON_KALSHI_NO_TICKER = "kalshi_dnp_no_ticker"
+REASON_KALSHI_LEG_UNMAPPABLE = "kalshi_dnp_leg_unmappable"
+REASON_KALSHI_UNREADABLE = "kalshi_market_unreadable"
+REASON_KALSHI_NOT_SETTLED = "kalshi_market_not_settled"
+# ESPN says he did not play and Kalshi settled the market yes/no as if he did.
+# Two authorities disagreeing is a finding, not a tie to break by guessing.
+REASON_KALSHI_RESULT_BINARY = "kalshi_dnp_market_result_binary"
+REASON_KALSHI_VALUE_UNREADABLE = "kalshi_fair_value_unreadable"
+
+_KALSHI_SETTLED_STATUSES = frozenset({"finalized", "settled"})
+# Settled markets only: a settled result never changes, an open one must be re-read.
+_KALSHI_MARKET_MEMO: dict[str, dict[str, Any]] = {}
+
+
+def _is_kalshi_venue(order: Mapping[str, Any]) -> bool:
+    """`kalshi`, `paper:kalshi`, `paper:kalshi:ladder` -- the test `settle_orders` uses for exits."""
+    return "kalshi" in str(order.get("venue") or "").lower()
+
+
+def _kalshi_market(ticker: str) -> dict[str, Any] | None:
+    """Kalshi's public market record for `ticker`, or None when no base URL answered."""
+    import urllib.parse
+
+    memo = _KALSHI_MARKET_MEMO.get(ticker)
+    if memo is not None:
+        return memo
+    from syndicate.features.shared.kalshi_client import _BASE_URLS, _MARKETS_PATH, _get
+
+    for base in _BASE_URLS:
+        try:
+            payload = _get(f"{base}{_MARKETS_PATH}/{urllib.parse.quote(ticker, safe='')}", timeout=10.0)
+        except Exception:  # noqa: BLE001 -- next base; all failing is a named refusal
+            continue
+        market = payload.get("market")
+        if not isinstance(market, Mapping):
+            continue
+        market = dict(market)
+        if str(market.get("status") or "").strip().lower() in _KALSHI_SETTLED_STATUSES and str(market.get("result") or "").strip():
+            _KALSHI_MARKET_MEMO[ticker] = market
+        return market
+    return None
+
+
+def kalshi_fair_price_order(
+    order: Mapping[str, Any], reason: str, market: Mapping[str, Any] | None, leg: str
+) -> dict[str, Any]:
+    """A filled Kalshi bet on a player who did not play -> settled at the market's fair price.
+
+    Pure, like `grade_order`: `market` is Kalshi's record, `leg` the venue leg held.
+    `settlement_value_dollars` is the YES leg's value; a NO leg is worth the rest.
+    A contract bought at $p and settled at $v returns v / p per dollar staked, and
+    the fee left the account at the fill, so it is netted here as in `grade_order`.
+    """
+    if str(order.get("status") or "") != "filled":
+        return {"graded": False, "reason": REASON_NOT_FILLED}
+    if market is None:
+        return {"graded": False, "reason": REASON_KALSHI_UNREADABLE}
+    result = str(market.get("result") or "").strip().lower()
+    if result in {"yes", "no"}:
+        return {"graded": False, "reason": REASON_KALSHI_RESULT_BINARY}
+    if result != "scalar" or str(market.get("status") or "").strip().lower() not in _KALSHI_SETTLED_STATUSES:
+        return {"graded": False, "reason": REASON_KALSHI_NOT_SETTLED}
+    value = _as_float(market.get("settlement_value_dollars"))
+    if value is None or not 0.0 <= value <= 1.0:
+        return {"graded": False, "reason": REASON_KALSHI_VALUE_UNREADABLE}
+
+    stake = _as_float(order.get("fill_stake_dollars"))
+    profit_multiple = profit_per_dollar(order.get("fill_price"))
+    if stake is None or stake <= 0 or profit_multiple is None:
+        return {"graded": False, "reason": REASON_NO_PRICE}
+    entry = 1.0 / (1.0 + profit_multiple)
+    leg_value = value if leg == "yes" else 1.0 - value
+    gross = stake * (leg_value / entry - 1.0)
+    fees = _as_float(order.get("fees_dollars")) or 0.0
+    return {
+        "graded": True,
+        "outcome": OUTCOME_PUSH,
+        "pnl_dollars": round(gross - fees, 4),
+        "pnl_gross_dollars": round(gross, 4),
+        "settled_value": None,
+        "line": order.get("line"),
+        "fair_price_reason": REASON_KALSHI_FAIR_PRICE,
+        "dnp_reason": reason,
+        "venue_fair_value": round(leg_value, 4),
+    }
+
+
+def _kalshi_dnp_verdict(order: Mapping[str, Any], reason: str) -> dict[str, Any]:
+    """`kalshi_fair_price_order` with its inputs read; no network for a row it would refuse anyway."""
+    if str(order.get("status") or "") != "filled":
+        return {"graded": False, "reason": REASON_NOT_FILLED}
+    ticker = str(order.get("venue_ticker") or "").strip()
+    if not ticker:
+        return {"graded": False, "reason": REASON_KALSHI_NO_TICKER}
+    from syndicate.features.shared.kalshi_orders import _side_to_kalshi
+
+    try:
+        # The order builder's own mapping, so the leg settled is the leg bought.
+        leg = _side_to_kalshi(order.get("side"), order.get("market"), order.get("line"))
+    except Exception:  # noqa: BLE001 -- refuses rather than guess a leg
+        return {"graded": False, "reason": REASON_KALSHI_LEG_UNMAPPABLE}
+    if leg not in {"yes", "no"}:
+        return {"graded": False, "reason": REASON_KALSHI_LEG_UNMAPPABLE}
+    return kalshi_fair_price_order(order, reason, _kalshi_market(ticker), leg)
+
+
+def _void_superseded(row: Mapping[str, Any]) -> bool:
+    """A void on a Kalshi venue: graded by the books' rule before Kalshi's was read, so stale."""
+    return bool(row.get("void_reason")) and _is_kalshi_venue(row) and dnp_void_enabled()
 
 # THE VENUE GETS FIRST REFUSAL ON A LIVE ORDER [user decision 2026-08-26].
 #
@@ -351,7 +477,10 @@ def _our_verdict(
         # `no_game_pk`, `no_feed` and `no_stat` are three different jobs.
         reason = str(resolved["unavailable_reason"])
         if reason in DNP_VOID_REASONS and dnp_void_enabled():
-            verdict = void_order(order, reason)
+            if _is_kalshi_venue(order):
+                verdict = _kalshi_dnp_verdict(order, reason)
+            else:
+                verdict = void_order(order, reason)
             if not verdict.get("graded"):
                 return None, resolved, str(verdict.get("reason"))
             return verdict, resolved, ""
@@ -494,6 +623,16 @@ def _stamp_grade(order: dict[str, Any], verdict: Mapping[str, Any], resolved: Ma
         for field in ("dnp_basis", "espn_athlete_id"):
             if resolved.get(field):
                 order[field] = resolved[field]
+    else:
+        # A re-grade supersedes an earlier void (`_void_superseded`); the stale
+        # reason would keep the new grade's stake out of ROI.
+        order.pop("void_reason", None)
+    if verdict.get("fair_price_reason"):
+        for field in ("fair_price_reason", "dnp_reason", "venue_fair_value"):
+            order[field] = verdict[field]
+        for field in ("dnp_basis", "espn_athlete_id"):
+            if resolved.get(field):
+                order[field] = resolved[field]
     # NOT `settled_at` -- that is the venue's clock and is already stamped.
     # See the module docstring; conflating them is the whole reason this
     # number read as zero.
@@ -510,7 +649,8 @@ def settle_orders(
 
     Idempotent by construction: an order carrying an `outcome` is skipped before
     the resolver is even asked, so re-running this cannot change a settled bet
-    and cannot cost a feed lookup for one either.
+    and cannot cost a feed lookup for one either. The one exception is a stale
+    Kalshi void (`_void_superseded`), re-graded once at Kalshi's fair price.
     """
     from syndicate.features.shared.bet_status import resolve_bet_status
     from syndicate.features.shared.execution_ledger import _load, _persist
@@ -559,7 +699,8 @@ def settle_orders(
     live_exits_error: str | None = None
 
     for order in orders:
-        if order.get("outcome"):
+        # A stale Kalshi void (`_void_superseded`) is graded again, not skipped.
+        if order.get("outcome") and not _void_superseded(order):
             already += 1
             # CROSS-EXAMINE THE VENUE'S GRADES ON THE WAY PAST. A settled row is
             # skipped for GRADING -- that idempotence is load-bearing and is not
@@ -650,6 +791,10 @@ def settle_orders(
             continue
 
         if exit_effect == "sold" and exit_row is not None:
+            if verdict.get("fair_price_reason"):
+                # `exit_adjusted_pnl` settles a push at cost, not at Kalshi's fair price.
+                _refuse("exit_fair_price_unsupported")
+                continue
             exit_pnl, exit_detail = _vs.exit_adjusted_pnl(order, verdict["outcome"], exit_row)
             if exit_pnl is None:
                 _refuse(str(exit_detail.get("refused") or "exit_refused"))
@@ -1182,7 +1327,7 @@ def settle_archived_orders(
     """Grade archive-only, ungraded, filled PAPER rows whose game has started.
 
     Candidates: the last archived copy per identity, `mode == paper`, filled,
-    no `outcome`, `selected_date` in [today - max_age_days, today], identity NOT
+    no `outcome` (or a stale Kalshi void, `_void_superseded`), `selected_date` in [today - max_age_days, today], identity NOT
     in the live document, and `commence_time` in the past (a row without one
     goes to the resolver, which decides). Grouped by `selected_date` and graded
     with that date's resolver -- the binding `settle_orders(selected_date)`
@@ -1268,7 +1413,9 @@ def settle_archived_orders(
                 )
 
         for row in archived:
-            if str(row.get("mode") or "") != PAPER or row.get("outcome"):
+            if str(row.get("mode") or "") != PAPER:
+                continue
+            if row.get("outcome") and not _void_superseded(row):
                 continue
             if str(row.get("status") or "") != "filled":
                 continue
