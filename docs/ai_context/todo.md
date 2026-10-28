@@ -27,6 +27,20 @@
 - **Fix (for the lane to pre-register):** a default-off grading pass over archived ungraded paper rows whose game is decided, appending the graded copy to the archive (`archived_orders` keeps the last copy per identity -- verify), then a one-off backfill from 10-02. Fleet writes are a user decision under the deploy locks.
 
 ### `#743` — **SGP `p_joint` CALIBRATION (from E4 `#740` c-ledger): NOT SHOWN miscalibrated — pooled +1.7 pts [-3.1, +6.4] on 971 clean tickets / 139 games. The lead's 3-6 pt over-prediction was mostly the GRADER: a ticket with an unresolved leg can be LOST but never WON (+2.4 pts [+1.3, +3.5] pooled, +4.3 [+2.6, +6.3] NHL), and 34% of NHL sheet-row SGP legs never grade (no `player_id`). Fix the calibration read + leg grading; keep `p_joint` as built** — 2026-10-27, lane `sgp-pjoint-calibration`, session 138eb1d7 (side session of local_668211d5); `.syndicate/findings_2026-10-27_sgp_pjoint_calibration.md`
+- **STATUS 2026-10-28 9:48 AM CT (14:48Z): (e) NHL hit-rate pool team match -- on main `c1a2fb4a`, NOT on the fleet; changes 0 legs on 12 days of history** -- lane `nhl-hitrate-pool-team-match` (session a6134f5b), CLOSED.
+  - **The defect:** `sgp_pool.GameLog.resolve` compared raw team strings, and the NHL log spells one club several ways ('MIN' / 'Minnesota Wild'; 'St. Louis Blues' where the board writes 'St Louis Blues'). So 90 in-lineup player-days in 12 days were never evaluated for the pool.
+  - **The fix:**
+    - match by club (`canonical_team`; an exact match still counts);
+    - among 2+ same-key hits, only players with a game in the log's latest season count;
+    - every pool leg carries the board's team string, because tickets tell teammate from opponent by string.
+  - **Pre-registered, and the first build was FALSIFIED** (`9bf4c00f`): Jaccob Slavin stopped resolving on 6 day-games. A past-season namesake ('CAR', 2 games, the last 2026-04-11) now tied him. The season filter is amendment A1 (`626867c6`), registered before re-measuring.
+  - **Measured with A1** (10-28 read-only fleet snapshot, 12 sheet days, raw vs A1, both on the post-(d) key):
+    - 90 player-days newly resolved; 0 lost; 0 pid changed (2,721 same); `no_game_log` 340 -> 53;
+    - 22 multi-hit cases: the season filter resolves 6 (Slavin); 16 still refuse (Pettersson, Johansson: both active);
+    - **pool 173 = 173 legs, tickets 23 = 23.** The newly resolved players' 865 extra rungs fail the gates, 833 of them the market gate. So the fix widens what is EVALUATED, and no leg or ticket in this history changes;
+    - 0 kept-leg changes; 0 legs with a non-board team; 0 relation disagreements over 896 pairs.
+  - Tests: `tests/test_nhl_sgp_pool_team_match.py`, 7. 4 of them fail on the raw-string resolve. 140 passed across the NHL SGP, leg-grading and cheat-sheet suites.
+  - **Fleet:** rides the same user-decided fleet ff as (d) (a SHA at or after `c1a2fb4a`, then a full down/up).
 - **STATUS 2026-10-28 8:51 AM CT (13:51Z): (d) FIXED on main `f2062fb3`, NOT on the fleet; (c) SCHEDULED** -- lane `nhl-v-initial-name-key` (session a6134f5b, side session of local_898e5510), CLOSED.
   - **(d)** `prop_evidence.common.name_key_loose` no longer drops the FIRST token as a suffix, so `initial_key("V. Trocheck")` == `"v trocheck"`. Real suffixes after the first token still drop ("Kenneth Walker III", "Some Name V"). Tests: `tests/test_name_key_leading_initial.py`, 18 pass, and 6 fail on the old code, `GameLog.resolve` included. 316 passed across the callers' suites.
   - **Measured on a read-only fleet snapshot** (10-28 8:36-8:39 AM CT, fleet `84967f75`), old key vs new. Scratch: `C:\tmp\nhlvkey\` (`snap_manifest.txt`, `measure.py` / `measure2.py` and their `.json`).

@@ -1219,7 +1219,7 @@ death, never life — do not invert it.
 - Verdict: MET. owner_liveness.py --idle-min 240 at 13:44Z (08:44 CDT) returned 3 SAFE of 9 CLOSED; moved to lanes_closed.md with one pointer each. Table and deferrals are in log/2026-10-28.md 13:44Z.
 - Moved: closed-lane-archive-20261027-2046, closed-lane-archive-20261027-2240, closed-lane-archive-20261028-0040
 
-### nhl-hitrate-pool-team-match — OPEN — opened 2026-10-28 — session a6134f5b-5e22-4d44-a4a2-4f2c1ba43772
+### nhl-hitrate-pool-team-match — CLOSED 2026-10-28 (GOAL MET with A1: on main c1a2fb4a, measured; first build FALSIFIED as registered) — opened 2026-10-28 — session a6134f5b-5e22-4d44-a4a2-4f2c1ba43772
 - Goal: Todo #743 (e): the NHL hit-rate pool (sgp_pool.GameLog.resolve) matches a player's latest log team to tonight's game CANONICALLY (raw match kept), and every pool leg carries the board's own team string, so teammate/opponent stays consistent; measured on the 10-28 read-only fleet snapshot (players resolved, pool legs, relations) before/after; hermetic tests; landed on main; fleet ff is a user decision
 - Files: syndicate/features/nhl/sgp_pool.py (GameLog.resolve + a team-spelling helper + the pool leg's team field ONLY), tests/test_nhl_sgp_pool_team_match.py (NEW), docs/ai_context/todo.md (#743 section only)
 - Hypothesis: The 90 in-lineup player-days (12 sheet days, 10-28 snapshot) that miss the pool with no_game_log resolve only on team spelling ('St Louis Blues' vs 'St. Louis Blues', 'MIN' vs 'Minnesota Wild'); matching canonically admits them, and pool legs are added only for those players
@@ -1227,6 +1227,7 @@ death, never life — do not invert it.
 - Verification: Snapshot replay of legs_by_game old vs new over the 12 sheet days: no_game_log, pool legs added/removed (cap vs other), relation of every pool-leg pair under raw string vs canonical comparison; hermetic tests incl. off != on (raw-only resolve fails them); test_nhl_sgp_pool + test_nhl_sgp + test_sgp_leg_grading pass
 - Result 1 2026-10-28, read before 14:44Z (9:44 AM CT) (snapshot, fix as first built): **FALSIFIED as registered.** Jaccob Slavin stops resolving on 6 day-games: a second J. Slavin (pid 8481004, 2 games, last 2026-04-11, logged 'CAR') now matches by club and the two tie; the raw compare had hidden him. Also: 90 player-days newly resolved, but 0 pool legs added (+865 rungs, +833 of them fail the market gate); pool 173 = 173 legs, tickets 23 = 23; 0 pid changes; 0 relation disagreements over 896 pairs.
 - A1 (registered BEFORE re-measuring): among 2+ same-key hits, keep only players with a game in the log's latest season; refuse if that leaves 0 or 2+. Falsified if, on the same snapshot, any previously resolved (day, event, player) still stops resolving or changes pid, or the season filter resolves any key where 2+ candidates played this season.
+- Result 2 (A1) 2026-10-28 14:48Z: A1 NOT falsified. 0 lost / 0 pid changed / 90 newly resolved; 6 of 22 multi-hit keys resolved by the season filter (Slavin), 16 with 2+ in-season still refuse; pool 173 = 173, tickets 23 = 23 (0 legs gained: the new rungs fail the market gate); 0 relation disagreements / 896 pairs. On main `c1a2fb4a`; NOT on the fleet (user decision). Record: todo #743 (e), log/2026-10-28.md 14:48Z.
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
