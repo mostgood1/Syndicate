@@ -332,6 +332,23 @@ def _compact_draw(h_box: Dict[str, Any], a_box: Dict[str, Any], hq: Any, aq: Any
     return out
 
 
+def injury_history_snapshot(raw: Path, d: str, history_csv: Path) -> Dict[str, int]:
+    """Write slate date `d`'s rows of a historical injury feed as `raw`/injuries.csv (lane basketball-player-distribution
+    step 1d: prepare_scratch deletes that file, so injured / inactive players kept their minutes in every resim). The
+    feed (scripts/nba_injury_history_build.py) is the official NBA report as of each game's tip - 30 min, so every row
+    is pregame; the SmartSim reads it as production reads the live report."""
+    import pandas as pd
+
+    hist = pd.read_csv(history_csv)
+    day = hist[hist["date"].astype(str) == d]
+    if day.empty:
+        return {"rows": 0}
+    raw.mkdir(parents=True, exist_ok=True)
+    day.to_csv(raw / "injuries.csv", index=False)
+    excluded = day["status"].astype(str).str.upper().isin({"OUT", "DOUBTFUL", "SUSPENDED", "INACTIVE", "REST"})
+    return {"rows": len(day), "teams": int(day["team"].nunique()), "excluded": int(excluded.sum())}
+
+
 def asof_roster(proc: Path, d: str, recent_days: int = 30) -> Dict[str, int]:
     """Rewrite `proc`/rosters_<season>.csv AS OF slate date `d` (lane basketball-player-distribution step 1b: the resim
     tree holds only the END-of-season roster, so deadline acquisitions were simulated for their new team all season
@@ -711,6 +728,9 @@ def run_sim(args) -> int:
             shutil.copy2(extra, scratch / "nba_source" / "data" / "processed" / Path(extra).name)
         if args.asof_roster:
             print(f"ASOF_ROSTER {d} {json.dumps(asof_roster(scratch / 'nba_source' / 'data' / 'processed', d))}", flush=True)
+        if args.injury_history:
+            snap = injury_history_snapshot(scratch / "nba_source" / "data" / "raw", d, Path(args.injury_history))
+            print(f"INJURY_HISTORY {d} {json.dumps(snap)}", flush=True)
         games.clear()
         job_rec.clear()
         src_root = scratch / "nba_source"
@@ -999,6 +1019,8 @@ def main(argv=None) -> int:
     ap.add_argument("--copy-file", action="append", help="extra production switch file copied into each scratch")
     ap.add_argument("--asof-roster", action="store_true",
                     help="rewrite the scratch season roster as of each slate date (default off: the end-of-season file)")
+    ap.add_argument("--injury-history", help="historical injury feed CSV (nba_injury_history_build.py) written as "
+                                             "each date's raw/injuries.csv (default off: no injury feed)")
     ap.add_argument("--lever", action="append", help="EventSimConfig field=value applied to every draw (Phase 2 sweeps)")
     ap.add_argument("--engine-flag", action="append", help="module-level engine switch NAME=VALUE on the real events module (Phase 2 #1d)")
     ap.add_argument("--track-oncourt", action="store_true", help="record per-draw simulated minutes of the top-5 (Phase 2 #4)")

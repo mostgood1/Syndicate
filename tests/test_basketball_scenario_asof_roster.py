@@ -47,3 +47,19 @@ def test_after_the_deadline_the_file_team_stands(tmp_path):
 
 def test_missing_inputs_are_a_no_op(tmp_path):
     assert asof_roster(tmp_path, "2025-11-02") == {"skipped": 1}
+
+
+def test_injury_history_snapshot_writes_only_the_date(tmp_path):
+    from scripts.basketball_scenario_rates import injury_history_snapshot
+
+    hist = tmp_path / "hist.csv"
+    pd.DataFrame([
+        {"date": "2026-01-15", "team": "BOS", "player": "Hurt Guy", "status": "OUT", "source": "nba_official"},
+        {"date": "2026-01-15", "team": "WAS", "player": "Maybe Guy", "status": "QUESTIONABLE", "source": "nba_official"},
+        {"date": "2026-01-16", "team": "MIA", "player": "Tomorrow", "status": "OUT", "source": "nba_official"},
+    ]).to_csv(hist, index=False)
+    raw = tmp_path / "raw"
+    assert injury_history_snapshot(raw, "2026-01-15", hist) == {"rows": 2, "teams": 2, "excluded": 1}
+    assert sorted(pd.read_csv(raw / "injuries.csv")["player"]) == ["Hurt Guy", "Maybe Guy"]
+    assert injury_history_snapshot(tmp_path / "raw2", "2026-02-01", hist) == {"rows": 0}
+    assert not (tmp_path / "raw2" / "injuries.csv").exists()
