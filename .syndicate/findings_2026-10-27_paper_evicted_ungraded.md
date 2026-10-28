@@ -310,3 +310,13 @@ Scratch: `C:\tmp\peg\` (`dryrun.sh`, `dryrun.log`, `report_20261027T163701Z.json
 - **Soccer 3** (Rayo v Athletic), and football 6 (above).
 
 **The fixes go live for the LIVE book as well,** since `settle_orders`, its straggler dates and the archived pass share these resolvers. Until a fleet run of this code: a forward-dated soccer order, any corners or btts order, an NCAAF San José State or McNeese State order, an uncached MLB game, an NFL prop on a player with no catch, and every NCAAF prop cannot grade.
+
+## Re-scope apply `[2026-10-28 12:39Z-13:00Z, fleet, user-approved "Yes, apply both"; deploys.md 12:39:41Z]`
+
+- **NBA preseason boxes:** written as 11 Redis keys (10-day TTL) holding 57 final games and 1,695 player lines. **H5 CONFIRMED: 72 / 72** NBA preseason rows graded.
+- **Archive backfill on main `7abbe65c`:** 943 graded copies appended (452 won / 489 lost / 2 push). Closing marks on all 943, 880 with a CLV.
+- **Stale paper 988 -> 80.** Archive-only 951 -> 43; still gradeable 0. Across the lane, archive-only stale went 1,875 (10-27 17:20Z) -> 922 -> 43.
+- **A failed first attempt, mine:** a `| head -40` in the runner closed the pipe, and Python exited 120 before the append. Nothing was written; it was re-run with a log file.
+- **The 43 left are refused by name.** NBA DNPs 12 (see `findings_2026-10-28_nba_prop_wrong_game.md`), MLB 11, NHL 7, other NBA 5, soccer 3, NFL DNP 3, NCAAF 2.
+  - The DNP rows (NBA 12, NFL 3, NHL 1) need a paper void outcome, and that is a user decision (`#744` owed (b)).
+- **The 37 rows in the live document** are graded by the live `settle_orders` path, which still runs `0fca3f2b`. They wait on a fleet ff plus a full down/up, which is a user decision.

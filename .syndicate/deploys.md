@@ -54742,3 +54742,47 @@ which is about the two sizing bases and not about the refusal boundary.
 ## 2026-10-28 12:35Z -- DECISION on the 7168 cap: KEEP (lane fleet-refresh-worker-early-recycle, CLOSED)
 
 - **who:** user, verbatim 2026-10-28: "Keep 7168". No fleet change; the 06:31:42Z reading's missed safety bars (5 post_build_overview, peak 6,611 MB) are accepted, with 0 OOM. The rollback in the 06:20:21Z entry is NOT taken.
+
+## 2026-10-28 12:39:41Z / 13:00:16Z (7:39 / 8:00 AM CT) -- FLEET DATA WRITE + BACKFILL: 11 NBA preseason box keys, then 943 archived paper rows graded with the fixed resolvers (lane paper-evicted-grading, #744) -- **APPLIED; stale-count reading MET**
+- **user, verbatim (this lane's chat):** "Yes, apply both".
+  - It answered this lane's question "Apply the grades now (NBA preseason boxes, then the archive backfill under the refresh-worker claim)?".
+  - The fleet ff and the full down/up were NOT part of it.
+- **claim:** refresh-worker, holder `paper-evicted-grading`, acquired 12:39:34Z (it was free) and released 13:00:57Z with its token.
+  - No code deploy, no ff, no restart, no env change. So no preflight: no SHA loaded anywhere.
+- **what ran:** code `7abbe65c` (on origin/main), from the scratch extract `~/peg-dryrun/7abbe65c`.
+  - The extract is a `git archive` that excludes `data/` and `reports/`. The fleet checkout (`84967f75`) was not touched.
+  - Everything ran at `nice -n 19` with the refresh-worker's derived env (`_load_fleet_env`).
+- **step 1, NBA preseason boxes:** `scripts/backfill_nba_paper_grades.py boxes --dates 2026-10-04,05,06,07,08,09,11,12,13,14,16 --commit`.
+  - Runners: `C:\tmp\peg\boxes.sh`, `C:\tmp\peg\nba_boxes.py`.
+  - **Expectation:** a preview at 12:39:05Z (write replaced by a no-op; the read-back afterwards found 0 present) gave 11 dates, 57 games all final, 1,695 player lines.
+  - **Where it writes:** on this fleet these are REDIS keys, not disk files. `_keyvalue_backed` is True for all 11 paths, and they carry the 10-day date-scoped TTL, so they expire around 11-07. The graded archive copies do not depend on them afterwards.
+  - **Read-back 12:39:59Z:** present 0 -> 11, games 57, final 57, players 1,695. **MET.**
+- **step 2, archive backfill:** `scripts/backfill_archived_paper_grades.py --since 2026-10-02 --fleet-home ~/syndicate-prod --apply`.
+  - **Expectation**, from a read-only dry run at 12:40:12Z (archive sha256 unchanged):
+    - The pass: candidates 988, graded 943 (452 won / 489 lost / 2 push).
+    - Archive-only stale: 951, of which 908 would grade (95.5%).
+    - Side writes counted: 3 NCAAF poller capture persists.
+- **A FAILED FIRST ATTEMPT (12:41:34Z-12:47:35Z), mine.** The runner `apply2.sh` piped the apply through `| head -40`.
+  - Once the CLV join's log lines passed 40, head closed the pipe. The next print raised BrokenPipeError and Python exited 120 before the append.
+  - Read-only checks afterwards: nothing appended (`"graded_from":"archive"` 981 -> 981), no report written, and no process left running. `.archived_grading.lock` is the 0-byte flock file from 10-27.
+  - The shard did grow 77 lines in that window. All 77 are the live worker's own trims: NBA 63, MLB 12 and NCAAF 2 rows, already settled by the live path, with no `graded_from`.
+  - Re-run as `apply3.sh`, with the full output going to a log file.
+- **the write (12:49:26Z-13:00:16Z), `orders_2026-10.jsonl`:**
+  - Lines 20,822 -> 21,792. That is +970: the 943 graded copies plus 27 concurrent lines from the worker.
+  - Bytes 33,875,028 -> 35,508,916. sha256 `b7d86937ef305dec...` -> `7f206ec8727084fa...`.
+  - `"graded_from":"archive"` 981 -> **1,924** (+943 exactly).
+  - Outcomes: 452 won, 489 lost, 2 push. By sport: soccer 495, NCAAF 247, MLB 104, **NBA 72** (H5 72 / 72), NFL 25, NHL 0.
+  - Closing marks stamped on 943 rows, 880 of them with a CLV.
+  - Side writes are not counted in apply mode. The dry run predicted 3 NCAAF capture persists, which are the poller's own artifacts.
+- **reading** (a read-only re-read, 13:00:17Z-13:00:31Z):
+  - **Stale total: 988 -> 80.** Archive only: 951 -> 43. Live document: 37 -> 37. Rows still gradeable: 908 -> 0.
+  - **verdict MET.** The drop equals the dry run's would-grade count (908).
+- **the 43 archive-only rows left, each refused by name:**
+  - NBA `player_not_in_box` 12. These are DNPs: lane `nba-prop-wrong-game` found 0 of 1,605 NBA prop orders on the wrong game, and the NBA grader has no DNP path.
+  - MLB 11: `stat_not_in_feed` 5, `not_decided_yet` 4, rescheduled 2.
+  - NHL 7: ambiguous 4, unmatched 2, `dnp_void` 1.
+  - NBA 5: q4 3, h2 1, unmapped `player_double_double` 1.
+  - Soccer 3 (Rayo v Athletic, no record). NFL DNP void 3. NCAAF not in final box 2.
+- **blast radius:** the readers that now see the 943 rows are paper PNL/ROI, CLV, the min-ev tuner (shadow), `#727`'s refit and `#724`'s ladder count.
+  - Stake sizing: every sport was at credibility 1.000 at the 10-27 16:41Z read. That was NOT re-read today.
+- **NOT DONE: the fleet ff to >= `7abbe65c` and a full drained down/up.** Until then the LIVE `settle_orders` path runs `0fca3f2b`'s resolvers, and the archived pass key stays inert. That is a separate USER decision.
