@@ -56,6 +56,18 @@ def _initial_key(name: Any) -> str:
     return initial_key(name)
 
 
+def _canon(team: Any) -> str | None:
+    from syndicate.features.shared.team_aliases import canonical_team
+
+    return canonical_team("nhl", team) if team else None
+
+
+def _same_club(a: Any, b: Any) -> bool:
+    """One club, any spelling: the log writes 'MIN' and 'Minnesota Wild', 'St. Louis Blues' where the board writes
+    'St Louis Blues'. An exact match still counts when the alias map does not know the name."""
+    return bool(a) and (str(a) == str(b) or (_canon(a) is not None and _canon(a) == _canon(b)))
+
+
 def _log_name(raw: Any) -> str:
     from syndicate.features.shared.prop_evidence.nhl import _log_name as log_name
 
@@ -103,6 +115,7 @@ class GameLog:
         self.by_key: dict[str, list[str]] = collections.defaultdict(list)
         for pid, rows_ in self.games.items():
             self.by_key[_initial_key(_log_name(rows_[0].get("player")))].append(pid)
+        self.season = max((self.season_of(pid) for pid in self.games), default="")
 
     @classmethod
     def load(cls, data_root: Path) -> "GameLog":
@@ -121,10 +134,26 @@ class GameLog:
         return str(rows[0].get("team") or "") if rows else ""
 
     def resolve(self, name: Any, teams: Iterable[str]) -> str | None:
-        """The one player id with this initial + surname whose latest team is in tonight's game; None if 0 or 2+."""
-        teams = {str(t) for t in teams}
-        hits = [pid for pid in self.by_key.get(_initial_key(name), []) if self.team_of(pid) in teams]
+        """The one player id with this initial + surname whose latest team is in tonight's game; None if 0 or 2+.
+        Teams compare by club, not spelling: measured 2026-10-28 (todo #743 (e)), 90 lineup player-days in 12 days
+        missed the pool on spelling alone. A namesake whose last game was in a past season is not tonight's player
+        (J. Slavin, 'CAR': 2 games, the last 2026-04-11), so among 2+ only those with a game this season count."""
+        teams = [t for t in teams if t]
+        hits = [pid for pid in self.by_key.get(_initial_key(name), [])
+                if any(_same_club(self.team_of(pid), t) for t in teams)]
+        if len(hits) > 1:
+            hits = [pid for pid in hits if self.season_of(pid) == self.season]
         return hits[0] if len(hits) == 1 else None
+
+    def season_of(self, pid: str) -> str:
+        rows = self.games.get(pid) or []
+        return str(rows[0].get("gamePk") or "")[:4] if rows else ""
+
+    def board_team(self, pid: str, teams: Iterable[str]) -> str:
+        """`pid`'s latest club as tonight's board spells it. Tickets tell teammate from opponent by comparing leg teams
+        as strings, so every leg in a game carries the board's spelling, never the log's."""
+        own = self.team_of(pid)
+        return next((str(t) for t in teams if t and _same_club(own, t)), own)
 
     def values(self, pid: str, market: str, *, before: str | None = None, n: int = LEG_GAMES) -> list[tuple[str, float]]:
         """(gamePk, stat) for the player's last `n` played games before `before` (an Eastern date), newest first."""
@@ -211,6 +240,7 @@ def legs_by_game(sheet: Mapping[str, Any], data_root: Path, day: str, roles: Map
             continue
         lam = means.get((_norm(player), market))
         factor = margins.get(market) or margins["*"]
+        team = log.board_team(pid, (game.get("home"), game.get("away")))
         for rung, books in ladder.items():
             counts["rungs"] += 1
             p_market = shared.market_prob(books, factor)
@@ -221,7 +251,7 @@ def legs_by_game(sheet: Mapping[str, Any], data_root: Path, day: str, roles: Map
             p_leg = shared.leg_prob(p_market, hits, len(history))
             counts["legs"] += 1
             out[event].append({
-                "player": player, "team": log.team_of(pid), "market": market, "side": "over", "line": rung,
+                "player": player, "team": team, "market": market, "side": "over", "line": rung,
                 "p_over": p_leg, "p_side": p_leg, "type": f"{market}|{role}", "role": role, "prices": dict(books),
                 "event_id": event, "p_market": round(p_market, 4), "p_sim": round(p_sim, 4), "hits": hits,
                 "games": len(history), "alt": True, "player_id": pid, "_history": history,
