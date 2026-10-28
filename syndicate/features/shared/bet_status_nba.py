@@ -27,6 +27,26 @@ and every tri-code the tick writes (30 of 30 each, checked); `nba/cards.py`'s
 NOT SEGMENT-AWARE. The box is whole-game, so a first-half or quarter bet refuses
 with the shared `actual_is_full_game_not_<seg>` reason rather than grading off
 the full game.
+
+DID NOT PLAY (2026-10-28, user decision "Yes, void them", `#744`). The box keeps
+only players with minutes, so a player who sat out is ABSENT -- and absence alone
+cannot tell a sat-out player from a name the box spells differently. ESPN,
+read on the three known games:
+
+    dressed, sat out   core game roster: `didNotPlay: true`, no statistics
+                       (Kawhi Leonard, 401909864, "LEFT KNEE SWELLING")
+    inactive           absent from the summary box, the core game roster AND
+                       the current injury list (LeBron James 401909855, Kyrie
+                       Irving 401909858)
+
+So for a FINAL game more than six hours past tip, a player absent from the box
+is matched by name to ONE athlete on the two clubs' ESPN team rosters, and that
+athlete's ID is looked up among the game roster's `playerId`s: `didNotPlay`
+with no statistics, or absent from both game rosters, is `REASON_DNP_VOID`,
+which `paper_settlement` settles as a void. A name no team-roster athlete
+carries refuses -- it never voids -- so absence is judged by ID, never by name.
+The reads are `bet_status_nfl.EspnSettlementFeed`'s, with its timeout and its
+process-wide refusal memo.
 """
 
 from __future__ import annotations
@@ -36,7 +56,7 @@ from typing import Any
 
 from syndicate.features.shared.bet_status import segment_refusal
 
-__all__ = ["nba_status_resolver", "REASON_NO_BOX"]
+__all__ = ["nba_status_resolver", "did_not_play", "REASON_NO_BOX", "REASON_DNP_VOID"]
 
 REASON_NO_EVENT_ID = "no_event_id"
 REASON_NO_BOX = "no_live_box_for_date"
@@ -47,6 +67,21 @@ REASON_UNMAPPED_MARKET = "unmapped_market"
 REASON_PLAYER_NOT_FOUND = "player_not_in_box"
 REASON_NO_STAT = "stat_not_in_box"
 REASON_NO_TEAM_SCORES = "no_team_scores_in_live_box"
+# Did-not-play, settlement-only (module docstring). Only REASON_DNP_VOID voids.
+REASON_DNP_VOID = "nba_player_did_not_play_void"
+REASON_ROSTER_UNAVAILABLE = "nba_game_roster_unavailable"
+REASON_NOT_ON_TEAM_ROSTER = "nba_player_not_on_either_team_roster"
+REASON_ROSTER_AMBIGUOUS = "nba_player_ambiguous_on_team_rosters"
+REASON_PLAYED_NOT_IN_BOX = "nba_player_played_but_not_in_box"
+REASON_PARTICIPATION_UNKNOWN = "nba_player_participation_unproven"
+
+_DEFINITIVE_ROSTER_REFUSALS = frozenset(
+    {REASON_DNP_VOID, REASON_NOT_ON_TEAM_ROSTER, REASON_ROSTER_AMBIGUOUS, REASON_PLAYED_NOT_IN_BOX,
+     REASON_PARTICIPATION_UNKNOWN}
+)
+# An NBA team dresses at least eight. Fewer game-roster rows than two of those is
+# a partial read, and a partial read cannot say a player was absent.
+_MIN_GAME_ROSTER_ENTRIES = 16
 
 # Canonical board market -> the key the box row carries (the live tick's own
 # spelling, `_live_extract_player_boxscore_from_espn_summary`).
@@ -225,10 +260,56 @@ def _game_line(order: Mapping[str, Any], market: str, game: Mapping[str, Any], m
     return {**view, **stamp, **scores}
 
 
-def nba_status_resolver(selected_date: str):
+def _athlete_names(athlete: Mapping[str, Any]) -> set[str]:
+    first, last = str(athlete.get("firstName") or "").strip(), str(athlete.get("lastName") or "").strip()
+    names = (athlete.get("fullName"), athlete.get("displayName"), f"{first} {last}".strip())
+    return {key for key in (_normalize_name(name) for name in names) if key}
+
+
+def did_not_play(feed: Any, event_id: str, player_name: Any) -> dict[str, Any]:
+    """For a player ABSENT from a final box: `{"unavailable_reason": ...}`, always.
+
+    `REASON_DNP_VOID` (with `dnp_basis`) only when ESPN identifies him on one of
+    the two clubs and his athlete ID either sat out on the game roster or is not
+    on it at all. See the module docstring."""
+    team_ids = feed.competitor_ids(event_id)
+    entries = feed.game_roster(event_id)
+    if team_ids is None or entries is None or len(entries) < _MIN_GAME_ROSTER_ENTRIES:
+        return {"unavailable_reason": REASON_ROSTER_UNAVAILABLE}
+    wanted = _normalize_name(player_name)
+    athlete_ids: set[str] = set()
+    for team_id in team_ids:
+        athletes = feed.team_athletes(team_id)
+        if athletes is None:
+            return {"unavailable_reason": REASON_ROSTER_UNAVAILABLE}
+        athlete_ids.update(
+            str(athlete.get("id") or "").strip() for athlete in athletes if wanted and wanted in _athlete_names(athlete)
+        )
+    athlete_ids.discard("")
+    if not athlete_ids:
+        return {"unavailable_reason": REASON_NOT_ON_TEAM_ROSTER}
+    if len(athlete_ids) > 1:
+        return {"unavailable_reason": REASON_ROSTER_AMBIGUOUS}
+    athlete_id = next(iter(athlete_ids))
+    rows = [entry for entry in entries if str(entry.get("playerId") or "").strip() == athlete_id]
+    if not rows:
+        return {"unavailable_reason": REASON_DNP_VOID, "dnp_basis": "inactive", "espn_athlete_id": athlete_id}
+    if len(rows) > 1:
+        return {"unavailable_reason": REASON_ROSTER_AMBIGUOUS}
+    has_stats = isinstance(rows[0].get("statistics"), Mapping)
+    if rows[0].get("didNotPlay") is True and not has_stats:
+        return {"unavailable_reason": REASON_DNP_VOID, "dnp_basis": "did_not_play", "espn_athlete_id": athlete_id}
+    if rows[0].get("didNotPlay") is False and has_stats:
+        # He played; our box spells him differently. Never a void, never a zero.
+        return {"unavailable_reason": REASON_PLAYED_NOT_IN_BOX}
+    return {"unavailable_reason": REASON_PARTICIPATION_UNKNOWN}
+
+
+def nba_status_resolver(selected_date: str, *, fetch_json=None):
     """A resolver `bet_status`/`paper_settlement` can inject, for NBA orders.
 
-    The box is read ONCE per resolver, not once per order.
+    The box is read ONCE per resolver, not once per order. `fetch_json` is the
+    did-not-play check's ESPN read (a test's seam; None is the network).
     """
     from syndicate.features.shared.game_line_bet import is_game_line_market
 
@@ -238,6 +319,27 @@ def nba_status_resolver(selected_date: str):
         if "box" not in cache:
             cache["box"] = _load_box(selected_date)
         return cache["box"]
+
+    def absent(order: Mapping[str, Any], game: Mapping[str, Any]) -> dict[str, Any]:
+        """A player not in the box of a FINAL game: did he play? (module docstring)"""
+        from syndicate.features.shared import bet_status_nfl as espn
+
+        event_id = str(game.get("event_id") or "").strip()
+        if not event_id or not espn.settlement_window_open(None, order):
+            return {"unavailable_reason": REASON_PLAYER_NOT_FOUND}
+        if "feed" not in cache:
+            cache["feed"] = espn.EspnSettlementFeed("nba", fetch_json=fetch_json)
+        feed = cache["feed"]
+        key = espn.settlement_memo_key("nba", event_id, order.get("player_name"))
+        remembered = espn.settlement_memo_get(feed, key)
+        if remembered is not None:
+            return remembered
+        refusal = did_not_play(feed, event_id, order.get("player_name"))
+        if refusal["unavailable_reason"] in _DEFINITIVE_ROSTER_REFUSALS:
+            espn.settlement_memo_put(feed, key, refusal, definitive=True)
+        elif refusal["unavailable_reason"] == REASON_ROSTER_UNAVAILABLE:
+            espn.settlement_memo_put(feed, key, refusal, definitive=False)
+        return refusal
 
     def resolve(order: Mapping[str, Any]) -> dict[str, Any]:
         if str(order.get("sport") or "").strip().lower() != "nba":
@@ -273,7 +375,10 @@ def nba_status_resolver(selected_date: str):
         if row is None:
             # Not in the box (has not played yet, or a name mismatch). Named, never
             # a zero: "0 blocks, under is fine" when we simply failed to find him is
-            # the worst wrong answer this can give.
+            # the worst wrong answer this can give. Once the game is FINAL, ESPN
+            # can say whether he sat out (`absent`).
+            if stamp["is_final"]:
+                return absent(order, game)
             return {"unavailable_reason": REASON_PLAYER_NOT_FOUND}
         if sum_keys is not None:
             parts = [_as_float(row.get(key)) for key in sum_keys]

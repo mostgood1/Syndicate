@@ -1170,6 +1170,7 @@ death, never life — do not invert it.
 - Re-scope result 2026-10-27 23:53Z (read-only fleet dry run, 23:51Z): 868 / 981 stale rows grade with the fixed resolvers (0 before). H1 172/175, H2 322/322, H3 171/171, H4 122/122 CONFIRMED; H6 NFL 25/28, NCAAF 56/59; H5 NBA preseason 72 awaits a box write (user). Code on main (see git log); NOT applied to the archive and NOT on the fleet.
 - Apply 2026-10-28 13:02Z (user: "Yes, apply both"): 11 NBA preseason box keys + 943 graded archive copies from 7abbe65c under the refresh-worker claim (12:39:34Z-13:00:57Z, released). Stale paper 988 -> 80 (archive-only 951 -> 43, 0 gradeable). deploys.md 12:39:41Z. Fleet ff + down/up NOT done (user decision).
 - Void re-scope 2026-10-28 13:10Z (user, verbatim: "Yes, void them"): DNP props settle as void (push, $0, `void_reason`, out of the ROI denominator) + NBA DNP detection by ESPN athlete id. H7/H8 pre-registered in the findings file BEFORE code. Files widened: bet_status_nba.py (+ DNP detection), bet_status_nfl.py (+ EspnSettlementFeed nba reads), paper_settlement.py (+ the DNP void outcome + the summary's void column), tests/test_paper_dnp_void.py (NEW).
+- Void result 2026-10-28 13:19Z (read-only fleet dry run 13:18Z): H7 16/16, H8 12/12 CONFIRMED (0 voided players with minutes); an apply would append 18 voids (stale 80 -> 64). Regression 859 passed. NOT applied.
 - Blocked by: none
 
 ### closed-lane-archive-20261027-2046 — CLOSED 2026-10-27 (GOAL MET: 1 block archived) — opened 2026-10-27 — session 77c27c5c-ab6e-4679-8370-bd8e164ff28c

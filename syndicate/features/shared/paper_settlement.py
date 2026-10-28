@@ -76,6 +76,58 @@ REASON_NOT_FILLED = "order_not_filled"
 REASON_NO_PRICE = "no_fill_price"
 REASON_ALREADY_GRADED = "already_graded"
 
+# A BET ON A PLAYER WHO DID NOT PLAY IS VOID [user decision 2026-10-28, `#744`:
+# "Yes, void them" -- stake back, out of ROI]. Books settle it that way, and until
+# this existed every such row was refused by name and sat in the stale count
+# forever, because paper settlement had no outcome to give it.
+#
+# A VOID IS A PUSH WITH `void_reason`. `settlement_identity._void_graded` already
+# grades a non-runner as a push; a fourth outcome value was rejected because
+# readers compare against "push" in ~200 places, and some score anything that is
+# not "won" as a loss (`live_cell_scorecard`'s `decided = outcome != "push"`).
+# `settlement_summary` keeps a void's stake out of the ROI denominator.
+#
+# AN ALLOWLIST, NOT A SUFFIX MATCH. Each is the resolver's own constant, raised
+# only for a FINAL game (`test_paper_dnp_void` pins the spellings):
+DNP_VOID_REASONS = frozenset(
+    {
+        "nfl_player_did_not_play_void",  # bet_status_nfl.REASON_DNP_VOID (ESPN game roster)
+        "dnp_void",  # bet_status_nhl.REASON_DNP_VOID (not dressed / never on the ice)
+        "soccer_player_did_not_appear_void",  # bet_status_soccer.REASON_DNP_VOID
+        "nba_player_did_not_play_void",  # bet_status_nba.REASON_DNP_VOID (ESPN athlete id)
+    }
+)
+# The decision is made, so absent means ON; this is the rollback switch.
+DNP_VOID_ENV = "SYNDICATE_PAPER_DNP_VOID"
+
+
+def dnp_void_enabled() -> bool:
+    import os
+
+    return os.environ.get(DNP_VOID_ENV, "").strip().lower() not in {"off", "0", "false", "no"}
+
+
+def void_order(order: Mapping[str, Any], reason: str) -> dict[str, Any]:
+    """A filled bet on a player who did not play -> a void: the stake back whole, $0.
+
+    Pure, like `grade_order`. No fee is netted: a void cancels the bet."""
+    if str(order.get("status") or "") != "filled":
+        return {"graded": False, "reason": REASON_NOT_FILLED}
+    return {
+        "graded": True,
+        "outcome": OUTCOME_PUSH,
+        "pnl_dollars": 0.0,
+        "pnl_gross_dollars": 0.0,
+        "settled_value": None,
+        "line": order.get("line"),
+        "void_reason": reason,
+    }
+
+
+def _outcome_key(verdict: Mapping[str, Any]) -> str:
+    """The tally key: a void is counted as a void, not hidden among the pushes."""
+    return "void" if verdict.get("void_reason") else str(verdict.get("outcome"))
+
 # THE VENUE GETS FIRST REFUSAL ON A LIVE ORDER [user decision 2026-08-26].
 #
 # `venue_settlement.settle_from_venue` grades a live order from the venue's own
@@ -297,7 +349,13 @@ def _our_verdict(
     if resolved.get("unavailable_reason"):
         # The feed's own vocabulary, passed through rather than flattened:
         # `no_game_pk`, `no_feed` and `no_stat` are three different jobs.
-        return None, resolved, str(resolved["unavailable_reason"])
+        reason = str(resolved["unavailable_reason"])
+        if reason in DNP_VOID_REASONS and dnp_void_enabled():
+            verdict = void_order(order, reason)
+            if not verdict.get("graded"):
+                return None, resolved, str(verdict.get("reason"))
+            return verdict, resolved, ""
+        return None, resolved, reason
 
     # THE RESOLVER MAY RESTATE `side` AND `line`, and for game lines it must.
     #
@@ -430,6 +488,12 @@ def _stamp_grade(order: dict[str, Any], verdict: Mapping[str, Any], resolved: Ma
     for field in ("home_score", "away_score", "home_name", "away_name"):
         if resolved.get(field) is not None:
             order[field] = resolved[field]
+    if verdict.get("void_reason"):
+        # Why it is void, and on what evidence, where the audit will look.
+        order["void_reason"] = verdict["void_reason"]
+        for field in ("dnp_basis", "espn_athlete_id"):
+            if resolved.get(field):
+                order[field] = resolved[field]
     # NOT `settled_at` -- that is the venue's clock and is already stamped.
     # See the module docstring; conflating them is the whole reason this
     # number read as zero.
@@ -603,7 +667,7 @@ def settle_orders(
 
         _stamp_grade(order, verdict, resolved)
         graded += 1
-        outcomes[verdict["outcome"]] = outcomes.get(verdict["outcome"], 0) + 1
+        outcomes[_outcome_key(verdict)] = outcomes.get(_outcome_key(verdict), 0) + 1
 
     if graded:
         dirty = True
@@ -1253,9 +1317,9 @@ def settle_archived_orders(
                 _stamp_grade(copy, verdict, resolved)
                 copy["graded_from"] = GRADED_FROM_ARCHIVE
                 graded_here.append(copy)
-                outcomes[verdict["outcome"]] = outcomes.get(verdict["outcome"], 0) + 1
+                outcomes[_outcome_key(verdict)] = outcomes.get(_outcome_key(verdict), 0) + 1
                 tally["graded"] += 1
-                _record(copy, outcome=verdict["outcome"])
+                _record(copy, outcome=_outcome_key(verdict))
             if graded_here and not dry_run:
                 # The close, on the row, exactly as `settle_orders` stamps it on
                 # the rows it grades. Never raises (see `stamp_closing_marks`).
@@ -1599,6 +1663,7 @@ def _aggregate(buckets: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "won": sum(int(b.get("won") or 0) for b in buckets),
         "lost": sum(int(b.get("lost") or 0) for b in buckets),
         "push": sum(int(b.get("push") or 0) for b in buckets),
+        "void": sum(int(b.get("void") or 0) for b in buckets),
         "staked_dollars": round(sum(float(b.get("staked_dollars") or 0.0) for b in buckets), 2),
         "pnl_dollars": round(sum(float(b.get("pnl_dollars") or 0.0) for b in buckets), 2),
     }
@@ -1634,7 +1699,7 @@ def settlement_summary(
         venue = str(order.get("venue") or "unknown")
         bucket = by_venue.setdefault(
             venue,
-            {"venue": venue, "orders": 0, "settled": 0, "won": 0, "lost": 0, "push": 0,
+            {"venue": venue, "orders": 0, "settled": 0, "won": 0, "lost": 0, "push": 0, "void": 0,
              "staked_dollars": 0.0, "pnl_dollars": 0.0, "pending": 0, "unknown": 0},
         )
         bucket["orders"] += 1
@@ -1667,6 +1732,11 @@ def settlement_summary(
                 bucket["unknown"] += 1
             continue
         bucket["settled"] += 1
+        if order.get("void_reason"):
+            # A VOID IS NOT A BET THAT HAPPENED [user decision 2026-10-28]: its own
+            # column, and its stake stays out of the ROI denominator.
+            bucket["void"] = bucket.get("void", 0) + 1
+            continue
         bucket[outcome] = bucket.get(outcome, 0) + 1
         bucket["staked_dollars"] += _as_float(order.get("fill_stake_dollars")) or 0.0
         bucket["pnl_dollars"] += _as_float(order.get("pnl_dollars")) or 0.0
@@ -2188,7 +2258,7 @@ def _grouped(rows: Sequence[Mapping[str, Any]], key_fn) -> list[dict[str, Any]]:
             key = "unknown"
         bucket = buckets.setdefault(
             key,
-            {"key": key, "orders": 0, "settled": 0, "won": 0, "lost": 0, "push": 0,
+            {"key": key, "orders": 0, "settled": 0, "won": 0, "lost": 0, "push": 0, "void": 0,
              "staked_dollars": 0.0, "pnl_dollars": 0.0, "pending": 0, "unknown": 0},
         )
         bucket["orders"] += 1
@@ -2204,6 +2274,11 @@ def _grouped(rows: Sequence[Mapping[str, Any]], key_fn) -> list[dict[str, Any]]:
                 bucket["unknown"] += 1
             continue
         bucket["settled"] += 1
+        if order.get("void_reason"):
+            # A VOID IS NOT A BET THAT HAPPENED [user decision 2026-10-28]: its own
+            # column, and its stake stays out of the ROI denominator.
+            bucket["void"] = bucket.get("void", 0) + 1
+            continue
         bucket[outcome] = bucket.get(outcome, 0) + 1
         bucket["staked_dollars"] += _as_float(order.get("fill_stake_dollars")) or 0.0
         bucket["pnl_dollars"] += _as_float(order.get("pnl_dollars")) or 0.0

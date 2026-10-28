@@ -343,3 +343,21 @@ Scratch: `C:\tmp\peg\` (`dryrun.sh`, `dryrun.log`, `report_20261027T163701Z.json
   - FALSIFIED if fewer than 14, or if any non-DNP reason's count moves.
 - **H8 NBA detection:** of the 12 NBA `player_not_in_box` rows, at least 10 resolve `nba_player_did_not_play_void`, and every voided row's player has 0 minutes in ESPN's summary for that game.
   - FALSIFIED if any voided player recorded minutes. That would be a wrongful void, which the athlete-id rule exists to make impossible.
+
+## Void re-scope: result `[2026-10-28 13:18Z-13:19Z, READ-ONLY fleet dry run; main 7abbe65c extract + the three changed files; every write suppressed (0 reached); archive sha256 unchanged]`
+
+| hypothesis | prediction | read | verdict |
+|---|---|---|---|
+| H7 void | >= 14 of the 16 DNP-class archive-only rows; no other reason moves | **16 / 16** (NBA 12, NFL 3, NHL 1). Every non-DNP count is unchanged: MLB 11, NBA 5, NCAAF 2, NHL 6, soccer 3 | **CONFIRMED** |
+| H8 NBA detection | >= 10 of 12 `nba_player_did_not_play_void`; 0 voided players with minutes | **12 / 12.** 7 sat out while dressed (ESPN summary `didNotPlay`), 5 were inactive (absent from ESPN's summary box). **0 played.** | **CONFIRMED** |
+
+**The NBA twelve**, each checked against ESPN's own summary for that game:
+- Inactive: LeBron James (1966), Kyrie Irving ×2 (6442), Keegan Murray (4594327), Ausar Thompson (4684742).
+- Sat out while dressed: Kawhi Leonard ×4 (6450), VJ Edgecombe ×3 (5124612).
+
+**What the archived pass would append: 18 voids.** That is the 16 stale rows plus 2 archive-only rows that are final but not yet 48 h past start.
+- Stale total 80 -> 64. Archive-only 43 -> 27.
+
+**Regression:** 859 passed across the 29 test files that touch the changed modules, plus the new `tests/test_paper_dnp_void.py` (25 tests, reachability first).
+
+**Known simplification.** The void is venue-agnostic, applied as the books' rule. An exchange's own contract terms for a player who doesn't play may differ; none of the 18 is on an exchange venue in this read. Not yet checked per row.

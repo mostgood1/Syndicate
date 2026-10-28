@@ -333,6 +333,13 @@ _ESPN_SUMMARY_URLS: Mapping[str, str] = {
 _ESPN_CORE_EVENTS_URLS: Mapping[str, str] = {
     "nfl": "https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/events",
     "ncaaf": "https://sports.core.api.espn.com/v2/sports/football/leagues/college-football/events",
+    # `bet_status_nba`'s did-not-play check reads the game roster only (2026-10-28).
+    "nba": "https://sports.core.api.espn.com/v2/sports/basketball/leagues/nba/events",
+}
+# A club's CURRENT roster, with ESPN athlete ids -- the identity `bet_status_nba`
+# looks for among a game roster's `playerId`s.
+_ESPN_TEAM_ROSTER_URLS: Mapping[str, str] = {
+    "nba": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/{team_id}/roster",
 }
 # The core API answers with `$ref` links to itself. Only that host is followed,
 # and always over https (the links come back as http://).
@@ -472,6 +479,31 @@ class EspnSettlementFeed:
         except Exception:
             return None
 
+    def competitor_ids(self, event_id: str) -> list[str] | None:
+        """The game's two ESPN team ids, or None when they could not be read."""
+        base = _ESPN_CORE_EVENTS_URLS.get(self.league)
+        event_id = str(event_id or "").strip()
+        if not base or not event_id:
+            return None
+        competitors = self._get(f"{base}/{event_id}/competitions/{event_id}/competitors")
+        items = competitors.get("items") if isinstance(competitors, Mapping) else None
+        if not isinstance(items, list) or len(items) != 2:
+            return None
+        ids = [str(item.get("id") or "").strip() if isinstance(item, Mapping) else "" for item in items]
+        return ids if all(ids) else None
+
+    def team_athletes(self, team_id: str) -> list[Mapping[str, Any]] | None:
+        """A club's current roster athletes (each with an ESPN `id`), or None = NOT READ."""
+        template = _ESPN_TEAM_ROSTER_URLS.get(self.league)
+        team_id = str(team_id or "").strip()
+        if not template or not team_id:
+            return None
+        payload = self._get(template.format(team_id=team_id))
+        athletes = payload.get("athletes") if isinstance(payload, Mapping) else None
+        if not isinstance(athletes, list) or not athletes:
+            return None
+        return [athlete for athlete in athletes if isinstance(athlete, Mapping)]
+
     def game_roster(self, event_id: str) -> list[Mapping[str, Any]] | None:
         """Both teams' game-roster entries, or None when either could not be read.
 
@@ -479,18 +511,12 @@ class EspnSettlementFeed:
         read says nothing about the half that was not."""
         base = _ESPN_CORE_EVENTS_URLS.get(self.league)
         event_id = str(event_id or "").strip()
-        if not base or not event_id:
+        team_ids = self.competitor_ids(event_id)
+        if not base or team_ids is None:
             return None
         competition = f"{base}/{event_id}/competitions/{event_id}"
-        competitors = self._get(f"{competition}/competitors")
-        items = competitors.get("items") if isinstance(competitors, Mapping) else None
-        if not isinstance(items, list) or len(items) != 2:
-            return None
         entries: list[Mapping[str, Any]] = []
-        for item in items:
-            team_id = str(item.get("id") or "").strip() if isinstance(item, Mapping) else ""
-            if not team_id:
-                return None
+        for team_id in team_ids:
             roster = self._get(f"{competition}/competitors/{team_id}/roster")
             rows = roster.get("entries") if isinstance(roster, Mapping) else None
             if not isinstance(rows, list) or not rows:
