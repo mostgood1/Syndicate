@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 1470 rules `[generated]`
+## Index — 1494 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -3026,3 +3026,19 @@ The 2026-10-20 entry said: "Rating INPUTS transfer, because the sim reads them w
   - A quiet watchdog is evidence only if it ran: check that `list_scheduled_tasks` is non-empty and that the watchdog's `state.json` `last_run_utc` is under ~5 h old.
   - The recovery source for schedules is the watchdog's last saved `list_scheduled_tasks` output (its run transcript's `tool-results/*.txt`), not the folders.
   - Restore recipe, measured 10-28 (46 / 46 byte-identical): back up the folders; move each aside (create refuses an existing folder); create with the same taskId, title, description and schedule plus a placeholder prompt; copy the original folder back; check SKILL.md sha256; Run now one task and read its first message.
+
+## 2026-10-28 -- A grader's ABSENCE reason is not a LOCATION: `player_not_in_box` read as "the player was not in that game" sent a session after a join defect that does not exist `[lane nba-prop-wrong-game, session c59f19b5]`
+
+- **The belief:**
+  - Five NBA paper props grade `player_not_in_box`: LeBron on MIL @ PHI, Kawhi x4 on TOR @ MIN.
+  - The brief read this as "the player was simply not in that game". It pre-registered a candidate-join defect: a stale roster, or an event-id mixup.
+- **What was true:**
+  - LeBron is PHI and Kawhi is TOR in 2026-27. ESPN's roster and the fleet box on their other dates both say so.
+  - ESPN marks Kawhi `didNotPlay` "LEFT KNEE SWELLING". LeBron was inactive.
+  - Over 14 days, 0 of 1,605 NBA prop orders carry a player on a team outside the game.
+  - The NBA box simply drops DNP rows (`tick.py:2467`).
+  - Both readings were open in 2026. 2025-26 intuition ("LeBron is a Laker") would have confirmed the wrong one.
+- **Rule:**
+  - Before diagnosing a join from an absence code, read the player's team on that date from a source the join does not use: the roster, or another game's box.
+  - An absence is consistent with a DNP, a name miss AND a wrong game. Only the team reading separates them.
+  - Sibling of 2026-09-28 (mlb-prop-grading-player-match): a VOID count's size is not evidence of a join failure.

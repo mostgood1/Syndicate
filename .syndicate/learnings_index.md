@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 1470 rules `[generated]`
+## Index — 1494 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -539,7 +539,7 @@
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](learnings_evidence.md#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override) `[evidence]`
 - [2026-09-03 — EXONERATED: `deploys.md` and `learnings.md` ARE guarded. Two sessions file…](learnings_archive.md#2026-09-03-exonerated-deploysmd-and-learningsmd-are-guarded-two-sessions-filed-the-same-false-gap-and-the-second-re-derived-it-with-the-same-blind-spot) `[evidence]`
 
-**Rules and corrections — 945**
+**Rules and corrections — 969**
 
 - [2026-09-16 — a detector that matches a FORMULA at published precision has a FALSE-POSIT…](#2026-09-16-a-detector-that-matches-a-formula-at-published-precision-has-a-false-positive-rate-and-mine-fired-at-about-1-row-per-1200-session-abacd435-lane-soccer-anytime-scorer)
 - [2026-09-16 — OVERTURNED: "the pre-registered criterion is the safe part, the risk is in…](#2026-09-16-overturned-the-pre-registered-criterion-is-the-safe-part-the-risk-is-in-the-mechanism-two-hypotheses-in-one-night-died-on-the-criterion-session-abacd435-fixes-4-and-5a-no-lane)
@@ -846,6 +846,30 @@
 - [2026-10-22 - The WSL system `python3` reads the fleet's keyvalue ledger as EMPTY, silen…](#2026-10-22---the-wsl-system-python3-reads-the-fleets-keyvalue-ledger-as-empty-silently-run-fleet-reads-on-the-fleet-venv-lane-sim-stake-earned-profile-session-bde77672)
 - [2026-10-22 - A reader's fallback can be load-bearing on the writer's defect: before fix…](#2026-10-22---a-readers-fallback-can-be-load-bearing-on-the-writers-defect-before-fixing-a-writer-read-what-each-readers-fallback-path-reads-lane-nba-injury-snapshot-overwrite-session-6c89053f)
 - [2026-10-22 - A filter that returns its input when its reference file is missing is not…](#2026-10-22---a-filter-that-returns-its-input-when-its-reference-file-is-missing-is-not-a-guard-where-that-file-is-missing-check-the-reference-exists-on-the-fleet-before-predicting-what-the-filter-does-lane-wnba-injury-nba-report-session-898e35dc)
+- [2026-10-22 -- A per-date size TRIPWIRE silently became a daily truncation: the CLV open…](#2026-10-22----a-per-date-size-tripwire-silently-became-a-daily-truncation-the-clv-openings-file-was-cut-on-6-of-24-days-lane-venue-order-opening-gap)
+- [2026-10-22 -- A same-identity sibling ledger is not a stand-in for a lost one: the popu…](#2026-10-22----a-same-identity-sibling-ledger-is-not-a-stand-in-for-a-lost-one-the-population-estimate-undercounted-lost-openings-39x-on-10-21-lane-clv-openings-ceiling)
+- [2026-10-22 -- An exposure window keyed on the game date's own snapshot misses lookahead…](#2026-10-22----an-exposure-window-keyed-on-the-game-dates-own-snapshot-misses-lookahead-builds-they-read-todays-lane-wnba-injury-snapshot-overwrite)
+- [2026-10-22 -- RULE: before choosing a role prefix for a fleet env key, read WHICH ROLE'…](#2026-10-22----rule-before-choosing-a-role-prefix-for-a-fleet-env-key-read-which-roles-process-tree-runs-the-code-the-nba-props-refresh-every-pregame-nba-smartsim-is-a-child-of-the-live-odds-worker-lane-nba-standins-shadow-session-15f24a49)
+- [2026-10-22 - When COMPLETION removes a row from the store you are reading, "0 completed…](#2026-10-22---when-completion-removes-a-row-from-the-store-you-are-reading-0-completed-is-the-signature-of-completion-not-its-absence-lane-ladder-refusal-control-arm-session-4ab694ed)
+- [2026-10-22 - A pre-registered falsification rule earns its keep precisely when the resu…](#2026-10-22---a-pre-registered-falsification-rule-earns-its-keep-precisely-when-the-result-is-null-lane-ladder-refusal-control-arm-session-4ab694ed)
+- [2026-10-22 - My own push loop discards an uncommitted lane block; `lane_open` must run…](#2026-10-22---my-own-push-loop-discards-an-uncommitted-lane-block-lane_open-must-run-inside-the-retry-not-before-it-session-4ab694ed)
+- [2026-10-22 -- Keeping heartbeats after a refused record turns a ceiling into a FALSE "k…](#2026-10-22----keeping-heartbeats-after-a-refused-record-turns-a-ceiling-into-a-false-kept-censor-the-sport-lane-clv-departures-ceiling)
+- [2026-10-23 - An explicit chat ask does not clear the classifier for live-money steps; e…](#2026-10-23---an-explicit-chat-ask-does-not-clear-the-classifier-for-live-money-steps-each-action-type-needs-its-own-standing-permission-lane-in-game-trading-session-15ceeb14)
+- [2026-10-25 - A real-time cell anchored on an OUTCOME-TIME quantity is look-ahead: the g…](#2026-10-25---a-real-time-cell-anchored-on-an-outcome-time-quantity-is-look-ahead-the-games-end-time-made-late-favourites-look-like-618c-lane-pm-trader-strategies-session-dbda2142)
+- [2026-10-25 - A new ORDER LIFECYCLE must be checked against every periodic pass that wri…](#2026-10-25---a-new-order-lifecycle-must-be-checked-against-every-periodic-pass-that-writes-to-the-venue-the-stale-resting-cancel-killed-the-maker-pilots-first-post-lane-kalshi-maker-pilot-session-78880f41)
+- [2026-10-26 -- RULE: a fleet env change needs a DRAIN, a SHA guard on the env file, and…](#2026-10-26----rule-a-fleet-env-change-needs-a-drain-a-sha-guard-on-the-env-file-and-a-live-operator----natural-idle-windows-my-one-key-and-pre-armed-scripts-all-failed-lane-fleet-refresh-worker-early-recycle-session-20868885)
+- [2026-10-26 -- A cross-session brief to a Desktop session in another permission mode is…](#2026-10-26----a-cross-session-brief-to-a-desktop-session-in-another-permission-mode-is-held-then-expires-undelivered-brief-through-the-ledger-first-lane-syndicate-decision-engine-session-e32fef1a)
+- [2026-10-26 -- A fair can WIN on log loss and LOSE on absolute error to the close: gate…](#2026-10-26----a-fair-can-win-on-log-loss-and-lose-on-absolute-error-to-the-close-gate-a-fair-for-ev-on-both-lane-syndicate-fair-v1-session-7c8317e7)
+- [2026-10-26 -- An append-on-change log marks only the runs where something CHANGED: neve…](#2026-10-26----an-append-on-change-log-marks-only-the-runs-where-something-changed-never-read-run-times-or-the-next-run-from-it-lane-e5-venue-news-lag-session-ce4dfadf)
+- [2026-10-26 -- A paged listing your own cap stopped is a SAMPLE: print the range it cove…](#2026-10-26----a-paged-listing-your-own-cap-stopped-is-a-sample-print-the-range-it-covers-before-claiming-an-absence-lane-e4-combo-correlation-session-b566f51c)
+- [2026-10-26 -- `settlement_inputs/closing_lines_<date>.csv` is one row per SELECTION at…](#2026-10-26----settlement_inputsclosing_lines_datecsv-is-one-row-per-selection-at-one-book-not-a-per-book-two-sided-close-lane-e4-combo-correlation-session-b566f51c)
+- [2026-10-26 -- A research dump on the FLEET hit `Cannot allocate memory`: build big extr…](#2026-10-26----a-research-dump-on-the-fleet-hit-cannot-allocate-memory-build-big-extracts-per-slice-and-stream-them-never-one-jsondumps-lane-e3-derived-surface-session-d266ae46)
+- [2026-10-22 -- A per-SERVICE claim does not lock the shared fleet CHECKOUT: a peer's ff…](#2026-10-22----a-per-service-claim-does-not-lock-the-shared-fleet-checkout-a-peers-ff-landed-between-my-ff-and-my-restart-and-my-restart-loaded-it-lane-sim-stake-earned-profile-session-b98807bc)
+- [2026-10-27 -- A calibration read over "settled" tickets is CENSORED when the settle rul…](#2026-10-27----a-calibration-read-over-settled-tickets-is-censored-when-the-settle-rule-is-any-leg-lost-lost-an-unresolved-leg-lets-a-ticket-lose-but-never-win-lane-sgp-pjoint-calibration-session-138eb1d7)
+- [2026-10-27 -- A recurring job's budget sized from an off-peak probe was 8-12x low: meas…](#2026-10-27----a-recurring-jobs-budget-sized-from-an-off-peak-probe-was-8-12x-low-measure-the-heaviest-part-of-its-cycle-and-charge-every-per-item-enrichment-get-to-the-same-run-budget-lane-kalshi-combo-capture-session-a48b0f49)
+- [2026-10-27 -- A memory bound that rests on how much a filter DROPS fails when the popul…](#2026-10-27----a-memory-bound-that-rests-on-how-much-a-filter-drops-fails-when-the-population-changes-bound-the-representation-not-the-expected-selectivity-lane-kalshi-combo-capture-session-a48b0f49)
+- [2026-10-28 -- The dispatch watchdog shares a failure domain with what it watches: the a…](#2026-10-28----the-dispatch-watchdog-shares-a-failure-domain-with-what-it-watches-the-app-lost-every-scheduled-task-overnight-and-nothing-alerted-lane-syndicate-decision-engine-session-e32fef1a)
+- [2026-10-28 -- A grader's ABSENCE reason is not a LOCATION: `player_not_in_box` read as…](#2026-10-28----a-graders-absence-reason-is-not-a-location-player_not_in_box-read-as-the-player-was-not-in-that-game-sent-a-session-after-a-join-defect-that-does-not-exist-lane-nba-prop-wrong-game-session-c59f19b5)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`

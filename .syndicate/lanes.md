@@ -1187,6 +1187,27 @@ death, never life — do not invert it.
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 1 of 6 CLOSED SAFE; dry run, invariant baseline (4 pre-existing contests, unchanged) and --apply all clean.
 - Moved: closed-lane-archive-20261027-1841. Table and WAIT reasons: log/2026-10-28.md.
 
+### nba-prop-wrong-game — CLOSED 2026-10-28 (HYPOTHESIS FALSIFIED: no wrong game; the rows are DNPs on the player's own team) — opened 2026-10-28 — session c59f19b5-f9a2-4c74-bd42-86d0adb1b22b
+- Goal: Name the first stage that attaches the wrong game to NBA paper props graded player_not_in_box (LeBron PHI v MIL 10-24, Kawhi x4 MIN v TOR 10-25), count 14-day NBA paper/live orders whose player is on a team not in the game (fleet, read-only), and fix with a reachability test if confirmed
+- GOAL: MET. No stage attaches a wrong game: the rows are DNPs.
+  - The stage that makes them LOOK wrong is the grader: `tick.py:2467` -> `bet_status_nba.py:272-277`.
+  - Count: 0 / 1,605.
+  - No fix was built: the conditional branch did not trigger. The DNP-grading follow-up is in `#744`.
+- Files: .syndicate/findings_2026-10-28_nba_prop_wrong_game.md (NEW)
+- Hypothesis: Pre-registered in the brief from local_35eb891d before any reading: the prop candidate join keys a player's line onto an OddsAPI event by something other than his actual team on that date (stale roster lookup or event-id mixup in the props pipeline)
+- Falsification test: The player is on one of the order's two clubs on that date (ESPN roster + the fleet box on other dates)
+- Verification: Fleet read-only count over live doc + archive, box and ESPN roster as truth; ESPN summary for the named games
+- Blocked by: none
+- Result 2026-10-28 12:39-12:43Z (fleet read-only, refresh-worker state env, code 2c8ba8be): FALSIFIED.
+  - **The named rows:** LeBron is PHI and Kawhi is TOR (also Kyrie, DAL). Three sources agree: the ESPN rosters_2026-27.csv on the fleet, and the fleet box on their other game dates.
+  - **ESPN summary:** Kawhi is `didNotPlay` "LEFT KNEE SWELLING"; LeBron and Kyrie were inactive.
+  - **Count:** 0 of 1,605 NBA prop orders (1,559 paper + 46 live, game dates 10-20..10-28) carry a player on a team outside the game. 1,584 played in the order's own game. 21 are absent from the box but rostered on one of the two clubs: 14 past-game DNPs plus 7 rows for 10-28 games not yet played.
+  - **The real stage:** grading, not the join.
+    - `tick.py:2467` drops 0-minute `didNotPlay` rows from the box.
+    - `bet_status_nba.py:272-277` then returns `player_not_in_box` on a final game.
+    - No sport's DNP refusal settles in paper today.
+  - Nothing was built or written on the fleet. Follow-ups are in `findings_2026-10-28_nba_prop_wrong_game.md` and `#744`.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

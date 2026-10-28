@@ -2,6 +2,17 @@
 
 ### `#744` — **PAPER BETS EVICTED UNGRADED: 1,834 filled paper orders whose game started > 48 h ago have no outcome (read 2026-10-27 16:06Z); 1,807 of them (98.5%) are in the execution-ledger ARCHIVE, which the grader never reads. Lane `paper-evicted-grading` OPENED FOR PICKUP; nothing built** — 2026-10-27, lane `syndicate-decision-engine` (Phase 0 item 4 of `#736`); `.syndicate/findings_2026-10-27_paper_evicted_ungraded.md`
 - **User, verbatim:** "...Then take the paper no-outcome count to close Phase 0."
+- **STATUS 2026-10-28 7:43 AM CT (12:43Z): the NBA `player_not_in_box` tail is DNPs, not wrong-game props. 0 of 1,605 NBA prop orders have a player on a team outside the game** (lane `nba-prop-wrong-game`, CLOSED falsified; `.syndicate/findings_2026-10-28_nba_prop_wrong_game.md`).
+  - **The named rows:** LeBron (PHI), Kawhi (TOR) and Kyrie (DAL) were on their own team's game.
+    - Kawhi is ESPN `didNotPlay` "LEFT KNEE SWELLING".
+    - LeBron and Kyrie were inactive. Both were bet while questionable, and ruled out 5 h and 4 h after the bet.
+  - **Why the tail stays ungraded:**
+    - `tick.py:2467` drops 0-minute `didNotPlay` rows from the NBA box.
+    - `bet_status_nba.py:272-277` gives the transient `player_not_in_box`, not a DNP refusal.
+    - No sport's DNP refusal (`dnp_void`, `nfl_player_did_not_play_void`, `soccer_player_did_not_appear_void`) settles in paper: there is no void outcome. These rows stay in the stale count forever.
+  - **Owed:**
+    - (a) NBA DNP detection, default-off. `bet_status_nfl`'s ESPN core-roster `didNotPlay` path is the precedent. `bet_status_nba.py` is in this lane's `Files:`.
+    - (b) USER decision: should paper settle a DNP refusal as a void, stake back and out of ROI?
 - **STATUS 2026-10-27 6:53 PM CT (23:53Z): RE-SCOPED TO THE GRADER GAPS AND FIXED IN CODE (user: "we need to solve for those") -- fleet dry run 868 / 981 stale rows grade (0 before).** H1-H4 CONFIRMED as pre-registered: soccer kickoff-date binding + the disk read 172/175 and corners/btts 322/322, NCAAF San José/McNeese 171/171, MLB finished-game fetch 122/122. H6 football props: NFL 25/28 and NCAAF 56/59. The rest refuse by name: NBA preseason 72, which awaits the user's OK to write 11 box files; tails 41. Applying the grades (archive backfill) and the fleet ff + restart are user decisions; nothing has been applied. Findings: "Re-scope result".
 - **STATUS 2026-10-27 3:54 PM CT (20:54Z): HOURLY PASS KEY ADDED TO THE FLEET ENV, NO RESTART (user-approved) -- INERT until a full down/up on a commit containing `2ec80fe0`.** `REFRESH_WORKER__SYNDICATE_PAPER_ARCHIVED_GRADING=on` (env sha256 b9431eb1 -> 67adbf4e, backup kept; refresh-worker's derived env reads `on`, web / live-odds-worker do not get it). Last UP `0fca3f2b`, checkout `84967f75`: neither has the code. Daily read-only scheduled task `paper-archived-grading-first-line` records the first `ARCHIVED_SETTLED` line in deploys.md and disables itself (hard stop 11-10). deploys.md 20:54:32Z. The 953 still stale are grader gaps: re-scope not started.
 - **STATUS 2026-10-27 12:28 PM CT (17:28Z): BACKFILL APPLIED (user-approved, refresh-worker claim) -- stale paper 1,906 -> 953** (NCAAF 1,092 -> 224, NFL 110 -> 25 archive-only; soccer 472 / MLB 115 / NBA 79 / NHL 7 unchanged); 981 graded copies appended, deploys.md 17:20:32Z. The remaining 953 are grader gaps by name. **Hourly pass NOT enabled:** its env key loads only at a full supervisor down/up (not a role restart) -- put to the user.
