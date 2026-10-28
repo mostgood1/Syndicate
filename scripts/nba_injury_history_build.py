@@ -175,12 +175,27 @@ def build(game_list: Iterable[Dict[str, object]], store: PdfStore, parse: Callab
     return out, summary
 
 
-def production_parser(processed_dir: Path):
+def production_parser(processed_dir: Path, work_dir: Path):
+    """The production parser, repairing names against the roster AS OF each report's date. Its name repair accepts a
+    word-dropped name only when it is exactly one roster player on the report's team, so an end-of-season roster
+    left every traded player's garbled name unrepaired (measured: 'Anthony Way Davis', 'Collin Way Sexton')."""
     import syndicate.features.nba.source_cli.scrapers.injuries as m
+    from scripts.basketball_scenario_rates import asof_roster
 
-    m.paths = types.SimpleNamespace(data_processed=processed_dir, data_root=processed_dir.parent)
+    roster_file = m.pick_rosters_file(processed_dir, season=None)
+    roster = pd.read_csv(roster_file)
+    logs = pd.read_csv(processed_dir / "player_logs.csv",
+                       usecols=["PLAYER_ID", "PLAYER_NAME", "TEAM_ABBREVIATION", "GAME_DATE"])
+    logs["GAME_DATE"] = logs["GAME_DATE"].astype(str).str[:10]
 
     def parse(pdf: bytes, date_str: str) -> pd.DataFrame:
+        day_dir = work_dir / date_str
+        if not (day_dir / roster_file.name).exists():
+            day_dir.mkdir(parents=True, exist_ok=True)
+            roster.to_csv(day_dir / roster_file.name, index=False)
+            logs[logs["GAME_DATE"] < date_str].to_csv(day_dir / "player_logs.csv", index=False)
+            asof_roster(day_dir, date_str)
+        m.paths = types.SimpleNamespace(data_processed=day_dir, data_root=day_dir.parent)
         df = m.NBAOfficialInjuryReportScraper()._parse_pdf_rows(pdf, date_str=date_str)
         if df is None or df.empty:
             return pd.DataFrame(columns=["team", "player", "status", "injury"])
@@ -188,8 +203,7 @@ def production_parser(processed_dir: Path):
         df["team"] = df["team"].astype(str).str.upper().map(lambda t: TRI.get(t, t))
         return df
 
-    roster = pd.read_csv(m.pick_rosters_file(processed_dir, season=None))
-    return parse, {m._norm_player_name_key(p) for p in roster["PLAYER"].dropna()}, m._norm_player_name_key
+    return parse, set(roster["PLAYER"].dropna()) | set(logs["PLAYER_NAME"].dropna())
 
 
 def main(argv: Optional[Iterable[str]] = None) -> int:
@@ -203,7 +217,12 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
     ap.add_argument("--json", type=Path)
     args = ap.parse_args(list(argv) if argv is not None else None)
 
-    parse, roster_keys, norm = production_parser(args.processed_dir)
+    from syndicate.features.shared.basketball_props_smart_sim import _norm_name_key as norm
+
+    # B3 counts names the SIM cannot match: its own key (which reads 'Gilgeous- Alexander' as the roster name) over
+    # every name an as-of pool can hold -- the season roster file plus everyone in player_logs.
+    parse, names = production_parser(args.processed_dir, args.out.parent / "injury_asof_rosters")
+    roster_keys = {norm(x) for x in names}
     store = PdfStore(args.pdf_dir, http_fetch())
     try:
         out, summary = build(games(args.cache, args.start, args.end), store, parse, roster_keys, norm)
