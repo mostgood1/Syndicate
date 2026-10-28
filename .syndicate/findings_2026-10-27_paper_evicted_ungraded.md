@@ -320,3 +320,26 @@ Scratch: `C:\tmp\peg\` (`dryrun.sh`, `dryrun.log`, `report_20261027T163701Z.json
 - **The 43 left are refused by name.** NBA DNPs 12 (see `findings_2026-10-28_nba_prop_wrong_game.md`), MLB 11, NHL 7, other NBA 5, soccer 3, NFL DNP 3, NCAAF 2.
   - The DNP rows (NBA 12, NFL 3, NHL 1) need a paper void outcome, and that is a user decision (`#744` owed (b)).
 - **The 37 rows in the live document** are graded by the live `settle_orders` path, which still runs `0fca3f2b`. They wait on a fleet ff plus a full down/up, which is a user decision.
+
+## Void re-scope: pre-registration `[2026-10-28 13:10Z, BEFORE any code; user, verbatim: "Yes, void them", answering "Should paper settle a sat-out prop as a void, stake back and out of ROI?"]`
+
+**The decision.** A paper bet on a player who did not play settles the way a book settles it: void, stake back, out of ROI and hit rate.
+
+**Design, fixed before code:**
+- **The outcome.** A void is `outcome = push`, with `pnl_dollars = 0.00` and `void_reason = <the resolver's DNP reason>` stamped on the row. This follows the existing convention: `settlement_identity._void_graded` grades a non-runner as `result: "push"` ("what a book does with a non-runner"). A new outcome value was rejected. 205 sites compare against `"push"`, and some treat anything not won as a loss (`live_cell_scorecard`'s `decided = outcome != "push"`), so a new value would be scored as a loss there.
+- **ROI.** The paper P&L summary counts voids in their own column and keeps their stake out of `staked_dollars`, the ROI denominator. `win_pct` already excludes pushes. Every other reader sees a $0 push.
+- **Which reasons void.** An explicit allowlist, never a suffix match: `nfl_player_did_not_play_void`, `dnp_void` (NHL), `soccer_player_did_not_appear_void`, and the new `nba_player_did_not_play_void`. Each fires only on a FINAL game. The rule sits in `_our_verdict`, so `settle_orders`, its straggler dates, the archived pass and the venue cross-check all share one copy. Kill switch: `SYNDICATE_PAPER_DNP_VOID=off`. Absent means ON, because the user has decided the policy.
+- **NBA detection** (ESPN, read 2026-10-28 13:2xZ on the three known games):
+  - The core game roster lists a DRESSED player who sat out with `didNotPlay: true` and no statistics. Kawhi Leonard, 401909864: "LEFT KNEE SWELLING".
+  - An INACTIVE player is absent from the summary box, the core game roster AND the current injury list. LeBron James, 401909855; Kyrie Irving, 401909858.
+  - So the rule is: match the order's name to ONE athlete on the two clubs' ESPN team rosters, which gives the athlete id; then find that id among the game-roster `playerId`s. In the roster with `didNotPlay: true` and no stats, or absent from both game rosters, means did not play. In the roster with stats means played (a name-form gap with our box), so refuse by name.
+  - A name that matches no team-roster athlete refuses and never voids. Absence is judged by ATHLETE ID, never by name.
+  - The checks above match ids 6450 / 1966 / 6442 as predicted: present + DNP, absent, absent.
+  - Settlement-only: a final game more than 6 h past tip, read through `EspnSettlementFeed` with the NFL path's timeout and its 6 h / 1 h refusal memo.
+
+**Hypotheses, falsifiable on a read-only fleet dry run of the archived pass:**
+- **H7 void:** of the 16 archive-only DNP-class rows at 13:00Z (NBA `player_not_in_box` 12, NFL void 3, NHL `dnp_void` 1), at least 14 grade as void.
+  - Every other refusal count is unchanged, and won / lost counts on previously graded rows are untouched (the pass skips rows with an outcome).
+  - FALSIFIED if fewer than 14, or if any non-DNP reason's count moves.
+- **H8 NBA detection:** of the 12 NBA `player_not_in_box` rows, at least 10 resolve `nba_player_did_not_play_void`, and every voided row's player has 0 minutes in ESPN's summary for that game.
+  - FALSIFIED if any voided player recorded minutes. That would be a wrongful void, which the athlete-id rule exists to make impossible.
