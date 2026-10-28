@@ -12807,3 +12807,59 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Falsification test: History-path DNP sim mass per side is small (median < 10 min/side) and starter bias is inside +-2 min with a CI covering 0 -> no history-path fix (NO-GO recorded); or the DNP mass on history sides is NOT carried mainly by zero-stint pool players (i.e. it comes from mapped stints) -> the leftover spread is not the cause.
 - Verification: Findings file with per-date coverage, per-side history vs derive table, the file:line trace and the leftover/mapped split of DNP minutes; #723 confirmatory verdict appended (or INCONCLUSIVE with its row count); any fix: pre-registration committed before its reading, tests incl. off != on through _smart_sim_worker_run_local, a replay/scratch reading on fleet copies; todo #723 updated. No fleet or env change without the user's yes.
 - Blocked by: none (time-gated: the slates 10-22..10-27 land their boxes ~6:45 AM CT the next day)
+
+### nba-prop-wrong-game — CLOSED 2026-10-28 (HYPOTHESIS FALSIFIED: no wrong game; the rows are DNPs on the player's own team) — opened 2026-10-28 — session c59f19b5-f9a2-4c74-bd42-86d0adb1b22b
+- Goal: Name the first stage that attaches the wrong game to NBA paper props graded player_not_in_box (LeBron PHI v MIL 10-24, Kawhi x4 MIN v TOR 10-25), count 14-day NBA paper/live orders whose player is on a team not in the game (fleet, read-only), and fix with a reachability test if confirmed
+- GOAL: MET. No stage attaches a wrong game: the rows are DNPs.
+  - The stage that makes them LOOK wrong is the grader: `tick.py:2467` -> `bet_status_nba.py:272-277`.
+  - Count: 0 / 1,605.
+  - No fix was built: the conditional branch did not trigger. The DNP-grading follow-up is in `#744`.
+- Files: .syndicate/findings_2026-10-28_nba_prop_wrong_game.md (NEW)
+- Hypothesis: Pre-registered in the brief from local_35eb891d before any reading: the prop candidate join keys a player's line onto an OddsAPI event by something other than his actual team on that date (stale roster lookup or event-id mixup in the props pipeline)
+- Falsification test: The player is on one of the order's two clubs on that date (ESPN roster + the fleet box on other dates)
+- Verification: Fleet read-only count over live doc + archive, box and ESPN roster as truth; ESPN summary for the named games
+- Blocked by: none
+- Result 2026-10-28 12:39-12:43Z (fleet read-only, refresh-worker state env, code 2c8ba8be): FALSIFIED.
+  - **The named rows:** LeBron is PHI and Kawhi is TOR (also Kyrie, DAL). Three sources agree: the ESPN rosters_2026-27.csv on the fleet, and the fleet box on their other game dates.
+  - **ESPN summary:** Kawhi is `didNotPlay` "LEFT KNEE SWELLING"; LeBron and Kyrie were inactive.
+  - **Count:** 0 of 1,605 NBA prop orders (1,559 paper + 46 live, game dates 10-20..10-28) carry a player on a team outside the game. 1,584 played in the order's own game. 21 are absent from the box but rostered on one of the two clubs: 14 past-game DNPs plus 7 rows for 10-28 games not yet played.
+  - **The real stage:** grading, not the join.
+    - `tick.py:2467` drops 0-minute `didNotPlay` rows from the box.
+    - `bet_status_nba.py:272-277` then returns `player_not_in_box` on a final game.
+    - No sport's DNP refusal settles in paper today.
+  - Nothing was built or written on the fleet. Follow-ups are in `findings_2026-10-28_nba_prop_wrong_game.md` and `#744`.
+
+### scheduled-task-registry-alert — CLOSED 2026-10-28 (GOAL MET: out-of-app registry alert on main, job created on the user's yes, first scheduled run OK) — opened 2026-10-28 — session 9af4433f-62e0-4e4f-a082-92522092d7f8
+- Goal: An alert that does NOT live in the Claude desktop app's task registry fires (Windows toast + non-zero exit) when the registry is lost or the dispatch watchdog stops running while the machine is awake: checker + hermetic test on main, one reading (fresh -> silent, simulated stale -> alert) in deploys.md; the Windows Task Scheduler job created ONLY on the user's explicit yes.
+- Files: scripts/check_scheduled_task_registry.py (NEW), tests/test_check_scheduled_task_registry.py (NEW), deploy/local/install_task_registry_check.ps1 (NEW), docs/ai_context/todo.md (ONE status line under `#736`, 252c0542 -- that item belongs to lane `syndicate-decision-engine`, whose session started this one; reported to it, no other line touched)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: py -3 -m pytest tests/test_check_scheduled_task_registry.py; live run against the real state.json + registry file (expect OK, exit 0, no toast); --now override past the next due time (expect STALE, exit 1, toast shown)
+- Blocked by: none
+- Result 2026-10-28 10:52 AM CT: checker + 28 hermetic tests on main (`084db263`). Drills (`edd86e1f`): fresh -> OK silent, stale -> ALERT exit 1 + toast read back from Action Center, registry lost -> ALERT. Windows job `SyndicateTaskRegistryCheck` created 14:36Z on the user's "Yes, create it" (toast only, no email; `b416f1b4`). First scheduled run 10:50 CT: OK, exit 0, silent, as predicted. Not yet seen: a toast from the job's own context (comes with the first real ALERT). Undo: `install_task_registry_check.ps1 -Uninstall`.
+
+### nhl-v-initial-name-key — CLOSED 2026-10-28 (GOAL MET: (d) on main f2062fb3, measured; (c) scheduled sgp-pjoint-forward-read-1124) — opened 2026-10-28 — session a6134f5b-5e22-4d44-a4a2-4f2c1ba43772
+- Goal: Todo #743 (d)+(c): prop_evidence.common.name_key_loose never drops the FIRST token as a generational suffix, so initial_key('V. Trocheck') == 'v trocheck' and every V-initial NHL player matches the game log (SGP leg grading + hit-rate pool); real trailing suffixes still drop. Measured on a read-only fleet snapshot: V-initial players/legs/hit-rate rows newly matched, and the full key map (name_key_loose, initial_key, name_keys) diffed before/after over every roster name, changed only for leading-suffix-token names. Hermetic tests; landed on main; fleet ff is a user decision. (c): one one-time scheduled task (fireAt 2026-11-24 ~9:30 AM CT) runs the prereg §8 forward SGP p_joint read read-only and records the verdict; earlier if NHL/NBA/NFL each reach >= 30 new clean games.
+- Files: syndicate/features/shared/prop_evidence/common.py (name_key_loose ONLY), tests/test_name_key_leading_initial.py (NEW), docs/ai_context/todo.md (#743 section only)
+- Hypothesis: n/a (fix of a measured defect: todo #743 (d), 5 of the 8 still-unresolved NHL SGP legs are V-initial players)
+- Falsification test: On the snapshot, the fix changes the key of any name whose first token is not a suffix word, or resolves a V-initial leg to a player other than the one the sheet graded -> the fix is wrong
+- Verification: Key-map diff before/after over the fleet's NHL game log + NHL rates/lineups + every sport's sheet names (only leading-suffix names change); pending NHL SGP legs before/after on a snapshot replay; hit-rate pool V-initial players matched before/after; new tests + test_sgp_leg_grading + prop_evidence suites pass
+- Result 2026-10-28 13:51Z: (d) on main `f2062fb3` + 18 hermetic tests; measured on a read-only fleet snapshot: 36 of 11,548 names changed key, all leading-suffix `V.` names (falsification NOT triggered: 0 non-suffix names changed, 0 wrong-player legs); NHL pending SGP legs 15 -> 7; hit-rate pool +6 V legs, 0 removed. NOT on the fleet (user decision). (c) task `sgp-pjoint-forward-read-1124` (2026-11-24 9:40 AM CT). Record: todo #743, log/2026-10-28.md 13:51Z.
+- Blocked by: none
+
+### closed-lane-archive-20261028-0841 — CLOSED 2026-10-28 (GOAL MET: 3 blocks archived) — opened 2026-10-28 — session 37db6440-d5da-42b4-b83c-53a1454c0e76
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: MET. owner_liveness.py --idle-min 240 at 13:44Z (08:44 CDT) returned 3 SAFE of 9 CLOSED; moved to lanes_closed.md with one pointer each. Table and deferrals are in log/2026-10-28.md 13:44Z.
+- Moved: closed-lane-archive-20261027-2046, closed-lane-archive-20261027-2240, closed-lane-archive-20261028-0040
+
+### nhl-hitrate-pool-team-match — CLOSED 2026-10-28 (GOAL MET with A1: on main c1a2fb4a, measured; first build FALSIFIED as registered) — opened 2026-10-28 — session a6134f5b-5e22-4d44-a4a2-4f2c1ba43772
+- Goal: Todo #743 (e): the NHL hit-rate pool (sgp_pool.GameLog.resolve) matches a player's latest log team to tonight's game CANONICALLY (raw match kept), and every pool leg carries the board's own team string, so teammate/opponent stays consistent; measured on the 10-28 read-only fleet snapshot (players resolved, pool legs, relations) before/after; hermetic tests; landed on main; fleet ff is a user decision
+- Files: syndicate/features/nhl/sgp_pool.py (GameLog.resolve + a team-spelling helper + the pool leg's team field ONLY), tests/test_nhl_sgp_pool_team_match.py (NEW), docs/ai_context/todo.md (#743 section only)
+- Hypothesis: The 90 in-lineup player-days (12 sheet days, 10-28 snapshot) that miss the pool with no_game_log resolve only on team spelling ('St Louis Blues' vs 'St. Louis Blues', 'MIN' vs 'Minnesota Wild'); matching canonically admits them, and pool legs are added only for those players
+- Falsification test: On the snapshot: any (day, event, player) that resolved before resolves to a different pid or stops resolving; any pool leg's team is not one of its game's board team strings; any existing pool leg disappears other than by the per-game cap; or a newly admitted player's log team is canonically a different club than the game's -> the fix is wrong
+- Verification: Snapshot replay of legs_by_game old vs new over the 12 sheet days: no_game_log, pool legs added/removed (cap vs other), relation of every pool-leg pair under raw string vs canonical comparison; hermetic tests incl. off != on (raw-only resolve fails them); test_nhl_sgp_pool + test_nhl_sgp + test_sgp_leg_grading pass
+- Result 1 2026-10-28, read before 14:44Z (9:44 AM CT) (snapshot, fix as first built): **FALSIFIED as registered.** Jaccob Slavin stops resolving on 6 day-games: a second J. Slavin (pid 8481004, 2 games, last 2026-04-11, logged 'CAR') now matches by club and the two tie; the raw compare had hidden him. Also: 90 player-days newly resolved, but 0 pool legs added (+865 rungs, +833 of them fail the market gate); pool 173 = 173 legs, tickets 23 = 23; 0 pid changes; 0 relation disagreements over 896 pairs.
+- A1 (registered BEFORE re-measuring): among 2+ same-key hits, keep only players with a game in the log's latest season; refuse if that leaves 0 or 2+. Falsified if, on the same snapshot, any previously resolved (day, event, player) still stops resolving or changes pid, or the season filter resolves any key where 2+ candidates played this season.
+- Result 2 (A1) 2026-10-28 14:48Z: A1 NOT falsified. 0 lost / 0 pid changed / 90 newly resolved; 6 of 22 multi-hit keys resolved by the season filter (Slavin), 16 with 2+ in-season still refuse; pool 173 = 173, tickets 23 = 23 (0 legs gained: the new rungs fail the market gate); 0 relation disagreements / 896 pairs. On main `c1a2fb4a`; NOT on the fleet (user decision). Record: todo #743 (e), log/2026-10-28.md 14:48Z.
+- Blocked by: none
