@@ -394,3 +394,43 @@ real box appearances:
 **Known residuals, out of scope:**
 - the AVAILABILITY component (T_AROUND); the harness deletes `raw/injuries.csv` for as-of hygiene;
 - the 565 pool-hole player-games (never in the season file).
+
+**STEP 1c SMOKE — RESULT 2026-10-28 17:05Z (12:05 CDT). VERDICT: PASS** (a, b, c all true).
+- Run dir `C:/tmp/bball_sc/sweep/ClarkAndAddison`, log `~/bball_sc/sweep_ClarkAndAddison.log`. Not "AR_smoke":
+  WSL's login shell exports NAME = the machine name, which the runner's `${NAME:-...}` default picked up.
+- Config verified: code_ar, calfiles_sw_all (as fit_pd), the fit_pd levers / flags, `--asof-roster`. 12/12 dates,
+  0 errors.
+- Control: the fit_pd files for the same 12 dates (`C:/tmp/bball_sc/ctl12`). 87 games, 174 team-games in each arm.
+- Grader `r2s/grade_ar.py` → `r2s/grade_ar.json`.
+
+| | as-of roster | control |
+|---|---|---|
+| leak (LEAK_FUTURE + NEVER_T_OTHER) | **0** | 50 |
+| SIM_NEVER_T, last listed elsewhere | **0** | 212 |
+| REAL_ONLY player-games | 98 | 356 |
+| REAL_ONLY real min / team-game | **5.27** | 34.07 |
+| ABSENT sim min / team-game | 15.97 | 20.38 |
+| DNP_LISTED_COACH sim min / team-game | 7.68 | 7.22 |
+| matched player-games (Phase 1) | 1,772 | 1,514 |
+| sim game total mean | 230.77 | 230.63 |
+
+**Phase 1 on the 12 dates** (descriptive; miss nominal .20):
+
+| cell | as-of | control |
+|---|---|---|
+| minutes (all) | miss .496, width 1.69, bias **+2.28** | miss .415, width 1.58, bias −0.18 |
+| minutes (bench) | miss .598 | miss .519 |
+| input-minutes bias | **+2.22** | −0.27 |
+| pts / reb / ast / threes | .327 / .309 / .283 / .246 | .310 / .299 / .292 / .234 |
+
+**Reading:**
+- The leak is removed (b, c). Team totals are unchanged (+0.14 per game), as expected for a sim calibrated to
+  targets.
+- The matched population grows by 258 player-games (players the leak had removed).
+- **The minutes read gets WORSE, not better.** With the right players in each pool, the INPUT minutes now
+  UNDER-allocate the players who play by 2.2 min on average. About 28 sim min per team-game still go to players who
+  do not play: ABSENT 16.0 (injured / inactive; the resim has no injury feed) + coach DNP 7.7 + other DNP 4.3.
+- The leak had masked this by replacing those minutes with wrong-team players' minutes.
+- **The minutes defect is now an ALLOCATION / AVAILABILITY bias first and a variance defect second.** This is the
+  baseline the minutes mechanism must be built against.
+- The full FIT `fit_ar` was launched 17:07Z (12:07 CDT): `r2s/launch_fit_ar.sh`, 3 workers, nice 19.
