@@ -54720,3 +54720,13 @@ which is about the two sizing bases and not about the refusal boundary.
 - **Pace:** ~1 settlement day per run (7-8 min, plus a 60 s gap) in the purged region; 06:00Z..20:00Z Saturdays are denser.
 - **Peak bound:** ~1 GB at nice 19. The worst case is a 300-page slice that keeps every row, at ~2 KB a row plus the base process.
 - **verify still OWED:** the first full forward settlement day, and the supervisor job (see the 20:56:16Z entry).
+
+## 2026-10-28 05:08:40Z (12:08 AM CT) -- READING: #743 SGP grading fix, first nightly SGP_PAPER after fleet ff 84967f75 (lane sgp-leg-grading) -- **MET**
+- **Closes** the "nightly SGP_PAPER reading OWED" line of the 2026-10-27 16:16:15Z entry.
+- **Source:** `~/syndicate-prod/logs/cheat_sheets_reconcile.log`, the run after `RECONCILE_RUN start 2026-10-28T04:50:02+00:00` (11:50 PM CT). Read-only by a session watcher at 05:05:24Z; nothing written on the fleet.
+- **The new code ran:** these are the first `SGP_PAPER` lines to carry `unresolved_leg`. The 10-27 12:45Z run's lines (pre-ff) have no such key. No Traceback after the header.
+- **Reading:** NHL **22.5% vs 22.0% predicted** (888 won/lost, 35 left out for an unresolved leg -> 853 resolved, 76 games; gap +0.5, SE 2.0); NFL 30.1% vs 32.8% (195 - 2 = 193, 25 games; gap -2.8, SE 4.1); NBA 40.5% vs 45.3% (277 - 15 = 262, 39 games; gap -4.8, SE 6.2); MLB 43.3% vs 46.6% (30); WNBA 36.8% vs 46.9% (38).
+- **Before:** the last pre-fix line (12:45Z 10-27) read NHL 19.4% vs 22.1% on 666 with 150 pending; NFL 29.4% vs 34.5% on 180 with 17 pending; NBA 39.6% vs 45.2% on 268.
+- **Agrees with the 16:17:36Z read-only regrade** (NHL 22.3% vs 22.0% on 799): +54 resolved NHL tickets from the 10-27 slate, the same sign and size of gap. NHL pending tickets 150 -> 13.
+- **ROI moved with it** (both prices are the ledger's, the book one an ASSUMED discount): NHL at worth-it +10.0% (was -14.0%), at est. book -4.5% (was -23.7%). The old ROI carried the same censoring.
+- **Not shown:** no per-sport gap is beyond 1.2 SE. This is a read of the measurement, not a new calibration test. That is #743 (c), the pre-registered forward read (>= 30 new clean games each in NHL / NBA / NFL, or 2026-11-24).
