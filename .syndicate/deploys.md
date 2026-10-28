@@ -54730,3 +54730,11 @@ which is about the two sizing bases and not about the refusal boundary.
 - **Agrees with the 16:17:36Z read-only regrade** (NHL 22.3% vs 22.0% on 799): +54 resolved NHL tickets from the 10-27 slate, the same sign and size of gap. NHL pending tickets 150 -> 13.
 - **ROI moved with it** (both prices are the ledger's, the book one an ASSUMED discount): NHL at worth-it +10.0% (was -14.0%), at est. book -4.5% (was -23.7%). The old ROI carried the same censoring.
 - **Not shown:** no per-sport gap is beyond 1.2 SE. This is a read of the measurement, not a new calibration test. That is #743 (c), the pre-registered forward read (>= 30 new clean games each in NHL / NBA / NFL, or 2026-11-24).
+
+## 2026-10-28 06:31:42Z (1:31 AM CT) -- READING for the 2026-10-27 06:20:21Z 7168-cap down/up: EARLY RECYCLES STOPPED -- (1)+(2) **MET**; (3) safety **MISSED narrowly on two of my own bars**, no OOM (lane fleet-refresh-worker-early-recycle)
+
+- **reading:** `slate.py` (scratchpad, nice 19) over all rotated fleet refresh-worker logs, lines stamped >= 2026-10-27T06:20:57Z; one worker the whole window, pid 2983218, 06:22:09Z .. 10-28 06:31:01Z.
+- **(1) refusals:** `pre_source_state_fingerprint` 11 / 333 `CALLING_SOURCE_STATE_FINGERPRINT` = 3.3% (baseline 8.1%, 140/1,724). Below 5,268 MB: **0**. Their current_mb: 5,415, 5,504, 5,717, 5,732, 5,569, 5,712, 6,088, 6,335, 5,485, 6,257, 6,001, rising through the evening. 322 builds persisted.
+- **(2) recycles:** `[worker_recycle] RECYCLE_EXIT` **0** in 24.2 h (baseline 1.3-2.5 h per boot).
+- **(3) safety:** kernel OOM lines (dmesg) 0; `free -m` available 7,822 MB, swap used 902 MB. MISSED: `post_build_overview` aborts **5** (bar 0; 19:14, 21:11, 22:22, 03:45, 03:58Z, current 5,277-6,029 MB; pre-change 6 days had 8). Role-tree heartbeat peak (container_memory_mb) **6,611 MB** at 05:35:07Z (bar ~6,500). Also `build_candidate_pool_start` aborts 2, one snapshot at **7,724 MB** (headroom -556) 10-27 16:04:00Z. VM accounted RSS peak 10,009 MB at 00:54:55Z.
+- **verdict:** the fix did what it was for, and the guard still refuses under real pressure. The rollback trigger "if (3) fails" is met only on proxy bars, with no OOM. Keep or roll back is put to the user; nothing changed on the fleet.
