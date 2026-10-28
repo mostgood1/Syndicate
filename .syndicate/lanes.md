@@ -1116,7 +1116,7 @@ death, never life — do not invert it.
 - Verification: Prereg committed first (SHA in findings); hermetic tests pass incl. off != on reachability and a no-order-path test; z fit reported with n; findings file + #738 + a #717 dated-read line on main; enabling the job on the fleet is the user's decision
 - Blocked by: none
 
-### kalshi-combo-capture — OPEN (RUNNING on the fleet via a bridge; supervisor job owed at the next fleet ff) — opened 2026-10-27 — session a48b0f49-3a6b-4105-b194-5804a934487c (picked up 2026-10-27 as a side session of local_668211d5; opened by e32fef1a for pickup)
+### kalshi-combo-capture — OPEN (RUNNING: hourly supervisor job live since 2026-10-28 16:44:45Z; first-forward-day reading owed via scheduled task) — opened 2026-10-27 — session a48b0f49-3a6b-4105-b194-5804a934487c (picked up 2026-10-27 as a side session of local_668211d5; opened by e32fef1a for pickup)
 - **Reading armed `[2026-10-27 23:20Z]`:** Claude scheduled task `kalshi-combo-capture-first-forward-day`, user-approved, runs daily at ~8:40 AM CT, read-only.
   - It runs `scripts/kalshi_combo_capture.py status` (`25485432`) on the fleet store, via `C:\tmp\kalshi_combo_status\cc_status.sh`.
   - Once `met`, it appends the first-full-forward-day + purge-age reading to `deploys.md`, adds a line here and in `#742`, and disables itself. Hard stop 2026-11-03.
@@ -1126,16 +1126,18 @@ death, never life — do not invert it.
   - **GOAL: NOT MET** (running; Verification owed).
   - The user approved verbatim: "launch the kalshi combo-capture bridge on the fleet now at nice 19 with a ~30-day backfill and no trade reads, then enable the hourly supervisor job at the next fleet ff under the deploy locks".
   - The bridge has run since 20:56:16Z. It was paused 21:24Z for the memory fix `6872eb2c` (2.5 GB -> 653 MB, same rows) and relaunched 21:36:16Z on `6872eb2c`. Its backfill starts at settlements of 09-27 20:51Z.
-  - **Left:**
-    - (1) The Verification reading: the first full forward day in `deploys.md`.
-    - (2) The supervisor job at the next fleet ff to >= `0d73eb92`: under the locks, add the env key, then a FULL down/up. Never on a checkout older than `6872eb2c`; the fleet's `84967f75` holds v1.
+  - **Left:** (1) the Verification reading: the first full forward day (10-29 UTC) in `deploys.md`, which the scheduled task records on its 10-30 run.
+  - **Done `[2026-10-28 17:11Z, read back by this lane]`:** (2) the supervisor job.
+    - Lane syndicate-decision-engine did the ff to `6d6e729d` + the key + one full drained down/up at 16:44:45Z (`deploys.md` 16:44:34Z and 17:09Z).
+    - The first supervisor row (17:02:09Z) is `ok` with 129 pages. The bridge exited by itself at 17:08:12Z.
+    - The backfill caught up at 13:03Z. Purge age: 59.6-71.4 h.
   - **Goal clauses restated by the user's decision:** no trade reads. The GET clause is superseded by the measured ~8,500 a day on a heavy day (purged history ~900 per day). The user approved the run knowing that number.
 - Goal: A forward, read-only capture of Kalshi same-game combo markets runs daily on the fleet: every combo whose legs include a same-game pair in a sport the platform prices is stored under the fleet data root (legs, quotes, volume_fp, result, and public trade prints for kept combos with volume > 0) within about 1,000 public GETs a day at nice 19, so E4 Stage 2 (#740 (d)) can run after a month of capture
 - Files: scripts/kalshi_combo_capture.py (NEW), tests/test_kalshi_combo_capture.py (NEW), scripts/local_production.py (SCHEDULED_JOBS kalshi-combo-capture entry ONLY), docs/ai_context/todo.md (#742 section + one appended OWED line in #740 only), .syndicate/findings_2026-10-27_kalshi_combo_capture.md (NEW), .syndicate/state_kalshi.md ([kalshi-combo-capture] section + one appended line in [kalshi-combo-public-data] only), .syndicate/state.md (one kalshi-combo-capture index row only)
 - Hypothesis: n/a (a capture, not a test; E4's registered Stage 2 is the test)
 - Falsification test: n/a
 - Verification: Hermetic tests incl. off != on for the job; built default-off and landed on main; after a user-approved fleet window under the deploy locks, the first full day's capture file on the fleet shows kept combos > 0 by sport, the day's GET count within budget, and results filled for settled combos, recorded in deploys.md
-- Blocked by: none for the bridge. The supervisor job waits for the next fleet ff to >= `0d73eb92` and a full drained down/up (the same down/up `#744`'s key needs).
+- Blocked by: none. Waiting on the 10-29 UTC settlement day to finish; the scheduled task reads it.
 
 ### paper-evicted-grading — OPEN — opened 2026-10-27 — session 7833a791-56c8-4845-99a7-d81bad2b6608 (adopted 2026-10-27 16:2xZ; opened by session e32fef1a for pickup; Phase 0 item 4 of #736)
 - Goal: Every filled PAPER order whose game is decided gets an outcome even after _trim_to_cap moved it to the archive: a default-off grading pass over archived ungraded paper rows (graded copy appended to the archive), a one-off backfill from 10-02, and the stale count (game started > 48 h ago, no outcome; 1,834 on 2026-10-27 16:06Z) read near 0 on the fleet afterwards

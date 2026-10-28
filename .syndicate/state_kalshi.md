@@ -979,7 +979,7 @@ board. The loop therefore checks `budget_remaining()` BEFORE spending.
   - An NFL Sunday evening settles about 438k cross-category combos an hour, 12x the 35k above. 61% hold a same-game pair; there are 21.7k traded two-leg tickets and 246k traded pure same-game tickets.
   - See `[kalshi-combo-capture]`.
 
-## [kalshi-combo-capture] KALSHI COMBO CAPTURE: RUNNING ON THE FLEET AS A SELF-EXITING BRIDGE (30-DAY BACKFILL, NO TRADE READS); SUPERVISOR JOB OWED; AN NFL SUNDAY SETTLES ~5.5M COMBOS IN 12.5 H `[measured on public Kalshi data 2026-10-27 13:13Z-18:23Z; fleet 20:56Z-21:36Z, lane kalshi-combo-capture]`
+## [kalshi-combo-capture] KALSHI COMBO CAPTURE: LIVE AS THE HOURLY FLEET SUPERVISOR JOB (NO TRADE READS; STORE FROM 09-27); KALSHI PURGES UNTRADED COMBOS ~2.5-3 DAYS AFTER SETTLEMENT; AN NFL SUNDAY SETTLES ~5.5M COMBOS IN 12.5 H `[measured on public Kalshi data 2026-10-27 13:13Z-18:23Z; fleet 2026-10-27 20:56Z -> 10-28 17:11Z, lane kalshi-combo-capture]`
 - **Code (on main):** `scripts/kalshi_combo_capture.py`; commits `b994e9cf`, `ce5c467c`, `da6dbdc3`, `af6e4c14` and `883edd96`; 51 hermetic tests.
   - Fleet job `kalshi-combo-capture` runs hourly in `local_production.SCHEDULED_JOBS`.
   - It is **INERT until `SYNDICATE_KALSHI_COMBO_CAPTURE=on`**; absent means OFF, with no request and no file.
@@ -1001,19 +1001,21 @@ board. The loop therefore checks `budget_remaining()` BEFORE spending.
 - **Two defects found and fixed before any fleet use:**
   - `report` held a date in memory (9 GB, stopped);
   - trade reads were not charged to the run budget.
-- **On the fleet (user-approved 2026-10-27):**
-  - A bridge loop runs `scripts/kalshi_combo_capture.py run --invoker bridge`. Code is `~/combo_capture_checkout`, a git archive of `6872eb2c`. It runs at nice 19, hourly, or after 60 s while a run ends `budget_stopped`.
-  - It writes `~/syndicate-prod/data/reports/intelligence/kalshi_combo_capture/`. Nothing reads that store, and it is not in `HOT_ARTIFACT_PATTERNS`.
+- **On the fleet (user-approved 2026-10-27; verified read-only 2026-10-28 17:11Z):**
+  - The hourly supervisor job `kalshi-combo-capture` runs with the refresh-worker's env. `SYNDICATE_KALSHI_COMBO_CAPTURE=on` was loaded by the full drained down/up at 16:44:45Z on `6d6e729d`.
+  - First supervisor row: 17:02:09Z, `ok`, 129 pages, `trades_max_legs` 0.
+  - The 2026-10-27 bridge exited by itself at 17:08:12Z, after 119 runs (113 `budget_stopped`, 2 transient `errors`). Its backfill caught up at 13:03Z.
+  - It writes `~/syndicate-prod/data/reports/intelligence/kalshi_combo_capture/`: 1.8 GB for settlements 09-27 -> 10-28. Nothing reads that store, and it is not in `HOT_ARTIFACT_PATTERNS`.
   - The store starts at settlements of **2026-09-27 20:51Z**: the `#740` (d) clock.
-  - The bridge stops itself once the supervisor job has run enabled and the newest run is `ok`. It does not restart after a WSL or host reboot; the watermark then catches up.
-- **A month back, the listing holds TRADED combos only:** kept 379,410, of which 379,393 traded (09-27 20:51Z -> 09-29 00:31Z, 836k rows listed).
-  - Kalshi appears to drop untraded combos some days after settlement.
-  - So the backfill's purged region costs ~900 GETs per day of history. Every kept row there is stored (~33 MB a day).
+  - Off switch: delete the env line, then a full down/up.
+- **Kalshi drops UNTRADED combos from the listing 59.6-71.4 h after settlement (~2.5-3 days).** Measured by `kalshi_combo_capture.py status` over the backfill: 36 runs were purged (kept-traded / kept >= 0.99) and 53 unpurged (<= 0.5).
+  - A month back, kept 379,410 of which 379,393 traded (09-27 20:51Z -> 09-29 00:31Z, 836k rows listed).
+  - So the purged region costs ~900 GETs per day of history, and every kept row there is stored (~33 MB a day). A capture outage longer than ~2.5 days loses the untraded counts, though not the traded rows.
 - **Peak memory is per slice, not a leak.** As a dict a row took 8.9 KB, against 1.9 KB as JSON.
   - Run 1 under `c21abdea` peaked at 2.5 GB.
   - `6872eb2c` holds rows that get no trade read as their encoded line: 653 MB over the same Sunday window (876 pages, 278,390 rows), byte-identical to the old rows apart from `captured_at`.
-- **Supervisor job OWED.** It needs a fleet ff to >= `0d73eb92`, then `REFRESH_WORKER__SYNDICATE_KALSHI_COMBO_CAPTURE=on` in `local_production.env`, then a FULL drained down/up (`up` derives the job env).
-  - **The fleet checkout `84967f75` holds v1 (`b994e9cf`). Never set the key on a checkout older than `6872eb2c`.**
+- **Never run a fleet checkout older than `6872eb2c` with the key set.** v1 (`b994e9cf`) stores untraded rows and reads trades without charging the run budget.
+- **Owed:** the first-full-forward-day reading (10-29 UTC), which the scheduled task `kalshi-combo-capture-first-forward-day` records.
 - **Detail:** `findings_2026-10-27_kalshi_combo_capture.md`; the readings are in `deploys.md`.
 
 ## [kalshi-derived-rung-pricing] KALSHI'S MID ON DERIVED RUNGS (ALT LADDERS, SEGMENTS, TEAM TOTALS) IS AT LEAST AS GOOD AS A SHARP-ANCHORED SURFACE; NO PREGAME TAKER EDGE AT THE ASK `[verified on fleet + public Kalshi data 2026-10-26 22:20Z..10-27 00:21Z, lane e3-derived-surface]`

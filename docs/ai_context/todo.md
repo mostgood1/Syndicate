@@ -108,7 +108,7 @@
   - **(c)** The registered forward read (prereg §8): same script, tickets >= 10-27, at >= 30 new clean games each in NHL / NBA / NFL, or on 2026-11-24. Watch NBA: its nudge adds +4.7 pts per ticket, its MDE80 is 17, and 10-26 read 26% vs 46% on 42 tickets.
 - **(a) is on the fleet since 2026-10-27 16:16:15Z.** The nightly `SGP_PAPER` line from 2026-10-28 04:50Z on calibrates on resolved parlays only; `unresolved_leg` counts the rest. Lines before that are biased toward over-prediction by about +2 pts pooled and +4 in NHL.
 
-### `#742` — **KALSHI COMBO CAPTURE (Decision Engine `#736`, E4 Stage 2): a forward, read-only capture of Kalshi same-game combo markets, so E4's venue-price test becomes runnable. RUNNING on the fleet since 2026-10-27 20:56Z as a self-exiting bridge (user-approved), with a 30-day backfill and no trade reads; the hourly supervisor job is OWED at the next fleet ff to >= `0d73eb92`. MEASURED over 26 h of settlements (NFL Sunday + Monday): ~8,500 GETs a day, not ~1,000; 508k traded same-game combos a day** — 2026-10-27, session loving-einstein-b3c45e (lane opened at user request); built by session a48b0f49 (lane `kalshi-combo-capture`); `.syndicate/findings_2026-10-27_kalshi_combo_capture.md`; `.syndicate/findings_2026-10-26_e4_combo_correlation.md` (Stage 2 section, Recommendation 3)
+### `#742` — **KALSHI COMBO CAPTURE (Decision Engine `#736`, E4 Stage 2): a forward, read-only capture of Kalshi same-game combo markets, so E4's venue-price test becomes runnable. RUNNING on the fleet: the 30-day backfill caught up 2026-10-28 13:03Z, and the HOURLY SUPERVISOR JOB has been live since the 16:44:45Z full down/up on `6d6e729d` (the bridge exited by itself at 17:08Z); no trade reads. The first-full-forward-day reading is OWED via scheduled task (due on the 10-30 run). MEASURED over 26 h of settlements (NFL Sunday + Monday): ~8,500 GETs a day, not ~1,000; 508k traded same-game combos a day** — 2026-10-27, session loving-einstein-b3c45e (lane opened at user request); built by session a48b0f49 (lane `kalshi-combo-capture`); `.syndicate/findings_2026-10-27_kalshi_combo_capture.md`; `.syndicate/findings_2026-10-26_e4_combo_correlation.md` (Stage 2 section, Recommendation 3)
 - **User, verbatim (2026-10-27):** "Yes, adopt E3 and E4's recommendations: Phase 5 drops the derived-line taker and sim-based combos (Kalshi's mid prices derived lines; measured SGP correlation prices combos, sim only for soccer scorelines). Route the engine reads to the sim owners and open a lane for a forward Kalshi combo capture."
 - **Why:** E4 Stage 1 passed 4 cells (MLB same-batter nested / other, NBA same-player nested, soccer result/total/BTTS) but has no price test. Kalshi's combo prints are public, but the past window cannot be rebuilt by paging (more than 30,000 trades in one 10-minute slice). Same-game legs from MLB, NBA, NHL and soccer already appear inside Kalshi combos.
 - **What (E4 Recommendation 3):**
@@ -132,6 +132,13 @@
   - The `0` shard and the per-sport collections settled 0.
   - Corrected along the way: the first 4-h sample's "no two-leg or pure SGP tickets trade" was a window artifact.
 - **DECIDED 2026-10-27 (user, verbatim, session a48b0f49):** "Yes: launch the kalshi combo-capture bridge on the fleet now at nice 19 with a ~30-day backfill and no trade reads, then enable the hourly supervisor job at the next fleet ff under the deploy locks."
+- **STATUS 2026-10-28 12:13 PM CT (17:13Z): SUPERVISOR JOB LIVE, BRIDGE EXITED -- verified read-only on the fleet.**
+  - Lane syndicate-decision-engine did the ff to `6d6e729d` + the env key + one full drained down/up at 16:44:45Z (`deploys.md` 16:44:34Z and 17:09Z).
+  - This lane read it back: the checkout contains `6872eb2c`, there is 1 key line, and the last UP was on `6d6e729d`.
+  - The first supervisor row (17:02:09Z) is `ok`: 129 pages, `trades_max_legs` 0. The bridge logged its exit at 17:08:12Z and no process remains.
+  - The backfill caught up at 13:03Z, so the first full forward day is 10-29 UTC.
+  - **Purge age measured by `status`: Kalshi drops untraded combos between 59.6 and 71.4 h after settlement (~2.5-3 days)**, from 36 purged and 53 unpurged runs.
+  - Store: 1.8 GB for 09-27 -> 10-28. The scheduled task's 13:44Z run reported `met` false, as expected.
 - **STATUS 2026-10-27 23:20Z:** the reading is armed. The scheduled task `kalshi-combo-capture-first-forward-day` (user-approved: "schedule a read-only check tomorrow morning that records the capture's first full forward day and the purge-horizon date in deploys.md") runs daily from 10-28.
   - It reads `kalshi_combo_capture.py status` (`25485432`) and records the reading once `met`. Hard stop 11-03.
   - At 22:46Z one bridge run ended `errors` (`SliceUnreadable`, a page GET returned None after 4 tries). The watermark held; the bridge retries the slice an hour later.
@@ -142,11 +149,11 @@
 - **Overturned by the backfill:** Kalshi's listing a month back holds TRADED combos only: 379,393 of 379,410 kept on 09-27/28.
   - So the purged region costs about 900 GETs per day of history, not the ~5-8k estimated.
   - And every kept row is stored, which pushed a run to 2.5 GB. Fixed by `6872eb2c`: 653 MB on the same window, with identical rows (278,390 / 278,390).
-- **OWED:**
-  - At the next fleet ff to >= `0d73eb92`: under the locks, back up `~/syndicate-prod/local_production.env`, append `REFRESH_WORKER__SYNDICATE_KALSHI_COMBO_CAPTURE=on`, and record both sha256s. A FULL drained down/up loads it (a role restart does not).
-  - **NEVER add the key while the fleet checkout is older than `6872eb2c`.** `84967f75` holds v1 (`b994e9cf`), which stores untraded rows and reads trades without charging the budget.
-  - The bridge exits by itself once a `"invoker": "supervisor"` row exists and the newest run is `ok`.
-  - It does not survive a WSL or host restart. The watermark catches up any gap, as long as it stays inside the ~30-day listing edge.
+- **DONE 2026-10-28 (formerly OWED):**
+  - The supervisor key + full down/up went in at 16:44:45Z on `6d6e729d`; the bridge exited by itself at 17:08Z.
+  - **Still true:** never run a fleet checkout older than `6872eb2c` with the key set. v1 (`b994e9cf`) stores untraded rows and reads trades without charging the budget.
+  - Off switch: delete the env line, then a full down/up.
+- **OWED:** the first-full-forward-day reading (10-29 UTC). The scheduled task `kalshi-combo-capture-first-forward-day` records it in `deploys.md` and disables itself; hard stop 11-03.
 
 ### `#741` — **E3 DERIVED-MARKET SURFACE (Decision Engine `#736`, plan §4 E3): KILLED by the registered rule on Kalshi, both tiers x both arms x t60 / t15, and on Polymarket (indicative). Priced off Pinnacle's main line plus a shape, both surfaces LOSE to Kalshi's own mid on held-out rungs (parametric +0.0051 nats [+0.0026, +0.0075], sim-shaped +0.0069; 26,708 rungs / 243 games); consensus-anchored the parametric ties it. No predicted-EV band makes money at the ask after fees. Even Pinnacle's own alt price does not beat Kalshi's mid** — 2026-10-26, lane `e3-derived-surface`, session d266ae46 (side session of local_898e5510); `.syndicate/findings_2026-10-26_e3_derived_surface.md`
 - **DECIDED 2026-10-27** (user, in the decision-engine session; `#736`): the recommendation is adopted, and Phase 5 has no derived-line taker. OWED (a) is routed in `.syndicate/brief_2026-10-27_engine_reads.md`; (b) the forward re-reads stay owed.
