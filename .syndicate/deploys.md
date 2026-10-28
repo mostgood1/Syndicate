@@ -54905,3 +54905,8 @@ which is about the two sizing bases and not about the refusal boundary.
   - So (b) proves nothing by itself. The live path is the same `_our_verdict` that (a) just ran 12 times, and the tests pin `settle_orders` separately.
   - A first live-path fair-price row is a FORWARD reading, not owed by a date.
 - **no change made:** read-only, no claim taken.
+
+## 2026-10-28 23:15Z (6:15 PM CT) -- MEASUREMENT for 6581bcb2 (order dollars=3) and 7ca75fbe (day cap 100): **MET on size and cap; fill OWED**
+- first new-size in-game entries, live-odds-worker log: `23:13:26Z LIVE_ENTRY KXNBASPREAD-26OCT28CHADET-DET8 ask=0.43 stake=2.6401 day_spend=0.0/100.0 placed=True` and `23:13:28Z KXNBATOTAL-26OCT28CHADET-213 ask=0.44 stake=2.7001 day_spend=2.6401/100.0 placed=True`.
+- 2.6401 = 6 x (0.43+0.01) and 2.7001 = 6 x 0.45: whole contracts under the $3 target, 6 per order where it was 1 before. The day-cap denominator reads 100.0.
+- ledger at 23:15Z: both `status=submitted`, fill_stake 0.0, not yet reconciled. A filled multi-contract row is still owed.
