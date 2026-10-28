@@ -3014,3 +3014,15 @@ The 2026-10-20 entry said: "Rating INPUTS transfer, because the sim reads them w
 - **The same mistake, in cost:**
   - The backfill estimate (150k-250k GETs) assumed the old listing looks like today's. The purged region costs ~900 GETs per day of history.
   - Size on the population the job will actually read, and read a page of it before sizing.
+
+## 2026-10-28 -- The dispatch watchdog shares a failure domain with what it watches: the app lost every scheduled task overnight and nothing alerted `[lane syndicate-decision-engine, session e32fef1a]`
+
+- **The belief:** the missed-dispatch watchdog (4 runs a day) catches any scheduled read that fails to fire.
+- **What was true:**
+  - Between 05:45Z and 07:38Z on 10-28 the desktop app's task registry emptied: all 46 enabled tasks, the watchdog among them. Believed cause: the app update at ~06:44Z (marker `AppData/Roaming/Claude/.user-data-left.*`, kind `update_visible`).
+  - The SKILL.md folders stayed on disk; the schedules (cron / fireAt) did not, because they live only in the app.
+  - Nothing alerted. A session assessment found it ~5 h later, by chance, through `list_scheduled_tasks`.
+- **Rule:**
+  - A quiet watchdog is evidence only if it ran: check that `list_scheduled_tasks` is non-empty and that the watchdog's `state.json` `last_run_utc` is under ~5 h old.
+  - The recovery source for schedules is the watchdog's last saved `list_scheduled_tasks` output (its run transcript's `tool-results/*.txt`), not the folders.
+  - Restore recipe, measured 10-28 (46 / 46 byte-identical): back up the folders; move each aside (create refuses an existing folder); create with the same taskId, title, description and schedule plus a placeholder prompt; copy the original folder back; check SKILL.md sha256; Run now one task and read its first message.
