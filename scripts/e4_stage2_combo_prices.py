@@ -210,16 +210,22 @@ def fetch_leg_meta(tickers: Iterable[str], cache: Path, get=None) -> tuple[dict[
     return meta, stats
 
 
-def read_fee_multiplier(series: str, get=None) -> tuple[float, bool]:
-    """(m, is_upper_bound): the combo series' own `fee_multiplier`; unreadable -> 1.0, stamped as an upper bound."""
+def read_fee_multiplier(series: str, get=None) -> tuple[float, bool, dict[str, Any]]:
+    """(m, is_upper_bound, raw): the combo series' own `fee_multiplier`; unreadable -> 1.0, stamped as an upper bound.
+
+    `KXMVECROSSCATEGORY` reports fee_type `quadratic_with_combo_maker_fees` (read 2026-10-28), which `venue_fees`
+    refuses as unknown on purpose, so the bound applies; the raw fields go in the report beside it (A4)."""
     from syndicate.features.shared.venue_fees import VenueFeeError, kalshi_fee_params
     if get is None:
         from syndicate.features.shared.kalshi_maker_shadow import public_get_json as get
+    payload = get(f"/series/{series}") or {}
+    inner = payload.get("series") if isinstance(payload.get("series"), Mapping) else payload
+    raw = {"fee_type": inner.get("fee_type"), "fee_multiplier": inner.get("fee_multiplier")}
     try:
-        _, m = kalshi_fee_params(get(f"/series/{series}") or {})
-        return float(m), False
+        _, m = kalshi_fee_params(payload)
+        return float(m), False, raw
     except (VenueFeeError, TypeError, ValueError):
-        return 1.0, True
+        return 1.0, True, raw
 
 
 # ----------------------------------------------------------------------------- parse a leg (A3 §4)
@@ -350,18 +356,30 @@ def blob_games(games: Sequence[Mapping[str, Any]], events: Mapping[str, Mapping[
     return out
 
 
+def same_slot(commence: Any, ticker_date: str, hint: datetime | None) -> bool:
+    """A4: the ticker's own start time (+/- 6 h) when it carries one (MLB), else its US/Eastern date. A +/- 1 day
+    window let a postseason series' next game match the same blob: MLB `game_ambiguous` 328 of 608 (funnel-only)."""
+    start = s1.parse_ts(commence)
+    if start is None:
+        return False
+    if hint is not None:
+        return abs((start - hint).total_seconds()) <= s1.GAME_MATCH_HOURS * 3600
+    from zoneinfo import ZoneInfo
+    return start.astimezone(ZoneInfo("America/New_York")).date().isoformat() == ticker_date
+
+
 def join_game(c: Mapping[str, Any], games: Sequence[Mapping[str, Any]], bgames: Sequence[Mapping[str, Any]],
               code_names: Mapping[str, Mapping[str, str]]) -> tuple[dict | None, str]:
     """The Stage 1 game a combo is played in, by the PRODUCTION blob matcher (`match_event_blob`), or a named refusal."""
     t = c["legs"][0]["ticker"]
     blob = event_blob_from_ticker(t)
-    d = date.fromisoformat(c["game_date"])
-    near = [b for b in bgames if abs((date.fromisoformat(b["date"]) - d).days) <= 1
+    hint = event_start_from_ticker(t)
+    near = [b for b in bgames if same_slot(b.get("commence_time"), c["game_date"], hint)
             and (c["sport"] != "soccer" or b.get("league") == c.get("league"))]
     if not near:
-        return None, "no_stage1_game_that_day"
+        return None, "no_stage1_game_in_slot"
     res = match_event_blob(blob, near, sport=c["sport"], code_names=(code_names.get(c.get("league")) or None),
-                           commence_hint=event_start_from_ticker(t))
+                           commence_hint=hint)
     if res.get("status") != "ok":
         return None, f"game_{res.get('status')}"
     return games[res["event_id"]], "ok"
@@ -691,8 +709,8 @@ def main(argv: list[str] | None = None) -> int:
     print("E4S2_STORE " + json.dumps(dict(funnel)), flush=True)
     meta, mstats = fetch_leg_meta((leg["ticker"] for c in cands for leg in c["legs"]), cache)
     report["leg_meta"] = mstats
-    m, m_upper = read_fee_multiplier("KXMVECROSSCATEGORY")
-    report["fee"] = {"series": "KXMVECROSSCATEGORY", "multiplier": m, "is_upper_bound": m_upper}
+    m, m_upper, m_raw = read_fee_multiplier("KXMVECROSSCATEGORY")
+    report["fee"] = {"series": "KXMVECROSSCATEGORY", "multiplier": m, "is_upper_bound": m_upper, "venue_said": m_raw}
     print(f"E4S2_META {json.dumps(mstats)} fee_multiplier={m} upper_bound={m_upper}", flush=True)
     code_names = soccer_code_names((c["league"], meta[l["ticker"]]) for c in cands if c["sport"] == "soccer"
                                    for l in c["legs"] if l["ticker"] in meta)

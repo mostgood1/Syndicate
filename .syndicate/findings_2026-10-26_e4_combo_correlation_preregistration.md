@@ -381,3 +381,32 @@ before then may count joins, but writes or prints no price, probability, outcome
     - the exact-line marginal (a one-sided book is never priced);
     - the blob join;
     - the R2 verdict rules (INSUFFICIENT is never a kill; EDGE needs Holm).
+
+## Amendment A4 -- 2026-10-28, after a `--funnel-only` run and before any statistic (the game join; the fee reading)
+
+**Found by the funnel-only run of `6034d16a`.** That run writes join counts only: no price, probability, outcome or
+reading was written or printed.
+
+- **The defect.** A3 §3's +/-1-day window let a postseason series' next game match the same team blob: MLB
+  `game_ambiguous` 328 of 608 candidates.
+- **The fix.** Keep only Stage 1 games whose commence is within +/-6 h of the ticker's own start time where the ticker
+  carries one (MLB, via `event_start_from_ticker`), else whose US/Eastern date equals the ticker's date (NBA, soccer).
+  Then `match_event_blob` as A3 §3. The refusal is renamed `no_stage1_game_in_slot`.
+- **Joined combos / games, before -> after:**
+  - MLB SP-nested 20 / 3 -> 54 / 6;
+  - MLB SP-other 17 / 6 -> 83 / 20;
+  - NBA SP-nested 12 / 11 -> 12 / 11;
+  - soccer GL 2,471 / 201 -> 2,467 / 200;
+  - MLB `game_ambiguous` 328 -> 0.
+- **What the counts already say, stated before any statistic.** MLB SP-nested, MLB SP-other and NBA SP-nested are
+  below A3's minimum n (200 combos / 20 games), so their R2 tests will read INSUFFICIENT. Soccer GL is the only cell
+  that can reach an R2 verdict. R1 and R3 are reported for all four. The main losses are:
+  - legs with no two-sided sportsbook quote at the combo's line (MLB 265, NBA 1,580, soccer 2,983);
+  - combos in games outside Stage 1's joined set.
+- **Fee.** `/series/KXMVECROSSCATEGORY` reports `fee_type` `quadratic_with_combo_maker_fees` and `fee_multiplier` 1.
+  - `venue_fees.kalshi_fee_params` refuses an unknown fee type on purpose, so A3 §7's fallback applies: m = 1.0,
+    stamped as an upper bound. The raw fields go in the report.
+  - The bound and the venue's own multiplier agree on the number. Whether the combo TAKER fee is the plain quadratic
+    is unverified.
+- **Code:** `same_slot` in `scripts/e4_stage2_combo_prices.py`. 30 tests, adding the next-day rematch and the ET-date
+  rule.

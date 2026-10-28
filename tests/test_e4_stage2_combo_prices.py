@@ -125,10 +125,14 @@ def test_fetch_leg_meta_batches_and_caches(tmp_path):
 
 
 def test_fee_multiplier_read_or_upper_bound():
-    m, ub = s2.read_fee_multiplier("KXMVECROSSCATEGORY", get=lambda p: {"series": {"fee_type": "quadratic",
-                                                                                  "fee_multiplier": 0.5}})
+    m, ub, _ = s2.read_fee_multiplier("KXMVECROSSCATEGORY", get=lambda p: {"series": {"fee_type": "quadratic",
+                                                                                     "fee_multiplier": 0.5}})
     assert (m, ub) == (0.5, False)
-    assert s2.read_fee_multiplier("KXMVECROSSCATEGORY", get=lambda p: None) == (1.0, True)
+    assert s2.read_fee_multiplier("KXMVECROSSCATEGORY", get=lambda p: None)[:2] == (1.0, True)
+    # the combo series' real reading (2026-10-28): an unknown fee type is refused, the bound applies, the raw is kept
+    m, ub, raw = s2.read_fee_multiplier("KXMVECROSSCATEGORY", get=lambda p: {"series": {
+        "fee_type": "quadratic_with_combo_maker_fees", "fee_multiplier": 1}})
+    assert (m, ub) == (1.0, True) and raw == {"fee_type": "quadratic_with_combo_maker_fees", "fee_multiplier": 1}
 
 
 # ------------------------------------------------------------------ marginal at the combo's own line (A3 §5)
@@ -185,8 +189,24 @@ def test_join_game_by_blob_and_date():
          "legs": [{"ticker": "KXMLBHIT-26OCT051908NYYTOR-NYYAJUDGE99-2"}]}
     g, why = s2.join_game(c, games, bg, {})
     assert why == "ok" and g["game"] == "mlb:1"
-    g, why = s2.join_game(dict(c, game_date="2026-10-09"), games, bg, {})
-    assert g is None and why == "no_stage1_game_that_day"
+    g, why = s2.join_game(dict(c, game_date="2026-10-09",
+                               legs=[{"ticker": "KXMLBHIT-26OCT091908NYYTOR-NYYAJUDGE99-2"}]), games, bg, {})
+    assert g is None and why == "no_stage1_game_in_slot"
+
+
+def test_join_game_series_rematch_next_day_is_not_ambiguous():
+    """A4: a postseason series plays the same blob on consecutive days; the ticker's start time picks the game."""
+    games = [{"game": "mlb:1", "date": "2026-10-05", "event": "e1"}, {"game": "mlb:2", "date": "2026-10-06", "event": "e2"}]
+    events = {"e1": {"home": "TOR", "away": "NYY", "commence": s2.s1.parse_ts("2026-10-05T23:08:00Z")},
+              "e2": {"home": "TOR", "away": "NYY", "commence": s2.s1.parse_ts("2026-10-06T23:08:00Z")}}
+    bg = s2.blob_games(games, events)
+    c = {"sport": "mlb", "league": None, "game_date": "2026-10-06",
+         "legs": [{"ticker": "KXMLBHIT-26OCT061908NYYTOR-NYYAJUDGE99-2"}]}
+    g, why = s2.join_game(c, games, bg, {})
+    assert why == "ok" and g["game"] == "mlb:2"
+    # no start time in the ticker (NBA, soccer): the US/Eastern date decides; a 00:30Z tip is the previous ET day
+    assert s2.same_slot("2026-10-21T00:30:00Z", "2026-10-20", None)
+    assert not s2.same_slot("2026-10-21T00:30:00Z", "2026-10-21", None)
 
 
 def test_soccer_side_draw_and_name_fallback():
