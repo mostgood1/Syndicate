@@ -1125,15 +1125,6 @@ death, never life — do not invert it.
 - Verification: Prereg committed first (SHA in findings); hermetic tests pass incl. off != on reachability and a no-order-path test; z fit reported with n; findings file + #738 + a #717 dated-read line on main; enabling the job on the fleet is the user's decision
 - Blocked by: none
 
-### e4-combo-correlation — CLOSED — opened 2026-10-26 — closed 2026-10-26 — session b566f51c-27f6-456c-b2ac-99f33cb133d4
-- **GOAL VERDICT `[2026-10-26 23:5xZ checkpoint]`: GOAL: NOT MET.** Goal, verbatim: "Decision Engine E4 (#736), OFFLINE and read-only on production: pre-register (committed before any join) and run the combo-correlation test -- Stage 1 on settled games, with each leg's marginal anchored to the de-vigged market, score the joint outcome of same-game leg pairs under (a) independence, (b) the sport's sim joint distribution re-anchored to the market marginals, (c) the SGP builders' measured copula / ledger posterior, by log loss and Brier with game-clustered CIs per sport x leg-pair type; Stage 2 (only if (b) beats (a) with a CI below 0) join captured venue combo prices and compute fee-net EV at the executable price by deviation band" -- Stage 1 RAN, and the lane's Verification reading exists: findings `.syndicate/findings_2026-10-26_e4_combo_correlation.md` (prereg `9f8d759e`, A1 `83f2e460`, A2 `f5a503c6`), coverage + intersection + n, 7 primary cells with game-clustered CIs, engine read, recommendation, todo `#740`, and the `syndicate-decision-engine` lane line. Stage 2 is OWED and NOT RUN: Holm passed 4 cells (MLB same-batter nested/other, NBA same-player nested, soccer GL), but no captured venue combo price exists. Kalshi prints are public, but the window is millions of trades (>30k per 10 minutes). Blocked on user decision `#740` (a), a forward Kalshi combo capture routed to the decision-engine session, then about a month of capture. The re-run is `#740` (d) under a NEW lane. Closed so it does not sit OPEN and stale.
-- Goal: Decision Engine E4 (#736), OFFLINE and read-only on production: pre-register (committed before any join) and run the combo-correlation test -- Stage 1 on settled games, with each leg's marginal anchored to the de-vigged market, score the joint outcome of same-game leg pairs under (a) independence, (b) the sport's sim joint distribution re-anchored to the market marginals, (c) the SGP builders' measured copula / ledger posterior, by log loss and Brier with game-clustered CIs per sport x leg-pair type; Stage 2 (only if (b) beats (a) with a CI below 0) join captured venue combo prices and compute fee-net EV at the executable price by deviation band
-- Files: scripts/e4_combo_correlation.py (NEW), tests/test_e4_combo_correlation.py (NEW), .syndicate/findings_2026-10-26_e4_combo_correlation_preregistration.md (NEW), .syndicate/findings_2026-10-26_e4_combo_correlation.md (NEW), docs/ai_context/todo.md (#740 section only, insert-only), .syndicate/state_kalshi.md ([kalshi-combo-public-data] section only), .syndicate/state.md (one index row), .syndicate/learnings.md (two appended entries)
-- Hypothesis: PRE-REGISTERED in .syndicate/findings_2026-10-26_e4_combo_correlation_preregistration.md (committed before any sim x market x outcome join)
-- Falsification test: Plan s4 E4 kill rule: the sim's re-anchored joint is no better than independence on realised same-game co-occurrence (game-clustered CI of the log-loss difference (b)-(a) not below 0)
-- Verification: findings file with the prereg SHA, per-source date coverage + intersection + n, per sport x pair-type log loss / Brier with game-clustered CIs for (a)/(b)/(c), engine read (which correlations the sims get right or wrong), recommendation; todo item + syndicate-decision-engine lane line pushed to main
-- Blocked by: Stage 2 -- user decision #740 (a) (Kalshi combo capture), then about a month of capture
-
 ### kalshi-combo-capture — OPEN (RUNNING on the fleet via a bridge; supervisor job owed at the next fleet ff) — opened 2026-10-27 — session a48b0f49-3a6b-4105-b194-5804a934487c (picked up 2026-10-27 as a side session of local_668211d5; opened by e32fef1a for pickup)
 - **Reading armed `[2026-10-27 23:20Z]`:** Claude scheduled task `kalshi-combo-capture-first-forward-day`, user-approved, runs daily at ~8:40 AM CT, read-only.
   - It runs `scripts/kalshi_combo_capture.py status` (`25485432`) on the fleet store, via `C:\tmp\kalshi_combo_status\cc_status.sh`.
@@ -1189,12 +1180,6 @@ death, never life — do not invert it.
 - Re-scope result 2026-10-27 23:53Z (read-only fleet dry run, 23:51Z): 868 / 981 stale rows grade with the fixed resolvers (0 before). H1 172/175, H2 322/322, H3 171/171, H4 122/122 CONFIRMED; H6 NFL 25/28, NCAAF 56/59; H5 NBA preseason 72 awaits a box write (user). Code on main (see git log); NOT applied to the archive and NOT on the fleet.
 - Blocked by: none
 
-### closed-lane-archive-20261027-1640 — CLOSED 2026-10-27 (GOAL MET: 4 blocks archived) — opened 2026-10-27 — session 0c3f7e57-ab40-4e18-aaec-1979f260089d
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: MET. owner_liveness.py --idle-min 240 at 21:41Z (16:41 CDT) returned 4 SAFE of 9 CLOSED; all 4 moved to lanes_closed.md with one pointer each. Table and deferrals are in log/2026-10-27.md 21:43Z.
-- Moved: min-ev-tuner-readout-fleet, sgp-pjoint-calibration, kalshi-both-leg-grading, closed-lane-archive-20261027-1209
-
 ### closed-lane-archive-20261027-1841 — CLOSED 2026-10-27 (GOAL MET: 1 block archived) — opened 2026-10-27 — session 9281bbf2-25d0-4318-a6fa-e48979e594b3
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
@@ -1206,6 +1191,12 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: MET. owner_liveness.py --idle-min 240 at 01:41Z (20:41 CDT) returned 1 SAFE of 6 CLOSED; moved to lanes_closed.md with one pointer. Table and deferrals are in log/2026-10-27.md 01:41Z.
 - Moved: closed-lane-archive-20261027-1456
+
+### closed-lane-archive-20261027-2240 — CLOSED 2026-10-27 (GOAL MET: 2 blocks archived) — opened 2026-10-27 — session d4ef7aae-2abd-48dc-baaf-bd231e874d31
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 read SAFE for 2 of 6 CLOSED blocks; both moved to lanes_closed.md with one pointer each. Reading in log/2026-10-27.md.
+- Moved: e4-combo-correlation, closed-lane-archive-20261027-1640
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1296,6 +1287,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261027-1209` — CLOSED 2026-10-27 (GOAL MET: 1 block archived) — opened 2026-10-27 — session 96c5c1ee-dc48-4da9-950c-86fb91926cf6
 - `closed-lane-archive-20261027-1331` — CLOSED 2026-10-27 (GOAL MET: 26 blocks archived) — opened 2026-10-27 — session f46dd5db-583d-477e-9fda-d858ff926bd2
 - `closed-lane-archive-20261027-1456` — CLOSED 2026-10-27 (GOAL MET: 1 block archived) — opened 2026-10-27 — session 8c9220b9-af5d-42ab-b91c-dd549e672791
+- `closed-lane-archive-20261027-1640` — CLOSED 2026-10-27 (GOAL MET: 4 blocks archived) — opened 2026-10-27 — session 0c3f7e57-ab40-4e18-aaec-1979f260089d
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
@@ -1320,6 +1312,7 @@ death, never life — do not invert it.
 - `dh-fix-web-deploy` — CLOSED — opened 2026-09-25, closed 2026-09-25 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `dh-ordinal-pairing` — CLOSED — opened 2026-09-25, closed 2026-09-25, closed 2026-09-25 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `e3-derived-surface` — CLOSED — opened 2026-10-26 — closed 2026-10-27 — session d266ae46-93f0-45d3-9528-b0f6b150c5a6
+- `e4-combo-correlation` — CLOSED — opened 2026-10-26 — closed 2026-10-26 — session b566f51c-27f6-456c-b2ac-99f33cb133d4
 - `e5-venue-news-lag` — CLOSED — opened 2026-10-26 — closed 2026-10-26 — session ce4dfadf-df79-4dbe-8940-70f92ba3ffc1
 - `evaluation-ledger-projected-mirror` — CLOSED 2026-09-10 — opened 2026-09-04 — session 5959f891 — **GOAL: MET: projected ledger produced on the worker (`over_ceiling=0`) and served by web (HTTP 200, 09-04..09-09); closed by `census-rescue-0910` on user decision**
 - `exchange-execution-unblock` — CLOSED 2026-09-10 — opened 2026-09-10 — session 7a239b89-c8fd-49b7-ba5a-e41bb9d4d9bc — **GOAL MET: live placement unfrozen; unbuildable positions refused before any write (`332e596d`); Kalshi NCAAF/NFL forward-date matching live on both workers, with the first NCAAF Kalshi orders placed and filled at 20:27:54Z.**
