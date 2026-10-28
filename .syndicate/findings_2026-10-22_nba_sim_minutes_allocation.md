@@ -455,3 +455,47 @@ Check (3), the book-blend weight, is owed with any enablement.
 - Neither counts toward enabling.
 - **The CONFIRMATORY reading is owed:** `--replay --min-rows 150` over slates after 10-21. The first candidates are 10-22's
   DEN, PHI and CLE (derive path, 5-7 priced at build); their box lands ~6:45 AM CT 10-23.
+
+### CONFIRMATORY minutes reading, 10-22..10-27 (`--replay --min-rows 150`): PASS
+
+`[run 2026-10-28 8:03:26-8:05:26 AM CT (13:03:26-13:05:26Z), scheduled task nba-sim-minutes-723-readings; code origin/main
+821d276a (contains 907e9c9c), detached worktree; fleet venv, nice 19, read-only on
+/home/amyn/syndicate-prod/data/nba_source/data/processed]`
+
+Rule: §5 above, unchanged. Command:
+`scripts/nba_sim_minutes_audit.py --replay --processed <fleet processed> --dates 2026-10-22,...,2026-10-27 --min-rows 150`.
+
+**What it rests on.**
+- Dates: all six (10-22..10-27). Every `player_checks_<D>.csv` is present; 84 pre-tip sides with a box, 0 built after tip,
+  0 without a box.
+- 62 sides DROPPED by the rule (all `rotation_history_applied=True`; history-path sides cannot be replayed by OFF).
+- 22 derive-path sides kept; the OFF replay reproduces production `_sim_min` with max deviation 0.000 on all 22.
+- **14 of 22 engage**, giving **n = 153 played rows** (>= 150, so the verdict is not forced INCONCLUSIVE).
+- Not engaged (8): 10-24 HOU (6 priced, base not over 240) and GSW (2 priced); 10-25 OKC, PHI, DET, SAC, MEM and 10-26 OKC
+  (0 priced in the replay's rebuild; see the caveat).
+
+| (played pool players, engaged sides) | value |
+|---|---|
+| **PRIMARY** paired \|ON-actual\| - \|OFF-actual\|, n=153, 14 sides | **-0.936 [-1.315, -0.567] -> PASS** |
+| MAE OFF -> ON | 6.871 [6.349, 7.380] -> 5.935 [5.296, 6.573] |
+| priced played, n=94 | -2.054 [-2.848, -1.366] |
+| unpriced played, n=59 | **+0.844 [-0.102, +1.929]** (not significant; the side where ON can hurt) |
+| box starters, n=70: paired | -2.042 [-2.821, -1.249] |
+| starter bias OFF -> ON | -4.494 [-6.276, -2.478] -> -0.850 [-2.791, +1.093] |
+| bench bias OFF -> ON, n=83 | -0.796 [-3.316, +1.508] -> -2.061 [-4.413, +0.166] |
+| DNP sim minutes per engaged side | 30.9 -> 20.2 |
+
+Per engaged side (paired mean): DEN -0.75, PHI -1.27, CLE -2.29 (10-22); GSW -1.16, MEM -1.62, LAL -2.29, DET +0.25,
+CHI -0.46, SAC -1.03, WAS -1.27 (10-23); NOP -1.00, PHI -0.70 (10-24); DET -0.59, SAC +0.42 (10-27).
+
+**Caveat (instrument, not rule).** On 10-25 the replay's priced-set rebuild (`priced_by_game_asof`) joined **0 of 110,354**
+pre-tip prop rows to a game, and on 10-26 28,432 of 210,899 (10-24: 93,349 of 93,349; 10-27: 95,400 of 95,400). So the
+six 10-25/10-26 derive sides could not engage in the replay. The reading is the rule's output as registered and stands;
+whether those six would have engaged in production (the fleet runs the switch in `shadow`) was not established here.
+Production's own shadow lines for those builds were not located.
+
+**Verdict.** CONFIRMATORY minutes primary: **PASS**, -0.936 [-1.315, -0.567], n=153 over 14 engaged sides, 6 slates.
+- Per §5's Decision: PASS + SECONDARY not FAIL -> propose `shadow`, then `on`. **The SECONDARY (points) has been read only
+  on 10-21 (development); it has not been read on a confirmatory slate.**
+- Still owed before any `on`: the k / book-blend re-fit check (§5 (2)/(3)) and a reuse stamp for the priced set.
+  Enabling is the user's decision.

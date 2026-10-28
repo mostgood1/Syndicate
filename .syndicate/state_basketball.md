@@ -1384,12 +1384,17 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   - Priced starters reach the points line (-1.94 -> -0.09 pts).
   - But priced BENCH players are over-protected: +4.7 min / +3.6 pts. Their last-season base is left whole.
   - Served width is unchanged (IQR(z)/1.349 1.03 -> 1.02), so no k re-fit is triggered.
-- **Owed (todo #723, lane nba-sim-minutes-history-path, time-gated to ~6:45 AM CT 10-28):**
-  - The CONFIRMATORY reading: >= 150 played rows on engaged sides after 10-21 (`--replay --min-rows 150`).
-  - The V-S reading (`--variant priced_starters`).
-  - The history-path reading against its pre-registered gate (`--history`, plus the HISTORY / DERIVE split).
-  - Before any `on`: the k / book-blend re-fit check, and a reuse stamp for the priced set.
-  - Enabling is the user's decision.
+- **Read `[verified 2026-10-28 8:03-8:05 AM CT, fleet production files 10-22..10-27 (all six boxes), code 821d276a, lane nba-sim-minutes-history-path CLOSED]`:**
+  - **#723 CONFIRMATORY minutes: PASS**, -0.936 [-1.315, -0.567], n=153 played rows over 14 engaged of 22 derive sides
+    (62 history sides dropped by rule). Starters -4.49 -> -0.85; unpriced +0.84 [-0.10, +1.93]. The replay's priced-set
+    rebuild joined 0% (10-25) / 13% (10-26) of pre-tip prop rows to a game, so 6 derive sides there could not engage.
+  - **V-S: PRIMARY-V PASS** -0.458 [-0.801, -0.116], but **HEAD-TO-HEAD +0.478 [+0.273, +0.707]**: the registered design
+    keeps precedence; V-S is not proposed.
+  - **History path vs derive:** DNP sim min/side 7.82 [5.71, 10.14] (62 sides) vs 33.97 [23.98, 44.14] (22); starter bias
+    -0.12 [-1.18, +0.98] vs -4.51 [-5.94, -3.00]. **§2 gate NO-GO**: no history-path fix. Its DNP mass is mapped 4.26 +
+    blend 2.26 + leftover 0.56 per side. Returning (zero-stint) players who played: 31, bias -6.60 [-8.89, -4.44].
+- **Owed before any `on`:** the points SECONDARY on a confirmatory slate's scratch arms; the k / book-blend re-fit
+  check; a reuse stamp for the priced set. Enabling is the user's decision.
 - Findings: `findings_2026-10-22_nba_sim_minutes_allocation.md`, `findings_2026-10-22_nba_sim_minutes_history_path.md`.
 
 ## [nba-injury-pdf-parser] THE NBA OFFICIAL INJURY-PDF PARSER WROTE 17% OF ITS ROWS UNDER NAMES NO POOL MATCHES AND GAVE AVAILABLE PLAYERS THE NEXT PLAYER'S OUT; THE FIX IS LIVE ON THE FLEET since 2026-10-22 16:29:00Z (ff 5e734fb6 -> 36eb357b, no restart) AND READ: 0 off-roster names `[measured 2026-10-22, lane nba-injury-pdf-parser, todo #725, main 36eb357b; ff lane nba-injury-parser-fleet-ff]`

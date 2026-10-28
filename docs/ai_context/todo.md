@@ -398,7 +398,7 @@
 - **Owed:** re-read at **≥400 settled** ladder rows, splitting by `fee_is_upper_bound` and comparing realised against `ev_net_pct` rather than `ev_pct`. Armed frame-guarded as scheduled task `ladder-refusal-control-arm-reading` for 2026-10-29T18:00Z.
 - Detail: `.syndicate/findings_2026-10-22_ladder_refusal_control_arm.md`.
 
-### `#723` — **The NBA SmartSim's minutes layer gives pool players who then DNP 37.7 sim min/side [26.4, 49.4] and runs starters -4.21 [-6.41, -1.87] (10-21, 22 pre-tip production sides). A default-off priced-first shrink is BUILT; the confirmatory reading is OWED** — FOUND 2026-10-22, lane `nba-sim-minutes-allocation`, session ffb7ab00 (side session of local_d458ff9c; `#714` follow-up)
+### `#723` — **The NBA SmartSim's minutes layer gives pool players who then DNP 37.7 sim min/side [26.4, 49.4] and runs starters -4.21 [-6.41, -1.87] (10-21, 22 pre-tip production sides). A default-off priced-first shrink is BUILT (fleet: shadow); its CONFIRMATORY minutes reading PASSED 2026-10-28; points secondary + re-fit checks owed before any `on`** — FOUND 2026-10-22, lane `nba-sim-minutes-allocation`, session ffb7ab00 (side session of local_d458ff9c; `#714` follow-up)
 - **Measured (production sims vs `player_checks` box, `scripts/nba_sim_minutes_audit.py`).**
   - Pool players who DNP hold 829 sim min on 22 sides: 68% unlisted deep bench, 20% OUT on the final report but not at build, 12% excluded under a broken name.
   - No DNP pool player had a pre-tip prop line, and all 137 priced pool players played.
@@ -410,11 +410,18 @@
   - Minutes replay on production engine_inputs: PASS, -0.895 [-1.552, -0.278] (17 sides). Starters -5.53 -> -1.11.
   - Points on scratch worker arms: NOT FAIL, -0.076 [-0.321, +0.140]. Starters reach the points line (-0.09), and the served width is unchanged (1.02).
   - But priced BENCH players are over-protected: +4.7 min, +3.6 pts. Any variant is a new design, pre-registered and read on the confirmatory slates only.
-- **OWED:**
-  1. The pre-registered CONFIRMATORY minutes reading. `--replay` on slates after 10-21, >= 150 played rows on engaged sides.
-  2. The points secondary on scratch arms.
-  3. Before any `on`: the k / book-blend re-fit check, and a reuse stamp for the priced set.
-  4. A reading of the rotation-HISTORY path, which takes over from a team's 2nd game and is not covered by this switch.
+- **OWED (updated 2026-10-28 8:05 AM CT, scheduled task `nba-sim-minutes-723-readings`, code `821d276a`):**
+  1. ~~CONFIRMATORY minutes reading~~ **DONE: PASS**, -0.936 [-1.315, -0.567], n=153 played rows over 14 engaged of 22
+     derive sides, 10-22..10-27 (62 history sides dropped by its rule). Starters -4.49 -> -0.85; unpriced +0.84
+     [-0.10, +1.93] (not significant). Caveat: the replay's priced-set rebuild joined 0% (10-25) / 13% (10-26) of pre-tip
+     prop rows to a game, so 6 derive sides there could not engage.
+  2. The points secondary on a CONFIRMATORY slate's scratch arms (read only on 10-21, development). Still owed.
+  3. Before any `on`: the k / book-blend re-fit check, and a reuse stamp for the priced set. Still owed.
+  4. ~~A reading of the rotation-HISTORY path~~ **DONE: §2 gate NO-GO** (history DNP 7.82 [5.71, 10.14] min/side, median
+     3.93; starter bias -0.12 [-1.18, +0.98]; leftover 0.56/side). No history-path fix.
+  5. Variant V-S: PRIMARY-V PASS -0.458 [-0.801, -0.116], but HEAD-TO-HEAD +0.478 [+0.273, +0.707] -> the registered
+     design keeps precedence; V-S is not proposed.
+  6. Enabling `shadow` -> `on` is the user's decision (the fleet already runs `shadow`, logs only).
 - **Lane `nba-sim-minutes-history-path` (OPEN 2026-10-22, session 1215cb2f; side session of local_c0ccc55a) holds owed items 1 and 4:**
   - **PRE-REGISTERED `cdfe3e59` (10:34 AM CT 10-22), before any post-10-21 box:**
     - The history-path reading, with its fix gate (G-LEFTOVER / G-OTHER / G-BIAS / NO-GO).
@@ -428,11 +435,8 @@
       zero-stint pool players hold only the 10% blend share (0.5-2.0 min).
     - V-S engages on all three 10-22 derive sides.
   - **SCHEDULED:** the one-time task `nba-sim-minutes-723-readings` (2026-10-28 8:00 AM CT) runs the readings below and records them.
-  - **OWED (time-gated):** run once the boxes for 10-22..10-27 are in (`player_checks_<D>.csv` lands ~6:45 AM CT the next
-    day):
-    - `--replay --min-rows 150 [--variant priced_starters]`;
-    - the non-replay audit split by path;
-    - `--history`.
+  - **READ 2026-10-28 8:03-8:05 AM CT (all six boxes present):** A PASS, B V-S PASS but loses the head-to-head, C history
+    7.82 vs derive 33.97 DNP min/side, D gate NO-GO (P1-P3 held). Lane CLOSED. Results in both findings files.
   - Findings: `.syndicate/findings_2026-10-22_nba_sim_minutes_history_path.md`.
 - **Follow-ups found:** the NBA official injury-PDF parser splices reason words into names (`ISAIAH WAY STEWART`, `BEN SUBLUXATION SIMMONS`), and probably hands an Available player the next player's OUT (Curry excluded and played 21; Moody simulated 32.9 and DNP).
 - Detail: `.syndicate/findings_2026-10-22_nba_sim_minutes_allocation.md`.

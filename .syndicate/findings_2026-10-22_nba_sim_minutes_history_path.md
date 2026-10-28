@@ -245,3 +245,81 @@ no box is compared.
     engage. VAR = ON on DEN, which means its 5 priced players all carry the starter signal. VAR differs from ON on PHI and CLE.
   - 10-23's derive sides are D-1 builds with 0 priced: neither engages, the registered no-op.
   - The 4 history sides are dropped by #723's own rule.
+
+### Readings on the confirmatory slates 10-22..10-27 `[run 2026-10-28 8:03:26-8:05:26 AM CT, scheduled task nba-sim-minutes-723-readings]`
+
+Code: origin/main `821d276a` (contains `907e9c9c`), detached worktree. Fleet venv, nice 19, read-only on
+`/home/amyn/syndicate-prod/data/nba_source/data/processed`. Dates: 10-22..10-27, all six boxes present (84 pre-tip sides,
+0 built after tip, 0 without a box). Rules: §2 and §4 above, unchanged.
+
+**#723 CONFIRMATORY (§3):** PASS, -0.936 [-1.315, -0.567], n=153 over 14 engaged of 22 derive sides (62 history sides
+dropped by its rule). Full entry and a priced-set caveat (10-25/10-26 rebuild joined 0% / 13% of pre-tip prop rows):
+`findings_2026-10-22_nba_sim_minutes_allocation.md` Results.
+
+#### B. Variant V-S (`--replay --min-rows 150 --variant priced_starters`)
+
+The #723 lines print identically to reading A (diff of the non-log output: identical apart from the VARIANT block).
+
+| | value |
+|---|---|
+| **PRIMARY-V** paired \|VAR-actual\| - \|OFF-actual\|, n=153, 14 of 22 sides | **-0.458 [-0.801, -0.116] -> PASS** |
+| **HEAD-TO-HEAD** \|VAR-actual\| - \|ON-actual\|, 14 sides both engaged, n=153 | **+0.478 [+0.273, +0.707] -> VAR worse; the registered design keeps precedence** |
+| bias priced starters (n=68) OFF / ON / VAR | -4.47 [-6.36, -2.42] / -0.65 [-2.59, +1.25] / -1.24 [-3.21, +0.79] |
+| bias priced bench (n=26) OFF / ON / VAR | -4.37 [-6.28, -2.35] / -0.37 [-2.19, +1.40] / -5.70 [-7.84, -3.51] |
+| bias unpriced (n=59) OFF / ON / VAR | +0.63 [-2.45, +3.45] / -2.99 [-6.12, -0.15] / -1.28 [-4.49, +1.61] |
+| DNP sim min per VAR-engaged side OFF / ON / VAR | 30.9 / 20.2 / 25.7 |
+
+Prediction check (§4): VAR keeps most of ON's priced-starter gain (85%: -4.47 -> -1.24 vs -0.65): HELD. VAR takes priced
+bench back to about OFF's bias (-5.70 vs -4.37): HELD. Unpriced bias lies between OFF and ON: HELD. But on these slates the
+registered design did NOT over-protect priced bench (ON -0.37, vs +4.71 on 10-21's scratch arms), so V-S's reason for
+existing did not recur, and V-S loses the head-to-head. **V-S is not proposed.**
+
+#### C. History vs derive, descriptive (no `--replay`)
+
+| pooled, built before tip (95% CI, cluster bootstrap over sides) | HISTORY path, 62 sides | DERIVE path, 22 sides |
+|---|---|---|
+| DNP sim min/side | **7.82 [5.71, 10.14]** (median 3.93) | **33.97 [23.98, 44.14]** (median 30.84) |
+| starter bias (box flag) | **-0.12 [-1.18, +0.98]** n=310 | **-4.51 [-5.94, -3.00]** n=110 |
+| bench bias | -0.92 [-1.66, -0.20] n=379 | -1.36 [-3.30, +0.41] n=126 |
+| outside-pool box min/side | 3.85 [1.94, 6.11] | 4.64 [1.05, 9.36] |
+| played MAE | 5.11 [4.59, 5.68] n=689 | 6.99 [6.48, 7.51] n=236 |
+| (reported) >=28-min players' bias | -2.93 [-3.77, -2.09] n=233 | -5.98 [-7.14, -4.83] n=84 |
+
+Derive refusal reasons: `rotation_minutes_conflict_with_current_signals` (signal guard) 20, `no_recent_history` 2; sparse
+0, other 0.
+
+#### D. History decomposition (`--history`)
+
+- 62 history sides; **45 replay** to within 0.05 (dev 0.000 on all 45). **17 dropped, `does_not_reproduce`**: 10-23 POR
+  (6.14); 10-24 ATL (5.02), CHA (10.42), MIA (4.87), CHI (6.22), WAS (3.73), DAL (3.65), SAS (2.24), MIL (4.51); 10-25
+  BKN (10.04), IND (0.58); 10-26 MIN (2.80), IND (5.04), UTA (2.55), MEM (6.53); 10-27 BOS (5.10), SAS (1.26). They stay
+  in C's table. (The cause of non-reproduction was not investigated; the history inputs read at replay time can differ
+  from those at build time.)
+- Pooled DNP sim minutes per side by component, 45 sides: **mapped 4.26 [2.43, 6.35]; leftover 0.56 [0.28, 0.89]; blend
+  2.26 [1.63, 2.91]; caps 0.00**; total 7.09 [4.80, 9.61].
+- LEFTOVER component > 0.05 on 17 of 45 sides, >= 1.0 on 10, max 4.3 (10-25 ORL).
+- **Returning players** (zero-stint pool players who PLAYED): 31 of 92 zero-stint pool players; **bias -6.60 [-8.89,
+  -4.44]**; sim median 1.6 min (0.46-4.11); none a box starter. The list: 10-23 NYK Wiseman 1.1/2, Dadiet 0.9/0 (box row
+  with 0 min), CHA PJ Hall 1.4/10, Salaun 1.0/23, ATL Finney-Smith 1.2/8, Kispert 1.4/10, Newell 1.3/8, IND Nesmith 3.2/20,
+  Huff 2.4/5, K. Brown 2.9/1, Slawson 2.7/16, DAL W. Clayton Jr. 2.2/1, MIA Dru Smith 1.9/6, ORL J. Carter 1.6/13,
+  Castleton 0.5/4, Morales 0.5/4, HOU S. Adams 3.4/9, NOP Matkovic 1.3/9; 10-24 BKN Minott 1.4/9, DEN Whitmore 3.8/11, PHX
+  Kennard 3.5/18; 10-25 MIN Pullin 1.9/5, NYK Kolek 1.2/15, ORL A. Black 4.1/26, UTA J. Green 0.8/3; 10-26 BOS Conley 1.7/7,
+  Harper Jr. 1.4/7, CHI Hawkins 3.0/7, DEN Nnaji 1.7/4; 10-27 NYK Dadiet 1.3/1, Diawara 1.8/1 (sim/actual min).
+
+#### §2 GATE, applied exactly
+
+- **G-LEFTOVER:** LEFTOVER 0.56 [0.28, 0.89] min/side, not >= 5. Does not fire.
+- **G-OTHER:** total history DNP CI lower 5.71 (C) / 4.80 (D), not >= 10. Does not fire.
+- **G-BIAS:** starter -0.12 [-1.18, +0.98] covers 0; bench -0.92 [-1.66, -0.20] excludes 0 but |mean| < 2. Does not fire.
+- **NO-GO:** history DNP median 3.93 < 10 and CI upper 10.14 < 15 (D: 9.61), AND starter bias -0.12 within +-2 with a CI
+  covering 0. **All conditions hold -> NO-GO. No history-path minutes fix is built.**
+
+Predictions:
+- **P1 HELD:** history 7.82 (< 10) vs derive 33.97 (>= 25).
+- **P2 HELD:** LEFTOVER is about 0 (0.56/side; under 1.0 on 35 of 45 sides); the DNP mass is MAPPED (4.26) then BLEND
+  (2.26). The lane Hypothesis's mechanism (leftover spread onto zero-stint players) is NOT the carrier.
+- **P3 HELD (does not gate):** returning players get a median 1.6 min (0.46-4.11) and run -6.60 [-8.89, -4.44]. A fix for
+  them would be a separate design with its own pre-registration; none is written or owed by this gate.
+
+Not gating, noted: the history path's >=28-min players run -2.93 [-3.77, -2.09]; the gate measures starters by the box
+flag, and that is within +-2.
