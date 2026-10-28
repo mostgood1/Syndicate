@@ -12732,3 +12732,8 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Files: none (ledger-only)
 - Verdict: MET. owner_liveness.py --idle-min 240 at 18:32Z (13:32 CDT) returned 26 SAFE of 34 CLOSED; all 26 moved to lanes_closed.md with one pointer each. Table, deferrals and Part B are in log/2026-10-27.md 18:45Z.
 - Moved: layer2-live-segment-actuals, signal-engine-nba, signal-engine-football, signal-engine-nhl, mlb-nearmiss-forward, forward-input-preservation, news-availability-gate, news-price-follow, sim-gap-ev-study, live-winpct-blank, props-book-coverage, nfl-sgp-builder, nhl-lineup-status, alt-ladders, alt-ladder-consistency, nhl-sgp-builder, basketball-sgp-builder, layer2-next-day-horizon, nba-live-board, nba-live-prop-coverage, nba-inplay-only-pulls, nfl-segment-capture-e, cheat-sheet-section-growth, decision-record-shadow, nba-live-state-overdue, status-clock-skew
+
+### closed-lane-archive-20261027-1456 — CLOSED 2026-10-27 (GOAL MET: 1 block archived) — opened 2026-10-27 — session 8c9220b9-af5d-42ab-b91c-dd549e672791
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness --idle-min 240 at 19:57Z returned SAFE for 1 of 9 CLOSED; moved `min-ev-tuner-shadow`. 8 deferred; table and Part B in log/2026-10-27.md.
