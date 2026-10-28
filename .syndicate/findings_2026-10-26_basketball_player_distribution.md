@@ -434,3 +434,59 @@ real box appearances:
 - **The minutes defect is now an ALLOCATION / AVAILABILITY bias first and a variance defect second.** This is the
   baseline the minutes mechanism must be built against.
 - The full FIT `fit_ar` was launched 17:07Z (12:07 CDT): `r2s/launch_fit_ar.sh`, 3 workers, nice 19.
+
+**STEP 1c FULL FIT `fit_ar` — RESULT 2026-10-28 19:48Z (14:48 CDT).** This is the descriptive baseline that
+pre-registration f76bea61 calls for; there is no pass/fail.
+- Run: the fit_pd config + `--asof-roster`, code_ar, 3 workers, nice 19. Finished about 19:40Z.
+- `ASOF_ROSTER` was printed on 109/109 dates.
+- 2 SIM_FAIL (2025-12-09 and 12-16, "SmartSim produced no player rows"). fit_pd failed on the SAME 2 dates
+  (fit_pd_w1.log), so the failures predate this change.
+- Both arms cover 806 games and 1,604 team-games.
+- Grader: `r2s/grade_fit_ar.py` (grade_ar.py pointed at fit_ar vs fit_pd) → `r2s/grade_fit_ar.json`.
+- The smoke gates also hold on the full run: leak 4 vs 440, never-T last-elsewhere 0 vs 1,712.
+
+| census | fit_ar | fit_pd |
+|---|---|---|
+| LEAK_FUTURE + NEVER_T_OTHER | **4** | 440 |
+| SIM_NEVER_T (all) | **2** | 2,277 |
+| REAL_ONLY player-games / real min per team-game | 948 / **6.15** | 2,983 / 29.64 |
+| ABSENT sim min / team-game (T_AROUND n) | 15.70 (1,309) | 19.84 (1,128) |
+| DNP_LISTED_COACH sim min / team-game | 8.07 | 7.06 |
+| DNP_LISTED_OTHER sim min / team-game | 4.86 | 4.47 |
+| sim game total mean | 230.55 | 230.50 |
+
+**Phase 1 (matched player-games; nominal miss .20; bias = real − sim):**
+
+| cell | fit_ar (n 16,318) | fit_pd (n 14,291) |
+|---|---|---|
+| minutes all | miss **.498**, width 1.71, bias +2.29 | .430, 1.57, +0.29 |
+| minutes bench | miss **.604**, width 2.30, bias +2.95 | .543, 2.03, +1.49 |
+| minutes starter | miss .367, width 1.24, bias +1.47 | .322, 1.25, −0.86 |
+| input-minutes bias | **+2.24** | +0.20 |
+| pts | .327, bias +1.06 | .319, +0.02 |
+| reb | .308, +0.52 | .300, +0.06 |
+| ast | .274, +0.26 | .274, −0.01 |
+| threes | .243, +0.07 | .243, −0.04 |
+
+**Reading:**
+- **The full run reproduces the smoke's direction and size.** Minutes miss .496 → .498; input bias +2.22 → +2.24.
+  The 12-date result was not a small-n artefact.
+- **The accounting closes.**
+  - Sim minutes that go to non-players: 15.70 + 8.07 + 4.86 = 28.63 per team-game.
+  - Minus the 6.15 real minutes the sim's pool lacks gives 22.5.
+  - The matched shortfall is 2.24 min × 10.17 matched players per team-game = 22.8.
+  - So the under-allocation of real players is the minutes the sim gives to players who sit, to within 0.3 min.
+- **pts / reb now show the same sign** (+1.06 / +0.52 per player-game). The stat miss rates moved ≤ .008 because
+  each player's stat band follows the minutes it rides on.
+- **The new baseline for the minutes mechanism (Phase 2 step 2):**
+  - miss .498 (bench .604, starter .367);
+  - input bias +2.24;
+  - about 28.6 sim min per team-game to non-players, of which 15.7 are injured/inactive (T_AROUND; the resim has no
+    injury feed), 8.1 coach DNP and 4.9 other DNP.
+- **The order this implies:**
+  - (1) availability: who is eligible to play at all;
+  - (2) rotation depth: coach DNPs, 8.1 min;
+  - (3) only then minutes variance (width).
+  - A width mechanism tuned first would widen bands to cover a level error.
+- **Residual pool holes:** REAL_ONLY is 948 player-games / 6.15 min. Of these, SIM_AROUND is 725: players the sim
+  has on the team on nearby dates but not this one. Not decomposed yet.
