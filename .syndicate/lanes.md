@@ -1217,6 +1217,14 @@ death, never life — do not invert it.
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 1 SAFE of 9 CLOSED; dry run, apply and invariant check passed (no FAIL beyond baseline).
 - Moved: nba-sim-minutes-history-path. Table and Part B in log/2026-10-28.md.
 
+### e4-stage2-combo-prices — OPEN — opened 2026-10-28 — session b566f51c-27f6-456c-b2ac-99f33cb133d4
+- Goal: E4 Stage 2 (#740 (d)) run as pre-registered (9f8d759e + A1/A2/A3) on the #742 capture store, offline and read-only, once the capture's first-full-forward-day reading is on origin/main; per passing cell the registered readings R1-R3 and the R2 verdict recorded in the E4 findings and #740
+- Files: scripts/e4_stage2_combo_prices.py (NEW), tests/test_e4_stage2_combo_prices.py (NEW), .syndicate/findings_2026-10-26_e4_combo_correlation_preregistration.md, .syndicate/findings_2026-10-26_e4_combo_correlation.md, docs/ai_context/todo.md (#740 section only)
+- Hypothesis: Kalshi prices same-game combos as independence plus a haircut, so where the sim's correlation raises the joint (p_b - p_a >= 1 pp) buying YES at the print earns a positive realised return
+- Falsification test: R2: the game-clustered 95% CI of the realised return on the sim-favoured side includes or sits below 0 in every sufficient passing cell (Holm m=8), or R1's slope CI excludes 0 near 1 (the prints already carry the correlation)
+- Verification: the Stage 2 run's report (C:/tmp/e4/stage2.json) read and its verdicts recorded in the findings file and #740, with the funnel and the n each reading rests on
+- Blocked by: the #742 first-full-forward-day reading (scheduled task kalshi-combo-capture-first-forward-day); user condition 'Yes, after the reading'
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

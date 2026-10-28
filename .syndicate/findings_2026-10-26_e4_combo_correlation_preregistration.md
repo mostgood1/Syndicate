@@ -260,3 +260,124 @@ hits over 0.5 was DraftKings -222 and the under was ESPN Bet +190. So it is a be
 7. **Code:** `scripts/e4_combo_correlation.py`. Tests: `tests/test_e4_combo_correlation.py`, 23 hermetic tests,
    including a reachability test (`off != on`) and recovery of a known NBA covariance through the real calibration
    widening.
+
+## Amendment A3 -- 2026-10-28, before any price x probability x outcome join (Stage 2 implementation; committed with the code)
+
+**Why.** Stage 1 passed 4 cells under Holm, so §7 applies to MLB SP-nested, MLB SP-other, NBA SP-nested and soccer
+GL. §7 was written before a price source existed. The source is now the forward capture `#742` (lane
+`kalshi-combo-capture`), which backfilled about 30 days of settled combos. This amendment fixes how §7 is computed
+from it. Lane `e4-stage2-combo-prices`.
+
+**Read before writing this (structure and coverage only).** No print price was compared with any probability, and
+no combo or leg was graded.
+- The capture's design and findings (`findings_2026-10-27_kalshi_combo_capture.md`).
+- The fleet store's file listing.
+- Two coverage probes, from tickers alone (`C:\tmp\e4\s2_coverage.py`, `s2_cells.py`; neither reads
+  `last_price`, `result` or any outcome).
+  - **Probe 1:** 13,608,138 stored rows, of which 685,789 are traded two-leg one-game combos.
+  - **Probe 2, games dated in the Stage 1 window, by ticker shape:**
+    - MLB same-batter: SP-nested 374 combos (33 games), SP-other 234 (33).
+    - NBA same-player: SP-nested 110 (33), SP-disjoint 2,502 (43).
+    - Soccer result/total/BTTS: about 7,600 in Stage 1's leagues, plus UCL, which has no Stage 1 sim.
+- 19 leg markets' public metadata, in 3 GETs (title, `floor_strike`, `strike_type`, rules; no leg result was read), to write the leg parser.
+
+**The run waits for a condition.** Stage 2 runs only after the capture's first-full-forward-day reading
+(`READING: Kalshi combo capture first full forward day`) is on origin/main. The user approved Stage 2 on that
+condition on 2026-10-28 ("Yes, after the reading"), relayed by the decision-engine session. A `--funnel-only` run
+before then may count joins, but writes or prints no price, probability, outcome or reading.
+
+1. **Price source** (replaces §7's "found through the public API ... trade prints").
+   - **Store:** `<data root>/reports/intelligence/kalshi_combo_capture/combos_<settled UTC date>.jsonl.gz`, first
+     row per ticker, settlement dates 09-29..10-28. It holds TRADED combos only: v2 stores no untraded row, and
+     Kalshi purges untraded finalized combos within about 3 days.
+   - **The price, `q`:** `quote_at_capture.last_price`, the last print's YES price. It equalled the last trade read
+     in 3,774 of 3,778 checked (`#742`).
+   - **DEVIATION: the print's taker side is NOT captured** (trade reads are off by default). The primary EV is §7's
+     own formula for a YES buyer at `q`; the NO buyer at `1 - q` is reported beside it, with the side chosen by the
+     sim (R2 below). A combo that printed several times is represented by its last print; 81% printed once (`#742`).
+   - **Unit:** one combo (ticker), unweighted. Volume-weighted means are reported beside.
+2. **Population, fixed now:**
+   - `n_legs == 2`, `traded`, both legs in ONE same-game group, a `last_price` in (0, 1);
+   - the game date, from the leg ticker, in Stage 1's window 09-30..10-25;
+   - the legs' shape maps onto a passing cell:
+     - **MLB:** same batter (same ticker player segment); `KXMLBHIT` / `KXMLBTB` / `KXMLBHR` / `KXMLBRBI` =
+       hits / total_bases / home_runs / rbi; nested per `MLB_NESTED`, else other. `KXMLBHRR` and pitcher series are
+       no Stage 1 market.
+     - **NBA:** same player; `KXNBAPTS` / `REB` / `AST` / `PRA`; the pair shares a component (SP-nested);
+       regular season only (Stage 1's game date >= 10-20).
+     - **Soccer:** full-match `KX<league>GAME` x `TOTAL`, `GAME` x `BTTS`, or `BTTS` x `TOTAL`, in Stage 1's 10
+       leagues; never 1H/2H/team totals, never result x result.
+   - Combos in killed or unregistered shapes are counted, not tested.
+   - The combo must join a Stage 1 game, with that game's sim, outcome and pregame gates (Stage 1's own loaders and
+     cache), so every arm's input comes from the Stage 1 machinery.
+   - No window extension: games after 10-25 have no Stage 1 join and are not used.
+3. **Game join:** the production matcher `kalshi_catalogue.match_event_blob`.
+   - It takes the leg ticker's team blob and a commence hint from the ticker, and matches against Stage 1 games
+     within ±1 day.
+   - Each game's `book_quotes` home/away names are used; soccer also needs the same league and a per-league code map
+     read from the GAME legs' own "<Club> wins" titles.
+   - Only `ok` is used; `no_match` and `ambiguous` are counted.
+4. **Legs** (public `GET /markets?tickers=` in batches of 100, cached; metadata only):
+   - **Props:** subject = the title before `:`; `strike_type` must be `greater`; line = `floor_strike`; the YES
+     event is stat > line.
+   - **Soccer:**
+     - total: over `floor_strike`, x.5 only;
+     - BTTS: title "Both Teams To Score";
+     - GAME: "<Club> wins" maps to home/away by `club_key`, else by unique token Jaccard >= 0.34; a `TIE` suffix
+       with "Tie is the result" means draw.
+   - A leg on side `no` takes the complement event. The combo's YES is both legs' chosen events.
+   - **Players:** Stage 1's identity rule (exact normalised name, else a unique first initial + last name). MLB
+     requires both legs to be the SAME joint pid.
+5. **Marginals** (replaces §3's main-line rule for Stage 2 only). The combo fixes each leg's line, so each leg's
+   marginal is A1's estimator AT THAT LINE:
+   - per sportsbook, the last pregame two-sided quote at exactly that line;
+   - multiplicative de-vig (soccer result: the 3-way de-vig);
+   - the median across books, with >= 1 two-sided book and p in (0.02, 0.98).
+   - A leg with no such quote is unanchored: the combo is dropped and counted (`leg_no_market_at_line`).
+6. **The arms**, on the legs' YES-oriented marginals:
+   - `p_a`: rho = 0.
+   - `p_b`: Stage 1's §4 sim rho for that pair:
+     - MLB: `corr_lower` -> 2 sin(pi rs / 6);
+     - NBA: the ladder-backed covariance with the PRA identity gate;
+     - soccer: the tetrachoric rho from the frozen scoreline table at the combo's total line.
+   - `p_c`: the SGP copula (`rho_for`, MLB/NBA only, where a cell exists).
+   - The Gaussian copula of §1 picks the cell matching the two sides.
+7. **Fee and EV.**
+   - Fee per contract: 0.07 x m x q(1-q), not rounded, since order size is not captured.
+   - m is `KXMVECROSSCATEGORY`'s own `fee_multiplier` from one public `/series` read at run time. If it cannot be
+     read, m = 1.0, stamped as an upper bound.
+   - EV: `EV_x = p_x/(q + fee) - 1` for x in {a, b, c}, and `EV_x^NO = (1 - p_x)/((1 - q) + fee) - 1`.
+   - Realised YES return: `R = 1{Kalshi result = yes}/(q + fee) - 1`. The NO return is defined likewise.
+   - **Kalshi's `result` decides R**, since it is what pays. Our own grading of both legs (Stage 1's outcome sources)
+     must agree. A disagreement is counted and that combo leaves R2/R3; it stays in R1.
+8. **Bands of p_b - p_a, in pp** (§7, per sign): <= -5, (-5,-3], (-3,-1], (-1,0), [0,1), [1,3), [3,5), >= 5.
+   - Per cell and band: n combos and games; mean q, p_a, p_b and p_c; mean EV_b and mean realised return (YES and
+     NO), each with a game-clustered (CR1) 95% CI. The game is the Stage 1 game.
+9. **Readings, registered now:**
+   - **R1, price tracking (per cell, descriptive):** OLS of (q - p_a) on (p_b - p_a), game-clustered SE.
+     - A slope CI that excludes 0 means the prints move with the sim's correlation; a slope near 1 means they carry
+       it fully.
+     - A slope CI that includes 0 means the prints are consistent with pricing the legs as independent.
+     - The intercept is the margin. Mean (q - p_a), (q - p_b) and (q - p_c) are reported beside it.
+   - **R2, sim edge at the print (the decision read; gated):**
+     - Per cell, on the side the sim's correlation favours: YES among combos with p_b - p_a >= 1 pp, and NO among
+       combos with p_a - p_b >= 1 pp.
+     - The statistic is the mean realised return, with a game-clustered 95% CI and a two-sided normal p.
+     - Holm runs across all 8 tests (4 cells x 2 sides). A test enters with p = 1 when it is below minimum n or its
+       mean is <= 0.
+     - Minimum n: >= 20 games and >= 200 combos, else **INSUFFICIENT**, which is never a kill.
+     - **EDGE:** minimum n, CI lower bound > 0, and Holm rejects at 0.05.
+     - **LEAD:** CI lower bound > 0 without Holm.
+     - **NO EDGE:** otherwise.
+     - Overall: EDGE_FOUND if any test is EDGE; INSUFFICIENT if every test is; otherwise NO_EDGE_SHOWN.
+   - **R3 (descriptive):** the binary log loss of Kalshi's YES result under p_b vs p_a, game-clustered.
+   - No outcome chooses a band, cell, side or threshold. The full §7 band table is reported regardless.
+10. **Polymarket:** NOT RUNNABLE (unchanged; no combo capture).
+11. **Code:** `scripts/e4_stage2_combo_prices.py`, reusing Stage 1's loaders, gates and scorer helpers from
+    `scripts/e4_combo_correlation.py` unchanged. Tests: `tests/test_e4_stage2_combo_prices.py`, 29 hermetic tests,
+    including:
+    - an `off != on` reachability test (the sim's rho moves the combo probability);
+    - side complements summing to 1;
+    - the exact-line marginal (a one-sided book is never priced);
+    - the blob join;
+    - the R2 verdict rules (INSUFFICIENT is never a kill; EDGE needs Holm).
