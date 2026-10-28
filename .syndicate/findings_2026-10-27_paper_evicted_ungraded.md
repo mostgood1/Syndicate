@@ -379,3 +379,38 @@ Scratch: `C:\tmp\peg\` (`dryrun.sh`, `dryrun.log`, `report_20261027T163701Z.json
   - The 8 book-style `paper` voids stay as they are.
   - A corrected copy supersedes each void (readers take the last copy per identity).
   - Polymarket ladders are unread; none of the 18 is on one.
+
+## Kalshi fair-price re-scope: pre-registration `[2026-10-28 16:02Z, BEFORE any code; user, verbatim: "Yes, build it", answering "Settle Kalshi-ladder paper bets on players who didn't play at Kalshi's fair price?"]`
+
+**The decision.** On a Kalshi venue, a bet on a player who did not play settles the way Kalshi settles it: at the market's published fair price, not as a void. Books and the other exchanges keep the void.
+
+**Design, fixed before code:**
+- **Scope.** Orders whose venue names Kalshi (`kalshi`, `paper:kalshi`, `paper:kalshi:ladder`; the same `"kalshi" in venue` test `settle_orders` uses for exits) with a reason in `DNP_VOID_REASONS`.
+- **The read.** Kalshi's public market by `venue_ticker`, through `kalshi_client._get` and its base URLs.
+  - It settles only when `result == "scalar"`, `status` is finalized or settled, and `settlement_value_dollars` reads inside [0, 1].
+  - Anything else refuses by name and never voids or guesses:
+    - not settled yet (it waits);
+    - a yes/no result, meaning ESPN and Kalshi disagree on whether he played;
+    - unreadable;
+    - no ticker on the order.
+- **The leg.** `kalshi_orders._side_to_kalshi(side, market, line)`, the order builder's own mapping. A YES leg is worth the fair value, a NO leg 1 minus it. An unmappable side refuses.
+- **The money.**
+  - Entry per contract = 1 / (1 + `profit_per_dollar(fill_price)`), which handles both units in the column.
+  - Gross = stake x (leg value / entry - 1). Net = gross - `fees_dollars` (paid at execution; Kalshi does not refund it).
+- **The shape.**
+  - `outcome = push`, since it is neither a win nor a loss, which keeps it out of hit rate. `pnl_dollars` is the net.
+  - `fair_price_reason = "kalshi_dnp_fair_price"` and `venue_fair_value` are stamped on the row, with NO `void_reason`. So the stake stays IN the ROI denominator, as the Kalshi account would show it.
+  - Tally key `fair_price`.
+- **Superseding the 10 voids.** The archived pass also takes, as a candidate, a last copy that carries `void_reason` on a Kalshi venue. The re-graded copy drops `void_reason`. Readers take the last copy per identity.
+- **Live Kalshi fallback.** A live order the venue left ungraded past its grace gets the same verdict. A SOLD exit plus a fair price refuses by name, because `exit_adjusted_pnl` would settle a push at cost.
+- **Rollback:** the same `SYNDICATE_PAPER_DNP_VOID=off` (DNP rows refuse again on every venue).
+
+**Hypotheses, falsifiable on a read-only fleet dry run of the archived pass with the new code:**
+- **H9 fair price:** all 10 `paper:kalshi:ladder` voids re-grade as `fair_price`.
+  - Gross total +$0.596 and net +$0.225 (+/- $0.005), from the 14:4xZ hand computation off Kalshi's settlement values.
+  - Every row's gross agrees with its hand figure to $0.001.
+  - FALSIFIED if any of the 10 refuses, or any row is off by more than $0.001.
+- **H10 nothing else moves:** the 8 book-style voids are not candidates, the 27 named refusals are unchanged, candidates = 37, and graded = 10.
+  - FALSIFIED on any other count change.
+
+**The apply is NOT authorised by this.** "Yes, build it" covers the code. Superseding the 10 on the fleet archive is a separate decision, asked with the dry run's numbers.
