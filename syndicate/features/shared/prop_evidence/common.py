@@ -215,8 +215,13 @@ def name_key(value: Any) -> str:
 
 
 def name_key_loose(value: Any) -> str:
-    """`name_key` without generational suffixes ("Kenneth Walker III" == "Kenneth Walker")."""
-    parts = [p for p in name_key(value).split() if p not in _NAME_SUFFIXES]
+    """`name_key` without generational suffixes ("Kenneth Walker III" == "Kenneth Walker").
+
+    The FIRST token is never a suffix. NHL publishes first initials, and "V. Trocheck" folds to "v trocheck": the
+    lone "v" was dropped as the roman numeral, so `initial_key` gave "trocheck" against the board's "v trocheck" and
+    every V-initial player missed the game log (todo #743 (d)).
+    """
+    parts = [p for i, p in enumerate(name_key(value).split()) if i == 0 or p not in _NAME_SUFFIXES]
     return " ".join(parts)
 
 
