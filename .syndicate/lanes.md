@@ -1221,6 +1221,14 @@ death, never life — do not invert it.
 - Blocked by: none
 - STATUS 2026-10-28 8:20 AM CT: checker + 28 hermetic tests on main (`084db263`); drills recorded in `deploys.md` (`edd86e1f`): live UNJUDGED (app restarted 06:44Z after the last due time), fresh drill OK, stale drill ALERT + toast read back from Action Center, registry-lost drill ALERT. OWED: (1) Windows job `SyndicateTaskRegistryCheck` (installer committed, NOT run) only on the user's explicit yes; (2) the first REAL OK reading after 10:45 CT.
 
+### nhl-v-initial-name-key — OPEN — opened 2026-10-28 — session a6134f5b-5e22-4d44-a4a2-4f2c1ba43772
+- Goal: Todo #743 (d)+(c): prop_evidence.common.name_key_loose never drops the FIRST token as a generational suffix, so initial_key('V. Trocheck') == 'v trocheck' and every V-initial NHL player matches the game log (SGP leg grading + hit-rate pool); real trailing suffixes still drop. Measured on a read-only fleet snapshot: V-initial players/legs/hit-rate rows newly matched, and the full key map (name_key_loose, initial_key, name_keys) diffed before/after over every roster name, changed only for leading-suffix-token names. Hermetic tests; landed on main; fleet ff is a user decision. (c): one one-time scheduled task (fireAt 2026-11-24 ~9:30 AM CT) runs the prereg §8 forward SGP p_joint read read-only and records the verdict; earlier if NHL/NBA/NFL each reach >= 30 new clean games.
+- Files: syndicate/features/shared/prop_evidence/common.py (name_key_loose ONLY), tests/test_name_key_leading_initial.py (NEW), docs/ai_context/todo.md (#743 section only)
+- Hypothesis: n/a (fix of a measured defect: todo #743 (d), 5 of the 8 still-unresolved NHL SGP legs are V-initial players)
+- Falsification test: On the snapshot, the fix changes the key of any name whose first token is not a suffix word, or resolves a V-initial leg to a player other than the one the sheet graded -> the fix is wrong
+- Verification: Key-map diff before/after over the fleet's NHL game log + NHL rates/lineups + every sport's sheet names (only leading-suffix names change); pending NHL SGP legs before/after on a snapshot replay; hit-rate pool V-initial players matched before/after; new tests + test_sgp_leg_grading + prop_evidence suites pass
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
