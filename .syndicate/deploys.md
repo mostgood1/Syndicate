@@ -54738,3 +54738,7 @@ which is about the two sizing bases and not about the refusal boundary.
 - **(2) recycles:** `[worker_recycle] RECYCLE_EXIT` **0** in 24.2 h (baseline 1.3-2.5 h per boot).
 - **(3) safety:** kernel OOM lines (dmesg) 0; `free -m` available 7,822 MB, swap used 902 MB. MISSED: `post_build_overview` aborts **5** (bar 0; 19:14, 21:11, 22:22, 03:45, 03:58Z, current 5,277-6,029 MB; pre-change 6 days had 8). Role-tree heartbeat peak (container_memory_mb) **6,611 MB** at 05:35:07Z (bar ~6,500). Also `build_candidate_pool_start` aborts 2, one snapshot at **7,724 MB** (headroom -556) 10-27 16:04:00Z. VM accounted RSS peak 10,009 MB at 00:54:55Z.
 - **verdict:** the fix did what it was for, and the guard still refuses under real pressure. The rollback trigger "if (3) fails" is met only on proxy bars, with no OOM. Keep or roll back is put to the user; nothing changed on the fleet.
+
+## 2026-10-28 12:35Z -- DECISION on the 7168 cap: KEEP (lane fleet-refresh-worker-early-recycle, CLOSED)
+
+- **who:** user, verbatim 2026-10-28: "Keep 7168". No fleet change; the 06:31:42Z reading's missed safety bars (5 post_build_overview, peak 6,611 MB) are accepted, with 0 OOM. The rollback in the 06:20:21Z entry is NOT taken.
