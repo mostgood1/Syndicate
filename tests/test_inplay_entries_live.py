@@ -69,13 +69,16 @@ def test_day_budget_and_its_ceiling(monkeypatch):
     p, calls = _placer(orders=rows)
     out = p(ENTRY)
     assert out["placed"] is False and out["reason"] == "in_game_day_budget" and not calls
-    assert live.day_budget_dollars() == 50.0
+    assert live.day_budget_dollars() == 50.0  # absent = the original cap, never the ceiling
     monkeypatch.setenv("SYNDICATE_INPLAY_ENTRY_DAY_DOLLARS", "500")
-    assert live.day_budget_dollars() == 50.0  # the user's cap is a ceiling
+    assert live.day_budget_dollars() == 100.0  # the user's $100/day (2026-10-28) is a ceiling
     monkeypatch.setenv("SYNDICATE_INPLAY_ENTRY_DAY_DOLLARS", "20")
     assert live.day_budget_dollars() == 20.0
     monkeypatch.setenv("SYNDICATE_INPLAY_ENTRY_DAY_DOLLARS", "junk")
     assert live.day_budget_dollars() == 50.0
+    monkeypatch.setenv("SYNDICATE_INPLAY_ENTRY_DAY_DOLLARS", "100")
+    p, calls = _placer(orders=rows)
+    assert p(ENTRY)["placed"] is True and len(calls) == 1  # $49.70 spent: room under $100
 
 
 def _req(**kw):

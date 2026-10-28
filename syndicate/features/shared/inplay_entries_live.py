@@ -13,7 +13,8 @@ OFF BY DEFAULT. Live only when ALL hold, re-read on every entry:
   * `SYNDICATE_INPLAY_ENTRIES` is `on` or `live` (absent / anything else = off);
   * `execution_ledger.execution_mode()` is live AND `live_execution_armed()`;
   * the day's in-game stake + this order <= `SYNDICATE_INPLAY_ENTRY_DAY_DOLLARS`
-    (default 50, and 50 is a CEILING the env cannot raise);
+    (absent / unusable = 50; the env may raise it to the CEILING of 100 and no further. User
+    2026-10-28, in chat: "we should double the cap to $100/day");
   * the decision ask, as a probability, is inside the pregame executor's live price
     band `[low, high)` (`execute_portfolio.live_price_band()`, the same
     `SYNDICATE_LIVE_PRICE_BAND`; absent/unusable = off, exactly as pregame). User
@@ -46,7 +47,8 @@ import time
 from typing import Any, Callable, Mapping, Sequence
 
 POSITION_PREFIX = "ingame:"
-DAY_DOLLARS_CEILING = 50.0
+DAY_DOLLARS_DEFAULT = 50.0  # absent / unusable env: the original cap, never the ceiling
+DAY_DOLLARS_CEILING = 100.0  # user 2026-10-28: "double the cap to $100/day"
 ORDER_DOLLARS_CEILING = 5.0
 MAX_PRICE_MOVE = 0.01
 CELL_GATE_CACHE_S = 60.0
@@ -70,8 +72,8 @@ def day_budget_dollars() -> float:
     try:
         v = float(str(os.environ.get("SYNDICATE_INPLAY_ENTRY_DAY_DOLLARS") or "").strip())
     except ValueError:
-        return DAY_DOLLARS_CEILING
-    return DAY_DOLLARS_CEILING if not (v >= 0) else min(v, DAY_DOLLARS_CEILING)
+        return DAY_DOLLARS_DEFAULT
+    return DAY_DOLLARS_DEFAULT if not (v >= 0) else min(v, DAY_DOLLARS_CEILING)
 
 
 def order_dollars() -> float | None:
