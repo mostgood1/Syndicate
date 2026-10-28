@@ -20,7 +20,8 @@ ENTRY = {"key": f"{DAY}:KXNHLSPREAD-26OCT22TORCBJ-TOR2:yes", "ticker": "KXNHLSPR
 def _env(monkeypatch, tmp_path):
     monkeypatch.setenv("SYNDICATE_REPORTS_ROOT", str(tmp_path))
     for k in ("SYNDICATE_INPLAY_ENTRIES", "SYNDICATE_INPLAY_ENTRY_DAY_DOLLARS", "SYNDICATE_EXECUTION_MODE",
-              "SYNDICATE_EXECUTION_LIVE_ARMED", "SYNDICATE_KALSHI_EXPIRE_AT_KICKOFF", "SYNDICATE_LIVE_PRICE_BAND", "SYNDICATE_LIVE_CELL_GATE"):
+              "SYNDICATE_EXECUTION_LIVE_ARMED", "SYNDICATE_KALSHI_EXPIRE_AT_KICKOFF", "SYNDICATE_LIVE_PRICE_BAND", "SYNDICATE_LIVE_CELL_GATE",
+              "SYNDICATE_INPLAY_ENTRY_ORDER_DOLLARS", "SYNDICATE_KALSHI_ROUND_UP_MIN_DOLLARS"):
         monkeypatch.delenv(k, raising=False)
 
 
@@ -314,3 +315,38 @@ def test_live_cell_gate_unknown_fails_closed_and_the_read_is_cached(monkeypatch)
     t["now"] = live.CELL_GATE_CACHE_S
     p({**ENTRY, "ticker": "KXNHLSPREAD-26OCT24JJJKKK-J2"})
     assert len(reads) == 2
+
+
+def test_order_dollars_off_is_one_contract_on_is_whole_contracts(monkeypatch):
+    for raw in ("", "abc", "0", "-3"):
+        monkeypatch.setenv("SYNDICATE_INPLAY_ENTRY_ORDER_DOLLARS", raw)
+        assert live.order_dollars() is None and live.entry_stake(0.30) == 0.31
+    monkeypatch.setenv("SYNDICATE_INPLAY_ENTRY_ORDER_DOLLARS", "3")
+    off_stake = 0.31
+    on_stake = live.entry_stake(0.30)
+    assert on_stake != off_stake and on_stake == 2.7901  # 9 contracts at 31c, under $3
+    for ask in (0.40, 0.55, 0.74):
+        stake = live.entry_stake(ask)
+        n = round(stake / (ask + 0.01))
+        assert stake <= 3.0 + 1e-3 and n >= 1
+        for price in (ask - 0.01, ask, ask + 0.01):  # the submitter floors at any live ask within 1c
+            assert ko.contracts_for_stake(stake, price) == n
+
+
+def test_order_dollars_ceiling_and_the_placer_reads_it(monkeypatch):
+    monkeypatch.setenv("SYNDICATE_INPLAY_ENTRY_ORDER_DOLLARS", "500")
+    assert live.order_dollars() == live.ORDER_DOLLARS_CEILING == 5.0
+    monkeypatch.setenv("SYNDICATE_INPLAY_ENTRY_ORDER_DOLLARS", "3")
+    p, calls = _placer()
+    assert p(ENTRY)["placed"] is True
+    assert calls[0]["stake"] == 2.7901
+
+
+def test_order_dollars_still_bounded_by_the_day_budget(monkeypatch):
+    monkeypatch.setenv("SYNDICATE_INPLAY_ENTRY_ORDER_DOLLARS", "3")
+    spent = [{"position_key": f"ingame:T{i}-X:yes", "venue_ticker": f"KXNHLSPREAD-G{i}-X", "selected_date": DAY,
+              "status": "filled", "fill_stake_dollars": 4.8} for i in range(10)]  # $48.00 spent
+    p, calls = _placer(orders=spent)
+    out = p(ENTRY)
+    assert out["placed"] is False and out["reason"] == "in_game_day_budget" and calls == []
+

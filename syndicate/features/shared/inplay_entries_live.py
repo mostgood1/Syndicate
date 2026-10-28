@@ -23,7 +23,8 @@ OFF BY DEFAULT. Live only when ALL hold, re-read on every entry:
     unreadable state refuses `live_cell_gate_unknown`, fail closed; the read is cached 60 s). User
     "Per-cell trip only (C)" via coordinator 332cb014, lane live-cell-scorecard (d57baa09), 2026-10-24.
 
-THE ORDER: 1 contract, `immediate_or_cancel` (`kalshi_orders.order_body_v2`
+THE ORDER: 1 contract (or, when `SYNDICATE_INPLAY_ENTRY_ORDER_DOLLARS` is set, as many whole contracts
+as that many dollars buys at ask + 1c, capped at $5 per order; `entry_stake`), `immediate_or_cancel` (`kalshi_orders.order_body_v2`
 honours `time_in_force` on the request; IOC orders carry no kickoff expiry and
 cannot rest), at the LIVE ask re-read at submit, refused if it moved more than
 1c from the decision ask (never an artifact fallback). Through the executor's own
@@ -46,6 +47,7 @@ from typing import Any, Callable, Mapping, Sequence
 
 POSITION_PREFIX = "ingame:"
 DAY_DOLLARS_CEILING = 50.0
+ORDER_DOLLARS_CEILING = 5.0
 MAX_PRICE_MOVE = 0.01
 CELL_GATE_CACHE_S = 60.0
 _ON = {"on", "live"}
@@ -70,6 +72,30 @@ def day_budget_dollars() -> float:
     except ValueError:
         return DAY_DOLLARS_CEILING
     return DAY_DOLLARS_CEILING if not (v >= 0) else min(v, DAY_DOLLARS_CEILING)
+
+
+def order_dollars() -> float | None:
+    """`SYNDICATE_INPLAY_ENTRY_ORDER_DOLLARS`: target $ per in-game order. Absent / unusable / <= 0 = None
+    (the original 1 contract). Clamped to ORDER_DOLLARS_CEILING, which the env cannot raise. User 2026-10-28
+    via coordinator 332cb014: "Step up now" (about $3 per order, $50/day cap kept), after 75 one-contract
+    fills, +$2.36 after fees on $33.50 (per-bet ROI +5.9% +/- 8.3 SE)."""
+    try:
+        v = float(str(os.environ.get("SYNDICATE_INPLAY_ENTRY_ORDER_DOLLARS") or "").strip())
+    except ValueError:
+        return None
+    return min(v, ORDER_DOLLARS_CEILING) if v > 0 else None
+
+
+def entry_stake(ask: float) -> float:
+    """Stake for one in-game order at decision ask `ask`: whole contracts priced at ask + MAX_PRICE_MOVE, so
+    the submitter's floor at any live ask within 1c lands on that count. At least 1 contract."""
+    unit = float(ask) + MAX_PRICE_MOVE
+    target = order_dollars()
+    if target is None or unit <= 0:
+        return round(unit, 4)  # the original single contract, unchanged
+    n = max(1, int((target + 1e-9) // unit))
+    # +0.0001: n * (ask + 1c) / (ask + 1c) floors to n - 1 in float (2.80 / 0.56 = 4.999...).
+    return round(n * unit + 1e-4, 4)
 
 
 def game_axis(ticker: str) -> tuple[str, str]:
@@ -195,7 +221,7 @@ class LiveEntryPlacer:
         ticker, leg, ask = str(entry["ticker"]), str(entry["leg"]), float(entry["ask"])
         pk = f"{POSITION_PREFIX}{ticker}:{leg}"
         spend = in_game_spend(self.orders_fn(), day)
-        stake = round(ask + MAX_PRICE_MOVE, 4)  # floors to exactly 1 contract at any live ask within 1c
+        stake = entry_stake(ask)  # whole contracts; 1 unless SYNDICATE_INPLAY_ENTRY_ORDER_DOLLARS is set
         band = _price_band()
         cell_refusal = self._cell_refusal(entry)
         if band is not None and not (band[0] - 1e-9 <= ask < band[1] - 1e-9):
