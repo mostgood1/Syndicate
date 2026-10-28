@@ -12863,3 +12863,15 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - A1 (registered BEFORE re-measuring): among 2+ same-key hits, keep only players with a game in the log's latest season; refuse if that leaves 0 or 2+. Falsified if, on the same snapshot, any previously resolved (day, event, player) still stops resolving or changes pid, or the season filter resolves any key where 2+ candidates played this season.
 - Result 2 (A1) 2026-10-28 14:48Z: A1 NOT falsified. 0 lost / 0 pid changed / 90 newly resolved; 6 of 22 multi-hit keys resolved by the season filter (Slavin), 16 with 2+ in-season still refuse; pool 173 = 173, tickets 23 = 23 (0 legs gained: the new rungs fail the market gate); 0 relation disagreements / 896 pairs. On main `c1a2fb4a`; NOT on the fleet (user decision). Record: todo #743 (e), log/2026-10-28.md 14:48Z.
 - Blocked by: none
+
+### closed-lane-archive-20261028-1139 — CLOSED 2026-10-28 (GOAL MET: 2 blocks archived) — opened 2026-10-28 — session 04aaaddc-ce12-46fd-bc7e-87ab04385a8c
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness --idle-min 240 read SAFE for 2 of 10 CLOSED blocks; both moved to lanes_closed.md with one pointer each. Table and WAIT reasons in log/2026-10-28.md.
+- Moved: fleet-refresh-worker-early-recycle, sgp-leg-grading
+
+### closed-lane-archive-20261028-1231 — CLOSED 2026-10-28 (GOAL MET: 1 blocks archived) — opened 2026-10-28 — session 8e5725f4-0dbe-484f-a679-386a1e901777
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 1 SAFE of 9 CLOSED; dry run, apply and invariant check passed (no FAIL beyond baseline).
+- Moved: nba-sim-minutes-history-path. Table and Part B in log/2026-10-28.md.

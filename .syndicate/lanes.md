@@ -1149,18 +1149,6 @@ death, never life — do not invert it.
 - Kalshi fair price LIVE 2026-10-28 17:11Z: fleet 6d6e729d since 16:44:45Z (syndicate-decision-engine window); pass 16:57:30Z appended 12 `fair_price`; last copies +0.6898 / +0.2496 on $12, 0 still void, 11 book voids untouched -- MET (deploys.md 17:10:59Z). Live path 0 voids since the up (a null on 26 min).
 - Blocked by: none
 
-### closed-lane-archive-20261028-1139 — CLOSED 2026-10-28 (GOAL MET: 2 blocks archived) — opened 2026-10-28 — session 04aaaddc-ce12-46fd-bc7e-87ab04385a8c
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness --idle-min 240 read SAFE for 2 of 10 CLOSED blocks; both moved to lanes_closed.md with one pointer each. Table and WAIT reasons in log/2026-10-28.md.
-- Moved: fleet-refresh-worker-early-recycle, sgp-leg-grading
-
-### closed-lane-archive-20261028-1231 — CLOSED 2026-10-28 (GOAL MET: 1 blocks archived) — opened 2026-10-28 — session 8e5725f4-0dbe-484f-a679-386a1e901777
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 1 SAFE of 9 CLOSED; dry run, apply and invariant check passed (no FAIL beyond baseline).
-- Moved: nba-sim-minutes-history-path. Table and Part B in log/2026-10-28.md.
-
 ### e4-stage2-combo-prices — OPEN — opened 2026-10-28 — session b566f51c-27f6-456c-b2ac-99f33cb133d4
 - Goal: E4 Stage 2 (#740 (d)) run as pre-registered (9f8d759e + A1/A2/A3) on the #742 capture store, offline and read-only, once the capture's first-full-forward-day reading is on origin/main; per passing cell the registered readings R1-R3 and the R2 verdict recorded in the E4 findings and #740
 - Files: scripts/e4_stage2_combo_prices.py (NEW), tests/test_e4_stage2_combo_prices.py (NEW), .syndicate/findings_2026-10-26_e4_combo_correlation_preregistration.md, .syndicate/findings_2026-10-26_e4_combo_correlation.md, docs/ai_context/todo.md (#740 section only)
@@ -1174,6 +1162,12 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: MET. owner_liveness.py --idle-min 240 at 20:16Z (15:16 CDT) returned 5 SAFE of 9 CLOSED; moved to lanes_closed.md with one pointer each. Table and deferrals are in log/2026-10-28.md 20:19Z.
 - Moved: nba-prop-wrong-game, scheduled-task-registry-alert, nhl-v-initial-name-key, closed-lane-archive-20261028-0841, nhl-hitrate-pool-team-match
+
+### closed-lane-archive-20261028-1641 — CLOSED 2026-10-28 (GOAL MET: 2 blocks archived) — opened 2026-10-28 — session 98129b83-c33c-49d4-8e37-a8012d4617af
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: MET. owner_liveness.py --idle-min 240 at 21:43Z (16:43 CDT) returned 2 SAFE of 5 CLOSED; moved to lanes_closed.md with one pointer each. Table and deferrals are in log/2026-10-28.md 21:41Z.
+- Moved: closed-lane-archive-20261028-1139, closed-lane-archive-20261028-1231
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1270,6 +1264,8 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261027-2240` — CLOSED 2026-10-27 (GOAL MET: 2 blocks archived) — opened 2026-10-27 — session d4ef7aae-2abd-48dc-baaf-bd231e874d31
 - `closed-lane-archive-20261028-0040` — CLOSED 2026-10-28 (GOAL MET: 1 block archived) — opened 2026-10-28 — session 91200a57-f194-475e-9d7c-4b8815303421
 - `closed-lane-archive-20261028-0841` — CLOSED 2026-10-28 (GOAL MET: 3 blocks archived) — opened 2026-10-28 — session 37db6440-d5da-42b4-b83c-53a1454c0e76
+- `closed-lane-archive-20261028-1139` — CLOSED 2026-10-28 (GOAL MET: 2 blocks archived) — opened 2026-10-28 — session 04aaaddc-ce12-46fd-bc7e-87ab04385a8c
+- `closed-lane-archive-20261028-1231` — CLOSED 2026-10-28 (GOAL MET: 1 blocks archived) — opened 2026-10-28 — session 8e5725f4-0dbe-484f-a679-386a1e901777
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
