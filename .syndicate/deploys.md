@@ -54822,3 +54822,39 @@ which is about the two sizing bases and not about the refusal boundary.
 - **correction to the 13:10:17Z entry above:** its OWED line shows a TAB where `\t` was meant (shell-transcoded); the path is `C:\SyndicateProd\task_registry_check`.
 - **verify (OWED):** the 10:50 CT run (15:50Z) logs `exit=0 notified=- OK: ... covering its 10-28 09:15 CT due time`. A watcher in session 9af4433f waits for it; the result is appended here.
 - **undo:** `powershell -ExecutionPolicy Bypass -File deploy\local\install_task_registry_check.ps1 -Uninstall`.
+
+## 2026-10-28 14:39:05Z / 14:40:27Z (9:39 / 9:40 AM CT) -- FLEET ARCHIVE WRITE: 18 did-not-play VOIDS appended to the paper archive (lane paper-evicted-grading, #744) -- **APPLIED; predicted counts MET; 10 of the 18 are WRONG under Kalshi's own rule (see finding)**
+- **user, verbatim (this lane's chat):** "Yes, apply voids".
+  - It answered "Apply the 18 voids to the archive under the refresh-worker claim?".
+  - The fleet ff to >= `a0d23665` and the full down/up were NOT part of it.
+- **claim:** refresh-worker, holder `paper-evicted-grading`, acquired 14:37:18Z (it was free) and released 14:40:55Z with its token.
+  - No code deploy, no ff, no restart, no env change. So no preflight: no SHA loaded anywhere.
+- **what ran:** code `a0d23665` (on origin/main), from the scratch extract `~/peg-dryrun/a0d23665`.
+  - The extract is a `git archive` without `data/` and `reports/`. The fleet checkout (`1f339cc2`, from coordinator 332cb014's ff at 14:01:54Z) was not touched.
+  - Everything ran at `nice -n 19` with the refresh-worker's derived env.
+  - The archived-grading flock serialises this with the worker's hourly archived pass, which has been live since 14:02Z on `1f339cc2`.
+- **expectation**, from a read-only dry run at 14:37:50Z:
+  - The pass: candidates 45, graded 18, outcomes `{void: 18}`.
+  - Stale total 45 (live document 2, archive only 43), would grade 16.
+  - Stale had been 80 at 13:00Z. The 14:02Z down/up took the live-document rows 37 -> 2.
+  - The shard grew 1 line during the dry run: an MLB paper row graded `lost` with no `graded_from`, which is the live worker's own trim. The dry run's `suppressed_writes` was `{}`.
+- **the write, `orders_2026-10.jsonl`:**
+  - Lines 21,908 -> 21,928 (+20: the 18 voids plus 2 concurrent worker lines). Bytes 35,721,509 -> 35,759,362. sha256 `000f8de2c9b3ff85...` -> `e551e097bfe0ddd8...`.
+  - `"graded_from":"archive"` 1,924 -> **1,942** (+18 exactly).
+  - Rows with `"void_reason"`: 0 -> **18**, every one `push` at $0.00.
+  - By sport: NBA 12 (7 `did_not_play`, 5 `inactive`), NFL 5, NHL 1 (`dnp_void`).
+  - Closing marks stamped on all 18.
+- **reading** (a read-only re-read, 14:40:27Z-14:40:35Z):
+  - **Stale total 45 -> 29.** Archive only 43 -> 27; live document 2 -> 2; still gradeable 16 -> 0. **MET.**
+  - The 27 left are refused by name: MLB 11, NHL 6, NBA 4 (segment q4/h2), NCAAF 2, soccer 3, plus 1 NBA unmapped `player_double_double`.
+- **FINDING (read after the write, 14:41:31Z): 10 of the 18 voids are on `paper:kalshi:ladder`, and Kalshi does NOT void a player who did not play.**
+  - The 10 rows: NBA 8, NFL 2. All are $1 `over` bets on real Kalshi tickers, e.g. `KXNBA3PT-26OCT25DETPHI-PHIVEDGECOMBE77-2`.
+  - Kalshi's public market API: all 9 distinct tickers are `finalized`, with result `scalar` and a settlement of $0.41-$0.65.
+  - The rule text on the ticker read: "If a player is inactive, or active but never takes the court, the market settles to a fair price."
+  - At Kalshi's fair price the 10 rows would be **+$0.596 gross, +$0.225 net of the assumed fees, on $10 staked** (8 up, 2 down). They are now $0.00, with their stake out of the ROI denominator.
+  - The 8 rows on plain `paper` (book-style) are right as voids.
+  - **Small in dollars, but the rule is wrong for the venue, and it will spread.** Once the fleet loads `a0d23665`, the LIVE path voids Kalshi-ladder DNPs the same way.
+  - The write was user-approved under a stated assumption that turned out false for these rows. The archive is append-only, and readers take the last copy per identity, so a corrected copy can supersede each void.
+- **NOT DONE (user decisions):**
+  - Settling Kalshi-ladder paper DNPs at Kalshi's fair price and superseding the 10 voids. This should come BEFORE the fleet ff to `a0d23665`.
+  - The fleet ff and a full down/up.

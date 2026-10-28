@@ -361,3 +361,21 @@ Scratch: `C:\tmp\peg\` (`dryrun.sh`, `dryrun.log`, `report_20261027T163701Z.json
 **Regression:** 859 passed across the 29 test files that touch the changed modules, plus the new `tests/test_paper_dnp_void.py` (25 tests, reachability first).
 
 **Known simplification.** The void is venue-agnostic, applied as the books' rule. An exchange's own contract terms for a player who doesn't play may differ; none of the 18 is on an exchange venue in this read. Not yet checked per row.
+
+## Void apply `[2026-10-28 14:37Z-14:41Z, fleet, user-approved "Yes, apply voids"; deploys.md 14:39:05Z]`
+
+- **Applied from main `a0d23665`:** 18 voids appended, every one `push` at $0.00 with `void_reason`. NBA 12, NFL 5, NHL 1.
+- **Stale 45 -> 29.** Archive-only 43 -> 27; still gradeable 0. The 14:02Z fleet down/up (coordinator 332cb014) had already taken the live-document rows 37 -> 2.
+- **CORRECTION to "Void re-scope: result" above.** It says "none of the 18 is on an exchange venue in this read". **That was wrong.**
+  - 10 of the 18 are `paper:kalshi:ladder` (NBA 8, NFL 2). The line was written without reading the `venue` field.
+- **Kalshi's rule for those 10** (public market API, read 14:41:31Z):
+  - All 9 distinct tickers are `finalized`, result `scalar`, settled at $0.41-$0.65.
+  - The rule text: "If a player is inactive, or active but never takes the court, the market settles to a fair price."
+  - So a Kalshi-ladder paper bet on a player who did not play gains or loses the gap between that fair price and its entry price. It is not a void.
+- **Size:** at Kalshi's prices the 10 rows are **+$0.596 gross, +$0.225 net of the assumed fees, on $10** (8 up, 2 down; per row -$0.063 to +$0.102 net).
+  - The voids hold them at $0.00, with $10 out of the ROI denominator.
+- **What the fix looks like:**
+  - For a `paper:kalshi:*` row with a DNP reason, read the market by `venue_ticker`. When it is `finalized` and `scalar`, settle at `settlement_value_dollars`: gross = stake x (fair / entry - 1).
+  - The 8 book-style `paper` voids stay as they are.
+  - A corrected copy supersedes each void (readers take the last copy per identity).
+  - Polymarket ladders are unread; none of the 18 is on one.
