@@ -26,6 +26,25 @@
 - **Fix (for the lane to pre-register):** a default-off grading pass over archived ungraded paper rows whose game is decided, appending the graded copy to the archive (`archived_orders` keeps the last copy per identity -- verify), then a one-off backfill from 10-02. Fleet writes are a user decision under the deploy locks.
 
 ### `#743` — **SGP `p_joint` CALIBRATION (from E4 `#740` c-ledger): NOT SHOWN miscalibrated — pooled +1.7 pts [-3.1, +6.4] on 971 clean tickets / 139 games. The lead's 3-6 pt over-prediction was mostly the GRADER: a ticket with an unresolved leg can be LOST but never WON (+2.4 pts [+1.3, +3.5] pooled, +4.3 [+2.6, +6.3] NHL), and 34% of NHL sheet-row SGP legs never grade (no `player_id`). Fix the calibration read + leg grading; keep `p_joint` as built** — 2026-10-27, lane `sgp-pjoint-calibration`, session 138eb1d7 (side session of local_668211d5); `.syndicate/findings_2026-10-27_sgp_pjoint_calibration.md`
+- **STATUS 2026-10-28 8:51 AM CT (13:51Z): (d) FIXED on main `f2062fb3`, NOT on the fleet; (c) SCHEDULED** -- lane `nhl-v-initial-name-key` (session a6134f5b, side session of local_898e5510), CLOSED.
+  - **(d)** `prop_evidence.common.name_key_loose` no longer drops the FIRST token as a suffix, so `initial_key("V. Trocheck")` == `"v trocheck"`. Real suffixes after the first token still drop ("Kenneth Walker III", "Some Name V"). Tests: `tests/test_name_key_leading_initial.py`, 18 pass, and 6 fail on the old code, `GameLog.resolve` included. 316 passed across the callers' suites.
+  - **Measured on a read-only fleet snapshot** (10-28 8:36-8:39 AM CT, fleet `84967f75`), old key vs new. Scratch: `C:\tmp\nhlvkey\` (`snap_manifest.txt`, `measure.py` / `measure2.py` and their `.json`).
+    - Key map over 11,548 distinct names (NHL log / rates / lineups / alt ladders, every sport's cheatsheets): **36 changed, and all 36 lead with a suffix token.** Every one is a `V.` NHL name. 0 `names_match` partner changes.
+    - NHL game log: 25 V-initial players rekeyed, 0 other players. Lineup V names that resolve to the log: 13 -> 32 of 47.
+    - SGP ledger replay, tickets <= 10-27; the old-key replay equals the graded file on disk exactly:
+      - unique pending NHL legs **15 -> 7**, and all 8 resolved are V-initial;
+      - 0 actuals changed or lost; 7 new actuals equal the sheet's own graded value, 0 mismatch;
+      - tickets pending 9 -> 3 (+5 won, +1 lost);
+      - `SGP_PAPER` NHL 22.77% vs 22.12% (908 settled, 34 with an unresolved leg) -> **22.87% vs 21.99%** (914, 22).
+    - Hit-rate pool (`sgp_pool.legs_by_game`, 12 sheet days): legs 167 -> 173. All 6 added are V players; 0 removed.
+  - **Fleet:** a user decision, under the deploy locks: a fleet ff to a SHA at or after `f2062fb3`, then a full down/up. Not done.
+  - **Still pending after (d):** 7 NHL legs (Cagnoni, Zacha, Foerster, Bolduc, Malkin x2, Hall).
+  - **(c) SCHEDULED:** one-time task `sgp-pjoint-forward-read-1124`, 2026-11-24 9:40 AM CT. It computes the §8 trigger date from the graded file and freezes the window there, so "whichever comes first" holds.
+    - Clean games since 10-27, read 10-28: NHL 11, NBA 4, NFL 0. NFL adds about 12 a week, so the trigger should land near 11-15/16.
+    - The read runs the script unchanged except FREEZE / SEEN_LAST, in a scratch copy, on a snapshot filtered to tickets >= 10-27. Rehearsed on the 10-27 snapshot: it reproduced every primary line.
+  - **New lead, not fixed (outside this lane):** `sgp_pool.GameLog.resolve` compares RAW team strings; `leg_player_id` already canonicalises.
+    - On the snapshot, 90 in-lineup player-days over 12 days missed the hit-rate pool on team spelling alone, e.g. "St Louis Blues" vs "St. Louis Blues".
+    - 219 of 1,038 log players carry an abbreviated latest team ("MIN", "NYR").
 - **STATUS 2026-10-28 12:08 AM CT (05:08Z): (a) + (b) DEPLOYED and MEASURED on the first nightly reconcile** (NHL 22.5% vs 22.0% on 853 resolved; was 19.4% vs 22.1%). Lane `sgp-leg-grading` CLOSED. **Still open:** (c) the forward read (>= 30 new clean games each in NHL / NBA / NFL, or 2026-11-24) and (d) the V-initial lead. Nobody holds either.
 - **STATUS 2026-10-27 9:55 AM CT (14:55Z): (a) and (b) are BUILT and on main, NOT on the fleet** (`84967f75`, lane `sgp-leg-grading`, user: "proceed next action").
   - **What changed:**
