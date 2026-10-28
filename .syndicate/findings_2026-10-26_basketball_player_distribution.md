@@ -490,3 +490,66 @@ pre-registration f76bea61 calls for; there is no pass/fail.
   - A width mechanism tuned first would widen bands to cover a level error.
 - **Residual pool holes:** REAL_ONLY is 948 player-games / 6.15 min. Of these, SIM_AROUND is 725: players the sim
   has on the team on nearby dates but not this one. Not decomposed yet.
+
+## STEP 1d — HISTORICAL INJURY FEED, PRE-REGISTERED 2026-10-28 23:20Z (18:20 CDT), before any feed row is built
+
+**User decision 10-28:** "build the historical injury feed first". It fills the T_AROUND hole: 15.7 sim min per
+team-game go to players who were injured or inactive.
+
+**Source, verified by probe 23:00Z:**
+- The official NBA injury-report PDFs at ak-static.cms.nba.com. The season index page lists only TODAY's reports
+  now, but the host still serves 2025-26.
+- Format change: the filename is hourly `_HHPM` through about 2025-12-21 and every 15 minutes `_HH_MMPM` from about
+  12-26.
+- Probe dates: 11-01, 11-15 and 12-20 served at 01/05/06PM; 12-28, 01-02, 01-15 and 02-25 at the 15-min times.
+- The production parser (`NBAOfficialInjuryReportScraper._parse_pdf_rows` + `_clean_injury_player_names`, unchanged)
+  reads both layouts: 4 sample reports gave 87-132 rows from 19-28 teams.
+- Known name glitch: "Dorian Finney- Smith". The build counts names that are on no roster.
+
+**Feed (`scripts/nba_injury_history_build.py`, NEW, this lane):**
+- Each regular-season game in the ESPN summary cache gets ONE report: the latest one stamped at or before
+  tip − 30 min, in ET.
+- Only that game's two teams' rows are kept, and every row is stamped with the game's US date. One date's rows =
+  the union over its games.
+- No look-ahead: a report published after tip − 30 is never read. Teams are the report's own; there is no roster
+  team correction, so the end-of-season roster cannot bring the leak back through this path.
+- The output CSV has columns date / team / player / status / injury / source=`nba_official` / report. That is the
+  shape `basketball_props_smart_sim` reads from `raw/injuries.csv`: the latest snapshot on or before the date, with
+  OUT / DOUBTFUL / SUSPENDED / INACTIVE / REST excluded — the production rule, unchanged.
+- The PDFs are downloaded into their own data dir, `C:/tmp/bball_sc/inj_pdf`.
+
+**Harness:** `--injury-history CSV` in `scripts/basketball_scenario_rates.py`. It is default off, so OFF is
+byte-identical. It writes date d's rows as the scratch `raw/injuries.csv` after the copy loop deletes that file, and
+prints `INJURY_HISTORY {d} {rows, teams, excluded}`. Edited under the calibration lane's marker, as with 54ed87dc.
+
+**Build gates (before any sim):**
+- (B1) every FIT game has a report at or before tip − 30;
+- (B2) for ≥ 95% of team-games the report lists the team; "not yet submitted" counts as unlisted;
+- (B3) report rows whose name is on no roster ≤ 5%.
+- Reported: per-format counts, the report-age distribution (tip − report time).
+
+**SMOKE INJ_smoke:**
+- Config: the fit_ar config + `--injury-history`, the same 12 sweep dates, 200 draws, nice 19.
+- Control: fit_ar's files for those 12 dates.
+- PASS iff ALL of:
+  - (a) INJURY_HISTORY is printed with rows > 0 on 12/12 dates;
+  - (b) T_AROUND count AND ABSENT sim min per team-game are both ≤ 50% of the control's;
+  - (c) FALSE EXCLUSIONS ≤ 3% of excluded player-game slots. A false exclusion is a player whom the feed excludes
+    for a date and who plays in that game's box. This is the feed's accuracy measured against the truth, with no
+    look-ahead in the feed itself.
+- Reported, no gate: every census class, the game-total and team-points means vs control, the Phase-1 minutes and
+  stat rows.
+
+**If PASS:**
+- the full FIT `fit_inj` (3 workers);
+- the step-1 / 1b census and the Phase-1 read against fit_ar's baseline: minutes miss .498 (bench .604, starter
+  .367), input bias +2.24, pts .327 / reb .308 / ast .274 / threes .243, ABSENT 15.70 + coach DNP 8.07 + other DNP
+  4.86 sim min per team-game.
+- Descriptive: this is the new baseline for the minutes mechanism.
+
+**If FAIL:** report which criterion failed; no FIT.
+
+**Out of scope:**
+- QUESTIONABLE / PROBABLE players stay in the pool, as in production; their minutes are the mechanism's job;
+- the coach DNP of healthy players (8.07);
+- production: the feed only fills a research hole, and production already reads the live report.
