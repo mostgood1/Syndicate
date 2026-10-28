@@ -332,6 +332,68 @@ def _compact_draw(h_box: Dict[str, Any], a_box: Dict[str, Any], hq: Any, aq: Any
     return out
 
 
+def asof_roster(proc: Path, d: str, recent_days: int = 30) -> Dict[str, int]:
+    """Rewrite `proc`/rosters_<season>.csv AS OF slate date `d` (lane basketball-player-distribution step 1b: the resim
+    tree holds only the END-of-season roster, so deadline acquisitions were simulated for their new team all season
+    and traded-away players were filtered off their old one). `proc`/player_logs.csv is already truncated to games
+    before `d` (resim_nba_availability.HISTORY_FILES). Rules, in order:
+      1. a player with a game before `d` -> the team of his LAST game before `d`;
+      2. a rostered player with no game yet whose HOW_ACQUIRED is dated on/after `d` -> the "from XXX" team of a trade,
+         else (signed / claimed / awarded later) dropped;
+      3. a player with a game in the `recent_days` before `d` who is absent from the file -> added on that team.
+    Production never calls this: live dates read the current ESPN roster (lane nba-current-rosters)."""
+    import re
+
+    import pandas as pd
+
+    start = int(d[:4]) if int(d[5:7]) >= 7 else int(d[:4]) - 1
+    path = proc / f"rosters_{start}-{str(start + 1)[-2:]}.csv"
+    logs_path = proc / "player_logs.csv"
+    if not path.exists() or not logs_path.exists():
+        return {"skipped": 1}
+    r = pd.read_csv(path)
+    logs = pd.read_csv(logs_path, usecols=["PLAYER_ID", "PLAYER_NAME", "TEAM_ABBREVIATION", "GAME_DATE"])
+    logs = logs[logs["GAME_DATE"].astype(str) < d].sort_values("GAME_DATE")
+    last = logs.groupby("PLAYER_ID").tail(1).set_index("PLAYER_ID")
+    stats = {"rows_in": len(r), "moved_by_logs": 0, "reverted_trade": 0, "dropped_future_add": 0, "added_departed": 0}
+    keep = []
+    for i, row in r.iterrows():
+        pid = row.get("PLAYER_ID")
+        team = str(row.get("TEAM_ABBREVIATION") or "")
+        how = str(row.get("HOW_ACQUIRED") or "")
+        m = re.search(r" on (\d{2})/(\d{2})/(\d{2})", how)
+        acq = f"20{m.group(3)}-{m.group(1)}-{m.group(2)}" if m else ""
+        if pid in last.index:
+            # A dated move AFTER his last game and on/before the slate stands (traded, then hurt: no game for the new team).
+            if not (acq and str(last.at[pid, "GAME_DATE"]) < acq <= d):
+                t = str(last.at[pid, "TEAM_ABBREVIATION"])
+                if t != team:
+                    stats["moved_by_logs"] += 1
+                    r.at[i, "TEAM_ABBREVIATION"] = t
+            keep.append(i)
+            continue
+        if acq and acq >= d:
+            frm = re.search(r"Traded from ([A-Z]{2,3})", how)
+            if frm:
+                stats["reverted_trade"] += 1
+                r.at[i, "TEAM_ABBREVIATION"] = frm.group(1)
+            else:
+                stats["dropped_future_add"] += 1
+                continue
+        keep.append(i)
+    out = r.loc[keep].copy()
+    cutoff = (pd.Timestamp(d) - pd.Timedelta(days=recent_days)).strftime("%Y-%m-%d")
+    absent = last[(~last.index.isin(r["PLAYER_ID"])) & (last["GAME_DATE"].astype(str) >= cutoff)]
+    if len(absent):
+        add = pd.DataFrame({"PLAYER_ID": absent.index, "PLAYER": absent["PLAYER_NAME"].values,
+                            "TEAM_ABBREVIATION": absent["TEAM_ABBREVIATION"].values, "SEASON": f"{start}-{str(start + 1)[-2:]}"})
+        stats["added_departed"] = len(add)
+        out = pd.concat([out, add], ignore_index=True)
+    out.to_csv(path, index=False)
+    stats["rows_out"] = len(out)
+    return stats
+
+
 def run_sim(args) -> int:
     """SIM side: production's engine re-run as of each FIT date (scratch copy; roster mode forced pregame), with the
     per-draw recorder wrapped IN THIS PROCESS ONLY to keep each draw's quarter scores, OT, team volume and foul-outs.
@@ -647,6 +709,8 @@ def run_sim(args) -> int:
         rs.prepare_scratch(pristine, scratch, d, asof, props_csv)
         for extra in args.copy_file or []:     # production switch files absent from the pristine copy
             shutil.copy2(extra, scratch / "nba_source" / "data" / "processed" / Path(extra).name)
+        if args.asof_roster:
+            print(f"ASOF_ROSTER {d} {json.dumps(asof_roster(scratch / 'nba_source' / 'data' / 'processed', d))}", flush=True)
         games.clear()
         job_rec.clear()
         src_root = scratch / "nba_source"
@@ -933,6 +997,8 @@ def main(argv=None) -> int:
     ap.add_argument("--worker", type=int, default=0)
     ap.add_argument("--workers", type=int, default=1)
     ap.add_argument("--copy-file", action="append", help="extra production switch file copied into each scratch")
+    ap.add_argument("--asof-roster", action="store_true",
+                    help="rewrite the scratch season roster as of each slate date (default off: the end-of-season file)")
     ap.add_argument("--lever", action="append", help="EventSimConfig field=value applied to every draw (Phase 2 sweeps)")
     ap.add_argument("--engine-flag", action="append", help="module-level engine switch NAME=VALUE on the real events module (Phase 2 #1d)")
     ap.add_argument("--track-oncourt", action="store_true", help="record per-draw simulated minutes of the top-5 (Phase 2 #4)")
