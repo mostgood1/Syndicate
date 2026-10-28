@@ -435,3 +435,10 @@ Scratch: `C:\tmp\peg\` (`dryrun.sh`, `dryrun.log`, `report_20261027T163701Z.json
 **Also fixed by this:** a LIVE Kalshi order on a player who did not play. `venue_settlement.grade_kalshi_settlement` refuses `scalar`, so before this the 24 h fallback had nothing to settle it with. Now it settles at the same fair price from the order's own fill. A SOLD exit refuses by name (`exit_fair_price_unsupported`).
 
 **Still unread:** the DNP rules of Polymarket, ProphetX and Novig. Those venues keep the void. Today none of the 23 voids is on them.
+
+## Kalshi fair price: live reading `[2026-10-28 17:10:59Z, READ-ONLY; deploys.md 17:10:59Z]`
+
+- **The fleet window carried `3f9be985`.** Lane syndicate-decision-engine's window put `6d6e729d` on all three roles at 16:44:45Z. The armed archived pass ran at 16:57:30Z: `appended=12 outcomes={'fair_price': 12}`.
+- **The 12 last copies** sum to **+$0.6898 gross / +$0.2496 net on $12**, equal to the dry run row by row. None still carries `void_reason`; all 11 book voids are untouched.
+- **#744's Kalshi voids are closed:** 0 Kalshi-venue last copies are still void.
+- **Live path:** 0 voids of either kind since the up, 0 in the live document. That is a null on a 26-minute window, so it carries no weight on its own (see deploys).

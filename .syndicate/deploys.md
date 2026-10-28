@@ -54892,3 +54892,16 @@ which is about the two sizing bases and not about the refusal boundary.
 - **(2) bridge exit -- MET.** Bridge log `2026-10-28T17:08:12Z supervisor runs kalshi-combo-capture enabled and the store is caught up; bridge exiting`, rc=0; pid 3312497 gone at 17:09:11Z. The capture now runs only under the supervisor, hourly.
 - **(4) OWED to lane `paper-evicted-grading`:** no new Kalshi-venue `void_reason` row on the live path after 16:44:45Z, and the 12 fair-price copies summing to +0.6898 gross / +0.2496 net (read last copies, not grep counts). Not read here.
 - **capture lane:** the supervisor job is now LIVE, so lane `kalshi-combo-capture`'s step (2) is done; its Verification (first full forward settlement day) stays with the daily task `kalshi-combo-capture-first-forward-day`.
+
+## 2026-10-28 17:10:59Z (12:10 PM CT) -- READING: Kalshi fair-price settlement live on the fleet (lane paper-evicted-grading, #744; code 3f9be985 carried by syndicate-decision-engine's 16:44:45Z window, deploys 17:09Z) -- **MET**
+- **what was owed:** the decision-engine entry (commit b2ef26bd) read the pass line and left two readings to this lane: (a) the 12 last copies, and (b) no new Kalshi void on the live path.
+- **pass line (theirs):** `16:57:30Z ARCHIVED_SETTLED dry_run=False candidates=33 graded=12 appended=12 outcomes={'fair_price': 12}` (NBA 10, NFL 2).
+- **(a) last copies per identity, read-only 17:10:59Z, fleet HEAD 6d6e729d:**
+  - 12 rows carry `fair_price_reason`, all `paper:kalshi:ladder`, `graded_from=archive`, `outcome=push`, graded 16:57:20Z-16:57:28Z.
+  - **Gross +$0.6898, net +$0.2496 on $12.00.** That equals the 16:07Z dry run to the cent, and row by row (10 registered rows + Holmgren + Wallace).
+  - **0** of them still carries `void_reason`. Kalshi-venue last copies still void: **0**. Book voids untouched: **11**. **MET.**
+- **(b) the live path:**
+  - Voids graded after 16:44:45Z: Kalshi 0, book 0. Live document: 3,000 orders, 0 voids, 0 fair-price rows. **MET, but a null on a 26-minute window with no evidence that any Kalshi DNP came due inside it.**
+  - So (b) proves nothing by itself. The live path is the same `_our_verdict` that (a) just ran 12 times, and the tests pin `settle_orders` separately.
+  - A first live-path fair-price row is a FORWARD reading, not owed by a date.
+- **no change made:** read-only, no claim taken.
