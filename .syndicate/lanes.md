@@ -1218,6 +1218,14 @@ death, never life — do not invert it.
 - Verdict: MET. owner_liveness.py --idle-min 240 at 13:44Z (08:44 CDT) returned 3 SAFE of 9 CLOSED; moved to lanes_closed.md with one pointer each. Table and deferrals are in log/2026-10-28.md 13:44Z.
 - Moved: closed-lane-archive-20261027-2046, closed-lane-archive-20261027-2240, closed-lane-archive-20261028-0040
 
+### nhl-hitrate-pool-team-match — OPEN — opened 2026-10-28 — session a6134f5b-5e22-4d44-a4a2-4f2c1ba43772
+- Goal: Todo #743 (e): the NHL hit-rate pool (sgp_pool.GameLog.resolve) matches a player's latest log team to tonight's game CANONICALLY (raw match kept), and every pool leg carries the board's own team string, so teammate/opponent stays consistent; measured on the 10-28 read-only fleet snapshot (players resolved, pool legs, relations) before/after; hermetic tests; landed on main; fleet ff is a user decision
+- Files: syndicate/features/nhl/sgp_pool.py (GameLog.resolve + a team-spelling helper + the pool leg's team field ONLY), tests/test_nhl_sgp_pool_team_match.py (NEW), docs/ai_context/todo.md (#743 section only)
+- Hypothesis: The 90 in-lineup player-days (12 sheet days, 10-28 snapshot) that miss the pool with no_game_log resolve only on team spelling ('St Louis Blues' vs 'St. Louis Blues', 'MIN' vs 'Minnesota Wild'); matching canonically admits them, and pool legs are added only for those players
+- Falsification test: On the snapshot: any (day, event, player) that resolved before resolves to a different pid or stops resolving; any pool leg's team is not one of its game's board team strings; any existing pool leg disappears other than by the per-game cap; or a newly admitted player's log team is canonically a different club than the game's -> the fix is wrong
+- Verification: Snapshot replay of legs_by_game old vs new over the 12 sheet days: no_game_log, pool legs added/removed (cap vs other), relation of every pool-leg pair under raw string vs canonical comparison; hermetic tests incl. off != on (raw-only resolve fails them); test_nhl_sgp_pool + test_nhl_sgp + test_sgp_leg_grading pass
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
