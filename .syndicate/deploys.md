@@ -54786,3 +54786,17 @@ which is about the two sizing bases and not about the refusal boundary.
 - **blast radius:** the readers that now see the 943 rows are paper PNL/ROI, CLV, the min-ev tuner (shadow), `#727`'s refit and `#724`'s ladder count.
   - Stake sizing: every sport was at credibility 1.000 at the 10-27 16:41Z read. That was NOT re-read today.
 - **NOT DONE: the fleet ff to >= `7abbe65c` and a full drained down/up.** Until then the LIVE `settle_orders` path runs `0fca3f2b`'s resolvers, and the archived pass key stays inert. That is a separate USER decision.
+
+## 2026-10-28 13:10:17Z (8:10 AM CT) -- READING: out-of-app alert for a lost Claude scheduled-task registry, checker `084db263` (lane scheduled-task-registry-alert) -- **MET on drills; the Task Scheduler job is NOT created (waits for the user's yes)**
+
+- **what:** `scripts/check_scheduled_task_registry.py`, 28 hermetic tests pass. Two signals, either alerts (Windows toast + exit 1): (1) the app's registry file `%LOCALAPPDATA%\Claude-Data\<install>\claude-code-sessions\<org>\<account>\scheduled-tasks.json` (newest candidate) parses and holds `syndicate-dispatch-watchdog`, enabled; (2) the watchdog's `state.json` `last_run_utc` covers its newest cron due time older than 90 min. Signal (2) judges a due time only if the machine was awake from it to +20 min (System log Kernel-Power 506/507 and 42/107, Power-Troubleshooter 1, Kernel-General 13/12; first 15 min after a wake count as asleep) and the desktop app's process had been up 15 min before it.
+- **why not a flat ~5 h age:** the watchdog's cron `15 9,13,17,21 * * *` leaves a 12 h overnight gap. At the live read below, state.json was already 10.6 h old with nothing missed.
+- **readings, 2026-10-28 13:06:35Z-13:07:19Z (8:06-8:07 AM CT):**
+  - A, live (real state.json, real registry, real clock): **UNJUDGED, exit 0, silent.** The 06:44:45Z app update restarted the app after the last due time (21:15 CT), so no due time is judgeable yet; registry 46 tasks, 45 enabled, incl. the watchdog.
+  - B, drill fresh (state copy with last run 09:26 CT, `--now` 10:50 CT): **OK, exit 0, no toast.**
+  - C, drill stale (the REAL state.json, last run 10-27 21:27 CT, `--now` 10:50 CT): **ALERT, exit 1, toast shown.** Read back from Action Center history (Windows PowerShell AUMID) as the newest entry: `[DRILL] Syndicate: scheduled tasks are NOT running`.
+  - D, drill registry lost (empty registry copy, real clock): **ALERT `REGISTRY LOST ... (0 tasks, 0 enabled)`, exit 1** (`--no-toast`).
+  - E, `pythonw.exe` (the job's interpreter), live: UNJUDGED, exit 0, log line written.
+- **standby guard has a live population:** 72 x 506 / 73 x 507 in the last 30 days, none in the last 3. Reachability is a test: the same inputs without the power history ALERT.
+- **OWED:** (1) Windows job `SyndicateTaskRegistryCheck` via `deploy/local/install_task_registry_check.ps1` (every 2 h at :50 past even hours, Interactive, StartWhenAvailable, script copied to `C:\SyndicateProd	ask_registry_check`) -- ONLY on the user's explicit yes. (2) The first REAL OK reading: the earliest judgeable due time is 10-28 09:15 CT, so a run after 10:45 CT should read OK with the watchdog's 09:15 run in state.json.
+
