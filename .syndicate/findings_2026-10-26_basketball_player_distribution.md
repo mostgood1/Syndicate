@@ -356,3 +356,41 @@ real box appearances:
   A minutes-variance mechanism tuned now would be fit against a contaminated baseline. **Proposed (owed a user
   decision):** an AS-OF roster in the harness first (team of each player's last `player_logs` game before the date;
   same-day signings via HOW_ACQUIRED); then re-run Phase 1; then pre-register the minutes mechanism.
+
+## STEP 1c — AS-OF ROSTER RE-RUN, PRE-REGISTERED 2026-10-28 16:25Z (11:25 CDT), before any as-of draw exists
+
+**User decision 10-28:** "As-of roster first", then re-run Phase 1, then pre-register the minutes mechanism.
+
+**Code:**
+- Harness `--asof-roster` (54ed87dc, default off, so OFF is the old path untouched). It rewrites the scratch season
+  roster per slate date from the truncated player_logs plus dated HOW_ACQUIRED. Rules in the docstring; 3 unit
+  tests.
+- Dry run on the real resim inputs:
+  - 11-02: 59 moved, 3 trades reverted, 35 future adds dropped, 25 departed added.
+  - 02-25: 6 moved.
+  - Zubac / Sexton / K. Brown / Simons are on the old team before the deadline and the new team after it.
+- Research copy `~/bball_sc/code_ar` = `code_pd` + `asof_roster` only (diff verified: 66 added lines, 0 removed).
+
+**SMOKE AR_smoke:**
+- Config: the fit_pd config (round-2b + assists) + `--asof-roster`, the 12 sweep dates, 200 draws, nice 19,
+  `--track-oncourt --record-player-draws`.
+- Control: the fit_pd files for the same 12 dates.
+- PASS iff ALL of:
+  - (a) ASOF_ROSTER is printed on 12/12 dates;
+  - (b) LEAK_FUTURE + NEVER_T_OTHER_TEAM ≤ 10% of the control's count;
+  - (c) SIM_NEVER_T whose last real listing is another team ≤ 25% of the control's count.
+- Reported, no gate:
+  - every census class;
+  - the sim game-total mean and the per-team points mean, vs control (calibration impact);
+  - the Phase-1 minutes miss on the 12 dates (small n).
+
+**If the smoke PASSES:** the full FIT `fit_ar` (the same config + `--asof-roster`, 3 workers), then:
+- the step-1 census and the 1b census on fit_ar;
+- the Phase-1 read on fit_ar, against fit_pd's minutes miss .430 (bench .543), pts .319, reb .300, ast .274,
+  threes .243. Descriptive: this is the new BASELINE for the minutes mechanism, not a pass/fail.
+
+**If the smoke FAILS:** report which criterion failed; no FIT.
+
+**Known residuals, out of scope:**
+- the AVAILABILITY component (T_AROUND); the harness deletes `raw/injuries.csv` for as-of hygiene;
+- the 565 pool-hole player-games (never in the season file).
