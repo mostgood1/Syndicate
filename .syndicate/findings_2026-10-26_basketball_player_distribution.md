@@ -329,3 +329,30 @@ real box appearances:
   muted, but rotation and player-level reads on FIT carry it. The Phase-1 matched population excludes these
   player-games by construction.
 - **Hand-off:** the nba-sim-minutes-allocation / -history-path lanes own the pool fix. Nothing is changed here.
+
+**STEP 1b — LEAK LOCATED 2026-10-28 16:14Z (11:14 CDT)** (verified by reading the code and the resim inputs):
+- **The input:** `~/nba_resim/pristine/nba_source/data/processed/rosters_2025-26.csv`, the ONLY roster file in the
+  research resim tree (written 10-05). It is an END-of-season snapshot. `HOW_ACQUIRED` reads "Traded from LAC on
+  02/05/26" (Zubac, Kobe Brown → IND), "Traded from CHA on 02/04/26" (Sexton → CHI), "Signed on 03/04/26".
+- **The path:**
+  - `basketball_props_smart_sim._team_players_from_processed_rosters_local` (`:1981`) builds each team's pool as
+    the file's rows with `TEAM_ABBREVIATION == team`. The season is picked from the date, and every 2025-26 date
+    reads the same file.
+  - `_filter_team_players_against_processed_roster_local` (`:2060`) then drops anyone the file does not put on
+    the team.
+  - The only per-date override is `league_status_<date>.csv` (it adds allowed names). The resim tree has 1 such
+    file, for no FIT date.
+- **Both faces of the step-1b leak follow:**
+  - deadline acquisitions are simulated for their new team all season (LEAK_FUTURE / NEVER_T_OTHER);
+  - traded-away players are filtered off their original team (SIM_NEVER_T, last listed elsewhere).
+- **Production is not affected on live dates:** lane nba-current-rosters (CLOSED 10-21, state
+  [nba-current-rosters]) writes ESPN's current rosters to `rosters_<season>.csv` every 90 min. The same code path
+  therefore reads a current file live.
+- **Not yet observed:** a mid-season trade under that fix (the 2026-27 deadline is in February).
+- **So the leak is HISTORICAL-RESIM ONLY.** It sits in the research harness owned by basketball-scenario-calibration;
+  no sim-minutes lane is open (history-path CLOSED 10-28). Every FIT / VALID sim of either lane carries it.
+- **Consequence for this lane's order:** Phase 1's minutes miss (.43) is read on the matched population, but the
+  leaked pool (wrong players water-filled, real rotation players removed) also distorts the matched players' minutes.
+  A minutes-variance mechanism tuned now would be fit against a contaminated baseline. **Proposed (owed a user
+  decision):** an AS-OF roster in the harness first (team of each player's last `player_logs` game before the date;
+  same-day signings via HOW_ACQUIRED); then re-run Phase 1; then pre-register the minutes mechanism.
