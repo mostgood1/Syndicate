@@ -54858,3 +54858,13 @@ which is about the two sizing bases and not about the refusal boundary.
 - **NOT DONE (user decisions):**
   - Settling Kalshi-ladder paper DNPs at Kalshi's fair price and superseding the 10 voids. This should come BEFORE the fleet ff to `a0d23665`.
   - The fleet ff and a full down/up.
+
+## 2026-10-28 15:12:28Z (10:12 AM CT) -- FLEET ff 1f339cc2 -> 5f813c4d + ENV EDIT + FULL DOWN/UP: in-game day cap $50 -> $100 (lane in-game-trading code, coordinator 332cb014 restart) -- **DEPLOYED; first x/100.0 LIVE_ENTRY OWED**
+- **user, verbatim:** "we should double the cap to $100/day" (in-play session b14b84d0's chat, relayed with the code); then in 332cb014's chat "Yes, at 10:02" to the full restart with ride-alongs f2062fb3 + a0d23665 named.
+- **code:** 5f813c4d (in-play session): `DAY_DOLLARS_CEILING` 50 -> 100; absent/unusable env stays $50.
+- **ride-alongs (1f339cc2..5f813c4d runtime):** f2062fb3 (#743 d, name_key_loose keeps the first token: NHL V-initial players), a0d23665 (#744, DNP-player bets settle VOID, user "Yes, void them" in that lane's chat). Nothing else under syndicate/ pipeline/ vendor/ engines/ render.yaml.
+- **guard headroom (read 14:4xZ at the live pid's env):** execution_guard live caps kalshi max_day_dollars 196.72, all-venues 518.22, max_order 19.67 (balance-scaled); in-game $100 + $3 orders fit.
+- **claims:** web / refresh-worker / live-odds-worker, holder `live-min-stake-five`, 15:03:17Z; released after this entry. **preflight:** web `--target fleet --target-commit 5f813c4d` CLEAR 15:03Z (expectation waived; verify below). Spacing: 61 min after the 14:02Z up.
+- **deploy:** drain CLEAR 15:12:25Z; ff 15:12:28Z; env in-place edit `LIVE_ODDS_WORKER__SYNDICATE_INPLAY_ENTRY_DAY_DOLLARS=50` -> `=100` (exactly 1 line, diff 2), sha256 258afdf54bd41399... -> 2de6a2a4d8e6f744..., backup `.bak-daycap100-20261028T151228Z`; down 15:12:28-34Z; schtasks up 15:12:40Z; healthz 200 15:12:41Z; DRAIN_CLEARED.
+- **reads 15:13:34Z:** `status` all three code=5f813c4d, restarts=0. live-odds environ INPLAY_ENTRY_DAY_DOLLARS=100, INPLAY_ENTRY_ORDER_DOLLARS=3, INPLAY_ENTRIES=on, LIVE_PRICE_BAND=0.40,0.75, LIVE_CELL_GATE=on, KALSHI_MAKER_PILOT=on. refresh-worker PAPER_ARCHIVED_GRADING=on. RECONCILE kalshi + polymarket not_found=0 unknown=0 at 15:13:26-30Z. 0 tracebacks; 1 benign pregame-cooldown SKIP line.
+- **verify (OWED, coordinator 332cb014):** a `[inplay_entries_live] LIVE_ENTRY` line shows `day_spend=x/100.0`, and the first multi-contract fill (owed from the 14:01:54Z entry) shows stake ~$2.6-3.0.
