@@ -93,3 +93,64 @@ queued and the median lag is ~1 day, so that is days not weeks). Armed as its
 own frame-guarded task for 2026-10-29T18:00Z. The re-read should also split by
 `fee_is_upper_bound` and compare `ev_net_pct` against realised, to turn the fee
 wedge above from an observation into a measurement.
+
+## Re-read 2026-10-29 — POWER GATE PASSED (n=5,689): H1 HOLDS; the refused rows lose, and it is NOT the fee
+
+`[2026-10-29 18:04Z / 1:04 PM CDT]` scheduled task `ladder-refusal-control-arm-reading`; frame guard: started 18:00:23Z against an 18:00:00Z slot (on time).
+Read-only on the WSL fleet with the refresh-worker's env (backend/url/reports/data roots: present, lengths only). Fleet checkout `6d6e729dc`.
+
+**Population.** Archive `orders_2026-10.jsonl` 23,608 lines -> 19,704 unique `idempotency_key`; live document 3,000; union (document wins) 22,617.
+Ladder rows **7,376, settled 5,689** (3,185 won / 2,490 lost / 14 push), unsettled 1,687 (1,399 future, 286 within 48h of their game, **2 stale >48h** -- so the
+paper-grading gap of `#744` does not bias this read). All `mode: paper`; every settled row staked exactly $1; venues `paper:kalshi:ladder` 3,854,
+`paper:polymarket:ladder` 1,835. Window `selected_date` 2026-10-20..10-29, 10 dates. **Power gate (>=400 settled): PASSED.**
+
+| cut | n | pnl | ROI (net) | 95% interval | ROI gross | admitted gross | admitted **net** |
+|---|---|---|---|---|---|---|---|
+| **all** | **5,689** | -$367.08 | **-6.45%** | +/-2.43 -> **excludes 0** | -3.65% +/-2.43 | +2.72% | -0.08% |
+| `below_suggested_floor` | 5,410 | -$367.90 | -6.80% | +/-2.47 -> excludes 0 | -4.03% | +2.68% | -0.08% |
+| `suggested_not_staked` | 279 | +$0.82 | +0.29% | +/-13.14 -> spans 0 | +3.77% | +3.42% | -0.04% |
+| band `m1to0` | 3,427 | -$256.23 | -7.48% | +/-3.08 -> excludes 0 | -4.81% | +2.08% | -0.56% |
+| band `0to1` | 1,786 | -$109.92 | -6.15% | +/-4.55 -> excludes 0 | -3.04% | +3.55% | +0.42% |
+| band `1to2` | 393 | +$8.92 | +2.27% | +/-9.03 -> spans 0 | +5.09% | +4.20% | +1.35% |
+| band `ge2` | 83 | -$9.85 | -11.87% | +/-15.46 -> spans 0 | -10.08% | +4.41% | +2.57% |
+| `fee_is_upper_bound=True` | 3,292 | -$196.28 | -5.96% | +/-3.20 -> excludes 0 | **-2.98% +/-3.20** | +2.92% | -0.05% |
+| `fee_is_upper_bound=False` | 2,397 | -$170.80 | -7.13% | +/-3.75 -> excludes 0 | -4.56% +/-3.75 | +2.45% | -0.11% |
+
+By sport (net ROI): nba 3,115 -5.79% +/-3.06; ncaaf 1,095 -5.53% +/-5.75; soccer 478 -14.27% +/-10.20; mlb 460 -2.96% +/-8.87; nfl 384 -1.87% +/-9.92;
+wnba 90 -9.47% +/-19.99; nhl 67 -43.03% +/-22.09. No sport is positive. Upper-bound x sport has one n<10 cell (mlb ub=True n=5) -- shown in the raw output, not relied on.
+
+Intervals are from per-unit returns (1.96*sd/sqrt(n)) and treat rows as independent. Rows share games and dates, so that is optimistic; as a check, the
+**date-clustered** estimate (mean of daily ROI over 10 dates) is **-6.97% +/-3.80** -- still excludes zero. Per date: 10-20 +2.24% (165), 10-21 -7.94% (485),
+10-22 -5.73% (549), 10-23 -3.53% (698), 10-24 -4.51% (803), 10-25 -10.07% (762), 10-26 -12.10% (920), 10-27 -3.51% (537), 10-28 -4.25% (768), 10-29 n=2.
+8 of the 9 full dates are negative.
+
+### Verdict against H1
+
+**H1 HOLDS.** Falsification required a POSITIVE ROI whose interval excludes zero; the ROI is NEGATIVE with an interval excluding zero -- in total, for
+`below_suggested_floor`, and in both large bands. The floor is not declining bets that make money. The only positive cells (`suggested_not_staked`, band `1to2`)
+span zero and are not called a finding.
+
+### The fee wedge -- measured, and it is not the story
+
+- Paper charges exactly the modelled fee: mean `fees_dollars` = **2.80% of stake**, identical to the mean admitted wedge `ev_pct - ev_net_pct` = 2.80pt
+  (ub=True 2.98 / 2.97; ub=False 2.56 / 2.56). So the paper ledger **cannot** say whether an upper-bound fee overstates the true one -- that needs live
+  Kalshi fills, not paper.
+- What it CAN do is bound it. The true fee on a `fee_is_upper_bound` row lies between 0 and the charged amount, so its true ROI lies between net and gross:
+  **[-5.96%, -2.98%]**, and even the zero-fee end (-2.98% +/-3.20) is not positive. The upper bound cannot be what keeps these rows from profit.
+- Realised minus admitted, per row: **-6.37pt +/-2.43 against net EV and -6.37pt against gross EV** (ub=True -5.91 / -5.90, ub=False -7.01 / -7.01). The miss is
+  the same size gross and net, so it lives in the PROBABILITY, not the fee.
+- **Retraction.** The 10-22 read said the floor "is refusing rows whose gross edge is real". At n=5,689 the gross edge is not real: admitted +2.72%, realised
+  -3.65% +/-2.43 gross. The refusal boundary is not being set by a mis-specified fee term; the refused tail's admitted EV is overstated by ~6pt.
+
+### Engine read
+
+On the refused tail the model over-states edge by ~6.4pt. On the STAKED book, `#698` reading B (deploys.md 2026-10-29 15:09Z) measured the
+realised-vs-admitted gap at -1.05pp (SE 1.59) -- indistinguishable from zero. So the over-statement concentrates where the floor refuses, which is consistent
+with the floor (and the staked/refused selection) being informative. LEAD, not followed: whether the refused-tail over-statement is a market-mix effect
+(soccer -14%, nhl -43% on small n) or a probability-calibration effect near the floor; a calibration curve of admitted probability vs outcome on ladder rows
+would separate them.
+
+### Owed
+
+Nothing on this question. The lane's goal is met; closing it is left to a session (this run was automated). Not re-armed.
+Scripts: scratchpad `read.py`, `stale.py` (session 4770a15b); raw output `reading.txt` there.
