@@ -1160,11 +1160,11 @@ death, never life — do not invert it.
 - Verification: the Stage 2 run's report (C:/tmp/e4/stage2.json) read and its verdicts recorded in the findings file and #740, with the funnel and the n each reading rests on
 - Blocked by: the #742 first-full-forward-day reading (scheduled task kalshi-combo-capture-first-forward-day); user condition 'Yes, after the reading'
 
-### closed-lane-archive-20261029-0101 — CLOSED 2026-10-29 (GOAL MET: 2 blocks archived) — opened 2026-10-29 — session 48fbb01e-b621-467d-93c0-70d80396ae76
+### closed-lane-archive-20261029-0841 — CLOSED 2026-10-29 (GOAL MET: 1 block archived) — opened 2026-10-29 — session 1a16603e-0d0a-4089-aa27-8994fbb73752
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
-- Verdict: MET. owner_liveness.py --idle-min 240 at 06:01Z (01:01 CDT) returned 2 SAFE of 4 CLOSED; moved to lanes_closed.md with one pointer each. Table and deferrals are in log/2026-10-29.md 06:01Z.
-- Moved: closed-lane-archive-20261028-1930, closed-lane-archive-20261028-2052
+- Verdict: MET. owner_liveness.py --idle-min 240 at 13:41Z (08:41 CDT) returned 1 SAFE of 5 CLOSED; moved to lanes_closed.md with one pointer. Table and deferrals are in log/2026-10-29.md 13:41Z.
+- Moved: closed-lane-archive-20261029-0101
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1267,6 +1267,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261028-1641` — CLOSED 2026-10-28 (GOAL MET: 2 blocks archived) — opened 2026-10-28 — session 98129b83-c33c-49d4-8e37-a8012d4617af
 - `closed-lane-archive-20261028-1930` — CLOSED 2026-10-28 (GOAL MET: 1 block archived) — opened 2026-10-28 — session 253454c5-0e7e-43fa-bb89-1b41ca2060dc
 - `closed-lane-archive-20261028-2052` — CLOSED 2026-10-28 (GOAL MET: 1 block archived) — opened 2026-10-28 — session b2127c97-6667-44d9-ae55-625e349e834c
+- `closed-lane-archive-20261029-0101` — CLOSED 2026-10-29 (GOAL MET: 2 blocks archived) — opened 2026-10-29 — session 48fbb01e-b621-467d-93c0-70d80396ae76
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
