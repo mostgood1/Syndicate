@@ -656,3 +656,90 @@ for the minutes mechanism.** The smoke gates were re-run over the whole FIT as a
 - **The minutes mechanism starts from here:** coach DNP 8.87 sim min per team-game (healthy players the coach
   does not play), REAL_ONLY 6.19 real min the sim never gave, then variance — bench width 1.98, about twice too
   wide; starter width 1.21.
+
+## STEP 2a — COACH DNP (PER-DRAW PARTICIPATION), PRE-REGISTERED 2026-10-29 20:16Z (15:16 CDT), before any as-of feature is read against the outcome
+
+**User decision 10-29:** "pre-register the coach DNP mechanism". Baseline is fit_inj (d674e150): healthy players the
+coach does not play take **8.87 sim min per team-game** (1,674 player-games over 1,604 team-games, about 8.5 sim min
+each).
+
+**What is already in the sim, so what this is NOT:**
+- NBA availability K=2 (`nba_sim_availability.json`, enabled in every run: 109/109 dates print NBA_SIM_AVAILABILITY)
+  already DROPS a player who missed the team's last 2 games. Every coach-DNP slot is therefore a player who played in
+  one of the last 2 games.
+- A deterministic tighter rule was measured and rejected: K=1 cost 14.09 / 17.13 real-player min wrongly removed per
+  team-game (train / test, findings_2026-10-02 "NBA availability (K=2)"). That was before the injury feed, so K=1 is
+  re-read below as a zero-code COMPARATOR, not as the mechanism.
+- So the mechanism is probabilistic: each pool player plays in a draw with as-of probability p; a non-participant's
+  minutes go to the participants.
+
+### Stage A — offline feasibility (no sim run). Decides whether stage B is built.
+
+**Population:** fit_inj's pool slots (the sim's `pnames` per team-game) with outcome PLAYED (box min > 0) or
+DNP_COACH (in the box, reason contains COACH). ABSENT, DNP_LISTED_OTHER and JOIN slots are left out. Input minutes
+`m` = the slot's mean sim minutes in fit_inj (the quantity that would be moved).
+
+**As-of features** (this season's regular-season player_logs rows strictly before the date; the team is the as-of
+roster's):
+- f1 `played_last`: MIN > 0 in the team's last game (0 or 1; K=2 guarantees the other of the last two);
+- f2 `share10`: games with MIN > 0 for this team among the team's last 10 games;
+- f3 `m`, the sim's own input minutes.
+
+**Model, fixed now:** a binned table P(play | cell). Cells = played_last {0, 1} × share10 {< .5, .5–.8, .8–< 1, 1}
+× m {< 6, 6–12, 12–20, ≥ 20}. A cell with < 30 train slots is pooled to its (played_last × m) margin, then to m alone.
+- **TRAIN** = 2025-11-01..12-31 fits the table. **TEST** = 2026-01-01..02-28 grades it. Nothing is re-fit after TEST
+  is read.
+
+**Gate A, on TEST (all must hold):**
+- (A1) Σ p·m over DNP_COACH slots ≤ 60% of Σ m over them, i.e. at least 40% of the 8.87 expected to go;
+- (A2) Σ (1 − p)·m over PLAYED slots ≤ Σ (1 − p)·m over DNP_COACH slots: the mechanism moves at least as many
+  minutes off the right players as off players who played;
+- (A3) calibration: in every p-decile with ≥ 100 slots, |mean p − played rate| ≤ .05.
+- Reported, no gate: AUC; per-cell n and rates; the K=1 comparator's minutes removed off DNP vs PLAYED on the same
+  population; the train numbers.
+
+**If A FAILS:** stop. Report which criterion failed. The reading would be that coach DNP is not predictable as-of from
+box history alone, and needs news (starting lineups, beat reports); no engine work.
+
+### Stage B — engine (only if A PASSES)
+
+**Mechanism:**
+- NEW `syndicate/features/shared/nba_sim_participation.py`, switch file `nba_sim_participation.json` carrying the
+  frozen stage-A table. Absent file = off; `SYNDICATE_NBA_SIM_PARTICIPATION=0` kills it.
+- Hook: the per-draw loop `syndicate/features/basketball_engine/orchestrator/smart_sim.py` ~:1719. Before each
+  `simulate_pbp_game_boxscore` call, draw u ~ U(0,1) per pool player:
+  - a non-participant's `_sim_min` is 0 for that draw, and minutes are re-water-filled over the participants with
+    the existing caps;
+  - rotation lineups (`home_lineups` / `away_lineups`) holding a non-participant are dropped and the weights
+    renormalized; if none are left, the minutes-weighted sampler is used.
+- One print line per game: `NBA_SIM_PARTICIPATION {applied, players, mean_p, mean_out_per_draw}`.
+- **Lane / files:** the hook section of orchestrator/smart_sim.py is claimed by no lane today (the calibration lane
+  holds only the pace injury-drag line there). It is added to this lane's `Files:` after a collision check at that
+  time, not now.
+
+**Engine standard (docs/ai_context/model_engine_standard.md):**
+- a checklist entry, CONSUMED × POPULATED;
+- a pipeline trace with file:line;
+- player_logs is already disk-backed (the K=2 rule reads it); verified again at build time;
+- a reachability test (off != on) before any correctness test.
+
+**Runs:** a 12-date smoke, then the full FIT `fit_part` = fit_inj's config + the switch file, vs fit_inj.
+
+**Gate B, on TEST dates only (all must hold):**
+- (B1) DNP_LISTED_COACH sim min per team-game ≤ 60% of fit_inj's on the same dates;
+- (B2) minutes miss (all) and bench miss are each not worse than fit_inj by more than .005;
+- (B3) pts / reb / ast / threes miss: none worse by more than .005;
+- (B4) game total mean within ±1.0 of fit_inj. If it moves more, the totals solver must be re-fit before any stat
+  read: this is the mechanism-vs-estimator rule.
+- Reported, no gate: width ratios, input bias, every census class, TRAIN dates separately.
+
+**Predictions, written now:**
+- B1 holds if A1 does.
+- Input-minutes bias moves from +0.38 into [−0.4, +0.2]. The moved minutes go to players who played, and REAL_ONLY's
+  6.19 real min per team-game is not addressed.
+- **Known risk:** bench width (1.98, already about twice too wide) GROWS, because a participant with p < 1 carries
+  mass at 0 minutes. B2 may fail on width-driven misplacement even if B1 passes. That is a result, not a reason to
+  change the gate.
+
+**Out of scope:** REAL_ONLY (6.19); variance (step 3); production. Production gets fields only via
+`nba_engine_config.json` after the forward test from 11-01.
