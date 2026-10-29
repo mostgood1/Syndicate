@@ -442,3 +442,46 @@ Scratch: `C:\tmp\peg\` (`dryrun.sh`, `dryrun.log`, `report_20261027T163701Z.json
 - **The 12 last copies** sum to **+$0.6898 gross / +$0.2496 net on $12**, equal to the dry run row by row. None still carries `void_reason`; all 11 book voids are untouched.
 - **#744's Kalshi voids are closed:** 0 Kalshi-venue last copies are still void.
 - **Live path:** 0 voids of either kind since the up, 0 in the live document. That is a null on a 26-minute window, so it carries no weight on its own (see deploys).
+
+## Double-double rule and the exchanges' did-not-play rules `[2026-10-29 13:36Z-13:50Z, READ-ONLY fleet reads; code on main 1ec1eb2d]`
+
+Asked by lane syndicate-decision-engine on 10-29, relaying the user's "proceed next steps across sessions".
+
+### `player_double_double`: graded
+
+- **The gap:** every archived pass logged `ARCHIVED_UNMAPPED_MARKETS {'player_double_double': 1}`. That is the archive's only one: Nikola Jokic, NBA 10-24, side `Yes`, `line` NaN, -680, $28.32 on venue `paper`. One more sits in the live document (Jokic, 10-28, Yes, -620, $8.85).
+- **The rule (`bet_status_nba`):** count how many of PTS, REB, AST, STL and BLK reached 10. A double needs 2 and a triple 3. The resolver restates the line as `needed - 0.5`, the same way `game_line_bet` restates a spread, so Yes reads as an over and No as an under. A missing category refuses `stat_not_in_box`.
+- **Not added to `is_monotone_market`:** the bet settles only at the final, never early in the game. That keeps the shared module out of the change.
+- **Dry run 13:40Z** (read-only): fleet code `6d6e729d` against the same code plus the new `bet_status_nba.py`.
+  - **Base:** both rows refuse `unmapped_market`. Pass: candidates 38, graded 0.
+  - **New code:** both rows grade **won**. Jokic had a triple-double both nights (`settled_value` 3, line 1.5). Archive row **+$4.1647** on $28.32 at -680; live row +$1.4274 on $8.85 at -620. Pass: candidates 38, graded **1**, `outcomes {'won': 1}`, `unmapped_markets {}`.
+  - **The other 37 refusals:** identical counts by reason. Archive shard 23,369 lines before and after; `suppressed_writes {}`.
+- **Regression:** 1003 passed across the 32 test files that import the changed modules. 8 new tests in `tests/test_bet_status_nba.py` cover reachability, the count, steals, exactly 10, the triple, not decided mid-game, a missing category, and a grade through `paper_settlement._our_verdict`.
+- **It applies itself.** The armed hourly archived pass grades the 10-24 row on its first tick after a fleet up that carries 1ec1eb2d. `settle_orders` grades the 10-28 row on the live path. Not on the fleet yet; that needs a window.
+
+### Exchange did-not-play rules
+
+**Reachable population today: 0.** Every exchange player-prop row on these three venues is MLB or WNBA (323 archived, 32 live), and every archived one is already graded won or lost. Neither the MLB nor the WNBA grader issues a did-not-play verdict, so neither the void nor any venue rule can fire on them. So the rules are recorded here and **no code was written for them**. A branch that no row can reach is the inert-feature pattern `model_engine_standard.md` warns about.
+
+| venue | rule (primary text where found) | computable for our rows? | today |
+|---|---|---|---|
+| **Polymarket US** (the venue we trade: `api.polymarket.us`, `astatc-...` slugs) | The official Sports FAQ (docs.polymarket.us/faqs/sports-faqs), MLB section: "If the player doesn't participate at all, the Contract settles at LFMP." LFMP is "the prevailing fair market price on the Exchange at a specified moment in time", "typically the moment an official announcement is made", and "not the last traded price at market close". The FAQ has **no** player-not-playing sentence for NBA, WNBA, NFL, NHL or soccer. | **Yes, as with Kalshi.** `GET https://gateway.polymarket.us/v1/markets/{slug}/settlement` is public and returns `settlement` (a decimal price). 91 / 102 `paper:polymarket` and 54 / 55 `paper:polymarket:ladder` player rows carry the slug. | Keeps the void. Fair price is owed only when a did-not-play verdict can first reach a Polymarket row: an NBA/NFL/NHL/soccer prop there, or an MLB did-not-play verdict. |
+| polymarket.com (global, NOT our venue) | Resolves **No**, per a third-party guide (about.darkhorseodds.com, "checked September 30, 2026"). No primary text read. | n/a | n/a |
+| **Novig** | support.novig.com, "How settlement works -- grading, disputes, and voided trades": "A trade is voided if the event is cancelled, a player doesn't participate, or other conditions in the Market Rules apply. When a trade is voided, you will be paid out at the Fair Market Value." The FVS article (updated September 2, 2026) prices from "the 30 minutes of trading immediately before the Reference Time". Its worked example blends margin-free independent markets with Novig's time-weighted mid, and it publishes no formula. | **No.** Paper rows carry no Novig market id (0 / 102), and the formula is not published. | Keeps the void, the nearest stake-neutral reading of a fair-value settlement. |
+| **ProphetX** | **Not found.** prophethelp.zendesk.com returns HTTP 403 to automated reads. The parlay-rules page defers to "House Rules", which could not be read. Search found only sportsbook practice and a June 2026 CFTC filing for MLB season-long contracts. | n/a | **Keeps the void: rule unread.** |
+
+Sources: docs.polymarket.us/faqs/sports-faqs.md; docs.polymarket.us/api-reference/markets/get-market-settlement.md; support.novig.com/en/articles/10336135; support.novig.com/en/articles/16163706; support.novig.com/en/articles/9612523 (contracts now govern, at ludlowexchange.com); about.darkhorseodds.com/guides/kalshi-polymarket-market-rules.
+
+### What #744 leaves
+
+**37 named refusals**, from the 13:40Z dry run on the new code. Each is logged by `ARCHIVED_SETTLED` every hour, so none is silent.
+
+- **15 NBA period bets** (`actual_is_full_game_not_{q1,q2,q3,q4,h1,h2}`, all venue `paper`). The box is whole-game. This one RECURS: every NBA quarter or half paper bet lands here.
+- **6 NHL name matches:** 2 unmatched, 4 ambiguous in the box.
+- **5 MLB `stat_not_in_feed`**, **4 `not_decided_yet`** and **2 MLB rescheduled off the slate date.**
+- **3 soccer matches not in the live state.**
+- **2 NCAAF players not in the final box.**
+
+**Lane `paper-evicted-grading` CLOSED.**
+- **Its goal is met:** stale paper fell from 1,906 to 38, then to 37 once the double-double rule is live.
+- **No residual has an owner yet.** The NBA period box is proposed as its own task, being the only one that recurs. The rest stay listed here.
