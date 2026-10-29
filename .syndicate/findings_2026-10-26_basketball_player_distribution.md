@@ -616,3 +616,43 @@ were compared directly.
 - **What is left for the minutes mechanism:** coach DNP 8.35 sim min per team-game (healthy scratches), then
   variance. Width 1.47 overall and 1.92 on the bench: the bench bands are still about twice too wide.
 - The full FIT `fit_inj` was launched 00:17Z (19:17 CDT): `r2s/launch_fit_inj.sh`, 3 workers, nice 19.
+
+**STEP 1d — FULL FIT `fit_inj` RESULT 2026-10-29 02:48Z (21:48 CDT 10-28). Descriptive; this is the NEW BASELINE
+for the minutes mechanism.** The smoke gates were re-run over the whole FIT as a check: all three hold.
+
+**Run:** code_inj, the fit_ar config + `--asof-roster --injury-history`, 3 workers, nice 19, 19:17 → 21:47 CDT.
+- 109/109 dates printed INJURY_HISTORY with rows > 0. 0 tracebacks.
+- 2 SIM_FAIL: 2025-12-09 and 2025-12-16, the SAME two dates that failed in fit_pd and fit_ar (not the feed).
+- 806 games, 1,604 team-games, matching fit_ar. Grader `r2s/grade_fit_inj.py` → `grade_fit_inj.json`.
+
+| | fit_inj | fit_ar (control) |
+|---|---|---|
+| T_AROUND | **148** | 1,309 |
+| ABSENT sim min / team-game | **1.19** | 15.70 |
+| DNP_LISTED_OTHER sim min / team-game | **0.15** | 4.86 |
+| DNP_LISTED_COACH sim min / team-game | 8.87 | 8.07 |
+| REAL_ONLY real min / team-game | 6.19 | 6.15 |
+| false exclusions / excluded slots | **3 / 6,995** (0.04%) | — |
+| sim game total mean | 230.53 | 230.55 |
+
+- The 3 false exclusions are one team-game: 2026-01-28 CHI (Giddey, Huerter, J. Smith all listed out and played).
+
+**Phase 1, all FIT dates** (miss nominal .20; bias = real − sim):
+
+| cell | fit_inj | fit_ar |
+|---|---|---|
+| minutes all | miss **.432**, width 1.52, bias +0.47 | .498, 1.71, +2.29 |
+| minutes bench | .547, width 1.98, bias +1.00 | .604, 2.30, +2.95 |
+| minutes starter | .312, width 1.21, bias −0.09 | .367, 1.24, +1.47 |
+| input-minutes bias | **+0.38** | +2.24 |
+| pts / reb / ast / threes miss | .303 / .286 / .267 / .234 | .327 / .308 / .274 / .243 |
+| pts / reb / ast / threes bias | +0.15 / +0.11 / +0.04 / −0.03 | +1.06 / +0.52 / +0.26 / +0.07 |
+
+**Reading:**
+- The full FIT reproduces the smoke. Of fit_ar's 28.6 non-player sim min per team-game, 19.2 go (ABSENT 15.70 →
+  1.19, other DNP 4.86 → 0.15). Every stat's miss and bias improve; game totals do not move.
+- Starter minutes are now unbiased (−0.09). The input under-allocation is +0.38.
+- Bench n is 8,330 vs 9,003: starter / bench is the top-5 by input minutes, so the split moved with the pools.
+- **The minutes mechanism starts from here:** coach DNP 8.87 sim min per team-game (healthy players the coach
+  does not play), REAL_ONLY 6.19 real min the sim never gave, then variance — bench width 1.98, about twice too
+  wide; starter width 1.21.
