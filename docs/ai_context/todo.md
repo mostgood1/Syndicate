@@ -1,5 +1,25 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#745` — **NBA QUARTER AND HALF PAPER BETS NOW GRADE, from the daily ESPN linescore. Until 10-29 every q1..q4/h1/h2 bet refused `actual_is_full_game_not_<seg>` forever (15 archived paper rows, plus every new one). Code on main; the fleet dry run grades 15/15 and moves nothing else. Applies itself at the next fleet up** — 2026-10-29, lane `nba-period-paper-grading`, session 35e11968 (side session of `#744`'s residual); `.syndicate/findings_2026-10-29_nba_period_paper_grading.md`
+- **STATUS 2026-10-29 3:38 PM CT (20:38Z): BUILT, DRY-RUN CONFIRMED, NOT ON THE FLEET.**
+  - **What changed:** `bet_status_nba` grades a segment spread, total or moneyline (and their alts) from `nba_source/data/processed/linescores_<date>.json`, through `segment_actuals.segment_scores_view`. That file is written daily at 10:35Z by the existing `basketball-linescores` job.
+  - **Unchanged:** segment player props still refuse `actual_is_full_game_not_<seg>`.
+  - **Read from disk:** on the fleet the store is keyvalue, and `read_json_file` would read Redis for this path.
+- **Overtime is the BOOK's rule, read from each book's house rules (findings has the quotes).** h2 includes OT at DraftKings, FanDuel, BetMGM and Pinnacle. q4 includes OT at DraftKings only.
+  - An unread book (Bovada, exchanges) grades q4/h2 only when no OT was played. With OT it refuses `nba_overtime_rule_unread:<book>`.
+- **Read-only fleet dry run 20:36Z, base main `682ec056` vs base + this file:**
+  - **H1:** 15/15 archived rows grade (4 won, 9 lost, 2 push; -$15.48 on $67.48), each equal to an independent sum from the fleet file.
+  - **H2:** pass candidates 44 -> 44 and graded 1 -> 16. The only reasons that move are the six `actual_is_full_game_not_*` (15 -> 0). Shard sha256 unchanged.
+  - **H3:** live document 10/11 grade (-$20.80 on $68.11). MEM@POR 10-29 waits for its file (`no_nba_linescore_for_date`).
+  - **Regression:** 1,071 passed. The 26 failures are all NCAAF registry tests that need `data/`.
+- **OWED (user decision, then a reading):**
+  - A fleet up carrying this commit. The armed hourly archived pass then grades the 15 on its own, and `settle_orders` the live rows.
+  - Reading: the first `ARCHIVED_SETTLED` after that up with no `actual_is_full_game_not_*` in `ungraded`.
+  - The rows leave the 14-day window from 11-06. After that, use `backfill_archived_paper_grades.py --apply` instead.
+- **Leads (findings):**
+  - WNBA's linescore path is written in two shapes by two producers. They collide only on a file backend, never on the fleet.
+  - NBA linescores are not in `HOT_ARTIFACT_PATTERNS`. Not needed while settlement runs beside the job.
+
 ### `#744` — **PAPER BETS EVICTED UNGRADED: 1,834 filled paper orders whose game started > 48 h ago have no outcome (read 2026-10-27 16:06Z); 1,807 of them (98.5%) are in the execution-ledger ARCHIVE, which the grader never reads. Lane `paper-evicted-grading` OPENED FOR PICKUP; nothing built** — 2026-10-27, lane `syndicate-decision-engine` (Phase 0 item 4 of `#736`); `.syndicate/findings_2026-10-27_paper_evicted_ungraded.md`
 - **User, verbatim:** "...Then take the paper no-outcome count to close Phase 0."
 - **STATUS 2026-10-29 8:49 AM CT (13:49Z): DOUBLE-DOUBLE GRADED ON MAIN `1ec1eb2d`; EXCHANGE DID-NOT-PLAY RULES READ; LANE `paper-evicted-grading` CLOSED.** `bet_status_nba` grades `player_double_double` / `player_triple_double` as a count of PTS/REB/AST/STL/BLK at 10 or more, with the line restated to 1.5 / 2.5. Read-only fleet dry run 13:40Z: the archive's only one (Jokic 10-24, Yes -680, $28.32) grades **won +$4.1647** (triple-double); candidates 38, graded 0 -> 1; the other 37 refusals unchanged; shard unchanged. Regression 1003 passed. NOT on the fleet: it applies itself on the first archived-pass tick after a fleet up that carries it (reading owed: one `ARCHIVED_SETTLED` with `outcomes {'won': 1}` and no `ARCHIVED_UNMAPPED_MARKETS`). **Venue rules (findings, with sources):** Polymarket US = last fair market price (official FAQ, MLB; readable per slug at the public `gateway.polymarket.us/v1/markets/{slug}/settlement`); Novig = paid at Fair Market Value (official, not computable for our rows); ProphetX = NOT FOUND (help center 403). All three keep the void, and no code was written: 0 reachable rows, because every exchange player prop is MLB/WNBA and neither grader issues a did-not-play verdict. **Residual, unowned:** 37 named refusals -- NBA period bets 15 (recurring; proposed as its own task), NHL names 6, MLB feed 5 + undecided 4 + rescheduled 2, soccer match 3, NCAAF box 2.

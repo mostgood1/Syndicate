@@ -24,9 +24,50 @@ is tried first and the two clubs second. Both sides go through
 and every tri-code the tick writes (30 of 30 each, checked); `nba/cards.py`'s
 `_canonical_nba_tri` alone returns "UTAH JAZZ" for "Utah Jazz".
 
-NOT SEGMENT-AWARE. The box is whole-game, so a first-half or quarter bet refuses
-with the shared `actual_is_full_game_not_<seg>` reason rather than grading off
-the full game.
+SEGMENT GAME LINES COME FROM THE DAILY LINESCORE, NEVER FROM THE BOX (`#745`).
+The box is whole-game, so until 2026-10-29 every q1..q4/h1/h2 bet refused
+`actual_is_full_game_not_<seg>` forever: 15 archived paper rows on the fleet's
+10-29 13:40Z read, plus every new one. The per-period points were already on
+disk: `scripts/fetch_basketball_linescores.py` (scheduled job
+`basketball-linescores`, 10:35Z) writes each COMPLETED game's `away_periods` /
+`home_periods` to `nba_source/data/processed/linescores_<date>.json`. A segment
+spread, total or moneyline is graded from those through
+`segment_actuals.segment_scores_view`, the path MLB and WNBA use. A segment
+PLAYER prop still refuses `actual_is_full_game_not_<seg>`: the linescore has no
+player stats.
+
+The file is read from DISK, not through `read_json_file`. On the fleet the state
+backend is `keyvalue` and this path routes to Redis there, while the producer
+writes the file with plain file IO, so `read_json_file` would never see it.
+
+OVERTIME IS THE BOOK'S RULE, AND THE BOOKS DISAGREE. Read 2026-10-29 from each
+book's house rules (Massachusetts filings at massgaming.com unless noted):
+
+    book         q4 + OT?   h2 + OT?   text
+    draftkings   yes        yes        8.18.25: "Bets on 4th Quarter Markets and
+                                       2nd Half Markets include overtime statistics"
+    fanduel      no         yes        7.30.26: "Quarter Markets: ... overtime does
+                                       not count"; "Second Half Markets: ...
+                                       inclusive of overtime"
+    betmgm       no         yes        3.28.25: "Fourth quarter wagers do not include
+                                       overtime periods unless otherwise stated";
+                                       "Overtime periods are counted in the Second
+                                       Half score"
+    pinnacle     no         yes        pinnacle.com/en/future/betting-rules: "Bets
+                                       on the Game and 2nd-Half periods include all
+                                       overtimes"; "Bets on a specific period count
+                                       only the scoring in that period"
+
+DraftKings' general rule excepts "4th Quarter/Moneyline Markets". In the same
+document "1st To Score/Moneyline" is a COMBINED market (scores first AND wins),
+so that exception is a combo and a plain fourth-quarter moneyline is one of its
+"4th Quarter Markets". BetMGM's sentence that fourth quarters include overtime
+sits under its Same Game Parlay heading; paper bets are straight bets.
+
+A book not in `_OVERTIME_RULES` (Bovada, an exchange) grades q4 and h2 only
+when no overtime was played, which is the one case where every rule gives the
+same answer. With overtime it refuses `nba_overtime_rule_unread:<book>`; it
+does not guess.
 
 DID NOT PLAY (2026-10-28, user decision "Yes, void them", `#744`). The box keeps
 only players with minutes, so a player who sat out is ABSENT -- and absence alone
@@ -51,12 +92,25 @@ process-wide refusal memo.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
 from typing import Any
 
-from syndicate.features.shared.bet_status import segment_refusal
+from syndicate.features.shared.bet_status import FULL_GAME_SEGMENT, segment_refusal
+from syndicate.features.shared.segment_actuals import (
+    REASON_SEGMENT_ACTUAL_PREFIX,
+    is_segment_scoreboard_market,
+    order_segment,
+    segment_scores_view,
+)
 
-__all__ = ["nba_status_resolver", "did_not_play", "REASON_NO_BOX", "REASON_DNP_VOID"]
+__all__ = [
+    "nba_status_resolver",
+    "did_not_play",
+    "linescores_relative_path",
+    "REASON_NO_BOX",
+    "REASON_DNP_VOID",
+]
 
 REASON_NO_EVENT_ID = "no_event_id"
 REASON_NO_BOX = "no_live_box_for_date"
@@ -117,6 +171,27 @@ _MARKET_TO_DOUBLES: dict[str, int] = {"player_double_double": 2, "player_triple_
 _DOUBLE_STATS = ("pts", "reb", "ast", "stl", "blk")
 
 _TOTAL_MARKETS = frozenset({"totals", "totals_alt"})
+
+# SEGMENT GAME LINES (`#745`, module docstring). Regulation periods per segment;
+# overtime is appended to `q4` / `h2` by the book's rule in `_OVERTIME_RULES`.
+_SEGMENT_PERIODS: dict[str, tuple[int, ...]] = {
+    "q1": (1,), "q2": (2,), "q3": (3,), "q4": (4,),
+    "h1": (1, 2), "h2": (3, 4),
+}
+_REGULATION_PERIODS = 4
+# book -> segment -> does that segment include overtime. Read from each book's
+# house rules on 2026-10-29; the quotes are in the module docstring.
+_OVERTIME_RULES: dict[str, dict[str, bool]] = {
+    "draftkings": {"q4": True, "h2": True},
+    "fanduel": {"q4": False, "h2": True},
+    "betmgm": {"q4": False, "h2": True},
+    "pinnacle": {"q4": False, "h2": True},
+}
+REASON_NO_LINESCORE = "no_nba_linescore_for_date"
+REASON_GAME_NOT_IN_LINESCORE = "game_not_in_nba_linescore"
+REASON_AMBIGUOUS_LINESCORE = "matchup_twice_in_nba_linescore"
+# `<prefix><book>`: overtime was played and this book's q4/h2 rule is unread.
+REASON_OVERTIME_RULE_UNREAD_PREFIX = "nba_overtime_rule_unread:"
 
 
 def _as_float(value: Any) -> float | None:
@@ -271,6 +346,108 @@ def _game_line(order: Mapping[str, Any], market: str, game: Mapping[str, Any], m
     return {**view, **stamp, **scores}
 
 
+def linescores_relative_path(selected_date: str) -> str:
+    """Where `scripts/fetch_basketball_linescores.py` writes NBA's per-period scores."""
+    return f"nba_source/data/processed/linescores_{selected_date}.json"
+
+
+def _load_linescores(selected_date: str) -> dict[str, Any] | None:
+    """`{"by_event": {id: game}, "by_matchup": {frozenset: game}}`, or None if absent or unreadable.
+
+    From DISK, not `read_json_file`: see the module docstring on the keyvalue backend.
+    """
+    from syndicate.features.shared.refresh_state_store import data_root
+
+    try:
+        payload = json.loads((data_root() / linescores_relative_path(selected_date)).read_text(encoding="utf-8-sig"))
+    except Exception:
+        return None
+    games = payload.get("games") if isinstance(payload, Mapping) else None
+    if not isinstance(games, Mapping):
+        return None
+    by_event: dict[str, dict[str, Any]] = {}
+    by_matchup: dict[Any, dict[str, Any]] = {}
+    for event_id, game in games.items():
+        if not isinstance(game, Mapping):
+            continue
+        entry = {**dict(game), "event_id": str(event_id), "fetched_at": payload.get("fetched_at")}
+        by_event[str(event_id)] = entry
+        key = _matchup_key(game.get("away"), game.get("home"))
+        if key is not None:
+            # Same rule as the box: one matchup twice on a date refuses both.
+            by_matchup[key] = {"ambiguous": True} if key in by_matchup else entry
+    return {"by_event": by_event, "by_matchup": by_matchup}
+
+
+def _segment_game_line(
+    order: Mapping[str, Any], market: str, segment: str, index: Mapping[str, Any] | None
+) -> dict[str, Any]:
+    """Grade an NBA segment spread/total/moneyline off the daily linescore, or refuse by name.
+
+    Never off the box: that is the whole-game defect `segment_refusal` exists for.
+    `is_final=True` because the producer writes COMPLETED games only, and a
+    completed game's quarters cannot change.
+    """
+    if index is None:
+        return {"unavailable_reason": REASON_NO_LINESCORE}
+    event_id = str(order.get("event_id") or "").strip()
+    game = index["by_event"].get(event_id) if event_id else None
+    matched_by = "final_linescore_segment:event_id"
+    if game is None:
+        key = _matchup_key(order.get("away_team"), order.get("home_team"))
+        if key is None:
+            return {"unavailable_reason": REASON_NO_EVENT_ID if not event_id else REASON_NO_MATCHUP_ON_ORDER}
+        game = index["by_matchup"].get(key)
+        if game is None:
+            # Not final yet, or the morning fetch has not run for it.
+            return {"unavailable_reason": REASON_GAME_NOT_IN_LINESCORE}
+        if game.get("ambiguous"):
+            return {"unavailable_reason": REASON_AMBIGUOUS_LINESCORE}
+        matched_by = "final_linescore_segment:matchup"
+
+    # Orient the periods to the ORDER's home/away by club, as `_game_line` does.
+    home_club = _club(order.get("home_team"))
+    if home_club and home_club == _club(game.get("home")):
+        home_raw, away_raw = game.get("home_periods"), game.get("away_periods")
+    elif home_club and home_club == _club(game.get("away")):
+        home_raw, away_raw = game.get("away_periods"), game.get("home_periods")
+    else:
+        return {"unavailable_reason": REASON_GAME_NOT_IN_LINESCORE}
+    home = [_as_float(value) for value in home_raw or []]
+    away = [_as_float(value) for value in away_raw or []]
+    played = len(home)
+    if played < _REGULATION_PERIODS or len(away) != played or any(value is None for value in home + away):
+        # A partial sum is a smaller number that looks real.
+        return {"unavailable_reason": f"{REASON_SEGMENT_ACTUAL_PREFIX}{segment}"}
+
+    periods = list(_SEGMENT_PERIODS[segment])
+    if played > _REGULATION_PERIODS and segment in ("q4", "h2"):
+        book = str(order.get("book") or "").strip().lower()
+        includes_overtime = _OVERTIME_RULES.get(book, {}).get(segment)
+        if includes_overtime is None:
+            return {"unavailable_reason": f"{REASON_OVERTIME_RULE_UNREAD_PREFIX}{book or 'no_book'}"}
+        if includes_overtime:
+            periods.extend(range(_REGULATION_PERIODS + 1, played + 1))
+
+    view = segment_scores_view(
+        sport="nba",
+        market=market,
+        order=order,
+        segment=segment,
+        home_score=sum(home[number - 1] for number in periods),
+        away_score=sum(away[number - 1] for number in periods),
+        is_final=True,
+        started=True,
+        home_name=order.get("home_team"),
+        away_name=order.get("away_team"),
+        matched_by=matched_by,
+    )
+    if view.get("unavailable_reason"):
+        return view
+    # `segment_periods` says which rule produced the number on an overtime game.
+    return {**view, "segment_periods": periods, "as_of": game.get("fetched_at")}
+
+
 def _athlete_names(athlete: Mapping[str, Any]) -> set[str]:
     first, last = str(athlete.get("firstName") or "").strip(), str(athlete.get("lastName") or "").strip()
     names = (athlete.get("fullName"), athlete.get("displayName"), f"{first} {last}".strip())
@@ -331,6 +508,11 @@ def nba_status_resolver(selected_date: str, *, fetch_json=None):
             cache["box"] = _load_box(selected_date)
         return cache["box"]
 
+    def linescores():
+        if "linescores" not in cache:
+            cache["linescores"] = _load_linescores(selected_date)
+        return cache["linescores"]
+
     def absent(order: Mapping[str, Any], game: Mapping[str, Any]) -> dict[str, Any]:
         """A player not in the box of a FINAL game: did he play? (module docstring)"""
         from syndicate.features.shared import bet_status_nfl as espn
@@ -356,6 +538,14 @@ def nba_status_resolver(selected_date: str, *, fetch_json=None):
         if str(order.get("sport") or "").strip().lower() != "nba":
             return {"unavailable_reason": "not_a_nba_order"}
 
+        # A segment GAME LINE grades off the linescore (`#745`) and returns from
+        # there, graded or refused by name, never reaching the whole-game box.
+        # Everything else on a segment, a player prop included, still refuses.
+        segment = order_segment(order)
+        if segment != FULL_GAME_SEGMENT:
+            segment_market = _canonical_market(order.get("market"))
+            if segment in _SEGMENT_PERIODS and is_segment_scoreboard_market("nba", segment_market):
+                return _segment_game_line(order, segment_market, segment, linescores())
         refusal = segment_refusal(order)
         if refusal is not None:
             return refusal

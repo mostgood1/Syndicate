@@ -72,3 +72,27 @@ Both run read-only from WSL `~/Syndicate`'s git, with the refresh-worker's deriv
   - On a file backend the last writer wins. If the fetcher wins, WNBA segment grading falls back to its refusal silently.
   - Unverified on any live host. The WNBA season is over.
 - **NBA linescores are not in `HOT_ARTIFACT_PATTERNS`.** Settlement runs on the fleet, where the job and the refresh-worker share `~/syndicate-prod/data` (measured above), so grading does not need it. A host that settles without running the job would refuse `no_nba_linescore_for_date`, by name.
+
+## Result: the fleet dry run `[2026-10-29 20:36:28Z-20:36:52Z (3:36 PM CDT), READ-ONLY; base = main 682ec056 extract, new = base + bet_status_nba.py sha256 f53d1650...; fleet checkout 6d6e729d untouched; 0 writes]`
+
+**The shard did not move.** `orders_2026-10.jsonl` read 23,737 lines, `graded_from:archive` 2,033 and sha256 `28e8a39ebc90c112` both before and after. `suppressed_writes` was `{}` in both arms, for the per-row re-ask and for the backfill.
+
+| hypothesis | prediction | read | verdict |
+|---|---|---|---|
+| H1 archived rows grade | 15 / 15 grade; values equal the independent sums | **15 / 15**: 4 won, 9 lost, 2 push. Every row's segment score equals the sum taken from the fleet file by a separate hand-keyed join (15 / 15 `agree=True`). Base: 15 / 15 `actual_is_full_game_not_*` | **CONFIRMED** |
+| H2 nothing else moves | only `graded` rises and the six `actual_is_full_game_not_*` reasons leave | Pass candidates **44 -> 44**, graded **1 -> 16**. Outcomes `{won: 1}` -> `{lost: 9, push: 2, won: 5}`. The 1 is the double-double, already on main. The ONLY ungraded changes: `_q1` 3 -> 0, `_q2` 2 -> 0, `_q3` 1 -> 0, `_q4` 4 -> 0, `_h1` 4 -> 0, `_h2` 1 -> 0. The other seven reasons have identical counts (not_decided_yet 10, stat_not_in_feed 5, nhl ambiguous 4 / unmatched 2, ncaaf box 2, mlb rescheduled 2, soccer match 3). Stale 38 in both arms; would-grade 1 -> 16 | **CONFIRMED** |
+| H3 live document (diagnostic) | 10 / 11 grade; MEM@POR 10-29 refuses `no_nba_linescore_for_date` | **10 / 11**: 4 won, 4 lost, 2 push, each equal to its independent sum. MEM@POR q4 refuses `no_nba_linescore_for_date` | **CONFIRMED** |
+
+**Money:**
+- **The 15 archived rows:** -$15.4782 on $67.48 staked. Won 4 (+$17.9918 on $26.12), lost 9 (-$33.47), push 2 ($7.89 returned).
+- **The 10 live-document rows:** -$20.7993 on $68.11. Those are graded by `settle_orders`, not by this pass.
+
+**Overtime decided none of these grades.** Two live-document games went to overtime: BKN@BOS 10-27 (5 rows) and SA@UTAH 10-28 (1 row). Every one of those rows is on q1, q2, q3 or h1, which overtime cannot reach. The q4/h2 overtime rule is exercised only by the hermetic tests so far.
+
+**Two-way segment moneylines that ended level pushed** (HOU@SA q4 29-29; CHI@BOS q2 33-33; BKN@BOS q2 30-30, twice). That is DraftKings' and FanDuel's own rule for a two-way market, and Pinnacle voids, which also returns the stake.
+
+**Regression:** across the 38 test files that import `bet_status_nba`, `paper_settlement`, `segment_actuals` or the linescore fetcher, 1,071 passed and 26 failed. All 26 are NCAAF (`test_bet_status_ncaaf.py` 11, `test_bet_status_football_props.py` 15). Each fails because `resolve_ncaaf_team_id("Michigan")` returns None: the registry lives under `data/`, which this worktree omits by design. None of those tests touches the NBA path. The 21 new tests fail on the unchanged resolver (mutation check) and pass on the new one.
+
+**Apply: none needed, and none made.** The armed hourly archived pass (`PAPER_ARCHIVED_GRADING=on`, 14-day window) grades the 15 on its first tick after a fleet up that carries this code. `settle_orders` grades the live-document rows on the same up. Fleet ff/restart is the USER's decision under the deploy locks.
+- **Reading owed after that up:** one `ARCHIVED_SETTLED` whose `ungraded` has no `actual_is_full_game_not_*` key, with `graded` >= 15 on the first tick.
+- **Window:** the rows are 10-23..10-26, so they leave the 14-day window from 11-06. An up after that date needs `scripts/backfill_archived_paper_grades.py --apply` instead.
