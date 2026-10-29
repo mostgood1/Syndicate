@@ -1074,12 +1074,6 @@ death, never life — do not invert it.
 - Verification: the Stage 2 run's report (C:/tmp/e4/stage2.json) read and its verdicts recorded in the findings file and #740, with the funnel and the n each reading rests on
 - Blocked by: the #742 first-full-forward-day reading (scheduled task kalshi-combo-capture-first-forward-day); user condition 'Yes, after the reading'
 
-### closed-lane-archive-20261029-1240 — CLOSED 2026-10-29 (GOAL MET: 1 block archived) — opened 2026-10-29 — session fa717701-d8bd-426a-aca5-9ae5e32d51cc
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. Scheduled task archive-closed-lanes-0917; owner_liveness.py --idle-min 240 read 1 of 7 CLOSED SAFE.
-- Moved: live-event-concentration. Readings and deferrals in `log/2026-10-29.md`.
-
 ### closed-lane-archive-20261029-1439 — CLOSED 2026-10-29 (GOAL MET: 3 blocks archived) — opened 2026-10-29 — session c92a1593-ee73-4f48-bc45-b7e8fb834a87
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
@@ -1094,6 +1088,12 @@ death, never life — do not invert it.
 - Falsification test: A read-only fleet dry run with the new code grades fewer than all of the archived NBA actual_is_full_game_not_<seg> rows (each non-grader named), or changes the verdict/reason of any other row
 - Verification: Hermetic tests incl. off != on through paper_settlement._default_resolver first; read-only fleet dry run (no --apply) from a code extract on WSL ~/Syndicate with archive shard unchanged; code pushed to main
 - Blocked by: none
+
+### closed-lane-archive-20261029-1650 — CLOSED 2026-10-29 (GOAL MET: 1 block archived) — opened 2026-10-29 — session 4bbe339d-1cf6-477c-9465-0039e9dfbd51
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness --idle-min 240 read 1 SAFE of 6 CLOSED; dry run, apply, invariants unchanged vs baseline.
+- Moved: closed-lane-archive-20261029-1240. Table and Part B in `.syndicate/log/2026-10-29.md` 21:52Z.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1198,6 +1198,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261028-2052` — CLOSED 2026-10-28 (GOAL MET: 1 block archived) — opened 2026-10-28 — session b2127c97-6667-44d9-ae55-625e349e834c
 - `closed-lane-archive-20261029-0101` — CLOSED 2026-10-29 (GOAL MET: 2 blocks archived) — opened 2026-10-29 — session 48fbb01e-b621-467d-93c0-70d80396ae76
 - `closed-lane-archive-20261029-0841` — CLOSED 2026-10-29 (GOAL MET: 1 block archived) — opened 2026-10-29 — session 1a16603e-0d0a-4089-aa27-8994fbb73752
+- `closed-lane-archive-20261029-1240` — CLOSED 2026-10-29 (GOAL MET: 1 block archived) — opened 2026-10-29 — session fa717701-d8bd-426a-aca5-9ae5e32d51cc
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
