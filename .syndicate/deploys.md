@@ -54922,3 +54922,39 @@ which is about the two sizing bases and not about the refusal boundary.
 
 ## 2026-10-29 13:31Z (8:31 AM CT) -- 6581bcb2 / 7ca75fbe fill reading: **MET, closed**
 - both 10-28 23:13Z new-size entries `status=filled venue_status=executed contracts=6`: KXNBASPREAD-26OCT28CHADET-DET8 at 0.43 ($2.58), KXNBATOTAL-26OCT28CHADET-213 at 0.42 ($2.52). Each filled a cent at or under the ask. The fill owed in the 23:15Z entry is delivered.
+
+## 2026-10-29 15:09Z (10:09 AM CT) -- READING: published-negative-ev owed readings -- A (#722 sizing-basis split), B (#698 staked forward ROI), prophetx settlement charge -- **B MET (gap -11.4pp -> -1.05pp); A taken, paper cells powered, 2 live cells UNDERPOWERED; prophetx MET** (lane `published-negative-ev`, scheduled task `published-negative-ev-698-reading`)
+- frame guard: slot 2026-10-29T15:00:00Z, started 15:00:21Z -- on time. Read-only: no code, env, data or deploy touched. Fleet checkout `6d6e729dc`. Ledger read through `execution_ledger._load()` / `full_history_orders()` under refresh-worker pid 4050955's env (4 keys present; no values printed).
+- **READING A -- sizing-basis split, `submitted_at >= 2026-10-21T22:15:52Z` (the cut) through 2026-10-29T14:58Z.** Population: live doc 3,000 UNION `execution_ledger_archive/orders_2026-10.jsonl` 23,478, deduped on `idempotency_key` = 22,488. **Exclusions:** pre-cut **11,527**; of 10,961 post-cut, ladder **6,642** (`selection == "ladder"`; `stake_basis == "flat_1"` agrees on every row), key-ABSENT **27** (all paper, 10-21 22:24Z..10-22 02:27Z: old builders, as measured 10-22) -> **4,292 key-present**.
+- **A fourth population, reported apart and never pooled:** 190 LIVE Kalshi orders with the key present but `staked_probability_version` AND `sizing_basis` null. Every one has `position_key` `ingame:KX...` (the in-game path; 10-23 23:38Z..10-29 03:01Z; nba 110 / nfl 35 / nhl 19 / ncaaf 18 / mlb 8). That writer never passes through the plan sizer, so it has no basis to carry -- see #722.
+- Version strings: the bulk is `market_fair@staked_probability_pooled_v1@2026-10-22T21:45:48Z` (appeared after the task was written). Version maps 1:1 onto basis: `market_fair@*` -> `model_edge`, `unfitted` -> `market_fair`.
+- settled = outcome won/lost/push; stake = `fill_stake_dollars`; ROI = P&L / settled stake; power gate = 60 settled:
+
+| mode | staked_probability_version | sizing_basis | n | stake | settled | W/L/P | P&L | ROI |
+|---|---|---|--:|--:|--:|---|--:|--:|
+| live | market_fair@...pooled_v1 | model_edge | 162 | $828.09 | 113 | 68/45/0 | -$3.58 | **-0.62%** (on $576.02) |
+| live | market_fair@unfitted | model_edge | 20 | $74.04 | 20 | 6/14/0 | -$47.21 | UNDERPOWERED |
+| live | unfitted | market_fair | 3 | $14.88 | 3 | 1/2/0 | -$9.13 | UNDERPOWERED |
+| live | null (in-game, not a sizing cell) | null | 190 | $144.70 | 160 | 75/85/0 | +$0.32 | +0.25% (on $126.18) |
+| paper | market_fair@...pooled_v1 | model_edge | 3,058 | $13,090.14 | 2,169 | 1110/1043/16 | -$77.87 | **-0.93%** (on $8,364.47) |
+| paper | market_fair@unfitted | model_edge | 408 | $1,714.87 | 395 | 203/187/5 | -$6.23 | **-0.37%** (on $1,666.19) |
+| paper | unfitted | market_fair | 451 | $1,276.38 | 243 | 128/114/1 | -$21.08 | **-3.10%** (on $679.14) |
+
+- by `sizing_basis` alone: paper model_edge 3,466 / 2,564 settled / -$84.11 / **-0.84%** (on $10,030.66); paper market_fair 451 / 243 / **-3.10%**; live model_edge 182 / 133 / -$50.78 / **-7.81%** (on $650.06), of which -$47.21 is the 20-order `market_fair@unfitted` cell; live market_fair 3 settled, UNDERPOWERED.
+- **POWER GATE: PASSED for all three paper cells and the live pooled_v1 cell; FAILED for live `market_fair@unfitted` (20 settled) and live `unfitted`/`market_fair` (3).** Live market-basis sizing is close to unused post-cut: 3 orders in 8 days. Sized live orders (in-game excluded): 185 over 10-22..10-29, ~23/day.
+- No intervals were computed for A. The paper cells' spread (-0.37% .. -3.10%) is not called a difference between them.
+- Predicted EV deliberately NOT reported (lane rule).
+- **READING B -- #698 staked forward ROI.** The 10-29 11:30:00Z `## Staked` reports 7,093 graded / 311 unjoined, but its window starts `selected_date` 2026-10-02 and so POOLS pre-fix rows; it is not the result. Instead I re-ran the CRON'S OWN grader, `daily_optimizer.staked_games` (fleet code), on the fleet's `model_scorecard_optimizer_state.json` + `full_history_orders()` with `today=2026-10-29, days=21` -> **window `selected_date` 2026-10-08..2026-10-29 (22 dates)**. Faithfulness check: the full-window rerun reproduces the report exactly (7,093 graded, 311 unjoined, identical book bands).
+- **GATE: PASSED -- 5,614 graded post-10-07 (needed > 695)**; 310 unjoined (5.2% of 5,924; baseline 0). The six props-tier `all` rows (a second view of the same bets) are excluded, as every cron summary does.
+- results are unit-stake ROI with game-clustered SE:
+  - **all: ROI +2.70% (SE 1.59, 3,264 games) vs admitted EV +3.75% -> gap -1.05pp (SE 1.59).** Baseline: -7.8% vs +3.6%, gap -11.4pp. **The gap narrowed by ~10.3pp and is now indistinguishable from 0.**
+  - **books 1-2: +2.37% (n=1,084, SE 3.39) vs EV +3.89% (gap -1.52pp). Baseline -11.4% (n=439).** books 3-4: +1.84% (1,416, SE 2.86; baseline -7.9%). books 5-7: +5.84% (1,619, SE 2.86; baseline +2.4%). books 8+: +0.36% (1,495, SE 3.08; baseline +4.6% on n=71).
+  - by basis: model +2.66% (4,406) vs EV +3.65%; market_only +2.86% (1,208) vs EV +4.12%.
+  - by sport: nba +12.66% (2,081), soccer +5.19% (570), nhl +0.17% (1,233), ncaaf -0.53% (1,917), nfl -0.67% (1,523), mlb -1.99% (541), wnba -11.13% (254).
+  - **stake-scale entries: still 0** (both the report's overlay and the rerun's `stake_scales`).
+  - The 1-2-book share of graded bets fell from 63% (439/695) to 19% (1,084/5,614).
+  - Attribution caveat: the window also spans #704's market-basis sizing (10-19) and later changes. This measures the forward book, not any single fix.
+- **PROPHETX SETTLEMENT CHARGE: MET.** Settled orders on `fee_basis = prophetx_win_commission_at_settlement`: 1,346 won / 1,363 lost / 34 push. **All 1,346 wins carry pnl = 0.98 x gross**, checked against `pnl_gross_dollars` and independently against fill_price x stake. First win 10-07 01:28Z, last 10-28 22:29Z.
+- LEAD (not folded in): the ladder (6,642 post-cut rows) is the refused-row control arm. It is already lane `ladder-refusal-control-arm` / #724, with a reading armed for 2026-10-29T18:00Z.
+- LEAD: live model_edge's -7.81% on 133 settled comes from 20 `market_fair@unfitted` orders (-$47.21 on $74.04); the live pooled_v1 cell alone is -0.62% on 113. Re-read live per cell at >= 60 settled before concluding anything about live.
+- verify: this entry IS the reading. Scripts: `C:\tmp\pnev698\split.py`, `b2.py`, `se.py`, `px.py`.
