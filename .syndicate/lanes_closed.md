@@ -12881,3 +12881,9 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Files: none (ledger-only)
 - Verdict: MET. owner_liveness.py --idle-min 240 at 20:16Z (15:16 CDT) returned 5 SAFE of 9 CLOSED; moved to lanes_closed.md with one pointer each. Table and deferrals are in log/2026-10-28.md 20:19Z.
 - Moved: nba-prop-wrong-game, scheduled-task-registry-alert, nhl-v-initial-name-key, closed-lane-archive-20261028-0841, nhl-hitrate-pool-team-match
+
+### closed-lane-archive-20261028-1641 — CLOSED 2026-10-28 (GOAL MET: 2 blocks archived) — opened 2026-10-28 — session 98129b83-c33c-49d4-8e37-a8012d4617af
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: MET. owner_liveness.py --idle-min 240 at 21:43Z (16:43 CDT) returned 2 SAFE of 5 CLOSED; moved to lanes_closed.md with one pointer each. Table and deferrals are in log/2026-10-28.md 21:41Z.
+- Moved: closed-lane-archive-20261028-1139, closed-lane-archive-20261028-1231
