@@ -54919,3 +54919,6 @@ which is about the two sizing bases and not about the refusal boundary.
 - 22 hourly passes 10-28 14:13Z .. 10-29 12:56Z graded 83 legs in total (graded == appended on every pass): 12, 9, 7, 1, 27, 21, 6 on the non-zero passes.
 - discharges the OWED first-line reading of the 2026-10-27 20:54:32Z env-edit entry.
 - recorded by scheduled task `paper-archived-grading-first-line` (read-only fleet check).
+
+## 2026-10-29 13:31Z (8:31 AM CT) -- 6581bcb2 / 7ca75fbe fill reading: **MET, closed**
+- both 10-28 23:13Z new-size entries `status=filled venue_status=executed contracts=6`: KXNBASPREAD-26OCT28CHADET-DET8 at 0.43 ($2.58), KXNBATOTAL-26OCT28CHADET-213 at 0.42 ($2.52). Each filled a cent at or under the ask. The fill owed in the 23:15Z entry is delivered.
