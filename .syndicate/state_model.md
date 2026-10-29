@@ -246,10 +246,14 @@ teams); on the live 2026-08-29 ESPN slate 16/16 names resolved. Scheduled task
 `verify-ncaaf-settlement-593` (daily 08:25 CT) reports PENDING rather than passing
 on a quiet log.
 
-**STILL CANNOT SETTLE A BET: `nba`, `nhl`, `ncaab`.** Pinned by
+**STILL CANNOT SETTLE A BET: `ncaab` only `[read in code 2026-10-29, lane nba-period-paper-grading]`.** `_default_resolver` gained
+`nhl` (`bet_status_nhl`, 09-19) and `nba` (`bet_status_nba`, 10-24). Pinned by
 `tests/test_paper_settlement.py::test_the_traded_sports_WITHOUT_a_resolver_are_pinned...`,
 so adding a sport to the board without a resolver now FAILS instead of quietly
-demonstrating the bug. Pinned is not fixed.
+demonstrating the bug. Pinned is not fixed. **NBA quarter/half GAME LINES grade off the daily ESPN linescore
+(`#745`, main `aa8dd3c6`, NOT on the fleet at 20:4xZ 10-29):** read-only fleet dry run graded 15/15 archived
+period rows and moved no other reason. Overtime follows each book's house rules (q4 includes OT at DraftKings
+only; h2 at all four books read). Segment player props still refuse `actual_is_full_game_not_<seg>`.
 
 ## [execution-ledger-lost-live-rows] 30 LIVE FILLS PLACED 2026-09-01..09-04 ARE MISSING FROM THE EXECUTION LEDGER, BY DESIGN NOT RESTORED — correct any ROI, settlement or CLV analysis over those dates by hand `[recorded 2026-09-16, user decision "Record the gap, don't restore"; lane execution-ledger-live-trim]`
 

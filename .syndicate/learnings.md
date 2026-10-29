@@ -3042,3 +3042,25 @@ The 2026-10-20 entry said: "Rating INPUTS transfer, because the sim reads them w
   - Before diagnosing a join from an absence code, read the player's team on that date from a source the join does not use: the roster, or another game's box.
   - An absence is consistent with a DNP, a name miss AND a wrong game. Only the team reading separates them.
   - Sibling of 2026-09-28 (mlb-prop-grading-player-match): a VOID count's size is not evidence of a join failure.
+
+## 2026-10-29 -- A segment's OVERTIME rule is the BOOK's, not the sport's: DraftKings' NBA 4th quarter includes overtime, FanDuel's, BetMGM's and Pinnacle's do not `[lane nba-period-paper-grading, session 35e11968]`
+
+- **The belief:** `segment_actuals` states one convention per sport, "q4 alone, h2 + every overtime", as "the sportsbook convention the orders were priced under". Reusing it for NBA looked like following the pattern.
+- **What was true (house rules read 2026-10-29, quotes in `.syndicate/findings_2026-10-29_nba_period_paper_grading.md`):**
+  - DraftKings MA 8.18.25: "Bets on 4th Quarter Markets and 2nd Half Markets include overtime statistics".
+  - FanDuel 7.30.26, BetMGM 3.28.25 and Pinnacle all exclude OT from the 4th quarter.
+  - All four include OT in the 2nd half.
+  - One third-party pricing post claimed the opposite for Pinnacle, against Pinnacle's own rules page.
+- **Rule:**
+  - An overtime-dependent segment (q4, h2, a hockey third period) is graded by the ORDER's book, from that book's primary text.
+  - A book whose text is unread refuses BY NAME, and only when overtime was actually played. With no overtime, every rule agrees, so it grades.
+  - Read the straight-bet clause, not a parlay heading: BetMGM's "fourth quarter ... include overtime" sentence is under Same Game Parlay.
+
+## 2026-10-29 -- "CLEAN" IS NOT "FINISHED": a peer's OneDrive shrink removed a live session's app worktree because it had nothing uncommitted `[lane nba-period-paper-grading, session 35e11968]`
+
+- **What happened:** the 10-29 shrink removed "5 clean app worktrees (branches kept)". One was this session's, mid-task: its lane commit was already pushed, so it was clean. The directory emptied around 20:21Z, between two commands. Git then fell through to the PRIMARY tree, and `git status` there showed another tree's dirt as though it were this session's.
+- **Nothing was lost** only because the one change so far was already on main.
+- **Rule:**
+  - Before removing a worktree, check the OWNER SESSION's liveness (`owner_liveness.py` / `list_sessions`), not just its cleanliness.
+  - A session should prefer `scripts/session_worktree.py open` (outside OneDrive, no `data/`) for anything longer than a few commands.
+  - When `ls` comes back empty and `git status` shows `../../..` paths, the worktree is gone. Stop, and re-home before editing anything.
