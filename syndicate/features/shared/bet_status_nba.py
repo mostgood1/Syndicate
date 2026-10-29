@@ -105,6 +105,17 @@ _MARKET_TO_BOX_SUM: dict[str, tuple[str, ...]] = {
     "player_blocks_steals": ("blk", "stl"),
 }
 
+# A DOUBLE-DOUBLE IS A COUNT, NOT A STAT [`#744`]. Yes/no on how many of points,
+# rebounds, assists, steals and blocks reached ten -- two for a double, three for
+# a triple. The order carries no line (`NaN` on the fleet), so the resolver
+# RESTATES one, the way `game_line_bet` restates a spread: the value is the count
+# and the line is `needed - 0.5`, so Yes is an over and No an under. Before this
+# every pass logged `ARCHIVED_UNMAPPED_MARKETS {'player_double_double': 1}`
+# (Nikola Jokic, 2026-10-24, the only one in the archive). The same table
+# `population_outcomes_espn._WNBA_DOUBLES` grades the population with.
+_MARKET_TO_DOUBLES: dict[str, int] = {"player_double_double": 2, "player_triple_double": 3}
+_DOUBLE_STATS = ("pts", "reb", "ast", "stl", "blk")
+
 _TOTAL_MARKETS = frozenset({"totals", "totals_alt"})
 
 
@@ -354,7 +365,8 @@ def nba_status_resolver(selected_date: str, *, fetch_json=None):
         market = _canonical_market(order.get("market"))
         box_key = _MARKET_TO_BOX_KEY.get(market)
         sum_keys = _MARKET_TO_BOX_SUM.get(market)
-        is_line = box_key is None and sum_keys is None
+        needed = _MARKET_TO_DOUBLES.get(market)
+        is_line = box_key is None and sum_keys is None and needed is None
         if is_line and not (is_game_line_market("nba", market) or market in _TOTAL_MARKETS):
             return {"unavailable_reason": REASON_UNMAPPED_MARKET}
 
@@ -380,6 +392,13 @@ def nba_status_resolver(selected_date: str, *, fetch_json=None):
             if stamp["is_final"]:
                 return absent(order, game)
             return {"unavailable_reason": REASON_PLAYER_NOT_FOUND}
+        if needed is not None:
+            parts = [_as_float(row.get(key)) for key in _DOUBLE_STATS]
+            if any(part is None for part in parts):
+                # A missing category could be the one that reached ten.
+                return {"unavailable_reason": REASON_NO_STAT}
+            count = float(sum(1 for part in parts if part >= 10))
+            return {**stamp, "current_value": count, "line": needed - 0.5}
         if sum_keys is not None:
             parts = [_as_float(row.get(key)) for key in sum_keys]
             if any(part is None for part in parts):

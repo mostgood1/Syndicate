@@ -199,7 +199,78 @@ def test_a_prop_is_not_restated(_isolated):
 
 
 def test_unmapped_market_is_permanent_and_checked_before_the_box(_isolated):
-    assert _status(_order(market="player_double_double"))["unavailable_reason"] == mod.REASON_UNMAPPED_MARKET
+    assert _status(_order(market="player_first_basket"))["unavailable_reason"] == mod.REASON_UNMAPPED_MARKET
+
+
+# ---------------------------------------------------------------------------
+# Double-double / triple-double: a count of categories at ten, line restated
+# ---------------------------------------------------------------------------
+
+
+def _jokic(**kw):
+    # The fleet's only archived one (2026-10-24): side "Yes", line NaN.
+    fields = {"market": "player_double_double", "side": "Yes", "line": float("nan"), "player_name": "Nikola Jokic"}
+    return _order(**{**fields, **kw})
+
+
+def _final_jokic_box(tmp_path, **stats):
+    base = {"pts": 30, "reb": 12, "ast": 9, "stl": 1, "blk": 0}
+    base.update(stats)
+    _write_box(tmp_path, [_game(state="post", final=True, players=[_player(name="Nikola Jokic", **base)])])
+
+
+def test_double_double_reachability_was_unmapped_now_resolves(_isolated):
+    _final_jokic_box(_isolated)
+    row = _status(_jokic())
+    assert row["unavailable_reason"] is None and row["status"] == "won"
+    assert row["current_value"] == 2.0 and row["line"] == 1.5
+
+
+@pytest.mark.parametrize(
+    "stats, side, expected",
+    [
+        ({}, "Yes", "won"),  # 30 / 12: two categories
+        ({"ast": 11}, "Yes", "won"),  # a triple-double is a double-double too
+        ({"reb": 9}, "Yes", "lost"),  # 30 / 9: one category
+        ({"reb": 9}, "No", "won"),
+        ({}, "No", "lost"),
+        ({"pts": 8, "reb": 10, "ast": 4, "stl": 10, "blk": 0}, "Yes", "won"),  # steals count
+        ({"reb": 10, "ast": 9.0}, "Yes", "won"),  # exactly ten counts
+    ],
+)
+def test_double_double_counts_five_categories_at_ten(_isolated, stats, side, expected):
+    _final_jokic_box(_isolated, **stats)
+    assert _status(_jokic(side=side))["status"] == expected
+
+
+def test_triple_double_needs_three(_isolated):
+    _final_jokic_box(_isolated)
+    row = _status(_jokic(market="player_triple_double"))
+    assert row["line"] == 2.5 and row["status"] == "lost"
+    _final_jokic_box(_isolated, ast=10)
+    assert _status(_jokic(market="player_triple_double"))["status"] == "won"
+
+
+def test_double_double_is_not_decided_mid_game(_isolated):
+    _write_box(_isolated, [_game(players=[_player(name="Nikola Jokic", pts=30, reb=12)])])
+    row = _status(_jokic())
+    assert row["status"] == "live_ahead" and row["decided"] is False
+
+
+def test_double_double_refuses_a_missing_category(_isolated):
+    _final_jokic_box(_isolated, blk=None)
+    assert _status(_jokic())["unavailable_reason"] == mod.REASON_NO_STAT
+
+
+def test_double_double_grades_through_paper_settlement(_isolated):
+    from syndicate.features.shared.paper_settlement import _default_resolver, _our_verdict
+
+    _final_jokic_box(_isolated)
+    order = _jokic(status="filled", fill_price=-680.0, fill_stake_dollars=28.32, fees_dollars=0.0)
+    verdict, _resolved, refusal = _our_verdict(order, _default_resolver(DATE))
+    assert refusal == ""
+    assert verdict["outcome"] == "won" and verdict["settled_value"] == 2.0 and verdict["line"] == 1.5
+    assert verdict["pnl_dollars"] == round(28.32 * 100 / 680, 4)
 
 
 # ---------------------------------------------------------------------------
