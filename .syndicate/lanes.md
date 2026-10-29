@@ -1074,12 +1074,6 @@ death, never life — do not invert it.
 - Verification: the Stage 2 run's report (C:/tmp/e4/stage2.json) read and its verdicts recorded in the findings file and #740, with the funnel and the n each reading rests on
 - Blocked by: the #742 first-full-forward-day reading (scheduled task kalshi-combo-capture-first-forward-day); user condition 'Yes, after the reading'
 
-### closed-lane-archive-20261029-1439 — CLOSED 2026-10-29 (GOAL MET: 3 blocks archived) — opened 2026-10-29 — session c92a1593-ee73-4f48-bc45-b7e8fb834a87
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: MET. owner_liveness.py --idle-min 240 at 19:41Z (2:41 PM CDT) returned 3 SAFE of 7 CLOSED; all 3 moved to lanes_closed.md with one pointer each. Table and deferrals are in log/2026-10-29.md 19:41Z.
-- Moved: live-min-stake-five, published-negative-ev, closed-lane-archive-20261029-0841
-
 ### nba-period-paper-grading — CLOSED 2026-10-29 — opened 2026-10-29 — session 35e11968-5658-4c2d-9138-647f0c2d7814
 - **GOAL VERDICT (checkpoint 2026-10-29 20:4xZ, 35e11968):** "NBA quarter/half game lines (spreads, totals, h2h and their alts on q1..q4/h1/h2) grade off the daily ESPN linescore file (nba_source/data/processed/linescores_<date>.json) through segment_actuals.segment_scores_view instead of refusing actual_is_full_game_not_<seg>; segment player props still refuse by name; a read-only fleet dry run of backfill_archived_paper_grades.py shows the archived NBA period refusals grade and nothing else moves; code on main" -- **GOAL: MET.** Readings: 21 hermetic tests pass (all 21 fail on the old resolver; reachability off != on through paper_settlement._default_resolver first); read-only fleet dry run 20:36:28Z-20:36:52Z, base main 682ec056 vs base + bet_status_nba.py: archived NBA period rows 15/15 graded, each equal to an independent sum from the fleet file, pass candidates 44 -> 44, graded 1 -> 16, only the six actual_is_full_game_not_* reasons moved (15 -> 0), shard sha256 28e8a39ebc90c112 unchanged; code on origin/main aa8dd3c6. NOT on the fleet (user decision); the first-tick reading is owed in #745.
 - Goal: NBA quarter/half game lines (spreads, totals, h2h and their alts on q1..q4/h1/h2) grade off the daily ESPN linescore file (nba_source/data/processed/linescores_<date>.json) through segment_actuals.segment_scores_view instead of refusing actual_is_full_game_not_<seg>; segment player props still refuse by name; a read-only fleet dry run of backfill_archived_paper_grades.py shows the archived NBA period refusals grade and nothing else moves; code on main
@@ -1094,6 +1088,12 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness --idle-min 240 read 1 SAFE of 6 CLOSED; dry run, apply, invariants unchanged vs baseline.
 - Moved: closed-lane-archive-20261029-1240. Table and Part B in `.syndicate/log/2026-10-29.md` 21:52Z.
+
+### closed-lane-archive-20261029-1850 — CLOSED 2026-10-29 (GOAL MET: 1 block archived) — opened 2026-10-29 — session b78dab7e-a25e-4a92-a258-7ff450abc6f8
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness (--idle-min 240) read SAFE for 1 of 6 CLOSED blocks; archived after a dry run and an unchanged invariant check.
+- Moved: `closed-lane-archive-20261029-1439`. Table and WAIT reasons: `.syndicate/log/2026-10-29.md` 23:50Z.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1199,6 +1199,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261029-0101` — CLOSED 2026-10-29 (GOAL MET: 2 blocks archived) — opened 2026-10-29 — session 48fbb01e-b621-467d-93c0-70d80396ae76
 - `closed-lane-archive-20261029-0841` — CLOSED 2026-10-29 (GOAL MET: 1 block archived) — opened 2026-10-29 — session 1a16603e-0d0a-4089-aa27-8994fbb73752
 - `closed-lane-archive-20261029-1240` — CLOSED 2026-10-29 (GOAL MET: 1 block archived) — opened 2026-10-29 — session fa717701-d8bd-426a-aca5-9ae5e32d51cc
+- `closed-lane-archive-20261029-1439` — CLOSED 2026-10-29 (GOAL MET: 3 blocks archived) — opened 2026-10-29 — session c92a1593-ee73-4f48-bc45-b7e8fb834a87
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
