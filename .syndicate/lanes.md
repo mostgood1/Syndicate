@@ -1157,17 +1157,16 @@ death, never life — do not invert it.
 - Verification: the Stage 2 run's report (C:/tmp/e4/stage2.json) read and its verdicts recorded in the findings file and #740, with the funnel and the n each reading rests on
 - Blocked by: the #742 first-full-forward-day reading (scheduled task kalshi-combo-capture-first-forward-day); user condition 'Yes, after the reading'
 
-### closed-lane-archive-20261028-1442 — CLOSED 2026-10-28 (GOAL MET: 5 blocks archived) — opened 2026-10-28 — session dfe10840-6a18-4e37-9f37-54f8dbb0a597
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: MET. owner_liveness.py --idle-min 240 at 20:16Z (15:16 CDT) returned 5 SAFE of 9 CLOSED; moved to lanes_closed.md with one pointer each. Table and deferrals are in log/2026-10-28.md 20:19Z.
-- Moved: nba-prop-wrong-game, scheduled-task-registry-alert, nhl-v-initial-name-key, closed-lane-archive-20261028-0841, nhl-hitrate-pool-team-match
-
 ### closed-lane-archive-20261028-1641 — CLOSED 2026-10-28 (GOAL MET: 2 blocks archived) — opened 2026-10-28 — session 98129b83-c33c-49d4-8e37-a8012d4617af
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - Verdict: MET. owner_liveness.py --idle-min 240 at 21:43Z (16:43 CDT) returned 2 SAFE of 5 CLOSED; moved to lanes_closed.md with one pointer each. Table and deferrals are in log/2026-10-28.md 21:41Z.
 - Moved: closed-lane-archive-20261028-1139, closed-lane-archive-20261028-1231
+
+### closed-lane-archive-20261028-1930 — CLOSED 2026-10-28 (GOAL MET: 1 block archived) — opened 2026-10-28 — session 253454c5-0e7e-43fa-bb89-1b41ca2060dc
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- GOAL MET: owner_liveness.py --idle-min 240 read 1 SAFE of 4 CLOSED; moved `closed-lane-archive-20261028-1442`. Table and WAIT reasons in log/2026-10-28.md (00:32Z 10-29).
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1266,6 +1265,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261028-0841` — CLOSED 2026-10-28 (GOAL MET: 3 blocks archived) — opened 2026-10-28 — session 37db6440-d5da-42b4-b83c-53a1454c0e76
 - `closed-lane-archive-20261028-1139` — CLOSED 2026-10-28 (GOAL MET: 2 blocks archived) — opened 2026-10-28 — session 04aaaddc-ce12-46fd-bc7e-87ab04385a8c
 - `closed-lane-archive-20261028-1231` — CLOSED 2026-10-28 (GOAL MET: 1 blocks archived) — opened 2026-10-28 — session 8e5725f4-0dbe-484f-a679-386a1e901777
+- `closed-lane-archive-20261028-1442` — CLOSED 2026-10-28 (GOAL MET: 5 blocks archived) — opened 2026-10-28 — session dfe10840-6a18-4e37-9f37-54f8dbb0a597
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
