@@ -54910,3 +54910,12 @@ which is about the two sizing bases and not about the refusal boundary.
 - first new-size in-game entries, live-odds-worker log: `23:13:26Z LIVE_ENTRY KXNBASPREAD-26OCT28CHADET-DET8 ask=0.43 stake=2.6401 day_spend=0.0/100.0 placed=True` and `23:13:28Z KXNBATOTAL-26OCT28CHADET-213 ask=0.44 stake=2.7001 day_spend=2.6401/100.0 placed=True`.
 - 2.6401 = 6 x (0.43+0.01) and 2.7001 = 6 x 0.45: whole contracts under the $3 target, 6 per order where it was 1 before. The day-cap denominator reads 100.0.
 - ledger at 23:15Z: both `status=submitted`, fill_stake 0.0, not yet reconciled. A filled multi-contract row is still owed.
+
+## 2026-10-29 13:28Z (8:28 AM CT) -- READING: archived paper grading pass live on refresh-worker (lane paper-evicted-grading, #744) -- **MET**
+
+- last `LOCAL PRODUCTION UP` commit: `6d6e729dc949` (contains 2ec80fe0: merge-base rc 0); fleet checkout HEAD `6d6e729dc949` (rc 0).
+- first anchored `[paper_settlement] ARCHIVED_SETTLED` line: `2026-10-28T14:13:13.095Z` (9:13 AM CT 10-28), `dry_run=False today=2026-10-28 floor=2026-10-14 candidates=37 graded=0 appended=0 outcomes={}`; ungraded `player_not_in_box` 12, `nfl_player_did_not_play_void` 4, `not_decided_yet` 4, `actual_is_full_game_not_q4` 3, `stat_not_in_feed` 2, `ncaaf_player_not_in_final_box` 2, `nhl_player_name_unmatched` 2, `nhl_player_ambiguous_in_box` 2, `actual_is_full_game_not_h2` 1, `unmapped_market` 1; by_sport mlb 0/6, nba 0/17, ncaaf 0/2, nfl 0/4, nhl 0/.. (line cut at 700 chars).
+- token counts since 2026-10-27T20:54:32Z (refresh-worker.log + .log.1, timestamp-anchored regex only): ARCHIVED_SETTLED 22, ARCHIVED_UNMAPPED_MARKETS 22 (first: `{'player_double_double': 1}`), ARCHIVED_GRADING_OFF 0, ARCHIVED_SETTLE_BUSY 0, ARCHIVED_SETTLE_REFUSED 0, ARCHIVED_SETTLEMENT_FAILED 0, ARCHIVED_SETTLEMENT_GUARD_SKIP 0.
+- 22 hourly passes 10-28 14:13Z .. 10-29 12:56Z graded 83 legs in total (graded == appended on every pass): 12, 9, 7, 1, 27, 21, 6 on the non-zero passes.
+- discharges the OWED first-line reading of the 2026-10-27 20:54:32Z env-edit entry.
+- recorded by scheduled task `paper-archived-grading-first-line` (read-only fleet check).
