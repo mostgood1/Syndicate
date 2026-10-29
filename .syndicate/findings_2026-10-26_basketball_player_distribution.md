@@ -553,3 +553,66 @@ prints `INJURY_HISTORY {d} {rows, teams, excluded}`. Edited under the calibratio
 - QUESTIONABLE / PROBABLE players stay in the pool, as in production; their minutes are the mechanism's job;
 - the coach DNP of healthy players (8.07);
 - production: the feed only fills a research hole, and production already reads the live report.
+
+**STEP 1d — BUILD + SMOKE RESULT 2026-10-29 00:18Z (19:18 CDT 10-28). SMOKE VERDICT: PASS** (a, b, c).
+
+**Build** (`scripts/nba_injury_history_build.py`, bad527bf + 4d237be4) → `C:/tmp/bball_sc/r2s/injury_history_nba_2025-26.csv`:
+- 820 games (11-01..03-01), 0 without a report (B1). 1,627 of 1,640 team-games listed (B2, 99.2%).
+- 492 reports used: 343 games hourly, 477 every-15-min.
+- Report age before tip: p5 / p50 / p95 = 30 / 30 / 60 min.
+- 7,204 rows, 7,174 of them OUT. Only 18 QUESTIONABLE: by tip − 30, game-time decisions are mostly resolved.
+- **B3 FAILED on the first build: 704 of 6,875 rows off-roster (10.2%).**
+  - Cause: the production name repair (#725, 36eb357b) accepts a word-dropped name only when it is exactly ONE
+    roster player on the report's team. The build had given it the END-of-season roster, so traded players
+    stayed garbled ("Anthony Way Davis", "Collin Way Sexton", "Kristaps Assignment Porzingis").
+  - FIX (4d237be4): repair against the as-of roster of each report's date (the harness's `asof_roster`).
+- **DISCLOSED: B3's metric was changed after the result was seen.**
+  - It now counts with the SIM's own name key (`basketball_props_smart_sim._norm_name_key`) over roster file +
+    player_logs, instead of the parser's key over the roster file.
+  - Why: 183 of the 704 rows were hyphen splits ("Shai Gilgeous- Alexander"). The parser's key misses those, but
+    the sim's key matches them, so the sim excluded those players anyway.
+  - Rebuilt: 267 of 7,204 off (3.7%), so B3 PASS. All 267 are players with NO game all season (Highsmith,
+    Rozier, Niang, Exum, two-way players), so they cannot be in any pool.
+- **Production is not implicated:** live reads the current roster, and #725 read 0 off-roster on the fleet.
+
+**Consumption verified (not inferred):** on 2025-11-07, the 86 OUT-listed players are in the control pool
+24 times and in the INJ pool 0 times. Pool 282 → 258. The sim log prints no exclusion telemetry, so the pools
+were compared directly.
+
+**SMOKE INJ_smoke:**
+- code_inj = code_ar + the a6e56868 patch (22 added lines, 0 removed). The fit_ar config + `--injury-history`.
+- 12/12 dates, 0 errors. Control: fit_ar's files for the 12 dates (`C:/tmp/bball_sc/ctl12_ar`). 87 games, 174
+  team-games.
+- Grader `r2s/grade_inj.py` → `grade_inj.json`.
+
+| | INJ | control (fit_ar) |
+|---|---|---|
+| (a) INJURY_HISTORY rows > 0 | 12/12 | — |
+| (b) T_AROUND | **14** | 151 |
+| (b) ABSENT sim min / team-game | **0.46** | 16.00 |
+| DNP_LISTED_OTHER sim min / team-game | 0.02 | 4.34 |
+| DNP_LISTED_COACH sim min / team-game | 8.35 | 7.68 |
+| REAL_ONLY real min / team-game | 5.27 | 5.27 |
+| (c) false exclusions / excluded slots | **0 / 769** | — |
+| sim game total mean | 230.53 | 230.35 |
+
+**Phase 1 on the 12 dates** (miss nominal .20; bias = real − sim):
+
+| cell | INJ | control |
+|---|---|---|
+| minutes all | miss **.424**, width 1.47, bias +0.40 | .501, 1.70, +2.29 |
+| minutes bench | .530, width 1.92, bias +1.09 | .605, 2.30, +3.21 |
+| minutes starter | .314, width 1.15, bias −0.31 | .373, 1.23, +1.17 |
+| input-minutes bias | **+0.35** | +2.22 |
+| pts / reb / ast / threes | .302 / .298 / .260 / .236 | .327 / .309 / .279 / .248 |
+| pts / reb / ast bias | +0.17 / +0.13 / +0.10 | +1.13 / +0.55 / +0.32 |
+
+**Reading:**
+- The feed removes the availability hole. About 20 of the 28 non-player sim minutes per team-game go
+  (ABSENT 16.0 → 0.5, other DNP 4.3 → 0.0), with 0 false exclusions in 769 slots.
+- The input-minutes under-allocation falls from +2.22 to +0.35. Every stat's miss and bias improve.
+- Team totals do not move: 230.5 vs 230.4.
+- **Bench split shift:** starter / bench is the top-5 by input minutes, so the bench n changed (973 → 902).
+- **What is left for the minutes mechanism:** coach DNP 8.35 sim min per team-game (healthy scratches), then
+  variance. Width 1.47 overall and 1.92 on the bench: the bench bands are still about twice too wide.
+- The full FIT `fit_inj` was launched 00:17Z (19:17 CDT): `r2s/launch_fit_inj.sh`, 3 workers, nice 19.
