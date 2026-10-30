@@ -1087,6 +1087,14 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness --idle-min 240 read 1 SAFE of 6 CLOSED; moved `closed-lane-archive-20261030-0639`. Table and Part B in `.syndicate/log/2026-10-30.md`.
 
+### stale-lane-triage — OPEN — opened 2026-10-30 — session eb9e3103
+- Goal: Classify every OPEN lane quiet >7d on origin/main (42 at 2026-10-30) as CLOSE-MET / CLOSE-ABANDONED / HAND-OFF / KEEP with evidence; after user approval close + archive the dead ones to lanes_closed.md with one-line pointers, 0 deletions of other lanes' content.
+- Files: .syndicate/findings_2026-10-30_stale_lane_triage.md
+- Hypothesis: n/a (ledger hygiene)
+- Falsification test: n/a
+- Verification: lane_census.py on origin/main after landing: closed slugs absent from OPEN; check_lane_invariants.py clean; diff shows only the approved lanes' blocks moved
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
