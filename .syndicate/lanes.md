@@ -1074,12 +1074,6 @@ death, never life — do not invert it.
 - Verification: the Stage 2 run's report (C:/tmp/e4/stage2.json) read and its verdicts recorded in the findings file and #740, with the funnel and the n each reading rests on
 - Blocked by: the #742 first-full-forward-day reading (scheduled task kalshi-combo-capture-first-forward-day); user condition 'Yes, after the reading'
 
-### closed-lane-archive-20261029-2039 — CLOSED 2026-10-29 (GOAL MET: 1 block archived) — opened 2026-10-29 — session dbfa957e-4655-4581-ae04-b247240da689
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: MET. owner_liveness.py --idle-min 240 at 01:40Z 10-30 (8:40 PM CDT 10-29) returned 1 SAFE of 6 CLOSED; it was moved to lanes_closed.md with one pointer. Table and deferrals are in log/2026-10-30.md 01:40Z.
-- Moved: nba-period-paper-grading
-
 ### closed-lane-archive-20261029-2240 — CLOSED 2026-10-29 (GOAL MET: 1 block archived) — opened 2026-10-29 — session 927e2ecb-a75e-41f2-9c81-b46d5eba511f
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
@@ -1199,6 +1193,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261029-1439` — CLOSED 2026-10-29 (GOAL MET: 3 blocks archived) — opened 2026-10-29 — session c92a1593-ee73-4f48-bc45-b7e8fb834a87
 - `closed-lane-archive-20261029-1650` — CLOSED 2026-10-29 (GOAL MET: 1 block archived) — opened 2026-10-29 — session 4bbe339d-1cf6-477c-9465-0039e9dfbd51
 - `closed-lane-archive-20261029-1850` — CLOSED 2026-10-29 (GOAL MET: 1 block archived) — opened 2026-10-29 — session b78dab7e-a25e-4a92-a258-7ff450abc6f8
+- `closed-lane-archive-20261029-2039` — CLOSED 2026-10-29 (GOAL MET: 1 block archived) — opened 2026-10-29 — session dbfa957e-4655-4581-ae04-b247240da689
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
