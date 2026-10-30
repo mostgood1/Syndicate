@@ -718,6 +718,15 @@ death, never life — do not invert it.
 - Verification: Hermetic tests: shape parity with e4_stage2_combo_prices.shape_cell on a ticker grid, off != on for the shaped read, budget reservation; A5 committed on origin/main before the ff; after the ff, the first full UTC day's store rows read on the fleet (shaped traded two-leg combos, trades_status counts, prints with taker_side, GETs) and recorded in deploys.md
 - Blocked by: none
 
+### stale-todo-headlines — CLOSED 2026-10-30 (GOAL: MET) — opened 2026-10-30 — session eb9e3103-f175-4511-be0b-c4b7605e406f
+- Goal: The five todo headlines #662 #670 #697 #706 #709 state what is true on 2026-10-30, each correction citing its reading; no other line of todo.md changes
+- Files: docs/ai_context/todo.md (#662 #670 #697 #706 #709 header lines only)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: git diff origin/main -- docs/ai_context/todo.md shows exactly 5 lines changed, all ### headers of those ids
+- Blocked by: none
+- **GOAL VERDICT 2026-10-30 19:25Z:** "The five todo headlines #662 #670 #697 #706 #709 state what is true on 2026-10-30, each correction citing its reading; no other line of todo.md changes" -- GOAL: MET. Reading: `git diff --numstat` = 5/5 on todo.md, all five `### ` headers. #697 was NOT stale in substance: fleet ci-suite 10-30 03:53 CDT on `6d6e729dc9` = 61 NEW FAILURE(S), so its headline now says STILL RED.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
