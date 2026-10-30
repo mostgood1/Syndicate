@@ -607,8 +607,11 @@ def r2_test(rows: Sequence[Mapping[str, Any]], side: str) -> dict[str, Any]:
 
 
 def r3_logloss(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
-    """R3 (descriptive): binary log loss of Kalshi's YES result under p_b vs p_a, game-clustered."""
-    rr = [r for r in rows if r.get("y_kalshi") is not None]
+    """R3 (descriptive): binary log loss of Kalshi's YES result under p_b vs p_a, game-clustered.
+
+    A3 §7: a combo whose Kalshi result disagrees with our own grading leaves R3 as well as R2.
+    """
+    rr = [r for r in rows if r.get("y_kalshi") is not None and r["y_kalshi"] == r.get("y_ours")]
     if not rr:
         return {"n": 0}
     y = np.array([r["y_kalshi"] for r in rr], float)

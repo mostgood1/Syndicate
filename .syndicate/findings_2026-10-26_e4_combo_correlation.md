@@ -24,6 +24,8 @@ No LLM.
 **Registered verdict: PASS_TO_STAGE_2, Holm across 7 primary cells, for 4 cells.** Those are MLB same-batter
 nested, MLB same-batter other, NBA same-player nested and soccer result/total/BTTS. **Stage 2 was NOT RUN.**
 
+> **2026-10-30:** Stage 2 has since RUN on the `#742` capture. The registered reading is NO_EDGE_SHOWN, but the registered price is often an in-play print, so it is not a kill and the edge question stays OPEN. See **E4 Stage 2 RESULT** at the end of this file.
+
 - Kalshi's combo prints are public, and same-game legs do occur inside them.
 - But the window holds millions of public trades, more than 30,000 in one 10-minute Sunday slice. Reconstructing
   them after the fact is not feasible by paging.
@@ -378,3 +380,132 @@ Median per-player correlations, >= 15 MIN vs trailing-10:
   - Owed when the config is live: E4's served statistic (predicted 0.997 -> ~1.14), the `k_combo` pr/pa/ra
     (`nba_prop_calibration.py:19-21`) and SGP pool PR/PA/RA Normal re-reads, and `#740` (d)'s NBA cells. Tracked
     weekly by scheduled task `nba-pra-covariance-watch` (user 2026-10-27: "keep it where it is but stay on top of it").
+
+## E4 Stage 2 RESULT -- 2026-10-30, run as pre-registered (9f8d759e + A1 + A2 + A3 + A4) on the `#742` capture: registered reading NO_EDGE_SHOWN, but NOT a kill -- the registered price is an in-play print for at least 29% of soccer combos, so the pregame edge was not measured (lane `e4-stage2-combo-prices`)
+
+- **Condition:** the capture's first-full-forward-day reading is on origin/main (`deploys.md`, 2026-10-30 13:47Z,
+  **MET**). The user approved Stage 2 on that condition ("Yes, after the reading"), relayed by the decision-engine
+  session on 10-28.
+- **Run:** 2026-10-30 15:17:54Z -> about 15:22Z (10:17-10:22 AM CT), rc 0.
+  - `scripts/e4_stage2_combo_prices.py` at `c0201fc5`, which holds the A3 + A4 code. The script and every module it
+    imports are identical on origin/main `8af149aa`.
+  - Fleet `~/syndicate-prod/data`, read-only, at nice 19.
+  - Leg metadata came from the 10-28 cache: 5,771 legs, 0 new GETs. Stage 1's outcome cache: 0 GETs, the same 11
+    failures as Stage 1.
+  - The report's `amendments` field lists A1-A3. A4's join is in the code that ran.
+- **Fee:** `KXMVECROSSCATEGORY` reports `fee_type quadratic_with_combo_maker_fees` and `fee_multiplier 1`.
+  `venue_fees` does not know that type, so m = 1.0, stamped as an upper bound (A3 §7).
+- **Raw output (scratch, not in git):** `C:\tmp\e4\stage2.json`, `C:\tmp\e4\stage2.combos.csv` (2,616 priced
+  combos), `C:\tmp\e4\stage2_run.log`. The post-hoc check: `C:\tmp\e4\s2_q_extremes.py`.
+
+**Population (A3 §2)**, fixed before the run and unchanged by it:
+
+- 663,362 traded two-leg combos in the store.
+- Shaped into the passing cells:
+  - MLB SP-nested 374 and SP-other 234;
+  - NBA SP-nested 110 (SP-disjoint 2,502 counted, not tested);
+  - soccer GL 6,371.
+- These equal the 10-28 coverage probe's counts.
+
+**Where combos were lost (funnel):**
+
+| | MLB (both cells) | NBA | Soccer GL |
+|---|---|---|---|
+| Candidates | 608 | 2,612 | 6,371 |
+| No two-sided book quote at Kalshi's line | 265 | 1,580 | 2,983 |
+| No Stage 1 game in the ticker's slot | 102 | 390 | 216 |
+| Game not matched | 100 | -- | 687 |
+| SP-disjoint (counted, not tested) | -- | 494 | -- |
+| **Priced** | **137** | **12** | **2,467** |
+
+- MLB: in 3 combos our grading disagreed with Kalshi's result, and 1 settled on a scalar result. All 4 left R2, as
+  registered.
+- **Code deviation, found while writing this up:** `r3_logloss` dropped only the scalar combo. It kept the 3
+  disagreements in R3, against A3 §7. The MLB R3 values marked * are recomputed as registered, with the run's own
+  functions, from its per-combo file. As run, they were SP-nested -0.013 [-0.095, +0.068] on 54 combos and
+  SP-other -0.027 [-0.075, +0.021] on 82. Both CIs include 0 either way. Soccer and NBA have 0 such combos, so
+  their R3 is as run. The code is fixed in the commit that records this result, with a test that fails on the old
+  code.
+- Soccer: 0 disagreements.
+
+**Registered readings:**
+
+| Cell | Combos / games | R1 slope [95% CI] | R1 intercept | Mean q - p_a, pp | Mean q - p_b, pp | R2 YES (sim favours YES) | R2 NO (sim favours NO) | R3 `D_ba`, nats/combo |
+|---|---|---|---|---|---|---|---|---|
+| MLB SP-nested | 54 / 6 | 1.19 [0.50, 1.89] | +0.015 | +4.3 [+1.4, +7.3] | +1.9 [-1.0, +4.8] | INSUFFICIENT (46 / 4 games) | INSUFFICIENT (2 / 2) | -0.005 [-0.088, +0.079] (53)* |
+| MLB SP-other | 83 / 20 | 1.35 [0.96, 1.73] | -0.019 | +7.3 [+3.2, +11.4] | +0.5 [-3.3, +4.3] | INSUFFICIENT (79 / 20; -14.9% [-48.0, +18.2]) | INSUFFICIENT (1 / 1) | -0.017 [-0.062, +0.028] (80)* |
+| NBA SP-nested | 12 / 11 | 1.20 [-0.66, 3.06] | +0.017 | +20.5 [+11.4, +29.7] | +4.8 [-3.9, +13.6] | INSUFFICIENT (12 / 11) | INSUFFICIENT (0) | -0.019 [-0.244, +0.206] |
+| Soccer GL | 2,467 / 200 | 1.11 [0.95, 1.28] | +0.084 | +9.7 [+8.6, +10.7] | +8.6 [+7.6, +9.6] | **NO EDGE**: -48.9% [-54.1, -43.8] (1,135 / 198) | **NO EDGE**: +0.8% [-7.3, +8.9] (887 / 189) | **-0.0111 [-0.0156, -0.0065]** |
+
+- **Holm, m = 8:** no test rejects. Seven tests enter at p = 1, because they are below minimum n or their mean is
+  <= 0. Soccer NO enters at 0.845.
+- **Overall, by the registered rule: NO_EDGE_SHOWN.**
+- R2 is the mean realised return per combo at the print, net of the upper-bound fee. CIs are game-clustered (CR1)
+  95%.
+
+**Soccer, the full §7 band table** (p_b - p_a in pp; realised return per combo, game-clustered 95% CI):
+
+| Band | Combos / games | Mean q | Mean p_a | Mean p_b | Realised YES | Realised NO |
+|---|---|---|---|---|---|---|
+| <= -5 | 288 / 131 | 0.233 | 0.255 | 0.174 | -46.4% [-66.9, -25.8] | -0.8% [-6.4, +4.8] |
+| (-5,-3] | 268 / 139 | 0.318 | 0.267 | 0.228 | -60.1% [-69.3, -51.0] | -7.3% [-15.1, +0.4] |
+| (-3,-1] | 331 / 137 | 0.291 | 0.235 | 0.216 | -56.6% [-68.7, -44.6] | +8.8% [-12.0, +29.6] |
+| (-1,0) | 232 / 114 | 0.305 | 0.221 | 0.216 | -55.8% [-69.2, -42.5] | +32.4% [-27.7, +92.5] |
+| [0,1) | 213 / 110 | 0.309 | 0.216 | 0.221 | -52.0% [-67.3, -36.7] | -6.0% [-13.7, +1.8] |
+| [1,3) | 336 / 137 | 0.360 | 0.242 | 0.261 | -47.4% [-57.1, -37.7] | -6.8% [-15.3, +1.7] |
+| [3,5) | 292 / 144 | 0.347 | 0.227 | 0.267 | -60.6% [-69.4, -51.8] | +4.8% [-5.0, +14.6] |
+| >= 5 | 507 / 182 | 0.441 | 0.245 | 0.342 | -43.3% [-50.0, -36.5] | -8.5% [-16.0, -1.0] |
+
+The MLB and NBA band tables are in the report. No MLB or NBA band holds more than 70 combos.
+
+**POST-HOC, NOT pre-registered. Why the reading does not answer the question it was registered for.** This was
+found after the run, from the run's own per-combo file.
+
+- **A3 took q = the last print, and assumed it was an executable PREGAME price.** For soccer, it often is not.
+  Kalshi combos keep trading in play, and the last print often comes after the outcome is effectively decided.
+  - **448 of 2,467 soccer prints (18%) sit at q <= 0.05.** All 448 settled NO. The sim's pregame joint for them
+    averaged 0.21 (q < 0.02) and 0.17 (0.02-0.05).
+  - **275 (11%) sit at q >= 0.95.** 273 settled YES, against a mean pregame p_b of 0.33.
+  - **It is not confined to the extremes:**
+    - q in [0.05, 0.10) settled YES in 3 of 273 combos, against a mean p_b of 0.17;
+    - q in [0.90, 0.95) settled YES in 43 of 47, against a mean p_b of 0.28.
+    - No filter on q can separate the pregame prints.
+  - **It is not a leg-orientation error.** Our own grading of both legs agreed with Kalshi's result on every priced
+    soccer combo.
+  - **The registered EV at the print says the same thing.** Soccer YES `mean_ev_b` is +13,905% (139.05), which only
+    in-play prints near 0 can produce.
+- **So soccer R2's realised return does NOT measure the edge at a pregame price.** The YES figure, -48.9%, mixes
+  pregame prints with in-play prints that are near-certain losers for one side.
+  - R1's slope and intercept, and the mean q - p, are contaminated the same way.
+  - YES loses between -43% and -61% in EVERY band, including the bands where the sim favours NO. That pattern is a
+    timing artefact, not a correlation effect.
+- **R3 uses no price, and it stands.** On the combos people actually traded, Kalshi's result is predicted better by
+  the sim's correlated joint than by independence: soccer `D_ba` -0.0111 [-0.0156, -0.0065], on 2,467 combos and
+  200 matches. That replicates Stage 1 on this population. The MLB and NBA R3 CIs include 0, at 12-80 combos.
+- **MLB and NBA:** too few combos join for an R2 verdict. The main loss is legs with no two-sided book quote at
+  Kalshi's line (MLB 265 of 608, NBA 1,580 of 2,612). MLB SP-nested's median q is 0.064, the range of genuinely
+  unlikely combos, so its extremes are less clearly in-play. But it rests on 54 combos and 6 games.
+
+**The window cannot be repaired after the fact.**
+
+- The capture stores no print time: `trades` is null and `trades_status` is `skipped`, because trade reads are off
+  by default.
+- The book at capture is empty (yes_bid 0, yes_ask 1).
+- One finalized soccer combo from 10-20 was probed by public GET at 15:24Z. `/markets/<ticker>` returned 404, and
+  `/markets/trades?ticker=` returned 0 trades.
+- That is 1 of 1 probed. Kalshi appears to purge a finalized combo's market and trades, so the pregame prints for
+  09-30..10-25 are gone.
+
+**Verdict, as the decision-engine session should read it:**
+
+- **By the letter: NO_EDGE_SHOWN.** No test passes Holm. MLB and NBA are INSUFFICIENT; soccer is NO EDGE on both
+  sides.
+- **In substance: not a kill.** The registered price is contaminated by in-play prints, so Stage 2 did not measure
+  the pregame edge. E4's edge question stays OPEN.
+- **No edge was shown either.** Nothing here supports building on Kalshi combo prices.
+- **What would make it answerable: a user decision, not taken here.**
+  - Record each candidate combo's prints, with their time and taker side, going forward. That means trade reads in
+    the `#742` capture, limited to two-leg same-game combos in the passing shapes: about 270 a day at the window's
+    rate (7,089 shaped combos over 26 days).
+  - Then a new pre-registered amendment that takes each combo's last print before its earliest leg's start.
+  - That changes a fleet job, so it was not done in this lane.

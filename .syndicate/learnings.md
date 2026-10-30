@@ -3064,3 +3064,26 @@ The 2026-10-20 entry said: "Rating INPUTS transfer, because the sim reads them w
   - Before removing a worktree, check the OWNER SESSION's liveness (`owner_liveness.py` / `list_sessions`), not just its cleanliness.
   - A session should prefer `scripts/session_worktree.py open` (outside OneDrive, no `data/`) for anything longer than a few commands.
   - When `ls` comes back empty and `git status` shows `../../..` paths, the worktree is gone. Stop, and re-home before editing anything.
+
+## 2026-10-30 -- A finalized market's LAST PRINT is not a pregame price: Kalshi combos trade in play, and E4 Stage 2's registered price was an in-play print for at least 29% of soccer combos `[lane e4-stage2-combo-prices, session b566f51c]`
+
+- **The belief:** A3 registered q = `quote_at_capture.last_price`, the last print's YES price, as the executable
+  combo price. Its check, that last_price equalled the last trade in 3,774 of 3,778, showed only that the field was
+  the last TRADE. It said nothing about WHEN that trade happened.
+- **What was true:**
+  - 448 of 2,467 soccer combos printed last at q <= 0.05, and all 448 settled NO, against a pregame sim joint of
+    about 0.2.
+  - 273 of 275 at q >= 0.95 settled YES.
+  - The mid-range is contaminated too: q in [0.05, 0.10) settled YES in 3 of 273.
+  - The YES realised return was -43% to -61% in every band. The registered R2 therefore measured timing, not
+    correlation.
+  - The window cannot be repaired after the fact, because a probed finalized combo's market and trades are purged
+    (404 / 0 trades).
+- **Rule:**
+  - A price read from a SETTLED market (last_price, previous_price, the at-capture book) is not a pregame price
+    until its TIMESTAMP says so.
+  - A pre-registration that prices from prints names the print-time rule: the last print before the earliest leg's
+    start. It also names the source of that time.
+  - Check a price field for in-play contamination BEFORE registering it: the share of q <= 0.05 or q >= 0.95, and
+    whether those settle in the print's direction. That check uses outcomes, so run it on a held-out slice, or state
+    it as a validity check, never as a test.

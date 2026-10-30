@@ -259,3 +259,12 @@ def test_finish_row_uses_kalshi_result_only_when_our_grading_agrees():
     assert r["ret_yes"] is None and f["grading_disagrees_with_kalshi"] == 1
     r = s2.finish_row(dict(base, result="void"), 1.0, f)
     assert r["ret_yes"] is None and f["kalshi_result_not_yes_no"] == 1
+
+
+def test_r3_drops_combos_whose_grading_disagrees_with_kalshi():
+    agree = [{"y_kalshi": i % 2, "y_ours": i % 2, "p_a": 0.4, "p_b": 0.45, "game": f"g{i % 5}"} for i in range(20)]
+    bad = [{"y_kalshi": 1, "y_ours": 0, "p_a": 0.1, "p_b": 0.9, "game": "g0"},
+           {"y_kalshi": None, "y_ours": 1, "p_a": 0.1, "p_b": 0.9, "game": "g1"}]
+    got, want = s2.r3_logloss(agree + bad), s2.r3_logloss(agree)
+    assert got["D_ba"]["n"] == len(agree)
+    assert got["D_ba"]["mean"] == pytest.approx(want["D_ba"]["mean"]) and got["mean_y"] == want["mean_y"]
