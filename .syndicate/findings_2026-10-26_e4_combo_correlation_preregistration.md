@@ -410,3 +410,83 @@ reading was written or printed.
     is unverified.
 - **Code:** `same_slot` in `scripts/e4_stage2_combo_prices.py`. 30 tests, adding the next-day rematch and the ET-date
   rule.
+
+## Amendment A5 -- 2026-10-30 ~18:25Z, before any trade-read data exists (the price is the last PREGAME print on the side bought; forward window) -- lane `e4-pregame-prints`
+
+**Why.** Stage 2 (A3 + A4) read NO_EDGE_SHOWN on 2026-10-30. That reading did not measure the pregame edge.
+A3 §1 took `q` = the combo's LAST print, and for at least 29% of soccer GL combos that print came in play (findings,
+section E4 Stage 2 RESULT). The capture stored no print time or taker side, and Kalshi purges a finalized combo's
+trades, so the window cannot be repaired. **User decision, 2026-10-30, verbatim: "Yes, all four"**. It answered the
+umbrella session's recommendation (log 10-30 18:07Z, item E4 (e)): read the trade prints of the passing-shape
+two-leg combos going forward, then re-read Stage 2 on the last pregame print.
+
+**What the author had seen before writing this.** Stage 2's full result, including the contaminated soccer band
+table. So A5 changes ONLY the price definition, the window and the data source. The cells, sides, the 1 pp
+threshold, the minimum n, Holm's m and the verdict words are A3 §9's, unchanged. No forward trade print exists at
+the time of writing: the capture's trade read is off on the fleet (`trades_max_legs` 0) until the user-approved
+fast-forward that carries lane `e4-pregame-prints`' capture change.
+
+1. **Data source.** The `#742` store, `combos_<settled UTC date>.jsonl.gz`, as A3 §1. The capture now reads public
+   trade prints for every TRADED two-leg combo whose single same-game group has one of the four passing shapes
+   (A3 §2, from tickers alone; `scripts/kalshi_combo_capture.py` `e4_trade_shape`, parity-tested against
+   `e4_stage2_combo_prices.shape_cell`). Each print is stored as `{t, yes, no, count, taker_side}`.
+   - **D0** = the first UTC settlement date on which every capture run ran with the shaped trade read on
+     (`runs.jsonl` `trades_shapes`). It is printed with the coverage.
+   - A shaped row whose `trades_status` is `skipped_budget`, `unreadable` or `skipped` is MISSING. Missing rows are
+     counted per cell and per settlement date. If more than 10% of a cell's shaped rows are missing, that cell's
+     reading is stamped COVERAGE-LIMITED (the verdict is still reported).
+2. **Window.** Combos SETTLED D0 .. **2026-11-22** (UTC settlement date), with the game date from the leg ticker
+   inside the same range. **Read on or after 2026-11-24.**
+   - **One extension, registered now:** if EVERY R2 test reads INSUFFICIENT, the window extends once, to
+     settlements through **2026-12-20**, read on or after 2026-12-22. That reading stands, whatever it is.
+3. **Population and join.** A3 §2-§6 and A4, unchanged except for the window. Stage 1's loaders, game join
+   (A4 `same_slot` + `match_event_blob`), leg parser, marginals at the combo's line and the three arms run over the
+   forward dates. The ONLY code change allowed in the read is the window (dates as parameters instead of the
+   09-30..10-25 constants). It is made and tested before any price x probability x outcome join, with a
+   `--funnel-only` run allowed first, as in A3.
+4. **Commence.** The joined Stage 1 game's `commence_time` (its `book_quotes` start). A print is **pregame** iff its
+   `t < commence`.
+5. **The price (replaces A3 §1's `q` for R2):**
+   - `q_YES` = the `yes` price of the LAST pregame print whose `taker_side` is `yes`, i.e. what a YES taker paid.
+   - `q_NO` = the `no` price of the LAST pregame print whose `taker_side` is `no`.
+   - A combo enters a side's test only if that side has a pregame print with a price in (0, 1). A combo with none
+     is counted (`no_pregame_print_on_side`), never imputed.
+   - `q_any` = the `yes` price of the last pregame print of either side. R1 and the band table use it.
+6. **Fee, EV and realised return.** As A3 §7, at the side's own price:
+   - fee(q) = 0.07 x m x q(1 - q), with m read at run time from `/series/KXMVECROSSCATEGORY` (upper bound 1.0 if
+     unreadable);
+   - YES: `EV_x = p_x/(q_YES + fee) - 1`, `R = 1{result = yes}/(q_YES + fee(q_YES)) - 1`;
+   - NO: `EV_x^NO = (1 - p_x)/(q_NO + fee) - 1`, `R = 1{result = no}/(q_NO + fee(q_NO)) - 1`;
+   - Kalshi's `result` decides R; a grading disagreement leaves R2/R3 as A3 §7.
+7. **Readings, unchanged from A3 §9 except for the price:**
+   - **R1** (descriptive): OLS of (q_any - p_a) on (p_b - p_a), game-clustered.
+   - **R2** (gated): per cell, YES among combos with p_b - p_a >= 1 pp at `q_YES`, NO among combos with
+     p_a - p_b >= 1 pp at `q_NO`. Mean realised return, game-clustered (CR1) 95% CI, two-sided normal p.
+     - Holm over the same 8 tests (4 cells x 2 sides), even though MLB will hold few or no forward combos (the
+       season ends ~11-01).
+     - A test enters with p = 1 when it is below minimum n or its mean is <= 0.
+     - Minimum n >= 20 games and >= 200 combos, else INSUFFICIENT, which is never a kill.
+     - EDGE / LEAD / NO EDGE and the overall verdict exactly as A3 §9.
+   - **R3** (descriptive, no price): as A3, on the forward population.
+8. **Reported regardless, not gated:**
+   - the full A3 §8 band table at `q_any`;
+   - realised return per side at the any-side last pregame print (A3's own definition, restricted to pregame);
+   - the share of shaped combos whose LAST print overall is in play, and whose first print is in play;
+   - minutes from the last pregame print to commence (median, p90);
+   - a sensitivity of R2 with `t < commence - 15 min`.
+9. **What each reading decides (registered now):**
+   - **EDGE** in a cell: a PAPER combo track for that cell is proposed under Phase 5 (D2 paper first). No live
+     capital, and D6's canary rule is untouched.
+   - **NO EDGE** in a sufficient cell, on both sides: combo pricing from the sim is closed for that cell. The R3
+     result still informs the correlation source.
+   - **INSUFFICIENT**: the one extension in §2, then the reading stands.
+10. **Expectation, stated before any data:**
+    - MLB holds few or no forward combos.
+    - NBA SP-nested joined 12 combos in 26 days in Stage 2, so it will likely read INSUFFICIENT.
+    - Soccer GL is the only cell likely to reach minimum n. Stage 2 priced 2,467 of 6,371 shaped soccer combos in
+      26 days, before the pregame-print filter.
+11. **Code:**
+    - Capture: `scripts/kalshi_combo_capture.py` (`--trades-shapes`, default `e4`; `e4_trade_shape`; a per-run
+      reservation for the shaped reads), tests in `tests/test_kalshi_combo_capture.py`. Lane `e4-pregame-prints`.
+    - The A5 read: `scripts/e4_stage2_combo_prices.py`, window parameters and the §5 price only, with tests, built
+      before the read.
