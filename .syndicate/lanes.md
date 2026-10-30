@@ -1074,15 +1074,6 @@ death, never life — do not invert it.
 - Verification: the Stage 2 run's report (C:/tmp/e4/stage2.json) read and its verdicts recorded in the findings file and #740, with the funnel and the n each reading rests on
 - Blocked by: the #742 first-full-forward-day reading (scheduled task kalshi-combo-capture-first-forward-day); user condition 'Yes, after the reading'
 
-### nba-period-paper-grading — CLOSED 2026-10-29 — opened 2026-10-29 — session 35e11968-5658-4c2d-9138-647f0c2d7814
-- **GOAL VERDICT (checkpoint 2026-10-29 20:4xZ, 35e11968):** "NBA quarter/half game lines (spreads, totals, h2h and their alts on q1..q4/h1/h2) grade off the daily ESPN linescore file (nba_source/data/processed/linescores_<date>.json) through segment_actuals.segment_scores_view instead of refusing actual_is_full_game_not_<seg>; segment player props still refuse by name; a read-only fleet dry run of backfill_archived_paper_grades.py shows the archived NBA period refusals grade and nothing else moves; code on main" -- **GOAL: MET.** Readings: 21 hermetic tests pass (all 21 fail on the old resolver; reachability off != on through paper_settlement._default_resolver first); read-only fleet dry run 20:36:28Z-20:36:52Z, base main 682ec056 vs base + bet_status_nba.py: archived NBA period rows 15/15 graded, each equal to an independent sum from the fleet file, pass candidates 44 -> 44, graded 1 -> 16, only the six actual_is_full_game_not_* reasons moved (15 -> 0), shard sha256 28e8a39ebc90c112 unchanged; code on origin/main aa8dd3c6. NOT on the fleet (user decision); the first-tick reading is owed in #745.
-- Goal: NBA quarter/half game lines (spreads, totals, h2h and their alts on q1..q4/h1/h2) grade off the daily ESPN linescore file (nba_source/data/processed/linescores_<date>.json) through segment_actuals.segment_scores_view instead of refusing actual_is_full_game_not_<seg>; segment player props still refuse by name; a read-only fleet dry run of backfill_archived_paper_grades.py shows the archived NBA period refusals grade and nothing else moves; code on main
-- Files: syndicate/features/shared/bet_status_nba.py (segment game-line grading from the linescore ONLY), tests/test_bet_status_nba_segments.py (NEW), .syndicate/findings_2026-10-29_nba_period_paper_grading.md (NEW), docs/ai_context/todo.md (#745 section only)
-- Hypothesis: The 15 archived NBA period refusals (13:40Z read) are game lines on FINAL games whose linescore_<date>.json is on the fleet disk; the box is the only missing piece
-- Falsification test: A read-only fleet dry run with the new code grades fewer than all of the archived NBA actual_is_full_game_not_<seg> rows (each non-grader named), or changes the verdict/reason of any other row
-- Verification: Hermetic tests incl. off != on through paper_settlement._default_resolver first; read-only fleet dry run (no --apply) from a code extract on WSL ~/Syndicate with archive shard unchanged; code pushed to main
-- Blocked by: none
-
 ### closed-lane-archive-20261029-1650 — CLOSED 2026-10-29 (GOAL MET: 1 block archived) — opened 2026-10-29 — session 4bbe339d-1cf6-477c-9465-0039e9dfbd51
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
@@ -1094,6 +1085,12 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness (--idle-min 240) read SAFE for 1 of 6 CLOSED blocks; archived after a dry run and an unchanged invariant check.
 - Moved: `closed-lane-archive-20261029-1439`. Table and WAIT reasons: `.syndicate/log/2026-10-29.md` 23:50Z.
+
+### closed-lane-archive-20261029-2039 — CLOSED 2026-10-29 (GOAL MET: 1 block archived) — opened 2026-10-29 — session dbfa957e-4655-4581-ae04-b247240da689
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: MET. owner_liveness.py --idle-min 240 at 01:40Z 10-30 (8:40 PM CDT 10-29) returned 1 SAFE of 6 CLOSED; it was moved to lanes_closed.md with one pointer. Table and deferrals are in log/2026-10-30.md 01:40Z.
+- Moved: nba-period-paper-grading
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1374,6 +1371,7 @@ death, never life — do not invert it.
 - `nba-live-state-overdue` — CLOSED 2026-10-26 (GOAL MET) — opened 2026-10-23 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
 - `nba-minutes-priced-first-shadow` — CLOSED 2026-10-23 (GOAL MET) — opened 2026-10-22 — session ffb7ab00-4a20-4c1b-8afe-0175450f1082
 - `nba-no-history-admit` — CLOSED 2026-10-21 (GOAL MET) — opened 2026-10-20 — session 15f24a49-f7db-4e95-9863-43d1149e4d8f
+- `nba-period-paper-grading` — CLOSED 2026-10-29 — opened 2026-10-29 — session 35e11968-5658-4c2d-9138-647f0c2d7814
 - `nba-portfolio-live-prop-status` — CLOSED 2026-10-24 (GOAL MET) — opened 2026-10-23 — session 4aafc5d6-ccb2-4931-99cf-b906a41d252c
 - `nba-preseason-oddsapi` — CLOSED — opened 2026-10-02 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
 - `nba-prop-wrong-game` — CLOSED 2026-10-28 (HYPOTHESIS FALSIFIED: no wrong game; the rows are DNPs on the player's own team) — opened 2026-10-28 — session c59f19b5-f9a2-4c74-bd42-86d0adb1b22b
