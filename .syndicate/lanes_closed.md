@@ -13027,3 +13027,9 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness --idle-min 240 read 1 SAFE of 6 CLOSED; dry run, apply, invariants unchanged vs baseline.
 - Moved: closed-lane-archive-20261029-1240. Table and Part B in `.syndicate/log/2026-10-29.md` 21:52Z.
+
+### closed-lane-archive-20261029-1850 — CLOSED 2026-10-29 (GOAL MET: 1 block archived) — opened 2026-10-29 — session b78dab7e-a25e-4a92-a258-7ff450abc6f8
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness (--idle-min 240) read SAFE for 1 of 6 CLOSED blocks; archived after a dry run and an unchanged invariant check.
+- Moved: `closed-lane-archive-20261029-1439`. Table and WAIT reasons: `.syndicate/log/2026-10-29.md` 23:50Z.
