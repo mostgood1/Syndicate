@@ -13021,3 +13021,9 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Falsification test: A read-only fleet dry run with the new code grades fewer than all of the archived NBA actual_is_full_game_not_<seg> rows (each non-grader named), or changes the verdict/reason of any other row
 - Verification: Hermetic tests incl. off != on through paper_settlement._default_resolver first; read-only fleet dry run (no --apply) from a code extract on WSL ~/Syndicate with archive shard unchanged; code pushed to main
 - Blocked by: none
+
+### closed-lane-archive-20261029-1650 — CLOSED 2026-10-29 (GOAL MET: 1 block archived) — opened 2026-10-29 — session 4bbe339d-1cf6-477c-9465-0039e9dfbd51
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness --idle-min 240 read 1 SAFE of 6 CLOSED; dry run, apply, invariants unchanged vs baseline.
+- Moved: closed-lane-archive-20261029-1240. Table and Part B in `.syndicate/log/2026-10-29.md` 21:52Z.
