@@ -509,3 +509,4 @@ found after the run, from the run's own per-combo file.
     rate (7,089 shaped combos over 26 days).
   - Then a new pre-registered amendment that takes each combo's last print before its earliest leg's start.
   - That changes a fleet job, so it was not done in this lane.
+- **(e) TAKEN 2026-10-30** (user: "Yes, all four"): Amendment A5 in the pre-registration (`41cb8aba`) re-reads Stage 2 on the last pregame print per side; the capture's shaped trade read is `8a0a83dc` (lane `e4-pregame-prints`, `#740` (e)).
