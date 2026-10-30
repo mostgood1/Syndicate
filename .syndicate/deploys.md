@@ -55132,3 +55132,15 @@ which is about the two sizing bases and not about the refusal boundary.
 - **verify (OWED):**
   - the first `runs.jsonl` row carrying `trades_shapes: "e4"`, with `shaped_reads` > 0 or a shaped count of 0 that its window explains, and no `errors`;
   - after the first full UTC day (10-31): shaped traded two-leg rows with `trades_status` ok/empty > 0, `skipped_budget` counted, prints with `taker_side`, GETs within the run budget.
+
+## 2026-10-30 20:08Z (3:08 PM CT) -- MEASUREMENT for 2026-10-30 19:02:42Z (fleet ff to 413a08d5, #740 (e) shaped combo trade reads): the shaped read RAN on real combos -- **VERIFIED (first run); the 10-31 full-day reading still OWED** (lane e4-pregame-prints)
+- **Instrument:** fleet `runs.jsonl` (watcher `first_shaped_reads.sh`) and the stored rows (`stored_shaped.py`, read-only, the worktree's `kalshi_combo_capture.py` at `9013675e` for `e4_trade_shape`).
+- **Runs on the new code:**
+  - 19:02:54Z: `trades_shapes` e4, `shaped_reads` 0. A true zero: 0 shaped combos settled in its window (log 10-30 19:30Z).
+  - **20:02:56Z..20:04:35Z: `ok`, `shaped_reads` 42, `shaped_ok` 42, `shaped_prints` 138**, 0 `skipped_budget`, `shaped_budget_stopped` false, GETs markets 190 + trades 42, 99.3 s, errors [].
+- **Stored rows (captured 20:02:56Z):** 42 shaped traded two-leg rows, all soccer Ligue 1 GL, all `trades_status` ok. 138 prints, each `{t, yes, no, count, taker_side}`; taker_side yes 111 / no 27; median 2 prints per combo (max 20); first print a median 2.0 h before settlement (max 34.9 h).
+- **Found (read-only, 1 public GET):** the example's leg `KXLIGUE1GAME-26OCT31NICREN-TIE` has `occurrence_datetime` 2026-10-31T19:15Z but closed 10-30 19:54:54Z and settled 19:55:53Z. The fixture was evidently played a day early.
+  - A4's soccer join compares the ticker date with the game's US/Eastern date, so these combos will read `no_stage1_game_in_slot` in A5: counted, never mispriced.
+  - It affects rescheduled fixtures only. No amendment: the join is registered (A4), and A5 §3 allows no other change.
+- **verify:** the first-run clause is MET: a `trades_shapes` e4 row with `shaped_reads` > 0, no errors, prints stored with `taker_side`.
+  - Owed: the 10-31 full UTC day (readable from ~01:05Z 11-01): shaped rows ok/empty vs `skipped_budget`, prints with `taker_side`, GETs within the run budget. That day is A5's D0.
