@@ -1703,29 +1703,77 @@ def default_offdisk_dir(local: dict[str, str]) -> Path | None:
     return None
 
 
-def archive_offdisk(snapshot: Path, offdisk: Path, keep: int) -> dict[str, Any]:
-    """`tar | gzip -1` the snapshot into ONE file on `offdisk` (a single
-    sequential write: no per-file metadata for 9p to refuse), `.partial` until
-    complete, keep the newest `keep`."""
+def default_offdisk_staging_dir(local: dict[str, str], offdisk: Path) -> Path | None:
+    """Where the archive is WRITTEN before it is moved into `offdisk`:
+    `SYNDICATE_LOCAL_BACKUP_OFFDISK_STAGING_DIR`, else -- when `offdisk` is
+    inside a OneDrive folder -- `SyndicateBackup-staging` beside that OneDrive
+    folder, else none (the `.partial` is written in `offdisk` itself).
+
+    A sync client works on a file while it changes, so a `.partial` written
+    inside OneDrive is a 7 GB moving target; moved in at the end, the finished
+    archive appears at once. Beside the OneDrive folder is the same volume, so
+    the move is a rename and not a 7 GB copy. Measured 2026-10-30: the first
+    nightly archive written after the OneDrive client resumed syncing failed
+    mid-write (`gzip: stdout: Cannot allocate memory`). The cause is not
+    established; staging rules this one out."""
+    override = _setting(local, "SYNDICATE_LOCAL_BACKUP_OFFDISK_STAGING_DIR")
+    if override:
+        return Path(override).expanduser()
+    parts = offdisk.parts
+    for i, part in enumerate(parts):
+        if part == "OneDrive" or part.startswith("OneDrive - "):
+            return Path(*parts[:i]) / "SyndicateBackup-staging"
+    return None
+
+
+def archive_offdisk(snapshot: Path, offdisk: Path, keep: int, *, staging: Path | None = None,
+                    retries: int = 1, retry_delay: float = 300.0) -> dict[str, Any]:
+    """`tar | gzip -1` the snapshot into ONE file (a single sequential write: no
+    per-file metadata for 9p to refuse), `.partial` until complete, written in
+    `staging` when given (`default_offdisk_staging_dir`) and moved into
+    `offdisk`; keep the newest `keep`. A failed write is retried `retries`
+    times, `retry_delay` seconds apart: on 2026-10-30 the 09:21Z write failed
+    and a re-run of the same snapshot at 15:19Z succeeded."""
     offdisk.mkdir(parents=True, exist_ok=True)
-    for stale in offdisk.glob("*.tar.gz.partial"):
-        stale.unlink(missing_ok=True)
+    work = staging or offdisk
+    work.mkdir(parents=True, exist_ok=True)
+    for folder in {offdisk, work}:
+        for stale in folder.glob("*.tar.gz.partial"):
+            stale.unlink(missing_ok=True)
     target = offdisk / f"{snapshot.name}.tar.gz"
-    partial = offdisk / f"{snapshot.name}.tar.gz.partial"
+    partial = work / f"{snapshot.name}.tar.gz.partial"
     command = ["tar", "-C", str(snapshot.parent), "--use-compress-program=gzip -1", "-cf", str(partial), snapshot.name]
     if shutil.which("nice") and not IS_WINDOWS:
         command = ["nice", "-n", "15"] + command
-    proc = subprocess.run(command, capture_output=True, text=True)
-    # tar exits 1 for "file changed as we read it"; the snapshot is not being
-    # written, so anything non-zero here is a real failure.
-    if proc.returncode != 0 or not partial.is_file():
+    failures: list[str] = []
+    while True:
+        proc = subprocess.run(command, capture_output=True, text=True)
+        # tar exits 1 for "file changed as we read it"; the snapshot is not being
+        # written, so anything non-zero here is a real failure.
+        if proc.returncode == 0 and partial.is_file():
+            break
         partial.unlink(missing_ok=True)
-        return {"ok": False, "rc": proc.returncode, "error": (proc.stderr or "")[-300:]}
-    partial.rename(target)
+        failures.append(f"rc={proc.returncode} {(proc.stderr or '')[-300:].strip()}")
+        if len(failures) > retries:
+            return {"ok": False, "rc": proc.returncode, "error": (proc.stderr or "")[-300:],
+                    "attempts": len(failures), "failures": failures}
+        print(f"off-disk archive attempt {len(failures)} failed ({failures[-1]}); retrying in {retry_delay:.0f}s", flush=True)
+        time.sleep(retry_delay)
+    try:
+        partial.rename(target)
+    except OSError:
+        if work == offdisk:
+            raise
+        # staging on another volume: copy in under the .partial name, then rename
+        landing = offdisk / partial.name
+        shutil.copyfile(partial, landing)
+        partial.unlink(missing_ok=True)
+        landing.rename(target)
     archives = sorted(p for p in offdisk.glob("*.tar.gz") if p.is_file())
     for old in archives[: max(0, len(archives) - keep)]:
         old.unlink(missing_ok=True)
-    return {"ok": True, "path": str(target), "bytes": target.stat().st_size}
+    return {"ok": True, "path": str(target), "bytes": target.stat().st_size,
+            "attempts": len(failures) + 1, "failures": failures, "staging": str(staging) if staging else None}
 
 
 def _complete_snapshots(dest: Path) -> list[Path]:
@@ -1831,12 +1879,16 @@ def cmd_backup(args: argparse.Namespace) -> int:
     if offdisk is None:
         print("off-disk archive: none configured (SYNDICATE_LOCAL_BACKUP_OFFDISK_DIR)")
         return rc_out
+    staging = default_offdisk_staging_dir(local, offdisk)
     started_archive = time.time()
-    result = archive_offdisk(dest / name, offdisk, int(args.offdisk_keep))
+    result = archive_offdisk(dest / name, offdisk, int(args.offdisk_keep), staging=staging,
+                             retries=int(args.offdisk_retries), retry_delay=float(args.offdisk_retry_delay))
     if not result["ok"]:
-        print(f"FAILED: off-disk archive into {offdisk}: rc={result['rc']} {result['error']}")
+        print(f"FAILED: off-disk archive into {offdisk}: rc={result['rc']} {result['error']} "
+              f"(attempts {result['attempts']}, staged in {staging or offdisk})")
         return 6
-    print(f"off-disk archive {result['path']}: {result['bytes'] / 1e9:.2f} GB in {time.time() - started_archive:.0f}s")
+    print(f"off-disk archive {result['path']}: {result['bytes'] / 1e9:.2f} GB in {time.time() - started_archive:.0f}s "
+          f"(attempts {result['attempts']}, staged in {staging or offdisk})")
     return rc_out
 
 
@@ -2360,6 +2412,8 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     p.add_argument("--keep", type=int, default=7)
     p.add_argument("--offdisk", help="archive directory (default SYNDICATE_LOCAL_BACKUP_OFFDISK_DIR, else /mnt/c/SyndicateBackup on WSL)")
     p.add_argument("--offdisk-keep", type=int, default=2)
+    p.add_argument("--offdisk-retries", type=int, default=1, help="retry a failed archive write this many times")
+    p.add_argument("--offdisk-retry-delay", type=float, default=300.0, help="seconds between archive attempts")
     p.add_argument("--no-offdisk", action="store_true")
     p.set_defaults(func=cmd_backup)
 
