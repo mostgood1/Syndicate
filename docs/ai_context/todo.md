@@ -1,5 +1,37 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#753` — **GAMES RAIL: one live NFL/NCAAF situation reading left (possession, down & distance, field position on the served chip). Everything else in mockup-4 detail is served or named unavailable (verdict 2026-10-16)** — 2026-10-30, handed off from closed lane `games-rail-full-detail` (owner d4409ac4 idle since 10-14) by lane `stale-lane-triage`
+- **OWED:** during a live NFL or NCAAF game, read the fleet's `/api/board/game-chips?sport=nfl|ncaaf` and record the share of live chips carrying possession + down & distance + field position, with denominators, in `deploys.md`.
+- The lane's ~20-file claim map and its 10-16 verdict are in `lanes_closed.md` under `games-rail-full-detail`. Claims were released on close; take a lane before editing.
+
+### `#752` — **NFL SEGMENT MODEL: quarter/half lines (h1/h2/q1-q4) have no sim view, and full-game spreads/h2h carry a margin but no cover probability. NOT STARTED. More urgent since segment lines are captured by default (`a126ae95`, 10-22)** — 2026-10-30, handed off from closed lane `nfl-segment-model` (pickup item, never owned) by lane `stale-lane-triage`
+- **Goal (from the lane):** a segment model or a calibrated split of the full-game sim prices NFL segment rows (0/14 had a sim view on 10-08), plus a full-game cover probability.
+- **Verification:** served board segment rows with a sim view (before 0/14); a held-out calibration check before anything ranks on it. Follow `docs/ai_context/model_engine_standard.md`.
+
+### `#751` — **NHL GAME LINES AT ANY LINE: totals and puck lines are priced only at hockeysim's anchored total and the home -1.5; every other quoted line reads 'sim, average only'. NOT STARTED** — 2026-10-30, handed off from closed lane `nhl-game-any-line-pricing` (pickup item, never owned) by lane `stale-lane-triage`
+- **Goal:** hockeysim publishes a goals distribution, so every quoted NHL total/puck line carries a probability (0/19 on 10-08).
+- **Verification:** served board NHL totals/spreads with `model_prob_over` at non-anchored lines; home + away legs of each line sum to 1. Model-engine standard applies (checklist + reachability).
+
+### `#750` — **SOCCER CORNERS DISTRIBUTION: the soccer sim emits only `mean_home_corners` / `mean_away_corners` (adapters.py), so corners rows read 'sim, average only' and carry no `model_prob_over`. NOT STARTED** — 2026-10-30, handed off from closed lane `soccer-corners-distribution` (pickup item, never owned) by lane `stale-lane-triage`
+- **Goal:** publish a per-match corners distribution (per-sim counts or P(total > t) at every quoted line) so `totals_corners` / `alternate_totals_corners` price against the market (0/89 on 10-08).
+- **Verification:** served board corners rows with `model_prob_over`; the model-engine input checklist passes for the new field.
+
+### `#749` — **NFL PROP ARTIFACT RELAUNCH ON ODDS: code landed (`544cbb4e`, 10-06), never read on the fleet** — 2026-10-30, handed off from closed lane `nfl-prop-missing-odds-relaunch` (owner d81bf86d idle since 10-07) by lane `stale-lane-triage`
+- **OWED:** at a week rollover, grep the fleet refresh-worker log for `NFL_PROP_PROJECTION_LAUNCHING reason=odds_newer_than_launch` following that week's first odds capture within one cooldown, with no multi-hour `ARTIFACT_MISSING` run. Record it in `deploys.md`. Fleet logs keep ~4 days, so read within 3 days of the rollover.
+- The scheduled task `nfl-weekly-prop-artifact` (Tuesdays) touches the same artifact and is a natural place to take this reading.
+
+### `#748` — **FLEET WATCHDOG AUTO-RECOVERY: built, tested, installed; `RECOVERY_START` has never fired because no supervisor outage has lasted >= 9 min since install** — 2026-10-30, handed off from closed lane `fleet-watchdog-auto-recovery` (owner 43e4d5fe archived 10-16; kept open by user decision 10-14, closed by user approval 2026-10-30) by lane `stale-lane-triage`
+- **OWED:** the first real supervisor-down >= 9 min: `~/syndicate-prod/logs/watchdog.log` shows `RECOVERY_START` followed by a healthy fleet. Record it in `deploys.md`. The 2026-10-13 04:37Z WSL stop (1m37s) correctly did not trigger it.
+- The watchdog files (`scripts/local_watchdog.py`, `tests/test_local_watchdog.py`, `deploy/local/watchdog.ps1`, the runbook watchdog section) are no longer claimed. Take a lane before editing.
+
+### `#747` — **NBA LAYER 2 PROP PROJECTIONS: the game half is MET; the prop half (`prop_rows_with_projection`) read 0 only because books posted no preseason props. Regular-season props exist now, so one fleet read decides it** — 2026-10-30, handed off from closed lane `nba-layer2-projections` (owner ed75e56a idle since 10-05) by lane `stale-lane-triage`
+- **OWED:** fleet `/api/board/layer2-shortlist` -> `per_sport_ingest.nba.enrichment.projections`: `game_rows_with_projection / game_rows_considered`, `prop_rows_with_projection / prop_rows_considered`, `rows_with_probability`, unprojected by reason; check the edge distribution by side for a one-sided pile. Record it in `deploys.md`.
+- The served prop probability is the NBA book blend (`served_prop_probability`, `SYNDICATE_NBA_PROP_BOOK_BLEND=0` restores the ladder).
+
+### `#746` — **DAILY ACCURACY SUITE: 3 of 4 clauses met and deployed; the NBA regular-season grading reading (OWED (b)) was never recorded. NCAAB registration (OWED (c)) was struck 10-12** — 2026-10-30, handed off from closed UNOWNED lane `daily-accuracy-suite` (owner 9b88f9a2 archived 09-20) by lane `stale-lane-triage`
+- **OWED:** one `/daily-accuracy` read after NBA regular-season games have graded: NBA graded games and ungraded rate in the model-scorecard artifact, recorded in `deploys.md`.
+- **Loan note:** `syndicate/features/shared/population_outcomes_espn.py` was lent to OPEN lane `cheat-sheets` (2026-10-15) "returns on close". The lender is now closed, so the file simply stays with `cheat-sheets` until that lane closes.
+
 ### `#745` — **NBA QUARTER AND HALF PAPER BETS NOW GRADE, from the daily ESPN linescore. Until 10-29 every q1..q4/h1/h2 bet refused `actual_is_full_game_not_<seg>` forever (15 archived paper rows, plus every new one). Code on main; the fleet dry run grades 15/15 and moves nothing else. Applies itself at the next fleet up** — 2026-10-29, lane `nba-period-paper-grading`, session 35e11968 (side session of `#744`'s residual); `.syndicate/findings_2026-10-29_nba_period_paper_grading.md`
 - **STATUS 2026-10-29 3:38 PM CT (20:38Z): BUILT, DRY-RUN CONFIRMED, NOT ON THE FLEET.**
   - **What changed:** `bet_status_nba` grades a segment spread, total or moneyline (and their alts) from `nba_source/data/processed/linescores_<date>.json`, through `segment_actuals.segment_scores_view`. That file is written daily at 10:35Z by the existing `basketball-linescores` job.
