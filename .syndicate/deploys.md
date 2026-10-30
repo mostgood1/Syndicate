@@ -55008,3 +55008,18 @@ which is about the two sizing bases and not about the refusal boundary.
   - The day's GETs: ~11,176 (prorated).
   - Results filled: 99.49%.
 - discharges the OWED verify of the 2026-10-27 20:56:16Z entry (first forward day) and the 22:24Z reading's owed purge date.
+
+## 2026-10-30 15:34Z (10:34 AM CT) -- FLEET ONE-OFF: re-create today's off-disk backup archive after the 09:21Z failure (lane syndicate-decision-engine, user decision) -- **WRITE VERIFIED; upload reading to follow**
+- **Why:** the 09:15Z `data-backup` snapshot `20261030T091501Z` succeeded (283,273 files / 38.56 GB, rsync rc=0), but its off-disk archive failed at 09:21:39Z: `rc=2`, `gzip: stdout: Cannot allocate memory` writing into `/mnt/c/Users/tempadmin/OneDrive/SyndicateBackup`. Without a new archive, the newest off-host copy (10-29 09:27Z) passes Phase 0 item 3's 30 h bound at 15:27Z.
+- **User decision, verbatim:** "Yes, re-run it now (Recommended)".
+- **What:** `archive_offdisk(~/syndicate-prod-backup/20261030T091501Z, /mnt/c/Users/tempadmin/OneDrive/SyndicateBackup, keep=2)`, imported from the fleet checkout (`6d6e729dc`), at nice 19 / ionice idle.
+  - It is the same function the job calls. No new snapshot was taken.
+  - Nothing restarted, and the env was untouched.
+- **Expectation (printed before the write):** `20261030T091501Z.tar.gz` of about 7 GB, `ok=true`; keep 2 then removes `20261028T091501Z.tar.gz`.
+- **Reading:**
+  - Ran 15:19:54Z..15:33:41Z (827 s) and returned `{"ok": true, "bytes": 7222457465}`, `py_rc=0`.
+  - The folder now holds `20261029T091500Z.tar.gz` (7,011,609,781 B) and `20261030T091501Z.tar.gz` (7,222,457,465 B). The 10-28 archive was rotated out; it is still in the cloud recycle bin, since it was synced.
+  - Memory: available 7,870 MB before and 7,580 MB after.
+- **Cause evidence, one data point:** this write succeeded with the OneDrive client active and syncing. That weighs against "OneDrive touches the `.partial` mid-write" and toward the 09:15-09:30Z memory window. NOT proven: a single success does not exclude an intermittent cause.
+- **Gap:** Phase 0 item 3's 30 h bound lapsed at 15:27Z. It is restored when `20261030T091501Z.tar.gz` reads synced (state 2/3 with placeholder bit 0x8). Watcher `onedrive_watch5.ps1`, task bc68pdwye, polls every 2 min for up to 90 min.
+- **verify:** write MET (`ok=true`, size as expected, rotation as expected). Owed: the upload reading.
