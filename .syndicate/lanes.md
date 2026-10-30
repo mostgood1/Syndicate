@@ -624,20 +624,6 @@ death, never life — do not invert it.
 - Kalshi fair price LIVE 2026-10-28 17:11Z: fleet 6d6e729d since 16:44:45Z (syndicate-decision-engine window); pass 16:57:30Z appended 12 `fair_price`; last copies +0.6898 / +0.2496 on $12, 0 still void, 11 book voids untouched -- MET (deploys.md 17:10:59Z). Live path 0 voids since the up (a null on 26 min).
 - Blocked by: none
 
-### stale-lane-triage — CLOSED 2026-10-30 (GOAL: MET) — opened 2026-10-30 — session eb9e3103
-- **GOAL VERDICT 2026-10-30 17:5xZ.** Goal (verbatim): "Classify every OPEN lane quiet >7d on origin/main (42 at 2026-10-30) as CLOSE-MET / CLOSE-ABANDONED / HAND-OFF / KEEP with evidence; after user approval close + archive the dead ones to lanes_closed.md with one-line pointers, 0 deletions of other lanes' content." -- **GOAL: MET.** Reading: lane_census.py on origin/main after e5f540d9 = 36 OPEN / 0 UNOWNED / 8 stale (was 69/1/42); 0 of the 34 closed slugs OPEN; claims 448 -> 332, all released claims from closed slugs; 0 origin/main lanes.md lines lost. check_lane_invariants.py still FAILS on 2 contested files held only by OPEN lanes, pre-existing at session start (digest LEDGER INCOHERENT), not caused by this change. 42 classified: 34 closed (13 MET / 9 ABANDONED / 12 HANDOFF, todo #746-#753 new), 2 KEEP, 6 left to owners active <=7d. Narrative: log/2026-10-30.md 17:50Z; table: findings_2026-10-30_stale_lane_triage.md.
-- Goal: Classify every OPEN lane quiet >7d on origin/main (42 at 2026-10-30) as CLOSE-MET / CLOSE-ABANDONED / HAND-OFF / KEEP with evidence; after user approval close + archive the dead ones to lanes_closed.md with one-line pointers, 0 deletions of other lanes' content.
-- Files: .syndicate/findings_2026-10-30_stale_lane_triage.md
-- Hypothesis: n/a (ledger hygiene)
-- Falsification test: n/a
-- Verification: lane_census.py on origin/main after landing: closed slugs absent from OPEN; check_lane_invariants.py clean; diff shows only the approved lanes' blocks moved
-- Blocked by: none
-
-### closed-lane-archive-20261030-1256 — CLOSED 2026-10-30 (GOAL MET: 1 block archived) — opened 2026-10-30 — session b0e08c10-066e-43aa-80d7-a5bf71af8f58
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: MET. Moved `closed-lane-archive-20261030-0849` (owner_liveness SAFE at --idle-min 240). Table and Part B in `.syndicate/log/2026-10-30.md`.
-
 ### e4-pregame-prints — OPEN — opened 2026-10-30 — session 8e021fe8-8974-476f-a16c-bf20939134d8
 - **A5 READ ARMED `[2026-10-30 22:25Z]`** (user: "Yes, arm it"): one-time scheduled task `e4-a5-pregame-print-read-1124` fires 2026-11-24 10:15 AM CT (16:15Z). It derives D0 from `runs.jsonl` (expected 10-31), runs `--a5 --funnel-only` and then the registered read over settlements D0..11-22, records the verdict in this block, `#740` and a new findings file, and ASKS before arming the 12-22 extension. Nothing it does touches production. Backstops: `syndicate-dispatch-watchdog` alerts on a missed dispatch; read `list_task_runs` after 11-24.
 - **FIRST SHAPED READS `[2026-10-30 20:08Z]`** (deploys.md 20:08Z): run 20:02:56Z `ok`, 42 shaped read, 42 ok, 138 prints with taker_side, 0 skipped_budget, no errors. Found: a rescheduled fixture (Nice-Rennes, ticker 26OCT31, settled 10-30) will read `no_stage1_game_in_slot` under A4's join; counted, not mispriced. Owed: the 10-31 full-day reading (from ~01:05Z 11-01).
@@ -651,15 +637,6 @@ death, never life — do not invert it.
 - Verification: Hermetic tests: shape parity with e4_stage2_combo_prices.shape_cell on a ticker grid, off != on for the shaped read, budget reservation; A5 committed on origin/main before the ff; after the ff, the first full UTC day's store rows read on the fleet (shaped traded two-leg combos, trades_status counts, prints with taker_side, GETs) and recorded in deploys.md
 - Blocked by: none
 
-### stale-todo-headlines — CLOSED 2026-10-30 (GOAL: MET) — opened 2026-10-30 — session eb9e3103-f175-4511-be0b-c4b7605e406f
-- Goal: The five todo headlines #662 #670 #697 #706 #709 state what is true on 2026-10-30, each correction citing its reading; no other line of todo.md changes
-- Files: docs/ai_context/todo.md (#662 #670 #697 #706 #709 header lines only)
-- Hypothesis: n/a
-- Falsification test: n/a
-- Verification: git diff origin/main -- docs/ai_context/todo.md shows exactly 5 lines changed, all ### headers of those ids
-- Blocked by: none
-- **GOAL VERDICT 2026-10-30 19:25Z:** "The five todo headlines #662 #670 #697 #706 #709 state what is true on 2026-10-30, each correction citing its reading; no other line of todo.md changes" -- GOAL: MET. Reading: `git diff --numstat` = 5/5 on todo.md, all five `### ` headers. #697 was NOT stale in substance: fleet ci-suite 10-30 03:53 CDT on `6d6e729dc9` = 61 NEW FAILURE(S), so its headline now says STILL RED.
-
 ### closed-lane-archive-20261030-1439 — CLOSED 2026-10-30 (GOAL MET: 1 blocks archived) — opened 2026-10-30 — session 7f87246c-628e-4ddf-86cd-90c9eb3006a0
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
@@ -669,6 +646,11 @@ death, never life — do not invert it.
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness.py at 240m returned 1 SAFE of 9 CLOSED; archived `closed-lane-archive-20261030-1045`. 8 WAIT (reasons in log/2026-10-30.md).
+
+### closed-lane-archive-20261030-1840 — CLOSED 2026-10-30 (GOAL MET: 3 blocks archived) — opened 2026-10-30 — session e86b3ac8-fb2d-46f2-a3e2-36330c906b70
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. 3 of 9 CLOSED blocks read SAFE under `owner_liveness.py --idle-min 240` and were moved: `stale-lane-triage`, `stale-todo-headlines`, `closed-lane-archive-20261030-1256`. The 6 deferred and the dormant-OPEN table are in `log/2026-10-30.md` (23:4xZ entry).
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -786,6 +768,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261030-0639` — CLOSED 2026-10-30 (GOAL MET: 1 block archived) — opened 2026-10-30 — session 7809edab-22c3-4771-b0f7-f3d437485913
 - `closed-lane-archive-20261030-0849` — CLOSED 2026-10-30 (GOAL MET: 1 block archived) — opened 2026-10-30 — session 28ca790a-f93d-4c24-9b3e-fc91ded234e9
 - `closed-lane-archive-20261030-1045` — CLOSED 2026-10-30 (GOAL MET: 1 block archived) — opened 2026-10-30 — session 5d79ee1d-9207-4220-8f3c-74a872c47b9d
+- `closed-lane-archive-20261030-1256` — CLOSED 2026-10-30 (GOAL MET: 1 block archived) — opened 2026-10-30 — session b0e08c10-066e-43aa-80d7-a5bf71af8f58
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
@@ -1193,6 +1176,8 @@ death, never life — do not invert it.
 - `soccer-unfed-inputs` — CLOSED 2026-09-10 — opened 2026-09-07 — session 520cd594 — **GOAL: MET: soccer gate runs in production (alarms 6 -> 2, both unsourced) and the market prior's A/B moved; prior stays OFF on a null backtest; closed by `census-rescue-0910` on user decision**
 - `soccer-xg-totals-bias` — CLOSED 2026-10-05 — opened 2026-10-05 — session 43e4d5fe-e05e-41bc-aae6-6d6986460b22
 - `spread-line-sign-convention` — spread-line-sign-convention — CLOSED-VERIFIED 2026-08-16 — **ARTIFACT OUTPUT NOW MEASURED: 12 of 12 MLB spreads rows correct on the served shortlist ( → `lanes_closed.md`.
+- `stale-lane-triage` — CLOSED 2026-10-30 (GOAL: MET) — opened 2026-10-30 — session eb9e3103
+- `stale-todo-headlines` — CLOSED 2026-10-30 (GOAL: MET) — opened 2026-10-30 — session eb9e3103-f175-4511-be0b-c4b7605e406f
 - `state-md-oom-subject-unindexed` — CLOSED — closed 2026-10-04 — opened 2026-10-04 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
 - `state-read-expand-choke-point` — CLOSED 2026-09-15 — opened 2026-09-15 — session 3a65723e-e0d5-42da-bea1-0c61b0c94add — **GOAL MET: `_read_state_payload` expands; the round-trip test FAILS with the expansion removed (5 failed) and passes with it; no production behaviour change, not deployed.**
 - `state-subject-archive-sweep` — CLOSED — closed 2026-10-05 — opened 2026-10-05 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31

@@ -13585,3 +13585,26 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness --idle-min 240 read 1 SAFE of 6 CLOSED; moved `closed-lane-archive-20261030-0639`. Table and Part B in `.syndicate/log/2026-10-30.md`.
+
+### stale-lane-triage — CLOSED 2026-10-30 (GOAL: MET) — opened 2026-10-30 — session eb9e3103
+- **GOAL VERDICT 2026-10-30 17:5xZ.** Goal (verbatim): "Classify every OPEN lane quiet >7d on origin/main (42 at 2026-10-30) as CLOSE-MET / CLOSE-ABANDONED / HAND-OFF / KEEP with evidence; after user approval close + archive the dead ones to lanes_closed.md with one-line pointers, 0 deletions of other lanes' content." -- **GOAL: MET.** Reading: lane_census.py on origin/main after e5f540d9 = 36 OPEN / 0 UNOWNED / 8 stale (was 69/1/42); 0 of the 34 closed slugs OPEN; claims 448 -> 332, all released claims from closed slugs; 0 origin/main lanes.md lines lost. check_lane_invariants.py still FAILS on 2 contested files held only by OPEN lanes, pre-existing at session start (digest LEDGER INCOHERENT), not caused by this change. 42 classified: 34 closed (13 MET / 9 ABANDONED / 12 HANDOFF, todo #746-#753 new), 2 KEEP, 6 left to owners active <=7d. Narrative: log/2026-10-30.md 17:50Z; table: findings_2026-10-30_stale_lane_triage.md.
+- Goal: Classify every OPEN lane quiet >7d on origin/main (42 at 2026-10-30) as CLOSE-MET / CLOSE-ABANDONED / HAND-OFF / KEEP with evidence; after user approval close + archive the dead ones to lanes_closed.md with one-line pointers, 0 deletions of other lanes' content.
+- Files: .syndicate/findings_2026-10-30_stale_lane_triage.md
+- Hypothesis: n/a (ledger hygiene)
+- Falsification test: n/a
+- Verification: lane_census.py on origin/main after landing: closed slugs absent from OPEN; check_lane_invariants.py clean; diff shows only the approved lanes' blocks moved
+- Blocked by: none
+
+### closed-lane-archive-20261030-1256 — CLOSED 2026-10-30 (GOAL MET: 1 block archived) — opened 2026-10-30 — session b0e08c10-066e-43aa-80d7-a5bf71af8f58
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: MET. Moved `closed-lane-archive-20261030-0849` (owner_liveness SAFE at --idle-min 240). Table and Part B in `.syndicate/log/2026-10-30.md`.
+
+### stale-todo-headlines — CLOSED 2026-10-30 (GOAL: MET) — opened 2026-10-30 — session eb9e3103-f175-4511-be0b-c4b7605e406f
+- Goal: The five todo headlines #662 #670 #697 #706 #709 state what is true on 2026-10-30, each correction citing its reading; no other line of todo.md changes
+- Files: docs/ai_context/todo.md (#662 #670 #697 #706 #709 header lines only)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: git diff origin/main -- docs/ai_context/todo.md shows exactly 5 lines changed, all ### headers of those ids
+- Blocked by: none
+- **GOAL VERDICT 2026-10-30 19:25Z:** "The five todo headlines #662 #670 #697 #706 #709 state what is true on 2026-10-30, each correction citing its reading; no other line of todo.md changes" -- GOAL: MET. Reading: `git diff --numstat` = 5/5 on todo.md, all five `### ` headers. #697 was NOT stale in substance: fleet ci-suite 10-30 03:53 CDT on `6d6e729dc9` = 61 NEW FAILURE(S), so its headline now says STILL RED.
