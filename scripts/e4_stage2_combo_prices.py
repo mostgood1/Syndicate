@@ -14,6 +14,15 @@ fee read, and Stage 1's cached outcome GETs. Imports no order, execution or cred
 Unit: one TRADED two-leg combo whose legs are one game and map onto a passing cell. Its price q is the capture's
 `last_price` (the last print's YES price). All arms share the legs' market marginals AT THE COMBO'S LINES and one
 Gaussian copula; they differ only in rho: (a) 0, (b) the sim's, (c) the SGP measured copula (MLB/NBA).
+
+AMENDMENT A5 (`--a5`, lane `e4-pregame-prints`, #740 (e); `41cb8aba` + A6, both before any trade-read data). The
+registered `last_price` was an in-play print for at least 29% of soccer combos, so A5 re-reads Stage 2 on a forward
+window with each combo's last PREGAME print on the side bought, from the capture's shaped trade reads:
+
+    ... scripts/e4_stage2_combo_prices.py --a5 --window-start <D0> --window-end 2026-11-22 \\
+        --data-root ~/syndicate-prod/data --out /mnt/c/tmp/e4/a5.json --cache /mnt/c/tmp/e4/cache
+
+Nothing else changes: the same Stage 1 loaders, join, legs, marginals, arms, cells, sides, minimum n and Holm.
 """
 from __future__ import annotations
 
@@ -55,6 +64,11 @@ DELTA_MIN = 0.01                       # R2: |p_b - p_a| >= 1 pp
 KALSHI_TAKER_RATE = 0.07
 STORE_SUBDIR = ("reports", "intelligence", "kalshi_combo_capture")
 META_BATCH = 100
+
+# Amendment A5 (41cb8aba) and A6 (committed with this code): the pregame-print price over a forward window.
+A5_SENSITIVITY = timedelta(minutes=15)   # A5 §8: R2 again with t < commence - 15 min (descriptive)
+A5_COVERAGE_LIMIT = 0.10                 # A5 §1: more than 10% of a cell's shaped rows MISSING -> COVERAGE-LIMITED
+A5_READ_STATUSES = ("ok", "empty")       # A6 §1: the prints were read; any other `trades_status` is MISSING
 
 MLB_SERIES = {"KXMLBHIT": "batter_hits", "KXMLBTB": "batter_total_bases", "KXMLBHR": "batter_home_runs",
               "KXMLBRBI": "batter_rbis"}
@@ -137,8 +151,12 @@ def iter_store(root: Path, first: date, last: date) -> Iterator[dict[str, Any]]:
                     yield row
 
 
-def candidate(row: Mapping[str, Any], funnel: Counter) -> dict[str, Any] | None:
-    """A3 §3: a traded two-leg combo, both legs one game, game dated in the Stage 1 window, shaped like a passing cell."""
+def candidate(row: Mapping[str, Any], funnel: Counter, a5: bool = False) -> dict[str, Any] | None:
+    """A3 §3: a traded two-leg combo, both legs one game, game dated in the Stage 1 window, shaped like a passing cell.
+
+    With `a5` (A5 §1-§2): the settlement date must be in the window too, and the price is NOT the listing's
+    `last_price` but the trade prints, priced after the game join (`a5_prices`). A shaped row whose prints were not
+    read is MISSING: counted per cell and per settlement date, never priced."""
     if int(row.get("n_legs") or 0) != 2:
         return None
     funnel["two_leg"] += 1
@@ -162,7 +180,22 @@ def candidate(row: Mapping[str, Any], funnel: Counter) -> dict[str, Any] | None:
         return None
     quote = row.get("quote_at_capture") or {}
     q = _f(quote.get("last_price"))
-    if q is None or not (0.0 < q < 1.0):
+    if a5:
+        settled = s1.parse_ts(row.get("settlement_ts"))
+        sd = settled.date().isoformat() if settled else None
+        if sd is None or not (s1.WINDOW_START.isoformat() <= sd <= s1.WINDOW_END.isoformat()):
+            funnel["a5_settled_outside_window"] += 1
+            return None
+        key = f"{g['sport']}|{cell}"
+        funnel[f"a5_shaped:{key}"] += 1
+        status = str(row.get("trades_status") or "none")
+        if status not in A5_READ_STATUSES:
+            funnel[f"a5_missing:{key}"] += 1
+            funnel[f"a5_missing_by_date:{sd}"] += 1
+            funnel[f"a5_missing_status:{status}"] += 1
+            return None
+        q = None
+    elif q is None or not (0.0 < q < 1.0):
         funnel["no_print_price"] += 1
         return None
     funnel[f"shaped:{g['sport']}|{cell}"] += 1
@@ -170,17 +203,49 @@ def candidate(row: Mapping[str, Any], funnel: Counter) -> dict[str, Any] | None:
             "game_seg": g.get("game"), "game_date": gd, "shape_cell": cell, "q": q,
             "volume": _f(row.get("volume_fp")), "result": str(row.get("result") or "").lower(),
             "created_time": row.get("created_time"), "settlement_ts": row.get("settlement_ts"),
+            "trades": (row.get("trades") or []) if a5 else None,
             "legs": [{"ticker": str(x.get("market_ticker") or ""), "side": str(x.get("side") or "").lower()}
                      for x in legs]}
 
 
-def read_candidates(root: Path, funnel: Counter) -> list[dict[str, Any]]:
+def read_candidates(root: Path, funnel: Counter, a5: bool = False) -> list[dict[str, Any]]:
     out = []
     for row in iter_store(root, s1.WINDOW_START - timedelta(days=1), s1.WINDOW_END + timedelta(days=3)):
-        c = candidate(row, funnel)
+        c = candidate(row, funnel, a5=a5)
         if c is not None:
             out.append(c)
     return out
+
+
+def a5_prices(trades: Iterable[Mapping[str, Any]] | None, commence: datetime,
+              before: timedelta = timedelta(0)) -> dict[str, Any]:
+    """A5 §5 / A6 §2: the prices a pregame taker paid, from the stored prints `{t, yes, no, count, taker_side}`.
+
+    `q_yes` is the `yes` price of the last print strictly before `commence - before` whose taker side is `yes`;
+    `q_no` the `no` price of the last such print taken on `no`; `q_any` the `yes` price of the last such print of
+    either side. A print whose own price is outside (0, 1) is not a price, and the one before it is used. The timing
+    fields (A5 §8) look at every print, before and after `commence`."""
+    timed = sorted(((ts, p) for p in trades or [] if isinstance(p, Mapping)
+                    for ts in (s1.parse_ts(p.get("t")),) if ts is not None), key=lambda x: x[0])
+    cut = commence - before
+    pre = [(ts, p) for ts, p in timed if ts < cut]
+
+    def last(side: str | None, price_side: str) -> tuple[float | None, datetime | None]:
+        for ts, p in reversed(pre):
+            if side is not None and str(p.get("taker_side") or "").lower() != side:
+                continue
+            q = _f(p.get(price_side))
+            if q is not None and 0.0 < q < 1.0:
+                return q, ts
+        return None, None
+
+    q_yes, _ = last("yes", "yes")
+    q_no, _ = last("no", "no")
+    q_any, t_any = last(None, "yes")
+    return {"q_yes": q_yes, "q_no": q_no, "q_any": q_any, "n_prints": len(timed), "n_pregame": len(pre),
+            "first_in_play": bool(timed) and timed[0][0] >= commence,
+            "last_in_play": bool(timed) and timed[-1][0] >= commence,
+            "mins_before": (commence - t_any).total_seconds() / 60.0 if t_any is not None else None}
 
 
 # ----------------------------------------------------------------------------- leg metadata (public GETs, cached)
@@ -565,7 +630,8 @@ def clustered_slope(x: Sequence[float], y: Sequence[float], games: Sequence[Any]
             "ci": [beta - 1.96 * se, beta + 1.96 * se]}
 
 
-def band_table(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+def band_table(rows: Sequence[Mapping[str, Any]], suffix: str = "") -> dict[str, Any]:
+    """§7 / A3 §8. `suffix="_any"` reads A5's any-side fields (A5 §8: the table at `q_any`)."""
     out = {}
     groups: dict[str, list] = defaultdict(list)
     for r in rows:
@@ -577,12 +643,14 @@ def band_table(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
                     "mean_p_b": float(np.mean([r["p_b"] for r in rr])),
                     "mean_p_c": (float(np.mean([r["p_c"] for r in rr if r["p_c"] is not None]))
                                  if any(r["p_c"] is not None for r in rr) else None),
-                    "ev_b_yes": clustered_mean([r["ev_b"] for r in rr], games),
-                    "realised_yes": clustered_mean([r["ret_yes"] for r in rr if r.get("ret_yes") is not None],
-                                                   [r["game"] for r in rr if r.get("ret_yes") is not None]),
-                    "ev_b_no": clustered_mean([r["ev_b_no"] for r in rr], games),
-                    "realised_no": clustered_mean([r["ret_no"] for r in rr if r.get("ret_no") is not None],
-                                                  [r["game"] for r in rr if r.get("ret_no") is not None])}
+                    "ev_b_yes": clustered_mean([r[f"ev_b{suffix}"] for r in rr], games),
+                    "realised_yes": clustered_mean(
+                        [r[f"ret_yes{suffix}"] for r in rr if r.get(f"ret_yes{suffix}") is not None],
+                        [r["game"] for r in rr if r.get(f"ret_yes{suffix}") is not None]),
+                    "ev_b_no": clustered_mean([r[f"ev_b_no{suffix}"] for r in rr], games),
+                    "realised_no": clustered_mean(
+                        [r[f"ret_no{suffix}"] for r in rr if r.get(f"ret_no{suffix}") is not None],
+                        [r["game"] for r in rr if r.get(f"ret_no{suffix}") is not None])}
     return out
 
 
@@ -622,7 +690,12 @@ def r3_logloss(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
             "mean_y": float(y.mean()), "mean_p_a": float(pa.mean()), "mean_p_b": float(pb.mean())}
 
 
-def finish_row(r: dict[str, Any], m: float, funnel: Counter) -> dict[str, Any]:
+def finish_row(r: dict[str, Any], m: float, funnel: Counter, a5: bool = False) -> dict[str, Any]:
+    """A3 §7 at `q`. With `a5` (A5 §6 / A6 §3), `q` is `q_any` and its EVs/returns move to `*_any` (the band table and
+    A5 §8's any-side return); `ev_b`, `ev_b_no`, `ret_yes`, `ret_no` -- what R2 reads -- are at the side's own price,
+    `q_yes` or `q_no`, and are None when that side has no pregame print. `*_15` are the same at commence - 15 min."""
+    if a5:
+        return _finish_a5(r, m, funnel)
     q = r["q"]
     r["fee"] = fee_per_contract(q, m)
     for arm in ("a", "b", "c"):
@@ -641,7 +714,64 @@ def finish_row(r: dict[str, Any], m: float, funnel: Counter) -> dict[str, Any]:
     return r
 
 
-def readings(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+def _side_return(y: int, q: float | None, m: float) -> float | None:
+    return None if q is None else y / (q + fee_per_contract(q, m)) - 1.0
+
+
+def _finish_a5(r: dict[str, Any], m: float, funnel: Counter) -> dict[str, Any]:
+    finish_row(r, m, funnel)                       # A3 at q = q_any: fee, ev_*, ev_*_no, y_kalshi, ret_* ...
+    for k in ("ev_a", "ev_b", "ev_c", "ev_a_no", "ev_b_no", "ev_c_no", "ret_yes", "ret_no"):
+        r[f"{k}_any"] = r.pop(k)                   # ... kept as the any-side reading
+    ok = r["y_kalshi"] is not None and r["y_kalshi"] == r["y_ours"]
+    pb = r["p_b"]
+    for suffix in ("", "_15"):
+        qy, qn = r[f"q_yes{suffix}"], r[f"q_no{suffix}"]
+        r[f"ev_b{suffix}"] = ev_yes(pb, qy, m) if qy is not None else None
+        r[f"ev_b_no{suffix}"] = ev_yes(1.0 - pb, qn, m) if qn is not None else None
+        r[f"ret_yes{suffix}"] = _side_return(r["y_kalshi"], qy, m) if ok else None
+        r[f"ret_no{suffix}"] = _side_return(1 - r["y_kalshi"], qn, m) if ok else None
+    funnel["a5_side_yes_priced"] += r["q_yes"] is not None
+    funnel["a5_side_no_priced"] += r["q_no"] is not None
+    return r
+
+
+def _r2_on(rows: Sequence[Mapping[str, Any]], side: str, suffix: str) -> dict[str, Any]:
+    """`r2_test` read on another price's fields (descriptive; never enters Holm)."""
+    alt = [dict(r, ret_yes=r.get(f"ret_yes{suffix}"), ret_no=r.get(f"ret_no{suffix}"),
+                ev_b=r.get(f"ev_b{suffix}"), ev_b_no=r.get(f"ev_b_no{suffix}")) for r in rows]
+    return r2_test(alt, side)
+
+
+def a5_coverage(funnel: Mapping[str, int]) -> dict[str, Any]:
+    """A5 §1: per cell, shaped rows and MISSING ones; more than 10% missing stamps the cell COVERAGE-LIMITED."""
+    out: dict[str, Any] = {}
+    for sport, cell in PASSING:
+        key = f"{sport}|{cell}"
+        shaped, missing = int(funnel.get(f"a5_shaped:{key}", 0)), int(funnel.get(f"a5_missing:{key}", 0))
+        share = missing / shaped if shaped else None
+        out[key] = {"shaped": shaped, "missing": missing, "missing_share": share,
+                    "coverage_limited": bool(share is not None and share > A5_COVERAGE_LIMIT)}
+    out["missing_by_settlement_date"] = {k.split(":", 1)[1]: v for k, v in sorted(funnel.items())
+                                         if k.startswith("a5_missing_by_date:")}
+    return out
+
+
+def a5_timing(timing: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """A5 §8, per cell over the joined combos (with or without a pregame print)."""
+    out = {}
+    for sport, cell in PASSING:
+        tt = [x for x in timing if (x["sport"], x["cell"]) == (sport, cell)]
+        mins = [x["mins_before"] for x in tt if x["mins_before"] is not None]
+        out[f"{sport}|{cell}"] = {
+            "joined": len(tt), "with_pregame_print": sum(x["q_any"] is not None for x in tt),
+            "last_print_in_play_share": (sum(x["last_in_play"] for x in tt) / len(tt)) if tt else None,
+            "first_print_in_play_share": (sum(x["first_in_play"] for x in tt) / len(tt)) if tt else None,
+            "mins_last_pregame_to_commence": ({"median": float(np.median(mins)), "p90": float(np.percentile(mins, 90)),
+                                              "n": len(mins)} if mins else {"n": 0})}
+    return out
+
+
+def readings(rows: Sequence[Mapping[str, Any]], a5: bool = False) -> dict[str, Any]:
     out: dict[str, Any] = {"cells": {}}
     pvals = {}
     for sport, cell in PASSING:
@@ -649,7 +779,7 @@ def readings(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         games = [r["game"] for r in rr]
         res: dict[str, Any] = {"combos": len(rr), "games": len(set(games))}
         if rr:
-            res["bands"] = band_table(rr)
+            res["bands"] = band_table(rr, "_any" if a5 else "")
             res["R1_price_tracking"] = clustered_slope([r["p_b"] - r["p_a"] for r in rr],
                                                         [r["q"] - r["p_a"] for r in rr], games)
             res["mean_q_minus_p_a"] = clustered_mean([r["q"] - r["p_a"] for r in rr], games)
@@ -662,6 +792,10 @@ def readings(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
             if vw:
                 res["volume_weighted_realised_yes"] = float(np.average([r["ret_yes"] for r in vw],
                                                                        weights=[r["volume"] for r in vw]))
+            if a5:  # A5 §8, descriptive: R2's selection at the any-side price and at commence - 15 min
+                for side in ("yes", "no"):
+                    res[f"R2_{side}_at_q_any"] = _r2_on(rr, side, "_any")
+                    res[f"R2_{side}_sensitivity_15min"] = _r2_on(rr, side, "_15")
         for side in ("yes", "no"):
             t = r2_test(rr, side)
             res[f"R2_{side}"] = t
@@ -695,6 +829,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--data-root", default=os.environ.get("SYNDICATE_DATA_ROOT") or "")
     ap.add_argument("--out", required=True)
     ap.add_argument("--cache", required=True)
+    ap.add_argument("--a5", action="store_true",
+                    help="Amendment A5: the last PREGAME print per side, over --window-start..--window-end")
+    ap.add_argument("--window-start", type=date.fromisoformat, default=None, help="A5 §2: D0 (YYYY-MM-DD)")
+    ap.add_argument("--window-end", type=date.fromisoformat, default=None, help="A5 §2: 2026-11-22, or 12-20 extended")
     ap.add_argument("--funnel-only", action="store_true",
                     help="plumbing check before the run is authorised: write join counts only -- no price, "
                          "probability, outcome or reading is written or printed")
@@ -706,8 +844,20 @@ def main(argv: list[str] | None = None) -> int:
     cache = Path(args.cache)
     report: dict[str, Any] = {"prereg": "9f8d759e", "amendments": ["A1 83f2e460", "A2 f5a503c6", "A3"],
                               "run_at": datetime.now(UTC).isoformat(), "funnel": {}}
+    if args.a5:
+        if args.window_start is None or args.window_end is None or args.window_start > args.window_end:
+            print("REFUSING: --a5 needs --window-start <= --window-end (A5 §2)", flush=True)
+            return 2
+        # A5 §3: the ONLY change to Stage 1's machinery is its window; every loader reads these at call time.
+        s1.WINDOW_START, s1.WINDOW_END = args.window_start, args.window_end
+        report["amendments"] += ["A4", "A5 41cb8aba", "A6"]
+        report["a5_window"] = [args.window_start.isoformat(), args.window_end.isoformat()]
+    elif args.window_start or args.window_end:
+        print("REFUSING: a window is A5's; the registered Stage 2 window is Stage 1's", flush=True)
+        return 2
     funnel: Counter = Counter()
-    cands = read_candidates(root, funnel)
+    timing: list[dict[str, Any]] = []
+    cands = read_candidates(root, funnel, a5=args.a5)
     report["funnel"]["store"] = dict(funnel)
     print("E4S2_STORE " + json.dumps(dict(funnel)), flush=True)
     meta, mstats = fetch_leg_meta((leg["ticker"] for c in cands for leg in c["legs"]), cache)
@@ -747,6 +897,18 @@ def main(argv: list[str] | None = None) -> int:
             if g is None:
                 f[why] += 1
                 continue
+            a5p = a5p15 = None
+            if args.a5:
+                commence = (g.get("_event_meta") or {}).get("commence")
+                if commence is None:
+                    f["a5_no_commence"] += 1
+                    continue
+                a5p, a5p15 = a5_prices(c["trades"], commence), a5_prices(c["trades"], commence, A5_SENSITIVITY)
+                timing.append({"sport": sport, "cell": c["shape_cell"], **a5p})
+                if a5p["q_any"] is None:
+                    f["a5_no_pregame_print"] += 1
+                    continue
+                c = dict(c, q=a5p["q_any"])
             r = price_combo(c, g, legs, idx, cells_c, f)
             if r is None:
                 continue
@@ -754,7 +916,10 @@ def main(argv: list[str] | None = None) -> int:
                 f[f"not_passing:{r['cell']}"] += 1
                 continue
             f["priced"] += 1
-            rows.append(r if args.funnel_only else finish_row(r, m, f))
+            if a5p is not None:
+                r.update({k: a5p[k] for k in ("q_yes", "q_no", "q_any", "n_prints", "n_pregame", "mins_before")})
+                r.update({"q_yes_15": a5p15["q_yes"], "q_no_15": a5p15["q_no"]})
+            rows.append(r if args.funnel_only else finish_row(r, m, f, a5=args.a5))
         report["funnel"][sport] = dict(f)
         print(f"E4S2_FUNNEL {sport} " + json.dumps(dict(f)), flush=True)
     if args.funnel_only:
@@ -764,12 +929,21 @@ def main(argv: list[str] | None = None) -> int:
         Path(args.out).write_text(json.dumps(report, indent=1, default=str), encoding="utf-8")
         print("E4S2_JOINED " + json.dumps(report["joined"]), flush=True)
         return 0
-    report.update(readings(rows))
+    report.update(readings(rows, a5=args.a5))
+    if args.a5:
+        report["a5_coverage"] = a5_coverage(report["funnel"]["store"])
+        report["a5_timing"] = a5_timing(timing)
+        for key, cov in report["a5_coverage"].items():
+            if isinstance(cov, dict) and key in report["cells"] and cov.get("coverage_limited"):
+                report["cells"][key]["stamp"] = "COVERAGE-LIMITED"
     report["fetch"] = {"gets": fetch.gets, "fail": fetch.fail}
     Path(args.out).write_text(json.dumps(report, indent=1, default=str), encoding="utf-8")
     keys = ["ticker", "sport", "cell", "stat_pair", "game", "date", "q", "volume", "result", "side_a", "side_b",
             "mkt_a", "line_a", "mkt_b", "line_b", "pA", "pB", "yA", "yB", "y_ours", "y_kalshi", "rho_b", "rho_c",
             "p_a", "p_b", "p_c", "fee", "ev_a", "ev_b", "ev_c", "ev_b_no", "ret_yes", "ret_no"]
+    if args.a5:
+        keys += ["q_yes", "q_no", "q_any", "q_yes_15", "q_no_15", "n_prints", "n_pregame", "mins_before",
+                 "ev_b_any", "ev_b_no_any", "ret_yes_any", "ret_no_any", "ret_yes_15", "ret_no_15"]
     with open(Path(args.out).with_suffix(".combos.csv"), "w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=keys, extrasaction="ignore")
         w.writeheader()

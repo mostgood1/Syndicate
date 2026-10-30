@@ -490,3 +490,42 @@ fast-forward that carries lane `e4-pregame-prints`' capture change.
       reservation for the shaped reads), tests in `tests/test_kalshi_combo_capture.py`. Lane `e4-pregame-prints`.
     - The A5 read: `scripts/e4_stage2_combo_prices.py`, window parameters and the §5 price only, with tests, built
       before the read.
+
+## Amendment A6 -- 2026-10-30 19:28Z, committed with the A5 code, before any A5 data or run (the choices A5 left open) -- lane `e4-pregame-prints`
+
+**State when written.** The capture's shaped trade read has been on the fleet since 19:02:42Z (`413a08d5`). Its one
+run so far (19:02:54Z) read 0 shaped combos, because none settled in its window. The A5 code below has not been run
+on any data. Nothing in this amendment was chosen with a forward print in view.
+
+1. **What counts as read** (A5 §1). A shaped row whose `trades_status` is `ok` or `empty` was read; `empty` means
+   the read returned no prints, so the combo has no pregame print (A5 §5). Every other status (`skipped_budget`,
+   `unreadable`, `skipped`, absent) is MISSING.
+2. **The price** (A5 §5).
+   - A print is pregame iff its `t < commence`; a print AT `commence` is in play.
+   - `q_YES` is the `yes` price of the last pregame print taken on `yes`, and `q_NO` the `no` price of the last
+     pregame print taken on `no`. A print whose own price is outside (0, 1) is not a price, and the previous print
+     of that side is used.
+   - `q_any` is the `yes` price of the last pregame print of either side, under the same rule.
+   - A combo with no `q_any` is counted (`a5_no_pregame_print`) and enters no reading except A5 §8's timing.
+3. **What each reading uses.**
+   - R2 (gated): YES at `q_YES`, NO at `q_NO`, with `EV^NO = (1 - p_b)/(q_NO + fee(q_NO)) - 1` and the realised
+     returns of A5 §6.
+   - R1, the mean (q - p_x), R3 and the band table run over combos with a `q_any`. R1 and the band table use
+     `q_any` (A5 §7-§8). In the band table and the any-side return, A3's own formulas apply at `q_any`, NO at
+     `1 - q_any`; the report names these `*_any`.
+   - A5 §8's sensitivity is R2's selection at `commence - 15 min`. Like the any-side R2, it never enters Holm.
+4. **Commence** (A5 §4). The joined Stage 1 game's `commence` from `book_quotes` (the same field A4's join uses).
+   A joined combo whose game has none is counted (`a5_no_commence`).
+5. **Coverage** (A5 §1). Per (sport, cell): shaped rows whose settlement date and game date are both in the window,
+   and the MISSING among them. More than 10% missing stamps that cell's report entry `COVERAGE-LIMITED`. Missing
+   rows are also reported per settlement date and per status.
+6. **Window** (A5 §2-§3). `--window-start` / `--window-end` set Stage 1's `WINDOW_START` / `WINDOW_END`, which every
+   Stage 1 loader reads at call time. As in A3, the store is read for settlement dates start - 1 .. end + 3; A5 then
+   keeps only settlement dates inside the window. `--a5` without both dates, a start after the end, or a window
+   without `--a5` all refuse.
+7. **Code.** `scripts/e4_stage2_combo_prices.py --a5` (`a5_prices`, `a5_coverage`, `a5_timing`, `finish_row(a5=)`,
+   `band_table(suffix=)`, `readings(a5=)`).
+   - Tests in `tests/test_e4_stage2_combo_prices.py`: 7 new, all of which fail on the pre-A5 file. They include an
+     end-to-end reachability test: with `--a5` a combo is priced at its pregame print (0.31), never at the in-play
+     `last_price` (0.97).
+   - The registered Stage 2 path is unchanged, and its 31 tests pass unmodified.

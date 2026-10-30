@@ -268,3 +268,176 @@ def test_r3_drops_combos_whose_grading_disagrees_with_kalshi():
     got, want = s2.r3_logloss(agree + bad), s2.r3_logloss(agree)
     assert got["D_ba"]["n"] == len(agree)
     assert got["D_ba"]["mean"] == pytest.approx(want["D_ba"]["mean"]) and got["mean_y"] == want["mean_y"]
+
+
+# ------------------------------------------------------------------ Amendment A5 (lane e4-pregame-prints): the pregame print
+from datetime import date as _date, datetime as _dt, timezone as _tz  # noqa: E402
+
+KICK = _dt(2026, 11, 1, 15, 0, tzinfo=_tz.utc)
+GL = ["KXEPLGAME-26NOV01ARSCRY-ARS", "KXEPLTOTAL-26NOV01ARSCRY-3"]
+GL_GROUP = [{"sport": "soccer", "league": "epl", "game": "26NOV01ARSCRY", "legs": [0, 1]}]
+
+
+def _print(hhmm, side, yes, no=None):
+    h, m = hhmm.split(":")
+    return {"t": f"2026-11-01T{h}:{m}:00Z", "taker_side": side, "yes": yes,
+            "no": round(1 - yes, 4) if no is None else no, "count": 1.0}
+
+
+PRINTS = [_print("12:00", "yes", 0.28), _print("13:30", "no", 0.33), _print("14:10", "yes", 0.30),
+          _print("14:50", "no", 0.31), _print("15:40", "no", 0.04), _print("16:30", "yes", 0.97)]
+
+
+def test_a5_prices_take_the_last_pregame_print_on_each_taker_side():
+    p = s2.a5_prices(PRINTS, KICK)
+    assert p["q_yes"] == pytest.approx(0.30)          # the 14:10 YES taker, not the in-play 0.97
+    assert p["q_no"] == pytest.approx(0.69)           # the 14:50 NO taker paid its `no` price
+    assert p["q_any"] == pytest.approx(0.31)          # the last pregame print's YES price, either side
+    assert p["n_prints"] == 6 and p["n_pregame"] == 4 and p["mins_before"] == pytest.approx(10.0)
+    assert p["last_in_play"] is True and p["first_in_play"] is False
+    p15 = s2.a5_prices(PRINTS, KICK, s2.A5_SENSITIVITY)   # t < 14:45
+    assert p15["q_yes"] == pytest.approx(0.30) and p15["q_no"] == pytest.approx(0.67) and p15["q_any"] == pytest.approx(0.30)
+
+
+def test_a5_prices_skip_a_price_outside_zero_one_and_read_none_when_nothing_is_pregame():
+    p = s2.a5_prices([_print("13:00", "yes", 0.25), _print("14:00", "yes", 1.0, no=0.0)], KICK)
+    assert p["q_yes"] == pytest.approx(0.25) and p["q_no"] is None and p["q_any"] == pytest.approx(0.25)
+    late = s2.a5_prices([_print("15:00", "yes", 0.4), _print("16:00", "no", 0.2)], KICK)  # t == commence is in play
+    assert late["q_yes"] is late["q_no"] is late["q_any"] is late["mins_before"] is None
+    assert late["first_in_play"] is True and s2.a5_prices(None, KICK)["n_prints"] == 0
+
+
+def _a5_row(ticker, **kw):
+    kw.setdefault("groups", GL_GROUP)
+    kw.setdefault("settlement_ts", "2026-11-01T17:05:00Z")
+    kw.setdefault("trades_status", "ok")
+    kw.setdefault("trades", PRINTS)
+    kw.setdefault("quote_at_capture", {"last_price": 0.97})   # the listing's last print: in play
+    return _row(ticker, GL, **kw)
+
+
+def test_a5_candidate_reads_prints_in_the_window_and_counts_missing_rows(monkeypatch):
+    monkeypatch.setattr(s2.s1, "WINDOW_START", _date(2026, 10, 31))
+    monkeypatch.setattr(s2.s1, "WINDOW_END", _date(2026, 11, 22))
+    f = Counter()
+    reg = s2.candidate(_a5_row("R1"), Counter())
+    assert reg["q"] == pytest.approx(0.97) and reg["trades"] is None      # off: the registered price, the in-play one
+    on = s2.candidate(_a5_row("A1"), f, a5=True)
+    assert on["q"] is None and on["trades"] == PRINTS                     # on: priced from the prints after the join
+    assert s2.candidate(_a5_row("A2", quote_at_capture={"last_price": 0.0}), f, a5=True) is not None
+    assert s2.candidate(_a5_row("A3", trades_status="empty", trades=[]), f, a5=True)["trades"] == []
+    assert s2.candidate(_a5_row("M1", trades_status="skipped_budget", trades=None), f, a5=True) is None
+    assert s2.candidate(_a5_row("M2", trades_status="unreadable", trades=None), f, a5=True) is None
+    assert s2.candidate(_a5_row("M3", trades_status=None, trades=None), f, a5=True) is None
+    assert s2.candidate(_a5_row("W1", settlement_ts="2026-11-23T01:00:00Z"), f, a5=True) is None
+    assert f["a5_shaped:soccer|GL"] == 6 and f["a5_missing:soccer|GL"] == 3
+    assert f["a5_missing_by_date:2026-11-01"] == 3 and f["a5_missing_status:none"] == 1
+    assert f["a5_settled_outside_window"] == 1 and f["no_print_price"] == 0
+    cov = s2.a5_coverage(f)
+    assert cov["soccer|GL"] == {"shaped": 6, "missing": 3, "missing_share": 0.5, "coverage_limited": True}
+    assert cov["mlb|SP-nested"]["missing_share"] is None and not cov["mlb|SP-nested"]["coverage_limited"]
+    assert cov["missing_by_settlement_date"] == {"2026-11-01": 3}
+
+
+def _a5_priced(result="yes", y_ours=1, q_yes=0.30, q_no=0.69, q_any=0.31, p_b=0.36):
+    return {"q": q_any, "q_any": q_any, "q_yes": q_yes, "q_no": q_no, "q_yes_15": q_yes, "q_no_15": None,
+            "p_a": 0.30, "p_b": p_b, "p_c": None, "y_ours": y_ours, "result": result}
+
+
+def test_a5_finish_row_prices_each_side_at_its_own_print():
+    m, f = 1.0, Counter()
+    r = s2.finish_row(_a5_priced(), m, f, a5=True)
+    assert r["ret_yes"] == pytest.approx(1 / (0.30 + s2.fee_per_contract(0.30, m)) - 1)
+    assert r["ret_no"] == pytest.approx(-1.0)
+    assert r["ev_b"] == pytest.approx(s2.ev_yes(0.36, 0.30, m))
+    assert r["ev_b_no"] == pytest.approx(s2.ev_yes(0.64, 0.69, m))
+    assert r["ret_yes_any"] == pytest.approx(1 / (0.31 + s2.fee_per_contract(0.31, m)) - 1)   # A3's formula at q_any
+    assert r["ev_b_no_any"] == pytest.approx(s2.ev_no(0.36, 0.31, m))
+    assert r["ret_no_15"] is None and r["ret_yes_15"] == pytest.approx(r["ret_yes"])
+    no_only = s2.finish_row(_a5_priced(result="no", y_ours=0, q_yes=None), m, f, a5=True)
+    assert no_only["ret_yes"] is None and no_only["ev_b"] is None             # no YES taker pregame: not in that test
+    assert no_only["ret_no"] == pytest.approx(1 / (0.69 + s2.fee_per_contract(0.69, m)) - 1)
+    bad = s2.finish_row(_a5_priced(result="no", y_ours=1), m, f, a5=True)     # grading disagrees: leaves R2
+    assert bad["ret_yes"] is None and bad["ret_no"] is None and f["grading_disagrees_with_kalshi"] == 1
+    assert f["a5_side_yes_priced"] == 2 and f["a5_side_no_priced"] == 3
+
+
+def test_a5_readings_r2_reads_side_prices_and_the_band_table_reads_q_any():
+    m = 1.0
+    rows = []
+    for i in range(240):
+        r = s2.finish_row(_a5_priced(result="yes" if i % 3 else "no", y_ours=1 if i % 3 else 0), m, Counter(), a5=True)
+        rows.append(dict(r, sport="soccer", cell="GL", game=f"g{i % 30}", volume=1.0))
+    out = s2.readings(rows, a5=True)
+    cell = out["cells"]["soccer|GL"]
+    yes = [r["ret_yes"] for r in rows]
+    assert cell["R2_yes"]["n"] == 240 and cell["R2_yes"]["mean"] == pytest.approx(float(np.mean(yes)))
+    assert cell["R2_yes_at_q_any"]["mean"] == pytest.approx(float(np.mean([r["ret_yes_any"] for r in rows])))
+    assert cell["R2_yes_sensitivity_15min"]["n"] == 240 and cell["R2_no_sensitivity_15min"]["n"] == 0
+    band = cell["bands"][">=5"]
+    assert band["realised_yes"]["mean"] == pytest.approx(cell["R2_yes_at_q_any"]["mean"])
+    assert set(out["holm"]["pvals"]) == {f"{s}|{c}|{side}" for s, c in s2.PASSING for side in ("yes", "no")}
+    t = s2.a5_timing([{"sport": "soccer", "cell": "GL", "q_any": 0.3, "mins_before": 10.0, "first_in_play": False,
+                       "last_in_play": True},
+                      {"sport": "soccer", "cell": "GL", "q_any": None, "mins_before": None, "first_in_play": True,
+                       "last_in_play": True}])["soccer|GL"]
+    assert t["joined"] == 2 and t["with_pregame_print"] == 1 and t["last_print_in_play_share"] == 1.0
+    assert t["first_print_in_play_share"] == 0.5 and t["mins_last_pregame_to_commence"]["median"] == 10.0
+
+
+def test_main_refuses_a5_without_a_window_and_a_window_without_a5(tmp_path, capsys):
+    base = ["--data-root", str(tmp_path), "--out", str(tmp_path / "o.json"), "--cache", str(tmp_path / "c")]
+    assert s2.main(base + ["--a5"]) == 2
+    assert s2.main(base + ["--a5", "--window-start", "2026-11-22", "--window-end", "2026-10-31"]) == 2
+    assert s2.main(base + ["--window-start", "2026-10-31", "--window-end", "2026-11-22"]) == 2
+    assert capsys.readouterr().out.count("REFUSING") == 3
+
+
+def test_main_a5_prices_after_the_join_and_writes_coverage_and_timing(tmp_path, monkeypatch):
+    """Reachability, end to end with the heavy Stage 1 machinery stubbed: with --a5 the combo is priced at its
+    pregame print (not the in-play `last_price`), a combo with no pregame print is counted, and the report carries
+    A5's coverage and timing."""
+    monkeypatch.setattr(s2.s1, "WINDOW_START", s2.s1.WINDOW_START)   # main sets these; restore after
+    monkeypatch.setattr(s2.s1, "WINDOW_END", s2.s1.WINDOW_END)
+    rows = [_a5_row("T1"), _a5_row("T2", trades=[_print("16:00", "yes", 0.9)]),
+            _a5_row("T3", trades_status="skipped_budget", trades=None)]
+    monkeypatch.setattr(s2, "iter_store", lambda root, a, b: iter(rows))
+    monkeypatch.setattr(s2, "fetch_leg_meta", lambda tickers, cache: ({t: {} for t in tickers}, {"gets": 0}))
+    monkeypatch.setattr(s2, "read_fee_multiplier", lambda series: (1.0, False, {"fee_multiplier": 1}))
+    monkeypatch.setattr(s2, "soccer_code_names", lambda metas: {})
+
+    class _Fetch:
+        gets, fail = 0, 0
+
+        def __init__(self, cache):
+            pass
+
+    monkeypatch.setattr(s2.s1, "Fetcher", _Fetch)
+    game = {"event": "ev1", "game": "ARS-CRY", "date": "2026-11-01", "league": "epl"}
+    monkeypatch.setattr(s2, "stage1_games",
+                        lambda root, fetch, sport: ([game], {}, {"ev1": {"commence": KICK}}, Counter()))
+    monkeypatch.setattr(s2, "parse_leg", lambda sport, ticker, meta: {"market": "x", "line": 2.5, "subject": ""})
+    monkeypatch.setattr(s2, "join_game", lambda c, games, bgames, names: (games[0], "ok"))
+    seen = []
+
+    def fake_price(c, g, legs, idx, cells_c, funnel):
+        seen.append((c["ticker"], c["q"]))
+        return {"ticker": c["ticker"], "sport": "soccer", "cell": "GL", "stat_pair": "result~totals", "game": g["game"],
+                "date": g["date"], "q": c["q"], "volume": 1.0, "result": "yes", "side_a": "yes", "side_b": "yes",
+                "pA": 0.5, "pB": 0.6, "yA": 1, "yB": 1, "rho_b": 0.2, "rho_c": None, "line_a": None, "line_b": 2.5,
+                "mkt_a": "h2h", "mkt_b": "totals", "p_a": 0.30, "p_b": 0.36, "p_c": None, "y_ours": 1}
+
+    monkeypatch.setattr(s2, "price_combo", fake_price)
+    out = tmp_path / "a5.json"
+    rc = s2.main(["--a5", "--window-start", "2026-10-31", "--window-end", "2026-11-22", "--data-root", str(tmp_path),
+                  "--out", str(out), "--cache", str(tmp_path / "c")])
+    assert rc == 0 and seen == [("T1", pytest.approx(0.31))]            # q_any, never the in-play 0.97
+    rep = json.loads(out.read_text(encoding="utf-8"))
+    assert rep["a5_window"] == ["2026-10-31", "2026-11-22"] and "A5 41cb8aba" in rep["amendments"]
+    assert rep["funnel"]["soccer"]["a5_no_pregame_print"] == 1 and rep["funnel"]["soccer"]["priced"] == 1
+    assert rep["a5_coverage"]["soccer|GL"]["missing"] == 1 and rep["a5_coverage"]["soccer|GL"]["shaped"] == 3
+    assert rep["cells"]["soccer|GL"]["stamp"] == "COVERAGE-LIMITED"
+    assert rep["a5_timing"]["soccer|GL"]["joined"] == 2 and rep["a5_timing"]["soccer|GL"]["with_pregame_print"] == 1
+    assert rep["cells"]["soccer|GL"]["R2_yes"]["n"] == 1
+    csv_text = out.with_suffix(".combos.csv").read_text(encoding="utf-8")
+    assert "q_yes" in csv_text.splitlines()[0] and "0.3" in csv_text
