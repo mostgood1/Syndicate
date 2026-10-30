@@ -54969,3 +54969,24 @@ which is about the two sizing bases and not about the refusal boundary.
 - **Fee wedge:** fee_is_upper_bound=True n=3,292 net -5.96% +/-3.20, **gross (= zero-fee bound) -2.98% +/-3.20**; False n=2,397 net -7.13% +/-3.75, gross -4.56%. Paper charges exactly the modelled fee (2.80% of stake = admitted wedge 2.80pt), so whether the upper bound overstates the true fee is NOT measurable on paper -- but even at zero fee the upper-bound rows are not positive. Realised - admitted = -6.37pt both gross and net: the miss is in the probability, not the fee.
 - **Verdict: H1 NOT FALSIFIED and affirmatively supported** -- the refused rows lose; the floor is not declining profitable bets. The 10-22 "gross edge is real" line is retracted.
 - verify: this entry IS the reading. Findings `.syndicate/findings_2026-10-22_ladder_refusal_control_arm.md` "Re-read 2026-10-29"; todo #724; lanes GOAL MET.
+
+## 2026-10-30 02:55Z (9:55 PM CT 10-29) -- MEASUREMENT for 2026-10-26 17:30Z FLEET CONFIG (off-disk backup -> OneDrive): the archives are now OFF THE HOST (lane syndicate-decision-engine) -- **VERIFIED (client-side readings)**
+- **What this measures:** the owed half of the 10-26 17:30Z entry, "that OneDrive UPLOADED the archive". From 10-22 to 10-29 OneDrive uploaded nothing. The client restart was at 10-29 17:28Z, and the file-count shrink finished at 21:00Z.
+- **Expectation (stated before reading, in log 10-29 22:47Z):** Phase 0 item 3 is MET once an archive reads synced.
+- **Reading 1, bytes on the wire (`onedrive_watch3.ps1`, Wi-Fi `SentBytes` per 10-min poll):**
+  - 23:27:35Z..23:37:46Z: 11,949,304 B/s, about 7.30 GB.
+  - 23:37:46Z..23:47:58Z: 10,724,554 B/s, about 6.56 GB.
+  - Total about **13.86 GB in 20 min**. The two archives together are **13,743,989,265 B**. Every other poll in the window read 21-116 KB/s.
+- **Reading 2, the archives' sync state (Windows shell, read-only).** Both changed between 00:18:33Z and 00:28:44Z and have held since:
+  - `System.StorageProviderState` 4 -> **2**;
+  - `System.FilePlaceholderStatus` 6 -> **14**, adding the cloud-file bit 0x8;
+  - Explorer "Availability status" reads **"Available on this device"**;
+  - `fsutil reparsepoint query` gives tag **0x9000601A** (OneDrive cloud file).
+- **Calibration, 02:5xZ, 14 long-synced personal files outside `Coding/`:**
+  - 1/8 = "Available when online" (synced, cloud-only).
+  - 2/14 = "Available on this device" (synced, local).
+  - Before this, repo files read 3/15 (synced, pinned; log 10-28). 4/6 is the pending state both archives held from 10-28 to 10-30.
+  - So the archives now read exactly like files OneDrive has held in the cloud for years.
+- **Not read:** the cloud side itself (onedrive.com listing). The account quota is also unreadable from this host. Keep 2 at ~7 GB means about 7 GB a day goes into OneDrive's recycle bin; whether that counts against the quota is for the user to check.
+- **Attribution (restart vs shrink):** NOT separable. See log 10-29 22:47Z.
+- **verify:** MET -- off-host copy `20261029T091500Z.tar.gz` (7,011,609,781 B) synced by 00:28:44Z 10-30, age at reading about 17.5 h, under the 30 h bound. Owed: the steady-state read. Does the 10-30 09:15Z archive sync on its own? Watcher `onedrive_watch4.ps1` (scratchpad, task b7882v68u) runs to 18:00Z 10-30.
