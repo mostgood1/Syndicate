@@ -54990,3 +54990,21 @@ which is about the two sizing bases and not about the refusal boundary.
 - **Not read:** the cloud side itself (onedrive.com listing). The account quota is also unreadable from this host. Keep 2 at ~7 GB means about 7 GB a day goes into OneDrive's recycle bin; whether that counts against the quota is for the user to check.
 - **Attribution (restart vs shrink):** NOT separable. See log 10-29 22:47Z.
 - **verify:** MET -- off-host copy `20261029T091500Z.tar.gz` (7,011,609,781 B) synced by 00:28:44Z 10-30, age at reading about 17.5 h, under the 30 h bound. Owed: the steady-state read. Does the 10-30 09:15Z archive sync on its own? Watcher `onedrive_watch4.ps1` (scratchpad, task b7882v68u) runs to 18:00Z 10-30.
+
+## 2026-10-30 13:47Z (8:47 AM CT) -- READING: Kalshi combo capture first full forward day 2026-10-29 + purge age (lane kalshi-combo-capture, #742) -- **MET**
+
+- **instrument:** `scripts/kalshi_combo_capture.py status` at origin/main `a0b241b2f`, read-only, on the fleet store (scheduled task kalshi-combo-capture-first-forward-day; status `now` 2026-10-30T13:44:47Z).
+- **first full forward day D = 2026-10-29:**
+  - stored 473,517; traded_total 473,517; by_sport mlb 63,179 / nba 331,466 / wnba 16,217 / nhl 14,544 / nfl 12,858 / ncaaf 10,409 / soccer 54,106.
+  - results yes 39,255 / no 431,861 / other (scalar) 2,401 -> filled (yes + no) 471,116 / 473,517 = **99.49%**.
+  - gets_prorated 11,176 and pages_prorated 11,168, over runs_overlapping 24 runs, prorated by settlement seconds.
+  - kept_by_sport_prorated: mlb 480,876 / nba 4,471,259 / wnba 138,190 / nhl 137,666 / nfl 142,463 / ncaaf 92,334 / soccer 539,643.
+  - kept_traded_by_sport_prorated: mlb 63,095 / nba 331,733 / wnba 16,218 / nhl 14,548 / nfl 12,864 / ncaaf 10,390 / soccer 53,973.
+- **caught up:** run_at 2026-10-28T13:08:13Z, swept_to 2026-10-28T13:03:13Z.
+- **purge age:** above 59.6 h and at most 71.4 h (2.48-2.98 days); purged_runs 36, unpurged_runs 96. boundary_runs: run 2026-10-28T03:55:56Z settled 10-25 19:53-20:04Z age 55.9-56.0 h share 0.521; run 2026-10-28T12:08:03Z settled 10-28 11:56-12:03Z age 0.1-0.2 h share 0.73.
+- **capture runner:** invokers bridge 119 / supervisor 44 (163 runs); last_run supervisor `ok` at 2026-10-30T13:02:48Z, swept_to 12:57:48Z, lag 0.78 h; store_size 1.9G; fleet_checkout_head 6d6e729dc (contains 6872eb2c, merge-base rc 0); env_key_lines 1 (supervisor job's key present, as expected since 2026-10-28); bridge_loops 0 (expected, bridge retired 2026-10-28 17:08Z). Last 3 runs: 11:02Z budget_stopped, 12:02Z ok, 13:02Z ok, no errors.
+- **verdict for the lane's Verification:**
+  - Kept combos > 0 for mlb nba wnba nhl nfl ncaaf soccer. ncaab is 0: off-season (season opens in November), expected, not a failure.
+  - The day's GETs: ~11,176 (prorated).
+  - Results filled: 99.49%.
+- discharges the OWED verify of the 2026-10-27 20:56:16Z entry (first forward day) and the 22:24Z reading's owed purge date.

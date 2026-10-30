@@ -1022,6 +1022,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### kalshi-combo-capture — OPEN (RUNNING: hourly supervisor job live since 2026-10-28 16:44:45Z; first-forward-day reading owed via scheduled task) — opened 2026-10-27 — session a48b0f49-3a6b-4105-b194-5804a934487c (picked up 2026-10-27 as a side session of local_668211d5; opened by e32fef1a for pickup)
+- First forward day 2026-10-29 READ 2026-10-30: stored 473,517, results filled 99.49%, ~11,176 GETs; purge age 2.48-2.98 days (deploys.md)
 - **Reading armed `[2026-10-27 23:20Z]`:** Claude scheduled task `kalshi-combo-capture-first-forward-day`, user-approved, runs daily at ~8:40 AM CT, read-only.
   - It runs `scripts/kalshi_combo_capture.py status` (`25485432`) on the fleet store, via `C:\tmp\kalshi_combo_status\cc_status.sh`.
   - Once `met`, it appends the first-full-forward-day + purge-age reading to `deploys.md`, adds a line here and in `#742`, and disables itself. Hard stop 2026-11-03.

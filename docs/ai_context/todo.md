@@ -154,6 +154,7 @@
   - The `0` shard and the per-sport collections settled 0.
   - Corrected along the way: the first 4-h sample's "no two-leg or pure SGP tickets trade" was a window artifact.
 - **DECIDED 2026-10-27 (user, verbatim, session a48b0f49):** "Yes: launch the kalshi combo-capture bridge on the fleet now at nice 19 with a ~30-day backfill and no trade reads, then enable the hourly supervisor job at the next fleet ff under the deploy locks."
+- **STATUS 2026-10-30:** first full forward day 2026-10-29 read (stored 473,517, results filled 99.49%, ~11,176 GETs); purge age 2.48-2.98 days. Supervisor job live since 2026-10-28 (b486fcef).
 - **STATUS 2026-10-28 12:13 PM CT (17:13Z): SUPERVISOR JOB LIVE, BRIDGE EXITED -- verified read-only on the fleet.**
   - Lane syndicate-decision-engine did the ff to `6d6e729d` + the env key + one full drained down/up at 16:44:45Z (`deploys.md` 16:44:34Z and 17:09Z).
   - This lane read it back: the checkout contains `6872eb2c`, there is 1 key line, and the last UP was on `6d6e729d`.
