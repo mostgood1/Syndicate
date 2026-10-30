@@ -55116,3 +55116,19 @@ which is about the two sizing bases and not about the refusal boundary.
 - **verify (OWED, 10-31 09:15Z):**
   - `logs/job-data-backup.log` shows `off-disk archive ... (attempts N, staged in /mnt/c/Users/tempadmin/SyndicateBackup-staging)`.
   - `20261031T*.tar.gz` lands in `OneDrive/SyndicateBackup` and reads synced (state 2/3, placeholder bit 0x8).
+
+## 2026-10-30 19:02:42Z (2:02 PM CT) -- FLEET ff b92c1d57 -> 413a08d5, NO restart (lane e4-pregame-prints: #740 (e) shaped Kalshi combo trade reads, `8a0a83dc`) -- **CHECKOUT VERIFIED; first new-code capture run OWED**
+- **User, verbatim:** "Yes, fast-forward". It answered "Fast-forward the fleet to 413a08d5 so the combo trade reads start?"; the button text was "fast-forward the fleet checkout to 413a08d5 under the refresh-worker claim and a CLEAR preflight, no restart".
+- **Why:** `8a0a83dc` makes the hourly `kalshi-combo-capture` job read public trade prints (time, price, taker side) for traded two-leg combos in E4 Stage 2's four passing shapes (A5 `41cb8aba`, registered 18:23:47Z before any data). The job is a fresh process per run, so the ff alone makes it live at the next run.
+- **Precheck (18:41:39Z, read-only, fetch only):** HEAD `b92c1d57` on `main`; target present and on `github/main`; ff possible; 20 commits; no dirty file in range. Runtime paths in range: `scripts/kalshi_combo_capture.py` only (the rest is ledger/docs and the capture's tests); no `vendor/`, `engines/`, `pipeline/`, `syndicate/` or `render.yaml`.
+- **Claim:** refresh-worker, holder `e4-pregame-prints`, token da11ebfe, 18:41:17Z; released 19:03:21Z.
+- **Preflight** (`--target fleet --target-commit 413a08d5bea2... --expect fleet_checkout_head=413a08d5 --baseline fleet_checkout_head=<read each try>`): 37 tries of HOLD (board builds in flight: portfolio_commit / layer2_shortlist_build), polled every ~33 s; **CLEAR 19:02:28Z** (baseline read 19:02:25Z). No override flag.
+- **Deploy:** `git -C ~/Syndicate merge --ff-only 413a08d5bea2cca58c9f4853773be6558134c313` at 19:02:42Z (reflog 14:02:42 -0500 "Fast-forward"); HEAD read back `413a08d5bea2cca58c9f4853773be6558134c313`.
+- **Verified 19:02:49Z:**
+  - HEAD `413a08d5`; `def e4_trade_shape` present; the module's own defaults: `DEFAULT_TRADES_SHAPES e4`, cap 400, `run()` default `e4`; the job argv `('scripts/kalshi_combo_capture.py', 'run', '--invoker', 'supervisor')`, so the job runs the default.
+  - Roles not restarted: web pid 3710615 `code=b92c1d57`, refresh-worker 688033 and live-odds-worker 699933 `code=6d6e729d`. (At 18:41:39Z web read `code=6d6e729d` on the same pid; that moved before this ff and is not from it.)
+  - Dirty after the ff: 6 modified runtime outputs and 2 untracked report files; the precheck found none of them in the range. Not compared with a before-list.
+- **Timing:** a capture run started ~19:02Z (lock 14:02 CT, pid 719512), within seconds of the ff, so it may have loaded the old code. The 20:02Z run is the first certain new-code run. A5's D0 is the first UTC settlement date every run covered with the shaped read: expected **2026-10-31**.
+- **verify (OWED):**
+  - the first `runs.jsonl` row carrying `trades_shapes: "e4"`, with `shaped_reads` > 0 or a shaped count of 0 that its window explains, and no `errors`;
+  - after the first full UTC day (10-31): shaped traded two-leg rows with `trades_status` ok/empty > 0, `skipped_budget` counted, prints with `taker_side`, GETs within the run budget.
