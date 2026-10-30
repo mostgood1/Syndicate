@@ -55088,3 +55088,31 @@ which is about the two sizing bases and not about the refusal boundary.
   - The 30 with no `commence_time` are Kalshi NBA game lines (`KXNBATOTAL` 13, `KXNBASPREAD` 13, `KXNBAGAME` 3, `KXMLBTOTAL` 1) on 10-23/10-24. These are early in-play entries placed before orders were stamped with a start time.
   - **So 170 of 292 settled live fills (58%) are in-play entries with no DecisionRecord and no staked-probability version, by construction.** The DecisionRecord covers the pregame board, and the in-play program places off its own loop.
 - **verify:** #729 MET. The Phase 0 gate is MET only for the pregame path. The in-play record join is owed, and has no owner yet; that is the user's decision.
+
+## 2026-10-30 17:39:07Z (12:39 PM CT) -- FLEET ff 6d6e729d -> b92c1d57, NO restart (lane syndicate-decision-engine: hardened off-disk archive; ride-alongs #744/#745 NBA grading) -- **CHECKOUT VERIFIED; first hardened backup run OWED 10-31 09:15Z**
+- **User, verbatim:** "Yes, fast-forward". It answered the button "fast-forward the fleet's checkout to b92c1d57, no restart, including the two NBA grading fixes".
+- **Why:** `b92c1d57` stages the nightly off-disk archive beside OneDrive and retries a failed write once (deploys 10-30 15:34Z, log 15:5xZ). `data-backup` runs as a fresh `Popen` per run, so the ff alone makes it live for the next 09:15Z run.
+- **Precheck (16:54:44Z, read-only):**
+  - Fleet HEAD 6d6e729d on `main`; target fetched from `github` and on `github/main`; HEAD is an ancestor, so the ff is possible; 70 commits.
+  - No dirty file in the range; the 8 dirty runtime outputs were unchanged before and after.
+  - Runtime paths in range:
+    - `scripts/local_production.py` (this change);
+    - `syndicate/features/shared/bet_status_nba.py` (`1ec1eb2d` #744 double-double, `aa8dd3c6` #745 quarter/half);
+    - offline scripts `e4_stage2_combo_prices.py`, `nba_injury_history_build.py`, `basketball_scenario_rates.py`;
+    - no `vendor/`, `engines/`, `pipeline/` or `render.yaml`.
+- **Claim:** refresh-worker, holder `syndicate-decision-engine`, token 880a62ae, 16:54:51Z, ttl 2700 s.
+- **Preflight** (`--target fleet --target-commit b92c1d570d2a... --expect fleet_checkout_head=b92c1d57 --baseline fleet_checkout_head=<read each try>`):
+  - 16:54:58Z TOO_SOON (refresh-worker respawned 25 min earlier).
+  - Then 56 tries of HOLD for board builds in flight, polled every 30 s. Each try re-read the fleet HEAD as its baseline.
+  - **CLEAR 17:38:29Z** (baseline read 17:38:27Z).
+  - No override flag was used. Two poll runs stopped safely on a WSL-garbled HEAD read and were re-run.
+- **Deploy:** `git merge --ff-only b92c1d570d2a1c80e3ab64cd785b5029c38366d5` at 17:39:07Z. HEAD read back as `b92c1d570d2a1c80e3ab64cd785b5029c38366d5`; the reflog shows "Fast-forward".
+- **Verified 17:39:23Z:**
+  - HEAD `b92c1d57`, and `def default_offdisk_staging_dir` is present.
+  - The job's own config resolves offdisk `/mnt/c/Users/tempadmin/OneDrive/SyndicateBackup`, staging `/mnt/c/Users/tempadmin/SyndicateBackup-staging`, retries 1, delay 300 s.
+  - Roles: web 3710615, refresh-worker 688033 and live-odds-worker 699933 are all `code=6d6e729d`, which `status` reports as STALE vs HEAD, as expected without a restart.
+  - live-odds-worker restarts went 7 -> 8 (pid 437847 -> 699933) BEFORE the ff; it still reports `code=6d6e729d`.
+- **Ride-along note:** the NBA grading fixes load in fresh job processes now, and in a role at its next respawn or restart. Nothing was restarted for them.
+- **verify (OWED, 10-31 09:15Z):**
+  - `logs/job-data-backup.log` shows `off-disk archive ... (attempts N, staged in /mnt/c/Users/tempadmin/SyndicateBackup-staging)`.
+  - `20261031T*.tar.gz` lands in `OneDrive/SyndicateBackup` and reads synced (state 2/3, placeholder bit 0x8).
