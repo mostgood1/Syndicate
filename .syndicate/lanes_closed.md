@@ -13580,3 +13580,8 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Falsification test: R2: the game-clustered 95% CI of the realised return on the sim-favoured side includes or sits below 0 in every sufficient passing cell (Holm m=8), or R1's slope CI excludes 0 near 1 (the prints already carry the correlation)
 - Verification: the Stage 2 run's report (C:/tmp/e4/stage2.json) read and its verdicts recorded in the findings file and #740, with the funnel and the n each reading rests on
 - Blocked by: the #742 first-full-forward-day reading (scheduled task kalshi-combo-capture-first-forward-day); user condition 'Yes, after the reading'
+
+### closed-lane-archive-20261030-1045 — CLOSED 2026-10-30 (GOAL MET: 1 block archived) — opened 2026-10-30 — session 5d79ee1d-9207-4220-8f3c-74a872c47b9d
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness --idle-min 240 read 1 SAFE of 6 CLOSED; moved `closed-lane-archive-20261030-0639`. Table and Part B in `.syndicate/log/2026-10-30.md`.

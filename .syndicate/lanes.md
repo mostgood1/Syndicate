@@ -624,11 +624,6 @@ death, never life — do not invert it.
 - Kalshi fair price LIVE 2026-10-28 17:11Z: fleet 6d6e729d since 16:44:45Z (syndicate-decision-engine window); pass 16:57:30Z appended 12 `fair_price`; last copies +0.6898 / +0.2496 on $12, 0 still void, 11 book voids untouched -- MET (deploys.md 17:10:59Z). Live path 0 voids since the up (a null on 26 min).
 - Blocked by: none
 
-### closed-lane-archive-20261030-1045 — CLOSED 2026-10-30 (GOAL MET: 1 block archived) — opened 2026-10-30 — session 5d79ee1d-9207-4220-8f3c-74a872c47b9d
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness --idle-min 240 read 1 SAFE of 6 CLOSED; moved `closed-lane-archive-20261030-0639`. Table and Part B in `.syndicate/log/2026-10-30.md`.
-
 ### stale-lane-triage — CLOSED 2026-10-30 (GOAL: MET) — opened 2026-10-30 — session eb9e3103
 - **GOAL VERDICT 2026-10-30 17:5xZ.** Goal (verbatim): "Classify every OPEN lane quiet >7d on origin/main (42 at 2026-10-30) as CLOSE-MET / CLOSE-ABANDONED / HAND-OFF / KEEP with evidence; after user approval close + archive the dead ones to lanes_closed.md with one-line pointers, 0 deletions of other lanes' content." -- **GOAL: MET.** Reading: lane_census.py on origin/main after e5f540d9 = 36 OPEN / 0 UNOWNED / 8 stale (was 69/1/42); 0 of the 34 closed slugs OPEN; claims 448 -> 332, all released claims from closed slugs; 0 origin/main lanes.md lines lost. check_lane_invariants.py still FAILS on 2 contested files held only by OPEN lanes, pre-existing at session start (digest LEDGER INCOHERENT), not caused by this change. 42 classified: 34 closed (13 MET / 9 ABANDONED / 12 HANDOFF, todo #746-#753 new), 2 KEEP, 6 left to owners active <=7d. Narrative: log/2026-10-30.md 17:50Z; table: findings_2026-10-30_stale_lane_triage.md.
 - Goal: Classify every OPEN lane quiet >7d on origin/main (42 at 2026-10-30) as CLOSE-MET / CLOSE-ABANDONED / HAND-OFF / KEEP with evidence; after user approval close + archive the dead ones to lanes_closed.md with one-line pointers, 0 deletions of other lanes' content.
@@ -668,6 +663,11 @@ death, never life — do not invert it.
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 read SAFE for 1 of 9 CLOSED blocks; moved `e4-stage2-combo-prices` to lanes_closed.md with one pointer. Readings in log/2026-10-30.md 19:42Z.
+
+### closed-lane-archive-20261030-1640 — CLOSED 2026-10-30 (GOAL MET: 1 block archived) — opened 2026-10-30 — session bbb21e78-2913-482a-95bf-adfbf5e7053b
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py at 240m returned 1 SAFE of 9 CLOSED; archived `closed-lane-archive-20261030-1045`. 8 WAIT (reasons in log/2026-10-30.md).
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -784,6 +784,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261030-0440` — CLOSED 2026-10-30 (GOAL MET: 1 block archived) — opened 2026-10-30 — session 22e6fd9e-fa5d-4d52-9b0a-2085ced93b87
 - `closed-lane-archive-20261030-0639` — CLOSED 2026-10-30 (GOAL MET: 1 block archived) — opened 2026-10-30 — session 7809edab-22c3-4771-b0f7-f3d437485913
 - `closed-lane-archive-20261030-0849` — CLOSED 2026-10-30 (GOAL MET: 1 block archived) — opened 2026-10-30 — session 28ca790a-f93d-4c24-9b3e-fc91ded234e9
+- `closed-lane-archive-20261030-1045` — CLOSED 2026-10-30 (GOAL MET: 1 block archived) — opened 2026-10-30 — session 5d79ee1d-9207-4220-8f3c-74a872c47b9d
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
