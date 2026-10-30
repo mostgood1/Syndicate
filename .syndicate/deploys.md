@@ -55023,3 +55023,20 @@ which is about the two sizing bases and not about the refusal boundary.
 - **Cause evidence, one data point:** this write succeeded with the OneDrive client active and syncing. That weighs against "OneDrive touches the `.partial` mid-write" and toward the 09:15-09:30Z memory window. NOT proven: a single success does not exclude an intermittent cause.
 - **Gap:** Phase 0 item 3's 30 h bound lapsed at 15:27Z. It is restored when `20261030T091501Z.tar.gz` reads synced (state 2/3 with placeholder bit 0x8). Watcher `onedrive_watch5.ps1`, task bc68pdwye, polls every 2 min for up to 90 min.
 - **verify:** write MET (`ok=true`, size as expected, rotation as expected). Owed: the upload reading.
+
+## 2026-10-30 15:50Z (10:50 AM CT) -- MEASUREMENT for 2026-10-30 15:34Z (off-disk archive re-run): UPLOADED; Phase 0 item 3 restored (lane syndicate-decision-engine) -- **VERIFIED (client-side readings)**
+- **Reading** (`onedrive_watch5.ps1`, 2-min polls):
+
+  | Poll (UTC) | State / placeholder | Wi-Fi sent |
+  |---|---|---|
+  | 15:35:16Z | 4 / 6 (pending) | 4.19 MB/s |
+  | 15:45:51Z | 4 / 6 | 10.13 MB/s |
+  | **15:48:06Z** | **2 / 14** (synced on this device) | 7.15 MB/s |
+
+  - The file is `20261030T091501Z.tar.gz`, 7,222,457,465 B. The folder holds exactly `20261029T091500Z.tar.gz` and `20261030T091501Z.tar.gz`.
+- **Phase 0 item 3:**
+  - It lapsed from 15:27Z (30 h after the 10-29 archive) to 15:48Z, about 21 min.
+  - The newest off-host copy is now the 10-30 snapshot, about 6.5 h old at the reading.
+  - Not read: the cloud-side listing.
+- **verify:** MET -- the re-run archive reads synced (state 2, placeholder bit 0x8) 14 min after its write ended.
+  - Still owed: the hardened job (`b92c1d57`) on the fleet, which is the user's decision. Then the 10-31 09:15Z run's log line and upload.
