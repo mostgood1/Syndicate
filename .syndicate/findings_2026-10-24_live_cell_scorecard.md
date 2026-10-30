@@ -636,6 +636,70 @@ intercepts -0.034 / -0.057 / -0.037, so alpha is each outcome's average margin. 
 result stands as a test of their rule, not of a mis-set threshold. Their profit came from soft-book outliers in soccer
 1X2; exchange-style venue prices offer no such outlier.
 
+## s10. Kalshi MAKER PILOT -- P&L to date, held vs realised `[read 2026-10-30 15:23:30Z, fleet ledger, read-only]`
+
+Coordinator 332cb014 relayed the user's request on 2026-10-30 ("Yes, send it"); the pilot reads were handed to this
+lane on 10-26.
+
+**Source.** `execution_ledger.full_history_orders()` rows with `execution_style == maker_pilot`, read with the fleet
+interpreter after a live-document read ok=True.
+
+**Two views of P&L.**
+
+- **Realised** = `pnl_dollars` as booked. It includes the exit lane's in-play sale where one happened
+  (`exit_applied`).
+- **Held** = what holding to settlement would have paid: `contracts x (1 - price)` - entry fee if the bet won,
+  `-(stake + entry fee)` if it lost.
+
+The shadow study measured hold-to-settlement, so compare it against the **held** column.
+
+**Posts and fills: 12 posts.**
+
+| status | count | which |
+|---|---|---|
+| filled | 9 | |
+| venue-canceled / expired unfilled | 3 | ILL@MD total, Murray pass TDs, MIN@CLE total |
+| still resting | 1 | DET@BKN spread |
+
+That is 9 fills out of 11 resolved posts.
+
+**Maker/taker.** Every fill line in the log window (10-27 16:06Z onward, 7 lines covering 5 fills) says
+`filled_as=maker`. Pollard and PHXOKC were verified maker on 10-25 and 10-26. **The 10-27 MIL@TB fill rotated out of
+the logs before it could be read.** Its fee ($0.0259 on 12 @ 0.43) matches the verified 10-28 maker fill on the same
+series ($0.0258 on 12 @ 0.42) and is far below a taker fee (~$0.21), so it is maker by inference, not by reading.
+**0 taker fills seen; the stop rule is not triggered.**
+
+**PHXOKC** (KXNBATOTAL-26OCT26PHXOKC-229, under 228.5, NO, 8 @ 0.67, maker fee $0.031): **outcome lost.**
+
+- Held: **-$5.39** (-$5.36 stake - $0.031 fee). This matches the coordinator's cross-check: the resolver graded under
+  228.5 lost.
+- Realised: **+$0.84**. The exit lane sold all 8 in play @ 0.79 (proceeds $6.32, exit fee $0.093) before the under
+  lost.
+
+**Settled fills (6):**
+
+| fill | outcome | held | realised |
+|---|---|---|---|
+| Pollard u1.5 rec, 12 @ 0.44 | lost | -$5.28 | +$1.39 (sold in play @ 0.573) |
+| PHXOKC u228.5, 8 @ 0.67 | lost | -$5.39 | +$0.84 (sold in play @ 0.79) |
+| MIL@TB 10-27 TB, 12 @ 0.43 | won | +$6.81 | +$6.81 (held) |
+| MIL@TB 10-28 TB, 12 @ 0.42 | lost | -$5.07 | -$5.07 (held) |
+| GSW@MIN o219.5, 8 @ 0.65 | won | +$2.77 | +$0.83 (sold in play @ 0.77) |
+| Hubbard u2.5 rec, 10 @ 0.53 | lost | -$5.30 | -$5.30 (held) |
+| **total, $31.34 staked** | 2 won / 4 lost | **-$11.45 (-36.5%)** | **-$0.49 (-1.6%)** |
+
+**Pending:** FLA@UGA o55.5 (11 @ 0.47) and CHA@WAS o217.5 (9 @ 0.56), both filled maker.
+
+**Reading.**
+
+- n = 6 settled. **Nothing here is evidence either way about maker entry.**
+- The held/realised gap (+$10.96) comes entirely from the exit lane's 3 in-play sales. Two of those sold losing bets
+  at a profit, and one sold a winner early for less than holding would have paid. That is exit-lane behaviour, and it
+  is measured in that lane's own exit-vs-hold study, not here.
+- Fill rate is 9 / 11 resolved posts. That is higher than the shadow's ~45% pregame, because the pilot posts at
+  or 1c above the bid inside a 1-3c spread
+  (MIN@CLE posted 0.66 on a 0.65 bid; PHXOKC 0.67 on a 0.67 bid).
+
 ## s5. Running it
 
 **NIGHTLY JOB (built 2026-10-24, NOT LIVE until the coordinator's restart).**
