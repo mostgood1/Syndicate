@@ -743,3 +743,49 @@ box history alone, and needs news (starting lineups, beat reports); no engine wo
 
 **Out of scope:** REAL_ONLY (6.19); variance (step 3); production. Production gets fields only via
 `nba_engine_config.json` after the forward test from 11-01.
+
+**STEP 2a STAGE A — RESULT 2026-10-30 17:47Z (12:47 CDT). VERDICT: FAIL (A1, A2). Stage B is NOT built.**
+
+`r2s/stage_a.py` → `stage_a.json`, `stage_a_pop.csv`; run at nice 19.
+- Population: TRAIN 9,183 slots (859 coach DNP, 814 team-games); TEST 8,808 slots (815 coach DNP, 790 team-games).
+- 0 slots without history. On TEST, 8,769 slots used a full cell and 39 were pooled to the played_last × m margin.
+
+| TEST (Jan–Feb) | value | gate |
+|---|---|---|
+| coach-DNP sim min / team-game, before | 9.30 | — |
+| expected after (Σ p·m) | 7.25 | — |
+| (A1) Σ p·m / Σ m over DNP | **.779** | ≤ .60: **FAIL** |
+| (A2) minutes moved off DNP / off PLAYED, per team-game | **2.05 / 6.89** | off PLAYED ≤ off DNP: **FAIL** |
+| (A3) max calibration gap, deciles n ≥ 100 | .044 | ≤ .05: PASS |
+| AUC | .889 (train .906) | — |
+| K=1 comparator: min off DNP / off PLAYED per team-game | 2.75 / 16.04 | — |
+
+TRAIN reads the same way: A1 .745, off 2.15 vs 6.87, calibration gap .009.
+
+**Why it fails** (a descriptive breakdown of TEST, `r2s/stage_a_why.py`, read AFTER the verdict):
+
+| p band | DNP | PLAYED | DNP sim min / team-game | DNP mean m | PLAYED mean m |
+|---|---|---|---|---|---|
+| < .6 | 366 | 383 | 2.02 | 4.4 | 4.7 |
+| .6–.8 | 206 | 489 | 2.49 | 9.6 | 10.2 |
+| .8–.9 | 65 | 273 | 0.87 | 10.6 | 12.1 |
+| .9–.97 | 139 | 1,743 | 2.75 | 15.6 | 16.7 |
+| ≥ .97 | 39 | 5,105 | 1.18 | 23.8 | 27.8 |
+
+- **The table is accurate; the outcome is not predictable from box history.** 68.5% of coach DNPs played the team's
+  last game.
+- 3.9 of the 9.3 minutes sit with players the table gives p ≥ .9: rotation players sitting unexpectedly, averaging
+  16–24 sim min. No box-history feature flags them.
+- The low-p group is close to a coin flip. At p < .6, 366 sat and 383 played, with the same minutes (4.4 vs 4.7).
+  Thinning them moves as many minutes off players who played as off those who sat.
+- **K=1 is worse still on the new population:** it moves 16.0 min per team-game off players who played, to remove
+  2.75 from those who sat.
+
+**Reading (as pre-registered):** coach DNP is NOT predictable as-of from box history alone. The 8.87 needs NEWS: a
+pre-tip signal of who dresses and who sits. Healthy scratches are not on the injury report (the injury feed's
+DNP_LISTED_OTHER is already 0.15). Candidates, none built: pre-tip starting lineups and the inactive list (the
+NBA posts the active / inactive list about 30 min before tip), beat reports. That is a data-collection decision,
+not a mechanism.
+- Not done: no engine code, no switch file, no sim run.
+- **Next on the pre-registered order:** REAL_ONLY (6.19 real min per team-game the sim never gave) or variance
+  (bench width 1.98). Neither has been pre-registered.
