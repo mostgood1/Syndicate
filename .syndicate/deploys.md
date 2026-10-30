@@ -55040,3 +55040,51 @@ which is about the two sizing bases and not about the refusal boundary.
   - Not read: the cloud-side listing.
 - **verify:** MET -- the re-run archive reads synced (state 2, placeholder bit 0x8) 14 min after its write ended.
   - Still owed: the hardened job (`b92c1d57`) on the fleet, which is the user's decision. Then the 10-31 09:15Z run's log line and upload.
+
+## 2026-10-30 17:10Z (12:10 PM CT) -- READINGS: #729 forward reading (MET) and the Phase 0 gate (order instants MET; record join MET for pregame, NOT for in-play) (lane syndicate-decision-engine, #736) -- **read-only**
+- **User, verbatim:** "Yes, take them". It answered the button "take the #729 forward reading and the Phase 0 gate reading here, read-only, then close Phase 0 if both are met".
+- **Substrate:**
+  - The fleet ledger via `execution_ledger.full_history_orders()` (archive + live document), run from `~/Syndicate` at `6d6e729d`.
+  - Env from the refresh-worker pid 688033 (`/proc/<pid>/environ`, NUL-split; no value printed).
+  - DecisionRecords at `<data root>/reports/intelligence/decision_records/`: 9 dated files, plus per-build `*.agreement.jsonl`.
+  - Ledger: 23,954 rows, 1,057 live.
+  - Scripts: scratchpad `read_729_forward.py`, `phase0_gate_read.py`, `phase0_gate_split.py`.
+
+### #729 forward reading (lane `venue-prop-close-coverage`) -- **MET**
+- **Population:** MLB orders at a Kalshi or Polymarket venue (paper, ladder, live), outcome decided, `settled_at >= 2026-10-22T17:50:06Z` (the `aa06d5a1` load).
+  - n = **515**, settled 10-22 19:18Z..10-29 02:00Z (the LCS tail and World Series).
+- **Own-book close** means `closing_mark.clv_pct` is set, the scope is same-book, and the close book is the order's venue:
+
+  | Venue | Own-book | Before (findings) | Replay "after" |
+  |---|---|---|---|
+  | Kalshi (paper, ladder, live) | **371 of 429 (86%)** | 39 of 266 (15%) | 218 of 266 (82%) |
+  | Polymarket | **57 of 86 (66%)** | 0 of 95 | 72 of 95 (76%) |
+
+  By cell:
+  - `paper:kalshi`: prop 33/34, game 2/3.
+  - `paper:kalshi:ladder`: prop 246/282, game 72/85.
+  - Live `kalshi`: prop 13/13, game 5/12.
+  - `paper:polymarket`: prop 2/2, game 0/1.
+  - `paper:polymarket:ladder`: prop 47/64, game 2/13.
+  - Live `polymarket`: prop 6/6.
+- **Polymarket props alone:** 55 of 72 (76%), equal to the replay's prediction.
+- **The shortfall is Polymarket GAME lines: 2 of 14.** 12 of the other 12 read `no_close_for_market`. That is a residual for the owner lane, and not the prop mechanism `#729` fixed.
+- Not event-clustered, and paper fills are at the quoted price. The reading measures coverage only, not edge.
+
+### Phase 0 gate: "every settled live fill joins to its record and order instant" -- **NOT MET as written; MET for the pregame decision path**
+- **Population:** live orders, `status=filled`, `fill_stake_dollars > 0`, outcome won/lost/push, submitted on or after 2026-10-23 (the first DecisionRecord date). n = **292** (Kalshi 255, Polymarket 37).
+  - The first live order carrying `staked_probability_version` was submitted 2026-10-22 02:59:12Z.
+- **Order instant:** `submitted_at` present and `source != venue_rebuild` in **292 of 292**. MET.
+- **Join keys:** `position_key` present in **292 of 292**.
+- **Record join:** the order's `line_key` matched a record in some build's agreement line.
+
+  | Phase of the order | n | `staked_probability_version` | Record | Both |
+  |---|---|---|---|---|
+  | **Pregame** | 122 | 122 | 112 | **112** |
+  | **In-play** (submitted after `commence_time`) | 140 | 0 | 60 (the line's pregame record only) | 0 |
+  | No `commence_time` | 30 | 0 | 0 | 0 |
+
+  - The 10 pregame misses are all 10-23..10-26 (6, 1, 2, 1). **From 10-27 on, every pregame settled live fill joins.**
+  - The 30 with no `commence_time` are Kalshi NBA game lines (`KXNBATOTAL` 13, `KXNBASPREAD` 13, `KXNBAGAME` 3, `KXMLBTOTAL` 1) on 10-23/10-24. These are early in-play entries placed before orders were stamped with a start time.
+  - **So 170 of 292 settled live fills (58%) are in-play entries with no DecisionRecord and no staked-probability version, by construction.** The DecisionRecord covers the pregame board, and the in-play program places off its own loop.
+- **verify:** #729 MET. The Phase 0 gate is MET only for the pregame path. The in-play record join is owed, and has no owner yet; that is the user's decision.
