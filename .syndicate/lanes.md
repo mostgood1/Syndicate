@@ -632,7 +632,8 @@ death, never life — do not invert it.
 - Verification: Prereg committed first (SHA in findings); hermetic tests pass incl. off != on reachability and a no-order-path test; z fit reported with n; findings file + #738 + a #717 dated-read line on main; enabling the job on the fleet is the user's decision
 - Blocked by: none
 
-### kalshi-combo-capture — OPEN (RUNNING: hourly supervisor job live since 2026-10-28 16:44:45Z; first-forward-day reading owed via scheduled task) — opened 2026-10-27 — session a48b0f49-3a6b-4105-b194-5804a934487c (picked up 2026-10-27 as a side session of local_668211d5; opened by e32fef1a for pickup)
+### kalshi-combo-capture — CLOSED 2026-10-30 (GOAL MET: capture live on the fleet; first full forward day 10-29 read MET) — opened 2026-10-27 — session a48b0f49-3a6b-4105-b194-5804a934487c (picked up 2026-10-27 as a side session of local_668211d5; opened by e32fef1a for pickup)
+- **GOAL VERDICT `[2026-10-30 18:21Z, closed by lane syndicate-decision-engine, session 8e021fe8]`: GOAL: MET.** Reading: `deploys.md` 2026-10-30 13:47Z -- first full forward day 10-29: 473,517 traded combos stored, kept > 0 for mlb/nba/wnba/nhl/nfl/ncaaf/soccer (ncaab off-season), results filled 99.49%, ~11,176 GETs (prorated; the user approved the run on the ~8,500-a-day heavy-day figure, and the hourly run budget of 900 pages bounds it), purge age 2.48-2.98 d. The owner session a48b0f49 (CCD local_a887f012) was archived 10-30 on the user's instruction; its last transcript timestamp is 2026-10-29 20:14:46Z. The capture job keeps running unchanged. Its file claims pass to lane `e4-pregame-prints` (E4 (e), user 2026-10-30 "Yes, all four").
 - First forward day 2026-10-29 READ 2026-10-30: stored 473,517, results filled 99.49%, ~11,176 GETs; purge age 2.48-2.98 days (deploys.md)
 - **Reading armed `[2026-10-27 23:20Z]`:** Claude scheduled task `kalshi-combo-capture-first-forward-day`, user-approved, runs daily at ~8:40 AM CT, read-only.
   - It runs `scripts/kalshi_combo_capture.py status` (`25485432`) on the fleet store, via `C:\tmp\kalshi_combo_status\cc_status.sh`.
@@ -705,6 +706,14 @@ death, never life — do not invert it.
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - Verdict: MET. Moved `closed-lane-archive-20261030-0849` (owner_liveness SAFE at --idle-min 240). Table and Part B in `.syndicate/log/2026-10-30.md`.
+
+### e4-pregame-prints — OPEN — opened 2026-10-30 — session 8e021fe8-8974-476f-a16c-bf20939134d8
+- Goal: E4 (e) per the user 2026-10-30 ('Yes, all four'): Amendment A5 is pre-registered on main BEFORE any trade-read data exists, and after a user-approved fleet ff the #742 capture stores public trade prints (time, YES/NO price, taker side) for traded two-leg same-game combos in E4 Stage 2's four passing shapes, verified on the fleet store for the first full UTC day (shaped combos with trades_status ok/empty > 0, skipped_budget counted, GETs within the run budget)
+- Files: scripts/kalshi_combo_capture.py, tests/test_kalshi_combo_capture.py, .syndicate/findings_2026-10-26_e4_combo_correlation_preregistration.md (Amendment A5 appended section only), .syndicate/findings_2026-10-26_e4_combo_correlation.md (one appended pointer line under the Stage 2 RESULT section only), docs/ai_context/todo.md (#740 section only)
+- Hypothesis: n/a (a capture change plus a registered amendment; A5 R2 is the test, read later)
+- Falsification test: n/a here; A5's own R2 rule decides
+- Verification: Hermetic tests: shape parity with e4_stage2_combo_prices.shape_cell on a ticker grid, off != on for the shaped read, budget reservation; A5 committed on origin/main before the ff; after the ff, the first full UTC day's store rows read on the fleet (shaped traded two-leg combos, trades_status counts, prints with taker_side, GETs) and recorded in deploys.md
+- Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
