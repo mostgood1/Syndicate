@@ -624,15 +624,6 @@ death, never life — do not invert it.
 - Kalshi fair price LIVE 2026-10-28 17:11Z: fleet 6d6e729d since 16:44:45Z (syndicate-decision-engine window); pass 16:57:30Z appended 12 `fair_price`; last copies +0.6898 / +0.2496 on $12, 0 still void, 11 book voids untouched -- MET (deploys.md 17:10:59Z). Live path 0 voids since the up (a null on 26 min).
 - Blocked by: none
 
-### e4-stage2-combo-prices — CLOSED 2026-10-30 (GOAL MET: registered reading NO_EDGE_SHOWN; not a kill, the print is in-play) — opened 2026-10-28 — session b566f51c-27f6-456c-b2ac-99f33cb133d4
-- Goal verdict: E4 Stage 2 (#740 (d)) run as pre-registered (9f8d759e + A1/A2/A3) on the #742 capture store, offline and read-only, once the capture's first-full-forward-day reading is on origin/main; per passing cell the registered readings R1-R3 and the R2 verdict recorded in the E4 findings and #740 -- **GOAL: MET.** Reading: C:/tmp/e4/stage2.json (run 2026-10-30 15:17:54Z, rc 0) read and recorded in the findings (section E4 Stage 2 RESULT) and #740, with the funnel and the n per reading. Follow-up OWED (e) is a user decision, not this lane's.
-- Goal: E4 Stage 2 (#740 (d)) run as pre-registered (9f8d759e + A1/A2/A3) on the #742 capture store, offline and read-only, once the capture's first-full-forward-day reading is on origin/main; per passing cell the registered readings R1-R3 and the R2 verdict recorded in the E4 findings and #740
-- Files: scripts/e4_stage2_combo_prices.py (NEW), tests/test_e4_stage2_combo_prices.py (NEW), .syndicate/findings_2026-10-26_e4_combo_correlation_preregistration.md, .syndicate/findings_2026-10-26_e4_combo_correlation.md, docs/ai_context/todo.md (#740 section only)
-- Hypothesis: Kalshi prices same-game combos as independence plus a haircut, so where the sim's correlation raises the joint (p_b - p_a >= 1 pp) buying YES at the print earns a positive realised return
-- Falsification test: R2: the game-clustered 95% CI of the realised return on the sim-favoured side includes or sits below 0 in every sufficient passing cell (Holm m=8), or R1's slope CI excludes 0 near 1 (the prints already carry the correlation)
-- Verification: the Stage 2 run's report (C:/tmp/e4/stage2.json) read and its verdicts recorded in the findings file and #740, with the funnel and the n each reading rests on
-- Blocked by: the #742 first-full-forward-day reading (scheduled task kalshi-combo-capture-first-forward-day); user condition 'Yes, after the reading'
-
 ### closed-lane-archive-20261030-1045 — CLOSED 2026-10-30 (GOAL MET: 1 block archived) — opened 2026-10-30 — session 5d79ee1d-9207-4220-8f3c-74a872c47b9d
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
@@ -671,6 +662,11 @@ death, never life — do not invert it.
 - Verification: git diff origin/main -- docs/ai_context/todo.md shows exactly 5 lines changed, all ### headers of those ids
 - Blocked by: none
 - **GOAL VERDICT 2026-10-30 19:25Z:** "The five todo headlines #662 #670 #697 #706 #709 state what is true on 2026-10-30, each correction citing its reading; no other line of todo.md changes" -- GOAL: MET. Reading: `git diff --numstat` = 5/5 on todo.md, all five `### ` headers. #697 was NOT stale in substance: fleet ci-suite 10-30 03:53 CDT on `6d6e729dc9` = 61 NEW FAILURE(S), so its headline now says STILL RED.
+
+### closed-lane-archive-20261030-1439 — CLOSED 2026-10-30 (GOAL MET: 1 blocks archived) — opened 2026-10-30 — session 7f87246c-628e-4ddf-86cd-90c9eb3006a0
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 read SAFE for 1 of 9 CLOSED blocks; moved `e4-stage2-combo-prices` to lanes_closed.md with one pointer. Readings in log/2026-10-30.md 19:42Z.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -813,6 +809,7 @@ death, never life — do not invert it.
 - `dh-ordinal-pairing` — CLOSED — opened 2026-09-25, closed 2026-09-25, closed 2026-09-25 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `e3-derived-surface` — CLOSED — opened 2026-10-26 — closed 2026-10-27 — session d266ae46-93f0-45d3-9528-b0f6b150c5a6
 - `e4-combo-correlation` — CLOSED — opened 2026-10-26 — closed 2026-10-26 — session b566f51c-27f6-456c-b2ac-99f33cb133d4
+- `e4-stage2-combo-prices` — CLOSED 2026-10-30 (GOAL MET: registered reading NO_EDGE_SHOWN; not a kill, the print is in-play) — opened 2026-10-28 — session b566f51c-27f6-456c-b2ac-99f33cb133d4
 - `e5-venue-news-lag` — CLOSED — opened 2026-10-26 — closed 2026-10-26 — session ce4dfadf-df79-4dbe-8940-70f92ba3ffc1
 - `evaluation-ledger-projected-mirror` — CLOSED 2026-09-10 — opened 2026-09-04 — session 5959f891 — **GOAL: MET: projected ledger produced on the worker (`over_ceiling=0`) and served by web (HTTP 200, 09-04..09-09); closed by `census-rescue-0910` on user decision**
 - `exchange-execution-unblock` — CLOSED 2026-09-10 — opened 2026-09-10 — session 7a239b89-c8fd-49b7-ba5a-e41bb9d4d9bc — **GOAL MET: live placement unfrozen; unbuildable positions refused before any write (`332e596d`); Kalshi NCAAF/NFL forward-date matching live on both workers, with the first NCAAF Kalshi orders placed and filled at 20:27:54Z.**
