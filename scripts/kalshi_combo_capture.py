@@ -20,6 +20,9 @@ combos). An untraded kept combo therefore carries no price: it is COUNTED in run
 (`--store-untraded` keeps it). The executable prices are the TRADE PRINTS, read per traded kept combo
 (`kalshi_maker_shadow.read_trade_prints`) only up to DEFAULT_TRADES_MAX_LEGS legs: one GET per combo is
 unaffordable across 485k a Sunday evening, and a long ticket's pair price cannot be backed out anyway.
+The exception is E4 (e) (`--trades-shapes e4`, the default since 2026-10-30): every traded TWO-leg combo in one
+of E4 Stage 2's four passing shapes gets its prints read (~450 a day), because Stage 2's last print was in play
+for at least 29% of soccer combos and only a print's time and taker side can find the last PREGAME one.
 Snapshotting every creation would cost ~8k GETs a day and reading the global trade stream ~9.5k on a
 Monday morning. Listing SETTLEMENTS sees every combo exactly once, already resolved.
 
@@ -121,6 +124,26 @@ TRADE_PAUSE_S = 0.12
 # 21.7k traded two-leg combos and 122k of <= 4 legs in 12.5 h, 3-15x the listing's own pages. See attach_trades.
 DEFAULT_TRADES_MAX_LEGS: int | None = 0
 DAY = 86400
+
+# E4 (e) (lane `e4-pregame-prints`, #740; user 2026-10-30 "Yes, all four"; pre-registered as A5, 41cb8aba): the
+# shaped trade read. A traded two-leg combo whose one same-game group is in a passing E4 Stage 2 cell (A3 §2) gets
+# its prints read: 181-793 a day over settlements 10-24..10-29 on the fleet store (weekends ~780, soccer GL ~93%),
+# busiest settlement hour 151. That adds 4-7% to the capture's ~11k GETs a day. The tables copy
+# `e4_combo_correlation` / `e4_stage2_combo_prices` on purpose, so this fleet job imports no research module;
+# tests/test_kalshi_combo_capture.py holds `e4_shape_cell` equal to `e4_stage2_combo_prices.shape_cell`.
+TRADES_SHAPES = ("none", "e4")
+DEFAULT_TRADES_SHAPES = "e4"
+# The shaped reads have their own per-run cap, so a heavy listing hour cannot starve them, nor they it. 400 is
+# 2.6x the busiest hour measured; a catch-up run over several hours can reach it, and says `skipped_budget`.
+MAX_SHAPED_TRADE_READS_PER_RUN = 400
+E4_MLB_STAT = {"KXMLBHIT": "hits", "KXMLBTB": "total_bases", "KXMLBHR": "home_runs", "KXMLBRBI": "rbi"}
+E4_MLB_NESTED = {frozenset(x) for x in (("hits", "total_bases"), ("home_runs", "hits"), ("home_runs", "total_bases"),
+                                         ("home_runs", "rbi"))}
+E4_NBA_VEC = {"KXNBAPTS": (1, 0, 0), "KXNBAREB": (0, 1, 0), "KXNBAAST": (0, 0, 1), "KXNBAPRA": (1, 1, 1)}
+E4_SOCCER_LEAGUES = frozenset({"epl", "la_liga", "bundesliga", "serie_a", "ligue_1", "eredivisie", "primeira_liga",
+                               "belgian_pro_league", "championship", "mls"})
+E4_SOCCER_KINDS = ("GAME", "TOTAL", "BTTS")
+E4_PASSING = frozenset({("mlb", "SP-nested"), ("mlb", "SP-other"), ("nba", "SP-nested"), ("soccer", "GL")})
 
 
 # ------------------------------------------------------------------ small helpers
@@ -337,8 +360,61 @@ def store_date(row: Mapping[str, Any]) -> str:
     return utc_date(ms.ts(row.get("settlement_ts")) or ms.ts(row.get("close_time")) or time.time())
 
 
-def wants_trade_read(row: Mapping[str, Any], max_legs: int | None) -> bool:
-    return bool(row.get("traded")) and (max_legs is None or int(row.get("n_legs") or 0) <= max_legs)
+def _e4_series(ticker: str) -> str:
+    return ticker.split("-")[0].upper()
+
+
+def _e4_player(ticker: str) -> str | None:
+    parts = ticker.split("-")
+    return parts[2] if len(parts) >= 4 else None
+
+
+def _e4_soccer_kind(series: str) -> str | None:
+    for kind in E4_SOCCER_KINDS:
+        if series.endswith(kind):
+            head = series[: -len(kind)]
+            if head.endswith(("1H", "2H", "TEAM")) or not head.startswith("KX"):
+                return None
+            return kind
+    return None
+
+
+def e4_shape_cell(sport: Any, league: Any, a: str, b: str) -> str | None:
+    """`e4_stage2_combo_prices.shape_cell`, from the tickers alone: the cell a two-leg combo can belong to."""
+    sa, sb = _e4_series(a), _e4_series(b)
+    if sport == "mlb":
+        if sa in E4_MLB_STAT and sb in E4_MLB_STAT and sa != sb and _e4_player(a) and _e4_player(a) == _e4_player(b):
+            return "SP-nested" if frozenset((E4_MLB_STAT[sa], E4_MLB_STAT[sb])) in E4_MLB_NESTED else "SP-other"
+        return None
+    if sport == "nba":
+        if sa in E4_NBA_VEC and sb in E4_NBA_VEC and sa != sb and _e4_player(a) and _e4_player(a) == _e4_player(b):
+            shared = sum(x * y for x, y in zip(E4_NBA_VEC[sa], E4_NBA_VEC[sb]))
+            return "SP-disjoint" if shared == 0 else "SP-nested"
+        return None
+    if sport == "soccer" and league in E4_SOCCER_LEAGUES:
+        ka, kb = _e4_soccer_kind(sa), _e4_soccer_kind(sb)
+        if ka and kb and not (ka == "GAME" and kb == "GAME"):
+            return "GL"
+    return None
+
+
+def e4_trade_shape(row: Mapping[str, Any]) -> str | None:
+    """The passing E4 cell of a two-leg combo whose two legs are one game (A3 §2 / A5 §1), else None."""
+    legs = row.get("legs") or []
+    groups = row.get("same_game") or []
+    if int(row.get("n_legs") or 0) != 2 or len(legs) != 2 or len(groups) != 1 or len(groups[0].get("legs") or []) != 2:
+        return None
+    sport = groups[0].get("sport")
+    cell = e4_shape_cell(sport, groups[0].get("league"), *(str(leg.get("market_ticker") or "") for leg in legs))
+    return cell if (sport, cell) in E4_PASSING else None
+
+
+def wants_trade_read(row: Mapping[str, Any], max_legs: int | None, shapes: str = "none") -> bool:
+    if not row.get("traded"):
+        return False
+    if max_legs is None or int(row.get("n_legs") or 0) <= max_legs:
+        return True
+    return shapes == "e4" and e4_trade_shape(row) is not None
 
 
 def tally(stats: collections.Counter, row: Mapping[str, Any]) -> None:
@@ -356,11 +432,12 @@ def tally(stats: collections.Counter, row: Mapping[str, Any]) -> None:
 
 def sweep_slice(get: Callable[..., Any], series: str, lo: int, hi: int, *, budget: RunBudget,
                 captured_at: str, page_cap: int = SLICE_PAGE_CAP, keep_untraded: bool = True,
-                trades_max_legs: int | None = None) -> tuple[list[dict[str, Any] | EncodedRow], collections.Counter]:
+                trades_max_legs: int | None = None,
+                trades_shapes: str = "none") -> tuple[list[dict[str, Any] | EncodedRow], collections.Counter]:
     """Every kept combo of `series` settled in the integer seconds [lo, hi]. All or nothing: raises rather
     than return a partial slice. Every kept combo is TALLIED; an untraded one is returned only with
     `keep_untraded` (holding a peak slice's 180k untraded rows took 1.25 GB). Only a row that may get a trade
-    read (`trades_max_legs`, as in `attach_trades`) stays a dict; every other one is returned as its
+    read (`trades_max_legs` / `trades_shapes`, as in `attach_trades`) stays a dict; every other one is returned as its
     EncodedRow, its `trades_status` already final."""
     kept: dict[str, dict[str, Any] | EncodedRow] = {}
     seen: set[str] = set()
@@ -398,7 +475,7 @@ def sweep_slice(get: Callable[..., Any], series: str, lo: int, hi: int, *, budge
             tally(stats, row)
             if not (row["traded"] or keep_untraded):
                 continue
-            if wants_trade_read(row, trades_max_legs):
+            if wants_trade_read(row, trades_max_legs, trades_shapes):
                 kept[row["ticker"]] = row
                 continue
             if row["traded"]:
@@ -414,10 +491,11 @@ def sweep_slice(get: Callable[..., Any], series: str, lo: int, hi: int, *, budge
 
 def sweep_window(get: Callable[..., Any], series: str, lo: int, hi: int, *, budget: RunBudget,
                  captured_at: str, page_cap: int = SLICE_PAGE_CAP, keep_untraded: bool = True,
-                 trades_max_legs: int | None = None) -> tuple[list[dict[str, Any] | EncodedRow], collections.Counter]:
+                 trades_max_legs: int | None = None,
+                 trades_shapes: str = "none") -> tuple[list[dict[str, Any] | EncodedRow], collections.Counter]:
     """`sweep_slice`, halving a slice that needs more than `page_cap` pages."""
     kw = {"budget": budget, "captured_at": captured_at, "page_cap": page_cap, "keep_untraded": keep_untraded,
-          "trades_max_legs": trades_max_legs}
+          "trades_max_legs": trades_max_legs, "trades_shapes": trades_shapes}
     try:
         return sweep_slice(get, series, lo, hi, **kw)
     except SliceTooLarge:
@@ -433,7 +511,8 @@ def sweep_window(get: Callable[..., Any], series: str, lo: int, hi: int, *, budg
 
 
 def attach_trades(get: Callable[..., Any], rows: Iterable[dict[str, Any] | EncodedRow], pause: float = TRADE_PAUSE_S,
-                  max_legs: int | None = None, budget: RunBudget | None = None) -> collections.Counter:
+                  max_legs: int | None = None, budget: RunBudget | None = None, shapes: str = "none",
+                  shaped_budget: RunBudget | None = None) -> collections.Counter:
     """Public trade prints for each kept combo with volume; `trades_status` says what came back.
 
     `max_legs` bounds the one-GET-per-combo trade read to tickets of at most that many legs (0 = none, None = all).
@@ -441,30 +520,45 @@ def attach_trades(get: Callable[..., Any], rows: Iterable[dict[str, Any] | Encod
     `skipped_budget`. Measured 2026-10-26 15:03Z -> 10-27 03:33Z: 485k traded kept combos, 122k of them <= 4 legs.
     On the 3,778 read 14:35-18:34Z, `last_price` equalled the last print in 3,774, the prints summed to `volume`
     in all, 81% had one print, and the first print came a median 24 s (p90 113 s) after `created_time`. A
-    skipped row keeps `last_price`, `volume` and `created_time`."""
+    skipped row keeps `last_price`, `volume` and `created_time`.
+
+    `shapes="e4"` also reads every traded two-leg combo in a passing E4 shape (`e4_trade_shape`, A5 §1). Those
+    reads are charged to `shaped_budget` when given (else `budget`), and every shaped row is also counted under
+    `shaped*`, so a run row says how much of A5's population got its prints."""
     stats: collections.Counter[str] = collections.Counter()
-    charged = get
-    if budget is not None:
+
+    def charging(b: RunBudget | None) -> Callable[..., Any]:
+        if b is None:
+            return get
+
         def charged(path: str, params: Mapping[str, Any] | None = None) -> Any:
-            budget.spend()
+            b.spend()
             return get(path, params)
+        return charged
+
     for row in rows:
         if isinstance(row, EncodedRow) or not row.get("traded"):  # an EncodedRow's trades_status is final
             continue
-        if max_legs is not None and int(row.get("n_legs") or 0) > max_legs:
+        by_legs = max_legs is None or int(row.get("n_legs") or 0) <= max_legs
+        shaped = shapes == "e4" and e4_trade_shape(row) is not None
+        if not (by_legs or shaped):
             row["trades_status"] = "skipped"
             stats["trades_skipped"] += 1
             continue
-        if budget is not None and not budget.allow():
+        b = shaped_budget if shaped and not by_legs and shaped_budget is not None else budget
+        stats["shaped"] += shaped
+        if b is not None and not b.allow():
             row["trades_status"] = "skipped_budget"
             stats["trades_skipped_budget"] += 1
+            stats["shaped_skipped_budget"] += shaped
             continue
         hi = ms.ts(row.get("settlement_ts")) or ms.ts(row.get("close_time")) or time.time()
         lo = ms.ts(row.get("created_time")) or ms.ts(row.get("open_time")) or hi - 30 * DAY
-        prints = ms.read_trade_prints(row["ticker"], lo, hi, get=charged, pause=pause)
+        prints = ms.read_trade_prints(row["ticker"], lo, hi, get=charging(b), pause=pause)
         if prints is None:
             row["trades_status"] = "unreadable"
             stats["trades_unreadable"] += 1
+            stats["shaped_unreadable"] += shaped
             continue
         row["trades"] = [
             {"t": ms.iso(p["t"]), "yes": p.get("yes"), "no": p.get("no"), "count": _f(p.get("count")),
@@ -474,7 +568,10 @@ def attach_trades(get: Callable[..., Any], rows: Iterable[dict[str, Any] | Encod
         row["trades_status"] = "ok" if prints else "empty"
         stats["trades_ok" if prints else "trades_empty"] += 1
         stats["prints"] += len(prints)
-    return stats
+        if shaped:
+            stats["shaped_ok" if prints else "shaped_empty"] += 1
+            stats["shaped_prints"] += len(prints)
+    return +stats
 
 
 # ------------------------------------------------------------------ store
@@ -618,7 +715,10 @@ def run(root: Path, *, get: Callable[..., Any] = ms.public_get_json, now: float 
         max_seconds: float = MAX_RUN_S, series: Mapping[str, tuple[int, int]] = SWEEP_SERIES,
         invoker: str = "cli", trade_pause: float = TRADE_PAUSE_S, page_cap: int = SLICE_PAGE_CAP,
         snapshot: bool = True, trades_max_legs: int | None = DEFAULT_TRADES_MAX_LEGS,
-        store_untraded: bool = False) -> dict[str, Any]:
+        store_untraded: bool = False, trades_shapes: str = DEFAULT_TRADES_SHAPES,
+        max_shaped_reads: int = MAX_SHAPED_TRADE_READS_PER_RUN) -> dict[str, Any]:
+    if trades_shapes not in TRADES_SHAPES:
+        raise ValueError(f"trades_shapes must be one of {TRADES_SHAPES}, not {trades_shapes!r}")
     if not (capture_enabled() if enabled is None else enabled):
         print(f"[kalshi_combo_capture] OFF ({ENV_FLAG} is not on): no request, no file", flush=True)
         return {"status": "off"}
@@ -631,11 +731,12 @@ def run(root: Path, *, get: Callable[..., Any] = ms.public_get_json, now: float 
         return _run_locked(root, get=get, now=now, lookback_s=lookback_s, max_pages=max_pages,
                            max_seconds=max_seconds, series=series, invoker=invoker, trade_pause=trade_pause,
                            page_cap=page_cap, snapshot=snapshot, trades_max_legs=trades_max_legs,
-                           store_untraded=store_untraded)
+                           store_untraded=store_untraded, trades_shapes=trades_shapes,
+                           max_shaped_reads=max_shaped_reads)
 
 
 def _run_locked(root: Path, *, get, now, lookback_s, max_pages, max_seconds, series, invoker, trade_pause,
-                page_cap, snapshot, trades_max_legs, store_untraded) -> dict[str, Any]:
+                page_cap, snapshot, trades_max_legs, store_untraded, trades_shapes, max_shaped_reads) -> dict[str, Any]:
     started = time.monotonic()
     store = store_dir(root)
     state_path = store / "state.json"
@@ -645,10 +746,12 @@ def _run_locked(root: Path, *, get, now, lookback_s, max_pages, max_seconds, ser
     state.setdefault("series", {})
     counting = CountingGet(get)
     budget = RunBudget(max_pages, max_seconds)
+    shaped_budget = RunBudget(max_shaped_reads, max_seconds)
     bytes_before = _http_bytes()
     captured_at = ms.iso(now)
     summary: dict[str, Any] = {"run_at": captured_at, "rule_version": RULE_VERSION, "invoker": invoker,
                                "trades_max_legs": trades_max_legs, "store_untraded": store_untraded, "series": {},
+                               "trades_shapes": trades_shapes,
                                "kept_by_sport": collections.Counter(), "kept_traded_by_sport": collections.Counter(),
                                "kept_traded_by_legs": collections.Counter(), "kept_by_league": collections.Counter(),
                                "trades": collections.Counter(), "written": collections.Counter(), "errors": []}
@@ -686,13 +789,14 @@ def _run_locked(root: Path, *, get, now, lookback_s, max_pages, max_seconds, ser
                 # An untraded finalized combo's quote is zeroed: it carries no price, so it is tallied, not stored.
                 rows, stats = sweep_window(counting, name, lo, hi, budget=budget, captured_at=captured_at,
                                            page_cap=page_cap, keep_untraded=store_untraded,
-                                           trades_max_legs=trades_max_legs)
+                                           trades_max_legs=trades_max_legs, trades_shapes=trades_shapes)
             except BudgetStop:
                 break
             except (SliceUnreadable, SliceTooLarge) as exc:
                 summary["errors"].append(f"{type(exc).__name__}: {exc}")
                 break
-            trade_stats = attach_trades(counting, rows, pause=trade_pause, max_legs=trades_max_legs, budget=budget)
+            trade_stats = attach_trades(counting, rows, pause=trade_pause, max_legs=trades_max_legs, budget=budget,
+                                        shapes=trades_shapes, shaped_budget=shaped_budget)
             summary["trades"].update(trade_stats)
             for date, n in append_rows(root, rows).items():
                 summary["written"][date] += n
@@ -724,6 +828,8 @@ def _run_locked(root: Path, *, get, now, lookback_s, max_pages, max_seconds, ser
     summary["gets_total"] = sum(counting.calls.values())
     summary["pages"] = budget.pages
     summary["budget_stopped"] = budget.stopped
+    summary["shaped_reads"] = shaped_budget.pages
+    summary["shaped_budget_stopped"] = shaped_budget.stopped
     summary["seconds"] = round(time.monotonic() - started, 1)
     summary["finished_at"] = ms.iso(time.time())
     summary["status"] = "errors" if summary["errors"] else ("budget_stopped" if budget.stopped else "ok")
@@ -913,6 +1019,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     r.add_argument("--trades-max-legs", type=int, default=DEFAULT_TRADES_MAX_LEGS,
                    help=f"read trade prints only for traded combos of at most N legs (0 = none, -1 = all; "
                         f"default {DEFAULT_TRADES_MAX_LEGS})")
+    r.add_argument("--trades-shapes", choices=TRADES_SHAPES, default=DEFAULT_TRADES_SHAPES,
+                   help="e4: also read the prints of traded two-leg combos in E4 Stage 2's passing shapes "
+                        f"(#740 (e), A5; default {DEFAULT_TRADES_SHAPES}); none: off")
     r.add_argument("--store-untraded", action="store_true",
                    help="also store kept combos with no volume (their finalized quote is zeroed; default: count only)")
     p = sub.add_parser("report", help="GETs per covered day and kept combos per settlement date / sport")
@@ -928,7 +1037,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         summary = run(root, enabled=True if args.enable else None, lookback_s=int(args.lookback_hours * 3600),
                       max_pages=args.max_pages, max_seconds=args.max_seconds, invoker=args.invoker,
                       trades_max_legs=None if args.trades_max_legs < 0 else args.trades_max_legs,
-                      store_untraded=args.store_untraded)
+                      store_untraded=args.store_untraded, trades_shapes=args.trades_shapes)
         return 1 if summary.get("status") == "errors" else 0
     if args.cmd == "status":
         print(json.dumps(forward_status(root), indent=1, sort_keys=True))

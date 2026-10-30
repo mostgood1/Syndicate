@@ -591,3 +591,146 @@ def test_the_capture_sends_only_public_gets_through_the_shared_reader():
     assert not any("order" in name or "auth" in name or "execution" in name for name in imported), imported
     assert "urlopen(" not in text and "urllib" not in imported  # requests go through ms.public_get_json only
     assert cc.run.__kwdefaults__["get"] is cc.ms.public_get_json
+
+
+# ------------------------------------------------------------------ E4 (e): the shaped trade read (lane e4-pregame-prints, A5)
+GL_LEGS = [_leg("KXEPLGAME-26OCT31ARSCRY", "KXEPLGAME-26OCT31ARSCRY-ARS"),
+           _leg("KXEPLTOTAL-26OCT31ARSCRY", "KXEPLTOTAL-26OCT31ARSCRY-3")]
+RESULT_X_RESULT_LEGS = [_leg("KXEPLGAME-26OCT31ARSCRY", "KXEPLGAME-26OCT31ARSCRY-ARS"),
+                        _leg("KXEPLGAME-26OCT31ARSCRY", "KXEPLGAME-26OCT31ARSCRY-TIE")]
+NBA_NESTED_LEGS = [_leg("KXNBAPTS-26OCT31SACSAS", "KXNBAPTS-26OCT31SACSAS-SASVWEMBANYAMA1-30"),
+                   _leg("KXNBAPRA-26OCT31SACSAS", "KXNBAPRA-26OCT31SACSAS-SASVWEMBANYAMA1-45")]
+NBA_DISJOINT_LEGS = [_leg("KXNBAPTS-26OCT31SACSAS", "KXNBAPTS-26OCT31SACSAS-SASVWEMBANYAMA1-30"),
+                     _leg("KXNBAREB-26OCT31SACSAS", "KXNBAREB-26OCT31SACSAS-SASVWEMBANYAMA1-12")]
+MLB_OTHER_LEGS = [_leg("KXMLBHIT-26OCT31LADTOR", "KXMLBHIT-26OCT31LADTOR-LADSOHTANI17-1"),
+                  _leg("KXMLBRBI-26OCT31LADTOR", "KXMLBRBI-26OCT31LADTOR-LADSOHTANI17-1")]
+UCL_GL_LEGS = [_leg("KXUCLGAME-26NOV04ARSBAY", "KXUCLGAME-26NOV04ARSBAY-ARS"),
+               _leg("KXUCLTOTAL-26NOV04ARSBAY", "KXUCLTOTAL-26NOV04ARSBAY-3")]
+
+
+def _stage2():
+    import sys
+
+    for path in (str(REPO / "scripts"), str(REPO)):
+        if path not in sys.path:
+            sys.path.insert(0, path)
+    import e4_stage2_combo_prices as s2
+
+    return s2
+
+
+def test_the_shape_cell_equals_stage2s_registered_classifier_on_a_ticker_grid():
+    s2 = _stage2()
+    series = ["KXMLBHIT", "KXMLBTB", "KXMLBHR", "KXMLBRBI", "KXMLBHRR", "KXMLBKS", "KXNBAPTS", "KXNBAREB",
+              "KXNBAAST", "KXNBAPRA", "KXNBA3PT", "KXEPLGAME", "KXEPLTOTAL", "KXEPLBTTS", "KXEPL1HTOTAL",
+              "KXEPLTEAMTOTAL", "KXEPLSPREAD", "KXMLSGAME", "KXMLSBTTS", "XEPLTOTAL"]
+    tickers = []
+    for s in series:
+        tickers += [f"{s}-26OCT31ABCDEF", f"{s}-26OCT31ABCDEF-PLAYERA1-2", f"{s}-26OCT31ABCDEF-PLAYERB2-2",
+                    f"{s.lower()}-26oct31abcdef-playera1-2"]
+    leagues = sorted(s2.s1.SOCCER_LEAGUES) + ["ucl", None]
+    checked = 0
+    for sport in ("mlb", "nba", "soccer", "nhl", "nfl"):
+        for league in (leagues if sport == "soccer" else [None, "epl"]):
+            for a in tickers:
+                for b in tickers:
+                    assert cc.e4_shape_cell(sport, league, a, b) == s2.shape_cell(sport, league, a, b), (sport, league, a, b)
+                    checked += 1
+    assert checked > 50_000
+    assert cc.E4_PASSING == frozenset(s2.PASSING)
+    assert cc.E4_SOCCER_LEAGUES == frozenset(s2.s1.SOCCER_LEAGUES)
+
+
+@pytest.mark.parametrize("legs, cell", [
+    (GL_LEGS, "GL"), (NBA_NESTED_LEGS, "SP-nested"), (MLB_OTHER_LEGS, "SP-other"),
+    (RESULT_X_RESULT_LEGS, None),   # result x result is never a cell
+    (NBA_DISJOINT_LEGS, None),      # SP-disjoint is counted by Stage 2, never tested
+    (UCL_GL_LEGS, None),            # no Stage 1 sim for the UCL
+    (GL_LEGS + [_leg("KXNBAGAME-26OCT31BKNBOS")], None),  # a third leg: not a two-leg combo
+    (NBA_SGP_LEGS, None),
+])
+def test_e4_trade_shape_names_only_the_passing_two_leg_cells(legs, cell):
+    row = cc.combo_row(_combo("KXMVECROSSCATEGORY-S1-X", legs, T0, volume="2.00"), "t")
+    assert cc.e4_trade_shape(row) == cell
+
+
+def _shaped_world(end):
+    combos = [
+        _combo("KXMVECROSSCATEGORY-S1-GL", GL_LEGS, end - 50, volume="12.00", result="yes", created=end - 9000),
+        _combo("KXMVECROSSCATEGORY-S1-NB", NBA_NESTED_LEGS, end - 51, volume="3.00"),
+        _combo("KXMVECROSSCATEGORY-S1-MO", MLB_OTHER_LEGS, end - 52, volume="1.00"),
+        _combo("KXMVECROSSCATEGORY-S1-RR", RESULT_X_RESULT_LEGS, end - 53, volume="5.00"),
+        _combo("KXMVECROSSCATEGORY-S1-ND", NBA_DISJOINT_LEGS, end - 54, volume="5.00"),
+        _combo("KXMVECROSSCATEGORY-S1-GU", GL_LEGS, end - 55),  # shaped, never traded
+        _combo("KXMVECROSSCATEGORY-S1-L7", NBA_SGP_LEGS, end - 56, volume="9.00"),
+    ]
+    trades = {"KXMVECROSSCATEGORY-S1-GL": [
+        {"created_time": _iso(end - 8000), "yes_price_dollars": "0.3100", "no_price_dollars": "0.6900",
+         "count_fp": "10.00", "taker_side": "yes"},
+        {"created_time": _iso(end - 2000), "yes_price_dollars": "0.9600", "no_price_dollars": "0.0400",
+         "count_fp": "2.00", "taker_side": "no"}]}
+    return combos, trades
+
+
+def test_shapes_off_reads_no_trade_and_shapes_e4_reads_exactly_the_shaped_traded_combos(tmp_path):
+    end = T0 - cc.SETTLE_LAG_S
+    combos, trades = _shaped_world(end)
+    off = FakeKalshi(combos, trades=trades, page_size=10)
+    summary_off = _run(tmp_path / "off", off, T0, lookback_s=900, trades_shapes="none")
+    assert not [c for c in off.calls if c[0] == "/markets/trades"]
+    assert summary_off["trades_shapes"] == "none" and summary_off["shaped_reads"] == 0
+
+    on = FakeKalshi(combos, trades=trades, page_size=10)
+    summary = _run(tmp_path / "on", on, T0, lookback_s=900, trades_shapes="e4")
+    read = sorted(c[1]["ticker"] for c in on.calls if c[0] == "/markets/trades")
+    assert read == ["KXMVECROSSCATEGORY-S1-GL", "KXMVECROSSCATEGORY-S1-MO", "KXMVECROSSCATEGORY-S1-NB"]
+    rows = {r["ticker"]: r for r in _stored(tmp_path / "on")}
+    gl = rows["KXMVECROSSCATEGORY-S1-GL"]
+    assert gl["trades_status"] == "ok" and [p["taker_side"] for p in gl["trades"]] == ["yes", "no"]
+    assert gl["trades"][0] == {"t": _iso(end - 8000), "yes": 0.31, "no": 0.69, "count": 10.0, "taker_side": "yes"}
+    assert rows["KXMVECROSSCATEGORY-S1-NB"]["trades_status"] == "empty"
+    for unshaped in ("RR", "ND", "L7"):
+        assert rows[f"KXMVECROSSCATEGORY-S1-{unshaped}"]["trades_status"] == "skipped"
+    assert rows["KXMVECROSSCATEGORY-S1-GU"]["trades_status"] == "not_traded"
+    assert summary["trades_shapes"] == "e4" and summary["shaped_reads"] == 3
+    assert summary["trades"]["shaped"] == 3 and summary["trades"]["shaped_ok"] == 1
+    assert summary["trades"]["shaped_empty"] == 2 and summary["trades"]["shaped_prints"] == 2
+    # the listing's own budget is untouched by the shaped reads
+    assert summary["pages"] == summary_off["pages"] == 1 and summary["status"] == "ok"
+
+
+def test_shaped_reads_have_their_own_cap_and_a_row_past_it_says_skipped_budget(tmp_path):
+    end = T0 - cc.SETTLE_LAG_S
+    combos = [_combo(f"KXMVECROSSCATEGORY-S1-G{i}", GL_LEGS, end - 50 - i, volume="1.00") for i in range(4)]
+    fake = FakeKalshi(combos, page_size=10)
+    summary = _run(tmp_path, fake, T0, lookback_s=900, trades_shapes="e4", max_shaped_reads=1, max_pages=1)
+    assert summary["gets"] == {"markets": 1, "trades": 1} and summary["pages"] == 1
+    assert summary["shaped_reads"] == 1 and summary["shaped_budget_stopped"] is True
+    assert summary["trades"]["shaped"] == 4 and summary["trades"]["shaped_skipped_budget"] == 3
+    rows = _stored(tmp_path)
+    assert sorted(r["trades_status"] for r in rows) == ["empty", "skipped_budget", "skipped_budget", "skipped_budget"]
+    assert summary["status"] == "ok"  # the listing finished; the shaped cap is reported, not an error
+
+
+def test_the_shaped_read_is_on_by_default_and_reaches_the_fleet_job(tmp_path, monkeypatch):
+    from scripts import local_production as lp
+
+    assert cc.DEFAULT_TRADES_SHAPES == "e4" and cc.run.__kwdefaults__["trades_shapes"] == "e4"
+    with pytest.raises(ValueError):
+        cc.run(tmp_path, get=FakeKalshi([]), now=T0, enabled=True, trades_shapes="all")
+    job = {j.name: j for j in lp.SCHEDULED_JOBS}["kalshi-combo-capture"]
+    assert "--trades-shapes" not in job.argv  # the job runs the default
+    seen = {}
+    monkeypatch.setattr(cc, "_nice", lambda: None)
+    monkeypatch.setattr(cc, "run", lambda root, **kw: seen.update(kw) or {"status": "ok"})
+    cc.main(["run", "--data-root", str(tmp_path)])
+    assert seen["trades_shapes"] == "e4"
+    cc.main(["run", "--data-root", str(tmp_path), "--trades-shapes", "none"])
+    assert seen["trades_shapes"] == "none"
+
+
+def test_the_capture_imports_no_research_module():
+    tree = ast.parse(SCRIPT.read_text(encoding="utf-8"))
+    imported = {node.module or "" for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)}
+    imported |= {a.name for node in ast.walk(tree) if isinstance(node, ast.Import) for a in node.names}
+    assert not {"numpy", "e4_stage2_combo_prices", "e4_combo_correlation"} & imported, imported
