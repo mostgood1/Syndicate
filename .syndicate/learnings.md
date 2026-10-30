@@ -3087,3 +3087,10 @@ The 2026-10-20 entry said: "Rating INPUTS transfer, because the sim reads them w
   - Check a price field for in-play contamination BEFORE registering it: the share of q <= 0.05 or q >= 0.95, and
     whether those settle in the print's direction. That check uses outcomes, so run it on a held-out slice, or state
     it as a validity check, never as a test.
+
+## 2026-10-30 — Lane-owner liveness: read the LAST TIMESTAMP INSIDE the transcript, never the file mtime or the session list `[lane stale-lane-triage, session eb9e3103]`
+- **What happened:** to tell which stale lanes still had a living owner, the obvious instruments gave wrong answers.
+  - `list_sessions` (with archived sessions included) matched **0 of 30** lane-header session ids. Headers carry CLI UUIDs and the list carries `local_` app ids.
+  - Transcript FILE mtimes for most owners clustered at **06:44-06:45Z on 10-21 and 10-23**, a batch touch. Read as activity, it would have marked owners idle since mid-September as "active 7-9 days ago".
+- **How to apply:** for each UUID, open `~/.claude/projects/*/<uuid>*.jsonl` and take the last `"timestamp"` in its tail. That separated the 2 owners actually active this week (10-26, 10-29) from 26 idle since 09-04..10-22.
+- **Related:** `archive_closed_lanes_before.py --only ... --owner-idle-verified` asserts exactly this, so it must rest on the timestamp read.
