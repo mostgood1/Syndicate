@@ -361,12 +361,14 @@ def reconcile_line(row: Mapping[str, Any]) -> str | None:
 #                           ask fell below the plan's EV floor, which is the case this exists for.
 # NO SIGHTING, NO CANCEL: after a restart nothing is known until the next pass re-sends the position.
 # A cancel is never re-posted (the row stays, so `held_by_pilot` holds) and costs nothing at Kalshi.
-# Default ON with the pilot; `SYNDICATE_KALSHI_MAKER_PILOT_FAIR_CANCEL=off` restores rest-to-kickoff.
+# OFF WHEN ABSENT (user decision relayed 2026-10-31 from coordinator 332cb014: "behind a switch").
+# `SYNDICATE_KALSHI_MAKER_PILOT_FAIR_CANCEL=on` turns it on; absent or anything else = rest-to-kickoff
+# exactly as before, and nothing is cancelled. Sightings are recorded either way (a dict write), so
+# turning it on needs no warm-up beyond the next plan pass.
 
 EDGE_FLOOR_DEFAULT = 0.01
 EDGE_FLOOR_CEILING = 0.10
 PLAN_DROP_MARGIN_S = 300.0
-_OFF = {"0", "false", "no", "off"}
 #: idempotency_key -> {"fair": float | None, "at": epoch s, "date": plan date} of the latest sighting.
 _seen: dict[str, dict[str, Any]] = {}
 #: plan date -> epoch s of the latest Kalshi request of that date to reach `route` (a pass happened).
@@ -374,7 +376,7 @@ _pass_at: dict[str, float] = {}
 
 
 def fair_cancel_enabled() -> bool:
-    return str(os.environ.get("SYNDICATE_KALSHI_MAKER_PILOT_FAIR_CANCEL") or "").strip().lower() not in _OFF
+    return str(os.environ.get("SYNDICATE_KALSHI_MAKER_PILOT_FAIR_CANCEL") or "").strip().lower() in _ON
 
 
 def edge_floor() -> float:

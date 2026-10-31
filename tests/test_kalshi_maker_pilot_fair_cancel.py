@@ -21,6 +21,7 @@ def _isolated(tmp_path, monkeypatch):
                 "SYNDICATE_KALSHI_MAKER_PILOT_EDGE_FLOOR", "SYNDICATE_REFRESH_STATE_BACKEND"):
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("SYNDICATE_KALSHI_EXPIRE_AT_KICKOFF", "1")
+    monkeypatch.setenv("SYNDICATE_KALSHI_MAKER_PILOT_FAIR_CANCEL", "on")
     for store in (mp._seen, mp._pass_at, mp._routed_here):
         store.clear()
     mp._cache.update(at=None, orders=[])
@@ -71,13 +72,17 @@ def test_plan_fair_is_the_plans_price_times_one_plus_ev():
 
 # --------------------------------------------------------------------- reachability: off != on
 
-def test_fair_cancel_off_cancels_nothing_and_on_cancels(monkeypatch):
+def test_fair_cancel_is_off_when_absent_and_on_when_set(monkeypatch):
+    """Reachability, off != on. The switch is OFF WHEN ABSENT (user decision via 332cb014)."""
     mp.note_plan_sighting(_req(ev_pct=-4.0), now=T0)  # fair 0.5566 < resting 0.56: edge -0.3pp
     row = _row(_req())
+    monkeypatch.delenv("SYNDICATE_KALSHI_MAKER_PILOT_FAIR_CANCEL")
+    absent, absent_cancels = _review([row])
     monkeypatch.setenv("SYNDICATE_KALSHI_MAKER_PILOT_FAIR_CANCEL", "off")
     off, off_cancels = _review([row])
-    monkeypatch.delenv("SYNDICATE_KALSHI_MAKER_PILOT_FAIR_CANCEL")
+    monkeypatch.setenv("SYNDICATE_KALSHI_MAKER_PILOT_FAIR_CANCEL", "on")
     on, on_cancels = _review([row])
+    assert absent["status"] == "off" and absent_cancels.ids == []
     assert off["status"] == "off" and off_cancels.ids == []
     assert on["cancelled"] == 1 and on_cancels.ids == ["ord-1"]
     assert on["orders"][0]["reason"] == "edge_below_floor"
