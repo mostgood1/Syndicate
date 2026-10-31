@@ -1,5 +1,10 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#754` — **WNBA 2027 OPENER: two live readings owed on the native ports (live period lines; fixture_id on game_cards). Nothing to do before the May 2027 season** — 2026-10-31, handed off from closed lanes `wnba-live-period-lines-native` and `wnba-fixture-identity-native` (owner 2d413211 unreachable) by lane `close-p6-owner-lanes`, user-approved
+- **OWED (a), live period lines:** during the first in-progress WNBA game, confirm `refresh_wnba_oddsapi_props._build_source_live_lines_payload` gets OddsAPI period totals/spreads and live game lines from `syndicate/features/wnba/live_period_lines.py` on the fleet, with no vendored module loaded. Record it in `deploys.md`. The port shipped 2026-10-12 17:42:14Z (fleet `e256bf42`), with parity 32/32.
+- **OWED (b), fixture identity:** the first 2027 WNBA `game_cards_*` write carries `fixture_id` from the data-root schedule (port `44508f56`). Find first where the fleet writes WNBA game_cards: there is no `wnba_source` under the fleet data root, as of 2026-10-30.
+- Both lanes' file maps and verdicts are in `lanes_closed.md`. Claims were released on close; take a lane before editing.
+
 ### `#753` — **GAMES RAIL: one live NFL/NCAAF situation reading left (possession, down & distance, field position on the served chip). Everything else in mockup-4 detail is served or named unavailable (verdict 2026-10-16)** — 2026-10-30, handed off from closed lane `games-rail-full-detail` (owner d4409ac4 idle since 10-14) by lane `stale-lane-triage`
 - **OWED:** during a live NFL or NCAAF game, read the fleet's `/api/board/game-chips?sport=nfl|ncaaf` and record the share of live chips carrying possession + down & distance + field position, with denominators, in `deploys.md`.
 - The lane's ~20-file claim map and its 10-16 verdict are in `lanes_closed.md` under `games-rail-full-detail`. Claims were released on close; take a lane before editing.
