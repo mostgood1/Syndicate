@@ -55236,3 +55236,13 @@ which is about the two sizing bases and not about the refusal boundary.
   - **No pre-ff per-call sample exists** (the recorder keeps totals only), so this is the one-region bound, not a before/after diff.
 - **Not measured here:** new P2 paper bets in these cells grading with a `sharp_close`. That reading belongs to the gate-clock reads of lane `syndicate-decision-engine` / `decision-policy-paper`. NFL's first Sunday closes are 11-01, from 12:00 PM CT.
 - **Claims:** none taken or released by this lane.
+
+## 2026-10-31 22:10Z (5:10 PM CT) -- MEASUREMENT for 2026-10-31 21:03:20Z (fleet ff 413a08d5 -> 87ecf730, ride-along `d10cb953e` odds_history one shard at a time): soccer refresh peaks fall from 1,710 to 896 MB -- **VERIFIED** (lane live-odds-memory-spikes)
+- **Instrument:** fleet `logs/live-odds-worker.log` `ALL_PROCESS_MEMORY` samples, read-only (scratchpad `after.py`, `top.py`). Each `refresh_odds_sources.py` pid is classed by its FIRST sample: started before 21:03:20Z = old code (it imported the module at start), after = new code. Fleet HEAD read back `87ecf730`, `d10cb953e` an ancestor, the new loop present on disk.
+- **Per soccer run (peak RSS):**
+  - old code, 17:00Z-21:18Z: 286 runs, **max 1,710 MB**, >800 MB **34/286 (12%)**;
+  - new code, 21:03Z-22:08Z: 80 runs, **max 896 MB**, >800 MB **4/80 (5%)**; median 140 MB. Non-soccer max 204 MB (222 before).
+  - The replay predicted about -0.8 GB per run (+1,542 -> +704 MB); measured max -814 MB.
+- **Worker tree vs the 3,072 MB figure** (`container_memory_pct_of_max`, tree RSS on the fleet): 17:00Z-22:08Z max **162.0%** (19:16Z, a 1,651 MB old-code soccer run + 579 MB `poll_soccer_live_state` mls), >=100% in 429/3,350 samples (12.8%). New code only, after the last old-code run ended (21:18:35Z): max **105.4%**, >=100% **49/555 (8.8%)**, p50 82.2%.
+- **What is left is not this fix's mechanism:** at the new-code tops no child exceeds ~300 MB. The run_live_odds_refresh_worker.py ROOT itself holds 1,175-1,297 MB, and 13-19 children run at once. Recorded as a lead; not chased here.
+- **Caveat:** the new-code window is 50 min of one Saturday slate, against 4 h before.
