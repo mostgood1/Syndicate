@@ -601,11 +601,6 @@ death, never life — do not invert it.
 - Verification: the 16 failing files + the identified leaker run in CI order under _step_env on the fleet venv: 0 failures in the 36 ids; then the next 08:00Z ci-suite run reads 0 NEW
 - Blocked by: none
 
-### closed-lane-archive-20261031-1439 — CLOSED 2026-10-31 (GOAL MET: 1 blocks archived) — opened 2026-10-31 — session 05a30e8c-4bc9-4e0a-baec-a2d8c0b48bbe
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness.py --idle-min 240 read SAFE for 1 of 5 CLOSED blocks; moved `closed-lane-archive-20261031-0840`. Table and deferrals in the 2026-10-31 log.
-
 ### pinnacle-prop-swap — CLOSED (GOAL MET) — opened 2026-10-31 — closed 2026-10-31 — session e32fef1a-01e8-4afe-a284-01acd3728545
 - **GOAL VERDICT `[2026-10-31 21:56Z]`.** Goal, verbatim: "Pinnacle in the NFL and soccer prop-call book lists (williamhill_us's slot in both -- NOT betonlineag's for NFL, corrected 2026-10-31 before 20:39:42Z (stamp re-read) and before any code landed: the NFL alt ladders reuse the list and betonlineag was the only book on 26% of their rungs; 0 extra OddsAPI credits), on main and live on the fleet by a fast-forward with no restart, with Pinnacle prop quotes MEASURED landing in the NFL and soccer book_quotes shards" -- **GOAL: MET.** Readings (deploys.md 21:56Z MEASUREMENT for the 21:03:20Z fleet ff to `87ecf730`, made by lane maker-pilot-fair-cancel with this commit `b3cf9b013` as a user-approved ride-along): NFL 1,106 Pinnacle prop rows on the first fetch after the ff (0 of 117,157 before), soccer 622 (corners 488, btts 116; 0 of 647,552 before); 223 sampled Pinnacle-list calls, none billed above the markets asked (one region). Owed elsewhere: P2 bets in these cells grading with `sharp_close` (gate-clock reads, lane syndicate-decision-engine).
 - Goal: Pinnacle in the NFL and soccer prop-call book lists (williamhill_us's slot in both -- NOT betonlineag's for NFL, corrected 2026-10-31 before 20:39:42Z (stamp re-read) and before any code landed: the NFL alt ladders reuse the list and betonlineag was the only book on 26% of their rungs; 0 extra OddsAPI credits), on main and live on the fleet by a fast-forward with no restart, with Pinnacle prop quotes MEASURED landing in the NFL and soccer book_quotes shards
@@ -663,6 +658,11 @@ death, never life — do not invert it.
 - Falsification test: Kalshi and Polymarket list no open NHL game or player-prop markets for the 10-31 / 11-01 slates; or the fan-in's own NHL counts show matched prices that a later stage drops (then the hypothesis names the wrong stage)
 - Verification: findings file on main with per-stage NHL counts (venue listing -> catalogue -> join -> Layer 2 book_prices -> DecisionRecord venue price -> paper candidates), the first zero stage named with file:line, and the fix commit or owner
 - Blocked by: none
+
+### closed-lane-archive-20261031-1849 — CLOSED 2026-10-31 (GOAL MET: 1 blocks archived) — opened 2026-10-31 — session a9ec2bfa-b913-49e1-b196-311263f0d0c6
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. Moved `closed-lane-archive-20261031-1439` (owner 05a30e8c idle 243m, block last modified 248m). 8 other CLOSED blocks WAIT; detail in log/2026-10-31.md.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -792,6 +792,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261031-0640` — CLOSED 2026-10-31 (GOAL MET: 1 block archived) — opened 2026-10-31 — session 265b36c8-8a4c-4658-a9dd-1c6705801778
 - `closed-lane-archive-20261031-0840` — CLOSED 2026-10-31 (GOAL MET: 2 blocks archived) — opened 2026-10-31 — session 45521c6b-5676-40ae-a669-5c907e0bb827
 - `closed-lane-archive-20261031-1241` — CLOSED 2026-10-31 (GOAL MET: 1 block archived) — opened 2026-10-31 — session c3f2f55d-aaa0-42f4-9ee7-54dd984e35d6
+- `closed-lane-archive-20261031-1439` — CLOSED 2026-10-31 (GOAL MET: 1 blocks archived) — opened 2026-10-31 — session 05a30e8c-4bc9-4e0a-baec-a2d8c0b48bbe
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
