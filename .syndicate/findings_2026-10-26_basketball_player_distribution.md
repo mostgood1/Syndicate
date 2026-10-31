@@ -922,3 +922,69 @@ narrow band. Candidates for the next pre-registration, none chosen: (a) the empi
 (b) a de-concentration of the input minutes by cell (mean: ≥ 28 down ~1.1, < 12 up ~3), then this same σ table
 re-fit; (c) both, mean first per the mechanism-vs-estimator rule.
 - Not done: no engine code, no switch file, no sim run.
+
+## STEP 3b — MINUTES DE-CONCENTRATION (MEAN FIRST), PRE-REGISTERED 2026-10-31 21:03Z (16:03 CDT), before any de-concentrated draw exists
+
+**User decision 10-31:** "pre-register the minutes de-concentration fix first". Order: fix the mean, then re-fit the
+step-3 σ table on top (mechanism-vs-estimator rule). Baseline is fit_inj (d674e150); step-3 stage A (ed83c86ca)
+measured the bias by input-minutes cell, TEST: < 6 +4.7 · 6–12 +3.0 · 12–20 +1.4 · 20–28 +0.3 · ≥ 28 −1.4.
+
+**A caveat named now (selection):** the Phase-1 population is conditioned on PLAYED. Coach-DNP slots (real 0) are
+out of it, and they sit mostly in the low cells. Part of the low-cell bias is therefore selection: given he played, a
+fringe player plays more than the sim's average over draws. Raising low-m minutes to fit the played population also
+raises the sim minutes of the players who then do not play. That cost is gated below (D3), not ignored. The ≥ 28 bias
+has no such excuse: starters almost never sit.
+
+### Stage A — offline (no sim run). Decides whether stage B is built.
+
+**Mechanism, one parameter, emulated on fit_inj's recorded draws:** per team-game, each pool player's per-draw
+realised minutes x_id are scaled by w_i = max(m_i, 1)^(β − 1), m_i = the slot's fit_inj sim mean minutes; then, per
+draw, the pool is rescaled to the pre-shift team total and capped at game length (48 + 5·OT) with proportional
+water-fill (step 3's code). β < 1 flattens the minutes distribution; β = 1 is fit_inj exactly. Stats scale by x'/x.
+In the engine this is target'_i ∝ target_i^β, renormalised to the team total.
+
+**Fit:**
+- β on the grid {1.00, 0.97, …, 0.40} minimising Σ_c n_c·bias_c² over the five cells, on TRAIN (11-01..12-31).
+- Then, on top of the fitted β, the step-3 σ table is RE-FIT on TRAIN with step 3's exact procedure (same cells,
+  grid, 2-round coordinate descent, seed 0, |minutes miss − .20|).
+- TEST (01-01..02-28) is graded once. Nothing is re-fit after TEST is read.
+
+**Gate D, on TEST (all must hold):**
+- (D1) minutes bias, de-concentration alone (σ = 0): |bench| ≤ 0.5 and |starter| ≤ 0.5 (from +1.20 / −0.27), and
+  |≥ 28| ≤ 0.5 (from −1.41);
+- (D2) the step-3 gates V1–V4 on the combined arm (β + re-fit σ): bench and starter minutes miss in [.15, .25],
+  width in [.85, 1.15], |p_lo − p_hi| ≤ .05; pts / reb / ast / threes miss none worse than fit_inj by > .005;
+- (D3) selection cost: coach-DNP slots' sim minutes per team-game (fit_inj TEST population, step 2a's
+  classification) rise by no more than 1.0 over fit_inj.
+- Reported, no gate: β; σ table; per-cell bias / miss / width / tails for β alone and combined; stats miss for β
+  alone; REAL_ONLY untouched (no new players are added); the TRAIN numbers.
+
+**Predictions, written now:** β in [0.6, 0.9]. The < 6 cell keeps a positive bias (selection plus REAL_ONLY-like
+fringe minutes). Starter tails balance once ≥ 28 is unbiased, so V3 passes in the combined arm. The re-fit σ for the
+low cells comes out smaller than step 3's (1.05 / 0.90), because part of their miss was mean.
+
+**If D FAILS:** stop, report which. Readings fixed now: D1 fails → one power parameter cannot carry the shape; the
+next candidate is a per-cell shift (5 parameters, more overfit risk). D1 passes but D2's V3 fails → the residual is
+shape, and the empirical-ratio bootstrap is next. D3 fails → the low-cell bias is mostly selection, so it needs the
+participation signal (pre-tip news, step 2a), not more minutes.
+
+### Stage B — engine (only if D PASSES)
+
+- One switch file `nba_sim_minutes_shape.json` carrying β and the σ table; absent = off;
+  `SYNDICATE_NBA_SIM_MINUTES_SHAPE=0` kills it. NEW `syndicate/features/shared/nba_sim_minutes_shape.py`.
+- β hook: where the per-player target minutes are final, after `_derive_sim_minutes_local` / the rotation-minutes
+  path and before the per-draw loop (orchestrator/smart_sim.py, near `_sim_minutes_by_name` ~:2205 and the
+  rotation minutes ~:1525). σ hook: the per-draw loop (~:1719), as in step 3.
+- **Collision check at build time:** lane nba-lineup-pools (OPEN, session eb2ba139) feeds `home_lineups` /
+  `away_lineups` into the same call; its `Files:` today is only todo.md #696, but the lineup weights decide who is on
+  the floor. Pass-through (realised vs target slope ≥ .70, step 3's rule) is measured both with and without
+  contextual lineups. The hook sections go into this lane's `Files:` after that check, not now.
+- Engine standard: checklist CONSUMED × POPULATED, pipeline trace file:line, switch file disk-backed and in
+  HOT_ARTIFACT_PATTERNS, reachability test (off != on) before any correctness read.
+- Runs: 12-date smoke, then full FIT `fit_shape` = fit_inj's config + the switch file.
+- Gate B, TEST dates: minutes bias and miss within .03 / 0.3 min of stage A's emulated values; stats miss none
+  worse than fit_inj by > .005; game total mean within ±1.0 of fit_inj (if more, the totals solver is re-fit before
+  any stat read); E4 combo widths and team co-movement reported.
+
+**Out of scope:** coach DNP participation (needs news); REAL_ONLY (6.19); production. Production gets fields only via
+`nba_engine_config.json` after the forward test from 11-01.
