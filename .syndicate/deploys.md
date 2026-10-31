@@ -55246,3 +55246,15 @@ which is about the two sizing bases and not about the refusal boundary.
 - **Worker tree vs the 3,072 MB figure** (`container_memory_pct_of_max`, tree RSS on the fleet): 17:00Z-22:08Z max **162.0%** (19:16Z, a 1,651 MB old-code soccer run + 579 MB `poll_soccer_live_state` mls), >=100% in 429/3,350 samples (12.8%). New code only, after the last old-code run ended (21:18:35Z): max **105.4%**, >=100% **49/555 (8.8%)**, p50 82.2%.
 - **What is left is not this fix's mechanism:** at the new-code tops no child exceeds ~300 MB. The run_live_odds_refresh_worker.py ROOT itself holds 1,175-1,297 MB, and 13-19 children run at once. Recorded as a lead; not chased here.
 - **Caveat:** the new-code window is 50 min of one Saturday slate, against 4 h before.
+
+## 2026-10-31 ~21:10Z-22:19Z (4:10-5:19 PM CT) -- ABORTED before any change: enable `LIVE_ODDS_WORKER__SYNDICATE_KALSHI_MAKER_PILOT_FAIR_CANCEL=on` + full down/up (lane maker-pilot-fair-cancel) -- **NOTHING CHANGED; drain cost ~70 min of deferred board builds**
+- **User, verbatim (session 684b1d):** "Yes, turn it on".
+- **Claims:** refresh-worker 07f5ef14, web b57e002a, live-odds-worker 59d466aa (holder maker-pilot-fair-cancel, ttl 5400), ~21:08Z. All released 22:2xZ.
+- **Precheck:** env sha256 `99622537` (unchanged since 10-28 16:44Z); the key was absent; fleet HEAD 87ecf730.
+- **Drain:** `check_deploy_safety --drain --drain-owner maker-pilot-fair-cancel`, run inside WSL with the documented state env.
+  - It ended **UNKNOWN, exit 2** ("refresh-worker never acknowledged the drain") at ~22:18Z.
+  - Back-to-back refresh-worker odds child trees never let it reach CLEAR.
+  - The worker WAS honouring it: `DRAIN_HOLD stage=mlb_sim_tick`, plus **25 `DEFERRED_BOARD_BUILD reason=deploy_drain_requested`** between ~21:10Z and 22:18:24Z, so boards and plans were ~70 min stale on a Saturday evening.
+  - Lifted by hand: `--undrain` -> `DRAIN_CLEARED` 22:19:06Z. A board build started 22:19:29Z.
+- **Not done:** no env edit, no marker, no down/up. Env sha read back `99622537`; no `watchdog_no_autostart`.
+- **Lesson:** do not drain the fleet on a busy evening slate. The drain stalls board builds for as long as it waits. Retry off-peak; on 10-28 the drain cleared in ~22 min.
