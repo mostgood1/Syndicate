@@ -3107,3 +3107,13 @@ The 2026-10-20 entry said: "Rating INPUTS transfer, because the sim reads them w
   - Before using the page-cache caveat, check which backend produced the number: cgroup on Render, or tree RSS on the fleet.
   - On the fleet, attribute a spike from the per-process `rss_mb` in the same `ALL_PROCESS_MEMORY` line. Its `processes` list holds every process on the host; walk ppid from `pid` to get the role tree.
   - Child-emitted lines (`stage=live_lens_*` and so on) report the same role-tree figure, and they are where the spikes show.
+
+
+## 2026-10-31 — An order-leak bisect must key on the PROBE's failures, never on the run's exit code (lane `ci-suite-red-697`)
+- **What happened:** I bisected the fleet ci-suite's chunk 8 with the predicate "pytest rc != 0 over <candidates> + <probe>". Each candidate subset carries failures of its own: `test_live_refresh_loop`'s thread race, which passes in CI order. The predicate read those as "the probe failed" and named the wrong leaker (`test_live_refresh_loop.py`).
+- **The fix:** re-run with `-rf` and the predicate "`FAILED <probe>` appears in stdout". That named `tests/test_local_watchdog.py`, confirmed in 21 s alone + probe: 6 failed, 0 with the fix.
+- **Rule:**
+  - A bisect predicate tests the PROBE, not the run.
+  - Confirm the named leaker directly (leaker + probe, then probe alone) before fixing it.
+  - The leak is usually in an EARLIER file of the chunk, never in one of the failing tests.
+- **Leak shape seen 3 times now:** process-global state written by code under test and never restored: `align_data_root` 10-15, `execute_portfolio` by-name binding 10-16, `execution_watchdog` `os.environ.update` 10-31. Grep the code under test for bare `os.environ.update` / `os.environ[...] =` first.
