@@ -620,7 +620,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### maker-pilot-fair-cancel — OPEN — opened 2026-10-31 — session 9683e8c4-02ff-45b7-8c47-ae932f103e33
-- Goal: Resting Kalshi maker-pilot posts are cancelled when the plan's current fair minus the resting price falls below +1pp, or when a later plan pass drops the position; live on the fleet with a FAIR_CANCEL/FAIR_PASS log line read back
+- Goal: Resting Kalshi maker-pilot posts are cancelled when the plan's current fair minus the resting price falls below +1pp, or when a later plan pass drops the position; live on the fleet with a FAIR_CANCEL/FAIR_PASS log line read back — GOAL: NOT MET (2026-10-31 21:04Z). Built: `91f1e433` + `87ecf730` (switch `SYNDICATE_KALSHI_MAKER_PILOT_FAIR_CANCEL`, OFF WHEN ABSENT per the user's relayed "behind a switch"); 200 tests pass. On the fleet CHECKOUT since the ff at 21:03:20Z (deploys.md `e80eedc8f`); NOT in a running role and NOT enabled. Left: (a) the user's yes in session 684b1d to enable, which needs the key in `local_production.env` + a full `up` under the locks; (b) the read-back of a `MAKER_PILOT FAIR_PASS` line (`off rows=N` until enabled).
 - Files: syndicate/features/shared/kalshi_maker_pilot.py, syndicate/features/shared/execution_ledger.py (cancel_stale_resting_orders maker_pilot branch + the reconcile resting-row dict market/line fields ONLY), tests/test_kalshi_maker_pilot_fair_cancel.py (NEW)
 - Hypothesis: n/a (build; evidence in findings_2026-10-31_maker_pilot_review.md)
 - Falsification test: n/a

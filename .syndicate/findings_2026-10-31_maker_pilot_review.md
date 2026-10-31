@@ -112,3 +112,11 @@ There were 4 in-play sales. All 4 sold ABOVE entry, so **no exit sale locked in 
   - The FILL log rotates in ~1 day. Record the fill timestamp on the ledger row (`venue_filled_at`); today the row
     carries only the order's `venue_resolved_at`, ~1 s after submit.
   - Kalshi alt-line quotes are not captured in `book_quotes`.
+
+## Re-check 2026-10-31 ~20:50Z: matcher fixes (signed spread lines, segment = full, an extra shard date)
+
+The profitability session (d57baa09) noted that the matcher compared spread lines by absolute value and did not match segment. Re-run (`paths4.py`):
+
+- **Unchanged:** edge +3.2pp at post and +1.2pp at fill; 3/10 fills at negative edge; DET@BKN fair at fill 0.668; held -$22.00; z -1.64.
+- **Moved:** a few CLOSE reads only (FLA@UGA CLV +0.047, ACM@INT -0.016, DET@BKN d+5m +0.021).
+- **The recommendation stands.**
