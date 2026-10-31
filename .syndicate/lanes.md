@@ -614,8 +614,8 @@ death, never life — do not invert it.
 - Verification: findings file on main with, per class-B cell: our fetch config (file:line), Pinnacle offered yes/no on N probed events, players covered, credit cost per day at the current cadence, and the projected change in the P2 sharp-graded pace
 - Blocked by: none
 
-### maker-pilot-review — OPEN — opened 2026-10-31 — session 9683e8c4-02ff-45b7-8c47-ae932f103e33
-- Goal: One keep/adjust/pause recommendation for the live Kalshi maker pilot, with per-fill adverse selection (+5m/+30m/close), CLV vs fair, a CI on held P&L, and exit-lane lock-ins; READ-ONLY, no live change
+### maker-pilot-review — CLOSED (GOAL MET) — opened 2026-10-31 — closed 2026-10-31 — session 9683e8c4-02ff-45b7-8c47-ae932f103e33
+- Goal: One keep/adjust/pause recommendation for the live Kalshi maker pilot, with per-fill adverse selection (+5m/+30m/close), CLV vs fair, a CI on held P&L, and exit-lane lock-ins; READ-ONLY, no live change — GOAL: MET. Reading: `findings_2026-10-31_maker_pilot_review.md` (10 fills, 8 settled; edge +3.2pp at post -> +1.2pp at fill, 3/10 fills at negative edge; held -$22.00, z -1.64). Recommendation ADJUST (fair-move cancel), presented to the user in session 684b1d; the user's decision is owed there. No live change made.
 - Files: .syndicate/findings_2026-10-31_maker_pilot_review.md (NEW)
 - Hypothesis: Pilot fills are adversely selected (fair moves against us after fill), as the 10-19 shadow found (fills won 5.37pp below close)
 - Falsification test: Post-fill fair drift >= 0 on average across fills AND held win rate not below fill-time fair
