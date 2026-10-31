@@ -3094,3 +3094,16 @@ The 2026-10-20 entry said: "Rating INPUTS transfer, because the sim reads them w
   - Transcript FILE mtimes for most owners clustered at **06:44-06:45Z on 10-21 and 10-23**, a batch touch. Read as activity, it would have marked owners idle since mid-September as "active 7-9 days ago".
 - **How to apply:** for each UUID, open `~/.claude/projects/*/<uuid>*.jsonl` and take the last `"timestamp"` in its tail. That separated the 2 owners actually active this week (10-26, 10-29) from 26 idle since 09-04..10-22.
 - **Related:** `archive_closed_lanes_before.py --only ... --owner-idle-verified` asserts exactly this, so it must rest on the timestamp read.
+
+## 2026-10-31 -- On the FLEET, `container_memory_*` is the role's process-tree RSS, not cgroup memory: "it's page cache" does not apply there `[lane live-odds-memory-spikes, session 28697bd7]`
+
+- **The belief:** split anon vs file before reading `container_memory_pct_of_max`, because it includes page cache. That came from the Render-era rule ("memory.current is page cache") and was carried into this lane's brief.
+- **What was true:**
+  - On the local WSL fleet there is no cgroup max. `SYNDICATE_LOCAL_MEMORY_LIMIT_MB` is set, so `_read_container_memory_current_bytes` returns `_local_process_tree_rss_bytes()` (`memory_observability.py:115/155`), and the max is the declared cap.
+  - Page cache is not in that number. RssFile of shared libraries is, once per process.
+  - `container_memory_unreclaimable_mb` is null there, so the anon split is unavailable rather than reassuring.
+- **What it hid:** a real anon spike. One child, `refresh_odds_sources` with soccer, grew to 1.4-1.8 GB because it held every odds_history shard at once.
+- **Rule:**
+  - Before using the page-cache caveat, check which backend produced the number: cgroup on Render, or tree RSS on the fleet.
+  - On the fleet, attribute a spike from the per-process `rss_mb` in the same `ALL_PROCESS_MEMORY` line. Its `processes` list holds every process on the host; walk ppid from `pid` to get the role tree.
+  - Child-emitted lines (`stage=live_lens_*` and so on) report the same role-tree figure, and they are where the spikes show.
