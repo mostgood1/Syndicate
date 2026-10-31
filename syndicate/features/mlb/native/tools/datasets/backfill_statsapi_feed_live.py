@@ -33,11 +33,11 @@ def _pid_is_running(pid: int) -> bool:
             return False
         ctypes.windll.kernel32.CloseHandle(handle)
         return True
-    try:
-        os.kill(pid, 0)
-        return True
-    except Exception:
-        return False
+    # The shared probe (#692), not a raw `os.kill(pid, 0)`. One answer moves: EPERM
+    # (a pid owned by another user) now reads ALIVE, so its lock is not broken.
+    from syndicate.features.shared.process_liveness import probe_pid
+
+    return probe_pid(pid) is True
 
 
 def _acquire_lock(root: Path, season: int) -> Optional[Path]:

@@ -221,8 +221,22 @@ class HookWiringTests(unittest.TestCase):
         import inspect
         import pipeline.intelligence_state as ism
 
+        #
+        # EXEMPT: a guard carrying its OWN `token=`. Those are side stages with
+        # their own small floor (decision record db292883, archived settlement
+        # 2ec80fe0) that by design must NOT move the recycle counter --
+        # `_abort_if_memory_critical`'s docstring. The rule is about the heavy
+        # build's default-token guard, which is what an untokened call is.
+        import re
+
         body = inspect.getsource(ism.IntelligenceStateService._build_candidate_pool)
-        self.assertNotIn("_abort_if_memory_critical(", body.replace("_abort_build_candidate_pool_if_memory_critical(", ""))
+        direct = body.replace("_abort_build_candidate_pool_if_memory_critical(", "")
+        untokened = [
+            m.group(0)
+            for m in re.finditer(r"_abort_if_memory_critical\((?:[^()]|\([^()]*\))*\)", direct)
+            if "token=" not in m.group(0)
+        ]
+        self.assertEqual(untokened, [])
         self.assertGreaterEqual(body.count("_abort_build_candidate_pool_if_memory_critical("), 6)
 
     def test_the_reset_sits_at_the_pool_builds_normal_completion_only(self) -> None:

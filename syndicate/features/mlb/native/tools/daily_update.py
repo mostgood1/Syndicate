@@ -1036,13 +1036,11 @@ def _process_exists(pid: Any) -> bool:
                 kernel32.CloseHandle(handle)
         except Exception:
             return False
-    try:
-        os.kill(pid_i, 0)
-    except PermissionError:
-        return True
-    except (OSError, SystemError, ValueError):
-        return False
-    return True
+    # The shared probe (#692), not a raw `os.kill(pid, 0)`; same answers here:
+    # EPERM = alive, any other failure = not running.
+    from syndicate.features.shared.process_liveness import probe_pid
+
+    return bool(probe_pid(pid_i))
 
 
 def _process_cmdline(pid: Any) -> Optional[List[str]]:

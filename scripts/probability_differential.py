@@ -174,6 +174,13 @@ AMERICAN_TO_PROBABILITY: list[Impl] = [
     Impl("american_to_probability", "syndicate.features.shared.prop_projections", "_implied"),
     Impl("american_to_probability", "syndicate.features.prediction_ledger", "_implied_from_american"),
     # ADDED 2026-10-22 (lane `register-implied-from-price`): d1a7ffbe (todo #719, live CLV unit fix).
+    # ADDED 2026-10-31 (lane `ci-suite-red-697`): four scalar converters that
+    # landed unregistered 10-23..10-26 and turned the fleet ci-suite red.
+    Impl("american_to_probability", "scripts.e4_combo_correlation", "american_prob"),            # f5a503c6
+    Impl("american_to_probability", "scripts.pinnacle_edge_deciles", "implied"),                 # ccf8d612
+    Impl("american_to_probability", "scripts.price_bucket_audit", "implied",                     # dbbf3ebe
+         "DUAL SCALE: a value strictly inside (0, 1) is a venue contract price, passed through"),
+    Impl("american_to_probability", "syndicate.features.shared.decision_record", "american_to_prob"),  # db292883
     Impl("american_to_probability", "syndicate.features.prediction_ledger", "_implied_from_price",
          "DUAL SCALE: a value strictly inside (0, 1) is a venue contract price, passed through as a "
          "probability; anything else goes to `_implied_from_american`. Same boundary as "
@@ -628,6 +635,14 @@ NOT_A_SCALAR_CONVERTER: dict[str, str] = {
     "syndicate/features/shared/cheat_sheets.py:price_case.american": "NESTED; display formatting ('+130') inside a sentence; returns a str",
     "syndicate/features/nba/live_tick/odds_bovada.py:_extract_period_markets._to_american": "NESTED; parses a Bovada price string to an int ('+150' -> 150); a parser, not a conversion",
     "syndicate/features/wnba/live_tick/odds_bovada.py:_extract_period_markets._to_american": "NESTED; parses a Bovada price string to an int ('+150' -> 150); a parser, not a conversion",
+    # ADDED 2026-10-31 (lane `ci-suite-red-697`). Classified from each BODY; the
+    # scalar halves of the first three are REGISTERED above.
+    "scripts/e4_combo_correlation.py:devig_book": "multiplicative de-vig of ONE book's outcome Mapping; returns a dict, not scalar",
+    "scripts/pinnacle_edge_deciles.py:devig": "normalizes two PROBABILITIES (p_us / (p_us + p_them)); two args, no price conversion",
+    "syndicate/features/shared/syndicate_fair_runtime.py:_devig": "sequence in, sequence out (Shin, via opportunity_signals.devig)",
+    "scripts/sgp_pjoint_calibration.py:devig": "logit recalibration of a market probability by fitted (a, b); two args, probability in AND out",
+    "scripts/sgp_pjoint_calibration.py:fit_devig": "fits the (a, b) logistic coefficients over a list of legs; not a conversion",
+    "syndicate/features/shared/decision_record.py:_min_implied_book_total_pct": "reads venue_scope's threshold (a percent); same as the venue_scope entry above",
 }
 
 _NAME_HINT = ("implied", "american", "decimal", "devig", "no_vig", "novig",

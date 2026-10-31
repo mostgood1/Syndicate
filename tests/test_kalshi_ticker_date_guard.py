@@ -30,6 +30,7 @@ def _isolated(tmp_path, monkeypatch):
         "SYNDICATE_REFRESH_STATE_BACKEND",
         "SYNDICATE_EXECUTION_TICKER_DATE_GUARD",
         "SYNDICATE_EXECUTION_BALANCE_CAPS",
+        "SYNDICATE_EXECUTION_KALSHI_PREGAME_ONLY",
     ):
         monkeypatch.delenv(key, raising=False)
     yield
@@ -84,6 +85,11 @@ def _run(monkeypatch, row, *, switch=None, venue="kalshi"):
     monkeypatch.setenv("SYNDICATE_EXECUTION_VENUE", venue)
     monkeypatch.setenv("SYNDICATE_EXECUTION_MAX_ORDER_DOLLARS", "1000")
     monkeypatch.setenv("SYNDICATE_EXECUTION_MAX_DAY_DOLLARS", "10000")
+    # The fixture is the REAL 10-24 game, which kicked off 2026-10-24T19:00Z; from
+    # then on the separate pregame-only block (cd0901bf) refused every order here
+    # as `game_started` before this guard's outcome could be read. That block has
+    # its own tests -- switch it off so these read the ticker-date guard alone.
+    monkeypatch.setenv("SYNDICATE_EXECUTION_KALSHI_PREGAME_ONLY", "off")
     if switch is not None:
         monkeypatch.setenv("SYNDICATE_EXECUTION_TICKER_DATE_GUARD", switch)
     sent: list = []

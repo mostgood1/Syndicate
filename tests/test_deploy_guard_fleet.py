@@ -170,7 +170,11 @@ def test_an_ff_script_file_is_guarded(root):
     "grep -n \"git merge --ff-only\" ~/Syndicate/.syndicate/deploys.md",
     "wsl -- kill -TERM 1842841",
     "wsl -- kill -0 1826730",
-    "kill 1826730",
+    # A bare `kill` is a WINDOWS pid only when the shell is Windows. On the fleet
+    # host itself (the ci-suite runs there) it is a fleet kill, and the guard
+    # correctly BLOCKS it -- `os.name == "nt" and "wsl" not in cmd`.
+    pytest.param("kill 1826730", marks=pytest.mark.skipif(
+        os.name != "nt", reason="bare kill is a Windows pid only on Windows")),
     "wsl -- bash -lc 'ps -eo pid=,args= | grep run_refresh_worker'",
     "cat >> .syndicate/deploys.md <<'EOF'\n- **deploy:** `cd ~/Syndicate && git merge --ff-only 9260ea0b` at 18:56:50Z, "
     "`local_production.py reload-web` 2.6 s; refresh-worker `kill -TERM 1826730`\nEOF",

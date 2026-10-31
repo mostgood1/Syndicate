@@ -61,6 +61,12 @@ KNOWN_FAILING = {
         # price). A fix in the port is overwritten on regeneration; fix both at the
         # vendored source.
         "syndicate.features.mlb.live_lens_port.app_slice:_american_odds_implied_prob",
+        # ADDED 2026-10-31 (lane `ci-suite-red-697`): ccf8d612's offline research
+        # script. Fails `refuses_empty_string` ONLY, 4/5 -- `abs(float(''))` RAISES
+        # ValueError instead of returning None. Its file is claimed by OPEN lane
+        # `live-cell-scorecard`; the one-line fix (coerce in a try, as its own
+        # `contract_price` does) was sent to that lane rather than made here.
+        "scripts.pinnacle_edge_deciles:implied",
         # ADDED 2026-10-20 (lane `hygiene-guards-1020`), when the 17-name
         # backlog was classified. NOT NEW DEBT -- both have always failed this
         # requirement; they were invisible because they were never registered,

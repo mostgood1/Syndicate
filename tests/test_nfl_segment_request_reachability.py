@@ -52,8 +52,14 @@ class _Response:
 
 
 @pytest.fixture()
-def calls(monkeypatch):
+def calls(monkeypatch, tmp_path):
     """Every outbound GET, from whichever module makes it."""
+    # `fetch_event_segments` stamps `<data_root>/nfl_source/tracking/
+    # segment_pregame_fetch.json` after a fetch, and since a126ae95 the pregame
+    # tier is due only every 30 min by default -- so the REAL data root let one
+    # test's fetch defer the next test's (`pregame_deferred=1 events=0`), and
+    # wrote into the checkout's data/. Each test gets its own root.
+    monkeypatch.setenv("SYNDICATE_DATA_ROOT", str(tmp_path))
     recorded: list[dict] = []
 
     def _get(url, params=None, timeout=None, **_kw):

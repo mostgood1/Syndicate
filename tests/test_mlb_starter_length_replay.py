@@ -39,7 +39,7 @@ def test_crps_is_zero_for_a_point_mass_on_the_truth_and_grows_with_error():
 
 
 def test_context_from_sim_rebuilds_or_degrades_to_neutral():
-    rp_vendor = Path(rp.VENDOR)
+    rp_vendor = Path(rp.ENGINE_ROOT)  # VENDOR until 80ef51c8 (vendor tree deleted)
     assert rp_vendor.exists()
     w, p, u = rp.context_from_sim(None)
     assert (w, p, u) == (None, None, None)
