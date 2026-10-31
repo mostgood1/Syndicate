@@ -3353,6 +3353,10 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
                     # A maker-pilot post is MEANT to rest below the ask; the stale
                     # pass must not read that as a dead price [lane kalshi-maker-pilot].
                     "execution_style": order.get("execution_style"),
+                    # The pilot's fair-move cancel maps the leg like the order body does,
+                    # with market and line [lane maker-pilot-fair-cancel].
+                    "market": order.get("market"),
+                    "line": order.get("line"),
                 }
             )
             after = STATUS_SUBMITTED
@@ -3915,6 +3919,24 @@ def cancel_stale_resting_orders(resting: Sequence[Mapping[str, Any]]) -> dict[st
             }
         )
 
+    # THE PILOT'S OWN RULE [2026-10-31 user "Yes, build it", lane
+    # maker-pilot-fair-cancel]: skipped above for the market-price rule, judged
+    # here against the plan's current fair. Read from `resting` itself, not the
+    # loop, so the cancel cap's `break` cannot hide a pilot row. A failure here
+    # must never cost the taker pass its result.
+    pilot_fair: dict[str, Any] | None = None
+    pilot_rows = [row for row in resting if row.get("execution_style") == "maker_pilot"]
+    if pilot_rows:
+        try:
+            from syndicate.features.shared.kalshi_maker_pilot import review_resting
+
+            pilot_fair = review_resting(pilot_rows)
+        except Exception as exc:
+            print(
+                f"[execution_ledger] MAKER_PILOT_FAIR_REVIEW_FAILED {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+
     # THE LEDGER IS NOT UPDATED HERE. The next reconciliation pass reads the
     # venue, sees `canceled`, and moves the row to `rejected` through the one
     # path that is allowed to change a status -- the venue's own word. Writing
@@ -3935,6 +3957,7 @@ def cancel_stale_resting_orders(resting: Sequence[Mapping[str, Any]]) -> dict[st
         "too_young": too_young,
         "at_market": at_market,
         "maker_pilot": maker_pilot,
+        "maker_pilot_fair": pilot_fair,
         "orders": cancelled,
     }
 

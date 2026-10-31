@@ -301,6 +301,8 @@ def route(request: Any, *, now: _dt.datetime | None = None,
           enabled_fn: Callable[[], bool] = pilot_enabled,
           wrap: Callable[[Any], Any] | None = None) -> Routed | None:
     """The maker form of `request` and its adapter, or None (the request stays a taker order)."""
+    if pilot_switch_on() and str(getattr(request, "venue", "") or "").strip().lower() == "kalshi":
+        note_plan_sighting(request, now=now)
     why = refusal(request, now=now, orders=orders, enabled_fn=enabled_fn)
     if why == HELD:
         return Routed(request=request, submitter=None, skip=HELD)
@@ -338,3 +340,163 @@ def reconcile_line(row: Mapping[str, Any]) -> str | None:
             f" {row.get('from')}->{to} venue_status={row.get('venue_status')!r}"
             f" filled_as={role if kind == 'FILL' else '-'} maker_cost={maker_cost} taker_cost={taker_cost}"
             f" contracts={row.get('contracts')} fill_price={row.get('fill_price')} fees={row.get('fees_dollars')}")
+
+
+# ------------------------------------------------------------------ the fair-move cancel
+# USER DECISION 2026-10-31 ("Yes, build it", session 684b1d, lane maker-pilot-fair-cancel), on
+# `.syndicate/findings_2026-10-31_maker_pilot_review.md`: over the first 10 pilot fills the consensus
+# edge was +3.2pp at POST and +1.2pp at FILL, and 3 of 10 filled at NEGATIVE edge. A post that is never
+# re-priced and rests up to ~40 h is a stale quote: it fills once the world has moved to the taker's
+# side. So a resting post now lives only while the PLAN still wants it at the price it rests at.
+#
+# THE FAIR IS THE PLAN'S OWN. Every executor pass re-sends a held pilot position through `route`
+# (measured 2026-10-31: `refused={'maker_pilot_held': 1}` on the 06:07Z / 07:57Z / 08:04Z passes) with
+# the plan's current price and EV, both on market fair (#704). fair = P(price) x (1 + ev_pct/100), the
+# same number the plan sized on; on the review's fills it matched the book consensus within ~1pp.
+#
+# Two reasons to cancel, judged in the stale-resting pass (`review_resting`), every tick:
+#   * `edge_below_floor` -- the latest sighting's fair minus our resting price < the floor (+1pp);
+#   * `plan_dropped`     -- a plan pass for the sighting's date or later ran PLAN_DROP_MARGIN_S after
+#                           the last sighting without re-sending this position. Usually the edge at the
+#                           ask fell below the plan's EV floor, which is the case this exists for.
+# NO SIGHTING, NO CANCEL: after a restart nothing is known until the next pass re-sends the position.
+# A cancel is never re-posted (the row stays, so `held_by_pilot` holds) and costs nothing at Kalshi.
+# Default ON with the pilot; `SYNDICATE_KALSHI_MAKER_PILOT_FAIR_CANCEL=off` restores rest-to-kickoff.
+
+EDGE_FLOOR_DEFAULT = 0.01
+EDGE_FLOOR_CEILING = 0.10
+PLAN_DROP_MARGIN_S = 300.0
+_OFF = {"0", "false", "no", "off"}
+#: idempotency_key -> {"fair": float | None, "at": epoch s, "date": plan date} of the latest sighting.
+_seen: dict[str, dict[str, Any]] = {}
+#: plan date -> epoch s of the latest Kalshi request of that date to reach `route` (a pass happened).
+_pass_at: dict[str, float] = {}
+
+
+def fair_cancel_enabled() -> bool:
+    return str(os.environ.get("SYNDICATE_KALSHI_MAKER_PILOT_FAIR_CANCEL") or "").strip().lower() not in _OFF
+
+
+def edge_floor() -> float:
+    try:
+        value = float(str(os.environ.get("SYNDICATE_KALSHI_MAKER_PILOT_EDGE_FLOOR") or "").strip())
+    except ValueError:
+        return EDGE_FLOOR_DEFAULT
+    if not (0.0 <= value <= EDGE_FLOOR_CEILING):
+        return EDGE_FLOOR_DEFAULT
+    return value
+
+
+def _probability(price: Any) -> float | None:
+    """American odds (the plan's unit), or a probability / decimal price, -> P(our side)."""
+    try:
+        value = float(price)
+    except (TypeError, ValueError):
+        return None
+    if value >= 100:
+        return 100.0 / (value + 100.0)
+    if value <= -100:
+        return -value / (-value + 100.0)
+    if 0.0 < value < 1.0:
+        return value
+    if value > 1.0:
+        return 1.0 / value
+    return None
+
+
+def plan_fair(request: Any) -> float | None:
+    """The plan's fair on our side: P(requested_price) x (1 + ev_pct/100), or None (no EV on the row)."""
+    prob = _probability(getattr(request, "requested_price", None))
+    try:
+        ev = float(getattr(request, "ev_pct", None))
+    except (TypeError, ValueError):
+        return None
+    if prob is None or ev != ev:
+        return None
+    fair = prob * (1.0 + ev / 100.0)
+    return round(fair, 4) if 0.0 < fair < 1.0 else None
+
+
+def _epoch(now: _dt.datetime | None) -> float:
+    return (now or _dt.datetime.now(_dt.timezone.utc)).timestamp()
+
+
+def note_plan_sighting(request: Any, *, now: _dt.datetime | None = None) -> None:
+    """Record that the plan sent this Kalshi position now, at this fair. Called from `route`."""
+    at = _epoch(now)
+    date = str(getattr(request, "selected_date", "") or "")
+    _seen[_key(request)] = {"fair": plan_fair(request), "at": at, "date": date}
+    if date:
+        _pass_at[date] = max(_pass_at.get(date, 0.0), at)
+
+
+def _resting_leg_price(row: Mapping[str, Any]) -> float | None:
+    """What we rest at on OUR leg, mapped with market and line like the order body (a spread is not a
+    moneyline: DET@BKN `side=home` is the NO leg of the -DET14 contract)."""
+    from syndicate.features.shared.kalshi_orders import _side_to_kalshi
+
+    try:
+        leg = _side_to_kalshi(row.get("side"), row.get("market"), row.get("line"))
+    except Exception:
+        return None
+    try:
+        value = float(row.get(f"{leg}_price"))
+    except (TypeError, ValueError):
+        return None
+    return value if 0.0 < value < 1.0 else None
+
+
+def review_resting(rows: Sequence[Mapping[str, Any]], *, now: _dt.datetime | None = None,
+                   cancel: Callable[[Any], Mapping[str, Any]] | None = None) -> dict[str, Any]:
+    """Cancel resting pilot posts the plan no longer supports. `rows` = reconcile's resting maker rows."""
+    counts = {"rows": len(rows), "cancelled": 0, "failed": 0, "kept": 0, "unseen": 0, "no_fair": 0,
+              "unreadable": 0}
+    if not rows:
+        return {"status": "ok", **counts, "orders": []}
+    if not fair_cancel_enabled():
+        print(f"[kalshi_maker_pilot] MAKER_PILOT FAIR_PASS off rows={len(rows)}", flush=True)
+        return {"status": "off", **counts, "orders": []}
+    if cancel is None:
+        from syndicate.features.shared.kalshi_orders import cancel_order as cancel
+    at, floor = _epoch(now), edge_floor()
+    done: list[dict[str, Any]] = []
+    for row in rows:
+        key = row.get("idempotency_key")
+        seen = _seen.get(str(key))
+        if seen is None:
+            counts["unseen"] += 1
+            continue
+        resting = _resting_leg_price(row)
+        fair = seen.get("fair")
+        later = [t for d, t in _pass_at.items() if d >= seen["date"]]
+        edge = round(fair - resting, 4) if fair is not None and resting is not None else None
+        if later and max(later) > seen["at"] + PLAN_DROP_MARGIN_S:
+            reason = "plan_dropped"
+        elif fair is None:
+            counts["no_fair"] += 1
+            continue
+        elif resting is None:
+            counts["unreadable"] += 1
+            continue
+        elif edge < floor - 1e-9:
+            reason = "edge_below_floor"
+        else:
+            counts["kept"] += 1
+            continue
+        print(f"[kalshi_maker_pilot] MAKER_PILOT FAIR_CANCEL key={key} ticker={row.get('ticker')}"
+              f" reason={reason} fair={fair} resting={resting} edge={edge} floor={floor}"
+              f" seen_age_s={at - seen['at']:.0f}", flush=True)
+        result = cancel(row.get("order_id"))
+        if result.get("status") != "ok":
+            counts["failed"] += 1
+            print(f"[kalshi_maker_pilot] MAKER_PILOT FAIR_CANCEL_FAILED key={key}"
+                  f" reason={result.get('reason')} -- order left resting", flush=True)
+            continue
+        counts["cancelled"] += 1
+        done.append({"idempotency_key": key, "ticker": row.get("ticker"), "reason": reason,
+                     "fair": fair, "resting": resting, "edge": edge})
+    print(f"[kalshi_maker_pilot] MAKER_PILOT FAIR_PASS rows={counts['rows']} cancelled={counts['cancelled']}"
+          f" failed={counts['failed']} kept={counts['kept']} unseen={counts['unseen']}"
+          f" no_fair={counts['no_fair']} unreadable={counts['unreadable']} floor={floor}"
+          f" sightings={len(_seen)}", flush=True)
+    return {"status": "ok", **counts, "orders": done}
