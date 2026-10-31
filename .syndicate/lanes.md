@@ -611,7 +611,7 @@ death, never life — do not invert it.
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 read SAFE for 1 of 5 CLOSED blocks; moved `closed-lane-archive-20261031-0840`. Table and deferrals in the 2026-10-31 log.
 
 ### pinnacle-prop-swap — OPEN — opened 2026-10-31 — session e32fef1a-01e8-4afe-a284-01acd3728545
-- Goal: Pinnacle in the NFL and soccer prop-call book lists (betonlineag's and williamhill_us's slots, 0 extra OddsAPI credits), on main and live on the fleet by a fast-forward with no restart, with Pinnacle prop quotes MEASURED landing in the NFL and soccer book_quotes shards
+- Goal: Pinnacle in the NFL and soccer prop-call book lists (williamhill_us's slot in both -- NOT betonlineag's for NFL, corrected 2026-10-31 20:40Z before any code landed: the NFL alt ladders reuse the list and betonlineag was the only book on 26% of their rungs; 0 extra OddsAPI credits), on main and live on the fleet by a fast-forward with no restart, with Pinnacle prop quotes MEASURED landing in the NFL and soccer book_quotes shards
 - Files: syndicate/features/shared/odds_regions.py (the nfl and soccer PROP_BOOKMAKERS entries ONLY), tests/test_prop_bookmakers.py (the nfl and soccer list assertions ONLY), tests/test_pinnacle_capture.py (LOAN from live-cell-scorecard -- user "Yes, swap" 2026-10-31 on the NFL and soccer Pinnacle swap; the one NFL assertion that swap inverts ONLY)
 - Hypothesis: n/a (D5 read, findings_2026-10-31_pinnacle_coverage_d5.md)
 - Falsification test: after the ff, a fleet NFL or soccer prop fetch returns 0 pinnacle quotes on events where the D5 probe showed Pinnacle offering the market, or x-requests-last per prop call rises

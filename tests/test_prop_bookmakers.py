@@ -16,6 +16,10 @@ SEEN_US = {"nfl": {"draftkings", "bovada", "betonlineag", "fanduel", "betrivers"
            "ncaaf": {"betonlineag", "fanduel", "bovada", "draftkings", "betrivers", "betmgm"},
            # soccer prop-call shards 10-01..10-16, 573,710 rows (lane soccer-uefa-competitions)
            "soccer": {"betrivers", "fanduel", "draftkings", "betmgm", "mybookieag", "bovada", "fanatics", "williamhill_us"}}
+# The one book Pinnacle took the slot of (lane pinnacle-prop-swap, user 2026-10-31 "Yes, swap"): the ONLY list book on
+# 93 of 21,879 NFL prop lines and 19 of 31,302 NFL alt-ladder rungs, and on 0 of 77,744 soccer prop lines. NOT
+# betonlineag for NFL: the alt ladders reuse the list and it was the only book on 26% of their rungs.
+PINNACLE_TOOK = {"nfl": "williamhill_us", "soccer": "williamhill_us"}
 
 
 def _script(name):
@@ -30,7 +34,8 @@ def test_ten_books_never_eleven(sport):
     books = orx.prop_bookmakers(sport, env={}).split(",")
     assert len(books) == len(set(books)) <= 10                        # an 11th book bills a second region
     assert {"espnbet", "hardrockbet"} <= set(books)                   # the us2 books the region never reached
-    assert SEEN_US.get(sport, set()) <= set(books)                    # nothing NFL / NCAAF props had is dropped
+    # nothing NFL / NCAAF props had is dropped but the one book Pinnacle replaced
+    assert SEEN_US.get(sport, set()) - {PINNACLE_TOOK.get(sport)} <= set(books)
 
 
 def test_the_knobs():
@@ -44,7 +49,36 @@ def test_the_knobs():
 def test_soccer_ten_keep_every_book_soccer_props_had():
     books = orx.prop_bookmakers("soccer", env={}).split(",")
     assert len(books) == len(set(books)) <= 10
-    assert SEEN_US["soccer"] <= set(books)                            # MyBookie included: the shared list would drop it
+    assert SEEN_US["soccer"] - {PINNACLE_TOOK["soccer"]} <= set(books)  # MyBookie included: the shared list would drop it
+
+
+@pytest.mark.parametrize("sport", sorted(PINNACLE_TOOK))
+def test_pinnacle_takes_one_slot_at_no_extra_credit(sport):
+    books = orx.prop_bookmakers(sport, env={}).split(",")
+    assert "pinnacle" in books and PINNACLE_TOOK[sport] not in books
+    assert len(books) == len(set(books)) <= 10                        # a swap, not an 11th book (a second region)
+
+
+def test_ncaaf_and_mlb_keep_the_shared_list():
+    for sport in ("ncaaf", "mlb"):
+        books = orx.prop_bookmakers(sport, env={}).split(",")
+        assert "pinnacle" not in books and "williamhill_us" in books
+
+
+def test_nfl_keeps_betonline_for_the_alt_ladders():
+    # fetch_alt_ladders asks this same list; betonlineag was the only book on 26% of NFL alt rungs, Pinnacle on none.
+    m = _script("fetch_alt_ladders")
+    assert "betonlineag" in m.bookmakers_for("nfl").split(",") and "pinnacle" in m.bookmakers_for("nfl").split(",")
+
+
+def test_the_soccer_prop_request_carries_pinnacle(monkeypatch):
+    m = _script("fetch_soccer_oddsapi_props_local")
+    seen = []
+    monkeypatch.setattr(m.requests, "get", lambda url, params=None, timeout=None: seen.append(dict(params or {})) or _Resp())
+    monkeypatch.setattr(m, "record_oddsapi_quota", lambda *a, **k: None)
+    m.fetch_event_player_props("k", sport_key="soccer_epl", event_id="e1", region="us",
+                               markets=["btts", "alternate_totals_corners"], bookmakers=orx.prop_bookmakers("soccer", env={}))
+    assert "pinnacle" in seen[0]["bookmakers"].split(",") and seen[0]["regions"] == "us"
 
 
 def test_the_basketball_fetcher_defaults_to_the_league_list(monkeypatch):
@@ -82,6 +116,7 @@ def test_the_football_prop_request_carries_the_list(monkeypatch, name, sport):
     except Exception:  # noqa: BLE001 -- the request is under test, not the empty payload's shaping
         pass
     assert seen and seen[0]["bookmakers"] == orx.PROP_BOOKMAKERS[sport] and seen[0]["regions"] == "us"
+    assert ("pinnacle" in seen[0]["bookmakers"].split(",")) == (sport == "nfl")    # the NFL swap reaches the request
 
 
 def test_mlb_props_get_the_list_and_game_lines_do_not(monkeypatch, tmp_path):

@@ -78,7 +78,7 @@ def test_nba_per_event_list_carries_pinnacle_at_one_regions_price(monkeypatch):
     books = orx.prop_bookmakers("nba").split(",")
     assert "pinnacle" in books and "betonlineag" not in books
     assert len(books) == len(set(books)) <= 10                    # an 11th book bills a second region per event
-    # the other sports' lists are untouched
-    assert "pinnacle" not in orx.prop_bookmakers("nfl").split(",")
+    # the other sports' lists are untouched (NFL took Pinnacle too on 2026-10-31, lane pinnacle-prop-swap)
+    assert "pinnacle" not in orx.prop_bookmakers("ncaaf").split(",")
     # and the NBA fetcher actually asks for it
     assert "pinnacle" in _script("fetch_basketball_oddsapi_props_local")._league_prop_bookmakers("nba").split(",")

@@ -161,12 +161,25 @@ PROP_BOOKMAKERS = {
 PROP_BOOKMAKERS["nba"] = (
     "draftkings,fanduel,betmgm,williamhill_us,betrivers,fanatics,bovada,pinnacle,espnbet,hardrockbet"
 )
+# NFL TAKES PINNACLE IN WILLIAM HILL'S SLOT (lane pinnacle-prop-swap, user 2026-10-31 "Yes, swap"; the D5 read,
+# `.syndicate/findings_2026-10-31_pinnacle_coverage_d5.md`). The 10-25 instruction reached NFL's GAME lines (the
+# per-sport regions knob below) but not this call, so NFL paper bets on props had no Pinnacle close to grade against.
+# Measured 10-31: OddsAPI's Pinnacle prices receptions, reception / rush / pass yds for the same players DraftKings and
+# FanDuel do, at one credit per market inside the list. NOT BETONLINE'S SLOT, unlike NBA: `fetch_alt_ladders` reuses
+# this list, Pinnacle posts no player alternates, and betonlineag was the ONLY book on 8,275 of 31,302 NFL alt-ladder
+# rungs (26%, game days 10-18..11-01). williamhill_us was the only book on 19 of those rungs and 93 of 21,879 main
+# prop lines (0.43%, kickoffs 10-16..10-30) -- the cheapest book to drop across both. NCAAF and MLB keep the shared list.
+PROP_BOOKMAKERS["nfl"] = (
+    "draftkings,fanduel,betmgm,pinnacle,betrivers,fanatics,bovada,betonlineag,espnbet,hardrockbet"
+)
 # SOCCER (lane soccer-uefa-competitions, at props-book-coverage's invitation, 2026-10-16). NOT the shared list: soccer's
 # prop call has returned 8 books since 10-01 (fleet props shards, 573,710 rows), and MyBookie is 7.9% of them -- the
 # shared list would drop it. So: all 8 seen, plus the two `us2` books an EPL probe showed adding coverage (ballybet,
-# betparx). Pinnacle is NOT in it: whether it prices soccer props is unmeasured.
+# betparx). PINNACLE TAKES WILLIAM HILL'S SLOT (lane pinnacle-prop-swap, user 2026-10-31 "Yes, swap"): measured 10-31,
+# Pinnacle offers `btts` and `alternate_totals_corners` (five lines a side) on EPL events, and williamhill_us was the
+# ONLY list book on 0 of 77,744 soccer prop lines (kickoffs 10-16..10-30).
 PROP_BOOKMAKERS["soccer"] = (
-    "betrivers,fanduel,draftkings,betmgm,mybookieag,bovada,fanatics,williamhill_us,ballybet,betparx"
+    "betrivers,fanduel,draftkings,betmgm,mybookieag,bovada,fanatics,pinnacle,ballybet,betparx"
 )
 PROP_BOOKMAKERS_ENV_TEMPLATE = "SYNDICATE_{sport}_PROP_BOOKMAKERS"
 
