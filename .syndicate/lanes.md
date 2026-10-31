@@ -654,6 +654,14 @@ death, never life — do not invert it.
   - The REAL residual, smaller than reported: for the first ~6-8 min after 05:00Z the served board is the look-ahead build, 33-53 min old. Its length = time since the last `AROUND_NEXT_DAY` build + the first post-roll cycle. Not a clock skew; no shared helper is needed (one exists and is used).
   - Verify reading for any future change here: per-night `LAYER2_SHARD_GENERATION_DROPPED date=<new CT date>` timestamps across 04:00-06:00Z from refresh-worker.log, NOT an hourly endpoint sample.
 
+### nhl-venue-price-gap — OPEN — opened 2026-10-31 — session e32fef1a-01e8-4afe-a284-01acd3728545
+- Goal: Name the first pipeline stage at which NHL loses its Kalshi and Polymarket prices (DecisionRecords 2026-10-31: 0 of 618 NHL records carry a venue price, vs NFL 158 of 1,056), with per-stage counts read on the fleet, and either a fix on main with tests or a named owner; READ-ONLY on the fleet, no fleet or env change
+- Files: .syndicate/findings_2026-10-31_nhl_venue_price_gap.md (NEW)
+- Hypothesis: NHL Layer 2 rows never receive quote.book_prices kalshi or polymarket because the venue price fan-in or board join does not cover NHL (series not registered, or the join refuses NHL rows), NOT because the venues list no NHL markets for the slate
+- Falsification test: Kalshi and Polymarket list no open NHL game or player-prop markets for the 10-31 / 11-01 slates; or the fan-in's own NHL counts show matched prices that a later stage drops (then the hypothesis names the wrong stage)
+- Verification: findings file on main with per-stage NHL counts (venue listing -> catalogue -> join -> Layer 2 book_prices -> DecisionRecord venue price -> paper candidates), the first zero stage named with file:line, and the fix commit or owner
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
