@@ -593,12 +593,6 @@ death, never life — do not invert it.
 - Verification: Hermetic tests: shape parity with e4_stage2_combo_prices.shape_cell on a ticker grid, off != on for the shaped read, budget reservation; A5 committed on origin/main before the ff; after the ff, the first full UTC day's store rows read on the fleet (shaped traded two-leg combos, trades_status counts, prints with taker_side, GETs) and recorded in deploys.md
 - Blocked by: none
 
-### closed-lane-archive-20261031-0640 — CLOSED 2026-10-31 (GOAL MET: 1 block archived) — opened 2026-10-31 — session 265b36c8-8a4c-4658-a9dd-1c6705801778
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 1 SAFE of 5 CLOSED; dry run, invariants (no new FAIL vs baseline), apply.
-- Moved: closed-lane-archive-20261031-0040. Table and WAIT reasons in `log/2026-10-31.md` 11:4xZ.
-
 ### closed-lane-archive-20261031-0840 — CLOSED 2026-10-31 (GOAL MET: 2 blocks archived) — opened 2026-10-31 — session 45521c6b-5676-40ae-a669-5c907e0bb827
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
@@ -639,6 +633,11 @@ death, never life — do not invert it.
 - Falsification test: the 28 also fail when their files run alone under run_ci_suite._step_env in ci-checkout
 - Verification: the 16 failing files + the identified leaker run in CI order under _step_env on the fleet venv: 0 failures in the 36 ids; then the next 08:00Z ci-suite run reads 0 NEW
 - Blocked by: none
+
+### closed-lane-archive-20261031-1241 — CLOSED 2026-10-31 (GOAL MET: 1 block archived) — opened 2026-10-31 — session c3f2f55d-aaa0-42f4-9ee7-54dd984e35d6
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 read SAFE for 1 of 5 CLOSED blocks; moved `closed-lane-archive-20261031-0640`. Table and deferrals in the 2026-10-31 log.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -765,6 +764,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261031-0040` — CLOSED 2026-10-31 (GOAL MET: 1 block archived) — opened 2026-10-31 — session 7996dec0-ddc1-4d8a-b503-95dd243e7fc1
 - `closed-lane-archive-20261031-0240` — CLOSED 2026-10-31 (GOAL MET: 1 block archived) — opened 2026-10-31 — session 3bf47af2-419c-4649-b2b4-3ac129b80d99
 - `closed-lane-archive-20261031-0440` — CLOSED 2026-10-31 (GOAL MET: 2 blocks archived) — opened 2026-10-31 — session e4c3fac4-325a-4a46-90f1-6697455e68c3
+- `closed-lane-archive-20261031-0640` — CLOSED 2026-10-31 (GOAL MET: 1 block archived) — opened 2026-10-31 — session 265b36c8-8a4c-4658-a9dd-1c6705801778
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
