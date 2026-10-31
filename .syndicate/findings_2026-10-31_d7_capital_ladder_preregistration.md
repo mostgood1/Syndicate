@@ -1,8 +1,8 @@
-# D7 capital ladder: pre-registration DRAFT `[2026-10-31, lane syndicate-decision-engine, plan #736 decision D7]`
+# D7 capital ladder: pre-registration, ADOPTED 2026-10-31 `[2026-10-31, lane syndicate-decision-engine, plan #736 decision D7]`
 
-**Status: DRAFT. The user has not adopted it yet.** The user asked for it, verbatim: "Yes, draft D7". Edits made
-before the first canary order of a strategy that passed the gate are edits to this draft. After that order, any
-change is a new registration and must be named as one.
+**Status: ADOPTED `[2026-10-31 21:09Z]`.** The user asked for the draft, verbatim: "Yes, draft D7", and adopted it,
+verbatim: "Adopt as drafted". That takes all four choices in §11 as recommended. Any change from here is an amendment,
+named and dated; after the first canary order of a laddered strategy it is a new registration.
 
 **Plan D7, verbatim:** "Capital ladder: pre-register how stake bands grow once a strategy passes the edge gate.
 Example: double the band after each further 400 bets with the CLV and ROI CIs still above 0, with a drawdown stop
@@ -127,7 +127,7 @@ A rung read uses the counted bets at that rung (§2).
 
 ## 5. Demotion
 
-**If the user adopts this section, it is pre-authorised:** each stop is applied at the read that finds it, without
+**Pre-authorised (adopted 2026-10-31):** each stop is applied at the read that finds it, without
 waiting for an answer, and the user is told. Promotions always wait for the user.
 
 - **Edge stop: earned drops one rung.**
@@ -244,7 +244,7 @@ The owner is whoever takes the canary step (D2's live step). Until a lane holds 
   - with `--expect` naming the keys;
   - with its measurement (the first `STAKE_BAND` line at the new band) recorded in `deploys.md`.
 
-## 11. Decisions owed by the user
+## 11. Decisions (all four taken as recommended, 2026-10-31)
 
 1. **Adopt this draft as written.**
 2. **ROI rule.** Recommended: ROI above 0 is required only for R2 → R3, with the realization check at every rung.
@@ -253,3 +253,9 @@ The owner is whoever takes the canary step (D2's live step). Until a lane holds 
    with the stop raised to 25%, a true +2% edge trips it 5% of the time at 10 bets a day and 34% at 20 a day.
 4. **Pre-authorised demotions** (§5). Recommended. The alternative is to ask each time, which leaves a losing
    strategy at size while the question waits.
+
+**Adopted 2026-10-31 21:09Z** (user, verbatim: "Adopt as drafted"):
+1. Adopted as written.
+2. ROI above 0 is required only for R2 → R3; the realization check runs at every rung.
+3. Funding: a rung's max is at most 1% of the venue capital.
+4. Demotions are pre-authorised.
