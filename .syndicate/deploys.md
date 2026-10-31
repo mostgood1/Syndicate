@@ -55159,3 +55159,30 @@ which is about the two sizing bases and not about the refusal boundary.
   - The 10-30 archive (7,222,457,465 bytes, the 15:33Z re-run) still reads state 2 / placeholder 14.
 - **verify:** both clauses are MET. The log line names `attempts 1` and the staging path, and the 10-31 archive is in `OneDrive/SyndicateBackup` reading synced.
   - Not exercised: the retry path. Attempt 1 succeeded, so the one-retry-after-300-s branch is still untested in production.
+
+## 2026-10-31 21:03:20Z (4:03 PM CT) -- FLEET ff 413a08d5 -> 87ecf730, NO restart (lane maker-pilot-fair-cancel: Kalshi maker-pilot fair-move cancel, OFF WHEN ABSENT; ride-alongs d10cb953e live-odds-memory-spikes, b3cf9b013 pinnacle-prop-swap) -- **CHECKOUT VERIFIED; switch not enabled**
+- **User, verbatim (session 684b1d):** "Yes, build it" (the button read "build the fair-move cancel ... tested, then go through the deploy locks"), and for the swap ride-along "Yes, include it". The coordinator 332cb014 relayed the user's "Approve it" with "behind a switch", so the switch is off when absent (`87ecf730`).
+- **What:** `91f1e433` + `87ecf730`. A resting maker-pilot post is cancelled when the plan's current fair minus the resting price falls below +1pp (`edge_below_floor`), or when a later plan pass drops the position (`plan_dropped`).
+  - It is judged in `cancel_stale_resting_orders` via `kalshi_maker_pilot.review_resting`.
+  - The reconcile resting row now carries market/line, so the leg maps like the order body.
+  - Switch: `SYNDICATE_KALSHI_MAKER_PILOT_FAIR_CANCEL=on`. **Absent = off = rest-to-kickoff as before.**
+  - Evidence: `findings_2026-10-31_maker_pilot_review.md`.
+- **Ride-alongs (runtime paths in 413a08d5..87ecf730):**
+  - `d10cb953e` odds_refresh_tracking one-shard-at-a-time (lane live-odds-memory-spikes; owner: "Fold d10cb953e into your deploy"). It goes live in fresh refresh_odds_sources children at the ff.
+  - `b3cf9b013` odds_regions NFL+soccer PROP_BOOKMAKERS -> pinnacle (lane pinnacle-prop-swap, user "Yes, swap" + "Yes, include it" here). It goes live in fresh fetchers at the ff.
+  - `da3b48f9a` execution_watchdog env leak (ci-suite #697; the watchdog reloads every 5 min).
+  - `785844c18` MLB daily_update/backfill test fixes (season over).
+  - Offline scripts: e4_stage2_combo_prices, probability_differential, capital_ladder_calibration.
+  - No `vendor/`, `engines/`, `pipeline/` or `render.yaml`.
+- **Claim:** refresh-worker, holder maker-pilot-fair-cancel, token 70ac083e, 21:02:08Z.
+- **Preflight:** `--target fleet --target-commit 87ecf730 --expect fleet_checkout_head=87ecf730 --baseline fleet_checkout_head=413a08d5 --baseline-read-at 21:02:27Z` -> **CLEAR rc=0** 21:02:28Z.
+- **Deploy:** `git merge --ff-only 87ecf730c8dc72861275d1de962d4e6ed2657ad5`. HEAD read back as `87ecf730c8dc72861275d1de962d4e6ed2657ad5` at 21:03:20Z; reflog "Fast-forward".
+- **Verified 21:03:20Z:** `def review_resting` x1 in kalshi_maker_pilot.py; the resting dict has `"line": order.get("line")` (execution_ledger.py:3359); odds_regions.py has 9 `pinnacle` mentions; odds_refresh_tracking.py has the one-shard change.
+- **Roles not restarted:**
+  - live-odds-worker runs 413a08d5 until its next respawn. It then loads the cancel with the switch absent, i.e. OFF.
+  - **Owed reading at that respawn:** a `MAKER_PILOT FAIR_PASS off rows=N` line on a tick with a resting pilot post. That proves the hook is reached; `rows` > 0 needs a resting post.
+- **Not done:** enabling. It needs the key in `local_production.env` plus a full `up` (role restarts reuse the env from `up`). Decision owed: the user, in session 684b1d.
+- **Known limit:** the fair is the plan's, refreshed only at plan commits (gaps up to ~2.7 h measured 10-24/25). The 11-14 re-judge grades on both plan fair and book consensus.
+- **verify owed by ride-along lanes:**
+  - live-odds-memory-spikes: peak RSS of the soccer refresh_odds_sources child and the live-odds container_memory_pct.
+  - pinnacle-prop-swap: Pinnacle prop rows in the NFL/soccer book_quotes shards after 21:03:20Z, and x-requests-last per prop call unchanged.
