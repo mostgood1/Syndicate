@@ -619,6 +619,7 @@ The four signal-engine / near-miss lanes stay OPEN on purpose: their file claims
 - Detail: `.syndicate/findings_2026-10-21_remaining_four_ci_failures.md`. Lane `ci-suite-four-stale-1021`, session 4ab694ed.
 
 ### `#715` — **IN-GAME TRADING (user: "PRIORITY of the whole operation"): measured 10-20 NBA/NHL in play — Kalshi LEADS the books; book-consensus "edges" mark out at -1.3c after fee; the fixed take-profit LOSES vs hold, and loses more when checked faster; stage 1 fast loop BUILT, paper, not running** — lane `in-game-trading`, session 15ceeb14, 2026-10-21
+- **(e) in-play decision record BUILT 2026-10-31, on main `9a41c6f66`, NOT on the fleet:** one line per live in-play decision in `<data root>/reports/intelligence/decision_records/<date>.inplay.jsonl`, joined by the ledger's `idempotency_key`. Each line holds the fair and its version, the ask and leg, all six guard verdicts and the sizing rule. Ledger rows now carry `staked_probability_version` and `sizing_basis`. Baseline (fleet 87ecf730): 199 in-play settled fills since 10-23 with 0 records; 199/199 have a paper-doc trace. Owed: the user's yes for ff + live-odds-worker restart, then a re-run of `scripts/inplay_decision_record_join.py`. Log 2026-10-31 22:03Z.
 - **Measured** (read-only recorder, 23:09Z-04:39Z, 11 games, 64,688 priced side-samples):
   - Markout after fee: +300 s **-1.26c** (CI -1.80..-0.72, n=1,613); +60 s -1.93c.
   - No cell's CI is above 0. NHL spreads away from a score is +0.9c [-0.6, +2.4], n=270: the cell to watch, not traded.
