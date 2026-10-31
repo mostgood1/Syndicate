@@ -789,3 +789,94 @@ not a mechanism.
 - Not done: no engine code, no switch file, no sim run.
 - **Next on the pre-registered order:** REAL_ONLY (6.19 real min per team-game the sim never gave) or variance
   (bench width 1.98). Neither has been pre-registered.
+
+## STEP 3 — MINUTES DISPERSION (BENCH VARIANCE), PRE-REGISTERED 2026-10-31 20:27Z (15:27 CDT), before any residual is read by cell
+
+**User decision 10-31:** "pre-register the bench minutes variance fix". Baseline is fit_inj (d674e150).
+
+**CORRECTION to this file, lines 617 and 740 ("about twice too wide"): the direction was wrong.** The grader's
+width ratio is sd(real − sim mean) / rms(sim sd) (`scripts/basketball_player_distribution_read.py:74`). Bench 1.98
+means real bench minutes scatter about TWICE as far from the sim mean as the sim's own draws do: **the bench bands
+are about HALF as wide as they should be (too narrow)**, which is also what miss .547 > .20 says. Consequence for
+step 2a's "known risk" (line 740): a p < 1 participant would have WIDENED the sim's spread, i.e. moved bench width
+toward 1, not away. Stage A failed before that mattered; no number changes.
+
+**What is already in the sim** (fit_inj levers, `r2s/launch_fit_inj.sh`): blowout_bench_rest=1, bench_weight_boost=3.0,
+foul_out_in_sim=1 with foul-trouble thresholds, OT. Those are the only per-draw sources of minutes spread today; the
+per-player target `_sim_min` is fixed per game. Starter width 1.21, bench 1.98: the deficit is mostly bench.
+
+### Stage A — offline feasibility (no sim run). Decides whether stage B is built.
+
+**Population:** the Phase-1 population of fit_inj (in the sim AND played, real MIN > 0), with its recorded per-draw
+realised minutes (`pl[s][j][4]`) and stats. Starter / bench = top-5 by input minutes, as in Phase 1. Coach-DNP,
+ABSENT and REAL_ONLY slots are out (props on a DNP void; those are steps 2a / REAL_ONLY).
+
+**Mechanism, emulated on the recorded draws:**
+- per draw d, per pool player i with realised minutes x_id > 0: x'_id = x_id · exp(σ_c·z_id − σ_c²/2), z ~ N(0, 1)
+  iid, seed 0 (mean-preserving lognormal);
+- then, per team and draw, rescale the pool so the team total equals that draw's pre-shock total (keeps OT and the
+  team's 240), and cap each player at game length (48 + 5·OT), water-filling any excess proportionally;
+- x_id = 0 stays 0;
+- stats in the emulation: stat'_id = stat_id × x'_id / x_id (the Phase-1 minutes-oracle scaling).
+
+**Cells c, fixed now:** the slot's input minutes m (fit_inj sim mean) binned {< 6, 6–12, 12–20, 20–28, ≥ 28}. A bin
+with < 300 TRAIN player-games is pooled into its neighbour toward the middle.
+
+**Fit:** TRAIN = 2025-11-01..12-31. Per cell, σ_c from the grid {0, .05, …, 1.50} minimising |minutes miss − .20| on
+TRAIN for that cell. **TEST** = 2026-01-01..02-28 grades it. Nothing is re-fit after TEST is read.
+
+**Gate A, on TEST (all must hold):**
+- (V1) minutes miss: bench and starter each within [.15, .25] (from .547 / .312);
+- (V2) minutes width ratio: bench and starter each within [.85, 1.15] (from 1.98 / 1.21);
+- (V3) tail balance: for bench and starter, |p_lo − p_hi| ≤ .05 (a spread fix must not buy coverage on one side);
+- (V4) pts / reb / ast / threes miss (scaled stats): none worse than fit_inj's TEST value by more than .005.
+- Reported, no gate: σ per cell; per-cell miss / width / tails before and after; minutes bias (the shock is
+  mean-preserving before the renormalisation, so bias should barely move); the TRAIN numbers; the share of the real
+  residual variance per cell that the sim already carries (1 / width²).
+
+**If A FAILS:** stop and report which criterion. Readings fixed now: V1 fails with V2 passing → the miss is driven
+by bias / shape, not spread (the next target is the bench bias +1.00 or the REAL_ONLY minutes); V3 fails → the
+residual is skewed and a symmetric-in-logs shock is the wrong family (an empirical-ratio bootstrap would be the next
+pre-registration); V4 fails → stats do not follow minutes 1:1 and the engine must carry the spread differently.
+
+### Stage B — engine (only if A PASSES)
+
+**Mechanism:**
+- NEW `syndicate/features/shared/nba_sim_minutes_dispersion.py`, switch file `nba_sim_minutes_dispersion.json`
+  carrying the frozen σ table. Absent file = off; `SYNDICATE_NBA_SIM_MINUTES_DISPERSION=0` kills it.
+- Hook: the per-draw loop in `orchestrator/smart_sim.py` (~:1719). Before each `simulate_pbp_game_boxscore` call,
+  shock each pool player's `_sim_min` by the same lognormal, renormalise to the team total and re-cap with the
+  existing water-fill (`_derive_sim_minutes_local` caps). The draw's RNG is the draw's own (no shared-state seed
+  drift between off and on beyond the shock draws themselves).
+- One print line per game: `NBA_SIM_MINUTES_DISPERSION {applied, players, sigma_by_cell, mean_abs_shift}`.
+- **Lane / files:** the hook section of orchestrator/smart_sim.py is added to this lane's `Files:` after a collision
+  check at build time, not now.
+
+**Reachability and pass-through, before any correctness read:**
+- a unit test that on != off for `_sim_min` and for realised minutes;
+- **pass-through**, on the smoke: regress each draw's realised minutes on its shocked target; slope ≥ .70. Known
+  risk named now: when contextual rotation lineups (`home_lineups` / `away_lineup_w`) drive the possession sampler,
+  per-possession selection may ignore `_sim_min` and the shock would be inert. If the slope is < .70, stop: the
+  lineup weights must carry the shock, and that is a new pre-registration.
+
+**Engine standard (docs/ai_context/model_engine_standard.md):** checklist entry CONSUMED × POPULATED; pipeline trace
+with file:line; the switch file disk-backed and allowlisted in HOT_ARTIFACT_PATTERNS at build time; reachability
+test first.
+
+**Runs:** a 12-date smoke (the INJ smoke dates), then the full FIT `fit_disp` = fit_inj's config + the switch file.
+
+**Gate B, on TEST dates only (all must hold):**
+- (B1) bench and starter minutes miss each within .03 of stage A's emulated TEST value, and within [.15, .25];
+- (B2) pts / reb / ast / threes miss: none worse than fit_inj by more than .005;
+- (B3) game total mean within ±1.0 of fit_inj (mechanism-vs-estimator rule: moving minutes between players of
+  different rates can move team scoring; if it moves more, the totals solver is re-fit before any stat read);
+- (B4) team pts / reb / ast co-movement and the E4 combo widths reported (they consume per-player draws), no gate.
+
+**Predictions, written now:**
+- σ is larger for small m (bench) than for ≥ 28 (starters); bench σ ≥ .4.
+- Stats miss improves in every stat in stage A (each sits at .23–.30 with minutes as the first-order driver), by
+  less than minutes does.
+- Minutes bias moves by < 0.2 in either role.
+
+**Out of scope:** coach DNP (needs pre-tip news, step 2a); REAL_ONLY (6.19 real min per team-game); the bench bias
++1.00; production. Production gets fields only via `nba_engine_config.json` after the forward test from 11-01.
