@@ -613,6 +613,14 @@ death, never life — do not invert it.
 - Verification: findings file on main with, per class-B cell: our fetch config (file:line), Pinnacle offered yes/no on N probed events, players covered, credit cost per day at the current cadence, and the projected change in the P2 sharp-graded pace
 - Blocked by: none
 
+### maker-pilot-review — OPEN — opened 2026-10-31 — session 9683e8c4-02ff-45b7-8c47-ae932f103e33
+- Goal: One keep/adjust/pause recommendation for the live Kalshi maker pilot, with per-fill adverse selection (+5m/+30m/close), CLV vs fair, a CI on held P&L, and exit-lane lock-ins; READ-ONLY, no live change
+- Files: .syndicate/findings_2026-10-31_maker_pilot_review.md (NEW)
+- Hypothesis: Pilot fills are adversely selected (fair moves against us after fill), as the 10-19 shadow found (fills won 5.37pp below close)
+- Falsification test: Post-fill fair drift >= 0 on average across fills AND held win rate not below fill-time fair
+- Verification: Findings file with per-fill table + CI + recommendation presented to user in session 684b1d
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
