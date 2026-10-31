@@ -55144,3 +55144,18 @@ which is about the two sizing bases and not about the refusal boundary.
   - It affects rescheduled fixtures only. No amendment: the join is registered (A4), and A5 §3 allows no other change.
 - **verify:** the first-run clause is MET: a `trades_shapes` e4 row with `shaped_reads` > 0, no errors, prints stored with `taker_side`.
   - Owed: the 10-31 full UTC day (readable from ~01:05Z 11-01): shaped rows ok/empty vs `skipped_budget`, prints with `taker_side`, GETs within the run budget. That day is A5's D0.
+
+## 2026-10-31 09:42Z (4:42 AM CT) -- MEASUREMENT for 2026-10-30 17:39:07Z (fleet ff to b92c1d57, hardened off-disk archive): the first hardened nightly backup archived on attempt 1 and SYNCED to OneDrive -- **VERIFIED** (lane syndicate-decision-engine)
+- **Instruments:**
+  - watcher `backup_watch_1031.ps1`, every 3 min from 09:20Z, reading the fleet's `logs/job-data-backup.log` over WSL and OneDrive's `System.StorageProviderState` / `System.FilePlaceholderStatus` through Shell COM;
+  - then a one-shot re-read at 09:41:42Z.
+- **Fleet log (the run started 09:15:01Z, 4:15 AM CT):**
+  - 09:18:09Z: snapshot of 289,441 files / 39.82 GB, `redis ok`, `rsync rc=0`, link-dest `20261030T091501Z`.
+  - **09:28:01Z: `off-disk archive /mnt/c/Users/tempadmin/OneDrive/SyndicateBackup/20261031T091501Z.tar.gz: 7.46 GB in 592s (attempts 1, staged in /mnt/c/Users/tempadmin/SyndicateBackup-staging)`.**
+  - No `FAILED` line. The staging directory was empty afterwards.
+- **OneDrive:**
+  - `20261031T091501Z.tar.gz` is 7,459,136,328 bytes (the log's 7.46 GB), mtime 09:28:01Z.
+  - It read state 4 / placeholder 6 (pending) from 09:29Z to 09:38Z, then **state 2 / placeholder 14 (bit 0x8 set: synced) at 09:41:15Z**, about 13 min after the write. The 09:41:42Z re-read is the same.
+  - The 10-30 archive (7,222,457,465 bytes, the 15:33Z re-run) still reads state 2 / placeholder 14.
+- **verify:** both clauses are MET. The log line names `attempts 1` and the staging path, and the 10-31 archive is in `OneDrive/SyndicateBackup` reading synced.
+  - Not exercised: the retry path. Attempt 1 succeeded, so the one-retry-after-300-s branch is still untested in production.
