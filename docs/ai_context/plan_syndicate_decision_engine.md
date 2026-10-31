@@ -643,7 +643,7 @@ minutes without touching the decision logic.
 | **D4** | An LLM in the worker for news triage only (Ask stays off), behind a CLV test | Defer to Phase 4. Build rules-based official-feed ingestion first. |
 | **D5** | OddsAPI spend: widen sharp-book coverage (props, NHL game lines) within or above the 5M cap | Yes, within budget first |
 | **D6** | Live capital posture until the Phase 2 gate | Canary only. Do not widen the bands. |
-| **D7** | Capital ladder: pre-register how stake bands grow once a strategy passes the edge gate. Example: double the band after each further 400 bets with the CLV and ROI CIs still above 0, with a drawdown stop that drops back one rung. | Yes, write it before Phase 2 ends |
+| **D7** | Capital ladder: pre-register how stake bands grow once a strategy passes the edge gate. Example: double the band after each further 400 bets with the CLV and ROI CIs still above 0, with a drawdown stop that drops back one rung. | Yes, write it before Phase 2 ends. **Drafted 2026-10-31:** `.syndicate/findings_2026-10-31_d7_capital_ladder_preregistration.md`, awaiting the user's adoption |
 | **D8** | Reliability: off-host backup and a dispatch watchdog now; production off the single home host (or kept from sleeping) | Backup and watchdog now; the host decision at Phase 7 |
 
 **Decision log** (each one is the user's own words in the session "Syndicate AI decision engine"; detail in lane `syndicate-decision-engine`):
