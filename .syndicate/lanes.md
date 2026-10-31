@@ -577,31 +577,6 @@ death, never life — do not invert it.
 - Verification: Prereg committed first (SHA in findings); hermetic tests pass incl. off != on reachability and a no-order-path test; z fit reported with n; findings file + #738 + a #717 dated-read line on main; enabling the job on the fleet is the user's decision
 - Blocked by: none
 
-### kalshi-combo-capture — CLOSED 2026-10-30 (GOAL MET: capture live on the fleet; first full forward day 10-29 read MET) — opened 2026-10-27 — session a48b0f49-3a6b-4105-b194-5804a934487c (picked up 2026-10-27 as a side session of local_668211d5; opened by e32fef1a for pickup)
-- **GOAL VERDICT `[2026-10-30 18:21Z, closed by lane syndicate-decision-engine, session 8e021fe8]`: GOAL: MET.** Reading: `deploys.md` 2026-10-30 13:47Z -- first full forward day 10-29: 473,517 traded combos stored, kept > 0 for mlb/nba/wnba/nhl/nfl/ncaaf/soccer (ncaab off-season), results filled 99.49%, ~11,176 GETs (prorated; the user approved the run on the ~8,500-a-day heavy-day figure, and the hourly run budget of 900 pages bounds it), purge age 2.48-2.98 d. The owner session a48b0f49 (CCD local_a887f012) was archived 10-30 on the user's instruction; its last transcript timestamp is 2026-10-29 20:14:46Z. The capture job keeps running unchanged. Its file claims pass to lane `e4-pregame-prints` (E4 (e), user 2026-10-30 "Yes, all four").
-- First forward day 2026-10-29 READ 2026-10-30: stored 473,517, results filled 99.49%, ~11,176 GETs; purge age 2.48-2.98 days (deploys.md)
-- **Reading armed `[2026-10-27 23:20Z]`:** Claude scheduled task `kalshi-combo-capture-first-forward-day`, user-approved, runs daily at ~8:40 AM CT, read-only.
-  - It runs `scripts/kalshi_combo_capture.py status` (`25485432`) on the fleet store, via `C:\tmp\kalshi_combo_status\cc_status.sh`.
-  - Once `met`, it appends the first-full-forward-day + purge-age reading to `deploys.md`, adds a line here and in `#742`, and disables itself. Hard stop 2026-11-03.
-  - It flags BRIDGE DOWN, STUCK (2 of the last 3 runs `errors`), and the key set on an old checkout.
-- **GOAL VERDICT `[2026-10-27 21:39Z]`.**
-  - Goal, verbatim: "A forward, read-only capture of Kalshi same-game combo markets runs daily on the fleet: every combo whose legs include a same-game pair in a sport the platform prices is stored under the fleet data root (legs, quotes, volume_fp, result, and public trade prints for kept combos with volume > 0) within about 1,000 public GETs a day at nice 19, so E4 Stage 2 (#740 (d)) can run after a month of capture".
-  - **GOAL: NOT MET** (running; Verification owed).
-  - The user approved verbatim: "launch the kalshi combo-capture bridge on the fleet now at nice 19 with a ~30-day backfill and no trade reads, then enable the hourly supervisor job at the next fleet ff under the deploy locks".
-  - The bridge has run since 20:56:16Z. It was paused 21:24Z for the memory fix `6872eb2c` (2.5 GB -> 653 MB, same rows) and relaunched 21:36:16Z on `6872eb2c`. Its backfill starts at settlements of 09-27 20:51Z.
-  - **Left:** (1) the Verification reading: the first full forward day (10-29 UTC) in `deploys.md`, which the scheduled task records on its 10-30 run.
-  - **Done `[2026-10-28 17:11Z, read back by this lane]`:** (2) the supervisor job.
-    - Lane syndicate-decision-engine did the ff to `6d6e729d` + the key + one full drained down/up at 16:44:45Z (`deploys.md` 16:44:34Z and 17:09Z).
-    - The first supervisor row (17:02:09Z) is `ok` with 129 pages. The bridge exited by itself at 17:08:12Z.
-    - The backfill caught up at 13:03Z. Purge age: 59.6-71.4 h.
-  - **Goal clauses restated by the user's decision:** no trade reads. The GET clause is superseded by the measured ~8,500 a day on a heavy day (purged history ~900 per day). The user approved the run knowing that number.
-- Goal: A forward, read-only capture of Kalshi same-game combo markets runs daily on the fleet: every combo whose legs include a same-game pair in a sport the platform prices is stored under the fleet data root (legs, quotes, volume_fp, result, and public trade prints for kept combos with volume > 0) within about 1,000 public GETs a day at nice 19, so E4 Stage 2 (#740 (d)) can run after a month of capture
-- Files: scripts/kalshi_combo_capture.py (NEW), tests/test_kalshi_combo_capture.py (NEW), scripts/local_production.py (SCHEDULED_JOBS kalshi-combo-capture entry ONLY), docs/ai_context/todo.md (#742 section + one appended OWED line in #740 only), .syndicate/findings_2026-10-27_kalshi_combo_capture.md (NEW), .syndicate/state_kalshi.md ([kalshi-combo-capture] section + one appended line in [kalshi-combo-public-data] only), .syndicate/state.md (one kalshi-combo-capture index row only)
-- Hypothesis: n/a (a capture, not a test; E4's registered Stage 2 is the test)
-- Falsification test: n/a
-- Verification: Hermetic tests incl. off != on for the job; built default-off and landed on main; after a user-approved fleet window under the deploy locks, the first full day's capture file on the fleet shows kept combos > 0 by sport, the day's GET count within budget, and results filled for settled combos, recorded in deploys.md
-- Blocked by: none. Waiting on the 10-29 UTC settlement day to finish; the scheduled task reads it.
-
 ### paper-evicted-grading — CLOSED 2026-10-29 — opened 2026-10-27 — session 7833a791-56c8-4845-99a7-d81bad2b6608 (adopted 2026-10-27 16:2xZ; opened by session e32fef1a for pickup; Phase 0 item 4 of #736)
 - **CLOSED 2026-10-29 13:49Z (7833a791; asked by lane syndicate-decision-engine relaying the user's "proceed next steps across sessions"):** stale paper 1,906 -> 38 named refusals, with the hourly archived pass live (deploys.md, cbdb0dbd). Last pieces: `player_double_double` graded on main 1ec1eb2d (read-only dry run: Jokic 10-24 won +$4.1647, 37 other refusals unchanged; on the fleet with the next window, applies itself); the Polymarket US / Novig / ProphetX did-not-play rules read and recorded, all keeping the void (0 reachable rows). Residual 37 listed in the findings and #744; NBA period box proposed as its own task.
 - Goal: Every filled PAPER order whose game is decided gets an outcome even after _trim_to_cap moved it to the archive: a default-off grading pass over archived ungraded paper rows (graded copy appended to the archive), a one-off backfill from 10-02, and the stale count (game started > 48 h ago, no outcome; 1,834 on 2026-10-27 16:06Z) read near 0 on the fleet afterwards
@@ -637,11 +612,6 @@ death, never life — do not invert it.
 - Verification: Hermetic tests: shape parity with e4_stage2_combo_prices.shape_cell on a ticker grid, off != on for the shaped read, budget reservation; A5 committed on origin/main before the ff; after the ff, the first full UTC day's store rows read on the fleet (shaped traded two-leg combos, trades_status counts, prints with taker_side, GETs) and recorded in deploys.md
 - Blocked by: none
 
-### closed-lane-archive-20261030-1640 — CLOSED 2026-10-30 (GOAL MET: 1 block archived) — opened 2026-10-30 — session bbb21e78-2913-482a-95bf-adfbf5e7053b
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness.py at 240m returned 1 SAFE of 9 CLOSED; archived `closed-lane-archive-20261030-1045`. 8 WAIT (reasons in log/2026-10-30.md).
-
 ### closed-lane-archive-20261030-1840 — CLOSED 2026-10-30 (GOAL MET: 3 blocks archived) — opened 2026-10-30 — session e86b3ac8-fb2d-46f2-a3e2-36330c906b70
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
@@ -651,6 +621,11 @@ death, never life — do not invert it.
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - Verdict: MET. owner_liveness --idle-min 240 gave SAFE for 1 of 7 CLOSED blocks; moved closed-lane-archive-20261030-1439. 6 waited (reasons in log/2026-10-31.md).
+
+### closed-lane-archive-20261030-2240 — CLOSED 2026-10-30 (GOAL MET: 2 blocks archived) — opened 2026-10-30 — session 4eb730d5-72e7-4def-8963-9163c9a52618
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 read SAFE for 2 of 7 CLOSED blocks; both moved to lanes_closed.md with one pointer each: `kalshi-combo-capture`, `closed-lane-archive-20261030-1640`. Table and WAIT reasons in log/2026-10-31.md (03:40Z run).
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -770,6 +745,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261030-1045` — CLOSED 2026-10-30 (GOAL MET: 1 block archived) — opened 2026-10-30 — session 5d79ee1d-9207-4220-8f3c-74a872c47b9d
 - `closed-lane-archive-20261030-1256` — CLOSED 2026-10-30 (GOAL MET: 1 block archived) — opened 2026-10-30 — session b0e08c10-066e-43aa-80d7-a5bf71af8f58
 - `closed-lane-archive-20261030-1439` — CLOSED 2026-10-30 (GOAL MET: 1 blocks archived) — opened 2026-10-30 — session 7f87246c-628e-4ddf-86cd-90c9eb3006a0
+- `closed-lane-archive-20261030-1640` — CLOSED 2026-10-30 (GOAL MET: 1 block archived) — opened 2026-10-30 — session bbb21e78-2913-482a-95bf-adfbf5e7053b
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
@@ -835,6 +811,7 @@ death, never life — do not invert it.
 - `inplay-cadence-block-trim` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `intelligence-idle-poll` — CLOSED 2026-09-18 (GOAL MET: an untouched post-deploy /intelligence tab stopped POSTing at minute 14; resume unit-tested only) — opened 2026-09-18 — session f26bba3b-72ee-4f8c-9721-3f8c7e4678f1
 - `kalshi-both-leg-grading` — CLOSED 2026-10-27 — opened 2026-10-27 — session a7978a13-a882-425f-bedf-41b4299704ff
+- `kalshi-combo-capture` — CLOSED 2026-10-30 (GOAL MET: capture live on the fleet; first full forward day 10-29 read MET) — opened 2026-10-27 — session a48b0f49-3a6b-4105-b194-5804a934487c (picked up 2026-10-27 as a side session of local_668211d5; opened by e32fef1a for pickup)
 - `kalshi-line-aware-rungs` — ORPHANED, **UNOWNED** [ownership sweep 2026-08-31: owning session gone, no live session on this machine] — — **CLAIMS RELEASED 2026-08-26 03:3xZ, sess
 - `kalshi-maker-entry-paper` — CLOSED — opened 2026-10-19 — closed 2026-10-19 — session 2636b326-71e6-4908-8692-de0d92b6f94d
 - `kalshi-maker-pilot` — CLOSED (GOAL MET) — opened 2026-10-24 — closed 2026-10-26 — session 78880f41-ba0e-410c-aaac-d6cbeb02b884
