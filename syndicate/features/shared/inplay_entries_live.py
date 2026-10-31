@@ -38,14 +38,30 @@ reconciled by the normal RECONCILE pass: an unfilled IOC reads back `canceled`
 and is moved to `rejected`).
 
 Ledger rows: `position_key = "ingame:<ticker>:<leg>"`, market `spreads`, side = the leg.
+
+THE DECISION RECORD (lane in-game-trading item (e), handed over by syndicate-decision-engine, log
+2026-10-30 17:50Z: 170 of 292 settled live fills were in-play, with no record and no
+`staked_probability_version`). Every live decision, whether placed or refused, appends ONE line to
+`<data root>/reports/intelligence/decision_records/<date>.inplay.jsonl`. That is the pregame
+DecisionRecords' directory: export-only allowlisted, and on the fleet's shared data root, so web reads it.
+The line carries the fair and its version, the ask and leg, EVERY guard's verdict (each one is evaluated,
+not only the first refusal), the sizing rule and its version, and the result. It joins the ledger by
+`idempotency_key` (the ledger's own deterministic key, computed from the same request). The ledger row
+itself carries `staked_probability_version = "inplay:<fair version>"` and `sizing_basis`.
 """
 
 from __future__ import annotations
 
+import json
 import os
 import time
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
+RECORD_VERSION = "inplay_decision_record/1"
+# 1 = one contract per order (2026-10-23); 2 = SYNDICATE_INPLAY_ENTRY_ORDER_DOLLARS whole contracts (2026-10-28).
+SIZING_VERSION = "inplay_entry_stake/2"
 POSITION_PREFIX = "ingame:"
 DAY_DOLLARS_DEFAULT = 50.0  # absent / unusable env: the original cap, never the ceiling
 DAY_DOLLARS_CEILING = 100.0  # user 2026-10-28: "double the cap to $100/day"
@@ -194,6 +210,7 @@ class LiveEntryPlacer:
         enabled_fn: Callable[[], bool] = live_entries_enabled,
         gate_fn: Callable[[], Mapping[str, Any]] | None = None,
         clock: Callable[[], float] = time.monotonic,
+        record_fn: Callable[[str, Mapping[str, Any]], None] | None = None,
     ) -> None:
         self.today_fn = today_fn
         self.orders_fn = orders_fn or _ledger_orders
@@ -201,20 +218,22 @@ class LiveEntryPlacer:
         self.enabled_fn = enabled_fn
         self.gate_fn = gate_fn or _cell_gate_state
         self.clock = clock
+        self.record_fn = record_fn or append_decision_record
         self._gate: tuple[float, Mapping[str, Any]] | None = None
 
-    def _cell_refusal(self, entry: Mapping[str, Any]) -> str | None:
+    def _cell_check(self, entry: Mapping[str, Any]) -> tuple[str | None, str | None]:
+        """(cell, refusal). cell None = the gate is off; refusal None = allowed."""
         from syndicate.features.shared import live_cell_gate as lcg
 
         if not lcg.enabled():
-            return None
+            return None, None
         now = self.clock()
         if self._gate is None or now - self._gate[0] >= CELL_GATE_CACHE_S:
             self._gate = (now, dict(self.gate_fn() or {}))
         fam = lcg.family_of({"market": str(entry.get("kind") or "spreads")})
         cell = lcg.cell_key("kalshi", str(entry.get("sport") or "nhl").lower(), fam, "in_game")
         ok, why = lcg.allows(cell, self._gate[1])
-        return None if ok else str(why)
+        return cell, (None if ok else str(why))
 
     def __call__(self, entry: Mapping[str, Any]) -> dict[str, Any]:
         if not self.enabled_fn():
@@ -224,24 +243,43 @@ class LiveEntryPlacer:
         pk = f"{POSITION_PREFIX}{ticker}:{leg}"
         spend = in_game_spend(self.orders_fn(), day)
         stake = entry_stake(ask)  # whole contracts; 1 unless SYNDICATE_INPLAY_ENTRY_ORDER_DOLLARS is set
+        cap = day_budget_dollars()
         band = _price_band()
-        cell_refusal = self._cell_refusal(entry)
-        if band is not None and not (band[0] - 1e-9 <= ask < band[1] - 1e-9):
+        cell, cell_refusal = self._cell_check(entry)
+        # EVERY guard's verdict, evaluated independently so the record holds all of them; the order of the
+        # refusals below is unchanged (the first failing guard is the reason).
+        guards: dict[str, dict[str, Any]] = {
+            "band": {"verdict": "off"} if band is None else {
+                "verdict": "pass" if band[0] - 1e-9 <= ask < band[1] - 1e-9 else "fail", "band": [band[0], band[1]]},
+            "cell_gate": {"verdict": "off"} if cell is None else {
+                "verdict": "pass" if cell_refusal is None else "fail", "cell": cell, "reason": cell_refusal},
+            "ledger": {"verdict": "fail" if pk in spend["position_keys"] else "pass"},
+            "axis": {"verdict": "fail" if game_axis(ticker) in spend["held_axes"] else "pass",
+                     "axis": "/".join(game_axis(ticker))},
+            "day_budget": {"verdict": "fail" if spend["dollars"] + stake > cap + 1e-9 else "pass",
+                           "spend": spend["dollars"], "stake": stake, "cap": cap},
+        }
+        if guards["band"]["verdict"] == "fail":
             result = {"placed": False, "reason": "outside_price_band", "band": f"[{band[0]:.2f},{band[1]:.2f})"}
         elif cell_refusal is not None:
             result = {"placed": False, "reason": cell_refusal}
-        elif pk in spend["position_keys"]:
+        elif guards["ledger"]["verdict"] == "fail":
             result = {"placed": False, "reason": "already_in_ledger_today"}
-        elif game_axis(ticker) in spend["held_axes"]:
-            result = {"placed": False, "reason": "same_game_axis_held", "axis": "/".join(game_axis(ticker))}
-        elif spend["dollars"] + stake > day_budget_dollars() + 1e-9:
+        elif guards["axis"]["verdict"] == "fail":
+            result = {"placed": False, "reason": "same_game_axis_held", "axis": guards["axis"]["axis"]}
+        elif guards["day_budget"]["verdict"] == "fail":
             result = {"placed": False, "reason": "in_game_day_budget", "spend": spend["dollars"]}
         else:
             result = dict(self.place_fn(ticker=ticker, leg=leg, ask=ask, stake=stake, line=entry.get("line"),
                                         sport=str(entry.get("sport") or "nhl"), market=str(entry.get("kind") or "spreads"),
-                                        day=day, spend=spend, game=_game_fields(entry)) or {})
+                                        day=day, spend=spend, game=_game_fields(entry),
+                                        provenance=order_provenance(entry)) or {})
+        guards["check_order"] = dict(result.pop("check_order", None) or {"verdict": "not_reached"})
+        ikey = result.pop("idempotency_key", None) or (result.get("key") if result.get("placed") else None)
+        self.record_fn(day, build_decision_record(entry, day=day, stake=stake, cap=cap, spend=spend,
+                                                  guards=guards, result=result, idempotency_key=ikey))
         print(f"[inplay_entries_live] LIVE_ENTRY ticker={ticker} leg={leg} ask={ask} stake={stake}"
-              f" edge={entry.get('edge')} day_spend={spend['dollars']}/{day_budget_dollars()} result={result}"[:500],
+              f" edge={entry.get('edge')} day_spend={spend['dollars']}/{cap} result={result}"[:500],
               flush=True)
         return result
 
@@ -273,9 +311,10 @@ def _game_fields(entry: Mapping[str, Any]) -> dict[str, Any]:
 
 def _place_live(*, ticker: str, leg: str, ask: float, stake: float, line: Any, day: str,
                 sport: str = "nhl", market: str = "spreads",
-                spend: Mapping[str, Any], game: Mapping[str, Any] | None = None) -> dict[str, Any]:
+                spend: Mapping[str, Any], game: Mapping[str, Any] | None = None,
+                provenance: Mapping[str, Any] | None = None) -> dict[str, Any]:
     from syndicate.features.shared.execution_guard import check_order, guarded_submit
-    from syndicate.features.shared.execution_ledger import LIVE, OrderRequest, place_order
+    from syndicate.features.shared.execution_ledger import LIVE, OrderRequest, idempotency_key, place_order
     from syndicate.features.shared.kalshi_orders import kalshi_submitter
 
     g = dict(game or {})
@@ -287,20 +326,118 @@ def _place_live(*, ticker: str, leg: str, ask: float, stake: float, line: Any, d
         requested_price=ask, requested_stake_dollars=stake,
         line=None if order_line is None else float(order_line), book="kalshi", venue_ticker=ticker,
         home_team=g.get("home_team"), away_team=g.get("away_team"), commence_time=g.get("commence_time"),
+        staked_probability_version=(provenance or {}).get("staked_probability_version"),
+        sizing_basis=(provenance or {}).get("sizing_basis"),
     )
+    # The ledger's own key for this request: the decision record joins the ledger row on it.
+    ikey = idempotency_key(request)
     # The contract must not change because the label did: refuse if the human side maps to another leg.
     from syndicate.features.shared.kalshi_orders import _side_to_kalshi
 
     if _side_to_kalshi(request.side, request.market, request.line) != leg:
-        return {"placed": False, "reason": f"side_relabel_mismatch: {request.side}/{request.line} != {leg}"}
+        return {"placed": False, "reason": f"side_relabel_mismatch: {request.side}/{request.line} != {leg}",
+                "idempotency_key": ikey}
     verdict = check_order(request, mode=LIVE, already={"dollars": spend["dollars"], "orders": spend["orders"]})
+    checked = {"verdict": "pass" if verdict.get("allowed") else "fail", "reason": verdict.get("reason")}
     if not verdict.get("allowed"):
-        return {"placed": False, "reason": verdict.get("reason")}
+        return {"placed": False, "reason": verdict.get("reason"), "idempotency_key": ikey, "check_order": checked}
     submit = guarded_submit(ioc_submitter(kalshi_submitter(LivePrice(ask, leg))))
     try:
         record = place_order(request, submit=submit, mode=LIVE)
     except Exception as exc:  # noqa: BLE001 -- a raised send is kept as failed by the ledger
-        return {"placed": False, "reason": f"{type(exc).__name__}: {exc}"[:200]}
+        return {"placed": False, "reason": f"{type(exc).__name__}: {exc}"[:200], "idempotency_key": ikey,
+                "check_order": checked}
     if record.get("recorded") is False:
-        return {"placed": False, "reason": str(record.get("reason") or record.get("error") or "build_refused")}
-    return {"placed": True, "status": record.get("status"), "key": record.get("idempotency_key")}
+        return {"placed": False, "reason": str(record.get("reason") or record.get("error") or "build_refused"),
+                "idempotency_key": ikey, "check_order": checked}
+    return {"placed": True, "status": record.get("status"), "key": record.get("idempotency_key"),
+            "idempotency_key": record.get("idempotency_key") or ikey, "check_order": checked}
+
+
+# --------------------------------------------------------------------------- the decision record
+
+
+def order_provenance(entry: Mapping[str, Any]) -> dict[str, str]:
+    """What the ledger row carries about its decision, in the pregame fields (`OrderRequest`, todo #722)."""
+    from syndicate.features.shared.inplay_entries_paper import FAIR_VERSION
+
+    return {"staked_probability_version": f"inplay:{entry.get('fair_version') or FAIR_VERSION}",
+            "sizing_basis": "inplay_one_contract" if order_dollars() is None else "inplay_order_dollars"}
+
+
+def build_decision_record(entry: Mapping[str, Any], *, day: str, stake: float, cap: float, spend: Mapping[str, Any],
+                          guards: Mapping[str, Any], result: Mapping[str, Any],
+                          idempotency_key: str | None = None) -> dict[str, Any]:
+    """ONE live in-play decision, placed or refused. PURE apart from reading the sizing env."""
+    from syndicate.features.shared.inplay_entries_paper import FAIR_VERSION, rule_params
+
+    ticker, leg, ask = str(entry["ticker"]), str(entry["leg"]), float(entry["ask"])
+    sport = str(entry.get("sport") or "nhl")
+    prov = order_provenance(entry)
+    unit = ask + MAX_PRICE_MOVE
+    return {
+        "version": RECORD_VERSION,
+        "decided_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "selected_date": day,
+        "decision_id": entry.get("key"),  # the paper entry's key: <day>:<ticker>:<leg>
+        "idempotency_key": idempotency_key,  # the ledger row's key; None when no order request was built
+        "position_key": f"{POSITION_PREFIX}{ticker}:{leg}",
+        "venue": "kalshi", "venue_ticker": ticker, "leg": leg, "sport": sport, "kind": entry.get("kind"),
+        "line": entry.get("line"), "team": entry.get("team"),
+        "game": _game_fields(entry),
+        "fair": {"p": entry.get("fair"), "version": entry.get("fair_version") or FAIR_VERSION,
+                 "n_books": entry.get("n_books"), "edge": entry.get("edge"), "fee": entry.get("fee"),
+                 "since_score_s": entry.get("since_score_s"), "mid_move_60s": entry.get("mid_move_60s"),
+                 "rule": rule_params(sport), "booked_at": entry.get("at")},
+        "ask": ask,
+        "guards": dict(guards),
+        "sizing": {"version": SIZING_VERSION, "basis": prov["sizing_basis"], "order_dollars": order_dollars(),
+                   "order_dollars_ceiling": ORDER_DOLLARS_CEILING, "stake": stake,
+                   "contracts": max(1, round(stake / unit)) if unit > 0 else None,
+                   "day_cap": cap, "day_cap_ceiling": DAY_DOLLARS_CEILING,
+                   "day_spend_before": spend.get("dollars"), "day_orders_before": spend.get("orders")},
+        "staked_probability_version": prov["staked_probability_version"],
+        "result": dict(result),
+    }
+
+
+def records_path(day: str, root: Path | None = None) -> Path:
+    """`<data root>/reports/intelligence/decision_records/<day>.inplay.jsonl`, beside the pregame records."""
+    from syndicate.features.shared.decision_record import records_dir
+
+    return records_dir(root) / f"{day}.inplay.jsonl"
+
+
+def append_decision_record(day: str, record: Mapping[str, Any], root: Path | None = None) -> None:
+    """Append one line. Never raises into the placer: the order has already been decided (or sent)."""
+    try:
+        path = records_path(day, root)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(dict(record), separators=(",", ":"), default=str) + "\n")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[inplay_entries_live] DECISION_RECORD_WRITE_FAILED day={day} key={record.get('idempotency_key')}"
+              f" error={type(exc).__name__}: {exc}"[:300], flush=True)
+
+
+def read_decision_records(day: str, root: Path | None = None) -> list[dict[str, Any]]:
+    """Every line of a day's in-play records, in write order. A torn line is skipped."""
+    try:
+        text = records_path(day, root).read_text(encoding="utf-8")
+    except OSError:
+        return []
+    out = []
+    for raw in text.splitlines():
+        try:
+            rec = json.loads(raw)
+        except ValueError:
+            continue
+        if isinstance(rec, dict):
+            out.append(rec)
+    return out
+
+
+def records_by_idempotency_key(days: Sequence[str], root: Path | None = None) -> dict[str, dict[str, Any]]:
+    """{ledger idempotency_key: record} over `days`: the join for settled in-play fills."""
+    return {str(r["idempotency_key"]): r for d in days for r in read_decision_records(d, root)
+            if r.get("idempotency_key")}

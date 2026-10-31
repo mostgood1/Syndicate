@@ -19,6 +19,7 @@ ENTRY = {"key": f"{DAY}:KXNHLSPREAD-26OCT22TORCBJ-TOR2:yes", "ticker": "KXNHLSPR
 @pytest.fixture(autouse=True)
 def _env(monkeypatch, tmp_path):
     monkeypatch.setenv("SYNDICATE_REPORTS_ROOT", str(tmp_path))
+    monkeypatch.setenv("SYNDICATE_DATA_ROOT", str(tmp_path))  # decision records land under the data root
     for k in ("SYNDICATE_INPLAY_ENTRIES", "SYNDICATE_INPLAY_ENTRY_DAY_DOLLARS", "SYNDICATE_EXECUTION_MODE",
               "SYNDICATE_EXECUTION_LIVE_ARMED", "SYNDICATE_KALSHI_EXPIRE_AT_KICKOFF", "SYNDICATE_LIVE_PRICE_BAND", "SYNDICATE_LIVE_CELL_GATE",
               "SYNDICATE_INPLAY_ENTRY_ORDER_DOLLARS", "SYNDICATE_KALSHI_ROUND_UP_MIN_DOLLARS"):
@@ -123,7 +124,8 @@ def test_place_live_refusal_sends_nothing(monkeypatch):
     monkeypatch.setattr(execution_ledger, "place_order", lambda *a, **k: pytest.fail("sent after a refusal"))
     out = live._place_live(ticker=ENTRY["ticker"], leg="yes", ask=0.30, stake=0.31, line=1.5, day=DAY,
                            spend={"dollars": 0.0, "orders": 0})
-    assert out == {"placed": False, "reason": "kill_switch"}
+    assert out["placed"] is False and out["reason"] == "kill_switch"
+    assert out["check_order"] == {"verdict": "fail", "reason": "kill_switch"} and len(out["idempotency_key"]) == 24
 
 
 def test_place_live_feeds_the_in_game_spend_to_the_guard(monkeypatch):
@@ -141,7 +143,8 @@ def test_place_live_feeds_the_in_game_spend_to_the_guard(monkeypatch):
                         lambda req, **k: {"status": "submitted", "idempotency_key": "k1"})
     out = live._place_live(ticker=ENTRY["ticker"], leg="yes", ask=0.30, stake=0.31, line=1.5, day=DAY,
                            spend={"dollars": 3.0, "orders": 2})
-    assert out == {"placed": True, "status": "submitted", "key": "k1"}
+    assert {k: out[k] for k in ("placed", "status", "key", "idempotency_key")} == {
+        "placed": True, "status": "submitted", "key": "k1", "idempotency_key": "k1"}
     assert seen["already"] == {"dollars": 3.0, "orders": 2} and seen["stake"] == 0.31
 
 
@@ -353,3 +356,117 @@ def test_order_dollars_still_bounded_by_the_day_budget(monkeypatch):
     out = p(ENTRY)
     assert out["placed"] is False and out["reason"] == "in_game_day_budget" and calls == []
 
+
+
+# --------------------------------------------------------------------------- the decision record (item (e))
+
+BOOKED = {**ENTRY, "key": ENTRY["key"], "sport": "nhl", "kind": "spreads", "fair": 0.38, "fair_version": ip.FAIR_VERSION,
+          "n_books": 4, "fee": 0.0147, "team": "TOR", "at": "2026-10-22T23:50:00Z", "since_score_s": 400,
+          "mid_move_60s": 0.01, "event_id": "oddsapi-ev-9", "home_team": "Columbus Blue Jackets",
+          "away_team": "Toronto Maple Leafs", "commence_time": "2026-10-22T23:00:00Z", "order_side": "away",
+          "order_line": -1.5}
+
+
+def test_a_placed_entry_joins_the_ledger_row_by_its_idempotency_key(monkeypatch):
+    """Through the REAL _place_live: the record's key is the ledger's key for the very request sent."""
+    from syndicate.features.shared import execution_guard, execution_ledger
+
+    monkeypatch.setenv("SYNDICATE_LIVE_PRICE_BAND", "0.20,0.75")
+    monkeypatch.setenv("SYNDICATE_INPLAY_ENTRY_ORDER_DOLLARS", "3")
+    sent = {}
+    monkeypatch.setattr(execution_guard, "check_order", lambda r, **kw: {"allowed": True})
+    monkeypatch.setattr(execution_ledger, "place_order", lambda req, **k: sent.update(req=req) or {
+        "status": "submitted", "idempotency_key": execution_ledger.idempotency_key(req)})
+    p = live.LiveEntryPlacer(today_fn=lambda: DAY, orders_fn=lambda: [], enabled_fn=lambda: True)
+    out = p(BOOKED)
+    assert out["placed"] is True and "check_order" not in out and "idempotency_key" not in out  # paper doc shape kept
+    (rec,) = live.read_decision_records(DAY)
+    req = sent["req"]
+    assert rec["idempotency_key"] == execution_ledger.idempotency_key(req) == out["key"]
+    assert req.staked_probability_version == f"inplay:{ip.FAIR_VERSION}" == rec["staked_probability_version"]
+    assert req.sizing_basis == "inplay_order_dollars" == rec["sizing"]["basis"]
+    assert rec["fair"]["p"] == 0.38 and rec["fair"]["version"] == ip.FAIR_VERSION and rec["fair"]["n_books"] == 4
+    assert rec["fair"]["rule"]["min_edge"] == ip.MIN_EDGE and rec["fair"]["rule"]["score_quiet_s"] == 180.0
+    assert (rec["ask"], rec["leg"], rec["position_key"]) == (0.30, "yes", f"ingame:{ENTRY['ticker']}:yes")
+    assert rec["sizing"]["version"] == live.SIZING_VERSION and rec["sizing"]["stake"] == 2.7901
+    assert rec["sizing"]["contracts"] == 9 and rec["sizing"]["order_dollars"] == 3.0 and rec["sizing"]["day_cap"] == 50.0
+    assert set(rec["guards"]) == {"band", "cell_gate", "ledger", "axis", "day_budget", "check_order"}
+    assert rec["guards"]["band"] == {"verdict": "pass", "band": [0.20, 0.75]}
+    assert rec["guards"]["cell_gate"] == {"verdict": "off"}
+    assert rec["guards"]["check_order"] == {"verdict": "pass", "reason": None}
+    assert rec["game"]["event_id"] == "oddsapi-ev-9" and rec["result"]["placed"] is True
+    assert live.records_by_idempotency_key([DAY])[out["key"]]["decision_id"] == ENTRY["key"]
+
+
+def test_a_refusal_records_every_guard_not_only_the_first(monkeypatch):
+    monkeypatch.setenv("SYNDICATE_LIVE_PRICE_BAND", "0.40,0.75")
+    held = {"position_key": f"ingame:{ENTRY['ticker']}:yes", "venue_ticker": ENTRY["ticker"], "selected_date": DAY,
+            "status": "filled", "fill_stake_dollars": 49.9}
+    recs: list = []
+    p = live.LiveEntryPlacer(today_fn=lambda: DAY, orders_fn=lambda: [held], enabled_fn=lambda: True,
+                             place_fn=lambda **kw: pytest.fail("placed a refusal"), record_fn=lambda d, r: recs.append(r))
+    out = p(BOOKED)
+    assert out["reason"] == "outside_price_band"  # the first refusal is still THE reason
+    (rec,) = recs
+    g = rec["guards"]
+    assert [g[k]["verdict"] for k in ("band", "ledger", "axis", "day_budget")] == ["fail"] * 4
+    assert g["check_order"] == {"verdict": "not_reached"} and rec["idempotency_key"] is None
+    assert rec["sizing"]["basis"] == "inplay_one_contract" and rec["sizing"]["day_spend_before"] == 49.9
+
+
+def test_off_writes_no_record_and_a_failed_write_never_raises(monkeypatch, tmp_path):
+    p = live.LiveEntryPlacer(today_fn=lambda: DAY, orders_fn=lambda: [], enabled_fn=lambda: False)
+    p(BOOKED)
+    assert live.read_decision_records(DAY) == []
+    blocker = tmp_path / "file"
+    blocker.write_text("x")
+    live.append_decision_record(DAY, {"idempotency_key": "k"}, root=blocker)  # mkdir under a file fails: logged only
+    assert live.read_decision_records(DAY, root=blocker) == []
+
+
+def test_records_live_beside_the_pregame_records_and_web_may_read_them(tmp_path):
+    from syndicate.features.shared import artifact_publisher as ap
+    from syndicate.features.shared import decision_record as dr
+
+    path = live.records_path(DAY)
+    assert path.parent == dr.records_dir() and path.name == f"{DAY}.inplay.jsonl"
+    rel = path.relative_to(tmp_path).as_posix()
+    assert ap.is_exportable_artifact_relative_path(rel) and not ap.is_hot_artifact_relative_path(rel)
+    path.parent.mkdir(parents=True)
+    path.write_text('{"idempotency_key":"a","n":1}\n{torn\n{"idempotency_key":"a","n":2}\n', encoding="utf-8")
+    assert live.records_by_idempotency_key([DAY])["a"]["n"] == 2  # last line wins; a torn line is skipped
+
+
+def test_the_paper_booking_carries_the_fair_version(monkeypatch):
+    from tests import test_inplay_entries_paper as tp
+
+    monkeypatch.setenv("ODDS_API_KEY", "test-key-not-real")
+    ts = [tp.T0, tp.T0 + 200, tp.T0 + 220]
+    m = [tp._market(), tp._other()]
+    loop, advance = tp._loop([m, m, m], [("in", ("1", "0"))], ts, [])
+    for i in range(3):
+        advance(i)
+    (e,) = loop.doc["entries"].values()
+    assert e["fair_version"] == ip.FAIR_VERSION
+    assert live.order_provenance(e)["staked_probability_version"] == f"inplay:{ip.FAIR_VERSION}"
+
+
+def test_the_gate_reading_script_reads_what_the_placer_writes():
+    """scripts/inplay_decision_record_join.py is self-contained (it runs on older fleet checkouts): its reader must
+    agree with the writer's path and format."""
+    import importlib.util
+    from pathlib import Path
+
+    spec = importlib.util.spec_from_file_location(
+        "inplay_join", Path(__file__).resolve().parents[1] / "scripts" / "inplay_decision_record_join.py")
+    join = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(join)
+    recs: list = []
+    p = live.LiveEntryPlacer(today_fn=lambda: DAY, orders_fn=lambda: [], enabled_fn=lambda: True,
+                             place_fn=lambda **kw: {"placed": True, "status": "submitted", "key": "ledger-key-1"})
+    p(BOOKED)
+    got = join.read_inplay_records(live.records_path(DAY).parent, DAY)
+    assert set(got) == {"ledger-key-1"} and got["ledger-key-1"]["fair"]["version"] == ip.FAIR_VERSION
+    assert join.phase({"submitted_at": "2026-10-22T23:50:00Z", "commence_time": "2026-10-22T23:00:00Z"}) == "in_play"
+    assert join.phase({"submitted_at": "2026-10-22T22:50:00Z", "commence_time": "2026-10-22T23:00:00Z"}) == "pregame"
+    assert join.phase({"submitted_at": "2026-10-22T22:50:00Z"}) == "in_play_no_commence"

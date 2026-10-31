@@ -42,6 +42,10 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Any, Callable, Mapping, Sequence
 
+# THE FAIR'S VERSION, stamped on every booked entry and carried into the live decision record
+# (`inplay_entries_live.build_decision_record`) and onto the ledger row as `staked_probability_version`.
+# Bump it whenever `book_fair` or the rule constants below change what probability an entry is priced at.
+FAIR_VERSION = "inplay_book_median_novig/1"
 MIN_EDGE = 0.03
 MIN_BOOKS = 3
 MAX_BOOK_QUOTE_AGE_S = 120.0
@@ -264,6 +268,13 @@ def decide(
             best = {"leg": leg, "ask": ask, "fair": round(p, 4), "edge": round(edge, 4), "n_books": n,
                     "team": team, "line": line, "kind": kind}
     return best
+
+
+def rule_params(sport: str) -> dict[str, Any]:
+    """The rule constants an entry for `sport` was decided under (`decide` with no overrides). PURE."""
+    return {"min_edge": MIN_EDGE, "min_books": MIN_BOOKS, "max_book_quote_age_s": MAX_BOOK_QUOTE_AGE_S,
+            "max_book_poll_age_s": MAX_BOOK_POLL_AGE_S, "mid_max_move": MID_STABLE_MAX_MOVE,
+            "score_quiet_s": (SPORTS.get(sport) or {}).get("score_quiet_s", SCORE_QUIET_S), "ask_lo": 0.05, "ask_hi": 0.95}
 
 
 def leg_mid(market: Mapping[str, Any], leg: str) -> float | None:
@@ -511,7 +522,7 @@ class PaperEntryLoop:
             if refused is None:
                 entries[key] = {
                     "day": day, "t": t, "at": _iso(t), "ticker": tk, "leg": d["leg"], "ask": d["ask"],
-                    "fee": round(taker_fee_one(d["ask"]), 4), "fair": d["fair"], "edge": d["edge"],
+                    "fee": round(taker_fee_one(d["ask"]), 4), "fair": d["fair"], "fair_version": FAIR_VERSION, "edge": d["edge"],
                     "n_books": d["n_books"], "line": d["line"], "team": d["team"], "kind": d["kind"],
                     "sport": sport,
                     # The game, the way pregame orders carry it (portfolio display + R2 per-game pooling):
