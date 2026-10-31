@@ -988,3 +988,43 @@ participation signal (pre-tip news, step 2a), not more minutes.
 
 **Out of scope:** coach DNP participation (needs news); REAL_ONLY (6.19); production. Production gets fields only via
 `nba_engine_config.json` after the forward test from 11-01.
+
+**STEP 3b STAGE A — RESULT 2026-10-31 22:08Z (17:08 CDT). VERDICT: FAIL (D1; D3 by 0.03). Stage B is NOT built.**
+
+`r2s/stage3b.py` → `stage3b.json`, `stage3b.out`; nice 19, about 20 min. 1,604 team-games, TRAIN 8,324 / TEST 7,993
+rows, 1,674 coach-DNP slots (matching step 2a). No bin pooled.
+
+**Fit (TRAIN):** β = **0.85** (loss minimum; 0.82 and 0.88 either side). Re-fit σ: < 6 1.10 · 6–12 0.75 · 12–20 0.45
+· 20–28 0.20 · ≥ 28 0.10 (step 3: 1.05 / 0.90 / 0.50 / 0.20 / 0.00).
+
+| TEST (Jan–Feb) | fit_inj | β only | β + σ | gate |
+|---|---|---|---|---|
+| min bias bench / starter | +1.20 / −0.27 | **+0.53 / +0.66** | +0.66 / +0.48 | D1 ≤ 0.5 both: **FAIL** |
+| min bias ≥ 28 | −1.13 | +0.07 | −0.14 | D1 ≤ 0.5: pass |
+| bench miss / width | .551 / 2.00 | .543 / 1.92 | **.241 / 0.98** | V1, V2 pass |
+| starter miss / width | .324 / 1.22 | .362 / 1.25 | **.180 / 0.97** | V1, V2 pass |
+| starter tails lo / hi | .163 / .161 | .140 / .222 | **.101 / .079** | V3 pass (step 3: .133 / .065) |
+| bench tails lo / hi | .237 / .314 | .263 / .280 | .117 / .124 | V3 pass |
+| pts / reb / ast / threes miss | .303 / .287 / .262 / .231 | .300 / .279 / .253 / .233 | .264 / .246 / .239 / .222 | V4 pass |
+| coach-DNP sim min / team-game | 9.30 | **10.33 (+1.03)** | 10.11 (+0.81) | D3 ≤ +1.0 on the larger: **FAIL** |
+
+**Predictions:** β in [0.6, 0.9] — held (0.85). < 6 keeps a positive bias — held (+3.5 β only, +3.7 combined).
+Starter tails balance in the combined arm — held (.101 / .079). Low-cell σ comes out smaller than step 3's — held
+for 6–12 (0.75 vs 0.90) and 12–20; NOT for < 6 (1.10 vs 1.05).
+
+**Why D1 cannot pass with any redistribution (descriptive, read after the verdict).** Minutes are conserved per team:
+the sim hands out the team's minutes over the WHOLE pool, coach-DNP slots included, while the graded population is
+only players who played. So the played population's summed bias is fixed by how many sim minutes go to players who
+then sit (about 9.3 per team-game, plus ABSENT 1.2, minus REAL_ONLY 6.2), whatever the shape. A redistribution moves
+the bias BETWEEN roles but cannot remove it; worse, flattening gives the low-m players more, and those are the ones
+who sit, so the played population's total bias goes UP (+1.03 DNP min per team-game ≈ the observed rise). β fixed the
+≥ 28 overallocation (−1.13 → +0.07) and moved the starter role's bias from −0.27 to +0.66 (top-5-by-input includes
+20–28 starters, who lose minutes). This is a constraint of the target, not a failure of the power form, so the
+pre-registered D1 reading ("next: per-cell shift") is disclosed as NOT applicable — a per-cell shift is bound by the
+same sum. The D3 reading applies: the low-cell bias is selection and needs the participation signal (step 2a, news).
+
+**What the run does show (not a verdict):** the combined arm (β 0.85 + re-fit σ) passes all of step 3's V1–V4 on TEST,
+including the starter tail balance that failed step 3. Adopting it would mean changing the gates after reading TEST,
+so it is not adopted here. The honest route is a NEW pre-registration of exactly that arm (β 0.85, this σ table,
+frozen now) graded on data no fit has seen: the 2026-27 forward window from 11-01.
+- Not done: no engine code, no switch file, no sim run.
