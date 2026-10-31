@@ -646,6 +646,14 @@ death, never life — do not invert it.
 - Verification: fleet book_quotes shards for NFL props and soccer btts and alternate_totals_corners carry bookmaker=pinnacle rows fetched after the ff; x-requests-last per prop call unchanged; recorded in deploys.md
 - Blocked by: none
 
+### maker-pilot-fair-cancel — OPEN — opened 2026-10-31 — session 9683e8c4-02ff-45b7-8c47-ae932f103e33
+- Goal: Resting Kalshi maker-pilot posts are cancelled when the plan's current fair minus the resting price falls below +1pp, or when a later plan pass drops the position; live on the fleet with a FAIR_CANCEL/FAIR_PASS log line read back
+- Files: syndicate/features/shared/kalshi_maker_pilot.py, syndicate/features/shared/execution_ledger.py (cancel_stale_resting_orders maker_pilot branch + the reconcile resting-row dict market/line fields ONLY), tests/test_kalshi_maker_pilot_fair_cancel.py (NEW)
+- Hypothesis: n/a (build; evidence in findings_2026-10-31_maker_pilot_review.md)
+- Falsification test: n/a
+- Verification: unit tests incl. off!=on reachability; fleet log shows MAKER_PILOT FAIR_PASS lines after the restart, and any FAIR_CANCEL is followed by an EXPIRE from reconcile
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
