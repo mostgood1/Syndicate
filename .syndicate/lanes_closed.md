@@ -13686,3 +13686,15 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 1 SAFE of 6 CLOSED; dry run, invariants (no new FAIL vs baseline), apply.
 - Moved: closed-lane-archive-20261030-1840. Table and WAIT reasons in `log/2026-10-31.md`.
+
+### closed-lane-archive-20261031-0240 — CLOSED 2026-10-31 (GOAL MET: 1 block archived) — opened 2026-10-31 — session 3bf47af2-419c-4649-b2b4-3ac129b80d99
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 1 SAFE of 6 CLOSED; dry run, invariants (no new FAIL vs baseline), apply.
+- Moved: closed-lane-archive-20261030-2040. Table and WAIT reasons in `log/2026-10-31.md`.
+
+### closed-lane-archive-20261031-0440 — CLOSED 2026-10-31 (GOAL MET: 2 blocks archived) — opened 2026-10-31 — session e4c3fac4-325a-4a46-90f1-6697455e68c3
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 read SAFE for 2; both moved to lanes_closed.md with one pointer each; check_lane_invariants unchanged vs origin/main baseline.
+- Moved: `paper-evicted-grading`, `closed-lane-archive-20261030-2240`. Table and WAIT reasons: `.syndicate/log/2026-10-31.md` 09:42Z.
