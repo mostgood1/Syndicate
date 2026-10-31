@@ -3120,3 +3120,10 @@ The 2026-10-20 entry said: "Rating INPUTS transfer, because the sim reads them w
 
 ## Check origin/main lanes before building on a user's "go" `[2026-10-31, lane live-cell-scorecard]`
 The user said "go with the cancel rule" here AND "Yes, build it" in another session; that session's lane claimed the file on origin/main ~20 min before I started, and I wrote ~330 lines before the lane guard (on my SECOND edit) stopped me. A user yes given in one chat is often also given in another. **Rule:** before building on a decision, grep `origin/main:.syndicate/lanes.md` for the target file and the decision's subject -- not the local copy, which was 12 commits behind.
+
+## 2026-10-31 — An hourly endpoint sample is not a freeze: read the WRITER's flip lines before diagnosing staleness `[lane board-midnight-date-skew, session c634d0c4]`
+- **Belief overturned:** "the Layer 2 board freezes ~1.5 h at midnight CT, from a UTC/CT clock skew."
+  - In fact the worker flipped the new date's index every 6-9 min from 05:06Z.
+  - The watcher's curl runs hourly at :05. The 05:05:04Z sample fell 77 s before the first post-roll build, so it saw the 04:27Z look-ahead build.
+  - The next sample was an hour later. Two points an hour apart read as 1.5 h stale. Two nights in a row showed the same shape.
+- **Rule:** before diagnosing a stale board, list the writer's own flip lines (`LAYER2_SHARD_GENERATION_DROPPED date=<D>`) across the window. A sampler's cadence bounds the staleness it can resolve. A post-roll `SKIPPED_NON_TODAY` for the look-ahead date, or for the prior date, is correct, not evidence of skew.
