@@ -55186,3 +55186,53 @@ which is about the two sizing bases and not about the refusal boundary.
 - **verify owed by ride-along lanes:**
   - live-odds-memory-spikes: peak RSS of the soccer refresh_odds_sources child and the live-odds container_memory_pct.
   - pinnacle-prop-swap: Pinnacle prop rows in the NFL/soccer book_quotes shards after 21:03:20Z, and x-requests-last per prop call unchanged.
+
+## 2026-10-31 21:56Z (4:56 PM CT) -- MEASUREMENT for 2026-10-31 21:03:20Z (fleet ff 413a08d5 -> 87ecf730, ride-along `b3cf9b013` pinnacle-prop-swap): Pinnacle prop quotes LAND for NFL and soccer, and no prop call bills above one region -- **VERIFIED** (lane pinnacle-prop-swap)
+- **User, verbatim (this session e32fef1a):**
+  - "Yes, swap".
+  - Then "Yes, ship all", on "Update the fleet now, carrying the other two changes with it?".
+  - By then lane maker-pilot-fair-cancel had already made the ff (entry above, with the user's "Yes, include it" for this ride-along in session 684b1d). This session made NO deploy and took no claim.
+- **What went live:** `PROP_BOOKMAKERS["nfl"]` and `["soccer"]` have `pinnacle` in `williamhill_us`'s slot (10 books each). Both fetchers are fresh processes per run, so the ff alone made it live.
+- **Reading 1: quotes** (`verify_pinnacle_props.py`, fleet `book_quotes` via `iter_book_quotes`, refresh-worker env NUL-split; kickoff shards 10-31..11-03; split at `captured_at` 21:03:20Z):
+
+  | sport | rows before the ff | Pinnacle before | rows after (to 21:38Z) | Pinnacle after | williamhill_us after |
+  |---|---|---|---|---|---|
+  | NFL props | 117,157 | **0** | 3,037 (20 Kalshi) | **1,106** | 0 |
+  | soccer props + btts/corners | 647,552 | **0** | 11,003 (26 Polymarket) | **622** | 0 |
+
+  - **NFL**, first OddsAPI prop fetch after the ff (21:35Z), 183 players and 13 events:
+
+    | market | Pinnacle rows |
+    |---|---|
+    | receiving yards | 274 |
+    | receptions | 274 |
+    | anytime TD | 188 |
+    | rushing yards | 140 |
+    | rushing attempts | 80 |
+    | passing attempts | 50 |
+    | passing TDs | 50 |
+    | passing yards | 50 |
+
+    betonlineag is still there (175 rows), kept for the alt ladders.
+  - **Soccer**, from the first run (21:06Z), 44 events:
+
+    | market | Pinnacle rows |
+    |---|---|
+    | `alternate_totals_corners` | 488 |
+    | `btts` | 116 |
+    | `player_goal_scorer_anytime` | 18 |
+- **Reading 2: cost per call** (`sample_prop_call_cost.py`):
+  - **Method:** the quota document's `latest` observation was sampled once a second, 21:08:52Z..21:53:55Z.
+  - **Capture is incomplete:** a call shows up only if it was the newest observation at a sample tick.
+  - **Calls seen with Pinnacle in the list:**
+
+    | sport | calls | markets asked | `x-requests-last` max | mean |
+    |---|---|---|---|---|
+    | NFL | 6 | 9 | 9 | 4.5 |
+    | soccer | 217 | 10 | 10 | 3.69 |
+
+  - **0 calls billed above the markets asked.** OddsAPI bills per market returned, per region, so a second region would allow up to twice the markets.
+  - All lists had exactly 10 books. `williamhill_us` was in 0 of those lists.
+  - **No pre-ff per-call sample exists** (the recorder keeps totals only), so this is the one-region bound, not a before/after diff.
+- **Not measured here:** new P2 paper bets in these cells grading with a `sharp_close`. That reading belongs to the gate-clock reads of lane `syndicate-decision-engine` / `decision-policy-paper`. NFL's first Sunday closes are 11-01, from 12:00 PM CT.
+- **Claims:** none taken or released by this lane.
