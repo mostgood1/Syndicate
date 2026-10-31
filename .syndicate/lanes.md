@@ -654,6 +654,14 @@ death, never life — do not invert it.
 - Verification: unit tests incl. off!=on reachability; fleet log shows MAKER_PILOT FAIR_PASS lines after the restart, and any FAIR_CANCEL is followed by an EXPIRE from reconcile
 - Blocked by: none
 
+### close-p6-owner-lanes — OPEN — opened 2026-10-31 — session eb9e3103-f175-4511-be0b-c4b7605e406f
+- Goal: The 3 OPEN lanes owned by unreachable session 2d413211 (nba-live-tick-native, wnba-fixture-identity-native, wnba-live-period-lines-native) are CLOSED per the user's 2026-10-31 approval and archived to lanes_closed.md, the 2027 WNBA reads carried by a new todo; 0 other lanes' content or claims change
+- Files: docs/ai_context/todo.md (new hand-off item only)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: census drops by 3 OPEN; claims removed belong only to the 3 slugs; every pre-edit lanes.md line is in lanes.md or lanes_closed.md
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
