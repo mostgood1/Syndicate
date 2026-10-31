@@ -370,23 +370,19 @@ death, never life — do not invert it.
 - **STATUS 2026-10-20 16:38Z (11:38 AM CT): RECORDING MET, GRADING OWED.** `1006cb75` on the fleet (ff 16:04:36Z, refresh-worker TERM 16:18:24Z after a save, new pid 2971523). First build: 17 tagged paper rows (paper 9, paper:novig 3, paper:prophetx 5), 0 REFUSED_LIVE_INLINE; live unchanged (554 rows, env same). Owed: graded count after the 10-21 settlement pass + first tagged paper:kalshi/polymarket row. Follow-up (other lane's file): min_ev tuner counts a live bet and its paper twin twice -- proposed as its own session; hand-over in the b87af0fc notes folder.
 
 ### in-game-trading — OPEN — opened 2026-10-20 — session 15ceeb14-5d5b-47c4-9b84-e483511d5716
-- **LOAN NOTE 2026-10-28 -- LOAN OUT to lane `live-min-stake-five` (coordinator 332cb014), USER-APPROVED in that chat ("Step up now": about $3 per in-game order, $50/day cap kept, behind a switch):** `syndicate/features/shared/inplay_entries_live.py` -- NEW `ORDER_DOLLARS_CEILING` / `order_dollars()` / `entry_stake()` and the one `stake =` line in `LiveEntryPlacer.__call__` ONLY; `tests/test_inplay_entries_live.py` -- 3 new tests + 2 env keys in the autouse fixture. Absent `SYNDICATE_INPLAY_ENTRY_ORDER_DOLLARS` = the original 1 contract, byte-identical stake. Returned on landing.
+- GOAL (verbatim): Measured in-play venue-vs-book edge on NBA/NHL (read-only) and a staged in-game trading plan (held-position loop, in-game fair price, in-play entries, Polymarket in-play rule, one-engine fit) in a findings file, each stage with its user decision -- GOAL: MET (2026-10-21, findings §6); lane stays OPEN for the follow-ons below.
 - Goal: Measured in-play venue-vs-book edge on NBA/NHL (read-only) and a staged in-game trading plan (held-position loop, in-game fair price, in-play entries, Polymarket in-play rule, one-engine fit) in a findings file, each stage with its user decision
-- **GOAL: MET** (2026-10-21 04:45Z).
   - Reading: findings §6 markout +300 s -1.26c (CI -1.80..-0.72, n=1,613) over 23:09Z-04:39Z, 11 games. Plan §3 has stages 1-5, each with its user decision; todo #715. Main 796e55f5.
   - **Hypothesis FALSIFIED** for book-consensus fairs: positive sides exist (19.7%) but mark out negative, and Kalshi leads.
-  - STATUS 2026-10-23 12:54Z:
-    - Fast exits are LIVE (6 live sales on 10-22 night).
-    - The paper entry rule is LOSING (markout -5.2c, settled ~-8c/ct, n=24).
-    - LIVE entries are BUILT (437a6249) and OFF (switch absent; switch-on refused by the classifier; the user chose to leave it off).
-    - The entry-rule sweep (5a54f3ba) finds no config positive out of sample.
-    - Stage 2 is running nightly (local_8d3e969b); NHL score/time fair is NO-GO (0eb66ed0).
-    - Take-profit margin is now 0.10 with a hold at bid >= 0.90 (coordinator, 00:28Z 10-23).
+  - STATUS 2026-10-31 21:10Z (supersedes 10-23):
+    - LIVE in-game entries are ON: ~$3/order, $100/day cap, band [0.40,0.75), live cell gate on (fail closed); fleet code 5f813c4d since 10-28 15:12Z (coordinator reading).
+    - Realised: -15% ROI over nights 10-23/10-24 (64 fills, findings §10/§13). Later nights not yet read.
+    - Test C late cells: no GO (§12). R3 95-99c paper cell: INSUFFICIENT 67/150 games, -3.2c/game (§15); accrues nightly to 12-31.
   - Kept OPEN for:
-    - (a) a better FAIR (the gates are not the problem; findings §9);
-    - (b) the nightly sweep beside the scoreboard (asked of local_8d3e969b);
-    - (c) re-running the walk-forward at >= 5 nights before any rule change ships or the switch is revisited;
-    - (d) the fast-vs-slow-vs-hold settled read (first 4 sales: ~-$1.29 vs hold).
+    - (e) NEXT: the in-play DecisionRecord join handed here by syndicate-decision-engine (log 2026-10-30 17:50Z): 170 of 292 settled live fills are in-play with no record; design is this lane's; fleet change needs the user's yes;
+    - (a) a better FAIR (findings §9);
+    - (c) R3 / C1(c) re-read at their sample thresholds;
+    - (d) per-night in-game P&L by ROI at the new stake.
 - 2026-10-21 ~21:3xZ user decisions (asked here): "Exits + tiny entries live", then "Yes, take the loan" -- fast loop dispatches live sales via the slow tick's run_exit_tick; capped NHL-spread in-game entries (1 contract, $10/day) to follow.
 - Files: syndicate/features/shared/execution_exits.py (`EXIT_STATE_LOCK` + the `run_exit_tick` lock wrapper ONLY -- LOAN from kalshi-exit-path approved by the user 2026-10-21 ~21:45Z, owner session unreachable; body unchanged), scripts/inplay_recorder.py, scripts/inplay_edge_report.py, scripts/inplay_exit_replay.py, scripts/inplay_fair_score.py, scripts/run_fast_exit_loop.py (NEW), .syndicate/findings_2026-10-20_in_game_trading.md, syndicate/features/shared/execution_exits_fast.py (NEW, stage 1 fast exit loop PAPER; imports execution_exits read-only, never edits it), tests/test_execution_exits_fast.py (NEW), syndicate/features/shared/inplay_entries_paper.py (NEW, in-game entry rule PAPER ONLY, no order path), tests/test_inplay_entries_paper.py (NEW), syndicate/features/shared/inplay_entries_live.py (NEW, LIVE in-game entries behind SYNDICATE_INPLAY_ENTRIES, default off; user 2026-10-23), tests/test_inplay_entries_live.py (NEW), scripts/inplay_rule_sweep.py (NEW, entry-rule optimisation loop), tests/test_inplay_rule_sweep.py (NEW), syndicate/features/shared/kalshi_orders.py (`order_body_v2` allowlisted time_in_force=IOC seam ONLY -- LOAN from kalshi-cancel-alert, user-approved 2026-10-21 + permission rule 2026-10-23), scripts/run_live_odds_refresh_worker.py (`_fast_exit_background_loop` + `start_fast_exit_loop` + their one call in main() ONLY, NEW section), scripts/inplay_scoreboard.py (NEW, stage 2), scripts/inplay_nightly.py (NEW, stage 2), tests/test_inplay_fair_score.py (NEW, stage 2)
 - STAGE 2 BUILT 2026-10-22 (side session f7ccc844 of b14b84d0, working under this lane): score/time baseline in inplay_fair_score.py, per-(fair, sport, market) scoreboard inplay_scoreboard.py, nightly wrapper inplay_nightly.py; Windows scheduled task `Syndicate inplay nightly` (user in chat ~12:35 PM CT: "Yes, all 4 sports"). Read-only; no fleet change. Findings §8, todo #715.
