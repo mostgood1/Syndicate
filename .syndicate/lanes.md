@@ -593,8 +593,8 @@ death, never life — do not invert it.
 - Verification: Hermetic tests: shape parity with e4_stage2_combo_prices.shape_cell on a ticker grid, off != on for the shaped read, budget reservation; A5 committed on origin/main before the ff; after the ff, the first full UTC day's store rows read on the fleet (shaped traded two-leg combos, trades_status counts, prints with taker_side, GETs) and recorded in deploys.md
 - Blocked by: none
 
-### pinnacle-coverage-d5 — OPEN — opened 2026-10-31 — session e32fef1a-01e8-4afe-a284-01acd3728545
-- **GOAL VERDICT `[2026-10-31 15:40Z]`: GOAL: MET** (read-only D5 read done; findings `.syndicate/findings_2026-10-31_pinnacle_coverage_d5.md`, log 10-31 15:40Z). Pinnacle prices NFL props + soccer BTTS/corners and both prop lists omit it; a 0-credit swap (NFL betonlineag sole 0.16%, soccer williamhill_us sole 0%) is the recommendation. NBA gaps are Pinnacle's own (no steals/blocks, fewer assists players, no player alternates). **Stays OPEN for the user's decision on the swap**; the edit needs a scoped claim on `odds_regions.py` (nfl + soccer PROP_BOOKMAKERS entries), outside `live-cell-scorecard`'s nba-only scope.
+### pinnacle-coverage-d5 — CLOSED (GOAL MET) — opened 2026-10-31 — closed 2026-10-31 — session e32fef1a-01e8-4afe-a284-01acd3728545
+- **GOAL VERDICT `[2026-10-31 15:40Z]`: GOAL: MET** (read-only D5 read done; findings `.syndicate/findings_2026-10-31_pinnacle_coverage_d5.md`, log 10-31 15:40Z). Pinnacle prices NFL props + soccer BTTS/corners and both prop lists omit it; a 0-credit swap (NFL betonlineag sole 0.16%, soccer williamhill_us sole 0%) is the recommendation. NBA gaps are Pinnacle's own (no steals/blocks, fewer assists players, no player alternates). **CLOSED 2026-10-31: user "Yes, swap"; the swap is lane `pinnacle-prop-swap`.** Was: stays open for the user's decision on the swap; the edit needs a scoped claim on `odds_regions.py` (nfl + soccer PROP_BOOKMAKERS entries), outside `live-cell-scorecard`'s nba-only scope.
 - Goal: D5 read (plan #736, adopted 10-26 'Yes, within budget first'), READ-ONLY: for each sport x market where Phase 2 paper bets lack a Pinnacle close, establish whether OddsAPI's Pinnacle offers that market (main and alternate lines) and what capturing it would cost in OddsAPI credits per day; findings committed with a recommendation. No fetch, env or fleet change
 - Files: .syndicate/findings_2026-10-31_pinnacle_coverage_d5.md (NEW)
 - Hypothesis: Class B misses (189 of 279; log 10-30 23:15Z) are mostly a FETCH gap (markets or regions we do not request from Pinnacle), not a Pinnacle offering gap
@@ -637,6 +637,14 @@ death, never life — do not invert it.
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 read SAFE for 1 of 5 CLOSED blocks; moved `closed-lane-archive-20261031-0840`. Table and deferrals in the 2026-10-31 log.
+
+### pinnacle-prop-swap — OPEN — opened 2026-10-31 — session e32fef1a-01e8-4afe-a284-01acd3728545
+- Goal: Pinnacle in the NFL and soccer prop-call book lists (betonlineag's and williamhill_us's slots, 0 extra OddsAPI credits), on main and live on the fleet by a fast-forward with no restart, with Pinnacle prop quotes MEASURED landing in the NFL and soccer book_quotes shards
+- Files: syndicate/features/shared/odds_regions.py (the nfl and soccer PROP_BOOKMAKERS entries ONLY), tests/test_prop_bookmakers.py (the nfl and soccer list assertions ONLY), tests/test_pinnacle_capture.py (LOAN from live-cell-scorecard -- user "Yes, swap" 2026-10-31 on the NFL and soccer Pinnacle swap; the one NFL assertion that swap inverts ONLY)
+- Hypothesis: n/a (D5 read, findings_2026-10-31_pinnacle_coverage_d5.md)
+- Falsification test: after the ff, a fleet NFL or soccer prop fetch returns 0 pinnacle quotes on events where the D5 probe showed Pinnacle offering the market, or x-requests-last per prop call rises
+- Verification: fleet book_quotes shards for NFL props and soccer btts and alternate_totals_corners carry bookmaker=pinnacle rows fetched after the ff; x-requests-last per prop call unchanged; recorded in deploys.md
+- Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
