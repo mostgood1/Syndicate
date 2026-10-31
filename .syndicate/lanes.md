@@ -606,6 +606,7 @@ death, never life — do not invert it.
 - Moved: closed-lane-archive-20261031-0240, closed-lane-archive-20261031-0440. Table and WAIT reasons in `log/2026-10-31.md` 13:5xZ.
 
 ### pinnacle-coverage-d5 — OPEN — opened 2026-10-31 — session e32fef1a-01e8-4afe-a284-01acd3728545
+- **GOAL VERDICT `[2026-10-31 15:40Z]`: GOAL: MET** (read-only D5 read done; findings `.syndicate/findings_2026-10-31_pinnacle_coverage_d5.md`, log 10-31 15:40Z). Pinnacle prices NFL props + soccer BTTS/corners and both prop lists omit it; a 0-credit swap (NFL betonlineag sole 0.16%, soccer williamhill_us sole 0%) is the recommendation. NBA gaps are Pinnacle's own (no steals/blocks, fewer assists players, no player alternates). **Stays OPEN for the user's decision on the swap**; the edit needs a scoped claim on `odds_regions.py` (nfl + soccer PROP_BOOKMAKERS entries), outside `live-cell-scorecard`'s nba-only scope.
 - Goal: D5 read (plan #736, adopted 10-26 'Yes, within budget first'), READ-ONLY: for each sport x market where Phase 2 paper bets lack a Pinnacle close, establish whether OddsAPI's Pinnacle offers that market (main and alternate lines) and what capturing it would cost in OddsAPI credits per day; findings committed with a recommendation. No fetch, env or fleet change
 - Files: .syndicate/findings_2026-10-31_pinnacle_coverage_d5.md (NEW)
 - Hypothesis: Class B misses (189 of 279; log 10-30 23:15Z) are mostly a FETCH gap (markets or regions we do not request from Pinnacle), not a Pinnacle offering gap
