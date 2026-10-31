@@ -630,6 +630,14 @@ death, never life — do not invert it.
 - Verification: Local replay on copied fleet data: peak RSS before vs after, plus byte-identical shard outputs (normalised for timestamps); targeted pytest green. Fleet reading after a user-approved deploy: max refresh_odds_sources[soccer] child RSS and live-odds container_memory_pct_of_max on an evening slate
 - Blocked by: none
 
+### ci-suite-red-697 — OPEN — opened 2026-10-31 — session e76cc646-3e74-4beb-91ed-dcd684ebc00d
+- Goal: Fleet ci-suite pytest step reads 0 NEW FAILURE(S) (todo #697): the 10-31 run's 36 on 413a08d5 split into stale tests / order leaks / env, each fixed on main or named to its owner; before/after count and the commit that should turn it green recorded here and in todo #697
+- Files: tests/test_deploy_guard_fleet.py, tests/test_kalshi_ticker_date_guard.py, tests/test_mlb_starter_length_replay.py, tests/test_nfl_segment_request_reachability.py, tests/test_probability_differential.py, tests/test_worker_recycle.py, scripts/probability_differential.py (REGISTRY + NOT_A_SCALAR_CONVERTER additions only), syndicate/features/mlb/native/tools/daily_update.py (_process_exists POSIX probe only), syndicate/features/mlb/native/tools/datasets/backfill_statsapi_feed_live.py (_pid_is_running POSIX probe only), docs/ai_context/todo.md (#697 section only)
+- Hypothesis: 8 of 36 fail deterministically (stale tests vs 10-19..10-27 behaviour changes + 1 host-dependent case); the other 28 pass alone and fail only inside CI chunk 8, i.e. an order leak from an earlier file in that chunk
+- Falsification test: the 28 also fail when their files run alone under run_ci_suite._step_env in ci-checkout
+- Verification: the 16 failing files + the identified leaker run in CI order under _step_env on the fleet venv: 0 failures in the 36 ids; then the next 08:00Z ci-suite run reads 0 NEW
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
