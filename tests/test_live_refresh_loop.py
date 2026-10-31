@@ -109,6 +109,10 @@ def _no_worker_background_threads():
     # since 2026-10-03 and pages the live venue catalogue; not what these tests measure.
     stack.enter_context(patch.object(run_live_odds_refresh_worker, "start_venue_boot_then_poll", return_value=False))
     stack.enter_context(patch.object(run_live_odds_refresh_worker, "start_inplay_capture_loop", return_value=False))
+    # The in-game fast exit thread (afa34580, 2026-10-21; ON unless =off) polls the
+    # same `_LIVE_REFRESH_LOOP_STOP.is_set()`, so the uptime-recycle test read its
+    # call count as 2 whenever that thread got scheduled first (lane ci-suite-red-697).
+    stack.enter_context(patch.object(run_live_odds_refresh_worker, "start_fast_exit_loop", return_value=False))
     return stack
 
 class LiveRefreshLoopTests(unittest.TestCase):

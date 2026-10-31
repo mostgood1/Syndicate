@@ -424,10 +424,18 @@ def test_league_keyword_threads_through_storage_and_names(tmp_path):
     assert lr.load_engine_inputs("2026-08-01", "LVA", "NYL", root=tmp_path, league="wnba") == {k: k for k in lr._INPUT_KEYS}
     assert lr.live_lens_snapshot_path("wnba").name == "wnba_live_resim.json"
     assert lr.live_lens_snapshot_path().name == "nba_live_resim.json"  # default unchanged
-    assert lr.team_name("wnba", "LVA") == ""  # P5 registers its own map
-    lr.register_team_names("wnba", {"lva": "Las Vegas Aces"})
-    assert lr.team_name("wnba", "LVA") == "Las Vegas Aces" and lr.team_name("nba", "GSW") == "Golden State Warriors"
-    lr.TEAM_NAMES_BY_LEAGUE.pop("wnba", None)
+    # P5 registers its own map AT IMPORT of `wnba.live_resim`, so whether it is
+    # present here depended on which test files ran first in the process (the
+    # fleet ci-suite's chunk 4, 2026-10-31). Start from no map, restore after.
+    saved = lr.TEAM_NAMES_BY_LEAGUE.pop("wnba", None)
+    try:
+        assert lr.team_name("wnba", "LVA") == ""
+        lr.register_team_names("wnba", {"lva": "Las Vegas Aces"})
+        assert lr.team_name("wnba", "LVA") == "Las Vegas Aces" and lr.team_name("nba", "GSW") == "Golden State Warriors"
+    finally:
+        lr.TEAM_NAMES_BY_LEAGUE.pop("wnba", None)
+        if saved is not None:
+            lr.TEAM_NAMES_BY_LEAGUE["wnba"] = saved
 
 
 def test_wnba_summary_resumes_with_wnba_rules():

@@ -47,6 +47,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import contextlib
 import datetime as dt
 import json
 import os
@@ -224,9 +225,35 @@ def _lean(order: Mapping[str, Any]) -> dict[str, Any]:
     return {k: order.get(k) for k in keep if k in order}
 
 
+@contextlib.contextmanager
+def scoped_env(env: Mapping[str, str]):
+    """`env` in os.environ for the block, then the previous values back.
+
+    It used to be a bare `os.environ.update(env)`. Harmless in the one-shot CLI,
+    but in a pytest process the worker's store env -- keyvalue backend + the
+    LIVE loopback Redis URL + the fleet data root -- outlived the watchdog test
+    and every later test in the process ran against it (fleet ci-suite 10-31:
+    28 failures in one chunk, all `Refusing to open the keyvalue state store at
+    a loopback Redis`)."""
+    saved = {key: os.environ.get(key) for key in env}
+    os.environ.update(env)
+    try:
+        yield
+    finally:
+        for key, value in saved.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+
+
 def read_store_state(env: Mapping[str, str]) -> dict[str, Any]:
     """execution_state, venue_balances, the kill-switch flag and the ledger's rows, via the modules' own readers."""
-    os.environ.update(env)
+    with scoped_env(env):
+        return _read_store_state()
+
+
+def _read_store_state() -> dict[str, Any]:
     from syndicate.features.shared.refresh_state_store import reports_root
 
     intelligence = reports_root() / "intelligence"
@@ -304,14 +331,16 @@ def collect(settings: lp.Settings, now: dt.datetime, state: Mapping[str, Any]) -
         pass
     pid = (pidfile.get("roles") or {}).get(WORKER_ROLE)
     readings: dict[str, Any] = {"worker_pid": pid}
+    store_env = worker_state_env(settings, pid)
     try:
-        readings.update(read_store_state(worker_state_env(settings, pid)))
+        readings.update(read_store_state(store_env))
     except Exception as exc:  # noqa: BLE001
         readings["monitor_error"] = f"{type(exc).__name__}: {exc}"[:200]
     unknown = unknown_submits(readings.get("orders") or [])
     readings["unknown_submits"] = unknown
     if unknown:
-        readings["balance_evidence"] = balance_evidence(readings.get("orders") or [])
+        with scoped_env(store_env):  # it read the store under this env before it was scoped
+            readings["balance_evidence"] = balance_evidence(readings.get("orders") or [])
     lines, cursor = scan_log(settings.logs_dir / f"{WORKER_ROLE}.log", exec_state.get("log_cursor"))
     readings["log_lines"] = lines
     exec_state["log_cursor"] = cursor
