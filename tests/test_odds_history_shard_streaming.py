@@ -58,6 +58,11 @@ class _Env:
                 "SYNDICATE_REPORTS_ROOT": str(tmp / "reports"),
                 "SYNDICATE_ODDS_EVENTS_ROOT": str(tmp / "odds_events"),
                 "SYNDICATE_REFRESH_STATE_BACKEND": "file",
+                # The staleness eviction reads the REAL clock, not ort._utc_now,
+                # so markets stamped 10-31 12:00Z were evicted by the first sync
+                # once the wall clock passed 20:00Z 10-31 (8 h default) and the
+                # close test failed from then on (ci-suite #697).
+                "SYNDICATE_ODDS_HISTORY_MARKET_STALENESS_CEILING_SECONDS": str(10 * 365 * 86400),
             }),
             patch("syndicate.features.shared.artifact_publisher.publish_hot_artifact", lambda *a, **k: False),
             patch.object(ort, "_utc_now", lambda: "2026-10-31T12:00:00Z"),
