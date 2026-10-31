@@ -3117,3 +3117,6 @@ The 2026-10-20 entry said: "Rating INPUTS transfer, because the sim reads them w
   - Confirm the named leaker directly (leaker + probe, then probe alone) before fixing it.
   - The leak is usually in an EARLIER file of the chunk, never in one of the failing tests.
 - **Leak shape seen 3 times now:** process-global state written by code under test and never restored: `align_data_root` 10-15, `execute_portfolio` by-name binding 10-16, `execution_watchdog` `os.environ.update` 10-31. Grep the code under test for bare `os.environ.update` / `os.environ[...] =` first.
+
+## Check origin/main lanes before building on a user's "go" `[2026-10-31, lane live-cell-scorecard]`
+The user said "go with the cancel rule" here AND "Yes, build it" in another session; that session's lane claimed the file on origin/main ~20 min before I started, and I wrote ~330 lines before the lane guard (on my SECOND edit) stopped me. A user yes given in one chat is often also given in another. **Rule:** before building on a decision, grep `origin/main:.syndicate/lanes.md` for the target file and the decision's subject -- not the local copy, which was 12 commits behind.
