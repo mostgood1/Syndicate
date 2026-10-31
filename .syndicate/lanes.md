@@ -635,6 +635,14 @@ death, never life — do not invert it.
 - Verdict: GOAL MET. owner_liveness --idle-min 240 read 1 SAFE of 7 CLOSED; moved to lanes_closed.md with a pointer. Detail in log/2026-10-31.md.
 - Moved: closed-lane-archive-20261031-1241
 
+### board-midnight-date-skew — OPEN — opened 2026-10-31 — session c634d0c4-c4c3-499e-8f70-9fe8c873047d
+- Goal: the Layer 2 board (/api/board/layer2-shortlist) keeps advancing through 04:00-06:00Z: refresh-worker's board date selection and the latest-key promotion check use ONE America/Chicago clock, proven by a hermetic test frozen at 04:30Z and a reachability test (off != on)
+- Files: pipeline/intelligence_state.py, syndicate/features/shared/timezone.py, tests/test_board_midnight_date_skew.py (NEW)
+- Hypothesis: H1 (user, written before testing): one path derives today/selected_date from UTC (utcnow/date.today in a UTC process) while the NON_TODAY promotion check uses central_today_iso(); in 04:00-05:00Z the UTC path writes the next day's index early and CT-path builds are refused promotion. H2 (alternative, from a first code read: the promotion check at intelligence_state.py:8757 and the board window at :135 are already central_today_iso): the 10-31 build is a legitimate today+1 look-ahead build, and the freeze is in how the served shortlist/index picks a date, not in a second clock.
+- Falsification test: H1 is false if no code path reachable from the refresh-worker board build computes a calendar date from UTC/naive local time; the fleet log's 04:28:54Z selected_date=2026-10-31 build then has to be explained by the look-ahead window (H2) or something else.
+- Verification: targeted pytest of the new test file (Idle priority); after a user-approved deploy, the next night's refresh-worker log shows index_written_at advancing continuously through 04:00-06:00Z (no gap > 20 min) and /api/board/layer2-shortlist written_at tracking it
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
