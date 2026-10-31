@@ -1491,7 +1491,7 @@ def _shard_key_for_row(row: Mapping[str, Any], *, sport: str, date_str: str, sou
     return date_str
 
 
-def _write_odds_history_artifact(path: Path, payload: dict[str, Any]) -> None:
+def _write_odds_history_artifact(path: Path, payload: dict[str, Any], *, text: str | None = None) -> None:
     """odds_history shards are routinely tens of MB on a real slate
     (measured live 2026-07-28: 51.1MB / 3,713 markets for one MLB day) --
     not an occasional edge case exceeding the keyvalue store's 8MB
@@ -1507,7 +1507,7 @@ def _write_odds_history_artifact(path: Path, payload: dict[str, Any]) -> None:
     pure overhead with no chance of succeeding.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
-    _atomic_write_text(path, json.dumps(payload, separators=(",", ":")))
+    _atomic_write_text(path, text if text is not None else json.dumps(payload, separators=(",", ":")))
     try:
         from syndicate.features.shared.artifact_publisher import publish_hot_artifact
 
@@ -1613,6 +1613,13 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
     seen_current_snapshots: set[tuple[str, float, float | None]] = set()
     lifecycle_events: list[dict[str, Any]] = []
     steam_events: list[dict[str, Any]] = []
+    # Sort keys, parallel to the two lists above: rows are applied grouped by
+    # shard (below), and both lists are put back in FILE order before they
+    # are written. The steam record keeps only the newest
+    # `_STEAM_EVENTS_KEEP` by list position, every event of a run carries the
+    # same timestamp, so the order decides which ones the board sees.
+    lifecycle_order: list[tuple[int, int, int]] = []
+    steam_order: list[tuple[int, int, int]] = []
     shards: dict[str, dict[str, dict[str, Any]]] = {}
     shard_seen_market_keys: dict[str, set[str]] = {}
     shard_seen_live_market_keys: dict[str, set[str]] = {}
@@ -1626,6 +1633,25 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
             shard_entries_appended[shard_key] = 0
         return shards[shard_key]
 
+    # ONE SHARD RESIDENT AT A TIME (lane `live-odds-memory-spikes`,
+    # 2026-10-31). This used to apply rows in file order, which needs every
+    # shard the files touch loaded together: soccer's game_odds_current.csv
+    # and props files carry rows for ~10 game dates, so a soccer refresh
+    # held 449 MB of shard JSON (2026-10-31: 10 shards, the day's own 144 MB)
+    # as ~1.4 GB of dicts until the last write. That was the 1-2 minute
+    # live-odds-worker spike to 90%+ of its 3,072 MB cap at the end of every
+    # run that included soccer; runs without soccer peaked at 466 MB.
+    # Now pass 1 gates and dedupes rows in file order (cross-shard dedupe is
+    # unchanged) and buckets them by shard in first-touch order; pass 2
+    # loads, updates, writes and frees one shard before the next. Each
+    # shard's rows still apply in file order, so its output is unchanged, and
+    # the lifecycle/steam events are sorted back into file order before they
+    # are written. Replayed on a copy of the fleet's 10-31 soccer shards: peak
+    # +1,542 MB -> +704 MB, 70.8 s -> 41.4 s, all 54 output files
+    # byte-identical (events included). The one ordering change: shard files
+    # are now written BEFORE the event files rather than after.
+    rows_by_shard: dict[str, list[tuple[int, Path, Mapping[str, Any], str | None, str, Any, float, Any, str]]] = {}
+    row_ordinal = 0
     for candidate in candidates:
         files_scanned += 1
         suffix = candidate.suffix.lower()
@@ -1687,6 +1713,16 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
             seen_current_snapshots.add(dedupe_key)
 
             shard_key = _shard_key_for_row(row, sport=slug, date_str=date_str, source_root=source_root)
+            rows_by_shard.setdefault(shard_key, []).append(
+                (row_ordinal, candidate, row, matchup_label, market_key, line_snapshot, current_line, current_odds, row_snapshot_ts)
+            )
+            row_ordinal += 1
+        del rows
+
+    shard_results: dict[str, dict[str, Any]] = {}
+    for shard_position, shard_key in enumerate(list(rows_by_shard)):
+        shard_rows = rows_by_shard.pop(shard_key)
+        for ordinal, candidate, row, matchup_label, market_key, line_snapshot, current_line, current_odds, row_snapshot_ts in shard_rows:
             row_game_date = _row_game_date(row, sport=slug)
             markets = _shard_markets(shard_key)
             seen_market_keys = shard_seen_market_keys[shard_key]
@@ -1872,7 +1908,9 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
                 steam["previous_odds"] = previous_odds
                 lifecycle_event["steam"] = steam
                 steam_events.append({**lifecycle_event})
+                steam_order.append((0, ordinal, 0))
             lifecycle_events.append(lifecycle_event)
+            lifecycle_order.append((0, ordinal, 0))
 
             history.append(
                 {
@@ -1923,11 +1961,12 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
             markets[market_key] = market_state
             entries_appended += 1
             shard_entries_appended[shard_key] += 1
+        del shard_rows
 
-    for shard_key, markets in shards.items():
+        markets = shards[shard_key]
         seen_market_keys = shard_seen_market_keys.get(shard_key, set())
         missing_market_keys = [key for key in markets.keys() if key not in seen_market_keys]
-        for market_key in missing_market_keys:
+        for close_index, market_key in enumerate(missing_market_keys):
             market_state = markets.get(market_key)
             if not isinstance(market_state, dict):
                 continue
@@ -1949,29 +1988,14 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
                     is_live=bool(normalized_entry.get("is_live") if isinstance(normalized_entry, Mapping) else False),
                 )
             )
+            lifecycle_order.append((1, shard_position, close_index))
 
-    _annotate_steam_book_confirmation(steam_events)
-    _record_steam_events(date_str, steam_events)
-    if lifecycle_events:
-        _trace_log("before_append_odds_lifecycle_events", sport=slug, date=date_str, events=len(lifecycle_events), path=str(odds_lifecycle_path(date_str)))
-        append_odds_lifecycle_events(date_str, lifecycle_events)
-        _trace_log("after_append_odds_lifecycle_events", sport=slug, date=date_str, events=len(lifecycle_events), path=str(odds_lifecycle_path(date_str)), size_bytes=_trace_file_size(odds_lifecycle_path(date_str)))
-
-    if not entries_appended:
-        return {
-            "ok": True,
-            "skipped": True,
-            "reason": "no_line_or_odds_changes",
-            "sport": slug,
-            "date": date_str,
-            "files_scanned": int(files_scanned),
-            "entries_appended": 0,
-            "shards": {},
-        }
-
-    shard_results: dict[str, dict[str, Any]] = {}
-    for shard_key, shard_markets in shards.items():
+        # A shard with no new entry this cycle is not rewritten (as before),
+        # and is dropped now rather than held until the run ends.
+        shard_markets = shards.pop(shard_key)
+        del markets
         if shard_entries_appended.get(shard_key, 0) <= 0:
+            del shard_markets
             continue
         # #112 follow-up (breadth). Evict entire markets that haven't been
         # touched in _odds_history_market_staleness_ceiling_seconds() BEFORE
@@ -2075,9 +2099,13 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
         # all. The board reads these exact paths (odds_control_plane.py's
         # load_odds_history_payload_for_sport) directly off local disk to
         # match -- no keyvalue read on that side either.
-        _write_odds_history_artifact(history_path, payload)
-        _write_odds_history_artifact(shared_history_path, payload)
-        _write_odds_history_artifact(artifact_history_path, payload)
+        # Serialized ONCE for all three copies: the same bytes, a third of the
+        # json.dumps work, and one ~payload-sized string alive instead of three
+        # in turn.
+        payload_text = json.dumps(payload, separators=(",", ":"))
+        _write_odds_history_artifact(history_path, payload, text=payload_text)
+        _write_odds_history_artifact(shared_history_path, payload, text=payload_text)
+        _write_odds_history_artifact(artifact_history_path, payload, text=payload_text)
         _trace_log("after_write_odds_history_json", sport=slug, shard_key=shard_key, history_path=str(history_path), shared_history_path=str(shared_history_path), artifact_history_path=str(artifact_history_path), markets=len(shard_markets), entries_appended=shard_entries_appended[shard_key])
         shard_results[shard_key] = {
             "history_path": str(history_path),
@@ -2085,6 +2113,30 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
             "artifact_history_path": str(artifact_history_path),
             "markets_tracked": len(shard_markets),
             "entries_appended": shard_entries_appended[shard_key],
+        }
+        del payload_text, payload, shard_markets
+
+    # Back to file order; "close" events go after every row event, per shard
+    # in first-touch order, which is where the all-shards loop put them.
+    steam_events = [event for _, event in sorted(zip(steam_order, steam_events), key=lambda pair: pair[0])]
+    lifecycle_events = [event for _, event in sorted(zip(lifecycle_order, lifecycle_events), key=lambda pair: pair[0])]
+    _annotate_steam_book_confirmation(steam_events)
+    _record_steam_events(date_str, steam_events)
+    if lifecycle_events:
+        _trace_log("before_append_odds_lifecycle_events", sport=slug, date=date_str, events=len(lifecycle_events), path=str(odds_lifecycle_path(date_str)))
+        append_odds_lifecycle_events(date_str, lifecycle_events)
+        _trace_log("after_append_odds_lifecycle_events", sport=slug, date=date_str, events=len(lifecycle_events), path=str(odds_lifecycle_path(date_str)), size_bytes=_trace_file_size(odds_lifecycle_path(date_str)))
+
+    if not entries_appended:
+        return {
+            "ok": True,
+            "skipped": True,
+            "reason": "no_line_or_odds_changes",
+            "sport": slug,
+            "date": date_str,
+            "files_scanned": int(files_scanned),
+            "entries_appended": 0,
+            "shards": {},
         }
 
     primary_shard_key = next(iter(shard_results), None)
