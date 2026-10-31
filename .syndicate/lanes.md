@@ -598,11 +598,6 @@ death, never life — do not invert it.
 - Verification: the 16 failing files + the identified leaker run in CI order under _step_env on the fleet venv: 0 failures in the 36 ids; then the next 08:00Z ci-suite run reads 0 NEW
 - Blocked by: none
 
-### closed-lane-archive-20261031-1241 — CLOSED 2026-10-31 (GOAL MET: 1 block archived) — opened 2026-10-31 — session c3f2f55d-aaa0-42f4-9ee7-54dd984e35d6
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness.py --idle-min 240 read SAFE for 1 of 5 CLOSED blocks; moved `closed-lane-archive-20261031-0640`. Table and deferrals in the 2026-10-31 log.
-
 ### closed-lane-archive-20261031-1439 — CLOSED 2026-10-31 (GOAL MET: 1 blocks archived) — opened 2026-10-31 — session 05a30e8c-4bc9-4e0a-baec-a2d8c0b48bbe
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
@@ -632,6 +627,12 @@ death, never life — do not invert it.
 - Verification: census drops by 3 OPEN; claims removed belong only to the 3 slugs; every pre-edit lanes.md line is in lanes.md or lanes_closed.md
 - Blocked by: none
 - **GOAL VERDICT 2026-10-31:** "The 3 OPEN lanes owned by unreachable session 2d413211 (nba-live-tick-native, wnba-fixture-identity-native, wnba-live-period-lines-native) are CLOSED per the user's 2026-10-31 approval and archived to lanes_closed.md, the 2027 WNBA reads carried by a new todo; 0 other lanes' content or claims change" -- GOAL: MET. Reading: archive tool reported claims 324 -> 304 (all 20 from the 3 slugs) and wrote 3 pointers; every non-blank origin/main lanes.md line is in lanes.md or lanes_closed.md except the 3 rewritten OPEN headers; todo #754 carries the 2027 reads.
+
+### closed-lane-archive-20261031-1646 — CLOSED 2026-10-31 (GOAL MET: 1 block archived) — opened 2026-10-31 — session 5376f7b2-7854-4d74-92d0-6706064acfbb
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness --idle-min 240 read 1 SAFE of 7 CLOSED; moved to lanes_closed.md with a pointer. Detail in log/2026-10-31.md.
+- Moved: closed-lane-archive-20261031-1241
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -760,6 +761,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261031-0440` — CLOSED 2026-10-31 (GOAL MET: 2 blocks archived) — opened 2026-10-31 — session e4c3fac4-325a-4a46-90f1-6697455e68c3
 - `closed-lane-archive-20261031-0640` — CLOSED 2026-10-31 (GOAL MET: 1 block archived) — opened 2026-10-31 — session 265b36c8-8a4c-4658-a9dd-1c6705801778
 - `closed-lane-archive-20261031-0840` — CLOSED 2026-10-31 (GOAL MET: 2 blocks archived) — opened 2026-10-31 — session 45521c6b-5676-40ae-a669-5c907e0bb827
+- `closed-lane-archive-20261031-1241` — CLOSED 2026-10-31 (GOAL MET: 1 block archived) — opened 2026-10-31 — session c3f2f55d-aaa0-42f4-9ee7-54dd984e35d6
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b

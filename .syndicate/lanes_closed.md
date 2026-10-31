@@ -13741,3 +13741,8 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Falsification test: Any leaf difference between vendored and port on the same replayed network responses and the same files, or a positive control that fails to detect a planted difference.
 - Verification: Parity harness PASS on mocked + recorded-live inputs (with positive control); after deploy, the live-odds-worker's NBA live_lens_signals/projections JSONL keep being written by the port with no tick errors.
 - Blocked by: none
+
+### closed-lane-archive-20261031-1241 — CLOSED 2026-10-31 (GOAL MET: 1 block archived) — opened 2026-10-31 — session c3f2f55d-aaa0-42f4-9ee7-54dd984e35d6
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 read SAFE for 1 of 5 CLOSED blocks; moved `closed-lane-archive-20261031-0640`. Table and deferrals in the 2026-10-31 log.
