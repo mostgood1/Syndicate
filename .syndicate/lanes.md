@@ -622,6 +622,14 @@ death, never life — do not invert it.
 - Verification: Findings file with per-fill table + CI + recommendation presented to user in session 684b1d
 - Blocked by: none
 
+### live-odds-memory-spikes — OPEN — opened 2026-10-31 — session 28697bd7-c2b8-416a-b80c-66f00938c780
+- Goal: Find what causes live-odds-worker's 1-2 min memory spikes (43->90% of 3072 MB) on the local WSL fleet and land a fix on main with targeted tests; NO deploy without user yes + deploy locks
+- Files: syndicate/features/shared/odds_refresh_tracking.py, tests/test_odds_history_shard_streaming.py
+- Hypothesis: MEASURED before opening: the spikes are one refresh_odds_sources child whose own RSS jumps ~200 -> 1.4-1.8 GB in ~8 s at the END of every run that includes soccer (714/1609 such children >800 MB; 0/1313 without soccer, max 466 MB). Cause: _sync_odds_history_for_refresh loads EVERY soccer game-date shard it touches (10 shards, 449 MB JSON at 10:21 CDT 10-31; 2026-10-31.json alone 144 MB) into dicts at once, then json.dumps each 3x. Fleet 'container memory' is role-tree RSS (memory_observability.py:115), so page cache is NOT in it.
+- Falsification test: A local replay of _sync_odds_history_for_refresh over a copy of the fleet's 10 shards + soccer candidates shows peak RSS NOT falling materially when shards are processed one at a time, or output shards differ byte-for-byte (excluding updated_at)
+- Verification: Local replay on copied fleet data: peak RSS before vs after, plus byte-identical shard outputs (normalised for timestamps); targeted pytest green. Fleet reading after a user-approved deploy: max refresh_odds_sources[soccer] child RSS and live-odds container_memory_pct_of_max on an evening slate
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
