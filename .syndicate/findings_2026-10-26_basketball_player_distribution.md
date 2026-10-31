@@ -880,3 +880,45 @@ test first.
 
 **Out of scope:** coach DNP (needs pre-tip news, step 2a); REAL_ONLY (6.19 real min per team-game); the bench bias
 +1.00; production. Production gets fields only via `nba_engine_config.json` after the forward test from 11-01.
+
+**STEP 3 STAGE A — RESULT 2026-10-31 20:42Z (15:42 CDT). VERDICT: FAIL (V3, starters only). Stage B is NOT built.**
+
+`r2s/stage3a.py` → `stage3a.json`, `stage3a.out`; nice 19, about 13 min. 1,604 team-games; Phase-1 population TRAIN
+8,324 / TEST 7,993 rows. No bin was pooled (smallest TRAIN bin < 6 min: 367). The cell m is the slot's fit_inj sim
+mean minutes, as written.
+
+**σ fitted on TRAIN** (2 rounds of coordinate descent, round 2 final): < 6: 1.05 · 6–12: 0.90 · 12–20: 0.50 ·
+20–28: 0.20 · ≥ 28: 0.00.
+
+| TEST (Jan–Feb) | before (fit_inj) | after | gate |
+|---|---|---|---|
+| bench min miss / width | .551 / 2.00 | **.239 / 0.97** | V1, V2 PASS |
+| starter min miss / width | .324 / 1.22 | **.198 / 1.00** | V1, V2 PASS |
+| bench tails p_lo / p_hi | .237 / .314 | .097 / .142 (gap .045) | V3 PASS |
+| starter tails p_lo / p_hi | .163 / .161 | .133 / .065 (gap **.068**) | V3 **FAIL** (≤ .05) |
+| pts / reb / ast / threes miss | .304 / .287 / .260 / .230 | .268 / .257 / .246 / .225 | V4 PASS |
+| min bias bench / starter | +1.20 / −0.27 | +1.36 / −0.49 | — |
+
+TRAIN reads the same: bench .239 / 0.97, starter .184 / 0.99 with tails .108 / .076.
+
+**Predictions:** bench σ ≥ .4 — held. Every stat improves, by less than minutes — held. Minutes bias moves < 0.2 in
+either role — FAILED for starters (−0.27 → −0.49, 0.22); bench moved 0.16. The renormalisation is not exactly
+mean-preserving: bench draws pushed up take the team's minutes from everyone, starters included.
+
+**Per-cell, TEST, descriptive (read after the verdict):**
+- ≥ 28 (σ 0): miss .280 → .226, but tails .166 / .059 and bias −1.13 → −1.41. The sim gives its heaviest-minute
+  players too many minutes; once the band is the right width, that bias shows up as a one-sided low tail. The
+  starter V3 failure is this cell.
+- < 6: miss .681 → .419, ALL of it high side (p_lo .000, p_hi .419), bias +4.7. These are players the sim barely
+  plays who got real minutes: a mean error that spread alone cannot fix.
+- 6–12 bias +3.0; 12–20 +1.4; 20–28 +0.3. The bias runs monotonically from bench (sim too low) to heavy starters
+  (sim too high): the sim's minutes distribution is too CONCENTRATED on the top of the rotation.
+
+**Reading (as pre-registered: "V3 fails → the residual is skewed and a symmetric-in-logs shock is the wrong family;
+an empirical-ratio bootstrap would be the next pre-registration").** Disclosed alongside it, from the cell read above:
+the starter imbalance coincides with a MEAN error (≥ 28 bias −1.41), not only with shape. The two are not separated
+by this run. A spread fix with the right widths exposes the concentration bias rather than hiding it inside a too-
+narrow band. Candidates for the next pre-registration, none chosen: (a) the empirical-ratio bootstrap (shape);
+(b) a de-concentration of the input minutes by cell (mean: ≥ 28 down ~1.1, < 12 up ~3), then this same σ table
+re-fit; (c) both, mean first per the mechanism-vs-estimator rule.
+- Not done: no engine code, no switch file, no sim run.
