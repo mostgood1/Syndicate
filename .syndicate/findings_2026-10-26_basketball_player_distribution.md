@@ -1250,3 +1250,50 @@ its side of 1. Played rate in [.35, .50].
 
 **If A PASSES:** stage B exactly as step 4 pre-registered (switch key `defer_to_injury_report`, 12-date smoke, full
 FIT `fit_ro`, gates B1–B4). **If A FAILS:** M-K2 is closed; the 4.73 joins coach DNP as needing pre-tip news.
+
+**STEP 4b — M-K2 RE-GRADE ON THE RULE'S OWN NAMES, RESULT 2026-11-01 19:50Z (13:50 CST). VERDICT: FAIL (A2). M-K2 is
+CLOSED as pre-registered (3995a90d): the 4.73 real min per team-game joins coach DNP as needing pre-tip news.**
+
+Instrument `~/bball_sc/code_names` = code_inj + print-only patch (`r2s/make_code_names.py`, diff
+`r2s/code_names.diff`, 44 lines: a `K2_ADDED` print in `add_nba_recency_exclusions`, a `K2_EFFECT` print in
+smart_sim `_drop_excluded` with the filter mask computed once into `_hit`, same predicate). Run `fit_names`
+(`r2s/launch_fit_names.sh` = launch_fit_inj.sh with code_names, 20 draws, own out/scratch), 12:57-13:49 CST, nice 19,
+109/109 dates. Disclosed: the patch prints two lines (ADDED per team, EFFECT per call) where the pre-registration
+described one combined line; the effect set is their intersection per (d, T), as registered. Grader `r2s/stage4b.py`
+-> `stage4b.json`, `stage4b_pop.csv`, `stage4b.out`.
+
+**Fidelity (checked first):**
+- (F1) pools identical on **1,590 / 1,590** team-games as sets -> PASS. **Disclosed change of reading, made after an
+  8-date dry check and BEFORE the grade:** 1,565 / 1,590 are identical in ORDER. `pnames` order is the first draw's
+  box order, which moves with the draw count (20 vs 200); membership is what the patch could move, so the gate was
+  read on membership. On the ordered reading F1 is 98.4% and would have failed by 0.6 pt.
+- (F2) **777 / 779** C2 slots in the effect set (99.7%) -> PASS. Outside: 1 not named by the rule, 1 named but not
+  in any candidate frame. The rule's own summary line was identical to fit_inj's on the dates spot-checked
+  (11-01..11-03).
+- Instrument: 14,407 keys named across 3,204 team-dates; **6,513** actually left a candidate frame (45%). The other
+  55% (traded / waived / never pooled for T) is what over-dropped step 4's replication.
+
+**Gate A, verbatim from step 4, population = effect set minus report-listed, 1,582 team-games:**
+
+| | step 4b (rule's own names) | step 4 (replicated) | gate |
+|---|---|---|---|
+| re-admitted slots / played | 3,057 / 768 (25.1%) | 3,925 / 1,058 (27.0%) | — |
+| (A1) recovered real min / team-game | **4.72** vs C2 4.73 | 9.13 | ≥ 50%: PASS |
+| (A2) Σ p not played / Σ p played | 20,589 / 7,509 = **2.74** | 1.94 | ≤ 1: **FAIL** |
+| (A3) injury / illness reason | 0.07% | 0.05% | ≤ 10%: PASS |
+
+Halves: Nov-Dec A2 2.02, played .31; Jan-Feb A2 3.34, played .21. Coach-DNP share of non-players .44; not in T's box
+1,286 (42% of slots).
+
+**Predictions:** F1, F2 held. A2 "within ±0.15 of 0.95" — **FAILED** (2.74). Played rate "[.35, .50]" — **FAILED**
+(.25). Step 4's as-of-roster sensitivity (0.95) was NOT a good proxy for the real population: the real effect set
+keeps far more players who are in the frame yet absent from the box.
+
+**Post-hoc (`r2s/post4b.py`, NOT a verdict):** restricted to players who appear in T's box, 1,771 slots, played .434,
+**A2 1.15** — still > 1. The FAIL does not rest on the not-in-box slots. In-box non-players are 999 COACH'S DECISION
+of 1,003. Not-in-box p median 7.6 min (IQR 4.0-13.8), so they are real rotation-share players, not zeros.
+
+**Reading:** the K=2 rule removes about exactly the C2 minutes (A1 4.72 ≈ 4.73 — the effect set IS C2's source), but
+for every proxy-minute it would recover by deferring to the report, it would put 2.7 proxy-minutes on players who do
+not play — mostly coach's decisions and players absent from the box entirely. The injury report does not separate
+them. Nothing changes in code or config; the K=2 rule on the fleet is untouched.
