@@ -323,6 +323,25 @@ def test_interval_series_are_read_at_most_every_interval(tmp_path):
     assert len(nba) == 1
 
 
+def test_the_series_that_can_fill_the_budget_is_swept_last_so_it_cannot_starve_the_rest(tmp_path):
+    # 10-31 on the fleet: KXMVECROSSCATEGORY, swept first, spent each run's page cap and the other seven sat ~19 h.
+    assert list(cc.SWEEP_SERIES)[-1] == "KXMVECROSSCATEGORY"
+    end = T0 - cc.SETTLE_LAG_S
+    combos = [_combo(f"KXMVECROSSCATEGORY-S1-{i}", NBA_SGP_LEGS, end - 60 * i - 1) for i in range(40)]
+    combos.append(_combo("KXMVECROSSCATEGORY0-S1-A", NBA_SGP_LEGS, end - 100))
+    small = sorted(n for n in cc.SWEEP_SERIES if n != "KXMVECROSSCATEGORY")
+    old_order = {"KXMVECROSSCATEGORY": (900, 0), **{n: cc.SWEEP_SERIES[n] for n in small}}
+    unread = {}
+    for root, series in ((tmp_path / "old", old_order), (tmp_path / "new", cc.SWEEP_SERIES)):
+        summary = _run(root, FakeKalshi(combos), T0, series=series, lookback_s=3600, max_pages=10)
+        assert summary["status"] == "budget_stopped"
+        state = json.loads((cc.store_dir(root) / "state.json").read_text())["series"]
+        assert state["KXMVECROSSCATEGORY"]["swept_to"] < end  # the big one resumes next run either way
+        unread[root.name] = sorted(n for n in small if state[n].get("swept_to") != end)
+    assert unread == {"old": small, "new": []}
+    assert "KXMVECROSSCATEGORY0-S1-A" in {r["ticker"] for r in _stored(tmp_path / "new")}
+
+
 # ------------------------------------------------------------------ trades
 def test_trades_are_read_only_for_kept_traded_combos(tmp_path):
     end = T0 - cc.SETTLE_LAG_S

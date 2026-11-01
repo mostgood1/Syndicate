@@ -94,15 +94,18 @@ MODELLED_SPORTS = frozenset({"mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab
 # Combo series swept -> (slice seconds, minimum seconds between sweeps). The two cross-category series settle
 # continuously (the `0` shard ~1,000+ a week); the per-sport collections settled nothing over 10-20..10-27
 # but list open markets, so they are read four times a day for one page each.
+# Swept in this order, cheapest first. `KXMVECROSSCATEGORY` (median 658 pages a run, 10-25..11-01) is the one that
+# can fill MAX_PAGES_PER_RUN, so it goes LAST: swept first, it left each of the other seven (median 1-2 pages) unread
+# in 142-159 of 214 runs, and they sat ~19 h on 10-31 (lane `e4-pregame-prints`; user 2026-11-01 "Yes, reorder it").
 SWEEP_SERIES: dict[str, tuple[int, int]] = {
-    "KXMVECROSSCATEGORY": (900, 0),
-    "KXMVECROSSCATEGORY0": (3600, 0),
     "KXMVENBASINGLEGAME": (21600, 21600),
     "KXMVENFLSINGLEGAME": (21600, 21600),
     "KXMVESPORTSMULTIGAMEEXTENDED": (21600, 21600),
     "KXMVENBAMULTIGAMEEXTENDED": (21600, 21600),
     "KXMVENFLMULTIGAMEEXTENDED": (21600, 21600),
     "KXMVENFLMULTIGAME": (21600, 21600),
+    "KXMVECROSSCATEGORY0": (3600, 0),
+    "KXMVECROSSCATEGORY": (900, 0),
 }
 # Leg series that carry a game segment but are not a game outcome the platform prices (broadcast mentions).
 NON_GAME_SERIES_TOKENS = ("MENTION",)
