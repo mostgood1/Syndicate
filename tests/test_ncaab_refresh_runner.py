@@ -94,3 +94,33 @@ class NcaabRefreshRunnerTests(unittest.TestCase):
 
             self.assertEqual(rc, 0)
             self.assertTrue((out_dir / "odds_2026-05-22.csv").exists())
+
+    # The two tests above patch `_load_source_adapter` with a fake, so neither
+    # ever built the REAL client -- and the real client's constructor is where
+    # every fleet NCAAB fetch died (2026-11-01: 65 of 65 runs, "TheOddsAPI key
+    # not set"), because the fleet sets only the shared `ODDS_API_KEY`.
+    _KEY_NAMES = ("NCAAB_THEODDS_API_KEY", "THEODDSAPI_KEY", "THEODDS_API_KEY", "ODDS_API_KEY")
+
+    def _env_with(self, **keys: str) -> dict[str, str]:
+        env = {name: value for name, value in os.environ.items() if name not in self._KEY_NAMES}
+        env.update(keys)
+        return env
+
+    def test_real_client_builds_from_the_shared_key_alone(self) -> None:
+        module = self._load_module()
+        with patch.dict(os.environ, self._env_with(ODDS_API_KEY="shared-key"), clear=True):
+            client = module._load_source_adapter(None)(region="us")
+        self.assertEqual(client.api_key, "shared-key")
+        self.assertEqual(client.sport_key, "basketball_ncaab")
+
+    def test_ncaab_specific_key_still_wins_over_the_shared_key(self) -> None:
+        module = self._load_module()
+        env = self._env_with(NCAAB_THEODDS_API_KEY="ncaab-key", ODDS_API_KEY="shared-key")
+        with patch.dict(os.environ, env, clear=True):
+            self.assertEqual(module._load_api_key(), "ncaab-key")
+
+    def test_no_key_at_all_still_refuses(self) -> None:
+        module = self._load_module()
+        with patch.dict(os.environ, self._env_with(), clear=True):
+            with self.assertRaises(ValueError):
+                module._load_api_key()

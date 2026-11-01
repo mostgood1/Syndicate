@@ -26,6 +26,12 @@ ENV_API_KEY_NAMES = (
     "NCAAB_THEODDS_API_KEY",
     "THEODDSAPI_KEY",
     "THEODDS_API_KEY",
+    # LAST, so an NCAAB-specific key still wins. The shared name every other
+    # sport's fetcher reads, and the ONLY one the local fleet sets: the three
+    # above were injected by the retired `unified_daily_update.ps1`. Without it
+    # every fleet NCAAB fetch died in `__init__` before any call -- 65 of 65
+    # odds runs for the 2026-11-01..11-03 slates, zero quotes captured.
+    "ODDS_API_KEY",
 )
 
 
@@ -53,7 +59,7 @@ def _load_api_key(explicit_key: str | None = None) -> str:
         api_key = _trim_api_key(os.environ.get(env_name))
         if api_key:
             return api_key
-    raise ValueError("TheOddsAPI key not set. Provide NCAAB_THEODDS_API_KEY or pass --api-key.")
+    raise ValueError("TheOddsAPI key not set. Provide NCAAB_THEODDS_API_KEY or ODDS_API_KEY, or pass --api-key.")
 
 
 def _coerce_datetime(value: object) -> dt.datetime | None:
