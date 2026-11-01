@@ -13757,3 +13757,29 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness --idle-min 240 read 1 SAFE of 7 CLOSED; moved to lanes_closed.md with a pointer. Detail in log/2026-10-31.md.
 - Moved: closed-lane-archive-20261031-1241
+
+### maker-pilot-review — CLOSED (GOAL MET) — opened 2026-10-31 — closed 2026-10-31 — session 9683e8c4-02ff-45b7-8c47-ae932f103e33
+- Goal: One keep/adjust/pause recommendation for the live Kalshi maker pilot, with per-fill adverse selection (+5m/+30m/close), CLV vs fair, a CI on held P&L, and exit-lane lock-ins; READ-ONLY, no live change — GOAL: MET. Reading: `findings_2026-10-31_maker_pilot_review.md` (10 fills, 8 settled; edge +3.2pp at post -> +1.2pp at fill, 3/10 fills at negative edge; held -$22.00, z -1.64). Recommendation ADJUST (fair-move cancel), presented to the user in session 684b1d; the user's decision is owed there. No live change made.
+- Files: .syndicate/findings_2026-10-31_maker_pilot_review.md (NEW)
+- Hypothesis: Pilot fills are adversely selected (fair moves against us after fill), as the 10-19 shadow found (fills won 5.37pp below close)
+- Falsification test: Post-fill fair drift >= 0 on average across fills AND held win rate not below fill-time fair
+- Verification: Findings file with per-fill table + CI + recommendation presented to user in session 684b1d
+- Blocked by: none
+
+### live-odds-memory-spikes — CLOSED 2026-10-31 (fleet reading verified: soccer run peak 1,710 -> 896 MB) — opened 2026-10-31 — session 28697bd7-c2b8-416a-b80c-66f00938c780
+- **Goal (verbatim): Find what causes live-odds-worker's 1-2 min memory spikes (43->90% of 3072 MB) on the local WSL fleet and land a fix on main with targeted tests; NO deploy without user yes + deploy locks -- GOAL: MET** `[2026-10-31 22:10Z]`: fix `d10cb953e` live on the fleet in the 21:03:20Z ff to 87ecf730 (user: "Deploy when quiet"). Fleet reading: soccer refresh_odds_sources peak max 1,710 -> 896 MB, >800 MB 34/286 -> 4/80 runs; tree max 162% -> 105.4% of 3,072 MB. Residual (root ~1.2 GB + concurrency) is a lead in leads.md, not this lane. Detail: deploys.md 22:10Z.
+- Goal: Find what causes live-odds-worker's 1-2 min memory spikes (43->90% of 3072 MB) on the local WSL fleet and land a fix on main with targeted tests; NO deploy without user yes + deploy locks
+- Files: syndicate/features/shared/odds_refresh_tracking.py, tests/test_odds_history_shard_streaming.py
+- Hypothesis: MEASURED before opening: the spikes are one refresh_odds_sources child whose own RSS jumps ~200 -> 1.4-1.8 GB in ~8 s at the END of every run that includes soccer (714/1609 such children >800 MB; 0/1313 without soccer, max 466 MB). Cause: _sync_odds_history_for_refresh loads EVERY soccer game-date shard it touches (10 shards, 449 MB JSON at 10:21 CDT 10-31; 2026-10-31.json alone 144 MB) into dicts at once, then json.dumps each 3x. Fleet 'container memory' is role-tree RSS (memory_observability.py:115), so page cache is NOT in it.
+- Falsification test: A local replay of _sync_odds_history_for_refresh over a copy of the fleet's 10 shards + soccer candidates shows peak RSS NOT falling materially when shards are processed one at a time, or output shards differ byte-for-byte (excluding updated_at)
+- Verification: Local replay on copied fleet data: peak RSS before vs after, plus byte-identical shard outputs (normalised for timestamps); targeted pytest green. Fleet reading after a user-approved deploy: max refresh_odds_sources[soccer] child RSS and live-odds container_memory_pct_of_max on an evening slate
+- Blocked by: none
+
+### close-p6-owner-lanes — CLOSED 2026-10-31 (GOAL: MET) — opened 2026-10-31 — session eb9e3103-f175-4511-be0b-c4b7605e406f
+- Goal: The 3 OPEN lanes owned by unreachable session 2d413211 (nba-live-tick-native, wnba-fixture-identity-native, wnba-live-period-lines-native) are CLOSED per the user's 2026-10-31 approval and archived to lanes_closed.md, the 2027 WNBA reads carried by a new todo; 0 other lanes' content or claims change
+- Files: docs/ai_context/todo.md (new hand-off item only)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: census drops by 3 OPEN; claims removed belong only to the 3 slugs; every pre-edit lanes.md line is in lanes.md or lanes_closed.md
+- Blocked by: none
+- **GOAL VERDICT 2026-10-31:** "The 3 OPEN lanes owned by unreachable session 2d413211 (nba-live-tick-native, wnba-fixture-identity-native, wnba-live-period-lines-native) are CLOSED per the user's 2026-10-31 approval and archived to lanes_closed.md, the 2027 WNBA reads carried by a new todo; 0 other lanes' content or claims change" -- GOAL: MET. Reading: archive tool reported claims 324 -> 304 (all 20 from the 3 slugs) and wrote 3 pointers; every non-blank origin/main lanes.md line is in lanes.md or lanes_closed.md except the 3 rewritten OPEN headers; todo #754 carries the 2027 reads.

@@ -575,23 +575,6 @@ death, never life — do not invert it.
 - Verification: findings file on main with, per class-B cell: our fetch config (file:line), Pinnacle offered yes/no on N probed events, players covered, credit cost per day at the current cadence, and the projected change in the P2 sharp-graded pace
 - Blocked by: none
 
-### maker-pilot-review — CLOSED (GOAL MET) — opened 2026-10-31 — closed 2026-10-31 — session 9683e8c4-02ff-45b7-8c47-ae932f103e33
-- Goal: One keep/adjust/pause recommendation for the live Kalshi maker pilot, with per-fill adverse selection (+5m/+30m/close), CLV vs fair, a CI on held P&L, and exit-lane lock-ins; READ-ONLY, no live change — GOAL: MET. Reading: `findings_2026-10-31_maker_pilot_review.md` (10 fills, 8 settled; edge +3.2pp at post -> +1.2pp at fill, 3/10 fills at negative edge; held -$22.00, z -1.64). Recommendation ADJUST (fair-move cancel), presented to the user in session 684b1d; the user's decision is owed there. No live change made.
-- Files: .syndicate/findings_2026-10-31_maker_pilot_review.md (NEW)
-- Hypothesis: Pilot fills are adversely selected (fair moves against us after fill), as the 10-19 shadow found (fills won 5.37pp below close)
-- Falsification test: Post-fill fair drift >= 0 on average across fills AND held win rate not below fill-time fair
-- Verification: Findings file with per-fill table + CI + recommendation presented to user in session 684b1d
-- Blocked by: none
-
-### live-odds-memory-spikes — CLOSED 2026-10-31 (fleet reading verified: soccer run peak 1,710 -> 896 MB) — opened 2026-10-31 — session 28697bd7-c2b8-416a-b80c-66f00938c780
-- **Goal (verbatim): Find what causes live-odds-worker's 1-2 min memory spikes (43->90% of 3072 MB) on the local WSL fleet and land a fix on main with targeted tests; NO deploy without user yes + deploy locks -- GOAL: MET** `[2026-10-31 22:10Z]`: fix `d10cb953e` live on the fleet in the 21:03:20Z ff to 87ecf730 (user: "Deploy when quiet"). Fleet reading: soccer refresh_odds_sources peak max 1,710 -> 896 MB, >800 MB 34/286 -> 4/80 runs; tree max 162% -> 105.4% of 3,072 MB. Residual (root ~1.2 GB + concurrency) is a lead in leads.md, not this lane. Detail: deploys.md 22:10Z.
-- Goal: Find what causes live-odds-worker's 1-2 min memory spikes (43->90% of 3072 MB) on the local WSL fleet and land a fix on main with targeted tests; NO deploy without user yes + deploy locks
-- Files: syndicate/features/shared/odds_refresh_tracking.py, tests/test_odds_history_shard_streaming.py
-- Hypothesis: MEASURED before opening: the spikes are one refresh_odds_sources child whose own RSS jumps ~200 -> 1.4-1.8 GB in ~8 s at the END of every run that includes soccer (714/1609 such children >800 MB; 0/1313 without soccer, max 466 MB). Cause: _sync_odds_history_for_refresh loads EVERY soccer game-date shard it touches (10 shards, 449 MB JSON at 10:21 CDT 10-31; 2026-10-31.json alone 144 MB) into dicts at once, then json.dumps each 3x. Fleet 'container memory' is role-tree RSS (memory_observability.py:115), so page cache is NOT in it.
-- Falsification test: A local replay of _sync_odds_history_for_refresh over a copy of the fleet's 10 shards + soccer candidates shows peak RSS NOT falling materially when shards are processed one at a time, or output shards differ byte-for-byte (excluding updated_at)
-- Verification: Local replay on copied fleet data: peak RSS before vs after, plus byte-identical shard outputs (normalised for timestamps); targeted pytest green. Fleet reading after a user-approved deploy: max refresh_odds_sources[soccer] child RSS and live-odds container_memory_pct_of_max on an evening slate
-- Blocked by: none
-
 ### ci-suite-red-697 — OPEN — opened 2026-10-31 — session e76cc646-3e74-4beb-91ed-dcd684ebc00d
 - **GOAL VERDICT 2026-10-31 16:58Z.** Goal, verbatim: "Fleet ci-suite pytest step reads 0 NEW FAILURE(S) (todo #697): the 10-31 run's 36 on 413a08d5 split into stale tests / order leaks / env, each fixed on main or named to its owner; before/after count and the commit that should turn it green recorded here and in todo #697" — **GOAL: NOT MET.** Everything except the first clause is done. All 36 are fixed on main: 8 stale tests and tripwires (`785844c18`), and 27 + 1 order-dependent (`da3b48f9a`, mostly `execution_watchdog.read_store_state` leaking the store env). The before/after is in todo #697: 36 -> 0 of the 36 on a ci-checkout clone in chunks 4 and 8. **Left:** the scheduled 08:00Z run must read 0 NEW, and it can only do that after a fleet ff past `da3b48f9a`. The ff is not this lane's to do. Chunks 1-3 and 5-7 were not re-run on main. Owed to `live-cell-scorecard`: the `pinnacle_edge_deciles.implied` raise on `''` (it is in KNOWN_FAILING).
 - **2026-10-31 22:17Z update:** chunks 1-3/5-7 run on `2cf66baa`: 0 failed, except 1 in chunk 5 (odds-history close test, wall-clock eviction, from `d10cb953e`), fixed by `f5e32b75f`. Fleet `87ecf730` lacks `f5e32b75f`, so expect 1 NEW on 11-01 08:00Z unless an ff past `f5e32b75f` lands first. Green commit = `f5e32b75f`. Still GOAL: NOT MET until a nightly reads 0 NEW.
@@ -618,15 +601,6 @@ death, never life — do not invert it.
 - Falsification test: n/a
 - Verification: unit tests incl. off!=on reachability; fleet log shows MAKER_PILOT FAIR_PASS lines after the restart, and any FAIR_CANCEL is followed by an EXPIRE from reconcile
 - Blocked by: none
-
-### close-p6-owner-lanes — CLOSED 2026-10-31 (GOAL: MET) — opened 2026-10-31 — session eb9e3103-f175-4511-be0b-c4b7605e406f
-- Goal: The 3 OPEN lanes owned by unreachable session 2d413211 (nba-live-tick-native, wnba-fixture-identity-native, wnba-live-period-lines-native) are CLOSED per the user's 2026-10-31 approval and archived to lanes_closed.md, the 2027 WNBA reads carried by a new todo; 0 other lanes' content or claims change
-- Files: docs/ai_context/todo.md (new hand-off item only)
-- Hypothesis: n/a
-- Falsification test: n/a
-- Verification: census drops by 3 OPEN; claims removed belong only to the 3 slugs; every pre-edit lanes.md line is in lanes.md or lanes_closed.md
-- Blocked by: none
-- **GOAL VERDICT 2026-10-31:** "The 3 OPEN lanes owned by unreachable session 2d413211 (nba-live-tick-native, wnba-fixture-identity-native, wnba-live-period-lines-native) are CLOSED per the user's 2026-10-31 approval and archived to lanes_closed.md, the 2027 WNBA reads carried by a new todo; 0 other lanes' content or claims change" -- GOAL: MET. Reading: archive tool reported claims 324 -> 304 (all 20 from the 3 slugs) and wrote 3 pointers; every non-blank origin/main lanes.md line is in lanes.md or lanes_closed.md except the 3 rewritten OPEN headers; todo #754 carries the 2027 reads.
 
 ### board-midnight-date-skew — OPEN — opened 2026-10-31 — session c634d0c4-c4c3-499e-8f70-9fe8c873047d
 - **GOAL VERDICT 2026-10-31 22:06Z** — Goal (verbatim): "the Layer 2 board (/api/board/layer2-shortlist) keeps advancing through 04:00-06:00Z: refresh-worker's board date selection and the latest-key promotion check use ONE America/Chicago clock, proven by a hermetic test frozen at 04:30Z and a reachability test (off != on)" — **GOAL: NOT MET, PREMISE FALSIFIED.** The board already advances and already uses one CT clock (see RESULT below). No test was written and no fix is owed. Waiting on a user decision: close as exonerated, add a 04:30Z guard test, or shrink the ~6-8 min post-roll window served from the look-ahead build.
@@ -663,6 +637,11 @@ death, never life — do not invert it.
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 on origin/main returned SAFE for 1 of 9 CLOSED blocks; archived `closed-lane-archive-20261031-1646`. The other 8 WAIT (reasons in log/2026-10-31.md, 2026-11-01 01:5xZ entry).
+
+### closed-lane-archive-20261031-2240 — CLOSED 2026-10-31 (GOAL MET: 3 blocks archived) — opened 2026-10-31 — session 7a13f23d-d675-42a5-86bf-7d92c52c45bb
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: MET. Moved `maker-pilot-review`, `live-odds-memory-spikes`, `close-p6-owner-lanes` to lanes_closed.md (owners idle 317-335m, blocks 331-718m). 6 CLOSED blocks waited; reasons in the 2026-11-01 03:43Z log entry.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -715,6 +694,7 @@ death, never life — do not invert it.
 - `chunk-assignment-stable` — CLOSED-REVERTED 2026-09-09 — opened 2026-09-08 — session e371dfde — **the fix worked and was unaffordable: it OOM'd the suite twice and is reverted**
 - `ci-suite-four-stale-1021` — CLOSED 2026-10-21 — opened 2026-10-21 — closed 2026-10-21 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
 - `ci-suite-red-1015` — CLOSED-MET 2026-10-30 (stale-lane-triage, user-approved) — opened 2026-10-15 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
+- `close-p6-owner-lanes` — CLOSED 2026-10-31 (GOAL: MET) — opened 2026-10-31 — session eb9e3103-f175-4511-be0b-c4b7605e406f
 - `closed-lane-archive-0917` — CLOSED 2026-09-16 — opened 2026-09-16 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8 — **GOAL: NOT MET (deferred, nothing eligible)**
 - `closed-lane-archive-0917b` — CLOSED 2026-09-17 — opened 2026-09-17 — session 5d8da952-8b7e-4069-aa67-ef92b64684d3 (scheduled task archive-closed-lanes-0917) — **GOAL: NOT MET (deferred, nothing eligible)**
 - `closed-lane-archive-20260917-1442` — CLOSED 2026-09-17 — opened 2026-09-17 — session 15b0e4b6-80f1-4491-acfb-c4895a53452b (scheduled task archive-closed-lanes-0917)
@@ -916,6 +896,7 @@ death, never life — do not invert it.
 - `live-gameline-rescore-prefix-window` — CLOSED — opened 2026-09-24 — closed 2026-09-24 — session 25e0f859-2737-46ab-ad06-86879c7fd5f8
 - `live-min-stake-five` — CLOSED 2026-10-29 — opened 2026-10-21 — session 332cb014 (live-trading coordinator, handover from 34fdabd0)
 - `live-odds-latest-tick-stale` — CLOSED — opened 2026-10-02 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- `live-odds-memory-spikes` — CLOSED 2026-10-31 (fleet reading verified: soccer run peak 1,710 -> 896 MB) — opened 2026-10-31 — session 28697bd7-c2b8-416a-b80c-66f00938c780
 - `live-odds-worker-nfl-week-alignment` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `live-odds-worker-oom` — CLOSED 2026-09-15 — opened 2026-09-12 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8 — **GOAL: MET**
 - `live-odds-worker-oom-loop` — CLOSED-ABANDONED 2026-10-30 (stale-lane-triage, user-approved) — opened 2026-09-12 — session 791399da-baf0-48a5-a708-e99f4ae7fd00 — **DEPLOYED `e332b531` (live 2026-09-13T00:14:31Z). GOAL: NOT MET — live-slate census 23:23Z ENDED BY DEPLOY: 0 failures 00:14:31Z-22:31:19Z (designed recycles only), but `637278e3` cut the 09-13 slate at 5 h 31 m of live play; the >= 6 h reading is re-owed on `54f3d662`**
@@ -930,6 +911,7 @@ death, never life — do not invert it.
 - `local-production-boot-task` — CLOSED — opened 2026-09-30, closed 2026-09-30 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
 - `local-production-first-run` — CLOSED — opened 2026-09-30, closed 2026-09-30 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
 - `local-production-wsl` — CLOSED — opened 2026-09-30, closed 2026-10-01 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+- `maker-pilot-review` — CLOSED (GOAL MET) — opened 2026-10-31 — closed 2026-10-31 — session 9683e8c4-02ff-45b7-8c47-ae932f103e33
 - `maker-vs-taker-shadow` — CLOSED (GOAL MET) — opened 2026-10-24 — closed 2026-10-26 — session 78880f41-ba0e-410c-aaac-d6cbeb02b884
 - `market-history-index-memo` — CLOSED 2026-09-18 (GOAL: MET) — opened 2026-09-18 — session a1e40980-cceb-493f-adf9-5a5ca879acf6 — body in `lanes_history.md`.
 - `min-ev-paper-twin-dedup` — CLOSED 2026-10-20 — opened 2026-10-20 — session 5a76143c-2ec5-4c1e-96b3-cafbafb68664
