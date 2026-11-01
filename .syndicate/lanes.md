@@ -628,20 +628,16 @@ death, never life — do not invert it.
 - Verification: findings file on main with per-stage NHL counts (venue listing -> catalogue -> join -> Layer 2 book_prices -> DecisionRecord venue price -> paper candidates), the first zero stage named with file:line, and the fix commit or owner
 - Blocked by: none
 
-### closed-lane-archive-20261031-2056 — CLOSED 2026-10-31 (GOAL MET: 1 block archived) — opened 2026-10-31 — session dac1518f-3aec-4484-8c73-061d1d8b3320
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness.py --idle-min 240 on origin/main returned SAFE for 1 of 9 CLOSED blocks; archived `closed-lane-archive-20261031-1646`. The other 8 WAIT (reasons in log/2026-10-31.md, 2026-11-01 01:5xZ entry).
-
-### closed-lane-archive-20261031-2240 — CLOSED 2026-10-31 (GOAL MET: 3 blocks archived) — opened 2026-10-31 — session 7a13f23d-d675-42a5-86bf-7d92c52c45bb
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: MET. Moved `maker-pilot-review`, `live-odds-memory-spikes`, `close-p6-owner-lanes` to lanes_closed.md (owners idle 317-335m, blocks 331-718m). 6 CLOSED blocks waited; reasons in the 2026-11-01 03:43Z log entry.
-
 ### closed-lane-archive-20261101-0040 — CLOSED 2026-11-01 (GOAL MET: 1 blocks archived) — opened 2026-11-01 — session 28ad1d77-15fe-48f5-ac25-825ac243d696
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - Verdict: MET. Moved `closed-lane-archive-20261031-1849` to lanes_closed.md (owner a9ec2bfa idle 347m, block 349m). 6 CLOSED blocks waited; reasons in the 2026-11-01 05:4xZ log entry.
+
+### closed-lane-archive-20261101-0240 — CLOSED 2026-11-01 (GOAL MET: 2 blocks archived) — opened 2026-11-01 — session cdb66c22-02a4-41ba-86c8-fa1aeaefd108
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: MET. owner_liveness.py --idle-min 240 at 08:41Z (02:41 CST) returned 2 SAFE of 7 CLOSED; moved to lanes_closed.md with one pointer each. Table and deferrals are in log/2026-11-01.md 08:43Z.
+- Moved: closed-lane-archive-20261031-2056, closed-lane-archive-20261031-2240
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -775,6 +771,8 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261031-1439` — CLOSED 2026-10-31 (GOAL MET: 1 blocks archived) — opened 2026-10-31 — session 05a30e8c-4bc9-4e0a-baec-a2d8c0b48bbe
 - `closed-lane-archive-20261031-1646` — CLOSED 2026-10-31 (GOAL MET: 1 block archived) — opened 2026-10-31 — session 5376f7b2-7854-4d74-92d0-6706064acfbb
 - `closed-lane-archive-20261031-1849` — CLOSED 2026-10-31 (GOAL MET: 1 blocks archived) — opened 2026-10-31 — session a9ec2bfa-b913-49e1-b196-311263f0d0c6
+- `closed-lane-archive-20261031-2056` — CLOSED 2026-10-31 (GOAL MET: 1 block archived) — opened 2026-10-31 — session dac1518f-3aec-4484-8c73-061d1d8b3320
+- `closed-lane-archive-20261031-2240` — CLOSED 2026-10-31 (GOAL MET: 3 blocks archived) — opened 2026-10-31 — session 7a13f23d-d675-42a5-86bf-7d92c52c45bb
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
