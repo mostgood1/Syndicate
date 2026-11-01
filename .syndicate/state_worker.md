@@ -51,7 +51,7 @@ the same 3h window) and the process-sample path would return `UNKNOWN` forever.
 Crons are deliberately NOT in the guard's `ALL_SERVICES`: they are absent from
 `render.yaml`, so `blueprint_sync` cannot reach them.
 
-## [ci-suite-pytest-step] THE FULL SUITE RUNS ONLY WHEN CHUNKED; THE BASELINE IS EMPTY, AND THE STEP IS RED (10-31 08:00Z on `413a08d5`: 36 NEW, all 36 fixed on main by `785844c18` + `da3b48f9a`, green not yet read) `[verified 2026-10-31, lane ci-suite-red-697, local fleet]`
+## [ci-suite-pytest-step] THE FULL SUITE RUNS ONLY WHEN CHUNKED; THE BASELINE IS EMPTY, AND THE STEP IS RED (11-01 08:00Z on `87ecf730`: 1 NEW, down from 36 on 10-31 -- `test_odds_history_shard_streaming::test_close_events_come_after_every_row_event`, fixed on main by `f5e32b75f`, NOT on the fleet tree `9a41c6f66` as of 11-01 16:33Z) `[verified 2026-11-01, lane ci-suite-red-697, local fleet]`
 
 **Worker count was never the lever.** OOM-killed at 2Gi at `-n auto`, at `-n 2`
 (1056 s in) and at `-n 0` (537 s in) — **fewer workers failed SOONER**, because

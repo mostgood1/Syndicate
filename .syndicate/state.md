@@ -740,7 +740,7 @@ once this index exists: re-splitting would orphan the parts.
 | [exchange-venues] | Crypto.com is NOT a third venue — VERIFIED 2026-08-28, local full-egress session | `state_venues.md` |
 | [venue-market-universe] | The venues list ~25,000 markets and the board acts on 277 — VERIFIED 2026-08-30 | `state_venues.md` |
 | [render-crons] | THE THREE CRON SERVICES: WHAT THEY ARE, AND FOUR FACTS THAT COST A SESSION TO LEARN `[2026-09-08, lane render- | `state_worker.md` |
-| [ci-suite-pytest-step] | THE FULL SUITE RUNS ONLY WHEN CHUNKED; THE BASELINE IS EMPTY, AND THE STEP IS RED (10-31: 36 NEW on `413a08d5`, all fixed on main `da3b48f9a`, green not yet read) `[verified 2026-10-31, lane ci-suite-red-697]` | `state_worker.md` |
+| [ci-suite-pytest-step] | THE FULL SUITE RUNS ONLY WHEN CHUNKED; THE BASELINE IS EMPTY, AND THE STEP IS RED (11-01: 1 NEW on `87ecf730`, down from 36; fixed on main `f5e32b75f`, not yet on the fleet) `[verified 2026-11-01, lane ci-suite-red-697]` | `state_worker.md` |
 | [fleet-redis-test-pollution] | THE FLEET REDIS HELD 426 TEST-FIXTURE KEYS; A PYTEST GUARD AND A JANITOR ARE LIVE AND THE COUNT IS 0 `[verified 2026-10-23, lane fleet-redis-test-pollution, f2bf4d47 + c4a8aa8f]` | `state_worker.md` |
 | [odds-history-segment-keys] | THE odds_history SHARD CARRIES `segment=` KEYS NOW — and three separate key builders were segment-blind, in tw | `state_worker.md` |
 | [refresh-worker-headroom-2026-09-02] | THE ~1.4GB HEADROOM FIGURE IS STALE, AND THE METRIC EVERYONE READS IS THE WRONG ONE `[2026-09-02, lane m625-en | `state_worker.md` |
