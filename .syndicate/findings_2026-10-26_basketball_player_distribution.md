@@ -1082,3 +1082,81 @@ signal.
 
 **Owner:** lane basketball-player-distribution reads it on the round-2 read date (basketball-scenario-calibration,
 same session).
+
+## STEP 4 — REAL_ONLY (PLAYED, NEVER SIMULATED), PRE-REGISTERED 2026-11-01 16:09Z (10:09 CST), before any REAL_ONLY slot is classified by cause
+
+**User decision 11-01:** "pre-register the REAL_ONLY minutes fix". Baseline fit_inj (d674e150): 954 REAL_ONLY
+player-games, **6.19 real min per team-game** (1,604 team-games): SIM_AROUND 701 (the sim has the player on that team
+before AND after the date, not on it), SIM_LATER_ONLY 210 (roster lag / same-day signings), SIM_EARLIER_ONLY 36,
+SIM_NEVER_T 7. By step 3b's conservation identity, every REAL_ONLY minute is a minute the sim gave someone else, so
+this is the one lever that lowers the played population's summed bias instead of moving it.
+
+**Interaction with step 3c (218c26dd), fixed now:** step 3c's BASE is frozen as fit_inj's config. Nothing in this
+step changes that arm. A mechanism adopted here is tested in its own arm and enters a forward read only by its own
+pre-registration.
+
+### Stage A0 — census by cause (descriptive, no gate). Decides which mechanism stage A grades.
+
+Each fit_inj REAL_ONLY slot (date d, team T, player X) gets the FIRST cause that applies:
+- **C1 INJ_LISTED:** X is on the step-1d injury feed for d / T with an excluded status (OUT, DOUBTFUL, SUSPENDED,
+  INACTIVE, REST). Known small (the 3 CHI 01-28 false exclusions).
+- **C2 K2:** the K=2 rule would drop X: X has MIN > 0 for T in this season's regular-season player_logs before d, none
+  in T's last 2 games, T has ≥ 2 games, and X has no posted pre-tip prop line in the replay's
+  `oddsapi_player_props_<d>.csv` (the rule's re-admit). REPLICATED from `nba_sim_availability.py`'s docstring rule:
+  its print line carries counts only, not names. Cross-check: the replicated per-date count of added players against
+  the run's `added` where the logs carry it; a mismatch > 10% of slots is reported before any mechanism is graded.
+- **C3 ROSTER:** X is not on T's as-of roster for d (`asof_roster`), i.e. SIM_LATER_ONLY / SIM_NEVER_T in practice.
+- **C4 POOL:** none of the above: on the roster, eligible, and still not in `pnames` (the pool pruner, max_keep 13,
+  or another pool step). Reported with its sub-split where the code path can be named.
+- Reported per cause: slots, real min per team-game, share of the 6.19, month, 12 examples.
+
+### Stage A — offline feasibility of the mechanism for the LARGEST cause (no sim run)
+
+Exactly one mechanism is graded: the one matching the cause with the most real min per team-game. Each is fixed now.
+
+- **If C2 (K2) is largest — M-K2, "K=2 defers to the injury report":** when an as-of injury report exists for T's game,
+  K=2 does not drop a player who is NOT listed on it (the report is the newer evidence; K=2 was adopted 10-06,
+  before any NBA injury history existed). Population = every K=2-dropped (d, T, X) on FIT not listed on the report
+  (all of them, played or not, replicated as in C2). Proxy minutes p = X's mean MIN over his last 10 regular-season
+  games played for T before d.
+- **If C4 (POOL) is largest — M-POOL, pool depth:** max_keep 13 → 15, the two kept by the pruner's own order.
+  Population = the players the larger pool would add; same proxy p.
+- **If C3 (ROSTER) is largest:** no pre-tip source of same-day signings exists in the replay; stop and report it as a
+  data-collection question (like coach DNP). No mechanism.
+- **If C1 is largest:** the injury feed's status rule is re-read instead (report, no mechanism).
+
+**Gate A, over all 109 FIT dates (no parameter is fitted, so no train / test split; both halves reported):**
+- (A1) recovered: real minutes per team-game of the re-admitted players who PLAYED ≥ 50% of that cause's REAL_ONLY
+  real min per team-game;
+- (A2) cost: Σ p over re-admitted players who did NOT play ≤ Σ p over those who played — the mechanism puts at least as
+  many expected minutes on players who played as on players who sat (step 2a's A2 logic);
+- (A3) false re-admits of injured players: re-admitted players whose box reason names an injury or illness ≤ 10% of
+  re-admitted slots.
+- Reported, no gate: played rate of the re-admitted; real minutes of those who played (mean, distribution); the
+  coach-DNP share of the non-players; Nov–Dec vs Jan–Feb.
+
+**If A FAILS:** stop, report which. A1 → the cause is real but the mechanism reaches too little of it; A2 → the cause
+cannot be separated from healthy scratches without pre-tip news (same reading as step 2a); A3 → the report misses
+injured players and K=2 is carrying them.
+
+### Stage B — engine / harness (only if A PASSES)
+
+- M-K2: one switch key in `nba_sim_availability.json` (`"defer_to_injury_report": true`; absent = today's rule), read
+  in `add_nba_recency_exclusions` with a count in its existing print line (`deferred_to_report`). M-POOL: the
+  pruner's max_keep through the existing engine config. Lane `Files:` gets the touched section after a collision check
+  (nba-sim-availability is NOT this lane's file today; the owner lanes are closed, nba-prop-calibration CLOSED-MET).
+- Engine standard: checklist CONSUMED × POPULATED; trace file:line; reachability test (off != on) first; the switch
+  file is already disk-backed.
+- Runs: 12-date smoke (the INJ smoke dates), then the full FIT `fit_ro` = fit_inj's config + the switch.
+- **Gate B (all FIT dates, paired by game vs fit_inj):** (B1) REAL_ONLY real min per team-game ≤ fit_inj's minus 50%
+  of the stage-A recovered minutes; (B2) coach-DNP sim min per team-game rises by no more than the REAL_ONLY minutes
+  it removes; (B3) minutes miss (bench, starter) and pts / reb / ast / threes miss none worse than fit_inj by > .005;
+  (B4) game total within ±1.0 of fit_inj (else the totals solver is re-fit before any stat read).
+
+**Predictions, written now:** C2 (K2) is the largest cause, at ≥ 50% of the 6.19 (SIM_AROUND is 701 of 954 slots,
+and "on the team before and after, not on the date" is K=2's signature). M-K2's played rate among the re-admitted
+lands in [.4, .7]: K=2's own 10-02 measurement had 539 played vs 2,501 non-players dropped BEFORE the injury feed;
+the feed now removes the injured part of the non-players.
+
+**Out of scope:** production (the K=2 rule is LIVE on the fleet; any change to it there is a user decision after a
+forward read, and the live injury feed differs from this historical one); step 3c's frozen arms; coach DNP.
