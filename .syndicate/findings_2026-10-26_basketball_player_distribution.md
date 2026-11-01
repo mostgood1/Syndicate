@@ -1160,3 +1160,50 @@ the feed now removes the injured part of the non-players.
 
 **Out of scope:** production (the K=2 rule is LIVE on the fleet; any change to it there is a user decision after a
 forward read, and the live injury feed differs from this historical one); step 3c's frozen arms; coach DNP.
+
+**STEP 4 — A0 CENSUS + STAGE A RESULT 2026-11-01 16:35Z (10:35 CST). VERDICT AS REGISTERED: FAIL (A2). Stage B is NOT
+built. The replication is NOT faithful enough to trust either way (disclosed below).**
+
+`r2s/stage4.py` → `stage4.json`, `stage4_pop.csv`, `stage4.out`; nice 19. 1,604 team-games, 954 REAL_ONLY slots,
+6.19 real min per team-game (matches fit_inj). Every slot had an as-of roster file.
+
+**A0 census** (first cause that applies):
+
+| cause | slots | real min / team-game | share |
+|---|---|---|---|
+| C1 INJ_LISTED | 3 | 0.05 | 0.7% (the CHI 01-28 trio) |
+| **C2 K2** | **779** | **4.73** | **76.4%** |
+| C3 ROSTER | 44 | 0.30 | 4.9% |
+| C4 POOL | 128 | 1.11 | 18.0% (Nov 44, Feb 58) |
+
+Prediction "C2 is largest, ≥ 50% of the 6.19" — held. Disclosed: the replay holds NO `oddsapi_player_props_<d>.csv`
+on FIT dates (9 files, all from 2026-05), so the rule's prop-line re-admit is inert in fit_inj; and the run logs
+carry no per-date `added` line, so the pre-registered cross-check could not run.
+
+**Stage A, M-K2 ("K=2 defers to the injury report")**, population = replicated K=2-dropped (d, T, X) not listed out
+on the report, 1,582 team-games:
+
+| | value | gate |
+|---|---|---|
+| re-admitted slots / played | 3,925 / 1,058 (27.0%) | — |
+| (A1) recovered real min / team-game | 9.13 vs C2 4.73 | ≥ 50%: PASS |
+| (A2) Σ p not played / Σ p played | 29,714 / 15,353 = **1.94** | ≤ 1: **FAIL** |
+| (A3) re-admitted with an injury reason | 0.05% | ≤ 10%: PASS |
+
+Halves: Nov–Dec A2 1.02, played rate .37; Jan–Feb A2 2.73, .21. Prediction "played rate in [.4, .7]" — FAILED (.27).
+
+**FIDELITY PROBLEM (found by the numbers, read after the verdict).** The replicated population has 1,058 players who
+PLAYED, but only 779 C2 slots exist: the replication drops ~280 players the real rule did not.
+- The rule's TEAM KEY skip (a traded player is not excluded) was not replicated; 1,853 of the 2,867 non-players are
+  NOT IN T's BOX at all — mostly traded / waived players, who are not in T's pool anyway.
+- The rest is unexplained: ~250 players the replication drops who played AND were simulated.
+- Post-hoc sensitivity (`r2s/stage4_fidelity.py`, NOT a verdict): restricted to players on T's as-of roster for d,
+  2,671 slots, played rate .385, **A2 = 0.95** (Nov–Dec 0.87, Jan–Feb 1.01), recovered 8.91 (still > 4.73, so the
+  replication still over-drops). On a closer population A2 sits at the boundary, not clearly on either side.
+
+**Reading:** C2 is the cause (76% of REAL_ONLY). Whether deferring to the report is worth its cost is NOT decided by
+this run: the registered verdict is FAIL, and the sensitivity says that FAIL is largely traded players the real rule
+never drops. The decisive population is the rule's OWN list of dropped names, which no log carries. A faithful
+re-grade needs the rule to print its names in the research harness (or a harness smoke of M-K2 measured directly).
+Either is a NEW pre-registration with the same A1–A3; not done.
+- Not done: no engine code, no switch key, no sim run.
