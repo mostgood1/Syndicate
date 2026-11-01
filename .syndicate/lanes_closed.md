@@ -13783,3 +13783,8 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Verification: census drops by 3 OPEN; claims removed belong only to the 3 slugs; every pre-edit lanes.md line is in lanes.md or lanes_closed.md
 - Blocked by: none
 - **GOAL VERDICT 2026-10-31:** "The 3 OPEN lanes owned by unreachable session 2d413211 (nba-live-tick-native, wnba-fixture-identity-native, wnba-live-period-lines-native) are CLOSED per the user's 2026-10-31 approval and archived to lanes_closed.md, the 2027 WNBA reads carried by a new todo; 0 other lanes' content or claims change" -- GOAL: MET. Reading: archive tool reported claims 324 -> 304 (all 20 from the 3 slugs) and wrote 3 pointers; every non-blank origin/main lanes.md line is in lanes.md or lanes_closed.md except the 3 rewritten OPEN headers; todo #754 carries the 2027 reads.
+
+### closed-lane-archive-20261031-1849 — CLOSED 2026-10-31 (GOAL MET: 1 blocks archived) — opened 2026-10-31 — session a9ec2bfa-b913-49e1-b196-311263f0d0c6
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. Moved `closed-lane-archive-20261031-1439` (owner 05a30e8c idle 243m, block last modified 248m). 8 other CLOSED blocks WAIT; detail in log/2026-10-31.md.
