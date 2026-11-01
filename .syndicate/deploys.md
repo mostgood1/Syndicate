@@ -55315,3 +55315,59 @@ which is about the two sizing bases and not about the refusal boundary.
   - `KXMVECROSSCATEGORY`: 8 slices / 798 pages, 03:08:42Z..03:32:46Z; lag **13.57 h** (12.7 h at 15:42Z). The small series took 12 of the run's 810 pages.
 - **verify:** the first budget-stopped run read every due small series and left each under 1 h behind: **MET for this run.** **Owed:** the same over a day of runs. `series_cost.py` from 11-01 17:00Z must show 0 runs in which a due small series went unread; read with the 11-02 morning reads.
 - Separately, not from this change: `KXMVECROSSCATEGORY` is still falling behind on this NFL Sunday (the usual weekend backlog, deploys 11-01 01:22Z). Its rows arrive late, not lost.
+
+## 2026-11-01 17:18Z (12:18 PM CT) -- MEASUREMENT for `4520b47ae` (NHL Kalshi prices): on the fleet via the 16:49:50Z ff to `18090e38e`, loaded by the 16:53Z refresh-worker restart -- **VERIFIED: NHL Kalshi props and game lines are captured, sit in the sportsbooks' grid rows, and 329 of 486 NHL DecisionRecords carry a venue price (was 0 of 608)** (lane nhl-venue-price-gap, session e32fef1a)
+- **User, verbatim:** "Yes, update fleet", on "Update the fleet to include the NHL fix now?".
+- **This lane made NO deploy and took no claim.**
+  - The code reached the fleet in lane `ncaab-odds-key-fallback`'s ff `9a41c6f6 -> 18090e38e` at 16:49:50Z. That commit contains `4520b47ae`, and the ride-along is within the user's yes above.
+  - It loaded in lane `maker-pilot-fair-cancel`'s claimed restart: `down` at 16:53:29Z; refresh-worker `BOOTED` at 16:53:49Z.
+  - `status` at 16:54:08Z: web, refresh-worker and live-odds-worker all `code=18090e38`.
+  - So live-odds-worker also loaded it: its in-game Kalshi refresh now fetches the NHL prop series.
+- **Baselines (pre-restart):**
+  - 11-01 DecisionRecords, written 16:16:40Z: NHL 0 of 608 with a venue price.
+  - NHL venue rows in `book_quotes` captured 12:00-16:53Z: 0.
+  - `TRIM_BY_SPORT` NHL kept: 554.
+- **Reading 1, fetch and trim:**
+  - The first tick after boot did not reach the three prop series. It spent its 30 s budget on hot series: `BUDGET_STOP fetched=32 of 186`.
+  - The next tick fetched them at 16:59:25Z: `KXNHLGOAL` 299, `KXNHLPTS` 210, `KXNHLAST` 150 markets.
+  - `TRIM_BY_SPORT`: NHL kept 908 at 16:59:36Z, then 555 at 17:04:47Z, when NFL's fresh fetches took the spare slots.
+  - NHL's demand cap is about 576 of 6,000, so the props live in the sport-blind leftover pass.
+  - The persisted working set at 17:05:29Z held all 659 prop markets, all dated 11-01/11-02.
+  - NCAAF kept fell 1,107 -> 754 at 16:59Z, but its venue-priced records ROSE (reading 4).
+- **Reading 2, capture** (`QUOTE_CAPTURE` appended_by_sport nhl):
+
+  | Time | NHL rows appended |
+  |---|---|
+  | 16:55:15Z | 22 (game: h2h 9, spreads 13) |
+  | 17:05:55Z | 61 |
+  | 17:06:01Z | 340 |
+
+  - `segment_skipped=0` on every line, as predicted.
+  - 0 Traceback, 0 `QUOTE_CAPTURE_FAILED`.
+  - Polymarket (`portfolio_commit` `POLYMARKET_QUOTE_CAPTURE`): NHL appended 7 at 17:13:10Z.
+- **Reading 3, `book_quotes` + grid** (NHL 11-01 shard, rows captured since 16:53:49Z):
+  - 423 Kalshi rows: `GOALS` 165, `POINTS` 128, `ASSISTS` 108, spreads 13, h2h 9. All props are filed under the shard's codes.
+  - `build_book_grid`: 352 grid rows carry a venue price.
+    - 349 of them also carry at least one sportsbook; 140 carry Pinnacle.
+    - Venue-only: 3, all game spreads at lines no book posts.
+- **Reading 4, DecisionRecords** (11-01 file written 17:14:47Z) -- records with a venue price:
+
+  | Sport | Before (16:16:40Z) | After (17:14:47Z) |
+  |---|---|---|
+  | NHL | 0 / 608 | **329 / 486** (props 325 / 479, game 4 / 7) |
+  | NFL | 221 / 1,586 | 227 / 1,538 |
+  | NBA | 28 / 1,590 | 45 / 1,541 |
+  | Soccer | 192 / 1,579 | 214 / 1,541 |
+  | NCAAF | 74 / 116 | 115 / 195 |
+
+- **Reading 5, paper funnel** (`ev_lb_funnel_read.py`, the paper job's own path, over the 11-01 and 11-02 files):
+  - NHL: 329 candidates, all Kalshi; 200 eligible. The other 129 fail `one_sided_fair`.
+  - **0 qualify under `ev_lb`.** The best NHL `ev_lb` is -0.33%.
+  - Buckets: no raw edge 160 (80%), fee eats 35, haircut eats 5. Net EV positive: 5.
+  - On 10-31 NHL had 0 candidates of 1,230.
+  - Bookings by the paper job itself are not read yet: it has not logged since the restart.
+- **Reading 6, live:** 0 `STAKE_BAND` lines naming NHL (4 in all) and 0 NHL orders of ours, 16:53:49Z..17:17Z.
+- **Owed (handed to the gate-clock reads, lane `syndicate-decision-engine` / `decision-policy-paper`):**
+  - NHL paper bookings by strategy at the next paper run;
+  - their `sharp_close` grades. NHL props carry Pinnacle, so these should be sharp-gradable;
+  - the first live NHL `STAKE_BAND` if one ever sizes.

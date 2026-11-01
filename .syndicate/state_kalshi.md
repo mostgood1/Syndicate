@@ -690,14 +690,15 @@ venue plus a date-blind cap must produce it `[verified 2026-08-26]`.
 cancelled in favour of Kalshi yet** -- that turns a metered market into a
 missing one. Order: fix the join, measure `matched` per family, then cancel.
 
-**NO NHL AND NO NCAAB PLAYER PROP COULD EVER AUTO-REGISTER -- FIXED
-`b8a958fe6`, NOT YET DEPLOYED, and unobservable until those seasons start.**
-`market_keys._BY_SPORT` had no `nhl` and no `ncaab` key, and
-`auto_series_from_catalogue` gates registration on `canonical_market_key`
-resolving. `_TOTAL_UNIT` *does* carry both, so game totals work and props
-cannot -- which is why it reads as coverage. `KXNHLSAVES`, `KXNHLANYGOAL`,
-`KXNHLPTS` are already listed. Identical to the defect `market_keys`' own
-header records for NFL (`ticker_substring_n=317 classified_n=0`).
+**NHL PROPS AND GAME LINES ARE PRICED ON KALSHI SINCE 2026-11-01 16:53Z -- VERIFIED on the fleet
+(`deploys.md` 2026-11-01 17:18Z, lane nhl-venue-price-gap).** The vocabulary fix (`b8a958fe6`) was
+not enough: Kalshi titles its NHL prop series 'Pro Hockey Points' / 'NHL Goalscorer' / 'Pro Hockey
+Assists', which the "Player <stat>" discovery gate misses, so `KXNHLPTS` / `KXNHLGOAL` / `KXNHLAST`
+are hand-registered (`4520b47ae`); NHL game lines are captured (`_GAME_LINE_CAPTURE_SPORTS` =
+{soccer, nhl}); Kalshi NHL props file under the shard's codes (`POINTS`/`GOALS`/`ASSISTS`).
+Read 17:14Z: NHL DecisionRecords with a venue price 329 of 486 (was 0 of 608). NHL props sit in the
+trim's leftover pass (demand cap ~576 of 6,000), so their share moves with other sports' fetches.
+NCAAB props remain unobserved.
 
 **LADDERS: THE RECORD IS WHOLE, THE JOIN'S INPUT IS NOT.**
 `MAX_MARKETS_PER_SERIES=400` against `KXNCAAFSPREAD`'s **1994** real markets is

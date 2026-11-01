@@ -134,3 +134,21 @@ All readings were taken on 2026-10-31 between 22:08Z and 22:18Z. Fleet HEAD was 
 6. The first live `STAKE_BAND` / order line on NHL.
 
 **Live-money note (unchanged):** once live, the portfolio commit can price, and so order, NHL Kalshi markets, inside every existing cap. An ff to any SHA at or after `4520b47ae` therefore needs the user's yes.
+
+
+## Fleet reading, 2026-11-01 17:18Z (fleet `18090e38e`, refresh-worker restarted 16:53Z)
+
+The fix is LIVE. It reached the fleet in another lane's ff and loaded in another lane's claimed restart. The full entry is in `deploys.md` 2026-11-01 17:18Z.
+
+**The six owed checks:**
+
+| # | Check | Result |
+|---|---|---|
+| 1 | Trim | Props fetched 16:59:25Z (659 markets). NHL kept 908 then 555: they live in the leftover pass, and the working set at 17:05Z held all 659. NCAAF lost slots (1,107 -> 754) but gained venue-priced records. |
+| 2 | Capture | NHL appended 22 (game), then 61 and 340; Polymarket NHL 7. `segment_skipped=0`. |
+| 3 | Grid | 423 Kalshi rows under `GOALS` / `POINTS` / `ASSISTS` / h2h / spreads. 352 grid rows carry a venue price: 349 alongside sportsbooks, 140 alongside Pinnacle, 3 venue-only (spreads). |
+| 4 | DecisionRecords | NHL **329 of 486** with a venue price (was 0 of 608). |
+| 5 | Paper | 329 candidates, 200 eligible. **0 qualify under `ev_lb`** (best -0.33%); 80% have no raw edge at Kalshi's price. Paper-job bookings not yet read. |
+| 6 | Live | No NHL sizing or orders to 17:17Z. |
+
+**What this settles:** "no paper strategy can book NHL" was a plumbing defect, and it is fixed. Whether NHL gets booked is now the strategies' call, on prices. On this first build, `ev_lb` declines all of it.
