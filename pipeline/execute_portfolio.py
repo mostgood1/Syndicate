@@ -535,13 +535,35 @@ def _run_execution(
 
                     # Own guard: a failed cancel pass must not skip the
                     # Polymarket reconcile that follows in this loop.
+                    kicked: set[Any] = set()
                     try:
-                        _ledger.cancel_pregame_resting_at_kickoff(outcome["resting"])
+                        kickoff = _ledger.cancel_pregame_resting_at_kickoff(outcome["resting"])
+                        kicked = {o.get("idempotency_key") for o in kickoff.get("orders") or ()}
                     except Exception as exc:  # noqa: BLE001 -- never fatal, like the reconcile
                         print(
                             f"[execute_portfolio] KICKOFF_CANCEL_FAILED {type(exc).__name__}: {exc}",
                             flush=True,
                         )
+                    # THE MAKER PILOT'S FAIR-MOVE CANCEL  [2026-10-31 user "Yes, build
+                    # it", lane maker-pilot-fair-cancel]. Here because this is the only
+                    # per-tick read of what rests; it judges sightings the PREVIOUS pass
+                    # recorded (`observe_plan_position`, below). Rows the kickoff cancel
+                    # just pulled are not cancelled twice.
+                    pilot_rows = [
+                        row for row in outcome["resting"]
+                        if row.get("execution_style") == "maker_pilot"
+                        and row.get("idempotency_key") not in kicked
+                    ]
+                    if pilot_rows:
+                        try:
+                            from syndicate.features.shared.kalshi_maker_pilot import review_resting
+
+                            review_resting(pilot_rows)
+                        except Exception as exc:  # noqa: BLE001 -- never fatal, like the reconcile
+                            print(
+                                f"[execute_portfolio] MAKER_PILOT_FAIR_REVIEW_FAILED {type(exc).__name__}: {exc}",
+                                flush=True,
+                            )
         except Exception as exc:
             print(
                 f"[execute_portfolio] RECONCILE_FAILED {type(exc).__name__}: {exc}",
@@ -773,6 +795,13 @@ def _run_execution(
             skipped += 1
             refused["incomplete_position"] = refused.get("incomplete_position", 0) + 1
             continue
+        # The plan still names this contract, at this fair -- recorded BEFORE every
+        # gate below, so a position refused for its slate, band or event cap is
+        # not mistaken for one the plan dropped (lane maker-pilot-fair-cancel).
+        if mode == LIVE and str(venue).strip().lower() == "kalshi":
+            from syndicate.features.shared.kalshi_maker_pilot import observe_plan_position
+
+            observe_plan_position(request)
         if ladder and (request.position_key, normalized) in held_by_venue_book:
             skipped += 1
             refused["held_by_venue_book"] = refused.get("held_by_venue_book", 0) + 1

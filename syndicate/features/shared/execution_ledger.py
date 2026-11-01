@@ -3857,7 +3857,9 @@ def cancel_stale_resting_orders(resting: Sequence[Mapping[str, Any]]) -> dict[st
     for row in resting:
         # THE MAKER PILOT RESTS BELOW THE ASK ON PURPOSE [2026-10-24 user decision
         # "C: Small live pilot", lane kalshi-maker-pilot]. Its lifetime is the venue
-        # expiry at commence plus the kickoff cancel, never this pass. Measured
+        # expiry at commence, the kickoff cancel and the fair-move cancel
+        # (`kalshi_maker_pilot.review_resting`, per tick in `execute_portfolio`),
+        # never this pass. Measured
         # 2026-10-25 16:29:44Z: the first pilot post (resting 0.46, market 0.47,
         # age 2759 s) was cancelled here as stale six days before its kickoff.
         if row.get("execution_style") == "maker_pilot":
@@ -3919,24 +3921,6 @@ def cancel_stale_resting_orders(resting: Sequence[Mapping[str, Any]]) -> dict[st
             }
         )
 
-    # THE PILOT'S OWN RULE [2026-10-31 user "Yes, build it", lane
-    # maker-pilot-fair-cancel]: skipped above for the market-price rule, judged
-    # here against the plan's current fair. Read from `resting` itself, not the
-    # loop, so the cancel cap's `break` cannot hide a pilot row. A failure here
-    # must never cost the taker pass its result.
-    pilot_fair: dict[str, Any] | None = None
-    pilot_rows = [row for row in resting if row.get("execution_style") == "maker_pilot"]
-    if pilot_rows:
-        try:
-            from syndicate.features.shared.kalshi_maker_pilot import review_resting
-
-            pilot_fair = review_resting(pilot_rows)
-        except Exception as exc:
-            print(
-                f"[execution_ledger] MAKER_PILOT_FAIR_REVIEW_FAILED {type(exc).__name__}: {exc}",
-                flush=True,
-            )
-
     # THE LEDGER IS NOT UPDATED HERE. The next reconciliation pass reads the
     # venue, sees `canceled`, and moves the row to `rejected` through the one
     # path that is allowed to change a status -- the venue's own word. Writing
@@ -3957,7 +3941,6 @@ def cancel_stale_resting_orders(resting: Sequence[Mapping[str, Any]]) -> dict[st
         "too_young": too_young,
         "at_market": at_market,
         "maker_pilot": maker_pilot,
-        "maker_pilot_fair": pilot_fair,
         "orders": cancelled,
     }
 

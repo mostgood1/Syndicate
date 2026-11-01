@@ -301,8 +301,6 @@ def route(request: Any, *, now: _dt.datetime | None = None,
           enabled_fn: Callable[[], bool] = pilot_enabled,
           wrap: Callable[[Any], Any] | None = None) -> Routed | None:
     """The maker form of `request` and its adapter, or None (the request stays a taker order)."""
-    if pilot_switch_on() and str(getattr(request, "venue", "") or "").strip().lower() == "kalshi":
-        note_plan_sighting(request, now=now)
     why = refusal(request, now=now, orders=orders, enabled_fn=enabled_fn)
     if why == HELD:
         return Routed(request=request, submitter=None, skip=HELD)
@@ -349,12 +347,18 @@ def reconcile_line(row: Mapping[str, Any]) -> str | None:
 # re-priced and rests up to ~40 h is a stale quote: it fills once the world has moved to the taker's
 # side. So a resting post now lives only while the PLAN still wants it at the price it rests at.
 #
-# THE FAIR IS THE PLAN'S OWN. Every executor pass re-sends a held pilot position through `route`
-# (measured 2026-10-31: `refused={'maker_pilot_held': 1}` on the 06:07Z / 07:57Z / 08:04Z passes) with
-# the plan's current price and EV, both on market fair (#704). fair = P(price) x (1 + ev_pct/100), the
-# same number the plan sized on; on the review's fills it matched the book consensus within ~1pp.
+# THE FAIR IS THE PLAN'S OWN. Every live Kalshi executor pass records each plan position at the TOP
+# of its loop (`observe_plan_position`, before any gate) with the plan's current price and EV, both on
+# market fair (#704). fair = P(price) x (1 + ev_pct/100), the same number the plan sized on; on the
+# review's fills it matched the book consensus within ~1pp. Keyed by CONTRACT (ticker + our leg), not
+# idempotency key: a post made 10-29 for a 10-31 game comes back in the 10-30 plan under a new key and
+# is refused `held_other_slate` long before `route` -- recorded in `route`, as first built, it was
+# never seen again and would have been cancelled as dropped.
 #
-# Two reasons to cancel, judged in the stale-resting pass (`review_resting`), every tick:
+# Two reasons to cancel, judged by `review_resting` from the executor's per-tick Kalshi reconcile
+# (`pipeline/execute_portfolio`). NOT the stale pass: `cancel_stale_resting_orders` runs only from the
+# worker's boot dump, when nothing has been seen -- hooked there, as first built, it was live and inert
+# (0 passes over 13 reconciles, 2026-11-01 16:55-17:25Z):
 #   * `edge_below_floor` -- the latest sighting's fair minus our resting price < the floor (+1pp);
 #   * `plan_dropped`     -- a plan pass for the sighting's date or later ran PLAN_DROP_MARGIN_S after
 #                           the last sighting without re-sending this position. Usually the edge at the
@@ -369,7 +373,7 @@ def reconcile_line(row: Mapping[str, Any]) -> str | None:
 EDGE_FLOOR_DEFAULT = 0.01
 EDGE_FLOOR_CEILING = 0.10
 PLAN_DROP_MARGIN_S = 300.0
-#: idempotency_key -> {"fair": float | None, "at": epoch s, "date": plan date} of the latest sighting.
+#: contract ("ticker|leg") -> {"fair": float | None, "at": epoch s, "date": plan date} of the latest sighting.
 _seen: dict[str, dict[str, Any]] = {}
 #: plan date -> epoch s of the latest Kalshi request of that date to reach `route` (a pass happened).
 _pass_at: dict[str, float] = {}
@@ -423,23 +427,48 @@ def _epoch(now: _dt.datetime | None) -> float:
     return (now or _dt.datetime.now(_dt.timezone.utc)).timestamp()
 
 
+def _leg_of(side: Any, market: Any, line: Any) -> str | None:
+    """Our Kalshi leg, mapped with market and line like the order body (a spread is not a moneyline:
+    DET@BKN `side=home` is the NO leg of the -DET14 contract)."""
+    from syndicate.features.shared.kalshi_orders import _side_to_kalshi
+
+    try:
+        return _side_to_kalshi(side, market, line)
+    except Exception:
+        return None
+
+
+def _contract(ticker: Any, side: Any, market: Any, line: Any) -> str | None:
+    leg = _leg_of(side, market, line)
+    return f"{ticker}|{leg}" if ticker and leg else None
+
+
 def note_plan_sighting(request: Any, *, now: _dt.datetime | None = None) -> None:
-    """Record that the plan sent this Kalshi position now, at this fair. Called from `route`."""
+    """Record that the plan sent this Kalshi position now, at this fair."""
+    contract = _contract(getattr(request, "venue_ticker", None), getattr(request, "side", None),
+                         getattr(request, "market", None), getattr(request, "line", None))
+    if contract is None:
+        return
     at = _epoch(now)
     date = str(getattr(request, "selected_date", "") or "")
-    _seen[_key(request)] = {"fair": plan_fair(request), "at": at, "date": date}
+    _seen[contract] = {"fair": plan_fair(request), "at": at, "date": date}
     if date:
         _pass_at[date] = max(_pass_at.get(date, 0.0), at)
 
 
-def _resting_leg_price(row: Mapping[str, Any]) -> float | None:
-    """What we rest at on OUR leg, mapped with market and line like the order body (a spread is not a
-    moneyline: DET@BKN `side=home` is the NO leg of the -DET14 contract)."""
-    from syndicate.features.shared.kalshi_orders import _side_to_kalshi
-
+def observe_plan_position(request: Any) -> None:
+    """The executor's hook, first thing for every live Kalshi plan position. Never raises."""
     try:
-        leg = _side_to_kalshi(row.get("side"), row.get("market"), row.get("line"))
-    except Exception:
+        if pilot_switch_on():
+            note_plan_sighting(request)
+    except Exception as exc:  # noqa: BLE001 -- a bookkeeping write must never cost an order
+        print(f"[kalshi_maker_pilot] MAKER_PILOT SIGHTING_FAILED {type(exc).__name__}: {exc}", flush=True)
+
+
+def _resting_leg_price(row: Mapping[str, Any]) -> float | None:
+    """What we rest at on OUR leg."""
+    leg = _leg_of(row.get("side"), row.get("market"), row.get("line"))
+    if leg is None:
         return None
     try:
         value = float(row.get(f"{leg}_price"))
@@ -464,7 +493,7 @@ def review_resting(rows: Sequence[Mapping[str, Any]], *, now: _dt.datetime | Non
     done: list[dict[str, Any]] = []
     for row in rows:
         key = row.get("idempotency_key")
-        seen = _seen.get(str(key))
+        seen = _seen.get(_contract(row.get("ticker"), row.get("side"), row.get("market"), row.get("line")) or "")
         if seen is None:
             counts["unseen"] += 1
             continue

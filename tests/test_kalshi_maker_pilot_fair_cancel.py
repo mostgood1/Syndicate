@@ -146,40 +146,98 @@ def test_a_spread_reads_our_leg_with_market_and_line():
 
 # --------------------------------------------------------------------- wired end to end
 
-def test_route_records_the_sighting_and_the_stale_pass_cancels(monkeypatch):
-    from syndicate.features.shared import execution_ledger as mod
-
-    monkeypatch.setenv("SYNDICATE_KALSHI_MAKER_PILOT", "on")
-    held = _req(ev_pct=-4.0)
-    ledger_row = {"idempotency_key": idempotency_key(held), "execution_style": "maker_pilot", "mode": "live",
-                  "status": "submitted", "submitted_at": "2026-10-30T05:01:56Z", "requested_stake_dollars": 5.0}
-    routed = mp.route(held, now=T0, orders=[ledger_row], enabled_fn=lambda: True, wrap=lambda s: s)
-    assert routed is not None and routed.skip == mp.HELD
-    cancels = _Cancels()
-    monkeypatch.setattr("syndicate.features.shared.kalshi_orders.cancel_order", cancels)
-    monkeypatch.setattr(mod, "_market_price_for_side", lambda ticker, side: 0.57)
-    result = mod.cancel_stale_resting_orders([_row(held, submitted_at="2020-01-01T00:00:00Z")])
-    assert cancels.ids == ["ord-1"]
-    assert result["maker_pilot"] == 1 and result["cancelled"] == 0
-    assert result["maker_pilot_fair"]["cancelled"] == 1
+def test_a_post_from_an_earlier_slate_is_matched_by_contract():
+    """FLA@UGA was posted 10-29 for 10-31: the 10-30 plan re-sends it under a NEW idempotency key
+    (and refuses it `held_other_slate`). Keyed by contract, it is still the same post."""
+    posted = _req(selected_date="2026-10-29", position_key="pk-posted")
+    mp.note_plan_sighting(_req(selected_date="2026-10-30", position_key="pk-replanned"), now=T0)
+    assert idempotency_key(posted) != idempotency_key(_req(selected_date="2026-10-30", position_key="pk-replanned"))
+    result, cancels = _review([_row(posted)])
+    assert result["kept"] == 1 and result["unseen"] == 0 and cancels.ids == []
 
 
-def test_pilot_switch_off_records_nothing():
-    mp.route(_req(), now=T0, orders=[], enabled_fn=lambda: False, wrap=lambda s: s)
+def test_observe_records_only_when_the_pilot_is_on(monkeypatch):
+    mp.observe_plan_position(_req())
     assert mp._seen == {} and mp._pass_at == {}
+    monkeypatch.setenv("SYNDICATE_KALSHI_MAKER_PILOT", "on")
+    mp.observe_plan_position(_req())
+    assert list(mp._seen) == [f"{TICKER}|yes"] and mp._pass_at == {DATE: pytest.approx(mp._seen[f"{TICKER}|yes"]["at"])}
 
 
-def test_a_review_failure_never_costs_the_taker_pass(monkeypatch):
+def test_observe_never_raises(monkeypatch):
+    monkeypatch.setenv("SYNDICATE_KALSHI_MAKER_PILOT", "on")
+    monkeypatch.setattr(mp, "note_plan_sighting", lambda r: (_ for _ in ()).throw(RuntimeError("boom")))
+    mp.observe_plan_position(_req())  # no exception
+
+
+def _live_kalshi(monkeypatch):
+    for key, value in (("SYNDICATE_EXECUTION_ENABLED", "1"), ("SYNDICATE_EXECUTION_MODE", "live"),
+                       ("SYNDICATE_EXECUTION_LIVE_ARMED", "1"), ("SYNDICATE_EXECUTION_VENUE", "kalshi")):
+        monkeypatch.setenv(key, value)
+
+
+def test_the_executor_tick_hands_resting_pilot_rows_to_the_review(monkeypatch):
+    """Reachability at the CADENCE the rule needs: every Kalshi executor tick, not the boot dump.
+    Measured 2026-11-01: hooked in `cancel_stale_resting_orders` it ran 0 times over 13 reconciles."""
+    from pipeline import execute_portfolio as runner
+    from syndicate.features.shared import execution_ledger as L
+
+    _live_kalshi(monkeypatch)
+    pilot, kicked = _row(_req()), _row(_req(position_key="pk-k"), order_id="ord-k")
+    taker = _row(_req(position_key="pk-t"), order_id="ord-t", execution_style=None)
+    resting = [pilot, kicked, taker]
+    monkeypatch.setattr(L, "reconcile_live_orders",
+                        lambda venue="kalshi", **_: {"status": "ok", "resting": resting if venue == "kalshi" else []})
+    monkeypatch.setattr(L, "cancel_pregame_resting_at_kickoff",
+                        lambda rows, **_: {"status": "ok", "orders": [{"idempotency_key": kicked["idempotency_key"]}]})
+    handed: list = []
+    monkeypatch.setattr(mp, "review_resting", lambda rows, **_: handed.append(list(rows)) or {})
+    runner.run_execution(DATE, venue_scope="kalshi")
+    assert handed == [[pilot]]  # the taker row and the row the kickoff cancel pulled are not reviewed
+
+    handed.clear()
+    runner.run_execution(DATE, venue_scope="polymarket")
+    assert handed == []
+
+
+def test_a_review_failure_never_costs_the_executor_its_pass(monkeypatch):
+    from pipeline import execute_portfolio as runner
+    from syndicate.features.shared import execution_ledger as L
+
+    _live_kalshi(monkeypatch)
+    asked: list = []
+    monkeypatch.setattr(L, "reconcile_live_orders",
+                        lambda venue="kalshi", **_: asked.append(venue) or {"status": "ok", "resting": [_row(_req())]})
+    monkeypatch.setattr(L, "cancel_pregame_resting_at_kickoff", lambda rows, **_: {"orders": []})
+    monkeypatch.setattr(mp, "review_resting", lambda rows, **_: (_ for _ in ()).throw(RuntimeError("boom")))
+    runner.run_execution(DATE, venue_scope="kalshi")
+    assert asked == ["kalshi", "polymarket"]  # the Polymarket reconcile after it still ran
+
+
+def test_the_executor_records_each_position_before_any_gate():
+    """A sighting recorded after a refusal would read a refused position as dropped."""
+    import inspect
+    from pipeline import execute_portfolio as runner
+
+    src = inspect.getsource(runner._run_execution)
+    loop = src[src.index("for position in positions:"):]
+    at = loop.index("observe_plan_position(request)")
+    for gate in ("held_by_venue_book", "no_venue_ticker", "REFUSAL_HELD_OTHER_SLATE",
+                 "REFUSAL_HELD_VENUE_CONTRACT", "REFUSAL_PRICE_BAND", "_maker_route(request)"):
+        assert at < loop.index(gate), gate
+
+
+def test_the_boot_stale_pass_no_longer_reviews_pilot_rows(monkeypatch):
     from syndicate.features.shared import execution_ledger as mod
 
-    monkeypatch.setattr(mp, "review_resting", lambda rows: (_ for _ in ()).throw(RuntimeError("boom")))
-    monkeypatch.setattr(mod, "_market_price_for_side", lambda ticker, side: 0.60)
+    mp.note_plan_sighting(_req(ev_pct=-4.0), now=T0)  # would be below floor
+    called: list = []
+    monkeypatch.setattr(mp, "review_resting", lambda rows, **_: called.append(rows))
     cancels = _Cancels()
     monkeypatch.setattr("syndicate.features.shared.kalshi_orders.cancel_order", cancels)
-    taker = _row(_req(position_key="pk-t"), order_id="ord-t", execution_style=None,
-                 submitted_at="2020-01-01T00:00:00Z")
-    result = mod.cancel_stale_resting_orders([_row(_req()), taker])
-    assert result["cancelled"] == 1 and cancels.ids == ["ord-t"] and result["maker_pilot_fair"] is None
+    monkeypatch.setattr(mod, "_market_price_for_side", lambda ticker, side: 0.60)
+    result = mod.cancel_stale_resting_orders([_row(_req(), submitted_at="2020-01-01T00:00:00Z")])
+    assert result["maker_pilot"] == 1 and cancels.ids == [] and called == []
 
 
 def test_the_resting_row_carries_market_and_line():
