@@ -470,3 +470,34 @@ def test_the_gate_reading_script_reads_what_the_placer_writes():
     assert join.phase({"submitted_at": "2026-10-22T23:50:00Z", "commence_time": "2026-10-22T23:00:00Z"}) == "in_play"
     assert join.phase({"submitted_at": "2026-10-22T22:50:00Z", "commence_time": "2026-10-22T23:00:00Z"}) == "pregame"
     assert join.phase({"submitted_at": "2026-10-22T22:50:00Z"}) == "in_play_no_commence"
+
+
+def test_backfill_writes_a_joinable_record_once_and_only_for_placed_entries():
+    """scripts/inplay_decision_record_backfill.py (user 2026-11-01 "Backfill them"): a placed paper entry becomes a
+    record the gate reading joins on the ledger key; guards are marked inferred; a refusal and a re-run write nothing."""
+    import importlib.util
+    from pathlib import Path
+
+    def load(name):
+        spec = importlib.util.spec_from_file_location(name, Path(__file__).resolve().parents[1] / "scripts" / f"{name}.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    bf, join = load("inplay_decision_record_backfill"), load("inplay_decision_record_join")
+    placed = dict(BOOKED, day=DAY, live={"placed": True, "status": "submitted", "key": "ledger-key-9"})
+    refused = dict(BOOKED, day=DAY, ticker="KXOTHER", live={"placed": False, "reason": "band"})
+    orphan = dict(BOOKED, day=DAY, ticker="KXGONE", live={"placed": True, "key": "not-in-ledger"})
+    entries = {"a": placed, "b": refused, "c": orphan}
+    orders = {"ledger-key-9": {"idempotency_key": "ledger-key-9", "selected_date": DAY, "requested_stake_dollars": 2.5,
+                               "position_key": "ingame:x:yes"}}
+    todo, why = bf.plan(entries, orders, {}, record_version=live.RECORD_VERSION, backfilled_at="2026-11-01T00:00:00Z")
+    assert why == {"write": 1, "no_ledger_row": 1, "day_mismatch": 0}
+    (rec,) = todo[DAY]
+    assert rec["guards"]["check_order"] == {"verdict": "pass_inferred"} and set(rec["guards"]) == set(bf.GUARDS)
+    assert rec["backfill"]["ledger_row_edited"] is False and rec["sizing"]["stake"] == 2.5
+    live.append_decision_record(DAY, rec)
+    assert set(join.read_inplay_records(live.records_path(DAY).parent, DAY)) == {"ledger-key-9"}
+    again, why2 = bf.plan(entries, orders, {DAY: {"ledger-key-9"}}, record_version=live.RECORD_VERSION,
+                          backfilled_at="x")
+    assert again == {} and why2["already_recorded"] == 1
