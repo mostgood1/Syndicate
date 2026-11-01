@@ -55412,3 +55412,25 @@ which is about the two sizing bases and not about the refusal boundary.
   - `ODDS_SWEEP_OUTCOME sport=ncaab wrote=False exists=True ... sidecar_age_s=319` after the fix is the sidecar-age heuristic (the sidecar was written by a sibling run), NOT a failure. Do not read `wrote=False` as broken.
   - **No NCAAB live order can be placed yet:** `VENUE_REPRICE_KEYS` unmatched ncaab **802 of 802**; Kalshi `TRIM_BY_SPORT` kept_by_sport carries no ncaab. Kalshi lists men's college basketball as `KXNCAAMBGAME/SPREAD/TOTAL` (330 / ~1,000 / ~1,000 open, read 16:1xZ), which the catalogue's `NCAAB` token never matches; the registered `KXNCAABTOTAL` has 0 open markets. `paper_settlement` still has no ncaab resolver (pinned by test), so the resolver must land BEFORE anyone maps `KXNCAAMB*` (todo `#755`).
 - **11-02-dated grid (OWED):** `book-grid sport=ncaab date=2026-11-02` still reads 0 at 18:13Z. The 11-02 look-ahead runs last fired 11:03Z (before the fix). A manual NCAAB-only pregame run for 2026-11-02 was POSTed 17:33:19Z (`/api/ops/odds-refresh/run`, 202, job `aa92bf15`, `launch_mode` manifest_only) and **NEVER RAN**: no `migration_runs/2026-11-02` dir after 11:03Z through 18:13Z. The single latest-manifest slot showed the live loop's own later runs, so the queued manifest was most likely overwritten before refresh-worker's claim loop read it -- an existing hazard of that endpoint on a busy live loop, not investigated further. The date roll at 06:00Z makes the live loop sweep date 11-02 (first tip 11:00Z). **verify:** `book-grid sport=ncaab date=2026-11-02` total_rows > 0, and `/api/ops/oddsapi/quota` `by_sport.ncaab` after the first 11-02 sweeps, when the half-game per-event path engages (estimate ~7 credits/event/sweep, ~120 events: UNMEASURED).
+
+### 2026-11-01 18:55Z (12:55 PM CST) -- DATA WRITE on the fleet data root: in-play decision-record BACKFILL, 271 records (in-game-trading item e) -- **MET: 224/224 settled in-play fills join** -- lane in-game-trading
+- **user, verbatim (session 6a4afb):** "Backfill them". The question was "Backfill decision records for the 223 older in-play fills?"
+- **What ran:**
+  - `scripts/inplay_decision_record_backfill.py` (`d51f5720c`), copied to the fleet and run against `~/Syndicate` at `18090e38e`, with the env of live-odds-worker pid 2141381 (no values printed).
+  - Dry run 18:54:50Z, then `--write` 18:55:08Z.
+  - No code deploy, restart, env or switch change. The ledger was not edited.
+- **What it wrote:** one line per placed paper entry whose `live.key` matches a ledger row, to `decision_records/<selected_date>.inplay.jsonl`.
+  - **271 written:** 10-23 34, 10-24 38, 10-25 52, 10-26 20, 10-27 19, 10-28 27, 10-29 11, 10-30 23, 10-31 47.
+  - **18 skipped:** already written live by the placer since the restart.
+  - 0 with no ledger row; 0 day mismatches.
+- **How a backfilled record differs from a live one:**
+  - every guard reads `pass_inferred`;
+  - `sizing.version=backfill_unknown`, with only the requested stake;
+  - a `backfill{at, source, ledger_row_edited:false}` block;
+  - fair, ask, edge, fee, n_books and the filters are as booked in the paper doc.
+- **Reading, idempotency:** a second dry run at 18:55:13Z shows `already_recorded=289`, write 0.
+- **Reading, gate** (`inplay_decision_record_join.py --since 2026-10-23`, 18:55:20Z, 403 settled live fills):
+  - **in_play 194/194 and in_play_no_commence 30/30 have a record** (was 0/223 at 18:07Z);
+  - every submit day from 10-23 to 11-01 is n/n;
+  - pregame 179/179 version, unchanged.
+- **Still open:** in-play `version` is 0/224, because the ledger rows predate the provenance fields and stay unedited by design. The first SETTLED post-restart in-play fill should read record=1 AND version=1 (next live night; owed by lane in-game-trading).
