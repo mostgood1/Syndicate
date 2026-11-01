@@ -86,3 +86,51 @@ All readings were taken on 2026-10-31 between 22:08Z and 22:18Z. Fleet HEAD was 
 - Polymarket NHL props: Polymarket offered NHL game markets only (h2h, totals).
 - Whether NHL Kalshi props are liquid enough to fill.
 - NHL paper grading end to end.
+
+## Fix on main, 2026-11-01 (`4520b47ae`); NOT on the fleet
+
+**User, verbatim:** "Yes, build both", on "Build the two NHL fixes?". The same message said the game-line fix needs a claim on part of `odds_book_quotes.py`.
+
+**What changed:**
+- **F1, props** (`kalshi_catalogue.SERIES_SPORT`): `KXNHLPTS`, `KXNHLGOAL` and `KXNHLAST` are registered as `nhl`. Titles and sample markets were re-read 2026-11-01T15:52Z from the public listing:
+
+  | Series | Title | Sample market | Open |
+  |---|---|---|---|
+  | `KXNHLPTS` | 'Pro Hockey Points' | 'Tim Stutzle: 3+ points' | 200+ |
+  | `KXNHLGOAL` | 'NHL Goalscorer' | | 200+ |
+  | `KXNHLAST` | 'Pro Hockey Assists' | | 143 |
+
+- **F1 needed a second edit, found while building it.** NHL's `book_quotes` shard files props under the grid CODE: on the fleet 11-01 all 10,700 prop rows (Pinnacle's included) read `POINTS` 2,639, `GOALS` 2,480, `ASSISTS` 1,591, `SOG` 3,986, `SAVES` 4. The Kalshi capture would have written `player_points`. That is the NFL 2026-09-10 defect: a one-book grid row beside Pinnacle's instead of a cell in its row.
+  - `book_quote_prop_market` now relabels NHL props to those codes. The source is `nhl.prop_projections._MARKET_CODES` mapped through `market_keys`.
+  - NFL's labels are unchanged.
+- **F2, game lines** (`odds_book_quotes._GAME_LINE_CAPTURE_SPORTS`): now `{soccer, nhl}`.
+  - Both the Kalshi capture and the Polymarket capture (`portfolio_commit`) read this one predicate, so Polymarket NHL game lines are captured too.
+  - The re-check condition is restated in the comment: adding `us_ex` to NHL game-line regions means removing `nhl` here.
+  - Borrowed from lane `book-quotes-splice-repair` (its owner session is gone). Scope: the game-line set and the prop relabel only.
+- **Guard** (`kalshi_odds_refresh._capture_kalshi_quotes`): a match from a period series (`segment_for_series != "full"`) is skipped, and the count is logged as `segment_skipped=` on `QUOTE_CAPTURE`.
+  - Why: a match carries no segment and `_normalize` defaults one to "full", so a first-half total would be logged as a full-game total.
+  - Fleet log 10-31 08:44Z..11-01 15:51Z: the only segment matches were `h1->KXNCAAF1HTOTAL`, in 95 of 389 joins, and NCAAF game lines are not captured. So this drops nothing today.
+
+**Tested** (`tests/test_kalshi_nhl_venue_prices.py`, 23 tests; every check runs both with the change and without it):
+- registration, and that the title gate alone registers none of the three;
+- classification of the real titles;
+- the join against board rows spelled `POINTS` / `GOALS` / `ASSISTS`;
+- the `build_book_grid` merge with Pinnacle (the control reproduces the split);
+- capture of NHL props and NHL h2h, with MLB h2h still dropped;
+- the segment guard, mutation-checked: with the guard off, the 1.5 half total is written.
+
+374 related tests pass.
+
+**Fleet facts read 2026-11-01 15:45-15:51Z (fleet `87ecf730`):**
+- `QUOTE_CAPTURE` lists `nhl` in `sports` every tick on the today-board, with no `nhl` in `appended_by_sport`. These matches are game lines, since no NHL prop series was registered.
+- `TRIM_BY_SPORT`: NHL demand 642 and kept 559, within a full 6,000.
+
+**NOT measured, owed after a fleet update:**
+1. `TRIM_BY_SPORT kept_by_sport.nhl` and whether the prop series survive the trim. They compete for the 6,000 bound, which was full at every read.
+2. `QUOTE_CAPTURE appended_by_sport.nhl` > 0.
+3. Kalshi NHL rows in `book_quotes`, and whether they merge with the sportsbook rows on the grid.
+4. NHL DecisionRecords with a venue price (> 0 of N).
+5. NHL paper candidates.
+6. The first live `STAKE_BAND` / order line on NHL.
+
+**Live-money note (unchanged):** once live, the portfolio commit can price, and so order, NHL Kalshi markets, inside every existing cap. An ff to any SHA at or after `4520b47ae` therefore needs the user's yes.
