@@ -651,6 +651,14 @@ death, never life — do not invert it.
 - Files: .claude/worktrees/agent-a4e3c2800faf111e7 .claude/worktrees/agent-a5852835adfd15778 .claude/worktrees/sweet-chaum-b5fddd
 - Blocked by: none
 
+### ncaab-odds-key-fallback — OPEN — opened 2026-11-01 — session 547fe65e-71ca-4e19-9589-237553cb4eab
+- Goal: NCAAB odds capture works on the fleet: scripts/refresh_ncaab_odds_history.py falls back to the shared ODDS_API_KEY (the fleet sets only that name), landed on main with a test, the fleet checkout fast-forwarded to that exact SHA, and the first NCAAB sweep after the ff writes ncaab book_quotes for the 11-02 slate (book-grid sport=ncaab total_rows > 0)
+- Files: scripts/refresh_ncaab_odds_history.py, tests/test_ncaab_refresh_runner.py
+- Hypothesis: Every fleet NCAAB odds step dies in TheOddsApiClient.__init__ -> _load_api_key because it reads only NCAAB_THEODDS_API_KEY/THEODDSAPI_KEY/THEODDS_API_KEY and all three fleet roles carry only ODDS_API_KEY (measured 2026-11-01 ~16:05Z: 65/65 odds_refresh reports for slates 11-01..11-03 carry 'TheOddsAPI key not set' in failureSummary ncaab_odds_history_snapshot rc=1; role env key names = ODDS_API_KEY only; local repro rc=1 with only ODDS_API_KEY set)
+- Falsification test: After the ff, an NCAAB sweep still fails, or fails with a different error (e.g. 401/quota) -- then the key name was not the only gate
+- Verification: Read refresh-worker ODDS_SWEEP_OUTCOME sport=ncaab wrote=True after the ff, the next odds_refresh.json with no ncaab failingSteps, and /api/board/book-grid?sport=ncaab&date=2026-11-02 total_rows > 0; record in deploys.md
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
