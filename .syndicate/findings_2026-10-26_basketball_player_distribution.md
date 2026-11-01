@@ -1028,3 +1028,57 @@ including the starter tail balance that failed step 3. Adopting it would mean ch
 so it is not adopted here. The honest route is a NEW pre-registration of exactly that arm (β 0.85, this σ table,
 frozen now) graded on data no fit has seen: the 2026-27 forward window from 11-01.
 - Not done: no engine code, no switch file, no sim run.
+
+## STEP 3c — MINUTES SHAPE (β + σ) FORWARD TEST, PRE-REGISTERED 2026-11-01 15:41Z (09:41 CST), before any 2026-27 game is simulated or scored
+
+**User decision 11-01:** "pre-register the combined arm for the forward test". The arm was chosen after reading the
+2025-26 TEST (step 3b, 9b093f716), so 2025-26 cannot grade it. The grade is forward only.
+
+**FROZEN NOW (nothing below is re-fit, on any window):**
+- Cells by m = the BASE arm's per-slot sim mean minutes over its own draws: {< 6, 6–12, 12–20, 20–28, ≥ 28}.
+- Shift: x_id · max(m_i, 1)^(β − 1) with **β = 0.85**; per team-draw, rescale the pool to the pre-shift total, cap at
+  game length (48 + 5·OT) with proportional water-fill.
+- Then the shock x · exp(σ_c·z − σ_c²/2), z ~ N(0, 1) seed 0, rescale and cap again, with
+  **σ = < 6 1.10 · 6–12 0.75 · 12–20 0.45 · 20–28 0.20 · ≥ 28 0.10**.
+- Stats scale by x'/x. Code: `r2s/stage3b.py`'s `transform` with those constants (copied verbatim into the read
+  script; the copy is diffed against stage3b.py before the read).
+
+**Window and read timing:** the round-2 forward window (3020b556): 2026-27 REGULAR season from 2026-11-01. Read ONCE,
+on the same date as the round-2 read (≥ 250 finals with pre-tip period lines AND ≥ 400 with full-game lines;
+expected mid-to-late December). Before it: refresh the pristine mirror and as-of inputs through the read date, and
+build the 2026-27 injury feed with `scripts/nba_injury_history_build.py --start 2026-11-01` (the same tip − 30 rule;
+its B1–B3 gates must pass, or the read waits and says so). Nothing is scored before the read.
+
+**Arms (same harness, same replay inputs, 200 draws, paired by game):**
+- **BASE** = fit_inj's run exactly: code_inj, the fit_inj levers / engine flags / switch files
+  (`r2s/launch_fit_inj.sh`), `--asof-roster --injury-history`, `--record-player-draws --track-oncourt`. Frozen as of
+  now so the comparison isolates the minutes shape, not round 2's other changes.
+- **SHAPE** = BASE's recorded draws transformed offline by the frozen rule above. No second sim run.
+
+**Population:** Phase 1's (in the sim AND played; ESPN boxes); starter / bench = top-5 by input minutes.
+
+**Gates, forward read (all must hold; game-clustered bootstrap, 2,000):**
+- (F1) minutes miss, SHAPE − BASE, 95% CI upper < 0 for bench AND starter;
+- (F2) SHAPE minutes, bench and starter: miss in [.15, .25], width in [.85, 1.15], |p_lo − p_hi| ≤ .05;
+- (F3) pts / reb / ast / threes miss, SHAPE − BASE, CI upper < +.005 for each;
+- (F4) coach-DNP sim min per team-game, SHAPE − BASE ≤ +1.0 (step 2a's classification).
+- Reported, no gate: minutes bias by role and cell; per-cell miss / width / tails; widths of the stats; PRA and
+  E4 combo widths; game totals (unchanged by construction offline — the engine is where they could move).
+
+**Predictions** (from 2025-26 TEST; written now so the read can be compared): bench miss ≈ .24, starter ≈ .18;
+pts / reb / ast / threes ≈ .26 / .25 / .24 / .22; coach-DNP +0.8. Early-season inputs are thinner than Jan–Feb, so
+BASE's miss is expected WORSE than 2025-26's TEST and SHAPE's improvement larger, not smaller.
+
+**On a PASS:** stage B (engine) is built: `nba_sim_minutes_shape.json` + `syndicate/features/shared/
+nba_sim_minutes_shape.py`, β on the final target minutes, σ in the per-draw loop, all as step 3b's stage B (incl.
+the collision check with nba-lineup-pools and pass-through ≥ .70 with and without contextual lineups). Its
+equivalence check (engine within .03 miss / 0.3 min bias of the offline SHAPE) MAY use the forward games, because it
+fits nothing; the game total must stay within ±1.0 of BASE or the totals solver is re-fit first. Production only via
+`nba_engine_config.json`, and only on a user decision.
+
+**On a FAIL:** nothing is built; report which gate. F1/F2 failing forward while they passed on 2025-26 would mean the
+shape does not transfer across seasons (it was fitted on one); F4 → selection dominates, back to the participation
+signal.
+
+**Owner:** lane basketball-player-distribution reads it on the round-2 read date (basketball-scenario-calibration,
+same session).
