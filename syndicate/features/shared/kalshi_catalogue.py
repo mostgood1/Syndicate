@@ -261,6 +261,33 @@ SERIES_SPORT: dict[str, str] = {
     "KXWNBAGAME": "wnba",
     "KXWNBASPREAD": "wnba",
     "KXWNBATOTAL": "wnba",
+    # ------------------------------------------------------------------
+    # NHL PLAYER PROPS, hand-registered because the TITLE GATE misses all three.
+    # ------------------------------------------------------------------
+    #
+    # Seen 2026-11-01T15:52Z in Kalshi's public listing (`/series/<ticker>` and
+    # `/markets?status=open`), with these series titles:
+    #
+    #     KXNHLPTS   'Pro Hockey Points'    'Tim Stutzle: 3+ points'   200+ open
+    #     KXNHLGOAL  'NHL Goalscorer'       'Tim Stutzle: 1+ goals'    200+ open
+    #     KXNHLAST   'Pro Hockey Assists'   'Tim Stutzle: 2+ assists'  143 open
+    #
+    # `auto_series_from_catalogue` keeps a prop series only when its title ends
+    # "Player <stat>", and none of these says "Player" -- NBA's is 'NBA Player
+    # Points', NFL's 'Pro Football Player Receptions'. So no NHL prop was ever
+    # fetched. MEASURED on the fleet 2026-10-31 (lane nhl-venue-price-gap): 0 of
+    # 618 NHL DecisionRecords carried a venue price, against NFL 158 of 1,056, and
+    # no paper strategy could book NHL.
+    #
+    # The market titles are the usual player-threshold grammar, and `_HOCKEY` in
+    # `market_keys` already resolves points, goals and assists. `KXNHLGOAL`'s
+    # "1+ goals" classifies as `player_goals` over 0.5, the market the NHL board
+    # and its OddsAPI shard both file as `GOALS`.
+    # The 08-25 note on `_HOCKEY` expected `KXNHLANYGOAL`; that series and
+    # `KXNHLSOG` / `KXNHLSAVES` list 0 open markets today and stay unregistered.
+    "KXNHLPTS": "nhl",
+    "KXNHLGOAL": "nhl",
+    "KXNHLAST": "nhl",
 }
 
 # Series we have SEEN and deliberately do not cover. Kept explicit so they stop

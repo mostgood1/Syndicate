@@ -166,7 +166,16 @@ _KEY_FIELDS: tuple[str, ...] = (
 # remains the real remedy and remains unbuilt --
 # `tests/test_direct_feed_provenance.py::test_the_source_stamp_is_NOT_in_the_dedup_key`
 # still pins that condition and still passes.
-_GAME_LINE_CAPTURE_SPORTS: frozenset[str] = frozenset({"soccer"})
+#
+# NHL JOINED 2026-11-01 ON THE SAME MEASUREMENT (lane nhl-venue-price-gap).
+# The fleet's NHL shards for 10-31 and 11-01 held 0 exchange rows of any kind in
+# 71,341 quotes: NHL's game lines are fetched without `us_ex`, so OddsAPI writes
+# no Kalshi or Polymarket copy to collide with. The Kalshi join was already
+# matching NHL game markets and this bound dropped every one, so 0 of 618 NHL
+# DecisionRecords on 10-31 carried a venue price. The re-check condition above
+# applies unchanged: adding `us_ex` to NHL's game-line regions re-creates the
+# collision, so do that only together with removing `nhl` here.
+_GAME_LINE_CAPTURE_SPORTS: frozenset[str] = frozenset({"soccer", "nhl"})
 
 
 def sport_allows_game_line_capture(sport: Any) -> bool:
@@ -944,9 +953,17 @@ def append_book_quotes(
 #: Sports whose OddsAPI PLAYER-PROP capture files `book_quotes` rows under a
 #: DISPLAY label, and by Central KICKOFF date: `MARKET_STD_MAP` plus
 #: `bucket_quote_rows_by_kickoff_date` in `scripts/fetch_nfl_oddsapi_props_local.py`
-#: and its NCAAF twin. Every other sport's shard speaks the canonical OddsAPI key
-#: and is dated by the board, so nothing here changes for them.
+#: and its NCAAF twin. Other sports' shards are dated by the board, so nothing
+#: here changes for them; their LABELS are below.
 FOOTBALL_PROP_QUOTE_SPORTS = frozenset({"nfl", "ncaaf"})
+
+#: NHL's OddsAPI prop capture (`syndicate/local_nhl_odds.collect_oddsapi_props`)
+#: files `book_quotes` rows under the NHL grid CODE -- `POINTS`, `ASSISTS`,
+#: `GOALS`, `SOG` -- not the canonical key. MEASURED on the fleet's NHL shard
+#: 2026-11-01: all 10,700 prop rows, Pinnacle's included. It dates them by
+#: Central kickoff, which is the board's date for an NHL slate, so NHL needs the
+#: relabel and not `FOOTBALL_PROP_QUOTE_SPORTS`' kickoff bucketing.
+NHL_PROP_QUOTE_SPORTS = frozenset({"nhl"})
 
 _FOOTBALL_PROP_LABELS: dict[str, dict[str, str]] = {}
 
@@ -978,23 +995,40 @@ def book_quote_prop_market(sport: Any, market: Any) -> str:
     its market passes through unchanged, which is exactly today's behaviour.
     `tests/test_kalshi_book_quote_capture.py` pins this against both fetchers'
     maps, so the three cannot drift apart silently.
+
+    NHL IS THE SAME DEFECT, FOUND BEFORE IT SHIPPED `[2026-11-01]`. Its shard
+    files `POINTS`, while Kalshi's NHL props (registered the same day) would
+    have arrived as `player_points`, one-book grid rows beside Pinnacle's. The
+    labels are the NHL prop join's own codes (`prop_projections._MARKET_CODES`,
+    which reads the book grid's `SOG` / `POINTS`), mapped through `market_keys`
+    the same way. `tests/test_kalshi_nhl_venue_prices.py` pins them against the
+    grid.
     """
     text = str(market or "").strip()
     key = str(sport or "").strip().lower()
-    if not text or key not in FOOTBALL_PROP_QUOTE_SPORTS:
+    if not text or key not in FOOTBALL_PROP_QUOTE_SPORTS | NHL_PROP_QUOTE_SPORTS:
         return text
     labels = _FOOTBALL_PROP_LABELS.get(key)
     if labels is None:
         try:
-            from syndicate.features.nfl.props import _NFL_PROP_MARKET_TO_STAT
             from syndicate.features.shared.market_keys import canonical_market_key
+
+            if key in NHL_PROP_QUOTE_SPORTS:
+                from syndicate.features.nhl.prop_projections import _MARKET_CODES
+
+                pairs = [(odds_key, code) for odds_key, code in _MARKET_CODES.items()]
+                pairs += [(code, code) for code in _MARKET_CODES.values()]
+            else:
+                from syndicate.features.nfl.props import _NFL_PROP_MARKET_TO_STAT
+
+                pairs = [(label, label) for label in _NFL_PROP_MARKET_TO_STAT]
         except Exception:
             # Not cached: an import that failed once is retried on the next call
             # rather than disabling the relabel for the life of the process.
             return text
         labels = {}
-        for label in _NFL_PROP_MARKET_TO_STAT:
-            canonical = canonical_market_key(key, label)
+        for spelling, label in pairs:
+            canonical = canonical_market_key(key, spelling)
             if canonical and canonical != label:
                 labels.setdefault(canonical, label)
         _FOOTBALL_PROP_LABELS[key] = labels

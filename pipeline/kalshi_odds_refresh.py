@@ -2882,8 +2882,11 @@ def _capture_kalshi_quotes(
                     if value and field not in identity:
                         identity[field] = value
 
+        from syndicate.features.shared.kalshi_catalogue import segment_for_series
+
         by_sport: dict[str, list[dict[str, Any]]] = {}
         no_sport = 0
+        segment_skipped = 0
         identity_stamped = 0
         relabelled = 0
         for match in matches:
@@ -2893,6 +2896,18 @@ def _capture_kalshi_quotes(
             sport = sport_by_event.get(event_id)
             if not sport:
                 no_sport += 1
+                continue
+            # A PERIOD MARKET WOULD BE FILED AS A FULL GAME. A match carries no
+            # `segment`, the quote row builder adds none, and `_normalize` fills a
+            # missing one with "full" -- so a matched first-half total would land
+            # in the log as a full-game total at the first half's line. Refused
+            # rather than mislabelled. Measured on the fleet 10-31..11-01, the only
+            # segment matches were `h1->KXNCAAF1HTOTAL` (95 of 389 joins), whose
+            # game lines are not captured, so this drops nothing today; it holds
+            # for soccer's half markets and for NHL game lines, captured from
+            # 2026-11-01.
+            if segment_for_series(match.get("series")) != "full":
+                segment_skipped += 1
                 continue
             stamped = dict(match)
             gained = False
@@ -2989,7 +3004,7 @@ def _capture_kalshi_quotes(
             # wrote nothing.
             f" matches={len(matches)} sports={sorted(by_sport)}"
             f" appended={captured} appended_by_sport={appended_by_sport}"
-            f" game_lines={game_line_rows} no_sport={no_sport}"
+            f" game_lines={game_line_rows} no_sport={no_sport} segment_skipped={segment_skipped}"
             # 2026-09-10's counters, so the fix's reach reads off this same line:
             # prop matches moved into their shard's vocabulary, matches that
             # gained a team or kickoff from the board, rows with no known
