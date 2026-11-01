@@ -622,12 +622,6 @@ death, never life — do not invert it.
 - Verification: first live in-play decision after restart writes decision_records/<date>.inplay.jsonl with idempotency_key equal to its ledger row; no DECISION_RECORD_WRITE_FAILED
 - Blocked by: none
 
-### orphan-worktree-salvage — CLOSED 2026-11-01 (all 3 ALREADY-ON-MAIN; removed, branches deleted) — opened 2026-11-01 — session 6b4b1af9-1d77-48e7-a805-c3788e04c4f8
-- Goal: 3 orphaned worktrees (agent-a4e3c2800faf111e7, agent-a5852835adfd15778, sweet-chaum-b5fddd) unregistered, dirs gone, branches deleted; content verified identical to origin/main first (bf60a2b22, b9fc7029c, ff304ae13); user approved discard 2026-11-01
-- GOAL: MET -- 16:1xZ readings: `git worktree list` matches 0 of the 3; 6/6 paths (.claude/worktrees/<n>, .git/worktrees/<n>) absent; `git branch --list` 0; loving-einstein-b3c45e still registered. Log: .syndicate/log/2026-11-01.md 16:16Z.
-- Files: .claude/worktrees/agent-a4e3c2800faf111e7 .claude/worktrees/agent-a5852835adfd15778 .claude/worktrees/sweet-chaum-b5fddd
-- Blocked by: none
-
 ### ncaab-odds-key-fallback — OPEN — opened 2026-11-01 — session 547fe65e-71ca-4e19-9589-237553cb4eab
 - **STATUS 2026-11-01 18:2xZ (12:2x PM CST): fix LIVE, capture VERIFIED; one read OWED.** `18090e38e` on main; fleet ff 9a41c6f66 -> 18090e38e 16:49:50Z (user: "Yes, fix + deploy", ride-alongs "FF with both", web claim "Force it now"); all roles reloaded it at maker-pilot-fair-cancel's 16:53Z down/up. Hypothesis CONFIRMED (not falsified): the first post-ff sweep wrote `book_quotes/2026-11-01.jsonl` (3,804 rows, 134 events, 10 books), book-grid ncaab 11-01 0 -> 576 rows, Layer 2 ncaab cand None -> 804. OWED: book-grid ncaab date=2026-11-02 > 0 (still 0 at 18:13Z; a manual 11-02 run POSTed 17:33Z never ran; the 06:00Z date roll sweeps it) + the ncaab OddsAPI cost once halves engage. Remaining NCAAB gaps -> todo `#755` (settlement before Kalshi KXNCAAMB mapping). deploys.md 16:49:50Z. The read is armed as one-time scheduled task `ncaab-1102-board-check`, 2026-11-02 02:00 CST, notifying session 547fe65e. It is ONE-TIME and can miss: check `list_task_runs`, and take the read by hand if it did not run.
 - Goal: NCAAB odds capture works on the fleet: scripts/refresh_ncaab_odds_history.py falls back to the shared ODDS_API_KEY (the fleet sets only that name), landed on main with a test, the fleet checkout fast-forwarded to that exact SHA, and the first NCAAB sweep after the ff writes ncaab book_quotes for the 11-02 slate (book-grid sport=ncaab total_rows > 0)
@@ -648,6 +642,12 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: GOAL MET — 1 of 9 CLOSED blocks was SAFE (owner_liveness.py, idle-min 240) and was moved to lanes_closed.md; 8 WAIT. Table + Part B in log/2026-11-01.md.
 - Moved: board-midnight-date-skew
+
+### closed-lane-archive-20261101-1534 — CLOSED 2026-11-01 (GOAL MET: 1 block archived) — opened 2026-11-01 — session 275c48de-850e-492a-b22b-7d0e56752ec2
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET — 1 of 9 CLOSED blocks was SAFE (owner_liveness.py, idle-min 240) and was moved to lanes_closed.md; 8 WAIT. Table + Part B in log/2026-11-01.md.
+- Moved: orphan-worktree-salvage
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1093,6 +1093,7 @@ death, never life — do not invert it.
 - `optimizer-props-tier` — CLOSED-MET 2026-10-30 (stale-lane-triage, user-approved) — opened 2026-10-14 — session 57bbae67-d845-4808-86a8-9753482aba57
 - `order-model-view` — **ORPHANED 2026-09-08 -- VERIFY OWED** — opened 2026-09-03 — session 3492626c — **LIVE ON BOTH ORDER SERVICES (`04187cdf`); VERIFY STILL OWED after 10
 - `order-sizing-provenance` — CLOSED 2026-10-22 — opened 2026-10-21 — closed 2026-10-22 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- `orphan-worktree-salvage` — CLOSED 2026-11-01 (all 3 ALREADY-ON-MAIN; removed, branches deleted) — opened 2026-11-01 — session 6b4b1af9-1d77-48e7-a805-c3788e04c4f8
 - `paper-evicted-grading` — CLOSED 2026-10-29 — opened 2026-10-27 — session 7833a791-56c8-4845-99a7-d81bad2b6608 (adopted 2026-10-27 16:2xZ; opened by session e32fef1a for pickup; Phase 0 item 4 of #736)
 - `paper-execution-ledger-batch` — CLOSED 2026-09-18 (GOAL: MET) — opened 2026-09-18 — session a1e40980-cceb-493f-adf9-5a5ca879acf6 — body in `lanes_history.md`.
 - `phase3-staked-probability` — **ORPHANED 2026-09-08 -- STEP 1 OF 6 DONE** — opened 2026-09-04 — session 3492626c-1ec4-4366-9dbe-f194ae319c84 To resume: `staked_probability` shipped

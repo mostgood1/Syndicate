@@ -13832,3 +13832,9 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
   - 10-28→10-29 has the same shape: 10-29 index 04:15:54Z (look-ahead) → 05:08:13Z (`LAYER2_TODAY_CADENCE today=2026-10-29 age_before_s=3004`); samples at 05:05:04Z (stale) and 06:05:15Z (fresh). 05:04:55Z `SKIPPED_NON_TODAY date=2026-10-28` is a pre-roll build finishing after the roll, also refused correctly. 10-29→10-30 was 'clean' because its first post-roll write (05:02Z) beat the 05:05Z sample.
   - The REAL residual, smaller than reported: for the first ~6-8 min after 05:00Z the served board is the look-ahead build, 33-53 min old. Its length = time since the last `AROUND_NEXT_DAY` build + the first post-roll cycle. Not a clock skew; no shared helper is needed (one exists and is used).
   - Verify reading for any future change here: per-night `LAYER2_SHARD_GENERATION_DROPPED date=<new CT date>` timestamps across 04:00-06:00Z from refresh-worker.log, NOT an hourly endpoint sample.
+
+### orphan-worktree-salvage — CLOSED 2026-11-01 (all 3 ALREADY-ON-MAIN; removed, branches deleted) — opened 2026-11-01 — session 6b4b1af9-1d77-48e7-a805-c3788e04c4f8
+- Goal: 3 orphaned worktrees (agent-a4e3c2800faf111e7, agent-a5852835adfd15778, sweet-chaum-b5fddd) unregistered, dirs gone, branches deleted; content verified identical to origin/main first (bf60a2b22, b9fc7029c, ff304ae13); user approved discard 2026-11-01
+- GOAL: MET -- 16:1xZ readings: `git worktree list` matches 0 of the 3; 6/6 paths (.claude/worktrees/<n>, .git/worktrees/<n>) absent; `git branch --list` 0; loving-einstein-b3c45e still registered. Log: .syndicate/log/2026-11-01.md 16:16Z.
+- Files: .claude/worktrees/agent-a4e3c2800faf111e7 .claude/worktrees/agent-a5852835adfd15778 .claude/worktrees/sweet-chaum-b5fddd
+- Blocked by: none
