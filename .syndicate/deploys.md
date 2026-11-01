@@ -55378,3 +55378,22 @@ which is about the two sizing bases and not about the refusal boundary.
 - **Cause (code, read ~17:26Z):** `cancel_stale_resting_orders` (where `review_resting` is hooked) is called ONLY from `_live_ledger_at_boot` (`scripts/run_live_odds_refresh_worker.py:2402`). Its own docstring says so (`execution_ledger.py:3751`), as does `pipeline/execute_portfolio.py:525`. The in-memory sighting registry is always empty at boot, so every pilot row is `unseen` and kept. **The cancel can never fire as built.**
 - **Harm:** none. Unseen means keep, which is the pre-change behaviour; nothing was cancelled. The 16:54:07Z "ON path reached" reading is true but proves only that the switch reached the hook, not that the hook runs per tick.
 - **Fix (not built; needs the user's yes):** call `review_resting(outcome["resting"] maker_pilot rows)` from the per-tick Kalshi reconcile in `pipeline/execute_portfolio.py`, beside `cancel_pregame_resting_at_kickoff`, and remove it from the boot-only stale pass. Then a fleet ff and a live-odds restart.
+
+### 2026-11-01 18:07Z (12:07 PM CST) -- VERIFY for the 16:19Z fleet ff to 9a41c6f66 (in-play decision record, in-game-trading item e): **JOIN MET on the first decision** -- lane in-game-trading
+- **Code read:** fleet HEAD `18090e38e` (a later ff; contains `9a41c6f66`, `git merge-base --is-ancestor`). live-odds-worker pid 2141381, lstart 10:53:47 CST, so it runs the record code. Env read from that pid (names only, no secret values): `SYNDICATE_INPLAY_ENTRIES=on`, `ORDER_DOLLARS=3`, `DAY_DOLLARS=100`.
+- **Reading 1, record -> ledger join** (my own read at 18:06:38Z, independent of the coordinator's 18:0xZ report):
+  - `decision_records/2026-11-01.inplay.jsonl` holds 1 line: decided_at 18:04:54Z, `KXNFLTOTAL-26NOV01LVNYJ-47` leg `no`, ask 0.43, fair 0.4967 over 8 books, edge 0.0495, fair version `inplay_book_median_novig/1`.
+  - Guards: band, cell_gate, ledger, axis, day_budget and check_order all `pass`.
+  - Sizing `inplay_entry_stake/2`: $3 per order, stake $2.6401, 6 contracts, day cap $100, $0 spent before it.
+  - Its `idempotency_key` `5132c9b5a0ae...` matches **exactly 1 ledger row**. That row has `staked_probability_version=inplay:inplay_book_median_novig/1`, `sizing_basis=inplay_order_dollars` and `position_key=ingame:KXNFLTOTAL-26NOV01LVNYJ-47:no`.
+  - **1 of 1 decisions join.**
+- **The ledger row's outcome:** `status=rejected`, `error=venue_canceled`, `venue_status=canceled`, 0 contracts. It is an IOC entry that found no fill, so it is not a fault. The record's own `result` is `{placed: true, status: submitted}`, the state at the time of decision; the ledger row carries what the venue did with it.
+- **Reading 2:** 0 `DECISION_RECORD_WRITE_FAILED` lines (my grep, plus the coordinator's).
+- **Reading 3, gate re-run** (`scripts/inplay_decision_record_join.py --since 2026-10-23`, 18:07:02Z): 402 settled live fills.
+  - pregame 179: version 179/179.
+  - in_play 193 + no_commence 30 = **223 in-play: record 0, version 0, paper trace 223/223.**
+  - All 223 predate the restart: the 11-01 rows are the 10-31 night's games. **No post-restart fill has settled yet**, so the settled-fill gate itself turns over only with tonight's fills.
+- **Owed:**
+  - the first SETTLED post-restart in-play fill shows `inplay_record=1` and `version=1` in this script (the next live night);
+  - the 223 historical fills stay unjoined unless the user picks the backfill.
+- **verify (OWED, lane in-game-trading):** `inplay_decision_record_join.py` over `--since 2026-11-01` shows in-play `inplay_record == n` for fills submitted after 16:22Z.
