@@ -631,7 +631,7 @@ death, never life — do not invert it.
 - Verification: findings file on main with per-stage NHL counts (venue listing -> catalogue -> join -> Layer 2 book_prices -> DecisionRecord venue price -> paper candidates), the first zero stage named with file:line, and the fix commit or owner
 - Blocked by: none
 
-### inplay-decision-record-deploy — OPEN — opened 2026-11-01 — session 332cb014
+### inplay-decision-record-deploy — CLOSED 2026-11-01 (first in-play record joins its ledger row by key; 0 write failures) — opened 2026-11-01 — session 332cb014
 - Goal: Fleet ff to 9a41c6f66 + live-odds-worker restart (user: 'Yes, deploy it' in 332cb014); first in-play decision record joins its ledger row by idempotency_key
 - Files: none (fleet deploy only; code is in-game-trading's)
 - Hypothesis: n/a
