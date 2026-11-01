@@ -3127,3 +3127,15 @@ The user said "go with the cancel rule" here AND "Yes, build it" in another sess
   - The watcher's curl runs hourly at :05. The 05:05:04Z sample fell 77 s before the first post-roll build, so it saw the 04:27Z look-ahead build.
   - The next sample was an hour later. Two points an hour apart read as 1.5 h stale. Two nights in a row showed the same shape.
 - **Rule:** before diagnosing a stale board, list the writer's own flip lines (`LAYER2_SHARD_GENERATION_DROPPED date=<D>`) across the window. A sampler's cadence bounds the staleness it can resolve. A post-roll `SKIPPED_NON_TODAY` for the look-ahead date, or for the prior date, is correct, not evidence of skew.
+
+## 2026-11-01 — Read a ratio's definition before naming its direction; and a conserved total cannot be fixed by redistribution `[lane basketball-player-distribution, session e0a3e383]`
+- **Belief overturned (1):** "bench width ratio 1.98 = bands about twice too wide", written twice in the findings and
+  carried into a pre-registered risk. The ratio is sd(real − sim mean) / rms(sim sd): > 1 means the bands are too
+  NARROW (miss .547 > .20 said so too). The pre-registered "known risk" therefore predicted the wrong direction.
+  **Rule:** before interpreting a ratio, quote its numerator and denominator from the code line that computes it, and
+  cross-check against a second metric that must agree (here, the miss).
+- **Belief overturned (2):** "a de-concentration of minutes can zero the bench and starter bias". Team minutes are
+  conserved and the sim spends ~9.3/team-game on players who then sit, while grading covers only players who played,
+  so the graded population's summed bias is fixed; flattening even raises it (more minutes to the fringe players who
+  sit). **Rule:** before pre-registering a bias gate on a conditioned population, write the conservation identity and
+  check the gate is reachable at all.

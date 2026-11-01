@@ -1444,3 +1444,18 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   - **Fleet reading 2026-10-22 2:37 PM CT (lane wnba-injury-snapshot-overwrite, read-only):** the exposure is ALREADY open. The fleet (`21b4bdb0`, no `066c2158`) wrote the NBA's 10-22 report as the WNBA 10-22 snapshot: 2 TOR rows with spliced names, 46 ESPN rows deleted (1,027 -> 981). Every 10-24 build reads 10-22 as its latest snapshot. The props OUT refusal has no partial guard; the SmartSim, `wnba_sim_availability` and `league_status` fall back to 10-21. The last 10-24 build (4:08 AM CT) still read the ESPN rows (48 OUT, 0 lines refused).
 - **Lead FIXED by `#733` (`ae2cb646`), ON THE FLEET since 19:59:11Z 10-22:** a fetch for D run after midnight deleted D's snapshot (no 10-12), and a prefetch merged its scrape into today's. A fetch now replaces only the dates its rows carry, and ESPN rows carry the scrape's Central day, stamped once per scrape. An ff to `ae2cb646` or later carries `#731` too. `findings_2026-10-22_wnba_injury_snapshot_overwrite.md`.
 - Findings: `findings_2026-10-22_wnba_injury_nba_report.md`.
+
+## [nba-player-minutes-distribution] THE RAW NBA ENGINE'S BENCH-MINUTES BANDS ARE HALF AS WIDE AS REALITY; A FROZEN MINUTES-SHAPE FIX (β 0.85 + σ) AWAITS THE 2026-27 FORWARD READ. NOTHING ENABLED `[verified offline 2026-10-31, lane basketball-player-distribution, findings_2026-10-26_basketball_player_distribution.md, prereg 218c26dd]`
+- Research harness only (2025-26 FIT, ESPN boxes, 200 draws); no engine, switch-file or fleet change.
+- **Baseline `fit_inj`** (as-of roster + historical injury feed `scripts/nba_injury_history_build.py`, d674e150):
+  minutes miss of the central 80% (nominal .20): bench .547, starter .312; width ratio (real residual sd / sim sd)
+  bench 1.98, starter 1.21 — **>1 = bands too NARROW**. ABSENT sim min/team-game 15.70 → 1.19 with the feed.
+- **Coach DNP (8.87 sim min/team-game) is not predictable from box history** (stage A FAIL, 9084de78): 68.5% played
+  the team's last game. It needs pre-tip news (inactive list / lineups); no data source is built.
+- **Minutes-conservation constraint:** the played population's total minutes bias is fixed by the sim minutes given
+  to players who then sit; any redistribution moves it between roles but cannot remove it (step 3b, 9b093f71).
+- **Offline, Jan–Feb 2026:** β 0.85 (target ∝ target^β) + per-cell lognormal σ (<6 1.10, 6–12 .75, 12–20 .45,
+  20–28 .20, ≥28 .10) gives bench .241 / width .98, starter .180 / .97, pts/reb/ast/threes .264/.246/.239/.222;
+  chosen after reading that window, so it is graded FORWARD only (218c26dd: 2026-27 regular from 11-01, read once
+  with the round-2 read ~mid-Dec, gates F1–F4). Engine build only on a pass; production only via
+  `nba_engine_config.json` and a user decision.
