@@ -645,6 +645,12 @@ death, never life — do not invert it.
 - Verification: first live in-play decision after restart writes decision_records/<date>.inplay.jsonl with idempotency_key equal to its ledger row; no DECISION_RECORD_WRITE_FAILED
 - Blocked by: none
 
+### orphan-worktree-salvage — CLOSED 2026-11-01 (all 3 ALREADY-ON-MAIN; removed, branches deleted) — opened 2026-11-01 — session 6b4b1af9-1d77-48e7-a805-c3788e04c4f8
+- Goal: 3 orphaned worktrees (agent-a4e3c2800faf111e7, agent-a5852835adfd15778, sweet-chaum-b5fddd) unregistered, dirs gone, branches deleted; content verified identical to origin/main first (bf60a2b22, b9fc7029c, ff304ae13); user approved discard 2026-11-01
+- GOAL: MET -- 16:1xZ readings: `git worktree list` matches 0 of the 3; 6/6 paths (.claude/worktrees/<n>, .git/worktrees/<n>) absent; `git branch --list` 0; loving-einstein-b3c45e still registered. Log: .syndicate/log/2026-11-01.md 16:16Z.
+- Files: .claude/worktrees/agent-a4e3c2800faf111e7 .claude/worktrees/agent-a5852835adfd15778 .claude/worktrees/sweet-chaum-b5fddd
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
