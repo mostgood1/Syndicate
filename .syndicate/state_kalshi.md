@@ -1020,7 +1020,8 @@ board. The loop therefore checks `budget_remaining()` BEFORE spending.
   - Run 1 under `c21abdea` peaked at 2.5 GB.
   - `6872eb2c` holds rows that get no trade read as their encoded line: 653 MB over the same Sunday window (876 pages, 278,390 rows), byte-identical to the old rows apart from `captured_at`.
 - **Never run a fleet checkout older than `6872eb2c` with the key set.** v1 (`b994e9cf`) stores untraded rows and reads trades without charging the run budget.
-- **The first full forward day (10-29 UTC): MET** `[deploys.md 2026-10-30 13:47Z]`. Owed: the first full day WITH shaped trade reads (10-31 UTC), readable from ~01:05Z 11-01 (lane `e4-pregame-prints`).
+- **The first full forward day (10-29 UTC): MET** `[deploys.md 2026-10-30 13:47Z]`. **The first full day WITH shaped trade reads (10-31 UTC): MET** `[deploys.md 2026-11-01 11:24Z]`: 959 shaped traded two-leg rows, all read ok, 10,149 prints with taker side, 0 skipped_budget; A5's D0 is 10-31.
+- **The 7 smaller series starve while `KXMVECROSSCATEGORY` is behind** `[read on the fleet 2026-10-31 17:03Z..11-01 11:21Z]`. It is swept first, and a run stops at the 900-page cap before reaching the rest. They sat at 10-31 15:58:20Z for ~19 h, until an 11-01 11:03Z slice error left budget for them. Rows arrive late, not lost. No lane owns this (`kalshi-combo-capture` is CLOSED).
 - **Detail:** `findings_2026-10-27_kalshi_combo_capture.md`; the readings are in `deploys.md`.
 
 ## [kalshi-derived-rung-pricing] KALSHI'S MID ON DERIVED RUNGS (ALT LADDERS, SEGMENTS, TEAM TOTALS) IS AT LEAST AS GOOD AS A SHARP-ANCHORED SURFACE; NO PREGAME TAKER EDGE AT THE ASK `[verified on fleet + public Kalshi data 2026-10-26 22:20Z..10-27 00:21Z, lane e3-derived-surface]`
