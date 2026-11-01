@@ -615,14 +615,6 @@ death, never life — do not invert it.
 - Verification: findings file on main with per-stage NHL counts (venue listing -> catalogue -> join -> Layer 2 book_prices -> DecisionRecord venue price -> paper candidates), the first zero stage named with file:line, and the fix commit or owner
 - Blocked by: none
 
-### inplay-decision-record-deploy — CLOSED 2026-11-01 (first in-play record joins its ledger row by key; 0 write failures) — opened 2026-11-01 — session 332cb014
-- Goal: Fleet ff to 9a41c6f66 + live-odds-worker restart (user: 'Yes, deploy it' in 332cb014); first in-play decision record joins its ledger row by idempotency_key
-- Files: none (fleet deploy only; code is in-game-trading's)
-- Hypothesis: n/a
-- Falsification test: n/a
-- Verification: first live in-play decision after restart writes decision_records/<date>.inplay.jsonl with idempotency_key equal to its ledger row; no DECISION_RECORD_WRITE_FAILED
-- Blocked by: none
-
 ### ncaab-odds-key-fallback — OPEN — opened 2026-11-01 — session 547fe65e-71ca-4e19-9589-237553cb4eab
 - **STATUS 2026-11-01 18:2xZ (12:2x PM CST): fix LIVE, capture VERIFIED; one read OWED.** `18090e38e` on main; fleet ff 9a41c6f66 -> 18090e38e 16:49:50Z (user: "Yes, fix + deploy", ride-alongs "FF with both", web claim "Force it now"); all roles reloaded it at maker-pilot-fair-cancel's 16:53Z down/up. Hypothesis CONFIRMED (not falsified): the first post-ff sweep wrote `book_quotes/2026-11-01.jsonl` (3,804 rows, 134 events, 10 books), book-grid ncaab 11-01 0 -> 576 rows, Layer 2 ncaab cand None -> 804. OWED: book-grid ncaab date=2026-11-02 > 0 (still 0 at 18:13Z; a manual 11-02 run POSTed 17:33Z never ran; the 06:00Z date roll sweeps it) + the ncaab OddsAPI cost once halves engage. Remaining NCAAB gaps -> todo `#755` (settlement before Kalshi KXNCAAMB mapping). deploys.md 16:49:50Z. The read is armed as one-time scheduled task `ncaab-1102-board-check`, 2026-11-02 02:00 CST, notifying session 547fe65e. It is ONE-TIME and can miss: check `list_task_runs`, and take the read by hand if it did not run.
 - Goal: NCAAB odds capture works on the fleet: scripts/refresh_ncaab_odds_history.py falls back to the shared ODDS_API_KEY (the fleet sets only that name), landed on main with a test, the fleet checkout fast-forwarded to that exact SHA, and the first NCAAB sweep after the ff writes ncaab book_quotes for the 11-02 slate (book-grid sport=ncaab total_rows > 0)
@@ -631,12 +623,6 @@ death, never life — do not invert it.
 - Falsification test: After the ff, an NCAAB sweep still fails, or fails with a different error (e.g. 401/quota) -- then the key name was not the only gate
 - Verification: Read refresh-worker ODDS_SWEEP_OUTCOME sport=ncaab wrote=True after the ff, the next odds_refresh.json with no ncaab failingSteps, and /api/board/book-grid?sport=ncaab&date=2026-11-02 total_rows > 0; record in deploys.md
 - Blocked by: none
-
-### closed-lane-archive-20261101-1056 — CLOSED 2026-11-01 (GOAL MET: 1 block archived) — opened 2026-11-01 — session 4e393e15-b69d-4e81-a519-8d7936a48ff2
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET — 1 of 7 CLOSED blocks was SAFE (owner_liveness.py, idle-min 240) and was moved to lanes_closed.md; 6 WAIT. Table + Part B in log/2026-11-01.md.
-- Moved: closed-lane-archive-20261101-0646
 
 ### closed-lane-archive-20261101-1350 — CLOSED 2026-11-01 (GOAL MET: 1 block archived) — opened 2026-11-01 — session a2d4f225-e35b-437a-ad26-023cea114ea1
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
@@ -649,6 +635,12 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: GOAL MET — 1 of 9 CLOSED blocks was SAFE (owner_liveness.py, idle-min 240) and was moved to lanes_closed.md; 8 WAIT. Table + Part B in log/2026-11-01.md.
 - Moved: orphan-worktree-salvage
+
+### closed-lane-archive-20261101-1640 — CLOSED 2026-11-01 (GOAL MET: 2 blocks archived) — opened 2026-11-01 — session 710d1f48-6522-4461-900a-966a708498f1
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. `owner_liveness.py --idle-min 240` read SAFE for 2 of 9 CLOSED blocks; both moved to `lanes_closed.md`, one pointer each. Table, deferrals and Part B in `log/2026-11-01.md`.
+- Moved: `inplay-decision-record-deploy`, `closed-lane-archive-20261101-1056`
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -788,6 +780,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261101-0040` — CLOSED 2026-11-01 (GOAL MET: 1 blocks archived) — opened 2026-11-01 — session 28ad1d77-15fe-48f5-ac25-825ac243d696
 - `closed-lane-archive-20261101-0240` — CLOSED 2026-11-01 (GOAL MET: 2 blocks archived) — opened 2026-11-01 — session cdb66c22-02a4-41ba-86c8-fa1aeaefd108
 - `closed-lane-archive-20261101-0646` — CLOSED 2026-11-01 (GOAL MET: 2 blocks archived) — opened 2026-11-01 — session 65baa30d-91b7-4a61-915a-c9f3684faf34
+- `closed-lane-archive-20261101-1056` — CLOSED 2026-11-01 (GOAL MET: 1 block archived) — opened 2026-11-01 — session 4e393e15-b69d-4e81-a519-8d7936a48ff2
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
@@ -851,6 +844,7 @@ death, never life — do not invert it.
 - `heavy-build-memory-refusal` — CLOSED 2026-09-17 — opened 2026-09-13 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
 - `hygiene-guards-1020` — CLOSED 2026-10-21 — opened 2026-10-20 — closed 2026-10-21 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
 - `inplay-cadence-block-trim` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
+- `inplay-decision-record-deploy` — CLOSED 2026-11-01 (first in-play record joins its ledger row by key; 0 write failures) — opened 2026-11-01 — session 332cb014
 - `intelligence-idle-poll` — CLOSED 2026-09-18 (GOAL MET: an untouched post-deploy /intelligence tab stopped POSTing at minute 14; resume unit-tested only) — opened 2026-09-18 — session f26bba3b-72ee-4f8c-9721-3f8c7e4678f1
 - `kalshi-both-leg-grading` — CLOSED 2026-10-27 — opened 2026-10-27 — session a7978a13-a882-425f-bedf-41b4299704ff
 - `kalshi-combo-capture` — CLOSED 2026-10-30 (GOAL MET: capture live on the fleet; first full forward day 10-29 read MET) — opened 2026-10-27 — session a48b0f49-3a6b-4105-b194-5804a934487c (picked up 2026-10-27 as a side session of local_668211d5; opened by e32fef1a for pickup)

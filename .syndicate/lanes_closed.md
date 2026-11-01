@@ -13838,3 +13838,17 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - GOAL: MET -- 16:1xZ readings: `git worktree list` matches 0 of the 3; 6/6 paths (.claude/worktrees/<n>, .git/worktrees/<n>) absent; `git branch --list` 0; loving-einstein-b3c45e still registered. Log: .syndicate/log/2026-11-01.md 16:16Z.
 - Files: .claude/worktrees/agent-a4e3c2800faf111e7 .claude/worktrees/agent-a5852835adfd15778 .claude/worktrees/sweet-chaum-b5fddd
 - Blocked by: none
+
+### inplay-decision-record-deploy — CLOSED 2026-11-01 (first in-play record joins its ledger row by key; 0 write failures) — opened 2026-11-01 — session 332cb014
+- Goal: Fleet ff to 9a41c6f66 + live-odds-worker restart (user: 'Yes, deploy it' in 332cb014); first in-play decision record joins its ledger row by idempotency_key
+- Files: none (fleet deploy only; code is in-game-trading's)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: first live in-play decision after restart writes decision_records/<date>.inplay.jsonl with idempotency_key equal to its ledger row; no DECISION_RECORD_WRITE_FAILED
+- Blocked by: none
+
+### closed-lane-archive-20261101-1056 — CLOSED 2026-11-01 (GOAL MET: 1 block archived) — opened 2026-11-01 — session 4e393e15-b69d-4e81-a519-8d7936a48ff2
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET — 1 of 7 CLOSED blocks was SAFE (owner_liveness.py, idle-min 240) and was moved to lanes_closed.md; 6 WAIT. Table + Part B in log/2026-11-01.md.
+- Moved: closed-lane-archive-20261101-0646
