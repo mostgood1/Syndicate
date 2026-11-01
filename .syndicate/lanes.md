@@ -628,12 +628,6 @@ death, never life — do not invert it.
 - Blocked by: none
 - **GOAL VERDICT 2026-10-31:** "The 3 OPEN lanes owned by unreachable session 2d413211 (nba-live-tick-native, wnba-fixture-identity-native, wnba-live-period-lines-native) are CLOSED per the user's 2026-10-31 approval and archived to lanes_closed.md, the 2027 WNBA reads carried by a new todo; 0 other lanes' content or claims change" -- GOAL: MET. Reading: archive tool reported claims 324 -> 304 (all 20 from the 3 slugs) and wrote 3 pointers; every non-blank origin/main lanes.md line is in lanes.md or lanes_closed.md except the 3 rewritten OPEN headers; todo #754 carries the 2027 reads.
 
-### closed-lane-archive-20261031-1646 — CLOSED 2026-10-31 (GOAL MET: 1 block archived) — opened 2026-10-31 — session 5376f7b2-7854-4d74-92d0-6706064acfbb
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness --idle-min 240 read 1 SAFE of 7 CLOSED; moved to lanes_closed.md with a pointer. Detail in log/2026-10-31.md.
-- Moved: closed-lane-archive-20261031-1241
-
 ### board-midnight-date-skew — OPEN — opened 2026-10-31 — session c634d0c4-c4c3-499e-8f70-9fe8c873047d
 - **GOAL VERDICT 2026-10-31 22:06Z** — Goal (verbatim): "the Layer 2 board (/api/board/layer2-shortlist) keeps advancing through 04:00-06:00Z: refresh-worker's board date selection and the latest-key promotion check use ONE America/Chicago clock, proven by a hermetic test frozen at 04:30Z and a reachability test (off != on)" — **GOAL: NOT MET, PREMISE FALSIFIED.** The board already advances and already uses one CT clock (see RESULT below). No test was written and no fix is owed. Waiting on a user decision: close as exonerated, add a 04:30Z guard test, or shrink the ~6-8 min post-roll window served from the look-ahead build.
 - Goal: the Layer 2 board (/api/board/layer2-shortlist) keeps advancing through 04:00-06:00Z: refresh-worker's board date selection and the latest-key promotion check use ONE America/Chicago clock, proven by a hermetic test frozen at 04:30Z and a reachability test (off != on)
@@ -664,6 +658,11 @@ death, never life — do not invert it.
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - Verdict: GOAL MET. Moved `closed-lane-archive-20261031-1439` (owner 05a30e8c idle 243m, block last modified 248m). 8 other CLOSED blocks WAIT; detail in log/2026-10-31.md.
+
+### closed-lane-archive-20261031-2056 — CLOSED 2026-10-31 (GOAL MET: 1 block archived) — opened 2026-10-31 — session dac1518f-3aec-4484-8c73-061d1d8b3320
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 on origin/main returned SAFE for 1 of 9 CLOSED blocks; archived `closed-lane-archive-20261031-1646`. The other 8 WAIT (reasons in log/2026-10-31.md, 2026-11-01 01:5xZ entry).
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -794,6 +793,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261031-0840` — CLOSED 2026-10-31 (GOAL MET: 2 blocks archived) — opened 2026-10-31 — session 45521c6b-5676-40ae-a669-5c907e0bb827
 - `closed-lane-archive-20261031-1241` — CLOSED 2026-10-31 (GOAL MET: 1 block archived) — opened 2026-10-31 — session c3f2f55d-aaa0-42f4-9ee7-54dd984e35d6
 - `closed-lane-archive-20261031-1439` — CLOSED 2026-10-31 (GOAL MET: 1 blocks archived) — opened 2026-10-31 — session 05a30e8c-4bc9-4e0a-baec-a2d8c0b48bbe
+- `closed-lane-archive-20261031-1646` — CLOSED 2026-10-31 (GOAL MET: 1 block archived) — opened 2026-10-31 — session 5376f7b2-7854-4d74-92d0-6706064acfbb
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
