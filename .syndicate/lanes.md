@@ -635,6 +635,14 @@ death, never life — do not invert it.
 - Verdict: MET. owner_liveness.py --idle-min 240 at 12:47Z (06:47 CST) returned 2 SAFE of 6 CLOSED; moved to lanes_closed.md with one pointer each. Table and deferrals are in log/2026-11-01.md 12:50Z.
 - Moved: closed-lane-archive-20261101-0040, closed-lane-archive-20261101-0240
 
+### inplay-decision-record-deploy — OPEN — opened 2026-11-01 — session 332cb014
+- Goal: Fleet ff to 9a41c6f66 + live-odds-worker restart (user: 'Yes, deploy it' in 332cb014); first in-play decision record joins its ledger row by idempotency_key
+- Files: none (fleet deploy only; code is in-game-trading's)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: first live in-play decision after restart writes decision_records/<date>.inplay.jsonl with idempotency_key equal to its ledger row; no DECISION_RECORD_WRITE_FAILED
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
