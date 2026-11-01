@@ -13798,3 +13798,14 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - Verdict: MET. Moved `maker-pilot-review`, `live-odds-memory-spikes`, `close-p6-owner-lanes` to lanes_closed.md (owners idle 317-335m, blocks 331-718m). 6 CLOSED blocks waited; reasons in the 2026-11-01 03:43Z log entry.
+
+### closed-lane-archive-20261101-0040 — CLOSED 2026-11-01 (GOAL MET: 1 blocks archived) — opened 2026-11-01 — session 28ad1d77-15fe-48f5-ac25-825ac243d696
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: MET. Moved `closed-lane-archive-20261031-1849` to lanes_closed.md (owner a9ec2bfa idle 347m, block 349m). 6 CLOSED blocks waited; reasons in the 2026-11-01 05:4xZ log entry.
+
+### closed-lane-archive-20261101-0240 — CLOSED 2026-11-01 (GOAL MET: 2 blocks archived) — opened 2026-11-01 — session cdb66c22-02a4-41ba-86c8-fa1aeaefd108
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: MET. owner_liveness.py --idle-min 240 at 08:41Z (02:41 CST) returned 2 SAFE of 7 CLOSED; moved to lanes_closed.md with one pointer each. Table and deferrals are in log/2026-11-01.md 08:43Z.
+- Moved: closed-lane-archive-20261031-2056, closed-lane-archive-20261031-2240
