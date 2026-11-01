@@ -311,3 +311,45 @@ enough to judge says beta 0, which is what `market` already does.
 **Recommendation to the user:** do NOT publish. There is no stake to gain, and a published file would become one more artifact to keep
 in sync. Refit at the same grain on ~2026-11-01 (todo #727): the s4 arithmetic says ncaaf totals/h2h and nfl receptions should reach
 the floor by then. Re-ask then only if a cell passes the beta > 0 gate.
+
+## s11. REFIT 2026-11-01T15:25:44Z (09:25 CST): the VENUE-POOLED fit again -- still 0 beta>0; the same one cell market_only; shadow $0.00 by construction `[session 0ea4ac85, scheduled task staked-probability-pooled-refit-1101]`
+
+**Code and data.** Read-only on the FLEET, fleet checkout `87ecf730c` (contains the pooled writer `0f4363b9`: `merge-base --is-ancestor` OK), refresh-worker state env, fleet venv, `nice 19`. The live keyvalue ledger document read OK (no exit 4; nothing fitted on the archive alone).
+- `execution_ledger.json`: 26,009 records, of which **6,628 usable rows on 825 events**, dates **2026-10-02..2026-11-01 (30 slate dates)**. 10-22 was 2,959 / 427 over 10-02..10-21.
+- Dropped, with denominators: not_portfolio_book 15,977; no_model_edge_pct 2,046; no_ev_pct 643; unsettled 515; no_price 131; push 64; model_out_of_range 5.
+- Single source (the live ledger), so there is no per-family join: the coverage window IS the window the result rests on. Note the earliest usable date is still 10-02 in both fits.
+- Artifacts (fleet, NOT the live path): `reports/staked_probability/{coverage_pooled,fit_pooled,fit_pooled_diagnostic,candidate_pooled}_2026-11-01.json`. `calibration/staked_probability_profile.json` was not touched (mtime still 2026-10-22 17:16 CDT).
+
+**Verdicts (122 pooled cells; 10-22: 95).**
+
+| verdict | cells 11-01 | cells 10-22 |
+|---|---|---|
+| refused_n_test_below_floor | 99 | 70 |
+| refused_no_chronological_split | 22 | 24 |
+| market_only | 1 | 1 |
+| **write beta > 0** | **0** | **0** |
+
+**The cells expected to reach the floor did not** (floor: n_test >= 200 rows AND >= 30 events; train share 0.7, so ~667 rows):
+
+| cell | rows / events / dates | n_train | n_test / test events | verdict |
+|---|---|---|---|---|
+| ncaaf spreads full regular | 1,129 / 227 / 30 | 754 | **375 / 120** | market_only, beta 0 [0, 0.60], dFit CI [0, 0], dB1 -0.0395 |
+| ncaaf h2h full regular | 550 / 156 / 30 | 374 | 176 / 75 | refused (rows) |
+| ncaaf totals full regular | 470 / 152 / 30 | 314 | 156 / 65 | refused (rows) |
+| nfl receptions full regular | 299 / 54 / 26 | 201 | 98 / 13 | refused (rows and events) |
+| nba spreads_alt full regular | 360 / 78 / 12 | 243 | 117 / 27 | refused |
+
+**Diagnostic (floor waived, never written), 14 cells with a train/test split and >= 50 test rows:**
+- train beta > 0 in 6 of 14 (nba player_assists 0.45, player_points 0.60, player_threes 0.60, spreads_alt 0.20, totals_alt 0.55; soccer h2h 0.05); **every one of the 14 held-out dFit 95% CIs includes 0**, so none would pass the s9 write rule even with the floor waived.
+- The raw sim (beta 1) loses to market on the hold-out in **12 of 14** (dB1 < 0), worst ncaaf totals -0.0405 and ncaaf spreads -0.0395; positive only in nba player_assists +0.0044 and soccer h2h +0.0166 (50 test rows).
+
+**Candidate vs live.**
+- Live: `staked_probability_pooled_v1@2026-10-22T21:45:48Z`, 1 cell `ncaaf|spreads|full|regular` market_only (n_test 251 / 53 events, beta CI [0, 0.65]).
+- Candidate: `staked_probability_pooled_v1@2026-11-01T15:25:44Z`, the SAME 1 cell, market_only (n_test 375 / 120 events, beta CI [0, 0.60]).
+- New cells: 0. Changed betas: 0 (0 -> 0). Dropped cells: 0. Only the version label and the cell's fit statistics differ.
+
+**Shadow stake change: $0.00 by construction.** No candidate cell has beta > 0, and a market_only cell takes the same `market` branch as an unfitted one under the fleet's `SYNDICATE_STAKED_PROBABILITY_UNFITTED=market` (s10 measured this through `sizing_inputs_with_provenance`: 4/4 probes identical). No seam probe was run this time because there is no beta>0 cell to probe.
+
+**Verdict.** H-EARN-POOLED still FALSIFIED at 30 dates. Publishing the candidate would change only the provenance label on new orders (`...@2026-10-22T21:45:48Z` -> `...@2026-11-01T15:25:44Z`), not one dollar of stake. **Recommendation: keep the current live file**; the user's call.
+
+**Next refit.** At the 30-day row rates: ncaaf h2h needs ~117 more rows (~18/day -> ~7 days); nba spreads_alt ~307 more (~30/day -> ~10 days; test events already 27); ncaaf totals ~197 more (~16/day -> ~13 days); nfl receptions is event-bound (13 test events of 30 needed). **Refit about 2026-11-12..11-15.** The diagnostic CIs give no sign a beta>0 cell is coming; the refit is about the floor, not an expected change.
