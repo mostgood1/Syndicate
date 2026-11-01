@@ -1207,3 +1207,46 @@ never drops. The decisive population is the rule's OWN list of dropped names, wh
 re-grade needs the rule to print its names in the research harness (or a harness smoke of M-K2 measured directly).
 Either is a NEW pre-registration with the same A1–A3; not done.
 - Not done: no engine code, no switch key, no sim run.
+
+## STEP 4b — M-K2 RE-GRADE ON THE RULE'S OWN NAMES, PRE-REGISTERED 2026-11-01 17:05Z (11:05 CST), before any name is logged
+
+**User decision 11-01:** "pre-register the re-grade on the rule's actual names". Step 4 (33d07f61) graded M-K2 on a
+REPLICATED population that over-drops (1,058 played vs 779 C2 slots; traded players not in T's pool). This re-grade
+changes ONLY the population source. M-K2, the proxy p, the gates A1–A3 and their thresholds are step 4's, verbatim.
+
+**Instrument (research tree only, never on main):** `~/bball_sc/code_names` = code_inj + a print-only patch:
+- in `nba_sim_availability.add_nba_recency_exclusions`, keep the set of keys the K=2 rule ADDED per team;
+- in smart_sim's `_drop_excluded` (orchestrator/smart_sim.py ~:1353), print one line per team-game,
+  `K2_EFFECT {date, team, removed: [keys the K=2 set removed from that team's candidate frame], added: [all K=2 keys
+  for the team]}`.
+- The **effect set** (keys that actually left a candidate frame) is the graded population, not the added set: a key
+  added for a player the sim would never have pooled for T (traded, waived) changes nothing and is not re-admitted
+  by anything.
+- The patch prints only; it must not change any pool. Patch diff is committed to the findings with its line count.
+
+**Run `fit_names`:** fit_inj's exact config and inputs (`r2s/launch_fit_inj.sh`, code_names instead of code_inj),
+--n-sims 20 (draw count does not touch pool construction), 3 workers, nice 19, all 109 FIT dates.
+
+**Fidelity gates (checked BEFORE A1–A3 are computed; if either fails, stop and report — no grade):**
+- (F1) `pnames` per team-game identical to fit_inj on ≥ 99% of team-games (the patch did not move a pool);
+- (F2) ≥ 95% of step 4's 779 C2 REAL_ONLY slots appear in the effect set for their (d, T).
+
+**Population:** every (d, T, key) in the effect set, minus keys listed with an excluded status on the step-1d report
+for (d, T) (those stay dropped under M-K2). Outcome from the ESPN box: played (MIN > 0), DNP with reason, or not in
+box. p = the player's mean MIN over his last 10 regular-season games for T before d (step 4's proxy).
+
+**Gate A (all 109 dates; halves reported), verbatim from step 4:**
+- (A1) real min per team-game of re-admitted players who PLAYED ≥ 50% of C2's 4.73;
+- (A2) Σ p over re-admitted who did not play ≤ Σ p over those who played;
+- (A3) re-admitted with an injury / illness box reason ≤ 10%.
+- Reported: played rate; coach-DNP share of non-players; not-in-box count; how many C2 slots fall outside the effect
+  set and why; step 4's replicated numbers beside these.
+
+**Known limit, written now:** A1 is an UPPER bound. A re-admitted player still passes through the pool pruner
+(max_keep 13) and may be cut; only stage B's harness run measures what reaches the pool.
+
+**Predictions:** F1 and F2 hold. A2 lands within ±0.15 of step 4's as-of-roster sensitivity (0.95); I do not predict
+its side of 1. Played rate in [.35, .50].
+
+**If A PASSES:** stage B exactly as step 4 pre-registered (switch key `defer_to_injury_report`, 12-date smoke, full
+FIT `fit_ro`, gates B1–B4). **If A FAILS:** M-K2 is closed; the 4.73 joins coach DNP as needing pre-tip news.
