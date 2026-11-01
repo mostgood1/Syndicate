@@ -3139,3 +3139,6 @@ The user said "go with the cancel rule" here AND "Yes, build it" in another sess
   so the graded population's summed bias is fixed; flattening even raises it (more minutes to the fringe players who
   sit). **Rule:** before pre-registering a bias gate on a conditioned population, write the conservation identity and
   check the gate is reachable at all.
+
+## 2026-11-01 — `cancel_stale_resting_orders` is a BOOT-ONLY path; per-tick resting work goes in `execute_portfolio`'s Kalshi reconcile (lane maker-pilot-fair-cancel)
+I hooked the maker-pilot fair cancel into `cancel_stale_resting_orders` on the belief that it ran every tick. It runs only from `_live_ledger_at_boot` (`scripts/run_live_odds_refresh_worker.py:2402`). Its own docstring (`execution_ledger.py:3751`) and `pipeline/execute_portfolio.py:525` both say so. 13 unit tests passed, and so did an `off != on` reachability test, and the switch went live with a correct FAIR_PASS line at boot. Only a 30-min watch with ZERO further lines showed it was inert. **Rule:** before hooking into a pass, find its CALLER and its cadence (`grep -n "<fn>(" scripts pipeline syndicate`), not just its name. A reachability test must cover the cadence the feature needs (per tick), not only that the code is reached once.

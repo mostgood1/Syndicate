@@ -55371,3 +55371,9 @@ which is about the two sizing bases and not about the refusal boundary.
   - NHL paper bookings by strategy at the next paper run;
   - their `sharp_close` grades. NHL props carry Pinnacle, so these should be sharp-gradable;
   - the first live NHL `STAKE_BAND` if one ever sizes.
+
+### 2026-11-01 17:27Z — maker-pilot-fair-cancel — CORRECTION to the 16:53Z enable: switch ON, but the cancel is INERT (boot-only hook) — lane maker-pilot-fair-cancel
+- **Reading:** watched 16:55-17:25:34Z. No FAIR_PASS line after 16:54:07Z, though 13 `RECONCILE venue=kalshi` passes ran and both MLS pilot posts were still `submitted`. All three FAIR_PASS lines today (05:58, 12:11:52, 16:54:07Z) coincide with `LIVE_LEDGER_ROW` boot dumps.
+- **Cause (code, read ~17:26Z):** `cancel_stale_resting_orders` (where `review_resting` is hooked) is called ONLY from `_live_ledger_at_boot` (`scripts/run_live_odds_refresh_worker.py:2402`). Its own docstring says so (`execution_ledger.py:3751`), as does `pipeline/execute_portfolio.py:525`. The in-memory sighting registry is always empty at boot, so every pilot row is `unseen` and kept. **The cancel can never fire as built.**
+- **Harm:** none. Unseen means keep, which is the pre-change behaviour; nothing was cancelled. The 16:54:07Z "ON path reached" reading is true but proves only that the switch reached the hook, not that the hook runs per tick.
+- **Fix (not built; needs the user's yes):** call `review_resting(outcome["resting"] maker_pilot rows)` from the per-tick Kalshi reconcile in `pipeline/execute_portfolio.py`, beside `cancel_pregame_resting_at_kickoff`, and remove it from the boot-only stale pass. Then a fleet ff and a live-odds restart.
