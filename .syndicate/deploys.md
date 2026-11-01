@@ -55258,3 +55258,20 @@ which is about the two sizing bases and not about the refusal boundary.
   - Lifted by hand: `--undrain` -> `DRAIN_CLEARED` 22:19:06Z. A board build started 22:19:29Z.
 - **Not done:** no env edit, no marker, no down/up. Env sha read back `99622537`; no `watchdog_no_autostart`.
 - **Lesson:** do not drain the fleet on a busy evening slate. The drain stalls board builds for as long as it waits. Retry off-peak; on 10-28 the drain cleared in ~22 min.
+
+## 2026-11-01 01:22Z (8:22 PM CT 10-31) -- MEASUREMENT for 2026-10-30 19:02:42Z (fleet ff to 413a08d5, #740 (e) shaped combo trade reads): 10-31 read as swept so far -- **shaped read VERIFIED on 697 rows; the FULL day still OWED (the listing sweep is behind)** (lane e4-pregame-prints)
+- **Instrument:** `day_capture.py` (scratchpad, read-only, nice 19) over the fleet's `runs.jsonl` and `combos_2026-10-31.jsonl.gz`, using the worktree's `kalshi_combo_capture.py` (origin/main `e520e819`) for `e4_trade_shape` and the caps. Read at 01:19:17Z: fleet HEAD `87ecf730`, no run in flight (no `.lock`).
+- **Runs** (26, run_at 10-31 00:03Z .. 11-01 01:03Z): all `trades_shapes` e4, 0 errors.
+  - status `ok` 9, `budget_stopped` 17. The stop is the LISTING cap: pages max 900 of 900.
+  - shaped reads 697, at most 119 in a run (cap 400); `shaped_budget_stopped` 0; shaped `skipped_budget` 0.
+  - GETs: markets 16,975, trades 697, collections 16. Longest run 786.8 s (cap 1,800).
+- **Stored rows** (`combos_2026-10-31`): 697 shaped traded two-leg rows, the same as the runs' shaped count.
+  - `trades_status` ok 697 (0 empty, 0 skipped_budget, 0 unread).
+  - Cells: soccer GL 670 (EPL 249, Bundesliga 135, La Liga 115, Serie A 68, MLS 64, Championship 39); NBA SP-nested 27.
+  - 7,272 prints, each `{t, yes, no, count, taker_side}`; taker_side yes 6,049 / no 1,223; median 2 prints a combo (max 460); first print a median 3.17 h before settlement, last print 1.12 h.
+- **Not yet a full day.** At 01:21Z `KXMVECROSSCATEGORY` is swept to 10-31 20:47:24Z (4.5 h behind) and the other 7 series to 15:58:20Z (9.3 h). From 17:03Z every run spent its 900 pages on `KXMVECROSSCATEGORY`, which is swept first. So later 10-31 settlements are not stored yet, and 697 is a lower bound.
+  - It is the usual weekend backlog, not the shaped read, which has its own cap. `budget_stopped` runs per UTC day: 10/24 on 10-29, 10/24 on 10-30, 15/24 on 10-31 (15,198 pages against ~11.4k). The 10-31 morning backlog (02:03Z..09:03Z) cleared at 10:03Z.
+  - Nothing is lost: a settled market stays listable and its prints readable, so a late sweep stores the rows. Every window read so far was e4, and the fleet default is e4.
+- **verify:** on the swept part, every clause is met: `trades_status` ok/empty > 0 (697); `skipped_budget` counted (0, the shaped cap was never reached); prints with `taker_side` (7,272); GETs within the run budget (listing cap 900 held, shaped <= 119 of 400, <= 787 s of 1,800).
+  - **Owed:** the same reading once every series is swept past 11-01 00:00Z. A read-only watcher (`full_day_watch.sh`, scratchpad) polls every 20 min until 11-02 06:00Z and runs it then.
+  - D0 stays 10-31: every run that covered 10-31 was e4.
