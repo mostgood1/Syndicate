@@ -630,12 +630,6 @@ death, never life — do not invert it.
 - Verification: findings file on main with per-stage NHL counts (venue listing -> catalogue -> join -> Layer 2 book_prices -> DecisionRecord venue price -> paper candidates), the first zero stage named with file:line, and the fix commit or owner
 - Blocked by: none
 
-### closed-lane-archive-20261101-0646 — CLOSED 2026-11-01 (GOAL MET: 2 blocks archived) — opened 2026-11-01 — session 65baa30d-91b7-4a61-915a-c9f3684faf34
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: MET. owner_liveness.py --idle-min 240 at 12:47Z (06:47 CST) returned 2 SAFE of 6 CLOSED; moved to lanes_closed.md with one pointer each. Table and deferrals are in log/2026-11-01.md 12:50Z.
-- Moved: closed-lane-archive-20261101-0040, closed-lane-archive-20261101-0240
-
 ### inplay-decision-record-deploy — OPEN — opened 2026-11-01 — session 332cb014
 - Goal: Fleet ff to 9a41c6f66 + live-odds-worker restart (user: 'Yes, deploy it' in 332cb014); first in-play decision record joins its ledger row by idempotency_key
 - Files: none (fleet deploy only; code is in-game-trading's)
@@ -657,6 +651,12 @@ death, never life — do not invert it.
 - Falsification test: After the ff, an NCAAB sweep still fails, or fails with a different error (e.g. 401/quota) -- then the key name was not the only gate
 - Verification: Read refresh-worker ODDS_SWEEP_OUTCOME sport=ncaab wrote=True after the ff, the next odds_refresh.json with no ncaab failingSteps, and /api/board/book-grid?sport=ncaab&date=2026-11-02 total_rows > 0; record in deploys.md
 - Blocked by: none
+
+### closed-lane-archive-20261101-1056 — CLOSED 2026-11-01 (GOAL MET: 1 block archived) — opened 2026-11-01 — session 4e393e15-b69d-4e81-a519-8d7936a48ff2
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET — 1 of 7 CLOSED blocks was SAFE (owner_liveness.py, idle-min 240) and was moved to lanes_closed.md; 6 WAIT. Table + Part B in log/2026-11-01.md.
+- Moved: closed-lane-archive-20261101-0646
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -794,6 +794,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261031-2240` — CLOSED 2026-10-31 (GOAL MET: 3 blocks archived) — opened 2026-10-31 — session 7a13f23d-d675-42a5-86bf-7d92c52c45bb
 - `closed-lane-archive-20261101-0040` — CLOSED 2026-11-01 (GOAL MET: 1 blocks archived) — opened 2026-11-01 — session 28ad1d77-15fe-48f5-ac25-825ac243d696
 - `closed-lane-archive-20261101-0240` — CLOSED 2026-11-01 (GOAL MET: 2 blocks archived) — opened 2026-11-01 — session cdb66c22-02a4-41ba-86c8-fa1aeaefd108
+- `closed-lane-archive-20261101-0646` — CLOSED 2026-11-01 (GOAL MET: 2 blocks archived) — opened 2026-11-01 — session 65baa30d-91b7-4a61-915a-c9f3684faf34
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
