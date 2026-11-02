@@ -515,7 +515,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-new-games", type=int, default=None)
     parser.add_argument("--crawl-only", action="store_true", help="fetch box rows, write no priors table")
     parser.add_argument("--preseason", action="store_true", help="build the roster-based preseason table even if games exist")
+    # Women's college basketball (lane wncaab-module, user 2026-11-02): registry, ESPN path and data root
+    # come from the ratings module, so one switch there moves this producer too.
+    parser.add_argument("--league", default="ncaab", choices=("ncaab", "wncaab"))
     args = parser.parse_args(argv)
+    ratings.configure_league(args.league)
     today = dt.date.today()
     season = args.season or default_season(today)
     summary = run(season, today, rate=max(args.rate, 0.2), max_new_games=args.max_new_games, crawl_only=args.crawl_only,

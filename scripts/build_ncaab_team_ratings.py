@@ -52,6 +52,24 @@ REPO = Path(__file__).resolve().parents[1]
 REGISTRY = REPO / "syndicate" / "features" / "shared" / "ncaab_team_registry.csv"
 ESPN_HOSTS = ("site.api.espn.com", "site.web.api.espn.com")
 SPORT_PATH = "apis/site/v2/sports/basketball/mens-college-basketball"
+LEAGUE = "ncaab"
+# WOMEN'S COLLEGE BASKETBALL (lane wncaab-module, user 2026-11-02 "Approve the loans"): `--league wncaab`
+# swaps the registry, the ESPN path and the data root -- nothing else. The model constants below (HOME_EDGE,
+# PRIOR_*, HOME_POINTS, MARGIN_CALIBRATION_K) are the MEN'S fits, carried for the women until a women's
+# walk-forward refits them; `compute_ratings` itself is league-neutral.
+_LEAGUES = {
+    "ncaab": ("ncaab_team_registry.csv", "apis/site/v2/sports/basketball/mens-college-basketball",
+              "SYNDICATE_NCAAB_SOURCE_ROOT", "ncaab_source"),
+    "wncaab": ("wncaab_team_registry.csv", "apis/site/v2/sports/basketball/womens-college-basketball",
+               "SYNDICATE_WNCAAB_SOURCE_ROOT", "wncaab_source"),
+}
+
+
+def configure_league(league: str) -> None:
+    """Point this module (and `build_ncaab_player_priors`, which reads its paths and fetch) at a league."""
+    global LEAGUE, REGISTRY, SPORT_PATH
+    registry, sport_path, _env, _dir = _LEAGUES[league]
+    LEAGUE, REGISTRY, SPORT_PATH = league, REPO / "syndicate" / "features" / "shared" / registry, sport_path
 
 HOME_EDGE = 0.014  # ~3.5 points on a 100-possession game, the usual college estimate
 PRIOR_GAMES = 8.0  # games at which this season's rating and last season's weigh equally
@@ -82,10 +100,11 @@ RATING_FIELDS = (
 # ----------------------------------------------------------------------- paths
 
 def ncaab_root() -> Path:
-    override = str(os.environ.get("SYNDICATE_NCAAB_SOURCE_ROOT") or "").strip()
+    _registry, _path, env_var, dir_name = _LEAGUES[LEAGUE]
+    override = str(os.environ.get(env_var) or "").strip()
     if override:
         return Path(override)
-    return Path(os.environ.get("SYNDICATE_DATA_ROOT", str(REPO / "data"))) / "ncaab_source"
+    return Path(os.environ.get("SYNDICATE_DATA_ROOT", str(REPO / "data"))) / dir_name
 
 
 def processed_dir() -> Path:
@@ -227,8 +246,9 @@ def parse_summary(payload: Mapping[str, Any], *, season: int, day: str) -> list[
 
 # --------------------------------------------------------------------- ratings
 
-def load_registry(path: Path = REGISTRY) -> dict[str, str]:
+def load_registry(path: Path | None = None) -> dict[str, str]:
     """espn_id -> school, the D-I set."""
+    path = REGISTRY if path is None else path
     with path.open(encoding="utf-8", newline="") as handle:
         return {row["espn_id"]: row["school"] for row in csv.DictReader(handle) if row.get("espn_id")}
 
@@ -415,7 +435,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--rate", type=float, default=4.0, help="requests per second (default 4)")
     parser.add_argument("--max-new-games", type=int, default=None, help="stop after fetching this many new games")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--league", default="ncaab", choices=sorted(_LEAGUES))
     args = parser.parse_args(argv)
+    configure_league(args.league)
     today = dt.date.today()
     season = args.season or default_season(today)
     summary = run(season, today, rate=max(args.rate, 0.2), max_new_games=args.max_new_games, dry_run=args.dry_run)
