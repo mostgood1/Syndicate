@@ -639,7 +639,7 @@ death, never life — do not invert it.
 - **CLOSED 2026-11-02 10:55 AM CST. Goal, verbatim: "Grade Suggested vs all priced for 10-31/11-01 and pooled 10-17..11-01 and record it" -- GOAL: MET.** Pooled -1.1% per bet / +1.8% ladders once (5,353 / 551 g) vs all priced -12.6%; EV at Shin close pooled +0.45% [-0.20, +1.07], third window -0.61% (soccer -4.86%; +0.22% without). Recommendation keep 2% (user's call). Owed elsewhere (not this lane): alt-ladder cap exceeded on 210/210 multi-rung ladders 10-27..11-01 -- held-orders read via the 3,000-row `_load()` document (hypothesis), findings §7.
 - Blocked by: none
 
-### stake-band-off — OPEN — opened 2026-11-02 — session 86352bc9-921d-487c-bd24-c943dc6b8b98
+### stake-band-off — CLOSED 2026-11-02 (GOAL MET: band OFF 18:23Z, new refresh-worker environ band_on=0; deploys fa0abcfde) — opened 2026-11-02 — session 86352bc9-921d-487c-bd24-c943dc6b8b98
 - Goal: Live $5-$10 stake band OFF on the fleet: the new refresh-worker's /proc environ has SYNDICATE_LIVE_STAKE_BAND=on count 0 (user 11-02: 'yes, turn the band off'; paper-bet-optimization forward #2 venue+live ROI -11.0 +/- 4.2, n 600)
 - Files: none in the repo (fleet ~/syndicate-prod/local_production.env only)
 - Hypothesis: n/a
