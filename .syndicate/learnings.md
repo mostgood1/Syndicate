@@ -3142,3 +3142,13 @@ The user said "go with the cancel rule" here AND "Yes, build it" in another sess
 
 ## 2026-11-01 — `cancel_stale_resting_orders` is a BOOT-ONLY path; per-tick resting work goes in `execute_portfolio`'s Kalshi reconcile (lane maker-pilot-fair-cancel)
 I hooked the maker-pilot fair cancel into `cancel_stale_resting_orders` on the belief that it ran every tick. It runs only from `_live_ledger_at_boot` (`scripts/run_live_odds_refresh_worker.py:2402`). Its own docstring (`execution_ledger.py:3751`) and `pipeline/execute_portfolio.py:525` both say so. 13 unit tests passed, and so did an `off != on` reachability test, and the switch went live with a correct FAIR_PASS line at boot. Only a 30-min watch with ZERO further lines showed it was inert. **Rule:** before hooking into a pass, find its CALLER and its cadence (`grep -n "<fn>(" scripts pipeline syndicate`), not just its name. A reachability test must cover the cadence the feature needs (per tick), not only that the code is reached once.
+
+
+### `[2026-11-01, lane basketball-player-distribution]` A population rebuilt OUTSIDE the code is not the code's population; log the code's own names before grading a change to it
+Step 4 graded "K=2 rule defers to the injury report" on a replica of the rule built from player_logs: A2 1.94, and a
+post-hoc restriction to the as-of roster gave 0.95 ("at the boundary"). The rule's own names, printed from the sim
+(step 4b, 0e8746ce), gave **2.74**: the replica missed the trade skip AND kept players the sim never pooled, while the
+real effect set holds 1,286 players who are in the candidate frame yet absent from the box. Both replica readings,
+including the "better" restricted one, pointed the wrong way. **Rule:** when grading a change to a rule, take the
+population from the rule's own output (a print-only patch in the research tree, fidelity-gated against the baseline
+run), never from a reimplementation; a sensitivity cut of a replica is not a prediction for the real population.

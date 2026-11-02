@@ -1459,3 +1459,7 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   chosen after reading that window, so it is graded FORWARD only (218c26dd: 2026-27 regular from 11-01, read once
   with the round-2 read ~mid-Dec, gates F1–F4). Engine build only on a pass; production only via
   `nba_engine_config.json` and a user decision.
+- **REAL_ONLY minutes (players who played but the sim never pooled), 6.19 real min/team-game:** 76% (4.73) come
+  from the K=2 recency rule (census 33d07f61). Deferring the rule to the injury report FAILS on the rule's own logged
+  names (step 4b, 0e8746ce): A2 2.74 (in-box only 1.15) — 25% of re-admitted players play; the non-players are coach's
+  decisions or absent from the box. **The 4.73 needs pre-tip news, like coach DNP.** The fleet's K=2 rule is unchanged.
