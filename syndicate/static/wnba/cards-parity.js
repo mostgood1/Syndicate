@@ -83,7 +83,15 @@
     }
     return clampNumber(number, 0, cap);
   }
-  const API_BASE_PATH = '/wnba/api';
+  // SPORT SWITCH (2026-11-02, lane ncaab-board-slate). This page also renders
+  // NCAAB (`/ncaab/cards`), which has no model, no live lens and no sim detail:
+  // its template passes `sport` in the bootstrap and its own API base on the
+  // body. Absent both, every default below is WNBA's, so WNBA is unchanged.
+  const SPORT = Object.assign(
+    { key: 'wnba', liveLens: true, simDetail: true, hasModel: true },
+    (window.WNBACardsBootstrap && window.WNBACardsBootstrap.sport) || {},
+  );
+  const API_BASE_PATH = document.body?.dataset?.cardsApiBasePath || '/wnba/api';
   const SOURCE_CARDS_API_BASE_PATH = `${API_BASE_PATH}/source/cards`;
   const CARDS_PAYLOAD_PATH = document.body?.dataset?.cardsPayloadPath || SOURCE_CARDS_API_BASE_PATH;
   const cardsQuerySuffix = document.body?.dataset?.cardsQuerySuffix || '';
@@ -476,6 +484,9 @@
 
   function canonicalTeamTri(tri) {
     const value = normalizeLogoTri(tri);
+    if (SPORT.key !== 'wnba') {
+      return value;
+    }
     return {
       LA: 'LAS',
       LV: 'LAS',
@@ -3822,6 +3833,11 @@
         }));
     }
 
+    if (!SPORT.hasModel) {
+      // No model, no official pick: a "best side" here would be the market's
+      // own favourite presented as a recommendation.
+      return [];
+    }
     const betting = game?.betting || {};
     const score = game?.sim?.score || {};
     const market = game?.sim?.market || {};
@@ -3852,7 +3868,8 @@
         label: row.label,
         main: row.pick.detail,
         probability: row.pick.probability,
-        ev: Number(row.pick.ev) * 100,
+        // `Number(null) * 100` is 0: a missing EV used to render as "EV 0.0%".
+        ev: row.pick.ev == null ? null : Number(row.pick.ev) * 100,
         sub: row.sub,
         bucket: row.bucket,
         stakeAmount: null,
@@ -4993,13 +5010,19 @@
         { label: 'Sim rows', value: fmtInteger((toFiniteNumber(playersSummary.away) || 0) + (toFiniteNumber(playersSummary.home) || 0)), sub: `${fmtInteger(playersSummary.away)} away · ${fmtInteger(playersSummary.home)} home` },
       ];
 
-    const entries = boardHasStartedGames()
+    // No model and no live lens: the market's own numbers, not empty sim tiles.
+    const marketEntries = SPORT.hasModel ? null : [
+      { label: 'Market total', value: fmtNumber(game?.betting?.total, 1), sub: `${game.away_tri} @ ${game.home_tri}` },
+      { label: 'Market spread', value: fmtSigned(game?.betting?.home_spread, 1), sub: `${game.home_tri} line` },
+      { label: 'Books', value: fmtInteger(game?.betting?.books), sub: 'quoting this game' },
+    ];
+    const entries = marketEntries || (boardHasStartedGames()
       ? [
         livePaceTile(game.away_tri, awayPace, liveAwayPoss, liveLens?.awayAttempts),
         livePaceTile(game.home_tri, homePace, liveHomePoss, liveLens?.homeAttempts),
         { label: 'Official props', value: String(counts.home + counts.away), sub: `${counts.away} away · ${counts.home} home` },
       ]
-      : pregameEntries;
+      : pregameEntries);
 
     return entries.map((entry) => `
       <div class="cards-mini-metric ${safeArray(entry.extra).length ? 'is-rich' : ''}">
@@ -5009,6 +5032,21 @@
         ${safeArray(entry.extra).map((line) => `<div class="cards-mini-copy">${escapeHtml(line)}</div>`).join('')}
       </div>
     `).join('');
+  }
+
+  function marketLineText(game) {
+    const betting = game?.betting || {};
+    const parts = [];
+    if (Number.isFinite(Number(betting.home_spread)) && betting.home_spread !== null) {
+      parts.push(`${game.home_tri} ${fmtSigned(betting.home_spread, 1)}`);
+    }
+    if (Number.isFinite(Number(betting.total)) && betting.total !== null) {
+      parts.push(`o/u ${fmtNumber(betting.total, 1)}`);
+    }
+    if (betting.away_ml != null && betting.home_ml != null) {
+      parts.push(`ML ${game.away_tri} ${fmtAmerican(betting.away_ml)} / ${game.home_tri} ${fmtAmerican(betting.home_ml)}`);
+    }
+    return parts.length ? `Market ${parts.join(' · ')}` : 'No market line yet';
   }
 
   function marketCountSummary(game) {
@@ -5212,8 +5250,8 @@
       <div class="cards-tabs-rail">
         <div class="cards-tabs">
           <button class="cards-tab ${activeTab === 'game' ? 'is-active' : ''}" type="button" data-card-tab="game" data-card-target="${escapeHtml(id)}">Game</button>
-          <button class="cards-tab ${activeTab === 'box' ? 'is-active' : ''}" type="button" data-card-tab="box" data-card-target="${escapeHtml(id)}">Box Score</button>
-          <button class="cards-tab ${activeTab === 'props' ? 'is-active' : ''}" type="button" data-card-tab="props" data-card-target="${escapeHtml(id)}">Props</button>
+          ${SPORT.hasModel ? `<button class="cards-tab ${activeTab === 'box' ? 'is-active' : ''}" type="button" data-card-tab="box" data-card-target="${escapeHtml(id)}">Box Score</button>
+          <button class="cards-tab ${activeTab === 'props' ? 'is-active' : ''}" type="button" data-card-tab="props" data-card-target="${escapeHtml(id)}">Props</button>` : ''}
         </div>
         <div class="cards-mini-metrics cards-mini-metrics--rail">${miniMetrics(game)}</div>
       </div>
@@ -6029,7 +6067,10 @@
     const hasStarted = hasStartedGame(liveState);
     const awayScore = hasStarted && Number.isFinite(Number(liveState?.away_pts)) ? Number(liveState.away_pts) : score.away_mean;
     const homeScore = hasStarted && Number.isFinite(Number(liveState?.home_pts)) ? Number(liveState.home_pts) : score.home_mean;
-    const simScoreLabel = `Sim score ${game.away_tri} ${fmtNumber(score.away_mean, 1)} - ${fmtNumber(score.home_mean, 1)} ${game.home_tri}`;
+    const marketLabel = marketLineText(game);
+    const simScoreLabel = SPORT.hasModel
+      ? `Sim score ${game.away_tri} ${fmtNumber(score.away_mean, 1)} - ${fmtNumber(score.home_mean, 1)} ${game.home_tri}`
+      : marketLabel;
     const liveScoreLabel = hasStarted
       ? `Live score ${game.away_tri} ${fmtInteger(awayScore)} - ${fmtInteger(homeScore)} ${game.home_tri}`
       : simScoreLabel;
@@ -6041,7 +6082,11 @@
     const scoreMetaPrimary = liveDataPending ? 'Loading live box...' : liveScoreLabel;
     const scoreMetaSecondary = liveLensPending
       ? 'Loading live lens...'
-      : `${simScoreLabel} · Total ${fmtNumber(score.total_mean, 1)} · Margin ${fmtSigned(score.margin_mean, 1)}`;
+      : (SPORT.hasModel
+        ? `${simScoreLabel} · Total ${fmtNumber(score.total_mean, 1)} · Margin ${fmtSigned(score.margin_mean, 1)}`
+        : (hasStarted
+          ? `${marketLabel}${game?.betting?.books ? ` · ${fmtInteger(game.betting.books)} books` : ''}`
+          : `Market consensus${game?.betting?.books ? ` across ${fmtInteger(game.betting.books)} books` : ''} · no model`));
     const propsSummary = propBucketSummary(game);
     const livePropCount = liveOpportunityPropRows(game).length;
     return `
@@ -6235,7 +6280,9 @@
         reapplyCachedSimDetails();
       }
       const resolvedDate = payload.date || state.date;
-      state.liveDataLoading = true;
+      // Only the live lens ever clears this; a sport without one would sit on
+      // "Loading live box..." forever.
+      state.liveDataLoading = SPORT.liveLens;
       updateDateControls();
       renderHeaderMeta();
       renderSourceMeta();
@@ -6249,7 +6296,7 @@
         renderBoard();
       }
 
-      void loadLiveGameLens(resolvedDate, payload.games || [], { silent, epoch }).then(() => {
+      if (SPORT.liveLens) void loadLiveGameLens(resolvedDate, payload.games || [], { silent, epoch }).then(() => {
         if (epoch !== state.refreshEpoch) {
           return;
         }
@@ -6263,8 +6310,8 @@
         }
       });
 
-      void loadPropsStrip(resolvedDate, { silent, games: payload.games || [], epoch });
-      if (!slateUnchanged || !state.boardInitialized || !silent) {
+      if (SPORT.liveLens) void loadPropsStrip(resolvedDate, { silent, games: payload.games || [], epoch });
+      if (SPORT.simDetail && (!slateUnchanged || !state.boardInitialized || !silent)) {
         void prefetchSlateSimDetails(payload.games || [], { epoch, dateValue: resolvedDate });
       }
 

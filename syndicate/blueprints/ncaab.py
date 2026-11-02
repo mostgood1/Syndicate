@@ -20,6 +20,8 @@ from syndicate.features.ncaab.sources import season_dates
 from syndicate.features.ncaab.season import build_season_page_context
 from syndicate.features.ncaab.season import build_season_betting_card_api_payload
 from syndicate.features.ncaab.season import build_season_betting_card_page_context
+from syndicate.features.ncaab.source_cards import build_ncaab_source_cards_payload
+from syndicate.features.shared.asset_version import cards_source_asset_version
 from syndicate.features.shared.game_board_contract import build_game_board_api_payload
 from syndicate.features.shared.hub_summary import build_hub_bettor_summary
 from syndicate.features.shared.timezone import central_today_iso
@@ -84,8 +86,28 @@ def market_board():
 
 @ncaab_bp.get("/cards")
 def cards():
-    context = build_cards_page_context(_selected_date())
-    return render_template("shared/game_cards_board.html", **context)
+    # User 2026-11-02: "the ncaab page needs a complete overhaul to match
+    # nba/wnba". The WNBA parity page in NCAAB mode (no model, no live lens),
+    # fed by `/ncaab/api/source/cards`. The shared board stays at ?client=board,
+    # the same escape hatch NBA keeps.
+    if (request.args.get("client") or "").strip().lower() == "board":
+        return render_template("shared/game_cards_board.html", **build_cards_page_context(_selected_date()))
+    selected = _selected_live_date()
+    day = date.fromisoformat(selected)
+    return render_template(
+        "ncaab/cards_source.html",
+        date=selected,
+        prev_date=date.fromordinal(day.toordinal() - 1).isoformat(),
+        next_date=date.fromordinal(day.toordinal() + 1).isoformat(),
+        asset_version=cards_source_asset_version(
+            "shared/standalone_shell.css", "wnba/styles.css", "wnba/cards-parity.css", "wnba/cards-parity.js"
+        ),
+    )
+
+
+@ncaab_bp.get("/api/source/cards")
+def api_source_cards():
+    return jsonify(build_ncaab_source_cards_payload(_selected_live_date()))
 
 
 @ncaab_bp.get("/api/cards")
