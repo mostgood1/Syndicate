@@ -1713,6 +1713,12 @@ def _default_resolver(selected_date: str):
         # (`nba/live_player_box.py`), which carries per-game state, so an NBA
         # under grades only once ESPN says the game is over.
         "nba": lambda: _build("syndicate.features.shared.bet_status_nba", "nba_status_resolver", selected_date),
+        # Wired 2026-11-02, opening day: both NCAAB paper orders in the book read
+        # `no_resolver_for_ncaab`. Reads ESPN's Division I scoreboard (`groups=50`) at call
+        # time, once per capture date per resolver; game lines and halves only. The women's
+        # game is the same resolver with quarters, wired before its first order.
+        "ncaab": lambda: _build("syndicate.features.shared.bet_status_ncaab", "ncaab_status_resolver", selected_date),
+        "wncaab": lambda: _build("syndicate.features.shared.bet_status_wncaab", "wncaab_status_resolver", selected_date),
     }
     cache: dict[str, Any] = {}
 

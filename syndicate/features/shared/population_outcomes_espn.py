@@ -124,10 +124,16 @@ GRADER_VERSION = "espn/1"
 # because the blocker cleared now, and an empty season is the cheapest window in which
 # to be wrong about it. Everything else was already in place and pinned
 # (`_SPORT_PATHS["ncaab"]`, `BASKETBALL_SPORTS`, the halves in `regulation_periods`).
-HANDLED_SPORTS = frozenset({"nfl", "ncaaf", "wnba", "nba", "ncaab"})
+#
+# WNCAAB ADDED 2026-11-02 (lane `college-basketball-settlement`), the women's opening
+# day. Four quarters, so it takes the WNBA segment table; its team map is
+# `canonical_team("wncaab", ...)`, built by lane `wncaab-module` from the women's
+# registry. Until that map lands every wncaab row reads `team_unresolved` -- named,
+# not graded off the men's list.
+HANDLED_SPORTS = frozenset({"nfl", "ncaaf", "wnba", "nba", "ncaab", "wncaab"})
 
 # Every basketball sport reads the same ESPN summary box and the same stat tables.
-BASKETBALL_SPORTS = frozenset({"wnba", "nba", "ncaab"})
+BASKETBALL_SPORTS = frozenset({"wnba", "nba", "ncaab", "wncaab"})
 
 NCAAF_PLAYER_STATS_SNAPSHOT = (
     "ncaaf_source/source_artifacts/data/processed/player_game_stats/ncaaf_player_game_stats_snapshot.csv"
@@ -139,11 +145,19 @@ _SPORT_PATHS = {
     "ncaaf": "football/college-football",
     "wnba": "basketball/wnba",
     "nba": "basketball/nba",
-    # Present but unreachable until `ncaab` joins HANDLED_SPORTS -- see the note there.
     "ncaab": "basketball/mens-college-basketball",
+    "wncaab": "basketball/womens-college-basketball",
 }
-# FBS, and a page size that holds a full Saturday (`poll_ncaaf_live_state` measured it).
-_SCOREBOARD_EXTRA = {"ncaaf": "&groups=80&limit=200"}
+# NCAAF: FBS, and a page size that holds a full Saturday (`poll_ncaaf_live_state` measured
+# it). College basketball: Division I (`groups=50`). Without it the scoreboard is a small
+# featured subset -- measured 2026-11-02, men's 18 of 182 events, women's 16 of 164 -- so
+# most NCAAB rows read `game_not_found` on a slate ESPN does carry.
+_COLLEGE_BASKETBALL_EXTRA = "&groups=50&limit=500"
+_SCOREBOARD_EXTRA = {
+    "ncaaf": "&groups=80&limit=200",
+    "ncaab": _COLLEGE_BASKETBALL_EXTRA,
+    "wncaab": _COLLEGE_BASKETBALL_EXTRA,
+}
 _FETCH_TIMEOUT_SECONDS = 20.0
 
 FULL = "full"
@@ -161,6 +175,29 @@ _REGULATION_PERIODS_BY_SPORT = {"ncaab": 2}
 
 def regulation_periods(sport: str) -> int:
     return _REGULATION_PERIODS_BY_SPORT.get(str(sport or "").strip().lower(), _REGULATION_PERIODS)
+
+
+def _halves_points(home: list[Any], away: list[Any], segment: str) -> tuple[float, float] | None:
+    """NCAAB's `(home, away)` for `h1` (period 1) or `h2` (period 2 and every overtime).
+
+    Not WNBA's `_segment_points`, whose `h1` is periods 1+2 and `h2` 3+4: on two halves
+    that graded an NCAAB first half as the whole regulation game and a double-overtime
+    second half as the two overtimes alone (2026-11-02, lane
+    `college-basketball-settlement`). `h2` takes overtime by the same second-half
+    convention, only when both sides report the same number of periods; any missing
+    period refuses the segment.
+    """
+    if segment == "h1":
+        wanted = [1]
+    elif segment == "h2":
+        if len(home) != len(away):
+            return None
+        wanted = list(range(2, len(home) + 1))
+    else:
+        return None
+    if not wanted or any(len(side) < number or side[number - 1] is None for side in (home, away) for number in wanted):
+        return None
+    return float(sum(home[number - 1] for number in wanted)), float(sum(away[number - 1] for number in wanted))
 
 # ---- reasons (ungraded), each a different job ----------------------------------------
 R_NO_COMMENCE = "no_commence_time"
@@ -668,6 +705,8 @@ class EspnPopulationSettler:
         away = event["away"]["linescores"]
         if home is None or away is None:
             return None
+        if regulation_periods(sport) == 2:
+            return _halves_points(home, away, segment)
         if sport in BASKETBALL_SPORTS:
             from syndicate.features.shared.bet_status_wnba import _segment_points
 

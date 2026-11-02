@@ -69,13 +69,15 @@ from syndicate.features.shared import sim_gap_ev_study as sge  # noqa: E402
 # costs one not-found read; being wrong in the mean direction silently drops a sport from the
 # accuracy job for a month, which is the failure this replaces.
 #
-# NCAAB is inside a window here and still will not grade: it is not in the ESPN settler's
-# HANDLED_SPORTS because no NCAAB team registry exists. That is deliberate and visible --
-# the scorecard will carry the sport with zero graded rows rather than omit it silently.
+# NCAAB's old exception -- read but not graded, for want of a team registry -- ended
+# 2026-09-23 when it joined the ESPN settler's HANDLED_SPORTS. WNCAAB (added 2026-11-02, lane
+# `college-basketball-settlement`) opens and closes with the men's season, and is graded
+# once lane `wncaab-module`'s team map lands; until then its rows read `team_unresolved`.
 SEASON_WINDOWS = {
     "mlb": ((3, 20), (11, 5)),
     "nba": ((10, 1), (6, 25)),
     "ncaab": ((11, 1), (4, 10)),
+    "wncaab": ((11, 1), (4, 10)),
     "ncaaf": ((8, 20), (1, 20)),
     "nfl": ((9, 1), (2, 15)),
     "nhl": ((9, 15), (6, 30)),

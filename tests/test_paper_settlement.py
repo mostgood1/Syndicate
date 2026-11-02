@@ -351,7 +351,7 @@ def test_the_traded_sports_WITHOUT_a_resolver_are_pinned_so_a_new_gap_cannot_pas
     BEFORE its orders reached the ledger, i.e. before the counter could show
     the gap. Soccer and NFL were both found after the fact.
     """
-    traded = ("mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "soccer")
+    traded = ("mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "wncaab", "soccer")
     resolve = settle._default_resolver(DATE)
     missing = {
         sport
@@ -361,8 +361,10 @@ def test_the_traded_sports_WITHOUT_a_resolver_are_pinned_so_a_new_gap_cannot_pas
         if resolve({"sport": sport}).get("unavailable_reason") == f"no_resolver_for_{sport}"
     }
 
-    # nba gained `bet_status_nba` 2026-10-24 (lane nba-portfolio-live-prop-status).
-    assert missing == {"ncaab"}, (
+    # nba gained `bet_status_nba` 2026-10-24 (lane nba-portfolio-live-prop-status); ncaab
+    # and wncaab gained `bet_status_ncaab` / `_wncaab` 2026-11-02 (lane
+    # college-basketball-settlement), wncaab before its first order.
+    assert missing == set(), (
         "settlement resolver coverage changed -- if a sport gained one, shrink this set; "
         "if a sport was added to the board without one, its bets cannot be graded"
     )

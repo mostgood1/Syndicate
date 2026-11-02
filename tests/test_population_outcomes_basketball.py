@@ -187,3 +187,60 @@ def test_nba_player_props_are_supported_and_a_nonsense_market_is_not():
     assert espn._prop_supported("nba", "player_points") is True
     assert espn._prop_supported("nba", "player_double_double") is True
     assert espn._prop_supported("nba", "player_hole_in_ones") is False
+
+
+# --------------------------------------------------------------------------------------
+# NCAAB halves are graded off the HALVES (lane `college-basketball-settlement`, 2026-11-02).
+# --------------------------------------------------------------------------------------
+
+
+def _linescores(home, away):
+    return {"home": {"linescores": home}, "away": {"linescores": away}}
+
+
+def test_an_ncaab_first_half_is_period_one_not_the_whole_regulation_game():
+    """Before this, NCAAB went through WNBA's quarter table: `h1` = periods 1+2, which on
+    two halves is the whole regulation game (FAU-Charlotte 2026-03-01 read 69-69 for a
+    first half that ended 35-45)."""
+    settler = espn.EspnPopulationSettler()
+    game = _linescores([35, 34, 8], [45, 24, 7])
+    assert settler._segment_pair("ncaab", "h1", game) == (35.0, 45.0)
+    # `h2` is the second half AND the overtime, not the overtime alone.
+    assert settler._segment_pair("ncaab", "h2", game) == (42.0, 31.0)
+    assert settler._segment_pair("ncaab", "h2", _linescores([35, 30, 8, 9], [33, 32, 8, 5])) == (47.0, 45.0)
+    # The quarter sports are untouched: NBA's h1 is still Q1+Q2.
+    assert settler._segment_pair("nba", "h1", _linescores([30, 28, 25, 22], [27, 33, 24, 30])) == (58.0, 60.0)
+
+
+def test_an_ncaab_half_with_a_missing_period_or_a_quarter_segment_refuses():
+    settler = espn.EspnPopulationSettler()
+    assert settler._segment_pair("ncaab", "h2", _linescores([35], [45])) is None
+    assert settler._segment_pair("ncaab", "h2", _linescores([35, 34, 8], [45, 24])) is None
+    assert settler._segment_pair("ncaab", "q1", _linescores([35, 34], [45, 24])) is None
+
+
+# --------------------------------------------------------------------------------------
+# WNCAAB joins: four quarters, the women's ESPN path, the Division I scoreboard.
+# --------------------------------------------------------------------------------------
+
+
+def test_wncaab_is_handled_and_read_from_the_womens_path():
+    settler = espn.EspnPopulationSettler()
+    assert settler.handles(_row("wncaab")) is True
+    assert settler.handles(_row("wncaab", market="totals", segment="q1", player_name=None)) is True
+    assert espn._SPORT_PATHS["wncaab"] == "basketball/womens-college-basketball"
+    assert "wncaab" in espn.BASKETBALL_SPORTS
+    assert espn.regulation_periods("wncaab") == 4
+    # Quarters, so WNBA's table: h1 = Q1+Q2.
+    assert settler._segment_pair("wncaab", "h1", _linescores([33, 28, 17, 23], [14, 19, 26, 34])) == (61.0, 33.0)
+
+
+@pytest.mark.parametrize("sport,path", [("ncaab", "mens-college-basketball"), ("wncaab", "womens-college-basketball")])
+def test_the_college_scoreboard_asks_for_division_one(sport, path):
+    """Without `groups=50` ESPN serves a featured subset: 18 of 182 men's and 16 of 164
+    women's events on 2026-11-02."""
+    urls = []
+    settler = espn.EspnPopulationSettler(fetch_json=lambda url: urls.append(url) or {"events": []})
+    settler._scoreboard(sport, "2026-11-02")
+    assert urls[0] == (f"https://site.api.espn.com/apis/site/v2/sports/basketball/{path}/scoreboard"
+                       "?dates=20261102&groups=50&limit=500")

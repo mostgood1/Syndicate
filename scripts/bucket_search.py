@@ -91,7 +91,7 @@ except ImportError:  # run as `python scripts/<name>.py`
     from _base_url import admin_token as resolve_admin_token, default_base_url
 
 BASE_URL = default_base_url()
-SPORTS = ("mlb", "nfl", "ncaaf", "soccer", "wnba", "nba", "nhl", "ncaab")
+SPORTS = ("mlb", "nfl", "ncaaf", "soccer", "wnba", "nba", "nhl", "ncaab", "wncaab")
 MAX_PARTS = 64
 
 

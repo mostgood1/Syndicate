@@ -47,7 +47,9 @@ SETTLER_MODULES: tuple[tuple[str, str, str, tuple[str, ...]], ...] = (
     # here. Moving one alone does not fail loudly; it produces a sport that is graded and not
     # advertised (or advertised and not graded), which reads as a quiet coverage change.
     # `tests/test_population_outcomes_basketball.py` pins them in agreement.
-    ("espn", "syndicate.features.shared.population_outcomes_espn", "EspnPopulationSettler", ("nfl", "ncaaf", "wnba", "nba", "ncaab")),
+    # `wncaab` added 2026-11-02 (lane `college-basketball-settlement`).
+    ("espn", "syndicate.features.shared.population_outcomes_espn", "EspnPopulationSettler",
+     ("nfl", "ncaaf", "wnba", "nba", "ncaab", "wncaab")),
     ("nhl", "syndicate.features.shared.population_outcomes_nhl", "NhlPopulationSettler", ("nhl",)),
 )
 
