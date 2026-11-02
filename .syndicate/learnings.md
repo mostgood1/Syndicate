@@ -3152,3 +3152,9 @@ real effect set holds 1,286 players who are in the candidate frame yet absent fr
 including the "better" restricted one, pointed the wrong way. **Rule:** when grading a change to a rule, take the
 population from the rule's own output (a print-only patch in the research tree, fidelity-gated against the baseline
 run), never from a reimplementation; a sensitivity cut of a replica is not a prediction for the real population.
+
+### `[2026-11-02, lane e4-pregame-prints]` Putting a consumer FIRST in a shared budget makes its failure mode everyone's; a unit of work thrown away at the budget must change before it is retried
+`b9eb4202` swept `KXMVECROSSCATEGORY0` before the big series so it could not be starved, and its first run verified clean. Five runs later one 0-series slice cost more than a run's whole 900-page budget. `BudgetStop` discarded it without touching the density that sized it, so every run retried the same span: 19 runs, 17,100 GETs, 0 rows. Because it was now first, the big series got nothing either (24 h behind). The same livelock existed under the old order, but there it only ate the leftover pages. **Rule:**
+1. A retry after discarded work must differ from the try that failed: learn a bound, shrink the unit, or skip it. Otherwise the job livelocks at its own cadence.
+2. Before giving a consumer first claim on a shared budget, ask what it does when one unit costs more than the whole budget.
+3. A first-run verification of a loop change is not the day that was owed. Read the day before calling it done.
