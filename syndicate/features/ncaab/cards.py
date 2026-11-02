@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from datetime import date, datetime, timedelta
 from functools import lru_cache
 from typing import Any
 
@@ -167,6 +168,94 @@ def _group_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return games
 
 
+def _slate_status(game: dict[str, Any]) -> tuple[str, str]:
+    """(status, detail) strings for a slate card."""
+    from syndicate.features.ncaab.slate import central_start_label
+
+    live = game.get("live_state") if isinstance(game.get("live_state"), dict) else {}
+    if live.get("final"):
+        return "Final", str(live.get("status") or "Final")
+    if live.get("in_progress"):
+        return "Live", str(live.get("status") or "Live")
+    status_text = str(live.get("status") or "")
+    if any(word in status_text.lower() for word in ("postponed", "canceled", "cancelled", "suspended")):
+        return status_text, status_text
+    return "Pregame", central_start_label(game.get("start_time_utc")) or "TBD"
+
+
+def _slate_line(game: dict[str, Any], away: dict[str, Any], home: dict[str, Any]) -> str | None:
+    """The consensus main spread / total from the NCAAB book grid, as the chip footer prints it."""
+    try:
+        from syndicate.features.shared.game_chip_detail import pregame_footer
+
+        start = datetime.fromisoformat(str(game.get("start_time_utc") or "").replace("Z", "+00:00"))
+        return pregame_footer(
+            "ncaab", game,
+            away=away.get("abbr") or away.get("name") or "Away",
+            home=home.get("abbr") or home.get("name") or "Home",
+            away_name=away.get("name") or "", home_name=home.get("name") or "",
+            start_utc=start,
+        )
+    except Exception:  # noqa: BLE001 -- a missing line is "-", never a broken page
+        return None
+
+
+def _slate_cards(slate: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """`#755` follow-up (2026-11-02). Cards from the D1 slate when no recommendation
+    groups exist -- which is every date since the external NCAAB app was retired.
+    NCAAB has no pregame model, so a card is the matchup, the start, and the
+    market's consensus line; it does not claim a pick.
+
+    The chip fields (`event_id`, `start_time_utc`, `live_state`, side scores)
+    are kept on the card: the home provider hands these same dicts to
+    `build_game_chip`, so the cards page, the Games rail and Layer 1's game state
+    all read one game list.
+    """
+    cards: list[dict[str, Any]] = []
+    for game in sorted(slate, key=lambda g: str(g.get("start_time_utc") or "")):
+        away = dict(game.get("away") or {})
+        home = dict(game.get("home") or {})
+        if not away.get("name") or not home.get("name"):
+            continue
+        status, detail = _slate_status(game)
+        line = _slate_line(game, away, home) if status == "Pregame" else None
+        live = game.get("live_state") if isinstance(game.get("live_state"), dict) else {}
+        score = (
+            f"{away.get('abbr')} {away.get('score')} - {home.get('abbr')} {home.get('score')}"
+            if away.get("score") is not None and home.get("score") is not None
+            else None
+        )
+        game_id = str(game.get("event_id") or "")
+        summary = f"{away['name']} at {home['name']}" + (f", {game['venue']}" if game.get("venue") else "") + "."
+        cards.append({
+            **game,
+            "gamePk": game_id,
+            "card_variant": "shared_default",
+            "away": away,
+            "home": home,
+            "status": status,
+            "detail": detail,
+            "summary": summary,
+            "href": None,
+            "href_label": None,
+            "metrics": [
+                {"label": "Start" if status == "Pregame" else "Status", "value": detail},
+                {"label": "Line", "value": line or "-"},
+                {"label": "Score", "value": score or "-"},
+                {"label": "Site", "value": "Neutral" if game.get("neutral_site") else "Home"},
+            ],
+            "panels": [
+                {
+                    "eyebrow": "Market",
+                    "title": line or "No consensus line yet",
+                    "body": "Market-fair only: NCAAB has no pregame model, so opportunities on the boards come from cross-book consensus.",
+                    "items": [f"ESPN event {game_id}", str(live.get("status") or detail)],
+                },
+            ],
+        })
+    return cards
+
+
 def build_cards_page_context(selected_date: str) -> dict[str, Any]:
     resolved_date = str(selected_date or default_date()).strip() or default_date()
     season = int(resolved_date[:4]) if len(resolved_date) >= 4 and resolved_date[:4].isdigit() else 2025
@@ -174,10 +263,24 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
     rows = payload.get("data") if isinstance(payload.get("data"), list) else []
     games = _group_rows(rows)
     using_sample_data = False
+    from_slate = False
+    if not games:
+        from syndicate.features.ncaab.slate import slate_games
+
+        games = _slate_cards(slate_games(resolved_date))
+        from_slate = bool(games)
 
     dates = mirrored_available_dates()
     prev_date, next_date = neighboring_values(dates, resolved_date, fallback=resolved_date)
-    source_path = f"data/ncaab_source/api/recommendations/recommendations_{resolved_date}.json"
+    if from_slate:
+        # The mirror's date list ends with the retired app; a slate date steps by day.
+        day = date.fromisoformat(resolved_date)
+        prev_date, next_date = (day - timedelta(days=1)).isoformat(), (day + timedelta(days=1)).isoformat()
+    source_path = (
+        f"data/ncaab_source/data/scoreboard/scoreboard_{resolved_date}.json"
+        if from_slate
+        else f"data/ncaab_source/api/recommendations/recommendations_{resolved_date}.json"
+    )
     return apply_game_board_contract(
         {
             "date": resolved_date,
@@ -199,14 +302,14 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
                 for game in games
             ],
             "source_path": source_path,
-            "source_title": "NCAAB mirrored cards" if games else "NCAAB cards unavailable",
+            "source_title": ("NCAAB D1 slate" if from_slate else "NCAAB mirrored cards") if games else "NCAAB cards unavailable",
             "empty_state": {
                 "eyebrow": "NCAAB cards",
-                "title": "No game cards were available for this date",
-                "body": "The cards board only renders mirrored NCAAB recommendation groups, and none were available for the requested date.",
+                "title": "No Division I games on this date",
+                "body": "Cards come from the D1 scoreboard the refresh-worker publishes (ESPN, D1 vs D1 only), and it lists no game for the requested date.",
                 "list_items": [
                     f"Requested date: {selected_date or resolved_date}",
-                    "Choose another mirrored NCAAB date from the date control or refresh the source mirror.",
+                    "A date the worker has not built yet reads empty until its first board build for that date.",
                 ],
             } if not games else None,
             "using_sample_data": using_sample_data,
@@ -222,7 +325,7 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
                 {"label": "Games", "value": str(len(games))},
                 {"label": "Rows", "value": str(len(rows) or "-")},
                 {"label": "Dates", "value": str(len(dates) or "-")},
-                {"label": "Source", "value": "Mirror" if games else "No data"},
+                {"label": "Source", "value": ("D1 slate" if from_slate else "Mirror") if games else "No data"},
             ],
             "cards_stylesheet": None,
             "cards_grid_class": "cards-grid",

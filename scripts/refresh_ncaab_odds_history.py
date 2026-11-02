@@ -126,6 +126,15 @@ class TheOddsApiClient:
     @staticmethod
     def _infer_period_from_key(market_key: str) -> str:
         key = str(market_key or "").lower().strip()
+        # OddsAPI spells halves as a `_h1` / `_h2` SUFFIX (`spreads_h1`). This
+        # function only knew `1h` / `1st_half`, so every half line fell through to
+        # "full_game" -- measured 2026-11-02, 519 of 2,741 spread/total snapshot
+        # groups in the NCAAB quote log held a half line BESIDE the full-game one
+        # under the same label (BetMGM total 75.5 next to 153.5).
+        if key.endswith("_h1"):
+            return "1h"
+        if key.endswith("_h2"):
+            return "2h"
         if any(tok in key for tok in ("_1st_half", "1st_half", "first_half", "_1h", "1h_")):
             return "1h"
         if any(tok in key for tok in ("_2nd_half", "2nd_half", "second_half", "_2h", "2h_")):
@@ -286,7 +295,7 @@ class TheOddsApiClient:
                     for row in self._normalize_market_rows(event, book, market, fetched_at):
                         yield row
 
-    def get_event_odds(self, event_id: str, *, markets: str, bookmakers: str | None = None) -> dict:
+    def get_event_odds(self, event_id: str, *, markets: str, bookmakers: str | None = None, fallback_full_game: bool = True) -> dict:
         event_key = str(event_id or "").strip()
         if not event_key:
             return {}
@@ -306,7 +315,8 @@ class TheOddsApiClient:
                 timeout=30,
             )
         except _OddsApiRequestError as exc:
-            if exc.status_code not in {400, 422}:
+            # A half-only request must not silently become a paid full-game one.
+            if exc.status_code not in {400, 422} or not fallback_full_game:
                 raise
             params["markets"] = "h2h,spreads,totals"
             payload = self._request_json(
@@ -321,8 +331,8 @@ class TheOddsApiClient:
             return payload[0]
         return {}
 
-    def iter_event_odds(self, event_id: str, *, markets: str, bookmakers: str | None = None):
-        event = self.get_event_odds(event_id, markets=markets, bookmakers=bookmakers)
+    def iter_event_odds(self, event_id: str, *, markets: str, bookmakers: str | None = None, fallback_full_game: bool = True):
+        event = self.get_event_odds(event_id, markets=markets, bookmakers=bookmakers, fallback_full_game=fallback_full_game)
         if not isinstance(event, dict) or not event:
             return
         fetched_at = dt.datetime.now(dt.timezone.utc)
@@ -401,42 +411,79 @@ def _event_on_target_date(ct_raw: object, *, target_date: dt.date, tz: ZoneInfo)
         return False
 
 
-def _fetch_current_rows(*, adapter, date_iso: str, markets: str, bookmakers: str | None) -> list[dict]:
-    mk_l = (markets or "").lower()
-    wants_period = any(tok in mk_l for tok in ("_h1", "_h2", "1st_half", "2nd_half", "first_half", "second_half"))
-    if not wants_period:
-        return [_row_to_dict(row) for row in adapter.iter_current_odds_expanded(markets=markets, date_iso=date_iso, bookmakers=bookmakers)]
+_FULL_GAME_MARKETS = ("h2h", "spreads", "totals")
+_HALF_SUFFIXES = ("_h1", "_h2")
+# The live window for per-event half lines: from this long before tip until this
+# long after it (a college game runs ~2 h; 3 h covers overtime and delays).
+_HALF_WINDOW_BEFORE_TIP_SECONDS = 30 * 60
+_HALF_WINDOW_AFTER_TIP_SECONDS = 3 * 3600
+# After this long the first half is over and its lines are settled or pulled,
+# so only second-half markets are worth a credit.
+_FIRST_HALF_OVER_AFTER_SECONDS = 75 * 60
 
-    tz = _target_timezone()
-    target_date = dt.date.fromisoformat(date_iso)
-    event_ids: set[str] = set()
 
-    try:
-        for event in adapter.list_events_by_date(date_iso) or []:
-            event_id = str((event or {}).get("id") or "").strip()
-            commence_time = (event or {}).get("commence_time")
-            if event_id and _event_on_target_date(commence_time, target_date=target_date, tz=tz):
-                event_ids.add(event_id)
-    except Exception:
-        pass
+def _split_markets(markets: str) -> tuple[list[str], list[str]]:
+    """(full-game markets, half markets) from a comma list."""
+    keys = [m.strip().lower() for m in str(markets or "").split(",") if m.strip()]
+    halves = [m for m in keys if m.endswith(_HALF_SUFFIXES)]
+    full = [m for m in keys if m in _FULL_GAME_MARKETS]
+    return full, halves
 
-    try:
-        for row in adapter.iter_current_odds_expanded(markets="h2h", date_iso=date_iso, bookmakers=bookmakers):
-            event_id = str(getattr(row, "event_id", "") or "").strip()
-            commence_time = getattr(row, "commence_time", None)
-            if event_id and _event_on_target_date(commence_time, target_date=target_date, tz=tz):
-                event_ids.add(event_id)
-    except Exception:
-        pass
 
-    if event_ids:
-        rows: list[dict] = []
-        for event_id in sorted(event_ids):
-            rows.extend(_row_to_dict(row) for row in adapter.iter_event_odds(event_id, markets=markets, bookmakers=bookmakers))
-        if rows:
-            return rows
+def _half_window_events(rows: list[dict], *, now: dt.datetime) -> dict[str, dt.datetime]:
+    """{event_id: commence} for games in progress or tipping within the window."""
+    out: dict[str, dt.datetime] = {}
+    for row in rows:
+        event_id = str(row.get("event_id") or "").strip()
+        commence = _coerce_datetime(row.get("commence_time"))
+        if not event_id or commence is None or event_id in out:
+            continue
+        seconds_to_tip = (commence - now).total_seconds()
+        if -_HALF_WINDOW_AFTER_TIP_SECONDS <= seconds_to_tip <= _HALF_WINDOW_BEFORE_TIP_SECONDS:
+            out[event_id] = commence
+    return out
 
-    return [_row_to_dict(row) for row in adapter.iter_current_odds_expanded(markets=markets, date_iso=date_iso, bookmakers=bookmakers)]
+
+def _fetch_current_rows(*, adapter, date_iso: str, markets: str, bookmakers: str | None, now: dt.datetime | None = None) -> list[dict]:
+    """Full-game lines for EVERY game in one bulk call; half lines per event, live window only.
+
+    WHY (2026-11-02, user: bulk + live-window halves, "Live betting NCAAB is the
+    most important part of its usage"). The old slate-date path fetched every
+    market per event, for every event it found, and found too few:
+    `list_events_by_date` asked for the UTC day, which ends at 6 PM Central, and
+    the h2h backup read `getattr(row, "event_id")` off dict rows and so never
+    added one -- 16 of ~130 priced games on the 11-02 opener, evening slate
+    absent. Fixed naively that is ~7 credits x ~120 events per sweep (~800),
+    and NCAAB rides every live-loop sweep.
+
+    Now: one bulk `/odds` call (3 credits, every event, in play included) for
+    h2h/spreads/totals, plus `/events/{id}/odds` for the HALF markets only for
+    games in progress or tipping within 30 min -- the half lines a live bettor
+    actually uses -- with first-half markets dropped once the first half is
+    over. ~3 + 4 x (games in window) credits a sweep.
+    """
+    full, halves = _split_markets(markets)
+    bulk_markets = ",".join(full or _FULL_GAME_MARKETS)
+    rows = [_row_to_dict(row) for row in adapter.iter_current_odds_expanded(markets=bulk_markets, date_iso=date_iso, bookmakers=bookmakers)]
+    if not halves:
+        return rows
+
+    moment = now or dt.datetime.now(dt.timezone.utc)
+    for event_id, commence in sorted(_half_window_events(rows, now=moment).items()):
+        wanted = halves
+        if (moment - commence).total_seconds() > _FIRST_HALF_OVER_AFTER_SECONDS:
+            wanted = [m for m in halves if not m.endswith("_h1")]
+        if not wanted:
+            continue
+        try:
+            rows.extend(
+                _row_to_dict(row)
+                for row in adapter.iter_event_odds(event_id, markets=",".join(wanted), bookmakers=bookmakers, fallback_full_game=False)
+                if str(row.get("period") or "") != "full_game"
+            )
+        except Exception as exc:  # noqa: BLE001 -- one event's halves must not cost the slate its full-game lines
+            print(f"[ncaab_odds] HALF_LINES_FAILED event={event_id} error={type(exc).__name__}: {exc}", flush=True)
+    return rows
 
 
 def _discover_event_ids(*, adapter, date_iso: str) -> list[str]:
@@ -487,6 +534,9 @@ def _write_rows(out_path: Path, rows: list[dict]) -> None:
         writer.writerows(rows)
 
 
+_QUOTE_SEGMENT = {"full_game": "full", "1h": "h1", "2h": "h2"}
+
+
 def _append_ncaab_book_quotes(rows: list[dict], *, date_iso: str) -> None:
     """Route NCAAB's already-multi-book rows into the shared quote log.
 
@@ -515,7 +565,11 @@ def _append_ncaab_book_quotes(rows: list[dict], *, date_iso: str) -> None:
                 "home_team": row.get("home_team_name"),
                 "away_team": row.get("away_team_name"),
                 "bookmaker": row.get("book"),
-                "segment": str(row.get("period") or "full") or "full",
+                # The SHARED segment vocabulary (`market_segments`): `full`, `h1`,
+                # `h2`. This wrote the fetcher's own `full_game` / `1h`, which no
+                # other sport writes -- every consumer that keeps `segment ==
+                # "full"` (the chip footer's grid lines among them) skipped NCAAB.
+                "segment": _QUOTE_SEGMENT.get(str(row.get("period") or ""), "full"),
                 "player_name": None,
                 "book_updated_at": str(row.get("last_update") or "") or None,
             }

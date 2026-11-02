@@ -18,6 +18,24 @@ from typing import Iterator, Tuple
 
 REGISTRY_PATH = Path(__file__).resolve().parent / "ncaab_team_registry.csv"
 
+# DIVISION I PROGRAMMES ESPN'S TEAM LIST OMITS (2026-11-02). The CSV is ESPN's
+# `/teams?limit=1000`, which returns 362 programmes and not these three -- yet
+# ESPN's own per-team record files each under `groups.parent.id == "50"`
+# (Division I), all three play full D1 schedules (ASUN / OVC), and OddsAPI
+# prices them: Winthrop @ Queens and Southern Indiana @ Belmont were on the
+# 11-02 board with no game to join to. Kept here rather than in the CSV so
+# `build_ncaab_team_registry.py --check` still compares the CSV against ESPN's
+# list alone. Same columns as the CSV.
+_D1_MISSING_FROM_ESPN_TEAM_LIST: tuple[dict[str, str], ...] = (
+    {"espn_id": "2511", "school": "Queens University", "display_name": "Queens University Royals",
+     "short_display_name": "Queens", "abbreviation": "QUC", "mascot": "Royals", "slug": "queens-university-royals"},
+    {"espn_id": "88", "school": "Southern Indiana", "display_name": "Southern Indiana Screaming Eagles",
+     "short_display_name": "S Indiana", "abbreviation": "USI", "mascot": "Screaming Eagles",
+     "slug": "southern-indiana-screaming-eagles"},
+    {"espn_id": "2815", "school": "Lindenwood", "display_name": "Lindenwood Lions",
+     "short_display_name": "Lindenwood", "abbreviation": "LIN", "mascot": "Lions", "slug": "lindenwood-lions"},
+)
+
 
 @lru_cache(maxsize=1)
 def registry_rows() -> tuple[dict[str, str], ...]:
@@ -27,14 +45,19 @@ def registry_rows() -> tuple[dict[str, str], ...]:
     from "this sport has no map" -- `team_aliases` logs nothing either way, so
     `tests/test_nhl_ncaab_club_maps.py` pins a non-empty registry so a deleted
     or truncated file fails a test instead of silently emptying the map.
+    The supplement above is appended only to a registry that loaded.
     """
     if not REGISTRY_PATH.exists():
         return ()
     try:
         with REGISTRY_PATH.open(encoding="utf-8", newline="") as handle:
-            return tuple(dict(row) for row in csv.DictReader(handle))
+            rows = tuple(dict(row) for row in csv.DictReader(handle))
     except Exception:
         return ()
+    if not rows:
+        return ()
+    present = {str(row.get("espn_id") or "") for row in rows}
+    return rows + tuple(dict(row) for row in _D1_MISSING_FROM_ESPN_TEAM_LIST if row["espn_id"] not in present)
 
 
 def iter_team_alias_offers() -> Iterator[Tuple[str, str]]:
@@ -62,3 +85,60 @@ def iter_team_alias_offers() -> Iterator[Tuple[str, str]]:
         slug = str(row.get("slug") or "").strip()
         if slug:
             yield slug.replace("-", " "), school
+        yield from _odds_feed_spellings(row, school)
+    for token, school in _ODDS_FEED_ALIASES:
+        yield token, school
+
+
+# THE ODDS FEED SPELLS SCHOOLS ITS OWN WAY, and the registry is ESPN's. Measured
+# 2026-11-02 over the 120 OddsAPI events commencing 11-02/11-03: 50 did not
+# resolve to their ESPN game, almost all on a name the registry never offered --
+# "Georgia St Panthers" (ESPN "Georgia State"), "GW Revolutionaries", "LIU
+# Sharks", "Army Knights" (ESPN mascot "Black Knights"), "American Eagles"
+# (ESPN school "American University"). An unresolved side has no canonical key,
+# so the Games rail drew a chip-less card and Layer 1 left the game `unknown`.
+# Each spelling below is derived from the row it names, so it can only point at
+# that school; the collision pass in `team_aliases` still drops any token two
+# schools both produce.
+def _odds_feed_spellings(row: dict[str, str], school: str) -> Iterator[Tuple[str, str]]:
+    mascot = str(row.get("mascot") or "").strip()
+    short = str(row.get("short_display_name") or "").strip()
+    abbreviation = str(row.get("abbreviation") or "").strip()
+    stems = {school}
+    if school.endswith(" State"):
+        base = school[: -len(" State")]
+        stems |= {f"{base} St", f"{base} St."}
+    if school.endswith(" University"):
+        stems.add(school[: -len(" University")])
+    if school.startswith("Mount "):
+        stems.add("Mt. " + school[len("Mount "):])
+    for stem in stems:
+        yield stem, school
+        if mascot:
+            yield f"{stem} {mascot}", school
+    if mascot:
+        for prefix in (short, abbreviation):
+            if prefix:
+                yield f"{prefix} {mascot}", school
+        last = mascot.split()[-1]
+        if last != mascot:
+            yield f"{school} {last}", school
+
+
+# Vendor spellings no rule above derives, each read off the 2026-11-02 odds feed.
+_ODDS_FEED_ALIASES: tuple[tuple[str, str], ...] = (
+    ("Arkansas-Little Rock Trojans", "Little Rock"),
+    ("Boston Univ. Terriers", "Boston University"),
+    ("Loyola (MD) Greyhounds", "Loyola Maryland"),
+    ("St. Thomas (MN) Tommies", "St. Thomas"),
+    ("Grambling St Tigers", "Grambling"),
+    ("Central Connecticut St Blue Devils", "Central Connecticut"),
+    ("Appalachian St Mountaineers", "App State"),
+    ("SE Missouri St Redhawks", "Southeast Missouri State"),
+    ("UMKC Kangaroos", "Kansas City"),
+    ("Loyola (Chi) Ramblers", "Loyola Chicago"),
+    ("Tenn-Martin Skyhawks", "UT Martin"),
+    ("Grand Canyon Antelopes", "Grand Canyon"),
+    ("Long Beach St 49ers", "Long Beach State"),
+    ("Seattle Redhawks", "Seattle U"),
+)

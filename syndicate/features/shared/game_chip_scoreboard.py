@@ -358,6 +358,12 @@ def _live_status_token(sport: str, game: dict[str, Any]) -> str | None:
     prefix = "Q" if sport in _BASKETBALL_SPORTS or sport in _FOOTBALL_SPORTS else "P"
     period = _text(live_state.get("period") or game.get("period") or live_state.get("quarter"))
     clock = _text(live_state.get("clock") or game.get("clock") or live_state.get("game_clock"))
+    if sport == "ncaab" and period.isdigit():
+        # College basketball plays two HALVES; ESPN's period 3+ is overtime.
+        # "Q2 12:34" for a second half was the NBA token on a sport without quarters.
+        number = int(period)
+        label = f"H{number}" if number <= 2 else ("OT" if number == 3 else f"{number - 2}OT")
+        return f"{label} {clock}".strip()
     if period.isdigit():
         return f"{prefix}{period} {clock}".strip()
     for source in (live_state.get("status"), status.get("detailed"), game.get("detail")):
