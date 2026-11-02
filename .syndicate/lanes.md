@@ -617,7 +617,7 @@ death, never life — do not invert it.
 - Verification: findings file on main with per-stage NHL counts (venue listing -> catalogue -> join -> Layer 2 book_prices -> DecisionRecord venue price -> paper candidates), the first zero stage named with file:line, and the fix commit or owner
 - Blocked by: none
 
-### ncaab-odds-key-fallback — OPEN — opened 2026-11-01 — session 547fe65e-71ca-4e19-9589-237553cb4eab
+### ncaab-odds-key-fallback — CLOSED 2026-11-02 (GOAL MET: 11-02 grid 138 rows, 0 of 25 post-fix runs with the key error -- deploys.md 2026-11-02 08:01Z; follow-on work in lane ncaab-board-slate) — opened 2026-11-01 — session 547fe65e-71ca-4e19-9589-237553cb4eab
 - **STATUS 2026-11-01 18:2xZ (12:2x PM CST): fix LIVE, capture VERIFIED; one read OWED.** `18090e38e` on main; fleet ff 9a41c6f66 -> 18090e38e 16:49:50Z (user: "Yes, fix + deploy", ride-alongs "FF with both", web claim "Force it now"); all roles reloaded it at maker-pilot-fair-cancel's 16:53Z down/up. Hypothesis CONFIRMED (not falsified): the first post-ff sweep wrote `book_quotes/2026-11-01.jsonl` (3,804 rows, 134 events, 10 books), book-grid ncaab 11-01 0 -> 576 rows, Layer 2 ncaab cand None -> 804. OWED: book-grid ncaab date=2026-11-02 > 0 (still 0 at 18:13Z; a manual 11-02 run POSTed 17:33Z never ran; the 06:00Z date roll sweeps it) + the ncaab OddsAPI cost once halves engage. Remaining NCAAB gaps -> todo `#755` (settlement before Kalshi KXNCAAMB mapping). deploys.md 16:49:50Z. The read is armed as one-time scheduled task `ncaab-1102-board-check`, 2026-11-02 02:00 CST, notifying session 547fe65e. It is ONE-TIME and can miss: check `list_task_runs`, and take the read by hand if it did not run.
 - Goal: NCAAB odds capture works on the fleet: scripts/refresh_ncaab_odds_history.py falls back to the shared ODDS_API_KEY (the fleet sets only that name), landed on main with a test, the fleet checkout fast-forwarded to that exact SHA, and the first NCAAB sweep after the ff writes ncaab book_quotes for the 11-02 slate (book-grid sport=ncaab total_rows > 0)
 - Files: scripts/refresh_ncaab_odds_history.py, tests/test_ncaab_refresh_runner.py
@@ -630,6 +630,14 @@ death, never life — do not invert it.
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - Result: GOAL MET. owner_liveness.py --idle-min 240 gave SAFE for 1 of 6 CLOSED blocks; moved `closed-lane-archive-20261102-0257` (owner c37cf0d5 idle 241m, block last modified 244m). 5 deferred; table and Part B in log/2026-11-02.md.
+
+### ncaab-board-slate — OPEN — opened 2026-11-02 — session 547fe65e-71ca-4e19-9589-237553cb4eab
+- Goal: NCAAB boards work like every other sport on the fleet: an ESPN D1-vs-D1 slate artifact (ncaab/slate.py) feeds the Layer 2 Games rail chips, Layer 1 game state and the /ncaab cards page; NCAAB odds capture prices every D1 game via one bulk call with half lines per-event only for games live or tipping within 30 min, labelled h1/h2 (not full_game)
+- Files: syndicate/features/ncaab/slate.py, syndicate/features/ncaab/cards.py, syndicate/features/shared/ncaab_team_registry.py, syndicate/features/shared/game_chip_scoreboard.py (ncaab halves token only), syndicate/features/shared/game_chip_linescore.py (ncaab halves only), scripts/refresh_ncaab_odds_history.py, tests/test_ncaab_slate.py, tests/test_ncaab_refresh_runner.py
+- Hypothesis: Every NCAAB board gap on the 11-02 opener has one root: no NCAAB game list exists (provider reads the retired app's recommendations mirror), plus a fetcher that found 16 of ~130 games (UTC-day window, getattr on dict rows) and labelled half lines full_game
+- Falsification test: After ff + reload-web + refresh-worker restart: /api/board/game-chips sports=ncaab still 0, or Layer 1 ncaab by_state still all unknown, or /ncaab still empty, or the 11-02 quote log still holds two lines per (event, book, market, snapshot) under segment full
+- Verification: Fleet reads after deploy: game-chips ncaab > 100; layer1 ncaab rows_enriched > 0 and by_state unknown near 0; /ncaab/api/cards games > 100; new book_quotes rows carry segment full/h1/h2 with events > 100; /api/ops/oddsapi/quota by_sport.ncaab credits/hour measured over >= 1 h
+- Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
