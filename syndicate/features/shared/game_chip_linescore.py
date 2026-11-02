@@ -485,17 +485,32 @@ def espn_event_id(sport: str, game: Mapping[str, Any], date: str, *, away_abbr: 
     return (hit or {}).get("id")
 
 
+def _espn_sides_reversed(sport: str, hit: Mapping[str, Any], away_abbr: str, home_abbr: str) -> bool:
+    """True when ESPN lists the chip's away team as home and its home team as away.
+
+    A neutral-site college game is oriented to the ODDS FEED's away/home (`ncaab/slate.orient_neutral_site_games`),
+    not ESPN's. Measured 2026-11-02 20:34Z: 401911532 carded NKU @ UTEP, ESPN UTEP @ NKU -- ESPN's away periods
+    landed on NKU and the chip read NKU 38, UTEP 42 when NKU led 42-38."""
+    if not away_abbr or not home_abbr:
+        return False
+    a, h = _canon(sport, away_abbr), _canon(sport, home_abbr)
+    return a != h and a == _canon(sport, hit.get("home")) and h == _canon(sport, hit.get("away"))
+
+
 def _espn_linescore(sport: str, game: Mapping[str, Any], date: str, away_abbr: str, home_abbr: str) -> dict[str, Any] | None:
     hit = _espn_game(sport, game, date, away_abbr, home_abbr)
     if not hit or not hit["away_periods"] or not hit["home_periods"]:
         return None
+    away_periods, home_periods = hit["away_periods"], hit["home_periods"]
+    if _espn_sides_reversed(sport, hit, away_abbr, home_abbr):
+        away_periods, home_periods = home_periods, away_periods
     if sport in ("ncaab", "wncaab"):
         from syndicate.features.college_basketball.league import league_for
 
         regulation = league_for(sport).periods
     else:
         regulation = 3 if sport == "nhl" else 4
-    got = _periods(hit["away_periods"], hit["home_periods"], regulation)
+    got = _periods(away_periods, home_periods, regulation)
     if got and sport == "nhl" and len(got["labels"]) == 5:
         # Regular season / preseason: one 5-minute OT, then the shootout, which
         # ESPN lists as a fifth "period" worth the one deciding goal (measured

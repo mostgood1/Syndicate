@@ -123,6 +123,24 @@ def test_serve_time_linescore_prefers_espn_and_keeps_the_slate_when_espn_fails(m
     assert "groups=50" in gcl._ESPN_QUERY["wncaab"] and "womens-college-basketball" in gcl._ESPN_PATHS["wncaab"]
 
 
+def test_serve_time_periods_follow_the_chips_sides_on_a_neutral_site_game(monkeypatch):
+    # Measured 2026-11-02 20:34Z: 401911532 carded NKU @ UTEP (oriented to the odds feed), ESPN UTEP @ NKU 38-42.
+    from syndicate.features.shared import game_chip_scoreboard as gcs
+
+    hit = {"id": "401911532", "away": "UTEP", "home": "NKU", "away_periods": [38], "home_periods": [42],
+           "period": 2, "clock": "19:40", "status_name": "STATUS_IN_PROGRESS"}
+    monkeypatch.setattr(gcl, "_espn_game", lambda *a, **k: hit)
+    box = gcl.linescore("ncaab", {"event_id": "401911532"}, "2026-11-02", away_abbr="NKU", home_abbr="UTEP", live=True)
+    assert box["away"] == [42] and box["home"] == [38]
+    chip = {"sport": "ncaab", "state": "live", "game_key": "401911532", "status_token": "H2 19:40", "start_time_utc": "2026-11-02T19:00:00Z",
+            "away": {"abbr": "NKU", "score": "40"}, "home": {"abbr": "UTEP", "score": "38"}}
+    gcs.attach_served_linescores([chip], "2026-11-02")
+    assert chip["away"]["score"] == "42" and chip["home"]["score"] == "38" and chip["leader"] == "away"
+    # Same orientation as ESPN: untouched.
+    same = gcl.linescore("ncaab", {"event_id": "401911532"}, "2026-11-02", away_abbr="UTEP", home_abbr="NKU", live=True)
+    assert same["away"] == [38] and same["home"] == [42]
+
+
 def test_served_chip_keeps_worker_periods_and_reads_the_live_line(tmp_path, monkeypatch):
     from syndicate.features.shared import game_chip_scoreboard as gcs
 
