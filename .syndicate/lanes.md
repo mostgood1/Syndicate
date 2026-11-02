@@ -627,6 +627,14 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness --idle-min 240 read SAFE for 1 of 7 CLOSED blocks; moved `layer2-suggested-opps`. Table in log/2026-11-02.md.
 
+### layer2-suggested-grade-1102 — OPEN — opened 2026-11-02 — session 2486a60b-8b57-4282-a59f-c39e719113d2
+- Goal: Grade Suggested vs all priced for 10-31/11-01 and pooled 10-17..11-01 and record it
+- Files: .syndicate/findings_2026-11-02_suggested_grade.md
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: 
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
