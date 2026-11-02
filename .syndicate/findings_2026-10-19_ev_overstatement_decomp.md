@@ -186,3 +186,61 @@ threshold's evidence. That is a suggestion to that lane's owner; this lane chang
   `tr '\0' '\n' < /proc/<pid>/environ | grep -o "^SYNDICATE_..."`. The grep was anchored to five
   `SYNDICATE_*` names, so the only output was the data-root path, but the rule forbids line-splitting environ
   in a shell pipeline at all. Read it in Python next time.
+
+## FORWARD READ 2026-11-02 (pre-registered; scheduled task `sim-stake-forward-read-1102`) — VERDICT: CONFIRMED
+
+Run 2026-11-02 ~15:10Z (09:10 CST), on time (not late). Read-only. Fleet ledger dump, `ev_overstatement_decomp.py`
+copied from `github/main` (`4c7134a7`, the last commit to touch it) into `/tmp/evd/scripts` on the fleet at HEAD `6c22ebfa`.
+`dump` printed `rows 27520` (> 10,414 on 2026-10-19). The local `data/` mirror was not read.
+
+Two command deviations, both mechanical, neither touching the rule: (1) on the fleet the GitHub remote is `github`, and
+`origin` is a local mirror without the script, so the copy came from `github/main`; (2) `forward` and `report` need
+`PYTHONPATH=~/Syndicate` because `4c7134a7` (#719 follow-up) imports `paper_settlement.profit_per_dollar`.
+
+Verbatim `forward --since 2026-10-20T00:00:00Z`:
+
+    FORWARD since 2026-10-20T00:00:00Z: 12281 settled EV>=2 orders, 10695 with a model edge over 493 events; dates ['2026-10-20']..
+      sim-added dollars $0: ROI +nan +- nan
+      EV-only dollars   $26,920: ROI -2.7 +- 2.1
+      paired difference (sim - EV-only): +nan +- nan
+      fitted sim weight w = -0.10 [-0.38, +0.05] (sizer applies 1.0)
+    VERDICT: CONFIRMED -- the sim's added stake carries less than half the weight it is given
+
+**Denominators:** 12,281 settled EV>=2 orders, 10,695 of them with a model edge, over 493 events (rule floor 300); 13
+selected dates 2026-10-20..2026-11-01, submitted 2026-10-20 15:01Z..2026-11-02 04:33Z; $26,920 staked on the model-edge
+orders ($29,731 on all EV>=2). Decided on w alone: upper bound +0.05 < 0.5.
+
+**Why the paired dollar line is nan:** the flag was LIVE for the whole window. The refresh-worker (pid 2141380, started
+2026-11-01 10:53 fleet-local) carries `SYNDICATE_STAKED_PROBABILITY_UNFITTED=market`, read by key name in Python from
+`/proc/<pid>/environ`, enum-allowlisted; the fleet HEAD contains `bd9b0571`. Under `market` the sim adds no stake, so
+there are no sim-added dollars to pair. The w fit reads `model_edge_pct` against outcomes, not stake, so it is unaffected.
+This is therefore a KEEP read on the population the flag produces, not a pre-switch read.
+
+`report` per-date sim share of dollars (verbatim):
+
+    == sim share of dollars by submit date: 10-02 0.00, 10-03 0.00, 10-04 0.00, 10-05 0.35, 10-06 0.71, 10-07 0.82, 10-08 0.79, 10-09 0.80, 10-10 0.79, 10-11 0.76, 10-12 0.76, 10-13 0.76, 10-14 0.63, 10-15 0.53, 10-16 0.49, 10-17 0.52, 10-18 0.30, 10-19 0.52, 10-20 -0.27, 10-21 -0.05, 10-22 -0.07, 10-23 -0.14, 10-24 -0.07, 10-25 -0.06, 10-26 -0.05, 10-27 -0.05, 10-28 -0.06, 10-29 -0.05, 10-30 -0.05, 10-31 -0.02, 11-01 -0.06, 11-02 -0.12
+
+The share drops from 0.30–0.82 to about 0 on 10-20, the day the flag went live. It sits slightly BELOW zero
+(-0.02..-0.27): actual stakes are a few percent under the logged EV-only counterfactual (`stake_fraction_ev_only`).
+Not diagnosed here. Candidates are caps or bankroll scaling applied after the counterfactual. It is a lead, not a
+defect claim.
+The same `report` (all dates 10-02..11-01) gives w (EV>=2) -0.12 [-0.38, +0.00], n=16,183, 961 events.
+
+**Season phases, reported apart (descriptive, NOT decisive, cells as stored in `season_phase`, not re-cut), model-edge
+orders from 10-20:**
+
+    nba    regular     orders 4132 events  92 $8,082  w +0.18 [-0.05, +0.43]
+    ncaaf  regular     orders 3154 events 112 $8,763  w -0.45 [-0.85, +0.03]
+    nfl    regular     orders 1093 events  27 $2,336  w -0.10 [-0.65, +0.40]
+    nhl    regular     orders  724 events  86 $3,381  w -0.35 [-0.85, +0.13]
+    soccer regular     orders  719 events 165 $1,378  w +0.00 [-0.65, +0.78]
+    wnba   postseason  orders  285 events   5 $977    w +0.80 [+0.35, +1.30]
+    mlb    postseason  orders  269 events   5 $672    w +0.23 [-1.00, +0.48]
+    (season_phase null: nba 137/67 ev, ncaaf 69/54, nfl 32/17, soccer 27/24, mlb 25/5, wnba 21/5, nhl 8/7 — all w CIs span 0.5 or sit on the [-1, 1.5] fit bounds)
+
+NBA regular season (from 10-20) alone also has its upper bound below 0.5. MLB is postseason only, with 5 events, so it
+is uninformative. The WNBA postseason cell is the only one whose lower bound sits above 0.5, but it rests on 5 events
+and is not a cell the rule reads. Recorded for the earned-profile lane (`sim-stake-earned-profile`), not acted on.
+
+**Consequence:** KEEP `market`. The pre-registered falsifier (w lower bound > 0.5) did not fire, and the point estimate
+is below 0. Not re-armed.
