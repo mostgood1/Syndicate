@@ -1297,3 +1297,33 @@ of 1,003. Not-in-box p median 7.6 min (IQR 4.0-13.8), so they are real rotation-
 for every proxy-minute it would recover by deferring to the report, it would put 2.7 proxy-minutes on players who do
 not play — mostly coach's decisions and players absent from the box entirely. The injury report does not separate
 them. Nothing changes in code or config; the K=2 rule on the fleet is untouched.
+
+**2026-27 INJURY FEED BUILT (step 3c prerequisite, 218c26dd) 2026-11-02 14:32Z (08:32 CST). Registered window
+B1-B3 PASS on the one slate so far; a 10-20..10-31 shakedown (NOT the feed) fails B2 on real healthy teams.**
+
+`r2s/build_inj2627.sh <end> [<backup stamp>]` (re-run it with the read date before the forward read):
+`scripts/nba_injury_history_build.py` unchanged, tip − 30 rule. Inputs:
+- ESPN games: `basketball_scenario_rates.py real --start 2026-10-20` into its own dir `C:/tmp/bball_sc/inj2627/real`
+  (92 finals through 11-01, 0 fails).
+- Official PDFs in `inj2627/pdfs` (57 fetched, 0 missing on the host).
+- Roster `rosters_2026-27.csv` + `player_logs.csv` copied from the fleet's daily backup `20261102T091500Z` (read only;
+  the live tree not touched). **Disclosed choice:** player_logs restricted to SEASON_ID 22026 (2,048 rows through
+  11-01): an all-seasons log would put a summer mover with no 2026-27 game yet on LAST season's team in asof_roster,
+  which feeds the parser's name repair.
+
+**Feed `inj2627/injury_history_nba_2026-27.csv`** (`--start 2026-11-01 --end 2026-11-01`, sha256 6566bbe709d812c9…):
+4 games, 8 team-games, 34 rows, all OUT; B1 0 games without a report, B2 8/8, B3 0/34 off roster -> PASS. Report age
+30 min on every game.
+
+**Shakedown `inj2627/shakedown_2026-10-20_10-31.csv`** (NOT the feed; run to test this season's PDF format on more
+than one slate): 88 games, 571 rows, B1 PASS, B3 19/571 = 3.3% PASS, **B2 163/176 = 92.6% FAIL**. All 13 unlisted
+team-games were read in the PDF text: 7 have no section for the team at all, 6 list only "Available" players (the
+parser keeps OUT / DOUBTFUL / QUESTIONABLE / PROBABLE). MIL 6, MIA 5, NYK 1, NOP 1 (10-23 MIL: absent from that game's block; the report's MIL "NOT YET SUBMITTED" row
+belongs to 10-24's game). The parser lost
+nothing; teams are healthy at the start of the season. Status mix OUT .986 / Q .011 / P .004 vs 2025-26's .996 /
+.002 / .002 — no sign of a format change.
+
+**Risk to the forward read, flagged now:** B2's 95% bar came from Nov-Feb 2025-26, when injuries had accumulated. If
+a few healthy teams persist, B2 can fail on the forward window for the same benign reason, and 218c26dd says the read
+then WAITS. Whether to amend B2 (e.g. "every unlisted team-game is verified absent-or-Available in the PDF text")
+is a pre-registration change for the user to decide BEFORE the read; nothing is amended here.
