@@ -3358,7 +3358,9 @@ def _step_command_with_mode(step: RefreshStep, mode: str, *, force_refresh: bool
         command.extend(["--only-matchups", normalized_only_matchups])
     # IN-PLAY ONLY (lane `nba-inplay-only-pulls`, 2026-10-21): gated behind force_refresh like the flags above -- an
     # unforced run reuses the cached snapshot before any fetch -- and switched on only by `_in_play_only_scope`.
-    if force_refresh and in_play_only and any(str(part).endswith("refresh_nba_oddsapi_props.py") for part in command):
+    if force_refresh and in_play_only and any(
+        str(part).endswith(("refresh_nba_oddsapi_props.py", "refresh_ncaab_odds_history.py")) for part in command
+    ):
         command.append("--in-play-only")
     return tuple(command)
 
@@ -3367,9 +3369,14 @@ def _in_play_only_scope(args: argparse.Namespace, sport: str) -> bool:
     """The forced NBA LIVE-phase run -- exactly the live-odds-worker's NBA in-play lane (`_launch_autorun_nba_live_
     refresh`: sports=nba, phase=live, force_refresh, force_refresh_sports=nba). The shared live sweep is unforced and
     a pregame or `all` run is never in-play only. SYNDICATE_NBA_IN_PLAY_ONLY=0 turns it off."""
-    if str(os.environ.get("SYNDICATE_NBA_IN_PLAY_ONLY") or "").strip().lower() in {"0", "false", "no", "off"}:
+    # NCAAB joins 2026-11-02 (lane `ncaab-board-slate`, user "Build it now"): the same forced live-phase run, launched
+    # by `ncaab/inplay_lane.py`. SYNDICATE_NCAAB_IN_PLAY_ONLY=0 turns NCAAB's off without touching NBA's.
+    off_switch = {"nba": "SYNDICATE_NBA_IN_PLAY_ONLY", "ncaab": "SYNDICATE_NCAAB_IN_PLAY_ONLY"}.get(sport)
+    if off_switch is None:
         return False
-    return (sport == "nba" and str(getattr(args, "phase", "") or "").strip().lower() == "live"
+    if str(os.environ.get(off_switch) or "").strip().lower() in {"0", "false", "no", "off"}:
+        return False
+    return (str(getattr(args, "phase", "") or "").strip().lower() == "live"
             and _sport_force_refresh_scope(args, sport))
 
 

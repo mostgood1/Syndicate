@@ -430,8 +430,8 @@ def _split_markets(markets: str) -> tuple[list[str], list[str]]:
     return full, halves
 
 
-def _half_window_events(rows: list[dict], *, now: dt.datetime) -> dict[str, dt.datetime]:
-    """{event_id: commence} for games in progress or tipping within the window."""
+def _half_window_events(rows: list[dict], *, now: dt.datetime, before_tip_seconds: float = _HALF_WINDOW_BEFORE_TIP_SECONDS) -> dict[str, dt.datetime]:
+    """{event_id: commence} for games in progress or tipping within `before_tip_seconds`."""
     out: dict[str, dt.datetime] = {}
     for row in rows:
         event_id = str(row.get("event_id") or "").strip()
@@ -439,9 +439,27 @@ def _half_window_events(rows: list[dict], *, now: dt.datetime) -> dict[str, dt.d
         if not event_id or commence is None or event_id in out:
             continue
         seconds_to_tip = (commence - now).total_seconds()
-        if -_HALF_WINDOW_AFTER_TIP_SECONDS <= seconds_to_tip <= _HALF_WINDOW_BEFORE_TIP_SECONDS:
+        if -_HALF_WINDOW_AFTER_TIP_SECONDS <= seconds_to_tip <= before_tip_seconds:
             out[event_id] = commence
     return out
+
+
+def _append_half_lines(rows: list[dict], events: dict[str, dt.datetime], *, adapter, halves: list[str], bookmakers: str | None, now: dt.datetime) -> None:
+    """Per-event HALF markets for `events`, first half dropped once it is over."""
+    for event_id, commence in sorted(events.items()):
+        wanted = halves
+        if (now - commence).total_seconds() > _FIRST_HALF_OVER_AFTER_SECONDS:
+            wanted = [m for m in halves if not m.endswith("_h1")]
+        if not wanted:
+            continue
+        try:
+            rows.extend(
+                _row_to_dict(row)
+                for row in adapter.iter_event_odds(event_id, markets=",".join(wanted), bookmakers=bookmakers, fallback_full_game=False)
+                if str(row.get("period") or "") != "full_game"
+            )
+        except Exception as exc:  # noqa: BLE001 -- one event's halves must not cost the slate its full-game lines
+            print(f"[ncaab_odds] HALF_LINES_FAILED event={event_id} error={type(exc).__name__}: {exc}", flush=True)
 
 
 def _fetch_current_rows(*, adapter, date_iso: str, markets: str, bookmakers: str | None, now: dt.datetime | None = None) -> list[dict]:
@@ -469,20 +487,29 @@ def _fetch_current_rows(*, adapter, date_iso: str, markets: str, bookmakers: str
         return rows
 
     moment = now or dt.datetime.now(dt.timezone.utc)
-    for event_id, commence in sorted(_half_window_events(rows, now=moment).items()):
-        wanted = halves
-        if (moment - commence).total_seconds() > _FIRST_HALF_OVER_AFTER_SECONDS:
-            wanted = [m for m in halves if not m.endswith("_h1")]
-        if not wanted:
-            continue
-        try:
-            rows.extend(
-                _row_to_dict(row)
-                for row in adapter.iter_event_odds(event_id, markets=",".join(wanted), bookmakers=bookmakers, fallback_full_game=False)
-                if str(row.get("period") or "") != "full_game"
-            )
-        except Exception as exc:  # noqa: BLE001 -- one event's halves must not cost the slate its full-game lines
-            print(f"[ncaab_odds] HALF_LINES_FAILED event={event_id} error={type(exc).__name__}: {exc}", flush=True)
+    _append_half_lines(rows, _half_window_events(rows, now=moment), adapter=adapter, halves=halves, bookmakers=bookmakers, now=moment)
+    return rows
+
+
+def _fetch_in_play_rows(*, adapter, markets: str, bookmakers: str | None, now: dt.datetime | None = None) -> list[dict]:
+    """The NCAAB IN-PLAY lane's pull: games that have TIPPED and are not long over.
+
+    User 2026-11-02: "Live betting NCAAB is the most important part of its
+    usage", then "Build it now" for an NBA-style in-play lane. NBA's lane pulls
+    in-play games every 240 s; this is NCAAB's equivalent, and cheaper by shape:
+    the same one bulk `/odds` call (3 credits) carries live full-game prices for
+    every event, so only the HALF markets cost per game (~2-4 credits each).
+    Rows are kept for started games only -- the shared sweep already records the
+    pregame slate, and re-appending every pregame quote every four minutes would
+    only grow the quote log.
+    """
+    full, halves = _split_markets(markets)
+    moment = now or dt.datetime.now(dt.timezone.utc)
+    bulk = [_row_to_dict(row) for row in adapter.iter_current_odds_expanded(markets=",".join(full or _FULL_GAME_MARKETS), date_iso=None, bookmakers=bookmakers)]
+    started = _half_window_events(bulk, now=moment, before_tip_seconds=0)
+    rows = [row for row in bulk if str(row.get("event_id") or "").strip() in started]
+    if halves:
+        _append_half_lines(rows, started, adapter=adapter, halves=halves, bookmakers=bookmakers, now=moment)
     return rows
 
 
@@ -614,6 +641,8 @@ def main() -> int:
     parser.add_argument("--out-dir", required=True)
     parser.add_argument("--mode", default="current", choices=("current", "history"))
     parser.add_argument("--refresh-mode", choices=("fast", "full"), default="full")
+    parser.add_argument("--in-play-only", action="store_true",
+                        help="the in-play lane: started games only (bulk full-game + their half lines)")
     args = parser.parse_args()
 
     source_root = Path(args.source_root).resolve() if args.source_root else None
@@ -625,6 +654,16 @@ def main() -> int:
     except TypeError:
         adapter = TheOddsAPIAdapter(region=str(args.region or "us"))
 
+    if args.in_play_only:
+        rows = _fetch_in_play_rows(adapter=adapter, markets=str(args.markets or ""), bookmakers=args.bookmakers)
+        if not rows:
+            print("No in-play NCAAB events.")
+            return 0
+        _append_ncaab_book_quotes(rows, date_iso=date_iso)
+        # Its own file: the full-slate CSV must not be replaced by a few live games.
+        _write_rows(out_dir / f"odds_{date_iso}_inplay.csv", rows)
+        print(f"Wrote {len(rows)} in-play odds rows for {len({r.get('event_id') for r in rows})} events")
+        return 0
     if args.mode == "history":
         rows = _fetch_history_rows(adapter=adapter, date_iso=date_iso, markets=str(args.markets or ""), bookmakers=args.bookmakers)
     else:
