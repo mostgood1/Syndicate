@@ -55627,3 +55627,31 @@ Read-only scheduled reading (task ncaab-1102-board-check). Readings 08:01:48Z-08
   - **resolver live on the worker:** at the first plan cycle after the respawn (plan generated 21:00:14Z, read 21:01:19Z) both NCAAB orders' live bet status went `no_resolver_for_ncaab` -> **`not_started`** (no refusal; tip 00:00Z), Yale Bulldogs and Richmond Spiders. That is the ncaab entry dispatching and the pregame no-read branch answering. `settlement.by_sport` ncaab still settled 0 / pending 2 -- correct before tip.
 - **verify (OWED, tonight):** after both games are final (~02:00-02:30Z 11-03), `/api/portfolio/paper?date=2026-11-02` shows both NCAAB orders with `outcome` set and `settlement.by_sport` ncaab settled 2, each outcome matching ESPN's final (Yale vs Howard 401924743, Richmond vs UNC Asheville 401911237; home h2h). A background watcher in this session polls every 5 min until 04:00Z. Then: the 11-03 11:30Z model-scorecard run grades ncaab (and wncaab) rows (`settlers.handled.espn`, ncaab segment rows `espn_linescore`, no `home_away_disagree` on neutral-site games).
 - **revert:** `git revert 26d8be509 6af0a1ce6` + a claimed refresh-worker restart; paper settlement is grade-once, so rows graded in between stay graded.
+
+## 2026-11-02 20:52:17Z (2:52 PM CST) -- FLEET live-odds-worker TERM restart on 8e042af87 + ff b415303ee / reload-web 21:22Z: WNCAAB odds + in-play lane + college run/bonus capture LIVE; a narrator bug found and guarded -- **MET (Phase 1 + 2); capture fix owes one more live-odds-worker restart** (lane `wncaab-module`)
+- **gates:**
+  - live-odds-worker preflight HOLD from 20:04Z to 20:51Z (6-17 odds jobs). CLEAR at 20:51:46Z (loop line `CLEAR at 20:51:46Z`, read before acting).
+  - My claim had expired at 45 min, so I re-acquired it at 20:52:12Z (exit 0). TERM to pid 2879017 at 20:52:17Z; respawn pid 2923884 at 20:52:26Z.
+  - Web claim re-acquired at 21:22Z, CLEAR for b415303ee at 21:22:13Z.
+- **one-off odds pull:** before the restart, at 20:43:23Z, `refresh_odds_sources.py --sports wncaab --phase live --mode fast --skip-mirror` ran once on the fleet with the live-odds-worker's env (step `wncaab_odds_snapshot` rc 0, 2 s).
+  - OddsAPI lists **14 of the 94** D1-vs-D1 women's games today.
+  - Shard `wncaab_source/tracking/book_quotes/2026-11-02.jsonl`: 178 rows, 14 events, 7 books.
+- **verify (MET):**
+  - live-odds-worker log since 20:52Z, read 21:18Z:
+    - `WNCAAB_LIVE_AUTORUN_LAUNCHED` x7 (`live_games=3 lane=live-odds-worker-wncaab-live interval_s=240`);
+    - `SWEEP_OWNERSHIP_WEEKLY_CLAIM sport=wncaab kept=true`;
+    - `[college_momentum] THREAD_STARTED` x1; `CAPTURED league=ncaab` x11 and `league=wncaab` x10 (`with_series=3 written=True`, ~1 s each); `CAPTURE_FAILED` 0; Traceback 0.
+  - **Layer 1 wncaab:** 0 -> **14 games, 77 rows, 77 enriched** (21:18Z).
+  - **Layer 2:** `BOARD_OVERVIEW_READY ... wncaab:g=80` (20:52:42Z).
+  - **game-chips:** wncaab 94 (5 live / 12 final / 77 pre), all with logos (20:41Z).
+  - **Quote shard at 21:23Z:** 485 rows, 14 events, 7 books; in-play CSV 23 rows / 3 events.
+  - **Rail lines at 21:18Z:** NKU @ UTEP `UTEP on a 10–4 run · UTEP in double bonus · NKU in bonus`; OU @ UNC `OU in bonus`.
+  - **Kalshi:** `DAILY_BOOK ... skipped_by_sport={'wncaab': 42}`. Women's tickers are no longer read as ncaab.
+- **NOT MET / findings:**
+  - **No quarter or half lines exist for wncaab in OddsAPI today.** Every quote is `full`, in-play rows included.
+  - **`by_sport.wncaab` credits are unmeasurable:** the quota report carries only nba / ncaaf.
+- **INCIDENT 2 (narrator counted missed shots):**
+  - ESPN's college feeds carry `scoreValue` on misses (`scoringPlay: false`). USC @ UNLV at Q1 3-5 had narrator USC 13 / UNLV 8, and the chip read `USC on a 9–2 run` (21:18Z). The run lines shown 21:15-21:22Z were inflated by missed shots; the bonus lines are unaffected, since they count fouls.
+  - `b415303ee`: `basketball_scoring_events` refuses an explicit `scoringPlay: false`, and `college_live_line` drops a run whose rows add up to more than the card's score.
+  - The web guard is live from the 21:22:29Z reload. At the 21:22:13Z baseline no live chip showed a run at all (`with_run 0`, so the bad line had already rolled off). The capture fix loads with the NEXT live-odds-worker restart; a wait loop is armed.
+- **refresh-worker:** it runs ff2a4b53c (college-basketball-settlement's restart, 20:35Z). It lacks 8e042af87 (neutral-site period orientation) and b415303ee (run guard) in its own chip build. Web re-derives both at serve time for live chips, so served chips are correct. Its next restart loads both.
