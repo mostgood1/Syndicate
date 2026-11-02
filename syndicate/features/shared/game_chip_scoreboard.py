@@ -759,7 +759,7 @@ def _attach_linescore(sport: str, game: dict[str, Any], chip: dict[str, Any], da
         game = {**game, "_away_key": (chip.get("away") or {}).get("key"), "_home_key": (chip.get("home") or {}).get("key")}
         box = linescore(sport, game, day, away_abbr=away_abbr, home_abbr=home_abbr, live=chip.get("state") == "live")
         # NHL's live feed carries the period but no clock ("P3"); ESPN has it.
-        if sport in ("nhl", "nba", "wnba", "nfl", "ncaaf") and chip.get("state") == "live" and ":" not in str(chip.get("status_token") or ""):
+        if sport in ("nhl", "nba", "wnba", "nfl", "ncaaf", "ncaab", "wncaab") and chip.get("state") == "live" and ":" not in str(chip.get("status_token") or ""):
             from syndicate.features.shared.game_chip_linescore import live_clock_token
 
             token = live_clock_token(sport, game, day, away_abbr=away_abbr, home_abbr=home_abbr)
@@ -798,7 +798,7 @@ def _attach_linescore(sport: str, game: dict[str, Any], chip: dict[str, Any], da
             # quarters 28+9 / 27+12 -- the score was the worker artifact's (up to 180 s old), the quarters ESPN's at
             # serve time (45 s cache). ESPN's score is the sum of the same payload's periods, so the sum IS the score
             # of what the card shows. Never NHL in a shootout: the winner gets one goal, not its shootout tally.
-            if (chip.get("state") == "live" and sport in ("nba", "wnba", "nhl") and box.get("kind") == "periods"
+            if (chip.get("state") == "live" and sport in ("nba", "wnba", "nhl", "ncaab", "wncaab") and box.get("kind") == "periods"
                     and "SO" not in (box.get("labels") or [])):
                 a_vals, h_vals = box.get("away") or [], box.get("home") or []
                 away, home = chip.get("away") or {}, chip.get("home") or {}
@@ -827,7 +827,8 @@ def _attach_linescore(sport: str, game: dict[str, Any], chip: dict[str, Any], da
         return
 
 
-_SERVE_TIME_LINESCORE_SPORTS = {"nba", "wnba", "nhl", "mlb", "nfl", "ncaaf"}
+_SERVE_TIME_LINESCORE_SPORTS = {"nba", "wnba", "nhl", "mlb", "nfl", "ncaaf", "ncaab", "wncaab"}
+_COLLEGE_BASKETBALL = ("ncaab", "wncaab")
 
 
 def _chip_day(chip: dict[str, Any], date_value: str) -> str:
@@ -898,6 +899,22 @@ def _attach_trend(sport: str, game: dict[str, Any], chip: dict[str, Any], date_v
         return
 
 
+def _attach_college_line(chip: dict[str, Any], date_value: str) -> None:
+    """Run + bonus on a live college chip, re-read from the momentum file at serve time (it moves every
+    150 s; the worker's chip build every 3-4 min). Replaces, never stacks."""
+    if chip.get("state") != "live":
+        return
+    try:
+        from syndicate.features.shared.game_chip_detail import college_live_line
+
+        line = college_live_line(chip["sport"], {"event_id": chip.get("game_key")}, _chip_day(chip, date_value))
+        # A run that has ended or a bonus that has reset must not outlive the file that stated it.
+        kept = [p for p in str(chip.get("situation") or "").split(" · ") if p and " run" not in p and "bonus" not in p]
+        chip["situation"] = line or (" · ".join(kept) or None)
+    except Exception:  # noqa: BLE001 -- a live line must never break a chip
+        return
+
+
 def attach_served_linescores(chips: list[dict[str, Any]], date_value: str) -> None:
     """Line scores on WORKER-BUILT chips at serve time (NBA / WNBA / NHL only).
 
@@ -928,8 +945,14 @@ def attach_served_linescores(chips: list[dict[str, Any]], date_value: str) -> No
         if chip.get("state") == "live":
             chip["status_token"] = re.sub(r"\s*\d{1,2}:\d{2}$", "", str(chip.get("status_token") or "")).replace("END ", "") or None
         key = chip.get("game_key")
-        chip.pop("linescore", None) if chip.get("state") == "live" else None
+        built = chip.pop("linescore", None) if chip.get("state") == "live" else None
         _attach_linescore(chip["sport"], {"game_id": key, "event_id": key}, chip, date_value)
+        if chip["sport"] in _COLLEGE_BASKETBALL:
+            # The serve path has only the chip's key, not the slate's per-period scores: when ESPN's
+            # board cannot be read, keep the worker's halves / quarters rather than erase them.
+            if built and not chip.get("linescore"):
+                chip["linescore"] = built
+            _attach_college_line(chip, date_value)
         _attach_trend(chip["sport"], {"game_id": key, "event_id": key}, chip, date_value)
 
 

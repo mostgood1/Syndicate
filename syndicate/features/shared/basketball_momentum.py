@@ -78,6 +78,8 @@ _LEAGUE_PERIODS: dict[str, dict[str, float]] = {
     "wnba": {"quarter_minutes": 10.0, "ot_minutes": 5.0, "regulation_periods": 4.0},
     "ncaab": {"quarter_minutes": 20.0, "ot_minutes": 5.0, "regulation_periods": 2.0},
     "ncaabw": {"quarter_minutes": 10.0, "ot_minutes": 5.0, "regulation_periods": 4.0},
+    # The platform's slug for women's college basketball (lane wncaab-module, 2026-11-02); same geometry.
+    "wncaab": {"quarter_minutes": 10.0, "ot_minutes": 5.0, "regulation_periods": 4.0},
 }
 
 # Pressure weights. Ordered by how strongly each says "this team is threatening

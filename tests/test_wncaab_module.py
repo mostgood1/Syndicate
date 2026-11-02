@@ -21,6 +21,12 @@ from syndicate.features.shared.game_chip_scoreboard import GAME_CHIP_DEFAULT_SPO
 REPO = Path(__file__).resolve().parents[1]
 
 
+@pytest.fixture(autouse=True)
+def _no_college_momentum_thread(monkeypatch):
+    """The in-play lane starts the college momentum capture thread on a live game; never from a test."""
+    monkeypatch.setenv("SYNDICATE_COLLEGE_MOMENTUM_CAPTURE", "0")
+
+
 def _load(name: str, rel: str):
     spec = importlib.util.spec_from_file_location(name, REPO / rel)
     module = importlib.util.module_from_spec(spec)

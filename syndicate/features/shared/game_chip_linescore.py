@@ -315,10 +315,13 @@ def _mlb(game: Mapping[str, Any], date: str) -> dict[str, Any] | None:
 # league per date -- measured that night: NBA CLE @ ORL 28 24 17 / 35 37 23,
 # NHL FLA @ CBJ 0 4 2 / 1 0 1.
 _ESPN_PATHS = {"nba": "basketball/nba", "wnba": "basketball/wnba", "nhl": "hockey/nhl",
-               "nfl": "football/nfl", "ncaaf": "football/college-football"}
+               "nfl": "football/nfl", "ncaaf": "football/college-football",
+               "ncaab": "basketball/mens-college-basketball", "wncaab": "basketball/womens-college-basketball"}
 # All FBS games for college football (the default board is a curated subset);
 # NOT for the NFL, where `groups` returns no events at all (measured 2026-10-14).
-_ESPN_QUERY = {"ncaaf": "&groups=80&limit=300"}
+_ESPN_QUERY = {"ncaaf": "&groups=80&limit=300",
+               # All of Division I (the default board is a curated ~3-game subset), as `ncaab/slate.py` reads it.
+               "ncaab": "&groups=50&limit=500", "wncaab": "&groups=50&limit=500"}
 _ESPN_ABBR_FIX = {"UTAH": "UTA"}
 _LIVE_TTL_S = 45.0
 
@@ -391,7 +394,11 @@ def live_clock_token(sport: str, game: Mapping[str, Any], date: str, *, away_abb
         return None
     prefix = "P" if sport == "nhl" else "Q"
     period = hit["period"]
-    if sport == "nhl" and period >= 4:
+    if sport in ("ncaab", "wncaab"):
+        from syndicate.features.college_basketball.league import league_for
+
+        label = league_for(sport).period_label(period)  # H1 / H2 (men), Q1..Q4 (women), OT, 2OT
+    elif sport == "nhl" and period >= 4:
         label = "OT" if period == 4 else "SO"
     elif sport in ("nfl", "ncaaf") and period >= 5:
         label = "OT" if period == 5 else f"OT{period - 4}"
@@ -482,7 +489,13 @@ def _espn_linescore(sport: str, game: Mapping[str, Any], date: str, away_abbr: s
     hit = _espn_game(sport, game, date, away_abbr, home_abbr)
     if not hit or not hit["away_periods"] or not hit["home_periods"]:
         return None
-    got = _periods(hit["away_periods"], hit["home_periods"], 3 if sport == "nhl" else 4)
+    if sport in ("ncaab", "wncaab"):
+        from syndicate.features.college_basketball.league import league_for
+
+        regulation = league_for(sport).periods
+    else:
+        regulation = 3 if sport == "nhl" else 4
+    got = _periods(hit["away_periods"], hit["home_periods"], regulation)
     if got and sport == "nhl" and len(got["labels"]) == 5:
         # Regular season / preseason: one 5-minute OT, then the shootout, which
         # ESPN lists as a fifth "period" worth the one deciding goal (measured
@@ -510,6 +523,12 @@ def linescore(sport: str, game: Mapping[str, Any], date: str, *, away_abbr: str 
                     return got
             return _football(game)
         if sport in ("ncaab", "wncaab"):
+            # LIVE: ESPN's D1 board at serve time (one 45 s-cached request per league), so the periods move
+            # with the clock rather than with the worker's last build (lane wncaab-module, Phase 2).
+            if live:
+                got = _espn_linescore(sport, game, date, away_abbr, home_abbr)
+                if got:
+                    return got
             # Halves (men) or quarters (women), from the per-period scores the D1 slate
             # (`ncaab/slate.py`) already carries off ESPN's scoreboard -- no request per chip.
             from syndicate.features.college_basketball.league import league_for

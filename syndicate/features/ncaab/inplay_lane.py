@@ -109,6 +109,14 @@ def launch_autorun_ncaab_live_refresh(league: str = "ncaab") -> dict[str, Any] |
     live_games = ncaab_live_game_count(selected_date, league=league)
     if live_games <= 0:
         return None
+    # The rail's live line (run + bonus) for both college leagues: one capture thread per process,
+    # started the first time either league has a live game (`college_basketball/momentum_capture.py`).
+    try:
+        from syndicate.features.college_basketball.momentum_capture import ensure_capture_thread
+
+        ensure_capture_thread()
+    except Exception as exc:  # noqa: BLE001 -- the run line must never cost the odds lane
+        print(f"[live_odds_worker] COLLEGE_MOMENTUM_START_FAILED {type(exc).__name__}: {exc}", flush=True)
     status_path = _status_path(league)
     last_status = read_json_file(status_path) or {}
     if last_status and not last_status.get("reported"):

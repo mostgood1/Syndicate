@@ -379,19 +379,37 @@ def basketball_run(narrator: Any, min_points: int = 7, max_against: int = 4) -> 
     return str(team), pts_for, pts_against
 
 
-def _basketball_run_text(sport: str, game: Mapping[str, Any], day: str | None) -> str | None:
+def _momentum_entry(sport: str, game: Mapping[str, Any], day: str | None) -> Mapping[str, Any] | None:
     if not day:
         return None
     games = _cached(_first(f"{sport}_source/source_artifacts/data/live_lens/momentum_events_{day}.json"), _load_momentum) or {}
-    entry = None
     for key in (game.get("event_id"), game.get("gamePk"), game.get("game_id")):
         if key is not None and str(key) in games:
             entry = games[str(key)]
-            break
-    if not isinstance(entry, Mapping):
+            return entry if isinstance(entry, Mapping) else None
+    return None
+
+
+def _basketball_run_text(sport: str, game: Mapping[str, Any], day: str | None) -> str | None:
+    entry = _momentum_entry(sport, game, day)
+    if entry is None:
         return None
     run = basketball_run(entry.get("narrator"))
     return f"{run[0]} on a {run[1]}–{run[2]} run" if run else None
+
+
+def college_live_line(sport: str, game: Mapping[str, Any], day: str | None) -> str | None:
+    """"UCSD on a 9–2 run · WASH in bonus" for a live NCAAB / WNCAAB game, or None.
+
+    Both parts come from the momentum file `college_basketball/momentum_capture.py` writes on the
+    live-odds-worker (the run from the scoring narrator, the bonus from team fouls it counted in the
+    play-by-play), so the chip build and the serve-time re-read say the same thing."""
+    entry = _momentum_entry(sport, game, day)
+    if entry is None:
+        return None
+    run = basketball_run(entry.get("narrator"))
+    parts = [f"{run[0]} on a {run[1]}–{run[2]} run" if run else None, entry.get("bonus") or None]
+    return " · ".join(str(p) for p in parts if p) or None
 
 
 def live_detail(sport: str, game: Mapping[str, Any], start_utc: datetime | None = None, labels: Mapping[str, str] | None = None) -> str | None:
@@ -456,6 +474,8 @@ def live_detail(sport: str, game: Mapping[str, Any], start_utc: datetime | None 
         if sport in {"nba", "wnba"}:
             # Bonus has no source (no foul events are captured); the run does.
             return _basketball_run_text(sport, game, _ct_date(start_utc))
+        if sport in {"ncaab", "wncaab"}:
+            return college_live_line(sport, game, _ct_date(start_utc))
         if sport == "nhl":
             sog_h, sog_a = _num(live.get("home_sog")), _num(live.get("away_sog"))
             if sog_h is not None and sog_a is not None:

@@ -336,7 +336,8 @@ def momentum_events_path(root: Path, *, league_code: str, date_str: str) -> Path
     )
 
 
-def write_momentum_events(payload: Mapping[str, Any], *, path: Path) -> int:
+def write_momentum_events(payload: Mapping[str, Any], *, path: Path,
+                          extra_by_event: Mapping[str, Mapping[str, Any]] | None = None) -> int:
     """OVERWRITE the raw-event dump. Never append.
 
     **BECAUSE ESPN'S FEED IS CUMULATIVE.** Every tick's summary carries the whole
@@ -368,6 +369,11 @@ def write_momentum_events(payload: Mapping[str, Any], *, path: Path) -> int:
             "pressure": pressure,
             "narrator": narrator,
         }
+        # Per-game extras a caller computed from the same summary (college team fouls + bonus,
+        # `college_basketball/momentum_capture.py`). Never overrides the rows above.
+        extra = (extra_by_event or {}).get(str(event_id))
+        if isinstance(extra, Mapping):
+            rows_out[str(event_id)].update({k: v for k, v in extra.items() if k not in rows_out[str(event_id)]})
         total += len(pressure)
 
     path.parent.mkdir(parents=True, exist_ok=True)

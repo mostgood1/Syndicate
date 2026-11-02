@@ -48,6 +48,7 @@ _SPORT_PATH = {
     "wnba": "sports/basketball/wnba",
     "ncaab": "sports/basketball/mens-college-basketball",
     "ncaabw": "sports/basketball/womens-college-basketball",
+    "wncaab": "sports/basketball/womens-college-basketball",
 }
 
 _BROWSER_UA = (
