@@ -611,11 +611,6 @@ death, never life — do not invert it.
 - Verification: Read refresh-worker ODDS_SWEEP_OUTCOME sport=ncaab wrote=True after the ff, the next odds_refresh.json with no ncaab failingSteps, and /api/board/book-grid?sport=ncaab&date=2026-11-02 total_rows > 0; record in deploys.md
 - Blocked by: none
 
-### closed-lane-archive-20261102-0701 — CLOSED 2026-11-02 (GOAL MET: 1 block archived) — opened 2026-11-02 — session 7e1d55bb-530a-4b56-8046-50509b276bf7
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Result: GOAL MET. owner_liveness.py --idle-min 240 gave SAFE for 1 of 6 CLOSED blocks; moved `closed-lane-archive-20261102-0257` (owner c37cf0d5 idle 241m, block last modified 244m). 5 deferred; table and Part B in log/2026-11-02.md.
-
 ### ncaab-board-slate — OPEN — opened 2026-11-02 — session 547fe65e-71ca-4e19-9589-237553cb4eab
 - **STATUS 2026-11-02 18:3xZ (12:3x PM CST): in-play lane + re-sim opening-week fix LIVE (ff 308da1f38 18:27:07Z, live-odds-worker pid 2879017 18:30:36Z).** First lane launch 18:30:43Z; re-sim resimmed 0 -> 1 of 1 live D1-vs-D1 game (2 refusals are non-D1 opponents). OWED: the evening-slate reading (lane cadence, NCAAB credits/h vs ~1,850/h at 40 live, re-sim coverage) and the 11-03 look-ahead board join (106 -> ~116). deploys.md 18:27:07Z.
 - **STATUS 2026-11-02 17:0xZ (11:0x AM CST): DEPLOYED twice, mostly VERIFIED; one read OWED.** ff 6c22ebfaa -> b958db638 15:38:19Z + reload-web + refresh-worker restart 15:55:09Z: NCAAB chips 0 -> 119, Layer 1 16 -> 119 games (892 rows enriched), capture 16 -> 117 events, 0 mixed half lines, ~26 credits/h. ff -> 75bcbafc2 16:33:24Z + reload-web: `/ncaab` on the WNBA parity page, 119 cards. OWED: the 11-03 look-ahead board's first rebuild after the restart (last 09:42 CST, old alias map) -> NCAAB rail join 106 -> ~116 of 116. deploys.md 15:38:19Z + 16:33:24Z.
@@ -647,6 +642,11 @@ death, never life — do not invert it.
 - Falsification test: n/a
 - Verification: after a drained full down/up: refresh-worker environ band_on=0, healthz 200, deploys.md entry
 - Blocked by: none
+
+### closed-lane-archive-20261102-1245 — CLOSED 2026-11-02 (GOAL MET: 1 block archived) — opened 2026-11-02 — session d46449c9-dfb8-4a15-8be6-4656e4108198
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Result: GOAL MET. owner_liveness.py --idle-min 240 gave SAFE for 1 of 9 CLOSED blocks; moved `closed-lane-archive-20261102-0701` (owner 7e1d55bb idle 334m, block last modified 337m). 8 deferred; table and Part B in log/2026-11-02.md.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -794,6 +794,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261101-2051` — CLOSED 2026-11-01 (GOAL MET: 1 block archived) — opened 2026-11-01 — session 8ae0b214-a353-4c6a-abe1-24574194f3d9
 - `closed-lane-archive-20261101-2250` — CLOSED 2026-11-01 (GOAL MET: 1 block archived) — opened 2026-11-01 — session 94c34a30-adcf-48ce-a2b1-205ef6d2c818
 - `closed-lane-archive-20261102-0257` — CLOSED 2026-11-02 (GOAL MET: 2 blocks archived) — opened 2026-11-02 — session c37cf0d5-6e79-4eb0-8983-1959063559a6
+- `closed-lane-archive-20261102-0701` — CLOSED 2026-11-02 (GOAL MET: 1 block archived) — opened 2026-11-02 — session 7e1d55bb-530a-4b56-8046-50509b276bf7
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b

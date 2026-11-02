@@ -13908,3 +13908,8 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Verification: unit tests; on the fleet board after restart, suggested rows all have ev_pct>=2 and fair_method two-sided, count per sport logged; portfolio refusals show not_suggested; after 2 weekends grade suggested vs all on recorder sg
 - Blocked by: none
 - **CROSS-LANE NOTE 2026-10-20 18:50Z (lane paper-alongside-live):** pipeline/portfolio_commit.py: the paper ladder reads `shortlist.get("rows")` (the pre-gate rows) and the board's `suggested_reasons`; `suggested_rows` and its call are untouched. A row is ladder-eligible only if its reasons are a subset of {ev_below_min, ev_net_of_fee_below_min} -- a change to those reason names would silently empty the ladder.
+
+### closed-lane-archive-20261102-0701 — CLOSED 2026-11-02 (GOAL MET: 1 block archived) — opened 2026-11-02 — session 7e1d55bb-530a-4b56-8046-50509b276bf7
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Result: GOAL MET. owner_liveness.py --idle-min 240 gave SAFE for 1 of 6 CLOSED blocks; moved `closed-lane-archive-20261102-0257` (owner c37cf0d5 idle 241m, block last modified 244m). 5 deferred; table and Part B in log/2026-11-02.md.
