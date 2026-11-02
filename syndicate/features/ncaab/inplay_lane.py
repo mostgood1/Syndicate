@@ -26,10 +26,13 @@ role. SYNDICATE_ENABLE_NCAAB_LIVE_REFRESH_AUTORUN=0 turns it off.
 from __future__ import annotations
 
 import os
+import shutil
+import subprocess
+import sys
 import time
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from syndicate.features.shared.ops_refresh import launch_refresh_run
 from syndicate.features.shared.refresh_state_store import read_json_file, reports_root, write_json_file
@@ -100,9 +103,83 @@ def _is_contention(exc: Exception) -> bool:
     return isinstance(exc, ValueError) and "already active" in str(exc)
 
 
+# PREGAME SIMS (lane wncaab-module, Phase 3, user 2026-11-02 "Straight to the boards"). Launched from THIS
+# worker so the child inherits the live tier's engine switches (HALF_SPLIT / EXACT_TARGET / mechanisms): the
+# board's pregame numbers come from the same engine configuration as its live ones. One child at a time, at
+# low priority, each bounded by a budget so a deploy preflight is never held for long; the producer re-sims
+# only games whose inputs changed (`college_basketball/pregame_sim.py`). SYNDICATE_COLLEGE_PREGAME_SIM=0 is off.
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_pregame_child: Any = None
+_pregame_last_launch = 0.0
+
+
+def pregame_sim_enabled() -> bool:
+    raw = str(os.environ.get("SYNDICATE_COLLEGE_PREGAME_SIM") or "").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
+def _env_seconds(name: str, default: int, floor: int) -> int:
+    raw = str(os.environ.get(name) or "").strip()
+    try:
+        return max(floor, int(raw)) if raw else default
+    except ValueError:
+        return default
+
+
+def _pregame_dates() -> list[str]:
+    today = central_today_iso()
+    return [today, (date.fromisoformat(today) + timedelta(days=1)).isoformat()]
+
+
+def _pregame_game_count(dates: list[str], league: str) -> int:
+    from syndicate.features.college_basketball.pregame_sim import is_pregame
+    from syndicate.features.ncaab.slate import read_slate
+
+    moment = datetime.now(timezone.utc)
+    return sum(1 for d in dates for g in (read_slate(d, league) or {}).get("games") or [] if is_pregame(g, moment))
+
+
+def maybe_launch_pregame_sims(league: str = "ncaab", *, popen: Callable[..., Any] = subprocess.Popen,
+                              clock: Callable[[], float] = time.monotonic) -> dict[str, Any] | None:
+    """Start `scripts/build_college_pregame_sims.py` when the last child has exited, the interval has passed and
+    the slate shows a pregame game today or tomorrow. Returns what it launched, or None."""
+    global _pregame_child, _pregame_last_launch
+    if not pregame_sim_enabled():
+        return None
+    if _pregame_child is not None:
+        code = _pregame_child.poll()
+        if code is None:
+            return None
+        print(f"[live_odds_worker] COLLEGE_PREGAME_SIM_EXITED league={league} rc={code}", flush=True)
+        _pregame_child = None
+    interval = _env_seconds("SYNDICATE_COLLEGE_PREGAME_INTERVAL_SECONDS", 900, 300)
+    if _pregame_last_launch and clock() - _pregame_last_launch < interval:
+        return None
+    dates = _pregame_dates()
+    pregame = _pregame_game_count(dates, league)
+    if pregame <= 0:
+        return None
+    budget = _env_seconds("SYNDICATE_COLLEGE_PREGAME_BUDGET_SECONDS", 600, 60)
+    command = [sys.executable, str(_REPO_ROOT / "scripts" / "build_college_pregame_sims.py"), "--league", league,
+               "--dates", ",".join(dates), "--budget-seconds", str(budget)]
+    nice = shutil.which("nice")
+    if nice:
+        command = [nice, "-n", "15", *command]
+    _pregame_child = popen(command, cwd=str(_REPO_ROOT))
+    _pregame_last_launch = clock()
+    print(f"[live_odds_worker] COLLEGE_PREGAME_SIM_LAUNCHED league={league} dates={','.join(dates)} pregame_games={pregame} "
+          f"budget_s={budget} interval_s={interval} pid={getattr(_pregame_child, 'pid', None)}", flush=True)
+    return {"league": league, "dates": dates, "pregame_games": pregame, "budget_s": budget}
+
+
 def launch_autorun_ncaab_live_refresh(league: str = "ncaab") -> dict[str, Any] | None:
     """One tick of the lane for `league` (`ncaab` / `wncaab`). Returns what it launched, or None."""
     tag = league.upper()
+    if league == "ncaab":
+        try:
+            maybe_launch_pregame_sims("ncaab")
+        except Exception as exc:  # noqa: BLE001 -- the pregame sim must never cost the odds lane
+            print(f"[live_odds_worker] COLLEGE_PREGAME_SIM_LAUNCH_FAILED {type(exc).__name__}: {exc}", flush=True)
     if not ncaab_live_refresh_enabled(league):
         return None
     selected_date = central_today_iso()

@@ -163,10 +163,12 @@ def test_wrapper_runs_the_check_for_a_sport_with_no_projection_source(monkeypatc
     # production 2026-09-26), and from then on the premise -- not the wrapper --
     # was false (red on main, found by the local ci-suite run 2026-10-02). The
     # reason assertion makes the next wiring fail HERE, by name, instead of as a
-    # bare `True is False`.
-    coverage = mod.attach_projections([], sport="ncaab", selected_date="2026-08-13")
+    # bare `True is False`. And it did: NCAAB/WNCAAB were wired 2026-11-02 (lane
+    # wncaab-module, pregame sim), leaving no real sport unwired -- so the premise
+    # now uses a slug no branch will ever claim.
+    coverage = mod.attach_projections([], sport="unwired-sport", selected_date="2026-08-13")
     assert coverage["supported"] is False
-    assert coverage["reason"] == "no projection source wired for ncaab"
+    assert coverage["reason"] == "no projection source wired for unwired-sport"
     assert "degenerate_projection_groups" not in coverage
 
 

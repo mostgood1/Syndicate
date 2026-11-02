@@ -2107,6 +2107,26 @@ def _attach_projections_by_sport(grid: list, *, sport: str, selected_date: str) 
             prop_coverage = {"supported": True, "error": "prop projection join failed", "rows_with_projection": 0}
         return _merge_nfl_coverage(game_coverage, prop_coverage)
 
+    if sport in ("ncaab", "wncaab"):
+        # `[2026-11-02, lane wncaab-module, LOANED branch, user "Approve both loans"]`. College rows read
+        # "no projection source wired". The pregame sim (`college_basketball/pregame_sim.py`, the live
+        # tier's engine from the opening tip) publishes score histograms; `college_game_projections` prices
+        # each row off them. WNCAAB's producer refuses every game until women's engine inputs exist, which
+        # this coverage reports by name.
+        try:
+            from syndicate.features.shared.college_game_projections import (
+                attach_college_game_projections,
+                load_college_game_projections,
+            )
+
+            index = load_college_game_projections(selected_date, sport)
+            if not index.games:
+                return {"supported": True, "rows_with_projection": 0, "reason": f"no {sport} pregame sim for this date window"}
+            return attach_college_game_projections(grid, index)
+        except Exception:
+            _LOGGER.exception("BOOK_GRID_PROJECTION_FAILURE sport=%s date=%s", sport, selected_date)
+            return {"supported": True, "error": "projection join failed", "rows_with_projection": 0}
+
     if sport == "nba":
         # `[2026-10-03, lane nba-layer2-projections, LOANED branch]`. NBA read
         # "no projection source wired for nba" while the SmartSim published every

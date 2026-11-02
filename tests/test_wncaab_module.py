@@ -25,6 +25,7 @@ REPO = Path(__file__).resolve().parents[1]
 def _no_college_momentum_thread(monkeypatch):
     """The in-play lane starts the college momentum capture thread on a live game; never from a test."""
     monkeypatch.setenv("SYNDICATE_COLLEGE_MOMENTUM_CAPTURE", "0")
+    monkeypatch.setenv("SYNDICATE_COLLEGE_PREGAME_SIM", "0")
 
 
 def _load(name: str, rel: str):
