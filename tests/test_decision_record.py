@@ -94,6 +94,23 @@ def test_worker_hook_calls_run_shadow_after_the_portfolio_commit_with_the_shortl
 # reads that book for placement, sizing or the board. Matched by full path, so a same-named file elsewhere still fails.
 _PAPER_READERS = frozenset({"syndicate/features/shared/decision_policy_paper.py"})
 
+# Borrowing the records DIRECTORY is not reading the record: inplay_entries_live.py (lane in-game-trading,
+# 9a41c6f66) writes its own `<day>.inplay.jsonl` beside the pregame files via `records_dir` and nothing else.
+_PATH_ONLY_NAMES = frozenset({"records_dir"})
+
+
+def _only_borrows_the_records_dir(text: str) -> bool:
+    imported: set[str] = set()
+    for node in ast.walk(ast.parse(text)):
+        if isinstance(node, ast.Import) and any(a.name.endswith(("decision_record", "decision_agreement")) for a in node.names):
+            return False
+        if isinstance(node, ast.ImportFrom):
+            if (node.module or "").endswith(("decision_record", "decision_agreement")):
+                imported.update(a.name for a in node.names)
+            elif any(a.name in {"decision_record", "decision_agreement"} for a in node.names):
+                return False
+    return bool(imported) and imported <= _PATH_ONLY_NAMES
+
 
 def test_nothing_outside_the_lane_reads_the_record():
     """SHADOW means no reader: no placement, sizing or board module imports it (one paper-only reader, above)."""
@@ -105,8 +122,16 @@ def test_nothing_outside_the_lane_reads_the_record():
             continue
         text = path.read_text(encoding="utf-8", errors="ignore")
         if "shared.decision_record" in text or "shared.decision_agreement" in text or "import decision_record" in text:
-            readers.append(str(path))
+            if not _only_borrows_the_records_dir(text):
+                readers.append(str(path))
     assert readers == []
+
+
+def test_borrowing_the_records_dir_is_not_reading_the_record():
+    assert _only_borrows_the_records_dir("from syndicate.features.shared.decision_record import records_dir\n")
+    assert not _only_borrows_the_records_dir("from syndicate.features.shared.decision_record import records_dir, build_record\n")
+    assert not _only_borrows_the_records_dir("from syndicate.features.shared import decision_record\n")
+    assert not _only_borrows_the_records_dir("import syndicate.features.shared.decision_record as dr\n")
 
 
 # ----------------------------------------------------------------------------- the probability
