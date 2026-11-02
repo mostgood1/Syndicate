@@ -3218,6 +3218,13 @@ def _launch_inplay_capture_autoruns(source: str) -> None:
             launch_autorun_ncaab_live_refresh()
         except Exception as exc:  # noqa: BLE001
             print(f"[live_odds_worker] NCAAB_LIVE_AUTORUN_ERROR source={source} {type(exc).__name__}: {exc}", flush=True)
+        # WNCAAB's in-play lane (lane wncaab-module; user-approved loan of this file, 2026-11-02).
+        try:
+            from syndicate.features.ncaab.inplay_lane import launch_autorun_wncaab_live_refresh
+
+            launch_autorun_wncaab_live_refresh()
+        except Exception as exc:  # noqa: BLE001
+            print(f"[live_odds_worker] WNCAAB_LIVE_AUTORUN_ERROR source={source} {type(exc).__name__}: {exc}", flush=True)
         try:
             _launch_autorun_nfl_lines_refresh()
         except Exception as exc:  # noqa: BLE001

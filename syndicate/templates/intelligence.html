@@ -187,6 +187,7 @@
     { value: "nfl", label: "NFL" },
     { value: "ncaaf", label: "NCAAF" },
     { value: "ncaab", label: "NCAAB" },
+    { value: "wncaab", label: "WNCAAB" },
     { value: "nhl", label: "NHL" },
     { value: "soccer", label: "Soccer" },
   ];
@@ -2389,7 +2390,7 @@
   async function loadGameChips() {
     try {
       const dateParam = state.date ? `date=${encodeURIComponent(state.date)}&` : "";
-      const res = await fetch(`/api/board/game-chips?${dateParam}sports=mlb,nba,wnba,nhl,nfl,ncaaf,ncaab,soccer`, { cache: "no-store" });
+      const res = await fetch(`/api/board/game-chips?${dateParam}sports=mlb,nba,wnba,nhl,nfl,ncaaf,ncaab,wncaab,soccer`, { cache: "no-store" });
       if (!res.ok) {
         // A settled failure still unblocks the strip -- it must not hang on
         // "Loading…" forever just because this one fetch came back non-2xx.

@@ -128,10 +128,10 @@ def test_launcher_fires_only_with_a_live_game_and_respects_the_interval(tmp_path
     launches: list[dict] = []
     monkeypatch.setattr(inplay_lane, "launch_refresh_run", lambda **kw: launches.append(kw) or {"runStamp": "r1"})
 
-    monkeypatch.setattr(inplay_lane, "ncaab_live_game_count", lambda d: 0)
+    monkeypatch.setattr(inplay_lane, "ncaab_live_game_count", lambda d, league="ncaab": 0)
     assert inplay_lane.launch_autorun_ncaab_live_refresh() is None and not launches
 
-    monkeypatch.setattr(inplay_lane, "ncaab_live_game_count", lambda d: 3)
+    monkeypatch.setattr(inplay_lane, "ncaab_live_game_count", lambda d, league="ncaab": 3)
     assert inplay_lane.launch_autorun_ncaab_live_refresh()["live_games"] == 3
     assert launches[0]["sports"] == "ncaab" and launches[0]["phase"] == "live"
     assert launches[0]["force_refresh"] is True and launches[0]["force_refresh_sports"] == "ncaab"
@@ -148,7 +148,7 @@ def test_contention_keeps_the_old_epoch_so_the_next_tick_retries(monkeypatch):
     from syndicate.features.shared.ops_refresh import RefreshRunRefused
 
     monkeypatch.setattr(inplay_lane, "central_today_iso", lambda: "2026-11-02")
-    monkeypatch.setattr(inplay_lane, "ncaab_live_game_count", lambda d: 1)
+    monkeypatch.setattr(inplay_lane, "ncaab_live_game_count", lambda d, league="ncaab": 1)
     store: dict[str, dict] = {}
     monkeypatch.setattr(inplay_lane, "read_json_file", lambda path: store.get(str(path)))
     monkeypatch.setattr(inplay_lane, "write_json_file", lambda path, payload: store.__setitem__(str(path), payload))

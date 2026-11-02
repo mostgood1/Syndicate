@@ -896,6 +896,14 @@ def _nhl_alias_to_name() -> dict[str, str]:
 
 
 @lru_cache(maxsize=1)
+def _wncaab_alias_to_name() -> dict[str, str]:
+    """Women's college basketball (lane wncaab-module): `_ncaab_alias_to_name`'s construction over the
+    women's registry. Same canonical (the SCHOOL) and the same collision pass, so a school resolves to
+    the same key in both sports."""
+    return _college_alias_to_name("wncaab")
+
+
+@lru_cache(maxsize=1)
 def _ncaab_alias_to_name() -> dict[str, str]:
     """NCAAB alias -> canonical school, derived from the committed D1 registry.
 
@@ -926,6 +934,11 @@ def _ncaab_alias_to_name() -> dict[str, str]:
     A SCHOOL WITH NO UNIQUE TOKEN SIMPLY HAS NO ENTRY, which puts it back on
     `teams_match`'s heuristics: today's behaviour, not a regression.
     """
+    return _college_alias_to_name("ncaab")
+
+
+def _college_alias_to_name(league: str) -> dict[str, str]:
+    """The registry-derived map for one college basketball league (`ncaab` / `wncaab`)."""
     try:
         from syndicate.features.shared.ncaab_team_registry import iter_team_alias_offers
     except Exception:
@@ -933,7 +946,7 @@ def _ncaab_alias_to_name() -> dict[str, str]:
 
     offers: dict[str, set[str]] = {}
     try:
-        for token, school in iter_team_alias_offers():
+        for token, school in iter_team_alias_offers(league):
             key = normalize(token)
             canonical = normalize(school)
             if key and canonical:
@@ -989,6 +1002,8 @@ def _alias_map(sport: str) -> dict[str, str]:
         return _ncaaf_alias_to_name()
     if slug == "ncaab":
         return _ncaab_alias_to_name()
+    if slug == "wncaab":
+        return _wncaab_alias_to_name()
     return {}
 
 
@@ -1027,8 +1042,8 @@ def _nickname_alias_map(sport: str) -> dict[str, str]:
     wnba 0 added, because its vendored supplement already carries them.
     """
     slug = normalize(sport)
-    if slug == "ncaab":
-        # NCAAB DECLINES FOR EXACTLY NCAAF'S REASON, and the failure is worse
+    if slug in {"ncaab", "wncaab"}:
+        # NCAAB (and WNCAAB, same school-shaped canonicals) DECLINES FOR EXACTLY NCAAF'S REASON, and the failure is worse
         # here because the population is bigger. Canonical values are SCHOOLS,
         # so the last word is a qualifier, not a nickname: "Abilene Christian"
         # -> `christian`, "Air Force" -> `force`, "Boston College" -> `college`,

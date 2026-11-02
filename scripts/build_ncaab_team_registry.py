@@ -30,16 +30,18 @@ import urllib.request
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-DEST = REPO / "syndicate" / "features" / "shared" / "ncaab_team_registry.csv"
-SOURCE_URL = (
-    "https://site.api.espn.com/apis/site/v2/sports/basketball/"
-    "mens-college-basketball/teams?limit=1000"
-)
+sys.path.insert(0, str(REPO))
+from syndicate.features.college_basketball.league import league_for  # noqa: E402
+
+# `--league wncaab` (lane wncaab-module, 2026-11-02) writes the women's registry from ESPN's women's
+# list; the default stays the men's, byte for byte.
+DEST = league_for("ncaab").registry_csv
+SOURCE_URL = league_for("ncaab").teams_url
 FIELDS = ("espn_id", "school", "display_name", "short_display_name", "abbreviation", "mascot", "slug")
 
 
-def fetch_rows() -> list[dict[str, str]]:
-    request = urllib.request.Request(SOURCE_URL, headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json"})
+def fetch_rows(source_url: str = SOURCE_URL) -> list[dict[str, str]]:
+    request = urllib.request.Request(source_url, headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json"})
     with urllib.request.urlopen(request, timeout=60) as response:
         payload = json.loads(response.read().decode())
     entries = payload["sports"][0]["leagues"][0]["teams"]
@@ -75,11 +77,14 @@ def render(rows: list[dict[str, str]]) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--check", action="store_true", help="exit 1 if the committed file differs from the source")
+    parser.add_argument("--league", default="ncaab", choices=("ncaab", "wncaab"))
     args = parser.parse_args()
 
-    rows = fetch_rows()
+    league = league_for(args.league)
+    dest = league.registry_csv
+    rows = fetch_rows(league.teams_url)
     rendered = render(rows)
-    current = DEST.read_text(encoding="utf-8") if DEST.exists() else ""
+    current = dest.read_text(encoding="utf-8") if dest.exists() else ""
 
     if args.check:
         if rendered == current:
@@ -88,9 +93,9 @@ def main() -> int:
         print(f"STALE: source has {len(rows)} teams; committed file differs", file=sys.stderr)
         return 1
 
-    DEST.parent.mkdir(parents=True, exist_ok=True)
-    DEST.write_text(rendered, encoding="utf-8")
-    print(f"wrote {DEST.relative_to(REPO)}  ({len(rows)} teams, {len(rendered)} bytes)")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(rendered, encoding="utf-8")
+    print(f"wrote {dest.relative_to(REPO)}  ({len(rows)} teams, {len(rendered)} bytes)")
     return 0
 
 

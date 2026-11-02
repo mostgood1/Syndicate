@@ -4364,7 +4364,7 @@ _T_WINDOW_COMMENCE_PROVIDERS = {
 # `SYNDICATE_SLATE_STARTING_SOON_ENABLED` is on. NCAAB has no live checker, so
 # it is not skipped while live; `_slate_phase.t_window_force_allowed` in the
 # tick is what bounds that cost on a many-game slate.
-_T_WINDOW_SCHEDULE_SPORTS: tuple[str, ...] = ("nfl", "ncaaf", "nba", "nhl", "ncaab")
+_T_WINDOW_SCHEDULE_SPORTS: tuple[str, ...] = ("nfl", "ncaaf", "nba", "nhl", "ncaab", "wncaab")
 
 
 def _t_window_sports() -> list[str]:
@@ -5691,7 +5691,8 @@ def _mlb_refresh_tick_owner_here() -> bool:
 	return raw in ("1", "true", "yes", "y", "on")
 
 
-_WEEKLY_SPORTS_TICK_EXCLUDABLE = ("nfl", "ncaaf", "ncaab")
+# wncaab rides NCAAB's path (lane wncaab-module, 2026-11-02): swept on game days whatever SYNDICATE_ACTIVE_SPORTS lists.
+_WEEKLY_SPORTS_TICK_EXCLUDABLE = ("nfl", "ncaaf", "ncaab", "wncaab")
 
 
 def _weekly_sports_game_horizon_days() -> int:

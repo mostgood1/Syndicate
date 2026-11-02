@@ -318,7 +318,7 @@ def pregame_footer(
         parts: list[str | None] = []
         if sport == "mlb":
             parts = [_mlb_probables(game), _favourite_ml(lines, away, home)]
-        elif sport in {"nba", "wnba", "ncaab"}:
+        elif sport in {"nba", "wnba", "ncaab", "wncaab"}:
             parts = [_spread_text(lines["home_spread"], away, home), _total_text(lines["total"])]
         elif sport == "nhl":
             parts = [_nhl_goalies(game, day, away_name, home_name), _favourite_ml(lines, away, home), _total_text(lines["total"])]

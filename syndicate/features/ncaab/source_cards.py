@@ -51,11 +51,11 @@ def _american_prob(price: Any) -> float | None:
     return 100.0 / (value + 100.0) if value > 0 else -value / (-value + 100.0)
 
 
-def _team_key(name: Any) -> str | None:
+def _team_key(name: Any, league: str = "ncaab") -> str | None:
     try:
         from syndicate.features.shared.team_aliases import chip_join_key
 
-        return chip_join_key("ncaab", str(name or "")) or None
+        return chip_join_key(league, str(name or "")) or None
     except Exception:  # noqa: BLE001
         return None
 
@@ -63,9 +63,11 @@ def _team_key(name: Any) -> str | None:
 _grid_cache: dict[str, tuple[float, dict]] = {}
 
 
-def _grid_markets(day: str) -> dict[tuple[str, str], dict[str, Any]]:
+def _grid_markets(day: str, league: str = "ncaab") -> dict[tuple[str, str], dict[str, Any]]:
     """(home key, away key) -> {home_spread, total, home_ml, away_ml, books} for one grid date."""
-    path = _data_root() / "ncaab_source" / "data" / "book_grid" / f"book_grid_{day}.json"
+    from syndicate.features.college_basketball.league import league_for
+
+    path = _data_root() / league_for(league).data_dir / "data" / "book_grid" / f"book_grid_{day}.json"
     try:
         mtime = path.stat().st_mtime
     except OSError:
@@ -88,7 +90,7 @@ def _grid_markets(day: str) -> dict[tuple[str, str], dict[str, Any]]:
         market = row.get("market")
         if market not in ("h2h", "spreads", "totals"):
             continue
-        key = (_team_key(row.get("home_team")), _team_key(row.get("away_team")))
+        key = (_team_key(row.get("home_team"), league), _team_key(row.get("away_team"), league))
         if not key[0] or not key[1]:
             continue
         books.setdefault(key, set()).update(str(b) for b in (row.get("books") or []))
@@ -124,13 +126,13 @@ def _half_step(value: float | None) -> float | None:
     return round(value * 2) / 2 if value is not None else None
 
 
-def _betting(game: Mapping[str, Any], date_iso: str) -> dict[str, Any]:
-    home, away = _team_key(game["home"].get("name")), _team_key(game["away"].get("name"))
+def _betting(game: Mapping[str, Any], date_iso: str, league: str = "ncaab") -> dict[str, Any]:
+    home, away = _team_key(game["home"].get("name"), league), _team_key(game["away"].get("name"), league)
     day = date.fromisoformat(date_iso)
     lines: dict[str, Any] = {}
     # Grids are keyed by CAPTURE date; an evening tip is priced in the next day's file too.
     for d in (day, day + timedelta(days=1)):
-        for key, value in _grid_markets(d.isoformat()).get((home, away), {}).items():
+        for key, value in _grid_markets(d.isoformat(), league).get((home, away), {}).items():
             lines.setdefault(key, value)
     home_ml, away_ml = lines.get("home_ml"), lines.get("away_ml")
     p_home = p_away = None
@@ -168,10 +170,10 @@ def _status_detail(game: Mapping[str, Any]) -> str:
     return central_start_label(game.get("start_time_utc")) or "Scheduled"
 
 
-def _card(game: Mapping[str, Any], date_iso: str) -> dict[str, Any]:
+def _card(game: Mapping[str, Any], date_iso: str, league: str = "ncaab") -> dict[str, Any]:
     away, home = dict(game.get("away") or {}), dict(game.get("home") or {})
     live = dict(game.get("live_state") or {})
-    betting = _betting(game, date_iso)
+    betting = _betting(game, date_iso, league)
     implied_away, implied_home = _implied_points(betting)
     started = bool(live.get("in_progress") or live.get("final"))
     event_id = str(game.get("event_id") or "")
@@ -183,7 +185,7 @@ def _card(game: Mapping[str, Any], date_iso: str) -> dict[str, Any]:
         "gamePk": event_id,
         "game_id": event_id,
         "event_id": event_id,
-        "gameType": "NCAAB",
+        "gameType": league.upper(),
         "away_tri": away.get("abbr") or "",
         "home_tri": home.get("abbr") or "",
         "away_name": away.get("name") or "",
@@ -221,9 +223,13 @@ def _card(game: Mapping[str, Any], date_iso: str) -> dict[str, Any]:
     }
 
 
-def build_ncaab_source_cards_payload(date_iso: str) -> dict[str, Any]:
+def build_ncaab_source_cards_payload(date_iso: str, league: str = "ncaab") -> dict[str, Any]:
+    """`league="wncaab"` (lane wncaab-module) builds women's college basketball's page the same way."""
+    from syndicate.features.college_basketball.league import league_for
+
+    spec = league_for(league)
     date_value = str(date_iso or "").strip()[:10]
-    games = sorted(slate_games(date_value), key=lambda g: str(g.get("start_time_utc") or ""))
+    games = sorted(slate_games(date_value, league=league), key=lambda g: str(g.get("start_time_utc") or ""))
     parsed = date.fromisoformat(date_value)
     return {
         "date": date_value,
@@ -231,18 +237,18 @@ def build_ncaab_source_cards_payload(date_iso: str) -> dict[str, Any]:
         "lookahead_applied": False,
         "players_included": False,
         "pregame_portfolio": {"enabled": False, "selected": 0, "candidates": 0},
-        "games": [_card(game, date_value) for game in games if (game.get("away") or {}).get("name") and (game.get("home") or {}).get("name")],
+        "games": [_card(game, date_value, league) for game in games if (game.get("away") or {}).get("name") and (game.get("home") or {}).get("name")],
         "prev_date": (parsed - timedelta(days=1)).isoformat(),
         "next_date": (parsed + timedelta(days=1)).isoformat(),
         "board_contract": {
             "schema": "game_board_v1",
             "surface": "parity_cards_v1",
-            "sport": "ncaab",
+            "sport": league,
             "module": "cards",
             "source_kind": "d1_slate_market_consensus",
             "live_lens_integrated": False,
         },
-        "source_title": "NCAAB D1 slate + market consensus (no model)",
-        "source_path": f"ncaab_source/data/scoreboard/scoreboard_{date_value}.json",
+        "source_title": f"{spec.label} D1 slate + market consensus (no model)",
+        "source_path": f"{spec.data_dir}/data/scoreboard/scoreboard_{date_value}.json",
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }

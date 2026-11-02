@@ -84,10 +84,11 @@ def _row_to_dict(row: object) -> dict:
 
 
 class TheOddsApiClient:
-    def __init__(self, *, region: str = "us", api_key: str | None = None, sport_key: str = "basketball_ncaab") -> None:
+    def __init__(self, *, region: str = "us", api_key: str | None = None, sport_key: str = "basketball_ncaab", league: str = "ncaab") -> None:
         self.api_key = _load_api_key(api_key)
         self.region = str(region or "us")
         self.sport_key = sport_key
+        self.league = league
 
     def _request_json(
         self,
@@ -106,7 +107,7 @@ class TheOddsApiClient:
                 payload = response.read().decode("utf-8")
                 # Full url: the recorder redacts apiKey before persisting, and
                 # attribution needs the markets= in the query.
-                record_oddsapi_quota(response.headers, sport="ncaab", endpoint=url)
+                record_oddsapi_quota(response.headers, sport=getattr(self, "league", "ncaab"), endpoint=url)
         except urllib.error.HTTPError as exc:
             status_code = int(getattr(exc, "code", 0) or 0)
             if status_code in ignore_statuses:
@@ -135,6 +136,10 @@ class TheOddsApiClient:
             return "1h"
         if key.endswith("_h2"):
             return "2h"
+        # Women's college basketball plays QUARTERS (lane wncaab-module): `spreads_q3` -> "q3".
+        for quarter in ("q1", "q2", "q3", "q4"):
+            if key.endswith(f"_{quarter}"):
+                return quarter
         if any(tok in key for tok in ("_1st_half", "1st_half", "first_half", "_1h", "1h_")):
             return "1h"
         if any(tok in key for tok in ("_2nd_half", "2nd_half", "second_half", "_2h", "2h_")):
@@ -412,7 +417,7 @@ def _event_on_target_date(ct_raw: object, *, target_date: dt.date, tz: ZoneInfo)
 
 
 _FULL_GAME_MARKETS = ("h2h", "spreads", "totals")
-_HALF_SUFFIXES = ("_h1", "_h2")
+_HALF_SUFFIXES = ("_h1", "_h2", "_q1", "_q2", "_q3", "_q4")  # every segment suffix, halves and quarters
 # The live window for per-event half lines: from this long before tip until this
 # long after it (a college game runs ~2 h; 3 h covers overtime and delays).
 _HALF_WINDOW_BEFORE_TIP_SECONDS = 30 * 60
@@ -444,12 +449,27 @@ def _half_window_events(rows: list[dict], *, now: dt.datetime, before_tip_second
     return out
 
 
-def _append_half_lines(rows: list[dict], events: dict[str, dt.datetime], *, adapter, halves: list[str], bookmakers: str | None, now: dt.datetime) -> None:
-    """Per-event HALF markets for `events`, first half dropped once it is over."""
+# WHICH SEGMENTS ARE WORTH A CREDIT, by minutes since tip (lane wncaab-module, 2026-11-02): a segment is
+# asked for from `open` until `closed`. NCAAB's two rows ARE the rule this file had -- both halves from 30
+# min before tip, the first half dropped after 75 min (`_FIRST_HALF_OVER_AFTER_SECONDS`). Women play four
+# 10-minute quarters (~30 min of real time each); asking every quarter every pull would roughly double the
+# per-game cost, so a quarter is asked only while it is current or next, and a half while it can still trade.
+_SEGMENT_WINDOWS_MINUTES: dict[str, dict[str, tuple[float, float]]] = {
+    "ncaab": {"h1": (-30, _FIRST_HALF_OVER_AFTER_SECONDS / 60), "h2": (-30, 180)},
+    "wncaab": {"q1": (-30, 30), "q2": (0, 60), "q3": (30, 90), "q4": (60, 180), "h1": (-30, 60), "h2": (30, 180)},
+}
+
+
+def _segment_open(market: str, minutes_since_tip: float, league: str) -> bool:
+    window = _SEGMENT_WINDOWS_MINUTES.get(league, _SEGMENT_WINDOWS_MINUTES["ncaab"]).get(market.rsplit("_", 1)[-1])
+    return window is not None and window[0] <= minutes_since_tip < window[1]
+
+
+def _append_half_lines(rows: list[dict], events: dict[str, dt.datetime], *, adapter, halves: list[str], bookmakers: str | None, now: dt.datetime, league: str = "ncaab") -> None:
+    """Per-event SEGMENT markets for `events` -- only the segments still open (`_SEGMENT_WINDOWS_MINUTES`)."""
     for event_id, commence in sorted(events.items()):
-        wanted = halves
-        if (now - commence).total_seconds() > _FIRST_HALF_OVER_AFTER_SECONDS:
-            wanted = [m for m in halves if not m.endswith("_h1")]
+        minutes = (now - commence).total_seconds() / 60.0
+        wanted = [m for m in halves if _segment_open(m, minutes, league)]
         if not wanted:
             continue
         try:
@@ -462,7 +482,7 @@ def _append_half_lines(rows: list[dict], events: dict[str, dt.datetime], *, adap
             print(f"[ncaab_odds] HALF_LINES_FAILED event={event_id} error={type(exc).__name__}: {exc}", flush=True)
 
 
-def _fetch_current_rows(*, adapter, date_iso: str, markets: str, bookmakers: str | None, now: dt.datetime | None = None) -> list[dict]:
+def _fetch_current_rows(*, adapter, date_iso: str, markets: str, bookmakers: str | None, now: dt.datetime | None = None, league: str = "ncaab") -> list[dict]:
     """Full-game lines for EVERY game in one bulk call; half lines per event, live window only.
 
     WHY (2026-11-02, user: bulk + live-window halves, "Live betting NCAAB is the
@@ -487,11 +507,11 @@ def _fetch_current_rows(*, adapter, date_iso: str, markets: str, bookmakers: str
         return rows
 
     moment = now or dt.datetime.now(dt.timezone.utc)
-    _append_half_lines(rows, _half_window_events(rows, now=moment), adapter=adapter, halves=halves, bookmakers=bookmakers, now=moment)
+    _append_half_lines(rows, _half_window_events(rows, now=moment), adapter=adapter, halves=halves, bookmakers=bookmakers, now=moment, league=league)
     return rows
 
 
-def _fetch_in_play_rows(*, adapter, markets: str, bookmakers: str | None, now: dt.datetime | None = None) -> list[dict]:
+def _fetch_in_play_rows(*, adapter, markets: str, bookmakers: str | None, now: dt.datetime | None = None, league: str = "ncaab") -> list[dict]:
     """The NCAAB IN-PLAY lane's pull: games that have TIPPED and are not long over.
 
     User 2026-11-02: "Live betting NCAAB is the most important part of its
@@ -509,7 +529,7 @@ def _fetch_in_play_rows(*, adapter, markets: str, bookmakers: str | None, now: d
     started = _half_window_events(bulk, now=moment, before_tip_seconds=0)
     rows = [row for row in bulk if str(row.get("event_id") or "").strip() in started]
     if halves:
-        _append_half_lines(rows, started, adapter=adapter, halves=halves, bookmakers=bookmakers, now=moment)
+        _append_half_lines(rows, started, adapter=adapter, halves=halves, bookmakers=bookmakers, now=moment, league=league)
     return rows
 
 
@@ -561,10 +581,10 @@ def _write_rows(out_path: Path, rows: list[dict]) -> None:
         writer.writerows(rows)
 
 
-_QUOTE_SEGMENT = {"full_game": "full", "1h": "h1", "2h": "h2"}
+_QUOTE_SEGMENT = {"full_game": "full", "1h": "h1", "2h": "h2", "q1": "q1", "q2": "q2", "q3": "q3", "q4": "q4"}
 
 
-def _append_ncaab_book_quotes(rows: list[dict], *, date_iso: str) -> None:
+def _append_ncaab_book_quotes(rows: list[dict], *, date_iso: str, league: str = "ncaab") -> None:
     """Route NCAAB's already-multi-book rows into the shared quote log.
 
     NCAAB loops every bookmaker (`iter_current_odds_expanded`) and was never a
@@ -621,7 +641,7 @@ def _append_ncaab_book_quotes(rows: list[dict], *, date_iso: str) -> None:
                 quotes.append({**base, "market": market, "selection": selection, "price": price, "line": line})
 
         append_book_quotes(
-            sport="ncaab",
+            sport=league,
             date_str=str(date_iso),
             rows=quotes,
             captured_at=dt.datetime.now(dt.timezone.utc).isoformat(),
@@ -637,7 +657,8 @@ def main() -> int:
     parser.add_argument("--api-key")
     parser.add_argument("--region", default="us")
     parser.add_argument("--bookmakers")
-    parser.add_argument("--markets", default="h2h,spreads,totals,spreads_h1,totals_h1,spreads_h2,totals_h2")
+    parser.add_argument("--markets", default=None, help="default: the league's full-game + segment markets")
+    parser.add_argument("--league", default="ncaab", choices=("ncaab", "wncaab"))
     parser.add_argument("--out-dir", required=True)
     parser.add_argument("--mode", default="current", choices=("current", "history"))
     parser.add_argument("--refresh-mode", choices=("fast", "full"), default="full")
@@ -648,18 +669,27 @@ def main() -> int:
     source_root = Path(args.source_root).resolve() if args.source_root else None
     out_dir = Path(args.out_dir).resolve()
     date_iso = str(args.date).strip()
+    from syndicate.features.college_basketball.league import league_for
+
+    spec = league_for(args.league)
+    league = spec.slug
+    if args.markets is None:
+        args.markets = ",".join(("h2h", "spreads", "totals", *(f"{m}_{seg}" for seg in spec.segments for m in ("spreads", "totals"))))
     TheOddsAPIAdapter = _load_source_adapter(source_root)
     try:
         adapter = TheOddsAPIAdapter(region=str(args.region or "us"), api_key=args.api_key)
     except TypeError:
         adapter = TheOddsAPIAdapter(region=str(args.region or "us"))
+    if hasattr(adapter, "sport_key"):
+        adapter.sport_key = spec.oddsapi_key
+    adapter.league = league
 
     if args.in_play_only:
-        rows = _fetch_in_play_rows(adapter=adapter, markets=str(args.markets or ""), bookmakers=args.bookmakers)
+        rows = _fetch_in_play_rows(adapter=adapter, markets=str(args.markets or ""), bookmakers=args.bookmakers, league=league)
         if not rows:
-            print("No in-play NCAAB events.")
+            print(f"No in-play {spec.label} events.")
             return 0
-        _append_ncaab_book_quotes(rows, date_iso=date_iso)
+        _append_ncaab_book_quotes(rows, date_iso=date_iso, league=league)
         # Its own file: the full-slate CSV must not be replaced by a few live games.
         _write_rows(out_dir / f"odds_{date_iso}_inplay.csv", rows)
         print(f"Wrote {len(rows)} in-play odds rows for {len({r.get('event_id') for r in rows})} events")
@@ -667,12 +697,12 @@ def main() -> int:
     if args.mode == "history":
         rows = _fetch_history_rows(adapter=adapter, date_iso=date_iso, markets=str(args.markets or ""), bookmakers=args.bookmakers)
     else:
-        rows = _fetch_current_rows(adapter=adapter, date_iso=date_iso, markets=str(args.markets or ""), bookmakers=args.bookmakers)
+        rows = _fetch_current_rows(adapter=adapter, date_iso=date_iso, markets=str(args.markets or ""), bookmakers=args.bookmakers, league=league)
 
     out_path = out_dir / f"odds_{date_iso}.csv"
     input_hash = build_input_hash(
         {
-            "step": f"ncaab_odds_{args.mode}",
+            "step": f"{league}_odds_{args.mode}",
             "date": date_iso,
             "region": str(args.region or "us"),
             "bookmakers": str(args.bookmakers or ""),
@@ -680,13 +710,13 @@ def main() -> int:
             "rows": rows,
         }
     )
-    if not should_recompute(f"ncaab_odds_{args.mode}:{date_iso}", input_hash) and out_path.exists():
+    if not should_recompute(f"{league}_odds_{args.mode}:{date_iso}", input_hash) and out_path.exists():
         print(f"Reused {len(rows)} odds rows at {out_path}")
         return 0
-    _append_ncaab_book_quotes(rows, date_iso=date_iso)
+    _append_ncaab_book_quotes(rows, date_iso=date_iso, league=league)
     _write_rows(out_path, rows)
     record_refresh_state(
-        f"ncaab_odds_{args.mode}:{date_iso}",
+        f"{league}_odds_{args.mode}:{date_iso}",
         input_hash,
         outputs=[str(out_path)],
         metadata={

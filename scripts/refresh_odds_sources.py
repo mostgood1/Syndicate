@@ -75,6 +75,12 @@ from syndicate.features.wnba.sources import available_dates as wnba_available_da
 _PUBLISH_MANIFEST_LOCK = Lock()
 
 _DEFAULT_INTERVAL_MARKETS = "h2h,spreads,totals,spreads_h1,totals_h1,spreads_h2,totals_h2"
+# Women's college basketball plays four quarters (lane wncaab-module, 2026-11-02): the fetcher asks a
+# per-event segment only while it is open (`refresh_ncaab_odds_history._SEGMENT_WINDOWS_MINUTES`).
+_DEFAULT_WNCAAB_MARKETS = (
+    "h2h,spreads,totals,spreads_q1,totals_q1,spreads_q2,totals_q2,spreads_q3,totals_q3,"
+    "spreads_q4,totals_q4,spreads_h1,totals_h1,spreads_h2,totals_h2"
+)
 # #125 follow-up, 2026-07-29: this used to be "h2h,spreads,totals" -- unlike
 # NBA/NCAAB (_effective_markets -> _DEFAULT_INTERVAL_MARKETS above), WNBA's
 # bulk scheduled fetch never requested spreads_h1/totals_h1/spreads_h2/
@@ -629,6 +635,9 @@ def _coverage_report_for_sport(sport: str, *, requested_date: str) -> dict[str, 
         span = _date_span(nhl_available_dates())
     elif slug == "ncaab":
         span = _date_span(ncaab_available_dates())
+    elif slug == "wncaab":
+        # No mirror and no historical bundle: the quote log is the only record.
+        span = _date_span([])
     elif slug == "nfl":
         season = nfl_latest_season()
         weeks = [item.get("week") for item in nfl_week_summaries() if int(item.get("season") or 0) == int(season)]
@@ -757,6 +766,8 @@ def _effective_markets(slug: str, requested_markets: str) -> str:
         return cleaned
     if slug in {"nba", "wnba", "ncaab"}:
         return _DEFAULT_INTERVAL_MARKETS
+    if slug == "wncaab":
+        return _DEFAULT_WNCAAB_MARKETS
     return ""
 
 
@@ -777,7 +788,7 @@ def _local_source_bundle_root(slug: str) -> Path:
 def _post_refresh_root(spec: SportSpec) -> Path:
     if spec.slug == "mlb":
         return _local_mlb_bundle_root()
-    if spec.slug in {"nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "soccer"}:
+    if spec.slug in {"nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "wncaab", "soccer"}:
         return _local_source_bundle_root(spec.slug)
     return _source_repo_root(spec.slug, spec.source_repo_name)
 
@@ -1194,6 +1205,38 @@ def _build_ncaab_steps(args: argparse.Namespace) -> list[RefreshStep]:
                 markets,
             ),
             description="Refresh NCAAB current-day odds snapshot with full-game and derivative markets.",
+        )
+    ]
+
+
+def _build_wncaab_steps(args: argparse.Namespace) -> list[RefreshStep]:
+    """Women's college basketball (lane wncaab-module, 2026-11-02): NCAAB's runner with `--league wncaab`
+    -- OddsAPI `basketball_wncaab`, quarter + half segments, its own raw outputs and quote log."""
+    python_exe = _venv_python(REPO_ROOT)
+    raw_outputs_root = REPO_ROOT / "data" / "wncaab_source" / "raw_outputs" / "by_date" / args.date
+    markets = _effective_markets("wncaab", args.markets)
+    return [
+        RefreshStep(
+            name="wncaab_odds_snapshot",
+            phases=("pregame", "live"),
+            cwd=REPO_ROOT,
+            command=(
+                python_exe,
+                "scripts/refresh_ncaab_odds_history.py",
+                "--league",
+                "wncaab",
+                "--date",
+                args.date,
+                "--region",
+                args.regions,
+                "--out-dir",
+                str(raw_outputs_root),
+                "--mode",
+                "current",
+                "--markets",
+                markets,
+            ),
+            description="Refresh WNCAAB current-day odds: full-game for every game, quarter/half lines while open.",
         )
     ]
 
@@ -2544,6 +2587,16 @@ REGISTRY: dict[str, SportSpec] = {
         ingest_contract_notes="Hosted-safe ingest can rebuild the local API bundle from the mirrored raw bundle under data/ncaab_source/raw_outputs.",
         notes="Uses the existing TheOddsAPI adapter through a Syndicate-owned runner so period markets keep the same event-level fetch behavior while the planner stops shelling directly into the source CLI.",
     ),
+    "wncaab": SportSpec(
+        slug="wncaab",
+        source_repo_name="WNCAAB",
+        # No mirror exists for this sport; the live loop runs with skip_mirror (the default).
+        mirror_script_name="refresh_wncaab_source_mirror.ps1",
+        step_builder=_build_wncaab_steps,
+        ingest_contract_kind="existing_raw_outputs",
+        ingest_contract_notes="Syndicate-owned from the start: raw outputs under data/wncaab_source/raw_outputs and the shared quote log.",
+        notes="NCAAB's TheOddsAPI runner with --league wncaab (basketball_wncaab, quarter + half segments).",
+    ),
     "ncaaf": SportSpec(
         slug="ncaaf",
         source_repo_name="NCAAFCompare",
@@ -2594,7 +2647,7 @@ def _generation_payload(spec: SportSpec, *, execution_mode: str, source_root: Pa
             "source_repo": str(source_root),
             "steps": [],
         }
-    if execution_mode == "source" and spec.slug == "ncaab":
+    if execution_mode == "source" and spec.slug in {"ncaab", "wncaab"}:
         return {
             "kind": "local_raw_outputs",
             "source_dependency": "local_raw_outputs",
@@ -2633,7 +2686,7 @@ def _ingestion_payload(spec: SportSpec, *, skip_mirror: bool, execution_mode: st
     source_dependency = "source_repo_artifacts"
     if execution_mode == "ingest" and _ingest_is_hosted_safe(spec):
         source_dependency = "local_artifacts"
-    elif execution_mode == "source" and spec.slug == "ncaab":
+    elif execution_mode == "source" and spec.slug in {"ncaab", "wncaab"}:
         source_dependency = "local_artifacts"
     elif execution_mode == "source" and spec.slug in {"mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "soccer"}:
         source_dependency = "local_artifact_bundle"
@@ -3371,7 +3424,8 @@ def _in_play_only_scope(args: argparse.Namespace, sport: str) -> bool:
     a pregame or `all` run is never in-play only. SYNDICATE_NBA_IN_PLAY_ONLY=0 turns it off."""
     # NCAAB joins 2026-11-02 (lane `ncaab-board-slate`, user "Build it now"): the same forced live-phase run, launched
     # by `ncaab/inplay_lane.py`. SYNDICATE_NCAAB_IN_PLAY_ONLY=0 turns NCAAB's off without touching NBA's.
-    off_switch = {"nba": "SYNDICATE_NBA_IN_PLAY_ONLY", "ncaab": "SYNDICATE_NCAAB_IN_PLAY_ONLY"}.get(sport)
+    off_switch = {"nba": "SYNDICATE_NBA_IN_PLAY_ONLY", "ncaab": "SYNDICATE_NCAAB_IN_PLAY_ONLY",
+                  "wncaab": "SYNDICATE_WNCAAB_IN_PLAY_ONLY"}.get(sport)
     if off_switch is None:
         return False
     if str(os.environ.get(off_switch) or "").strip().lower() in {"0", "false", "no", "off"}:
@@ -3508,7 +3562,7 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
         generation_mode = "local_artifact_bundle"
     if execution_mode == "source" and spec.slug in {"ncaaf", "nhl", "nba", "wnba", "soccer"}:
         generation_mode = "local_artifact_bundle"
-    elif execution_mode == "source" and spec.slug == "ncaab":
+    elif execution_mode == "source" and spec.slug in {"ncaab", "wncaab"}:
         generation_mode = "local_raw_outputs"
 
     sport_result: dict[str, Any] = {
@@ -3679,7 +3733,7 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
     # nothing on disk worth syncing in that case.
     sport_had_a_successful_step = any(bool(step.get("ok")) for step in sport_result["refresh_steps"])
     _log_memory("sport_step_post_append_before_post_refresh_check", sport=sport, execution_mode=execution_mode, sport_ok=bool(sport_result.get("ok")), sport_had_a_successful_step=sport_had_a_successful_step)
-    post_refresh_gate_entered = execution_mode == "source" and spec.slug in {"mlb", "nba", "wnba", "nhl", "nfl", "ncaab", "ncaaf", "soccer"} and sport_had_a_successful_step
+    post_refresh_gate_entered = execution_mode == "source" and spec.slug in {"mlb", "nba", "wnba", "nhl", "nfl", "ncaab", "wncaab", "ncaaf", "soccer"} and sport_had_a_successful_step
     if post_refresh_gate_entered:
         _log_memory("sport_step_post_append_enter_post_refresh_branch", sport=sport, execution_mode=execution_mode)
         _log_memory("sport_step_post_append_before_post_refresh_root", sport=sport, execution_mode=execution_mode)

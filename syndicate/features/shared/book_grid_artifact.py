@@ -851,7 +851,7 @@ def read_book_grid_artifact(sport: str, date_str: str) -> dict[str, Any] | None:
 # ---------------------------------------------------------------------------
 
 INPLAY_OVERLAY_VERSION = 1
-INPLAY_OVERLAY_SPORTS: tuple[str, ...] = ("mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "soccer")
+INPLAY_OVERLAY_SPORTS: tuple[str, ...] = ("mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "wncaab", "soccer")
 _INPLAY_OFF_VALUES = frozenset({"off", "0", "false", "no", "disabled"})
 # (sport, date) -> (generated_at, rows): the latest build's in-play rows, held
 # between `build_book_grid_artifact` and `write_book_grid_artifact`. One entry

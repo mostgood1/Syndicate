@@ -171,6 +171,7 @@ _SLATE_WINDOW_DAYS = {
     # cheap, per this table's own rule.
     "ncaaf": 7,
     "ncaab": 1,
+    "wncaab": 1,
     # Soccer's own board has been week-scoped since 2026-07-24 for a reason its
     # module records: the odds feed is a single rolling file covering every
     # upcoming fixture days ahead of kickoff, and one date's recommendations

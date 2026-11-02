@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ page_title or 'WNCAAB Game Cards' }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='shared/standalone_shell.css', v=asset_version) }}" />
+  <link rel="stylesheet" href="/wnba/styles.css?v={{ asset_version }}" />
+  <link rel="stylesheet" href="/wnba/cards-parity.css?v={{ asset_version }}" />
+  {% if embed_mode %}
+  <style>
+    .cards-app-shell--embed {
+      background: transparent;
+    }
+
+    .cards-app-shell--embed .site-chrome,
+    .cards-app-shell--embed .site-main,
+    .cards-app-shell--embed .cards-shell {
+      padding: 0;
+      margin: 0;
+      max-width: none;
+    }
+
+    .cards-app-shell--embed .cards-header,
+    .cards-app-shell--embed .cards-control-card {
+      display: none;
+    }
+  </style>
+  {% endif %}
+</head>
+<body data-cards-base-path="/wncaab/cards" data-cards-payload-path="/wncaab/api/source/cards" data-cards-api-base-path="/wncaab/api" data-cards-query-suffix="" class="cards-body cards-app-shell{% if embed_mode %} cards-app-shell--embed{% endif %}">
+  {% if not embed_mode %}
+  {% with active_sport_slug='wncaab', active_sport_name='WNCAAB' %}
+    {% include 'shared/_standalone_app_header.html' %}
+  {% endwith %}
+  {% endif %}
+  <div class="site-chrome">
+    <main class="site-main">
+      <div class="cards-shell cards-page-shell">
+        {% if not embed_mode %}
+        <header class="cards-header">
+          <div class="cards-title-row">
+            <h1>{{ page_heading or 'WNCAAB Game Cards' }}</h1>
+            <div class="cards-header-meta" id="cardsHeaderMeta">Loading slate...</div>
+          </div>
+        </header>
+
+        <section class="cards-control-card" aria-label="Slate controls">
+          <form id="controls" class="cards-date-form" onsubmit="return false;">
+            <a class="cards-nav-pill" id="cardsPrevDateLink" href="/wncaab/cards?date={{ prev_date or date }}" rel="prev">Prev</a>
+            <span class="cards-nav-pill cards-form-pill" aria-hidden="true">Date</span>
+            <input type="date" id="datePicker" aria-label="Select slate date" title="Select slate date" />
+            <button type="button" id="applyBtn">Load</button>
+            <a class="cards-nav-pill" id="cardsNextDateLink" href="/wncaab/cards?date={{ next_date or date }}" rel="next">Next</a>
+            <a class="cards-nav-pill" href="/wncaab/market-board?date={{ date }}">Market Board</a>
+            <a class="cards-nav-pill" href="/intelligence?sport=wncaab">Betting Board</a>
+                    <a class="cards-nav-pill" href="/ncaab/cards?date={{ date }}">NCAAB (Men)</a>
+          </form>
+
+          <div class="cards-toolbar-rail">
+            <div class="cards-source-meta" id="cardsSourceMeta">Loading slate...</div>
+            <div class="cards-filters" id="cardsFilters" aria-label="Slate filters"></div>
+          </div>
+        </section>
+        {% endif %}
+
+        <div id="note" class="alert hidden"></div>
+
+        <section class="cards-scoreboard" id="cardsScoreboard" aria-label="Games">
+          <div class="cards-loading-strip">Loading scoreboard...</div>
+        </section>
+
+        <main class="cards-grid" id="cardsGrid" aria-live="polite">
+          <div class="cards-loading-state">Loading cards...</div>
+        </main>
+      </div>
+    </main>
+  </div>
+
+  <script src="{{ url_for('static', filename='shared/polling.js', v=asset_version) }}"></script>
+  <script src="{{ url_for('static', filename='shared/sport_cards_utils.js', v=asset_version) }}"></script>
+  <script>
+    // The WNBA parity page's WNCAAB mode (`SPORT` in cards-parity.js): D1 slate
+    // + market consensus, no model, no live lens, no sim detail.
+    window.WNBACardsBootstrap = {
+      refreshPolicy: {{ refresh_policy|default({})|tojson }},
+      date: {{ date|tojson }},
+      sport: { key: 'wncaab', liveLens: false, simDetail: false, hasModel: false },
+    };
+  </script>
+  <script src="/wnba/cards-parity.js?v={{ asset_version }}"></script>
+</body>
+</html>

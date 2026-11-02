@@ -41,8 +41,8 @@ def data_root(tmp_path, monkeypatch):
         {**_row("totals", "80.5", {"over": -110, "under": -110}), "segment": "h1"},  # a half line stays out
     ]
     (grid / "book_grid_2026-11-02.json").write_text(json.dumps({"rows": rows}), encoding="utf-8")
-    monkeypatch.setattr(slate, "slate_games", lambda d, refresh=None: [dict(GAME)])
-    monkeypatch.setattr(source_cards, "slate_games", lambda d: [dict(GAME)])
+    monkeypatch.setattr(slate, "slate_games", lambda d, refresh=None, league="ncaab": [dict(GAME)])
+    monkeypatch.setattr(source_cards, "slate_games", lambda d, league="ncaab": [dict(GAME)])
     return tmp_path
 
 
@@ -74,7 +74,7 @@ def test_a_started_game_carries_score_clock_and_halves(data_root, monkeypatch):
             "away": {**GAME["away"], "score": 41}, "home": {**GAME["home"], "score": 38},
             "live_state": {"in_progress": True, "final": False, "period": 2, "clock": "12:34", "status": "12:34 - 2nd Half",
                            "away_linescores": [35, 6], "home_linescores": [30, 8]}}
-    monkeypatch.setattr(source_cards, "slate_games", lambda d: [live])
+    monkeypatch.setattr(source_cards, "slate_games", lambda d, league="ncaab": [live])
     card = source_cards.build_ncaab_source_cards_payload("2026-11-02")["games"][0]
     assert card["live_state"]["in_progress"] is True
     assert (card["live_state"]["away_pts"], card["live_state"]["home_pts"]) == (41, 38)

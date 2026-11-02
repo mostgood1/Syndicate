@@ -409,7 +409,7 @@ def _active_weekly_sports_for_date(selected_date: str) -> str:
     split existed in the first place.
     """
     active = {item.strip().lower() for item in _active_sports_for_date(selected_date).split(",") if item.strip()}
-    candidates = [sport for sport in ("nfl", "ncaaf", "ncaab") if sport in active]
+    candidates = [sport for sport in ("nfl", "ncaaf", "ncaab", "wncaab") if sport in active]
     try:
         from syndicate.features.shared.live_refresh_loop import _weekly_sport_claimed_by_fast_tick
 
@@ -7085,7 +7085,7 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
     # Decided ONCE, from the previous tick, before anything is built (lever 2b).
     live_cadence = _book_grid_live_cadence_active()
     for build_date in dates:
-        for sport in ("mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "soccer"):
+        for sport in ("mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "wncaab", "soccer"):
             if build_date in rebuild_only and sport not in rebuild_only[build_date]:
                 continue
             # `#565`. Skip the pairs no board will ever read, BEFORE the shard

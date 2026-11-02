@@ -117,6 +117,7 @@ def _default_syndicate_sports() -> list[dict[str, Any]]:
         {"slug": "nfl", "name": "NFL", "primary_href": "/nfl", "primary_label": "Open NFL cards"},
         {"slug": "ncaaf", "name": "NCAAF", "primary_href": "/ncaaf", "primary_label": "Open NCAAF cards"},
         {"slug": "ncaab", "name": "NCAAB", "primary_href": "/ncaab", "primary_label": "Open NCAAB cards"},
+        {"slug": "wncaab", "name": "WNCAAB", "primary_href": "/wncaab", "primary_label": "Open WNCAAB cards"},
         {"slug": "nhl", "name": "NHL", "primary_href": "/nhl", "primary_label": "Open NHL cards"},
         {"slug": "soccer", "name": "Soccer", "primary_href": "/soccer", "primary_label": "Open Soccer cards"},
     ]
@@ -346,6 +347,7 @@ _SPORT_KEYWORDS: dict[str, set[str]] = {
     "nfl": {"nfl", "football", "touchdown", "passing", "rushing", "receiving", "yards"},
     "ncaaf": {"ncaaf", "college football", "cfb", "touchdown", "passing", "rushing", "receiving", "yards"},
     "ncaab": {"ncaab", "college basketball", "cbb", "points", "rebounds", "assists", "threes"},
+    "wncaab": {"wncaab", "women's college basketball", "wcbb", "ncaaw"},
 }
 
 _PROP_MARKET_KEYWORDS = {

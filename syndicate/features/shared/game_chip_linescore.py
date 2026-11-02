@@ -509,11 +509,13 @@ def linescore(sport: str, game: Mapping[str, Any], date: str, *, away_abbr: str 
                 if got:
                     return got
             return _football(game)
-        if sport == "ncaab":
-            # Halves, from the per-period scores the D1 slate (`ncaab/slate.py`)
-            # already carries off ESPN's scoreboard -- no request per chip.
+        if sport in ("ncaab", "wncaab"):
+            # Halves (men) or quarters (women), from the per-period scores the D1 slate
+            # (`ncaab/slate.py`) already carries off ESPN's scoreboard -- no request per chip.
+            from syndicate.features.college_basketball.league import league_for
+
             live_state = game.get("live_state") if isinstance(game.get("live_state"), Mapping) else {}
-            return _periods(live_state.get("away_linescores") or [], live_state.get("home_linescores") or [], 2)
+            return _periods(live_state.get("away_linescores") or [], live_state.get("home_linescores") or [], league_for(sport).periods)
         if sport in _ESPN_PATHS and live:
             return _espn_linescore(sport, game, date, away_abbr, home_abbr)
         if sport in ("nba", "wnba"):

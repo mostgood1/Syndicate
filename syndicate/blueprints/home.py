@@ -6486,6 +6486,29 @@ class _NCAABDataProvider(_HomeSportDataProviderBase):
         return []
 
 
+class _WNCAABDataProvider(_HomeSportDataProviderBase):
+    """Women's college basketball (lane wncaab-module, 2026-11-02). The D1 slate IS the game list:
+    `ncaab/slate.py` with `league="wncaab"` -- ESPN's women's board cut to D1 vs D1, worker-refreshed,
+    web-read -- so chips, the home rail and Layer 1's game state read one list, as NCAAB's do. No
+    model and no prop feed yet; the props methods say so rather than borrowing another sport's."""
+
+    slug = "wncaab"
+
+    def is_active(self, *, today_value: str, context_label: str) -> bool:
+        return context_label == today_value
+
+    def games(self, context: SportContext, *, is_active_today: bool, include_upcoming: bool = False) -> list[dict[str, Any]]:
+        from syndicate.features.ncaab.slate import slate_games
+
+        return slate_games(context.context_label, league="wncaab")
+
+    def pregame_props(self, context: SportContext, home_games: list[dict[str, Any]], *, is_active_today: bool) -> list[dict[str, Any]]:
+        return []
+
+    def live_props(self, context: SportContext, home_games: list[dict[str, Any]], *, is_active_today: bool) -> list[dict[str, Any]]:
+        return []
+
+
 _ISO_DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 
@@ -7166,6 +7189,7 @@ for _provider in (
     _WNBADataProvider(),
     _NHLDataProvider(),
     _NCAABDataProvider(),
+    _WNCAABDataProvider(),
     _NFLDataProvider(),
     _NCAAFDataProvider(),
     _SoccerDataProvider(),

@@ -146,7 +146,7 @@ def test_web_reads_the_artifact_and_never_fetches(tmp_path, monkeypatch):
 
 def test_worker_refresh_writes_the_artifact_and_a_failed_fetch_keeps_the_last_one(tmp_path, monkeypatch):
     monkeypatch.setenv("SYNDICATE_DATA_ROOT", str(tmp_path))
-    monkeypatch.setattr(slate, "_d1_ids", lambda: D1)
+    monkeypatch.setattr(slate, "_d1_ids", lambda league="ncaab": D1)
     payload = {"events": [_event("30", _competitor("1", "A Team", "AAA", "away"), _competitor("2", "B Team", "BBB", "home"))]}
     art = slate.refresh_slate("2026-11-02", fetch_json=lambda url: payload)
     assert [g["event_id"] for g in art["games"]] == ["30"]

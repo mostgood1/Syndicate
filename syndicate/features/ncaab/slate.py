@@ -58,14 +58,23 @@ def _data_root() -> Path:
     return Path(__file__).resolve().parents[3] / "data"
 
 
-def slate_artifact_path(date_iso: str) -> Path:
-    return _data_root() / "ncaab_source" / "data" / "scoreboard" / f"scoreboard_{date_iso}.json"
+# ONE MODULE, BOTH COLLEGE LEAGUES (lane wncaab-module, 2026-11-02): every function takes `league`
+# (`ncaab` default, unchanged) -- women's college basketball reads ESPN's women's board, its own
+# registry, its own data dir and its own book grid through the same code.
+def _league(league: str):
+    from syndicate.features.college_basketball.league import league_for
+
+    return league_for(league)
 
 
-def _d1_ids() -> frozenset[str]:
+def slate_artifact_path(date_iso: str, league: str = "ncaab") -> Path:
+    return _data_root() / _league(league).data_dir / "data" / "scoreboard" / f"scoreboard_{date_iso}.json"
+
+
+def _d1_ids(league: str = "ncaab") -> frozenset[str]:
     from syndicate.features.shared.ncaab_team_registry import registry_rows
 
-    return frozenset(str(row.get("espn_id") or "").strip() for row in registry_rows() if str(row.get("espn_id") or "").strip())
+    return frozenset(str(row.get("espn_id") or "").strip() for row in registry_rows(league) if str(row.get("espn_id") or "").strip())
 
 
 def _score(value: Any) -> int | None:
@@ -151,16 +160,16 @@ def parse_scoreboard(payload: Any, *, d1_ids: frozenset[str]) -> tuple[list[dict
     return games, dropped
 
 
-def _team_key(name: Any) -> str | None:
+def _team_key(name: Any, league: str = "ncaab") -> str | None:
     try:
         from syndicate.features.shared.team_aliases import chip_join_key
 
-        return chip_join_key("ncaab", str(name or "")) or None
+        return chip_join_key(league, str(name or "")) or None
     except Exception:  # noqa: BLE001
         return None
 
 
-def _odds_feed_pairs(date_iso: str) -> set[tuple[str, str]]:
+def _odds_feed_pairs(date_iso: str, league: str = "ncaab") -> set[tuple[str, str]]:
     """(away key, home key) for every NCAAB game the book grid prices on this
     Central date or the next UTC one (an evening tip is tomorrow in UTC)."""
     from datetime import date, timedelta
@@ -168,7 +177,7 @@ def _odds_feed_pairs(date_iso: str) -> set[tuple[str, str]]:
     pairs: set[tuple[str, str]] = set()
     day = date.fromisoformat(date_iso)
     for d in (day, day + timedelta(days=1)):
-        path = _data_root() / "ncaab_source" / "data" / "book_grid" / f"book_grid_{d.isoformat()}.json"
+        path = _data_root() / _league(league).data_dir / "data" / "book_grid" / f"book_grid_{d.isoformat()}.json"
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
         except Exception:  # noqa: BLE001 -- no grid yet means no orientation evidence
@@ -177,7 +186,7 @@ def _odds_feed_pairs(date_iso: str) -> set[tuple[str, str]]:
         for row in rows or []:
             if not isinstance(row, Mapping):
                 continue
-            away, home = _team_key(row.get("away_team")), _team_key(row.get("home_team"))
+            away, home = _team_key(row.get("away_team"), league), _team_key(row.get("home_team"), league)
             if away and home:
                 pairs.add((away, home))
     return pairs
@@ -190,7 +199,7 @@ def _swap_sides(game: dict[str, Any]) -> dict[str, Any]:
     return {**game, "away": away, "home": home, "live_state": live, "matchup": f"{away['name']} @ {home['name']}"}
 
 
-def orient_neutral_site_games(games: list[dict[str, Any]], odds_pairs: set[tuple[str, str]]) -> tuple[list[dict[str, Any]], int]:
+def orient_neutral_site_games(games: list[dict[str, Any]], odds_pairs: set[tuple[str, str]], league: str = "ncaab") -> tuple[list[dict[str, Any]], int]:
     """At a NEUTRAL SITE, list home/away the way the odds feed does.
 
     "Home" at a neutral site is a label each vendor assigns, and ESPN and
@@ -209,7 +218,7 @@ def orient_neutral_site_games(games: list[dict[str, Any]], odds_pairs: set[tuple
     swapped = 0
     for game in games:
         if game.get("neutral_site") and odds_pairs:
-            direct = (_team_key(game["away"].get("name")), _team_key(game["home"].get("name")))
+            direct = (_team_key(game["away"].get("name"), league), _team_key(game["home"].get("name"), league))
             if direct not in odds_pairs and (direct[1], direct[0]) in odds_pairs:
                 out.append(_swap_sides(game))
                 swapped += 1
@@ -224,46 +233,47 @@ def _fetch_json(url: str) -> Any:
         return json.loads(response.read().decode("utf-8"))
 
 
-def refresh_slate(date_iso: str, *, fetch_json: Callable[[str], Any] = _fetch_json) -> dict[str, Any] | None:
+def refresh_slate(date_iso: str, *, fetch_json: Callable[[str], Any] = _fetch_json, league: str = "ncaab") -> dict[str, Any] | None:
     """Fetch, cut to D1 vs D1, write the artifact. None (and nothing written) on failure."""
     compact = date_iso.replace("-", "")
     try:
-        payload = fetch_json(SCOREBOARD_URL.format(compact=compact))
+        payload = fetch_json((SCOREBOARD_URL if league == "ncaab" else _league(league).scoreboard_url).format(compact=compact))
     except Exception as exc:  # noqa: BLE001 -- the last good artifact keeps serving
-        print(f"[ncaab_slate] FETCH_FAILED date={date_iso} error={type(exc).__name__}: {exc}", flush=True)
+        print(f"[ncaab_slate] FETCH_FAILED league={league} date={date_iso} error={type(exc).__name__}: {exc}", flush=True)
         return None
-    d1_ids = _d1_ids()
+    d1_ids = _d1_ids(league)
     if not d1_ids:
         # An empty registry would drop every game and write an empty slate that
         # looks exactly like a day off. Refuse instead.
-        print(f"[ncaab_slate] REGISTRY_EMPTY date={date_iso} -- not writing", flush=True)
+        print(f"[ncaab_slate] REGISTRY_EMPTY league={league} date={date_iso} -- not writing", flush=True)
         return None
     games, dropped = parse_scoreboard(payload, d1_ids=d1_ids)
-    games, reoriented = orient_neutral_site_games(games, _odds_feed_pairs(date_iso))
+    games, reoriented = orient_neutral_site_games(games, _odds_feed_pairs(date_iso, league), league)
     artifact = {
         "date": date_iso,
         "fetched_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "source": "espn_scoreboard_groups50",
+        "league": league,
         "games": games,
         "dropped_non_d1": dropped,
         "reoriented_neutral_site": reoriented,
     }
-    path = slate_artifact_path(date_iso)
+    path = slate_artifact_path(date_iso, league)
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_suffix(".json.tmp")
         tmp.write_text(json.dumps(artifact), encoding="utf-8")
         os.replace(tmp, path)
     except Exception as exc:  # noqa: BLE001
-        print(f"[ncaab_slate] WRITE_FAILED date={date_iso} error={type(exc).__name__}: {exc}", flush=True)
+        print(f"[ncaab_slate] WRITE_FAILED league={league} date={date_iso} error={type(exc).__name__}: {exc}", flush=True)
     return artifact
 
 
 _read_cache: dict[str, tuple[float, dict[str, Any] | None]] = {}
 
 
-def read_slate(date_iso: str) -> dict[str, Any] | None:
-    path = slate_artifact_path(date_iso)
+def read_slate(date_iso: str, league: str = "ncaab") -> dict[str, Any] | None:
+    path = slate_artifact_path(date_iso, league)
     try:
         mtime = path.stat().st_mtime
     except OSError:
@@ -286,21 +296,21 @@ def _is_worker() -> bool:
     return is_worker()
 
 
-def slate_games(date_iso: str, *, refresh: bool | None = None) -> list[dict[str, Any]]:
+def slate_games(date_iso: str, *, refresh: bool | None = None, league: str = "ncaab") -> list[dict[str, Any]]:
     """The D1 games for a Central date. Refreshes (worker only) when the artifact is >60 s old."""
     date_value = str(date_iso or "").strip()[:10]
     if len(date_value) != 10:
         return []
     allowed = _is_worker() if refresh is None else refresh
-    current = read_slate(date_value)
+    current = read_slate(date_value, league)
     if allowed:
         age = None
         try:
-            age = time.time() - slate_artifact_path(date_value).stat().st_mtime
+            age = time.time() - slate_artifact_path(date_value, league).stat().st_mtime
         except OSError:
             pass
         if age is None or age > _REFRESH_AFTER_SECONDS:
-            current = refresh_slate(date_value) or current
+            current = refresh_slate(date_value, league=league) or current
     games = (current or {}).get("games")
     return [dict(game) for game in games] if isinstance(games, list) else []
 

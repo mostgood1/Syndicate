@@ -1209,6 +1209,8 @@ def _active_sports_for_date(date_str: str) -> str:
     # NCAAB: November – April
     if month >= 11 or month <= 4:
         active.append("ncaab")
+        # WNCAAB: the same November - April window (lane wncaab-module, 2026-11-02).
+        active.append("wncaab")
     # Soccer: 10 leagues combined span the full calendar year (MLS runs
     # Feb-Dec, European leagues run Aug-May); always active.
     active.append("soccer")

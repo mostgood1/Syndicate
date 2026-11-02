@@ -32,6 +32,7 @@ from syndicate.blueprints.ops_steam import ops_steam_bp
 from syndicate.blueprints.nfl import nfl_bp
 from syndicate.blueprints.nhl import nhl_bp
 from syndicate.blueprints.ncaab import ncaab_bp
+from syndicate.blueprints.wncaab import wncaab_bp  # lane wncaab-module (user-approved loan, 2026-11-02)
 from syndicate.blueprints.ncaaf import ncaaf_bp
 from syndicate.blueprints.nba import nba_bp
 from syndicate.blueprints.mlb import mlb_bp
@@ -435,6 +436,24 @@ def create_app() -> Flask:
                 },
             },
             {
+                # Lane wncaab-module (user-approved loan of this file, 2026-11-02).
+                "slug": "wncaab",
+                "name": "WNCAAB",
+                "status": "Active build",
+                "phase": "D1 slate + market consensus cards, game chips, Layer 1/Layer 2 boards",
+                "summary": "Women's college basketball runs on the shared college-basketball code: ESPN's D1 slate, OddsAPI basketball_wncaab capture, the parity cards page and the shared market board.",
+                "primary_href": "/wncaab",
+                "primary_label": "Open WNCAAB cards",
+                "surfaces": ["cards", "market board"],
+                "next_step": "Pregame and live sims on the native engine (four 10-minute quarters).",
+                "runtime_contract": {
+                    "dependency_tier": "artifact_backed",
+                    "ownership_goal": "syndicate_owned",
+                    "source_of_truth": "Worker-written D1 slate + OddsAPI quote log",
+                    "fallback_surfaces": [],
+                },
+            },
+            {
                 "slug": "soccer",
                 "name": "Soccer",
                 "status": "Active migration",
@@ -494,6 +513,7 @@ def create_app() -> Flask:
     app.register_blueprint(wnba_bp)
     app.register_blueprint(ncaaf_bp)
     app.register_blueprint(ncaab_bp)
+    app.register_blueprint(wncaab_bp)
     app.register_blueprint(soccer_bp)
     app.register_blueprint(sports_bp)
     app.register_blueprint(model_scorecard_bp)

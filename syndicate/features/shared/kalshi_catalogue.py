@@ -754,6 +754,11 @@ _SEGMENT_TIE = re.compile(
 # women's rebounds off a men's box score. Longest-first, and WNBA before NBA.
 _SPORT_TOKENS: tuple[tuple[str, str], ...] = (
     ("NCAAF", "ncaaf"),
+    # Women's college basketball BEFORE `NCAAB` (lane wncaab-module, 2026-11-02): this is a substring
+    # scan, so a ticker like `KXWNCAAB...` would otherwise read as men's -- the same reason WNBA sits
+    # before NBA. Classification only; no WNCAAB series is registered and nothing is paired.
+    ("NCAAWB", "wncaab"),
+    ("WNCAAB", "wncaab"),
     ("NCAAB", "ncaab"),
     ("WNBA", "wnba"),
     ("NBA", "nba"),

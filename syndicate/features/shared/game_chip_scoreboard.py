@@ -25,7 +25,7 @@ from typing import Any
 from syndicate.features.shared.live_gameline_score import LEVEL_FINAL_IS_A_BAD_ROW
 from syndicate.features.shared.timezone import CENTRAL_TIMEZONE, central_today_iso
 
-_BASKETBALL_SPORTS = {"nba", "wnba", "ncaab"}
+_BASKETBALL_SPORTS = {"nba", "wnba", "ncaab", "wncaab"}
 _FOOTBALL_SPORTS = {"nfl", "ncaaf"}
 
 _CACHE_TTL_SECONDS = 30.0
@@ -358,12 +358,13 @@ def _live_status_token(sport: str, game: dict[str, Any]) -> str | None:
     prefix = "Q" if sport in _BASKETBALL_SPORTS or sport in _FOOTBALL_SPORTS else "P"
     period = _text(live_state.get("period") or game.get("period") or live_state.get("quarter"))
     clock = _text(live_state.get("clock") or game.get("clock") or live_state.get("game_clock"))
-    if sport == "ncaab" and period.isdigit():
-        # College basketball plays two HALVES; ESPN's period 3+ is overtime.
-        # "Q2 12:34" for a second half was the NBA token on a sport without quarters.
-        number = int(period)
-        label = f"H{number}" if number <= 2 else ("OT" if number == 3 else f"{number - 2}OT")
-        return f"{label} {clock}".strip()
+    if sport in {"ncaab", "wncaab"} and period.isdigit():
+        # Men's college basketball plays two HALVES, women's four QUARTERS; ESPN's period after
+        # regulation is overtime. "Q2 12:34" for a men's second half was the NBA token on a sport
+        # without quarters, and "Q5" would be a women's overtime.
+        from syndicate.features.college_basketball.league import league_for
+
+        return f"{league_for(sport).period_label(int(period))} {clock}".strip()
     if period.isdigit():
         return f"{prefix}{period} {clock}".strip()
     for source in (live_state.get("status"), status.get("detailed"), game.get("detail")):
@@ -558,9 +559,15 @@ def _side_logo(sport: str, game: dict[str, Any], side: str) -> str | None:
     try:
         from syndicate.features.shared.team_logos import logo_url
 
-        return logo_url(sport, _side_name(game, side), _side_key(sport, game, side), _side_label(game, side))
+        found = logo_url(sport, _side_name(game, side), _side_key(sport, game, side), _side_label(game, side))
     except Exception:  # noqa: BLE001 -- a logo must never break a chip
-        return None
+        found = None
+    if found:
+        return found
+    # The game's OWN logo when the branding index has none -- women's college basketball has no branding
+    # snapshot, but its D1 slate carries ESPN's logo URL per side (lane wncaab-module).
+    container = game.get(side) if isinstance(game.get(side), dict) else {}
+    return _text(container.get("logo")) or None
 
 
 def _live_situation(game: dict[str, Any], status_token: str | None) -> str | None:
@@ -1001,6 +1008,7 @@ GAME_CHIP_DEFAULT_SPORTS: tuple[str, ...] = (
     "nfl",
     "ncaaf",
     "ncaab",
+    "wncaab",
     "soccer",
 )
 

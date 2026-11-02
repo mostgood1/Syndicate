@@ -17,6 +17,10 @@ from pathlib import Path
 from typing import Iterator, Tuple
 
 REGISTRY_PATH = Path(__file__).resolve().parent / "ncaab_team_registry.csv"
+# Women's college basketball (lane wncaab-module, 2026-11-02): the same ESPN shape, its own list --
+# 359 of 362 ids are shared with the men's; women's-only Queens/Lindenwood/Southern Indiana are IN
+# ESPN's women's list, so the men's supplement below does not apply to it.
+WNCAAB_REGISTRY_PATH = Path(__file__).resolve().parent / "wncaab_team_registry.csv"
 
 # DIVISION I PROGRAMMES ESPN'S TEAM LIST OMITS (2026-11-02). The CSV is ESPN's
 # `/teams?limit=1000`, which returns 362 programmes and not these three -- yet
@@ -37,8 +41,12 @@ _D1_MISSING_FROM_ESPN_TEAM_LIST: tuple[dict[str, str], ...] = (
 )
 
 
-@lru_cache(maxsize=1)
-def registry_rows() -> tuple[dict[str, str], ...]:
+def _registry_path(league: str) -> Path:
+    return WNCAAB_REGISTRY_PATH if str(league).lower() == "wncaab" else REGISTRY_PATH
+
+
+@lru_cache(maxsize=4)
+def registry_rows(league: str = "ncaab") -> tuple[dict[str, str], ...]:
     """Every row of the committed registry, or an empty tuple if it is gone.
 
     An empty result here means THE FILE IS MISSING, which is a different fact
@@ -47,20 +55,23 @@ def registry_rows() -> tuple[dict[str, str], ...]:
     or truncated file fails a test instead of silently emptying the map.
     The supplement above is appended only to a registry that loaded.
     """
-    if not REGISTRY_PATH.exists():
+    path = _registry_path(league)
+    if not path.exists():
         return ()
     try:
-        with REGISTRY_PATH.open(encoding="utf-8", newline="") as handle:
+        with path.open(encoding="utf-8", newline="") as handle:
             rows = tuple(dict(row) for row in csv.DictReader(handle))
     except Exception:
         return ()
     if not rows:
         return ()
+    if str(league).lower() == "wncaab":
+        return rows
     present = {str(row.get("espn_id") or "") for row in rows}
     return rows + tuple(dict(row) for row in _D1_MISSING_FROM_ESPN_TEAM_LIST if row["espn_id"] not in present)
 
 
-def iter_team_alias_offers() -> Iterator[Tuple[str, str]]:
+def iter_team_alias_offers(league: str = "ncaab") -> Iterator[Tuple[str, str]]:
     """Yield ``(alias_token, canonical_school)`` for every name a feed may emit.
 
     CANONICAL IS THE SCHOOL, NOT THE DISPLAY NAME -- the same choice
@@ -74,7 +85,7 @@ def iter_team_alias_offers() -> Iterator[Tuple[str, str]]:
     handful that ARE unique, and it would put the collision policy in two
     places. Offer everything; let one collision pass decide.
     """
-    for row in registry_rows():
+    for row in registry_rows(league):
         school = str(row.get("school") or "").strip()
         if not school:
             continue

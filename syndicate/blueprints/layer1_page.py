@@ -24,7 +24,7 @@ from syndicate.features.shared.timezone import central_today_iso
 # production 2026-08-10 while `/api/board/book-grid` served them by parameter.
 # An out-of-season sport renders an empty board that says WHY (`#296`), which is
 # the correct answer and a different one from "no such page".
-LAYER1_SPORTS: tuple[str, ...] = ("mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "soccer")
+LAYER1_SPORTS: tuple[str, ...] = ("mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "wncaab", "soccer")
 
 
 def _selected_date() -> str:

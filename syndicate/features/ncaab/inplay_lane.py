@@ -41,13 +41,16 @@ from syndicate.features.shared.timezone import central_today_iso
 _LIVE_AFTER_TIP_SECONDS = 3 * 3600
 
 
-def ncaab_live_refresh_enabled() -> bool:
-    raw = str(os.environ.get("SYNDICATE_ENABLE_NCAAB_LIVE_REFRESH_AUTORUN") or "").strip().lower()
+# BOTH COLLEGE LEAGUES (lane wncaab-module, 2026-11-02): every switch, lane name, status file and log tag
+# is keyed by league -- `ncaab` keeps exactly the names it shipped with; women's college basketball gets
+# SYNDICATE_ENABLE_WNCAAB_LIVE_REFRESH_AUTORUN, lane `live-odds-worker-wncaab-live`, WNCAAB_LIVE_AUTORUN_*.
+def ncaab_live_refresh_enabled(league: str = "ncaab") -> bool:
+    raw = str(os.environ.get(f"SYNDICATE_ENABLE_{league.upper()}_LIVE_REFRESH_AUTORUN") or "").strip().lower()
     return raw not in {"0", "false", "no", "off"}
 
 
-def ncaab_live_refresh_interval_seconds() -> int:
-    raw = str(os.environ.get("SYNDICATE_NCAAB_LIVE_REFRESH_INTERVAL_SECONDS") or "").strip()
+def ncaab_live_refresh_interval_seconds(league: str = "ncaab") -> int:
+    raw = str(os.environ.get(f"SYNDICATE_{league.upper()}_LIVE_REFRESH_INTERVAL_SECONDS") or "").strip()
     try:
         value = int(raw or 240)
     except ValueError:
@@ -55,21 +58,21 @@ def ncaab_live_refresh_interval_seconds() -> int:
     return max(60, value)
 
 
-def ncaab_live_refresh_lane() -> str:
-    return str(os.environ.get("SYNDICATE_NCAAB_LIVE_REFRESH_LANE") or "").strip() or "live-odds-worker-ncaab-live"
+def ncaab_live_refresh_lane(league: str = "ncaab") -> str:
+    return str(os.environ.get(f"SYNDICATE_{league.upper()}_LIVE_REFRESH_LANE") or "").strip() or f"live-odds-worker-{league}-live"
 
 
-def _status_path() -> Path:
-    return reports_root() / "refresh_status" / "latest" / "ncaab_live_autorun_status.json"
+def _status_path(league: str = "ncaab") -> Path:
+    return reports_root() / "refresh_status" / "latest" / f"{league}_live_autorun_status.json"
 
 
-def ncaab_live_game_count(date_iso: str, *, now: datetime | None = None) -> int:
+def ncaab_live_game_count(date_iso: str, *, now: datetime | None = None, league: str = "ncaab") -> int:
     """D1 games in progress on the slate, or tipped < 3 h ago and not final."""
     from syndicate.features.ncaab.slate import read_slate
 
     moment = now or datetime.now(timezone.utc)
     count = 0
-    for game in (read_slate(date_iso) or {}).get("games") or []:
+    for game in (read_slate(date_iso, league) or {}).get("games") or []:
         live = game.get("live_state") if isinstance(game.get("live_state"), dict) else {}
         if live.get("final"):
             continue
@@ -97,31 +100,32 @@ def _is_contention(exc: Exception) -> bool:
     return isinstance(exc, ValueError) and "already active" in str(exc)
 
 
-def launch_autorun_ncaab_live_refresh() -> dict[str, Any] | None:
-    """One tick of the lane. Returns what it launched, or None."""
-    if not ncaab_live_refresh_enabled():
+def launch_autorun_ncaab_live_refresh(league: str = "ncaab") -> dict[str, Any] | None:
+    """One tick of the lane for `league` (`ncaab` / `wncaab`). Returns what it launched, or None."""
+    tag = league.upper()
+    if not ncaab_live_refresh_enabled(league):
         return None
     selected_date = central_today_iso()
-    live_games = ncaab_live_game_count(selected_date)
+    live_games = ncaab_live_game_count(selected_date, league=league)
     if live_games <= 0:
         return None
-    status_path = _status_path()
+    status_path = _status_path(league)
     last_status = read_json_file(status_path) or {}
     if last_status and not last_status.get("reported"):
         err = last_status.get("error")
-        print(f"[live_odds_worker] NCAAB_LIVE_AUTORUN_PREV date={last_status.get('date')} "
+        print(f"[live_odds_worker] {tag}_LIVE_AUTORUN_PREV date={last_status.get('date')} "
               + (f"FAILED {err}" if err else f"launched=ok runStamp={last_status.get('runStamp')}"), flush=True)
         try:
             write_json_file(status_path, {**last_status, "reported": True})
         except Exception:  # noqa: BLE001
             pass
     last_epoch = float(last_status.get("epoch") or 0.0)
-    if last_epoch > 0.0 and (time.time() - last_epoch) < float(ncaab_live_refresh_interval_seconds()):
+    if last_epoch > 0.0 and (time.time() - last_epoch) < float(ncaab_live_refresh_interval_seconds(league)):
         return None
     try:
         result = launch_refresh_run(
             date=selected_date,
-            sports="ncaab",
+            sports=league,
             phase="live",
             execution_mode="source",
             regions="us",
@@ -129,22 +133,27 @@ def launch_autorun_ncaab_live_refresh() -> dict[str, Any] | None:
             mode="fast",
             launch_mode="web_process",
             force_refresh=True,
-            force_refresh_sports="ncaab",
-            lane=ncaab_live_refresh_lane(),
+            force_refresh_sports=league,
+            lane=ncaab_live_refresh_lane(league),
         )
     except Exception as exc:  # noqa: BLE001
         if _is_contention(exc):
             # Keep the old epoch: the next tick retries instead of waiting a full interval.
-            write_json_file(status_path, {**last_status, "sports": "ncaab", "date": selected_date,
+            write_json_file(status_path, {**last_status, "sports": league, "date": selected_date,
                                           "error": f"{type(exc).__name__}: {exc}", "reported": False})
         else:
-            write_json_file(status_path, {"epoch": time.time(), "sports": "ncaab", "date": selected_date,
+            write_json_file(status_path, {"epoch": time.time(), "sports": league, "date": selected_date,
                                           "error": f"{type(exc).__name__}: {exc}"})
-        print(f"[live_odds_worker] NCAAB_LIVE_AUTORUN_FAILED {type(exc).__name__}: {exc}", flush=True)
+        print(f"[live_odds_worker] {tag}_LIVE_AUTORUN_FAILED {type(exc).__name__}: {exc}", flush=True)
         return None
     run_stamp = (result or {}).get("runStamp") or (result or {}).get("run_stamp")
-    write_json_file(status_path, {"epoch": time.time(), "sports": "ncaab", "date": selected_date,
+    write_json_file(status_path, {"epoch": time.time(), "sports": league, "date": selected_date,
                                   "runStamp": run_stamp, "live_games": live_games, "reported": False})
-    print(f"[live_odds_worker] NCAAB_LIVE_AUTORUN_LAUNCHED date={selected_date} phase=live mode=fast force=ncaab "
-          f"live_games={live_games} lane={ncaab_live_refresh_lane()} interval_s={ncaab_live_refresh_interval_seconds()}", flush=True)
+    print(f"[live_odds_worker] {tag}_LIVE_AUTORUN_LAUNCHED date={selected_date} phase=live mode=fast force={league} "
+          f"live_games={live_games} lane={ncaab_live_refresh_lane(league)} interval_s={ncaab_live_refresh_interval_seconds(league)}", flush=True)
     return {"date": selected_date, "live_games": live_games, "runStamp": run_stamp}
+
+
+def launch_autorun_wncaab_live_refresh() -> dict[str, Any] | None:
+    """Women's college basketball's in-play lane (lane wncaab-module): quarter + half lines for live games."""
+    return launch_autorun_ncaab_live_refresh("wncaab")

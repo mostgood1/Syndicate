@@ -32,6 +32,9 @@ WIRED = [
     ("basketball", "nba", "scripts/fetch_basketball_oddsapi_props_local.py", "segment_market_keys(league)", "_segment_for_market"),
     ("basketball-wnba", "wnba", "scripts/fetch_basketball_oddsapi_props_local.py", "segment_market_keys(league)", "_segment_for_market"),
     ("basketball-ncaab", "ncaab", "scripts/fetch_basketball_oddsapi_props_local.py", "segment_market_keys(league)", "_segment_for_market"),
+    # Women's college basketball (lane wncaab-module): NCAAB's game-line runner with `--league wncaab` asks quarter and
+    # half markets per event while each is open, and stores them under the shared segment names.
+    ("college-wncaab", "wncaab", "scripts/refresh_ncaab_odds_history.py", "_SEGMENT_WINDOWS_MINUTES", "_QUOTE_SEGMENT"),
     ("soccer", "soccer", "scripts/fetch_soccer_oddsapi_odds_local.py", 'segment_market_keys("soccer")', "_segment_market_map()"),
     ("nfl-team", "nfl", "scripts/fetch_nfl_team_odds_local.py", "_fetch_nfl_segments", "_nfl_segment_market_map()"),
     ("nfl-pre", "nfl", "scripts/fetch_nfl_preseason_odds.py", 'segment_market_keys("nfl")', "_nfl_segment_market_map()"),

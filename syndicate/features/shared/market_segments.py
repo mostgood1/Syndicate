@@ -54,6 +54,8 @@ SPORT_SEGMENTS: Mapping[str, tuple[str, ...]] = {
     # Halves only. College basketball does not play quarters, so a q1 request is
     # a credit spent to be told nothing exists.
     "ncaab": ("h1", "h2"),
+    # Women's college basketball plays four 10-minute quarters (lane wncaab-module, 2026-11-02).
+    "wncaab": ("q1", "q2", "q3", "q4", "h1", "h2"),
     "nfl": ("q1", "q2", "q3", "q4", "h1", "h2"),
     "ncaaf": ("q1", "q2", "q3", "q4", "h1", "h2"),
     "nhl": ("p1", "p2", "p3"),
