@@ -23,6 +23,23 @@ def _nba_rows(values: dict[str, tuple[float, float, float]], games: int = 82) ->
     return "".join(lines)
 
 
+def _clear_team_name_caches() -> None:
+    """The NCAAF tests resolve team names under THIS empty data root, and the
+    registry loaders behind `team_aliases` are process-wide lru_caches, so an empty
+    registry stayed cached for every later test in the pytest process:
+    test_venue_fanin_game_identity failed in fleet ci-suite chunk 2 on 11-02
+    ("the fan-in offers no club key for 'Troy Trojans'"). ci-suite #697."""
+    from syndicate.features.ncaaf import oddsapi_lines
+    from syndicate.features.shared import team_aliases
+
+    # NCAAF only. Clearing every team_aliases cache also emptied the soccer maps,
+    # which test_kalshi_event_scoped_codes then refilled from its stubbed branding.
+    for value in vars(oddsapi_lines).values():
+        if callable(getattr(value, "cache_clear", None)):
+            value.cache_clear()
+    team_aliases._ncaaf_alias_to_name.cache_clear()
+
+
 @pytest.fixture()
 def data_root(tmp_path, monkeypatch):
     monkeypatch.setenv("SYNDICATE_DATA_ROOT", str(tmp_path))
@@ -31,7 +48,9 @@ def data_root(tmp_path, monkeypatch):
     monkeypatch.delenv("SYNDICATE_MLB_DATA_ROOT", raising=False)
     se._CACHE.clear()
     se._TABLES_MEMO.clear()
-    return tmp_path
+    _clear_team_name_caches()
+    yield tmp_path
+    _clear_team_name_caches()
 
 
 def _write(path: Path, text: str, mtime: dt.date | None = None) -> Path:
