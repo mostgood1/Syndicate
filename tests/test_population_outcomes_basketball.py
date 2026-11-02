@@ -244,3 +244,43 @@ def test_the_college_scoreboard_asks_for_division_one(sport, path):
     settler._scoreboard(sport, "2026-11-02")
     assert urls[0] == (f"https://site.api.espn.com/apis/site/v2/sports/basketball/{path}/scoreboard"
                        "?dates=20261102&groups=50&limit=500")
+
+
+# --------------------------------------------------------------------------------------
+# At a neutral site "home" is a label: a swapped college basketball pair is ORIENTED.
+# --------------------------------------------------------------------------------------
+
+
+def _scoreboard_event(home, away, home_periods, away_periods, *, neutral):
+    def side(home_away, name, periods):
+        return {"homeAway": home_away, "team": {"id": name[:4], "displayName": name}, "score": str(sum(periods)),
+                "linescores": [{"value": float(v), "period": n} for n, v in enumerate(periods, start=1)]}
+    status = {"period": 2, "type": {"state": "post", "completed": True, "name": "STATUS_FINAL"}}
+    return {"id": "401911707", "date": "2026-03-01T16:30Z", "status": status,
+            "competitions": [{"neutralSite": neutral, "status": status, "competitors": [
+                side("home", home, home_periods), side("away", away, away_periods)]}]}
+
+
+def _half_row(sport="ncaab", **extra):
+    # The odds feed's orientation: Murray St at home. ESPN lists Tennessee St at home.
+    row = {"sport": sport, "market": "spreads", "segment": "h1", "side": "home", "line": -5.0, "player_name": None,
+           "home_team": "Murray St Racers", "away_team": "Tennessee St Tigers", "commence_time": "2026-03-01T16:30:00Z"}
+    row.update(extra)
+    return row
+
+
+@pytest.mark.parametrize("neutral,expected", [(True, ("win", "espn_linescore")), (False, (None, "home_away_disagree"))])
+def test_a_swapped_neutral_site_ncaab_game_is_oriented_and_a_swapped_home_game_still_refuses(neutral, expected):
+    """2026-11-02: 106 of 118 NCAAB half rows on the fleet refused `home_away_disagree`, all on
+    two neutral-site games. Murray St led the first half 46-35, so the record's home -5 wins."""
+    event = _scoreboard_event("Tennessee State Tigers", "Murray State Racers", [35, 29], [46, 48], neutral=neutral)
+    settler = espn.EspnPopulationSettler(fetch_json=lambda url: {"events": [event]})
+    assert settler.settle(_half_row()) == expected
+
+
+def test_neutral_site_orientation_is_college_basketball_only():
+    """NBA has no measured case; a swapped pair there keeps the refusal it always had."""
+    event = _scoreboard_event("Indiana Pacers", "Boston Celtics", [30, 28, 25, 22], [27, 33, 24, 30], neutral=True)
+    settler = espn.EspnPopulationSettler(fetch_json=lambda url: {"events": [event]})
+    row = _half_row(sport="nba", home_team="Boston Celtics", away_team="Indiana Pacers")
+    assert settler.settle(row) == (None, "home_away_disagree")

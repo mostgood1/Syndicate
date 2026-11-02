@@ -23,7 +23,8 @@ the game is found on ESPN's scoreboard for the kickoff's US-Eastern date(s)
 `team_aliases.canonical_team` for NFL and WNBA, and for NCAAF the registry
 (`ncaaf_team_registry.resolve_ncaaf_team_id`), never `teams_match` -- its prefix heuristic
 joins "Michigan" to "Michigan State". A pair that matches only swapped refuses
-(`home_away_disagree`); two matches refuse (`game_ambiguous`).
+(`home_away_disagree`) -- except a neutral-site NCAAB/WNCAAB game, which is oriented to
+the record (`_NEUTRAL_SITE_ORIENTED_SPORTS`); two matches refuse (`game_ambiguous`).
 
 FINALITY. `status.type.completed` is the authority. A game line on a segment settles once
 that segment's periods are behind the live period (`h2` and anything with overtime only at
@@ -158,6 +159,14 @@ _SCOREBOARD_EXTRA = {
     "ncaab": _COLLEGE_BASKETBALL_EXTRA,
     "wncaab": _COLLEGE_BASKETBALL_EXTRA,
 }
+# AT A NEUTRAL SITE "HOME" IS A LABEL, and ESPN and OddsAPI assign it differently. For
+# these sports a pair that matches only swapped, on an event ESPN marks `neutralSite`, is
+# ORIENTED to the record (its home side becomes ESPN's away side) instead of refused as
+# `home_away_disagree` -- the rule `ncaab/slate.py` applies to the board. Measured on the
+# fleet's 2026-11-02 NCAAB population: 106 of 118 half rows refused, every one on two
+# neutral-site games at the Sanford Pentagon (Tennessee St-Murray St, Northern
+# Kentucky-UTEP). A true home game swapped still refuses: there it is a join defect.
+_NEUTRAL_SITE_ORIENTED_SPORTS = frozenset({"ncaab", "wncaab"})
 _FETCH_TIMEOUT_SECONDS = 20.0
 
 FULL = "full"
@@ -433,6 +442,7 @@ def parse_scoreboard_events(payload: Any) -> list[dict[str, Any]] | None:
             "status_name": str(status_type.get("name") or ""),
             "detail": str(status_type.get("shortDetail") or status_type.get("detail") or ""),
             "period": period,
+            "neutral_site": bool(competition.get("neutralSite")),
             "home": sides["home"],
             "away": sides["away"],
         })
@@ -677,7 +687,7 @@ class EspnPopulationSettler:
 
         read_any = False
         exact: dict[str, dict[str, Any]] = {}
-        swapped = False
+        swapped: dict[str, dict[str, Any]] = {}
         for capture_date in kickoff_capture_dates(shaped.get("commence_time")):
             events = self._scoreboard(sport, capture_date)
             if events is None:
@@ -689,13 +699,18 @@ class EspnPopulationSettler:
                 if espn_home == home_key and espn_away == away_key:
                     exact[event["event_id"]] = event
                 elif espn_home == away_key and espn_away == home_key:
-                    swapped = True
+                    swapped[event["event_id"]] = event
         if len(exact) == 1:
             return next(iter(exact.values())), ""
         if len(exact) > 1:
             return None, R_GAME_AMBIGUOUS
         if not read_any:
             return None, R_SCOREBOARD_UNAVAILABLE
+        if len(swapped) == 1 and sport in _NEUTRAL_SITE_ORIENTED_SPORTS:
+            event = next(iter(swapped.values()))
+            if event.get("neutral_site"):
+                self.counters[f"oriented_neutral_site:{sport}"] += 1
+                return {**event, "home": event["away"], "away": event["home"]}, ""
         return None, R_HOME_AWAY if swapped else R_GAME_NOT_FOUND
 
     # -- game lines ------------------------------------------------------------------------
