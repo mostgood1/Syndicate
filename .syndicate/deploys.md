@@ -55655,3 +55655,66 @@ Read-only scheduled reading (task ncaab-1102-board-check). Readings 08:01:48Z-08
   - `b415303ee`: `basketball_scoring_events` refuses an explicit `scoringPlay: false`, and `college_live_line` drops a run whose rows add up to more than the card's score.
   - The web guard is live from the 21:22:29Z reload. At the 21:22:13Z baseline no live chip showed a run at all (`with_run 0`, so the bad line had already rolled off). The capture fix loads with the NEXT live-odds-worker restart; a wait loop is armed.
 - **refresh-worker:** it runs ff2a4b53c (college-basketball-settlement's restart, 20:35Z). It lacks 8e042af87 (neutral-site period orientation) and b415303ee (run guard) in its own chip build. Web re-derives both at serve time for live chips, so served chips are correct. Its next restart loads both.
+
+## 2026-11-02 21:37:46Z..23:06:26Z (3:37-5:06 PM CST) -- FLEET: narrator fix live (b415303ee) + ff f0baff0fa (college pregame sims) + ff d01b5916d (WNCAAB producers) + ff 70b2bdf09 (no second shrink + market anchor + WNCAAB engine path) -- **b415303ee MET; f0baff0fa MET then CORRECTED by 70b2bdf09 (refresh-worker restart + re-sim OWED); d01b5916d MET (crawl running)** (lane `wncaab-module`)
+
+### b415303ee (run narrator counts a miss as no points) -- live-odds-worker restart
+- **gates:** preflight CLEAR 21:36:47Z; claim re-acquired 21:37Z (exit 0); TERM pid 2923884 at 21:37:46Z; respawn pid 2941749 at 21:37:54Z.
+- **verify, MET:** momentum files at 21:38:13Z against ESPN's live D-I board at ~21:40Z. In all 5 live games the narrator's points are <= the live score, trailing by 0-2 (the capture is ~90 s old):
+  - SJSU 70 / UTSA 54 vs 70 / 56;
+  - NKU 79 / UTEP 71 vs 81 / 73;
+  - GMU 29 / UMBC 20 vs 29 / 24;
+  - OU 80 / UNC 67 vs 82 / 67;
+  - USC 29 / UNLV 15 vs 29 / 17.
+- Before the fix, USC @ UNLV read narrator 13 / 8 against a 3-5 score.
+
+### f0baff0fa (college pregame sims straight to the boards) -- ff 21:49:47Z + refresh-worker restart 21:51:02Z
+- **change:**
+  - `college_basketball/pregame_sim.py` + `scripts/build_college_pregame_sims.py`: the live tier's engine from the opening tip (`GameState()`), with the live tier's inputs and switches.
+  - `ncaab/inplay_lane.maybe_launch_pregame_sims`: one niced child of the live-odds-worker every 900 s.
+  - `shared/college_game_projections.py` + a `board_enrichment` ncaab/wncaab branch (user-approved loan).
+  - Trace doc: `docs/ai_context/college_pregame_sim.md`.
+  - Ride-alongs: ledger only (c8632ebaf, b0867ebb8, 190cdeab9).
+- **gates:**
+  - Web: CLEAR 21:49:34Z, baseline layer1 ncaab 11-03 rows_with_projection 0 of 20; `reload-web` 2.0 s, 0 failures.
+  - refresh-worker: claim 21:49Z; **no drain** (the 20:08-20:35Z drain had held board builds ~27 min during live games); preflight polled to CLEAR at 21:50:37Z (no board build in flight); TERM pid 2917669 at 21:51:02Z; respawn pid 2945323 at 21:51:08Z.
+- **producer:** run once by hand at 21:50Z with the live-odds-worker's env, nice 15. The launcher only starts at the next live-odds-worker restart, since that process predates f0baff0fa.
+  - 11-02: `pregame=112 simmed=102 refused=10 elapsed_s=1247.8`.
+  - 11-03: `pregame=19 simmed=18 refused=1`.
+  - Refusals are named (`team_has_no_player_priors`).
+- **verify, MET (read 22:22Z):**
+  - layer1 ncaab 11-02: **743 of 1017** rows carry a projection;
+  - 11-03: **14 of 20**;
+  - grid coverage `source=college_pregame_sim`, `games_with_sim_distribution=120`, `rows_with_edge=711`.
+  - My watcher reported TIMEOUT. That was a broken instrument (`enrichment` is a string; its parser crashed every pass), not a null result.
+- **FINDING -> corrected by 70b2bdf09, user decision "Fix + anchor":**
+  - Spread edges had a median of **-21.5 points** (h2h -9.3).
+  - Over 109 11-03 games, the sim's margins against the market's: **slope 0.51, correlation 0.90, mean |gap| 8.0 points** (mean margin 10.3 vs 17.2).
+  - Cause: last season's table is calibrated (`calibration_k` 0.78) and the opening-week fallback regressed it another 30% (~0.55 combined).
+  - Totals were sane: sim -1.0 points vs the line, median edge -2.8.
+- **SEPARATE FINDING (not traced):** on 11-02, 55 ncaab `totals` rows labelled `segment=full_game` carried half-game-sized lines (sim minus line +69). They look mislabelled upstream (in-play rows?). The join refuses most of them as certain (32 `every draw on one side`).
+
+### d01b5916d (WNCAAB `--league` for the ratings + player-priors producers) -- ff 22:07:58Z
+- Scripts only: no running role loads it. Preflight web CLEAR with `--no-expectation` (scripts-only ff). Ride-along: ledger 0a16e6e50.
+- **crawl** (`wncaab_crawl.sh`, nice 19, rate 4, data root `~/syndicate-prod/data/wncaab_source`):
+  - ratings `--season 2026` 22:08-23:07Z: `team_game_box_2026.csv` 11,771 rows;
+  - ratings `--season 2027` at 23:07:09Z: rc 0, `teams_rated=2` (only 11-01 is a fully final date so far);
+  - player box `--season 2026 --crawl-only` started 23:07:09Z (running); player priors `--season 2027` follows.
+- **verify, MET:** `team_ratings_2026_asof_*` and `team_ratings_2027_asof_20261101` written under `wncaab_source` (the men's `ncaab_source` is untouched).
+
+### 70b2bdf09 (no second shrink + market anchor + WNCAAB engine path) -- ff 23:06:26Z + `reload-web` 14.0 s, 0 failures
+- **change:**
+  - `live_team_model.prior_regression_for` / producer prior blend: a calibrated table is not regressed again.
+  - `college_game_projections`: spreads / h2h served via `blend_with_book` at `SYNDICATE_COLLEGE_MARGIN_MODEL_WEIGHT` (default 0 = the de-vigged fair, no model edge); totals raw.
+  - pregame `inputs_key` now carries the prior's targets.
+  - `basketball_engine.league.WNCAAB` + `league=` threaded through the team model and re-sim (ncaab default unchanged).
+  - The launcher runs both leagues, plus a daily women's input refresh. User-approved loans: board_enrichment, league.py, live_resim, live_team_model, player priors.
+  - Ride-along: ledger a6c7da4c3.
+- **gates:** claims web + refresh-worker re-acquired 23:05Z (exit 0); web CLEAR 23:05:55Z; baseline spreads full_game median edge **-21.7** (n=226) / h2h -9.8, read at 23:05:55Z.
+- **measured on the fleet code, 3 games, 100 sims:** prior margins moved x1.28-1.38 (expected 1/0.7 = 1.43): TENN 17.9 -> 24.3, UK 21.25 -> 29.4, DUQ 7.9 -> 10.1.
+- **OWED:**
+  - **refresh-worker restart** (loads the anchor in the board join): preflight loop armed 23:06Z. Verify: spreads `edge_vs_market_pct` median ~0 and `book_blend=applied`.
+  - **NCAAB re-sim** on the fixed prior, running since 23:06Z. Verify: new artifact entries' `provenance.pregameHomeMargin` larger; sim-vs-market slope re-measured (expected ~0.7).
+  - **live-odds-worker restart** (launcher for both leagues + live-tier prior fix). Verify: `COLLEGE_PREGAME_SIM_LAUNCHED leagues=ncaab,wncaab`.
+  - **WNCAAB pregame** once the priors crawl finishes. Verify: `pregame_sim_<date>.json` under `wncaab_source` with published > 0, and layer1 wncaab `rows_with_projection` > 0.
+- **claims:** live-odds-worker released (expired at 22:22Z); web + refresh-worker held under wncaab-module for the steps above.
