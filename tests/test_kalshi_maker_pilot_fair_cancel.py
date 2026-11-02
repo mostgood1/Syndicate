@@ -128,6 +128,47 @@ def test_the_same_pass_or_an_earlier_date_does_not_count_as_dropped():
     assert result["kept"] == 1 and cancels.ids == []
 
 
+# --------------------------------------------------------------------- after a restart
+
+def _other_pass(at, date=DATE):
+    """A plan pass that sends some OTHER Kalshi position of `date` at `at`."""
+    mp.note_plan_sighting(_req(position_key="pk-other", event_id="e2", selected_date=date,
+                               venue_ticker="KXNBATOTAL-26OCT30OTHER-220"), now=at)
+
+
+def test_a_post_made_before_the_restart_and_missing_from_a_later_pass_is_dropped(monkeypatch):
+    """2026-11-01: the two MLS posts left the plan after the 16:53Z restart and rested on to kickoff."""
+    monkeypatch.setattr(mp, "_BOOT_AT", T0.timestamp())
+    _other_pass(T0 + dt.timedelta(seconds=mp.PLAN_DROP_MARGIN_S + 60))
+    result, cancels = _review([_row(_req(), selected_date=DATE)],
+                              at=T0 + dt.timedelta(seconds=mp.PLAN_DROP_MARGIN_S + 90))
+    assert cancels.ids == ["ord-1"] and result["orders"][0]["reason"] == "plan_dropped"
+    assert result["unseen"] == 0
+
+
+def test_after_a_restart_only_a_pass_past_the_margin_counts(monkeypatch):
+    monkeypatch.setattr(mp, "_BOOT_AT", T0.timestamp())
+    _other_pass(T0 + dt.timedelta(seconds=60))
+    result, cancels = _review([_row(_req(), selected_date=DATE)], at=T0 + dt.timedelta(seconds=90))
+    assert result["unseen"] == 1 and cancels.ids == []
+
+
+def test_after_a_restart_an_undated_post_or_an_earlier_dated_pass_cancels_nothing(monkeypatch):
+    monkeypatch.setattr(mp, "_BOOT_AT", T0.timestamp())
+    _other_pass(T0 + dt.timedelta(seconds=mp.PLAN_DROP_MARGIN_S + 60), date="2026-10-29")
+    late = T0 + dt.timedelta(seconds=mp.PLAN_DROP_MARGIN_S + 90)
+    result, cancels = _review([_row(_req()), _row(_req(), selected_date=DATE, order_id="ord-2")], at=late)
+    assert result["unseen"] == 2 and cancels.ids == []
+
+
+def test_a_post_resent_after_the_restart_is_judged_on_its_sighting(monkeypatch):
+    monkeypatch.setattr(mp, "_BOOT_AT", T0.timestamp())
+    at = T0 + dt.timedelta(seconds=mp.PLAN_DROP_MARGIN_S + 60)
+    mp.note_plan_sighting(_req(), now=at)
+    result, cancels = _review([_row(_req(), selected_date=DATE)], at=at + dt.timedelta(seconds=30))
+    assert result["kept"] == 1 and cancels.ids == []
+
+
 def test_a_failed_cancel_leaves_the_post_and_says_so():
     mp.note_plan_sighting(_req(ev_pct=-4.0), now=T0)
     result, cancels = _review([_row(_req())], cancel=_Cancels(status="error"))

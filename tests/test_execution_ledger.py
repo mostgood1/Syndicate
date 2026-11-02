@@ -681,6 +681,8 @@ def test_a_phantom_fill_is_corrected_to_submitted(monkeypatch):
     assert fixed["fill_stake_dollars"] is None
     assert fixed["contracts"] == 0
     assert fixed["reconciled_from"] == mod.STATUS_FILLED
+    # The maker pilot dates a post it never saw (since a restart) by this field.
+    assert result["resting"][0]["selected_date"] == fixed["selected_date"]
 
 
 def test_a_resting_order_that_filled_later_is_booked(monkeypatch):
