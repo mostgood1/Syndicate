@@ -408,6 +408,12 @@ def basketball_scoring_events(
     for play_index, play in enumerate(plays):
         if not isinstance(play, dict):
             continue
+        # A MISS IS NOT POINTS. ESPN's college feeds carry the attempt's value in `scoreValue` on a missed
+        # shot too, flagged only by `scoringPlay: false` -- measured 2026-11-02 on USC @ UNLV (Q1, 3-5):
+        # the narrator summed USC 13, UNLV 8, and the chip read "USC on a 9-2 run". Only an explicit False
+        # is refused, so a feed without the flag reads as before.
+        if play.get("scoringPlay") is False:
+            continue
         try:
             points = int(play.get("scoreValue") or 0)
         except (TypeError, ValueError):

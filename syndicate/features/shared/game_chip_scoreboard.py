@@ -907,7 +907,9 @@ def _attach_college_line(chip: dict[str, Any], date_value: str) -> None:
     try:
         from syndicate.features.shared.game_chip_detail import college_live_line
 
-        line = college_live_line(chip["sport"], {"event_id": chip.get("game_key")}, _chip_day(chip, date_value))
+        scores = {str(side.get("abbr")): side.get("score") for side in (chip.get("away") or {}, chip.get("home") or {})
+                  if side.get("abbr") and side.get("score") not in (None, "")}
+        line = college_live_line(chip["sport"], {"event_id": chip.get("game_key")}, _chip_day(chip, date_value), scores)
         # A run that has ended or a bonus that has reset must not outlive the file that stated it.
         kept = [p for p in str(chip.get("situation") or "").split(" · ") if p and " run" not in p and "bonus" not in p]
         chip["situation"] = line or (" · ".join(kept) or None)

@@ -398,18 +398,50 @@ def _basketball_run_text(sport: str, game: Mapping[str, Any], day: str | None) -
     return f"{run[0]} on a {run[1]}–{run[2]} run" if run else None
 
 
-def college_live_line(sport: str, game: Mapping[str, Any], day: str | None) -> str | None:
+def _narrator_exceeds_score(narrator: Any, scores: Mapping[str, Any] | None) -> bool:
+    """True when a team's narrator points exceed its score on the card.
+
+    The narrator lags the score (it is as old as the last capture), so it can trail the card but never
+    lead it. Leading means the rows are wrong -- 2026-11-02 they counted missed shots -- and a run built on
+    them must not be shown."""
+    if not scores:
+        return False
+    totals: dict[str, float] = {}
+    for row in narrator or []:
+        if isinstance(row, Mapping) and row.get("type") == "points" and row.get("team"):
+            totals[str(row["team"])] = totals.get(str(row["team"]), 0.0) + (_num(row.get("weight")) or 0.0)
+    for team, total in totals.items():
+        score = _num(scores.get(team))
+        if score is not None and total > score:
+            return True
+    return False
+
+
+def college_live_line(sport: str, game: Mapping[str, Any], day: str | None,
+                      scores: Mapping[str, Any] | None = None) -> str | None:
     """"UCSD on a 9–2 run · WASH in bonus" for a live NCAAB / WNCAAB game, or None.
 
     Both parts come from the momentum file `college_basketball/momentum_capture.py` writes on the
     live-odds-worker (the run from the scoring narrator, the bonus from team fouls it counted in the
-    play-by-play), so the chip build and the serve-time re-read say the same thing."""
+    play-by-play), so the chip build and the serve-time re-read say the same thing. `scores`
+    ({tri: points}) drops a run whose rows add up to more than the card's score."""
     entry = _momentum_entry(sport, game, day)
     if entry is None:
         return None
-    run = basketball_run(entry.get("narrator"))
+    narrator = entry.get("narrator")
+    run = None if _narrator_exceeds_score(narrator, scores) else basketball_run(narrator)
     parts = [f"{run[0]} on a {run[1]}–{run[2]} run" if run else None, entry.get("bonus") or None]
     return " · ".join(str(p) for p in parts if p) or None
+
+
+def _college_scores(game: Mapping[str, Any]) -> dict[str, Any]:
+    """{tri: score} from a slate game's sides (`ncaab/slate.py`: away/home carry `abbr` and `score`)."""
+    out = {}
+    for side in ("away", "home"):
+        team = game.get(side) if isinstance(game.get(side), Mapping) else {}
+        if team.get("abbr") and team.get("score") not in (None, ""):
+            out[str(team["abbr"])] = team["score"]
+    return out
 
 
 def live_detail(sport: str, game: Mapping[str, Any], start_utc: datetime | None = None, labels: Mapping[str, str] | None = None) -> str | None:
@@ -475,7 +507,7 @@ def live_detail(sport: str, game: Mapping[str, Any], start_utc: datetime | None 
             # Bonus has no source (no foul events are captured); the run does.
             return _basketball_run_text(sport, game, _ct_date(start_utc))
         if sport in {"ncaab", "wncaab"}:
-            return college_live_line(sport, game, _ct_date(start_utc))
+            return college_live_line(sport, game, _ct_date(start_utc), _college_scores(game))
         if sport == "nhl":
             sog_h, sog_a = _num(live.get("home_sog")), _num(live.get("away_sog"))
             if sog_h is not None and sog_a is not None:

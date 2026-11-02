@@ -81,6 +81,25 @@ def test_capture_writes_the_file_the_chip_reads(tmp_path, monkeypatch):
     assert live_detail("ncaab", {"event_id": "401"}, start) is None  # each league reads its own file
 
 
+def test_a_missed_shot_is_not_points_and_a_run_never_outruns_the_score(tmp_path, monkeypatch):
+    # Measured 2026-11-02 USC @ UNLV, Q1 3-5: college feeds carry `scoreValue` on misses (`scoringPlay: false`),
+    # the narrator summed USC 13 / UNLV 8, and the chip read "USC on a 9–2 run".
+    from syndicate.features.shared.basketball_momentum import basketball_scoring_events
+
+    miss = {**_play(AWAY[0], 1, "7:30", points=0), "scoreValue": 3, "scoringPlay": False}
+    rows = basketball_scoring_events(_summary([_play(HOME[0], 1, "8:00", points=2), miss], 1), league_code="wncaab")
+    assert [(r["team"], r["weight"]) for r in rows] == [("WASH", 2.0)]
+    # A feed without the flag still counts its points.
+    unflagged = {k: v for k, v in _play(AWAY[0], 1, "7:00", points=3, attempted=3).items() if k != "scoringPlay"}
+    assert len(basketball_scoring_events(_summary([unflagged], 1), league_code="wncaab")) == 1
+
+    # Read-time guard: rows that add up to more than the card's score never become a run.
+    monkeypatch.setenv("SYNDICATE_DATA_ROOT", str(tmp_path))
+    mc.capture_once("wncaab", "2026-11-02", event_ids=["401"], fetch_summary=lambda eid: _run_summary(), out_root=tmp_path)
+    assert college_live_line("wncaab", {"event_id": "401"}, "2026-11-02", {"UCSD": 3, "WASH": 2}) == "UCSD in bonus"
+    assert college_live_line("wncaab", {"event_id": "401"}, "2026-11-02", {"UCSD": 9, "WASH": 2}) == "UCSD on a 9–2 run · UCSD in bonus"
+
+
 def test_capture_with_no_live_game_writes_nothing(tmp_path):
     assert mc.capture_once("ncaab", "2026-11-02", event_ids=[], out_root=tmp_path) == {"league": "ncaab", "live": 0, "written": False}
     assert not any(tmp_path.rglob("*.json"))
