@@ -649,6 +649,14 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Result: GOAL MET. owner_liveness.py --idle-min 240 gave SAFE for 1 of 9 CLOSED blocks; moved `closed-lane-archive-20261102-0701` (owner 7e1d55bb idle 334m, block last modified 337m). 8 deferred; table and Part B in log/2026-11-02.md.
 
+### college-basketball-settlement — OPEN — opened 2026-11-02 — session 911dbcee-3893-4ca0-993f-3d78598b80f0
+- Goal: NCAAB and WNCAAB paper bets settle: bet_status_ncaab / bet_status_wncaab grade full-game h2h/spreads/totals and segments (men h1/h2, women q1..q4/h1/h2) from ESPN finals (groups=50&limit=500), wired into paper_settlement._default_resolver; the model scorecard's ESPN settler handles wncaab and grades NCAAB halves correctly; deployed to the fleet and a 2026-11-02 NCAAB paper bet reads settled with the right win/loss against ESPN's final
+- Files: syndicate/features/shared/bet_status_ncaab.py (NEW), syndicate/features/shared/bet_status_wncaab.py (NEW), tests/test_bet_status_college_basketball.py (NEW), syndicate/features/shared/paper_settlement.py (_default_resolver ncaab/wncaab entries only), tests/test_paper_settlement.py (traded-sports pin only), syndicate/features/shared/population_outcomes_espn.py (HANDLED_SPORTS / paths / scoreboard extras / college halves segment pair only), syndicate/features/shared/population_outcomes.py (espn SETTLER_MODULES row only), scripts/publish_model_scorecard.py (SEASON_WINDOWS only), scripts/bucket_search.py (SPORTS tuple only), tests/test_population_outcomes_basketball.py (ncaab halves + wncaab tests only)
+- Hypothesis: n/a (build): NCAAB paper orders read no_resolver_for_ncaab (measured on the fleet 2026-11-02 ~19:3xZ: 2 ncaab paper orders on 11-02, both bovada h2h, unavailable_reason=no_resolver_for_ncaab)
+- Falsification test: After deploy, the 11-02 NCAAB orders still carry no outcome once ESPN reports their games final, or carry an outcome that disagrees with ESPN's final
+- Verification: Fleet after deploy: settlement for 2026-11-02 grades both NCAAB orders (Richmond vs UNC Asheville, Yale vs Howard) with outcome matching ESPN's final; scorecard grades ncaab rows; deploys.md entry
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
