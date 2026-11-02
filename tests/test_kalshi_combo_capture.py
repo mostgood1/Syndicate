@@ -314,6 +314,28 @@ def test_the_budget_stops_between_slices_and_the_next_run_resumes(tmp_path):
     assert len({r["ticker"] for r in _stored(tmp_path)}) == 12 and first
 
 
+def test_a_slice_denser_than_a_whole_run_narrows_the_next_one_instead_of_repeating(tmp_path, monkeypatch):
+    # 11-01 22:03Z.. on the fleet: one KXMVECROSSCATEGORY0 slice needed more than a run's 900 pages, was discarded
+    # each time, and was retried at the same span for 19 runs.
+    monkeypatch.setattr(cc, "TARGET_SLICE_PAGES", 2)
+    end = T0 - cc.SETTLE_LAG_S
+    combos = [_combo(f"KXMVECROSSCATEGORY-S1-{i}", NBA_SGP_LEGS, end - 20 * i - 1) for i in range(40)]
+    fake = FakeKalshi(combos, page_size=1)
+    first = _run(tmp_path, fake, T0, lookback_s=900, max_pages=10)
+    state = json.loads((cc.store_dir(tmp_path) / "state.json").read_text())["series"]["KXMVECROSSCATEGORY"]
+    assert first["status"] == "budget_stopped" and first["pages"] == 10 and not _stored(tmp_path)
+    assert state.get("swept_to") is None and state["pages_per_s"] == pytest.approx(10 / 900)
+    fake.calls.clear()
+    second = _run(tmp_path, fake, T0, lookback_s=900, max_pages=10)
+    spans = [c[1]["max_settled_ts"] - c[1]["min_settled_ts"] for c in fake.calls if c[0] == "/markets"]
+    assert spans[0] == 180  # 2 pages / (10 pages / 900 s), not the 900 s that cannot be finished
+    state = json.loads((cc.store_dir(tmp_path) / "state.json").read_text())["series"]["KXMVECROSSCATEGORY"]
+    assert second["series"]["KXMVECROSSCATEGORY"]["slices"] >= 1 and state["swept_to"] > end - 900
+    for _ in range(10):
+        _run(tmp_path, fake, T0, lookback_s=900, max_pages=10)
+    assert len({r["ticker"] for r in _stored(tmp_path)}) == 40
+
+
 def test_interval_series_are_read_at_most_every_interval(tmp_path):
     series = {"KXMVECROSSCATEGORY": (900, 0), "KXMVENBASINGLEGAME": (21600, 21600)}
     fake = FakeKalshi([])

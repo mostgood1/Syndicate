@@ -788,12 +788,20 @@ def _run_locked(root: Path, *, get, now, lookback_s, max_pages, max_seconds, ser
             # Stop BEFORE a slice the budget cannot finish: a slice cut short is discarded, pages and all.
             if not budget.allow(int(st.get("last_slice_pages") or 1)):
                 break
+            before = budget.pages
             try:
                 # An untraded finalized combo's quote is zeroed: it carries no price, so it is tallied, not stored.
                 rows, stats = sweep_window(counting, name, lo, hi, budget=budget, captured_at=captured_at,
                                            page_cap=page_cap, keep_untraded=store_untraded,
                                            trades_max_legs=trades_max_legs, trades_shapes=trades_shapes)
             except BudgetStop:
+                # The pages a cut-short slice spent are a floor on its density, so the next run reads a narrower one.
+                # Without it a slice denser than a whole run is retried at the same span forever: KXMVECROSSCATEGORY0
+                # spent all 900 pages on one 2,834 s slice in each of 19 runs from 11-01 22:03Z, and being swept
+                # before KXMVECROSSCATEGORY, stalled that series too (lane `e4-pregame-prints`).
+                spent = budget.pages - before
+                if spent:
+                    st["pages_per_s"] = max(density, spent / (hi - lo + 1))
                 break
             except (SliceUnreadable, SliceTooLarge) as exc:
                 summary["errors"].append(f"{type(exc).__name__}: {exc}")
