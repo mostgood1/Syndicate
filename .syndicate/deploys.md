@@ -55547,3 +55547,20 @@ Read-only scheduled reading (task ncaab-1102-board-check). Readings 08:01:48Z-08
   - **live re-sim:** `NCAAB_LIVE_RESIM_TICK live=4 resimmed=1 refused=3 {'regulation_over': 1, 'team_unrated': 2}` 18:30:37Z; `live=3 resimmed=1 refused=2 {'team_unrated': 2}` 18:32:44Z (was resimmed=0 on every tick today). The 2 refusals are D1 vs NON-D1 (Morris @ South Carolina St, North American @ Nicholls: the non-D1 side has no rating anywhere -- correct, user "only D1"); the one D1-vs-D1 live game (Murray St @ Tennessee St) is rated via `prior_season_fallback=True` with player priors both sides.
   - credits: `by_sport.ncaab` 7,299 at 18:32:52Z (7,244 at 16:49:52Z).
   - **verify OWED (evening slate, ~23:00Z on):** (a) `NCAAB_LIVE_AUTORUN_LAUNCHED` every ~240 s while D1 games are live, `live_games` tracking the slate; (b) `by_sport.ncaab` credits/h over >= 1 h at the evening peak vs the ~1,850/h estimate at 40 live games; (c) `NCAAB_LIVE_RESIM_TICK` resimmed ~= live D1-vs-D1 games, refusals only non-D1 / stale-roster / budget.
+
+## 2026-11-02 19:12Z (1:12 PM CT) -- MEASUREMENT: #742 capture livelock fix `d8def445`, first two runs -- `KXMVECROSSCATEGORY0` **UNSTUCK, VERIFIED**; `KXMVECROSSCATEGORY` not yet moving, projected to clear before the purge (lane e4-pregame-prints)
+- **Run 1 on the fix, 18:04:13Z** (`cc0_detail.py`, read 18:12:07Z): 900 pages, no progress, as predicted. It left `pages_per_s` **0.3176** (= 900 / 2,834 s), up from 0.0353.
+- **Run 2, 19:04:15Z** (read 19:10:42Z): `KXMVECROSSCATEGORY0` read **7 slices / 787 pages** and moved `swept_to` 11-01 20:58:47Z -> **21:43:02Z** (2,655 s), 0 errors. Its 21Z settlement hour cost 766 pages; last Sunday's densest 0-series hour was 541. The six per-sport series were not due.
+- **verify (from the 11-02 17:29Z entry):**
+  - 0-series `pages_per_s` > 0.0353 after the 18:03Z run: **MET** (0.3176).
+  - Its `swept_to` past 11-01 20:58:47Z by the 19:03Z run: **MET** (21:43:02Z).
+  - `KXMVECROSSCATEGORY`'s `swept_to` past 11-01 16:06:19Z: **OWED.** It got 0 pages in both runs, because the 0-series is swept first and is reading its own backlog. Lag 26.99 h.
+- **Projection** (`backlog_cost.py`, pages per SETTLEMENT hour from `runs.jsonl`; a PROJECTION, not a reading):
+  - Last Sunday (10-25) the same 27 h window cost the big series **18,040** pages. The hours 16Z..01Z cost 1,300-1,780 each; from 03Z on, about 67 each.
+  - At 900 pages a run, after the 0-series' own backlog (a few runs at this week's density), the big series reads about 0.6 settlement hours a run through the dense stretch. Its lag then peaks near **35-42 h** and falls fast over the sparse hours.
+  - That is under the **59.6 h** purge floor for untraded combos (oldest unread second 11-01 16:06Z -> 11-04 03:42Z).
+  - **What would break it:** 0-series Sunday-evening hours much denser than its 21Z hour, which would hold the whole budget for longer.
+- **verify (OWED):**
+  - tonight's 11-03 04:00Z check: the big series has moved or the 0-series' backlog is nearly read;
+  - the 11-03 16:00Z read: the big series' lag is below 45 h and falling.
+  - If either misses, the lever is extra catch-up runs, which is the user's decision; the purge leaves until 11-04 03:42Z.
