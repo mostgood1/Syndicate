@@ -308,9 +308,17 @@ def compute_ratings(
         weight = 1.0
         if prior and t in prior:
             p = prior[t]
-            po = league + (1 - PRIOR_REGRESSION) * (float(p["adj_off"]) - league)
-            pd = league + (1 - PRIOR_REGRESSION) * (float(p["adj_def"]) - league)
-            pt = tempo_mean + (1 - PRIOR_REGRESSION) * (float(p["tempo"]) - tempo_mean)
+            # No second shrink on a calibrated prior (user 2026-11-02 "Fix + anchor"): a row carrying
+            # `calibration_k` < 1 is already scaled; regressing it again scaled team gaps to ~0.55 of the
+            # market's (pregame sim vs market, 109 games, slope 0.51). A legacy uncalibrated row still regresses.
+            try:
+                prior_k = float(p.get("calibration_k") or 1.0)
+            except (TypeError, ValueError):
+                prior_k = 1.0
+            keep = 1.0 if prior_k < 1.0 else 1 - PRIOR_REGRESSION
+            po = league + keep * (float(p["adj_off"]) - league)
+            pd = league + keep * (float(p["adj_def"]) - league)
+            pt = tempo_mean + keep * (float(p["tempo"]) - tempo_mean)
             weight = n / (n + PRIOR_GAMES)
             o, d, tp = weight * o + (1 - weight) * po, weight * d + (1 - weight) * pd, weight * tp + (1 - weight) * pt
         out[t] = {

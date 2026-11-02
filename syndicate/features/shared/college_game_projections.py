@@ -14,10 +14,12 @@ own facts, each counted by reason:
     stays, the edge goes);
   - every draw on one side of the line (`refuse_published_certainty`).
 
-NO BOOK BLEND. NBA serves a logit blend toward the market (`nba_prop_calibration.served_game_probability`),
-fitted on NBA seasons. No college fit exists, so the raw sim probability is served and the edge is computed
-against the same de-vigged fair. The pregame sim lands on the team model's targets by construction
-(EXACT_TARGET), so the edge is mostly the team model's own disagreement with the market.
+MARGIN LINES ARE MARKET-ANCHORED (user 2026-11-02 "Fix + anchor"). Measured on the 2026-11-03 slate, the sim's
+margins ran at ~half the market's (slope 0.51 over 109 games, correlation 0.90): spread edges had a median of
+-21 points, a scale defect rather than a view. Until a college margin fit exists, spreads and moneylines serve
+the NBA logit blend (`nba_prop_calibration.blend_with_book`) at weight SYNDICATE_COLLEGE_MARGIN_MODEL_WEIGHT
+(default 0.0: the de-vigged fair itself, so no model edge). The sim's margin and raw probability stay on the
+row (`projected`, `p_model_raw`). Totals are served raw: the sim sat ~1 point under the line.
 
 THE JOIN. Grid rows carry the odds feed's team names; sim entries carry ESPN's. Both go through
 `team_aliases.chip_join_key(league, ...)`, the registry the slate's own odds join uses. Orientation: the
@@ -32,6 +34,7 @@ from datetime import date, timedelta
 from typing import Any, Iterable, Mapping
 
 from syndicate.features.shared.probability_refusal import refuse_published_certainty
+from syndicate.features.shared.prop_projections import _no_vig_over_probability
 from syndicate.features.shared.timezone import central_date_from_iso
 from syndicate.features.shared.wnba_game_projections import (
     _GAME_MARKET_FAMILY,
@@ -44,6 +47,34 @@ from syndicate.features.shared.wnba_game_projections import (
 SOURCE = "college_pregame_sim"
 # Grid rows name the whole game `full_game` (NCAAB, 2026-11-02) or `full` (WNCAAB); the sim names it `full`.
 _SEGMENT_ALIASES = {"": "full", "full_game": "full", "game": "full", "fg": "full"}
+
+
+def margin_model_weight() -> float:
+    import os
+
+    raw = str(os.environ.get("SYNDICATE_COLLEGE_MARGIN_MODEL_WEIGHT") or "").strip()
+    try:
+        return min(1.0, max(0.0, float(raw))) if raw else 0.0
+    except ValueError:
+        return 0.0
+
+
+def _served(prob: float, row: Mapping[str, Any], market: str) -> tuple[float, dict[str, Any]]:
+    """(served probability, stamp). Margin markets blend toward the de-vigged fair; totals pass through."""
+    meta: dict[str, Any] = {"p_model_raw": round(float(prob), 4)}
+    if market not in {"spreads", "h2h"}:
+        meta["book_blend"] = "not applied: totals served raw"
+        return prob, meta
+    fair = _no_vig_over_probability(row)
+    if fair is None or not (0.0 < float(fair) < 1.0):
+        meta["book_blend"] = "no two-sided book price for this line"
+        return prob, meta
+    from syndicate.features.shared.nba_prop_calibration import blend_with_book
+
+    weight = margin_model_weight()
+    meta.update(book_blend="applied", book_blend_w=weight, p_book=round(float(fair), 4),
+                book_blend_basis="college margin unfitted (sim/market slope 0.51, 2026-11-03)")
+    return blend_with_book(float(prob), float(fair), weight), meta
 
 
 def _segment(value: Any) -> str:
@@ -140,6 +171,8 @@ def _project_row(row: Mapping[str, Any], market: str, segment: str, entry: Colle
         projection.pop("edge_unavailable_reason", None)
         projection.pop("market_fair_prob_over", None)
     if prob is not None:
+        prob, meta = _served(prob, row, market)
+        projection.update(meta)
         _attach_sim_probability_edge(projection, row=row, model_prob=prob)
     return projection, None
 

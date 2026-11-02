@@ -125,10 +125,10 @@ def _utc_now_iso() -> str:
 
 # ------------------------------------------------------------------------------------------- inputs
 
-def _processed_dirs() -> list[Path]:
+def _processed_dirs(league: str = "ncaab") -> list[Path]:
     from syndicate.features.ncaab.live_team_model import ratings_dirs
 
-    return ratings_dirs()
+    return ratings_dirs(league)
 
 
 def load_player_priors(game_date: dt.date, *, dirs: Optional[Sequence[Path]] = None):
@@ -232,12 +232,18 @@ def team_frame(rows: Sequence[Mapping[str, Any]], *, team_code: str, date: str):
 
 def build_engine_inputs(date: str, home_id: str, away_id: str, *, neutral: bool, home_code: str = "",
                         away_code: str = "", priors: Any = None, team_prior: Any = None,
-                        dirs: Optional[Sequence[Path]] = None):
-    """The engine kwargs for one NCAAB game, built from Syndicate's own dated tables."""
+                        dirs: Optional[Sequence[Path]] = None, league: str = LEAGUE):
+    """The engine kwargs for one NCAAB game, built from Syndicate's own dated tables.
+
+    `league="wncaab"` (lane wncaab-module, user-approved loan 2026-11-02) reads the women's tables and runs NO
+    men-fitted adjustment: the half split (H1_SHARE is the men's 47.43%) and the live mechanisms (fitted on
+    men's games) stay off for the women until women's fits exist. Every NCAAB value is unchanged."""
     from syndicate.features.basketball_engine.engine import EventSimConfig
     from syndicate.features.ncaab import live_team_model as tm
 
     day = dt.date.fromisoformat(str(date))
+    if dirs is None and league != LEAGUE:
+        dirs = _processed_dirs(league)
     if team_prior is None:
         team_prior = tm.prior_for_game(day, str(home_id), str(away_id), neutral=bool(neutral), dirs=dirs)
     if isinstance(team_prior, tm.NcaabPriorRefusal):
@@ -255,16 +261,19 @@ def build_engine_inputs(date: str, home_id: str, away_id: str, *, neutral: bool,
         if isinstance(frame, NcaabResimRefusal):
             return frame
         frames[side] = frame
+    mechanisms = live_mechanisms_from_env() if league == LEAGUE else {}
+    half_split = half_split_enabled() and league == LEAGUE
     return {
         "home_players": frames["home"],
         "away_players": frames["away"],
-        "cfg": EventSimConfig(possessions_per_game=float(team_prior.possessions), **live_mechanisms_from_env()),
+        "cfg": EventSimConfig(possessions_per_game=float(team_prior.possessions), **mechanisms),
         "target_home_points": float(team_prior.home_points),
         "target_away_points": float(team_prior.away_points),
-        "quarters": half_targets(team_prior.home_points, team_prior.away_points) if half_split_enabled() else None,
+        "quarters": half_targets(team_prior.home_points, team_prior.away_points) if half_split else None,
         "_provenance": {
-            "halfSplit": half_split_enabled(),
-            "mechanisms": sorted(live_mechanisms_from_env()),
+            "league": league,
+            "halfSplit": half_split,
+            "mechanisms": sorted(mechanisms),
             "ratingsAsOf": team_prior.ratings_as_of.isoformat(),
             "priorSeasonFallback": bool(team_prior.prior_season_fallback),
             "playerPriorsAsOf": priors.as_of.isoformat(),
@@ -288,23 +297,25 @@ def exact_target_enabled(env: Optional[Mapping[str, str]] = None) -> bool:
     return raw in {"1", "true", "on", "yes"}
 
 
-def ncaab_engine(exact_target: Optional[bool] = None):
+def ncaab_engine(exact_target: Optional[bool] = None, league: str = LEAGUE):
     """P1's engine bound to NCAAB params and production's lineup sampler. Never NBA's: the smart sim's
-    `_engine_for_league_local` maps every non-WNBA code to NBA, so it is NOT used here."""
+    `_engine_for_league_local` maps every non-WNBA code to NBA, so it is NOT used here. `league="wncaab"`
+    binds the women's params (four quarters) -- `basketball_engine.league.WNCAAB`."""
     exact = exact_target_enabled() if exact_target is None else bool(exact_target)
+    key = (league, exact)
     with _ENGINE_LOCK:
-        if exact not in _ENGINES:
+        if key not in _ENGINES:
             import dataclasses
 
             from syndicate.features.basketball_engine import league_params
             from syndicate.features.basketball_engine.league_engine import LeagueEngine
             from syndicate.features.shared.basketball_props_smart_sim import _sample_lineup_local
 
-            params = league_params(LEAGUE)
+            params = league_params(league)
             if exact:
                 params = dataclasses.replace(params, exact_target_calibration=True)
-            _ENGINES[exact] = LeagueEngine(params, sample_lineup=_sample_lineup_local)
-        return _ENGINES[exact]
+            _ENGINES[key] = LeagueEngine(params, sample_lineup=_sample_lineup_local)
+        return _ENGINES[key]
 
 
 _ENGINE_KWARGS = ("home_players", "away_players", "cfg", "target_home_points", "target_away_points", "quarters")
@@ -459,7 +470,7 @@ def _hist(values: Sequence[int]) -> dict[str, int]:
 
 def resim_live_game(inputs: Mapping[str, Any], game_state: Any, *, sims: int = DEFAULT_SIMS, base_seed: int = 0,
                     deadline: Optional[float] = None, simulate: Optional[Callable[..., Any]] = None,
-                    clock: Callable[[], float] = time.monotonic):
+                    clock: Callable[[], float] = time.monotonic, league: str = LEAGUE):
     """`sims` resumed games from `game_state`; full-game and per-half distributions.
 
     Hitting `deadline` before `sims` draws finish is `budget_exhausted` -- partial draws are
@@ -469,7 +480,7 @@ def resim_live_game(inputs: Mapping[str, Any], game_state: Any, *, sims: int = D
     if sims < MIN_SIMS:
         return NcaabResimRefusal("sims_below_floor", f"{sims}<{MIN_SIMS}")
     if simulate is None:
-        engine = ncaab_engine()
+        engine = ncaab_engine(league=league)
         kwargs = {k: inputs[k] for k in _ENGINE_KWARGS}
 
         def simulate(rng, gs):  # noqa: E306
@@ -478,7 +489,9 @@ def resim_live_game(inputs: Mapping[str, Any], game_state: Any, *, sims: int = D
     rng = np.random.default_rng(int(base_seed))
     totals: list[int] = []
     margins: list[int] = []
-    halves: list[tuple[int, int, int, int]] = []
+    # Regulation periods per sim: halves for the men, quarters for the women (`league="wncaab"`).
+    regulation = 4 if league == "wncaab" else _REGULATION_PERIODS
+    periods: list[tuple[tuple[int, ...], tuple[int, ...]]] = []
     for i in range(int(sims)):
         if deadline is not None and clock() >= deadline:
             return NcaabResimRefusal("budget_exhausted", f"{i}/{sims}")
@@ -489,13 +502,15 @@ def resim_live_game(inputs: Mapping[str, Any], game_state: Any, *, sims: int = D
         h, a = int(sum(hq)), int(sum(aq))
         totals.append(h + a)
         margins.append(h - a)
-        if len(hq) >= 2 and len(aq) >= 2:
-            halves.append((int(hq[0]), int(aq[0]), int(hq[1]), int(aq[1])))
+        if len(hq) >= regulation and len(aq) >= regulation:
+            periods.append((tuple(int(x) for x in hq[:regulation]), tuple(int(x) for x in aq[:regulation])))
     n = len(totals)
     segments: dict[str, Any] = {}
-    for name, (hi, ai) in (("h1", (0, 1)), ("h2", (2, 3))):
-        tot = [x[hi] + x[ai] for x in halves]
-        mar = [x[hi] - x[ai] for x in halves]
+    layout = ({"h1": (0,), "h2": (1,)} if regulation == 2 else
+              {"q1": (0,), "q2": (1,), "q3": (2,), "q4": (3,), "h1": (0, 1), "h2": (2, 3)})
+    for name, idx in layout.items():
+        tot = [sum(h[i] for i in idx) + sum(a[i] for i in idx) for h, a in periods]
+        mar = [sum(h[i] for i in idx) - sum(a[i] for i in idx) for h, a in periods]
         if tot:
             segments[name] = {"total_mean": sum(tot) / len(tot), "total_dist": _hist(tot), "margin_dist": _hist(mar)}
     return {

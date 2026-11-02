@@ -106,8 +106,12 @@ def espn_season_for(day: dt.date) -> int:
 
 # ------------------------------------------------------------------- tables
 
-def ratings_dirs() -> list[Path]:
-    roots = preferred_artifact_roots(__file__, env_var="SYNDICATE_NCAAB_SOURCE_ROOT", local_dir_name="ncaab_source")
+def ratings_dirs(league: str = "ncaab") -> list[Path]:
+    # `league="wncaab"` (lane wncaab-module, user-approved loan 2026-11-02): the women's tables, built by
+    # `build_ncaab_team_ratings.py --league wncaab` under `wncaab_source`. The model below is league-neutral;
+    # HOME_POINTS / PRIOR_REGRESSION are the men's fits, carried for the women until a women's walk-forward.
+    env_var, local_dir = ("SYNDICATE_WNCAAB_SOURCE_ROOT", "wncaab_source") if league == "wncaab" else ("SYNDICATE_NCAAB_SOURCE_ROOT", "ncaab_source")
+    roots = preferred_artifact_roots(__file__, env_var=env_var, local_dir_name=local_dir)
     return [root / "data" / "processed" for root in roots]
 
 
@@ -140,6 +144,7 @@ def table_from_rows(
     as_of: dt.date,
     source: str,
     regress_toward_mean: float = 0.0,
+    prior_season: bool = False,
 ) -> Optional[NcaabRatingsTable]:
     """A table from producer-shaped rows (CSV rows, or `compute_ratings` values with `espn_id`).
 
@@ -161,6 +166,7 @@ def table_from_rows(
     league_def = sum(p[3] for p in parsed) / len(parsed)
     league_tempo = sum(p[4] for p in parsed) / len(parsed)
     keep = 1.0 - float(regress_toward_mean)
+    fallback = bool(prior_season or regress_toward_mean)
     teams = {
         tid: NcaabTeamRating(
             espn_id=tid,
@@ -168,8 +174,8 @@ def table_from_rows(
             adj_off=league_off + keep * (off - league_off),
             adj_def=league_def + keep * (deff - league_def),
             tempo=league_tempo + keep * (tempo - league_tempo),
-            games=0 if regress_toward_mean else games,
-            prior_weight=1.0 if regress_toward_mean else prior_weight,
+            games=0 if fallback else games,
+            prior_weight=1.0 if fallback else prior_weight,
         )
         for tid, name, off, deff, tempo, games, prior_weight in parsed
     }
@@ -180,7 +186,7 @@ def table_from_rows(
         teams=teams,
         league_off=league_off,
         league_tempo=league_tempo,
-        prior_season_fallback=bool(regress_toward_mean),
+        prior_season_fallback=fallback,
     )
 
 
@@ -213,7 +219,21 @@ def _prior_season_table(game_date: dt.date, *, dirs: Optional[Iterable[Path]] = 
     if not earlier:
         return None
     s, a, p = earlier[-1]
-    return table_from_rows(_read_csv(p), season=s, as_of=a, source=str(p), regress_toward_mean=PRIOR_REGRESSION)
+    rows = _read_csv(p)
+    return table_from_rows(rows, season=s, as_of=a, source=str(p), regress_toward_mean=prior_regression_for(rows),
+                           prior_season=True)
+
+
+def prior_regression_for(rows: Iterable[Mapping[str, object]]) -> float:
+    """NO SECOND SHRINK ON A CALIBRATED TABLE (user 2026-11-02 "Fix + anchor", lane wncaab-module loan).
+
+    A table built with `calibration_k` < 1 (`build_ncaab_team_ratings.MARGIN_CALIBRATION_K`, 0.78) is already
+    shrunk toward the mean; regressing it another PRIOR_REGRESSION scaled team gaps to ~0.55. Measured on the
+    2026-11-03 slate: the pregame sim's margins against the market's had slope 0.51 over 109 games
+    (correlation 0.90, mean |gap| 8.0 points). Only an uncalibrated (legacy) table is still regressed."""
+    ks = [_f(row.get("calibration_k")) for row in rows]
+    calibrated = any(k is not None and k < 1.0 for k in ks)
+    return 0.0 if calibrated else PRIOR_REGRESSION
 
 
 # -------------------------------------------------------------------- prior
@@ -249,7 +269,8 @@ def game_prior(table: NcaabRatingsTable, home_id: str, away_id: str, *, neutral:
     )
 
 
-def prior_for_game(game_date: dt.date, home_id: str, away_id: str, *, neutral: bool, dirs: Optional[Iterable[Path]] = None) -> PriorResult:
+def prior_for_game(game_date: dt.date, home_id: str, away_id: str, *, neutral: bool, dirs: Optional[Iterable[Path]] = None,
+                   league: str = "ncaab") -> PriorResult:
     """THE PRESEASON FALLBACK IS PER GAME, not per season (2026-11-02, lane ncaab-board-slate, user-approved
     loan: "Fix + ship together"). `table_for_game` falls back to last season's regressed table only while the
     season has NO table at all, so the first handful of finals switched every game onto an in-season table:
@@ -257,6 +278,8 @@ def prior_for_game(game_date: dt.date, home_id: str, away_id: str, *, neutral: b
     7 of 7 live games `team_unrated`, with the 361-team 2026 table unused. A game whose two teams are not both
     rated this season is priced off last season's table (both sides from the SAME table, so one league mean),
     flagged `prior_season_fallback`; once both teams are rated this season, this season's table wins."""
+    if dirs is None and league != "ncaab":
+        dirs = ratings_dirs(league)
     table = table_for_game(game_date, dirs=dirs)
     if isinstance(table, NcaabPriorRefusal):
         return table

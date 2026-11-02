@@ -87,13 +87,17 @@ def test_producer_stops_at_its_deadline(slate_day):
     assert ps.read_pregame_sims("2026-11-03") is None  # nothing half-built is published
 
 
-def test_womens_games_refuse_until_inputs_exist(tmp_path, monkeypatch):
+def test_womens_games_refuse_by_name_until_their_tables_exist(tmp_path, monkeypatch):
+    # The women's path is real (user 2026-11-02 "Approve the loans"); with no women's priors table on disk a game
+    # refuses with the re-sim's own reason, never a default and never the men's tables.
     monkeypatch.setenv("SYNDICATE_DATA_ROOT", str(tmp_path))
+    monkeypatch.setenv("SYNDICATE_WNCAAB_SOURCE_ROOT", str(tmp_path / "wncaab_source"))
     path = slate.slate_artifact_path("2026-11-03", "wncaab")
     path.parent.mkdir(parents=True)
     path.write_text(json.dumps({"games": [_game("9", TENN, WOF)]}), encoding="utf-8")
     summary = ps.run_pregame_sims("2026-11-03", "wncaab", sims=100, now=NOW)
-    assert summary["refused"] == 1 and ps.read_pregame_sims("2026-11-03", "wncaab")["games"]["9"]["refused"] == "no_engine_inputs_for_league"
+    entry = ps.read_pregame_sims("2026-11-03", "wncaab")["games"]["9"]
+    assert summary["refused"] == 1 and entry["refused"] in {"no_player_priors", "no_ratings_table"} and "dist" not in entry
 
 
 def _row(market, *, home="Tennessee Volunteers", away="Wofford Terriers", line=None, segment="full_game", sides=("home", "away"), prices=(-110, -110)):
@@ -163,3 +167,55 @@ def test_launcher_switch_is_reachable_and_runs_one_child_at_a_time(slate_day, mo
     child.code = 0
     assert inplay_lane.maybe_launch_pregame_sims(popen=popen, clock=lambda: 1100.0) is None  # exited, interval not passed
     assert inplay_lane.maybe_launch_pregame_sims(popen=popen, clock=lambda: 3000.0) is not None and len(launched) == 2
+
+
+def _priced_row(market, line, *, sides, prices, home="Tennessee Volunteers", away="Wofford Terriers"):
+    return {"kind": "game", "sport": "ncaab", "market": market, "segment": "full_game", "line": line, "home_team": home,
+            "away_team": away, "commence_time": "2026-11-04 00:00:00+00:00", "sides": list(sides), "consensus": dict(zip(sides, prices))}
+
+
+def _spread_sim(rng, state):
+    # A spread of outcomes so no line is a certainty: home margin cycles 2..18.
+    _spread_sim.i = (getattr(_spread_sim, "i", 0) + 1) % 9
+    margin = 2 + 2 * _spread_sim.i
+    return None, None, [40 + margin, 38], [40, 38]
+
+
+def test_margin_lines_are_market_anchored_and_totals_are_not(slate_day, monkeypatch):
+    # User 2026-11-02 "Fix + anchor": sim margins ran at ~half the market's (slope 0.51, 109 games).
+    from syndicate.features.shared import college_game_projections as cgp
+
+    ps.run_pregame_sims("2026-11-03", sims=180, now=NOW, simulate=_spread_sim)
+    index = cgp.load_college_game_projections("2026-11-03", "ncaab")
+    spread = _priced_row("spreads", 10.5, sides=("home", "away"), prices=(-110, -110))
+    total = _priced_row("totals", 160.5, sides=("over", "under"), prices=(-110, -110))
+    cgp.attach_college_game_projections([spread, total], index)
+    sp, tt = spread["projection"], total["projection"]
+    assert sp["book_blend"] == "applied" and sp["book_blend_w"] == 0.0 and sp["p_model_raw"] is not None
+    assert abs(sp["model_prob_over"] - sp["market_fair_prob_over"]) < 1e-3 and abs(sp["edge_vs_market_pct"]) < 0.1
+    assert sp["projected"] == 10.0  # the sim's own margin stays on the row
+    assert tt["book_blend"].startswith("not applied") and tt["model_prob_over"] == tt["p_model_raw"]
+    monkeypatch.setenv("SYNDICATE_COLLEGE_MARGIN_MODEL_WEIGHT", "1")  # the switch is reachable: w=1 serves the sim
+    spread2 = _priced_row("spreads", 10.5, sides=("home", "away"), prices=(-110, -110))
+    cgp.attach_college_game_projections([spread2], index)
+    assert abs(spread2["projection"]["model_prob_over"] - spread2["projection"]["p_model_raw"]) < 1e-3
+
+
+def test_a_calibrated_prior_table_is_not_shrunk_twice():
+    import datetime as dt
+
+    from syndicate.features.ncaab import live_team_model as tm
+
+    calibrated = [{"espn_id": "1", "adj_off": "120", "adj_def": "95", "tempo": "70", "games": "30", "calibration_k": "0.78"},
+                  {"espn_id": "2", "adj_off": "100", "adj_def": "105", "tempo": "66", "games": "30", "calibration_k": "0.78"}]
+    legacy = [{k: v for k, v in row.items() if k != "calibration_k"} for row in calibrated]
+    assert tm.prior_regression_for(calibrated) == 0.0 and tm.prior_regression_for(legacy) == tm.PRIOR_REGRESSION
+    table = tm.table_from_rows(calibrated, season=2026, as_of=dt.date(2026, 4, 6), source="t",
+                               regress_toward_mean=tm.prior_regression_for(calibrated), prior_season=True)
+    assert table.prior_season_fallback is True and table.teams["1"].adj_off == 120.0 and table.teams["1"].games == 0
+
+
+def test_a_changed_prior_target_resims_the_game(slate_day):
+    ps.run_pregame_sims("2026-11-03", sims=100, now=NOW, simulate=_simulate)
+    slate_day["provenance"]["pregameHomeMargin"] = 18.0  # same table dates, a differently-built prior
+    assert ps.run_pregame_sims("2026-11-03", sims=100, now=NOW, simulate=_simulate)["simmed"] == 1

@@ -131,15 +131,16 @@ def _pregame_dates() -> list[str]:
     return [today, (date.fromisoformat(today) + timedelta(days=1)).isoformat()]
 
 
-def _pregame_game_count(dates: list[str], league: str) -> int:
+def _pregame_game_count(dates: list[str], leagues: tuple[str, ...]) -> int:
     from syndicate.features.college_basketball.pregame_sim import is_pregame
     from syndicate.features.ncaab.slate import read_slate
 
     moment = datetime.now(timezone.utc)
-    return sum(1 for d in dates for g in (read_slate(d, league) or {}).get("games") or [] if is_pregame(g, moment))
+    return sum(1 for league in leagues for d in dates for g in (read_slate(d, league) or {}).get("games") or []
+               if is_pregame(g, moment))
 
 
-def maybe_launch_pregame_sims(league: str = "ncaab", *, popen: Callable[..., Any] = subprocess.Popen,
+def maybe_launch_pregame_sims(leagues: tuple[str, ...] = ("ncaab", "wncaab"), *, popen: Callable[..., Any] = subprocess.Popen,
                               clock: Callable[[], float] = time.monotonic) -> dict[str, Any] | None:
     """Start `scripts/build_college_pregame_sims.py` when the last child has exited, the interval has passed and
     the slate shows a pregame game today or tomorrow. Returns what it launched, or None."""
@@ -150,26 +151,28 @@ def maybe_launch_pregame_sims(league: str = "ncaab", *, popen: Callable[..., Any
         code = _pregame_child.poll()
         if code is None:
             return None
-        print(f"[live_odds_worker] COLLEGE_PREGAME_SIM_EXITED league={league} rc={code}", flush=True)
+        print(f"[live_odds_worker] COLLEGE_PREGAME_SIM_EXITED leagues={','.join(leagues)} rc={code}", flush=True)
         _pregame_child = None
     interval = _env_seconds("SYNDICATE_COLLEGE_PREGAME_INTERVAL_SECONDS", 900, 300)
     if _pregame_last_launch and clock() - _pregame_last_launch < interval:
         return None
     dates = _pregame_dates()
-    pregame = _pregame_game_count(dates, league)
+    pregame = _pregame_game_count(dates, leagues)
     if pregame <= 0:
         return None
     budget = _env_seconds("SYNDICATE_COLLEGE_PREGAME_BUDGET_SECONDS", 600, 60)
-    command = [sys.executable, str(_REPO_ROOT / "scripts" / "build_college_pregame_sims.py"), "--league", league,
-               "--dates", ",".join(dates), "--budget-seconds", str(budget)]
+    # --refresh-inputs: the women's ratings / player priors have no scheduled job; the child brings them up to
+    # date once a day before simming (`build_college_pregame_sims.refresh_womens_inputs`).
+    command = [sys.executable, str(_REPO_ROOT / "scripts" / "build_college_pregame_sims.py"), "--league", ",".join(leagues),
+               "--dates", ",".join(dates), "--budget-seconds", str(budget), "--refresh-inputs"]
     nice = shutil.which("nice")
     if nice:
         command = [nice, "-n", "15", *command]
     _pregame_child = popen(command, cwd=str(_REPO_ROOT))
     _pregame_last_launch = clock()
-    print(f"[live_odds_worker] COLLEGE_PREGAME_SIM_LAUNCHED league={league} dates={','.join(dates)} pregame_games={pregame} "
+    print(f"[live_odds_worker] COLLEGE_PREGAME_SIM_LAUNCHED leagues={','.join(leagues)} dates={','.join(dates)} pregame_games={pregame} "
           f"budget_s={budget} interval_s={interval} pid={getattr(_pregame_child, 'pid', None)}", flush=True)
-    return {"league": league, "dates": dates, "pregame_games": pregame, "budget_s": budget}
+    return {"leagues": list(leagues), "dates": dates, "pregame_games": pregame, "budget_s": budget}
 
 
 def launch_autorun_ncaab_live_refresh(league: str = "ncaab") -> dict[str, Any] | None:
@@ -177,7 +180,7 @@ def launch_autorun_ncaab_live_refresh(league: str = "ncaab") -> dict[str, Any] |
     tag = league.upper()
     if league == "ncaab":
         try:
-            maybe_launch_pregame_sims("ncaab")
+            maybe_launch_pregame_sims()
         except Exception as exc:  # noqa: BLE001 -- the pregame sim must never cost the odds lane
             print(f"[live_odds_worker] COLLEGE_PREGAME_SIM_LAUNCH_FAILED {type(exc).__name__}: {exc}", flush=True)
     if not ncaab_live_refresh_enabled(league):

@@ -167,7 +167,38 @@ NCAAB = LeagueParams(
     ft_mult_errors_neutral=True,
 )
 
-_BY_CODE = {"nba": NBA, "wnba": WNBA, "ncaab": NCAAB}
+# WOMEN'S COLLEGE BASKETBALL (lane wncaab-module, user-approved loan 2026-11-02). The geometry is real: four
+# 10-minute quarters, 5-minute OT, 30-second shot clock, five personal fouls, two shots from the 5th team foul
+# of a quarter. Every RATE switch is NCAAB's (itself the NBA default: no college fit exists), and the pace is
+# a starting value -- the team model's tempo product, not this default, sets a game's possessions.
+WNCAAB = LeagueParams(
+    code="wncaab",
+    regulation_periods=4,
+    regulation_period_seconds=10 * 60,
+    overtime_period_seconds=5 * 60,
+    regulation_team_minutes=200.0,
+    shot_clock_seconds=30,
+    personal_foul_limit=5,
+    team_fouls_for_bonus=5,  # two free throws from the 5th team foul per quarter; no 1-and-1; carried only
+    default_possessions_per_game=70.0,
+    min_rate_possessions=55.0,
+    shooter_ft_rate=False,
+    fouled_miss_not_fga=False,
+    exact_target_calibration=False,
+    team_prior_stacks_on_target=None,
+    tov_per_attempt=False,
+    player_rebound_credit=False,
+    oreb_player_credit=1.0,
+    dreb_player_credit=1.0,
+    block_mode="legacy",
+    league_blocks_per_missed_2pa=0.2065,
+    block_rate_assumed_fg3_pct=0.34,
+    block_alloc_by_rate=False,
+    block_alloc_floor_pm=0.002,
+    ft_mult_errors_neutral=True,
+)
+
+_BY_CODE = {"nba": NBA, "wnba": WNBA, "ncaab": NCAAB, "wncaab": WNCAAB}
 
 
 def league_params(code: str | None) -> LeagueParams:

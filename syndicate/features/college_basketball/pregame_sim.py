@@ -23,8 +23,10 @@ is ~22 CPU-minutes at 200. Each run therefore stops at its DEADLINE and writes w
 re-simmed only when its inputs key changes (ratings / player-prior dates, switches, sims). The next
 launch continues where this one stopped.
 
-WNCAAB has no engine inputs yet (no women's ratings or player priors): every game refuses
-`no_engine_inputs_for_league` until they exist. Named, never NBA rules in disguise.
+WNCAAB (user 2026-11-02 "Approve the loans"): the same engine under `basketball_engine.league.WNCAAB` (four
+quarters), fed by the women's tables (`build_ncaab_team_ratings.py` / `build_ncaab_player_priors.py --league
+wncaab`). No men-fitted adjustment is applied to the women (half split, live mechanisms); segments are
+q1..q4 plus h1 = q1+q2 and h2 = q3+q4. A game without women's ratings or priors refuses by name.
 """
 from __future__ import annotations
 
@@ -98,7 +100,10 @@ def _side(game: Mapping[str, Any], side: str, league: str) -> dict[str, Any]:
 
 def inputs_key(provenance: Mapping[str, Any], sims: int) -> str:
     """What makes two runs of the same game the same run. A change re-sims the game."""
-    keep = {k: provenance.get(k) for k in ("ratingsAsOf", "playerPriorsAsOf", "priorSeasonFallback", "halfSplit", "mechanisms")}
+    keep = {k: provenance.get(k) for k in ("ratingsAsOf", "playerPriorsAsOf", "priorSeasonFallback", "halfSplit", "mechanisms",
+                                           "league", "pregameTotal", "pregameHomeMargin")}
+    # The prior's own targets are in the key: a change to HOW the prior is built (2026-11-02, no second shrink on a
+    # calibrated table) moves them with no change of table date, and must re-sim the game.
     keep["exactTarget"] = provenance.get("exactTarget")
     keep["sims"] = int(sims)
     return json.dumps(keep, sort_keys=True)
@@ -111,11 +116,15 @@ def _segments(result: Mapping[str, Any]) -> dict[str, Any]:
     return segments
 
 
-def _ncaab_engine_inputs(date_iso: str, game: Mapping[str, Any], home: Mapping[str, Any], away: Mapping[str, Any], priors: Any):
+LEAGUES = ("ncaab", "wncaab")
+
+
+def _engine_inputs(league: str, date_iso: str, game: Mapping[str, Any], home: Mapping[str, Any], away: Mapping[str, Any], priors: Any):
     from syndicate.features.ncaab import live_resim as lr
 
     inputs = lr.build_engine_inputs(date_iso, home["espn_id"], away["espn_id"], neutral=bool(game.get("neutral_site")),
-                                    home_code=str(home.get("abbr") or ""), away_code=str(away.get("abbr") or ""), priors=priors)
+                                    home_code=str(home.get("abbr") or ""), away_code=str(away.get("abbr") or ""), priors=priors,
+                                    league=league)
     if isinstance(inputs, lr.NcaabResimRefusal):
         return None, inputs.reason, inputs.detail
     inputs["_provenance"]["exactTarget"] = lr.exact_target_enabled()
@@ -143,10 +152,11 @@ def run_pregame_sims(
     games: dict[str, Any] = dict(previous)
     counts = {"pregame": 0, "simmed": 0, "unchanged": 0, "refused": 0, "not_reached": 0}
     priors = None
-    if league == "ncaab":
+    if league in LEAGUES:
         from syndicate.features.ncaab import live_resim as lr
 
-        priors = lr.load_player_priors(datetime.fromisoformat(date_iso).date())
+        priors = lr.load_player_priors(datetime.fromisoformat(date_iso).date(),
+                                       dirs=None if league == "ncaab" else lr._processed_dirs(league))
     started = clock()
 
     def publish() -> None:
@@ -164,7 +174,7 @@ def run_pregame_sims(
         home, away = _side(game, "home", league), _side(game, "away", league)
         base = {"event_id": event_id, "start_time_utc": game.get("start_time_utc"), "neutral_site": bool(game.get("neutral_site")),
                 "home": home, "away": away, "computed_at": _utc_now_iso()}
-        if league != "ncaab":
+        if league not in LEAGUES:
             games[event_id] = {**base, "refused": "no_engine_inputs_for_league", "detail": league}
             counts["refused"] += 1
             continue
@@ -176,7 +186,7 @@ def run_pregame_sims(
                 games[event_id] = {**base, "refused": priors.reason, "detail": priors.detail}
                 counts["refused"] += 1
                 continue
-            inputs, reason, detail = _ncaab_engine_inputs(date_iso, game, home, away, priors)
+            inputs, reason, detail = _engine_inputs(league, date_iso, game, home, away, priors)
             if inputs is None:
                 games[event_id] = {**base, "refused": reason, "detail": detail}
                 counts["refused"] += 1
@@ -187,7 +197,7 @@ def run_pregame_sims(
                 counts["unchanged"] += 1
                 continue
             result = lr.resim_live_game(inputs, GameState(), sims=sims, base_seed=lr.stable_seed(event_id, 0),
-                                        deadline=deadline, simulate=simulate, clock=clock)
+                                        deadline=deadline, simulate=simulate, clock=clock, league=league)
             if isinstance(result, lr.NcaabResimRefusal):
                 if result.reason == "budget_exhausted":
                     counts["not_reached"] += 1
