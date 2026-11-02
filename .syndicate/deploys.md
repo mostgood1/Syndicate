@@ -55718,3 +55718,23 @@ Read-only scheduled reading (task ncaab-1102-board-check). Readings 08:01:48Z-08
   - **live-odds-worker restart** (launcher for both leagues + live-tier prior fix). Verify: `COLLEGE_PREGAME_SIM_LAUNCHED leagues=ncaab,wncaab`.
   - **WNCAAB pregame** once the priors crawl finishes. Verify: `pregame_sim_<date>.json` under `wncaab_source` with published > 0, and layer1 wncaab `rows_with_projection` > 0.
 - **claims:** live-odds-worker released (expired at 22:22Z); web + refresh-worker held under wncaab-module for the steps above.
+
+## 2026-11-02 23:37:24Z (5:37 PM CST) -- FLEET refresh-worker restart on 70b2bdf09 + NCAAB re-sim on the fixed prior: market anchor + no second shrink VERIFIED (lane `wncaab-module`)
+- **gates:**
+  - Claim refresh-worker held since 23:05Z.
+  - Preflight HOLD 23:06-23:31Z: a board build was in flight, plus odds child jobs (`build_soccer_artifacts --league mls`). No drain, so builds were not held mid-slate.
+  - Re-polled every 4 s; CLEAR at 23:37:06Z (baseline 11-03 spread median edge 0.0 at 23:37:04Z, already anchored by web's inline build on 70b2bdf09).
+  - TERM pid 2945323 at 23:37:24Z; respawn pid 2972420 at 23:37:31Z.
+- **re-sim** (run by hand 23:06Z with the live-odds-worker env, nice 15):
+  - 11-02: `simmed=97 refused=10 published=102 elapsed_s=936`;
+  - 11-03: `simmed=18 refused=1`.
+- **verify -- no second shrink, MET.** Pregame sim margin vs market, 11-02 slate, 102 games:
+  - **slope 0.51 -> 0.69**, mean |gap| **8.0 -> 5.8** points, correlation 0.90;
+  - the team prior alone: slope 0.73 (the 0.78 calibration that remains);
+  - expected ~0.7.
+- **verify -- anchor, MET** (read 23:42:09Z, the first post-restart build):
+  - 11-02: **394 of 394** spread rows `book_blend=applied`, median `edge_vs_market_pct` **0.0** (was -14.0 at 23:37Z), h2h median 0.0;
+  - 11-03: spreads / h2h median 0.0.
+- **Totals (raw by decision):** sim -2.2 points vs the line (mean, 321 rows); median edge -6.0, p10 -27.5 / p90 +17.0.
+- **Live rows are not the pregame join's:** the 20 spread rows with |edge| > 10 are all `live_aware`, priced by the NCAAB live re-sim (`live_gameline.edge_pp`, 200 sims). That tier still builds its tip prior with the old double shrink until the live-odds-worker restarts (OWED: held until the women's player-box crawl finishes, so the launcher's daily women's refresh cannot write the same files concurrently).
+- **claims:** refresh-worker + web released 23:43Z.
