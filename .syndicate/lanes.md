@@ -625,15 +625,6 @@ death, never life — do not invert it.
 - Verification: Fleet reads after deploy: game-chips ncaab > 100; layer1 ncaab rows_enriched > 0 and by_state unknown near 0; /ncaab/api/cards games > 100; new book_quotes rows carry segment full/h1/h2 with events > 100; /api/ops/oddsapi/quota by_sport.ncaab credits/hour measured over >= 1 h
 - Blocked by: none
 
-### layer2-suggested-grade-1102 — CLOSED 2026-11-02 (GOAL MET) — opened 2026-11-02 — session 2486a60b-8b57-4282-a59f-c39e719113d2
-- Goal: Grade Suggested vs all priced for 10-31/11-01 and pooled 10-17..11-01 and record it
-- Files: .syndicate/findings_2026-11-02_suggested_grade.md
-- Hypothesis: n/a
-- Falsification test: n/a
-- Verification: findings_2026-11-02_suggested_grade.md written, log/2026-11-02.md appended, state_layer2.md [layer2-suggested-opps] Graded-on line replaced in place.
-- **CLOSED 2026-11-02 10:55 AM CST. Goal, verbatim: "Grade Suggested vs all priced for 10-31/11-01 and pooled 10-17..11-01 and record it" -- GOAL: MET.** Pooled -1.1% per bet / +1.8% ladders once (5,353 / 551 g) vs all priced -12.6%; EV at Shin close pooled +0.45% [-0.20, +1.07], third window -0.61% (soccer -4.86%; +0.22% without). Recommendation keep 2% (user's call). Owed elsewhere (not this lane): alt-ladder cap exceeded on 210/210 multi-rung ladders 10-27..11-01 -- held-orders read via the 3,000-row `_load()` document (hypothesis), findings §7.
-- Blocked by: none
-
 ### stake-band-off — CLOSED 2026-11-02 (GOAL MET: band OFF 18:23Z, new refresh-worker environ band_on=0; deploys fa0abcfde) — opened 2026-11-02 — session 86352bc9-921d-487c-bd24-c943dc6b8b98
 - Goal: Live $5-$10 stake band OFF on the fleet: the new refresh-worker's /proc environ has SYNDICATE_LIVE_STAKE_BAND=on count 0 (user 11-02: 'yes, turn the band off'; paper-bet-optimization forward #2 venue+live ROI -11.0 +/- 4.2, n 600)
 - Files: none in the repo (fleet ~/syndicate-prod/local_production.env only)
@@ -668,6 +659,11 @@ death, never life — do not invert it.
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - Verdict: GOAL MET — owner_liveness --idle-min 240 SAFE for 1 of 9 CLOSED blocks; moved `closed-lane-archive-20261102-1037`. Table in log/2026-11-02.md.
+
+### closed-lane-archive-20261102-1640 — CLOSED 2026-11-02 (GOAL MET: 1 block archived) — opened 2026-11-02 — session fd5e3ad8-a68b-4e37-ad07-a5143353d308
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Result: GOAL MET. owner_liveness.py --idle-min 240 gave SAFE for 1 of 9 CLOSED blocks; moved `layer2-suggested-grade-1102` (owner 2486a60b idle 341m, block last modified 344m). 8 deferred; table in log/2026-11-02.md.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -923,6 +919,7 @@ death, never life — do not invert it.
 - `layer2-prior-date-live-carryover` — CLOSED 2026-09-20 — GOAL MET: on the night of 2026-09-19, 8 games were live across the 05:00Z roll (MLB MIN@LAA last play 05:15:24Z; NCAAF UAB@UL 06:42:43Z, the last of 7); the carryover made 12 builds 05:05:31–06:46:32Z and stopped on `reason=nothing_live_at_last_build` at 06:52:51Z, 10.1 min after that final play and 4.1 h before the 6 h cap; the served 09-19 shortlist reads `written_at` 09:04:12Z with 0 `game_state=live` and 0 `rows_live_state_stale` — opened 2026-09-13 — session 887508de-2233-46fd-ae82-2ad385de111c (ARCHIVED 2026-09-13 at the user's request; the readings belonged to scheduled tasks `layer2-carryover-roll-reading-0914`, `layer2-carryover-crossing-reading-0915`, `-0919` and `-0920`, and `-0920` recorded R3).
 - `layer2-sim-disagrees` — **CLOSED-VERIFIED 2026-09-08** — opened 2026-09-03 — session 3492626c-1ec4-4366-9dbe-f194ae319c84 — **ANSWERED, FIXED, LANDED, AND SHIPPED: the fix is
 - `layer2-stale-quote-sample` — CLOSED 2026-10-05 — opened 2026-10-04 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
+- `layer2-suggested-grade-1102` — CLOSED 2026-11-02 (GOAL MET) — opened 2026-11-02 — session 2486a60b-8b57-4282-a59f-c39e719113d2
 - `layer2-suggested-opps` — CLOSED 2026-10-26 (GOAL MET) — opened 2026-10-13 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
 - `layer2-today-next-day-starvation` — CLOSED-ABANDONED 2026-10-30 (stale-lane-triage, user-approved) — opened 2026-09-17 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
 - `layer2-unmeasured-per-line` — CLOSED 2026-10-05 — opened 2026-10-05 — session f028352c-8cd6-4236-9dae-f51b4216c08c
