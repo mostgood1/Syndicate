@@ -1327,3 +1327,54 @@ nothing; teams are healthy at the start of the season. Status mix OUT .986 / Q .
 a few healthy teams persist, B2 can fail on the forward window for the same benign reason, and 218c26dd says the read
 then WAITS. Whether to amend B2 (e.g. "every unlisted team-game is verified absent-or-Available in the PDF text")
 is a pre-registration change for the user to decide BEFORE the read; nothing is amended here.
+
+**PRE-REGISTRATION — B2' AMENDMENT to step 3c's (218c26dd) injury-feed gate B2, 2026-11-02 16:50Z (10:50 CST), on the
+user's request ("pre-register the B2 amendment"). Registered BEFORE any forward-window data past 11-01 exists; the
+forward feed so far (11-01) passes the original B2 8/8.**
+
+**Why:** B2's 95% bar was set on 2025-26 Nov-Feb. The 2026-27 shakedown (10-20..10-31, outside the window) lists 92.6%
+of team-games, and all 13 unlisted were healthy teams (see the feed-build record above). Under 218c26dd a B2 miss makes
+the read WAIT, so healthy teams alone could hold the read indefinitely. An unlisted team-game puts no rows in the feed
+either way; what B2 has to rule out is a team that HAD out players and was lost in parsing.
+
+**Rule (replaces only how a B2 miss is handled; B1 and B3 are unchanged; applies only to the step-3c forward feed,
+2026-11-01..read date; not retroactive):** the feed gate passes on B2 if EITHER
+- (B2) listed ≥ 95% of team-games, as registered; OR
+- (B2') ALL of:
+  - (i) listed ≥ 85% of team-games (floor against a wholesale format break);
+  - (ii) EVERY unlisted team-game is classed ABSENT or AVAILABLE_ONLY by the verifier;
+  - (iii) control: ≥ 99% of LISTED team-games are classed HAS_STATUS (the verifier can see a real listing).
+Otherwise the read waits, as registered. NOT_SUBMITTED, HAS_STATUS (a parse loss), EMPTY_SECTION, NO_BLOCK and NO_REPORT
+are never benign. When B2' is what passes, the read reports both B2 and B2' and lists every unlisted team-game.
+
+**Verifier** `C:/tmp/bball_sc/r2s/b2_verify.py` (not in git, like stage3b.py), **sha256 07dd34db7551897989aacd278c1ac84a4d891a4e7fcc421a3498f3b2c69b6c67**,
+checked before the read. For each team-game it re-picks the build's own tip − 30 report (`pick_report`), reads the
+text with pypdf, finds the game's block (`AWY@HOM` token to the next `@` token) and the team's section inside it by
+nickname, and classes it. HAS_STATUS (Out / Doubtful / Questionable / Probable) is checked before NOT YET SUBMITTED.
+LISTED = the feed CSV has a row for (date, team), the build's own definition. `r2s/build_inj2627.sh` now runs it over
+2026-11-01..END after the feed (output `inj2627/b2v_feed.json`), so re-running the build before the read produces it.
+
+**Calibration (all outside the forward window, or the one forward slate already seen):**
+
+| run | team-games | listed | unlisted classes | control (listed HAS_STATUS) | B2 | B2' |
+|---|---|---|---|---|---|---|
+| shakedown 10-20..10-31 | 176 | 163 (92.6%) | ABSENT 7, AVAILABLE_ONLY 6 | 163/163 | fail | pass |
+| feed 11-01 | 8 | 8 | — | 8/8 | pass | pass |
+| 2025-26 FIT 11-01..03-01 | 1,640 | 1,627 (99.2%) | AVAILABLE_ONLY 6, ABSENT 3, **NOT_SUBMITTED 4** | 1,627/1,627 | pass | (ii) fails |
+
+- The shakedown classes reproduce the hand check exactly (7 no section, 6 Available-only; same team-games).
+- The 2025-26 run shows the failing branch fires: 4 unlisted team-games on 2026-01-25 (DEN@MEM, DAL@MIL) were NOT YET
+  SUBMITTED at tip − 30, so B2' alone would NOT have cleared that season; it passed on the original B2.
+- **Disclosed design change before the freeze:** the first version checked NOT YET SUBMITTED before real statuses; on
+  2025-26 that classed 16 LISTED team-games as NOT_SUBMITTED (their game block runs on into a later NOT YET SUBMITTED
+  line), control 99.02%. The order was swapped; the control is now 100% on all three runs. For an unlisted team-game
+  the swap cannot make anything benign (both classes fail (ii)).
+- **Disclosed:** the 85% floor was chosen after seeing the shakedown's 92.6%; it is not fitted to a pass/fail edge on
+  any run above.
+
+- **Wiring checked:** the full `build_inj2627.sh 2026-11-01` re-run (10:42 CST) printed the verifier's sha256 and
+  B2_amended_pass true; the feed CSV is byte-identical (sha256 6566bbe709d812c9...).
+
+**Before the read:** re-run `build_inj2627.sh <read date> <newer backup stamp>`; check the verifier's sha256 (printed by
+the script) and stage3b.py / launch_fit_inj.sh as already registered; read `feed.json` B1/B3 and `b2v_feed.json`
+`B2_amended_pass`. Nothing changes in code or config; nothing is scored.
