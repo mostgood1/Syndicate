@@ -160,7 +160,36 @@ def load_player_priors(game_date: dt.date, *, dirs: Optional[Sequence[Path]] = N
     with path.open(encoding="utf-8", newline="") as fh:
         for row in csv.DictReader(fh):
             by_team.setdefault(str(row.get("team_id") or ""), []).append(row)
+    # A TEAM WITH NO IN-SEASON ROWS YET TAKES ITS PRESEASON ROWS (2026-11-02, lane ncaab-board-slate, user-approved
+    # loan). The in-season table carries only teams with box rows, so the first few finals replaced the preseason
+    # table for EVERY team: on the 11-02 opener `player_priors_2027_asof_20261102` held 4 teams while
+    # `player_preseason_2027_asof_20261101` held 346, and every other game refused. The builder blends the same
+    # preseason rows into a team once it has played; a team that has not played gets them unblended.
+    preseason = _newest_preseason(season, game_date, dirs)
+    if preseason is not None:
+        with preseason.open(encoding="utf-8", newline="") as fh:
+            filled: dict[str, list[dict[str, Any]]] = {}
+            for row in csv.DictReader(fh):
+                tid = str(row.get("team_id") or "")
+                if tid not in by_team:
+                    filled.setdefault(tid, []).append(row)
+        by_team.update(filled)
     return PlayerPriors(season=season, as_of=as_of, source=str(path), by_team=by_team)
+
+
+_PRESEASON_RE = re.compile(r"player_preseason_(\d{4})_asof_(\d{8})\.csv$")
+
+
+def _newest_preseason(season: int, game_date: dt.date, dirs: Optional[Sequence[Path]]) -> Optional[Path]:
+    found: list[tuple[dt.date, Path]] = []
+    for d in dirs if dirs is not None else _processed_dirs():
+        if not Path(d).is_dir():
+            continue
+        for path in Path(d).glob(f"player_preseason_{season}_asof_*.csv"):
+            m = _PRESEASON_RE.search(path.name)
+            if m and dt.datetime.strptime(m.group(2), "%Y%m%d").date() <= game_date:
+                found.append((dt.datetime.strptime(m.group(2), "%Y%m%d").date(), path))
+    return max(found)[1] if found else None
 
 
 def _num(value: Any) -> float:

@@ -198,14 +198,22 @@ def table_for_game(game_date: dt.date, *, dirs: Optional[Iterable[Path]] = None)
         s, a, p = this_season[-1]
         table = table_from_rows(_read_csv(p), season=s, as_of=a, source=str(p))
     else:
-        earlier = [(s, a, p) for s, a, p in files if s < season]
-        if not earlier:
+        table = _prior_season_table(game_date, dirs=dirs)
+        if table is None:
             return NcaabPriorRefusal("no_ratings_table", f"no team_ratings_<season>_asof_*.csv before {game_date} in {[str(d) for d in (dirs or ratings_dirs())]}")
-        s, a, p = earlier[-1]
-        table = table_from_rows(_read_csv(p), season=s, as_of=a, source=str(p), regress_toward_mean=PRIOR_REGRESSION)
+        return table
     if table is None:
         return NcaabPriorRefusal("no_ratings_table", f"{p} has no rated rows")
     return table
+
+
+def _prior_season_table(game_date: dt.date, *, dirs: Optional[Iterable[Path]] = None) -> Optional[NcaabRatingsTable]:
+    """Last season's newest table, regressed toward the mean -- the preseason prior."""
+    earlier = [(s, a, p) for s, a, p in _table_files(dirs) if s < espn_season_for(game_date)]
+    if not earlier:
+        return None
+    s, a, p = earlier[-1]
+    return table_from_rows(_read_csv(p), season=s, as_of=a, source=str(p), regress_toward_mean=PRIOR_REGRESSION)
 
 
 # -------------------------------------------------------------------- prior
@@ -242,7 +250,21 @@ def game_prior(table: NcaabRatingsTable, home_id: str, away_id: str, *, neutral:
 
 
 def prior_for_game(game_date: dt.date, home_id: str, away_id: str, *, neutral: bool, dirs: Optional[Iterable[Path]] = None) -> PriorResult:
+    """THE PRESEASON FALLBACK IS PER GAME, not per season (2026-11-02, lane ncaab-board-slate, user-approved
+    loan: "Fix + ship together"). `table_for_game` falls back to last season's regressed table only while the
+    season has NO table at all, so the first handful of finals switched every game onto an in-season table:
+    measured on the 11-02 opener, `team_ratings_2027_asof_20261101` rated 4 teams and the live re-sim refused
+    7 of 7 live games `team_unrated`, with the 361-team 2026 table unused. A game whose two teams are not both
+    rated this season is priced off last season's table (both sides from the SAME table, so one league mean),
+    flagged `prior_season_fallback`; once both teams are rated this season, this season's table wins."""
     table = table_for_game(game_date, dirs=dirs)
     if isinstance(table, NcaabPriorRefusal):
         return table
-    return game_prior(table, home_id, away_id, neutral=neutral)
+    result = game_prior(table, home_id, away_id, neutral=neutral)
+    if isinstance(result, NcaabPriorRefusal) and result.reason == "team_unrated" and not table.prior_season_fallback:
+        fallback = _prior_season_table(game_date, dirs=dirs)
+        if fallback is not None:
+            retry = game_prior(fallback, home_id, away_id, neutral=neutral)
+            if not isinstance(retry, NcaabPriorRefusal):
+                return retry
+    return result
