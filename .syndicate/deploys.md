@@ -55564,3 +55564,55 @@ Read-only scheduled reading (task ncaab-1102-board-check). Readings 08:01:48Z-08
   - tonight's 11-03 04:00Z check: the big series has moved or the 0-series' backlog is nearly read;
   - the 11-03 16:00Z read: the big series' lag is below 45 h and falling.
   - If either misses, the lever is extra catch-up runs, which is the user's decision; the purge leaves until 11-04 03:42Z.
+
+## 2026-11-02 20:05:38Z (2:05 PM CST) -- FLEET ff 308da1f38 -> b51b2ddc4 -> ff2a4b53c -> 8e042af87 + reload-web x3: WNCAAB module (Phase 1) + college rail momentum (Phase 2) + a neutral-site score fix -- **web MET; live-odds-worker + refresh-worker restarts OWED** (lane `wncaab-module`)
+- **why:** user 11-02 asked for a WNCAAB module modelled on NCAAB (front end, Layer 1/Layer 2, Games rail, odds capture, in-play lane, sims), and for NBA-style game shape / momentum on NCAAB's rail. The women's D1 season opened TODAY (ESPN 11-02: 164 events, 94 D1-vs-D1), with games live at deploy time.
+- **change:**
+  - `bece3283b` WNCAAB Phase 1:
+    - One league config (`college_basketball/league.py`). NCAAB keeps its exact constants; its modules take `league="ncaab"` by default.
+    - `wncaab_team_registry.csv` (362) and a women's slate (`wncaab_source/data/scoreboard/`).
+    - `refresh_ncaab_odds_history.py --league wncaab` (OddsAPI `basketball_wncaab`). Quarter and half lines are fetched only while that segment is open.
+    - Orchestrator `SportSpec` + weekly carve-out.
+    - In-play lane `live-odds-worker-wncaab-live`: 240 s, one guarded call in `run_live_odds_refresh_worker.py`, a user-approved loan from kalshi-exit-path / in-game-trading.
+    - Chips Q1..Q4/OT, and the Layer 1/Layer 2 sport lists.
+    - `intelligence.html` tab (loan from dh-state-aware-pairing).
+    - `/wncaab` blueprint + nav (`syndicate/app.py`, loan from cheat-sheets).
+    - Kalshi women's tickers classified before NCAAB (classification only).
+  - `62bb94965` Phase 2:
+    - `college_basketball/momentum_capture.py`: a live-odds-worker thread, every 150 s, writes the run narrator and play-by-play team fouls/bonus to `<league>_source/.../momentum_events_<date>.json`. ESPN's college `fouls` header block is a placeholder: bonusState DOUBLE for every women's team, NONE for every men's, 0 fouls.
+    - `live_detail` and the serve-time chip line show run + bonus.
+    - Serve-time ESPN D1 board (`groups=50`) refreshes H1/H2/Q1..Q4/OT clocks and period lines for ncaab + wncaab.
+  - `8e042af87` fix: serve-time ESPN periods follow the chip's sides.
+- **ride-alongs (runtime):** `6af0a1ce6` + `26d8be509` (lane college-basketball-settlement: `bet_status_ncaab/wncaab`, `paper_settlement`, `population_outcomes_espn`, scorecard). Ledger only otherwise; no vendor/.
+- **gates:**
+  - Claims web + live-odds-worker under wncaab-module at 20:03:51Z.
+  - Web preflight CLEAR before each ff: b51b2ddc4 20:04Z, ff2a4b53c 20:33Z, 8e042af87 20:36:53Z.
+  - The refresh-worker claim was HELD by college-basketball-settlement (mid-drain) and was not forced. That session agreed to restart it on the current SHA.
+- **deploy:**
+  - ff b51b2ddc4 20:05:38Z, then `reload-web` 2.2 s, 0 failures.
+  - ff ff2a4b53c 20:33:54Z, then reload 2.6 s.
+  - ff 8e042af87 20:37:0xZ, then reload 12.0 s, 0 failures.
+- **seed:** the women's slate artifact was written once from the fleet at 20:06:43Z, with the worker's own `refresh_slate(league="wncaab")` (one ESPN call), so web had a slate before the refresh-worker restart. 11-02: 94 games (6 live / 11 final); 11-03: 26.
+- **verify (web):**
+  - 20:06:54Z: `/wncaab/cards` 404 -> **200**; `/wncaab/api/source/cards` 94 cards, gameType WNCAAB; `/wncaab/market-board` 200; `/ncaab/cards` 200 (unchanged).
+  - Browser: "94 games · 77 upcoming · 6 live · 11 final", live quarter tokens.
+  - 20:34:10Z, serve-time college clock: 401911469 `H1 9:57` (worker) -> `H1 9:18`; 401911532 `H1 0:00` -> `HALF`. ESPN at the same minute: H1 7:50 and STATUS_HALFTIME.
+- **INCIDENT (ff2a4b53c, 20:34-20:37Z):**
+  - The serve-time ESPN periods were applied in ESPN's away/home order.
+  - A neutral-site college game is oriented to the odds feed (`ncaab/slate.orient_neutral_site_games`). 401911532 carded NKU @ UTEP, while ESPN lists UTEP @ NKU.
+  - The served chip read **NKU 38, UTEP 42 while NKU led 42-38**, because the period sum also rewrites the score.
+  - Fixed forward in `8e042af87`: swap when ESPN's sides are the chip's reversed. 20:37:30Z: NKU 42, UTEP 38, matching ESPN (home NKU 42, away UTEP 38). About 3 minutes of wrong scores on 1 live neutral-site chip.
+- **NOT DONE (owed):**
+  - **live-odds-worker TERM.** It loads the wncaab sweep, the in-play lane, and the momentum capture thread. Preflight read HOLD continuously from 20:04Z to 20:35Z (6-17 odds jobs in flight) and the guard holds the TERM.
+    - I misread a timed-out wait loop's exit 0 as CLEAR and sent a TERM at 20:35Z. **deploy-guard blocked it** (newest receipt HOLD, 8 jobs). Nothing was killed.
+    - Re-armed with a timeout that exits non-zero.
+  - **refresh-worker restart** (college-basketball-settlement's claim). It loads wncaab chips, the grid loop, Layer 2 lists, and `_WNCAABDataProvider`. Layer 1 wncaab reads `no_precomputed_grid_artifact` and game-chips has 0 wncaab chips until then.
+- **verify (OWED, after both restarts):**
+  - `game-chips sports=wncaab` > 0;
+  - `layer1 sport=wncaab` games > 0;
+  - Layer 2 `PER_SPORT_INGEST wncaab`;
+  - quote log rows with `full`/`q*` segments;
+  - `WNCAAB_LIVE_AUTORUN_LAUNCHED`;
+  - `[college_momentum] CAPTURED league=wncaab ... written=True`;
+  - a live chip with `on a N–M run` or `in bonus`;
+  - `by_sport.wncaab` credits/h.
