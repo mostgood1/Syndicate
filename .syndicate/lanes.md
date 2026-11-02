@@ -657,6 +657,14 @@ death, never life — do not invert it.
 - Verification: Fleet after deploy: settlement for 2026-11-02 grades both NCAAB orders (Richmond vs UNC Asheville, Yale vs Howard) with outcome matching ESPN's final; scorecard grades ncaab rows; deploys.md entry
 - Blocked by: none
 
+### wncaab-module — OPEN — opened 2026-11-02 — session 547fe65e-71ca-4e19-9589-237553cb4eab
+- Goal: Women's college basketball (wncaab) runs like NCAAB on the fleet: /wncaab parity cards page + market board + hub, D1 slate, OddsAPI basketball_wncaab capture (bulk + 240 s in-play quarter/half lines), game chips on the Layer 2 rail, Layer 1 board, Layer 2 market-fair rows; then (Phase 3) pregame sims for ncaab + wncaab straight to the boards and a wncaab live re-sim, under the model engine standard
+- Files: syndicate/features/college_basketball/ (new), syndicate/features/wncaab/ (new), syndicate/blueprints/wncaab.py (new), syndicate/templates/wncaab/ (new), syndicate/features/shared/wncaab_team_registry.csv (new), syndicate/features/shared/ncaab_team_registry.py (league param), scripts/build_ncaab_team_registry.py (--league), syndicate/features/ncaab/slate.py + source_cards.py + inplay_lane.py (league param, ncaab default), scripts/refresh_ncaab_odds_history.py (--league, quarters), scripts/refresh_odds_sources.py (wncaab steps), syndicate/features/shared/market_segments.py + team_aliases.py + team_logos.py + game_chip_scoreboard.py + game_chip_linescore.py + game_chip_detail.py + layer1_board.py + book_grid_artifact.py + kalshi_catalogue.py + live_refresh_loop.py (wncaab entries only), syndicate/blueprints/home.py (_WNCAABDataProvider only), syndicate/blueprints/layer1_page.py + sports.py, syndicate/features/intelligence.py (sport lists only), scripts/run_refresh_worker.py (grid sport list only), tests/test_wncaab_*.py, LOANS user-approved 2026-11-02 'Take all three': syndicate/app.py (blueprint + SYNDICATE_SPORTS entry; lane cheat-sheets), syndicate/templates/intelligence.html (sport tab + game-chips query; lane dh-state-aware-pairing), scripts/run_live_odds_refresh_worker.py (one guarded wncaab in-play call; lanes kalshi-exit-path, in-game-trading)
+- Hypothesis: n/a (build)
+- Falsification test: n/a
+- Verification: Fleet after deploy: /api/board/game-chips sports=wncaab > 0, /wncaab/api/source/cards games > 0, /api/board/layer1 sport=wncaab games > 0 with rows enriched, Layer 2 PER_SPORT_INGEST wncaab(cand>0), wncaab quote log with full/q* segments and 0 mixed-line groups, WNCAAB_LIVE_AUTORUN_LAUNCHED during the 11-03 opener, by_sport.wncaab credits/h vs ~950/h estimate; Phase 3: input checklist exit 0, pregame projections on Layer 1/Layer 2 for both sports, wncaab re-sim resimmed > 0
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
