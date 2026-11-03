@@ -126,24 +126,28 @@ _MODULE_ISOLATION = None
 
 
 def setUpModule() -> None:
-    """Two redirects, both shared with `conftest.py` so they cannot drift.
+    """Three redirects, all shared with `conftest.py` so they cannot drift.
 
     The cards-context publish writes `data/live/` in-process; the vendored
     `fetch-schedule` CLI writes the tracked `vendor/.../schedule_2026.*` from a
     CHILD process, which no in-process guard can see. Both were measured under
-    this module, and this is the runner CI gates on.
+    this module, and this is the runner CI gates on. The college slate refresh
+    (an ESPN fetch that writes `data/ncaab_source/`) is reached from the NCAAB
+    cards page this module renders.
     """
     global _MODULE_ISOLATION
     import contextlib as _contextlib
 
     from tests._artifact_isolation import (
         isolated_wnba_cards_context,
+        no_college_slate_fetch,
         no_vendored_basketball_schedule_fetch,
     )
 
     _MODULE_ISOLATION = _contextlib.ExitStack()
     _MODULE_ISOLATION.enter_context(isolated_wnba_cards_context())
     _MODULE_ISOLATION.enter_context(no_vendored_basketball_schedule_fetch())
+    _MODULE_ISOLATION.enter_context(no_college_slate_fetch())
 
 
 def tearDownModule() -> None:

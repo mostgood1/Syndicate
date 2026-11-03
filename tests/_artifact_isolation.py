@@ -120,3 +120,24 @@ def no_vendored_basketball_schedule_fetch() -> Iterator[None]:
 
     with patch.object(schedule_adapter, "_fetch_basketball_schedule_via_cli", return_value=False):
         yield
+
+
+@contextlib.contextmanager
+def no_college_slate_fetch() -> Iterator[None]:
+    """Stop `ncaab.slate.slate_games` from refreshing the D-I slate under test.
+
+    `slate_games` refreshes when the caller is a worker, and "worker" is
+    `game_chip_plays._is_worker()`: any process gunicorn did not start. A test
+    process is one, so every test that reached `/ncaab`, `/wncaab`, the game
+    chips or the Layer 2 shortlist fetched ESPN's live scoreboard and wrote
+    `data/{ncaab,wncaab}_source/data/scoreboard/` into the tracked mirror.
+    Measured 2026-11-03: 184 guarded writes behind 81 teardown errors in one run.
+
+    Patched at the role check, not at `refresh_slate`: the slate tests call
+    `refresh_slate(..., fetch_json=...)` directly and pass `refresh=True` when they
+    mean the worker path, so both keep working; only the implicit refresh goes.
+    """
+    from syndicate.features.ncaab import slate
+
+    with patch.object(slate, "_is_worker", return_value=False):
+        yield

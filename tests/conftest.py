@@ -277,6 +277,24 @@ def _install_vendored_schedule_fetch_block() -> None:
 _install_vendored_schedule_fetch_block()
 
 
+# Same shape, same reason (threads outlive tests): the college D-I slate refresh is a
+# live ESPN fetch that writes the tracked mirror. See `no_college_slate_fetch`.
+_COLLEGE_SLATE_FETCH_BLOCK = None
+
+
+def _install_college_slate_fetch_block() -> None:
+    global _COLLEGE_SLATE_FETCH_BLOCK
+    if _COLLEGE_SLATE_FETCH_BLOCK is not None:
+        return
+    from tests._artifact_isolation import no_college_slate_fetch
+
+    _COLLEGE_SLATE_FETCH_BLOCK = no_college_slate_fetch()
+    _COLLEGE_SLATE_FETCH_BLOCK.__enter__()
+
+
+_install_college_slate_fetch_block()
+
+
 @pytest.fixture(autouse=True)
 def _isolate_wnba_cards_context_publish(tmp_path_factory):
     """THE FOURTH INSTANCE, and the first one under `data/` rather than `reports/`.

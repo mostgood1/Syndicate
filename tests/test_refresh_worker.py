@@ -501,7 +501,7 @@ class RefreshWorkerTests(unittest.TestCase):
         ):
             self.assertEqual(module._active_weekly_sports_for_date("2026-07-15"), "")
             self.assertEqual(module._active_weekly_sports_for_date("2026-10-15"), "nfl,ncaaf")
-            self.assertEqual(module._active_weekly_sports_for_date("2026-12-01"), "nfl,ncaaf,ncaab")
+            self.assertEqual(module._active_weekly_sports_for_date("2026-12-01"), "nfl,ncaaf,ncaab,wncaab")
 
     def test_active_weekly_sports_for_date_yields_sports_the_fast_tick_claims(self) -> None:
         # The other half of the ownership partition. A sport with games in the

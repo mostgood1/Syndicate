@@ -18,7 +18,7 @@ from syndicate.app import app
 
 CANONICAL = [
     "Home", "The Syndicate", "Betting Board", "Cheatsheets", "Portfolio",
-    "MLB", "NBA", "NHL", "NFL", "WNBA", "NCAAF", "NCAAB", "Soccer",
+    "MLB", "NBA", "NHL", "NFL", "WNBA", "NCAAF", "NCAAB", "WNCAAB", "Soccer",
 ]
 
 
