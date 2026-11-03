@@ -113,10 +113,21 @@ def test_neutral_site_game_takes_the_odds_feed_orientation_and_a_home_game_never
     ("Mt. St. Mary's Mountaineers", "Mount St. Mary's Mountaineers"),
     ("UMKC Kangaroos", "Kansas City Roos"),
     ("Queens University Royals", "Queens University Royals"),
+    # 2026-11-03 slate (each drew a chip-less card on the Games rail).
+    ("Cal Baptist Lancers", "California Baptist Lancers"),
+    ("CSU Fullerton Titans", "Cal State Fullerton Titans"),
+    ("Fort Wayne Mastodons", "Purdue Fort Wayne Mastodons"),
+    ("New Orleans Privateers", "LSU New Orleans Privateers"),
+    ("Sam Houston St Bearkats", "Sam Houston Bearkats"),
 ])
 def test_odds_feed_spellings_join_the_espn_team(odds_feed, espn):
     key = chip_join_key("ncaab", odds_feed)
     assert key is not None and key == chip_join_key("ncaab", espn)
+
+
+def test_womens_odds_feed_spelling_joins_the_lady_lions():
+    key = chip_join_key("wncaab", "Penn State Nittany Lions")
+    assert key is not None and key == chip_join_key("wncaab", "Penn State")
 
 
 def test_derived_spellings_do_not_make_ambiguous_mascots_keys():

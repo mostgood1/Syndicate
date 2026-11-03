@@ -152,4 +152,13 @@ _ODDS_FEED_ALIASES: tuple[tuple[str, str], ...] = (
     ("Grand Canyon Antelopes", "Grand Canyon"),
     ("Long Beach St 49ers", "Long Beach State"),
     ("Seattle Redhawks", "Seattle U"),
+    # 2026-11-03: the 11-03/11-04 slates brought these (every unresolved name across the 11-01..11-05 quote logs,
+    # both leagues). Unresolved, the Games rail drew a chip-less "N opportunities" card for each game, and the
+    # live re-sim's margin anchor could not find the game's close.
+    ("Cal Baptist Lancers", "California Baptist"),
+    ("CSU Fullerton Titans", "Cal State Fullerton"),
+    ("Fort Wayne Mastodons", "Purdue Fort Wayne"),
+    ("New Orleans Privateers", "LSU New Orleans"),
+    ("Sam Houston St Bearkats", "Sam Houston"),
+    ("Penn State Nittany Lions", "Penn State"),  # the women's registry carries ESPN's "Lady Lions"
 )
