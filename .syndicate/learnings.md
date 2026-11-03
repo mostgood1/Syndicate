@@ -3170,3 +3170,10 @@ Three ESPN college fields were wrong in three different ways on opening night:
 2. Leave a standing guard where the reconciliation is cheap. The run line now refuses rows whose sum exceeds the card's score.
 
 Related, same session: a model that ranks well can still be on the wrong SCALE. The pregame sim's margins correlated 0.90 with the market's at slope 0.51, from two shrinks compounding (calibration_k 0.78 x a 30% preseason regression). Measure the slope, not only the correlation, before publishing edges.
+
+### `[2026-11-02, lane college-basketball-settlement]` `check_deploy_safety.py --drain` needs the refresh-worker's WHOLE environment, not just the state-backend variables
+The belief: the drain flag and the worker heartbeat live in the shared keyvalue store, so `SYNDICATE_REFRESH_STATE_BACKEND` + its URL are enough to drain from a shell. Measured on the fleet 11-02 19:49Z: the drain keys derive from `reports_root()`, which reads other env vars. A shell with only the backend vars wrote the flag under a stray key, and read the worker as `unknown` for 18 min. Run 2, under the worker's own environment, keyed correctly at once.
+
+**Rule:**
+1. Run `--drain` / `--undrain` under the target role's full environment: read `/proc/<pid>/environ` in Python and `execve` the check. Never print or list the values (secrets).
+2. A drain that reads `unknown` for more than one heartbeat is mis-keyed, not slow. Stop, `--undrain` with the same environment that drained, and re-run correctly.
