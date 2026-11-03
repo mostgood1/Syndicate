@@ -35,6 +35,8 @@ A refusal publishes a `pregame_only` lane with NO probability (`#414`), which
 `live_gameline_join.LIVE_LENS_SOURCES_BY_SPORT["ncaab"]` rejects by its stamp. The budget is a
 refusal, not fewer sims (`simsRun` is what the join's precision gate trusts).
 
+The served full-game MARGIN is market-anchored (user 2026-11-03): see "margin anchor" below.
+
 --------------------------------------------------------------------------
 THE SLATE IS BIGGER THAN NBA'S, so a tick ROTATES
 --------------------------------------------------------------------------
@@ -125,6 +127,7 @@ class ResumeFacts:
     last_seq: int
     as_of: str
     score_source: str = "official"
+    tip_wallclock: str = ""  # the first play's ESPN wall clock: the actual tip, the margin anchor's close cutoff
 
 
 @dataclass(frozen=True)
@@ -472,6 +475,7 @@ def resume_from_summary(summary: Mapping[str, Any], *, date: str = "", as_of: st
         home_score=int(sum(hp)), away_score=int(sum(ap)), period=period, clock_seconds=float(clock),
         possession=state.possession_side, last_seq=int(state.last_seq),
         as_of=as_of or state.built_at or _utc_now_iso(), score_source=score_source,
+        tip_wallclock=min((str(e.wallclock) for e in rec.events if getattr(e, "wallclock", "")), default=""),
     )
     return state, gs, facts
 
@@ -587,6 +591,206 @@ def board_name(espn_display: str, odds_names: Mapping[str, str], league: str = L
     return espn_display, "espn_display"
 
 
+# ------------------------------------------------------------------------------------------- margin anchor
+
+# LIVE MARGINS ARE MARKET-ANCHORED (user 2026-11-03 "Anchor them", both leagues). The sim's margins run at about
+# 0.69 of the market's (2026-11-02, 102 games), so a live spread or moneyline priced straight off the sim carried
+# that scale defect as an "edge": measured on the first live women's game, ECU -26.5 read -27 pp. Pregame, the
+# same defect is answered by serving the de-vigged fair (`college_game_projections`); live, that would erase the
+# in-game information too. So the live FULL-GAME margin is shifted by the game's PREGAME gap -- the closing
+# consensus home margin minus the pregame sim's home margin -- frozen at tip. At the tip the anchored margin IS
+# the market's; every edge after that comes from what the sim makes of the game state. Totals stay raw (the
+# pregame decision), and so do the half/quarter histograms, which the live join does not price.
+#
+# A game with no closing spread or no pregame sim margin REFUSES by name (`no_margin_anchor`) before it is simmed:
+# a raw margin would bring the defect back, and such a game has no priced board row to lose. ABSENT IS ON (the
+# user's decision); `SYNDICATE_COLLEGE_LIVE_MARGIN_ANCHOR=0` serves the raw sim again.
+MARGIN_ANCHOR_ENV = "SYNDICATE_COLLEGE_LIVE_MARGIN_ANCHOR"
+_ANCHOR_SOURCES_TTL_S = 600.0
+
+
+def margin_anchor_enabled(env: Optional[Mapping[str, str]] = None) -> bool:
+    raw = str((env if env is not None else os.environ).get(MARGIN_ANCHOR_ENV, "") or "").strip().lower()
+    return raw not in {"0", "false", "off", "no"}
+
+
+@dataclass(frozen=True)
+class MarginAnchor:
+    market_home_margin: float  # closing consensus, in the LIVE home orientation
+    sim_home_margin: float     # the pregame sim's mean, same orientation
+    books: int
+
+    @property
+    def offset(self) -> float:
+        return self.market_home_margin - self.sim_home_margin
+
+    def as_dict(self) -> dict[str, Any]:
+        return {"marketHomeMargin": round(self.market_home_margin, 2), "simHomeMargin": round(self.sim_home_margin, 2),
+                "offset": round(self.offset, 2), "books": self.books, "source": "book_quotes_close+pregame_sim"}
+
+
+def _join_key(league: str, name: Any) -> str:
+    from syndicate.features.shared.team_aliases import chip_join_key
+
+    text = str(name or "").strip()
+    return chip_join_key(league, text) or text.lower()
+
+
+def _utc(value: Any) -> Optional[datetime]:
+    """An ISO timestamp as an aware UTC datetime, or None. PARSED, never compared as text: the quote log writes
+    `commence_time` as `2026-11-03 16:00:00+00:00` and `snapshot_ts` as `2026-11-03T16:00:02...`, and as strings
+    every same-day quote sorts AFTER its own commence (' ' < 'T') -- measured on the 11-03 women's shard."""
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+# (observed at, book, home spread line, commence) for one game's full-game home-spread quotes.
+SpreadQuote = tuple[datetime, str, float, Optional[datetime]]
+
+
+def home_spread_quotes(league: str, date_str: str, *, rows: Optional[Any] = None) -> dict[tuple[str, str], list[SpreadQuote]]:
+    """(home_key, away_key) -> every full-game HOME spread quote of the date's quote-log shard (Central kickoff date)."""
+    from collections import defaultdict
+
+    if rows is None:
+        from syndicate.features.shared.odds_book_quotes import iter_book_quotes
+
+        rows = iter_book_quotes(league, date_str)
+    out: dict[tuple[str, str], list[SpreadQuote]] = defaultdict(list)
+    for row in rows:
+        if (not isinstance(row, Mapping) or row.get("market") != "spreads" or row.get("selection") != "home"
+                or str(row.get("segment") or "full") not in ("full", "full_game") or row.get("line") is None):
+            continue
+        seen = _utc(row.get("snapshot_ts") or row.get("captured_at"))
+        if seen is None:
+            continue
+        try:
+            line = float(row["line"])
+        except (TypeError, ValueError):
+            continue
+        key = (_join_key(league, row.get("home_team")), _join_key(league, row.get("away_team")))
+        out[key].append((seen, str(row.get("bookmaker") or ""), line, _utc(row.get("commence_time"))))
+    return dict(out)
+
+
+def closing_home_margin(quotes: Sequence[SpreadQuote], *, tip: Optional[datetime] = None) -> Optional[tuple[float, int]]:
+    """(closing consensus home margin, books): each book's LAST home spread observed strictly before the tip,
+    then the median across books (per book, not per line, so a line a book stopped offering never votes; the
+    rule of `odds_book_quotes.closing_quotes`). Home margin = -home spread.
+
+    The cutoff is the ACTUAL tip -- the first play's ESPN wall clock -- when known, else the scheduled commence.
+    College games tip minutes after the listed time, and the women's feed can post a game's first line at the
+    listed time itself (ECU 11-03: first quote 16:00:02Z for a 16:00:00Z listing)."""
+    from statistics import median
+
+    latest: dict[str, tuple[datetime, float]] = {}
+    for seen, book, line, commence in quotes:
+        cutoff = tip or commence
+        if cutoff is None or seen >= cutoff:
+            continue
+        if book not in latest or seen > latest[book][0]:
+            latest[book] = (seen, line)
+    if not latest:
+        return None
+    return float(median(-line for _seen, line in latest.values())), len(latest)
+
+
+def pregame_sim_margins(league: str, date_str: str) -> dict[str, tuple[float, str]]:
+    """ESPN event id -> (pregame sim home margin, the sim's home ESPN id), from `pregame_sim_<date>.json`."""
+    from syndicate.features.college_basketball.pregame_sim import read_pregame_sims
+
+    out: dict[str, tuple[float, str]] = {}
+    for event_id, game in ((read_pregame_sims(str(date_str), league) or {}).get("games") or {}).items():
+        margin = game.get("home_margin_mean") if isinstance(game, Mapping) else None
+        if margin is None:
+            continue
+        out[str(event_id)] = (float(margin), str((game.get("home") or {}).get("espn_id") or ""))
+    return out
+
+
+def margin_anchor_for(facts: ResumeFacts, names: Mapping[str, str], *, league: str,
+                      market: Mapping[tuple[str, str], Sequence[SpreadQuote]],
+                      sims: Mapping[str, tuple[float, str]]):
+    """The game's anchor in the LIVE home orientation, or `no_margin_anchor`. A neutral-site game can be oriented
+    differently by the odds feed or the slate than by ESPN's summary; both are flipped onto the live home side."""
+    sim = sims.get(str(facts.event_id))
+    if sim is None:
+        return NcaabResimRefusal("no_margin_anchor", "no pregame sim margin for this game")
+    sim_margin, sim_home = sim
+    if sim_home and sim_home not in (str(facts.home_id), str(facts.away_id)):
+        return NcaabResimRefusal("no_margin_anchor", f"pregame sim home {sim_home} is neither side")
+    if sim_home and sim_home != str(facts.home_id):
+        sim_margin = -sim_margin
+    home, away = _join_key(league, names.get("home")), _join_key(league, names.get("away"))
+    tip = _utc(facts.tip_wallclock)
+    for key, flip in (((home, away), False), ((away, home), True)):
+        close = closing_home_margin(market.get(key) or (), tip=tip)
+        if close is not None:
+            market_margin, books = close
+            return MarginAnchor(market_home_margin=-market_margin if flip else market_margin,
+                                sim_home_margin=sim_margin, books=books)
+    return NcaabResimRefusal("no_margin_anchor", "no closing full-game spread in the quote log")
+
+
+def anchor_result(result: Mapping[str, Any], anchor: MarginAnchor) -> dict[str, Any]:
+    """Shift the full-game margin histogram by `anchor.offset` and re-derive the win probability from it.
+
+    The join reads integer margins and integer counts (`live_gameline_join._two_way_home_prob`), so a fractional
+    offset splits each bucket between its two neighbours, allocated by CUMULATIVE rounding: the counts stay
+    integers, their total is unchanged, and the mean moves by the offset to within 1/sims. A shifted margin of 0
+    (a game cannot end tied) counts half to each side. The sim's own numbers stay on the result (`raw_*`)."""
+    import math
+
+    offset = float(anchor.offset)
+    base = math.floor(offset)
+    frac = offset - base
+    shifted: Counter = Counter()
+    cumulative = 0.0
+    allocated = 0
+    for raw_margin, raw_count in sorted(((int(k), int(v)) for k, v in (result.get("margin_dist") or {}).items()), key=lambda kv: kv[0]):
+        cumulative += raw_count * frac
+        up = int(round(cumulative)) - allocated
+        allocated += up
+        if raw_count - up:
+            shifted[raw_margin + base] += raw_count - up
+        if up:
+            shifted[raw_margin + base + 1] += up
+    n = sum(shifted.values())
+    out = dict(result)
+    out["raw_home_win_prob"] = result.get("home_win_prob")
+    out["raw_home_margin_mean"] = result.get("home_margin_mean")
+    out["margin_anchor"] = anchor.as_dict()
+    if n <= 0:
+        return out
+    out["margin_dist"] = {str(m): c for m, c in sorted(shifted.items())}
+    out["home_margin_mean"] = sum(m * c for m, c in shifted.items()) / n
+    out["home_win_prob"] = (sum(c for m, c in shifted.items() if m > 0) + 0.5 * shifted.get(0, 0)) / n
+    return out
+
+
+_ANCHOR_CACHE: dict[tuple[str, str], MarginAnchor] = {}
+_ANCHOR_SOURCES: dict[tuple[str, str], tuple[float, Any, Any]] = {}
+
+
+def _anchor_sources(league: str, date_str: str, clock: Callable[[], float] = time.monotonic):
+    """(closing margins, pregame sim margins) for a league-date, read at most every 10 minutes. An anchor once found
+    is cached per game for the process (`_ANCHOR_CACHE`), so it never drifts during a game."""
+    key = (league, str(date_str))
+    hit = _ANCHOR_SOURCES.get(key)
+    if hit is not None and clock() - hit[0] < _ANCHOR_SOURCES_TTL_S:
+        return hit[1], hit[2]
+    market = home_spread_quotes(league, str(date_str))
+    sims = pregame_sim_margins(league, str(date_str))
+    _ANCHOR_SOURCES[key] = (clock(), market, sims)
+    return market, sims
+
+
 # ------------------------------------------------------------------------------------------- the lane
 
 def build_game_lens(facts: Optional[ResumeFacts], result: Any, *, live_state_as_of: str = "",
@@ -602,7 +806,7 @@ def build_game_lens(facts: Optional[ResumeFacts], result: Any, *, live_state_as_
             "liveResimRefusal": reason, "liveResimRefusalDetail": detail[:200],
             "liveStateAsOf": live_state_as_of,
         }]
-    return [{
+    lane = {
         "key": "live", "label": "Live", "source": LIVE_RESIM_LENS_SOURCE, "closed": False,
         "modelHomeWinProb": result["home_win_prob"],
         "simsRun": result["sims_run"],
@@ -621,7 +825,13 @@ def build_game_lens(facts: Optional[ResumeFacts], result: Any, *, live_state_as_
         },
         "resumeMatch": dict(match_report or {}),
         "inputs": dict(provenance or {}),
-    }]
+    }
+    if result.get("margin_anchor"):
+        # The served margin is anchored; the sim's own numbers stay beside it.
+        lane["rawModelHomeWinProb"] = result.get("raw_home_win_prob")
+        lane["projection"]["rawHomeMargin"] = result.get("raw_home_margin_mean")
+        lane["projection"]["marginAnchor"] = result["margin_anchor"]
+    return [lane]
 
 
 def _lane_row(event_id: str, names: Mapping[str, str], facts: Optional[ResumeFacts], result: Any,
@@ -732,6 +942,12 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
               if str(ev.get("status_state") or ev.get("state") or "").lower() == "in"]
     ids = [str(ev.get("event_id") or ev.get("id") or "") for ev in events]
     cursor_key = _cursor_key(str(date_str), league)
+    anchor_on = margin_anchor_enabled()
+    if anchor_on:
+        # Never carry forward a priced lane computed before the anchor existed: it would republish the raw margin.
+        previous = {eid: g for eid, g in previous.items()
+                    if all(lane.get("source") != LIVE_RESIM_LENS_SOURCE or (lane.get("projection") or {}).get("marginAnchor")
+                           for lane in g.get("gameLens") or [])}
     start = _ROTATION_CURSOR.get(cursor_key, 0) % max(1, len(ids)) if ids else 0
     order = ids[start:] + ids[:start]
     games: dict[str, dict[str, Any]] = {}
@@ -771,9 +987,26 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
             games[event_id] = _lane_row(event_id, names, facts, inputs)
             counts["refused"] += 1
             continue
+        anchor = None
+        if anchor_on:
+            anchor = _ANCHOR_CACHE.get((league, str(facts.event_id)))
+            if anchor is None:
+                try:
+                    market, sim_margins = _anchor_sources(league, str(date_str))
+                    anchor = margin_anchor_for(facts, names, league=league, market=market, sims=sim_margins)
+                except Exception as exc:  # noqa: BLE001 -- unreadable sources are this game's named refusal
+                    anchor = NcaabResimRefusal("no_margin_anchor", f"anchor sources unreadable: {type(exc).__name__}")
+                if isinstance(anchor, MarginAnchor):
+                    _ANCHOR_CACHE[(league, str(facts.event_id))] = anchor
+            if isinstance(anchor, NcaabResimRefusal):
+                games[event_id] = _lane_row(event_id, names, facts, anchor)
+                counts["refused"] += 1
+                continue
         gs, match = map_state_names(gs, inputs["home_players"], inputs["away_players"])
         result = resim_live_game(inputs, gs, sims=sims, base_seed=stable_seed(facts.event_id, facts.last_seq, league),
                                  deadline=deadline, clock=clock, league=league)
+        if isinstance(anchor, MarginAnchor) and not isinstance(result, NcaabResimRefusal):
+            result = anchor_result(result, anchor)
         if isinstance(result, NcaabResimRefusal) and result.reason == "budget_exhausted" and event_id in previous:
             games[event_id] = _carry(previous[event_id])
             counts["carried_forward"] += 1
@@ -793,6 +1026,7 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
         "elapsedSeconds": round(clock() - started, 2),
         "playerPriors": priors.source if isinstance(priors, PlayerPriors) else f"refused:{priors.reason}",
         "oddsNamesIndexed": len(odds_names),
+        "marginAnchor": "on" if anchor_on else "off",
         "counts": counts,
         "games": out_games,
         "refusalsByReason": _refusals_by_reason(out_games),

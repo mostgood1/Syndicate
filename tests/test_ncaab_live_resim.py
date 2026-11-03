@@ -136,6 +136,7 @@ def test_oversize_lane_loses_its_histograms_not_its_number():
 
 def test_rotation_and_carry_forward(monkeypatch):
     """A tick that runs out of budget carries forward the last lane and resumes from where it stopped."""
+    monkeypatch.setenv("SYNDICATE_COLLEGE_LIVE_MARGIN_ANCHOR", "0")  # rotation, not the anchor (its own file)
     events = [{"event_id": str(i), "status_state": "in"} for i in range(4)]
     monkeypatch.setattr("syndicate.features.shared.request_path_guard.refuse_if_compute_in_request_path", lambda *_: None)
     monkeypatch.setattr("syndicate.features.shared.basketball_pbp.scoreboard_events", lambda sb: events)

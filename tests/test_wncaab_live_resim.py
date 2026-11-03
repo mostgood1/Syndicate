@@ -128,6 +128,7 @@ def test_engine_resumes_under_womens_rules_and_a_lead_moves_it(tmp_path):
 
 
 def test_snapshot_runs_the_womens_league_with_its_own_cursor(monkeypatch):
+    monkeypatch.setenv("SYNDICATE_COLLEGE_LIVE_MARGIN_ANCHOR", "0")  # the league plumbing, not the anchor
     events = [{"event_id": str(i), "status_state": "in"} for i in range(3)]
     seen = {"scoreboard": [], "summary": [], "resume": [], "inputs": [], "resim": []}
     monkeypatch.setattr("syndicate.features.shared.request_path_guard.refuse_if_compute_in_request_path", lambda *_: None)

@@ -82,6 +82,32 @@ tree (`odds_team_names(league="wncaab")`). A game with no quote falls back to ES
 name, and has no board row to join anyway. Measured 2026-11-03 morning: all 6 quoted teams
 matched.
 
+## Margin anchor (both leagues, user 2026-11-03 "Anchor them")
+
+The sim's margins run at about 0.69 of the market's. Unanchored, the first live women's game read -27 pp on
+ECU -26.5. So before a game is simmed, `build_live_lens_snapshot` finds its anchor:
+
+- **Market:** the closing consensus home margin (`closing_home_margin`). That is each book's last full-game
+  home-spread quote in the quote log observed before the ACTUAL tip (the first play's ESPN wall clock, else the
+  listed start), then the median across books. Times are parsed, not compared as text.
+- **Sim:** the pregame sim's home margin (`pregame_sim_<date>.json`).
+- Both are oriented onto the live home side.
+
+`anchor_result` then shifts the full-game margin histogram by `market - sim`. Integer counts are kept by
+cumulative rounding, and the win probability is re-derived from the shifted histogram, so at the tip the served
+margin is the market's. The sim's own numbers stay on the lane (`rawModelHomeWinProb`,
+`projection.rawHomeMargin`, `projection.marginAnchor`). Totals and the half/quarter histograms are not shifted.
+
+- **No anchor:** a game with no close or no pregame sim margin refuses `no_margin_anchor` BEFORE it is simmed.
+- **Caching:** anchors are cached per game for the process. Sources are re-read at most every 10 minutes.
+- **No raw carry:** a priced lane without an anchor is never carried forward.
+- **Off switch:** `SYNDICATE_COLLEGE_LIVE_MARGIN_ANCHOR=0` serves the raw sim. Absent is ON.
+
+Fleet dry run (2026-11-03, worktree code on fleet data):
+- NCAAB 11-02: 102 of 119 slate games anchored, every one with a pregame sim. Offset median +4.6
+  (p10 -2.9, p90 +11.3).
+- WNCAAB 11-03: the odds feed had quoted 4 of 26 games by 16:37Z. Anchoring follows the feed.
+
 ## Gates
 
 - **Input checklist:**
