@@ -55891,3 +55891,25 @@ Scheduled task `ncaab-opening-night-live-lens-reading` (slot 03:30Z; started 03:
   - new `player_priors_2027_asof_20261103.csv` (605,900 B), `player_game_box_2027.csv` (586,748 B), `team_game_box_2027.csv` (33,722 B).
   - No women's `team_ratings_2027_*` file yet; only `team_ratings_2026_asof_20260405.csv`. Not checked: whether the ratings builder skips the 2027 table on purpose this early.
 - Producer after the refresh: `13:44:10Z RUN league=wncaab date=2026-11-03 pregame=26 published=22 refused=4` and `date=2026-11-04 pregame=17 published=17 refused=0`. The 4 refusal reasons were not read here.
+
+## 2026-11-03 14:53Z (8:53 AM CST) -- FLEET ff 70b2bdf0 -> ddfdf668: #742 capture floor-hold fix (lane e4-pregame-prints)
+- **What:** `ddfdf668f` (`scripts/kalshi_combo_capture.py` + its test). A slice cut short at the run budget now leaves its density floor in state (`dense_to` / `dense_pages_per_s`) until `swept_to` passes that span. Before, the next completed slice replaced the floor, and 5 runs 11-02 21:04Z..01:04Z each read ~400 sparse seconds and threw away ~890 of 900 pages (deploys 11-03 04:08Z). 70 tests pass; the new test fails on the old code (1 page kept vs >= 45).
+- **User decision, verbatim (11-03):** "Push and ff".
+- **Push:** `b7c889c34..ddfdf668f` to main, ~13:49Z.
+- **Ride-along** (21 commits, 70b2bdf0..ddfdf668, excluding ledger and docs):
+  - a nightly `reports/live_gameline_accuracy/history.jsonl` append (4 rows);
+  - a new WNCAAB test baseline manifest `reports/manifests/wncaab.json`;
+  - tests in 6 files.
+  - `local_production.py` counts **1 runtime file** changed: the capture script. Those paths had no local changes on the fleet before the ff.
+- **Claim:** refresh-worker by e4-pregame-prints from 13:50:05Z.
+- **Preflight:**
+  - 13:50Z..14:25Z: 66 tries, all HOLD (63 board builds in flight, 3 odds jobs). Timed out at 35 min.
+  - Claim released and re-taken at ~14:26Z with `--ttl 5400`, polling every 15 s.
+  - Try 86 at **14:51:15Z: CLEAR** ("only infrastructure processes running"), baseline `fleet_checkout_head` read 14:51:12Z, expect 70b2bdf0 -> ddfdf668.
+- **ff:** `fleet_ff_to.sh` (`git merge --ff-only ddfdf668f...`, only from HEAD 70b2bdf0, only if on github/main) at **14:51:47Z**, merge_rc 0.
+- **Prediction MET** (`fleet_ff_verify_dd.sh`, read 14:51:55Z): HEAD `ddfdf668`, and the fix lines are on disk at 783-784, 810-811 and 830-832. Capture lock free; last run 14:04:33Z..14:11:16Z.
+- **Roles not restarted** (web, refresh-worker and live-odds-worker still load 70b2bdf0). Their STALE note is the capture script, which runs as a fresh process each hour, so the 15:03Z run is the first on the fix.
+- **verify (OWED):**
+  - **Reachability:** the first run on the fix that is cut short mid-slice writes `dense_to` to that series' state, and `dense_to` is gone once `swept_to` passes it. Since 04:04Z, 2 of 10 runs were cut short mid-slice (04:04Z, 12:04Z), so this should come within hours, not days.
+  - **Outcome:** no run that follows a budget-stopped slice keeps less than half its pages.
+  - Read at the 11-03 16:00Z check, together with the big series' lag (< 45 h).
