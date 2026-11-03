@@ -103,7 +103,7 @@ def _side(game: Mapping[str, Any], side: str, league: str) -> dict[str, Any]:
 def inputs_key(provenance: Mapping[str, Any], sims: int) -> str:
     """What makes two runs of the same game the same run. A change re-sims the game."""
     keep = {k: provenance.get(k) for k in ("ratingsAsOf", "playerPriorsAsOf", "priorSeasonFallback", "halfSplit", "mechanisms",
-                                           "league", "pregameTotal", "pregameHomeMargin", "priorCalibration")}
+                                           "league", "pregameTotal", "pregameHomeMargin", "priorCalibration", "effMultBounds")}
     # The prior's own targets are in the key: a change to HOW the prior is built (2026-11-02, no second shrink on a
     # calibrated table) moves them with no change of table date, and must re-sim the game.
     keep["exactTarget"] = provenance.get("exactTarget")

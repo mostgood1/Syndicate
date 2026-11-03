@@ -309,8 +309,18 @@ def build_engine_inputs(date: str, home_id: str, away_id: str, *, neutral: bool,
             "priorCalibration": getattr(team_prior, "calibration", None),
             "rawPregameTotal": _round_or_none(getattr(team_prior, "raw_total", None)),
             "rawPregameHomeMargin": _round_or_none(getattr(team_prior, "raw_home_margin", None)),
+            "effMultBounds": eff_mult_bounds(league),
         },
     }
+
+
+def eff_mult_bounds(league: str = LEAGUE) -> dict[str, list[float]]:
+    """The engine's efficiency-multiplier bounds for `league` (`basketball_engine/league.py`). They sit in the
+    pregame inputs key, so a new bound re-sims a published game."""
+    from syndicate.features.basketball_engine import league_params
+
+    params = league_params(league)
+    return {"solve": [float(b) for b in params.exact_target_solve_bounds], "final": [float(b) for b in params.eff_mult_final_bounds]}
 
 
 def _round_or_none(value: Any) -> Optional[float]:

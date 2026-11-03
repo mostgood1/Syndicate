@@ -65,6 +65,16 @@ class LeagueParams:
     # NBA wraps the per-shooter FT multipliers in try/except (neutral 1.0 on error); WNBA lets the error propagate.
     ft_mult_errors_neutral: bool
 
+    # --- Efficiency-multiplier bounds (lane wncaab-module, 2026-11-03) ---------------------------------------
+    # `exact_target_solve_bounds` brackets the exact-target bisection; `eff_mult_final_bounds` clips the multiplier
+    # after the team prior stacks on it. The defaults are the vendored literals, so NBA/WNBA are byte-identical.
+    # A college mismatch (a 104-45 women's target) needs a team far past both, so the sim fell short of its own
+    # target. Measured 2026-11-03 on 39 women's / 27 men's pregame games, sim minus target, vendored -> (0.40, 2.00):
+    # women total -4.29 -> -0.81, margin toward the favourite -5.65 -> -0.49; men -0.98 -> -0.20, -0.94 -> -0.22.
+    # (0.55, 1.55) still bound in 5 women's games (43-63-point targets). Inside the vendored range nothing moves.
+    exact_target_solve_bounds: tuple[float, float] = (0.70, 1.30)
+    eff_mult_final_bounds: tuple[float, float] = (0.75, 1.25)
+
     @property
     def half_start_periods(self) -> tuple[int, ...]:
         """Periods that open a half: (1, 3) for quarters, (1, 2) for halves."""
@@ -165,6 +175,8 @@ NCAAB = LeagueParams(
     block_alloc_by_rate=False,
     block_alloc_floor_pm=0.002,
     ft_mult_errors_neutral=True,
+    exact_target_solve_bounds=(0.40, 2.00),
+    eff_mult_final_bounds=(0.40, 2.00),
 )
 
 # WOMEN'S COLLEGE BASKETBALL (lane wncaab-module, user-approved loan 2026-11-02). The geometry is real: four
@@ -196,6 +208,8 @@ WNCAAB = LeagueParams(
     block_alloc_by_rate=False,
     block_alloc_floor_pm=0.002,
     ft_mult_errors_neutral=True,
+    exact_target_solve_bounds=(0.40, 2.00),
+    eff_mult_final_bounds=(0.40, 2.00),
 )
 
 _BY_CODE = {"nba": NBA, "wnba": WNBA, "ncaab": NCAAB, "wncaab": WNCAAB}

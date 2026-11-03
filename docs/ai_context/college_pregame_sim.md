@@ -53,7 +53,8 @@ the same engine configuration.
 
 The engine is told what to produce by the team prior, and with the exact target on it reproduces it.
 Measured 11-03 on the fleet, sim mean against prior: men slope 0.94 (129 games); the women's sim narrows
-only blowouts over 25 points, by about 6. So the prior is what gets fitted, as an ESTIMATOR: the mean
+only blowouts over 25 points, by about 6 (the engine's efficiency bounds; fixed the same day, see "Cost and
+known limits"). So the prior is what gets fitted, as an ESTIMATOR: the mean
 margin and total move, pace and every engine rate stay.
 
 1. **Fit, once a day after 11:00Z, in the pregame child.**
@@ -136,11 +137,32 @@ Board rows label the full game `full_game` (NCAAB) or `full` (WNCAAB). The join 
 - **WNCAAB** (corrected 2026-11-03; this bullet said the women had no inputs): the women's ratings, preseason
   and player priors have been built since 11-02 and refreshed daily by the pregame child. The women's
   engine rules are `basketball_engine/league.WNCAAB`.
+- **The engine's efficiency bounds (fixed 2026-11-03, lane wncaab-module).**
+  - With the exact target on, the engine solves each team's efficiency multiplier to hit its points
+    target. The vendored engine bounded that multiplier twice: the solve to 0.70–1.30
+    (`basketball_engine/engine.py`, the EXACT_TARGET_CALIBRATION block), then a clip to 0.75–1.25
+    after the team prior stacks on it.
+  - A college mismatch needs a team far past both. The sim then fell short of its own target, and the
+    calibration could not fix that: it moves the input, and the engine narrowed the result.
+  - Both bounds are `LeagueParams` fields now (`exact_target_solve_bounds`, `eff_mult_final_bounds`).
+    NBA/WNBA keep the vendored values (byte-identical, `tests/test_basketball_engine_eff_bounds.py`).
+    NCAAB and WNCAAB use 0.40–2.00 for both.
+  - The bounds are in the provenance (`effMultBounds`) and the pregame inputs key, so a new bound re-sims
+    every published game.
+  - **Measured 2026-11-03 on the fleet, offline.** The 11-03 + 11-04 slates were run three ways: 200
+    sims each, the same seeds, the production worker's college switches. Harness: the vendored-bound arm
+    reproduced every published sim to 0.00.
+    - Sim minus target, vendored → 0.40–2.00:
+      - women (39 games): total −4.29 → −0.81 (se 0.20); margin toward the favourite −5.65 → −0.49;
+      - women, targets of 24+ points: −8.51 → −1.48 total and −11.56 → −0.93 margin;
+      - men (27 games): total −0.98 → −0.20; margin −0.94 → −0.22.
+    - 0.55–1.55 still bound in 5 women's games, all with 43–63-point targets such as 104–45. For the men
+      it matched 0.40–2.00 exactly.
+    - Games inside the vendored range are byte-identical: 17 of 39 women's, 20 of 27 men's.
+    - Cost unchanged: ~9 s per game at 200 sims.
 - **Prior calibration limits.**
-  - The women's sim still narrows blowouts past 25 points (about 6 points), and calibration cannot fix
-    that: it moves the input, and the engine narrows the result. The root of the women's narrow margins is
-    the men's `MARGIN_CALIBRATION_K` in `build_ncaab_team_ratings.py`; the calibration corrects for it
-    downstream.
+  - The root of the women's narrow margins is the men's `MARGIN_CALIBRATION_K` in
+    `build_ncaab_team_ratings.py`; the calibration corrects for it downstream.
   - The calibration file sits beside the ratings tables on the fleet disk. It is not in Render's
     `HOT_ARTIFACT_PATTERNS`, and neither are the women's tables: `artifact_publisher.py` belongs to other
     lanes, and the fleet serves from its own disk.

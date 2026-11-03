@@ -1187,7 +1187,7 @@ def simulate_pbp_game_boxscore(
                                                                sf_a3 * _rs, sf_b3 * _rs, _ftp, float(cfg.base_oreb_rate) * float(oreb_m), e)
                         return loop if _sb <= 0.0 else (1.0 - _sb) * loop + _sb * 2.0 * float(np.clip(_bft * e, 0.45, 0.95))
 
-                    lo_, hi_ = 0.70, 1.30
+                    lo_, hi_ = (float(b) for b in lp.exact_target_solve_bounds)
                     if _model(lo_) >= tpp_eff:
                         solved = lo_
                     elif _model(hi_) <= tpp_eff:
@@ -1214,6 +1214,8 @@ def simulate_pbp_game_boxscore(
                         bonus_trip_share=sv_bonus_share,
                         bonus_ft=(_team_avg(ftv, _loop_shot_share(players, mins, "_prior_fta_pm"), 0.78) if sv_bonus_share > 0.0 else None),
                         foul3_mult=float(getattr(cfg, "foul_3pa_mult", 1.0)) / float(getattr(cfg, "foul_2pa_mult", 1.0) or 1.0),
+                        lo=float(lp.exact_target_solve_bounds[0]),
+                        hi=float(lp.exact_target_solve_bounds[1]),
                     )
                 if side == "h":
                     eff_mult_h = solved
@@ -1225,10 +1227,11 @@ def simulate_pbp_game_boxscore(
     # Apply opponent-aware/team prior efficiency multipliers (kept bounded).
     try:
         _stack = bool(getattr(cfg, "team_prior_stacks_on_target", True)) if lp.team_prior_stacks_on_target is None else bool(lp.team_prior_stacks_on_target)
+        _flo, _fhi = (float(b) for b in lp.eff_mult_final_bounds)
         if _stack or tpp_h is None:
-            eff_mult_h = float(np.clip(float(eff_mult_h) * float(eff_prior_h), 0.75, 1.25))
+            eff_mult_h = float(np.clip(float(eff_mult_h) * float(eff_prior_h), _flo, _fhi))
         if _stack or tpp_a is None:
-            eff_mult_a = float(np.clip(float(eff_mult_a) * float(eff_prior_a), 0.75, 1.25))
+            eff_mult_a = float(np.clip(float(eff_mult_a) * float(eff_prior_a), _flo, _fhi))
     except Exception:
         pass
 
