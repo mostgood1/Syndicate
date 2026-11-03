@@ -55945,3 +55945,18 @@ Scheduled task `ncaab-opening-night-live-lens-reading` (slot 03:30Z; started 03:
 - **correction to the 13:54Z entry:** "No women's `team_ratings_2027_*` file yet" was WRONG. `team_ratings_2027_asof_20261102.csv` (190 teams) was written at 11:16:12Z (`[ncaab_ratings] RUN ... teams_rated=190 ... written=...`); my `ls | head -15` cut it off.
 - **revert:** `git revert d6d56d925`, ff, reload-web, TERM both workers (claimed). Faster for the women's thread alone: `SYNDICATE_WNCAAB_LIVE_RESIM=0` (env change, fleet env recipe).
 - **claims:** live-odds-worker + web released 15:58Z; refresh-worker released 16:03:09Z.
+
+## 2026-11-03 16:15Z (10:15 AM CST) -- MEASUREMENT: #742 capture floor-hold fix `ddfdf668`: **REACHED and VERIFIED**; big series 38.26 h behind, under 45 h (lane e4-pregame-prints)
+- **Read 16:02Z and 16:13Z** (`cc0_detail.py`, `big_progress.py`, `run_waste.py`, `sweep_day_read.py`; fleet store, read-only, nice 19). Fleet HEAD read `d6d56d92` (a peer's ff, deploys 11-03 acb9542c); `git diff --stat ddfdf668f d6d56d92 -- scripts/kalshi_combo_capture.py` is empty, so the capture code is the fix.
+- **Reachability: MET, both halves.**
+  - **Written:** the 15:04Z run (the first on the fix) was budget-stopped mid-slice, kept 807 of 900 pages, and left `dense_to` 1793581531 (= 11-02 01:05:31Z) and `dense_pages_per_s` 0.5172 in `KXMVECROSSCATEGORY`'s state. Code before `ddfdf668` never writes those keys.
+  - **Cleared:** the 16:04Z run read 01:02:19Z -> 01:52:37Z, past `dense_to`. Both keys are gone from state (read 16:13Z).
+- **Outcome: MET.** The run after the budget-stopped slice (16:04Z) kept **845 of 845** pages (0 discarded).
+  - **Not a discriminating test:** the stretch it read is dense throughout, so the code before the fix would likely have kept them too. The ping-pong (a sparse slice ahead of a dense one) did not recur in these two runs. The evidence that the fix stops it is still its test, which fails on the old code.
+- **Big series (`KXMVECROSSCATEGORY`): lag 38.26 h at 16:13Z, under 45 h: MET.**
+  - Per run since 07:04Z it read 22-33 settlement minutes at 1,386-2,232 pages per settlement hour (the NFL Sunday-evening stretch, 11-01 21Z..11-02 01Z). The lag grew ~0.5 h a run.
+  - The 16:04Z run read 50 minutes of the 11-02 01Z hour at **1,006** pages/h. The dense stretch is ending. Lag after the run is about flat (+0.16 h vs after the 15:04Z run).
+  - **Purge margin:** the oldest unread second (11-02 01:52:38Z) is purged at 11-04 13:28Z (59.6 h), 21.3 h of margin.
+  - **Projection** (not a reading): the lag peaks near 38-40 h and falls once the 11-02 02Z..04Z hours (Sunday night's late game) are read. Last Sunday's hours after 03Z cost about 67 pages each.
+- **Waste since the fix:** 93 pages in 2 runs (the 15:04Z run's stopped slice). Since 03:04Z: 13 runs, 3 mid-slice stops (04:04Z 191, 12:04Z 99, 15:04Z 93 pages). 0-series lag 0.97 h; per-sport series all read when due.
+- **verify (OWED, small):** the 11-04 04:00Z read: the big series' lag is falling (below 38 h). If it is not, extra catch-up runs before 11-04 13:28Z are the user's decision.
