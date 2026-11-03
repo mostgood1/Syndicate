@@ -55791,3 +55791,25 @@ Read-only scheduled reading (task ncaab-1102-board-check). Readings 08:01:48Z-08
   - `2026-11-02`: 2,151 rows with keys, 19 keyless. These are outside the owed 11-03 check; noted only.
 - **(5) Tracebacks:** 0 lines starting `Traceback` in live-odds-worker.log after 18:30:36Z (scan at 02:02:57Z).
 - **Verdict: NOT MET**, on (c) alone. Two unlisted refusal reasons appear (`on_floor_incomplete`, `pbp_score_mismatch`, feed-quality guards with low counts), and the non-D1 attribution of `team_unrated` is unverified. (a) MET. (b) MET on the proportional test but flagged over 3,000/h. Join MET. Nothing was changed on the fleet.
+
+## 2026-11-03T03:24Z (2026-11-02 21:24 CT) -- READINGS, no deploy: NCAAB re-sim `team_unrated` attribution MET; WNCAAB Layer 2 manifest gate skipped wncaab once, cold-start baseline now committed (lanes `ncaab-board-slate`, `wncaab-module`)
+- Read-only. No restarts, no ff, no env changes, no claims.
+- **(1) `team_unrated` attribution, MET.** This closes the item the 02:23Z reading left UNVERIFIED.
+  - Source: keyvalue `live/ncaab_live_resim.json`, read under the live-odds-worker's env. `generatedAt` 2026-11-02T21:16:25-06:00.
+  - `counts`: live 55, resimmed 2, refused 1, carried_forward 50, not_reached 2.
+  - `refusalsByReason`: team_unrated 13, budget_exhausted 13, team_has_no_player_priors 2.
+  - **All 13 `team_unrated` rows pair a D-I home side with a non-D-I visitor** (checked against the 362-row `ncaab_team_registry.csv`). Examples: Mid America Christian @ Omaha, Regent @ Norfolk State, Willamette @ Portland, Fresno Pacific @ Fresno State, George Fox @ Idaho.
+  - No D-I-vs-D-I game was refused `team_unrated`.
+  - The refusal text names both ids, because neither side is rated in the 4-team 2027 table. The per-game fallback to last season then has no row for the non-D-I side.
+  - Not re-read here: `on_floor_incomplete` and `pbp_score_mismatch`. Neither was in this snapshot. Both are live-feed state guards (`live_resim.py:390`, `:378`) that refuse by design.
+- **(2) WNCAAB Layer 2 manifest gate.**
+  - `refresh-worker.log` carries one `MANIFEST_GATE_SKIPPED_SPORTS date=2026-11-02 skipped=wncaab` at 20:35:27Z, and none after it.
+  - `PER_SPORT_INGEST` has carried wncaab since then: 03:10:03Z `wncaab(cand=326,scored=326,priced=326,opps=18)`.
+  - Cause: there was no `reports/manifests/wncaab.json` until the first wncaab refresh wrote one through the state store. The suite test `test_every_configured_sport_ships_a_committed_baseline_manifest` (the soccer precedent) failed on it.
+  - Fixed by a committed baseline manifest (cold start only; the live manifest supersedes it).
+- **(3) Regression suite triage (the 7 h 13 m run started 19:39Z):** 13 failed, 81 errors.
+  - 81 errors: `ncaab.slate.slate_games` treats any process gunicorn did not start as a worker, so tests fetched ESPN and wrote `data/{ncaab,wncaab}_source/` into the tracked mirror (184 guarded writes). Fixed test-side by a process-wide `no_college_slate_fetch` block, in conftest and in `test_archives.setUpModule` (the CI runner).
+  - 13 failed. **6 passed on the current tree.** 4 were stale vintage: the tree changed under the run, so `inspect.getsource` read the rewritten `live_team_model.py`, and two segment-wiring tests were collected before `bece3283b`. The other 2 were a Windows file lock and a timing flake (`betting_day_backfill`, `skips_runner`).
+  - **4 were expectations WNCAAB moved:** the site menu (2 tests), the in-season weekly sports (1), and the baseline manifest subtest (1, a real missing file).
+  - The other 3, `GuardReleaseTests.test_guard_releases_when_the_install_stretch_raises` and `RefreshWorkerTests.test_main_run_once_{executes_runner_when_pending,recovers_stuck_claim_before_launch}`, are **pre-existing**. They fail identically on `26d8be509`, the commit before `bece3283b` (run 03:15-03:28Z, 3 failed / 1 passed). Two other sports' writers cause them: the MLB statsapi disk cache and the WNBA `live_snapshots` write. Not WNCAAB's.
+  - Landed `53f692552` (tests + the `wncaab.json` baseline). Re-run of the formerly-erroring sample plus the moved expectations: **50 passed**, 0 slate fetches, 0 guarded writes.
