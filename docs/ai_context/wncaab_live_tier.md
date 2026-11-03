@@ -93,7 +93,10 @@ ECU -26.5. So before a game is simmed, `build_live_lens_snapshot` finds its anch
 - **Sim:** the pregame sim's home margin (`pregame_sim_<date>.json`).
 - Both are oriented onto the live home side.
 
-`anchor_result` then shifts the full-game margin histogram by `market - sim`. Integer counts are kept by
+`anchor_result` then shifts the full-game margin histogram by `(market - sim)` times the share of regulation still
+to play (`remaining_regulation_fraction`: 1.0 at the tip, 0.5 at halftime, 0.0 in overtime). The pregame gap is the
+sim's error over the possessions it simulates; points already scored are real. Unscaled, the first anchored board
+(11-03 16:45Z, ECU at Q2 2:11) showed a +20 pp spread edge that was the anchor itself. Integer counts are kept by
 cumulative rounding, and the win probability is re-derived from the shifted histogram, so at the tip the served
 margin is the market's. The sim's own numbers stay on the lane (`rawModelHomeWinProb`,
 `projection.rawHomeMargin`, `projection.marginAnchor`). Totals and the half/quarter histograms are not shifted.

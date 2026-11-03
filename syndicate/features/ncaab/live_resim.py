@@ -598,9 +598,10 @@ def board_name(espn_display: str, odds_names: Mapping[str, str], league: str = L
 # that scale defect as an "edge": measured on the first live women's game, ECU -26.5 read -27 pp. Pregame, the
 # same defect is answered by serving the de-vigged fair (`college_game_projections`); live, that would erase the
 # in-game information too. So the live FULL-GAME margin is shifted by the game's PREGAME gap -- the closing
-# consensus home margin minus the pregame sim's home margin -- frozen at tip. At the tip the anchored margin IS
-# the market's; every edge after that comes from what the sim makes of the game state. Totals stay raw (the
-# pregame decision), and so do the half/quarter histograms, which the live join does not price.
+# consensus home margin minus the pregame sim's home margin, frozen at tip -- SCALED BY THE SHARE OF REGULATION
+# STILL TO PLAY (the gap is the sim's error over the possessions it simulates; the scored points are real). At the
+# tip the anchored margin IS the market's; every edge after that comes from what the sim makes of the game state.
+# Totals stay raw (the pregame decision), and so do the half/quarter histograms, which the live join does not price.
 #
 # A game with no closing spread or no pregame sim margin REFUSES by name (`no_margin_anchor`) before it is simmed:
 # a raw margin would bring the defect back, and such a game has no priced board row to lose. ABSENT IS ON (the
@@ -738,8 +739,27 @@ def margin_anchor_for(facts: ResumeFacts, names: Mapping[str, str], *, league: s
     return NcaabResimRefusal("no_margin_anchor", "no closing full-game spread in the quote log")
 
 
-def anchor_result(result: Mapping[str, Any], anchor: MarginAnchor) -> dict[str, Any]:
-    """Shift the full-game margin histogram by `anchor.offset` and re-derive the win probability from it.
+def remaining_regulation_fraction(facts: ResumeFacts, league: str = LEAGUE) -> float:
+    """Share of regulation still to play at the resume point: 1.0 at the tip, 0.5 at halftime, 0.0 in overtime."""
+    from syndicate.features.college_basketball.league import league_for
+
+    spec = league_for(league)
+    period = int(facts.period or 1)
+    if period > spec.periods:
+        return 0.0
+    remaining = (spec.periods - period) * spec.period_seconds + max(0.0, min(float(facts.clock_seconds or 0.0), spec.period_seconds))
+    return max(0.0, min(1.0, remaining / float(spec.periods * spec.period_seconds)))
+
+
+def anchor_result(result: Mapping[str, Any], anchor: MarginAnchor, *, remaining_fraction: float = 1.0) -> dict[str, Any]:
+    """Shift the full-game margin histogram by the anchor's offset SCALED BY THE SHARE OF REGULATION STILL TO
+    PLAY, and re-derive the win probability from it.
+
+    WHY SCALED (measured 2026-11-03 16:45Z, the first anchored board build): the pregame gap is the sim's error over
+    a WHOLE game -- its rates understate the stronger side -- and the points already scored are real, not simmed.
+    Shifting the full +10.37 at 2:11 of the women's Q2 (55% of regulation left) moved ECU's margin 17.5 -> 27.8
+    against a live market of 21.5: a +20 pp spread "edge" that was the anchor itself. Scaled, the shift is +5.8
+    (-> 23.2). At the tip the two agree.
 
     The join reads integer margins and integer counts (`live_gameline_join._two_way_home_prob`), so a fractional
     offset splits each bucket between its two neighbours, allocated by CUMULATIVE rounding: the counts stay
@@ -747,7 +767,8 @@ def anchor_result(result: Mapping[str, Any], anchor: MarginAnchor) -> dict[str, 
     (a game cannot end tied) counts half to each side. The sim's own numbers stay on the result (`raw_*`)."""
     import math
 
-    offset = float(anchor.offset)
+    fraction = max(0.0, min(1.0, float(remaining_fraction)))
+    offset = float(anchor.offset) * fraction
     base = math.floor(offset)
     frac = offset - base
     shifted: Counter = Counter()
@@ -765,7 +786,7 @@ def anchor_result(result: Mapping[str, Any], anchor: MarginAnchor) -> dict[str, 
     out = dict(result)
     out["raw_home_win_prob"] = result.get("home_win_prob")
     out["raw_home_margin_mean"] = result.get("home_margin_mean")
-    out["margin_anchor"] = anchor.as_dict()
+    out["margin_anchor"] = {**anchor.as_dict(), "remainingFraction": round(fraction, 4), "appliedOffset": round(offset, 2)}
     if n <= 0:
         return out
     out["margin_dist"] = {str(m): c for m, c in sorted(shifted.items())}
@@ -1006,7 +1027,7 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
         result = resim_live_game(inputs, gs, sims=sims, base_seed=stable_seed(facts.event_id, facts.last_seq, league),
                                  deadline=deadline, clock=clock, league=league)
         if isinstance(anchor, MarginAnchor) and not isinstance(result, NcaabResimRefusal):
-            result = anchor_result(result, anchor)
+            result = anchor_result(result, anchor, remaining_fraction=remaining_regulation_fraction(facts, league))
         if isinstance(result, NcaabResimRefusal) and result.reason == "budget_exhausted" and event_id in previous:
             games[event_id] = _carry(previous[event_id])
             counts["carried_forward"] += 1

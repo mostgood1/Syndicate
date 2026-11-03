@@ -100,6 +100,35 @@ def test_anchor_shifts_the_margin_and_rederives_the_win_prob():
     assert flat["margin_dist"] == {"-2": 100, "0": 100} and flat["home_win_prob"] == pytest.approx(0.25)
 
 
+def test_the_shift_scales_with_the_regulation_still_to_play():
+    def facts(period, clock):
+        return lr.ResumeFacts("1", "10", "20", 0, 0, period, clock, None, 0, "t")
+
+    frac = lr.remaining_regulation_fraction
+    assert frac(facts(1, 1200.0), "ncaab") == 1.0 and frac(facts(2, 1200.0), "ncaab") == 0.5
+    assert frac(facts(1, 0.0), "ncaab") == 0.5, "a half-time break: the second half is still to play"
+    assert frac(facts(3, 300.0), "ncaab") == 0.0, "overtime: no pregame gap left to apply"
+    assert frac(facts(3, 600.0), "wncaab") == 0.5 and frac(facts(4, 60.0), "wncaab") == pytest.approx(60 / 2400)
+    flat = _result([5] * 200)
+    half = lr.anchor_result(flat, lr.MarginAnchor(26.5, 16.5, 3), remaining_fraction=0.5)
+    assert half["home_margin_mean"] == pytest.approx(10.0) and half["margin_anchor"]["appliedOffset"] == 5.0
+
+
+def test_mid_game_the_anchor_moves_only_the_remaining_game():
+    """The 2026-11-03 16:45Z ECU board: Q2 2:11 left (55.5% of regulation to play), raw margin 17.5, pregame gap
+    +10.37 (market 24.5, sim 14.13), live line 21.5. Unscaled, the anchor itself was a +20 pp spread edge."""
+    ecu = lr.ResumeFacts("401913822", "10", "20", 23, 32, 2, 131.0, "home", 300, "t")
+    fraction = lr.remaining_regulation_fraction(ecu, "wncaab")
+    assert fraction == pytest.approx(1331 / 2400)
+    margins = [m for m in range(5, 31) for _ in range(8)][:200]   # mean ~17.4
+    raw = _result(margins)
+    anchor = lr.MarginAnchor(24.5, 14.13, 1)
+    scaled = lr.anchor_result(raw, anchor, remaining_fraction=fraction)
+    full = lr.anchor_result(raw, anchor)
+    assert scaled["home_margin_mean"] == pytest.approx(raw["home_margin_mean"] + 10.37 * fraction, abs=0.01)
+    assert abs(scaled["home_margin_mean"] - 21.5) < abs(full["home_margin_mean"] - 21.5)
+
+
 def _snapshot(monkeypatch, *, anchor_on, market, sims, previous=None, budget_seconds=240.0):
     events = [{"event_id": "401", "status_state": "in"}, {"event_id": "402", "status_state": "in"}]
     monkeypatch.setenv("SYNDICATE_COLLEGE_LIVE_MARGIN_ANCHOR", "1" if anchor_on else "0")
@@ -129,8 +158,10 @@ def test_snapshot_anchors_priced_games_and_refuses_the_rest_before_simming(monke
     lanes = {g["event_id"]: g["gameLens"][0] for g in snap["games"]}
     assert lanes["402"]["liveResimRefusal"] == "no_margin_anchor" and "modelHomeWinProb" not in lanes["402"]
     priced = lanes["401"]
-    assert priced["projection"]["marginAnchor"]["offset"] == 9.3
-    assert priced["projection"]["homeMargin"] == pytest.approx(26.3, abs=0.01)
+    anchor = priced["projection"]["marginAnchor"]
+    # 1st half, 531 s left: (1200 + 531) / 2400 of regulation remains, so 72.1% of the +9.3 gap is applied.
+    assert anchor["offset"] == 9.3 and anchor["remainingFraction"] == pytest.approx(1731 / 2400, abs=1e-4)
+    assert priced["projection"]["homeMargin"] == pytest.approx(17.0 + 9.3 * 1731 / 2400, abs=0.01)
     assert priced["projection"]["rawHomeMargin"] == pytest.approx(17.0) and priced["rawModelHomeWinProb"] == 1.0
 
 
