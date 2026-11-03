@@ -700,6 +700,52 @@ series ($0.0258 on 12 @ 0.42) and is far below a taker fee (~$0.21), so it is ma
   or 1c above the bid inside a 1-3c spread
   (MIN@CLE posted 0.66 on a 0.65 bid; PHXOKC 0.67 on a 0.67 bid).
 
+## s11. Test B LOOK 1 + W44 + the fair-cancel in practice `[read 2026-11-03 16:34Z, fleet ledger, read-only]`
+
+Delivered a day late: owed Monday 11-02, run 11-03 after the coordinator's brief. The full weekly is in the coordinator's
+notes folder as `weekly_2026-W44.md`.
+
+**Capture-age reader (built today).** `scripts/pinnacle_edge_deciles.py` `capture_age` reads the F0 fetch heartbeat
+(`read_fetch_heartbeats`). Capture age is the time from the last fetch at or before submit that SAW Pinnacle on the
+event, to submit. It is `unknown` when there is no such heartbeat, never "fresh". Of the 11,899 eligible orders,
+6,612 have a known capture age.
+
+The frozen join and edge maths are untouched. Added: `submitted` on each row, and the `testb` subcommand, which applies
+the prereg arms and bar to orders submitted in [REG, as_of).
+
+**Look 1** (as_of 2026-11-02 00:00Z; 6,634 settled orders; 7.3 days of the 14-day bar):
+
+| arm | n | games | ROI per bet | CI95 | mean close edge pp | status |
+|---|---|---|---|---|---|---|
+| P1 Pinnacle >= +0.4 | 332 | 108 | -3.9% | [-20.6, +14.5] | +0.34 | not sized; no pass, no futility |
+| P2 Pinnacle < 0 | 1,414 | 166 | -3.5% | [-12.2, +3.9] | -2.09 | not confirmed |
+| C1 consensus >= +0.4 | 1,131 | 194 | -4.6% | [-14.9, +5.4] | +0.38 | control |
+| C1-only | 998 | 188 | -6.4% | [-17.7, +5.6] | +0.25 | C2 = +2.5pp |
+| population | 6,634 | 272 | -6.0% | [-9.7, -2.1] | -1.62 | |
+
+- P1 by capture age (secondary): <= 2 min n 101, +5.6% [-25, +35]; > 2 min n 223, -9.3% [-28, +11].
+- **P2's retrospective -10.6% (significant) has not reproduced forward.**
+- The next look is 11-09. It is the first look at which the 14-day bar can be met.
+
+**W44 live** (submitted 10-26..11-01 UTC): 303 bets, $1,080.80 staked, **-$85.06 (-7.9%)**. No live book is
+significant either way. One family is flagged: Kalshi NFL totals, n 14, -56% [-84, -28], 13 of them in-game, -$15.53.
+That is below the gate's trip size. The gate's 3 trips are unchanged since 10-25 (state evaluated 11-03 16:12Z, 56
+cells).
+
+**Maker pilot, today.**
+
+- 31 posts: 11 filled, 19 cancelled/expired, 1 resting. 0 taker fills.
+- 11 settled fills (4 won) on $57.89: held -$18.56, realised -$4.24.
+
+**The fair-cancel rule, in practice** (lane `maker-pilot-fair-cancel`, live 11-02 02:23Z):
+
+- 13 `FAIR_CANCEL` lines from 11-02 00:34Z to 11-03 15:36Z. **All 13 are `reason=plan_dropped`, at edge +2.8..+4.3pp.**
+  The +1pp edge floor has not fired once.
+- Since 11-02, 1 of 15 posts has filled.
+- So the plan-dropped branch, not the review's edge floor, is what ends pilot posts now. At this rate the review's
+  30-timed-fill re-judge cannot be reached. This went to the coordinator as a user question with options; nothing was
+  changed here.
+
 ## s5. Running it
 
 **NIGHTLY JOB (built 2026-10-24, NOT LIVE until the coordinator's restart).**

@@ -87,3 +87,57 @@ def test_deciles_split_the_joined_population():
     assert len(report["decile_cuts_pp"]) == 9
     assert report["by_decile"]["D01"]["n"] == 10 and report["by_decile"]["D10"]["n"] == 10
     assert report["by_decile"]["none"]["n"] == 1
+
+
+def test_capture_age_reads_the_last_fetch_that_saw_pinnacle_on_the_event_before_submit():
+    order = _order()                                             # submitted at T0+10m
+    beats = [{"captured_at": (T0 + timedelta(minutes=2)).isoformat(), "events": ["e1"], "pinnacle_events": ["e1"]},
+             {"captured_at": (T0 + timedelta(minutes=8)).isoformat(), "events": ["e1"], "pinnacle_events": []},
+             {"captured_at": (T0 + timedelta(minutes=9)).isoformat(), "events": ["e2"], "pinnacle_events": ["e2"]},
+             {"captured_at": (T0 + timedelta(minutes=11)).isoformat(), "events": ["e1"], "pinnacle_events": ["e1"]}]
+    assert pe.capture_age(order, beats) == 480.0                 # T0+2m: the 8m fetch had no Pinnacle, 11m is after
+    assert pe.capture_age(order, beats, key="events") == 120.0   # any book: the 8m fetch
+    assert pe.capture_bucket(480.0) == ">2m" and pe.capture_bucket(120.0) == "<=2m"
+
+
+def test_capture_age_is_unknown_without_a_heartbeat_never_fresh():
+    assert pe.capture_age(_order(), []) is None
+    assert pe.capture_bucket(None) == "unknown"
+
+
+def _row(edge, cons_edge, ret, game, submitted, close=0.5, capture="<=2m"):
+    return {"edge": edge, "cons_edge": cons_edge, "ret": ret, "game": game, "stake": 5.0, "pnl": 5.0 * ret,
+            "close_edge": close, "cons_close_edge": close, "submitted": submitted, "sport": "nhl", "book": "paper",
+            "capture": capture}
+
+
+def test_testb_counts_only_orders_since_reg_and_splits_the_frozen_arms():
+    before, after = "2026-10-25T15:38:14Z", "2026-10-25T15:38:15Z"
+    rows = [_row(1.0, 1.0, 0.5, "g1", before),                   # before REG: never counted
+            _row(1.0, 0.0, 0.5, "g2", after),                    # P1, not C1
+            _row(-1.0, 1.0, -1.0, "g3", after),                  # P2 and C1-only
+            _row(0.2, None, -1.0, "g4", after, capture=">2m"),  # in neither P arm (0 <= edge < 0.4)
+            _row(1.0, 1.0, 0.5, "g5", "2026-11-02T00:00:00Z")]    # at/after the look instant: the next look's
+    as_of = datetime(2026, 11, 2, tzinfo=timezone.utc)
+    rep = pe.testb_report(rows, as_of=as_of)
+    arms = rep["arms"]
+    assert rep["orders_since_reg"] == 3
+    assert (arms["P1"]["n"], arms["P2"]["n"], arms["C1"]["n"], arms["C1_only"]["n"]) == (1, 1, 1, 1)
+    assert arms["C2_diff_pp"] == 150.0                           # +50% minus -100%
+    assert not arms["P1"]["bar_sized"] and not arms["P1"]["pass"] and not arms["P1"]["futility"]
+    assert rep["p1_by_capture"]["<=2m"]["n"] == 1
+
+
+def test_testb_bar_needs_size_ci_and_close_edge():
+    rows = [_row(1.0, 1.0, 0.9, f"g{i % 50}", "2026-10-26T00:00:00Z") for i in range(160)]
+    ok = pe.testb_report(rows, as_of=datetime(2026, 11, 20, tzinfo=timezone.utc))["arms"]["P1"]
+    assert ok["bar_sized"] and ok["pass"]
+    early = pe.testb_report(rows, as_of=datetime(2026, 11, 2, tzinfo=timezone.utc))["arms"]["P1"]
+    assert not early["bar_sized"] and not early["pass"]          # < 14 days since REG
+    neg_close = [{**r, "close_edge": -1.0} for r in rows]
+    bad = pe.testb_report(neg_close, as_of=datetime(2026, 11, 20, tzinfo=timezone.utc))["arms"]["P1"]
+    assert not bad["pass"] and bad["futility"]                   # mean close edge < -0.5pp
+    p2 = pe.testb_report([{**r, "edge": -1.0, "ret": -0.9} for r in rows],
+                         as_of=datetime(2026, 11, 20, tzinfo=timezone.utc))["arms"]
+    assert p2["P2"]["confirmed_negative"] and p2["P2"]["futility"] is None and p2["P1"]["confirmed_negative"] is None
+
