@@ -55738,3 +55738,32 @@ Read-only scheduled reading (task ncaab-1102-board-check). Readings 08:01:48Z-08
 - **Totals (raw by decision):** sim -2.2 points vs the line (mean, 321 rows); median edge -6.0, p10 -27.5 / p90 +17.0.
 - **Live rows are not the pregame join's:** the 20 spread rows with |edge| > 10 are all `live_aware`, priced by the NCAAB live re-sim (`live_gameline.edge_pp`, 200 sims). That tier still builds its tip prior with the old double shrink until the live-odds-worker restarts (OWED: held until the women's player-box crawl finishes, so the launcher's daily women's refresh cannot write the same files concurrently).
 - **claims:** refresh-worker + web released 23:43Z.
+
+## 2026-11-03 00:24:03Z (11-02 6:24 PM CST) -- WNCAAB pregame sims LIVE on the boards + FLEET live-odds-worker restart on 70b2bdf09 (launcher for both leagues, live-tier prior fix) -- **MET** (lane `wncaab-module`)
+- **women's inputs** (crawl on the fleet data root, nice 19, rate 4; scripts from d01b5916d):
+  - ratings 2026: 166 dates, **6,029 games, 361 teams** (`team_ratings_2026_asof_20260405`);
+  - ratings 2027: 2 teams (only 11-01 final);
+  - player box 2026: **168,226 rows** (22:08Z-00:04Z);
+  - priors 2027: 19 players (`player_priors_2027_asof_20261102`);
+  - **preseason** `--preseason`: 362 teams rostered, 14 stale excluded, **348 in table, 4,742 players (1,757 newcomers)** (`player_preseason_2027_asof_20261102`).
+- **women's pregame** (run by hand 00:08Z with the live-odds-worker env, nice 15):
+  - 11-02: `pregame=21 simmed=17 refused=4`;
+  - 11-03: `pregame=26 simmed=22 refused=4`. Refusals are named: `team_has_no_player_priors` x3 (stale-roster exclusions), `team_unrated` x1 (UWF @ ETSU, rated in neither table).
+  - Mean total 133.3. First game: HOW @ MIZ total 142.2 (prior 142.5), margin 11.3 (prior 13.4).
+  - Segments full / h1 / h2 / q1..q4 present.
+- **verify -- WNCAAB board, MET** (00:15Z):
+  - book-grid wncaab: coverage `games_with_sim_distribution` 32 (11-02) / 39 (11-03 window); 5 rows per date carry a projection (OddsAPI prices 14 women's games, most of them final by then).
+  - Example: Towson @ Iowa totals 141.5, sim 144.2, raw edge +5.9; spreads 41.5 / 42.5 sim 31.7, `book_blend=applied`, edge 0.0. The same margin compression as the men's (anchored).
+- **live-odds-worker restart:** claim 00:06Z; preflight polled to CLEAR at 00:23:46Z; TERM pid 2941749 at 00:24:03Z; respawn pid 2990173 at 00:24:11Z.
+- **verify -- launcher, MET** (log, 00:24Z):
+  - `COLLEGE_PREGAME_SIM_LAUNCHED leagues=ncaab,wncaab dates=2026-11-02,2026-11-03 pregame_games=131 budget_s=600 interval_s=900`;
+  - child RUN lines: all four league-dates `simmed=0 unchanged=...` (the inputs key held, so it is incremental);
+  - `COLLEGE_PREGAME_SIM_EXITED rc=0` 3.7 s after launch;
+  - `[college_momentum] THREAD_STARTED leagues=ncaab,wncaab`;
+  - `WNCAAB_LIVE_AUTORUN_LAUNCHED live_games=47`.
+- **live tier:** the NCAAB live re-sim now builds its tip prior without the second shrink (70b2bdf09). Not separately measured.
+- **OWED:**
+  - 11:00Z 11-03: the launcher's daily women's refresh. Read `[college_pregame_sim] WNCAAB_INPUTS build_ncaab_team_ratings.py rc=0` and `... player_priors ... rc=0`, plus the marker `.inputs_refreshed_2026-11-03`.
+  - A college margin fit, to lift `SYNDICATE_COLLEGE_MARGIN_MODEL_WEIGHT` from 0.
+  - WNCAAB LIVE re-sim (not built: `resume_from_summary` is men's-halves-only).
+- **claims:** live-odds-worker released 00:25Z. No claims held.
