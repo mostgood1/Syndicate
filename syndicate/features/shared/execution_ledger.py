@@ -3357,8 +3357,6 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
                     # with market and line [lane maker-pilot-fair-cancel].
                     "market": order.get("market"),
                     "line": order.get("line"),
-                    # ...and dates a post this process never saw, to judge it dropped.
-                    "selected_date": order.get("selected_date"),
                 }
             )
             after = STATUS_SUBMITTED

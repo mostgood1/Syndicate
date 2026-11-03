@@ -355,21 +355,16 @@ def reconcile_line(row: Mapping[str, Any]) -> str | None:
 # is refused `held_other_slate` long before `route` -- recorded in `route`, as first built, it was
 # never seen again and would have been cancelled as dropped.
 #
-# Two reasons to cancel, judged by `review_resting` from the executor's per-tick Kalshi reconcile
+# ONE reason to cancel, judged by `review_resting` from the executor's per-tick Kalshi reconcile
 # (`pipeline/execute_portfolio`). NOT the stale pass: `cancel_stale_resting_orders` runs only from the
 # worker's boot dump, when nothing has been seen -- hooked there, as first built, it was live and inert
 # (0 passes over 13 reconciles, 2026-11-01 16:55-17:25Z):
-#   * `edge_below_floor` -- the latest sighting's fair minus our resting price < the floor (+1pp);
-#   * `plan_dropped`     -- a plan pass for the sighting's date or later ran PLAN_DROP_MARGIN_S after
-#                           the last sighting without re-sending this position. Usually the edge at the
-#                           ask fell below the plan's EV floor, which is the case this exists for.
-#   * `plan_dropped`, UNSEEN -- the sightings live in memory, so a restart forgets every post made
-#                           before it. A post this process has never seen is judged as if seen at
-#                           `_BOOT_AT` (this module's import, which precedes every sighting): once a
-#                           pass for its date or later ran PLAN_DROP_MARGIN_S after boot without it,
-#                           the plan dropped it. [2026-11-01 user "Yes, close the gap": the two MLS
-#                           posts left the plan after the 16:53Z restart and rested on to kickoff.]
-#                           No date on the row (an old ledger row), no cancel.
+#   * `edge_below_floor` -- the latest sighting's fair minus our resting price < the floor (+1pp).
+# A post the plan stops sending is KEPT on its last sighting. [USER DECISION 2026-11-03 "Edge-floor
+# only" (coordinator 332cb014, confirmed here): a `plan_dropped` cancel fired 13 times 11-02 00:34Z ..
+# 11-03 15:36Z, every one at +2.8..+4.3pp edge, while the floor never fired, and 1 of 15 posts filled
+# (profit-program findings s11, 51fcbf3d8). The plan holds one Kalshi position per pass, so "not sent"
+# is rotation, not a lost edge.] No sighting (since a restart), no cancel.
 # A cancel is never re-posted (the row stays, so `held_by_pilot` holds) and costs nothing at Kalshi.
 # OFF WHEN ABSENT (user decision relayed 2026-10-31 from coordinator 332cb014: "behind a switch").
 # `SYNDICATE_KALSHI_MAKER_PILOT_FAIR_CANCEL=on` turns it on; absent or anything else = rest-to-kickoff
@@ -378,13 +373,8 @@ def reconcile_line(row: Mapping[str, Any]) -> str | None:
 
 EDGE_FLOOR_DEFAULT = 0.01
 EDGE_FLOOR_CEILING = 0.10
-PLAN_DROP_MARGIN_S = 300.0
-#: contract ("ticker|leg") -> {"fair": float | None, "at": epoch s, "date": plan date} of the latest sighting.
+#: contract ("ticker|leg") -> {"fair": float | None, "at": epoch s} of the latest sighting.
 _seen: dict[str, dict[str, Any]] = {}
-#: plan date -> epoch s of the latest Kalshi plan position of that date observed (a pass happened).
-_pass_at: dict[str, float] = {}
-#: Nothing before this is known: the moment `_seen` started empty.
-_BOOT_AT: float = time.time()
 
 
 def fair_cancel_enabled() -> bool:
@@ -457,11 +447,7 @@ def note_plan_sighting(request: Any, *, now: _dt.datetime | None = None) -> None
                          getattr(request, "market", None), getattr(request, "line", None))
     if contract is None:
         return
-    at = _epoch(now)
-    date = str(getattr(request, "selected_date", "") or "")
-    _seen[contract] = {"fair": plan_fair(request), "at": at, "date": date}
-    if date:
-        _pass_at[date] = max(_pass_at.get(date, 0.0), at)
+    _seen[contract] = {"fair": plan_fair(request), "at": _epoch(now)}
 
 
 def observe_plan_position(request: Any) -> None:
@@ -487,7 +473,8 @@ def _resting_leg_price(row: Mapping[str, Any]) -> float | None:
 
 def review_resting(rows: Sequence[Mapping[str, Any]], *, now: _dt.datetime | None = None,
                    cancel: Callable[[Any], Mapping[str, Any]] | None = None) -> dict[str, Any]:
-    """Cancel resting pilot posts the plan no longer supports. `rows` = reconcile's resting maker rows."""
+    """Cancel resting pilot posts whose plan fair has fallen below the edge floor. `rows` = reconcile's
+    resting maker rows."""
     counts = {"rows": len(rows), "cancelled": 0, "failed": 0, "kept": 0, "unseen": 0, "no_fair": 0,
               "unreadable": 0}
     if not rows:
@@ -503,19 +490,12 @@ def review_resting(rows: Sequence[Mapping[str, Any]], *, now: _dt.datetime | Non
         key = row.get("idempotency_key")
         seen = _seen.get(_contract(row.get("ticker"), row.get("side"), row.get("market"), row.get("line")) or "")
         if seen is None:
-            date = str(row.get("selected_date") or "")
-            later = [t for d, t in _pass_at.items() if date and d >= date]
-            if not (later and max(later) > _BOOT_AT + PLAN_DROP_MARGIN_S):
-                counts["unseen"] += 1
-                continue
-            seen = {"fair": None, "at": _BOOT_AT, "date": date}
+            counts["unseen"] += 1
+            continue
         resting = _resting_leg_price(row)
         fair = seen.get("fair")
-        later = [t for d, t in _pass_at.items() if d >= seen["date"]]
         edge = round(fair - resting, 4) if fair is not None and resting is not None else None
-        if later and max(later) > seen["at"] + PLAN_DROP_MARGIN_S:
-            reason = "plan_dropped"
-        elif fair is None:
+        if fair is None:
             counts["no_fair"] += 1
             continue
         elif resting is None:

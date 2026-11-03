@@ -22,11 +22,11 @@ def _isolated(tmp_path, monkeypatch):
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("SYNDICATE_KALSHI_EXPIRE_AT_KICKOFF", "1")
     monkeypatch.setenv("SYNDICATE_KALSHI_MAKER_PILOT_FAIR_CANCEL", "on")
-    for store in (mp._seen, mp._pass_at, mp._routed_here):
+    for store in (mp._seen, mp._routed_here):
         store.clear()
     mp._cache.update(at=None, orders=[])
     yield
-    for store in (mp._seen, mp._pass_at, mp._routed_here):
+    for store in (mp._seen, mp._routed_here):
         store.clear()
 
 
@@ -111,62 +111,23 @@ def test_post_below_floor_is_cancelled_and_floor_is_configurable(monkeypatch):
     assert result["kept"] == 1 and cancels.ids == []
 
 
-def test_a_later_pass_without_the_position_cancels_as_plan_dropped():
-    mp.note_plan_sighting(_req(), now=T0)
+def test_a_later_pass_without_the_position_keeps_it_edge_floor_only():
+    """USER DECISION 2026-11-03 "Edge-floor only": `plan_dropped` fired 13 of 13 cancels at +2.8..+4.3pp.
+    A post the plan stops sending is judged on its LAST sighting, however long ago."""
+    mp.note_plan_sighting(_req(), now=T0)  # fair 0.6065 vs resting 0.56: +4.6pp
     other = _req(position_key="pk-other", event_id="e2", venue_ticker="KXNBATOTAL-26OCT30OTHER-220")
-    mp.note_plan_sighting(other, now=T0 + dt.timedelta(seconds=mp.PLAN_DROP_MARGIN_S + 60))
-    result, cancels = _review([_row(_req())], at=T0 + dt.timedelta(seconds=mp.PLAN_DROP_MARGIN_S + 90))
-    assert cancels.ids == ["ord-1"] and result["orders"][0]["reason"] == "plan_dropped"
-
-
-def test_the_same_pass_or_an_earlier_date_does_not_count_as_dropped():
-    mp.note_plan_sighting(_req(), now=T0)
-    mp.note_plan_sighting(_req(position_key="pk-same-pass", event_id="e2"), now=T0 + dt.timedelta(seconds=20))
-    mp.note_plan_sighting(_req(position_key="pk-old", event_id="e3", selected_date="2026-10-29"),
-                          now=T0 + dt.timedelta(hours=2))
-    result, cancels = _review([_row(_req())], at=T0 + dt.timedelta(hours=2))
+    mp.note_plan_sighting(other, now=T0 + dt.timedelta(hours=6))
+    result, cancels = _review([_row(_req())], at=T0 + dt.timedelta(hours=6, seconds=30))
     assert result["kept"] == 1 and cancels.ids == []
+    assert not hasattr(mp, "PLAN_DROP_MARGIN_S") and not hasattr(mp, "_pass_at")
 
 
-# --------------------------------------------------------------------- after a restart
-
-def _other_pass(at, date=DATE):
-    """A plan pass that sends some OTHER Kalshi position of `date` at `at`."""
-    mp.note_plan_sighting(_req(position_key="pk-other", event_id="e2", selected_date=date,
-                               venue_ticker="KXNBATOTAL-26OCT30OTHER-220"), now=at)
-
-
-def test_a_post_made_before_the_restart_and_missing_from_a_later_pass_is_dropped(monkeypatch):
-    """2026-11-01: the two MLS posts left the plan after the 16:53Z restart and rested on to kickoff."""
-    monkeypatch.setattr(mp, "_BOOT_AT", T0.timestamp())
-    _other_pass(T0 + dt.timedelta(seconds=mp.PLAN_DROP_MARGIN_S + 60))
-    result, cancels = _review([_row(_req(), selected_date=DATE)],
-                              at=T0 + dt.timedelta(seconds=mp.PLAN_DROP_MARGIN_S + 90))
-    assert cancels.ids == ["ord-1"] and result["orders"][0]["reason"] == "plan_dropped"
-    assert result["unseen"] == 0
-
-
-def test_after_a_restart_only_a_pass_past_the_margin_counts(monkeypatch):
-    monkeypatch.setattr(mp, "_BOOT_AT", T0.timestamp())
-    _other_pass(T0 + dt.timedelta(seconds=60))
-    result, cancels = _review([_row(_req(), selected_date=DATE)], at=T0 + dt.timedelta(seconds=90))
-    assert result["unseen"] == 1 and cancels.ids == []
-
-
-def test_after_a_restart_an_undated_post_or_an_earlier_dated_pass_cancels_nothing(monkeypatch):
-    monkeypatch.setattr(mp, "_BOOT_AT", T0.timestamp())
-    _other_pass(T0 + dt.timedelta(seconds=mp.PLAN_DROP_MARGIN_S + 60), date="2026-10-29")
-    late = T0 + dt.timedelta(seconds=mp.PLAN_DROP_MARGIN_S + 90)
-    result, cancels = _review([_row(_req()), _row(_req(), selected_date=DATE, order_id="ord-2")], at=late)
-    assert result["unseen"] == 2 and cancels.ids == []
-
-
-def test_a_post_resent_after_the_restart_is_judged_on_its_sighting(monkeypatch):
-    monkeypatch.setattr(mp, "_BOOT_AT", T0.timestamp())
-    at = T0 + dt.timedelta(seconds=mp.PLAN_DROP_MARGIN_S + 60)
-    mp.note_plan_sighting(_req(), now=at)
-    result, cancels = _review([_row(_req(), selected_date=DATE)], at=at + dt.timedelta(seconds=30))
-    assert result["kept"] == 1 and cancels.ids == []
+def test_a_dropped_post_whose_last_fair_is_below_the_floor_is_still_cancelled():
+    mp.note_plan_sighting(_req(ev_pct=-4.0), now=T0)  # edge -0.3pp
+    mp.note_plan_sighting(_req(position_key="pk-other", event_id="e2",
+                               venue_ticker="KXNBATOTAL-26OCT30OTHER-220"), now=T0 + dt.timedelta(hours=6))
+    result, cancels = _review([_row(_req())], at=T0 + dt.timedelta(hours=6, seconds=30))
+    assert cancels.ids == ["ord-1"] and result["orders"][0]["reason"] == "edge_below_floor"
 
 
 def test_a_failed_cancel_leaves_the_post_and_says_so():
@@ -199,10 +160,10 @@ def test_a_post_from_an_earlier_slate_is_matched_by_contract():
 
 def test_observe_records_only_when_the_pilot_is_on(monkeypatch):
     mp.observe_plan_position(_req())
-    assert mp._seen == {} and mp._pass_at == {}
+    assert mp._seen == {}
     monkeypatch.setenv("SYNDICATE_KALSHI_MAKER_PILOT", "on")
     mp.observe_plan_position(_req())
-    assert list(mp._seen) == [f"{TICKER}|yes"] and mp._pass_at == {DATE: pytest.approx(mp._seen[f"{TICKER}|yes"]["at"])}
+    assert list(mp._seen) == [f"{TICKER}|yes"]
 
 
 def test_observe_never_raises(monkeypatch):
