@@ -1383,7 +1383,11 @@ def _enforce_live_edge_policy(grid: list) -> dict:
 # NFL + NCAAF ONLY: the decision named these two, and MLB is in its postseason, where the board does not change.
 # A live re-sim row is untouched -- the policy allows `live_aware` projections, and `live_projection_join` (which
 # runs after this sweep in `book_grid_artifact`) gives a row it prices its live number back.
-LIVE_PROBABILITY_WITHHELD_SPORTS = frozenset({"nfl", "ncaaf"})
+# NCAAB + WNCAAB JOINED 2026-11-03 (lane wncaab-module, user "Yes, blank it"). On the 11-03 grids (23:10Z), 15 live
+# men's rows and 1,228 final rows served the pregame sim's probability at an in-play line, e.g. "over 104.5 at 0.985"
+# for a women's game that finished 61-45 against a pregame projection of 135.4. Their edges were already withheld;
+# the 7 live re-sim rows keep their live probability and edge (the join prices them from `live_model_prob_over`).
+LIVE_PROBABILITY_WITHHELD_SPORTS = frozenset({"nfl", "ncaaf", "ncaab", "wncaab"})
 
 
 def _withhold_pregame_probability(projection: dict, reason: str) -> int:
