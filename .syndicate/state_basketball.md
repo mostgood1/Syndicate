@@ -1470,6 +1470,7 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   - `/wncaab` cards / market-board / hub, D-I slate (`wncaab_source/data/scoreboard/`), chips (Q1..Q4/OT), Layer 1, Layer 2.
   - OddsAPI `basketball_wncaab`: bulk every sweep, plus in-play lane `live-odds-worker-wncaab-live` (240 s).
   - OddsAPI carries NO women's quarter/half lines (every quote is `full`), and prices only ~14 of ~94 D-I games a night.
+- **NCAAB in-play capture cost: UNCAPPED by user decision (2026-11-03).** ~46-51 OddsAPI credits/h per live game; 3,707/h at 73-80 live games over a 20-minute window on the 11-02 evening slate. The ~1,850/h approval assumed a 40-game peak; the user kept capture uncapped rather than cap big slates (deploys.md 2026-11-03T13:50Z).
 - **College config:** one league config, `college_basketball/league.py`. NCAAB modules take `league=` with an `ncaab` default.
 - **Rail:**
   - Live college chips get the clock / period lines from ESPN's D-I board at serve time (`groups=50`); the slate's periods are kept when ESPN fails.

@@ -55875,3 +55875,10 @@ Scheduled task `ncaab-opening-night-live-lens-reading` (slot 03:30Z; started 03:
   - Lag at the end of the dense stretch: **30-44 h**. After that the sparse hours read fast.
   - Purge floor 59.6 h: the oldest unread second (11-01 17:32:04Z) is purged at 11-04 05:08Z (11:08 PM CST 11-03).
 - **verify (OWED):** the 11-03 16:00Z read: the big series' lag is below 45 h.
+
+## 2026-11-03T13:50Z (2026-11-03 07:50 CST) -- USER DECISION, no deploy: NCAAB in-play odds capture stays UNCAPPED on big slates (lane `ncaab-board-slate`)
+- **user, in this chat:** "Keep it uncapped". The question was whether to keep NCAAB in-play capture uncapped at ~3,700 credits/h on big slates, or cap it.
+- Basis: the 11-02 evening reading (entry `bd906dd34`): **3,707 credits/h** over a 20m10s window at 73-80 live games. That is about 2x the ~1,850/h the user approved, which assumed a 40-game peak. Per live game it is ~46-51 credits/h, in line with that estimate's ~46/h.
+- Effect on later readings: NCAAB in-play cost is **not** gated on a fixed credits/h ceiling. The ~3,000/h flag came from the one-time `ncaab-evening-lane-check` task (already run, disabled). Cost scales with the number of live games, with no cap.
+- Nothing changed on the fleet: no code, no env, no restart, no claim.
+- Still owed for lane `ncaab-board-slate`'s Verification: `by_sport.ncaab` credits/h over **>= 1 h** (the 3,707/h reading is a 20-minute window).
