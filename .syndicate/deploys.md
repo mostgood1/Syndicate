@@ -55882,3 +55882,12 @@ Scheduled task `ncaab-opening-night-live-lens-reading` (slot 03:30Z; started 03:
 - Effect on later readings: NCAAB in-play cost is **not** gated on a fixed credits/h ceiling. The ~3,000/h flag came from the one-time `ncaab-evening-lane-check` task (already run, disabled). Cost scales with the number of live games, with no cap.
 - Nothing changed on the fleet: no code, no env, no restart, no claim.
 - Still owed for lane `ncaab-board-slate`'s Verification: `by_sport.ncaab` credits/h over **>= 1 h** (the 3,707/h reading is a 20-minute window).
+
+## 2026-11-03T13:54Z (2026-11-03 07:54 CST) -- READING, no deploy: WNCAAB daily input refresh 2026-11-03 MET (lane `wncaab-module`)
+- Read-only. No restarts, no env changes, no claims.
+- `live-odds-worker.log`: `11:16:12Z [college_pregame_sim] WNCAAB_INPUTS build_ncaab_team_ratings.py rc=0` and `11:17:33Z ... build_ncaab_player_priors.py rc=0`.
+- Fleet `SYNDICATE_DATA_ROOT/wncaab_source/data/processed/`:
+  - marker `.inputs_refreshed_2026-11-03` (11:17Z);
+  - new `player_priors_2027_asof_20261103.csv` (605,900 B), `player_game_box_2027.csv` (586,748 B), `team_game_box_2027.csv` (33,722 B).
+  - No women's `team_ratings_2027_*` file yet; only `team_ratings_2026_asof_20260405.csv`. Not checked: whether the ratings builder skips the 2027 table on purpose this early.
+- Producer after the refresh: `13:44:10Z RUN league=wncaab date=2026-11-03 pregame=26 published=22 refused=4` and `date=2026-11-04 pregame=17 published=17 refused=0`. The 4 refusal reasons were not read here.
