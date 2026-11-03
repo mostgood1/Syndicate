@@ -13975,3 +13975,13 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Falsification test: After the ff, an NCAAB sweep still fails, or fails with a different error (e.g. 401/quota) -- then the key name was not the only gate
 - Verification: Read refresh-worker ODDS_SWEEP_OUTCOME sport=ncaab wrote=True after the ff, the next odds_refresh.json with no ncaab failingSteps, and /api/board/book-grid?sport=ncaab&date=2026-11-02 total_rows > 0; record in deploys.md
 - Blocked by: none
+
+### closed-lane-archive-20261102-2041 — CLOSED 2026-11-02 (GOAL MET: 1 blocks archived) — opened 2026-11-02 — session ec0d661e-c956-4615-8714-dcb6dd31bb13
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. Moved `closed-lane-archive-20261102-1447` (owner_liveness SAFE at 240m). 8 CLOSED blocks deferred (owners idle < 240m or transcript not found); table in log/2026-11-02.md.
+
+### closed-lane-archive-20261103-0040 — CLOSED 2026-11-03 (GOAL MET: 2 blocks archived) — opened 2026-11-03 — session 6fba21a0-a415-46e6-b1d9-9806725ec6d4
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. Moved `closed-lane-archive-20261102-1640` and `closed-lane-archive-20261102-1841` (owner_liveness SAFE at 240m). 8 CLOSED blocks deferred (owners idle < 240m or transcript not found); table in log/2026-11-03.md.
