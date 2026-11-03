@@ -55849,3 +55849,27 @@ Scheduled task `ncaab-opening-night-live-lens-reading` (slot 03:30Z; started 03:
   - 0 ncaab keyvalue rejections;
   - 0 tick errors.
 - **Next action:** a state-age ceiling for carried-forward lanes in `live_gameline_join` (withhold, the same way the quote-age ceiling does), and/or more re-sim throughput per tick. Both are changes, so both need the user.
+
+## 2026-11-03 04:08Z (10:08 PM CST 11-02) -- MEASUREMENT: #742 capture, tonight's check -- `KXMVECROSSCATEGORY0` **CAUGHT UP**, `KXMVECROSSCATEGORY` **MOVING**; a second waste pattern found (lane e4-pregame-prints)
+- **Read 04:02Z** (`sweep_day_read.py`, `cc0_detail.py`, `run_waste.py`; 9 runs 11-02 19:04Z..11-03 03:04Z, 0 errors). Fleet HEAD `70b2bdf0` carries `d8def445` (ancestor check), and the capture script's last change on it is `d8def445`.
+- **0-series: caught up** at the 03:04Z run (27 slices / 106 pages, swept_to 11-03 02:59:23Z, lag **0.97 h**).
+- **Big series: moving** for the first time since 11-01. The 03:04Z run read 6 slices / 613 pages, swept_to 11-01 16:06:19Z -> **17:32:04Z**. Lag **34.42 h** at 04:02Z.
+- **Per-sport series:** all six read when due; 0 of 9 runs left one unread.
+- **verify (from the 11-02 19:12Z entry):** tonight's check, "the big series has moved or the 0-series' backlog is nearly read": **MET**, both.
+- **NEW: 5 runs threw away nearly all their pages** (`run_waste.py`; all GETs were market pages, no trade reads):
+  - 21:04Z, 22:04Z, 23:04Z, 00:04Z and 01:04Z each spent 900 pages and kept 1-16. The 0-series moved 285-640 s of settlement time per run, and the big series got nothing.
+  - Since 19:04Z, **5,137 of 7,825** market pages (66%) were discarded.
+- **Mechanism (DIAGNOSED; the arithmetic matches all 4 runs it can be checked on):**
+  - A completed slice REPLACES `pages_per_s` (`_run_locked`, the line after `st["last_slice_pages"]`).
+  - The `d8def445` floor sized each run's first slice at about 400 s (100 / (899 / 3,600 s)). That slice landed in a sparse stretch (11-02 00:30Z..01:06Z) and cost 1 page.
+  - That one page reset the estimate, so the next slice went out at the full 3,600 s into the dense hour after 01:06Z. It hit the 300-page split and the run's budget ran out mid-slice, which discards it.
+  - Predicted first spans: 404 s at 22:04Z (100 / (890 / 3,600 s)), 285 s at 23:04Z (100 / (884 / 2,525 s)), 400-404 s at 00:04Z and 01:04Z. **Observed: 404, 285, 404, 400.**
+  - It ended at 02:04Z, when the first slice reached the dense hour itself: 8 slices, 806 pages, nothing discarded.
+  - **When it recurs:** whenever a backlog crosses a sparse stretch ahead of a dense one. The 0-series is swept first, so its waste is the big series' loss.
+  - **Candidate fix (not written yet):** keep a budget-stopped span's density floor until that span has been read, so a sparse slice inside it cannot widen the next one. A push and fleet ff are the user's decision.
+- **Projection** (a PROJECTION, not a reading):
+  - The 0-series now needs about 100 pages a run, so the big series gets about 800-850.
+  - Its dense stretch is 17:32Z..~02Z 11-02, about 8.5 settlement hours. This week's first 1.43 h cost 429 pages/h; last Sunday's peak hours cost up to 1,780. That is 3,650-15,100 pages, or 4-18 runs.
+  - Lag at the end of the dense stretch: **30-44 h**. After that the sparse hours read fast.
+  - Purge floor 59.6 h: the oldest unread second (11-01 17:32:04Z) is purged at 11-04 05:08Z (11:08 PM CST 11-03).
+- **verify (OWED):** the 11-03 16:00Z read: the big series' lag is below 45 h.
