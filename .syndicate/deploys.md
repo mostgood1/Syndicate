@@ -55980,3 +55980,14 @@ Scheduled task `ncaab-opening-night-live-lens-reading` (slot 03:30Z; started 03:
 - **OWED:** the men's anchor on a live men's game (no men's game live at either deploy; tips 23:00Z), and the share of priced live games that refuse `no_margin_anchor`. Both are in tonight's one-time reading (`wncaab-live-resim-evening-reading`, 7 PM CST), which was updated to check them.
 - **revert:** `SYNDICATE_COLLEGE_LIVE_MARGIN_ANCHOR=0` (env change, fleet env recipe) or `git revert 0a5dc86a2 9cfd7f941` + ff + live-odds-worker TERM (claimed).
 - **claims:** live-odds-worker released 16:44:35Z and 16:53:33Z.
+
+## 2026-11-03T17:12Z (11:12 CST) -- DEPLOY + MEASUREMENT: maker-pilot fair cancel EDGE-FLOOR ONLY (fleet ff 0a5dc86a2 -> 637de43e7, live-odds restart) -- DEPLOYED, NOT YET EXERCISED
+
+User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) relayed it via session a21617bf, and the user confirmed it in session 9683e8c4 ("Yes, edge-floor only"). Lane maker-pilot-fair-cancel.
+- **Evidence, re-read on the fleet log before the change:** 13 FAIR_CANCEL 11-02 00:34:27Z..11-03 15:36:03Z, 13/13 reason=plan_dropped, edge 0.028..0.043, 0 edge_below_floor. Two more plan_dropped at 17:06:10Z (restart rule, fair=None): KXNHLAST DALWSH Dubois and KXNCAAFSPREAD OHIOAKR, so 15 in total.
+- **Change:** `637de43e7` removes plan_dropped, PLAN_DROP_MARGIN_S, _pass_at, _BOOT_AT and the resting-row selected_date (added in `6c22ebfaa`). A post is judged on its LAST sighting's fair vs the +1pp floor. No sighting since a restart means it is kept to kickoff. Tests: 17 fair-cancel + 284 pilot/ledger/executor pass. The new keep test fails on the old code.
+- **Ride-along:** `4072db88a` (ci-suite #697: test pins plus a probability_differential registry entry; no runtime path). That lane says a fleet ff past it is owed.
+- **Locks:** claims live-odds-worker (451ed9a4) + web (ae027a32), 17:10:15Z. Preflight 17:10:24Z: HOLD only for the odds-refresh chain (+ fetch_soccer_history grandchild).
+- **Done:** fleet HEAD -> 637de43e7 at 17:10:52Z; plan_dropped refs on disk = 1 (the comment). No non-odds children at 17:11:12Z; TERM to 3459432. Respawned pid 3463398 at 17:12:05Z.
+- **Reading:** Kalshi EXECUTED 17:13:17Z and 17:19:50Z (positions=2, placed=0). 0 FAIR lines 17:12:05Z..17:21:24Z: no resting pilot row, because the 17:06Z cancels pulled the last two.
+- **verify (owed):** the first FAIR_PASS after 17:12:05Z with a sighted pilot row reads kept or edge_below_floor, and no reason=plan_dropped appears from 17:12:05Z on.

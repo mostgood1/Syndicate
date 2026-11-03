@@ -3185,3 +3185,6 @@ Measured on the first board build after the deploy (ECU, women's, 16:45Z, 55% of
 **Rule:**
 1. A correction fitted on a whole game (pregame gap, rate bias, calibration offset) applies to the live state only in proportion to what is left: scale it by the remaining regulation share (1.0 at the tip, 0 in overtime).
 2. Every live-tier adjustment gets a MID-GAME test against a real board row, not just a tip-state test. The tip is the one state where a scaled and an unscaled correction agree, so it cannot tell them apart.
+
+### 2026-11-03 -- "the plan stopped sending it" is not "the edge is gone" (lane maker-pilot-fair-cancel)
+Belief overturned: a resting post the plan no longer sends has lost its edge. Measured on the fleet log: plan_dropped made 15 of 15 fair-move cancels 11-02..11-03. The 13 with a fair were at +2.8..+4.3pp edge, and the +1pp floor never fired. The live Kalshi plan holds one position per pass, so absence is rotation, not a price verdict. **Rule:** a cancel trigger must read the quantity it protects (here, edge vs the resting price), never a proxy (the plan's membership). Before shipping a proxy trigger, count how often it fires while the direct measure would have said keep. User decision "Edge-floor only", `637de43e7`.
