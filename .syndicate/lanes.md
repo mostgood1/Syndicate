@@ -635,6 +635,14 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: GOAL MET. Moved `closed-lane-archive-20261103-1150` and `closed-lane-archive-20261103-1302` (owner_liveness --idle-min 240, SAFE). Table and narrative: log/2026-11-03.md 23:10Z.
 
+### ncaab-kalshi-pairing — OPEN — opened 2026-11-03 — session e32fef1a-01e8-4afe-a284-01acd3728545
+- Goal: Kalshi men's college basketball full-game markets (KXNCAAMBGAME, KXNCAAMBSPREAD, KXNCAAMBTOTAL) pair with NCAAB board rows: fix on main with tests, and on the fleet the Kalshi join reports matched NCAAB rows > 0 with sampled pairs correct by team, side and line (todo #755 (b))
+- Files: syndicate/features/shared/kalshi_catalogue.py (SERIES_SPORT and _SERIES_SEGMENT KXNCAAMB entries and club_key's NCAAB Kalshi spellings ONLY), syndicate/features/shared/odds_book_quotes.py (_GAME_LINE_CAPTURE_SPORTS line ONLY), tests/test_kalshi_ncaab_pairing.py (NEW), tests/test_soccer_game_line_capture.py (the predicate test ONLY)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: pytest on the new tests (each with an off != on control); a fleet read-only join of the live Kalshi NCAAMB markets against the real NCAAB shortlist before any fleet update; after the user-approved update, the Kalshi join's matched NCAAB count > 0 and a sample checked by team, side and line
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
