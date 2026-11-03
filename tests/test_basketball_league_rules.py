@@ -79,5 +79,5 @@ def test_ncaab_windows_are_marked_as_priors_and_cover_both_halves():
 def test_unknown_league_refuses():
     with pytest.raises(KeyError):
         rules_for("euroleague")
-    assert set(rules.LEAGUES) == {"nba", "wnba", "ncaab"}
+    assert set(rules.LEAGUES) == {"nba", "wnba", "ncaab", "wncaab"}
     assert WNBA.period_seconds == 600

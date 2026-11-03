@@ -199,7 +199,7 @@ DRAW_IS_A_REAL_OUTCOME: frozenset[str] = frozenset({
 
 # Cannot draw: a level final is a corrupt row and must not be scored.
 LEVEL_FINAL_IS_A_BAD_ROW: frozenset[str] = frozenset({
-    "mlb", "nba", "wnba", "ncaab",
+    "mlb", "nba", "wnba", "ncaab", "wncaab",
     # Hockey resolves every game by overtime or shootout, so a FINAL is never
     # level on the scoreline this grid carries.
     "nhl",

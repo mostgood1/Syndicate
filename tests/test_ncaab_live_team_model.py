@@ -123,28 +123,80 @@ def _registry(tmp_path, ids):
     return path
 
 
+def _player_priors(directory: Path, as_of: str, teams, players: int = 8):
+    """A player-priors table: `players` projected players per team (the live tier fields MIN_ROTATION = 7)."""
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / f"player_priors_2026_asof_{as_of.replace('-', '')}.csv"
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=("team_id", "athlete_id", "player_name", "min_proj", "starter_prob"))
+        writer.writeheader()
+        for tid in teams:
+            for i in range(players):
+                writer.writerow({"team_id": tid, "athlete_id": f"{tid}{i}", "player_name": f"P{tid}_{i}", "min_proj": 20, "starter_prob": 0.5})
+    return path
+
+
+def _dirs_to(path):
+    return lambda *a, **k: [path]
+
+
 def test_checklist_passes_a_full_table(tmp_path, monkeypatch):
     _write(tmp_path / "p", 2026, "2026-01-10", TEAMS)
-    monkeypatch.setattr(tm, "ratings_dirs", lambda: [tmp_path / "p"])
+    _player_priors(tmp_path / "p", "2026-01-10", ["1", "2", "3"])
+    monkeypatch.setattr(tm, "ratings_dirs", _dirs_to(tmp_path / "p"))
     monkeypatch.setattr(checklist, "REGISTRY", _registry(tmp_path, ["1", "2", "3"]))
     code, report = checklist.run(dt.date(2026, 1, 20))
     assert code == 0 and report["verdict"] == "PASS"
     consumed = {r["field"] for r in report["fields"] if r["consumed"]}
     assert {"adj_off", "adj_def", "tempo"} <= consumed
+    assert report["player_priors_coverage"] == 1.0
 
 
 def test_checklist_fails_on_thin_coverage(tmp_path, monkeypatch):
     _write(tmp_path / "p", 2026, "2026-01-10", TEAMS)
-    monkeypatch.setattr(tm, "ratings_dirs", lambda: [tmp_path / "p"])
+    _player_priors(tmp_path / "p", "2026-01-10", [str(i) for i in range(1, 11)])
+    monkeypatch.setattr(tm, "ratings_dirs", _dirs_to(tmp_path / "p"))
     monkeypatch.setattr(checklist, "REGISTRY", _registry(tmp_path, [str(i) for i in range(1, 11)]))
     code, report = checklist.run(dt.date(2026, 1, 20))
     assert code == 1 and report["d1_coverage"] == pytest.approx(0.3)
 
 
+def test_checklist_counts_the_per_game_prior_season_fallback(tmp_path, monkeypatch):
+    """Opening week: this season rates 1 team, last season all 3. The tier prices every game (per-game fallback),
+    so coverage is 3/3 -- this season's table alone would read 1/3 (the 2026-11-03 fleet false alarm)."""
+    _write(tmp_path / "p", 2025, "2025-04-05", TEAMS)
+    _write(tmp_path / "p", 2026, "2025-11-04", TEAMS[:1])
+    _player_priors(tmp_path / "p", "2025-11-05", ["1", "2", "3"])
+    monkeypatch.setattr(tm, "ratings_dirs", _dirs_to(tmp_path / "p"))
+    monkeypatch.setattr(checklist, "REGISTRY", _registry(tmp_path, ["1", "2", "3"]))
+    code, report = checklist.run(dt.date(2025, 11, 5))
+    assert report["d1_coverage_this_table"] == pytest.approx(1 / 3, abs=1e-4) and report["d1_coverage"] == 1.0
+    assert report["fallback_table"] and report["fallback_fields"]
+    assert code == 0 and report["verdict"] == "PASS"
+
+
+def test_checklist_fails_on_thin_player_priors(tmp_path, monkeypatch):
+    _write(tmp_path / "p", 2026, "2026-01-10", TEAMS)
+    _player_priors(tmp_path / "p", "2026-01-10", ["1", "2"])
+    monkeypatch.setattr(tm, "ratings_dirs", _dirs_to(tmp_path / "p"))
+    monkeypatch.setattr(checklist, "REGISTRY", _registry(tmp_path, ["1", "2", "3"]))
+    code, report = checklist.run(dt.date(2026, 1, 20))
+    assert code == 1 and report["d1_without_player_priors"] == ["3"]
+
+
+def test_checklist_no_player_priors_is_exit_2(tmp_path, monkeypatch):
+    _write(tmp_path / "p", 2026, "2026-01-10", TEAMS)
+    monkeypatch.setattr(tm, "ratings_dirs", _dirs_to(tmp_path / "p"))
+    monkeypatch.setattr(checklist, "REGISTRY", _registry(tmp_path, ["1", "2", "3"]))
+    code, report = checklist.run(dt.date(2026, 1, 20))
+    assert code == 2 and report["verdict"] == "NO_PLAYER_PRIORS"
+
+
 def test_checklist_fails_when_a_consumed_field_is_unfed(tmp_path, monkeypatch):
     """Reachability of the alarm itself: a zero tempo is unusable and tempo is consumed."""
     _write(tmp_path / "p", 2026, "2026-01-10", TEAMS)
-    monkeypatch.setattr(tm, "ratings_dirs", lambda: [tmp_path / "p"])
+    _player_priors(tmp_path / "p", "2026-01-10", ["1", "2", "3"])
+    monkeypatch.setattr(tm, "ratings_dirs", _dirs_to(tmp_path / "p"))
     monkeypatch.setattr(checklist, "REGISTRY", _registry(tmp_path, ["1", "2", "3"]))
     real = tm.table_from_rows
 
@@ -159,6 +211,6 @@ def test_checklist_fails_when_a_consumed_field_is_unfed(tmp_path, monkeypatch):
 
 
 def test_checklist_no_table_is_exit_2(tmp_path, monkeypatch):
-    monkeypatch.setattr(tm, "ratings_dirs", lambda: [tmp_path / "empty"])
+    monkeypatch.setattr(tm, "ratings_dirs", _dirs_to(tmp_path / "empty"))
     code, report = checklist.run(dt.date(2026, 1, 20))
     assert code == 2 and report["verdict"] == "NO_TABLE"

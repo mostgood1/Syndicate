@@ -42,13 +42,17 @@ ESPN_SPORT_PATH = {
     "nba": "basketball/nba",
     "wnba": "basketball/wnba",
     "ncaab": "basketball/mens-college-basketball",
+    "wncaab": "basketball/womens-college-basketball",
 }
+# The college leagues: ESPN's D-I filter on the scoreboard, NCAA personal-foul counting.
+COLLEGE_LEAGUES = frozenset({"ncaab", "wncaab"})
 # ESPN abbreviation -> Syndicate tricode (same table as scripts/build_basketball_player_game_log.py).
-# NCAAB keeps ESPN's abbreviation; its stable key is the ESPN team id, carried beside it.
+# NCAAB keeps ESPN's abbreviation; its stable key is the ESPN team id, carried beside it. WNCAAB likewise.
 TEAM_ALIASES = {
     "wnba": {"GS": "GSV", "LV": "LVA", "LA": "LAS", "NY": "NYL", "CONN": "CON", "WAS": "WSH", "PHO": "PHX"},
     "nba": {"GS": "GSW", "NY": "NYK", "SA": "SAS", "NO": "NOP", "UTAH": "UTA", "WSH": "WAS", "PHO": "PHX"},
     "ncaab": {},
+    "wncaab": {},
 }
 # ESPN `season.type`. Phases are separate populations and are never pooled by anything here.
 SEASON_TYPES = {1: "preseason", 2: "regular", 3: "playoffs", 5: "play-in"}
@@ -73,7 +77,8 @@ class LeagueRules:
     ot_penalty_after: int
     double_bonus_after: int | None
     last_two_minute_rule: bool
-    foul_period: str  # "period" (fouls reset each quarter/OT) or "half" (NCAAB: reset at half; OT continues the 2nd half)
+    foul_period: str  # "period" (fouls reset each quarter/OT), "half" (NCAAB: reset at half; OT continues the 2nd half)
+    #                   or "quarter" (WNCAAB: reset each quarter; OT continues the 4th)
     possession_fta_coef: float
 
     def period_length(self, period: int) -> int:
@@ -96,13 +101,15 @@ class LeagueRules:
     def foul_bucket(self, period: int) -> int:
         """Which foul-count bucket a period belongs to."""
         p = int(period)
-        if self.foul_period == "half":
-            return 1 if p <= 1 else 2  # NCAAB: OT fouls carry over from the 2nd half
+        if self.foul_period in ("half", "quarter"):
+            # Each regulation half (NCAAB) / quarter (WNCAAB) is its own bucket; OT carries over from the last.
+            return min(p, self.regulation_periods)
         return p
 
 
-# Possessions = FGA + TOV + c*FTA - OREB. `c` is an ESTIMATOR, not a rule, so it lives here.
-POSSESSION_FTA_COEF = {"nba": 0.44, "wnba": 0.44, "ncaab": 0.475}
+# Possessions = FGA + TOV + c*FTA - OREB. `c` is an ESTIMATOR, not a rule, so it lives here. WNCAAB carries the
+# men's value UNFITTED; it feeds the live state's displayed possessions / pace, not the re-sim's resume.
+POSSESSION_FTA_COEF = {"nba": 0.44, "wnba": 0.44, "ncaab": 0.475, "wncaab": 0.475}
 
 
 def _from_rulebook(code: str) -> LeagueRules:
@@ -125,7 +132,7 @@ def _from_rulebook(code: str) -> LeagueRules:
     )
 
 
-RULES: dict[str, LeagueRules] = {code: _from_rulebook(code) for code in ("nba", "wnba", "ncaab")}
+RULES: dict[str, LeagueRules] = {code: _from_rulebook(code) for code in ("nba", "wnba", "ncaab", "wncaab")}
 
 
 def rules_for(league: str) -> LeagueRules:
@@ -156,7 +163,7 @@ def espn_get(league: str, path: str, *, timeout: float = 30.0, attempts: int = 3
 
 
 def fetch_scoreboard(league: str, date_yyyymmdd: str) -> dict[str, Any]:
-    extra = "&groups=50&limit=500" if str(league).lower() == "ncaab" else "&limit=100"
+    extra = "&groups=50&limit=500" if str(league).lower() in COLLEGE_LEAGUES else "&limit=100"
     return espn_get(league, f"scoreboard?dates={date_yyyymmdd}{extra}")
 
 
@@ -808,7 +815,7 @@ def personal_fouls(events: Iterable[PbpEvent], league: str) -> dict[str, int]:
     attribute every technical to a player, so only attributed ones are counted.
     """
     out: dict[str, int] = {}
-    count_tech = str(league).lower() == "ncaab"
+    count_tech = str(league).lower() in COLLEGE_LEAGUES  # NCAA's rule, men's and women's
     for ev in events:
         if ev.kind in {"foul", "foul_offensive"} or (count_tech and ev.kind == "foul_technical" and "foul" in ev.type_text.lower()):
             if ev.players:

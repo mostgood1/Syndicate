@@ -65,7 +65,7 @@ if str(REPO_ROOT) not in sys.path:
 # no live tier anywhere is a legitimate row (`ncaab`); a sport MISSING from this
 # tuple that turns up in a registry is caught by R1.
 ALL_SPORTS: tuple[str, ...] = (
-    "mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "soccer",
+    "mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "wncaab", "soccer",
 )
 
 # Provenance of the GAME-LINE probability a sport publishes.
@@ -168,6 +168,18 @@ DECLARATIONS: dict[str, Declaration] = {
                            "(its own thread started beside NBA's in live_lens_loop, behind "
                            "SYNDICATE_NCAAB_LIVE_RESIM, code default OFF; writes live/ncaab_live_resim.json)",
         note="Game lines only: NCAAB player priors exist for the engine, but no prop pipeline prices them.",
+    ),
+    "wncaab": Declaration(
+        gameline=LIVE_RESIM,
+        props=PROPS_NONE,
+        evidence="ncaab/live_resim.py with league='wncaab' resumes P1's possession engine (league_params('wncaab'), "
+                 "four quarters) from P2's LiveGameState; refusals publish a `pregame_only` lane carrying NO "
+                 "probability, and the join rejects that stamp",
+        alternate_producer="syndicate/features/ncaab/live_resim.py league='wncaab' "
+                           "(its own thread, started by start_ncaab_live_resim_loop, behind SYNDICATE_WNCAAB_LIVE_RESIM, "
+                           "which follows SYNDICATE_NCAAB_LIVE_RESIM when absent; writes live/wncaab_live_resim.json)",
+        note="Game lines only, and OddsAPI quotes no women's quarter or half lines: the re-sim's q1..q4/h1/h2 "
+             "distributions price nothing until a venue does.",
     ),
     "soccer": Declaration(
         gameline=LIVE_RESIM,

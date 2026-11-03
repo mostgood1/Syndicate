@@ -78,10 +78,12 @@ class LeagueRules:
     shot_clock_after_offensive_rebound: int
     foul_out: int
     # Team-foul bonus. `bonus_scope` is what the team-foul count resets on:
-    # "period" (NBA/WNBA quarters) or "half" (NCAAB; overtime CONTINUES the
-    # second half's count). Thresholds are the opponent's team-foul number at
-    # which the award starts (the 5th foul in an NBA quarter is two shots).
-    bonus_scope: Literal["period", "half"]
+    # "period" (NBA/WNBA quarters), "half" (NCAAB; overtime CONTINUES the
+    # second half's count) or "quarter" (WNCAAB; resets each quarter, and
+    # overtime CONTINUES the fourth quarter's count). Thresholds are the
+    # opponent's team-foul number at which the award starts (the 5th foul in
+    # an NBA quarter is two shots).
+    bonus_scope: Literal["period", "half", "quarter"]
     one_and_one_from: Optional[int]
     two_shots_from: int
     overtime_two_shots_from: Optional[int]
@@ -136,7 +138,7 @@ class LeagueRules:
         p = int(period)
         if self.bonus_scope == "period":
             return True
-        # half scope: only the second half resets; overtime continues it.
+        # half / quarter scope: every regulation period resets; overtime continues the last one.
         return p <= self.periods
 
     def bonus_free_throws(
@@ -288,7 +290,30 @@ NCAAB = LeagueRules(
     source="NCAA men's rules 2025-26 (two 20:00 halves, 30 s / 20 s reset, 1-and-1 on the 7th team foul per half, double bonus on the 10th, foul out at 5)",
 )
 
-LEAGUES: Dict[str, LeagueRules] = {r.league: r for r in (NBA, WNBA, NCAAB)}
+# WOMEN'S COLLEGE BASKETBALL (lane wncaab-module, 2026-11-03). Four 10:00 quarters and 5:00 overtimes; two
+# shots from the 5th team foul of a quarter, no 1-and-1; overtime is an extension of the fourth quarter for
+# team fouls (the same rule `college_basketball/momentum_capture.py` counts the rail's bonus line by). No
+# rotation windows: `_NCAAB_WINDOWS` are drawn on halves and `_PRO_WINDOWS` on pro quarters, and nothing reads
+# this league's windows (the engine draws its own from LeagueParams).
+WNCAAB = LeagueRules(
+    league="wncaab",
+    periods=4,
+    period_seconds=600,
+    overtime_seconds=300,
+    shot_clock_seconds=30,
+    # NOT VERIFIED against the women's rulebook; nothing reads this field (grep 2026-11-03).
+    shot_clock_after_offensive_rebound=30,
+    foul_out=5,
+    bonus_scope="quarter",
+    one_and_one_from=None,
+    two_shots_from=5,
+    overtime_two_shots_from=None,  # overtime continues the fourth quarter's count
+    late_period_seconds=None,
+    late_period_two_shots_from=None,
+    source="NCAA women's rules (four 10:00 quarters, 5:00 overtime, 30 s shot clock, two shots from the 5th team foul per quarter, no 1-and-1, overtime extends the 4th quarter's team fouls, foul out at 5)",
+)
+
+LEAGUES: Dict[str, LeagueRules] = {r.league: r for r in (NBA, WNBA, NCAAB, WNCAAB)}
 
 
 def rules_for(league: str) -> LeagueRules:

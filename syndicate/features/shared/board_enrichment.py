@@ -2568,7 +2568,9 @@ _LIVE_PROP_SPORTS = frozenset({"mlb", "wnba", "soccer"})
 # `pregame_only` lanes with no probability. The producer is OFF unless SYNDICATE_NCAAB_LIVE_RESIM is
 # set, so -- exactly as ncaaf and nhl above -- enabling the sport changes no edge until it runs, and
 # says "no published live-lens snapshot" instead of "no live re-sim wired" until then.
-_LIVE_GAMELINE_SPORTS = frozenset({"mlb", "wnba", "soccer", "ncaaf", "nhl", "nfl", "ncaab"})
+# `wncaab` JOINED 2026-11-03 (lane wncaab-module, user "Build it"): the same producer with `league="wncaab"`,
+# its own key (`live/wncaab_live_resim.json`), the same `live_resim` stamp. Its switch follows NCAAB's when absent.
+_LIVE_GAMELINE_SPORTS = frozenset({"mlb", "wnba", "soccer", "ncaaf", "nhl", "nfl", "ncaab", "wncaab"})
 
 # `nba` JOINS ONLY WHEN `SYNDICATE_NBA_LIVE_PRICED` IS SET (lane `nba-native-live-resim`, P3; ABSENT = OFF,
 # checked not assumed). Unlike ncaaf / nhl / ncaab above, the NBA producer ALREADY RUNS on the fleet in shadow
@@ -2620,6 +2622,7 @@ _LIVE_GAMELINE_SNAPSHOT_PATHS: dict[str, str] = {
     # Its own key, not `ncaab_live_lens.json`: the NCAAB live-lens PAGE has its own mirrored payloads,
     # and one Redis key with two writers is the nfl collision above (R8).
     "ncaab": "ncaab_live_resim.json",
+    "wncaab": "wncaab_live_resim.json",
 }
 
 

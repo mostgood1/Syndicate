@@ -52,6 +52,21 @@ RUNS ON A WORKER. NEVER IN A REQUEST HANDLER. A DEDICATED THREAD, OFF BY DEFAULT
 `build_live_lens_snapshot` calls `refuse_if_compute_in_request_path`. Like NBA it is not a
 `_LIVE_LENS_SPORTS` builder: tens of seconds per game would stall every other sport's lens. It
 runs only when `SYNDICATE_NCAAB_LIVE_RESIM` is on (absent = off, checked, not assumed).
+
+--------------------------------------------------------------------------
+WOMEN'S COLLEGE BASKETBALL: `league="wncaab"` (lane wncaab-module, user 2026-11-03 "Build it")
+--------------------------------------------------------------------------
+
+The same tick, resumed from the women's live state: four 10:00 quarters, so `resume_from_summary`
+resumes inside a quarter and the result carries q1..q4 plus h1 = Q1+Q2, h2 = Q3+Q4. Inputs come from
+the women's dated tables (`wncaab_source/data/processed/`), with no men-fitted adjustment (no half
+split, no live mechanisms). It writes `live/wncaab_live_resim.json` and logs WNCAAB_LIVE_RESIM_TICK.
+
+Its own thread, started beside the men's (`start_ncaab_live_resim_loop`). `SYNDICATE_WNCAAB_LIVE_RESIM`
+switches it; ABSENT, IT FOLLOWS `SYNDICATE_NCAAB_LIVE_RESIM` -- so it runs exactly where the men's
+re-sim runs (the live-odds-worker) and nowhere else, and `SYNDICATE_WNCAAB_LIVE_RESIM=0` stops it
+alone. Its budget is its own (`SYNDICATE_WNCAAB_LIVE_RESIM_BUDGET_SECONDS`, default 120 s: the
+women's slate is about half the men's, and both threads share one interpreter).
 """
 
 from __future__ import annotations
@@ -73,10 +88,11 @@ from typing import Any, Callable, Mapping, Optional, Sequence
 LIVE_RESIM_LENS_SOURCE = "live_resim"
 PREGAME_LENS_SOURCE = "pregame_only"
 LEAGUE = "ncaab"
-_REGULATION_PERIODS = 2
+WOMENS_LEAGUE = "wncaab"
 
 DEFAULT_SIMS = int(os.environ.get("SYNDICATE_NCAAB_LIVE_RESIM_SIMS", "200") or 200)
 DEFAULT_BUDGET_SECONDS = float(os.environ.get("SYNDICATE_NCAAB_LIVE_RESIM_BUDGET_SECONDS", "240") or 240)
+WNCAAB_DEFAULT_BUDGET_SECONDS = 120.0
 MIN_SIMS = 100
 MAX_HEADER_LEAD = 3
 MIN_ROTATION = 7  # projected players with minutes; fewer cannot field the engine's lineups
@@ -121,6 +137,13 @@ class PlayerPriors:
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def _regulation_periods(league: str) -> int:
+    """2 halves (NCAAB) or 4 quarters (WNCAAB), from the one college league description."""
+    from syndicate.features.college_basketball.league import league_for
+
+    return int(league_for(league).periods)
 
 
 # ------------------------------------------------------------------------------------------- inputs
@@ -378,8 +401,9 @@ def _period_points(events: Sequence[Any], period: int) -> tuple[tuple[int, ...],
     return period_points(events, period)
 
 
-def resume_from_summary(summary: Mapping[str, Any], *, date: str = "", as_of: str = ""):
-    """ESPN summary -> (LiveGameState, GameState, ResumeFacts), or a named refusal. NBA's rules, two halves."""
+def resume_from_summary(summary: Mapping[str, Any], *, date: str = "", as_of: str = "", league: str = LEAGUE):
+    """ESPN summary -> (LiveGameState, GameState, ResumeFacts), or a named refusal. NBA's resume, the league's
+    clock: two halves (NCAAB) or four quarters (WNCAAB)."""
     from syndicate.features.basketball_engine.resume import GameState
     from syndicate.features.shared import basketball_pbp as pbp
     from syndicate.features.shared.basketball_live_state import build_live_game_state
@@ -387,8 +411,8 @@ def resume_from_summary(summary: Mapping[str, Any], *, date: str = "", as_of: st
     if not isinstance(summary, Mapping):
         return NcaabResimRefusal("summary_not_a_mapping")
     try:
-        rec = pbp.reconstruct(summary, LEAGUE, date=date)
-        state = build_live_game_state(summary, LEAGUE, date=date)
+        rec = pbp.reconstruct(summary, league, date=date)
+        state = build_live_game_state(summary, league, date=date)
     except Exception as exc:  # noqa: BLE001
         return NcaabResimRefusal("live_state_unparseable", type(exc).__name__)
     status = str(state.status_state or "").lower()
@@ -418,7 +442,7 @@ def resume_from_summary(summary: Mapping[str, Any], *, date: str = "", as_of: st
             return NcaabResimRefusal("pbp_score_mismatch",
                                      f"pbp {sum(hp)}-{sum(ap)} official {state.home.score}-{state.away.score}")
     if clock <= 0:
-        if period >= _REGULATION_PERIODS and sum(hp) != sum(ap):
+        if period >= _regulation_periods(league) and sum(hp) != sum(ap):
             return NcaabResimRefusal("regulation_over")
         r_period, r_secs = period + 1, None
         hp, ap = hp + (0,), ap + (0,)
@@ -460,8 +484,8 @@ def _names(state: Any, side: str) -> list[str]:
 
 # ------------------------------------------------------------------------------------------- the re-sim
 
-def stable_seed(event_id: str, last_seq: int) -> int:
-    return zlib.crc32(f"ncaab-live-resim|{event_id}|{int(last_seq)}".encode("utf-8")) & 0x7FFFFFFF
+def stable_seed(event_id: str, last_seq: int, league: str = LEAGUE) -> int:
+    return zlib.crc32(f"{league}-live-resim|{event_id}|{int(last_seq)}".encode("utf-8")) & 0x7FFFFFFF
 
 
 def _hist(values: Sequence[int]) -> dict[str, int]:
@@ -490,7 +514,7 @@ def resim_live_game(inputs: Mapping[str, Any], game_state: Any, *, sims: int = D
     totals: list[int] = []
     margins: list[int] = []
     # Regulation periods per sim: halves for the men, quarters for the women (`league="wncaab"`).
-    regulation = 4 if league == "wncaab" else _REGULATION_PERIODS
+    regulation = _regulation_periods(league)
     periods: list[tuple[tuple[int, ...], tuple[int, ...]]] = []
     for i in range(int(sims)):
         if deadline is not None and clock() >= deadline:
@@ -526,8 +550,8 @@ def resim_live_game(inputs: Mapping[str, Any], game_state: Any, *, sims: int = D
 
 # ------------------------------------------------------------------------------------------- names
 
-def odds_team_names(date: str, *, dirs: Optional[Sequence[Path]] = None) -> dict[str, str]:
-    """canonical NCAAB team -> the OddsAPI name the board's rows carry, from `odds_<date>.csv`.
+def odds_team_names(date: str, *, dirs: Optional[Sequence[Path]] = None, league: str = LEAGUE) -> dict[str, str]:
+    """canonical team -> the OddsAPI name the board's rows carry, from `odds_<date>.csv`.
 
     `live_gameline_join` keys on exact lower-cased names, so the lane must carry the BOARD's
     spelling. Any failure -> {} and every game falls back to ESPN's display name, which the lane
@@ -535,7 +559,7 @@ def odds_team_names(date: str, *, dirs: Optional[Sequence[Path]] = None) -> dict
     from syndicate.features.shared.team_aliases import canonical_team
 
     out: dict[str, str] = {}
-    roots = list(dirs) if dirs is not None else _processed_dirs()
+    roots = list(dirs) if dirs is not None else _processed_dirs(league)
     for d in roots:
         base = Path(d).parent.parent if Path(d).name == "processed" else Path(d)
         for path in base.rglob(f"odds_{date}.csv"):
@@ -544,7 +568,7 @@ def odds_team_names(date: str, *, dirs: Optional[Sequence[Path]] = None) -> dict
                     for row in csv.DictReader(fh):
                         for col in ("home_team", "away_team", "home_team_name", "away_team_name"):
                             name = str(row.get(col) or "").strip()
-                            canon = canonical_team(LEAGUE, name) if name else None
+                            canon = canonical_team(league, name) if name else None
                             if canon and canon not in out:
                                 out[canon] = name
             except Exception:  # noqa: BLE001
@@ -554,10 +578,10 @@ def odds_team_names(date: str, *, dirs: Optional[Sequence[Path]] = None) -> dict
     return out
 
 
-def board_name(espn_display: str, odds_names: Mapping[str, str]) -> tuple[str, str]:
+def board_name(espn_display: str, odds_names: Mapping[str, str], league: str = LEAGUE) -> tuple[str, str]:
     from syndicate.features.shared.team_aliases import canonical_team
 
-    canon = canonical_team(LEAGUE, espn_display) if espn_display else None
+    canon = canonical_team(league, espn_display) if espn_display else None
     if canon and canon in odds_names:
         return odds_names[canon], "odds"
     return espn_display, "espn_display"
@@ -629,18 +653,18 @@ def _refusals_by_reason(games: Sequence[Mapping[str, Any]]) -> dict[str, int]:
     return out
 
 
-def live_lens_snapshot_path() -> Path:
+def live_lens_snapshot_path(league: str = LEAGUE) -> Path:
     from syndicate.features.shared.refresh_state_store import data_root
 
-    return data_root() / "live" / "ncaab_live_resim.json"
+    return data_root() / "live" / f"{league}_live_resim.json"
 
 
-def _previous_lanes(date_str: str) -> dict[str, dict[str, Any]]:
+def _previous_lanes(date_str: str, league: str = LEAGUE) -> dict[str, dict[str, Any]]:
     """The last published snapshot's game rows for this date, keyed by event id (for carry-forward)."""
     try:
         from syndicate.features.shared.refresh_state_store import read_json_file
 
-        prev = read_json_file(live_lens_snapshot_path())
+        prev = read_json_file(live_lens_snapshot_path(league))
     except Exception:  # noqa: BLE001
         return {}
     if not isinstance(prev, Mapping) or str(prev.get("date")) != str(date_str):
@@ -648,7 +672,13 @@ def _previous_lanes(date_str: str) -> dict[str, dict[str, Any]]:
     return {str(g.get("event_id")): dict(g) for g in prev.get("games") or [] if isinstance(g, Mapping)}
 
 
+# Keyed by date for NCAAB (its key since P4) and by "<league>|<date>" for any other league, so the two
+# threads never move each other's cursor.
 _ROTATION_CURSOR: dict[str, int] = {}
+
+
+def _cursor_key(date_str: str, league: str) -> str:
+    return str(date_str) if league == LEAGUE else f"{league}|{date_str}"
 
 
 def _carry(game: Mapping[str, Any]) -> dict[str, Any]:
@@ -682,24 +712,27 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
                              fetch_summary: Optional[Callable[..., Any]] = None,
                              dirs: Optional[Sequence[Path]] = None,
                              previous: Optional[Mapping[str, Mapping[str, Any]]] = None,
-                             clock: Callable[[], float] = time.monotonic) -> dict[str, Any]:
+                             clock: Callable[[], float] = time.monotonic, league: str = LEAGUE) -> dict[str, Any]:
     from syndicate.features.shared import basketball_pbp as pbp
     from syndicate.features.nba.live_resim import map_state_names
     from syndicate.features.shared.request_path_guard import refuse_if_compute_in_request_path
 
-    refuse_if_compute_in_request_path("ncaab_live_resim_snapshot")
+    refuse_if_compute_in_request_path(f"{league}_live_resim_snapshot")
     fetch_scoreboard = fetch_scoreboard or pbp.fetch_scoreboard
     fetch_summary = fetch_summary or pbp.fetch_summary
     started = clock()
     deadline = started + float(budget_seconds)
-    previous = dict(previous) if previous is not None else _previous_lanes(date_str)
+    previous = dict(previous) if previous is not None else _previous_lanes(date_str, league)
+    if dirs is None and league != LEAGUE:
+        dirs = _processed_dirs(league)
     day = dt.date.fromisoformat(str(date_str))
     priors = load_player_priors(day, dirs=dirs)
-    odds_names = odds_team_names(str(date_str), dirs=dirs)
-    events = [ev for ev in pbp.scoreboard_events(fetch_scoreboard(LEAGUE, str(date_str).replace("-", "")))
+    odds_names = odds_team_names(str(date_str), dirs=dirs, league=league)
+    events = [ev for ev in pbp.scoreboard_events(fetch_scoreboard(league, str(date_str).replace("-", "")))
               if str(ev.get("status_state") or ev.get("state") or "").lower() == "in"]
     ids = [str(ev.get("event_id") or ev.get("id") or "") for ev in events]
-    start = _ROTATION_CURSOR.get(str(date_str), 0) % max(1, len(ids)) if ids else 0
+    cursor_key = _cursor_key(str(date_str), league)
+    start = _ROTATION_CURSOR.get(cursor_key, 0) % max(1, len(ids)) if ids else 0
     order = ids[start:] + ids[:start]
     games: dict[str, dict[str, Any]] = {}
     counts = {"live": len(ids), "resimmed": 0, "refused": 0, "carried_forward": 0, "not_reached": 0}
@@ -716,31 +749,31 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
             break
         next_cursor = (start + pos + 1) % max(1, len(ids))
         try:
-            summary = fetch_summary(LEAGUE, event_id)
+            summary = fetch_summary(league, event_id)
         except Exception as exc:  # noqa: BLE001
             games[event_id] = _lane_row(event_id, {}, None, NcaabResimRefusal("summary_fetch_failed", type(exc).__name__))
             counts["refused"] += 1
             continue
         espn = _espn_names(summary)
-        home_name, src_h = board_name(espn.get("home", ""), odds_names)
-        away_name, src_a = board_name(espn.get("away", ""), odds_names)
+        home_name, src_h = board_name(espn.get("home", ""), odds_names, league=league)
+        away_name, src_a = board_name(espn.get("away", ""), odds_names, league=league)
         names = {"home": home_name, "away": away_name, "home_id": espn.get("home_id", ""),
                  "away_id": espn.get("away_id", ""), "source": src_h if src_h == src_a else f"{src_a}/{src_h}"}
-        resumed = resume_from_summary(summary, date=str(date_str))
+        resumed = resume_from_summary(summary, date=str(date_str), league=league)
         if isinstance(resumed, NcaabResimRefusal):
             games[event_id] = _lane_row(event_id, names, None, resumed)
             counts["refused"] += 1
             continue
         _state, gs, facts = resumed
         inputs = build_engine_inputs(str(date_str), facts.home_id, facts.away_id, neutral=_neutral(summary),
-                                     priors=priors, dirs=dirs)
+                                     priors=priors, dirs=dirs, league=league)
         if isinstance(inputs, NcaabResimRefusal):
             games[event_id] = _lane_row(event_id, names, facts, inputs)
             counts["refused"] += 1
             continue
         gs, match = map_state_names(gs, inputs["home_players"], inputs["away_players"])
-        result = resim_live_game(inputs, gs, sims=sims, base_seed=stable_seed(facts.event_id, facts.last_seq),
-                                 deadline=deadline, clock=clock)
+        result = resim_live_game(inputs, gs, sims=sims, base_seed=stable_seed(facts.event_id, facts.last_seq, league),
+                                 deadline=deadline, clock=clock, league=league)
         if isinstance(result, NcaabResimRefusal) and result.reason == "budget_exhausted" and event_id in previous:
             games[event_id] = _carry(previous[event_id])
             counts["carried_forward"] += 1
@@ -748,10 +781,10 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
             continue
         games[event_id] = _lane_row(event_id, names, facts, result, match, inputs.get("_provenance"))
         counts["resimmed" if not isinstance(result, NcaabResimRefusal) else "refused"] += 1
-    _ROTATION_CURSOR[str(date_str)] = next_cursor
+    _ROTATION_CURSOR[cursor_key] = next_cursor
     out_games = [games[i] for i in ids if i in games]
     return {
-        "sport": LEAGUE,
+        "sport": league,
         "date": str(date_str),
         "generatedAt": _utc_now_iso(),
         "source": LIVE_RESIM_LENS_SOURCE,
@@ -798,33 +831,68 @@ def fit_snapshot_to_budget(snapshot: dict[str, Any], *, max_bytes: int = MAX_SNA
 
 LIVE_RESIM_ENV = "SYNDICATE_NCAAB_LIVE_RESIM"
 LIVE_RESIM_INTERVAL_ENV = "SYNDICATE_NCAAB_LIVE_RESIM_INTERVAL_SECONDS"
+WNCAAB_LIVE_RESIM_ENV = "SYNDICATE_WNCAAB_LIVE_RESIM"
 
-_LOOP_THREAD: Optional[threading.Thread] = None
+_LOOP_THREADS: dict[str, threading.Thread] = {}
 _LOOP_STOP = threading.Event()
 _LOOP_LOCK = threading.Lock()
+_ON = {"1", "true", "on", "yes"}
+
+
+def _env_name(league: str, suffix: str = "") -> str:
+    return f"SYNDICATE_{league.upper()}_LIVE_RESIM{suffix}"
 
 
 def ncaab_live_resim_enabled(env: Optional[Mapping[str, str]] = None) -> bool:
     raw = str((env if env is not None else os.environ).get(LIVE_RESIM_ENV, "") or "").strip().lower()
-    return raw in {"1", "true", "on", "yes"}
+    return raw in _ON
 
 
-def _interval_seconds(env: Optional[Mapping[str, str]] = None) -> float:
-    raw = str((env if env is not None else os.environ).get(LIVE_RESIM_INTERVAL_ENV, "") or "").strip()
+def wncaab_live_resim_enabled(env: Optional[Mapping[str, str]] = None) -> bool:
+    """`SYNDICATE_WNCAAB_LIVE_RESIM` when set; ABSENT, the men's switch (module docstring says why)."""
+    source = env if env is not None else os.environ
+    raw = str(source.get(WNCAAB_LIVE_RESIM_ENV, "") or "").strip().lower()
+    if not raw:
+        return ncaab_live_resim_enabled(source)
+    return raw in _ON
+
+
+def live_resim_enabled(league: str = LEAGUE, env: Optional[Mapping[str, str]] = None) -> bool:
+    return wncaab_live_resim_enabled(env) if league == WOMENS_LEAGUE else ncaab_live_resim_enabled(env)
+
+
+def _interval_seconds(env: Optional[Mapping[str, str]] = None, league: str = LEAGUE) -> float:
+    raw = str((env if env is not None else os.environ).get(_env_name(league, "_INTERVAL_SECONDS"), "") or "").strip()
     try:
         return max(30.0, float(raw or 120))
     except ValueError:
         return 120.0
 
 
-def run_live_resim_tick(date_str: Optional[str] = None, **kwargs: Any) -> dict[str, Any]:
-    """One tick: build, size-fit, write. Prints one line, prefix NCAAB_LIVE_RESIM_TICK."""
+def _tick_kwargs(league: str, env: Optional[Mapping[str, str]] = None) -> dict[str, Any]:
+    """The women's sims / budget from their own env names; NCAAB keeps its import-time defaults."""
+    if league == LEAGUE:
+        return {}
+    source = env if env is not None else os.environ
+    try:
+        sims = int(str(source.get(_env_name(league, "_SIMS"), "") or "").strip() or DEFAULT_SIMS)
+    except ValueError:
+        sims = DEFAULT_SIMS
+    try:
+        budget = float(str(source.get(_env_name(league, "_BUDGET_SECONDS"), "") or "").strip() or WNCAAB_DEFAULT_BUDGET_SECONDS)
+    except ValueError:
+        budget = WNCAAB_DEFAULT_BUDGET_SECONDS
+    return {"sims": sims, "budget_seconds": budget}
+
+
+def run_live_resim_tick(date_str: Optional[str] = None, *, league: str = LEAGUE, **kwargs: Any) -> dict[str, Any]:
+    """One tick: build, size-fit, write. Prints one line, prefix <LEAGUE>_LIVE_RESIM_TICK."""
     from syndicate.features.shared.refresh_state_store import write_json_file
     from syndicate.features.shared.timezone import central_today_iso
 
     date_str = date_str or central_today_iso()
     started = time.monotonic()
-    snapshot = build_live_lens_snapshot(date_str, **kwargs)
+    snapshot = build_live_lens_snapshot(date_str, league=league, **{**_tick_kwargs(league), **kwargs})
     snapshot, size = fit_snapshot_to_budget(snapshot)
     status = {
         "date": date_str,
@@ -834,32 +902,52 @@ def run_live_resim_tick(date_str: Optional[str] = None, **kwargs: Any) -> dict[s
         "written": False,
     }
     if size <= MAX_SNAPSHOT_BYTES:
-        write_json_file(live_lens_snapshot_path(), snapshot)
+        write_json_file(live_lens_snapshot_path(league), snapshot)
         status["written"] = True
     status["elapsed_s"] = round(time.monotonic() - started, 1)
-    print("NCAAB_LIVE_RESIM_TICK " + " ".join(f"{k}={v}" for k, v in status.items()), flush=True)
+    print(f"{league.upper()}_LIVE_RESIM_TICK " + " ".join(f"{k}={v}" for k, v in status.items()), flush=True)
     return status
 
 
-def _loop() -> None:
+def _loop(league: str = LEAGUE) -> None:
     while not _LOOP_STOP.is_set():
         try:
-            run_live_resim_tick()
+            run_live_resim_tick(league=league)
         except Exception as exc:  # noqa: BLE001
-            print(f"NCAAB_LIVE_RESIM_TICK_ERROR {type(exc).__name__}: {str(exc)[:300]}", flush=True)
-        _LOOP_STOP.wait(_interval_seconds())
+            print(f"{league.upper()}_LIVE_RESIM_TICK_ERROR {type(exc).__name__}: {str(exc)[:300]}", flush=True)
+        _LOOP_STOP.wait(_interval_seconds(league=league))
+
+
+def _start_loop(league: str) -> bool:
+    if not live_resim_enabled(league):
+        return False
+    with _LOOP_LOCK:
+        running = _LOOP_THREADS.get(league)
+        if running is not None and running.is_alive():
+            return False
+        _LOOP_STOP.clear()
+        thread = threading.Thread(target=_loop, args=(league,), name=f"syndicate-{league}-live-resim", daemon=True)
+        _LOOP_THREADS[league] = thread
+        thread.start()
+        print(f"{league.upper()}_LIVE_RESIM_LOOP_STARTED interval_s={_interval_seconds(league=league)}", flush=True)
+        return True
+
+
+def start_wncaab_live_resim_loop() -> bool:
+    """The women's thread, once per process, only when `wncaab_live_resim_enabled()`."""
+    return _start_loop(WOMENS_LEAGUE)
 
 
 def start_ncaab_live_resim_loop() -> bool:
-    """Start the dedicated thread once per process, only when `SYNDICATE_NCAAB_LIVE_RESIM` is on."""
-    global _LOOP_THREAD
-    if not ncaab_live_resim_enabled():
-        return False
-    with _LOOP_LOCK:
-        if _LOOP_THREAD is not None and _LOOP_THREAD.is_alive():
-            return False
-        _LOOP_STOP.clear()
-        _LOOP_THREAD = threading.Thread(target=_loop, name="syndicate-ncaab-live-resim", daemon=True)
-        _LOOP_THREAD.start()
-        print("NCAAB_LIVE_RESIM_LOOP_STARTED interval_s=%s" % _interval_seconds(), flush=True)
-        return True
+    """Start the men's thread once per process, only when `SYNDICATE_NCAAB_LIVE_RESIM` is on. Returns whether
+    THE MEN'S thread started.
+
+    It also starts the women's thread (`start_wncaab_live_resim_loop`, its own switch), because this is the
+    one call `live_lens_loop` makes for college basketball and that file belongs to another lane
+    (wnba-native-live-cutover)."""
+    started = _start_loop(LEAGUE)
+    try:
+        start_wncaab_live_resim_loop()
+    except Exception as exc:  # noqa: BLE001 -- never let the women's thread stop the men's
+        print(f"WNCAAB_LIVE_RESIM_LOOP_START_FAILED {type(exc).__name__}: {exc}", flush=True)
+    return started
