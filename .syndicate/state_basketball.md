@@ -1463,3 +1463,27 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   from the K=2 recency rule (census 33d07f61). Deferring the rule to the injury report FAILS on the rule's own logged
   names (step 4b, 0e8746ce): A2 2.74 (in-box only 1.15) — 25% of re-admitted players play; the non-players are coach's
   decisions or absent from the box. **The 4.73 needs pre-tip news, like coach DNP.** The fleet's K=2 rule is unchanged.
+
+## [college-basketball-boards] NCAAB + WNCAAB ON THE BOARDS: WNCAAB MODULE LIVE, PREGAME SIMS FOR BOTH (MARGIN LINES MARKET-ANCHORED), RAIL RUN/BONUS LINE `[verified 2026-11-02/03 on the fleet, lane wncaab-module, fleet HEAD 70b2bdf09; readings in deploys.md 20:05Z..00:24Z]`
+
+- **WNCAAB:**
+  - `/wncaab` cards / market-board / hub, D-I slate (`wncaab_source/data/scoreboard/`), chips (Q1..Q4/OT), Layer 1, Layer 2.
+  - OddsAPI `basketball_wncaab`: bulk every sweep, plus in-play lane `live-odds-worker-wncaab-live` (240 s).
+  - OddsAPI carries NO women's quarter/half lines (every quote is `full`), and prices only ~14 of ~94 D-I games a night.
+- **College config:** one league config, `college_basketball/league.py`. NCAAB modules take `league=` with an `ncaab` default.
+- **Rail:**
+  - Live college chips get the clock / period lines from ESPN's D-I board at serve time (`groups=50`); the slate's periods are kept when ESPN fails.
+  - The run + bonus line comes from `college_basketball/momentum_capture.py` (live-odds-worker, 150 s).
+  - Bonus is counted from the play-by-play: ESPN's college `fouls` header block is a placeholder.
+- **Pregame sims (both leagues):**
+  - Producer: `college_basketball/pregame_sim.py`, the live tier's engine from `GameState()`, launched by the live-odds-worker every 900 s, 600 s budget, incremental on an inputs key.
+  - Artifact: `<league>_source/data/pregame_sim/pregame_sim_<date>.json`.
+  - Priced by `shared/college_game_projections.py`.
+  - **Spreads / moneylines are served at the de-vigged fair** (`SYNDICATE_COLLEGE_MARGIN_MODEL_WEIGHT`=0; user 2026-11-02). Sim margins measure at slope 0.69 of the market's (102 games) after the no-second-shrink fix (was 0.51). Totals are served raw (sim ~2 points under the line).
+- **Team prior:** a ratings table carrying `calibration_k` < 1 is not regressed again for the opening-week fallback, in the team model or in the producer's prior blend.
+- **WNCAAB inputs:**
+  - `wncaab_source/data/processed/`: ratings 2026 (361 teams, 6,029 games), preseason 2027 (348 teams, 4,742 players), player box 2026 (168,226 rows).
+  - Refreshed once a day after 11:00Z by the pregame child (`--refresh-inputs`); no `local_production` job.
+- **Not built:**
+  - the WNCAAB live re-sim (`ncaab/live_resim.resume_from_summary` is men's-halves-only);
+  - a college margin fit.

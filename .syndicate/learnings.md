@@ -3158,3 +3158,15 @@ run), never from a reimplementation; a sensitivity cut of a replica is not a pre
 1. A retry after discarded work must differ from the try that failed: learn a bound, shrink the unit, or skip it. Otherwise the job livelocks at its own cadence.
 2. Before giving a consumer first claim on a shared budget, ask what it does when one unit costs more than the whole budget.
 3. A first-run verification of a loop change is not the day that was owed. Read the day before calling it done.
+
+### `[2026-11-02, lane wncaab-module]` A feed field that exists is not a field that means what its name says; check it against the box score before you build on it
+Three ESPN college fields were wrong in three different ways on opening night:
+- `competitors[].fouls` is a placeholder: every women's team read `bonusState=DOUBLE`, every men's team `NONE`, all with 0 team fouls.
+- `plays[].scoreValue` carries a MISSED shot's value; only `scoringPlay: false` marks it. The run narrator summed misses, and the chip read "USC on a 9-2 run" at 3-5.
+- `homeAway` is ESPN's orientation, while the slate orients neutral-site games to the odds feed. Serve-time periods swapped NKU / UTEP scores for 3 minutes.
+
+**Rule:**
+1. Before a field feeds a user-visible number, reconcile it once against an independent total from the same payload (box-score fouls, the header score, the slate's own sides).
+2. Leave a standing guard where the reconciliation is cheap. The run line now refuses rows whose sum exceeds the card's score.
+
+Related, same session: a model that ranks well can still be on the wrong SCALE. The pregame sim's margins correlated 0.90 with the market's at slope 0.51, from two shrinks compounding (calibration_k 0.78 x a 30% preseason regression). Measure the slope, not only the correlation, before publishing edges.
