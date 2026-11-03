@@ -38,12 +38,14 @@ def _poly_game():
 
 
 class TestThePredicate:
-    def test_soccer_and_nhl_are_the_only_sports_allowed_game_line_capture(self):
+    def test_soccer_nhl_and_ncaab_are_the_only_sports_allowed_game_line_capture(self):
         """NHL joined 2026-11-01 on the same measurement: 0 exchange rows in
-        71,341 NHL quotes (`tests/test_kalshi_nhl_venue_prices.py`)."""
+        71,341 NHL quotes (`tests/test_kalshi_nhl_venue_prices.py`). NCAAB joined
+        2026-11-03: 0 in 194,619 (`tests/test_kalshi_ncaab_pairing.py`)."""
         assert sport_allows_game_line_capture("soccer")
         assert sport_allows_game_line_capture("nhl")
-        for sport in ("mlb", "nba", "wnba", "nfl", "ncaaf", "ncaab", ""):
+        assert sport_allows_game_line_capture("ncaab")
+        for sport in ("mlb", "nba", "wnba", "nfl", "ncaaf", "wncaab", ""):
             assert not sport_allows_game_line_capture(sport), sport
 
     def test_the_predicate_is_case_and_whitespace_insensitive(self):

@@ -288,6 +288,29 @@ SERIES_SPORT: dict[str, str] = {
     "KXNHLPTS": "nhl",
     "KXNHLGOAL": "nhl",
     "KXNHLAST": "nhl",
+    # ------------------------------------------------------------------
+    # MEN'S COLLEGE BASKETBALL, FULL GAME (todo #755 (b), lane ncaab-kalshi-pairing).
+    # ------------------------------------------------------------------
+    #
+    # Kalshi spells the sport `NCAAMB`, and `_SPORT_TOKENS` reads `NCAAB`, so no
+    # men's game series ever got a sport. The one entry above, `KXNCAABTOTAL`,
+    # lists 0 open markets. Measured 2026-11-03 off Kalshi's public listing, with
+    # all of these classifying `ok` once registered:
+    #
+    #     KXNCAAMBGAME    324 open / 162 events  'Hampton wins'
+    #     KXNCAAMBSPREAD  270 open /  22 events  "Saint Mary's wins by over 5.5 points"
+    #     KXNCAAMBTOTAL   315 open /  22 events  'Full Game: Over 170.5 points scored'
+    #
+    # BY NAME, NOT BY ADDING `NCAAMB` TO `_SPORT_TOKENS`. The token would hand
+    # discovery about 80 more `KXNCAAMB*` series: conference tournaments, the AP
+    # poll, awards, win totals. That is how the 2026-08-25 futures entered the
+    # working set (see `SERIES_OUT_OF_SCOPE`).
+    # The segment families stay unregistered for the same reason the NCAAF ones
+    # do: `KXNCAAMB1H` is a winner with a tie leg, and `KXNCAAMB1HTOTAL` /
+    # `KXNCAAMB1HSPREAD` listed 0 open on 11-03.
+    "KXNCAAMBGAME": "ncaab",
+    "KXNCAAMBSPREAD": "ncaab",
+    "KXNCAAMBTOTAL": "ncaab",
 }
 
 # Series we have SEEN and deliberately do not cover. Kept explicit so they stop
@@ -1140,7 +1163,35 @@ def club_key(sport: Any, value: Any) -> str | None:
     text = str(value or "").strip()
     if not resolved and text.endswith(" St.") and str(sport or "").strip().lower() == "ncaaf":
         resolved = chip_join_key(sport, text[: -len(" St.")] + " State")
+    if not resolved and str(sport or "").strip().lower() == "ncaab":
+        spelled = _KALSHI_NCAAB_SPELLINGS.get(text)
+        if spelled:
+            resolved = chip_join_key(sport, spelled)
     return resolved or None
+
+
+# Kalshi's spelling -> the D1 registry's school (`ncaab_team_registry.csv`), for the
+# NCAAB names `chip_join_key` does not resolve. Measured 2026-11-03: 272 of 282
+# distinct names in Kalshi's open `KXNCAAMBGAME` / `KXNCAAMBSPREAD` markets resolved
+# and none collided; these are 9 of the 10 that did not. Applied ONLY after a
+# direct miss, so a name the registry already reads is never re-routed.
+#
+# AN EXPLICIT TABLE, NOT NCAAF's " St." -> " State" retry. Two of these drop the
+# "St." altogether ("Nicholls St." is the registry's "Nicholls"), and a stripping
+# rule loose enough for those could land on a different school.
+# The tenth name, 'Bethesda', is not Division I and has no entry, so it stays
+# unresolved and is refused.
+_KALSHI_NCAAB_SPELLINGS: dict[str, str] = {
+    "Central Connecticut St.": "Central Connecticut",
+    "Miami (FL)": "Miami",
+    "New Orleans": "LSU New Orleans",
+    "Nicholls St.": "Nicholls",
+    "Southeastern Louisiana": "SE Louisiana",
+    "Southern University": "Southern",
+    "Tennessee-Martin": "UT Martin",
+    "USC Upstate": "South Carolina Upstate",
+    "University at Albany": "UAlbany",
+}
 
 
 def match_event_blob(
@@ -1617,6 +1668,9 @@ _SERIES_SEGMENT: dict[str, str] = {
     "KXNCAAFGAME": "full",
     "KXNCAAFSPREAD": "full",
     "KXNCAABTOTAL": "full",
+    "KXNCAAMBGAME": "full",
+    "KXNCAAMBSPREAD": "full",
+    "KXNCAAMBTOTAL": "full",
     "KXWNBAGAME": "full",
 }
 

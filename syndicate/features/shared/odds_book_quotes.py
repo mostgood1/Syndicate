@@ -175,7 +175,15 @@ _KEY_FIELDS: tuple[str, ...] = (
 # DecisionRecords on 10-31 carried a venue price. The re-check condition above
 # applies unchanged: adding `us_ex` to NHL's game-line regions re-creates the
 # collision, so do that only together with removing `nhl` here.
-_GAME_LINE_CAPTURE_SPORTS: frozenset[str] = frozenset({"soccer", "nhl"})
+#
+# NCAAB JOINED 2026-11-03 ON THE SAME MEASUREMENT (lane ncaab-kalshi-pairing,
+# todo #755 (b)). The fleet's NCAAB shards for 11-02..11-04 held 0 exchange rows
+# of any kind in 194,619 quotes, all `kind=game`: NCAAB's lines are fetched
+# without `us_ex`. Kalshi's men's game series were registered the same day, and
+# NCAAB is game lines only, so without this every matched NCAAB market would be
+# dropped here. The re-check condition is unchanged: `us_ex` on NCAAB's regions
+# means removing `ncaab` here.
+_GAME_LINE_CAPTURE_SPORTS: frozenset[str] = frozenset({"soccer", "nhl", "ncaab"})
 
 
 def sport_allows_game_line_capture(sport: Any) -> bool:
