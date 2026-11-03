@@ -13927,3 +13927,8 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Verification: findings_2026-11-02_suggested_grade.md written, log/2026-11-02.md appended, state_layer2.md [layer2-suggested-opps] Graded-on line replaced in place.
 - **CLOSED 2026-11-02 10:55 AM CST. Goal, verbatim: "Grade Suggested vs all priced for 10-31/11-01 and pooled 10-17..11-01 and record it" -- GOAL: MET.** Pooled -1.1% per bet / +1.8% ladders once (5,353 / 551 g) vs all priced -12.6%; EV at Shin close pooled +0.45% [-0.20, +1.07], third window -0.61% (soccer -4.86%; +0.22% without). Recommendation keep 2% (user's call). Owed elsewhere (not this lane): alt-ladder cap exceeded on 210/210 multi-rung ladders 10-27..11-01 -- held-orders read via the 3,000-row `_load()` document (hypothesis), findings §7.
 - Blocked by: none
+
+### closed-lane-archive-20261102-1245 — CLOSED 2026-11-02 (GOAL MET: 1 block archived) — opened 2026-11-02 — session d46449c9-dfb8-4a15-8be6-4656e4108198
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Result: GOAL MET. owner_liveness.py --idle-min 240 gave SAFE for 1 of 9 CLOSED blocks; moved `closed-lane-archive-20261102-0701` (owner 7e1d55bb idle 334m, block last modified 337m). 8 deferred; table and Part B in log/2026-11-02.md.

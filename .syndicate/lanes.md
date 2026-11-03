@@ -633,11 +633,6 @@ death, never life — do not invert it.
 - Verification: after a drained full down/up: refresh-worker environ band_on=0, healthz 200, deploys.md entry
 - Blocked by: none
 
-### closed-lane-archive-20261102-1245 — CLOSED 2026-11-02 (GOAL MET: 1 block archived) — opened 2026-11-02 — session d46449c9-dfb8-4a15-8be6-4656e4108198
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Result: GOAL MET. owner_liveness.py --idle-min 240 gave SAFE for 1 of 9 CLOSED blocks; moved `closed-lane-archive-20261102-0701` (owner 7e1d55bb idle 334m, block last modified 337m). 8 deferred; table and Part B in log/2026-11-02.md.
-
 ### college-basketball-settlement — OPEN — opened 2026-11-02 — session 911dbcee-3893-4ca0-993f-3d78598b80f0
 - **STATUS 2026-11-02 21:0xZ (3:0x PM CST): DEPLOYED, resolver live VERIFIED; first settlement OWED.** `6af0a1ce6` + `26d8be509` on main; loaded by a claimed refresh-worker restart on `ff2a4b53c` (pid 2917669 20:35:15Z; one restart shared with lane wncaab-module, whose ff it was). Both 11-02 NCAAB orders `no_resolver_for_ncaab` -> `not_started` at the 21:00Z plan. OWED: their outcomes after tonight's finals (~02:30Z 11-03; watcher in this session) and the 11-03 11:30Z scorecard. deploys.md 2026-11-02 20:35:08Z. Scorecard read ARMED as one-time task `cbb-scorecard-read-1103` (2026-11-03 06:15 CST, read-only, notifies this session; backed by a session timer at 12:40Z). One-time tasks can miss: check `list_task_runs`, and run `wsl -- bash /mnt/c/tmp/cbb-settlement/scorecard_read.sh` by hand if it did not run.
 - Goal: NCAAB and WNCAAB paper bets settle: bet_status_ncaab / bet_status_wncaab grade full-game h2h/spreads/totals and segments (men h1/h2, women q1..q4/h1/h2) from ESPN finals (groups=50&limit=500), wired into paper_settlement._default_resolver; the model scorecard's ESPN settler handles wncaab and grades NCAAB halves correctly; deployed to the fleet and a 2026-11-02 NCAAB paper bet reads settled with the right win/loss against ESPN's final
@@ -666,6 +661,11 @@ death, never life — do not invert it.
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - Result: GOAL MET. owner_liveness.py --idle-min 240 gave SAFE for 1 of 9 CLOSED blocks; moved `layer2-suggested-grade-1102` (owner 2486a60b idle 341m, block last modified 344m). 8 deferred; table in log/2026-11-02.md.
+
+### closed-lane-archive-20261102-1841 — CLOSED 2026-11-02 (GOAL MET: 1 block archived) — opened 2026-11-02 — session d3a2ac69-36cf-4ee6-a9a0-5cd6c936f538
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Result: GOAL MET. owner_liveness.py --idle-min 240 gave SAFE for 1 of 9 CLOSED blocks; moved `closed-lane-archive-20261102-1245`. 8 deferred; table in log/2026-11-02.md.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -815,6 +815,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261102-0257` — CLOSED 2026-11-02 (GOAL MET: 2 blocks archived) — opened 2026-11-02 — session c37cf0d5-6e79-4eb0-8983-1959063559a6
 - `closed-lane-archive-20261102-0701` — CLOSED 2026-11-02 (GOAL MET: 1 block archived) — opened 2026-11-02 — session 7e1d55bb-530a-4b56-8046-50509b276bf7
 - `closed-lane-archive-20261102-1037` — CLOSED 2026-11-02 (GOAL MET: 1 blocks archived) — opened 2026-11-02 — session 485527ef-79e4-4b5c-be1b-0efccbebbd58
+- `closed-lane-archive-20261102-1245` — CLOSED 2026-11-02 (GOAL MET: 1 block archived) — opened 2026-11-02 — session d46449c9-dfb8-4a15-8be6-4656e4108198
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
