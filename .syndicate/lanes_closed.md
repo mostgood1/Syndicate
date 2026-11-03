@@ -14009,3 +14009,13 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - Verdict: GOAL MET -- moved `closed-lane-archive-20261103-0241`, `closed-lane-archive-20261103-0445` (owner_liveness SAFE at 240m). Reading and Part B table in `.syndicate/log/2026-11-03.md`.
+
+### closed-lane-archive-20261103-1150 — CLOSED 2026-11-03 (GOAL MET: 1 block archived) — opened 2026-11-03 — session 223c5374-1929-4e07-8b95-2fedd6836e2f
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness --idle-min 240 at 17:49Z: SAFE = college-basketball-settlement (911dbcee idle 241m, block 302m); 6 others WAIT. Moved: college-basketball-settlement. Detail in log/2026-11-03.md.
+
+### closed-lane-archive-20261103-1302 — CLOSED 2026-11-03 (GOAL MET: 1 block archived) — opened 2026-11-03 — session af622b20-78d3-4c4c-868e-3e5bd1b754e1
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 read SAFE for 1 of 7 CLOSED slugs; moved `closed-lane-archive-20261103-0851`. Table and WAIT reasons in log/2026-11-03.md.
