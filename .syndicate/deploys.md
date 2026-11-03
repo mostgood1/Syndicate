@@ -56088,3 +56088,18 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **not changed:** NBA/WNBA (defaults are the vendored values); the refresh-worker (not restarted; it reads the pregame artifact). Live college re-sims use the new bounds from the 22:47:12Z respawn. Games already live keep their old pregame sim until final.
 - **the 7 PM CST reading** (`wncaab-live-resim-evening-reading`, reading 7) now reads the calibration and the bounds together. Both move the sim toward the calibrated target.
 - **claims:** web + live-odds-worker released 22:56:28Z. The verification above is read-only. No claims held.
+
+## 2026-11-03 23:19:16Z (5:19 PM CST) -- FLEET ff 5c12a1809 -> 92dd72ed5 + reload-web: COLLEGE LIVE WIN% BLANK -- **NOT LIVE YET: loads at the next refresh-worker restart** (lane `wncaab-module`)
+- **user, in this chat:** "Yes, blank it", answering "Blank the pregame Win% on live college lines, as NFL/NCAAF do?". It extends the 10-15 NFL/NCAAF decision ("Blank the live Win%"), which `live_edge_policy` reserves per sport.
+- **change `8a5e97d55`:** `board_enrichment.LIVE_PROBABILITY_WITHHELD_SPORTS` += ncaab, wncaab.
+  - A live/final row with a PREGAME projection keeps `projected` and moves `model_prob_over` to `sim_model_prob_over` (`pregame_on_live`).
+  - Live re-sim rows keep their live number and edge: `live_gameline_join` prices from `live_model_prob_over` after the sweep.
+  - Tests: `tests/test_college_live_winpct_blank.py`; with NFL/NCAAF's suite and the live-edge enforcement suite, 46 pass.
+  - `layer2_board.py`'s docstring still names NFL + NCAAF only. That file is claimed by lane fair-price-v2; it reads the flag, so no code change is needed there.
+- **baseline** `college_live_pregame_prob_rows=1275` (live/final college rows with a pregame projection still serving `model_prob_over`, both 11-03 grids, read 23:30:18Z); `pregame_on_live_rows=0`; 14 live re-sim rows (14 with a probability, 9 with an edge). Expect `college_live_pregame_prob_rows=0` after the restart.
+- **gates:**
+  - Claims web + refresh-worker 23:18Z. Web preflight CLEAR -> ff 23:19:16Z + reload-web 2.0 s, healthz 200.
+  - **refresh-worker preflight HOLD on every poll, 23:19Z-23:41Z** (~47 tries, ~27 s apart): "a board build is in flight". During the live college slate the builds run back to back: BOARD_BUILD_TIMING 23:22:20 / 23:28:40 / 23:33:27 / 23:37:19 / 23:40:29Z, each followed by the next BUILD_SPAN_ENTER 79-89 s later.
+  - NOT forced: a drain or `--allow-mid-build` would throw the build away and leave the board cold for 7-35 min during live games. The decision on timing went to the user.
+  - Claims released 23:41:35Z. **No restart done.** The refresh-worker still runs 9d47c77b5. The fleet checkout is at 92dd72ed5, so any refresh-worker restart from here loads it.
+- **verify:** OWED. After the restart, `college_live_pregame_prob_rows` -> 0 on both college grids, `pregame_on_live_rows` > 0, and live re-sim rows keep a probability and edge (read from `/api/board/book-grid?sport=<ncaab|wncaab>&date=<CT date>` rows: `game.state` live/final, `projection.live_aware` false, `projection.model_prob_over` non-null).
