@@ -28,6 +28,8 @@ League means are the table's own means: the producer shrinks every team toward
 its league mean, so the table mean IS that mean to rounding. HOME_POINTS is the
 producer's walk-forward fit (2.9 pts, 2025-26); it moves the margin and leaves
 the total alone. `tests/test_ncaab_live_team_model.py` pins it to the producer.
+`prior_for_game` then applies the league's daily PRIOR CALIBRATION to the mean
+margin and total (`college_basketball/prior_calibration.py`, 2026-11-03).
 """
 
 from __future__ import annotations
@@ -35,9 +37,9 @@ from __future__ import annotations
 import csv
 import datetime as dt
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Iterable, Mapping, Optional, Union
+from typing import Any, Iterable, Mapping, Optional, Union
 
 from syndicate.features.shared.source_roots import preferred_artifact_roots
 
@@ -86,6 +88,11 @@ class NcaabGamePrior:
     prior_season_fallback: bool
     home_games: int
     away_games: int
+    # Set by `prior_for_game` on every path (`college_basketball/prior_calibration.py`): the margin / total before
+    # calibration, and the calibration's stamp. Only a bare `game_prior` leaves them None.
+    raw_home_margin: Optional[float] = None
+    raw_total: Optional[float] = None
+    calibration: Optional[Mapping[str, Any]] = None
 
 
 @dataclass(frozen=True)
@@ -270,7 +277,7 @@ def game_prior(table: NcaabRatingsTable, home_id: str, away_id: str, *, neutral:
 
 
 def prior_for_game(game_date: dt.date, home_id: str, away_id: str, *, neutral: bool, dirs: Optional[Iterable[Path]] = None,
-                   league: str = "ncaab") -> PriorResult:
+                   league: str = "ncaab", calibrate: Optional[bool] = None) -> PriorResult:
     """THE PRESEASON FALLBACK IS PER GAME, not per season (2026-11-02, lane ncaab-board-slate, user-approved
     loan: "Fix + ship together"). `table_for_game` falls back to last season's regressed table only while the
     season has NO table at all, so the first handful of finals switched every game onto an in-season table:
@@ -289,5 +296,39 @@ def prior_for_game(game_date: dt.date, home_id: str, away_id: str, *, neutral: b
         if fallback is not None:
             retry = game_prior(fallback, home_id, away_id, neutral=neutral)
             if not isinstance(retry, NcaabPriorRefusal):
-                return retry
-    return result
+                result = retry
+    return _calibrated(result, game_date, league=league, dirs=dirs, calibrate=calibrate)
+
+
+def _calibrated(result: PriorResult, game_date: dt.date, *, league: str, dirs: Optional[Iterable[Path]],
+                calibrate: Optional[bool]) -> PriorResult:
+    """THE PRIOR CALIBRATION (`college_basketball/prior_calibration.py`; user 2026-11-03 "College model fit").
+
+    The mean margin and total move to the league's daily fit; home / away points are re-derived from them and
+    possessions stay. `calibrate=False` is the raw prior (the fit itself reads it); None follows the switch
+    SYNDICATE_COLLEGE_PRIOR_CALIBRATION (absent = on). Every path fills `raw_*` and `calibration`: a raw prior
+    says why it is raw, so no field reads like an unfed input (`model_engine_standard.md` section 1)."""
+    if isinstance(result, NcaabPriorRefusal):
+        return result
+
+    def raw(reason: str) -> NcaabGamePrior:
+        return replace(result, raw_home_margin=result.home_margin, raw_total=result.total,
+                       calibration={"calibrated": False, "reason": reason})
+
+    if calibrate is False:
+        return raw("raw prior requested")
+    from syndicate.features.college_basketball import prior_calibration as pc
+
+    if calibrate is None and not pc.enabled():
+        return raw(f"switched off ({pc.ENV})")
+    cal = pc.calibration_for(game_date, league, dirs=dirs)
+    if cal is None:
+        return raw("no calibration file for this season before this date")
+    if not cal.calibrated:
+        return replace(raw(cal.reason), calibration=cal.stamp())
+    margin = cal.margin(result.home_margin, home_site=not result.neutral)
+    total = cal.total(result.total)
+    home_points, away_points = (total + margin) / 2.0, (total - margin) / 2.0
+    return replace(result, home_points=home_points, away_points=away_points, total=total, home_margin=margin,
+                   home_ppp=home_points / result.possessions, away_ppp=away_points / result.possessions,
+                   raw_home_margin=result.home_margin, raw_total=result.total, calibration=cal.stamp())

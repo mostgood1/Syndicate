@@ -159,9 +159,27 @@ def run(day: dt.date, league: str = "ncaab") -> tuple[int, dict]:
         player_priors_coverage=round(priors_coverage, 4),
         d1_without_player_priors=sorted(d1 - fielded),
     )
-    ok = not failed and coverage >= COVERAGE_FLOOR and priors_coverage >= COVERAGE_FLOOR
+    calibration = _calibration_report(day, league, dirs)
+    report["prior_calibration"] = calibration
+    ok = not failed and coverage >= COVERAGE_FLOOR and priors_coverage >= COVERAGE_FLOOR and not calibration.get("stale")
     report["verdict"] = "PASS" if ok else "FAIL"
     return (0 if ok else 1), report
+
+
+# The pregame child refits the calibration daily; a newest fit older than this means the refit stopped, and the
+# prior is being moved by a stale fit. No file at all is REPORTED, not failed: a season's first days have none.
+CALIBRATION_MAX_AGE_DAYS = 3
+
+
+def _calibration_report(day: dt.date, league: str, dirs) -> dict:
+    from syndicate.features.college_basketball import prior_calibration as pc
+
+    cal = pc.calibration_for(day, league, dirs=dirs)
+    if cal is None:
+        return {"switch_on": pc.enabled(), "file": None, "stale": False, "note": "no calibration file for this season before this date"}
+    age = (day - cal.as_of).days
+    return {"switch_on": pc.enabled(), "file": cal.source, "as_of": cal.as_of.isoformat(), "age_days": age, **cal.stamp(),
+            "stale": pc.enabled() and age > CALIBRATION_MAX_AGE_DAYS}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -181,6 +199,10 @@ def main(argv: list[str] | None = None) -> int:
     for key in ("d1_unrated", "d1_without_player_priors"):
         if report.get(key):
             print(f"  {key} ({len(report[key])}): {', '.join(report[key][:25])}{' ...' if len(report[key]) > 25 else ''}", flush=True)
+    if report.get("prior_calibration"):
+        cal = report["prior_calibration"]
+        print("  prior_calibration: " + " ".join(f"{k}={cal[k]}" for k in ("switch_on", "as_of", "age_days", "calibrated", "target",
+                                                                             "games", "beta", "gamma", "totalSlope", "reason", "note", "stale") if k in cal), flush=True)
     if args.json_out:
         args.json_out.write_text(json.dumps(report, indent=2), encoding="utf-8")
     return code

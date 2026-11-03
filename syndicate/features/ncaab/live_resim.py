@@ -305,8 +305,16 @@ def build_engine_inputs(date: str, home_id: str, away_id: str, *, neutral: bool,
             "playerPriorsAsOf": priors.as_of.isoformat(),
             "pregameTotal": round(float(team_prior.total), 2),
             "pregameHomeMargin": round(float(team_prior.home_margin), 2),
+            # `college_basketball/prior_calibration.py` (2026-11-03): the fit the targets above carry, and the raw prior.
+            "priorCalibration": getattr(team_prior, "calibration", None),
+            "rawPregameTotal": _round_or_none(getattr(team_prior, "raw_total", None)),
+            "rawPregameHomeMargin": _round_or_none(getattr(team_prior, "raw_home_margin", None)),
         },
     }
+
+
+def _round_or_none(value: Any) -> Optional[float]:
+    return None if value is None else round(float(value), 2)
 
 
 _ENGINES: dict[bool, Any] = {}

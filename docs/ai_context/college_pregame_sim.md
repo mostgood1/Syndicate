@@ -49,6 +49,54 @@ the same engine configuration.
    - **Writes** `row["projection"]` on grid rows. The coverage it returns is reported under
      `enrichment.projections`.
 
+## Prior calibration: the college fit (user 2026-11-03 "College model fit")
+
+The engine is told what to produce by the team prior, and with the exact target on it reproduces it.
+Measured 11-03 on the fleet, sim mean against prior: men slope 0.94 (129 games); the women's sim narrows
+only blowouts over 25 points, by about 6. So the prior is what gets fitted, as an ESTIMATOR: the mean
+margin and total move, pace and every engine rate stay.
+
+1. **Fit, once a day after 11:00Z, in the pregame child.**
+   - `scripts/build_college_pregame_sims.py:47` `refresh_prior_calibrations`. It is called at `:88` under
+     `--refresh-inputs`, before any sim.
+   - That calls `syndicate/features/college_basketball/prior_calibration.py:320` `refresh_calibration`:
+     - it builds rows over the trailing 21 days of this season: `build_fit_rows` (`:261`), with the RAW
+       prior via `prior_for_game(calibrate=False)`, the close via `live_resim.closing_home_margin` and
+       `closing_totals` (`:227`), and the final from the slate;
+     - it then runs `fit` (`:166`): margin' = beta·margin + gamma·[home site], and total' = target_mean +
+       slope·(total − prior_mean);
+     - the target is the close (≥ 60 games), else the final (≥ 80), else UNCALIBRATED by name;
+     - out-of-range values are clamped and recorded;
+     - `holdout` (`:190`) records a split-sample check: fit on even event ids, score the odd ones.
+   - **Writes** `<league>_source/data/processed/prior_calibration_<season>_asof_<D-1>.json`.
+   - Log line: `[college_prior_calibration] FIT league= as_of= rows= closes= finals= ...`, or `FIT_FAILED`.
+2. **Apply.** `syndicate/features/ncaab/live_team_model.py:279` `prior_for_game` → `_calibrated` (`:303`):
+   - the newest file of the game's season dated STRICTLY before the game (`calibration_for`, `:353`);
+   - an uncalibrated or unreadable newest file serves the raw prior by name, never an older fit.
+   Pregame and live sims both read it, so the live margin anchor compares like with like.
+3. **Provenance.** `ncaab/live_resim.py:309` stamps `priorCalibration`, `rawPregameTotal` and
+   `rawPregameHomeMargin`. `pregame_sim.py:106` puts the stamp in the inputs key, so a new fit re-sims
+   the game.
+4. **Gate.** `scripts/ncaab_live_input_checklist.py:174` reports the fit in force and FAILS when it is
+   older than 3 days with the switch on (the daily refit stopped). No file at all is reported, not
+   failed: a season's first days have none.
+
+Measured before shipping (`deploys.md`, 2026-11-03 college model fit entry):
+
+- **2025-26 walk-forward against finals.** Ratings come from games strictly before each date; both teams
+  had ≥ 5 games; fit on Nov–Jan, judged on Feb–Apr.
+  - Men's margins were already right (beta 1.007, gamma 0.06): the ratings builder's own
+    `MARGIN_CALIBRATION_K` fit holds.
+  - Men's totals were spread out (slope 0.70) and about 1.5 points low.
+  - Women's margins were 12–19% too narrow, because they carry the men's K. Women's totals slope 0.80.
+- **11-02/03 opener, men, against the close (135 games).** Margins: beta 1.115, gamma +2.25. Totals:
+  slope 0.72. Split-sample against the close: margin RMSE 6.08 → 5.20, total RMSE 6.63 → 6.16.
+
+**Spread and moneyline weight stays 0, by measurement.** On the opener, the prior's disagreement with
+the close carried no information about the final margin: regressing (final − close) on (prior − close)
+gives a coefficient of +0.04 over 116 games. The fit fixes what the board shows, not whether it has an
+edge.
+
 ## Inputs: consumed vs populated
 
 The pregame path consumes EXACTLY `build_engine_inputs`' output, nothing more. The gating input
@@ -75,6 +123,7 @@ Board rows label the full game `full_game` (NCAAB) or `full` (WNCAAB). The join 
 | `SYNDICATE_COLLEGE_PREGAME_INTERVAL_SECONDS` | 900 (floor 300) | gap between launches |
 | `SYNDICATE_COLLEGE_PREGAME_BUDGET_SECONDS` | 600 (floor 60) | per-launch deadline |
 | `SYNDICATE_COLLEGE_PREGAME_SIMS` | 200 (floor 100) | draws per game |
+| `SYNDICATE_COLLEGE_PRIOR_CALIBRATION` | on | `0`/`off` serves the raw prior to pregame AND live sims (reachability: `tests/test_college_prior_calibration.py`) |
 
 ## Cost and known limits
 
@@ -84,6 +133,14 @@ Board rows label the full game `full_game` (NCAAB) or `full` (WNCAAB). The join 
 - **Tip quality is the team model's.** The P4 backtest (`docs/ai_context/ncaab_live_tier.md`) graded
   the engine at the tip as no better than the team model, and with the settled switches its total
   bias is +1.1 regular season / +4.0 tournaments. No book blend is applied (NBA's is NBA-fitted).
-- **WNCAAB:** no women's ratings or player priors exist yet, so every game refuses
-  `no_engine_inputs_for_league` and the board reports it. Women's engine rules
-  (`basketball_engine/league.py`) and the data producers are the next step.
+- **WNCAAB** (corrected 2026-11-03; this bullet said the women had no inputs): the women's ratings, preseason
+  and player priors have been built since 11-02 and refreshed daily by the pregame child. The women's
+  engine rules are `basketball_engine/league.WNCAAB`.
+- **Prior calibration limits.**
+  - The women's sim still narrows blowouts past 25 points (about 6 points), and calibration cannot fix
+    that: it moves the input, and the engine narrows the result. The root of the women's narrow margins is
+    the men's `MARGIN_CALIBRATION_K` in `build_ncaab_team_ratings.py`; the calibration corrects for it
+    downstream.
+  - The calibration file sits beside the ratings tables on the fleet disk. It is not in Render's
+    `HOT_ARTIFACT_PATTERNS`, and neither are the women's tables: `artifact_publisher.py` belongs to other
+    lanes, and the fleet serves from its own disk.

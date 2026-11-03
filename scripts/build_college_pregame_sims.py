@@ -4,7 +4,9 @@
 
 `--refresh-inputs` brings the WOMEN'S team ratings and player priors up to date once a day (after 11:00Z, the
 men's scheduled-job hour) before simming: the women have no `local_production` job, so the pregame child --
-already launched every 15 minutes -- owns that refresh. A marker file per date makes it once a day.
+already launched every 15 minutes -- owns that refresh. A marker file per date makes it once a day. It also
+refits each league's PRIOR CALIBRATION once a day (`college_basketball/prior_calibration.py`): the file for
+today's games is its own marker.
 
 Launched by the live-odds-worker (`ncaab/inplay_lane.maybe_launch_pregame_sims`) so it inherits the live
 tier's engine switches; see `syndicate/features/college_basketball/pregame_sim.py`. Stops at the budget and
@@ -42,6 +44,30 @@ def refresh_womens_inputs(now: dt.datetime | None = None, *, run: object = subpr
     return "refreshed"
 
 
+def refresh_prior_calibrations(leagues: list[str], now: dt.datetime | None = None, *, refit: object = None) -> dict[str, str]:
+    """Once a day after 11:00Z per league: refit the prior calibration on the trailing window. Never raises: a failed
+    fit leaves yesterday's file in force (it applies to every later date) and says so."""
+    from syndicate.features.college_basketball import prior_calibration as pc
+    from syndicate.features.ncaab import live_team_model as tm
+
+    moment = now or dt.datetime.now(dt.timezone.utc)
+    if moment.hour < 11:
+        return {league: "before_11z" for league in leagues}
+    today = moment.date()
+    out: dict[str, str] = {}
+    for league in leagues:
+        if pc.calibration_path(league, tm.espn_season_for(today), today - dt.timedelta(days=1)).exists():
+            out[league] = "already_today"
+            continue
+        try:
+            (refit or pc.refresh_calibration)(league, today=today, now=moment)  # type: ignore[operator]
+            out[league] = "refitted"
+        except Exception as exc:  # noqa: BLE001 -- one league's failed fit must not stop the sims
+            print(f"[college_prior_calibration] FIT_FAILED league={league} {type(exc).__name__}: {exc}"[:300], flush=True)
+            out[league] = "failed"
+    return out
+
+
 def main(argv: list[str] | None = None) -> int:
     from syndicate.features.college_basketball.pregame_sim import LEAGUES, default_sims, run_pregame_sims
 
@@ -58,6 +84,8 @@ def main(argv: list[str] | None = None) -> int:
         parser.error(f"unknown league(s) {unknown}; expected {list(LEAGUES)}")
     if args.refresh_inputs and "wncaab" in leagues:
         refresh_womens_inputs()
+    if args.refresh_inputs:
+        refresh_prior_calibrations(leagues)
     deadline = time.monotonic() + max(1.0, float(args.budget_seconds))
     for date_iso in [d.strip() for d in args.dates.split(",") if d.strip()]:
         for league in leagues:

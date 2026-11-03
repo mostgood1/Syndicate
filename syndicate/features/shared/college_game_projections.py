@@ -16,10 +16,16 @@ own facts, each counted by reason:
 
 MARGIN LINES ARE MARKET-ANCHORED (user 2026-11-02 "Fix + anchor"). Measured on the 2026-11-03 slate, the sim's
 margins ran at ~half the market's (slope 0.51 over 109 games, correlation 0.90): spread edges had a median of
--21 points, a scale defect rather than a view. Until a college margin fit exists, spreads and moneylines serve
-the NBA logit blend (`nba_prop_calibration.blend_with_book`) at weight SYNDICATE_COLLEGE_MARGIN_MODEL_WEIGHT
-(default 0.0: the de-vigged fair itself, so no model edge). The sim's margin and raw probability stay on the
-row (`projected`, `p_model_raw`). Totals are served raw: the sim sat ~1 point under the line.
+-21 points, a scale defect rather than a view. Spreads and moneylines serve the NBA logit blend
+(`nba_prop_calibration.blend_with_book`) at weight SYNDICATE_COLLEGE_MARGIN_MODEL_WEIGHT (default 0.0: the
+de-vigged fair itself, so no model edge). The sim's margin and raw probability stay on the row (`projected`,
+`p_model_raw`). Totals are served from the sim.
+
+THE COLLEGE FIT (2026-11-03, `college_basketball/prior_calibration.py`): the sims now start from a team prior
+whose mean margin and total are refitted daily to the closing line, so the SCALE defect above is fixed at the
+source and totals are no longer spread too wide. The weight stays 0 by measurement, not by default: on the
+11-02/03 opener the prior's disagreement with the close carried no information about the final margin
+((final - close) on (prior - close): +0.04 over 116 games).
 
 THE JOIN. Grid rows carry the odds feed's team names; sim entries carry ESPN's. Both go through
 `team_aliases.chip_join_key(league, ...)`, the registry the slate's own odds join uses. Orientation: the
@@ -73,7 +79,7 @@ def _served(prob: float, row: Mapping[str, Any], market: str) -> tuple[float, di
 
     weight = margin_model_weight()
     meta.update(book_blend="applied", book_blend_w=weight, p_book=round(float(fair), 4),
-                book_blend_basis="college margin unfitted (sim/market slope 0.51, 2026-11-03)")
+                book_blend_basis="college margin: prior calibrated daily; no information beyond the close (+0.04, 116 games, 2026-11-03)")
     return blend_with_book(float(prob), float(fair), weight), meta
 
 
