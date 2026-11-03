@@ -6000,7 +6000,9 @@ class ArchiveRouteTests(unittest.TestCase):
     def test_wnba_cards_parity_script_uses_namespaced_api_routes(self) -> None:
         script = self.client.get("/wnba/cards-parity.js").get_data(as_text=True)
 
-        self.assertIn("const API_BASE_PATH = '/wnba/api';", script)
+        # efc3640d6 (lane ncaab-board-slate) lets a page override the base via data-cards-api-base-path
+        # (NCAAB reuses this script); WNBA's own namespaced route stays the default.
+        self.assertIn("const API_BASE_PATH = document.body?.dataset?.cardsApiBasePath || '/wnba/api';", script)
         self.assertIn("const SOURCE_CARDS_API_BASE_PATH = `${API_BASE_PATH}/source/cards`", script)
         self.assertNotIn("fetch(`/api/cards", script)
 
@@ -6301,7 +6303,8 @@ class ArchiveRouteTests(unittest.TestCase):
         self.assertEqual(context.get("games"), [])
         self.assertFalse(context.get("using_sample_data"))
         self.assertEqual(context.get("source_title"), "NCAAB cards unavailable")
-        self.assertEqual((context.get("empty_state") or {}).get("title"), "No game cards were available for this date")
+        # Reworded by efc3640d6 (cards come from the D1 slate now).
+        self.assertEqual((context.get("empty_state") or {}).get("title"), "No Division I games on this date")
 
     def test_ncaab_game_detail_missing_card_does_not_inject_fake_matchup(self) -> None:
         with patch(
@@ -6556,7 +6559,8 @@ class ArchiveRouteTests(unittest.TestCase):
             mlb_hub = self.client.get("/mlb/hub").get_data(as_text=True)
 
         mlb_launch_date = str(mlb_context.get("launch_date") or "")
-        ncaab_hub = self.client.get("/ncaab").get_data(as_text=True)
+        # /ncaab renders the parity cards page since efc3640d6; the hub is /ncaab/hub, like /nba/hub.
+        ncaab_hub = self.client.get("/ncaab/hub").get_data(as_text=True)
         ncaaf_hub = self.client.get("/ncaaf").get_data(as_text=True)
         nfl_hub = self.client.get("/nfl").get_data(as_text=True)
         wnba_hub = self.client.get("/wnba/hub").get_data(as_text=True)

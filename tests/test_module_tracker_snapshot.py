@@ -29,9 +29,11 @@ class ModuleTrackerSnapshotTests(unittest.TestCase):
         lowest = snapshot["gap_summary"]["lowest_ownership_modules"]
 
         self.assertGreaterEqual(len(lowest), 1)
-        self.assertGreaterEqual(lowest[0]["ownership_score"], 90)
+        # WNCAAB (53f692552 / lane wncaab-module, 2026-11-02) is new and still carries real gaps; move these as it closes them.
+        self.assertGreaterEqual(lowest[0]["ownership_score"], 85)
         self.assertEqual(lowest[0]["dependency_tier"], "artifact_backed")
-        self.assertEqual({item["slug"] for item in lowest[:3]}, {"nba", "ncaab", "ncaaf"})
+        self.assertEqual({item["slug"] for item in lowest[:3]}, {"wncaab", "nba", "ncaab"})
+        self.assertTrue(all(item["ownership_score"] >= 90 for item in lowest if item["slug"] != "wncaab"))
 
     def test_text_report_includes_ownership_section(self) -> None:
         snapshot = module_snapshot()
@@ -40,7 +42,7 @@ class ModuleTrackerSnapshotTests(unittest.TestCase):
         self.assertIn("Lowest ownership / source-independence modules:", report)
         self.assertIn("nba", report)
         self.assertIn("ncaab", report)
-        self.assertIn("ncaaf", report)
+        self.assertIn("wncaab", report)
 
     def test_text_report_ranks_real_gaps_and_suppresses_empty_rankings(self) -> None:
         # Soccer ships without a season betting-card surface (no settlement
@@ -49,7 +51,8 @@ class ModuleTrackerSnapshotTests(unittest.TestCase):
         snapshot = module_snapshot()
         report = render_text_report(snapshot)
 
-        self.assertIn("Highest leverage MLB parity gaps:\n- season betting-card: 1 modules (soccer)", report)
+        # WNCAAB (53f692552 / lane wncaab-module, 2026-11-02) is new and still carries real gaps; move these as it closes them.
+        self.assertIn("Highest leverage MLB parity gaps:\n- season betting-card: 2 modules (wncaab, soccer)", report)
         self.assertIn("Modules ranked by remaining gap count:\n- soccer: gaps=1;", report)
 
         emptied = dict(snapshot)

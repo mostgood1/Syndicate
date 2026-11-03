@@ -202,6 +202,8 @@ AMERICAN_TO_PROBABILITY: list[Impl] = [
     Impl("american_to_probability", "syndicate.features.wnba.cards", "_implied_prob_from_american"),
     Impl("american_to_probability", "syndicate.features.ncaab.mirror_export", "_american_to_probability",
          "compares the raw argument to 0 -- no coercion"),
+    # ADDED 2026-11-03 (lane `ci-suite-red-697`): efc3640d6, the /ncaab parity cards (lane `ncaab-board-slate`).
+    Impl("american_to_probability", "syndicate.features.ncaab.source_cards", "_american_prob"),
     Impl("american_to_probability", "syndicate.features.nhl.sim_engine.hockeysim.adapters", "american_to_implied",
          "routes through american_to_decimal: 1/decimal, not the direct form"),
     Impl("american_to_probability", "syndicate.features.nhl.sim_engine.hockeysim.features.market_lines", "_american_to_prob"),
@@ -643,6 +645,7 @@ NOT_A_SCALAR_CONVERTER: dict[str, str] = {
     "scripts/sgp_pjoint_calibration.py:devig": "logit recalibration of a market probability by fitted (a, b); two args, probability in AND out",
     "scripts/sgp_pjoint_calibration.py:fit_devig": "fits the (a, b) logistic coefficients over a list of legs; not a conversion",
     "syndicate/features/shared/decision_record.py:_min_implied_book_total_pct": "reads venue_scope's threshold (a percent); same as the venue_scope entry above",
+    "syndicate/features/ncaab/source_cards.py:_implied_points": "(total, home spread) -> (away, home) implied team POINTS; takes a Mapping, returns a tuple, no price or probability",
 }
 
 _NAME_HINT = ("implied", "american", "decimal", "devig", "no_vig", "novig",
