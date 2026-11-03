@@ -609,15 +609,15 @@ death, never life — do not invert it.
 - Verification: after a drained full down/up: refresh-worker environ band_on=0, healthz 200, deploys.md entry
 - Blocked by: none
 
-### wncaab-module — OPEN (live re-sim + checklist + live margin anchor + college prior calibration DONE; evening reading + player-prior gaps left) — opened 2026-11-02 — session 547fe65e-71ca-4e19-9589-237553cb4eab
-- **STATUS 2026-11-03 19:53Z: college prior calibration LIVE (pregame VERIFIED; live half owed tonight)**
-  - User "College model fit". `640c56bbf`: ff 19:40:54Z, live-odds-worker 19:41:57Z.
-  - Pregame sims carry the calibrated prior: ncaab 11-03 18/18, wncaab 21/22.
-  - Tonight's men's sims vs the lines: margin gap +4.27 -> +1.06; totals |gap| 3.32 -> 2.77.
+### wncaab-module — OPEN (live re-sim + checklist + live margin anchor + college prior calibration + engine efficiency bounds DONE; evening reading + player-prior gaps left) — opened 2026-11-02 — session 547fe65e-71ca-4e19-9589-237553cb4eab
+- **STATUS 2026-11-03 22:58Z: college prior calibration + engine efficiency bounds LIVE (pregame VERIFIED; live half owed tonight)**
+  - User "College model fit". `640c56bbf`: ff 19:40:54Z, live-odds-worker 19:41:57Z. Pregame sims carry the calibrated prior.
+  - User "Yes, fix it here" (the women's blowout limit). `acd835ee1`: ff 22:46:50Z, live-odds-worker TERM 22:47:05Z.
+    - College exact-target bounds 0.40-2.00 (NBA/WNBA unchanged); loan from basketball-scenario-calibration noted in its block.
+    - Pregame sims vs their own target: wncaab 11-04 total -5.82 -> -1.06, margin -7.67 -> -0.40; ncaab 11-03 -0.92 -> -0.28 / -1.08 -> -0.32.
   - Spread/ML weight stays 0 by measurement (residual +0.04).
   - LEFT:
-    - the 7 PM CST reading's men's anchor offset (reading 7);
-    - the women's engine efficiency bound (sims -3.2 total / -4.1 margin, blowouts);
+    - the 7 PM CST reading (reading 7 now reads the calibration and the bounds together);
     - the women's MARGIN_CALIBRATION_K (the men's, carried).
 - **STATUS 2026-11-03 16:56Z: live margin anchor LIVE and VERIFIED** (user "Anchor them"; `9cfd7f941` + `0a5dc86a2`, live-odds-worker 16:53Z): ECU's live spread edge -27 pp raw -> +6.2 time-scaled (withheld by the interval gate). LEFT: tonight's one-time reading (7 PM CST: men's anchor on a live game, men's re-sim throughput with both threads, credits/h); the 5 women's teams with no player priors; live totals stay raw by decision (ECU totals -10..-15 pp at 16:45Z).
 - **STATUS 2026-11-03 16:12Z: WNCAAB live re-sim LIVE and VERIFIED** -- `d6d56d925` (ff 15:38:09Z, live-odds-worker 15:47:04Z, refresh-worker 16:02:49Z): first live women's game re-simmed 16:05:38Z (200 sims, q1..q4/h1/h2) and priced on the board 16:11:25Z (index 1, 4 rows). Input checklist on fleet data: wncaab PASS (0.997 rated / 0.986 player priors), ncaab PASS. LEFT: live college margins are not market-anchored (user decision owed); the 5 women's teams with no player priors; men's re-sim throughput with both threads on a full slate (tonight).

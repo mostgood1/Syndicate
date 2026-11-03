@@ -1501,4 +1501,7 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
     - ncaab: beta 1.117, gamma +2.19, total slope 0.734 (117 closes);
     - wncaab: beta 1.217, gamma +1.03, total slope 0.865 (94 finals).
   - 2025-26 walk-forward vs finals: men's in-season margins were already right (1.007) and men's totals over-spread (0.70). Women's margins were 12-19% narrow: they carry the men's `MARGIN_CALIBRATION_K`.
-  - The engine lands on its calibrated target for the men (total -0.09 +/- 0.19, 129 sims). Women's sims fall -3.2 total / -4.1 margin short: the exact-target efficiency bound [0.70, 1.30] caps blowouts.
+  - **Engine efficiency bounds: LIVE 2026-11-03** (`acd835ee1`, deploys.md 22:46:50Z; user "Yes, fix it here").
+    - `LeagueParams.exact_target_solve_bounds` / `eff_mult_final_bounds`: NCAAB and WNCAAB 0.40-2.00; NBA/WNBA keep the vendored 0.70-1.30 / 0.75-1.25.
+    - The narrower vendored clip (0.75-1.25, after the team prior stacks) had capped blowouts. Women's sims fell -3.2 total / -4.1 margin short of their own target.
+    - Now the published pregame sims sit on their target: wncaab 11-04 total -1.06, margin -0.40; ncaab 11-03 -0.28 / -0.32 (22:56Z read).

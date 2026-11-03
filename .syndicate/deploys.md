@@ -56047,3 +56047,44 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **Spread/ML model weight stays 0** (`SYNDICATE_COLLEGE_MARGIN_MODEL_WEIGHT` unset), by the residual test above, not by default. The fit changes what the board SHOWS (sim margins, totals, halves, the live anchor's size), not whether a spread edge exists.
 - **known limits:** the women's engine still narrows blowouts over 25 points (calibration moves the input; the engine narrows the result). The root of the women's narrow margins is the men's K in `build_ncaab_team_ratings.py`. The calibration file is not in `HOT_ARTIFACT_PATTERNS` (`artifact_publisher.py` belongs to other lanes; the fleet serves from its own disk). Games already live at the restart keep a raw pregame sim, so the anchor over-corrects them by the calibration delta until final (1 women's game).
 - **claims:** web + live-odds-worker released 19:46:08Z (after the restart; the verification above is read-only). No claims held.
+
+## 2026-11-03 22:46:50Z (4:46 PM CST) -- FLEET ff 640c56bbf -> 5c12a1809 + reload-web + live-odds-worker TERM 22:47:05Z: COLLEGE ENGINE EFFICIENCY BOUNDS -- **deploy MET (both leagues' pregame sims land on their own target)** (lane `wncaab-module`)
+- **user, in this chat:** "Yes, fix it here", answering "Fix the women's engine blowout limit next?".
+- **diagnosis:** with the exact target on, the engine solves each team's efficiency multiplier to hit its points target. The vendored engine bounded it twice:
+  - the solve to 0.70-1.30 (`basketball_engine/engine.py`, the EXACT_TARGET_CALIBRATION block, both the coherent bisection and the `_solve_eff_mult` call);
+  - then a clip to 0.75-1.25 after the team prior stacks on it. This one is the narrower, and it was not named in the 19:40:54Z entry.
+  - A college mismatch (a 104-45 women's target) needs a team far past both, so the sim fell short of its own target and the prior calibration could not reach the board.
+- **change `acd835ee1`** (loan from lane basketball-scenario-calibration, noted in `5c12a1809`):
+  - two `LeagueParams` fields, `exact_target_solve_bounds` / `eff_mult_final_bounds`. The defaults are the vendored literals, so NBA/WNBA are byte-identical (parity tests pass).
+  - NCAAB and WNCAAB set both to 0.40-2.00.
+  - The bounds go in the provenance (`effMultBounds`) and the pregame inputs key, so every published pregame sim re-sims.
+  - Tests: `tests/test_basketball_engine_eff_bounds.py` (NBA/WNBA values pinned, reachability off != on, a close game unmoved, provenance + key). 131 engine/college tests pass.
+- **offline measurement on the fleet (22:25Z-22:42Z, nice 19):**
+  - Set-up: an overlay copy of the package; the 11-03 + 11-04 slates run three ways, 200 sims each, the same seeds, the worker's college switches.
+  - Harness: the vendored arm reproduced every published sim to 0.00 (38 women's, 27 men's).
+  - Sim minus target, vendored -> 0.55-1.55 -> 0.40-2.00:
+    - women (39 games): total -4.29 -> -1.00 -> -0.81 (se 0.20); margin toward the favourite -5.65 -> -0.76 -> -0.49.
+    - women, targets of 24+ points (18 games): total -8.51 -> -1.90 -> -1.48; margin -11.56 -> -1.51 -> -0.93.
+    - men (27 games): total -0.98 -> -0.20 -> -0.20; margin -0.94 -> -0.22 -> -0.22.
+  - 0.55-1.55 still bound in 5 women's games (43-63-point targets), so 0.40-2.00 was chosen. Games inside the vendored range are byte-identical (17/39 women's, 20/27 men's). Cost unchanged (~9 s per game at 200 sims).
+- **gates:**
+  - Claims web + live-odds-worker 22:46:27Z (`wncaab-module`).
+  - Baseline `wncaab_pregame_bounds_1104=0` (0 of 17 pregame entries carry the new bounds), read 22:46:13Z.
+  - Web preflight CLEAR 22:46:34Z -> ff 22:46:50Z + reload-web 2.0 s, healthz 200.
+  - live-odds-worker preflight CLEAR 22:46:59Z -> TERM pid 3503383 (literal pid) 22:47:05Z -> respawn pid 3546648 22:47:12Z.
+  - The ff carried only my commits (`00d872e89`, `acd835ee1`, `5c12a1809`).
+- **verify -- pregame sims, MET** (child pid 3546706, 22:47:25Z..22:56:05Z, rc=0, 0 Tracebacks since 22:47Z):
+  - RUN lines: ncaab 11-03 `simmed=18`; wncaab 11-03 `simmed=21 refused=4`; ncaab 11-04 `simmed=9`; wncaab 11-04 `simmed=17`.
+  - Read 22:56:15Z: **`wncaab_pregame_bounds_1104` 0 -> 17 of 17** (expectation met); ncaab 11-03 18/18; ncaab 11-04 9/9; wncaab 11-03 21/22 (the 22nd had tipped).
+  - Published sims vs their own target, before (22:46:13Z) -> after:
+    - wncaab 11-04: total -5.82 -> **-1.06**; margin toward the favourite -7.67 -> **-0.40**;
+    - wncaab 11-03: -2.95 / -3.95 -> -0.87 / -0.92;
+    - ncaab 11-03: -0.92 / -1.08 -> -0.28 / -0.32;
+    - ncaab 11-04: -1.10 / -0.65 -> -0.05 / -0.03.
+- **verify -- the board carries the new sims, MET** (read 23:08:24Z; ncaab 11-03 grid 23:07:44Z, wncaab 11-03 grid 23:00:46Z; the grid builds today's CT date only):
+  - Projected total = the new sim's `total_mean` on every row matched by team key: 25 men's, 8 women's, max |diff| 0.00.
+  - Men's pregame full-game totals: mean(projected - line) -1.36 over 588 rows, alternates included. It was -1.39 at 19:51Z, but that read was not same-instant and the lines move.
+  - Women's: +9.89 over 9 rows, and that is ONE game. Charleston Southern @ East Carolina (tipped 16:00Z) shows in-play total lines 104.5-109.5 beside its pregame projection 135.4, on rows not flagged `live_aware`. The other 6 rows average +0.89. A board lead, not this change.
+- **not changed:** NBA/WNBA (defaults are the vendored values); the refresh-worker (not restarted; it reads the pregame artifact). Live college re-sims use the new bounds from the 22:47:12Z respawn. Games already live keep their old pregame sim until final.
+- **the 7 PM CST reading** (`wncaab-live-resim-evening-reading`, reading 7) now reads the calibration and the bounds together. Both move the sim toward the calibrated target.
+- **claims:** web + live-odds-worker released 22:56:28Z. The verification above is read-only. No claims held.
