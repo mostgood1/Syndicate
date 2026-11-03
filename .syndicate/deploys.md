@@ -55767,3 +55767,25 @@ Read-only scheduled reading (task ncaab-1102-board-check). Readings 08:01:48Z-08
   - A college margin fit, to lift `SYNDICATE_COLLEGE_MARGIN_MODEL_WEIGHT` from 0.
   - WNCAAB LIVE re-sim (not built: `resume_from_summary` is men's-halves-only).
 - **claims:** live-odds-worker released 00:25Z. No claims held.
+
+## 2026-11-03T02:23Z (2026-11-02 20:23 CT) -- MEASUREMENT for 2026-11-02 18:27:07Z (fleet ff 308da1f38, NCAAB in-play lane + live re-sim opening-week priors): NOT MET (lane ncaab-board-slate)
+- **BUDGET FLAG: NCAAB credits ran at ~3,707/h in the 20-min window, above the ~3,000/h flag.** That is in proportion to the approved estimate (~1,850/h at 40 live games is ~46/h per game; the lane saw 73-80 live games, so ~3,380-3,700/h expected), and it sits at the top of that range. It is about 2x the number the user approved, because the live slate was about 2x the 40-game peak that number assumed.
+- Scheduled read-only reading (task `ncaab-evening-lane-check`). No restarts, no ff, no env changes, no claims. NOTE: another session restarted live-odds-worker at 00:24:11Z (pid 2990173, entry above), and that restart also carries 70b2bdf09 (live re-sim tip prior). So the readings below cover the post-00:24Z worker, not pid 2879017 alone.
+- **(1) Lane cadence, MET** (read 02:02:57Z / 20:02 CT, last 60 min). 15 `NCAAB_LIVE_AUTORUN_LAUNCHED` lines; gap median 250 s (min 245, max 256); `live_games` min 73, max 80. 108 launches since the 18:30:43Z first launch. `NCAAB_LIVE_AUTORUN_FAILED|ERROR`: 0 since 18:30:36Z. `odds_2026-11-02_inplay.csv` mtime 02:02:33Z with 1,592 rows. `odds_2026-11-03_inplay.csv` is absent, which is expected: launches still carry `date=2026-11-02`.
+- **(2) NCAAB credit rate, MET on the proportional test, budget-flagged** (`/api/ops/oddsapi/quota`):
+  - 02:03:05Z (20:03 CT): credits 18,078, calls 6,001.
+  - 02:23:15Z (20:23 CT): credits 19,324, calls 6,643.
+  - The window is 20m10s: +1,246 credits = **3,707 credits/h** (642 calls = 1,910 calls/h, ~1.94 credits per call).
+  - Average since the 18:32:52Z baseline of 7,299: +10,779 over 7.50 h = 1,437/h. The early evening had few live games, so the average understates the peak.
+  - Platform `credits_per_hour` was 5,514.9, then 5,632.4.
+  - At the peak rate, NCAAB is ~66% of the platform's hourly burn.
+- **(3) Re-sim coverage, NOT MET (strictly), priors fix working.** In the last 10 `NCAAB_LIVE_RESIM_TICK` lines (01:04:16Z-01:58:19Z, 20:58 CT), `live` was 86-115 and `resimmed` 2-10 on every tick (last tick: live=100 resimmed=10 refused=6 carried_forward=84). The opening-week failure mode (resimmed=0 with every game `team_unrated`) is gone.
+  - Refusal reasons seen: `team_unrated` 25-38, `team_has_no_player_priors` 4-5, `budget_exhausted` 8-32, `regulation_over` 0-1, `on_floor_incomplete` 1-2 and `pbp_score_mismatch` 1-3.
+  - The last two are NOT on the expected list. Both are live-feed state guards, not priors: `live_resim.py:390` (on-floor five not 5 distinct names) and `:378` (PBP score disagrees with the header beyond `MAX_HEADER_LEAD`). They cover 1-3 games per tick.
+  - UNVERIFIED: whether every `team_unrated` refusal is a non-D1 opponent. The per-game detail lives in the keyvalue snapshot `live/ncaab_live_resim.json`. No file copy turned up under ~/syndicate-prod or ~/Syndicate (the absence is not proof), and no web route serves it. 25-38 unrated games out of ~110 live is high enough to be worth a per-game read.
+  - Coverage is thin: 2-10 fresh re-sims per tick against 84-110 carried forward, and `budget_exhausted` runs 8-32 per tick.
+- **(4) Layer 2 Games-rail join, MET** (read 02:03:17Z / 20:03 CT). The `intelligence_state_history_2026_11_03.jsonl` last `updated_at` is 2026-11-02T19:42:11-06:00 (was 09:42:56-06:00), so it rebuilt. `POST /api/intelligence/query` `ranked_all` held 8,129 rows. NCAAB rows by date:
+  - `source_board_date=2026-11-03`: 60 rows with both keys, **0 keyless**.
+  - `2026-11-02`: 2,151 rows with keys, 19 keyless. These are outside the owed 11-03 check; noted only.
+- **(5) Tracebacks:** 0 lines starting `Traceback` in live-odds-worker.log after 18:30:36Z (scan at 02:02:57Z).
+- **Verdict: NOT MET**, on (c) alone. Two unlisted refusal reasons appear (`on_floor_incomplete`, `pbp_score_mismatch`, feed-quality guards with low counts), and the non-D1 attribution of `team_unrated` is unverified. (a) MET. (b) MET on the proportional test but flagged over 3,000/h. Join MET. Nothing was changed on the fleet.
