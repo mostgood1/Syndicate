@@ -780,6 +780,8 @@ def _run_locked(root: Path, *, get, now, lookback_s, max_pages, max_seconds, ser
         while swept < end and not budget.stopped:
             span = int(slice_s)
             density = float(st.get("pages_per_s") or 0.0)
+            if swept < int(st.get("dense_to") or 0):
+                density = max(density, float(st.get("dense_pages_per_s") or 0.0))
             if density > 0:
                 span = max(MIN_SLICE_S, min(span, int(TARGET_SLICE_PAGES / density)))
             lo, hi = swept + 1, min(swept + span, end)
@@ -802,6 +804,11 @@ def _run_locked(root: Path, *, get, now, lookback_s, max_pages, max_seconds, ser
                 spent = budget.pages - before
                 if spent:
                     st["pages_per_s"] = max(density, spent / (hi - lo + 1))
+                    # The floor holds until the whole span is read. A cheap slice at its start replaces
+                    # `pages_per_s`, and alone it sent the next slice out at the full `slice_s` into the dense part:
+                    # 5 runs 11-02 21:04Z..01:04Z each read ~400 sparse seconds and threw away ~890 of 900 pages.
+                    st["dense_to"] = max(hi, int(st.get("dense_to") or 0))
+                    st["dense_pages_per_s"] = st["pages_per_s"]
                 break
             except (SliceUnreadable, SliceTooLarge) as exc:
                 summary["errors"].append(f"{type(exc).__name__}: {exc}")
@@ -820,6 +827,9 @@ def _run_locked(root: Path, *, get, now, lookback_s, max_pages, max_seconds, ser
             info["slices"] += 1
             swept = hi
             st["swept_to"] = hi
+            if hi >= int(st.get("dense_to") or 0):
+                st.pop("dense_to", None)
+                st.pop("dense_pages_per_s", None)
             st["last_slice_pages"] = int(stats["pages"])
             if hi - lo + 1 >= MIN_SLICE_S:  # a slice costs >= 1 page, so a seconds-long one overstates density
                 st["pages_per_s"] = int(stats["pages"]) / (hi - lo + 1)

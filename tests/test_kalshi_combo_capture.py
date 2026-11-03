@@ -336,6 +336,26 @@ def test_a_slice_denser_than_a_whole_run_narrows_the_next_one_instead_of_repeati
     assert len({r["ticker"] for r in _stored(tmp_path)}) == 40
 
 
+def test_a_cheap_slice_inside_a_budget_stopped_span_does_not_widen_the_next_one(tmp_path, monkeypatch):
+    # 11-02 21:04Z..01:04Z on the fleet: each run's floor-sized first KXMVECROSSCATEGORY0 slice read ~400 sparse
+    # seconds for one page, that page reset the density, and the next slice went out at the full 3,600 s into the
+    # dense hour and ran out of budget. 5 runs kept 1-16 of 900 pages each.
+    monkeypatch.setattr(cc, "TARGET_SLICE_PAGES", 10)
+    end = T0 - cc.SETTLE_LAG_S
+    start = end - 3600  # 2,000 s with nothing settled, then a combo every 15 s
+    combos = [_combo(f"KXMVECROSSCATEGORY-S1-{i}", NBA_SGP_LEGS, start + 2001 + 15 * i) for i in range(106)]
+    fake = FakeKalshi(combos, page_size=1)
+    kw = {"series": {"KXMVECROSSCATEGORY": (3600, 0)}, "lookback_s": 3600, "max_pages": 90, "page_cap": 30}
+    first = _run(tmp_path, fake, T0, **kw)
+    assert first["status"] == "budget_stopped" and not _stored(tmp_path)
+    second = _run(tmp_path, fake, T0, **kw)
+    assert second["series"]["KXMVECROSSCATEGORY"]["pages"] >= 45  # most of the run kept, not the one sparse page
+    _run(tmp_path, fake, T0, **kw)
+    assert len({r["ticker"] for r in _stored(tmp_path)}) == 106
+    state = json.loads((cc.store_dir(tmp_path) / "state.json").read_text())["series"]["KXMVECROSSCATEGORY"]
+    assert "dense_to" not in state and "dense_pages_per_s" not in state
+
+
 def test_interval_series_are_read_at_most_every_interval(tmp_path):
     series = {"KXMVECROSSCATEGORY": (900, 0), "KXMVENBASINGLEGAME": (21600, 21600)}
     fake = FakeKalshi([])
