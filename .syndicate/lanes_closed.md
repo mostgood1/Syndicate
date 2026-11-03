@@ -13985,3 +13985,13 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - Verdict: GOAL MET. Moved `closed-lane-archive-20261102-1640` and `closed-lane-archive-20261102-1841` (owner_liveness SAFE at 240m). 8 CLOSED blocks deferred (owners idle < 240m or transcript not found); table in log/2026-11-03.md.
+
+### closed-lane-archive-20261103-0241 — CLOSED 2026-11-03 (GOAL MET: 2 blocks archived) — opened 2026-11-03 — session a216af1b-9288-4616-9eea-9f0a511588d5
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Result: GOAL MET. owner_liveness.py --idle-min 240 gave SAFE for 2 of 9 CLOSED blocks; moved `ncaab-native-live-tier` and `ncaab-odds-key-fallback` (owner 547fe65e idle 303m). 7 deferred; table and Part B in log/2026-11-03.md.
+
+### closed-lane-archive-20261103-0445 — CLOSED 2026-11-03 (GOAL MET: 2 blocks archived) — opened 2026-11-03 — session 1ee1e710-c584-4872-92d5-0d36fd262ddf
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. Moved closed-lane-archive-20261102-2041 and closed-lane-archive-20261103-0040 (owner_liveness SAFE at --idle-min 240). Reading and deferrals: log 2026-11-03.
