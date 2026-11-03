@@ -1480,11 +1480,25 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   - Producer: `college_basketball/pregame_sim.py`, the live tier's engine from `GameState()`, launched by the live-odds-worker every 900 s, 600 s budget, incremental on an inputs key.
   - Artifact: `<league>_source/data/pregame_sim/pregame_sim_<date>.json`.
   - Priced by `shared/college_game_projections.py`.
-  - **Spreads / moneylines are served at the de-vigged fair** (`SYNDICATE_COLLEGE_MARGIN_MODEL_WEIGHT`=0; user 2026-11-02). Sim margins measure at slope 0.69 of the market's (102 games) after the no-second-shrink fix (was 0.51). Totals are served raw (sim ~2 points under the line).
+  - **Spreads / moneylines are served at the de-vigged fair** (`SYNDICATE_COLLEGE_MARGIN_MODEL_WEIGHT`=0; user 2026-11-02).
+    - Kept at 0 BY MEASUREMENT 2026-11-03: the prior's disagreement with the close carries no information about the final margin ((final - close) on (prior - close) = +0.04, 116 games).
+    - Totals are served from the sim.
+    - The old "sim slope 0.69 of the market's" was the regression the wrong way round (sim on market). Market on prior is 1.11, mostly a +4-point opening-week home/favourite gap.
 - **Team prior:** a ratings table carrying `calibration_k` < 1 is not regressed again for the opening-week fallback, in the team model or in the producer's prior blend.
 - **WNCAAB inputs:**
   - `wncaab_source/data/processed/`: ratings 2026 (361 teams, 6,029 games), preseason 2027 (348 teams, 4,742 players), player box 2026 (168,226 rows).
   - Refreshed once a day after 11:00Z by the pregame child (`--refresh-inputs`); no `local_production` job.
 - **WNCAAB live re-sim: LIVE 2026-11-03** (`d6d56d925`, deploys.md 15:38:09Z). `ncaab/live_resim.py` with `league="wncaab"`: four quarters, its own thread on the live-odds-worker (switch follows `SYNDICATE_NCAAB_LIVE_RESIM` when absent), `live/wncaab_live_resim.json`, `WNCAAB_LIVE_RESIM_TICK`; the board prices live women's full-game rows from it (first: 16:11:25Z, 4 rows). Trace: `docs/ai_context/wncaab_live_tier.md`.
 - **Live college margins are MARKET-ANCHORED** (both leagues; user 2026-11-03 "Anchor them"; `9cfd7f941` + `0a5dc86a2`, deploys.md 16:42:35Z). Each live full-game margin is shifted by the pregame gap (closing consensus home margin before the actual tip, minus the pregame sim's), times the share of regulation still to play; the win probability is re-derived. Totals stay raw. No close or no pregame sim -> `no_margin_anchor`. Off: `SYNDICATE_COLLEGE_LIVE_MARGIN_ANCHOR=0`. Verified on ECU 11-03: live spread edge -27 pp raw -> +6.2 (withheld by the interval gate).
-- **Not built:** a college margin fit.
+- **College prior calibration: LIVE 2026-11-03** (`640c56bbf`, deploys.md 19:40:54Z; user "College model fit").
+  - `college_basketball/prior_calibration.py` refits the team prior's mean margin and total daily (the pregame child, after 11:00Z):
+    - margin: beta x margin + gamma at a home site;
+    - total: a slope about the mean;
+    - window: the trailing 21 days of this season;
+    - target: the close (>= 60 games), else finals (>= 80), else uncalibrated by name.
+  - Pregame AND live sims read it through `live_team_model.prior_for_game`. Switch `SYNDICATE_COLLEGE_PRIOR_CALIBRATION` (absent = on).
+  - First fit (as_of 11-02):
+    - ncaab: beta 1.117, gamma +2.19, total slope 0.734 (117 closes);
+    - wncaab: beta 1.217, gamma +1.03, total slope 0.865 (94 finals).
+  - 2025-26 walk-forward vs finals: men's in-season margins were already right (1.007) and men's totals over-spread (0.70). Women's margins were 12-19% narrow: they carry the men's `MARGIN_CALIBRATION_K`.
+  - The engine lands on its calibrated target for the men (total -0.09 +/- 0.19, 129 sims). Women's sims fall -3.2 total / -4.1 margin short: the exact-target efficiency bound [0.70, 1.30] caps blowouts.

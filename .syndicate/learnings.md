@@ -3188,3 +3188,16 @@ Measured on the first board build after the deploy (ECU, women's, 16:45Z, 55% of
 
 ### 2026-11-03 -- "the plan stopped sending it" is not "the edge is gone" (lane maker-pilot-fair-cancel)
 Belief overturned: a resting post the plan no longer sends has lost its edge. Measured on the fleet log: plan_dropped made 15 of 15 fair-move cancels 11-02..11-03. The 13 with a fair were at +2.8..+4.3pp edge, and the +1pp floor never fired. The live Kalshi plan holds one position per pass, so absence is rotation, not a price verdict. **Rule:** a cancel trigger must read the quantity it protects (here, edge vs the resting price), never a proxy (the plan's membership). Before shipping a proxy trigger, count how often it fires while the direct measure would have said keep. User decision "Edge-floor only", `637de43e7`.
+
+### 2026-11-03 -- regress the TARGET on the MODEL, never the model on the target (lane wncaab-module)
+Belief overturned: "the college sim's margins run at slope 0.69 of the market's". It was carried in `state_basketball.md` and read as a 31% compression.
+
+- That slope was sim regressed on market. A slope that way round is shrunk by r^2: 0.90^2 / 1.18 = 0.69.
+- The direction a calibration uses, market regressed on the model (as x), gives **1.11 with an intercept of +2.4**.
+- Split by bins of the model's margin, the gap was a +4-point opening-week home/favourite offset that grows with the favourite's size (prior 0-8: -0.1; 8-16: +3.7; 16-24: +5.4). It was not a uniform stretch.
+- The fix (`640c56bbf`) needed both terms. A pure scale of 1/0.69 would have overstretched every small margin by ~45%.
+
+**Rule:** to say how far a model's output must move, regress the target (close or final) on the model output.
+
+1. Report the slope and the intercept together.
+2. Split by bins of the model's value before calling a gap a scale defect. When every game sits on the same side (opening-week buy games are all home favourites), a constant offset and a stretch look alike in one slope.
