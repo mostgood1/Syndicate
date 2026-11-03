@@ -55913,3 +55913,35 @@ Scheduled task `ncaab-opening-night-live-lens-reading` (slot 03:30Z; started 03:
   - **Reachability:** the first run on the fix that is cut short mid-slice writes `dense_to` to that series' state, and `dense_to` is gone once `swept_to` passes it. Since 04:04Z, 2 of 10 runs were cut short mid-slice (04:04Z, 12:04Z), so this should come within hours, not days.
   - **Outcome:** no run that follows a budget-stopped slice keeps less than half its pages.
   - Read at the 11-03 16:00Z check, together with the big series' lag (< 45 h).
+
+## 2026-11-03 15:38:09Z (9:38 AM CST) -- FLEET ff ddfdf668f -> d6d56d925 + reload-web + live-odds-worker TERM 15:46:56Z + refresh-worker TERM 16:02:43Z: WNCAAB live re-sim -- **deploy MET; first live women's game re-simmed AND priced on the board, VERIFIED** (lane `wncaab-module`)
+- **user, in this chat:** "Build it" (the women's live re-sim, after "what is next").
+- **change `d6d56d925`:**
+  - `ncaab/live_resim.py`: every hop takes `league` (ncaab default, the men's tier unchanged: seed string, cursor key, snapshot path, tick prefix). With `league="wncaab"` it resumes four quarters, writes `live/wncaab_live_resim.json`, and logs `WNCAAB_LIVE_RESIM_TICK`.
+  - Its own thread is started inside `start_ncaab_live_resim_loop`, because `live_lens_loop.py` belongs to lane wnba-native-live-cutover.
+  - Switch `SYNDICATE_WNCAAB_LIVE_RESIM`: when ABSENT it follows `SYNDICATE_NCAAB_LIVE_RESIM`, so it runs only where the men's does, with no env change. `=0` stops it alone. Budget 120 s/tick by default.
+  - Rulebook: a `WNCAAB` entry, bonus scope `"quarter"` (two shots from the 5th foul; OT continues Q4). `basketball_pbp`: women's ESPN path, `groups=50`, quarter foul buckets.
+  - Board: wncaab added to `_LIVE_GAMELINE_SPORTS`, the snapshot path map, `LIVE_LENS_SOURCES_BY_SPORT` (`live_resim`) and `LEVEL_FINAL_IS_A_BAD_ROW`. `live_tier_coverage_check` declares wncaab (9 sports, fail=0).
+  - `ncaab_live_input_checklist.py`: `--league`; coverage counts the per-game prior-season fallback; new player-priors coverage gate.
+  - Tests: targeted 268 + 222 passed (the two pinned expectations updated).
+- **ride-alongs:** fleet `ddfdf668f..d6d56d925` = `63ac86651`, `d58624518`, `90c030a0c`, `74adb24bc`, `92771f9cf` (ledger/log only) + `d6d56d925`. No fleet dirty path is touched by the target.
+- **gates:**
+  - claims web / refresh-worker / live-odds-worker 15:36:42Z (`wncaab-module`).
+  - web preflight CLEAR 15:37:38Z -> `git merge --ff-only d6d56d925` 15:38:09Z (reflog) -> `reload-web` 2.0 s, healthz 200, 0 failures.
+  - live-odds-worker: preflight HOLD (3 odds jobs) -> CLEAR 15:46:46Z (101 polls) -> TERM pid 3179563 15:46:56Z -> respawn pid 3443782 15:47:04Z.
+  - refresh-worker: preflight HOLD (layer2_shortlist build + NCAAF smartsim + odds jobs) 15:48-16:02Z (also a portfolio_commit build) -> CLEAR 16:02:27Z -> TERM pid 2972420 16:02:43Z -> respawn pid 3449444 16:02:49Z.
+- **fleet input checklist (worktree code on fleet data, read before the deploy):** `--league wncaab` **PASS**: rated 0.9972 (this season's table 0.5249; fallback `team_ratings_2026_asof_20260405`), player priors 0.9862 (none for 150 Duke, 2507 Providence, 50 Florida A&M, 2523, 309). `--league ncaab` **PASS**: 0.9972 / 0.9945.
+  - The checklist at its OLD code read FAIL d1_coverage 0.6519 on the men's table (fleet, this morning, before the deploy): counting this season's table only, a false alarm since the 11-02 per-game fallback.
+- **verify -- live-odds-worker, MET:** `WNCAAB_LIVE_RESIM_LOOP_STARTED interval_s=120.0` at 15:47:06.052Z (expect 0 -> 1, baseline 0 read 15:36:05Z), beside `NCAAB_LIVE_RESIM_LOOP_STARTED` at 15:47:06.051Z. First tick 15:47:06Z `live=0 ... written=True`.
+- **verify -- first live women's game, MET** (the 16:00Z tip; tick 16:05:38Z `WNCAAB_LIVE_RESIM_TICK live=1 resimmed=1 refused=0 ... bytes=5624 elapsed_s=27.6`):
+  - keyvalue `live/wncaab_live_resim.json` (read under the live-odds-worker env): Charleston Southern @ East Carolina (401913822), Q1 531 s left, 3-0 ECU, `source=live_resim`, `modelHomeWinProb` 0.87, `simsRun` 200;
+  - segments `q1 q2 q3 q4 h1 h2` (means 33.1 / 34.3 / 33.6 / 33.4; h1 67.4, h2 67.0); projected total 134.5, home margin 17.4;
+  - inputs `league=wncaab halfSplit=false mechanisms=[]`, ratings `2026-04-05` via the per-game prior-season fallback, player priors 2026-11-03; resume matched 5/5 on the floor both sides.
+  - names: `nameSource=espn_display` (this game is not in the morning `odds_2026-11-03.csv`, 6 names indexed), and the board rows spell both teams identically, so the join keyed anyway.
+- **verify -- refresh-worker, MET** (expect `wncaab_live_gamelines_supported` false -> true; baseline false read 15:48:00Z from the served book-grid, `reason=no live re-sim wired for wncaab`, built 15:40:07Z):
+  - first women's grid after the restart, 16:04:38Z: `supported=True`, 4 live rows considered, `withheld_by_reason={no_live_gameline_projection: 4}` (no live lane yet).
+  - first grid after the first live lane, **16:11:25Z: `index_size=1`, considered 6, projected 4**, withheld `prob_interval_swamps_edge` 2 + `quote_older_than_live_pricing_ceiling` 2.
+- **FINDING (not a defect of this deploy; a decision for the user):** the live spread rows carry big re-sim edges. ECU -26.5: model 0.5129 = market fair (the pregame anchor), but `edge_basis=live`, `edge_pct` **-27.27**; at -28.5, **-31.6**. The live margin (17.4) is the sim's compressed margin (slope ~0.69 vs the market, deploys 2026-11-02 23:37:24Z), and NOTHING anchors the live tier. The men's live tier has done the same since 11-02 ("the 20 spread rows with |edge| > 10 are all `live_aware`", same entry). Totals withheld here by the interval gate.
+- **correction to the 13:54Z entry:** "No women's `team_ratings_2027_*` file yet" was WRONG. `team_ratings_2027_asof_20261102.csv` (190 teams) was written at 11:16:12Z (`[ncaab_ratings] RUN ... teams_rated=190 ... written=...`); my `ls | head -15` cut it off.
+- **revert:** `git revert d6d56d925`, ff, reload-web, TERM both workers (claimed). Faster for the women's thread alone: `SYNDICATE_WNCAAB_LIVE_RESIM=0` (env change, fleet env recipe).
+- **claims:** live-odds-worker + web released 15:58Z; refresh-worker released 16:03:09Z.
