@@ -14004,3 +14004,8 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Falsification test: After deploy, the 11-02 NCAAB orders still carry no outcome once ESPN reports their games final, or carry an outcome that disagrees with ESPN's final
 - Verification: Fleet after deploy: settlement for 2026-11-02 grades both NCAAB orders (Richmond vs UNC Asheville, Yale vs Howard) with outcome matching ESPN's final; scorecard grades ncaab rows; deploys.md entry
 - Blocked by: none
+
+### closed-lane-archive-20261103-0851 — CLOSED 2026-11-03 (GOAL MET: 2 blocks archived) — opened 2026-11-03 — session 914c633d-6762-4a5d-86ab-b86de9c7afc4
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET -- moved `closed-lane-archive-20261103-0241`, `closed-lane-archive-20261103-0445` (owner_liveness SAFE at 240m). Reading and Part B table in `.syndicate/log/2026-11-03.md`.
