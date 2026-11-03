@@ -3177,3 +3177,11 @@ The belief: the drain flag and the worker heartbeat live in the shared keyvalue 
 **Rule:**
 1. Run `--drain` / `--undrain` under the target role's full environment: read `/proc/<pid>/environ` in Python and `execve` the check. Never print or list the values (secrets).
 2. A drain that reads `unknown` for more than one heartbeat is mis-keyed, not slow. Stop, `--undrain` with the same environment that drained, and re-run correctly.
+
+### `[2026-11-03, lane wncaab-module]` A pregame correction applied to a LIVE re-sim must be scaled to the game still to play -- and test it MID-GAME, not at the tip
+The belief: anchoring a live margin to the market means shifting it by the pregame gap (closing market margin minus the pregame sim margin). Every test passed and the fleet dry run looked right, because both checked the TIP state, where the full gap is correct.
+Measured on the first board build after the deploy (ECU, women's, 16:45Z, 55% of regulation left): the full +10.37 shift turned a -27 pp spread edge into **+20 pp**. That edge was the anchor itself. The gap is the sim's error over the possessions it SIMULATES, and the points already scored are real.
+
+**Rule:**
+1. A correction fitted on a whole game (pregame gap, rate bias, calibration offset) applies to the live state only in proportion to what is left: scale it by the remaining regulation share (1.0 at the tip, 0 in overtime).
+2. Every live-tier adjustment gets a MID-GAME test against a real board row, not just a tip-state test. The tip is the one state where a scaled and an unscaled correction agree, so it cannot tell them apart.
