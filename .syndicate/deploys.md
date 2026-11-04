@@ -56344,7 +56344,7 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **Baselines (fleet logs, 20:54Z; re-read on every preflight pass, the same except `cbb` 1345 -> 1346 and the join's `matched` drifting with the slate) -> readings after the restart:**
   - Polymarket daily archive (live-odds-worker) `skipped_by_sport`: `cbb` 1345 -> **0**, `wcbb` 482 -> **0**. MET.
   - Kalshi daily archive `skipped_by_sport` `wncaab`: 869 -> **0** on both workers. MET.
-  - `[layer2_shortlist] VENUE_REPRICE` ncaab `polymarket_us`: `no_rows`, 0 quotes -> **1316 quotes** (first line after the restart). MET.
+  - `[layer2_shortlist] VENUE_REPRICE` ncaab `polymarket_us`: `no_rows`, 0 quotes -> **1266 quotes** on the first line after the restart (21:25:17Z, status ok) and 1316 on the next. MET.
   - `SEGMENT_MISMATCH_GRID sport=ncaab` `full|polymarket_us|-`: 0 (repriced 55, all Kalshi) -> **100** of 106 repriced, 21:31:47Z. Kalshi `full` matches fell 55 -> 6 on the same line. MET for the price feed.
   - `POLYMARKET_QUOTE_CAPTURE sports=` / `POLYMARKET_BOARD_JOIN matched` (order-path join): baseline `['nba','ncaaf','nfl','soccer']` / 390-395. **Not yet read**: no line since the restart as of 21:33Z.
   - College live re-sim tick line: `dropped_non_d1` absent -> **present** on both leagues' first ticks (21:06:47Z, `live=0 ... dropped_non_d1=0`). The code is loaded. A non-zero drop is **OWED**: it needs a live non-D1 game, and tonight's slates have 16 men's and 19 women's.
@@ -56353,3 +56353,7 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - (1) Order-path join: `POLYMARKET_QUOTE_CAPTURE sports=` includes `ncaab` on the first line after 21:18:32Z.
   - (2) Re-sim filter: a `NCAAB_LIVE_RESIM_TICK` or `WNCAAB_LIVE_RESIM_TICK` line with `dropped_non_d1` > 0 while a D1-vs-non-D1 game is live.
   - (3) For lane `polymarket-cbb-pairing`, after `f070ac25c` reaches the fleet: 0 wrong-game `polymarket_us` sides on the ncaab grid.
+- **VERIFY (21:37Z, 3:37 PM CST):**
+  - (1) **MET.** First `[portfolio_commit] POLYMARKET_QUOTE_CAPTURE` after the restart, 21:36:33Z: `matches=442 sports=['nba', 'ncaab', 'ncaaf', 'nfl', 'nhl', 'soccer'] appended_by_sport={'soccer': 9, 'ncaab': 39}`, against a 20:58:39Z baseline of `matches=395 sports=['nba', 'ncaaf', 'nfl', 'soccer']`. `POLYMARKET_BOARD_JOIN matched` 442 on the same line (390-395 before).
+  - (2) **MET.** `2026-11-04T21:34:58.269Z WNCAAB_LIVE_RESIM_TICK ... live=0 ... dropped_non_d1=1`. ESPN's women's scoreboard (groups=50, read 21:36Z) shows exactly one game in progress, Clinton Golden Bears (130129, not D-I) @ UNC Asheville (2427), 8:20 1st: the tick skipped it with no summary fetch.
+  - (3) Open, that lane's.
