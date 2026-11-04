@@ -24,6 +24,13 @@ WHAT IS SCORED
                 (event, market, segment, player) at a DIFFERENT line after its last quote on this one, at or before
                 the sighting (H5, pre-registered 2026-10-16 in lane fair-price-v2: the board's quote fair counted
                 such stale cells -- the 10-15 Knicks total 225.5, 7 of 8 books long moved to 226.5-228.5)
+    shin_live   shin, with a book counted by whether it was still being OBSERVED, not by when its price last moved:
+                its last price at or before the moment, kept if the key's last look (the shard's `.state.json`
+                last-seen, or a later change) is no earlier than --live-tol-min before it. The tape is a CHANGE log,
+                so the age windows above drop live books whose price has not moved -- on soccer corners that put
+                the rebuilt fair 2.7 pts under the board's (`findings_2026-11-04_soccer_corners_fair_gap.md`). A key
+                with no last-seen is unknown, never stale: the age windows decide it. Off unless --live-tol-min is
+                given, and reported in its own block (`live_vs_shin`), never in the pooled table.
   A book needs every outcome of the market quoted (both sides; three for a soccer 1X2) and a hold in [0.90, 1.35].
 
   Shared feeds are DETECTED, not assumed: two books whose last pregame prices are identical on >= --dup-threshold of
@@ -70,7 +77,10 @@ if str(REPO_ROOT) not in sys.path:
 
 from syndicate.features.shared.opportunity_signals import devig, expected_value_pct, implied_probability  # noqa: E402
 
-_METHOD_NAME = {"mult": "multiplicative", "power": "power", "shin": "shin", "power_dedup": "power", "shin_fresh": "shin"}
+_METHOD_NAME = {"mult": "multiplicative", "power": "power", "shin": "shin", "power_dedup": "power", "shin_fresh": "shin",
+                "shin_live": "shin"}
+# `odds_book_quotes._KEY_FIELDS`, the order a `.state.json` key is joined in.
+_STATE_KEY_FIELDS = ("sport", "kind", "event_id", "bookmaker", "segment", "market", "selection", "player_name", "line")
 
 
 def ev_at(price: Any, prob: Any) -> float | None:
@@ -297,23 +307,52 @@ def load_graded(path: Path) -> list[dict]:
     return rows
 
 
+def read_last_seen(state_path: Path, events: set[str], groups: set[tuple], out: dict[tuple, datetime]) -> None:
+    """Fill (group, book, side) -> when the key was last OBSERVED, from one shard's `.state.json`.
+
+    The sidecar `append_book_quotes` dedupes against: key -> [line, price, last_seen]. A 2-element entry predates
+    last-seen and is skipped -- unknown, not stale (`odds_book_quotes.read_quote_last_seen`)."""
+    try:
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return
+    for key, value in state.items():
+        if not isinstance(value, list) or len(value) < 3 or not value[2]:
+            continue
+        f = dict(zip(_STATE_KEY_FIELDS, str(key).split("|")))
+        if f.get("event_id") not in events:
+            continue
+        side = str(f.get("selection") or "").strip().lower()
+        g = group_key(f["event_id"], f.get("market"), f.get("segment"), f.get("player_name"), side, f.get("line") or None)
+        seen = ts(value[2])
+        if g not in groups or seen is None:
+            continue
+        k = (g, str(f.get("bookmaker") or "").lower(), side)
+        out[k] = max(out.get(k, seen), seen)
+
+
 def read_quotes(data_root: Path, sport: str, events: set[str], groups: set[tuple],
-                activity: dict[tuple, list[tuple]] | None = None) -> dict[tuple, list[tuple]]:
+                activity: dict[tuple, list[tuple]] | None = None,
+                last_seen: dict[tuple, datetime] | None = None) -> dict[tuple, list[tuple]]:
     """(group, book, side) -> [(captured_at, price, commence_time)] for the wanted groups.
 
     With `activity`, also fills (market key = group[:4], book) -> [(captured_at, line)] over EVERY line of the wanted
-    markets, which is what `shin_fresh` needs to see a book move off a line."""
+    markets, which is what `shin_fresh` needs to see a book move off a line. With `last_seen`, also fills each wanted
+    key's last look from the state file of every shard that held a wanted event (`shin_live`)."""
     hist: dict[tuple, list[tuple]] = defaultdict(list)
     markets = {g[:4] for g in groups}
     directory = data_root / f"{sport}_source" / "tracking" / "book_quotes"
+    states_read: set[str] = set()
     for path in sorted(directory.glob("*.jsonl*")):
         opener = gzip.open if path.suffix == ".gz" else open
+        wanted = False
         try:
             with opener(path, "rt", encoding="utf-8") as fh:
                 for line in fh:
                     m = _EVENT_RE.search(line)
                     if not m or m.group(1) not in events:
                         continue
+                    wanted = True
                     q = json.loads(line)
                     side = str(q.get("selection") or "").strip().lower()
                     g = group_key(q.get("event_id"), q.get("market"), q.get("segment"), q.get("player_name"), side, q.get("line"))
@@ -329,6 +368,10 @@ def read_quotes(data_root: Path, sport: str, events: set[str], groups: set[tuple
                     hist[(g, str(q.get("bookmaker") or "").lower(), side)].append((cap, q.get("price"), ct))
         except (OSError, EOFError) as exc:
             print(f"READ_ERROR {path} {type(exc).__name__}", flush=True)
+        date_str = path.name.split(".", 1)[0]
+        if last_seen is not None and wanted and date_str not in states_read:
+            states_read.add(date_str)
+            read_last_seen(directory / f"{date_str}.state.json", events, groups, last_seen)
     return hist
 
 
@@ -363,8 +406,40 @@ def fresh_vs_shin(rows: list[dict]) -> dict[str, Any]:
     return out
 
 
+def live_vs_shin(rows: list[dict]) -> dict[str, Any]:
+    """`shin_live` beside `shin`: log loss at sighting (game-clustered CI), how often and how far the fair moved, and
+    books counted at sighting and close. NBA (preseason) apart, never pooled -- the same convention as H5."""
+    def block(sub: list[dict]) -> dict[str, Any]:
+        base = [r for r in sub if r.get("sight_shin") is not None and r.get("sight_shin_live") is not None]
+        if not base:
+            return {"n": 0}
+
+        def diff(s):
+            return (sum(log_loss(r["sight_shin_live"], r["y"]) - log_loss(r["sight_shin"], r["y"]) for r in s) / len(s)
+                    if s else None)
+        lo, hi = boot_ci(base, diff)
+        close = [r for r in sub if r.get("close_shin_live") is not None]
+
+        def mean(key, s):
+            return round(sum(r[key] for r in s) / len(s), 3) if s else None
+        return {"n": len(base), "games": len({r["game"] for r in base}),
+                "log_loss_live_minus_shin": round(diff(base), 6), "ci95": [round(lo, 6), round(hi, 6)],
+                "mean_sight_live_minus_shin_pts": round(100 * sum(r["sight_shin_live"] - r["sight_shin"] for r in base) / len(base), 3),
+                "share_fair_moved_1pt": round(sum(1 for r in base if abs(r["sight_shin_live"] - r["sight_shin"]) >= 0.01) / len(base), 4),
+                "sight_books_shin": mean("sight_books_shin", base), "sight_books_live": mean("sight_books_shin_live", base),
+                "rows_close_shin": sum(1 for r in sub if r.get("close_shin") is not None), "rows_close_live": len(close),
+                "close_books_shin": mean("close_books_shin", [r for r in close if r.get("close_shin") is not None]),
+                "close_books_live": mean("close_books_shin_live", close),
+                "keys_last_seen_unknown": sum(r.get("live_unknown_keys", 0) for r in sub)}
+    out: dict[str, Any] = {"pooled_ex_nba": block([r for r in rows if r["sport"] != "nba"]), "by_sport": {}}
+    for sport in sorted({r["sport"] for r in rows}):
+        out["by_sport"][sport] = block([r for r in rows if r["sport"] == sport])
+    return out
+
+
 def evaluate(rows: list[dict], hist: Mapping[tuple, list[tuple]], *, max_age_h: float, max_stale_h: float,
-             dup_threshold: float, activity: Mapping[tuple, list[tuple]] | None = None) -> dict[str, Any]:
+             dup_threshold: float, activity: Mapping[tuple, list[tuple]] | None = None,
+             last_seen: Mapping[tuple, datetime] | None = None, live_tol_min: float | None = None) -> dict[str, Any]:
     by_group: dict[tuple, list[tuple[str, str, list[tuple]]]] = defaultdict(list)
     for (g, book, side), h in hist.items():
         h.sort(key=lambda x: x[0])
@@ -375,13 +450,18 @@ def evaluate(rows: list[dict], hist: Mapping[tuple, list[tuple]], *, max_age_h: 
         for book, side, h in items:
             last_prices[(g, side)][book] = h[-1][1]
     clusters = feed_clusters(last_prices, dup_threshold)
+    live = live_tol_min is not None
+    tol = timedelta(minutes=live_tol_min or 0)
     for r in rows:
         items = by_group.get(r["gkey"], ())
         t = ts(r["t"])
         sight: dict[str, dict[str, Any]] = defaultdict(dict)
         close: dict[str, dict[str, Any]] = defaultdict(dict)
+        sight_live: dict[str, dict[str, Any]] = defaultdict(dict)
+        close_live: dict[str, dict[str, Any]] = defaultdict(dict)
         sight_at: dict[str, datetime] = {}
         close_at: dict[str, tuple] = {}
+        unknown = 0
         for book, side, h in items:
             prior = [x for x in h if x[0] <= t and t - x[0] <= timedelta(hours=max_age_h)] if t else []
             if prior:
@@ -391,6 +471,22 @@ def evaluate(rows: list[dict], hist: Mapping[tuple, list[tuple]], *, max_age_h: 
             if last[2] - last[0] <= timedelta(hours=max_stale_h):
                 close[book][side] = last[1]
                 close_at[book] = (max(close_at.get(book, (last[0],))[0], last[0]), last[2])
+            if not live:
+                continue
+            seen = (last_seen or {}).get((r["gkey"], book, side))
+            if seen is None:  # unknown, never stale: the age windows decide
+                unknown += 1
+                if side in sight.get(book, {}):
+                    sight_live[book][side] = sight[book][side]
+                if side in close.get(book, {}):
+                    close_live[book][side] = close[book][side]
+                continue
+            seen = max(seen, last[0])
+            upto = [x for x in h if x[0] <= t] if t else []
+            if upto and seen >= t - tol:
+                sight_live[book][side] = upto[-1][1]
+            if seen >= last[2] - tol:
+                close_live[book][side] = last[1]
         stale = {b for b, at in sight_at.items() if t and moved_off(activity, r["gkey"], b, at, t)}
         stale_close = {b for b, (at, ct) in close_at.items() if moved_off(activity, r["gkey"], b, at, ct)}
         sight_fresh = {b: v for b, v in sight.items() if b not in stale}
@@ -400,6 +496,11 @@ def evaluate(rows: list[dict], hist: Mapping[tuple, list[tuple]], *, max_age_h: 
             src_sight, src_close = (sight_fresh, close_fresh) if m == "shin_fresh" else (sight, close)
             r[f"sight_{m}"], r[f"sight_books_{m}"] = fair_for(src_sight, r["sd"], m, clusters)
             r[f"close_{m}"], _ = fair_for(src_close, r["sd"], m, clusters)
+        if live:
+            r["live_unknown_keys"] = unknown
+            r["sight_shin_live"], r["sight_books_shin_live"] = fair_for(sight_live, r["sd"], "shin_live")
+            r["close_shin_live"], r["close_books_shin_live"] = fair_for(close_live, r["sd"], "shin_live")
+            r["close_books_shin"] = fair_for(close, r["sd"], "shin")[1]
     scored = [r for r in rows if r.get("sight_mult") is not None]
     report: dict[str, Any] = {
         "rows_graded_pregame": len(rows), "rows_with_sighting_fair": len(scored),
@@ -410,6 +511,8 @@ def evaluate(rows: list[dict], hist: Mapping[tuple, list[tuple]], *, max_age_h: 
         "selection_ev2": selection_test(scored),
         "h5_fresh_vs_shin": fresh_vs_shin(scored),
     }
+    if live:
+        report["live_vs_shin"] = live_vs_shin(scored)
     for sport in sorted({r["sport"] for r in scored}):
         report["by_sport"][sport] = summarize([r for r in scored if r["sport"] == sport], "sight")
     for kind in ("game", "prop"):
@@ -429,18 +532,22 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--max-age-h", type=float, default=12.0)
     ap.add_argument("--max-stale-h", type=float, default=6.0)
     ap.add_argument("--dup-threshold", type=float, default=0.9)
+    ap.add_argument("--live-tol-min", type=float, default=None,
+                    help="Also score shin_live: a book counts if its key was last observed no earlier than this many "
+                         "minutes before the moment. Off by default; reads each relevant shard's .state.json.")
     args = ap.parse_args(argv)
     root = Path(os.path.expanduser(args.data_root))
     rows = load_graded(Path(args.graded))
     hist: dict[tuple, list[tuple]] = {}
     activity: dict[tuple, list[tuple]] = {}
+    last_seen: dict[tuple, datetime] | None = {} if args.live_tol_min is not None else None
     for sport in sorted({r["sport"] for r in rows}):
         sub = [r for r in rows if r["sport"] == sport]
-        got = read_quotes(root, sport, {r["event_id"] for r in sub}, {r["gkey"] for r in sub}, activity)
+        got = read_quotes(root, sport, {r["event_id"] for r in sub}, {r["gkey"] for r in sub}, activity, last_seen)
         print(f"QUOTES {sport} rows={len(sub)} keys={len(got)}", flush=True)
         hist.update(got)
     report = evaluate(rows, hist, max_age_h=args.max_age_h, max_stale_h=args.max_stale_h, dup_threshold=args.dup_threshold,
-                      activity=activity)
+                      activity=activity, last_seen=last_seen, live_tol_min=args.live_tol_min)
     Path(args.out).write_text(json.dumps(report, indent=1, default=str), encoding="utf-8")
     pooled = report["pooled"]["sighting"]
     print(f"ROWS graded_pregame={report['rows_graded_pregame']} with_fair={report['rows_with_sighting_fair']} "
@@ -452,6 +559,8 @@ def main(argv: list[str] | None = None) -> int:
     print("FEED_CLUSTERS", json.dumps(report["feed_clusters"]))
     print("SELECTION_EV2", json.dumps(report["selection_ev2"]))
     print("H5_FRESH_VS_SHIN", json.dumps(report["h5_fresh_vs_shin"]))
+    if "live_vs_shin" in report:
+        print("LIVE_VS_SHIN", json.dumps(report["live_vs_shin"]))
     return 0
 
 
