@@ -2894,3 +2894,8 @@ for that, and it fires on the persist path before the ceiling is reached.
 - Cause: one no-`since` export of 291 freeze files / 94.4 MB against the 48 MB response budget (183 delivered, no resume point).
 - Fix `754e0b07c` + `84903bb5c`: the freeze, game_markets and props exports page through the `since`/`next_since` cursor (a stall raises); a `--with-book-quotes` 404 is counted, not fatal (the fleet holds book_quotes only from 11-03).
 - Measured: pull rc 0, 2 pages, 291 = inventory; merged 329 -> 574; W1r 42 bets -7.0%, W2 64 -12.8%, W3 67 -8.4%, all WATCHING. The weekly task's worktree ff's to this code on 11-09. log/2026-11-04.md 17:31Z.
+
+### `#758` — **Soccer Suggested "loses at the close" (-4.86%): the grading script, not the board, on corners** — FOUND 2026-11-02 (Suggested grade), DIAGNOSED + FIXED 2026-11-04, lane `soccer-corners-fair-inflation`, session 8000dc38 — **CLOSED 2026-11-04**
+- Cause: `fair_price_eval.evaluate` ages a book by its last price CHANGE (12 h sighting / 6 h close) on a change-only tape, so motionless live books (corners ladders) were dropped and the fair rested on the bet book.
+- Fix `7b205d9d3`: `shin_live` beside `shin` (`--live-tol-min`): a book counts if its key was last OBSERVED within the tolerance. Off by default; existing outputs unchanged. Loaned from `fair-price-v2` (user-approved), returned.
+- Measured (findings_2026-11-04_soccer_corners_fair_gap.md section 6): reproduction -4.86% exact; 14 games with intact state: corners sighting EV +3.16% live vs +3.20% board (old rule -4.40%), close -2.62% [-5.53, +0.39] (old -5.21%). Board unchanged.

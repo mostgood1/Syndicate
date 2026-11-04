@@ -3238,3 +3238,8 @@ Two beliefs overturned by three refused college games on one slate:
 - "A Freshman with last season's D-I box means ESPN serves a stale roster." Validated on 10-12 in the preseason (ESPN still served old rosters). On 11-04's current rosters it flagged 30 teams at 0-60% returning, each on one redshirt.
 
 **Rule:** when you add a supplement or override beside a data file, grep for every reader that opens the FILE, and route them through the accessor in the same change. A heuristic checked on one population (preseason rosters) needs re-checking when it is applied to the next (in-season rosters): read its verdicts on today's data, not the day it was measured.
+
+### 2026-11-04 -- a change log cannot age a quote by its last change; ask when it was last SEEN (lane soccer-corners-fair-inflation)
+The 11-02 Suggested grade put soccer at -4.86% EV at the close and called it the fair's fault. The grading script kept a book only if its price had CHANGED within 12 h (6 h at the close). The quote tape writes a row only on a change, so a corners ladder that sat still for a day read as dead, and the fair rested on the book being bet. The board's fair was right all along (+3.16% rebuilt from live books vs +3.20% shown, 14 games).
+
+**Rule:** on `book_quotes`, staleness is the state file's last-seen (`read_quote_last_seen`, `fair_price_eval --live-tol-min`), never the age of the last row. Before blaming a fair, rebuild it from the books that were live at that moment and check the rebuild reproduces the board.

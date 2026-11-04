@@ -72,3 +72,54 @@ A liveness-aware method beside `shin` (a book counts at moment t if its key was 
 at or after t − tolerance), reported alongside the existing one, then the 10-26..11-01 grade re-run (the shards survive as
 `.jsonl.gz`, which `read_quotes` already reads). Until then any EV-at-close reading of a motionless market (corners, alt ladders)
 from this evaluator is suspect, in every sport.
+
+## 6. RESULT `[2026-11-04 21:09Z]`: the re-grade with a liveness-aware fair (`shin_live`, `7b205d9d3`)
+
+`scripts/fair_price_eval.py` (borrowed from `fair-price-v2`, user-approved) gained `shin_live`: a book counts at a moment if
+its key was last OBSERVED (the shard's `.state.json` last-seen, or a later change) no earlier than `--live-tol-min` before it,
+priced at its last change at or before the moment. Off by default; METHODS and every existing output unchanged. Re-ran the
+11-02 EV-at-close script on the same 456 pregame Suggested rows (10-26..11-01) with both rules side by side on the fleet
+(`C:\tmp\ucl-corners\regrade\`, fleet checkout `60b131d32`, 20:59-21:01Z).
+
+**Reproduction:** `shin` gives soccer **-4.86% [-7.30, -2.44]** (61 / 34 g), identical to 11-02. The instrument is the same.
+
+**A second defect blocks half the soccer rows: the quote STATE files were reset on the weekend.** Soccer state for kickoff
+dates 10-31 and 11-01 holds 1,783 of 58,622 and 4,071 of 35,252 shard keys, every last-seen after 21:58:50Z / 21:28:38Z;
+10-26, 10-28, 10-29 and 11-02 hold every key. So 658 of 1,113 soccer keys in this grade have no last-seen and fall back to the
+change-age rule (`shin_live` = `shin` there, by design). Measured separately below (section 7).
+
+**Rows whose state survived (22 corners rows / 14 games; mostly 10-28/10-29 kickoffs):**
+
+| | board | `shin` (11-02 rule) | `shin_live` (60 min) |
+|---|---|---|---|
+| EV at sighting | +3.20% | -4.40% [-7.28, -0.31] (17 rows) | **+3.16% [+2.87, +3.42]** (22) |
+| EV at the close | -- | -5.21% [-7.59, -2.78] | **-2.62% [-5.53, +0.39]** |
+| books at sighting / close | -- | 1.23 / 2.91 | 3.73 / 4.86 |
+
+- The live rebuild reproduces the board's sighting EV (+3.16% vs +3.20%) on historical rows too. The 11-02 rebuilt sighting
+  EV (-2.86% on corners) was the instrument.
+- At the close, corners Suggested still lose, by about half as much: -2.62%, CI touching 0, on 14 games. With live books on
+  both sides that is genuine drift (+3.16% at sighting to -2.62% at the close), not an artifact; too few games to act on.
+  Flat P&L on these 22: +48.8% (noise).
+- Tolerance does not matter: 360 min moves no material cell by more than 0.1 pp (soccer -3.70% vs -3.65% at 60).
+
+**Every sport, same run (`shin` -> `shin_live` 60 min):** regular-season pooled close -0.61% -> -0.20% (paired, n 372: -0.62% ->
+-0.49%); sighting +2.20% -> +2.79% (board +3.35%). The change-age rule also understated **NCAAF game lines**: sighting +1.34% ->
++3.40% (board +3.61%), close paired +1.89% -> +2.54% (35 rows). NHL props close -0.94% -> -1.18% (books 3.8 -> 5.2). NBA, NFL,
+MLB, WNBA move within noise. No sport's Suggested close turned from positive to negative or back.
+
+## 7. The state reset `[2026-11-04 21:09Z]` (production defect, NOT fixed here -- todo `#759`)
+
+`append_book_quotes` loads the state, updates it, and writes it via `<date>.state.json.tmp` + `os.replace`. That
+read-modify-write is outside `shard_append_lock` (which covers only the shard append), every writer uses the same `.tmp` name,
+and `_load_state` returns `{}` on any exception. Evidence it reset, from the change log itself (a reset re-appends every live
+key at an unchanged price):
+- soccer 10-31: 37,563 unchanged re-appends of 819,431 rows; bursts at 16:24-16:25Z (15,114), 17:14Z (2,535), 08:06Z (1,795);
+- soccer 11-01: 4,417; burst at 21:28Z (1,285), the minute its surviving state begins;
+- soccer 10-29: 593 (one burst at 13:39Z of 535); NBA 10-31: 19,349 spread across the evening (shape not checked).
+
+**Likely mechanism, unproven:** two writers on the same shard date tear the shared `.tmp` (or interleave), a reader then fails
+to parse, and the state restarts from empty. Not seen directly (no corrupt file survives). Costs: duplicate rows on every reset
+(4.6% of 10-31's soccer rows), lost last-seen for every key not quoted again after it (any match already kicked off), and
+`read_quote_last_seen` answers "unknown" for those keys. `odds_book_quotes.py` is claimed by lane
+`book-quotes-splice-repair`.
