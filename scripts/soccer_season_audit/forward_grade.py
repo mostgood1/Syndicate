@@ -41,6 +41,7 @@ import random
 import re
 import sys
 import time
+import urllib.error
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -663,7 +664,15 @@ def pull(cache: Path, with_book_quotes: bool = False, pause: float = 2.0, env_ro
         if with_book_quotes and d in days:
             dest = cache / "book_quotes" / f"{iso}.jsonl"
             if fresh or not dest.exists():
-                _stream(base, token, f"soccer_source/tracking/book_quotes/{iso}.jsonl", dest)
+                try:
+                    _stream(base, token, f"soccer_source/tracking/book_quotes/{iso}.jsonl", dest)
+                except urllib.error.HTTPError as exc:
+                    # Counted, not fatal: the fleet holds no Render-era shard (09-16 404'd on 11-04), and this
+                    # is the REPORTED-ONLY price sensitivity -- one absent day must not cost every later step.
+                    if exc.code != 404:
+                        raise
+                    tally["book_quotes_missing"] += 1
+                    continue
                 tally["book_quotes_days"] += 1
                 time.sleep(pause)
     return dict(tally)

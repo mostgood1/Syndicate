@@ -286,3 +286,30 @@ def test_export_paged_single_page_when_nothing_is_cut():
     fake = _FakeExport({"a.json": 1.0, "b.json": 2.0}, per_page=10)
     got, _oversize, pages = fg._export_paged(fake, "b", "t", "x")
     assert set(got) == {"a.json", "b.json"} and pages == 1
+
+
+def test_pull_counts_a_missing_book_quotes_shard_and_finishes(tmp_path, monkeypatch):
+    import urllib.error
+
+    import syndicate.features.soccer.ingestion.espn_lineups as espn
+
+    kickoff = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=3)).isoformat()
+    name = "soccer_source/la_liga/api/recommendations/recommendations_prekickoff_2026-09-16.lo.json"
+    freeze = {"league": "la_liga", "date": "2026-09-16", "service": "lo", "matches": {MID: {**_match(), "kickoff": kickoff}}}
+    streamed = []
+
+    def fake_export(base, token, params, timeout):
+        body = {name: freeze} if params["pattern"] == fg.PREKICKOFF_PATTERN else {}
+        return {"artifacts": body, "truncated": False, "oversize": []}
+
+    def fake_stream(base, token, rel_path, dest):
+        streamed.append(rel_path)
+        raise urllib.error.HTTPError(rel_path, 404, "NOT FOUND", {}, None)  # a Render-era day the fleet never had
+
+    monkeypatch.setattr(fg, "_prod", lambda env_root=None: ("b", "t", fake_export))
+    monkeypatch.setattr(fg, "_stream", fake_stream)
+    monkeypatch.setattr(espn, "fetch_match_summary", lambda lg, mid: {"header": {}})
+    monkeypatch.setattr(fg.time, "sleep", lambda s: None)
+    tally = fg.pull(tmp_path, with_book_quotes=True)
+    assert streamed and tally["book_quotes_missing"] == 1 and tally["freeze_files"] == 1
+    assert tally["prod/game_markets_pages"] >= 1  # the steps after the miss still ran
