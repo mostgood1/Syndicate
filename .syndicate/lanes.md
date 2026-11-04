@@ -725,6 +725,14 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness --idle-min 240 SAFE for 1 of 7 CLOSED blocks; moved `closed-lane-archive-20261104-0530` to lanes_closed.md with one pointer. Table and WAIT reasons in log/2026-11-04.md.
 
+### polymarket-cbb-pairing — OPEN — opened 2026-11-04 — session e32fef1a-01e8-4afe-a284-01acd3728545
+- Goal: Polymarket college basketball (league tokens cbb / wcbb) pairs with the NCAAB and WNCAAB boards on the fleet: the refresh-worker grid fan-in reprices ncaab and wncaab sides from polymarket_us (> 0, sampled by team, side and line), and the daily venue archive files Kalshi women's and Polymarket college rows under ncaab / wncaab (DAILY_BOOK skipped_by_sport no longer lists wncaab), after a fix on main
+- Files: syndicate/features/shared/polymarket_board_join.py (_VENUE_LEAGUE_ALIASES ONLY), syndicate/features/shared/venue_quote_adapters.py (_polymarket_pair_games + the pair and moneyline naming in polymarket_us_outcome ONLY), syndicate/features/shared/venue_daily_odds.py (POLYMARKET_LEAGUE_TO_SPORT + in_scope_sports ONLY), tests/test_polymarket_cbb_pairing.py (NEW)
+- Hypothesis: Two defects: (1) Polymarket files college basketball under league tokens cbb / wcbb, which _effective_league never maps, so 0 quotes reach ncaab / wncaab; (2) the learned-pair fallback stamps a Polymarket quote with event_game_token(event_id) while a grid row whose clubs canonicalise carries the club-pair game_token, so a role_game total can never match, and moneyline outcomes that are bare mascots stay unresolved
+- Falsification test: With both fixes in a read-only fleet fan-in run (worktree code), polymarket_us still reprices 0 ncaab and 0 wncaab sides on a grid that carries tonight's games, or any repriced side lands on a different game, team, side or line than the board row
+- Verification: off != on reachability tests; read-only fleet fan-in off (fleet checkout) vs on (worktree), sampled pairs by team/side/line; after a user-approved ff + refresh-worker restart: refresh-worker log shows polymarket_us repricing ncaab / wncaab sides and DAILY_BOOK skipped_by_sport without wncaab, recorded in deploys.md
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
