@@ -56192,3 +56192,60 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
     - wncaab: 54 of 107 builds (max 33 / 23, last 02:52:57Z).
 - **verify:** `college_live_pregame_prob_rows=0` on the 11-03 grids rebuilt after the boot -- **MET**.
 - **not measured (separate, owed):** the one-time `wncaab-live-resim-evening-reading` (7 PM CST) started 01:00:59Z and stopped at its first PowerShell call 01:01:17Z (most likely a permission prompt; session `local_fb3dd7ca` still open). The live half of the 22:46:50Z engine-bounds entry and of the college prior calibration therefore remains unmeasured.
+
+## 2026-11-04 13:45Z (7:45 AM CST) -- MEASUREMENT for 2026-11-03 15:38:09Z (ff d6d56d925, WNCAAB live re-sim) + 16:42:35Z (ff 9cfd7f941, live margin anchor) + 19:40:54Z (ff 640c56bbf, college prior calibration) + 22:46:50Z (ff 5c12a1809, college engine efficiency bounds): NOT MET (lane wncaab-module)
+- **TAKEN AFTER THE FACT (user "Yes, read it now").** The scheduled `wncaab-live-resim-evening-reading` started 01:00:59Z and stopped at its first tool call 01:01:17Z, so it measured nothing.
+  - Read 13:39Z-13:43Z (7:39-7:43 AM CST, 11-04) from what the slate left:
+    - the live-odds-worker log (pid 3546648 ran from 22:47:12Z through the whole slate; next restart 11:22:34Z 11-04);
+    - refresh-worker `LIVE_GAMELINE_BUILD` lines;
+    - the 11-03 live gameline ledgers and pregame sim files;
+    - the quote log, through `live_resim`'s own anchor functions.
+  - The keyvalue re-sim snapshots had rolled to 11-04 (0 games). So readings 3 and 7 are RECONSTRUCTED, and reading 5's live-hour rate cannot be taken.
+- **(1) ticks 23:00Z-06:00Z, both 0 `TICK_ERROR`:**
+  - **Women's:** 189 ticks, 129 with live > 0, 120 re-simmed, max live 29, last live 04:00:53Z.
+    - Refusals: no_margin_anchor 753, team_unrated 624, team_has_no_player_priors 124, on_floor_incomplete 61, regulation_over 48, pbp_score_mismatch 14, game_final 3, budget_exhausted 2.
+    - **game_not_started 1 is NOT on the expected list.** ESPN still read `pre` when the slate called the game live; the refusal publishes no probability.
+  - **Men's:** 159 ticks, 139 live > 0, 656 re-simmed, max live 21, last live 05:20:19Z.
+    - Refusals: team_unrated 353, team_has_no_player_priors 45, pbp_score_mismatch 14, on_floor_incomplete 9, regulation_over 9, budget_exhausted 2, game_final 2.
+    - No no_margin_anchor: every men's game had a close and a sim.
+- **(2) seconds per re-simmed game:**
+  - Men's 11-02 evening (thread alone): 30.99 over 56 ticks. Men's tonight (both threads): 9.24 over 139 ticks. **Ratio 0.30.**
+  - NOT a clean sim-speed comparison. 11-02 had up to 115 live games and budget-bound ticks (median elapsed 240 s, budget_exhausted 570), and elapsed includes each live game's fetch and refusal work.
+  - Women's: 19.88 s/game over 66 ticks (max 3 per tick).
+- **(3) anchor:**
+  - **The switch was on through the slate in that process.** 753 women's no_margin_anchor refusals exist only with it on (one switch for both leagues), and both current snapshots read `marginAnchor: on`.
+  - Re-simmed games: men's 18; women's 3 after 22:47Z, plus ECU at 16:45Z.
+  - "0 unanchored priced lanes" holds BY CONSTRUCTION (an unanchored game is refused before it is simmed). It was NOT counted off a snapshot.
+  - **Offsets RECONSTRUCTED** (close before the SCHEDULED tip, minus the pregame sim's home margin; the live path used the actual tip):
+    - men's median |offset| 3.24, max 9.29 (New Orleans @ LSU), signed median -0.15, 18 of 18;
+    - women's 2.39 / max 6.3, 3 of 3.
+- **(4) board, `LIVE_GAMELINE_BUILD date=2026-11-03`, 23:00Z-06:00Z:**
+  - **wncaab:** 136 builds, 73 with index > 0 AND projected > 0; max index 3, max projected 33; last projected 02:55:02Z.
+  - **ncaab:** 167 builds, 161 projected > 0; max index 14, considered 652, projected 267; last 05:19:53Z.
+  - **Withheld, summed over the projected builds:**
+    - wncaab: no_live_gameline_projection 1348, quote_older_than_live_pricing_ceiling 687, prob_interval_swamps_edge 439, live_resim_published_no_distribution_for_this_market 23;
+    - ncaab: segment_is_not_full_game 18376, quote_older 5437, prob_interval 4975, no_live_gameline_projection 2148, published_no_distribution 413, no_two_sided 220.
+  - **Live spread `edge_pp`, median |edge|.** Snapshot equivalent: from the ledger, the last row per game/segment/line/book as of T and written within 10 min of T.
+    - ncaab: 01:00Z 9.98 (78 rows, 9 games); 01:30Z 9.28 (150 rows, 14 games).
+    - wncaab: 01:00Z 12.56 (17 rows, 2 games); 01:30Z 4.55 (10 rows, 3 games).
+    - All night: ncaab 9.30 (4,631 rows, 18 games); wncaab 9.05 (399 rows, 3 games).
+    - Priceable rows only: about 14-15 at every read.
+- **(5) NCAAB credits/h over a live hour: NOT MEASURED.** The quota record keeps per-sport totals, not a time series.
+  - Average only: `by_sport.ncaab` 7,299 at 18:32:52Z 11-03 -> 30,625 at 13:39:15Z 11-04 = 23,326 credits in 19.1 h (~1,221/h, mostly over hours with no live NCAAB).
+  - `wncaab` 1,398 cumulative. No verdict (user decision: uncapped).
+- **(6) Tracebacks since 16:43:23Z: 9 lines = 3 events x 3 chained.** All are `[soccer_live_state]` ESPN ReadTimeout (`scripts/poll_soccer_live_state.py` -> `espn_lineups.py:247/326`), at 01:40:34Z, 06:10:19Z and 12:55:21Z. None from either college thread.
+- **(7) prior calibration + bounds, live:**
+  - **Men's:** 18 re-simmed games; all 18 pregame sims calibrated with bounds [0.4, 2.0] (computed 22:47-22:49Z, before every tip).
+    - Median |offset| 3.24, against the 11-02 raw-prior dry run's median +4.6. The signed median is now -0.15.
+  - **Women's** (excluding 401921494, which has no rows in the ledger): 3 games, median |offset| 2.39, max 6.3; 3 of 3 calibrated with the new bounds.
+  - **ECU** (tipped 16:00Z, raw sim) reconstructs no close: its first quote was 16:00:02Z, after the 16:00:00Z listing. Live it read +10.37.
+- **Verdict: NOT MET.**
+  - (a) fails on its letter only: one unlisted refusal (`game_not_started` x1). Re-simmed 120 > 0 and 0 TICK_ERROR both hold.
+  - (b) MET: 73 builds with index > 0 and projected > 0 while women's games were live.
+  - (c) MET: men's s/game is 0.30x the 11-02 rate. **The women's thread is not slowing the men's re-sim.**
+  - (d) Anchoring holds by construction. Men's median |edge| is below 10 at both reads (9.98, 9.28) and all night (9.30). Women's: 12.56 at 01:00Z on 17 rows / 2 games, 4.55 at 01:30Z, 9.05 all night.
+- **Reading 7 verdict: NOT MET.** Men's median |offset| is 3.24, above 2.5 (18 games, all calibrated with the new bounds).
+  - The bias is gone (signed median +4.6 -> -0.15). What is left is the per-game spread, and the anchor absorbs that live.
+- **Engine read (a lead, not diagnosed):** live spread edges lean one way while the pregame offset's signed median is about 0.
+  - Signed median `edge_pp`: ncaab +4.53 over all rows, +10.41 over priceable rows; wncaab +4.22 / +10.71.
+  - The pregame anchor is not the source. Something in play keeps the model above the market on the row's side.

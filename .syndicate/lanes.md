@@ -613,12 +613,13 @@ death, never life — do not invert it.
 - Verification: after a drained full down/up: refresh-worker environ band_on=0, healthz 200, deploys.md entry
 - Blocked by: none
 
-### wncaab-module — OPEN (live re-sim + checklist + live margin anchor + college prior calibration + engine efficiency bounds + college live Win% blank DONE; evening reading (never ran) + player-prior gaps left) — opened 2026-11-02 — session 547fe65e-71ca-4e19-9589-237553cb4eab
+### wncaab-module — OPEN (live re-sim + checklist + live margin anchor + college prior calibration + engine efficiency bounds + college live Win% blank DONE; evening reading taken post hoc NOT MET; player-prior gaps left) — opened 2026-11-02 — session 547fe65e-71ca-4e19-9589-237553cb4eab
 - **2026-11-04 -- LOAN noted (lane `wncaab-kalshi-pairing`, session e32fef1a), USER-APPROVED ("Yes, land it (Recommended)", ~13:35Z; the work itself: "Yes, pair WNCAAB"):** `kalshi_catalogue.py` -- the `KXNCAAWBGAME`/`KXNCAAWBSPREAD`/`KXNCAAWBTOTAL` entries in `SERIES_SPORT` and `_SERIES_SEGMENT`, `KXNCAAWBWINS` in `SERIES_OUT_OF_SCOPE`, `club_key`'s spelling table now serving `wncaab` too, and the `_SPORT_TOKENS` comment line that said nothing was paired. `team_aliases.py` and `wncaab_team_registry.csv` are NOT touched; Mercyhurst (D1) is absent from the women's registry, so its Kalshi games stay refused. Also yours to know: `tests/test_college_pregame_sim.py::test_launcher_switch_is_reachable_and_runs_one_child_at_a_time` fails since 11-04 -- `_pregame_game_count` reads the real clock (`datetime.now`) against the fixture's fixed 11-03 games.
 - **STATUS 2026-11-04 07:52Z: college live Win% blank LIVE and VERIFIED** (user "Yes, blank it"; `8a5e97d55`, loaded by `ncaab-kalshi-pairing`'s refresh-worker TERM 00:46:25Z, no restart by this lane)
   - Live/final college rows serving a pregame Win%: 1275 -> 0. `pregame_on_live`: 0 -> 1937. Live gameline pricing continued after the boot.
   - LEFT:
-    - the 7 PM CST reading NEVER RAN: stalled at its first PowerShell call 01:01:17Z, session `local_fb3dd7ca`. The engine bounds' and calibration's LIVE half, women's re-sim ticks, men's throughput and credits/h stay unmeasured;
+    - the 7 PM CST reading, taken after the fact 13:45Z: NOT MET on (a)'s letter (`game_not_started` x1). (b) and (c) MET; men's s/game 0.30x 11-02. Reading 7 NOT MET: men's median |offset| 3.24 > 2.5, signed bias +4.6 -> -0.15. NCAAB credits/h over a live hour not measurable after the fact. The stalled run (`local_fb3dd7ca`) is still open;
+    - the lead: live spread edges lean one way (+4.5 pp signed median, both leagues);
     - the women's MARGIN_CALIBRATION_K;
     - the 5 women's teams with no player priors.
 - **STATUS 2026-11-03 22:58Z: college prior calibration + engine efficiency bounds LIVE (pregame VERIFIED; live half owed tonight)**
