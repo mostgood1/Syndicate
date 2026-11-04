@@ -137,7 +137,8 @@ def markets_from_state(payload: Mapping[str, Any] | None) -> list[dict[str, Any]
         out: list[dict[str, Any]] = []
         for entry in series.values():
             if isinstance(entry, Mapping):
-                out.extend(entry.get("markets") or [])
+                # Stored rows omit derivable fields (`_compact_market`).
+                out.extend(_expand_market(m) for m in entry.get("markets") or [])
         if out:
             return out
     legacy = payload.get("markets")
@@ -1794,6 +1795,9 @@ def _run_kalshi_odds_refresh_unbounded(*, force: bool = False) -> dict[str, Any]
     except Exception:
         state = {}
     per_series: dict[str, Any] = dict(state.get("series") or {})
+    # Stored rows are compacted (`_compact_market`); everything below reads
+    # full rows, including the merge that carries unfetched series forward.
+    _expand_stored_series(per_series)
 
     wanted = sports_series()
     interval = refresh_interval_seconds()
@@ -2265,7 +2269,7 @@ def _run_kalshi_odds_refresh_unbounded(*, force: bool = False) -> dict[str, Any]
                 precap_window,
                 date_aware=precap_date_aware,
             )[0]
-        entry["markets"] = [_lean_market(m) for m in markets]
+        entry["markets"] = [_compact_market(_lean_market(m)) for m in markets]
 
     print(
         "[kalshi_odds] TICK"
@@ -2408,6 +2412,83 @@ def _lean_market(market: Mapping[str, Any]) -> dict[str, Any]:
     """One market, reduced to what the join, the price lookup and the snapshot
     read. See the size note at the persistence bound."""
     return {field: market.get(field) for field in _LEAN_MARKET_FIELDS}
+
+
+# STORED ONCE, DERIVED ON READ. Six of the fourteen lean fields are a pure
+# function of two others -- `normalize_market` computes `series` and the four
+# price fields from the ticker and the asks, and `event_ticker` is the ticker
+# less its last segment -- yet they were 2.93 MB of an 8.39 MB payload.
+#
+# MEASURED 2026-11-04 (lane `kalshi-state-cap`): the stored state reached
+# 8,386,958 bytes against the 8,388,608 cap. live-odds-worker's writes were
+# REJECTED from 20:40:56Z (8.41 -> 8.56 MB, 40 rejections by 22:33Z) and
+# refresh-worker's landed only when they fell just under. This week's college
+# pairings (KXNCAAMB* / KXNCAAWB*, 636 KB) were the last increment; the rows
+# were already lean, so the shrink the refusal prescribes is in the encoding.
+#
+# A stored row drops a derivable field only when deriving it gives the value it
+# holds, so `_expand_market(_compact_market(row)) == row` for every row
+# `normalize_market` produces. Expansion also fills a derivable field stored as
+# None: a writer still on the full-row code re-leans a compacted row into
+# Nones, and this heals that on the next read instead of persisting it.
+_DERIVED_LEAN_FIELDS = (
+    "event_ticker",
+    "series",
+    "yes_probability",
+    "yes_american",
+    "no_probability",
+    "no_american",
+)
+
+
+def _derived_lean_fields(market: Mapping[str, Any]) -> dict[str, Any]:
+    from syndicate.features.shared.kalshi_client import (
+        dollars_to_american,
+        dollars_to_probability,
+        series_from_ticker,
+    )
+
+    ticker = str(market.get("ticker") or "").strip()
+    yes_ask = market.get("yes_ask_dollars")
+    no_ask = market.get("no_ask_dollars")
+    return {
+        "event_ticker": ticker.rsplit("-", 1)[0] if "-" in ticker else None,
+        "series": series_from_ticker(ticker),
+        "yes_probability": dollars_to_probability(yes_ask),
+        "yes_american": dollars_to_american(yes_ask),
+        "no_probability": dollars_to_probability(no_ask),
+        "no_american": dollars_to_american(no_ask),
+    }
+
+
+def _compact_market(market: Mapping[str, Any]) -> dict[str, Any]:
+    """A lean row without the fields `_expand_market` re-derives exactly."""
+    derived = _derived_lean_fields(market)
+    return {
+        field: value
+        for field, value in market.items()
+        if not (field in derived and value == derived[field])
+    }
+
+
+def _expand_market(market: Mapping[str, Any]) -> Mapping[str, Any]:
+    """A stored row with its derivable fields restored. Full rows pass through."""
+    if all(market.get(field) is not None for field in _DERIVED_LEAN_FIELDS):
+        return market
+    derived = _derived_lean_fields(market)
+    out = dict(market)
+    for field, value in derived.items():
+        if out.get(field) is None:
+            out[field] = value
+    return out
+
+
+def _expand_stored_series(per_series: Mapping[str, Any]) -> None:
+    """Expand every stored entry's markets IN PLACE, keeping the entries the
+    same objects the state holds, as the plain read always did."""
+    for entry in per_series.values():
+        if isinstance(entry, dict) and entry.get("markets"):
+            entry["markets"] = [_expand_market(m) for m in entry["markets"]]
 
 
 def _record_daily_book(markets: list[dict[str, Any]]) -> None:

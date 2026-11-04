@@ -777,14 +777,18 @@ def test_the_persisted_row_is_LEAN(monkeypatch):
 
     from syndicate.features.shared.refresh_state_store import read_json_file
 
-    stored = read_json_file(mod.markets_artifact_path())["series"]["LEAN"]["markets"][0]
+    state = read_json_file(mod.markets_artifact_path())
+    stored = state["series"]["LEAN"]["markets"][0]
     for gone in ("volume_fp", "open_interest_fp", "liquidity_dollars",
                  "yes_bid_dollars", "strike_type", "missing_fields"):
         assert gone not in stored, gone
-    # ...and everything the join, the price lookup and the snapshot read stays.
+    # ...and everything the join, the price lookup and the snapshot read stays,
+    # AS READ: the stored row omits what `markets_from_state` re-derives
+    # (lane `kalshi-state-cap`).
+    read = mod.markets_from_state(state)[0]
     for kept in ("ticker", "series", "title", "yes_ask_dollars", "no_ask_dollars",
                  "yes_american", "no_american", "close_time"):
-        assert kept in stored, kept
+        assert read.get(kept) is not None, kept
 
     # THE RECORD IS UNTOUCHED -- it saw the full row.
     assert recorded[0][0]["volume_fp"] == 12345
