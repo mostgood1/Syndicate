@@ -112,8 +112,12 @@ an external worktree and an internal `.claude\worktrees` worktree, absolute `cor
 - In-play runner: 1 rewrite. Harvester: 1. User `settings.json`: 4. **`~/.claude.json`: 75, JSON-valid.**
 - Desktop stores: 5,136 rewrites in 1,487 files. `SKILL.md`: 401 rewrites in 285 files. 58 project folders to copy.
 
-**Still open:** F6 (the in-play recorder `.env` default). `scripts/inplay_recorder.py` and `scripts/inplay_nightly.py`
-are claimed by OPEN lane `in-game-trading` (owner idle since 11-01), so editing them needs a user-granted loan.
+**F6 LANDED 2026-11-04 `74767d036`** (loan from `in-game-trading`, user "Yes, take the loan", recorded at `2176a0329`):
+- `inplay_nightly.py`: `REPO` = the first candidate (`Coding\Syndicate`, then `OneDrive\Coding\Syndicate`) holding a `.git`; `SYNDICATE_PRIMARY_TREE` overrides.
+- The recorder is handed `--env <repo>\.env`. A missing repo logs `SYNC_FAILED repo not found`.
+- `inplay_recorder.py` `--env` defaults to the first existing candidate; `SYNDICATE_ENV_FILE` overrides.
+- `tests/test_inplay_repo_paths.py`: 5 pass, and 16 existing in-play tests pass. Today both defaults resolve to the OneDrive path, so behaviour is unchanged until the move.
+- **Re-arm gate:** the runner at `C:	mp\inplay_runner` picks up the change at its next self-sync (the 08:00 CST run of `\Syndicate inplay nightly`). Its log must show `SYNC origin/main=<sha at or after 74767d036>`, or the runner copy of `inplay_recorder.py` must contain `ENV_CANDIDATES`.
 
 ---
 
@@ -422,8 +426,8 @@ the in-play nightly at 08:00. Pick a gap.
 
 ## 11. Decisions for the user
 
-0. ~~OK to patch `run_move.ps1` (F8) and land F6 first.~~ The user said yes on 11-04. The script is done (§1c). **F6
-   still needs a loan of the two in-play files from lane `in-game-trading`.**
+0. ~~OK to patch `run_move.ps1` (F8) and land F6 first.~~ The user said yes on 11-04. The script is done (§1c). F6 landed
+   `74767d036`; gate the window on the runner sync (§1c).
 1. **Go, and a window** (attended; the app must be quit).
 2. **Target:** `C:\Users\tempadmin\Coding\Syndicate` (recommended) or `C:\dev\Syndicate`.
 3. **F1:** OK to add `--repo` to the `\Syndicate inplay nightly` task as part of the move.
