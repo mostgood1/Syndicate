@@ -663,10 +663,10 @@ death, never life — do not invert it.
 - Verification: refresh-worker.log after the restart that loads the fix: QUOTE_CAPTURE appended_by_sport['wncaab'] > 0; SEGMENT_MISMATCH_GRID sport=wncaab repriced > 0 and count=0; sampled pairs correct by team, side and line
 - Blocked by: none
 
-### closed-lane-archive-20261104-0221 — CLOSED 2026-11-04 (GOAL MET: 1 block archived) — opened 2026-11-04 — session fbda37da-0ede-4603-819a-08508fc767f0
+### closed-lane-archive-20261104-0530 — CLOSED 2026-11-04 (GOAL MET: 1 block archived) — opened 2026-11-04 — session 7146e063-8b93-4000-b518-333dd6e21a55
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 1 of 7 CLOSED blocks SAFE; archived it. Moved: `closed-lane-archive-20261103-2115`. Table and WAIT reasons in `log/2026-11-04.md`.
+- Verdict: GOAL MET. owner_liveness --idle-min 240 gave 1 SAFE of 7 CLOSED; moved `closed-lane-archive-20261104-0221`. Table + Part B in .syndicate/log/2026-11-04.md.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -829,6 +829,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261103-1302` — CLOSED 2026-11-03 (GOAL MET: 1 block archived) — opened 2026-11-03 — session af622b20-78d3-4c4c-868e-3e5bd1b754e1
 - `closed-lane-archive-20261103-1706` — CLOSED 2026-11-03 (GOAL MET: 2 blocks archived) — opened 2026-11-03 — session 6dc2fbc3-1988-466a-9dc9-00370e852775
 - `closed-lane-archive-20261103-2115` — CLOSED 2026-11-03 (GOAL MET: 1 block archived) — opened 2026-11-03 — session f5444ea1-9fd1-4849-a787-370e12ddb49a
+- `closed-lane-archive-20261104-0221` — CLOSED 2026-11-04 (GOAL MET: 1 block archived) — opened 2026-11-04 — session fbda37da-0ede-4603-819a-08508fc767f0
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
