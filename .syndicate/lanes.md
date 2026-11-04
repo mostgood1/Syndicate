@@ -653,6 +653,14 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness --idle-min 240 SAFE for 1 of 7 CLOSED blocks; moved `closed-lane-archive-20261103-1706`. Readings in log/2026-11-03.md.
 
+### wncaab-kalshi-pairing — OPEN — opened 2026-11-04 — session e32fef1a-01e8-4afe-a284-01acd3728545
+- Goal: Kalshi women's college basketball game lines (KXNCAAWBGAME / KXNCAAWBSPREAD / KXNCAAWBTOTAL) pair with the WNCAAB board on the fleet: refresh-worker log shows QUOTE_CAPTURE appended_by_sport['wncaab'] > 0 and SEGMENT_MISMATCH_GRID sport=wncaab repriced > 0 with count=0, after a fix on main
+- Files: syndicate/features/shared/kalshi_catalogue.py (LOAN from wncaab-module, pending the user's answer: the KXNCAAWB entries in SERIES_SPORT, _SERIES_SEGMENT and SERIES_OUT_OF_SCOPE, and club_key's college Kalshi spelling table ONLY), syndicate/features/shared/odds_book_quotes.py (LOAN from book-quotes-splice-repair, pending the user's answer: _GAME_LINE_CAPTURE_SPORTS only), tests/test_kalshi_wncaab_pairing.py (NEW), tests/test_kalshi_ncaab_pairing.py (spelling-table name only), tests/test_soccer_game_line_capture.py (the predicate test only)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: refresh-worker.log after the restart that loads the fix: QUOTE_CAPTURE appended_by_sport['wncaab'] > 0; SEGMENT_MISMATCH_GRID sport=wncaab repriced > 0 and count=0; sampled pairs correct by team, side and line
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
