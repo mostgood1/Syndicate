@@ -2819,6 +2819,117 @@ def _step_stdout_markers(stdout_text: str) -> list[str]:
     return markers
 
 
+# A CHILD STEP MAY NOT OOM THE FLEET (lane `nba-props-oom`, 2026-11-04).
+# refresh_nba_oddsapi_props.py peaked at 6.5-7.7 GB RSS on every 11-04 slate run
+# from 12:40Z (20 of 389 runs over the logged window >4 GB; every other child of
+# this script <=1.8 GB over 7,859 runs). The fleet is one 15.7 GB WSL VM shared by
+# all three roles, so a child that size is one bad slate from the kernel picking
+# the refresh-worker as its victim. The cap kills the child's TREE and the step
+# fails alone, with a STEP_FAIL status=memory_cap line, instead of the machine
+# choosing what dies. Tree RSS, sampled each second: RLIMIT_AS counts reserved
+# virtual memory, not what the host loses. SYNDICATE_ODDS_STEP_RSS_CAP_MB sets it;
+# 0 or "off" turns it off. Absent means the default, never off.
+_STEP_RSS_CAP_DEFAULT_MB = 4096
+_STEP_RSS_CAP_POLL_SECONDS = 1.0
+
+
+def _step_rss_cap_mb() -> int | None:
+    raw = str(os.environ.get("SYNDICATE_ODDS_STEP_RSS_CAP_MB") or "").strip().lower()
+    if raw in {"0", "off", "false", "no", "none"}:
+        return None
+    if not raw:
+        return _STEP_RSS_CAP_DEFAULT_MB
+    try:
+        value = int(float(raw))
+    except ValueError:
+        return _STEP_RSS_CAP_DEFAULT_MB
+    return value if value > 0 else None
+
+
+def _process_tree(pid: int) -> list[Any]:
+    if psutil is None:
+        return []
+    try:
+        root = psutil.Process(pid)
+        return [root, *root.children(recursive=True)]
+    except (psutil.NoSuchProcess, psutil.AccessDenied):
+        return []
+
+
+def _process_tree_rss_mb(pid: int) -> float | None:
+    if psutil is None:
+        return None
+    total = 0
+    for proc in _process_tree(pid):
+        try:
+            total += int(proc.memory_info().rss)
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue
+    return total / (1024.0 * 1024.0)
+
+
+def _kill_process_tree(pid: int) -> None:
+    tree = _process_tree(pid)
+    for proc in reversed(tree):  # children first, so nothing is reparented and missed
+        try:
+            proc.kill()
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue
+
+
+def _run_step_process(
+    command: list[str],
+    *,
+    cwd: str,
+    env: dict[str, str],
+    timeout_seconds: float | None,
+    cap_mb: int | None,
+) -> tuple[subprocess.CompletedProcess, dict[str, Any] | None]:
+    """subprocess.run(capture_output=True, text=True, timeout=...) plus the tree-RSS cap.
+
+    Returns (result, breach); breach is None unless the cap killed the tree, and then
+    carries the reading that tripped it. TimeoutExpired is raised as subprocess.run does."""
+    if cap_mb is None or psutil is None:
+        if cap_mb is not None:
+            print("STEP_RSS_CAP unavailable reason=psutil_missing", file=sys.stderr, flush=True)
+        return subprocess.run(command, cwd=cwd, env=env, capture_output=True, text=True, timeout=timeout_seconds), None
+    proc = subprocess.Popen(command, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    breach: dict[str, Any] = {}
+    stop = threading.Event()
+    peak = {"rss_mb": 0.0}
+
+    def _watch() -> None:
+        while not stop.wait(_STEP_RSS_CAP_POLL_SECONDS):
+            rss_mb = _process_tree_rss_mb(proc.pid)
+            if rss_mb is None:
+                return
+            peak["rss_mb"] = max(peak["rss_mb"], rss_mb)
+            if cap_mb is not None and rss_mb > cap_mb:
+                breach.update({"rss_mb": round(rss_mb, 1), "cap_mb": cap_mb, "pid": proc.pid})
+                _kill_process_tree(proc.pid)
+                return
+
+    watcher = threading.Thread(target=_watch, name="step-rss-cap", daemon=True) if cap_mb is not None and psutil is not None else None
+    if watcher is not None:
+        watcher.start()
+    try:
+        stdout, stderr = proc.communicate(timeout=timeout_seconds)
+    except subprocess.TimeoutExpired:
+        _kill_process_tree(proc.pid)
+        proc.kill()
+        proc.communicate()
+        raise
+    finally:
+        stop.set()
+        if watcher is not None:
+            watcher.join(timeout=5)
+    result = subprocess.CompletedProcess(command, proc.returncode, stdout, stderr)
+    if breach:
+        breach["peak_rss_mb"] = round(peak["rss_mb"], 1)
+        return result, breach
+    return result, None
+
+
 def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
     env = os.environ.copy()
     if step.env_updates:
@@ -2850,15 +2961,16 @@ def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
             "dry_run": True,
         }
     result = None
+    memory_breach = None
+    rss_cap_mb = _step_rss_cap_mb()
     try:
         log_runtime_memory("before_sport_launch", step=step.name, cwd=str(step.cwd), dry_run=bool(dry_run))
-        result = subprocess.run(
+        result, memory_breach = _run_step_process(
             list(step.command),
             cwd=str(step.cwd),
             env=env,
-            capture_output=True,
-            text=True,
-            timeout=timeout_seconds,
+            timeout_seconds=timeout_seconds,
+            cap_mb=rss_cap_mb,
         )
     except subprocess.TimeoutExpired:
         log_runtime_memory("after_sport_launch", step=step.name, cwd=str(step.cwd), status="timeout")
@@ -2904,7 +3016,15 @@ def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
     # Render", which sent the fix at the wrong layer. It reaches Render; there
     # was simply nothing to find.
     step_status = "ok" if result.returncode == 0 else "failed"
-    if result.returncode != 0:
+    if memory_breach is not None:
+        step_status = "memory_cap"
+        print(
+            f"STEP_FAIL name={step.name} status=memory_cap runtime_seconds={runtime_seconds if runtime_seconds is not None else 'unknown'} "
+            f"return_code={result.returncode} tree_rss_mb={memory_breach['rss_mb']} cap_mb={memory_breach['cap_mb']} pid={memory_breach['pid']}",
+            file=sys.stderr,
+            flush=True,
+        )
+    elif result.returncode != 0:
         print(
             f"STEP_FAIL name={step.name} status=failed runtime_seconds={runtime_seconds if runtime_seconds is not None else 'unknown'} return_code={result.returncode}",
             file=sys.stderr,
@@ -2945,7 +3065,8 @@ def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
         "stdout": stdout_text,
         "stderr": stderr_text,
         "stdout_markers": stdout_markers,
-        "ok": result.returncode == 0,
+        "memory_cap": memory_breach,
+        "ok": result.returncode == 0 and memory_breach is None,
         "dry_run": False,
     }
 

@@ -262,19 +262,15 @@ def _compute_props_edges_file_only_local(
     unmatched_before = int(merged["player_id"].isna().sum())
     unmatched = merged[merged["player_id"].isna()].copy()
     if not unmatched.empty:
-        alt = odds.merge(
-            preds[["short_key", "player_id", "player_name", "team", *pred_cols]].rename(columns={"short_key": "short_key_pred"}),
-            left_on="short_key",
-            right_on="short_key_pred",
-            how="left",
-            suffixes=("", "_pred"),
-        )
-        if "player_name_pred" in alt.columns:
-            alt["player_name_join"] = alt["player_name_pred"].fillna(alt.get("player_name"))
-        else:
-            alt["player_name_join"] = alt.get("player_name")
-        keep = [column for column in ["short_key", "player_id", "player_name_join", "team", *pred_cols] if column in alt.columns]
-        alt = alt[keep].copy().rename(columns={"player_name_join": "player_name"})
+        # The lookup is built from the PREDICTIONS, one row per distinct prediction.
+        # It used to be odds.merge(preds) -- one row per ODDS row -- merged back onto
+        # every odds row by short_key, so each player's rows multiplied by themselves
+        # (~120 lines a player -> ~120x). Measured on the fleet 2026-11-04 18:04Z:
+        # 60,790 odds rows -> 5,040,004 merged rows, 7,740 MB, a 7.6 GB process (lane
+        # nba-props-oom). The copies were identical and the drop_duplicates at the end
+        # removed them, so the output does not change; only the peak does.
+        keep = [column for column in ["short_key", "player_id", "player_name", "team", *pred_cols] if column in preds.columns]
+        alt = preds[keep].drop_duplicates()
         merged = merged.merge(alt.add_suffix("_alt"), left_on="short_key", right_on="short_key_alt", how="left")
         for column in ["player_id", "player_name", "team", *pred_cols]:
             alt_column = f"{column}_alt"

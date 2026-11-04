@@ -36,7 +36,8 @@ def _run(module, stdout, capsys):
     with patch.object(module.subprocess, "run", return_value=completed), \
             patch.object(module, "_log_memory", return_value=None), \
             patch.object(module, "_dump_child_runtime_state", return_value=None), \
-            patch.object(module, "_record_step_in_sim_ledger", return_value=None):
+            patch.object(module, "_record_step_in_sim_ledger", return_value=None), \
+            patch.object(module, "_step_rss_cap_mb", return_value=None):
         result = module._run_command(step)
     return result, capsys.readouterr().err
 

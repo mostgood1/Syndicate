@@ -81,7 +81,7 @@ class RefreshOddsSourcesTests(unittest.TestCase):
             module,
             "_log_memory",
             return_value=None,
-        ), patch.object(module, "_dump_child_runtime_state", return_value=None):
+        ), patch.object(module, "_dump_child_runtime_state", return_value=None), patch.object(module, "_step_rss_cap_mb", return_value=None):
             result = module._run_command(step)
 
         self.assertTrue(result["ok"])
@@ -96,7 +96,7 @@ class RefreshOddsSourcesTests(unittest.TestCase):
             module.subprocess,
             "run",
             return_value=completed,
-        ) as mocked_run, patch.object(module, "_log_memory", return_value=None), patch.object(module, "_dump_child_runtime_state", return_value=None):
+        ) as mocked_run, patch.object(module, "_log_memory", return_value=None), patch.object(module, "_dump_child_runtime_state", return_value=None), patch.object(module, "_step_rss_cap_mb", return_value=None):
             result = module._run_command(step)
 
         self.assertTrue(result["ok"])
@@ -112,7 +112,7 @@ class RefreshOddsSourcesTests(unittest.TestCase):
             module,
             "sys",
             wraps=module.sys,
-        ) as mocked_sys, patch.object(module, "_log_memory", return_value=None), patch.object(module, "_dump_child_runtime_state", return_value=None):
+        ) as mocked_sys, patch.object(module, "_log_memory", return_value=None), patch.object(module, "_dump_child_runtime_state", return_value=None), patch.object(module, "_step_rss_cap_mb", return_value=None):
             mocked_sys.stderr = stderr_capture
             with self.assertRaises(subprocess.TimeoutExpired):
                 module._run_command(step)

@@ -286,12 +286,15 @@ class StepFailMarkerTests(unittest.TestCase):
         completed = types.SimpleNamespace(returncode=return_code, stdout="", stderr="boom")
         original_run = self.module.subprocess.run
         self.module.subprocess.run = lambda *a, **k: completed
+        original_cap = self.module._step_rss_cap_mb
+        self.module._step_rss_cap_mb = lambda: None
         buffer = io.StringIO()
         try:
             with redirect_stderr(buffer):
                 self.module._run_command(step)
         finally:
             self.module.subprocess.run = original_run
+            self.module._step_rss_cap_mb = original_cap
         return buffer.getvalue()
 
     def test_non_zero_return_code_emits_step_fail(self) -> None:
