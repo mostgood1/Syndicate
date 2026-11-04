@@ -147,16 +147,9 @@ class _Child:
 def test_launcher_switch_is_reachable_and_runs_one_child_at_a_time(slate_day, monkeypatch):
     from syndicate.features.ncaab import inplay_lane
 
+    # The slate date AND the wall clock are pinned: with only the date pinned, the fixture's 11-04 00:00Z tips went
+    # past and this turned red from 11-04 (ci-suite #697). `now=` is the launcher's own parameter for it.
     monkeypatch.setattr(inplay_lane, "central_today_iso", lambda: "2026-11-03")
-
-    class _FrozenNow(datetime):
-        # `_pregame_game_count` judges is_pregame against datetime.now; unpinned, the fixture's
-        # 11-04 00:00Z tips went past and the test turned red from 11-04 (ci-suite #697).
-        @classmethod
-        def now(cls, tz=None):
-            return NOW if tz is not None else NOW.replace(tzinfo=None)
-
-    monkeypatch.setattr(inplay_lane, "datetime", _FrozenNow)
     monkeypatch.setattr(inplay_lane, "_pregame_child", None)
     monkeypatch.setattr(inplay_lane, "_pregame_last_launch", 0.0)
     launched, child = [], _Child()
