@@ -123,3 +123,25 @@ to parse, and the state restarts from empty. Not seen directly (no corrupt file 
 (4.6% of 10-31's soccer rows), lost last-seen for every key not quoted again after it (any match already kicked off), and
 `read_quote_last_seen` answers "unknown" for those keys. `odds_book_quotes.py` is claimed by lane
 `book-quotes-splice-repair`.
+
+## 8. FIX SHIPPED, and a correction to section 7 `[2026-11-04 23:35Z, lane book-quotes-state-reset]`
+
+**The fix** (`7b30517b1`, `odds_book_quotes.py` on loan from `book-quotes-splice-repair`, user-approved):
+- The state's load, compare, append and write run under `shard_append_lock`.
+- Each writer uses its own temp file.
+- An unreadable state is logged (`BOOK_QUOTES_STATE_UNREADABLE`) and kept as `<name>.unreadable`.
+- The two-writer test loses the second writer's key on the old module, exactly as on 10-31.
+
+The fleet checkout was fast-forwarded at 22:53:06Z, so the OddsAPI fetch children use the fix from then on. A peer lane's worker restart (`kalshi-state-cap`, 23:26:04Z, onto `e10ea9610`) loaded it into the Kalshi and Polymarket captures too, so every writer runs it from 23:27:20Z. Verification is OWED on the 11-08 soccer shard (`deploys.md` 2026-11-04 22:53:06Z).
+
+**Correction to section 7:** "NBA 10-31: 19,349 spread across the evening" is NOT a reset.
+- All 19,349 are moneyline rows whose `line` is NaN. NaN never equals itself, so the writer's dedupe (`list(previous[:2]) == current`) re-appends every such row on every fetch.
+- An analysis script reading through `json.loads` gets one shared NaN object, so a tuple comparison there calls the rows unchanged. That is how they were counted as duplicates.
+- NBA 10-31's state is complete (79,305 of 79,305 keys).
+- The same pattern holds on NBA 11-04 (20,337), NHL 11-04 (16,206, 41% of the shard's 39,289 rows) and NHL 11-05 (2,849). Soccer has none, because its moneyline line is None.
+- With NaN rows set apart, the reset evidence is soccer's alone: 10-31, 11-01, and 10-29's 593.
+
+**The NaN defect** (todo `#760`, not fixed): `_coerce_line` passes `float('nan')` through, and the NBA/NHL fetchers hand it pandas NaN for h2h. Effects:
+- duplicate rows;
+- a moneyline's newest row always carries the last fetch time, so its "last change" age reads as fresh;
+- `NaN` is not strict JSON.

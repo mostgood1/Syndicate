@@ -3256,3 +3256,8 @@ The same evening, the college additions pushed `kalshi_markets.json` over its 8 
 - For every side a venue newly prices, check that the quote's `venue_ref` names THIS row's game. Do this as well as the price gap, which a plausible wrong-game price passes.
 - An outlier is not filed as "empty book" until its slug is read.
 - Adding a sport's markets to a capped keyvalue document needs the document's size read against the cap before landing (`KEYVALUE_PAYLOAD_COMPOSITION`).
+
+### 2026-11-04 -- split a duplicate count by its shape before naming its cause (lane book-quotes-state-reset)
+I counted "unchanged re-appends" on the NBA and NHL quote shards (NHL: 41% of rows) and told the user the soccer state race ran on weekdays too. Every one of those rows was a moneyline with `line: NaN`, re-appended on every fetch because NaN never equals itself. That is a different bug, and the race showed 0 there. The analysis script called the rows "unchanged" only because `json.loads` reuses one NaN object, so the tuple comparison passed where the writer's comparison fails.
+
+**Rule:** before attributing a pile of anomalous rows to a mechanism, diff a few of them field by field against their predecessors and split the count by what differs. A mechanism (a race) predicts a shape -- some keys, some moments; a whole fetch every time is a different cause.

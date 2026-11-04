@@ -782,6 +782,7 @@ death, never life — do not invert it.
 - Hypothesis: Soccer state for 10-31 and 11-01 was reset because several processes write the same shard date's state with no lock: each loads it, one replaces it through the SHARED <date>.state.json.tmp name while another is still writing that inode, a reader parses a partial file, _load_state returns {} and that writer saves a state holding only its own keys
 - Falsification test: After the fix is live on every writer, a busy soccer day still shows a state holding far fewer keys than its shard, or a burst of unchanged re-appends, with no BOOK_QUOTES_STATE_UNREADABLE line -- then the reset has another cause
 - Verification: Tests: two concurrent writers keep both keys and append no duplicates (fails on the old code, passes on the new); an unreadable state is logged and kept. Fleet: on the next Saturday soccer shard, state keys == unique shard keys and unchanged re-appends per hour near 0; recorded in deploys.md
+- **PROGRESS 2026-11-04 23:35Z:** fix `7b30517b1` on main; fleet ff 22:53:06Z (refresh-worker claim b322206a, CLEAR preflight, released 22:54:31Z). OddsAPI children use it; the Kalshi and Polymarket captures got it in lane `kalshi-state-cap`'s worker restart, so every writer runs it from 23:27:20Z. Reading 1 shows soccer states complete (no weekday signal). **OWED:** the 11-08 soccer shard reading, then close, and RETURN the loan. Found on the way: NaN-line moneyline repeats (todo `#760`), outside this loan's scope.
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
