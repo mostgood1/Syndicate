@@ -312,7 +312,7 @@ The script runs §1's steps in order and stops at the first failure.
 | Option | Keeps | Loses or costs | Verdict |
 |---|---|---|---|
 | **Same-volume rename** (`Move-Item`, R3) | everything: uncommitted work in 33 worktrees, local-only branches, stash, reflog, untracked `.syndicate`, `.env`, `data/` mirror, `reports/` | Worktree pointers are absolute, so `git worktree repair` is needed (R4). The `cldflt` behaviour on a rename out of a sync root is **unmeasured**, which is why the R2 rename test aborts before R3 | **recommended**. The script is built for it |
-| Robocopy copy plus later delete | the same | ~2x disk for a while (C: has 128.5 GB free [M]; the tree is still ~90+ GB because `vendor/` is 61 GB on disk [M]), so it barely fits unless `vendor/` is set aside first. Slow over ~414k files | fallback if R2 fails |
+| Robocopy copy plus later delete | the same | ~2x disk for a while (C: has 128.5 GB free [M]; the tree is ~101 GB [M, `du -sh` 11-04: `vendor/` 61, `.claude/worktrees` 31, `data` 6.2, `.git` 3.1]), so it barely fits unless `vendor/` is set aside first. Slow over ~414k files | fallback if R2 fails |
 | Fresh clone plus re-add worktrees | committed, pushed history only | **Loses** local-only branches, the stash (repo-global), reflog-only commits, untracked ledger files (`.syndicate/deploy/preflight`, claims), `.env`, `data/`. It cannot re-add worktrees that hold uncommitted work. Every desktop session's worktree is orphaned | rejected. A clone is a new repo, not a moved one. Measured 09-10: husks alone held records of 413 unreachable SHAs |
 
 A junction left at the old path is rejected as well (11-02 §3). OneDrive syncs a junction's contents on creation [B,
