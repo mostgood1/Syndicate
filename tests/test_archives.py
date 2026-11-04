@@ -6297,7 +6297,9 @@ class ArchiveRouteTests(unittest.TestCase):
     def test_ncaab_cards_empty_date_does_not_inject_fake_sample_game(self) -> None:
         with patch("syndicate.features.ncaab.cards.mirrored_recommendations_payload", return_value={}), patch(
             "syndicate.features.ncaab.cards.mirrored_available_dates", return_value=["2025-11-03"]
-        ):
+        ), patch("syndicate.features.ncaab.slate.slate_games", return_value=[]):
+            # Under pytest `_is_worker()` is True, so the real slate_games fetched ESPN's live
+            # 2025-11-03 board (event 401823449) and the nightly read 18 games (ci-suite #697).
             context = build_ncaab_cards_page_context("2025-11-03")
 
         self.assertEqual(context.get("games"), [])
