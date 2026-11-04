@@ -723,11 +723,6 @@ death, never life — do not invert it.
 - Verification: fleet book_quotes shard for the next UEFA matchday carries uel/uecl/ucl alternate_totals_corners rows whose captured_at is >24h before commence_time, and /api/board/layer2-shortlist?sport=soccer&date=<tomorrow> serves them; x-requests-last for a game-only call <= 2; recorded in deploys.md
 - Blocked by: none
 
-### closed-lane-archive-20261104-0936 — CLOSED 2026-11-04 (GOAL MET: 1 block archived) — opened 2026-11-04 — session 58b50504-07d9-4335-9985-dcde45a48cc9
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness --idle-min 240 SAFE for 1 of 7 CLOSED blocks; moved `closed-lane-archive-20261104-0530` to lanes_closed.md with one pointer. Table and WAIT reasons in log/2026-11-04.md.
-
 ### polymarket-cbb-pairing — OPEN — opened 2026-11-04 — session e32fef1a-01e8-4afe-a284-01acd3728545
 - **STATUS `[2026-11-04 18:14Z]`: GOAL: NOT MET -- ON MAIN `b27fbf454`, NOT on the fleet.** Read-only fleet A/B on one frozen snapshot: ncaab grid sides priced from Polymarket 0 -> 62 (NCAAF 228 -> 284, NBA 72 -> 82, every other sport unchanged; 0 lost or changed anywhere); order-path join ncaab 0 -> 33 of 50 shortlist rows. Women's pairs learn but tonight's women's board carries no moneyline, Polymarket's only women's market. Owed: the user's yes for a fleet ff + refresh-worker restart (price feed, join, Kalshi archive) and a live-odds-worker restart (Polymarket archive), then the readings in Verification.
 - Goal: Polymarket college basketball (league tokens cbb / wcbb) pairs with the NCAAB and WNCAAB boards on the fleet: the refresh-worker grid fan-in reprices ncaab and wncaab sides from polymarket_us (> 0, sampled by team, side and line), and the daily venue archive files Kalshi women's and Polymarket college rows under ncaab / wncaab (DAILY_BOOK skipped_by_sport no longer lists wncaab), and the order-path join pairs men's college shortlist rows with Polymarket markets (POLYMARKET_BOARD_JOIN matches include ncaab), after a fix on main [order-path clause added 2026-11-04 ~17:40Z, same session, before any landing: measured 0 of 50 men's shortlist rows paired because Polymarket's college slug codes resolve to nothing]
@@ -754,6 +749,12 @@ death, never life — do not invert it.
 - Falsification test: H1 is false if, on served suggested corners rows, the board's fair_consensus_prob equals the tape rebuild within 0.5pp once the tape is read at the build instant with one price per (book, side, line) -- i.e. the gap disappears without any variant handling; H3 is false if the tape rebuild at the build instant reproduces the 11-02 evaluator's sight_shin
 - Verification: per-row table (board fair vs tape rebuild, per book) on >= 10 served suggested corners rows, with the mechanism named; written to a findings file; if a defect, a per-line fix with an off != on test and a fleet measurement in deploys.md
 - Blocked by: none
+
+### closed-lane-archive-20261104-1346 — CLOSED 2026-11-04 (GOAL MET: 1 block archived) — opened 2026-11-04 — session 7fa59aa3-fe89-483e-ac9a-473d31f05c16
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: goal met — owner_liveness --idle-min 240 read 1 SAFE of 11 CLOSED; invariants identical to the origin/main baseline.
+- Moved: `closed-lane-archive-20261104-0936`. Reading and WAIT reasons in `log/2026-11-04.md`.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -918,6 +919,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261103-2115` — CLOSED 2026-11-03 (GOAL MET: 1 block archived) — opened 2026-11-03 — session f5444ea1-9fd1-4849-a787-370e12ddb49a
 - `closed-lane-archive-20261104-0221` — CLOSED 2026-11-04 (GOAL MET: 1 block archived) — opened 2026-11-04 — session fbda37da-0ede-4603-819a-08508fc767f0
 - `closed-lane-archive-20261104-0530` — CLOSED 2026-11-04 (GOAL MET: 1 block archived) — opened 2026-11-04 — session 7146e063-8b93-4000-b518-333dd6e21a55
+- `closed-lane-archive-20261104-0936` — CLOSED 2026-11-04 (GOAL MET: 1 block archived) — opened 2026-11-04 — session 58b50504-07d9-4335-9985-dcde45a48cc9
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
