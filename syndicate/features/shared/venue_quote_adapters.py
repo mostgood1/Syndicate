@@ -1019,6 +1019,20 @@ def _learned_game_token(sport: Any, game: Mapping[str, Any]) -> str | None:
     )
 
 
+# College basketball quotes that cannot NAME their game are dropped, not emitted
+# bare. Polymarket lists a ~30-line alternate-total ladder per college game, and
+# the fan-in tries the bare `ncaab|totals|<side>|<line>` key FIRST, accepting an
+# unnamed quote wherever one board game holds that line (`#603`'s claimant rule
+# counts the GRID's games, not the venue's). Measured on the fleet 2026-11-04
+# 21:24Z, right after this lane's rollout: 316 of 1,266 men's quotes were
+# unnamed, and Towson @ Utah's ladder (`tsc-cbb-tows-utah-2026-11-05-168pt5`,
+# both slug codes unresolvable, no learned moneyline) priced Cal Poly @
+# Arizona's 168.5 total at over -127 / under -9900 over Cal Poly's own named
+# -144 / -1329. Before this lane no `cbb` quote existed at all, so dropping the
+# unnamed ones costs only what it measured: Towson's own two sides (2 of 101).
+_NAMED_GAME_ONLY_SPORTS = frozenset({"ncaab", "wncaab"})
+
+
 def _decode_outcome_names(value: Any) -> list:
     """`outcomes` is a JSON STRING on the wire as often as it is a list."""
     if isinstance(value, list):
@@ -1083,6 +1097,8 @@ def polymarket_us_outcome(sport: str, selected_date: str, *, games: Any = None) 
     # confusion this whole module is built to prevent.
     spread_rows = 0
     unresolved_clubs: list[str] = []
+    # College markets dropped for naming no game (`_NAMED_GAME_ONLY_SPORTS`).
+    unnamed_games = 0
     # `#603` NCAAF. The slug's team tokens are Polymarket's own abbreviations
     # and cannot be derived (`jaxst` is not even a subsequence of "jacksonville
     # state"). The MONEYLINE rows DO name their teams, and a game's token pair
@@ -1162,6 +1178,9 @@ def polymarket_us_outcome(sport: str, selected_date: str, *, games: Any = None) 
             # impossible does the learned game apply, so nothing that works
             # today changes shape.
             pm_game = _learned_game_token(sport, learned[0])
+        if pm_game is None and wanted_league in _NAMED_GAME_ONLY_SPORTS:
+            unnamed_games += 1
+            continue
         # ONLY role-keyed markets put the fixture INSIDE the key. h2h keys stay
         # bare so the board's `<sport>|h2h|<club>` lookup is unchanged.
         pm_game_in_key = pm_game if market in _ROLE_KEYED_MARKETS else None
@@ -1202,7 +1221,7 @@ def polymarket_us_outcome(sport: str, selected_date: str, *, games: Any = None) 
         # send them to the wrong one. The last is the dangerous one to
         # mis-report: an alias-map gap that reads as an absent league looks
         # like the venue's fault instead of ours.
-        dropped = _polymarket_ok_reason(spread_rows, unresolved_clubs)
+        dropped = _polymarket_ok_reason(spread_rows, unresolved_clubs, unnamed_games)
         reason = (
             f"no_placeable_polymarket_row_for_league_{sport} {dropped}"
             if dropped
@@ -1221,13 +1240,15 @@ def polymarket_us_outcome(sport: str, selected_date: str, *, games: Any = None) 
         # Carried on a SUCCESSFUL outcome too: spreads refused while moneylines
         # and totals priced is the normal state until the handicap question is
         # settled, and it must stay visible rather than vanish on success.
-        reason=_polymarket_ok_reason(spread_rows, unresolved_clubs),
+        reason=_polymarket_ok_reason(spread_rows, unresolved_clubs, unnamed_games),
         quotes=quotes,
         age_seconds=max(0.0, time.time() - fetched_at),
     )
 
 
-def _polymarket_ok_reason(spread_rows: int, unresolved_clubs: list[str]) -> str | None:
+def _polymarket_ok_reason(
+    spread_rows: int, unresolved_clubs: list[str], unnamed_games: int = 0
+) -> str | None:
     """What was dropped on a SUCCESSFUL read, or None if nothing was.
 
     Carried on `status="ok"` deliberately. Spreads refused and clubs the alias
@@ -1242,6 +1263,8 @@ def _polymarket_ok_reason(spread_rows: int, unresolved_clubs: list[str]) -> str 
     if unresolved_clubs:
         sample = sorted(set(unresolved_clubs))[:6]
         parts.append(f"clubs_unresolved:{len(unresolved_clubs)}:{sample}")
+    if unnamed_games:
+        parts.append(f"unnamed_game_refused:{unnamed_games}")
     return " ".join(parts) if parts else None
 
 

@@ -284,6 +284,61 @@ def test_the_join_learns_only_for_college_basketball():
 
 
 # ---------------------------------------------------------------------------
+# 4. A college quote that names no game is dropped
+# ---------------------------------------------------------------------------
+
+# Towson @ Utah, read off the fleet 2026-11-04 21:24Z: `tows` resolves to nothing
+# and the game had no learned moneyline, so its alternate-total ladder was
+# emitted with `game=None`. One rung sits at CSUN's line, which no other board
+# game holds -- the shape that priced Cal Poly @ Arizona from Towson's market.
+_TOWSON_RUNG = {
+    "slug": "tsc-cbb-tows-utah-2026-11-04-161pt5", "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_TOTAL",
+    "line": 161.5, "outcomes": '["Over","Under"]', "outcomePrices": '["0.80","0.25"]',
+    "gameStartTime": "2026-11-06T02:00:00Z", "orderPriceMinTickSize": 0.01,
+    "minimumTradeQty": 1, "orderable": True,
+}
+
+
+@pytest.fixture
+def slate_with_unnamed_game(monkeypatch):
+    payload = _slate()
+    payload["markets"].append(dict(_TOWSON_RUNG))
+    monkeypatch.setattr(adapters, "_artifact", lambda parts: (payload, time.time()))
+    return payload
+
+
+def test_the_unnamed_fixture_really_names_no_game(slate_with_unnamed_game):
+    assert adapters.game_token("ncaab", "utah", "tows") is None
+
+
+def test_an_unnamed_college_quote_cannot_price_another_game(slate_with_unnamed_game):
+    grid = [_grid_row(_LONGWOOD, 150.5), _grid_row(_CSUN, 161.5)]
+
+    _reprice(grid)
+
+    assert grid[1]["best"]["over"]["price"] == adapters.probability_to_american(0.50)
+    assert grid[1]["best"]["under"]["price"] == adapters.probability_to_american(0.52)
+
+
+def test_dropping_unnamed_quotes_is_what_protects_the_row(monkeypatch, slate_with_unnamed_game):
+    """off != on: without the drop, Towson's rung answers the bare key first and
+    CSUN's total takes Towson's prices -- the fleet's Cal Poly reading."""
+    monkeypatch.setattr(adapters, "_NAMED_GAME_ONLY_SPORTS", frozenset())
+    grid = [_grid_row(_LONGWOOD, 150.5), _grid_row(_CSUN, 161.5)]
+
+    _reprice(grid)
+
+    assert grid[1]["best"]["over"]["price"] == adapters.probability_to_american(0.80)
+
+
+def test_the_drop_is_counted_in_the_reason(slate_with_unnamed_game):
+    out = adapters.polymarket_us_outcome("ncaab", _DATE, games=_GAMES)
+
+    assert not [q for q in out.quotes if "tows" in str(q.venue_ref)]
+    assert "unnamed_game_refused:1" in str(out.reason), out.reason
+
+
+# ---------------------------------------------------------------------------
 # The daily archive
 # ---------------------------------------------------------------------------
 
