@@ -715,6 +715,14 @@ death, never life — do not invert it.
 - Verification: rehearsal log + RESULT.txt readings recorded in the plan doc and the daily log
 - Blocked by: none
 
+### uefa-corners-window — OPEN — opened 2026-11-04 — session 8000dc38-298a-4e02-806b-15931006aff3
+- Goal: UEFA (UCL/UEL/UECL) corners + BTTS reach the Layer 2 board for TOMORROW's matches, not only within 24h of kickoff: the UEFA props step gets a separate 72h window for game markets (btts, alternate_totals_corners) while player props stay at 24h; on main, live on the fleet, and MEASURED as UEL/UECL alternate_totals_corners rows captured >24h before kickoff in the book_quotes shard and served on the Layer 2 shortlist
+- Files: scripts/fetch_soccer_oddsapi_props_local.py, scripts/refresh_odds_sources.py (UEFA props step horizon only), tests/test_soccer_uefa_followups.py
+- Hypothesis: UEFA corners are missing from the board for any match more than 24h out because game markets ride the player-props call, which the UEFA step gates with --max-hours-ahead 24 (domestic leagues have no window and get corners 7-14 days ahead: EPL 11-07 first seen 10-24; UCL 11-04 first seen 11-03T17:46Z; UEL/UECL 11-05 have h2h only)
+- Falsification test: After the change is live, a UEL/UECL match 24-72h out still has 0 alternate_totals_corners rows in its book_quotes shard while OddsAPI returns corners for it (probe 2026-11-04 15:2xZ: Ferencvaros @ AC Milan 26.4h out had fanduel/pinnacle/draftkings corners)
+- Verification: fleet book_quotes shard for the next UEFA matchday carries uel/uecl/ucl alternate_totals_corners rows whose captured_at is >24h before commence_time, and /api/board/layer2-shortlist?sport=soccer&date=<tomorrow> serves them; x-requests-last for a game-only call <= 2; recorded in deploys.md
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

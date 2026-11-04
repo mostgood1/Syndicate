@@ -148,6 +148,27 @@ def _keep_unscoped_rows(existing: list[dict[str, Any]], scoped_ids: set[str]) ->
     return [row for row in existing if str(row.get("event_id") or "").strip() not in scoped_ids]
 
 
+def _kicked_off_rows(existing: list[dict[str, Any]], fetched_ids: set[str], *, now: datetime) -> list[dict[str, Any]]:
+    """Rows of `existing` for events that have KICKED OFF and were not fetched this run.
+
+    A windowed capture (`--max-hours-ahead`) lists only events still to start, so rewriting the game-markets file
+    from it would drop the last pregame btts/corners of a match already under way. The no-window domestic capture
+    keeps them because OddsAPI still lists in-play events. Rows of events not yet started are NOT kept: those are
+    either refetched or gone from the event list (postponed, removed).
+    """
+    kept = []
+    for row in existing:
+        if str(row.get("event_id") or "").strip() in fetched_ids:
+            continue
+        try:
+            start = datetime.fromisoformat(str(row.get("game_time") or "").replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if start.tzinfo is not None and start <= now:
+            kept.append(row)
+    return kept
+
+
 def _ordered_bookmakers(bookmakers: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """All bookmakers, preferred books first.
 
@@ -548,6 +569,11 @@ def main() -> int:
         "--max-hours-ahead", type=float, default=None,
         help="Only fetch events kicking off within this many hours from now (default: no window).",
     )
+    parser.add_argument(
+        "--game-markets-max-hours-ahead", type=float, default=None,
+        help="A wider window for the GAME markets alone (btts, corners): an event past --max-hours-ahead "
+             "but inside this one gets a game-markets-only call. Default: no wider window.",
+    )
     parser.add_argument("--event-ids", type=str, default=None,
                         help="Comma-separated OddsAPI event ids. Player props cost ONE CALL "
                              "PER EVENT, so a 60s live refresh over a whole slate is the "
@@ -627,11 +653,31 @@ def main() -> int:
     # 2026-10-21, 1 credit). The UEFA steps pass `--max-hours-ahead 24`; domestic leagues pass nothing and
     # are unchanged. An empty window makes NO per-event call and leaves the last file in place -- writing an
     # empty CSV would erase the earlier capture of a match that has since kicked off.
+    #
+    # GAME MARKETS GET THEIR OWN, WIDER WINDOW (lane uefa-corners-window, 2026-11-04). The 24h gate was sized for
+    # player props, but btts/corners rode the same call, so a UEFA match reached the board with no corners until
+    # the day before kickoff -- tomorrow's 36 UEL/UECL matches carried h2h only, while domestic corners land 7-14
+    # days out (EPL 11-07 first seen 10-24). Books already price UEFA corners a day+ out (probe 11-04: Ferencvaros
+    # @ AC Milan, 26.4h, corners at fanduel/pinnacle/draftkings; x-requests-last 2). An event past the props
+    # window but inside `--game-markets-max-hours-ahead` takes a call for the game markets ALONE.
+    game_only_ids: set[str] = set()
+    props_window_empty = False
     if args.max_hours_ahead is not None and not args.event_ids:
         before = len(events)
-        events = events_within_hours(events, args.max_hours_ahead)
-        print(f"PROPS_HORIZON kept {len(events)} of {before} events kicking off within "
+        prop_events = events_within_hours(events, args.max_hours_ahead)
+        print(f"PROPS_HORIZON kept {len(prop_events)} of {before} events kicking off within "
               f"{args.max_hours_ahead:g}h", flush=True)
+        game_only: list[dict[str, Any]] = []
+        game_hours = args.game_markets_max_hours_ahead
+        if game_markets and game_hours is not None and game_hours > args.max_hours_ahead:
+            prop_ids = {str(e.get("id") or "") for e in prop_events}
+            game_only = [e for e in events_within_hours(events, game_hours) if str(e.get("id") or "") not in prop_ids]
+            print(f"GAME_MARKETS_HORIZON kept {len(game_only)} more of {before} events kicking off within "
+                  f"{game_hours:g}h (game markets only: {','.join(game_markets)})", flush=True)
+        # Props first, so `--max-events` can never cut a props event in favour of a game-only one.
+        events = prop_events + game_only
+        game_only_ids = {str(e.get("id") or "") for e in game_only}
+        props_window_empty = not prop_events
         if not events:
             print("PROPS_HORIZON_EMPTY: no event inside the window -- no per-event calls, file unchanged", flush=True)
             return 0
@@ -644,7 +690,8 @@ def main() -> int:
         if not event_id:
             continue
         payload = fetch_event_player_props(
-            api_key, sport_key=sport_key, event_id=event_id, region=region, markets=request_markets,
+            api_key, sport_key=sport_key, event_id=event_id, region=region,
+            markets=game_markets if event_id in game_only_ids else request_markets,
             bookmakers=books,
         )
         if payload is None:
@@ -679,6 +726,18 @@ def main() -> int:
             kept = _keep_unscoped_rows([r for r in prior if isinstance(r, dict)], scoped_ids)
             print(f"GAME_MARKET_LIVE_MERGE kept={len(kept)} fresh={len(game_rows)} "
                   f"scoped_events={len(scoped_ids)}", flush=True)
+            game_rows = kept + game_rows
+        elif args.max_hours_ahead is not None and game_out.exists():
+            try:
+                prior = json.loads(game_out.read_text(encoding="utf-8")).get("rows") or []
+            except Exception as exc:  # noqa: BLE001 -- a corrupt file is replaced, as before
+                print(f"GAME_MARKET_MERGE_READ_FAILED {type(exc).__name__}: {exc}", flush=True)
+                prior = []
+            fetched_ids = {str(e.get("id") or "") for e in events}
+            kept = _kicked_off_rows([r for r in prior if isinstance(r, dict)], fetched_ids,
+                                    now=datetime.now(timezone.utc))
+            if kept:
+                print(f"GAME_MARKET_KICKED_OFF_KEPT kept={len(kept)} fresh={len(game_rows)}", flush=True)
             game_rows = kept + game_rows
         game_df = pd.DataFrame(game_rows)
         # THE FEED DUPLICATES (book, market, side, line) WITH DIFFERENT PRICES.
@@ -747,6 +806,11 @@ def main() -> int:
               f"for {len(events)} event(s) in region {args.region}", flush=True)
 
     out_path = Path(args.out)
+    if props_window_empty:
+        # Only game-only events were fetched: they carry no player rows, and writing that empty set would erase
+        # the earlier props capture of a match that has since kicked off (the PROPS_HORIZON_EMPTY rule above).
+        print(f"PROPS_HORIZON_EMPTY: game markets only this run -- {out_path} unchanged", flush=True)
+        return 0
     if scoped_ids and out_path.exists():
         try:
             prior_df = pd.read_csv(out_path, dtype={"event_id": "string"}, keep_default_na=False)

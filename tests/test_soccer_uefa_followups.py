@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import json
 import os
 import sys
 import time
@@ -75,6 +76,90 @@ def test_an_empty_window_makes_no_event_call_and_leaves_the_file(tmp_path, monke
     assert props.main() == 0
     assert calls == []                                           # no per-event spend
     assert "Kept From Earlier" in out.read_text(encoding="utf-8")  # earlier capture not erased
+
+
+# --- (1b) game markets on a wider window (lane uefa-corners-window, 2026-11-04) ------------------------------
+
+
+def test_uefa_props_step_carries_the_72h_game_markets_window_and_domestic_does_not():
+    steps = _steps("uel,epl")
+    uel = list(steps["soccer_uel_props"].command)
+    epl = list(steps["soccer_epl_props"].command)
+    assert uel[uel.index("--max-hours-ahead") + 1] == "24"  # player props unchanged
+    assert uel[uel.index("--game-markets-max-hours-ahead") + 1] == "72"
+    assert "--game-markets-max-hours-ahead" not in epl  # control: domestic has no window at all
+
+
+def _run_props(props, monkeypatch, tmp_path, events, argv_extra):
+    out = tmp_path / "2026-11-04.csv"
+    out.write_text("league,player,event_id\nuel,Kept From Earlier,started\n", encoding="utf-8")
+    calls = []
+
+    def fake_fetch(api_key, *, sport_key, event_id, region, markets, bookmakers=None):
+        calls.append((event_id, tuple(markets)))
+        return {
+            "id": event_id, "home_team": "AC Milan", "away_team": "Ferencvaros",
+            "commence_time": next(e["commence_time"] for e in events if e["id"] == event_id),
+            "bookmakers": [{"key": "fanduel", "markets": [
+                {"key": "alternate_totals_corners", "outcomes": [{"name": "Over", "point": 9.5, "price": -110}]},
+            ]}],
+        }
+
+    monkeypatch.setenv("ODDS_API_KEY", "test-key")
+    monkeypatch.setattr(props, "fetch_events", lambda *a, **k: events)
+    monkeypatch.setattr(props, "fetch_event_player_props", fake_fetch)
+    monkeypatch.setattr(props, "_append_soccer_prop_book_quotes", lambda **k: None)
+    monkeypatch.setattr(sys, "argv", ["x", "--league", "uel", "--max-hours-ahead", "24", *argv_extra, "--out", str(out)])
+    assert props.main() == 0
+    return out, calls
+
+
+def test_events_past_the_props_window_take_a_game_markets_only_call(tmp_path, monkeypatch):
+    props = _load_script("fetch_soccer_oddsapi_props_local")
+    now = datetime.now(timezone.utc)
+    events = [
+        {"id": "soon", "commence_time": (now + timedelta(hours=3)).isoformat()},
+        {"id": "tomorrow", "commence_time": (now + timedelta(hours=27)).isoformat()},
+        {"id": "far", "commence_time": (now + timedelta(days=13)).isoformat()},
+    ]
+    _out, calls = _run_props(props, monkeypatch, tmp_path, events, ["--game-markets-max-hours-ahead", "72"])
+    by_event = dict(calls)
+    assert set(by_event) == {"soon", "tomorrow"}  # `far` is outside both windows: no spend
+    assert by_event["tomorrow"] == tuple(props.DEFAULT_GAME_EVENT_MARKETS)  # game markets ONLY
+    assert set(props.DEFAULT_GAME_EVENT_MARKETS) < set(by_event["soon"])  # props + game markets, as before
+    game = json.loads((tmp_path / "game_markets_2026-11-04.json").read_text(encoding="utf-8"))
+    assert {r["event_id"] for r in game["rows"]} == {"soon", "tomorrow"}
+
+
+def test_without_the_wider_window_tomorrow_is_not_fetched(tmp_path, monkeypatch):
+    # Control arm: the flag, not some other path, is what reaches `tomorrow`.
+    props = _load_script("fetch_soccer_oddsapi_props_local")
+    now = datetime.now(timezone.utc)
+    events = [
+        {"id": "soon", "commence_time": (now + timedelta(hours=3)).isoformat()},
+        {"id": "tomorrow", "commence_time": (now + timedelta(hours=27)).isoformat()},
+    ]
+    _out, calls = _run_props(props, monkeypatch, tmp_path, events, [])
+    assert [event_id for event_id, _ in calls] == ["soon"]
+
+
+def test_a_game_markets_only_run_leaves_the_props_csv_and_kicked_off_game_rows(tmp_path, monkeypatch):
+    props = _load_script("fetch_soccer_oddsapi_props_local")
+    now = datetime.now(timezone.utc)
+    started = (now - timedelta(hours=1)).isoformat()
+    (tmp_path / "game_markets_2026-11-04.json").write_text(json.dumps({"rows": [
+        {"event_id": "started", "market_key": "btts", "side": "yes", "line": None, "price": 120,
+         "book": "fanduel", "game_time": started},
+        {"event_id": "dropped", "market_key": "btts", "side": "yes", "line": None, "price": 120,
+         "book": "fanduel", "game_time": (now + timedelta(hours=40)).isoformat()},
+    ]}), encoding="utf-8")
+    events = [{"id": "tomorrow", "commence_time": (now + timedelta(hours=27)).isoformat()}]
+    out, calls = _run_props(props, monkeypatch, tmp_path, events, ["--game-markets-max-hours-ahead", "72"])
+    assert calls == [("tomorrow", tuple(props.DEFAULT_GAME_EVENT_MARKETS))]
+    assert "Kept From Earlier" in out.read_text(encoding="utf-8")  # no props event: props CSV untouched
+    game = json.loads((tmp_path / "game_markets_2026-11-04.json").read_text(encoding="utf-8"))
+    # The started match keeps its last pregame rows; a not-yet-started event no longer listed is not kept.
+    assert {r["event_id"] for r in game["rows"]} == {"started", "tomorrow"}
 
 
 # --- (2) UEFA branding refresh -----------------------------------------------------------------------------

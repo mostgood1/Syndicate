@@ -1567,6 +1567,10 @@ def _soccer_artifact_scope_args(league: str, fallback_date: str, *, pinned_date:
 #                                             -> --kind teams (Understat-only)
 #: UEFA props window (hours before kickoff). Books post soccer props in the last day or so.
 _SOCCER_UEFA_PROPS_HORIZON_HOURS = 24
+#: UEFA GAME-markets window (btts, corners), wider than the props one (lane uefa-corners-window, 2026-11-04): 72h
+#: covers the board's TODAY and TOMORROW tabs from any hour. Past 24h each event costs a game-markets-only call
+#: (<= 2 credits, one per market returned; probe x-requests-last 2), and OddsAPI lists one matchday at a time.
+_SOCCER_UEFA_GAME_MARKETS_HORIZON_HOURS = 72
 
 _SOCCER_GOALS_BASED_RATING_LEAGUES = {"eredivisie", "primeira_liga", "championship", "belgian_pro_league"}
 _SOCCER_HISTORY_SEASON_DEPTH = {"matches": 3, "teams": 2}
@@ -2380,8 +2384,12 @@ def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
     for league in league_slugs:
         # UEFA competitions (no model) take props ONLY near kickoff (lane soccer-uefa-followups, user
         # 2026-10-21): far-out UEFA events return almost nothing and every listed event costs a call on
-        # every run. Domestic leagues are unchanged.
-        horizon = () if soccer_league_has_sim(league) else ("--max-hours-ahead", str(_SOCCER_UEFA_PROPS_HORIZON_HOURS))
+        # every run. Domestic leagues are unchanged. Their btts/corners take the wider game-markets window
+        # (lane uefa-corners-window): with the 24h one, tomorrow's UEFA matches reached the board with no corners.
+        horizon = () if soccer_league_has_sim(league) else (
+            "--max-hours-ahead", str(_SOCCER_UEFA_PROPS_HORIZON_HOURS),
+            "--game-markets-max-hours-ahead", str(_SOCCER_UEFA_GAME_MARKETS_HORIZON_HOURS),
+        )
         steps.append(
             RefreshStep(
                 name=f"soccer_{league}_props",
