@@ -742,6 +742,15 @@ death, never life — do not invert it.
 - Verification: pull exits 0 against the fleet with freeze_pages >= 2 and the freeze file count equal to the server's inventory for the pattern; grade's W1r/W2/W3 funnels move off the 10-19 numbers (25/39/37 bets); recorded in log + state_soccer
 - Blocked by: none
 
+### soccer-corners-fair-inflation — OPEN — opened 2026-11-04 — session 8000dc38-298a-4e02-806b-15931006aff3
+- **RESULT `[2026-11-04 17:50Z]`: mechanism NAMED -- it is the EVALUATOR, not the board (H3 SUPPORTED; H1/H2 FALSIFIED).** Served build 17:09:37Z, 603 corners rows: board fair = live-observed-book fair (+0.00 pp, 5/602 beyond 1 pp); the 11-02 evaluator's change-age rule (`fair_price_eval.evaluate`, a book counts only if its price CHANGED within 12 h) reproduces the 11-02 gap on today's 14 Suggested rows (board - ev12 +2.73 pp, median +2.65; ev12 - live -2.60 pp). The tape is a change log, so motionless live books are dropped and the fair rests on the bet book. No board fix is warranted. The instrument fix is in `scripts/fair_price_eval.py`, claimed by OPEN lane `fair-price-v2` -- NOT edited; loan or hand-off is the user's call. `findings_2026-11-04_soccer_corners_fair_gap.md`.
+- Goal: Name the mechanism that puts the Layer 2 board's consensus fair for soccer alternate_totals_corners ~2.7pp above a per-book Shin fair rebuilt from the same quotes (11-02 grade: 41 suggested corners rows, mean +2.68pp, median +2.76pp; every other market, all sports, +0.20pp), measured on served rows against the fleet quote tape, and fix it line by line if it is a defect
+- Files: none yet (read-only diagnosis; a fix will name its files when it is known)
+- Hypothesis: H1: the grid pairs a book's over and under from DIFFERENT corner variants -- OddsAPI duplicates (book, market, side, line) with different prices (fanduel, measured 2026-08-22), so a book's two sides can come from two ladders, lowering its overround and inflating the de-vigged side. H2: the grid keeps a stale or wrong-line opposite side. H3: the evaluator's rebuild, not the board, is the one that is off (it rebuilds at a different instant or book set).
+- Falsification test: H1 is false if, on served suggested corners rows, the board's fair_consensus_prob equals the tape rebuild within 0.5pp once the tape is read at the build instant with one price per (book, side, line) -- i.e. the gap disappears without any variant handling; H3 is false if the tape rebuild at the build instant reproduces the 11-02 evaluator's sight_shin
+- Verification: per-row table (board fair vs tape rebuild, per book) on >= 10 served suggested corners rows, with the mechanism named; written to a findings file; if a defect, a per-line fix with an off != on test and a fleet measurement in deploys.md
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
