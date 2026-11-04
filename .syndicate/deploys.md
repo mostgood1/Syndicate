@@ -56290,3 +56290,16 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **verify -- served MET:** `/api/board/layer2-shortlist?sport=soccer&date=2026-11-05`, build `written_at` 17:09:37Z (the 16:09:35Z build predates the capture): **17 of 30 matches carry corners, 272 corners rows**, 33 btts rows (was 0 / 0). Rows are price-only (`no_projection`), as for every UEFA market (#699 NO-GO).
 - **NOT covered, by source:** UECL corners. Our 10-book prop list returned no UECL corners on any capture, including inside 24h on the 10-23 matchday (`uecl/props/game_markets_2026-10-21..24` and `_2026-11-04`: btts only). Widening needs uk/eu regions (more credits) -- not done.
 - **Cost, NOT measured per call from the run:** the probe's game-only call was 2 credits. Bound: <= 2 x events in the 24-72h band (one matchday, 18-36) x UEFA sweeps/day (~30-35), only in UEFA weeks.
+
+## 2026-11-04 18:20Z (12:20 PM CST) -- VERIFY `7bc7ffbfd` (women's college basketball on Kalshi, refresh-worker since 13:41:40Z): **pairing MET** (lane `wncaab-kalshi-pairing`, CLOSED GOAL MET; todo #755)
+- **Discharges the pairing read owed by the 14:00Z entry.** Read from `refresh-worker.log` by a session-local, read-only watcher (5-minute polls, 13:59Z-18:18Z).
+- **Board reprice:** at 16:25:23.062Z the log read `SEGMENT_MISMATCH_GRID sport=wncaab count=0 sides_seen=48 repriced=2 matched={'full|kalshi|KXNCAAWBTOTAL': 2}`. It was the first non-zero reading since the restart; repriced has since read 0-2 as the women's grid fills (sides_seen 36 -> 70).
+- **Quote capture:** at 18:13:35.350Z the log read `QUOTE_CAPTURE ... appended_by_sport={'soccer': 28, 'nba': 7, 'nfl': 7, 'nhl': 53, 'ncaab': 6, 'wncaab': 2}`. It was the first women's capture.
+- **Pairs sampled 18:18:42Z** (read-only join, fleet checkout code, live Kalshi markets against the 11-04 WNCAAB grid): 8 matches on 5 of 10 grid games, all right by team, side and line.
+  - KXNCAAWBSPREAD-26NOV04STETLOU-LOU50: NO is Stetson +49.5 (away).
+  - KXNCAAWBSPREAD-26NOV04QUCVAN-VAN57: NO is Queens +56.5.
+  - KXNCAAWBSPREAD-26NOV04FDUTEX-TEX43: NO is FDU +42.5.
+  - KXNCAAWBSPREAD-26NOV04DETILL-ILL36: NO is Detroit Mercy +35.5.
+  - KXNCAAWBTOTAL-26NOV04STETLOU-140 and -26NOV04CAMPNCST-130: YES is over and NO is under, at 139.5 and 129.5.
+  - Unmatched events (`event_not_on_our_board`) were games whose books had not yet posted women's lines.
+- **Errors:** 0 real `Traceback (most recent call last)` headers since the respawn. The watcher's earlier `tb=6` was a false count: `ALL_PROCESS_MEMORY` logs every process's command line, and my own `grep ... Traceback` probes were among them. The probe now anchors on the header.

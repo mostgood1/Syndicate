@@ -29,6 +29,7 @@
     - The `KXNCAAWBWINS` futures (30, all unreadable) were evicted.
   - **Read with the fix:** all 18 games on the 11-03 women's grid resolve to a Kalshi event. After the restart, `KXNCAAWBTOTAL` is fetched (189), the futures are gone, and there are 0 tracebacks.
   - **Owed:** the first `QUOTE_CAPTURE` with `wncaab` > 0 and `SEGMENT_MISMATCH_GRID sport=wncaab repriced` > 0, once tonight's women's lines are on the board. The newest women's OddsAPI capture was 00:01Z 11-04.
+  - **MET 2026-11-04 18:20Z** (deploys.md 18:20Z, lane CLOSED GOAL MET): `SEGMENT_MISMATCH_GRID sport=wncaab count=0 repriced=2` (`KXNCAAWBTOTAL`) at 16:25:23Z, and `QUOTE_CAPTURE` `'wncaab': 2` at 18:13:35Z. 8 of 8 live pairs sampled at 18:18Z were right by team, side and line.
   - **Not done:**
     - Polymarket `cbb`.
     - Women's quarter and half Kalshi series, which are refused by segment.
