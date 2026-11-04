@@ -648,11 +648,6 @@ death, never life — do not invert it.
 - Verification: pytest on the new tests (each with an off != on control); a fleet read-only join of the live Kalshi NCAAMB markets against the real NCAAB shortlist before any fleet update; after the user-approved update, the Kalshi join's matched NCAAB count > 0 and a sample checked by team, side and line
 - Blocked by: none
 
-### closed-lane-archive-20261103-2115 — CLOSED 2026-11-03 (GOAL MET: 1 block archived) — opened 2026-11-03 — session f5444ea1-9fd1-4849-a787-370e12ddb49a
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness --idle-min 240 SAFE for 1 of 7 CLOSED blocks; moved `closed-lane-archive-20261103-1706`. Readings in log/2026-11-03.md.
-
 ### wncaab-kalshi-pairing — OPEN — opened 2026-11-04 — session e32fef1a-01e8-4afe-a284-01acd3728545
 - Goal: Kalshi women's college basketball game lines (KXNCAAWBGAME / KXNCAAWBSPREAD / KXNCAAWBTOTAL) pair with the WNCAAB board on the fleet: refresh-worker log shows QUOTE_CAPTURE appended_by_sport['wncaab'] > 0 and SEGMENT_MISMATCH_GRID sport=wncaab repriced > 0 with count=0, after a fix on main
 - Files: syndicate/features/shared/kalshi_catalogue.py (LOAN from wncaab-module, pending the user's answer: the KXNCAAWB entries in SERIES_SPORT, _SERIES_SEGMENT and SERIES_OUT_OF_SCOPE, and club_key's college Kalshi spelling table ONLY), syndicate/features/shared/odds_book_quotes.py (LOAN from book-quotes-splice-repair, pending the user's answer: _GAME_LINE_CAPTURE_SPORTS only), tests/test_kalshi_wncaab_pairing.py (NEW), tests/test_kalshi_ncaab_pairing.py (spelling-table name only), tests/test_soccer_game_line_capture.py (the predicate test only)
@@ -660,6 +655,11 @@ death, never life — do not invert it.
 - Falsification test: n/a
 - Verification: refresh-worker.log after the restart that loads the fix: QUOTE_CAPTURE appended_by_sport['wncaab'] > 0; SEGMENT_MISMATCH_GRID sport=wncaab repriced > 0 and count=0; sampled pairs correct by team, side and line
 - Blocked by: none
+
+### closed-lane-archive-20261104-0221 — CLOSED 2026-11-04 (GOAL MET: 1 block archived) — opened 2026-11-04 — session fbda37da-0ede-4603-819a-08508fc767f0
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 1 of 7 CLOSED blocks SAFE; archived it. Moved: `closed-lane-archive-20261103-2115`. Table and WAIT reasons in `log/2026-11-04.md`.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -821,6 +821,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261103-1150` — CLOSED 2026-11-03 (GOAL MET: 1 block archived) — opened 2026-11-03 — session 223c5374-1929-4e07-8b95-2fedd6836e2f
 - `closed-lane-archive-20261103-1302` — CLOSED 2026-11-03 (GOAL MET: 1 block archived) — opened 2026-11-03 — session af622b20-78d3-4c4c-868e-3e5bd1b754e1
 - `closed-lane-archive-20261103-1706` — CLOSED 2026-11-03 (GOAL MET: 2 blocks archived) — opened 2026-11-03 — session 6dc2fbc3-1988-466a-9dc9-00370e852775
+- `closed-lane-archive-20261103-2115` — CLOSED 2026-11-03 (GOAL MET: 1 block archived) — opened 2026-11-03 — session f5444ea1-9fd1-4849-a787-370e12ddb49a
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
