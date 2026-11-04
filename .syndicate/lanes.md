@@ -748,12 +748,6 @@ death, never life — do not invert it.
 - Verification: per-row table (board fair vs tape rebuild, per book) on >= 10 served suggested corners rows, with the mechanism named; written to a findings file; if a defect, a per-line fix with an off != on test and a fleet measurement in deploys.md
 - Blocked by: none
 
-### closed-lane-archive-20261104-1346 — CLOSED 2026-11-04 (GOAL MET: 1 block archived) — opened 2026-11-04 — session 7fa59aa3-fe89-483e-ac9a-473d31f05c16
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: goal met — owner_liveness --idle-min 240 read 1 SAFE of 11 CLOSED; invariants identical to the origin/main baseline.
-- Moved: `closed-lane-archive-20261104-0936`. Reading and WAIT reasons in `log/2026-11-04.md`.
-
 ### closed-lane-archive-20261104-1519 — CLOSED 2026-11-04 (GOAL MET: 1 block archived) — opened 2026-11-04 — session f354500b-b7a2-4acb-ab91-3fc6d182b28f
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
@@ -786,6 +780,11 @@ death, never life — do not invert it.
 - **SCOPE WIDENED 2026-11-04 23:48Z (user: "Yes, fix it here", answering "Fix the NaN moneyline repeats (#760) here?"):** todo `#760` -- the dedupe treats a NaN line as unchanged, so NBA/NHL moneylines stop re-appending on every fetch. Verify: NaN-line repeats near 0 per fetch on the NBA and NHL shards after the fleet ff; first check what reads a moneyline's age on the board.
 - **PROGRESS 2026-11-04 23:35Z:** fix `7b30517b1` on main; fleet ff 22:53:06Z (refresh-worker claim b322206a, CLEAR preflight, released 22:54:31Z). OddsAPI children use it; the Kalshi and Polymarket captures got it in lane `kalshi-state-cap`'s worker restart, so every writer runs it from 23:27:20Z. Reading 1 shows soccer states complete (no weekday signal). **OWED:** the 11-08 soccer shard reading, then close, and RETURN the loan. Found on the way: NaN-line moneyline repeats (todo `#760`), outside this loan's scope.
 - Blocked by: none
+
+### closed-lane-archive-20261104-1752 — CLOSED 2026-11-04 (GOAL MET: 1 block archived) — opened 2026-11-04 — session 77a1e255-ea42-4a66-b091-d51f5ef3abd9
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness --idle-min 240 at 23:54Z gave 1 SAFE of 15 CLOSED; archived with the dry run, apply and invariant check passing (no new FAIL). Moved: `closed-lane-archive-20261104-1346`. Reading and Part B in log/2026-11-04.md.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -951,6 +950,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261104-0221` — CLOSED 2026-11-04 (GOAL MET: 1 block archived) — opened 2026-11-04 — session fbda37da-0ede-4603-819a-08508fc767f0
 - `closed-lane-archive-20261104-0530` — CLOSED 2026-11-04 (GOAL MET: 1 block archived) — opened 2026-11-04 — session 7146e063-8b93-4000-b518-333dd6e21a55
 - `closed-lane-archive-20261104-0936` — CLOSED 2026-11-04 (GOAL MET: 1 block archived) — opened 2026-11-04 — session 58b50504-07d9-4335-9985-dcde45a48cc9
+- `closed-lane-archive-20261104-1346` — CLOSED 2026-11-04 (GOAL MET: 1 block archived) — opened 2026-11-04 — session 7fa59aa3-fe89-483e-ac9a-473d31f05c16
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b

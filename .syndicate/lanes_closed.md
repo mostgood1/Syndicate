@@ -14053,3 +14053,9 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Falsification test: n/a
 - Verification: unit tests incl. off!=on reachability; fleet log shows MAKER_PILOT FAIR_PASS lines after the restart, and any FAIR_CANCEL is followed by an EXPIRE from reconcile
 - Blocked by: none
+
+### closed-lane-archive-20261104-1346 — CLOSED 2026-11-04 (GOAL MET: 1 block archived) — opened 2026-11-04 — session 7fa59aa3-fe89-483e-ac9a-473d31f05c16
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: goal met — owner_liveness --idle-min 240 read 1 SAFE of 11 CLOSED; invariants identical to the origin/main baseline.
+- Moved: `closed-lane-archive-20261104-0936`. Reading and WAIT reasons in `log/2026-11-04.md`.
