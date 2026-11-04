@@ -171,6 +171,51 @@ def test_rotation_and_carry_forward(monkeypatch):
                    for l in g["gameLens"])
 
 
+def _tick_on_events(monkeypatch, events, **kw):
+    """The snapshot over `events` with every input faked; (snapshot, event ids whose summary was fetched)."""
+    monkeypatch.setenv("SYNDICATE_COLLEGE_LIVE_MARGIN_ANCHOR", "0")
+    monkeypatch.setattr("syndicate.features.shared.request_path_guard.refuse_if_compute_in_request_path", lambda *_: None)
+    monkeypatch.setattr("syndicate.features.shared.basketball_pbp.scoreboard_events", lambda sb: events)
+    monkeypatch.setattr(lr, "load_player_priors", lambda *a, **k: lr.NcaabResimRefusal("no_player_priors"))
+    monkeypatch.setattr(lr, "odds_team_names", lambda *a, **k: {})
+    monkeypatch.setattr(lr, "resume_from_summary", lambda s, **k: lr.NcaabResimRefusal("not_live"))
+    lr._ROTATION_CURSOR.clear()
+    fetched = []
+    snap = lr.build_live_lens_snapshot("2026-11-04", previous={}, dirs=[], fetch_scoreboard=lambda *a: {},
+                                       fetch_summary=lambda league, eid: fetched.append(eid) or {"header": {}}, **kw)
+    return snap, fetched
+
+
+def test_the_tick_skips_live_games_against_a_non_d1_school(monkeypatch):
+    """Board games only: a non-D1 side costs no summary fetch and no refusal; a side ESPN leaves unnamed is kept."""
+    events = [{"event_id": "1", "status_state": "in", "home_id": "10", "away_id": "20"},
+              {"event_id": "2", "status_state": "in", "home_id": "10", "away_id": "99"},  # non-D1 visitor
+              {"event_id": "3", "status_state": "in", "home_id": "20", "away_id": ""},  # ESPN named no visitor
+              {"event_id": "4", "status_state": "post", "home_id": "10", "away_id": "20"}]
+    snap, fetched = _tick_on_events(monkeypatch, events, d1_ids=frozenset({"10", "20"}))
+    assert fetched == ["1", "3"]
+    assert snap["counts"]["live"] == 2 and snap["counts"]["dropped_non_d1"] == 1 and snap["counts"]["refused"] == 2
+    assert [g["event_id"] for g in snap["games"]] == ["1", "3"]
+
+
+@pytest.mark.parametrize("league,d1_team", [("ncaab", "2511"), ("wncaab", "2385")])
+def test_the_tick_reads_the_slates_d1_registry_supplements_included(monkeypatch, league, d1_team):
+    """off != on through the worker's own path (no `d1_ids`): the registry the slate cuts the board with,
+    supplements included (Queens men's, Mercyhurst women's; ESPN's team list omits both). An empty registry
+    filters nothing."""
+    from syndicate.features.ncaab import slate
+
+    d1 = slate._d1_ids(league)
+    assert d1_team in d1 and "999999" not in d1
+    rival = sorted(d1 - {d1_team})[0]
+    events = [{"event_id": "1", "status_state": "in", "home_id": d1_team, "away_id": rival},
+              {"event_id": "2", "status_state": "in", "home_id": d1_team, "away_id": "999999"}]
+    on, fetched_on = _tick_on_events(monkeypatch, events, league=league)
+    assert fetched_on == ["1"] and on["counts"]["dropped_non_d1"] == 1
+    off, fetched_off = _tick_on_events(monkeypatch, events, league=league, d1_ids=frozenset())
+    assert fetched_off == ["1", "2"] and off["counts"]["dropped_non_d1"] == 0
+
+
 def test_loop_is_off_unless_switched_on():
     assert lr.ncaab_live_resim_enabled({}) is False
     assert lr.ncaab_live_resim_enabled({"SYNDICATE_NCAAB_LIVE_RESIM": "1"}) is True

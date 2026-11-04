@@ -961,9 +961,11 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
                              fetch_summary: Optional[Callable[..., Any]] = None,
                              dirs: Optional[Sequence[Path]] = None,
                              previous: Optional[Mapping[str, Mapping[str, Any]]] = None,
-                             clock: Callable[[], float] = time.monotonic, league: str = LEAGUE) -> dict[str, Any]:
+                             clock: Callable[[], float] = time.monotonic, league: str = LEAGUE,
+                             d1_ids: Optional[frozenset[str]] = None) -> dict[str, Any]:
     from syndicate.features.shared import basketball_pbp as pbp
     from syndicate.features.nba.live_resim import map_state_names
+    from syndicate.features.ncaab import slate
     from syndicate.features.shared.request_path_guard import refuse_if_compute_in_request_path
 
     refuse_if_compute_in_request_path(f"{league}_live_resim_snapshot")
@@ -979,6 +981,16 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
     odds_names = odds_team_names(str(date_str), dirs=dirs, league=league)
     events = [ev for ev in pbp.scoreboard_events(fetch_scoreboard(league, str(date_str).replace("-", "")))
               if str(ev.get("status_state") or ev.get("state") or "").lower() == "in"]
+    # BOARD GAMES ONLY (2026-11-04, lane wncaab-module): `groups=50` returns every game a D1 team plays, and
+    # the board keeps D1 vs D1 (`slate.parse_scoreboard`). A game against a non-D1 school cost a summary
+    # fetch every tick only to be refused for its unrated side -- 3 of the 4 live women's games at midday
+    # on 11-04. Same registry as the slate; a side ESPN does not name is kept and refused downstream by
+    # name, and an empty registry filters nothing rather than emptying the tick.
+    d1 = slate._d1_ids(league) if d1_ids is None else d1_ids
+    live_count = len(events)
+    if d1:
+        events = [ev for ev in events
+                  if {s for s in (str(ev.get("home_id") or ""), str(ev.get("away_id") or "")) if s} <= d1]
     ids = [str(ev.get("event_id") or ev.get("id") or "") for ev in events]
     cursor_key = _cursor_key(str(date_str), league)
     anchor_on = margin_anchor_enabled()
@@ -990,7 +1002,8 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
     start = _ROTATION_CURSOR.get(cursor_key, 0) % max(1, len(ids)) if ids else 0
     order = ids[start:] + ids[:start]
     games: dict[str, dict[str, Any]] = {}
-    counts = {"live": len(ids), "resimmed": 0, "refused": 0, "carried_forward": 0, "not_reached": 0}
+    counts = {"live": len(ids), "resimmed": 0, "refused": 0, "carried_forward": 0, "not_reached": 0,
+              "dropped_non_d1": live_count - len(ids)}
     next_cursor = start
     for pos, event_id in enumerate(order):
         if clock() >= deadline:
