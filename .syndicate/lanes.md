@@ -681,6 +681,14 @@ death, never life — do not invert it.
 - Verification: plan doc on origin/main; user given a go/no-go and window question
 - Blocked by: none
 
+### repo-move-script-fixes — OPEN — opened 2026-11-04 — session eeaddaa6-9251-44ab-b4c4-546b2d84cd8e
+- Goal: run_move.ps1 survives its real (non-dry) branch: S1-S7 from docs/ai_context/repo_out_of_onedrive_plan.md section 1b fixed, plus -Resume and a git-only rehearsal mode, proven by a full non-dry rehearsal on a throwaway repo with an external worktree outside OneDrive (rename + repair + HEAD check pass, and an injected failure ends in Fail with RESULT.txt saying so). In-play F6 (recorder .env default) needs a loan from in-game-trading and is not edited until the user grants it.
+- Files: C:/SyndicateProd/repo_move/run_move.ps1, docs/ai_context/repo_out_of_onedrive_plan.md
+- Hypothesis: n/a
+- Falsification test: rehearsal throws or leaves RESULT.txt stale after an injected post-rename failure
+- Verification: rehearsal log + RESULT.txt readings recorded in the plan doc and the daily log
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
