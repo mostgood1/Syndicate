@@ -863,6 +863,13 @@ def kalshi_daily_rows(markets: Sequence[Mapping[str, Any]]) -> list[dict[str, An
 # it without a deploy.
 POLYMARKET_LEAGUE_TO_SPORT: dict[str, str] = {
     "cfb": "ncaaf",
+    # College basketball, confirmed by the fixture: `aec-wcbb-camp-ncst-2026-11-04`
+    # ["Fighting Camels","Wolfpack"] is Campbell at NC State on the WNCAAB board and
+    # Kalshi's KXNCAAWBGAME-26NOV04CAMPNCST. Same aliases as
+    # `polymarket_board_join._VENUE_LEAGUE_ALIASES` (2026-11-04, lane
+    # `polymarket-cbb-pairing`).
+    "cbb": "ncaab",
+    "wcbb": "wncaab",
     "epl": "soccer",
     "lal": "soccer",
     "lg1": "soccer",
@@ -1018,7 +1025,12 @@ def in_scope_sports() -> frozenset[str]:
         chosen = {part.strip().lower() for part in raw.split(",") if part.strip()}
         if chosen:
             return frozenset(chosen)
-    return frozenset(set(SUPPORTED_SPORT_SLUGS) | {"soccer"})
+    # `wncaab` is modelled (lane `wncaab-module`) but is not in
+    # `SUPPORTED_SPORT_SLUGS`, which other readers depend on, so it is added here
+    # only. Without it every Kalshi women's college market was counted
+    # `skipped_by_sport={'wncaab': 724}` on each DAILY_BOOK pass (fleet,
+    # 2026-11-04 17:00Z) and never archived. Lane `polymarket-cbb-pairing`.
+    return frozenset(set(SUPPORTED_SPORT_SLUGS) | {"soccer", "wncaab"})
 
 
 def record_venue_book(

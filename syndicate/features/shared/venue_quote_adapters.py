@@ -899,8 +899,15 @@ def _kalshi_ok_reason(spread_rows: int, h2h_keyed: int, h2h_unresolved: int, no_
 # --------------------------------------------------------------------------
 
 
-def _polymarket_pair_games(rows: Any, sport: Any, games: Any) -> dict[tuple[str, str], str]:
-    """`(away_token, home_token)` -> our `event_id`, learned from MONEYLINE rows.
+def _polymarket_pair_games(
+    rows: Any, sport: Any, games: Any
+) -> dict[tuple[str, str], tuple[Mapping[str, Any], dict[str, str]]]:
+    """`(away_token, home_token)` -> (our game, {outcome name: "home" | "away"}),
+    learned from MONEYLINE rows.
+
+    The game, not only its `event_id`: `_learned_game_token` derives the token
+    the BOARD ROW carries from it, and `_polymarket_sides` names a bare mascot
+    by which of the game's two teams it matched (both 2026-11-04, `#755`).
 
     --------------------------------------------------------------------------
     THE SLUG'S TEAM TOKENS ARE POLYMARKET'S OWN ABBREVIATIONS AND CANNOT BE
@@ -966,7 +973,7 @@ def _polymarket_pair_games(rows: Any, sport: Any, games: Any) -> dict[tuple[str,
             return "away"
         return None
 
-    out: dict[tuple[str, str], str] = {}
+    out: dict[tuple[str, str], tuple[Mapping[str, Any], dict[str, str]]] = {}
     for row in rows or []:
         if not isinstance(row, Mapping):
             continue
@@ -982,11 +989,34 @@ def _polymarket_pair_games(rows: Any, sport: Any, games: Any) -> dict[tuple[str,
         if len(names) != 2:
             continue
         hits = [g for g in games if {_side(n, g) for n in names} == {"home", "away"}]
-        if len(hits) == 1:
-            event_id = str(hits[0].get("event_id") or "").strip()
-            if event_id:
-                out[pair] = event_id
+        if len(hits) == 1 and str(hits[0].get("event_id") or "").strip():
+            out[pair] = (hits[0], {n: str(_side(n, hits[0])) for n in names})
     return out
+
+
+def _learned_game_token(sport: Any, game: Mapping[str, Any]) -> str | None:
+    """The token the BOARD ROW of a learned game carries.
+
+    `venue_quote_fanin._row_game_token`'s own expression, over the same game,
+    so the two halves agree by construction rather than by coincidence.
+
+    It used to be `event_game_token(event_id)` alone, which agrees with the
+    board only while the board's clubs do not canonicalise either. NCAAF is
+    held there by `game_token` itself. College basketball was not: `ncaab` and
+    `wncaab` gained registry maps (lane `wncaab-module`, 2026-11-02), so their
+    board rows carry the CLUB PAIR while a learned Polymarket quote carried
+    `evt:`, and `_quote_is_for_another_game` refused every learned total --
+    `game_token`'s docstring predicted exactly this for NCAAF. Measured
+    2026-11-04 on the fleet, read-only (lane `polymarket-cbb-pairing`): with
+    the `cbb` alias alone, 604 men's Polymarket totals were offered and 2 of
+    528 men's grid sides repriced; with this token and the mascot naming in
+    `_polymarket_sides` as well, 62 on a frozen snapshot, a median 0.9 points
+    from the book price each replaced. The only outliers were the two sides of
+    one empty Polymarket book (0.99 / 0.99).
+    """
+    return game_token(sport, game.get("home_team"), game.get("away_team")) or event_game_token(
+        game.get("event_id")
+    )
 
 
 def _decode_outcome_names(value: Any) -> list:
@@ -1075,7 +1105,10 @@ def polymarket_us_outcome(sport: str, selected_date: str, *, games: Any = None) 
             continue
         if str(row.get("sportsMarketTypeV2") or "").upper() == "SPORTS_MARKET_TYPE_SPREAD":
             spread_rows += 1
-        parsed = _polymarket_sides(row, sport, parsed_slug, unresolved_clubs)
+        learned = _pair_games.get(
+            (str(parsed_slug.get("away") or ""), str(parsed_slug.get("home") or ""))
+        )
+        parsed = _polymarket_sides(row, sport, parsed_slug, unresolved_clubs, learned)
         if not parsed:
             continue
         market, sides, line = parsed
@@ -1123,15 +1156,12 @@ def polymarket_us_outcome(sport: str, selected_date: str, *, games: Any = None) 
         # that works today can be lost; the quote simply gains the name it needs
         # to be checkable.
         pm_game = game_token(sport, parsed_slug.get("home"), parsed_slug.get("away"))
-        if pm_game is None:
+        if pm_game is None and learned is not None:
             # The club-pair token first -- unchanged for every sport whose clubs
             # canonicalise (mlb, nfl, wnba, soccer). Only when that is
-            # impossible does the event fallback apply, so nothing that works
+            # impossible does the learned game apply, so nothing that works
             # today changes shape.
-            learned = _pair_games.get(
-                (str(parsed_slug.get("away") or ""), str(parsed_slug.get("home") or ""))
-            )
-            pm_game = event_game_token(learned)
+            pm_game = _learned_game_token(sport, learned[0])
         # ONLY role-keyed markets put the fixture INSIDE the key. h2h keys stay
         # bare so the board's `<sport>|h2h|<club>` lookup is unchanged.
         pm_game_in_key = pm_game if market in _ROLE_KEYED_MARKETS else None
@@ -1220,6 +1250,7 @@ def _polymarket_sides(
     sport: Any = None,
     parsed_slug: Mapping[str, Any] | None = None,
     unresolved: list[str] | None = None,
+    learned: tuple[Mapping[str, Any], Mapping[str, str]] | None = None,
 ) -> tuple[str, list[tuple[str, float | None]], float | None] | None:
     """`(market, [(side, probability)], line)` in THE BOARD'S OWN VOCABULARY.
 
@@ -1360,6 +1391,19 @@ def _polymarket_sides(
     resolved: list[tuple[str, float | None]] = []
     for name, price in zip(outcomes, prices):
         club = canonical_team(sport, name)
+        if not club and learned is not None:
+            # A BARE MASCOT, NAMED BY THE GAME ITS PAIR WAS LEARNED AGAINST.
+            # College moneylines carry only the mascot ("Lancers", "Hawks") and
+            # dozens of schools share most of them, so `canonical_team` rightly
+            # refuses -- 436 men's and 439 women's outcomes on the 2026-11-04
+            # fleet slate. `_polymarket_pair_games` already matched BOTH names
+            # against one of OUR games and recorded which team each is, so the
+            # board's own team name is resolved instead, through the same
+            # `canonical_team` the fan-in applies to that row. Only when the
+            # direct read fails, so every club that resolves today is unchanged.
+            game, sides = learned
+            side = sides.get(str(name))
+            club = canonical_team(sport, game.get(f"{side}_team")) if side in {"home", "away"} else None
         # A club we cannot name is REFUSED, never taken positionally. Array
         # order does not reliably follow the slug (measured on spread rows,
         # 1 of 5 would have been the opposite side), and there is no reason to

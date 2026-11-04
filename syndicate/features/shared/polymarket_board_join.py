@@ -346,12 +346,22 @@ _NON_SOCCER_LEAGUE_TOKENS = frozenset({
 })
 
 
-# Venue league token -> the sport Syndicate's board stamps. One entry, because
-# one is all that is PROVEN; see the block inside `_effective_league`.
+# Venue league token -> the sport Syndicate's board stamps. Each entry is PROVEN
+# by a venue count and a named fixture; see the block inside `_effective_league`.
 _VENUE_LEAGUE_ALIASES: dict[str, str] = {
     # 2,194 venue rows vs zero under `ncaaf`, plus a named fixture match
     # (`sacst-emich`). Measured 2026-08-29.
     "cfb": "ncaaf",
+    # College basketball, measured on the fleet slate 2026-11-04 17:10Z (lane
+    # `polymarket-cbb-pairing`): `cbb` 1,052 markets (moneyline 396, spread 293,
+    # total 363) and `wcbb` 410 (moneyline only), zero under `ncaab` / `wncaab`.
+    # Named fixtures: `aec-cbb-longwd-stjoe-2026-11-04` ["Lancers","Hawks"] is
+    # Longwood @ Saint Joseph's on the NCAAB board (its 150.5 total paired on a
+    # read-only fleet join); `aec-wcbb-camp-ncst-2026-11-04` ["Fighting Camels",
+    # "Wolfpack"] is Campbell @ NC State on the WNCAAB board, the same game as
+    # Kalshi's KXNCAAWBGAME-26NOV04CAMPNCST.
+    "cbb": "ncaab",
+    "wcbb": "wncaab",
 }
 
 
@@ -1485,11 +1495,13 @@ def join_polymarket_to_board(
     alias maps, or a test's monkeypatch -- that produced it.
     """
     token = _TEAMS_MATCH_MEMO.set({})
+    learned_token = _LEARNED_PAIRS.set(_learn_moneyline_pairs(markets, board_rows))
     try:
         return _join_polymarket_to_board_impl(
             markets, board_rows, sport=sport, selected_date=selected_date
         )
     finally:
+        _LEARNED_PAIRS.reset(learned_token)
         _TEAMS_MATCH_MEMO.reset(token)
 
 
@@ -3130,6 +3142,67 @@ _TEAMS_MATCH_MEMO: contextvars.ContextVar[dict | None] = contextvars.ContextVar(
 )
 
 
+# COLLEGE BASKETBALL'S SLUG CODES ARE POLYMARKET'S OWN AND RESOLVE TO NOTHING.
+#
+# `csunr`, `wichst`, `longwd`, `stjoe`: `teams_match` is False for all four on
+# the 2026-11-04 fleet slate, so 0 of 50 men's shortlist rows paired here while
+# the venue fan-in, which learns the pair from the MONEYLINE's mascots, priced
+# them. This is that same learning, `venue_quote_adapters._polymarket_pair_games`
+# -- one method, both consumers -- consulted only after `teams_match` fails.
+#
+# ONLY THESE SPORTS. This path places orders; NCAAF and the pro leagues keep
+# exactly today's matching until their own reading says otherwise. Lane
+# `polymarket-cbb-pairing`, `#755`.
+_LEARNED_PAIR_SPORTS = frozenset({"ncaab", "wncaab"})
+
+# {sport: {(away_code, home_code): (our game, {outcome name: "home" | "away"})}},
+# set for one `join_polymarket_to_board` call like `_TEAMS_MATCH_MEMO`.
+_LEARNED_PAIRS: contextvars.ContextVar[dict | None] = contextvars.ContextVar(
+    "polymarket_learned_pairs", default=None
+)
+
+
+def _learn_moneyline_pairs(
+    markets: Sequence[Mapping[str, Any]], board_rows: Sequence[Mapping[str, Any]]
+) -> dict[str, dict]:
+    """Each `_LEARNED_PAIR_SPORTS` sport's learned pairs over this join's own board games."""
+    games: dict[str, dict[str, dict[str, Any]]] = {}
+    for row in board_rows or ():
+        if not isinstance(row, Mapping):
+            continue
+        sport = str(row.get("sport") or "").strip().lower()
+        event_id = str(row.get("event_id") or "").strip()
+        if sport not in _LEARNED_PAIR_SPORTS or not event_id:
+            continue
+        if row.get("home_team") and row.get("away_team"):
+            games.setdefault(sport, {}).setdefault(
+                event_id,
+                {"event_id": event_id, "home_team": row["home_team"], "away_team": row["away_team"]},
+            )
+    if not games:
+        return {}
+    try:
+        from syndicate.features.shared.venue_quote_adapters import _polymarket_pair_games
+    except Exception:  # noqa: BLE001 -- no learning means today's matching, unchanged
+        return {}
+    return {
+        sport: _polymarket_pair_games(markets, sport, list(by_event.values()))
+        for sport, by_event in games.items()
+    }
+
+
+def _learned_pair(sport: Any, parsed: Mapping[str, Any]) -> tuple[Mapping[str, Any], Mapping[str, str]] | None:
+    """The learned (game, sides) for this slug's club codes, or None.
+
+    In the slug's OWN order only: a game's markets share it, while a reversed
+    pair is the return fixture, a different game.
+    """
+    learned = (_LEARNED_PAIRS.get() or {}).get(str(sport or "").strip().lower())
+    if not learned:
+        return None
+    return learned.get((str(parsed.get("away") or ""), str(parsed.get("home") or "")))
+
+
 def _row_game_dates(board_row: Mapping[str, Any]) -> frozenset[str]:
     """The local calendar dates this row's kickoff can carry; empty = unknown.
 
@@ -3190,6 +3263,9 @@ def _teams_match(
         board_row.get("home") or board_row.get("home_team"),
         board_row.get("away") or board_row.get("away_team"),
         id(fixtures) if fixtures is not None else None,
+        # The learned-pair answer is per GAME (`_LEARNED_PAIR_SPORTS`), so two
+        # games between the same names must not share a memoised answer.
+        board_row.get("event_id") if str(sport or "").strip().lower() in _LEARNED_PAIR_SPORTS else None,
     )
     if key not in memo:
         memo[key] = _teams_match_uncached(board_row, parsed, sport, fixtures)
@@ -3230,6 +3306,14 @@ def _teams_match_uncached(
         sport, parsed.get("away"), away
     ):
         return True
+
+    # COLLEGE BASKETBALL: THE PAIR THE MONEYLINE NAMED. Both outcome names matched
+    # one of OUR games, so the fixture is that game or no game -- see
+    # `_LEARNED_PAIR_SPORTS`. Empty for every other sport.
+    learned = _learned_pair(sport, parsed)
+    if learned is not None:
+        event_id = str(board_row.get("event_id") or "").strip()
+        return bool(event_id) and str(learned[0].get("event_id") or "").strip() == event_id
 
     # FALLBACK: RESOLVE THE FIXTURE AS A PAIR. Soccer only, and only after the
     # normal path has already failed, so this can add matches and never remove
@@ -3457,6 +3541,7 @@ def _probability_for_side(
     wanted = str(side or "").strip()
     if not wanted:
         return None
+    role = wanted.lower()
 
     # A SIGNED SPREAD: the outcome is the HANDICAP and its SLOT names the club
     # (`_SIGNED_SPREAD_LEAGUES`). Position AND number must both agree with the
@@ -3572,6 +3657,13 @@ def _probability_for_side(
         return None
 
     hits = [p for name, p in outcomes if alias_match(sport, name, wanted)]
+    if not hits and role in {"home", "away"}:
+        # A COLLEGE MASCOT ("Lancers") names no club on its own; the learned pair
+        # recorded which of THIS game's teams it is. Same game or nothing.
+        learned = _learned_pair(sport, candidate.get("parsed") or {})
+        event_id = str((board_row or {}).get("event_id") or "").strip()
+        if learned is not None and event_id and str(learned[0].get("event_id") or "").strip() == event_id:
+            hits = [p for name, p in outcomes if learned[1].get(str(name)) == role]
     # UNIQUE or nothing. Two outcomes both resolving to the board side means we
     # cannot tell them apart, and picking one is a coin flip on a real order.
     return hits[0] if len(hits) == 1 else None
