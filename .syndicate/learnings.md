@@ -3230,3 +3230,11 @@ Belief overturned: "live college spread edges lean one way (+4.5 pp signed media
 3. Grade it against the outcomes.
 
 A lean the outcomes agree with is a disagreement with the market, not a defect. Say how many games it rests on.
+
+### 2026-11-04 -- a supplement reaches only the readers that go through its accessor; a tell validated on one population is not validated on the next (lane wncaab-module)
+Two beliefs overturned by three refused college games on one slate:
+
+- "The college D-I set is the registry." The registry module supplemented the three D-I teams ESPN's list omits, for every caller of `registry_rows`. The ratings and player-prior producers opened the CSV directly, so the teams were on the slate and the odds join but unrated in every table, for a season and a half. The coverage gate read the CSV too, so it could not see them.
+- "A Freshman with last season's D-I box means ESPN serves a stale roster." Validated on 10-12 in the preseason (ESPN still served old rosters). On 11-04's current rosters it flagged 30 teams at 0-60% returning, each on one redshirt.
+
+**Rule:** when you add a supplement or override beside a data file, grep for every reader that opens the FILE, and route them through the accessor in the same change. A heuristic checked on one population (preseason rosters) needs re-checking when it is applied to the next (in-season rosters): read its verdicts on today's data, not the day it was measured.

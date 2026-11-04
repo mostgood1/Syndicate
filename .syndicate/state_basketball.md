@@ -1485,8 +1485,12 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
     - Totals are served from the sim.
     - The old "sim slope 0.69 of the market's" was the regression the wrong way round (sim on market). Market on prior is 1.11, mostly a +4-point opening-week home/favourite gap.
 - **Team prior:** a ratings table carrying `calibration_k` < 1 is not regressed again for the opening-week fallback, in the team model or in the producer's prior blend.
+- **D-I set and opening-week priors `[verified 2026-11-04 on the fleet, b4cebb757, deploys.md 17:26:16Z]`:**
+  - The ratings and player-prior producers read `ncaab_team_registry.registry_rows`: the CSV plus the D-I teams ESPN's `/teams` list omits (men's Queens, Lindenwood, Southern Indiana; women's Mercyhurst). Men's 365, women's 363. Before, they read the CSV and never rated those teams.
+  - The stale-roster freshman tell counts only above 65% returning (`STALE_TELL_FLOOR`); alone it excluded 30 current rosters. The daily in-season run refills preseason-table gaps (`refresh_preseason_gaps`).
+  - A game whose two teams sit in different seasons' tables is priced per side, re-scaled to this season's means (`live_team_model._mixed_table`, flagged `prior_season_fallback`).
 - **WNCAAB inputs:**
-  - `wncaab_source/data/processed/`: ratings 2026 (361 teams, 6,029 games), preseason 2027 (348 teams, 4,742 players), player box 2026 (168,226 rows).
+  - `wncaab_source/data/processed/`: ratings 2026 (362 teams with Mercyhurst; 361 and 6,029 games before 11-04), preseason 2027 (363 teams from 11-04), player box 2026 (168,226 rows).
   - Refreshed once a day after 11:00Z by the pregame child (`--refresh-inputs`); no `local_production` job.
 - **WNCAAB live re-sim: LIVE 2026-11-03** (`d6d56d925`, deploys.md 15:38:09Z). `ncaab/live_resim.py` with `league="wncaab"`: four quarters, its own thread on the live-odds-worker (switch follows `SYNDICATE_NCAAB_LIVE_RESIM` when absent), `live/wncaab_live_resim.json`, `WNCAAB_LIVE_RESIM_TICK`; the board prices live women's full-game rows from it (first: 16:11:25Z, 4 rows). Trace: `docs/ai_context/wncaab_live_tier.md`.
 - **Live college margins are MARKET-ANCHORED** (both leagues; user 2026-11-03 "Anchor them"; `9cfd7f941` + `0a5dc86a2`, deploys.md 16:42:35Z). Each live full-game margin is shifted by the pregame gap (closing consensus home margin before the actual tip, minus the pregame sim's), times the share of regulation still to play; the win probability is re-derived. Totals stay raw. No close or no pregame sim -> `no_margin_anchor`. Off: `SYNDICATE_COLLEGE_LIVE_MARGIN_ANCHOR=0`. Verified on ECU 11-03: live spread edge -27 pp raw -> +6.2 (withheld by the interval gate).

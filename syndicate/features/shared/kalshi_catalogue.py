@@ -1211,8 +1211,9 @@ def club_key(sport: Any, value: Any) -> str | None:
 # rule loose enough for those could land on a different school.
 # Names outside Division I have no entry, so they stay unresolved and are
 # refused: 'Bethesda' (men's), 'District of Columbia', 'Johnson C. Smith' and
-# 14 more (women's). So is 'Mercyhurst' for the women: Division I, but absent
-# from `wncaab_team_registry.csv`, which is a registry gap and not a spelling.
+# 14 more (women's). 'Mercyhurst' for the women is Division I and absent from
+# ESPN's women's team list; since 2026-11-04 the registry's women's supplement
+# (`ncaab_team_registry._WNCAAB_D1_MISSING_FROM_ESPN_TEAM_LIST`) resolves it.
 _KALSHI_COLLEGE_BASKETBALL_SPELLINGS: dict[str, str] = {
     "Central Connecticut St.": "Central Connecticut",
     "Miami (FL)": "Miami",
