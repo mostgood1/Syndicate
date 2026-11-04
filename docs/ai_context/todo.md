@@ -20,6 +20,20 @@
   - **Fleet reading:** a read-only join on 11-03 paired 45 of 98 shortlist rows, covering 17 of 19 games.
   - **Owed:** the fleet ff plus a refresh-worker restart, on the user's yes. After that, NCAAB Kalshi game lines are live-orderable at canary, because refresh-worker's `SYNDICATE_PORTFOLIO_MARKET_FAIR_SPORTS` includes `ncaab`.
   - **Not done:** women's `KXNCAAWB*` and Polymarket `cbb`.
+- **(b) WOMEN'S 2026-11-04 (lane `wncaab-kalshi-pairing`): LIVE on the fleet (`7bc7ffbfd`, refresh-worker restart 13:41:34Z on CLEAR, user "Yes, tonight (Recommended)"); restart readings MET, pairing read OWED** (deploys.md 2026-11-04 14:00Z).
+  - **Five gaps closed:**
+    - `KXNCAAWBTOTAL` was never discovered, and `market_keys._TOTAL_UNIT` had no `wncaab`; 189 of 189 totals refused.
+    - `venue_odds_loop._GRID_SPORTS` had no `wncaab`. Women's rows reach no Layer 2 shortlist, so the coverage join never held a women's game.
+    - 6 Kalshi spellings were missing; the table is now shared with NCAAB.
+    - Game-line capture was off: 0 exchange rows in 8,483 WNCAAB quotes.
+    - The `KXNCAAWBWINS` futures (30, all unreadable) were evicted.
+  - **Read with the fix:** all 18 games on the 11-03 women's grid resolve to a Kalshi event. After the restart, `KXNCAAWBTOTAL` is fetched (189), the futures are gone, and there are 0 tracebacks.
+  - **Owed:** the first `QUOTE_CAPTURE` with `wncaab` > 0 and `SEGMENT_MISMATCH_GRID sport=wncaab repriced` > 0, once tonight's women's lines are on the board. The newest women's OddsAPI capture was 00:01Z 11-04.
+  - **Not done:**
+    - Polymarket `cbb`.
+    - Women's quarter and half Kalshi series, which are refused by segment.
+    - Kalshi `DAILY_BOOK` skips `wncaab` (515 markets), because `artifact_manifests.SUPPORTED_SPORT_SLUGS` has no `wncaab`.
+    - Mercyhurst is missing from `wncaab_team_registry.csv`.
 - **(c) No pregame model.** NCAAB rows are market-fair only. `/ncaab/cards` stays empty: its `recommendations_<date>.json` was produced only by the retired external NCAAB app (nothing in the repo writes `predictions_unified_enriched_<date>.csv`). The team-ratings job rolled to season 2027 on 11-01 with 0 games (`teams_rated=0 written=None`); it fills as games are played.
 - **(d) OddsAPI cost of the half-game markets (UNMEASURED).** The default NCAAB markets include h1/h2, which force one per-event request per game on the slate date (~7 credits/event/sweep; ~120 events on 11-02). Read `/api/ops/oddsapi/quota` `by_sport.ncaab` after the first 11-02 sweeps. The user chose to keep halves (11-01).
 - **(e) Manual odds trigger is unreliable on a busy live loop.** `POST /api/ops/odds-refresh/run` (manifest_only) returned 202 for an ncaab 11-02 run at 17:33:19Z and never ran: the single latest-manifest slot was apparently overwritten by the live loop's own launches first (deploys.md 11-01 16:49:50Z entry). Not investigated.

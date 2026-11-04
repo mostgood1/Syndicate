@@ -56249,3 +56249,33 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **Engine read (a lead, not diagnosed):** live spread edges lean one way while the pregame offset's signed median is about 0.
   - Signed median `edge_pp`: ncaab +4.53 over all rows, +10.41 over priceable rows; wncaab +4.22 / +10.71.
   - The pregame anchor is not the source. Something in play keeps the model above the market on the row's side.
+
+## 2026-11-04 14:00Z (8:00 AM CST) -- FLEET ff 68baa1f3a -> 7bc7ffbfd + refresh-worker TERM 13:41:34Z on CLEAR: women's college basketball on Kalshi (KXNCAAWBGAME/SPREAD/TOTAL) -- **LIVE; restart readings MET; pairing read OWED** (tonight's women's lines are not on the board yet) (lane `wncaab-kalshi-pairing`, todo #755)
+- **User, in this chat:** "Yes, pair WNCAAB", then answered two questions at about 13:35Z:
+  - "Borrow them and land the fix on main?" → "Yes, land it (Recommended)". This covers two loans: the `KXNCAAWB` entries in `kalshi_catalogue.py` (lane `wncaab-module`) and `wncaab` in `odds_book_quotes._GAME_LINE_CAPTURE_SPORTS` (lane `book-quotes-splice-repair`). Both are noted in the lenders' blocks.
+  - "fast-forward the fleet and restart refresh-worker now...?" → "Yes, tonight (Recommended)".
+- **Change `7bc7ffbfd`:**
+  - `kalshi_catalogue.py` registers the three full-game series by name and evicts `KXNCAAWBWINS`. Its spelling table now serves `ncaab` and `wncaab`, with 6 new entries.
+  - `market_keys._TOTAL_UNIT` gains a `wncaab` entry.
+  - `venue_odds_loop._GRID_SPORTS` gains `wncaab`.
+  - `odds_book_quotes` turns on `wncaab` game-line capture, on the evidence of 0 exchange rows in 8,483 WNCAAB quotes.
+  - 44 new tests; 3,202 pass across 158 related files.
+- **Pre-deploy reading (read-only, 06:00-06:15Z):** with this code, all 18 games on the 11-03 women's grid resolve to a Kalshi event, joined against the settled 11-02/11-03 markets. The join refused 21 rows for `no_kalshi_price` and 168 for `no_matching_board_row`, so identity resolved and the settled markets carry no price.
+- **Gates:**
+  - Claims on web and refresh-worker at 13:38:46Z.
+  - Baseline at 13:39:06Z: `quote_capture_appended_wncaab=0`, `kalshi_tick_kxncaawbtotal_30m=0`, `grid_repriced_wncaab=0`. All three are predicted to go above 0.
+  - Web preflight (fleet, target `7bc7ffbfd`) was CLEAR at 13:39:14Z.
+  - Precheck: 16 commits in range. Runtime paths are only my 4 files; the rest is ledger, todo and nightly history, with nothing dirty.
+  - `git merge --ff-only 7bc7ffbfd...` ran at 13:39:24Z. There was no reload-web, because nothing the web serves changed. The web claim was released between 13:39:37Z and 13:40:05Z.
+  - The refresh-worker preflight was HOLD on 4 polls between 13:40:07Z and 13:41:03Z, because a board build was in flight. It returned CLEAR at 13:41:20Z on a fresh baseline (0, 0, 0). No `--allow-mid-build`.
+  - `kill -TERM 3585479` at 13:41:34Z. `role_restarts.jsonl` recorded exit 13:41:36Z, claimed, holder `wncaab-kalshi-pairing`.
+  - Respawned as pid 3777077 at 13:41:40Z, `code=7bc7ffbf`. Claim released at 13:41:55Z.
+- **verify -- restart readings MET** (refresh-worker.log 13:41:40Z-13:58:14Z, 0 tracebacks):
+  - `SERIES_DISCOVERY` at 13:41:50Z: game_series 247 -> 246 and added 251 -> 248. `KXNCAAWBWINS` is no longer admitted, and the three by-name series are no longer counted as discovered.
+  - `TICK` at 13:47:49Z: `'KXNCAAWBTOTAL': (189, 'series_filter')`. Before the restart it appeared in no TICK line in 30 min.
+  - `TRIM_BY_SPORT kept_by_sport['wncaab']`: 300 -> 507 (13:47:24Z) -> 315.
+  - `GAP` for women's series: only `KXNCAAWB1H` (24) and `KXNCAAWBTEAMTOTAL` (22), both `recognised_but_no_board_market`. There is no `KXNCAAWBWINS unreadable_title` line, and no `KXNCAAWBTOTAL` in any GAP or `JOIN_TITLES` line, so the totals classify.
+- **verify -- pairing OWED:**
+  - `QUOTE_CAPTURE` has no `wncaab` yet, and `SEGMENT_MISMATCH_GRID sport=wncaab` still reads `repriced=0` with sides_seen 36-40.
+  - Expected for now. The fleet's newest women's OddsAPI capture is from 00:01Z, and the 11-04 women's grid (rebuilt 13:40:29Z) holds only 5 of last night's games, whose Kalshi markets have closed. `VENUE_KEY_SHAPE` shows `role_game` offered 28-34 and present 0.
+  - A session-local read-only watcher polls every 5 min until 00:30Z for the first `QUOTE_CAPTURE ... 'wncaab': >0` and the first non-zero `SEGMENT_MISMATCH_GRID sport=wncaab repriced`. Then sample pairs by team, side and line.
