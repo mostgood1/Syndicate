@@ -56103,3 +56103,35 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - NOT forced: a drain or `--allow-mid-build` would throw the build away and leave the board cold for 7-35 min during live games. The decision on timing went to the user.
   - Claims released 23:41:35Z. **No restart done.** The refresh-worker still runs 9d47c77b5. The fleet checkout is at 92dd72ed5, so any refresh-worker restart from here loads it.
 - **verify:** OWED. After the restart, `college_live_pregame_prob_rows` -> 0 on both college grids, `pregame_on_live_rows` > 0, and live re-sim rows keep a probability and edge (read from `/api/board/book-grid?sport=<ncaab|wncaab>&date=<CT date>` rows: `game.state` live/final, `projection.live_aware` false, `projection.model_prob_over` non-null).
+
+## 2026-11-03 23:49:47Z (5:49 PM CST) -- FLEET ff 92dd72ed5 -> 68baa1f3a: NCAAB on Kalshi (KXNCAAMBGAME/SPREAD/TOTAL) -- **NOT LIVE YET: no refresh-worker CLEAR in 38 min of the live college slate; loads at the next refresh-worker restart** (lane `ncaab-kalshi-pairing`, todo #755 (b))
+- **User, in this chat:** "Yes, update fleet", answering "Update the fleet with the NCAAB fix now?". The reply also covers the `odds_book_quotes.py` `_GAME_LINE_CAPTURE_SPORTS` line, lent by `book-quotes-splice-repair`; the loan was named in the message before the ask. Before that, the user said "Yes, build NCAAB".
+- **Change `68baa1f3a`:**
+  - `kalshi_catalogue.py` registers the three full-game `KXNCAAMB*` series by name and carries 9 Kalshi school spellings in `club_key`.
+  - `odds_book_quotes.py` adds `ncaab` to `_GAME_LINE_CAPTURE_SPORTS`, on the evidence of 0 exchange rows in 194,619 NCAAB quotes.
+  - 33 new tests.
+- **Pre-deploy reading (read-only, 23:20:50Z):** live Kalshi markets joined against the real shortlist paired 45 of 98 NCAAB rows on 11-03, across 17 of 19 games. Full detail is in the log for 2026-11-03 23:35Z.
+- **Baseline (refresh-worker log, 23:48:36Z):**
+  - `TRIM_BY_SPORT kept_by_sport` has no `ncaab`: `kalshi_trim_kept_ncaab=0`.
+  - `QUOTE_CAPTURE appended_by_sport` has no `ncaab`: `quote_capture_appended_ncaab=0`.
+  - Both are predicted to be above 0 after the restart.
+- **Gates:**
+  - Claims web + refresh-worker at 23:49:03Z.
+  - Web preflight (fleet, target `68baa1f3a`) was CLEAR at 23:49:17Z.
+  - Precheck: 2 commits in range (the lane claim and the fix), touching only my 2 runtime files, with nothing dirty.
+  - `git merge --ff-only 68baa1f3a...` ran at 23:49:47Z. There was no reload-web, because nothing the web serves changed. The web claim was released at 23:50Z.
+- **The restart also loads commits already on the fleet disk**, since refresh-worker ran `9d47c77b5`. All three are on main and user-approved (lane `wncaab-module`):
+  - `640c56bbf`: college prior calibration.
+  - `acd835ee1`: college engine efficiency bounds.
+  - `8a5e97d55`: college live Win% blank. Its deploys.md entry of 23:19:16Z says "loads at the next refresh-worker restart", and its verification is owed to that lane.
+- **refresh-worker preflight was HOLD on every poll from 23:50:59Z to 00:28:47Z: 132 tries, about 17 s apart, each with a fresh baseline (0, 0 every time).**
+  - The verdicts alternated between "a board build is in flight" (`layer2_shortlist_build`, then `portfolio_commit`) and, once, "3 job(s) in flight".
+  - During the live college slate the builds run back to back, so the idle window after a save never opened. This is the same pattern lane `wncaab-module` hit at 23:19-23:41Z.
+  - NOT forced: `--allow-mid-build` would throw away an in-flight build and leave the board cold for 7-35 min during live games. The timing went to the user.
+  - Claim released at 00:29:35Z.
+- **State:** the fleet checkout is at `68baa1f3a`, and refresh-worker still runs `9d47c77b5`. Any refresh-worker restart from here loads this fix and the three `wncaab-module` commits above.
+- **verify, OWED after that restart (read in refresh-worker.log):**
+  - `TRIM_BY_SPORT kept_by_sport['ncaab'] > 0`: the three series are fetched and kept.
+  - `QUOTE_CAPTURE appended_by_sport['ncaab'] > 0`.
+  - `VENUE_REPRICE_KEYS selected_by_sport['ncaab']` names `kalshi`.
+  - Then sample the pairs by team, side and line.
