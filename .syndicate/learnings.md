@@ -3201,3 +3201,15 @@ Belief overturned: "the college sim's margins run at slope 0.69 of the market's"
 
 1. Report the slope and the intercept together.
 2. Split by bins of the model's value before calling a gap a scale defect. When every game sits on the same side (opening-week buy games are all home favourites), a constant offset and a stretch look alike in one slope.
+
+## 2026-11-04 -- A DRY RUN THAT SKIPS THE RISKY BRANCH IS NOT A REHEARSAL: run_move.ps1 passed two dry runs and would have thrown right after the rename `[lane repo-out-of-onedrive-plan, session eeaddaa6]`
+
+- **Belief:** "DRY RUN OK" on 11-02 and 11-03 meant the move script was ready. Only the app being open kept it from running on 11-03 and 11-04.
+- **What was true:**
+  - Every post-rename line sits in `if ($DryRun) { log } else { act }`. So `git worktree repair 2>&1` under `ErrorActionPreference=Stop` (`:12`, `:133`) had never run.
+  - Under PS 5.1, git's normal stderr becomes a terminating error. It would have thrown after `Move-Item`, before the fleet claim-dir repair, and uncaught. `RESULT.txt` would have kept the previous night's "FAILED gave up", which reads as "nothing moved".
+  - Waiting on the app (x26, x20 claude.exe until 02:00) is what prevented harm.
+- **Rule:**
+  - Before arming a one-shot destructive script, run its real branch end to end on a throwaway fixture: a repo plus an external worktree, outside OneDrive.
+  - Write `RESULT=RUNNING` at start, so a crash cannot leave a stale verdict.
+  - Wrap everything after the point of no return in a catch that says what is done.

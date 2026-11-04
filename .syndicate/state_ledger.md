@@ -1366,6 +1366,11 @@ existed, emptied by a remove that could not delete a folder a shell sat in, and
 lab shows the bit alone is sufficient; whether a pause stops NEW bits is
 unmeasured. Moving the store out of OneDrive (below) is what ends the class.
 
+**REPO MOVE `[2026-11-04, lane repo-out-of-onedrive-plan]`:**
+- The whole-repo move (`C:\SyndicateProd\repo_move\run_move.ps1` -> `C:\Users\tempadmin\Coding\Syndicate`) has NOT happened. Two armed nights (11-03, 11-04) gave up because the desktop app was running.
+- The script has a post-rename blocker (S1, PS 5.1 stderr under Stop at `:133`).
+- The plan, inventory and required fixes are in `docs/ai_context/repo_out_of_onedrive_plan.md`.
+
 **Relocation tooling exists and has NOT been run:** `scripts/move_git_store.py`
 (dry run by default, refuses on a dirty tree — it correctly returned
 `REFUSE: 10 tracked file(s) modified`), `tests/test_move_git_store.py`, runbook
