@@ -632,11 +632,6 @@ death, never life — do not invert it.
 - Verification: Fleet after deploy: /api/board/game-chips sports=wncaab > 0, /wncaab/api/source/cards games > 0, /api/board/layer1 sport=wncaab games > 0 with rows enriched, Layer 2 PER_SPORT_INGEST wncaab(cand>0), wncaab quote log with full/q* segments and 0 mixed-line groups, WNCAAB_LIVE_AUTORUN_LAUNCHED during the 11-03 opener, by_sport.wncaab credits/h vs ~950/h estimate; Phase 3: input checklist exit 0, pregame projections on Layer 1/Layer 2 for both sports, wncaab re-sim resimmed > 0
 - Blocked by: none
 
-### closed-lane-archive-20261103-1706 — CLOSED 2026-11-03 (GOAL MET: 2 blocks archived) — opened 2026-11-03 — session 6dc2fbc3-1988-466a-9dc9-00370e852775
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. Moved `closed-lane-archive-20261103-1150` and `closed-lane-archive-20261103-1302` (owner_liveness --idle-min 240, SAFE). Table and narrative: log/2026-11-03.md 23:10Z.
-
 ### ncaab-kalshi-pairing — CLOSED 2026-11-04 (GOAL MET: 68baa1f3a live on the fleet; Kalshi selected for 59 NCAAB shortlist keys, unmatched 821 -> 189) — opened 2026-11-03 — session e32fef1a-01e8-4afe-a284-01acd3728545
 - **GOAL VERDICT `[2026-11-04 01:01Z]`.** Goal, verbatim: "Kalshi men's college basketball full-game markets (KXNCAAMBGAME, KXNCAAMBSPREAD, KXNCAAMBTOTAL) pair with NCAAB board rows: fix on main with tests, and on the fleet the Kalshi join reports matched NCAAB rows > 0 with sampled pairs correct by team, side and line (todo #755 (b))" -- **GOAL: MET.** Fix `68baa1f3a` on main with 33 tests (829 across 40 related files pass). Fleet ff at 23:49:47Z. refresh-worker TERM at 00:46:25Z on the user's "Restart now", after 132 HOLD polls on the live slate; `--allow-mid-build`, so one in-flight build was discarded. Readings in refresh-worker.log (deploys.md 2026-11-04 01:01Z):
   - `TRIM_BY_SPORT` ncaab kept 0 -> 922 at 00:47:08Z, then 928.
@@ -652,6 +647,11 @@ death, never life — do not invert it.
 - Falsification test: n/a
 - Verification: pytest on the new tests (each with an off != on control); a fleet read-only join of the live Kalshi NCAAMB markets against the real NCAAB shortlist before any fleet update; after the user-approved update, the Kalshi join's matched NCAAB count > 0 and a sample checked by team, side and line
 - Blocked by: none
+
+### closed-lane-archive-20261103-2115 — CLOSED 2026-11-03 (GOAL MET: 1 block archived) — opened 2026-11-03 — session f5444ea1-9fd1-4849-a787-370e12ddb49a
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness --idle-min 240 SAFE for 1 of 7 CLOSED blocks; moved `closed-lane-archive-20261103-1706`. Readings in log/2026-11-03.md.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -812,6 +812,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261103-0851` — CLOSED 2026-11-03 (GOAL MET: 2 blocks archived) — opened 2026-11-03 — session 914c633d-6762-4a5d-86ab-b86de9c7afc4
 - `closed-lane-archive-20261103-1150` — CLOSED 2026-11-03 (GOAL MET: 1 block archived) — opened 2026-11-03 — session 223c5374-1929-4e07-8b95-2fedd6836e2f
 - `closed-lane-archive-20261103-1302` — CLOSED 2026-11-03 (GOAL MET: 1 block archived) — opened 2026-11-03 — session af622b20-78d3-4c4c-868e-3e5bd1b754e1
+- `closed-lane-archive-20261103-1706` — CLOSED 2026-11-03 (GOAL MET: 2 blocks archived) — opened 2026-11-03 — session 6dc2fbc3-1988-466a-9dc9-00370e852775
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
