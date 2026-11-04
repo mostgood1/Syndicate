@@ -235,3 +235,54 @@ def test_h27_verdict(n, mae_m, mae_k, bias, today, expected):
 def test_implied_mean_inverts_nb_sf():
     mean = fg.implied_mean(9.5, 0.5, 1.3)
     assert abs(common.nb_sf(10, mean, 1.3) - 0.5) < 1e-6
+
+
+# --- pull pages the export (lane soccer-forward-grade-pull-paging, 2026-11-04) -------------------------------
+
+
+class _FakeExport:
+    """The export route's contract, from ops.py: a `since` request is filled OLDEST-FIRST, and a truncated page
+    names `next_since` -- the mtime of the first file that did not fit, which the next page re-includes."""
+
+    def __init__(self, files: dict, per_page: int, stall: bool = False):
+        self.files = sorted(files.items(), key=lambda kv: kv[1])  # (name, mtime)
+        self.per_page, self.stall, self.calls = per_page, stall, []
+
+    def __call__(self, base, token, params, timeout):
+        self.calls.append(dict(params))
+        if "since" not in params:  # the old one-shot read: walk order, no resume point
+            return {"artifacts": {n: {"n": n} for n, _ in self.files[:self.per_page]},
+                    "truncated": len(self.files) > self.per_page, "next_since": None}
+        since = float(params["since"])
+        todo = [(n, m) for n, m in self.files if m >= since]
+        page, rest = todo[:self.per_page], todo[self.per_page:]
+        return {"artifacts": {n: {"n": n} for n, _ in page}, "truncated": bool(rest),
+                "next_since": None if (not rest or self.stall) else rest[0][1], "oversize": []}
+
+
+def test_export_paged_collects_every_file_across_pages_oldest_first():
+    files = {f"soccer_source/epl/api/recommendations/recommendations_prekickoff_2026-10-{d:02d}.lo.json": 1000.0 + d
+             for d in range(1, 8)}
+    fake = _FakeExport(files, per_page=3)
+    got, oversize, pages = fg._export_paged(fake, "b", "t", fg.PREKICKOFF_PATTERN)
+    assert set(got) == set(files) and oversize == [] and pages == 3
+    assert [c["since"] for c in fake.calls] == ["0.0", "1004.0", "1007.0"]  # every page carries the cursor
+
+
+def test_one_shot_export_is_the_failure_paging_replaces():
+    # Control arm: the request the pull used to make, over the same files, delivers a partial set.
+    files = {f"f{d}.json": 1000.0 + d for d in range(1, 8)}
+    res = _FakeExport(files, per_page=3)("b", "t", {"pattern": "x"}, 900)
+    assert res["truncated"] and res["next_since"] is None and len(res["artifacts"]) == 3
+
+
+def test_export_paged_raises_when_the_cursor_cannot_advance():
+    fake = _FakeExport({f"f{d}.json": 1000.0 + d for d in range(1, 8)}, per_page=3, stall=True)
+    with pytest.raises(SystemExit, match="stalled"):
+        fg._export_paged(fake, "b", "t", fg.PREKICKOFF_PATTERN)
+
+
+def test_export_paged_single_page_when_nothing_is_cut():
+    fake = _FakeExport({"a.json": 1.0, "b.json": 2.0}, per_page=10)
+    got, _oversize, pages = fg._export_paged(fake, "b", "t", "x")
+    assert set(got) == {"a.json", "b.json"} and pages == 1

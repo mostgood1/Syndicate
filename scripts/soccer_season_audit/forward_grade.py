@@ -566,6 +566,39 @@ def _stream(base: str, token: str, rel_path: str, dest: Path) -> int:
     return dest.stat().st_size
 
 
+EXPORT_MAX_PAGES = 50
+
+
+def _export_paged(export, base: str, token: str, pattern: str, pause: float = 0.0) -> tuple[dict, list, int]:
+    """Every file `pattern` matches, as ({name: body}, oversize, pages), through the export's resume cursor.
+
+    Lane `soccer-forward-grade-pull-paging`, 2026-11-04. A request WITHOUT `since` stops at the response budget in
+    walk order and gives no point to resume from, and the freeze outgrew it: fleet 11-04, 291 freeze files / 94.4 MB
+    against a 48 MB budget -> 183 delivered, `truncated` with `next_since` null, so `pull` aborted on 10-26 and
+    11-02. A request WITH `since` is filled oldest-first and a truncated one names `next_since`, a floor that skips
+    nothing (ops.py `api_ops_artifacts_export`). `since=0` starts at the oldest file. A truncated page without
+    `next_since` is the server saying it cannot advance: that raises, because a grade over a partial freeze reads
+    as a complete one.
+    """
+    artifacts: dict = {}
+    oversize: list = []
+    since = 0.0
+    for page in range(1, EXPORT_MAX_PAGES + 1):
+        res = export(base, token, {"pattern": pattern, "since": repr(since)}, 900)
+        artifacts.update(res.get("artifacts") or {})
+        oversize.extend(o for o in res.get("oversize") or [] if o not in oversize)
+        if not res.get("truncated"):
+            return artifacts, oversize, page
+        nxt = res.get("next_since")
+        if nxt is None or float(nxt) <= since:
+            raise SystemExit(f"export of {pattern} stalled at page {page} (since={since!r}, next_since={nxt!r}): "
+                             "the server cannot advance the cursor -- not grading over a partial set")
+        since = float(nxt)
+        if pause:
+            time.sleep(pause)
+    raise SystemExit(f"export of {pattern} still truncated after {EXPORT_MAX_PAGES} pages")
+
+
 def pull(cache: Path, with_book_quotes: bool = False, pause: float = 2.0, env_root: Path | None = None) -> dict:
     from syndicate.features.soccer.ingestion.espn_lineups import fetch_match_summary  # noqa: E402
     cache = Path(cache)
@@ -575,16 +608,15 @@ def pull(cache: Path, with_book_quotes: bool = False, pause: float = 2.0, env_ro
     now = dt.datetime.now(dt.timezone.utc)
     tally = collections.Counter()
 
-    res = export(base, token, {"pattern": PREKICKOFF_PATTERN}, 900)
-    for name in [o["path"] for o in res.get("oversize") or []]:
+    freeze, oversize, pages = _export_paged(export, base, token, PREKICKOFF_PATTERN, pause)
+    tally["freeze_pages"] += pages
+    for name in [o["path"] for o in oversize]:
         _stream(base, token, name, cache / "freeze" / f"{name.split('/')[1]}__{os.path.basename(name)}")
         tally["freeze_streamed"] += 1
-    for name, body in (res.get("artifacts") or {}).items():
+    for name, body in freeze.items():
         text = json.dumps(body) if isinstance(body, (dict, list)) else body
         (cache / "freeze" / f"{name.split('/')[1]}__{os.path.basename(name)}").write_text(text, encoding="utf-8")
         tally["freeze_files"] += 1
-    if res.get("truncated"):
-        raise SystemExit("freeze export truncated: re-run with a narrower pattern before grading")
 
     started = []
     for f in load_freeze_files(cache / "freeze"):
@@ -619,12 +651,14 @@ def pull(cache: Path, with_book_quotes: bool = False, pause: float = 2.0, env_ro
                                   (f"soccer_source/*/props/{iso}.csv", "prod/props", "csv")):
             if not fresh and list((cache / sub).glob(f"*_{iso}.{ext}")):
                 continue
-            r = export(base, token, {"pattern": pattern}, 900)
-            for name, body in (r.get("artifacts") or {}).items():
+            # Paged too: these exports never checked `truncated`, so a cut would have dropped leagues silently.
+            bodies, oversize, pages = _export_paged(export, base, token, pattern, pause)
+            tally[f"{sub}_pages"] += pages
+            for name, body in bodies.items():
                 text = json.dumps(body) if isinstance(body, (dict, list)) else body
                 (cache / sub / f"{name.split('/')[1]}_{iso}.{ext}").write_text(text, encoding="utf-8")
                 tally[f"{sub}_files"] += 1
-            tally[f"{sub}_oversize_skipped"] += int(r.get("oversize_skipped") or 0)
+            tally[f"{sub}_oversize_skipped"] += len(oversize)
             time.sleep(pause)
         if with_book_quotes and d in days:
             dest = cache / "book_quotes" / f"{iso}.jsonl"

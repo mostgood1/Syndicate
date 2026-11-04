@@ -733,6 +733,14 @@ death, never life — do not invert it.
 - Verification: off != on reachability tests; read-only fleet fan-in off (fleet checkout) vs on (worktree), sampled pairs by team/side/line; after a user-approved ff + refresh-worker restart: refresh-worker log shows polymarket_us repricing ncaab / wncaab sides and DAILY_BOOK skipped_by_sport without wncaab, recorded in deploys.md
 - Blocked by: none
 
+### soccer-forward-grade-pull-paging — OPEN — opened 2026-11-04 — session 8000dc38-298a-4e02-806b-15931006aff3
+- Goal: forward_grade.py pull completes against the fleet with no 'freeze export truncated' abort: the freeze, game_markets and props exports page through /api/ops/artifacts/export's since/next_since cursor (a stall raises, never skips); then a fresh grade advances W1r/W2/W3 past their stale 10-19 numbers before the 11-15 grade date
+- Files: scripts/soccer_season_audit/forward_grade.py, tests/test_soccer_forward_grade.py
+- Hypothesis: The pull aborts because it exports every league's pre-kickoff freeze with ONE no-since request; past the 48 MB response budget a no-since export truncates in walk order with no resume point (ops.py:2928-2932), and forward_grade.py:586 raises on it. The since-bearing path fills oldest-first and returns next_since (ops.py:2960-2978).
+- Falsification test: A since-paged pull still returns truncated with next_since=null (a stall), or still misses freeze files a names-only inventory of the same pattern lists
+- Verification: pull exits 0 against the fleet with freeze_pages >= 2 and the freeze file count equal to the server's inventory for the pattern; grade's W1r/W2/W3 funnels move off the 10-19 numbers (25/39/37 bets); recorded in log + state_soccer
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
