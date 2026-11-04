@@ -620,6 +620,11 @@ death, never life — do not invert it.
   - LEFT:
     - the 7 PM CST reading, taken after the fact 13:45Z: NOT MET on (a)'s letter (`game_not_started` x1). (b) and (c) MET; men's s/game 0.30x 11-02. Reading 7 NOT MET: men's median |offset| 3.24 > 2.5, signed bias +4.6 -> -0.15. NCAAB credits/h over a live hour not measurable after the fact. The stalled run (`local_fb3dd7ca`) is still open;
     - the lead: live spread edges lean one way (+4.5 pp signed median, both leagues);
+      - HYPOTHESIS 2026-11-04 15:11Z, before testing (user "Yes, diagnose it"). A spread row's `edge_pp` = P_model(home covers the row's away-frame line L, i.e. margin > L) - the de-vigged market P(home covers) (`live_gameline_join.py:1686`, `:893`, `:935`). Positive = the model likes home.
+        - H1, line frame: college grid spread rows carry the HOME-frame line. Falsified if, at fixed progress, the signed edge does not change sign with the favorite and `model_margin_mean - L` centres on 0.
+        - H2, in-play home drift: the anchor or the home-court term adds home margin during play. Falsified if `model_margin_mean` minus the market-implied margin centres on 0 at every progress band.
+        - H3, segment: half rows priced off the full-game margin distribution. Falsified if the lean is the same on full-game rows alone.
+        - Grading the rows against the finals decides whether model or market was right.
     - the women's MARGIN_CALIBRATION_K;
     - the 5 women's teams with no player priors.
 - **STATUS 2026-11-03 22:58Z: college prior calibration + engine efficiency bounds LIVE (pregame VERIFIED; live half owed tonight)**
