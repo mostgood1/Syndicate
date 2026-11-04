@@ -733,7 +733,8 @@ death, never life — do not invert it.
 - Verification: off != on reachability tests; read-only fleet fan-in off (fleet checkout) vs on (worktree), sampled pairs by team/side/line; after a user-approved ff + refresh-worker restart: refresh-worker log shows polymarket_us repricing ncaab / wncaab sides and DAILY_BOOK skipped_by_sport without wncaab, recorded in deploys.md
 - Blocked by: none
 
-### soccer-forward-grade-pull-paging — OPEN — opened 2026-11-04 — session 8000dc38-298a-4e02-806b-15931006aff3
+### soccer-forward-grade-pull-paging — CLOSED 2026-11-04 (GOAL MET) — opened 2026-11-04 — session 8000dc38-298a-4e02-806b-15931006aff3
+- **GOAL VERDICT `[2026-11-04 17:31Z]`: GOAL: MET.** Pull rc 0 against the fleet: freeze_pages 2, freeze_files 291 = the names-only inventory, game_markets/props paged (18 pages each), 0 oversize. Grade on 574 merged matches (was 329): W1r 42 bets -7.0%, W2 64 bets -12.8%, W3 67 bets -8.4%, all WATCHING and moved off their 10-19 numbers. Commits ea69b8bbe + ad032ca67 (a book_quotes 404 is now counted, not fatal). log/2026-11-04.md 17:31Z.
 - Goal: forward_grade.py pull completes against the fleet with no 'freeze export truncated' abort: the freeze, game_markets and props exports page through /api/ops/artifacts/export's since/next_since cursor (a stall raises, never skips); then a fresh grade advances W1r/W2/W3 past their stale 10-19 numbers before the 11-15 grade date
 - Files: scripts/soccer_season_audit/forward_grade.py, tests/test_soccer_forward_grade.py
 - Hypothesis: The pull aborts because it exports every league's pre-kickoff freeze with ONE no-since request; past the 48 MB response budget a no-since export truncates in walk order with no resume point (ops.py:2928-2932), and forward_grade.py:586 raises on it. The since-bearing path fills oldest-first and returns next_since (ops.py:2960-2978).
