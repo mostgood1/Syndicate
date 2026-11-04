@@ -281,7 +281,23 @@ The [M] "11-02" column is from the 11-02 plan. "Now" is this pass.
   - It makes the robocopy fallback ~2x heavier.
   - Deleting or archiving it is a **separate** decision. It is not part of this lane, and the user decides it after
     checking that nothing reads it (memory `feedback_scan_the_parent_path_piece`: grep `vendor` too).
-- The OneDrive file count is in §8 V6.
+- **OneDrive file count, measured 2026-11-04 (`find -type f` per folder, read-only; the scan finished ~15:55Z) [M]:**
+  **~509,800 files**, not the ~350k the brief assumed. It has crept back up since the 10-29 shrink to ~389k.
+
+  | Folder | Files |
+  |---|---|
+  | `Coding/Syndicate` | 413,952 |
+  | ...of which `.claude/` (worktrees) | 322,263 |
+  | ...of which `data/` | 42,715 |
+  | ...of which `vendor/` | 34,533 |
+  | ...of which `.git/` | 6,634 |
+  | `Coding/NCAAB` | 86,891 |
+  | `Coding/NFL-Betting` | 6,354 |
+  | `Coding/NCAAFCompare` | 1,839 |
+  | everything else | < 1,000 |
+
+  - **After the move, ~95,900 files remain**, well under 300k, so V6 passes without F4.
+  - F4 (moving the siblings too) would take it to ~1,000. NCAAB alone is 86,891.
 
 ---
 
@@ -390,7 +406,7 @@ anything else, so that a fleet deploy cannot split the lock.
 | V3 | **Fleet unaffected:** from WSL, `deploy_claim.py status` lists the same claims as Windows `py -3 scripts/deploy_claim.py status` at the new path. `local_production.py status` shows the same supervisor pid and `started_at` as before the window. The next `data-backup` (09:15Z) archive lands in `OneDrive\SyndicateBackup` and reads synced (state 2/14) | identical; pid unchanged; archive synced |
 | V4 | **Deploy guard loads:** in a new session at the new path, run a dry-run `deploy_claim.py status`, then a guard invocation that should block (a deploy-shaped command with no claim) and check that it is refused | refused, with the remedy text |
 | V5 | **Scheduled tasks fire:** `list_scheduled_tasks` shows 60 tasks, 35 enabled, `cwd` = new path. Run-now one cheap task; its first message shows the new cwd. `\SyndicateTaskRegistryCheck` next run reports OK. `\Syndicate inplay nightly` log on **night 1 and night 2** (the F1 revert shows only on night 2): `SYNC origin/main=<non-empty sha>` with **0** `SYNC_KEEP` lines, and `recorder.stdout` has no `FileNotFoundError`. A missing repo still prints `SYNC origin/main= changed=[]` with an empty sha | all |
-| V6 | **OneDrive count:** `find C:/Users/tempadmin/OneDrive -type f \| wc -l` (read-only) | < 300,000 |
+| V6 | **OneDrive count:** `find C:/Users/tempadmin/OneDrive -type f \| wc -l` (read-only). Baseline 11-04: ~509,800; expected after: ~95,900 | < 300,000 |
 | V7 | Memory carried: `C:\Users\tempadmin\.claude\projects\C--Users-tempadmin-Coding-Syndicate\memory` has 142 files, and a new session's context lists the memory index | yes |
 | V8 | Hooks: a `git commit` in a worktree runs `.githooks` (`git config --get core.hooksPath` = the new path) | yes |
 | V9 | No old-path writes: 24 h later, `C:\Users\tempadmin\OneDrive\Coding\Syndicate` still does not exist | absent |
