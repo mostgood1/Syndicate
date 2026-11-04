@@ -693,11 +693,6 @@ death, never life — do not invert it.
 - Verification: refresh-worker.log after the restart that loads the fix: QUOTE_CAPTURE appended_by_sport['wncaab'] > 0; SEGMENT_MISMATCH_GRID sport=wncaab repriced > 0 and count=0; sampled pairs correct by team, side and line
 - Blocked by: none
 
-### closed-lane-archive-20261104-0530 — CLOSED 2026-11-04 (GOAL MET: 1 block archived) — opened 2026-11-04 — session 7146e063-8b93-4000-b518-333dd6e21a55
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness --idle-min 240 gave 1 SAFE of 7 CLOSED; moved `closed-lane-archive-20261104-0221`. Table + Part B in .syndicate/log/2026-11-04.md.
-
 ### repo-out-of-onedrive-plan — OPEN — opened 2026-11-04 — session eeaddaa6-9251-44ab-b4c4-546b2d84cd8e
 - GOAL VERDICT `[2026-11-04]`. Goal (verbatim): "A reviewed, user-presented runbook to move the repo from C:\Users\tempadmin\OneDrive\Coding\Syndicate to C:\dev\Syndicate, with a file:line inventory of every path dependency, ordering, quiesce, git-native move, rollback, verify and downtime. READ-ONLY: moves nothing." -- **GOAL: MET** on push of `docs/ai_context/repo_out_of_onedrive_plan.md` to origin/main (independent review folded in; go/window question put to the user in-session). The plan recommends `C:\Users\tempadmin\Coding\Syndicate` over `C:\dev` (ACL + existing script/backup). It found a 11-02 move script that failed twice (app open), plus post-rename blocker S1 and recorder blocker F6. Lane stays OPEN only until the user answers; the move itself needs its own lane.
 - Goal: A reviewed, user-presented runbook to move the repo from C:\Users\tempadmin\OneDrive\Coding\Syndicate to C:\dev\Syndicate, with a file:line inventory of every path dependency, ordering, quiesce, git-native move, rollback, verify and downtime. READ-ONLY: moves nothing.
@@ -723,6 +718,11 @@ death, never life — do not invert it.
 - Falsification test: After the change is live, a UEL/UECL match 24-72h out still has 0 alternate_totals_corners rows in its book_quotes shard while OddsAPI returns corners for it (probe 2026-11-04 15:2xZ: Ferencvaros @ AC Milan 26.4h out had fanduel/pinnacle/draftkings corners)
 - Verification: fleet book_quotes shard for the next UEFA matchday carries uel/uecl/ucl alternate_totals_corners rows whose captured_at is >24h before commence_time, and /api/board/layer2-shortlist?sport=soccer&date=<tomorrow> serves them; x-requests-last for a game-only call <= 2; recorded in deploys.md
 - Blocked by: none
+
+### closed-lane-archive-20261104-0936 — CLOSED 2026-11-04 (GOAL MET: 1 block archived) — opened 2026-11-04 — session 58b50504-07d9-4335-9985-dcde45a48cc9
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness --idle-min 240 SAFE for 1 of 7 CLOSED blocks; moved `closed-lane-archive-20261104-0530` to lanes_closed.md with one pointer. Table and WAIT reasons in log/2026-11-04.md.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -886,6 +886,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261103-1706` — CLOSED 2026-11-03 (GOAL MET: 2 blocks archived) — opened 2026-11-03 — session 6dc2fbc3-1988-466a-9dc9-00370e852775
 - `closed-lane-archive-20261103-2115` — CLOSED 2026-11-03 (GOAL MET: 1 block archived) — opened 2026-11-03 — session f5444ea1-9fd1-4849-a787-370e12ddb49a
 - `closed-lane-archive-20261104-0221` — CLOSED 2026-11-04 (GOAL MET: 1 block archived) — opened 2026-11-04 — session fbda37da-0ede-4603-819a-08508fc767f0
+- `closed-lane-archive-20261104-0530` — CLOSED 2026-11-04 (GOAL MET: 1 block archived) — opened 2026-11-04 — session 7146e063-8b93-4000-b518-333dd6e21a55
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
