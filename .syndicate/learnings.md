@@ -3243,3 +3243,16 @@ Two beliefs overturned by three refused college games on one slate:
 The 11-02 Suggested grade put soccer at -4.86% EV at the close and called it the fair's fault. The grading script kept a book only if its price had CHANGED within 12 h (6 h at the close). The quote tape writes a row only on a change, so a corners ladder that sat still for a day read as dead, and the fair rested on the book being bet. The board's fair was right all along (+3.16% rebuilt from live books vs +3.20% shown, 14 games).
 
 **Rule:** on `book_quotes`, staleness is the state file's last-seen (`read_quote_last_seen`, `fair_price_eval --live-tol-min`), never the age of the last row. Before blaming a fair, rebuild it from the books that were live at that moment and check the rebuild reproduces the board.
+
+### 2026-11-04 -- a price-gap A/B cannot see a wrong-game price; check every new venue side's provenance (lanes polymarket-cbb-pairing, kalshi-state-cap)
+The frozen fleet A/B for Polymarket college basketball reported 0 lost / 0 changed, a median 0.9-point gap to the book prices it replaced, and two "outliers", which were filed as one empty Polymarket book (0.99 / 0.99). After the rollout an identity spot-check found 6 of 98 newly priced men's sides carrying ANOTHER game's market. Example: Cal Poly @ Arizona 168.5 priced from Wake Forest @ Vanderbilt's alternate-total rung. How it happened:
+- A college game whose slug codes do not resolve is emitted with `game=None`.
+- The fan-in tries the bare `<sport>|totals|<side>|<line>` key first.
+- `#603`'s claimant rule counts only the GRID's games, so any line one board game holds was uncontested.
+
+The same evening, the college additions pushed `kalshi_markets.json` over its 8 MiB keyvalue cap. "Size" had been checked only as a test count, never against the cap.
+
+**Rule:**
+- For every side a venue newly prices, check that the quote's `venue_ref` names THIS row's game. Do this as well as the price gap, which a plausible wrong-game price passes.
+- An outlier is not filed as "empty book" until its slug is read.
+- Adding a sport's markets to a capped keyvalue document needs the document's size read against the cap before landing (`KEYVALUE_PAYLOAD_COMPOSITION`).

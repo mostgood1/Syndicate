@@ -56375,3 +56375,46 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - The run's overall `state=failed` is `wncaab_post_refresh_tracking_sync` -> `unsupported_sport:wncaab` (`odds_refresh_tracking.py:3122`), **pre-existing**: same failure in runs 18:31Z, 18:40Z, 21:15Z, 21:59Z and on 11-03, all before this ff. Not this change.
   - Local replay on the fleet's 11-04 inputs (pre-ff): the 22 fallback players' output CSV is byte-identical old vs new; old 1,674,962 merged rows / +1,894 MB / 30.7 s, new 6,508 / +12 MB / 1.0 s.
 - **OOM attribution (15:53:53Z, 9.1 GB anon):** very likely NOT this script -- no props run between 15:09Z and 16:40Z in `ALL_PROCESS_MEMORY`; `news_price_follow.py --data-root data --start 2026-10-13` (pid 3892188) peaked 9,862 MB at 16:04:24Z and was re-run chunked. The kernel ring no longer holds 15:53Z, and the ~10-min gap is assumed to be `dmesg -T` drift, not proven.
+
+## 2026-11-04 23:24:11Z (5:24 PM CST) -- FLEET ff 7b30517b1 -> e10ea9610 + reload-web + refresh-worker AND live-odds-worker TERM 23:26:04Z on a joint CLEAR: Kalshi markets state back under its keyvalue cap (lane `kalshi-state-cap`) + college Polymarket wrong-game fix `f070ac25c` loaded (lane `polymarket-cbb-pairing`) -- **MET**
+- **User, in this chat:** "Yes, restart both", answering "Fast-forward the fleet to e10ea9610 and restart both workers together, with a web reload?"
+- **Why:** reported by the NCAAF backtesting session.
+  - `intelligence/kalshi_markets.json` (keyvalue only) reached 8,386,958 B against the 8,388,608 cap.
+  - live-odds-worker logged `KEYVALUE_WRITE_REJECTED` from 20:40:56Z (40 by 22:33Z, 8.41 -> 8.56 MB). refresh-worker followed from 21:18:09Z and landed only when just under, so the rotation could not record its progress.
+  - The disk file's mtime is 2026-09-30. It is not the state.
+  - This week's college pairings (KXNCAAMB* / KXNCAAWB*, 636 KB) were the last increment.
+- **Change `e10ea9610`:** `kalshi_odds_refresh` stores the 6 derivable lean fields (event_ticker, series, yes/no_probability, yes/no_american) only when derivation would not reproduce them (`_compact_market`). Every read restores them (`_expand_market`, in `markets_from_state` and in the rotation's read of the stored series). A derivable field stored as None is filled on read, which covers an old-code writer during the rollout.
+- **Also loaded:** `f070ac25c` (college Polymarket quotes that name no game are dropped).
+- **Ride-alongs loaded by these worker restarts:**
+  - `7b30517b1`: odds_book_quotes state under the shard lock, lane `book-quotes-state-reset`. Its owner had ff'd it to the fleet with no restart; it is now in both long-running workers since 23:26:11Z / 23:27:18Z.
+  - `94e545522`: basketball_props_edges + refresh_odds_sources, already used by child processes.
+  - `7b205d9d3`: fair_price_eval, a script.
+  - Fleet dirty files: 0 overlap.
+- **Pre-deploy, read-only (22:54Z), worktree code applied to the live state:**
+  - Size: 8,386,105 -> 5,586,953 B (66.6%).
+  - 0 round-trip mismatches over 19,393 rows; `markets_from_state` output identical.
+  - 3,148 rows keep the venue's own event_ticker.
+  - Tests: 12 new; 1,648 pass across the 71 test files touching the Kalshi state.
+- **Gates:**
+  - Claims on web, refresh-worker and live-odds-worker at 23:23:30Z (`kalshi-state-cap`).
+  - Baseline 23:23:53Z: `kalshi_state_rejected_30m=19` (refresh-worker 7, live-odds-worker 12) and `kalshi_state_bytes=8881781`. Expect 0 and <6000000.
+  - Web preflight (fleet, `e10ea9610`) CLEAR at 23:24:05Z.
+  - `git merge --ff-only e10ea9610` at 23:24:11Z: 2 commits; the only runtime file is `kalshi_odds_refresh.py`.
+  - `reload-web` at 23:24:29Z: done in 2.0 s, 0 failures. Web claim released 23:24:39Z.
+  - Joint poll: refresh-worker HOLD on tries 1-4 (board build in flight); both CLEAR at 23:25:51Z (try 5).
+  - `kill -TERM 3988772` + `kill -TERM 3984665` at 23:26:04Z. `role_restarts.jsonl`: refresh-worker exit 23:26:07Z, claimed, holder `kalshi-state-cap`.
+  - Respawned: refresh-worker pid 4021599 at 23:26:11Z; live-odds-worker pid 4021781 at 23:27:18Z. All three roles `code=e10ea961`.
+  - Worker claims released 23:27:34Z.
+- **VERIFY (23:26:11Z-23:33:32Z, 7 min): MET.**
+  - `KEYVALUE_WRITE_*` kalshi_markets: refresh-worker 5 written, 0 rejected. live-odds-worker 1 written at 23:32:52Z (its first since 20:40Z), 0 rejected. 0 `WRITE_FAILED` and 0 tracebacks on either worker. Sizes 5,708,295 -> 5,947,331 B.
+  - Read-back at 23:28:57Z: stored 5,711,660 B, all 19,816 rows compacted. `markets_from_state` returns 19,816 rows with 0 None ticker / event_ticker / series / close_time.
+  - Kalshi-priced grid sides, last line before the restart (23:22Z) -> first after (23:29-23:34Z):
+    - nba 0 -> 28
+    - nfl 18 -> 68
+    - ncaaf 10 -> 46
+    - ncaab 3 -> 81
+    - wncaab 2 -> 5
+  - College Polymarket with the fleet's code (23:28:21Z): ncaab 1,584 quotes, 0 unnamed; 54 newly priced sides, all same-game. wncaab 4, same-game.
+- **Owed / not shown:**
+  - A 7-min window is not tonight. Rejections should stay 0 through the evening slate; the NCAAF backtesting session watches the count hourly.
+  - The rotation's `oldest_s` was ~12,400 s at 23:33Z (series not yet re-fetched, 190 per tick) and should fall over the next ticks.

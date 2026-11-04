@@ -56,6 +56,16 @@
   - The user's yes for a fleet ff plus a refresh-worker restart (price feed, order-path join, Kalshi archive) and a live-odds-worker restart (Polymarket and Kalshi archive).
   - Then the readings: `SEGMENT_MISMATCH_GRID sport=ncaab` repricing from `polymarket_us`, `POLYMARKET_BOARD_JOIN` matches including ncaab, and DAILY_BOOK `skipped_by_sport` without `cbb` / `wcbb` / `wncaab`.
 - **Lead, not followed:** an empty Polymarket book (both asks 0.99) replaces a fresher-aged book price on the board in every sport. Sums outside [0.90, 1.10] on the 11-04 slate: NHL totals 210 of 336, cbb totals 168 of 362, wcbb moneylines 333 of 384. It is an executable price, but it hides the book's line.
+- **(b) LIVE AND MET 2026-11-04 23:34Z (lane `polymarket-cbb-pairing` CLOSED).**
+  - `b27fbf454` went live via lane `wncaab-module`'s rollout (fleet `60b131d32`, 21:06Z / 21:18Z restarts).
+  - A wrong-game defect was found on the fleet. Unnamed college totals ladders priced another game on an uncontested line: 6 of 98 men's sides at 21:30Z, e.g. Cal Poly @ Arizona 168.5 from Wake Forest @ Vanderbilt's market.
+  - The fix `f070ac25c` (college quotes that name no game are dropped) was loaded at 23:26Z with `e10ea9610`. With the fleet's code at 23:28Z: 0 unnamed quotes, and 54 newly priced men's sides and 4 women's sides, all same-game.
+  - Archive skips: cbb / wcbb / Kalshi wncaab -> 0. Order path: POLYMARKET_QUOTE_CAPTURE lists ncaab (39 appended at 21:36Z).
+- **Consequence, fixed same night (lane `kalshi-state-cap` CLOSED):** this week's college Kalshi pairings pushed `intelligence/kalshi_markets.json` over its 8 MiB keyvalue cap.
+  - Writes were refused from 20:40:56Z.
+  - `e10ea9610` stores the derivable lean fields once and derives them on read: 8.39 -> 5.59 MB, lossless.
+  - After the 23:26Z restart: 0 rejected writes on either worker, and Kalshi-priced ncaab sides rose 3 -> 81.
+  - deploys.md 23:24:11Z.
 - **(c) No pregame model.** NCAAB rows are market-fair only. `/ncaab/cards` stays empty: its `recommendations_<date>.json` was produced only by the retired external NCAAB app (nothing in the repo writes `predictions_unified_enriched_<date>.csv`). The team-ratings job rolled to season 2027 on 11-01 with 0 games (`teams_rated=0 written=None`); it fills as games are played.
 - **(d) OddsAPI cost of the half-game markets (UNMEASURED).** The default NCAAB markets include h1/h2, which force one per-event request per game on the slate date (~7 credits/event/sweep; ~120 events on 11-02). Read `/api/ops/oddsapi/quota` `by_sport.ncaab` after the first 11-02 sweeps. The user chose to keep halves (11-01).
 - **(e) Manual odds trigger is unreliable on a busy live loop.** `POST /api/ops/odds-refresh/run` (manifest_only) returned 202 for an ncaab 11-02 run at 17:33:19Z and never ran: the single latest-manifest slot was apparently overwritten by the live loop's own launches first (deploys.md 11-01 16:49:50Z entry). Not investigated.
