@@ -86,6 +86,11 @@ PRESEASON_FADE_GAMES = 10
 # rather than being priced off players who left. The daily job re-reads rosters; a team enters the
 # table the day ESPN loads its real one.
 STALE_RETURNING_SHARE = 0.95
+# THE FRESHMAN TELL NEEDS A RETURNING SHARE ABOVE STALE_TELL_FLOOR (lane wncaab-module, user 2026-11-04 "Yes, fix
+# it here"). On its own it read redshirts as staleness: on 11-04's CURRENT rosters it still excluded 30 teams (16
+# men's, 14 women's), every one at 0-60% returning (Grambling women 0%), each on one "Freshman" with 1-30 games of
+# last season's box. The 10-12 sample above found 0/8 stale at <= 65% returning, so the tell counts only above it.
+STALE_TELL_FLOOR = 0.65
 
 
 def processed_dir() -> Path:
@@ -286,11 +291,12 @@ def stale_roster_reason(roster: Sequence[Mapping[str, Any]], prev_athletes: set[
     """Why this roster looks like LAST season's, or None. See STALE_RETURNING_SHARE."""
     if not roster:
         return "empty_roster"
-    if any(str(p.get("experience") or "").lower() == "freshman" and str(p.get("athlete_id")) in prev_athletes for p in roster):
-        return "freshman_with_prior_season_box"
-    returning = sum(1 for p in roster if str(team_id) in prev_teams.get(str(p.get("athlete_id")), set()))
-    if returning / len(roster) >= STALE_RETURNING_SHARE:
+    share = sum(1 for p in roster if str(team_id) in prev_teams.get(str(p.get("athlete_id")), set())) / len(roster)
+    if share >= STALE_RETURNING_SHARE:
         return "returning_share_at_or_above_stale_floor"
+    if share > STALE_TELL_FLOOR and any(str(p.get("experience") or "").lower() == "freshman"
+                                         and str(p.get("athlete_id")) in prev_athletes for p in roster):
+        return "freshman_with_prior_season_box"
     return None
 
 
@@ -488,6 +494,44 @@ def build_preseason(season: int, today: dt.date, *, rate: float) -> dict[str, An
     return out
 
 
+def refresh_preseason_gaps(season: int, today: dt.date, *, rate: float) -> dict[str, Any]:
+    """Re-read the rosters of registry teams MISSING from the newest preseason table, and add the ones that load.
+
+    Once a season has finals, `run` stops calling `build_preseason`, so the STALE ROSTERS promise above ("the daily
+    job re-reads rosters") held only until the opener: a team left out on opening day stayed out, and its first
+    game refused `team_has_no_player_priors` (Robert Morris women, 11-05). A team that has played needs the rows
+    too: `compute_priors` blends them into its early minutes. Only the gaps are fetched; a table's existing rows
+    are carried unchanged into a new `player_preseason_*` dated today. No `player_priors_*` is written here."""
+    paths = sorted(processed_dir().glob(f"player_preseason_{season}_asof_*.csv"))
+    if not paths:
+        return {}
+    have_rows = read_csv(paths[-1])
+    gaps = sorted(set(ratings.load_registry()) - {r["team_id"] for r in have_rows})
+    out: dict[str, Any] = {"preseason_gaps": len(gaps)}
+    if not gaps:
+        return out
+    prev = read_csv(box_path(season - 1))
+    if not prev:
+        out["preseason_gaps_refused"] = f"no prior-season box at {box_path(season - 1)}"
+        return out
+    rosters: dict[str, list] = {}
+    for tid in gaps:
+        try:
+            rosters[tid] = fetch_roster(tid)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[ncaab_player_priors] ROSTER_FAILED team={tid} {exc}", flush=True)
+        time.sleep(1.0 / rate)
+    stale: dict[str, str] = {}
+    added = compute_preseason(rosters, prev, stale_out=stale)
+    out.update({"preseason_gaps_filled": len({k[0] for k in added}), "preseason_gaps_stale": len(stale),
+                "preseason_gaps_roster_errors": len(gaps) - len(rosters)})
+    if added:
+        merged = {(r["team_id"], r["athlete_id"]): r for r in have_rows}
+        merged.update(added)
+        out["preseason_written"] = str(write_priors(season, today, merged, path=preseason_path(season, today)))
+    return out
+
+
 def run(season: int, today: dt.date, *, rate: float, max_new_games: int | None, crawl_only: bool,
         preseason: bool = False) -> dict[str, Any]:
     counts = crawl(season, today, rate=rate, max_new_games=max_new_games)
@@ -497,6 +541,7 @@ def run(season: int, today: dt.date, *, rate: float, max_new_games: int | None, 
         counts.update(build_preseason(season, today, rate=rate))
         written = counts.get("written")
     elif rows and not crawl_only:
+        counts.update(refresh_preseason_gaps(season, today, rate=rate))
         as_of = min(today, dt.date.fromisoformat(max(r["date"] for r in rows)) + dt.timedelta(days=1))
         priors = compute_priors(rows, as_of=as_of, d1=ratings.load_registry(), prior_rows=read_csv(box_path(season - 1)),
                                 preseason=newest_preseason(season))

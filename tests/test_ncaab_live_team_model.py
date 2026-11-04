@@ -214,3 +214,9 @@ def test_checklist_no_table_is_exit_2(tmp_path, monkeypatch):
     monkeypatch.setattr(tm, "ratings_dirs", _dirs_to(tmp_path / "empty"))
     code, report = checklist.run(dt.date(2026, 1, 20))
     assert code == 2 and report["verdict"] == "NO_TABLE"
+
+
+def test_checklist_coverage_counts_the_programmes_espns_list_omits():
+    """Over the CSV alone the coverage gate could not see Queens, Lindenwood or Southern Indiana go unrated."""
+    assert {"2511", "88", "2815"} <= checklist._d1_ids("ncaab")
+    assert "2385" in checklist._d1_ids("wncaab")

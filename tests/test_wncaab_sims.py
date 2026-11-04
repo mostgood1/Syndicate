@@ -32,7 +32,8 @@ def test_ratings_producer_switches_registry_path_and_root(tmp_path, monkeypatch)
     ratings.configure_league("wncaab")
     women = ratings.load_registry()
     assert "womens-college-basketball" in ratings.SPORT_PATH and ratings.processed_dir() == tmp_path / "wncaab_source" / "data" / "processed"
-    assert len(women) >= 350 and {"2511", "88"} <= set(women) and "2511" not in men  # Queens: women's D-I only
+    # Queens is D-I in both leagues: ESPN's men's team list omits it and the registry supplement adds it (11-04).
+    assert len(women) >= 350 and {"2511", "88"} <= set(women) and "2511" in men and "2385" in women
     ratings.configure_league("ncaab")
     assert ratings.load_registry() == men
 

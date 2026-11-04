@@ -152,6 +152,53 @@ def test_a_stale_roster_is_excluded_not_projected():
     assert out == {"10": "returning_share_at_or_above_stale_floor"}
 
 
+def test_the_freshman_tell_needs_a_stale_returning_share():
+    """11-04: on CURRENT rosters the tell alone excluded 30 teams at 0-60% returning (redshirts with 1-30 games).
+    Robert Morris women: 6 of 13 returning plus two such freshmen -> out of the table, and its 11-05 game refused."""
+    prev = _prev("1", "10") + _prev("5", "10", minutes=15, games=4)
+    current = {"10": [{"athlete_id": "1", "experience": "Senior"}, {"athlete_id": "5", "experience": "Freshman"},
+                      *({"athlete_id": str(n), "experience": "Freshman"} for n in range(20, 22))]}  # 2 of 4 returning
+    out: dict = {}
+    assert {k[1] for k in pp.compute_preseason(current, prev, stale_out=out)} == {"1", "5", "20", "21"} and out == {}
+    assert pp.stale_roster_reason(current["10"][:3], {"1", "5"}, "10", {"1": {"10"}, "5": {"10"}}) == "freshman_with_prior_season_box"
+
+
+def _preseason_csv(path, team_ids):
+    pre = {(t, f"{t}a"): {"team_id": t, "athlete_id": f"{t}a", "player_name": "X", "min_proj": 20.0, "starter_prob": 1.0,
+                          "prior_source": "returning"} for t in team_ids}
+    pp.write_priors(2027, dt.date(2026, 11, 2), pre, path=path)
+
+
+def test_the_daily_run_adds_teams_missing_from_the_preseason_table(tmp_path, monkeypatch):
+    """After the opener `run` no longer built a preseason table, so a team left out on day one stayed out."""
+    monkeypatch.setattr(pp, "processed_dir", lambda: tmp_path)
+    monkeypatch.setattr(pp.ratings, "load_registry", lambda: {"10": "Home U", "20": "Away U", "30": "Stale U"})
+    monkeypatch.setattr(pp, "crawl", lambda *a, **k: {"errors": 0, "games_fetched": 0})
+    monkeypatch.setattr(pp.time, "sleep", lambda s: None)
+    rosters = {"20": [{"athlete_id": "7", "player_name": "New", "experience": "Senior"}],
+               "30": [{"athlete_id": "8", "player_name": "Gone", "experience": "Senior"}]}  # 1 of 1 returning: stale
+    fetched: list[str] = []
+    monkeypatch.setattr(pp, "fetch_roster", lambda tid: fetched.append(tid) or rosters[tid])
+    _preseason_csv(pp.preseason_path(2027, dt.date(2026, 11, 2)), ["10"])
+    pp.append_box(pp.box_path(2026), [{**r, "season": 2026} for r in _prev("8", "30")])
+    pp.append_box(pp.box_path(2027), [{**r, "season": 2027, "date": "2026-11-03", "game_id": "g1"} for r in _prev("1", "10", games=1)])
+    summary = pp.run(2027, dt.date(2026, 11, 4), rate=100, max_new_games=None, crawl_only=False)
+    assert sorted(fetched) == ["20", "30"]  # only the gaps
+    assert summary["preseason_gaps"] == 2 and summary["preseason_gaps_filled"] == 1 and summary["preseason_gaps_stale"] == 1
+    new = pp.read_csv(pp.preseason_path(2027, dt.date(2026, 11, 4)))
+    assert {(r["team_id"], r["athlete_id"]) for r in new} == {("10", "10a"), ("20", "7")}
+    assert summary["written"].endswith("player_priors_2027_asof_20261104.csv")  # the in-season table, not a preseason one
+    assert {r["team_id"] for r in pp.read_csv(Path(summary["written"]))} == {"10"}
+
+
+def test_no_gap_writes_no_new_preseason_table(tmp_path, monkeypatch):
+    monkeypatch.setattr(pp, "processed_dir", lambda: tmp_path)
+    monkeypatch.setattr(pp.ratings, "load_registry", lambda: {"10": "Home U"})
+    _preseason_csv(pp.preseason_path(2027, dt.date(2026, 11, 2)), ["10"])
+    assert pp.refresh_preseason_gaps(2027, dt.date(2026, 11, 4), rate=100) == {"preseason_gaps": 0}
+    assert not pp.preseason_path(2027, dt.date(2026, 11, 4)).exists()
+
+
 def test_preseason_blends_into_early_season_minutes_then_fades():
     pre = {("10", "1"): {"min_proj": 30.0, "starter_prob": 1.0}}
     early = _rows(aid="1", games=1, minutes=10)

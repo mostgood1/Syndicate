@@ -19,7 +19,7 @@ from typing import Iterator, Tuple
 REGISTRY_PATH = Path(__file__).resolve().parent / "ncaab_team_registry.csv"
 # Women's college basketball (lane wncaab-module, 2026-11-02): the same ESPN shape, its own list --
 # 359 of 362 ids are shared with the men's; women's-only Queens/Lindenwood/Southern Indiana are IN
-# ESPN's women's list, so the men's supplement below does not apply to it.
+# ESPN's women's list, so the men's supplement below does not apply to it. The women's has its own (Mercyhurst).
 WNCAAB_REGISTRY_PATH = Path(__file__).resolve().parent / "wncaab_team_registry.csv"
 
 # DIVISION I PROGRAMMES ESPN'S TEAM LIST OMITS (2026-11-02). The CSV is ESPN's
@@ -38,6 +38,14 @@ _D1_MISSING_FROM_ESPN_TEAM_LIST: tuple[dict[str, str], ...] = (
      "slug": "southern-indiana-screaming-eagles"},
     {"espn_id": "2815", "school": "Lindenwood", "display_name": "Lindenwood Lions",
      "short_display_name": "Lindenwood", "abbreviation": "LIN", "mascot": "Lions", "slug": "lindenwood-lions"},
+)
+# THE WOMEN'S LIST OMITS ONE THE SAME WAY (2026-11-04, lane wncaab-module, user "Yes, fix it here"): Mercyhurst
+# (NEC), whose women's team record files under `groups.parent.id == "50"` and is active. Out of the registry, its
+# games never reached the women's slate, board, sims or grading. The women's VMI (no group) and The Citadel
+# (inactive) are the other two men's-only ids, and neither is a women's D-I team.
+_WNCAAB_D1_MISSING_FROM_ESPN_TEAM_LIST: tuple[dict[str, str], ...] = (
+    {"espn_id": "2385", "school": "Mercyhurst", "display_name": "Mercyhurst Lakers", "short_display_name": "Mercyhurst",
+     "abbreviation": "MERC", "mascot": "Lakers", "slug": "mercyhurst-lakers"},
 )
 
 
@@ -65,10 +73,9 @@ def registry_rows(league: str = "ncaab") -> tuple[dict[str, str], ...]:
         return ()
     if not rows:
         return ()
-    if str(league).lower() == "wncaab":
-        return rows
+    missing = _WNCAAB_D1_MISSING_FROM_ESPN_TEAM_LIST if str(league).lower() == "wncaab" else _D1_MISSING_FROM_ESPN_TEAM_LIST
     present = {str(row.get("espn_id") or "") for row in rows}
-    return rows + tuple(dict(row) for row in _D1_MISSING_FROM_ESPN_TEAM_LIST if row["espn_id"] not in present)
+    return rows + tuple(dict(row) for row in missing if row["espn_id"] not in present)
 
 
 def iter_team_alias_offers(league: str = "ncaab") -> Iterator[Tuple[str, str]]:

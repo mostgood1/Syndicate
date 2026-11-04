@@ -156,3 +156,14 @@ def test_calibration_shrinks_this_season_but_not_the_calibrated_prior_twice():
     blended = ratings.compute_ratings(game, d1, prior=prior)
     w = 1 / (1 + ratings.PRIOR_GAMES)
     assert blended["A"]["adj_em"] == pytest.approx(w * plain["A"]["adj_em"], abs=0.05)
+
+
+def test_the_d1_set_includes_the_programmes_espns_team_list_omits():
+    """Queens @ LMU refused `team_unrated` on 11-04: this producer read the CSV, which ESPN's team list leaves 3 short
+    (Mercyhurst short for the women). Every table and the player priors filter on this set."""
+    assert {"2511", "88", "2815"} <= set(ratings.load_registry())
+    ratings.configure_league("wncaab")
+    try:
+        assert "2385" in ratings.load_registry()
+    finally:
+        ratings.configure_league("ncaab")

@@ -92,6 +92,21 @@ def _registry(league: str) -> Path:
     return league_for(league).registry_csv
 
 
+def _d1_ids(league: str) -> set[str]:
+    """The D-I set coverage is measured over. The committed registry gets the programmes ESPN's team list omits
+    (`registry_rows`, 2026-11-04): over the CSV alone this gate never counted Queens, Lindenwood or Southern
+    Indiana, so their being unrated in every men's table could not show up as a coverage gap."""
+    from syndicate.features.college_basketball.league import league_for
+    from syndicate.features.shared.ncaab_team_registry import registry_rows
+
+    path = _registry(league)
+    with path.open(encoding="utf-8", newline="") as handle:
+        ids = {row["espn_id"] for row in csv.DictReader(handle) if row.get("espn_id")}
+    if path.resolve() == league_for(league).registry_csv.resolve():
+        ids |= {row["espn_id"] for row in registry_rows(league) if row.get("espn_id")}
+    return ids
+
+
 def _dirs(league: str):
     # NCAAB passes None so `table_for_game` / `load_player_priors` resolve their own default directories.
     return None if league == "ncaab" else tm.ratings_dirs(league)
@@ -123,8 +138,7 @@ def run(day: dt.date, league: str = "ncaab") -> tuple[int, dict]:
     if fallback is not None:
         fallback_rows, fallback_failed = _field_rows(fallback, source)
         failed += [f"fallback:{name}" for name in fallback_failed]
-    with _registry(league).open(encoding="utf-8", newline="") as handle:
-        d1 = {row["espn_id"] for row in csv.DictReader(handle) if row.get("espn_id")}
+    d1 = _d1_ids(league)
     in_season = d1 & set(table.teams)
     rated = in_season | (d1 & set(fallback.teams) if fallback is not None else set())
     coverage = len(rated) / len(d1) if d1 else 0.0

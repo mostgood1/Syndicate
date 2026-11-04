@@ -10,6 +10,8 @@ from __future__ import annotations
 import csv
 import datetime as dt
 
+import pytest
+
 from syndicate.features.ncaab import live_resim
 from syndicate.features.ncaab import live_team_model as tm
 
@@ -44,6 +46,27 @@ def test_a_game_with_an_unrated_team_is_priced_off_last_seasons_table(tmp_path):
     # A team in neither table still refuses by name -- never a league-average default.
     missing = tm.prior_for_game(GAME_DAY, "1", "999", neutral=False, dirs=[tmp_path])
     assert isinstance(missing, tm.NcaabPriorRefusal) and missing.reason == "team_unrated"
+
+
+def test_a_game_whose_teams_sit_in_different_tables_takes_each_from_its_own(tmp_path):
+    """West Florida @ Western Carolina women, 11-05: UWF rated only this season, WCU only last season, so both
+    same-table attempts refused `team_unrated`. Each side now comes from the table that rates it."""
+    _ratings(tmp_path / "team_ratings_2027_asof_20261101.csv", [("1", 110, 100, 70, 1), ("5", 100, 110, 66, 1)])
+    _ratings(tmp_path / "team_ratings_2026_asof_20260406.csv", [("1", 115, 95, 69, 33), ("2", 100, 105, 67, 31)])
+    prior = tm.prior_for_game(GAME_DAY, "5", "2", neutral=True, dirs=[tmp_path], calibrate=False)
+    assert not isinstance(prior, tm.NcaabPriorRefusal)
+    assert prior.prior_season_fallback is True and prior.ratings_season == 2027
+    # Team 2 from last season's table: regressed there (an uncalibrated table), then re-scaled to this season's means.
+    keep = 1 - tm.PRIOR_REGRESSION
+    off2, def2, tempo2 = 107.5 + keep * (100 - 107.5), 100 + keep * (105 - 100), 68 + keep * (67 - 68)
+    off2, def2 = off2 * 105 / 107.5, def2 * 105 / 107.5  # this season's league_off 105, last season's 107.5; tempo 68 both
+    assert prior.possessions == pytest.approx(66 * tempo2 / 68)
+    assert prior.home_ppp == pytest.approx(100 * def2 / 105 / 100)
+    assert prior.away_ppp == pytest.approx(off2 * 110 / 105 / 100)
+    # A game the same-table fallback prices is unchanged: both from last season.
+    assert tm.prior_for_game(GAME_DAY, "1", "2", neutral=True, dirs=[tmp_path]).ratings_season == 2026
+    # Still never a default: a team in neither table refuses.
+    assert tm.prior_for_game(GAME_DAY, "5", "999", neutral=True, dirs=[tmp_path]).reason == "team_unrated"
 
 
 def test_no_table_this_season_still_uses_last_season(tmp_path):

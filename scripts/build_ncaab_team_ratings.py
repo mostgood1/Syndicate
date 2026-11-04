@@ -49,7 +49,6 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 REPO = Path(__file__).resolve().parents[1]
-REGISTRY = REPO / "syndicate" / "features" / "shared" / "ncaab_team_registry.csv"
 ESPN_HOSTS = ("site.api.espn.com", "site.web.api.espn.com")
 SPORT_PATH = "apis/site/v2/sports/basketball/mens-college-basketball"
 LEAGUE = "ncaab"
@@ -67,9 +66,9 @@ _LEAGUES = {
 
 def configure_league(league: str) -> None:
     """Point this module (and `build_ncaab_player_priors`, which reads its paths and fetch) at a league."""
-    global LEAGUE, REGISTRY, SPORT_PATH
-    registry, sport_path, _env, _dir = _LEAGUES[league]
-    LEAGUE, REGISTRY, SPORT_PATH = league, REPO / "syndicate" / "features" / "shared" / registry, sport_path
+    global LEAGUE, SPORT_PATH
+    _registry, sport_path, _env, _dir = _LEAGUES[league]
+    LEAGUE, SPORT_PATH = league, sport_path
 
 HOME_EDGE = 0.014  # ~3.5 points on a 100-possession game, the usual college estimate
 PRIOR_GAMES = 8.0  # games at which this season's rating and last season's weigh equally
@@ -247,10 +246,22 @@ def parse_summary(payload: Mapping[str, Any], *, season: int, day: str) -> list[
 # --------------------------------------------------------------------- ratings
 
 def load_registry(path: Path | None = None) -> dict[str, str]:
-    """espn_id -> school, the D-I set."""
-    path = REGISTRY if path is None else path
-    with path.open(encoding="utf-8", newline="") as handle:
-        return {row["espn_id"]: row["school"] for row in csv.DictReader(handle) if row.get("espn_id")}
+    """espn_id -> school, the D-I set.
+
+    The default is the league's `registry_rows`: the CSV PLUS the D-I programmes ESPN's team list omits (lane
+    wncaab-module, user 2026-11-04 "Yes, fix it here"). Reading the CSV alone, this producer and the player priors
+    never rated Queens, Lindenwood or Southern Indiana, though the slate and the odds join already carried them:
+    Queens @ LMU refused `team_unrated` on 11-04, with 35 Queens games sitting in last season's box file."""
+    if path is not None:
+        with path.open(encoding="utf-8", newline="") as handle:
+            rows: Iterable[Mapping[str, Any]] = list(csv.DictReader(handle))
+    else:
+        if str(REPO) not in sys.path:
+            sys.path.insert(0, str(REPO))
+        from syndicate.features.shared.ncaab_team_registry import registry_rows
+
+        rows = registry_rows(LEAGUE)
+    return {row["espn_id"]: row["school"] for row in rows if row.get("espn_id")}
 
 
 def compute_ratings(

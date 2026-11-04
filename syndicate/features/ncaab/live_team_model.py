@@ -284,7 +284,9 @@ def prior_for_game(game_date: dt.date, home_id: str, away_id: str, *, neutral: b
     measured on the 11-02 opener, `team_ratings_2027_asof_20261101` rated 4 teams and the live re-sim refused
     7 of 7 live games `team_unrated`, with the 361-team 2026 table unused. A game whose two teams are not both
     rated this season is priced off last season's table (both sides from the SAME table, so one league mean),
-    flagged `prior_season_fallback`; once both teams are rated this season, this season's table wins."""
+    flagged `prior_season_fallback`; once both teams are rated this season, this season's table wins.
+
+    When NEITHER table rates both teams, each side comes from the table that rates it (`_mixed_table`)."""
     if dirs is None and league != "ncaab":
         dirs = ratings_dirs(league)
     table = table_for_game(game_date, dirs=dirs)
@@ -297,7 +299,32 @@ def prior_for_game(game_date: dt.date, home_id: str, away_id: str, *, neutral: b
             retry = game_prior(fallback, home_id, away_id, neutral=neutral)
             if not isinstance(retry, NcaabPriorRefusal):
                 result = retry
+            else:
+                mixed = _mixed_table(table, fallback, (str(home_id), str(away_id)))
+                if mixed is not None:
+                    result = game_prior(mixed, home_id, away_id, neutral=neutral)
     return _calibrated(result, game_date, league=league, dirs=dirs, calibrate=calibrate)
+
+
+def _mixed_table(table: NcaabRatingsTable, fallback: NcaabRatingsTable, team_ids: Iterable[str]) -> Optional[NcaabRatingsTable]:
+    """This season's table plus each of `team_ids` it lacks, from last season's, re-scaled to this season's means.
+
+    THE GAME WHOSE TWO TEAMS SIT IN DIFFERENT TABLES (lane wncaab-module, user 2026-11-04 "Yes, fix it here").
+    West Florida women are rated only this season (new to the D-I list), Western Carolina only last season (no
+    game yet), so both same-table attempts refused their 11-05 game `team_unrated`. A team's offence, defence and
+    tempo are read relative to ITS table's league means and re-expressed on this season's, which keeps the
+    `game_prior` formula's single league mean. Flagged `prior_season_fallback`. None while a team is in neither."""
+    added: dict[str, NcaabTeamRating] = {}
+    for tid in team_ids:
+        if tid in table.teams:
+            continue
+        rating = fallback.teams.get(tid)
+        if rating is None:
+            return None
+        eff, pace = table.league_off / fallback.league_off, table.league_tempo / fallback.league_tempo
+        added[tid] = replace(rating, adj_off=rating.adj_off * eff, adj_def=rating.adj_def * eff, tempo=rating.tempo * pace)
+    return replace(table, teams={**table.teams, **added}, source=f"mixed:{table.source}+{fallback.source}",
+                   prior_season_fallback=True)
 
 
 def _calibrated(result: PriorResult, game_date: dt.date, *, league: str, dirs: Optional[Iterable[Path]],
