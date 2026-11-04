@@ -54,6 +54,7 @@ import gzip
 import json
 import os
 import time
+import uuid
 from collections import OrderedDict
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -626,10 +627,54 @@ def _load_state(path: Path) -> dict[str, list[Any]]:
     return {}
 
 
+def _load_state_for_update(path: Path) -> dict[str, list[Any]]:
+    """`_load_state` for the WRITER, which must not read an unreadable file as an
+    empty one in silence: an empty state re-appends every key it sees at an
+    unchanged price and forgets the last-seen of every key it does not.
+
+    [2026-11-04, lane book-quotes-state-reset, #759] Soccer state for 10-31 and
+    11-01 held 1,783 of 58,622 and 4,071 of 35,252 shard keys, and 10-31's change
+    log carried 37,563 unchanged re-appends in bursts, with no line saying why.
+    Still returns {} -- the capture must go on -- but says so, and keeps the bytes
+    beside the state as `<name>.unreadable` so the next one can be read.
+    """
+    try:
+        raw = path.read_bytes()
+    except FileNotFoundError:
+        return {}
+    except OSError as exc:
+        print(f"[odds_book_quotes] BOOK_QUOTES_STATE_UNREADABLE path={path} error={type(exc).__name__}: {exc}", flush=True)
+        return {}
+    try:
+        loaded = json.loads(raw)
+        if isinstance(loaded, dict):
+            return {str(key): list(value) for key, value in loaded.items() if isinstance(value, (list, tuple))}
+        error = f"top-level {type(loaded).__name__}"
+    except ValueError as exc:
+        error = f"{type(exc).__name__}: {exc}"
+    kept = path.with_name(path.name + ".unreadable")
+    try:
+        kept.write_bytes(raw)
+    except OSError:
+        kept = None
+    print(f"[odds_book_quotes] BOOK_QUOTES_STATE_UNREADABLE path={path} bytes={len(raw)} error={error} kept={kept}",
+          flush=True)
+    return {}
+
+
 def _write_state(path: Path, state: Mapping[str, Any]) -> None:
-    tmp = path.with_name(path.name + ".tmp")
-    tmp.write_text(json.dumps(state, separators=(",", ":")), encoding="utf-8")
-    os.replace(tmp, path)
+    # A temp name per WRITER, not one shared `<name>.tmp`: with a shared name a
+    # second writer truncates and rewrites the inode the first has just renamed
+    # into place, so readers parse half a file. [#759]
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp")
+    try:
+        tmp.write_text(json.dumps(state, separators=(",", ":")), encoding="utf-8")
+        os.replace(tmp, path)
+    finally:
+        try:
+            tmp.unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 def quote_key(row: Mapping[str, Any]) -> str:
@@ -867,13 +912,11 @@ def append_book_quotes(
         path = book_quotes_path(sport, date_str)
         path.parent.mkdir(parents=True, exist_ok=True)
         state_path = _state_path(sport, date_str)
-        state = _load_state(state_path)
 
-        appended: list[dict[str, Any]] = []
+        observations: list[tuple[str, dict[str, Any]]] = []
         seen_this_call: set[str] = set()
         heartbeat: dict[str, set] = {"events": set(), "books": set(), "pinnacle_events": set()}
         considered = 0
-        observed = 0
         for raw in rows or ():
             if not isinstance(raw, Mapping):
                 continue
@@ -889,55 +932,71 @@ def append_book_quotes(
             if key in seen_this_call:
                 continue
             seen_this_call.add(key)
-            observed += 1
             _heartbeat_note(heartbeat, normalized)
-            previous = state.get(key) or []
-            current = [normalized.get("line"), normalized.get("price")]
-            # LAST-SEEN, third slot. This log is a CHANGE log by design: a price
-            # that has not moved writes no row, so the newest row for a key keeps
-            # its ORIGINAL `book_updated_at` and `captured_at`. Both age fields
-            # downstream are therefore "time since this price last MOVED", not
-            # "time since we last LOOKED" -- and nothing recorded the latter at
-            # all, so a stable market and a market we stopped observing were
-            # indistinguishable.
-            #
-            # That is what made the served board look 11.9h stale: measured
-            # 2026-08-08, all 100 MLB rows carried book ages inside a 1.2-minute
-            # window ~11.9h wide, growing with wall-clock across rebuilds of a
-            # 1.4-minute-old artifact. Not a capture outage -- the change log
-            # working exactly as specified, read as if it were a freshness clock.
-            #
-            # Kept as a third element rather than a dict so every existing
-            # 2-element state file still loads and compares correctly: the
-            # equality check below slices to the first two.
-            if list(previous[:2]) == current:
-                state[key] = current + [captured_at]
-                continue
-            state[key] = current + [captured_at]
-            appended.append(normalized)
+            observations.append((key, normalized))
+        observed = len(observations)
 
-        if appended:
+        appended: list[dict[str, Any]] = []
+        torn = False
+        state: dict[str, list[Any]] = {}
+        if observed:
+            # The state's load-compare-write runs under the SHARD's lock, so two
+            # writers on one shard date take turns. [2026-11-04, lane
+            # book-quotes-state-reset, #759] It used to load before and write after
+            # with no lock: several processes write soccer's shard (the odds and
+            # props fetches, the venue captures), the later write dropped the
+            # earlier one's keys, and the shared temp name let a reader parse half
+            # a file and start again from {} -- 10-31's state kept 1,783 of 58,622
+            # keys. Nothing inside takes the lock again: flock on a second handle
+            # to the same file would wait on itself.
             with shard_append_lock(path):
-                # A torn last line (a write cut by ENOSPC or a kill) has no
-                # newline, and appending straight after it glues the next intact
-                # row onto it: one unreadable line where there should be a bad
-                # line and a good one. 16 of the 20 lines left unreadable after
-                # the 2026-09-15 repair are that shape, all captured during
-                # refresh-worker's 09-13 ENOSPC outage. [lane book-quotes-splice-repair]
-                torn = _ends_without_newline(path)
-                with path.open("a", encoding="utf-8") as handle:
-                    if torn:
-                        handle.write("\n")
-                    for row in appended:
-                        handle.write(json.dumps(row, separators=(",", ":")) + "\n")
-            if torn:
-                print(f"[odds_book_quotes] BOOK_QUOTES_TORN_TAIL_TERMINATED path={path}", flush=True)
-        # Written whenever anything was OBSERVED, not only when something
-        # changed. Previously this was inside `if appended`, so a refresh that
-        # confirmed every price unchanged left no trace it had run -- which is
-        # precisely the evidence needed to tell "stable" from "stopped looking".
-        if appended or observed:
-            _write_state(state_path, state)
+                state = _load_state_for_update(state_path)
+                for key, normalized in observations:
+                    previous = state.get(key) or []
+                    current = [normalized.get("line"), normalized.get("price")]
+                    # LAST-SEEN, third slot. This log is a CHANGE log by design: a price
+                    # that has not moved writes no row, so the newest row for a key keeps
+                    # its ORIGINAL `book_updated_at` and `captured_at`. Both age fields
+                    # downstream are therefore "time since this price last MOVED", not
+                    # "time since we last LOOKED" -- and nothing recorded the latter at
+                    # all, so a stable market and a market we stopped observing were
+                    # indistinguishable.
+                    #
+                    # That is what made the served board look 11.9h stale: measured
+                    # 2026-08-08, all 100 MLB rows carried book ages inside a 1.2-minute
+                    # window ~11.9h wide, growing with wall-clock across rebuilds of a
+                    # 1.4-minute-old artifact. Not a capture outage -- the change log
+                    # working exactly as specified, read as if it were a freshness clock.
+                    #
+                    # Kept as a third element rather than a dict so every existing
+                    # 2-element state file still loads and compares correctly: the
+                    # equality check below slices to the first two.
+                    if list(previous[:2]) == current:
+                        state[key] = current + [captured_at]
+                        continue
+                    state[key] = current + [captured_at]
+                    appended.append(normalized)
+
+                if appended:
+                    # A torn last line (a write cut by ENOSPC or a kill) has no
+                    # newline, and appending straight after it glues the next intact
+                    # row onto it: one unreadable line where there should be a bad
+                    # line and a good one. 16 of the 20 lines left unreadable after
+                    # the 2026-09-15 repair are that shape, all captured during
+                    # refresh-worker's 09-13 ENOSPC outage. [lane book-quotes-splice-repair]
+                    torn = _ends_without_newline(path)
+                    with path.open("a", encoding="utf-8") as handle:
+                        if torn:
+                            handle.write("\n")
+                        for row in appended:
+                            handle.write(json.dumps(row, separators=(",", ":")) + "\n")
+                # Written whenever anything was OBSERVED, not only when something
+                # changed. Previously this was inside `if appended`, so a refresh that
+                # confirmed every price unchanged left no trace it had run -- which is
+                # precisely the evidence needed to tell "stable" from "stopped looking".
+                _write_state(state_path, state)
+        if torn:
+            print(f"[odds_book_quotes] BOOK_QUOTES_TORN_TAIL_TERMINATED path={path}", flush=True)
         if observed:
             _append_heartbeat(sport=sport, date_str=date_str, captured_at=captured_at, heartbeat=heartbeat)
 
@@ -945,7 +1004,9 @@ def append_book_quotes(
             "path": str(path),
             "considered": int(considered),
             "appended": int(len(appended)),
-            "tracked_keys": int(len(state)),
+            # None when nothing was observed: the state is not read then, and 0
+            # would read as a reset.
+            "tracked_keys": int(len(state)) if observed else None,
             "books": sorted({str(row.get("bookmaker")) for row in appended}),
         }
         published = None
