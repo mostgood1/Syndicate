@@ -645,6 +645,7 @@ death, never life — do not invert it.
           - The 5 NCAAB paper bets are all pregame, on 11-04's slate.
     - the women's MARGIN_CALIBRATION_K;
     - re-grade live college spreads/totals against finals over more nights on the current engine (the script is `lean_read3.py` in session 547fe65e's scratchpad, NOT in the repo);
+    - college credits/day, the budget half of the owed credits reading: baseline OddsAPI `by_sport` (cumulative) at 15:36:34Z 11-04: ncaab 30,655 credits / 11,341 calls; wncaab 1,398 / 2,298; platform 5,082 credits/h. Read the same counters after the 11-05 slate (43 men's + 68 women's games) and divide by the hours between;
     - the nightly time bomb (`test_launcher_switch_is_reachable_and_runs_one_child_at_a_time`): FIXED 2026-11-04 15:29Z, user "Yes, fix it here". `e210220ba` gives `maybe_launch_pregame_sims` / `_pregame_game_count` a `now=` parameter (default the real clock, so production is unchanged) plus a reachability test. `4c48c8488` drops the duplicate `inplay_lane.datetime` freeze from lane `ci-suite-red-697`'s loan `3c09b6461`, which fixed the same bomb from the test side a few minutes earlier. 25 passed at Idle on the real 11-04 clock. The green nightly read is `ci-suite-red-697`'s, and its loan of `tests/test_college_pregame_sim.py` can be released;
     - the 5 women's teams with no player priors.
 - **STATUS 2026-11-03 22:58Z: college prior calibration + engine efficiency bounds LIVE (pregame VERIFIED; live half owed tonight)**
