@@ -581,14 +581,6 @@ death, never life — do not invert it.
 - Verification: fleet book_quotes shards for NFL props and soccer btts and alternate_totals_corners carry bookmaker=pinnacle rows fetched after the ff; x-requests-last per prop call unchanged; recorded in deploys.md
 - Blocked by: none
 
-### maker-pilot-fair-cancel — CLOSED 2026-11-04 (GOAL MET as amended: edge-floor-only cancel live, FAIR_PASS read back on sighted rows, 0 plan_dropped since 17:12:05Z 11-03) — opened 2026-10-31 — session 9683e8c4-02ff-45b7-8c47-ae932f103e33
-- Goal: Resting Kalshi maker-pilot posts are cancelled when the plan's current fair minus the resting price falls below +1pp, or when a later plan pass drops the position; live on the fleet with a FAIR_CANCEL/FAIR_PASS log line read back — GOAL AMENDED 2026-11-03 by the user ("Edge-floor only", coordinator 332cb014, confirmed in this session): the "plan pass drops the position" clause is withdrawn. GOAL: MET (2026-11-04 17:13Z, deploys.md 17:12Z 11-03 verify line): 103 FAIR_PASS after the restart, 58 judged and kept a sighted row, 0 FAIR_CANCEL, 0 plan_dropped; the floor cancel has not fired live (unit tests only). The 11-14 pilot re-judge is NOT this lane (state_kalshi.md maker pilot). Prior: GOAL: NOT MET (2026-11-03 17:22Z): edge-floor only is live (`637de43e7`, fleet ff + live-odds restart 17:12:05Z, deploys.md 17:12Z), but no resting pilot row since boot, so no edge-floor decision read yet. History: `6c22ebfaa` (restart rule, 11-02 02:23Z) and plan_dropped made all 15 cancels 11-02..11-03 17:06Z, the 13 with a fair at +2.8..+4.3pp, now removed. Switch ON since the 16:53Z full up (env fc18ce2b). The boot-only hook was found inert at 17:27Z. Fix `d29aec4a2` (per-tick review in execute_portfolio; sightings recorded before every gate, keyed by contract) went to the fleet by ff + live-odds restart at 19:08Z (deploys.md 19:08Z). Reading: per-tick FAIR_PASS 19:10:15Z (sightings=0) and 19:15:27Z (sightings=1). Left: (a) the first FAIR_PASS after 17:12:05Z 11-03 with a sighted pilot row, showing kept or edge_below_floor and NO reason=plan_dropped. (b) The 11-14 re-judge (findings_2026-10-31); profit-program s11 reads 1 of 15 posts filled since 11-02, so the 30-fill trigger may not come first.
-- Files: syndicate/features/shared/kalshi_maker_pilot.py, syndicate/features/shared/execution_ledger.py (cancel_stale_resting_orders maker_pilot branch + the reconcile resting-row dict market/line fields ONLY), tests/test_execution_ledger.py (the phantom-fill test ONLY), pipeline/execute_portfolio.py (the live-Kalshi observe_plan_position call at the loop top + the maker-pilot review in the per-tick Kalshi reconcile ONLY), tests/test_kalshi_maker_pilot_fair_cancel.py
-- Hypothesis: n/a (build; evidence in findings_2026-10-31_maker_pilot_review.md)
-- Falsification test: n/a
-- Verification: unit tests incl. off!=on reachability; fleet log shows MAKER_PILOT FAIR_PASS lines after the restart, and any FAIR_CANCEL is followed by an EXPIRE from reconcile
-- Blocked by: none
-
 ### nhl-venue-price-gap — CLOSED 2026-11-01 (GOAL MET: fix 4520b47ae live on the fleet; NHL DecisionRecords with a venue price 0/608 -> 329/486) — opened 2026-10-31 — session e32fef1a-01e8-4afe-a284-01acd3728545
 - **GOAL VERDICT `[2026-11-01 17:18Z]`.** Goal, verbatim: "Name the first pipeline stage at which NHL loses its Kalshi and Polymarket prices (DecisionRecords 2026-10-31: 0 of 618 NHL records carry a venue price, vs NFL 158 of 1,056), with per-stage counts read on the fleet, and either a fix on main with tests or a named owner; READ-ONLY on the fleet, no fleet or env change" -- **GOAL: MET.** Fix `4520b47ae` on main with tests, and LIVE on the fleet (user: "Yes, update fleet"). It was carried by ncaab-odds-key-fallback's ff to `18090e38e` and loaded by maker-pilot-fair-cancel's 16:53Z restart; this lane made no deploy. Readings (deploys.md 17:18Z): NHL Kalshi props + game lines captured (423 rows, segment_skipped=0), 349 of 352 venue grid rows sit with sportsbooks (140 with Pinnacle), NHL DecisionRecords with a venue price 0/608 -> 329/486; 0 NHL candidates qualify under ev_lb on the first build (best -0.33%); no live NHL sizing. Handed on: NHL paper bookings + sharp_close grades to the gate-clock reads (syndicate-decision-engine / decision-policy-paper). CLOSED; claims and the odds_book_quotes.py loan released.
 - Goal: Name the first pipeline stage at which NHL loses its Kalshi and Polymarket prices (DecisionRecords 2026-10-31: 0 of 618 NHL records carry a venue price, vs NFL 158 of 1,056), with per-stage counts read on the fleet, and either a fix on main with tests or a named owner; READ-ONLY on the fleet, no fleet or env change
@@ -758,6 +750,11 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: goal met — owner_liveness --idle-min 240 read 1 SAFE of 11 CLOSED; invariants identical to the origin/main baseline.
 - Moved: `closed-lane-archive-20261104-0936`. Reading and WAIT reasons in `log/2026-11-04.md`.
+
+### closed-lane-archive-20261104-1519 — CLOSED 2026-11-04 (GOAL MET: 1 block archived) — opened 2026-11-04 — session f354500b-b7a2-4acb-ab91-3fc6d182b28f
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- GOAL: MET. owner_liveness.py --idle-min 240 at origin/main ~21:20Z returned SAFE for exactly one slug; moved `maker-pilot-fair-cancel` to lanes_closed.md with a pointer. Reading and WAIT reasons in log/2026-11-04.md.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1064,6 +1061,7 @@ death, never life — do not invert it.
 - `local-production-boot-task` — CLOSED — opened 2026-09-30, closed 2026-09-30 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
 - `local-production-first-run` — CLOSED — opened 2026-09-30, closed 2026-09-30 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
 - `local-production-wsl` — CLOSED — opened 2026-09-30, closed 2026-10-01 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+- `maker-pilot-fair-cancel` — CLOSED 2026-11-04 (GOAL MET as amended: edge-floor-only cancel live, FAIR_PASS read back on sighted rows, 0 plan_dropped since 17:12:05Z 11-03) — opened 2026-10-31 — session 9683e8c4-02ff-45b7-8c47-ae932f103e33
 - `maker-pilot-review` — CLOSED (GOAL MET) — opened 2026-10-31 — closed 2026-10-31 — session 9683e8c4-02ff-45b7-8c47-ae932f103e33
 - `maker-vs-taker-shadow` — CLOSED (GOAL MET) — opened 2026-10-24 — closed 2026-10-26 — session 78880f41-ba0e-410c-aaac-d6cbeb02b884
 - `market-history-index-memo` — CLOSED 2026-09-18 (GOAL: MET) — opened 2026-09-18 — session a1e40980-cceb-493f-adf9-5a5ca879acf6 — body in `lanes_history.md`.
