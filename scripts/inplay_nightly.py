@@ -39,7 +39,23 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 RUNNER = HERE.parent
-REPO = r"C:\Users\tempadmin\OneDrive\Coding\Syndicate"
+# The primary dev checkout, which moves out of OneDrive (docs/ai_context/repo_out_of_onedrive_plan.md, F6). The
+# first candidate holding a .git wins, so this file works on either side of the move; SYNDICATE_PRIMARY_TREE
+# overrides. Not derived from __file__: the task runs a COPY in C:/tmp/inplay_runner.
+REPO_CANDIDATES = (r"C:\Users\tempadmin\Coding\Syndicate", r"C:\Users\tempadmin\OneDrive\Coding\Syndicate")
+
+
+def default_repo() -> str:
+    override = os.environ.get("SYNDICATE_PRIMARY_TREE", "").strip()
+    if override:
+        return override
+    for cand in REPO_CANDIDATES:
+        if (Path(cand) / ".git").exists():
+            return cand
+    return REPO_CANDIDATES[0]
+
+
+REPO = default_repo()
 RUNNER_FILES = ["scripts/inplay_recorder.py", "scripts/inplay_edge_report.py", "scripts/inplay_fair_score.py",
                 "scripts/inplay_scoreboard.py", "scripts/inplay_nightly.py", "scripts/inplay_rule_sweep.py",
                 "syndicate/features/shared/venue_fees.py", "syndicate/features/shared/inplay_entries_paper.py",
@@ -72,6 +88,10 @@ def idle():
 def sync(root: Path, repo: str):
     if RUNNER == Path(repo) or (RUNNER / ".git").exists():
         log(root, "SYNC skipped: running from a checkout, not the runner")
+        return
+    if not (Path(repo) / ".git").exists():
+        # Without this, `git -C <missing>` exits 128 for every file and reads as "SYNC_KEEP (not on origin/main)".
+        log(root, f"SYNC_FAILED repo not found: {repo} (pass --repo or set SYNDICATE_PRIMARY_TREE)")
         return
     (RUNNER / "syndicate").mkdir(parents=True, exist_ok=True)
     init = RUNNER / "syndicate" / "__init__.py"
@@ -168,7 +188,8 @@ def main():
         out.mkdir(parents=True, exist_ok=True)
         run(root, [py, str(RUNNER / "scripts" / "inplay_recorder.py"), "--date", date, "--sports", ",".join(rec_sports),
                    "--out", str(out), "--until", until.strftime("%Y-%m-%dT%H:%M:%SZ"), "--regions", a.regions,
-                   "--stop-after-final-minutes", str(a.tail_minutes)], out / "recorder.stdout")
+                   "--stop-after-final-minutes", str(a.tail_minutes), "--env", str(Path(a.repo) / ".env")],
+            out / "recorder.stdout")
     else:
         rec_sports = sports
     if "nba" in rec_sports:

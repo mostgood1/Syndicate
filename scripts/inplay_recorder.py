@@ -61,6 +61,21 @@ def get_json(url: str, timeout: float = 15.0):
         return json.loads(r.read().decode("utf-8")), dict(r.headers)
 
 
+# The primary dev checkout's .env; the checkout moves out of OneDrive (docs/ai_context/repo_out_of_onedrive_plan.md,
+# F6). The first that exists wins, so the default works on either side of the move; SYNDICATE_ENV_FILE overrides.
+ENV_CANDIDATES = (r"C:\Users\tempadmin\Coding\Syndicate\.env", r"C:\Users\tempadmin\OneDrive\Coding\Syndicate\.env")
+
+
+def default_env_file() -> str:
+    override = os.environ.get("SYNDICATE_ENV_FILE", "").strip()
+    if override:
+        return override
+    for cand in ENV_CANDIDATES:
+        if Path(cand).is_file():
+            return cand
+    return ENV_CANDIDATES[0]
+
+
 def odds_key(env_path: Path) -> str:
     for line in env_path.read_text(encoding="utf-8").splitlines():
         if line.startswith("ODDS_API_KEY="):
@@ -90,7 +105,7 @@ def main() -> int:
     ap.add_argument("--sports", default="nba,nhl")
     ap.add_argument("--out", required=True)
     ap.add_argument("--fleet-root", default=r"\\wsl.localhost\Ubuntu-24.04\home\amyn\syndicate-prod\data\reports\intelligence\venue_odds")
-    ap.add_argument("--env", default=r"C:\Users\tempadmin\OneDrive\Coding\Syndicate\.env")
+    ap.add_argument("--env", default=default_env_file())
     ap.add_argument("--kalshi-seconds", type=float, default=10.0)
     ap.add_argument("--fleet-seconds", type=float, default=60.0)
     ap.add_argument("--books-seconds", type=float, default=60.0)
