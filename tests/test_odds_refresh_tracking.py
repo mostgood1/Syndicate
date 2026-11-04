@@ -1725,3 +1725,37 @@ class SoccerPropRowOddsHistoryCoverageTests(unittest.TestCase):
                 any("goal_scorer" in key.lower() or "carles" in key.lower() for key in markets),
                 f"no goalscorer/player market key in shard: {list(markets)}",
             )
+
+
+class CollegeBasketballTrackingTests(unittest.TestCase):
+    # Every odds refresh that ran women's college basketball ended `unsupported_sport:wncaab`
+    # (190 of 190 on the fleet, 2026-11-04) because only NCAAB had a branch. WNCAAB shares
+    # NCAAB's fetcher and CSV shape, so it shares NCAAB's tracking, under its own prefix.
+    def _sync(self, sport: str, root: Path) -> dict:
+        with patch.dict("os.environ", {"SYNDICATE_REPORTS_ROOT": str(root / "reports"), "SYNDICATE_ODDS_EVENTS_ROOT": str(root / "odds_events")}, clear=False):
+            return sync_post_refresh_tracking_for_source_root(sport=sport, source_root=root, date_str="2026-11-04")
+
+    def test_an_empty_womens_bundle_is_skipped_not_unsupported(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = self._sync("wncaab", Path(tmpdir))
+        self.assertTrue(result["ok"], result)
+        self.assertNotIn("error", result)
+        self.assertEqual(result["artifacts"]["team_odds"].get("reason"), "empty_snapshot")
+        self.assertEqual(result["artifacts"]["odds_history"].get("reason"), "no_odds_snapshots")
+
+    def test_each_league_tracks_its_odds_under_its_own_prefix(self) -> None:
+        for sport in ("ncaab", "wncaab"):
+            with self.subTest(sport=sport), tempfile.TemporaryDirectory() as tmpdir:
+                root = Path(tmpdir)
+                odds_dir = root / "raw_outputs" / "by_date" / "2026-11-04"
+                odds_dir.mkdir(parents=True)
+                (odds_dir / "odds_2026-11-04.csv").write_text(
+                    "event_id,bookmaker,market,outcome_name,point,price,commence_time\n"
+                    "ev1,draftkings,totals,Over,137.5,-110,2026-11-04T23:00:00Z\n",
+                    encoding="utf-8",
+                )
+                result = self._sync(sport, root)
+                self.assertTrue(result["ok"], result)
+                written = sorted(path.name for path in (root / "tracking").glob("odds_*_team_odds_*.csv"))
+                self.assertTrue(written, result)
+                self.assertTrue(all(name.startswith(f"odds_{sport}_team_odds_") for name in written), written)

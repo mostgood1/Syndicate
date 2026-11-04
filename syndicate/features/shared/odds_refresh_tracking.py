@@ -1355,7 +1355,7 @@ def _odds_history_snapshot_paths(*, sport: str, source_root: Path, date_str: str
         add("source_artifacts", f"oddsapi_player_props_{season}_wk{week}.csv")
         return [path for path in candidates if path.exists() and path.is_file()]
 
-    if slug == "ncaab":
+    if slug in {"ncaab", "wncaab"}:
         for base_parts in (
             ("raw_outputs", "by_date", date_str, f"odds_{date_str}.csv"),
             ("source_artifacts", "raw_outputs", "by_date", date_str, f"odds_{date_str}.csv"),
@@ -1445,7 +1445,7 @@ def _row_game_date(row: Mapping[str, Any], *, sport: str) -> date | None:
         return _parse_game_date_token(row.get("commence_time"))
     if slug == "nhl":
         return _parse_game_date_token(row.get("commence_time") or row.get("gameDate"))
-    if slug == "ncaab":
+    if slug in {"ncaab", "wncaab"}:
         return _parse_game_date_token(row.get("commence_time"))
     if slug == "nfl":
         return _parse_game_date_token(row.get("game_time"))
@@ -3038,14 +3038,16 @@ def sync_sport_post_refresh_tracking(*, sport: str, source_root: Path, date_str:
         _trace_log("after_sync_odds_history", sport=slug, source_root=str(source_root), date=date_str, ok=bool(results["artifacts"]["odds_history"].get("ok")))
         return results
 
-    if slug == "ncaab":
+    # Women's college basketball (lane wncaab-module, 2026-11-04) writes NCAAB's odds CSV shape under its own
+    # bundle; without this branch every odds refresh that ran it ended `unsupported_sport:wncaab` and failed.
+    if slug in {"ncaab", "wncaab"}:
         odds_path = source_root / "raw_outputs" / "by_date" / date_str / f"odds_{date_str}.csv"
         if not odds_path.exists():
-            odds_path = source_root / "data" / "ncaab_source" / "raw_outputs" / "by_date" / date_str / f"odds_{date_str}.csv"
+            odds_path = source_root / "data" / f"{slug}_source" / "raw_outputs" / "by_date" / date_str / f"odds_{date_str}.csv"
         team_df = _build_ncaab_snapshot(odds_path)
         results["artifacts"]["team_odds"] = _sync_csv_tracking(
             tracking_root=tracking_root,
-            prefix="odds_ncaab_team_odds",
+            prefix=f"odds_{slug}_team_odds",
             scope=date_str,
             snapshot_df=team_df,
             key_cols=["event_key", "book", "market", "selection"],
