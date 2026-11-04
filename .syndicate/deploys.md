@@ -56176,3 +56176,19 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - **Paper:** 1,101 bets, 0 NCAAB; no booking of any sport since 01:00:36Z (02Z and 03Z are quiet hours: 11-03 had 0 at 04Z and 07-09Z). **Dry run** of the book's own candidate step on the 11-04 file (fleet code, nothing written): 20 Kalshi candidates, **19 eligible, 0 qualifying** in every strategy. Best net EV 0.61% (the Kalshi `net_floor_719` floor is 1.0%); `ev_lb` negative on all 19; none board-suggested.
   - **Why `ev_lb` is so negative:** all 19 take sigma S3 (`no_grid_line`), because no NCAAB book grid exists yet for 11-04 or 11-05 (newest: `book_grid_2026-11-03.json`, 22:02Z). With S3, the 0.61% line reads -8.66% at the lower bound. Whether NCAAB gets S2 once the 11-04 grid lands is a reading owed, not a defect claim.
 - **verify (OWED):** 11-05 15:00Z (session timer): NCAAB live fills, paper bookings by strategy (consensus-only grading), and the sigma source of NCAAB paper candidates after the 11-04 grid is written.
+
+## 2026-11-04 07:52Z (1:52 AM CST) -- MEASUREMENT: college live Win% blank `8a5e97d55` -- **LIVE and VERIFIED** (lane `wncaab-module`; the owed verify of the 2026-11-03 23:19:16Z entry)
+- **how it went live: not my restart.** Lane `ncaab-kalshi-pairing`'s refresh-worker TERM 00:46:25Z (the user's "Restart now", their 2026-11-04 01:01Z entry) booted the fleet checkout at `68baa1f3a`, which contains `8a5e97d55` (`git merge-base --is-ancestor` true).
+  - Refresh-worker pid 3585479 BOOTED 00:46:34Z. Checkout HEAD still `68baa1f3a` at 07:49Z.
+- **my restart: not done, and no longer needed.** The user's "After tonight's games" watcher saw `BOOK_GRID_TICK any_live=false` from 05:22:28Z (11:22 PM CST).
+  - Then refresh-worker preflight HOLD on every poll 05:35Z-07:48Z: back-to-back board builds even with nothing live, plus a few job-in-flight HOLDs. It timed out at 07:48:51Z.
+  - Two polls (05:51Z, 06:54Z) read "92dd72ed is already contained in live 68baa1f3 -- the deploy is redundant"; that is how the earlier restart was found.
+  - No claim was taken and nothing was restarted by this lane.
+- **reading** (`blank_read.py`, both college grids for 11-03 and 11-04, read 07:49:50Z; the 11-03 grids last built 06:06:48Z / 06:06:50Z, after the slate):
+  - `college_live_pregame_prob_rows` 1275 -> **0** (expected 0).
+  - `pregame_on_live_rows` 0 -> **1937**: live/final college rows with a pregame projection now flagged, serving no sim probability.
+  - Live re-sim rows on the grids: 0 now (every game final; the baseline's 14 were games in progress). The "keeps its live number" clause is therefore read from the log, NOT off a served row:
+    - After the 00:46Z boot, `LIVE_GAMELINE_BUILD` ncaab had priceable > 0 in 117 of 134 builds (max projected 267 / priceable 185, last 05:19:53Z).
+    - wncaab: 54 of 107 builds (max 33 / 23, last 02:52:57Z).
+- **verify:** `college_live_pregame_prob_rows=0` on the 11-03 grids rebuilt after the boot -- **MET**.
+- **not measured (separate, owed):** the one-time `wncaab-live-resim-evening-reading` (7 PM CST) started 01:00:59Z and stopped at its first PowerShell call 01:01:17Z (most likely a permission prompt; session `local_fb3dd7ca` still open). The live half of the 22:46:50Z engine-bounds entry and of the college prior calibration therefore remains unmeasured.

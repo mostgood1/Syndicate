@@ -611,7 +611,13 @@ death, never life — do not invert it.
 - Verification: after a drained full down/up: refresh-worker environ band_on=0, healthz 200, deploys.md entry
 - Blocked by: none
 
-### wncaab-module — OPEN (live re-sim + checklist + live margin anchor + college prior calibration + engine efficiency bounds DONE; evening reading + player-prior gaps left) — opened 2026-11-02 — session 547fe65e-71ca-4e19-9589-237553cb4eab
+### wncaab-module — OPEN (live re-sim + checklist + live margin anchor + college prior calibration + engine efficiency bounds + college live Win% blank DONE; evening reading (never ran) + player-prior gaps left) — opened 2026-11-02 — session 547fe65e-71ca-4e19-9589-237553cb4eab
+- **STATUS 2026-11-04 07:52Z: college live Win% blank LIVE and VERIFIED** (user "Yes, blank it"; `8a5e97d55`, loaded by `ncaab-kalshi-pairing`'s refresh-worker TERM 00:46:25Z, no restart by this lane)
+  - Live/final college rows serving a pregame Win%: 1275 -> 0. `pregame_on_live`: 0 -> 1937. Live gameline pricing continued after the boot.
+  - LEFT:
+    - the 7 PM CST reading NEVER RAN: stalled at its first PowerShell call 01:01:17Z, session `local_fb3dd7ca`. The engine bounds' and calibration's LIVE half, women's re-sim ticks, men's throughput and credits/h stay unmeasured;
+    - the women's MARGIN_CALIBRATION_K;
+    - the 5 women's teams with no player priors.
 - **STATUS 2026-11-03 22:58Z: college prior calibration + engine efficiency bounds LIVE (pregame VERIFIED; live half owed tonight)**
   - User "College model fit". `640c56bbf`: ff 19:40:54Z, live-odds-worker 19:41:57Z. Pregame sims carry the calibrated prior.
   - User "Yes, fix it here" (the women's blowout limit). `acd835ee1`: ff 22:46:50Z, live-odds-worker TERM 22:47:05Z.
