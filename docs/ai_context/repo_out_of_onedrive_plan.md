@@ -26,7 +26,7 @@ Tags: **[M]** measured in this pass (2026-11-04 ~07:00-08:30 CST), **[B]** belie
   the fleet repair, it is uncaught, and it leaves a stale `FAILED … nothing moved` in `RESULT.txt`. Waiting on the app
   was what kept the script from causing harm.
 - **What the next attempt needs:**
-  1. The **script fixes in §1b** (S1-S4 are blockers).
+  1. The **script fixes in §1b** (S1-S4 are blockers). **DONE 2026-11-04 and rehearsed on the real branch (§1c).**
   2. **Pre-window code fixes** (§4: F1, F3 is now a blocker, F6, F7).
   3. An **attended** window in which the user quits the app (§5). An unattended night task cannot quiesce an app that is
      left open.
@@ -73,6 +73,47 @@ Dry runs cannot catch these. Everything below `:132` runs only when the script i
 | S7 | nit | `hookspath_before.txt` captures only `.git/config`, not the 8 `config.worktree` values | `:94` | snapshot all 9 |
 | S8 | nit | `-WaitUntil` is not "wait until": a run started between 02:00 and 14:00 gives up after the first unmet check | `:62` | pass `-WaitUntil` explicitly from the command line (§5) |
 | S9 | nit | `$RX_PATH` skips an old path followed by `.` (sentence end in `SKILL.md`) | `:29` | allow a trailing `.` that is followed by whitespace or end of text |
+
+#### 1c. FIXED 2026-11-04 (lane `repo-move-script-fixes`, user "Yes, fix both")
+
+`run_move.ps1` was rewritten. The original is kept as `run_move.ps1.bak-20261104-pre-fixes`. Changes:
+
+| Item | Fix |
+|---|---|
+| S1 | Every `git`, `py` and `wsl.exe` call goes through `Invoke-Native`: `'Continue'` plus `$LASTEXITCODE`. The whole body is in one `try/catch` that ends in `Fail`. `RESULT.txt` = `RUNNING …` from the first line |
+| S2 | `-Resume` finishes R4+ from the newest snapshot that holds `moved.txt` (written right after R3) |
+| S3 | R5.1 (fleet) runs right after R3. `ROLLBACK.txt` puts the fleet first |
+| S4 | Partly addressed. A post-move check (`R3check`): main HEAD equals the snapshot, `git status` rc 0, 300 random tracked files read. The R2 test still uses fresh files, so U1 is still unmeasured before the move; the check catches it after |
+| S5 | `Fail` if `OneDrive.exe` is still running 30 s after `/shutdown`. A failure before the move restarts OneDrive; a failure after it never does |
+| S6 | `~/.claude.json` is snapshotted and rewritten with JSON validation |
+| S7 | `.git/config` and every `config.worktree` are copied to `snapshot\gitconfig\` |
+| S8 | `-WaitMinutes N` for attended runs. A past `-WaitUntil` means tomorrow |
+| S9 | The path may be followed by `.` when no word character comes next |
+| F1 | The in-play nightly task gets `--repo "<NEW>"` (`Set-ScheduledTask`; a warning on failure, not a stop) |
+| F7 | The harvester launcher's `PRIMARY` is rewritten. The launcher does not self-sync, so the rewrite sticks |
+| New | `-GitOnly` rehearsal mode (refuses the real paths), `-Old`/`-New`/`-StateDir`/`-SnapRoot`, and the `-FailAt <step>` test hook. Re-homing steps outside git (R5.2) record warnings in `RESULT.txt` instead of stopping |
+
+**Rehearsal: the real branch, not a dry run** [M, 2026-11-04 09:15-09:17 CST]. Fixture `C:\tmp\repomove_rehearsal`: a repo with
+an external worktree and an internal `.claude\worktrees` worktree, absolute `core.hooksPath` plus a `config.worktree`
+`hooksPath`, and uncommitted files in both worktrees.
+
+| Case | Result |
+|---|---|
+| Plain run | `REHEARSAL OK`, exit 0. Git **did** write `repair: gitdir incorrect … \| .git file broken …` to stderr, and it was handled (rc 0). `worktrees=3 prunable=0 head_mismatch=0`, 0 old paths in git files or pointers, `hooksPath` re-pointed in both configs, uncommitted files kept, OLD gone |
+| `-FailAt R4` (after the move) | exit 1. `RESULT.txt`: `POST-MOVE FAILURE at R4 … The repo IS at <new> … DO NOT start OneDrive … re-run with -Resume` |
+| then `-Resume` | `REHEARSAL OK`, exit 0. 3 worktrees, uncommitted file kept |
+| `-FailAt R3` (before the move) | exit 1, `… (nothing moved)`. OLD intact, NEW absent |
+| fresh `.git\index.lock` | exit 1 at the deadline: `gave up … git in-flight: …index.lock (nothing moved)` |
+| `-GitOnly` with the default (real) paths | refused, exit 1 |
+
+**Real-repo `-DryRun`** [M, 09:17-09:18 CST]: `DRY RUN OK`.
+- Snapshot: 33 worktrees, 0 without a HEAD.
+- Fleet: `fleet key lines on old path: 1`. Git configs: 9 of 30 to rewrite. 32 repair paths, 8 of them inside the repo.
+- In-play runner: 1 rewrite. Harvester: 1. User `settings.json`: 4. **`~/.claude.json`: 75, JSON-valid.**
+- Desktop stores: 5,136 rewrites in 1,487 files. `SKILL.md`: 401 rewrites in 285 files. 58 project folders to copy.
+
+**Still open:** F6 (the in-play recorder `.env` default). `scripts/inplay_recorder.py` and `scripts/inplay_nightly.py`
+are claimed by OPEN lane `in-game-trading` (owner idle since 11-01), so editing them needs a user-granted loan.
 
 ---
 
@@ -381,7 +422,8 @@ the in-play nightly at 08:00. Pick a gap.
 
 ## 11. Decisions for the user
 
-0. **OK to patch `run_move.ps1` (F8) and land F6 first.** Without them, a successful quiesce runs into S1.
+0. ~~OK to patch `run_move.ps1` (F8) and land F6 first.~~ The user said yes on 11-04. The script is done (§1c). **F6
+   still needs a loan of the two in-play files from lane `in-game-trading`.**
 1. **Go, and a window** (attended; the app must be quit).
 2. **Target:** `C:\Users\tempadmin\Coding\Syndicate` (recommended) or `C:\dev\Syndicate`.
 3. **F1:** OK to add `--repo` to the `\Syndicate inplay nightly` task as part of the move.
