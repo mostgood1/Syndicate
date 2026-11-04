@@ -311,6 +311,25 @@ SERIES_SPORT: dict[str, str] = {
     "KXNCAAMBGAME": "ncaab",
     "KXNCAAMBSPREAD": "ncaab",
     "KXNCAAMBTOTAL": "ncaab",
+    # ------------------------------------------------------------------
+    # WOMEN'S COLLEGE BASKETBALL, FULL GAME (todo #755, lane wncaab-kalshi-pairing).
+    # ------------------------------------------------------------------
+    #
+    # Here the token DOES exist (`NCAAWB`, lane wncaab-module, 2026-11-02), so
+    # discovery already found the moneyline and the spread by title. It never
+    # found the total: "Women's College Basketball Total Points" has no
+    # game-market tail, so no women's game total was ever fetched. Measured
+    # 2026-11-04 off Kalshi's public listing:
+    #
+    #     KXNCAAWBGAME    318 open / 159 events  'Sacramento St. wins'
+    #     KXNCAAWBSPREAD  130 open /  14 events  'Oregon St. wins by over 7.5 points'
+    #     KXNCAAWBTOTAL   189 open /  17 events  'Full Game: Over 154.5 points scored'
+    #
+    # Registered by name all the same, so the three join without waiting on
+    # discovery in the process that prices them.
+    "KXNCAAWBGAME": "wncaab",
+    "KXNCAAWBSPREAD": "wncaab",
+    "KXNCAAWBTOTAL": "wncaab",
 }
 
 # Series we have SEEN and deliberately do not cover. Kept explicit so they stop
@@ -400,6 +419,9 @@ SERIES_OUT_OF_SCOPE: dict[str, str] = {
     "KXNHLSEASONPTS": "season_futures",  # seen in AUTO_SERIES game_sample 19:11:24Z
     "KXNFLPLAYOFFHOST": "season_futures",  # 32
     "KXNBAMOSTWINS": "season_futures",   # 4
+    # Admitted by the `NCAAWB` token: 'Will the LSU women's college basketball
+    # team win at least 27 games this season?'. refresh-worker GAP, 2026-11-04.
+    "KXNCAAWBWINS": "season_futures",    # 30, all unreadable
     # Slate-level and exhibition markets: real, and not a game line on any
     # board row. KXNFLCOMPETE 21:13:07Z: 'Jake Paul to compete in a Pro
     # Football game in the 2026-27 season?'.
@@ -779,7 +801,7 @@ _SPORT_TOKENS: tuple[tuple[str, str], ...] = (
     ("NCAAF", "ncaaf"),
     # Women's college basketball BEFORE `NCAAB` (lane wncaab-module, 2026-11-02): this is a substring
     # scan, so a ticker like `KXWNCAAB...` would otherwise read as men's -- the same reason WNBA sits
-    # before NBA. Classification only; no WNCAAB series is registered and nothing is paired.
+    # before NBA. The full-game series are also registered by name in `SERIES_SPORT` (2026-11-04).
     ("NCAAWB", "wncaab"),
     ("WNCAAB", "wncaab"),
     ("NCAAB", "ncaab"),
@@ -1163,25 +1185,35 @@ def club_key(sport: Any, value: Any) -> str | None:
     text = str(value or "").strip()
     if not resolved and text.endswith(" St.") and str(sport or "").strip().lower() == "ncaaf":
         resolved = chip_join_key(sport, text[: -len(" St.")] + " State")
-    if not resolved and str(sport or "").strip().lower() == "ncaab":
-        spelled = _KALSHI_NCAAB_SPELLINGS.get(text)
+    if not resolved and str(sport or "").strip().lower() in {"ncaab", "wncaab"}:
+        spelled = _KALSHI_COLLEGE_BASKETBALL_SPELLINGS.get(text)
         if spelled:
             resolved = chip_join_key(sport, spelled)
     return resolved or None
 
 
-# Kalshi's spelling -> the D1 registry's school (`ncaab_team_registry.csv`), for the
-# NCAAB names `chip_join_key` does not resolve. Measured 2026-11-03: 272 of 282
-# distinct names in Kalshi's open `KXNCAAMBGAME` / `KXNCAAMBSPREAD` markets resolved
-# and none collided; these are 9 of the 10 that did not. Applied ONLY after a
-# direct miss, so a name the registry already reads is never re-routed.
+# Kalshi's spelling -> the D1 registry's school (`ncaab_team_registry.csv`, and
+# `wncaab_team_registry.csv` for the women: the same ESPN schools), for the names
+# `chip_join_key` does not resolve. Kalshi spells a school the same way in both
+# leagues, so one table serves the two. Applied ONLY after a direct miss, so a
+# name the registry already reads is never re-routed.
+#
+# Measured 2026-11-03, men's: 272 of 282 distinct names in Kalshi's open
+# `KXNCAAMBGAME` / `KXNCAAMBSPREAD` markets resolved and none collided; the first
+# nine entries are 9 of the 10 that did not. Measured 2026-11-04, women's: 284 of
+# 295 names in the open `KXNCAAWBGAME` / `KXNCAAWBSPREAD` markets resolved; six
+# misses were already here, and "Grambling St." / "North Carolina St." /
+# "Seattle" are three more. The settled 11-02..11-03 women's listing (137 events)
+# added the last three. Nothing on either slate collided.
 #
 # AN EXPLICIT TABLE, NOT NCAAF's " St." -> " State" retry. Two of these drop the
 # "St." altogether ("Nicholls St." is the registry's "Nicholls"), and a stripping
 # rule loose enough for those could land on a different school.
-# The tenth name, 'Bethesda', is not Division I and has no entry, so it stays
-# unresolved and is refused.
-_KALSHI_NCAAB_SPELLINGS: dict[str, str] = {
+# Names outside Division I have no entry, so they stay unresolved and are
+# refused: 'Bethesda' (men's), 'District of Columbia', 'Johnson C. Smith' and
+# 14 more (women's). So is 'Mercyhurst' for the women: Division I, but absent
+# from `wncaab_team_registry.csv`, which is a registry gap and not a spelling.
+_KALSHI_COLLEGE_BASKETBALL_SPELLINGS: dict[str, str] = {
     "Central Connecticut St.": "Central Connecticut",
     "Miami (FL)": "Miami",
     "New Orleans": "LSU New Orleans",
@@ -1191,6 +1223,12 @@ _KALSHI_NCAAB_SPELLINGS: dict[str, str] = {
     "Tennessee-Martin": "UT Martin",
     "USC Upstate": "South Carolina Upstate",
     "University at Albany": "UAlbany",
+    "Grambling St.": "Grambling",
+    "North Carolina St.": "NC State",
+    "Seattle": "Seattle U",
+    "Appalachian St.": "App State",
+    "Louisiana-Monroe": "UL Monroe",
+    "San Jose St.": "San José State",
 }
 
 
@@ -1671,6 +1709,9 @@ _SERIES_SEGMENT: dict[str, str] = {
     "KXNCAAMBGAME": "full",
     "KXNCAAMBSPREAD": "full",
     "KXNCAAMBTOTAL": "full",
+    "KXNCAAWBGAME": "full",
+    "KXNCAAWBSPREAD": "full",
+    "KXNCAAWBTOTAL": "full",
     "KXWNBAGAME": "full",
 }
 

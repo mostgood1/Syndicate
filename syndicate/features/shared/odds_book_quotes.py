@@ -183,7 +183,13 @@ _KEY_FIELDS: tuple[str, ...] = (
 # NCAAB is game lines only, so without this every matched NCAAB market would be
 # dropped here. The re-check condition is unchanged: `us_ex` on NCAAB's regions
 # means removing `ncaab` here.
-_GAME_LINE_CAPTURE_SPORTS: frozenset[str] = frozenset({"soccer", "nhl", "ncaab"})
+#
+# WNCAAB JOINED 2026-11-04 ON THE SAME MEASUREMENT (lane wncaab-kalshi-pairing).
+# The fleet's WNCAAB shards for 11-02..11-05 held 0 exchange rows in 8,483
+# quotes, all `kind=game`. WNCAAB is game lines only, so without this every
+# matched women's Kalshi market would be dropped here. Same re-check condition:
+# `us_ex` on WNCAAB's regions means removing `wncaab` here.
+_GAME_LINE_CAPTURE_SPORTS: frozenset[str] = frozenset({"soccer", "nhl", "ncaab", "wncaab"})
 
 
 def sport_allows_game_line_capture(sport: Any) -> bool:

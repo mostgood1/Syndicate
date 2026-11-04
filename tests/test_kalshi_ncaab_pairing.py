@@ -195,7 +195,7 @@ def test_OFF_IS_NOT_ON_the_join_matches_nothing_without_the_registry(monkeypatch
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("kalshi,school", sorted(cat._KALSHI_NCAAB_SPELLINGS.items()))
+@pytest.mark.parametrize("kalshi,school", sorted(cat._KALSHI_COLLEGE_BASKETBALL_SPELLINGS.items()))
 def test_each_kalshi_spelling_resolves_to_its_registry_school(kalshi, school):
     from syndicate.features.shared.team_aliases import chip_join_key
 
@@ -225,14 +225,15 @@ def test_a_school_outside_division_one_stays_unresolved():
     assert cat.club_key("ncaab", "Bethesda") is None
 
 
-def test_the_table_is_ncaab_only():
+def test_the_table_is_college_basketball_only():
+    """Shared with `wncaab` since 2026-11-04 (`tests/test_kalshi_wncaab_pairing.py`)."""
     assert cat.club_key("ncaaf", "Tennessee-Martin") != cat.club_key("ncaab", "Tennessee-Martin")
 
 
 def test_OFF_IS_NOT_ON_without_the_spelling_the_game_does_not_pair(monkeypatch):
     rows = [_row(_UNO_LSU, "spreads", "away", 26.5)]
     assert _join(_UNO_LSU_MARKETS, rows, "2026-11-03")["matched"] == 1
-    monkeypatch.delitem(cat._KALSHI_NCAAB_SPELLINGS, "New Orleans")
+    monkeypatch.delitem(cat._KALSHI_COLLEGE_BASKETBALL_SPELLINGS, "New Orleans")
     assert _join(_UNO_LSU_MARKETS, rows, "2026-11-03")["matched"] == 0
 
 

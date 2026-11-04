@@ -260,6 +260,10 @@ _TOTAL_UNIT: dict[str, frozenset[str]] = {
     "nba": frozenset({"point", "points"}),
     "wnba": frozenset({"point", "points"}),
     "ncaab": frozenset({"point", "points"}),
+    # Absent until 2026-11-04, so every Kalshi women's college total ('Full Game:
+    # Over 154.5 points scored', KXNCAAWBTOTAL) refused `stat_not_in_market_vocabulary`:
+    # 189 of 189 open on a read-only fleet join that day.
+    "wncaab": frozenset({"point", "points"}),
     "nfl": frozenset({"point", "points"}),
     "ncaaf": frozenset({"point", "points"}),
     "nhl": frozenset({"goal", "goals"}),

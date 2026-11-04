@@ -138,7 +138,10 @@ def kalshi_board_coverage_interval_seconds() -> float:
 
 
 _GAME_LINE_MARKETS = ("h2h", "totals", "spreads")
-_GRID_SPORTS = ("mlb", "nhl", "nfl", "ncaaf", "ncaab", "nba", "wnba")
+# `wncaab` added 2026-11-04 (lane wncaab-kalshi-pairing): women's college rows
+# reach no Layer 2 shortlist (cand=34, every one in the `dead` lane on 11-04), so
+# without this the Kalshi join and quote capture never see a women's game.
+_GRID_SPORTS = ("mlb", "nhl", "nfl", "ncaaf", "ncaab", "wncaab", "nba", "wnba")
 
 
 def kalshi_join_all_game_lines_enabled() -> bool:
