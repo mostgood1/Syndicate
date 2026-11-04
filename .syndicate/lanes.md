@@ -672,6 +672,14 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness --idle-min 240 gave 1 SAFE of 7 CLOSED; moved `closed-lane-archive-20261104-0221`. Table + Part B in .syndicate/log/2026-11-04.md.
 
+### repo-out-of-onedrive-plan — OPEN — opened 2026-11-04 — session eeaddaa6-9251-44ab-b4c4-546b2d84cd8e
+- Goal: A reviewed, user-presented runbook to move the repo from C:\Users\tempadmin\OneDrive\Coding\Syndicate to C:\dev\Syndicate, with a file:line inventory of every path dependency, ordering, quiesce, git-native move, rollback, verify and downtime. READ-ONLY: moves nothing.
+- Files: docs/ai_context/repo_out_of_onedrive_plan.md
+- Hypothesis: n/a (planning lane)
+- Falsification test: n/a
+- Verification: plan doc on origin/main; user given a go/no-go and window question
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
