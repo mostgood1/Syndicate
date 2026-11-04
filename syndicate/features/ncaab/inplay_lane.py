@@ -131,19 +131,22 @@ def _pregame_dates() -> list[str]:
     return [today, (date.fromisoformat(today) + timedelta(days=1)).isoformat()]
 
 
-def _pregame_game_count(dates: list[str], leagues: tuple[str, ...]) -> int:
+def _pregame_game_count(dates: list[str], leagues: tuple[str, ...], *, now: datetime | None = None) -> int:
     from syndicate.features.college_basketball.pregame_sim import is_pregame
     from syndicate.features.ncaab.slate import read_slate
 
-    moment = datetime.now(timezone.utc)
+    moment = now or datetime.now(timezone.utc)
     return sum(1 for league in leagues for d in dates for g in (read_slate(d, league) or {}).get("games") or []
                if is_pregame(g, moment))
 
 
 def maybe_launch_pregame_sims(leagues: tuple[str, ...] = ("ncaab", "wncaab"), *, popen: Callable[..., Any] = subprocess.Popen,
-                              clock: Callable[[], float] = time.monotonic) -> dict[str, Any] | None:
+                              clock: Callable[[], float] = time.monotonic, now: datetime | None = None) -> dict[str, Any] | None:
     """Start `scripts/build_college_pregame_sims.py` when the last child has exited, the interval has passed and
-    the slate shows a pregame game today or tomorrow. Returns what it launched, or None."""
+    the slate shows a pregame game today or tomorrow. Returns what it launched, or None.
+
+    `now` is the wall clock that judges "pregame" (default: the real one). A test that pins the slate date must
+    pin this too, or it starts failing once that date's fixture games have tipped (nightly 2026-11-04)."""
     global _pregame_child, _pregame_last_launch
     if not pregame_sim_enabled():
         return None
@@ -157,7 +160,7 @@ def maybe_launch_pregame_sims(leagues: tuple[str, ...] = ("ncaab", "wncaab"), *,
     if _pregame_last_launch and clock() - _pregame_last_launch < interval:
         return None
     dates = _pregame_dates()
-    pregame = _pregame_game_count(dates, leagues)
+    pregame = _pregame_game_count(dates, leagues, now=now)
     if pregame <= 0:
         return None
     budget = _env_seconds("SYNDICATE_COLLEGE_PREGAME_BUDGET_SECONDS", 600, 60)

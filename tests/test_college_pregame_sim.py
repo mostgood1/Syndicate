@@ -167,15 +167,34 @@ def test_launcher_switch_is_reachable_and_runs_one_child_at_a_time(slate_day, mo
 
     clock = iter([1000.0, 1000.0, 1100.0, 3000.0, 3000.0])
     monkeypatch.setenv("SYNDICATE_COLLEGE_PREGAME_SIM", "0")
-    assert inplay_lane.maybe_launch_pregame_sims(popen=popen, clock=lambda: next(clock)) is None and not launched
+    assert inplay_lane.maybe_launch_pregame_sims(popen=popen, clock=lambda: next(clock), now=NOW) is None and not launched
     monkeypatch.setenv("SYNDICATE_COLLEGE_PREGAME_SIM", "1")
-    got = inplay_lane.maybe_launch_pregame_sims(popen=popen, clock=lambda: next(clock))
+    got = inplay_lane.maybe_launch_pregame_sims(popen=popen, clock=lambda: next(clock), now=NOW)
     assert got["pregame_games"] == 2 and got["dates"] == ["2026-11-03", "2026-11-04"]
     assert any(str(part).endswith("build_college_pregame_sims.py") for part in launched[0]) and "--budget-seconds" in launched[0]
-    assert inplay_lane.maybe_launch_pregame_sims(popen=popen, clock=lambda: next(clock)) is None  # child still running
+    assert inplay_lane.maybe_launch_pregame_sims(popen=popen, clock=lambda: next(clock), now=NOW) is None  # child still running
     child.code = 0
-    assert inplay_lane.maybe_launch_pregame_sims(popen=popen, clock=lambda: 1100.0) is None  # exited, interval not passed
-    assert inplay_lane.maybe_launch_pregame_sims(popen=popen, clock=lambda: 3000.0) is not None and len(launched) == 2
+    assert inplay_lane.maybe_launch_pregame_sims(popen=popen, clock=lambda: 1100.0, now=NOW) is None  # exited, interval not passed
+    assert inplay_lane.maybe_launch_pregame_sims(popen=popen, clock=lambda: 3000.0, now=NOW) is not None and len(launched) == 2
+
+
+def test_launcher_judges_pregame_on_the_clock_it_is_given(slate_day, monkeypatch):
+    # The 2026-11-04 nightly failure, pinned: the same slate is "two pregame games" before the tip and nothing after it.
+    from syndicate.features.ncaab import inplay_lane
+
+    monkeypatch.setattr(inplay_lane, "central_today_iso", lambda: "2026-11-03")
+    monkeypatch.setattr(inplay_lane, "_pregame_child", None)
+    monkeypatch.setattr(inplay_lane, "_pregame_last_launch", 0.0)
+    monkeypatch.setenv("SYNDICATE_COLLEGE_PREGAME_SIM", "1")
+    launched = []
+
+    def popen(command, cwd=None):
+        launched.append(command)
+        return _Child()
+
+    after_tip = datetime(2026, 11, 4, 6, 0, tzinfo=timezone.utc)
+    assert inplay_lane.maybe_launch_pregame_sims(popen=popen, clock=lambda: 1000.0, now=after_tip) is None and not launched
+    assert inplay_lane.maybe_launch_pregame_sims(popen=popen, clock=lambda: 1000.0, now=NOW)["pregame_games"] == 2
 
 
 def _priced_row(market, line, *, sides, prices, home="Tennessee Volunteers", away="Wofford Terriers"):
