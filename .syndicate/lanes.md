@@ -711,7 +711,8 @@ death, never life — do not invert it.
 - Verification: rehearsal log + RESULT.txt readings recorded in the plan doc and the daily log
 - Blocked by: none
 
-### uefa-corners-window — OPEN — opened 2026-11-04 — session 8000dc38-298a-4e02-806b-15931006aff3
+### uefa-corners-window — CLOSED 2026-11-04 (GOAL MET) — opened 2026-11-04 — session 8000dc38-298a-4e02-806b-15931006aff3
+- **GOAL VERDICT `[2026-11-04 17:12Z]`: GOAL: MET.** Fleet ff to `bd20ef2bf` 15:41:16Z (no restart). First sweep on the new code 16:21:40Z: 2026-11-05 shard `uel alternate_totals_corners` 767 rows on 17 matches, 25-28h before kickoff (was 0); served shortlist for 11-05 (build 17:09:37Z) 17 of 30 matches with corners, 272 rows (was 0). UECL corners are not offered by our books at all (btts only, even inside 24h on 10-23) -- a source limit, not this window. Per-call credit cost read from the probe only (2). deploys.md 2026-11-04 17:12Z.
 - Goal: UEFA (UCL/UEL/UECL) corners + BTTS reach the Layer 2 board for TOMORROW's matches, not only within 24h of kickoff: the UEFA props step gets a separate 72h window for game markets (btts, alternate_totals_corners) while player props stay at 24h; on main, live on the fleet, and MEASURED as UEL/UECL alternate_totals_corners rows captured >24h before kickoff in the book_quotes shard and served on the Layer 2 shortlist
 - Files: scripts/fetch_soccer_oddsapi_props_local.py, scripts/refresh_odds_sources.py (UEFA props step horizon only), tests/test_soccer_uefa_followups.py
 - Hypothesis: UEFA corners are missing from the board for any match more than 24h out because game markets ride the player-props call, which the UEFA step gates with --max-hours-ahead 24 (domestic leagues have no window and get corners 7-14 days ahead: EPL 11-07 first seen 10-24; UCL 11-04 first seen 11-03T17:46Z; UEL/UECL 11-05 have h2h only)
