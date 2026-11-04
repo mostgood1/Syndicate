@@ -614,19 +614,35 @@ death, never life — do not invert it.
 - Verification: after a drained full down/up: refresh-worker environ band_on=0, healthz 200, deploys.md entry
 - Blocked by: none
 
-### wncaab-module — OPEN (live re-sim + checklist + live margin anchor + college prior calibration + engine efficiency bounds + college live Win% blank DONE; evening reading taken post hoc NOT MET; player-prior gaps left) — opened 2026-11-02 — session 547fe65e-71ca-4e19-9589-237553cb4eab
+### wncaab-module — OPEN (live re-sim + checklist + live margin anchor + college prior calibration + engine efficiency bounds + college live Win% blank DONE; evening reading taken post hoc NOT MET; live spread edge lean diagnosed, not a defect; player-prior gaps + a nightly test owed) — opened 2026-11-02 — session 547fe65e-71ca-4e19-9589-237553cb4eab
 - **2026-11-04 -- LOAN noted (lane `wncaab-kalshi-pairing`, session e32fef1a), USER-APPROVED ("Yes, land it (Recommended)", ~13:35Z; the work itself: "Yes, pair WNCAAB"):** `kalshi_catalogue.py` -- the `KXNCAAWBGAME`/`KXNCAAWBSPREAD`/`KXNCAAWBTOTAL` entries in `SERIES_SPORT` and `_SERIES_SEGMENT`, `KXNCAAWBWINS` in `SERIES_OUT_OF_SCOPE`, `club_key`'s spelling table now serving `wncaab` too, and the `_SPORT_TOKENS` comment line that said nothing was paired. `team_aliases.py` and `wncaab_team_registry.csv` are NOT touched; Mercyhurst (D1) is absent from the women's registry, so its Kalshi games stay refused. Also yours to know: `tests/test_college_pregame_sim.py::test_launcher_switch_is_reachable_and_runs_one_child_at_a_time` fails since 11-04 -- `_pregame_game_count` reads the real clock (`datetime.now`) against the fixture's fixed 11-03 games.
 - **STATUS 2026-11-04 07:52Z: college live Win% blank LIVE and VERIFIED** (user "Yes, blank it"; `8a5e97d55`, loaded by `ncaab-kalshi-pairing`'s refresh-worker TERM 00:46:25Z, no restart by this lane)
   - Live/final college rows serving a pregame Win%: 1275 -> 0. `pregame_on_live`: 0 -> 1937. Live gameline pricing continued after the boot.
   - LEFT:
     - the 7 PM CST reading, taken after the fact 13:45Z: NOT MET on (a)'s letter (`game_not_started` x1). (b) and (c) MET; men's s/game 0.30x 11-02. Reading 7 NOT MET: men's median |offset| 3.24 > 2.5, signed bias +4.6 -> -0.15. NCAAB credits/h over a live hour not measurable after the fact. The stalled run (`local_fb3dd7ca`) is still open;
-    - the lead: live spread edges lean one way (+4.5 pp signed median, both leagues);
+    - the lead "live spread edges lean one way": DIAGNOSED 2026-11-04 15:20Z. NOT A DEFECT, and not one way (result below the hypothesis);
       - HYPOTHESIS 2026-11-04 15:11Z, before testing (user "Yes, diagnose it"). A spread row's `edge_pp` = P_model(home covers the row's away-frame line L, i.e. margin > L) - the de-vigged market P(home covers) (`live_gameline_join.py:1686`, `:893`, `:935`). Positive = the model likes home.
         - H1, line frame: college grid spread rows carry the HOME-frame line. Falsified if, at fixed progress, the signed edge does not change sign with the favorite and `model_margin_mean - L` centres on 0.
         - H2, in-play home drift: the anchor or the home-court term adds home margin during play. Falsified if `model_margin_mean` minus the market-implied margin centres on 0 at every progress band.
         - H3, segment: half rows priced off the full-game margin distribution. Falsified if the lean is the same on full-game rows alone.
         - Grading the rows against the finals decides whether model or market was right.
+      - RESULT 2026-11-04 15:20Z (read-only, fleet ledgers 11-02 + 11-03 graded against the ESPN scoreboard finals):
+        - H1 FALSIFIED. Rows carry the away-frame line. Model margin minus line sits at +-2.4 to 3.3 points, where a flip would read about twice the spread. Home covers the stored line 0.43-0.57 of the time against a market of ~0.50. Example: Tennessee -26.5 stored as 26.5, model margin 28.6. (The H1 test as pre-written was loose; this is the deciding reading.)
+        - H3 FALSIFIED. No half row carries an edge; every priced row is full-game.
+        - H2: no home drift. The lean's direction moved with the engine:
+          - 11-02 (no anchor, pre-calibration; 95 men's games): toward the underdog, model margin - L -2.75 on home favourites.
+          - 11-03 (anchor + calibration + bounds; 18 games, every one a home favourite): toward the favourite, +2.72.
+        - Graded:
+          - 11-02, the model lost: Brier worse at every stage, 46-49 by game, remaining-margin error 8.5 vs the line's 6.8.
+          - 11-03, it won: Brier better at 3 of 4 stages, 12-6 by game, 6.2 vs 7.0.
+          - Totals lean under both nights: they lost 43-52 on 11-02 and won 15-3 on 11-03.
+        - One night on the current engine (18 men's, 4 women's games) is not skill.
+        - No money path:
+          - Kalshi live entries after tip are refused (`execute_portfolio.py:902`, `game_started`; 4 college refusals 11-03/04), and nothing sets `fair_source=in_game`.
+          - The 5 NCAAB paper bets are all pregame, on 11-04's slate.
     - the women's MARGIN_CALIBRATION_K;
+    - re-grade live college spreads/totals against finals over more nights on the current engine (the script is `lean_read3.py` in session 547fe65e's scratchpad, NOT in the repo);
+    - the nightly time bomb owed to this lane (11-04 nightly reading): `test_college_pregame_sim::test_launcher_switch_is_reachable_and_runs_one_child_at_a_time`. `inplay_lane._pregame_game_count` judges `is_pregame` on the real clock while the test pins 11-03;
     - the 5 women's teams with no player priors.
 - **STATUS 2026-11-03 22:58Z: college prior calibration + engine efficiency bounds LIVE (pregame VERIFIED; live half owed tonight)**
   - User "College model fit". `640c56bbf`: ff 19:40:54Z, live-odds-worker 19:41:57Z. Pregame sims carry the calibrated prior.

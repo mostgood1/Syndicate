@@ -3213,3 +3213,20 @@ Belief overturned: "the college sim's margins run at slope 0.69 of the market's"
   - Before arming a one-shot destructive script, run its real branch end to end on a throwaway fixture: a repo plus an external worktree, outside OneDrive.
   - Write `RESULT=RUNNING` at start, so a crash cannot leave a stale verdict.
   - Wrap everything after the point of no return in a catch that says what is done.
+
+### 2026-11-04 -- a one-night signed edge median is not a direction: split it by favourite and grade it before calling it a bias (lane wncaab-module)
+Belief overturned: "live college spread edges lean one way (+4.5 pp signed median, both leagues)". This lane wrote it as a lead from the 11-03 ledger alone.
+
+- On 11-03 every men's game had a home favourite, so the home split and the favourite split were the same. The same trap as the 11-03 entry above.
+- On 11-02 the same rows read -10.9 the other way, on a different engine.
+- Graded against the finals:
+  - 11-03's lean was right more often than wrong: 12-6 by game, and a remaining-margin error of 6.2 against the line's 7.0.
+  - 11-02's opposite lean was wrong: 46-49.
+
+**Rule:** before calling a signed edge median a bias, do three things:
+
+1. Read a second slate.
+2. Split by favourite and underdog, not only home and away.
+3. Grade it against the outcomes.
+
+A lean the outcomes agree with is a disagreement with the market, not a defect. Say how many games it rests on.
