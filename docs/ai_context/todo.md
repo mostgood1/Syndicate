@@ -5,6 +5,14 @@
 - **(a) STATUS 2026-11-02 (lane `college-basketball-settlement`): resolvers SHIPPED and LIVE; first settlements VERIFIED 11-03 02:27Z (5 of 5 NCAAB paper orders graded, all match ESPN's finals).** `bet_status_ncaab` + `bet_status_wncaab` (ESPN D1 scoreboard `groups=50&limit=500`, full game + halves / quarters) wired into `_default_resolver` (`6af0a1ce6`); the pinned missing set is now empty. Loaded by the refresh-worker restart 20:35:15Z on `ff2a4b53c`; both 11-02 NCAAB orders read `not_started` from 21:00Z (were `no_resolver_for_ncaab`). Settled 02:23Z 11-03: 3 won, 2 lost, every outcome equal to ESPN's final (deploys.md 2026-11-02 20:35:08Z). Scorecard MET 11-03: ncaab graded 28,687 of 28,975 rows over 121 games (halves 93 / 61 games), wncaab 1,668 rows, 0 settler errors; a 6th 11-02 order (totals) also graded correctly. **(a) DONE except one reading OWED: the first WNCAAB paper settlement** -- no wncaab paper order existed on 11-02/11-03; when one settles, check `outcome` against ESPN's final (womens-college-basketball scoreboard, `groups=50`). Lane `college-basketball-settlement` CLOSED 11-03. The scorecard's NCAAB halves were graded off WNBA's quarter table until `6af0a1ce6` (h1 = whole regulation); fixed, plus neutral-site orientation (`26d8be509`). (b) is UNBLOCKED: settlement reads correct.
 - **(b) Kalshi pairing, only after (a).** Kalshi lists men's college basketball as `KXNCAAMBGAME` / `KXNCAAMBSPREAD` / `KXNCAAMBTOTAL` (330 / ~1,000 / ~1,000 open on 11-01). The catalogue's sport token is `NCAAB` (`kalshi_catalogue._SPORT_TOKENS`), which never matches `NCAAMB`, and the one registered series `KXNCAABTOTAL` has 0 open markets. Measured 11-01 17:3xZ: `VENUE_REPRICE_KEYS` unmatched ncaab 802/802, Kalshi `kept_by_sport` has no ncaab. Mapping it makes NCAAB live-orderable at once: refresh-worker's `SYNDICATE_PORTFOLIO_MARKET_FAIR_SPORTS` includes `ncaab` and the fleet trades live. Polymarket college basketball is unverified (`cbb` slug not aliased).
 - **(b) STATUS 2026-11-03 (lane `ncaab-kalshi-pairing`): BUILT, on main `68baa1f3a`, NOT on the fleet.**
+- **(b) LIVE and VERIFIED 2026-11-04 01:01Z** (deploys.md): fleet ff `68baa1f3a` + refresh-worker restart 00:46:25Z (user "Restart now").
+  - Readings:
+    - Kalshi NCAAB markets kept: 0 -> 922.
+    - NCAAB quotes captured: 0 -> 10.
+    - Shortlist NCAAB keys unmatched: 821 -> 189.
+    - Kalshi selected for 59 NCAAB keys.
+  - Live pairs were sampled correct by team, side and line. Lane `ncaab-kalshi-pairing` CLOSED.
+  - Owed: the first NCAAB Kalshi fill.
   - **What changed:**
     - `KXNCAAMBGAME` / `KXNCAAMBSPREAD` / `KXNCAAMBTOTAL` are registered by name. An `NCAAMB` sport token would have handed discovery about 80 futures series.
     - Nine Kalshi school spellings were added to `club_key`, so 281 of 282 Kalshi names resolve.

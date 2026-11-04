@@ -56135,3 +56135,32 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - `QUOTE_CAPTURE appended_by_sport['ncaab'] > 0`.
   - `VENUE_REPRICE_KEYS selected_by_sport['ncaab']` names `kalshi`.
   - Then sample the pairs by team, side and line.
+
+## 2026-11-04 01:01Z (7:01 PM CST 11-03) -- refresh-worker TERM 00:46:25Z (mid-build, user's call) + MEASUREMENT: NCAAB on Kalshi `68baa1f3a` -- **LIVE and VERIFIED** (lane `ncaab-kalshi-pairing` CLOSED, todo #755 (b))
+- **The user, in this chat:** "Restart now". This answered "When should I restart refresh-worker to load it?", which came after this lane's 23:49:47Z entry: 132 HOLD polls, each a board build or a job in flight. The message before the ask said a forced restart throws the in-flight build away and leaves the board cold for 7-35 min during live games. The user's earlier "Yes, update fleet" covered the `odds_book_quotes.py` line borrowed from `book-quotes-splice-repair`, which was named in the message before that ask.
+- **Gates:**
+  - Claim refresh-worker taken at 00:46:06Z.
+  - Fresh baseline at 00:46:16Z: `kalshi_trim_kept_ncaab=0`, `quote_capture_appended_ncaab=0`.
+  - Preflight (fleet, target `68baa1f3a`, `--allow-mid-build`, expectations `>0` on both) returned CLEAR at 00:46:16Z, with 0 child processes.
+  - `kill -TERM 3473754` sent at 00:46:25Z. `role_restarts.jsonl` recorded exit 00:46:28Z, claimed, holder `ncaab-kalshi-pairing`.
+  - Respawned as pid 3585479 at 00:46:32Z, `code=68baa1f3`.
+  - Claim released at 00:46:57Z.
+  - The restart also loaded the three `wncaab-module` commits listed in the 23:49:47Z entry, including `8a5e97d55` (college live Win% blank), whose verification that lane owes.
+- **verify -- MET** (refresh-worker.log, watcher 00:46:51Z-00:59:54Z, 0 tracebacks):
+  - `TRIM_BY_SPORT kept_by_sport['ncaab']`: **0 -> 922** at 00:47:08Z, the first tick, then 925 and 928.
+  - `QUOTE_CAPTURE appended_by_sport['ncaab']`: **0 -> 10** at 00:47:46Z, then 1 at 00:58:01Z.
+  - `[layer2_shortlist] VENUE_REPRICE_KEYS`:
+    - ncaab unmatched went 821 (00:49:22Z) -> 600 (00:54:26Z) -> **189** (00:58:54Z). On 11-01 it was 802 of 802.
+    - `selected_by_sport['ncaab'] = {'kalshi': 59}` at 00:58:54Z.
+  - `[venue_quote_fanin] SEGMENT_MISMATCH_GRID sport=ncaab count=0` at 00:58:35Z, with `matched={'full|kalshi|KXNCAAMBGAME': 19, 'full|kalshi|KXNCAAMBTOTAL': 40}`, so only full-game rows were repriced.
+  - Working set at 00:59:13Z: `KXNCAAMBGAME` 324, `KXNCAAMBSPREAD` 276, `KXNCAAMBTOTAL` 328. `SERIES_FULL` showed `truncated=False`.
+  - **Live pairs, sampled at 01:00:24Z off the persisted working set and the current shortlist, with fleet code:**
+    - 11-03 paired 40 rows across 15 of 29 games; 11-04 paired 10 rows across 4 of 22 games.
+    - Each sample was correct by team, side and line:
+      - SDSU h2h home at YES -900.
+      - Fort Wayne h2h away at YES +223.
+      - The board's Lipscomb +22.5 took NO +113 on "Iowa wins by over 22.5".
+      - UNF/CBU 154.5: over took YES, under took NO.
+      - SMC -12.5 home at YES.
+- **Orders:** no `ORDER_PATH` or `EXECUTED` line names ncaab between 00:46:32Z and 01:00Z. Live NCAAB orders go through the existing market-fair path at the canary stake, and each line is gated by its own edge and the Kalshi net floor. A first NCAAB Kalshi fill has NOT been observed.
+- **Cost of the forced restart:** one in-flight board build was discarded at 00:46:25Z. The first `VENUE_REPRICE_KEYS` after the respawn came at 00:49:22Z.

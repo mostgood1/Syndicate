@@ -636,8 +636,15 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: GOAL MET. Moved `closed-lane-archive-20261103-1150` and `closed-lane-archive-20261103-1302` (owner_liveness --idle-min 240, SAFE). Table and narrative: log/2026-11-03.md 23:10Z.
 
-### ncaab-kalshi-pairing — OPEN — opened 2026-11-03 — session e32fef1a-01e8-4afe-a284-01acd3728545
-- **STATUS `[2026-11-03 23:31Z]`: GOAL: NOT MET -- fix on main `68baa1f3a`, NOT on the fleet.** 33 new tests pass (829 across 40 related files). Read-only fleet join (23:20:50Z, live Kalshi markets vs the real shortlist): 11-03 paired 45 of 98 NCAAB rows, 17 of 19 games (h2h 13, spreads 5, totals 27). Left: the fleet ff + refresh-worker restart, on the user's yes, then the live join reading.
+### ncaab-kalshi-pairing — CLOSED 2026-11-04 (GOAL MET: 68baa1f3a live on the fleet; Kalshi selected for 59 NCAAB shortlist keys, unmatched 821 -> 189) — opened 2026-11-03 — session e32fef1a-01e8-4afe-a284-01acd3728545
+- **GOAL VERDICT `[2026-11-04 01:01Z]`.** Goal, verbatim: "Kalshi men's college basketball full-game markets (KXNCAAMBGAME, KXNCAAMBSPREAD, KXNCAAMBTOTAL) pair with NCAAB board rows: fix on main with tests, and on the fleet the Kalshi join reports matched NCAAB rows > 0 with sampled pairs correct by team, side and line (todo #755 (b))" -- **GOAL: MET.** Fix `68baa1f3a` on main with 33 tests (829 across 40 related files pass). Fleet ff at 23:49:47Z. refresh-worker TERM at 00:46:25Z on the user's "Restart now", after 132 HOLD polls on the live slate; `--allow-mid-build`, so one in-flight build was discarded. Readings in refresh-worker.log (deploys.md 2026-11-04 01:01Z):
+  - `TRIM_BY_SPORT` ncaab kept 0 -> 922 at 00:47:08Z, then 928.
+  - `QUOTE_CAPTURE` ncaab appended 0 -> 10 at 00:47:46Z.
+  - `VENUE_REPRICE_KEYS` ncaab unmatched 821 -> 189, with selected `{'kalshi': 59}` at 00:58:54Z.
+  - `SEGMENT_MISMATCH_GRID` ncaab count=0, and every reprice landed on a full-game row.
+  - Live pairs sampled correct by team, side and line; 0 tracebacks.
+  - No NCAAB Kalshi order by 01:00Z; each line is gated by its own edge.
+  Not done: women's `KXNCAAWB*` and Polymarket `cbb`. CLOSED; the claims and the odds_book_quotes.py loan are released.
 - Goal: Kalshi men's college basketball full-game markets (KXNCAAMBGAME, KXNCAAMBSPREAD, KXNCAAMBTOTAL) pair with NCAAB board rows: fix on main with tests, and on the fleet the Kalshi join reports matched NCAAB rows > 0 with sampled pairs correct by team, side and line (todo #755 (b))
 - Files: syndicate/features/shared/kalshi_catalogue.py (SERIES_SPORT and _SERIES_SEGMENT KXNCAAMB entries and club_key's NCAAB Kalshi spellings ONLY), syndicate/features/shared/odds_book_quotes.py (LOAN from book-quotes-splice-repair - the section the user approved lending for NHL on 2026-11-01; for NCAAB put to the user 2026-11-03 together with the fleet update; the game-line capture set ONLY), tests/test_kalshi_ncaab_pairing.py (NEW), tests/test_soccer_game_line_capture.py (the predicate test ONLY)
 - Hypothesis: n/a
