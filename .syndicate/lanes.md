@@ -765,6 +765,14 @@ death, never life — do not invert it.
 - Verification: fleet: a capped run that exceeds the cap exits non-zero alone with a STEP_FAIL memory line; after the fix, per-run peak RSS from ALL_PROCESS_MEMORY falls well below 6 GB, written to deploys.md
 - Blocked by: none
 
+### kalshi-state-cap — OPEN — opened 2026-11-04 — session e32fef1a-01e8-4afe-a284-01acd3728545
+- Goal: The Kalshi markets state (intelligence/kalshi_markets.json, keyvalue) is written again by BOTH workers: 0 KEYVALUE_WRITE_REJECTED for kalshi_markets after the rollout, payload well under the 8 MiB cap, and every reader sees the same rows (markets_from_state output unchanged)
+- Files: pipeline/kalshi_odds_refresh.py, tests/test_kalshi_state_compaction.py
+- Hypothesis: This week's college Kalshi pairings (+~0.6 MB, KXNCAAMB*/KXNCAAWB*) took a lean state that was already at 8.3 MB over the 8,388,608-byte cap; live-odds-worker rejected since 20:40:56Z, refresh-worker lands only when just under
+- Falsification test: Payload composition shows the growth elsewhere, or a lossless compaction does not bring it under
+- Verification: fleet: KEYVALUE_WRITE_REJECTED kalshi_markets count stops growing on both workers after restart; WRITE_LARGE size well below cap; read-only round-trip check expand(compact(row)) == row over the live state's rows
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
