@@ -2811,6 +2811,7 @@ def attach_live_gamelines_for_sport(grid: list, *, sport: str, selected_date: st
             analytic_std_err_for_sport,
             attach_live_gamelines,
             build_live_gameline_index,
+            college_segment_pricing_enabled,
             lens_sources_for_sport,
         )
         from syndicate.features.shared.refresh_state_store import data_root, read_json_file
@@ -2914,6 +2915,25 @@ def attach_live_gamelines_for_sport(grid: list, *, sport: str, selected_date: st
                     # instant, which is what separates a doubleheader's halves.
                     slate_date=selected_date,
                 )
+            # COLLEGE HALVES AND QUARTERS (lane wncaab-module, 2026-11-04): one index PER SEGMENT, each built
+            # from the re-sim lane's own segment block, so an h1 row can only ever meet an h1 number. Built
+            # with pricing off too, so those rows say `segment_pricing_disabled`, not "not a full game".
+            # Pricing is OFF by default: `live_gameline_join.COLLEGE_SEGMENT_PRICING_ENV` has the measurement.
+            segment_indexes = None
+            if sport in ("ncaab", "wncaab"):
+                from syndicate.features.college_basketball.league import league_for
+
+                segment_indexes = {
+                    seg: build_live_gameline_index(
+                        snapshot,
+                        sources=lens_sources_for_sport(sport),
+                        analytic_std_err=analytic_std_err_for_sport(sport),
+                        sport=sport,
+                        slate_date=selected_date,
+                        segment=seg,
+                    )
+                    for seg in league_for(sport).segments
+                }
             coverage = attach_live_gamelines(
                 grid,
                 build_live_gameline_index(
@@ -2939,9 +2959,14 @@ def attach_live_gamelines_for_sport(grid: list, *, sport: str, selected_date: st
                 # SPORT-SCOPED PUBLISH SWITCH, same value the index already
                 # carries. Threaded so disabling one sport cannot silence another.
                 sport=sport,
+                segment_indexes=segment_indexes,
+                segment_pricing_enabled=college_segment_pricing_enabled(),
             )
             if segment_index is not None:
                 coverage["segment_index_size"] = len(segment_index)
+            if segment_indexes is not None:
+                coverage["segment_index_sizes"] = {seg: len(ix) for seg, ix in segment_indexes.items()}
+                coverage["segment_pricing_enabled"] = college_segment_pricing_enabled()
         coverage["supported"] = True
         coverage["index_diagnostics"] = index_diag
         _attribute_live_gameline_zero(coverage, index_diag, sport=sport)

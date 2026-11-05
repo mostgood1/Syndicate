@@ -309,6 +309,45 @@ REASON_SEGMENT_PRICING_DISABLED = "segment_pricing_disabled"
 REASON_NO_SEGMENT_PROJECTION = "no_live_segment_projection"
 REASON_SEGMENT_LEG_SET_UNKNOWN = "segment_leg_set_unknown"
 
+# ---------------------------------------------------------------------------
+# COLLEGE HALVES AND QUARTERS (lane wncaab-module, 2026-11-04, user "Yes,
+# college first" to pricing live intervals off the re-sims' own results).
+#
+# The college re-sim already plays every live game to the final buzzer and
+# keeps each sim's per-period points, so each segment's total and margin
+# histograms come off the SAME sims as the full game (`ncaab/live_resim.py`
+# `resim_live_game`: h1/h2 for the men, q1..q4 + h1/h2 for the women, h2 with
+# overtime). A segment row is answered ONLY from its own segment's index --
+# never the full-game one, which is the +42.43 pp mismatch above.
+#
+# Two refusals of its own, both by name:
+#   - the segment is over (its last period has ended; h2 only with the game):
+#     the histogram is a point mass at the real score, and a book still
+#     quoting it is a dead quote;
+#   - a margin market whose segment the producer did not anchor: the raw sim
+#     margin runs at about half to two-thirds of the market's, the scale defect
+#     the full-game anchor exists for. Totals are served raw, as the full game's.
+#
+# WHY IT SHIPS OFF (measured 2026-11-05 ~01:56Z, replay of the new code on the
+# fleet's live NCAAB snapshot and board, 6 games, 117 live h1/h2 rows). The
+# freshest live segment quote on the grid was 240-400 s old (the in-play lane
+# fetches every 240 s): model minus market there was mean |edge| 11.3 pp
+# (spreads, n=13) and 14.4 pp (totals, n=16); at 400-600 s, 25.5 and 31.9 pp.
+# Late in a half the game moves faster than the quote, so most of that is quote
+# lag, not information -- and the 600 s default ceiling admits all of it.
+# Turning this on is a decision to make against a tighter college quote-age
+# ceiling and a scored sample, not a side effect of landing the plumbing (the
+# first5 precedent above).
+REASON_SEGMENT_OVER = "segment_already_over"
+REASON_SEGMENT_MARGIN_UNANCHORED = "segment_margin_not_anchored"
+COLLEGE_SEGMENT_PRICING_ENV = "SYNDICATE_COLLEGE_LIVE_SEGMENT_PRICING"
+
+
+def college_segment_pricing_enabled(env: Mapping[str, str] | None = None) -> bool:
+    """Explicit opt-in. Absent reads as OFF."""
+    raw = str((env if env is not None else os.environ).get(COLLEGE_SEGMENT_PRICING_ENV, "") or "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
 
 def first5_pricing_enabled() -> bool:
     """Explicit opt-in. Absent reads as OFF."""
@@ -745,7 +784,7 @@ def _analytic_markets_from_lens(lens: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def live_gameline_from_lens(
-    lens_rows: Any, *, sources: tuple[str, ...] | None = None
+    lens_rows: Any, *, sources: tuple[str, ...] | None = None, segment: str | None = None
 ) -> dict[str, Any] | None:
     """The live-state moneyline projection from a snapshot's `gameLens`.
 
@@ -773,6 +812,8 @@ def live_gameline_from_lens(
         if not (0.0 <= p <= 1.0):
             continue
         projection = lens.get("projection") if isinstance(lens.get("projection"), Mapping) else {}
+        if segment is not None:
+            return _segment_hit(lens, projection, segment)
         return {
             "home_win_prob": p,
             "sims_run": lens.get("simsRun"),
@@ -824,6 +865,39 @@ def live_gameline_from_lens(
             "pregame_home_win_prob": lens.get("baselineHomeWinProb"),
         }
     return None
+
+
+def _segment_hit(lens: Mapping[str, Any], projection: Mapping[str, Any], segment: str) -> dict[str, Any] | None:
+    """One SEGMENT of an accepted live lane, in the full-game hit's shape -- or None when the lane has no block
+    for it. Nothing full-game crosses over: the win probability, sim count, means and both histograms are the
+    segment's own, and the lane's full-game analytic markets and pregame baseline are dropped."""
+    segments = projection.get("segments") if isinstance(projection.get("segments"), Mapping) else {}
+    block = segments.get(segment)
+    if not isinstance(block, Mapping):
+        return None
+    margin = block.get("margin_dist") or {}
+    counts = [(int(k), int(v)) for k, v in margin.items()] if isinstance(margin, Mapping) else []
+    n = sum(c for _m, c in counts)
+    anchored = block.get("marginAnchored") is True
+    return {
+        # Every sim resolves to home, tie or away over a segment: the three-way frame `segment_home_win_prob`
+        # reads for a book that lists the draw. A two-way book is answered from `margin_dist` instead.
+        "home_win_prob": (sum(c for m, c in counts if m > 0) / n) if n > 0 and anchored else None,
+        "sims_run": block.get("sims") or lens.get("simsRun"),
+        "total_mean": block.get("total_mean"),
+        "home_margin": (sum(m * c for m, c in counts) / n) if n > 0 else None,
+        "total_runs_dist": block.get("total_dist") or {},
+        "margin_dist": margin if anchored else {},
+        "as_of": lens.get("liveStateAsOf"),
+        "carried_forward": bool(lens.get("liveStateCarriedForward")),
+        "lane": f"{lens.get('key')}:{segment}",
+        "analytic_markets": {},
+        "progress": {"remainingFraction": block.get("remainingFraction")},
+        "pregame_home_win_prob": None,
+        "segment": segment,
+        "segment_settled": bool(block.get("settled")),
+        "segment_margin_unanchored": not anchored,
+    }
 
 
 def price_distribution_market(
@@ -1328,8 +1402,12 @@ def build_live_gameline_index(
     sport: Any = None,
     slate_date: Any = None,
     diagnostics: dict[str, Any] | None = None,
+    segment: str | None = None,
 ) -> dict[tuple[str, str], dict[str, Any]]:
     """(away_team, home_team) -> the live moneyline projection.
+
+    With `segment`, the index answers THAT segment only, from each accepted lane's own
+    `projection.segments[segment]` block (`_segment_hit`); a lane without one is not indexed.
 
     **AND EVERY CANDIDATE FOR THAT PAIR, under `.candidates`** -- see
     `LiveGamelineIndex`. `slate_date` is what lets a lens game's `startTime`
@@ -1436,7 +1514,7 @@ def build_live_gameline_index(
                 stamp = str(lens.get("source") or "none").strip().lower()
                 seen = diag["sources_seen"]
                 seen[stamp] = int(seen.get(stamp, 0)) + 1
-        projection = live_gameline_from_lens(game.get("gameLens"), sources=sources)
+        projection = live_gameline_from_lens(game.get("gameLens"), sources=sources, segment=segment)
         if projection is None:
             if diag is not None:
                 diag["skipped_no_accepted_lane"] = int(diag["skipped_no_accepted_lane"]) + 1
@@ -1476,8 +1554,15 @@ def attach_live_gamelines(
     *,
     segment_index: Mapping[tuple[str, str], Mapping[str, Any]] | None = None,
     sport: Any = None,
+    segment_indexes: Mapping[str, Mapping[tuple[str, str], Mapping[str, Any]]] | None = None,
+    segment_pricing_enabled: bool = False,
 ) -> dict[str, Any]:
     """Overlay the live game-line projection on live moneyline rows.
+
+    `segment_indexes` (college halves and quarters) maps a segment to ITS OWN index, built with
+    `build_live_gameline_index(..., segment=...)`; a row of that segment is priced from it, and only
+    from it, while `segment_pricing_enabled`. Passed with pricing off, those rows refuse
+    `segment_pricing_disabled` rather than the standing `segment_is_not_full_game`.
 
     Mirrors `attach_live_projections`' contract deliberately: a row the join
     MISSES keeps whatever suppression it already had rather than silently
@@ -1531,19 +1616,22 @@ def attach_live_gamelines(
                     game_pk=row.get("game_pk") or game.get("game_pk"),
                     sport=sport,
                 )
+            own_segment_index = segment_indexes is not None and segment in segment_indexes
             priceable_segment = (
                 segment in _FIRST5_SEGMENTS
                 and segment_index is not None
                 and first5_pricing_enabled()
-            )
+            ) or (own_segment_index and bool(segment_pricing_enabled))
             if priceable_segment:
-                row_index = segment_index
+                row_index = segment_indexes[segment] if own_segment_index else segment_index
         if segment not in _FULL_GAME_SEGMENTS and not priceable_segment:
             # THREE DISTINCT STATES, NOT ONE. "the flag is off" is a decision
             # we made, "the lane is missing" is a producer gap, and "not a
             # full-game segment" is the standing rule -- flattening them would
             # make the ledger unable to say which one a zero came from.
             if segment in _FIRST5_SEGMENTS and segment_index is not None:
+                seg_reason = REASON_SEGMENT_PRICING_DISABLED
+            elif own_segment_index:
                 seg_reason = REASON_SEGMENT_PRICING_DISABLED
             elif segment in _FIRST5_SEGMENTS and first5_pricing_enabled():
                 seg_reason = REASON_NO_SEGMENT_PROJECTION
@@ -1655,6 +1743,10 @@ def attach_live_gamelines(
                       else REASON_NO_LIVE_PROJECTION)
             record(coverage, {"priceable": False, "withheld_reason": reason}, projected=False)
             continue
+        if hit.get("segment_settled"):
+            # A finished segment cannot move; its histogram is the real score. Not a projection.
+            record(coverage, {"priceable": False, "withheld_reason": REASON_SEGMENT_OVER}, projected=False)
+            continue
 
         # THE STALENESS GATE SITS HERE, ABOVE THE MARKET BRANCH, ON PURPOSE.
         # Below this line the code forks three ways (moneyline, distribution,
@@ -1676,6 +1768,10 @@ def attach_live_gamelines(
             continue
 
         projection = row.get("projection") if isinstance(row.get("projection"), Mapping) else {}
+        if hit.get("segment_margin_unanchored") and market_key not in _TOTALS_MARKETS:
+            verdict = {"priceable": False, "withheld_reason": REASON_SEGMENT_MARGIN_UNANCHORED}
+            _apply_verdict(row, projection, verdict, hit, coverage, sport=sport)
+            continue
         if market_key in _DIST_MARKETS:
             # THE SIDE THE PROJECTION DESCRIBES, taken from the row's own side
             # tokens rather than assumed. `market_fair_prob_over` is the de-vig

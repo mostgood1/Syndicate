@@ -149,6 +149,50 @@ def _regulation_periods(league: str) -> int:
     return int(league_for(league).periods)
 
 
+# Which regulation periods (0-based) each segment spans: halves for the men, quarters and halves for the women.
+_SEGMENTS_BY_PERIODS: dict[int, dict[str, tuple[int, ...]]] = {
+    2: {"h1": (0,), "h2": (1,)},
+    4: {"q1": (0,), "q2": (1,), "q3": (2,), "q4": (3,), "h1": (0, 1), "h2": (2, 3)},
+}
+# The segments whose market settles with overtime in it. A fourth quarter settles on the fourth quarter alone.
+OVERTIME_SEGMENTS = frozenset({"h2"})
+
+
+def segment_layout(league: str) -> dict[str, tuple[int, ...]]:
+    return dict(_SEGMENTS_BY_PERIODS.get(_regulation_periods(league), {}))
+
+
+def _ot_points(box: Any) -> int:
+    pts = box.get("ot_pts") if isinstance(box, Mapping) else None
+    return int(sum(int(x) for x in pts)) if isinstance(pts, (list, tuple)) else 0
+
+
+def segment_progress(league: str, segment: str, period: int, clock_seconds: float) -> tuple[float, bool]:
+    """(share of REGULATION still to play inside `segment`, whether the segment is over) at a resume point.
+
+    The share is what the margin anchor scales by: the segments' shares add up to the full game's
+    `remaining_regulation_fraction`. A segment is over once its last period has ended -- except one that settles
+    with overtime, which is over only when the game is."""
+    from syndicate.features.college_basketball.league import league_for
+
+    spec = league_for(league)
+    idx = segment_layout(league).get(segment)
+    if not idx:
+        return 0.0, False
+    period = int(period or 1)
+    clock = max(0.0, min(float(clock_seconds or 0.0), float(spec.period_seconds)))
+    remaining = 0.0
+    for i in idx:
+        p = i + 1
+        if p > period:
+            remaining += float(spec.period_seconds)
+        elif p == period:
+            remaining += clock
+    last = idx[-1] + 1
+    over = segment not in OVERTIME_SEGMENTS and (period > last or (period == last and clock <= 0.0))
+    return max(0.0, min(1.0, remaining / float(spec.periods * spec.period_seconds))), over
+
+
 # ------------------------------------------------------------------------------------------- inputs
 
 def _processed_dirs(league: str = "ncaab") -> list[Path]:
@@ -537,28 +581,31 @@ def resim_live_game(inputs: Mapping[str, Any], game_state: Any, *, sims: int = D
     margins: list[int] = []
     # Regulation periods per sim: halves for the men, quarters for the women (`league="wncaab"`).
     regulation = _regulation_periods(league)
-    periods: list[tuple[tuple[int, ...], tuple[int, ...]]] = []
+    periods: list[tuple[tuple[int, ...], tuple[int, ...], int, int]] = []
     for i in range(int(sims)):
         if deadline is not None and clock() >= deadline:
             return NcaabResimRefusal("budget_exhausted", f"{i}/{sims}")
         try:
-            _hb, _ab, hq, aq = simulate(rng, game_state)
+            hb, ab, hq, aq = simulate(rng, game_state)
         except Exception as exc:  # noqa: BLE001
             return NcaabResimRefusal("engine_resume_rejected", type(exc).__name__)
         h, a = int(sum(hq)), int(sum(aq))
         totals.append(h + a)
         margins.append(h - a)
         if len(hq) >= regulation and len(aq) >= regulation:
-            periods.append((tuple(int(x) for x in hq[:regulation]), tuple(int(x) for x in aq[:regulation])))
+            periods.append((tuple(int(x) for x in hq[:regulation]), tuple(int(x) for x in aq[:regulation]),
+                            _ot_points(hb), _ot_points(ab)))
     n = len(totals)
     segments: dict[str, Any] = {}
-    layout = ({"h1": (0,), "h2": (1,)} if regulation == 2 else
-              {"q1": (0,), "q2": (1,), "q3": (2,), "q4": (3,), "h1": (0, 1), "h2": (2, 3)})
-    for name, idx in layout.items():
-        tot = [sum(h[i] for i in idx) + sum(a[i] for i in idx) for h, a in periods]
-        mar = [sum(h[i] for i in idx) - sum(a[i] for i in idx) for h, a in periods]
+    for name, idx in segment_layout(league).items():
+        # The second half settles on every point after halftime, overtime included (`segment_actuals`, the book
+        # convention); the engine keeps overtime in the box's `ot_pts`, outside the period list.
+        ot = name in OVERTIME_SEGMENTS
+        tot = [sum(h[i] for i in idx) + sum(a[i] for i in idx) + ((oh + oa) if ot else 0) for h, a, oh, oa in periods]
+        mar = [sum(h[i] for i in idx) - sum(a[i] for i in idx) + ((oh - oa) if ot else 0) for h, a, oh, oa in periods]
         if tot:
-            segments[name] = {"total_mean": sum(tot) / len(tot), "total_dist": _hist(tot), "margin_dist": _hist(mar)}
+            segments[name] = {"total_mean": sum(tot) / len(tot), "total_dist": _hist(tot), "margin_dist": _hist(mar),
+                              "sims": len(tot), "includesOvertime": ot}
     return {
         "sims_run": n,
         "home_win_prob": sum(1 for m in margins if m > 0) / n,
@@ -619,7 +666,8 @@ def board_name(espn_display: str, odds_names: Mapping[str, str], league: str = L
 # consensus home margin minus the pregame sim's home margin, frozen at tip -- SCALED BY THE SHARE OF REGULATION
 # STILL TO PLAY (the gap is the sim's error over the possessions it simulates; the scored points are real). At the
 # tip the anchored margin IS the market's; every edge after that comes from what the sim makes of the game state.
-# Totals stay raw (the pregame decision), and so do the half/quarter histograms, which the live join does not price.
+# Totals stay raw (the pregame decision). The half/quarter margins take the same anchor, each scaled by its own share
+# of regulation still to play (`_anchor_segments`); their totals stay raw too.
 #
 # A game with no closing spread or no pregame sim margin REFUSES by name (`no_margin_anchor`) before it is simmed:
 # a raw margin would bring the defect back, and such a game has no priced board row to lose. ABSENT IS ON (the
@@ -783,16 +831,33 @@ def anchor_result(result: Mapping[str, Any], anchor: MarginAnchor, *, remaining_
     offset splits each bucket between its two neighbours, allocated by CUMULATIVE rounding: the counts stay
     integers, their total is unchanged, and the mean moves by the offset to within 1/sims. A shifted margin of 0
     (a game cannot end tied) counts half to each side. The sim's own numbers stay on the result (`raw_*`)."""
-    import math
-
     fraction = max(0.0, min(1.0, float(remaining_fraction)))
     offset = float(anchor.offset) * fraction
+    shifted = _shift_margin_hist(result.get("margin_dist"), offset)
+    n = sum(shifted.values())
+    out = dict(result)
+    out["raw_home_win_prob"] = result.get("home_win_prob")
+    out["raw_home_margin_mean"] = result.get("home_margin_mean")
+    out["margin_anchor"] = {**anchor.as_dict(), "remainingFraction": round(fraction, 4), "appliedOffset": round(offset, 2)}
+    out["segments"] = _anchor_segments(result.get("segments"), anchor)
+    if n <= 0:
+        return out
+    out["margin_dist"] = {str(m): c for m, c in sorted(shifted.items())}
+    out["home_margin_mean"] = sum(m * c for m, c in shifted.items()) / n
+    out["home_win_prob"] = (sum(c for m, c in shifted.items() if m > 0) + 0.5 * shifted.get(0, 0)) / n
+    return out
+
+
+def _shift_margin_hist(dist: Any, offset: float) -> Counter:
+    """An integer margin histogram moved by a fractional `offset` (cumulative rounding, see `anchor_result`)."""
+    import math
+
     base = math.floor(offset)
     frac = offset - base
     shifted: Counter = Counter()
     cumulative = 0.0
     allocated = 0
-    for raw_margin, raw_count in sorted(((int(k), int(v)) for k, v in (result.get("margin_dist") or {}).items()), key=lambda kv: kv[0]):
+    for raw_margin, raw_count in sorted(((int(k), int(v)) for k, v in (dist or {}).items()), key=lambda kv: kv[0]):
         cumulative += raw_count * frac
         up = int(round(cumulative)) - allocated
         allocated += up
@@ -800,16 +865,38 @@ def anchor_result(result: Mapping[str, Any], anchor: MarginAnchor, *, remaining_
             shifted[raw_margin + base] += raw_count - up
         if up:
             shifted[raw_margin + base + 1] += up
-    n = sum(shifted.values())
+    return shifted
+
+
+def stamp_segment_progress(result: Mapping[str, Any], facts: ResumeFacts, league: str = LEAGUE) -> dict[str, Any]:
+    """Each segment's share of regulation still to play and whether it is over, at this resume point."""
     out = dict(result)
-    out["raw_home_win_prob"] = result.get("home_win_prob")
-    out["raw_home_margin_mean"] = result.get("home_margin_mean")
-    out["margin_anchor"] = {**anchor.as_dict(), "remainingFraction": round(fraction, 4), "appliedOffset": round(offset, 2)}
-    if n <= 0:
-        return out
-    out["margin_dist"] = {str(m): c for m, c in sorted(shifted.items())}
-    out["home_margin_mean"] = sum(m * c for m, c in shifted.items()) / n
-    out["home_win_prob"] = (sum(c for m, c in shifted.items() if m > 0) + 0.5 * shifted.get(0, 0)) / n
+    segments: dict[str, Any] = {}
+    for name, block in (result.get("segments") or {}).items():
+        share, over = segment_progress(league, name, facts.period, facts.clock_seconds)
+        segments[name] = {**block, "remainingFraction": round(share, 4), "settled": over}
+    out["segments"] = segments
+    return out
+
+
+def _anchor_segments(segments: Any, anchor: MarginAnchor) -> dict[str, Any]:
+    """THE SAME ANCHOR, PER SEGMENT (lane wncaab-module, 2026-11-04): each segment's margin moves by the pregame gap
+    times ITS OWN share of regulation still to play, so the segments' shifts add up to the full game's. A segment
+    the tick did not stamp (`stamp_segment_progress`) is left raw and marked unanchored, and the join prices no
+    margin off it -- the raw sim margin is the scale defect the anchor exists for."""
+    out: dict[str, Any] = {}
+    for name, block in (segments or {}).items():
+        if not isinstance(block, Mapping):
+            continue
+        share = block.get("remainingFraction")
+        if share is None:
+            out[name] = {**block, "marginAnchored": False}
+            continue
+        offset = float(anchor.offset) * max(0.0, min(1.0, float(share)))
+        shifted = _shift_margin_hist(block.get("margin_dist"), offset)
+        n = sum(shifted.values())
+        out[name] = {**block, "marginAnchored": True, "marginAnchorOffset": round(offset, 2),
+                     "margin_dist": {str(m): c for m, c in sorted(shifted.items())} if n > 0 else block.get("margin_dist")}
     return out
 
 
@@ -1057,6 +1144,8 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
         gs, match = map_state_names(gs, inputs["home_players"], inputs["away_players"])
         result = resim_live_game(inputs, gs, sims=sims, base_seed=stable_seed(facts.event_id, facts.last_seq, league),
                                  deadline=deadline, clock=clock, league=league)
+        if not isinstance(result, NcaabResimRefusal):
+            result = stamp_segment_progress(result, facts, league)
         if isinstance(anchor, MarginAnchor) and not isinstance(result, NcaabResimRefusal):
             result = anchor_result(result, anchor, remaining_fraction=remaining_regulation_fraction(facts, league))
         if isinstance(result, NcaabResimRefusal) and result.reason == "budget_exhausted" and event_id in previous:
