@@ -59,6 +59,21 @@ def test_the_second_half_settles_with_overtime_and_the_first_without(league, hq,
         assert seg["q4"]["includesOvertime"] is False
 
 
+def test_the_full_game_counts_overtime_so_an_overtime_game_is_not_a_tie():
+    """A game resumed in overtime used to be ALL ties: total at the regulation score, win probability a coin flip."""
+    regulation = ((40, 30), (38, 32))   # 70-70 after regulation
+    n_home = lr.MIN_SIMS * 3 // 4
+    sims = [(regulation[0], regulation[1], (9,), (5,))] * n_home + \
+           [(regulation[0], regulation[1], (6,), (8,))] * (lr.MIN_SIMS - n_home)
+    out = lr.resim_live_game({}, None, sims=lr.MIN_SIMS, simulate=_fake_sims(sims), league="ncaab")
+    assert out["total_dist"] == {"154": lr.MIN_SIMS}        # 140 + the overtime points, never 140
+    assert out["margin_dist"] == {"-2": lr.MIN_SIMS - n_home, "4": n_home}
+    assert out["home_win_prob"] == pytest.approx(0.75)        # was 0.0: every draw a tie, none a home win
+    no_ot = lr.resim_live_game({}, None, sims=lr.MIN_SIMS, simulate=_fake_sims([(regulation[0], regulation[1], (), ())] * lr.MIN_SIMS),
+                               league="ncaab")
+    assert no_ot["total_dist"] == {"140": lr.MIN_SIMS}   # a regulation-only sim is unchanged
+
+
 @pytest.mark.parametrize("league,period,clock", [
     ("ncaab", 1, 1200), ("ncaab", 1, 600), ("ncaab", 2, 300), ("ncaab", 3, 120),
     ("wncaab", 1, 600), ("wncaab", 2, 131), ("wncaab", 3, 0), ("wncaab", 4, 45), ("wncaab", 5, 200),

@@ -589,7 +589,12 @@ def resim_live_game(inputs: Mapping[str, Any], game_state: Any, *, sims: int = D
             hb, ab, hq, aq = simulate(rng, game_state)
         except Exception as exc:  # noqa: BLE001
             return NcaabResimRefusal("engine_resume_rejected", type(exc).__name__)
-        h, a = int(sum(hq)), int(sum(aq))
+        # FINAL SCORES, OVERTIME INCLUDED (2026-11-05, `#763`). The engine keeps overtime in the box's `ot_pts`,
+        # outside the period list, and this summed the periods alone: a sim that went to overtime ended as a
+        # regulation tie with its overtime points missing. Pregame that is 1.44% of men's sims (11-01..11-04);
+        # a game RESUMED in overtime was ALL ties -- every total at the regulation score, below any live line,
+        # and a coin-flip win probability whatever the overtime score.
+        h, a = int(sum(hq)) + _ot_points(hb), int(sum(aq)) + _ot_points(ab)
         totals.append(h + a)
         margins.append(h - a)
         if len(hq) >= regulation and len(aq) >= regulation:
