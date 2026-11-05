@@ -56508,3 +56508,19 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - The first college closing stamp. 0 so far, by design: a close needs an explicit prior pregame observation, and games already live at the ff have none. The 11-05 shard's 545 pregame markets will reach live tomorrow.
   - The first college steam event; none written yet.
 - **Not covered:** `odds_<date>_inplay.csv` (the in-play lane's 240 s file) is not a tracking candidate. Its rows for live games are newer than the main file's, and reading both would make each live market's last point flip between them on every run.
+
+## 2026-11-05 15:04Z (9:04 AM CST 11-05) -- MEASUREMENT: NCAAB on Kalshi after `68baa1f3` -- **FIRST LIVE FILL 11-04 09:34:49Z**; paper book 41 NCAAB bets, consensus-graded only; S2 sigma once the date's grid exists. Capture lag 11.54 h (lanes syndicate-decision-engine + e4-pregame-prints)
+- **Read 15:02-15:04Z** (fleet store, read-only, nice 19; fleet HEAD `54a17eab`; `sport_live_orders.py`, `sport_paper_read.py`, `sport_records_kalshi.py`, `sport_paper_dryrun.py`, `big_progress.py`, `run_errors.py`).
+- **Live: 7 NCAAB orders, 6 filled** (0 at 11-04 01:05Z).
+  - **First fill:** 11-04 09:34:49Z (3:34 AM CST), Kalshi spreads away +24.5, fill 0.48, $0.53, staked prob `market_fair@staked_probability_pooled_v1`.
+  - Kalshi 4 (h2h 2 filled, spreads 1 filled + 1 submitted); Polymarket 3 filled (h2h 2, totals 1). Stakes on the five listed: $0.53-$1.67 (canary).
+  - Polymarket NCAAB is lane `polymarket-cbb-pairing`'s (#755, verified via `60b131d32`'s fleet rollout, deploys 11-04), not part of this hand-in.
+- **Paper: 41 NCAAB bets** of 1,365, all booked after the fix. By strategy (Kalshi / Polymarket):
+  - `ev_lb` 8 (3 / 5), all h2h. Graded 2; consensus CLV +0.49% (n 1, Kalshi), +0.36% (n 1, Polymarket).
+  - `net_floor_719` 14 (7 on 6 games / 7 on 7). Graded 6; consensus n 4: Kalshi -4.86% (n 2), Polymarket +0.37% (n 2).
+  - `suggested_2pct` 19 (9 / 10). Graded 3; consensus -1.86% (n 3, Kalshi).
+  - **Sharp close: 0 of 11 graded**, every one `no_pinnacle_close_at_this_line`, as expected: NCAAB bets never enter the sharp gate population. These n are far too small to read; they are counts, not results.
+- **Sigma source (owed from 11-04): S2 once the date's grid exists.** Dry run of the book's candidate step on the 11-05 file (15:01:30Z, nothing written): 165 NCAAB candidates (Kalshi 70, Polymarket 95), all eligible; sigma **S2 on 162** (2-12 books), S3 on 3 (`under_min_books:1`). On the 11-06 file (14:37Z) all 3 candidates take S3 (`no_grid_line`): `book_grid_2026-11-06.json` does not exist yet (newest `book_grid_2026-11-05.json`, 08:59Z). So S3 is the state of a date's first builds until its grid is written: timing, not a defect.
+  - At this build, 0 qualify in any strategy (best net EV 0.36%), and the live gates pass 0 of 70 Kalshi-priced records (40 stop only at `min_ev_floor`). Bookings come from other builds of the day.
+- **Capture, `KXMVECROSSCATEGORY`:** `swept_to` 11-05 03:26:10Z, **lag 11.54 h** at 15:03Z (28.12 h on 11-04 04:01Z). 35 runs since 11-04 04:04Z, all budget-stopped at 718-900 pages, **0 errored**; they read 51.6 settlement hours (11-02 23:48:52Z -> 11-05 03:26:10Z). `dense_to` is no longer in state.
+- **Hand-in reads: DONE.** Both owed readings are taken (first NCAAB Kalshi live fill; paper bookings by strategy). From Mon 11-09 the weekly task `decision-policy-paper-weekly-read` reports NCAAB paper separately.
