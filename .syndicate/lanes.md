@@ -603,14 +603,6 @@ death, never life — do not invert it.
 - Verification: Fleet reads after deploy: game-chips ncaab > 100; layer1 ncaab rows_enriched > 0 and by_state unknown near 0; /ncaab/api/cards games > 100; new book_quotes rows carry segment full/h1/h2 with events > 100; /api/ops/oddsapi/quota by_sport.ncaab credits/hour measured over >= 1 h
 - Blocked by: none
 
-### stake-band-off — CLOSED 2026-11-02 (GOAL MET: band OFF 18:23Z, new refresh-worker environ band_on=0; deploys fa0abcfde) — opened 2026-11-02 — session 86352bc9-921d-487c-bd24-c943dc6b8b98
-- Goal: Live $5-$10 stake band OFF on the fleet: the new refresh-worker's /proc environ has SYNDICATE_LIVE_STAKE_BAND=on count 0 (user 11-02: 'yes, turn the band off'; paper-bet-optimization forward #2 venue+live ROI -11.0 +/- 4.2, n 600)
-- Files: none in the repo (fleet ~/syndicate-prod/local_production.env only)
-- Hypothesis: n/a
-- Falsification test: n/a
-- Verification: after a drained full down/up: refresh-worker environ band_on=0, healthz 200, deploys.md entry
-- Blocked by: none
-
 ### wncaab-module — OPEN (live re-sim + checklist + live margin anchor + college prior calibration + engine efficiency bounds + college live Win% blank DONE; evening reading taken post hoc NOT MET; live spread edge lean diagnosed, not a defect; refused college pregame games fixed; college live re-sims cut to board games, on the fleet and verified; wncaab odds-refresh tracking failure fixed, on the fleet and verified; live college halves/quarters built, pricing OFF after a replay (#763); college odds history recording, on the fleet and verified) — opened 2026-11-02 — session 547fe65e-71ca-4e19-9589-237553cb4eab
 - **2026-11-04 15:23Z -- LOAN noted (lane `ci-suite-red-697`), USER-APPROVED ("Yes, land the loan"):** `tests/test_college_pregame_sim.py::test_launcher_switch_is_reachable_and_runs_one_child_at_a_time` only -- freezes `inplay_lane.datetime` at the test's NOW (the 11-04 nightly's clock bomb). Test-only; no production code touched. The message offering it to your session was held and expired undelivered.
 - **2026-11-04 -- LOAN noted (lane `wncaab-kalshi-pairing`, session e32fef1a), USER-APPROVED ("Yes, land it (Recommended)", ~13:35Z; the work itself: "Yes, pair WNCAAB"):** `kalshi_catalogue.py` -- the `KXNCAAWBGAME`/`KXNCAAWBSPREAD`/`KXNCAAWBTOTAL` entries in `SERIES_SPORT` and `_SERIES_SEGMENT`, `KXNCAAWBWINS` in `SERIES_OUT_OF_SCOPE`, `club_key`'s spelling table now serving `wncaab` too, and the `_SPORT_TOKENS` comment line that said nothing was paired. `team_aliases.py` and `wncaab_team_registry.csv` are NOT touched; Mercyhurst (D1) is absent from the women's registry, so its Kalshi games stay refused. Also yours to know: `tests/test_college_pregame_sim.py::test_launcher_switch_is_reachable_and_runs_one_child_at_a_time` fails since 11-04 -- `_pregame_game_count` reads the real clock (`datetime.now`) against the fixture's fixed 11-03 games. **RETURNED 2026-11-04 18:20Z: lane closed, GOAL MET.**
@@ -770,11 +762,6 @@ death, never life — do not invert it.
 - **PROGRESS 2026-11-04 23:35Z:** fix `7b30517b1` on main; fleet ff 22:53:06Z (refresh-worker claim b322206a, CLEAR preflight, released 22:54:31Z). OddsAPI children use it; the Kalshi and Polymarket captures got it in lane `kalshi-state-cap`'s worker restart, so every writer runs it from 23:27:20Z. Reading 1 shows soccer states complete (no weekday signal). **OWED:** the 11-08 soccer shard reading, then close, and RETURN the loan. Found on the way: NaN-line moneyline repeats (todo `#760`), outside this loan's scope.
 - Blocked by: none
 
-### closed-lane-archive-20261104-1752 — CLOSED 2026-11-04 (GOAL MET: 1 block archived) — opened 2026-11-04 — session 77a1e255-ea42-4a66-b091-d51f5ef3abd9
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness --idle-min 240 at 23:54Z gave 1 SAFE of 15 CLOSED; archived with the dry run, apply and invariant check passing (no new FAIL). Moved: `closed-lane-archive-20261104-1346`. Reading and Part B in log/2026-11-04.md.
-
 ### nba-live-proj-actuals — OPEN — opened 2026-11-04 — session c3e396a7-b445-45b4-9dfd-3713ff67d5a9
 - Goal: Every live NBA game on the Layer 2 board shows Live proj. and Live actual within one re-sim tick of tip and keeps them all game: (1) the NBA live re-sim stops starving the same games when the tick budget runs out (staleness-first order + bounded carry-forward of the last good lane, honest counters/history); (2) web refreshes NBA prop live_projection/actual from the live lens at read time (as MLB already does), removing the ~9-15 min Layer 2 build lag; (3) live spread rows stop showing the game TOTAL as Live proj. Verified on the fleet on a live slate: per-game share of live NBA rows with Live proj./Live actual, before vs after.
 - Files: syndicate/features/nba/live_resim.py (build_live_lens_snapshot ordering/carry-forward, _refusals_by_reason, history_rows, run_live_resim_tick, resim_live_game full-game overtime + new _ot_points only), tests/test_nba_live_resim_fairness.py (NEW), tests/test_nba_live_resim_overtime.py (NEW), syndicate/blueprints/intelligence.py (_refresh_live_columns_from_artifact + new NBA read-time helpers only), tests/test_nba_live_columns_read_time.py (NEW), syndicate/features/shared/live_projection_join.py (attach_live_projections key lookup + new live_prop_hit/_lookup_key_parts/_index_hit helpers only), syndicate/features/shared/layer2_board.py (_live_projection_columns only), tests/test_layer2_live_spread_projection.py (NEW), tests/test_layer2_movement_live_segment.py (test_the_gameline_block_is_a_fallback_source only), .syndicate/findings_2026-11-04_nba_live_proj_actuals.md (NEW), docs/ai_context/todo.md (#761 + #762 sections + one cross-lane note line under #763 only), .syndicate/state_basketball.md ([nba-live-native-p3] section only)
@@ -792,6 +779,11 @@ death, never life — do not invert it.
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - Verdict: GOAL MET. Moved nba-props-oom (owner 726b74ba idle 246m, block lastmod 246m). 14 others WAIT; table in log/2026-11-04.md 03:00Z 11-05.
+
+### closed-lane-archive-20261104-2240 — CLOSED 2026-11-04 (GOAL MET: 2 blocks archived) — opened 2026-11-04 — session f27d1701-2c80-4729-9ec8-05999ab37fc1
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. Moved stake-band-off (owner 86352bc9 idle 303m) and closed-lane-archive-20261104-1752 (owner 77a1e255 idle 283m). 13 others WAIT; table in log/2026-11-04.md 04:40Z 11-05.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -959,6 +951,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261104-0936` — CLOSED 2026-11-04 (GOAL MET: 1 block archived) — opened 2026-11-04 — session 58b50504-07d9-4335-9985-dcde45a48cc9
 - `closed-lane-archive-20261104-1346` — CLOSED 2026-11-04 (GOAL MET: 1 block archived) — opened 2026-11-04 — session 7fa59aa3-fe89-483e-ac9a-473d31f05c16
 - `closed-lane-archive-20261104-1519` — CLOSED 2026-11-04 (GOAL MET: 1 block archived) — opened 2026-11-04 — session f354500b-b7a2-4acb-ab91-3fc6d182b28f
+- `closed-lane-archive-20261104-1752` — CLOSED 2026-11-04 (GOAL MET: 1 block archived) — opened 2026-11-04 — session 77a1e255-ea42-4a66-b091-d51f5ef3abd9
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
@@ -1380,6 +1373,7 @@ death, never life — do not invert it.
 - `soccer-unfed-inputs` — CLOSED 2026-09-10 — opened 2026-09-07 — session 520cd594 — **GOAL: MET: soccer gate runs in production (alarms 6 -> 2, both unsourced) and the market prior's A/B moved; prior stays OFF on a null backtest; closed by `census-rescue-0910` on user decision**
 - `soccer-xg-totals-bias` — CLOSED 2026-10-05 — opened 2026-10-05 — session 43e4d5fe-e05e-41bc-aae6-6d6986460b22
 - `spread-line-sign-convention` — spread-line-sign-convention — CLOSED-VERIFIED 2026-08-16 — **ARTIFACT OUTPUT NOW MEASURED: 12 of 12 MLB spreads rows correct on the served shortlist ( → `lanes_closed.md`.
+- `stake-band-off` — CLOSED 2026-11-02 (GOAL MET: band OFF 18:23Z, new refresh-worker environ band_on=0; deploys fa0abcfde) — opened 2026-11-02 — session 86352bc9-921d-487c-bd24-c943dc6b8b98
 - `stale-lane-triage` — CLOSED 2026-10-30 (GOAL: MET) — opened 2026-10-30 — session eb9e3103
 - `stale-todo-headlines` — CLOSED 2026-10-30 (GOAL: MET) — opened 2026-10-30 — session eb9e3103-f175-4511-be0b-c4b7605e406f
 - `state-md-oom-subject-unindexed` — CLOSED — closed 2026-10-04 — opened 2026-10-04 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31

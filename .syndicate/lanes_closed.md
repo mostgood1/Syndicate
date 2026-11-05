@@ -14073,3 +14073,16 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Falsification test: the OOM victim's cmdline is another job, or tracemalloc shows the peak is something else
 - Verification: fleet: a capped run that exceeds the cap exits non-zero alone with a STEP_FAIL memory line; after the fix, per-run peak RSS from ALL_PROCESS_MEMORY falls well below 6 GB, written to deploys.md
 - Blocked by: none
+
+### stake-band-off — CLOSED 2026-11-02 (GOAL MET: band OFF 18:23Z, new refresh-worker environ band_on=0; deploys fa0abcfde) — opened 2026-11-02 — session 86352bc9-921d-487c-bd24-c943dc6b8b98
+- Goal: Live $5-$10 stake band OFF on the fleet: the new refresh-worker's /proc environ has SYNDICATE_LIVE_STAKE_BAND=on count 0 (user 11-02: 'yes, turn the band off'; paper-bet-optimization forward #2 venue+live ROI -11.0 +/- 4.2, n 600)
+- Files: none in the repo (fleet ~/syndicate-prod/local_production.env only)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: after a drained full down/up: refresh-worker environ band_on=0, healthz 200, deploys.md entry
+- Blocked by: none
+
+### closed-lane-archive-20261104-1752 — CLOSED 2026-11-04 (GOAL MET: 1 block archived) — opened 2026-11-04 — session 77a1e255-ea42-4a66-b091-d51f5ef3abd9
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness --idle-min 240 at 23:54Z gave 1 SAFE of 15 CLOSED; archived with the dry run, apply and invariant check passing (no new FAIL). Moved: `closed-lane-archive-20261104-1346`. Reading and Part B in log/2026-11-04.md.
