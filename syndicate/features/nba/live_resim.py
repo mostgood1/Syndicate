@@ -525,7 +525,12 @@ def resim_live_game(inputs: Mapping[str, Any], game_state: Any, *, sims: int = D
             return NbaResimRefusal("engine_resume_rejected", type(exc).__name__)
         _collect_player_remainders(rem, "home", hb, i)
         _collect_player_remainders(rem, "away", ab, i)
-        h, a = int(sum(hq)), int(sum(aq))
+        # THE FULL GAME INCLUDES OVERTIME (todo #763). The engine returns REGULATION periods in `hq`/`aq` and keeps
+        # every overtime in the box's `ot_pts`, so summing `hq` alone scored a simulated overtime game as a regulation
+        # tie: its total missed the OT points and it counted as a home non-win. Measured over 6,215 live lanes
+        # (10-13..11-05): 2.9% of draws tied in regulation, 9.2% in Q4's last 5:00 within 5 points -- and all 41 lanes
+        # resumed IN overtime published `modelHomeWinProb` 0.0. Quarter and half blocks stay regulation-only.
+        h, a = int(sum(hq)) + _ot_points(hb), int(sum(aq)) + _ot_points(ab)
         totals.append(h + a)
         margins.append(h - a)
         periods_h.append([int(x) for x in hq])
@@ -589,6 +594,12 @@ COMBO_STATS: dict[str, tuple[str, ...]] = {
     "ra": ("reb", "ast"),
     "pra": ("pts", "reb", "ast"),
 }
+
+
+def _ot_points(box: Any) -> int:
+    """A team's overtime points in one draw: the engine's `box["ot_pts"]` (one entry per OT period), 0 without OT."""
+    ot = box.get("ot_pts") if isinstance(box, Mapping) else None
+    return int(sum(int(x) for x in ot)) if isinstance(ot, (list, tuple)) else 0
 
 
 def _collect_player_remainders(rem: dict, side: str, box: Any, draw: int) -> None:
