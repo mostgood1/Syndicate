@@ -56550,3 +56550,43 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - live spread/h2h rows with `live_total` = 0.
   - Overtime is exercised only if a game goes to OT. Reachability is covered by `tests/test_nba_live_resim_overtime.py::test_real_engine_resumed_in_overtime_is_not_a_certain_home_loss`: a real engine tied after regulation read p_home 0.0 before the fix and a split after.
   - **The fairness claim needs a big slate.** With 2 games the 240 s budget never runs out, so `carried=0` tonight proves nothing either way. The reading is Fri 11-06 (9 games, 4 tipping at 00:00Z 11-07): per-game re-simmed share flat across scoreboard position and `carried=` > 0 on budget-exhausted ticks.
+
+## 2026-11-05 22:36:05Z (4:36 PM CST) -- FLEET ff 54a17eabd -> d6a691168 + reload-web + live-odds-worker TERM 22:37:35Z + refresh-worker TERM 23:35:42Z: college live halves/quarters published ready to price, pricing OFF (`cc2cea242`), and the college full game counts overtime (`b9999dc1d`) (lane `wncaab-module`); carries NBA's `8d0a8f2b0` + `d6a691168` (lane `nba-live-proj-actuals`) -- **MET** for the live re-sim and the board; pregame **OWED** (written 23:38Z, 5:38 PM CST)
+- **User, in this chat:** "Yes, roll out", answering "Roll out both college re-sim changes now, with half/quarter pricing still off?"
+- **Why `d6a691168` and not my `b9999dc1d`:**
+  - The owner of `d6a691168`, lane `nba-live-proj-actuals`, offered it by message to spare the fleet a second live-odds-worker restart: "I approve it as d6a691168's lane owner".
+  - That lane reports its own user approved "Yes, restart now" for its re-sim fixes (its account, not this chat).
+  - `d6a691168` is the only runtime commit past mine (`nba/live_resim.py`). That lane recorded its own reading (`4597d848f`).
+- **Ride-alongs `54a17eabd..d6a691168`, runtime:**
+  - `ncaab/live_resim.py`, `live_gameline_join.py`, `board_enrichment.py` (mine).
+  - `nba/live_resim.py`: `8d0a8f2b0`, carry bound 600 -> 900 s; `d6a691168`, overtime.
+  - The rest is ledger and tests. Fleet dirty files overlap none of these.
+  - `84bb34d26` was already loaded (live-odds-worker pid 325047 since 17:39:58Z, per that lane), so this restart gets no credit for it.
+- **Gates:**
+  - Claims on web, refresh-worker and live-odds-worker at 22:35:36Z (`wncaab-module`).
+  - Web: preflight (fleet, `d6a691168`) CLEAR 22:35:50Z. `git merge --ff-only d6a691168` 22:36:05Z. `reload-web` done 22:36:07Z (2.0 s, 0 failures). Claim released 22:36:17Z.
+  - live-odds-worker: CLEAR 22:37:17Z on the first poll. TERM pid 325047 22:37:35Z; respawned as pid 413072 22:37:41Z; NBA / NCAAB / WNCAAB re-sim loops started 22:37:43Z. Claim released 22:39:28Z.
+  - refresh-worker: **40 min of HOLD** (138 polls ~17 s apart). Every poll caught a board build in flight or an odds-job child.
+    - Tonight the idle-after-save window (LOOP_ITERATION -> BUILD_SPAN_ENTER) lasts 3-9 s, once every ~4 min.
+    - Odds-job children ran during 55% of checks.
+    - A 2 s watcher waited for both at once (no job child, last `[intelligence_state]` event LOOP_ITERATION). It saw them together once in 558 checks (~15 min).
+    - Claim re-acquired at 23:19:27Z when its TTL ran out. CLEAR 23:35:31Z; TERM pid 349940 23:35:42Z; respawned as pid 441331 23:35:48Z. Claim released 23:36:11Z.
+  - `local_production.py status` 23:37:40Z: all three roles `code=d6a69116`.
+- **Baselines (22:35:18Z; re-read 22:37:14Z and 23:31:04Z) -> readings:**
+  - **Live re-sim snapshot (keyvalue `live/<league>_live_resim.json`):** segment blocks carrying `settled` + `marginAnchored`.
+    - ncaab 0/2 -> **2/2** at 22:39:10Z (8/8 at 23:22Z). wncaab 0/6 -> **6/6**. MET.
+    - Values, men's game 1st half: h1 `remainingFraction` 0.1625, h2 0.5 (`includesOvertime` true). The halves' anchor shifts sum to the full game's applied shift: -0.21 + -0.64 = -0.85 vs -0.84 (= the -1.27 pregame gap x 0.6625 of regulation left). Women's 0.61 = 0.61.
+    - Women's game in Q3: q1, q2 and h1 `settled` true, shift 0.
+  - **Re-sim cost:** the first ticks after boot took 64.7 / 74.8 s (cold). The next four took 8.3-20.3 s, against 3.5-26.2 s in the 10 ticks before. Snapshot bytes rose ~5-10% (women's 5,079 -> 5,557). 0 tracebacks.
+  - **Board build** (refresh-worker `[book_grid] LIVE_GAMELINE_BUILD sport=ncaab`):
+    - `segment_is_not_full_game`: 88 / 77 / 82 in the 3 builds before -> **0**.
+    - `segment_pricing_disabled`: 0 -> **93** at 23:37:16Z, the first build after the restart. MET.
+    - Full-game projected 50 (50-58 before); `error=none`.
+    - Pre-check ~23:21Z (the new join run read-only on the served board, before the restart): full-game rows priced 39 = 39 served (men's) and 5 = 5 (women's); 0 segment rows priced (switch off).
+  - **Pregame full-game ties** (share of draws with margin 0), 11-05: 1.51% men's (43 games), 1.61% women's (68).
+    - **No pregame entry re-simmed since the ff.** The 23:08:47Z run found every 11-05 and 11-06 game `unchanged`: `inputs_key` holds no code version.
+    - Overtime-inclusive pregame entries appear as each game's inputs change, and for the whole 11-07 slate. OWED.
+- **Fact (lane `nba-live-proj-actuals`, from `supervisor.log`):** live-odds-worker recycles itself every ~5-6 h (exited code=0 after 21,923 / 20,939 / 22,683 / 17,858 s). A fleet ff that touches its code goes live within ~6 h with no restart.
+- **verify:**
+  - (1) Pregame: a college pregame entry with `computed_at` after 22:36:05Z has a full-game margin-0 share near 0 (was 1.5-1.6%).
+  - (2) A live college game in overtime: its lens full-game total is not a point mass, and its h2 total includes the OT points.
