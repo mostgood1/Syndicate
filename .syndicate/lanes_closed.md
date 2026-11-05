@@ -14124,3 +14124,14 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - Verdict: GOAL MET. Moved nba-props-oom (owner 726b74ba idle 246m, block lastmod 246m). 14 others WAIT; table in log/2026-11-04.md 03:00Z 11-05.
+
+### closed-lane-archive-20261104-2240 — CLOSED 2026-11-04 (GOAL MET: 2 blocks archived) — opened 2026-11-04 — session f27d1701-2c80-4729-9ec8-05999ab37fc1
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. Moved stake-band-off (owner 86352bc9 idle 303m) and closed-lane-archive-20261104-1752 (owner 77a1e255 idle 283m). 13 others WAIT; table in log/2026-11-04.md 04:40Z 11-05.
+
+### closed-lane-archive-20261105-0045 — CLOSED 2026-11-05 (GOAL MET: 4 blocks archived) — opened 2026-11-05 — session aae0fc92-0076-49bd-b575-ba3ebaf5a93d
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 4 SAFE of 14 CLOSED; dry run, invariants unchanged vs baseline (same 12 pre-existing contests), applied.
+- Moved: `uefa-corners-window`, `soccer-forward-grade-pull-paging`, `soccer-corners-fair-inflation`, `closed-lane-archive-20261104-1931`. Table and WAIT reasons: `.syndicate/log/2026-11-05.md`.
