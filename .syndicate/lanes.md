@@ -748,15 +748,6 @@ death, never life — do not invert it.
 - Verification: per-row table (board fair vs tape rebuild, per book) on >= 10 served suggested corners rows, with the mechanism named; written to a findings file; if a defect, a per-line fix with an off != on test and a fleet measurement in deploys.md
 - Blocked by: none
 
-### nba-props-oom — CLOSED 2026-11-04 (GOAL MET: props peak 6,470-7,665 MB -> 523 MB on the fleet, merged rows 5.1M -> 29,246; 4 GB per-child RSS cap live, 0 trips; deploys.md 22:37:46Z) — opened 2026-11-04 — session 726b74ba-085a-4d00-bbeb-4b443c9bcf43
-- Goal: refresh_nba_oddsapi_props.py cannot OOM the fleet: a per-child memory cap makes it fail alone and loudly, and its 6-9 GB peak is cut at the cause, measured on the fleet
-- Files: scripts/refresh_odds_sources.py (_run_command + a new child memory-cap helper only), syndicate/features/shared/basketball_props_edges.py, scripts/refresh_nba_oddsapi_props.py, tests/test_refresh_odds_child_memory_cap.py (NEW), tests/test_nba_props_memory.py (NEW), tests/test_refresh_odds_sources.py, tests/test_refresh_odds_step_markers.py, tests/test_refresh_failure_observability.py
-- Finding 2026-11-04 21:00Z: the 15:53:53Z OOM victim is very likely NOT this script (no props run 15:09Z-16:40Z; research job news_price_follow.py peaked 9,862 MB at 16:04Z and was re-run chunked). The props peak IS real: basketball_props_edges short_key fallback merged 60,790 odds rows into 5,040,004 rows / 7,740 MB (DATAFRAME_MEMORY 18:04Z run).
-- Hypothesis: the 15:53:53Z 9.1 GB OOM victim was this script; its peak comes from loading whole history/quote shards or unbounded per-event accumulation
-- Falsification test: the OOM victim's cmdline is another job, or tracemalloc shows the peak is something else
-- Verification: fleet: a capped run that exceeds the cap exits non-zero alone with a STEP_FAIL memory line; after the fix, per-run peak RSS from ALL_PROCESS_MEMORY falls well below 6 GB, written to deploys.md
-- Blocked by: none
-
 ### kalshi-state-cap — CLOSED (GOAL MET) — opened 2026-11-04 — closed 2026-11-04 — session e32fef1a-01e8-4afe-a284-01acd3728545
 - **VERDICT `[2026-11-04 23:36Z]`: GOAL: MET.** Goal, verbatim: "The Kalshi markets state (intelligence/kalshi_markets.json, keyvalue) is written again by BOTH workers: 0 KEYVALUE_WRITE_REJECTED for kalshi_markets after the rollout, payload well under the 8 MiB cap, and every reader sees the same rows (markets_from_state output unchanged)". Readings (deploys.md 23:24:11Z): fix `e10ea9610` live on both workers since 23:26:11Z / 23:27:18Z; KEYVALUE_WRITE kalshi_markets 6 written / 0 rejected / 0 WRITE_FAILED / 0 tracebacks to 23:33:32Z, 5.71-5.95 MB vs the 8,388,608 cap (was 8.39-8.88 MB, 19 rejected in the 30 min before); markets_from_state returns all 19,816 stored rows complete; pre-deploy round-trip 0 mismatches over 19,393 live rows. Kalshi-priced grid sides 23:22Z -> 23:29-23:34Z: ncaab 3 -> 81, nfl 18 -> 68, nba 0 -> 28, ncaaf 10 -> 46, wncaab 2 -> 5. Window 7 min; the evening-long read is with the NCAAF backtesting session.
 - Goal: The Kalshi markets state (intelligence/kalshi_markets.json, keyvalue) is written again by BOTH workers: 0 KEYVALUE_WRITE_REJECTED for kalshi_markets after the rollout, payload well under the 8 MiB cap, and every reader sees the same rows (markets_from_state output unchanged)
@@ -796,6 +787,11 @@ death, never life — do not invert it.
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 returned 1 SAFE of 15 CLOSED; moved `closed-lane-archive-20261104-1519`. Table + WAIT reasons in log/2026-11-04.md.
+
+### closed-lane-archive-20261104-2100 — CLOSED 2026-11-04 (GOAL MET: 1 blocks archived) — opened 2026-11-04 — session 49ed0ef3-b921-4349-8aec-6ebc78385dd5
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. Moved nba-props-oom (owner 726b74ba idle 246m, block lastmod 246m). 14 others WAIT; table in log/2026-11-04.md 03:00Z 11-05.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1163,6 +1159,7 @@ death, never life — do not invert it.
 - `nba-preseason-oddsapi` — CLOSED — opened 2026-10-02 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
 - `nba-prop-calibration` — CLOSED-MET 2026-10-30 (owner e0a3e383, on stale-lane-triage's ask: goal MET 10-04; the unowned served Layer-2 / book-blend reading -> leads.md 2026-10-30) — opened 2026-10-03 — session e0a3e383-4fa1-4669-8740-c9a46b681c7a — **GOAL: MET 2026-10-04; BOOK-BLEND SERVING ON 2026-10-05 20:03:24Z (user placed nba_prop_book_blend.json; fleet probe applied; served reading OWED at the first NBA prop rows); GAME-LINE BLEND + PHASE KEYING SERVING since 2026-10-05 23:46:45Z (9d60ef66, f16991cb; reading MET for the priced rows, deploys.md); ENABLED IN PRODUCTION 2026-10-04 16:40Z/17:40Z by FILE SWITCH (user: 'enable before the first prop day'), with the prior-season fallback; READING 2 MET 2026-10-05 01:35Z; LADDER DEFECT FIXED + ON THE FLEET 2026-10-05 14:23Z (3493715f; readings 1 and 2 MET, 0/1,477 ladder rows off); served reading owed when books post NBA props**
 - `nba-prop-wrong-game` — CLOSED 2026-10-28 (HYPOTHESIS FALSIFIED: no wrong game; the rows are DNPs on the player's own team) — opened 2026-10-28 — session c59f19b5-f9a2-4c74-bd42-86d0adb1b22b
+- `nba-props-oom` — CLOSED 2026-11-04 (GOAL MET: props peak 6,470-7,665 MB -> 523 MB on the fleet, merged rows 5.1M -> 29,246; 4 GB per-child RSS cap live, 0 trips; deploys.md 22:37:46Z) — opened 2026-11-04 — session 726b74ba-085a-4d00-bbeb-4b443c9bcf43
 - `nba-recon-props-no-header-only` — CLOSED 2026-10-01 — opened 2026-10-01 — session 0bafeeeb-4766-4142-9294-a51e7591d647
 - `nba-season-phase` — CLOSED-HANDOFF 2026-10-30 (owner e0a3e383, on stale-lane-triage's ask: built + dry-run MET; the post-10-20 production check (0 preseason games in any regular-season window) and recon bias pairs were never recorded -> leads.md 2026-10-30) — opened 2026-10-05 — session e0a3e383-4fa1-4669-8740-c9a46b681c7a — **GOAL: NOT MET (built + dry-run MET on main faa5f804/46daccca; verification is after the 2026-10-20 opener)**
 - `nba-sim-anchor-staleness` — CLOSED 2026-10-21 4:40 PM CT (GOAL MET) — opened 2026-10-21 — session fe168a0f-ecef-45f2-b09f-4c69d00f4de6

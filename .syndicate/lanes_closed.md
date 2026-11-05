@@ -14064,3 +14064,12 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - GOAL: MET. owner_liveness.py --idle-min 240 at origin/main ~21:20Z returned SAFE for exactly one slug; moved `maker-pilot-fair-cancel` to lanes_closed.md with a pointer. Reading and WAIT reasons in log/2026-11-04.md.
+
+### nba-props-oom — CLOSED 2026-11-04 (GOAL MET: props peak 6,470-7,665 MB -> 523 MB on the fleet, merged rows 5.1M -> 29,246; 4 GB per-child RSS cap live, 0 trips; deploys.md 22:37:46Z) — opened 2026-11-04 — session 726b74ba-085a-4d00-bbeb-4b443c9bcf43
+- Goal: refresh_nba_oddsapi_props.py cannot OOM the fleet: a per-child memory cap makes it fail alone and loudly, and its 6-9 GB peak is cut at the cause, measured on the fleet
+- Files: scripts/refresh_odds_sources.py (_run_command + a new child memory-cap helper only), syndicate/features/shared/basketball_props_edges.py, scripts/refresh_nba_oddsapi_props.py, tests/test_refresh_odds_child_memory_cap.py (NEW), tests/test_nba_props_memory.py (NEW), tests/test_refresh_odds_sources.py, tests/test_refresh_odds_step_markers.py, tests/test_refresh_failure_observability.py
+- Finding 2026-11-04 21:00Z: the 15:53:53Z OOM victim is very likely NOT this script (no props run 15:09Z-16:40Z; research job news_price_follow.py peaked 9,862 MB at 16:04Z and was re-run chunked). The props peak IS real: basketball_props_edges short_key fallback merged 60,790 odds rows into 5,040,004 rows / 7,740 MB (DATAFRAME_MEMORY 18:04Z run).
+- Hypothesis: the 15:53:53Z 9.1 GB OOM victim was this script; its peak comes from loading whole history/quote shards or unbounded per-event accumulation
+- Falsification test: the OOM victim's cmdline is another job, or tracemalloc shows the peak is something else
+- Verification: fleet: a capped run that exceeds the cap exits non-zero alone with a STEP_FAIL memory line; after the fix, per-run peak RSS from ALL_PROCESS_MEMORY falls well below 6 GB, written to deploys.md
+- Blocked by: none
