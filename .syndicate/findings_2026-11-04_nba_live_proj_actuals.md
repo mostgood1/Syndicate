@@ -72,8 +72,10 @@ Per-game cost swings ~5x with host load (00:44Z: 5 games in 56.5 s; 00:50Z: 4.7 
 1. **Re-sim (live-odds-worker): stalest-first + bounded carry-forward.** Never-re-simmed games first, then the
    oldest re-simmed state. A budget refusal republishes the game's previous `live_resim` lane and props, stamped
    `carriedForward` / `carriedRefusal` / `carriedAgeSeconds`, keeping its ORIGINAL `liveStateAsOf` and `simsRun`
-   (never a thinner number), refused as before once that state is older than 600 s (the platform's live freshness
-   ceiling, `live_gameline_join._DEFAULT_MAX_QUOTE_AGE_SECONDS`). History records a carried lane as the refusal
+   (never a thinner number), refused as before once that state is older than 900 s. Sized from the cadence
+   measured under load: at peak a tick runs 240 s then waits 120 s, so a game re-simmed first in one tick is
+   ~595 s old when the next tick reaches it -- 600 s (first draft, the live quote ceiling) would have refused
+   about a quarter of single-tick carries. History records a carried lane as the refusal
    the tick produced (`pregame_only` / `budget_exhausted` + `carried_forward`), so forward grading never
    double-counts it; the tick line's `resimmed` counts fresh lanes only and `carried=` is new.
    Switches: `SYNDICATE_NBA_LIVE_RESIM_CARRY` (absent = ON), `SYNDICATE_NBA_LIVE_RESIM_CARRY_MAX_AGE_SECONDS`.

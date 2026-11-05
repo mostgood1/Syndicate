@@ -881,17 +881,20 @@ def _game_identity(summary: Mapping[str, Any], league: str = LEAGUE) -> tuple[st
 #   2. CARRY THE LAST GOOD LANE, BOUNDED. A game the budget did not reach this tick republishes its previous
 #      `live_resim` lane and props, stamped `carriedForward`, with its ORIGINAL `liveStateAsOf` -- the number
 #      is a real full-sims result for the state it says, never a thinner one (`simsRun` stays true). Past
-#      `carry_max_age_seconds` of that state it is refused as before (`budget_exhausted`), so nothing older
-#      than the platform's live freshness ceiling is republished.
+#      `carry_max_age_seconds` of that state it is refused as before (`budget_exhausted`): one missed tick is
+#      bridged, a starved game is not papered over.
 #
 # Carried lanes are NOT new measurements: the tick history records them as the refusal the tick produced
 # (`history_rows`), and `run_live_resim_tick`'s `resimmed` counts only fresh lanes.
 
 CARRY_ENV = "SYNDICATE_NBA_LIVE_RESIM_CARRY"
 CARRY_MAX_AGE_ENV = "SYNDICATE_NBA_LIVE_RESIM_CARRY_MAX_AGE_SECONDS"
-# The platform's live freshness ceiling (`live_gameline_join._DEFAULT_MAX_QUOTE_AGE_SECONDS`): a model state
-# older than the oldest quote we would price live is not republished.
-DEFAULT_CARRY_MAX_AGE_SECONDS = 600.0
+# SIZED FROM THE CADENCE MEASURED UNDER LOAD, not the documented one. At peak (2026-11-02 01-02Z, 2026-11-05 01Z)
+# a tick runs the full 240 s budget and then waits its 120 s interval, so ticks land ~360 s apart. A game
+# re-simmed FIRST in tick k carries a state ~5 s into that tick; when tick k+1 reaches it after its own 240 s it
+# is ~595 s old. 600 s (the live quote-age ceiling) would refuse about a quarter of single-tick carries; 900 s
+# covers one missed tick at peak with margin, and no more than that: stalest-first re-sims it on the tick after.
+DEFAULT_CARRY_MAX_AGE_SECONDS = 900.0
 
 
 def carry_enabled(env: Optional[Mapping[str, str]] = None) -> bool:

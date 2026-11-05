@@ -129,7 +129,7 @@ def test_a_carried_lane_is_the_previous_result_stamped_with_its_own_age(slate):
 
 def test_a_state_older_than_the_ceiling_is_refused_not_carried(slate):
     first = slate["tick"]()
-    second = slate["tick"](first, now_minutes=30, carry_max_age=600)  # B's state is ~28 min old
+    second = slate["tick"](first, now_minutes=30)  # B's state is ~28 min old; the default ceiling is 15 min
     b = _lane(second, "B")
     assert b["source"] == lr.PREGAME_LENS_SOURCE and b["liveResimRefusal"] == "budget_exhausted"
     assert second["carriedForward"] == 0
@@ -209,8 +209,8 @@ def test_an_unreadable_previous_snapshot_is_the_old_behaviour_not_a_failed_tick(
     assert seen["previous"] is None and st["written"] is True
 
 
-@pytest.mark.parametrize("raw,expected", [("", 600.0), ("900", 900.0), ("0", 600.0), ("-5", 600.0),
-                                          ("nan", 600.0), ("abc", 600.0)])
+@pytest.mark.parametrize("raw,expected", [("", 900.0), ("600", 600.0), ("0", 900.0), ("-5", 900.0),
+                                          ("nan", 900.0), ("abc", 900.0)])
 def test_the_age_ceiling_never_parses_into_carry_forever(raw, expected):
     assert lr.carry_max_age_seconds({lr.CARRY_MAX_AGE_ENV: raw}) == expected
 
