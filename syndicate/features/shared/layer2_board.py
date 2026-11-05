@@ -3990,8 +3990,14 @@ def _live_projection_columns(row: Mapping[str, Any]) -> dict[str, Any]:
     if live_value is not None and not gameline:
         out["live_projection"] = live_value
         out["live_total"] = live_value
-    elif gameline:
-        # The one number on the gameline block that IS a count.
+    elif gameline and str(row.get("market") or "").strip().lower() in _TOTALS_ACTUAL_MARKETS:
+        # The one number on the gameline block that IS a count -- and it is the GAME TOTAL, so it is this
+        # row's own live number only on a totals row. `[2026-11-04, lane nba-live-proj-actuals]` It used to
+        # be written on every gameline row, and the page's Live column reads `live_projection ?? live_total`:
+        # measured on the served board 2026-11-05 00:49Z, live SPREAD rows (NBA 27, NCAAF 6, NCAAB 3) and
+        # MONEYLINE rows (NCAAB 3, NCAAF 1) showed the game's projected total ("215.9" beside PHI -3.5) as
+        # their Live proj. A spread row now falls through to its live cover probability
+        # (`live_model_probability`, below) and a moneyline row stays blank, as the h2h note below requires.
         total_mean = _as_float(gameline.get("total_mean"))
         if total_mean is not None:
             out["live_total"] = total_mean

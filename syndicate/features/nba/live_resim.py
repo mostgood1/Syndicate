@@ -865,27 +865,154 @@ def _game_identity(summary: Mapping[str, Any], league: str = LEAGUE) -> tuple[st
     return meta.event_id, meta.home.code, meta.away.code
 
 
+# ------------------------------------------------------------------------------------------- budget fairness
+#
+# THE BUDGET USED TO STARVE THE SAME GAMES EVERY TICK. Games were walked in ESPN scoreboard order under ONE
+# shared deadline, so when a tick could not fit the slate, the games at the end of the scoreboard were the
+# ones refused -- and they were the same games every tick. Measured on the 2026-11-02 slate (11-12 games
+# live at once, 16 of 20 ticks at 01Z-02Z exhausted the 240 s budget): the first 6 games in scoreboard order
+# were re-simmed on 98-100% of ticks, the last 4 on 64-70%, and UTA@SAS was refused 10 ticks running (~1 h
+# with no live number on the board). On 2026-11-04 00:50Z the 5th live game was refused the same way.
+#
+# Two changes, both here:
+#   1. STALEST FIRST. Games no tick has re-simmed yet (just tipped) go first, then the rest by the age of
+#      their last re-simmed state. A slate bigger than one tick's capacity then rotates instead of starving
+#      its tail. (NFL/NCAAF go cheapest-first; for basketball that would starve exactly the just-tipped games.)
+#   2. CARRY THE LAST GOOD LANE, BOUNDED. A game the budget did not reach this tick republishes its previous
+#      `live_resim` lane and props, stamped `carriedForward`, with its ORIGINAL `liveStateAsOf` -- the number
+#      is a real full-sims result for the state it says, never a thinner one (`simsRun` stays true). Past
+#      `carry_max_age_seconds` of that state it is refused as before (`budget_exhausted`), so nothing older
+#      than the platform's live freshness ceiling is republished.
+#
+# Carried lanes are NOT new measurements: the tick history records them as the refusal the tick produced
+# (`history_rows`), and `run_live_resim_tick`'s `resimmed` counts only fresh lanes.
+
+CARRY_ENV = "SYNDICATE_NBA_LIVE_RESIM_CARRY"
+CARRY_MAX_AGE_ENV = "SYNDICATE_NBA_LIVE_RESIM_CARRY_MAX_AGE_SECONDS"
+# The platform's live freshness ceiling (`live_gameline_join._DEFAULT_MAX_QUOTE_AGE_SECONDS`): a model state
+# older than the oldest quote we would price live is not republished.
+DEFAULT_CARRY_MAX_AGE_SECONDS = 600.0
+
+
+def carry_enabled(env: Optional[Mapping[str, str]] = None) -> bool:
+    raw = str((env if env is not None else os.environ).get(CARRY_ENV, "") or "").strip().lower()
+    return raw not in ("0", "false", "off", "no")
+
+
+def carry_max_age_seconds(env: Optional[Mapping[str, str]] = None) -> float:
+    """A bad or non-positive value falls back to the default rather than meaning "carry forever"."""
+    raw = str((env if env is not None else os.environ).get(CARRY_MAX_AGE_ENV, "") or "").strip()
+    try:
+        value = float(raw) if raw else DEFAULT_CARRY_MAX_AGE_SECONDS
+    except ValueError:
+        return DEFAULT_CARRY_MAX_AGE_SECONDS
+    return value if value > 0 and math.isfinite(value) else DEFAULT_CARRY_MAX_AGE_SECONDS
+
+
+def _parse_as_of(value: Any) -> Optional[datetime]:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=timezone.utc)
+
+
+def _prior_live_rows(previous: Optional[Mapping[str, Any]], date_str: str) -> dict[str, dict[str, Any]]:
+    """event_id -> the previous snapshot's game row, for games whose lane was a `live_resim` result.
+
+    Same date only: a snapshot left over from yesterday must neither reorder nor feed today's tick."""
+    if not isinstance(previous, Mapping) or str(previous.get("date") or "") != str(date_str):
+        return {}
+    out: dict[str, dict[str, Any]] = {}
+    for game in previous.get("games") or []:
+        if not isinstance(game, Mapping):
+            continue
+        lanes = game.get("gameLens") or []
+        lane = lanes[0] if lanes and isinstance(lanes[0], Mapping) else {}
+        if lane.get("source") == LIVE_RESIM_LENS_SOURCE and _parse_as_of(lane.get("liveStateAsOf")) is not None:
+            out[str(game.get("event_id") or "")] = dict(game)
+    return out
+
+
+def _stalest_first(events: Sequence[Mapping[str, Any]], prior: Mapping[str, Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+    """Never-re-simmed games first (scoreboard order kept among them), then oldest re-simmed state first."""
+    def key(item: tuple[int, Mapping[str, Any]]) -> tuple[int, float, int]:
+        index, ev = item
+        row = prior.get(str(ev.get("event_id") or ev.get("id") or ""))
+        if row is None:
+            return (0, 0.0, index)
+        as_of = _parse_as_of(((row.get("gameLens") or [{}])[0]).get("liveStateAsOf"))
+        return (1, as_of.timestamp() if as_of else 0.0, index)
+
+    return [ev for _i, ev in sorted(enumerate(events), key=key)]
+
+
+def _carried_row(prior_row: Mapping[str, Any], refusal: "NbaResimRefusal", *, now: datetime, max_age: float,
+                 refused_state_as_of: str = "") -> Optional[dict[str, Any]]:
+    """The previous tick's row republished, or None when its state is older than `max_age`."""
+    lanes = prior_row.get("gameLens") or []
+    lane = dict(lanes[0]) if lanes and isinstance(lanes[0], Mapping) else {}
+    as_of = _parse_as_of(lane.get("liveStateAsOf"))
+    if as_of is None:
+        return None
+    age = (now - as_of).total_seconds()
+    if age > max_age:
+        return None
+    # A carried lane's own carry stamps are replaced, never stacked: the age is always from the original state.
+    lane.update({
+        "carriedForward": True,
+        "carriedRefusal": refusal.reason,
+        "carriedRefusalDetail": refusal.detail,
+        "carriedAgeSeconds": round(max(0.0, age), 1),
+        "refusedStateAsOf": refused_state_as_of,
+    })
+    row = dict(prior_row)
+    row["gameLens"] = [lane]
+    return row
+
+
 def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_seconds: float = DEFAULT_BUDGET_SECONDS,
                              fetch_scoreboard: Optional[Callable[..., Any]] = None,
                              fetch_summary: Optional[Callable[..., Any]] = None,
                              inputs_root: Optional[Path] = None,
-                             clock: Callable[[], float] = time.monotonic, league: str = LEAGUE) -> dict[str, Any]:
+                             clock: Callable[[], float] = time.monotonic, league: str = LEAGUE,
+                             previous: Optional[Mapping[str, Any]] = None,
+                             carry: Optional[bool] = None,
+                             carry_max_age: Optional[float] = None,
+                             now: Optional[datetime] = None) -> dict[str, Any]:
+    """`previous` is the last snapshot this loop wrote. Without it the tick behaves as before: scoreboard order,
+    nothing carried. With it, games run stalest-first and a budget refusal republishes the game's last lane
+    within `carry_max_age` (see "budget fairness" above)."""
     from syndicate.features.shared import basketball_pbp as pbp
     from syndicate.features.shared.request_path_guard import refuse_if_compute_in_request_path
 
     refuse_if_compute_in_request_path("nba_live_resim_snapshot")
     fetch_scoreboard = fetch_scoreboard or pbp.fetch_scoreboard
     fetch_summary = fetch_summary or pbp.fetch_summary
+    carry = carry_enabled() if carry is None else bool(carry)
+    carry_max_age = carry_max_age_seconds() if carry_max_age is None else float(carry_max_age)
+    prior = _prior_live_rows(previous, str(date_str))
     started = clock()
     deadline = started + float(budget_seconds)
     games: list[dict[str, Any]] = []
     scoreboard = fetch_scoreboard(league, str(date_str).replace("-", ""))
     events = pbp.scoreboard_events(scoreboard)
-    for ev in events:
+    live_events = [ev for ev in events if str(ev.get("status_state") or ev.get("state") or "").lower() == "in"]
+
+    def _carry_or_refuse(event_id: str, home: str, away: str, facts: Optional[ResumeFacts],
+                         refusal: NbaResimRefusal, match: Optional[Mapping[str, Any]] = None) -> dict[str, Any]:
+        if carry and event_id in prior:
+            carried = _carried_row(prior[event_id], refusal, now=now or datetime.now(timezone.utc),
+                                   max_age=carry_max_age, refused_state_as_of=facts.as_of if facts else "")
+            if carried is not None:
+                return carried
+        return _lane_row(event_id, home, away, facts, refusal, match, league=league)
+
+    for ev in _stalest_first(live_events, prior):
         event_id = str(ev.get("event_id") or ev.get("id") or "")
-        state = str(ev.get("status_state") or ev.get("state") or "").lower()
-        if state != "in":
-            continue
         try:
             summary = fetch_summary(league, event_id)
         except Exception as exc:  # noqa: BLE001
@@ -908,11 +1035,13 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
         match = {**match, "mechanisms": sorted(mechanisms), "resumeEngine": resume_engine_label(league, league_params_overrides_of(inputs),
                                                                    getattr(inputs.get("cfg"), "config_sha", None))}
         if clock() >= deadline:
-            games.append(_lane_row(event_id, home, away, facts, NbaResimRefusal("budget_exhausted", "before_start"),
-                                   league=league))
+            games.append(_carry_or_refuse(event_id, home, away, facts, NbaResimRefusal("budget_exhausted", "before_start")))
             continue
         result = resim_live_game(inputs, gs, sims=sims, base_seed=stable_seed(facts.event_id, facts.last_seq),
                                  deadline=deadline, clock=clock, league=league)
+        if isinstance(result, NbaResimRefusal) and result.reason == "budget_exhausted":
+            games.append(_carry_or_refuse(event_id, home, away, facts, result, match))
+            continue
         row = _lane_row(event_id, home, away, facts, result, match, league=league)
         if not isinstance(result, NbaResimRefusal):
             lines = lines_from_props_csv(props_csv_path(str(date_str), root=inputs_root, league=league),
@@ -933,6 +1062,7 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
         "elapsedSeconds": round(clock() - started, 2),
         "games": games,
         "refusalsByReason": _refusals_by_reason(games),
+        "carriedForward": sum(1 for g in games for lane in g.get("gameLens") or [] if lane.get("carriedForward")),
     }
 
 
@@ -960,12 +1090,18 @@ def _lane_row(event_id: str, home: str, away: str, facts: Optional[ResumeFacts],
 
 
 def _refusals_by_reason(games: Sequence[Mapping[str, Any]]) -> dict[str, int]:
+    """What THIS tick refused. A carried lane is still a refusal this tick (`carriedRefusal`); carrying is
+    counted separately (`carriedForward`), so the budget running out never disappears from the tick line."""
     out: dict[str, int] = {}
     for g in games:
         for lane in g.get("gameLens") or []:
             if lane.get("source") == PREGAME_LENS_SOURCE:
                 r = str(lane.get("liveResimRefusal") or "unknown")
-                out[r] = out.get(r, 0) + 1
+            elif lane.get("carriedForward"):
+                r = str(lane.get("carriedRefusal") or "unknown")
+            else:
+                continue
+            out[r] = out.get(r, 0) + 1
     return out
 
 
@@ -1049,6 +1185,11 @@ def history_rows(snapshot: Mapping[str, Any]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for g in snapshot.get("games") or []:
         for lane in g.get("gameLens") or []:
+            if lane.get("carriedForward"):
+                # A CARRIED LANE IS NOT A NEW MEASUREMENT -- its numbers are already in the history under their own
+                # `as_of`. Record what this tick actually produced: the refusal, exactly as before carrying existed.
+                lane = {"source": PREGAME_LENS_SOURCE, "liveResimRefusal": lane.get("carriedRefusal"),
+                        "liveStateAsOf": lane.get("refusedStateAsOf") or "", "carriedForward": True}
             proj = lane.get("projection") or {}
             rows.append({
                 "t": snapshot.get("generatedAt"), "date": snapshot.get("date"), "event_id": g.get("event_id"),
@@ -1063,6 +1204,8 @@ def history_rows(snapshot: Mapping[str, Any]) -> list[dict[str, Any]]:
                 "segments": {k: (v or {}).get("total_mean") for k, v in (proj.get("segments") or {}).items()},
                 "resume": lane.get("resumeMatch"),
             })
+            if lane.get("carriedForward"):
+                rows[-1]["carried_forward"] = True
     return rows
 
 
@@ -1085,13 +1228,25 @@ def run_live_resim_tick(date_str: Optional[str] = None, **kwargs: Any) -> dict[s
 
     date_str = date_str or central_today_iso()
     started = time.monotonic()
+    if "previous" not in kwargs:
+        # The last snapshot this loop wrote -- what the budget-fairness order and the carry read. Unreadable is
+        # the pre-carry behaviour (scoreboard order, nothing carried), never a failed tick.
+        try:
+            from syndicate.features.shared.refresh_state_store import read_json_file
+
+            kwargs["previous"] = read_json_file(live_lens_snapshot_path())
+        except Exception:  # noqa: BLE001
+            kwargs["previous"] = None
     snapshot = build_live_lens_snapshot(date_str, **kwargs)
     snapshot, size = fit_snapshot_to_budget(snapshot)
     status = {
         "date": date_str,
         "games": len(snapshot.get("games") or []),
+        # FRESH lanes only: a carried lane was not re-simmed this tick.
         "resimmed": sum(1 for g in snapshot.get("games") or []
-                        for lane in g.get("gameLens") or [] if lane.get("source") == LIVE_RESIM_LENS_SOURCE),
+                        for lane in g.get("gameLens") or []
+                        if lane.get("source") == LIVE_RESIM_LENS_SOURCE and not lane.get("carriedForward")),
+        "carried": snapshot.get("carriedForward") or 0,
         "refusals": snapshot.get("refusalsByReason") or {},
         "bytes": size,
         "written": False,

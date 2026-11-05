@@ -462,6 +462,43 @@ def _row_side_and_prob(row: Mapping[str, Any], live_prob_over: Any) -> tuple[str
     return None, None
 
 
+def _lookup_key_parts(market: Any, line: Any) -> tuple[tuple[str, ...], float] | None:
+    """The market spellings to try and the line to key on, or None when the row has no line to key.
+
+    A yes/no market (double-double) has no posted line; it keys on its fixed 0.5 under its own family."""
+    line_value = _as_float(line)
+    if line_value is not None:
+        return _market_candidates(market), line_value
+    yes_no = _YES_NO_LINE_KEYS.get(_norm_market(market))
+    if yes_no is None:
+        return None
+    return (yes_no[0],), yes_no[1]
+
+
+def _index_hit(index: Mapping[Any, Any], player: str, lookup_markets: Sequence[str], line: float) -> Any:
+    for candidate in lookup_markets:
+        hit = index.get((player, _canonical_market(candidate), line))
+        if hit is not None:
+            return hit
+    return None
+
+
+def live_prop_hit(indexed: Mapping[str, Any] | None, player_name: Any, market: Any, line: Any) -> dict[str, Any] | None:
+    """The live index entry `attach_live_projections` would join this prop to, or None.
+
+    For a READ-TIME refresh of a row the build already joined: the same name normalisation, market aliases
+    and line key as the build, so the refresh can never pick a different lens row than the join would.
+    Side is not part of the key (see `build_live_prop_index`)."""
+    index = indexed.get("index") if isinstance(indexed, Mapping) else None
+    if not isinstance(index, dict):
+        return None
+    player = _norm_name(player_name)
+    key_parts = _lookup_key_parts(market, line) if player else None
+    if key_parts is None:
+        return None
+    return _index_hit(index, player, *key_parts)
+
+
 def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[str, Any]) -> dict[str, Any]:
     """Overlay live projections onto LIVE rows. Returns a coverage payload.
 
@@ -538,20 +575,13 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
         if not player:
             miss_no_player += 1
             continue
-        line = _as_float(row.get("line"))
-        lookup_markets = _market_candidates(row.get("market"))
-        if line is None:
-            yes_no = _YES_NO_LINE_KEYS.get(_norm_market(row.get("market")))
-            if yes_no is None:
-                miss_no_line += 1
-                continue
-            lookup_markets, line = (yes_no[0],), yes_no[1]
+        key_parts = _lookup_key_parts(row.get("market"), row.get("line"))
+        if key_parts is None:
+            miss_no_line += 1
+            continue
+        lookup_markets, line = key_parts
 
-        hit = None
-        for candidate in lookup_markets:
-            hit = index.get((player, _canonical_market(candidate), line))
-            if hit is not None:
-                break
+        hit = _index_hit(index, player, lookup_markets, line)
         if hit is None:
             # ATTRIBUTE THE MISS. The key is `(player, market, line)`, so "no
             # match" had three possible causes and one counter, and the counter

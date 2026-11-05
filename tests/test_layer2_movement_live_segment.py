@@ -474,12 +474,18 @@ def test_the_gameline_block_is_a_fallback_source():
     )
     assert "live_total" not in got, "and it is not a total either"
 
-    # `total_mean` IS a count, and is what the block may fill Live total from.
+    # `total_mean` IS a count, and is what the block may fill Live total from
+    # -- on a TOTALS row only: it is the game's total, so on a spread or a
+    # moneyline it is somebody else's number (lane nba-live-proj-actuals).
     with_total = _live_projection_columns(
-        {"live_gameline": {"live_projected": 0.19, "total_mean": 8.6}}
+        {"market": "totals", "live_gameline": {"live_projected": 0.19, "total_mean": 8.6}}
     )
     assert with_total["live_total"] == 8.6
     assert "live_projection" not in with_total
+    on_a_spread = _live_projection_columns(
+        {"market": "spreads", "live_gameline": {"live_projected": 0.19, "total_mean": 8.6}}
+    )
+    assert "live_total" not in on_a_spread
 
 
 # --------------------------------------------------------------------------

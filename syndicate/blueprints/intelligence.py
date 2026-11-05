@@ -1508,7 +1508,14 @@ def _refresh_live_columns_from_artifact(payload: dict[str, object]) -> None:
     Deliberately narrow: only candidates already flagged is_live, only the
     two clock-sensitive columns, and one cached artifact read per request
     regardless of how many candidates match.
+
+    NBA props get the same refresh from their own lens (`_refresh_lens_prop_live_columns`).
     """
+    try:
+        _refresh_lens_prop_live_columns(payload)
+    except Exception as exc:  # noqa: BLE001 -- never break the board over a display refresh
+        print(f"[intelligence] LIVE_COLUMN_REFRESH_FAILED sport=nba {type(exc).__name__}: {exc}", flush=True)
+
     try:
         from syndicate.features.intelligence import _mlb_hydrate_live_prop_projection
         from syndicate.features.intelligence import _mlb_live_lens_prop_rows_for_game
@@ -1583,6 +1590,122 @@ def _refresh_live_columns_from_artifact(payload: dict[str, object]) -> None:
 
     if refreshed:
         print(f"[intelligence] LIVE_COLUMNS_REFRESHED_FROM_ARTIFACT candidates={refreshed}", flush=True)
+
+
+# THE SAME READ-TIME REFRESH FOR NBA PROPS `[2026-11-04, lane nba-live-proj-actuals]`.
+#
+# NBA's LIVE PROJ. / LIVE ACTUAL were only ever written by the Layer 2 build, whose prop join runs every ~9 min
+# and publishes ~6.5 min after that. Measured on the served board 2026-11-05 00:49Z: 3 of 5 live games
+# (CHA@BKN, CHI@NYK, MIL@BOS) had 0 live rows with either column, because the 00:41:34Z join ran before the
+# re-sim picked them up at 00:44:01Z and the 00:48:04Z publish carried that join. The live lens on this box
+# already held their re-sim props (721 for MIL@BOS at 00:50Z). Same shape as the MLB defect above.
+#
+# Keyed EXACTLY as the build's join keys (`live_projection_join.live_prop_hit`: player, market aliases, line),
+# so a refresh can never attach a different lens row than the build would. Props only: a game line's live
+# number is a priced probability, and refreshing it without its edge would put two different moments on one row.
+_LENS_PROP_REFRESH_SPORTS = ("nba",)
+# Every open board polls this route; the lens changes once per live-lens tick (~60 s), so a few seconds of
+# per-process reuse costs nothing in freshness and saves re-parsing a ~1.2 MB document per poll.
+_LENS_PROP_INDEX_TTL_SECONDS = 15.0
+_LENS_PROP_INDEX_CACHE: dict[str, tuple[float, dict | None]] = {}
+_LENS_PROP_INDEX_LOCK = threading.Lock()
+
+
+def _lens_prop_index(sport: str, *, now: float | None = None) -> dict | None:
+    """`build_live_prop_index` over `<data root>/live/<sport>_live_lens.json` (keyvalue-aware read), plus the lens's
+    own date, which the caller matches before joining anything."""
+    from syndicate.features.shared.live_projection_join import build_live_prop_index
+    from syndicate.features.shared.refresh_state_store import data_root
+
+    clock = time.monotonic() if now is None else now
+    with _LENS_PROP_INDEX_LOCK:
+        cached = _LENS_PROP_INDEX_CACHE.get(sport)
+        if cached is not None and clock - cached[0] < _LENS_PROP_INDEX_TTL_SECONDS:
+            return cached[1]
+    snapshot = read_json_file(data_root() / "live" / f"{sport}_live_lens.json")
+    indexed: dict | None = None
+    if isinstance(snapshot, dict):
+        indexed = build_live_prop_index(snapshot)
+        indexed["lens_date"] = str(snapshot.get("date") or "").strip()
+        indexed["lens_generated_at"] = str(snapshot.get("generated_at") or snapshot.get("generatedAt") or "")
+    with _LENS_PROP_INDEX_LOCK:
+        _LENS_PROP_INDEX_CACHE[sport] = (clock, indexed)
+    return indexed
+
+
+def _finite_float(value: object) -> float | None:
+    try:
+        number = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+    return number if number == number and number not in (float("inf"), float("-inf")) else None
+
+
+def _refresh_lens_prop_live_columns(payload: dict[str, object]) -> dict[str, dict[str, int]]:
+    """Overwrite `live_projection` / `actual` on live NBA prop rows with the live lens's current numbers.
+
+    Only rows the build already flagged live, only when the lens is for the row's own date (a lens with no date
+    joins nothing), and a row the lens does not carry keeps whatever the build gave it."""
+    from syndicate.features.shared.live_projection_join import live_prop_hit
+
+    collections = [key for key in ("top_opportunities", "top_live_opportunities", "recommendations", "ranked_all") if isinstance(payload.get(key), list)]
+    by_sport = payload.get("by_sport") if isinstance(payload.get("by_sport"), dict) else {}
+    indexes: dict[str, dict | None] = {}
+    counts: dict[str, dict[str, int]] = {}
+    seen: set[int] = set()
+
+    def _visit(candidate: object) -> None:
+        if not isinstance(candidate, dict) or id(candidate) in seen:
+            return
+        sport = str(candidate.get("sport_slug") or candidate.get("sport") or "").strip().lower()
+        if sport not in _LENS_PROP_REFRESH_SPORTS or not candidate.get("is_live"):
+            return
+        if not (candidate.get("player_name") or str(candidate.get("candidate_type") or "").strip().lower() == "prop"):
+            return
+        seen.add(id(candidate))
+        if sport not in indexes:
+            indexes[sport] = _lens_prop_index(sport)
+        indexed = indexes[sport]
+        tally = counts.setdefault(sport, {"considered": 0, "matched": 0, "refreshed": 0, "no_lens_for_date": 0})
+        tally["considered"] += 1
+        game_date = str(candidate.get("game_date") or candidate.get("source_board_date") or "").strip()
+        if not indexed or not indexed.get("lens_date") or game_date != indexed["lens_date"]:
+            tally["no_lens_for_date"] += 1
+            return
+        hit = live_prop_hit(indexed, candidate.get("player_name") or candidate.get("entity"),
+                            candidate.get("market"), candidate.get("line"))
+        if hit is None:
+            return
+        tally["matched"] += 1
+        before = (candidate.get("live_projection"), candidate.get("actual"))
+        live_value = _finite_float(hit.get("live_projection"))
+        if live_value is not None:
+            # Both names, as `layer2_board._live_projection_columns` writes them for a prop.
+            candidate["live_projection"] = live_value
+            candidate["live_total"] = live_value
+        actual_value = _finite_float(hit.get("actual_so_far"))
+        if actual_value is not None:
+            candidate["actual"] = actual_value
+        if (candidate.get("live_projection"), candidate.get("actual")) != before:
+            tally["refreshed"] += 1
+
+    for key in collections:
+        for candidate in payload.get(key) or []:
+            _visit(candidate)
+    for items in by_sport.values():
+        if isinstance(items, list):
+            for candidate in items:
+                _visit(candidate)
+
+    for sport, tally in counts.items():
+        indexed = indexes.get(sport) or {}
+        print(
+            f"[intelligence] LIVE_COLUMNS_REFRESHED_FROM_ARTIFACT sport={sport} considered={tally['considered']} "
+            f"matched={tally['matched']} refreshed={tally['refreshed']} no_lens_for_date={tally['no_lens_for_date']} "
+            f"lens_date={indexed.get('lens_date') or None} lens_generated_at={indexed.get('lens_generated_at') or None}",
+            flush=True,
+        )
+    return counts
 
 
 def _response_candidate_count(response_payload: dict[str, object] | None) -> int:
