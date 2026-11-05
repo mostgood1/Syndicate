@@ -748,11 +748,6 @@ death, never life — do not invert it.
 - Verification: per-row table (board fair vs tape rebuild, per book) on >= 10 served suggested corners rows, with the mechanism named; written to a findings file; if a defect, a per-line fix with an off != on test and a fleet measurement in deploys.md
 - Blocked by: none
 
-### closed-lane-archive-20261104-1519 — CLOSED 2026-11-04 (GOAL MET: 1 block archived) — opened 2026-11-04 — session f354500b-b7a2-4acb-ab91-3fc6d182b28f
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- GOAL: MET. owner_liveness.py --idle-min 240 at origin/main ~21:20Z returned SAFE for exactly one slug; moved `maker-pilot-fair-cancel` to lanes_closed.md with a pointer. Reading and WAIT reasons in log/2026-11-04.md.
-
 ### nba-props-oom — CLOSED 2026-11-04 (GOAL MET: props peak 6,470-7,665 MB -> 523 MB on the fleet, merged rows 5.1M -> 29,246; 4 GB per-child RSS cap live, 0 trips; deploys.md 22:37:46Z) — opened 2026-11-04 — session 726b74ba-085a-4d00-bbeb-4b443c9bcf43
 - Goal: refresh_nba_oddsapi_props.py cannot OOM the fleet: a per-child memory cap makes it fail alone and loudly, and its 6-9 GB peak is cut at the cause, measured on the fleet
 - Files: scripts/refresh_odds_sources.py (_run_command + a new child memory-cap helper only), syndicate/features/shared/basketball_props_edges.py, scripts/refresh_nba_oddsapi_props.py, tests/test_refresh_odds_child_memory_cap.py (NEW), tests/test_nba_props_memory.py (NEW), tests/test_refresh_odds_sources.py, tests/test_refresh_odds_step_markers.py, tests/test_refresh_failure_observability.py
@@ -795,6 +790,11 @@ death, never life — do not invert it.
 - Falsification test: If, after the fix on a slate with >= 8 simultaneous live games, any live game has 0 rows with Live proj. for > 1 re-sim tick + 1 web poll after its first resim, or per-game resim coverage still falls with scoreboard position, the hypothesis is wrong or the fix inert.
 - Verification: Fleet, next big NBA slate: (i) NBA_LIVE_RESIM_TICK carried= > 0 when budget_exhausted fires and per-game resimmed share flat across scoreboard position in live_resim_history; (ii) served /api/intelligence/query: share of live NBA rows (per game) with Live proj./Live actual, before vs after; (iii) LIVE_COLUMNS_REFRESHED_FROM_ARTIFACT sport=nba lines on web; (iv) spreads rows' live_total absent, Live proj. renders cover %.
 - Blocked by: none
+
+### closed-lane-archive-20261104-1931 — CLOSED 2026-11-04 (GOAL MET: 1 block archived) — opened 2026-11-04 — session 9b6a3cab-885a-4c48-8ca5-9b9d679997fb
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 returned 1 SAFE of 15 CLOSED; moved `closed-lane-archive-20261104-1519`. Table + WAIT reasons in log/2026-11-04.md.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -961,6 +961,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261104-0530` — CLOSED 2026-11-04 (GOAL MET: 1 block archived) — opened 2026-11-04 — session 7146e063-8b93-4000-b518-333dd6e21a55
 - `closed-lane-archive-20261104-0936` — CLOSED 2026-11-04 (GOAL MET: 1 block archived) — opened 2026-11-04 — session 58b50504-07d9-4335-9985-dcde45a48cc9
 - `closed-lane-archive-20261104-1346` — CLOSED 2026-11-04 (GOAL MET: 1 block archived) — opened 2026-11-04 — session 7fa59aa3-fe89-483e-ac9a-473d31f05c16
+- `closed-lane-archive-20261104-1519` — CLOSED 2026-11-04 (GOAL MET: 1 block archived) — opened 2026-11-04 — session f354500b-b7a2-4acb-ab91-3fc6d182b28f
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
