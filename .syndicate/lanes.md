@@ -702,15 +702,6 @@ death, never life — do not invert it.
 - Verification: rehearsal log + RESULT.txt readings recorded in the plan doc and the daily log
 - Blocked by: none
 
-### uefa-corners-window — CLOSED 2026-11-04 (GOAL MET) — opened 2026-11-04 — session 8000dc38-298a-4e02-806b-15931006aff3
-- **GOAL VERDICT `[2026-11-04 17:12Z]`: GOAL: MET.** Fleet ff to `bd20ef2bf` 15:41:16Z (no restart). First sweep on the new code 16:21:40Z: 2026-11-05 shard `uel alternate_totals_corners` 767 rows on 17 matches, 25-28h before kickoff (was 0); served shortlist for 11-05 (build 17:09:37Z) 17 of 30 matches with corners, 272 rows (was 0). UECL corners are not offered by our books at all (btts only, even inside 24h on 10-23) -- a source limit, not this window. Per-call credit cost read from the probe only (2). deploys.md 2026-11-04 17:12Z.
-- Goal: UEFA (UCL/UEL/UECL) corners + BTTS reach the Layer 2 board for TOMORROW's matches, not only within 24h of kickoff: the UEFA props step gets a separate 72h window for game markets (btts, alternate_totals_corners) while player props stay at 24h; on main, live on the fleet, and MEASURED as UEL/UECL alternate_totals_corners rows captured >24h before kickoff in the book_quotes shard and served on the Layer 2 shortlist
-- Files: scripts/fetch_soccer_oddsapi_props_local.py, scripts/refresh_odds_sources.py (UEFA props step horizon only), tests/test_soccer_uefa_followups.py
-- Hypothesis: UEFA corners are missing from the board for any match more than 24h out because game markets ride the player-props call, which the UEFA step gates with --max-hours-ahead 24 (domestic leagues have no window and get corners 7-14 days ahead: EPL 11-07 first seen 10-24; UCL 11-04 first seen 11-03T17:46Z; UEL/UECL 11-05 have h2h only)
-- Falsification test: After the change is live, a UEL/UECL match 24-72h out still has 0 alternate_totals_corners rows in its book_quotes shard while OddsAPI returns corners for it (probe 2026-11-04 15:2xZ: Ferencvaros @ AC Milan 26.4h out had fanduel/pinnacle/draftkings corners)
-- Verification: fleet book_quotes shard for the next UEFA matchday carries uel/uecl/ucl alternate_totals_corners rows whose captured_at is >24h before commence_time, and /api/board/layer2-shortlist?sport=soccer&date=<tomorrow> serves them; x-requests-last for a game-only call <= 2; recorded in deploys.md
-- Blocked by: none
-
 ### polymarket-cbb-pairing — CLOSED (GOAL MET) — opened 2026-11-04 — closed 2026-11-04 — session e32fef1a-01e8-4afe-a284-01acd3728545
 - **VERDICT `[2026-11-04 23:36Z]`: GOAL: MET.** Goal, verbatim: "Polymarket college basketball (league tokens cbb / wcbb) pairs with the NCAAB and WNCAAB boards on the fleet: the refresh-worker grid fan-in reprices ncaab and wncaab sides from polymarket_us (> 0, sampled by team, side and line), and the daily venue archive files Kalshi women's and Polymarket college rows under ncaab / wncaab (DAILY_BOOK skipped_by_sport no longer lists wncaab), and the order-path join pairs men's college shortlist rows with Polymarket markets (POLYMARKET_BOARD_JOIN matches include ncaab), after a fix on main [order-path clause added 2026-11-04 ~17:40Z, same session, before any landing: measured 0 of 50 men's shortlist rows paired because Polymarket's college slug codes resolve to nothing]". Readings (deploys.md 20:57:24Z by `wncaab-module` + 23:24:11Z): fan-in `SEGMENT_MISMATCH_GRID` `full|polymarket_us|-` ncaab 0 -> 100 (21:31:47Z), wncaab 0 -> 4; after the wrong-game fix `f070ac25c` loaded 23:26Z: ncaab 61, wncaab 4 (23:29Z), fleet code 0 unnamed college quotes, 54 newly priced men's sides + 4 women's all same-game by venue_ref (6 of 98 had been wrong-game at 21:30Z before the fix). Archive: POLYMARKET_DAILY_BOOK skipped cbb 1345 / wcbb 482 -> 0, Kalshi DAILY_BOOK skipped wncaab 869 -> 0 (both workers), polymarket__ncaab / wncaab daily files written. Order path: POLYMARKET_QUOTE_CAPTURE sports includes ncaab, appended 39 (21:36:33Z).
 - **STATUS `[2026-11-04 18:14Z]`: GOAL: NOT MET -- ON MAIN `b27fbf454`, NOT on the fleet.** Read-only fleet A/B on one frozen snapshot: ncaab grid sides priced from Polymarket 0 -> 62 (NCAAF 228 -> 284, NBA 72 -> 82, every other sport unchanged; 0 lost or changed anywhere); order-path join ncaab 0 -> 33 of 50 shortlist rows. Women's pairs learn but tonight's women's board carries no moneyline, Polymarket's only women's market. Owed: the user's yes for a fleet ff + refresh-worker restart (price feed, join, Kalshi archive) and a live-odds-worker restart (Polymarket archive), then the readings in Verification.
@@ -719,25 +710,6 @@ death, never life — do not invert it.
 - Hypothesis: Two defects: (1) Polymarket files college basketball under league tokens cbb / wcbb, which _effective_league never maps, so 0 quotes reach ncaab / wncaab; (2) the learned-pair fallback stamps a Polymarket quote with event_game_token(event_id) while a grid row whose clubs canonicalise carries the club-pair game_token, so a role_game total can never match, and moneyline outcomes that are bare mascots stay unresolved
 - Falsification test: With both fixes in a read-only fleet fan-in run (worktree code), polymarket_us still reprices 0 ncaab and 0 wncaab sides on a grid that carries tonight's games, or any repriced side lands on a different game, team, side or line than the board row
 - Verification: off != on reachability tests; read-only fleet fan-in off (fleet checkout) vs on (worktree), sampled pairs by team/side/line; after a user-approved ff + refresh-worker restart: refresh-worker log shows polymarket_us repricing ncaab / wncaab sides and DAILY_BOOK skipped_by_sport without wncaab, recorded in deploys.md
-- Blocked by: none
-
-### soccer-forward-grade-pull-paging — CLOSED 2026-11-04 (GOAL MET) — opened 2026-11-04 — session 8000dc38-298a-4e02-806b-15931006aff3
-- **GOAL VERDICT `[2026-11-04 17:31Z]`: GOAL: MET.** Pull rc 0 against the fleet: freeze_pages 2, freeze_files 291 = the names-only inventory, game_markets/props paged (18 pages each), 0 oversize. Grade on 574 merged matches (was 329): W1r 42 bets -7.0%, W2 64 bets -12.8%, W3 67 bets -8.4%, all WATCHING and moved off their 10-19 numbers. Commits ea69b8bbe + ad032ca67 (a book_quotes 404 is now counted, not fatal). log/2026-11-04.md 17:31Z.
-- Goal: forward_grade.py pull completes against the fleet with no 'freeze export truncated' abort: the freeze, game_markets and props exports page through /api/ops/artifacts/export's since/next_since cursor (a stall raises, never skips); then a fresh grade advances W1r/W2/W3 past their stale 10-19 numbers before the 11-15 grade date
-- Files: scripts/soccer_season_audit/forward_grade.py, tests/test_soccer_forward_grade.py
-- Hypothesis: The pull aborts because it exports every league's pre-kickoff freeze with ONE no-since request; past the 48 MB response budget a no-since export truncates in walk order with no resume point (ops.py:2928-2932), and forward_grade.py:586 raises on it. The since-bearing path fills oldest-first and returns next_since (ops.py:2960-2978).
-- Falsification test: A since-paged pull still returns truncated with next_since=null (a stall), or still misses freeze files a names-only inventory of the same pattern lists
-- Verification: pull exits 0 against the fleet with freeze_pages >= 2 and the freeze file count equal to the server's inventory for the pattern; grade's W1r/W2/W3 funnels move off the 10-19 numbers (25/39/37 bets); recorded in log + state_soccer
-- Blocked by: none
-
-### soccer-corners-fair-inflation — CLOSED 2026-11-04 (GOAL MET: the evaluator, not the board; evaluator fixed and re-graded) — opened 2026-11-04 — session 8000dc38-298a-4e02-806b-15931006aff3
-- **CLOSED `[2026-11-04 21:09Z]`: GOAL MET.** The evaluator now has `shin_live` (`7b205d9d3`; a book counts if it was last OBSERVED within 60 min, not if its price CHANGED within 12 h / 6 h). Re-grade of the 11-02 rows: `shin` reproduces -4.86% exactly; on the 14 games whose quote state survived, corners Suggested EV at sighting is +3.16% live vs +3.20% board (was -4.40%), and at the close -2.62% [-5.53, +0.39] (was -5.21%). The board needs no fix. NEW DEFECT FOUND, not fixed here: soccer `.state.json` reset on 10-31/11-01 (1,783 of 58,622 / 4,071 of 35,252 keys kept), so 658 of 1,113 soccer keys have no last-seen -- todo `#759`, file owned by `book-quotes-splice-repair`. Findings sections 6-7. The fair_price_eval loan is RETURNED to `fair-price-v2`.
-- **RESULT `[2026-11-04 17:50Z]`: mechanism NAMED -- it is the EVALUATOR, not the board (H3 SUPPORTED; H1/H2 FALSIFIED).** Served build 17:09:37Z, 603 corners rows: board fair = live-observed-book fair (+0.00 pp, 5/602 beyond 1 pp); the 11-02 evaluator's change-age rule (`fair_price_eval.evaluate`, a book counts only if its price CHANGED within 12 h) reproduces the 11-02 gap on today's 14 Suggested rows (board - ev12 +2.73 pp, median +2.65; ev12 - live -2.60 pp). The tape is a change log, so motionless live books are dropped and the fair rests on the bet book. No board fix is warranted. The instrument fix is in `scripts/fair_price_eval.py`, claimed by OPEN lane `fair-price-v2` -- NOT edited; loan or hand-off is the user's call. `findings_2026-11-04_soccer_corners_fair_gap.md`.
-- Goal: Name the mechanism that puts the Layer 2 board's consensus fair for soccer alternate_totals_corners ~2.7pp above a per-book Shin fair rebuilt from the same quotes (11-02 grade: 41 suggested corners rows, mean +2.68pp, median +2.76pp; every other market, all sports, +0.20pp), measured on served rows against the fleet quote tape, and fix it line by line if it is a defect
-- Files: scripts/fair_price_eval.py (LOAN from fair-price-v2 - user approved in chat 2026-11-04 - a liveness-aware fair method beside the existing ones ONLY), tests/test_fair_price_eval.py (LOAN from fair-price-v2 - same approval - tests for that method ONLY), .syndicate/findings_2026-11-04_soccer_corners_fair_gap.md
-- Hypothesis: H1: the grid pairs a book's over and under from DIFFERENT corner variants -- OddsAPI duplicates (book, market, side, line) with different prices (fanduel, measured 2026-08-22), so a book's two sides can come from two ladders, lowering its overround and inflating the de-vigged side. H2: the grid keeps a stale or wrong-line opposite side. H3: the evaluator's rebuild, not the board, is the one that is off (it rebuilds at a different instant or book set).
-- Falsification test: H1 is false if, on served suggested corners rows, the board's fair_consensus_prob equals the tape rebuild within 0.5pp once the tape is read at the build instant with one price per (book, side, line) -- i.e. the gap disappears without any variant handling; H3 is false if the tape rebuild at the build instant reproduces the 11-02 evaluator's sight_shin
-- Verification: per-row table (board fair vs tape rebuild, per book) on >= 10 served suggested corners rows, with the mechanism named; written to a findings file; if a defect, a per-line fix with an off != on test and a fleet measurement in deploys.md
 - Blocked by: none
 
 ### kalshi-state-cap — CLOSED (GOAL MET) — opened 2026-11-04 — closed 2026-11-04 — session e32fef1a-01e8-4afe-a284-01acd3728545
@@ -770,11 +742,6 @@ death, never life — do not invert it.
 - Verification: Fleet, next big NBA slate: (i) NBA_LIVE_RESIM_TICK carried= > 0 when budget_exhausted fires and per-game resimmed share flat across scoreboard position in live_resim_history; (ii) served /api/intelligence/query: share of live NBA rows (per game) with Live proj./Live actual, before vs after; (iii) LIVE_COLUMNS_REFRESHED_FROM_ARTIFACT sport=nba lines on web; (iv) spreads rows' live_total absent, Live proj. renders cover %.
 - Blocked by: none
 
-### closed-lane-archive-20261104-1931 — CLOSED 2026-11-04 (GOAL MET: 1 block archived) — opened 2026-11-04 — session 9b6a3cab-885a-4c48-8ca5-9b9d679997fb
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness.py --idle-min 240 returned 1 SAFE of 15 CLOSED; moved `closed-lane-archive-20261104-1519`. Table + WAIT reasons in log/2026-11-04.md.
-
 ### closed-lane-archive-20261104-2100 — CLOSED 2026-11-04 (GOAL MET: 1 blocks archived) — opened 2026-11-04 — session 49ed0ef3-b921-4349-8aec-6ebc78385dd5
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
@@ -784,6 +751,12 @@ death, never life — do not invert it.
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - Verdict: GOAL MET. Moved stake-band-off (owner 86352bc9 idle 303m) and closed-lane-archive-20261104-1752 (owner 77a1e255 idle 283m). 13 others WAIT; table in log/2026-11-04.md 04:40Z 11-05.
+
+### closed-lane-archive-20261105-0045 — CLOSED 2026-11-05 (GOAL MET: 4 blocks archived) — opened 2026-11-05 — session aae0fc92-0076-49bd-b575-ba3ebaf5a93d
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 4 SAFE of 14 CLOSED; dry run, invariants unchanged vs baseline (same 12 pre-existing contests), applied.
+- Moved: `uefa-corners-window`, `soccer-forward-grade-pull-paging`, `soccer-corners-fair-inflation`, `closed-lane-archive-20261104-1931`. Table and WAIT reasons: `.syndicate/log/2026-11-05.md`.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -952,6 +925,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261104-1346` — CLOSED 2026-11-04 (GOAL MET: 1 block archived) — opened 2026-11-04 — session 7fa59aa3-fe89-483e-ac9a-473d31f05c16
 - `closed-lane-archive-20261104-1519` — CLOSED 2026-11-04 (GOAL MET: 1 block archived) — opened 2026-11-04 — session f354500b-b7a2-4acb-ab91-3fc6d182b28f
 - `closed-lane-archive-20261104-1752` — CLOSED 2026-11-04 (GOAL MET: 1 block archived) — opened 2026-11-04 — session 77a1e255-ea42-4a66-b091-d51f5ef3abd9
+- `closed-lane-archive-20261104-1931` — CLOSED 2026-11-04 (GOAL MET: 1 block archived) — opened 2026-11-04 — session 9b6a3cab-885a-4c48-8ca5-9b9d679997fb
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
@@ -1341,7 +1315,9 @@ death, never life — do not invert it.
 - `soccer-board-mlb-parity` — ORPHANED, UNOWNED (session `f98be73b` checkpointed 2026-08-22 23:2xZ) — — **TWO THINGS DEPLOYED TONIGHT. (1) `#518` FOTMOB MOMENTUM — live-odds-worker
 - `soccer-capture-staleness` — CLOSED 2026-09-17 — opened 2026-09-17 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77 — **GOAL: MET** (2026-09-17 ~07:45 CT): the reading is established, and no capture change is licensed. **H28 FALSIFIED.** (a) price-only BTTS/corners positions DO reach the paper plan: 2 BTTS on 09-16; 1 corners + 1 BTTS on 09-17, of about 65 positions. Body in `lanes_history.md`.**
 - `soccer-corners-distribution` — CLOSED-HANDOFF 2026-10-30 (stale-lane-triage, user-approved -> todo #750) — opened 2026-10-08 — session unowned (opened at user request 2026-10-08 by session d4409ac4 for pickup; not worked there)
+- `soccer-corners-fair-inflation` — CLOSED 2026-11-04 (GOAL MET: the evaluator, not the board; evaluator fixed and re-graded) — opened 2026-11-04 — session 8000dc38-298a-4e02-806b-15931006aff3
 - `soccer-espn-player-leagues` — **ORPHANED 2026-09-08** — opened 2026-09-04 — session 3492626c-1ec4-4366-9dbe-f194ae319c84 — **THE FETCH WORKS AND WAS RUN FOR ALL FOUR LEAGUES; THE H
+- `soccer-forward-grade-pull-paging` — CLOSED 2026-11-04 (GOAL MET) — opened 2026-11-04 — session 8000dc38-298a-4e02-806b-15931006aff3
 - `soccer-forward-graders` — CLOSED 2026-09-17 — opened 2026-09-17 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77 — **GOAL: MET** (2026-09-17 19:05Z / 14:05 CT, first run after the 17:00Z La Liga match): every cell joins end to end on production data. Body in `lanes_history.md`.**
 - `soccer-h24-grader` — CLOSED 2026-09-17 — opened 2026-09-17 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77 — **GOAL: MET 2026-09-17 ~20:40 CT** (`log/2026-09-17.md`): the first production grade joined 2 finished frozen La Liga matches through outcome, FotMob factor (full window), both arms and the football-data close. Body in `lanes_history.md`.**
 - `soccer-lines-props-backtest` — CLOSED 2026-10-05 — opened 2026-10-02 — session 43e4d5fe-e05e-41bc-aae6-6d6986460b22
@@ -1386,6 +1362,7 @@ death, never life — do not invert it.
 - `todo-id-push-reserve` — CLOSED 2026-09-10 — opened 2026-09-10 — session 4d4e0959-c99d-4777-bebb-37851c341e75 — **GOAL MET: ids are reserved on the remote. Two separate clones got 101/102 through a real bare remote (the previous version gave 101/101); that remote REJECTED a stale-base reservation; the real reservation `f08c0125` (`#654`) touched one file and started no CI run. Tooling only, no deploy.**
 - `tripwire-applog-page-cap` — CLOSED 2026-09-24 — opened 2026-09-23 — session 8ce91d9d-ac1c-498f-90d3-89a2bc5fd620
 - `tripwire-bucket-window` — CLOSED 2026-09-10 — opened 2026-09-10 — session 92a71e78-b21c-4366-a900-f7a3f6fc434d — **FIXED AND VERIFIED: the tripwire, the arm 2 gate and the reader all pair a bandwidth bucket with its own hour; all 23 captures re-derived and both falsification tests passed.**
+- `uefa-corners-window` — CLOSED 2026-11-04 (GOAL MET) — opened 2026-11-04 — session 8000dc38-298a-4e02-806b-15931006aff3
 - `uefa-favourite-temper` — CLOSED 2026-10-19 (GOAL MET) — opened 2026-10-19 — session ca3c8313-c460-4732-b844-c922698ed19d
 - `ui-probe-baseline-nfl-ncaaf` — ui-probe-baseline-nfl-ncaaf — CLOSED 2026-08-16 — armed for nfl/ncaaf only; mlb stays watch-only — opened 2026-08-16 — session: ui-probe-rerun-compare → `lanes_closed.md`.
 - `ui-probe-curvature-detection` — ui-probe-curvature-detection — CLOSED 2026-08-16 — `curved` forces `reliable:false`; Preview (the falsification case) is not flagged — opened 2026-08- → `lanes_closed.md`.
