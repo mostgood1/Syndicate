@@ -742,11 +742,6 @@ death, never life — do not invert it.
 - Verification: Fleet, next big NBA slate: (i) NBA_LIVE_RESIM_TICK carried= > 0 when budget_exhausted fires and per-game resimmed share flat across scoreboard position in live_resim_history; (ii) served /api/intelligence/query: share of live NBA rows (per game) with Live proj./Live actual, before vs after; (iii) LIVE_COLUMNS_REFRESHED_FROM_ARTIFACT sport=nba lines on web; (iv) spreads rows' live_total absent, Live proj. renders cover %.
 - Blocked by: none
 
-### closed-lane-archive-20261104-2100 — CLOSED 2026-11-04 (GOAL MET: 1 blocks archived) — opened 2026-11-04 — session 49ed0ef3-b921-4349-8aec-6ebc78385dd5
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. Moved nba-props-oom (owner 726b74ba idle 246m, block lastmod 246m). 14 others WAIT; table in log/2026-11-04.md 03:00Z 11-05.
-
 ### closed-lane-archive-20261104-2240 — CLOSED 2026-11-04 (GOAL MET: 2 blocks archived) — opened 2026-11-04 — session f27d1701-2c80-4729-9ec8-05999ab37fc1
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
@@ -757,6 +752,11 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 4 SAFE of 14 CLOSED; dry run, invariants unchanged vs baseline (same 12 pre-existing contests), applied.
 - Moved: `uefa-corners-window`, `soccer-forward-grade-pull-paging`, `soccer-corners-fair-inflation`, `closed-lane-archive-20261104-1931`. Table and WAIT reasons: `.syndicate/log/2026-11-05.md`.
+
+### closed-lane-archive-20261105-0240 — CLOSED 2026-11-05 (GOAL MET: 1 blocks archived) — opened 2026-11-05 — session 9032b398-2445-4caf-8df1-1ec7a05d6f0d
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. Moved closed-lane-archive-20261104-2100 (owner 49ed0ef3 idle 284m, lastmod 337m). 10 others WAIT; table in log/2026-11-05.md 08:4xZ.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -926,6 +926,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261104-1519` — CLOSED 2026-11-04 (GOAL MET: 1 block archived) — opened 2026-11-04 — session f354500b-b7a2-4acb-ab91-3fc6d182b28f
 - `closed-lane-archive-20261104-1752` — CLOSED 2026-11-04 (GOAL MET: 1 block archived) — opened 2026-11-04 — session 77a1e255-ea42-4a66-b091-d51f5ef3abd9
 - `closed-lane-archive-20261104-1931` — CLOSED 2026-11-04 (GOAL MET: 1 block archived) — opened 2026-11-04 — session 9b6a3cab-885a-4c48-8ca5-9b9d679997fb
+- `closed-lane-archive-20261104-2100` — CLOSED 2026-11-04 (GOAL MET: 1 blocks archived) — opened 2026-11-04 — session 49ed0ef3-b921-4349-8aec-6ebc78385dd5
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
