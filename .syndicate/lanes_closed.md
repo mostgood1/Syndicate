@@ -14135,3 +14135,13 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 4 SAFE of 14 CLOSED; dry run, invariants unchanged vs baseline (same 12 pre-existing contests), applied.
 - Moved: `uefa-corners-window`, `soccer-forward-grade-pull-paging`, `soccer-corners-fair-inflation`, `closed-lane-archive-20261104-1931`. Table and WAIT reasons: `.syndicate/log/2026-11-05.md`.
+
+### closed-lane-archive-20261105-0240 — CLOSED 2026-11-05 (GOAL MET: 1 blocks archived) — opened 2026-11-05 — session 9032b398-2445-4caf-8df1-1ec7a05d6f0d
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. Moved closed-lane-archive-20261104-2100 (owner 49ed0ef3 idle 284m, lastmod 337m). 10 others WAIT; table in log/2026-11-05.md 08:4xZ.
+
+### closed-lane-archive-20261105-0428 — CLOSED 2026-11-05 (GOAL MET: 2 blocks archived) — opened 2026-11-05 — session e4c0f2b0-6445-44d1-85c3-cce65ab22750
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET — 2 CLOSED blocks moved to lanes_closed.md (owner_liveness SAFE at 240m): closed-lane-archive-20261104-2240, closed-lane-archive-20261105-0045. 9 deferred; table in log/2026-11-05.md.
