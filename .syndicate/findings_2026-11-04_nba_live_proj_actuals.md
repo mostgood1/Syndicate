@@ -102,3 +102,14 @@ Money: in-play entries are refused on both venues after commence (`cd0901bf`), s
   by the time the board reads it (up to ~15 min before this change).
 - NCAAB has its own copy of `build_live_lens_snapshot` (`ncaab/live_resim.py:959`) — the same scoreboard-order
   budget shape is likely; not measured.
+
+## 6. Overtime dropped from the live full game -- FIXED on main `d6a691168` (todo `#763`, NBA half)
+
+Reported by lane `wncaab-module` (session "NCAAB readiness check"), verified here. `basketball_engine` returns
+regulation periods in `home_q_pts` / `away_q_pts` and every overtime in the box's `ot_pts`
+(`engine.py` overtime loop + `home_box["ot_pts"]`); `resim_live_game` summed the period lists only. Fleet
+`live_resim_history` 10-13..11-05, 6,215 `live_resim` lanes: 74.2% carry at least one regulation-tied draw, 2.9% of
+draws on average; Q4 last 5:00 at margin <= 5 (250 lanes): 9.2% (home win probability understated ~4-5 pp, total
+~1 pt). **All 41 lanes resumed IN overtime published `modelHomeWinProb` 0.0** (every draw a regulation tie). The fix
+adds each box's `ot_pts` to the full-game total / margin / win; quarter and half blocks stay regulation-only.
+Negative control: a real-engine resume tied after regulation returns 0.0 without the fix and a real split with it.
