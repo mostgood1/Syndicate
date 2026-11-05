@@ -1729,7 +1729,7 @@ class SoccerPropRowOddsHistoryCoverageTests(unittest.TestCase):
 
 class CollegeBasketballTrackingTests(unittest.TestCase):
     # Every odds refresh that ran women's college basketball ended `unsupported_sport:wncaab`
-    # (190 of 190 on the fleet, 2026-11-04) because only NCAAB had a branch. WNCAAB shares
+    # (176 of 176 fleet runs on 2026-11-04) because only NCAAB had a branch. WNCAAB shares
     # NCAAB's fetcher and CSV shape, so it shares NCAAB's tracking, under its own prefix.
     def _sync(self, sport: str, root: Path) -> dict:
         with patch.dict("os.environ", {"SYNDICATE_REPORTS_ROOT": str(root / "reports"), "SYNDICATE_ODDS_EVENTS_ROOT": str(root / "odds_events")}, clear=False):
