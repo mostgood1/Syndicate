@@ -56524,3 +56524,29 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - At this build, 0 qualify in any strategy (best net EV 0.36%), and the live gates pass 0 of 70 Kalshi-priced records (40 stop only at `min_ev_floor`). Bookings come from other builds of the day.
 - **Capture, `KXMVECROSSCATEGORY`:** `swept_to` 11-05 03:26:10Z, **lag 11.54 h** at 15:03Z (28.12 h on 11-04 04:01Z). 35 runs since 11-04 04:04Z, all budget-stopped at 718-900 pages, **0 errored**; they read 51.6 settlement hours (11-02 23:48:52Z -> 11-05 03:26:10Z). `dense_to` is no longer in state.
 - **Hand-in reads: DONE.** Both owed readings are taken (first NCAAB Kalshi live fill; paper bookings by strategy). From Mon 11-09 the weekly task `decision-policy-paper-weekly-read` reports NCAAB paper separately.
+
+## 2026-11-05 22:40:49Z (4:40 PM CST) -- LOADED on the fleet by a peer's restart: NBA live re-sim counts overtime in the full game (`d6a691168`, todo `#763` NBA half) + carry bound 600 -> 900 s (`8d0a8f2b0`, todo `#761`) -- lane `nba-live-proj-actuals`; live-slate VERIFY owed at tonight's 02:00Z tip
+- **User, in this chat:** "Yes, restart now", at ~22:30Z (4:30 PM CST). It answered "Restart live-odds-worker now, mid-slate, to load the re-sim fixes?" No NBA game was live at the time. Tonight's two games are ORL@PHX 02:00Z and MIA@GS 03:00Z.
+- **Who deployed:** lane `wncaab-module` (session "NCAAB readiness check") under its own claims, as part of rolling out its `cc2cea242` + `b9999dc1d`, which its user approved. I had asked it to hold at `8d0a8f2b0`. Once its user said yes, I approved, as `d6a691168`'s lane owner, an ff straight to `d6a691168` so the fleet takes one live-odds-worker restart instead of two. Its timeline, as read back here:
+  - fleet reflog: `merge d6a6911681db...: Fast-forward` at 22:36:05Z.
+  - reload-web 22:36:07Z.
+  - live-odds-worker: TERM pid 325047 at 22:37:35Z; supervisor.log `pid=413072`, started 22:37:41Z; first `NBA_LIVE_RESIM_TICK` 22:37:44Z; 0 tracebacks.
+  - Its refresh-worker restart is still pending (its claims).
+- **Loaded, read back 22:38-22:39Z:**
+  - Fleet HEAD is `d6a6911681db79575d4a328d8988c687d3aecb84`, and `def _ot_points` is present in the checkout's `nba/live_resim.py`.
+  - pid 413072 started 96 s after the ff.
+  - Carry settings come from the fleet checkout's own `carry_enabled` / `carry_max_age_seconds`, applied to pid 413072's environ (parsed in Python, names only): `SYNDICATE_NBA_LIVE_RESIM_CARRY` absent and `..._CARRY_MAX_AGE_SECONDS` absent, which resolves to carry ON with a 900.0 s bound.
+- **CORRECTION to my 01:41:40Z entry and `d671de3cc` ("re-sim half loads at the next live-odds-worker restart"):** live-odds-worker RECYCLES ITSELF about every 6 h. supervisor.log shows `exited code=0 after 21923s`, then 20939 s, then 22683 s, then 17858 s.
+  - pid 4021781 (23:27:18Z 11-04) exited ~05:32:41Z. Its replacement, pid 2943, came up on fleet `54a17eabd`, so `84bb34d26`'s stalest-first + carry (600 s) has been live since ~05:32:46Z 11-05.
+  - It ran the last 27 min of the 11-04 slate: 18 history rows, through 05:59:35Z.
+  - The tick line's `carried=` field exists only in that change, and it is present on every tick since.
+  - So no restart was needed for it. **Generalisation:** a live-odds-worker change loads within ~6 h of an ff, unattended. "Waits for a restart" overstates the wait, and also hides that an ff alone is a deploy on a ~6 h fuse.
+- **Spread fix (`layer2_board`, `84bb34d26`), also already loaded:** refresh-worker pid 349940 has run since 18:59:27Z 11-05, on `54a17eabd`. Its predecessor exited at 18:59:23Z unclaimed (`holder: null`, ran 70,391 s); that cause is not this lane's.
+  - Served board at 22:39:16Z (snapshot 22:23:41Z): live spread / h2h game rows with `live_total`: **0 of 5** (NCAAB 2 h2h + 3 spreads). Totals rows keep it: NCAAB 6/19, WNCAAB 1/1.
+  - 5 rows is a thin population. The NBA read is owed at tip; 11-04's bug count was NBA 27 spread/h2h rows.
+- **VERIFY owed (tonight, a 2-game slate):**
+  - ticks with `games>=1` and each game re-simmed.
+  - served Live proj. / Live actual per live NBA game on Layer 2.
+  - live spread/h2h rows with `live_total` = 0.
+  - Overtime is exercised only if a game goes to OT. Reachability is covered by `tests/test_nba_live_resim_overtime.py::test_real_engine_resumed_in_overtime_is_not_a_certain_home_loss`: a real engine tied after regulation read p_home 0.0 before the fix and a split after.
+  - **The fairness claim needs a big slate.** With 2 games the 240 s budget never runs out, so `carried=0` tonight proves nothing either way. The reading is Fri 11-06 (9 games, 4 tipping at 00:00Z 11-07): per-game re-simmed share flat across scoreboard position and `carried=` > 0 on budget-exhausted ticks.
