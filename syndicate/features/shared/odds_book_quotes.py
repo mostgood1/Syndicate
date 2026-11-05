@@ -677,6 +677,23 @@ def _write_state(path: Path, state: Mapping[str, Any]) -> None:
             pass
 
 
+def _is_nan(value: Any) -> bool:
+    return isinstance(value, float) and value != value
+
+
+def _unchanged(previous: list[Any], current: list[Any]) -> bool:
+    """`previous[:2] == current`, except that a NaN equals a NaN.
+
+    [2026-11-04, lane book-quotes-state-reset, #760] The NBA and NHL fetchers
+    hand moneylines `line: NaN`, and NaN never equals itself -- the state's comes
+    from `json.loads`, the fetch's from the frame -- so every fetch re-appended
+    every moneyline at an unchanged price: 16,206 of NHL 11-04's 39,289 rows.
+    """
+    if len(previous) < 2:
+        return False
+    return all(old == new or (_is_nan(old) and _is_nan(new)) for old, new in zip(previous[:2], current))
+
+
 def quote_key(row: Mapping[str, Any]) -> str:
     """Public alias for the log's identity key, so consumers can join a grid
     cell back to `read_quote_last_seen()` without reaching into a private."""
@@ -971,7 +988,7 @@ def append_book_quotes(
                     # Kept as a third element rather than a dict so every existing
                     # 2-element state file still loads and compares correctly: the
                     # equality check below slices to the first two.
-                    if list(previous[:2]) == current:
+                    if _unchanged(previous, current):
                         state[key] = current + [captured_at]
                         continue
                     state[key] = current + [captured_at]
