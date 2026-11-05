@@ -875,9 +875,11 @@ class OddsRefreshTrackingTests(unittest.TestCase):
             root = Path(tmpdir)
             odds_root = root / "raw_outputs" / "by_date" / "2026-06-07"
             odds_root.mkdir(parents=True)
+            # The college fetcher's WIDE shape (`refresh_ncaab_odds_history.py`); this test used a long
+            # one (`point`/`price`) that the fetcher does not write.
             (odds_root / "odds_2026-06-07.csv").write_text(
-                "home_team,away_team,bookmaker,market,point,price\n"
-                "Home,Away,draftkings,h2h,,-140\n",
+                "event_id,book,last_update,commence_time,home_team_name,away_team_name,market,period,moneyline_home,moneyline_away\n"
+                "ev1,DraftKings,2026-06-07T18:00:00Z,2026-06-07T23:00:00Z,Home,Away,h2h,full_game,-140,120\n",
                 encoding="utf-8",
             )
 
@@ -1743,19 +1745,100 @@ class CollegeBasketballTrackingTests(unittest.TestCase):
         self.assertEqual(result["artifacts"]["team_odds"].get("reason"), "empty_snapshot")
         self.assertEqual(result["artifacts"]["odds_history"].get("reason"), "no_odds_snapshots")
 
+    # The fetcher's real header and row shapes (`refresh_ncaab_odds_history.py`, copied from the fleet's
+    # 2026-11-04 file): one row per (event, book, market, period), the sides as columns.
+    _HEADER = (
+        "event_id,book,fetched_at,last_update,commence_time,home_team_name,away_team_name,market,period,"
+        "home_spread,home_spread_price,away_spread,away_spread_price,total,over_price,under_price,"
+        "moneyline_home,moneyline_away\n"
+    )
+    _EVENT = "ev1,FanDuel,2026-11-04 23:48:46+00:00,{ts},2026-11-04 23:00:00+00:00,Butler Bulldogs,Fairleigh Dickinson Knights"
+
+    def _write(self, root: Path, *rows: str, ts: str = "2026-11-04 23:40:00+00:00") -> None:
+        odds_dir = root / "raw_outputs" / "by_date" / "2026-11-04"
+        odds_dir.mkdir(parents=True, exist_ok=True)
+        body = "".join(f"{self._EVENT.format(ts=ts)},{row}\n" for row in rows)
+        (odds_dir / "odds_2026-11-04.csv").write_text(self._HEADER + body, encoding="utf-8")
+
+    _SPREAD = "spreads,full_game,-34.5,-118,34.5,-112,,,,,"
+    _TOTAL = "totals,full_game,,,,,141.5,-110,-110,,"
+    _H2H = "h2h,full_game,,,,,,,,-5000,+1600"
+    _H1_SPREAD = "spreads,1h,-18.5,-104,18.5,-128,,,,,"
+
+    def _shard(self, root: Path) -> dict:
+        return json.loads((root / "tracking" / "odds_history" / "2026-11-04.json").read_text(encoding="utf-8"))["markets"]
+
     def test_each_league_tracks_its_odds_under_its_own_prefix(self) -> None:
         for sport in ("ncaab", "wncaab"):
             with self.subTest(sport=sport), tempfile.TemporaryDirectory() as tmpdir:
                 root = Path(tmpdir)
-                odds_dir = root / "raw_outputs" / "by_date" / "2026-11-04"
-                odds_dir.mkdir(parents=True)
-                (odds_dir / "odds_2026-11-04.csv").write_text(
-                    "event_id,bookmaker,market,outcome_name,point,price,commence_time\n"
-                    "ev1,draftkings,totals,Over,137.5,-110,2026-11-04T23:00:00Z\n",
-                    encoding="utf-8",
-                )
+                self._write(root, self._TOTAL)
                 result = self._sync(sport, root)
                 self.assertTrue(result["ok"], result)
                 written = sorted(path.name for path in (root / "tracking").glob("odds_*_team_odds_*.csv"))
                 self.assertTrue(written, result)
                 self.assertTrue(all(name.startswith(f"odds_{sport}_team_odds_") for name in written), written)
+
+    def test_the_wide_csv_writes_odds_history_under_the_key_clv_looks_up(self) -> None:
+        # Before: the generic reader met this file and the fleet's college runs all reported
+        # `no_odds_snapshots` -- no history, movement, steam or close for either league.
+        from syndicate.features.shared.clv_join import _history_key, _price_for_side
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            self._write(root, self._SPREAD, self._TOTAL, self._H2H, self._H1_SPREAD)
+            result = self._sync("ncaab", root)
+            history = result["artifacts"]["odds_history"]
+            self.assertTrue(history["ok"], history)
+            self.assertEqual(history["entries_appended"], 4, history)
+            markets = self._shard(root)
+
+        teams = {"event_id": "ev1", "home_team": "Butler Bulldogs", "away_team": "Fairleigh Dickinson Knights", "bookmaker": "FanDuel"}
+        cases = (
+            ({"market": "spreads", "segment": "full", "side": "away", "line": 34.5}, -112.0),
+            ({"market": "totals", "segment": "full", "side": "under", "line": 141.5}, -110.0),
+            ({"market": "h2h", "segment": "full", "side": "away"}, 1600.0),
+            ({"market": "spreads", "segment": "h1", "side": "home", "line": -18.5}, -104.0),
+        )
+        for opening, price in cases:
+            key = _history_key({**teams, **opening})
+            self.assertIn(key, markets, sorted(markets))
+            point = markets[key]["history"][-1]
+            self.assertEqual(_price_for_side(point, {**teams, **opening})[0], price, (key, point.get("line")))
+        self.assertIn("|market=spreads|segment=h1|", next(k for k in markets if "segment=" in k))
+
+    def test_a_period_outside_the_map_is_dropped_not_filed_as_full_game(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            self._write(root, "spreads,3h,-9.5,-110,9.5,-110,,,,,", self._TOTAL)
+            self._sync("ncaab", root)
+            markets = self._shard(root)
+        self.assertEqual([key.split("|market=")[1] for key in markets], ["totals|bookmaker=fanduel"])
+
+    def test_an_unchanged_quote_appends_nothing_and_a_moved_line_appends_one(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            self._write(root, self._SPREAD, self._TOTAL)
+            self._sync("ncaab", root)
+            # A new sweep: a new fetch time, the books' own update times unchanged.
+            again = self._sync("ncaab", root)["artifacts"]["odds_history"]["entries_appended"]
+            self._write(root, "spreads,full_game,-35.5,-110,35.5,-110,,,,,", self._TOTAL, ts="2026-11-04 23:44:00+00:00")
+            moved = self._sync("ncaab", root)["artifacts"]["odds_history"]
+            markets = self._shard(root)
+        self.assertEqual(again, 0)
+        spread = next(state for key, state in markets.items() if "market=spreads" in key)
+        self.assertEqual([point["current_line"] for point in spread["history"]], [-34.5, -35.5])
+        # The total's book clock moved with no new number, so it gets a point too: that is the writer's
+        # rule for every sport (line, price OR timestamp), not something this flattener decides.
+        self.assertEqual(moved["entries_appended"], 2, moved)
+
+    def test_the_odds_step_writes_where_the_tracking_reads(self) -> None:
+        from syndicate.features.shared import ops_refresh
+
+        with tempfile.TemporaryDirectory() as tmpdir, patch.dict("os.environ", {"SYNDICATE_DATA_ROOT": tmpdir}, clear=False):
+            plan = ops_refresh.build_refresh_plan(date="2026-11-04", sports="ncaab,wncaab", execution_mode="source")
+            for result in plan["results"]:
+                command = [str(part) for part in result["refresh_steps"][0]["command"]]
+                out_dir = Path(command[command.index("--out-dir") + 1])
+                expected = Path(tmpdir).resolve() / f"{result['sport']}_source" / "raw_outputs" / "by_date" / "2026-11-04"
+                self.assertEqual(out_dir.resolve(), expected, result["sport"])

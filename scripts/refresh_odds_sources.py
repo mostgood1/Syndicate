@@ -1181,9 +1181,19 @@ def _build_nfl_steps(args: argparse.Namespace) -> list[RefreshStep]:
     return steps
 
 
+def _college_raw_outputs_root(slug: str, date_str: str) -> Path:
+    """Where a college odds step writes its CSVs: the bundle the post-refresh tracking reads.
+
+    This was `REPO_ROOT/data/<slug>_source`, the checkout, while `_post_refresh_root` reads the data
+    root. On the fleet the two differ, so every college tracking sync found no file and reported
+    `empty_snapshot` / `no_odds_snapshots` (all runs on 2026-11-04). The one other reader,
+    `ncaab.live_resim.odds_team_names`, already searches the data root first."""
+    return _local_source_bundle_root(slug) / "raw_outputs" / "by_date" / date_str
+
+
 def _build_ncaab_steps(args: argparse.Namespace) -> list[RefreshStep]:
     python_exe = _venv_python(REPO_ROOT)
-    raw_outputs_root = REPO_ROOT / "data" / "ncaab_source" / "raw_outputs" / "by_date" / args.date
+    raw_outputs_root = _college_raw_outputs_root("ncaab", args.date)
     markets = _effective_markets("ncaab", args.markets)
     return [
         RefreshStep(
@@ -1213,7 +1223,7 @@ def _build_wncaab_steps(args: argparse.Namespace) -> list[RefreshStep]:
     """Women's college basketball (lane wncaab-module, 2026-11-02): NCAAB's runner with `--league wncaab`
     -- OddsAPI `basketball_wncaab`, quarter + half segments, its own raw outputs and quote log."""
     python_exe = _venv_python(REPO_ROOT)
-    raw_outputs_root = REPO_ROOT / "data" / "wncaab_source" / "raw_outputs" / "by_date" / args.date
+    raw_outputs_root = _college_raw_outputs_root("wncaab", args.date)
     markets = _effective_markets("wncaab", args.markets)
     return [
         RefreshStep(

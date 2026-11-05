@@ -1682,6 +1682,10 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
             # market per game (whichever column _primary_line_value checks
             # first), silently dropping the other two.
             rows = _flatten_basketball_game_cards(candidate).to_dict("records")
+        elif slug in {"ncaab", "wncaab"} and _is_college_odds_path(candidate):
+            # One row per (event, book, market, period), sides as columns -- see
+            # _flatten_college_odds_rows.
+            rows = _flatten_college_odds_rows(candidate)
         elif suffix == ".csv":
             rows = _odds_history_rows_from_csv(candidate)
         elif suffix == ".jsonl":
@@ -2852,6 +2856,114 @@ def _flatten_basketball_game_cards(path: Path) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+# `refresh_ncaab_odds_history.py`'s `period` -> the shared segment names (its `_QUOTE_SEGMENT`). A period
+# outside this map is DROPPED, not read as full game: a half line filed under the full-game key is a
+# different bet with the wrong price history (the 519 mixed groups that fetcher's own comment records).
+_COLLEGE_PERIOD_SEGMENTS = {"full_game": "full", "1h": "h1", "2h": "h2", "q1": "q1", "q2": "q2", "q3": "q3", "q4": "q4"}
+
+
+def _is_college_odds_path(path: Path) -> bool:
+    return path.suffix.lower() == ".csv" and path.name.startswith("odds_")
+
+
+def _college_text(value: Any) -> str:
+    # A blank cell reads back from pandas as NaN, and str(nan) is the truthy "nan".
+    return "" if value is None or (isinstance(value, float) and value != value) else str(value).strip()
+
+
+def _college_iso(value: Any) -> str:
+    # The fetcher writes pandas' "2026-11-04 23:02:00+00:00"; the rest of the store carries the T form.
+    return _college_text(value).replace(" ", "T", 1)
+
+
+def _flatten_college_odds_rows(path: Path) -> list[dict[str, Any]]:
+    """`odds_<date>.csv` from `refresh_ncaab_odds_history.py` (both college leagues) is WIDE: one row per
+    (event, book, market, period) with `moneyline_home`/`moneyline_away`, or `home_spread`/`away_spread`
+    and their prices, or `total`/`over_price`/`under_price`. The generic reader takes the first line
+    column it meets, so it would have filed every side under one number.
+
+    Each row becomes MLB's game-line shape -- one entry per (event, market, segment, book) holding both
+    sides -- so `_odds_history_market_key` builds the exact key `clv_join._history_key` looks up, and
+    `_price_for_side` finds `<side>_line` / `<side>_odds` in the point. Two choices that are not MLB's:
+      - `bookmaker` is the lower-cased title, the spelling the quote log (and so the board's openings)
+        carries for these books (`odds_book_quotes`, `.strip().lower()`).
+      - a spread also carries `line` = the home handicap, as NBA's game-cards flattener does, so a
+        basketball line move registers as one; MLB's run line never moves, college spreads do.
+    `snapshot_ts` is the book's own `last_update`, not the fetch time: the writer appends a point only
+    when line, price OR timestamp changes, and the fetch time changes on every sweep."""
+    df = _read_csv(path)
+    if df.empty:
+        return []
+    fallback_ts = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc).isoformat(timespec="seconds")
+    rows: list[dict[str, Any]] = []
+    for record in df.to_dict(orient="records"):
+        segment = _COLLEGE_PERIOD_SEGMENTS.get(str(record.get("period") or "").strip().lower())
+        home_team = _college_text(record.get("home_team_name"))
+        away_team = _college_text(record.get("away_team_name"))
+        event_id = _college_text(record.get("event_id"))
+        bookmaker = _college_text(record.get("book")).lower()
+        if segment is None or not (event_id and home_team and away_team and bookmaker):
+            continue
+        base = {
+            "event_id": event_id,
+            "home_team": home_team,
+            "away_team": away_team,
+            "commence_time": _college_iso(record.get("commence_time")),
+            "bookmaker": bookmaker,
+            "snapshot_ts": _college_iso(record.get("last_update")) or _college_iso(record.get("fetched_at")) or fallback_ts,
+        }
+        if segment != "full":
+            base["segment"] = segment
+        market = str(record.get("market") or "").strip().lower()
+        if market == "h2h":
+            home_odds, away_odds = _line_number(record.get("moneyline_home")), _line_number(record.get("moneyline_away"))
+            if home_odds is None and away_odds is None:
+                continue
+            rows.append({**base, "market": "h2h", "market_type": "h2h", "home_odds": home_odds, "away_odds": away_odds})
+        elif market == "spreads":
+            home_line, away_line = _line_number(record.get("home_spread")), _line_number(record.get("away_spread"))
+            if home_line is None and away_line is None:
+                continue
+            rows.append({
+                **base, "market": "spreads", "market_type": "spreads",
+                "line": home_line if home_line is not None else -away_line,
+                "home_line": home_line, "home_odds": _line_number(record.get("home_spread_price")),
+                "away_line": away_line, "away_odds": _line_number(record.get("away_spread_price")),
+            })
+        elif market == "totals":
+            total = _line_number(record.get("total"))
+            if total is None:
+                continue
+            rows.append({
+                **base, "market": "totals", "market_type": "totals", "line": total,
+                "over_odds": _line_number(record.get("over_price")), "under_odds": _line_number(record.get("under_price")),
+            })
+    return rows
+
+
+def _build_college_team_odds_snapshot(path: Path) -> pd.DataFrame:
+    """The per-selection team-odds tracking frame (`event_key`/`book`/`market`/`selection`) from the same
+    flattened rows. A segment rides in `market` (`spreads_h1`), the OddsAPI spelling, because the
+    tracking key has no segment column and a half line must not overwrite the full-game one."""
+    out: list[dict[str, Any]] = []
+    for row in _flatten_college_odds_rows(path):
+        market = row["market"] if "segment" not in row else f"{row['market']}_{row['segment']}"
+        if row["market"] == "h2h":
+            sides = (("home", row.get("home_odds"), None), ("away", row.get("away_odds"), None))
+        elif row["market"] == "spreads":
+            sides = (("home", row.get("home_odds"), row.get("home_line")), ("away", row.get("away_odds"), row.get("away_line")))
+        else:
+            sides = (("over", row.get("over_odds"), row.get("line")), ("under", row.get("under_odds"), row.get("line")))
+        for selection, price, line in sides:
+            if price is None:
+                continue
+            out.append({
+                "event_key": row["event_id"], "book": row["bookmaker"], "market": market, "selection": selection,
+                "line": line, "price": price, "snapshot_ts": row["snapshot_ts"],
+            })
+    return pd.DataFrame(out)
+
+
 def _sync_csv_tracking(*, tracking_root: Path, prefix: str, scope: str, snapshot_df: pd.DataFrame, key_cols: list[str], line_col: str, price_cols: list[str], label_cols: list[str] | None = None) -> dict[str, Any]:
     return _persist_tracking_snapshot(
         tracking_root=tracking_root,
@@ -3044,7 +3156,10 @@ def sync_sport_post_refresh_tracking(*, sport: str, source_root: Path, date_str:
         odds_path = source_root / "raw_outputs" / "by_date" / date_str / f"odds_{date_str}.csv"
         if not odds_path.exists():
             odds_path = source_root / "data" / f"{slug}_source" / "raw_outputs" / "by_date" / date_str / f"odds_{date_str}.csv"
-        team_df = _build_ncaab_snapshot(odds_path)
+        # Not _build_ncaab_snapshot: that reads a LONG file (outcome_name/point/price), which NHL's team
+        # odds still are and the college fetcher's wide CSV is not -- it gave rows with no selection,
+        # line or price.
+        team_df = _build_college_team_odds_snapshot(odds_path)
         results["artifacts"]["team_odds"] = _sync_csv_tracking(
             tracking_root=tracking_root,
             prefix=f"odds_{slug}_team_odds",
