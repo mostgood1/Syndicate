@@ -145,3 +145,9 @@ The fleet checkout was fast-forwarded at 22:53:06Z, so the OddsAPI fetch childre
 - duplicate rows;
 - a moneyline's newest row always carries the last fetch time, so its "last change" age reads as fresh;
 - `NaN` is not strict JSON.
+
+## 9. #760 SHIPPED and VERIFIED `[2026-11-05 01:07Z, lane book-quotes-state-reset]`
+
+`02797d89f`: the writer's unchanged check treats NaN as equal to NaN, so NBA/NHL moneylines (`line: NaN`) stop re-appending on every fetch. Fleet ff at 00:57:01Z (no restart needed: the fetches are per-run children). In the following 9 minutes there were 0 NaN repeats, while 390 NBA and 72 NHL moneyline keys were observed and 817 + 43 real price changes were written (`deploys.md` 2026-11-05 00:57:01Z).
+
+User-accepted consequence: live moneylines now meet `opportunity_gate`'s 900 s live ceiling like spreads and totals. Measured right after: 4-32 of ~100 live NBA cells per game over 900 s.

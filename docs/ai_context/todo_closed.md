@@ -2899,3 +2899,9 @@ for that, and it fires on the persist path before the ceiling is reached.
 - Cause: `fair_price_eval.evaluate` ages a book by its last price CHANGE (12 h sighting / 6 h close) on a change-only tape, so motionless live books (corners ladders) were dropped and the fair rested on the bet book.
 - Fix `7b205d9d3`: `shin_live` beside `shin` (`--live-tol-min`): a book counts if its key was last OBSERVED within the tolerance. Off by default; existing outputs unchanged. Loaned from `fair-price-v2` (user-approved), returned.
 - Measured (findings_2026-11-04_soccer_corners_fair_gap.md section 6): reproduction -4.86% exact; 14 games with intact state: corners sighting EV +3.16% live vs +3.20% board (old rule -4.40%), close -2.62% [-5.53, +0.39] (old -5.21%). Board unchanged.
+
+### `#760` — **NaN LINES NEVER DEDUPE: NBA/NHL moneyline `book_quotes` rows carried `line: NaN`, so every fetch re-appended every one** — FOUND 2026-11-04 (lane `book-quotes-state-reset`, reading #759's fix), FIXED + VERIFIED 2026-11-05 00:57-01:07Z, session 8000dc38 — **CLOSED 2026-11-05**
+- Cause: NaN never equals itself, so `list(previous[:2]) == current` was False on every fetch (NHL 11-04: 16,206 of 39,289 rows; NBA 11-04: 20,337 before the fix).
+- Fix `02797d89f`: `_unchanged` compares like `==` except that NaN equals NaN. Keys and rows are unchanged. Loan of `odds_book_quotes.py` from `book-quotes-splice-repair` widened for it (user-approved).
+- Board consequence, user-approved ("Yes, ship it"): live moneylines now meet the 900 s live gate. Replayed 6.4-10.5% of live readings; measured 4-32 of ~100 live NBA cells per game right after.
+- Verified: 0 NaN repeats after the 00:57:01Z fleet ff over 390 NBA + 72 NHL observed keys, with 817 + 43 real changes still written. `deploys.md` 2026-11-05 00:57:01Z.
