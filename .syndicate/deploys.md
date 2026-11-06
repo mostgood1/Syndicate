@@ -56704,3 +56704,16 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - Verify (2), a live college game in overtime, is still OWED.
 - **Fleet since:** `3d376da7c` (lane `nba-live-proj-actuals`). `a147d16cd..3d376da7c` touches none of the 9 `SIM_CODE_MODULES`, and every run since prints the same `sim_code`.
 - **verify:** MET (readings above). The next engine commit to one of the 9 modules should show RUN lines with a new `sim_code` and `simmed` covering every pregame game within ~3 runs.
+
+## 2026-11-06 21:56:43Z (3:56 PM CST) -- FLEET ff 3d376da7c -> 506973f97 + live-odds-worker TERM 21:53:28Z: execution_exits.json back under its keyvalue cap (lane `exit-state-size`) -- **MET**
+- **User, in coordinator 332cb014's chat:** "Yes, fix it here", then "Yes, deploy it", 2026-11-06.
+- **What:** `506973f97`. Watch and exit rows whose position date is before today - (lookback 3 + 2) move to `execution_exits_archive/` (`exits_YYYY-MM.jsonl` is new). Kept regardless of date: unreconciled live rows, and live rows sent in the last two UTC days. The range `3d376da7c..506973f97` held only `execution_exits.py`, `exit_counterfactual_report.py` and the test file.
+- **Why:** the document was 9.05MB (watch 5.84MB / 7,745 rows at 14-day retention; exits 3.21MB / 3,894 rows, never pruned). The keyvalue copy sat 20KB under the 8,388,608 cap (8,368,770 compact), so each tick's save was refused: `EXIT_TICK_FAILED KeyValuePayloadTooLarge` at 8.5-8.9MB, the last at 21:54:35Z (8,558,420). A live sale persists its row BEFORE sending, so live exits only went out when a save happened to fit. One did, on the fast path, at 21:11:51Z (KXLIGUE1TOTAL-26NOV06TFCRCS-3, filled 1). My earlier "no EXIT_LIVE since 11-05 06:02Z" was wrong in absolute terms; they were rare, not zero.
+- **Gates:** claim live-odds-worker `exit-state-size` 21:50:58Z. Preflight `--target fleet --target-commit 506973f97 --expect fleet_checkout_head=506973f9 --baseline fleet_checkout_head=3d376da7`, baseline re-read every poll; HOLD on 5 odds jobs, then CLEAR at 21:53:13Z. NOTE: the primary tree's `deploy_preflight.py` is stale and reads Render, so run main's copy from a worktree.
+- **Deploy:** `git merge --ff-only 506973f97` at 21:53:27Z. One odds-job child was present at TERM. TERM pid 11549 at 21:53:28Z; it drained and exited code=0 about 2 minutes later; pid 114688 started 21:55:35Z. Claim released 21:56:5xZ.
+- **verify (MET 21:56:43Z):**
+  - First tick on the new code, 21:56:25Z: `EXIT_TICK status=ok mode=live positions=400 live=10 ... watching=3290`. Before: `EXIT_TICK_FAILED`.
+  - Saved document: `updated_at 15:56:10 CST`, **3,246,367 bytes compact** (8,368,770 before), watch 3,290, exits 1,255, last tick `pruned_exits=2722`.
+  - Archive: exits 2,722 rows, watch 5,163 unique rows.
+  - Since the restart: 0 refusals, 0 line-start tracebacks.
+- **Owed:** the next `EXIT_LIVE` on a qualifying position (10 live positions watched). The 11-07 log read should also confirm no `EXIT_TICK_FAILED` across a full slate.
