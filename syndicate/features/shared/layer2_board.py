@@ -4043,6 +4043,11 @@ def _live_projection_columns(row: Mapping[str, Any]) -> dict[str, Any]:
     )
     if live_prob is None and display:
         live_prob = _as_float(display.get("prob_over"))
+    if live_prob is None and projection.get("live_display_only"):
+        # A display-only prop (`#762` (c): double-/triple-double), in the row's own Yes/No. Its Live cell is the count.
+        shown = _as_float(projection.get("live_display_prob_over"))
+        if shown is not None:
+            live_prob = _model_prob_for_side({**row, "projection": {"model_prob_over": shown}})
     # IN THE ROW'S OWN SIDE (`#762`). The live number is over/home by construction (`live_gameline_join` prices
     # side "over" / "home"), and it was published unrestated: reproduced 2026-11-06 on main's version of this
     # function, the home and the away row of one spread line both read 0.7 -- the away row showed P(HOME covers),

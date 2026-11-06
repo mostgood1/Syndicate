@@ -1466,6 +1466,8 @@ def build_layer2_shortlist(
                         # rule is not deployed" must not look alike.
                         f"edged_modelled={live_stats.get('rows_live_edged_modelled')} "
                         f"prob_withheld={live_stats.get('rows_live_prob_withheld')} "
+                        # `#762` (c): double-/triple-double rows shown live, never priced. Apart from `projected`.
+                        f"display_only={live_stats.get('rows_live_display_only')} "
                         f"lens_indexed={live_stats.get('snapshot_rows_indexed')} "
                         f"lens_live_games={live_stats.get('live_games_in_snapshot')} "
                         f"miss_player={live_stats.get('miss_no_player')} "

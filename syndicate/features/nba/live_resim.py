@@ -600,6 +600,19 @@ COMBO_STATS: dict[str, tuple[str, ...]] = {
     "ra": ("reb", "ast"),
     "pra": ("pts", "reb", "ast"),
 }
+# DOUBLE-DOUBLE / TRIPLE-DOUBLE (`#762` (c), user "Yes, build it" 2026-11-06). A COUNT, the grader's own framing
+# (`bet_status_nba._MARKET_TO_DOUBLES`): how many of these five stats finish at 10 or more, so Yes on a double-double
+# is OVER 1.5 and on a triple-double OVER 2.5. It is a JOINT threshold, which is why the pregame join refuses it (the
+# pregame sim ships per-stat marginals) and why this is computed per DRAW: each draw is one simulated rest-of-game, so
+# a player's points and rebounds reach ten together or not in that draw. Measured 2026-11-05: 12 of ~280 live NBA prop
+# rows were these two markets and none had a live number.
+DOUBLE_STATS: tuple[str, ...] = ("pts", "reb", "ast", "stl", "blk")
+DOUBLE_THRESHOLD = 10
+DOUBLES_LINES: dict[str, float] = {"dd": 1.5, "td": 2.5}
+# Per player, the joint rest-of-game draws of DOUBLE_STATS, each capped at DOUBLE_THRESHOLD: `"p,r,a,s,b" -> draws`.
+# The cap is lossless (banked >= 0, so a remainder of 10 already reaches 10) and keeps the key space to the draws.
+# In memory only: the snapshot publishes `liveProps` rows, never `player_remainders`.
+DOUBLES_JOINT_KEY = "doubles_joint"
 
 
 def _ot_points(box: Any) -> int:
@@ -630,10 +643,18 @@ def _player_remainder_hists(rem: dict, n: int) -> dict[str, dict[str, dict[str, 
             padded = {key: stats.get(key, []) + [0] * (n - len(stats.get(key, []))) for key, _label in PROP_STATS}
             for combo, parts in COMBO_STATS.items():
                 padded[combo] = [sum(vals) for vals in zip(*(padded[part] for part in parts))]
-            hists = {key: _hist(vals) for key, vals in padded.items() if any(vals)}
+            hists: dict[str, Any] = {key: _hist(vals) for key, vals in padded.items() if any(vals)}
             if hists:
+                hists[DOUBLES_JOINT_KEY] = _doubles_joint(padded, n)
                 out[side][name] = hists
     return out
+
+
+def _doubles_joint(padded: Mapping[str, Sequence[int]], n: int) -> dict[str, int]:
+    """`"p,r,a,s,b" -> draws` over DOUBLE_STATS, each remainder capped at DOUBLE_THRESHOLD (see DOUBLES_JOINT_KEY)."""
+    cols = [list(padded.get(key) or []) + [0] * (n - len(padded.get(key) or [])) for key in DOUBLE_STATS]
+    joint: Counter = Counter(",".join(str(min(int(v), DOUBLE_THRESHOLD)) for v in draw) for draw in zip(*cols))
+    return {key: int(count) for key, count in sorted(joint.items())}
 
 
 # ESPN box column -> PROP_STATS key (ESPN's NBA box: MIN PTS FG 3PT FT REB AST TO STL BLK OREB DREB PF +/-).
@@ -678,6 +699,7 @@ BOARD_PROP_MARKETS = {
     "stl": "player_steals", "blk": "player_blocks", "tov": "player_turnovers",
     "pr": "player_points_rebounds", "pa": "player_points_assists", "ra": "player_rebounds_assists",
     "pra": "player_points_rebounds_assists",
+    "dd": "player_double_double", "td": "player_triple_double",
 }
 _CSV_MARKET_TO_STAT = {v: k for k, v in BOARD_PROP_MARKETS.items()}
 
@@ -701,7 +723,15 @@ def lines_from_props_csv(path: Path, home_name: str, away_name: str) -> dict[tup
                 if teams != (home_name, away_name):
                     continue
                 stat = _CSV_MARKET_TO_STAT.get(str(row.get("market") or "").strip().lower())
-                if not stat or str(row.get("outcome_name") or "").strip().lower() not in ("over", "under"):
+                outcome = str(row.get("outcome_name") or "").strip().lower()
+                if stat in DOUBLES_LINES:
+                    # Yes/No with no point (`#762` (c)): the line is the count's own, 1.5 / 2.5.
+                    if outcome not in ("yes", "no"):
+                        continue
+                    key = (normalize_name(row.get("player_name")), stat)
+                    counts.setdefault(key, _Counter())[DOUBLES_LINES[stat]] += 1
+                    continue
+                if not stat or outcome not in ("over", "under"):
                     continue
                 try:
                     line = float(row.get("point"))
@@ -729,6 +759,10 @@ def with_neighbour_lines(lines: Mapping[tuple[str, str], Any], window: int = LIV
     out: dict[tuple[str, str], tuple[float, ...]] = {}
     for key, posted in lines.items():
         base = (posted,) if isinstance(posted, (int, float)) else tuple(posted)
+        if key[1] in DOUBLES_LINES:
+            # A yes/no market's line is fixed by its definition and never moves; a neighbour would be another market.
+            out[key] = tuple(sorted(float(line) for line in base))
+            continue
         grid = {float(line) + step for line in base for step in range(-int(window), int(window) + 1)}
         out[key] = tuple(sorted(line for line in grid if line >= 0.5))
     return out
@@ -753,7 +787,7 @@ def build_live_props(result: Mapping[str, Any], actuals: Mapping[str, Mapping[st
     actual + remainder exceeds the line. An exact 0 or 1 is a statement about the sample, so it is published as None
     with the reason."""
     rows: list[dict[str, Any]] = []
-    counts = {"players_simmed": 0, "rows": 0, "priced": 0, "no_actual": 0, "certainty_refused": 0}
+    counts = {"players_simmed": 0, "rows": 0, "priced": 0, "no_actual": 0, "certainty_refused": 0, "doubles_rows": 0}
     stat_keys = tuple(key for key, _label in PROP_STATS) + tuple(COMBO_STATS)
     sims_run = int(result.get("sims_run") or 0)
     for side in ("home", "away"):
@@ -797,7 +831,61 @@ def build_live_props(result: Mapping[str, Any], actuals: Mapping[str, Mapping[st
                         row["unpricedReason"] = reason
                     rows.append(row)
                     counts["rows"] += 1
+            for key, line in DOUBLES_LINES.items():
+                if lines.get((nk, key)) is None:
+                    continue
+                row = _doubles_row(name, side, key, line, hists.get(DOUBLES_JOINT_KEY), act, sims_run, counts)
+                if row is not None:
+                    rows.append(row)
     return rows, counts
+
+
+def _doubles_row(name: str, side: str, key: str, line: float, joint: Optional[Mapping[str, int]],
+                 act: Optional[Mapping[str, int]], sims_run: int, counts: dict[str, int]) -> Optional[dict[str, Any]]:
+    """One double-double / triple-double `liveProps` row: the count of DOUBLE_STATS finishing at 10+.
+
+    `liveProjection` is the mean final count, `actualSoFar` the count already at 10+, P(over) the share of draws whose
+    final count clears the line. Same rules as every other row: every component must be banked (a missing actual is
+    not a zero), and an exact 0 or 1 is refused with its reason."""
+    if act is None or any(stat not in act for stat in DOUBLE_STATS):
+        counts["no_actual"] += 1
+        return None
+    banked = [int(act[stat]) for stat in DOUBLE_STATS]
+    draws = joint if joint else {",".join("0" for _ in DOUBLE_STATS): sims_run}
+    total = 0
+    over = 0
+    count_sum = 0
+    for draw_key, draw_count in draws.items():
+        remainder = [int(v) for v in str(draw_key).split(",")]
+        if len(remainder) != len(DOUBLE_STATS):
+            continue
+        final = sum(1 for b, r in zip(banked, remainder) if b + r >= DOUBLE_THRESHOLD)
+        total += int(draw_count)
+        count_sum += final * int(draw_count)
+        if final > line:
+            over += int(draw_count)
+    if total <= 0:
+        return None
+    p_over: Optional[float] = round(over / total, 4)
+    row: dict[str, Any] = {
+        "playerName": name,
+        "prop": BOARD_PROP_MARKETS[key],
+        "line": line,
+        "liveProjection": round(count_sum / total, 3),
+        "liveModelProbOver": p_over,
+        "actualSoFar": float(sum(1 for b in banked if b >= DOUBLE_THRESHOLD)),
+        "simsRun": sims_run,
+        "side": side,
+    }
+    if p_over in (0.0, 1.0):
+        row["liveModelProbOver"] = None
+        row["unpricedReason"] = "certainty_refused"
+        counts["certainty_refused"] += 1
+    else:
+        counts["priced"] += 1
+    counts["rows"] += 1
+    counts["doubles_rows"] += 1
+    return row
 
 
 def _hist(values: Sequence[int]) -> dict[str, int]:

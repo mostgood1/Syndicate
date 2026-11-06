@@ -120,7 +120,19 @@ _LINE_TOLERANCE = 1e-6
 # scorer are races, not a goal count, and must never land here.
 _YES_NO_LINE_KEYS: dict[str, tuple[str, float]] = {
     "player_goal_scorer_anytime": ("player_goals", 0.5),
+    # `#762` (c): a double-double is the count of points/rebounds/assists/steals/blocks at 10+ OVER 1.5, a triple-double
+    # OVER 2.5 -- the grader's framing (`bet_status_nba._MARKET_TO_DOUBLES`) and the NBA re-sim's (`DOUBLES_LINES`).
+    "player_double_double": ("player_double_double", 1.5),
+    "player_triple_double": ("player_triple_double", 2.5),
 }
+
+# LIVE NUMBERS SHOWN, NEVER PRICED (`#762` (c), 2026-11-06). These rows get the re-sim's live count and actual and a
+# display-only probability, and NOTHING the edge or the ranking reads: no `model_prob_over`, no `live_aware`, no
+# `basis` change. Not a caution about the number -- a scope line. The pregame join has never priced these markets (it
+# refuses them for want of joint draws), and on a one-sided quote `layer2_board._model_value_ev` ranks a row by EV
+# against `model_prob_over`, so writing that field here would start ranking double-doubles live with nothing pregame
+# behind them. Pricing them is a separate decision.
+_DISPLAY_ONLY_LIVE_PROP_MARKETS = frozenset({"player_double_double", "player_triple_double"})
 
 
 def _build_canonical_markets() -> dict[str, str]:
@@ -552,6 +564,7 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
         edge_blocked += 1
         edge_withheld_by_reason[reason] = edge_withheld_by_reason.get(reason, 0) + 1
     prob_withheld = 0
+    display_only = 0
     considered = 0
     miss_no_player = 0
     miss_no_market_alias = 0
@@ -633,6 +646,21 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
                         "player_in_lens": player in players_seen,
                     }
                 )
+            continue
+
+        if _norm_market(row.get("market")) in _DISPLAY_ONLY_LIVE_PROP_MARKETS:
+            # See `_DISPLAY_ONLY_LIVE_PROP_MARKETS`: the Live and Actual columns only.
+            shown = dict(row.get("projection") or {})
+            shown.update(
+                {
+                    "live_projected": hit["live_projection"],
+                    "actual_so_far": hit.get("actual_so_far"),
+                    "live_display_prob_over": hit.get("live_prob_over"),
+                    "live_display_only": True,
+                }
+            )
+            row["projection"] = shown  # type: ignore[index]
+            display_only += 1
             continue
 
         projection = dict(row.get("projection") or {})
@@ -998,6 +1026,8 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
         # `rows_live_prob_withheld == rows_live_projected` means the re-sim
         # priced nothing this tick; a gap between them means it priced some.
         "rows_live_prob_withheld": prob_withheld,
+        # `#762` (c). NOT in `rows_live_projected`: those rows are live-aware and edge-eligible, these never are.
+        "rows_live_display_only": display_only,
         "rows_live_edge_withheld": edge_blocked,
         "edge_withheld_by_reason": dict(sorted(edge_withheld_by_reason.items())),
         "live_games_in_snapshot": indexed.get("live_games"),

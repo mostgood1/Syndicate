@@ -41,12 +41,12 @@ def test_every_posted_line_both_sides_and_the_new_markets_for_this_game_only(tmp
         f"t,e1,c,dk,DK,player_points_rebounds_assists,Over,Josh Hart,25.5,-115,t,{GAME}",
         f"t,e1,c,dk,DK,player_steals,Over,Josh Hart,0.5,-150,t,{GAME}",
         f"t,e1,c,dk,DK,player_turnovers,Over,Josh Hart,1.5,120,t,{GAME}",
-        f"t,e1,c,dk,DK,player_double_double,Yes,Josh Hart,,150,t,{GAME}",    # yes/no: not a line, not here
+        f"t,e1,c,dk,DK,player_double_double,Yes,Josh Hart,,150,t,{GAME}",    # yes/no: the count's own 1.5 (#762 (c))
         "t,e2,c,dk,DK,player_points,Over,LeBron James,24.5,-110,t,Los Angeles Lakers,Sacramento Kings",
     ])
     out = lr.lines_from_props_csv(f, "New York Knicks", "Philadelphia 76ers")
     assert out == {("josh hart", "pts"): (11.5, 12.5, 13.5), ("josh hart", "pra"): (25.5,),
-                   ("josh hart", "stl"): (0.5,), ("josh hart", "tov"): (1.5,)}
+                   ("josh hart", "stl"): (0.5,), ("josh hart", "tov"): (1.5,), ("josh hart", "dd"): (1.5,)}
 
 
 def test_actuals_read_steals_blocks_turnovers_from_espns_box():
