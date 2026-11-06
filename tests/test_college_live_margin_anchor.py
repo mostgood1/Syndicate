@@ -200,7 +200,8 @@ def test_the_board_prices_the_anchored_spread_near_the_market_and_the_raw_one_fa
         index = build_live_gameline_index(snap, sources=lens_sources_for_sport("wncaab"), sport="wncaab")
         # The grid's spread line is the AWAY-frame line (home covers when margin > L): ECU -26.5 is L = 26.5.
         row = {"kind": "game", "market": "spreads", "segment": "full", "away_team": AWAY, "home_team": HOME,
-               "line": 26.5, "age_seconds": 30.0, "game": {"state": "live"}, "sides": ["home", "away"],
+               "line": 26.5, "age_seconds": 30.0, "updated_at": "2026-11-03 16:05:40+00:00",
+               "game": {"state": "live"}, "sides": ["home", "away"],
                "projection": {"model_prob_over": 0.5, "market_fair_prob_over": 0.5, "basis": "college_pregame_sim"}}
         attach_live_gamelines([row], index)
         return (row.get("live_gameline") or {}).get("edge_pp")

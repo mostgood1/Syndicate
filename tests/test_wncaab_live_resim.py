@@ -224,7 +224,7 @@ def test_a_womens_live_lane_indexes_and_prices_the_row():
     index = build_live_gameline_index(snap, sources=lens_sources_for_sport("wncaab"), sport="wncaab")
     assert len(index) == 1
     row = {"kind": "game", "market": "h2h", "segment": "full", "away_team": AWAY, "home_team": HOME,
-           "age_seconds": 30.0, "game": {"state": "live"},
+           "age_seconds": 30.0, "updated_at": "2026-11-04 01:00:05+00:00", "game": {"state": "live"},
            "projection": {"model_prob_over": 0.62, "market_fair_prob_over": 0.40, "basis": "college_pregame_sim"}}
     attach_live_gamelines([row], index)
     assert row["projection"]["live_aware"] is True

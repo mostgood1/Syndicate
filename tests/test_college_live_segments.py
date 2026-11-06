@@ -131,6 +131,7 @@ def _snapshot(*, settled=False, anchored=True):
     return {"games": [{
         "home": "Duke Blue Devils", "away": "Army Black Knights",
         "gameLens": [{"key": "live", "source": "live_resim", "modelHomeWinProb": 0.9, "simsRun": 200,
+                      "liveStateAsOf": "2026-11-04T01:00:00+00:00",
                       "projection": {"total": 140.0, "homeMargin": 20.0, "totalRunsDist": FULL_TOTALS,
                                      "marginDist": {"20": 200}, "segments": {"h1": h1}}}],
     }]}
@@ -140,6 +141,7 @@ def _row(segment="h1", market="totals", line=64.5, market_prob=0.40):
     sides = ["over", "under"] if market == "totals" else ["home", "away"]
     return {"kind": "game", "market": market, "segment": segment, "line": line, "sides": sides,
             "away_team": "Army Black Knights", "home_team": "Duke Blue Devils", "age_seconds": 20.0,
+            "updated_at": "2026-11-04 01:00:05+00:00",   # 5 s after the lens' score: the quote-order gate passes
             "game": {"state": "live"}, "projection": {"market_fair_prob_over": market_prob}}
 
 

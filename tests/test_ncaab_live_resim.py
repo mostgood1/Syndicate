@@ -254,10 +254,11 @@ def test_engine_reachability_tip_equals_pregame_and_lead_moves_it(tmp_path):
 AWAY, HOME = "Army Black Knights", "Duke Blue Devils"
 
 
-def _grid_row(*, state="live", age_seconds=30.0):
+def _grid_row(*, state="live", age_seconds=30.0, updated_at="2026-11-05 01:00:05+00:00"):
+    # `updated_at` is the quote's time: 5 s after the lane's score (`_lanes`' as_of), so the college quote-order gate passes.
     return {
         "kind": "game", "market": "h2h", "segment": "full", "away_team": AWAY, "home_team": HOME,
-        "age_seconds": age_seconds, "game": {"state": state},
+        "age_seconds": age_seconds, "updated_at": updated_at, "game": {"state": state},
         "projection": {"model_prob_over": 0.62, "market_fair_prob_over": 0.40, "basis": "ncaab_team_model"},
     }
 

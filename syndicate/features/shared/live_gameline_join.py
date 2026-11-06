@@ -60,6 +60,7 @@ from __future__ import annotations
 import math
 import os
 from collections.abc import Mapping
+from datetime import datetime, timezone
 from typing import Any
 from syndicate.features.shared.doubleheader import (
     MAX_SAME_GAME_GAP_SECONDS,
@@ -582,6 +583,63 @@ def quote_age_verdict(age_seconds: Any, sport: Any = None) -> dict[str, Any] | N
     age = float(age_seconds)
     if age != age or age > max_quote_age_seconds(sport):  # NaN-safe
         return {"priceable": False, "withheld_reason": REASON_STALE_QUOTE,
+                "model_prob": None, "market_prob": None, "edge_pp": None}
+    return None
+
+
+# A QUOTE TAKEN BEFORE THE SCORE THE MODEL WAS HANDED IS NOT PRICED -- COLLEGE (lane wncaab-module; user 2026-11-06
+# "Yes, do it here", answering "Stop pricing live college games against quotes older than the score?").
+#
+# MEASURED 2026-11-06 on the fleet's live-gameline ledgers, 11-03..11-05: priceable full-game spreads/totals graded
+# against the ESPN finals (69 men's games, ~25 women's). Brier, model minus the de-vigged market, by when the quote
+# was taken against the score the re-sim used (`row["updated_at"]` minus `hit["as_of"]`):
+#
+#                      quote 30 s+ OLDER    within 30 s       quote 30 s+ NEWER
+#     ncaab  spreads   -0.0177 (4,776)      +0.0061 (773)     +0.0247 (3,507)
+#     ncaab  totals    -0.0015 (6,052)      +0.0319 (1,165)   +0.0326 (5,307)
+#     wncaab spreads   -0.0562 (1,017)      +0.0090 (143)     +0.0146 (231)
+#     wncaab totals    -0.0246 (1,457)      -0.0151 (262)     -0.0070 (346)
+#
+# Negative = the model beat the market. It "won" only where the book's quote predated the score: the model had seen
+# points the book had not, which is an edge nobody can take. The MLB table above says the same by quote AGE; this is
+# the sharper cut, the ORDER of the two clocks. A 400-second-old quote that is still newer than the score is a fair
+# comparison and stays priced (the 600 s ceiling above still applies to it).
+#
+# MEASURED SPORTS ONLY. A sport absent from the table gets no order check, so every other sport is unchanged. On a
+# gated sport an absent or unparseable time REFUSES (`unknown must not default permissive`): every priced college row
+# in the measured ledgers carried both times, so that branch firing is a bug report, not a relaxed gate.
+REASON_QUOTE_BEHIND_SCORE = "quote_older_than_the_score_the_model_saw"
+REASON_QUOTE_OR_SCORE_TIME_ABSENT = "row_carries_no_quote_or_score_time"
+_MAX_QUOTE_LAG_BEHIND_SCORE_SECONDS: dict[str, float] = {"ncaab": 30.0, "wncaab": 30.0}
+
+
+def _utc_instant(value: Any) -> datetime | None:
+    """An ISO timestamp ("2026-11-05 22:05:40+00:00" or "...T22:04:43Z") as an aware UTC instant; naive reads as
+    UTC, the writers' convention. None for anything unparseable."""
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        moment = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return moment if moment.tzinfo is not None else moment.replace(tzinfo=timezone.utc)
+
+
+def quote_behind_score_verdict(quote_at: Any, score_as_of: Any, sport: Any = None) -> dict[str, Any] | None:
+    """`None` if the quote may be priced against the live number; a refusal verdict, shaped like
+    `quote_age_verdict`'s, if it was taken more than the sport's tolerance BEFORE the score the re-sim used.
+
+    `sport` selects the tolerance; a sport absent from `_MAX_QUOTE_LAG_BEHIND_SCORE_SECONDS` returns None."""
+    tolerance = _MAX_QUOTE_LAG_BEHIND_SCORE_SECONDS.get(str(sport or "").strip().lower())
+    if tolerance is None:
+        return None
+    quoted, scored = _utc_instant(quote_at), _utc_instant(score_as_of)
+    if quoted is None or scored is None:
+        return {"priceable": False, "withheld_reason": REASON_QUOTE_OR_SCORE_TIME_ABSENT,
+                "model_prob": None, "market_prob": None, "edge_pp": None}
+    if (scored - quoted).total_seconds() > tolerance:
+        return {"priceable": False, "withheld_reason": REASON_QUOTE_BEHIND_SCORE,
                 "model_prob": None, "market_prob": None, "edge_pp": None}
     return None
 
@@ -1870,7 +1928,10 @@ def attach_live_gamelines(
         # and carries it; guessing would apply baseball's 120s ceiling to a sport
         # nobody has measured, which is exactly what the per-sport table exists
         # to prevent.
-        stale = quote_age_verdict(row.get("age_seconds"), sport=hit.get("sport"))
+        # And, for a sport that measured it, a quote taken before the score the re-sim used (college,
+        # `REASON_QUOTE_BEHIND_SCORE`): the same choke point, so all three pricing paths below are covered.
+        stale = (quote_age_verdict(row.get("age_seconds"), sport=hit.get("sport"))
+                 or quote_behind_score_verdict(row.get("updated_at"), hit.get("as_of"), sport=hit.get("sport")))
         if stale is not None:
             record(coverage, stale, projected=False)
             # The QUOTE is dead, not the game: the live number is about the game, so it is shown and nothing is
