@@ -56639,3 +56639,31 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - 0 `[kalshi_odds] WRITE_FAILED` on either worker.
 - **Size:** max 5,996,716 B against the 8,388,608 cap. It was 5.95 MB at 23:33Z 11-04, so about +50 KB in 40 h.
 - **Also seen, not this lane:** WSL came up at 2026-11-06 09:08:57 CST (`uptime -s`). web pid 649 and refresh-worker / live-odds-worker pids 714 / 715 all show `restarts=0`. The workers run `d6a69116` against fleet HEAD `a147d16c` (1 runtime file stale, for another lane to load). This also killed session-local timers on the host, e.g. the decision-engine umbrella's 11-24 backup timer.
+
+## 2026-11-06 16:42:06Z (10:42 AM CST) -- FLEET ff a147d16cd -> 3d376da7c + live-odds-worker / refresh-worker TERM -- `#762`: display-only live numbers on NBA quarter/half rows, own-side live %, moneyline + stale-quote display (lane `nba-live-proj-actuals`) -- **LOADED; live VERIFY owed on the 11-06 slate**
+- **User, in this chat:** "Yes, start #762", 2026-11-06.
+- **What:** `3d376da7c`, 6 runtime files. The range `a147d16cd..3d376da7c` held only this commit's runtime files, listed in a separate step before the merge. Nothing is priced: the segment refusal and its ledger record are unchanged, and the college segment switch is now passed for ncaab/wncaab only.
+- **Locks:** claims on refresh-worker and live-odds-worker, holder `nba-live-proj-actuals`, from 15:38:34Z. Fleet preflight `--target fleet`, SHA-bound, with expectations, the baseline re-read on every poll.
+- **live-odds-worker:**
+  - HOLD on 3-5 odds jobs, then CLEAR at 15:50:49Z (21 polls).
+  - ff at 15:51:07Z. Children at TERM: one defunct, no live job.
+  - TERM pid 715 at 15:51:21Z. pid 11549 came up at 15:51:30Z; first `NBA_LIVE_RESIM_TICK` 15:51:31Z `games=0`.
+  - 0 line-start tracebacks. Two hits for the word "Traceback" were my own grep, printed inside an `ALL_PROCESS_MEMORY` dump.
+  - Its claim EXPIRED at 16:23:34Z, after the restart; it was not released.
+- **refresh-worker:**
+  - HOLD for 40 min (74 polls). The board builds back to back on two dates: the next `BUILD_SPAN_ENTER` follows `LOOP_ITERATION` by ~2 s, so the after-a-save window never opened.
+  - Claim lapsed and was re-acquired at 16:23:49Z.
+  - `check_deploy_safety --drain --drain-owner nba-live-proj-actuals` from 16:24Z, run with the worker's own environ. It was idle at 16:31:40Z, after waiting on a smartsim2 NCAAF child.
+  - Preflight CLEAR at 16:31:54Z. TERM pid 714 at 16:32:00Z. pid 20903 came up at 16:32:08Z.
+  - `DRAIN_CLEARED` at 16:32:2xZ, against the new pid.
+- **Loaded, measured:**
+  - Fleet HEAD is `3d376da7c`; `def live_display_block` = 1; segment blocks carry `"sims"` = 1 (0 before).
+  - First build on the new code: `LIVE_GAMELINE_JOIN sport=nba ... display=0` at 16:33:33Z (the field was absent before; 0 is expected with no NBA game live). `BOARD_BUILD_TIMING wall_s=183.9 ok=True` at 16:41:20Z.
+  - 0 tracebacks since 16:32.
+- **VERIFY owed, tonight's 9-game slate:**
+  - per game, quarter/half rows with Live proj. and Live actual > 0 (11-05: 0 of 260);
+  - 0 segment rows `live_aware`;
+  - `LIVE_GAMELINE_JOIN sport=nba` shows `display` > 0 and `segment_pricing_disabled`;
+  - home + away live % of one spread line sum to ~1;
+  - plus `#761`'s fairness reading.
+  - Backup reader: one-time task `syndicate-nba-live-readings-1106`, 20:15 CST.
