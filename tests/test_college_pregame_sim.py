@@ -240,3 +240,39 @@ def test_a_changed_prior_target_resims_the_game(slate_day):
     ps.run_pregame_sims("2026-11-03", sims=100, now=NOW, simulate=_simulate)
     slate_day["provenance"]["pregameHomeMargin"] = 18.0  # same table dates, a differently-built prior
     assert ps.run_pregame_sims("2026-11-03", sims=100, now=NOW, simulate=_simulate)["simmed"] == 1
+
+
+def test_a_change_to_the_sims_code_resims_the_game(slate_day, monkeypatch):
+    # 2026-11-05: `b9999dc1d` fixed overtime in the engine path and every already-simmed game stayed `unchanged`.
+    ps.run_pregame_sims("2026-11-03", sims=100, now=NOW, simulate=_simulate)
+    assert ps.run_pregame_sims("2026-11-03", sims=100, now=NOW, simulate=_simulate)["unchanged"] == 1
+    monkeypatch.setattr(ps, "sim_code_fingerprint", lambda: "after-a-fix")
+    assert ps.run_pregame_sims("2026-11-03", sims=100, now=NOW, simulate=_simulate)["simmed"] == 1
+    assert '"simCode": "after-a-fix"' in ps.read_pregame_sims("2026-11-03")["games"]["1"]["inputs_key"]
+
+
+def test_every_sim_module_is_a_file_the_fingerprint_reads():
+    import importlib.util
+    from pathlib import Path
+
+    for name in ps.SIM_CODE_MODULES:
+        spec = importlib.util.find_spec(name)
+        assert spec is not None and spec.origin and Path(spec.origin).is_file(), name
+
+
+def test_the_fingerprint_follows_the_bytes_and_ignores_line_endings(tmp_path, monkeypatch):
+    module = tmp_path / "fp_probe_module.py"
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.setattr(ps, "SIM_CODE_MODULES", ("fp_probe_module",))
+
+    def fingerprint(source: bytes) -> str:
+        module.write_bytes(source)
+        ps.sim_code_fingerprint.cache_clear()
+        return ps.sim_code_fingerprint()
+
+    try:
+        base = fingerprint(b"X = 1\n")
+        assert fingerprint(b"X = 1\r\n") == base  # a Windows checkout of the same commit
+        assert fingerprint(b"X = 2\n") != base
+    finally:
+        ps.sim_code_fingerprint.cache_clear()

@@ -22,7 +22,8 @@ rows off them.
 
 COST, measured 2026-11-02 on the fleet at nice 19: ~5.5-6 s per game for 100 sims, so a 120-game slate
 is ~22 CPU-minutes at 200. Each run therefore stops at its DEADLINE and writes what it has; a game is
-re-simmed only when its inputs key changes (ratings / player-prior dates, switches, sims). The next
+re-simmed only when its inputs key changes (ratings / player-prior dates, switches, sims, the sim's own code --
+`SIM_CODE_MODULES`). The next
 launch continues where this one stopped.
 
 WNCAAB (user 2026-11-02 "Approve the loans"): the same engine under `basketball_engine.league.WNCAAB` (four
@@ -32,15 +33,50 @@ q1..q4 plus h1 = q1+q2 and h2 = q3+q4. A game without women's ratings or priors 
 """
 from __future__ import annotations
 
+import hashlib
+import importlib.util
 import json
 import os
 import time
 from datetime import datetime, timezone
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Callable, Mapping, Optional
 
 SCHEMA = "college_pregame_sim_v1"
 DEFAULT_SIMS = 200
+
+# THE SIM'S OWN CODE IS AN INPUT (lane wncaab-module, 2026-11-06). `inputs_key` held only data and switches, so an
+# engine fix never reached a game already simmed: `b9999dc1d` (the full game counts overtime) went live on the fleet
+# 2026-11-05 22:36Z, and the 23:08:47Z run found all 181 of the 11-05 / 11-06 games `unchanged` -- they kept
+# publishing regulation ties, 1.5-1.6% of draws. These are the modules the sim executes, from the inputs it is
+# handed to the histograms it writes; a change to any of them re-sims each game once (~11 s a game at 200 sims,
+# spread across runs by the deadline). A module renamed out of this list is caught by its test, not by a re-sim.
+SIM_CODE_MODULES = (
+    "syndicate.features.ncaab.live_resim",
+    "syndicate.features.ncaab.live_team_model",
+    "syndicate.features.basketball_engine.engine",
+    "syndicate.features.basketball_engine.resume",
+    "syndicate.features.basketball_engine.league",
+    "syndicate.features.basketball_engine.league_engine",
+    "syndicate.features.shared.basketball_league_rules",
+    "syndicate.features.college_basketball.league",
+    "syndicate.features.college_basketball.pregame_sim",
+)
+
+
+@lru_cache(maxsize=1)
+def sim_code_fingerprint() -> str:
+    """sha256 over the source of `SIM_CODE_MODULES`, read from disk. Cached for the process: the producer is a
+    child launched per run, so a fast-forward reaches the next run with no restart."""
+    digest = hashlib.sha256()
+    for name in SIM_CODE_MODULES:
+        spec = importlib.util.find_spec(name)
+        origin = getattr(spec, "origin", None)
+        digest.update(name.encode("utf-8") + b"\0")
+        # CRLF folded: the same commit hashes alike on a Windows checkout and on the fleet.
+        digest.update(Path(origin).read_bytes().replace(b"\r\n", b"\n") if origin else b"missing")
+    return digest.hexdigest()[:12]
 
 
 def default_sims() -> int:
@@ -108,6 +144,7 @@ def inputs_key(provenance: Mapping[str, Any], sims: int) -> str:
     # calibrated table) moves them with no change of table date, and must re-sim the game.
     keep["exactTarget"] = provenance.get("exactTarget")
     keep["sims"] = int(sims)
+    keep["simCode"] = sim_code_fingerprint()
     return json.dumps(keep, sort_keys=True)
 
 
@@ -229,5 +266,6 @@ def run_pregame_sims(
                "published": sum(1 for g in games.values() if g.get("dist")), "elapsed_s": round(clock() - started, 1)}
     print(f"[college_pregame_sim] RUN league={league} date={date_iso} sims={sims} pregame={counts['pregame']} "
           f"simmed={counts['simmed']} unchanged={counts['unchanged']} refused={counts['refused']} "
-          f"not_reached={counts['not_reached']} published={summary['published']} elapsed_s={summary['elapsed_s']}", flush=True)
+          f"not_reached={counts['not_reached']} published={summary['published']} elapsed_s={summary['elapsed_s']} "
+          f"sim_code={sim_code_fingerprint()}", flush=True)
     return summary
