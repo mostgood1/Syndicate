@@ -186,6 +186,32 @@ def live_exit_rules() -> frozenset[str]:
     return frozenset(part.strip() for part in raw.split(",") if part.strip())
 
 
+ENTRY_PREGAME = "pregame"
+ENTRY_IN_GAME = "in_game"
+_LIVE_PHASES_ENV = "SYNDICATE_EXIT_LIVE_PHASES"
+
+
+def live_exit_phases() -> frozenset[str]:
+    """Which ENTRY phases may be SOLD live. Default: pregame entries only.
+
+    USER DECISION 2026-11-06 (coordinator 332cb014, option A "in-game off"):
+    settled live bets 11-02..11-06, exact hold-to-settle replay -- in-game
+    entries' take-profit sales cost $29.40 (actual -$23.58 vs +$5.82 held; 22
+    eventual winners sold at 0.61 avg from 0.44 entries, -$53.47, against
+    +$24.07 saved on 7 losers), while pregame sales saved $18.18. An in-game
+    entry that triggers now gets a PAPER exit row instead, so the counterfactual
+    keeps reading it. `pregame,in_game` restores both; an unknown token is
+    ignored, and a value with no known token falls back to the default rather
+    than to "sell everything".
+    """
+    raw = os.environ.get(_LIVE_PHASES_ENV)
+    if raw is None or not raw.strip():
+        return frozenset({ENTRY_PREGAME})
+    tokens = {t.strip().lower().replace("-", "_") for t in raw.split(",")}
+    known = tokens & {ENTRY_PREGAME, ENTRY_IN_GAME}
+    return frozenset(known) if known else frozenset({ENTRY_PREGAME})
+
+
 def live_exit_daily_caps() -> tuple[int, float]:
     """`(max live sales per UTC day, max sale notional $ per UTC day)`.
 
@@ -353,6 +379,9 @@ class OpenPosition:
     player_name: str | None
     model_probability: float | None  # raw model view at entry; None = no view
     family: str = KALSHI  # which venue's book the position trades on
+    # When the ENTRY was placed: "in_game" for the in-play entry path
+    # (`position_key` "ingame:..."), else "pregame". Gates live sales by phase.
+    entry_phase: str = "pregame"
 
     @property
     def entry_cost_per_contract(self) -> float:
@@ -532,6 +561,7 @@ def open_positions(
                 player_name=order.get("player_name"),
                 model_probability=model_probability_at_entry(order, price),
                 family=family,
+                entry_phase=ENTRY_IN_GAME if str(order.get("position_key") or "").startswith("ingame:") else ENTRY_PREGAME,
             )
         )
     return positions, skipped
@@ -1410,6 +1440,8 @@ def _run_exit_tick_unlocked(
                 live_skip = None  # place_exit answers `duplicate`
             elif not rules & live_exit_rules():
                 live_skip = "rule_not_armed"
+            elif position.entry_phase not in live_exit_phases():
+                live_skip = "phase_not_armed"
             elif unfilled_tries >= _MAX_DEAD_RETRIES:
                 live_skip = "unfilled_retry_limit"
             elif used_count >= cap_count:

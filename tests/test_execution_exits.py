@@ -24,6 +24,7 @@ def _isolated(tmp_path, monkeypatch):
         "SYNDICATE_EXECUTION_KILL_SWITCH",
         "SYNDICATE_EXIT_TAKE_PROFIT_MARGIN",
         "SYNDICATE_EXIT_FAIR_MARGIN",
+        "SYNDICATE_EXIT_LIVE_PHASES",
     ):
         monkeypatch.delenv(name, raising=False)
     yield
@@ -838,3 +839,51 @@ def test_fill_price_is_converted_from_the_venues_outcome_side(leg, outcome_side,
     ex._exit_row_from_view(row, {"state": "filled", "filled_count": 1, "fill_cost_dollars": cost,
                                  "fees_dollars": 0.01, "outcome_side": outcome_side}, {"leg": leg})
     assert row["fill_price"] == (pytest.approx(expected) if expected is not None else None)
+
+
+# -- in-game entries are not SOLD live by default (user 2026-11-06, option A) --
+
+
+def test_an_in_game_entry_is_paper_exited_by_default_and_a_pregame_one_still_sells(monkeypatch):
+    sent = []
+    ingame = _order(idempotency_key="i" * 24, position_key="ingame:T:yes")
+    s = _live_tick(monkeypatch, [ingame], _market(), sent, SYNDICATE_EXIT_TAKE_PROFIT_MARGIN="0.05")
+    assert sent == [] and s["live_exits"] == {"phase_not_armed": 1} and s["new_paper_exits"] == 1
+    row = next(iter(ex.load_state()["exits"].values()))
+    assert row["mode"] == "paper" and row["entry_key"] == "i" * 24
+
+    sent2 = []
+    s2 = _live_tick(monkeypatch, [_order()], _market(), sent2, SYNDICATE_EXIT_TAKE_PROFIT_MARGIN="0.05")
+    assert s2["live_exits"] == {"placed": 1} and len(sent2) == 1
+
+
+def test_in_game_live_sales_return_when_the_phase_is_armed(monkeypatch):
+    # off != on: the same in-game position sells once the env names its phase.
+    sent = []
+    ingame = _order(idempotency_key="i" * 24, position_key="ingame:T:yes")
+    s = _live_tick(monkeypatch, [ingame], _market(), sent, SYNDICATE_EXIT_TAKE_PROFIT_MARGIN="0.05",
+                   SYNDICATE_EXIT_LIVE_PHASES="pregame,in_game")
+    assert s["live_exits"] == {"placed": 1} and len(sent) == 1
+
+
+@pytest.mark.parametrize(
+    "raw, expected",
+    [
+        (None, {"pregame"}),
+        ("", {"pregame"}),
+        ("in_game", {"in_game"}),
+        ("pregame, in-game", {"pregame", "in_game"}),
+        ("everything", {"pregame"}),  # unknown never widens to "sell everything"
+    ],
+)
+def test_live_exit_phases_parsing(monkeypatch, raw, expected):
+    if raw is not None:
+        monkeypatch.setenv("SYNDICATE_EXIT_LIVE_PHASES", raw)
+    assert ex.live_exit_phases() == frozenset(expected)
+
+
+def test_open_positions_marks_the_entry_phase():
+    positions, _ = ex.open_positions(
+        [_order(), _order(idempotency_key="i" * 24, position_key="ingame:T:yes")], today=TODAY
+    )
+    assert sorted(p.entry_phase for p in positions) == ["in_game", "pregame"]
