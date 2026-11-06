@@ -56667,3 +56667,40 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - home + away live % of one spread line sum to ~1;
   - plus `#761`'s fairness reading.
   - Backup reader: one-time task `syndicate-nba-live-readings-1106`, 20:15 CST.
+
+## 2026-11-06 15:19:15Z (9:19 AM CST) -- FLEET ff d6a691168 -> a147d16cd, no restart: college pregame sims key on the sim's own code (`a147d16cd`, `#763`) (lane `wncaab-module`) -- **MET**; also closes verify (1) of the 2026-11-05 22:36:05Z entry (written 17:34Z, 11:34 AM CST)
+- **User, in this chat:** "Yes, do it here", answering "Make pregame sims re-run when the sim code changes, so the overtime fix reaches the 11-05 and 11-06 games?"
+- **What:**
+  - `pregame_sim.inputs_key` gains `simCode`: 12 hex of a sha256 over the bytes of the 9 `SIM_CODE_MODULES`, with CRLF folded to LF.
+  - A commit that changes any of those files re-sims every pregame game once, over the next few 15-min runs. Before, the change waited for the next morning's calibration roll.
+- **Range `d6a691168..a147d16cd`, runtime:** `college_basketball/pregame_sim.py` only, plus its test.
+- **No restart needed:** live-odds-worker launches the pregame sim as a fresh child process every 900 s, and each launch loads the file again.
+- **Gates:**
+  - web claim 15:18:52Z (`wncaab-module`);
+  - preflight (fleet, `a147d16cd`) CLEAR 15:19:02Z, baseline read 15:18:42Z;
+  - `git merge --ff-only a147d16cd` 15:19:15Z;
+  - web claim free at the 17:33Z status read.
+- **Fingerprint:** `0c53912cfe04` on the fleet, the same value as on the Windows checkout, so the CRLF fold works.
+- **Baseline (15:18:42Z):** 178 pregame games (ncaab and wncaab, 11-06 and 11-07); 0 carried `simCode`.
+- **Readings (`live-odds-worker.log.1` and `.log`, snapshot 17:31Z):**
+  - **Wave: 3 runs, 178 simmed = 58 + 14 + 21 + 37 + 11 + 37.**
+    - 15:23:01Z: ncaab 11-06 58 (495.8 s), wncaab 11-06 14 (104.1 s), the rest `not_reached`. The 600 s budget held.
+    - 15:39:43Z: wncaab 11-06 21 (270.8 s), ncaab 11-07 37 (328.3 s).
+    - 15:51:49Z: ncaab 11-07 11 (104.8 s), wncaab 11-07 37 (273.8 s). Last RUN line 15:58:44Z.
+    - Every RUN line since the ff ends `sim_code=0c53912cfe04`.
+  - **Cost:** 1,578 s of child runtime over 36 min, ~8.9 s per game. That is the one-time price of a future engine commit at this slate size.
+  - **After the wave:** every run (16:08Z, 16:25Z, 16:42Z, 16:59Z, 17:16Z) has `simmed=0`, except one game in the 16:25:17Z run (wncaab 11-06, `simmed=1`), which was driven by an input change.
+  - **Snapshot vs baseline:** 178/178 carry `simCode`, and all 178 re-simmed. **177 are identical** (dist hash, total_mean, home_win_prob).
+    - The exception is wncaab 11-06 `401919333`, re-simmed again at 16:25:17Z after the wave. That overwrote its wave entry, so identity is shown for 177 of 178.
+    - Its home win went 0.735 -> 0.52 and its total 127.9 -> 127.61. Current calibrated pregame home margin is -0.57 (raw -1.26), on prior-season-fallback ratings.
+    - **Cause of that input change not identified.**
+  - Identical output is the expected result. The 11:07-11:27Z calibration-roll re-sim had already run `d6a691168`'s engine, so this wave changed only the key. It shows the seeded re-sim reproduces its results.
+  - Tie share (draws with full-game margin 0) is 0.0000 in all four files.
+  - `refused=1` on ncaab 11-06 every run, including 15:06:38Z before the ff. Not this change.
+- **Verify (1) of the 2026-11-05 22:36:05Z entry is MET, earlier than that entry predicted:**
+  - The daily `priorCalibration` roll re-simmed every 11-06 and 11-07 game at 11:07-11:27Z on `d6a691168`'s engine. Tie share went 1.51% / 1.61% -> 0.0000 on 178 games.
+  - That entry and `#763` said the 11-07 slate would be the first with overtime. That was wrong.
+  - The 11-05 files keep 1.51% / 1.61%: those games finished before any re-sim.
+  - Verify (2), a live college game in overtime, is still OWED.
+- **Fleet since:** `3d376da7c` (lane `nba-live-proj-actuals`). `a147d16cd..3d376da7c` touches none of the 9 `SIM_CODE_MODULES`, and every run since prints the same `sim_code`.
+- **verify:** MET (readings above). The next engine commit to one of the 9 modules should show RUN lines with a new `sim_code` and `simmed` covering every pregame game within ~3 runs.
