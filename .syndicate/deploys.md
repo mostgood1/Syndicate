@@ -56603,3 +56603,30 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - **Spread fix, NBA:** live spread / spreads_alt / h2h / h2h_3_way rows with `live_total`: **0 of 83** (11-04: 27). Totals rows keep it: 4/20 and 106/218 alt, the ones the overlay priced.
 - **The 42 props still blank at 02:17Z are bench players who had not checked in.** Gillespie 19, da Silva 13, Maluach 4, Cain 2, and others. The lens's `livePropsCoverage`: players_simmed 24, rows 691, `no_actual` 173. `build_live_props` publishes only with a banked box-score actual ("a missing actual is not a zero"), so these rows should appear when the players enter. That is part 2's reading.
 - **Not provable tonight:** fairness/carry (2 games never exhaust the 240 s budget; reading is Fri 11-06, 9 games); overtime (needs an OT game).
+
+## 2026-11-06 03:44:00Z (9:44 PM CST) -- VERIFY part 2 (both games live) for `d6a691168` / `8d0a8f2b0` / `84bb34d26` on the fleet (lane `nba-live-proj-actuals`, todo `#761`) -- **MET: every live NBA game re-simmed on every tick; per game, 95% and 98% of non-segment live rows carry a live number; bench props filled; segments still 0 (`#762`)**
+- **Re-sim, tip to 03:40:07Z:** 37 ticks with a live game: 25 at `games=1` from 02:12:18Z, then 12 at `games=2` from 03:12:45Z (89 s after MIA@GS's 03:11:16Z commence).
+  - Every tick had `resimmed == games`, `carried=0` and `refusals={}`.
+  - Elapsed 5.1-76.2 s of the 240 s budget. 0 tracebacks in live-odds-worker.log since 02:00Z.
+- **Served board:** 7 reads, 03:34:15-03:39:34Z. The `layer2_shortlist` snapshot was 03:03:26Z throughout, BEFORE MIA@GS tipped. The live numbers came from the in-play overlay (grids 03:33:29Z and 03:35:35Z) and the web read-time prop refresh. The board build published 03:39:29Z (`BOARD_BUILD_TIMING wall_s=336.2`).
+  - Rows with a live number / with an actual / total, at the first read then the last:
+
+    | game | full-game | props | segments |
+    |---|---|---|---|
+    | MIA@GS | 110/109/110 → 84/84/85 | 117/117/128 → 138/138/148 | 0/0/176 → 0/0/165 |
+    | ORL@PHX | 82/93/102 → 97/90/99 | 125/125/130 → 125/125/128 | 0/0/89 → 0/0/95 |
+
+  - Per game at 03:39:34Z, segments excluded: MIA@GS **222 of 233 (95%)**, ORL@PHX **222 of 227 (98%)**. With segments: 56% and 69%. Before the fix, on 11-04, 3 of 5 live games had 0.
+- **Bench props filled.** The lens's `livePropsCoverage` at 03:32Z had `no_actual` 0 in both games (part 1: 173). Pelle Larsson's 10 blank rows at 03:27Z were filled by 03:32:54Z.
+- **The 16 props still blank at 03:32:54Z:**
+  - 12 double-double / triple-double rows. The re-sim prices neither market; `BOARD_PROP_MARKETS` has no key for them.
+  - 4 Bobby Portis rows. He is not among the re-sim's players and not in the lens box score, so there is no actual. That blank is correct.
+- **Full-game gaps come per price grid, not per game.**
+  - Grid 03:26:45Z: 15 MIA@GS and 36 ORL@PHX rows had no live number. Grid 03:29:04Z: 0 of 172.
+  - Grid 03:33:29Z: ORL@PHX 20 of 102. Grid 03:35:35Z: 2 of 99.
+  - Tonight's board-build joins logged `quote_older_than_live_pricing_ceiling` 33-65 times per join. The NBA ceiling is 600 s, and `live_gameline_join` refuses those rows BEFORE it attaches any live number, so a stale quote blanks Live proj. as well as the edge.
+  - This is the likely cause but is **unproven per row**. The served `book_age_seconds` did not separate priced rows from unpriced ones: ORL o242.5 at 850 s carried 0.173.
+- **Full-game moneyline rows never get Live proj.** That is by design today. `live_gameline_join` does not publish the h2h probability: it is the HOME win probability, and the Live column is side-blind. Tonight there were 1-2 such rows at any one time.
+- **Spread fix, NBA:** live spread / spreads_alt / h2h / h2h_3_way rows with `live_total`: **0 of 165** at 03:27:27Z (part 1: 0 of 83; 11-04: 27). Totals rows keep it: 7/37, and 131/328 on alt totals.
+- **Watcher error, mine:** `wait_two.sh` grepped the whole log and fired at 03:11:09Z on its OWN command line, which was printed inside an `ALL_PROCESS_MEMORY` telemetry dump. The real first two-game tick came 96 s later, so this reading ran 14 min after it rather than 15. The fix is the standing rule: anchor on the timestamp and tag together.
+- **Still owed:** the Fri 11-06 fairness/carry read (9 games); overtime needs an OT game. Remaining live gaps, filed under `#762`: segments, stale-quote rows, full-game moneylines, DD/TD props.
