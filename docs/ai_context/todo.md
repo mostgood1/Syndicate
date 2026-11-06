@@ -1,6 +1,17 @@
 # Syndicate TODO — canonical cross-session list
 
 ### `#764` — **KALSHI TOTALS THAT NAME NO GAME PRICE ANOTHER GAME'S ROW: 26 of 26 measured sides wrong-game (men's and women's college basketball, college football). Polymarket is clean in every sport. NOT FIXED** — 2026-11-06, session e32fef1a (user "Yes, measure it here")
+- **UPDATE 22:14Z 11-06 (4:14 PM CST): FIX WRITTEN AND COMMITTED as `98cbbb8b0` (lane `kalshi-unnamed-role-key`), on branch `claude/syndicate-ai-engine-762439` only. NOT ON MAIN, NOT LOADED ON THE FLEET:** pushing code and loading it wait on the user's yes.
+  - The rule: `venue_quote_fanin._unnamed_venue_quote_on_a_role_key` refuses a Kalshi or Polymarket quote that names no game on a totals / totals_alt / spreads / spreads_alt row, on the grid path and the board path, after the `#603` check. Switch: `_UNNAMED_ROLE_KEY_REFUSAL_ENABLED` (True). OddsAPI is unchanged (unmeasured). h2h is untouched.
+  - New log lines `UNNAMED_ROLE_KEY_GRID sport= count= sample=<tickers> refusing=` and `UNNAMED_ROLE_KEY_ROWS`, with the same fields in both return payloads.
+  - **Verified, read-only:** one quote pull per sport, replayed with the switch off and on, on fleet `506973f97` plus the patched file, 22:07-22:09Z.
+    - Every side refused was another game's ticker: ncaaf 11-07 8 (`IWSELA-39/59/71`, `CINHOU-61`), ncaab 4 (`UWFLFIU-180`, `MTUKU-176`), wncaab 1-3 (`WSUORE-*`).
+    - At 22:08Z, 10 of the 13 refused sides were re-priced by a SAME-GAME quote instead (Polymarket 8 on ncaaf, Kalshi's named total 2 on ncaab); 3 fall back to the books.
+    - Same-game sides lost: 0, in every sport. nfl / nba / nhl / soccer: off == on.
+  - The population moves with Kalshi's quotes: the all-sport pass at 22:07:12Z found 0 on ncaaf 11-07, and the pass one minute later found 8.
+  - Probe caveat: on unnamed Kalshi MONEYLINES the probe's `ref_NOT_this_game` means `match_event_blob` could not resolve the ticker, not that it is wrong. Read by eye at 22:08Z: 14 ncaab, 4 ncaaf and 28 soccer tickers, every one the row's own game (e.g. `PEAYKENN` on Austin Peay @ Kennesaw St).
+  - Tests: `tests/test_venue_fanin_unnamed_role_key.py` (NEW: off != on on both paths and on the live benchmark). 7 existing tests in 4 files encoded the old pass-through: they now name their game, or switch `#764` off to keep pinning the guard they test. 465 passed over the 22 fan-in test files, and 1,599 over 95 neighbouring files.
+  - Owed: push, fleet ff to `98cbbb8b0`, restart of the worker(s) that build the shortlist, then a live read of `UNNAMED_ROLE_KEY_GRID ... refusing=True` on the college slate. Probe: `venue_prov_ab.py` in session e32fef1a's scratchpad.
 - **How it was measured (2026-11-06 17:34-17:39Z, read-only, nice 19):**
   - `apply_venue_quotes_to_grid` replayed on a copy of each sport's on-disk grid, with the fleet's code (`3d376da7c`) and data.
   - Grids for 11-06: nfl, ncaaf, nba, nhl, ncaab, wncaab, soccer. For 11-07: ncaaf, soccer. mlb and wnba have none.

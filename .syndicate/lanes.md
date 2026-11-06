@@ -770,6 +770,14 @@ death, never life — do not invert it.
 - Verification: unit tests; landed on origin/main; fleet ff + live-odds-worker restart behind claim+preflight; no execution_exits refusals after the restart; EXIT_TICK pruned_exits>0 once; document size under 5MB; an EXIT_LIVE line on the next qualifying position
 - Blocked by: none
 
+### kalshi-unnamed-role-key — OPEN — opened 2026-11-06 — session e32fef1a-01e8-4afe-a284-01acd3728545
+- Goal: A venue quote that names no game can no longer price a totals or spreads row in any sport: the read-only fan-in replay (venue_prov.py) on the fleet's data shows 0 unnamed-quote totals/spreads sides where fleet code showed 26, with every same-game and moneyline side unchanged
+- Files: syndicate/features/shared/venue_quote_fanin.py, tests/test_venue_fanin_unnamed_role_key.py (NEW), tests/test_venue_unnamed_quote_ambiguity.py, tests/test_venue_quote_segment_join.py, tests/test_polymarket_cbb_pairing.py, tests/test_prop_player_keying.py
+- Hypothesis: n/a (todo #764 measured the defect: Kalshi totals that name no game priced another game's row on 26 of 26 sides)
+- Falsification test: n/a
+- Verification: off != on reachability test; venue_prov.py replay with this worktree's code against fleet data: unnamed_quote totals/spreads sides 26 -> 0, same_game and h2h counts unchanged
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
