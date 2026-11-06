@@ -56630,3 +56630,12 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **Spread fix, NBA:** live spread / spreads_alt / h2h / h2h_3_way rows with `live_total`: **0 of 165** at 03:27:27Z (part 1: 0 of 83; 11-04: 27). Totals rows keep it: 7/37, and 131/328 on alt totals.
 - **Watcher error, mine:** `wait_two.sh` grepped the whole log and fired at 03:11:09Z on its OWN command line, which was printed inside an `ALL_PROCESS_MEMORY` telemetry dump. The real first two-game tick came 96 s later, so this reading ran 14 min after it rather than 15. The fix is the standing rule: anchor on the timestamp and tag together.
 - **Still owed:** the Fri 11-06 fairness/carry read (9 games); overtime needs an OT game. Remaining live gaps, filed under `#762`: segments, stale-quote rows, full-game moneylines, DD/TD props.
+
+## 2026-11-06 15:44Z (9:44 AM CST) -- VERIFY follow-up for `e10ea9610` (lane `kalshi-state-cap`, CLOSED): the owed evening-long read -- **MET**
+- **Window:** from the 2026-11-04 23:26:04Z restart to 15:41Z today, limited to what the current logs hold: refresh-worker.log from 2026-11-05 06:19Z, live-odds-worker.log from 2026-11-05 16:23Z. The hours before those are not visible here.
+- **Kalshi markets state writes (`KEYVALUE_WRITE_*` kalshi_markets):**
+  - refresh-worker: 825 written, 0 rejected (11-05: 442 / 0; 11-06: 383 / 0).
+  - live-odds-worker: 579 written, 0 rejected (11-05: 178 / 0; 11-06: 401 / 0).
+  - 0 `[kalshi_odds] WRITE_FAILED` on either worker.
+- **Size:** max 5,996,716 B against the 8,388,608 cap. It was 5.95 MB at 23:33Z 11-04, so about +50 KB in 40 h.
+- **Also seen, not this lane:** WSL came up at 2026-11-06 09:08:57 CST (`uptime -s`). web pid 649 and refresh-worker / live-odds-worker pids 714 / 715 all show `restarts=0`. The workers run `d6a69116` against fleet HEAD `a147d16c` (1 runtime file stale, for another lane to load). This also killed session-local timers on the host, e.g. the decision-engine umbrella's 11-24 backup timer.
