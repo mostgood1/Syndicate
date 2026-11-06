@@ -675,6 +675,72 @@ def test_watch_pruning_keeps_a_forward_bet_until_its_game_ages_out():
     assert pruned == 1 and list(state["watch"]) == ["fwd"]
 
 
+# -- document size: rows past lookback + 2 days move to the archive (2026-11-06) --
+# MEASURED: 9.05MB against the 8,388,608-byte keyvalue cap; every save refused and
+# the live write-ahead raised before the send.
+
+
+def _exit_row(key, day, **extra):
+    return {"exit_key": key, "entry_key": key[:24], "selected_date": day,
+            "commence_time": f"{day}T23:00:00Z", "mode": "paper", "status": "paper_filled", **extra}
+
+
+def test_watch_retention_is_lookback_plus_pad():
+    state = ex._empty_state()
+    state["watch"] = {"keep": {"entry_key": "keep", "selected_date": "2026-10-14"},
+                      "drop": {"entry_key": "drop", "selected_date": "2026-10-13"}}
+    assert ex._prune_watch(state, TODAY) == 1 and list(state["watch"]) == ["keep"]
+    assert [r["entry_key"] for r in ex.archived_watch_rows()] == ["drop"]
+
+
+def test_exit_pruning_archives_old_rows_but_keeps_what_live_safety_reads(monkeypatch):
+    monkeypatch.setattr(ex, "_utc_now", lambda: f"{TODAY}T12:00:00Z")
+    state = ex._empty_state()
+    state["exits"] = {
+        "old_paper": _exit_row("old_paper", "2026-10-01"),
+        "new_paper": _exit_row("new_paper", "2026-10-18"),
+        "old_live_done": _exit_row("old_live_done", "2026-10-01", mode="live", status="filled",
+                                   fill_price=0.9, submitted_at="2026-10-01T20:00:00Z"),
+        "old_live_open": _exit_row("old_live_open", "2026-10-01", mode="live", status="submitted",
+                                   submitted_at="2026-10-01T20:00:00Z"),
+        "old_live_sent_today": _exit_row("old_live_sent_today", "2026-10-01", mode="live", status="filled",
+                                         fill_price=0.9, submitted_at=f"{TODAY}T03:00:00Z"),
+    }
+    assert ex._prune_exits(state, TODAY) == 2
+    assert sorted(state["exits"]) == ["new_paper", "old_live_open", "old_live_sent_today"]
+    assert sorted(r["exit_key"] for r in ex.archived_exit_rows()) == ["old_live_done", "old_paper"]
+
+
+def test_a_refused_save_re_archives_without_duplicating_the_reading():
+    for _ in range(2):  # the second pass is the tick after a refused save
+        state = ex._empty_state()
+        state["exits"] = {"old": _exit_row("old", "2026-10-01")}
+        ex._prune_exits(state, TODAY)
+    assert [r["exit_key"] for r in ex.archived_exit_rows()] == ["old"]
+
+
+def test_counterfactual_grades_archived_exits_and_the_document_wins():
+    archived = [_exit_row("k" * 24 + "x", "2026-10-01", rule="take_profit", contracts=1, entry_price=0.5,
+                          realized_pnl_dollars=0.2, family="kalshi", entry_mode="paper", entry_fee_dollars=0.0),
+                _exit_row("dup", "2026-10-01", purpose="manual")]
+    state = ex._empty_state()
+    state["exits"] = {"dup": _exit_row("dup", "2026-10-01")}  # newer copy, no `purpose`
+    orders = [{"idempotency_key": "k" * 24, "outcome": "won"}]
+    report = ex.exit_counterfactual(state, orders, archived_exits=archived)
+    assert report["exits"] == 2 and report["graded"] == 1
+    assert report["manual_excluded"] == 0 and report["pending"] == 1
+
+
+def test_the_tick_prunes_exit_rows_and_persists_without_them(monkeypatch):
+    state = ex._empty_state()
+    state["exits"] = {"old": _exit_row("old", "2026-10-01")}
+    ex._persist(state)
+    s = ex.run_exit_tick(today=TODAY, orders=[], quotes=_quotes([]), now=NOW)
+    assert s["pruned_exits"] == 1
+    assert ex.load_state()["exits"] == {}
+    assert [r["exit_key"] for r in ex.archived_exit_rows()] == ["old"]
+
+
 # -- arming: take-profit only, daily caps, paper rows never block (2026-10-20) --
 
 

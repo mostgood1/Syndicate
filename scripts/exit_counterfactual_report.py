@@ -27,6 +27,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     from syndicate.features.shared.execution_exits import (
+        archived_exit_rows,
         archived_watch_rows,
         exit_counterfactual,
         load_state,
@@ -34,12 +35,15 @@ def main(argv: list[str] | None = None) -> int:
     from syndicate.features.shared.execution_ledger import full_history_orders
 
     state = load_state()
-    report = exit_counterfactual(state, full_history_orders(), archived_watch=archived_watch_rows())
+    archived_exits = archived_exit_rows()
+    report = exit_counterfactual(
+        state, full_history_orders(), archived_watch=archived_watch_rows(), archived_exits=archived_exits
+    )
     report["last_tick"] = state.get("last_tick")
     if args.exits:
-        report["exit_rows"] = sorted(
-            (state.get("exits") or {}).values(), key=lambda r: str(r.get("decided_at") or "")
-        )
+        rows = {str(r.get("exit_key")): r for r in archived_exits if r.get("exit_key")}
+        rows.update({str(k): r for k, r in (state.get("exits") or {}).items()})
+        report["exit_rows"] = sorted(rows.values(), key=lambda r: str(r.get("decided_at") or ""))
     print(json.dumps(report, indent=2, sort_keys=True, default=str))
     return 0
 

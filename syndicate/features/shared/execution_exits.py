@@ -105,7 +105,15 @@ LIVE_BLOCKERS: tuple[str, ...] = ()
 
 _DEFAULT_TAKE_PROFIT_MARGIN = 0.08
 _DEFAULT_LOOKBACK_DAYS = 3
-_WATCH_RETENTION_DAYS = 14
+# Days PAST the lookback that watch and exit rows stay in the document before they
+# move to `execution_exits_archive/`. Was a flat 14 days for watch rows, and exit
+# rows were never pruned. MEASURED 2026-11-06: the document was 9.05MB (watch 5.84MB
+# / 7,745 rows, exits 3.21MB / 3,894 rows, 91% paper) against the 8,388,608-byte
+# keyvalue cap, so saves from ~2026-11-05 16:28Z were refused -- and a live sale
+# persists its row BEFORE it sends, so no live exit was sent after 06:02Z that day.
+# A row older than the lookback can never be evaluated again (`open_positions`
+# drops it), so only the counterfactual reads it, and that reads the archive too.
+_STATE_RETENTION_PAD_DAYS = 2
 _MAX_TICKERS_PER_TICK = 400
 _QUOTE_CHUNK = 50
 # Polymarket books are one SIGNED read per market (5 s timeout each), so they are
@@ -254,8 +262,12 @@ def _persist(state: Mapping[str, Any]) -> None:
     write_json_file(exits_path(), dict(state))
 
 
-def _archive(rows: Sequence[Mapping[str, Any]]) -> None:
-    """Append pruned watch rows to disk BEFORE the document that omits them."""
+def _archive(rows: Sequence[Mapping[str, Any]], prefix: str = "watch") -> None:
+    """Append pruned rows to disk BEFORE the document that omits them.
+
+    A save refused after this runs re-archives the same rows next tick; the
+    readers keep the newest copy per key, so a duplicate line is harmless.
+    """
     if not rows:
         return
     directory = _archive_dir()
@@ -266,27 +278,36 @@ def _archive(rows: Sequence[Mapping[str, Any]]) -> None:
         month = month if re.fullmatch(r"\d{4}-\d{2}", month) else "undated"
         by_month.setdefault(month, []).append(json.dumps(row, sort_keys=True, default=str) + "\n")
     for month, lines in sorted(by_month.items()):
-        with open(directory / f"watch_{month}.jsonl", "a", encoding="utf-8") as handle:
+        with open(directory / f"{prefix}_{month}.jsonl", "a", encoding="utf-8") as handle:
             handle.write("".join(lines))
             handle.flush()
             os.fsync(handle.fileno())
 
 
-def archived_watch_rows() -> list[dict[str, Any]]:
+def _archived_rows(prefix: str, key_field: str) -> list[dict[str, Any]]:
     directory = _archive_dir()
     if not directory.is_dir():
         return []
     latest: dict[str, dict[str, Any]] = {}
-    for path in sorted(directory.glob("watch_*.jsonl")):
+    for path in sorted(directory.glob(f"{prefix}_*.jsonl")):
         with open(path, encoding="utf-8") as handle:
             for line in handle:
                 try:
                     row = json.loads(line)
                 except ValueError:
                     continue
-                if isinstance(row, dict) and row.get("entry_key"):
-                    latest[str(row["entry_key"])] = row
+                if isinstance(row, dict) and row.get(key_field):
+                    latest[str(row[key_field])] = row
     return list(latest.values())
+
+
+def archived_watch_rows() -> list[dict[str, Any]]:
+    return _archived_rows("watch", "entry_key")
+
+
+def archived_exit_rows() -> list[dict[str, Any]]:
+    """Exit rows moved out of the document by `_prune_exits`, newest copy per key."""
+    return _archived_rows("exits", "exit_key")
 
 
 # --------------------------------------------------------------------------
@@ -1231,10 +1252,17 @@ def _update_watch(watch: dict[str, Any], position: OpenPosition, decision: Mappi
             row["fair_reached_at"] = now
 
 
-def _prune_watch(state: dict[str, Any], today: str) -> int:
+def _retention_floor(today: str) -> str | None:
+    """Rows whose position date is before this leave the document (see the pad)."""
     try:
-        floor = (date.fromisoformat(today) - timedelta(days=_WATCH_RETENTION_DAYS)).isoformat()
+        return (date.fromisoformat(today) - timedelta(days=lookback_days() + _STATE_RETENTION_PAD_DAYS)).isoformat()
     except ValueError:
+        return None
+
+
+def _prune_watch(state: dict[str, Any], today: str) -> int:
+    floor = _retention_floor(today)
+    if floor is None:
         return 0
     watch = state.get("watch") or {}
     stale = [k for k, row in watch.items() if _position_date(row) < floor]
@@ -1243,6 +1271,39 @@ def _prune_watch(state: dict[str, Any], today: str) -> int:
     _archive([watch[k] for k in stale])  # moved, never dropped
     for k in stale:
         watch.pop(k, None)
+    return len(stale)
+
+
+def _prune_exits(state: dict[str, Any], today: str) -> int:
+    """Move exit rows for positions past the retention floor to the archive.
+
+    KEPT whatever their date: a live row whose venue outcome is still unknown
+    (`unreconciled_exits` -- the reconcile pass and the `unreconciled_exits`
+    refusal read it), and a live row sent in the last two UTC days (the daily
+    cap counts today's sends by `submitted_at`, a different clock from the
+    position's date).
+    """
+    floor = _retention_floor(today)
+    if floor is None:
+        return 0
+    exits = state.get("exits") or {}
+    keep = {id(row) for row in unreconciled_exits(state)}
+    try:
+        recent = (date.fromisoformat(_utc_now()[:10]) - timedelta(days=1)).isoformat()
+    except ValueError:
+        recent = ""
+    stale = [
+        k
+        for k, row in exits.items()
+        if _position_date(row) < floor
+        and id(row) not in keep
+        and not (row.get("mode") == EXIT_LIVE and str(row.get("submitted_at") or "")[:10] >= recent)
+    ]
+    if not stale:
+        return 0
+    _archive([{**exits[k], "exit_key": exits[k].get("exit_key") or k} for k in stale], prefix="exits")
+    for k in stale:
+        exits.pop(k, None)
     return len(stale)
 
 
@@ -1397,6 +1458,7 @@ def _run_exit_tick_unlocked(
         )
 
     pruned = _prune_watch(state, today)
+    pruned_exits = _prune_exits(state, today)
     summary = {
         "status": "ok",
         "mode": mode,
@@ -1417,6 +1479,7 @@ def _run_exit_tick_unlocked(
         "fair_buffer": buffer,
         "watching": len(watch),
         "pruned": pruned,
+        "pruned_exits": pruned_exits,
     }
     state["last_tick"] = summary
     state["updated_at"] = now_text
@@ -1476,6 +1539,7 @@ def exit_counterfactual(
     orders: Iterable[Mapping[str, Any]],
     *,
     archived_watch: Sequence[Mapping[str, Any]] = (),
+    archived_exits: Sequence[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
     """Every recorded exit, graded against holding to settlement.
 
@@ -1497,7 +1561,9 @@ def exit_counterfactual(
     by_phase: dict[str, dict[str, Any]] = {}
     by_sport: dict[str, dict[str, Any]] = {}
     by_venue: dict[str, dict[str, Any]] = {}
-    for row in (state.get("exits") or {}).values():
+    all_exits = {str(r.get("exit_key")): r for r in archived_exits if r.get("exit_key")}
+    all_exits.update({str(k): r for k, r in (state.get("exits") or {}).items()})  # the document wins
+    for row in all_exits.values():
         if row.get("purpose"):
             # A one-off operator sale (`exit_sell_once`), not a rule's decision:
             # it says nothing about whether the RULE beats holding.
@@ -1555,7 +1621,7 @@ def exit_counterfactual(
             else:
                 _add(bucket, hold, hold)
     return {
-        "exits": len(state.get("exits") or {}),
+        "exits": len(all_exits),
         "graded": sum(b["n"] for b in by_mode.values()),
         "pending": pending,
         "ungradable": ungradable,

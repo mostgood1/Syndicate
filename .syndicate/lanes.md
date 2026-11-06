@@ -292,6 +292,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### kalshi-exit-path — OPEN — opened 2026-10-19 — session b4e23404-e8a9-47ef-a692-2e33892ec354
+- **LOAN NOTE 2026-11-06 -- LOAN OUT to lane `exit-state-size` (session 332cb014, live-trading coordinator; this lane's owner session is gone). USER-APPROVED in 332cb014's chat ("Yes, fix it here"):** `execution_exits.py` retention/prune/archive only (`_STATE_RETENTION_PAD_DAYS` replaces `_WATCH_RETENTION_DAYS`, new `_prune_exits` + `archived_exit_rows`, `exit_counterfactual(archived_exits=)`), `scripts/exit_counterfactual_report.py` (reads the exits archive), new prune tests in `tests/test_execution_exits.py`. Why: the document hit 9.05MB against the 8MB keyvalue cap, every save refused since ~11-05 16:28Z, and live sales stopped at the write-ahead.
 - **LOAN NOTE 2026-10-23 -- LOAN OUT to lane `polymarket-fee-quadratic` (session 9333b297; user chose option A "Build + deploy" in coordinator 332cb014's chat):** `tests/test_execution_exits.py`, the expected Polymarket fee values in two tests ONLY (0.15 flat -> 0.1738 / 0.1602 under the filed 0.0695*C*p*(1-p)); test renamed `test_polymarket_fee_is_flat_on_notional` -> `test_polymarket_fee_is_the_filed_quadratic`. `execution_exits.py` NOT touched (its `estimate_fee` docstring still says "flat on notional"; the behaviour follows `venue_fees.polymarket_fee_dollars`).
 - **LOAN NOTE 2026-10-23 ~00:15Z -- LOAN OUT to lane `live-min-stake-five` (session 332cb014, live-trading coordinator by the 34fdabd0 handover; this lane's owner session was archived in that handover). USER-REQUESTED in 332cb014's chat: "we need to guard against in game exits where the prop has been achieved", design "Price guard (fast)":** `syndicate/features/shared/execution_exits.py`, `evaluate_exit` (a hold-near-settlement check after the bid read) + a new `_hold_at_or_above_bid` helper ONLY.
 - LOAN 2026-10-21 ~21:45Z to lane in-game-trading (user-approved; this session was unreachable): `EXIT_STATE_LOCK` + a `run_exit_tick` lock wrapper in execution_exits.py, so the fast exit thread and the slow tick never persist execution_exits.json concurrently. Body renamed `_run_exit_tick_unlocked`, unchanged; your 78 tests pass.
@@ -747,6 +748,14 @@ death, never life — do not invert it.
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - Verdict: GOAL MET — owner_liveness.py --idle-min 240 read 1 of 9 CLOSED SAFE; moved `closed-lane-archive-20261106-0147`. 8 WAIT (owner e32fef1a live; d458ff9c no transcript). Table in log/2026-11-06.md.
+
+### exit-state-size — OPEN — opened 2026-11-06 — session 332cb014
+- Goal: execution_exits.json stays under the 8,388,608-byte keyvalue cap: watch and exit rows older than lookback+2 days move to execution_exits_archive/, the counterfactual reads the archive, and live exits resume on the fleet
+- Files: syndicate/features/shared/execution_exits.py (_STATE_RETENTION_PAD_DAYS, _retention_floor, _prune_watch, _prune_exits, _archive, _archived_rows/archived_*_rows, exit_counterfactual archived_exits, the prune call + summary in _run_exit_tick_unlocked ONLY -- LOAN from kalshi-exit-path, user-approved 2026-11-06 in coordinator 332cb014's chat), scripts/exit_counterfactual_report.py (LOAN, same), tests/test_execution_exits.py (new prune tests ONLY, LOAN, same)
+- Hypothesis: the document is 9.05MB compact-ish (watch 5.84MB/7,745 rows at 14-day retention, exits 3.21MB/3,894 rows never pruned); every save is refused and place_exit's write-ahead raises before the send, so no live exit since 2026-11-05 06:02Z
+- Falsification test: after the fleet loads the fix, KEYVALUE_PAYLOAD_TOO_LARGE for execution_exits keeps printing, or the document stays over 8MB
+- Verification: unit tests; landed on origin/main; fleet ff + live-odds-worker restart behind claim+preflight; no execution_exits refusals after the restart; EXIT_TICK pruned_exits>0 once; document size under 5MB; an EXIT_LIVE line on the next qualifying position
+- Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
