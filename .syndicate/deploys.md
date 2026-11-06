@@ -56717,3 +56717,58 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - Archive: exits 2,722 rows, watch 5,163 unique rows.
   - Since the restart: 0 refusals, 0 line-start tracebacks.
 - **Owed:** the next `EXIT_LIVE` on a qualifying position (10 live positions watched). The 11-07 log read should also confirm no `EXIT_TICK_FAILED` across a full slate.
+
+## 2026-11-06 21:59Z (3:59 PM CST) -- MEASUREMENT: the owed college readings -- closing stamps + steam (owed by the 2026-11-05 01:50:36Z `54a17eabd` entry) **MET**; college credits/day **MEASURED**; live college re-grade: **the model's edge is quote staleness**; women's margin K **superseded by the daily calibration** (lane `wncaab-module`)
+- **User, in this chat:** "Yes, start them", answering "Start the owed college readings now?"
+- **All read-only on the fleet** at nice 19. Ledgers, shards and scoreboards are read under `/home/amyn/syndicate-prod/data`; steam and quota are read from keyvalue with the live-odds-worker's environment.
+- **(1) Closing stamps, closing the `54a17eabd` entry's first OWED item: MET.**
+  - **First stamp:** ncaab 11-04 Loyola Marymount v Queens, h2h, fanduel. Close -230, captured 02:57:28Z 11-05, detected 03:08:11Z.
+  - **Stamped markets:** ncaab 133 / 1,677 / 48 (shards 11-04 / 11-05 / 11-06, the last read mid-day); wncaab 0 / 88 / 16.
+  - **Timing against the odds CSV's `commence_time`:**
+    - Men's (1,691 measurable): captured a median 7.2 min before the scheduled tip (p10 1.4, p90 10.0, range -3.9 to 15.4). 35 (2.1%) were captured up to 3.9 min AFTER the scheduled tip.
+    - Women's: 20 measurable, all 1.1-7.3 min before. 84 of 104 have no `commence_time` match in the CSV, so they are unmeasured.
+- **(2) Steam, closing the second OWED item: MET.** College steam events are written for both leagues every day since 11-04.
+  - **Counts:** ncaab 200 / 200 / 200 (11-04 / 05 / 06, at `_STEAM_EVENTS_KEEP`); wncaab 191 / 200 / 143.
+  - **Mostly in-game:** live share ncaab 125 / 135 / 109 of 200, wncaab 191/191, 200/200, 130/143. The board files live events in its live lane (`intelligence.py:5622-5624`).
+  - **The first-ever event is gone:** the store keeps the newest 200 per sport-date, so the earliest stored is not the first written.
+  - **Instrument check:** a first probe built its env from the env files. It resolved the reports root to the checkout and read 0 for every sport. Rebuilt with the worker's env, it reads nhl and soccer 200/day, so the college counts are real.
+  - **Two leads (`leads.md`):**
+    - `books_confirming` is 0 on every steam event in nhl, soccer, ncaab and wncaab (11-05): no event carries a `bookmaker`/`book` field.
+    - The 200 cap fills with college in-game repricing and evicts that night's pregame steam.
+- **(3) College OddsAPI credits/day: MEASURED.**
+  - **Counters (`read_oddsapi_quota().by_sport`, cumulative since 2026-10-01):**
+    - Baseline 11-04 15:36:34Z: ncaab 30,655 credits / 11,341 calls; wncaab 1,398 / 2,298; platform 5,082 credits/h.
+    - Read 11-06 21:53:39Z: ncaab 44,544 / 16,299; wncaab 3,897 / 5,157; platform 5,231.7/h.
+  - **Window:** 54.28 h (2.26 days), holding two evening slates (11-04 and 11-05).
+  - **Rates:**
+    - ncaab +13,889 credits = **6,141/day (256/h)**, +4,958 calls.
+    - wncaab +2,499 = **1,105/day (46/h)**, +2,859 calls. The lane's ~950/h estimate was 20x high.
+    - Together 7,246/day = 5.8% of the platform rate, ~217k credits per 30 days.
+- **(4) Live college full-game spreads/totals re-graded against the ESPN finals:** 11-03 to 11-05, which is anchor + calibration + bounds, plus OT from 11-05 22:37Z. Priceable `segment=full` rows; script `lean_read4.py` / `lean_split.py` (session scratchpad).
+  - **Pooled Brier, model vs de-vigged market:**
+
+    | League | Market | Rows | Games | Model | Market | Games right-wrong by mean edge sign |
+    |---|---|---|---|---|---|---|
+    | ncaab | spreads | 9,056 | 69 | 0.2364 | 0.2356 | 39-30 |
+    | ncaab | totals | 12,524 | 69 | 0.2440 | 0.2279 | 43-26 |
+    | wncaab | spreads | 1,391 | 24 | 0.2127 | 0.2504 | 15-9 |
+    | wncaab | totals | 2,065 | 25 | 0.2281 | 0.2485 | 15-10 |
+
+  - **Split by when the quote was taken against the score the model saw (`quote_updated_at` - `live_state_as_of`), Brier model minus market:**
+    - **Quote 30 s+ OLDER than the score:** the model is better in all four: ncaab spreads -0.0177 / totals -0.0015, wncaab -0.0562 / -0.0246.
+    - **Within 30 s:** the model is WORSE in 3 of 4:
+      - ncaab spreads +0.0061 (773 rows), totals +0.0319 (1,165);
+      - wncaab spreads +0.0090 (143);
+      - wncaab totals -0.0151 (262 rows, 25 games), the one exception.
+    - **Quote 30 s+ NEWER:** the model is worse in 3 of 4: +0.0247, +0.0326, +0.0146; wncaab totals -0.0070.
+  - **Reading:** the model's apparent live edge is the age of the quote it is compared with. The model has seen a newer score than the book had. On aligned quotes it does not beat the market, except women's totals on 25 games.
+  - **Exposure:** priceable rows carry quotes up to 600 s old; 180-600 s holds 4,861 of 9,056 men's spread rows.
+  - **No money path:** Kalshi live entries after tip are refused, `game_started`.
+  - **Caveat:** rows are correlated within a game, so the sample is 69 men's and ~25 women's games, not rows.
+- **(5) Women's `MARGIN_CALIBRATION_K`: SUPERSEDED, no change.**
+  - **Daily `priorCalibration` beta (wncaab, target final):** 1.2171 (11-02, 94 finals), 1.1944 (11-03, 119), 1.1658 (11-04, 137), 1.1753 (11-05, 205).
+  - **Hold-out against finals:** margin RMSE 15.22 calibrated vs 15.83 raw (99 games).
+  - **Effective women's K:** 0.78 x 1.175 = 0.92, inside the 2025-26 walk-forward's 0.87-0.93 ("women's margins 12-19% too narrow").
+  - **Why no refit:** the calibration is the estimator fit, applied to pregame and live alike. A separate K refit would be re-absorbed by the next morning's beta.
+- **verify:** (1) and (2) MET; (3) and (5) are readings, not fixes.
+  - (4) is a finding. Acting on it is a user decision: a quote-age ceiling, or requiring the quote to be no older than the score, for live college full-game pricing.
