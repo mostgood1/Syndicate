@@ -56590,3 +56590,16 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **verify:**
   - (1) Pregame: a college pregame entry with `computed_at` after 22:36:05Z has a full-game margin-0 share near 0 (was 1.5-1.6%).
   - (2) A live college game in overtime: its lens full-game total is not a point mass, and its h2 total includes the OT points.
+
+## 2026-11-06 02:18:12Z (8:18 PM CST) -- VERIFY part 1 (ORL@PHX tip) for `d6a691168` / `8d0a8f2b0` / `84bb34d26` on the fleet (lane `nba-live-proj-actuals`, todo `#761`) -- **MET for full-game rows and props; segments not covered (`#762`)**
+- **Re-sim:** the first tick with a live game was at 02:12:18Z, `games=1 resimmed=1 carried=0 refusals={}`, elapsed 8.9 s. The next was at 02:15:15Z (1/1, 57.2 s). 0 tracebacks.
+- **Served board:** `/api/intelligence/query`. The `layer2_shortlist` snapshot was 01:57:14Z, BEFORE tip, for every read below, so none of these numbers came from a post-tip board build.
+  - 02:13:33Z (79 s after the first tick, lens not yet merged): 0 of 530 live rows with Live proj.; actual on 153 game rows.
+  - **02:14:11Z:** props **164 / 206** with Live proj. and actual. web.log at 02:14:03Z: `LIVE_COLUMNS_REFRESHED_FROM_ARTIFACT sport=nba considered=752 matched=602 refreshed=602 lens_generated_at=20:13:27 CST`. This is the read-time refresh. On 11-04 the same rows waited 15-25 min for a build.
+  - **02:16:41Z, game rows by kind:**
+    - full-game `layer2_inplay_overlay` **154 / 154** (Live proj. / probability + actual);
+    - full-game `layer2_shortlist` 0 / 3 (the pre-tip build);
+    - segment (q1-q4/h1/h2) overlay 0 / 161 and shortlist 0 / 7. That is `#762`, not this change.
+  - **Spread fix, NBA:** live spread / spreads_alt / h2h / h2h_3_way rows with `live_total`: **0 of 83** (11-04: 27). Totals rows keep it: 4/20 and 106/218 alt, the ones the overlay priced.
+- **The 42 props still blank at 02:17Z are bench players who had not checked in.** Gillespie 19, da Silva 13, Maluach 4, Cain 2, and others. The lens's `livePropsCoverage`: players_simmed 24, rows 691, `no_actual` 173. `build_live_props` publishes only with a banked box-score actual ("a missing actual is not a zero"), so these rows should appear when the players enter. That is part 2's reading.
+- **Not provable tonight:** fairness/carry (2 games never exhaust the 240 s budget; reading is Fri 11-06, 9 games); overtime (needs an OT game).
