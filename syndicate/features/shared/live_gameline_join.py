@@ -888,6 +888,9 @@ def _segment_hit(lens: Mapping[str, Any], projection: Mapping[str, Any], segment
         "home_margin": (sum(m * c for m, c in counts) / n) if n > 0 else None,
         "total_runs_dist": block.get("total_dist") or {},
         "margin_dist": margin if anchored else {},
+        # The same histogram whatever the anchor says, for DISPLAY only (`live_display_block`,
+        # `_RAW_MARGIN_DISPLAY_SPORTS`). Never priced: pricing reads `margin_dist` above.
+        "margin_dist_raw": margin if isinstance(margin, Mapping) else {},
         "as_of": lens.get("liveStateAsOf"),
         "carried_forward": bool(lens.get("liveStateCarriedForward")),
         "lane": f"{lens.get('key')}:{segment}",
@@ -1023,6 +1026,92 @@ def price_distribution_market(
 def _edge_pp(model_prob: float, market_prob: float) -> float:
     """Model minus market, in percentage POINTS, not percent-of-percent."""
     return (float(model_prob) - float(market_prob)) * 100.0
+
+
+# ---------------------------------------------------------------------------
+# DISPLAY-ONLY LIVE NUMBERS (`#762`, lane nba-live-proj-actuals, user "Yes, start
+# #762" 2026-11-06).
+#
+# The only road to the board's Live column ran through PRICING, so three kinds of
+# live row showed a dash while the re-sim's answer existed one level down:
+#   - a quarter/half row whose sport's segment pricing is off (NBA 11-05: 0 of 260
+#     live segment rows, about half of every live game's game-line rows);
+#   - a full-game row whose quote is past the pricing ceiling, refused before any
+#     number is attached (11-05: up to 36 rows of one game on one price grid);
+#   - a full-game moneyline, whose branch never publishes its HOME win probability
+#     because the Live column was side-blind.
+#
+# `row[LIVE_DISPLAY_KEY]` carries that number FOR DISPLAY ONLY. Nothing here
+# prices: no edge, no `live_aware`, no projection change, and the row's refusal is
+# recorded exactly as before, so the ledger is unchanged. Its one reader is
+# `layer2_board._live_projection_columns`, which builds cards AFTER the shortlist
+# is chosen. The probability is in the projection's own frame -- over for totals,
+# home for spreads and moneylines -- and the board restates it in the row's side.
+LIVE_DISPLAY_KEY = "live_display"
+# Sports whose stale-quote and moneyline rows get the display number. An explicit
+# table, as `lens_sources_for_sport` is: another sport's board changes when someone
+# has read it, not as a side effect of this.
+LIVE_DISPLAY_SPORTS = frozenset({"nba"})
+# Sports whose UNANCHORED segment margin may be SHOWN. NBA prices its full-game
+# margin raw, and its quarter margin is not narrow: engine sd 8.2-9.0 per quarter
+# (synthetic inputs, 300 sims, 2026-11-06) against 7.9-9.6 across 163 real 2026 NBA
+# games. College is different -- its raw margin ran at half to two-thirds of the
+# market's, which is what `marginAnchored` exists for -- and is not listed.
+_RAW_MARGIN_DISPLAY_SPORTS = frozenset({"nba"})
+
+
+def live_display_block(
+    hit: Mapping[str, Any], row: Mapping[str, Any], *, sport: Any, basis: str
+) -> dict[str, Any] | None:
+    """The live number for one row, for display only -- None when there is nothing honest to show.
+
+    `prob_over` is P(over) on a totals row and P(home) on a spreads or moneyline row, Agresti-Coull smoothed as
+    the priced path is; an exact 0 or 1 is dropped (`refuse_published_certainty`'s rule). `total_mean` rides only
+    on a totals row, where it is the row's own live count. `basis` names why this row is display-only."""
+    market_key = str(row.get("market") or "").strip().lower()
+    sims = hit.get("sims_run")
+    prob: Any = None
+    if market_key == "h2h":
+        prob = hit.get("home_win_prob")
+    elif market_key in _DIST_MARKETS:
+        if market_key in _TOTALS_MARKETS:
+            dist, side = hit.get("total_runs_dist"), "over"
+        else:
+            dist, side = hit.get("margin_dist"), "home"
+            if not dist and str(sport or "").strip().lower() in _RAW_MARGIN_DISPLAY_SPORTS:
+                dist = hit.get("margin_dist_raw")
+        if dist:
+            # `market_prob=None` stops the pricer after the model probability: nothing is priced here.
+            prob = price_distribution_market(dist=dist, line=row.get("line"), side=side, market=market_key,
+                                              market_prob=None, sims=sims, sport=sport).get("model_prob")
+    else:
+        return None
+    smoothed = agresti_coull_point(prob, sims) if prob is not None else None
+    if smoothed is not None:
+        prob = smoothed
+    try:
+        prob = float(prob) if prob is not None else None
+    except (TypeError, ValueError):
+        prob = None
+    if prob is not None and not (0.0 < prob < 1.0):
+        prob = None
+    total_mean = hit.get("total_mean") if market_key in _TOTALS_MARKETS else None
+    if prob is None and total_mean is None:
+        return None
+    return {
+        "basis": basis,
+        "segment": hit.get("segment") or "full",
+        "prob_over": prob,
+        "total_mean": total_mean,
+        "home_margin": hit.get("home_margin"),
+        "sims_run": sims,
+        "as_of": hit.get("as_of"),
+        "lane": hit.get("lane"),
+    }
+
+
+def _count_display(coverage: dict[str, Any]) -> None:
+    coverage["rows_live_display"] = int(coverage.get("rows_live_display") or 0) + 1
 
 
 def price_moneyline(
@@ -1556,6 +1645,7 @@ def attach_live_gamelines(
     sport: Any = None,
     segment_indexes: Mapping[str, Mapping[tuple[str, str], Mapping[str, Any]]] | None = None,
     segment_pricing_enabled: bool = False,
+    segment_display_only: bool = False,
 ) -> dict[str, Any]:
     """Overlay the live game-line projection on live moneyline rows.
 
@@ -1563,6 +1653,10 @@ def attach_live_gamelines(
     `build_live_gameline_index(..., segment=...)`; a row of that segment is priced from it, and only
     from it, while `segment_pricing_enabled`. Passed with pricing off, those rows refuse
     `segment_pricing_disabled` rather than the standing `segment_is_not_full_game`.
+
+    `segment_display_only` (NBA, `#762`): with pricing off, a segment row with a live segment of its
+    own still refuses exactly as above, and ALSO carries `row[LIVE_DISPLAY_KEY]` for the Live column.
+    A settled segment gets nothing. See `live_display_block`.
 
     Mirrors `attach_live_projections`' contract deliberately: a row the join
     MISSES keeps whatever suppression it already had rather than silently
@@ -1640,6 +1734,20 @@ def attach_live_gamelines(
             record(coverage, {"priceable": False,
                               "withheld_reason": seg_reason},
                    projected=False)
+            if own_segment_index and segment_display_only and isinstance(row, dict):
+                # DISPLAY, NOT PRICE (`#762`). The refusal above and the ledger record below are untouched.
+                disp_hit, _disp_why = resolve_live_gameline(
+                    segment_indexes[segment],
+                    (_norm_team(row.get("away_team")), _norm_team(row.get("home_team"))),
+                    target_start=row.get("commence_time"),
+                    game_pk=row.get("game_pk") or game.get("game_pk"),
+                    sport=sport,
+                )
+                if isinstance(disp_hit, Mapping) and not disp_hit.get("segment_settled"):
+                    block = live_display_block(disp_hit, row, sport=sport, basis=seg_reason)
+                    if block is not None:
+                        row[LIVE_DISPLAY_KEY] = block
+                        _count_display(coverage)
             # RECORDED, NOT PRICED. See `REFUSAL_KEY` for the measurement that
             # motivates it. Identity and the reason only: no probability, no
             # edge, no market price.
@@ -1765,6 +1873,14 @@ def attach_live_gamelines(
         stale = quote_age_verdict(row.get("age_seconds"), sport=hit.get("sport"))
         if stale is not None:
             record(coverage, stale, projected=False)
+            # The QUOTE is dead, not the game: the live number is about the game, so it is shown and nothing is
+            # priced (`#762`). Full-game rows of a listed sport only.
+            if (isinstance(row, dict) and segment in _FULL_GAME_SEGMENTS
+                    and str(sport or "").strip().lower() in LIVE_DISPLAY_SPORTS):
+                block = live_display_block(hit, row, sport=sport, basis=str(stale.get("withheld_reason") or ""))
+                if block is not None:
+                    row[LIVE_DISPLAY_KEY] = block
+                    _count_display(coverage)
             continue
 
         projection = row.get("projection") if isinstance(row.get("projection"), Mapping) else {}
@@ -1853,6 +1969,15 @@ def attach_live_gamelines(
         )
 
         _apply_verdict(row, projection, verdict, hit, coverage, sport=sport)
+        # THE MONEYLINE'S LIVE NUMBER, FOR THE LIVE COLUMN (`#762`). `_apply_verdict` still does not publish it
+        # (`live_model_prob_over` feeds the plausibility gate, so publishing there would change which edges pass);
+        # the display block carries the HOME probability and `layer2_board` restates it per side.
+        if (isinstance(row, dict) and segment in _FULL_GAME_SEGMENTS
+                and str(sport or "").strip().lower() in LIVE_DISPLAY_SPORTS):
+            block = live_display_block(hit, row, sport=sport, basis="moneyline_not_published")
+            if block is not None:
+                row[LIVE_DISPLAY_KEY] = block
+                _count_display(coverage)
 
     return coverage
 

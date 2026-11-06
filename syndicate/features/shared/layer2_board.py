@@ -3348,6 +3348,11 @@ def build_layer2_rows(
             live_gameline = row.get("live_gameline")
             if live_gameline is not None:
                 candidate["live_gameline"] = live_gameline
+            # Same boundary, same reason (`#762`): the display-only live number for a row the join would not
+            # price. Read by `_live_projection_columns` alone, after the shortlist is chosen.
+            live_display = row.get("live_display")
+            if live_display is not None:
+                candidate["live_display"] = live_display
 
             # Eligibility BEFORE scoring: a dead market should never be ranked,
             # and the gate is the one place that decision lives (#245).
@@ -3959,6 +3964,10 @@ def _live_projection_columns(row: Mapping[str, Any]) -> dict[str, Any]:
     """
     projection = row.get("projection") if isinstance(row.get("projection"), Mapping) else {}
     gameline = row.get("live_gameline") if isinstance(row.get("live_gameline"), Mapping) else {}
+    # DISPLAY-ONLY live number for a row the join would not price (`#762`: NBA quarters/halves, stale-quote and
+    # moneyline rows; `live_gameline_join.live_display_block`). Used only where the priced path left a gap.
+    display = row.get("live_display") if isinstance(row.get("live_display"), Mapping) else {}
+    is_game = str(row.get("kind") or "").strip().lower() == "game"
     out: dict[str, Any] = {}
 
     # A GAME-LINE `live_projected` IS A PROBABILITY, NOT A COUNT — and it was
@@ -4001,6 +4010,11 @@ def _live_projection_columns(row: Mapping[str, Any]) -> dict[str, Any]:
         total_mean = _as_float(gameline.get("total_mean"))
         if total_mean is not None:
             out["live_total"] = total_mean
+    elif display and str(row.get("market") or "").strip().lower() in _TOTALS_ACTUAL_MARKETS:
+        # A quarter/half block's `total_mean` is that segment's own live total, so this is the row's count.
+        total_mean = _as_float(display.get("total_mean"))
+        if total_mean is not None:
+            out["live_total"] = total_mean
 
     # **h2h GAME ROWS DELIBERATELY DO NOT REACH THIS, AND MUST NOT** `[2026-09-05,
     # lane edge-basis-moneyline]`. The comment above used to say `_apply_verdict`
@@ -4027,6 +4041,15 @@ def _live_projection_columns(row: Mapping[str, Any]) -> dict[str, Any]:
         if projection.get("live_model_prob_over") is not None
         else projection.get("live_prob_over")
     )
+    if live_prob is None and display:
+        live_prob = _as_float(display.get("prob_over"))
+    # IN THE ROW'S OWN SIDE (`#762`). The live number is over/home by construction (`live_gameline_join` prices
+    # side "over" / "home"), and it was published unrestated: reproduced 2026-11-06 on main's version of this
+    # function, the home and the away row of one spread line both read 0.7 -- the away row showed P(HOME covers),
+    # the defect `_model_prob_for_side` fixed for the pregame column. Game rows only; a prop's Live cell is its
+    # count, not this.
+    if live_prob is not None and is_game:
+        live_prob = _live_prob_for_side(row, live_prob)
     if live_prob is not None:
         out["live_model_probability"] = live_prob
 
@@ -4042,12 +4065,54 @@ def _live_projection_columns(row: Mapping[str, Any]) -> dict[str, Any]:
     actual_value = _as_float(projection.get("actual_so_far"))
     if actual_value is None:
         actual_value = _game_total_actual(row)
+    if actual_value is None:
+        actual_value = _segment_margin_actual(row)
     if actual_value is not None:
         out["actual"] = actual_value
 
     if projection.get("live_aware") or gameline:
         out["live_aware"] = True
     return out
+
+
+def _live_prob_for_side(row: Mapping[str, Any], prob_first_side: float) -> float | None:
+    """A live over/home probability restated for THIS ROW'S side, by `_model_prob_for_side`'s own rules.
+
+    The frame is the live producer's, not the pregame projection's: over on a totals row, home otherwise. A
+    three-way market (a draw leg on the projection) answers only the side the number is about -- `1 - P(home)`
+    is not `P(away)` there."""
+    projection = row.get("projection") if isinstance(row.get("projection"), Mapping) else {}
+    frame = "over" if str(row.get("market") or "").strip().lower() in _TOTALS_ACTUAL_MARKETS else "home"
+    if _as_float(projection.get("draw_probability")) is not None:
+        side = str(row.get("side") or "").strip().lower()
+        return prob_first_side if side == frame else None
+    return _model_prob_for_side({**row, "projection": {"model_prob_over": prob_first_side, "side": frame}})
+
+
+_SPREAD_ACTUAL_MARKETS = frozenset({"spreads", "spreads_alt", "alternate_spreads"})
+
+
+def _segment_margin_actual(row: Mapping[str, Any]) -> float | None:
+    """Home minus away so far over a SPREAD row's own quarter/half (`#762`).
+
+    The full-game spread's actual is the chip's home margin (`intelligence_state._attach_layer2_live_actual`),
+    which deliberately skips interval rows; this is the same quantity off `game.segment_score`, under the same
+    rule as `_game_total_actual`: a q3 row never falls back to the game's score."""
+    if str(row.get("kind") or "").strip().lower() != "game":
+        return None
+    if str(row.get("market") or "").strip().lower() not in _SPREAD_ACTUAL_MARKETS:
+        return None
+    segment = str(row.get("segment") or "").strip().lower() or "full"
+    if segment == "full":
+        return None
+    game = row.get("game") if isinstance(row.get("game"), Mapping) else {}
+    score = game.get("segment_score") if isinstance(game.get("segment_score"), Mapping) else None
+    if not score or str(score.get("segment") or "").strip().lower() != segment:
+        return None
+    home, away = _as_float(score.get("home")), _as_float(score.get("away"))
+    if home is None or away is None:
+        return None
+    return home - away
 
 
 def _segment_label(segment: Any, sport: Any = None) -> str | None:

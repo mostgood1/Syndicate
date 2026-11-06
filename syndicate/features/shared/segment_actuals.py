@@ -59,6 +59,7 @@ WHAT A SEGMENT MEANS, PER SPORT, AND THE OVERTIME DECISION
                h2       periods 3 + 4 **AND EVERY OVERTIME PERIOD**
     soccer     h1       period 1 (stoppage time included -- it IS period 1)
                h2       period 2 only; extra time is NOT the second half
+    nba        as football (live board actuals only; NBA orders grade in `bet_status_nba`)
 
 `h2` includes overtime because that is the sportsbook convention the orders
 were priced under: second-half lines settle on all points scored after the
@@ -260,10 +261,24 @@ _SOCCER_SEGMENTS: Mapping[str, tuple[int | None, ...]] = {
     "h2": (2,),
 }
 
+# NBA (`#762`, lane nba-live-proj-actuals): the board's live ACTUAL for a quarter/half row, read off the chip's
+# per-period line score by `board_enrichment._segment_score_for_row`. Same shape as football: `h2` takes every
+# overtime (all four books in `bet_status_nba._OVERTIME_RULES`), `q4` is the fourth quarter alone (three of the four).
+# NBA orders are NOT graded here -- `bet_status_nba` keeps its own per-book overtime table.
+_NBA_SEGMENTS: Mapping[str, tuple[int | None, ...]] = {
+    "q1": (1,),
+    "q2": (2,),
+    "q3": (3,),
+    "q4": (4,),
+    "h1": (1, 2),
+    "h2": (3, 4, None),
+}
+
 SEGMENT_PERIODS: Mapping[str, Mapping[str, tuple[int | None, ...]]] = {
     "nfl": _FOOTBALL_SEGMENTS,
     "ncaaf": _FOOTBALL_SEGMENTS,
     "soccer": _SOCCER_SEGMENTS,
+    "nba": _NBA_SEGMENTS,
 }
 
 

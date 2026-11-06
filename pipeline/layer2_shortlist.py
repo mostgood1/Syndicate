@@ -1634,6 +1634,8 @@ def build_layer2_shortlist(
                         f"projected={gl_stats.get('rows_live_gameline_projected')} "
                         f"priceable={gl_stats.get('rows_live_gameline_priceable')} "
                         f"withheld={gl_stats.get('rows_live_gameline_withheld')} "
+                        # Display-only live numbers on rows it would not price (`#762`); 0 means none.
+                        f"display={gl_stats.get('rows_live_display') or 0} "
                         f"why={gl_stats.get('withheld_by_reason')} "                        # WHY AN EMPTY INDEX IS EMPTY. `index=0` reads as "no
                         # producer wired" and that reading was WRONG for WNBA on
                         # 2026-08-25: the lens builds every 60s and its lane was

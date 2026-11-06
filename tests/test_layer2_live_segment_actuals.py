@@ -53,7 +53,8 @@ def test_actual_column_reads_the_interval_never_the_game() -> None:
     pregame = {**_row("nfl", "full"), "projection": {}, "game": {"state": "pregame", "home_score": None, "away_score": None}}
     assert "actual" not in _live_projection_columns(pregame)
     spread = {**_row("nfl", "q2", market="spreads"), "projection": {}, "game": q2["game"]}
-    assert "actual" not in _live_projection_columns(spread)   # totals only
+    # A spread reads the interval's home MARGIN, the full-game spread's own convention (`#762`; it was totals only).
+    assert _live_projection_columns(spread)["actual"] == 7.0
 
 
 def test_prop_join_actual_still_wins() -> None:

@@ -515,6 +515,8 @@ def resim_live_game(inputs: Mapping[str, Any], game_state: Any, *, sims: int = D
     margins: list[int] = []
     periods_h: list[list[int]] = []
     periods_a: list[list[int]] = []
+    ot_h: list[int] = []
+    ot_a: list[int] = []
     rem: dict[str, dict[str, dict[str, list[int]]]] = {"home": {}, "away": {}}
     for i in range(int(sims)):
         if deadline is not None and clock() >= deadline:
@@ -529,12 +531,16 @@ def resim_live_game(inputs: Mapping[str, Any], game_state: Any, *, sims: int = D
         # every overtime in the box's `ot_pts`, so summing `hq` alone scored a simulated overtime game as a regulation
         # tie: its total missed the OT points and it counted as a home non-win. Measured over 6,215 live lanes
         # (10-13..11-05): 2.9% of draws tied in regulation, 9.2% in Q4's last 5:00 within 5 points -- and all 41 lanes
-        # resumed IN overtime published `modelHomeWinProb` 0.0. Quarter and half blocks stay regulation-only.
-        h, a = int(sum(hq)) + _ot_points(hb), int(sum(aq)) + _ot_points(ab)
+        # resumed IN overtime published `modelHomeWinProb` 0.0. Quarters stay regulation-only; `h2` takes the OT
+        # (`_segments`).
+        ot_home, ot_away = _ot_points(hb), _ot_points(ab)
+        h, a = int(sum(hq)) + ot_home, int(sum(aq)) + ot_away
         totals.append(h + a)
         margins.append(h - a)
         periods_h.append([int(x) for x in hq])
         periods_a.append([int(x) for x in aq])
+        ot_h.append(ot_home)
+        ot_a.append(ot_away)
     n = len(totals)
     wins = sum(1 for m in margins if m > 0)
     out: dict[str, Any] = {
@@ -544,7 +550,7 @@ def resim_live_game(inputs: Mapping[str, Any], game_state: Any, *, sims: int = D
         "home_margin_mean": float(np.mean(margins)),
         "total_dist": _hist(totals),
         "margin_dist": _hist(margins),
-        "segments": _segments(periods_h, periods_a),
+        "segments": _segments(periods_h, periods_a, ot_h, ot_a, period=getattr(game_state, "period", None)),
         "player_remainders": _player_remainder_hists(rem, n),
     }
     # (lane nba-no-history-admit) a no-history stand-in plays in the resumed game -- his teammates' minutes depend on
@@ -798,20 +804,40 @@ def _hist(values: Sequence[int]) -> dict[str, int]:
     return {str(k): int(v) for k, v in sorted(Counter(int(x) for x in values).items())}
 
 
-def _segments(ph: list[list[int]], pa: list[list[int]]) -> dict[str, dict[str, Any]]:
-    """Quarter and half totals/margins (regulation only; OT sits in the full-game numbers)."""
-    segs: dict[str, tuple[int, ...]] = {"q1": (0,), "q2": (1,), "q3": (2,), "q4": (3,), "h1": (0, 1), "h2": (2, 3)}
+_SEGMENT_PERIODS: dict[str, tuple[int, ...]] = {"q1": (0,), "q2": (1,), "q3": (2,), "q4": (3,), "h1": (0, 1),
+                                                 "h2": (2, 3)}
+
+
+def _segments(ph: list[list[int]], pa: list[list[int]], oth: Sequence[int] = (), ota: Sequence[int] = (), *,
+              period: Any = None) -> dict[str, dict[str, Any]]:
+    """Quarter and half totals/margins, binned the way the books settle them (`#762`).
+
+    `q4` is the fourth quarter alone; `h2` is q3 + q4 + EVERY overtime, the rule all four books in
+    `bet_status_nba._OVERTIME_RULES` settle a second half on (it used to be regulation-only, so a simulated OT
+    game's second half was short its OT points). `sims` is the draw count each block rests on. `settled` is True
+    once the live game (`period`, 1-based) has moved past the segment's last period: its histogram is then the real
+    score, not a projection. `h2` closes only with the game, so it is never settled while the game is live."""
     out: dict[str, dict[str, Any]] = {}
-    for name, idx in segs.items():
+    try:
+        live_period = int(period) if period is not None else None
+    except (TypeError, ValueError):
+        live_period = None
+    for name, idx in _SEGMENT_PERIODS.items():
         tot, mar = [], []
-        for h, a in zip(ph, pa):
+        for i, (h, a) in enumerate(zip(ph, pa)):
             if len(h) < 4 or len(a) < 4:
                 continue
-            hs, as_ = sum(h[i] for i in idx), sum(a[i] for i in idx)
+            hs, as_ = sum(h[j] for j in idx), sum(a[j] for j in idx)
+            if name == "h2":
+                hs += int(oth[i]) if i < len(oth) else 0
+                as_ += int(ota[i]) if i < len(ota) else 0
             tot.append(hs + as_)
             mar.append(hs - as_)
         if tot:
-            out[name] = {"total_mean": sum(tot) / len(tot), "total_dist": _hist(tot), "margin_dist": _hist(mar)}
+            last_period = idx[-1] + 1
+            out[name] = {"total_mean": sum(tot) / len(tot), "total_dist": _hist(tot), "margin_dist": _hist(mar),
+                         "sims": len(tot),
+                         "settled": name != "h2" and live_period is not None and live_period > last_period}
     return out
 
 

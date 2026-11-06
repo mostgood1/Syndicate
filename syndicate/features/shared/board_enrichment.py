@@ -2934,6 +2934,23 @@ def attach_live_gamelines_for_sport(grid: list, *, sport: str, selected_date: st
                     )
                     for seg in league_for(sport).segments
                 }
+            # NBA QUARTERS AND HALVES, DISPLAY ONLY (`#762`, lane nba-live-proj-actuals). The same per-segment
+            # indexes, off the re-sim's own segment blocks (`nba/live_resim._segments`), so a q3 row only ever
+            # meets a q3 number. Never priced: `college_pricing` below is the COLLEGE switch and is False for
+            # every other sport, so a college opt-in cannot price NBA segments by accident.
+            elif sport == "nba":
+                segment_indexes = {
+                    seg: build_live_gameline_index(
+                        snapshot,
+                        sources=lens_sources_for_sport(sport),
+                        analytic_std_err=analytic_std_err_for_sport(sport),
+                        sport=sport,
+                        slate_date=selected_date,
+                        segment=seg,
+                    )
+                    for seg in ("q1", "q2", "q3", "q4", "h1", "h2")
+                }
+            college_pricing = sport in ("ncaab", "wncaab") and college_segment_pricing_enabled()
             coverage = attach_live_gamelines(
                 grid,
                 build_live_gameline_index(
@@ -2960,13 +2977,14 @@ def attach_live_gamelines_for_sport(grid: list, *, sport: str, selected_date: st
                 # carries. Threaded so disabling one sport cannot silence another.
                 sport=sport,
                 segment_indexes=segment_indexes,
-                segment_pricing_enabled=college_segment_pricing_enabled(),
+                segment_pricing_enabled=college_pricing,
+                segment_display_only=sport == "nba",
             )
             if segment_index is not None:
                 coverage["segment_index_size"] = len(segment_index)
             if segment_indexes is not None:
                 coverage["segment_index_sizes"] = {seg: len(ix) for seg, ix in segment_indexes.items()}
-                coverage["segment_pricing_enabled"] = college_segment_pricing_enabled()
+                coverage["segment_pricing_enabled"] = college_pricing
         coverage["supported"] = True
         coverage["index_diagnostics"] = index_diag
         _attribute_live_gameline_zero(coverage, index_diag, sport=sport)
