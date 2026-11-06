@@ -1,5 +1,37 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#764` — **KALSHI TOTALS THAT NAME NO GAME PRICE ANOTHER GAME'S ROW: 26 of 26 measured sides wrong-game (men's and women's college basketball, college football). Polymarket is clean in every sport. NOT FIXED** — 2026-11-06, session e32fef1a (user "Yes, measure it here")
+- **How it was measured (2026-11-06 17:34-17:39Z, read-only, nice 19):**
+  - `apply_venue_quotes_to_grid` replayed on a copy of each sport's on-disk grid, with the fleet's code (`3d376da7c`) and data.
+  - Grids for 11-06: nfl, ncaaf, nba, nhl, ncaab, wncaab, soccer. For 11-07: ncaaf, soccer. mlb and wnba have none.
+  - For every side a venue priced, the quote behind its `venue_ref` was checked against the row's game.
+- **Polymarket:** every priced side is the row's own game, in every sport. New sides at 17:35Z: ncaab 108, ncaaf 164 (11-07), nfl 30, nba 28. `f070ac25c`'s college drop holds, and no other sport has the hole on Polymarket.
+- **Kalshi moneylines that name no game:** 143 sides over 98 ticker/row pairs, every one the row's own game by its ticker. The club key carries the identity.
+- **Kalshi TOTALS that name no game: 26 of 26 sides carry another game's market.**
+  - ncaab: 14 sides on 4 games. Texas Southern @ LSU 162.5 is priced from `KXNCAAMBTOTAL-26NOV06CSNKSU-163` (CSU Northridge / Kansas St); CSU Northridge @ Kansas St 164.5 from `...TARLUSD-165`.
+  - wncaab: 2 sides on 2 games, e.g. Northwestern St @ Arkansas 132.5 from `KXNCAAWBTOTAL-26NOV06STNHND-133`.
+  - ncaaf: 10 sides on 4 games. `KXNCAAFTOTAL-26NOV07IWSELA-39` prices UCLA @ Minnesota; `...CINHOU-64` prices Oklahoma St @ Kansas St at +113 / -117, a plausible-looking price.
+  - soccer: 21 Kalshi totals that name no game (15 full-game, 6 first-half) sit in the pool on each date, and none priced a row at read time (latent).
+- **How often Kalshi names no game in the fan-in:** ncaaf 406 of 406 quotes (11-06 and 11-07), wncaab 321 of 333, ncaab 367 of 887. NHL's are player props, keyed by player, which is by design.
+- **Cause:** `_unconfirmed_on_a_contested_key` lets a quote that names no game answer any bare key that only ONE GRID game claims.
+  - The grid is not the venue's slate: Kalshi lists games the grid does not carry.
+  - A totals key, `sport|totals|side|line`, holds no game.
+  - So "uncontested on the grid" is not "uncontested". This is the same hole `f070ac25c` closed for Polymarket college, now on Kalshi and in more than college basketball.
+- **Served effect, read at 17:38Z via `/api/board/layer2-shortlist`:**
+  - 6 of the 26 sides are served as opportunity rows labelled `price_source=kalshi`. Their served price, `book_prices` and consensus fair all come from real books.
+  - On pregame rows the fan-in writes `best[side]` only, and the served price comes from `cells`. So the wrong number reaches `best[side]`'s age, `price_source`, `venue_ref` and `venue_basis`, but not the served price or EV.
+- **Not measured, from reading the code:** live rows.
+  - `_reprice_live_benchmark` writes the venue into `cells` and sets the books aside. It checks that both sides came from ONE VENUE, not one game.
+  - 24 of the 26 sides are both sides of one ticker.
+  - So once a game is live, the other game's line can become the served live price and fair. College basketball tips from 00:00Z 11-07; college football plays 11-07.
+  - Also untraced: what reads `best[side]` age and `price_source` on pregame rows (gate freshness, commit placeability).
+- **Proposed fix (not started):**
+  - At the fan-in choke point, refuse a quote that names no game on a role-keyed (totals / spreads) bare key, in every sport.
+  - Cost at read time: 0 correct sides. Every no-game totals side that priced a row was wrong-game, and moneylines are untouched.
+  - Caveat: MLB and WNBA are out of season and unmeasured.
+  - Coverage follow-up: name NCAAF Kalshi games in the fan-in. The order path (`kalshi_board_join`) resolves them with Kalshi's own code-to-name pairs; `_kalshi_game_token` passes none.
+- **Probes:** `venue_prov.py`, `served_rows.py`, `served_src.py`, in this session's scratchpad.
+
 ### `#763` — **COLLEGE LIVE HALVES / QUARTERS: built and OFF (`cc2cea242`, on the fleet since 2026-11-05 22:36Z, pricing still off). Turning pricing on needs fresher segment quotes. Also: the basketball sims drop overtime points from full-game totals** — 2026-11-05, lane `wncaab-module` (user "Yes, college first")
 - **Built:** the college re-sim's h2 includes overtime (the engine keeps OT in the box's `ot_pts`, outside the period list). Each segment carries its sim count, share of regulation left and `settled`, and its margin takes the market anchor scaled by that share. The join prices a segment row from that segment's own index (`segment_indexes`), refusing `segment_already_over` / `segment_margin_not_anchored`, and says `segment_pricing_disabled` while off. Switch `SYNDICATE_COLLEGE_LIVE_SEGMENT_PRICING`, opt-in. The pregame sim runs the same function, so pregame h2 rows include OT once this ships.
 - **Why off (replay 2026-11-05 ~01:56Z, new code on the fleet's live NCAAB snapshot + board, 6 games, 117 live h1/h2 rows):** the freshest segment quote was 240-400 s old (the in-play lane fetches every 240 s). Model minus market there: mean |edge| 11.3 pp spreads (n=13), 14.4 pp totals (n=16); at 400-600 s, 25.5 / 31.9 pp. 31 rows quoted first halves already over. Late in a half the game outruns the quote, and the 600 s default ceiling admits it.
