@@ -743,10 +743,10 @@ death, never life — do not invert it.
 - Verification: Fleet, next big NBA slate: (i) NBA_LIVE_RESIM_TICK carried= > 0 when budget_exhausted fires and per-game resimmed share flat across scoreboard position in live_resim_history; (ii) served /api/intelligence/query: share of live NBA rows (per game) with Live proj./Live actual, before vs after; (iii) LIVE_COLUMNS_REFRESHED_FROM_ARTIFACT sport=nba lines on web; (iv) spreads rows' live_total absent, Live proj. renders cover %. (v) `#762`, first live NBA slate after the deploy: per game, quarter/half rows with Live proj. and Live actual > 0 (11-05: 0 of 260); 0 segment rows with `edge_vs_market_pct`; NBA segment ledger records still refusals; an away spread row's live % = 1 - its home row's.
 - Blocked by: none
 
-### closed-lane-archive-20261106-0147 — CLOSED 2026-11-06 (GOAL MET: 1 block archived) — opened 2026-11-06 — session 46f870eb-96a5-4df8-8312-bde2d0763263
+### closed-lane-archive-20261106-1040 — CLOSED 2026-11-06 (GOAL MET: 1 block archived) — opened 2026-11-06 — session 5f92da50-c5b5-4bc3-a8f6-20197eb8d085
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
-- Verdict: GOAL MET. Moved `closed-lane-archive-20261105-2141` (owner_liveness SAFE, 10dadf79 241m idle). 8 others WAIT; reasons in log 2026-11-06.
+- Verdict: GOAL MET — owner_liveness.py --idle-min 240 read 1 of 9 CLOSED SAFE; moved `closed-lane-archive-20261106-0147`. 8 WAIT (owner e32fef1a live; d458ff9c no transcript). Table in log/2026-11-06.md.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -925,6 +925,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261105-1320` — CLOSED 2026-11-05 (GOAL MET: 1 block archived) — opened 2026-11-05 — session e7e95e9a-ec3d-45fe-86ef-2478544fa98d
 - `closed-lane-archive-20261105-1725` — CLOSED 2026-11-05 (GOAL MET: 1 block archived) — opened 2026-11-05 — session 0205937c-3727-40bc-b340-e97495e89eaf
 - `closed-lane-archive-20261105-2141` — CLOSED 2026-11-05 (GOAL MET: 1 block archived) — opened 2026-11-05 — session 10dadf79-53b0-4adb-ad30-03f3a07d8ad0
+- `closed-lane-archive-20261106-0147` — CLOSED 2026-11-06 (GOAL MET: 1 block archived) — opened 2026-11-06 — session 46f870eb-96a5-4df8-8312-bde2d0763263
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
