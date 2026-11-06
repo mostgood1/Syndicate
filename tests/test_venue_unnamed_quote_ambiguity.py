@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import time
 
+from syndicate.features.shared import venue_quote_fanin as fanin
 from syndicate.features.shared.venue_quote_adapters import quote_key
 from syndicate.features.shared.venue_quote_fanin import Quote, apply_venue_quotes_to_grid
 
@@ -95,13 +96,22 @@ def test_TWO_games_sharing_a_key_refuse_an_unnamed_quote():
         assert row["best"]["over"].get("price_source") is None
 
 
-def test_ONE_game_claiming_the_key_still_takes_an_unnamed_quote():
-    """off != on, and the COVERAGE half of it.
+def test_ONE_game_claiming_the_key_still_takes_an_unnamed_quote(monkeypatch):
+    """off != on, and the COVERAGE half of it -- for THIS guard (`#603`).
 
     The guard must bite only where the key is contested. A sport with one live
     game must keep working exactly as before, or this trades a wrong-price bug
     for a no-price bug.
+
+    `#764` (2026-11-06) is switched OFF here, deliberately. "One GRID game
+    claims the key" turned out not to mean one game: a live venue lists games
+    the grid does not carry, and on the fleet's 11-06 data every unnamed Kalshi
+    totals side this rule let through was another game's market, 26 of 26. So
+    `#764` now refuses this exact quote; this test keeps pinning what the
+    claimant count alone decides. `tests/test_venue_fanin_unnamed_role_key.py`
+    pins the shipped state.
     """
+    monkeypatch.setattr(fanin, "_UNNAMED_ROLE_KEY_REFUSAL_ENABLED", False)
     now = time.time()
     grid = [_row("evt-bal-ath", "Baltimore Orioles", "Athletics")]
     quotes = dict([_quote(now, "over", game=None), _quote(now, "under", game=None)])
@@ -218,13 +228,18 @@ def test_THIRTY_THREE_fixtures_on_one_ticker_yield_ZERO_matches():
     assert all(r["best"]["over"]["price"] == -110 for r in grid)
 
 
-def test_the_guard_is_keyed_per_LINE_not_per_market():
+def test_the_guard_is_keyed_per_LINE_not_per_market(monkeypatch):
     """Two games on DIFFERENT lines do not contest each other.
 
     `over 7.5` and `over 8.5` are different keys, so each is claimed by one game
     and both keep their quote. Over-refusing here would silently delete good
     coverage across a whole slate.
+
+    `#764` is switched OFF for the reason given in
+    `test_ONE_game_claiming_the_key_still_takes_an_unnamed_quote`: this pins
+    the claimant count, not the shipped refusal of unnamed venue totals.
     """
+    monkeypatch.setattr(fanin, "_UNNAMED_ROLE_KEY_REFUSAL_ENABLED", False)
     now = time.time()
     grid = [
         _row("evt-a", "Away A", "Home A", line=7.5),

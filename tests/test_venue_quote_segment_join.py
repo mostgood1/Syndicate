@@ -273,6 +273,10 @@ def test_the_defect_spans_polymarket_too(kalshi_artifact, refusing):
                 line=4.5,
                 fetched_at=now,
                 venue_ref="tsc-mlb-mil-cin-2026-09-06-tot-4pt5",
+                # Named, as the Polymarket adapter names a paired game: an
+                # unnamed one is refused by `#764` before the segment guard
+                # is ever asked.
+                game=fanin._row_game_token(_grid_row("first5"), "mlb"),
             )
         }
     }
@@ -289,6 +293,8 @@ def test_an_unsegmented_sport_is_untouched(kalshi_artifact):
     vocabulary must behave exactly as before rather than start refusing."""
     kalshi_artifact(FULL_GAME_CONTRACT)
     now = time.time()
+    ncaab_row = _grid_row("full")
+    ncaab_row["sport"] = "ncaab"
     collected = {
         "quotes": {
             "ncaab|totals|over|4.5": Quote(
@@ -302,11 +308,12 @@ def test_an_unsegmented_sport_is_untouched(kalshi_artifact):
                 line=4.5,
                 fetched_at=now,
                 venue_ref="KXNCAABTOTAL-X-4",
+                # Named: an unnamed one is refused by `#764` (totals key).
+                game=fanin._row_game_token(ncaab_row, "ncaab"),
             )
         }
     }
-    row = _grid_row("full")
-    row["sport"] = "ncaab"
+    row = ncaab_row
     result = apply_venue_quotes_to_grid(
         [row], "ncaab", "2026-09-06", now=now, collected=collected
     )
@@ -325,10 +332,15 @@ def test_the_freshness_path_carries_the_same_rule(kalshi_artifact, refusing):
     join that works on whichever one you happen to read -- the failure `#603`
     already paid for in this module."""
     kalshi_artifact(F5_CONTRACT, FULL_GAME_CONTRACT)
+    # `event_id` so the board names its game and the Kalshi ticker resolves to
+    # it: since `#764` an UNNAMED Kalshi totals quote is refused before the
+    # segment guard is asked, and this test is about the segment guard.
     rows = [
         {"sport": "mlb", "segment": "first5", "market": "totals", "side": "over", "line": 4.5,
+         "event_id": "mlb-2026-09-06-MIL-CIN",
          "home_team": "Cincinnati Reds", "away_team": "Milwaukee Brewers"},
         {"sport": "mlb", "segment": "full", "market": "totals", "side": "over", "line": 4.5,
+         "event_id": "mlb-2026-09-06-MIL-CIN",
          "home_team": "Cincinnati Reds", "away_team": "Milwaukee Brewers"},
     ]
     result = apply_venue_quotes(rows, "2026-09-06", now=time.time())

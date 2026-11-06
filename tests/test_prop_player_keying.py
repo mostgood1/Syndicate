@@ -283,15 +283,17 @@ def test_selections_are_attributed_per_sport():
     from syndicate.features.shared.venue_quote_fanin import Quote, apply_venue_quotes
 
     now = 1_787_000_000.0
+    # Each quote NAMES its game: since `#764` a live venue's totals quote that
+    # names no game is refused outright, and this test is about attribution.
     quotes = {
         "soccer|totals|over|2.5": Quote(
             key="soccer|totals|over|2.5", source="polymarket_us", sport="soccer",
             market="totals", side="over", probability=0.5, american=100,
-            line=2.5, fetched_at=now),
+            line=2.5, fetched_at=now, game="evt:soccer-1"),
         "nfl|totals|over|44.5": Quote(
             key="nfl|totals|over|44.5", source="kalshi", sport="nfl",
             market="totals", side="over", probability=0.5, american=100,
-            line=44.5, fetched_at=now),
+            line=44.5, fetched_at=now, game="evt:nfl-1"),
     }
     collected = {
         "soccer": {"quotes": quotes, "by_source": {}, "ceiling_seconds": 86400},

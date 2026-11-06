@@ -573,6 +573,9 @@ def apply_venue_quotes(
     cross_date_counts: dict[str, int] = {}
     ambiguous_unnamed_rejected = 0
     # Quotes DETECTED pricing a different PORTION of the game than the row.
+    # `#764`: live-venue quotes naming NO game on a totals/spreads key. Counted
+    # whether or not `_UNNAMED_ROLE_KEY_REFUSAL_ENABLED` refuses them.
+    unnamed_role_key_detected = 0
     #
     # `_detected`, NOT `_rejected`, and the distinction is the whole point of
     # shipping this before the refusal: while `_SEGMENT_REFUSAL_ENABLED` is
@@ -688,6 +691,13 @@ def apply_venue_quotes(
             ):
                 ambiguous_unnamed_rejected += 1
                 continue
+            # `#764`, SAME RULE AND SAME HELPER AS THE GRID PATH. The check
+            # above only sees the board's games; a live venue lists more, so a
+            # quote naming no game on a role key may be another game's line.
+            if _unnamed_venue_quote_on_a_role_key(found, row.get("market")):
+                unnamed_role_key_detected += 1
+                if _UNNAMED_ROLE_KEY_REFUSAL_ENABLED:
+                    continue
             # A QUOTE FOR A DIFFERENT PORTION OF THE GAME IS NOT THIS ROW'S
             # PRICE, however well its key matched. Same rule and same helper as
             # the grid path below -- two paths disagreeing about whether a
@@ -781,6 +791,16 @@ def apply_venue_quotes(
         flush=True,
     )
 
+    # `#764`. UNCONDITIONAL, INCLUDING THE ZERO.
+    print(
+        "[venue_quote_fanin] UNNAMED_ROLE_KEY_ROWS"
+        f" count={unnamed_role_key_detected} rows_in={len(rows)} stamped={stamped}"
+        f" refusing={_UNNAMED_ROLE_KEY_REFUSAL_ENABLED}"
+        " -- live-venue quotes naming NO game on a totals/spreads key (#764);"
+        " refusing=False means counted and still used",
+        flush=True,
+    )
+
     # UNCONDITIONAL, INCLUDING THE ZERO, AND WITH THE SAMPLE BESIDE IT. The
     # 2026-09-05 audit could not tell "the guard is fine" from "the guard is
     # not on this path", because the counter it read
@@ -810,6 +830,8 @@ def apply_venue_quotes(
         "doubleheader_rows": dict(dh_counts),
         "ambiguous_unnamed_rejected": ambiguous_unnamed_rejected,
         "segment_mismatch_detected": segment_mismatch_detected,
+        "unnamed_role_key_detected": unnamed_role_key_detected,
+        "unnamed_role_key_refusal_enabled": _UNNAMED_ROLE_KEY_REFUSAL_ENABLED,
         "segment_refusal_enabled": _SEGMENT_REFUSAL_ENABLED,
         "segment_mismatch_sample": list(segment_mismatch_sample),
         # The number that predicts whether this actually helped. Rows left
@@ -1162,6 +1184,50 @@ def _key_claimants(
 
 def _quote_names_no_game(quote: Any) -> bool:
     return not str(getattr(quote, "game", None) or "").strip()
+
+# `#764`. THE GRID IS NOT THE VENUE'S SLATE.
+#
+# `_unconfirmed_on_a_contested_key` lets a quote that names no game answer any
+# bare key that only ONE GRID GAME claims. Its claimant count sees the board's
+# games only, while Kalshi and Polymarket list games the board does not carry,
+# so "uncontested on the grid" is not "uncontested" -- and a totals or spreads
+# key (`sport|totals|side|line`) holds no game term to tell them apart.
+#
+# Measured 2026-11-06 (read-only replay of this fan-in, fleet `3d376da7c`, every
+# sport with a grid): Kalshi totals that named no game priced 26 board sides,
+# and all 26 were ANOTHER game's market. `KXNCAAMBTOTAL-26NOV06CSNKSU-163`
+# (CSU Northridge / Kansas St) priced Texas Southern @ LSU 162.5;
+# `KXNCAAFTOTAL-26NOV07CINHOU-64` (Cincinnati / Houston) priced Oklahoma St @
+# Kansas St at +113 / -117 -- a price that looks entirely normal. The same
+# replay found 0 correct sides priced this way, so the refusal removes nothing
+# that was measured to be right. Moneylines are untouched: their side IS the
+# club, and 143 of 143 unnamed Kalshi moneyline sides were the right game.
+#
+# ON LIVE ROWS THIS IS NOT COSMETIC. `_reprice_live_benchmark` writes the venue
+# into `cells` and sets the books aside; it checks that both sides came from
+# ONE VENUE, not one game, and 24 of the 26 were both sides of one ticker. So
+# once a game is live the other game's line became its served price and fair.
+#
+# SCOPE: the two live venues only. OddsAPI's role-keyed quotes also name no
+# game on sports without a club map (ncaaf, ncaab, nhl), but its shard is the
+# feed the grid is built from, so the grid's claimant count does describe its
+# slate. It was not measured here and is deliberately left as it was.
+#
+# A module constant, like `_SEGMENT_REFUSAL_ENABLED`, so a test can prove the
+# refusal is reachable (off != on) and the counter still measures when off.
+_UNNAMED_ROLE_KEY_REFUSAL_ENABLED = True
+
+
+def _unnamed_venue_quote_on_a_role_key(quote: Any, market: Any) -> bool:
+    """True when a LIVE VENUE's quote names no game on a row whose market keys
+    its side by ROLE (over/under, home/away), so neither the quote nor the key
+    can say which game it prices. Detection only: the caller refuses when
+    `_UNNAMED_ROLE_KEY_REFUSAL_ENABLED` is on (`#764`)."""
+    if str(market or "").strip().lower() not in _ROLE_KEYED_MARKETS:
+        return False
+    if str(getattr(quote, "source", None) or "").strip().lower() not in _LIVE_QUOTING_VENUES:
+        return False
+    return _quote_names_no_game(quote)
 
 
 def _unconfirmed_on_a_contested_key(
@@ -1814,6 +1880,10 @@ def apply_venue_quotes_to_grid(
     cross_date_counts: dict[str, int] = {}
     ambiguous_unnamed_rejected = 0
     grid_claimants: dict[str, set[str]] | None = None
+    # `#764`: live-venue quotes naming NO game on a totals/spreads key, and the
+    # contracts behind them, bounded. Counted whether or not refused.
+    unnamed_role_key_detected = 0
+    unnamed_role_key_sample: list[str] = []
     grid_dh_ranks, grid_dh_unrankable = _doubleheader_ranks_for(
         [row for row in (grid or []) if isinstance(row, Mapping)], sport_slug
     )
@@ -1973,6 +2043,18 @@ def apply_venue_quotes_to_grid(
                     ambiguous_unnamed_rejected += 1
                     _shape_note(_shape, "refused_ambiguous", live=row_is_live)
                     continue
+                # `#764`. The check above counts the GRID's games only, and a
+                # live venue lists games the grid does not carry. A quote that
+                # names no game on a role key (`sport|totals|over|162.5`) may be
+                # any of them: measured 26 of 26 such sides another game's.
+                if _unnamed_venue_quote_on_a_role_key(found, market):
+                    unnamed_role_key_detected += 1
+                    _ref = str(getattr(found, "venue_ref", None) or "?")
+                    if len(unnamed_role_key_sample) < 5 and _ref not in unnamed_role_key_sample:
+                        unnamed_role_key_sample.append(_ref)
+                    if _UNNAMED_ROLE_KEY_REFUSAL_ENABLED:
+                        _shape_note(_shape, "refused_unnamed_role_key", live=row_is_live)
+                        continue
                 # THE GUARD THIS PATH NEVER HAD. `quote_key` above is built
                 # from `market` alone, while the grid row carries `segment`
                 # beside it (`book_grid._INSTANCE_FIELDS`) -- so a `first5`
@@ -2309,6 +2391,16 @@ def apply_venue_quotes_to_grid(
         flush=True,
     )
 
+    # `#764`. UNCONDITIONAL, INCLUDING THE ZERO, with the contracts named.
+    print(
+        "[venue_quote_fanin] UNNAMED_ROLE_KEY_GRID"
+        f" sport={sport_slug} count={unnamed_role_key_detected} sides_seen={sides_seen}"
+        f" sample={unnamed_role_key_sample} refusing={_UNNAMED_ROLE_KEY_REFUSAL_ENABLED}"
+        " -- live-venue quotes naming NO game on a totals/spreads key (#764);"
+        " refusing=False means counted and still used",
+        flush=True,
+    )
+
     if cross_game_rejected:
         print(
             "[venue_quote_fanin] CROSS_GAME_REJECTED_GRID"
@@ -2370,6 +2462,10 @@ def apply_venue_quotes_to_grid(
         # facts that look identical without `sides_seen`.
         "ambiguous_unnamed_rejected": ambiguous_unnamed_rejected,
         "venue_basis_rows": venue_basis_rows,
+        # `#764`. Count, switch and named contracts, returned as well as printed.
+        "unnamed_role_key_detected": unnamed_role_key_detected,
+        "unnamed_role_key_refusal_enabled": _UNNAMED_ROLE_KEY_REFUSAL_ENABLED,
+        "unnamed_role_key_sample": list(unnamed_role_key_sample),
         # `#S6a`. Returned as well as printed so a caller can aggregate the
         # coverage across sports without parsing logs.
         "fee_multiplier_resolved": fee_multiplier_resolved,

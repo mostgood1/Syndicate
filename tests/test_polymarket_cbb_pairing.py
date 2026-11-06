@@ -25,6 +25,7 @@ import pytest
 
 from syndicate.features.shared import polymarket_board_join as pbj
 from syndicate.features.shared import venue_quote_adapters as adapters
+from syndicate.features.shared import venue_quote_fanin as fanin
 from syndicate.features.shared.venue_quote_fanin import (
     _row_game_token,
     apply_venue_quotes_to_grid,
@@ -322,8 +323,14 @@ def test_an_unnamed_college_quote_cannot_price_another_game(slate_with_unnamed_g
 
 def test_dropping_unnamed_quotes_is_what_protects_the_row(monkeypatch, slate_with_unnamed_game):
     """off != on: without the drop, Towson's rung answers the bare key first and
-    CSUN's total takes Towson's prices -- the fleet's Cal Poly reading."""
+    CSUN's total takes Towson's prices -- the fleet's Cal Poly reading.
+
+    The fan-in's own `#764` refusal is switched off as well: it is a second,
+    independent guard on the same shape (an unnamed venue quote on a totals
+    key), and with it on this row is protected even without the adapter drop.
+    `tests/test_venue_fanin_unnamed_role_key.py` pins that half."""
     monkeypatch.setattr(adapters, "_NAMED_GAME_ONLY_SPORTS", frozenset())
+    monkeypatch.setattr(fanin, "_UNNAMED_ROLE_KEY_REFUSAL_ENABLED", False)
     grid = [_grid_row(_LONGWOOD, 150.5), _grid_row(_CSUN, 161.5)]
 
     _reprice(grid)
