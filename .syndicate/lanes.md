@@ -827,7 +827,16 @@ ba_lens_state_check.py`.
 - Verification: unit tests incl. off != on (artifact present -> block, absent -> none); JS render test; fleet: game-chips read pregame + live per sport (share with a block vs games with a sim; source live_resim on live chips; settled == linescore); served-page screenshot of the rail; 0 tracebacks; chip publish time not up >10%
 - Blocked by: none
 
-### basketball-interval-backtest — OPEN — opened 2026-11-07 — session c2fd17f8-7d77-4eed-b025-0830211e05b3
+### basketball-interval-backtest — CLOSED 2026-11-07 (GOAL MET: harness on main 4264deceb..c7ba7a01c, run on the fleet for NCAAB + NBA + WNBA; findings + todo #765) — opened 2026-11-07 — session c2fd17f8-7d77-4eed-b025-0830211e05b3
+- **GOAL VERDICT `[2026-11-07 22:02Z checkpoint]`: GOAL: MET.**
+  - Goal verbatim: "A read-only replay harness scores basketball interval projections (full-game / h1 / h2 / q1-q4 total and home margin) every 30 s of game clock over completed games, per projector x league x segment x clock bucket (college min 10/20/30/38; NBA/WNBA the same fractions), with per-family date coverage and game counts printed; it runs end to end on NCAAB and at least one other league; each projector variant has an off != on reachability test; findings file holds the MAE/bias table vs the old NCAAB app bar (25.97/16.75/10.64/4.67) and the old NBA pregame quarter MAE 8.53; landed on main. Measurement only: no engine, re-sim or served-code edit, no deploy, college segment pricing stays off (#763)".
+  - Readings: 22 tests green (an off != on test per variant).
+  - Runs on the fleet data root, read-only at nice 19, coverage printed per family:
+    - NCAAB 2025-26: 6,257 games every 30 s, plus a 400-game re-sim sample;
+    - NBA 2026-27: 132 games with the re-sim and the tick;
+    - NBA 2025-26: 1,391 games; WNBA 2026: 373 games.
+  - The findings hold both bars. No engine, re-sim or served code touched; no deploy.
+  - Result: the bar is `pregame_rate`; NBA's re-sim beats it nowhere; NCAAB's wins on h2 and the in-game full total and loses on h1 (todo #765).
 - Goal: A read-only replay harness scores basketball interval projections (full-game / h1 / h2 / q1-q4 total and home margin) every 30 s of game clock over completed games, per projector x league x segment x clock bucket (college min 10/20/30/38; NBA/WNBA the same fractions), with per-family date coverage and game counts printed; it runs end to end on NCAAB and at least one other league; each projector variant has an off != on reachability test; findings file holds the MAE/bias table vs the old NCAAB app bar (25.97/16.75/10.64/4.67) and the old NBA pregame quarter MAE 8.53; landed on main. Measurement only: no engine, re-sim or served-code edit, no deploy, college segment pricing stays off (#763)
 - Files: scripts/backtest_basketball_intervals.py (NEW), syndicate/features/shared/basketball_interval_backtest.py (NEW), tests/test_basketball_interval_backtest.py (NEW), .syndicate/findings_2026-11-07_basketball_interval_backtest.md (NEW), docs/ai_context/todo.md (a new item section for this harness only)
 - Hypothesis: n/a (builds the bar; Phase 2 engine variants are judged against it later)

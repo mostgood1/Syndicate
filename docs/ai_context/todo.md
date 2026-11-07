@@ -1,5 +1,28 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#765` — **BASKETBALL INTERVAL REPLAY HARNESS: BUILT, ON MAIN, RUN ON THE FLEET. The bar for Phase 2 is the pregame line spread over the time left (`pregame_rate`), not the engine. NBA's live re-sim beats it nowhere; NCAAB's beats it on h2 and the in-game full total but loses on h1; observed game pace loses everywhere** — 2026-11-07, lane `basketball-interval-backtest` (session c2fd17f8; Phase 2 step 1 of the user's interval-projection plan)
+- **Built (on main `4264deceb`..`c7ba7a01c`, new files only, read-only, no deploy):**
+  - `syndicate/features/shared/basketball_interval_backtest.py`: state every 30 s from the `pbp_events` prefix with the production builders; projectors; scoring; `paired_delta`, the game-clustered ship gate.
+  - `scripts/backtest_basketball_intervals.py`: fleet loaders, per-family coverage first, walk-forward NCAAB priors plus a daily prior-calibration refit.
+  - `tests/test_basketball_interval_backtest.py`: 22 tests, an off != on test per variant.
+- **Findings:** `.syndicate/findings_2026-11-07_basketball_interval_backtest.md`. Outputs in WSL `~/bball_iv/runs/`.
+- **Measured (2026-11-07, fleet data root read-only):**
+  - NBA 2026-27 regular, 132 games, 17 dates: the re-sim is n.s. or WORSE than `pregame_rate` in every segment x checkpoint (full total +0.93 ± 0.67 at 12m). The tick is worse in 9 of 23 cells.
+  - NCAAB 2025-26 regular, 282 paired games: the re-sim is BETTER on h2 at every checkpoint and on the full total from minute 20 (-0.88 ± 0.26 at 30m); WORSE on h1 (+1.62 at the tip, its pregame h1 runs +8.4 high); anchored margin ties the line.
+  - 5,000+ NCAAB games: pooled game pace / efficiency / rate lose to the line at minutes 10-38 (replicates #535).
+  - Shape biases: the line's even split puts h1 +4.35 / h2 -5.01; every projector is ~4 low at minute 38.
+  - The old bars (NCAAB 25.97 / 16.75 / 10.64 / 4.67; NBA pregame quarter 8.53) are beaten by the line alone.
+  - Fidelity: production's recorded NBA live re-sim and the replay have the same MAE on the same games (14.71 vs 14.61 at 12m ... 5.12 vs 5.18 at 45.6m).
+- **Next (Phase 2, each against this harness):**
+  - the NCAAB half split (`SYNDICATE_NCAAB_HALF_SPLIT`; gate: h1 better, h2 / full do not regress);
+  - the end-game mechanisms (`resim_mech --mechanisms`);
+  - then pace only if pooled much harder than k=60 possessions.
+- **Not covered:**
+  - WNCAAB: no pbp store on the fleet; `build_basketball_rotation_stints.py` does not run for it.
+  - The WNBA re-sim: pregame inputs persisted for 6 of 373 games.
+  - Shot mix: an extension point, not a variant.
+- **Pricing:** college segment pricing stays off (#763).
+
 ### `#764` — **KALSHI TOTALS THAT NAME NO GAME PRICE ANOTHER GAME'S ROW: 26 of 26 measured sides wrong-game (men's and women's college basketball, college football). Polymarket is clean in every sport. NOT FIXED** — 2026-11-06, session e32fef1a (user "Yes, measure it here")
 - **UPDATE 2026-11-07 20:47:15Z (2:47 PM CST): REVERSED-ORDER GAP DIAGNOSED AND FIXED, on a branch only** (lane `kalshi-fanin-reversed-orientation`, on branch `claude/syndicate-ai-engine-762439` only, not on main, not loaded).
   - **Cause, confirmed on fleet data:** `kalshi_catalogue._candidate_blobs` builds `AWAY+HOME` only, for every sport but soccer.
