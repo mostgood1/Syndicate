@@ -468,13 +468,115 @@ def _kalshi_leg_probability(row: Mapping[str, Any], leg: str) -> float | None:
     return value
 
 
-def _kalshi_game_token(ticker: Any, sport: Any, games: Any, memo: "dict | None" = None) -> str | None:
+# KALSHI'S OWN CODE -> NAME PAIRS, IN THE FAN-IN TOO (`#764` follow-up, lane
+# `kalshi-fanin-college-naming`, 2026-11-07).
+#
+# `_kalshi_game_token_uncached` resolved a ticker with `match_event_blob` and NO
+# `code_names`, then turned the match into `game_token(...)` alone. Two holes,
+# both measured on the fleet 2026-11-07:
+#
+#   * Kalshi's college codes (`CSF`, `SDAK`, `TXST`...) are not in our alias
+#     maps, so the blob matched nothing. Kalshi PUBLISHES the pairing beside
+#     every moneyline ("Cal State Fullerton wins" on `...CSFSDAK-CSF`): 258
+#     codes in KXNCAAF, 287 in KXNCAAMB, 283 in KXNCAAWB. The ORDER path has
+#     read it since 2026-09-01 (`kalshi_board_join.build_club_code_names`); this
+#     path never did.
+#   * `game_token` refuses NCAAF by design (see `event_game_token`), so even a
+#     match came back None -- ncaaf named 406 of 406 Kalshi quotes as nothing.
+#
+# With `#764` refusing unnamed quotes on totals/spreads keys, that cost real
+# coverage: 4 of the 21 sides refused on 11-07 were the row's OWN game
+# (`KXNCAAFTOTAL-26NOV07CINHOU-61` on Cincinnati @ Houston,
+# `KXNCAAMBTOTAL-26NOV07CSFSDAK-177` on CSU Fullerton @ South Dakota).
+#
+# So the fan-in now resolves through `kalshi_board_join._resolve_event` -- the
+# order path's resolver, reused rather than reimplemented, with the same
+# per-competition code map, the same collided-code refusal and the same
+# per-event names -- and names a match the way `_row_game_token` names a row:
+# club pair first, our own event id second. A switch so a test can prove the
+# path is reachable (off != on).
+_KALSHI_FANIN_VENUE_NAMES_ENABLED = True
+
+
+def _kalshi_naming_context(rows: Any) -> "dict | None":
+    """Kalshi's code -> name maps for ONE adapter pass, built from the market list
+    already in hand, exactly as `kalshi_board_join` builds them for the order path.
+    None when switched off or unbuildable, which leaves the old resolver in charge."""
+    if not _KALSHI_FANIN_VENUE_NAMES_ENABLED:
+        return None
+    try:
+        from syndicate.features.shared.kalshi_board_join import (
+            build_club_code_collisions,
+            build_club_code_names,
+            build_event_club_code_names,
+        )
+
+        market_rows = [row for row in (rows or ()) if isinstance(row, Mapping)]
+        return {
+            "code_names": build_club_code_names(market_rows),
+            "collided": build_club_code_collisions(market_rows),
+            "event_names": build_event_club_code_names(market_rows),
+            # `_resolve_event`'s own memo: every line of one game shares a blob.
+            "memo": {},
+        }
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _kalshi_game_token_by_venue_names(
+    market: Mapping[str, Any], sport: Any, games: Any, naming: Mapping[str, Any]
+) -> str | None:
+    """The fixture a Kalshi market names, resolved the ORDER path's way, or None.
+
+    None on any doubt, as before: no match, `ambiguous` (two games, or a code the
+    competition gives to two clubs), a resolver error, or a series whose sport is
+    not the one being priced."""
+    try:
+        from syndicate.features.shared.kalshi_board_join import _resolve_event
+
+        result = _resolve_event(
+            market,
+            (),
+            naming.get("code_names"),
+            games=[dict(game) for game in games if isinstance(game, Mapping)],
+            memo=naming.get("memo"),
+            collided=naming.get("collided"),
+            event_names=naming.get("event_names"),
+        )
+    except Exception:  # noqa: BLE001
+        return None
+    if not isinstance(result, Mapping) or str(result.get("status") or "") != "ok":
+        return None
+    if str(result.get("sport") or "").strip().lower() != str(sport or "").strip().lower():
+        return None
+    # THE SAME TWO SHAPES, IN THE SAME ORDER, AS `venue_quote_fanin._row_game_token`
+    # -- the row and the quote must agree on what a game is called, or a correct
+    # match reads as "another game" and is refused by name.
+    return game_token(sport, result.get("home_team"), result.get("away_team")) or event_game_token(
+        result.get("event_id")
+    )
+
+
+def _kalshi_game_token(
+    ticker: Any,
+    sport: Any,
+    games: Any,
+    memo: "dict | None" = None,
+    *,
+    market: "Mapping[str, Any] | None" = None,
+    naming: "Mapping[str, Any] | None" = None,
+) -> str | None:
     """`memo` (lane `web-restart-healthz` 2026-10-07): a dict scoped to ONE caller pass
     with fixed `games`/`sport`, keyed by event blob. Many tickers share one blob
     (every line of one game), and `match_event_blob` tries every split against the
     whole schedule -- py-spy on the fleet: 27% of a today shortlist refresh here.
     The answer depends only on (blob, sport, games), so it is reused within the pass.
+
+    `market` + `naming` (from `_kalshi_naming_context`): resolve with Kalshi's own
+    code -> name pairs through the order path's resolver. Absent, unchanged.
     """
+    if naming is not None and isinstance(market, Mapping) and games:
+        return _kalshi_game_token_by_venue_names(market, sport, games, naming)
     if memo is None or not games:
         return _kalshi_game_token_uncached(ticker, sport, games)
     try:
@@ -612,6 +714,12 @@ def kalshi_outcome(
         return SourceOutcome(source="kalshi", status="error", reason=f"classify_unavailable: {type(exc).__name__}")
 
     game_token_memo: dict = {}  # one pass, fixed `games` -- see `_kalshi_game_token`
+    # Kalshi's own code -> name pairs, from this same market list. See
+    # `_KALSHI_FANIN_VENUE_NAMES_ENABLED`.
+    naming = _kalshi_naming_context(rows) if games else None
+    # Game-line quotes (h2h / totals) whose ticker named no game we hold: the
+    # number `#764` turns into refusals on a totals key. Reported in `reason`.
+    game_unnamed = 0
     for row in rows:
         if not isinstance(row, Mapping):
             continue
@@ -753,10 +861,14 @@ def kalshi_outcome(
         # that works today can be lost. It can REMOVE a match that was landing
         # on the wrong game, which is the point.
         k_game = (
-            _kalshi_game_token(row.get("ticker"), sport, games, memo=game_token_memo)
+            _kalshi_game_token(
+                row.get("ticker"), sport, games, memo=game_token_memo, market=row, naming=naming
+            )
             if not prop_player
             else None
         )
+        if not prop_player and not k_game:
+            game_unnamed += 1
         # ONLY role-keyed markets carry the fixture INSIDE the key. h2h keys stay
         # bare so the board's `mlb|h2h|<club>` lookup is unchanged.
         k_game_in_key = k_game if market in _ROLE_KEYED_MARKETS else None
@@ -860,14 +972,24 @@ def kalshi_outcome(
         # moneylines and props price is the normal state until the sign
         # question is settled, and it must stay visible rather than vanish the
         # moment anything else succeeds.
-        reason=_kalshi_ok_reason(spread_rows, h2h_keyed, h2h_unresolved, no_price, prop_unnamed)
+        reason=_kalshi_ok_reason(
+            spread_rows, h2h_keyed, h2h_unresolved, no_price, prop_unnamed, game_unnamed=game_unnamed
+        )
         or (None if quotes else "no_kalshi_market_classified_to_this_sport"),
         quotes=quotes,
         age_seconds=max(0.0, time.time() - fetched_at),
     )
 
 
-def _kalshi_ok_reason(spread_rows: int, h2h_keyed: int, h2h_unresolved: int, no_price: int = 0, prop_unnamed: int = 0) -> str | None:
+def _kalshi_ok_reason(
+    spread_rows: int,
+    h2h_keyed: int,
+    h2h_unresolved: int,
+    no_price: int = 0,
+    prop_unnamed: int = 0,
+    *,
+    game_unnamed: int = 0,
+) -> str | None:
     """What this adapter could not key, by name and count.
 
     `h2h_keyed` is reported alongside the refusals rather than only on failure:
@@ -884,6 +1006,10 @@ def _kalshi_ok_reason(spread_rows: int, h2h_keyed: int, h2h_unresolved: int, no_
         parts.append(f"h2h_keyed_by_team:{h2h_keyed}")
     if prop_unnamed:
         parts.append(f"prop_without_player:{prop_unnamed}")
+    if game_unnamed:
+        # Game-line quotes naming no game we hold. On a totals key `#764`
+        # refuses every one of them, so this is that refusal's upper bound.
+        parts.append(f"game_line_unnamed:{game_unnamed}")
     if no_price:
         # THE COUNTER THAT WOULD HAVE CAUGHT THIS. Every Kalshi quote was
         # published priceless for as long as the adapter read `yes_bid`, and
