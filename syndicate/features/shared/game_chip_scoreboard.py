@@ -956,6 +956,27 @@ def attach_served_linescores(chips: list[dict[str, Any]], date_value: str) -> No
                 chip["linescore"] = built
             _attach_college_line(chip, date_value)
         _attach_trend(chip["sport"], {"game_id": key, "event_id": key}, chip, date_value)
+    # A live chip's interval projection, re-read at serve time like its line score: the worker's copy is as old as
+    # its last board build, and the live re-sim publishes every tick. Pregame blocks stay as the worker built them.
+    _attach_intervals(chips, date_value, live_only=True)
+
+
+def _attach_intervals(chips: list[dict[str, Any]], date_value: str, *, live_only: bool) -> None:
+    """Interval projections on basketball chips (`game_chip_intervals`, lane basketball-interval-projections).
+
+    Reads published sim artifacts only. Never costs the scoreboard: any failure leaves the chips as they were.
+    """
+    try:
+        from syndicate.features.shared.game_chip_intervals import attach_interval_projections
+
+        counts = attach_interval_projections(chips, date_value, live_only=live_only)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[game_chip_intervals] ATTACH_FAILED date={date_value} live_only={live_only} "
+              f"error={type(exc).__name__}: {str(exc)[:160]}", flush=True)
+        return
+    if not live_only and counts:
+        print(f"[game_chip_intervals] ATTACHED date={date_value} "
+              + " ".join(f"{k}={v}" for k, v in sorted(counts.items())), flush=True)
 
 
 def _attach_board_plays(chips: list[dict[str, Any]], date_value: str, sports: tuple[str, ...]) -> None:
@@ -1151,6 +1172,7 @@ def _build_game_chips_uncached(date_value, normalized_sports, cache_key, now):
                 chips.append(chip)
 
     _attach_board_plays(chips, date_value, normalized_sports)
+    _attach_intervals(chips, date_value, live_only=False)
 
     with _cache_lock:
         _cache[cache_key] = (now, chips)

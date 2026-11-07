@@ -2537,5 +2537,16 @@ table.board-blotter tbody tr:last-child td {
 .game-mini-card__box-team .game-mini-card__logo { width: 18px; height: 18px; margin-right: 5px; }
 .game-mini-card__box .is-leader { font-weight: 700; color: var(--cards-text); }
 
+/* Interval projections (lane basketball-interval-projections, 2026-11-07): the sim's
+   projected points per half / quarter and the projected final, set apart from the
+   real line score by the PROJ tag, a smaller face and italics. */
+.game-mini-card__box--proj { margin-top: 3px; font-size: 11px; }
+.game-mini-card__box--proj .game-mini-card__box-team { font-size: 11px; color: var(--cards-text-dim); }
+.game-mini-card__box--proj .game-mini-card__box-cell,
+.game-mini-card__box--proj .game-mini-card__box-total { font-style: italic; }
+.game-mini-card__box--proj .is-current { color: var(--cards-text); font-weight: 600; }
+.game-mini-card__proj-tag { text-align: left; font-weight: 600; letter-spacing: 0.06em; }
+.game-mini-card__proj-line { margin-top: 2px; font-size: 11px; line-height: 1.3; color: var(--cards-text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+
 /* Games rail card footer (mockup 4, lane games-rail-full-detail). */
 .game-mini-card__footer { font-size: 11px; line-height: 1.3; color: var(--cards-text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }

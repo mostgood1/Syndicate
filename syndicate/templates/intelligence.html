@@ -3080,6 +3080,54 @@
     return `<div class="game-mini-card__box" style="--box-cols:${cols}"><span></span>${ls.labels.map(label).join("")}${rhe ? "" : label("T")}${row("away")}${row("home")}</div>`;
   }
 
+  // INTERVAL PROJECTIONS (lane basketball-interval-projections, 2026-11-07).
+  // User: "need the game rail cards to indicate the interval projections",
+  // "we need college qtr/half projections back". `chip.intervals` is built
+  // server-side from the sims' own per-half / per-quarter histograms
+  // (`game_chip_intervals.py`): pregame from the pregame sim, live from the
+  // live re-sim. A projection, never a price -- college segment pricing stays
+  // off (`#763`). No block, no box: the card renders exactly as before.
+  //
+  // Pregame: every period plus T. Live: only the periods still to finish
+  // (the real line score above already shows the settled ones), plus T =
+  // the projected final. The period in progress is marked `is-current`.
+  function chipIntervals(chip) {
+    const iv = chip && chip.intervals;
+    if (!iv || !Array.isArray(iv.periods) || !iv.periods.length) return "";
+    const live = iv.source === "live_resim";
+    const shown = iv.periods.filter((p) => p && p.away != null && p.home != null && (!live || p.state !== "settled"));
+    const final = iv.final || {};
+    if (!shown.length && final.away == null) return "";
+    const whole = (v) => (v == null || !Number.isFinite(Number(v)) ? "–" : String(Math.round(Number(v))));
+    const abbr = (side) => String((chip[side] || {}).abbr || (side === "away" ? "AWY" : "HOM"));
+    const label = (text, extra = "") => `<span class="game-mini-card__box-label${extra}">${escapeHtml(text)}</span>`;
+    const row = (side) => {
+      const cells = shown.map((p) => {
+        const current = p.state === "in_progress" ? " is-current" : "";
+        return `<span class="game-mini-card__box-cell${current}">${escapeHtml(whole(p[side]))}</span>`;
+      }).join("");
+      return `<span class="game-mini-card__box-team">${escapeHtml(abbr(side))}</span>${cells}<span class="game-mini-card__box-total">${escapeHtml(whole(final[side]))}</span>`;
+    };
+    const head = label("PROJ", " game-mini-card__proj-tag")
+      + shown.map((p) => label(p.label + (p.state === "in_progress" ? "*" : ""))).join("") + label("T");
+    const box = `<div class="game-mini-card__box game-mini-card__box--proj" style="--box-cols:${shown.length + 1}">${head}${row("away")}${row("home")}</div>`;
+    const parts = [];
+    const margin = Number(final.home_margin);
+    if (final.home_margin != null && Number.isFinite(margin)) {
+      parts.push(Math.abs(margin) < 0.05 ? "PK" : `${margin > 0 ? abbr("home") : abbr("away")} −${Math.abs(margin).toFixed(1)}`);
+    }
+    if (final.total != null && Number.isFinite(Number(final.total))) parts.push(`O/U ${Number(final.total).toFixed(1)}`);
+    const hp = Number(final.home_win_prob);
+    if (final.home_win_prob != null && Number.isFinite(hp)) {
+      const fav = hp >= 0.5 ? "home" : "away";
+      parts.push(`${abbr(fav)} ${Math.round((fav === "home" ? hp : 1 - hp) * 100)}%`);
+    }
+    const sims = iv.sims ? `${iv.sims} sims` : "";
+    const title = [live ? "Live re-sim" : "Pregame sim", sims, iv.as_of ? `as of ${iv.as_of}` : ""].filter(Boolean).join(" · ");
+    const line = parts.length ? `<div class="game-mini-card__proj-line" title="${escapeHtml(title)}">${live ? "Proj final " : "Proj "}${escapeHtml(parts.join(" · "))}</div>` : "";
+    return box + line;
+  }
+
   // One mini card per underlying game (not per opportunity) so a user can
   // scan today's slate and jump straight to a specific matchup's
   // opportunities, instead of scrolling the full board looking for it.
@@ -3795,6 +3843,7 @@
                 <div class="game-mini-card__head"><span>${headLeft}</span><span>${stateLabel}</span></div>
                 ${(isLive || chip.state === "final") && chipLineScore(chip) ? chipLineScore(chip) : `${chipTeamRow("away", chip)}${chipTeamRow("home", chip)}`}
                 ${isLive && chip.situation ? `<div class="game-mini-card__situation">${escapeHtml(chip.situation)}</div>` : ""}
+                ${chip.state !== "final" ? chipIntervals(chip) : ""}
                 ${footer ? `<div class="game-mini-card__footer">${escapeHtml(footer)}</div>` : ""}
                 <div class="game-mini-card__meta">${chipPlaysText(chip) || (game.count ? `${game.count} play${game.count === 1 ? "" : "s"}` : "no plays")}</div>
               </button>
