@@ -7,6 +7,7 @@ import json
 import math
 import os
 import re
+import time
 from datetime import datetime
 from datetime import timedelta
 from datetime import timezone
@@ -65,22 +66,58 @@ def _render_web_dyno() -> bool:
     return str(os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
-_NBA_CARDS_CONTEXT_CACHE: "OrderedDict[tuple[Any, ...], dict[str, Any]]" = OrderedDict()
+# cache_key -> (live_signature, context). The live signature lives in the VALUE, not the key, so a live-state change
+# REPLACES the date's entry instead of adding one: during play it changes every ESPN read, and a 1.8 MB context per
+# score change would fill all 32 slots with copies of one date (see `_live_state_merge_signature`).
+_NBA_CARDS_CONTEXT_CACHE: "OrderedDict[tuple[Any, ...], tuple[Any, dict[str, Any]]]" = OrderedDict()
 _NBA_CARDS_CONTEXT_CACHE_MAX_ENTRIES = 32
 
 
-def _cache_get_context(cache_key: tuple[Any, ...]) -> dict[str, Any] | None:
+def _cache_get_context(cache_key: tuple[Any, ...], live_signature: Any = None) -> dict[str, Any] | None:
     cached = _NBA_CARDS_CONTEXT_CACHE.get(cache_key)
-    if cached is not None:
-        _NBA_CARDS_CONTEXT_CACHE.move_to_end(cache_key)
-    return cached
+    if cached is None or cached[0] != live_signature:
+        return None
+    _NBA_CARDS_CONTEXT_CACHE.move_to_end(cache_key)
+    return cached[1]
 
 
-def _cache_put_context(cache_key: tuple[Any, ...], result: dict[str, Any]) -> None:
-    _NBA_CARDS_CONTEXT_CACHE[cache_key] = result
+def _cache_put_context(cache_key: tuple[Any, ...], result: dict[str, Any], live_signature: Any = None) -> None:
+    _NBA_CARDS_CONTEXT_CACHE[cache_key] = (live_signature, result)
     _NBA_CARDS_CONTEXT_CACHE.move_to_end(cache_key)
     while len(_NBA_CARDS_CONTEXT_CACHE) > _NBA_CARDS_CONTEXT_CACHE_MAX_ENTRIES:
         _NBA_CARDS_CONTEXT_CACHE.popitem(last=False)
+
+
+def _live_state_merge_signature(selected_date: str) -> int | None:
+    """A hash of the live state `build_cards_page_context` merges into its games, for its cache identity.
+
+    THE CACHE FROZE THE LIVE LENS AT TIP (lane `nba-lens-live-state`, todo `#762`). The context cache was keyed on
+    the cards/sim/props/recommendations files and on the `live_state_<date>.jsonl` text -- but the live state the
+    merge actually used was usually neither: `_best_live_state_payload` falls through to an ESPN read whenever that
+    file is stale or holds a started game as pregame, and the ESPN read was in no part of the key. Measured on the
+    fleet 2026-11-07 for the 11-06 slate: `live_state_2026-11-06.jsonl` was written ONCE, 17:30:49 CST, every game
+    Scheduled; `game_cards_2026-11-06.csv` at 17:30:48 and `cards_sim_detail_2026-11-06.json` on 11-05. Nothing in the
+    key changed after 17:30, so live-odds-worker's first build of the evening was served for the rest of it, and
+    `nba_live_lens.json` (built from this context) read `Scheduled 0-0` for games ESPN and the re-sim had in play
+    (11-04 00:50Z: MIL@BOS, CHA@BKN, CHI@NYK).
+
+    The whole merged games list is hashed, not just the state fields, because the merge copies each row in whole
+    (`live_state`). ESPN rows carry no per-row timestamp, so a pregame slate hashes the same on every read and the
+    cache still hits until something actually changes. None on the web dyno, which never merges live state (and must
+    not fetch ESPN for a cache key)."""
+    if _render_web_dyno():
+        return None
+    try:
+        payload = _best_live_state_payload(selected_date)
+    except Exception:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    try:
+        return hash(json.dumps([payload.get("source"), payload.get("date"), payload.get("games")],
+                               sort_keys=True, default=str))
+    except Exception:
+        return hash(repr(payload.get("games")))
 
 
 def _path_cache_signature(path: Path | None) -> int:
@@ -695,23 +732,62 @@ def _note_overdue_bypass(selected_date: str, snapshot: dict[str, Any] | None, *,
           f"decided_by_overdue={decided}", flush=True)
 
 
+# ESPN live-state reads, memoized per date. `build_cards_page_context` now reads the live state BEFORE its cache
+# lookup (`_live_state_merge_signature`) and again inside the merge, and the live-lens build calls it three times a
+# tick, so without this one tick would fetch the scoreboard ~6 times. A failed read is remembered longer, so an ESPN
+# outage costs one timeout a minute, not one per caller.
+_ESPN_LIVE_STATE_MEMO: dict[str, tuple[float, dict[str, Any] | None]] = {}
+_ESPN_LIVE_STATE_MEMO_SECONDS = 10.0
+_ESPN_LIVE_STATE_FAILURE_MEMO_SECONDS = 60.0
+_ESPN_LIVE_STATE_MEMO_MAX_DATES = 8
+_ESPN_LIVE_STATE_FETCH_TIMEOUT_SECONDS = 5.0
+_ESPN_LIVE_STATE_FAILURE_NOTED: dict[str, float] = {}
+
+
 def _espn_live_state_payload(selected_date: str) -> dict[str, Any] | None:
+    """ESPN's scoreboard for `selected_date` as a live-state payload (memoized; a copy every call)."""
     date_value = str(selected_date or "").strip()
+    now = time.monotonic()
+    hit = _ESPN_LIVE_STATE_MEMO.get(date_value)
+    if hit is not None:
+        age = now - hit[0]
+        if age < (_ESPN_LIVE_STATE_MEMO_SECONDS if hit[1] is not None else _ESPN_LIVE_STATE_FAILURE_MEMO_SECONDS):
+            return deepcopy(hit[1])
+    payload = _fetch_espn_live_state_payload(date_value)
+    _ESPN_LIVE_STATE_MEMO[date_value] = (now, payload)
+    while len(_ESPN_LIVE_STATE_MEMO) > _ESPN_LIVE_STATE_MEMO_MAX_DATES:
+        _ESPN_LIVE_STATE_MEMO.pop(next(iter(_ESPN_LIVE_STATE_MEMO)))
+    return deepcopy(payload)
+
+
+def _note_espn_live_state_failure(date_value: str, exc: BaseException) -> None:
+    """At most one line per date per 10 minutes: an unreadable ESPN leaves the lens on the pregame snapshot, and that
+    must not look like a quiet slate."""
+    now = time.monotonic()
+    if now - _ESPN_LIVE_STATE_FAILURE_NOTED.get(date_value, -1e9) < 600.0:
+        return
+    _ESPN_LIVE_STATE_FAILURE_NOTED[date_value] = now
+    print(f"[nba_live_state] ESPN_LIVE_STATE_FETCH_FAILED date={date_value} {type(exc).__name__}: {str(exc)[:200]}",
+          flush=True)
+
+
+def _fetch_espn_live_state_payload(date_value: str) -> dict[str, Any] | None:
     if not date_value:
         return None
     try:
         date_compact = parse_iso_date(date_value).strftime("%Y%m%d")
     except Exception:
         return None
-    url = (
-        "https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
-        f"?dates={date_compact}"
-    )
-    request = urllib_request.Request(url, headers={"User-Agent": "Syndicate-NBA/1.0"})
+    # THE RE-SIM'S OWN FETCHER (`basketball_pbp.espn_get`: both ESPN hosts, the headers ESPN answers), so the lens and
+    # `nba/live_resim.py` read game state from the same place. One attempt and a short timeout per host: this sits
+    # in the live-lens tick and in every worker-side cards build, where the re-sim's 3 x 30 s retries cannot.
+    from syndicate.features.shared import basketball_pbp
+
     try:
-        with urllib_request.urlopen(request, timeout=5) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-    except Exception:
+        payload = basketball_pbp.espn_get("nba", f"scoreboard?dates={date_compact}&limit=100",
+                                          timeout=_ESPN_LIVE_STATE_FETCH_TIMEOUT_SECONDS, attempts=1)
+    except Exception as exc:
+        _note_espn_live_state_failure(date_value, exc)
         return None
     events = payload.get("events") if isinstance(payload, dict) and isinstance(payload.get("events"), list) else []
     out_games: list[dict[str, Any]] = []
@@ -2493,7 +2569,8 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
         _path_cache_signature(_artifact_paths(requested_date)["props"]),
         _live_snapshot_or_state_signature(live_snapshot_path(f"live_state_{requested_date}.jsonl")),
     )
-    cached_context = _cache_get_context(cache_key)
+    live_signature = _live_state_merge_signature(requested_date)
+    cached_context = _cache_get_context(cache_key, live_signature)
     if cached_context is not None:
         return deepcopy(cached_context)
 
@@ -2632,7 +2709,7 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
         "skipWhenHidden": False,
         "poller": "shared.polling",
     }
-    _cache_put_context(cache_key, deepcopy(result))
+    _cache_put_context(cache_key, deepcopy(result), live_signature)
     return deepcopy(result)
 
 

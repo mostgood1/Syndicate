@@ -55,6 +55,9 @@ def clear_nba_cards_caches() -> None:
     from syndicate.features.nba.cards import _local_live_state_payload_cached
     from syndicate.features.nba.cards import _nba_team_branding_index
 
+    from syndicate.features.nba.cards import _ESPN_LIVE_STATE_FAILURE_NOTED
+    from syndicate.features.nba.cards import _ESPN_LIVE_STATE_MEMO
+
     for cache_owner in (
         _nba_team_branding_index,
         _local_live_state_payload_cached,
@@ -63,6 +66,9 @@ def clear_nba_cards_caches() -> None:
     ):
         cache_owner.cache_clear()
     _NBA_CARDS_CONTEXT_CACHE.clear()
+    # Wall-clock TTL, keyed on the date only: two tests reading the same date literal within 10 s would share it.
+    _ESPN_LIVE_STATE_MEMO.clear()
+    _ESPN_LIVE_STATE_FAILURE_NOTED.clear()
 
 
 def clear_mlb_wall_clock_caches() -> None:

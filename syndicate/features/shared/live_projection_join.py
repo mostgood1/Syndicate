@@ -255,8 +255,16 @@ def _norm_side(value: Any) -> str:
     return text
 
 
-def _status_text(status: Mapping[str, Any]) -> str:
-    """Both status vocabularies, because the lens speaks two of them.
+def _status_text(status: Mapping[str, Any] | str | None) -> str:
+    """Every status shape the lenses publish: two mappings and a string.
+
+    **NBA's lens status is a STRING** -- `nba/cards.py` writes the normalized
+    label (`"Live"`, `"Final"`, `"Scheduled"`) straight into `game["status"]`.
+    `build_live_prop_index` used to replace anything that was not a Mapping with
+    `{}`, so every NBA game read `""` and `lens_live_games` was structurally 0
+    for NBA however many games were in play -- the same instrument failure the
+    WNBA paragraph below describes, a sport later (lane `nba-lens-live-state`,
+    todo `#762`). A string is used as it stands.
 
     MLB's lens carries StatsAPI's `abstract`/`detailed`. **WNBA's carries
     `status`/`detail`** -- `features/wnba/live_lens.py:_game_status_text` reads
@@ -286,6 +294,10 @@ def _status_text(status: Mapping[str, Any]) -> str:
     use. Not a merged mapping: the two dicts are read independently so neither
     sport's spelling can mask the other's absence.
     """
+    if isinstance(status, str):
+        return status.strip().lower()
+    if not isinstance(status, Mapping):
+        return ""
     parts = [
         status.get("abstract"),
         status.get("detailed"),
@@ -353,8 +365,7 @@ def build_live_prop_index(snapshot: Mapping[str, Any] | None) -> dict[str, Any]:
         if not isinstance(game, Mapping):
             continue
         games_seen += 1
-        status = game.get("status") if isinstance(game.get("status"), Mapping) else {}
-        status_text = _status_text(status)
+        status_text = _status_text(game.get("status"))
         # FINAL IS CHECKED FIRST. A completed game's detailed state can still
         # carry live-ish wording, and mislabelling one final game as live is
         # exactly what would put a guaranteed-null row into the only bucket that

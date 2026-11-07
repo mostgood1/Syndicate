@@ -630,8 +630,59 @@ def _attach_native_resim(games: list[dict[str, Any]], resolved_date: str) -> dic
             if key in src:
                 game[key] = src[key]
         merged += 1
+    state_check = _lens_state_vs_resim(games, by_event)
+    if state_check["lens_not_started"]:
+        _note_lens_state_behind_resim(str(resolved_date), state_check, resim.get("generatedAt"))
     return {"merged": merged, "resim_generated_at": resim.get("generatedAt"),
-            "refusals": resim.get("refusalsByReason") or {}}
+            "refusals": resim.get("refusalsByReason") or {}, "state_check": state_check}
+
+
+def _lens_game_state(game: dict[str, Any]) -> str:
+    """`live` / `final` / `not_started`, from the normalized status `nba/cards.py` writes and its `live_state` row."""
+    live_state = game.get("live_state") if isinstance(game.get("live_state"), dict) else {}
+    status = str(game.get("status") or "").strip().lower()
+    if live_state.get("final") or status == "final":
+        return "final"
+    if live_state.get("in_progress") or status == "live":
+        return "live"
+    return "not_started"
+
+
+def _lens_state_vs_resim(games: list[dict[str, Any]], resim_by_event: dict[str, Any]) -> dict[str, Any]:
+    """THE LENS'S GAME STATE, CHECKED AGAINST THE RE-SIM'S (lane `nba-lens-live-state`, todo `#762`).
+
+    Every row the re-sim publishes is a game ESPN's scoreboard had IN PLAY when that tick ran
+    (`nba/live_resim.build_live_lens_snapshot` re-sims `state == "in"` only). A lens game in that set still reading
+    pregame is the stale-state defect -- 11-04 00:50Z had three -- so it is counted on every build, not inferred
+    after the fact. `lens_final` is NOT a defect: a game can end between a re-sim tick and this build."""
+    out: dict[str, Any] = {"resim_in_play": 0, "lens_live": 0, "lens_final": 0, "lens_not_started": []}
+    for game in games:
+        event_id = str(game.get("event_id") or "").strip()
+        if not event_id or event_id not in resim_by_event:
+            continue
+        out["resim_in_play"] += 1
+        state = _lens_game_state(game)
+        if state == "live":
+            out["lens_live"] += 1
+        elif state == "final":
+            out["lens_final"] += 1
+        else:
+            out["lens_not_started"].append(event_id)
+    return out
+
+
+_LENS_STATE_BEHIND_NOTED: set[tuple[str, tuple[str, ...]]] = set()
+
+
+def _note_lens_state_behind_resim(date_str: str, state_check: dict[str, Any], resim_generated_at: Any) -> None:
+    """One line per (date, set of games): the alarm for the defect `_lens_state_vs_resim` counts."""
+    key = (date_str, tuple(sorted(state_check["lens_not_started"])))
+    if key in _LENS_STATE_BEHIND_NOTED:
+        return
+    _LENS_STATE_BEHIND_NOTED.add(key)
+    print(f"[nba_live_lens] LENS_STATE_BEHIND_RESIM date={date_str} event_ids={','.join(key[1])} "
+          f"resim_in_play={state_check['resim_in_play']} lens_live={state_check['lens_live']} "
+          f"resim_generated_at={resim_generated_at}", flush=True)
 
 
 def build_live_lens_snapshot(selected_date: str, *, limit: int = 50) -> dict[str, Any]:
