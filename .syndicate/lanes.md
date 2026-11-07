@@ -801,6 +801,14 @@ ba_lens_state_check.py`.
 - Files: none (ledger-only)
 - Verdict: GOAL MET. Moved `closed-lane-archive-20261107-0700` (owner acc7ac9c 245m idle, block 247m). 10 CLOSED blocks WAIT; table in log/2026-11-07.md.
 
+### kalshi-fanin-college-naming — OPEN — opened 2026-11-07 — session e32fef1a-01e8-4afe-a284-01acd3728545
+- Goal: The venue fan-in names the game of a Kalshi game-line quote with Kalshi's own code-to-name pairs (the order path's resolver), so correct college Kalshi totals price their own row again: on the fleet's data the refused-but-right tickers (CINHOU-61 on Cincinnati @ Houston, CSFSDAK-177 on CSU Fullerton @ South Dakota) price their row, every wrong-game ticker stays refused, and every changed side is read by eye
+- Files: syndicate/features/shared/venue_quote_adapters.py, tests/test_kalshi_fanin_college_naming.py (NEW)
+- Hypothesis: _kalshi_game_token_uncached calls match_event_blob without code_names and returns game_token() only, which is None for ncaaf by design, so college Kalshi quotes name no game (ncaaf 406/406) and #764 refuses even the correct ones
+- Falsification test: with code_names + the event-id fallback, CINHOU-61 / CSFSDAK-177 still resolve to no game, or a wrong-game ticker resolves onto a row
+- Verification: off != on unit tests; same-payload replay old vs new adapter on fleet data, every changed side printed beside its row and read by eye; named-quote counts per sport before/after
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

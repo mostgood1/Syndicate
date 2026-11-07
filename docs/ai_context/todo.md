@@ -1,6 +1,23 @@
 # Syndicate TODO — canonical cross-session list
 
 ### `#764` — **KALSHI TOTALS THAT NAME NO GAME PRICE ANOTHER GAME'S ROW: 26 of 26 measured sides wrong-game (men's and women's college basketball, college football). Polymarket is clean in every sport. NOT FIXED** — 2026-11-06, session e32fef1a (user "Yes, measure it here")
+- **UPDATE 2026-11-07 17:27Z (11:27 AM CST): NAMING FIX WRITTEN (lane `kalshi-fanin-college-naming`), committed on branch `claude/syndicate-ai-engine-762439` only. NOT on main, NOT loaded.**
+  - **The change:** the Kalshi adapter now resolves a ticker through `kalshi_board_join._resolve_event`, using Kalshi's own "<Club> wins" code-to-name pairs. That is the order path's resolver.
+    - A match is named club pair first, our event id second, the same way `_row_game_token` names a row.
+    - Switch: `_KALSHI_FANIN_VENUE_NAMES_ENABLED` (True). New reason field: `game_line_unnamed:N`.
+  - **Read-only replay**, old vs patched adapter, on one Kalshi snapshot and one clock. Fleet `59638f001`, 17:22Z, every sport with a grid on 11-07 / 11-08.
+    - Kalshi game-line quotes named: ncaaf 0 -> 548; ncaab 580 -> 828; wncaab 80 -> 117; soccer 260 -> 439 (11-07) and 196 -> 374 (11-08). nfl, nba and nhl unchanged.
+    - Venue-priced sides lost: 0, in every sport.
+    - Sides gained: ncaaf 4, ncaab 4, soccer 8 + 29.
+    - Source changed: ncaaf 189 (Polymarket -> Kalshi, both the same game; the fresher quote wins), ncaab 12, soccer 4 + 14.
+    - nfl / nba / nhl / wncaab: identical.
+  - **All 73 distinct (game, ticker) pairs behind those changes were read by eye.** Every one is the row's own game, e.g. `CINHOU` on Cincinnati @ Houston, `CSFSDAK` on CSU Fullerton @ South Dakota, `KOELEV` on Leverkusen @ Koln.
+  - **Wrong-game tickers stay refused:**
+    - ncaaf `UWFLUNA` / `IWSELA` name games we do not carry, so they stay unnamed and `#764` refuses them (12 sides). `UWF` has no Kalshi name.
+    - soccer 11-08 now refuses by name 44 quotes that land on another game's row (`cross_game_rejected` 0 -> 44). Before, those quotes named no game.
+  - **Dead end:** a first replay showed soccer 11-07 losing 63 sides. It applied the old and new pools at different moments, so the cached quotes aged past the freshness ceiling in between. Re-run on one clock: 0 lost.
+  - **Tests:** `tests/test_kalshi_fanin_college_naming.py` (8, NEW): off != on at the adapter and through the fan-in, and a wrong game stays refused. 723 passed over the 34 Kalshi / fan-in test files.
+  - **Owed:** push; fleet ff + refresh-worker restart (the user's call); then a live read of `game_line_unnamed` and `UNNAMED_ROLE_KEY_GRID` on the college slate.
 - **UPDATE 2026-11-07 16:40Z (10:40 AM CST): LIVE ON THE FLEET since 16:29:14Z, lane `kalshi-unnamed-role-key` CLOSED (GOAL MET).**
   - Loaded by lane `wncaab-module`'s ff to `59638f001` and its refresh-worker restart (pid 517695). The first build logged `UNNAMED_ROLE_KEY_GRID ... refusing=True` in all 7 sports: ncaaf 14, ncaab 4, wncaab 3, others 0.
   - **CORRECTION:** 4 of the 21 sides refused at 16:36Z were the row's OWN game: `KXNCAAFTOTAL-26NOV07CINHOU-61` on Cincinnati @ Houston 60.5, and `KXNCAAMBTOTAL-26NOV07CSFSDAK-177` on CSU Fullerton @ South Dakota 176.5. These are correct Kalshi totals that the adapter cannot name, and all 4 are re-priced by a same-game Polymarket quote today.
