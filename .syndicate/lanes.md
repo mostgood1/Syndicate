@@ -756,11 +756,6 @@ death, never life — do not invert it.
 - Verification: Fleet, next big NBA slate: (i) NBA_LIVE_RESIM_TICK carried= > 0 when budget_exhausted fires and per-game resimmed share flat across scoreboard position in live_resim_history; (ii) served /api/intelligence/query: share of live NBA rows (per game) with Live proj./Live actual, before vs after; (iii) LIVE_COLUMNS_REFRESHED_FROM_ARTIFACT sport=nba lines on web; (iv) spreads rows' live_total absent, Live proj. renders cover %. (v) `#762`, first live NBA slate after the deploy: per game, quarter/half rows with Live proj. and Live actual > 0 (11-05: 0 of 260); 0 segment rows with `edge_vs_market_pct`; NBA segment ledger records still refusals; an away spread row's live % = 1 - its home row's. (vi) `#762` (c), first live NBA slate after its fleet ff: `LIVE_PROJECTION_JOIN sport=nba display_only=` > 0; live DD/TD rows with Live proj. and Live actual; 0 of them with an edge or `model_ev_pct`.
 - Blocked by: none
 
-### closed-lane-archive-20261106-1040 — CLOSED 2026-11-06 (GOAL MET: 1 block archived) — opened 2026-11-06 — session 5f92da50-c5b5-4bc3-a8f6-20197eb8d085
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET — owner_liveness.py --idle-min 240 read 1 of 9 CLOSED SAFE; moved `closed-lane-archive-20261106-0147`. 8 WAIT (owner e32fef1a live; d458ff9c no transcript). Table in log/2026-11-06.md.
-
 ### exit-state-size — OPEN — opened 2026-11-06 — session 332cb014
 - **SCOPE ADDED 2026-11-06 ~22:40Z (user, coordinator chat: "A: in-game off"):** live sales of IN-GAME entries stop; pregame entries keep selling. `SYNDICATE_EXIT_LIVE_PHASES` (default `pregame`) in execution_exits.py. Why: since 11-02, in-game take-profit sales cost $29.40 against holding, and pregame sales saved $18.18 (exact hold-to-settle replay over 202 settled live bets).
 - **STATUS 2026-11-06 21:56:43Z (3:56 PM CST): LIVE + MEASURED.** `506973f97` is on the fleet; live-odds-worker restarted 21:55:35Z. First tick `status=ok`; document 3,246,367 bytes (was 8.37-8.56MB); 2,722 exits + 5,163 watch rows archived; 0 refusals. **Left:** the next EXIT_LIVE on a qualifying position, and no EXIT_TICK_FAILED across the 11-07 slate (see deploys.md).
@@ -778,6 +773,11 @@ death, never life — do not invert it.
 - Falsification test: n/a
 - Verification: off != on reachability test; venue_prov.py replay with this worktree's code against fleet data: unnamed_quote totals/spreads sides 26 -> 0, same_game and h2h counts unchanged
 - Blocked by: none
+
+### closed-lane-archive-20261106-1840 — CLOSED 2026-11-06 (GOAL MET: 1 block archived) — opened 2026-11-06 — session 9aa4f12c-8cf6-4463-8aa8-09e62b5a4c27
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 at 00:40Z 11-07 (6:40 PM CST 11-06) gave 1 SAFE of 9 CLOSED; moved `closed-lane-archive-20261106-1040`. 8 WAIT (owner e32fef1a idle 14m; nba-current-rosters transcript d458ff9c not found). Table in log/2026-11-06.md.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -957,6 +957,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261105-1725` — CLOSED 2026-11-05 (GOAL MET: 1 block archived) — opened 2026-11-05 — session 0205937c-3727-40bc-b340-e97495e89eaf
 - `closed-lane-archive-20261105-2141` — CLOSED 2026-11-05 (GOAL MET: 1 block archived) — opened 2026-11-05 — session 10dadf79-53b0-4adb-ad30-03f3a07d8ad0
 - `closed-lane-archive-20261106-0147` — CLOSED 2026-11-06 (GOAL MET: 1 block archived) — opened 2026-11-06 — session 46f870eb-96a5-4df8-8312-bde2d0763263
+- `closed-lane-archive-20261106-1040` — CLOSED 2026-11-06 (GOAL MET: 1 block archived) — opened 2026-11-06 — session 5f92da50-c5b5-4bc3-a8f6-20197eb8d085
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
