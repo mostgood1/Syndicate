@@ -1400,3 +1400,11 @@ commit above (`git show <commit>:<path>` into a scratch tree), never on a newer 
   the old literals (byte-identical); the frozen trees have no `league.py` and keep the literals.
 - No file in `code_inj` / `code_r5b` is newer than `launch_fit_inj.sh`, and the harness puts its own tree first on
   sys.path (the smart sim's one `live_resim` import resolves to the frozen copy).
+
+**ADDENDUM 2026-11-07 16:00Z — comparison key for the four pinned files is the GIT BLOB ID.** The sha256s above are of
+the Windows working copies (CRLF after checkout); a sha256 of `git show origin/main:<path>` differs (3 of 4) without
+any content change. Before the read compare `git rev-parse origin/main:<path>` (equal to `git hash-object <path>` on
+the working copy) with: `basketball_player_distribution_read.py` afadb7c5fb258ec2272bd7b1563aed778214e6c6,
+`nba_injury_history_build.py` 30e2fdb5c3a7de3e202ea93ca21264f492bf5f20, `basketball_scenario_rates.py`
+d909018f4dee2850e9c7d3c6a0533d8f4c1c0461, `nba/source_cli/scrapers/injuries.py` 5865c7b3fce954079661443d6e019568f39cda29.
+The fallback rule above is unchanged.
