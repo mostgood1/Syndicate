@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -146,7 +147,11 @@ class OddsRefreshWiringTests(unittest.TestCase):
     def _run(self, name: str, command: list[str]):
         step = self.mod.RefreshStep(name=name, phases=("live",), cwd=REPO_ROOT, command=tuple(command))
         result = MagicMock(returncode=0, stdout="", stderr="")
-        with patch.object(self.mod.subprocess, "run", return_value=result):
+        # The step RSS cap (94e545522) is on by default and spawns via Popen when psutil
+        # is present, so the subprocess.run mock was bypassed and a real `python` ran (#697).
+        with patch.dict(os.environ, {"SYNDICATE_ODDS_STEP_RSS_CAP_MB": "off"}), patch.object(
+            self.mod.subprocess, "run", return_value=result
+        ):
             self.mod._run_command(step)
 
     def test_a_soccer_sim_step_reaches_the_ledger(self) -> None:
