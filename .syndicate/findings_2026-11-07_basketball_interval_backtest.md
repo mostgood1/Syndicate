@@ -269,3 +269,12 @@ makes per side), not a registered variant. `resim_mech` (the default-off end-gam
 (`--projectors resim_mech --mechanisms '<json>'`) but not run: which mechanism values to test is Phase 2's
 pre-registration, not this harness's. WNCAAB has no play-by-play store on the fleet (`build_basketball_rotation_stints.py`
 does not run for it), so it is not replayed.
+
+## CORRECTION 23:50Z 11-07 (5:50 PM CST) -- the NCAAB re-sim scored here ran with production's switches OFF
+
+- **What the findings got wrong:** they state `SYNDICATE_NCAAB_HALF_SPLIT` (and the mechanisms) are ABSENT on the fleet. That holds for refresh-worker only. live-odds-worker, the process that launches the college pregame sims and runs the NCAAB live re-sim, has `SYNDICATE_NCAAB_HALF_SPLIT` and `SYNDICATE_NCAAB_EXACT_TARGET` truthy and `SYNDICATE_NCAAB_LIVE_MECHANISMS` non-empty (read from /proc environ as booleans only, 22:5xZ).
+- **Production's pregame sims:** all 177 with a dist 11-03..11-07 carry `provenance.halfSplit: True`.
+- **Production h1 against 147 real finals:** +1.27 projected minus actual (sd 10.29, n.s.), h2 -0.78, full +0.50. Projected h1 share 0.4761 vs actual 0.4695.
+- **Which statements stand:**
+  - The re-sim h1 / h2 / end-game statements above describe the engine with the switches off. They need a re-run with live-odds-worker's switches before they decide anything.
+  - The `pregame_rate` bar, the NBA rows and the pace / efficiency results do not depend on these switches.
