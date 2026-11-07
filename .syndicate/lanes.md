@@ -849,6 +849,14 @@ ba_lens_state_check.py`.
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 (21:23Z) gave one SAFE slug; moved `closed-lane-archive-20261107-1112`. Reading and Part B table in `.syndicate/log/2026-11-07.md`.
 
+### ncaab-live-resim-capacity — OPEN — opened 2026-11-07 — session c3107f70-7ace-46b7-b16c-b31fd0c9d3f0
+- Goal: The NCAAB live re-sim loop keeps every live board game's lane fresh on 8-15 game slates: the cause of the 11-07 starvation (every NCAAB tick at its 240 s budget from 20:07:44Z re-simming 1-6 of 8-13 games) measured with its denominator; the capacity fix plus an age bound on ncaab/live_resim._carry (NBA's 900 s carry pattern) on main with tests incl. off != on; the expected change in NCAAB_LIVE_RESIM_TICK carried_forward and elapsed stated for the user's deploy decision (no fleet change without the user's yes)
+- Files: syndicate/features/ncaab/live_resim.py (the _carry age bound + the loop/tick scheduling section: _loop, _start_loop, start_*_live_resim_loop, run_live_resim_tick, and the carry call sites in build_live_lens_snapshot ONLY), tests/test_ncaab_live_resim_capacity.py (NEW), scripts/ncaab_resim_contention_probe.py (NEW), docs/ai_context/todo.md (the #762 NCAAB budget-loop bullets only)
+- Hypothesis: NOT TESTED yet: the NCAAB and WNCAAB loops are threads in one live-odds-worker process and contend for the GIL; from 20:04:21Z WNCAAB began re-simming and NCAAB per-game cost rose from 12-26 s to 40-240 s. Alternatives to rule out: heavier game states (games at the tip cost more possessions than late games), other live-odds-worker threads (NBA/NCAAF re-sims, lens loop), host CPU load from other fleet processes
+- Falsification test: Per-game re-sim cost for the same game state is no slower with a second league's loop running in the same process than alone (offline timing), or the 11-07 slowdown tracks remaining game time / host load rather than WNCAAB activity
+- Verification: Offline: run_live_resim_tick one league alone vs both at once on the same states, per-game seconds; fleet 11-07 tick logs joined to WNCAAB activity; unit tests incl. off != on for the carry bound; fleet reading after the user's deploy: NCAAB_LIVE_RESIM_TICK carried_forward and elapsed on a busy slate
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
