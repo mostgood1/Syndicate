@@ -56784,3 +56784,37 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - #761 ticks (live-odds-worker, 11-07): 41 ticks, 36 with games>=1, max games 7, max elapsed_s 240.5. budget_exhausted on 2 ticks (01:23:19Z resimmed 5 carried 2; 01:29:12Z resimmed 6 carried 1): 2/2 carried>0.
 - #761 history (155 rows, 36 ticks, to 02:17Z; field is `carried_forward`): fresh/n per game WAS@ATL 35/36, BOS@CHA 35/36, PHI@CLE 23/24, UTA@DAL 14/15 (1 game_not_started at 01:12, pre-tip), OKC@MEM 15/15, MIN@NOP 15/15, TOR@MIL 14/14. By position: 0-2 95/96, 3-5 44/45, 6+ 12/14 (86%, 13 pts below; n=14). No game refused for budget; every one carried.
 - UNTESTED: overtime (0 rows with period>=5 by 02:19Z); POR@LAL and SAS@SAC (03:10Z tips) not yet live, so the 9-game load is unread.
+
+## 2026-11-07 16:29:14Z (10:29 AM CST) -- FLEET ff 506973f97 -> 59638f001 + refresh-worker TERM: live college rows are not priced against a quote taken more than 30 s before the re-sim's score (`59638f001`, lane `wncaab-module`); ride-alongs `239d932fe` (`#764`, lane `kalshi-unnamed-role-key`) + `3ae26ba6e` (`#762` (c), lane `nba-live-proj-actuals`) -- **LOADED; verify OWED on the first priced college build** (written 16:34Z, 10:34 AM CST)
+- **User, in this chat:**
+  - "Yes, do it here", answering "Stop pricing live college games against quotes older than the score?".
+  - "Yes, roll out".
+  - "Yes, ship it too", answering "Ship NBA's display-only commit 3ae26ba6e along with this rollout?".
+- **Ride-alongs, approved by their owners:**
+  - **`239d932fe` (venue fan-in refuses a quote that names no game):** lane `kalshi-unnamed-role-key` (session e32fef1a) sent "(a) ... approves". It cites its user's "Yes, ship it" (11-06) and stood down its own restart.
+  - **`3ae26ba6e` (live DD/TD rows, display only):** lane `nba-live-proj-actuals` first sent "(b) HOLD". After its user answered "Yes, ride along" it sent "(a) ... approves". The user also said "Yes, ship it too" in this chat.
+  - Both lanes were messaged the ff time and the new pid.
+- **Range `506973f97..59638f001`, runtime:** `pipeline/layer2_shortlist.py`, `nba/live_resim.py`, `shared/layer2_board.py`, `shared/live_projection_join.py` (`3ae26ba6e`); `shared/venue_quote_fanin.py` (`239d932fe`); `shared/live_gameline_join.py` (mine). The rest is ledger and tests.
+- **Loaded by:** refresh-worker only, which builds the board.
+  - **NOT restarted:** live-odds-worker (pid 483251) and web (pid 649) still run `506973f9`; `status` marks them STALE (6 runtime files).
+  - **Who loads it when:** the NBA lane owns loading `3ae26ba6e`'s `nba/live_resim.py` into live-odds-worker, at that worker's next recycle or under its own claim before the 22:00Z tip. Nothing of mine runs on web.
+- **Gates:**
+  - **Claim:** refresh-worker claimed 15:51:14Z (`wncaab-module`).
+  - **Preflight HOLD, 15:51Z:** a board build was in flight, plus an odds job.
+  - **Drain:** `check_deploy_safety --drain --drain-owner wncaab-module` 15:52:14Z, run under refresh-worker's own environ (`drain_rw.py`). Board builds were idle from ~16:00Z.
+    - It hit its 1,500 s cap NOT CLEAR at 16:17:32Z: odds jobs kept running, most of them live-odds-worker's children, which a refresh-worker TERM does not touch.
+  - **CLEAR:** a 1 s no-child watcher, then preflight `--target fleet --target-commit 59638f001 --expect fleet_checkout_head=59638f00 --baseline fleet_checkout_head=506973f9`. HOLD on 2 jobs at 16:26:51Z, then CLEAR at 16:28:59Z.
+  - **Deploy:** `git merge --ff-only 59638f001` 16:29:14Z. TERM pid 284940 16:29:14Z, with no child jobs. Respawned as pid 517695 at 16:29:25Z, `code=59638f00`.
+  - **Release:** drain cleared 16:29:36Z (`DRAIN_CLEARED owner=wncaab-module`); claim released 16:29:44Z.
+  - **Cost:** no board build ran ~16:00-16:29Z, while 1 women's game was live (unpriced: `no_margin_anchor`).
+- **Baseline (15:47:49Z):** college `LIVE_GAMELINE_BUILD` `withheld_by_reason={}`; 0 builds carried `quote_older_than_the_score_the_model_saw`.
+- **Loaded, measured (16:32:51Z):**
+  - Fleet HEAD `59638f001`; refresh-worker `code=59638f00`; 0 tracebacks since 16:29:25Z.
+  - First builds on the new code: `LIVE_GAMELINE_BUILD sport=ncaab considered=0` (16:32:33Z, no men's game live); `sport=wncaab considered=8 ... {"no_live_gameline_projection":8}` (16:32:35Z). The one live women's game has no lane yet: `WNCAAB_LIVE_RESIM_TICK ... refusals={'no_margin_anchor': 1}`.
+  - `#764` is live: `[venue_quote_fanin] UNNAMED_ROLE_KEY_GRID sport=nba count=0 ... refusing=True` at 16:30:38Z.
+- **expect** (from the replay over 11-03..11-06):
+  - `quote_older_than_the_score_the_model_saw` on college builds, at ~35-53% of men's and ~71-74% of women's priced full-game rows;
+  - `row_carries_no_quote_or_score_time` = 0;
+  - priced rows > 0.
+- **verify:** OWED. A watcher (`wait_reason.sh`, cap 90 min) waits for a college build that shows the new reason plus a build with `projected>0`, and flags any `row_carries_no_quote_or_score_time`. Men's games tip at 17:00Z.
+- **Revert:** `git revert 59638f001` on main, then ff + refresh-worker TERM. Or remove `ncaab`/`wncaab` from `_MAX_QUOTE_LAG_BEHIND_SCORE_SECONDS`.
