@@ -56869,3 +56869,44 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **expect** (from the 10-21..11-07 ledger replay): on a busy NCAAB slate (35+ live games, ticks exhausting the 240 s budget), `lane_age_would_refuse_priced` for ncaab at ~19% of priced rows, all carried lanes; NBA ~0; NCAAF / NFL 0.
 - **verify:** OWED. A read-only watcher (`C:\tmp\lanegate\wait_shadow.sh`, this session) sums the shadow fields per sport over every build since 17:40Z and reports at the first NCAAB build with a non-empty would-refuse plus 60 min, or at 22:15Z.
 - **Revert:** `SYNDICATE_LIVE_GAMELINE_LANE_AGE_GATE=off` needs a full down/up. Or revert `846016a91` (back to default off) on main, then ff + refresh-worker TERM.
+
+## 2026-11-07 19:52:31Z (1:52 PM CST) -- FLEET ff 34ac35df3 -> 23780354f + refresh-worker TERM: Kalshi game-line quotes named with Kalshi's own code-to-name pairs (lane `kalshi-fanin-college-naming`, `#764` follow-up) -- **LOADED AND VERIFIED: college unnamed-quote refusals 14 / 16 -> 0 / 0; 26 newly priced sides, every one the row's own game**
+- **User, in this chat:** "Yes, ship it", answering "Push the naming fix and load it on the fleet?"
+- **What:** `23780354f` (the rebase of `dc68e387e`; 2,245 tests passed over 104 Kalshi / venue / grid test files) resolves a Kalshi ticker through `kalshi_board_join._resolve_event` with Kalshi's "<Club> wins" names. A match is named by club pair, then by our event id. Switch `_KALSHI_FANIN_VENUE_NAMES_ENABLED`: a code default (True), no env.
+- **Range `34ac35df3..23780354f`, runtime** (listed in its own step at 19:15:48Z, re-checked by the ff script): `syndicate/features/shared/venue_quote_adapters.py` only. No dirty fleet file overlapped.
+  - **No ride-along.** Lane `wncaab-module` held the claim and loaded `34ac35df3` itself (ff + TERM 19:14:24Z) while I waited.
+- **Loaded by:** refresh-worker only. live-odds-worker and web were not restarted.
+- **Gates:**
+  - **Claim:** refresh-worker acquired 19:16:00Z, holder `kalshi-fanin-college-naming`; released 19:53:14Z.
+  - **Restart spacing:** preflight TOO_SOON 19:17:09Z, inside the 25-min minimum after `wncaab-module`'s 19:14:24Z TERM. Waited it out; no `--allow-rapid`.
+  - **Drain:** `check_deploy_safety --drain --drain-owner kalshi-fanin-college-naming` from 19:36:06Z, under the worker's own environ. It ended NOT CLEAR at the 900 s cap (19:51:14Z): the new worker's first board build ran through it (`BOARD_BUILD_TIMING` 19:49:52Z, wall 1,351 s).
+  - **Preflight** `--target fleet --target-commit 23780354f` with expect + baseline (read 19:39:46Z): HOLD 19:39:59Z (board build in flight); CLEAR 19:51:51Z. After the ff: NO_CHILD 19:52:15.976Z, CLEAR 19:52:18Z.
+  - **Deploy:** `git merge --ff-only 23780354f` 19:52:05Z. TERM pid 668309 19:52:31.418Z. Respawned as pid 700071 19:52:39Z (`role_restarts.jsonl`: claimed, holder `kalshi-fanin-college-naming`). `DRAIN_CLEARED` against pid 700071 19:52:51Z.
+  - **Cost:** no board build between the 19:49:52Z publish and the new worker's first build.
+- **Baseline** (pid 668309 on `34ac35df3`, builds 19:33Z, read 19:39:46Z):
+  - `fleet_def_kalshi_fanin_venue_names` 0.
+  - `UNNAMED_ROLE_KEY_GRID`: ncaaf 14 (sample Kalshi `OKSTKSU-88/94/97/100`, plus Polymarket `tsc-cfb-del-kenest`); ncaab 16; wncaab 0; soccer 0.
+- **expect** (replay at 19:21Z, patched vs fleet adapter, one clock):
+  - `fleet_def` 0 -> 1.
+  - ncaaf: no Kalshi ref left in the refusal (6 Polymarket sides stay).
+  - ncaab: 4, all `NEBPROV-183/184`.
+  - wncaab: 6, all games we do not carry.
+- **verify (measured):**
+  - `fleet_def_kalshi_fanin_venue_names=1` after the ff.
+  - First builds on pid 700071 (19:57:08-19:58:31Z), all `refusing=True`: `UNNAMED_ROLE_KEY_GRID` ncaaf 0, ncaab 0, wncaab 0, soccer 0. 0 tracebacks since 19:52:39Z.
+  - **Counterfactual, same data, same clock (19:58:06Z):** the pre-fix adapter (`34ac35df3`) would refuse ncaaf 10 / ncaab 14; the loaded one refuses 2 / 0. The 2 are `KXNCAAFTOTAL-26NOV07UWFLUNA-68`, West Florida / North Alabama: not on our board, and Kalshi publishes no names for it.
+  - **Newly priced sides vs pre-fix (19:58:45Z):** 26 (ncaaf 24, ncaab 2), 0 lost. Every one read by eye as the row's own game:
+    - `WYOUNLV-50`: Wyoming @ UNLV 49.5
+    - `MDPUR-50/-77`: Maryland @ Purdue 49.5 / 76.5
+    - `ARKAUB-40/-64`: Arkansas @ Auburn 39.5 / 63.5
+    - `TLSATULN-59/-65`: Tulsa @ Tulane 58.5 / 64.5
+    - `OKSTKSU-88/91/94/97`: Oklahoma St @ Kansas St 87.5-96.5
+    - `UNCCONN-65`: North Carolina @ UConn 64.5
+    - `NWSTMURR-155`: Northwestern St @ Murray St 154.5
+    - ncaab `cross_game_rejected` 11 under both versions.
+  - **Prediction miss, explained:** ncaab read 0, not the predicted 4. At 19:58Z the pre-fix adapter refuses no `NEBPROV` quote either: those totals no longer land on a board row. So the residual did not arise; it is **untested, not fixed** (below).
+- **Residual (not fixed):** at 19:21Z the patched adapter left `KXNCAAMBTOTAL-26NOV07NEBPROV-183/-184` unnamed.
+  - The board carried Providence Friars @ Nebraska Cornhuskers: the neutral-site game whose odds-feed home/away flipped mid-day (lane `wncaab-module`, 17:50Z). Kalshi's ticker reads Nebraska first.
+  - Hypothesis, not tested: the resolver refuses the reversed orientation.
+  - Old and new code both refuse those quotes, so nothing regressed.
+- **Revert:** `_KALSHI_FANIN_VENUE_NAMES_ENABLED = False` (or revert `23780354f`) on main, then ff + refresh-worker TERM. With it off, `#764` still refuses the unnamed quotes.

@@ -803,7 +803,13 @@ ba_lens_state_check.py`.
 - Files: none (ledger-only)
 - Verdict: GOAL MET. Moved `closed-lane-archive-20261107-0700` (owner acc7ac9c 245m idle, block 247m). 10 CLOSED blocks WAIT; table in log/2026-11-07.md.
 
-### kalshi-fanin-college-naming — OPEN — opened 2026-11-07 — session e32fef1a-01e8-4afe-a284-01acd3728545
+### kalshi-fanin-college-naming — CLOSED (GOAL MET) — opened 2026-11-07 — closed 2026-11-07 — session e32fef1a-01e8-4afe-a284-01acd3728545
+- **VERDICT `[2026-11-07 20:02:11Z]`: GOAL: MET.** Goal, verbatim: "The venue fan-in names the game of a Kalshi game-line quote with Kalshi's own code-to-name pairs (the order path's resolver), so correct college Kalshi totals price their own row again: on the fleet's data the refused-but-right tickers (CINHOU-61 on Cincinnati @ Houston, CSFSDAK-177 on CSU Fullerton @ South Dakota) price their row, every wrong-game ticker stays refused, and every changed side is read by eye". Reading:
+  - Replay on the fleet's data at 17:22Z: `CINHOU-61` and `CSFSDAK-177` named and priced their rows; all 73 changed (game, ticker) pairs read by eye as the row's own game; 0 sides lost.
+  - LOADED `23780354f`: ff + refresh-worker TERM 19:52:31Z, pid 700071. First builds 19:57Z: `UNNAMED_ROLE_KEY_GRID` ncaaf 14 -> 0, ncaab 16 -> 0, 0 tracebacks.
+  - Same-clock counterfactual: the pre-fix adapter refuses 10 / 14, the loaded one 2 / 0. The 2 are the off-board `UWFLUNA`, still refused.
+  - 26 newly priced sides, every one the row's own game by eye.
+  - Left, not fixed: neutral-site `NEBPROV` (orientation flipped) stayed unnamed at 19:21Z. deploys.md 19:52:31Z.
 - Goal: The venue fan-in names the game of a Kalshi game-line quote with Kalshi's own code-to-name pairs (the order path's resolver), so correct college Kalshi totals price their own row again: on the fleet's data the refused-but-right tickers (CINHOU-61 on Cincinnati @ Houston, CSFSDAK-177 on CSU Fullerton @ South Dakota) price their row, every wrong-game ticker stays refused, and every changed side is read by eye
 - Files: syndicate/features/shared/venue_quote_adapters.py, tests/test_kalshi_fanin_college_naming.py (NEW)
 - Hypothesis: _kalshi_game_token_uncached calls match_event_blob without code_names and returns game_token() only, which is None for ncaaf by design, so college Kalshi quotes name no game (ncaaf 406/406) and #764 refuses even the correct ones

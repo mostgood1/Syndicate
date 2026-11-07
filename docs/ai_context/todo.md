@@ -1,6 +1,15 @@
 # Syndicate TODO — canonical cross-session list
 
 ### `#764` — **KALSHI TOTALS THAT NAME NO GAME PRICE ANOTHER GAME'S ROW: 26 of 26 measured sides wrong-game (men's and women's college basketball, college football). Polymarket is clean in every sport. NOT FIXED** — 2026-11-06, session e32fef1a (user "Yes, measure it here")
+- **UPDATE 2026-11-07 20:02:11Z (2:02 PM CST): NAMING FIX LOADED AND VERIFIED. Lane `kalshi-fanin-college-naming` CLOSED (GOAL MET).**
+  - **Loaded:** `23780354f` on the fleet. ff + refresh-worker TERM 19:52:31Z, pid 700071.
+  - **First builds 19:57Z:** college unnamed-quote refusals ncaaf 14 -> 0, ncaab 16 -> 0.
+  - **Same-clock counterfactual:** the pre-fix adapter refuses 10 / 14, the loaded one 2 / 0. The 2 are the off-board `UWFLUNA`.
+  - **Priced:** 26 newly priced sides, all the row's own game by eye; 0 lost. deploys.md 19:52:31Z.
+  - **Left (not fixed):** the neutral-site `NEBPROV` totals stayed unnamed under the patch at 19:21Z.
+    - Our board carries Providence @ Nebraska; Kalshi's ticker reads Nebraska first. The game's odds-feed orientation flipped mid-day.
+    - Hypothesis: the resolver refuses the reversed orientation. Not tested.
+    - Old and new code both refuse those quotes, so nothing regressed.
 - **UPDATE 2026-11-07 17:27Z (11:27 AM CST): NAMING FIX WRITTEN (lane `kalshi-fanin-college-naming`), committed on branch `claude/syndicate-ai-engine-762439` only. NOT on main, NOT loaded.**
   - **The change:** the Kalshi adapter now resolves a ticker through `kalshi_board_join._resolve_event`, using Kalshi's own "<Club> wins" code-to-name pairs. That is the order path's resolver.
     - A match is named club pair first, our event id second, the same way `_row_game_token` names a row.

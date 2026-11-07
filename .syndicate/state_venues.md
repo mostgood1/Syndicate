@@ -112,6 +112,12 @@ answer.
 
 Scheduled task `verify-603-cross-game-mlb` fires 2026-08-30 20:15 CT.
 
+**Kalshi and Polymarket US quotes that name no game `[verified 2026-11-07 on the fleet, lanes kalshi-unnamed-role-key + kalshi-fanin-college-naming, todo #764]`:**
+- **Refused on totals/spreads keys.** `venue_quote_fanin._unnamed_venue_quote_on_a_role_key` refuses them and logs `UNNAMED_ROLE_KEY_GRID`.
+- **Kalshi names a game with Kalshi's own "<Club> wins" names.** `_KALSHI_FANIN_VENUE_NAMES_ENABLED` routes the ticker through `kalshi_board_join._resolve_event`, not our alias maps, which keeps the rule above. NCAAF quotes are named by our event id, since `game_token` still refuses NCAAF.
+- **On the fleet (`23780354f`, first builds 19:57Z):** college refusals 14 / 16 -> 0 / 0.
+- **Not named:** a neutral-site game whose odds-feed orientation flipped (Nebraska / Providence, 19:21Z). Cause untested.
+
 ## [venue-fee-economics] FEES ARE READ FROM THE VENUE AND VERIFIED AGAINST 18/18 REAL FILLS; THE ARB THRESHOLD WAS ABOVE BREAK-EVEN EVERYWHERE ON MLB `[2026-08-30, lane live-venue-order-placement]`
 
 Kalshi publishes `fee_type`/`fee_multiplier` per series — four distinct
