@@ -700,15 +700,6 @@ death, never life — do not invert it.
 - Verification: refresh-worker.log after the restart that loads the fix: QUOTE_CAPTURE appended_by_sport['wncaab'] > 0; SEGMENT_MISMATCH_GRID sport=wncaab repriced > 0 and count=0; sampled pairs correct by team, side and line
 - Blocked by: none
 
-### repo-out-of-onedrive-plan — CLOSED 2026-11-07 (goal MET 2026-11-04: plan on main, presented; the move itself is tracked by repo-move-script-fixes) — opened 2026-11-04 — session eeaddaa6-9251-44ab-b4c4-546b2d84cd8e
-- GOAL VERDICT `[2026-11-04]`. Goal (verbatim): "A reviewed, user-presented runbook to move the repo from C:\Users\tempadmin\OneDrive\Coding\Syndicate to C:\dev\Syndicate, with a file:line inventory of every path dependency, ordering, quiesce, git-native move, rollback, verify and downtime. READ-ONLY: moves nothing." -- **GOAL: MET** on push of `docs/ai_context/repo_out_of_onedrive_plan.md` to origin/main (independent review folded in; go/window question put to the user in-session). The plan recommends `C:\Users\tempadmin\Coding\Syndicate` over `C:\dev` (ACL + existing script/backup). It found a 11-02 move script that failed twice (app open), plus post-rename blocker S1 and recorder blocker F6. Lane stays OPEN only until the user answers; the move itself needs its own lane.
-- Goal: A reviewed, user-presented runbook to move the repo from C:\Users\tempadmin\OneDrive\Coding\Syndicate to C:\dev\Syndicate, with a file:line inventory of every path dependency, ordering, quiesce, git-native move, rollback, verify and downtime. READ-ONLY: moves nothing.
-- Files: docs/ai_context/repo_out_of_onedrive_plan.md
-- Hypothesis: n/a (planning lane)
-- Falsification test: n/a
-- Verification: plan doc on origin/main; user given a go/no-go and window question
-- Blocked by: none
-
 ### repo-move-script-fixes — OPEN — opened 2026-11-04 — session eeaddaa6-9251-44ab-b4c4-546b2d84cd8e
 - GOAL VERDICT `[2026-11-04]`. Goal (verbatim): "run_move.ps1 survives its real (non-dry) branch: S1-S7 from docs/ai_context/repo_out_of_onedrive_plan.md section 1b fixed, plus -Resume and a git-only rehearsal mode, proven by a full non-dry rehearsal on a throwaway repo with an external worktree outside OneDrive (rename + repair + HEAD check pass, and an injected failure ends in Fail with RESULT.txt saying so). In-play F6 (recorder .env default) needs a loan from in-game-trading and is not edited until the user grants it." -- **GOAL: MET** (script part): REHEARSAL OK on the real branch (git stderr handled, rc 0, head_mismatch=0); -FailAt R4 -> POST-MOVE FAILURE message then -Resume OK; -FailAt R3 -> nothing moved; real-repo -DryRun OK (log 2026-11-04 15:2xZ, plan doc section 1c). F6 LANDED 74767d036 under a user-approved loan (2176a0329); 5 new + 16 existing in-play tests pass. Owed: the runner self-sync reading at the 2026-11-05 08:00 CST nightly (the re-arm gate, handed to fleet-watcher local_379fd729).
 - Goal: run_move.ps1 survives its real (non-dry) branch: S1-S7 from docs/ai_context/repo_out_of_onedrive_plan.md section 1b fixed, plus -Resume and a git-only rehearsal mode, proven by a full non-dry rehearsal on a throwaway repo with an external worktree outside OneDrive (rename + repair + HEAD check pass, and an injected failure ends in Fail with RESULT.txt saying so). In-play F6 (recorder .env default) needs a loan from in-game-trading and is not edited until the user grants it.
@@ -816,6 +807,11 @@ ba_lens_state_check.py`.
 - Falsification test: with code_names + the event-id fallback, CINHOU-61 / CSFSDAK-177 still resolve to no game, or a wrong-game ticker resolves onto a row
 - Verification: off != on unit tests; same-payload replay old vs new adapter on fleet data, every changed side printed beside its row and read by eye; named-quote counts per sport before/after
 - Blocked by: none
+
+### closed-lane-archive-20261107-1406 — CLOSED 2026-11-07 (GOAL MET: 1 blocks archived) — opened 2026-11-07 — session 5271e327-8caa-46c6-919f-36784b66f165
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: MET. owner_liveness.py --idle-min 240 at 20:06Z (2:06 PM CST) returned SAFE for 1 of 12 CLOSED slugs; dry run + invariants matched baseline. Moved: `repo-out-of-onedrive-plan`. Table and WAIT reasons in `log/2026-11-07.md` 20:09Z.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1365,6 +1361,7 @@ ba_lens_state_check.py`.
 - `render-events-reader` — render-events-reader — CLOSED-VERIFIED 2026-08-16 — **`scripts/render_events.py` + `tests/test_render_events.py` SHIPPED TO THE TREE (no deploy — this → `lanes_closed.md`.
 - `render-web-request-path` — **ORPHANED, UNOWNED, CLAIMS RELEASED** `[session 726ef4ff checkpointed and archived 2026-08-22 ~19:4xZ]` — — **SHIPPED AND MEASURED; ONE ITEM OWED**
 - `render-yaml-env-drift` — CLOSED-STALE 2026-09-23 — opened 2026-09-09 — session b56b699e-f30e-4b57-ace1-c3023a513e5f
+- `repo-out-of-onedrive-plan` — CLOSED 2026-11-07 (goal MET 2026-11-04: plan on main, presented; the move itself is tracked by repo-move-script-fixes) — opened 2026-11-04 — session eeaddaa6-9251-44ab-b4c4-546b2d84cd8e
 - `scheduled-task-registry-alert` — CLOSED 2026-10-28 (GOAL MET: out-of-app registry alert on main, job created on the user's yes, first scheduled run OK) — opened 2026-10-28 — session 9af4433f-62e0-4e4f-a082-92522092d7f8
 - `scripts-base-url-resolver` — CLOSED — opened 2026-10-01 — closed 2026-10-01 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
 - `scripts-fleet-default` — CLOSED 2026-10-06 (GOAL MET: unflagged scripts reach the fleet with its own token, landed 393bbf29; publish_model_scorecard handed to daily-optimizer) — opened 2026-10-06 — session 5da10f7c-2faf-4ee1-9c98-33ffbab3771b
