@@ -56818,3 +56818,17 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - priced rows > 0.
 - **verify:** OWED. A watcher (`wait_reason.sh`, cap 90 min) waits for a college build that shows the new reason plus a build with `projected>0`, and flags any `row_carries_no_quote_or_score_time`. Men's games tip at 17:00Z.
 - **Revert:** `git revert 59638f001` on main, then ff + refresh-worker TERM. Or remove `ncaab`/`wncaab` from `_MAX_QUOTE_LAG_BEHIND_SCORE_SECONDS`.
+
+## 2026-11-07 16:40Z (10:40 AM CST) -- VERIFY `239d932fe` (`#764`, lane `kalshi-unnamed-role-key`), loaded by the 16:29:14Z ff + refresh-worker TERM above -- **MET**, with a correction to my 11-06 claim
+- **Reading 1, production log** (refresh-worker pid 517695, `code=59638f00`, first board build on the new code): `[venue_quote_fanin] UNNAMED_ROLE_KEY_GRID ... refusing=True` for all 7 sports, 16:30:38-16:34:55Z.
+  - nba 0 (sides_seen 11,212), nfl 0, ncaaf 14, ncaab 4, wncaab 3, nhl 0, soccer 0.
+  - 0 tracebacks from 16:30:38Z to 16:35:42Z.
+- **Reading 2, read-only replay with the switch off vs on** (one quote pull, fleet code + data, 16:36:48Z). Every refused side was read BY EYE against the row's teams:
+  - 21 sides refused: 17 carried another game's ticker, 4 the row's OWN game.
+  - ncaaf 14. Wrong game: `UWFLUNA-38/43/73`, `IWSELA-59/71`, `CINHOU-64` (on UCLA @ Minnesota, Iowa @ Northwestern, Texas St @ Oregon St, Merrimack @ Wake Forest, Oklahoma St @ Kansas St). RIGHT game: `CINHOU-61` on Cincinnati @ Houston 60.5. All 14 are now priced by Polymarket's same-game total.
+  - ncaab 4. Wrong game: `COOKGC-137` on Houston Christian @ Western Illinois. RIGHT game: `CSFSDAK-177` on CSU Fullerton @ South Dakota 176.5. All 4 are now Polymarket same-game.
+  - wncaab 3. Wrong game: `PSUCIN-135/138` on Minnesota @ Marquette and Kent St @ Northern Kentucky. 1 side is now Kalshi's named same-game total (`MINNMARQ-135`); 2 are back on the books' price.
+  - Same-game sides never fell (ncaab Kalshi same-game totals 76 -> 76). h2h unchanged.
+- **CORRECTION to `#764`'s 11-06 22:14Z update:** "every side refused was another game's ticker" was never established. The probe's ticker check (`_kalshi_game_token_uncached` against the row alone) returns nothing both for another game's ticker and for a correct one whose codes it cannot read. On 11-06 only the LOST sides were read by eye, not the re-priced ones. `CINHOU-61` was among the 11-06 22:08Z refusals too.
+- **Net:** the rule trades 4 correct Kalshi quotes (each covered today by a same-game Polymarket quote) for 17 wrong-game ones. A correct Kalshi total with no same-game Polymarket quote now falls back to the books. Kept. The follow-up is to name Kalshi's college games in the fan-in, so that correct tickers name their game and pass (todo `#764`).
+- **Claims:** none held by this lane. The ff and the restart were `wncaab-module`'s.

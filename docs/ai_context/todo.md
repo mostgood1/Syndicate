@@ -1,6 +1,13 @@
 # Syndicate TODO — canonical cross-session list
 
 ### `#764` — **KALSHI TOTALS THAT NAME NO GAME PRICE ANOTHER GAME'S ROW: 26 of 26 measured sides wrong-game (men's and women's college basketball, college football). Polymarket is clean in every sport. NOT FIXED** — 2026-11-06, session e32fef1a (user "Yes, measure it here")
+- **UPDATE 2026-11-07 16:40Z (10:40 AM CST): LIVE ON THE FLEET since 16:29:14Z, lane `kalshi-unnamed-role-key` CLOSED (GOAL MET).**
+  - Loaded by lane `wncaab-module`'s ff to `59638f001` and its refresh-worker restart (pid 517695). The first build logged `UNNAMED_ROLE_KEY_GRID ... refusing=True` in all 7 sports: ncaaf 14, ncaab 4, wncaab 3, others 0.
+  - **CORRECTION:** 4 of the 21 sides refused at 16:36Z were the row's OWN game: `KXNCAAFTOTAL-26NOV07CINHOU-61` on Cincinnati @ Houston 60.5, and `KXNCAAMBTOTAL-26NOV07CSFSDAK-177` on CSU Fullerton @ South Dakota 176.5. These are correct Kalshi totals that the adapter cannot name, and all 4 are re-priced by a same-game Polymarket quote today.
+  - The 11-06 claim "every side refused was another game's ticker" rested on a ticker check that reads an unresolvable correct ticker as "not this game". Details: deploys.md 2026-11-07 16:40Z.
+  - **OPEN follow-up, what keeps this item open:** name Kalshi's college games in the fan-in, so correct tickers name their game and pass while wrong ones are refused by name.
+    - `_kalshi_game_token` passes no code-to-name pairs; `kalshi_board_join` resolves the same tickers with Kalshi's own pairs.
+    - Today ncaaf names 0 of its Kalshi quotes, and ncaab misses codes such as `CSF`.
 - **UPDATE 22:14Z 11-06 (4:14 PM CST): FIX WRITTEN AND COMMITTED as `98cbbb8b0` (lane `kalshi-unnamed-role-key`), on branch `claude/syndicate-ai-engine-762439` only. NOT ON MAIN, NOT LOADED ON THE FLEET:** pushing code and loading it wait on the user's yes.
   - The rule: `venue_quote_fanin._unnamed_venue_quote_on_a_role_key` refuses a Kalshi or Polymarket quote that names no game on a totals / totals_alt / spreads / spreads_alt row, on the grid path and the board path, after the `#603` check. Switch: `_UNNAMED_ROLE_KEY_REFUSAL_ENABLED` (True). OddsAPI is unchanged (unmeasured). h2h is untouched.
   - New log lines `UNNAMED_ROLE_KEY_GRID sport= count= sample=<tickers> refusing=` and `UNNAMED_ROLE_KEY_ROWS`, with the same fields in both return payloads.

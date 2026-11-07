@@ -3269,3 +3269,14 @@ I counted "unchanged re-appends" on the NBA and NHL quote shards (NHL: 41% of ro
 - **Rule:**
   - Move a directory with `[IO.Directory]::Move` (MoveFileEx, one rename, all-or-nothing), never with `Move-Item`.
   - Check the failure branch with a live holder in a rehearsal before trusting it. A test folder that nothing holds proves nothing about this path.
+
+## 2026-11-07 -- AN IDENTITY CHECK THAT CANNOT RESOLVE A CODE READS AS "NOT THIS GAME" `[lane kalshi-unnamed-role-key, session e32fef1a]`
+
+- **Belief:** on 11-06 I reported that every Kalshi totals side the `#764` refusal removed carried another game's ticker. The basis was a probe asking `_kalshi_game_token_uncached(ticker, sport, [this_row])` and finding nothing.
+- **What was true [M]:** that call returns nothing both for a ticker that belongs elsewhere and for a correct ticker whose codes the resolver cannot read.
+  - Read by eye on 11-07, 4 of the 21 refused sides were the row's own game: `CINHOU-61` on Cincinnati @ Houston, `CSFSDAK-177` on CSU Fullerton @ South Dakota.
+  - On 11-06 only the LOST sides had been read by eye; the re-priced ones had not.
+- **Rule:**
+  - An identity check that can come back empty must report three outcomes: this game, another game, unresolved.
+  - An unresolved verdict is read by eye before it is counted either way.
+  - Print every refused row beside its ticker, not a sample of 6.
