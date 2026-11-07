@@ -1464,6 +1464,7 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   from the K=2 recency rule (census 33d07f61). Deferring the rule to the injury report FAILS on the rule's own logged
   names (step 4b, 0e8746ce): A2 2.74 (in-box only 1.15) — 25% of re-admitted players play; the non-players are coach's
   decisions or absent from the box. **The 4.73 needs pre-tip news, like coach DNP.** The fleet's K=2 rule is unchanged.
+- **Forward-read injury feed:** the 2026-27 feed is built (tip − 30 rule, B1–B3 pass on 11-01; c1ca9c0e). Its B2 gate is amended to B2' (decf567e): ≥ 95% listed, OR ≥ 85% listed with every unlisted team-game verified absent or Available-only in the PDF and a ≥ 99% listed control; verifier `C:/tmp/bball_sc/r2s/b2_verify.py` sha256 07dd34db.
 
 ## [college-basketball-boards] NCAAB + WNCAAB ON THE BOARDS: WNCAAB MODULE LIVE, PREGAME SIMS FOR BOTH (MARGIN LINES MARKET-ANCHORED), RAIL RUN/BONUS LINE `[verified 2026-11-02/03 on the fleet, lane wncaab-module, fleet HEAD 70b2bdf09; readings in deploys.md 20:05Z..00:24Z]`
 
