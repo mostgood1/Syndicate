@@ -51,6 +51,7 @@ looking like "the sim had no opinion".
 from __future__ import annotations
 
 import re
+import unicodedata
 from collections.abc import Mapping, Sequence
 from typing import Any
 
@@ -178,15 +179,30 @@ def _build_canonical_markets() -> dict[str, str]:
 _CANONICAL_MARKETS = _build_canonical_markets()
 
 
+# Letters NFKD does not decompose into a base letter plus a combining mark (`#762`).
+_NAME_FOLD = str.maketrans({"ł": "l", "Ł": "L", "ø": "o", "Ø": "O", "đ": "d", "Đ": "D", "ð": "d", "ı": "i",
+                            "æ": "ae", "Æ": "AE", "œ": "oe", "Œ": "OE", "ß": "ss", "þ": "th", "Þ": "Th"})
+
+
 def _norm_name(value: Any) -> str:
-    """Player identity for joining: lowercase, punctuation stripped.
+    """Player identity for joining: accents folded, lowercase, punctuation stripped.
 
     Deliberately NOT a fuzzy match. `J.D. Martinez` vs `JD Martinez` must join;
     `Will Smith` (catcher) vs `Will Smith` (pitcher) is a real collision that a
     fuzzy matcher would hide, and the per-event scoping below is what separates
     them.
+
+    ACCENTS ARE FOLDED, NOT DROPPED (`#762`, 2026-11-07). The NBA lens carries ESPN's
+    spelling (`Nikola Jokić`) and the board carries the odds feed's (`Nikola Jokic`).
+    The old `[^a-z0-9]` pass turned `ć` into a space, giving `nikola joki` against
+    `nikola jokic`, so none of his live props ever joined. Measured on the
+    DEN@IND live board at 22:40Z: 16 of 123 live NBA prop rows had no live number,
+    and all 16 were Jokić's. Both sides of every join go through this function, so
+    folding can only merge spellings of the same name. It can never split one.
     """
-    text = str(value or "").strip().lower()
+    text = unicodedata.normalize("NFKD", str(value or "").translate(_NAME_FOLD))
+    text = "".join(ch for ch in text if not unicodedata.combining(ch))
+    text = text.strip().lower()
     text = re.sub(r"[.'`]", "", text)
     text = re.sub(r"[^a-z0-9]+", " ", text)
     return " ".join(text.split())
