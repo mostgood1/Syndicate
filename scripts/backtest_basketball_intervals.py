@@ -453,21 +453,72 @@ def _fmt(stat: Mapping[str, Any]) -> str:
     return f"{stat['mae']:.2f} ({stat['bias']:+.2f})"
 
 
-def markdown(report: Mapping[str, Any]) -> str:
+def markdown(report: Mapping[str, Any], *, segments: Optional[Iterable[str]] = None) -> str:
+    """The report as tables: coverage, the checkpoint MAE (bias) per projector x segment, the 5%-bucket curve at the
+    old NCAAB app's bins (minute 10/20/30/38 of 40, i.e. 2-minute bins over every 30 s snapshot), and the paired
+    gates against the baseline. Every cell carries the games it rests on."""
+    want = set(segments) if segments else None
     lines: list[str] = []
+    cfg = report.get("config") or {}
+    lines.append(f"**{cfg.get('league')} season {cfg.get('season')}** -- code `{cfg.get('code')}`, sims {cfg.get('sims')}, "
+                 f"re-sim at {cfg.get('sim_times')}; games scored {report.get('games_scored')} of {report.get('games_replayed')} "
+                 f"replayed (eligible {report.get('eligible_games')}); refused before replay {report.get('skipped_before_replay')}; "
+                 f"game refusals {report.get('game_refusals')}; {report.get('sec_per_game')} s/game\n")
+    lines.append("| family | dates | first | last |\n|---|---|---|---|")
+    for name, c in (report.get("coverage") or {}).items():
+        lines.append(f"| {name} | {c['dates']} | {c['first']} | {c['last']} |")
+    if report.get("prepare_refusals"):
+        lines.append(f"\nPer-game projector refusals (named): `{json.dumps(report['prepare_refusals'], sort_keys=True)}`")
     for lg, phases in (report.get("checkpoint") or {}).items():
         labels = list(bib.checkpoint_times(lg))
         for ph, projs in phases.items():
             for qty in ("total", "margin"):
-                lines.append(f"\n#### {lg} / {ph} -- {qty}: MAE (bias) at {', '.join(labels)}; games per cell in brackets\n")
+                lines.append(f"\n#### {lg} / {ph} -- {qty}: MAE (bias) at {', '.join(labels)} elapsed; [games]\n")
                 lines.append("| projector | segment | " + " | ".join(labels) + " |")
                 lines.append("|---|---|" + "---|" * len(labels))
                 for pj, segs in projs.items():
                     for seg, cells in segs.items():
+                        if want and seg not in want:
+                            continue
                         row = [f"{_fmt(cells.get(lb, {}).get(qty, {}))} [{cells.get(lb, {}).get('games', 0)}]" for lb in labels]
                         if all(r.startswith("--") for r in row):
                             continue
                         lines.append(f"| {pj} | {seg} | " + " | ".join(row) + " |")
+    bars = [str(f) for f in bib.CHECKPOINT_FRACTIONS]
+    for lg, phases in (report.get("bucket") or {}).items():
+        reg_min = float(pbp.rules_for(lg).regulation_seconds()) / 60.0
+        heads = [f"{float(b) * reg_min:g}-{(float(b) + bib.BUCKET_FRACTION) * reg_min:g}m" for b in bars]
+        for ph, projs in phases.items():
+            lines.append(f"\n#### {lg} / {ph} -- FULL-GAME TOTAL over every 30 s snapshot in the bin: MAE (bias) [games]\n")
+            lines.append("| projector | " + " | ".join(heads) + " |")
+            lines.append("|---|" + "---|" * len(heads))
+            for pj, segs in projs.items():
+                cells = segs.get("full") or {}
+                row = [f"{_fmt(cells.get(b, {}).get('total', {}))} [{cells.get(b, {}).get('games', 0)}]" for b in bars]
+                if not all(r.startswith("--") for r in row):
+                    lines.append(f"| {pj} | " + " | ".join(row) + " |")
+    base = report.get("gate_baseline")
+    for gate, by_qty in (report.get("gates") or {}).items():
+        for qty, tree in by_qty.items():
+            for lg, phases in tree.items():
+                labels = list(bib.checkpoint_times(lg))
+                for ph, segs in phases.items():
+                    rows = []
+                    for seg, cells in segs.items():
+                        if want and seg not in want:
+                            continue
+                        vals = []
+                        for lb in labels:
+                            c = cells.get(lb)
+                            vals.append("--" if not c else f"{c['delta']:+.2f} +-{(c['se'] or 0) * 1.96:.2f} {c['verdict']} [{c['games']}]")
+                        if not all(v == "--" for v in vals):
+                            rows.append(f"| {seg} | " + " | ".join(vals) + " |")
+                    if rows:
+                        lines.append(f"\n#### GATE {gate} -- {lg} / {ph} -- {qty}: mean |err| difference vs {base} "
+                                     f"(negative = better), +-1.96 game-clustered SE [games]\n")
+                        lines.append("| segment | " + " | ".join(labels) + " |")
+                        lines.append("|---|" + "---|" * len(labels))
+                        lines.extend(rows)
     return "\n".join(lines) + "\n"
 
 
@@ -506,8 +557,8 @@ def build_report(results: list[dict[str, Any]], meta: Mapping[str, Any], args: a
 
 def main(argv: Optional[list[str]] = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--league", required=True, choices=("ncaab", "nba", "wnba"))
-    ap.add_argument("--season", type=int, required=True, help="ESPN season = the year the season ENDS (NBA 2027 = 2026-27)")
+    ap.add_argument("--league", choices=("ncaab", "nba", "wnba"))
+    ap.add_argument("--season", type=int, help="ESPN season = the year the season ENDS (NBA 2027 = 2026-27)")
     ap.add_argument("--data-root", type=Path, default=Path(os.environ.get("SYNDICATE_DATA_ROOT") or (REPO / "data")))
     ap.add_argument("--phases", default="", help="comma list (ncaab: regular,conf_tournament,...; nba/wnba: regular,playoffs,...); empty = all")
     ap.add_argument("--projectors", default="naive_pace,interval_projection,league_rate,pregame_rate,pooled_rate,pooled_pace,pooled_efficiency")
@@ -522,8 +573,17 @@ def main(argv: Optional[list[str]] = None) -> int:
     ap.add_argument("--workers", type=int, default=2)
     ap.add_argument("--code-sha", default="", help="the commit the run's code is at (recorded in the report)")
     ap.add_argument("--out", type=Path, required=True)
+    ap.add_argument("--render", default="", help="re-render report.md from an existing report.json (no replay)")
+    ap.add_argument("--render-segments", default="", help="with --render: only these segments in the tables")
     ap.add_argument("--max-games", type=int, default=None, help="smoke runs: only the first N tasks")
     args = ap.parse_args(argv)
+    if args.render:
+        report = json.loads(Path(args.render).read_text(encoding="utf-8"))
+        text = markdown(report, segments=[x for x in args.render_segments.split(",") if x] or None)
+        (args.out / "report.md").write_text(text, encoding="utf-8") if args.out.is_dir() else print(text)
+        return 0
+    if not args.league or not args.season:
+        ap.error("--league and --season are required (except with --render)")
     args.phases = [p for p in args.phases.split(",") if p] or None
     args.projector_names = [p for p in args.projectors.split(",") if p]
     args.mechanisms_obj = json.loads(args.mechanisms) if args.mechanisms else {}
