@@ -119,6 +119,11 @@ def test_neutral_site_game_takes_the_odds_feed_orientation_and_a_home_game_never
     ("Fort Wayne Mastodons", "Purdue Fort Wayne Mastodons"),
     ("New Orleans Privateers", "LSU New Orleans Privateers"),
     ("Sam Houston St Bearkats", "Sam Houston Bearkats"),
+    # 2026-11-07 (the rail's "Tenn-Martin Skyhawks @ IUPUI Jaguars" card, and the rest of the 11-04..11-08 misses).
+    ("IUPUI Jaguars", "IU Indianapolis Jaguars"),
+    ("Albany Great Danes", "UAlbany Great Danes"),
+    ("Florida Int'l Golden Panthers", "Florida International Panthers"),
+    ("Nicholls St Colonels", "Nicholls Colonels"),
 ])
 def test_odds_feed_spellings_join_the_espn_team(odds_feed, espn):
     key = chip_join_key("ncaab", odds_feed)
@@ -128,6 +133,23 @@ def test_odds_feed_spellings_join_the_espn_team(odds_feed, espn):
 def test_womens_odds_feed_spelling_joins_the_lady_lions():
     key = chip_join_key("wncaab", "Penn State Nittany Lions")
     assert key is not None and key == chip_join_key("wncaab", "Penn State")
+
+
+@pytest.mark.parametrize("odds_feed,espn", [
+    ("Morgan St Bears", "Morgan State Lady Bears"),
+    ("Northwestern St Demons", "Northwestern State Lady Demons"),
+    ("IUPUI Jaguars", "IU Indianapolis Jaguars"),
+])
+def test_womens_odds_feed_drops_lady_and_still_joins(odds_feed, espn):
+    key = chip_join_key("wncaab", odds_feed)
+    assert key is not None and key == chip_join_key("wncaab", espn)
+
+
+def test_dropping_lady_offers_no_bare_mascot_key():
+    from syndicate.features.shared.team_aliases import canonical_team
+
+    for mascot in ("Bears", "Demons"):
+        assert canonical_team("wncaab", mascot) is None
 
 
 def test_derived_spellings_do_not_make_ambiguous_mascots_keys():

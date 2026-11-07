@@ -122,6 +122,13 @@ def _odds_feed_spellings(row: dict[str, str], school: str) -> Iterator[Tuple[str
     mascot = str(row.get("mascot") or "").strip()
     short = str(row.get("short_display_name") or "").strip()
     abbreviation = str(row.get("abbreviation") or "").strip()
+    # THE WOMEN'S "LADY" PREFIX (2026-11-07). ESPN's women's registry says "Morgan State Lady Bears" and
+    # "Northwestern State Lady Demons"; the odds feed says "Morgan St Bears", "Northwestern St Demons". Both sides
+    # failed to resolve on the 11-04..11-08 quote logs. Only COMPOSITE spellings take the bare mascot -- the lone
+    # mascot token above stays "Lady Bears" -- so no bare "Bears" key is offered for the collision pass to fight over.
+    mascots = [mascot] if mascot else []
+    if mascot.startswith("Lady ") and len(mascot) > len("Lady "):
+        mascots.append(mascot[len("Lady "):])
     stems = {school}
     if school.endswith(" State"):
         base = school[: -len(" State")]
@@ -132,12 +139,12 @@ def _odds_feed_spellings(row: dict[str, str], school: str) -> Iterator[Tuple[str
         stems.add("Mt. " + school[len("Mount "):])
     for stem in stems:
         yield stem, school
-        if mascot:
-            yield f"{stem} {mascot}", school
-    if mascot:
+        for name in mascots:
+            yield f"{stem} {name}", school
+    for name in mascots:
         for prefix in (short, abbreviation):
             if prefix:
-                yield f"{prefix} {mascot}", school
+                yield f"{prefix} {name}", school
         last = mascot.split()[-1]
         if last != mascot:
             yield f"{school} {last}", school
@@ -168,4 +175,10 @@ _ODDS_FEED_ALIASES: tuple[tuple[str, str], ...] = (
     ("New Orleans Privateers", "LSU New Orleans"),
     ("Sam Houston St Bearkats", "Sam Houston"),
     ("Penn State Nittany Lions", "Penn State"),  # the women's registry carries ESPN's "Lady Lions"
+    # 2026-11-07: every name in the 11-04..11-08 men's quote logs that still did not resolve (user: games on the
+    # rail "not matched"). IUPUI renamed itself IU Indianapolis in 2024; the feed kept the old name.
+    ("Albany Great Danes", "UAlbany"),
+    ("Florida Int'l Golden Panthers", "Florida International"),
+    ("IUPUI Jaguars", "IU Indianapolis"),
+    ("Nicholls St Colonels", "Nicholls"),
 )

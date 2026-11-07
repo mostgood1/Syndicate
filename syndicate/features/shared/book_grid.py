@@ -578,6 +578,81 @@ def freshest_rows_for_grid(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, 
     return [kept[index] for index in sorted(kept)]
 
 
+_SIDE_SWAP = {"home": "away", "away": "home"}
+
+
+def orient_events_to_latest(rows: list[Mapping[str, Any]]) -> tuple[list[Mapping[str, Any]], int, int, int]:
+    """ONE EVENT, ONE ORIENTATION: the orientation of the event's newest SPORTSBOOK quote.
+
+    WHY (lane wncaab-module, 2026-11-07; the user saw "Nebraska Cornhuskers @ Providence Friars" on the Games rail
+    as an unmatched card). OddsAPI changed that neutral-site event's home/away mid-day: its 12:07Z pull listed
+    Nebraska @ Providence and its 16:53Z pull Providence @ Nebraska. `book_quotes` is a day-long change log keyed by
+    `selection` = "home"/"away", so the morning's quotes stayed filed under labels that now named the OTHER team:
+    the 11-07 grid carried 8 rows one way and 3 the other for one event, and
+      * a spread split into two rows (the canonical line's sign follows `selection`),
+      * an h2h row could take one team's price under the other's label (`_freshest_per_book_side` keys on
+        (book, "home")),
+      * the slate's neutral-site orientation saw BOTH pairs and kept ESPN's, so most rows matched no game: no chip,
+        no game state, no projection.
+
+    The latest orientation is decided by aggregator rows only, by OUR capture time. On 11-07 the newest
+    old-orientation rows were all Kalshi/Polymarket (to 17:15Z), while the books' newest (16:34:44Z) said Nebraska.
+
+    An AGGREGATOR row in the REVERSED orientation (exact names) gets `home_team`/`away_team` swapped, and its
+    `selection` too when that is the literal "home"/"away" -- the fetcher wrote both from one OddsAPI event, so they
+    agree. Its line is untouched, because a quote's line belongs to the side it names. Totals ("over"/"under"),
+    club-name selections and draws are untouched.
+
+    A VENUE row in the reversed orientation is DROPPED, not relabelled: its `selection` is the BOARD's side from the
+    join while its team fields can come from elsewhere, so the two need not agree. Measured on 11-07: Polymarket's
+    16:52Z row said away (= Nebraska by its own fields) at +138 against Nebraska -145 at every book -- a Providence
+    price, labelled by the new orientation, under old team fields; Kalshi's rows were self-consistent. A label that
+    may name either team is not priced. The venue re-quotes within minutes from the corrected board.
+
+    A row naming neither orientation is left alone. An event quoted one way only (nearly all of them) is unchanged.
+
+    Returns (rows, events reoriented, aggregator rows relabelled, venue rows dropped).
+    """
+    latest: dict[tuple[str, str], tuple[str, tuple[str, str]]] = {}
+    for row in rows:
+        event = str(row.get("event_id") or "").strip()
+        away, home = str(row.get("away_team") or "").strip(), str(row.get("home_team") or "").strip()
+        if not event or not away or not home or is_direct_feed_book(row.get("bookmaker")):
+            continue
+        key = (str(row.get("sport") or "").strip().lower(), event)
+        # OUR capture time, not the book's clock: a book whose price has not moved since before the change keeps
+        # an old `book_updated_at` while its row already carries the new orientation.
+        stamp = str(row.get("captured_at") or row.get("snapshot_ts") or _observed_at(row))
+        current = latest.get(key)
+        if current is None or stamp >= current[0]:
+            latest[key] = (stamp, (away, home))
+    if not latest:
+        return rows, 0, 0, 0
+    out: list[Mapping[str, Any]] = []
+    events: set[tuple[str, str]] = set()
+    relabelled = dropped_venue = 0
+    for row in rows:
+        key = (str(row.get("sport") or "").strip().lower(), str(row.get("event_id") or "").strip())
+        target = latest.get(key)
+        away, home = str(row.get("away_team") or "").strip(), str(row.get("home_team") or "").strip()
+        if target is None or not away or not home or (away, home) == target[1] or (home, away) != target[1]:
+            out.append(row)
+            continue
+        events.add(key)
+        if is_direct_feed_book(row.get("bookmaker")):
+            dropped_venue += 1
+            continue
+        flipped = dict(row)
+        flipped["away_team"], flipped["home_team"] = row.get("home_team"), row.get("away_team")
+        selection = str(row.get("selection") or "")
+        swapped = _SIDE_SWAP.get(selection.strip().lower())
+        if swapped is not None:
+            flipped["selection"] = swapped if selection.strip().islower() else swapped.title()
+        out.append(flipped)
+        relabelled += 1
+    return out, len(events), relabelled, dropped_venue
+
+
 def build_book_grid(
     rows: Iterable[Mapping[str, Any]],
     *,
@@ -605,6 +680,12 @@ def build_book_grid(
     """
     now = now or datetime.now(timezone.utc)
     materialised = [row for row in rows or () if isinstance(row, Mapping)]
+    # Before grouping: an event whose home/away changed upstream mid-day is put back to ONE orientation, so a side
+    # label means the same team in every row (`orient_events_to_latest`).
+    materialised, oriented_events, oriented_rows, dropped_venue_rows = orient_events_to_latest(materialised)
+    if oriented_events:
+        print(f"[book_grid] ORIENTATION_NORMALISED events={oriented_events} rows={oriented_rows} "
+              f"venue_rows_dropped={dropped_venue_rows}", flush=True)
 
     # Group by market instance. `market_sides_for_quote` decides which LINES
     # belong together (mirrored for spreads, absent for h2h), so group only on
