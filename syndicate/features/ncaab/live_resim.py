@@ -48,6 +48,28 @@ published lane unchanged -- its `liveStateAsOf` is the time it was computed, so 
 freshness gate judges it. A game never computed yet publishes `budget_exhausted`.
 
 --------------------------------------------------------------------------
+WHY THE BUDGET RAN OUT ON SMALL SLATES, AND THE TWO CHANGES (#762, lane ncaab-live-resim-capacity)
+--------------------------------------------------------------------------
+
+The draws are pure-Python CPU work and this loop is a THREAD in the live-odds-worker process, which runs about a
+dozen other CPU-active threads under ONE interpreter lock. Fleet, 2026-11-07 22:25-22:35Z (per-thread
+`/proc/<pid>/task/<tid>/stat`, 2 s samples): the process ran at 103% of a core; this thread got 12.1% of it, and
+18.0% over its 22:27:40-22:31:40Z tick (43.2 CPU-s in 240 s wall), which re-simmed 1 of 15 games. The rest went
+to the live-lens loop (17.2%), the NBA re-sim (13.6%), the WNCAAB re-sim (9.4%), the main loop and three others.
+A game costs about 20 CPU-s at 200 sims, so at an 18% share it costs about 110 s of wall time. Offline the same
+re-sim is x2.17 slower as one of two threads and x0.92 as one of two processes
+(`scripts/ncaab_resim_contention_probe.py`).
+
+  1. RE-SIM WORKERS (`SYNDICATE_COLLEGE_LIVE_RESIM_WORKERS`, default 0 = this thread, as before). With N > 0 each
+     game's draws run in one of N child processes (`shared/live_resim_workers.py`), shared by the men's and women's
+     threads, while this thread fetches, resumes and anchors the next games. Same inputs, same seed, same refusal
+     on the deadline. A child that fails names it (`worker_errors`) and the rest of the tick runs here.
+  2. THE CARRY IS BOUNDED (`SYNDICATE_COLLEGE_LIVE_RESIM_CARRY_BOUND` off|shadow|on, default shadow;
+     `..._CARRY_MAX_AGE_SECONDS`, default 900 s, NBA's measured bound). A carried `live_resim` lane older than the
+     bound (or with no state time) is refused as `budget_exhausted` under `on`; `shadow` carries it as before and
+     counts it (`carry_expired`). Lanes reached 1,506 s on 11-07 and 5,750 s on 11-05 with no bound at all.
+
+--------------------------------------------------------------------------
 RUNS ON A WORKER. NEVER IN A REQUEST HANDLER. A DEDICATED THREAD, OFF BY DEFAULT.
 --------------------------------------------------------------------------
 
@@ -1022,13 +1044,110 @@ def _cursor_key(date_str: str, league: str) -> str:
     return str(date_str) if league == LEAGUE else f"{league}|{date_str}"
 
 
-def _carry(game: Mapping[str, Any]) -> dict[str, Any]:
+def _carry(game: Mapping[str, Any], age_seconds: Optional[float] = None) -> dict[str, Any]:
     """A previous tick's game row, re-published unchanged except for the carry marks. The LANE flag is
     what the join reads (`live_gameline_join`: `liveStateCarriedForward`, MLB's convention); its
-    `liveStateAsOf` stays the time it was computed, so freshness is judged on the real age."""
+    `liveStateAsOf` stays the time it was computed, so freshness is judged on the real age. `carriedAgeSeconds`
+    is that age when this tick carried it (replaced, never stacked)."""
     out = {**game, "carriedForward": True}
-    out["gameLens"] = [{**lane, "liveStateCarriedForward": True} for lane in game.get("gameLens") or []]
+    extra = {} if age_seconds is None else {"carriedAgeSeconds": round(max(0.0, age_seconds), 1)}
+    out["gameLens"] = [{**lane, "liveStateCarriedForward": True, **extra} for lane in game.get("gameLens") or []]
     return out
+
+
+# ------------------------------------------------------------------------------------------- the carry bound
+# (#762, lane ncaab-live-resim-capacity; module docstring "WHY THE BUDGET RAN OUT"). NBA's rule
+# (`nba/live_resim.DEFAULT_CARRY_MAX_AGE_SECONDS`): one missed tick is bridged, a starved game is not papered
+# over. The college cadence under load is NBA's: a 240 s tick plus a 120 s wait, so ~360 s between ticks, and 900 s
+# covers one missed tick with margin. Only a lane that carries a NUMBER (`live_resim`) is judged; a carried
+# refusal publishes no probability and keeps its own reason.
+CARRY_BOUND_ENV = "SYNDICATE_COLLEGE_LIVE_RESIM_CARRY_BOUND"
+CARRY_MAX_AGE_ENV = "SYNDICATE_COLLEGE_LIVE_RESIM_CARRY_MAX_AGE_SECONDS"
+CARRY_BOUND_MODES = ("off", "shadow", "on")
+# SHADOW until the user's deploy decision: it carries exactly as before and prints `carry_expired`, so riding along
+# on another lane's live-odds-worker restart changes no board row (`on` withholds the old number).
+DEFAULT_CARRY_BOUND = "shadow"
+DEFAULT_CARRY_MAX_AGE_SECONDS = 900.0
+
+
+def carry_bound_mode(env: Optional[Mapping[str, str]] = None) -> str:
+    """off | shadow | on. Absent or unrecognised = the default, never an unbounded carry by accident."""
+    raw = str((env if env is not None else os.environ).get(CARRY_BOUND_ENV, "") or "").strip().lower()
+    return raw if raw in CARRY_BOUND_MODES else DEFAULT_CARRY_BOUND
+
+
+def carry_max_age_seconds(env: Optional[Mapping[str, str]] = None) -> float:
+    """A bad or non-positive value falls back to the default rather than meaning "carry forever" (NBA's rule)."""
+    import math
+
+    raw = str((env if env is not None else os.environ).get(CARRY_MAX_AGE_ENV, "") or "").strip()
+    try:
+        value = float(raw) if raw else DEFAULT_CARRY_MAX_AGE_SECONDS
+    except ValueError:
+        return DEFAULT_CARRY_MAX_AGE_SECONDS
+    return value if value > 0 and math.isfinite(value) else DEFAULT_CARRY_MAX_AGE_SECONDS
+
+
+def _carried_number_age(game: Mapping[str, Any], now: datetime) -> tuple[bool, Optional[float]]:
+    """(does the row carry a live NUMBER, the oldest such lane's age in seconds or None when it has no state time)."""
+    has_number, ages = False, []
+    for lane in game.get("gameLens") or []:
+        if lane.get("source") != LIVE_RESIM_LENS_SOURCE:
+            continue
+        has_number = True
+        as_of = _utc(lane.get("liveStateAsOf"))
+        if as_of is None:
+            return True, None
+        ages.append((now - as_of).total_seconds())
+    return has_number, (max(ages) if ages else None)
+
+
+# ------------------------------------------------------------------------------------------- re-sim workers
+WORKERS_ENV = "SYNDICATE_COLLEGE_LIVE_RESIM_WORKERS"
+# OFF until the user's deploy decision: 0 = the draws run in the league's own thread, exactly as before.
+DEFAULT_WORKERS = 0
+MAX_WORKERS = 6
+# A worker checks the deadline before every draw, so a job still running at the deadline returns within one draw.
+WORKER_GRACE_SECONDS = 5.0
+_POOL_LOCK = threading.Lock()
+_POOL: Optional[Any] = None
+
+
+def resim_workers(env: Optional[Mapping[str, str]] = None) -> int:
+    """0..MAX_WORKERS. Absent, unparseable or negative = DEFAULT_WORKERS (the thread, as before)."""
+    raw = str((env if env is not None else os.environ).get(WORKERS_ENV, "") or "").strip()
+    try:
+        value = int(raw) if raw else DEFAULT_WORKERS
+    except ValueError:
+        return DEFAULT_WORKERS
+    return min(max(value, 0), MAX_WORKERS) if value >= 0 else DEFAULT_WORKERS
+
+
+def _college_pool(workers: int):
+    """The process's ONE college re-sim pool (both leagues' threads share it), or None to run in the thread.
+
+    A pool that disabled itself (`MAX_CONSECUTIVE_FAILURES`) is KEPT, so every later tick runs in the thread for the
+    life of the process instead of re-spawning children that fail the same way each tick."""
+    global _POOL
+    if workers <= 0:
+        return None
+    with _POOL_LOCK:
+        if _POOL is not None and _POOL.workers != workers:
+            _POOL.close()
+            _POOL = None
+        if _POOL is None:
+            from syndicate.features.shared.live_resim_workers import ResimWorkerPool
+
+            _POOL = ResimWorkerPool(workers, name="college-live-resim")
+        return None if _POOL.disabled else _POOL
+
+
+def pool_resim_job(*, inputs: Mapping[str, Any], game_state: Any, sims: int, base_seed: int, deadline_epoch: float,
+                   league: str = LEAGUE):
+    """The job a worker process runs: `resim_live_game` on the WALL clock (the parent's monotonic deadline is
+    converted at submit, since a monotonic reading means nothing in another process)."""
+    return resim_live_game(inputs, game_state, sims=sims, base_seed=base_seed, deadline=deadline_epoch,
+                           clock=time.time, league=league)
 
 
 def _neutral(summary: Mapping[str, Any]) -> bool:
@@ -1054,7 +1173,13 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
                              dirs: Optional[Sequence[Path]] = None,
                              previous: Optional[Mapping[str, Mapping[str, Any]]] = None,
                              clock: Callable[[], float] = time.monotonic, league: str = LEAGUE,
-                             d1_ids: Optional[frozenset[str]] = None) -> dict[str, Any]:
+                             d1_ids: Optional[frozenset[str]] = None, workers: Optional[int] = None,
+                             executor: Optional[Any] = None, now: Optional[datetime] = None,
+                             carry_bound: Optional[str] = None, carry_max_age: Optional[float] = None) -> dict[str, Any]:
+    """One tick's snapshot. `workers` / `executor` (tests) pick where the draws run (module docstring, "WHY THE
+    BUDGET RAN OUT"); `now` / `carry_bound` / `carry_max_age` judge carried lanes (None = the env / wall clock)."""
+    from concurrent.futures import FIRST_COMPLETED, wait
+
     from syndicate.features.shared import basketball_pbp as pbp
     from syndicate.features.nba.live_resim import map_state_names
     from syndicate.features.ncaab import slate
@@ -1095,19 +1220,98 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
     order = ids[start:] + ids[:start]
     games: dict[str, dict[str, Any]] = {}
     counts = {"live": len(ids), "resimmed": 0, "refused": 0, "carried_forward": 0, "not_reached": 0,
-              "dropped_non_d1": live_count - len(ids)}
-    next_cursor = start
+              "dropped_non_d1": live_count - len(ids), "carry_expired": 0}
+    # WHERE THE DRAWS RUN. `executor` is a test seam (anything with `.submit(job, **kwargs) -> Future`).
+    n_workers = resim_workers() if workers is None else max(0, int(workers))
+    pool = executor if executor is not None else _college_pool(n_workers)
+    slots = max(1, int(getattr(pool, "workers", n_workers) or 1))
+    timing = {"workers": slots if pool is not None else 0, "resim_jobs": 0, "resim_wall_s": 0.0,
+              "resim_cpu_s": 0.0, "worker_errors": 0}
+    worker_pids: set[int] = set()
+    bound = carry_bound_mode() if carry_bound is None else (
+        carry_bound if carry_bound in CARRY_BOUND_MODES else DEFAULT_CARRY_BOUND)
+    max_age = carry_max_age_seconds() if carry_max_age is None else float(carry_max_age)
+    carry_now = now or datetime.now(timezone.utc)
+    carried_ages: list[float] = []
+    # The next tick starts at the FIRST game in this tick's order that the budget stopped (carried or not reached);
+    # with none, one full lap. In the thread that is exactly the cursor the sequential loop always kept.
+    stops: list[int] = []
+
+    def carry_or_expire(event_id: str) -> dict[str, Any]:
+        game = previous[event_id]
+        has_number, age = _carried_number_age(game, carry_now)
+        expired = has_number and (age is None or age > max_age)
+        if expired and bound != "off":
+            counts["carry_expired"] += 1
+        if expired and bound == "on":
+            # Refused exactly like a game the budget never reached, keyed by its board names (a refusal the board
+            # cannot key is invisible).
+            names = {k: str(game.get(k) or "") for k in ("home", "away", "home_id", "away_id")}
+            names["source"] = str(game.get("nameSource") or "")
+            counts["not_reached"] += 1
+            detail = "carry_expired:no_state_time" if age is None else f"carry_expired:{age:.0f}s>{max_age:.0f}s"
+            return _lane_row(event_id, names, None, NcaabResimRefusal("budget_exhausted", detail))
+        counts["carried_forward"] += 1
+        if has_number and age is not None:
+            carried_ages.append(age)
+        return _carry(game, age if has_number else None)
+
+    def budget_stop(pos: int, event_id: str) -> None:
+        stops.append(pos)
+        if event_id in previous:
+            games[event_id] = carry_or_expire(event_id)
+        else:
+            games[event_id] = _lane_row(event_id, {}, None, NcaabResimRefusal("budget_exhausted", "not_reached"))
+            counts["not_reached"] += 1
+
+    def finish(job: dict[str, Any], result: Any) -> None:
+        pos, event_id, facts, anchor = job["pos"], job["event_id"], job["facts"], job["anchor"]
+        if not isinstance(result, NcaabResimRefusal):
+            result = stamp_segment_progress(result, facts, league)
+        if isinstance(anchor, MarginAnchor) and not isinstance(result, NcaabResimRefusal):
+            result = anchor_result(result, anchor, remaining_fraction=remaining_regulation_fraction(facts, league))
+        if isinstance(result, NcaabResimRefusal) and result.reason == "budget_exhausted" and event_id in previous:
+            stops.append(pos)
+            games[event_id] = carry_or_expire(event_id)
+            return
+        games[event_id] = _lane_row(event_id, job["names"], facts, result, job["match"], job["provenance"])
+        counts["resimmed" if not isinstance(result, NcaabResimRefusal) else "refused"] += 1
+
+    inflight: dict[Any, dict[str, Any]] = {}
+
+    def harvest(done: Any) -> None:
+        nonlocal pool
+        for fut in done:
+            job = inflight.pop(fut)
+            try:
+                result, meta = fut.result()
+            except Exception as exc:  # noqa: BLE001 -- named on the tick line; the rest of the tick runs here
+                timing["worker_errors"] += 1
+                print(f"{league.upper()}_LIVE_RESIM_WORKER_ERROR event={job['event_id']} {type(exc).__name__}: "
+                      f"{str(exc)[:200]}", flush=True)
+                pool = None
+                budget_stop(job["pos"], job["event_id"])
+                continue
+            timing["resim_jobs"] += 1
+            timing["resim_wall_s"] += float((meta or {}).get("wall_s") or 0.0)
+            timing["resim_cpu_s"] += float((meta or {}).get("cpu_s") or 0.0)
+            if (meta or {}).get("pid") is not None:
+                worker_pids.add(int(meta["pid"]))
+            finish(job, result)
+
+    def run_here(job: dict[str, Any], inputs: Mapping[str, Any], gs: Any, seed: int) -> None:
+        wall0, cpu0 = time.perf_counter(), time.thread_time()
+        result = resim_live_game(inputs, gs, sims=sims, base_seed=seed, deadline=deadline, clock=clock, league=league)
+        timing["resim_jobs"] += 1
+        timing["resim_wall_s"] += time.perf_counter() - wall0
+        timing["resim_cpu_s"] += time.thread_time() - cpu0
+        finish(job, result)
+
     for pos, event_id in enumerate(order):
         if clock() >= deadline:
-            for rest in order[pos:]:
-                if rest in previous:
-                    games[rest] = _carry(previous[rest])
-                    counts["carried_forward"] += 1
-                else:
-                    games[rest] = _lane_row(rest, {}, None, NcaabResimRefusal("budget_exhausted", "not_reached"))
-                    counts["not_reached"] += 1
+            for later, rest in enumerate(order[pos:], start=pos):
+                budget_stop(later, rest)
             break
-        next_cursor = (start + pos + 1) % max(1, len(ids))
         try:
             summary = fetch_summary(league, event_id)
         except Exception as exc:  # noqa: BLE001
@@ -1147,20 +1351,34 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
                 counts["refused"] += 1
                 continue
         gs, match = map_state_names(gs, inputs["home_players"], inputs["away_players"])
-        result = resim_live_game(inputs, gs, sims=sims, base_seed=stable_seed(facts.event_id, facts.last_seq, league),
-                                 deadline=deadline, clock=clock, league=league)
-        if not isinstance(result, NcaabResimRefusal):
-            result = stamp_segment_progress(result, facts, league)
-        if isinstance(anchor, MarginAnchor) and not isinstance(result, NcaabResimRefusal):
-            result = anchor_result(result, anchor, remaining_fraction=remaining_regulation_fraction(facts, league))
-        if isinstance(result, NcaabResimRefusal) and result.reason == "budget_exhausted" and event_id in previous:
-            games[event_id] = _carry(previous[event_id])
-            counts["carried_forward"] += 1
-            next_cursor = (start + pos) % max(1, len(ids))
+        job = {"pos": pos, "event_id": event_id, "names": names, "facts": facts, "anchor": anchor, "match": match,
+               "provenance": inputs.get("_provenance")}
+        seed = stable_seed(facts.event_id, facts.last_seq, league)
+        # PREPARE FIRST, THEN WAIT FOR A SLOT: the next game's fetch and resume overlap the workers' draws.
+        while pool is not None and len(inflight) >= slots and clock() < deadline:
+            harvest(wait(list(inflight), timeout=max(0.0, min(1.0, deadline - clock())), return_when=FIRST_COMPLETED)[0])
+        if pool is None:  # no pool, or a worker failed while this game waited: the draws run here, as before
+            run_here(job, inputs, gs, seed)
             continue
-        games[event_id] = _lane_row(event_id, names, facts, result, match, inputs.get("_provenance"))
-        counts["resimmed" if not isinstance(result, NcaabResimRefusal) else "refused"] += 1
-    _ROTATION_CURSOR[cursor_key] = next_cursor
+        if clock() >= deadline:
+            for later, rest in enumerate(order[pos:], start=pos):
+                budget_stop(later, rest)
+            break
+        fut = pool.submit("syndicate.features.ncaab.live_resim:pool_resim_job",
+                          inputs={k: inputs[k] for k in _ENGINE_KWARGS}, game_state=gs, sims=int(sims), base_seed=seed,
+                          deadline_epoch=time.time() + max(0.0, deadline - clock()), league=league)
+        inflight[fut] = job
+    if inflight:
+        done, _pending = wait(list(inflight), timeout=max(0.0, deadline - clock()) + WORKER_GRACE_SECONDS)
+        harvest(done)
+        for fut, job in list(inflight.items()):  # still running past the grace: discarded, the game is carried
+            fut.cancel()
+            inflight.pop(fut)
+            budget_stop(job["pos"], job["event_id"])
+    if ids:
+        _ROTATION_CURSOR[cursor_key] = (start + (min(stops) if stops else len(order))) % len(ids)
+    else:
+        _ROTATION_CURSOR[cursor_key] = start
     out_games = [games[i] for i in ids if i in games]
     return {
         "sport": league,
@@ -1174,6 +1392,10 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
         "oddsNamesIndexed": len(odds_names),
         "marginAnchor": "on" if anchor_on else "off",
         "counts": counts,
+        "carryBound": {"mode": bound, "maxAgeSeconds": max_age,
+                       "carriedAgeMaxSeconds": round(max(carried_ages), 1) if carried_ages else None},
+        "resimTiming": {**timing, "resim_wall_s": round(timing["resim_wall_s"], 1),
+                        "resim_cpu_s": round(timing["resim_cpu_s"], 1), "worker_pids": sorted(worker_pids)},
         "games": out_games,
         "refusalsByReason": _refusals_by_reason(out_games),
     }
@@ -1274,9 +1496,20 @@ def run_live_resim_tick(date_str: Optional[str] = None, *, league: str = LEAGUE,
     started = time.monotonic()
     snapshot = build_live_lens_snapshot(date_str, league=league, **{**_tick_kwargs(league), **kwargs})
     snapshot, size = fit_snapshot_to_budget(snapshot)
+    carry = snapshot.get("carryBound") or {}
+    timing = snapshot.get("resimTiming") or {}
     status = {
         "date": date_str,
         **(snapshot.get("counts") or {}),
+        # #762: the carry bound's mode and the oldest number this tick still carried; where the draws ran and what
+        # they cost (cpu / wall = the share of a core they got: ~1.0 in a worker, measured 0.12-0.18 in the thread).
+        "carry_bound": carry.get("mode"),
+        "carry_age_max_s": carry.get("carriedAgeMaxSeconds"),
+        "workers": timing.get("workers", 0),
+        "resim_jobs": timing.get("resim_jobs", 0),
+        "resim_wall_s": timing.get("resim_wall_s", 0.0),
+        "resim_cpu_s": timing.get("resim_cpu_s", 0.0),
+        "worker_errors": timing.get("worker_errors", 0),
         "refusals": snapshot.get("refusalsByReason") or {},
         "bytes": size,
         "written": False,

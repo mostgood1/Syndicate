@@ -77,6 +77,26 @@ board: board_enrichment._LIVE_GAMELINE_SPORTS (:2424) + _LIVE_GAMELINE_SNAPSHOT_
   -> live_gameline_join.LIVE_LENS_SOURCES_BY_SPORT["ncaab"] = ("live_resim",)  (:119)
 ```
 
+### Capacity hop (2026-11-07, `#762`, lane `ncaab-live-resim-capacity`)
+
+```
+build_live_lens_snapshot           per game, IN THE THREAD: fetch_summary -> resume -> inputs -> anchor -> map names
+  -> SYNDICATE_COLLEGE_LIVE_RESIM_WORKERS = 0 (default)   resim_live_game here, as before
+  -> SYNDICATE_COLLEGE_LIVE_RESIM_WORKERS = N (1..6)      _college_pool(N), ONE pool for both leagues' threads
+       -> shared/live_resim_workers.ResimWorkerPool       N `python -m` children, nice 5, stdin = lifeline
+            -> ncaab/live_resim.pool_resim_job            resim_live_game on the WALL clock (deadline converted)
+  -> carry_or_expire                                      SYNDICATE_COLLEGE_LIVE_RESIM_CARRY_BOUND off|shadow|on
+                                                          (default shadow), ..._CARRY_MAX_AGE_SECONDS (900)
+tick line adds: carry_expired carry_bound carry_age_max_s workers resim_jobs resim_wall_s resim_cpu_s worker_errors
+```
+
+**Why.** The thread shares one interpreter lock with about a dozen CPU-active threads in the live-odds-worker.
+Fleet, 11-07 22:25-22:35Z, per-thread `/proc` samples: the process ran at 103% of a core. The NCAAB thread got 12.1%
+of it, and 18.0% across its 22:27:40Z tick (43.2 CPU-s in 240 s), which re-simmed 1 of 15 games. Offline
+(`scripts/ncaab_resim_contention_probe.py`, 100 draws at halftime): 8.25 s alone, 17.9 s as one of two threads, and
+7.5 s as one of two processes. Pool of 2, real engine: 4 games x 200 draws took 28.9 s against 54.2 s in an
+uncontended thread. Each child is ~119 MB RSS. Tests: `tests/test_ncaab_live_resim_capacity.py`.
+
 **Reuse flag (engine standard section 3):** none. Inputs are rebuilt on every tick from the
 newest dated tables. A new input therefore needs only a new table, not a rebuild.
 
