@@ -616,6 +616,7 @@ death, never life — do not invert it.
   - women's K superseded by the daily calibration (no change);
   - pregame sim-code key `a147d16cd` MET (deploys.md 2026-11-06 15:19:15Z).
   - LEFT:
+    - Games-rail unmatched college games: ON MAIN `34ac35df3` (17:50Z, user report "not matched"), NOT on the fleet. 6 team spellings resolve (0 unresolved in 11-04..11-08); `book_grid.orient_events_to_latest` keeps one orientation per event. Replay: 1 event in all sports (Nebraska/Providence). Rollout = fleet ff + refresh-worker restart;
     - the college quote-order gate: ON THE FLEET and VERIFIED (`59638f001`, ff + refresh-worker TERM 2026-11-07 16:29:14Z; men's build 17:05:08Z refused 6 of 12 rows past the age ceiling, 0 absent-time; deploys.md). Women's not yet exercised live (`no_margin_anchor` upstream);
     - #763 segment pricing (off);
     - Mercyhurst women on 11-08;
