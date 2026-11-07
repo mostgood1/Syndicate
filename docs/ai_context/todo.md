@@ -1,6 +1,22 @@
 # Syndicate TODO — canonical cross-session list
 
 ### `#764` — **KALSHI TOTALS THAT NAME NO GAME PRICE ANOTHER GAME'S ROW: 26 of 26 measured sides wrong-game (men's and women's college basketball, college football). Polymarket is clean in every sport. NOT FIXED** — 2026-11-06, session e32fef1a (user "Yes, measure it here")
+- **UPDATE 2026-11-07 20:47:15Z (2:47 PM CST): REVERSED-ORDER GAP DIAGNOSED AND FIXED, on a branch only** (lane `kalshi-fanin-reversed-orientation`, on branch `claude/syndicate-ai-engine-762439` only, not on main, not loaded).
+  - **Cause, confirmed on fleet data:** `kalshi_catalogue._candidate_blobs` builds `AWAY+HOME` only, for every sport but soccer.
+    - A neutral-site game has no real home, and Kalshi and our odds feed can pick different ones.
+    - `NEBPROV` against our Providence @ Nebraska was `no_match`. With home/away swapped it was `ok`, onto that one event.
+  - **Census 20:14Z** (ncaab / ncaaf / wncaab / nba / nhl / nfl, 11-07 and 11-08): 3 events, all ncaab, all the same club pair on the ticker's own date. `NEBPROV` 11-07, `WICHUSC` 11-08, `KUUK` 11-10 (Champions Classic).
+  - **Fix:** after a `no_match` only (never after `ambiguous`), the fan-in's Kalshi adapter retries once with home/away swapped.
+    - It tries only games played on the ticker's own date. `venue_quote_fanin._distinct_games` now carries `start_dates`, a key the matcher never reads, so the straight match stays byte-identical.
+    - The order path is untouched. Soccer is skipped: it already tries both orders.
+    - Switch `_KALSHI_FANIN_REVERSED_ORDER_ENABLED`. New reason field `game_line_reversed_order:N`.
+  - **Replay, old vs patched, one clock, fleet `50ce820d0` 20:20Z:** only ncaab changes; every other sport is identical.
+    - ncaab: 13 Kalshi markets named by the retry; named game-line quotes 632 -> 651.
+    - 2 sides changed: Providence @ Nebraska 158.5 over/under, Polymarket same-game -> Kalshi `NEBPROV-159`, same prices (+108 / -113), read by eye.
+    - 0 lost, 0 gained. `cross_game_rejected` 14 = 14, the same Polymarket moneylines for other dates' games.
+    - `cross_date_rejected` 304 -> 256: named reversed quotes no longer bare-key onto other games' rows at the same line.
+  - **Tests:** `tests/test_kalshi_fanin_reversed_orientation.py` (11, NEW): off != on at the adapter and through the fan-in, the game's date not the slate's, another-day ticker stays unnamed, undated games never retry, `ambiguous` not retried, soccer skipped. 4,175 passed over 228 Kalshi / venue / grid / layer2 test files.
+  - **Owed:** push + fleet ff + refresh-worker restart (the user's call); then a live read of `game_line_reversed_order`.
 - **UPDATE 2026-11-07 20:02:11Z (2:02 PM CST): NAMING FIX LOADED AND VERIFIED. Lane `kalshi-fanin-college-naming` CLOSED (GOAL MET).**
   - **Loaded:** `23780354f` on the fleet. ff + refresh-worker TERM 19:52:31Z, pid 700071.
   - **First builds 19:57Z:** college unnamed-quote refusals ncaaf 14 -> 0, ncaab 16 -> 0.
