@@ -56958,3 +56958,40 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - wncaab: 37 cards, 0 chip-less.
 - **verify: MET** -- the replay of the served page (`tests/js/game_rail_production_replay.mjs`, `SYNDICATE_TEMPLATE_HTML=served.html`). Not read by eye in a browser.
 - **Revert:** `git revert 50ce820d0`, then ff + `reload-web`.
+
+## 2026-11-07 21:17:16Z (3:17 PM CST) -- VERIFY of the 17:39:56Z `#762` lane-age gate SHADOW load (lane `live-gameline-lane-age-gate`) -- **MEASURED: shadow on every gated build across three refresh-worker pids; NCAAB would refuse 90 of 214 priced row-builds (42.1%), all in 3 builds 20:14-21:00Z; NCAAF 0 of 1,734; NBA / NFL had no live lane**
+- **Appended, not edited into the 17:39:56Z row.** This closes that row's `verify: OWED`. That row names the watcher `wait_shadow.sh`; it is `C:\tmp\lanegate\wait_shadow.py`.
+- **Source:** the read-only watcher summed every `LIVE_GAMELINE_JOIN` line in the refresh-worker logs from 17:40:04Z to 21:17:16Z, by sport.
+  - **Unit:** ROW-BUILDS (one row counted once per board build), not ledger records. Not comparable 1:1 with the ledger replay's ~19%.
+  - **Window:** it covers three pids, all descendants of `846016a91`:
+    - 573627 (this lane);
+    - 668309 (19:14:31Z, `wncaab-module`, `34ac35df3`);
+    - 700071 (19:52:39Z, `kalshi-fanin-college-naming`, `23780354f`; the later ff to `50ce820d0` was web-only).
+  - Every gated build printed `lane_age_gate=shadow`.
+- **Per sport** (builds / priceable row-builds / would refuse / of which priceable / `lane_age_max`):
+  - ncaab 14 / 214 / 135 / **90 (42.1% of priceable)** / 1,506.6 s
+  - wncaab 12 / 10 / 3 / 2 (20.0%) / 979.4 s
+  - ncaaf 15 / 1,734 / 0 / 0 / 725.7 s (ceiling 1,800 s)
+  - nba 13 builds, nfl 15: no live lane in the window (unmeasured, not 0).
+  - nhl 14 builds and soccer 14 (319 priceable): both ungated, `lane_age_max=None` as designed.
+- **Where:** all 90 NCAAB rows came from 3 builds, 90 of the 145 those builds priced:
+  - 20:14:59Z: 22 of 26 priced
+  - 20:45:11Z: 41 of 65
+  - 21:00:05Z: 27 of 54
+  - The 21:13:47Z build (`lane_age_max` 1,506.6 s) priced 0. The quote gates and no-projection refused all 69 rows first. Shadow counts only rows the quote gates passed, so it counted 0. That is correct.
+- **Cause, same window** (live-odds-worker `NCAAB_LIVE_RESIM_TICK` / `WNCAAB_LIVE_RESIM_TICK`): budget starvation again, but at 8-13 live NCAAB games, not the 35-40 of 11-05 / 11-06.
+  - **19:30-20:01Z:** 6 live games, 6 re-sims per tick in 72-157 s (12-26 s each), 0 carried. Meanwhile WNCAAB's ticks took 3-13 s, because it refused all 12-14 games (`no_margin_anchor`).
+  - **From 20:04:21Z:** WNCAAB began re-simming and its ticks ran to their 120 s budget. From 20:07:44Z every NCAAB tick ran to 240 s and re-simmed only 1-6 of 8-13 live games (40-240 s each), carrying 3-8 per tick.
+  - **Hypothesis, NOT tested:** the two loops contend inside one process. Both are `threading.Thread`s in live-odds-worker (`ncaab/live_resim.py:1309`). The expectation assumed starvation needs a 35+ game slate; today it began at 9.
+- **Engine read** (the 11-07 NCAAB live-gameline ledger, priced records, deduped on movement, the whole day):
+  - 240 of 785 (30.6%) were priced at a lane age over 600 s.
+  - Mean |edge| on spreads/totals: 14.7-16.7 pp under 300 s, 17.2 / 20.1 at 300-450 / 450-600 s, 19.8 at 600-900 s, 21.4 at 900-1,800 s.
+  - Mean |edge| on h2h: 9.5-14.6 under 600 s, 13.5 and 19.0 above (n=10 each).
+  - Same signature as 10-21..11-07: the gap to the market widens with lane age, and on spreads/totals it is already 20.1 pp in the 450-600 s bucket, below the ceiling.
+- **expect vs measured:**
+  - Expect: ncaab ~19% on a 35+ slate; NBA ~0; NCAAF / NFL 0.
+  - Measured: ncaab 42.1% (3 of 14 builds) at 8-13 live games; NCAAF 0 of 1,734; NBA and NFL unmeasured (no live game).
+  - The sport ordering held. The NCAAB rate and the slate premise did not (explained above).
+- **Not measured:** whether withholding those rows would have improved results; that needs settlement. Three would-refuse builds is a small denominator.
+- **Two soccer builds printed `lane_age_gate=None`** (18:28:29Z, 21:14:57Z). They are empty-index returns (`aggregate=stale_date`, `index=0`), whose coverage carries none of the join's row counters (`priceable=None`, `withheld=None` too). No rows meant no gate to reach. Soccer is ungated.
+- **Decision owed (user):** turn the gate `on`. Either change the default to `on` (one line), push to main, then ff + a claimed refresh-worker TERM; or set the env key and do a full down/up. Revert either way: back to shadow.
