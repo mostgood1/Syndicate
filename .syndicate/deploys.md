@@ -56845,3 +56845,27 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - First board build after the restart and drain: `BOARD_BUILD_TIMING wall_s=819.5 ok=True` (16:55:57Z), against 264-411 s before.
   - `#764`'s `UNNAMED_ROLE_KEY_GRID` runs every build (that lane recorded its own VERIFY, a068c6766).
 - **Seen, not this lane:** web is now `code=59638f00` (17:05:35Z status), so another session reloaded it after 16:32Z. live-odds-worker is still `506973f9`, as the NBA lane expects.
+
+## 2026-11-07 17:39:56Z (11:39 AM CST) -- FLEET ff 59638f001 -> 846016a91 + refresh-worker TERM: `#762` model-lane age gate LOADED IN SHADOW (lane `live-gameline-lane-age-gate`); ride-alongs `e21335809` (NBA lens fix, lane `nba-lens-live-state`) + `8b1dcd020` (in-game exits off, lane `exit-state-size`) -- **LOADED; shadow printing on every sport; would-refuse reading OWED on a busy NCAAB slate**
+- **User, in this chat:** "Yes, shadow", then "Yes, load both", answering "Load the NBA lens fix together with the lane-age shadow?".
+- **What:** `0caaf978c` adds the gate behind `SYNDICATE_LIVE_GAMELINE_LANE_AGE_GATE`. `846016a91` makes SHADOW the default: it prices exactly as before and prints `lane_age_gate` / `lane_age_max` / `lane_age_would_refuse` / `lane_age_would_refuse_priced` on LIVE_GAMELINE_JOIN. Only an explicit `on` withholds edges. No env was set.
+- **Why a code default and not an env key:** `local_production.py` builds each role's env once at `up` (`Supervised(... env ...)`, :1289), and a respawn reuses it (:1373). A new env key needs a full down/up of all three services. A default loads with one claimed refresh-worker TERM.
+- **Range `59638f001..846016a91`, runtime** (listed in its own step before the merge): `pipeline/layer2_shortlist.py`, `shared/live_gameline_join.py` (mine); `nba/cards.py`, `nba/live_lens.py`, `shared/live_projection_join.py` (`e21335809`); `shared/execution_exits.py` (`8b1dcd020`). The rest is ledger and tests. No dirty fleet file overlapped.
+- **Loaded by:** refresh-worker only.
+  - **NOT restarted:** live-odds-worker (`exit-state-size` held its claim throughout) and web.
+  - `e21335809`'s lens half and `8b1dcd020` (`execution_exits` runs only inside live-odds-worker; no fast-exit process was running) load at that worker's next restart. The lens lane was told and will record that load; it expects the ~21:03Z self-recycle or a 21:30Z restart by `nba-live-proj-actuals`.
+- **Gates:**
+  - **Claim:** refresh-worker acquired 17:18:08Z, holder `live-gameline-lane-age-gate`; released 17:40:36Z.
+  - **Restart spacing:** the previous refresh-worker TERM was 16:29:14Z (`wncaab-module`). This one is 70 min later.
+  - **Drain:** `check_deploy_safety --drain --drain-owner live-gameline-lane-age-gate` from ~17:18Z, under the worker's own environ. The board went idle, but the 900 s cap ended NOT CLEAR on odds child jobs (mostly live-odds-worker's).
+  - **Preflight** `--target fleet --target-commit 846016a91 --expect fleet_def_lane_age_gate_mode=1 --expect join_log_lane_age_field=present_on_next_join`, baseline re-read on every poll. HOLD 17:33:52Z on a refresh-worker soccer odds chain (`build_soccer_artifacts --league la_liga`). CLEAR 17:35:21Z, re-run CLEAR 17:36:52Z.
+  - **Deploy:** `git merge --ff-only 846016a91` 17:37:04Z. A new odds job had started 16 s later, so I held the TERM. A 1 s no-child watcher saw none at 17:39:31Z. Preflight CLEAR 17:39:49Z (0 processes). TERM pid 517695 17:39:56Z. Respawned as pid 573627 at 17:40:04Z. `DRAIN_CLEARED` against the new pid at ~17:40:10Z.
+  - **Cost:** no board build from the 17:19:35Z save until the new worker's first build.
+- **Baseline (17:39:43Z):** `fleet_def_lane_age_gate_mode` 0 -> 1 (read 1 after the ff); `join_log_lane_age_field` 0.
+- **Loaded, measured (17:43-17:46Z), first shadow builds on pid 573627, 0 line-start tracebacks since 17:40:**
+  - `LIVE_GAMELINE_JOIN sport=ncaaf index=9 considered=579 priceable=73 ... lane_age_gate=shadow lane_age_max=725.7 lane_age_would_refuse={}`. Correct: NCAAF's ceiling is 1,800 s.
+  - `sport=ncaab index=2 considered=69 priceable=0 ... lane_age_max=100.2 lane_age_would_refuse={}`. The quote-order gate refused 29.
+  - `sport=nba` / `nfl` / `wncaab` / `nhl`: `lane_age_gate=shadow`, no live lane, `lane_age_max=None`.
+- **expect** (from the 10-21..11-07 ledger replay): on a busy NCAAB slate (35+ live games, ticks exhausting the 240 s budget), `lane_age_would_refuse_priced` for ncaab at ~19% of priced rows, all carried lanes; NBA ~0; NCAAF / NFL 0.
+- **verify:** OWED. A read-only watcher (`C:\tmp\lanegate\wait_shadow.sh`, this session) sums the shadow fields per sport over every build since 17:40Z and reports at the first NCAAB build with a non-empty would-refuse plus 60 min, or at 22:15Z.
+- **Revert:** `SYNDICATE_LIVE_GAMELINE_LANE_AGE_GATE=off` needs a full down/up. Or revert `846016a91` (back to default off) on main, then ff + refresh-worker TERM.
