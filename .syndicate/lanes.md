@@ -822,6 +822,14 @@ ba_lens_state_check.py`.
 - Verification: reproduce on fleet data first (status original vs swapped); off != on unit tests incl. a wrong-date reversed ticker staying unnamed; same-clock replay old vs patched adapter on fleet data, every changed side printed beside its row and read by eye
 - Blocked by: none
 
+### basketball-interval-projections — OPEN — opened 2026-11-07 — session 547fe65e-71ca-4e19-9589-237553cb4eab
+- Goal: Every basketball Games-rail card (nba, wnba, ncaab, wncaab) shows the sims' interval projections -- projected points per half (men's college) or quarter (women's college, NBA, WNBA) and the projected final, spread, total and win% -- pregame from the pregame sims and live from the live re-sim, read on the fleet's served /api/board/game-chips: every pregame chip whose game has a pregame sim carries an intervals block, every live chip with a re-sim lane carries one with source live_resim, settled periods equal the linescore; college segment PRICING stays off (#763)
+- Files: syndicate/features/shared/game_chip_intervals.py (new), syndicate/features/shared/game_chip_scoreboard.py (the intervals attach in build_game_chip and at serve time beside attach_served_linescores ONLY), syndicate/templates/intelligence.html (the rail card's interval render beside chipLineScore ONLY), tests/test_game_chip_intervals.py (new), tests/js/games_rail_intervals.test.mjs (new)
+- Hypothesis: n/a (display of existing sim output; plan approved 2026-11-07)
+- Falsification test: n/a
+- Verification: unit tests incl. off != on (artifact present -> block, absent -> none); JS render test; fleet: game-chips read pregame + live per sport (share with a block vs games with a sim; source live_resim on live chips; settled == linescore); served-page screenshot of the rail; 0 tracebacks; chip publish time not up >10%
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
