@@ -876,6 +876,14 @@ death, never life — do not invert it.
 - STATUS 2026-11-07 5:04 PM CST (23:04Z): CODE ON MAIN `eb9afa26a`, NOTHING DEPLOYED, no env set. Cause measured (see Hypothesis). Fix: `SYNDICATE_COLLEGE_LIVE_RESIM_WORKERS` (default 0 = the thread, unchanged) runs each game's draws in N `python -m` children (`shared/live_resim_workers.py`, ~119 MB RSS each, nice 5), one pool for both college threads; carry bound `SYNDICATE_COLLEGE_LIVE_RESIM_CARRY_BOUND` off|shadow|on (default shadow) at 900 s. 17 new tests + 206 pass across the college live files and the lane-age gate; 3 mutations caught. Baseline 11-07 17:02-22:55Z: 29 of 81 NCAAB ticks with live games exhausted 240 s; 208 of 527 live game-ticks (39.5%) carried or not reached; 7-12 live median 6 carried, 13-20 live median 9. OWED: the user's deploy decision (workers=2 then bound on), then the reading `NCAAB_LIVE_RESIM_TICK workers=2 carried_forward=0` on a 7-20 game slate.
 - Blocked by: none
 
+### render-retirement-inventory — OPEN — opened 2026-11-07 — session 36cc0a0e-47c9-4ad6-83aa-c4f05c75d91b
+- Goal: Inventory and retire what still assumes Render now that production runs on the WSL fleet: findings file, CLAUDE.md docs fix, fleet-native preflight gaps; RENDER_* marker replacement and render.yaml/fleet-env changes PROPOSED ONLY, user decision first. No Render account/service touched, no fleet behaviour change.
+- Files: CLAUDE.md, .syndicate/findings_2026-11-07_render_dependency_inventory.md, scripts/deploy_preflight.py, .claude/hooks/deploy-guard.py, scripts/check_blueprint_drift.py
+- Hypothesis: Most Render dependencies are already fleet-aware (preflight fleet path 10-25, guard fleet path 10-25, render_logs local default 10-06, _base_url fleet default 10-06); what remains is docs, the render.yaml-push gate (drift checker reads the suspended env API), and the RENDER_* marker convention
+- Falsification test: a Render API read on the default (no-flag) deploy path, or an onrender.com fallback reachable on the fleet with the documented env set
+- Verification: findings file on origin/main with file:line per dependency; CLAUDE.md on origin/main points at the runbook + state_worker [local-production-host]; marker decision put to the user
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
