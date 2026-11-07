@@ -362,6 +362,10 @@ class IntervalModule(Projector):
     def project(self, game, state, prepared):
         from syndicate.features.shared.basketball_interval_projection import project_interval
 
+        if state.elapsed <= 0:
+            # The module divides by elapsed minutes (floored at 1e-6): a play ESPN logs AT the tip (a scoring play at
+            # 12:00 of Q1, 2 of 1,391 NBA 2025-26 games) made its pace ~1e8 points. Undefined at the tip, so refused.
+            return Refusal("no_elapsed")
         k = state.n_events
         pressure = prepared["pressure"][:k]
         scoring = [r for r in prepared["scoring"] if r["clock_seconds"] <= state.elapsed]

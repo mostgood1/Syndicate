@@ -478,3 +478,20 @@ def test_tip_projection_reuses_the_anchor_tip_sim(monkeypatch):
     tip = [r for r in res["rows"] if r["projector"] == "resim" and r["checkpoint"] == "0m" and r["segment"] == "full"]
     assert tip and tip[0]["total"] == 55.0 and tip[0]["margin"] == 5.0
     assert not [r for r in res["rows"] if r["projector"] == "naive_pace"]  # not registered here
+
+
+def test_tip_projectors_are_defined_even_with_a_play_logged_at_the_tip():
+    """ESPN sometimes logs a scoring play AT the tip (elapsed 0). The rate projectors divide by elapsed time, so they
+    refuse there by name; the line-based ones still project (measured: 2 of 1,391 NBA 2025-26 games)."""
+    g = make_game("nba", extra={"league_points_per_second": 0.08})
+    tip_score = _event("nba", -1, 0.0, "home", "free_throw", points=1, made=True)
+    g = replace(g, events=(tip_score,) + g.events,
+                meta=replace(g.meta, home=replace(g.meta.home, score=g.meta.home.score + 1)))
+    s = bib.state_at(g, 0.0)
+    assert s.total == 1
+    for proj in (bib.NaivePace(), bib.IntervalModule()):
+        assert proj.project(g, s, proj.prepare(g)).reason == "no_elapsed"
+    pre = bib.PregameRate().project(g, s, None)["pregame_rate"]["full"]
+    assert pre[0] == pytest.approx(1 + 140.0)
+    res = bib.replay_game(g, [bib.IntervalModule(), bib.PregameRate()])
+    assert max(abs(r["total"]) for r in res["rows"] if r["projector"] == "interval_projection") < 1000
