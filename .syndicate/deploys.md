@@ -57060,3 +57060,24 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **verify: MET.** Every pregame chip with a sim, and every live chip with a re-sim projection, carries its block; settled periods equal the line score (7/7).
 - **Caution (lane `basketball-interval-backtest`, findings 2026-11-07):** the replayed men's college pregame first-half total runs 8.4 points high, and NBA's live re-sim beats the pregame line prorated over the time left in no segment. The rail shows the sims' numbers as they are; Phase 2 is where they improve.
 - **Revert:** `git revert b13a1202a`, then ff + refresh-worker TERM + `reload-web`. The block degrades to nothing if its sources are absent.
+
+## 2026-11-07 22:49:17Z (4:49 PM CST) -- VERIFY of `3ae26ba6e` (#762 (c) live double- / triple-double, DISPLAY ONLY): **MET**; a name-join gap found and fixed on main `7d72f8e9d`, NOT loaded (lane `nba-live-proj-actuals`)
+- **Loaded:**
+  - refresh-worker: at `wncaab-module`'s ff to `59638f001` 16:29:14Z (pid 517695). Rode along on the user's "Yes, ride along" (deploys.md ddd0a3c11). Reloaded since by the age-gate lane at 17:39:56Z.
+  - live-odds-worker: the producer, a thread in the main process. It loaded the code only at its max-uptime recycle 21:04:32Z (pid 483251 -> 757868, fleet HEAD `50ce820d0`, `3ae26ba6e` an ancestor); `NBA_LIVE_RESIM_LOOP_STARTED` 21:04:34Z.
+  - No claim was taken by this lane, and no restart was this lane's.
+- **Reading, DEN@IND (the one live game):**
+  - Producer snapshot (state store, generated 22:34:49Z): `livePropsCoverage` rows=636 priced=587 certainty_refused=49 no_actual=0 **doubles_rows=13**. Every posted Yes/No double market in the props CSV for the game got a row (13 player-markets).
+  - Board join, refresh-worker `LIVE_PROJECTION_JOIN sport=nba` 22:34:04Z: considered=327 projected=247 edged=236 **display_only=12** lens_live_games=1 miss_not_live=63.
+  - Served board, 22:36:48Z: 13 DD/TD rows, 4 live. Gordon DD showed Live proj. 0.85 / actual 0 / live 0.02. Nembhard DD showed 0.86 / 0 / 0.02.
+- **Display only held:**
+  - The live DD/TD rows carry no `live_aware`, no `model_ev_pct`, no `model_edge_pct`; `sim_view=none` and `board_score_components.sim_component=null`.
+  - Their `edge` / `simulated_edge` / `ev_pct` is the cross-book no-vig edge (`gate.fair_method=consensus`; the row text says "No sim view ... ranked on price"). It is the same field 9 of 9 pregame DD/TD rows carry. The live probability does not reach it.
+- **Gap found: accented names never joined.**
+  - Jokic's 2 live DD/TD rows, and all 16 of his live prop rows, had no live number. 16 of 123 live NBA prop rows on the 22:40Z board lacked one, and all 16 were his.
+  - Cause: `live_projection_join._norm_name` turned ESPN's `ć` into a space, so `nikola joki` never met the odds feed's `nikola jokic`.
+  - Fix on main `7d72f8e9d`: NFKD fold plus a small map. Replayed on the fleet at 22:44Z, old vs patched join over the served board: 5 rows gain a hit (all Jokic), 0 already-joined rows change their hit, index 598 rows / 12 players both ways. Soccer's live gameline index imports the same function.
+- **Still missing after that fix:** 4 live rows whose in-game line moved past the re-sim's +-3 line window (Murray P+A 28.5 vs lens max 27.5; Zubac P+R 17.5 / 18.5 vs lens min 20.5). Not fixed.
+- **Owed:**
+  - Load `7d72f8e9d`. The fleet is at `b13a1202a` (lane `basketball-interval-projections`: ff + refresh-worker TERM + web reload 22:44:30Z), which does NOT contain it. It needs a fleet ff + a refresh-worker restart, plus a web reload for the read-time refresh. Then verify Jokic's rows carry a live number.
+  - Overtime is still untested (`#761`/`#763`, passive).
