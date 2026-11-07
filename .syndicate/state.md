@@ -497,6 +497,7 @@ once this index exists: re-splitting would orphan the parts.
 | [wnba-injury-nba-report] | THE WNBA INJURY FETCH TOOK THE NBA'S OFFICIAL REPORT; ON 10-20 AND 10-21 THE DAY'S WNBA SNAPSHOT WAS THE NBA'S | `state_basketball.md` |
 | [nba-player-minutes-distribution] | THE RAW NBA ENGINE'S BENCH-MINUTES BANDS ARE HALF AS WIDE AS REALITY; A FROZEN MINUTES-SHAPE FIX AWAITS | `state_basketball.md` |
 | [college-basketball-boards] | NCAAB + WNCAAB ON THE BOARDS: WNCAAB MODULE LIVE, PREGAME SIMS FOR BOTH (MARGIN LINES MARKET-ANCHORED), RAIL RUN/BONUS LINE | `state_basketball.md` |
+| [nba-lens-live-state] | THE NBA LIVE LENS'S GAME STATE FROZE AT TIP: THE CARDS-CONTEXT CACHE NEVER SAW ITS OWN ESPN READ. FIX ON MAIN | `state_basketball.md` |
 | [board-freshness] | BOARD FRESHNESS AND STALENESS | `state_board.md` |
 | [board-intelligence-engine] | BOARD / INTELLIGENCE ENGINE — structural facts, archived — **ARCHIVED 2026-08-19 to `state_archive_2026-08-19. | `state_board.md` |
 | [locked-cards-retuned-no-autorun] | `locked_cards_retuned` HAS NO AUTOMATIC TRIGGER, ANYWHERE `[measured 2026-08-18]` | `state_board.md` |

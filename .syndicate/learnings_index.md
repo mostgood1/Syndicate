@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 1494 rules `[generated]`
+## Index — 1514 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -539,7 +539,7 @@
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](learnings_evidence.md#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override) `[evidence]`
 - [2026-09-03 — EXONERATED: `deploys.md` and `learnings.md` ARE guarded. Two sessions file…](learnings_archive.md#2026-09-03-exonerated-deploysmd-and-learningsmd-are-guarded-two-sessions-filed-the-same-false-gap-and-the-second-re-derived-it-with-the-same-blind-spot) `[evidence]`
 
-**Rules and corrections — 969**
+**Rules and corrections — 989**
 
 - [2026-09-16 — a detector that matches a FORMULA at published precision has a FALSE-POSIT…](#2026-09-16-a-detector-that-matches-a-formula-at-published-precision-has-a-false-positive-rate-and-mine-fired-at-about-1-row-per-1200-session-abacd435-lane-soccer-anytime-scorer)
 - [2026-09-16 — OVERTURNED: "the pre-registered criterion is the safe part, the risk is in…](#2026-09-16-overturned-the-pre-registered-criterion-is-the-safe-part-the-risk-is-in-the-mechanism-two-hypotheses-in-one-night-died-on-the-criterion-session-abacd435-fixes-4-and-5a-no-lane)
@@ -870,6 +870,26 @@
 - [2026-10-27 -- A memory bound that rests on how much a filter DROPS fails when the popul…](#2026-10-27----a-memory-bound-that-rests-on-how-much-a-filter-drops-fails-when-the-population-changes-bound-the-representation-not-the-expected-selectivity-lane-kalshi-combo-capture-session-a48b0f49)
 - [2026-10-28 -- The dispatch watchdog shares a failure domain with what it watches: the a…](#2026-10-28----the-dispatch-watchdog-shares-a-failure-domain-with-what-it-watches-the-app-lost-every-scheduled-task-overnight-and-nothing-alerted-lane-syndicate-decision-engine-session-e32fef1a)
 - [2026-10-28 -- A grader's ABSENCE reason is not a LOCATION: `player_not_in_box` read as…](#2026-10-28----a-graders-absence-reason-is-not-a-location-player_not_in_box-read-as-the-player-was-not-in-that-game-sent-a-session-after-a-join-defect-that-does-not-exist-lane-nba-prop-wrong-game-session-c59f19b5)
+- [2026-10-29 -- A segment's OVERTIME rule is the BOOK's, not the sport's: DraftKings' NBA…](#2026-10-29----a-segments-overtime-rule-is-the-books-not-the-sports-draftkings-nba-4th-quarter-includes-overtime-fanduels-betmgms-and-pinnacles-do-not-lane-nba-period-paper-grading-session-35e11968)
+- [2026-10-29 -- "CLEAN" IS NOT "FINISHED": a peer's OneDrive shrink removed a live sessio…](#2026-10-29----clean-is-not-finished-a-peers-onedrive-shrink-removed-a-live-sessions-app-worktree-because-it-had-nothing-uncommitted-lane-nba-period-paper-grading-session-35e11968)
+- [2026-10-30 -- A finalized market's LAST PRINT is not a pregame price: Kalshi combos tra…](#2026-10-30----a-finalized-markets-last-print-is-not-a-pregame-price-kalshi-combos-trade-in-play-and-e4-stage-2s-registered-price-was-an-in-play-print-for-at-least-29-of-soccer-combos-lane-e4-stage2-combo-prices-session-b566f51c)
+- [2026-10-30 — Lane-owner liveness: read the LAST TIMESTAMP INSIDE the transcript, never…](#2026-10-30-lane-owner-liveness-read-the-last-timestamp-inside-the-transcript-never-the-file-mtime-or-the-session-list-lane-stale-lane-triage-session-eb9e3103)
+- [2026-10-31 -- On the FLEET, `container_memory_*` is the role's process-tree RSS, not cg…](#2026-10-31----on-the-fleet-container_memory_-is-the-roles-process-tree-rss-not-cgroup-memory-its-page-cache-does-not-apply-there-lane-live-odds-memory-spikes-session-28697bd7)
+- [2026-10-31 — An order-leak bisect must key on the PROBE's failures, never on the run's…](#2026-10-31-an-order-leak-bisect-must-key-on-the-probes-failures-never-on-the-runs-exit-code-lane-ci-suite-red-697)
+- [2026-10-31 — An hourly endpoint sample is not a freeze: read the WRITER's flip lines be…](#2026-10-31-an-hourly-endpoint-sample-is-not-a-freeze-read-the-writers-flip-lines-before-diagnosing-staleness-lane-board-midnight-date-skew-session-c634d0c4)
+- [2026-11-01 — Read a ratio's definition before naming its direction; and a conserved tot…](#2026-11-01-read-a-ratios-definition-before-naming-its-direction-and-a-conserved-total-cannot-be-fixed-by-redistribution-lane-basketball-player-distribution-session-e0a3e383)
+- [2026-11-01 — `cancel_stale_resting_orders` is a BOOT-ONLY path; per-tick resting work g…](#2026-11-01-cancel_stale_resting_orders-is-a-boot-only-path-per-tick-resting-work-goes-in-execute_portfolios-kalshi-reconcile-lane-maker-pilot-fair-cancel)
+- [2026-11-03 -- "the plan stopped sending it" is not "the edge is gone" (lane maker-pilot…](#2026-11-03----the-plan-stopped-sending-it-is-not-the-edge-is-gone-lane-maker-pilot-fair-cancel)
+- [2026-11-03 -- regress the TARGET on the MODEL, never the model on the target (lane wnca…](#2026-11-03----regress-the-target-on-the-model-never-the-model-on-the-target-lane-wncaab-module)
+- [2026-11-04 -- A DRY RUN THAT SKIPS THE RISKY BRANCH IS NOT A REHEARSAL: run_move.ps1 pa…](#2026-11-04----a-dry-run-that-skips-the-risky-branch-is-not-a-rehearsal-run_moveps1-passed-two-dry-runs-and-would-have-thrown-right-after-the-rename-lane-repo-out-of-onedrive-plan-session-eeaddaa6)
+- [2026-11-04 -- a one-night signed edge median is not a direction: split it by favourite…](#2026-11-04----a-one-night-signed-edge-median-is-not-a-direction-split-it-by-favourite-and-grade-it-before-calling-it-a-bias-lane-wncaab-module)
+- [2026-11-04 -- a supplement reaches only the readers that go through its accessor; a tel…](#2026-11-04----a-supplement-reaches-only-the-readers-that-go-through-its-accessor-a-tell-validated-on-one-population-is-not-validated-on-the-next-lane-wncaab-module)
+- [2026-11-04 -- a change log cannot age a quote by its last change; ask when it was last…](#2026-11-04----a-change-log-cannot-age-a-quote-by-its-last-change-ask-when-it-was-last-seen-lane-soccer-corners-fair-inflation)
+- [2026-11-04 -- a price-gap A/B cannot see a wrong-game price; check every new venue side…](#2026-11-04----a-price-gap-ab-cannot-see-a-wrong-game-price-check-every-new-venue-sides-provenance-lanes-polymarket-cbb-pairing-kalshi-state-cap)
+- [2026-11-04 -- split a duplicate count by its shape before naming its cause (lane book-q…](#2026-11-04----split-a-duplicate-count-by-its-shape-before-naming-its-cause-lane-book-quotes-state-reset)
+- [2026-11-07 -- `Move-Item` ON A DIRECTORY IS NOT A RENAME: with a handle held inside, it…](#2026-11-07----move-item-on-a-directory-is-not-a-rename-with-a-handle-held-inside-it-moves-the-children-one-by-one-and-leaves-the-tree-split-lane-repo-move-script-fixes-session-eeaddaa6)
+- [2026-11-07 -- AN IDENTITY CHECK THAT CANNOT RESOLVE A CODE READS AS "NOT THIS GAME" `[l…](#2026-11-07----an-identity-check-that-cannot-resolve-a-code-reads-as-not-this-game-lane-kalshi-unnamed-role-key-session-e32fef1a)
+- [2026-11-07 -- A CACHE KEYED ON THE FILES A FUNCTION READS MISSES THE FALLBACK IT FETCHE…](#2026-11-07----a-cache-keyed-on-the-files-a-function-reads-misses-the-fallback-it-fetches-the-nba-lens-read-scheduled-0-0-because-the-cards-cache-never-saw-its-own-espn-read-lane-nba-lens-live-state-session-41b9ecce)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`

@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 1494 rules `[generated]`
+## Index — 1514 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -3280,3 +3280,14 @@ I counted "unchanged re-appends" on the NBA and NHL quote shards (NHL: 41% of ro
   - An identity check that can come back empty must report three outcomes: this game, another game, unresolved.
   - An unresolved verdict is read by eye before it is counted either way.
   - Print every refused row beside its ticker, not a sample of 6.
+
+## 2026-11-07 -- A CACHE KEYED ON THE FILES A FUNCTION READS MISSES THE FALLBACK IT FETCHES: the NBA lens read "Scheduled 0-0" because the cards cache never saw its own ESPN read `[lane nba-lens-live-state, session 41b9ecce]`
+
+- **Belief:** `#762` called it "the lens's own source lags" behind the re-sim's ESPN summary.
+- **What was true [M]:** the source was fresh. `nba/cards._best_live_state_payload` falls through to a live ESPN read whenever `live_state_<date>.jsonl` is stale, and on the fleet that file is written once, pregame (11-06: 17:30:49 CST). `build_cards_page_context`'s cache key covered the files and that pregame text, not the ESPN read. Nothing in the key changed during play, so live-odds-worker served its first pregame build all evening. HEAD's code replayed on a fed tip: `Scheduled 0.0-0.0`.
+- **How found:** reading the fleet's keyvalue `live_state` line and the artifact mtimes against the cache key, then replaying HEAD's module beside the fix on the same fed feed.
+- **Rule:**
+  - A cached function's identity must include every input it can READ, including a network or keyvalue fallback, not only the files it stats. Before trusting a cache, list each branch that sources data and check that each is in the key.
+  - Put a fast-changing input's signature in the cache VALUE (replace the entry on mismatch) rather than in the key, or every change adds an entry.
+  - "Stale data" in a derived artifact: first check whether its producer was asked at all (cache hit) before blaming the upstream source.
+- **Cost:** the NBA page lens and the prop join's `lens_live_games` were wrong on every live slate since the merge relied on the ESPN fallback (unmeasured start; seen 11-04 00:50Z).
