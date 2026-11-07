@@ -112,6 +112,19 @@ an external worktree and an internal `.claude\worktrees` worktree, absolute `cor
 - In-play runner: 1 rewrite. Harvester: 1. User `settings.json`: 4. **`~/.claude.json`: 75, JSON-valid.**
 - Desktop stores: 5,136 rewrites in 1,487 files. `SKILL.md`: 401 rewrites in 285 files. 58 project folders to copy.
 
+#### 1d. 2026-11-07: the R3 failure and the hardening
+
+- **The 11-07 09:30 run** force-stopped claude.exe x20 (the `-StopAppAfterMinutes` option, added 11-06 by fleet-watcher). R0, R1 and R2 passed. **R3 threw "being used by another process", and nothing moved.** The holder was not named; `handle.exe` was not installed.
+- **The fix**, details in the `.syndicate/log/2026-11-07.md` 15:58Z entry:
+  - claude.exe is killed as a tree;
+  - `OneDrive.Sync.Service` is stopped;
+  - Windows command-line holders and WSL cwd holders are cleared before each try (WSL fd-only holders are only logged);
+  - `handle64` is logged when installed;
+  - the rename is retried 8 x 15 s.
+- **Found in rehearsal:** `Move-Item` on a directory **splits the tree** when a handle is held inside it. R3 now uses `[IO.Directory]::Move`, which is all-or-nothing.
+- **Rehearsed:** a cwd holder gives a clean "nothing moved"; a command-line holder is killed and the move succeeds; `-FailAt R4` then `-Resume` still works.
+- **Real-repo `-DryRun` 11-07 09:56: OK.** It found one live WSL cwd holder, which a real run would kill.
+
 **F6 LANDED 2026-11-04 `74767d036`** (loan from `in-game-trading`, user "Yes, take the loan", recorded at `2176a0329`):
 - `inplay_nightly.py`: `REPO` = the first candidate (`Coding\Syndicate`, then `OneDrive\Coding\Syndicate`) holding a `.git`; `SYNDICATE_PRIMARY_TREE` overrides.
 - The recorder is handed `--env <repo>\.env`. A missing repo logs `SYNC_FAILED repo not found`.

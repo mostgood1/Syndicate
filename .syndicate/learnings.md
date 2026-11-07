@@ -3261,3 +3261,11 @@ The same evening, the college additions pushed `kalshi_markets.json` over its 8 
 I counted "unchanged re-appends" on the NBA and NHL quote shards (NHL: 41% of rows) and told the user the soccer state race ran on weekdays too. Every one of those rows was a moneyline with `line: NaN`, re-appended on every fetch because NaN never equals itself. That is a different bug, and the race showed 0 there. The analysis script called the rows "unchanged" only because `json.loads` reuses one NaN object, so the tuple comparison passed where the writer's comparison fails.
 
 **Rule:** before attributing a pile of anomalous rows to a mechanism, diff a few of them field by field against their predecessors and split the count by what differs. A mechanism (a race) predicts a shape -- some keys, some moments; a whole fetch every time is a different cause.
+
+## 2026-11-07 -- `Move-Item` ON A DIRECTORY IS NOT A RENAME: with a handle held inside, it moves the children one by one and leaves the tree SPLIT `[lane repo-move-script-fixes, session eeaddaa6]`
+
+- **Belief:** a same-volume `Move-Item <dir> <dir>` is one rename. It either moves the whole tree or fails with nothing moved; the 11-07 09:35 failure ("being used by another process", OLD intact, NEW absent) looked like proof.
+- **What was true [M, rehearsal]:** a holder whose cwd was inside OLD made the rename fail. PowerShell then moved the children one at a time: `.git` and `.claude` went to NEW, while `scripts\` and a partial `.git` stayed in OLD. It then threw "You do not have sufficient access rights". On the real repo that is a split `.git`, and the script's message said "repo IS at NEW".
+- **Rule:**
+  - Move a directory with `[IO.Directory]::Move` (MoveFileEx, one rename, all-or-nothing), never with `Move-Item`.
+  - Check the failure branch with a live holder in a rehearsal before trusting it. A test folder that nothing holds proves nothing about this path.
