@@ -27,6 +27,11 @@
   - **Production, measured against 147 real finals 11-03..11-07 (pregame sim vs ESPN linescores):** h1 projected minus actual **+1.27** (median +1.54, sd 10.29, so +-0.85 SE: not significant), h2 incl. OT -0.78, full +0.50; projected h1 share 0.4761 vs actual 0.4695. The replay's "+8.4 high at the tip" is the half split switched OFF, not a production defect.
   - **So:** do not "fix" h1 by switching the split on, because it is on. Re-run the NCAAB re-sim variant with live-odds-worker's three engine switches before any Phase 2 NCAAB decision. That includes the "~4 low at minute 38" read, because production's end-game mechanisms are configured. NBA and pregame_rate rows are unaffected.
 ### `#764` — **KALSHI TOTALS THAT NAME NO GAME PRICE ANOTHER GAME'S ROW: 26 of 26 measured sides wrong-game (men's and women's college basketball, college football). Polymarket is clean in every sport. NOT FIXED** — 2026-11-06, session e32fef1a (user "Yes, measure it here")
+- **UPDATE 2026-11-07 23:49Z (5:49 PM CST): REVERSED-ORDER FIX LOADED AND VERIFIED** (lane `kalshi-fanin-reversed-orientation`, CLOSED).
+  - **Load:** `79c8aac12`, fleet ff + refresh-worker TERM 23:41:12Z.
+  - **Worker's first ncaab build** (23:45:43Z): refused-unnamed 32, cross-date 496, cross-game 6, role-key 2. At the same clock the pre-fix code gives 42 / 618 / 4 / 2.
+  - **Sides:** 4 changed, 0 lost, each the row's own game: Providence @ Nebraska 158.5 -> `NEBPROV-159`, USC @ Wichita St 156.5 -> `WICHUSC-157`.
+  - **Left on this item:** `PVUTRGV-124` is still unnamed on a role key (Prairie View / UTRGV). Not diagnosed.
 - **UPDATE 2026-11-07 20:47:15Z (2:47 PM CST): REVERSED-ORDER GAP DIAGNOSED AND FIXED, on a branch only** (lane `kalshi-fanin-reversed-orientation`, on branch `claude/syndicate-ai-engine-762439` only, not on main, not loaded).
   - **Cause, confirmed on fleet data:** `kalshi_catalogue._candidate_blobs` builds `AWAY+HOME` only, for every sport but soccer.
     - A neutral-site game has no real home, and Kalshi and our odds feed can pick different ones.

@@ -116,7 +116,11 @@ Scheduled task `verify-603-cross-game-mlb` fires 2026-08-30 20:15 CT.
 - **Refused on totals/spreads keys.** `venue_quote_fanin._unnamed_venue_quote_on_a_role_key` refuses them and logs `UNNAMED_ROLE_KEY_GRID`.
 - **Kalshi names a game with Kalshi's own "<Club> wins" names.** `_KALSHI_FANIN_VENUE_NAMES_ENABLED` routes the ticker through `kalshi_board_join._resolve_event`, not our alias maps, which keeps the rule above. NCAAF quotes are named by our event id, since `game_token` still refuses NCAAF.
 - **On the fleet (`23780354f`, first builds 19:57Z):** college refusals 14 / 16 -> 0 / 0.
-- **Not named:** a neutral-site game whose odds-feed orientation flipped (Nebraska / Providence, 19:21Z). Cause untested.
+- **A ticker in the other club order is named too** `[verified 2026-11-07 on the fleet, lane kalshi-fanin-reversed-orientation]`.
+  - **Cause:** `kalshi_catalogue._candidate_blobs` builds `AWAY+HOME` only outside soccer, and a neutral-site game has no real home.
+  - **Fix:** `_KALSHI_FANIN_REVERSED_ORDER_ENABLED` retries the resolver with home/away swapped, after a `no_match` only, on games played on the ticker's own date.
+  - **On the fleet** (`79c8aac12`, first ncaab build 23:45Z): the worker's refusal counts equal the new code's. `NEBPROV` / `WICHUSC` totals price their own rows.
+  - **Still unnamed:** `PVUTRGV-124`, cause not diagnosed.
 
 ## [venue-fee-economics] FEES ARE READ FROM THE VENUE AND VERIFIED AGAINST 18/18 REAL FILLS; THE ARB THRESHOLD WAS ABOVE BREAK-EVEN EVERYWHERE ON MLB `[2026-08-30, lane live-venue-order-placement]`
 

@@ -57081,3 +57081,48 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **Owed:**
   - Load `7d72f8e9d`. The fleet is at `b13a1202a` (lane `basketball-interval-projections`: ff + refresh-worker TERM + web reload 22:44:30Z), which does NOT contain it. It needs a fleet ff + a refresh-worker restart, plus a web reload for the read-time refresh. Then verify Jokic's rows carry a live number.
   - Overtime is still untested (`#761`/`#763`, passive).
+
+## 2026-11-07 23:41:12Z (5:41 PM CST) -- FLEET ff b13a1202a -> 79c8aac12 + refresh-worker TERM: a Kalshi ticker in the other club order names its game, on the ticker's own date (lane `kalshi-fanin-reversed-orientation`, `#764` follow-up) -- **LOADED AND VERIFIED: the worker's first ncaab build logs the new code's counts on all four (refused-unnamed 32, cross-date 496, cross-game 6, role-key 2; pre-fix 42 / 618 / 4 / 2 at the same moment); 4 sides now Kalshi's quote for the row's own game** (written 23:49Z, 5:49 PM CST)
+- **User, in this chat:** "Yes, ship it", answering "Push the reversed-order fix and load it on the fleet?"
+- **What:** `79c8aac12`, the rebase of `48e2cdd6b`. Tests: 134 passed over 11 fan-in and venue-quote files after the rebase; 4,175 passed over 228 files before it.
+  - After a `no_match` only, the fan-in's Kalshi adapter retries the resolver once with home/away swapped, on games played on the ticker's own date. `_distinct_games` now carries `start_dates` for that.
+  - Switch `_KALSHI_FANIN_REVERSED_ORDER_ENABLED`: a code default (True), no env. The order path is untouched; soccer is skipped.
+- **Range `b13a1202a..79c8aac12`, runtime** (listed in its own step at 22:45:36Z, re-checked by the ff script): mine are `venue_quote_adapters.py` and `venue_quote_fanin.py`.
+  - Also in range: `scripts/backtest_basketball_intervals.py` and `shared/basketball_interval_backtest.py` (lane `basketball-interval-backtest`, CLOSED). Only that script imports them, so nothing in the worker loads them.
+  - No dirty fleet file overlapped.
+  - `7d72f8e9d` (lane `nba-live-proj-actuals`) is NOT in the range and is still owed.
+  - **No unloaded feature rode along.** Lane `basketball-interval-projections` held web + refresh-worker and loaded `b13a1202a` itself (TERM 22:44:36Z) while I waited. Its ff stopped at its own SHA, before mine.
+  - My heads-up to that session was held, not delivered (permission modes differ).
+- **Loaded by:** refresh-worker only. live-odds-worker and web were not restarted.
+- **Gates:**
+  - **Claim:** refresh-worker acquired 23:08:54Z, holder `kalshi-fanin-reversed-orientation`; released 23:41:34Z.
+  - **Restart spacing:** preflight TOO_SOON at 23:09:00Z and again about 40 s later, inside the 25-min minimum after 22:44:36Z. Waited it out; no `--allow-rapid`.
+  - **Drain:** from about 23:09:50Z. It ended NOT CLEAR at the cap twice: first a board build in flight, then odds-job children. The board build was idle by about 23:25Z.
+  - **Preflight** `--target fleet --target-commit 79c8aac12` with expect + baseline (re-read 23:35:37Z): HOLD 23:35:46Z (3 odds jobs); CLEAR 23:38:41Z, 2 s after NO_CHILD at 23:38:39.865Z.
+  - **ff:** `git merge --ff-only 79c8aac12` 23:38:55Z. File hashes equal the commit: adapter `a6ac7ba7c616776b`, fan-in `02d538a4f1e77930`.
+  - **TERM:** the first attempt refused (HAS_CHILD: an odds job started at about 23:39Z). NO_CHILD 23:41:03.166Z. TERM pid 878269 23:41:12.131Z.
+  - **Respawn:** pid 917471 at 23:41:17Z (`role_restarts.jsonl`: claimed, holder `kalshi-fanin-reversed-orientation`, code 0). `DRAIN_CLEARED` against pid 917471 at about 23:41:30Z.
+- **Baseline** (pid 878269 on `b13a1202a`, last ncaab build 23:08:19Z, read 23:08:35Z):
+  - `fleet_def_kalshi_fanin_reversed_order` 0.
+  - ncaab: `AMBIGUOUS_UNNAMED_REJECTED` 76, `CROSS_DATE_REJECTED_GRID` 389, `CROSS_GAME_REJECTED_GRID` 4.
+  - ncaab `UNNAMED_ROLE_KEY_GRID` 6 (sample `NEBPROV-183/184`, `PVUTRGV-124`).
+- **expect** (replay 23:09:09Z, fleet vs patched adapter, one clock):
+  - `fleet_def` 0 -> 1.
+  - ncaab: role-key 6 -> 2; refused-unnamed 78 -> 22.
+  - Reason `game_line_reversed_order:14`; 0 priced sides changed at that moment.
+- **verify (measured):**
+  - After the ff: `fleet_def_kalshi_fanin_reversed_order=1`, `start_dates` present.
+  - **First ncaab build on pid 917471** (grid 23:45:31Z, fan-in lines 23:45:43Z):
+    - `AMBIGUOUS_UNNAMED_REJECTED` 32, `CROSS_DATE_REJECTED_GRID` 496, `CROSS_GAME_REJECTED_GRID` 6.
+    - `UNNAMED_ROLE_KEY_GRID` 2: sample `PVUTRGV-124` only, no `NEBPROV`.
+    - 0 tracebacks since 23:41:17Z.
+  - **Same data, same clock (23:45:59Z), pre-fix (`8547543b1`) vs the loaded modules:**
+    - Counts: 42 / 618 / 4 / 2 vs 32 / 496 / 6 / 2. **The worker's logged counts equal the loaded column on all four**, so the running worker is on the new code.
+    - Loaded reason `game_line_reversed_order:25`. Kalshi named game-line quotes 595 -> 638.
+  - **Changed sides vs pre-fix: 4, 0 lost.** Each read by eye as the row's own game:
+    - Providence @ Nebraska totals 158.5 over/under: Polymarket `tsc-cbb-prov-nebr-2026-11-07-158pt5` +108 / -113 -> Kalshi `KXNCAAMBTOTAL-26NOV07NEBPROV-159` +108 / -113.
+    - USC @ Wichita St totals 156.5 over/under: Polymarket `tsc-cbb-wichst-usc-2026-11-08-156pt5` -113 / -104 -> Kalshi `KXNCAAMBTOTAL-26NOV08WICHUSC-157` -122 / -104.
+    - The WICHUSC over now shows Kalshi's -122 where Polymarket's -113 stood. The fan-in's existing rule for choosing between two venues' quotes picked Kalshi's; this change only made Kalshi's quote eligible.
+  - **`cross_game_rejected` 4 -> 6:** consistent with newly named quotes being refused on another game's row instead of as unnamed. Not traced per quote.
+  - **Served `/api/board/book-grid`** shows sportsbook bests and the feed's own exchange-book cells, not fan-in quotes (as at 19:58Z). It is not this change's surface, so no served-page claim is made.
+- **Revert:** `_KALSHI_FANIN_REVERSED_ORDER_ENABLED = False` (or revert `79c8aac12`) on main, then ff + refresh-worker TERM. With it off, the quotes are unnamed again and `#764` refuses them.

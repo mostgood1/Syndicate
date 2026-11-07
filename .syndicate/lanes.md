@@ -815,8 +815,19 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: MET. owner_liveness.py --idle-min 240 at 20:06Z (2:06 PM CST) returned SAFE for 1 of 12 CLOSED slugs; dry run + invariants matched baseline. Moved: `repo-out-of-onedrive-plan`. Table and WAIT reasons in `log/2026-11-07.md` 20:09Z.
 
-### kalshi-fanin-reversed-orientation — OPEN — opened 2026-11-07 — session e32fef1a-01e8-4afe-a284-01acd3728545
-- **STATUS `[2026-11-07 20:47:15Z]`: GOAL: NOT MET -- written and replayed on fleet data; committed on branch `claude/syndicate-ai-engine-762439` only, NOT on main, NOT loaded.** The goal's own Verification has run on a replay, not on the live worker. Left: the user's call to ship, then a live read of `game_line_reversed_order` in the Kalshi reason and a reversed total pricing its own row.
+### kalshi-fanin-reversed-orientation — CLOSED 2026-11-07 (GOAL MET: 79c8aac12 loaded on the fleet refresh-worker 23:41:12Z; the worker's first ncaab build logs the new code's counts) — opened 2026-11-07 — session e32fef1a-01e8-4afe-a284-01acd3728545
+- **GOAL VERDICT `[2026-11-07 23:49Z checkpoint]`: GOAL: MET.**
+  - Goal verbatim: "A Kalshi game-line quote whose ticker lists a game's clubs in the reverse order of our board (the neutral-site NEBPROV totals vs our Providence @ Nebraska) names that game in the venue fan-in when the ticker's own date is the game's date, so it prices its own totals row; a reversed match on any other date, or onto two games, stays unnamed and refused; every changed side on a fleet-data replay is read by eye".
+  - Readings, on the fleet (`79c8aac12`, refresh-worker pid 917471, first ncaab build 23:45:43Z):
+    - The worker logged refused-unnamed 32 / cross-date 496 / cross-game 6 / role-key 2.
+    - Against the same data at the same clock, the pre-fix code gives 42 / 618 / 4 / 2 and the loaded code gives the worker's numbers on all four.
+    - `NEBPROV` left the role-key sample.
+    - The loaded Kalshi reason carries `game_line_reversed_order:25`.
+  - Priced rows: 4 sides changed, 0 lost, each read by eye as the row's own game.
+    - Providence @ Nebraska 158.5 -> `NEBPROV-159`.
+    - USC @ Wichita St 156.5 -> `WICHUSC-157`, its own date, 11-08.
+  - Refusal cases: the wrong-date and two-game cases stay refused (unit tests: another-day ticker unnamed, `ambiguous` not retried).
+  - Deploy record: `deploys.md` 2026-11-07 23:41:12Z.
 - **Hypothesis result `[2026-11-07 20:14Z]`: CONFIRMED** on fleet data (`50ce820d0`): `NEBPROV` vs the board's games -> `no_match`; with home/away swapped -> `ok`, event `e8b5176c` (Providence @ Nebraska). Census over ncaab/ncaaf/wncaab/nba/nhl/nfl 11-07/11-08: 3 flips, all ncaab, all the same club pair on the ticker's own date (`NEBPROV` 11-07, `WICHUSC` 11-08, `KUUK` 11-10). The 11-07 grid spans 11-06..11-10, so the date gate must compare the ticker's date with the GAME's date, not the slate's; hence `venue_quote_fanin._distinct_games` gains a date key the matcher never reads.
 - Goal: A Kalshi game-line quote whose ticker lists a game's clubs in the reverse order of our board (the neutral-site NEBPROV totals vs our Providence @ Nebraska) names that game in the venue fan-in when the ticker's own date is the game's date, so it prices its own totals row; a reversed match on any other date, or onto two games, stays unnamed and refused; every changed side on a fleet-data replay is read by eye
 - Files: syndicate/features/shared/venue_quote_adapters.py, syndicate/features/shared/venue_quote_fanin.py, tests/test_kalshi_fanin_reversed_orientation.py (NEW)
