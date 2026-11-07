@@ -57002,3 +57002,26 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **What happened:** claim live-odds-worker `exit-state-size` from ~15:45Z. Preflight `--target fleet --target-commit 8b1dcd020` held HOLD on 9-10 odds/soccer jobs for ~6.5h and never cleared. Meanwhile fleet HEAD moved to `50ce820d0` (contains `8b1dcd020`, `merge-base --is-ancestor` = 0) and the live-odds-worker self-recycled at 21:04:32Z (supervisor exit code=0, new pid 757868). Reported by the NCAAF backtesting session's fleet watcher, then re-read by me.
 - **Verify (read 22:2xZ, in pid 757868's environ):** `SYNDICATE_EXIT_LIVE_PHASES` unset; `live_exit_phases()` = `['pregame']`. 4 EXIT_LIVE sales after the recycle (21:05Z LAMAC NCAAMB spread, 21:33Z LT/Troy, 21:38Z Rice/UNT, 22:15Z UCF/KU), all pregame entries: three by `open_positions(...).entry_phase`, LAMAC by its ledger position_key (no `ingame:` prefix, placed 15:22Z). 0 `phase_not_armed` so far, so no in-game entry has triggered a live sale since the recycle. EXIT_TICK 22:15Z/22:22Z status=ok, live_exits={'rule_not_armed': 4}.
 - **Owed:** the first `phase_not_armed` in EXIT_TICK live_exits, with the matching in-game trigger written as a paper row. Claim released 22:24:59Z.
+
+## 2026-11-07 22:36:00Z (4:36 PM CST) -- LOAD record + VERIFY of `e21335809` NBA lens live-state fix (lane `nba-lens-live-state`, todo `#762`); no deploy, TERM or claim of mine -- **MEASURED: lens state == ESPN for the live game from the first lens write after ESPN flipped it; `state_check.lens_not_started == []`; `LIVE_PROJECTION_JOIN sport=nba lens_live_games=1`**
+- **Appended, not edited into the 17:39:56Z row.** That row (lane `live-gameline-lane-age-gate`) records the ff `59638f001 -> 846016a91`, which carried `e21335809`, and the refresh-worker TERM (pid 573627, 17:40:04Z) that loaded the `_status_text` half. User, in this lane's chat: "Yes, load it".
+- **Lens half loaded by the worker's own uptime recycle.**
+  - live-odds-worker pid 483251 (old code, started 15:27:04Z) logged `LIVE ODDS REFRESH WORKER RECYCLING after 20237s uptime` at 21:04:22.776Z (`max_uptime_seconds=20133.26`). The supervisor logged `==== start 2026-11-07T21:04:33Z restarts=6`, and the new pid is 757868.
+  - Fleet HEAD at the load was `50ce820d0`, which contains `e21335809`.
+  - I held no live-odds-worker claim (lane `exit-state-size` held it) and sent no signal.
+- **Post-load read, 21:07:16Z:**
+  - 0 line-start tracebacks and 0 `ESPN_LIVE_STATE_FETCH_FAILED`.
+  - The lens carries `native_resim.state_check`.
+  - Baseline fields: `fleet_espn_memo_def=1`, `fleet_status_text_str=1`, `lens_state_check_key=1`.
+- **Readings:** read-only, `nba_lens_state_check.py`, with ESPN fetched in the same run as the lens.
+  - **22:16:32Z** (lens written 22:15:00Z): DEN@IND was `in 10:59 1st 0-3` on ESPN and `Scheduled` in the lens, 1 mismatch. That lens write was built before ESPN flipped: the NBA pass at 22:15:04Z logged `NBA_LIVE_BOX_CAPTURED ... live=0`. **The lens tick is ~170 s, not 60 s** (`TICK_COMPLETE` 22:13:33Z, then 22:16:24Z). The lane's falsification test assumed 60 s.
+  - **22:19:11Z** (lens 22:18:54Z): `Live 9:35 1st 4-6` against ESPN's `4-7`, read 17 s later. The 6 pregame games agree. 0 mismatches. `state_check` = `{resim_in_play 1, lens_live 1, lens_final 0, lens_not_started []}`.
+  - **22:21:58Z** (lens 22:21:37Z): `Live 7:52 1st 12-7`, an exact match. 0 mismatches, same `state_check`.
+  - `LENS_STATE_BEHIND_RESIM`: 0 lines today. `ESPN_LIVE_STATE_FETCH_FAILED`: 0.
+  - **22:34:04.984Z** `[layer2_shortlist] LIVE_PROJECTION_JOIN sport=nba considered=327 projected=247 edged=236 ... lens_indexed=665 lens_live_games=1 ... miss_not_live=63`, with 0 refresh-worker tracebacks since 22:19Z. This is the first NBA join with a game in play. The earlier joins today printed `lens_live_games=None` with `reason=live-lens snapshot for nba carries no liveProps` (pregame).
+- **expect vs measured:**
+  - Expect: lens state == ESPN within one lens tick plus the 10 s memo; `lens_not_started == []`; `lens_live_games > 0`.
+  - Measured: correct from the first lens write built after ESPN flipped; `[]`; `1`.
+- **No same-slate before-reading:** the old code was never read with a game in play today. The counterfactual is the offline replay of HEAD's `cards.py`, which gave `Scheduled 0.0-0.0` after a fed tip, and the 11-04 00:50Z field report (3 in-play games `Scheduled 0-0`).
+- **Seen, not mine (lane `nba-live-proj-actuals` owns the join's key lookup):** the player key does not fold diacritics. The lens has `Nikola Jokić` and the board has `nikola jokic`, so the join's miss sample shows `player_in_lens: False` for every Jokić row. 1 of the 11 live players today.
+- **Still to read:** a multi-game slate and a Final transition. A watcher (`C:\tmp\lenslive\later.sh`) reads the first 2 lens writes after ESPN puts DEN@IND in `post`, then a full read at 01:20Z (7:20 PM CST). It appends here.

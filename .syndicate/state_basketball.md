@@ -1512,16 +1512,24 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
     - The narrower vendored clip (0.75-1.25, after the team prior stacks) had capped blowouts. Women's sims fell -3.2 total / -4.1 margin short of their own target.
     - Now the published pregame sims sit on their target: wncaab 11-04 total -1.06, margin -0.40; ncaab 11-03 -0.28 / -0.32 (22:56Z read).
 
-## [nba-lens-live-state] THE NBA LIVE LENS'S GAME STATE FROZE AT TIP: THE CARDS-CONTEXT CACHE NEVER SAW ITS OWN ESPN READ. FIX ON MAIN `e21335809`, **NOT LOADED** on the fleet (HEAD `59638f001` at 17:08Z) `[verified 2026-11-07 in code + read-only on the fleet, lane nba-lens-live-state, todo #762]`
+## [nba-lens-live-state] THE NBA LIVE LENS'S GAME STATE FROZE AT TIP: THE CARDS-CONTEXT CACHE NEVER SAW ITS OWN ESPN READ. FIX `e21335809` LOADED ON THE FLEET 2026-11-07 AND VERIFIED ON A LIVE GAME `[verified 2026-11-07 in code + on the fleet, lane nba-lens-live-state, todo #762, deploys.md 2026-11-07 22:36:00Z]`
 
 - **Where the lens's game state comes from:** `live/nba_live_lens.json` (live-odds-worker's lens loop) takes its games, `status` and `live_state` score from `nba/cards.build_cards_page_context`. That merges `_best_live_state_payload`: the keyvalue `nba_source/data/processed/live_snapshots/live_state_<date>.jsonl`, else an ESPN scoreboard read. The re-sim's keys (`gameLens`, `liveProps`, ...) are merged on top; status and score are not.
 - **On the fleet, `live_state_<date>.jsonl` is written ONCE, pregame, and never during play.** 11-06: 1 line at 17:30:49 CST, every game Scheduled. 11-07: 06:41 CST. During play the live state is therefore ESPN's, through that fallback.
-- **The defect (running code `59638f001`):** the context cache key covers the cards/sim/props/recommendations files and the `live_state` text, never the ESPN read. 11-06: `game_cards` 17:30:48 CST, sim detail from 11-05, so nothing in the key changed during play and the first pregame build was served all evening. HEAD's `cards.py`, replayed on a fed ESPN tip, returned `Scheduled 0.0-0.0`.
+- **The defect (code before `e21335809`):** the context cache key covers the cards/sim/props/recommendations files and the `live_state` text, never the ESPN read. 11-06: `game_cards` 17:30:48 CST, sim detail from 11-05, so nothing in the key changed during play and the first pregame build was served all evening. The old `cards.py`, replayed on a fed ESPN tip, returned `Scheduled 0.0-0.0`.
 - **Second defect:** `live_projection_join.build_live_prop_index` read `status` only as a Mapping; NBA's is the string `Live`/`Final`/`Scheduled`, so `lens_live_games` was structurally 0 for NBA.
 - **Fix `e21335809`:**
   - the cache value carries a hash of the merged live state (a change replaces the date's entry);
   - the ESPN read goes through `basketball_pbp.espn_get` (both hosts, 1 attempt, 5 s), memoized 10 s / 60 s after a failure;
   - `native_resim.state_check` + `LENS_STATE_BEHIND_RESIM` in the lens;
   - `_status_text` takes strings.
-- **Loads with:** a live-odds-worker restart (lens loop + NBA re-sim live there) and a refresh-worker restart (`LIVE_PROJECTION_JOIN` runs there).
+- **Loaded:**
+  - `_status_text` half: refresh-worker TERM at 17:39:56Z (lane `live-gameline-lane-age-gate`'s ff to `846016a91`).
+  - Lens half: live-odds-worker's own uptime recycle at 21:04:22Z (new pid 757868), no deploy.
+- **Measured on the 11-07 slate:**
+  - The first lens write built after ESPN flipped DEN@IND to `in` read `Live` with ESPN's score, and so did the next one (`12-7` exact). 0 mismatches across 7 games.
+  - `state_check.lens_not_started == []`.
+  - `LIVE_PROJECTION_JOIN sport=nba lens_live_games=1` at 22:34:04Z.
+- **The lens tick is ~170 s, not 60 s** (`TICK_COMPLETE` 22:13:33Z, then 22:16:24Z). A game can read `Scheduled` for up to one tick after tip.
 - **Cost, measured on the fleet:** a cold cards build is ~0.3 s of work plus two ~0.2 s deepcopies of a 1.79 MB-pickle context; a hit is 0.22 s.
+- **Open, not this subject:** the prop join's player key does not fold diacritics (lens `Nikola Jokić` vs board `nikola jokic`). Lane `nba-live-proj-actuals` owns that lookup.
