@@ -777,11 +777,6 @@ death, never life — do not invert it.
 - Verification: off != on reachability test; venue_prov.py replay with this worktree's code against fleet data: unnamed_quote totals/spreads sides 26 -> 0, same_game and h2h counts unchanged
 - Blocked by: none
 
-### closed-lane-archive-20261107-0700 — CLOSED 2026-11-07 (GOAL MET: 1 block archived) — opened 2026-11-07 — session acc7ac9c-5f0f-432c-89dc-61ad15e92a7c
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. Moved `closed-lane-archive-20261107-0250` (owner 2dc4077e 246m idle, block 249m old, owner_liveness SAFE). 8 others WAIT; table in `log/2026-11-07.md`.
-
 ### nba-lens-live-state — OPEN (GOAL: NOT MET — fix on main e21335809, NOT LOADED; user approved the load 2026-11-07, waiting on lane exit-state-size's live-odds-worker claim) — opened 2026-11-07 — session 41b9ecce-0019-4143-ab62-f74bc2f862c8
 - **GOAL VERDICT (checkpoint 2026-11-07 17:1xZ, 11:1x AM CST).** Goal, verbatim: "The NBA live lens (live/nba_live_lens.json, built by syndicate/features/nba/live_lens.py on live-odds-worker) shows every live NBA game's real state and score within one lens tick, matching the ESPN scoreboard the chips and the re-sim read, and the prop join's lens_live_games instrument counts NBA's live games (todo #762 open item 'Stale NBA lens game state')." **GOAL: NOT MET.** The cause is confirmed (HEAD's cards.py replayed on a fed ESPN tip -> `Scheduled 0.0-0.0`; fixed -> `Live 51-55`) and the fix is on main `e21335809` with tests. The lane's Verification has NOT run: the fix is not loaded on the fleet (HEAD `59638f001` at 17:08Z), and no live slate has been read with it. Left: ff the fleet to `e21335809`, restart live-odds-worker + refresh-worker, then read the 11-07 slate (first tip 22:00Z = 4:00 PM CST) with `nba_lens_state_check.py`.
 - Goal: The NBA live lens (live/nba_live_lens.json, built by syndicate/features/nba/live_lens.py on live-odds-worker) shows every live NBA game's real state and score within one lens tick, matching the ESPN scoreboard the chips and the re-sim read, and the prop join's lens_live_games instrument counts NBA's live games (todo #762 open item 'Stale NBA lens game state').
@@ -800,6 +795,11 @@ ba_lens_state_check.py`.
 - Verification: after fleet rollout (user yes only): LIVE_GAMELINE_JOIN why= carries live_lane_older_than_pricing_ceiling for ncaab on a busy slate with priceable > 0 still; NBA display= unchanged; 0 priced ledger records with recorded_at - live_state_as_of over the sport ceiling
 - STATUS 2026-11-07 10:30 AM CST: gate ON MAIN `0caaf978c`, DEFAULT OFF (parent session's call: a ~19% NCAAB pricing change must not ride along on another session's fleet fast-forward). Switch `SYNDICATE_LIVE_GAMELINE_LANE_AGE_GATE` off|shadow|on; nothing deployed, no env set. 55 tests in tests/test_live_gameline_lane_age_gate.py (off/shadow/on through attach_live_gamelines + the board_enrichment path on the wall clock); 515 pass across the 24 live-gameline test files; two mutations caught. Before-count (priced ledger records 10-21..11-07): nba 0/157,479, ncaab 8,096/42,336, wncaab 39/4,474, ncaaf 0/29,142, nfl 0/379. Root cause measured: 95.6% of the stale NCAAB records inside the retained tick logs came from budget-exhausted ticks (NCAAB loop starvation, #762's other item). GOAL NOT YET MET in production: switching to shadow or on is the user's decision; then verify on a busy NCAAB slate.
 - Blocked by: none
+
+### closed-lane-archive-20261107-1112 — CLOSED 2026-11-07 (GOAL MET: 1 block archived) — opened 2026-11-07 — session 8578f21b-7320-4325-bba6-9bc031984887
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. Moved `closed-lane-archive-20261107-0700` (owner acc7ac9c 245m idle, block 247m). 10 CLOSED blocks WAIT; table in log/2026-11-07.md.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -983,6 +983,7 @@ ba_lens_state_check.py`.
 - `closed-lane-archive-20261106-1840` — CLOSED 2026-11-06 (GOAL MET: 1 block archived) — opened 2026-11-06 — session 9aa4f12c-8cf6-4463-8aa8-09e62b5a4c27
 - `closed-lane-archive-20261106-2245` — CLOSED 2026-11-06 (GOAL MET: 1 block archived) — opened 2026-11-06 — session 3f031ca8-2dfc-401b-8563-f09846a3e74b
 - `closed-lane-archive-20261107-0250` — CLOSED 2026-11-07 (GOAL MET: 1 block archived) — opened 2026-11-07 — session 2dc4077e-c096-4d42-ad11-49c63e5980af
+- `closed-lane-archive-20261107-0700` — CLOSED 2026-11-07 (GOAL MET: 1 block archived) — opened 2026-11-07 — session acc7ac9c-5f0f-432c-89dc-61ad15e92a7c
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
