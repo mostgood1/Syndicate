@@ -56941,3 +56941,20 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - Nebraska/Providence: NOT MET. Follow-up: the rail looks up the flipped pair on the same Central day.
 - **Peer restart:** refresh-worker restarted again at ~19:52:37Z (`CLAIMED_RESTART holder=kalshi-fanin-college-naming`, fleet `23780354f`, a descendant of `34ac35df3`). Web is on `23780354`.
 - **Revert:** `git revert 34ac35df3`, then ff + refresh-worker TERM.
+
+## 2026-11-07 20:13:27Z (2:13 PM CST) -- FLEET ff 23780354f -> 50ce820d0 + reload-web: the Games rail joins a row group named in the flipped home/away orientation to its chip, same Central day only (lane `wncaab-module`) -- **LOADED and VERIFIED** (written 20:15Z, 2:15 PM CST)
+- **Why:** the follow-up to `34ac35df3` (entry above). The rail groups by odds event id and takes the label and keys from the first-ranked row. When an old-orientation Nebraska @ Providence row ranked first, the card missed every chip index.
+- **Range `23780354f..50ce820d0`:** the only runtime file is `syndicate/templates/intelligence.html` (`chipForGame`). The rest is ledger and a JS test. refresh-worker and live-odds-worker were not restarted; nothing of theirs changed.
+- **Gates:**
+  - Web claim 20:12Z (`wncaab-module`).
+  - Preflight `--target fleet --target-commit 50ce820d0 --expect fleet_checkout_head=50ce820d --baseline fleet_checkout_head=23780354`: CLEAR 20:13:03Z.
+  - Deploy: `git merge --ff-only 50ce820d0` 20:13:27Z. `reload-web` 20:13:29Z (2.0 s, 0 failures, healthz 200). Web `code=50ce820d`.
+  - Claim released 20:13:47Z.
+- **Baseline (replay of the served payload read 20:08Z):** the 3 old-orientation Nebraska/Providence rows in `top_opportunities` ranked first, against the pre-change template: 50 ncaab cards, 2 chip-less. One is "Nebraska Cornhuskers @ Providence Friars"; the other is Arkansas @ Virginia, tomorrow, outside today's chip window.
+- **expect:** the served page carries the flipped-pair lookup; with the same payload, 49 cards, 1 chip-less (Arkansas @ Virginia), Nebraska/Providence on chip `401909532`.
+- **Measured (20:14:58Z, served `/intelligence`, 33.9 MB, 1 match for the new comment):**
+  - Live payload: 49 ncaab cards, 1 chip-less (Arkansas @ Virginia). Tenn-Martin @ IUPUI on chip `401921174` (keys `ut martin @ iu indianapolis`); Providence @ Nebraska on `401909532`.
+  - Old-orientation-first payload: 49 cards, 1 chip-less; the "Nebraska Cornhuskers @ Providence Friars" group on chip `401909532`.
+  - wncaab: 37 cards, 0 chip-less.
+- **verify: MET** -- the replay of the served page (`tests/js/game_rail_production_replay.mjs`, `SYNDICATE_TEMPLATE_HTML=served.html`). Not read by eye in a browser.
+- **Revert:** `git revert 50ce820d0`, then ff + `reload-web`.

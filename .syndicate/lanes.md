@@ -616,7 +616,7 @@ death, never life — do not invert it.
   - women's K superseded by the daily calibration (no change);
   - pregame sim-code key `a147d16cd` MET (deploys.md 2026-11-06 15:19:15Z).
   - LEFT:
-    - Games-rail unmatched college games: ON THE FLEET `34ac35df3` (19:14:31Z; grid VERIFIED one orientation; new rows keyed `iu indianapolis`). Still chip-less: carried pregame Nebraska @ Providence shortlist rows (rail lookup is orientation-exact) -- rail flipped-pair lookup next;
+    - Games-rail unmatched college games: FIXED and VERIFIED on the fleet -- `34ac35df3` (grid, aliases; refresh-worker 19:14:31Z) + `50ce820d0` (rail flipped-pair join, same Central day; web 20:13:29Z; served-page replay: both games on their chips);
     - the college quote-order gate: ON THE FLEET and VERIFIED (`59638f001`, ff + refresh-worker TERM 2026-11-07 16:29:14Z; men's build 17:05:08Z refused 6 of 12 rows past the age ceiling, 0 absent-time; deploys.md). Women's not yet exercised live (`no_margin_anchor` upstream);
     - #763 segment pricing (off);
     - Mercyhurst women on 11-08;
