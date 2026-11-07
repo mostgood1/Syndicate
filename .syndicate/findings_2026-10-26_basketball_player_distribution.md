@@ -1378,3 +1378,25 @@ LISTED = the feed CSV has a row for (date, team), the build's own definition. `r
 **Before the read:** re-run `build_inj2627.sh <read date> <newer backup stamp>`; check the verifier's sha256 (printed by
 the script) and stage3b.py / launch_fit_inj.sh as already registered; read `feed.json` B1/B3 and `b2v_feed.json`
 `B2_amended_pass`. Nothing changes in code or config; nothing is scored.
+
+**ADDENDUM 2026-11-07 15:59Z (09:59 CST) — four more files pinned for the step-3c forward read (218c26dd + B2'
+decf567e), on the user's request.** The sims run from frozen copies (`~/bball_sc/code_inj`, `code_r5b`; not git
+checkouts), but these four are imported from this session's git worktree, which resets to origin/main, so a later
+commit would change them under the read. Recorded at origin/main f91bbda4b; none changed after its last commit below:
+
+| file (worktree) | role in the read | last commit | sha256 |
+|---|---|---|---|
+| `scripts/basketball_player_distribution_read.py` | grading helpers, imported by `r2s/stage3b.py` | 855c32081 10-27 | `ee3e192ed4a76fb178790f8220719a1cbad61d5c7ce0aa9b250b6f62b9ae0045` |
+| `scripts/nba_injury_history_build.py` | builds the 2026-27 feed | 4d237be43 10-28 | `e02916b83c6b6030bc3d5efa0bb40a1d73e1215863ddf141b589d2bdbadb44fd` |
+| `scripts/basketball_scenario_rates.py` | ESPN games (`real`), `asof_roster` for the feed's name repair | a6e568689 10-28 | `f392c106e6fb1e09fa0060b13537ea7d62a1c6d32ce216ce42020bd53e21fee1` |
+| `syndicate/features/nba/source_cli/scrapers/injuries.py` | the production PDF parser the feed uses | 21b4bdb00 10-22 | `8c769d1ff2ef8d2a4ed4cc2b27e315bc267334c847ed38753203b5cdf72fd520` |
+
+**Rule:** checked with the three r2s hashes before the read. If any differs, the read runs on the file as of the
+commit above (`git show <commit>:<path>` into a scratch tree), never on a newer version, and says so.
+
+**Cross-lane check, same date:** neither change named in the 11-07 checkpoint reaches either forward read.
+- OT fixes d6a691168 / b9999dc1d edit only the NBA / college LIVE re-sims (`nba/live_resim.py`, `ncaab/live_resim.py`).
+- WNCAAB loans acd835ee1 / 70b2bdf09 move the efficiency bounds into `LeagueParams`, with NBA/WNBA defaults equal to
+  the old literals (byte-identical); the frozen trees have no `league.py` and keep the literals.
+- No file in `code_inj` / `code_r5b` is newer than `launch_fit_inj.sh`, and the harness puts its own tree first on
+  sys.path (the smart sim's one `live_resim` import resolves to the frozen copy).
