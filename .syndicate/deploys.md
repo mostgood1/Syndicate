@@ -57025,3 +57025,38 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **No same-slate before-reading:** the old code was never read with a game in play today. The counterfactual is the offline replay of HEAD's `cards.py`, which gave `Scheduled 0.0-0.0` after a fed tip, and the 11-04 00:50Z field report (3 in-play games `Scheduled 0-0`).
 - **Seen, not mine (lane `nba-live-proj-actuals` owns the join's key lookup):** the player key does not fold diacritics. The lens has `Nikola Jokić` and the board has `nikola jokic`, so the join's miss sample shows `player_in_lens: False` for every Jokić row. 1 of the 11 live players today.
 - **Still to read:** a multi-game slate and a Final transition. A watcher (`C:\tmp\lenslive\later.sh`) reads the first 2 lens writes after ESPN puts DEN@IND in `post`, then a full read at 01:20Z (7:20 PM CST). It appends here.
+
+## 2026-11-07 22:44:30Z (4:44 PM CST) -- FLEET ff 50ce820d0 -> b13a1202a + refresh-worker TERM + reload-web: interval projections (halves / quarters + projected final) on every basketball Games-rail card (lane `basketball-interval-projections`) -- **LOADED and VERIFIED** (written 22:47Z, 4:47 PM CST)
+- **User, in this chat:**
+  - "we need college qtr/half projections back"; plan approved.
+  - "Yes, roll out", 21:5xZ, after the auto-mode classifier refused the first attempt at 20:43Z. Nothing changed then: claims released, fleet untouched.
+- **Range `50ce820d0..b13a1202a`, runtime:** `shared/game_chip_intervals.py` (new), `shared/game_chip_scoreboard.py`, `static/shared/board_cards.css`, `templates/intelligence.html`, all this lane's. The rest is ledger.
+- **Gates:**
+  - Claims: refresh-worker + web, `basketball-interval-projections`. Taken 21:52Z, released and re-taken 22:25Z so the 45-min window would not lapse mid-wait.
+  - Refresh-worker preflight HOLD (board build in flight) 21:52-22:43Z. CLEAR at 22:43:52Z with 0 child processes.
+  - Web preflight CLEAR 22:44:07Z.
+  - Deploy: `git merge --ff-only b13a1202a` 22:44:30Z. TERM pid 700071 (no children). `reload-web` 22:44:32Z (2.0 s, 0 failures). Refresh-worker respawned pid 878269 at 22:44:42Z, `code=b13a1202`.
+  - Claims released 22:44:56Z.
+- **Baseline (21:52:27Z, served `/api/board/game-chips`):** 92 basketball chips, 0 with an `intervals` block.
+- **expect:**
+  - every pregame chip whose game has a pregame sim carries a `pregame_sim` block;
+  - every live chip with a live re-sim projection carries a `live_resim` block;
+  - settled periods equal the line score;
+  - `[game_chip_intervals] ATTACHED` on the worker's chip builds;
+  - no `ATTACH_FAILED`.
+- **Measured:**
+  - **22:44:57Z, serve-time live attach only:** live nba 1/1, ncaab 14/16, wncaab 1/3. 7 settled periods checked, 0 mismatched.
+  - **Worker:** `22:45:20.651Z [game_chip_intervals] ATTACHED date=2026-11-07 nba:live_resim=1 nba:pregame_sim=6`, then `date=2026-11-08 nba:pregame_sim=7`. No `ATTACH_FAILED`.
+  - **22:45:55Z served chips:**
+    - pregame: nba 6/6, ncaab 20/20, wncaab 8/8;
+    - live: nba 1/1, ncaab 14/16, wncaab 1/3;
+    - finals: none, by design;
+    - 7 settled periods checked, 0 mismatched.
+  - **The 4 live chips with no block** each have no live projection lane: men's `401925106` and `401922291` `budget_exhausted` (re-sim tick budget); women's `401916151` and `401919875` `no_margin_anchor`.
+  - **Served page (browser pane, `/intelligence`, ~22:46Z):** 210 rail cards, 50 with the PROJ box (34 pregame).
+    - Live SDSU @ COLO: "PROJ 2H* T ... Proj final SDSU −14.4 · O/U 134.9".
+    - Pregame HAMP @ GW: halves, "Proj GW −23.9 · O/U 145.6".
+    - Pregame DEN @ WEB: quarters, "Proj WEB −5.4 · O/U 129.0".
+- **verify: MET.** Every pregame chip with a sim, and every live chip with a re-sim projection, carries its block; settled periods equal the line score (7/7).
+- **Caution (lane `basketball-interval-backtest`, findings 2026-11-07):** the replayed men's college pregame first-half total runs 8.4 points high, and NBA's live re-sim beats the pregame line prorated over the time left in no segment. The rail shows the sims' numbers as they are; Phase 2 is where they improve.
+- **Revert:** `git revert b13a1202a`, then ff + refresh-worker TERM + `reload-web`. The block degrades to nothing if its sources are absent.
