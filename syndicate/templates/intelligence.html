@@ -2600,6 +2600,23 @@
     if (awayKey && homeKey) {
       const canonical = gameChipsByCanonical.get(`${sport}|${awayKey} @ ${homeKey}`);
       if (canonical) return canonical;
+      // THE SAME GAME, NAMED THE OTHER WAY ROUND (lane wncaab-module,
+      // 2026-11-07). OddsAPI changed the neutral-site Nebraska / Providence
+      // event's home/away mid-day; the board kept pregame rows from both
+      // pulls, so one game reached the rail as two groups, and the one in the
+      // feed's OLD orientation found no chip ("Nebraska Cornhuskers @
+      // Providence Friars" as a chip-less card beside the real one). Each row
+      // is consistent with itself -- its `selection` names its own home/away
+      // -- so joining the flipped pair to the chip moves no price between
+      // teams. Only after the exact pair missed, and only on the same Central
+      // day as the chip: an NHL home-and-home is the same pair reversed on
+      // the NEXT day, and a start missing on either side refuses.
+      const flipped = gameChipsByCanonical.get(`${sport}|${homeKey} @ ${awayKey}`);
+      if (flipped) {
+        const chipDay = centralDateOfMs(chipStartMs(flipped.start_time_utc));
+        const groupDay = centralDateOfMs(chipStartMs(group.commenceTime));
+        if (chipDay && groupDay && chipDay === groupDay) return flipped;
+      }
     }
     // Last resort only. See the normalized index in `loadGameChips` for why it
     // exists and why it is consulted after both exact lookups rather than
