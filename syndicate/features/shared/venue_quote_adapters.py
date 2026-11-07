@@ -498,6 +498,33 @@ def _kalshi_leg_probability(row: Mapping[str, Any], leg: str) -> float | None:
 _KALSHI_FANIN_VENUE_NAMES_ENABLED = True
 
 
+# A TICKER WRITTEN IN THE OTHER CLUB ORDER (lane `kalshi-fanin-reversed-orientation`,
+# 2026-11-07).
+#
+# `kalshi_catalogue._candidate_blobs` builds `AWAY+HOME` and nothing else for every
+# sport but soccer, so a ticker that lists the clubs the other way round matches no
+# game. Kalshi writes college games away-first (`CINHOU` = Cincinnati @ Houston), but
+# a NEUTRAL-SITE game has no real home, and the venue and our odds feed can each pick
+# a different "home". Measured on the fleet 2026-11-07 20:14Z, ncaab: `NEBPROV`
+# (Kalshi: Nebraska first) against our Providence @ Nebraska was `no_match`, and `ok`
+# onto that one event with home/away swapped. `WICHUSC` (USC @ Wichita St) and `KUUK`
+# (Kentucky @ Kansas, the Champions Classic) are the same shape. Their totals named
+# no game, so `#764` refused them. No other sport flipped that day.
+#
+# So when the straight match is `no_match` (never after `ambiguous`, a refusal), the
+# fan-in tries once more with home/away swapped, over ONLY the games played on the
+# ticker's own date (`start_dates`, from `venue_quote_fanin._distinct_games`). The
+# other order of a club pair on the SAME date is the same game: a return leg is
+# another day. Every other guard still runs, because the retry IS `_resolve_event`.
+# `game_token` is order-independent, so the name it produces is the row's.
+#
+# THE ORDER PATH IS UNTOUCHED. There, spreads and moneylines are placed by role and
+# the order matters; here only totals carry the game in their key (spreads are
+# refused above, h2h keys by club). Soccer already tries both orders, so it is
+# skipped. A switch so a test can prove the path is reachable (off != on).
+_KALSHI_FANIN_REVERSED_ORDER_ENABLED = True
+
+
 def _kalshi_naming_context(rows: Any) -> "dict | None":
     """Kalshi's code -> name maps for ONE adapter pass, built from the market list
     already in hand, exactly as `kalshi_board_join` builds them for the order path.
@@ -518,6 +545,11 @@ def _kalshi_naming_context(rows: Any) -> "dict | None":
             "event_names": build_event_club_code_names(market_rows),
             # `_resolve_event`'s own memo: every line of one game shares a blob.
             "memo": {},
+            # The reversed-order retry's memos, one per ticker date: its game list
+            # depends on that date and `_resolve_event`'s memo key does not.
+            "memo_reversed": {},
+            # Game-line markets named only by the reversed-order retry.
+            "reversed_named": 0,
         }
     except Exception:  # noqa: BLE001
         return None
@@ -545,7 +577,12 @@ def _kalshi_game_token_by_venue_names(
         )
     except Exception:  # noqa: BLE001
         return None
-    if not isinstance(result, Mapping) or str(result.get("status") or "") != "ok":
+    if not isinstance(result, Mapping):
+        return None
+    if str(result.get("status") or "") == "no_match":
+        # ONLY `no_match`: an `ambiguous` answer is a refusal and stays one.
+        return _kalshi_reversed_order_token(market, sport, games, naming)
+    if str(result.get("status") or "") != "ok":
         return None
     if str(result.get("sport") or "").strip().lower() != str(sport or "").strip().lower():
         return None
@@ -555,6 +592,67 @@ def _kalshi_game_token_by_venue_names(
     return game_token(sport, result.get("home_team"), result.get("away_team")) or event_game_token(
         result.get("event_id")
     )
+
+
+def _kalshi_reversed_order_token(
+    market: Mapping[str, Any], sport: Any, games: Any, naming: Mapping[str, Any]
+) -> str | None:
+    """The game a ticker names when it lists the clubs in the OTHER order, or None.
+
+    See `_KALSHI_FANIN_REVERSED_ORDER_ENABLED`. Only games whose `start_dates` hold
+    the ticker's own date are tried, so a game list without dates (the old shape)
+    never reaches a match here. None on any doubt, exactly like the straight match."""
+    if not _KALSHI_FANIN_REVERSED_ORDER_ENABLED or not isinstance(naming, dict):
+        return None
+    sport_slug = str(sport or "").strip().lower()
+    try:
+        from syndicate.features.shared.kalshi_board_join import _resolve_event
+        from syndicate.features.shared.kalshi_catalogue import (
+            _HOME_FIRST_BLOB_SPORTS,
+            game_date_from_ticker,
+        )
+    except Exception:  # noqa: BLE001
+        return None
+    if sport_slug in _HOME_FIRST_BLOB_SPORTS:
+        return None  # both orders were already tried
+    ticker_date = game_date_from_ticker(market.get("ticker"))
+    if not ticker_date:
+        return None
+    same_day = [
+        dict(game)
+        for game in games
+        if isinstance(game, Mapping)
+        and game.get("home_team")
+        and game.get("away_team")
+        and ticker_date in (game.get("start_dates") or ())
+    ]
+    if not same_day:
+        return None
+    swapped = [{**game, "home_team": game["away_team"], "away_team": game["home_team"]} for game in same_day]
+    memo = naming.setdefault("memo_reversed", {}).setdefault(ticker_date, {})
+    try:
+        result = _resolve_event(
+            market,
+            (),
+            naming.get("code_names"),
+            games=swapped,
+            memo=memo,
+            collided=naming.get("collided"),
+            event_names=naming.get("event_names"),
+        )
+    except Exception:  # noqa: BLE001
+        return None
+    if not isinstance(result, Mapping) or str(result.get("status") or "") != "ok":
+        return None
+    if str(result.get("sport") or "").strip().lower() != sport_slug:
+        return None
+    event_id = str(result.get("event_id") or "")
+    original = next((game for game in same_day if str(game.get("event_id") or "") == event_id), None)
+    if original is None:
+        return None
+    naming["reversed_named"] = int(naming.get("reversed_named") or 0) + 1
+    # Named from OUR game, in OUR order -- the row's name, whatever order the ticker used.
+    return game_token(sport, original.get("home_team"), original.get("away_team")) or event_game_token(event_id)
 
 
 def _kalshi_game_token(
@@ -973,7 +1071,13 @@ def kalshi_outcome(
         # question is settled, and it must stay visible rather than vanish the
         # moment anything else succeeds.
         reason=_kalshi_ok_reason(
-            spread_rows, h2h_keyed, h2h_unresolved, no_price, prop_unnamed, game_unnamed=game_unnamed
+            spread_rows,
+            h2h_keyed,
+            h2h_unresolved,
+            no_price,
+            prop_unnamed,
+            game_unnamed=game_unnamed,
+            game_reversed=int((naming or {}).get("reversed_named") or 0),
         )
         or (None if quotes else "no_kalshi_market_classified_to_this_sport"),
         quotes=quotes,
@@ -989,6 +1093,7 @@ def _kalshi_ok_reason(
     prop_unnamed: int = 0,
     *,
     game_unnamed: int = 0,
+    game_reversed: int = 0,
 ) -> str | None:
     """What this adapter could not key, by name and count.
 
@@ -1010,6 +1115,10 @@ def _kalshi_ok_reason(
         # Game-line quotes naming no game we hold. On a totals key `#764`
         # refuses every one of them, so this is that refusal's upper bound.
         parts.append(f"game_line_unnamed:{game_unnamed}")
+    if game_reversed:
+        # Game-line markets named only because the ticker lists the clubs in the
+        # other order (`_KALSHI_FANIN_REVERSED_ORDER_ENABLED`): neutral sites.
+        parts.append(f"game_line_reversed_order:{game_reversed}")
     if no_price:
         # THE COUNTER THAT WOULD HAVE CAUGHT THIS. Every Kalshi quote was
         # published priceless for as long as the adapter read `yes_bid`, and

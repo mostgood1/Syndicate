@@ -1101,7 +1101,18 @@ def _distinct_games(
         home, away = row.get("home_team"), row.get("away_team")
         if not (event_id and home and away) or event_id in seen:
             continue
-        seen[event_id] = {"event_id": event_id, "home_team": home, "away_team": away}
+        seen[event_id] = {
+            "event_id": event_id,
+            "home_team": home,
+            "away_team": away,
+            # The game's local calendar dates (`_row_game_dates`, the same predicate
+            # `_quote_is_for_another_date` uses). Read ONLY by the Kalshi adapter's
+            # reversed-order retry, which tries a game only on the ticker's own date
+            # (`_KALSHI_FANIN_REVERSED_ORDER_ENABLED`). Deliberately NOT
+            # `commence_time`: `match_event_blob` reads that key to split doubleheaders
+            # and ambiguous pairs, and the straight match must stay byte-identical.
+            "start_dates": tuple(sorted(_row_game_dates(row))),
+        }
     return list(seen.values())
 
 
