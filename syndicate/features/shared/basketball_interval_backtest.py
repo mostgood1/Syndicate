@@ -61,7 +61,8 @@ from syndicate.features.shared import basketball_pbp as pbp
 
 STEP_SECONDS = 30
 # The four snapshot points the old NCAAB app's bar is quoted at: minute 10 / 20 / 30 / 38 of a 40-minute game.
-# NBA (48 min) and WNBA / WNCAAB (40 min) use the same FRACTIONS of regulation.
+# NBA (48 min) and WNBA / WNCAAB (40 min) use the same FRACTIONS of regulation. `checkpoint_times` adds the tip
+# ('0m'): the pregame number, where the old NBA app's quarter bar (MAE 8.53) is quoted.
 CHECKPOINT_FRACTIONS = (0.25, 0.50, 0.75, 0.95)
 # The old app's 2-minute elapsed bins are 5% of a 40-minute game; every league is binned at 5% of regulation.
 BUCKET_FRACTION = 0.05
@@ -188,9 +189,10 @@ def snapshot_times(league: str, step: int = STEP_SECONDS) -> list[float]:
 
 
 def checkpoint_times(league: str) -> dict[str, float]:
-    """{label: regulation seconds} for the bar's four points. Labels are elapsed minutes ('10m', '45.6m')."""
+    """{label: regulation seconds}: the TIP ('0m', the pregame number -- the old NBA app's pregame quarter bar is
+    quoted there) and the bar's four in-game points. Labels are elapsed minutes ('10m', '45.6m')."""
     reg = float(pbp.rules_for(league).regulation_seconds())
-    out: dict[str, float] = {}
+    out: dict[str, float] = {"0m": 0.0}
     for f in CHECKPOINT_FRACTIONS:
         sec = round(f * reg, 1)
         out[f"{sec / 60.0:g}m"] = sec
@@ -632,6 +634,7 @@ class Resim(Projector):
         if isinstance(tip, Refusal):
             return tip
         prep["tip"] = {"total_mean": tip["total_mean"], "home_margin_mean": tip["home_margin_mean"]}
+        prep["tip_result"] = tip  # the same seed as a t=0 projection: reused there, not re-run
         return prep
 
     def _run(self, game, prep, gs, *, seed_key: int):
@@ -658,7 +661,10 @@ class Resim(Projector):
 
             gs, rep = lr.map_state_names(gs, prepared["inputs"]["home_players"], prepared["inputs"]["away_players"])
             report.update(rep)
-        res = self._run(game, prepared, gs, seed_key=int(round(state.elapsed)))
+        if state.elapsed <= 0 and "tip_result" in prepared:
+            res = prepared["tip_result"]
+        else:
+            res = self._run(game, prepared, gs, seed_key=int(round(state.elapsed)))
         if isinstance(res, Refusal):
             return res
         out = {self.name: _segment_means(res, game, state)}

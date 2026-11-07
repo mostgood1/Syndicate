@@ -132,9 +132,9 @@ def test_state_at_rebuilds_score_period_and_boundary():
 
 
 def test_checkpoints_are_the_bar_minutes_and_its_fractions():
-    assert bib.checkpoint_times("ncaab") == {"10m": 600.0, "20m": 1200.0, "30m": 1800.0, "38m": 2280.0}
-    assert bib.checkpoint_times("wnba") == {"10m": 600.0, "20m": 1200.0, "30m": 1800.0, "38m": 2280.0}
-    assert bib.checkpoint_times("nba") == {"12m": 720.0, "24m": 1440.0, "36m": 2160.0, "45.6m": 2736.0}
+    assert bib.checkpoint_times("ncaab") == {"0m": 0.0, "10m": 600.0, "20m": 1200.0, "30m": 1800.0, "38m": 2280.0}
+    assert bib.checkpoint_times("wnba") == {"0m": 0.0, "10m": 600.0, "20m": 1200.0, "30m": 1800.0, "38m": 2280.0}
+    assert bib.checkpoint_times("nba") == {"0m": 0.0, "12m": 720.0, "24m": 1440.0, "36m": 2160.0, "45.6m": 2736.0}
     # The old NCAAB app's 2-minute bins: elapsed 10:00-11:59 is one bin.
     assert bib.bucket_of("ncaab", 600) == bib.bucket_of("ncaab", 690) == 0.25
     assert bib.bucket_of("ncaab", 720) == 0.3
@@ -354,8 +354,8 @@ def test_expensive_projectors_run_only_at_the_sim_times(monkeypatch):
     g = make_game("ncaab", pregame=None, extra=_college_extra())
     res = bib.replay_game(g, [bib.NaivePace(), bib.Resim(sims=100, simulate=_stub_simulate(calls))])
     resim_times = sorted({r["elapsed"] for r in res["rows"] if r["projector"] == "resim"})
-    assert resim_times == [600.0, 1200.0, 1800.0, 2280.0]
-    assert len(calls) == 4 * 100  # no tip sim without a close to anchor to
+    assert resim_times == [0.0, 600.0, 1200.0, 1800.0, 2280.0]  # the tip (pregame) + the four bar points
+    assert len(calls) == 5 * 100  # no separate anchor tip sim without a close to anchor to
     naive_times = {r["elapsed"] for r in res["rows"] if r["projector"] == "naive_pace"}
     assert len(naive_times) == 2400 // 30 - 1
 
@@ -467,3 +467,14 @@ def test_script_runs_end_to_end_on_a_written_substrate(tmp_path):
             "box_rows": [], "pregame": {}, "extra": {}}
     rebuilt = s.build_game(task)
     assert rebuilt.events == game.events and bib.segment_actuals(rebuilt) == bib.segment_actuals(game)
+
+
+def test_tip_projection_reuses_the_anchor_tip_sim(monkeypatch):
+    _fake_college_inputs(monkeypatch)
+    calls = []
+    g = make_game("ncaab", pregame=(140.0, 10.0), extra=_college_extra())
+    res = bib.replay_game(g, [bib.Resim(sims=100, simulate=_stub_simulate(calls))])
+    assert len(calls) == 5 * 100  # prepare's tip + 4 in-game points; t=0 reused, not re-simmed
+    tip = [r for r in res["rows"] if r["projector"] == "resim" and r["checkpoint"] == "0m" and r["segment"] == "full"]
+    assert tip and tip[0]["total"] == 55.0 and tip[0]["margin"] == 5.0
+    assert not [r for r in res["rows"] if r["projector"] == "naive_pace"]  # not registered here
