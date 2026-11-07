@@ -813,6 +813,14 @@ ba_lens_state_check.py`.
 - Files: none (ledger-only)
 - Verdict: MET. owner_liveness.py --idle-min 240 at 20:06Z (2:06 PM CST) returned SAFE for 1 of 12 CLOSED slugs; dry run + invariants matched baseline. Moved: `repo-out-of-onedrive-plan`. Table and WAIT reasons in `log/2026-11-07.md` 20:09Z.
 
+### kalshi-fanin-reversed-orientation — OPEN — opened 2026-11-07 — session e32fef1a-01e8-4afe-a284-01acd3728545
+- Goal: A Kalshi game-line quote whose ticker lists a game's clubs in the reverse order of our board (the neutral-site NEBPROV totals vs our Providence @ Nebraska) names that game in the venue fan-in when the ticker's own date is the game's date, so it prices its own totals row; a reversed match on any other date, or onto two games, stays unnamed and refused; every changed side on a fleet-data replay is read by eye
+- Files: syndicate/features/shared/venue_quote_adapters.py, tests/test_kalshi_fanin_reversed_orientation.py (NEW)
+- Hypothesis: kalshi_catalogue._candidate_blobs builds only (away, home) for every sport but soccer, so a ticker written in the other order returns no_match from match_event_blob and the fan-in quote names no game; #764 then refuses it (KXNCAAMBTOTAL-26NOV07NEBPROV-183/184 at 19:21Z)
+- Falsification test: on fleet data, NEBPROV against the board's games returns something other than no_match (ambiguous, a collision refusal, an unresolved club), or still no_match with every game's home/away swapped
+- Verification: reproduce on fleet data first (status original vs swapped); off != on unit tests incl. a wrong-date reversed ticker staying unnamed; same-clock replay old vs patched adapter on fleet data, every changed side printed beside its row and read by eye
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
