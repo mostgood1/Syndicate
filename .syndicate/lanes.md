@@ -774,10 +774,11 @@ death, never life — do not invert it.
 - Verification: off != on reachability test; venue_prov.py replay with this worktree's code against fleet data: unnamed_quote totals/spreads sides 26 -> 0, same_game and h2h counts unchanged
 - Blocked by: none
 
-### closed-lane-archive-20261106-2245 — CLOSED 2026-11-06 (GOAL MET: 1 block archived) — opened 2026-11-06 — session 3f031ca8-2dfc-401b-8563-f09846a3e74b
+### closed-lane-archive-20261107-0250 — CLOSED 2026-11-07 (GOAL MET: 1 block archived) — opened 2026-11-07 — session 2dc4077e-c096-4d42-ad11-49c63e5980af
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
-- Verdict: GOAL MET — owner_liveness.py --idle-min 240 read SAFE for 1 of 9 CLOSED blocks; moved `closed-lane-archive-20261106-1840`. Table in `.syndicate/log/2026-11-06.md`.
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 returned 1 SAFE slug; it was moved, invariants unchanged vs baseline. Table in log/2026-11-07.md.
+- Moved: closed-lane-archive-20261106-2245
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -959,6 +960,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261106-0147` — CLOSED 2026-11-06 (GOAL MET: 1 block archived) — opened 2026-11-06 — session 46f870eb-96a5-4df8-8312-bde2d0763263
 - `closed-lane-archive-20261106-1040` — CLOSED 2026-11-06 (GOAL MET: 1 block archived) — opened 2026-11-06 — session 5f92da50-c5b5-4bc3-a8f6-20197eb8d085
 - `closed-lane-archive-20261106-1840` — CLOSED 2026-11-06 (GOAL MET: 1 block archived) — opened 2026-11-06 — session 9aa4f12c-8cf6-4463-8aa8-09e62b5a4c27
+- `closed-lane-archive-20261106-2245` — CLOSED 2026-11-06 (GOAL MET: 1 block archived) — opened 2026-11-06 — session 3f031ca8-2dfc-401b-8563-f09846a3e74b
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
