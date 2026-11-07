@@ -56910,3 +56910,34 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - Hypothesis, not tested: the resolver refuses the reversed orientation.
   - Old and new code both refuse those quotes, so nothing regressed.
 - **Revert:** `_KALSHI_FANIN_VENUE_NAMES_ENABLED = False` (or revert `23780354f`) on main, then ff + refresh-worker TERM. With it off, `#764` still refuses the unnamed quotes.
+
+## 2026-11-07 19:14:18Z (1:14 PM CST) -- FLEET ff 846016a91 -> 34ac35df3 + refresh-worker TERM: college rail matching (6 odds-feed spellings; one home/away orientation per event in the book grid), lane `wncaab-module` -- **LOADED; grid VERIFIED; rail PARTLY: Nebraska/Providence still chip-less from carried board rows** (written 20:04Z, 2:04 PM CST)
+- **User, in this chat:** "Yes, roll out".
+- **Range `846016a91..34ac35df3`:** runtime `shared/book_grid.py`, `shared/ncaab_team_registry.py` (both mine). Every other commit in the range is ledger-only.
+- **Gates:**
+  - Claim: refresh-worker 18:52:38Z (`wncaab-module`).
+  - Preflight HOLD 18:53-19:09Z: board build in flight (19:08:08Z `BOARD_BUILD_TIMING`), then a refresh-worker odds job.
+  - Drain set ~19:13Z (`drain_rw.py`), inside the gap before the next build (~19:23Z).
+  - CLEAR at 19:14:08Z with 0 child processes.
+  - Deploy: `git merge --ff-only 34ac35df3` 19:14:18Z. TERM pid 573627 (no children) 19:14:18Z; respawned pid 668309 19:14:31Z, `code=34ac35df`.
+  - Cleanup: `DRAIN_CLEARED owner=wncaab-module` 19:14:45Z. The leftover drain waiter was killed so it cannot re-set the drain. Claim released 19:15:20Z.
+- **Baseline (18:54:02Z):**
+  - 11-07 grid: Nebraska/Providence 5 rows in two orientations (3 Nebraska @ Providence, 2 Providence @ Nebraska).
+  - Served board: Nebraska/Providence 10 rows (6 / 4); "Tenn-Martin Skyhawks @ IUPUI Jaguars" 17 rows, every one with `home_key` None.
+- **expect:**
+  - `ORIENTATION_NORMALISED events>=1` on every grid build;
+  - the event's grid rows in one orientation;
+  - new Tenn-Martin board rows carry `home_key` `iu indianapolis`.
+- **Measured:**
+  - **Grid, from 19:27:54Z:** `[book_grid] ORIENTATION_NORMALISED events=1 rows=79 venue_rows_dropped=21` on every grid build (12 lines to 19:57:19Z). 0 tracebacks.
+  - **Grid read 19:59Z:** 11-07 Nebraska/Providence 5 rows, all Providence @ Nebraska (was 3 / 2).
+  - **Chips (20:00Z):** `401909532` Providence @ Nebraska; `401921174` UT Martin @ IU Indianapolis.
+  - **Board build on the new code** 19:27:21-19:49:52Z. Served `ranked_all` read 20:00Z:
+    - **Tenn-Martin:** 13 rows. The 4 rows built on the new code carry `ut martin @ iu indianapolis`. The 9 others are pregame `layer2_shortlist` rows carried from before the restart, still keyed None.
+    - **Nebraska/Providence:** 11 rows, 5 Providence @ Nebraska and 6 Nebraska @ Providence. The 6 old-orientation rows are carried pregame shortlist rows at the morning's lines (totals 156.5 / 157.5, spread 2.5). No grid change reaches them, and the rail's key lookup is orientation-exact.
+- **verify:**
+  - grid MET.
+  - Tenn-Martin: expected to join, because the rail backfills the key pair from any one row of the group. Not read in the browser.
+  - Nebraska/Providence: NOT MET. Follow-up: the rail looks up the flipped pair on the same Central day.
+- **Peer restart:** refresh-worker restarted again at ~19:52:37Z (`CLAIMED_RESTART holder=kalshi-fanin-college-naming`, fleet `23780354f`, a descendant of `34ac35df3`). Web is on `23780354`.
+- **Revert:** `git revert 34ac35df3`, then ff + refresh-worker TERM.
