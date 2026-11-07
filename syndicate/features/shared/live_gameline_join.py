@@ -644,6 +644,121 @@ def quote_behind_score_verdict(quote_at: Any, score_as_of: Any, sport: Any = Non
     return None
 
 
+# A LIVE LANE OLDER THAN ITS SPORT'S CEILING IS NOT PRICED (`#762`, lane live-gameline-lane-age-gate, 2026-11-07).
+#
+# The two gates above judge the QUOTE. Nothing judged the MODEL: a re-sim lane was priced however old it was when the
+# board read it. Lane age = build time minus the lane's `liveStateAsOf`.
+#
+# MEASURED 2026-11-07 on the fleet's live-gameline ledgers, 10-21..11-07 (read-only): each record's `recorded_at` (the
+# build, stamped right after this join) minus its `live_state_as_of`. Ledger RECORDS dedupe on movement, so every
+# count below is a LOWER bound on row-builds.
+#
+#              priced records   fresh-lane max     carried lanes priced            priced over the ceiling
+#     nba         157,479         591 s            none seen                       0 at 600 s
+#     ncaab        42,336         592 s (32,602)   9,734: p50 987 s, max 5,750 s   8,096 at 600 s (19.1%), all carried
+#     wncaab        4,474         318 s (4,236)      238: p50 396 s, max 2,013 s      39 at 600 s (0.9%)
+#     ncaaf        29,142       1,143 s            none (no carry)                 0 at 1,800 s (529 at 600 s)
+#     nfl             379         786 s            none (no carry)                 0 at 1,800 s (3 at 600 s)
+#
+# College's carry (`ncaab/live_resim._carry`) has NO age bound: it keeps `liveStateAsOf` "so freshness is judged on the
+# real age", and nothing judged it. NBA's carry is bounded at 900 s by its producer (`#761`), but only when a tick
+# RUNS; a stalled live-odds-worker leaves the last snapshot in place and its lanes age without limit.
+#
+# THE STALE-MODEL SIGNATURE, same ledgers, priced rows: in college the model-minus-market gap GROWS with lane age --
+# ncaab h2h mean |edge| 9.9 pp under 120 s, 12.4 at 600-900 s, 18.3 over 1,800 s; wncaab totals/spreads 18.7 pp under
+# 120 s, 26.6 at 900-1,800 s. The market kept moving and the model did not. Football's gap is flat through 1,800 s,
+# and NBA never had a lane past 600 s to show it.
+#
+# THE CEILINGS sit just above each sport's FRESH distribution, so a normal tick is untouched and only carried or
+# stalled lanes are refused. Basketball 600 s: above every fresh lane measured, and the ceiling its quotes are held to.
+# Football 1,800 s: a stall guard above NCAAF's 1,143 s max, because its gap does not grow with lane age.
+#
+# THE EDGE IS WITHHELD, THE LIVE NUMBER IS NOT: an NBA full-game row keeps `live_display`, as a stale quote's does.
+#
+# MEASURED SPORTS ONLY. MLB, WNBA and soccer lanes reach this join with NO lane time (0 of their projected ledger
+# records carry `live_state_as_of`) and NHL writes no ledger, so a ceiling there would refuse everything or nothing on
+# a guess; they are not gated. On a gated sport an absent or unparseable lane time REFUSES (`unknown must not default
+# permissive`): 0 of 558,840 projected records in the five sports lacked one, so that branch firing is a bug report.
+#
+# WHY NCAAB'S LANES GO STALE: THE RE-SIM LOOP'S BUDGET. Each stale (> 600 s) priced NCAAB record was joined to the
+# live-odds-worker's `NCAAB_LIVE_RESIM_TICK` lines over the lane's life (tick logs retained 11-03..11-07): 3,291 of
+# 3,444 (95.6%) had EVERY tick in that time exhaust its 240 s budget, the other 153 some; none came from a stalled
+# loop or a worker restart. Those slates ran 35-40 live games against 12-20 re-sims per exhausted tick. (11-02's 4,652
+# predate the retained logs; unmeasured.) This gate keeps those lanes off the price; the loop's capacity is the cure.
+#
+# DEFAULT OFF, behind `SYNDICATE_LIVE_GAMELINE_LANE_AGE_GATE` (`lane_age_gate_mode`): absent / off = no lane gate,
+# exactly as before; `shadow` = price as before and count what it WOULD refuse (`lane_age_would_refuse`, and of those
+# the rows that were then priced, `lane_age_would_refuse_priced`), printed on LIVE_GAMELINE_JOIN; `on` = refuse.
+# Refusing ~19% of priced NCAAB rows is a pricing decision, so it is switched, not shipped live: code on main reaches
+# the fleet with any session's fast-forward.
+LANE_AGE_GATE_ENV = "SYNDICATE_LIVE_GAMELINE_LANE_AGE_GATE"
+REASON_STALE_LANE = "live_lane_older_than_pricing_ceiling"
+REASON_LANE_TIME_ABSENT = "live_lane_carries_no_state_time"
+MAX_LANE_AGE_ENV = "SYNDICATE_LIVE_GAMELINE_MAX_LANE_AGE_SECONDS"
+_MAX_LANE_AGE_SECONDS_BY_SPORT: dict[str, float] = {
+    "nba": 600.0,
+    "ncaab": 600.0,
+    "wncaab": 600.0,
+    "ncaaf": 1800.0,
+    "nfl": 1800.0,
+}
+
+
+def lane_age_gate_mode(env: Mapping[str, str] | None = None) -> str:
+    """`off` (absent or anything unrecognised), `shadow`, or `on` -- the repo's three-way switch spelling."""
+    raw = str((env if env is not None else os.environ).get(LANE_AGE_GATE_ENV) or "").strip().lower()
+    if raw in {"on", "1", "true", "yes"}:
+        return "on"
+    return "shadow" if raw == "shadow" else "off"
+
+
+def max_lane_age_seconds(sport: Any = None) -> float | None:
+    """The lane-age ceiling for this sport, or None when the sport is not gated.
+
+    `SYNDICATE_LIVE_GAMELINE_MAX_LANE_AGE_SECONDS` overrides every GATED sport (an incident knob, as the quote one is);
+    it never gates a sport the table leaves out, whose lanes carry no time to judge. A non-positive or unparseable
+    value falls back to the table rather than turning the gate off."""
+    key = str(sport or "").strip().lower()
+    ceiling = _MAX_LANE_AGE_SECONDS_BY_SPORT.get(key)
+    if ceiling is None:
+        return None
+    raw = str(os.environ.get(MAX_LANE_AGE_ENV) or "").strip()
+    if raw:
+        try:
+            value = float(raw)
+        except ValueError:
+            value = 0.0
+        if value > 0.0 and math.isfinite(value):
+            return value
+    return ceiling
+
+
+def lane_age_seconds(as_of: Any, now: datetime) -> float | None:
+    """Seconds from the lane's `liveStateAsOf` to `now`; None when the time is absent or unparseable. A lane time
+    ahead of `now` (clock skew) reads as 0: it is not stale."""
+    stamped = _utc_instant(as_of)
+    if stamped is None:
+        return None
+    current = now if now.tzinfo is not None else now.replace(tzinfo=timezone.utc)
+    return max(0.0, (current - stamped).total_seconds())
+
+
+def lane_age_verdict(as_of: Any, now: datetime, sport: Any = None) -> dict[str, Any] | None:
+    """`None` if the lane is fresh enough to price; a refusal verdict, shaped like `quote_age_verdict`'s, if it is older
+    than its sport's ceiling or carries no time. A sport absent from `_MAX_LANE_AGE_SECONDS_BY_SPORT` returns None."""
+    ceiling = max_lane_age_seconds(sport)
+    if ceiling is None:
+        return None
+    age = lane_age_seconds(as_of, now)
+    if age is None:
+        return {"priceable": False, "withheld_reason": REASON_LANE_TIME_ABSENT,
+                "model_prob": None, "market_prob": None, "edge_pp": None}
+    if age > ceiling:
+        return {"priceable": False, "withheld_reason": REASON_STALE_LANE,
+                "model_prob": None, "market_prob": None, "edge_pp": None}
+    return None
+
+
 _TOTALS_MARKETS = frozenset({"totals", "total", "totals_alt", "alternate_totals"})
 _SPREAD_MARKETS = frozenset({"spreads", "run_line", "ats", "spreads_alt", "alternate_spreads"})
 _DIST_MARKETS = _TOTALS_MARKETS | _SPREAD_MARKETS
@@ -1704,8 +1819,11 @@ def attach_live_gamelines(
     segment_indexes: Mapping[str, Mapping[tuple[str, str], Mapping[str, Any]]] | None = None,
     segment_pricing_enabled: bool = False,
     segment_display_only: bool = False,
+    now: datetime | None = None,
 ) -> dict[str, Any]:
     """Overlay the live game-line projection on live moneyline rows.
+
+    `now` is the build time each lane's age is judged against (`lane_age_verdict`); absent, the wall clock.
 
     `segment_indexes` (college halves and quarters) maps a segment to ITS OWN index, built with
     `build_live_gameline_index(..., segment=...)`; a row of that segment is priced from it, and only
@@ -1728,6 +1846,16 @@ def attach_live_gamelines(
     """
     coverage = new_coverage()
     coverage["index_size"] = len(index)
+    # The oldest lane any row reached the staleness gate with, every sport whose lanes carry a time; None = none did.
+    # Printed on LIVE_GAMELINE_JOIN: once a stale lane is refused it leaves the ledger, so this is what still shows it.
+    coverage["lane_age_max_s"] = None
+    build_now = now if now is not None else datetime.now(timezone.utc)
+    # The lane-age gate's switch (`LANE_AGE_GATE_ENV`, default off) and, in shadow, what it would have refused.
+    lane_gate = lane_age_gate_mode()
+    coverage["lane_age_gate"] = lane_gate
+    coverage["lane_age_would_refuse"] = {}
+    coverage["lane_age_would_refuse_priced"] = {}
+    lane_shadow: list[tuple[Mapping[str, Any], str]] = []
     if not isinstance(grid, (list, tuple)):
         return coverage
 
@@ -1930,8 +2058,21 @@ def attach_live_gamelines(
         # to prevent.
         # And, for a sport that measured it, a quote taken before the score the re-sim used (college,
         # `REASON_QUOTE_BEHIND_SCORE`): the same choke point, so all three pricing paths below are covered.
+        # And the LANE (`REASON_STALE_LANE`), when its switch is on: a model state older than its sport's ceiling,
+        # judged LAST so the two quote reasons count exactly what they did before and this reason counts only the rows
+        # it newly refuses. Its sport falls back to the caller's, never to a default: the fallback can only gate more.
+        lane_age = lane_age_seconds(hit.get("as_of"), build_now)
+        if lane_age is not None:
+            seen = coverage.get("lane_age_max_s")
+            coverage["lane_age_max_s"] = round(lane_age if seen is None else max(seen, lane_age), 1)
+        lane_verdict = (lane_age_verdict(hit.get("as_of"), build_now, sport=hit.get("sport") or sport)
+                        if lane_gate != "off" else None)
         stale = (quote_age_verdict(row.get("age_seconds"), sport=hit.get("sport"))
-                 or quote_behind_score_verdict(row.get("updated_at"), hit.get("as_of"), sport=hit.get("sport")))
+                 or quote_behind_score_verdict(row.get("updated_at"), hit.get("as_of"), sport=hit.get("sport"))
+                 or (lane_verdict if lane_gate == "on" else None))
+        if stale is None and lane_verdict is not None:
+            # SHADOW: priced exactly as before; tallied after the loop, once the row's own verdict is known.
+            lane_shadow.append((row, str(lane_verdict.get("withheld_reason") or "unspecified")))
         if stale is not None:
             record(coverage, stale, projected=False)
             # The QUOTE is dead, not the game: the live number is about the game, so it is shown and nothing is
@@ -2040,6 +2181,14 @@ def attach_live_gamelines(
                 row[LIVE_DISPLAY_KEY] = block
                 _count_display(coverage)
 
+    # THE SHADOW TALLY: rows the lane gate would have refused, and how many of them were then PRICED -- the count
+    # that becomes refused edges when the switch goes on.
+    would, would_priced = coverage["lane_age_would_refuse"], coverage["lane_age_would_refuse_priced"]
+    for shadow_row, reason in lane_shadow:
+        would[reason] = int(would.get(reason, 0)) + 1
+        verdict_block = shadow_row.get("live_gameline")
+        if isinstance(verdict_block, Mapping) and verdict_block.get("priceable"):
+            would_priced[reason] = int(would_priced.get(reason, 0)) + 1
     return coverage
 
 

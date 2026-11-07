@@ -1638,6 +1638,12 @@ def build_layer2_shortlist(
                         f"withheld={gl_stats.get('rows_live_gameline_withheld')} "
                         # Display-only live numbers on rows it would not price (`#762`); 0 means none.
                         f"display={gl_stats.get('rows_live_display') or 0} "
+                        # The `#762` lane-age gate: its switch, the oldest live lane this build judged (s; None = no
+                        # lane time), and in shadow what it would refuse (rows / of those priced), by reason.
+                        f"lane_age_gate={gl_stats.get('lane_age_gate')} "
+                        f"lane_age_max={gl_stats.get('lane_age_max_s')} "
+                        f"lane_age_would_refuse={gl_stats.get('lane_age_would_refuse')} "
+                        f"lane_age_would_refuse_priced={gl_stats.get('lane_age_would_refuse_priced')} "
                         f"why={gl_stats.get('withheld_by_reason')} "                        # WHY AN EMPTY INDEX IS EMPTY. `index=0` reads as "no
                         # producer wired" and that reading was WRONG for WNBA on
                         # 2026-08-25: the lens builds every 60s and its lane was
