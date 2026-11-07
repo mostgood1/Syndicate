@@ -177,6 +177,54 @@ def test_workers_env_parses_to_zero_unless_valid():
     assert lr._college_pool(0) is None
 
 
+def test_the_loop_defaults_to_two_workers_and_hands_them_to_the_tick(monkeypatch):
+    """off != on for the LOOP's default (user 2026-11-07 "Yes, load workers=2"): absent = 2 for the loop only; a
+    direct call still runs in its own thread; "0" switches the loop back."""
+    assert lr.loop_resim_workers({}) == 2 and lr.resim_workers({}) == 0
+    assert lr.loop_resim_workers({lr.WORKERS_ENV: "0"}) == 0
+    assert lr.loop_resim_workers({lr.WORKERS_ENV: "3"}) == 3
+    assert lr.loop_resim_workers({lr.WORKERS_ENV: "two"}) == 0
+    monkeypatch.delenv(lr.WORKERS_ENV, raising=False)
+    seen = []
+
+    def tick(**kw):
+        seen.append(kw)
+        lr._LOOP_STOP.set()
+
+    monkeypatch.setattr(lr, "run_live_resim_tick", tick)
+    lr._LOOP_STOP.clear()
+    try:
+        lr._loop("wncaab")
+    finally:
+        lr._LOOP_STOP.clear()
+    assert seen == [{"league": "wncaab", "workers": 2}]
+
+
+def test_workers_reach_the_pool_through_the_tick(slate, monkeypatch):
+    """The hop the loop uses: run_live_resim_tick(workers=2) -> build_live_lens_snapshot -> _college_pool(2)."""
+    asked = []
+    fake = None
+
+    def college_pool(n):
+        nonlocal fake
+        asked.append(n)
+        fake = fake or FakePool(workers=n)
+        return fake if n > 0 else None
+
+    monkeypatch.setattr(lr, "_college_pool", college_pool)
+    on = slate["run"](2, workers=2)
+    off = slate["run"](2, workers=0)
+    assert asked == [2, 0]
+    assert on["resimTiming"]["workers"] == 2 and on["resimTiming"]["worker_pids"] == [4242]
+    assert off["resimTiming"]["workers"] == 0 and off["resimTiming"]["worker_pids"] == []
+    seen = {}
+    monkeypatch.setattr(lr, "build_live_lens_snapshot", lambda date_str, **kw: seen.update(kw) or {
+        "counts": {}, "games": [], "refusalsByReason": {}})
+    monkeypatch.setattr("syndicate.features.shared.refresh_state_store.write_json_file", lambda *a, **k: None)
+    lr.run_live_resim_tick("2026-11-07", workers=2)
+    assert seen["workers"] == 2
+
+
 class FakePool:
     """`ResimWorkerPool`'s surface over threads, running the REAL job function (`pool_resim_job`)."""
 

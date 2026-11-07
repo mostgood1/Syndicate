@@ -60,7 +60,8 @@ A game costs about 20 CPU-s at 200 sims, so at an 18% share it costs about 110 s
 re-sim is x2.17 slower as one of two threads and x0.92 as one of two processes
 (`scripts/ncaab_resim_contention_probe.py`).
 
-  1. RE-SIM WORKERS (`SYNDICATE_COLLEGE_LIVE_RESIM_WORKERS`, default 0 = this thread, as before). With N > 0 each
+  1. RE-SIM WORKERS (`SYNDICATE_COLLEGE_LIVE_RESIM_WORKERS`; the LOOP defaults to 2, user 2026-11-07 "Yes, load
+     workers=2"; a direct `build_live_lens_snapshot` call defaults to 0 = the calling thread). With N > 0 each
      game's draws run in one of N child processes (`shared/live_resim_workers.py`), shared by the men's and women's
      threads, while this thread fetches, resumes and anchors the next games. Same inputs, same seed, same refusal
      on the deadline. A child that fails names it (`worker_errors`) and the rest of the tick runs here.
@@ -1104,8 +1105,11 @@ def _carried_number_age(game: Mapping[str, Any], now: datetime) -> tuple[bool, O
 
 # ------------------------------------------------------------------------------------------- re-sim workers
 WORKERS_ENV = "SYNDICATE_COLLEGE_LIVE_RESIM_WORKERS"
-# OFF until the user's deploy decision: 0 = the draws run in the league's own thread, exactly as before.
+# DIRECT callers (tests, backtests, scripts calling `build_live_lens_snapshot`): 0 = the draws run in the calling
+# thread, exactly as before. THE LOOP (the live-odds-worker, the only place SYNDICATE_NCAAB_LIVE_RESIM switches it on)
+# defaults to LOOP_DEFAULT_WORKERS instead -- user 2026-11-07 "Yes, load workers=2". `..._WORKERS=0` turns it off.
 DEFAULT_WORKERS = 0
+LOOP_DEFAULT_WORKERS = 2
 MAX_WORKERS = 6
 # A worker checks the deadline before every draw, so a job still running at the deadline returns within one draw.
 WORKER_GRACE_SECONDS = 5.0
@@ -1522,10 +1526,17 @@ def run_live_resim_tick(date_str: Optional[str] = None, *, league: str = LEAGUE,
     return status
 
 
+def loop_resim_workers(env: Optional[Mapping[str, str]] = None) -> int:
+    """The loop's worker count: the env when set (`resim_workers`' parse, so "0" or a bad value = the thread),
+    LOOP_DEFAULT_WORKERS when absent."""
+    source = env if env is not None else os.environ
+    return resim_workers(source) if str(source.get(WORKERS_ENV, "") or "").strip() else LOOP_DEFAULT_WORKERS
+
+
 def _loop(league: str = LEAGUE) -> None:
     while not _LOOP_STOP.is_set():
         try:
-            run_live_resim_tick(league=league)
+            run_live_resim_tick(league=league, workers=loop_resim_workers())
         except Exception as exc:  # noqa: BLE001
             print(f"{league.upper()}_LIVE_RESIM_TICK_ERROR {type(exc).__name__}: {str(exc)[:300]}", flush=True)
         _LOOP_STOP.wait(_interval_seconds(league=league))
@@ -1542,7 +1553,8 @@ def _start_loop(league: str) -> bool:
         thread = threading.Thread(target=_loop, args=(league,), name=f"syndicate-{league}-live-resim", daemon=True)
         _LOOP_THREADS[league] = thread
         thread.start()
-        print(f"{league.upper()}_LIVE_RESIM_LOOP_STARTED interval_s={_interval_seconds(league=league)}", flush=True)
+        print(f"{league.upper()}_LIVE_RESIM_LOOP_STARTED interval_s={_interval_seconds(league=league)} "
+              f"workers={loop_resim_workers()}", flush=True)
         return True
 
 

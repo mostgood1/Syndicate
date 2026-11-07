@@ -81,8 +81,9 @@ board: board_enrichment._LIVE_GAMELINE_SPORTS (:2424) + _LIVE_GAMELINE_SNAPSHOT_
 
 ```
 build_live_lens_snapshot           per game, IN THE THREAD: fetch_summary -> resume -> inputs -> anchor -> map names
-  -> SYNDICATE_COLLEGE_LIVE_RESIM_WORKERS = 0 (default)   resim_live_game here, as before
+  -> SYNDICATE_COLLEGE_LIVE_RESIM_WORKERS = 0            resim_live_game here, as before (a direct call's default)
   -> SYNDICATE_COLLEGE_LIVE_RESIM_WORKERS = N (1..6)      _college_pool(N), ONE pool for both leagues' threads
+       (_loop passes loop_resim_workers(): absent = 2, user 2026-11-07 "Yes, load workers=2")
        -> shared/live_resim_workers.ResimWorkerPool       N `python -m` children, nice 5, stdin = lifeline
             -> ncaab/live_resim.pool_resim_job            resim_live_game on the WALL clock (deadline converted)
   -> carry_or_expire                                      SYNDICATE_COLLEGE_LIVE_RESIM_CARRY_BOUND off|shadow|on
