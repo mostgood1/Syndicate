@@ -686,11 +686,13 @@ def quote_behind_score_verdict(quote_at: Any, score_as_of: Any, sport: Any = Non
 # loop or a worker restart. Those slates ran 35-40 live games against 12-20 re-sims per exhausted tick. (11-02's 4,652
 # predate the retained logs; unmeasured.) This gate keeps those lanes off the price; the loop's capacity is the cure.
 #
-# DEFAULT OFF, behind `SYNDICATE_LIVE_GAMELINE_LANE_AGE_GATE` (`lane_age_gate_mode`): absent / off = no lane gate,
-# exactly as before; `shadow` = price as before and count what it WOULD refuse (`lane_age_would_refuse`, and of those
-# the rows that were then priced, `lane_age_would_refuse_priced`), printed on LIVE_GAMELINE_JOIN; `on` = refuse.
-# Refusing ~19% of priced NCAAB rows is a pricing decision, so it is switched, not shipped live: code on main reaches
-# the fleet with any session's fast-forward.
+# DEFAULT SHADOW, behind `SYNDICATE_LIVE_GAMELINE_LANE_AGE_GATE` (`lane_age_gate_mode`): `shadow` (absent, or anything
+# unrecognised) = price exactly as before and count what it WOULD refuse (`lane_age_would_refuse`, and of those the
+# rows that were then priced, `lane_age_would_refuse_priced`), printed on LIVE_GAMELINE_JOIN; `off` = not even counted;
+# `on` = refuse. Refusing ~19% of priced NCAAB rows is a pricing decision, so ONLY an explicit `on` prices differently:
+# code on main reaches the fleet with any session's fast-forward. Shadow changes no row, which is why it can be the
+# default: the fleet builds its env once at `up`, so a respawned refresh-worker cannot pick up a new env key, and a
+# default is what a single claimed refresh-worker restart CAN load (user 2026-11-07 "Yes, shadow").
 LANE_AGE_GATE_ENV = "SYNDICATE_LIVE_GAMELINE_LANE_AGE_GATE"
 REASON_STALE_LANE = "live_lane_older_than_pricing_ceiling"
 REASON_LANE_TIME_ABSENT = "live_lane_carries_no_state_time"
@@ -705,11 +707,14 @@ _MAX_LANE_AGE_SECONDS_BY_SPORT: dict[str, float] = {
 
 
 def lane_age_gate_mode(env: Mapping[str, str] | None = None) -> str:
-    """`off` (absent or anything unrecognised), `shadow`, or `on` -- the repo's three-way switch spelling."""
+    """`on`, `off`, or `shadow` (absent or anything unrecognised). A typo can never turn pricing changes on, and
+    never silently drops the instrument either."""
     raw = str((env if env is not None else os.environ).get(LANE_AGE_GATE_ENV) or "").strip().lower()
     if raw in {"on", "1", "true", "yes"}:
         return "on"
-    return "shadow" if raw == "shadow" else "off"
+    if raw in {"off", "0", "false", "no"}:
+        return "off"
+    return "shadow"
 
 
 def max_lane_age_seconds(sport: Any = None) -> float | None:
@@ -1850,7 +1855,7 @@ def attach_live_gamelines(
     # Printed on LIVE_GAMELINE_JOIN: once a stale lane is refused it leaves the ledger, so this is what still shows it.
     coverage["lane_age_max_s"] = None
     build_now = now if now is not None else datetime.now(timezone.utc)
-    # The lane-age gate's switch (`LANE_AGE_GATE_ENV`, default off) and, in shadow, what it would have refused.
+    # The lane-age gate's switch (`LANE_AGE_GATE_ENV`, default shadow) and, in shadow, what it would have refused.
     lane_gate = lane_age_gate_mode()
     coverage["lane_age_gate"] = lane_gate
     coverage["lane_age_would_refuse"] = {}

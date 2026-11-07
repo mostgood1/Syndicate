@@ -6,10 +6,11 @@ read it. Measured on the fleet's live-gameline ledgers 10-21..11-07: NCAAB carri
 600 s. 95.6% of the stale NCAAB records measurable against the re-sim's tick logs came from ticks that exhausted
 their budget, so the loop's capacity is the cure and this gate keeps those lanes off the price.
 
-It ships DEFAULT OFF behind `SYNDICATE_LIVE_GAMELINE_LANE_AGE_GATE` (off | shadow | on): refusing ~19% of priced NCAAB
-rows is the user's decision, and main reaches the fleet with any session's fast-forward. These pin the gate:
+It ships behind `SYNDICATE_LIVE_GAMELINE_LANE_AGE_GATE` (off | shadow | on), DEFAULT SHADOW: refusing ~19% of priced
+NCAAB rows is the user's decision, so only an explicit `on` prices differently, and main reaches the fleet with any
+session's fast-forward. Shadow changes no row (user 2026-11-07 "Yes, shadow"). These pin the gate:
 
-  - off (absent) prices exactly as before; shadow prices as before and counts what it would refuse; on refuses;
+  - shadow (absent, unrecognised) and off price exactly as before, shadow counting what it would refuse; on refuses;
   - each measured sport refuses past its ceiling and prices at it; an unmeasured sport is untouched;
   - an absent lane time refuses on a gated sport (`unknown must not default permissive`);
   - through the join, `off != on`: the same row and lane price fresh and refuse stale, with only the build time moved;
@@ -61,10 +62,11 @@ def _at(seconds: float) -> datetime:
 
 # --------------------------------------------------------------------------------------------- the switch
 
-@pytest.mark.parametrize("raw,mode", [(None, "off"), ("", "off"), ("off", "off"), ("OFF", "off"), ("onn", "off"),
-                                      ("0", "off"), ("shadow", "shadow"), (" Shadow ", "shadow"), ("on", "on"),
-                                      ("1", "on"), ("true", "on"), ("yes", "on")])
-def test_the_switch_is_off_unless_it_says_shadow_or_on(raw, mode):
+@pytest.mark.parametrize("raw,mode", [(None, "shadow"), ("", "shadow"), ("onn", "shadow"), ("garbage", "shadow"),
+                                      ("shadow", "shadow"), (" Shadow ", "shadow"), ("off", "off"), ("OFF", "off"),
+                                      ("0", "off"), ("false", "off"), ("no", "off"), ("on", "on"), ("1", "on"),
+                                      ("true", "on"), ("yes", "on")])
+def test_only_an_explicit_on_prices_differently_and_the_default_is_shadow(raw, mode):
     assert lane_age_gate_mode({} if raw is None else {LANE_AGE_GATE_ENV: raw}) == mode
 
 
@@ -158,17 +160,19 @@ def _assert_edge_withheld(row, coverage, reason):
     assert coverage["withheld_by_reason"] == {reason: 1}
 
 
-@pytest.mark.parametrize("raw", [None, "off", "garbage"])
-def test_off_prices_a_stale_lane_exactly_as_before(monkeypatch, raw):
-    """Absent, off, or unrecognised: no lane gate. The instrument still reads the lane's age."""
+@pytest.mark.parametrize("raw,mode,counted", [(None, "shadow", 1), ("garbage", "shadow", 1), ("off", "off", 0)])
+def test_the_default_and_off_price_a_stale_lane_exactly_as_before(monkeypatch, raw, mode, counted):
+    """Absent or unrecognised (shadow, the default) and off: the row prices as it always did; only shadow counts it.
+    The instrument reads the lane's age either way."""
     if raw is not None:
         monkeypatch.setenv(LANE_AGE_GATE_ENV, raw)
     rows = [_row()]
     cov = _attach(rows, _snapshot(), now=_at(5_000))
     _assert_priced(rows[0], cov)
-    assert cov["lane_age_gate"] == "off"
+    assert cov["lane_age_gate"] == mode
     assert cov["withheld_by_reason"] == {}
-    assert cov["lane_age_would_refuse"] == {} and cov["lane_age_would_refuse_priced"] == {}
+    expected = {REASON_STALE_LANE: 1} if counted else {}
+    assert cov["lane_age_would_refuse"] == expected and cov["lane_age_would_refuse_priced"] == expected
     assert cov["lane_age_max_s"] == 5_000.0
 
 
@@ -288,7 +292,7 @@ def test_the_sport_falls_back_to_the_callers_when_the_index_stamps_none(gate_on)
 def test_the_board_caller_judges_the_lane_against_the_wall_clock_and_reads_the_switch(monkeypatch):
     """`board_enrichment.attach_live_gamelines_for_sport` passes no `now`: the default must be the build's wall
     clock, or the gate is inert on the one path that prices. Same row, same producer; only the lane's age and the
-    switch change -- and with the switch absent, the production default, the stale lane still prices."""
+    switch change -- and with the switch absent, the production default (shadow), the stale lane still prices."""
     from syndicate.features.shared import refresh_state_store
 
     monkeypatch.setattr(board_enrichment, "_nba_live_priced", lambda: True)
@@ -308,6 +312,11 @@ def test_the_board_caller_judges_the_lane_against_the_wall_clock_and_reads_the_s
 
     for key in ((None, "fresh"), (None, "stale"), ("on", "fresh")):
         _assert_priced(*outcomes[key])
+    # The production default counts the stale, priced row it would refuse, and refuses nothing.
+    row, cov = outcomes[(None, "stale")]
+    assert cov["lane_age_gate"] == "shadow" and cov["withheld_by_reason"] == {}
+    assert cov["lane_age_would_refuse_priced"] == {REASON_STALE_LANE: 1}
+    assert outcomes[(None, "fresh")][1]["lane_age_would_refuse"] == {}
     row, cov = outcomes[("on", "stale")]
     _assert_edge_withheld(row, cov, REASON_STALE_LANE)
     assert cov["lane_age_max_s"] >= 3_600.0 and cov["lane_age_gate"] == "on"
