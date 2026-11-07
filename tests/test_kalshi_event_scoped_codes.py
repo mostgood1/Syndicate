@@ -36,13 +36,16 @@ def stub_branding(monkeypatch):
     from syndicate.features.soccer import sources
 
     monkeypatch.setattr(sources, "all_teams", lambda league: [dict(r) for r in _BRANDING.get(league, [])])
-    ta._soccer_alias_to_name.cache_clear()
-    ta._soccer_alias_by_league.cache_clear()
+    # The nickname/token maps are derived from the soccer map and cached per sport too; left
+    # filled from the stubbed branding, `Athletic` stopped resolving for later tests (ci-suite #697).
+    clears = (ta._soccer_alias_to_name, ta._soccer_alias_by_league, ta._nickname_alias_map, ta.unambiguous_club_tokens)
+    for cached in clears:
+        cached.cache_clear()
     ta._CANONICAL_MEMO.clear()
     ta._ALIAS_VALUES_MEMO.clear()
     yield
-    ta._soccer_alias_to_name.cache_clear()
-    ta._soccer_alias_by_league.cache_clear()
+    for cached in clears:
+        cached.cache_clear()
     ta._CANONICAL_MEMO.clear()
     ta._ALIAS_VALUES_MEMO.clear()
 
