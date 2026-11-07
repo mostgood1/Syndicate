@@ -15,6 +15,8 @@ and asserts the OPPOSITE outcome for a refused game, which is the half that
 """
 from __future__ import annotations
 
+import pytest
+
 from syndicate.features.ncaaf import live_resim as lr
 from syndicate.features.shared.board_enrichment import _LIVE_GAMELINE_SPORTS
 from syndicate.features.shared.live_edge_policy import live_edge_unavailable_reason
@@ -25,6 +27,13 @@ from syndicate.features.shared.live_gameline_join import (
 )
 
 AWAY, HOME = "Boise State", "Oregon"
+
+
+@pytest.fixture(autouse=True)
+def _lane_age_gate_off(monkeypatch):
+    """The `#762` lane-age gate (default on) judges a lane against the wall clock, and these lanes carry fixed past
+    times. This file pins the interlock, not lane age, which `tests/test_live_gameline_lane_age_gate.py` owns."""
+    monkeypatch.setenv("SYNDICATE_LIVE_GAMELINE_LANE_AGE_GATE", "off")
 
 
 def _grid_row(*, state="live", age_seconds=30.0):
