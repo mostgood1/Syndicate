@@ -788,6 +788,14 @@ death, never life — do not invert it.
 - Verification: Fleet, first live NBA slate after the fix loads (read-only): every game nba_live_lens.json calls live matches ESPN's scoreboard state; native_resim.state_check.lens_not_started == [] while the re-sim has games in play; LIVE_PROJECTION_JOIN sport=nba lens_live_games > 0. Tests: off != on for the cache (old key serves Scheduled after tip, new one serves Live) and for the string status.
 - Blocked by: none
 
+### live-gameline-lane-age-gate — OPEN — opened 2026-11-07 — session d6f97e17-e7b4-43a8-9ac8-e2460c2f2cce
+- Goal: attach_live_gamelines withholds the EDGE on a live game-line row whose re-sim lane is older than its sport's measured ceiling (nba/ncaab/wncaab 600 s + ncaaf/nfl 1800 s) and keeps the display-only live number; counted as its own reason on LIVE_GAMELINE_JOIN; on main with tests incl. off != on; before-count of priced rows it would have refused measured on the fleet ledgers (todo #762 open item)
+- Files: syndicate/features/shared/live_gameline_join.py (new lane-age gate: REASON_LANE_* + _MAX_LANE_AGE_SECONDS_BY_SPORT + max_lane_age_seconds + lane_age_verdict + its clause at the attach_live_gamelines staleness choke point + the attach_live_gamelines now kwarg + the lane_age_max_s coverage key only), pipeline/layer2_shortlist.py (the LIVE_GAMELINE_JOIN print's lane_age_max= field only), tests/test_live_gameline_lane_age_gate.py (NEW), docs/ai_context/todo.md (the #762 model-lane age gate bullet only)
+- Hypothesis: MEASURED before any code (fleet ledgers 10-21..11-07, read-only, nice 19): lane age at pricing = recorded_at - live_state_as_of. NBA 157,479 priced records max 591 s (0 over 600). NCAAB 42,336 priced: fresh max 592 s but 9,734 CARRIED lanes priced at p50 987 s / max 5,750 s (ncaab/live_resim._carry has no age bound). WNCAAB 4,474 priced / 39 over 600 (carried up to 2,013 s). NCAAF 29,142 priced max 1,143 s. NFL 379 priced max 786 s. College |edge| grows with lane age (ncaab h2h 9.9 pp under 120 s to 18.3 pp over 1800 s).
+- Falsification test: If the gate refuses fresh lanes in normal operation (NBA/college fresh lanes over 600 s on a typical slate) or leaves a carried college lane over 600 s priced on the fleet after rollout
+- Verification: after fleet rollout (user yes only): LIVE_GAMELINE_JOIN why= carries live_lane_older_than_pricing_ceiling for ncaab on a busy slate with priceable > 0 still; NBA display= unchanged; 0 priced ledger records with recorded_at - live_state_as_of over the sport ceiling
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
