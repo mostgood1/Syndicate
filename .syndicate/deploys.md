@@ -56832,3 +56832,16 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **CORRECTION to `#764`'s 11-06 22:14Z update:** "every side refused was another game's ticker" was never established. The probe's ticker check (`_kalshi_game_token_uncached` against the row alone) returns nothing both for another game's ticker and for a correct one whose codes it cannot read. On 11-06 only the LOST sides were read by eye, not the re-priced ones. `CINHOU-61` was among the 11-06 22:08Z refusals too.
 - **Net:** the rule trades 4 correct Kalshi quotes (each covered today by a same-game Polymarket quote) for 17 wrong-game ones. A correct Kalshi total with no same-game Polymarket quote now falls back to the books. Kept. The follow-up is to name Kalshi's college games in the fan-in, so that correct tickers name their game and pass (todo `#764`).
 - **Claims:** none held by this lane. The ff and the restart were `wncaab-module`'s.
+
+## 2026-11-07 17:07Z (11:07 AM CST) -- VERIFY of the 16:29:14Z `59638f001` rollout (college quote-order gate): **MET** (lane `wncaab-module`)
+- **Reading:** the first men's build with live games, `[book_grid] LIVE_GAMELINE_BUILD sport=ncaab` at 17:05:08Z (refresh-worker pid 517695, `code=59638f00`).
+  - `considered=41 projected=6 withheld_by_reason={"prob_interval_swamps_edge":5,"quote_older_than_live_pricing_ceiling":11,"quote_older_than_the_score_the_model_saw":6,"segment_pricing_disabled":18}`.
+  - Of the 23 full-game rows: 11 refused by the 600 s age ceiling. Of the 12 that passed it, **6 refused by the new gate (50%)**, inside the replay's 35-53% for men's. 6 reached pricing; 5 of those were withheld by the interval.
+  - `row_carries_no_quote_or_score_time` = 0.
+  - **Baseline:** 0 builds carried the reason before the rollout (15:47:49Z).
+- **Women's: not yet exercised.** Every wncaab build since the restart is `no_live_gameline_projection` (4-8 rows). The 2 live women's games are refused upstream by the re-sim, `WNCAAB_LIVE_RESIM_TICK ... refusals={'no_margin_anchor': 2}` (17:06:13Z), before the join. Women's evidence for the gate is the replay (71-74%).
+- **Health:**
+  - 0 line-start tracebacks since 16:29:25Z.
+  - First board build after the restart and drain: `BOARD_BUILD_TIMING wall_s=819.5 ok=True` (16:55:57Z), against 264-411 s before.
+  - `#764`'s `UNNAMED_ROLE_KEY_GRID` runs every build (that lane recorded its own VERIFY, a068c6766).
+- **Seen, not this lane:** web is now `code=59638f00` (17:05:35Z status), so another session reloaded it after 16:32Z. live-odds-worker is still `506973f9`, as the NBA lane expects.

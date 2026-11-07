@@ -616,7 +616,7 @@ death, never life — do not invert it.
   - women's K superseded by the daily calibration (no change);
   - pregame sim-code key `a147d16cd` MET (deploys.md 2026-11-06 15:19:15Z).
   - LEFT:
-    - the college quote-order gate: ON MAIN `59638f001` (22:18Z, user "Yes, do it here"), NOT on the fleet. It refuses a live ncaab/wncaab quote taken more than 30 s before the re-sim's score, ncaab/wncaab only, absent times refuse. Replay 11-03..11-06: refuses men's 35-53%, women's 71-74% of priced rows. Rollout = fleet ff + refresh-worker restart (it builds the board). Uses this lane's `live_gameline_join.py` claim for ncaab as well as wncaab;
+    - the college quote-order gate: ON THE FLEET and VERIFIED (`59638f001`, ff + refresh-worker TERM 2026-11-07 16:29:14Z; men's build 17:05:08Z refused 6 of 12 rows past the age ceiling, 0 absent-time; deploys.md). Women's not yet exercised live (`no_margin_anchor` upstream);
     - #763 segment pricing (off);
     - Mercyhurst women on 11-08;
     - a live college OT game;
