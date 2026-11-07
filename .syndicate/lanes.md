@@ -790,11 +790,6 @@ ba_lens_state_check.py`.
 - STATUS 2026-11-07 3:25 PM CST: SHADOW READING TAKEN (deploys.md 2026-11-07 21:17:16Z), 17:40-21:17Z over three refresh-worker pids, every gated build `lane_age_gate=shadow`: NCAAB would refuse 90 of 214 priced row-builds (42.1%), all in 3 of 14 builds (20:14 / 20:45 / 21:00Z); WNCAAB 2 of 10; NCAAF 0 of 1,734 (max 725.7 s); NBA / NFL no live lane. Cause again budget starvation, but at 9-13 live NCAAB games: every tick from 20:07:44Z ran to 240 s once WNCAAB's loop began re-simming (same process, threads; contention is a hypothesis, not tested). Switching `on` is the user's call; nothing changed on the fleet since the 17:39:56Z load.
 - Blocked by: none
 
-### closed-lane-archive-20261107-1112 — CLOSED 2026-11-07 (GOAL MET: 1 block archived) — opened 2026-11-07 — session 8578f21b-7320-4325-bba6-9bc031984887
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. Moved `closed-lane-archive-20261107-0700` (owner acc7ac9c 245m idle, block 247m). 10 CLOSED blocks WAIT; table in log/2026-11-07.md.
-
 ### kalshi-fanin-college-naming — CLOSED (GOAL MET) — opened 2026-11-07 — closed 2026-11-07 — session e32fef1a-01e8-4afe-a284-01acd3728545
 - **VERDICT `[2026-11-07 20:02:11Z]`: GOAL: MET.** Goal, verbatim: "The venue fan-in names the game of a Kalshi game-line quote with Kalshi's own code-to-name pairs (the order path's resolver), so correct college Kalshi totals price their own row again: on the fleet's data the refused-but-right tickers (CINHOU-61 on Cincinnati @ Houston, CSFSDAK-177 on CSU Fullerton @ South Dakota) price their row, every wrong-game ticker stays refused, and every changed side is read by eye". Reading:
   - Replay on the fleet's data at 17:22Z: `CINHOU-61` and `CSFSDAK-177` named and priced their rows; all 73 changed (game, ticker) pairs read by eye as the row's own game; 0 sides lost.
@@ -839,6 +834,11 @@ ba_lens_state_check.py`.
 - Falsification test: n/a
 - Verification: pytest tests/test_basketball_interval_backtest.py green incl. off != on per variant; harness run on fleet data (read-only, nice 19) for NCAAB + NBA (+ WNBA naive); findings table with n games, coverage per family, MAE/bias per projector x segment x bucket
 - Blocked by: none
+
+### closed-lane-archive-20261107-1522 — CLOSED 2026-11-07 (GOAL MET: 1 block archived) — opened 2026-11-07 — session b48a94c8-8f26-41cc-91c1-832e5008a705
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 (21:23Z) gave one SAFE slug; moved `closed-lane-archive-20261107-1112`. Reading and Part B table in `.syndicate/log/2026-11-07.md`.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1023,6 +1023,7 @@ ba_lens_state_check.py`.
 - `closed-lane-archive-20261106-2245` — CLOSED 2026-11-06 (GOAL MET: 1 block archived) — opened 2026-11-06 — session 3f031ca8-2dfc-401b-8563-f09846a3e74b
 - `closed-lane-archive-20261107-0250` — CLOSED 2026-11-07 (GOAL MET: 1 block archived) — opened 2026-11-07 — session 2dc4077e-c096-4d42-ad11-49c63e5980af
 - `closed-lane-archive-20261107-0700` — CLOSED 2026-11-07 (GOAL MET: 1 block archived) — opened 2026-11-07 — session acc7ac9c-5f0f-432c-89dc-61ad15e92a7c
+- `closed-lane-archive-20261107-1112` — CLOSED 2026-11-07 (GOAL MET: 1 block archived) — opened 2026-11-07 — session 8578f21b-7320-4325-bba6-9bc031984887
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
