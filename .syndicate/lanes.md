@@ -956,6 +956,14 @@ death, never life — do not invert it.
 - Verification: otsplit replay reproduces the harness re-sim total_mean on every game (fidelity), and the findings carry regulation / OT tables with n
 - Blocked by: none
 
+### ncaab-regulation-tie-shape — OPEN — opened 2026-11-08 — session c2fd17f8-7d77-4eed-b025-0830211e05b3
+- Goal: Measure, read-only, the production NCAAB re-sim's end-of-regulation margin distribution against real games by margin and clock (minutes 30-39.5), and say whether its regulation-tie deficit (12.8% vs 19.1% OT within 3 at 38m) is SPREAD (the late margin moves the wrong amount) or SHAPE (no end-game mass at a tie), before any engine change
+- Files: .syndicate/findings_2026-11-07_basketball_interval_backtest.md, docs/ai_context/todo.md, .syndicate/log/2026-11-08.md
+- Hypothesis: SHAPE, pre-registered 2026-11-08 21:27Z: the sims' spread of the leader's late margin change is right (SD within 10% of real at 36-39m, |margin| <= 6), but real games put more mass on a regulation tie relative to +-1 (tie ratio P(0) / mean P(+-1) higher than the sims' beyond 1.96 SE), from end-game play the engine does not model (a tied team holding for the last shot, a trailer down 3 shooting a 3). Engine read: possessions are pre-counted per period with a random alternation (0.85) and no last-shot logic; the only trailer rule is a p3 bump.
+- Falsification test: The sims' SD of the leader's margin change differs from real by more than 10% with the interval excluding 1 (SPREAD explains it), or the tie ratios agree within 1.96 SE.
+- Verification: Sims re-run at 8 checkpoints (30-39.5m) on the pooled 535 regular-season re-sim games, same seeds and live-odds-worker's three switches, recording each sim's regulation-end margin; tables of P(regulation tie) by clock x |margin|, the SD of the leader's margin change and the tie ratio, sims vs real (re-sim eligibility pool and the same games), in the findings file and #765. Diagnostic only: nothing ships from this lane.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
