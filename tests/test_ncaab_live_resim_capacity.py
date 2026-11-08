@@ -285,12 +285,14 @@ def test_the_pool_honours_the_budget_and_resumes_at_the_first_stopped_game(slate
             return lr.NcaabResimRefusal("budget_exhausted", "12/200")
         if gs["gs"] == "0":
             return dict(RESULT)
-        time.sleep(0.6)  # past the 0.5 s deadline, inside the grace
+        time.sleep(2.4)  # past the 2 s deadline, inside the grace
         return dict(RESULT)
 
     slate["resim"] = resim
     previous = {"1": _prev_row("1", age=200.0)}
-    snap = slate["run"](4, previous=previous, budget=0.5, executor=FakePool(workers=2))
+    # 2 s, not 0.5 s: under load (Idle priority beside ~40 test files, 2026-11-08) the thread's own prep of game 2
+    # outran a 0.5 s budget and it was correctly never submitted, which is not what this test pins.
+    snap = slate["run"](4, previous=previous, budget=2.0, executor=FakePool(workers=2))
     by_id = {g["event_id"]: g["gameLens"][0] for g in snap["games"]}
     assert by_id["0"]["source"] == lr.LIVE_RESIM_LENS_SOURCE and "liveStateCarriedForward" not in by_id["0"]
     assert by_id["1"]["liveStateCarriedForward"] is True

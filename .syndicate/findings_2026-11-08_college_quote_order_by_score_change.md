@@ -80,7 +80,31 @@ Mean points, game-clustered:
 - `quote_updated_at` is the quote's own time from the grid. A quote can stay posted after it, which this cannot see.
 - Women's is 29 games; its rows are not evidence on their own.
 
-## What changing the check would take (not done)
+## Tolerance against the score change (measured 2026-11-08 ~11:25 AM CST, after the user chose the rule)
+
+The current check allows a quote up to 30 s before the state. Quote-older records, by the quote's time minus the last score change the state held (plays up to `as_of` − 20 s):
+
+| ncaab | quote at/after the change | 0-10 s before | 10-30 s before | more than 30 s before |
+|---|---|---|---|---|
+| spreads | −0.0042 ± 0.0100 (1,222 / 150) | −0.0173 ± 0.0123 (204 / 89) | −0.0092 ± 0.0116 (461 / 111) | −0.0237 ± 0.0087 (4,309 / 171) |
+| totals | +0.0206 ± 0.0132 (2,167 / 156) | +0.0446 ± 0.0187 (219 / 76) | +0.0256 ± 0.0152 (471 / 103) | −0.0026 ± 0.0108 (4,778 / 173) |
+
+- On spreads, a quote taken even 0-10 s before the change still shows the model "winning". So the rule has **no grace**: a quote is refused if it was taken before the last score change.
+- One no-change sub-bucket reads −0.0252 ± 0.0114 (spreads, quote 90-180 s before the state, 430 records). The other three gaps read +0.011, +0.006 and −0.026 ± 0.024. That is not monotonic, and with four cuts one at ~2 SE is expected, so it is noted rather than acted on.
+
+## The change (user "Score-change rule", 2026-11-08; on main, NOT on the fleet)
+
+- `ncaab/live_resim.last_score_change_wallclock` → lane `liveScoreChangedAt`. It is published only when the plays match the official score.
+- `live_gameline_join`: the full-game hit carries `score_changed_at`. `quote_behind_score_verdict` refuses an NCAAB quote only if it was taken before that time.
+- Switch `SYNDICATE_COLLEGE_QUOTE_ORDER_BASIS`:
+  - absent = `score_change`;
+  - `state` = the old rule;
+  - anything unrecognised = `state`.
+- An absent score-change time keeps the old rule. wncaab is unchanged.
+- Trace: `docs/ai_context/ncaab_live_tier.md` "Quote vs last score change hop".
+- Tests: `tests/test_ncaab_quote_vs_score_change.py`, including the reachability test. It fails if either the producer's field or the join's read is removed.
+
+## What changing the check would take (as first written, before the decision)
 
 - **The lane** must publish its last score-change time, from the last scoring play's ESPN wallclock already parsed in `pbp.reconstruct`, in `ncaab/live_resim.py`.
 - **The check** (`live_gameline_join.py:611-642`, lane `wncaab-module`) would compare the quote with that time instead of `as_of`. The 600 s ceiling and the lane-age gate stay.

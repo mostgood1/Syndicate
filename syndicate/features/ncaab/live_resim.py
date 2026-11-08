@@ -151,6 +151,9 @@ class ResumeFacts:
     as_of: str
     score_source: str = "official"
     tip_wallclock: str = ""  # the first play's ESPN wall clock: the actual tip, the margin anchor's close cutoff
+    # The ESPN wall clock of the LAST play that changed the score in the state the re-sim used; "" when unknown
+    # (published as `liveScoreChangedAt`, read by `live_gameline_join.quote_behind_score_verdict`, #762).
+    score_changed_at: str = ""
 
 
 @dataclass(frozen=True)
@@ -483,6 +486,27 @@ def half_targets(home_points: float, away_points: float) -> list[dict[str, float
 
 # ------------------------------------------------------------------------------------------- live state
 
+def last_score_change_wallclock(events: Sequence[Any]) -> str:
+    """ESPN wall clock of the last play that changed the cumulative score; "" when none did or that play has none.
+
+    WHY (#762, user 2026-11-08 "Score-change rule"): the join refused an NCAAB quote taken more than 30 s before the
+    lane's STATE FETCH. With fresh lanes that refused nearly every quote. Re-measured
+    (`findings_2026-11-08_college_quote_order_by_score_change.md`), the check's spurious edge sits where a score changed
+    between the quote and the state (ncaab spreads -0.0221 Brier vs the market), not where none did (-0.0043 +- 0.0100).
+    So the join judges an NCAAB quote against THIS time. An unknown time ("") keeps the state-fetch rule, the stricter one.
+    """
+    last, prev = "", (0, 0)
+    for event in events:
+        home, away = getattr(event, "home_score", None), getattr(event, "away_score", None)
+        if home is None or away is None:
+            continue
+        score = (int(home), int(away))
+        if score != prev:
+            last = str(getattr(event, "wallclock", "") or "")
+            prev = score
+    return last
+
+
 def _period_points(events: Sequence[Any], period: int) -> tuple[tuple[int, ...], tuple[int, ...]]:
     from syndicate.features.nba.live_resim import period_points
 
@@ -561,6 +585,9 @@ def resume_from_summary(summary: Mapping[str, Any], *, date: str = "", as_of: st
         possession=state.possession_side, last_seq=int(state.last_seq),
         as_of=as_of or state.built_at or _utc_now_iso(), score_source=score_source,
         tip_wallclock=min((str(e.wallclock) for e in rec.events if getattr(e, "wallclock", "")), default=""),
+        # Only when the plays ARE the official score: a header ahead of the play-by-play scored after the last play
+        # we can time, so the real change time is unknown and the join must keep its stricter rule.
+        score_changed_at=last_score_change_wallclock(rec.events) if score_source == "official" else "",
     )
     return state, gs, facts
 
@@ -965,6 +992,7 @@ def build_game_lens(facts: Optional[ResumeFacts], result: Any, *, live_state_as_
         "modelHomeWinProb": result["home_win_prob"],
         "simsRun": result["sims_run"],
         "liveStateAsOf": live_state_as_of or facts.as_of,
+        "liveScoreChangedAt": facts.score_changed_at,
         "projection": {
             "homeMargin": result["home_margin_mean"],
             "total": result["total_mean"],

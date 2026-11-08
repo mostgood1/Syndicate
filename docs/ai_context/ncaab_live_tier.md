@@ -98,6 +98,28 @@ of it, and 18.0% across its 22:27:40Z tick (43.2 CPU-s in 240 s), which re-simme
 7.5 s as one of two processes. Pool of 2, real engine: 4 games x 200 draws took 28.9 s against 54.2 s in an
 uncontended thread. Each child is ~119 MB RSS. Tests: `tests/test_ncaab_live_resim_capacity.py`.
 
+### Quote vs last score change hop (2026-11-08, `#762`, lane `ncaab-live-resim-capacity`, loan from `wncaab-module`)
+
+```
+ncaab/live_resim.resume_from_summary   facts.score_changed_at = last_score_change_wallclock(rec.events)
+                                       (the ESPN wallclock of the last play that moved the score; "" unless
+                                        score_source == "official", i.e. the plays ARE the header's score)
+  -> build_game_lens                   lane["liveScoreChangedAt"]        (carried lanes keep it: _carry copies the lane)
+  -> shared/live_gameline_join         full-game hit["score_changed_at"] = lens["liveScoreChangedAt"]
+  -> quote_behind_score_verdict(row["updated_at"], hit["as_of"], sport, score_changed_at=hit["score_changed_at"])
+       ncaab + SYNDICATE_COLLEGE_QUOTE_ORDER_BASIS absent/score_change: refuse iff quote < score change (no grace)
+       time absent / unparseable, `state`, or anything unrecognised: the state-fetch rule (30 s), as before
+       wncaab: always the state-fetch rule
+```
+
+**Why.** After workers=2 loaded (2026-11-08 03:28Z) NCAAB lanes were 18-40 s old at the board build, and quotes
+refresh about every 240 s. The state-fetch rule then refused every full-game row that reached it (77 of 110, 86 of
+105), and NCAAB priced nothing. Re-measured over 193 men's games, 11-02..11-06
+(`.syndicate/findings_2026-11-08_college_quote_order_by_score_change.md`): the model "beats" the market only where a
+score changed between the quote and the state (spreads Brier −0.0221 vs −0.0043 ± 0.0100 without). No grace, because
+quotes 0-10 s before the change still read −0.0173 on spreads. The re-admitted rows carry no measured edge; the user
+chose the rule for coverage ("Score-change rule"). Tests: `tests/test_ncaab_quote_vs_score_change.py`.
+
 **Reuse flag (engine standard section 3):** none. Inputs are rebuilt on every tick from the
 newest dated tables. A new input therefore needs only a new table, not a rebuild.
 

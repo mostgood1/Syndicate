@@ -626,18 +626,64 @@ def _utc_instant(value: Any) -> datetime | None:
     return moment if moment.tzinfo is not None else moment.replace(tzinfo=timezone.utc)
 
 
-def quote_behind_score_verdict(quote_at: Any, score_as_of: Any, sport: Any = None) -> dict[str, Any] | None:
+# NCAAB: JUDGED AGAINST THE LAST SCORE CHANGE, NOT THE STATE FETCH (`#762`, lane ncaab-live-resim-capacity on a loan
+# from wncaab-module; user 2026-11-08 "Score-change rule").
+#
+# The rule above compares the quote with the lane's `as_of`, which for college is when the state was FETCHED. Once the
+# NCAAB loop ran in worker processes (2026-11-08 03:28Z) its lanes were 18-40 s old at the build while quotes refresh
+# about every 240 s, so every full-game row that reached this check was refused (77 of 110, 86 of 105) and NCAAB
+# priced nothing. Re-measured on the same ledgers, 11-02..11-06, 193 men's games, against ESPN play wall clocks
+# (`.syndicate/findings_2026-11-08_college_quote_order_by_score_change.md`):
+#
+#     ncaab, quote 30 s+ before the state      no score change between them    a score change between them
+#     spreads  Brier model minus market         -0.0043 +- 0.0100 (1,223)       -0.0221 +- 0.0083 (4,974)
+#     totals                                    +0.0206 +- 0.0131 (2,178)       +0.0018 +- 0.0107 (5,468)
+#
+# The spurious edge is the SCORE the book had not seen. So an NCAAB quote is refused only when it was taken BEFORE the
+# last score change the re-sim saw (`liveScoreChangedAt`, `ncaab/live_resim.last_score_change_wallclock`), with NO
+# grace: quotes 0-10 s before that change still read -0.0173 +- 0.0123 on spreads (204 records). The rows this lets
+# back in carry no measured edge either; the user chose the rule for coverage.
+#
+# An absent or unparseable score-change time keeps the state-fetch rule above (the stricter one), never a pass.
+# wncaab keeps the state-fetch rule: its no-change part (-0.0180 +- 0.0160, 28 games) is not shown to be at the market.
+QUOTE_ORDER_BASIS_ENV = "SYNDICATE_COLLEGE_QUOTE_ORDER_BASIS"
+QUOTE_ORDER_BASIS_SCORE_CHANGE = "score_change"
+QUOTE_ORDER_BASIS_STATE = "state"
+_SCORE_CHANGE_BASIS_SPORTS = frozenset({"ncaab"})
+
+
+def quote_order_basis(env: Mapping[str, str] | None = None) -> str:
+    """`score_change` (absent, the user's decision) or `state`. Anything unrecognised reads as `state`, the stricter
+    basis: a typo must not loosen a pricing gate."""
+    raw = str((os.environ if env is None else env).get(QUOTE_ORDER_BASIS_ENV) or "").strip().lower()
+    if not raw or raw == QUOTE_ORDER_BASIS_SCORE_CHANGE:
+        return QUOTE_ORDER_BASIS_SCORE_CHANGE
+    return QUOTE_ORDER_BASIS_STATE
+
+
+def quote_behind_score_verdict(quote_at: Any, score_as_of: Any, sport: Any = None,
+                               score_changed_at: Any = None) -> dict[str, Any] | None:
     """`None` if the quote may be priced against the live number; a refusal verdict, shaped like
     `quote_age_verdict`'s, if it was taken more than the sport's tolerance BEFORE the score the re-sim used.
 
-    `sport` selects the tolerance; a sport absent from `_MAX_QUOTE_LAG_BEHIND_SCORE_SECONDS` returns None."""
-    tolerance = _MAX_QUOTE_LAG_BEHIND_SCORE_SECONDS.get(str(sport or "").strip().lower())
+    `sport` selects the tolerance; a sport absent from `_MAX_QUOTE_LAG_BEHIND_SCORE_SECONDS` returns None.
+    `score_changed_at` (the lane's `liveScoreChangedAt`): for NCAAB under the `score_change` basis, the quote is
+    judged against it with no tolerance; absent or unparseable, the state-fetch rule applies."""
+    key = str(sport or "").strip().lower()
+    tolerance = _MAX_QUOTE_LAG_BEHIND_SCORE_SECONDS.get(key)
     if tolerance is None:
         return None
     quoted, scored = _utc_instant(quote_at), _utc_instant(score_as_of)
     if quoted is None or scored is None:
         return {"priceable": False, "withheld_reason": REASON_QUOTE_OR_SCORE_TIME_ABSENT,
                 "model_prob": None, "market_prob": None, "edge_pp": None}
+    if key in _SCORE_CHANGE_BASIS_SPORTS and quote_order_basis() == QUOTE_ORDER_BASIS_SCORE_CHANGE:
+        changed = _utc_instant(score_changed_at)
+        if changed is not None:
+            if quoted < changed:
+                return {"priceable": False, "withheld_reason": REASON_QUOTE_BEHIND_SCORE,
+                        "model_prob": None, "market_prob": None, "edge_pp": None}
+            return None
     if (scored - quoted).total_seconds() > tolerance:
         return {"priceable": False, "withheld_reason": REASON_QUOTE_BEHIND_SCORE,
                 "model_prob": None, "market_prob": None, "edge_pp": None}
@@ -1012,6 +1058,9 @@ def live_gameline_from_lens(
             "total_runs_dist": projection.get("totalRunsDist") or {},
             "margin_dist": projection.get("marginDist") or {},
             "as_of": lens.get("liveStateAsOf"),
+            # When the last score change the re-sim saw happened (NCAAB lanes, `#762`); judged by
+            # `quote_behind_score_verdict`. Absent on other lanes and older snapshots: the state-fetch rule applies.
+            "score_changed_at": lens.get("liveScoreChangedAt"),
             "carried_forward": bool(lens.get("liveStateCarriedForward")),
             "lane": lens.get("key"),
             # LINE-SPECIFIC ANALYTIC PROBABILITIES, where the producer publishes
@@ -2075,7 +2124,8 @@ def attach_live_gamelines(
         lane_verdict = (lane_age_verdict(hit.get("as_of"), build_now, sport=hit.get("sport") or sport)
                         if lane_gate != "off" else None)
         stale = (quote_age_verdict(row.get("age_seconds"), sport=hit.get("sport"))
-                 or quote_behind_score_verdict(row.get("updated_at"), hit.get("as_of"), sport=hit.get("sport"))
+                 or quote_behind_score_verdict(row.get("updated_at"), hit.get("as_of"), sport=hit.get("sport"),
+                                               score_changed_at=hit.get("score_changed_at"))
                  or (lane_verdict if lane_gate == "on" else None))
         if stale is None and lane_verdict is not None:
             # SHADOW: priced exactly as before; tallied after the loop, once the row's own verdict is known.

@@ -242,6 +242,13 @@ def main():
                             gap = -d
                             gb = "30-90s" if gap < 90 else ("90-180s" if gap < 180 else ("180-300s" if gap < 300 else "300s+"))
                             acc[(m, f"older30|lag20|A_no_change|gap {gb}")].append((eid, diff))
+                if b1 == "older30":
+                    hi = a.timestamp() - 20
+                    seen = [w.timestamp() for w in g["changes"] if w.timestamp() <= hi]
+                    if seen:
+                        lag_q = q.timestamp() - max(seen)  # quote minus the last score change the state held
+                        tb = ("q>=last" if lag_q >= 0 else ("last-10..0" if lag_q >= -10 else ("last-30..-10" if lag_q >= -30 else "q<last-30")))
+                        acc[(m, "older30|vs_last_change " + tb)].append((eid, diff))
                 if b1 == "newer30":
                     n_ch = sum(1 for w in g["changes"] if a.timestamp() < w.timestamp() <= q.timestamp())
                     acc[(m, "newer30|" + ("quote_saw_no_new_score" if n_ch == 0 else "quote_saw_a_newer_score"))].append((eid, diff))
