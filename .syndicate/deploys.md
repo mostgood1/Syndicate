@@ -57433,3 +57433,24 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **Revert:**
   - Code: drop `"ncaab"` from `_SCORE_CHANGE_BASIS_SPORTS` (`live_gameline_join.py`), then ff + a claimed refresh-worker TERM.
   - Env: `SYNDICATE_COLLEGE_QUOTE_ORDER_BASIS=state` (needs a full fleet down/up).
+
+## 2026-11-08 19:35:55Z (1:35 PM CST) -- VERIFY part 2 of the 2026-11-07 23:56:57Z FLEET ff (college live re-sim WORKERS=2, `#762`, lane `ncaab-live-resim-capacity`): the 7-20-live reading the 03:28:10Z entry owed -- **MET: 30 of 30 NCAAB ticks at 7-14 live games carried 0 and none reached the 240 s budget (median 49.5 s at 7-9 live, 68.8 s at 13-14); `worker_errors=0` throughout** (written 19:37Z, 1:37 PM CST)
+- **Read by:** watcher `C:/tmp/ncaabcap/verify_busy.sh`, exit 0 at 19:35:55Z, read-only. It collected `NCAAB_LIVE_RESIM_TICK` lines with live >= 7 from live-odds-worker pid 1556143 (up since 15:50:42Z; the checkout was then `d9324512e`, which contains `af4244afd`, per the fleet reflog).
+- **verify (measured), 11-08 18:09-19:35Z:**
+  - 7-9 live, 20 ticks (18:09-19:03Z): `carried_forward=0 not_reached=0` on all 20; `elapsed_s` 28.4-91.5, median 49.5.
+  - 13-14 live, 10 ticks (19:06-19:35Z): `carried_forward=0 not_reached=0` on all 10; `elapsed_s` 49.1-113.7, median 68.8.
+  - In a child: 6.6-16.9 s a game (`resim_wall_s / resim_jobs`). `resim_cpu_s / resim_wall_s` 0.79-0.99 per tick, median ~0.93. The 0.79 was at 18:27:02Z.
+  - `worker_errors=0` on all 30. No `TICK_ERROR` / `WORKER_ERROR` / `POOL_DISABLED` line since 03:28:10Z.
+  - Children pid 1580549 and 1581335 started on first use (17:05:14Z, 17:07:32Z), when the first games went live. At 19:35Z: nice 5, RSS ~98 MB each (100,516 / 100,504 kB), ~24% CPU averaged over their life.
+  - live-odds-worker RSS 1,066 MB at 13,514 s up. That is not comparable with the 865 MB at 763 s on the 03:28Z process.
+- **Against the expectation and the baseline:**
+
+  | live games | baseline 11-07 (thread) | expected (workers=2) | measured 11-08 |
+  |---|---|---|---|
+  | 7-12 | median 240 s, median 6 carried | ~70-160 s, 0 carried | 7-9 live: median 49.5 s, 0 carried (20 ticks) |
+  | 13-20 | median 240 s, median 9 carried | ~130-240 s, 0-2 carried | 13-14 live: median 68.8 s, 0 carried (10 ticks) |
+
+- **Downstream (refresh-worker `LIVE_GAMELINE_JOIN sport=ncaab`, 6 builds 18:23-19:13Z, still on the OLD quote rule):** `live_lane_older_than_pricing_ceiling` 0 on all 6; `lane_age_max` 101-294 s; priceable 37 / 40 / 0 / 17 / 7 / 35.
+  - Full-game rows reaching the quote checks: ~123-161 a build. Of those, 26-68% were refused as `quote_older_than_the_score_the_model_saw` (42-107).
+- **Not measured:** 15-20 and 35-40 live (11-08 peaked at 14 by 19:35Z), and host CPU under the evening peak.
+- **Carry bound:** still `shadow`, `carry_expired=0` throughout. Turning it `on` is NOT approved.
