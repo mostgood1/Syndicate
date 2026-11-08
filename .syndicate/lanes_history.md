@@ -39504,3 +39504,16 @@ Slugs: basketball-schedule-adapter-native, coverage-gate-inactive-sports, deploy
   - Upload to the cloud is for the user to confirm (OneDrive icon). The old `C:\SyndicateBackup` archives (2 x ~4.5 GB) no longer rotate, and C: is 96% full (39 GB free); the user can delete them once OneDrive shows synced.
   - deploys.md entry 2026-10-26 17:30Z.
 
+
+## TRIMMED FROM lanes.md — 2026-11-08 (render-retirement-inventory, checkpoint)
+
+- **STATUS 2026-11-08 00:3xZ (6:3x PM CST 11-07): inventory DONE, findings + skill fix ON MAIN, docs fix DRAFTED, decisions OWED.**
+  - Findings `3dcc71093`. Hypothesis CONFIRMED: no Render API read on the default deploy path from `main`; no onrender fallback reachable on the fleet with its forced env.
+  - The one onrender default an operator actually hits was the daily-accuracy skill. Fixed in `c4989c721`; verified with a no-flag run against the fleet, rc 0.
+  - New fact: `render.yaml` edits are inert on the fleet. 0 of 48/77/72 keys are decided by it alone, because the 10-01 snapshot shadows every one.
+  - The primary tree is 2,488 commits behind `main`. That is the source of the preflight-reads-Render reports.
+  - CLAUDE.md + `/preflight` docs fix: `9fcd9e25b` on local branch `render-retirement-docs-draft`. Patch in the 5d941771 notes folder. NOT on main until the user approves (brief: "propose, then make once approved").
+  - Owed to the user: D1 docs, D2 markers, D3 `render.yaml` / guard drift read, D4 `chmod 600` on the 0644 snapshot. All are in todo `#766`.
+  - `deploy_preflight.py`, `deploy-guard.py` and `check_blueprint_drift.py` are claimed but UNCHANGED: preflight already has its fleet path. The guard's drift read is coupled to D3.
+- **D1 DONE 2026-11-08:** the CLAUDE.md + `/preflight` docs fix landed on main as `1ead99fbe`, a cherry-pick of draft `9fcd9e25b` with the message reworded (user: "Yes, land it"). Upstream had not touched either file since the draft. Still owed: D2 markers, D3 `render.yaml` / guard drift read (todo `#766`).
+- **D4 DONE 2026-11-08 16:54Z (10:54 AM CST)** — user: "Yes, chmod it". `render_env/live-odds-worker.json` 644 -> 600 (owner amyn). Content sha256 is unchanged, the owner can still read it, and all four files in `render_env/` now read 600. Not a deploy: no role restarted, no env value changed.

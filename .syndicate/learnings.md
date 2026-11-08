@@ -3291,3 +3291,14 @@ I counted "unchanged re-appends" on the NBA and NHL quote shards (NHL: 41% of ro
   - Put a fast-changing input's signature in the cache VALUE (replace the entry on mismatch) rather than in the key, or every change adds an entry.
   - "Stale data" in a derived artifact: first check whether its producer was asked at all (cache hit) before blaming the upstream source.
 - **Cost:** the NBA page lens and the prop join's `lens_live_games` were wrong on every live slate since the merge relied on the ESPN fallback (unmeasured start; seen 11-04 00:50Z).
+
+## 2026-11-08 -- RULE: on the fleet a `render.yaml` VALUE edit is inert -- the 10-01 Render env snapshot shadows every declared key; change env in `local_production.env` `[lane render-retirement-inventory, session 36cc0a0e]`
+- **Believed:** `render.yaml` is the fleet's env source, so editing and pushing it changes production. CLAUDE.md said so until `1ead99fbe`, and the lane's brief said `local_production.py` "reads render.yaml per service to derive each role's env".
+- **Measured 2026-11-08 on the fleet**, using `local_production`'s own parsers and printing key names only:
+  - 0 of 48 / 77 / 72 `render.yaml` value keys are decided by `render.yaml` alone.
+  - Every one is also in `render_env/<role>.json` (fetched 2026-10-01), which `derive_role_env` applies AFTER the blueprint.
+- **Rule:**
+  - To change a role's env, edit `local_production.env` (`ROLE__KEY` for one role), then do a drained full `down`/`up`.
+  - A `render.yaml` edit matters only for a key the snapshot lacks.
+  - Do not push `render.yaml` without a user decision: it may still fire `blueprint_sync` on the suspended Render services.
+- **Also:** a deploy tool that fails "against Render" when run from the PRIMARY tree tells you about that tree's stale copy, not about `main`. `deploy_preflight.py` there predates the 2026-10-25 fleet path; the tree was 2,519 commits behind on 11-08.
