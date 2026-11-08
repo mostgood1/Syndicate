@@ -3302,3 +3302,11 @@ I counted "unchanged re-appends" on the NBA and NHL quote shards (NHL: 41% of ro
   - A `render.yaml` edit matters only for a key the snapshot lacks.
   - Do not push `render.yaml` without a user decision: it may still fire `blueprint_sync` on the suspended Render services.
 - **Also:** a deploy tool that fails "against Render" when run from the PRIMARY tree tells you about that tree's stale copy, not about `main`. `deploy_preflight.py` there predates the 2026-10-25 fleet path; the tree was 2,519 commits behind on 11-08.
+
+## 2026-11-08 -- RULE: read a fleet engine switch from the environ of the process that RUNS the code, never from another role or a config file `[lane wncaab-module, #765 correction]`
+- **Believed (#765 findings, 11-07):** `SYNDICATE_NCAAB_HALF_SPLIT` and the NCAAB live mechanisms were "absent on the fleet", so the replay ran them OFF and reported the men's first half +8.4 high at the tip.
+- **Measured 11-07 23:4xZ (booleans only, /proc/<pid>/environ):** the switches sit on live-odds-worker, which runs the college pregame sims and the live re-sim, and not on refresh-worker.
+  - All 177 production pregame sims carry `halfSplit: True`.
+  - Production h1 against 147 real finals: +1.27 (n.s.).
+  - The re-run with the role's switches: +2.15 at the tip, and the re-sim BEATS the line on h1.
+- **Rule:** before scoring, replaying or "fixing" a model, list the role that runs it and read THAT process's environ, keys and booleans only. `local_production.env` holds `ROLE__KEY` overrides, so a plain-name grep reads a role-scoped switch as absent. Better still, read the artifact's own provenance (`halfSplit`, `mechanisms`), which records what actually ran.

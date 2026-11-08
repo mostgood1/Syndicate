@@ -1512,6 +1512,20 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
     - The narrower vendored clip (0.75-1.25, after the team prior stacks) had capped blowouts. Women's sims fell -3.2 total / -4.1 margin short of their own target.
     - Now the published pregame sims sit on their target: wncaab 11-04 total -1.06, margin -0.40; ncaab 11-03 -0.28 / -0.32 (22:56Z read).
 
+- **Rail interval projections: LIVE 2026-11-07 22:44Z** (`b13a1202a`, deploys.md 22:44:30Z). Every basketball chip with a sim carries an `intervals` block: per half (ncaab) or quarter, plus the projected final.
+  - Source: the pregame sim, or the live re-sim lane for live chips (re-read at serve time).
+  - No block when there is no sim. A projection, never a price.
+  - Read 22:45:55Z: pregame 34/34; live blocks on every chip with a re-sim projection; settled periods == line score 7/7.
+  - Other sports: lane `all-sport-interval-projections`.
+- **Engine switches live per ROLE `[verified 2026-11-07 23:4xZ, /proc environ, booleans only]`:** the college pregame sims and the live re-sim run on live-odds-worker.
+  - It has `SYNDICATE_NCAAB_HALF_SPLIT` and `SYNDICATE_NCAAB_EXACT_TARGET` truthy, and `SYNDICATE_NCAAB_LIVE_MECHANISMS` non-empty. refresh-worker has none of them.
+  - All 177 pregame sims 11-03..11-07 carry `halfSplit: True`. Production h1 vs 147 finals: +1.27 (n.s.), h2 -0.78, full +0.50 (#765 correction).
+- **Live overtime counts in college full-game totals `[verified 2026-11-08 on the ledger]`:** 3 men's OT games' late totals sat at their finals (158-163 vs 163; 162.4 vs 163; 184.4 vs 186), not at the regulation score.
+- **College quote-order gate (`59638f001`) refuses on both leagues `[verified 2026-11-07/08]`:**
+  - men's: 6 of 12 rows at 17:05:08Z 11-07;
+  - women's: 43 of 161 builds name `quote_older_than_the_score_the_model_saw`;
+  - 0 builds with an absent quote or score time.
+- **Women's live coverage is limited by the anchor `[measured at 2 instants, 2026-11-07]`:** a women's live lane refuses `no_margin_anchor` for a game with no market close. 16 of 18 live had no lane at 20:17Z; 2 of 3 at 22:45Z.
 ## [nba-lens-live-state] THE NBA LIVE LENS'S GAME STATE FROZE AT TIP: THE CARDS-CONTEXT CACHE NEVER SAW ITS OWN ESPN READ. FIX `e21335809` LOADED ON THE FLEET 2026-11-07 AND VERIFIED ON A MULTI-GAME SLATE `[verified 2026-11-07/08 in code + on the fleet, lane nba-lens-live-state (CLOSED, GOAL MET), todo #762, deploys.md 2026-11-07 22:36:00Z + 2026-11-08 01:25:00Z]`
 
 - **Where the lens's game state comes from:** `live/nba_live_lens.json` (live-odds-worker's lens loop) takes its games, `status` and `live_state` score from `nba/cards.build_cards_page_context`. That merges `_best_live_state_payload`: the keyvalue `nba_source/data/processed/live_snapshots/live_state_<date>.jsonl`, else an ESPN scoreboard read. The re-sim's keys (`gameLens`, `liveProps`, ...) are merged on top; status and score are not.
