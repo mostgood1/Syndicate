@@ -8,7 +8,7 @@
   - `deploy_preflight.py` on `main` is fleet-native (10-25). The HTTP 503 reports come from the PRIMARY tree, which is 2,488 commits behind `main`.
 - **Shipped:** findings `3dcc71093`; the daily-accuracy skill defaults to the fleet `c4989c721` (it read the suspended onrender host and exited 4; verified rc 0 against the fleet).
 - **Owed (user decisions):**
-  - **D1** — CLAUDE.md + `/preflight` docs fix. Drafted as `9fcd9e25b` on local branch `render-retirement-docs-draft`, NOT on main.
+  - ~~**D1**~~ **DONE 2026-11-08** — the CLAUDE.md + `/preflight` docs fix is on main as `1ead99fbe` (user: "Yes, land it").
   - **D2** — `RENDER_*` markers → neutral `SYNDICATE_SERVICE_ROLE` / `SYNDICATE_HOSTED` (findings §4, options 1/2/3; recommended 3: keep and document).
   - **D3** — `render.yaml`'s role: freeze, or fold the snapshot into a fleet-owned env file. Also whether the guard's render.yaml drift check stops reading Render.
   - **D4** — `chmod 600` on `render_env/live-odds-worker.json`, which is world-readable 0644 on the fleet host.
