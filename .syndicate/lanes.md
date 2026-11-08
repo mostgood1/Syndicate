@@ -861,11 +861,6 @@ death, never life — do not invert it.
 - Verification: pytest tests/test_basketball_interval_backtest.py green incl. off != on per variant; harness run on fleet data (read-only, nice 19) for NCAAB + NBA (+ WNBA naive); findings table with n games, coverage per family, MAE/bias per projector x segment x bucket
 - Blocked by: none
 
-### closed-lane-archive-20261107-1522 — CLOSED 2026-11-07 (GOAL MET: 1 block archived) — opened 2026-11-07 — session b48a94c8-8f26-41cc-91c1-832e5008a705
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness.py --idle-min 240 (21:23Z) gave one SAFE slug; moved `closed-lane-archive-20261107-1112`. Reading and Part B table in `.syndicate/log/2026-11-07.md`.
-
 ### ncaab-live-resim-capacity — OPEN — opened 2026-11-07 — session c3107f70-7ace-46b7-b16c-b31fd0c9d3f0
 - Goal: The NCAAB live re-sim loop keeps every live board game's lane fresh on 8-15 game slates: the cause of the 11-07 starvation (every NCAAB tick at its 240 s budget from 20:07:44Z re-simming 1-6 of 8-13 games) measured with its denominator; the capacity fix plus an age bound on ncaab/live_resim._carry (NBA's 900 s carry pattern) on main with tests incl. off != on; the expected change in NCAAB_LIVE_RESIM_TICK carried_forward and elapsed stated for the user's deploy decision (no fleet change without the user's yes)
 - Files: syndicate/features/ncaab/live_resim.py (the _carry age bound + carry_or_expire, the re-sim worker switch + _college_pool + pool_resim_job, build_live_lens_snapshot's per-game dispatch (the fetch/resume/inputs/anchor steps are moved into the same loop unchanged; wncaab-module's anchor and segment functions are NOT edited), run_live_resim_tick's tick-line fields, and the module docstring's #762 section ONLY), syndicate/features/shared/live_resim_workers.py (NEW), tests/test_ncaab_live_resim_capacity.py (NEW), scripts/ncaab_resim_contention_probe.py (NEW), docs/ai_context/ncaab_live_tier.md (the 'Capacity hop' section only), docs/ai_context/todo.md (the #762 NCAAB budget-loop bullets only)
@@ -921,6 +916,11 @@ death, never life — do not invert it.
 - Falsification test: With halfSplit=True recorded on every replayed game, the re-sim's h1 bias at the tip stays above +4
 - Verification: pytest tests/test_basketball_interval_backtest.py green incl. an off != on test for the env switches; the re-run report shows halfSplit/exactTarget/mechanisms on every resim game; paired old-vs-new rows in the findings
 - Blocked by: none
+
+### closed-lane-archive-20261107-1932 — CLOSED 2026-11-07 (GOAL MET: 1 block archived) — opened 2026-11-07 — session 8bbf546a-4f76-485c-8347-ea838666cd44
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 1 SAFE of 17 CLOSED; moved `closed-lane-archive-20261107-1522`. Readings in .syndicate/log/2026-11-07.md (01:3xZ 11-08 entry).
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1107,6 +1107,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261107-0700` — CLOSED 2026-11-07 (GOAL MET: 1 block archived) — opened 2026-11-07 — session acc7ac9c-5f0f-432c-89dc-61ad15e92a7c
 - `closed-lane-archive-20261107-1112` — CLOSED 2026-11-07 (GOAL MET: 1 block archived) — opened 2026-11-07 — session 8578f21b-7320-4325-bba6-9bc031984887
 - `closed-lane-archive-20261107-1406` — CLOSED 2026-11-07 (GOAL MET: 1 blocks archived) — opened 2026-11-07 — session 5271e327-8caa-46c6-919f-36784b66f165
+- `closed-lane-archive-20261107-1522` — CLOSED 2026-11-07 (GOAL MET: 1 block archived) — opened 2026-11-07 — session b48a94c8-8f26-41cc-91c1-832e5008a705
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
