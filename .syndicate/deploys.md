@@ -57216,3 +57216,44 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **Whole evening:** `LENS_STATE_BEHIND_RESIM` 0 lines; `ESPN_LIVE_STATE_FETCH_FAILED` 0 lines.
 - **expect vs measured:** the expectation was lens == ESPN within one tick, `lens_not_started == []`, and `lens_live_games` = live games. All three held on 1-game, 3-game and Final states.
 - Lane `nba-lens-live-state` CLOSED (GOAL MET).
+
+## 2026-11-08 03:28:10Z (9:28 PM CST 11-07) -- VERIFY of the 23:56:57Z FLEET ff (college live re-sim WORKERS=2, `#762`, lane `ncaab-live-resim-capacity`) -- **LOADED AND MEASURED on a 5-game slate: 6 of 6 NCAAB ticks re-simmed 5 of 5, 0 carried, 13.8-17.7 s (the last old-code tick, 2.4 min earlier: 6 live, 96.2 s); `worker_errors=0`; the draws get 0.99-1.00 of a core. UNEXPECTED: NCAAB priced 0 rows on both builds since, every full-game row refused by the quote-order check. The 7-20-game case is NOT measured yet** (written 03:46Z, 9:46 PM CST)
+- **Loaded by:** live-odds-worker's own uptime recycle, no TERM. `LIVE_ODDS_WORKER_MEMORY ... "recycled_for_uptime": true` 03:28:03Z (old pid 757868), new pid 1058536. Its code is `d9324512e` (another lane's ff at 00:42:53Z sits on top of `af4244afd`; that range's runtime change is `live_gameline_join.py` only, which this process does not run).
+- **Read by:** watcher `C:/tmp/ncaabcap/verify_recycle.sh`, exit 0 at 03:40:53Z; `C:/tmp/ncaabcap/after_load.sh` and `odds_after2.sh` at ~03:44Z. All read-only.
+- **verify (measured):**
+  - `NCAAB_LIVE_RESIM_LOOP_STARTED interval_s=120.0 workers=2` and the same for WNCAAB, 03:28:10.922Z.
+  - `COLLEGE_LIVE_RESIM_WORKER_STARTED` pid 1058557 (03:28:11.8Z) and pid 1058569 (03:28:12.5Z), parent 1058536.
+  - Children at ~760 s: nice 5, RSS 107 MB each (109,628 / 109,612 kB), 11.8% CPU averaged over their life.
+  - First 6 NCAAB ticks, 03:28:27-03:39:46Z: `live=5 resimmed=5 carried_forward=0 not_reached=0 carry_expired=0 worker_errors=0`, `resim_jobs=5`, `elapsed_s` 16.4 / 16.3 / 16.6 / 14.2 / 17.7 / 13.8.
+  - `resim_wall_s` 23.3-28.0 for 5 jobs (4.7-5.6 s a game in a child), `resim_cpu_s` within 0.3 s of it: 0.99-1.00 of a core, against 0.12-0.18 in the thread.
+  - The thread's own share (`elapsed_s - resim_wall_s / 2`, assuming full overlap): 2.2-4.8 s a tick for 5 games.
+  - WNCAAB: 6 ticks, `live=2`, 2.5-4.0 s, `worker_errors=0`; one `on_floor_incomplete` refusal on the first.
+  - 0 `TICK_ERROR` / `WORKER_ERROR` / `POOL_DISABLED` lines; 0 line-start tracebacks since 03:28:10Z.
+- **Against the same evening on the old code** (`NCAAB_LIVE_RESIM_TICK` 02:01-03:26Z, 17 ticks):
+  - 6-12 live; 8 of the 17 ran to the 240 s budget; 23 lanes carried in all; median elapsed 201.8 s.
+  - At 6 live: 96.2 / 131.2 / 150.3 / 159.8 / 197.8 s.
+  - The 11-07 17:02-22:55Z baseline at 1-6 live: median 82 s, 0 carried.
+  - **Expected at 1-6 live:** ~20-60 s, 0 carried. **Measured:** 13.8-17.7 s, 0 carried. MET.
+- **The lane-age gate (refresh-worker `LIVE_GAMELINE_JOIN sport=ncaab`; the 00:43:32Z entry handed this reading to this lane):**
+  - Old code, 7 builds 02:00-03:21Z: `lane_age_max` 272-911 s; `live_lane_older_than_pricing_ceiling` 12 / 49 / 17 / 0 / 0 / 0 / 0; priceable 28 / 28 / 36 / 21 / 13 / 0 / 50.
+  - New code, 2 builds 03:30:44Z and 03:40:11Z: `lane_age_max` 17.8 s and 39.7 s; 0 lane refusals. **Expected ~0: MET.**
+- **UNEXPECTED: priceable 0 on both new builds.**
+  - Every full-game row that reached the quote checks was refused:
+    - 03:30:44Z: 110 rows; 77 `quote_older_than_the_score_the_model_saw`, 33 `quote_older_than_live_pricing_ceiling`.
+    - 03:40:11Z: 105 rows; 86 and 19.
+  - The other rows are `segment_pricing_disabled` (102 and 84), which is judged before the quote checks.
+  - The last old-code build (03:21:43Z): 132 rows reached the quote checks. 25 were behind the score, 18 over 600 s, and 89 passed them (50 priced).
+  - **Not the restart:** `NCAAB_LIVE_AUTORUN_LAUNCHED ... interval_s=240` kept its ~4-minute cadence across the recycle: 03:24:45, 03:28:56, 03:33:03, 03:37:09 and 03:41:15Z, each `launched=ok`.
+  - **Mechanism, read from the code and not measured per row** (refused rows leave the ledger):
+    - `quote_behind_score_verdict` (`live_gameline_join.py:611-642`, lane `wncaab-module`, `59638f001`) refuses a quote taken more than 30 s before the lane's `as_of`.
+    - For college, `as_of` is when the state was FETCHED (`ncaab/live_resim.py:562`, `as_of or state.built_at`), not when the score last changed.
+    - NCAAB odds refresh about every 240 s, and the lane is now 18-40 s old at the build. So a quote fails the check unless it was fetched within ~30 s before the state, which is most of each odds cycle.
+    - Under the old loop lanes were older (`lane_age_max` 272-911 s per build), so more quotes were newer than their lane and passed.
+  - Per that check's own measured table (11-03..11-05), the rows that passed only because the lane was older than the quote sat in its "quote 30 s+ NEWER" bucket. There the model LOST to the market: ncaab Brier +0.0247 on spreads, +0.0326 on totals. So the old loop's priced rows were not a profitable set. That does not make 0 priced the right end state.
+  - **Owed decision (user / lane `wncaab-module`):** judge the quote against the time the SCORE last changed rather than the state fetch, or refresh NCAAB live odds faster than 240 s. Until then, a fresh college lane prices little or nothing. Nothing was changed for it.
+- **Not measured yet:**
+  - The case this fix was for: 7-20 live games. Expected carried 6 → 0 at 7-12 and 9 → 0-2 at 13-20, with elapsed ~70-160 s and ~130-240 s. 11-08 has 29 NCAAB games on the pregame sim's slate (03:25:52Z). A read-only watcher reads it.
+  - NBA ticks on the new process: 3 games, 0 carried, 17.9-44.9 s, against 1 game in 68-195 s on 11-07. Confounded by a fresh process and different game states, so not credited to this change.
+  - The host CPU and memory cost under a busy slate.
+- **Carry bound:** still `shadow` (`carry_bound=shadow` on every tick, `carry_expired=0`). Turning it `on` is NOT approved.
+- **Revert** (unchanged): `LOOP_DEFAULT_WORKERS = 0` on main, then ff + a claimed live-odds-worker TERM between slates. The pool also disables itself after 3 consecutive failed jobs.
