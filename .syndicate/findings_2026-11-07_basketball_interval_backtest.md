@@ -515,6 +515,139 @@ precise read so far, and it supersedes the single-sample gate in the college sec
    distribution against real games, conditioned on margin and clock. It needs a new end-game mechanism (for
    example, a trailing-by-3 team taking threes, or a tied team holding for the last shot). That means a loan of
    `engine.py` (lane `basketball-scenario-calibration`) and a refit of the rates the mechanism absorbs.
+   **Measured 2026-11-08 23:13Z: see PHASE 2 STEP 3b below, whose revised order supersedes this item.**
 2. **Blowout late scoring** (11+ margins, minutes 30-40), from the measured margin-state scoring rate.
 3. **Trailing-by-7-10 end-game scoring.** The foul rate is not the lever (B). Look at the trailing team's own
    possessions.
+
+## PHASE 2 STEP 3b (NCAAB): the sims' end-of-regulation margin against real games — the tie deficit is BOTH too much late spread and too little mass on a tie
+
+`[2026-11-08 21:27-23:13Z (3:27-5:13 PM CST), lane ncaab-regulation-tie-shape, session c2fd17f8, read-only, nice 19]`
+
+**Verdict.** The pre-registered hypothesis was SHAPE alone (lane block, pushed `605e2574f` before any run). The data
+say BOTH, so the SHAPE-only hypothesis is falsified.
+1. **SPREAD.** From minute 30 to minute 37 the sims' late margin moves 16-27% more than real games' does. From
+   minute 30 to 38, sim leaders also EXTEND their leads by the end of regulation (+0.2 to +1.2 points) where real
+   leaders hold (-0.5 to +0.1). By minute 39 the spread is right.
+2. **SHAPE.** Real games put 2.5-3.0 times as much probability on a regulation tie as on a one-point finish either
+   way. The sims put 1.6-1.9 times as much. The gap is beyond 1.96 SE at minute 30, at 34 (just), and at every checkpoint
+   from minute 37 on. It is not at minute 36.
+3. **Size.** Weighted to the season's margin mix, the sims send 1.8% too few of all games to overtime from minute 38,
+   and 3.1% too few from minute 30. A real overtime adds 24.6 points (258 OT games in the pool), so that is about
+   **0.44 points a game of total at minute 38 and 0.76 at minute 30**. Step 3's rough estimate was 0.6.
+
+**Method.**
+- **Sims:** the production NCAAB re-sim (live-odds-worker's three switches, read from its environ, never printed) on
+  the 540 pooled regular-season re-sim games of `ncaab2026_resim_prod` and `ncaab2026_oos_B`, with the harness's
+  seeds, at 8 checkpoints (30, 34, 36, 37, 38, 38.5, 39, 39.5 minutes) and 100 sims each. A wrapper records each
+  sim's end-of-regulation margin. Code snapshot `~/bball_iv/code3`: its engine, resume and league files match the
+  fleet's HEAD `582c24637` line for line. The only re-sim difference is a timestamp field.
+- **Real:** the re-sim eligibility pool (regular season, a close, both teams with 5 or more prior games, PBP final
+  matching, events file) — 4,472 games. The margin at the checkpoint and at the end of regulation come from the
+  play-by-play events.
+- **Checks:**
+  - The replay state's margin equals the events' margin at 4,320 of 4,320 game-checkpoints.
+  - A sim goes to OT exactly when its regulation ends tied, 4,320 of 4,320.
+  - A real game goes to OT exactly when its regulation ends tied, 5,865 of 5,865.
+- **Leader frame:** X = the end-of-regulation margin from the side leading at the checkpoint (the home side when
+  tied), and D = X − |m|. The **tie ratio** is P(X=0) / mean(P(X=+1), P(X=−1)). Every ± is 1.96 × a bootstrap SE over
+  games (1,000 draws). "Season" means the real pool; the sims' games are drawn from that same pool.
+
+**P(regulation ends tied), and the late margin's spread**, wide buckets of |m| at the checkpoint:
+
+| checkpoint | 0-3: season / sims (pp gap) | 4-6: season / sims (pp gap) | SD ratio sims/season, 0-3 / 4-6 | tie ratio 0-3, season / sims | mean D 0-3, season / sims |
+|---|---|---|---|---|---|
+| 30m | 11.3 / 5.5 (**-5.8 ± 2.0**) | 8.6 / 4.0 (**-4.5 ± 2.1**) | **1.27** / **1.20** | 2.66 / 1.61 | -0.09 / +0.50 |
+| 34m | 12.9 / 7.7 (**-5.2 ± 2.2**) | 9.8 / 5.5 (**-4.3 ± 2.2**) | **1.23** / **1.17** | 2.62 / 1.89 | -0.19 / +0.21 |
+| 36m | 14.9 / 9.8 (**-5.1 ± 2.4**) | 10.0 / 6.1 (**-3.9 ± 2.2**) | **1.26** / **1.16** | 2.49 / 1.92 | -0.11 / +0.40 |
+| 37m | 16.2 / 11.2 (**-5.1 ± 2.5**) | 8.7 / 6.3 (**-2.4 ± 2.1**) | **1.22** / **1.18** | 2.62 / 1.93 | -0.10 / +0.41 |
+| 38m | 18.5 / 12.9 (**-5.6 ± 2.5**) | 7.3 / 5.6 (-1.6 ± 2.0) | 1.09 / **1.16** | 3.01 / 1.77 | -0.02 / +0.30 |
+| 38.5m | 18.9 / 14.3 (**-4.6 ± 2.5**) | 7.3 / 4.7 (**-2.6 ± 2.0**) | 1.10 / 1.09 | 2.65 / 1.85 | +0.17 / +0.41 |
+| 39m | 20.0 / 15.4 (**-4.6 ± 2.6**) | 5.5 / 3.7 (-1.8 ± 1.8) | 1.04 / 1.08 | 2.61 / 1.84 | +0.22 / +0.30 |
+| 39.5m | 21.1 / 17.3 (**-3.8 ± 3.0**) | 3.5 / 1.6 (**-1.9 ± 1.5**) | 0.96 / 1.02 | 2.60 / 1.65 | +0.33 / +0.16 |
+
+- **Season n per cell:** 0-3 has 961-1,124 games and 4-6 has 603-782. The sims' cells have 75-142 games each.
+- **SD ratio interval:** ± 0.04-0.06 throughout. **Bold** means beyond 10% with the interval excluding 1, the
+  pre-registered SPREAD test.
+- **Tie ratio intervals:** season ± 0.5-0.8, sims ± 0.13-0.29.
+- **7-10 drift:** real leaders give back 0.1-0.5 points; sim leaders add 0.9-1.2 (for example 30m: -0.42 vs
+  +1.21).
+
+**What it says.**
+- **The excess spread is inside each game, not between games.** The sims' within-game SD alone (7.98 at 30m, 0-3)
+  is larger than the real total SD (6.55). The between-game part (team strength) is 2.4. A rough split of the 0-3
+  tie deficit, scaling the sims' P(tie) by the SD ratio:
+  - spread is about 1.5 of 5.8 pp at 30m and 2.6 of 5.1 at 36-37m;
+  - shape is the rest: 4.4 of 5.6 at 38m and nearly all of it in the last minute.
+- **Where the shape gap sits:**
+  - **Tied with under a minute left: the sims are right.** 39m: 27.0% vs 26.8%; 39.5m: 46.7% vs 40.7% (n.s.).
+  - **Trailing by one or two late: the gap is there.** Real games end tied far more often:
+    - down 2 at 39m: 22.1% vs 13.5% (-8.7 ± 4.8);
+    - down 2 at 39.5m: 23.1% vs 15.6% (-7.5 ± 4.7);
+    - down 1 at 39m: 19.6% vs 13.7%.
+  - **With 30 s left and a 1-3 lead,** the sims leave the leader ahead by exactly 1 in 15.4% of games against a real
+    9.3%. Real leaders more often finish 4-6 up (fouled, free throws) or the game ties. The sims under-produce
+    events in the last possessions on both sides.
+- **Engine read** (`engine.py`, no edit):
+  - Each period's possessions are pre-counted.
+  - The next possession switches team with probability 0.85, else a coin flip.
+  - The only trailing-team rule is a bump to 3-point rate. There is no last-shot logic: no going for 2 to tie, no
+    holding the ball when tied.
+  - The catch-up lever `score_effect_k` (shot and FT make probability scaled by the lead against the expected lead)
+    exists, default off, and production does not set it.
+    - NBA: k = 0.002 brought the margin SD from 18.89 to 14.91 against a real 14.00 (`state_basketball.md`).
+    - The user accepted it as a PROPOSAL on 2026-10-10. It is not enabled.
+- **What it does to the projection:**
+  - Totals: about 0.44 points a game of overtime are missing at minute 38, and 0.76 at minute 30.
+  - Probabilities: the over-wide spread makes the late win probability and margin distribution too uncertain.
+  - The P(leader loses) differences are inside the intervals (for example 30m 0-3: 34.9 real vs 37.8 sims,
+    ± 2.9 / 2.1). So the excess spread mostly fattens BOTH tails, and the leader's extension offsets it.
+
+**Lever follow-up: neither existing lever fixes the spread.** This was diagnostic and pre-registered in the lane
+block (`0f8db1dd8`) before the run.
+- **What ran:** two EventSimConfig fields, each on top of production's E1, at minutes 30, 36 and 38, on the same
+  540 games and seeds.
+- **Provenance:** each variant carried its own field plus E1, on 540 of 540 games.
+- **Paired change:** the variant's P(tie) minus production's, on the same game and seed.
+
+| 0-3 bucket | SD ratio at 30m / 36m / 38m | mean D at 30m (real -0.09) | 7-10 mean D at 30m (real -0.42) | paired change in tie %, 30m / 36m / 38m |
+|---|---|---|---|---|
+| production | 1.27 / 1.26 / 1.09 | +0.50 | +1.21 | -- |
+| SE: `score_effect_k` 0.002 | 1.26 / 1.25 / 1.08 | +0.27 | +0.77 | -0.2 ± 0.5 / +0.2 ± 0.7 / +0.2 ± 0.6 |
+| ALT: `possession_alternation` 1.0 | 1.23 / 1.21 / 1.04 | +0.37 | +1.21 | +0.1 ± 0.6 / +0.3 ± 0.9 / +0.6 ± 0.8 |
+
+- **SE is falsified as the spread fix.**
+  - It moved the SD ratio 0.01 of a 0.27 gap; the pre-registered test needed a third of it. 4-6 and 7-10 moved by
+    0.01-0.03.
+  - It does what it is built to do on the DRIFT: about halfway toward real at 30m (+0.50 to +0.27; 7-10: +1.21 to
+    +0.77).
+  - But it is far too weak per possession to tighten the spread. The factor is about 1% per 5 points of
+    deviation. NBA's k was fitted on full-game margin SD.
+- **ALT is small, as predicted:** 3-5% off the SD, with the shape unchanged. Possessions repeating by coin flip are
+  a real but minor source.
+- **No variant moves the tie rate:** every paired change is within ±0.9 pp.
+- **The spread's source is still unidentified.** It is not team strength: the between-game part is 2.4, and the
+  sims' within-game SD alone exceeds the real total. Next to measure, from the sims' rest-of-game box against the
+  real play-by-play over the same window:
+  - possessions per team in the last 10 minutes, and how unequal they are;
+  - the spread of points per possession: 3-point share, offensive-rebound chains (up to 5 shots per possession),
+    and free-throw trips.
+
+**For Phase 2 (NCAAB), revised order** (this supersedes item 1 of step 3's list):
+1. **End-game decision rules for the last possessions.** This is the SHAPE part: about 4 of the 5-6 pp tie
+   deficit in close games from minute 38.
+   - What to model: a trailer down 2 plays for 2 to tie; a 1-3 lead turns into free throws for the leader; the
+     team with the ball when tied holds it.
+   - It needs a loan of `engine.py` (lane `basketball-scenario-calibration`) and a refit of the E1 foul rates the
+     rules absorb.
+   - Gate: first P(tie) and the tie ratio by state against the tables above, then the harness totals and margin
+     gate.
+2. **Find the spread source before choosing a lever** (diagnostic, no engine edit): the box comparison above. A
+   wider catch-up k is a candidate only after that; k = 0.002 is not enough.
+3. Blowout late scoring and trailing-by-7-10 scoring (step 3's items 2 and 3) are unchanged. The spread finding
+   bears on both, so re-read them after item 2.
+
+**Scratch:**
+- Scripts, in the session scratchpad: `tieshape.py`, `tiereal.py`, `tieanalyze.py`, `tieextra.py`,
+  `otpoints.py`, `leverscan.py`, `leveranalyze.py`.
+- Outputs: `~/bball_iv/runs/ncaab2026_tieshape/{sims,real,levers}.jsonl`.

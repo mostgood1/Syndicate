@@ -90,7 +90,7 @@
   - The old bars (NCAAB 25.97 / 16.75 / 10.64 / 4.67; NBA pregame quarter 8.53) are beaten by the line alone.
   - Fidelity: production's recorded NBA live re-sim and the replay have the same MAE on the same games (14.71 vs 14.61 at 12m ... 5.12 vs 5.18 at 45.6m).
 - **Next (Phase 2, each against this harness):**
-  - NCAAB: the baseline is `ncaab2026_resim_prod`. Production already runs the half split and the end-game mechanisms. Measured 2026-11-08 (below): the late gap is mostly the sims under-producing regulation ties, not regulation scoring. Next, in order: (1) the OT / regulation-tie probability in close games, which needs a new end-game mechanism and an `engine.py` loan; (2) blowout late scoring (11+ margins, minutes 30-40); (3) the trailing-by-7-10 bucket (not the foul rate).
+  - NCAAB: the baseline is `ncaab2026_resim_prod`. Production already runs the half split and the end-game mechanisms. Measured 2026-11-08 (below): the late gap is mostly the sims under-producing regulation ties, not regulation scoring. Next, in order (revised 2026-11-08 23:13Z after the tie-shape measurement below): (1) end-game decision rules for the last possessions (go for 2 to tie, a 1-3 lead turning into free throws, holding the ball when tied), which needs an `engine.py` loan and an E1 refit; (2) find the source of the over-wide late margin spread first (rest-of-game box vs real PBP), since `score_effect_k` 0.002 does not fix it; (3) blowout late scoring (11+ margins, minutes 30-40) and the trailing-by-7-10 bucket (not the foul rate), re-read after (2).
   - Every college run must carry live-odds-worker's three switches; check `college_switches` and `engine_provenance` in `report.md`.
   - Further end-game values go through `resim_mech --mechanisms`, set on top of the env's.
   - Pace, only if pooled much harder than k=60 possessions.
@@ -118,6 +118,17 @@
   - Refit: E1 foul probability `[0.25, 0.7, 0.9]` (variant B) was better at minute 38 in-sample. Out of sample (seed 20261108, 272 games) it is n.s. on every total and +0.08 ± 0.06 worse on the minute-38 margin. **Not adopted; production E1 stays.** `blowout_bench_rest` is inert on NCAAB totals.
   - Pooled production re-sim vs the line, 535 games: better on h2 at every checkpoint, on the full total from minute 20 (-0.68 / -1.06 / -0.97) and on h1 at the tip (-0.57 ± 0.31). WORSE on the full total at the tip (+0.53 ± 0.34). The anchored margin ties the line everywhere.
   - Full tables: the findings' PHASE 2 STEP 3 section. Runs: WSL `~/bball_iv/runs/ncaab2026_oos_B`, plus `otsplit.jsonl` / `mechscan.jsonl` in `ncaab2026_resim_prod`.
+- **PHASE 2 STEP 3b, NCAAB regulation ties `[2026-11-08 23:13Z (5:13 PM CST)]` (lane `ncaab-regulation-tie-shape`, session c2fd17f8, read-only, user "Yes, measure it"): the sims' tie deficit is BOTH too much late spread AND too little mass on a tie. The pre-registered SHAPE-only hypothesis (`605e2574f`) is falsified.**
+  - Setup: 540 pooled re-sim games × 8 checkpoints (30-39.5m), production switches, against 4,472 real pool games.
+  - Spread: the sims' late margin moves 16-27% too much from minute 30 to 37; it is right by minute 39. From 30 to 38, sim leaders extend leads +0.2..+1.2 where real leaders hold (-0.5..+0.1). The excess is within-game: the sims' within-game SD of 7.98 exceeds the real total of 6.55 at 30m.
+  - Shape: real games put 2.5-3.0× as much mass on a regulation tie as on ±1. The sims put 1.6-1.9×. The gap is beyond 1.96 SE at 30m, 34m and every checkpoint from 37m.
+  - Tied under a minute left: the sims are right (39m 26.8% vs 27.0%). Down 2 late: they are not (39m 13.5% vs 22.1%; 39.5m 15.6% vs 23.1%).
+  - Size: season-weighted, the sims send 1.8% too few games to OT from minute 38 (3.1% from 30m). At 24.6 OT points per OT game, that is about 0.44 points a game of total at 38m (0.76 at 30m).
+  - Levers (pre-registered `0f8db1dd8`, diagnostic):
+    - `score_effect_k` 0.002 moves the SD ratio 0.01 of a 0.27 gap. **FALSIFIED as the spread fix**, though it halves the leaders' drift at 30m.
+    - `possession_alternation` 1.0 cuts the SD 3-5%.
+    - Neither moves the tie rate (paired within ±0.9 pp).
+  - Nothing ships. Full tables: the findings' PHASE 2 STEP 3b section. Runs: WSL `~/bball_iv/runs/ncaab2026_tieshape/`.
 ### `#764` — **KALSHI TOTALS THAT NAME NO GAME PRICE ANOTHER GAME'S ROW: 26 of 26 measured sides wrong-game (men's and women's college basketball, college football). Polymarket is clean in every sport. NOT FIXED** — 2026-11-06, session e32fef1a (user "Yes, measure it here")
 - **UPDATE 2026-11-07 23:49Z (5:49 PM CST): REVERSED-ORDER FIX LOADED AND VERIFIED** (lane `kalshi-fanin-reversed-orientation`, CLOSED).
   - **Load:** `79c8aac12`, fleet ff + refresh-worker TERM 23:41:12Z.

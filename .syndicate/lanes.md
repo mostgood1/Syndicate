@@ -890,7 +890,12 @@ death, never life — do not invert it.
 - Verification: otsplit replay reproduces the harness re-sim total_mean on every game (fidelity), and the findings carry regulation / OT tables with n
 - Blocked by: none
 
-### ncaab-regulation-tie-shape — OPEN — opened 2026-11-08 — session c2fd17f8-7d77-4eed-b025-0830211e05b3
+### ncaab-regulation-tie-shape — CLOSED 2026-11-08 (GOAL MET: tie deficit is BOTH spread and shape; SHAPE-only hypothesis falsified; score_effect_k 0.002 not the spread fix; findings PHASE 2 STEP 3b + todo #765) — opened 2026-11-08 — session c2fd17f8-7d77-4eed-b025-0830211e05b3
+- **GOAL VERDICT `[2026-11-08 23:15Z]`: GOAL: MET.**
+  - Verification ran: sims at 8 checkpoints on 540 pooled games (switches on, snapshot engine = fleet HEAD 582c24637), against 4,472 real pool games. Checks 4,320/4,320 (margin match, OT iff tie) and real 5,865/5,865.
+  - Hypothesis (SHAPE only) FALSIFIED by its own test: the SD ratio is 1.16-1.27 at 30-37m with the interval excluding 1. Shape is ALSO real: the tie ratio is 2.5-3.0 real vs 1.6-1.9 sims, beyond SE from 37m.
+  - Lever follow-up falsified for SE (0.01 of a 0.27 SD gap). ALT gives 3-5%. Neither moves the tie rate.
+  - Read-only: no engine, served-code or config change; no deploy.
 - Goal: Measure, read-only, the production NCAAB re-sim's end-of-regulation margin distribution against real games by margin and clock (minutes 30-39.5), and say whether its regulation-tie deficit (12.8% vs 19.1% OT within 3 at 38m) is SPREAD (the late margin moves the wrong amount) or SHAPE (no end-game mass at a tie), before any engine change
 - Files: .syndicate/findings_2026-11-07_basketball_interval_backtest.md, docs/ai_context/todo.md, .syndicate/log/2026-11-08.md
 - Hypothesis: SHAPE, pre-registered 2026-11-08 21:27Z: the sims' spread of the leader's late margin change is right (SD within 10% of real at 36-39m, |margin| <= 6), but real games put more mass on a regulation tie relative to +-1 (tie ratio P(0) / mean P(+-1) higher than the sims' beyond 1.96 SE), from end-game play the engine does not model (a tied team holding for the last shot, a trailer down 3 shooting a 3). Engine read: possessions are pre-counted per period with a random alternation (0.85) and no last-shot logic; the only trailer rule is a p3 bump.
