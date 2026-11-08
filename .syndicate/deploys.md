@@ -57201,3 +57201,18 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - **Why NCAAB is 108 refused / 7 priced:** the loop still starves. Every `NCAAB_LIVE_RESIM_TICK` 00:02-00:50Z ran to its 240 s budget, re-simming 1-8 of 10-14 live games and carrying 4-11 per tick. `ncaab-live-resim-capacity`'s workers=2 loads at live-odds-worker's own recycle (~03:26Z per its 23:56:57Z entry). After that, the refusal count is that lane's reading too.
   - **Not read yet:** the served board after this build's publish. NBA's Live column was not read by eye (the join's `display=512` is the instrument).
 - **Revert:** set the default back to `shadow` (one line in `lane_age_gate_mode`) on main, then ff + a claimed refresh-worker TERM. Or `SYNDICATE_LIVE_GAMELINE_LANE_AGE_GATE=shadow` with a full down/up.
+
+## 2026-11-08 01:25:00Z (7:25 PM CST 11-07) -- VERIFY addendum to the 22:36:00Z `e21335809` NBA lens live-state row (lane `nba-lens-live-state`, todo `#762`) -- **MEASURED: Final transition exact, a 3-live-game slate 0 mismatches, `lens_live_games` = ESPN's live-game count on every NBA join since tip (1 ... 1, then 3)**
+- **Appended, not edited into the 22:36:00Z row.** This closes that row's "still to read". Same code (fleet live-odds-worker pid 757868); read-only watcher `C:\tmp\lenslive\later.sh`.
+- **Final:** ESPN put DEN@IND in `post` by 00:33:33Z. The lens writes at 00:33:34Z and 00:34:50Z both show `Final 114-102`, exact, with 0 mismatches across 7 games.
+  - `state_check` on the first write: `{resim_in_play 1, lens_live 0, lens_final 1, lens_not_started []}`.
+  - On the second: all 0, because the re-sim had dropped the finished game.
+- **Multi-game, 01:20:00Z** (lens written 01:17:14Z): 3 live (BKN@ATL, NY@CLE, WSH@OKC), 1 final, 3 pregame. 0 mismatches.
+  - `state_check` = `{resim_in_play 3, lens_live 3, lens_final 0, lens_not_started []}`.
+  - Scores trail ESPN by the lens's age (166 s here; e.g. BKN@ATL lens `9:16 2nd 42-32` vs ESPN `8:09 2nd 43-34`). That is one lens tick, the bound the goal sets.
+- **Prop join (`[layer2_shortlist] LIVE_PROJECTION_JOIN sport=nba`, refresh-worker), every line since tip:**
+  - `lens_live_games=1` at 22:34:04Z, 22:48:37Z, 23:07:14Z, 23:43:48Z, 00:07:17Z (DEN@IND live), 00:47:30Z and 01:03:41Z (BKN@ATL live; NY@CLE / WSH@OKC tipped ~01:12Z).
+  - Then `lens_live_games=3 lens_indexed=2118` at 01:24:09Z. 0 tracebacks.
+- **Whole evening:** `LENS_STATE_BEHIND_RESIM` 0 lines; `ESPN_LIVE_STATE_FETCH_FAILED` 0 lines.
+- **expect vs measured:** the expectation was lens == ESPN within one tick, `lens_not_started == []`, and `lens_live_games` = live games. All three held on 1-game, 3-game and Final states.
+- Lane `nba-lens-live-state` CLOSED (GOAL MET).

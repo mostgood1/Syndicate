@@ -1512,7 +1512,7 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
     - The narrower vendored clip (0.75-1.25, after the team prior stacks) had capped blowouts. Women's sims fell -3.2 total / -4.1 margin short of their own target.
     - Now the published pregame sims sit on their target: wncaab 11-04 total -1.06, margin -0.40; ncaab 11-03 -0.28 / -0.32 (22:56Z read).
 
-## [nba-lens-live-state] THE NBA LIVE LENS'S GAME STATE FROZE AT TIP: THE CARDS-CONTEXT CACHE NEVER SAW ITS OWN ESPN READ. FIX `e21335809` LOADED ON THE FLEET 2026-11-07 AND VERIFIED ON A LIVE GAME `[verified 2026-11-07 in code + on the fleet, lane nba-lens-live-state, todo #762, deploys.md 2026-11-07 22:36:00Z]`
+## [nba-lens-live-state] THE NBA LIVE LENS'S GAME STATE FROZE AT TIP: THE CARDS-CONTEXT CACHE NEVER SAW ITS OWN ESPN READ. FIX `e21335809` LOADED ON THE FLEET 2026-11-07 AND VERIFIED ON A MULTI-GAME SLATE `[verified 2026-11-07/08 in code + on the fleet, lane nba-lens-live-state (CLOSED, GOAL MET), todo #762, deploys.md 2026-11-07 22:36:00Z + 2026-11-08 01:25:00Z]`
 
 - **Where the lens's game state comes from:** `live/nba_live_lens.json` (live-odds-worker's lens loop) takes its games, `status` and `live_state` score from `nba/cards.build_cards_page_context`. That merges `_best_live_state_payload`: the keyvalue `nba_source/data/processed/live_snapshots/live_state_<date>.jsonl`, else an ESPN scoreboard read. The re-sim's keys (`gameLens`, `liveProps`, ...) are merged on top; status and score are not.
 - **On the fleet, `live_state_<date>.jsonl` is written ONCE, pregame, and never during play.** 11-06: 1 line at 17:30:49 CST, every game Scheduled. 11-07: 06:41 CST. During play the live state is therefore ESPN's, through that fallback.
@@ -1530,6 +1530,7 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   - The first lens write built after ESPN flipped DEN@IND to `in` read `Live` with ESPN's score, and so did the next one (`12-7` exact). 0 mismatches across 7 games.
   - `state_check.lens_not_started == []`.
   - `LIVE_PROJECTION_JOIN sport=nba lens_live_games=1` at 22:34:04Z.
+  - Final: `Final 114-102` at the first lens write after ESPN's `post`. 01:20Z: 3 live + 1 final + 3 pregame, 0 mismatches. `lens_live_games` equalled ESPN's live count on every join since tip (1 x7, then 3 at 01:24:09Z).
 - **The lens tick is ~170 s, not 60 s** (`TICK_COMPLETE` 22:13:33Z, then 22:16:24Z). A game can read `Scheduled` for up to one tick after tip.
 - **Cost, measured on the fleet:** a cold cards build is ~0.3 s of work plus two ~0.2 s deepcopies of a 1.79 MB-pickle context; a hit is 0.22 s.
 - **Open, not this subject:** the prop join's player key does not fold diacritics (lens `Nikola Jokić` vs board `nikola jokic`). Lane `nba-live-proj-actuals` owns that lookup.
