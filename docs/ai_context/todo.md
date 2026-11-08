@@ -161,6 +161,14 @@
 - **Owed:** (1) DONE 11-06 (deploys.md VERIFY part 1 02:18:12Z, part 2 2026-11-06 03:44:00Z (9:44 PM CST)): 37 of 37 live ticks re-simmed every live game (`carried=0 refusals={}`, elapsed <= 76.2 s); per game 95% / 98% of non-segment live rows carry a live number; bench props filled (`no_actual` 173 -> 0); live NBA spread/h2h rows with `live_total` 0 of 165. Remaining live gaps went to `#762`. (2) Fri 11-06 (9 games; 2 tip 00:10Z, 1 at 00:40Z, 4 at 01:10Z, 2 at 03:10Z 11-07): `NBA_LIVE_RESIM_TICK carried=` > 0 on budget-exhausted ticks, and the per-game re-simmed share in `live_resim_history` flat across scoreboard position. Backup reader: one-time task `syndicate-nba-live-readings-1106`, 20:15 CST 11-06. Two games never exhaust the 240 s budget, so tonight cannot show the fairness. (3) OT is exercised live only by an overtime game.
 
 ### `#762` — **NBA LIVE QUARTER / HALF LINES NEVER GET A LIVE NUMBER, and three more live-NBA gaps seen beside `#761`: DISPLAY FIX ON THE FLEET (`3d376da7c`, live-odds-worker 15:51:30Z + refresh-worker 16:32:08Z 11-06); live VERIFY owed on the 11-06 slate** — 2026-11-04, lane `nba-live-proj-actuals` (user "Yes, start #762" 2026-11-06)
+- **STATUS 2026-11-08 11:12 AM CST (17:12Z): (6) PULLED-MARKET PROPS BUILT, on main `a3d72c82b` (user "Yes, build it"), NOT LOADED.**
+  - Each game row remembers its posted lines across ticks. A line the latest pull no longer covers is published with `quotePulled` and no `liveModelProbOver`, and the join shows it display-only: Live proj., actual and display %, with no live-aware flag, live probability or edge.
+  - Fail-safe: if the flag is dropped, the join still finds no live probability and withholds the edge (`no_live_probability`).
+  - Switch `SYNDICATE_NBA_LIVE_PROPS_PULLED_LINES` (default on). 23 new tests pass, 311 neighbouring tests pass.
+  - Load needs a fleet ff to `a3d72c82b`, plus:
+    - a refresh-worker restart (the join);
+    - a live-odds-worker restart, or its max-uptime recycle (~21:26Z today) (the producer).
+  - The fleet is at `4f367324a`: lane `all-sport-interval-projections` ff'd at 17:11:42Z to its own SHA, so this commit did not ride. Verify per lane (vii).
 - **STATUS 2026-11-07 11:41 PM CST (05:41Z 11-08): ACCENT FIX `7d72f8e9d` LOADED 00:43:32Z, NOT YET VERIFIED. LATE-GAME PROP GAP MEASURED, NOT BUILT (deploys.md 2026-11-08 05:41:43Z).**
   - Verification: no live NBA player had an accented ESPN name after the load (watcher 00:44-05:32Z; `miss_player=0` on all 20 joins). It moves to LAL @ DET 11-08 23:00Z (`Luka Dončić`).
   - Gap: 1,926 of 14,478 live prop row-builds (13.3%) had their player in the lens but no live number; late in games the share reached 79%.
