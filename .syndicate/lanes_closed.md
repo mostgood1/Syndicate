@@ -14287,3 +14287,14 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 1 SAFE of 17 CLOSED; moved `closed-lane-archive-20261107-1522`. Readings in .syndicate/log/2026-11-07.md (01:3xZ 11-08 entry).
+
+### closed-lane-archive-20261107-2241 — CLOSED 2026-11-07 (GOAL MET: 1 blocks archived) — opened 2026-11-07 — session 21885fca-02fd-4271-85e1-37c50bd24059
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness --idle-min 240 read 1 SAFE of 17 CLOSED; moved `closed-lane-archive-20261107-1818`. Table in log/2026-11-07.md.
+
+### closed-lane-archive-20261108-0040 — CLOSED 2026-11-08 (GOAL MET: 5 blocks archived) — opened 2026-11-08 — session a737c5e6-9439-434a-98a2-a6763b5e7357
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 5 SAFE of 17 CLOSED; all 5 moved to lanes_closed.md with one pointer each. Detail in log/2026-11-08.md.
+- Moved: nba-lens-live-state, basketball-interval-projections, basketball-interval-backtest, ncaab-interval-resim-prod-switches, closed-lane-archive-20261107-1932
