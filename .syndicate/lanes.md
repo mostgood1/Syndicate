@@ -875,6 +875,14 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 read SAFE for 1 of 12; moved closed-lane-archive-20261108-0445. Table and WAIT reasons in log/2026-11-08.md.
 
+### primary-tree-ff — OPEN — opened 2026-11-08 — session 8a93d939-bc0c-4fd2-aa61-bcd76b63680d
+- Goal: The shared PRIMARY checkout C:/Users/tempadmin/OneDrive/Coding/Syndicate is fast-forwarded from f5427e385 to an exact origin/main SHA with every previously-dirty path either still present or proven duplicated upstream, each non-identical file sha256-backed-up outside the repo first; its scripts/deploy_preflight.py contains target_is_fleet
+- Files: none (ledger-only in git: this lane block + todo #766 follow-up line; the ff rewrites the primary tree's working copy, not repo content)
+- Hypothesis: n/a (maintenance; 09-15 recipe in auto-memory project_primary_tree_fast_forward_recipe.md)
+- Falsification test: n/a
+- Verification: git -C <primary> rev-parse HEAD == the target SHA; 0 staged; kept files byte-identical to backup; grep target_is_fleet in primary scripts/deploy_preflight.py; backup manifest sha256 verified
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
