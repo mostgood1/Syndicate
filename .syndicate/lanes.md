@@ -811,11 +811,6 @@ death, never life — do not invert it.
 - Verification: off != on unit tests; same-payload replay old vs new adapter on fleet data, every changed side printed beside its row and read by eye; named-quote counts per sport before/after
 - Blocked by: none
 
-### closed-lane-archive-20261107-1406 — CLOSED 2026-11-07 (GOAL MET: 1 blocks archived) — opened 2026-11-07 — session 5271e327-8caa-46c6-919f-36784b66f165
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: MET. owner_liveness.py --idle-min 240 at 20:06Z (2:06 PM CST) returned SAFE for 1 of 12 CLOSED slugs; dry run + invariants matched baseline. Moved: `repo-out-of-onedrive-plan`. Table and WAIT reasons in `log/2026-11-07.md` 20:09Z.
-
 ### kalshi-fanin-reversed-orientation — CLOSED 2026-11-07 (GOAL MET: 79c8aac12 loaded on the fleet refresh-worker 23:41:12Z; the worker's first ncaab build logs the new code's counts) — opened 2026-11-07 — session e32fef1a-01e8-4afe-a284-01acd3728545
 - **GOAL VERDICT `[2026-11-07 23:49Z checkpoint]`: GOAL: MET.**
   - Goal verbatim: "A Kalshi game-line quote whose ticker lists a game's clubs in the reverse order of our board (the neutral-site NEBPROV totals vs our Providence @ Nebraska) names that game in the venue fan-in when the ticker's own date is the game's date, so it prices its own totals row; a reversed match on any other date, or onto two games, stays unnamed and refused; every changed side on a fleet-data replay is read by eye".
@@ -902,6 +897,11 @@ death, never life — do not invert it.
 - Falsification test: n/a
 - Verification: unit tests incl. off != on per sport source; JS render test; read-only dry-run of the attach over the fleet's served chips (blocks per sport x state, settled == linescore) BEFORE ship; after ff + refresh-worker TERM + reload-web: served chips per sport x state, served-page screenshot, 0 ATTACH_FAILED
 - Blocked by: none
+
+### closed-lane-archive-20261107-1818 — CLOSED 2026-11-07 (GOAL MET: 1 blocks archived) — opened 2026-11-07 — session 8e33ad2d-f216-48f4-95a0-fcaf8a10b203
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness --idle-min 240 read 1 SAFE of 15 CLOSED; moved `closed-lane-archive-20261107-1406`. Table in log/2026-11-07.md.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1087,6 +1087,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261107-0250` — CLOSED 2026-11-07 (GOAL MET: 1 block archived) — opened 2026-11-07 — session 2dc4077e-c096-4d42-ad11-49c63e5980af
 - `closed-lane-archive-20261107-0700` — CLOSED 2026-11-07 (GOAL MET: 1 block archived) — opened 2026-11-07 — session acc7ac9c-5f0f-432c-89dc-61ad15e92a7c
 - `closed-lane-archive-20261107-1112` — CLOSED 2026-11-07 (GOAL MET: 1 block archived) — opened 2026-11-07 — session 8578f21b-7320-4325-bba6-9bc031984887
+- `closed-lane-archive-20261107-1406` — CLOSED 2026-11-07 (GOAL MET: 1 blocks archived) — opened 2026-11-07 — session 5271e327-8caa-46c6-919f-36784b66f165
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
