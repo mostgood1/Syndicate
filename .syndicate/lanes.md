@@ -884,6 +884,14 @@ death, never life — do not invert it.
 - Verification: findings file on origin/main with file:line per dependency; CLAUDE.md on origin/main points at the runbook + state_worker [local-production-host]; marker decision put to the user
 - Blocked by: none
 
+### all-sport-interval-projections — OPEN — opened 2026-11-07 — session c5cc97a7-c15d-4482-a455-7482f69262af
+- Goal: Every Games-rail card for nhl, nfl, ncaaf, mlb and soccer whose engine publishes per-segment score output carries an interval-projections block (the basketball contract: periods + projected final; pregame from the pregame sim, live from the live re-sim where it computes segments), read on the fleet's served /api/board/game-chips (every chip whose game has such a source carries a block, none where it is absent, settled periods equal the line score) and seen on the served page; each sport whose engine has no segment output is listed with what it would take; no pricing switch turned on
+- Files: syndicate/features/shared/game_chip_intervals.py (non-basketball sources + period tables), syndicate/features/shared/game_chip_scoreboard.py (the _attach_intervals call sites ONLY), syndicate/templates/intelligence.html (chipIntervals ONLY), syndicate/static/shared/board_cards.css (the interval-box rules only), tests/test_game_chip_intervals.py, tests/js/games_rail_intervals.test.mjs
+- Hypothesis: n/a (display of existing sim output; Phase 3 of the plan approved 2026-11-07)
+- Falsification test: n/a
+- Verification: unit tests incl. off != on per sport source; JS render test; read-only dry-run of the attach over the fleet's served chips (blocks per sport x state, settled == linescore) BEFORE ship; after ff + refresh-worker TERM + reload-web: served chips per sport x state, served-page screenshot, 0 ATTACH_FAILED
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
