@@ -32,7 +32,13 @@
   - ~~**D2**~~ **DECIDED 2026-11-08: keep the `RENDER_*` markers**, documented in CLAUDE.md as faked on purpose (user 2026-11-08 "Yes, close out" (accepting keep-as-is)). No code change. Revisit only if Render is cancelled (findings §4).
   - ~~**D3**~~ **DECIDED 2026-11-08: leave `render.yaml` and the guard's drift check as they are** (user 2026-11-08 "Yes, close out" (accepting keep-as-is)). Do NOT add even a header comment: any `render.yaml` push may fire `blueprint_sync` against the suspended Render services. CLAUDE.md documents that its edits are inert on the fleet.
   - ~~**D4**~~ **DONE 2026-11-08 16:54Z (10:54 AM CST)** — user: "Yes, chmod it". `render_env/live-odds-worker.json` 644 -> 600 (owner amyn). Content sha256 is unchanged, the owner can still read it, and all four files in `render_env/` now read 600.
-- **Follow-up (OPEN, owned elsewhere):** fast-forward the primary tree. It is why sessions still see preflight read Render. Being done by session `local_9d448bd9` ("Fast-forward the primary checkout to main"), started 2026-11-08; that session records its result here.
+- ~~**Follow-up:** fast-forward the primary tree.~~ **DONE 2026-11-08 17:50Z (11:50 AM CST), lane `primary-tree-ff` (session `local_9d448bd9`):**
+  - The primary tree went `f5427e385` -> `711e299d6` (2,539 commits, guarded ff) -> `517d47dbc`, which was origin/main at 17:51Z.
+  - Its `scripts/deploy_preflight.py` now has the fleet path (`target_is_fleet`, line 535). That is what sessions started there were missing.
+  - Nothing was lost. All 599 dirty files were sha256-backed-up first to `C:\tmp\primary-tree-backup-2026-11-08\`, and a re-hash matched 599/599.
+    - The 4 blockers were identical to main, or contained in main's ledger union.
+    - The 4 other modified files and all 591 untracked files are still present, byte-identical.
+  - Details are in the lane block.
 
 ### `#765` — **BASKETBALL INTERVAL REPLAY HARNESS: BUILT, ON MAIN, RUN ON THE FLEET. The bar for Phase 2 is the pregame line spread over the time left (`pregame_rate`), not the engine. NBA's live re-sim beats it nowhere. NCAAB's, run with production's switches, beats it on h1 at the tip, on h2 and on the in-game full total. Observed game pace loses everywhere** — 2026-11-07, lane `basketball-interval-backtest` (session c2fd17f8; Phase 2 step 1 of the user's interval-projection plan)
 - **Built (on main `4264deceb`..`c7ba7a01c`, new files only, read-only, no deploy):**

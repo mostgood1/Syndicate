@@ -901,13 +901,31 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 read SAFE for 1 of 12; moved closed-lane-archive-20261108-0445. Table and WAIT reasons in log/2026-11-08.md.
 
-### primary-tree-ff — OPEN — opened 2026-11-08 — session 8a93d939-bc0c-4fd2-aa61-bcd76b63680d
+### primary-tree-ff — CLOSED 2026-11-08 (GOAL MET: primary tree f5427e385 -> 711e299d6 -> 517d47dbc = origin/main at 17:51Z, nothing lost, preflight there has target_is_fleet) — opened 2026-11-08 — session 8a93d939-bc0c-4fd2-aa61-bcd76b63680d
 - Goal: The shared PRIMARY checkout C:/Users/tempadmin/OneDrive/Coding/Syndicate is fast-forwarded from f5427e385 to an exact origin/main SHA with every previously-dirty path either still present or proven duplicated upstream, each non-identical file sha256-backed-up outside the repo first; its scripts/deploy_preflight.py contains target_is_fleet
 - Files: none (ledger-only in git: this lane block + todo #766 follow-up line; the ff rewrites the primary tree's working copy, not repo content)
 - Hypothesis: n/a (maintenance; 09-15 recipe in auto-memory project_primary_tree_fast_forward_recipe.md)
 - Falsification test: n/a
 - Verification: git -C <primary> rev-parse HEAD == the target SHA; 0 staged; kept files byte-identical to backup; grep target_is_fleet in primary scripts/deploy_preflight.py; backup manifest sha256 verified
 - Blocked by: none
+- **RESULT 2026-11-08 17:50Z (11:50 AM CST): GOAL MET.**
+  - Two fast-forwards. First the guarded `ff.py` took the primary tree `f5427e385` -> `711e299d6`: 2,539 commits, 2,537 files. Then a plain `--ff-only` took it to `517d47dbc`, which touched only `lanes.md` and `todo.md`, both clean there. `517d47dbc` was origin/main at 17:51Z.
+  - 0 staged. `scripts/deploy_preflight.py` there now has `target_is_fleet` at line 535, which is the fleet path.
+  - **Dirty set: 8 modified + 591 untracked = 599 files** (216 porcelain entries). There were 0 staged.
+  - **Backup.** All 599 files, not just the non-identical ones: `C:\tmp\primary-tree-backup-2026-11-08\`. It holds `files/<path>`, `manifest.json` with each sha256, `diff_HEAD_binary.patch` and `status_porcelain.txt`. A re-hash matched 599/599 and found 0 changes between classify and backup.
+  - **4 blockers were reset**, being modified files that the target changes:
+    - `deploy-guard.py` and `history.jsonl`: identical to the target. history.jsonl has 369/369 rows, and was re-hashed immediately before the checkout.
+    - `log/2026-10-14.md`: every line is in main's `.syndicate` union.
+    - `lanes.md`: 108 lines absent from main's union. 102 are in HEAD's own lanes.md, as older versions of blocks main has rewritten. The other 6 are the OPEN copies of `soccer-uefa-competitions` / `soccer-uefa-followups`, which main carries CLOSED in `lanes_closed.md`. Accepted by name.
+  - **Kept byte-identical:**
+    - The 4 modified files main does not touch, which stay modified: `findings_unknown_submit_live_evidence.md`, the nfl wk1 props csv, `bucket_realised_mlb.json` and `oddsapi_quota.json`.
+    - All 591 untracked files. 0 collided with a target add, checked exact and case-insensitive. 0 ignored on-disk files were overwritten. Both probes got a both-answers control.
+  - **(c) live peer work: none.** The only non-regenerable untracked files are `.github/workflows/mlb-season-artifacts.yml` and `scripts/merge_odds_history_artifact.py`. Every line of both is in main's `.syndicate/recovered_2026-09-10_uncommitted_code.md`, so they are (b), and they are left in place.
+  - **`check_lane_invariants.py` from the primary tree.** Before: 2 contested + 1 orphan marker. After: 6 contested + 1 orphan marker.
+    - The 6 contested come from main itself: a worktree at origin/main reads the same 6.
+    - The orphan marker is `ncaab-late-gap-decomposition` (`.current-lane.c2fd17f8`, written 10:56 CST today). Its block exists only uncommitted in worktree `beautiful-bell-389a6f`'s lanes.md. That is a lane in flight, not lost.
+  - **Scripts:** `C:\tmp\pt_ff_1108\{classify,lanes_check,backup,ff}.py`, with `classify.json` beside them.
+  - **The tree drifts again at once.** origin/main was 2 ahead by 17:55Z. Re-run the recipe in auto-memory `project_primary_tree_fast_forward_recipe.md`.
 
 ### ncaab-live-totals-bias — OPEN — opened 2026-11-08 — session 6df1b15d-5ff8-4256-aba9-3a91f7304efc
 - Goal: Findings file on origin/main attributing the NCAAB live re-sim's low full-game total (model_total_mean - ESPN final -3.41 +-1.10 within 30 s, 11-02..11-06, 1,680 rec / 151 games) by game phase, margin, pace and prior vs live update, with the smallest proposed fix and its expected effect, plus a todo entry. Read-only; no fleet change.
