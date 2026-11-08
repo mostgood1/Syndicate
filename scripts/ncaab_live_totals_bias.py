@@ -345,7 +345,9 @@ def main():
                         acc[("P1 priced totals model-final", t)].append((eid, err))
                         acc[("P1 priced totals line-final", t)].append((eid, line_err))
                         acc[("P1 priced totals model-line", t)].append((eid, gap))
-                        if pen is not None:
+                        if pen is not None:  # the same rows, as they are and with the rule off
+                            acc[("P1 SAME ROWS today model-final", t)].append((eid, err))
+                            acc[("P1 SAME ROWS today model-line", t)].append((eid, gap))
                             acc[("P1 COUNTERFACTUAL rule off model-final", t)].append((eid, err + pen))
                             acc[("P1 COUNTERFACTUAL rule off model-line", t)].append((eid, gap + pen))
                     rec_at = str(r.get("recorded_at") or "")
@@ -371,6 +373,7 @@ def main():
                 tags.append(f"{censored}|h2 margin {mb}")
                 tags.append(f"{censored}|h2 {bf}")
                 tags.append(f"{censored}|{ep}|h2 {bf}")
+                tags.append(f"{censored}|h2 {bf}|phase {ph}")
                 if period == PERIODS and clock <= 240:
                     tags.append(f"{censored}|h2 last4m margin {mb}")
                 # the threshold itself: |margin| 11..19 in the last period with > 8 min to play (the flag's step at 15)

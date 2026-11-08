@@ -1,5 +1,36 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#768` — **NCAAB LIVE TOTALS RUN ~2 LOW BECAUSE THE ENGINE'S NBA BLOWOUT RULE COVERS THE WHOLE COLLEGE SECOND HALF; NOT THE PRIOR, NOT END-GAME FOULING. FIX PROPOSED (two env fields), NOT LOADED; HARNESS GATE RUNNING** `[2026-11-08, lane ncaab-live-totals-bias, session 6df1b15d]`
+- **Findings:** `.syndicate/findings_2026-11-08_ncaab_live_totals_bias.md`.
+- **Scripts:**
+  - `scripts/ncaab_live_totals_bias.py`: ledger attribution, men's and women's.
+  - `scripts/ncaab_blowout_resume_probe.py`: engine probe, rule off vs on.
+  - `tests/test_ncaab_live_totals_bias.py`.
+- **Cause.** `basketball_engine/engine.py:2246-2250` flags a period `blowout` at `q >= N_PERIODS and |m| >= 15`.
+  - NCAAB has 2 periods, so the flag covers the whole second half, decided at the half or at the resume point.
+  - It brings 8% longer possessions, makes x0.96 and bench minutes.
+- **Measured on fleet ledgers, 2,431 lane states / 192 games, 11-02..11-06:**
+  - h2 flag-on live update **−1.97 ± 0.09** (715 states / 111 games), against +0.69 ± 0.16 with the flag off;
+  - a step of −1.45 ± 0.43 exactly at |m| = 15;
+  - priced rows model − line −2.74 ± 0.37 (h2 flag on) and −4.02 ± 0.69 (h1 |m| ≥ 15);
+  - the probe (30 games): the rule takes −1.94 ± 0.26 / −1.87 ± 0.21 from a full h2 at a 16 / 24 lead.
+- **Not the cause:**
+  - the prior: pregame target − final +0.01 ± 1.06 on 279 games;
+  - end-game fouling: last 2 min −1.12 ± 0.68;
+  - overtime: fixed 11-05 22:37:41Z.
+- **Women's.** Books +3.6 ± 1.6 high on 29 live-priced games. NOT supportable:
+  - the same games' close-calibrated prior was also +4.0 high;
+  - all 196 women's games give +1.22 ± 1.23;
+  - a claim needs about 43-110 games.
+- **Proposed (user's call; nothing loaded):**
+  - add `"blowout_q4_margin": 999, "blowout_margin": 999` to live-odds-worker's `SYNDICATE_NCAAB_LIVE_MECHANISMS` (men's only), loaded by a drained full down/up;
+  - better follow-up: an engine `blowout_window_s` field (final ~240 s for NCAAB), because real blowouts DO slow in the last 4 minutes.
+- **Re-fit owed:**
+  - the pregame tip total rises +0.61 ± 0.36: re-centre with `solver_endgame_pts_per_team`;
+  - pair-gate with the end-game fouling re-fit another session is running (`ncaab2026_oos_B`).
+- **Expected effect (lower bound, probe cost pro rata, same 19,906 priced rows / 192 games):** model - line -1.95 -> -1.40; h2 flag-on rows -2.74 -> -1.91; h1 |m| >= 15 rows -4.02 -> -2.74.
+- **Owed:** the paired harness gate, run `ncaab2026_blowout_off` (WSL `~/bball_iv/runs/`, launched 18:11:38Z, nice 19, ~20:50Z done). Read it with `scripts/ncaab_blowout_harness_read.py`. Its verdict goes into the findings, then the user's decision.
+
 ### `#767` — **GAMES-RAIL INTERVAL PROJECTIONS FOR EVERY SPORT: ON MAIN `4f367324a`, LOADED AND VERIFIED FOR NFL / NHL / SOCCER; NCAAF READING OWED, MLB AT THE 2027 OPENER** `[2026-11-08 17:3xZ, lane all-sport-interval-projections (CLOSED, GOAL PARTLY MET), session c5cc97a7]`
 - **UPDATE 17:30Z:** (a) is DONE for nfl / nhl / soccer. The pregame blocks rode lane `nba-live-proj-actuals`' refresh-worker restart at 17:23:38Z (user: "Ride the next restart"). Served at 17:28Z: nfl pregame 13/13, nhl 6/6, soccer pregame 12. The other 182 soccer chips have NO sim match (0 of 182). Page: 134 PROJ boxes (deploys.md VERIFY 17:30:45Z).
   - **Still owed: NCAAF.** Read the served chips on its next slate, pregame Q1-Q4 and live final. Expect every game in the week's `smartsim2_segment_distributions` sidecar (FBS-vs-FCS games have none) and every live re-sim lane. Read-only, no claim needed.
