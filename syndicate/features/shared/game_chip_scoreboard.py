@@ -962,10 +962,12 @@ def attach_served_linescores(chips: list[dict[str, Any]], date_value: str) -> No
 
 
 def _attach_intervals(chips: list[dict[str, Any]], date_value: str, *, live_only: bool) -> None:
-    """Interval projections on basketball chips (`game_chip_intervals`, lane basketball-interval-projections).
+    """Interval projections on the chips (`game_chip_intervals`; lanes basketball-interval-projections and
+    all-sport-interval-projections).
 
     Reads published sim artifacts only. Never costs the scoreboard: any failure leaves the chips as they were.
     """
+    started = time.monotonic()
     try:
         from syndicate.features.shared.game_chip_intervals import attach_interval_projections
 
@@ -975,7 +977,7 @@ def _attach_intervals(chips: list[dict[str, Any]], date_value: str, *, live_only
               f"error={type(exc).__name__}: {str(exc)[:160]}", flush=True)
         return
     if not live_only and counts:
-        print(f"[game_chip_intervals] ATTACHED date={date_value} "
+        print(f"[game_chip_intervals] ATTACHED date={date_value} seconds={time.monotonic() - started:.2f} "
               + " ".join(f"{k}={v}" for k, v in sorted(counts.items())), flush=True)
 
 
