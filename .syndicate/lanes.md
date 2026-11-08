@@ -925,6 +925,14 @@ death, never life — do not invert it.
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 at ~22:45Z (16:45 CST) gave SAFE for 3 of 20 CLOSED blocks; dry run, apply and the invariant check (no new FAIL vs baseline) all passed.
 - Moved to lanes_closed.md: render-retirement-inventory, all-sport-interval-projections, primary-tree-ff. Table + deferrals: log/2026-11-08.md.
 
+### ncaab-late-spread-source — OPEN — opened 2026-11-08 — session c2fd17f8-7d77-4eed-b025-0830211e05b3
+- Goal: Find, read-only, where the production NCAAB re-sim's over-wide late margin spread comes from (SD of the margin change 16-27% above real at minutes 30-37, step 3b): decompose the margin-change variance from minute 30 and 36 to the end of regulation into a possession-differential part and a per-possession part, sims vs real play-by-play, on the same 540 games and the 4,472-game pool
+- Files: .syndicate/findings_2026-11-07_basketball_interval_backtest.md, docs/ai_context/todo.md, .syndicate/log/2026-11-08.md
+- Hypothesis: PER-POSSESSION, pre-registered 2026-11-08 23:26Z: with possessions measured the same way on both sides (FGA + TOV + c*FTA - OREB), the sims' possession differential (home minus away) over the window has an SD within 25% of real, and at least 60% of the sims' excess margin-change variance at 30m sits in the per-possession residual (points beyond the window's mean points per possession times possessions, home minus away). The candidates for that residual are the shot mix (3PA share), offensive-rebound chains and free-throw trips, read off the same box.
+- Falsification test: The possession-differential part carries at least half of the excess variance at 30m, or the residual part is within 10% of real.
+- Verification: A scratch engine copy (~/bball_iv/code4) adds one RNG-neutral POSS marker per possession under record_events; its regulation margins reproduce sims.jsonl exactly at 30m and 36m (fidelity, every game). Tables of per-team window points, possessions, PPP, 3PA share, FTA rate, OREB rate and the variance split, sims vs real, in the findings file and #765. Diagnostic only: nothing ships from this lane.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
