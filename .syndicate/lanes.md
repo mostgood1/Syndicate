@@ -860,6 +860,15 @@ death, never life — do not invert it.
   - Second board build on the new pid 273.1 s (23:00:37Z), back to the day's 246 s median; the first, 2,321 s, was the cold start.
   - Ride-along: `wncaab-module`'s chip `_pace_block` now also runs in refresh-worker.
   - deploys.md 2026-11-08 21:52:45Z. Carry bound stays shadow. Owed: a 13-40-live reading.
+- STATUS 2026-11-08 5:32 PM CST (23:32Z): MEMORY READ (fleet watcher's report; read-only, no change).
+  - live-odds-worker's `container_memory_pct_of_max` is its own process tree's RSS against `SYNDICATE_LOCAL_MEMORY_LIMIT_MB=3072`. That is not a cgroup.
+  - The pool is a flat 188-214 MB.
+  - The peaks are `refresh_odds_sources.py` (up to 1,143 MB) and `poll_soccer_live_state.py` (up to 1,156 MB), on a ~1 GB worker.
+  - Before the pool (11-07 5:00-9:28 PM CT): 81 readings at >=100%, max 122.4%.
+  - 11-08 since workers=2: 55 at >=100%; 17 without the pool's RSS.
+  - 0 headroom refusals (the six reason codes) in any role, 11-07/08.
+  - Worker count unchanged. Raising the limit is the user's call.
+  - Scripts `C:/tmp/ncaabcap/mem_attr.py`, `mem_refuse.sh`.
 - Blocked by: none
 
 ### ncaab-live-totals-bias — CLOSED 2026-11-08 (GOAL: MET; harness gate PASSED, fix NOT loaded, the user decides) — opened 2026-11-08 — session 6df1b15d-5ff8-4256-aba9-3a91f7304efc
