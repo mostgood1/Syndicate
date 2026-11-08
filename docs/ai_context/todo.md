@@ -1,5 +1,19 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#766` — **RENDER IS NOT NEEDED AT RUN TIME; FOUR DECISIONS OWED TO RETIRE WHAT STILL ASSUMES IT** `[2026-11-08 00:3xZ, lane render-retirement-inventory, session 36cc0a0e]`
+- **Findings:** `.syndicate/findings_2026-11-07_render_dependency_inventory.md` (file:line per dependency, and what breaks if Render vanished).
+- **Measured:**
+  - Every `render.yaml` `value:` key (48 / 77 / 72 per role) is shadowed by the 2026-10-01 Render env snapshot `~/syndicate-prod/render_env/<role>.json`. So editing `render.yaml` changes nothing on the fleet.
+  - That snapshot is excluded from backup, and its only documented recovery is re-import from Render.
+  - `deploy_preflight.py` on `main` is fleet-native (10-25). The HTTP 503 reports come from the PRIMARY tree, which is 2,488 commits behind `main`.
+- **Shipped:** findings `3dcc71093`; the daily-accuracy skill defaults to the fleet `c4989c721` (it read the suspended onrender host and exited 4; verified rc 0 against the fleet).
+- **Owed (user decisions):**
+  - **D1** — CLAUDE.md + `/preflight` docs fix. Drafted as `9fcd9e25b` on local branch `render-retirement-docs-draft`, NOT on main.
+  - **D2** — `RENDER_*` markers → neutral `SYNDICATE_SERVICE_ROLE` / `SYNDICATE_HOSTED` (findings §4, options 1/2/3; recommended 3: keep and document).
+  - **D3** — `render.yaml`'s role: freeze, or fold the snapshot into a fleet-owned env file. Also whether the guard's render.yaml drift check stops reading Render.
+  - **D4** — `chmod 600` on `render_env/live-odds-worker.json`, which is world-readable 0644 on the fleet host.
+- **Follow-up:** fast-forward the primary tree. It is why sessions still see preflight read Render.
+
 ### `#765` — **BASKETBALL INTERVAL REPLAY HARNESS: BUILT, ON MAIN, RUN ON THE FLEET. The bar for Phase 2 is the pregame line spread over the time left (`pregame_rate`), not the engine. NBA's live re-sim beats it nowhere; NCAAB's beats it on h2 and the in-game full total but loses on h1; observed game pace loses everywhere** — 2026-11-07, lane `basketball-interval-backtest` (session c2fd17f8; Phase 2 step 1 of the user's interval-projection plan)
 - **Built (on main `4264deceb`..`c7ba7a01c`, new files only, read-only, no deploy):**
   - `syndicate/features/shared/basketball_interval_backtest.py`: state every 30 s from the `pbp_events` prefix with the production builders; projectors; scoring; `paired_delta`, the game-clustered ship gate.

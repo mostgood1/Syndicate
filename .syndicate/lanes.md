@@ -880,11 +880,20 @@ death, never life — do not invert it.
 
 ### render-retirement-inventory — OPEN — opened 2026-11-07 — session 36cc0a0e-47c9-4ad6-83aa-c4f05c75d91b
 - Goal: Inventory and retire what still assumes Render now that production runs on the WSL fleet: findings file, CLAUDE.md docs fix, fleet-native preflight gaps; RENDER_* marker replacement and render.yaml/fleet-env changes PROPOSED ONLY, user decision first. No Render account/service touched, no fleet behaviour change.
-- Files: CLAUDE.md, .syndicate/findings_2026-11-07_render_dependency_inventory.md, scripts/deploy_preflight.py, .claude/hooks/deploy-guard.py, scripts/check_blueprint_drift.py
+- Files: CLAUDE.md, .syndicate/findings_2026-11-07_render_dependency_inventory.md, scripts/deploy_preflight.py, .claude/hooks/deploy-guard.py, scripts/check_blueprint_drift.py, .claude/skills/daily-accuracy/driver.py, .claude/skills/daily-accuracy/SKILL.md, .claude/commands/preflight.md
 - Hypothesis: Most Render dependencies are already fleet-aware (preflight fleet path 10-25, guard fleet path 10-25, render_logs local default 10-06, _base_url fleet default 10-06); what remains is docs, the render.yaml-push gate (drift checker reads the suspended env API), and the RENDER_* marker convention
 - Falsification test: a Render API read on the default (no-flag) deploy path, or an onrender.com fallback reachable on the fleet with the documented env set
 - Verification: findings file on origin/main with file:line per dependency; CLAUDE.md on origin/main points at the runbook + state_worker [local-production-host]; marker decision put to the user
 - Blocked by: none
+- **STATUS 2026-11-08 00:3xZ (6:3x PM CST 11-07): inventory DONE, findings + skill fix ON MAIN, docs fix DRAFTED, decisions OWED.**
+  - Findings `3dcc71093`. Hypothesis CONFIRMED: no Render API read on the default deploy path from `main`; no onrender fallback reachable on the fleet with its forced env.
+  - The one onrender default an operator actually hits was the daily-accuracy skill. Fixed in `c4989c721`; verified with a no-flag run against the fleet, rc 0.
+  - New fact: `render.yaml` edits are inert on the fleet. 0 of 48/77/72 keys are decided by it alone, because the 10-01 snapshot shadows every one.
+  - The primary tree is 2,488 commits behind `main`. That is the source of the preflight-reads-Render reports.
+  - CLAUDE.md + `/preflight` docs fix: `9fcd9e25b` on local branch `render-retirement-docs-draft`. Patch in the 5d941771 notes folder. NOT on main until the user approves (brief: "propose, then make once approved").
+  - Owed to the user: D1 docs, D2 markers, D3 `render.yaml` / guard drift read, D4 `chmod 600` on the 0644 snapshot. All are in todo `#766`.
+  - `deploy_preflight.py`, `deploy-guard.py` and `check_blueprint_drift.py` are claimed but UNCHANGED: preflight already has its fleet path. The guard's drift read is coupled to D3.
+- **CROSS-LANE WRITE 2026-11-08 ~00:35Z, lane `render-retirement-inventory` (session 36cc0a0e):** prepended NEW item `#766` to `docs/ai_context/todo.md`. No other item was touched (0 lines deleted).
 
 ### all-sport-interval-projections — OPEN — opened 2026-11-07 — session c5cc97a7-c15d-4482-a455-7482f69262af
 - Goal: Every Games-rail card for nhl, nfl, ncaaf, mlb and soccer whose engine publishes per-segment score output carries an interval-projections block (the basketball contract: periods + projected final; pregame from the pregame sim, live from the live re-sim where it computes segments), read on the fleet's served /api/board/game-chips (every chip whose game has such a source carries a block, none where it is absent, settled periods equal the line score) and seen on the served page; each sport whose engine has no segment output is listed with what it would take; no pricing switch turned on

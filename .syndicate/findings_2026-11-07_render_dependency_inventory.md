@@ -283,8 +283,8 @@ capability, and it spans 7+ claimed files on a live-money fleet.
 | `docs/ai_context/local_production_runbook.md:111` | snapshot files are mode 600 | one is 0644 (§1). File held by lane `syndicate-decision-engine`; not edited |
 | `.claude/skills/daily-accuracy/SKILL.md:38-42` | "against production by default" with `ADMIN_TOKEN=...` | production = the fleet; token in WSL — **fixed in this lane** (§6) |
 
-**Proposed CLAUDE.md change:** on branch `claude/intelligent-hertz-2ddf76`, commit
-listed in the lane block. It awaits the user's approval before `main`.
+**Proposed CLAUDE.md + `/preflight` change:** commit `9fcd9e25b` on local branch
+`render-retirement-docs-draft`. It awaits the user's approval before `main`.
 
 ---
 
@@ -296,7 +296,11 @@ listed in the lane block. It awaits the user's approval before `main`.
    none is exported. This mirrors `daily-optimizer/review.py`, which is already
    fleet-native. The skill stays stdlib-only. Read-only operator tooling; no fleet
    behaviour change.
-3. The CLAUDE.md docs fix: drafted, NOT on main until approved.
+3. The CLAUDE.md + `.claude/commands/preflight.md` docs fix: drafted as `9fcd9e25b`
+   (branch `render-retirement-docs-draft`), NOT on main until approved.
+4. Nothing in `deploy_preflight.py` / `deploy-guard.py` / `check_blueprint_drift.py`:
+   preflight's fleet path already exists (§0.1), and the guard's one Render read is
+   coupled to D3.
 
 ## 7. Decisions owed to the user
 
