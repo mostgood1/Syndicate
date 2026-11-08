@@ -700,7 +700,7 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
             if pulled:
                 shown["live_quote_pulled"] = True
                 display_only_pulled += 1
-            row["projection"] = shown  # type: ignore[index]
+            row["projection"] = refuse_published_certainty(shown)  # type: ignore[index]
             display_only += 1
             continue
 
