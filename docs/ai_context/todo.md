@@ -1,6 +1,9 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#767` — **GAMES-RAIL INTERVAL PROJECTIONS FOR EVERY SPORT: ON MAIN `4f367324a`, LIVE ON WEB; THE PREGAME BLOCKS LOAD AT THE NEXT REFRESH-WORKER RESTART** `[2026-11-08 17:2xZ, lane all-sport-interval-projections, session c5cc97a7]`
+### `#767` — **GAMES-RAIL INTERVAL PROJECTIONS FOR EVERY SPORT: ON MAIN `4f367324a`, LOADED AND VERIFIED FOR NFL / NHL / SOCCER; NCAAF READING OWED, MLB AT THE 2027 OPENER** `[2026-11-08 17:3xZ, lane all-sport-interval-projections (CLOSED, GOAL PARTLY MET), session c5cc97a7]`
+- **UPDATE 17:30Z:** (a) is DONE for nfl / nhl / soccer. The pregame blocks rode lane `nba-live-proj-actuals`' refresh-worker restart at 17:23:38Z (user: "Ride the next restart"). Served at 17:28Z: nfl pregame 13/13, nhl 6/6, soccer pregame 12. The other 182 soccer chips have NO sim match (0 of 182). Page: 134 PROJ boxes (deploys.md VERIFY 17:30:45Z).
+  - **Still owed: NCAAF.** Read the served chips on its next slate, pregame Q1-Q4 and live final. Expect every game in the week's `smartsim2_segment_distributions` sidecar (FBS-vs-FCS games have none) and every live re-sim lane. Read-only, no claim needed.
+  - **(g) Payload wart:** a chip that turns FINAL between worker builds keeps its stale `live_resim` block in the payload. The card hides it, but `attach_interval_projections(live_only=True)` skips non-live chips, so it never drops one. Basketball's path behaves the same.
 - **What it does:** the basketball `intervals` block (`game_chip_intervals.py`), extended to each sport from what its engine simulates and publishes:
   - soccer pregame: 1H/2H goals plus the 3-way win %;
   - NFL / NCAAF pregame: Q1-Q4, from smartsim2's `quarter_log` sidecar;

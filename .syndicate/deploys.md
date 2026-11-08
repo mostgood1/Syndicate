@@ -57368,3 +57368,21 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - 0 pulled rows on the served board with an edge, `live_aware` or `model_ev_pct`.
   - The Dončić accent check (LAL@DET) is owed in the same session.
 - **Revert:** `SYNDICATE_NBA_LIVE_PROPS_PULLED_LINES=0` on the live-odds-worker role (env change recipe). Or revert `a3d72c82b` on main, then ff + a claimed refresh-worker TERM (the join), with live-odds-worker at its recycle.
+
+## 2026-11-08 17:30:45Z (11:30 AM CST) -- VERIFY of the 17:11:42Z `4f367324a` rollout (lane `all-sport-interval-projections`, todo `#767`): **PREGAME BLOCKS LOADED and VERIFIED** -- they rode lane `nba-live-proj-actuals`' refresh-worker restart 17:23:38Z (user: "Ride the next restart")
+- **Loaded:** that lane restarted the refresh-worker at 17:23:38Z (pid 1586492) on fleet HEAD `a3d72c82b`, which contains `4f367324a`. This lane took no claim and did no restart.
+- **Worker:** `17:26:48.888Z [game_chip_intervals] ATTACHED date=2026-11-08 seconds=0.83 ... nfl:live_resim=1 nfl:pregame_sim=13 nhl:pregame_sim=6 soccer:live_resim=10 soccer:pregame_sim=12 ...`. Later builds took `seconds=0.00-0.03`. 0 `ATTACH_FAILED` since the restart.
+- **Served chips, 17:28:13Z:**
+  - nfl pregame 13/13 (Q1-Q4 + T) and live 1/1;
+  - nhl pregame 6/6 (the projected final only);
+  - soccer pregame 12, and every one of the other 182 has no sim match (0 of 182 found in their league-day artifacts: UEFA cups have no sim, and the rest are matchdays 11-20 or later with no sim yet);
+  - soccer live 9/9.
+- **Served page `/intelligence`, ~17:29Z:** 156 rail cards, 134 with PROJ: NFL 13, NHL 6, soccer 21, plus basketball.
+  - NFL pregame: "PROJ Q1 Q2 Q3 Q4 T DEN 4 7 6 7 23 CAR 5 6 5 6 22 · Proj DEN −1.4 · O/U 44.6", above the market footer "DEN −3 · o/u 44.5".
+  - NHL: "PROJ T FLA 3.0 BOS 3.1 · Proj BOS −0.1 · O/U 6.1 · BOS 52%".
+- **CORRECTION to the 17:11:42Z entry:** "NFL kicked off at 17:00Z, so I did not drain" was wrong. In November Central is UTC−6, so the noon games kick off at 18:00Z; only the 8:30 AM CT London game (CIN @ ATL) was live. The no-TERM call cost nothing, since the next restart came 12 min later, but its stated reason was a misread clock.
+- **verify:** MET for nfl, nhl and soccer on the served chips and the page.
+  - **ncaaf:** NOT YET READ on served chips. No game since the load; the pre-ship dry-run over 11-07's served chips gave pregame 14/14 and live 14/14. Read on the next NCAAF slate.
+  - **mlb pregame:** replayed against the 10-24 / 10-26 / 10-28 artifacts only. Season over.
+  - **Settled == line score:** 0 cells to check, because no non-basketball live block carries a period.
+- **Payload wart, harmless:** one served soccer chip that went FINAL between builds kept its `live_resim` block. The card hides it (`chip.state !== "final"`), but the serve-time attach (`live_only`) skips non-live chips and so never drops it. Basketball's path has the same behaviour. Noted in todo `#767`.
