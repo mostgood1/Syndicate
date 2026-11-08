@@ -24,7 +24,9 @@ WHAT THE BLOCK SAYS, and what it never does:
   - NO PRICE. College segment pricing stays off (`SYNDICATE_COLLEGE_LIVE_SEGMENT_PRICING`, todo `#763`); this
     is display of the sim's own numbers.
   - NO NEUTRAL FILL. A chip whose game has no sim, or a live chip whose re-sim refused or has no lane, gets no
-    block, and the card renders exactly as before.
+    block, and the card renders exactly as before -- except a LIVE COLLEGE chip with no lane, which gets the
+    `pregame_pace` block (its own score plus the pregame sim's per-period means for the time left; display only,
+    see `_pace_block`) when every input it needs is readable.
 
 WIN PROBABILITY. College pregame moneylines are served at the de-vigged fair (`college_game_projections`,
 SYNDICATE_COLLEGE_MARGIN_MODEL_WEIGHT default 0.0), so the board shows no college pregame model win
@@ -37,6 +39,7 @@ MARGINS. Live college margins are the market-anchored ones the board prices from
 """
 from __future__ import annotations
 
+import re
 import threading
 import time
 from typing import Any, Callable, Iterable, Mapping
@@ -105,6 +108,9 @@ OTHER_SPORTS_SOURCES = """
 
 SOURCE_PREGAME = "pregame_sim"
 SOURCE_LIVE = "live_resim"
+#: A LIVE college chip with no live re-sim lane (lane wncaab-module, 2026-11-08; user "Yes, do it here" on
+#: "Work out live projections for women's games with no market line?"). See `_pace_block`.
+SOURCE_PACE = "pregame_pace"
 
 #: Cache lifetimes. A live lane moves every re-sim tick (~1-4 min); a pregame sim at most a few times a day.
 _TTL_LIVE_SECONDS = 15.0
@@ -397,6 +403,164 @@ def _college_pregame_block(sport: str, chip: Mapping[str, Any], games: Mapping[s
     # No college pregame win probability: the board serves college moneylines at the de-vigged fair.
     return build_block(sport, source=SOURCE_PREGAME, segments=segments, final_total=total, final_margin=margin,
                        home_win_prob=None, as_of=entry.get("computed_at"), sims=entry.get("sims_run"))
+
+
+# -- college live with no live lane: the score so far plus the pregame sim's per-period means for the time left
+#
+# WHY (lane wncaab-module, 2026-11-08). A college live lane needs a market close to anchor its margin
+# (`ncaab/live_resim.margin_anchor_for`, user 2026-11-03 "Anchor them"); a game no book prices refuses
+# `no_margin_anchor`, and women's books price ~14 of ~94 D-I games a night -- measured 2026-11-07 20:17Z, 16 of
+# 18 live women's games had no lane, so their rail cards showed no projection at all. Men's games the tick's budget
+# did not reach (`budget_exhausted`) are the same case.
+#
+# NOT A RE-SIM, deliberately. Re-simming those games would put 16-80 more jobs a tick on the two college sim
+# workers that the men's PRICED games share, and would need the tick loop another lane owns. This needs no sim:
+# settled periods are the real score, the period being played is its points so far plus the pregame sim's mean
+# for that period times the share of it still to play, later periods are the pregame means, and overtime adds the
+# pregame scoring rate for the overtime clock left. The backtest (todo #765) found the pregame number prorated over
+# the time left a strong baseline -- the re-sim beat it only on some segments.
+#
+# DISPLAY ONLY. No board row reads it, there is no win probability (no sims), and it is labelled `pregame_pace`
+# so the card says so. Anything it cannot read -- an unparseable clock, a missing settled period, per-period
+# scores that do not add up to the score shown -- is no block, never a guess.
+
+_PACE_TOKEN_RE = re.compile(
+    r"^\s*(?P<end>END\s+)?(?:(?P<hq>[HQ])(?P<n>\d)|(?P<k>\d*)OT)\s*(?:(?P<m>\d{1,2}):(?P<s>\d{2}(?:\.\d+)?))?\s*$",
+    re.IGNORECASE)
+
+
+def _college_league(sport: str):
+    from syndicate.features.college_basketball.league import league_for
+
+    return league_for(sport)
+
+
+def parse_college_clock(sport: str, token: Any) -> tuple[int, float] | None:
+    """(1-based period, seconds left in it) from a live college status token, or None.
+
+    Tokens come from `league.period_label`: men's `H1 5:11` / `H2 0:45.3`, women's `Q3 6:12`, then `OT 2:00`,
+    `2OT 1:10`; between periods `END Q2` / `END H1` / `HALF`. A label with no clock cannot say how much is left.
+    """
+    text = str(token or "").strip()
+    if not text:
+        return None
+    league = _college_league(sport)
+    if text.upper() in ("HALF", "HALFTIME", "HT"):
+        return (league.periods // 2, 0.0)
+    match = _PACE_TOKEN_RE.match(text)
+    if not match:
+        return None
+    if match.group("hq"):
+        letter, number = match.group("hq").upper(), int(match.group("n"))
+        if (letter == "H") != (league.periods == 2) or not 1 <= number <= league.periods:
+            return None
+        period = number
+    else:
+        period = league.periods + (int(match.group("k")) if match.group("k") else 1)
+    if match.group("end"):
+        return (period, 0.0)
+    if match.group("m") is None:
+        return None
+    left = int(match.group("m")) * 60 + float(match.group("s"))
+    full = league.period_seconds if period <= league.periods else _OT_SECONDS
+    return (period, max(0.0, min(float(full), left)))
+
+
+#: College overtime is five minutes, men's and women's (`college_basketball/league.py` docstring).
+_OT_SECONDS = 300
+
+
+def _int_list(values: Any) -> list[int] | None:
+    if not isinstance(values, (list, tuple)):
+        return None
+    out: list[int] = []
+    for value in values:
+        try:
+            out.append(int(value))
+        except (TypeError, ValueError):
+            return None
+    return out
+
+
+def _pace_block(sport: str, chip: Mapping[str, Any], entry: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    """A live college chip's projection from its own score and the pregame sim. See the section comment above."""
+    if not isinstance(entry, Mapping):
+        return None
+    clock = parse_college_clock(sport, chip.get("status_token"))
+    if clock is None:
+        return None
+    period, left = clock
+    league = _college_league(sport)
+    regulation = league.periods
+    linescore = chip.get("linescore") if isinstance(chip.get("linescore"), Mapping) else {}
+    actual = {side: _int_list(linescore.get(side)) for side in ("away", "home")}
+    if actual["away"] is None or actual["home"] is None or len(actual["away"]) != len(actual["home"]):
+        return None
+    played = len(actual["away"])
+    # Every period before the one being played must be on the line score; the current one may not be there yet.
+    if played < period - 1:
+        return None
+    for side in ("away", "home"):
+        score = _side(chip, side).get("score")
+        if score not in (None, "") and str(score).strip().lstrip("-").isdigit() and int(score) != sum(actual[side]):
+            return None  # the line score and the score disagree: one of them is stale
+    segments = ((entry.get("dist") or {}).get("segments")) or {}
+    names = PERIODS[sport]
+    means: list[tuple[float, float]] = []
+    for name in names:
+        total, margin = _segment_means(segments.get(name))
+        away, home = _split(total, margin)
+        if away is None:
+            return None
+        means.append((away, home))
+    full_total, full_margin = _segment_means(segments.get("full"))
+    f_away, f_home = _split(full_total, full_margin)
+    if f_away is None:
+        return None
+    periods: list[dict[str, Any]] = []
+    proj = {"away": 0.0, "home": 0.0}
+    for i, name in enumerate(names, start=1):
+        if i < period or (i == period and left <= 0.0) or period > regulation:
+            if i > played:
+                return None
+            vals = {side: float(actual[side][i - 1]) for side in ("away", "home")}
+            state = "settled"
+        elif i == period:
+            share = left / float(league.period_seconds)
+            so_far = {side: float(actual[side][i - 1]) if i <= played else 0.0 for side in ("away", "home")}
+            vals = {"away": so_far["away"] + means[i - 1][0] * share, "home": so_far["home"] + means[i - 1][1] * share}
+            state = "in_progress"
+        else:
+            vals = {"away": means[i - 1][0], "home": means[i - 1][1]}
+            state = "ahead"
+        proj["away"] += vals["away"]
+        proj["home"] += vals["home"]
+        periods.append({"key": name, "label": LABELS[name], "away": _r1(vals["away"]), "home": _r1(vals["home"]),
+                        "total": _r1(vals["away"] + vals["home"]), "home_margin": _r1(vals["home"] - vals["away"]),
+                        "state": state})
+    if period > regulation:
+        # Overtime: the overtime points so far, plus the pregame scoring rate for the overtime clock left.
+        regulation_seconds = float(regulation * league.period_seconds)
+        for side, full in (("away", f_away), ("home", f_home)):
+            proj[side] += float(sum(actual[side][regulation:])) + full / regulation_seconds * left
+    away, home = proj["away"], proj["home"]
+    return {"source": SOURCE_PACE, "as_of": entry.get("computed_at"), "sims": entry.get("sims_run"),
+            "periods": periods,
+            "final": {"away": _r1(away), "home": _r1(home), "total": _r1(away + home), "home_margin": _r1(home - away),
+                      "home_win_prob": None}}
+
+
+def _pace_entry(sport: str, chip: Mapping[str, Any], date_value: str) -> Mapping[str, Any] | None:
+    """The chip's pregame sim entry, on its Central day first (a 7 PM Central tip is filed under that day)."""
+    key = str(chip.get("game_key") or "").strip()
+    if not key:
+        return None
+    for day in _chip_days(chip, date_value):
+        games = _cached(("pregame", sport, day), _TTL_PREGAME_SECONDS, lambda s=sport, d=day: _college_pregame_games(s, d))
+        entry = (games or {}).get(key)
+        if isinstance(entry, Mapping):
+            return entry
+    return None
 
 
 def _pro_pregame_block(sport: str, chip: Mapping[str, Any], index: Any) -> dict[str, Any] | None:
@@ -880,6 +1044,13 @@ def attach_interval_projections(chips: Iterable[dict[str, Any]], date_value: str
         elif state == "live":
             snapshot = _cached(("live", sport), _TTL_LIVE_SECONDS, lambda s=sport: _live_snapshot(s))
             block = _live_block(sport, chip, snapshot)
+            if block is None and sport in COLLEGE_SPORTS:
+                # No live lane (no market close to anchor it, or the tick's budget never reached the game).
+                try:
+                    block = _pace_block(sport, chip, _pace_entry(sport, chip, date_value))
+                except Exception:  # noqa: BLE001 -- a display fallback must never cost the chip
+                    bump(f"{sport}:pace_error")
+                    block = None
         elif state not in ("final",):
             if sport in COLLEGE_SPORTS:
                 games = _cached(("pregame", sport, date_value), _TTL_PREGAME_SECONDS,

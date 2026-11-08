@@ -508,3 +508,129 @@ def test_json_reads_are_reused_until_the_file_changes(tmp_path):
     os.utime(path, ns=(st.st_atime_ns, st.st_mtime_ns + 10_000_000))
     assert gci._read_json_unchanged(path) == {"a": 2}
     assert gci._read_json_unchanged(tmp_path / "absent.json") is None
+
+
+# ------------------------------------------------------------------------------------------- college pregame pace
+# Lane wncaab-module, 2026-11-08 (user "Yes, do it here" on live projections for women's games with no market line).
+# A live college chip with NO live lane gets its own score plus the pregame sim's per-period means for the time left.
+
+def _wq_segments():
+    segs = {"full": {"total": _point(132), "margin": _point(8)}}
+    for q in ("q1", "q2", "q3", "q4"):
+        segs[q] = {"total": _point(33), "margin": _point(2)}  # 15.5 away / 17.5 home each quarter
+    return segs
+
+
+def _pace_chip(token, away_ls, home_ls, sport="wncaab", away_score=None, home_score=None):
+    chip = _chip(sport=sport, state="live")
+    chip["status_token"] = token
+    chip["linescore"] = {"kind": "periods", "labels": [str(i + 1) for i in range(len(away_ls))],
+                         "away": away_ls, "home": home_ls}
+    chip["away"]["score"] = sum(away_ls) if away_score is None else away_score
+    chip["home"]["score"] = sum(home_ls) if home_score is None else home_score
+    return chip
+
+
+@pytest.mark.parametrize("sport,token,want", [
+    ("wncaab", "Q2 1:02", (2, 62.0)),
+    ("wncaab", "Q4 0:45.3", (4, 45.3)),
+    ("wncaab", "END Q2", (2, 0.0)),
+    ("wncaab", "HALF", (2, 0.0)),
+    ("wncaab", "OT 2:00", (5, 120.0)),
+    ("wncaab", "2OT 4:59", (6, 299.0)),
+    ("ncaab", "H1 5:11", (1, 311.0)),
+    ("ncaab", "END H1", (1, 0.0)),
+    ("ncaab", "HALF", (1, 0.0)),
+    ("ncaab", "OT 0:30", (3, 30.0)),
+    ("ncaab", "Q2 1:00", None),     # a quarter token on a halves league
+    ("wncaab", "H1 1:00", None),
+    ("wncaab", "Q2", None),         # no clock: cannot say how much is left
+    ("wncaab", "", None),
+    ("wncaab", "7:00P CT", None),
+])
+def test_parse_college_clock(sport, token, want):
+    got = gci.parse_college_clock(sport, token)
+    assert got == (None if want is None else (want[0], pytest.approx(want[1])))
+
+
+def test_pace_projects_a_womens_quarter_in_progress_from_the_score_and_the_pregame_means(monkeypatch):
+    _patch_sources(monkeypatch, college={"wncaab": {"401909532": _pregame_entry(_wq_segments(), 132.0, 8.0)}})
+    chip = _pace_chip("Q2 5:00", [12, 6], [20, 9])          # Q2 half played
+    gci.attach_interval_projections([chip], "2026-11-07")
+    block = chip["intervals"]
+    assert block["source"] == "pregame_pace" and block["final"]["home_win_prob"] is None
+    assert [p["state"] for p in block["periods"]] == ["settled", "in_progress", "ahead", "ahead"]
+    assert (block["periods"][0]["away"], block["periods"][0]["home"]) == (12.0, 20.0)   # the real Q1
+    assert (block["periods"][1]["away"], block["periods"][1]["home"]) == (13.8, 17.8)   # 6 + 15.5/2, 9 + 17.5/2
+    assert block["final"] == {"away": 56.8, "home": 72.8, "total": 129.5, "home_margin": 16.0, "home_win_prob": None}
+
+
+def test_pace_at_halftime_keeps_both_halves_settled_and_projects_the_rest(monkeypatch):
+    _patch_sources(monkeypatch, college={"wncaab": {"401909532": _pregame_entry(_wq_segments(), 132.0, 8.0)}})
+    chip = _pace_chip("HALF", [12, 14], [20, 16])
+    gci.attach_interval_projections([chip], "2026-11-07")
+    assert [p["state"] for p in chip["intervals"]["periods"]] == ["settled", "settled", "ahead", "ahead"]
+    assert chip["intervals"]["final"]["away"] == 57.0 and chip["intervals"]["final"]["home"] == 71.0
+
+
+def test_pace_in_overtime_adds_the_pregame_rate_for_the_overtime_clock_left(monkeypatch):
+    _patch_sources(monkeypatch, college={"wncaab": {"401909532": _pregame_entry(_wq_segments(), 132.0, 8.0)}})
+    chip = _pace_chip("OT 2:30", [15, 15, 15, 15, 4], [15, 15, 15, 15, 6])   # tied 60-60, OT 4-6, half of OT left
+    gci.attach_interval_projections([chip], "2026-11-07")
+    block = chip["intervals"]
+    assert all(p["state"] == "settled" for p in block["periods"])
+    # rate per side: full-game means (62 away / 70 home) over 2400 s, times 150 s left
+    assert block["final"]["away"] == round(60 + 4 + 62 / 2400 * 150, 1)
+    assert block["final"]["home"] == round(60 + 6 + 70 / 2400 * 150, 1)
+
+
+def test_pace_for_a_mens_game_the_tick_never_reached(monkeypatch):
+    segs = {"full": {"total": _point(150), "margin": _point(4)}, "h1": {"total": _point(70), "margin": _point(2)},
+            "h2": {"total": _point(80), "margin": _point(2)}}
+    _patch_sources(monkeypatch, college={"ncaab": {"401909532": _pregame_entry(segs, 150.0, 4.0)}},
+                   live={"ncaab": _live_snapshot(refused=True)})
+    chip = _pace_chip("H2 10:00", [30, 20], [35, 22], sport="ncaab")
+    gci.attach_interval_projections([chip], "2026-11-07")
+    block = chip["intervals"]
+    assert block["source"] == "pregame_pace"
+    assert (block["periods"][1]["away"], block["periods"][1]["home"]) == (39.5, 42.5)   # 20 + 39/2, 22 + 41/2
+
+
+def test_a_live_lane_wins_over_pace(monkeypatch):
+    _patch_sources(monkeypatch, college={"ncaab": {"401909532": _pregame_entry(
+        {"full": {"total": _point(150), "margin": _point(4)}, "h1": {"total": _point(70), "margin": _point(2)},
+         "h2": {"total": _point(80), "margin": _point(2)}}, 150.0, 4.0)}}, live={"ncaab": _live_snapshot()})
+    chip = _pace_chip("H2 0:39", [27, 41], [38, 39], sport="ncaab")
+    gci.attach_interval_projections([chip], "2026-11-07")
+    assert chip["intervals"]["source"] == "live_resim"
+
+
+@pytest.mark.parametrize("token,away_ls,home_ls,away_score,why", [
+    ("Q3", [12, 14], [20, 16], None, "no clock"),
+    ("Q3 4:00", [12], [20], None, "a settled quarter missing from the line score"),
+    ("Q2 4:00", [12, 6], [20, 9], 30, "line score and score disagree"),
+    ("7:00P CT", [], [], None, "not a live clock"),
+])
+def test_pace_refuses_what_it_cannot_read(monkeypatch, token, away_ls, home_ls, away_score, why):
+    _patch_sources(monkeypatch, college={"wncaab": {"401909532": _pregame_entry(_wq_segments(), 132.0, 8.0)}})
+    chip = _pace_chip(token, away_ls, home_ls, away_score=away_score)
+    gci.attach_interval_projections([chip], "2026-11-07")
+    assert "intervals" not in chip, why
+
+
+def test_pace_needs_the_pregame_sim(monkeypatch):
+    """off != on: the same live chip gets the pace block only when its pregame sim exists."""
+    chip_off, chip_on = _pace_chip("Q2 5:00", [12, 6], [20, 9]), _pace_chip("Q2 5:00", [12, 6], [20, 9])
+    _patch_sources(monkeypatch)
+    gci.attach_interval_projections([chip_off], "2026-11-07")
+    gci.clear_cache()
+    _patch_sources(monkeypatch, college={"wncaab": {"401909532": _pregame_entry(_wq_segments(), 132.0, 8.0)}})
+    gci.attach_interval_projections([chip_on], "2026-11-07")
+    assert "intervals" not in chip_off and chip_on["intervals"]["source"] == "pregame_pace"
+
+
+def test_pace_runs_on_the_serve_path_too(monkeypatch):
+    _patch_sources(monkeypatch, college={"wncaab": {"401909532": _pregame_entry(_wq_segments(), 132.0, 8.0)}})
+    chip = _pace_chip("Q2 5:00", [12, 6], [20, 9])
+    gci.attach_interval_projections([chip], "2026-11-07", live_only=True)
+    assert chip["intervals"]["source"] == "pregame_pace"

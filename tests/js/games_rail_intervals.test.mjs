@@ -134,5 +134,26 @@ const mlb = {
 };
 check('mlb shows F1 F3 F5 T to one decimal', /^PROJ F1 F3 F5 T MIL 0\.4 1\.0 1\.7 3\.4 TB 0\.4 1\.1 1\.8 3\.1 Proj MIL −0\.3 · O\/U 6\.5 · TB 50%$/.test(text(chipIntervals(mlb))), true);
 
+// Pregame pace (lane wncaab-module, 2026-11-08): a live college game with no live re-sim lane. Treated as live
+// (settled periods left to the real line score), tagged PACE, never a win %.
+const pace = {
+  sport: 'wncaab', state: 'live', away: { abbr: 'MUR' }, home: { abbr: 'PRIN' },
+  intervals: {
+    source: 'pregame_pace', sims: 200, as_of: '2026-11-08T11:20:00Z',
+    periods: [
+      { key: 'q1', label: 'Q1', away: 17, home: 17, state: 'settled' },
+      { key: 'q2', label: 'Q2', away: 23.6, home: 16.9, state: 'in_progress' },
+      { key: 'q3', label: 'Q3', away: 14.8, home: 15.9, state: 'ahead' },
+      { key: 'q4', label: 'Q4', away: 15.1, home: 16.2, state: 'ahead' },
+    ],
+    final: { away: 70.5, home: 66.0, total: 136.5, home_margin: -4.5, home_win_prob: null },
+  },
+};
+const paceOut = chipIntervals(pace);
+check('pace is tagged PACE, not PROJ', /PACE Q2\* Q3 Q4 T/.test(text(paceOut)) && !/PROJ/.test(text(paceOut)), true);
+check('pace drops the settled quarter like a live block', /Q1/.test(text(paceOut)), false);
+check('pace line is a projected final with no win %', /Proj final MUR −4\.5 · O\/U 136\.5$/.test(text(paceOut)), true);
+check('pace says where the number comes from', /no live sim for this game/.test(paceOut), true);
+
 console.log(failures === 0 ? '\nall assertions passed' : `\n${failures} assertion(s) failed`);
 process.exit(failures === 0 ? 0 : 1);

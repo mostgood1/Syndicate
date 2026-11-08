@@ -3098,10 +3098,17 @@
   // block with no period is the projected final alone (NHL, and live
   // soccer / football, whose engines publish no period number); a
   // three-way block (soccer) names the favourite's own win % and the draw.
+  //
+  // `pregame_pace` (lane wncaab-module, 2026-11-08): a LIVE college game with
+  // no live re-sim lane -- most women's games, which no book prices -- shown
+  // as a live projection from its own score plus the pregame sim's
+  // per-period means for the time left. Tagged PACE, not PROJ, and never a
+  // win %: no live sim ran.
   function chipIntervals(chip) {
     const iv = chip && chip.intervals;
     if (!iv || !Array.isArray(iv.periods)) return "";
-    const live = iv.source === "live_resim";
+    const pace = iv.source === "pregame_pace";
+    const live = iv.source === "live_resim" || pace;
     const shown = iv.periods.filter((p) => p && p.away != null && p.home != null && (!live || p.state !== "settled"));
     const final = iv.final || {};
     if (!shown.length && final.away == null) return "";
@@ -3117,7 +3124,7 @@
       }).join("");
       return `<span class="game-mini-card__box-team">${escapeHtml(abbr(side))}</span>${cells}<span class="game-mini-card__box-total">${escapeHtml(whole(final[side]))}</span>`;
     };
-    const head = label("PROJ", " game-mini-card__proj-tag")
+    const head = label(pace ? "PACE" : "PROJ", " game-mini-card__proj-tag")
       + shown.map((p) => label(p.label + (p.state === "in_progress" ? "*" : ""))).join("") + label("T");
     const box = `<div class="game-mini-card__box game-mini-card__box--proj" style="--box-cols:${shown.length + 1}">${head}${row("away")}${row("home")}</div>`;
     const parts = [];
@@ -3139,7 +3146,8 @@
       parts.push(`${abbr(fav)} ${Math.round((fav === "home" ? hp : 1 - hp) * 100)}%`);
     }
     const sims = iv.sims ? `${iv.sims} sims` : "";
-    const title = [live ? "Live re-sim" : "Pregame sim", sims, iv.as_of ? `as of ${iv.as_of}` : ""].filter(Boolean).join(" · ");
+    const title = [pace ? "Score + pregame sim pace (no live sim for this game)" : live ? "Live re-sim" : "Pregame sim",
+      pace ? "" : sims, iv.as_of ? `${pace ? "pregame sim" : "as"} of ${iv.as_of}` : ""].filter(Boolean).join(" · ");
     const line = parts.length ? `<div class="game-mini-card__proj-line" title="${escapeHtml(title)}">${live ? "Proj final " : "Proj "}${escapeHtml(parts.join(" · "))}</div>` : "";
     return box + line;
   }
