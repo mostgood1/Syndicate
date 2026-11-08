@@ -1,5 +1,22 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#767` — **GAMES-RAIL INTERVAL PROJECTIONS FOR EVERY SPORT: ON MAIN `4f367324a`, LIVE ON WEB; THE PREGAME BLOCKS LOAD AT THE NEXT REFRESH-WORKER RESTART** `[2026-11-08 17:2xZ, lane all-sport-interval-projections, session c5cc97a7]`
+- **What it does:** the basketball `intervals` block (`game_chip_intervals.py`), extended to each sport from what its engine simulates and publishes:
+  - soccer pregame: 1H/2H goals plus the 3-way win %;
+  - NFL / NCAAF pregame: Q1-Q4, from smartsim2's `quarter_log` sidecar;
+  - MLB pregame: cumulative F1/F3/F5 from `daily_summary`;
+  - NHL pregame, and live soccer / NFL / NCAAF / NHL: the projected final alone.
+- **Measured:** pre-ship dry-run over the fleet's served chips (nfl pregame 13/13, ncaaf 14/14, nhl 6/6, soccer every match with a sim file). After `reload-web` 17:11:49Z, served live soccer 11/11 and nfl 1/1, and the page renders them (deploys.md 2026-11-08 17:11:42Z).
+- **Owed:**
+  - **(a) The pregame reading.** The refresh-worker was not restarted (preflight HOLD for 18 min of back-to-back builds, in the NFL window). Its next restart loads the pregame blocks; lane `nba-live-proj-actuals` has one owed for `#762` (6). Then read served pregame per sport, plus `[game_chip_intervals] ATTACHED ... seconds=` in refresh-worker.log.
+  - **(b) MLB live.** Not shown. The `live_mc_first5` F5 lane never writes `homeMargin` (`app_slice` reads `first5HomeMargin`, which nothing sets), and the F1/F3/F7 lanes are pregame-mean interpolations. Fix it and verify at the 2027 opener.
+  - **(c) Period output from the live engines.** NHL (`props_boxscore._team_pd`), NFL/NCAAF (`quarter_log` on resume) and soccer (resumed `half_log`) each compute periods in the re-sim and throw them away. Publishing them is what live period blocks would take.
+  - **(d) NHL pregame periods.** These need hockeysim to simulate periods; its columns today are fixed league shares (0.2924 / 0.3478 / 0.3598) of each team's input rate, so none are shown.
+- **Found in the basketball path (lane `basketball-interval-projections`, closed; NOT changed here):**
+  - **(e)** wncaab live UC San Diego @ San Diego, 11-08 00:21Z: the re-sim's settled Q1/Q2 are home/away SWAPPED against the chip line score. `_live_lane` matches on event id and never checks orientation, so that card's final and win % are probably swapped too.
+  - **(f)** The rail shows LIVE college win %, which the board blanks (`board_enrichment.LIVE_PROBABILITY_WITHHELD_SPORTS`, user 2026-11-03 "Yes, blank it").
+- **Also seen:** at 11-08 00:10Z the NHL live re-sim refused both live games `no_slate_features` (no live NHL projection at all). Not investigated.
+
 ### `#766` — **RENDER IS NOT NEEDED AT RUN TIME; FOUR DECISIONS OWED TO RETIRE WHAT STILL ASSUMES IT** `[2026-11-08 00:3xZ, lane render-retirement-inventory, session 36cc0a0e]`
 - **Findings:** `.syndicate/findings_2026-11-07_render_dependency_inventory.md` (file:line per dependency, and what breaks if Render vanished).
 - **Measured:**

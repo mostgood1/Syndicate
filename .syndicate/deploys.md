@@ -57283,3 +57283,26 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 
 ## 2026-11-08 17:20Z (11:20 AM CST) -- follow-up to the 2026-11-07 22:25Z `8b1dcd020` entry (lane `exit-state-size`) -- owed reading **MET**
 - First `phase_not_armed`: 2026-11-07 23:02:32Z. 32 ticks carried it through 05:32Z 11-08 (live-odds-worker.log.1). 0 keyvalue refusals and 0 real EXIT_TICK failures, 11-07 07:57Z..11-08 17:17Z. Lane closed.
+
+## 2026-11-08 17:11:42Z (11:11 AM CST) -- FLEET ff d9324512e -> 4f367324a + reload-web (NO refresh-worker TERM): interval projections on the Games-rail cards for soccer, NFL, NCAAF, NHL and MLB (lane `all-sport-interval-projections`) -- **WEB LOADED and VERIFIED (live blocks + card renderer); refresh-worker part (pregame blocks) loads at its NEXT restart** (written 17:2xZ)
+- **User, via the parent session:** the Phase 3 task ("we need this for all sports"); on the ride-along, "Wait for its lane". `2d738afef` (lane-age gate ON) was already on the fleet from that lane's own ff + TERM at 00:43:32Z, so the condition held. Template `chipIntervals` on loan from lane `wncaab-module` (the owner's grant).
+- **Range `d9324512e..4f367324a`, runtime:** `shared/game_chip_intervals.py`, `shared/game_chip_scoreboard.py`, `templates/intelligence.html` (this lane's). The other runtime-looking files are `.claude/skills/daily-accuracy/*`, which no service loads; the rest is ledger.
+- **Gates:**
+  - Claims refresh-worker + web, `all-sport-interval-projections`, 16:51:19-17:14:53Z.
+  - Web preflight CLEAR 16:51:41Z and again 17:11:21Z.
+  - Refresh-worker preflight HOLD at every poll, 16:51-17:09:44Z (40 polls, baseline re-read each time). Board builds ran back to back (`layer2_shortlist_build`, then `portfolio_commit`), so no after-save window opened. NFL kicked off at 17:00Z, so I did not drain. A display change is not worth pausing the board in the NFL window.
+  - ff `git merge --ff-only 4f367324a` 17:11:42Z, with the runtime range pinned. `reload-web` 17:11:49Z (6.0 s, 0 failures). Refresh-worker pid 952259 untouched.
+- **Baseline (17:11:15Z, served `/api/board/game-chips`):** `other_sport_interval_blocks=0` (soccer / nhl / nfl / ncaaf / mlb). Basketball 97.
+- **expect:** live non-basketball chips gain a `live_resim` block at serve time; the card renders them; 0 web tracebacks; no pregame non-basketball block until the refresh-worker restarts.
+- **Measured:**
+  - **Served chips, 17:11:57Z:** soccer live 11/11 `live_resim` and nfl live 1/1 (CIN @ ATL, `sims 120`, final only, `home_win_prob null` as the board withholds it). Pregame nfl 0/13, nhl 0/6, soccer 0/194, as expected before the worker restart.
+  - **Served page `/intelligence` (browser pane, ~17:13Z):** 156 rail cards, 106 with the PROJ box; NFL 1, soccer 11 among them.
+    - NFL: "PROJ T CIN 34 ATL 20 · Proj final CIN −13.6 · O/U 53.5" (live 31-17 Q4).
+    - Soccer, one decimal and three-way: "PROJ T LYO 0.7 BRE 1.8 · Proj final BRE −1.1 · O/U 2.5 · BRE 74% · D 21%".
+  - **web.log since 17:11:45Z:** 0 tracebacks, 0 `ATTACH_FAILED`.
+  - **refresh-worker.log 17:13-17:14Z:** still the old code (`ATTACHED ... wncaab:pregame_sim=58`, no `seconds=` field).
+- **Pre-ship dry-run (this code over the served chips, read-only, 16:5xZ):** nfl pregame 13/13 + live 1/1, nhl pregame 6/6, soccer pregame 13 (every match with a sim file) + live 12/12. Steady-state attach 0.33 s over all sports.
+- **verify: PARTLY MET.** The live blocks and the card renderer are verified. **OWED:** the pregame blocks, read after the next refresh-worker restart: nfl pregame 13/13 on 11-08, nhl, soccer (matches with a sim file), ncaaf on a Saturday, plus `[game_chip_intervals] ATTACHED ... seconds=` in refresh-worker.log.
+  - Lane `nba-live-proj-actuals` has its own ff + refresh-worker restart owed (todo `#762` (6), `21487591a`). That restart would load this too; it is display-only and needs nothing of its own.
+- **Not shown, by design:** NHL period columns (fixed league shares of hockeysim's input rate), MLB live (F1/F3 lanes are interpolations, F5 `homeMargin` never written, season over), and any period on a live soccer, NFL, NCAAF or NHL chip (no live engine publishes one).
+- **Revert:** `git revert 4f367324a f27a2c85a`, then ff + `reload-web` (+ refresh-worker TERM if it has loaded). A missing source degrades to no block.
