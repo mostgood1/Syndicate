@@ -14226,3 +14226,64 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness --idle-min 240 read 1 SAFE of 15 CLOSED; moved `closed-lane-archive-20261107-1406`. Table in log/2026-11-07.md.
+
+### nba-lens-live-state — CLOSED (GOAL MET) — opened 2026-11-07 — closed 2026-11-08 — session 41b9ecce-0019-4143-ab62-f74bc2f862c8
+- **VERDICT `[2026-11-08 01:25Z, 7:25 PM CST 11-07]`: GOAL: MET.** Goal, verbatim: "The NBA live lens (live/nba_live_lens.json, built by syndicate/features/nba/live_lens.py on live-odds-worker) shows every live NBA game's real state and score within one lens tick, matching the ESPN scoreboard the chips and the re-sim read, and the prop join's lens_live_games instrument counts NBA's live games (todo #762 open item 'Stale NBA lens game state')." Reading (deploys.md 2026-11-07 22:36:00Z + 2026-11-08 01:25:00Z):
+  - Loaded: `e21335809`, with refresh-worker at 17:39:56Z (the age-gate lane's TERM) and live-odds-worker at its own uptime recycle, 21:04:22Z.
+  - DEN@IND read `Live` with ESPN's score from the first lens write built after ESPN flipped it, and `Final 114-102` at the first write after `post`.
+  - 01:20Z: 3 live + 1 final + 3 pregame, 0 mismatches, `state_check.lens_not_started == []`.
+  - `LIVE_PROJECTION_JOIN sport=nba lens_live_games` equalled ESPN's live count on every join since tip (1 x7, then 3 at 01:24:09Z).
+  - 0 `LENS_STATE_BEHIND_RESIM`, 0 `ESPN_LIVE_STATE_FETCH_FAILED`.
+  - Overturned: the falsification test's 60 s lens tick. It measures ~170 s.
+  - Left, not this lane: the prop join's player key does not fold diacritics (`Nikola Jokić` vs `nikola jokic`). It belongs to lane `nba-live-proj-actuals`, which owns that lookup.
+- Goal: The NBA live lens (live/nba_live_lens.json, built by syndicate/features/nba/live_lens.py on live-odds-worker) shows every live NBA game's real state and score within one lens tick, matching the ESPN scoreboard the chips and the re-sim read, and the prop join's lens_live_games instrument counts NBA's live games (todo #762 open item 'Stale NBA lens game state').
+- Files: syndicate/features/nba/cards.py (build_cards_page_context cache lookup/put + _cache_get_context/_cache_put_context, _espn_live_state_payload fetch + new memo/_live_state_merge_signature helpers only), syndicate/features/nba/live_lens.py (_attach_native_resim + new state-check helper only), syndicate/features/shared/live_projection_join.py (_status_text + the one status read in build_live_prop_index only; lane nba-live-proj-actuals keeps its sections), tests/_cache_isolation.py (clear_nba_cards_caches only), tests/test_nba_lens_live_state.py (NEW), docs/ai_context/todo.md (#762 'Stale NBA lens game state' bullet only)
+- Hypothesis: Measured 2026-11-07 on the fleet (read-only): live_state_<date>.jsonl is written once pregame (11-06: 17:30:49 CST, every game Scheduled) and never during play; the cards/sim artifacts on disk were last written 17:30:48 CST / 11-05. build_cards_page_context's cache key covers those files and the live_state text but NOT the ESPN fallback that _best_live_state_payload merges, so after the first build of the evening live-odds-worker served that cached pregame context (Scheduled 0-0) until some artifact changed. Separately, live_projection_join.build_live_prop_index reads game['status'] only when it is a Mapping, and NBA's lens status is a string, so lens_live_games is structurally 0 for NBA.
+- Falsification test: If, with the fix loaded on live-odds-worker, a live NBA game shows Scheduled (or a stale score) in nba_live_lens.json for more than one lens tick (60 s) + the 10 s ESPN memo after ESPN's scoreboard says it is in play, or LIVE_PROJECTION_JOIN sport=nba lens_live_games stays 0 with games live, the hypothesis is wrong or the fix inert.
+- Verification: Fleet, first live NBA slate after the fix loads (read-only): every game nba_live_lens.json calls live matches ESPN's scoreboard state; native_resim.state_check.lens_not_started == [] while the re-sim has games in play; LIVE_PROJECTION_JOIN sport=nba lens_live_games > 0. Tests: off != on for the cache (old key serves Scheduled after tip, new one serves Live) and for the string status.
+- Blocked by: none (closed)
+
+### basketball-interval-projections — CLOSED (GOAL MET) — opened 2026-11-07 — session 547fe65e-71ca-4e19-9589-237553cb4eab
+- **VERDICT `[2026-11-07 22:47Z]`: GOAL: MET.** Reading: served `/api/board/game-chips` 22:45:55Z -- pregame blocks nba 6/6, ncaab 20/20, wncaab 8/8; live blocks on every chip with a re-sim projection (16/20, the 4 others have no lane); settled == line score 7/7; served page 50 rail cards with PROJ. On the fleet `b13a1202a` (deploys.md 22:44:30Z). College segment pricing still off.
+- Goal: Every basketball Games-rail card (nba, wnba, ncaab, wncaab) shows the sims' interval projections -- projected points per half (men's college) or quarter (women's college, NBA, WNBA) and the projected final, spread, total and win% -- pregame from the pregame sims and live from the live re-sim, read on the fleet's served /api/board/game-chips: every pregame chip whose game has a pregame sim carries an intervals block, every live chip with a re-sim lane carries one with source live_resim, settled periods equal the linescore; college segment PRICING stays off (#763)
+- Files: syndicate/features/shared/game_chip_intervals.py (new), syndicate/features/shared/game_chip_scoreboard.py (the intervals attach in build_game_chip and at serve time beside attach_served_linescores ONLY), syndicate/templates/intelligence.html (the rail card's interval render beside chipLineScore ONLY), tests/test_game_chip_intervals.py (new), tests/js/games_rail_intervals.test.mjs (new), syndicate/static/shared/board_cards.css (the interval-box rules only)
+- Hypothesis: n/a (display of existing sim output; plan approved 2026-11-07)
+- Falsification test: n/a
+- Verification: unit tests incl. off != on (artifact present -> block, absent -> none); JS render test; fleet: game-chips read pregame + live per sport (share with a block vs games with a sim; source live_resim on live chips; settled == linescore); served-page screenshot of the rail; 0 tracebacks; chip publish time not up >10%
+- Blocked by: none
+
+### basketball-interval-backtest — CLOSED 2026-11-07 (GOAL MET: harness on main 4264deceb..c7ba7a01c, run on the fleet for NCAAB + NBA + WNBA; findings + todo #765) — opened 2026-11-07 — session c2fd17f8-7d77-4eed-b025-0830211e05b3
+- **GOAL VERDICT `[2026-11-07 22:02Z checkpoint]`: GOAL: MET.**
+  - Goal verbatim: "A read-only replay harness scores basketball interval projections (full-game / h1 / h2 / q1-q4 total and home margin) every 30 s of game clock over completed games, per projector x league x segment x clock bucket (college min 10/20/30/38; NBA/WNBA the same fractions), with per-family date coverage and game counts printed; it runs end to end on NCAAB and at least one other league; each projector variant has an off != on reachability test; findings file holds the MAE/bias table vs the old NCAAB app bar (25.97/16.75/10.64/4.67) and the old NBA pregame quarter MAE 8.53; landed on main. Measurement only: no engine, re-sim or served-code edit, no deploy, college segment pricing stays off (#763)".
+  - Readings: 22 tests green (an off != on test per variant).
+  - Runs on the fleet data root, read-only at nice 19, coverage printed per family:
+    - NCAAB 2025-26: 6,257 games every 30 s, plus a 400-game re-sim sample;
+    - NBA 2026-27: 132 games with the re-sim and the tick;
+    - NBA 2025-26: 1,391 games; WNBA 2026: 373 games.
+  - The findings hold both bars. No engine, re-sim or served code touched; no deploy.
+  - Result: the bar is `pregame_rate`; NBA's re-sim beats it nowhere; NCAAB's wins on h2 and the in-game full total and loses on h1 (todo #765).
+- Goal: A read-only replay harness scores basketball interval projections (full-game / h1 / h2 / q1-q4 total and home margin) every 30 s of game clock over completed games, per projector x league x segment x clock bucket (college min 10/20/30/38; NBA/WNBA the same fractions), with per-family date coverage and game counts printed; it runs end to end on NCAAB and at least one other league; each projector variant has an off != on reachability test; findings file holds the MAE/bias table vs the old NCAAB app bar (25.97/16.75/10.64/4.67) and the old NBA pregame quarter MAE 8.53; landed on main. Measurement only: no engine, re-sim or served-code edit, no deploy, college segment pricing stays off (#763)
+- Files: scripts/backtest_basketball_intervals.py (NEW), syndicate/features/shared/basketball_interval_backtest.py (NEW), tests/test_basketball_interval_backtest.py (NEW), .syndicate/findings_2026-11-07_basketball_interval_backtest.md (NEW), docs/ai_context/todo.md (a new item section for this harness only)
+- Hypothesis: n/a (builds the bar; Phase 2 engine variants are judged against it later)
+- Falsification test: n/a
+- Verification: pytest tests/test_basketball_interval_backtest.py green incl. off != on per variant; harness run on fleet data (read-only, nice 19) for NCAAB + NBA (+ WNBA naive); findings table with n games, coverage per family, MAE/bias per projector x segment x bucket
+- Blocked by: none
+
+### ncaab-interval-resim-prod-switches — CLOSED 2026-11-07 (GOAL MET: 8c1378e9a + run ncaab2026_resim_prod; findings college section + todo #765 corrected) — opened 2026-11-07 — session c2fd17f8-7d77-4eed-b025-0830211e05b3
+- **GOAL VERDICT `[2026-11-08 00:54Z]`: GOAL: MET.**
+  - Readings: 24 tests green, incl. the env-switch off != on test through production's `build_engine_inputs`.
+  - The run's provenance: all 308 re-simmed games carry halfSplit, exactTarget and 3 end-game cfg fields, read off the engine inputs.
+  - Hypothesis CONFIRMED (not falsified): the h1 tip bias is +2.15 with the switches (threshold +4; was +8.44). Production's +1.27 on 147 2026-27 finals.
+  - Result: vs `pregame_rate` on 282 paired games, h1 tip -0.93 ± 0.41 better, h2 better at every checkpoint, full total better from minute 20; minute 38 bias -2.67 (the line -5.02).
+  - No engine, served-code or config change; no deploy.
+- Goal: The #765 NCAAB re-sim rows re-run with live-odds-worker's three switches (SYNDICATE_NCAAB_HALF_SPLIT, _EXACT_TARGET, _LIVE_MECHANISMS) in the replay env, per-game provenance proving they reached the engine inputs, and the findings + #765 carrying the corrected h1/h2/full and minute-38 rows
+- Files: syndicate/features/shared/basketball_interval_backtest.py, scripts/backtest_basketball_intervals.py, tests/test_basketball_interval_backtest.py, .syndicate/findings_2026-11-07_basketball_interval_backtest.md, docs/ai_context/todo.md (#765 section only)
+- Hypothesis: The replay's +8.4 first-half bias at the tip is the half split switched off: with production's switches the re-sim's h1 tip bias falls to about production's +1.3 (147 finals 11-03..11-07)
+- Falsification test: With halfSplit=True recorded on every replayed game, the re-sim's h1 bias at the tip stays above +4
+- Verification: pytest tests/test_basketball_interval_backtest.py green incl. an off != on test for the env switches; the re-run report shows halfSplit/exactTarget/mechanisms on every resim game; paired old-vs-new rows in the findings
+- Blocked by: none
+
+### closed-lane-archive-20261107-1932 — CLOSED 2026-11-07 (GOAL MET: 1 block archived) — opened 2026-11-07 — session 8bbf546a-4f76-485c-8347-ea838666cd44
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 1 SAFE of 17 CLOSED; moved `closed-lane-archive-20261107-1522`. Readings in .syndicate/log/2026-11-07.md (01:3xZ 11-08 entry).
