@@ -302,6 +302,8 @@ def test_college_resim_mechanisms_reach_the_engine_call_off_ne_on(monkeypatch):
     seen = []
 
     class Engine:
+        params = type("Params", (), {"exact_target_calibration": False})()  # read by the per-game provenance
+
         def simulate_pbp_game_boxscore(self, *, rng, cfg, state, **kw):
             seen.append(cfg)
             return _stub_simulate([])(rng, state)
@@ -495,3 +497,59 @@ def test_tip_projectors_are_defined_even_with_a_play_logged_at_the_tip():
     assert pre[0] == pytest.approx(1 + 140.0)
     res = bib.replay_game(g, [bib.IntervalModule(), bib.PregameRate()])
     assert max(abs(r["total"]) for r in res["rows"] if r["projector"] == "interval_projection") < 1000
+
+
+# ------------------------------------------------------------------- production's college switches (2026-11-07)
+
+_COLLEGE_SWITCHES = ("SYNDICATE_NCAAB_HALF_SPLIT", "SYNDICATE_NCAAB_EXACT_TARGET", "SYNDICATE_NCAAB_LIVE_MECHANISMS")
+
+
+def test_college_production_switches_reach_the_engine_inputs_off_ne_on(monkeypatch):
+    """live-odds-worker runs the NCAAB re-sim with SYNDICATE_NCAAB_HALF_SPLIT / _EXACT_TARGET / _LIVE_MECHANISMS set
+    and refresh-worker with none (measured 2026-11-07); the first replay ran with none. Set in the replay env they
+    must reach production's OWN `build_engine_inputs` and engine binding -- and the per-game provenance must read
+    them off those inputs, not off the env."""
+    from syndicate.features.ncaab import live_resim as lr
+
+    monkeypatch.setattr(lr, "team_frame", lambda rows, **kw: _Frame(athlete_id=HOME5, player_name=[f"P {p}" for p in HOME5]))
+    extra = _college_extra()
+    extra["college_resim"]["player_priors"] = {"100": [{"min_proj": 30.0}], "200": [{"min_proj": 30.0}]}
+    g = make_game("ncaab", pregame=None, extra=extra)  # no close: prepare runs no tip sim
+    for key in _COLLEGE_SWITCHES:
+        monkeypatch.delenv(key, raising=False)
+    off = bib.Resim(sims=100).prepare(g)
+    monkeypatch.setenv("SYNDICATE_NCAAB_HALF_SPLIT", "1")
+    monkeypatch.setenv("SYNDICATE_NCAAB_EXACT_TARGET", "1")
+    monkeypatch.setenv("SYNDICATE_NCAAB_LIVE_MECHANISMS", json.dumps({"endgame_foul_window_s": 120, "endgame_foul_p_by_deficit": [0.1, 0.2]}))
+    on = bib.Resim(sims=100).prepare(g)
+    assert off["provenance"] == {"halfSplit": False, "cfgFields": [], "exactTarget": False}
+    assert on["provenance"] == {"halfSplit": True, "cfgFields": ["endgame_foul_p_by_deficit", "endgame_foul_window_s"],
+                                "exactTarget": True}
+    assert off["inputs"]["quarters"] is None
+    assert on["inputs"]["quarters"][0]["home_pts_mu"] == pytest.approx(71.0 * lr.H1_SHARE)
+    assert on["inputs"]["cfg"].endgame_foul_window_s == 120 and off["inputs"]["cfg"].endgame_foul_window_s == 0
+    assert lr.ncaab_engine(league="ncaab").params.exact_target_calibration is True  # the engine the re-sim binds
+
+
+def test_engine_provenance_is_recorded_per_game_and_counted_in_the_report(monkeypatch):
+    for key in _COLLEGE_SWITCHES:
+        monkeypatch.delenv(key, raising=False)
+    _fake_college_inputs(monkeypatch)
+    g = make_game("ncaab", pregame=(140.0, 10.0), extra=_college_extra())
+    res = bib.replay_game(g, [bib.Resim(sims=100, simulate=_stub_simulate([])), bib.PregameRate()])
+    prov = {"halfSplit": False, "cfgFields": [], "exactTarget": False}
+    assert res["provenance"] == {"resim": prov, "resim_anchored": prov}  # pregame_rate has no engine inputs
+    s = _script()
+    assert s.college_switches("nba") is None
+    assert s.college_switches("ncaab", {}) == {"half_split": False, "exact_target": False, "live_mechanisms": []}
+    assert s.college_switches("ncaab", {"SYNDICATE_NCAAB_HALF_SPLIT": "1", "SYNDICATE_NCAAB_EXACT_TARGET": "true",
+                                        "SYNDICATE_NCAAB_LIVE_MECHANISMS": '{"endgame_foul_window_s": 120}'}) == \
+        {"half_split": True, "exact_target": True, "live_mechanisms": ["endgame_foul_window_s"]}
+    from types import SimpleNamespace
+
+    args = SimpleNamespace(league="ncaab", season=2026, phases=None, projector_names=["pregame_rate", "resim"], sims=100,
+                           mechanisms_obj={}, sim_times=None, seed=1, sample=None, code_sha="x", baseline="pregame_rate")
+    report = s.build_report([bib.compact(res), bib.compact(res)], {}, args)
+    assert report["engine_provenance"]["resim"] == {json.dumps(prov, sort_keys=True): 2}
+    assert report["config"]["college_switches"]["half_split"] is False
+    assert "College engine switches in the replay env" in s.markdown(report)

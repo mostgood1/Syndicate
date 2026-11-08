@@ -612,7 +612,26 @@ class Resim(Projector):
         names: dict[str, str] = {}
         for frame in (inputs["home_players"], inputs["away_players"]):
             names.update({str(k): str(v) for k, v in zip(frame["athlete_id"], frame["player_name"])})
-        return {"inputs": inputs, "names": names}
+        return {"inputs": inputs, "names": names, "provenance": self._college_provenance(game, inputs)}
+
+    def _college_provenance(self, game, inputs) -> dict[str, Any]:
+        """Which of production's college switches THIS game's engine call carries, read off the fields the engine
+        consumes rather than the env: the half split is `quarters` set (`SYNDICATE_NCAAB_HALF_SPLIT`), the
+        mechanisms are the cfg fields off their defaults (`SYNDICATE_NCAAB_LIVE_MECHANISMS`, plus `mechanisms`),
+        and the exact solve is the bound engine's `exact_target_calibration` (`SYNDICATE_NCAAB_EXACT_TARGET`).
+        live-odds-worker runs all three and refresh-worker none (2026-11-07), so a run without this record cannot
+        say which production it replayed."""
+        from syndicate.features.basketball_engine.engine import EventSimConfig
+        from syndicate.features.ncaab import live_resim as lr
+
+        cfg = inputs["cfg"]
+        default = EventSimConfig(possessions_per_game=cfg.possessions_per_game)
+        changed = sorted(f.name for f in dataclasses.fields(cfg) if getattr(cfg, f.name) != getattr(default, f.name))
+        if self.simulate is None:  # the engine resim_live_game will bind: the same cached call, same env
+            exact = bool(lr.ncaab_engine(league=game.league).params.exact_target_calibration)
+        else:
+            exact = lr.exact_target_enabled()
+        return {"halfSplit": inputs.get("quarters") is not None, "cfgFields": changed, "exactTarget": exact}
 
     def _nba_inputs(self, game):
         from syndicate.features.nba import live_resim as lr
@@ -752,7 +771,7 @@ def replay_game(game: ReplayGame, projectors: Sequence[Projector], *, step: int 
     expensive projector (`every_step=False`) runs at; default the four checkpoints."""
     actual = segment_actuals(game)
     out: dict[str, Any] = {"league": game.league, "game_id": game.game_id, "date": game.date, "phase": game.phase,
-                           "rows": [], "refusals": {}, "prepare_refusals": {}}
+                           "rows": [], "refusals": {}, "prepare_refusals": {}, "provenance": {}}
     if isinstance(actual, Refusal):
         out["game_refusal"] = actual.reason
         out["detail"] = actual.detail
@@ -772,6 +791,9 @@ def replay_game(game: ReplayGame, projectors: Sequence[Projector], *, step: int 
                 out["prepare_refusals"][name] = refusal.reason
             continue
         active.append((proj, prepared))
+        if isinstance(prepared, Mapping) and prepared.get("provenance") is not None:
+            for name in proj.emits:  # what this game's engine inputs carried (`Resim._college_provenance`)
+                out["provenance"][name] = prepared["provenance"]
     reg = float(game.regulation_seconds)
     refusals: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     for t in times:

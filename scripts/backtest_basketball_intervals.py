@@ -467,6 +467,11 @@ def markdown(report: Mapping[str, Any], *, segments: Optional[Iterable[str]] = N
     lines.append("| family | dates | first | last |\n|---|---|---|---|")
     for name, c in (report.get("coverage") or {}).items():
         lines.append(f"| {name} | {c['dates']} | {c['first']} | {c['last']} |")
+    if cfg.get("college_switches") is not None:
+        lines.append(f"\nCollege engine switches in the replay env: `{json.dumps(cfg['college_switches'], sort_keys=True)}`")
+    if report.get("engine_provenance"):
+        lines.append(f"\nGames per engine-input provenance (read off the engine's own inputs): "
+                     f"`{json.dumps(report['engine_provenance'], sort_keys=True)}`")
     if report.get("prepare_refusals"):
         lines.append(f"\nPer-game projector refusals (named): `{json.dumps(report['prepare_refusals'], sort_keys=True)}`")
     for lg, phases in (report.get("checkpoint") or {}).items():
@@ -522,6 +527,19 @@ def markdown(report: Mapping[str, Any], *, segments: Optional[Iterable[str]] = N
     return "\n".join(lines) + "\n"
 
 
+def college_switches(league: str, env: Optional[Mapping[str, str]] = None) -> Optional[dict[str, Any]]:
+    """Production's three college engine switches as this process reads them, through production's own readers --
+    booleans and mechanism FIELD NAMES only, never a value. live-odds-worker runs all three and refresh-worker none
+    (2026-11-07): copy them into the replay env from the process that runs the re-sim, or the run replays neither.
+    None for the pro leagues (they read none of the three)."""
+    if league not in ("ncaab", "wncaab"):
+        return None
+    from syndicate.features.ncaab import live_resim as lr
+
+    return {"half_split": lr.half_split_enabled(env), "exact_target": lr.exact_target_enabled(env),
+            "live_mechanisms": sorted(lr.live_mechanisms_from_env(env))}
+
+
 def build_report(results: list[dict[str, Any]], meta: Mapping[str, Any], args: argparse.Namespace) -> dict[str, Any]:
     refusals: dict[str, int] = defaultdict(int)
     prep: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
@@ -534,6 +552,10 @@ def build_report(results: list[dict[str, Any]], meta: Mapping[str, Any], args: a
         for k, d in (r.get("refusals") or {}).items():
             for reason, n in d.items():
                 step[k][reason] += n
+    provenance: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    for r in results:
+        for variant, prov in (r.get("provenance") or {}).items():
+            provenance[variant][json.dumps(prov, sort_keys=True)] += 1
     scored = [r for r in results if not r.get("game_refusal")]
     names = sorted({row["projector"] for r in scored for row in r.get("cp_rows") or ()})
     base = args.baseline if args.baseline in names else ("pregame_rate" if "pregame_rate" in names else "naive_pace")
@@ -543,10 +565,12 @@ def build_report(results: list[dict[str, Any]], meta: Mapping[str, Any], args: a
         "config": {"league": args.league, "season": args.season, "phases": args.phases, "projectors": args.projector_names,
                    "sims": args.sims, "mechanisms": args.mechanisms_obj, "step_seconds": bib.STEP_SECONDS,
                    "checkpoints": bib.checkpoint_times(args.league), "sim_times": args.sim_times or "checkpoints",
-                   "seed": args.seed, "sample": args.sample, "code": args.code_sha},
+                   "seed": args.seed, "sample": args.sample, "code": args.code_sha,
+                   "college_switches": college_switches(args.league)},
         **meta,
         "games_replayed": len(results), "games_scored": len(scored), "game_refusals": dict(refusals),
         "prepare_refusals": {k: dict(v) for k, v in prep.items()}, "step_refusals": {k: dict(v) for k, v in step.items()},
+        "engine_provenance": {k: dict(v) for k, v in provenance.items()},
         "sec_per_game": round(statistics.fmean(r.get("sec", 0.0) for r in results), 2) if results else None,
         "checkpoint": bib.summarize(scored, by="checkpoint"),
         "bucket": bib.summarize(scored, by="bucket"),

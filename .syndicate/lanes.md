@@ -906,6 +906,14 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness --idle-min 240 read 1 SAFE of 15 CLOSED; moved `closed-lane-archive-20261107-1406`. Table in log/2026-11-07.md.
 
+### ncaab-interval-resim-prod-switches — OPEN — opened 2026-11-07 — session c2fd17f8-7d77-4eed-b025-0830211e05b3
+- Goal: The #765 NCAAB re-sim rows re-run with live-odds-worker's three switches (SYNDICATE_NCAAB_HALF_SPLIT, _EXACT_TARGET, _LIVE_MECHANISMS) in the replay env, per-game provenance proving they reached the engine inputs, and the findings + #765 carrying the corrected h1/h2/full and minute-38 rows
+- Files: syndicate/features/shared/basketball_interval_backtest.py, scripts/backtest_basketball_intervals.py, tests/test_basketball_interval_backtest.py, .syndicate/findings_2026-11-07_basketball_interval_backtest.md, docs/ai_context/todo.md (#765 section only)
+- Hypothesis: The replay's +8.4 first-half bias at the tip is the half split switched off: with production's switches the re-sim's h1 tip bias falls to about production's +1.3 (147 finals 11-03..11-07)
+- Falsification test: With halfSplit=True recorded on every replayed game, the re-sim's h1 bias at the tip stays above +4
+- Verification: pytest tests/test_basketball_interval_backtest.py green incl. an off != on test for the env switches; the re-run report shows halfSplit/exactTarget/mechanisms on every resim game; paired old-vs-new rows in the findings
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
