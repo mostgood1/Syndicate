@@ -18,9 +18,12 @@ Answer every question. A missing answer is a FAIL, not a shrug.
 3. **Measurement.** Where does the number come from, and who reads it?
    If nobody is assigned to read it, FAIL.
 
-4. **Blast radius.** Which services restart? For any service on a
-   persistent disk, note that deploys are stop-then-start with downtime
-   and that instances cannot overlap.
+4. **Blast radius.** Which fleet roles restart, and what dies with them?
+   Web reloads by rolling HUP (`local_production.py reload-web`; nothing is
+   refused). A worker TERM kills that worker's in-flight jobs (an MLB sim,
+   odds children), and the supervisor restarts it. An env change needs a
+   drained full `down`/`up`. Every restart comes back LIVE money. A fleet ff
+   ships ALL of `main` to each role at its next load, not just your commit.
 
 5. **Rollback.** Exact command or PR revert, stated now.
 

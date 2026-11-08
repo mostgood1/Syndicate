@@ -19,52 +19,75 @@ stable and never reused; check both files before taking a number, and before
 finishing run the #71 check that shipped work actually reached one of them. It carries the current
 priority order, what has been *validated* against production versus merely
 believed, and a set of operational facts that are expensive to rediscover — among
-them: **Render auto-deploy is OFF — but that is true of CODE and false of
-CONFIG** (see below), **deploying kills an in-flight MLB sim**, and `logger.info`
-never reaches Render's log collector (use `print(..., flush=True)`).
+them: **production is the local WSL fleet, not Render, since 2026-09-30** (see
+below), **restarting refresh-worker kills an in-flight MLB sim**, and `logger.info`
+never reached Render's log collector, so keep using `print(..., flush=True)` for
+anything you need to read back from a role log.
 
-### Pushing `render.yaml` IS a production change (`#284`)
+### Production is the WSL fleet, not Render `[since 2026-09-30]`
 
-`autoDeploy = no` on all three services, so pushing `.py` to `main` really does
-ship nothing. **`blueprint_sync` is a separate mechanism that bypasses it.**
-Measured 2026-08-08: a web deploy at 23:02:26Z carried `trigger =
-blueprint_sync` with no user in it, rewrote env vars on two live services
-(refresh-worker 92 → 93 keys), and 502'd every route for ~2 minutes. Nobody
-deployed it; a `render.yaml` commit had been pushed.
+Render billing-suspended all three services (web, refresh-worker,
+live-odds-worker) at 2026-09-30 06:37:51Z. Production now runs on this Windows
+machine's WSL as **the fleet**: `scripts/local_production.py up` supervises web,
+both workers and a local Redis on ONE shared disk (`~/syndicate-prod/data`). **It
+has traded live money since 2026-10-19, and every restart comes back LIVE.**
+Runbook: `docs/ai_context/local_production_runbook.md`. Verified current state:
+`.syndicate/state_worker.md` `[local-production-host]`. Nothing at run time needs
+Render. Leave the Render account and its services alone: they are dormant.
 
-It fires on `render.yaml` changes, not on every push — 1 `blueprint_sync` against
-19 `api` deploys over 20. So:
+- **Pushing to `main` ships nothing until someone fast-forwards the fleet, and then
+  it ships ALL of `main`.** The fleet checkout is `~/Syndicate`, and its GitHub
+  remote is `github`, not `origin`. A fleet deploy is an exact-SHA
+  `git merge --ff-only <sha>`, followed by one of:
+  - `local_production.py reload-web` for web (a rolling HUP);
+  - a role TERM for a worker (the supervisor restarts it);
+  - a drained full `down` + `Start-ScheduledTask SyndicateLocalProduction` for an
+    env change.
 
-- **Pushing `.py` is free. Pushing `render.yaml` applies to production.** Get an
-  explicit decision first; committing is still safe.
-- **A sync writes the WHOLE env block, not your diff.** The blast radius of a
-  one-key edit is every value in the file, including drift nobody has read.
-  Enumerate before pushing: diff `render.yaml` against each service's live
-  `/v1/services/<id>/env-vars` (paginate — `limit` > 100 returns HTTP 400).
+  An ff alone reaches web at its next worker recycle. So land a behaviour change
+  only when you are ready to measure it (learnings 2026-10-03).
+- **Fleet env is layered:** `render.yaml` → `~/syndicate-prod/render_env/<role>.json`
+  (a Render snapshot from 2026-10-01) → `~/syndicate-prod/local_production.env` →
+  forced keys. A later layer wins.
+  - **Every key `render.yaml` declares is also in the snapshot, so editing
+    `render.yaml` changes NOTHING on the fleet.** Measured 2026-11-08: 0 of 48 / 77 /
+    72 keys are decided by `render.yaml` alone.
+  - To change env, edit `local_production.env` (global, or `ROLE__KEY` for one
+    role), then run a drained full `down`/`up`. Env is built only at `up`, and a role
+    restart reuses the old env.
+- **A `render.yaml` push is still gated** (claims and preflight on all three
+  services, plus `check_blueprint_drift.py`). If the Render blueprint is still
+  linked, a push can fire `blueprint_sync` against the suspended services. Get an
+  explicit user decision first.
 - **Absent ≠ off. Check the code's default for any key you add or remove.**
   `_evaluation_settlement_auto_refresh_enabled` treats absent as **False**;
-  `_mlb_refresh_tick_owner_here` defaults **True**. The same edit is a no-op in
-  one case and a behaviour change in the other.
-- A deploy nobody remembers ordering is findable: `/v1/services/<id>/deploys` →
-  `trigger`.
+  `_mlb_refresh_tick_owner_here` defaults **True**. The same edit is a no-op in one
+  case and a behaviour change in the other.
+- **The code still branches on `RENDER*` markers, and the fleet fakes them on
+  purpose.** `local_production.py` sets `RENDER=true`,
+  `RENDER_SERVICE_NAME`/`_ID=local-<role>`, `RENDER_INSTANCE_ID` and
+  `RENDER_GIT_COMMIT` on every role. Without them:
+  - web starts its own board builder (`syndicate/app.py _start_background_loops`);
+  - the request-path guard switches off;
+  - the two workers count each other's jobs.
 
-**Why this is stated at this length:** the old one-liner was *literally true and
-materially misleading*, which is the worst combination — it read as a guarantee
-that pushes are free, and seven parallel sessions batched deploys all evening on
-that basis. A near-miss the same night: `EVALUATION_SETTLEMENT_REFRESH_INTERVAL_SECONDS`
-sat in the blueprint while absent from the live service, and setting that key
-**at all** overrides the settlement autorun's daily gate (`int(raw or 86400)`) —
-4 runs/day of a ~1.4GB job. It was commented out four hours before the sync fired.
+  Do not strip them. The full inventory of what still assumes Render is in
+  `.syndicate/findings_2026-11-07_render_dependency_inventory.md`.
 
-## Render is the source of truth — `data/**` in git is a lossy mirror
+History (`#284`): on Render, `autoDeploy = no` held for code. But `blueprint_sync`
+applied any pushed `render.yaml` to every service. Measured 2026-08-08: an unordered
+sync rewrote env on two live services and 502'd every route for ~2 minutes.
+
+## Production is the source of truth — `data/**` in git is a lossy mirror
 
 **This applies to every task in this repo: analysis, modelling, backtests, and
 debugging alike. Read it before drawing any conclusion from a file under
 `data/`.**
 
 The daily pipeline does **not** run off git. Workers write artifacts to
-Render's mounted disk and the web service reads them from there (see the
-worker-split rule below). The git-tracked `data/<sport>_source/` trees are a
+production's disk, and web reads them from there (see the worker-split rule
+below). That disk was Render's until 2026-09-30. Since then it is the fleet's
+shared `~/syndicate-prod/data`. The git-tracked `data/<sport>_source/` trees are a
 **cold-start safety net** — periodically refreshed by
 `scripts/refresh_<sport>_source_mirror.ps1` or pulled back over HTTP by the
 backup workflow via `/api/ops/artifacts/export`. They are not a snapshot of
@@ -92,9 +115,11 @@ mix git-tracked and untracked on-disk files.
 - `git ls-files` vs. what is on disk is a real distinction here: much of
   `data/` on a dev machine is untracked mirror output of unknown vintage. Say
   which you used.
-- Don't diagnose "missing data" from the local checkout — check production
-  first (`/api/ops/...` with `ADMIN_TOKEN`, or the per-sport JSON APIs).
-- Fixing thin coverage means refreshing the mirror from Render or widening
+- Don't diagnose "missing data" from the local checkout. Check production first:
+  the fleet's `/api/ops/...` or the per-sport JSON APIs, at `http://127.0.0.1:10000`
+  (`scripts/_base_url.py` resolves both the URL and the token). The repo `.env` holds
+  Render's token, which the fleet rejects.
+- Fixing thin coverage means refreshing the mirror from production or widening
   `HOT_ARTIFACT_PATTERNS` — not quietly falling back to whatever is on disk.
 
 ## Model engines — a mandatory standard
@@ -113,8 +138,8 @@ Non-negotiable for every engine, current and future:
   `dataclasses.fields()` — **never a name grep** — and exits non-zero.
 - **A documented pipeline trace**, file:line at each hop, including what it writes.
 - **Every input disk-backed** via `SYNDICATE_DATA_ROOT` and **allowlisted** in
-  `HOT_ARTIFACT_PATTERNS`. A local cache cannot reach Render: `vendor/*/data/` is
-  gitignored AND inside the ephemeral checkout.
+  `HOT_ARTIFACT_PATTERNS`. A cache outside `SYNDICATE_DATA_ROOT` never reaches
+  production: the fleet's roles read `~/syndicate-prod/data`, not a checkout.
 - **Publishing is not sufficient** — MLB's `--use-roster-artifacts` defaults to
   `on`, so a new input needs a roster REBUILD or it is silently ignored.
 - **Reachability test before correctness tests** (`off != on`) for anything behind
@@ -178,15 +203,15 @@ There's also a `run-syndicate` Claude Code skill that launches the app and drive
 
 ## Architecture
 
-### Render (web) vs. worker split — the load-bearing rule
+### Web vs. worker split — the load-bearing rule
 
 This is the single most important architectural constraint in the repo (see `docs/ai_context/runtime_execution_model.md` and `worker_architecture.md`):
 
 - **The web service does no heavy computation.** It only reads precomputed artifacts, hydrates responses, and does light transformation for display.
 - **All simulation, artifact generation, enrichment, and evaluation happens in background workers** (`refresh-worker`, `live-odds-worker`) or offline scripts — never synchronously inside a Flask route handler.
-- Workers write artifacts → Render reads artifacts. There is no path where a request handler recomputes a simulation or rebuilds a full game context from scratch.
+- Workers write artifacts → web reads artifacts. There is no path where a request handler recomputes a simulation or rebuilds a full game context from scratch.
 - If data is missing at request time, the correct behavior is a degraded/empty UI state, not an on-request backfill.
-- Render's Redis-backed disk cannot be shared between the web service and the worker (Render constraint) — shared mutable state (refresh manifests, run history, logs) goes through `syndicate/features/shared/refresh_state_store.py` with `SYNDICATE_REFRESH_STATE_BACKEND=keyvalue`, not the filesystem.
+- Shared mutable state (refresh manifests, run history, logs) goes through `syndicate/features/shared/refresh_state_store.py` with `SYNDICATE_REFRESH_STATE_BACKEND=keyvalue` (the fleet's local Redis), not the filesystem. On Render this was forced, because each service had its own disk. The fleet's roles share one disk (`SYNDICATE_WEB_PUBLISH_URL` is unset, so publishing is a no-op), but the code still assumes the keyvalue store, so the rule stands.
 
 When debugging a "missing data" symptom, work backward through the pipeline and find the first stage that's zero — don't start at the UI:
 ```
@@ -295,8 +320,9 @@ contradicts `state.md`, say so before proceeding.
 
 **Deploys are yours to run, behind two locks you take yourself**
 `[2026-08-18, user decision — this REPLACES the coordinator-session role]`.
-This includes `render.yaml` pushes, which fire `blueprint_sync` and apply to
-production regardless of `autoDeploy = no`.
+On the fleet, a "deploy" is any of: an ff of `~/Syndicate`, `reload-web`, a role
+TERM, or `down`/`up` (see "Production is the WSL fleet" above). `deploy-guard.py`
+gates each of them. A `render.yaml` push is gated too, on all three services.
 
 ```bash
 python scripts/deploy_claim.py acquire --service <svc> --holder <lane>
@@ -306,7 +332,12 @@ python scripts/deploy_preflight.py --service <svc> --holder <lane> --target-comm
 
 Both must pass before `.claude/hooks/deploy-guard.py` will let a deploy
 through: an unexpired claim held by YOUR lane, plus a preflight that returned
-`CLEAR` within 15 minutes **for the exact SHA you are deploying**. Preflight
+`CLEAR` within 15 minutes **for the exact SHA you are deploying**. Preflight reads
+the fleet by default (`--target auto`, since 2026-10-25): the loaded commit, a `ps`
+snapshot of each worker's jobs, and the board build in the fleet log. **Run it from
+a worktree at `origin/main`.** The primary tree's copy predates the fleet path, so
+it reads the suspended Render API and returns UNKNOWN or HTTP 503. For a restart,
+`check_deploy_safety.py` (fleet by default) names what is in flight. Preflight
 also returns `NO_EXPECTATION` (exit 6) unless the deploy states its prediction
 (`--expect`) and a baseline read within 15 minutes for every field it names
 (`--baseline`, `--baseline-read-at`). A prediction carried from an earlier
