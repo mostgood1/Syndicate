@@ -456,6 +456,35 @@ def live_lens_snapshot_path():
     return data_root() / "live" / "nhl_live_lens.json"
 
 
+def _slate_features_root():
+    """The NHL artifact root the slate features are read from: the one the PREGAME producer writes.
+
+    WHY THIS EXISTS `[2026-11-08, lane nhl-live-resim-slate-root]`. `build_slate_features(date)` with no
+    `root` resolves `hockeysim.features.loaders.nhl_source_root()`, which honours only
+    `SYNDICATE_ARTIFACT_ROOT_NHL` and otherwise falls back to `<repo>/data/nhl_source` -- on the fleet the
+    CHECKOUT `~/Syndicate`, whose git mirror's odds scoreboards stop at `date=2026-06-14`. The pregame
+    producer never hits that: `refresh_odds_sources` passes `--artifact-root <SYNDICATE_DATA_ROOT>/nhl_source`.
+    So every live game refused `no_slate_features`. Measured on the fleet 2026-11-08 23:4xZ, same code,
+    same date: default root 0 games; `~/syndicate-prod/data/nhl_source` 6 games, including the live
+    TBL@WPG (2026020280) the 23:39Z snapshot had refused. NHL live rows carried no live number.
+
+    `SYNDICATE_ARTIFACT_ROOT_NHL` keeps its precedence (None hands the loader its own default, which reads
+    it). Otherwise `sources.default_nhl_source_root()`: `SYNDICATE_NHL_SOURCE_ROOT`, then
+    `SYNDICATE_DATA_ROOT/nhl_source`, then the repo mirror -- the same chain every other NHL reader uses.
+    None if that chain cannot resolve (strict hosted storage with no data root), which is the old behaviour.
+    """
+    import os
+
+    if str(os.environ.get("SYNDICATE_ARTIFACT_ROOT_NHL") or "").strip():
+        return None
+    try:
+        from syndicate.features.nhl.sources import default_nhl_source_root
+
+        return default_nhl_source_root()
+    except Exception:
+        return None
+
+
 def validate_live_lens_snapshot(snapshot: Any) -> bool:
     """Is this snapshot safe to publish?
 
@@ -587,7 +616,8 @@ def build_live_lens_snapshot(
         )
 
         try:
-            slate_features = build_slate_features(date_key)
+            # The producer's root, not the loader's checkout default -- see `_slate_features_root`.
+            slate_features = build_slate_features(date_key, root=_slate_features_root())
         except Exception:
             slate_features = []
     by_pk = {str(getattr(g, "game_pk", "")).strip(): g for g in (slate_features or [])}
@@ -648,6 +678,9 @@ def build_live_lens_snapshot(
         "coverage": {
             "slateRows": len(rows),
             "slateError": slate_error,
+            # Games the slate FEATURES cover. 0 beside slateRows > 0 is "features unreadable" (the
+            # 2026-11-08 wrong-root defect, `_slate_features_root`), not a refusal per game.
+            "slateFeatureGames": len(by_pk),
             "games": len(out_games),
             "liveResimmed": sum(
                 1 for g in out_games
