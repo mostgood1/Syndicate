@@ -57257,3 +57257,25 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - The host CPU and memory cost under a busy slate.
 - **Carry bound:** still `shadow` (`carry_bound=shadow` on every tick, `carry_expired=0`). Turning it `on` is NOT approved.
 - **Revert** (unchanged): `LOOP_DEFAULT_WORKERS = 0` on main, then ff + a claimed live-odds-worker TERM between slates. The pool also disables itself after 3 consecutive failed jobs.
+
+## 2026-11-08 05:41:43Z (11:41 PM CST 11-07) -- VERIFY of `7d72f8e9d` (accent fold in the live prop join): **NOT YET MET, no accented player was live after the load**; a late-game gap MEASURED, not fixed (lane `nba-live-proj-actuals`)
+- **Loaded:** rode the age-gate lane's ff to `d9324512e` + refresh-worker TERM 00:43:32Z (entry above), on the user's "Ride the next restart". refresh-worker pid 952259. Web: the gunicorn workers respawned at 05:37:35Z and 05:40:36Z from the same checkout, so the web's read-time refresh carries the fold too.
+- **Reading:**
+  - The fleet checkout's `_norm_name("Nikola Jokić") == _norm_name("Nikola Jokic")`: True.
+  - 20 NBA joins 00:47:30-05:31:22Z: `miss_player=0` on every one.
+  - A read-only watcher (every 3 min, 00:44-05:32Z) read every game's `liveProps` in `live/nba_live_lens.json`, the file the prop join reads (`board_enrichment.py:2260`). **0 accented `playerName`.** ESPN spelled every live player tonight in ASCII. The only accented name in the lens was `Nikola Jokić`, in DEN@IND's box, which went final before the load.
+  - That file could have produced a non-null result: it fed 14,478 joined row-builds tonight.
+- **Owed:** LAL @ DET 11-08 23:00Z (5:00 PM CST). ESPN spells `Luka Dončić`. Read his live rows on the served board.
+- **GAP MEASURED: when books pull a prop market mid-game, its row loses the live number.**
+  - Across the 21 NBA joins 00:07-05:31Z, 14,478 live prop row-builds had their player in the lens, and 1,926 (13.3%) had no live number:
+    - 1,598 had no line at all for that market (`miss_market`);
+    - 328 had a line outside the +-3 window (`miss_line_match`).
+  - The share grows late in games:
+    - 1-21% per build while 3-5 games were live;
+    - 79% (197 of 249) at 05:14:26Z, with SAS@POR and ORL@GS in the fourth.
+  - **Cause:** the producer prices only the lines in `oddsapi_player_props_<date>.csv` (`nba/live_resim.py:1175`, `lines_from_props_csv`). That file holds each game's LATEST pull. Books pull player props as a game goes on, while the board keeps the row: `layer2_shortlist` names it `market_gone`, bounded only by the 14-hour ceiling.
+    - At 05:32Z the file held 847 rows over 7 games: 14 `player_points`, 2 `player_threes`, 7 DD, 2 TD. The rest were game lines.
+    - Join sample at 05:14:26Z: Fox rebounds 3.5, Lillard threes 2.5 and points 19.5, Castle assists 5.5, Harper assists 4.5. All had `player_in_lens=True` and `lens_lines_available=[]`.
+  - **The prop join has no quote-age gate** (`live_projection_join.py`; compare `live_gameline_join.quote_age_verdict`). Publishing these lines as they stand would PRICE dead quotes, so a fix must keep them display-only, as `#762` (4) does for stale-quote game lines.
+  - Not built and not approved. Proposed: the producer remembers each game's posted lines across ticks. A line missing from the latest pull is published with a flag, and the join shows it display-only (Live proj. + actual, no edge).
+- **Not read:** `miss_not_live` ran 0-380 per build. The sampled rows had no lens row at all (A. Davis, Bane, McCollum, J. Allen, K. Williams, Holiday). That would fit players who did not play, but it was not checked.
