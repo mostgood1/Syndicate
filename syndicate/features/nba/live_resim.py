@@ -773,8 +773,14 @@ def with_neighbour_lines(lines: Mapping[tuple[str, str], Any], window: int = LIV
 # MEASURED 2026-11-07 on the fleet, 21 NBA board builds 00:07-05:31Z: 1,926 of 14,478 live prop row-builds (13.3%) had
 # their player in the lens and no live number. 1,598 of them had NO line at all for that market, and the share rose to
 # 79% (197 of 249) at 05:14Z with two games in the fourth. The props CSV holds each game's LATEST pull, and books take
-# player props down as a game goes on (at 05:32Z it held 14 `player_points` rows over 7 games), while the board keeps
-# the row -- `layer2_shortlist` calls it `market_gone`, bounded only by its 14-hour ceiling.
+# player props down as a game goes on (at 05:32Z it held 14 `player_points` rows over 7 games), while the board's GRID
+# keeps the row.
+#
+# THOSE ARE JOIN ROW-BUILDS, NOT SERVED ROWS (corrected 2026-11-08 22:10Z, after this loaded). The served board drops a
+# live row whose quote went unobserved for 300 s (`opportunity_gate.live_quote_unobserved`, dead lane, never
+# shortlisted), and a pulled line is by construction unobserved: of 151 pulled lines found in the quote state, 146 were
+# last seen over 300 s before, and 0 of 43 served live NBA prop rows were pulled ones. So the served effect of this
+# block is a row inside that window. The 11-07 served gap was 16 of 123 rows, all one accented name (`7d72f8e9d`).
 #
 # So each game row remembers every line it has seen posted (`postedLines`, same date only), and a remembered line the
 # latest pull no longer carries is published FLAGGED: `quotePulled`, NO `liveModelProbOver` (`unpricedReason:

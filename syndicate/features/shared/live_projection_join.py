@@ -683,9 +683,13 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
         if pulled or _norm_market(row.get("market")) in _DISPLAY_ONLY_LIVE_PROP_MARKETS:
             # See `_DISPLAY_ONLY_LIVE_PROP_MARKETS`: the Live and Actual columns only.
             #
-            # AND A LINE THE BOOKS PULLED (`#762` (6), 2026-11-08). The board keeps a prop row after the market comes
-            # down (`market_gone` in `layer2_shortlist`), so its price is dead: there is nothing to beat, and an edge
-            # against it would be the stale-quote fiction `live_gameline_join.quote_age_verdict` exists to refuse.
+            # AND A LINE THE BOOKS PULLED (`#762` (6), 2026-11-08). The GRID keeps a prop row after the market comes
+            # down, so this join sees it and its price is dead: there is nothing to beat, and an edge against it would
+            # be the stale-quote fiction `live_gameline_join.quote_age_verdict` exists to refuse. The SERVED board
+            # mostly does not: `opportunity_gate` dead-lanes a live quote unobserved for 300 s
+            # (`live_quote_unobserved`), and only the opportunity lane is shortlisted. Measured 2026-11-08 22:10Z: of
+            # 151 pulled lines found in the quote state, 146 were last seen over 300 s before; 0 of 43 served live NBA
+            # prop rows were pulled ones. So this matters for a row inside that window, not for most pulled rows.
             # The re-sim publishes these lines flagged and with no `liveModelProbOver`; here they get the same
             # display-only treatment as a double-double, whatever the market.
             shown = dict(row.get("projection") or {})
