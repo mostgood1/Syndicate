@@ -304,10 +304,13 @@ capability, and it spans 7+ claimed files on a live-money fleet.
 ## 7. Decisions owed to the user
 
 - ~~**D1**~~ CLAUDE.md docs fix: DONE, `1ead99fbe`.
-- **D2** Marker replacement (Proposal M): options 1 / 2 / 3. Recommended: 3.
-- **D3** `render.yaml` role (R1 a/b/c) and the guard's Render read (R2). Recommended: R1(a), R2 additive.
+- ~~**D2**~~ Marker replacement: **DECIDED 2026-11-08, option 3 (keep and document).**
+- ~~**D3**~~ `render.yaml` role: **DECIDED 2026-11-08, R1(c) keep as is.** No header comment either:
+  a `render.yaml` push may fire `blueprint_sync` on the suspended services. The guard's
+  drift read stays.
 - ~~**D4**~~ `chmod 600` on the snapshot: DONE 2026-11-08 16:54Z.
-- **Follow-up, not a decision:** fast-forward the primary tree (2,488 behind). It is the
+- **Follow-up, not a decision:** fast-forward the primary tree (2,488 behind; 2,519 on
+  2026-11-08). **Started 2026-11-08 as its own session `local_9d448bd9`.** It is the
   cause of every "preflight reads Render" report. Recipe: memory
   `project_primary_tree_fast_forward_recipe`. It needs a uniqueness check of the
   primary tree's uncommitted work first.
