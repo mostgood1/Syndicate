@@ -3310,3 +3310,15 @@ I counted "unchanged re-appends" on the NBA and NHL quote shards (NHL: 41% of ro
   - Production h1 against 147 real finals: +1.27 (n.s.).
   - The re-run with the role's switches: +2.15 at the tip, and the re-sim BEATS the line on h1.
 - **Rule:** before scoring, replaying or "fixing" a model, list the role that runs it and read THAT process's environ, keys and booleans only. `local_production.env` holds `ROLE__KEY` overrides, so a plain-name grep reads a role-scoped switch as absent. Better still, read the artifact's own provenance (`halfSplit`, `mechanisms`), which records what actually ran.
+
+## 2026-11-08 -- RULE: a rule keyed on a PERIOD INDEX changes meaning when the league's period count changes; NBA's fourth-quarter blowout rule is the whole NCAAB second half `[lane ncaab-live-totals-bias, session 6df1b15d]`
+- **Believed (this lane's own hypothesis):** the NCAAB live re-sim's low totals (−3.41 within 30 s) were the remaining-time scoring rate or the early-season prior.
+- **Measured (fleet ledgers 11-02..11-07, 2,431 lane states / 192 games; engine probe on main `e2b7b2f45`):**
+  - The prior is level: pregame target − final +0.01 ± 1.06 on 279 games.
+  - The deficit sits in lopsided states. `engine.py:2246-2250` sets `blowout` for `q >= N_PERIODS and |m| >= 15`. NCAAB has `N_PERIODS = 2`, so that is the whole second half, not the closing 12 minutes it is for NBA.
+  - h2 flag-on live update −1.97 ± 0.09 vs +0.69 ± 0.16 off; a step of −1.45 ± 0.43 exactly at |m| = 15.
+  - The probe: the rule takes 1.9 points from a full college h2 at a 16-24 lead. Real blowouts out-score the prior rate until the last 4 minutes.
+- **Rule:**
+  1. When an engine built for one league is bound to another, grep every comparison against a period index (`q >= N_PERIODS`, `q == last`, `half_end`) and restate what it covers in MINUTES for the new league.
+  2. Decompose model − final into live update (model remaining − the engine's own prior remaining) plus prior error before blaming the prior. The live update has a tiny SE (it carries no outcome noise), so it isolates engine behaviour.
+  3. Grade against the market as well: model − line was ±0.35 where model − final was ±0.9.
