@@ -896,7 +896,8 @@ death, never life — do not invert it.
 - Hypothesis: n/a (display of existing sim output; Phase 3 of the plan approved 2026-11-07)
 - Falsification test: n/a
 - Verification: unit tests incl. off != on per sport source; JS render test; read-only dry-run of the attach over the fleet's served chips (blocks per sport x state, settled == linescore) BEFORE ship; after ff + refresh-worker TERM + reload-web: served chips per sport x state, served-page screenshot, 0 ATTACH_FAILED
-- Blocked by: none
+- STATUS 2026-11-08 00:26Z: Python done, 31 tests green, committed LOCALLY (not on main: it must ship with the card change). Survey: simulated segments exist for soccer pregame (halves), nfl/ncaaf pregame (quarters), mlb pregame (F1/F3/F5); NHL pregame period columns are fixed league shares of hockeysim's input rates, so they are NOT shown; no live engine publishes periods (nhl/nfl/ncaaf/soccer get the projected final alone; mlb live not shown). Read-only dry-run over the fleet's served chips 00:21Z: pregame ncaaf 14/14, nhl 6/6, soccer 39 (every league-day with a sim file), nfl 14/14 (11-08); live ncaaf 14/14, soccer 7/7, nhl 0/4 (producer refuses `no_slate_features`); steady-state attach 0.33 s. Notes: side-session note all-sport-interval-projections.md.
+- Blocked by: (1) the chipIntervals card edit needs a loan from lane wncaab-module, which claims the template whole-file (asked 2026-11-07 ~23:59Z); (2) a fleet ff to this lane's SHA would carry 2d738afef (lane-age gate default ON, lane live-gameline-lane-age-gate, not on the fleet) unless that lane ships first or the user OKs the ride-along
 
 ### closed-lane-archive-20261107-1818 — CLOSED 2026-11-07 (GOAL MET: 1 blocks archived) — opened 2026-11-07 — session 8e33ad2d-f216-48f4-95a0-fcaf8a10b203
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
