@@ -57157,3 +57157,47 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - Quick, env: `SYNDICATE_COLLEGE_LIVE_RESIM_WORKERS=0`. It needs a full fleet down/up, because a respawn reuses the role's env.
   - Code: set `LOOP_DEFAULT_WORKERS = 0` (or revert `af4244afd`), then ff + live-odds-worker TERM.
   - Self-protection: the pool disables itself after 3 failed jobs in a row, and the loop then runs in the thread as before.
+
+## 2026-11-08 00:43:32Z (6:43 PM CST 11-07) -- FLEET ff af4244afd -> d9324512e + refresh-worker TERM: `#762` lane-age gate DEFAULT ON (lane `live-gameline-lane-age-gate`); ride-along `7d72f8e9d` (accent fold in the live prop join, lane `nba-live-proj-actuals`) -- **LOADED AND MEASURED: first build on pid 952259, `lane_age_gate=on` on every sport; NCAAB refused 108 rows on lanes past 600 s (7 priced); NBA / NCAAF 0; 0 tracebacks**
+- **User, in this chat:** "Yes, turn it on", answering "Turn the lane-age gate on, borrowing wncaab-module's 5 test files for the pin?".
+  - The decision first reached this lane relayed by `nba-live-proj-actuals` (user "Turn it on" there, ~22:20Z). This lane took it again in its own chat before acting.
+- **What:** `2d738afef` makes `on` the default of `SYNDICATE_LIVE_GAMELINE_LANE_AGE_GATE` (absent or unrecognised = on). Only an explicit `shadow` / `off` prices a stale lane.
+  - On a lane older than its sport's ceiling (nba / ncaab / wncaab 600 s, ncaaf / nfl 1,800 s), the edge is withheld under `live_lane_older_than_pricing_ceiling`. NBA keeps its display number.
+  - `344e7b3c7` and the NCAAF registration test pin the gate off in 6 test files whose lanes carry fixed past times; 5 of the 6 are loaned from `wncaab-module` (`d9324512e`).
+- **Tests:**
+  - 55 live-gameline test files: 1,085 passed on the default.
+  - After the last rebase: 276 passed over the borrowed, gate and newly changed files.
+  - Reverting the default to shadow fails 18 of the 61 gate tests.
+- **Range `af4244afd..d9324512e`, runtime** (listed in its own step at ~00:07Z): `syndicate/features/shared/live_gameline_join.py` only. 7 commits; the rest is ledger and tests. No dirty fleet file overlapped.
+- **Loaded by:** refresh-worker only. live-odds-worker and web were not restarted.
+  - The worker had started at 23:41:17Z on `79c8aac12`, so this TERM also loads what lane `ncaab-live-resim-capacity`'s 23:56:57Z ff put in the checkout:
+    - `7d72f8e9d`: an approved ride-along ("Ride the next restart", `73be62c71`; that lane verifies the join itself).
+    - `eb9afa26a` / `af4244afd`: read only in live-odds-worker, where `SYNDICATE_NCAAB_LIVE_RESIM` starts the college loops, so inert here.
+- **Gates:**
+  - **Claim:** refresh-worker acquired 00:06:23Z, holder `live-gameline-lane-age-gate`; released 00:44:01Z.
+  - **Restart spacing:** the previous refresh-worker TERM was 23:41:13Z (`kalshi-fanin-reversed-orientation`). This one is 62 min later.
+  - **Drain:** `check_deploy_safety --drain --drain-owner live-gameline-lane-age-gate` from ~00:06Z, under the worker's own environ. The 900 s cap ended NOT CLEAR on a board build already in flight.
+  - **Preflight** `--target fleet --target-commit d9324512e --expect fleet_lane_age_default=on --expect join_lane_age_gate_on=present_on_next_join`, baseline re-read on every poll.
+    - 62 HOLDs on that build (`layer2_shortlist_build`, then `portfolio_commit`).
+    - CLEAR 00:42:33Z, 0 processes.
+  - **Deploy:**
+    - `git merge --ff-only d9324512e` 00:42:53Z.
+    - NO_CHILD 00:42:59.5Z. Preflight CLEAR again 00:43:12Z on a fresh baseline.
+    - TERM pid 917471 00:43:32.870Z, with 0 children.
+    - Respawned as pid 952259 at 00:43:39Z. `role_restarts.jsonl`: claimed exit, holder `live-gameline-lane-age-gate`, ran_s 3737.
+    - `DRAIN_CLEARED` against pid 952259 at ~00:43:51Z.
+  - **Cost:** no board build from the in-flight build's save (~00:42Z) until the new worker's first build.
+- **Baseline:** `fleet_lane_age_default` shadow (00:42:29Z) -> on (00:43:12Z, after the ff); `join_lane_age_gate_on` 0.
+- **expect:**
+  - `lane_age_gate=on` on every gated build, and the shadow counters `{}`.
+  - NCAAB `why=` carries `live_lane_older_than_pricing_ceiling` while its loop starves. The shadow rate was 42.1% of priced row-builds, in 3 of 14 builds.
+  - NBA and NCAAF: none expected (NCAAF max 725.7 s against 1,800 s).
+  - NBA `display=` unchanged.
+- **verify (measured):** first build on pid 952259, `LIVE_GAMELINE_JOIN` 00:47:30-00:51:55Z, 0 line-start tracebacks since 00:43:39Z.
+  - `sport=ncaab index=11 considered=362 priceable=7 lane_age_gate=on lane_age_max=1236.5`, with `why={'live_lane_older_than_pricing_ceiling': 108, 'quote_older_than_the_score_the_model_saw': 37, 'quote_older_than_live_pricing_ceiling': 37, 'segment_pricing_disabled': 169, 'prob_interval_swamps_edge': 4}`.
+  - `sport=nba considered=603 priceable=41 display=512 lane_age_max=316.8`: no lane refusal.
+  - `sport=ncaaf considered=617 priceable=59 lane_age_max=497.0`: no lane refusal.
+  - wncaab: 29 considered, no projection. nhl: 13 considered, no projection. nfl: no live game.
+  - **Why NCAAB is 108 refused / 7 priced:** the loop still starves. Every `NCAAB_LIVE_RESIM_TICK` 00:02-00:50Z ran to its 240 s budget, re-simming 1-8 of 10-14 live games and carrying 4-11 per tick. `ncaab-live-resim-capacity`'s workers=2 loads at live-odds-worker's own recycle (~03:26Z per its 23:56:57Z entry). After that, the refusal count is that lane's reading too.
+  - **Not read yet:** the served board after this build's publish. NBA's Live column was not read by eye (the join's `display=512` is the instrument).
+- **Revert:** set the default back to `shadow` (one line in `lane_age_gate_mode`) on main, then ff + a claimed refresh-worker TERM. Or `SYNDICATE_LIVE_GAMELINE_LANE_AGE_GATE=shadow` with a full down/up.
