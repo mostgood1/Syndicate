@@ -57279,3 +57279,7 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - **The prop join has no quote-age gate** (`live_projection_join.py`; compare `live_gameline_join.quote_age_verdict`). Publishing these lines as they stand would PRICE dead quotes, so a fix must keep them display-only, as `#762` (4) does for stale-quote game lines.
   - Not built and not approved. Proposed: the producer remembers each game's posted lines across ticks. A line missing from the latest pull is published with a flag, and the join shows it display-only (Live proj. + actual, no edge).
 - **Not read:** `miss_not_live` ran 0-380 per build. The sampled rows had no lens row at all (A. Davis, Bane, McCollum, J. Allen, K. Williams, Holiday). That would fit players who did not play, but it was not checked.
+
+
+## 2026-11-08 17:20Z (11:20 AM CST) -- follow-up to the 2026-11-07 22:25Z `8b1dcd020` entry (lane `exit-state-size`) -- owed reading **MET**
+- First `phase_not_armed`: 2026-11-07 23:02:32Z. 32 ticks carried it through 05:32Z 11-08 (live-odds-worker.log.1). 0 keyvalue refusals and 0 real EXIT_TICK failures, 11-07 07:57Z..11-08 17:17Z. Lane closed.
