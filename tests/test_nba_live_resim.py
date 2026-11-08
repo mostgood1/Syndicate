@@ -228,7 +228,8 @@ def test_live_props_price_actual_plus_remainder_and_refuse_certainty():
     reb = by["player_rebounds"]  # 9 already banked over 6.5: decided, so no probability is published
     assert reb["liveModelProbOver"] is None and reb["unpricedReason"] == "certainty_refused"
     assert cov == {"players_simmed": 2, "rows": 2, "priced": 1, "no_actual": 1, "certainty_refused": 1,
-                   "doubles_rows": 0}  # `#762` (c): always present, so "none posted" is not "code not loaded"
+                   "doubles_rows": 0,  # `#762` (c): always present, so "none posted" is not "code not loaded"
+                   "pulled_rows": 0}  # `#762` (6): likewise; no `pulled` lines were passed
 
 
 def test_lines_are_every_posted_line_for_this_game_only(tmp_path):

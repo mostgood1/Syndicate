@@ -1468,6 +1468,8 @@ def build_layer2_shortlist(
                         f"prob_withheld={live_stats.get('rows_live_prob_withheld')} "
                         # `#762` (c): double-/triple-double rows shown live, never priced. Apart from `projected`.
                         f"display_only={live_stats.get('rows_live_display_only')} "
+                        # `#762` (6): the part of `display_only` whose line the books had pulled.
+                        f"display_only_pulled={live_stats.get('rows_live_display_only_pulled')} "
                         f"lens_indexed={live_stats.get('snapshot_rows_indexed')} "
                         f"lens_live_games={live_stats.get('live_games_in_snapshot')} "
                         f"miss_player={live_stats.get('miss_no_player')} "

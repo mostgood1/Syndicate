@@ -768,6 +768,107 @@ def with_neighbour_lines(lines: Mapping[tuple[str, str], Any], window: int = LIV
     return out
 
 
+# A MARKET THE BOOKS PULLED KEEPS ITS LIVE NUMBER, DISPLAY ONLY (`#762` (6), user "Yes, build it" 2026-11-08).
+#
+# MEASURED 2026-11-07 on the fleet, 21 NBA board builds 00:07-05:31Z: 1,926 of 14,478 live prop row-builds (13.3%) had
+# their player in the lens and no live number. 1,598 of them had NO line at all for that market, and the share rose to
+# 79% (197 of 249) at 05:14Z with two games in the fourth. The props CSV holds each game's LATEST pull, and books take
+# player props down as a game goes on (at 05:32Z it held 14 `player_points` rows over 7 games), while the board keeps
+# the row -- `layer2_shortlist` calls it `market_gone`, bounded only by its 14-hour ceiling.
+#
+# So each game row remembers every line it has seen posted (`postedLines`, same date only), and a remembered line the
+# latest pull no longer carries is published FLAGGED: `quotePulled`, NO `liveModelProbOver` (`unpricedReason:
+# quote_pulled`), its probability only under `liveDisplayProbOver`. Its quote is dead -- there is no price to beat --
+# so the board shows the Live proj. and the actual and prices nothing. Fail-safe both ways: a reader that drops the
+# flag still finds no live probability, and the prop join refuses a row without one (`no_live_probability`).
+#
+# Window +-1, not +-3: a pulled line is what the board last saw, which is a line this loop read or one step from it
+# (a pull between two ticks). The +-3 window is for lines that move while the market is up.
+PULLED_LINES_ENV = "SYNDICATE_NBA_LIVE_PROPS_PULLED_LINES"
+PULLED_LINE_WINDOW = 1
+# A bound, not a tuning knob: a points line that walks 22.5 -> 35.5 over a game is 14 lines.
+MAX_REMEMBERED_LINES_PER_KEY = 24
+
+
+def pulled_lines_enabled(env: Optional[Mapping[str, str]] = None) -> bool:
+    """On unless `SYNDICATE_NBA_LIVE_PROPS_PULLED_LINES` says 0/false/off/no. Off = the latest pull only, as before."""
+    raw = str((env if env is not None else os.environ).get(PULLED_LINES_ENV, "") or "").strip().lower()
+    return raw not in ("0", "false", "off", "no")
+
+
+def _posted_lines_payload(lines: Mapping[tuple[str, str], Any]) -> list[list[Any]]:
+    """`(player, stat) -> lines` as JSON: `[[player, stat, [lines]], ...]`, sorted so a tick's bytes are stable."""
+    out: list[list[Any]] = []
+    for (player, stat), posted in sorted(lines.items()):
+        values = (posted,) if isinstance(posted, (int, float)) else tuple(posted)
+        out.append([str(player), str(stat), sorted(float(v) for v in values)])
+    return out
+
+
+def _posted_lines_from_payload(payload: Any) -> dict[tuple[str, str], tuple[float, ...]]:
+    """The inverse of `_posted_lines_payload`. Anything malformed is skipped, never guessed."""
+    out: dict[tuple[str, str], tuple[float, ...]] = {}
+    for item in payload if isinstance(payload, list) else ():
+        if not isinstance(item, (list, tuple)) or len(item) != 3 or not isinstance(item[2], (list, tuple)):
+            continue
+        values = []
+        for value in item[2]:
+            try:
+                number = float(value)
+            except (TypeError, ValueError):
+                continue
+            if math.isfinite(number):
+                values.append(number)
+        if values:
+            out[(str(item[0]), str(item[1]))] = tuple(sorted(set(values)))
+    return out
+
+
+def _prior_posted_lines(previous: Optional[Mapping[str, Any]], date_str: str) -> dict[str, dict[tuple[str, str], tuple[float, ...]]]:
+    """event_id -> the lines the previous snapshot remembered for that game.
+
+    Every game row counts -- a refused or carried one too -- so one refused tick does not forget a game's lines. Same
+    date only, like `_prior_live_rows`."""
+    if not isinstance(previous, Mapping) or str(previous.get("date") or "") != str(date_str):
+        return {}
+    out: dict[str, dict[tuple[str, str], tuple[float, ...]]] = {}
+    for game in previous.get("games") or []:
+        if isinstance(game, Mapping) and game.get("postedLines"):
+            out[str(game.get("event_id") or "")] = _posted_lines_from_payload(game.get("postedLines"))
+    return out
+
+
+def _merge_posted_lines(prior: Optional[Mapping[tuple[str, str], Any]], current: Mapping[tuple[str, str], Any],
+                        cap: int = MAX_REMEMBERED_LINES_PER_KEY) -> dict[tuple[str, str], tuple[float, ...]]:
+    """Every line seen for each (player, stat), this pull's and the remembered ones. Past `cap`, the lines nearest
+    this pull's (or, with none, the remembered ones') centre are kept."""
+    out: dict[tuple[str, str], tuple[float, ...]] = {}
+    for key in set(prior or {}) | set(current):
+        now_posted = current.get(key)
+        now_values = () if now_posted is None else ((now_posted,) if isinstance(now_posted, (int, float)) else tuple(now_posted))
+        old = (prior or {}).get(key) or ()
+        old_values = (old,) if isinstance(old, (int, float)) else tuple(old)
+        values = sorted({float(v) for v in (*old_values, *now_values)})
+        if len(values) > cap:
+            anchor = now_values or old_values
+            centre = sum(float(v) for v in anchor) / len(anchor)
+            values = sorted(sorted(values, key=lambda v: (abs(v - centre), v))[:cap])
+        out[key] = tuple(values)
+    return out
+
+
+def pulled_lines(remembered: Mapping[tuple[str, str], Any], current: Mapping[tuple[str, str], Any],
+                 window: int = PULLED_LINE_WINDOW) -> dict[tuple[str, str], tuple[float, ...]]:
+    """The remembered lines (+-`window`) that `current` -- this pull's lines WITH their neighbours -- does not cover."""
+    out: dict[tuple[str, str], tuple[float, ...]] = {}
+    for key, lines in with_neighbour_lines(remembered, window=window).items():
+        covered = set(current.get(key) or ())
+        gone = tuple(line for line in lines if line not in covered)
+        if gone:
+            out[key] = gone
+    return out
+
+
 def _banked(act: Optional[Mapping[str, int]], key: str) -> Optional[int]:
     """Actual so far for a stat or a combo; None unless EVERY component is read (a missing actual is not a zero)."""
     if act is None:
@@ -778,16 +879,38 @@ def _banked(act: Optional[Mapping[str, int]], key: str) -> Optional[int]:
     return int(sum(int(act[part]) for part in parts))
 
 
+def _as_pulled(row: dict[str, Any]) -> dict[str, Any]:
+    """A row at a line the books no longer post: its probability moves to `liveDisplayProbOver`, and
+    `liveModelProbOver` -- the only field the prop join prices from -- is None (see `PULLED_LINES_ENV`)."""
+    row["liveDisplayProbOver"] = row.get("liveModelProbOver")
+    row["liveModelProbOver"] = None
+    row["unpricedReason"] = "quote_pulled"
+    row["quotePulled"] = True
+    return row
+
+
+def _line_values(posted: Any) -> tuple[float, ...]:
+    if posted is None:
+        return ()
+    return (posted,) if isinstance(posted, (int, float)) else tuple(posted)
+
+
 def build_live_props(result: Mapping[str, Any], actuals: Mapping[str, Mapping[str, int]],
-                     lines: Mapping[tuple[str, str], Any]) -> tuple[list[dict[str, Any]], dict[str, int]]:
+                     lines: Mapping[tuple[str, str], Any],
+                     pulled: Optional[Mapping[tuple[str, str], Any]] = None) -> tuple[list[dict[str, Any]], dict[str, int]]:
     """`liveProps` rows in the snapshot contract `live_projection_join.build_live_prop_index` reads.
 
     A row exists for every LINE posted (a probability needs something to be about) where the player has a
     banked actual (a missing actual is not a zero; a combo needs every component). P(over) = share of draws whose
     actual + remainder exceeds the line. An exact 0 or 1 is a statement about the sample, so it is published as None
-    with the reason."""
+    with the reason.
+
+    `pulled` holds lines the books posted earlier in the game and have since taken down (`pulled_lines`). They get the
+    same rows, flagged by `_as_pulled`, counted in `pulled_rows` and never in `priced`."""
     rows: list[dict[str, Any]] = []
-    counts = {"players_simmed": 0, "rows": 0, "priced": 0, "no_actual": 0, "certainty_refused": 0, "doubles_rows": 0}
+    counts = {"players_simmed": 0, "rows": 0, "priced": 0, "no_actual": 0, "certainty_refused": 0, "doubles_rows": 0,
+              "pulled_rows": 0}
+    pulled = pulled or {}
     stat_keys = tuple(key for key, _label in PROP_STATS) + tuple(COMBO_STATS)
     sims_run = int(result.get("sims_run") or 0)
     for side in ("home", "away"):
@@ -796,13 +919,14 @@ def build_live_props(result: Mapping[str, Any], actuals: Mapping[str, Mapping[st
             nk = normalize_name(name)
             act = actuals.get(nk)
             for key in stat_keys:
-                posted = lines.get((nk, key))
-                if posted is None:
+                live_lines = _line_values(lines.get((nk, key)))
+                gone_lines = tuple(line for line in _line_values(pulled.get((nk, key))) if line not in live_lines)
+                if not live_lines and not gone_lines:
                     continue
                 banked = _banked(act, key)
                 hist = hists.get(key) or {"0": sims_run}
                 total = sum(int(v) for v in hist.values())
-                for line in ((posted,) if isinstance(posted, (int, float)) else tuple(posted)):
+                for line, gone in (*((v, False) for v in live_lines), *((v, True) for v in gone_lines)):
                     if banked is None:
                         counts["no_actual"] += 1
                         continue
@@ -814,8 +938,9 @@ def build_live_props(result: Mapping[str, Any], actuals: Mapping[str, Mapping[st
                     reason = None
                     if p_over in (0.0, 1.0):
                         p_over, reason = None, "certainty_refused"
-                        counts["certainty_refused"] += 1
-                    else:
+                        if not gone:
+                            counts["certainty_refused"] += 1
+                    elif not gone:
                         counts["priced"] += 1
                     row = {
                         "playerName": name,
@@ -829,19 +954,25 @@ def build_live_props(result: Mapping[str, Any], actuals: Mapping[str, Mapping[st
                     }
                     if reason:
                         row["unpricedReason"] = reason
+                    if gone:
+                        _as_pulled(row)
+                        counts["pulled_rows"] += 1
                     rows.append(row)
                     counts["rows"] += 1
             for key, line in DOUBLES_LINES.items():
-                if lines.get((nk, key)) is None:
+                gone = lines.get((nk, key)) is None
+                if gone and pulled.get((nk, key)) is None:
                     continue
-                row = _doubles_row(name, side, key, line, hists.get(DOUBLES_JOINT_KEY), act, sims_run, counts)
+                row = _doubles_row(name, side, key, line, hists.get(DOUBLES_JOINT_KEY), act, sims_run, counts,
+                                   pulled=gone)
                 if row is not None:
                     rows.append(row)
     return rows, counts
 
 
 def _doubles_row(name: str, side: str, key: str, line: float, joint: Optional[Mapping[str, int]],
-                 act: Optional[Mapping[str, int]], sims_run: int, counts: dict[str, int]) -> Optional[dict[str, Any]]:
+                 act: Optional[Mapping[str, int]], sims_run: int, counts: dict[str, int],
+                 pulled: bool = False) -> Optional[dict[str, Any]]:
     """One double-double / triple-double `liveProps` row: the count of DOUBLE_STATS finishing at 10+.
 
     `liveProjection` is the mean final count, `actualSoFar` the count already at 10+, P(over) the share of draws whose
@@ -880,9 +1011,13 @@ def _doubles_row(name: str, side: str, key: str, line: float, joint: Optional[Ma
     if p_over in (0.0, 1.0):
         row["liveModelProbOver"] = None
         row["unpricedReason"] = "certainty_refused"
-        counts["certainty_refused"] += 1
-    else:
+        if not pulled:
+            counts["certainty_refused"] += 1
+    elif not pulled:
         counts["priced"] += 1
+    if pulled:
+        _as_pulled(row)
+        counts["pulled_rows"] = counts.get("pulled_rows", 0) + 1
     counts["rows"] += 1
     counts["doubles_rows"] += 1
     return row
@@ -1110,10 +1245,12 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
                              previous: Optional[Mapping[str, Any]] = None,
                              carry: Optional[bool] = None,
                              carry_max_age: Optional[float] = None,
-                             now: Optional[datetime] = None) -> dict[str, Any]:
+                             now: Optional[datetime] = None,
+                             remember_lines: Optional[bool] = None) -> dict[str, Any]:
     """`previous` is the last snapshot this loop wrote. Without it the tick behaves as before: scoreboard order,
     nothing carried. With it, games run stalest-first and a budget refusal republishes the game's last lane
-    within `carry_max_age` (see "budget fairness" above)."""
+    within `carry_max_age` (see "budget fairness" above), and each game's remembered lines publish the ones the
+    books have since pulled, flagged (`PULLED_LINES_ENV`; `remember_lines` overrides the env)."""
     from syndicate.features.shared import basketball_pbp as pbp
     from syndicate.features.shared.request_path_guard import refuse_if_compute_in_request_path
 
@@ -1122,7 +1259,9 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
     fetch_summary = fetch_summary or pbp.fetch_summary
     carry = carry_enabled() if carry is None else bool(carry)
     carry_max_age = carry_max_age_seconds() if carry_max_age is None else float(carry_max_age)
+    remember_lines = pulled_lines_enabled() if remember_lines is None else bool(remember_lines)
     prior = _prior_live_rows(previous, str(date_str))
+    prior_lines = _prior_posted_lines(previous, str(date_str)) if remember_lines else {}
     started = clock()
     deadline = started + float(budget_seconds)
     games: list[dict[str, Any]] = []
@@ -1174,12 +1313,27 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
         if not isinstance(result, NbaResimRefusal):
             lines = lines_from_props_csv(props_csv_path(str(date_str), root=inputs_root, league=league),
                                          row["home_name"], row["away_name"])
-            props, coverage = build_live_props(result, actuals_from_summary(summary), with_neighbour_lines(lines))
+            current = with_neighbour_lines(lines)
+            remembered = _merge_posted_lines(prior_lines.get(event_id), lines) if remember_lines else {}
+            gone = pulled_lines(remembered, current) if remember_lines else {}
+            props, coverage = build_live_props(result, actuals_from_summary(summary), current, pulled=gone)
             row["liveProps"] = props
             row["livePropsCoverage"] = {**coverage, "lines_available": len(lines),
                                         "lines_posted": sum(len(v) for v in lines.values()),
-                                        "line_window": LIVE_LINE_WINDOW}
+                                        "line_window": LIVE_LINE_WINDOW,
+                                        "lines_remembered": sum(len(v) for v in remembered.values()),
+                                        "keys_pulled": len(gone), "pulled_line_window": PULLED_LINE_WINDOW,
+                                        "remember_lines": bool(remember_lines)}
+            if remember_lines:
+                row["postedLines"] = _posted_lines_payload(remembered)
         games.append(row)
+    if remember_lines:
+        # A REFUSED TICK MUST NOT FORGET A GAME'S LINES. A carried row already holds its own (`_carried_row` copies the
+        # prior row whole); any other row that published none takes the previous snapshot's.
+        for game in games:
+            event_id = str(game.get("event_id") or "")
+            if "postedLines" not in game and prior_lines.get(event_id):
+                game["postedLines"] = _posted_lines_payload(prior_lines[event_id])
     return {
         "sport": str(league).lower(),
         "date": str(date_str),

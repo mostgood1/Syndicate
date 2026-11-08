@@ -445,6 +445,9 @@ def build_live_prop_index(snapshot: Mapping[str, Any] | None) -> dict[str, Any]:
                 "actual_so_far": prop.get("actualSoFar") if prop.get("actualSoFar") is not None else prop.get("actual"),
                 "live_edge_hint": prop.get("liveEdge"),
                 "side": _norm_side(prop.get("selection")),
+                # `#762` (6): a line the books took down. Shown, never priced -- see `attach_live_projections`.
+                "quote_pulled": prop.get("quotePulled") is True,
+                "live_display_prob_over": prop.get("liveDisplayProbOver"),
             }
             rows_indexed += 1
             if has_live_prob:
@@ -592,6 +595,7 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
         edge_withheld_by_reason[reason] = edge_withheld_by_reason.get(reason, 0) + 1
     prob_withheld = 0
     display_only = 0
+    display_only_pulled = 0
     considered = 0
     miss_no_player = 0
     miss_no_market_alias = 0
@@ -675,17 +679,27 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
                 )
             continue
 
-        if _norm_market(row.get("market")) in _DISPLAY_ONLY_LIVE_PROP_MARKETS:
+        pulled = hit.get("quote_pulled") is True
+        if pulled or _norm_market(row.get("market")) in _DISPLAY_ONLY_LIVE_PROP_MARKETS:
             # See `_DISPLAY_ONLY_LIVE_PROP_MARKETS`: the Live and Actual columns only.
+            #
+            # AND A LINE THE BOOKS PULLED (`#762` (6), 2026-11-08). The board keeps a prop row after the market comes
+            # down (`market_gone` in `layer2_shortlist`), so its price is dead: there is nothing to beat, and an edge
+            # against it would be the stale-quote fiction `live_gameline_join.quote_age_verdict` exists to refuse.
+            # The re-sim publishes these lines flagged and with no `liveModelProbOver`; here they get the same
+            # display-only treatment as a double-double, whatever the market.
             shown = dict(row.get("projection") or {})
             shown.update(
                 {
                     "live_projected": hit["live_projection"],
                     "actual_so_far": hit.get("actual_so_far"),
-                    "live_display_prob_over": hit.get("live_prob_over"),
+                    "live_display_prob_over": hit.get("live_display_prob_over") if pulled else hit.get("live_prob_over"),
                     "live_display_only": True,
                 }
             )
+            if pulled:
+                shown["live_quote_pulled"] = True
+                display_only_pulled += 1
             row["projection"] = shown  # type: ignore[index]
             display_only += 1
             continue
@@ -1055,6 +1069,8 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
         "rows_live_prob_withheld": prob_withheld,
         # `#762` (c). NOT in `rows_live_projected`: those rows are live-aware and edge-eligible, these never are.
         "rows_live_display_only": display_only,
+        # `#762` (6): of those, the rows whose line the books had pulled. Inside `rows_live_display_only`, not beside it.
+        "rows_live_display_only_pulled": display_only_pulled,
         "rows_live_edge_withheld": edge_blocked,
         "edge_withheld_by_reason": dict(sorted(edge_withheld_by_reason.items())),
         "live_games_in_snapshot": indexed.get("live_games"),
