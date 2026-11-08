@@ -57386,3 +57386,24 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - **mlb pregame:** replayed against the 10-24 / 10-26 / 10-28 artifacts only. Season over.
   - **Settled == line score:** 0 cells to check, because no non-basketball live block carries a period.
 - **Payload wart, harmless:** one served soccer chip that went FINAL between builds kept its `live_resim` block. The card hides it (`chip.state !== "final"`), but the serve-time attach (`live_only`) skips non-live chips and so never drops it. Basketball's path has the same behaviour. Noted in todo `#767`.
+
+## 2026-11-08 18:02:04Z (12:02 PM CST) -- FLEET ff a3d72c82b -> 582c24637 + reload-web: a live college game with no live re-sim lane gets a pregame-pace interval projection on its rail card (lane `wncaab-module`) -- **LOADED and VERIFIED** (written 18:04Z, 12:04 PM CST)
+- **User, in this chat:**
+  - "Yes, do it here", on "Work out live projections for women's games with no market line?";
+  - "Yes, reload web", on "Reload web now, carrying the other lanes' commits along?".
+- **Range `a3d72c82b..582c24637`, runtime:**
+  - mine: `shared/game_chip_intervals.py` (`_pace_block`, `parse_college_clock`) and `templates/intelligence.html` (`chipIntervals` PACE branch);
+  - ride-alongs, disclosed to and approved by the user:
+    - `711e299d6`, the college score-change rule (`ncaab/live_resim.py`, `shared/live_gameline_join.py`). Approved by the user in its own lane ("Score-change rule"). It loads only at a worker restart; none was done here.
+    - `7cc7ba263`, the `refuse_published_certainty` guard on the display-only prop projection writer (`shared/live_projection_join.py`). Loaded into web by this reload.
+    - `4dbfd84bd`, findings plus `scripts/college_quote_order_by_score_change.py`. Not run.
+- **Gates:** web claim (`wncaab-module`) 18:01Z. Preflight `--target fleet --target-commit 582c24637 --expect fleet_checkout_head=582c2463 --baseline fleet_checkout_head=a3d72c82` CLEAR at 18:01:35Z. `git merge --ff-only 582c24637` 18:02:04Z; `reload-web` 18:02:06Z (2.0 s, 0 failures); web `code=582c2463`. Claim released 18:02:20Z. refresh-worker and live-odds-worker were not restarted and show STALE.
+- **Baseline (18:01:30Z, served game-chips):** 5 live college chips. ncaab 1 `live_resim`; wncaab 4 with no block (Murray St @ Princeton, Cornell @ Syracuse, UMass Lowell @ Canisius, Mercer @ Wake Forest).
+- **expect:** the 4 live women's chips with no lane carry a `pregame_pace` block; the men's chip keeps `live_resim`; settled periods equal the line score; 0 web tracebacks after the reload.
+- **Measured (18:02:21Z, served game-chips):**
+  - ncaab 1 `live_resim`; wncaab 4 `pregame_pace`.
+  - 8 settled periods checked, 0 mismatched.
+  - 0 web tracebacks after 18:02:06Z. The one in the window is a gunicorn worker timeout at 17:32:56Z, before this reload.
+  - **Served page (`/intelligence`, ~18:04Z):** 4 rail cards tagged PACE. Examples: "MUR @ PRIN Q3 7:14 ... PACE Q3* Q4 T ... Proj final MUR −7.8 · O/U 145.3"; "COR @ SYR HALF ... Proj final SYR −49.3 · O/U 118.6".
+- **verify: MET.**
+- **Revert:** `git revert 582c24637`, then ff + `reload-web`. The block degrades to nothing when its inputs are unreadable.

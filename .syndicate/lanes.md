@@ -634,6 +634,7 @@ death, never life — do not invert it.
 
 ### wncaab-module — OPEN (GOAL: NOT MET — one gap: the women's live re-sim covers only market-anchored games; everything else MET and verified) — opened 2026-11-02 — session 547fe65e-71ca-4e19-9589-237553cb4eab
 - **VERDICT `[2026-11-08 17:37Z]`: GOAL: NOT MET.** Goal, verbatim: "Women's college basketball (wncaab) runs like NCAAB on the fleet: /wncaab parity cards page + market board + hub, D1 slate, OddsAPI basketball_wncaab capture (bulk + 240 s in-play quarter/half lines), game chips on the Layer 2 rail, Layer 1 board, Layer 2 market-fair rows; then (Phase 3) pregame sims for ncaab + wncaab straight to the boards and a wncaab live re-sim, under the model engine standard".
+  - **UPDATE `[2026-11-08 18:04Z]`:** the rail gap is CLOSED for display. A live college chip with no lane shows a `pregame_pace` projection (`582c24637`, web 18:02:04Z, verified 4 of 4 live women's chips, deploys.md). The live RE-SIM itself still runs only on market-anchored games (an unanchored re-sim fallback was rejected: it would put 16-80 jobs a tick on the workers the priced men's games share).
   - **MET (fleet readings in deploys.md):**
     - /wncaab pages, D-I slate, `basketball_wncaab` capture, chips, Layer 1, Layer 2 (11-03);
     - pregame sims for both leagues on the boards, with prior calibration and engine bounds (11-03);
