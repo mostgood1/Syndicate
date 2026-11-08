@@ -57306,3 +57306,28 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - Lane `nba-live-proj-actuals` has its own ff + refresh-worker restart owed (todo `#762` (6), `21487591a`). That restart would load this too; it is display-only and needs nothing of its own.
 - **Not shown, by design:** NHL period columns (fixed league shares of hockeysim's input rate), MLB live (F1/F3 lanes are interpolations, F5 `homeMargin` never written, season over), and any period on a live soccer, NFL, NCAAF or NHL chip (no live engine publishes one).
 - **Revert:** `git revert 4f367324a f27a2c85a`, then ff + `reload-web` (+ refresh-worker TERM if it has loaded). A missing source degrades to no block.
+
+## 2026-11-08 17:20:34Z (11:20 AM CST) -- VERIFY of the 00:43:32Z `#762` lane-age gate DEFAULT-ON load (lane `live-gameline-lane-age-gate`) -- **MET: 0 of 5,630 priced live game-line ledger records since 00:43:39Z sit on a lane past their sport's ceiling (24 h before: NCAAB 3,222 of 11,911, WNCAAB 32 of 483); lane CLOSED (GOAL MET)**
+- **Appended, not edited into the 00:43:32Z row.**
+- **The lane's own verification:** "0 priced ledger records with `recorded_at - live_state_as_of` over the sport ceiling".
+  - Read on the fleet ledgers (`<sport>_source/data/live_gameline_ledger/`, 11-06..11-08, read-only, nice 19).
+  - Priced records only. The ledger dedupes on movement, so these are a lower bound on row-builds.
+  - Each sport: priced since 00:43:39Z / over the ceiling / oldest lane priced.
+    - nba (600 s): 4,639 / **0** / 469.9 s
+    - ncaab (600 s): 744 / **0** / 586.6 s
+    - wncaab (600 s): 35 / **0** / 503.5 s
+    - ncaaf (1,800 s): 202 / **0** / 793.9 s
+    - nfl (1,800 s): 10 / **0** / 437.6 s
+  - **The population could have been non-zero:** in the 24 h before the switch, ncaab 3,222 of 11,911 priced records were over the ceiling, wncaab 32 of 483, nba 0 of 11,795, ncaaf 0 of 8,242.
+- **Falsification check:**
+  - Whether the gate refused FRESH lanes in normal operation: the oldest NBA lane priced since was 469.9 s, and the first build's NBA join showed 0 lane refusals.
+  - Whether a carried college lane past 600 s was still priced: 0.
+- **The rest of the lane's verification (from the 00:43:32Z row):**
+  - First build: NCAAB `why=` carried `live_lane_older_than_pricing_ceiling: 108`, with priceable 7 > 0.
+  - NBA `display=512`.
+- **After lane `ncaab-live-resim-capacity`'s workers=2 loaded (03:28:10Z):**
+  - Its builds read `lane_age_max` 17.8 / 39.7 s with 0 lane refusals (its 03:28:10Z row).
+  - The ledger shows 88 NCAAB records priced after that point: 37 in 03Z, 42 in 04Z, 8 in 05Z, 1 in 17Z. So "priced 0" held for its first two builds, not the whole night.
+  - That lane is re-measuring the quote-order interaction (user "Yes, measure it here").
+- **Not caused by this load:** `ci-suite #697`'s 2 new failures on fleet `d9324512e` (`tests/test_platform_certainty_refusal.py`) reproduce with `SYNDICATE_LIVE_GAMELINE_LANE_AGE_GATE=shadow` as well (2 failed / 8 passed, both ways, 17:1xZ). That fits its attribution to `live_projection_join.py:689`.
+- **Served board:** not read separately. The ledger is stamped from the board rows right after the join, so it is the stronger instrument.
