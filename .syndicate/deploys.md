@@ -57503,3 +57503,65 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - The served safety check is MET, n=1.
   - (6) is verified end to end: producer, join, served page.
 - **Still owed:** the Dončić accent check on LAL@DET (from 23:00Z); its watcher is running.
+
+## 2026-11-08 21:52:45Z (3:52 PM CST) -- claimed refresh-worker TERM loads the NCAAB score-change quote rule's JOIN (`711e299d6` on fleet `582c24637`, `#762`, lane `ncaab-live-resim-capacity`); its producer loaded at live-odds-worker's own recycle 21:29:05Z -- **BOTH HALVES LOADED; verify: MET on the first 3 NCAAB joins: 39.7% of full-game rows pass the quote checks (6.9% on the 8 joins before), `quote_older_than_the_score_the_model_saw` 72% -> 46%, wncaab unchanged, 0 tracebacks** (written 23:02Z, 5:02 PM CST)
+- **User, in this lane's chat:** "Yes, deploy it" (the score-change rule, carrying `7cc7ba263`). The plan the user approved: the producer loads at live-odds-worker's own recycle, then a claimed refresh-worker restart loads the join. This entry is that restart. The fleet ff was lane `wncaab-module`'s (18:02:04Z entry), and I ran none.
+- **Producer half (live-odds-worker, no restart by me):** it self-recycled; `NCAAB_LIVE_RESIM_LOOP_STARTED workers=2` at 21:29:05.337Z, pool children 1665738 / 1665739.
+  - Watcher `C:/tmp/ncaabcap/verify_sc_recycle.sh`, exit 0 at 21:33:41Z: the state-store snapshot had 5 of 5 `live_resim` lanes carrying a non-empty `liveScoreChangedAt`. e.g. `as_of` 21:31:29Z against a change at 21:31:14Z or 21:30:34Z.
+  - At 21:52Z, 6 of 6 carried the key and 5 a value. An empty one is what a lagging header or 0-0 publishes by design.
+  - First 3 NCAAB ticks: 5 live, 0 carried, `worker_errors=0`, 23.5-31.3 s. 0 tracebacks.
+- **What this TERM loaded into refresh-worker:** `a3d72c82b..582c24637`, since the role had been on `a3d72c82b` since the 17:23:38Z restart.
+  - mine: `shared/live_gameline_join.py`, the score-change verdict (a loan from `wncaab-module`, closed since; recorded in both lanes);
+  - `7cc7ba263` (`shared/live_projection_join.py`, lane `ci-suite-red-697`), carried with the user's yes;
+  - **ride-along, lane `wncaab-module` (CLOSED, GOAL MET):** `shared/game_chip_intervals.py` `_pace_block`. Web has served it since its 18:02:06Z `reload-web` (that entry measured 4 of 4 live women's chips). Refresh-worker's `[game_chip_intervals] ATTACHED` now runs the same code.
+- **Gates:**
+  - **Claim:** refresh-worker acquired 21:36:32Z, holder `ncaab-live-resim-capacity` (rc 0, status HELD).
+  - **Drain:** `check_deploy_safety --drain --drain-owner ncaab-live-resim-capacity`, run under refresh-worker's own environ (`C:/tmp/ncaabcap/drain_rw.py`), from 21:36:44Z.
+    - It hit the 900 s cap **NOT CLEAR** at 21:51:57Z (rc 1).
+    - refresh-worker read `board_build=idle in_flight=[]` throughout. Its own children (an odds job, soccer artifacts) had finished by ~21:47Z. The jobs listed at the cap were all live-odds-worker's: the re-sim pool and odds jobs. That matches the 17:21Z entry.
+  - **Preflight:** `--target fleet --target-commit 582c24637`, four `--expect` fields, each with a `--baseline` read 21:52:20Z. **CLEAR** at 21:52:32Z, 0 processes; live commit `a3d72c82`, last deploy 269 min ago.
+  - **TERM:**
+    - pid 1586492 got `kill -TERM` at 21:52:45.524Z. It had one defunct child and 0 live ones.
+    - `role_restarts.jsonl` at 21:52:48Z: claimed, code 0, holder `ncaab-live-resim-capacity`, ran_s 16144.
+    - Respawned as pid 1673776 at 21:52:52Z on `582c24637`.
+  - **`DRAIN_CLEARED`** 21:53:01Z, against the new pid. Claim released 21:53:20Z (with its token).
+  - **Spacing:** the previous refresh-worker TERM was 17:23:34Z.
+- **Baseline (read 21:52:20Z): the last 8 NCAAB joins on the old rule, 20:31-21:30Z, 5-10 live games.**
+  - Full-game rows reaching the quote checks (considered − `segment_pricing_disabled` − `no_live_gameline_projection`): 1,197.
+  - Passed: 83 (**6.9%**).
+  - Refused: `quote_older_than_the_score_the_model_saw` 866 (**72%**); `quote_older_than_live_pricing_ceiling` 248.
+  - 4 of the 8 builds priced 0. `row_carries_no_quote_or_score_time` 0.
+- **verify (measured): the first 3 NCAAB joins on pid 1673776** (22:00:01Z / 22:13:33Z / 22:49:40Z; 6 / 7 / 4 lanes):
+
+  | | baseline: 8 joins 20:31-21:30Z, old rule | measured: 3 joins 22:00-22:49Z |
+  |---|---|---|
+  | full-game rows reaching the quote checks | 1,197 | 375 (129 / 156 / 90) |
+  | passed | 83 (**6.9%**) | 149 (**39.7%**): 50 / 80 / 19 |
+  | refused `quote_older_than_the_score_the_model_saw` | 866 (72%) | 171 (46%): 59 / 55 / 57 |
+  | refused `quote_older_than_live_pricing_ceiling` (600 s) | 248 (21%) | 55 (15%) |
+  | priceable | 47 over 8 builds; 4 builds priced 0 | 98 (37 / 51 / 10); none priced 0 |
+
+  - **Against the expectations:**
+    - `ncaab_quote_pass_share` ~20-30%: **MET, larger** (39.7%). The estimate came from the 11-02..11-06 records, written by the slow loop. Lanes are fresh now (`lane_age_max` 67-150 s), so a quote more often comes after the last change.
+    - `ncaab_quote_behind_score_share` below 72%: **MET** (46%).
+    - `row_carries_no_quote_or_score_time` = 0: **MET** (absent from all 3).
+    - `lanes_with_liveScoreChangedAt` = all: **MET** (6 of 6 carry the key at 21:52Z).
+  - **The mechanism, in production:** read-only, from `ncaab_source/data/live_gameline_ledger/live_gameline_ledger_2026-11-08.jsonl`, written rows only. Counted: full-game records quoted more than 30 s before the lane's `live_state_as_of`.
+    - Before the restart: 0 of 1,241, because the old rule refused every one.
+    - After it: 161 of 203. Only the score-change rule writes those.
+  - **wncaab unchanged:** `quote_older_than_the_score_the_model_saw` 7 / 0 / 5 on its 3 joins (the state rule still applies).
+  - **Not checked in production:** whether each re-admitted quote came after the lane's last score change. The ledger carries no score-change time. The verdict is pinned by `tests/test_ncaab_quote_vs_score_change.py`.
+  - **Health:** 0 tracebacks since the restart. `[game_chip_intervals]` 0 `ATTACH_FAILED`. Refresh-worker's attach now runs the ride-along (`wncaab:pregame_pace=8` at 22:49:43Z).
+  - **First board build on the new pid: `BOARD_BUILD_TIMING wall_s=2321.1` at 22:46:14Z.** That is a cold start:
+    - first builds after this week's restarts: 1,430.6 / 2,312.0 / 1,250.6 / 1,956.2 s;
+    - second builds: 779-1,251 s;
+    - the 11-08 12:00-21:52Z median: 246 s.
+    - The new code's own steps take ≤0.25 s (chip attach 0.00-0.23 s).
+    - **Second build: `wall_s=273.1` at 23:00:37Z**, back to the day's median (246 s).
+  - **Not value:** finding 2 of `.syndicate/findings_2026-11-08_college_quote_order_by_score_change.md` says the re-admitted rows carry no measured edge. This restores coverage (priced rows, and the board's live number).
+    - Live-money in-game entries do not trade NCAAB (`inplay_entries_paper.SPORTS` is nhl/nba/nfl/ncaaf/mlb, priced off book consensus).
+    - I did not trace every other consumer of the board.
+  - **Sample:** 3 joins at 4-7 live games. The 13-40-live evening peak is not measured.
+- **Revert:**
+  - Code: drop `"ncaab"` from `_SCORE_CHANGE_BASIS_SPORTS` (`live_gameline_join.py`), then ff + a claimed refresh-worker TERM.
+  - Env: `SYNDICATE_COLLEGE_QUOTE_ORDER_BASIS=state` (a drained full down/up).
