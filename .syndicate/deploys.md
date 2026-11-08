@@ -57407,3 +57407,29 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - **Served page (`/intelligence`, ~18:04Z):** 4 rail cards tagged PACE. Examples: "MUR @ PRIN Q3 7:14 ... PACE Q3* Q4 T ... Proj final MUR −7.8 · O/U 145.3"; "COR @ SYR HALF ... Proj final SYR −49.3 · O/U 118.6".
 - **verify: MET.**
 - **Revert:** `git revert 582c24637`, then ff + `reload-web`. The block degrades to nothing when its inputs are unreadable.
+
+## 2026-11-08 18:02:04Z (12:02 PM CST) -- NCAAB quote judged against the LAST SCORE CHANGE (`711e299d6`, `#762`, lane `ncaab-live-resim-capacity`) reached the FLEET CHECKOUT on lane `wncaab-module`'s ff a3d72c82b -> 582c24637 (its entry above) -- **NOT LOADED YET: the producer loads at live-odds-worker's own recycle (~21:28Z, 3:28 PM CST); the join at my claimed refresh-worker TERM after that** (written 18:05Z, 12:05 PM CST)
+- **User, in this lane's chat:** "Yes, deploy it", answering "Deploy the score-change rule, carrying 7cc7ba263 along?". The stated plan was: fleet ff; the producer loads at live-odds-worker's own recycle; then a claimed refresh-worker restart loads the join.
+- **What happened instead of my ff:** before I took a claim, lane `wncaab-module` fast-forwarded the fleet a3d72c82b -> 582c24637 (reflog 18:02:04Z) and reloaded web (gunicorn workers 55 s old at 18:02:59Z), listing `711e299d6` as a ride-along that loads only at a worker restart.
+  - `582c24637` contains `711e299d6` and the ride-along `7cc7ba263`. So I ran no ff and hold no claim.
+  - Not restarted: refresh-worker (pid 1586492, up since the 17:23:38Z restart) and live-odds-worker (pid 1556143, up since 15:50:42Z). Neither runs the new code yet.
+- **Range a3d72c82b..711e299d6, runtime:**
+  - `syndicate/features/ncaab/live_resim.py`, `syndicate/features/shared/live_gameline_join.py` (mine; the join part is a loan from `wncaab-module`, recorded in both lanes);
+  - `syndicate/features/shared/live_projection_join.py`: `7cc7ba263`, a display-only certainty guard from lane `ci-suite-red-697`, carried with the user's yes here.
+  - `582c24637`'s own runtime beyond mine (`game_chip_intervals.py`, `intelligence.html`) is that lane's.
+- **Where each half runs:**
+  - The producer (`liveScoreChangedAt` on each lane) runs in live-odds-worker's college re-sim thread.
+  - The join (`quote_behind_score_verdict` with `score_changed_at`) runs in refresh-worker's board build (`[layer2_shortlist] LIVE_GAMELINE_JOIN`).
+  - Either order is safe: a lane without the field keeps the old 30 s state rule.
+- **Baseline (18:03:32Z):** fleet_head `582c24637`.
+  - NCAAB joins at 17:13 / 17:30 / 17:50Z, 1 live game. Full-game rows reaching the quote checks: 15 / 21 / 19.
+  - Refused: `quote_older_than_the_score_the_model_saw` 7 / 17 / 10, over 600 s 4 / 4 / 5. Passed 4 / 0 / 4 (priceable 3 / 0 / 4), i.e. 8 of 55 (15%).
+  - Lanes 41-125 s old. Ticks show `workers=2`, 0 carried.
+- **expect** once both halves load:
+  - NCAAB lanes in `<data>/live/ncaab_live_resim.json` carry `liveScoreChangedAt`.
+  - `quote_older_than_the_score_the_model_saw` falls on NCAAB joins. The share of full-game rows passing the quote checks rises from ~15% to roughly 20-30%. That is an estimate from the 11-02..11-06 ledgers, not a measurement.
+  - `row_carries_no_quote_or_score_time` = 0; wncaab unchanged; 0 line-start tracebacks.
+- **verify:** owed after the refresh-worker TERM. It needs the first 3 NCAAB `LIVE_GAMELINE_JOIN` lines on the new pid against this baseline, and a read of the lanes' `liveScoreChangedAt` presence. A watcher waits for the recycle.
+- **Revert:**
+  - Code: drop `"ncaab"` from `_SCORE_CHANGE_BASIS_SPORTS` (`live_gameline_join.py`), then ff + a claimed refresh-worker TERM.
+  - Env: `SYNDICATE_COLLEGE_QUOTE_ORDER_BASIS=state` (needs a full fleet down/up).
