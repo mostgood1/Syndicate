@@ -964,6 +964,14 @@ death, never life — do not invert it.
 - Verification: Sims re-run at 8 checkpoints (30-39.5m) on the pooled 535 regular-season re-sim games, same seeds and live-odds-worker's three switches, recording each sim's regulation-end margin; tables of P(regulation tie) by clock x |margin|, the SD of the leader's margin change and the tie ratio, sims vs real (re-sim eligibility pool and the same games), in the findings file and #765. Diagnostic only: nothing ships from this lane.
 - Blocked by: none
 
+### ncaab-blowout-tip-recentre — OPEN — opened 2026-11-08 — session 6df1b15d-5ff8-4256-aba9-3a91f7304efc
+- Goal: Measure the solver_endgame_pts_per_team value that re-centres the NCAAB tip total with the blowout rule off, and gate rule-off plus that value against production on #765's paired harness; result in the findings and todo #768 on origin/main. Read-only; no fleet change.
+- Files: scripts/ncaab_blowout_resume_probe.py, scripts/ncaab_blowout_harness_read.py, .syndicate/findings_2026-11-08_ncaab_live_totals_bias.md, docs/ai_context/todo.md (the #768 entry only)
+- Hypothesis: The tip total falls about 2 points per point of solver_endgame_pts_per_team (it is subtracted from each team's target before the exact solve). Restoring production's tip needs about 0.2-0.3; centring the sim on the target needs about 0.6. The re-centre costs nothing measurable where the rule fires.
+- Falsification test: The probe's slope is far from -2 per point (solve bounds bind), or the paired harness reads the re-centred rule-off variant worse than production at any checkpoint on the total or the margin.
+- Verification: Probe table of tip mean minus target per value on production inputs; harness run read with scripts/ncaab_blowout_harness_read.py; findings + todo #768 on origin/main.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
