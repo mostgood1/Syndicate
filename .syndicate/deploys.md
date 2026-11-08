@@ -57331,3 +57331,40 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - That lane is re-measuring the quote-order interaction (user "Yes, measure it here").
 - **Not caused by this load:** `ci-suite #697`'s 2 new failures on fleet `d9324512e` (`tests/test_platform_certainty_refusal.py`) reproduce with `SYNDICATE_LIVE_GAMELINE_LANE_AGE_GATE=shadow` as well (2 failed / 8 passed, both ways, 17:1xZ). That fits its attribution to `live_projection_join.py:689`.
 - **Served board:** not read separately. The ledger is stamped from the board rows right after the join, so it is the stronger instrument.
+
+## 2026-11-08 17:23:34Z (11:23 AM CST) -- FLEET ff 4f367324a -> a3d72c82b + refresh-worker TERM: `#762` (6) pulled-market NBA props DISPLAY-ONLY (lane `nba-live-proj-actuals`) -- **JOIN HALF LOADED** (field on the first build); the PRODUCER loads at live-odds-worker's own recycle (~21:28Z); verification (vii) owed on today's slate (written 2026-11-08 17:28:21Z)
+- **User, in this chat:** "Yes, build it" (2026-11-08, answering "Build display-only live numbers for prop markets books pull mid-game?"), then "Yes, load it" (answering "Load the pulled-market fix before today's 2:30 PM tip?").
+- **What:** `a3d72c82b`. The re-sim remembers each game's posted lines across ticks (`postedLines`). A line the latest pull no longer covers is published with `quotePulled` and no `liveModelProbOver`. The join shows it display-only (`live_quote_pulled`), with no live-aware flag, live probability or edge.
+  - `LIVE_PROJECTION_JOIN` prints `display_only_pulled=`.
+  - Switch: `SYNDICATE_NBA_LIVE_PROPS_PULLED_LINES` (default on).
+- **Range `4f367324a..a3d72c82b`, runtime:**
+  - this lane's `nba/live_resim.py`, `shared/live_projection_join.py`, `pipeline/layer2_shortlist.py`;
+  - `8c1378e9a` (`shared/basketball_interval_backtest.py` + its script; imported only by `scripts/backtest_basketball_intervals.py`, so inert on the fleet).
+  - The rest is ledger and tests. 0 of the fleet's 14 dirty paths overlap the range.
+- **ALSO LOADED BY THIS TERM: `4f367324a` (lane `all-sport-interval-projections`).** That lane ff'd the fleet to it at 17:11:42Z and released its web + refresh-worker claims at ~17:18Z without a refresh-worker TERM. refresh-worker was still pid 952259 from 00:43Z, so this restart is what loaded its rail interval change.
+  - On the new pid: `[game_chip_intervals] ATTACHED` lines from 17:26:51Z, 0 `ATTACH_FAILED` by 17:27Z.
+  - Web was NOT reloaded by this lane.
+  - A heads-up sent to that session at ~17:20Z was held (different permission mode) and expired undelivered. This entry is the notice; its post-ship reading is that lane's.
+- **Gates:**
+  - **Claims:** refresh-worker + live-odds-worker acquired 17:19:52Z, holder `nba-live-proj-actuals`. live-odds-worker released 17:25Z with no deploy; refresh-worker released ~17:27Z.
+  - **live-odds-worker preflight 17:21:23Z: HOLD**, 13 jobs. Two of them are the NCAAB re-sim's permanent pool (`live_resim_workers --serve`, lane `ncaab-live-resim-capacity`), so its preflight may never read CLEAR while that pool is on. It was NOT restarted.
+  - **Drain:** `check_deploy_safety --drain --drain-owner nba-live-proj-actuals` from 17:21:57Z. refresh-worker read `board_build=idle in_flight=[]` throughout; the jobs it listed were live-odds-worker's.
+  - **refresh-worker preflight** `--target fleet --target-commit a3d72c82b --expect fleet_checkout_head=a3d72c82b --expect join_display_only_pulled_field=present_on_next_nba_join`, baseline re-read on each poll. CLEAR 17:22:20Z, 0 processes.
+  - **Deploy:**
+    - `git merge --ff-only a3d72c82b` at 17:22:47Z. CLEAR again at 17:23:00Z on a fresh baseline.
+    - One defunct (already-exited) child, 0 live children. TERM pid 952259 at 17:23:34.071Z.
+    - `role_restarts.jsonl`: claimed exit code 0, holder `nba-live-proj-actuals`, ran_s 59998. Respawned as pid 1586492 at 17:23:42Z on `a3d72c82b`.
+    - `DRAIN_CLEARED` at 17:23:56Z. The waiting drain process was killed and cleared again at ~17:24Z.
+  - **Spacing:** the previous refresh-worker TERM was 00:43:32Z.
+- **Baseline (17:22:57Z):** `fleet_checkout_head` 4f367324a; NBA join `display_only_pulled` field absent (last join 17:12:59Z); re-sim snapshot 0 games.
+- **expect / measured:**
+  - `fleet_checkout_head` -> a3d72c82b: **MET** at 17:22:48Z.
+  - `display_only_pulled=` on the next NBA join: **MET**. 17:26:36.723Z, `display_only_pulled=None reason=live-lens snapshot for nba carries no liveProps` (no live NBA game). 0 line-start tracebacks since 17:23:42Z.
+  - Producer: pid 1556143, started 15:50:58Z, `max_uptime_seconds=20206.85`. It recycles on its own at ~21:28Z (3:28 PM CST), during PHI@CHI (tip 20:30Z) and before LAL@DET (23:00Z), and loads `a3d72c82b` then. Until then, the producer publishes no pulled rows.
+- **Owed, verification (vii):**
+  - After the recycle, `NBA_LIVE_RESIM_LOOP_STARTED`.
+  - The re-sim snapshot's `livePropsCoverage.remember_lines=True`, and `pulled_rows` > 0 once books pull a market.
+  - `LIVE_PROJECTION_JOIN sport=nba display_only_pulled=` > 0, with `miss_market` well below 11-07's 1,598 of 14,478 row-builds, late builds above all.
+  - 0 pulled rows on the served board with an edge, `live_aware` or `model_ev_pct`.
+  - The Dončić accent check (LAL@DET) is owed in the same session.
+- **Revert:** `SYNDICATE_NBA_LIVE_PROPS_PULLED_LINES=0` on the live-odds-worker role (env change recipe). Or revert `a3d72c82b` on main, then ff + a claimed refresh-worker TERM (the join), with live-odds-worker at its recycle.
