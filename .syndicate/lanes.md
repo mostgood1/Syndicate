@@ -898,11 +898,6 @@ death, never life — do not invert it.
 - STATUS 2026-11-08 17:14Z: ON MAIN `4f367324a` (code f27a2c85a + card 4f367324a). FLEET ff d9324512e -> 4f367324a + reload-web 17:11:42Z, NO refresh-worker TERM (preflight HOLD for 18 min of back-to-back board builds, NFL window); deploys.md 2026-11-08 17:11:42Z. VERIFIED on web: served live blocks soccer 11/11 + nfl 1/1, page renders them, 0 tracebacks. OWED: the pregame blocks (nfl/nhl/soccer/ncaaf/mlb), which load at the next refresh-worker restart -- read served pregame per sport + `ATTACHED ... seconds=` then.
 - Blocked by: none (the ride-along held per the user's "Wait for its lane"; 2d738afef was already on the fleet from that lane's own 00:43:32Z rollout)
 
-### closed-lane-archive-20261108-0855 — CLOSED 2026-11-08 (GOAL MET: 1 block archived) — opened 2026-11-08 — session 0be02206-1b92-41af-bb1e-62a677d1a857
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness.py --idle-min 240 read SAFE for 1 of 12; moved closed-lane-archive-20261108-0445. Table and WAIT reasons in log/2026-11-08.md.
-
 ### primary-tree-ff — CLOSED 2026-11-08 (GOAL MET: primary tree f5427e385 -> 711e299d6 -> 517d47dbc = origin/main at 17:51Z, nothing lost, preflight there has target_is_fleet) — opened 2026-11-08 — session 8a93d939-bc0c-4fd2-aa61-bcd76b63680d
 - Goal: The shared PRIMARY checkout C:/Users/tempadmin/OneDrive/Coding/Syndicate is fast-forwarded from f5427e385 to an exact origin/main SHA with every previously-dirty path either still present or proven duplicated upstream, each non-identical file sha256-backed-up outside the repo first; its scripts/deploy_preflight.py contains target_is_fleet
 - Files: none (ledger-only in git: this lane block + todo #766 follow-up line; the ff rewrites the primary tree's working copy, not repo content)
@@ -938,6 +933,11 @@ death, never life — do not invert it.
 - Verification: Reproduce the -3.41/-2.57/-1.43 totals_bias rows with scripts/college_quote_order_by_score_change.py on fleet ledger copies; then per-phase/margin/pace tables with game-clustered SEs in the findings file, n records / games / dates stated; findings + todo on origin/main.
 - Blocked by: none
 - STATUS: hypothesis WRONG in its main claim (not the remaining-time prior rate, not end-game fouling): the cause is the engine's blowout rule over the whole NCAAB second half. No fleet change; nothing loaded.
+
+### closed-lane-archive-20261108-1311 — CLOSED 2026-11-08 (GOAL MET: 1 block archived) — opened 2026-11-08 — session c7bfc622-f09d-4be5-af1b-5d3f79c510eb
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. Moved `closed-lane-archive-20261108-0855` (owner 0be02206 idle 243m, block 245m). Readings in log/2026-11-08.md.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1132,6 +1132,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261107-2241` — CLOSED 2026-11-07 (GOAL MET: 1 blocks archived) — opened 2026-11-07 — session 21885fca-02fd-4271-85e1-37c50bd24059
 - `closed-lane-archive-20261108-0040` — CLOSED 2026-11-08 (GOAL MET: 5 blocks archived) — opened 2026-11-08 — session a737c5e6-9439-434a-98a2-a6763b5e7357
 - `closed-lane-archive-20261108-0445` — CLOSED 2026-11-08 (GOAL MET: 2 blocks archived) — opened 2026-11-08 — session ddab5a53-4bc0-4f4b-94b6-88aaf35a8127
+- `closed-lane-archive-20261108-0855` — CLOSED 2026-11-08 (GOAL MET: 1 block archived) — opened 2026-11-08 — session 0be02206-1b92-41af-bb1e-62a677d1a857
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
