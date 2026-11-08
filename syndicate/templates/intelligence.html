@@ -3091,14 +3091,23 @@
   // Pregame: every period plus T. Live: only the periods still to finish
   // (the real line score above already shows the settled ones), plus T =
   // the projected final. The period in progress is marked `is-current`.
+  //
+  // Every other sport (lane all-sport-interval-projections, 2026-11-08):
+  // the same block. `precision` (goals, runs) gives the cells a decimal;
+  // a block without it (basketball, football) stays whole-numbered. A
+  // block with no period is the projected final alone (NHL, and live
+  // soccer / football, whose engines publish no period number); a
+  // three-way block (soccer) names the favourite's own win % and the draw.
   function chipIntervals(chip) {
     const iv = chip && chip.intervals;
-    if (!iv || !Array.isArray(iv.periods) || !iv.periods.length) return "";
+    if (!iv || !Array.isArray(iv.periods)) return "";
     const live = iv.source === "live_resim";
     const shown = iv.periods.filter((p) => p && p.away != null && p.home != null && (!live || p.state !== "settled"));
     const final = iv.final || {};
     if (!shown.length && final.away == null) return "";
-    const whole = (v) => (v == null || !Number.isFinite(Number(v)) ? "–" : String(Math.round(Number(v))));
+    const digits = Number.isInteger(iv.precision) && iv.precision > 0 ? Math.min(iv.precision, 2) : 0;
+    const whole = (v) => (v == null || !Number.isFinite(Number(v)) ? "–"
+      : digits ? Number(v).toFixed(digits) : String(Math.round(Number(v))));
     const abbr = (side) => String((chip[side] || {}).abbr || (side === "away" ? "AWY" : "HOM"));
     const label = (text, extra = "") => `<span class="game-mini-card__box-label${extra}">${escapeHtml(text)}</span>`;
     const row = (side) => {
@@ -3118,7 +3127,14 @@
     }
     if (final.total != null && Number.isFinite(Number(final.total))) parts.push(`O/U ${Number(final.total).toFixed(1)}`);
     const hp = Number(final.home_win_prob);
-    if (final.home_win_prob != null && Number.isFinite(hp)) {
+    const ap = Number(final.away_win_prob);
+    const dp = Number(final.draw_prob);
+    if (final.home_win_prob != null && Number.isFinite(hp) && final.draw_prob != null && Number.isFinite(dp)
+        && final.away_win_prob != null && Number.isFinite(ap)) {
+      // Three-way: 1 − P(home) is not P(away) when a draw is possible.
+      const fav = hp >= ap ? "home" : "away";
+      parts.push(`${abbr(fav)} ${Math.round((fav === "home" ? hp : ap) * 100)}% · D ${Math.round(dp * 100)}%`);
+    } else if (final.home_win_prob != null && Number.isFinite(hp)) {
       const fav = hp >= 0.5 ? "home" : "away";
       parts.push(`${abbr(fav)} ${Math.round((fav === "home" ? hp : 1 - hp) * 100)}%`);
     }
