@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#768` — **NCAAB LIVE TOTALS RUN ~2 LOW BECAUSE THE ENGINE'S NBA BLOWOUT RULE COVERS THE WHOLE COLLEGE SECOND HALF; NOT THE PRIOR, NOT END-GAME FOULING. FIX PROPOSED (two env fields), NOT LOADED; HARNESS GATE PASSED 11-08 2:07 PM CST, TIP RE-CENTRE + PAIR GATE OWED** `[2026-11-08, lane ncaab-live-totals-bias, session 6df1b15d]`
+### `#768` — **NCAAB LIVE TOTALS RUN ~2 LOW BECAUSE THE ENGINE'S NBA BLOWOUT RULE COVERS THE WHOLE COLLEGE SECOND HALF; NOT THE PRIOR, NOT END-GAME FOULING. FIX PROPOSED (three env fields), NOT LOADED; HARNESS GATE PASSED 11-08 2:07 PM CST, RE-CENTRED PAIR (solver_endgame_pts_per_team 0.2) PASSED 5:33 PM CST; ONLY THE USER'S YES IS OWED** `[2026-11-08, lanes ncaab-live-totals-bias / ncaab-blowout-tip-recentre, session 6df1b15d]`
 - **Findings:** `.syndicate/findings_2026-11-08_ncaab_live_totals_bias.md`.
 - **Scripts:**
   - `scripts/ncaab_live_totals_bias.py`: ledger attribution, men's and women's.
@@ -23,18 +23,24 @@
   - all 196 women's games give +1.22 ± 1.23;
   - a claim needs about 43-110 games.
 - **Proposed (user's call; nothing loaded):**
-  - add `"blowout_q4_margin": 999, "blowout_margin": 999` to live-odds-worker's `SYNDICATE_NCAAB_LIVE_MECHANISMS` (men's only), loaded by a drained full down/up;
+  - add `"blowout_q4_margin": 999, "blowout_margin": 999` to live-odds-worker's `SYNDICATE_NCAAB_LIVE_MECHANISMS` (men's only), with the tip re-centre `"solver_endgame_pts_per_team": 0.2` (below), loaded by a drained full down/up;
   - a clock-windowed engine rule (`blowout_window_s`, final ~240 s) is now only a HYPOTHESIS: the harness does not see the closing-minutes cost it was meant to avoid (at 2 min left, 15+ apart, rule off is still nearer the final, -0.11 +- 0.09).
-- **Re-fit owed:**
-  - the pregame tip total rises +0.39 ± 0.09 (harness, 285 games; probe +0.61 ± 0.36 on 20): re-centre with `solver_endgame_pts_per_team`;
-  - pair-gate with the end-game fouling re-fit another session is running (`ncaab2026_oos_B`).
+- **Re-fits (engine standard §4.4), both resolved 11-08:**
+  - the pregame tip total rises +0.39 ± 0.09 with the rule off (harness, 285 games; probe +0.61 ± 0.36 on 20): re-centred with `solver_endgame_pts_per_team` 0.2 (below);
+  - the end-game fouling re-fit `ncaab2026_oos_B` (variant B) was NOT adopted (`findings_2026-11-07_basketball_interval_backtest.md:391-392`), so production's E1 is the pair's other half, and every gate here carries it.
 - **Expected effect (lower bound, probe cost pro rata, same 19,906 priced rows / 192 games):** model - line -1.95 -> -1.40; h2 flag-on rows -2.74 -> -1.91; h1 |m| >= 15 rows -4.02 -> -2.74.
 - **Harness gate PASSED** (run `ncaab2026_blowout_off`, WSL `~/bball_iv/runs/`, done 2:05 PM CST 11-08; 399 of 400 scored, 285 regular season; read with `scripts/ncaab_blowout_harness_read.py`):
   - total |err| off - prod improves or ties at every checkpoint, full and h2 (-0.12 ± 0.08 at 30 m, ± 1.96 SE); the margin ties everywhere;
   - where the rule fires (15+ apart): -0.47 ± 0.30 at 30 m (73 games), -0.11 ± 0.09 at 38 m (81); h2 states below 15 shift exactly 0.00;
   - in real states the rule takes ~1.3x the probe's cost, so the live headline (model - line -1.95) moves about +0.7, not just the +0.55 lower bound;
   - not fixed by it: 2025-26 h2 runs low where the rule never fires (-3.59 ± 0.72 at 2 min left in close games) -- end-game fouling, `ncaab2026_oos_B`'s domain.
-- **Owed before any load:** the tip re-centre, then a PAIR gate of rule off + the end-game fit `ncaab2026_oos_B` passes; then the user's yes. Nothing loaded.
+- **Tip re-centre PASSED** (lane `ncaab-blowout-tip-recentre`, read 5:33 PM CST 11-08; findings "Tip re-centre"):
+  - probe (24 games 11-05..07, tip, production inputs): the tip falls ~2.2 per point of the field; 0.6 centres it on the target (−0.10 ± 0.22), 0.2 leaves it +0.77 ± 0.35 over;
+  - harness runs `ncaab2026_off_eg02` / `_eg06` (same 400 games and seed, 285 regular season; production `resim` identical across runs, max difference 0.0000): **rule off + 0.2** improves or ties production on the total (full and h2) and the margin at every checkpoint, keeps the gain where the rule fires (−0.36 ± 0.29 at 30 m, −0.12 ± 0.09 at 38 m), restores the tip (+0.04 ± 0.10 vs production), and ties rule off alone everywhere;
+  - **rule off + 0.6 is not recommended:** no gain at the tip, +0.06 to +0.11 worse than rule off alone at every in-game checkpoint (at the 1.96 SE edge at 30 m), and the 10 m bias deepens −1.99 → −2.52. One rate field cannot lower the tip without lowering every live projection.
+  - separate, pre-existing, not part of this load: production's tip sits +1.11 ± 0.43 over its own target (probe) and +1.28 over `pregame_rate` (harness), unseen against finals (2026-27 pregame sims +0.40 ± 1.05).
+- **Expected effect of the load (rule off + 0.2), revised:** live model − line −1.95 → about −1.45; h2 flag-on rows −2.74 → about −2.0.
+- **The load (the user's call; nothing loaded):** live-odds-worker `SYNDICATE_NCAAB_LIVE_MECHANISMS` (role key `LIVE_ODDS_WORKER__`) = production's four end-game fields + `"blowout_q4_margin": 999, "blowout_margin": 999, "solver_endgame_pts_per_team": 0.2`, by a drained full down/up between slates (lane, three claims, origin/main preflight `--reinject-env`, joint CLEAR). **Owed: only the user's yes.**
 
 ### `#767` — **GAMES-RAIL INTERVAL PROJECTIONS FOR EVERY SPORT: ON MAIN `4f367324a`, LOADED AND VERIFIED FOR NFL / NHL / SOCCER; NCAAF READING OWED, MLB AT THE 2027 OPENER** `[2026-11-08 17:3xZ, lane all-sport-interval-projections (CLOSED, GOAL PARTLY MET), session c5cc97a7]`
 - **UPDATE 17:30Z:** (a) is DONE for nfl / nhl / soccer. The pregame blocks rode lane `nba-live-proj-actuals`' refresh-worker restart at 17:23:38Z (user: "Ride the next restart"). Served at 17:28Z: nfl pregame 13/13, nhl 6/6, soccer pregame 12. The other 182 soccer chips have NO sim match (0 of 182). Page: 134 PROJ boxes (deploys.md VERIFY 17:30:45Z).

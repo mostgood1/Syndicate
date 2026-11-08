@@ -1,7 +1,8 @@
 # NCAAB live totals run low: the engine's NBA blowout rule covers the whole college second half (2026-11-08)
 
 Lane `ncaab-live-totals-bias`, session 6df1b15d. Read-only; nothing deployed, no env changed. Written 2026-11-08,
-12:46 PM CST (18:46Z). The harness gate result was added at 2:07 PM CST (20:07Z).
+12:46 PM CST (18:46Z). The harness gate result was added at 2:07 PM CST (20:07Z), and the tip re-centre result
+(lane `ncaab-blowout-tip-recentre`) at 5:33 PM CST (23:33Z).
 
 **Substrates.**
 - Fleet live-gameline ledgers (`<data>/ncaab_source/data/live_gameline_ledger/`) and pregame sims
@@ -47,8 +48,11 @@ Lane `ncaab-live-totals-bias`, session 6df1b15d. Read-only; nothing deployed, no
 5. **Switching the rule off passes #765's harness gate** (285 regular-season 2025-26 games, paired).
    - The total improves or ties at every checkpoint; the margin is unchanged.
    - Where the rule fires (15+ apart), the total improves by −0.47 ± 0.30 |err| at 30 m (73 games, ± 1.96 SE).
-   - Two things are still owed before a load: the tip re-centring, and a pair gate with the end-game re-fit (see
-     "Gate result").
+   - **With its re-fit it passes again.** Adding `solver_endgame_pts_per_team` 0.2 puts the tip back on production's
+     (+0.04 ± 0.10), still improves or ties everywhere against production, and ties rule off alone at every
+     checkpoint (see "Tip re-centre"). 0.6, which centres the tip on its target, is not recommended.
+   - The end-game re-fit it was to be paired with (`ncaab2026_oos_B`) was not adopted, so production's end-game
+     fields are the partner, and every gate here carries them. **Nothing is owed before a load but the user's yes.**
 
 ## Reproduction (`college_quote_order_by_score_change.py`, same work dir, same ledger copies)
 
@@ -224,6 +228,10 @@ live-odds-worker's `SYNDICATE_NCAAB_LIVE_MECHANISMS`
 
     "blowout_q4_margin": 999, "blowout_margin": 999
 
+**With its §4.4 re-fit the load is three fields** (measured in "Tip re-centre" below):
+
+    "blowout_q4_margin": 999, "blowout_margin": 999, "solver_endgame_pts_per_team": 0.2
+
 - **Why it is safe to scope:**
   - `live_mechanisms_from_env` (`ncaab/live_resim.py:460`) accepts any `EventSimConfig` field.
   - `build_engine_inputs` applies it to `league == "ncaab"` only (`:360`), so women's, NBA and WNBA are untouched.
@@ -287,6 +295,9 @@ today (−1.06 / −0.30).
    - But another session is re-fitting it now (harness run `ncaab2026_oos_B`, `endgame_foul_p_by_deficit
      [0.25, 0.7, 0.9]`, seed 20261108). **The two must be gated as a PAIR** (learnings 2026-10-12: "test the pair,
      never one alone").
+   - **Resolved 11-08:** variant B was not adopted. On a fresh sample it improves no total and worsens the 38 m
+     margin, so production's E1 stays (`findings_2026-11-07_basketball_interval_backtest.md:391-392`, `:487`). The
+     partner is therefore production's end-game fields, which every gate here already carries.
 3. **Unaffected:**
    - `H1_SHARE`, an estimator measured from data;
    - the prior calibration, fitted prior → close with no sim in the loop.
@@ -337,17 +348,118 @@ today (−1.06 / −0.30).
   - So the harness gives no support to the windowed rule. It stays a hypothesis that would need its own gate.
 - **The tip moves up +0.39 ± 0.09** (285 games; the probe read +0.61 ± 0.36 on 20).
   - Bias prod +0.13 ± 1.02 → +0.52, with |err| −0.01 ± 0.17.
-  - Re-fit 1's re-centring is still owed. The shift is systematic even though this sample cannot see its cost.
+  - Re-fit 1's re-centring was owed: the shift is systematic even though this sample cannot see its cost. Done in
+    "Tip re-centre" below.
 - **What it does not fix: a low bias in 2025-26 second halves that does not depend on the rule.**
   - Where the rule never fires (h2 below 15), the total reads −1.33 ± 0.88 at the half, −3.17 ± 0.82 at 30 m and
     −3.59 ± 0.72 at 2 minutes left.
   - The 2-minute cell is close games' end-game fouling: `pregame_rate`, pro rata, reads −7.14 there. That is the
     end-game re-fit's domain (`ncaab2026_oos_B`), not this rule.
   - The live 2026-27 ledger reads that phase at −1.12 ± 0.68, so the two seasons differ there.
-- **The pair is still owed.**
-  - This gate switched the rule off alone, against production's end-game fields.
-  - At the tip and in the first half, the simulated future spans both mechanisms.
-  - So the load candidate is: rule off, plus whichever end-game fit `ncaab2026_oos_B` passes, gated together.
+- **The pair** `[corrected 11-08 5:33 PM CST]`. This gate switched the rule off against production's end-game fields.
+  At the tip and in the first half the simulated future spans both mechanisms, so they had to be gated together. The
+  end-game re-fit `ncaab2026_oos_B` was not adopted (re-fit 2 above), so production's fields ARE the pair's other half,
+  and this gate tested it. The re-centred pair is gated again below.
+
+## Tip re-centre `[read 5:33 PM CST (23:33Z) 11-08]`: 0.2 PASSES; 0.6 is not recommended
+
+Lane `ncaab-blowout-tip-recentre`. Read-only, nothing loaded. The lever is `solver_endgame_pts_per_team` (re-fit 1).
+
+**Probe** (`scripts/ncaab_blowout_resume_probe.py --variant NAME=JSON`).
+- 24 games, 11-05..11-07, at the tip, 100 sims each.
+- Production inputs, with live-odds-worker's switches copied from pid 1665718 (names only printed).
+- Tip total minus the exact solve's target, ± 1 SE:
+
+| variant | − target | − production | − rule off alone |
+|---|---|---|---|
+| production | +1.11 ± 0.43 | — | −0.11 ± 0.29 |
+| rule off | +1.23 ± 0.38 | +0.11 ± 0.29 | — |
+| rule off + 0.2 | +0.77 ± 0.35 | −0.34 ± 0.38 | −0.46 ± 0.29 |
+| rule off + 0.6 | −0.10 ± 0.22 | −1.21 ± 0.34 | −1.33 ± 0.30 |
+
+- The tip falls about 2.2 points per point of the field, so the solve bounds do not bind. The hypothesis held.
+- On these 24 games the rule's own tip shift is only +0.11 ± 0.29, below the harness's +0.39 ± 0.09. So the probe
+  alone cannot pin the value that restores production; the harness does.
+
+**Harness.**
+- Runs `ncaab2026_off_eg02` and `ncaab2026_off_eg06`: the same 400 games and seed (20261107) as the gate above, with
+  `resim_mech` = rule off + 0.2 and + 0.6.
+- Launched 3:33 PM CST (21:33Z) from `ed224359a`, nice 19; each done after 7,116 s. 399 scored (1 `pbp_final_mismatch`),
+  285 regular season.
+- Read with `scripts/ncaab_blowout_harness_read.py`, against production, and with
+  `--vs ~/bball_iv/runs/ncaab2026_blowout_off/results.jsonl` against rule off alone.
+- **Pairing check:** production's `resim` is identical across the three runs (max |difference| 0.0000 over 3,696
+  rows).
+
+Full-game total, all 285 games, |err| new − base, ± 1.96 SE. Negative means nearer the final:
+
+| checkpoint | 0.2 vs prod | 0.2 vs rule off | 0.6 vs prod | 0.6 vs rule off |
+|---|---|---|---|---|
+| 0 m (tip) | +0.01 ± 0.19 | +0.02 ± 0.17 | +0.05 ± 0.20 | +0.06 ± 0.22 |
+| 10 m | −0.08 ± 0.16 | −0.06 ± 0.15 | +0.07 ± 0.18 | +0.09 ± 0.18 |
+| 20 m | −0.00 ± 0.17 | +0.06 ± 0.13 | +0.03 ± 0.18 | +0.10 ± 0.16 |
+| 30 m | −0.09 ± 0.12 | +0.03 ± 0.10 | −0.01 ± 0.12 | **+0.11 ± 0.11** |
+| 38 m | −0.01 ± 0.05 | +0.02 ± 0.04 | −0.02 ± 0.06 | +0.01 ± 0.06 |
+
+- **Where the rule fires (15+ apart), against production:**
+  - 0.2: −0.36 ± 0.29 at 30 m (73 games), −0.12 ± 0.09 at 38 m (81);
+  - 0.6: −0.39 ± 0.28 and −0.11 ± 0.08;
+  - rule off alone was −0.47 ± 0.30 and −0.11 ± 0.09.
+- **h2 total, against production, ties everywhere:** 0.2 reads −0.16 ± 0.17 / −0.12 / −0.00 / −0.09 / −0.01, and 0.6
+  −0.05 / −0.05 / +0.03 / −0.01 / −0.02.
+- **Margin, against production, ties everywhere for both, in every split.** The largest cell is 0.2 at the tip,
+  +0.14 ± 0.17. At 38 m both are slightly better (−0.03 ± 0.03, −0.05 ± 0.04).
+- **The tip** (± 1 SE):
+  - 0.2 shifts it +0.04 ± 0.10 against production (−0.35 ± 0.09 against rule off), so it restores production's tip;
+  - 0.6 shifts it −0.77 ± 0.09.
+  - Bias against finals: production +0.13 ± 1.02, rule off +0.52, 0.2 +0.17, 0.6 −0.63.
+
+In-game bias, full total, all 285 games (model − final):
+
+| | 10 m | 20 m | 30 m | 38 m |
+|---|---|---|---|---|
+| production | −1.99 | −1.80 | −3.46 | −2.67 |
+| rule off | −1.57 | −1.44 | −3.14 | −2.64 |
+| rule off + 0.2 | −1.86 | −1.61 | −3.30 | −2.68 |
+| rule off + 0.6 | −2.52 | −2.08 | −3.49 | −2.70 |
+
+**Verdict.**
+- **Rule off + 0.2 passes the gate against production.**
+  - The total (full and h2) and the margin improve or tie at every checkpoint.
+  - It keeps the gain where the rule fires.
+  - It puts the tip back on production's, which meets §4.4's re-fit.
+  - Against rule off alone it ties at every checkpoint, so the re-centre costs nothing measurable.
+- **Rule off + 0.6 is not recommended.** It also ties production, but:
+  - it gains nothing at the tip (|err| +0.05 ± 0.20);
+  - it reads worse than rule off alone at every in-game checkpoint (+0.06 to +0.11, at the 1.96 SE edge at 30 m);
+  - it deepens the in-game low bias this work exists to fix, by −0.5 at 10 m.
+  - The reason is structural. The field lowers the whole-game scoring rate, so live projections fall in proportion to
+    the time left. One rate field cannot lower the tip without lowering the live total too.
+- **Production's tip sits above its own target, and this load leaves that alone.**
+  - It reads +1.11 ± 0.43 over the target (probe, 24 games, 2026-27), and +1.28 over the harness's `pregame_rate`
+    projector at the tip (2025-26).
+  - That predates this change. Neither sample sees it against finals: 2026-27 graded pregame sims read
+    +0.40 ± 1.05, and the harness tip +0.13 ± 1.02.
+  - It is a separate question, a possible lean to the over on pregame totals, and not part of this load.
+
+**Expected live effect, revised for 0.2.**
+- The re-centre takes back 0.29 / 0.18 / 0.16 / 0.04 at 10 / 20 / 30 / 38 m against rule off alone (harness). That
+  is a rate change, pro rata to the time left, so it should carry to the 2026-27 states roughly unchanged.
+- Rule off alone was expected to move the live headline (model − line −1.95) by about +0.7. Net of the re-centre,
+  **about +0.5, to roughly −1.45.**
+- On h2 flag-on rows (−2.74 today), the re-centre takes back about 0.15 (15+ apart: 0.29 / 0.13 / 0.02 at 20 / 30 /
+  38 m), so they move to roughly −2.0.
+- These are approximate: the harness is 2025-26 regular season, not this week's population.
+
+**The load, if the user says yes** (nothing done):
+- live-odds-worker's `SYNDICATE_NCAAB_LIVE_MECHANISMS`, role key `LIVE_ODDS_WORKER__` in `local_production.env`;
+- production's four end-game fields, plus `"blowout_q4_margin": 999, "blowout_margin": 999,
+  "solver_endgame_pts_per_team": 0.2`;
+- men's only; a drained full `down`/`up` between slates (lane, three claims, origin/main preflight with
+  `--reinject-env`, joint CLEAR). Every men's pregame game re-sims once, because the `inputs_key` carries the
+  mechanism names.
+- **Verify** on the live ledger after load: priced-row model − line from −1.95 to about −1.45, and h2 flag-on rows
+  from −2.74 to about −2.0. The tip needs no reading of its own: the harness puts it at +0.04 ± 0.10 from today's.
 
 ## Women's (wncaab)
 

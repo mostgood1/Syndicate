@@ -10,6 +10,9 @@ second-half points (overtime included) under three engine configs:
   no_scales   prod with garbage_time_pace_scale = garbage_time_eff_scale = 1.0 (bench minutes + the x1.08 possession
               duration of `_contextual_duration_scale` still apply)
   no_blowout  prod with blowout_margin = blowout_q4_margin = 999: the blowout flag never fires
+  --variant NAME=JSON  any further variant: prod's cfg with those EventSimConfig fields replaced, e.g.
+              --variant 'off_eg0.5={"blowout_margin": 999, "blowout_q4_margin": 999, "solver_endgame_pts_per_team": 0.5}'
+              (lane ncaab-blowout-tip-recentre: the tip re-centre with the rule off)
 
 WHY: `engine.simulate_pbp_game_boxscore` sets `blowout` for a period when `q >= N_PERIODS and |margin| >= 15` (or
 `q >= second_half_first_period and |margin| >= 18`). That is NBA's fourth-quarter rule; NCAAB has N_PERIODS = 2, so it
@@ -81,7 +84,13 @@ def main() -> int:
                     help="half: start of h2 (default); tip: the opening tip (the pregame sim); h1mid / h2mid: 10:00 left "
                          "in that half, first half scored pro rata at its prior share")
     ap.add_argument("--margins", default=",".join(str(m) for m in MARGINS))
+    ap.add_argument("--variant", action="append", default=[],
+                    help="NAME=JSON: an extra variant, prod's cfg with these EventSimConfig fields replaced")
     args = ap.parse_args()
+    extra = {}
+    for spec in args.variant:
+        name, _, js = spec.partition("=")
+        extra[name.strip()] = json.loads(js)
     keys = env_from_pid(args.env_from_pid)
     print(f"env keys copied from pid {args.env_from_pid}: {keys}", flush=True)
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -107,6 +116,8 @@ def main() -> int:
             "no_scales": dataclasses.replace(cfg, garbage_time_pace_scale=1.0, garbage_time_eff_scale=1.0),
             "no_blowout": dataclasses.replace(cfg, blowout_margin=999, blowout_q4_margin=999),
         }
+        for name, fields in extra.items():
+            variants[name] = dataclasses.replace(cfg, **fields)
         h1_full = total * lr.H1_SHARE
         h2_full = total * (1.0 - lr.H1_SHARE)
         sign = 1 if gi % 2 == 0 else -1  # alternate which side leads
@@ -164,6 +175,15 @@ def main() -> int:
         print(f"[{args.checkpoint}] margin {m:2d}, {len(rs)} games: remaining prod-prior {p_minus_prior[0]:+.2f}+-{p_minus_prior[1]:.2f}  "
               f"no_blowout-prior {nb_minus_prior[0]:+.2f}+-{nb_minus_prior[1]:.2f}  prod-no_blowout {p_minus_nb[0]:+.2f}+-{p_minus_nb[1]:.2f}  "
               f"prod-no_scales {p_minus_ns[0]:+.2f}+-{p_minus_ns[1]:.2f}", flush=True)
+        for name in extra:
+            rx = [r for r in rs if r.get(name) is not None]
+            if len(rx) < 2:
+                continue
+            v_prior = mean_sd([r[name] - r["prior_h2"] for r in rx])
+            v_prod = mean_sd([r[name] - r["prod"] for r in rx])
+            v_nb = mean_sd([r[name] - r["no_blowout"] for r in rx])
+            print(f"[{args.checkpoint}] margin {m:2d}, {len(rx)} games: {name}: remaining -prior {v_prior[0]:+.2f}+-{v_prior[1]:.2f}  "
+                  f"-prod {v_prod[0]:+.2f}+-{v_prod[1]:.2f}  -no_blowout {v_nb[0]:+.2f}+-{v_nb[1]:.2f}", flush=True)
     return 0
 
 
