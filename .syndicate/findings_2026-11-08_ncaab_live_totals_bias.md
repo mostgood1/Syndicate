@@ -1,7 +1,7 @@
 # NCAAB live totals run low: the engine's NBA blowout rule covers the whole college second half (2026-11-08)
 
 Lane `ncaab-live-totals-bias`, session 6df1b15d. Read-only; nothing deployed, no env changed. Written 2026-11-08,
-12:46 PM CST (18:46Z).
+12:46 PM CST (18:46Z). The harness gate result was added at 2:07 PM CST (20:07Z).
 
 **Substrates.**
 - Fleet live-gameline ledgers (`<data>/ncaab_source/data/live_gameline_ledger/`) and pregame sims
@@ -44,6 +44,11 @@ Lane `ncaab-live-totals-bias`, session 6df1b15d. Read-only; nothing deployed, no
    - Games 6-10 points apart with ≤ 4 minutes left run −2.03 ± 0.83, but that is 59 of 2,431 states (2.4%).
 4. **Overtime was a defect, now fixed.** Before `b9999dc1d` (loaded 11-05 22:37:41Z), the full-game total left out
    the overtime points of sims that went to OT, and states resumed IN overtime read −11.9 (9 states / 3 games).
+5. **Switching the rule off passes #765's harness gate** (285 regular-season 2025-26 games, paired).
+   - The total improves or ties at every checkpoint; the margin is unchanged.
+   - Where the rule fires (15+ apart), the total improves by −0.47 ± 0.30 |err| at 30 m (73 games, ± 1.96 SE).
+   - Two things are still owed before a load: the tip re-centring, and a pair gate with the end-game re-fit (see
+     "Gate result").
 
 ## Reproduction (`college_quote_order_by_score_change.py`, same work dir, same ledger copies)
 
@@ -251,20 +256,23 @@ the 19,906 priced rows / 192 games whose state could be placed on the clock.
 - Post-gate 11-07 (40 games): model − line −1.76 → −1.44.
 - **Upper side.** Flag-on live states sit −1.97 below the prior rate, against a pro-rata probe cost of about 0.9.
   If the whole of that gap is the rule, the headline moves about +0.9 rather than +0.55. The harness run re-sims real
-  states and decides between the two.
+  states and puts it at about +0.7 (gate result below).
 - **What is left after the fix is mostly not model error:**
   - In close second halves the model is nearer the final than the book: model − final −0.48 ± 1.17 against line −
     final +0.74 ± 1.25.
   - Lopsided first halves keep scoring above the prior (prior error, n.s. at the state level). The prior target is
     level over the whole slate (+0.01 ± 1.06).
 
-**What switching it off costs.** In the final 4 minutes real blowouts do slow (prior error +0.52 / +0.95). With the
-rule off, the model would run about +0.5 to +1 high on those states, where it is about right today (−1.06 / −0.30).
-- That is the case for the BETTER fix, as a follow-up: keep the rule but give it a clock window. Add a new
-  `EventSimConfig` field, e.g. `blowout_window_s`, defaulting to the whole period (byte-identical for NBA/WNBA).
-  Set NCAAB to the final ~240 s of regulation through the same env.
-- That is an `engine.py` change (lanes `basketball-scenario-calibration` and `wncaab-module` hold loans there) and a
-  new mechanism, so it carries §4.4's re-fit too.
+**What switching it off might cost.** In the final 4 minutes real blowouts do slow (prior error +0.52 / +0.95). On
+the live ledger, the model with the rule off would run about +0.5 to +1 high on those states, where it is about right
+today (−1.06 / −0.30).
+- **The harness does not see that cost** (gate result below). At 2 minutes left, states 15+ apart are still nearer
+  the final with the rule off.
+- That leaves a clock-windowed rule as a HYPOTHESIS, not the recommendation. It would keep the rule but add a new
+  `EventSimConfig` field, e.g. `blowout_window_s`, defaulting to the whole period (byte-identical for NBA/WNBA), with
+  NCAAB set to the final ~240 s of regulation through the same env.
+- It would be an `engine.py` change (lanes `basketball-scenario-calibration` and `wncaab-module` hold loans there)
+  and a new mechanism, so it would carry §4.4's re-fit and need its own gate.
 
 **Re-fit obligations (engine standard §4.4): what was absorbing the rule?**
 1. **The pregame tip total.**
@@ -289,19 +297,57 @@ rule off, the model would run about +0.5 to +1 high on those states, where it is
 - launched 18:11:38Z, WSL `~/bball_iv/runs/ncaab2026_blowout_off`, nice 19.
 - **Ship only if** the full-game and h2 total |err| improve or tie at every checkpoint (0 / 10 / 20 / 30 / 38 m) and
   the margin does not get worse.
-- The result is appended below when the run completes. Until then the fix is a proposal resting on the 2026-27
-  ledger and the probe.
 
-**Harness gate status `[18:45Z 11-08]`:** RUNNING, 50 of 400 games. Expected done about 20:50Z (2:50 PM CST).
-- Two other jobs share the host at nice 19: another session's `ncaab2026_oos_B` (3 workers) and this lane's probes,
-  now finished.
-- **Reachability already read off the partial output** (19 regular-season games):
-  - states with \|m\| < 15 at 20 / 30 / 38 m shift by exactly 0.00;
-  - at 20 m with \|m\| ≥ 15 the total shifts +1.69 ± 0.44 (3 games), in line with the probe.
-- Read it with `scripts/ncaab_blowout_harness_read.py <run>/results.jsonl`. It recovers the margin at each checkpoint from
-  `pregame_rate`, and splits by the engine's flag.
-- **Expect the season-wide gate to read small or tie.** Mid-season 2025-26 has far fewer lopsided games than
-  opening week, so the split by \|m\| ≥ 15 is the reading that matters.
+**Gate result `[read 2:07 PM CST (20:07Z) 11-08]`: PASS.**
+- Run `ncaab2026_blowout_off` finished at 2:05 PM CST (20:05Z) after 6,814 s. It scored 399 of 400 games (1 refused
+  `pbp_final_mismatch`), 285 of them regular season.
+- Read with `scripts/ncaab_blowout_harness_read.py <run>/results.jsonl`. It recovers the margin at each checkpoint
+  from `pregame_rate` and splits on the engine's flag. It reads the projected total and the projected margin.
+- In the table, each cell is |err| off − prod, ± 1.96 SE. Negative means the rule-off variant is nearer the final.
+  Shifts and biases below carry ± 1 SE.
+
+| checkpoint | full total, all 285 | h2 total, all 285 | full total, \|m now\| ≥ 15 | margin, all 285 |
+|---|---|---|---|---|
+| 0 m (tip) | −0.01 ± 0.17 | −0.09 ± 0.16 | — | +0.10 ± 0.16 |
+| 10 m | −0.02 ± 0.16 | −0.09 ± 0.15 | +0.91 ± 0.91 (13 games) | −0.04 ± 0.14 |
+| 20 m (half) | −0.06 ± 0.12 | −0.06 ± 0.12 | −0.38 ± 0.84 (42) | +0.01 ± 0.06 |
+| 30 m | **−0.12 ± 0.08** | **−0.12 ± 0.08** | **−0.47 ± 0.30** (73) | +0.01 ± 0.05 |
+| 38 m | −0.03 ± 0.03 | −0.03 ± 0.03 | **−0.11 ± 0.09** (81) | −0.01 ± 0.02 |
+
+- **Against the ship rule:**
+  - the total improves or ties at every checkpoint, full and h2, and improves beyond 1.96 SE at 30 m;
+  - the margin ties at every checkpoint, in every split.
+- **The one cell that is not better:** first-half states 15+ apart at 10 m, 13 games. The full total reads
+  +0.91 ± 0.91, but its h2 part reads −0.07 ± 1.17. Thirteen games resolve neither.
+- **Reachability.** h2 states below 15 shift by exactly 0.00 at 20 / 30 / 38 m (240 / 209 / 201 games). States 15+
+  apart shift +2.41 ± 0.21 at the half, +1.23 ± 0.10 at 30 m and +0.11 ± 0.04 at 38 m.
+- **It removes the margin dependence of the bias.** h2 total bias, prod → off:
+  - at the half, 15+ apart: −3.99 ± 1.81 → −1.58, beside −1.33 ± 0.88 for closer games;
+  - at 30 m, 15+ apart: −4.11 ± 0.90 → −2.87, beside −3.17 ± 0.82.
+- **The expected effect is above the lower bound.**
+  - In real states the rule takes about 1.3× the probe's pro-rata cost at the same checkpoint: +2.41 at the half
+    against the probe's ~1.9, and +1.23 at 30 m against ~0.95.
+  - Scaled, the live headline (model − line −1.95) moves about +0.7. That sits inside the bracket above: +0.55 as the
+    lower bound, +0.9 as the upper side.
+  - The scaling is approximate. The harness is 2025-26 regular season, not this week's population.
+- **The closing-minutes cost is not seen.**
+  - At 2 minutes left, states 15+ apart are still nearer the final with the rule off (−0.11 ± 0.09). Their bias
+    stays low: prod −0.46 ± 0.43 → −0.35.
+  - The +0.5 to +1 over-projection estimated from the live ledger (above) does not appear here.
+  - So the harness gives no support to the windowed rule. It stays a hypothesis that would need its own gate.
+- **The tip moves up +0.39 ± 0.09** (285 games; the probe read +0.61 ± 0.36 on 20).
+  - Bias prod +0.13 ± 1.02 → +0.52, with |err| −0.01 ± 0.17.
+  - Re-fit 1's re-centring is still owed. The shift is systematic even though this sample cannot see its cost.
+- **What it does not fix: a low bias in 2025-26 second halves that does not depend on the rule.**
+  - Where the rule never fires (h2 below 15), the total reads −1.33 ± 0.88 at the half, −3.17 ± 0.82 at 30 m and
+    −3.59 ± 0.72 at 2 minutes left.
+  - The 2-minute cell is close games' end-game fouling: `pregame_rate`, pro rata, reads −7.14 there. That is the
+    end-game re-fit's domain (`ncaab2026_oos_B`), not this rule.
+  - The live 2026-27 ledger reads that phase at −1.12 ± 0.68, so the two seasons differ there.
+- **The pair is still owed.**
+  - This gate switched the rule off alone, against production's end-game fields.
+  - At the tip and in the first half, the simulated future spans both mechanisms.
+  - So the load candidate is: rule off, plus whichever end-game fit `ncaab2026_oos_B` passes, gated together.
 
 ## Women's (wncaab)
 

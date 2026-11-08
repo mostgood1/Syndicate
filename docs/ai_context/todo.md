@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#768` — **NCAAB LIVE TOTALS RUN ~2 LOW BECAUSE THE ENGINE'S NBA BLOWOUT RULE COVERS THE WHOLE COLLEGE SECOND HALF; NOT THE PRIOR, NOT END-GAME FOULING. FIX PROPOSED (two env fields), NOT LOADED; HARNESS GATE RUNNING** `[2026-11-08, lane ncaab-live-totals-bias, session 6df1b15d]`
+### `#768` — **NCAAB LIVE TOTALS RUN ~2 LOW BECAUSE THE ENGINE'S NBA BLOWOUT RULE COVERS THE WHOLE COLLEGE SECOND HALF; NOT THE PRIOR, NOT END-GAME FOULING. FIX PROPOSED (two env fields), NOT LOADED; HARNESS GATE PASSED 11-08 2:07 PM CST, TIP RE-CENTRE + PAIR GATE OWED** `[2026-11-08, lane ncaab-live-totals-bias, session 6df1b15d]`
 - **Findings:** `.syndicate/findings_2026-11-08_ncaab_live_totals_bias.md`.
 - **Scripts:**
   - `scripts/ncaab_live_totals_bias.py`: ledger attribution, men's and women's.
@@ -24,12 +24,17 @@
   - a claim needs about 43-110 games.
 - **Proposed (user's call; nothing loaded):**
   - add `"blowout_q4_margin": 999, "blowout_margin": 999` to live-odds-worker's `SYNDICATE_NCAAB_LIVE_MECHANISMS` (men's only), loaded by a drained full down/up;
-  - better follow-up: an engine `blowout_window_s` field (final ~240 s for NCAAB), because real blowouts DO slow in the last 4 minutes.
+  - a clock-windowed engine rule (`blowout_window_s`, final ~240 s) is now only a HYPOTHESIS: the harness does not see the closing-minutes cost it was meant to avoid (at 2 min left, 15+ apart, rule off is still nearer the final, -0.11 +- 0.09).
 - **Re-fit owed:**
-  - the pregame tip total rises +0.61 ± 0.36: re-centre with `solver_endgame_pts_per_team`;
+  - the pregame tip total rises +0.39 ± 0.09 (harness, 285 games; probe +0.61 ± 0.36 on 20): re-centre with `solver_endgame_pts_per_team`;
   - pair-gate with the end-game fouling re-fit another session is running (`ncaab2026_oos_B`).
 - **Expected effect (lower bound, probe cost pro rata, same 19,906 priced rows / 192 games):** model - line -1.95 -> -1.40; h2 flag-on rows -2.74 -> -1.91; h1 |m| >= 15 rows -4.02 -> -2.74.
-- **Owed:** the paired harness gate, run `ncaab2026_blowout_off` (WSL `~/bball_iv/runs/`, launched 18:11:38Z, nice 19, ~20:50Z done). Read it with `scripts/ncaab_blowout_harness_read.py`. Its verdict goes into the findings, then the user's decision.
+- **Harness gate PASSED** (run `ncaab2026_blowout_off`, WSL `~/bball_iv/runs/`, done 2:05 PM CST 11-08; 399 of 400 scored, 285 regular season; read with `scripts/ncaab_blowout_harness_read.py`):
+  - total |err| off - prod improves or ties at every checkpoint, full and h2 (-0.12 ± 0.08 at 30 m, ± 1.96 SE); the margin ties everywhere;
+  - where the rule fires (15+ apart): -0.47 ± 0.30 at 30 m (73 games), -0.11 ± 0.09 at 38 m (81); h2 states below 15 shift exactly 0.00;
+  - in real states the rule takes ~1.3x the probe's cost, so the live headline (model - line -1.95) moves about +0.7, not just the +0.55 lower bound;
+  - not fixed by it: 2025-26 h2 runs low where the rule never fires (-3.59 ± 0.72 at 2 min left in close games) -- end-game fouling, `ncaab2026_oos_B`'s domain.
+- **Owed before any load:** the tip re-centre, then a PAIR gate of rule off + the end-game fit `ncaab2026_oos_B` passes; then the user's yes. Nothing loaded.
 
 ### `#767` — **GAMES-RAIL INTERVAL PROJECTIONS FOR EVERY SPORT: ON MAIN `4f367324a`, LOADED AND VERIFIED FOR NFL / NHL / SOCCER; NCAAF READING OWED, MLB AT THE 2027 OPENER** `[2026-11-08 17:3xZ, lane all-sport-interval-projections (CLOSED, GOAL PARTLY MET), session c5cc97a7]`
 - **UPDATE 17:30Z:** (a) is DONE for nfl / nhl / soccer. The pregame blocks rode lane `nba-live-proj-actuals`' refresh-worker restart at 17:23:38Z (user: "Ride the next restart"). Served at 17:28Z: nfl pregame 13/13, nhl 6/6, soccer pregame 12. The other 182 soccer chips have NO sim match (0 of 182). Page: 134 PROJ boxes (deploys.md VERIFY 17:30:45Z).
