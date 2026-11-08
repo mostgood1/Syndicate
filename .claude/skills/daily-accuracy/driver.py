@@ -48,13 +48,20 @@ import argparse
 import collections
 import json
 import os
+import subprocess
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-DEFAULT_BASE_URL = "https://syndicate-an21.onrender.com"
+# Production is the local WSL fleet since 2026-09-30 (Render billing-suspended all three
+# services that day); its web answers on loopback :10000. The old default was the public
+# onrender host, which made every no-flag run read a suspended service and exit 4
+# `[2026-11-07, lane render-retirement-inventory]`.
+DEFAULT_BASE_URL = "http://127.0.0.1:10000"
+FLEET_ENV_FILE = "~/syndicate-prod/local_production.env"
 TIMEOUT_SECONDS = 90.0
 
 # Every sport the platform trades. A sport missing from the scorecard is only
@@ -79,6 +86,34 @@ SEASON_WINDOWS = {
 
 class ReadError(RuntimeError):
     pass
+
+
+def _is_fleet(base_url: str) -> bool:
+    parts = urllib.parse.urlsplit(str(base_url or "").strip())
+    try:
+        port = parts.port
+    except ValueError:
+        return False
+    return (parts.hostname or "").lower() in {"localhost", "127.0.0.1", "::1"} and port == 10000
+
+
+def _admin_token(base_url: str) -> str:
+    """`ADMIN_TOKEN` from the environment, else -- for the fleet only -- from the fleet's
+    own env file. The repo `.env` holds RENDER's token, which the fleet rejects, so it is
+    never read here (same rule as `scripts/_base_url.admin_token`, restated because this
+    skill is stdlib-only with no repo imports). Never printed."""
+    value = str(os.environ.get("ADMIN_TOKEN") or "").strip()
+    if value or not _is_fleet(base_url):
+        return value
+    script = f"grep -m1 '^ADMIN_TOKEN=' {FLEET_ENV_FILE} | cut -d= -f2-"
+    command = ["bash", "-lc", script]
+    if sys.platform.startswith("win"):
+        command = ["wsl.exe", "-e"] + command
+    try:
+        out = subprocess.run(command, capture_output=True, text=True, timeout=60).stdout
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return out.strip().strip('"').strip("'")
 
 
 def _get_json(base_url: str, path: str, token: str) -> Any:
@@ -339,9 +374,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--json", action="store_true", help="emit the machine-readable summary instead of the report")
     args = parser.parse_args(argv)
 
-    token = os.environ.get("ADMIN_TOKEN", "").strip()
+    token = _admin_token(args.base_url)
     if not token:
-        print("FAIL no ADMIN_TOKEN in the environment. Without it every read 401s and this "
+        print("FAIL no ADMIN_TOKEN (not in the environment, and not readable from the fleet's "
+              f"{FLEET_ENV_FILE}). Without it every read 401s and this "
               "tool would report an empty scorecard as a real one.", file=sys.stderr)
         return 5
 

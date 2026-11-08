@@ -10,8 +10,9 @@ Paths below are relative to the repo root; this file's own path is
 
 ## What already exists (read this before building anything)
 
-**A daily job already does the work.** The Render cron `model-scorecard`
-(`crn-dam0ao942hec73cge0rg`, schedule `30 11 * * *`, branch `main`) runs
+**A daily job already does the work.** The fleet supervisor's scheduled job
+`model-scorecard` (11:30Z daily, `scripts/local_production.py` `SCHEDULED_JOBS`; it was
+the Render cron `crn-dam0ao942hec73cge0rg` until Render was suspended 2026-09-30) runs
 `scripts/publish_model_scorecard.py` from a fresh clone, grades the Layer 2
 **priced** population (`opportunity_population_ledger` — never the published
 subset), and publishes a dated scorecard plus a validated-bucket overlay. On
@@ -35,11 +36,14 @@ can settle. This skill is a READER.
 ## Running it
 
 ```bash
-ADMIN_TOKEN=... python .claude/skills/daily-accuracy/driver.py
+py -3 .claude/skills/daily-accuracy/driver.py
 ```
 
 Stdlib only, no repo imports — it runs from a bare checkout, against production
-by default (`--base-url`, or `SYNDICATE_BASE_URL`). Useful flags:
+by default: the local fleet, `http://127.0.0.1:10000` (`--base-url`, or
+`SYNDICATE_BASE_URL`). The token is `ADMIN_TOKEN` if exported, else the fleet's own
+`~/syndicate-prod/local_production.env` read through WSL; the repo `.env` holds
+Render's token and is never read. Useful flags:
 `--json` for the machine-readable summary, `--compare-to YYYY-MM-DD` to diff
 verdicts against a specific earlier slate, `--no-compare`, `--max-age-hours`.
 
