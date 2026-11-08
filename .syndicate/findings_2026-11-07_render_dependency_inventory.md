@@ -95,8 +95,7 @@ before 2026-09-29**.
   mode **0644** (world-readable). The other two are 0600, and the runbook (`:111`)
   says 600. It was rewritten 2026-10-04 12:42 (beside
   `live-odds-worker.json.bak_nba_20261004T174221Z`, which is 0600), and the rewrite
-  lost the mode. It holds plaintext venue and API secrets. Fix: `chmod 600` on that
-  file. It needs the user's OK because it touches the fleet host.
+  lost the mode. It holds plaintext venue and API secrets. **DONE 2026-11-08 16:54Z (10:54 AM CST)** — user: "Yes, chmod it". `render_env/live-odds-worker.json` 644 -> 600 (owner amyn). Content sha256 is unchanged, the owner can still read it, and all four files in `render_env/` now read 600.
 - `render.yaml` carries a literal `ODDS_API_KEY` value at 3 sites (`:37`, `:290`, `:763`),
   i.e. a secret in git. On the fleet the snapshot overrides it at all three. The value
   is not repeated here.
@@ -307,7 +306,7 @@ capability, and it spans 7+ claimed files on a live-money fleet.
 - ~~**D1**~~ CLAUDE.md docs fix: DONE, `1ead99fbe`.
 - **D2** Marker replacement (Proposal M): options 1 / 2 / 3. Recommended: 3.
 - **D3** `render.yaml` role (R1 a/b/c) and the guard's Render read (R2). Recommended: R1(a), R2 additive.
-- **D4** `chmod 600 ~/syndicate-prod/render_env/live-odds-worker.json` on the fleet host.
+- ~~**D4**~~ `chmod 600` on the snapshot: DONE 2026-11-08 16:54Z.
 - **Follow-up, not a decision:** fast-forward the primary tree (2,488 behind). It is the
   cause of every "preflight reads Render" report. Recipe: memory
   `project_primary_tree_fast_forward_recipe`. It needs a uniqueness check of the
