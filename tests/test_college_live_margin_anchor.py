@@ -10,6 +10,14 @@ import pytest
 
 from syndicate.features.ncaab import live_resim as lr
 
+
+@pytest.fixture(autouse=True)
+def _lane_age_gate_off(monkeypatch):
+    """The `#762` lane-age gate (default on) judges a lane against the wall clock, and these lanes carry fixed past
+    times. This file pins the margin anchor, not lane age (loaned to lane `live-gameline-lane-age-gate`, 2026-11-07)."""
+    monkeypatch.setenv("SYNDICATE_LIVE_GAMELINE_LANE_AGE_GATE", "off")
+
+
 AWAY, HOME = "Army Black Knights", "Duke Blue Devils"
 COMMENCE = "2026-11-04T00:00:00Z"
 

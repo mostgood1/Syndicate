@@ -18,6 +18,13 @@ from tests.basketball_pbp_fixtures import Game
 from tests.test_ncaab_live_resim import _team_prior, _write_priors
 
 
+@pytest.fixture(autouse=True)
+def _lane_age_gate_off(monkeypatch):
+    """The `#762` lane-age gate (default on) judges a lane against the wall clock, and these lanes carry fixed past
+    times. This file pins the women's re-sim, not lane age (loaned to lane `live-gameline-lane-age-gate`, 2026-11-07)."""
+    monkeypatch.setenv("SYNDICATE_LIVE_GAMELINE_LANE_AGE_GATE", "off")
+
+
 def _state(game: Game):
     return live.build_live_game_state(game.summary(), "wncaab", date="2026-11-03", built_at="t")
 

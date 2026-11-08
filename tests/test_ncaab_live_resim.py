@@ -12,6 +12,14 @@ import pytest
 from syndicate.features.ncaab import live_resim as lr
 from syndicate.features.ncaab import live_team_model as tm
 
+
+@pytest.fixture(autouse=True)
+def _lane_age_gate_off(monkeypatch):
+    """The `#762` lane-age gate (default on) judges a lane against the wall clock, and these lanes carry fixed past
+    times. This file pins the re-sim, not lane age (loaned to lane `live-gameline-lane-age-gate`, 2026-11-07)."""
+    monkeypatch.setenv("SYNDICATE_LIVE_GAMELINE_LANE_AGE_GATE", "off")
+
+
 PRIOR_COLS = ("season", "as_of", "team_id", "athlete_id", "player_name", "games", "minutes", "min_proj", "starter_prob",
               "last_game", "prior_season_minutes") + tuple(f"{k}_pm" for k in lr.RATE_STATS)
 RATES = {"pts_pm": 0.42, "fga_pm": 0.33, "fgm_pm": 0.15, "threes_att_pm": 0.13, "threes_pm": 0.045, "fta_pm": 0.11,

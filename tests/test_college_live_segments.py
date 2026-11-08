@@ -20,6 +20,13 @@ from syndicate.features.shared.live_gameline_join import (
 )
 
 
+@pytest.fixture(autouse=True)
+def _lane_age_gate_off(monkeypatch):
+    """The `#762` lane-age gate (default on) judges a lane against the wall clock, and these lanes carry fixed past
+    times. This file pins segment pricing, not lane age (loaned to lane `live-gameline-lane-age-gate`, 2026-11-07)."""
+    monkeypatch.setenv("SYNDICATE_LIVE_GAMELINE_LANE_AGE_GATE", "off")
+
+
 def _facts(period: int, clock: float) -> lr.ResumeFacts:
     return lr.ResumeFacts(event_id="1", home_id="10", away_id="20", home_score=0, away_score=0, period=period,
                           clock_seconds=clock, possession=None, last_seq=0, as_of="", score_source="official",
