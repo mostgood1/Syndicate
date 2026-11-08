@@ -943,6 +943,14 @@ death, never life — do not invert it.
 - Verification: A scratch engine copy (~/bball_iv/code4) adds one RNG-neutral POSS marker per possession under record_events; its regulation margins reproduce sims.jsonl exactly at 30m and 36m (fidelity, every game). Tables of per-team window points, possessions, PPP, 3PA share, FTA rate, OREB rate and the variance split, sims vs real, in the findings file and #765. Diagnostic only: nothing ships from this lane.
 - Blocked by: none
 
+### nhl-live-resim-slate-root — OPEN — opened 2026-11-08 — session e1aa93b0-e5f4-4422-a186-b82171244058
+- Goal: The NHL live re-sim stops refusing every live game no_slate_features: build_live_lens_snapshot reads its slate features from the same root the pregame producer writes (SYNDICATE_NHL_SOURCE_ROOT / SYNDICATE_DATA_ROOT nhl_source), so live NHL games publish live_resim lanes and live NHL game-line rows on the Layer 2 board carry a live number
+- Files: syndicate/features/nhl/live_resim.py (build_live_lens_snapshot's build_slate_features call + a new _slate_features_root helper only), tests/test_nhl_live_resim_slate_root.py (NEW)
+- Hypothesis: hockeysim loaders.nhl_source_root() honours only SYNDICATE_ARTIFACT_ROOT_NHL (unset on the fleet) and falls back to <repo>/data/nhl_source = the fleet checkout ~/Syndicate's git mirror, whose odds/games scoreboards stop at date=2026-06-14; live_resim calls build_slate_features(date) with no root, so by_pk is empty and every live game refuses no_slate_features (measured 2026-11-08 23:39Z: TBL@WPG 2026020280 LIVE refused no_slate_features; 23:23Z LIVE_GAMELINE_JOIN sport=nhl index=0 sources_seen pregame_only=6). The pregame producer passes --artifact-root ~/syndicate-prod/data/nhl_source explicitly, whose scoreboard.csv for 11-08 lists 2026020280.
+- Falsification test: On the fleet, build_slate_features('2026-11-08', root=~/syndicate-prod/data/nhl_source) does NOT return a feature row for 2026020280 (or the default-root call DOES), or after the fix a live NHL game still refuses no_slate_features
+- Verification: Fleet read-only probe: default root vs fleet root feature counts for 11-08; after the fix loads on live-odds-worker: nhl_live_lens.json lanes source=live_resim for live games, LIVE_GAMELINE_JOIN sport=nhl index>0, and served /api/intelligence/query live NHL game rows with a Live number > 0
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
