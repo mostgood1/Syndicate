@@ -939,6 +939,19 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: GOAL MET. Moved `closed-lane-archive-20261108-0855` (owner 0be02206 idle 243m, block 245m). Readings in log/2026-11-08.md.
 
+### ncaab-late-gap-decomposition — CLOSED 2026-11-08 (GOAL MET: late gap decomposed; refit B NOT ADOPTED, fails out of sample; findings PHASE 2 STEP 3 + todo #765) — opened 2026-11-08 — session c2fd17f8-7d77-4eed-b025-0830211e05b3
+- **GOAL VERDICT `[2026-11-08 19:36Z]`: GOAL: MET.**
+  - Fidelity: otsplit reproduces the harness re-sim total on 285 / 285 games at 30m and 38m (max |diff| 0.0000).
+  - Hypothesis CONFIRMED (not falsified). Minute-38 regulation residual +1.01 ± 0.57, under the +1.5 threshold. In games that end in regulation, +0.47 / +0.49 in two samples. OT residual +1.66 of +2.67. The sims' OT share is low (12.8% vs 19.1% within 3), so the OT part is part under-production and part sample excess.
+  - Refit B pre-registered and run out of sample: fails. Production E1 stays.
+  - Read-only: no engine, served-code or config change; no deploy.
+- Goal: The production NCAAB re-sim's late total deficit (-2.67 at minute 38, -3.46 at 30m on the #765 sample) decomposed into regulation vs overtime (per-sim OT share vs the actual OT rate) and by margin bucket, so Phase 2 step 3 targets the part that is real; read-only, recorded in the #765 findings
+- Files: .syndicate/findings_2026-11-07_basketball_interval_backtest.md, docs/ai_context/todo.md (#765 section only)
+- Hypothesis: Most of the late deficit is overtime: the sample's OT rate is 9.8% (28/285) against the season's 5.6%, and on games that end in regulation the re-sim is near unbiased at minute 38 (+0.47 +- 0.61)
+- Falsification test: The regulation-only residual (actual regulation total minus the sims' regulation mean) at minute 38 is beyond +1.5 points, or the sims' OT share is calibrated and the sample OT excess explains under half the gap
+- Verification: otsplit replay reproduces the harness re-sim total_mean on every game (fidelity), and the findings carry regulation / OT tables with n
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

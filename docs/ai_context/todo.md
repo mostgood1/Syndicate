@@ -85,7 +85,7 @@
   - The old bars (NCAAB 25.97 / 16.75 / 10.64 / 4.67; NBA pregame quarter 8.53) are beaten by the line alone.
   - Fidelity: production's recorded NBA live re-sim and the replay have the same MAE on the same games (14.71 vs 14.61 at 12m ... 5.12 vs 5.18 at 45.6m).
 - **Next (Phase 2, each against this harness):**
-  - NCAAB: the baseline is `ncaab2026_resim_prod`. Production already runs the half split and the end-game mechanisms. What is left is the in-game second half (h2 -2.02 at the tip, -3.46 at 30m) and minute 38 (-2.67, against the line's -5.02).
+  - NCAAB: the baseline is `ncaab2026_resim_prod`. Production already runs the half split and the end-game mechanisms. Measured 2026-11-08 (below): the late gap is mostly the sims under-producing regulation ties, not regulation scoring. Next, in order: (1) the OT / regulation-tie probability in close games, which needs a new end-game mechanism and an `engine.py` loan; (2) blowout late scoring (11+ margins, minutes 30-40); (3) the trailing-by-7-10 bucket (not the foul rate).
   - Every college run must carry live-odds-worker's three switches; check `college_switches` and `engine_provenance` in `report.md`.
   - Further end-game values go through `resim_mech --mechanisms`, set on top of the env's.
   - Pace, only if pooled much harder than k=60 possessions.
@@ -105,6 +105,14 @@
   - Why the first read missed them: the keys sit in `local_production.env` as `LIVE_ODDS_WORKER__<key>`.
   - `8c1378e9a` makes every run record which switches it replayed (`college_switches`, per-game `engine_provenance`), and adds an off != on test through production's `build_engine_inputs`.
   - Full tables: the findings' college section.
+- **PHASE 2 STEP 3, NCAAB late gap `[2026-11-08 19:35Z (1:35 PM CST)]` (lane `ncaab-late-gap-decomposition`, session c2fd17f8, read-only): decomposed; the first mechanism refit does NOT confirm.**
+  - In games that end in regulation, the production re-sim is unbiased at minute 38 in two samples: +0.47 ± 0.61 (257 games) and +0.49 ± 0.59 (247).
+  - The rest is mostly OVERTIME. In games within 3 at minute 38 the sims give 12.8% OT against the season's 19.1% (n = 1,131). At minute 30 they give about half the season's rate.
+  - Both seeded samples are OT-rich by chance (33/400 and 30/400 against a 5.2% pool). Over 2,000 seeds the mean is 21.0 ± 4.3 and the draw reproduces the run's ids, so the sampling is fair. Season-weighted, the minute-38 gap is about 1.4 points, not 2.67.
+  - Regulation pieces: trailing by 7-10 at minute 38 (+3.22 ± 1.54) and blowouts at minute 30 (+4.21 in 11-19; smaller in sample 2).
+  - Refit: E1 foul probability `[0.25, 0.7, 0.9]` (variant B) was better at minute 38 in-sample. Out of sample (seed 20261108, 272 games) it is n.s. on every total and +0.08 ± 0.06 worse on the minute-38 margin. **Not adopted; production E1 stays.** `blowout_bench_rest` is inert on NCAAB totals.
+  - Pooled production re-sim vs the line, 535 games: better on h2 at every checkpoint, on the full total from minute 20 (-0.68 / -1.06 / -0.97) and on h1 at the tip (-0.57 ± 0.31). WORSE on the full total at the tip (+0.53 ± 0.34). The anchored margin ties the line everywhere.
+  - Full tables: the findings' PHASE 2 STEP 3 section. Runs: WSL `~/bball_iv/runs/ncaab2026_oos_B`, plus `otsplit.jsonl` / `mechscan.jsonl` in `ncaab2026_resim_prod`.
 ### `#764` — **KALSHI TOTALS THAT NAME NO GAME PRICE ANOTHER GAME'S ROW: 26 of 26 measured sides wrong-game (men's and women's college basketball, college football). Polymarket is clean in every sport. NOT FIXED** — 2026-11-06, session e32fef1a (user "Yes, measure it here")
 - **UPDATE 2026-11-07 23:49Z (5:49 PM CST): REVERSED-ORDER FIX LOADED AND VERIFIED** (lane `kalshi-fanin-reversed-orientation`, CLOSED).
   - **Load:** `79c8aac12`, fleet ff + refresh-worker TERM 23:41:12Z.

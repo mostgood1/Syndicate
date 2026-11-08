@@ -43,6 +43,8 @@ variant). On main as `4264deceb`..`c7ba7a01c`, plus `8c1378e9a`, which records t
    live-odds-worker (re-measured 2026-11-08, below). With them on, the college re-sim's h1 is +2.15 at the tip
    (the line +5.11), and its full total is -2.67 at minute 38 (the line -5.02). What is left is the second half:
    h2 -2.02 at the tip and -3.46 at minute 30.
+   That late remainder is mostly OVERTIME: in games that end in regulation the re-sim is unbiased at minute
+   38 in two samples. The sims under-produce regulation ties (section PHASE 2 STEP 3, 2026-11-08).
 4. **The old bars are already beaten by trivial baselines.** The old NCAAB app's quoted full-game total MAE was
    25.97 / 16.75 / 10.64 / 4.67 at minute 10 / 20 / 30 / 38. Its own definition (`proj_pace`, reproduced here as
    `naive_pace`) scores 21.02 / 13.60 / 9.20 / 5.21 on its window (2026-02-01..02-12, 522 games, 41,238 snapshots
@@ -376,3 +378,143 @@ does not run for it), so it is not replayed.
   the pace / efficiency results.
 - **Superseded:** "+8.4 high at the tip" and "the half split is Phase 2's first candidate" (production runs it).
   The "~4 low at minute 38" applies to the arithmetic projectors only; the production re-sim is -2.7 low.
+
+## PHASE 2 STEP 3 (NCAAB): where the production re-sim's late deficit comes from; the first mechanism refit does NOT confirm
+
+`[2026-11-08 16:55-19:35Z (10:55 AM-1:35 PM CST), lane ncaab-late-gap-decomposition, session c2fd17f8, read-only, nice 19]`
+
+**Verdict.**
+1. In games that end in regulation, the production NCAAB re-sim is UNBIASED at minute 38, in two independent
+   samples: +0.47 ± 0.61 (257 games) and +0.49 ± 0.59 (247).
+2. Most of the late deficit is OVERTIME. The sims under-produce regulation ties: in games within 3 at minute 38
+   they give 12.8% OT, against the season's 19.1%. Both samples are also OT-rich by chance, which inflates the gap.
+3. Raising the end-game foul probability (variant B) looked better in-sample at minute 38. On a fresh sample it
+   does not improve any total, and it makes the minute-38 margin worse. **Production's E1 stays.**
+
+**Method.** Residual = actual − projected; POSITIVE means the projection ran LOW. The bucket is |margin| at the
+checkpoint.
+- A scratch replay (`otsplit`) re-ran the production re-sim at minutes 30 and 38 for sample 1's 285 regular-season
+  games, with the same seeds and live-odds-worker's three switches.
+- It wraps the engine call to record each sim's regulation points and overtime points separately.
+- **Fidelity:** it reproduces the harness's stored re-sim total on 285 of 285 games at both checkpoints
+  (max |diff| 0.0000).
+
+**Sample 1, minute 38** (285 games):
+
+| | 0-3 | 4-6 | 7-10 | 11-19 | 20+ | all |
+|---|---|---|---|---|---|---|
+| games | 61 | 54 | 54 | 62 | 54 | 285 |
+| total residual | +5.06 ± 3.34 | +2.10 ± 1.57 | +5.38 ± 2.95 | +0.79 ± 1.31 | +0.02 ± 0.95 | +2.67 ± 1.04 |
+| regulation residual | -0.16 ± 1.18 | +1.37 ± 1.12 | **+3.22 ± 1.54** | +0.79 ± 1.31 | +0.02 ± 0.95 | **+1.01 ± 0.57** |
+| overtime residual | +5.21 ± 3.26 | +0.73 ± 1.52 | +2.16 ± 2.34 | 0.00 | 0.00 | +1.66 ± 0.90 |
+| sims' OT share | 0.128 | 0.055 | 0.010 | 0.000 | 0.000 | 0.040 |
+| this sample's OT rate | 0.311 | 0.093 | 0.074 | 0.000 | 0.000 | 0.098 |
+| **season OT rate**, games with a close (5,278) | **0.191** | 0.074 | 0.019 | 0.001 | 0.000 | 0.056 |
+
+**Sample 1, minute 30** (285 games):
+
+| | 0-3 | 4-6 | 7-10 | 11-19 | 20+ | all |
+|---|---|---|---|---|---|---|
+| games | 70 | 45 | 61 | 68 | 41 | 285 |
+| total residual | +2.94 ± 2.80 | +2.68 ± 3.26 | +1.62 ± 2.84 | +6.46 ± 2.56 | +2.96 ± 2.11 | +3.46 ± 1.26 |
+| regulation residual | -0.09 ± 1.86 | -0.18 ± 2.18 | +0.83 ± 2.46 | **+4.21 ± 2.07** | **+2.96 ± 2.11** | +1.56 ± 0.99 |
+| overtime residual | +3.03 ± 2.24 | +2.86 ± 2.95 | +0.78 ± 1.30 | +2.25 ± 2.06 | 0.00 | +1.90 ± 0.92 |
+| sims' OT share | 0.053 | 0.040 | 0.028 | 0.009 | 0.000 | 0.027 |
+| **season OT rate**, games with a close | **0.115** | 0.087 | 0.052 | 0.025 | 0.001 | 0.056 |
+
+**Sample 2 replicates it** (`ncaab2026_oos_B`, seed 20261108, 272 regular-season re-sim games; total residual
+including OT, from the harness rows):
+- **Minute 38:**
+  - games that end in regulation +0.49 ± 0.59 (247);
+  - games that go to OT +20.70 (25);
+  - trailing-by-7-10 +4.00 ± 2.11.
+- **Minute 30:**
+  - games that end in regulation +0.71 ± 1.05;
+  - 11-19 +2.90 ± 2.04 and 20+ +1.59 ± 2.67. The blowout direction replicates; its size is uncertain.
+
+**What it says.**
+- **Both samples are OT-rich by chance, and the draw itself is fair.**
+  - The samples hold 33 / 400 and 30 / 400 OT games. The pool they are drawn from holds 326 / 6,269 (5.2%).
+  - Re-drawing with the run's own seeds gives back exactly the run's game ids.
+  - Over 2,000 other seeds the OT count averages 21.0 ± 4.3. A count of 33 or more appears 9 times (0.45%);
+    30 or more appears 59 times (3%).
+  - The re-sim eligibility pool (regular season, a close, both teams with ≥ 5 prior games) runs 5.8% OT
+    (258 / 4,476). So this is not a population effect.
+- **Regulation: the re-sim is close, except in two places.**
+  - At minute 38 the regulation residual is +1.01 ± 0.57. Almost all of it is the trailing-by-7-10 bucket
+    (+3.22 ± 1.54). That is where real teams foul hardest: +5.68 points over the line's time share in the last
+    2:00, against +2.51 at 0-3.
+  - At minute 30 the regulation gap is in BLOWOUTS (sample 1: 11-19 +4.21, 20+ +2.96; smaller in sample 2). Real
+    games with 11+ margins score +4.8 / +3.2 over the line's share in the last ten minutes.
+- **Overtime: the sims under-produce regulation ties.**
+  - Within 3 at minute 38, the sims give 12.8% OT against the season's 19.1% (n = 1,131, ± 2.3 pp).
+  - At minute 30 they give about half the season's rate in every bucket.
+- **Weighted to the season's margin mix** (bucket shares at minute 38: 19.6 / 14.6 / 16.4 / 22.7 / 26.7%), the
+  expected late gap is about +0.9 regulation and +0.6 OT, roughly 1.4 points rather than the sample's 2.67. This
+  assumes the sims' per-bucket OT shares carry over to the season.
+
+**The refit, step 1: three variants of the existing end-game mechanisms.** They were pre-registered before the
+run, then scanned at minutes 30 and 38 on sample 1's games and seeds (`mechscan`), on top of production's E1:
+- **A:** the trailing-by-7-10 foul probability goes 0.6 → 0.9 (`endgame_foul_p_by_deficit` `[0.25, 0.5, 0.9]`).
+- **B:** 4-6 goes 0.5 → 0.7 and 7-10 goes 0.6 → 0.9 (`[0.25, 0.7, 0.9]`).
+- **C:** `blowout_bench_rest` on.
+
+Gate: paired |err| better than production beyond 1.96 SE at minute 30 AND minute 38, with no bucket worse.
+
+| variant | 30m, all | 38m, all | 38m, 7-10 | 38m regulation residual | bucket worse? |
+|---|---|---|---|---|---|
+| A | -0.04 ± 0.10 n.s. | -0.04 ± 0.08 n.s. | **-0.27 ± 0.22 better** | +1.01 → +0.78 | none |
+| B | -0.03 ± 0.11 n.s. | **-0.12 ± 0.10 better** | **-0.29 ± 0.28 better** | +1.01 → +0.57 | none |
+| C | -0.02 ± 0.05 n.s. | -0.01 ± 0.02 n.s. | 0.00 | unchanged | none |
+
+No variant passed. B was better at minute 38 only, and it had been chosen after looking at this sample's buckets.
+
+**The refit, step 2: B out of sample.** Fresh seed 20261108, a full harness run with `resim` (production) and
+`resim_mech` (B), every segment and checkpoint.
+- Pre-registered: the primary gate is the full total at minute 38; the secondary is that no segment ×
+  checkpoint gets worse.
+- 272 regular-season games, 17 of them shared with sample 1. Excluding those 17 changes no verdict.
+
+| B vs production | 0m | 10m | 20m | 30m | 38m |
+|---|---|---|---|---|---|
+| full total | -0.02 ± 0.18 n.s. | -0.06 ± 0.18 n.s. | -0.07 ± 0.15 n.s. | -0.02 ± 0.12 n.s. | **-0.01 ± 0.10 n.s.** |
+| h1 total | -0.08 ± 0.14 n.s. | -0.03 ± 0.11 n.s. | -- | -- | -- |
+| h2 total | +0.08 ± 0.17 n.s. | +0.09 ± 0.16 n.s. | -0.07 ± 0.15 n.s. | -0.02 ± 0.12 n.s. | -0.01 ± 0.10 n.s. |
+| full margin, raw | **-0.26 ± 0.18 better** | -0.01 ± 0.15 n.s. | +0.02 ± 0.13 n.s. | -0.01 ± 0.10 n.s. | **+0.08 ± 0.06 worse** |
+| full margin, anchored | +0.00 | +0.09 ± 0.21 n.s. | +0.09 ± 0.15 n.s. | +0.00 ± 0.11 n.s. | **+0.08 ± 0.06 worse** |
+
+- **B fails both gates.** It moves the minute-38 bias the right way (-2.34 → -1.91) without reducing |error|,
+  and it costs margin at minute 38. Its in-sample gain was selection plus noise. Production E1 stays as it is.
+- More foul probability alone does not fix the trailing-by-7-10 gap: B left that bucket +2.37 low in regulation
+  even in-sample. What the trailing team does with its own possessions (quick threes, timeouts) is not modelled.
+- **C (`blowout_bench_rest`) is inert on NCAAB totals.** The blowout gap needs a different input: the measured
+  second-half scoring rate by margin state (1.010 / 1.059 / 1.052 / 1.047 of the prior's rate at
+  0-5 / 6-10 / 11-19 / 20+, `ncaab_live_tier.md`).
+
+**Production re-sim vs the line, both samples pooled** (535 regular-season games, deduplicated). This is the most
+precise read so far, and it supersedes the single-sample gate in the college section for every cell it covers:
+
+| production re-sim vs `pregame_rate` | 0m | 10m | 20m | 30m | 38m |
+|---|---|---|---|---|---|
+| full total | **+0.53 ± 0.34 worse** | -0.20 ± 0.35 n.s. | **-0.68 ± 0.41 better** | **-1.06 ± 0.28 better** | **-0.97 ± 0.24 better** |
+| h1 total | **-0.57 ± 0.31 better** | +0.09 ± 0.16 n.s. | -- | -- | -- |
+| h2 total | **-0.64 ± 0.40 better** | **-0.69 ± 0.40 better** | **-0.68 ± 0.41 better** | **-1.06 ± 0.28 better** | **-0.97 ± 0.24 better** |
+| full margin, raw | **+0.33 ± 0.26 worse** | +0.18 ± 0.22 n.s. | **+0.17 ± 0.15 worse** | -0.00 ± 0.10 n.s. | +0.06 ± 0.08 n.s. |
+| full margin, anchored (served) | +0.00 | +0.09 ± 0.15 n.s. | +0.04 ± 0.11 n.s. | -0.04 ± 0.09 n.s. | +0.05 ± 0.08 n.s. |
+
+- **Replicated:** better than the line on h2 at every checkpoint and on the full total from minute 20, and better
+  on h1 at the tip.
+- **Not replicated:** sample 1's full total at the tip was n.s. Pooled, it is worse (+0.53 ± 0.34): the h1 gain
+  and the h2 gain at the tip do not add up to a full-game gain. Sample 1's anchored-margin loss at 10m was also
+  chance (pooled: n.s.).
+
+**For Phase 2 (NCAAB), in order:**
+1. **The OT / regulation-tie probability in close games.** It is the largest measured piece: about 0.6 points a
+   game at minute 38, season-weighted, and it also bears on win probability in close games. The engine
+   under-produces ties in the last minutes. Before building anything, measure the sims' end-of-regulation margin
+   distribution against real games, conditioned on margin and clock. It needs a new end-game mechanism (for
+   example, a trailing-by-3 team taking threes, or a tied team holding for the last shot). That means a loan of
+   `engine.py` (lane `basketball-scenario-calibration`) and a refit of the rates the mechanism absorbs.
+2. **Blowout late scoring** (11+ margins, minutes 30-40), from the measured margin-state scoring rate.
+3. **Trailing-by-7-10 end-game scoring.** The foul rate is not the lever (B). Look at the trailing team's own
+   possessions.
