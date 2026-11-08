@@ -9,8 +9,8 @@ deploy, college segment pricing stays off (`SYNDICATE_COLLEGE_LIVE_SEGMENT_PRICI
 
 **Code.** `syndicate/features/shared/basketball_interval_backtest.py` (state rebuild, projectors, scoring, the paired
 ship gate), `scripts/backtest_basketball_intervals.py` (read-only loaders, coverage, walk-forward NCAAB priors,
-resumable worker pool, report), `tests/test_basketball_interval_backtest.py` (22 tests, an off != on test per
-variant). On main as `4264deceb`..`c7ba7a01c`. Outputs in WSL `~/bball_iv/runs/<run>/` (`results.jsonl`,
+resumable worker pool, report), `tests/test_basketball_interval_backtest.py` (24 tests, an off != on test per
+variant). On main as `4264deceb`..`c7ba7a01c`, plus `8c1378e9a`, which records the college engine switches per game. Outputs in WSL `~/bball_iv/runs/<run>/` (`results.jsonl`,
 `report.json`, `report.md`), all at `nice -n 19`.
 
 ## Headline
@@ -38,8 +38,11 @@ variant). On main as `4264deceb`..`c7ba7a01c`. Outputs in WSL `~/bball_iv/runs/<
      fouling plus overtime, and the arithmetic projects neither.
 
    NBA shows the same in Q4: the line share projects Q4 +2.82 HIGH at the tip, and the full-game total is -2.26 at
-   45.6m. The men's half split (`H1_SHARE` 47.43%, `SYNDICATE_NCAAB_HALF_SPLIT`) and the default-off end-game
-   mechanisms are exactly these shapes. They are what Phase 2 should test first, against this table.
+   45.6m. The men's half split (`H1_SHARE` 47.43%, `SYNDICATE_NCAAB_HALF_SPLIT`) and the end-game mechanisms
+   (`SYNDICATE_NCAAB_LIVE_MECHANISMS`) are exactly these shapes, and **production already runs both** on
+   live-odds-worker (re-measured 2026-11-08, below). With them on, the college re-sim's h1 is +2.15 at the tip
+   (the line +5.11), and its full total is -2.67 at minute 38 (the line -5.02). What is left is the second half:
+   h2 -2.02 at the tip and -3.46 at minute 30.
 4. **The old bars are already beaten by trivial baselines.** The old NCAAB app's quoted full-game total MAE was
    25.97 / 16.75 / 10.64 / 4.67 at minute 10 / 20 / 30 / 38. Its own definition (`proj_pace`, reproduced here as
    `naive_pace`) scores 21.02 / 13.60 / 9.20 / 5.21 on its window (2026-02-01..02-12, 522 games, 41,238 snapshots
@@ -70,18 +73,51 @@ variant). On main as `4264deceb`..`c7ba7a01c`. Outputs in WSL `~/bball_iv/runs/<
    `naive_pace` to rounding on every league, so it is not an independent baseline. The pace / efficiency split only
    matters once one side is pooled (`pooled_pace`, `pooled_efficiency`).
 
-## The college re-sim — NCAAB 2025-26 regular season, 282 paired games (`ncaab2026_resim`)
+## The college re-sim — NCAAB 2025-26 regular season, 282 paired games, production's switches ON (`ncaab2026_resim_prod`)
 
-A seeded sample of 400 games from all phases. Refused before the re-sim, by name:
-- 43 with no team prior (season start);
-- 48 where a team had < 5 prior games;
-- 1 `pbp_final_mismatch`.
+`[re-run 2026-11-08 00:06-00:49Z (6:06-6:49 PM CST 11-07), lane ncaab-interval-resim-prod-switches, code 8c1378e9a]`
 
-Re-simmed: 285 regular-season games, 282 of them with a close and therefore paired against the line. Tournaments:
-16 conference and 7 NCAA tournament games, reported apart in `report.rescored.md` and too thin to read.
+**Why this section was re-run.** Its first version (`ncaab2026_resim`, code `acdff2fee`) replayed the college
+engine with all three of production's college switches OFF. live-odds-worker launches the college pregame sims
+and runs the NCAAB live re-sim, and it runs with all three:
+- `SYNDICATE_NCAAB_HALF_SPLIT` on;
+- `SYNDICATE_NCAAB_EXACT_TARGET` on;
+- `SYNDICATE_NCAAB_LIVE_MECHANISMS` set, with four fields: `endgame_extend_possessions`,
+  `endgame_foul_max_deficit`, `endgame_foul_p_by_deficit`, `endgame_foul_window_s`.
 
-**Paired gate vs `pregame_rate`** (mean |error| difference, negative = the re-sim is better, ± 1.96
-game-clustered SE, 282 games):
+They sit in `local_production.env` under a role prefix (`LIVE_ODDS_WORKER__<key>`), and the first reading grepped
+the file for the plain names. refresh-worker and web carry none of the three.
+
+The re-run copied the three keys from live-odds-worker's `/proc/<pid>/environ` into the replay env. The values
+were never printed. Everything else matches the first run:
+- the same 400-game sample and seed, and the same walk-forward priors;
+- no sim-path code change between the two runs, or against the fleet's `79c8aac12`;
+- the fleet's newer `af4244afd` runs the re-sim draws in 2 worker processes, but it calls the same
+  `resim_live_game` with the same seed.
+
+**Proof the switches reached the engine.** The provenance is read off each game's engine inputs, not off the env
+(`report.md`, `engine_provenance`). All 308 re-simmed games (285 regular season, 23 tournament) carry:
+- `halfSplit`: the `quarters` targets are set;
+- `exactTarget`: the bound engine's `exact_target_calibration`;
+- three cfg fields off their defaults: `endgame_extend_possessions`, `endgame_foul_p_by_deficit`,
+  `endgame_foul_window_s`.
+
+The fourth configured field, `endgame_foul_max_deficit`, carries its default value, so it changes nothing.
+Refusals are as in the first run: 91 `no_walk_forward_inputs` (43 games with no team prior, 48 with a team on
+fewer than 5 prior games) and 1 `pbp_final_mismatch`.
+
+**Paired gate vs `pregame_rate`, switches ON.** The mean |error| difference; negative means the re-sim is better.
+± is 1.96 game-clustered SE, over 282 games.
+
+| segment | 0m | 10m | 20m | 30m | 38m |
+|---|---|---|---|---|---|
+| full total | +0.23 ± 0.45 n.s. | -0.41 ± 0.48 n.s. | **-0.97 ± 0.57 better** | **-1.22 ± 0.40 better** | **-0.98 ± 0.33 better** |
+| h1 total | **-0.93 ± 0.41 better** | -0.01 ± 0.23 n.s. | -- | -- | -- |
+| h2 total | **-0.94 ± 0.54 better** | **-0.89 ± 0.56 better** | **-0.97 ± 0.57 better** | **-1.22 ± 0.40 better** | **-0.98 ± 0.33 better** |
+| full margin, raw | +0.13 ± 0.34 n.s. | +0.18 ± 0.30 n.s. | +0.06 ± 0.20 n.s. | +0.04 ± 0.14 n.s. | +0.10 ± 0.12 n.s. |
+| full margin, anchored (production) | +0.00 (= the close) | **+0.24 ± 0.20 worse** | +0.11 ± 0.15 n.s. | +0.03 ± 0.13 n.s. | +0.10 ± 0.12 n.s. |
+
+The same gate with the switches OFF, as first published:
 
 | segment | 0m | 10m | 20m | 30m | 38m |
 |---|---|---|---|---|---|
@@ -89,38 +125,66 @@ game-clustered SE, 282 games):
 | h1 total | **+1.62 ± 0.36 worse** | **+0.56 ± 0.21 worse** | -- | -- | -- |
 | h2 total | **-0.83 ± 0.42 better** | **-0.74 ± 0.43 better** | **-0.78 ± 0.45 better** | **-0.88 ± 0.26 better** | **-0.38 ± 0.15 better** |
 | full margin, raw | **+0.49 ± 0.40 worse** | +0.31 ± 0.32 n.s. | **+0.27 ± 0.22 worse** | +0.04 ± 0.14 n.s. | +0.02 ± 0.09 n.s. |
-| full margin, anchored (production) | +0.00 (= the close) | +0.06 ± 0.20 n.s. | +0.13 ± 0.14 n.s. | +0.00 ± 0.12 n.s. | +0.02 ± 0.09 n.s. |
+| full margin, anchored | +0.00 (= the close) | +0.06 ± 0.20 n.s. | +0.13 ± 0.14 n.s. | +0.00 ± 0.12 n.s. | +0.02 ± 0.09 n.s. |
 
-MAE (bias) of the re-sim:
+**ON vs OFF, paired by game.** Negative means the switches help. 285 games; the anchored margin is on 282.
 
 | segment | 0m | 10m | 20m | 30m | 38m |
 |---|---|---|---|---|---|
-| full total | 13.92 (+5.14) | 11.86 (-0.09) | 10.92 (-3.19) | 8.80 (-4.80) | 6.43 (-4.29) |
-| h1 total | 10.94 (+8.44) | 6.25 (+3.15) | -- | -- | -- |
-| h2 total | 10.86 (-3.30) | 10.95 (-3.23) | 10.92 (-3.19) | 8.80 (-4.80) | 6.43 (-4.29) |
+| full total | -0.57 ± 0.60 n.s. | +0.16 ± 0.29 n.s. | -0.20 ± 0.22 n.s. | **-0.35 ± 0.20 better** | **-0.61 ± 0.23 better** |
+| h1 total | **-2.60 ± 0.63 better** | **-0.60 ± 0.37 better** | -- | -- | -- |
+| h2 total | -0.12 ± 0.23 n.s. | -0.17 ± 0.23 n.s. | -0.20 ± 0.22 n.s. | **-0.35 ± 0.20 better** | **-0.61 ± 0.23 better** |
+| full margin, raw | **-0.34 ± 0.28 better** | -0.14 ± 0.23 n.s. | **-0.21 ± 0.16 better** | +0.00 ± 0.13 n.s. | +0.10 ± 0.10 n.s. |
+| full margin, anchored | +0.00 | +0.18 ± 0.21 n.s. | -0.02 ± 0.15 n.s. | +0.03 ± 0.12 n.s. | +0.07 ± 0.09 n.s. |
 
-The line on the same population, full-game total: 12.95 (-1.21) / 12.09 (-5.23) / 11.29 (-6.32) / 9.31 (-6.56) /
-6.51 (-5.02), over 348 games. This sample's games score higher than the season's (-5 to -6.6 bias against
--4.2 to -5.3 on all 5,278).
+**MAE (bias).** Over 285 re-sim games; the line is over 348 games of the same sample.
 
-**What it says.**
-- The college engine already carries part of the SHAPE that the line's even split misses. Its second half is
-  heavier, so it beats the line on h2 and on the in-game full total from minute 20.
-- Its FIRST half is mis-shaped: +8.4 high at the tip against the line's +5.1. That is the half split
-  (`H1_SHARE` 47.43%, `SYNDICATE_NCAAB_HALF_SPLIT`, default off and absent on the fleet). It is Phase 2's first
-  candidate, with a pre-registered gate of "h1 total improves; h2 / full do not regress".
-- Its end-game deficit remains: -4.3 at minute 38, the default-off end-game fouling mechanisms
-  (`SYNDICATE_NCAAB_LIVE_MECHANISMS`).
-- The anchored margin (what production serves) ties the line everywhere. The raw margin loses at the tip.
+| segment | 0m | 10m | 20m | 30m | 38m |
+|---|---|---|---|---|---|
+| full total, switches ON | 13.35 (+0.13) | 12.02 (-1.99) | 10.72 (-1.80) | 8.45 (-3.46) | 5.82 (-2.67) |
+| full total, switches OFF | 13.92 (+5.14) | 11.86 (-0.09) | 10.92 (-3.19) | 8.80 (-4.80) | 6.43 (-4.29) |
+| full total, the line | 12.95 (-1.21) | 12.09 (-5.23) | 11.29 (-6.32) | 9.31 (-6.56) | 6.51 (-5.02) |
+| h1 total, switches ON | 8.34 (+2.15) | 5.65 (-0.15) | -- | -- | -- |
+| h1 total, switches OFF | 10.94 (+8.44) | 6.25 (+3.15) | -- | -- | -- |
+| h1 total, the line | 9.12 (+5.11) | 5.46 (+1.08) | -- | -- | -- |
+| h2 total, switches ON | 10.74 (-2.02) | 10.78 (-1.85) | 10.72 (-1.80) | 8.45 (-3.46) | 5.82 (-2.67) |
+| h2 total, switches OFF | 10.86 (-3.30) | 10.95 (-3.23) | 10.92 (-3.19) | 8.80 (-4.80) | 6.43 (-4.29) |
+| h2 total, the line | 11.29 (-6.32) | 11.29 (-6.32) | 11.29 (-6.32) | 9.31 (-6.56) | 6.51 (-5.02) |
+| full margin raw, switches ON | 9.30 (-0.22) | 8.19 (-0.23) | 7.30 (-0.50) | 5.29 (+0.06) | 2.82 (+0.01) |
+| full margin raw, switches OFF | 9.64 (-1.13) | 8.33 (-0.84) | 7.50 (-1.17) | 5.29 (-0.29) | 2.73 (-0.07) |
+| full margin, the line | 9.06 (-0.48) | 7.86 (-0.28) | 7.28 (-0.44) | 5.31 (-0.11) | 2.69 (+0.03) |
 
-**Today's fleet config IS what was replayed** (`/home/amyn/syndicate-prod/local_production.env`, read 2026-11-07,
-allowlisted flags only):
-- ABSENT, so the code defaults apply: `SYNDICATE_NCAAB_HALF_SPLIT` (off), `SYNDICATE_NCAAB_LIVE_MECHANISMS` (off),
-  `SYNDICATE_NCAAB_EXACT_TARGET` (off), `SYNDICATE_COLLEGE_PRIOR_CALIBRATION` (on), `SYNDICATE_COLLEGE_LIVE_MARGIN_ANCHOR`
-  (on), `SYNDICATE_NBA_LIVE_MECHANISMS` (off), `SYNDICATE_NBA_TEAM_INPUTS` (on), `SYNDICATE_COLLEGE_LIVE_SEGMENT_PRICING` (off).
-- `SYNDICATE_NBA_LIVE_RESIM_SIMS=100`, the same as here.
-- NCAAB production runs the default 200 sims; this replay ran 100, so its re-sim errors carry a little more Monte
-  Carlo noise than production's.
+This sample's games score higher than the season's: the line's bias here is -5 to -6.6, against -4.2 to -5.3 on
+all 5,278 games. Read each bias against the line's bias on the same games. Tournaments (16 conference, 7 NCAA) are
+reported apart in the run's `report.md` and are too thin to read.
+
+**What it says.** This is production's engine as it runs, so these rows are decision-grade.
+- **It beats the line on the totals.** It is better on h2 at every checkpoint, on the full total from minute 20
+  (-0.97 / -1.22 / -0.98), and on h1 at the tip (-0.93 ± 0.41). It ties the line on h1 at 10m and on the full
+  total at 0m and 10m.
+- **Production's first half is not mis-shaped.** The first run's +8.44 at the tip was the half split switched off.
+  With it on, the bias is +2.15, against the line's +5.11 on the same games, and the switches cut h1 tip MAE by
+  2.60 ± 0.63. That matches production's +1.27 against 147 real 2026-27 finals 11-03..11-07, which is a different
+  season and population.
+- **The end-game deficit shrinks but is not gone.** At minute 38 the full total runs -2.67 with the mechanisms
+  and -4.29 without them (|err| better by 0.61 ± 0.23). The line runs -5.02 on the same games, so about 2.7 points
+  of end-game scoring (fouling and overtime) is still not projected.
+- **The remaining shape error is the in-game second half:** h2 -2.02 at the tip, -1.80 at 20m and -3.46 at 30m.
+  Phase 2's NCAAB candidates should aim there.
+- **Margin.** The raw margin now ties the line everywhere; the switches removed its losses at the tip and at 20m.
+  The anchored margin, which is what production serves, also ties except at 10m, where it is worse by
+  +0.24 ± 0.20. That is one marginal cell among the 22 gated here, so it may be chance until it replicates.
+- **Noise.** This replay ran 100 sims against production's default 200, so its re-sim errors carry a little more
+  Monte Carlo noise than production's.
+
+**The fleet config that was replayed** (corrected 2026-11-08; read from each process's environ, key names and
+booleans only):
+- live-odds-worker runs the half split, the exact target and the end-game mechanisms (above).
+- Both workers lack these keys, so the code defaults apply: `SYNDICATE_COLLEGE_PRIOR_CALIBRATION` (on),
+  `SYNDICATE_COLLEGE_LIVE_MARGIN_ANCHOR` (on), `SYNDICATE_NBA_LIVE_MECHANISMS` (off), `SYNDICATE_NBA_TEAM_INPUTS`
+  (on) and `SYNDICATE_COLLEGE_LIVE_SEGMENT_PRICING` (off).
+- `SYNDICATE_NBA_LIVE_RESIM` and `SYNDICATE_NBA_LIVE_RESIM_SIMS` are identical on both workers, and
+  `_SIMS=100` is the same as this replay. So the NBA rows stand as first written.
 
 ## For Phase 2: how to use this
 
@@ -130,7 +194,12 @@ allowlisted flags only):
   1.96 game-clustered SE and regresses no other segment.
 - Give each run its own `--out`. Results resume by game id, so a new projector added to an existing run's
   `--out` would skip every finished game. The same `--sample` / `--seed` picks the same games. A re-sim costs
-  ~14 s/game at 100 sims and nice 19.
+  ~14 s/game at 100 sims and nice 19, or ~17 s/game with production's college switches on.
+- **A college re-sim run must carry live-odds-worker's three switches in its env.** Copy
+  `SYNDICATE_NCAAB_HALF_SPLIT`, `_EXACT_TARGET` and `_LIVE_MECHANISMS` from that process's `/proc/<pid>/environ`,
+  never by printing them. Before reading any college row, check `report.md`: "College engine switches in the
+  replay env", and the per-game `engine_provenance` (read off the engine inputs). A run without them replays an
+  engine production does not run. The NCAAB baseline for Phase 2 is `ncaab2026_resim_prod`.
 
 ## Runs and coverage
 
@@ -140,7 +209,8 @@ Every run prints per-family coverage first; the numbers rest on the intersection
 |---|---|---|---|---|
 | `nba2027_resim` | NBA 2026-27 regular | games 17 dates, pbp 17, engine inputs 24, smart sim 32 -> **17 dates (10-20..11-06)** | **132** of 132 with persisted pregame inputs | all + `resim` + `nba_tick` |
 | `ncaab2026_all` | NCAAB 2025-26, all phases | corpus 147, games 147, pbp 147, player box 166 -> **147 dates (2025-11-03..2026-04-06)** | **6,257** (12 `pbp_final_mismatch`); line on 5,278 regular | arithmetic, every 30 s |
-| `ncaab2026_resim` | NCAAB 2025-26, seeded sample 400 (all phases interleaved) | as above | see the college table | all + `resim` / `resim_anchored` |
+| `ncaab2026_resim` | NCAAB 2025-26, seeded sample 400 (all phases interleaved) | as above | 399; re-sim on 285 regular | all + `resim` / `resim_anchored`, college switches OFF (superseded) |
+| `ncaab2026_resim_prod` | the same 400 games and seed | as above | 399; re-sim on 285 regular (282 paired) | all + `resim` / `resim_anchored`, **live-odds-worker's three college switches ON** (the college table) |
 | `nba2026_all` | NBA 2025-26, all phases | games 229, pbp 229 -> **229 dates** | **1,391** (1,230 regular) | arithmetic; no line or pregame inputs that season |
 | `wnba2026_all` | WNBA 2026, all phases | games 136, pbp 136 -> **136 dates** | **373** (318 regular for `league_rate`) | arithmetic; a line on 15 games, pregame inputs on 6 (so the WNBA re-sim is not read) |
 
@@ -149,6 +219,9 @@ Code per run (each run copied the code to WSL before it started, with the commit
 - The two re-sim runs are at main's `acdff2fee` (`30418d0d0` before the rebase). That predates
   `interval_projection`'s tip refusal (`c7ba7a01c`), so they were re-scored without that projector's tip rows
   (`report.rescored.*`); NBA 2026-27 had 0 such rows.
+- `ncaab2026_resim_prod` is at main's `8c1378e9a` (`f315df356` before the rebase onto main, and the SHA its report
+  stamps; the content is identical): `c7ba7a01c` plus the per-game switch provenance. It is not re-scored,
+  because that code already refuses the tip.
 
 The rebase changed only the SHAs: the content is identical.
 
@@ -252,7 +325,9 @@ priors from player box rows < D (`compute_priors`, the producer's function), and
 calibration REFIT for each date (`prior_calibration.fit` over D-21..D-1 against the close, >= 60 closes, else finals
 >= 80), applied exactly as `live_team_model._calibrated` (pinned by a test). Games where either team has < 5 prior
 games are not re-simmed (the P4 backtest's rule). Run at the tip + the four checkpoints; the t=0 projection reuses
-the anchor's tip sim (same seed).
+the anchor's tip sim (same seed). Production's college switches are read from the replay process's env by
+production's own readers (`build_engine_inputs`, `ncaab_engine`). The decision-grade run (`ncaab2026_resim_prod`)
+carried live-odds-worker's three; the first run carried none.
 
 **The re-sim, NBA.** `nba/live_resim.load_engine_inputs` (production's persisted pregame kwargs) + `resim_live_game`
 through `_engine_for_league_local` with the pregame's league-params overrides — the same engine object production
@@ -265,9 +340,9 @@ floor (`MIN_SIMS`). Measured cost at nice 19 on the shared host: an NCAAB 100-si
 the half, 2.5 s at H2 10:00 (~14 s per game over tip + 4 checkpoints); every-30 s re-sims would be ~400 s per game.
 
 **Not done here (named, not hidden).** Shot mix is an extension point (`ReplayState.counts` carries 3PA/FGA and
-makes per side), not a registered variant. `resim_mech` (the default-off end-game mechanisms) is wired and tested
-(`--projectors resim_mech --mechanisms '<json>'`) but not run: which mechanism values to test is Phase 2's
-pre-registration, not this harness's. WNCAAB has no play-by-play store on the fleet (`build_basketball_rotation_stints.py`
+makes per side), not a registered variant. `resim_mech` (mechanisms set on top of the env's, `--mechanisms '<json>'`)
+is wired and tested but not run. Production's own end-game mechanisms are already in `ncaab2026_resim_prod` through
+the env, and which further values to test is Phase 2's pre-registration, not this harness's. WNCAAB has no play-by-play store on the fleet (`build_basketball_rotation_stints.py`
 does not run for it), so it is not replayed.
 
 ## CORRECTION 23:50Z 11-07 (5:50 PM CST) -- the NCAAB re-sim scored here ran with production's switches OFF
@@ -278,3 +353,26 @@ does not run for it), so it is not replayed.
 - **Which statements stand:**
   - The re-sim h1 / h2 / end-game statements above describe the engine with the switches off. They need a re-run with live-odds-worker's switches before they decide anything.
   - The `pregame_rate` bar, the NBA rows and the pace / efficiency results do not depend on these switches.
+
+## RE-RUN DONE 00:49Z 11-08 (6:49 PM CST 11-07) -- the college rows above now carry production's switches
+
+`[lane ncaab-interval-resim-prod-switches, session c2fd17f8, code 8c1378e9a, run ncaab2026_resim_prod]`
+
+- **The correction checks out.** Read from each process's environ (booleans and field names only):
+  - live-odds-worker has the half split and the exact target truthy, and the mechanisms parse (through
+    production's `live_mechanisms_from_env`) to 4 fields;
+  - refresh-worker and web have none of the three;
+  - the keys come from `local_production.env` as `LIVE_ODDS_WORKER__<key>`.
+- **The re-run:** the same 400 games and seed, with the three keys copied into the replay env. All 308
+  re-simmed games carry `halfSplit`, `exactTarget` and the end-game cfg fields, read off their engine inputs.
+- **Corrected rows, 282 paired regular-season games** (the full tables are in the college section above):
+  - h1 tip bias +2.15 (was +8.44). Against the line: -0.93 ± 0.41 better (was +1.62 worse).
+  - Full total at the tip +0.13 (was +5.14). Against the line: n.s. at 0m / 10m, better from minute 20
+    (-0.97 / -1.22 / -0.98).
+  - h2: better than the line at every checkpoint (-0.89 to -1.22).
+  - Minute 38: -2.67 (was -4.29; the line -5.02). The switches improve it by 0.61 ± 0.23.
+  - The anchored margin ties the line except at 10m (+0.24 ± 0.20 worse, one marginal cell of 22).
+- **What stands unchanged:** the `pregame_rate` bar, the NBA rows (no NBA switch differs between the workers), and
+  the pace / efficiency results.
+- **Superseded:** "+8.4 high at the tip" and "the half split is Phase 2's first candidate" (production runs it).
+  The "~4 low at minute 38" applies to the arithmetic projectors only; the production re-sim is -2.7 low.

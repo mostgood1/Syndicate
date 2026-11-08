@@ -14,23 +14,24 @@
   - **D4** — `chmod 600` on `render_env/live-odds-worker.json`, which is world-readable 0644 on the fleet host.
 - **Follow-up:** fast-forward the primary tree. It is why sessions still see preflight read Render.
 
-### `#765` — **BASKETBALL INTERVAL REPLAY HARNESS: BUILT, ON MAIN, RUN ON THE FLEET. The bar for Phase 2 is the pregame line spread over the time left (`pregame_rate`), not the engine. NBA's live re-sim beats it nowhere; NCAAB's beats it on h2 and the in-game full total but loses on h1; observed game pace loses everywhere** — 2026-11-07, lane `basketball-interval-backtest` (session c2fd17f8; Phase 2 step 1 of the user's interval-projection plan)
+### `#765` — **BASKETBALL INTERVAL REPLAY HARNESS: BUILT, ON MAIN, RUN ON THE FLEET. The bar for Phase 2 is the pregame line spread over the time left (`pregame_rate`), not the engine. NBA's live re-sim beats it nowhere. NCAAB's, run with production's switches, beats it on h1 at the tip, on h2 and on the in-game full total. Observed game pace loses everywhere** — 2026-11-07, lane `basketball-interval-backtest` (session c2fd17f8; Phase 2 step 1 of the user's interval-projection plan)
 - **Built (on main `4264deceb`..`c7ba7a01c`, new files only, read-only, no deploy):**
   - `syndicate/features/shared/basketball_interval_backtest.py`: state every 30 s from the `pbp_events` prefix with the production builders; projectors; scoring; `paired_delta`, the game-clustered ship gate.
   - `scripts/backtest_basketball_intervals.py`: fleet loaders, per-family coverage first, walk-forward NCAAB priors plus a daily prior-calibration refit.
-  - `tests/test_basketball_interval_backtest.py`: 22 tests, an off != on test per variant.
+  - `tests/test_basketball_interval_backtest.py`: 24 tests, an off != on test per variant, the college env switches included (`8c1378e9a`).
 - **Findings:** `.syndicate/findings_2026-11-07_basketball_interval_backtest.md`. Outputs in WSL `~/bball_iv/runs/`.
 - **Measured (2026-11-07, fleet data root read-only):**
   - NBA 2026-27 regular, 132 games, 17 dates: the re-sim is n.s. or WORSE than `pregame_rate` in every segment x checkpoint (full total +0.93 ± 0.67 at 12m). The tick is worse in 9 of 23 cells.
-  - NCAAB 2025-26 regular, 282 paired games: the re-sim is BETTER on h2 at every checkpoint and on the full total from minute 20 (-0.88 ± 0.26 at 30m); WORSE on h1 (+1.62 at the tip, its pregame h1 runs +8.4 high); anchored margin ties the line.
+  - NCAAB 2025-26 regular, 282 paired games, **with live-odds-worker's three college switches** (re-run `ncaab2026_resim_prod`, 2026-11-08): the re-sim is BETTER on h1 at the tip (-0.93 ± 0.41; bias +2.15), on h2 at every checkpoint, and on the full total from minute 20 (-0.97 / -1.22 / -0.98 at 20 / 30 / 38m). The full total is n.s. at 0m / 10m. The anchored margin ties the line except at 10m (+0.24 ± 0.20 worse, one marginal cell of 22). The first run's "WORSE on h1, +8.4 high" was the switches OFF.
   - 5,000+ NCAAB games: pooled game pace / efficiency / rate lose to the line at minutes 10-38 (replicates #535).
   - Shape biases: the line's even split puts h1 +4.35 / h2 -5.01; every projector is ~4 low at minute 38.
   - The old bars (NCAAB 25.97 / 16.75 / 10.64 / 4.67; NBA pregame quarter 8.53) are beaten by the line alone.
   - Fidelity: production's recorded NBA live re-sim and the replay have the same MAE on the same games (14.71 vs 14.61 at 12m ... 5.12 vs 5.18 at 45.6m).
 - **Next (Phase 2, each against this harness):**
-  - the NCAAB half split (`SYNDICATE_NCAAB_HALF_SPLIT`; gate: h1 better, h2 / full do not regress);
-  - the end-game mechanisms (`resim_mech --mechanisms`);
-  - then pace only if pooled much harder than k=60 possessions.
+  - NCAAB: the baseline is `ncaab2026_resim_prod`. Production already runs the half split and the end-game mechanisms. What is left is the in-game second half (h2 -2.02 at the tip, -3.46 at 30m) and minute 38 (-2.67, against the line's -5.02).
+  - Every college run must carry live-odds-worker's three switches; check `college_switches` and `engine_provenance` in `report.md`.
+  - Further end-game values go through `resim_mech --mechanisms`, set on top of the env's.
+  - Pace, only if pooled much harder than k=60 possessions.
 - **Not covered:**
   - WNCAAB: no pbp store on the fleet; `build_basketball_rotation_stints.py` does not run for it.
   - The WNBA re-sim: pregame inputs persisted for 6 of 373 games.
@@ -40,6 +41,13 @@
 - **CORRECTION `[2026-11-07 23:50Z]` (lane `wncaab-module`, user "Yes, do it here" on fixing the men's first-half bias): the NCAAB re-sim this harness scored is NOT production's engine.** live-odds-worker (pid 757868, which launches the college pregame sims and runs the live re-sim) HAS `SYNDICATE_NCAAB_HALF_SPLIT` truthy, `SYNDICATE_NCAAB_EXACT_TARGET` truthy and a non-empty `SYNDICATE_NCAAB_LIVE_MECHANISMS`. refresh-worker has none of the three, so the findings' "absent on the fleet" read the wrong process. Every production NCAAB pregame sim 11-03..11-07 carries `halfSplit: True` (177 of 177).
   - **Production, measured against 147 real finals 11-03..11-07 (pregame sim vs ESPN linescores):** h1 projected minus actual **+1.27** (median +1.54, sd 10.29, so +-0.85 SE: not significant), h2 incl. OT -0.78, full +0.50; projected h1 share 0.4761 vs actual 0.4695. The replay's "+8.4 high at the tip" is the half split switched OFF, not a production defect.
   - **So:** do not "fix" h1 by switching the split on, because it is on. Re-run the NCAAB re-sim variant with live-odds-worker's three engine switches before any Phase 2 NCAAB decision. That includes the "~4 low at minute 38" read, because production's end-game mechanisms are configured. NBA and pregame_rate rows are unaffected.
+- **RE-RUN DONE `[2026-11-08 00:49Z (6:49 PM CST 11-07)]` (lane `ncaab-interval-resim-prod-switches`, session c2fd17f8, code `8c1378e9a`):** the correction is confirmed, and the NCAAB rows above are now the production engine.
+  - Same 400 games and seed, with live-odds-worker's three keys copied into the replay env (never printed).
+  - All 308 re-simmed games carry `halfSplit`, `exactTarget` and 3 end-game cfg fields off their defaults, read off the engine inputs. The 4th configured field, `endgame_foul_max_deficit`, equals its default.
+  - Switches ON vs OFF, paired on 285 games: h1 at the tip -2.60 ± 0.63 better; minute 38 -0.61 ± 0.23 better.
+  - Why the first read missed them: the keys sit in `local_production.env` as `LIVE_ODDS_WORKER__<key>`.
+  - `8c1378e9a` makes every run record which switches it replayed (`college_switches`, per-game `engine_provenance`), and adds an off != on test through production's `build_engine_inputs`.
+  - Full tables: the findings' college section.
 ### `#764` — **KALSHI TOTALS THAT NAME NO GAME PRICE ANOTHER GAME'S ROW: 26 of 26 measured sides wrong-game (men's and women's college basketball, college football). Polymarket is clean in every sport. NOT FIXED** — 2026-11-06, session e32fef1a (user "Yes, measure it here")
 - **UPDATE 2026-11-07 23:49Z (5:49 PM CST): REVERSED-ORDER FIX LOADED AND VERIFIED** (lane `kalshi-fanin-reversed-orientation`, CLOSED).
   - **Load:** `79c8aac12`, fleet ff + refresh-worker TERM 23:41:12Z.
