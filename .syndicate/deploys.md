@@ -57126,3 +57126,34 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - **`cross_game_rejected` 4 -> 6:** consistent with newly named quotes being refused on another game's row instead of as unnamed. Not traced per quote.
   - **Served `/api/board/book-grid`** shows sportsbook bests and the feed's own exchange-book cells, not fan-in quotes (as at 19:58Z). It is not this change's surface, so no served-page claim is made.
 - **Revert:** `_KALSHI_FANIN_REVERSED_ORDER_ENABLED = False` (or revert `79c8aac12`) on main, then ff + refresh-worker TERM. With it off, the quotes are unnamed again and `#764` refuses them.
+
+## 2026-11-07 23:56:57Z (5:56 PM CST) -- FLEET ff 79c8aac12 -> af4244afd: college live re-sim WORKERS=2 (`#762`, lane `ncaab-live-resim-capacity`) -- **LOADS at live-odds-worker's own uptime recycle (~03:26Z, 9:26 PM CST); no TERM of mine; verify OWED**
+- **User, in this lane's chat:** "Yes, load workers=2", answering "Load re-sim workers=2 on the fleet between slates?". So the load rides the worker's own recycle and adds no restart.
+- **What loads:** `eb9afa26a` (pool + carry bound) and `af4244afd` (the LOOP defaults to 2 workers; direct callers stay at 0).
+  - The carry bound stays `shadow` by default: it counts `carry_expired` and changes no row.
+  - Both are read only in live-odds-worker, where `SYNDICATE_NCAAB_LIVE_RESIM` starts the college loops.
+- **Range `79c8aac12..af4244afd`, runtime:** this lane's 4 files plus `shared/live_projection_join.py` (`7d72f8e9d`, the accent fold).
+  - The accent fold was approved to "Ride the next restart" (lane `nba-live-proj-actuals`, `73be62c71`).
+  - It loads in refresh-worker at that worker's next restart, which is not mine.
+  - The rest of the range is ledger and tests.
+- **Gates:**
+  - Claim live-odds-worker 23:55:39Z (replaced `exit-state-size`'s claim, expired at 45.3 min). Preflight `--target fleet --target-commit af4244afd --expect fleet_checkout_head=af4244af --expect ncaab_tick_workers=2_after_uptime_recycle --baseline fleet_checkout_head=79c8aac1 --baseline ncaab_tick_workers=absent --baseline-read-at 2026-11-07T23:55:18Z`: **HOLD**, 6 odds jobs (a TERM would kill them; an ff kills nothing).
+  - Claim web 23:56:26Z, used as the receipt for an ff only. Preflight web, same SHA: **CLEAR rc=0** 23:56:38Z. There was no `reload-web`.
+  - Deploy: `git merge --ff-only af4244afd` 23:56:57Z. Both claims released 23:57:53Z.
+- **Fleet smoke test before the load** (fleet python, checkout `af4244afd`, nice 19, a separate process):
+  - one child `python -m syndicate.features.shared.live_resim_workers`: 100 draws at halftime, 5.24 s wall / 5.23 s CPU;
+  - child VmRSS 106 MB; a past-deadline job came back `budget_exhausted 0/100`;
+  - the child exited when the pool closed; `loop_resim_workers()` = 2, `resim_workers()` = 0.
+- **Baseline (fleet, 11-07 17:02-22:55Z):** 29 of 81 NCAAB ticks with live games ran to the 240 s budget, and 208 of 527 live game-ticks (39.5%) were carried or not reached.
+  - Median carried per tick: 6 at 7-12 live, 9 at 13-20 live.
+  - Last tick before the ff: `23:50:00Z live=13 resimmed=9 carried_forward=2 elapsed_s=241.2`, no `workers` field.
+- **expect:**
+  - After the recycle: `NCAAB_LIVE_RESIM_LOOP_STARTED ... workers=2`, and 2 `COLLEGE_LIVE_RESIM_WORKER_STARTED` lines, children at nice 5.
+  - Ticks print `workers=2 worker_errors=0`, with `resim_cpu_s / resim_wall_s` ~0.9-1.0 (thread: 0.12-0.18).
+  - On 7-20 live games: `carried_forward` 0-2 (was median 6 / 9), `elapsed_s` ~70-240 (was 240).
+  - No `WORKER_ERROR`, no `POOL_DISABLED`, no `TICK_ERROR`.
+- **verify:** the first 6 `NCAAB_LIVE_RESIM_TICK` lines after the recycle: `workers=2`, `carried_forward`, `elapsed_s`, `resim_cpu_s / resim_wall_s`, and the 2 children's RSS and nice from `/proc`. Watcher: `C:/tmp/ncaabcap/verify_recycle.sh`.
+- **Revert:**
+  - Quick, env: `SYNDICATE_COLLEGE_LIVE_RESIM_WORKERS=0`. It needs a full fleet down/up, because a respawn reuses the role's env.
+  - Code: set `LOOP_DEFAULT_WORKERS = 0` (or revert `af4244afd`), then ff + live-odds-worker TERM.
+  - Self-protection: the pool disables itself after 3 failed jobs in a row, and the loop then runs in the thread as before.
