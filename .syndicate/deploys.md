@@ -57487,3 +57487,19 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
     - By construction such a row has no `liveModelProbOver` (tested), so `live_aware` cannot be set.
     - Its `edge` / `ev_pct`, if served, would be the cross-book no-vig edge, the same field DD/TD rows carry (deploys 2026-11-07 22:49:17Z).
   - Accent check: LAL@DET from 23:00Z (Luka Dončić); its watcher is running.
+
+## 2026-11-08 22:23:20Z (4:23 PM CST) -- VERIFY of `a3d72c82b` (`#762` (6)), the served safety check: **MET on a same-instant served pulled row** (lane `nba-live-proj-actuals`)
+- **Test:** a served live NBA prop row in a non-DD/TD market with Live proj. and no `live_aware`. Only a row the join showed display-only at build time looks like that, so the test needs no cross-instant join.
+- **Watcher reads:**
+  - 22:16:40Z: 86 rows, 86 with both, 0 such rows.
+  - **22:22:50Z: 43 rows, 43 with both, 1 such row:** Tre Jones `player_points` 8.5 over (PHI@CHI).
+- **That row's fields:**
+  - Live proj. 7.46, actual 6.0. `live_model_probability` 0.38 is the display probability, restated to the row's side.
+  - **`live_aware` null, `model_edge_pct` null, `sim_view` "unpriced", `board_score_components.sim_component` null.**
+  - `edge` / `ev_pct` 0.24%: the cross-book no-vig price edge, the same field DD/TD rows carry (deploys 2026-11-07 22:49:17Z).
+  - `book_age_seconds` 297.8 and `board_lane` opportunity, so it was served just inside the gate's 300-s observation window: the case (6) was built for.
+- **Same line, previous build:** at 22:13:34Z its under side was served `live_aware` with a model edge. The line was posted at that build and pulled before this one, and this build stopped pricing it.
+- **Verdict:**
+  - The served safety check is MET, n=1.
+  - (6) is verified end to end: producer, join, served page.
+- **Still owed:** the Dončić accent check on LAL@DET (from 23:00Z); its watcher is running.
