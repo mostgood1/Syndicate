@@ -57454,3 +57454,36 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - Full-game rows reaching the quote checks: ~123-161 a build. Of those, 26-68% were refused as `quote_older_than_the_score_the_model_saw` (42-107).
 - **Not measured:** 15-20 and 35-40 live (11-08 peaked at 14 by 19:35Z), and host CPU under the evening peak.
 - **Carry bound:** still `shadow`, `carry_expired=0` throughout. Turning it `on` is NOT approved.
+
+## 2026-11-08 22:16:37Z (4:16 PM CST) -- VERIFY of `a3d72c82b` (`#762` (6) pulled-market NBA props, DISPLAY ONLY): **MECHANISM MET at producer and join; SERVED EFFECT SMALL BY CONSTRUCTION, 0 served so far**; the 11-07 gap reading CORRECTED; comments fixed on main `bc05afbdc` (lane `nba-live-proj-actuals`)
+- **Producer loaded at its own recycle**, with no restart by this lane: live-odds-worker pid 1665718 started 21:29:03Z, `NBA_LIVE_RESIM_LOOP_STARTED` 21:29:05.326Z.
+- **Producer readings (PHI@CHI, the one live game):**
+  - 21:29:39Z: the first snapshot with `livePropsCoverage.remember_lines=True`.
+  - 22:08:18Z snapshot: 689 prop rows. 179 are pulled (`quotePulled`, no `liveModelProbOver`), 428 priced. 350 lines remembered, 53 keys pulled.
+  - Ticks 22:05-22:10Z: `resimmed=1 carried=0 refusals={}`, bytes 138,382-138,983 (cap 6,000,000), elapsed 11-35 s.
+  - 0 tracebacks in live-odds-worker.log since 21:29Z (6,996 lines).
+- **Join readings (refresh-worker `LIVE_PROJECTION_JOIN sport=nba`):**
+  - 21:29:13Z, built before the producer's first new snapshot: considered 335, display_only 16, display_only_pulled 0, miss_market 15.
+  - 21:56:47Z: considered 239, projected 165, display_only 44, **display_only_pulled 31**, miss_market 10, miss_line_match 0.
+  - `MARKET_GONE_DROPPED`: nba 1 at 21:32Z, nba 0 at 22:02Z.
+- **Served board (`/api/intelligence/query`, `response.ranked_all`):**
+  - 22:05:56Z: 42 live NBA prop rows, 42 with Live proj. AND actual.
+  - 22:08:08Z: 43 of 43, all `live_aware`, book age 80-201 s.
+  - **0 served rows were pulled ones**, cross-referenced against the re-sim's 179 pulled (player, market, line).
+  - 22:13:34Z (the first watcher read): 3 served rows matched the re-sim's CURRENT pulled set. They were Caleb Wilson PRA 28.5 and Tre Jones points 8.5 and P+R 10.5. All 3 were `live_aware`, with a live model probability and a model edge.
+    - **They were posted when the board was built and pulled after it.** At 22:15:01Z the quote state last saw them 1,371 / 618 / 869 s before, and 0 of the 163 pulled lines had been seen within 300 s.
+    - So the join did not price a pulled line: that cross-reference compared two instants.
+    - The board serves a build-time edge until its next build (21:29Z -> 21:56Z today, 27 min). That is the existing build lag: `#761` (A) refreshes only Live proj. and actual at read time.
+    - LEAD, not followed: a served live edge outlives its pulled market by up to one build.
+- **Why, and the CORRECTION:**
+  - `opportunity_gate.evaluate` dead-lanes a live row whose quote has gone unobserved for 300 s (`live_quote_unobserved`, `LIVE_QUOTE_MAX_OBSERVED_AGE_SECONDS`). The shortlist takes the opportunity lane only (`layer2_board.py:3580`, `:3684`). A pulled line is, by construction, no longer observed.
+  - At 22:10:18Z the quote state (`read_quote_last_seen("nba", "2026-11-08")`, freshest book per player / market / line) held 151 of the 179 pulled rows. 146 were last seen over 300 s before (123 over 900 s); 5 within 300 s. Median 2,437 s.
+  - **So the 11-07 gap (1,926 of 14,478 live prop row-builds, 13.3%) counted JOIN row-builds on the grid.** Most were rows the served board never showed. The served gap on 11-07 was 16 of 123 rows at 22:40Z, all Jokic (the accent fold, `7d72f8e9d`; deploys 2026-11-07 22:49:17Z).
+  - Reading the 2026-11-08 05:41:43Z gap entry, and the comments in `a3d72c82b`, as a served-board gap was wrong. The comments said the board keeps the row (`market_gone`, 14-hour ceiling). They are corrected on main `bc05afbdc`, comment-only, with nothing to load.
+  - The gate dropping an unobserved live quote is correct and is left alone. (6) shows a live number for a pulled row only inside that 300-s window.
+  - The `miss_market` comparison with 11-07 rests on one build at a different game phase, so it is not claimed.
+- **Still owed:**
+  - **The safety check has NO SAME-INSTANT POPULATION yet.** It reads: 0 served pulled rows carry a model edge, `live_aware` or a model EV. A read-only watcher samples the served board every 6 min to 04:30Z 11-09. It prints any served live NBA prop row in a non-DD/TD market that has Live proj. but no `live_aware`. Only a row the join showed display-only at build time can look like that, so the test needs no cross-instant join.
+    - By construction such a row has no `liveModelProbOver` (tested), so `live_aware` cannot be set.
+    - Its `edge` / `ev_pct`, if served, would be the cross-book no-vig edge, the same field DD/TD rows carry (deploys 2026-11-07 22:49:17Z).
+  - Accent check: LAL@DET from 23:00Z (Luka Dončić); its watcher is running.
