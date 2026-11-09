@@ -952,6 +952,14 @@ death, never life — do not invert it.
 - Verification: fleet live-odds-worker log: LIVE_ENTRY result reason=below_inplay_min_ask on asks <0.55, and no in-game ledger fill below 0.55 after the restart
 - Blocked by: none
 
+### kalshi-five-char-codes — OPEN — opened 2026-11-09 — session e32fef1a-01e8-4afe-a284-01acd3728545
+- Goal: Kalshi club codes of 5 characters (UTRGV, MASSL) resolve in kalshi_catalogue.match_event_blob, for the fan-in and the order path alike: PVUTRGV names Prairie View @ UT Rio Grande Valley; on a fleet replay over every live Kalshi game event, every answer that was ok before is identical and each changed answer is read by eye
+- Files: syndicate/features/shared/kalshi_catalogue.py, tests/test_kalshi_five_char_codes.py (NEW)
+- Hypothesis: kalshi_catalogue._splits caps a club code at 4 characters, so a blob holding a 5-character code (UTRGV, MASSL) has no correct split and returns no_match whatever names Kalshi supplies (PVUTRGV-124, 11-07)
+- Falsification test: with 5-character splits allowed, PVUTRGV against the 11-07 ncaab board still returns no_match; or any event that resolved ok before changes its answer
+- Verification: off != on unit tests (matcher, order-path _resolve_event, fan-in naming); fleet replay old vs new over every live Kalshi game event and each board date held, every status change listed and read by eye; ncaab/wncaab fan-in A/B at one clock
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
