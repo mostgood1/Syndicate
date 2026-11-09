@@ -87,3 +87,82 @@ def test_an_explicit_artifact_root_keeps_its_precedence(nhl_env, monkeypatch, tm
     monkeypatch.setenv("SYNDICATE_ARTIFACT_ROOT_NHL", str(bundle))
     # None hands the loader its own default, which honours SYNDICATE_ARTIFACT_ROOT_NHL.
     assert LR._slate_features_root() is None
+
+
+# --- The names the snapshot publishes are the BOARD's names `[2026-11-09]` -------------------------
+#
+# `/v1/score` names clubs by `name.default`, the SHORT name ('Senators'); the board's rows and the
+# scoreboard say 'Ottawa Senators', and the game-line join compares full names lowercased. Measured on
+# the fleet 11-09: snapshot ('Rangers', 'Oilers') vs 107 served rows ('New York Rangers',
+# 'Edmonton Oilers') -- no live NHL lane could be indexed. These use the REAL row shape (short names).
+
+
+def _real_shape_row(away_short="Senators", home_short="Maple Leafs"):
+    row = _score_row()
+    row["awayTeam"] = dict(row["awayTeam"], name={"default": away_short}, abbrev="OTT")
+    row["homeTeam"] = dict(row["homeTeam"], name={"default": home_short}, abbrev="TOR")
+    return row
+
+
+def _write_scoreboard_named(nhl_root, home, away, date=DATE, pk=GAME_PK):
+    out = nhl_root / "data" / "odds" / "games" / f"date={date}"
+    out.mkdir(parents=True, exist_ok=True)
+    with (out / "scoreboard.csv").open("w", newline="", encoding="utf-8") as fh:
+        w = csv.DictWriter(fh, fieldnames=["gamePk", "gameDate", "home", "away", "home_abbr", "away_abbr", "gameState"])
+        w.writeheader()
+        w.writerow({"gamePk": pk, "gameDate": f"{date}T23:00:00Z", "home": home, "away": away,
+                    "home_abbr": "TOR", "away_abbr": "OTT", "gameState": "LIVE"})
+
+
+def test_a_live_game_publishes_the_scoreboards_full_names_not_the_short_ones(nhl_env):
+    _write_scoreboard(nhl_env)
+    snap = LR.build_live_lens_snapshot(DATE, sims=5, score_rows=[_real_shape_row()], slate_features=None)
+    game = snap["games"][0]
+    assert (game["away_name"], game["home_name"]) == ("Ottawa Senators", "Toronto Maple Leafs")
+
+
+def test_a_refused_game_publishes_the_same_full_names(nhl_env):
+    _write_scoreboard(nhl_env)
+    row = _real_shape_row()
+    row["clock"] = dict(row["clock"], inIntermission=True)  # refused in_intermission, by design
+    snap = LR.build_live_lens_snapshot(DATE, sims=5, score_rows=[row], slate_features=None)
+    game = snap["games"][0]
+    assert game["gameLens"][0].get("liveResimRefusal") == "in_intermission"
+    assert (game["away_name"], game["home_name"]) == ("Ottawa Senators", "Toronto Maple Leafs")
+
+
+def test_the_scoreboards_accented_spelling_wins_over_an_alias_table(nhl_env):
+    # canonical_team('nhl', 'Canadiens') is 'montreal canadiens'; the scoreboard and the board say
+    # 'Montréal Canadiens'. Publishing the scoreboard's spelling is what makes the exact join match.
+    _write_scoreboard_named(nhl_env, home="Toronto Maple Leafs", away="Montréal Canadiens")
+    snap = LR.build_live_lens_snapshot(DATE, sims=5, score_rows=[_real_shape_row("Canadiens")], slate_features=None)
+    assert snap["games"][0]["away_name"] == "Montréal Canadiens"
+
+
+def test_without_slate_features_the_raw_names_are_kept(nhl_env):
+    nhl_env.mkdir(parents=True, exist_ok=True)
+    snap = LR.build_live_lens_snapshot(DATE, sims=5, score_rows=[_real_shape_row()], slate_features=None)
+    game = snap["games"][0]
+    assert game["gameLens"][0]["liveResimRefusal"] == "no_slate_features"
+    assert (game["away_name"], game["home_name"]) == ("Senators", "Maple Leafs")
+
+
+def test_the_board_join_indexes_the_live_game_under_the_board_rows_names(nhl_env):
+    """REACHABILITY: the join's own index call finds the game under the board row's key."""
+    from syndicate.features.shared.live_gameline_join import (
+        _norm_team,
+        build_live_gameline_index,
+        lens_sources_for_sport,
+    )
+
+    # Stub features carry rosters (a temp root's real loader has none, so it refuses `no_rosters`)
+    # and the scoreboard's FULL names, as `build_slate_features` does; the row keeps NHL's short ones.
+    from tests.test_nhl_live_resim import _StubFeatures
+
+    feats = _StubFeatures(GAME_PK, "Toronto Maple Leafs", "Ottawa Senators")
+    snap = LR.build_live_lens_snapshot(DATE, sims=20, score_rows=[_real_shape_row()], slate_features=[feats])
+    lane = snap["games"][0]["gameLens"][0]
+    assert lane.get("source") == LR.LIVE_RESIM_LENS_SOURCE, lane  # the branch that publishes a probability
+    index = build_live_gameline_index(snap, sources=lens_sources_for_sport("nhl"), sport="nhl", slate_date=DATE)
+    board_key = (_norm_team("Ottawa Senators"), _norm_team("Toronto Maple Leafs"))
+    assert board_key in index, sorted(index)

@@ -206,6 +206,36 @@ def team_names_from_score_row(row: Mapping[str, Any]) -> tuple[str, str]:
     return _one(row.get("awayTeam")), _one(row.get("homeTeam"))
 
 
+def _published_team_names(row: Mapping[str, Any], by_pk: Mapping[str, Any]) -> tuple[str, str]:
+    """`(away_name, home_name)` the snapshot PUBLISHES for one game: the slate features' full names.
+
+    WHY `[2026-11-09, lane nhl-live-resim-slate-root]`. The board joins on full team names compared
+    lowercased (`live_gameline_join._norm_team`, "JOINED ON FULL TEAM NAMES, WHICH MATCH EXACTLY"),
+    and its NHL rows carry the scoreboard's names -- 'New York Rangers' @ 'Edmonton Oilers'.
+    `/v1/score`'s `name.default` is the SHORT name, 'Rangers' @ 'Oilers', so no live NHL game could
+    ever be indexed. Measured on the fleet 11-09 ~17:0xZ: served NHL rows ('New York Rangers',
+    'Edmonton Oilers') x107, ('Philadelphia Flyers', 'Vancouver Canucks') x99, ('New York Islanders',
+    'San Jose Sharks') x96, while the snapshot said ('Rangers', 'Oilers') etc. (first reported by
+    lane nhl-nfl-live-prop-actuals).
+
+    The slate features carry the SCOREBOARD's spelling -- the board's own source -- so they match
+    where an alias table would not: `canonical_team('nhl', 'Canadiens')` is 'montreal canadiens', but
+    the scoreboard and the board say 'Montréal Canadiens'. Keyed by gamePk, so orientation comes from
+    the scoreboard row. A game the features do not cover keeps the raw row's names, exactly as before
+    (it is refused `no_slate_features` anyway). Both the refusal and the success path call this, so
+    the two cannot drift -- the reason `team_names_from_score_row` is shared.
+    """
+    raw_away, raw_home = team_names_from_score_row(row)
+    pk = str(row.get("id") or row.get("gamePk") or "").strip() if isinstance(row, Mapping) else ""
+    feats = by_pk.get(pk) if pk else None
+    if feats is not None:
+        away = str(getattr(getattr(feats, "away", None), "name", "") or "").strip()
+        home = str(getattr(getattr(feats, "home", None), "name", "") or "").strip()
+        if away and home:
+            return away, home
+    return raw_away, raw_home
+
+
 def live_state_from_score_row(row: Mapping[str, Any]) -> NhlLiveGameState | NhlResimRefusal:
     """Read one `/v1/score/<date>` game into a resume state, or refuse by name.
 
@@ -642,7 +672,7 @@ def build_live_lens_snapshot(
             # return before the team block is ever read. A refusal the board
             # cannot match is indistinguishable from a game the producer never
             # saw, which is the ambiguity this whole module exists to remove.
-            ref_away, ref_home = team_names_from_score_row(row)
+            ref_away, ref_home = _published_team_names(row, by_pk)
             out_games.append({
                 "away_name": ref_away,
                 "home_name": ref_home,
@@ -663,9 +693,11 @@ def build_live_lens_snapshot(
         else:
             result = resim_live_game(features, state, sims=sims)
 
+        # The board's spelling, not the state's short names -- see `_published_team_names`.
+        pub_away, pub_home = _published_team_names(row, by_pk)
         out_games.append({
-            "away_name": state.away_name,
-            "home_name": state.home_name,
+            "away_name": pub_away,
+            "home_name": pub_home,
             "gameLens": build_game_lens(state, result, live_state_as_of=state.as_of),
         })
 
