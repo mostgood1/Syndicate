@@ -57752,3 +57752,25 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - rc=1, NOT CLEAR, on an unrelated refresh-worker board build. The live games stayed a note.
 - **Verdict MET.** The old code read only `anyLive` (false here) and would have printed "No live games". Taken on WNCAAB, which goes through the same `resim_snapshot_reading` as NCAAB; men's D1-vs-D1 games tipped only at 23:00Z.
 - **Interim reading, 16:57:08Z:** "No live games on any source below" with 1 men's and 2 women's games against non-D1 opponents in play. That is correct for what a restart interrupts, because the re-sim drops them and the board does not price them. The note's "live" means a D1-vs-D1 board game (recorded in `state_worker.md` `[local-production-host]`).
+
+## 2026-11-09 17:11:12Z (11:11 AM CST) -- FLEET ff 56f2e7a10 -> e75315e62 + reload-web (NO refresh-worker TERM): rail interval blocks -- college sim restated in the chip's frame on reversed (neutral-site) games, live college win % withheld, a chip served FINAL drops its block (lane `rail-interval-frame-fixes`, todo `#767` (e)(f)(g)) -- **WEB LOADED and VERIFIED for (f); (e) and (g) loaded, their served readings owed**
+- **User:** "Yes, finish them", on the three gaps this session found in the rail code (todo `#767` (e)(f)(g)). The (f) rule comes from the user's 2026-11-03 "Yes, blank it" for the board's live college Win%.
+- **Range `56f2e7a10..e75315e62`, runtime:** `shared/game_chip_intervals.py` only. The rest is tests and ledger.
+- **Gates:**
+  - Web claim, `rail-interval-frame-fixes`, 17:10:47-17:11:58Z.
+  - Web preflight CLEAR. `--expect live_college_win_shown=0`, baseline `=3` read 17:10:48Z.
+  - ff with the range pinned 17:11:12Z. `reload-web` 17:11:14Z (2.0 s, 0 failures).
+  - Refresh-worker untouched. The worker-built PREGAME college frame check loads at its next restart.
+- **Before the ship (read-only):**
+  - Measured over 11-06..11-08: 3 of ~267 college chips had their sim's home/away REVERSED against the chip, all neutral-site (SDSU @ Colorado, UC San Diego @ San Diego, Murray State @ Princeton).
+  - Replay, fleet code against this code over all 269 college chips forced to pregame: **3 changed, the 3 reversed games, each an exact side swap; 0 same-frame chips changed.**
+  - Tests: 63 game_chip_intervals (each frame path paired with a same-frame twin, i.e. off != on), 136 other chip tests, and the JS suite, all green.
+- **Measured, served `/api/board/game-chips` 17:11:29Z:**
+  - **(f) MET:** `live_college_win_shown` 3 -> 0. All 3 live women's games still carry their `live_resim` block.
+  - **(g):** `final_chips_with_block` 0. It was also 0 at baseline, so the drop is not yet observed on a live transition.
+  - **(e):** 0 reversed games on the 11-09 and 11-10 slates (150 college chips, all same-frame), so nothing to flip yet.
+  - web.log since 17:11:12Z: 0 tracebacks, 0 `ATTACH_FAILED`.
+- **verify OWED:**
+  - (e) on the first neutral-site reversed game: served blocks in the chip's frame, and settled live periods equal to the line score. The pregame side needs the next refresh-worker restart.
+  - (g) on a chip that turns final between worker builds.
+- **Revert:** `git revert e75315e62`, then ff + `reload-web` (+ refresh-worker TERM if it has loaded).

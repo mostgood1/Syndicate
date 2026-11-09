@@ -82,6 +82,12 @@
 - **UPDATE 17:30Z:** (a) is DONE for nfl / nhl / soccer. The pregame blocks rode lane `nba-live-proj-actuals`' refresh-worker restart at 17:23:38Z (user: "Ride the next restart"). Served at 17:28Z: nfl pregame 13/13, nhl 6/6, soccer pregame 12. The other 182 soccer chips have NO sim match (0 of 182). Page: 134 PROJ boxes (deploys.md VERIFY 17:30:45Z).
   - **Still owed: NCAAF.** Read the served chips on its next slate, pregame Q1-Q4 and live final. Expect every game in the week's `smartsim2_segment_distributions` sidecar (FBS-vs-FCS games have none) and every live re-sim lane. Read-only, no claim needed.
   - **(g) Payload wart:** a chip that turns FINAL between worker builds keeps its stale `live_resim` block in the payload. The card hides it, but `attach_interval_projections(live_only=True)` skips non-live chips, so it never drops one. Basketball's path behaves the same.
+- **UPDATE 2026-11-09 17:1xZ (lane `rail-interval-frame-fixes`, CLOSED, GOAL PARTLY MET; user "Yes, finish them"):** (e), (f) and (g) are FIXED in `e75315e62`. On the fleet since ff + `reload-web` at 17:11:12Z (deploys.md); no refresh-worker TERM.
+  - **(f) VERIFIED:** served live college chips showing a win % went 3 -> 0 at 17:11:29Z. Their live blocks are kept.
+  - **(e):** a college sim whose own team names are the chip's reversed is restated in the chip's frame, on the live, pregame and pace paths.
+    - Before the ship, a replay over 269 college chips 11-06..11-08 changed exactly the 3 reversed neutral-site games, each by an exact side swap, and no same-frame chip.
+    - **OWED:** the served reading on the first reversed game (the 11-09 and 11-10 slates have none: 150 chips, all same-frame). The pregame side loads at the next refresh-worker restart.
+  - **(g)** is loaded; its served reading is owed on a chip that turns final between worker builds.
 - **What it does:** the basketball `intervals` block (`game_chip_intervals.py`), extended to each sport from what its engine simulates and publishes:
   - soccer pregame: 1H/2H goals plus the 3-way win %;
   - NFL / NCAAF pregame: Q1-Q4, from smartsim2's `quarter_log` sidecar;
