@@ -7921,6 +7921,16 @@ def main() -> int:
     except Exception as exc:
         print(f"[refresh_worker] LIVE_LENS_LOOP_START_FAILED {type(exc).__name__}: {exc}", flush=True)
 
+    # Phase 1B M0 (lane `live-evidence-log`): keep every live re-sim / lens tick as an as-of row, because each
+    # producer overwrites its own snapshot. Reads the shared store only; started here, in ONE role, so two
+    # processes never append the same rows. `SYNDICATE_LIVE_EVIDENCE_LOG=off` turns it off.
+    try:
+        from syndicate.features.shared.live_evidence_log import start_live_evidence_loop
+
+        print(f"[refresh_worker] LIVE_EVIDENCE_LOOP_START_RESULT started={start_live_evidence_loop()}", flush=True)
+    except Exception as exc:
+        print(f"[refresh_worker] LIVE_EVIDENCE_LOOP_START_FAILED {type(exc).__name__}: {exc}", flush=True)
+
     parser = argparse.ArgumentParser(description="Poll Syndicate refresh state and execute queued external-runner jobs.")
     parser.add_argument("--latest-manifest", default=str(_default_latest_manifest_path()))
     parser.add_argument("--worker-status", default=str(_default_worker_status_path()))
