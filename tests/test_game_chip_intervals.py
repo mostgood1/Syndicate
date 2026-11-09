@@ -112,7 +112,9 @@ def test_live_college_uses_the_lane_settled_flags_and_its_anchored_margin(monkey
     assert (block["periods"][0]["away"], block["periods"][0]["home"]) == (32.0, 37.0)   # 69 total, +5 home
     # The FINAL is the lane's anchored homeMargin (10.555), never rawHomeMargin (10.45).
     assert block["final"]["home_margin"] == 10.6
-    assert block["final"]["home_win_prob"] == 0.97
+    # No live college win probability: the board withholds it (user 2026-11-03 "Yes, blank it"); the lane's 0.97 is
+    # NOT shown (lane rail-interval-frame-fixes, 2026-11-09 -- this asserted 0.97 until then).
+    assert block["final"]["home_win_prob"] is None
     assert block["as_of"] == "2026-11-07T20:03:45+00:00"
 
 
@@ -634,3 +636,87 @@ def test_pace_runs_on_the_serve_path_too(monkeypatch):
     chip = _pace_chip("Q2 5:00", [12, 6], [20, 9])
     gci.attach_interval_projections([chip], "2026-11-07", live_only=True)
     assert chip["intervals"]["source"] == "pregame_pace"
+
+
+# ------------------------------------------------------------------------------------------- sim frame vs chip frame
+# Lane rail-interval-frame-fixes, 2026-11-09. The college sims take home/away from ESPN's summary, the chip from the
+# board's slate; on a NEUTRAL-SITE game they can disagree (measured 3 of ~267 college chips 11-06..11-08, all
+# neutral-site). A sim matched by event id whose own team names are the chip's REVERSED is restated in the chip's
+# frame; the same data with the chip's own frame is untouched (off != on); a sim whose names cannot be read either
+# way is untouched too (the default `_pregame_entry` above carries no names).
+
+def _named(entry, away, home):
+    return dict(entry, away={"name": away}, home={"name": home})
+
+
+_CHIP_FRAME = ("Providence Friars", "Nebraska Cornhuskers")       # the default `_chip()` pair (away, home)
+_REVERSED = ("Nebraska Cornhuskers", "Providence Friars")
+
+
+def _halves():
+    return {"full": {"total": _point(150), "margin": _point(4)},
+            "h1": {"total": _point(70), "margin": _point(2)}, "h2": {"total": _point(80), "margin": _point(2)}}
+
+
+def test_a_reversed_pregame_sim_is_restated_in_the_chips_frame(monkeypatch):
+    entry = _named(_pregame_entry(_halves(), 150.0, 4.0), *_REVERSED)   # the SIM's home is Providence, +4
+    _patch_sources(monkeypatch, college={"ncaab": {"401909532": entry}})
+    chip = _chip()                                                       # the CHIP's home is Nebraska
+    gci.attach_interval_projections([chip], "2026-11-07")
+    block = chip["intervals"]
+    assert block["final"] == {"away": 77.0, "home": 73.0, "total": 150.0, "home_margin": -4.0, "home_win_prob": None}
+    assert (block["periods"][0]["away"], block["periods"][0]["home"]) == (36.0, 34.0)
+
+
+def test_a_pregame_sim_in_the_chips_frame_is_untouched(monkeypatch):
+    entry = _named(_pregame_entry(_halves(), 150.0, 4.0), *_CHIP_FRAME)
+    _patch_sources(monkeypatch, college={"ncaab": {"401909532": entry}})
+    chip = _chip()
+    gci.attach_interval_projections([chip], "2026-11-07")
+    assert chip["intervals"]["final"]["home_margin"] == 4.0
+    assert (chip["intervals"]["periods"][0]["away"], chip["intervals"]["periods"][0]["home"]) == (34.0, 36.0)
+
+
+def test_a_reversed_live_lane_is_restated_and_its_settled_half_matches_the_line_score(monkeypatch):
+    """The UC San Diego @ San Diego case: the re-sim's settled half came out swapped against the chip's line score."""
+    snapshot = _live_snapshot()
+    snapshot["games"][0].update(away=_REVERSED[0], home=_REVERSED[1])   # re-sim home = Providence: h1 69, +5
+    _patch_sources(monkeypatch, live={"ncaab": snapshot})
+    chip = _chip(state="live")
+    chip["linescore"] = {"kind": "periods", "labels": ["1"], "away": [37], "home": [32]}  # Providence led by 5
+    gci.attach_interval_projections([chip], "2026-11-07")
+    block = chip["intervals"]
+    assert [p["state"] for p in block["periods"]] == ["settled", "in_progress"]
+    assert (block["periods"][0]["away"], block["periods"][0]["home"]) == (37.0, 32.0)     # == the line score
+    assert block["final"]["home_margin"] == -10.6 and block["final"]["home_win_prob"] is None
+
+
+def test_a_reversed_pregame_sim_feeds_pace_in_the_chips_frame(monkeypatch):
+    entry = _named(_pregame_entry(_wq_segments(), 132.0, 8.0), *_REVERSED)   # sim home scores 17.5 a quarter
+    _patch_sources(monkeypatch, college={"wncaab": {"401909532": entry}})
+    chip = _pace_chip("Q2 5:00", [12, 6], [20, 9])                           # chip home is the sim's AWAY
+    gci.attach_interval_projections([chip], "2026-11-07")
+    periods = chip["intervals"]["periods"]
+    assert (periods[1]["away"], periods[1]["home"]) == (14.8, 16.8)          # 6 + 17.5/2, 9 + 15.5/2
+    assert (periods[2]["away"], periods[2]["home"]) == (17.5, 15.5)
+
+
+def test_the_flip_negates_margin_histograms_and_swaps_per_side_values():
+    block = {"total_dist": {"70": 2}, "margin_dist": {"5": 1, "-3.5": 1}, "home_points_mean": 7.0,
+             "away_points_mean": 3.0, "settled": True}
+    flipped = gci._flip_block(block)
+    assert flipped["margin_dist"] == {"-5": 1, "3.5": 1} and flipped["total_dist"] == {"70": 2}
+    assert (flipped["home_points_mean"], flipped["away_points_mean"]) == (3.0, 7.0) and flipped["settled"] is True
+    assert gci._flip_block(flipped) == block
+
+
+def test_the_serve_path_drops_the_block_of_a_chip_served_final(monkeypatch):
+    """Measured 2026-11-08 17:28Z: a soccer chip the serve path turned FINAL still carried its worker-built live block."""
+    _patch_sources(monkeypatch)
+    final = _chip(state="final")
+    final["intervals"] = {"source": "live_resim", "periods": [], "final": {}}
+    pregame = _chip()
+    pregame["intervals"] = {"source": "pregame_sim", "kept": True}
+    counts = gci.attach_interval_projections([final, pregame], "2026-11-07", live_only=True)
+    assert "intervals" not in final and counts.get("removed") == 1
+    assert pregame["intervals"] == {"source": "pregame_sim", "kept": True}

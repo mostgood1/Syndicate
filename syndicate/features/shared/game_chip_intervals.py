@@ -30,8 +30,9 @@ WHAT THE BLOCK SAYS, and what it never does:
 
 WIN PROBABILITY. College pregame moneylines are served at the de-vigged fair (`college_game_projections`,
 SYNDICATE_COLLEGE_MARGIN_MODEL_WEIGHT default 0.0), so the board shows no college pregame model win
-probability; a rail card that showed the sim's would contradict it. It is left out there. Live college, NBA
-and WNBA show the model probability the board already shows.
+probability; a rail card that showed the sim's would contradict it. It is left out there. Live college is left
+out too: the board withholds it (`LIVE_WIN_WITHHELD`, corrected 2026-11-09). Live NBA and WNBA show the model
+probability the board shows.
 
 MARGINS. Live college margins are the market-anchored ones the board prices from (`ncaab/live_resim`
 `_anchor_segments`, user 2026-11-02 "Fix + anchor"): the lane's `homeMargin` and the segments' anchored
@@ -78,10 +79,11 @@ PRECISION: dict[str, int] = {"soccer": 1, "nhl": 1, "mlb": 1}
 #: publishes no per-period number (NHL pregame and live; soccer, NFL and NCAAF live). Never basketball.
 FINAL_ONLY_SPORTS: frozenset[str] = frozenset({"soccer", "nhl", "nfl", "ncaaf"})
 
-#: Live win probabilities the BOARD withholds (`board_enrichment.LIVE_PROBABILITY_WITHHELD_SPORTS` holds nfl,
-#: ncaaf, ncaab, wncaab). A rail card must not show what the board blanks. Only this phase's two are applied here;
-#: the basketball path above predates this and still shows live college win% (raised with its owner, 2026-11-08).
-LIVE_WIN_WITHHELD: frozenset[str] = frozenset({"nfl", "ncaaf"})
+#: Live win probabilities the BOARD withholds (`board_enrichment.LIVE_PROBABILITY_WITHHELD_SPORTS`: nfl, ncaaf,
+#: ncaab, wncaab -- user 2026-11-03 "Yes, blank it" for college). A rail card must not show what the board blanks.
+#: College was shown here until lane rail-interval-frame-fixes (2026-11-09); the module docstring's "live college
+#: showed the model probability the board already shows" was never true of the board.
+LIVE_WIN_WITHHELD: frozenset[str] = frozenset({"nfl", "ncaaf", "ncaab", "wncaab"})
 
 #: What each non-basketball source publishes, so the next reader does not re-survey (2026-11-07):
 OTHER_SPORTS_SOURCES = """
@@ -366,8 +368,13 @@ def _live_block(sport: str, chip: Mapping[str, Any], snapshot: Mapping[str, Any]
     hit = _live_lane(snapshot, sport, chip)
     if hit is None:
         return None
-    _game, lane = hit
+    game, lane = hit
     projection = lane["projection"]
+    away_name, home_name = _entry_names(game)
+    flipped = _pair_matches(sport, chip, away_name, home_name) == -1
+    if flipped:
+        # The re-sim's home is the chip's away (a neutral-site game listed the other way round): restate it.
+        projection = dict(_flip_block(projection), segments=_flip_segments(projection.get("segments") or {}))
     total = projection.get("total")
     margin = projection.get("homeMargin")
     try:
@@ -380,6 +387,10 @@ def _live_block(sport: str, chip: Mapping[str, Any], snapshot: Mapping[str, Any]
         win = float(win) if win is not None else None
     except (TypeError, ValueError):
         win = None
+    if win is not None and flipped:
+        win = 1.0 - win
+    if sport in LIVE_WIN_WITHHELD:
+        win = None
     return build_block(sport, source=SOURCE_LIVE, segments=projection.get("segments") or {}, final_total=total,
                        final_margin=margin, home_win_prob=win, live_period=projection.get("period"),
                        as_of=lane.get("liveStateAsOf"), sims=lane.get("simsRun"))
@@ -388,7 +399,7 @@ def _live_block(sport: str, chip: Mapping[str, Any], snapshot: Mapping[str, Any]
 def _college_pregame_block(sport: str, chip: Mapping[str, Any], games: Mapping[str, Any] | None) -> dict[str, Any] | None:
     if not games:
         return None
-    entry = games.get(str(chip.get("game_key") or "").strip())
+    entry = _college_entry_in_chip_frame(sport, chip, games.get(str(chip.get("game_key") or "").strip()))
     if not isinstance(entry, Mapping):
         return None
     segments = ((entry.get("dist") or {}).get("segments")) or {}
@@ -559,7 +570,7 @@ def _pace_entry(sport: str, chip: Mapping[str, Any], date_value: str) -> Mapping
         games = _cached(("pregame", sport, day), _TTL_PREGAME_SECONDS, lambda s=sport, d=day: _college_pregame_games(s, d))
         entry = (games or {}).get(key)
         if isinstance(entry, Mapping):
-            return entry
+            return _college_entry_in_chip_frame(sport, chip, entry)
     return None
 
 
@@ -687,16 +698,76 @@ def _pair_matches(sport: str, chip: Mapping[str, Any], away: Any, home: Any) -> 
     return 0
 
 
+# -- the sim's frame vs the chip's (lane rail-interval-frame-fixes, 2026-11-09)
+#
+# A sim matched by EVENT ID can still list the two teams the other way round from the chip. The college sims take
+# home/away from ESPN's game summary; the chip takes them from the board's slate, and on a NEUTRAL-SITE game the two
+# disagree. Measured 11-06..11-08: 3 of ~267 college chips (SDSU @ Colorado, UC San Diego @ San Diego, Murray State
+# @ Princeton), every one neutral-site. The live UCSD @ SD block's settled Q1/Q2 were the line score swapped. So the
+# sim's own team names are checked against the chip; a REVERSED pair is restated in the chip's frame (sides swapped,
+# margins negated), and a pair that cannot be read either way is left as it was -- the event id already chose it.
+
+_MARGIN_HIST_KEYS: tuple[str, ...] = ("margin", "margin_dist", "marginDist", "run_margin_dist")
+_MARGIN_MEAN_KEYS: tuple[str, ...] = ("margin_mean", "home_margin_mean", "homeMargin", "rawHomeMargin")
+
+
+def _negated_key(key: Any) -> Any:
+    try:
+        value = -float(key)
+    except (TypeError, ValueError):
+        return key
+    return str(int(value)) if value.is_integer() else str(value)
+
+
+def _flip_block(block: Any) -> Any:
+    """One segment (or projection) block restated in the other frame: per-side values swapped, margins negated."""
+    if not isinstance(block, Mapping):
+        return block
+    out = dict(block)
+    for key in _MARGIN_HIST_KEYS:
+        hist = block.get(key)
+        if isinstance(hist, Mapping):
+            out[key] = {_negated_key(k): v for k, v in hist.items()}
+    for key in _MARGIN_MEAN_KEYS:
+        value = _f(block.get(key))
+        if value is not None:
+            out[key] = -value
+    for home_key, away_key in (*_PER_SIDE_KEYS, ("homeScore", "awayScore"), ("home", "away"),
+                               ("home_name", "away_name")):
+        if home_key in block and away_key in block:
+            out[home_key], out[away_key] = block[away_key], block[home_key]
+    return out
+
+
 def _flip_segments(segments: Mapping[str, Any]) -> dict[str, Any]:
-    """Per-side segments restated in the other frame (home <-> away). Only per-side means survive a flip."""
-    out: dict[str, Any] = {}
-    for name, block in (segments or {}).items():
-        if not isinstance(block, Mapping):
-            continue
-        for home_key, away_key in _PER_SIDE_KEYS:
-            if home_key in block and away_key in block:
-                out[name] = {home_key: block[away_key], away_key: block[home_key]}
-                break
+    """Every segment restated in the other frame (home <-> away)."""
+    return {name: _flip_block(block) for name, block in (segments or {}).items() if isinstance(block, Mapping)}
+
+
+def _entry_names(entry: Mapping[str, Any]) -> tuple[Any, Any]:
+    """(away, home) names a sim row carries: `{"name": ...}` dicts (college pregame) or plain strings."""
+    names = []
+    for side in ("away", "home"):
+        value = entry.get(f"{side}_name") or entry.get(side)
+        names.append(value.get("name") if isinstance(value, Mapping) else value)
+    return names[0], names[1]
+
+
+def _college_entry_in_chip_frame(sport: str, chip: Mapping[str, Any], entry: Any) -> Any:
+    """A college PREGAME sim entry in the chip's frame (see the section comment). Unchanged unless reversed."""
+    if not isinstance(entry, Mapping):
+        return entry
+    away, home = _entry_names(entry)
+    if _pair_matches(sport, chip, away, home) != -1:
+        return entry
+    out = _flip_block(entry)
+    dist = entry.get("dist")
+    if isinstance(dist, Mapping) and isinstance(dist.get("segments"), Mapping):
+        out["dist"] = dict(dist, segments=_flip_segments(dist["segments"]))
+    win = _f(entry.get("home_win_prob"))
+    if win is not None:
+        out["home_win_prob"] = 1.0 - win
+    out["frame_flipped"] = True
     return out
 
 
@@ -1033,6 +1104,10 @@ def attach_interval_projections(chips: Iterable[dict[str, Any]], date_value: str
             continue
         state = chip.get("state")
         if live_only and state != "live":
+            # A chip the serve path has just turned FINAL keeps the worker's live block otherwise (the card hides
+            # it, the payload still carried it -- measured 2026-11-08 17:28Z on a soccer chip).
+            if state == "final" and chip.pop("intervals", None) is not None:
+                bump("removed")
             continue
         block = None
         if sport in OTHER_INTERVAL_SPORTS:
