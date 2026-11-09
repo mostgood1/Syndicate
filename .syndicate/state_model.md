@@ -877,8 +877,11 @@ lockout and busy by the time it lifts, which is exactly why waiting kept losing.
   `_slate_features_root()` = `default_nhl_source_root()` (the pregame producer's root) unless
   `SYNDICATE_ARTIFACT_ROOT_NHL` is set; coverage carries `slateFeatureGames`. Loaded 03:53:10Z 11-09; the 11-09
   snapshot reads `slateRows 3, slateFeatureGames 3`. **Not yet measured:** `liveResimmed > 0` on a game in play
-  (owed on the 11-09 slate, deploys.md 2026-11-09 01:25:21Z). Only the moneyline can gain a live number: the
-  producer publishes no margin/total distributions (below).
+  (owed on the 11-09 slate, deploys.md 2026-11-09 01:25:21Z). A second blocker, also fixed: the snapshot
+  published `/v1/score`'s SHORT names ('Rangers') while board rows and the join use full names; `365be1a90`
+  publishes the scoreboard's names by gamePk (full names 3 of 3 on 11-09 17:20Z). Moneyline rows can gain a live
+  probability and totals rows the live total COUNT (`projection.total`, the mean); puck lines cannot (no margin
+  distribution) -- pinned in `tests/test_live_display_other_sports.py`.
 - **"INERT until the season opens" was WRONG and is retracted.** NHL preseason began
   2026-09-19; eleven games were played on 2026-09-24 and six were live at once. The
   chain was exercised, not idle.
