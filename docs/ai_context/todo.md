@@ -282,6 +282,14 @@
 - **Owed:** (1) DONE 11-06 (deploys.md VERIFY part 1 02:18:12Z, part 2 2026-11-06 03:44:00Z (9:44 PM CST)): 37 of 37 live ticks re-simmed every live game (`carried=0 refusals={}`, elapsed <= 76.2 s); per game 95% / 98% of non-segment live rows carry a live number; bench props filled (`no_actual` 173 -> 0); live NBA spread/h2h rows with `live_total` 0 of 165. Remaining live gaps went to `#762`. (2) Fri 11-06 (9 games; 2 tip 00:10Z, 1 at 00:40Z, 4 at 01:10Z, 2 at 03:10Z 11-07): `NBA_LIVE_RESIM_TICK carried=` > 0 on budget-exhausted ticks, and the per-game re-simmed share in `live_resim_history` flat across scoreboard position. Backup reader: one-time task `syndicate-nba-live-readings-1106`, 20:15 CST 11-06. Two games never exhaust the 240 s budget, so tonight cannot show the fairness. (3) OT is exercised live only by an overtime game.
 
 ### `#762` — **NBA LIVE QUARTER / HALF LINES NEVER GET A LIVE NUMBER, and three more live-NBA gaps seen beside `#761`: DISPLAY FIX ON THE FLEET (`3d376da7c`, live-odds-worker 15:51:30Z + refresh-worker 16:32:08Z 11-06); live VERIFY owed on the 11-06 slate** — 2026-11-04, lane `nba-live-proj-actuals` (user "Yes, start #762" 2026-11-06)
+- **STATUS 2026-11-08 8:45 PM CST (02:45Z): ACCENT FOLD VERIFIED; (7) NAME SPLITS FIXED ON MAIN `e2558013c`, NOT LOADED (deploys.md 2026-11-09 02:45:07Z).**
+  - Accent: Karlo Matković, 7 of 7 served live rows with Live proj. and actual (02:30Z).
+  - Residual: 39 of 607 served live NBA prop rows lacked both at 02:30Z, and 18 of 399 at 02:36Z.
+    - Wagler and Monk had simply not entered yet, and were filled by 02:36Z.
+    - 12 were name splits, now fixed on main: `Derrick Jones`/`Jr.` (join), `Herb`/`Herbert` Jones and `A.J.`/`AJ` Green (re-sim).
+    - Bobby Portis (6-7 rows) is absent from the engine roster, and is NOT fixed.
+  - Replay 02:43Z: re-sim gains Herbert Jones and AJ Green; join hits Derrick Jones 6/6; 398 of 398 old hits unchanged.
+  - Owed: the load (refresh-worker TERM, `reload-web`, live-odds-worker TERM; needs a user yes), then a served reading.
 - **STATUS 2026-11-08 4:23 PM CST (22:23Z): (6) VERIFIED END TO END (deploys.md 2026-11-08 22:23:20Z).** At 22:22:50Z one pulled row was served: Tre Jones points 8.5. It showed Live proj. 7.46 and actual 6, with no `live_aware`, no model edge, and `sim_view` unpriced. Its quote was 297.8 s old, just inside the 300-s gate. Only the Dončić accent check is still owed.
 - **STATUS 2026-11-08 4:16 PM CST (22:16Z): (6) LOADED; MECHANISM VERIFIED; SERVED EFFECT SMALL BY CONSTRUCTION; THE 11-07 GAP READING CORRECTED (deploys.md 2026-11-08 22:16:37Z).**
   - Loaded: join with the claimed refresh-worker TERM at 17:23:34Z. Producer at live-odds-worker's own recycle at 21:29:03Z.

@@ -57565,3 +57565,26 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **Revert:**
   - Code: drop `"ncaab"` from `_SCORE_CHANGE_BASIS_SPORTS` (`live_gameline_join.py`), then ff + a claimed refresh-worker TERM.
   - Env: `SYNDICATE_COLLEGE_QUOTE_ORDER_BASIS=state` (a drained full down/up).
+
+## 2026-11-09 02:45:07Z (8:45 PM CST) -- VERIFY of `7d72f8e9d` (`#762` accent fold): **MET on a live accented player (Karlo Matković, NOP@LAC)**; a residual served gap found, and its name half FIXED ON MAIN `e2558013c`, NOT LOADED (lane `nba-live-proj-actuals`)
+- **Accent fold, MET:**
+  - The watcher saw its first accented live lens player at 02:16:36Z, 8:16 PM CST (`Karlo Matković`). An NBA join ran after it at 02:20:22Z.
+  - Served board 02:30:29Z (`response.ranked_all`, same instant as the page lens generated 20:29:42 CST): **7 of 7** of his live prop rows, spelled `Karlo Matkovic` by the odds feed, carried Live proj. AND actual. Examples: points 6.5 over at 8.63 / 0.0, P+R 9.5 at 11.6 / 0.0, all `live_aware`.
+  - His lens rows show `actualSoFar` 0.0 with `liveProjection` 8.63, so the 0.0 is his real early-game line, not a default.
+  - Dončić was not the test: LAL@DET was Final by the time the watcher fired, and no Dončić spelling was in the lens. Any accented lens name is the same test.
+- **Residual served gap (same read):** 39 of 607 served live NBA prop rows had no Live proj./actual. Per game: BOS@MIL 129/131, BKN@DAL 95/95, MIA@SAC 139/151, NOP@LAC 144/167, UTA@MIN 61/63.
+  - **Timing, not a defect (17 rows):** Keaton Wagler (11) and Malik Monk (6). They were on the engine roster with CSV lines, but had not entered the game when the page lens was written. A missing actual is not a zero, so they had no row yet. **At 02:36:57Z both were filled** by the web read-time refresh.
+  - **Name splits, a defect (14 rows at 02:30Z; 12 of 18 at 02:36Z):**
+    - `Derrick Jones` (odds feed) vs the lens's `Derrick Jones Jr.`: the join's `_norm_name` keeps the suffix.
+    - `Herb Jones` (CSV, ESPN) vs the engine's `Herbert Jones`: the re-sim key has no alias table, so no lines and no row.
+    - `A.J. Green` (CSV) vs the engine's `AJ Green`: the re-sim key turns periods into spaces.
+  - **Roster gap, NOT fixed (6-7 rows):** Bobby Portis. He is in the props CSV for MIA@SAC and on the served board, and absent from both engine frames. Terrence Shannon Jr. (2 rows at 02:30Z, UTA@MIN) was in neither the CSV nor the roster; gone by 02:36Z.
+- **Fix on main `e2558013c`, not loaded:**
+  - Re-sim: `normalize_name` becomes the pregame engine's own key (`normalize_player_name_key`).
+  - Join: new `_resolve_player`. Exact key first; only on a miss, the engine canonical key, and only when it names exactly one lens player. The web read-time refresh gets it through `live_prop_hit`.
+  - New counter `player_alias=` on `LIVE_PROJECTION_JOIN`.
+- **Read-only fleet replay of the new code, 02:43Z:**
+  - Re-sim: Herbert Jones (NOP@LAC) and AJ Green (BOS@MIL) gain CSV lines; no player in 4 rostered games loses any.
+  - Join, against the current page lens: Derrick Jones 6/6 rows hit on the join alone. Herb Jones 4 and A.J. Green 2 need the re-sim half loaded first. Portis 7 stays a miss.
+  - Regression check: all 398 served rows the old key matched hit the same lens entry under the new one, with 0 differing.
+- **Load:** owed, needs a user decision. The join needs a refresh-worker TERM plus `reload-web`, and the re-sim needs a live-odds-worker TERM.
