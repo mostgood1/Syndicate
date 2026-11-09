@@ -1001,6 +1001,19 @@ death, never life — do not invert it.
 - GOAL: MET in 145523971. Sources line `ncaab re-sim (D1 vs D1): N live`; headline `(wncaab: 3 live D1-vs-D1)`; the comment block records why. 151 tests pass (live_note, fleet_logs, deploy_guard, build_estimate, preflight_board_build_hold). Read-only fleet run 17:17:39Z (11:17 AM CST): "WARNING: Live games in progress (wncaab: 3 live D1-vs-D1)"; sources "ncaab re-sim (D1 vs D1): 0 live (1m ago); wncaab re-sim (D1 vs D1): 3 live (2m ago)". It matches WNCAAB_LIVE_RESIM_TICK live=3 (17:16:04Z), which was unchanged before and after the check.
 
 ### live-evidence-log — OPEN — opened 2026-11-09 — session e32fef1a-01e8-4afe-a284-01acd3728545
+- **STATUS `[2026-11-09 18:18Z]`: GOAL: NOT MET -- built and dry-run on fleet data; committed on the branch only, NOT on main, NOT loaded.**
+  - Built:
+    - `syndicate/features/shared/live_evidence_log.py`: collector + `iter_rows` / `evidence_at`; switch `SYNDICATE_LIVE_EVIDENCE_LOG`, absent = on; every 30 s.
+    - the refresh-worker start call;
+    - `scripts/live_evidence_check.py`: `nba-crosscheck` / `probe` / `size`;
+    - 12 tests, plus 59 related tests passing.
+  - Dry run 11-09 18:15-18:18Z, reading the fleet's store and writing to `/tmp` only:
+    - wncaab: 3 live games, 9 fresh rows (~4.2 KB each). The same-moment probe matched 3 of 3 lanes, 0 mismatches.
+    - ncaaf 67, nfl 15 and nhl 3 pregame/refusal rows, once each.
+    - The first pass rewrote NHL's pregame lanes every tick (they carry the tick time). Fixed: refusal rows are compared without `liveStateAsOf`.
+  - Owed:
+    - the user's OK to push and load (fleet ff + refresh-worker TERM);
+    - then the NBA cross-check on a live NBA night, probes per live sport, and bytes/day.
 - Goal: Phase 1B M0: every live projection the fleet's re-sims and lenses publish (nba, ncaab, wncaab, ncaaf, nfl, nhl; wnba when on) is kept as an append-only, as-of-stamped row per game lane per tick in <data root>/live_evidence/<sport>/<date>.jsonl, read by one as-of reader; on the fleet, the NBA rows reproduce NBA's own live_resim_history for the same ticks with 0 mismatches, a same-moment probe on each other live sport matches the rebuilt evidence with 0 mismatches, and the bytes per day are measured
 - Files: syndicate/features/shared/live_evidence_log.py (NEW), scripts/live_evidence_check.py (NEW), tests/test_live_evidence_log.py (NEW), scripts/run_refresh_worker.py (the collector start call ONLY)
 - Hypothesis: n/a (build; the sport re-sim modules are read through the shared store, never edited)
