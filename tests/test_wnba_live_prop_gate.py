@@ -13,7 +13,9 @@ class GateTests(unittest.TestCase):
         self.assertTrue(out.get("supported"))
 
     def test_an_unlisted_sport_still_fails_closed_by_name(self):
-        out = self._run("nfl", {"games": []})
+        # Not "nfl" any more: since 2026-11-09 nfl and nhl have a DISPLAY-ONLY live-actuals route
+        # (`board_enrichment._LIVE_PLAYER_ACTUAL_SPORTS`). ncaaf is in neither path.
+        out = self._run("ncaaf", {"games": []})
         self.assertFalse(out.get("supported"))
         self.assertIn("no live re-sim wired", out.get("reason", ""))
 

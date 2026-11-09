@@ -947,6 +947,58 @@ def _maybe_capture_prop_snapshot(row: Any, resolved: Any, *, date_str: str) -> s
         return "failed"
 
 
+# Wall clock for one tick's box reads. A Sunday window is ~13 games at one GET each.
+_PLAYER_STATS_BUDGET_SECONDS = 20.0
+
+
+def _attach_live_player_stats(
+    targets: list[tuple[dict[str, Any], Any]],
+    *,
+    budget_seconds: float = _PLAYER_STATS_BUDGET_SECONDS,
+) -> dict[str, Any]:
+    """Put each IN-PROGRESS game's ESPN box on its snapshot entry as `livePlayerStats`.
+
+    `targets` pairs each snapshot entry with its normalised live row. A game is read only when the
+    row says `state == "in"` (ESPN's in-progress, halftime included) AND carries an `event_id`; a
+    pregame or final game has no live reader. The read is `live_player_actuals.nfl_live_player_stats`
+    -- looked up at call time so a test can substitute it.
+    """
+    tally: dict[str, Any] = {"live_games": 0, "attached": 0, "unreadable": 0, "no_event_id": 0,
+                             "budget_exhausted": 0}
+    try:
+        from syndicate.features.shared import live_player_actuals as actuals
+    except Exception as exc:  # noqa: BLE001 -- deploy-skew guard
+        tally["error"] = type(exc).__name__
+        return tally
+    started = time.monotonic()
+    for game, live_row in targets:
+        if not isinstance(live_row, Mapping):
+            continue
+        if str(live_row.get("state") or "").strip().lower() not in {"in", "live", "in_progress"}:
+            continue
+        tally["live_games"] += 1
+        event_id = str(live_row.get("event_id") or "").strip()
+        if not event_id:
+            tally["no_event_id"] += 1
+            continue
+        if time.monotonic() - started >= float(budget_seconds):
+            tally["budget_exhausted"] += 1
+            continue
+        try:
+            block = actuals.nfl_live_player_stats(event_id, game_state="in")
+        except Exception:  # noqa: BLE001 -- a box must not cost the tick its snapshot
+            block = None
+        if block is None:
+            tally["unreadable"] += 1
+            continue
+        game[actuals.BLOCK_KEY] = block
+        tally["attached"] += 1
+    tally["elapsed_seconds"] = round(time.monotonic() - started, 3)
+    if tally["live_games"]:
+        print("[nfl_live_resim] LIVE_PLAYER_STATS " + " ".join(f"{k}={v}" for k, v in tally.items()), flush=True)
+    return tally
+
+
 def build_live_lens_snapshot(
     date_str: str,
     *,
@@ -996,7 +1048,8 @@ def build_live_lens_snapshot(
     # 120 s window from a third bug. A tally names every branch, once per tick.
     _capture_tally: dict[str, int] = {}
 
-    prepared: list[tuple[float, dict[str, str], Any]] = []
+    # The live row rides along (4th item) for the box-score attach after the loop.
+    prepared: list[tuple[float, dict[str, str], Any, Any]] = []
     for game in games or ():
         if not isinstance(game, Mapping):
             continue
@@ -1019,7 +1072,7 @@ def build_live_lens_snapshot(
             if isinstance(resolved, NflLiveGameState) else -1.0
         )
         prepared.append((float(remaining),
-                         {"away_team": away_team, "home_team": home_team}, resolved))
+                         {"away_team": away_team, "home_team": home_team}, resolved, live_row))
     prepared.sort(key=lambda item: item[0])
 
     if _capture_tally:
@@ -1028,7 +1081,8 @@ def build_live_lens_snapshot(
 
     started = time.monotonic()
     out_games: list[dict[str, Any]] = []
-    for _remaining, names, resolved in prepared:
+    box_targets: list[tuple[dict[str, Any], Any]] = []
+    for _remaining, names, resolved, live_row in prepared:
         state: Any = None
         if isinstance(resolved, NflResimRefusal):
             result: Any = resolved
@@ -1065,10 +1119,18 @@ def build_live_lens_snapshot(
             "home_code": names["home_team"],
             "gameLens": build_game_lens(state, result, live_state_as_of=generated_at),
         })
+        box_targets.append((out_games[-1], live_row))
 
     coverage = summarise(out_games)
     coverage["budget_seconds"] = budget
     coverage["elapsed_seconds"] = round(time.monotonic() - started, 3)
+    # LIVE BOX SCORES, after every re-sim (lane `nhl-nfl-live-prop-actuals`, 2026-11-09). Live NFL props
+    # had no Actual on the board (0 of 140 measured 01:31Z, SNF TB@CHI), and the board join must not
+    # fetch. This tick already owns every live game and its ESPN event id, so it reads each in-progress
+    # game's box -- the SETTLEMENT read, every athlete, real zeros kept -- and the join reads the
+    # snapshot. Independent of the re-sim: a refused game (uninformative band, budget, flag off) still
+    # has a box. One GET per in-progress game per tick, under its own wall clock. Never raises.
+    coverage["live_player_stats"] = _attach_live_player_stats(box_targets)
     return {
         "sport": "nfl",
         "date": str(date_str or ""),

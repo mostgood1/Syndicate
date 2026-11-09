@@ -2218,6 +2218,8 @@ def attach_live_projections_for_sport(grid: list, *, sport: str, selected_date: 
     # cares that `liveModelProbOver` exists and that the interval behind it was
     # measured rather than assumed, which is the bar MLB's 120-sim tier meets
     # too.
+    if sport in _LIVE_PLAYER_ACTUAL_SPORTS and sport not in _live_prop_sports():
+        return _live_player_actuals_for_sport(grid, sport=sport)
     if sport not in _live_prop_sports():
         return {"supported": False, "reason": f"no live re-sim wired for {sport}", "rows_live_projected": 0}
     try:
@@ -2287,6 +2289,48 @@ def attach_live_projections_for_sport(grid: list, *, sport: str, selected_date: 
     except Exception:
         _LOGGER.exception("BOOK_GRID_LIVE_PROJECTION_FAILURE sport=%s date=%s", sport, selected_date)
         return {"supported": True, "error": "live projection join failed", "rows_live_projected": 0}
+
+
+# LIVE ACTUALS, NEVER PRICED (lane `nhl-nfl-live-prop-actuals`, 2026-11-09). NHL and NFL have no live
+# PLAYER model, so neither is in `_LIVE_PROP_SPORTS` and neither may be. What each does have is a box
+# score its live tick can read, and the player's count so far is a fact, not an estimate. These rows get
+# that count in the Actual column and nothing the edge reads (`live_player_actuals` says what it writes).
+# A sport is routed here only while it is NOT in `_live_prop_sports()`, so admitting one to the priced
+# join later replaces this display-only path instead of running beside it.
+_LIVE_PLAYER_ACTUAL_SPORTS = frozenset({"nhl", "nfl"})
+
+
+def _live_player_actuals_for_sport(grid: list, *, sport: str) -> dict:
+    """Read the sport's published live snapshot and write box-score Actuals onto live prop rows.
+
+    A READ: the box was fetched by the sport's live tick on a worker. The same snapshot paths the
+    live game-line join reads (`_LIVE_GAMELINE_SNAPSHOT_PATHS`): NFL's re-sim file, NHL's lens."""
+    try:
+        from syndicate.features.shared.live_player_actuals import attach_live_player_actuals
+        from syndicate.features.shared.refresh_state_store import data_root, read_json_file
+
+        name = _LIVE_GAMELINE_SNAPSHOT_PATHS.get(sport, f"{sport}_live_lens.json")
+        snapshot = read_json_file(data_root() / "live" / name)
+        if not isinstance(snapshot, dict):
+            return {"supported": True, "join": "live_player_actuals", "rows_live_projected": 0,
+                    "rows_live_display_only": 0, "reason": f"no published live snapshot ({name})"}
+        coverage = attach_live_player_actuals(grid, snapshot, sport=sport)
+        # print(), not logger.info (CLAUDE.md). The shared LIVE_PROJECTION_JOIN line carries the
+        # totals; this one carries the refusal split that line has no fields for.
+        print(
+            f"[board_enrichment] LIVE_PLAYER_ACTUALS_JOIN sport={sport} snapshot={name} "
+            f"considered={coverage.get('rows_live_considered')} actual={coverage.get('rows_live_actual')} "
+            f"games_with_box={coverage.get('live_games_in_snapshot')} players={coverage.get('snapshot_rows_indexed')} "
+            f"miss_game={coverage.get('miss_no_game')} stale={coverage.get('miss_stale_block')} "
+            f"segment={coverage.get('miss_segment')} market={coverage.get('miss_no_market_field')} "
+            f"absent={coverage.get('miss_player_absent')} ambiguous={coverage.get('miss_player_ambiguous')} "
+            f"stat={coverage.get('miss_stat_unavailable')} sample={coverage.get('unmatched_samples')}",
+            flush=True,
+        )
+        return coverage
+    except Exception:
+        _LOGGER.exception("BOOK_GRID_LIVE_PLAYER_ACTUALS_FAILURE sport=%s", sport)
+        return {"supported": True, "error": "live player actuals join failed", "rows_live_projected": 0}
 
 
 def attach_margin_model(grid: list) -> dict:

@@ -153,7 +153,9 @@ def test_gate3_unwired_sport_still_fails_closed():
 
 
 def test_gate2_unwired_sport_still_fails_closed():
-    wired = board_enrichment._live_prop_sports()
+    # The display-only live-actuals sports (nhl, nfl since 2026-11-09) are routed before this gate,
+    # so they are not "unwired" for the purpose of this probe.
+    wired = board_enrichment._live_prop_sports() | board_enrichment._LIVE_PLAYER_ACTUAL_SPORTS
     sport = _an_unwired_sport(wired)
     assert sport not in wired, f"derivation picked a WIRED sport: {sport}"
     out = board_enrichment.attach_live_projections_for_sport(

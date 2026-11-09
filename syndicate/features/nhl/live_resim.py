@@ -577,11 +577,18 @@ def build_live_lens_snapshot(
     budget_seconds: float = _DEFAULT_BUDGET_SECONDS,
     score_rows: Optional[Sequence[Mapping[str, Any]]] = None,
     slate_features: Optional[Sequence[Any]] = None,
+    player_stats_fetch_json: Any = None,
 ) -> dict[str, Any]:
     """The shared `gameLens` snapshot for one date.
 
     A SIMULATION. Runs on the worker that owns the live-lens loop and writes an
     artifact the web service reads; the join never calls this.
+
+    Each LIVE game also carries its box score as `livePlayerStats`
+    (`_attach_live_player_stats`) -- read here, on the worker, so the board
+    join can show a live prop's Actual without fetching anything.
+    `player_stats_fetch_json` is that read's injectable seam; an injected
+    `score_rows` with no seam fetches no box at all.
 
     `score_rows` and `slate_features` are injectable so this is testable
     without the network or a mirrored slate -- production passes neither.
@@ -662,6 +669,15 @@ def build_live_lens_snapshot(
             "gameLens": build_game_lens(state, result, live_state_as_of=state.as_of),
         })
 
+    # LIVE BOX SCORES, AFTER EVERY RE-SIM, so a slow feed can never spend the
+    # budget a priced lane needed. See `_attach_live_player_stats`.
+    player_stats_tally = _attach_live_player_stats(
+        rows,
+        out_games,
+        fetch_json=player_stats_fetch_json,
+        enabled=score_rows is None or player_stats_fetch_json is not None,
+    )
+
     return {
         "sport": "nhl",
         "date": date_key,
@@ -688,8 +704,82 @@ def build_live_lens_snapshot(
                 if lane.get("source") == LIVE_RESIM_LENS_SOURCE
             ),
             "refusalsByReason": _refusals_by_reason(out_games),
+            "livePlayerStats": player_stats_tally,
         },
     }
+
+
+# The scoreboard states whose box is a game IN PROGRESS. An intermission is still
+# LIVE here (the re-sim refuses it; the box is perfectly readable). Not FINAL/OFF:
+# a finished game's board rows are no longer live, so its box has no live reader.
+_LIVE_BOX_STATES = frozenset({"LIVE", "CRIT"})
+# Wall clock for the box reads of one tick. Two GETs per game the first time
+# (box + the once-per-game roster), one after that.
+_PLAYER_STATS_BUDGET_SECONDS = 15.0
+
+
+def _attach_live_player_stats(
+    rows: Sequence[Mapping[str, Any]],
+    out_games: list[dict[str, Any]],
+    *,
+    fetch_json: Any = None,
+    enabled: bool = True,
+    budget_seconds: float = _PLAYER_STATS_BUDGET_SECONDS,
+) -> dict[str, Any]:
+    """Put each LIVE game's box score on its snapshot entry as `livePlayerStats`.
+
+    WHY HERE `[2026-11-09, lane nhl-nfl-live-prop-actuals]`. Live NHL props had no
+    Actual on the board (0 of 29 measured 01:31Z), and the board join must not
+    fetch (`board_enrichment` runs in the board cycle). This tick already owns
+    every live NHL game, so it reads the box and the join reads the snapshot.
+    The box is INDEPENDENT of the re-sim: a game the re-sim refused (intermission,
+    no slate features, budget) still has a box, and its Actual is still a fact.
+
+    `rows` and `out_games` are parallel -- the loop above appends exactly one
+    entry per score row. A length mismatch means that stopped being true, and it
+    attaches nothing rather than pinning one game's box on another.
+
+    Never raises: a box must not cost the tick its snapshot.
+    """
+    tally: dict[str, Any] = {"enabled": bool(enabled), "liveGames": 0, "attached": 0,
+                             "unreadable": 0, "budgetExhausted": 0}
+    if not enabled:
+        return tally
+    if len(rows) != len(out_games):
+        tally["misaligned"] = [len(rows), len(out_games)]
+        print(f"[nhl_live_resim] LIVE_PLAYER_STATS_MISALIGNED rows={len(rows)} games={len(out_games)}", flush=True)
+        return tally
+    try:
+        from syndicate.features.shared.live_player_actuals import BLOCK_KEY, nhl_live_player_stats
+    except Exception as exc:  # noqa: BLE001 -- deploy-skew guard
+        tally["error"] = type(exc).__name__
+        return tally
+    started = time.monotonic()
+    for row, game in zip(rows, out_games):
+        state = str(row.get("gameState") or row.get("gameStatus") or "").strip().upper()
+        if state not in _LIVE_BOX_STATES:
+            continue
+        tally["liveGames"] += 1
+        if time.monotonic() - started >= float(budget_seconds):
+            tally["budgetExhausted"] += 1
+            continue
+        try:
+            block = nhl_live_player_stats(row.get("id") or row.get("gamePk"), fetch_json=fetch_json, game_state=state)
+        except Exception:  # noqa: BLE001
+            block = None
+        if block is None:
+            tally["unreadable"] += 1
+            continue
+        game[BLOCK_KEY] = block
+        tally["attached"] += 1
+    tally["elapsedSeconds"] = round(time.monotonic() - started, 3)
+    if tally["liveGames"]:
+        print(
+            "[nhl_live_resim] LIVE_PLAYER_STATS "
+            + " ".join(f"{k}={v}" for k, v in tally.items()),
+            flush=True,
+        )
+    return tally
 
 
 def _refusals_by_reason(games: list[dict[str, Any]]) -> dict[str, int]:
