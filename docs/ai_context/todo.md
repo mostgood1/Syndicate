@@ -211,6 +211,7 @@
   - Rough engine size: `score_effect_k` about 0.005 (back-of-envelope from the run coefficient); step 3b tried only 0.002.
   - Nothing ships. Full tables: the findings' PHASE 2 STEP 3f section. Runs: WSL `~/bball_iv/runs/ncaab2026_tieshape/pull_real.jsonl`.
 ### `#764` — **KALSHI TOTALS THAT NAME NO GAME PRICE ANOTHER GAME'S ROW: 26 of 26 measured sides wrong-game (men's and women's college basketball, college football). Polymarket is clean in every sport. NOT FIXED** — 2026-11-06, session e32fef1a (user "Yes, measure it here")
+- **READ 2026-11-09 (coordinator 332cb014): the defect never reached a live ORDER.** Every live Kalshi totals / spread / alt order in the fleet ledger: 663 orders. 29 carry no team names. 569 match both teams by an automatic code check. The other 65 (unique tickers) were all the row's own game by eye; the misses were abbreviations such as BKN, UK and UGA. So 0 wrong-game orders. The order path resolves its own ticker; #764 corrupted board fields (`best[side]`, `price_source`, `venue_ref`) only. **Consequence:** the -19% pregame totals ROI (n=112) is SELECTION, not this bug. Residual `PVUTRGV-124` is still refused (safe); no further fix owed for P&L.
 - **UPDATE 2026-11-07 23:49Z (5:49 PM CST): REVERSED-ORDER FIX LOADED AND VERIFIED** (lane `kalshi-fanin-reversed-orientation`, CLOSED).
   - **Load:** `79c8aac12`, fleet ff + refresh-worker TERM 23:41:12Z.
   - **Worker's first ncaab build** (23:45:43Z): refused-unnamed 32, cross-date 496, cross-game 6, role-key 2. At the same clock the pre-fix code gives 42 / 618 / 4 / 2.
