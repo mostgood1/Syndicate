@@ -1370,6 +1370,7 @@ is better:
 
 **What it means:**
 - **SE5_ALT is the first change in this series that both narrows the late margin and passes the gate.**
+  - **PREPARED in step 3h below (2026-11-09):** load RC46 (adds `solver_endgame_pts_per_team` 0.46); its tip shift is -0.02 and it keeps the gain. Not loaded.
   - Candidate load: live-odds-worker's `SYNDICATE_NCAAB_LIVE_MECHANISMS` + `"score_effect_k": 0.005,
     "possession_alternation": 1.0`.
   - It is a production change and the user's decision.
@@ -1386,3 +1387,129 @@ is better:
 - Runs:
   - `~/bball_iv/runs/ncaab2026_tieshape/spread_k.jsonl` (2,160 game-arm rows);
   - `~/bball_iv/runs/ncaab2026_se05_alt/` and `ncaab2026_se10_alt/` (`results.jsonl`, `report.md`).
+
+## PHASE 2 STEP 3h (NCAAB): the load, PREPARED — k 0.005 + strict alternation with the tip re-centred (`solver_endgame_pts_per_team` 0.2 -> 0.46); NOT loaded
+
+`[2026-11-09 18:55Z-20:25Z (12:55-2:25 PM CST), lane ncaab-score-effect-load, session c2fd17f8; user "Yes, prepare it" here, and "yes proceed" in the parent session (relayed): PREPARE ONLY. The env edit and the drained down/up need the user's explicit yes]`
+
+**Verdict.**
+- **Load the RE-CENTRED variant, RC46:** `score_effect_k` 0.005 + `possession_alternation` 1.0 +
+  `solver_endgame_pts_per_team` 0.46.
+- **It keeps all of step 3g's distribution gain and removes the mean drift:**
+
+  | | plain k 0.005 | RC46 |
+  |---|---|---|
+  | SD(margin change) / real from 30m (base 1.172) | 1.090 | 1.092 |
+  | SD(margin change) / real from 36m (base 1.159) | 1.095 | 1.095 |
+  | team-specific variance vs base | -13.5% | -13.2% |
+  | mean window points per team | +0.084 | -0.003 |
+  | CRPS from 30m | -0.110 ± 0.099 | -0.121 ± 0.096 |
+  | win-probability Brier from 30m | +0.0020 | +0.0002 |
+
+- **The harness gate passes and the tip is re-centred.** Totals and margin tie production at every checkpoint. The
+  tip total shift is -0.02 ± 0.11, against plain's +0.57.
+- **The re-centre costs nothing measurable in-game.** Against plain, |err| ties everywhere: +0.07 ± 0.10 at 30m,
+  -0.07 ± 0.17 at 10m.
+  - #768 found that 0.6 did cost in-game. 0.46 is a smaller step, and here the score effect's own upward shift
+    absorbs it.
+- **Why re-centre at all.** The same key feeds the men's PREGAME sims, and they price NCAAB full-game totals.
+  - `build_engine_inputs`, `ncaab/live_resim.py:360`, puts the mechanisms into every college engine call.
+  - #768's load triggered a one-time men's pregame re-sim (`COLLEGE_PREGAME_SIM_LAUNCHED pregame_games=60`).
+  - `state_basketball.md [college-basketball-boards]`: "Totals are served from the sim".
+  - So plain k 0.005 would have moved published pregame totals by +0.57.
+
+**The re-centre, measured on the harness the way #768 did its +0.39:**
+- **Value.** #768's probe measured the tip falling about 2.2 per point of the field, so offsetting +0.57 takes
+  about +0.26: 0.2 -> 0.46.
+- **Run `ncaab2026_se05_rc46`:**
+  - the same 400 games and seed (20261107) as the plain run, from clean code `09ca1af93`;
+  - `resim` (production) vs `resim_mech` = RC46;
+  - 399 of 400 scored (1 `pbp_final_mismatch`), 285 regular season;
+  - 3,239 s as a `systemd-run --user` unit, done 20:11:49Z;
+  - production `resim` identical to the plain run's (max difference 0.0000 over 3,696 rows).
+- **Full-game total, all 285 games.** |err| RC46 - production ± 1.96 SE, with the mean shift beside it:
+
+| checkpoint | full total |err| | shift | h2 total |err| | margin |err| |
+|---|---|---|---|---|
+| 0m (tip) | +0.06 ± 0.22 | **-0.02 ± 0.11** (plain +0.57) | +0.12 ± 0.18 | -0.10 ± 0.21 |
+| 10m | -0.08 ± 0.19 | +0.09 ± 0.10 | -0.09 ± 0.18 | -0.07 ± 0.33 |
+| 20m | +0.08 ± 0.18 | +0.03 ± 0.09 | +0.08 ± 0.18 | -0.04 ± 0.35 |
+| 30m | +0.02 ± 0.13 | +0.01 ± 0.07 | +0.02 ± 0.13 | -0.09 ± 0.21 |
+| 38m | -0.07 ± 0.07 | +0.06 ± 0.04 | -0.07 ± 0.07 | -0.06 ± 0.07 |
+
+- **Replay of RC46** (`spread_k_rc.jsonl`, 540 games × 30m / 36m × 100 sims; 10 min as unit `kscan-replay-rc`):
+  - fields named in 540/540 games;
+  - histograms differ from the base in 1,080/1,080 game-checkpoints;
+  - window points reconcile 108,000 / 108,000.
+  - Paired RC46 - base: team-specific -4.28 ± 0.63 (30m) and -1.41 ± 0.21 (36m); run slope -0.067 and -0.045;
+    tie rate +0.24 points; CRPS -0.055 ± 0.051 from 36m.
+
+**The exact change (not made):**
+- **File and key:** `~/syndicate-prod/local_production.env`, key `LIVE_ODDS_WORKER__SYNDICATE_NCAAB_LIVE_MECHANISMS`.
+  There is 1 line, unquoted, at line 109 of 202 on 11-09.
+- **From** #768's 7 fields: `{"endgame_foul_window_s": 120, "endgame_foul_max_deficit": 10,
+  "endgame_foul_p_by_deficit": [0.25, 0.5, 0.6], "endgame_extend_possessions": true, "blowout_q4_margin": 999,
+  "blowout_margin": 999, "solver_endgame_pts_per_team": 0.2}`.
+- **To** 9 keys: `{"endgame_foul_window_s": 120, "endgame_foul_max_deficit": 10, "endgame_foul_p_by_deficit": [0.25,
+  0.5, 0.6], "endgame_extend_possessions": true, "blowout_q4_margin": 999, "blowout_margin": 999,
+  "solver_endgame_pts_per_team": 0.46, "score_effect_k": 0.005, "possession_alternation": 1.0}`.
+  - Men's only; wncaab untouched.
+- **Tool:** `~/bball_iv/k_scan/env_load_k.py --variant rc46`.
+  - It refuses unless there is exactly one key line and its value equals the 7 fields.
+  - It backs up to `local_production.env.bak-ncaab-score-effect-<UTC>`.
+  - It keeps the old value on a comment line and keeps the quoting.
+- **Dry run 11-09, after 19:17Z:** sha8 `4a316bd1` -> `7a94249e`, 202 -> 203 lines, PASS.
+- **Read-only checks:**
+  - The fleet's own code at the time (HEAD `564f8dbde`) parses the new value to 9 keys, with `score_effect_k`
+    0.005, `possession_alternation` 1.0 and `solver_endgame_pts_per_team` 0.46 on the `EventSimConfig`.
+  - live-odds-worker's live value equalled #768's 7 fields just before 19:17Z (boolean check, pid 374416).
+
+**Runbook for the load** (#768's 05:13:12Z deploys.md entry is the template; memory
+`project_fleet_env_change_recipe`). Only after the user's explicit yes:
+1. **Preconditions:**
+   - lane `ncaab-blowout-off-live-read` has recorded #768's live reading in deploys.md (a verdict, not
+     INSUFFICIENT), so the two changes are not confounded;
+   - between slates: `check_deploy_safety` QUIET, no live games.
+2. **Claims:** web, refresh-worker and live-odds-worker under holder `ncaab-score-effect-load`, `--ttl 7200`. Gate
+   on the acquire exit code; never grep it.
+3. **Drain:** `--drain --drain-owner ncaab-score-effect-load`.
+4. **Baseline:** live-odds-worker `/proc/<pid>/environ` parses to `ncaab_live_mechanisms_keys=7`. Record the time.
+5. **Fleet preflights from a worktree at origin/main:** `--target fleet --target-commit <fleet HEAD> --reinject-env`.
+   - live-odds-worker: `--expect ncaab_live_mechanisms_keys=9 --baseline ncaab_live_mechanisms_keys=7
+     --baseline-read-at <UTC>`.
+   - web and refresh-worker: `--no-expectation "env unchanged for this role; full down/up for live-odds-worker's
+     env"`.
+   - Poll all three until CLEAR together.
+6. **The change:** marker; `env_load_k.py --variant rc46` (not dry-run); `local_production.py down`; then
+   `Start-ScheduledTask SyndicateLocalProduction`.
+7. **Verify (config):**
+   - the new live-odds-worker environ parses to 9 keys, with `score_effect_k=0.005`,
+     `possession_alternation=1.0` and `solver_endgame_pts_per_team=0.46`;
+   - healthz 200 and 0 Tracebacks in all three role logs;
+   - `NCAAB_LIVE_RESIM_TICK` clean;
+   - `COLLEGE_PREGAME_SIM_LAUNCHED`: the one-time men's pregame re-sim, since `inputs_key` carries the mechanism
+     names.
+8. **Close:** clear the marker; `--undrain`; release the claims with `--token`; write the deploys.md entry
+   (measurement, owed reading, revert).
+
+**Expected readings (pre-stated):**
+- **Config:** 9 keys (baseline 7).
+- **Reachability:** on the first live NCAAB games, the lens `inputs.mechanisms` names `score_effect_k` and
+  `possession_alternation`.
+- **Effect.** On the first post-load slate's completed games, re-sim states at minutes 30 and 36 on the old
+  7-field config and on the new one, paired; the replay's method on 2026-27 games:
+  - served / old SD of the regulation margin about 0.93 from 30m and about 0.94 from 36m;
+  - FALSIFIED if outside 0.88-0.98;
+  - mean total shift +0.0 to +0.1 in-game, about 0 at the tip.
+- **Live totals:** `ncaab_live_totals_bias.py`, split at the load: model − line moves by less than ±0.2. RC46's
+  in-game shifts are +0.01 to +0.09.
+
+**Revert:** `env_load_k.py --revert <backup>`, then the same drained down/up.
+
+**Not decided here:** WNCAAB, which runs no live mechanisms (`live_mechanisms_from_env` applies to the men's league
+only).
+
+**Scratch:**
+- Scripts in WSL `~/bball_iv/k_scan/`: `env_load_k.py`, `spreadk_rc.py`, `run_gate_se05rc46.sh`, plus the session
+  scratchpad's `kanalyze_rc.py` and `kprob_rc.py`.
+- Runs: `~/bball_iv/runs/ncaab2026_se05_rc46/`, `ncaab2026_tieshape/spread_k_rc.jsonl`.

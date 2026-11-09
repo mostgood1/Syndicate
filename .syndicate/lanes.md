@@ -1017,12 +1017,13 @@ death, never life — do not invert it.
 - Moved: closed-lane-archive-20261109-0758.
 
 ### ncaab-score-effect-load — OPEN — opened 2026-11-09 — session c2fd17f8-7d77-4eed-b025-0830211e05b3
+- **STATUS `[2026-11-09 20:25Z]`: PREPARED, NOT LOADED.** Variant decided: RC46 (`solver_endgame_pts_per_team` 0.46 added); its gate `ncaab2026_se05_rc46` passes with a tip shift of -0.02 ± 0.11 and its replay keeps the gain (SD ratio 1.092, CRPS -0.121 ± 0.096). Runbook, readings and revert: findings PHASE 2 STEP 3h.
 - Goal: PREPARED (user 'Yes, prepare it'; the load itself needs its own yes): load score_effect_k 0.005 + possession_alternation 1.0 into live-odds-worker's SYNDICATE_NCAAB_LIVE_MECHANISMS by a drained full down/up, with or without the tip re-centre solver_endgame_pts_per_team 0.2 -> 0.46 as its gate decides (run ncaab2026_se05_rc46). Load only AFTER #768's owed live reading on the 11-09 evening slate is recorded (one change at a time), between slates, on the user's go-ahead. Edit tool ~/bball_iv/k_scan/env_load_k.py (dry-run passed 11-09: 1 key line, value = #768's 7 fields, -> 9 keys; fleet code parses both variants to 9).
 - Files: .syndicate/deploys.md, docs/ai_context/todo.md, .syndicate/log/2026-11-09.md, .syndicate/log/2026-11-10.md
 - Hypothesis: Expected from step 3g (findings PHASE 2 STEP 3g): served live margin distributions narrower, SD ratio new/old config about 0.93 at 10 min left in regulation and 0.94 at 4 min left; in-game total projections up about +0.48 at H2 start falling to +0.10 at 2 min (plain) or about 0 (rc46, if its gate confirms); pregame totals +0.57 (plain) or about 0 (rc46). Config: the new live-odds-worker environ parses to 9 keys (baseline 7).
 - Falsification test: The new environ parses to anything but 9 keys; or the paired probe (each live state re-simmed on the old 7-field config, >= 20 states from the first slate after the load) gives a served/old margin SD ratio outside 0.88-0.98 at 4-10 min left.
 - Verification: deploys.md entry: claims on all three services, fleet preflight from an origin/main worktree (--target fleet --reinject-env; live-odds-worker --expect ncaab_live_mechanisms_keys=9 --baseline =7), joint CLEAR, drained down/up, 9 keys in /proc/<pid>/environ, 0 Tracebacks, first NCAAB tick clean, lens inputs.mechanisms names both fields; then the paired-probe reading. Revert: env_load_k.py --revert <backup> and the same drained down/up.
-- Blocked by: the #768 live reading (11-09 evening slate) and the user's go-ahead to load
+- Blocked by: lane ncaab-blowout-off-live-read recording #768's live reading (a verdict, not INSUFFICIENT), and the user's explicit yes to load
 
 ### closed-lane-archive-20261109-1350 — CLOSED 2026-11-09 (GOAL MET: 1 blocks archived) — opened 2026-11-09 — session e6b38892-f13e-48eb-b2a5-cae03c9d2880
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
