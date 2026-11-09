@@ -975,6 +975,14 @@ death, never life — do not invert it.
 - Verification: Unit tests (pool not a job, odds job beside it still a job; mutation: drop the marker -> tests fail); live-odds-worker preflight CLEAR with only the pool present; after up: /proc environ parse = 7 keys, healthz 200, both workers up; deploys.md entry; live reading (model - line -1.95 -> ~-1.45) owed on the next NCAAB slate
 - Blocked by: none
 
+### nhl-nfl-live-prop-actuals — OPEN — opened 2026-11-08 — session 386d4115-6e7b-47e3-9ff7-be3914d851cb
+- Goal: Live NHL and NFL player-prop rows on the Layer 2 board carry a Live actual (the player's box stat so far, the field the settlement grader reads) and, NHL only and only where measured honest, a display-only Live proj.; never priced: 0 of them carry an edge. Verified on the fleet's served /api/intelligence/query on a live NHL and a live NFL slate
+- Files: syndicate/features/shared/live_player_actuals.py (NEW), tests/test_live_player_actuals.py (NEW), syndicate/features/shared/board_enrichment.py (attach_live_projections_for_sport: the new nhl/nfl live-player-actuals branch above the _live_prop_sports gate + new _LIVE_PLAYER_ACTUAL_SPORTS / _live_player_actuals_for_sport only), syndicate/features/nhl/live_resim.py (the livePlayerStats attach after build_live_lens_snapshot's re-sim loop + a new _attach_live_player_stats helper only), syndicate/features/nfl/live_resim.py (build_live_lens_snapshot's livePlayerStats attach + the prepared tuple carrying the live row only), .syndicate/findings_2026-11-09_nhl_nfl_live_prop_actuals.md (NEW)
+- Hypothesis: n/a (measured cause: board_enrichment._LIVE_PROP_SPORTS is mlb/wnba/soccer + nba and no NHL/NFL producer publishes per-player live stats; served board 2026-11-09 01:31Z: NHL 0 of 29 live props with Actual, NFL 0 of 140)
+- Falsification test: n/a
+- Verification: unit: off != on reachability (nhl/nfl rows gain actual_so_far only through the new branch), grader-identical field per market, display-only (no model_prob_over / live_aware / edge), stale-box and ambiguous-name refusals; fleet: livePlayerStats present on live games in live/nhl_live_lens.json and live/nfl_live_resim.json, LIVE_PROJECTION_JOIN sport=nhl|nfl display_only>0, served board live NHL + NFL props with Actual > 0 and 0 with edge_vs_market_pct, each Actual spot-checked against the box
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
