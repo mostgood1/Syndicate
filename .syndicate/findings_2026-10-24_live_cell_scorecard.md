@@ -746,6 +746,44 @@ cells).
   30-timed-fill re-judge cannot be reached. This went to the coordinator as a user question with options; nothing was
   changed here.
 
+## s12. Test B LOOK 2 + 2026-W45 `[read 2026-11-09 15:09-15:15Z, fleet ledger, read-only; scheduled Monday read]`
+
+**Substrate.** Fleet ledger dump 15:09Z, 38,092 rows, `live_document_read_ok=True`. Pinnacle join 15:15Z: 18,376 orders,
+5,425 with Pinnacle at submit, 17,471 with consensus. Test B as of 2026-11-09T00:00:00Z; W45 = submitted 11-02..11-09
+UTC.
+
+**Test B LOOK 2** (13,596 settled since REG, 14.35 days: the day bar is met for the first time).
+
+| arm | n | games | staked | ROI flat | CI95 | close edge pp (n) | status |
+|---|---|---|---|---|---|---|---|
+| P1 | 708 | 242 | $1,094.84 | -6.4% | [-18.7, +6.3] | +0.51 (647) | sized; no PASS, no FUTILITY |
+| P2 | 3,053 | 388 | $3,769.43 | -2.5% | [-7.5, +2.3] | -2.22 (2,990) | not confirmed |
+| C1 | 2,290 | 520 | $3,237.37 | -4.6% | [-11.7, +2.3] | +0.36 (1,989) | control |
+| C1-only | 1,985 | 502 | $2,800.22 | -5.8% | [-13.3, +1.7] | +0.19 (1,700) | |
+| population | 13,596 | 762 | $16,891.28 | -4.1% | [-6.9, -1.5] | -1.72 (5,624) | |
+
+C2 = -0.6pp (look 1: +2.5pp). **No verdict reached.** P1 capture age: <= 2m n 246 / 126 g -0.7% [-21.4, +19.4];
+> 2m n 454 / 180 g -10.0% [-23.8, +4.6]; unknown n 8. NCAAB has 0 Pinnacle coverage (878 ladder orders).
+
+**W45 live** (settled, net of fees, CI90 by game): Kalshi pregame 167 bets / 114 g, $232.08, -$20.02, -5.1% flat
+[-14, +3]; **Kalshi in-game 151 / 91 g, $394.11, -$49.02, -12.9% [-25, -1] LOSES**; Polymarket pregame 120 / 83 g,
+$101.96, -$13.33, -1.0% [-14, +12]. **Total 438 bets, $728.15 staked, -$82.37 (-11.3%).** Families n >= 8 flagged:
+Kalshi NBA totals 62 -15.1% [-30, -2] LOSES; Kalshi NCAAF totals 16 -41.7% [-74, -5] LOSES; Polymarket NCAAB totals 12
+-49.0% [-85, -0] LOSES; Kalshi NHL h2h 12 +46.5% [+18, +71] EDGE (thin). Ladder: no book significant (Kalshi pregame
+2,706 -3.1% [-7, +1]).
+
+**Gate** (evaluated 14:56:58Z, 64 cells): 4 tripped, **1 new: `kalshi|nba|spread|in_game` at 2026-11-07 02:49:19Z**,
+CI rule, n 84 / 76 g, -$25.95, -17.0%, CI90 [-33.8, -0.0] (worker `CELL_TRIP` line 02:49:20.114Z). No re-arm.
+
+**Nightly flags 11-09:** 119 (99 LOSES / 20 EDGE). New live EDGE family `kalshi|nhl|h2h` n 21 +31.3% [+5.5, +56.5];
+`kalshi|ncaaf|spread|40-55c|pregame` holds at n 54 +21.6% [+3.5, +39.4]. Multiple-comparison caution applies.
+
+**Maker pilot** (last copy per key): 45 posts, 21 filled / 24 cancelled; 19 settled fills (8 won), $100.77 staked,
+**held -$25.91, realised -$8.05**; 2 unsettled. `taker_fill_cost_dollars` is None on every ledger row; the 9 retained
+`MAKER_PILOT FILL` log lines (11-05..11-09) all read `filled_as=maker taker_cost=0.0`; the 3 fills of 11-03..11-04 are
+unread. **0 taker fills seen.** 0 `FAIR_CANCEL` lines in the retained live-odds logs. Maker shadow 11-09: 630 counted,
+all `CONTINUE`.
+
 ## s5. Running it
 
 **NIGHTLY JOB (built 2026-10-24, NOT LIVE until the coordinator's restart).**
