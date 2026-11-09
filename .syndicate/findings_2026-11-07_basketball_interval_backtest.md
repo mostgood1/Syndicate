@@ -966,6 +966,7 @@ rest hold.**
   - That points to real games pulling back toward something within the window, such as score effects or
     mean reversion. The sims have none of it: their closure is exact (+0.12 / +0.15).
   - This piece is INFERRED. It rests on the sims' between-game spread standing in for the real one.
+  - **MEASURED in step 3f below (2026-11-09), from real margins alone:** at least 2.51 ± 0.92 from 30m (30% of the excess) and at least 0.59 ± 0.42 from 36m (18%).
 - **The real outcome mix.** Real possessions score 0 less often (45.5% vs 52.7%) and 3 less often (12.4% vs
   14.8%), and score 1 and 2 more often (6.3% vs 2.9%; 35.5% vs 29.0%). 24.6% of real late possessions include a
   free throw. Real points per possession average 1.157 against the sims' 1.078.
@@ -1106,3 +1107,121 @@ falsification line was not crossed.**
 **Scratch:**
 - Scripts, in the session scratchpad: `possprobe.py`, `possreal.py`, `run_possreal.sh`, `possanalyze.py`.
 - Outputs: `~/bball_iv/runs/ncaab2026_tieshape/poss_real.jsonl` (4,472 games) and `poss_real_sample.txt`.
+
+## PHASE 2 STEP 3f (NCAAB): the within-game pull-back, measured on real margins alone — at least 30% of the sims' excess from minute 30, at least 18% from minute 36
+
+`[2026-11-09 14:14Z-14:21Z (8:14-8:21 AM CST), lane ncaab-real-pullback, session c2fd17f8, read-only, nice 19; the user's "yes" in the parent session local_8c13723c, relayed]`
+
+**Verdict.**
+- **Real late margins pull back within the game, and it is measurable without the sims.**
+  - The lower bound needs no assumption: 2.51 ± 0.92 points² (team-specific units) from minute 30, which is 30%
+    of the sims' 8.43 excess. From minute 36 it is 0.59 ± 0.42, 18% of 3.25.
+  - Step 3e had inferred 3.00 (36%) and 1.27 (39%) by borrowing the sims' between-game spread. From 30m the
+    measurement nearly reaches the inferred value; from 36m it sets a lower floor.
+- **The direct read is a give-back of recent runs.**
+  - From 30m: of each point the margin moves over minutes 30-35, 0.095 ± 0.030 comes back over minutes 35-40,
+    beyond what the close, the margin and the pace at minute 30 predict.
+  - From 36m: of each point of the 36-38 run, 0.107 ± 0.032 comes back in 38-40.
+- **The split-window residual covariance agrees:** -2.24 ± 0.69 (30m) and -0.97 ± 0.30 (36m). If the predictor's
+  errors do not anti-correlate across the two parts (both share any miss of team strength), these are lower bounds
+  too: at least 2.24 (27%) and at least 0.97 (30%).
+- **So most of step 3e's "rest" piece is real pull-back.**
+  - From 30m: at least 2.5 of the 3.0 piece. The remainder, at most 0.4, is the sims spreading expected margins
+    wider across games than real games do.
+  - From 36m: at least 0.59 of the 1.27 piece, and at least 0.97 under the split-window assumption.
+- **Side finding: the re-sim's own expected late margin change is spread too wide across games.**
+  - Real margin change regressed on the re-sim's per-game mean gives a slope of 0.68 ± 0.22 from 30m and
+    0.38 ± 0.29 from 36m (535 replay games).
+  - The re-sim mean predicts real late margins less well than a two-variable line-plus-margin regression: R² 0.048
+    against 0.094 from 30m, and -0.024 against 0.012 from 36m.
+
+**Pre-registered hypothesis PULL-BACK (lane block `d01ca8283`, before any fit): every clause HOLDS; the
+falsification test did not fire.**
+
+| clause | predicted | measured | |
+|---|---|---|---|
+| p_lb from 30m | at least 1.0 (central 1-3) | 2.51 ± 0.92 | holds |
+| p_lb from 36m | at least 0.4 (central 0.5-1.3) | 0.59 ± 0.42 | holds |
+| split-window residual Cov, 95% interval below 0 | negative | -2.24 ± 0.69 / -0.97 ± 0.30 | holds |
+| run coefficient (later change on the earlier change, given pre-window information) | negative | -0.095 ± 0.030 / -0.107 ± 0.032 | holds |
+
+**Method.**
+- **Data:** the 4,472 pool games. 4,439 have a pregame close in their corpus record (the harness's `_close`);
+  33 do not.
+- **Scores:** regulation scores at minutes 30, 35, 36, 38 and 40 from the play-by-play. Margins agree with step 3b's
+  `real.jsonl` in every game.
+- **Inputs reconcile with steps 3c and 3e on these 4,439 games:**
+  - Var(dM)/2 is 23.60 / 9.81 (step 3c: 23.61 / 9.79);
+  - A + B is 23.41 / 10.00 (step 3e: 23.42 / 10.00).
+- **The bound:**
+  - Within-game noise has mean zero given anything known before the window. So for any predictor f of that
+    information, Var(dM - f) = within + Var(f's error), which is at least the within variance.
+  - Hence p_lb = (A + B) - Var(dM - f)/2 is at most the true pull-back.
+  - A + B is step 3e's independent-possession prediction, built from real possessions only.
+  - f is OLS, cross-fitted over 2 random folds by game, so no in-sample fit flatters it.
+- **Features:**
+  - "line + margin": the close's home margin and the margin at the checkpoint.
+  - The full set adds: the close's total; scoring pace so far against the close (points minus the total × the
+    elapsed share); the margin's deviation from the line to date; and the margin beyond 11 and beyond 20 points.
+- **Split window:** 30-35m against 35-40m, and 36-38m against 38-40m. Both parts are residualised on the full
+  pre-window set, cross-fitted.
+- **Intervals:** 1.96 × a bootstrap SE over games. A + B and the residual variance are drawn together; residuals
+  are fixed after the cross-fit.
+
+**The bound by predictor:**
+
+| predictor f, cross-fitted | from 30m: V_f = Var(dM - f)/2 | p_lb | share of the sims' excess | R² | from 36m: V_f | p_lb | share | R² |
+|---|---|---|---|---|---|---|---|---|
+| none | 23.60 | -0.19 ± 1.02 | -2% | 0 | 9.81 | +0.19 ± 0.44 | +6% | 0 |
+| line + margin | 21.02 | +2.39 ± 0.93 | +28% | 0.109 | 9.42 | +0.58 ± 0.42 | +18% | 0.039 |
+| full pre-window set | **20.90** | **+2.51 ± 0.92** | **+30%** | 0.114 | **9.41** | **+0.59 ± 0.42** | **+18%** | 0.041 |
+
+- **The replay's 535 games**, where the re-sim's per-game mean margin change (a point projection made at the
+  checkpoint) is a further predictor:
+
+  | predictor | from 30m: p_lb | R² | from 36m: p_lb | R² |
+  |---|---|---|---|---|
+  | the re-sim mean, as is | +1.88 ± 2.56 | 0.048 | +0.48 ± 1.25 | -0.024 |
+  | full set only | +2.93 ± 2.37 | 0.094 | +0.81 ± 1.15 | 0.012 |
+  | full set + the re-sim mean | +3.01 ± 2.39 | 0.098 | +0.88 ± 1.14 | 0.019 |
+
+  - The re-sim mean adds almost nothing beyond the line and the state.
+- **Raw split-window covariance**, before residualising: -0.89 (30m) and -0.80 (36m). Residualising removes the
+  shared team-strength part, which is positive, so the residual covariance is more negative.
+
+**Where the sims' excess team-specific variance now sits** (step 3e's table, with the inferred piece replaced by
+measured bounds):
+
+| piece | from 30m | from 36m |
+|---|---|---|
+| per-possession dispersion | +2.77 (33%) | +1.35 (41%) |
+| more possessions in the sims | +1.03 (12%) | -0.05 (0%) |
+| unshared possession count (coin-flip imbalance) | +1.63 (19%) | +0.68 (21%) |
+| **real within-game pull-back, MEASURED lower bound** | **at least +2.51 (30%)** | **at least +0.59 (18%); at least +0.97 (30%) by the split window** |
+| the sims' own structure (no pull-back; noise level) | +0.12 | +0.15 |
+| the sims' expected margins spread wider across games than real (what is left) | at most +0.38 (5%) | at most +0.51 (16%); at most +0.13 by the split window |
+
+**What it means (nothing ships from this lane):**
+- **The engine needs margin reversion inside the game.** The give-back is about 0.10 of each point of a recent
+  run, beyond the state at the checkpoint.
+- **`score_effect_k` is the existing field for it.** It keys on the lead now minus the expected lead to date, and a
+  run moves exactly that.
+  - Rough size (INFERRED, back-of-envelope): the give-back over about 9 possessions a team, at about 1.1 points a
+    possession, means 2 × 9 × 1.1 × k ≈ 0.095 per point of deviation. That gives k ≈ 0.005, rather more as the
+    deviation decays.
+  - Step 3b scanned only k = 0.002, the NBA proposal: 2-3× smaller.
+- **The calibration slope (0.68 / 0.38) says the re-sim also over-reacts across games** in its expected late margin
+  change. Pull-back inside the sims would shrink that spread as well, so read the slope again after a k scan.
+
+**Next for NCAAB:**
+1. **Scan `score_effect_k`** (0.005 and 0.01; existing field, no engine edit), with `possession_alternation` 1.0.
+   Read against:
+   - step 3e's closure;
+   - this step's run coefficients (targets -0.095 / -0.107, measured the same way on the sims' paths);
+   - the calibration slope.
+2. **Then the mechanisms**: a late-weighted bonus refit for the outcome mix, and step 3b's end-game decisions. Each
+   needs an `engine.py` loan and an E1 refit.
+
+**Scratch:**
+- Scripts, in the session scratchpad: `pullreal.py`, `run_pullreal.sh`, `pullanalyze.py`, `pullslope.py`.
+- Output: `~/bball_iv/runs/ncaab2026_tieshape/pull_real.jsonl` (4,439 games).
