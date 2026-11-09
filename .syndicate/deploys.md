@@ -57774,3 +57774,8 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - (e) on the first neutral-site reversed game: served blocks in the chip's frame, and settled live periods equal to the line score. The pregame side needs the next refresh-worker restart.
   - (g) on a chip that turns final between worker builds.
 - **Revert:** `git revert e75315e62`, then ff + `reload-web` (+ refresh-worker TERM if it has loaded).
+
+## 2026-11-09 17:17:39Z (11:17 AM CST) -- MEASUREMENT, no deploy: `check_deploy_safety` college readings labelled D1 vs D1 (`145523971`, lane `deploy-safety-live-note-d1-label`) -- **MET**
+- Script run from a checkout; nothing on the fleet loads it. Read-only.
+- **Read:** `WARNING: Live games in progress (wncaab: 3 live D1-vs-D1)`, with `Live-game sources: ... ncaab re-sim (D1 vs D1): 0 live (1m ago); wncaab re-sim (D1 vs D1): 3 live (2m ago)`. It matches `WNCAAB_LIVE_RESIM_TICK live=3` (17:16:04Z), the same line before (17:17:38Z) and after (17:17:41Z) the check.
+- **Why:** at 16:57Z a bare "0 live" read as "no college game" while 3 games against non-D1 opponents were in play. The re-sim drops those (`dropped_non_d1`), and the board does not price them.

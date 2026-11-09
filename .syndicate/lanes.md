@@ -971,13 +971,14 @@ death, never life — do not invert it.
 - Verification: off != on unit tests (matcher, order-path _resolve_event, fan-in naming); fleet replay old vs new over every live Kalshi game event and each board date held, every status change listed and read by eye; ncaab/wncaab fan-in A/B at one clock
 - Blocked by: none
 
-### deploy-safety-live-note-d1-label — OPEN — opened 2026-11-09 — session 8e61bcf3-f1f0-484f-9d78-eea1e8eb0e27
+### deploy-safety-live-note-d1-label — CLOSED 2026-11-09 (GOAL MET: 145523971 on main; 151 tests pass; fleet run 17:17:39Z shows the label live) — opened 2026-11-09 — session 8e61bcf3-f1f0-484f-9d78-eea1e8eb0e27
 - Goal: check_deploy_safety's college re-sim readings say they count D1-vs-D1 games only, in the sources line and the live headline (user 'Yes, relabel')
 - Files: scripts/check_deploy_safety.py (resim_snapshot_reading label + summarize_live_games live entry + the live-games comment block only), tests/test_check_deploy_safety_live_note.py
 - Hypothesis: none -- wording change; the re-sim drops non-D1-opponent games (dropped_non_d1), so '0 live' read as no college game at 16:57Z with 3 such games in play
 - Falsification test: n/a
 - Verification: Unit tests assert the D1-vs-D1 label in sources + headline; deploy-safety suites pass; read-only fleet run shows the new label
 - Blocked by: none
+- GOAL: MET in 145523971. Sources line `ncaab re-sim (D1 vs D1): N live`; headline `(wncaab: 3 live D1-vs-D1)`; the comment block records why. 151 tests pass (live_note, fleet_logs, deploy_guard, build_estimate, preflight_board_build_hold). Read-only fleet run 17:17:39Z (11:17 AM CST): "WARNING: Live games in progress (wncaab: 3 live D1-vs-D1)"; sources "ncaab re-sim (D1 vs D1): 0 live (1m ago); wncaab re-sim (D1 vs D1): 3 live (2m ago)". It matches WNCAAB_LIVE_RESIM_TICK live=3 (17:16:04Z), which was unchanged before and after the check.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
