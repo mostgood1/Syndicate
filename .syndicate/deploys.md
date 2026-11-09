@@ -57731,3 +57731,13 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
     - The watcher started 15:31Z died when the session restarted; this is a direct read of the log growth since the ff (sizes 166038 -> 188121 and 79570 -> 84982).
 - **Owed (todo `#772`):** on the next MIA or MIN slate, Portis (and a healthy, priced Shannon) in `live_resim.load_engine_inputs`, and their served live prop rows with Live proj. and actual.
 - **Revert:** revert `8fc72076d` on main, then a fleet ff to the revert commit. That needs no restart, for the same reason.
+
+
+## 2026-11-09 17:05:47Z (11:05 AM CST) -- FLEET ff 8fc72076d -> 56f2e7a10 + live-odds-worker TERM 17:04:42Z: in-game entries refuse a decision ask below 0.55 (lane `inplay-min-ask`) -- **LOADED; first refusal OWED**
+- **User (coordinator chat):** "Yes, 0.55 floor", then "Yes, take the loan" (inplay_entries_live.py borrowed from in-game-trading), then "Yes, deploy it" after auto mode refused the first attempt.
+- **What:** `56f2e7a10`. New guard `min_ask` in `LiveEntryPlacer`, `SYNDICATE_INPLAY_MIN_ASK`. Absent, blank or unusable = 0.55; "off"/"none"/"0" disables. Refusal reason `below_inplay_min_ask`. Pregame is untouched. Why: live in-game Kalshi fills 10-23..11-09 at asks 0.40-0.55 were n=369, -10.7% ROI; at >=0.55, n=32, about +30% (small sample).
+- **Ride-along:** `80aec5a3f`, `scripts/ncaab_live_totals_bias.py`. Offline analysis only; its one importer is another offline script.
+- **Gates:** claim live-odds-worker `inplay-min-ask` 16:59Z. Preflight `--target fleet --target-commit 56f2e7a10 --expect fleet_checkout_head=56f2e7a1 --baseline fleet_checkout_head=8fc72076`: HOLD on 6 jobs, CLEAR 17:01:28Z, re-run CLEAR 17:04:24Z.
+- **Deploy:** `git merge --ff-only 56f2e7a10` 17:04:42Z. TERM pid 325044; it had 2 live_resim_workers children. Respawn pid 354171 at 17:05:09Z.
+- **Verify (~17:05:30Z, in pid 354171's environ):** the key is unset, so effective `inplay_min_ask()` = 0.55; price band (0.40, 0.75); in-game entries on. 0 tracebacks since restart. 0 LIVE_ENTRY lines yet, because no in-play slate had started.
+- **Owed:** the first LIVE_ENTRY with `reason=below_inplay_min_ask` on tonight's slate, and 0 `ingame:` ledger fills with fill price < 0.55 after 17:05:09Z.
