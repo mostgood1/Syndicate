@@ -976,6 +976,9 @@ death, never life — do not invert it.
   - Every live answer is identical on a same-moment replay.
   - **Left:** the positive live read, when a 5-letter game reaches a board (Texas St @ UTRGV 11-10, then the 11-11 games): named by the fan-in, `ok` in the board join.
   - Record: `deploys.md` 2026-11-09 18:25:43Z.
+  - **Live-read task `[2026-11-09 19:15Z]`** (user "Yes, schedule it"): `kalshi-five-char-live-read-1110`, one-time Tue 11-10 5:00 PM CST, enabled.
+    - It reads Texas St @ UTRGV (else the 11-11 UTRGV / UMass Lowell games): fan-in token, board-join status, and the pre-fix counterfactual.
+    - It records MET / NOT MET / NOT YET, reconciles the pending marker if MET, and closes this lane if MET. Ledger only.
 - **STATUS `[2026-11-09 17:28Z]`: GOAL: NOT MET -- written, tested and replayed; on a branch only, NOT on main, NOT loaded.**
   - **Hypothesis CONFIRMED:**
     - `_splits` capped codes at 4 characters.
