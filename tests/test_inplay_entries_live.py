@@ -24,6 +24,9 @@ def _env(monkeypatch, tmp_path):
               "SYNDICATE_EXECUTION_LIVE_ARMED", "SYNDICATE_KALSHI_EXPIRE_AT_KICKOFF", "SYNDICATE_LIVE_PRICE_BAND", "SYNDICATE_LIVE_CELL_GATE",
               "SYNDICATE_INPLAY_ENTRY_ORDER_DOLLARS", "SYNDICATE_KALSHI_ROUND_UP_MIN_DOLLARS"):
         monkeypatch.delenv(k, raising=False)
+    # The in-game min ask (default 0.55) is OFF here so the tests below keep pinning the guard they test at
+    # the 0.30 ask; the min-ask tests at the bottom delete or set it themselves.
+    monkeypatch.setenv("SYNDICATE_INPLAY_MIN_ASK", "off")
 
 
 def _placer(orders=(), enabled=True):
@@ -390,7 +393,8 @@ def test_a_placed_entry_joins_the_ledger_row_by_its_idempotency_key(monkeypatch)
     assert (rec["ask"], rec["leg"], rec["position_key"]) == (0.30, "yes", f"ingame:{ENTRY['ticker']}:yes")
     assert rec["sizing"]["version"] == live.SIZING_VERSION and rec["sizing"]["stake"] == 2.7901
     assert rec["sizing"]["contracts"] == 9 and rec["sizing"]["order_dollars"] == 3.0 and rec["sizing"]["day_cap"] == 50.0
-    assert set(rec["guards"]) == {"band", "cell_gate", "ledger", "axis", "day_budget", "check_order"}
+    assert set(rec["guards"]) == {"band", "min_ask", "cell_gate", "ledger", "axis", "day_budget", "check_order"}
+    assert rec["guards"]["min_ask"] == {"verdict": "off"}
     assert rec["guards"]["band"] == {"verdict": "pass", "band": [0.20, 0.75]}
     assert rec["guards"]["cell_gate"] == {"verdict": "off"}
     assert rec["guards"]["check_order"] == {"verdict": "pass", "reason": None}
@@ -501,3 +505,51 @@ def test_backfill_writes_a_joinable_record_once_and_only_for_placed_entries():
     again, why2 = bf.plan(entries, orders, {DAY: {"ledger-key-9"}}, record_version=live.RECORD_VERSION,
                           backfilled_at="x")
     assert again == {} and why2["already_recorded"] == 1
+
+
+# --- in-game min ask (lane inplay-min-ask; user 2026-11-09 "Yes, 0.55 floor") ---
+
+def test_min_ask_default_is_on_and_refuses_below_without_placing(monkeypatch):
+    monkeypatch.delenv("SYNDICATE_INPLAY_MIN_ASK", raising=False)
+    assert live.inplay_min_ask() == 0.55
+    for ask, placed in ((0.30, False), (0.549, False), (0.55, True), (0.70, True)):
+        p, calls = _placer()
+        out = p({**ENTRY, "ask": ask})
+        assert out["placed"] is placed, ask
+        assert len(calls) == (1 if placed else 0)
+        if not placed:
+            assert out == {"placed": False, "reason": "below_inplay_min_ask", "floor": 0.55}
+
+
+def test_min_ask_off_differs_from_on_reachability(monkeypatch):
+    p, calls = _placer()
+    assert p(ENTRY)["placed"] is True and len(calls) == 1  # "off" (fixture): the 0.30 entry is placed
+    monkeypatch.delenv("SYNDICATE_INPLAY_MIN_ASK", raising=False)
+    p, calls = _placer()
+    assert p(ENTRY)["reason"] == "below_inplay_min_ask" and calls == []  # default on: the same entry is refused
+
+
+def test_min_ask_env_parsing_never_opens_on_a_bad_value(monkeypatch):
+    for raw, want in (("", 0.55), ("junk", 0.55), ("1.5", 0.55), ("-0.2", 0.55), ("0.6", 0.6),
+                      ("off", None), ("NONE", None), ("0", None)):
+        monkeypatch.setenv("SYNDICATE_INPLAY_MIN_ASK", raw)
+        assert live.inplay_min_ask() == want, raw
+
+
+def test_min_ask_refusal_is_recorded_with_every_guard(monkeypatch):
+    monkeypatch.delenv("SYNDICATE_INPLAY_MIN_ASK", raising=False)
+    recs: list = []
+    p = live.LiveEntryPlacer(today_fn=lambda: DAY, orders_fn=lambda: [], enabled_fn=lambda: True,
+                             place_fn=lambda **kw: pytest.fail("placed below the floor"),
+                             record_fn=lambda d, r: recs.append(r))
+    assert p(ENTRY)["reason"] == "below_inplay_min_ask"
+    (rec,) = recs
+    assert rec["guards"]["min_ask"] == {"verdict": "fail", "floor": 0.55}
+    assert rec["guards"]["band"] == {"verdict": "off"} and rec["guards"]["check_order"] == {"verdict": "not_reached"}
+
+
+def test_price_band_still_refuses_first_when_both_fail(monkeypatch):
+    monkeypatch.delenv("SYNDICATE_INPLAY_MIN_ASK", raising=False)
+    monkeypatch.setenv("SYNDICATE_LIVE_PRICE_BAND", "0.40,0.75")
+    p, calls = _placer()
+    assert p({**ENTRY, "ask": 0.30})["reason"] == "outside_price_band" and calls == []

@@ -22,7 +22,9 @@ OFF BY DEFAULT. Live only when ALL hold, re-read on every entry:
   * when `SYNDICATE_LIVE_CELL_GATE=on`, the entry's cell (`kalshi|<sport>|<family>|in_game`) is not
     tripped in the persisted `live_cell_gate` state (READ only: the refresh-worker evaluates; an
     unreadable state refuses `live_cell_gate_unknown`, fail closed; the read is cached 60 s). User
-    "Per-cell trip only (C)" via coordinator 332cb014, lane live-cell-scorecard (d57baa09), 2026-10-24.
+    "Per-cell trip only (C)" via coordinator 332cb014, lane live-cell-scorecard (d57baa09), 2026-10-24;
+  * the decision ask is at least the in-game MIN ASK (`SYNDICATE_INPLAY_MIN_ASK`, default 0.55; `inplay_min_ask`).
+    User 2026-11-09 via coordinator 332cb014: "Yes, 0.55 floor", lane inplay-min-ask.
 
 THE ORDER: 1 contract (or, when `SYNDICATE_INPLAY_ENTRY_ORDER_DOLLARS` is set, as many whole contracts
 as that many dollars buys at ask + 1c, capped at $5 per order; `entry_stake`), `immediate_or_cancel` (`kalshi_orders.order_body_v2`
@@ -67,6 +69,12 @@ DAY_DOLLARS_DEFAULT = 50.0  # absent / unusable env: the original cap, never the
 DAY_DOLLARS_CEILING = 100.0  # user 2026-10-28: "double the cap to $100/day"
 ORDER_DOLLARS_CEILING = 5.0
 MAX_PRICE_MOVE = 0.01
+# In-game entries only: the decision ask must be >= this. USER DECISION 2026-11-09 (coordinator 332cb014,
+# "Yes, 0.55 floor", lane inplay-min-ask). Settled live in-game Kalshi fills 10-23..11-09: asks 0.40-0.55
+# n=369, -10.7% ROI (-$75.96); asks >= 0.55 n=32, about +30%. Small sample, so it is a floor, not a verdict.
+INPLAY_MIN_ASK_DEFAULT = 0.55
+_INPLAY_MIN_ASK_ENV = "SYNDICATE_INPLAY_MIN_ASK"
+_OFF = {"off", "none", "0"}
 CELL_GATE_CACHE_S = 60.0
 _ON = {"on", "live"}
 
@@ -102,6 +110,22 @@ def order_dollars() -> float | None:
     except ValueError:
         return None
     return min(v, ORDER_DOLLARS_CEILING) if v > 0 else None
+
+
+def inplay_min_ask() -> float | None:
+    """The in-game floor on the decision ask, or None when explicitly switched off.
+
+    Absent, blank or unusable = the 0.55 default (an unreadable value must not open the floor);
+    "off" / "none" / "0" = no floor; a number in (0, 1) = that floor.
+    """
+    raw = str(os.environ.get(_INPLAY_MIN_ASK_ENV) or "").strip().lower()
+    if raw in _OFF:
+        return None
+    try:
+        v = float(raw)
+    except ValueError:
+        return INPLAY_MIN_ASK_DEFAULT
+    return v if 0.0 < v < 1.0 else INPLAY_MIN_ASK_DEFAULT
 
 
 def entry_stake(ask: float) -> float:
@@ -245,12 +269,15 @@ class LiveEntryPlacer:
         stake = entry_stake(ask)  # whole contracts; 1 unless SYNDICATE_INPLAY_ENTRY_ORDER_DOLLARS is set
         cap = day_budget_dollars()
         band = _price_band()
+        floor = inplay_min_ask()
         cell, cell_refusal = self._cell_check(entry)
         # EVERY guard's verdict, evaluated independently so the record holds all of them; the order of the
         # refusals below is unchanged (the first failing guard is the reason).
         guards: dict[str, dict[str, Any]] = {
             "band": {"verdict": "off"} if band is None else {
                 "verdict": "pass" if band[0] - 1e-9 <= ask < band[1] - 1e-9 else "fail", "band": [band[0], band[1]]},
+            "min_ask": {"verdict": "off"} if floor is None else {
+                "verdict": "pass" if ask >= floor - 1e-9 else "fail", "floor": floor},
             "cell_gate": {"verdict": "off"} if cell is None else {
                 "verdict": "pass" if cell_refusal is None else "fail", "cell": cell, "reason": cell_refusal},
             "ledger": {"verdict": "fail" if pk in spend["position_keys"] else "pass"},
@@ -261,6 +288,8 @@ class LiveEntryPlacer:
         }
         if guards["band"]["verdict"] == "fail":
             result = {"placed": False, "reason": "outside_price_band", "band": f"[{band[0]:.2f},{band[1]:.2f})"}
+        elif guards["min_ask"]["verdict"] == "fail":
+            result = {"placed": False, "reason": "below_inplay_min_ask", "floor": floor}
         elif cell_refusal is not None:
             result = {"placed": False, "reason": cell_refusal}
         elif guards["ledger"]["verdict"] == "fail":
