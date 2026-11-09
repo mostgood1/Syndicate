@@ -57705,3 +57705,23 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **Failure lines (`fail_lines_strict.sh`):** strict writer-emitted count since 11-04T23:27Z **0**. One loose match, 2026-11-08T17:15:52.174Z, is ALL_PROCESS_MEMORY telemetry and carries a grep cmdline (the owning session's own grep); no unexplained telemetry match.
 - **Pass rule (pre-registered 2026-11-04):** missing 0 / repeats <= 0.1% / strict count 0 / no `.unreadable` -- **all four hold on both shards. PASS.** Both populations are >500k rows (10-31, the failing day, had 819,431), so this is a strong test.
 - **verify:** state keys == shard keys on both weekend shards, read above. Lane `book-quotes-state-reset` CLOSED, loan returned, todo `#759` closed.
+
+## 2026-11-09 15:30:09Z (9:30 AM CST) -- FLEET ff `aa5f50ac5 -> 8fc72076d` (`#772` NBA pregame pool name-key fix: roster filter + recency readmit + expected-minutes merge). **LOADED by the ff alone (no role restart); fleet_checkout_head MET; first-run reading PENDING; served effect owed on the next MIA/MIN slate** (lane `nba-roster-filter-name-key`, user "Load it now")
+- **User, in this chat:** "Load it now". That answered "Load 8fc72076d on the fleet before MIA's next game?". It covers this change only.
+- **Range `aa5f50ac5..8fc72076d`, 4 commits.**
+  - Runtime: `basketball_props_smart_sim.py` (roster filter + expected-minutes merge) and `nba_sim_availability.py` (readmit), plus the new test.
+  - The other 3 commits are ledger only (lanes, todo).
+  - vendor/ unchanged. 0 of the fleet's dirty paths overlap. ff to MY SHA only.
+- **Why no TERM:** the changed functions run only on the NBA pregame pool build. That build runs in `scripts/refresh_nba_oddsapi_props.py`, a fresh grandchild (`run_refresh_odds_job.py` -> `refresh_odds_sources.py` -> it) spawned per job from `~/Syndicate`, so the next spawn imports the new code. In-process, the workers use only unchanged functions of these modules (`_engine_for_league_local`, `_to_tricode_local`, `_sample_lineup_local`).
+- **Claim:** live-odds-worker, holder `nba-roster-filter-name-key`, 15:25:22Z (status confirmed HELD).
+- **Preflight** (`--target fleet --target-commit 8fc72076d --expect fleet_checkout_head=8fc72076d --baseline fleet_checkout_head=aa5f50ac5 --baseline-read-at 2026-11-09T15:25:41Z`), from a worktree at origin/main `09ca1af93`. First read HOLD: 4 odds jobs, including an NHL fetch after the NBA props child. Polled every ~20 s: **CLEAR 15:30:01Z** after 11 polls, 0 processes.
+- **Deploy:** `git merge --ff-only 8fc72076d` in `~/Syndicate` at 15:30:09Z (reflog `HEAD@{2026-11-09T09:30:09-06:00}: merge 8fc72076d: Fast-forward`). The fleet files carry `ROSTER_FILTER_DROPPED` and `priced_canon`.
+- **Prediction, before the ff (replays on fleet data, both codes):**
+  - 11-09 (8 games, 16 teams): filter replay = persisted frames on 16/16, identical under the new code. 102 priced, 0 absent; filter drops 0, so `ROSTER_FILTER_DROPPED` stays silent.
+  - Recency rule identical: 11-09 added 68 / readmitted 2, 11-10 added 70 / readmitted 0 (replay counts; production's own lines read 55/2 and 58/0).
+  - **Today's sims are expected NOT to change.** No Jr./Jr split plays 11-09 or 11-10.
+- **expect / measured:**
+  - `fleet_checkout_head` -> 8fc72076d: **MET** at 15:30:09Z.
+  - First NBA props run after the ff completes on the new code: same `NBA_SIM_AVAILABILITY` counts as the run before, no Traceback, no `ROSTER_FILTER_WIDEN_FAILED`. Measured: <pending -- watcher on `syndicate_refresh_oddsapi_props_2026-11-09.log`, started 15:31Z>.
+- **Owed (todo `#772`):** on the next MIA or MIN slate, Portis (and a healthy, priced Shannon) in `live_resim.load_engine_inputs`, and their served live prop rows with Live proj. and actual.
+- **Revert:** revert `8fc72076d` on main, then a fleet ff to the revert commit. That needs no restart, for the same reason.
