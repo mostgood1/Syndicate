@@ -892,6 +892,14 @@ death, never life — do not invert it.
 - Verification: Replay on fleet data: fleet code drops Portis at the filter, fixed code keeps him; unit test off != on; slate count before/after printed; on-fleet effect read after the next NBA pregame rebuild once loaded
 - Blocked by: none
 
+### deploy-safety-live-note-sports — OPEN — opened 2026-11-09 — session 8e61bcf3-f1f0-484f-9d78-eea1e8eb0e27
+- Goal: check_deploy_safety's live-game note names what it covers and shows live NCAAB/WNCAAB from their re-sim snapshots; an unreadable/stale reading prints UNKNOWN, never 'No live games'; stays a NOTE/WARNING, never a blocker
+- Files: scripts/check_deploy_safety.py (the live-game note in main() + new live-reading helpers only; NOT fleet_worker_children / is_service_child / board build), tests/test_check_deploy_safety_live_note.py (NEW)
+- Hypothesis: anyLive = _any_tracked_sport_game_live() over _LIVE_STATUS_CHECKERS (mlb,wnba,nba,nhl,soccer,nfl,ncaaf) only; ncaab/wncaab have no checker, so a live college slate reads 'No live games' (11-09 04:41Z, NCAAB_LIVE_RESIM_TICK live=2). anyLive=None (adaptive off) also reads 'No live games'.
+- Falsification test: If live/ncaab_live_resim.json's game count is NOT the producer's counts.live (some live ids omitted), the snapshot count cannot stand in for live games and the note must fall back to wording only.
+- Verification: Unit: fixture anyLive=false + ncaab snapshot with 2 games -> WARNING names 'ncaab: 2 live'; stale/absent snapshot -> UNKNOWN; drift tests vs _LIVE_STATUS_CHECKERS and the board's live gameline sports. Existing tests/test_check_deploy_safety*.py pass. Read-only fleet run during a live slate names the right sports.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
