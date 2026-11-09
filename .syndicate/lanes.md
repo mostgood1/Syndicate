@@ -1002,6 +1002,14 @@ death, never life — do not invert it.
 - Verification: off != on unit tests; fleet: LIVE_GAMELINE_JOIN display= > 0 for ncaab/wncaab (and nfl/nhl/ncaaf when live); served /api/intelligence/query live game rows with Live proj. per sport before vs after; 0 display-only rows with edge_vs_market_pct/live_aware/model_ev_pct
 - Blocked by: none
 
+### ncaab-real-possession-outcomes — OPEN — opened 2026-11-09 — session c2fd17f8-7d77-4eed-b025-0830211e05b3
+- Goal: Measure, read-only, the real per-possession scoring distribution of 2025-26 NCAAB games from the play-by-play, from minutes 30 and 36 to the end of regulation (4,472-game pool and the replay's 539 games), against the production re-sim's (base 0/1/2/3/4+ = 52.7/2.9/29.0/14.8/0.6%, variance 1.459 from 30m), and read whether per-possession dispersion carries the sims' team-specific excess (step 3c/3d)
+- Files: .syndicate/findings_2026-11-07_basketball_interval_backtest.md, docs/ai_context/todo.md, .syndicate/log/2026-11-09.md
+- Hypothesis: PER-POSS-VAR, pre-registered 2026-11-09 14:01Z before any segmentation ran; it is step 3c's INFERENCE under test: on segmented real possessions from 30m, the variance of points per possession is 0.95-1.20 (sims 1.459), so the sims' per-possession outcomes are 20-50% too dispersed and that is the bulk of the team-specific excess. Expected shape: real 1-point possessions at least twice the sims' 2.9% and 3-point possessions under 12% (sims 14.8%). Prior, stated honestly: a rough pmf built from the window box rates gives 1.2-1.37, so the falsification branch is live.
+- Falsification test: Real per-possession variance from 30m is 1.32 or more (within ~10% of the sims). Then per-possession dispersion is NOT the excess; the closure table (E[N] x variance + mean^2 x unshared Var(N), real and sims) says whether it sits in within-game structure (real possessions negatively correlated, e.g. score effects) or between-game spread.
+- Verification: Validation gates read BEFORE the result: credited possession points reconcile with each team's regulation points in every game; segmented possessions per team-window within 5% of the box estimator's 17.74 from 30m; two games' last-3-minute sequences eyeballed. Then pmf, mean and variance per possession, real (pool, same games) vs sims (base, E2), and the closure table, in the findings file and #765. Diagnostic only: no engine, served-code or config change; nothing deployed.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
