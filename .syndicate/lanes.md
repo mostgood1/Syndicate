@@ -959,6 +959,14 @@ death, never life — do not invert it.
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 1 of 21 CLOSED blocks SAFE at 00:42Z 11-09 (18:42 CST 11-08); 20 WAIT (table in log/2026-11-08.md).
 - Moved: closed-lane-archive-20261108-1311
 
+### ncaab-spread-existing-levers — OPEN — opened 2026-11-08 — session c2fd17f8-7d77-4eed-b025-0830211e05b3
+- Goal: Measure, read-only, whether the NCAAB re-sim's existing default-off or default-valued fields fix step 3c's misplaced late variance: four arms on top of production E1 (E2 bonus free throws 0.08 x1.5; possession_alternation 1.0; possessions_jitter 0.12; all three), same 540 games, seeds and checkpoints (30m, 36m), 100 sims, read against step 3c's tables (team-specific variance, Cov(home, away), Var(total), Var(margin change), regulation tie rate, FTA/FGA, mean window points)
+- Files: .syndicate/findings_2026-11-07_basketball_interval_backtest.md, docs/ai_context/todo.md, .syndicate/log/2026-11-09.md
+- Hypothesis: EXISTING-FIELDS, pre-registered 2026-11-09 01:23Z before any arm ran. (a) JIT12 (possessions_jitter 0.12, the value that brings the sims' total-possession variance from 30m to the real estimator's 19.2) raises Cov(home, away) of window points from 30m to 3.5-6.0 (real 6.82, base 0.72) but from 36m to under 1.5 (real 4.51), because jitter scales with time left squared and the real shared variance does not; Var(margin change) moves under 5% at both. (b) E2 lowers the team-specific part (Var - Cov) by 4-12% at both checkpoints, brings FTA/FGA from 30m to 0.45-0.70 (real 0.576, base 0.289) and raises mean window points per team by 0.4-1.2. (c) ALT1 lowers Var(margin change) by 4-10% and leaves Cov and Var(total) within 10% of base. (d) ALL leaves the team-specific part at least 10% above real at both checkpoints, so per-possession variance stays the larger unexplained piece.
+- Falsification test: Any arm's measured change is outside its predicted range in direction, or off by more than twice the range's width; or JIT12 closes at least half of the 36m covariance gap (then the late shared variance IS a pace multiplier); or ALL brings the team-specific part within 10% of real at 30m.
+- Verification: Reachability first: each arm's provenance cfgFields name its fields, and its margin histograms differ from the base in at least 90% of game-checkpoints. Base = step 3c's spread_sims.jsonl (same code4 copy, seeds and tasks; fidelity already 1,080/1,080). Per-arm tables vs base and real in the findings file and #765. Diagnostic only: no engine, served-code or config change, nothing deployed.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
