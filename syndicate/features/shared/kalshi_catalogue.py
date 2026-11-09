@@ -1011,17 +1011,45 @@ def _candidate_blobs(game: Mapping[str, Any], sport: Any) -> list[tuple[str, str
     return orderings
 
 
+# FIVE-CHARACTER CLUB CODES (lane `kalshi-five-char-codes`, 2026-11-09).
+#
+# `_splits` used to cap a code at 4 characters. Kalshi's college series use two
+# 5-character codes: `UTRGV` (UT Rio Grande Valley: KXNCAAF / KXNCAAMB / KXNCAAWB)
+# and `MASSL` (UMass Lowell: KXNCAAMB / KXNCAAWB). Measured over Kalshi's whole
+# code map 2026-11-09 16:56Z, those are the only game-series codes outside 2-4.
+# A blob holding one has no correct split under the old cap, so no name Kalshi
+# supplies can help: `KXNCAAMBTOTAL-26NOV07PVUTRGV-124` was `no_match` against our
+# Prairie View @ UT Rio Grande Valley even with Kalshi's own names, and #764
+# refused its totals as unnamed.
+#
+# Allowing 5 keeps the guarantee the cap never provided on its own: every split
+# is still CHECKED against one of our games, both halves against that game's two
+# clubs, so a split that matches names both clubs. A wider range can add a
+# second matching game, which `match_event_blob` refuses as ambiguous.
+# `kalshi_board_join._resolve_event` reads the same lengths for its
+# collided-code ends, so that refusal widens in step. A switch so a test can
+# prove the path is reachable (off != on).
+_KALSHI_FIVE_CHAR_CODES_ENABLED = True
+
+
+def club_code_lengths() -> tuple[int, ...]:
+    """The lengths a Kalshi club code may run to, shortest first."""
+    return (2, 3, 4, 5) if _KALSHI_FIVE_CHAR_CODES_ENABLED else (2, 3, 4)
+
+
 def _splits(blob: str) -> list[tuple[str, str]]:
     """Every way `MINATH` could be two club codes.
 
-    Club codes run 2-4 characters, so the boundary is bounded rather than
-    guessed at -- and every candidate is CHECKED against our own schedule
-    below, so a wrong split cannot survive.
+    The boundary is bounded by `club_code_lengths()` rather than guessed at --
+    and every candidate is CHECKED against our own schedule below, so a wrong
+    split cannot survive.
     """
+    lengths = club_code_lengths()
+    shortest, longest = lengths[0], lengths[-1]
     return [
         (blob[:i], blob[i:])
         for i in range(2, len(blob) - 1)
-        if 2 <= i <= 4 and 2 <= len(blob) - i <= 4
+        if shortest <= i <= longest and shortest <= len(blob) - i <= longest
     ]
 
 

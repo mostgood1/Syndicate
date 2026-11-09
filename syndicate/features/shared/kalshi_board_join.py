@@ -665,8 +665,9 @@ def _resolve_event(
     with a code its own series family gives to two clubs is REFUSED as
     ambiguous, even when the global alias map would resolve it, because that
     resolution is a guess the venue has already contradicted. Checked on the
-    blob's 2-4 character ends, which can over-refuse a coincidental split and
-    never under-refuse. Refusing is the direction that cannot lose money.
+    blob's ends of every club-code length (`kalshi_catalogue.club_code_lengths`),
+    which can over-refuse a coincidental split and never under-refuse. Refusing
+    is the direction that cannot lose money.
 
     `games` (from `_distinct_games(board_rows)`) and `memo` let the game-line
     branch resolve 6,000 markets without rescanning ~5,600 rows per market and
@@ -681,6 +682,7 @@ def _resolve_event(
     in THIS game -- and the resolved game must then contain every club so named.
     Events with no collided code, and `event_names=None`, resolve byte-identically."""
     from syndicate.features.shared.kalshi_catalogue import (
+        club_code_lengths,
         event_blob_from_ticker,
         event_start_from_ticker,
         match_event_blob,
@@ -743,7 +745,10 @@ def _resolve_event(
             }
     if family_collided and result.get("status") == "ok":
         upper = str(blob).upper()
-        ends = {upper[:n] for n in (2, 3, 4)} | {upper[-n:] for n in (2, 3, 4)}
+        # The same lengths `_splits` tries (`kalshi-five-char-codes`): a collided
+        # 5-character code must be refused as surely as a 3-character one.
+        lengths = club_code_lengths()
+        ends = {upper[:n] for n in lengths} | {upper[-n:] for n in lengths}
         hit = sorted((ends & set(family_collided)) - set(own_names or ()))
         if hit:
             result = {
