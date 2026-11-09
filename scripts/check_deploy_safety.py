@@ -878,6 +878,137 @@ def _run_undrain(*, owner: str) -> int:
     return 0 if clear_drain(owner) else 1
 
 
+# --- live games: what the note covers -----------------------------------------
+#
+# "NO LIVE GAMES" MEANT "NONE ON THE LIVE-REFRESH LOOP", AND COLLEGE BASKETBALL IS
+# NOT ON IT (lane `deploy-safety-live-note-sports`, 2026-11-09). `latest_tick.anyLive`
+# is `live_refresh_loop._any_tracked_sport_game_live()`: an OR over
+# `_LIVE_STATUS_CHECKERS` (mlb, wnba, nba, nhl, soccer, nfl, ncaaf), narrowed by
+# `SYNDICATE_LIVE_ODDS_REFRESH_SPORTS` (the tick's `sports`; "active" = unset = all
+# seven). NCAAB and WNCAAB have no checker. Measured 2026-11-09 04:41:07Z: this
+# printed "No live games" while live-odds-worker's NCAAB re-sim ticked `live=2
+# resimmed=2` (04:41-05:18Z). That restart was safe, but the note misled anyone
+# timing one around a college slate.
+#
+# So the note names its sources, and adds the live re-sims that sit outside the
+# loop, read from the snapshot each publishes: `/api/ops/live-lens/snapshot-index`,
+# the same keyvalue read the board's join makes. An NCAAB/WNCAAB snapshot gives
+# every live D1 event a row (re-simmed, refused, carried or not reached), so its
+# row count IS the producer's `counts.live`.
+#
+# UNKNOWN IS NOT NONE. `anyLive: null` (adaptive off), a reading too old to speak
+# for now, or an unreadable snapshot prints UNKNOWN for the sports it would have
+# covered, never "No live games". It stays a note: live games are normal for hours,
+# and the verdict rests on child jobs and the board build.
+
+# `live_refresh_loop._LIVE_STATUS_CHECKERS`'s keys. A copy, because importing the loop
+# pulls in the app; tests/test_check_deploy_safety_live_note.py fails when they drift.
+LIVE_REFRESH_LOOP_SPORTS = ("mlb", "wnba", "nba", "nhl", "soccer", "nfl", "ncaaf")
+# Live re-sims with no liveness checker. A sport belongs here only if its snapshot
+# lists live games and nothing else. The drift test fails if the board prices a live
+# sport that neither tuple covers.
+RESIM_SNAPSHOT_SPORTS = ("ncaab", "wncaab")
+# The loop idles up to 900 s between pregame ticks (SYNDICATE_LIVE_ODDS_REFRESH_IDLE_INTERVAL_SECONDS).
+_LIVE_TICK_MAX_AGE_MINUTES = 30
+# The college re-sims tick every 120 s (SYNDICATE_<LEAGUE>_LIVE_RESIM_INTERVAL_SECONDS).
+_RESIM_SNAPSHOT_MAX_AGE_MINUTES = 10
+
+
+def _ago(age_minutes: float | None) -> str:
+    return "age unknown" if age_minutes is None else f"{max(0.0, age_minutes):.0f}m ago"
+
+
+def loop_live_sports(tick: dict[str, Any]) -> list[str]:
+    """The sports `anyLive` was computed over: the tick's `sports`, as the loop reads it."""
+    configured = str(tick.get("sports") or "").strip().lower()
+    if not configured or configured == "active":
+        return list(LIVE_REFRESH_LOOP_SPORTS)
+    listed = [item.strip() for item in configured.split(",") if item.strip()]
+    return [sport for sport in listed if sport in LIVE_REFRESH_LOOP_SPORTS]
+
+
+def loop_live_reading(tick: dict[str, Any]) -> dict[str, Any]:
+    """The live-refresh loop's `anyLive`, with what it covers and how old it is."""
+    sports = loop_live_sports(tick)
+    age = _run_age_minutes(tick.get("finishedAt") or tick.get("startedAt"))
+    reading: dict[str, Any] = {"label": f"live-refresh loop [{','.join(sports)}]", "sports": sports, "age_minutes": age}
+    any_live = tick.get("anyLive")
+    if not tick:
+        reading["unknown"] = "no latest_tick"
+    elif any_live is None:
+        reading["unknown"] = "anyLive=null: adaptive phase off, liveness not read"
+    elif age is None:
+        reading["unknown"] = "tick has no readable timestamp"
+    elif age > _LIVE_TICK_MAX_AGE_MINUTES:
+        reading["unknown"] = f"tick {age:.0f}m old > {_LIVE_TICK_MAX_AGE_MINUTES}m, said anyLive={bool(any_live)}"
+    else:
+        reading["live"] = bool(any_live)
+        # anyLive does not say which sport. The slate phases resolve each sport with the
+        # same checkers when observing, so name what they saw; absent, say so.
+        phases = _as_dict(_as_dict(tick.get("slatePhases")).get("sports"))
+        reading["live_sports"] = [s for s in sports if _as_dict(phases.get(s)).get("phase") == "live"]
+    return reading
+
+
+def resim_snapshot_reading(base_url: str, token: str, sport: str) -> dict[str, Any]:
+    """One live re-sim's game count from its published snapshot; UNKNOWN if absent or stale."""
+    reading: dict[str, Any] = {"label": f"{sport} re-sim", "sports": [sport], "age_minutes": None}
+    try:
+        payload = _as_dict(_get_json(base_url, f"/api/ops/live-lens/snapshot-index?sport={sport}", token, timeout=30))
+    except Exception as exc:
+        reading["unknown"] = f"snapshot unreadable: {type(exc).__name__}"
+        return reading
+    if payload.get("snapshot_present") is not True:
+        reading["unknown"] = f"no snapshot ({payload.get('reason') or 'snapshot_present not true'})"
+        return reading
+    age = _run_age_minutes(payload.get("snapshot_generated_at"))
+    reading["age_minutes"] = age
+    count = payload.get("snapshot_game_count")
+    if isinstance(count, bool) or not isinstance(count, int):
+        reading["unknown"] = "snapshot has no game count"
+    elif age is None:
+        reading["unknown"] = "snapshot has no readable generatedAt"
+    elif age > _RESIM_SNAPSHOT_MAX_AGE_MINUTES:
+        reading["unknown"] = (
+            f"snapshot {age:.0f}m old > {_RESIM_SNAPSHOT_MAX_AGE_MINUTES}m: producer off or stalled, said {count} live"
+        )
+    else:
+        reading["live"] = count > 0
+        reading["count"] = count
+    return reading
+
+
+def live_game_readings(base_url: str, token: str, tick: dict[str, Any]) -> list[dict[str, Any]]:
+    return [loop_live_reading(tick)] + [resim_snapshot_reading(base_url, token, s) for s in RESIM_SNAPSHOT_SPORTS]
+
+
+def _describe_reading(reading: dict[str, Any]) -> str:
+    label, ago = reading["label"], _ago(reading.get("age_minutes"))
+    if "unknown" in reading:
+        return f"{label}: UNKNOWN ({reading['unknown']})"
+    if "count" in reading:
+        return f"{label}: {reading['count']} live ({ago})"
+    if not reading.get("live"):
+        return f"{label}: none ({ago})"
+    named = reading.get("live_sports") or []
+    return f"{label}: LIVE{' (' + ', '.join(named) + ')' if named else ', sport not named'} ({ago})"
+
+
+def summarize_live_games(readings: list[dict[str, Any]]) -> tuple[bool, list[str], list[str]]:
+    """(any live, what is live, the sports nobody could speak for) over every reading."""
+    live: list[str] = []
+    unknown: list[str] = []
+    for reading in readings:
+        if "unknown" in reading:
+            unknown.extend(reading["sports"])
+        elif reading.get("live"):
+            if "count" in reading:
+                live.append(f"{reading['sports'][0]}: {reading['count']} live")
+            else:
+                live.append(", ".join(reading.get("live_sports") or []) or f"one of {','.join(reading['sports'])}")
+    return bool(live), live, unknown
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--base-url", default=DEFAULT_BASE_URL)
@@ -982,9 +1113,14 @@ def main() -> int:
     else:
         notes.append(f"Odds refresh: {refresh_state or 'idle'}")
 
-    any_live = bool(tick.get("anyLive"))
+    # Which sports are live, from every source that can say so (see `live_game_readings`).
+    live_readings = live_game_readings(args.base_url, token, tick)
+    any_live, live_what, live_unknown = summarize_live_games(live_readings)
     if any_live:
-        message = "Live games in progress -- a restart interrupts live-lens ticks and live prop hydration"
+        message = (
+            f"Live games in progress ({'; '.join(live_what)}) -- a restart interrupts live-lens ticks, "
+            "live re-sims and live prop hydration"
+        )
         if args.allow_live_games:
             notes.append(f"{message} (allowed)")
         else:
@@ -992,8 +1128,15 @@ def main() -> int:
             # time, and treating them as a hard block would make deploying
             # nearly impossible in season. Surfaced so it is a decision.
             notes.append(f"WARNING: {message}")
+    elif live_unknown:
+        read_none = any("unknown" not in r for r in live_readings)
+        notes.append(
+            f"Live games UNKNOWN for {', '.join(live_unknown)} -- not the same as none"
+            + ("; none on the sources that answered" if read_none else "")
+        )
     else:
-        notes.append("No live games")
+        notes.append("No live games on any source below")
+    notes.append("Live-game sources: " + "; ".join(_describe_reading(r) for r in live_readings))
 
     # A restart also destroys an in-flight board build (~23 min of work), which
     # every earlier version of this script was blind to. UNKNOWN blocks: an
@@ -1059,6 +1202,8 @@ def main() -> int:
     print("\nCLEAR: nothing in flight that a restart would interrupt.")
     if any_live and not args.allow_live_games:
         print("(Live games are in progress -- see the warning above.)")
+    elif live_unknown and not any_live:
+        print(f"(Live games could not be ruled out for {', '.join(live_unknown)} -- see the note above.)")
     return 0
 
 
