@@ -906,6 +906,14 @@ death, never life — do not invert it.
 - Verification: Unit: fixture anyLive=false + ncaab snapshot with 2 games -> WARNING names 'ncaab: 2 live'; stale/absent snapshot -> UNKNOWN; drift tests vs _LIVE_STATUS_CHECKERS and the board's live gameline sports. Existing tests/test_check_deploy_safety*.py pass. Read-only fleet run during a live slate names the right sports.
 - Blocked by: none
 
+### ncaab-real-pullback — OPEN — opened 2026-11-09 — session c2fd17f8-7d77-4eed-b025-0830211e05b3
+- Goal: Measure, read-only and from real games alone (no sims variance borrowed), the within-game pull-back in 2025-26 NCAAB late margins that step 3e inferred (36% / 39% of the sims' team-specific excess from minutes 30 / 36): a lower bound from the residual variance of the real window margin change after any pre-window predictor (pregame close, margin and pace at the checkpoint, cross-fitted), against the independent-possession prediction A + B (23.42 / 10.00), plus a split-window covariance and run-reversion test
+- Files: .syndicate/findings_2026-11-07_basketball_interval_backtest.md, docs/ai_context/todo.md, .syndicate/log/2026-11-09.md
+- Hypothesis: PULL-BACK, pre-registered 2026-11-09 14:17Z before any fit ran (user "yes" relayed by the parent session local_8c13723c). Method: any predictor f built only from information before the window leaves residual variance >= the within-game variance, so p_lb = (A + B) - Var(dM - f)/2 is a LOWER bound on the pull-back in team-specific units. Predicted: from 30m, the best cross-fitted f gives p_lb >= 1.0 (at least 12% of the sims' 8.43 excess), central guess 1-3; from 36m, p_lb >= 0.4 (central 0.5-1.3). Split-window: residual Cov(d1, d2) of the margin change over 30-35m and 35-40m, both residualised on pre-30m information, is negative with its 95% interval below 0, and the 35-40m change regressed on pre-30m information plus the 30-35m change gives a negative run coefficient.
+- Falsification test: p_lb's 95% interval includes 0 or lies below it at both checkpoints, AND the split-window residual covariance is 0 or positive. Then no pull-back is measurable, and step 3e's 3.0 piece is instead the sims' between-game spread of expected margins being wider than real games'.
+- Verification: Inputs reconcile with steps 3c/3e (Var(dM) 47.23 / 19.58 and A + B 23.42 / 10.00 on the pool); the predictor is cross-fitted (2-fold by game) so the bound is not in-sample; bootstrap over games pairs A + B and the residual variance. Tables in the findings file and #765, with the measured share of the excess. Diagnostic only: no engine, served-code or config change; nothing deployed.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
