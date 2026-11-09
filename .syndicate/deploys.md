@@ -57694,3 +57694,14 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - NFL spreads still blank.
   - NHL shows only if its re-sim indexes games. The `nhl-live-resim-slate-root` fix has been on the fleet since 01:25Z.
 - **Revert:** set `LIVE_DISPLAY_SPORTS` back to `frozenset({"nba"})` in `live_gameline_join.py` on main, then ff + a claimed refresh-worker TERM. The display is board-only, so there is no ledger or pricing state to undo.
+
+## 2026-11-09 15:09Z (09:09 CST) -- MEASUREMENT for 2026-11-04 22:53:06Z (book_quotes state lock 7b30517b1, #759): PASS
+- **Who:** scheduled task `syndicate-quote-state-weekend-check` (session 3a0508d8), lane `book-quotes-state-reset`. Read-only; nothing deployed or restarted.
+- **Fleet runs the fix:** `~/Syndicate` HEAD `aa5f50ac5`; `git merge-base --is-ancestor 7b30517b1 HEAD` -> yes. role_restarts tail: refresh-worker exits/down 11-08 17:23Z .. 11-09 14:48Z, all claimed.
+- **Reading (2026-11-09T15:07:58Z, `bq_state_watch.sh`, cutoff 2026-11-04T23:27:20Z):**
+  - soccer **2026-11-07** (Saturday, closed: state last-seen ends 11-08 07:24Z): 654,882 rows, **population 533,689 after the cutoff**. Shard keys 47,729, state keys 47,729, **missing 0**. Unchanged re-appends after the cutoff **0 of 533,689 (0.0%)**. NaN-line repeats 0. Beside the state: nothing.
+  - soccer **2026-11-08** (Sunday, closed: last-seen ends 11-09 05:55Z): 749,885 rows, **population 619,746 after the cutoff**. Shard keys 53,161, state keys 53,161, **missing 0**. Unchanged re-appends after the cutoff **0 of 619,746 (0.0%)**; 2 in the whole shard, both before the cutoff. NaN-line repeats 0. Beside the state: nothing.
+  - soccer 2026-11-09 (in progress, context only): 526 rows, 110 of 110 keys, 0 repeats.
+- **Failure lines (`fail_lines_strict.sh`):** strict writer-emitted count since 11-04T23:27Z **0**. One loose match, 2026-11-08T17:15:52.174Z, is ALL_PROCESS_MEMORY telemetry and carries a grep cmdline (the owning session's own grep); no unexplained telemetry match.
+- **Pass rule (pre-registered 2026-11-04):** missing 0 / repeats <= 0.1% / strict count 0 / no `.unreadable` -- **all four hold on both shards. PASS.** Both populations are >500k rows (10-31, the failing day, had 819,431), so this is a strong test.
+- **verify:** state keys == shard keys on both weekend shards, read above. Lane `book-quotes-state-reset` CLOSED, loan returned, todo `#759` closed.
