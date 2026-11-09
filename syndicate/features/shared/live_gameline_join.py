@@ -1277,16 +1277,56 @@ def _edge_pp(model_prob: float, market_prob: float) -> float:
 # is chosen. The probability is in the projection's own frame -- over for totals,
 # home for spreads and moneylines -- and the board restates it in the row's side.
 LIVE_DISPLAY_KEY = "live_display"
-# Sports whose stale-quote and moneyline rows get the display number. An explicit
+# Sports whose stale-quote and moneyline rows get the display number, and whose
+# quarter/half rows get it too where `board_enrichment` builds segment indexes (NBA,
+# NCAAB, WNCAAB) -- it passes `segment_display_only` from this table. An explicit
 # table, as `lens_sources_for_sport` is: another sport's board changes when someone
 # has read it, not as a side effect of this.
-LIVE_DISPLAY_SPORTS = frozenset({"nba"})
+#
+# WIDENED 2026-11-09 (lane live-display-other-sports, user "Yes, lend them"). Served
+# board 2026-11-08 23:35Z, live game rows with a Live proj.: ncaab 15 of 43 (h1/h2
+# totals 0 of 14, h2h 0 of 2), wncaab 2 of 29, nfl h2h 0 of 4. The refresh-worker's
+# LIVE_GAMELINE_JOIN put ncaab's blanks on `quote_older_than_the_score_the_model_saw`
+# (58) and `segment_pricing_disabled` (71), with display=0. Each sport shows what its
+# producer already prices, or would price, and never more:
+#   - ncaab / wncaab: all three branches. A segment total is shown raw, as the full
+#     game's is priced; a segment margin only where the producer anchored it
+#     (`_RAW_MARGIN_DISPLAY_SPORTS` leaves college out). Segment PRICING stays off for
+#     QUOTE lag (`COLLEGE_SEGMENT_PRICING_ENV`), which says nothing against the model.
+#   - ncaaf / nfl / nhl: stale quote + moneyline; their re-sims publish no segments.
+#     A market with no distribution on the hit (nfl/nhl spreads, nhl totals) gets no
+#     probability, because `live_display_block` reads the hit pricing reads. NFL's
+#     margin draws do ride on its lane, but were graded a measured FAIL (worst bucket
+#     0.4290 against `#499`'s 0.150, ~35-40% too narrow; `nfl/live_resim.build_game_lens`)
+#     -- the over-confidence that keeps college's raw margin off this column -- so NFL
+#     spreads stay blank by design.
+#   The pregame win % stays blank on live college/football rows
+#   (`board_enrichment.LIVE_PROBABILITY_WITHHELD_SPORTS`). That is the Win% column and a
+#   PREGAME number; this is the Live column and the live re-sim's.
+LIVE_DISPLAY_SPORTS = frozenset({"nba", "ncaab", "wncaab", "ncaaf", "nfl", "nhl"})
 # Sports whose UNANCHORED segment margin may be SHOWN. NBA prices its full-game
 # margin raw, and its quarter margin is not narrow: engine sd 8.2-9.0 per quarter
 # (synthetic inputs, 300 sims, 2026-11-06) against 7.9-9.6 across 163 real 2026 NBA
 # games. College is different -- its raw margin ran at half to two-thirds of the
 # market's, which is what `marginAnchored` exists for -- and is not listed.
 _RAW_MARGIN_DISPLAY_SPORTS = frozenset({"nba"})
+# Sports whose display number may come from a lane PAST its pricing ceiling
+# (`lane_age_verdict`). Everywhere else a display number must be as fresh as a price
+# would have to be. The stale branch fires on a stale LANE too, and college's carry
+# has no age bound (priced ncaab carried lanes p50 987 s, max 5,750 s; see
+# `_MAX_LANE_AGE_SECONDS_BY_SPORT`): a projection 95 minutes old beside the live score
+# is not a live number. NBA's producer bounds its carry at 900 s, and lane
+# nba-live-proj-actuals chose to keep showing it (`#762`), so NBA is unchanged. A
+# sport the lane gate does not measure (nhl) has no ceiling and is not refused here.
+_DISPLAY_PAST_LANE_CEILING_SPORTS = frozenset({"nba"})
+
+
+def _display_lane_fresh(hit: Mapping[str, Any], now: datetime, sport: Any) -> bool:
+    """May this hit's lane feed a DISPLAY number? Judged whatever the lane gate's mode, so a shadowed or switched-off
+    gate cannot put an hour-old college projection on the Live column; an absent lane time refuses, as pricing does."""
+    if str(sport or "").strip().lower() in _DISPLAY_PAST_LANE_CEILING_SPORTS:
+        return True
+    return lane_age_verdict(hit.get("as_of"), now, sport=hit.get("sport") or sport) is None
 
 
 def live_display_block(
@@ -1886,9 +1926,10 @@ def attach_live_gamelines(
     from it, while `segment_pricing_enabled`. Passed with pricing off, those rows refuse
     `segment_pricing_disabled` rather than the standing `segment_is_not_full_game`.
 
-    `segment_display_only` (NBA, `#762`): with pricing off, a segment row with a live segment of its
-    own still refuses exactly as above, and ALSO carries `row[LIVE_DISPLAY_KEY]` for the Live column.
-    A settled segment gets nothing. See `live_display_block`.
+    `segment_display_only` (NBA, `#762`; NCAAB/WNCAAB since 2026-11-09): with pricing off, a segment row
+    with a live segment of its own still refuses exactly as above, and ALSO carries `row[LIVE_DISPLAY_KEY]`
+    for the Live column. A settled segment gets nothing, and outside NBA neither does a lane past its
+    pricing ceiling (`_display_lane_fresh`). See `live_display_block`.
 
     Mirrors `attach_live_projections`' contract deliberately: a row the join
     MISSES keeps whatever suppression it already had rather than silently
@@ -1985,7 +2026,8 @@ def attach_live_gamelines(
                     game_pk=row.get("game_pk") or game.get("game_pk"),
                     sport=sport,
                 )
-                if isinstance(disp_hit, Mapping) and not disp_hit.get("segment_settled"):
+                if (isinstance(disp_hit, Mapping) and not disp_hit.get("segment_settled")
+                        and _display_lane_fresh(disp_hit, build_now, sport)):
                     block = live_display_block(disp_hit, row, sport=sport, basis=seg_reason)
                     if block is not None:
                         row[LIVE_DISPLAY_KEY] = block
@@ -2135,7 +2177,8 @@ def attach_live_gamelines(
             # The QUOTE is dead, not the game: the live number is about the game, so it is shown and nothing is
             # priced (`#762`). Full-game rows of a listed sport only.
             if (isinstance(row, dict) and segment in _FULL_GAME_SEGMENTS
-                    and str(sport or "").strip().lower() in LIVE_DISPLAY_SPORTS):
+                    and str(sport or "").strip().lower() in LIVE_DISPLAY_SPORTS
+                    and _display_lane_fresh(hit, build_now, sport)):
                 block = live_display_block(hit, row, sport=sport, basis=str(stale.get("withheld_reason") or ""))
                 if block is not None:
                     row[LIVE_DISPLAY_KEY] = block
@@ -2232,7 +2275,8 @@ def attach_live_gamelines(
         # (`live_model_prob_over` feeds the plausibility gate, so publishing there would change which edges pass);
         # the display block carries the HOME probability and `layer2_board` restates it per side.
         if (isinstance(row, dict) and segment in _FULL_GAME_SEGMENTS
-                and str(sport or "").strip().lower() in LIVE_DISPLAY_SPORTS):
+                and str(sport or "").strip().lower() in LIVE_DISPLAY_SPORTS
+                and _display_lane_fresh(hit, build_now, sport)):
             block = live_display_block(hit, row, sport=sport, basis="moneyline_not_published")
             if block is not None:
                 row[LIVE_DISPLAY_KEY] = block

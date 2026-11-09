@@ -2852,6 +2852,7 @@ def attach_live_gamelines_for_sport(grid: list, *, sport: str, selected_date: st
     try:
         from syndicate.features.shared.live_gameline_join import (
             FIRST5_LENS_SOURCE,
+            LIVE_DISPLAY_SPORTS,
             analytic_std_err_for_sport,
             attach_live_gamelines,
             build_live_gameline_index,
@@ -3022,7 +3023,10 @@ def attach_live_gamelines_for_sport(grid: list, *, sport: str, selected_date: st
                 sport=sport,
                 segment_indexes=segment_indexes,
                 segment_pricing_enabled=college_pricing,
-                segment_display_only=sport == "nba",
+                # DISPLAY, NEVER PRICE: one table decides which sports' segment rows carry a Live number (NBA, and
+                # since 2026-11-09 college; `live_gameline_join.LIVE_DISPLAY_SPORTS`). With college pricing ON its
+                # segment rows are priced instead and never reach the display branch.
+                segment_display_only=sport in LIVE_DISPLAY_SPORTS,
             )
             if segment_index is not None:
                 coverage["segment_index_size"] = len(segment_index)

@@ -133,8 +133,14 @@ def test_an_unanchored_nba_quarter_margin_is_shown_but_never_priced():
 
 def test_college_never_shows_a_raw_margin():
     """The raw margin is shown for NBA only; college's ran at half to two-thirds of the market's."""
+    from datetime import datetime, timezone
+
+    snapshot = _snapshot()
+    # Outside NBA a display number needs a lane as fresh as a price would (lane live-display-other-sports,
+    # 2026-11-09), so the college lane carries its time; this NBA fixture's lane has none.
+    snapshot["games"][0]["gameLens"][0]["liveStateAsOf"] = datetime.now(timezone.utc).isoformat()
     grid = [_row(market="spreads", line=-1.5, market_prob=0.5), _row()]
-    _attach(grid, _snapshot(), sport="ncaab")
+    _attach(grid, snapshot, sport="ncaab")
     assert LIVE_DISPLAY_KEY not in grid[0]
     assert grid[1][LIVE_DISPLAY_KEY]["prob_over"] == pytest.approx(0.5, abs=0.02)
 
@@ -161,8 +167,10 @@ def test_a_stale_full_game_quote_shows_the_live_number_and_prices_nothing():
 
 
 def test_another_sports_stale_quote_is_untouched():
+    # A sport outside `LIVE_DISPLAY_SPORTS`. It read `ncaab` until college joined the table on 2026-11-09 (lane
+    # live-display-other-sports; `tests/test_live_display_other_sports.py` pins college's own display rules).
     grid = [_row(segment="full", line=230.5, age=900.0)]
-    _attach(grid, _snapshot(), sport="ncaab")
+    _attach(grid, _snapshot(), sport="mlb")
     assert LIVE_DISPLAY_KEY not in grid[0]
 
 
@@ -194,7 +202,8 @@ def test_a_college_opt_in_cannot_price_nba_segments(monkeypatch):
     assert len(seen["segment_indexes"]["q1"]) == 1
     seen.clear()
     board_enrichment.attach_live_gamelines_for_sport([_row()], sport="ncaab", selected_date="2026-11-06")
-    assert seen["segment_pricing_enabled"] is True and seen["segment_display_only"] is False
+    # College displays its segments too since 2026-11-09; with its pricing ON they are priced, never displayed.
+    assert seen["segment_pricing_enabled"] is True and seen["segment_display_only"] is True
 
 
 # ----------------------------------------------------------------------------------------------- the board
