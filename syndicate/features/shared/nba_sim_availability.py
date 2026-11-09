@@ -16,7 +16,9 @@ RULE.
     slate. Never last season: early in the season "the last 2 games" must not reach back to April.
   * A player who appeared for the team this season (MIN > 0) but in none of its last K games is ADDED to the sim's
     excluded map. A team with fewer than K games this season is skipped.
-  * RE-ADMIT: a player with any posted pre-tip player-prop line in oddsapi_player_props_<date>.csv is not added.
+  * RE-ADMIT: a player with any posted pre-tip player-prop line in oddsapi_player_props_<date>.csv is not added. The
+    match is on the caller's key OR the engine's punctuation- and suffix-blind `normalize_player_name_key`, because
+    the books' "Terrence Shannon Jr." must meet player_logs' "Terrence Shannon Jr" (lane nba-roster-filter-name-key).
   * TEAM KEY (peer review, lane basketball-injury-exclusion-reinclusion, 2026-10-06): the evidence is "missed team T's
     last K games", which is about membership of T, not health. If the sim's props_df places the player on a single
     team OTHER than T, he was traded: no exclusion (re-keying it to the new team would wrongly drop a healthy traded
@@ -107,6 +109,16 @@ def _priced_names(processed_root: Path, date_str: str) -> Set[str]:
     return out
 
 
+def _canon(name: object) -> str:
+    """The engine's punctuation- and suffix-blind player key ("" when it cannot be computed)."""
+    try:
+        from syndicate.features.basketball_engine.orchestrator.player_names import normalize_player_name_key
+
+        return str(normalize_player_name_key(name) or "")
+    except Exception:  # noqa: BLE001
+        return ""
+
+
 def _props_teams(props_df: Any, name_key: Callable[[object], str]) -> Dict[str, Set[str]]:
     """{player key: {teams props_df places him on}} -- the team the sim will put him on."""
     out: Dict[str, Set[str]] = defaultdict(set)
@@ -152,7 +164,13 @@ def add_nba_recency_exclusions(excluded_map: Dict[str, Set[str]], *, processed_r
             summary["reason"] = "regular-season start unknown" if not lo else f"history absent: {path}"
             return summary
         by_team, seen = _team_history(path, lo, d)
-        priced = {str(name_key(n) or "").strip().upper() for n in _priced_names(Path(processed_root), d)} if cfg["readmit"] else set()
+        priced_names = _priced_names(Path(processed_root), d) if cfg["readmit"] else set()
+        priced = {str(name_key(n) or "").strip().upper() for n in priced_names}
+        # The history spells a player as stats.nba does and the books as they do. The caller's `_norm_name_key`
+        # keeps periods, so "Terrence Shannon Jr" (player_logs) never met the books' "Terrence Shannon Jr.". The
+        # 2026-11-08 MIN @ UTA sim left him out, and he played 18 min. A readmit also matches on the engine's
+        # punctuation- and suffix-blind key (lane nba-roster-filter-name-key). It only readmits more players.
+        priced_canon = {_canon(n) for n in priced_names} - {""}
         k = cfg["k"]
         sim_team = _props_teams(props_df, name_key)
         for team, rows in by_team.items():
@@ -165,7 +183,7 @@ def add_nba_recency_exclusions(excluded_map: Dict[str, Set[str]], *, processed_r
                 key = str(name_key(name) or "").strip().upper()
                 if not key:
                     continue
-                if key in priced:
+                if key in priced or (priced_canon and _canon(name) in priced_canon):
                     summary["readmitted_with_prop_line"] += 1
                     continue
                 placed = sim_team.get(key, set())

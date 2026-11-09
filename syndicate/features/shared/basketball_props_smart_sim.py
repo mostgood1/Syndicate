@@ -1737,6 +1737,21 @@ def _merge_pregame_expected_minutes_for_team_local(*, processed_root: Path, team
     except Exception:
         pid_maps = {}
         key_maps = {}
+    # Last resort after the id and the `_norm_name_key` match: the engine's punctuation- and suffix-blind key (lane
+    # nba-roster-filter-name-key). The file has no player_id, and on 2026-11-08 its "Bobby Portis" / "Terrence
+    # Shannon Jr." never met the pool's "Bobby Portis Jr." / "Terrence Shannon Jr". It only fills cells still empty.
+    canon_maps: dict[str, dict[str, Any]] = {}
+    try:
+        from syndicate.features.basketball_engine.orchestrator.player_names import normalize_player_name_key
+
+        out_canon = _frame_series_local(out, "player_name", "").map(normalize_player_name_key)
+        pem_canon = _frame_series_local(pem_t, "player_name", "").map(normalize_player_name_key)
+        for column in cols:
+            if column not in {"_pkey", "player_id"}:
+                canon_maps[column] = {k: v for k, v in zip(pem_canon.astype(str).tolist(), pem_t[column].tolist()) if k}
+    except Exception:
+        canon_maps = {}
+        out_canon = pd.Series([""] * len(out), index=out.index)
     pid_out = pd.to_numeric(out.get("player_id"), errors="coerce").astype("Int64") if "player_id" in out.columns else pd.Series([pd.NA] * len(out), index=out.index, dtype="Int64")
     for column in cols:
         if column == "_pkey":
@@ -1746,6 +1761,8 @@ def _merge_pregame_expected_minutes_for_team_local(*, processed_root: Path, team
         v_key = out["_pkey"].astype(str).map(key_maps[column]) if key_maps.get(column) else pd.Series([np.nan] * len(out), index=out.index)
         filled = base.where(base.notna(), other=v_pid)
         filled = filled.where(filled.notna(), other=v_key)
+        if canon_maps.get(column):
+            filled = filled.where(filled.notna(), other=out_canon.astype(str).map(canon_maps[column]))
         out[column] = filled
     try:
         if "exp_min_mean" in out.columns:
@@ -2091,14 +2108,39 @@ def _filter_team_players_against_processed_roster_local(*, processed_root: Path,
         if roster is None or roster.empty:
             return team_df
         out = team_df.copy()
-        allowed_names = {_norm_name_key(value) for value in roster.get("player_name", pd.Series(dtype=str)).astype(str).tolist() if str(value).strip()}
+        roster_names = [str(value).strip() for value in roster.get("player_name", pd.Series(dtype=str)).astype(str).tolist() if str(value).strip()]
+        allowed_names = {_norm_name_key(value) for value in roster_names}
         allowed_names |= _league_status_allowed_names()
         if not allowed_names:
             return team_df
         names = out.get("player_name", pd.Series(["" for _ in range(len(out))], index=out.index)).astype(str)
         keep = names.map(_norm_name_key).isin(allowed_names)
+        # ONE PLAYER, ONE ROSTER MATCH (lane nba-roster-filter-name-key). `_norm_name_key` keeps periods, so it strips
+        # " JR" but not " JR.". Measured on the fleet, 2026-11-08 MIA @ SAC: the pool row is the 2026-27 player_logs
+        # spelling "Bobby Portis Jr." and rosters_2026-27.csv has "Bobby Portis". The PLAYER_ID is 1626171 on both
+        # sides. This filter dropped him, the only drop on the slate. He played 20 minutes, had 6-7 served live prop
+        # rows and got no Live proj. "Terrence Shannon Jr" (logs) against "Terrence Shannon Jr." (roster) is the same
+        # split. So a row is also on the roster when its stats.nba id is on this team's roster, or when its name
+        # matches under the engine's punctuation- and suffix-blind `normalize_player_name_key`. Both checks only add
+        # rows, so no player this filter kept before is dropped now.
+        try:
+            from syndicate.features.basketball_engine.orchestrator.player_names import normalize_player_name_key
+
+            allowed_canon = {key for key in (normalize_player_name_key(value) for value in roster_names) if key}
+            if allowed_canon:
+                keep = keep | names.map(normalize_player_name_key).isin(allowed_canon)
+            if "player_id" in roster.columns and "player_id" in out.columns:
+                allowed_ids = {float(pid) for pid in pd.to_numeric(roster["player_id"], errors="coerce").dropna().tolist() if float(pid) > 0}
+                if allowed_ids:
+                    keep = keep | pd.to_numeric(out["player_id"], errors="coerce").isin(allowed_ids)
+        except Exception as exc:  # noqa: BLE001 -- the widened match must never take the filter down
+            print(f"[basketball_roster_filter] ROSTER_FILTER_WIDEN_FAILED team={str(team_tri).upper()} {type(exc).__name__}: {str(exc)[:160]}", flush=True)
         kept = out[keep].copy()
         if len(kept) >= int(max(1, min_keep)):
+            dropped = [str(value) for value in names[~keep].tolist() if str(value).strip()]
+            if dropped:
+                print(f"[basketball_roster_filter] ROSTER_FILTER_DROPPED date={str(date_str)[:10]} team={str(team_tri).upper()} "
+                      f"n={len(dropped)} names={dropped[:8]}", flush=True)
             return kept.reset_index(drop=True)
         return team_df
     except Exception:
