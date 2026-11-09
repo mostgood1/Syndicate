@@ -57790,3 +57790,29 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **verify MET (mechanism):** Redis `live/nhl_live_lens.json` generated 11:20:09 CST: `[('New York Rangers', 'Edmonton Oilers'), ('Philadelphia Flyers', 'Vancouver Canucks'), ('New York Islanders', 'San Jose Sharks')]`, `slateFeatureGames 3`, refusals `game_not_started 3` (baseline 11:14:00 CST: `('Rangers', 'Oilers')` etc.). 0 lines beginning `Traceback` in live-odds-worker.log after 17:17Z (4 regex hits were `error=None` ledger rows and memory telemetry).
 - Measured: <pending> -- shared with the 01:25:21Z entry: on the 11-09 NHL slate (~01:00Z 11-10), `liveResimmed > 0`, `LIVE_GAMELINE_JOIN sport=nhl index > 0`, served live NHL moneyline rows with a Live proj.
 - **Revert:** revert `365be1a90` on main, then ff + a claimed live-odds-worker TERM.
+
+## 2026-11-09 17:21:39Z (11:21 AM CST) -- VERIFY part 1 of the 14:48:33Z load (`aa5f50ac5`, display-only Live proj. beyond NBA, todo `#771`, lane `live-display-other-sports`): **WNCAAB MET -- 6 -> 19 of 22 served live game rows with a Live proj. on the same board, 0 display rows with a model edge or `live_aware`**; NCAAB / NFL owed tonight; NHL blocked upstream (written 17:22Z, 11:22 AM CST)
+- **The live population:** the first D1 games since the load, 3 WNCAAB games that tipped at 17:00Z: Tennessee Tech @ Missouri, Northwestern St @ Oklahoma St, UNC Asheville @ Samford. The morning's 16:00Z college tips are non-D1, and the re-sims drop those (`dropped_non_d1`, `live=0`).
+- **Join (refresh-worker pid 324654, `LIVE_GAMELINE_JOIN sport=wncaab`):**
+  - 17:03:12Z: index 0, considered 13, `display=0` (the re-sim had not indexed a game yet).
+  - 17:11:08Z: index 3, considered 9, withheld 9 (`quote_older_than_the_score_the_model_saw` 1, `quote_older_than_live_pricing_ceiling` 8), **`display=9`**.
+  - 17:16:44Z: considered 35, projected 12, priceable 7, withheld 28 (quote-behind-score 17, past the ceiling 6, `prob_interval_swamps_edge` 5), **`display=23`**. That is every quote-refused row.
+  - `lane_age_max` 48.6 / 84.8 s. 0 tracebacks, 0 `BOOK_GRID_LIVE_GAMELINE_FAILURE` since the load.
+- **Served** (`POST /api/intelligence/query`, the board page's own request, `ranked_all` 3,037 cards, fetched 17:21:39Z), 22 live WNCAAB game rows. "Old code" is derived on the same board: a non-NBA game row could get a Live cell only from the gameline block, which also stamps `live_aware`, and never on h2h (`C:/tmp/livedisp/probe.py`).
+
+  | | rows | Live proj. now | old code, same board | added by display |
+  |---|---|---|---|---|
+  | full-game totals | 20 | 18 | 6 | 12 |
+  | full-game h2h | 2 | 1 | 0 | 1 |
+  | **all** | **22** | **19** | **6** | **13** |
+
+  - **0 of the 13 display rows carry `model_edge_pct` or `live_aware`.** The 6 that do are the priced rows (`live_aware=True`, edges ±9.0 / ±10.5 / ±17.5), unchanged.
+  - **Side-restated:** over 154.5 reads 0.397 and under 154.5 0.603; over 153.5 0.426 and under 0.574. Each pair sums to 1. One game's lines all show its live total, 150.8 for TTU @ MIZ.
+  - **h2h:** Missouri (home) 0.919, against a pregame win % that is withheld on live college rows. This is the Live column, not the Win% column.
+  - **The 3 blank rows are carried from the earlier build** (Actual 3 / 0 against 35 / 19 on the live rows). One is UNC Asheville @ Samford h2h. Read again on the evening slate before calling it a gap.
+- **Not yet read:**
+  - college half/quarter rows: none were posted for these games;
+  - NCAAB: from 23:00Z;
+  - NFL h2h, and NFL spreads staying blank: MNF 01:15Z;
+  - NCAAF: no games today.
+- **NHL: blocked upstream, not by this change.** The NHL snapshot names games by short club name (`'Rangers' @ 'Oilers'`, read 17:00Z) while board rows carry full names, and `_norm_team` only lowercases. So no live NHL row finds its re-sim lane (`no_live_gameline_projection`). Found by lane `nhl-nfl-live-prop-actuals`; the fix sits with the owner of `nhl-live-resim-slate-root`. NHL rows show 0 display numbers until a fix loads.
