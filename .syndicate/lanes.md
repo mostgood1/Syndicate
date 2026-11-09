@@ -881,11 +881,6 @@ death, never life — do not invert it.
 - Blocked by: none
 - STATUS: hypothesis WRONG in its main claim (not the remaining-time prior rate, not end-game fouling): the cause is the engine's blowout rule over the whole NCAAB second half. No fleet change; nothing loaded. Harness gate PASSED 11-08 2:05 PM CST; lane CLOSED, no claims held.
 
-### closed-lane-archive-20261108-1311 — CLOSED 2026-11-08 (GOAL MET: 1 block archived) — opened 2026-11-08 — session c7bfc622-f09d-4be5-af1b-5d3f79c510eb
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. Moved `closed-lane-archive-20261108-0855` (owner 0be02206 idle 243m, block 245m). Readings in log/2026-11-08.md.
-
 ### ncaab-late-gap-decomposition — CLOSED 2026-11-08 (GOAL MET: late gap decomposed; refit B NOT ADOPTED, fails out of sample; findings PHASE 2 STEP 3 + todo #765) — opened 2026-11-08 — session c2fd17f8-7d77-4eed-b025-0830211e05b3
 - **GOAL VERDICT `[2026-11-08 19:36Z]`: GOAL: MET.**
   - Fidelity: otsplit reproduces the harness re-sim total on 285 / 285 games at 30m and 38m (max |diff| 0.0000).
@@ -957,6 +952,12 @@ death, never life — do not invert it.
 - Blocked by: none
 - **2026-11-08 23:4xZ -- HYPOTHESIS CONFIRMED (read-only fleet probe, fleet code `582c24637`, nice 19):** `build_slate_features('2026-11-08')` default root `/home/amyn/Syndicate/data/nhl_source` -> 0 games; `root=~/syndicate-prod/data/nhl_source` -> 6 games incl. 2026020280. Dry-run `build_live_lens_snapshot` with producer-root features (build only, nothing written) 23:48Z: `no_slate_features` 0 (was every live game); refusals game_final 2 / in_intermission 1 (TBL@WPG, by design) / game_not_started 3; `liveResimmed` 0 only because the one live game was in intermission. Fix `a627c46b0` committed in the worktree, NOT pushed (code push needs the user's OK); 62 tests pass; the new test fails on the pre-fix call (0 == 1). Ride-alongs fleet `582c24637`..main: `nba/live_resim.py` + `live_projection_join.py` comment-only (`bc05afbdc`), plus offline scripts. Loads only at a live-odds-worker restart (last start 21:29:03Z, own recycle ~03:29Z).
 - **Found beside it, NOT this lane** (served board 23:35Z, 412 live rows, 266 with Live proj., 268 with Actual): NHL + NFL live PROPS have no live prop join or producer (`_LIVE_PROP_SPORTS` mlb/wnba/soccer + nba), 0 of 49; college/NFL/NHL game-line rows the join refuses (quote age, segments, moneyline) get no display-only number -- `LIVE_DISPLAY_SPORTS = {"nba"}` (`#762`, lane `nba-live-proj-actuals`' files); NFL spreads by design (re-sim withholds `marginDist`, `nfl/live_resim.py:659`).
+
+### closed-lane-archive-20261108-1840 — CLOSED 2026-11-08 (GOAL MET: 1 block archived) — opened 2026-11-08 — session a6a71879-48d8-49eb-a154-1b092f18a282
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 1 of 21 CLOSED blocks SAFE at 00:42Z 11-09 (18:42 CST 11-08); 20 WAIT (table in log/2026-11-08.md).
+- Moved: closed-lane-archive-20261108-1311
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1153,6 +1154,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261108-0040` — CLOSED 2026-11-08 (GOAL MET: 5 blocks archived) — opened 2026-11-08 — session a737c5e6-9439-434a-98a2-a6763b5e7357
 - `closed-lane-archive-20261108-0445` — CLOSED 2026-11-08 (GOAL MET: 2 blocks archived) — opened 2026-11-08 — session ddab5a53-4bc0-4f4b-94b6-88aaf35a8127
 - `closed-lane-archive-20261108-0855` — CLOSED 2026-11-08 (GOAL MET: 1 block archived) — opened 2026-11-08 — session 0be02206-1b92-41af-bb1e-62a677d1a857
+- `closed-lane-archive-20261108-1311` — CLOSED 2026-11-08 (GOAL MET: 1 block archived) — opened 2026-11-08 — session c7bfc622-f09d-4be5-af1b-5d3f79c510eb
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b

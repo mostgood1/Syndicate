@@ -14382,3 +14382,8 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
     - The orphan marker is `ncaab-late-gap-decomposition` (`.current-lane.c2fd17f8`, written 10:56 CST today). Its block exists only uncommitted in worktree `beautiful-bell-389a6f`'s lanes.md. That is a lane in flight, not lost.
   - **Scripts:** `C:\tmp\pt_ff_1108\{classify,lanes_check,backup,ff}.py`, with `classify.json` beside them.
   - **The tree drifts again at once.** origin/main was 2 ahead by 17:55Z. Re-run the recipe in auto-memory `project_primary_tree_fast_forward_recipe.md`.
+
+### closed-lane-archive-20261108-1311 — CLOSED 2026-11-08 (GOAL MET: 1 block archived) — opened 2026-11-08 — session c7bfc622-f09d-4be5-af1b-5d3f79c510eb
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. Moved `closed-lane-archive-20261108-0855` (owner 0be02206 idle 243m, block 245m). Readings in log/2026-11-08.md.
