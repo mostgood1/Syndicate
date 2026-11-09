@@ -963,9 +963,19 @@ death, never life — do not invert it.
 - Verification: fleet live-odds-worker log: LIVE_ENTRY result reason=below_inplay_min_ask on asks <0.55, and no in-game ledger fill below 0.55 after the restart
 - Blocked by: none
 
-### kalshi-five-char-codes — OPEN — opened 2026-11-09 — session e32fef1a-01e8-4afe-a284-01acd3728545
+### kalshi-five-char-codes — OPEN — opened 2026-11-09 — session 750e160f-f027-491e-9dc9-57257d2c6bec (handed off 2026-11-09 from e32fef1a)
+- **STATUS `[2026-11-09 17:28Z]`: GOAL: NOT MET -- written, tested and replayed; on a branch only, NOT on main, NOT loaded.**
+  - **Hypothesis CONFIRMED:**
+    - `_splits` capped codes at 4 characters.
+    - With 2-5 allowed, the 11-07 `PVUTRGV` control goes `no_match` -> Prairie View Panthers @ UT Rio Grande Valley Vaqueros.
+  - **Replay 17:11Z on fleet data**, fleet code + this change, one Kalshi read: 2,083 event x board resolutions across nine sports, **0 changed**.
+  - **Also changed:** `kalshi_board_join._resolve_event`'s collided-code ends read the same lengths, so the refusal widens in step. That file was added to `Files:`.
+  - **Tests:** 2,371 passed over 107 Kalshi / venue / fan-in / Polymarket test files (11 min), plus the 14 new.
+  - **Left:**
+    - the user's call to push and load: the order path places live money;
+    - a live read on the first 5-letter game on a board, Texas St @ UTRGV (`TXSTUTRGV`), 11-10.
 - Goal: Kalshi club codes of 5 characters (UTRGV, MASSL) resolve in kalshi_catalogue.match_event_blob, for the fan-in and the order path alike: PVUTRGV names Prairie View @ UT Rio Grande Valley; on a fleet replay over every live Kalshi game event, every answer that was ok before is identical and each changed answer is read by eye
-- Files: syndicate/features/shared/kalshi_catalogue.py, tests/test_kalshi_five_char_codes.py (NEW)
+- Files: syndicate/features/shared/kalshi_catalogue.py, syndicate/features/shared/kalshi_board_join.py, tests/test_kalshi_five_char_codes.py (NEW)
 - Hypothesis: kalshi_catalogue._splits caps a club code at 4 characters, so a blob holding a 5-character code (UTRGV, MASSL) has no correct split and returns no_match whatever names Kalshi supplies (PVUTRGV-124, 11-07)
 - Falsification test: with 5-character splits allowed, PVUTRGV against the 11-07 ncaab board still returns no_match; or any event that resolved ok before changes its answer
 - Verification: off != on unit tests (matcher, order-path _resolve_event, fan-in naming); fleet replay old vs new over every live Kalshi game event and each board date held, every status change listed and read by eye; ncaab/wncaab fan-in A/B at one clock

@@ -211,6 +211,14 @@
   - Rough engine size: `score_effect_k` about 0.005 (back-of-envelope from the run coefficient); step 3b tried only 0.002.
   - Nothing ships. Full tables: the findings' PHASE 2 STEP 3f section. Runs: WSL `~/bball_iv/runs/ncaab2026_tieshape/pull_real.jsonl`.
 ### `#764` — **KALSHI TOTALS THAT NAME NO GAME PRICE ANOTHER GAME'S ROW: 26 of 26 measured sides wrong-game (men's and women's college basketball, college football). Polymarket is clean in every sport. WRONG-GAME PRICING FIXED AND VERIFIED 2026-11-07 (refused, then named); OPEN: games on our board whose Kalshi quotes still name no game, incl. the 5-character codes UTRGV / MASSL** — 2026-11-06, session e32fef1a (user "Yes, measure it here")
+- **UPDATE 2026-11-09 17:28Z (11:28 AM CST): 5-LETTER CODE FIX WRITTEN AND REPLAYED, on a branch only** (lane `kalshi-five-char-codes`; user "Yes, both paths").
+  - **Change:**
+    - `kalshi_catalogue._splits` reads `club_code_lengths()`: 2-5 with `_KALSHI_FIVE_CHAR_CODES_ENABLED`, 2-4 off.
+    - `kalshi_board_join._resolve_event`'s collided-code refusal checks the same lengths.
+  - **Replay 17:11Z on fleet data:** 2,083 event x board resolutions across nine sports, 0 changed. The 11-07 `PVUTRGV` control is now named.
+  - **Live 5-letter events (Kalshi, 11-09):** `TXSTUTRGV` 11-10; `ACUTRGV`, `MASSLBC`, `MASSLMASS` 11-11; `SFAUTRGV` 11-14; `UTRGVHCU` 11-21.
+  - **Tests:** 2,371 passed over 107 Kalshi / venue / fan-in / Polymarket test files (11 min), plus the 14 new.
+  - **Owed:** the user's call to push + load; then a live read on `TXSTUTRGV`.
 - **UPDATE 2026-11-09 16:57Z (10:57 AM CST): WHAT IS STILL UNNAMED, AND WHY** (session e32fef1a, read-only on the fleet `8fc72076d`; no code changed).
   - **Census:** `UNNAMED_ROLE_KEY_GRID` samples, 11-07 23:41Z (the reversed-order load) to 11-09 15:43Z.
     - ncaab: 87 of 375 builds nonzero. wncaab: 79 of 127.
