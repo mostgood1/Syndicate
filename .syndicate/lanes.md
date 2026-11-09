@@ -935,7 +935,12 @@ death, never life — do not invert it.
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 at ~22:45Z (16:45 CST) gave SAFE for 3 of 20 CLOSED blocks; dry run, apply and the invariant check (no new FAIL vs baseline) all passed.
 - Moved to lanes_closed.md: render-retirement-inventory, all-sport-interval-projections, primary-tree-ff. Table + deferrals: log/2026-11-08.md.
 
-### ncaab-late-spread-source — OPEN — opened 2026-11-08 — session c2fd17f8-7d77-4eed-b025-0830211e05b3
+### ncaab-late-spread-source — CLOSED 2026-11-08 (GOAL MET: source found -- late scoring variance misplaced, team-specific +33-36%, shared ~2% vs 22-32% real via the possession count; PER-POSSESSION hypothesis falsified as framed; findings PHASE 2 STEP 3c + todo #765) — opened 2026-11-08 — session c2fd17f8-7d77-4eed-b025-0830211e05b3
+- **GOAL VERDICT `[2026-11-09 00:00Z]`: GOAL: MET.**
+  - Verification ran: the code4 scratch copy with RNG-neutral markers reproduces the margin histograms in 1,080/1,080 game-checkpoints, and window points reconcile in 108,000/108,000 sims.
+  - Hypothesis FALSIFIED as framed: the possession differential is not within 25% of real (estimator SD 2.83 vs 1.17; the sims' true SD 1.88). The estimator split it was framed on is unreliable for the sims, which it overcounts by 10%.
+  - The source is in an unregistered channel, an identity that replicated in both samples, both checkpoints and every bucket: Cov(home, away) is 6.82 real vs 0.72 sims from 30m; the real partial correlation given possessions is 0.01.
+  - Read-only: no engine, served-code or config change; no deploy.
 - Goal: Find, read-only, where the production NCAAB re-sim's over-wide late margin spread comes from (SD of the margin change 16-27% above real at minutes 30-37, step 3b): decompose the margin-change variance from minute 30 and 36 to the end of regulation into a possession-differential part and a per-possession part, sims vs real play-by-play, on the same 540 games and the 4,472-game pool
 - Files: .syndicate/findings_2026-11-07_basketball_interval_backtest.md, docs/ai_context/todo.md, .syndicate/log/2026-11-08.md
 - Hypothesis: PER-POSSESSION, pre-registered 2026-11-08 23:26Z: with possessions measured the same way on both sides (FGA + TOV + c*FTA - OREB), the sims' possession differential (home minus away) over the window has an SD within 25% of real, and at least 60% of the sims' excess margin-change variance at 30m sits in the per-possession residual (points beyond the window's mean points per possession times possessions, home minus away). The candidates for that residual are the shot mix (3PA share), offensive-rebound chains and free-throw trips, read off the same box.

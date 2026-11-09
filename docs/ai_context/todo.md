@@ -96,7 +96,7 @@
   - The old bars (NCAAB 25.97 / 16.75 / 10.64 / 4.67; NBA pregame quarter 8.53) are beaten by the line alone.
   - Fidelity: production's recorded NBA live re-sim and the replay have the same MAE on the same games (14.71 vs 14.61 at 12m ... 5.12 vs 5.18 at 45.6m).
 - **Next (Phase 2, each against this harness):**
-  - NCAAB: the baseline is `ncaab2026_resim_prod`. Production already runs the half split and the end-game mechanisms. Measured 2026-11-08 (below): the late gap is mostly the sims under-producing regulation ties, not regulation scoring. Next, in order (revised 2026-11-08 23:13Z after the tie-shape measurement below): (1) end-game decision rules for the last possessions (go for 2 to tie, a 1-3 lead turning into free throws, holding the ball when tied), which needs an `engine.py` loan and an E1 refit; (2) find the source of the over-wide late margin spread first (rest-of-game box vs real PBP), since `score_effect_k` 0.002 does not fix it; (3) blowout late scoring (11+ margins, minutes 30-40) and the trailing-by-7-10 bucket (not the foul rate), re-read after (2).
+  - NCAAB: the baseline is `ncaab2026_resim_prod`. Production already runs the half split and the end-game mechanisms. Measured 2026-11-08 (below): the late gap is mostly the sims under-producing regulation ties, not regulation scoring. Next, in order (revised 2026-11-09 00:00Z after steps 3b and 3c below): (1) test the existing default-off fields against step 3c's variance tables, with no engine edit: E2 bonus free throws, alternation 1.0, `possessions_jitter`; (2) segment real PBP into possessions to measure the real per-possession outcome distribution; (3) end-game decision rules for the last possessions (go for 2 to tie, a 1-3 lead turning into free throws, holding the ball when tied), which needs an `engine.py` loan and an E1 refit; (4) blowout late scoring and the trailing-by-7-10 bucket, re-read after (1).
   - Every college run must carry live-odds-worker's three switches; check `college_switches` and `engine_provenance` in `report.md`.
   - Further end-game values go through `resim_mech --mechanisms`, set on top of the env's.
   - Pace, only if pooled much harder than k=60 possessions.
@@ -135,6 +135,17 @@
     - `possession_alternation` 1.0 cuts the SD 3-5%.
     - Neither moves the tie rate (paired within ±0.9 pp).
   - Nothing ships. Full tables: the findings' PHASE 2 STEP 3b section. Runs: WSL `~/bball_iv/runs/ncaab2026_tieshape/`.
+- **PHASE 2 STEP 3c, NCAAB late spread source `[2026-11-09 00:00Z (6:00 PM CST 11-08)]` (lane `ncaab-late-spread-source`, session c2fd17f8, read-only, user "Yes, find the source"): the sims put late scoring variance in the WRONG PLACE. The pre-registered PER-POSSESSION hypothesis (`cb875abd8`) is falsified as framed.**
+  - Setup: a scratch engine copy with RNG-neutral possession markers (`~/bball_iv/code4`), on the same 540 games and seeds, from minutes 30 and 36. Fidelity 1,080/1,080 game-checkpoints and 108,000/108,000 sims.
+  - Per team, late scoring variance is about right (+8% / -6%). Real games share 22-32% of it between the two teams (correlation 0.224 / 0.315); the sims share about 2% (0.022 / 0.026).
+  - So the team-specific part is +36% / +33%, and the margin variance (twice that) is too wide by the same amount. The late TOTAL's variance is too narrow: 0.90x / 0.73x real.
+  - In real games the shared part is entirely the possession count: the partial correlation given total window possessions is 0.01. It replicates in both samples, both checkpoints and every margin bucket.
+  - Inside the team-specific excess:
+    - The sims take HALF the real late free throws: FTA per FGA 0.29 vs 0.58 from minute 30, 0.38 vs 0.75 from 36. Points shift to made threes.
+    - Per-possession outcomes look about 35% too variable. INFERRED; real per-possession data is not measured yet.
+    - Coin-flip possession imbalance (true SD 1.88 vs real 1.17 or less) is the smaller piece: alternation 1.0 gives 3-5% of the SD.
+  - Pace is NOT the source. True sim possessions are 18.48 per team from 30m against real's estimated 17.74. The pace input is +2.4% vs real. The first pass's "14% more possessions" was the estimator overcounting the sims (withdrawn).
+  - Nothing ships. Full tables: the findings' PHASE 2 STEP 3c section. Runs: WSL `~/bball_iv/runs/ncaab2026_tieshape/spread_*.jsonl`.
 ### `#764` — **KALSHI TOTALS THAT NAME NO GAME PRICE ANOTHER GAME'S ROW: 26 of 26 measured sides wrong-game (men's and women's college basketball, college football). Polymarket is clean in every sport. NOT FIXED** — 2026-11-06, session e32fef1a (user "Yes, measure it here")
 - **UPDATE 2026-11-07 23:49Z (5:49 PM CST): REVERSED-ORDER FIX LOADED AND VERIFIED** (lane `kalshi-fanin-reversed-orientation`, CLOSED).
   - **Load:** `79c8aac12`, fleet ff + refresh-worker TERM 23:41:12Z.
