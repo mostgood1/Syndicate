@@ -3322,3 +3322,13 @@ I counted "unchanged re-appends" on the NBA and NHL quote shards (NHL: 41% of ro
   1. When an engine built for one league is bound to another, grep every comparison against a period index (`q >= N_PERIODS`, `q == last`, `half_end`) and restate what it covers in MINUTES for the new league.
   2. Decompose model − final into live update (model remaining − the engine's own prior remaining) plus prior error before blaming the prior. The live update has a tiny SE (it carries no outcome noise), so it isolates engine behaviour.
   3. Grade against the market as well: model − line was ±0.35 where model − final was ±0.9.
+
+## 2026-11-09 — REPEAT of the 2026-10-22 rule (cross-source names go through `normalize_player_name_key`, never `_norm_name_key`): two more cross-source joins still used `_norm_name_key`, and two players who played were left out of the sim `[lane nba-roster-filter-name-key, session c7e5cb4c]`
+- **What happened:** the NBA pregame roster filter compared the props pool (player_logs spelling, "Bobby Portis Jr.") with rosters_2026-27 ("Bobby Portis") through `_norm_name_key`, which keeps periods and so never strips " JR.". The NBA recency rule's prop-line readmit compared the books ("Terrence Shannon Jr.") with player_logs ("Terrence Shannon Jr") the same way.
+  - On 11-08 both players played (20 and 18 min) and neither was simulated, so neither had a live number.
+  - The 10-22 rule had already named this key. It had been fixed in a different join, and these two were never swept.
+  - `#762` (7) fixed the same split on the live path the day before; the pregame path still had it.
+- **How to apply:**
+  - When fixing a name split, grep EVERY `_norm_name_key` call site that compares two different sources (roster file vs features, books vs logs, pem vs pool), not just the one in front of you.
+  - Where an id exists on both sides (stats.nba PLAYER_ID), match on it first.
+  - Keep `_norm_name_key` itself unchanged: it is the key of the exclusion map and the `props_pool` reuse stamp. Widen the comparison, not the key.
