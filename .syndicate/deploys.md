@@ -57722,6 +57722,12 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - **Today's sims are expected NOT to change.** No Jr./Jr split plays 11-09 or 11-10.
 - **expect / measured:**
   - `fleet_checkout_head` -> 8fc72076d: **MET** at 15:30:09Z.
-  - First NBA props run after the ff completes on the new code: same `NBA_SIM_AVAILABILITY` counts as the run before, no Traceback, no `ROSTER_FILTER_WIDEN_FAILED`. Measured: <pending -- watcher on `syndicate_refresh_oddsapi_props_2026-11-09.log`, started 15:31Z>.
+  - First NBA props run after the ff completes on the new code: same `NBA_SIM_AVAILABILITY` counts as the run before, no Traceback, no `ROSTER_FILTER_WIDEN_FAILED`. **MET** (read 16:56Z, 10:56 AM CST).
+    - Two NBA props runs after the ff. Each is a fresh `refresh_nba_oddsapi_props.py` child on fleet HEAD `8fc72076d`; no run was in flight at the ff.
+    - 11-10 run (log written 16:07:15Z): `NBA_SIM_AVAILABILITY added=58 readmitted=0`, the same as every pre-ff 11-10 line.
+    - 11-09 run (log written 16:42:06Z): `added=55 readmitted=2`, the same as the last pre-ff line. It rebuilt 3 games on the new code: DAL_IND 16:40:52Z, DET_WAS 16:41:21Z, TOR_MEM 16:41:44Z.
+    - Filter replay vs persisted frames, fleet code (now `8fc72076d`): **16 of 16 teams equal**, including the 3 rebuilt games.
+    - 0 `Traceback`, `ROSTER_FILTER_WIDEN_FAILED` or `PERSIST_FAILED` in either new log portion. 0 `ROSTER_FILTER_DROPPED`, as predicted (no drop on today's slate).
+    - The watcher started 15:31Z died when the session restarted; this is a direct read of the log growth since the ff (sizes 166038 -> 188121 and 79570 -> 84982).
 - **Owed (todo `#772`):** on the next MIA or MIN slate, Portis (and a healthy, priced Shannon) in `live_resim.load_engine_inputs`, and their served live prop rows with Live proj. and actual.
 - **Revert:** revert `8fc72076d` on main, then a fleet ff to the revert commit. That needs no restart, for the same reason.
