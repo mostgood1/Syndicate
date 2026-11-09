@@ -902,12 +902,6 @@ death, never life — do not invert it.
 - Verification: Validation gates read BEFORE the result: credited possession points reconcile with each team's regulation points in every game; segmented possessions per team-window within 5% of the box estimator's 17.74 from 30m; two games' last-3-minute sequences eyeballed. Then pmf, mean and variance per possession, real (pool, same games) vs sims (base, E2), and the closure table, in the findings file and #765. Diagnostic only: no engine, served-code or config change; nothing deployed.
 - Blocked by: none
 
-### closed-lane-archive-20261109-0758 — CLOSED 2026-11-09 (GOAL MET: 13 blocks archived) — opened 2026-11-09 — session 69ca0430-f422-40ad-8c8d-6cc58b509d6f
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. `owner_liveness.py --idle-min 240` read 13 SAFE; all 13 moved to lanes_closed.md, one pointer each; invariants unchanged vs origin/main baseline. Table and WAIT reasons: log/2026-11-09.md 14:03Z.
-- Moved: pinnacle-coverage-d5, pinnacle-prop-swap, nhl-venue-price-gap, ncaab-kalshi-pairing, wncaab-kalshi-pairing, polymarket-cbb-pairing, kalshi-state-cap, kalshi-unnamed-role-key, kalshi-fanin-college-naming, kalshi-fanin-reversed-orientation, closed-lane-archive-20261108-1640, closed-lane-archive-20261108-1840, closed-lane-archive-20261108-2040.
-
 ### nba-roster-filter-name-key — OPEN — opened 2026-11-09 — session c7e5cb4c-7fce-4f43-8d7a-29867b074087
 - **GOAL VERDICT 2026-11-09 14:26Z (8:26 AM CST):** Bobby Portis (MIA, 6-7 served live NBA prop rows MIA@SAC 11-08 with no Live proj./actual) is in the pregame engine frames: the cause of his drop named with file:line, the 11-08 slate count of props-CSV players absent from their game's engine frames, and if a defect a fix on main with a reachability test (off != on) -- **GOAL: NOT MET.** Cause named (basketball_props_smart_sim.py:2094-2099 before the fix; _norm_name_key keeps 'JR.'), slate count 106 priced / 5 absent (3 correct exclusions + Portis + Shannon), fix + 5 OFF-arm tests on main `8fc72076d` -- all done. LOADED 2026-11-09 15:30:09Z (fleet ff to 8fc72076d, user "Load it now"; no restart needed: child-process code). First NBA props runs after the ff are clean and unchanged as predicted (filter replay = frames 16/16; NBA_SIM_AVAILABILITY 55/2 and 58/0 unchanged; 0 errors). Left: the Verification's on-fleet reading on MIA's or MIN's next slate (Portis in the engine frames, his live rows with Live proj./actual). Lane stays OPEN for that. todo #772.
 - Goal: Bobby Portis (MIA, 6-7 served live NBA prop rows MIA@SAC 11-08 with no Live proj./actual) is in the pregame engine frames: the cause of his drop named with file:line, the 11-08 slate count of props-CSV players absent from their game's engine frames, and if a defect a fix on main with a reachability test (off != on)
@@ -1020,6 +1014,12 @@ death, never life — do not invert it.
 - Falsification test: n/a
 - Verification: unit tests incl. off != on; a dry run against the fleet's live snapshots written to a scratch dir; after the user-approved load: NBA cross-check vs live_resim_history (coverage + 0 field mismatches), a same-moment probe per live sport (0 mismatches), bytes/day per sport, 0 tracebacks, refresh-worker memory not up
 - Blocked by: none
+
+### closed-lane-archive-20261109-1218 — CLOSED 2026-11-09 (GOAL MET: 1 blocks archived) — opened 2026-11-09 — session 87365a6a-6674-4092-8c62-aa741d4c00b9
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. `owner_liveness.py --idle-min 240` read 1 SAFE of 19 CLOSED; moved to lanes_closed.md with one pointer; invariants unchanged vs origin/main baseline. Table and WAIT reasons: log/2026-11-09.md 18:20Z.
+- Moved: closed-lane-archive-20261109-0758.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1221,6 +1221,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261108-1640` — CLOSED 2026-11-08 (GOAL MET: 3 blocks archived) — opened 2026-11-08 — session 439d45fa-c87e-47fd-b05d-640af3819698
 - `closed-lane-archive-20261108-1840` — CLOSED 2026-11-08 (GOAL MET: 1 block archived) — opened 2026-11-08 — session a6a71879-48d8-49eb-a154-1b092f18a282
 - `closed-lane-archive-20261108-2040` — CLOSED 2026-11-08 (GOAL MET: 1 block archived) — opened 2026-11-08 — session 7f416731-a9ac-4983-bb8f-437c50b13de0
+- `closed-lane-archive-20261109-0758` — CLOSED 2026-11-09 (GOAL MET: 13 blocks archived) — opened 2026-11-09 — session 69ca0430-f422-40ad-8c8d-6cc58b509d6f
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b

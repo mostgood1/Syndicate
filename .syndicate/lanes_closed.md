@@ -14527,3 +14527,9 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 at ~02:40Z 11-09 (8:40 PM CST 11-08) gave SAFE for 1 of 22 CLOSED blocks; dry run, apply and the invariant check (no new FAIL vs baseline) all passed.
 - Moved to lanes_closed.md: closed-lane-archive-20261108-1531. Table + deferrals: log/2026-11-08.md.
+
+### closed-lane-archive-20261109-0758 — CLOSED 2026-11-09 (GOAL MET: 13 blocks archived) — opened 2026-11-09 — session 69ca0430-f422-40ad-8c8d-6cc58b509d6f
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. `owner_liveness.py --idle-min 240` read 13 SAFE; all 13 moved to lanes_closed.md, one pointer each; invariants unchanged vs origin/main baseline. Table and WAIT reasons: log/2026-11-09.md 14:03Z.
+- Moved: pinnacle-coverage-d5, pinnacle-prop-swap, nhl-venue-price-gap, ncaab-kalshi-pairing, wncaab-kalshi-pairing, polymarket-cbb-pairing, kalshi-state-cap, kalshi-unnamed-role-key, kalshi-fanin-college-naming, kalshi-fanin-reversed-orientation, closed-lane-archive-20261108-1640, closed-lane-archive-20261108-1840, closed-lane-archive-20261108-2040.
