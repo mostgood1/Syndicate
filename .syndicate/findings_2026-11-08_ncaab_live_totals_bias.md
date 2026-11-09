@@ -451,7 +451,7 @@ In-game bias, full total, all 285 games (model − final):
   38 m), so they move to roughly −2.0.
 - These are approximate: the harness is 2025-26 regular season, not this week's population.
 
-**The load, if the user says yes** (nothing done):
+**The load** (user "Yes, load it"; **LOADED 2026-11-09 05:13:12Z, 11:13 PM CST 11-08**, deploys.md entry of that time):
 - live-odds-worker's `SYNDICATE_NCAAB_LIVE_MECHANISMS`, role key `LIVE_ODDS_WORKER__` in `local_production.env`;
 - production's four end-game fields, plus `"blowout_q4_margin": 999, "blowout_margin": 999,
   "solver_endgame_pts_per_team": 0.2`;
@@ -460,6 +460,10 @@ In-game bias, full total, all 285 games (model − final):
   mechanism names.
 - **Verify** on the live ledger after load: priced-row model − line from −1.95 to about −1.45, and h2 flag-on rows
   from −2.74 to about −2.0. The tip needs no reading of its own: the harness puts it at +0.04 ± 0.10 from today's.
+- **Loaded `[verified 05:13:55Z 11-09]`:** env sha `1372fe93` -> `551a8dfc` after a joint CLEAR at 05:12:57Z, then a drained
+  `down`/`up` (05:13:12-41Z). The new live-odds-worker (pid 1754434) parses its own environ to 7 keys (was 4), with
+  `blowout_q4_margin=999 blowout_margin=999 solver_endgame_pts_per_team=0.2`. First NCAAB tick 05:13:50Z
+  `live=2 resimmed=2 refused=0`; 0 Tracebacks. **The live reading above is OWED**, on rows after 05:13:43Z only.
 
 ## Women's (wncaab)
 

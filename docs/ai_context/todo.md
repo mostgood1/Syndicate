@@ -15,7 +15,7 @@
   - **(c) Freshness.** NHL/NFL Actuals reach the board at the Layer 2 build cadence (the build in flight 11-09 01:5xZ logged `typical=38.7min`). NBA/MLB have a web read-time refresh (`intelligence._refresh_live_columns_from_artifact`, held by lane `nba-live-proj-actuals`); NHL/NFL do not.
   - **(d) NHL live game-line join never matches (NOT this lane).** The re-sim snapshot says `'Penguins'`; the board says `'Pittsburgh Penguins'`; `live_gameline_join._norm_team` is a plain lowercase. `canonical_team` fixes both sides. Lane `nhl-live-resim-slate-root` was told.
 
-### `#768` — **NCAAB LIVE TOTALS RUN ~2 LOW BECAUSE THE ENGINE'S NBA BLOWOUT RULE COVERS THE WHOLE COLLEGE SECOND HALF; NOT THE PRIOR, NOT END-GAME FOULING. FIX PROPOSED (three env fields), NOT LOADED; HARNESS GATE PASSED 11-08 2:07 PM CST, RE-CENTRED PAIR (solver_endgame_pts_per_team 0.2) PASSED 5:33 PM CST; ONLY THE USER'S YES IS OWED** `[2026-11-08, lanes ncaab-live-totals-bias / ncaab-blowout-tip-recentre, session 6df1b15d]`
+### `#768` — **NCAAB LIVE TOTALS RUN ~2 LOW BECAUSE THE ENGINE'S NBA BLOWOUT RULE COVERS THE WHOLE COLLEGE SECOND HALF; NOT THE PRIOR, NOT END-GAME FOULING. FIX (three env fields) LOADED 11-08 11:13 PM CST (05:13Z 11-09) AFTER BOTH HARNESS GATES PASSED; 7 KEYS VERIFIED IN THE NEW live-odds-worker ENVIRON; THE LIVE BIAS READING IS OWED ON THE NEXT NCAAB SLATE** `[2026-11-08..09, lanes ncaab-live-totals-bias / ncaab-blowout-tip-recentre / ncaab-blowout-off-load, session 6df1b15d]`
 - **Findings:** `.syndicate/findings_2026-11-08_ncaab_live_totals_bias.md`.
 - **Scripts:**
   - `scripts/ncaab_live_totals_bias.py`: ledger attribution, men's and women's.
@@ -37,7 +37,7 @@
   - the same games' close-calibrated prior was also +4.0 high;
   - all 196 women's games give +1.22 ± 1.23;
   - a claim needs about 43-110 games.
-- **Proposed (user's call; nothing loaded):**
+- **Proposed, and LOADED 11-09 05:13Z (user "Yes, load it"):**
   - add `"blowout_q4_margin": 999, "blowout_margin": 999` to live-odds-worker's `SYNDICATE_NCAAB_LIVE_MECHANISMS` (men's only), with the tip re-centre `"solver_endgame_pts_per_team": 0.2` (below), loaded by a drained full down/up;
   - a clock-windowed engine rule (`blowout_window_s`, final ~240 s) is now only a HYPOTHESIS: the harness does not see the closing-minutes cost it was meant to avoid (at 2 min left, 15+ apart, rule off is still nearer the final, -0.11 +- 0.09).
 - **Re-fits (engine standard §4.4), both resolved 11-08:**
@@ -55,7 +55,10 @@
   - **rule off + 0.6 is not recommended:** no gain at the tip, +0.06 to +0.11 worse than rule off alone at every in-game checkpoint (at the 1.96 SE edge at 30 m), and the 10 m bias deepens −1.99 → −2.52. One rate field cannot lower the tip without lowering every live projection.
   - separate, pre-existing, not part of this load: production's tip sits +1.11 ± 0.43 over its own target (probe) and +1.28 over `pregame_rate` (harness), unseen against finals (2026-27 pregame sims +0.40 ± 1.05).
 - **Expected effect of the load (rule off + 0.2), revised:** live model − line −1.95 → about −1.45; h2 flag-on rows −2.74 → about −2.0.
-- **The load (the user's call; nothing loaded):** live-odds-worker `SYNDICATE_NCAAB_LIVE_MECHANISMS` (role key `LIVE_ODDS_WORKER__`) = production's four end-game fields + `"blowout_q4_margin": 999, "blowout_margin": 999, "solver_endgame_pts_per_team": 0.2`, by a drained full down/up between slates (lane, three claims, origin/main preflight `--reinject-env`, joint CLEAR). **Owed: only the user's yes.**
+- **LOADED 2026-11-09 05:13:12Z (11:13 PM CST 11-08), user "Yes, load it"** (deploys.md entry of that time; lane `ncaab-blowout-off-load`): live-odds-worker `SYNDICATE_NCAAB_LIVE_MECHANISMS` (role key `LIVE_ODDS_WORKER__`) = production's four end-game fields + `"blowout_q4_margin": 999, "blowout_margin": 999, "solver_endgame_pts_per_team": 0.2`, by a drained full down/up between slates (lane, three claims, origin/main preflight `--reinject-env`, joint CLEAR).
+  - env sha `1372fe93` -> `551a8dfc`, backup `local_production.env.bak-ncaab-blowout-off-20261109T051312Z`; joint CLEAR 05:12:57Z; `down` 05:13:12-37Z; up 05:13:41Z; new live-odds-worker pid 1754434 parses to **7** keys (was 4); healthz 200; 0 Tracebacks; first tick 05:13:50Z `live=2 resimmed=2 refused=0`.
+  - needed first: the fleet preflight held live-odds-worker at HOLD for as long as the college re-sim pool ran (its two `--serve` children counted as jobs). Fixed on main `f52c6afa9` (user "Fix the preflight").
+  - **OWED: the live reading** on the next NCAAB slate (11-09 evening CST on), rows after 05:13:43Z only, `scripts/ncaab_live_totals_bias.py`: priced-row model − line −1.95 → about −1.45; h2 flag-on −2.74 → about −2.0. Revert: restore the backup and do the same drained down/up.
 
 ### `#767` — **GAMES-RAIL INTERVAL PROJECTIONS FOR EVERY SPORT: ON MAIN `4f367324a`, LOADED AND VERIFIED FOR NFL / NHL / SOCCER; NCAAF READING OWED, MLB AT THE 2027 OPENER** `[2026-11-08 17:3xZ, lane all-sport-interval-projections (CLOSED, GOAL PARTLY MET), session c5cc97a7]`
 - **UPDATE 17:30Z:** (a) is DONE for nfl / nhl / soccer. The pregame blocks rode lane `nba-live-proj-actuals`' refresh-worker restart at 17:23:38Z (user: "Ride the next restart"). Served at 17:28Z: nfl pregame 13/13, nhl 6/6, soccer pregame 12. The other 182 soccer chips have NO sim match (0 of 182). Page: 134 PROJ boxes (deploys.md VERIFY 17:30:45Z).
