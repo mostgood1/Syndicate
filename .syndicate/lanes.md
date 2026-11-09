@@ -884,6 +884,14 @@ death, never life — do not invert it.
 - Verdict: GOAL MET. `owner_liveness.py --idle-min 240` read 13 SAFE; all 13 moved to lanes_closed.md, one pointer each; invariants unchanged vs origin/main baseline. Table and WAIT reasons: log/2026-11-09.md 14:03Z.
 - Moved: pinnacle-coverage-d5, pinnacle-prop-swap, nhl-venue-price-gap, ncaab-kalshi-pairing, wncaab-kalshi-pairing, polymarket-cbb-pairing, kalshi-state-cap, kalshi-unnamed-role-key, kalshi-fanin-college-naming, kalshi-fanin-reversed-orientation, closed-lane-archive-20261108-1640, closed-lane-archive-20261108-1840, closed-lane-archive-20261108-2040.
 
+### nba-roster-filter-name-key — OPEN — opened 2026-11-09 — session c7e5cb4c-7fce-4f43-8d7a-29867b074087
+- Goal: Bobby Portis (MIA, 6-7 served live NBA prop rows MIA@SAC 11-08 with no Live proj./actual) is in the pregame engine frames: the cause of his drop named with file:line, the 11-08 slate count of props-CSV players absent from their game's engine frames, and if a defect a fix on main with a reachability test (off != on)
+- Files: syndicate/features/shared/basketball_props_smart_sim.py (_filter_team_players_against_processed_roster_local section only), tests/test_nba_roster_filter_name_key.py (NEW), .syndicate/findings_2026-11-09_nba_roster_filter_name_key.md (NEW)
+- Hypothesis: The sim's roster filter (_filter_team_players_against_processed_roster_local, basketball_props_smart_sim.py:2099) compares _norm_name_key, which strips a ' JR' suffix but not ' JR.'; the props pool carries 'Bobby Portis Jr.' (props_predictions/player_logs spelling) and rosters_2026-27.csv carries 'Bobby Portis' (same PLAYER_ID 1626171), so the filter drops him after exclusions and before the engine call. ctx.props_pool MIA has 16 names incl. BOBBY PORTIS JR., excluded MIA = Powell/Donaldson/Goldin, players.away = 14 without him.
+- Falsification test: Replaying the fleet's code on the fleet's 11-08 MIA pool keeps Portis through the roster filter (then the drop is elsewhere: prune, priors, minutes).
+- Verification: Replay on fleet data: fleet code drops Portis at the filter, fixed code keeps him; unit test off != on; slate count before/after printed; on-fleet effect read after the next NBA pregame rebuild once loaded
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
