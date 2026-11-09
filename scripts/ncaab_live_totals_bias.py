@@ -57,7 +57,12 @@ EPOCHS = (
     ("E0_precal", datetime(2026, 11, 3, 19, 41, 57, tzinfo=timezone.utc)),
     ("E1_cal", datetime(2026, 11, 3, 22, 47, 5, tzinfo=timezone.utc)),
     ("E2_bounds_noOT", datetime(2026, 11, 5, 22, 37, 41, tzinfo=timezone.utc)),
-    ("E3_OTcounted", datetime(2100, 1, 1, tzinfo=timezone.utc)),
+    ("E3_OTcounted", datetime(2026, 11, 8, 21, 52, 45, tzinfo=timezone.utc)),
+    # The score-change quote rule's join loaded (refresh-worker TERM, deploys.md 2026-11-08 21:52:45Z): which full-game
+    # rows are priced changed (6.9% -> 39.7% pass the quote checks), so P1 before and after it are different selections.
+    ("E3q_quoterule", datetime(2026, 11, 9, 5, 13, 43, tzinfo=timezone.utc)),
+    # #768 loaded: blowout rule off + solver_endgame_pts_per_team 0.2 (live-odds-worker up 2026-11-09 05:13:43Z).
+    ("E4_blowout_off", datetime(2100, 1, 1, tzinfo=timezone.utc)),
 )
 BLOWOUT_Q4_MARGIN = 15  # basketball_engine.engine.EventSimConfig.blowout_q4_margin; NCAAB N_PERIODS=2 -> all of h2
 
@@ -333,13 +338,16 @@ def main():
                     b1 = "older30" if d < -30 else ("within30" if d <= 30 else "newer30")
                     line_err = float(r["line"]) - fin
                     gap = float(r["model_total_mean"]) - float(r["line"])
-                    p1tags = [f"{censored}|{b1}", f"{censored}|all"]
+                    ep1 = epoch(a)
+                    p1tags = [f"{censored}|{b1}", f"{censored}|all", f"{censored}|{ep1}|all"]
                     if pl is not None:
                         per = pl[0]
                         if PERIODS // 2 < per <= PERIODS:
-                            p1tags.append(f"{censored}|h2 " + ("blowout flag ON" if blowout_flag(per, h - w) else "blowout flag off"))
+                            h2t = "h2 " + ("blowout flag ON" if blowout_flag(per, h - w) else "blowout flag off")
+                            p1tags += [f"{censored}|{h2t}", f"{censored}|{ep1}|{h2t}"]
                         elif per <= PERIODS // 2:
-                            p1tags.append(f"{censored}|h1 margin " + ("<15" if abs(h - w) < 15 else ">=15"))
+                            h1t = "h1 margin " + ("<15" if abs(h - w) < 15 else ">=15")
+                            p1tags += [f"{censored}|{h1t}", f"{censored}|{ep1}|{h1t}"]
                     pen = blowout_penalty(penalty, pl[0], pl[1], h - w) if (penalty and pl is not None and sport == "ncaab") else None
                     for t in p1tags:
                         acc[("P1 priced totals model-final", t)].append((eid, err))
@@ -380,6 +388,7 @@ def main():
                 if period == PERIODS and clock > 480 and 11 <= abs(h - w) <= 19:
                     tags.append(f"{censored}|threshold |m|={abs(h - w):02d}")
                     tags.append(f"{censored}|threshold " + ("|m| 11-14" if abs(h - w) < BLOWOUT_Q4_MARGIN else "|m| 15-19"))
+                    tags.append(f"{censored}|{ep}|threshold " + ("|m| 11-14" if abs(h - w) < BLOWOUT_Q4_MARGIN else "|m| 15-19"))
             if period <= PERIODS // 2:
                 tags.append(f"{censored}|h1 margin {mb}")
             if pg and isinstance(pg.get("target"), (int, float)) and period <= PERIODS:
