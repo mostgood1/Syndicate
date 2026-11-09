@@ -57816,3 +57816,49 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - NFL h2h, and NFL spreads staying blank: MNF 01:15Z;
   - NCAAF: no games today.
 - **NHL: blocked upstream, not by this change.** The NHL snapshot names games by short club name (`'Rangers' @ 'Oilers'`, read 17:00Z) while board rows carry full names, and `_norm_team` only lowercases. So no live NHL row finds its re-sim lane (`no_live_gameline_projection`). Found by lane `nhl-nfl-live-prop-actuals`; the fix sits with the owner of `nhl-live-resim-slate-root`. NHL rows show 0 display numbers until a fix loads.
+
+## 2026-11-09 18:25:43Z (12:25 PM CST) -- FLEET ff 365be1a90 -> 722af0338 + live-odds-worker TERM 18:20:57Z + refresh-worker TERM 18:25:43Z: Kalshi 5-character club codes (UTRGV, MASSL) resolve in the matcher, for the fan-in and the order path (lane `kalshi-five-char-codes`, `#764` follow-up) -- **LOADED; every live answer identical on a same-moment replay; the positive live read is OWED (first 5-letter game on a board: Texas St @ UTRGV, 11-10)** (written 18:30Z, 12:30 PM CST)
+- **User, in this chat:** "Yes, ship it", answering "Push the five-letter code fix and load it on the fleet?". The behaviour was approved earlier: "Yes, both paths".
+- **What:** `722af0338`.
+  - `kalshi_catalogue._splits` reads `club_code_lengths()`: 2-5 with `_KALSHI_FIVE_CHAR_CODES_ENABLED` (a code default, True, no env), 2-4 off.
+  - `kalshi_board_join._resolve_event`'s collided-code refusal checks the blob's ends at the same lengths.
+- **Range `365be1a90..722af0338`, runtime** (listed in its own step at 18:14:17Z, re-checked by the ff script):
+  - my 2 files;
+  - `scripts/check_deploy_safety.py` (lane `deploy-safety-live-note-d1-label`): a label in a CLI readout. No worker imports it; `live_refresh_loop.py` names it only in a comment.
+  - No dirty fleet file overlapped.
+- **Roles, from each role's own log over 6 h:**
+  - live-odds-worker runs the Kalshi order path (61 `ORDER_PATH venue=kalshi`).
+  - refresh-worker runs the fan-in and the board join (549 `UNNAMED_ROLE_KEY_GRID`, 63 `KALSHI_JOIN`).
+  - Web shows neither and was not reloaded.
+- **Gates:**
+  - **Claims:** refresh-worker and live-odds-worker acquired 18:16:43Z (holder `kalshi-five-char-codes`); released 18:26:00Z.
+  - **Preflight** `--target fleet --target-commit 722af0338`, expect `fleet_def_kalshi_five_char_codes=1`, baseline 0 (read 18:15:00Z):
+    - live-odds-worker CLEAR ~18:17Z;
+    - refresh-worker HOLD (board build in flight, stage `portfolio_commit`), then CLEAR ~18:25:35Z after the drain.
+  - **ff:** `git merge --ff-only 722af0338` 18:17:20Z; flag 1.
+  - **live-odds-worker restart:**
+    - The first TERM attempt refused: an odds job was 22 s old.
+    - Its 2 `live_resim_workers --serve` children are permanent (the preflight calls them infrastructure), so the gate was "no child but those": NO_JOB 18:20:50.941Z.
+    - TERM pid 359168 at 18:20:57.276Z (`STOP_SIGNAL` logged). It finished its exit tick and exited ~18:24:04Z.
+    - Respawn pid 374416 at 18:24:11Z. The NBA / NCAAB / WNCAAB live re-sim loops and both college re-sim workers started 18:24:12-13Z. About 3 min without the live loops.
+  - **refresh-worker restart:**
+    - Drain (owner `kalshi-five-char-codes`) CLEAR: acked, idle, no build, no child.
+    - Preflight CLEAR. TERM pid 324654 at 18:25:43.009Z. Respawn at 18:25:4xZ (pid 374835). `DRAIN_CLEARED` after.
+- **Baseline** (18:15:00Z, fleet `365be1a90`):
+  - flag 0;
+  - ncaab `UNNAMED_ROLE_KEY_GRID` 0; wncaab 1 (`SEAUCSB-155`); ncaaf 6 (Polymarket, 11-14 games);
+  - last `BOARD_JOIN` matched 984 (7,093 rows) / 283 (3,154); `ORDER_PATH venue=kalshi` ok, positions 6;
+  - 0 tracebacks.
+- **expect:** flag 0 -> 1, and NO live answer changes today.
+  - Replay 17:11Z: 2,083 event x board resolutions, 0 changed.
+  - 18:16Z: none of the 6 live 5-letter events (`TXSTUTRGV` 11-10; `ACUTRGV`, `MASSLBC`, `MASSLMASS` 11-11; `SFAUTRGV` 11-14; `UTRGVHCU` 11-21) has its game in the board join's own rows for 11-09 / 11-10 (299 games on 11-10).
+- **verify (measured):**
+  - Fleet `722af0338`, flag 1. Both roles started after the ff (live-odds-worker 18:24:07-11Z, refresh-worker 18:25:46Z).
+  - **Same moment, loaded vs pre-fix (`365be1a90` copies), 18:26:52Z:** every live answer identical. Only the 11-07 `PVUTRGV` control differs: `no_match` -> Prairie View Panthers @ UT Rio Grande Valley Vaqueros.
+  - **First lines on the new code:**
+    - `ORDER_PATH venue=kalshi status=ok positions=5` 18:25:04Z;
+    - `BOARD_JOIN` matched 994 (7,134 rows) 18:26:56Z and 281 (3,266) 18:27:03Z;
+    - `UNNAMED_ROLE_KEY_GRID` ncaab 0, wncaab 2 (`SEAUCSB`, not on our board, as at baseline), ncaaf 6 (Polymarket, 11-14), all 18:28Z.
+  - **Errors:** 0 tracebacks on either role since the restarts. The 7 `FAILED|ERROR` lines on live-odds-worker are the same patterns as the hour before: pregame cooldown, Polymarket US catalogue-route 404s, and a `fetch_failed=0` field.
+- Measured: <pending> -- the POSITIVE live read. When the first 5-letter game reaches a board (Texas St @ UTRGV `TXSTUTRGV` 11-10, then the 11-11 games): its Kalshi totals are named in the fan-in (no `TXSTUTRGV` in `UNNAMED_ROLE_KEY_GRID` samples), and its event resolves `ok` in the board join (absent from the `JOIN_EVENTS` unmatched sample).
+- **Revert:** `_KALSHI_FIVE_CHAR_CODES_ENABLED = False` (or revert `722af0338`) on main, then ff + TERM both workers.

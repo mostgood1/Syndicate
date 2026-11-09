@@ -211,6 +211,10 @@
   - Rough engine size: `score_effect_k` about 0.005 (back-of-envelope from the run coefficient); step 3b tried only 0.002.
   - Nothing ships. Full tables: the findings' PHASE 2 STEP 3f section. Runs: WSL `~/bball_iv/runs/ncaab2026_tieshape/pull_real.jsonl`.
 ### `#764` — **KALSHI TOTALS THAT NAME NO GAME PRICE ANOTHER GAME'S ROW: 26 of 26 measured sides wrong-game (men's and women's college basketball, college football). Polymarket is clean in every sport. WRONG-GAME PRICING FIXED AND VERIFIED 2026-11-07 (refused, then named); OPEN: games on our board whose Kalshi quotes still name no game, incl. the 5-character codes UTRGV / MASSL** — 2026-11-06, session e32fef1a (user "Yes, measure it here")
+- **UPDATE 2026-11-09 18:30Z (12:30 PM CST): 5-LETTER CODE FIX LOADED** (`722af0338`, lane `kalshi-five-char-codes`).
+  - **Load:** fleet ff + live-odds-worker TERM 18:20:57Z + refresh-worker TERM 18:25:43Z.
+  - **Same-moment replay, loaded vs pre-fix:** every live answer identical; the 11-07 `PVUTRGV` control is named.
+  - **Owed:** the live read on the first 5-letter game on a board (`TXSTUTRGV`, 11-10).
 - **UPDATE 2026-11-09 17:28Z (11:28 AM CST): 5-LETTER CODE FIX WRITTEN AND REPLAYED, on a branch only** (lane `kalshi-five-char-codes`; user "Yes, both paths").
   - **Change:**
     - `kalshi_catalogue._splits` reads `club_code_lengths()`: 2-5 with `_KALSHI_FIVE_CHAR_CODES_ENABLED`, 2-4 off.
