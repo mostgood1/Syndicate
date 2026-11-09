@@ -24,7 +24,7 @@
   - **FAIL:** "No live games", or ncaab UNKNOWN, while those tick lines are fresh.
   - Nothing on the fleet loads this script, so no deploy is needed.
 
-### `#769` — **LIVE NHL / NFL PROPS HAD NO LIVE ACTUAL ON LAYER 2 (served 01:31Z 11-09: NHL 0 of 29, NFL 0 of 140). DISPLAY-ONLY BOX-SCORE ACTUAL BUILT (`827b6259d`), NOT PUSHED OR LOADED: the user's OK is owed. NHL Live proj. NOT shipped: the live re-sim's per-player means run 4-13% hot (no `special_teams_cal`)** `[2026-11-09, lane nhl-nfl-live-prop-actuals, session 386d4115]`
+### `#769` — **LIVE NHL / NFL PROPS HAD NO LIVE ACTUAL ON LAYER 2 (served 01:31Z 11-09: NHL 0 of 29, NFL 0 of 140). DISPLAY-ONLY BOX-SCORE ACTUAL ON MAIN `b2a5013e2`, LOADED on the fleet 11-09 14:48-14:50Z (config verify MET); the live served-board reading is owed (11-09 evening slate). NHL Live proj. NOT shipped: the live re-sim's per-player means run 4-13% hot (no `special_teams_cal`)** `[2026-11-09, lane nhl-nfl-live-prop-actuals, session 386d4115]`
 - **Built:** a `livePlayerStats` box block on each live game's snapshot.
   - NHL: live-odds-worker re-sim tick.
   - NFL: refresh-worker re-sim tick.
@@ -32,7 +32,7 @@
   - Same-instant replay: NFL TB@CHI 54/74 (20 players not in the Q1 box yet); NHL PIT@ANA 25/27.
   - Findings: `.syndicate/findings_2026-11-09_nhl_nfl_live_prop_actuals.md`.
 - **Owed:**
-  - **(a) The load.** Push, `ff --only` the fleet, TERM live-odds-worker (NHL producer) and refresh-worker (NFL producer + join). Then read the served board on a live NHL and a live NFL slate: Actual > 0 and 0 with an edge. Record in `deploys.md`.
+  - **(a) The live reading.** The load is done (`deploys.md` 2026-11-09 14:50:05Z). Read the served board on a live NHL and a live NFL slate: Actual > 0 and 0 rows with an edge. Record it in `deploys.md`.
   - **(b) NHL Live proj.** Measured on the fleet's 11-08 features (n=200): resuming at P1 20:00, 0-0 WITHOUT `special_teams_cal` (what `nhl/live_resim` runs) puts per-player SOG +5.7..+7.4%, goals +4.1..+10.5%, assists +6.4..+12.6%, points +5.5..+11.4%, saves +5.1..+7.1% above the pregame prop sim. WITH it, MAD is 0.0000. Two routes, neither taken:
     - pass the cal into the re-sim. This changes the PRICED live moneyline, so it needs the user and the nhl-live-resim owner;
     - run a separate calibrated prop resume (~3 s per game at puck drop).

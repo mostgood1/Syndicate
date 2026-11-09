@@ -850,6 +850,12 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### nhl-nfl-live-prop-actuals — OPEN — opened 2026-11-08 — session 386d4115-6e7b-47e3-9ff7-be3914d851cb
+- **2026-11-09 14:54Z — LOADED on the fleet; config verify MET; GOAL NOT YET MET (the live served-board reading is owed, 11-09 evening).**
+  - The user said "Yes, push and load". `b2a5013e2` is on main.
+  - Fleet ff to `aa5f50ac5` and refresh-worker TERM 14:48:37Z: done by lane `live-display-other-sports`, carrying this change (option (b), by message).
+  - live-odds-worker TERM 14:50:05Z: mine, claimed, preflight CLEAR 14:49:56Z.
+  - Both snapshots carry the new coverage keys, and `LIVE_PROJECTION_JOIN sport=nhl` printed for the first time (14:50:32Z). 0 tracebacks.
+  - `deploys.md` entry 2026-11-09 14:50:05Z.
 - **2026-11-09 02:0xZ — BUILT, NOT PUSHED, NOT LOADED; the user's OK is owed (asked via the parent session).**
   - Code is local commit `827b6259d` on `claude/focused-jang-b0e715`: 17 new tests, 157 neighbouring tests green.
   - Same-instant replay on the live slate: NFL TB@CHI 54/74 live props get an Actual (20 players not in the Q1 box yet); NHL PIT@ANA 25/27; 0 get an edge.

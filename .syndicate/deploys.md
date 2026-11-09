@@ -57642,3 +57642,27 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - `Herbert Jones` rows in the re-sim snapshot for NOP@GSW (absent on 11-08 for want of CSV lines);
   - the served missing-row list reduced to roster gaps and not-yet-entered players.
 - **Revert:** revert `e2558013c` on main, then ff + `reload-web` + a claimed refresh-worker TERM (the join), with live-odds-worker at its recycle or a claimed TERM (the re-sim key).
+
+## 2026-11-09 14:50:05Z (8:50 AM CST) -- live-odds-worker TERM loads the NHL `livePlayerStats` box producer (`b2a5013e2`, fleet `aa5f50ac5`); its NFL half and the board join rode lane `live-display-other-sports`' ff + refresh-worker TERM (14:48:37Z) -- **LOADED, config verify MET; live served-board reading OWED** (lane `nhl-nfl-live-prop-actuals`, todo `#769`)
+- **User, in this chat:** "Yes, push and load". That answered "Push 5cd1034f0 to main and load it on the fleet (ff plus both worker restarts)?". `5cd1034f0` was rebased to `b2a5013e2` with an identical diff. The answer covers loading this change only.
+- **What:** `b2a5013e2`. Each live NHL/NFL game's box score rides its live snapshot as `livePlayerStats`:
+  - NHL on live-odds-worker's re-sim tick (`/v1/gamecenter/{id}/boxscore`, plus rosterSpots once per game);
+  - NFL on refresh-worker's re-sim tick (ESPN summary, the settlement read).
+  - New join `live_player_actuals.attach_live_player_actuals` (board build, routed for nhl/nfl ahead of the priced gate). It writes `actual_so_far` and display flags only. It writes no `model_prob_over`, `live_aware` or `basis`, so the edge stays suppressed.
+  - NO Live proj.: the live re-sim omits `special_teams_cal`, measured +4..+13% hot (findings `2026-11-09_nhl_nfl_live_prop_actuals`).
+- **Split of the load (agreed by message with session cb29eaf2, lane `live-display-other-sports`, option (b)):** that lane ran the ff `e2558013c -> aa5f50ac5` and the claimed refresh-worker TERM, carrying `b2a5013e2` with my user's OK quoted to it. Its own entry records that half. Runtime ride-alongs in `e2558013c..aa5f50ac5`, besides mine:
+  - `6817e2180` (`check_deploy_safety.py`, operator tooling);
+  - `aa5f50ac5` (theirs: `live_gameline_join.py`, `board_enrichment.py` -- loaded on live-odds-worker by my TERM, with their stated "no objection").
+- **Gates:** claim live-odds-worker holder `nhl-nfl-live-prop-actuals` 14:49:48Z (token-checked, rc 0). Preflight from a worktree at origin/main `f31599007`: `--target fleet --target-commit aa5f50ac5 --expect nhl_lens_coverage_livePlayerStats=present --baseline nhl_lens_coverage_livePlayerStats=absent --baseline-read-at 2026-11-09T14:49:22Z`. Result **CLEAR** 14:49:56Z (only infrastructure processes; live commit `e2558013`, fleet HEAD `aa5f50ac`).
+- **Deploy:** `kill -TERM 80029` (live-odds-worker, started 14:04:03Z on `e2558013c`) at 14:50:05Z. The old pid was gone and the new pid 325044 started 14:50:13Z. Claim released 14:54Z.
+- **Verify, config (MET, 14:53:25Z read, fleet keyvalue):**
+  - `live/nhl_live_lens.json` (generated 14:52:56Z): `coverage.livePlayerStats = {enabled: True, liveGames: 0, attached: 0, ...}`. Baseline at 14:49:22Z: key absent.
+  - `live/nfl_live_resim.json` (14:53:16Z): `coverage.live_player_stats = {live_games: 0, ...}`. Baseline: absent.
+  - refresh-worker.log: first ever `LIVE_PROJECTION_JOIN sport=nhl` at 14:50:32.630Z (baseline 0). `LIVE_PLAYER_ACTUALS_JOIN sport=nhl|nfl` from 14:50:32Z, all `considered=0` (no game in play).
+  - 0 line-start Tracebacks on either worker since its restart.
+- **Measured:** <pending> -- the live reading. 11-09 evening: MNF, plus NHL games from 01:00Z 11-10. On the served `/api/intelligence/query`, live NHL and NFL prop rows:
+  - expected: Actual > 0 rows per live game;
+  - expected: 0 rows with `edge_vs_market_pct`;
+  - expected: `LIVE_PROJECTION_JOIN sport=nhl|nfl display_only=` > 0;
+  - each Actual spot-checked against the box.
+- **Revert:** revert `b2a5013e2` on main, then ff + a claimed refresh-worker TERM (join + NFL producer) and a live-odds-worker TERM (NHL producer). Without the producer block the join reads "no live game ... carries livePlayerStats" and writes nothing.
