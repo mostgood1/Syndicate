@@ -208,6 +208,41 @@ def _norm_name(value: Any) -> str:
     return " ".join(text.split())
 
 
+def _canonical_player(value: Any) -> str:
+    """The basketball engine's player key: suffixes dropped, nickname aliases applied. A FALLBACK, never the key.
+
+    `#762` (7), measured 2026-11-09 02:36Z: 6 of the 18 served live NBA prop rows with no live number were the odds
+    feed's `Derrick Jones` against the lens's `Derrick Jones Jr.`. The lens publishes the ENGINE's spelling, and the
+    engine names its players by its own canonical key (`HERB JONES` -> `HERBERT JONES`, `Jr.` dropped). `_resolve_player`
+    consults this only after the exact `_norm_name` key has missed, and accepts it only when exactly one lens player
+    carries it."""
+    from syndicate.features.nba.live_tick.player_names import normalize_player_name_key
+
+    key = normalize_player_name_key(str(value or "").translate(_NAME_FOLD), case="lower")
+    return " ".join(re.sub(r"[^a-z0-9]+", " ", key).split())
+
+
+def _resolve_player(indexed: Mapping[str, Any] | None, player_name: Any) -> tuple[str, bool]:
+    """`(index player key, via_alias)` for a board row's player name.
+
+    The exact `_norm_name` key first, always. Only when the lens has no player under that key, the engine's
+    canonical key (`_canonical_player`), and only if it names exactly one lens player. Two lens players sharing a
+    canonical key (a `Jr.` and his father, say) is a real ambiguity, so neither is chosen and the miss stands.
+    The index is not event-scoped (neither is the exact key), so the fallback can only reach a player the lens
+    already carries on this date."""
+    player = _norm_name(player_name)
+    if not player or not isinstance(indexed, Mapping):
+        return player, False
+    seen = indexed.get("players_seen")
+    by_canonical = indexed.get("players_by_canonical")
+    if not isinstance(seen, (set, frozenset)) or not isinstance(by_canonical, Mapping) or player in seen:
+        return player, False
+    candidates = by_canonical.get(_canonical_player(player_name)) or ()
+    if len(candidates) == 1:
+        return next(iter(candidates)), True
+    return player, False
+
+
 def _norm_market(value: Any) -> str:
     return re.sub(r"[^a-z0-9]+", "_", str(value or "").strip().lower()).strip("_")
 
@@ -338,6 +373,8 @@ def build_live_prop_index(snapshot: Mapping[str, Any] | None) -> dict[str, Any]:
     # counter. `miss_no_market_alias` was carrying all three.
     lines_by_player_market: dict[tuple[str, str], list[float]] = {}
     players_seen: set[str] = set()
+    # `#762` (7): engine canonical key -> the `_norm_name` keys indexed under it, for `_resolve_player`'s fallback.
+    players_by_canonical: dict[str, set[str]] = {}
     games_seen = 0
     rows_seen = 0
     rows_indexed = 0
@@ -435,6 +472,9 @@ def build_live_prop_index(snapshot: Mapping[str, Any] | None) -> dict[str, Any]:
             # being lumped into one catch-all. See `attach_live_projections`.
             lines_by_player_market.setdefault((player, market), []).append(line)
             players_seen.add(player)
+            canonical = _canonical_player(prop.get("playerName"))
+            if canonical:
+                players_by_canonical.setdefault(canonical, set()).add(player)
             index[(player, market, line)] = {
                 "live_projection": projection,
                 "model_prob_over": prop.get("modelProbOver"),
@@ -457,6 +497,7 @@ def build_live_prop_index(snapshot: Mapping[str, Any] | None) -> dict[str, Any]:
         "index": index,
         "lines_by_player_market": lines_by_player_market,
         "players_seen": players_seen,
+        "players_by_canonical": players_by_canonical,
         "games_seen": games_seen,
         "live_games": live_games,
         "rows_seen": rows_seen,
@@ -534,7 +575,7 @@ def live_prop_hit(indexed: Mapping[str, Any] | None, player_name: Any, market: A
     index = indexed.get("index") if isinstance(indexed, Mapping) else None
     if not isinstance(index, dict):
         return None
-    player = _norm_name(player_name)
+    player, _via_alias = _resolve_player(indexed, player_name)
     key_parts = _lookup_key_parts(market, line) if player else None
     if key_parts is None:
         return None
@@ -602,6 +643,8 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
     miss_no_line = 0
     miss_no_line_match = 0
     miss_player_not_live = 0
+    # `#762` (7): joined rows whose player was found only by `_resolve_player`'s canonical fallback.
+    player_alias_matched = 0
     unmatched_samples: list[dict[str, Any]] = []
 
     for row in grid:
@@ -615,7 +658,7 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
             continue
         considered += 1
 
-        player = _norm_name(row.get("player_name"))
+        player, via_alias = _resolve_player(indexed, row.get("player_name"))
         if not player:
             miss_no_player += 1
             continue
@@ -679,6 +722,8 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
                 )
             continue
 
+        if via_alias:
+            player_alias_matched += 1
         pulled = hit.get("quote_pulled") is True
         if pulled or _norm_market(row.get("market")) in _DISPLAY_ONLY_LIVE_PROP_MARKETS:
             # See `_DISPLAY_ONLY_LIVE_PROP_MARKETS`: the Live and Actual columns only.
@@ -1075,6 +1120,8 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
         "rows_live_display_only": display_only,
         # `#762` (6): of those, the rows whose line the books had pulled. Inside `rows_live_display_only`, not beside it.
         "rows_live_display_only_pulled": display_only_pulled,
+        # `#762` (7): joined rows (projected or display-only) found only through the engine's canonical player key.
+        "rows_live_player_alias": player_alias_matched,
         "rows_live_edge_withheld": edge_blocked,
         "edge_withheld_by_reason": dict(sorted(edge_withheld_by_reason.items())),
         "live_games_in_snapshot": indexed.get("live_games"),

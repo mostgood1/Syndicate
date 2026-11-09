@@ -362,14 +362,24 @@ def load_engine_inputs(date: str, home: str, away: str, *, root: Optional[Path] 
 
 # ------------------------------------------------------------------------------------------- names
 
-_SUFFIXES = {"jr", "sr", "ii", "iii", "iv", "v"}
-
-
 def normalize_name(name: Any) -> str:
-    s = unicodedata.normalize("NFKD", str(name or "")).encode("ascii", "ignore").decode("ascii").lower()
-    s = "".join(ch if ch.isalnum() or ch.isspace() else " " for ch in s)
-    parts = [p for p in s.split() if p not in _SUFFIXES]
-    return " ".join(parts)
+    """The pregame engine's own player key (`normalize_player_name_key`), lowercase.
+
+    THREE SOURCES MEET ON THIS KEY: the engine frames (`player_name`), ESPN's live box and on-floor names, and the
+    OddsAPI props CSV. It used to be a weaker key of its own, so two spellings of one player split (`#762` (7),
+    measured 2026-11-09 02:36Z, served board, 18 of 399 live NBA prop rows with no live number):
+      - `A.J. Green` (CSV) is `a j green` with punctuation turned into spaces, and the engine frame's `AJ Green` is
+        `aj green`. So he had no lines, and no live prop row.
+      - `Herb Jones` (CSV, ESPN) against `Herbert Jones` (engine): no alias table, so again no lines and no row. ESPN's
+        on-floor name could not map to the engine's either.
+    The engine key drops periods and apostrophes (`A.J.` = `AJ`, `De'Andre` = `De’Andre` = `DeAndre`), drops
+    generational suffixes, and applies the engine's nickname aliases (`HERB JONES` -> `HERBERT JONES`). Every caller
+    keys both sides through this one function, so the change can only merge two spellings of a name. It can never
+    split one. Anything left that is not a letter, a digit or a space becomes a space, as before."""
+    from syndicate.features.nba.live_tick.player_names import normalize_player_name_key
+
+    key = normalize_player_name_key(name, case="lower")
+    return " ".join("".join(ch if ch.isalnum() or ch.isspace() else " " for ch in key).split())
 
 
 def map_state_names(gs: Any, home_frame: Any, away_frame: Any):

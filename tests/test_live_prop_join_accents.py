@@ -74,6 +74,8 @@ def test_the_board_spelling_joins_the_lens_spelling():
 
 def test_off_is_not_on_with_the_old_normaliser(monkeypatch):
     monkeypatch.setattr(J, "_norm_name", _old_norm_name)
+    # The engine-key fallback (`#762` (7), `_resolve_player`) folds accents too, so "off" turns off both paths.
+    monkeypatch.setattr(J, "_canonical_player", _old_norm_name)
     grid = _grid()
     cov = J.attach_live_projections(grid, J.build_live_prop_index(_snapshot()))
     assert cov["rows_live_projected"] == 0 and cov["rows_live_display_only"] == 0

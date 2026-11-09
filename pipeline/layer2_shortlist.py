@@ -1470,6 +1470,8 @@ def build_layer2_shortlist(
                         f"display_only={live_stats.get('rows_live_display_only')} "
                         # `#762` (6): the part of `display_only` whose line the books had pulled.
                         f"display_only_pulled={live_stats.get('rows_live_display_only_pulled')} "
+                        # `#762` (7): joined only through the engine's canonical player key (`Jr.`, nicknames).
+                        f"player_alias={live_stats.get('rows_live_player_alias')} "
                         f"lens_indexed={live_stats.get('snapshot_rows_indexed')} "
                         f"lens_live_games={live_stats.get('live_games_in_snapshot')} "
                         f"miss_player={live_stats.get('miss_no_player')} "
