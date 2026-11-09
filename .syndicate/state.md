@@ -203,6 +203,13 @@ Product decisions, not engineering ones. Do not re-take them.
   Same day, the user's scope note: this is NOT a product to sell; the bar is market-grade success with our own capital.
   Unchanged by this: every line is its own decision (no market-level switches); `#704`'s 11-02 keep/revert read, which nothing may pre-empt.
   2026-10-31, **D7 ADOPTED as drafted** (user, verbatim: "Adopt as drafted"): the capital ladder is `.syndicate/findings_2026-10-31_d7_capital_ladder_preregistration.md`. Rungs R0 $5-10 (today) to R3 $40-80. A rung above R0 needs its max <= 1% of venue capital and a passing live rung read, plus the user's yes to move up. ROI above 0 is required only for R2 -> R3. Demotions (edge, funding and 7-day loss stops) apply without asking. Nothing changes until a strategy passes the Phase-2 gate and goes canary.
+- **2026-11-09 — ADOPT PHASE 1B, ONE ENGINE PREGAME AND LIVE (D9–D12).** User, verbatim: "Yes, adopt and start", answering "Adopt the one-engine plan (D9–D12) and start M0, the live evidence log?".
+  - Plan: `docs/ai_context/plan_one_engine_pregame_live.md`.
+  - **D9:** one record, one learner and one policy for pregame AND live, in parallel with Phases 1–2, shadow only.
+  - **D10:** in-play (E7) becomes the engine's live half; its entries read `p_decision` only after M3's pre-registered gate.
+  - **D11:** live truth is the fee-net mark-out at +300 s, then the outcome; pregame truth is the sharp close, else the consensus close.
+  - **D12:** the NCAAB consensus-close test folds into M2/M3.
+  - **Unchanged:** D6 (canary capital); Phase 2's frozen registration; every line its own decision.
 
 **Nothing is currently owed by the user.**
 

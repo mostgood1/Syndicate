@@ -1,4 +1,4 @@
-# One engine, pregame and live: the plan `[PROPOSED 2026-11-09, lane syndicate-decision-engine, umbrella #736; NOT ADOPTED — decisions D9–D12 in §7 are the user's]`
+# One engine, pregame and live: the plan `[ADOPTED 2026-11-09 — D9–D12, user: "Yes, adopt and start"; lane syndicate-decision-engine, umbrella #736]`
 
 **What the user asked for, verbatim (2026-11-09):**
 
@@ -237,7 +237,7 @@ is read. **No step changes a stake, an order or the board until its gate passes 
 
 ---
 
-## 7. Decisions owed by the user
+## 7. Decisions — ADOPTED 2026-11-09 (user, verbatim: "Yes, adopt and start", answering "Adopt the one-engine plan (D9–D12) and start M0, the live evidence log?")
 
 | # | Decision | Recommendation |
 |---|---|---|
@@ -246,4 +246,4 @@ is read. **No step changes a stake, an order or the board until its gate passes 
 | **D11** | Truth for live decisions: the fee-net mark-out at +300 s (fast) and the outcome (slow). Pregame: the sharp close, else the consensus close. | Yes |
 | **D12** | Fold the paused NCAAB consensus-close test into M2/M3, as the gate for markets with no sharp close | Yes |
 
-**First step if adopted:** open the M0 lane and start the live evidence log, because every later step trains on it.
+**First step (started 2026-11-09):** open the M0 lane and start the live evidence log, because every later step trains on it.

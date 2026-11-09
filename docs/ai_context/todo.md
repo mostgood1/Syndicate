@@ -809,6 +809,15 @@
     3. `py -3 scripts/syndicate_fair_stage2.py read --out C:/tmp/sfv1_stage2 --report C:/tmp/sfv1_stage2/stage2.json` (Idle priority)
 
 ### `#736` — **SYNDICATE DECISION ENGINE: one learning decision engine behind Layer 2 Suggested + the Kalshi/Polymarket Portfolio. ADOPTED 2026-10-26 with D1-D8 as recommended; PHASE 0 STARTED (lane `syndicate-decision-engine`)** — 2026-10-26, session loving-einstein-b3c45e; `docs/ai_context/plan_syndicate_decision_engine.md` (reading copy https://claude.ai/artifact/4umLu5SHUzhPUFLKqpieRe)
+- **UPDATE 2026-11-09 18:05Z (12:05 PM CST): D9–D12 ADOPTED -- Phase 1B, one engine, pregame and live** (user, verbatim: "Yes, adopt and start", answering "Adopt the one-engine plan (D9–D12) and start M0, the live evidence log?").
+  - Plan: `docs/ai_context/plan_one_engine_pregame_live.md`, marked adopted, with the main plan's roadmap row 1B and decision log.
+  - **Committed to:**
+    - **D9:** Phase 1B runs in parallel with Phases 1–2, shadow only.
+    - **D10:** in-play (E7) becomes the engine's live half; its entries switch to `p_decision` only after M3's gate.
+    - **D11:** live truth is the fee-net +300 s mark-out (fast) and the outcome (slow).
+    - **D12:** the NCAAB consensus-close test folds into M2/M3.
+  - **Unchanged:** D6 (canary until a gate passes); Phase 2's frozen registration; every line its own decision.
+  - **Next:** M0, the live evidence log, started the same day under its own lane.
 - **UPDATE 2026-11-09 17:34Z (11:34 AM CST): PHASE 1B PROPOSED -- ONE ENGINE, PREGAME AND LIVE** (session e32fef1a; plan `docs/ai_context/plan_one_engine_pregame_live.md`; NOT adopted).
   - **What the user said:** "WAY BEHIND my expectations of a single AI engine that makes use of all our advanced stats, sim engine data, and betting data", then that live decisions should use "all the same data but based on game shape/stat progress ... and projected outcomes".
   - **Gaps found (read-only surveys, 11-09):**
