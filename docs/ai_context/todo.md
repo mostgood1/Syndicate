@@ -91,7 +91,7 @@
 - **Found in the basketball path (lane `basketball-interval-projections`, closed; NOT changed here):**
   - **(e)** wncaab live UC San Diego @ San Diego, 11-08 00:21Z: the re-sim's settled Q1/Q2 are home/away SWAPPED against the chip line score. `_live_lane` matches on event id and never checks orientation, so that card's final and win % are probably swapped too.
   - **(f)** The rail shows LIVE college win %, which the board blanks (`board_enrichment.LIVE_PROBABILITY_WITHHELD_SPORTS`, user 2026-11-03 "Yes, blank it").
-- **Also seen:** at 11-08 00:10Z the NHL live re-sim refused both live games `no_slate_features` (no live NHL projection at all). Not investigated.
+- **Also seen:** at 11-08 00:10Z the NHL live re-sim refused both live games `no_slate_features` (no live NHL projection at all). **Cause found and fixed `[2026-11-09, lane nhl-live-resim-slate-root]`:** the hockeysim loader read the fleet checkout's stale `data/nhl_source` (scoreboards end 2026-06-14), not the producer's root; fix `7d48129c5` LOADED 03:53:10Z 11-09, mechanism MET (`slateFeatureGames` 3 of 3 on the 11-09 slate); live effect owed on the 11-09 NHL games (deploys.md 2026-11-09 01:25:21Z).
 
 ### `#766` — **RENDER IS NOT NEEDED AT RUN TIME; FOUR DECISIONS OWED TO RETIRE WHAT STILL ASSUMES IT** `[2026-11-08 00:3xZ, lane render-retirement-inventory, session 36cc0a0e]`
 - **Findings:** `.syndicate/findings_2026-11-07_render_dependency_inventory.md` (file:line per dependency, and what breaks if Render vanished).
