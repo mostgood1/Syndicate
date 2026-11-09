@@ -57899,3 +57899,26 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - `local_production.env` already has the new path, which does exist.
   - Env is built only at `up`, so the fix is the next drained full down/up. Until then `role_restarts.jsonl` attribution is wrong. Restarts are not blocked.
 - **Revert:** `SYNDICATE_LIVE_EVIDENCE_LOG=off` needs an env change (full down/up). Reverting `564f8dbde` needs an ff + refresh-worker TERM. The log files can be left in place: nothing reads them on a request path.
+
+## 2026-11-09 23:09:54Z (5:09 PM CST) -- VERIFY part 2a of the 14:48:33Z load (`aa5f50ac5`, display-only Live proj. beyond NBA, todo `#771`, lane `live-display-other-sports`): **NCAAB MET on the first live D1 game -- 2 -> 16 of 18 served live game rows with a Live proj., 0 display rows with a model edge or `live_aware`; half rows shown**; NHL / NFL owed after 01:00Z / 01:15Z (written 23:2xZ, 5:2x PM CST)
+- **Code running:** the fleet head is `564f8dbde`, which contains `aa5f50ac5`. refresh-worker pid 386232 is the 19:18:06Z respawn from that load, not my 14:48Z one.
+- **Live population:** 1 D1 game, Marshall @ Ohio State, tipped 23:00Z. The lane age max is 50.5 s at 23:05Z and 39.8 s at 23:09Z, so the college lane gate passes.
+- **Join (`LIVE_GAMELINE_JOIN sport=ncaab`):**
+  - 23:02:11Z: index 0, `display=0`.
+  - **23:05:17Z: considered 22, priceable 2, withheld 20 (`segment_pricing_disabled` 11, quote-behind-score 6, `prob_interval_swamps_edge` 2, past the quote ceiling 1), `display=18`.** That is 11 segment rows plus 7 quote-refused rows.
+  - 23:09:17Z: considered 25, `display=22`.
+  - 0 `BOOK_GRID_LIVE_GAMELINE_FAILURE` (watcher `C:/tmp/livedisp/wait_live.sh`, exit 0 on the first hit).
+- **Served** (`POST /api/intelligence/query`, `ranked_all` 3,613 cards, fetched 23:09:54Z, `C:/tmp/livedisp/probe.py`), after build 23:07:23Z:
+
+  | | rows | Live proj. now | old code, same board | added by display |
+  |---|---|---|---|---|
+  | full-game totals | 10 | 8 | 2 | 6 |
+  | full-game h2h | 1 | 1 | 0 | 1 |
+  | h1 / h2 totals | 7 | 7 | 0 | 7 |
+  | **all** | **18** | **16** | **2** | **14** |
+
+  - **0 of the 14 display rows carry `model_edge_pct` or `live_aware`, and 0 of 16 live-number rows are `suggested`.** The 2 old-code rows are the join's priced rows (`live_aware=True`).
+  - **Half rows show the half's own total, raw:** h1 lines read 75.4 and h2 lines 81.4. They are side-restated: h1 77.5 under 0.564; h1 76.5 over 0.480 / under 0.520; h2 84.5 over 0.422 / under 0.578. The full game reads 156.8.
+  - **h2h:** Ohio State (home) 0.926.
+- **The 2 blank rows are not the join's: they come from the look-ahead board date.** Both are Marshall @ Ohio State full-game unders (162.0, 161.5), `source_board_date` 2026-11-10, `board_lane` dead. They carry the PREGAME projection 161.4 and pregame edges 6.05 / 3.97 with no live number (`by_board_date.py`: 11-09 rows 16 of 16 live; 11-10 rows 0 of 2). They predate this change, which adds no edge. Filed as a lead, not fixed here.
+- **Earlier read, 23:07:47Z, two minutes before:** 14 of 18, 0 old code. The 4 blanks were the same 2 look-ahead rows plus the h2h row and the full-game under 162.5 (pregame edge 5.39). Both had a live number by 23:09:54Z. Same-day served rows can change between reads, so this entry rests on the 23:09:54Z read.
