@@ -763,7 +763,8 @@ block (`0f8db1dd8`) before the run.
 - **Means:** neither moves the means. Mean points from minute 30 run 0.55 per team low, consistent with step 3.
 
 **Next for NCAAB, both diagnostic first, against these tables:**
-1. **Test the existing default-off fields** with no engine edit, on the same games, seeds and checkpoints. Read
+1. **DONE in step 3d below** (2026-11-09 02:21Z): no existing setting fixes it; jitter supplies the shared part from 30m only.
+   **Test the existing default-off fields** with no engine edit, on the same games, seeds and checkpoints. Read
    team-specific variance, covariance, total variance, margin SD and tie rate.
    - The fields: E2's bonus free throws (`bonus_nonshoot_foul_per_poss` 0.08, `bonus_second_half_mult` 1.5);
      alternation 1.0; and `possessions_jitter` for shared pace variance.
@@ -778,3 +779,167 @@ block (`0f8db1dd8`) before the run.
 - Scripts, in the session scratchpad: `make_code4.py`, `spreadsrc.py`, `spreadreal.py`, `spreadanalyze.py`,
   `pacecheck.py`, `spreaddirect.py`, `spreadcov.py`.
 - Outputs: `~/bball_iv/runs/ncaab2026_tieshape/spread_{sims,real}.jsonl`.
+
+## PHASE 2 STEP 3d (NCAAB): no existing setting fixes the misplaced late variance — possession jitter supplies the shared part from minute 30 only; per-possession variance is the remaining piece
+
+`[2026-11-09 01:23Z-02:21Z (7:23-8:21 PM CST 11-08), lane ncaab-spread-existing-levers, session c2fd17f8, read-only, nice 19; user "Yes, test them"]`
+
+**Verdict.**
+- **No existing setting fixes it.** All three together close 30% of the team-specific excess from minute 30 and
+  44% from minute 36. The SD of the margin change goes from 1.165× real to 1.118× (30m) and from 1.154× to 1.089×
+  (36m). The three arms' effects on the team-specific part add up: -2.52 together against -2.48 summed (30m).
+- **`possessions_jitter` 0.12 supplies the missing SHARED variance from minute 30, but not from minute 36.**
+  - From 30m: Cov(home, away) goes 0.71 → 5.00 (real 6.82), closing 70% of the gap.
+  - From 36m: 0.34 → 1.11 (real 4.51), closing 18%.
+  - Jitter scales with the time left squared; the real shared variance does not. Real Cov from 36m is 66% of the
+    30m value with 40% of the time left. So the last minutes' shared variance is game STATE, not pace uncertainty.
+- **Jitter alone makes the late total too WIDE from 30m:** Var(total) 84.0 against real 74.5 (base 66.9). The
+  team-specific part is still 36% high, and the shared part now sits on top of it. The two have to be fixed
+  together; jitter is not a standalone fix.
+- **Strict alternation (1.0) is the only arm that narrows the margin without moving the means:** Var(margin
+  change) -5.7% / -6.6%, mean points -0.03 / +0.01.
+- **E2 bonus free throws fix the free-throw RATE and the late MEAN, not the spread.**
+  - FTA per FGA 0.289 → 0.466 (real 0.575).
+  - Late points per team from 30m +0.48 ± 0.05, which closes 87% of the mean gap.
+  - Per-possession variance only 1.459 → 1.398 (-4%), so team-specific -1.9% / -3.7%.
+- **Tie rate:** no arm moves it by more than 0.3 points.
+  - Real: 5.77% of the pool's games end regulation tied, and 8.91% ± 2.42 of these same 539 games.
+  - Sims: from 30m, base 2.65% and the arms 2.77-2.92%. From 36m, base 3.53% and the arms 3.53-3.69%.
+
+**Pre-registered hypothesis EXISTING-FIELDS (lane block `7af9dd1d0`, before any arm ran): one clause FALSIFIED, the
+rest hold.**
+
+| clause | predicted | measured (30m / 36m) | |
+|---|---|---|---|
+| (a) JIT12 Cov(home, away) from 30m | 3.5-6.0 | 5.00 | holds |
+| (a) JIT12 Cov from 36m | under 1.5 | 1.11 | holds |
+| (a) JIT12 Var(margin change) | moves under 5% | -0.1% / -0.8% | holds |
+| (b) E2 team-specific part | -4% to -12% at both | -1.9% / -3.7% | **below the range** (right direction, inside the 2× tolerance) |
+| (b) E2 FTA per FGA from 30m | 0.45-0.70 | 0.466 | holds |
+| (b) E2 mean window points per team | +0.4 to +1.2 | +0.48 (30m) | holds |
+| (c) ALT1 Var(margin change) | -4% to -10% | -5.7% / -6.6% | holds |
+| (c) ALT1 Var(total) | within 10% | +0.9% / +0.3% | holds |
+| (c) ALT1 Cov(home, away) | within 10% | **+150% / +133%** (0.71 → 1.78; 0.34 → 0.79) | **FALSIFIED** |
+| (d) ALL team-specific part | at least 10% above real | +25% / +19% | holds |
+
+- **Why (c)'s Cov clause failed.**
+  - The identity is Cov(N_h, N_a) = (Var(T) - Var(dN)) / 4, with T the total and dN the difference of the two
+    teams' possessions.
+  - The coin-flip split's imbalance is negatively shared. Removing it takes the true SD(dN) from 1.88 to 0.71.
+  - That raises Cov(N_h, N_a) by about (3.53 - 0.50) / 4 = 0.76 possessions², or 0.88 points² at the sims'
+    1.078 points per possession. Measured: +1.07.
+  - The identity predicted it; the pre-registration did not apply it.
+- **The falsification test's other triggers did not fire.**
+  - JIT12 closed 18% of the 36m covariance gap, not half or more.
+  - ALL leaves the team-specific part 25% above real from 30m, not within 10%.
+
+**Method.**
+- **Same setup as step 3c:**
+  - the code4 copy with RNG-neutral possession markers;
+  - the production re-sim with live-odds-worker's three switches (never printed);
+  - the same 540 games, seeds and checkpoints (30m, 36m), 100 sims each.
+- **Arms, each on top of production E1 via `Resim(mechanisms=...)`:**
+  - E2: `bonus_free_throws` true, `bonus_nonshoot_foul_per_poss` 0.08, `bonus_second_half_mult` 1.5. That is
+    `ncaab_live_tier.md` §E2's config, as recorded in `ncaab_bt_e2.json`.
+  - ALT1: `possession_alternation` 1.0 (default 0.85, otherwise a coin flip).
+  - JIT12: `possessions_jitter` 0.12 (default 0.06). 0.12 was set before the run: it is the value that brings the
+    sims' total-possession variance from 30m up to the real estimator's 19.2.
+  - ALL: the three together.
+- **Base:** step 3c's run (same copy, seeds and tasks).
+- **Reachability, every arm:**
+  - provenance `cfgFields` name its fields in 540 / 540 games;
+  - margin histograms differ from the base in 1,080 / 1,080 game-checkpoints;
+  - window points reconcile in 108,000 / 108,000 sims.
+- **Intervals:** paired arm minus base, 1.96 × a bootstrap SE over games.
+- **Real column:** the 4,472-game pool, step 3c's reference. These same 539 games agree with it within their
+  interval on every row except the tie rate.
+
+**From minute 30 to the end of regulation** (per team, window; ± in the paired table below):
+
+| | real | base | E2 | ALT1 | JIT12 | ALL |
+|---|---|---|---|---|---|---|
+| points | 20.47 | 19.91 | 20.39 | 19.89 | 19.92 | 20.41 |
+| Var(points) | 30.44 | 32.76 | 32.24 | 31.99 | 37.00 | 36.02 |
+| Cov(home, away) | 6.82 | 0.71 | 0.80 | 1.78 | 5.00 | 6.50 |
+| correlation | 0.224 | 0.022 | 0.025 | 0.056 | 0.135 | 0.180 |
+| team-specific part (Var - Cov) | 23.61 | 32.05 | 31.44 | 30.21 | 32.00 | **29.52** |
+| Var(margin change) | 47.23 | 64.09 | 62.88 | 60.42 | 64.00 | 59.05 |
+| SD(margin change), × real | 1 | 1.165 | 1.154 | 1.131 | 1.164 | 1.118 |
+| Var(window total) | 74.52 | 66.94 | 66.08 | 67.54 | **84.00** | **85.04** |
+| FTA per FGA | 0.575 | 0.289 | 0.466 | 0.289 | 0.289 | 0.467 |
+| true SD(home - away possessions) | ≤ 1.17 | 1.88 | 1.87 | 0.71 | 1.87 | 0.71 |
+| true Var(total possessions) | 19.2 (estimator) | 7.08 | 7.33 | 7.15 | 21.57 | 21.85 |
+| variance of points per possession | ~1.08 (inferred, 3c) | 1.459 | 1.398 | 1.459 | 1.459 | 1.399 |
+
+**From minute 36:**
+
+| | real | base | E2 | ALT1 | JIT12 | ALL |
+|---|---|---|---|---|---|---|
+| points | 9.00 | 8.40 | 8.67 | 8.40 | 8.39 | 8.67 |
+| Var(points) | 14.30 | 13.38 | 12.97 | 12.97 | 14.04 | 13.22 |
+| Cov(home, away) | 4.51 | 0.34 | 0.42 | 0.79 | **1.11** | 1.60 |
+| correlation | 0.315 | 0.025 | 0.032 | 0.061 | 0.079 | 0.121 |
+| team-specific part | 9.79 | 13.04 | 12.56 | 12.18 | 12.94 | **11.61** |
+| Var(margin change) | 19.58 | 26.08 | 25.11 | 24.36 | 25.87 | 23.23 |
+| SD(margin change), × real | 1 | 1.154 | 1.132 | 1.116 | 1.150 | 1.089 |
+| Var(window total) | 37.62 | 27.43 | 26.78 | 27.52 | 30.30 | 29.64 |
+| FTA per FGA | 0.746 | 0.376 | 0.626 | 0.377 | 0.376 | 0.630 |
+| true SD(home - away possessions) | - | 1.32 | 1.32 | 0.71 | 1.32 | 0.71 |
+| true Var(total possessions) | 10.5 (estimator) | 2.66 | 2.71 | 2.68 | 5.08 | 5.13 |
+| variance of points per possession | - | 1.441 | 1.359 | 1.442 | 1.440 | 1.357 |
+
+**Paired, arm minus base** (1.96 × bootstrap SE over games):
+
+| arm | team-specific | Cov | Var(margin change) | Var(total) | points per team | tie % |
+|---|---|---|---|---|---|---|
+| E2, 30m | -0.60 ± 0.52 | +0.09 ± 0.38 | -1.21 ± 1.03 | -0.86 ± 1.10 | +0.48 ± 0.05 | +0.27 ± 0.21 |
+| ALT1, 30m | -1.84 ± 0.50 | +1.07 ± 0.38 | -3.67 ± 1.01 | +0.60 ± 1.12 | -0.03 ± 0.04 | +0.12 ± 0.19 |
+| JIT12, 30m | -0.04 ± 0.48 | +4.29 ± 0.38 | -0.09 ± 0.96 | +17.06 ± 1.22 | +0.01 ± 0.04 | +0.21 ± 0.18 |
+| ALL, 30m | -2.52 ± 0.50 | +5.78 ± 0.45 | -5.04 ± 0.99 | +18.10 ± 1.38 | +0.50 ± 0.05 | +0.21 ± 0.20 |
+| E2, 36m | -0.49 ± 0.20 | +0.08 ± 0.16 | -0.97 ± 0.41 | -0.65 ± 0.48 | +0.27 ± 0.03 | +0.16 ± 0.23 |
+| ALT1, 36m | -0.86 ± 0.20 | +0.45 ± 0.15 | -1.72 ± 0.40 | +0.08 ± 0.46 | +0.01 ± 0.03 | +0.08 ± 0.22 |
+| JIT12, 36m | -0.10 ± 0.19 | +0.77 ± 0.14 | -0.21 ± 0.39 | +2.87 ± 0.45 | -0.01 ± 0.03 | +0.00 ± 0.20 |
+| ALL, 36m | -1.43 ± 0.22 | +1.27 ± 0.16 | -2.85 ± 0.43 | +2.21 ± 0.49 | +0.27 ± 0.03 | +0.15 ± 0.22 |
+
+- **E2's points per possession** (sims, from 30m), as 0 / 1 / 2 / 3 / 4+:
+  - base: 52.7 / 2.9 / 29.0 / 14.8 / 0.6%;
+  - E2: 50.0 / 4.6 / 31.3 / 13.6 / 0.6%.
+  - Free-throw trips move mass from 0 and 3 to 1 and 2. That is a 4% cut in variance; the inferred real level
+    needs about 26%.
+- **Tie rate, real pool against these games:** the 539 games carry more regulation ties than the pool (8.91% ± 2.42
+  vs 5.77% ± 0.69). The sims' base rate is 2.65% from 30m either way, so the deficit is 3.1 to 6.3 points.
+
+**What it means for the projections (nothing ships from this lane):**
+- **The late-variance error now splits into three measured pieces.**
+  1. **Shared possession variance.**
+     - From minute 30, a pace-uncertainty knob reaches it (jitter).
+     - From minute 36 it does not: real 4.51 against 1.11 with jitter doubled.
+     - Step 3c's buckets put the real shared correlation from 36m highest when the margin is 7-19 (0.373) and
+       lowest at 20+ (0.076). That fits trailing teams speeding up and fouling across the last 4 minutes, well
+       before E1's 120-second window. This is a HYPOTHESIS, not measured here; it needs an `engine.py` mechanism.
+  2. **Possession imbalance.** Alternation 1.0 removes it: -5.7% / -6.6% of the margin-change variance, with no
+     mean change. It is an existing field, so it could go to the harness's paired point-accuracy gate with no
+     engine edit.
+  3. **Per-possession variance.** This is the largest piece left. E2 removes 4% of it, and the inferred gap is
+     about 26%. The real per-possession distribution has to be measured before any mechanism is built.
+- **E2 is no longer just "rejected".** It fixes the late free-throw rate and the late mean from 30m (+0.48 per
+  team, 87% of the gap). Its rejection was on early-game totals and margins (tip and H2 10:00).
+  - A late-only bonus rate, for example `bonus_second_half_mult` with a lower first-half base, is a refit
+    candidate.
+  - Not tested here: refitting E2 interacts with E1 and the exact-target solve (`solver_bonus_trip_share`).
+- **Do not raise `possessions_jitter` on its own.** It fixes the 30m total's narrowness only by over-shooting it
+  (84 vs 74.5) while the team-specific excess stands. From 36m it leaves 82% of the shared gap.
+
+**Next for NCAAB:**
+1. **Segment real play-by-play into possessions** (production `_possession_after`) to measure the real
+   per-possession outcome distribution and its variance. That decides piece 3.
+2. **Alternation 1.0 through the harness's paired gate** on point accuracy: an existing field, no engine edit.
+   It is optional and cheap.
+3. **Mechanisms for pieces 1 and 3, plus step 3b's end-game decision rules.** Each needs an `engine.py` loan from
+   lane `basketball-scenario-calibration`, and an E1 refit afterwards (model_engine_standard.md: mechanism vs
+   estimator).
+
+**Scratch:**
+- Scripts, in the session scratchpad: `spreadlevers.py`, `run_spreadlevers.sh`, `leversanalyze.py`.
+- Output: `~/bball_iv/runs/ncaab2026_tieshape/spread_levers.jsonl` (2,160 game-arm rows). Log:
+  `~/bball_iv/runs/ncaab2026_spreadlevers.log` (DONE 2160 jobs in 2,877 s).
