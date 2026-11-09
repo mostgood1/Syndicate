@@ -57614,3 +57614,31 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **verify MET (mechanism):** Redis `live/nhl_live_lens.json` generated 2026-11-09T08:19:24-06:00: `slateRows 3, slateFeatureGames 3, games 3, refusalsByReason {game_not_started: 3}`. `slateFeatureGames` exists only in the new code, and it equals `slateRows`; the old root read 0 games for any date after 2026-06-14.
 - Measured: <pending> -- the live effect, on the 11-09 NHL slate (NYR@EDM, PHI@VAN, NYI@SJS; first puck ~01:00Z 11-10, 7 PM CST): `nhl_live_lens.json` coverage `liveResimmed > 0` and `no_slate_features` absent while a game is in play (intermissions refuse `in_intermission` by design); `LIVE_GAMELINE_JOIN sport=nhl index > 0`; served `/api/intelligence/query` live NHL game rows with a Live proj. (was 0 of 42 on 11-08 23:35Z).
 - **Revert:** revert `7d48129c5` on main, then ff + a claimed live-odds-worker TERM (the pool no longer blocks its preflight since `f52c6afa9`).
+
+## 2026-11-09 14:24:51Z (8:24 AM CST) -- DEPLOY `e2558013c` (`#762` (7) one player, one key: NBA live re-sim + board join use the engine's canonical player name) to web, live-odds-worker and refresh-worker: **LOADED on all three; mechanism MET; served effect owed tonight** (lane `nba-live-proj-actuals`, user "Yes, load it")
+- **Range `7d48129c5..e2558013c`, 7 commits.** Runtime:
+  - this lane's `nba/live_resim.py`, `shared/live_projection_join.py`, `pipeline/layer2_shortlist.py`;
+  - `f52c6afa9` (`scripts/check_deploy_safety.py`, `scripts/deploy_preflight.py`; tooling, run by no role).
+  - The rest is ledger and tests. 0 of the fleet's dirty paths overlap the range. ff to MY SHA only.
+- **Claims:** web, refresh-worker and live-odds-worker, holder `nba-live-proj-actuals`, from 13:59:11Z. web + live-odds-worker released 14:05:47Z, refresh-worker at this entry.
+- **Baseline (13:59:25Z):** `fleet_checkout_head` 7d48129c5. The last NBA join (13:58:05Z) carried no `player_alias=` field. Pids: refresh-worker 469, live-odds-worker 61221, web workers 403/415/57409 (the fleet came back overnight).
+- **Preflight `--target fleet --target-commit e2558013c`, each with `--expect`/`--baseline`:**
+  - web and live-odds-worker CLEAR at 13:59:5xZ. refresh-worker HOLD: a board build in flight.
+  - Before its TERM, live-odds-worker read HOLD (3 jobs: one `run_refresh_odds_job` chain ending in `fetch_nfl_schedule`).
+  - A background loop re-read the baseline and re-ran preflight every ~20 s, and TERMed each role on its first CLEAR.
+- **Deploy:**
+  - `git merge --ff-only e2558013c` 14:00:17Z. `def _resolve_player` present.
+  - `reload-web` 14:00:18-14:00:23Z: 5.3 s, 0 failures, healthz 200; workers 78201/78202.
+  - live-odds-worker: CLEAR 14:01:34Z with 0 live children. TERM pid 61221 at 14:01:35.249Z; respawned pid 80029 at 14:05:02Z on `e2558013c`.
+  - refresh-worker: CLEAR 14:22:05Z after 64 HOLD polls, 0 live children. TERM pid 469 at 14:22:05.473Z; respawned pid 308606 at 14:22:11Z on `e2558013c`.
+- **expect / measured:**
+  - `fleet_checkout_head` -> e2558013c: **MET** at 14:00:17Z.
+  - Web workers respawned after the reload: **MET** (78201/78202, started after the ff).
+  - The NBA re-sim loop restarted on the new pid: **MET**. `NBA_LIVE_RESIM_LOOP_STARTED` at 14:05:03.784Z; first tick at 14:05:05Z with `games=0 written=True`; 0 tracebacks after 14:05Z.
+  - `player_alias=` on the next NBA join: **MET**. 14:24:08.110Z `player_alias=None`, with no live NBA game: the no-snapshot early return carries no counters, as `display_only_pulled` did on 11-08. 0 tracebacks since 14:22:11Z.
+- **Owed, verification (tonight's slate, 8 games).** NOP@GSW carries Herbert Jones; LAL@ATL can also serve the Dončić accent check. A read-only watcher samples the served board every 6 min from 23:40Z to 07:00Z 11-10. It expects:
+  - `player_alias=` > 0 on a live NBA join, when a split-spelling player is live;
+  - a served row resolved only through the canonical key, carrying Live proj. and actual;
+  - `Herbert Jones` rows in the re-sim snapshot for NOP@GSW (absent on 11-08 for want of CSV lines);
+  - the served missing-row list reduced to roster gaps and not-yet-entered players.
+- **Revert:** revert `e2558013c` on main, then ff + `reload-web` + a claimed refresh-worker TERM (the join), with live-odds-worker at its recycle or a claimed TERM (the re-sim key).
