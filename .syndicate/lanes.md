@@ -1000,6 +1000,14 @@ death, never life — do not invert it.
 - Blocked by: none
 - GOAL: MET in 145523971. Sources line `ncaab re-sim (D1 vs D1): N live`; headline `(wncaab: 3 live D1-vs-D1)`; the comment block records why. 151 tests pass (live_note, fleet_logs, deploy_guard, build_estimate, preflight_board_build_hold). Read-only fleet run 17:17:39Z (11:17 AM CST): "WARNING: Live games in progress (wncaab: 3 live D1-vs-D1)"; sources "ncaab re-sim (D1 vs D1): 0 live (1m ago); wncaab re-sim (D1 vs D1): 3 live (2m ago)". It matches WNCAAB_LIVE_RESIM_TICK live=3 (17:16:04Z), which was unchanged before and after the check.
 
+### live-evidence-log — OPEN — opened 2026-11-09 — session e32fef1a-01e8-4afe-a284-01acd3728545
+- Goal: Phase 1B M0: every live projection the fleet's re-sims and lenses publish (nba, ncaab, wncaab, ncaaf, nfl, nhl; wnba when on) is kept as an append-only, as-of-stamped row per game lane per tick in <data root>/live_evidence/<sport>/<date>.jsonl, read by one as-of reader; on the fleet, the NBA rows reproduce NBA's own live_resim_history for the same ticks with 0 mismatches, a same-moment probe on each other live sport matches the rebuilt evidence with 0 mismatches, and the bytes per day are measured
+- Files: syndicate/features/shared/live_evidence_log.py (NEW), scripts/live_evidence_check.py (NEW), tests/test_live_evidence_log.py (NEW), scripts/run_refresh_worker.py (the collector start call ONLY)
+- Hypothesis: n/a (build; the sport re-sim modules are read through the shared store, never edited)
+- Falsification test: n/a
+- Verification: unit tests incl. off != on; a dry run against the fleet's live snapshots written to a scratch dir; after the user-approved load: NBA cross-check vs live_resim_history (coverage + 0 field mismatches), a same-moment probe per live sport (0 mismatches), bytes/day per sport, 0 tracebacks, refresh-worker memory not up
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
