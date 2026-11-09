@@ -210,7 +210,31 @@
   - So at least 2.5 of step 3e's 3.0 piece is pull-back; at most 0.4 is the sims spreading expected margins wider across games. Side finding: real late margin change on the re-sim's per-game mean has slope 0.68 ± 0.22 (30m) / 0.38 ± 0.29 (36m).
   - Rough engine size: `score_effect_k` about 0.005 (back-of-envelope from the run coefficient); step 3b tried only 0.002.
   - Nothing ships. Full tables: the findings' PHASE 2 STEP 3f section. Runs: WSL `~/bball_iv/runs/ncaab2026_tieshape/pull_real.jsonl`.
-### `#764` — **KALSHI TOTALS THAT NAME NO GAME PRICE ANOTHER GAME'S ROW: 26 of 26 measured sides wrong-game (men's and women's college basketball, college football). Polymarket is clean in every sport. NOT FIXED** — 2026-11-06, session e32fef1a (user "Yes, measure it here")
+### `#764` — **KALSHI TOTALS THAT NAME NO GAME PRICE ANOTHER GAME'S ROW: 26 of 26 measured sides wrong-game (men's and women's college basketball, college football). Polymarket is clean in every sport. WRONG-GAME PRICING FIXED AND VERIFIED 2026-11-07 (refused, then named); OPEN: games on our board whose Kalshi quotes still name no game, incl. the 5-character codes UTRGV / MASSL** — 2026-11-06, session e32fef1a (user "Yes, measure it here")
+- **UPDATE 2026-11-09 16:57Z (10:57 AM CST): WHAT IS STILL UNNAMED, AND WHY** (session e32fef1a, read-only on the fleet `8fc72076d`; no code changed).
+  - **Census:** `UNNAMED_ROLE_KEY_GRID` samples, 11-07 23:41Z (the reversed-order load) to 11-09 15:43Z.
+    - ncaab: 87 of 375 builds nonzero. wncaab: 79 of 127.
+    - ncaaf: 375 of 375 nonzero, but every sample is a Polymarket total for an 11-14 game (`tsc-cfb-*-2026-11-14-*`), which is not on the board.
+    - soccer / nba / nfl / nhl: 0.
+  - **Most refusals are correct.** These Kalshi games are NOT on our board:
+    - ncaab: `NDSUCSB`, `MRSTMASSL`;
+    - wncaab: Morgan / Oklahoma, Corpus / Baylor, Rice / Richmond, UC Davis / Stanford, Northwestern / UIC, Mississippi St / UT Martin;
+    - the 26 wncaab events dated 11-09: no women's grid for 11-09 existed at 15:44Z.
+  - **Real misses: the game WAS on our board and its Kalshi totals named nothing.**
+    - ncaab: `PVUTRGV` (11-07), `IWUTEP` (11-08).
+    - wncaab 11-08: `ETAMSMU`, `JMUVT`, `UCRVGONZ`, `IONAARIZ`, `GRAMWIS`.
+    - ncaab 11-09: `AAMUDEP` and `RICESTAN` were unnamed only briefly (4 and 2 samples); both are named on the 15:44Z replay.
+  - **Replay on today's Kalshi code map** (each settled event rebuilt from a live template; real rows' `series` field set):
+    - 5 of the 7 now resolve to the right game, with or without the event's moneylines.
+    - `UCRVGONZ` resolves only with its moneylines: `GONZ` is in no other women's event today.
+    - `PVUTRGV` never resolves.
+  - **Cause for `PVUTRGV`, CONFIRMED in code.**
+    - `kalshi_catalogue._splits` tries only 2-4 character codes, and `UTRGV` is 5. The right split (`PV` + `UTRGV`) is never tried, so no name map can help.
+    - Census of Kalshi's code map, 11-09 16:56Z: exactly 2 game-series codes are outside 2-4, `UTRGV` (UT Rio Grande Valley: ncaaf / ncaab / wncaab) and `MASSL` (UMass Lowell: ncaab / wncaab). The `KXNHLLINDSAY` codes are award markets, not games.
+  - **Cause for the other 6, a HYPOTHESIS, not tested:** on 11-07/11-08 Kalshi's code -> name map lacked one of each event's codes (moneylines not yet listed), and it has filled in since. It cannot be tested now: those markets have settled out of the state.
+  - **Fix option, not written:** let `_splits` try a 5-character code, or try any split whose side is a known Kalshi code.
+    - Every split is still checked against our own game, so a wrong split cannot match.
+    - **`match_event_blob` also serves the ORDER path**, so this would make UTRGV and UMass Lowell games orderable on Kalshi. That is a live-money behaviour change and the user's decision.
 - **READ 2026-11-09 (coordinator 332cb014): the defect never reached a live ORDER.** Every live Kalshi totals / spread / alt order in the fleet ledger: 663 orders. 29 carry no team names. 569 match both teams by an automatic code check. The other 65 (unique tickers) were all the row's own game by eye; the misses were abbreviations such as BKN, UK and UGA. So 0 wrong-game orders. The order path resolves its own ticker; #764 corrupted board fields (`best[side]`, `price_source`, `venue_ref`) only. **Consequence:** the -19% pregame totals ROI (n=112) is SELECTION, not this bug. Residual `PVUTRGV-124` is still refused (safe); no further fix owed for P&L.
 - **UPDATE 2026-11-07 23:49Z (5:49 PM CST): REVERSED-ORDER FIX LOADED AND VERIFIED** (lane `kalshi-fanin-reversed-orientation`, CLOSED).
   - **Load:** `79c8aac12`, fleet ff + refresh-worker TERM 23:41:12Z.
