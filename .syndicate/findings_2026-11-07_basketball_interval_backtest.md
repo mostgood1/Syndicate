@@ -1206,6 +1206,7 @@ measured bounds):
   run, beyond the state at the checkpoint.
 - **`score_effect_k` is the existing field for it.** It keys on the lead now minus the expected lead to date, and a
   run moves exactly that.
+  - **TESTED in step 3g below (2026-11-09):** k 0.005 with alternation 1.0 halves the late margin-spread gap and passes the harness gate; k 0.01 adds nothing and costs win probability.
   - Rough size (INFERRED, back-of-envelope): the give-back over about 9 possessions a team, at about 1.1 points a
     possession, means 2 × 9 × 1.1 × k ≈ 0.095 per point of deviation. That gives k ≈ 0.005, rather more as the
     deviation decays.
@@ -1225,3 +1226,163 @@ measured bounds):
 **Scratch:**
 - Scripts, in the session scratchpad: `pullreal.py`, `run_pullreal.sh`, `pullanalyze.py`, `pullslope.py`.
 - Output: `~/bball_iv/runs/ncaab2026_tieshape/pull_real.jsonl` (4,439 games).
+
+## PHASE 2 STEP 3g (NCAAB): `score_effect_k` with strict alternation — k 0.005 halves the late margin-spread gap and passes the harness gate; k 0.01 adds nothing and costs win probability
+
+`[2026-11-09 15:19Z-18:46Z (9:19 AM-12:46 PM CST), lane ncaab-score-effect-scan, session c2fd17f8, read-only, nice 19; the user's "yes" in the parent session local_8c13723c, relayed; jobs detached on the user's "Yes, detach them" here]`
+
+**Verdict.**
+- **k 0.005 with `possession_alternation` 1.0 (SE5_ALT) halves the late margin-spread gap with no point-accuracy
+  cost.**
+  - From 30m: SD(margin change) goes from 1.172× real to 1.090×. The team-specific variance drops 13.5%, about
+    half of the gap to real.
+  - From 36m: 1.159× to 1.095× (-10.8%).
+  - The harness gate passes. Full and h2 totals tie production at every checkpoint, and the margin ties or improves.
+    It improves at the tip: -0.24 ± 0.22.
+  - Unregistered extra read: CRPS of the regulation margin improves -0.110 ± 0.099 from 30m.
+- **k 0.01 (SE10_ALT) adds no further narrowing** (team-specific -14.0% vs -13.5%) and costs elsewhere:
+  - win-probability Brier +0.0043 ± 0.0037 from 36m;
+  - margin |err| +0.28 ± 0.21 at 10m against SE5_ALT.
+- **Why the larger k stops paying.** The field reverts toward the PREGAME target: dev = lead − target margin ×
+  elapsed share. That does produce within-game pull-back:
+  - own pull-back 3.55 (k 0.005) and 5.92 (k 0.01) from 30m, against real games' measured floor of 2.51;
+  - run slope -0.075 / -0.128, against real's ≤ -0.095.
+
+  But it also makes each game's expected late change depend on where the game stands against the line. That widens
+  the across-game spread of expected margins:
+  - the team-specific between-game part goes 3.12 → 4.33 → 6.53, against real's ≥ 2.70;
+  - step 3f's calibration slope (0.68) already said that spread is too wide.
+
+  Real games give back RECENT runs (step 3f). So a run-keyed reversion is the engine change this points to. It is a
+  hypothesis and needs an `engine.py` loan.
+- **What is still open.**
+  - Per-possession dispersion is untouched: 1.46 vs real 1.30.
+  - The shared covariance rises but stays short: 0.35 → 2.87 against real 6.82.
+  - Late totals stay narrow: Var(total) 67.6 vs 74.5 from 30m, 27.8 vs 37.6 from 36m.
+  - The tie rate rises only +0.28 points (2.71% → 2.99%), against real's 5.77%.
+
+**Pre-registered hypothesis SCORE-EFFECT (lane block `09ca1af93`, before any arm ran): every clause HOLDS; the
+falsification test did not fire.**
+
+| clause | predicted | measured | |
+|---|---|---|---|
+| (a) reachable | fields named, histograms differ | 540/540 games per arm; 1,080/1,080 game-checkpoints | holds |
+| (b) SE5_ALT run slope from 30m | -0.05 to -0.15 | -0.075 ± 0.009 | holds |
+| (b) SE5_ALT team-specific vs base | -8% to -16% | -13.5% | holds |
+| (b) SE5_ALT SD(margin change) / real | 1.06-1.13 | 1.090 (30m), 1.095 (36m) | holds |
+| (c) SE10_ALT run slope from 30m | -0.10 to -0.30 | -0.128 ± 0.010 | holds |
+| (c) SE10_ALT team-specific vs base | -12% to -25% | -14.0% | holds |
+| (d) mean window points per team | moves at most 0.2 | +0.084 / +0.082 (30m) | holds |
+| (d) regulation tie rate | moves at most 1 point | +0.28 / +0.53 points | holds |
+| (e) SE5_ALT gate | totals and margin improve or tie everywhere | ties everywhere; margin -0.24 ± 0.22 at the tip | holds |
+| (e) SE10_ALT margin at 30m / 38m | improves or ties | +0.06 ± 0.31 / -0.00 ± 0.10 | holds |
+
+**Setup.**
+- **Production as loaded now.** live-odds-worker's three switches (field names only). The base carries 7
+  mechanism fields, including #768's `blowout_margin`, `blowout_q4_margin` and `solver_endgame_pts_per_team`
+  (loaded 05:13Z today).
+- **BASE vs step 3c's old base (pre-#768):** team-specific +0.37, Cov -0.37, Var(margin change) +0.75 from 30m.
+  This is within noise, so steps 3c-3f's sim tables still describe production.
+- **Code.**
+  - `~/bball_iv/code5`: a clean export of `09ca1af93`, used for the gate.
+  - `~/bball_iv/code6`: code5 plus the RNG-neutral possession markers, used for the replay. Both are scratch.
+- **Replay:** 540 games, the same seeds, checkpoints 30m and 36m, 100 sims, four arms (BASE, ALT1, SE5_ALT,
+  SE10_ALT). Window points reconcile in 432,000 / 432,000 sims.
+- **Run give-back:** within-game slope of the change after the split (35m / 38m) on the change before it, demeaned
+  per game over its 100 sims. Real (step 3f) is a cross-game regression with pre-window controls, an upper bound on
+  real's within-game slope.
+- **Gate:** the #765 harness: 400 games, seed 20261107, `resim` (production) vs `resim_mech` (the arm).
+  - Read with `scripts/ncaab_blowout_harness_read.py`.
+  - 399 of 400 scored (1 `pbp_final_mismatch`); 285 regular season.
+  - Pairing check: production `resim` is identical across the two runs (max difference 0.0000 over 3,696 rows). It
+    differs from 11-08's #768 runs (5.73), as it should: production changed at 05:13Z.
+- **Interruptions.** The first launch, at about 15:21Z, died with two session restarts. The relaunch at 17:07Z ran
+  as `systemd-run --user` units and resumed from 253 replay rows and 30 games per gate. The seeds are per game, so a
+  resumed game is the same game.
+
+**Replay, from minute 30** (per team, window; real = the 4,472-game pool):
+
+| | real | BASE | ALT1 | SE5_ALT | SE10_ALT |
+|---|---|---|---|---|---|
+| team-specific (Var - Cov) | 23.61 | 32.42 | 30.30 | **28.04** | 27.87 |
+| Cov(home, away) | 6.82 | 0.35 | 1.77 | 2.87 | 3.00 |
+| Var(margin change) | 47.23 | 64.83 | 60.59 | 56.07 | 55.74 |
+| SD(margin change), × real | 1 | 1.172 | 1.133 | **1.090** | 1.086 |
+| Var(window total) | 74.52 | 66.23 | 67.68 | 67.56 | 67.75 |
+| run slope (35-40m on 30-35m) | ≤ -0.095 ± 0.030 | 0.000 | -0.000 | **-0.075** | -0.128 |
+| within-game Cov(d1, d2) | ≤ -2.24 | 0.00 | -0.00 | -1.81 | -2.92 |
+| own pull-back = A + B - within-game team-specific | ≥ 2.51 | -0.40 | -0.18 | 3.55 | 5.92 |
+| between-game team-specific (measured - within) | ≥ 2.70 | 3.12 | 3.03 | 4.33 | 6.53 |
+| regulation tie % | 5.77 | 2.71 | 2.74 | 2.99 | 3.24 |
+| points per team | 20.47 | 20.00 | 19.98 | 20.08 | 20.08 |
+| per-possession variance | 1.30 | 1.45 | 1.45 | 1.46 | 1.46 |
+
+**From minute 36:**
+
+| | real | BASE | ALT1 | SE5_ALT | SE10_ALT |
+|---|---|---|---|---|---|
+| team-specific | 9.79 | 13.16 | 12.21 | **11.74** | 11.76 |
+| Cov(home, away) | 4.51 | 0.21 | 0.72 | 1.07 | 1.03 |
+| SD(margin change), × real | 1 | 1.159 | 1.117 | **1.095** | 1.096 |
+| Var(window total) | 37.62 | 27.16 | 27.30 | 27.78 | 27.63 |
+| run slope (38-40m on 36-38m) | ≤ -0.107 ± 0.032 | -0.003 | -0.011 | -0.049 | -0.070 |
+| own pull-back | ≥ 0.59 (≥ 0.97 split window) | -0.21 | -0.06 | 0.70 | 1.14 |
+| between-game team-specific | ≥ 0.38 | 0.94 | 0.87 | 1.12 | 1.54 |
+| regulation tie % | 5.77 | 3.46 | 3.56 | 3.78 | 3.90 |
+
+- **Paired, arm - BASE, team-specific:**
+  - ALT1: -2.12 ± 0.53 (30m), -0.95 ± 0.20 (36m).
+  - SE5_ALT: -4.38 ± 0.62 and -1.42 ± 0.20.
+  - SE10_ALT: -4.55 ± 0.87 and -1.40 ± 0.24.
+- **From 36m both k fall short of real's run give-back** (-0.049 / -0.070 against ≤ -0.107). Their own pull-back
+  (0.70 / 1.14) brackets the real floor.
+
+**Harness gate**, regular season, 285 games. |err| arm - production, ± 1.96 SE; negative = nearer the final:
+
+| checkpoint | SE5_ALT full total | h2 total | margin | SE10_ALT full total | h2 total | margin |
+|---|---|---|---|---|---|---|
+| 0m (tip) | +0.10 ± 0.24 | -0.03 ± 0.18 | **-0.24 ± 0.22** | +0.07 ± 0.25 | +0.06 ± 0.20 | -0.20 ± 0.20 |
+| 10m | -0.01 ± 0.19 | +0.01 ± 0.17 | -0.06 ± 0.34 | +0.01 ± 0.22 | -0.02 ± 0.18 | +0.23 ± 0.47 |
+| 20m | +0.08 ± 0.17 | +0.08 ± 0.17 | -0.06 ± 0.34 | -0.09 ± 0.18 | -0.09 ± 0.18 | +0.15 ± 0.48 |
+| 30m | -0.05 ± 0.14 | -0.05 ± 0.14 | -0.05 ± 0.22 | -0.01 ± 0.14 | -0.01 ± 0.14 | +0.06 ± 0.31 |
+| 38m | -0.04 ± 0.08 | -0.04 ± 0.08 | -0.05 ± 0.07 | +0.01 ± 0.09 | +0.01 ± 0.09 | -0.00 ± 0.10 |
+
+- **The totals' MEAN shifts up** (SE5_ALT / SE10_ALT): +0.57 / +1.03 at the tip, +0.48 / +0.76 at 10m, +0.19 /
+  +0.26 at 30m.
+  - In-game this works against production's low bias (-1.86 at 10m, -3.30 at 30m).
+  - At the tip it moves production's +0.17 to +0.74 / +1.19. |err| still ties.
+  - #768 re-centred a +0.39 tip shift before its load, which is the §4.4 re-fit of the engine standard.
+- **SE10_ALT against SE5_ALT directly:** margin |err| +0.28 ± 0.21 at 10m, +0.21 ± 0.22 at 20m.
+
+**Probabilistic read** (added after the pre-registration; the harness has no distribution to score). Each arm's
+100-sim regulation-margin distribution against the real regulation margin, 540 games, paired arm - BASE; negative
+is better:
+
+| | CRPS 30m | CRPS 36m | log score 30m | Brier home ahead 30m | Brier home ahead 36m |
+|---|---|---|---|---|---|
+| ALT1 | -0.038 ± 0.054 | -0.024 ± 0.035 | -0.028 ± 0.152 | +0.0008 ± 0.0032 | -0.0004 ± 0.0028 |
+| SE5_ALT | **-0.110 ± 0.099** | -0.044 ± 0.052 | -0.051 ± 0.160 | +0.0020 ± 0.0039 | +0.0016 ± 0.0030 |
+| SE10_ALT | -0.045 ± 0.142 | -0.019 ± 0.071 | -0.034 ± 0.167 | +0.0061 ± 0.0060 | **+0.0043 ± 0.0037** |
+
+- BASE CRPS is 3.844 (30m) and 2.528 (36m), so SE5_ALT's gain from 30m is 2.8%.
+- Win-probability Brier moves the wrong way for both k, beyond the interval only for k 0.01 from 36m. That fits a
+  reversion toward the pregame target.
+
+**What it means:**
+- **SE5_ALT is the first change in this series that both narrows the late margin and passes the gate.**
+  - Candidate load: live-odds-worker's `SYNDICATE_NCAAB_LIVE_MECHANISMS` + `"score_effect_k": 0.005,
+    "possession_alternation": 1.0`.
+  - It is a production change and the user's decision.
+  - Before loading, decide whether to re-centre its +0.57 tip total first (#768's precedent).
+  - Read its live effect on the next slates.
+- **k beyond 0.005 is not the way to close the rest.** The next engine step is a run-keyed reversion (`engine.py`
+  loan), measured against step 3f's run coefficients and this step's between-game spread.
+- **Still open:** the outcome mix (per-possession dispersion 1.46 vs 1.30; a late-weighted bonus refit), the late
+  shared variance and the tie rate.
+
+**Scratch:**
+- Scripts, in the session scratchpad and in WSL `~/bball_iv/k_scan/`: `spreadk.py`, `kanalyze.py`, `kprob.py`,
+  `run_gate_se05.sh`, `run_gate_se10.sh`, `make_code6.py`.
+- Runs:
+  - `~/bball_iv/runs/ncaab2026_tieshape/spread_k.jsonl` (2,160 game-arm rows);
+  - `~/bball_iv/runs/ncaab2026_se05_alt/` and `ncaab2026_se10_alt/` (`results.jsonl`, `report.md`).
