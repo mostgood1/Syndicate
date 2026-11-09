@@ -809,6 +809,20 @@
     3. `py -3 scripts/syndicate_fair_stage2.py read --out C:/tmp/sfv1_stage2 --report C:/tmp/sfv1_stage2/stage2.json` (Idle priority)
 
 ### `#736` — **SYNDICATE DECISION ENGINE: one learning decision engine behind Layer 2 Suggested + the Kalshi/Polymarket Portfolio. ADOPTED 2026-10-26 with D1-D8 as recommended; PHASE 0 STARTED (lane `syndicate-decision-engine`)** — 2026-10-26, session loving-einstein-b3c45e; `docs/ai_context/plan_syndicate_decision_engine.md` (reading copy https://claude.ai/artifact/4umLu5SHUzhPUFLKqpieRe)
+- **UPDATE 2026-11-09 17:34Z (11:34 AM CST): PHASE 1B PROPOSED -- ONE ENGINE, PREGAME AND LIVE** (session e32fef1a; plan `docs/ai_context/plan_one_engine_pregame_live.md`; NOT adopted).
+  - **What the user said:** "WAY BEHIND my expectations of a single AI engine that makes use of all our advanced stats, sim engine data, and betting data", then that live decisions should use "all the same data but based on game shape/stat progress ... and projected outcomes".
+  - **Gaps found (read-only surveys, 11-09):**
+    - DecisionRecord is in shadow, pregame-only, and read by nothing that places or sizes a bet.
+    - The sim weight is 0 in every cell, and no source emits a per-line Δ with its own σ.
+    - Three rank multipliers and three separate sim-weight fits overlap.
+    - In-play entries price on the book median and read no re-sim. Exits use the entry-time probability.
+    - NHL / NFL / NCAAF / soccer discard their period logs.
+  - **The plan:** one record per (line, instant), pregame and live, carrying the game state and stat progress.
+    - Every source becomes a Δlogit with its own σ.
+    - One hierarchical learner, by sport → family → market → segment → phase → clock bucket, fitted against the sharp close / the live mark-out and against the outcome.
+    - One policy, with live latency and adverse-selection terms.
+  - **Steps, shadow first:** M0 live evidence log → M1 experts → M2 learner → M3 pregame + live paper → M4 surfaces and retirement.
+  - **Owed:** the user's D9–D12. If adopted, M0 (the live evidence log) comes first.
 - **ADOPTED 2026-10-26** (user, verbatim: "Adopt the decision-engine plan with the recommended D1-D8. Open the umbrella lane, brief the owner sessions, and start Phase 0."). Decisions as recorded in `state.md` [user-decisions]. Phase 0 owner map and progress: lane `syndicate-decision-engine` in `lanes.md`.
 - **E5 KILLED; PHASE 4 RESCOPED 2026-10-26** (user, verbatim: "Yes, adopt E5's recommendation: Phase 4 becomes cancel-protection plumbing only, gated on the Phase 3 maker engine and an earlier official-source event time; no paid news feed. Update the plan and #736 accordingly.").
   - E5 (`#739`, findings `6f0e90cc`): no timing edge. Kalshi move after our capture +0.04pp [-0.05, +0.13], 197 units / 93 games; fee-net -4.3% at +1 min.
