@@ -896,6 +896,12 @@ def _run_undrain(*, owner: str) -> int:
 # every live D1 event a row (re-simmed, refused, carried or not reached), so its
 # row count IS the producer's `counts.live`.
 #
+# THAT COUNT IS D1-vs-D1 GAMES ONLY, AND THE LABEL SAYS SO (lane
+# `deploy-safety-live-note-d1-label`). The re-sim drops a game against a non-D1
+# opponent (`dropped_non_d1` on its tick line), and the board never prices one.
+# Measured 2026-11-09 16:57Z: "0 live" with 1 men's and 2 women's such games in play.
+# For a restart that is the right count, but a bare "0 live" read as no college game.
+#
 # UNKNOWN IS NOT NONE. `anyLive: null` (adaptive off), a reading too old to speak
 # for now, or an unreadable snapshot prints UNKNOWN for the sports it would have
 # covered, never "No live games". It stays a note: live games are normal for hours,
@@ -952,7 +958,7 @@ def loop_live_reading(tick: dict[str, Any]) -> dict[str, Any]:
 
 def resim_snapshot_reading(base_url: str, token: str, sport: str) -> dict[str, Any]:
     """One live re-sim's game count from its published snapshot; UNKNOWN if absent or stale."""
-    reading: dict[str, Any] = {"label": f"{sport} re-sim", "sports": [sport], "age_minutes": None}
+    reading: dict[str, Any] = {"label": f"{sport} re-sim (D1 vs D1)", "sports": [sport], "age_minutes": None}
     try:
         payload = _as_dict(_get_json(base_url, f"/api/ops/live-lens/snapshot-index?sport={sport}", token, timeout=30))
     except Exception as exc:
@@ -1003,7 +1009,7 @@ def summarize_live_games(readings: list[dict[str, Any]]) -> tuple[bool, list[str
             unknown.extend(reading["sports"])
         elif reading.get("live"):
             if "count" in reading:
-                live.append(f"{reading['sports'][0]}: {reading['count']} live")
+                live.append(f"{reading['sports'][0]}: {reading['count']} live D1-vs-D1")
             else:
                 live.append(", ".join(reading.get("live_sports") or []) or f"one of {','.join(reading['sports'])}")
     return bool(live), live, unknown

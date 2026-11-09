@@ -64,12 +64,12 @@ def _run_main(capsys, tick, snapshots, *argv):
 
 def test_ncaab_live_while_anylive_is_false_is_named_and_warned(capsys):
     rc, out = _run_main(capsys, _tick(any_live=False), {"ncaab": _snapshot(2), "wncaab": _snapshot(0)})
-    assert "WARNING: Live games in progress (ncaab: 2 live)" in out
+    assert "WARNING: Live games in progress (ncaab: 2 live D1-vs-D1)" in out
     assert "live re-sims" in out
     assert "No live games" not in out
     # What each source said, so the reader can see the loop and the re-sims disagree for a reason.
     assert "live-refresh loop [mlb,wnba,nba,nhl,soccer,nfl,ncaaf]: none (2m ago)" in out
-    assert "ncaab re-sim: 2 live (1m ago)" in out and "wncaab re-sim: 0 live (1m ago)" in out
+    assert "ncaab re-sim (D1 vs D1): 2 live (1m ago)" in out and "wncaab re-sim (D1 vs D1): 0 live (1m ago)" in out
     # Still a note, never a blocker.
     assert rc == 0 and "CLEAR: nothing in flight" in out
     assert "(Live games are in progress -- see the warning above.)" in out
@@ -79,7 +79,7 @@ def test_allow_live_games_marks_it_allowed_and_never_blocks(capsys):
     rc, out = _run_main(capsys, _tick(any_live=False), {"ncaab": _snapshot(0), "wncaab": _snapshot(3)},
                         "--allow-live-games")
     assert rc == 0
-    assert "Live games in progress (wncaab: 3 live)" in out and "(allowed)" in out
+    assert "Live games in progress (wncaab: 3 live D1-vs-D1)" in out and "(allowed)" in out
     assert "WARNING: Live games" not in out and "see the warning above" not in out
 
 
@@ -88,7 +88,7 @@ def test_all_sources_read_none_says_no_live_games_and_names_them(capsys):
     assert rc == 0
     assert "No live games on any source below" in out
     assert ("Live-game sources: live-refresh loop [mlb,wnba,nba,nhl,soccer,nfl,ncaaf]: none (2m ago); "
-            "ncaab re-sim: 0 live (1m ago); wncaab re-sim: 0 live (1m ago)") in out
+            "ncaab re-sim (D1 vs D1): 0 live (1m ago); wncaab re-sim (D1 vs D1): 0 live (1m ago)") in out
 
 
 def test_loop_live_names_the_sport_from_slate_phases(capsys):
@@ -116,7 +116,7 @@ def test_stale_ncaab_snapshot_is_unknown_not_none(capsys):
     assert rc == 0
     assert "No live games" not in out
     assert "Live games UNKNOWN for ncaab -- not the same as none; none on the sources that answered" in out
-    assert "ncaab re-sim: UNKNOWN (snapshot 47m old > 10m: producer off or stalled, said 0 live)" in out
+    assert "ncaab re-sim (D1 vs D1): UNKNOWN (snapshot 47m old > 10m: producer off or stalled, said 0 live)" in out
     assert "(Live games could not be ruled out for ncaab -- see the note above.)" in out
 
 
@@ -124,8 +124,8 @@ def test_unreadable_or_absent_snapshot_is_unknown(capsys):
     absent = {"ok": True, "snapshot_present": False, "reason": "no_snapshot_at_path"}
     _rc, out = _run_main(capsys, _tick(any_live=False), {"ncaab": TimeoutError("slow"), "wncaab": absent})
     assert "Live games UNKNOWN for ncaab, wncaab" in out and "No live games" not in out
-    assert "ncaab re-sim: UNKNOWN (snapshot unreadable: TimeoutError)" in out
-    assert "wncaab re-sim: UNKNOWN (no snapshot (no_snapshot_at_path))" in out
+    assert "ncaab re-sim (D1 vs D1): UNKNOWN (snapshot unreadable: TimeoutError)" in out
+    assert "wncaab re-sim (D1 vs D1): UNKNOWN (no snapshot (no_snapshot_at_path))" in out
 
 
 def test_anylive_null_is_unknown_for_the_loops_sports(capsys):
@@ -149,7 +149,7 @@ def test_every_source_unknown_does_not_claim_the_others_read_none(capsys):
 
 def test_a_live_reading_wins_over_an_unknown_one(capsys):
     _rc, out = _run_main(capsys, _tick(any_live=None), {"ncaab": _snapshot(4), "wncaab": _snapshot(0)})
-    assert "WARNING: Live games in progress (ncaab: 4 live)" in out
+    assert "WARNING: Live games in progress (ncaab: 4 live D1-vs-D1)" in out
     assert "could not be ruled out" not in out
 
 
