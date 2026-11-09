@@ -114,7 +114,7 @@
   - The old bars (NCAAB 25.97 / 16.75 / 10.64 / 4.67; NBA pregame quarter 8.53) are beaten by the line alone.
   - Fidelity: production's recorded NBA live re-sim and the replay have the same MAE on the same games (14.71 vs 14.61 at 12m ... 5.12 vs 5.18 at 45.6m).
 - **Next (Phase 2, each against this harness):**
-  - NCAAB: the baseline is `ncaab2026_resim_prod`. Production already runs the half split and the end-game mechanisms. Measured 2026-11-08 (below): the late gap is mostly the sims under-producing regulation ties, not regulation scoring. Next, in order (revised 2026-11-09 02:21Z after steps 3b-3d below): (1) segment real PBP into possessions to measure the real per-possession outcome distribution, the largest piece left (step 3d); (2) optional: `possession_alternation` 1.0 through the paired point-accuracy gate, an existing field with no engine edit; (3) mechanisms for the late, state-driven shared possession variance (minutes 36-40) and for the per-possession variance, plus step 3b's end-game decision rules (go for 2 to tie, a 1-3 lead turning into free throws, holding the ball when tied), each needing an `engine.py` loan and an E1 refit; (4) blowout late scoring and the trailing-by-7-10 bucket, re-read after (3).
+  - NCAAB: the baseline is `ncaab2026_resim_prod`. Production already runs the half split and the end-game mechanisms. Measured 2026-11-08 (below): the late gap is mostly the sims under-producing regulation ties, not regulation scoring. Next, in order (revised 2026-11-09 14:10Z after steps 3b-3e below): (1) test the real within-game pull-back directly on real margins (is the late residual against the 36m re-sim mean negatively related to the 30-36m run or to the deviation from pregame?); (2) scan `score_effect_k` (0.005 / 0.01 / 0.02, an existing field, no engine edit) with `possession_alternation` 1.0 against step 3e's closure; (3) mechanisms: a late-weighted bonus free-throw refit for the outcome mix, the late state-driven shared possession variance (minutes 36-40), and step 3b's end-game decision rules (go for 2 to tie, a 1-3 lead turning into free throws, holding the ball when tied), each needing an `engine.py` loan and an E1 refit; (4) blowout late scoring and the trailing-by-7-10 bucket, re-read after (3).
   - Every college run must carry live-odds-worker's three switches; check `college_switches` and `engine_provenance` in `report.md`.
   - Further end-game values go through `resim_mech --mechanisms`, set on top of the env's.
   - Pace, only if pooled much harder than k=60 possessions.
@@ -161,6 +161,7 @@
   - Inside the team-specific excess:
     - The sims take HALF the real late free throws: FTA per FGA 0.29 vs 0.58 from minute 30, 0.38 vs 0.75 from 36. Points shift to made threes.
     - Per-possession outcomes look about 35% too variable. INFERRED; real per-possession data is not measured yet.
+      - **WITHDRAWN by step 3e (2026-11-09):** measured 11.5% from 30m (real 1.308 vs sims 1.459), not 35%.
     - Coin-flip possession imbalance (true SD 1.88 vs real 1.17 or less) is the smaller piece: alternation 1.0 gives 3-5% of the SD.
   - Pace is NOT the source. True sim possessions are 18.48 per team from 30m against real's estimated 17.74. The pace input is +2.4% vs real. The first pass's "14% more possessions" was the estimator overcounting the sims (withdrawn).
   - Nothing ships. Full tables: the findings' PHASE 2 STEP 3c section. Runs: WSL `~/bball_iv/runs/ncaab2026_tieshape/spread_*.jsonl`.
@@ -172,6 +173,13 @@
   - E2 bonus free throws: FTA/FGA 0.289 -> 0.466 (real 0.575), and late points +0.48 per team from 30m (87% of the mean gap). Per-possession variance falls only 4%; the inferred gap is about 26%.
   - Tie rate: no arm moves it by 0.3 points. Sims 2.65-2.92% from 30m; real 5.77% in the pool, 8.91% in these games.
   - Nothing ships. Full tables: the findings' PHASE 2 STEP 3d section. Runs: WSL `~/bball_iv/runs/ncaab2026_tieshape/spread_levers.jsonl`.
+- **PHASE 2 STEP 3e, NCAAB real per-possession scoring `[2026-11-09 14:10Z (8:10 AM CST)]` (lane `ncaab-real-possession-outcomes`, session c2fd17f8, read-only, user "Yes, measure it"): real late possessions are 11-15% LESS dispersed than the sims', not 35%. Real late outcomes vary less than independent possessions would (INFERRED). Pre-registered PER-POSS-VAR (`110e34ed2`): NOT SUPPORTED; its falsification line was not crossed.**
+  - Real PBP segmented into the engine's possessions, 4,472 games. Gates: points reconcile 4,472/4,472 games and 8,944/8,944 team-windows; segmented possessions 17.69 vs the estimator's 17.74 from 30m; two games read by hand.
+  - Points-per-possession variance: real 1.308 ± 0.005 vs sims 1.459 from 30m (+11.5%); 1.259 vs 1.441 from 36m (+14.5%).
+  - Real mix: 0 / 1 / 2 / 3 = 45.5 / 6.3 / 35.5 / 12.4% vs sims 52.7 / 2.9 / 29.0 / 14.8%. 24.6% of real late possessions carry a free throw. Mean 1.157 vs 1.078. E2 closes 40% of the variance gap.
+  - Closure of real team-specific variance: independent possessions alone (A + B = 23.42 ± 0.12) already equal the measured 23.61 ± 0.95, leaving no room for team-strength spread (sims 3.08). So real late outcomes pull back within the game (rest -2.88 from 30m, -1.12 from 36m, INFERRED: the sims' between-game spread stands in for real's). The sims' closure is exact (+0.12).
+  - The sims' team-specific excess, from 30m / 36m: per-possession dispersion 33% / 41%, extra possessions 12% / 0%, unshared possession count 19% / 21%, real's within-game pull-back 36% / 39%.
+  - Nothing ships. Full tables: the findings' PHASE 2 STEP 3e section. Runs: WSL `~/bball_iv/runs/ncaab2026_tieshape/poss_real.jsonl`.
 ### `#764` — **KALSHI TOTALS THAT NAME NO GAME PRICE ANOTHER GAME'S ROW: 26 of 26 measured sides wrong-game (men's and women's college basketball, college football). Polymarket is clean in every sport. NOT FIXED** — 2026-11-06, session e32fef1a (user "Yes, measure it here")
 - **UPDATE 2026-11-07 23:49Z (5:49 PM CST): REVERSED-ORDER FIX LOADED AND VERIFIED** (lane `kalshi-fanin-reversed-orientation`, CLOSED).
   - **Load:** `79c8aac12`, fleet ff + refresh-worker TERM 23:41:12Z.

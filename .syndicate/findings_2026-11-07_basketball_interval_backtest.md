@@ -740,6 +740,7 @@ block (`0f8db1dd8`) before the run.
   - Taking the two pools' between-game strength spread as equal, and real's unshared possession variance as 0.68 at
     most, real's per-possession variance comes out near 1.08. So the sims' would be about 35% too high.
   - This is INFERRED. The real per-possession distribution is not measured yet; the next step measures it.
+  - **WITHDRAWN in step 3e below (2026-11-09):** measured real variance is 1.308 from 30m, so the sims are 11.5% too dispersed, not 35%. The inference assumed independent real possessions.
 - **Possession imbalance.**
   - The sims' coin-flip alternation (2.69 repeats per team-window from minute 30) gives a true SD of home-minus-away
     possessions of 1.88. Real is at most 1.17, the estimator's SD, which includes its own noise.
@@ -906,6 +907,7 @@ rest hold.**
   - E2: 50.0 / 4.6 / 31.3 / 13.6 / 0.6%.
   - Free-throw trips move mass from 0 and 3 to 1 and 2. That is a 4% cut in variance; the inferred real level
     needs about 26%.
+  - **REPLACED in step 3e below (2026-11-09):** measured real variance is 1.308, so E2 closes 40% of a 0.151 gap.
 - **Tie rate, real pool against these games:** the 539 games carry more regulation ties than the pool (8.91% ± 2.42
   vs 5.77% ± 0.69). The sims' base rate is 2.65% from 30m either way, so the deficit is 3.1 to 6.3 points.
 
@@ -943,3 +945,164 @@ rest hold.**
 - Scripts, in the session scratchpad: `spreadlevers.py`, `run_spreadlevers.sh`, `leversanalyze.py`.
 - Output: `~/bball_iv/runs/ncaab2026_tieshape/spread_levers.jsonl` (2,160 game-arm rows). Log:
   `~/bball_iv/runs/ncaab2026_spreadlevers.log` (DONE 2160 jobs in 2,877 s).
+
+## PHASE 2 STEP 3e (NCAAB): real per-possession scoring, measured — the sims are 11-15% too dispersed, not 35%; real late outcomes vary LESS than independent possessions would
+
+`[2026-11-09 14:00Z-14:10Z (8:00-8:10 AM CST), lane ncaab-real-possession-outcomes, session c2fd17f8, read-only, nice 19; user "Yes, measure it"]`
+
+**Verdict.**
+- **Real late possessions are less dispersed than the sims' (11-15%), but not by the 35% step 3c inferred.**
+  - Variance of points per possession, from minute 30: real 1.308 ± 0.005 against the sims' 1.459, so the sims
+    are 11.5% too dispersed.
+  - From minute 36: 1.259 ± 0.007 against 1.441, 14.5% too dispersed.
+- **That is about a third of the sims' team-specific excess.** The rest is extra and unevenly split possessions,
+  plus a piece that only the real side has.
+- **The piece only the real side has (INFERRED).**
+  - Treat each real possession as an independent draw from the real distribution. That alone predicts the whole
+    of real games' measured team-specific variance (23.42 against 23.61 from 30m; 10.00 against 9.79 from 36m),
+    leaving NO room for teams differing in strength.
+  - Teams do differ: in the sims that part is 3.08 / 0.91. So real late outcomes vary about 3 / 1 points² LESS
+    than independent possessions plus team strength would give.
+  - That points to real games pulling back toward something within the window, such as score effects or
+    mean reversion. The sims have none of it: their closure is exact (+0.12 / +0.15).
+  - This piece is INFERRED. It rests on the sims' between-game spread standing in for the real one.
+- **The real outcome mix.** Real possessions score 0 less often (45.5% vs 52.7%) and 3 less often (12.4% vs
+  14.8%), and score 1 and 2 more often (6.3% vs 2.9%; 35.5% vs 29.0%). 24.6% of real late possessions include a
+  free throw. Real points per possession average 1.157 against the sims' 1.078.
+- **E2 bonus free throws close 40% of the per-possession variance gap** (1.459 → 1.398) and move every outcome
+  class toward real. In step 3d that looked like 4% of an inferred 26% gap.
+
+**Pre-registered hypothesis PER-POSS-VAR (lane block `110e34ed2`, before any segmentation): NOT SUPPORTED; its
+falsification line was not crossed.**
+
+| clause | predicted | measured | |
+|---|---|---|---|
+| real per-possession variance from 30m | 0.95-1.20 | 1.308 ± 0.005 | **outside the range** |
+| falsification line | at least 1.32 falsifies | 1.308 (upper bound 1.313) | not crossed |
+| "the bulk of the team-specific excess" | most of +8.4 | about +2.8 of +8.4 | **fails** |
+| 1-point possessions, real | at least 2 × the sims' 2.9% | 6.3% | holds |
+| 3-point possessions, real | under 12% | 12.4% | **narrowly fails** |
+
+- The value fell in the gap the pre-registration left between its range and its falsification line.
+- The prior stated in the lane (1.2-1.37 from the box rates) was right. Step 3c's 35% inference was wrong: it
+  assumed real possessions are independent, and the closure below contradicts that.
+
+**Method.**
+- **Segmentation.** Production's PBP event stream (`read_events`, the harness's own), 4,472 pool games, regulation
+  only, into possessions as the engine defines them:
+  - one team's spell with the ball, offensive-rebound chains and free-throw trips inside it;
+  - and-one free throws credited to the basket's possession.
+  - ESPN's college feed has NO last-free-throw flag (0 of 12,145 free throws in 300 games), so a control change is
+    read off the next informative play: a defensive or dead-ball rebound, a steal, or the other team's shot,
+    turnover or free throw.
+  - Both orders of steal / turnover and offensive-foul / turnover pairs attach to one possession.
+- **Window.** Possessions with an action (shot, free throw, turnover, offensive foul) after the checkpoint; points
+  after the checkpoint. "Empty" possessions (a rebound or steal, then the buzzer) are excluded: 0.32 per
+  team-window from 30m.
+- **Validation gates, read before the result:**
+  - credited points equal regulation points in 4,472 / 4,472 games;
+  - window points equal box points in 8,944 / 8,944 team-windows;
+  - segmented possessions per team-window from 30m: 17.69 against the estimator's 17.74 (-0.3%; per-window
+    correlation 0.955). From 36m: 7.71 against 7.67;
+  - two games' last 3 minutes read by hand (scratch `poss_real_sample.txt`), every possession right.
+- **Sims:** step 3c's base and step 3d's E2 rows (`h_pp` / `a_pp` and the true possession counts from the code4
+  markers).
+- **"Within-window variance":** each team-window's own sample variance, pooled. It strips the between-game spread
+  of the mean; it differs from the pooled variance by under 0.01.
+
+**Points per possession, from minute 30 to the end of regulation:**
+
+| | 0 | 1 | 2 | 3 | 4+ | mean | variance | within-window | possessions per team | with a free throw |
+|---|---|---|---|---|---|---|---|---|---|---|
+| real, pool (4,472) | 45.5% | 6.3% | 35.5% | 12.4% | 0.3% | 1.157 | 1.308 | 1.300 | 17.69 | 24.6% |
+| real, the replay's 540 | 45.6% | 6.3% | 35.3% | 12.6% | 0.3% | 1.157 | 1.313 | 1.309 | 17.69 | 24.6% |
+| sims, base | 52.7% | 2.9% | 29.0% | 14.8% | 0.6% | 1.078 | 1.459 | 1.450 | 18.48 | - |
+| sims, E2 | 50.0% | 4.6% | 31.3% | 13.6% | 0.6% | 1.103 | 1.398 | 1.388 | 18.49 | - |
+
+**From minute 36:**
+
+| | 0 | 1 | 2 | 3 | 4+ | mean | variance | within-window | possessions per team | with a free throw |
+|---|---|---|---|---|---|---|---|---|---|---|
+| real, pool | 43.7% | 7.9% | 36.7% | 11.4% | 0.3% | 1.168 | 1.259 | 1.251 | 7.71 | 29.5% |
+| real, the replay's 540 | 44.2% | 7.8% | 36.3% | 11.3% | 0.3% | 1.158 | 1.265 | 1.265 | 7.71 | 29.0% |
+| sims, base | 51.2% | 4.0% | 29.5% | 14.7% | 0.6% | 1.095 | 1.441 | 1.427 | 7.67 | - |
+| sims, E2 | 47.5% | 6.4% | 32.4% | 13.1% | 0.6% | 1.129 | 1.359 | 1.345 | 7.68 | - |
+
+**Closure of the team-specific variance** (Var - Cov of window points, per team):
+- **A** = E[N] × within-window variance: the independent-possession noise.
+- **B** = mean² × (Var(N) - Cov(N_h, N_a)): the unshared possession count.
+- **between** = the team-specific spread of the per-game expected points. It is measured for the sims from each
+  game's 100 sims. For real games it is unknown, and the sims' value stands in.
+- **rest** = measured - A - B - between.
+
+| from 30m | measured | A | B | between | rest | E[N] | Var(N) | Cov(N_h, N_a) | mean | within var |
+|---|---|---|---|---|---|---|---|---|---|---|
+| real, pool | 23.61 ± 0.95 | 23.00 | 0.42 | 3.08 (sims' value) | **-2.88** | 17.69 | 4.77 | 4.46 | 1.157 | 1.300 |
+| real, the replay's 540 | 22.83 | 23.16 | 0.41 | 3.08 (sims' value) | -3.81 | 17.69 | 4.63 | 4.32 | 1.157 | 1.309 |
+| sims, base | 32.04 | 26.80 | 2.05 | 3.08 | +0.12 | 18.48 | 2.65 | 0.89 | 1.078 | 1.450 |
+| sims, E2 | 31.44 | 25.68 | 2.13 | 3.28 | +0.35 | 18.49 | 2.71 | 0.95 | 1.103 | 1.388 |
+
+| from 36m | measured | A | B | between | rest | E[N] | Var(N) | Cov(N_h, N_a) | mean | within var |
+|---|---|---|---|---|---|---|---|---|---|---|
+| real, pool | 9.79 ± 0.40 | 9.64 | 0.36 | 0.91 (sims' value) | **-1.12** | 7.71 | 2.73 | 2.46 | 1.168 | 1.251 |
+| real, the replay's 540 | 9.36 | 9.75 | 0.35 | 0.91 (sims' value) | -1.65 | 7.71 | 2.70 | 2.44 | 1.158 | 1.265 |
+| sims, base | 13.04 | 10.94 | 1.04 | 0.91 | +0.15 | 7.67 | 1.10 | 0.23 | 1.095 | 1.427 |
+| sims, E2 | 12.55 | 10.33 | 1.11 | 0.95 | +0.16 | 7.68 | 1.11 | 0.24 | 1.129 | 1.345 |
+
+- **The method checks out on the sims.** Their within-game team-specific variance, measured directly per game over
+  100 sims, is 28.97 against A + B = 28.84 (base), and 28.16 against 27.81 (E2).
+- **Real A + B is known tightly (± 0.12 from 30m).** Measured real is 23.61 ± 0.95. So the real rest is +0.19 ± 0.96 minus
+  the real between-game spread, which cannot be negative. With the sims' value (3.08) it is -2.88; a spread
+  above about 1.2 makes it negative beyond the interval.
+
+**Where the sims' excess team-specific variance sits** (base minus real, from 30m: +8.43; from 36m: +3.25):
+
+| piece | from 30m | from 36m |
+|---|---|---|
+| per-possession dispersion (sims' within variance - real's) × sims' E[N] | +2.77 (33%) | +1.35 (41%) |
+| more possessions in the sims (18.48 vs 17.69) × real's within variance | +1.03 (12%) | -0.05 (0%) |
+| unshared possession count, B (coin-flip imbalance) | +1.63 (19%) | +0.68 (21%) |
+| rest: real's within-game pull-back, INFERRED (sims' +0.12 vs real's -2.88) | +3.00 (36%) | +1.27 (39%) |
+
+**Corrections to steps 3c and 3d:**
+- **Step 3c's "per-possession outcomes about 35% too variable" is WITHDRAWN.** Measured: 11.5% from 30m, 14.5%
+  from 36m. The inference assumed equal between-game spread and independent real possessions; the second
+  assumption fails.
+- **Step 3d's "E2 removes 4% of it, and the inferred gap is about 26%" is REPLACED.** E2 removes 40% of the measured
+  gap of 0.151 (1.459 → 1.398 against real 1.308; the sims sit 11.5% above real).
+- **Step 3c's "pace is not the source" stands, with a measured size.** True possessions from 30m: real 17.69,
+  sims 18.48 (+4.5%), which is 12% of the excess. From 36m they are equal. Real possessions are 7.3% MORE
+  efficient (1.157 vs 1.078); the sims' extra possessions do not make up the difference, so the mean runs 0.56
+  per team low.
+
+**What it means (nothing ships from this lane):**
+- **The largest single piece is a within-game pull-back** in real games that the sims do not have (inferred,
+  36-39%).
+  - `score_effect_k` is the existing engine field for exactly this: each shot's make probability scales with
+    clip(1 - k × dev, 0.85, 1.15), where dev is the lead now minus the expected lead to date.
+  - Step 3b's scan tried only k = 0.002, the NBA proposal, which moves a make probability by about 1% at a 5-point
+    deviation. It was inert on the spread.
+  - A scan of larger k is a diagnostic with no engine edit, read against this closure (rest and the team-specific
+    part). Step 3b already measured that k does not move the tie rate.
+  - The pull-back can also be tested directly on the real margins: regress the real late residual (actual minus
+    the 36m re-sim mean) on the 30m-36m margin change, or on the deviation from the pregame expectation.
+- **Per-possession dispersion (33-41%) is an outcome-mix error:**
+  - too many empty and 3-point possessions;
+  - too few 1- and 2-point possessions;
+  - 24.6-29.5% of real late possessions carry a free throw.
+  - E2 closes 40% of it, and its first-half rate is what failed the earlier point-accuracy gate. So a late-weighted
+    bonus rate is the refit candidate, together with E1 and the exact-target solve.
+- **The unshared possession count (19-21%):** alternation 1.0 (step 3d: -1.84 of the team-specific part from
+  30m).
+
+**Next for NCAAB:**
+1. **Test the pull-back directly**, real margins only: is the late residual negatively related to the recent run or
+   to the deviation from pregame?
+2. **Scan `score_effect_k`** (for example 0.005 / 0.01 / 0.02, existing field) with alternation 1.0 against this
+   closure.
+3. **The mechanisms** (outcome mix: a late bonus rate refit; end-game decisions) need an `engine.py` loan and an E1
+   refit.
+
+**Scratch:**
+- Scripts, in the session scratchpad: `possprobe.py`, `possreal.py`, `run_possreal.sh`, `possanalyze.py`.
+- Outputs: `~/bball_iv/runs/ncaab2026_tieshape/poss_real.jsonl` (4,472 games) and `poss_real_sample.txt`.
