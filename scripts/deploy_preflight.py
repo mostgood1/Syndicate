@@ -629,9 +629,16 @@ def fleet_role_processes(role: str, now: datetime) -> tuple[list[dict] | None, d
         started = datetime.fromtimestamp(now.timestamp() - float(age_s), tz=timezone.utc)
         last = {"id": f"fleet pid {root}", "status": "live", "trigger": "fleet role start",
                 "createdAt": started.isoformat().replace("+00:00", "Z")}
-    jobs = [{"pid": c["pid"], "ppid": c["ppid"], "rss_mb": None, "cmdline": str(c["args"]).split()}
-            for c in children]
-    return jobs, {"worker_pid": root, "worker_age_seconds": age_s}, last
+    # The worker's own long-lived servers (`check_deploy_safety.is_service_child`: the college live re-sim pool) start
+    # and die with it, so a restart kills them either way. Counted as jobs they held live-odds-worker HOLD for the
+    # worker's whole life (2026-11-08). They are recorded, never counted. Lane ncaab-blowout-off-load.
+    as_proc = lambda c: {"pid": c["pid"], "ppid": c["ppid"], "rss_mb": None, "cmdline": str(c["args"]).split()}
+    jobs = [as_proc(c) for c in children if not module.is_service_child(c["args"])]
+    servers = [as_proc(c) for c in children if module.is_service_child(c["args"])]
+    facts = {"worker_pid": root, "worker_age_seconds": age_s}
+    if servers:
+        facts["service_children"] = [{"pid": s["pid"], "cmdline": " ".join(s["cmdline"])} for s in servers]
+    return jobs, facts, last
 
 
 def board_build_verdict(service: str, allow_mid_build: bool, state: tuple[bool | None, dict]) -> tuple[str, int, str] | None:

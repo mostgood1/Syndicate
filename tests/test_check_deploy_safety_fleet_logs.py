@@ -473,3 +473,46 @@ def test_fleet_pid_alive_edges():
         assert cds.fleet_pid_alive("http://127.0.0.1:10000", 999) is False
         assert cds.fleet_pid_alive("http://127.0.0.1:10000", None) is None
     assert cds.fleet_pid_alive(None, 200) is None
+
+
+# --- lane `ncaab-blowout-off-load` 2026-11-08: the college re-sim pool's servers ARE live-odds-worker -------------
+# They start and die with the worker, so counting them as jobs held its check NOT CLEAR for the worker's whole life.
+
+POOL_A = (602, 201, 8125, "/venv/bin/python -m syndicate.features.shared.live_resim_workers --serve --nice 5")
+POOL_B = (603, 201, 8125, "/venv/bin/python -m syndicate.features.shared.live_resim_workers --serve --nice 5")
+POOL_KID = (604, 602, 5, "/venv/bin/python -c helper")
+
+
+def test_only_the_exact_pool_serve_cmdline_is_a_service_child():
+    assert cds.is_service_child(POOL_A[3])
+    assert not cds.is_service_child("/venv/bin/python -m syndicate.features.shared.live_resim_workers --nice 5")
+    assert not cds.is_service_child(ODDS_JOB[3])
+    assert not cds.is_service_child("")
+
+
+def test_pool_servers_are_not_jobs_but_an_odds_job_beside_them_is():
+    with mock.patch.object(cds, "_fleet_process_table", return_value=[SUP, RW, ODDS, POOL_A, POOL_B, ODDS_JOB]):
+        scan = cds.fleet_worker_children("http://127.0.0.1:10000")
+    jobs, facts = scan["live-odds-worker"]
+    assert [k["pid"] for k in jobs] == [600]
+    assert sorted(s["pid"] for s in facts["service_children"]) == [602, 603]
+    assert [k["pid"] for k in cds._combined_children(scan)] == [600]
+
+
+def test_pool_alone_leaves_the_worker_with_no_jobs_and_a_pool_childs_own_child_still_counts():
+    with mock.patch.object(cds, "_fleet_process_table", return_value=[SUP, RW, ODDS, POOL_A, POOL_B]):
+        scan = cds.fleet_worker_children("http://127.0.0.1:10000")
+    assert scan["live-odds-worker"][0] == []
+    assert cds._combined_children(scan) == []
+    with mock.patch.object(cds, "_fleet_process_table", return_value=[SUP, RW, ODDS, POOL_A, POOL_KID]):
+        scan = cds.fleet_worker_children("http://127.0.0.1:10000")
+    assert [k["pid"] for k in scan["live-odds-worker"][0]] == [604]
+
+
+def test_main_is_clear_with_only_the_pool_and_names_it(capsys):
+    with mock.patch.object(cds, "_fleet_process_table", return_value=[SUP, RW, ODDS, POOL_A, POOL_B]):
+        scan = cds.fleet_worker_children("http://127.0.0.1:10000")
+    rc, out = _run_main(scan["refresh-worker"], capsys, odds_result=scan["live-odds-worker"])
+    assert rc == 0, out
+    assert "live-odds-worker own servers, not jobs (they restart with the worker): pid=602 age=8125s, pid=603" in out
+    assert "child job RUNNING" not in out

@@ -634,6 +634,21 @@ def _worker_children(
     return root, children
 
 
+# Children that ARE the worker rather than work it started: long-lived servers that start with it and die with it,
+# so any restart of the worker kills them whether or not they are counted. Counted as jobs, they make the role's
+# check NOT CLEAR for as long as the worker runs. Measured 2026-11-08: the college live re-sim pool
+# (`shared/live_resim_workers.py`, SYNDICATE_COLLEGE_LIVE_RESIM_WORKERS=2 since 03:28Z) left live-odds-worker's
+# preflight HOLD on its two `--serve` children alone, so no live-odds-worker deploy could pass the guard. Matched on
+# the exact serve cmdline; anything else under a worker -- odds jobs, a pool child's own descendants -- stays a job.
+# `deploy_preflight.fleet_role_processes` uses this same helper. Lane ncaab-blowout-off-load.
+SERVICE_CHILD_CMDLINE_MARKERS = ("syndicate.features.shared.live_resim_workers --serve",)
+
+
+def is_service_child(args: str) -> bool:
+    """True when a worker child's command line is one of the worker's own long-lived servers."""
+    return any(marker in str(args or "") for marker in SERVICE_CHILD_CMDLINE_MARKERS)
+
+
 def fleet_worker_children(
     base_url: str | None = None,
 ) -> dict[str, tuple[list[dict[str, Any]] | None, dict[str, Any]]]:
@@ -641,6 +656,8 @@ def fleet_worker_children(
 
     children None = UNKNOWN (callers block); [] = none running. Off the fleet
     returns {} -- nothing is scanned (Render, `deploy_preflight`'s call).
+    The worker's own servers (`is_service_child`) are not jobs: they are listed in
+    facts["service_children"] and never block.
     """
     if not _is_fleet_base_url(base_url):
         return {}
@@ -655,7 +672,9 @@ def fleet_worker_children(
         if root is None:
             out[role] = (None, {"applicable": True, "reason": f"no {role} process under the supervisor"})
         else:
-            out[role] = ([dict(c, role=role) for c in children], {"applicable": True, "worker_pid": root})
+            jobs = [dict(c, role=role) for c in children if not is_service_child(c.get("args", ""))]
+            servers = [dict(c, role=role) for c in children if is_service_child(c.get("args", ""))]
+            out[role] = (jobs, {"applicable": True, "worker_pid": root, **({"service_children": servers} if servers else {})})
     return out
 
 
@@ -995,6 +1014,13 @@ def main() -> int:
                 )
         else:
             notes.append(f"{role} child jobs: none (worker pid={child_facts.get('worker_pid')})")
+        servers = (child_facts.get("service_children") or []) if children is not None else []
+        if servers:
+            notes.append(
+                f"{role} own servers, not jobs (they restart with the worker): "
+                + ", ".join(f"pid={s['pid']} age={s['age_s']}s" for s in servers)
+                + f" -- {servers[0]['args'][:100]}"
+            )
 
     build_in_flight, build_facts = board_build_state(args.base_url)
     if build_in_flight is None:

@@ -967,6 +967,14 @@ death, never life — do not invert it.
 - Verification: Reachability first: each arm's provenance cfgFields name its fields, and its margin histograms differ from the base in at least 90% of game-checkpoints. Base = step 3c's spread_sims.jsonl (same code4 copy, seeds and tasks; fidelity already 1,080/1,080). Per-arm tables vs base and real in the findings file and #765. Diagnostic only: no engine, served-code or config change, nothing deployed.
 - Blocked by: none
 
+### ncaab-blowout-off-load — OPEN — opened 2026-11-08 — session 6df1b15d-5ff8-4256-aba9-3a91f7304efc
+- Goal: Load rule off + solver_endgame_pts_per_team 0.2 (todo #768) into live-odds-worker's SYNDICATE_NCAAB_LIVE_MECHANISMS by a drained full fleet down/up between slates (user 'Yes, load it'), after teaching deploy_preflight and check_deploy_safety that the college re-sim pool's live_resim_workers --serve children are part of live-odds-worker, not jobs (user 'Fix the preflight'); the new live-odds-worker /proc environ carries all 7 keys; deploys.md entry with the live reading owed
+- Files: scripts/deploy_preflight.py (fleet_role_processes only), scripts/check_deploy_safety.py (SERVICE_CHILD_CMDLINE_MARKERS + is_service_child (NEW), fleet_worker_children and the child-job report loop only), tests/test_check_deploy_safety_fleet_logs.py, tests/test_deploy_preflight_fleet.py, .syndicate/findings_2026-11-08_ncaab_live_totals_bias.md, docs/ai_context/todo.md (the #768 entry only)
+- Hypothesis: n/a (a load; the pool fix is mechanical: its two children start and die with live-odds-worker, so a restart kills them whether or not they are counted)
+- Falsification test: After the fix, live-odds-worker's preflight still HOLDs with only the pool running, OR an odds job beside the pool no longer HOLDs, OR the new live-odds-worker environ has fewer than 7 mechanism keys (the parser drops ALL on any unknown field)
+- Verification: Unit tests (pool not a job, odds job beside it still a job; mutation: drop the marker -> tests fail); live-odds-worker preflight CLEAR with only the pool present; after up: /proc environ parse = 7 keys, healthz 200, both workers up; deploys.md entry; live reading (model - line -1.95 -> ~-1.45) owed on the next NCAAB slate
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

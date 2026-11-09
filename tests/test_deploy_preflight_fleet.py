@@ -141,5 +141,37 @@ class FleetVerdictTests(unittest.TestCase):
         self.assertIn("scheduled job", got["reason"])
 
 
+class FleetServiceChildTests(unittest.TestCase):
+    """Lane `ncaab-blowout-off-load` 2026-11-08: the college re-sim pool's `--serve` children start and die with
+    live-odds-worker, so they are recorded on the receipt and never counted as jobs; an odds job beside them is."""
+
+    SUP = (100, 1, 9000, "/venv/bin/python scripts/local_production.py --home /h up")
+    ODDS = (201, 100, 9000, "/venv/bin/python scripts/run_live_odds_refresh_worker.py")
+    POOL_A = (602, 201, 8125, "/venv/bin/python -m syndicate.features.shared.live_resim_workers --serve --nice 5")
+    POOL_B = (603, 201, 8125, "/venv/bin/python -m syndicate.features.shared.live_resim_workers --serve --nice 5")
+    ODDS_JOB = (600, 201, 160, "/venv/bin/python /home/u/Syndicate/scripts/run_refresh_odds_job.py --manifest-path /x")
+
+    def _processes(self, rows):
+        module = deploy_preflight._safety_module()
+        with mock.patch.object(deploy_preflight, "_safety_module", return_value=module), \
+             mock.patch.object(module, "_fleet_process_table", return_value=rows):
+            return deploy_preflight.fleet_role_processes("live-odds-worker", datetime.now(timezone.utc))
+
+    def test_the_pool_alone_is_no_job_and_is_recorded(self) -> None:
+        jobs, facts, _last = self._processes([self.SUP, self.ODDS, self.POOL_A, self.POOL_B])
+        self.assertEqual(jobs, [])
+        self.assertEqual(sorted(s["pid"] for s in facts["service_children"]), [602, 603])
+        self.assertIn("live_resim_workers --serve", facts["service_children"][0]["cmdline"])
+
+    def test_an_odds_job_beside_the_pool_is_still_a_job(self) -> None:
+        jobs, facts, _last = self._processes([self.SUP, self.ODDS, self.POOL_A, self.POOL_B, self.ODDS_JOB])
+        self.assertEqual([j["pid"] for j in jobs], [600])
+        self.assertEqual(len(facts["service_children"]), 2)
+
+    def test_no_pool_keeps_the_old_facts_shape(self) -> None:
+        jobs, facts, _last = self._processes([self.SUP, self.ODDS, self.ODDS_JOB])
+        self.assertEqual([j["pid"] for j in jobs], [600])
+        self.assertNotIn("service_children", facts)
+
 if __name__ == "__main__":
     unittest.main()
