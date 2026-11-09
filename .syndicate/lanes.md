@@ -971,6 +971,14 @@ death, never life — do not invert it.
 - Verification: off != on unit tests (matcher, order-path _resolve_event, fan-in naming); fleet replay old vs new over every live Kalshi game event and each board date held, every status change listed and read by eye; ncaab/wncaab fan-in A/B at one clock
 - Blocked by: none
 
+### deploy-safety-live-note-d1-label — OPEN — opened 2026-11-09 — session 8e61bcf3-f1f0-484f-9d78-eea1e8eb0e27
+- Goal: check_deploy_safety's college re-sim readings say they count D1-vs-D1 games only, in the sources line and the live headline (user 'Yes, relabel')
+- Files: scripts/check_deploy_safety.py (resim_snapshot_reading label + summarize_live_games live entry + the live-games comment block only), tests/test_check_deploy_safety_live_note.py
+- Hypothesis: none -- wording change; the re-sim drops non-D1-opponent games (dropped_non_d1), so '0 live' read as no college game at 16:57Z with 3 such games in play
+- Falsification test: n/a
+- Verification: Unit tests assert the D1-vs-D1 label in sources + headline; deploy-safety suites pass; read-only fleet run shows the new label
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
