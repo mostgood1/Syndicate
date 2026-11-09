@@ -759,6 +759,14 @@ death, never life — do not invert it.
   - 0 headroom refusals (the six reason codes) in any role, 11-07/08.
   - Worker count unchanged. Raising the limit is the user's call.
   - Scripts `C:/tmp/ncaabcap/mem_attr.py`, `mem_refuse.sh`.
+- STATUS 2026-11-09 11:08 AM CST (17:08Z): BUSY-SLATE READING ARMED (user "Yes, read tonight"). Expectation written BEFORE the slate.
+  - Slate: ESPN lists 50 men's games tonight, 22 of them tipping at 6 PM CST. If all are on the board, the overlap peaks at ~27-40 live around 7-8 PM CST.
+  - Code: fleet `56f2e7a10` (live-odds-worker restarted 17:05Z by another lane), `workers=2`, carry bound `shadow`.
+  - Model: elapsed ~= live x per-game wall / 2 workers, plus ~9 s. Per-game wall in a child, 11-08: median 4.8 s (1-6 live), 7.2 s (7-12), 6.0 s (13-14); the slowest seen was 16.9 s.
+  - Expected median elapsed: 15-20 live ~45-80 s; 21-30 ~65-120 s; 31-40 ~95-155 s. All under the 240 s budget at the median per-game cost. At 16.9 s a game, 29+ live passes 240 s, so a few carried games are plausible in the 6 PM tip burst.
+  - **Rule (pre-registered):** MET if >= 90% of NCAAB ticks with live >= 15 carry 0 and leave 0 not reached, with `worker_errors=0` on every tick and no error line. NOT MET otherwise. NOT MEASURED if fewer than 5 ticks reach 15 live.
+  - Reported, not gating: refresh-worker NCAAB joins at >= 15 live (`lane_age_max` <= 600 s, `live_lane_older_than_pricing_ceiling` = 0), and `carry_expired` (shadow) for the carry-bound decision.
+  - Read (read-only): `C:/tmp/ncaabcap/busy2_read.sh 2026-11-09T22:00 2026-11-10T09:00`. Dry run on 11-08 reproduced peak 14 live, 0 carried.
 - Blocked by: none
 
 ### ncaab-live-totals-bias — CLOSED 2026-11-08 (GOAL: MET; harness gate PASSED, fix NOT loaded, the user decides) — opened 2026-11-08 — session 6df1b15d-5ff8-4256-aba9-3a91f7304efc
