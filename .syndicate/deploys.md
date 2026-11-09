@@ -57862,3 +57862,40 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - **Errors:** 0 tracebacks on either role since the restarts. The 7 `FAILED|ERROR` lines on live-odds-worker are the same patterns as the hour before: pregame cooldown, Polymarket US catalogue-route 404s, and a `fetch_failed=0` field.
 - Measured: <pending> -- the POSITIVE live read. When the first 5-letter game reaches a board (Texas St @ UTRGV `TXSTUTRGV` 11-10, then the 11-11 games): its Kalshi totals are named in the fan-in (no `TXSTUTRGV` in `UNNAMED_ROLE_KEY_GRID` samples), and its event resolves `ok` in the board join (absent from the `JOIN_EVENTS` unmatched sample).
 - **Revert:** `_KALSHI_FIVE_CHAR_CODES_ENABLED = False` (or revert `722af0338`) on main, then ff + TERM both workers.
+
+## 2026-11-09 19:18:04Z (1:18 PM CST) -- FLEET ff 722af0338 -> 564f8dbde + refresh-worker TERM: the live evidence log (Phase 1B M0, lane `live-evidence-log`) -- **LOADED; collector running and writing; the live readings are OWED tonight (nothing was live at load)** (written 19:22Z, 1:22 PM CST)
+- **User, in this chat:** "Yes, ship it", answering "Push the live evidence log and load it on the fleet before tonight's games?"
+- **What:** `564f8dbde`, the rebase of `2c4c12536`.
+  - Tests: 68 passed (12 new, plus the refresh-worker script tests).
+  - One collector thread in the refresh-worker reads each live snapshot through the shared store every 30 s: nba, wnba, ncaab, wncaab, ncaaf, nfl, nhl.
+  - It appends an as-of row per game lane per new tick to `<data root>/live_evidence/<sport>/<date>.jsonl`.
+  - Switch `SYNDICATE_LIVE_EVIDENCE_LOG` (absent = on). No sport module edited.
+- **Range `722af0338..564f8dbde`, runtime** (listed in its own step at 19:15:10Z, re-checked by the ff script): `scripts/live_evidence_check.py`, `scripts/run_refresh_worker.py` (the start call), `syndicate/features/shared/live_evidence_log.py`. Every other commit in range is ledger-only. No dirty fleet file overlapped.
+- **Loaded by:** refresh-worker only.
+- **Gates:**
+  - Claim: refresh-worker acquired 19:15:30Z, holder `live-evidence-log`; released 19:18:23Z.
+  - Restart spacing: 50 min after the 18:25:44Z restart.
+  - Preflight `--target fleet --target-commit 564f8dbde` with expect + baseline (read 19:15:24Z):
+    - HOLD 19:15:35Z (board build in flight);
+    - drain from about 19:15:40Z, CLEAR once the build finished;
+    - preflight CLEAR at about 19:17:50Z.
+  - ff `git merge --ff-only 564f8dbde` 19:17:57Z.
+  - TERM pid 374835 19:18:04.494Z; respawned pid 386232 19:18:10Z. `DRAIN_CLEARED` against pid 386232 at about 19:18:20Z.
+- **Baseline** (pid 374835 on `722af0338`, read 19:15:24Z):
+  - `fleet_def_live_evidence_start` 0; `live_evidence/` absent;
+  - RSS 2,624 MB at 50 min age;
+  - 0 tracebacks.
+- **expect:** `fleet_def` 0 -> 1. **Read 2 after the ff**, a definition miss and not a fault: the grep counts both the import line and the call line.
+- **verify (measured):**
+  - `[live_evidence] LOOP_STARTED interval_s=30 sports=nba,wnba,ncaab,wncaab,ncaaf,nfl,nhl` and `LIVE_EVIDENCE_LOOP_START_RESULT started=True`, 19:18:17.606Z.
+  - First `TICK rows=86` (ncaaf 67, nfl 15, nhl 3, wncaab 1). Files written under `live_evidence/`. 0 tracebacks.
+  - At 19:21:08Z no live lane on any sport, so the probe had nothing to compare. Snapshots kept ticking with unchanged lanes, and no row was added (the dedupe works).
+  - RSS 1,546 MB at 3 min. Not comparable to the baseline: memory is boot-confounded.
+- **Owed, timers set in session e32fef1a:**
+  - 01:15Z (7:15 PM CST): the same-moment probe on each live sport.
+  - 05:30Z (11:30 PM CST): the NBA cross-check against `live_resim_history` (coverage + 0 field mismatches), plus bytes/day per sport.
+- **Found while loading:** the supervisor logs every refresh-worker restart since the repo move as `claimed: false` (this one and 18:25:44Z).
+  - The running worker's environ still holds the OLD OneDrive `SYNDICATE_DEPLOY_CLAIM_DIR`, which does not exist.
+  - `local_production.env` already has the new path, which does exist.
+  - Env is built only at `up`, so the fix is the next drained full down/up. Until then `role_restarts.jsonl` attribution is wrong. Restarts are not blocked.
+- **Revert:** `SYNDICATE_LIVE_EVIDENCE_LOG=off` needs an env change (full down/up). Reverting `564f8dbde` needs an ff + refresh-worker TERM. The log files can be left in place: nothing reads them on a request path.

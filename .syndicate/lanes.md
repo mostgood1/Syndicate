@@ -1006,7 +1006,7 @@ death, never life — do not invert it.
 - GOAL: MET in 145523971. Sources line `ncaab re-sim (D1 vs D1): N live`; headline `(wncaab: 3 live D1-vs-D1)`; the comment block records why. 151 tests pass (live_note, fleet_logs, deploy_guard, build_estimate, preflight_board_build_hold). Read-only fleet run 17:17:39Z (11:17 AM CST): "WARNING: Live games in progress (wncaab: 3 live D1-vs-D1)"; sources "ncaab re-sim (D1 vs D1): 0 live (1m ago); wncaab re-sim (D1 vs D1): 3 live (2m ago)". It matches WNCAAB_LIVE_RESIM_TICK live=3 (17:16:04Z), which was unchanged before and after the check.
 
 ### live-evidence-log — OPEN — opened 2026-11-09 — session e32fef1a-01e8-4afe-a284-01acd3728545
-- **STATUS `[2026-11-09 18:18Z]`: GOAL: NOT MET -- built and dry-run on fleet data; committed on the branch only, NOT on main, NOT loaded.**
+- **STATUS `[2026-11-09 19:22Z]`: GOAL: NOT MET -- LOADED on the fleet (`564f8dbde`, refresh-worker TERM 19:18:04Z); collector running and writing; the live readings are owed tonight (timers 01:15Z probe, 05:30Z NBA cross-check + sizes).** Earlier: built and dry-run 18:18Z (wncaab probe 3/3).
   - Built:
     - `syndicate/features/shared/live_evidence_log.py`: collector + `iter_rows` / `evidence_at`; switch `SYNDICATE_LIVE_EVIDENCE_LOG`, absent = on; every 30 s.
     - the refresh-worker start call;
