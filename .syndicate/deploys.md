@@ -57666,3 +57666,31 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - expected: `LIVE_PROJECTION_JOIN sport=nhl|nfl display_only=` > 0;
   - each Actual spot-checked against the box.
 - **Revert:** revert `b2a5013e2` on main, then ff + a claimed refresh-worker TERM (join + NFL producer) and a live-odds-worker TERM (NHL producer). Without the producer block the join reads "no live game ... carries livePlayerStats" and writes nothing.
+
+## 2026-11-09 14:48:33Z (8:48 AM CST) -- FLEET ff e2558013c -> aa5f50ac5 + claimed refresh-worker TERM: live game-line rows the join refuses to price get a DISPLAY-ONLY Live proj. in ncaab / wncaab / ncaaf / nfl / nhl (`aa5f50ac5`, todo `#771`, lane `live-display-other-sports`); carried `b2a5013e2` (lane `nhl-nfl-live-prop-actuals`, its user "Yes, push and load") -- **LOADED; first build clean; the live reading is OWED on the 11-09 evening slate** (written 14:59Z, 8:59 AM CST)
+- **What loaded:** `live_gameline_join.LIVE_DISPLAY_SPORTS` gains the five sports (it was `{nba}`), with a new `_display_lane_fresh`: outside NBA a display number needs a lane as fresh as a price would. `board_enrichment` passes `segment_display_only` from the same table, so college half/quarter rows get one too. Nothing prices. NFL spreads stay blank by decision (the lane's margins were graded a measured FAIL).
+- **Range `e2558013c..aa5f50ac5`, runtime:**
+  - mine: `shared/live_gameline_join.py`, `shared/board_enrichment.py` (the `segment_display_only` argument). Files on LOAN from lane `nba-live-proj-actuals`, user "Yes, lend them".
+  - `b2a5013e2`: `shared/live_player_actuals.py` (NEW), `board_enrichment.attach_live_projections_for_sport`'s new branch, `nfl/live_resim.py`, `nhl/live_resim.py`. That lane chose (b): I ran the ff and this TERM, and it TERMed live-odds-worker itself (its 14:50:05Z entry).
+  - `6817e2180`: `scripts/check_deploy_safety.py` (operator tooling).
+  - 0 of the fleet's 14 dirty paths overlap the range.
+- **Gates:**
+  - **Claim:** refresh-worker acquired 14:25:50Z, holder `live-display-other-sports`, ttl 7200. It was free only after lane `nba-live-proj-actuals`' own TERM at 14:22:06Z. I waited for that pid's first build (`BOARD_BUILD_TIMING wall_s=224.8` at 14:33:29Z).
+  - **Drain:** `check_deploy_safety --drain --drain-owner live-display-other-sports`, under refresh-worker's own environ (`C:/tmp/livedisp/drain_rw.py`). CLEAR ~14:34:40Z, and re-confirmed CLEAR at 14:47:3xZ.
+  - **Preflight:** 14:34:58Z returned **TOO_SOON** (rc 5): the 25-min spacing, 13 min after 14:22. I waited it out and did not pass `--allow-rapid`. 14:48:08Z returned **CLEAR** (rc 0, 0 processes): `--target fleet --target-commit aa5f50ac5`, four `--expect` fields, each with a `--baseline` read at 14:47:29Z.
+  - **ff:** `git merge --ff-only aa5f50ac5` at 14:48:13Z. The five runtime files hash-equal to the commit: `live_gameline_join.py` `5f0fc844c058`, `board_enrichment.py` `1ba44636ae4a`, `live_player_actuals.py` `c32d7800aa87`, `nfl/live_resim.py` `3922b7231eeb`, `nhl/live_resim.py` `e7cbe3de5253`.
+  - **TERM:** pid 308606 had 0 children. `kill -TERM` at 14:48:33.053Z. `role_restarts.jsonl` 14:48:34Z: claimed, code 0, holder `live-display-other-sports`, ran_s 1583. Respawned as pid 324654 at 14:48:38Z. `DRAIN_CLEARED` against the new pid. Claim released 14:58Z (with its token).
+- **Baseline (14:47:29Z):** fleet head `e2558013c`. Last `LIVE_GAMELINE_JOIN` `display=0 considered=0` for ncaab / ncaaf / nfl / nhl (14:30Z) and wncaab (06:36Z): nothing live. `LIVE_PROJECTION_JOIN sport=nhl|nfl` lines since 14:22Z: 0. `nfl_live_resim.json` `coverage.live_player_stats` absent.
+- **Before, on a live slate (served board 2026-11-08 23:35Z, the parent session's reading, `/api/intelligence/query` `top_opportunities`, `is_live` game rows with a Live proj.):** ncaab 15 of 43 (h1/h2 totals 0 of 14, full totals 11 of 21, h2h 0 of 2); wncaab 2 of 29; nfl spreads 0 of 7, h2h 0 of 4, totals 27 of 27. That board's refresh-worker `LIVE_GAMELINE_JOIN` (23:23Z) gave ncaab `quote_older_than_the_score_the_model_saw` 58, `segment_pricing_disabled` 71, `display=0`; and nfl `live_resim_published_no_distribution_for_this_market` 70. It is another slate. The same-instant counterfactual is owed below.
+- **expect / measured:**
+  - `fleet_checkout_head` -> `aa5f50ac5`: **MET** 14:48:13Z.
+  - First board build on pid 324654: `BOARD_BUILD_TIMING wall_s=177.1 ok=True` at 14:57:21Z. 0 `Traceback` lines in refresh-worker.log, and 0 `BOOK_GRID_LIVE_GAMELINE_FAILURE`. `LIVE_GAMELINE_JOIN` ran for nba / nfl / ncaaf / ncaab / nhl at 14:50Z and 14:55Z, all `considered=0` (nothing live).
+  - `live_projection_join_nhl_nfl_lines` 0 -> present: **MET**. `LIVE_PROJECTION_JOIN sport=nfl` 14:50:21Z, `sport=nhl` 14:50:32Z. Lane `nhl-nfl-live-prop-actuals` records its own readings.
+  - `live_gameline_join_display_college_nfl_nhl_ncaaf` 0 -> > 0 on the first live join: **OWED**. A watcher (`C:/tmp/livedisp/wait_live.sh`) wakes on the first non-NBA join with `display>0`, or on a failure line.
+- **Owed, verify (11-09 evening: NCAAB/WNCAAB from ~23:00Z, NHL, MNF 01:15Z 11-10):**
+  - per sport, served live game rows with a Live proj., against the SAME-INSTANT old-code count on the same board. `C:/tmp/livedisp/probe.py` derives it: old code = a gameline-backed non-h2h Live cell only, since non-NBA sports had no display block.
+  - `LIVE_GAMELINE_JOIN display=` > 0 for college; quote-behind-score and `segment_pricing_disabled` rows carry it.
+  - 0 display rows with `model_edge_pct` / `live_aware`.
+  - NFL spreads still blank.
+  - NHL shows only if its re-sim indexes games. The `nhl-live-resim-slate-root` fix has been on the fleet since 01:25Z.
+- **Revert:** set `LIVE_DISPLAY_SPORTS` back to `frozenset({"nba"})` in `live_gameline_join.py` on main, then ff + a claimed refresh-worker TERM. The display is board-only, so there is no ledger or pricing state to undo.
