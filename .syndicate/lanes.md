@@ -935,6 +935,14 @@ death, never life — do not invert it.
 - Verification: After the 11-09 slate ends: fresh work dir C:/tmp/ncaab_postload (fleet ledgers 11-08 + 11-09, pregame 11-08/09, a FRESH ESPN cache since the old one predates the finals); per-epoch tables with n rows / games named; result in deploys.md as a RECONCILED line for the 05:13:12Z entry, findings, todo #768.
 - Blocked by: none
 
+### rail-interval-frame-fixes — OPEN — opened 2026-11-09 — session c5cc97a7-c15d-4482-a455-7482f69262af
+- Goal: On the fleet's served /api/board/game-chips: a college chip whose sim lists its teams the other way round (neutral-site games: 3 of ~267 chips 11-06..11-08) carries its interval block in the CHIP's frame (live re-sim, pregame and pace paths; settled live periods equal the line score); live college blocks carry no win probability, as the board withholds it (user 2026-11-03 'Yes, blank it'); a chip served FINAL carries no intervals block; on main with tests incl. off != on
+- Files: syndicate/features/shared/game_chip_intervals.py (the sim-to-chip frame check + college live win withheld + the serve-time final drop only), tests/test_game_chip_intervals.py, docs/ai_context/todo.md (the #767 section only)
+- Hypothesis: MEASURED before code: college pregame sims vs served chips by event id, 11-06..11-08 -- 3 REVERSED of 267 (SDSU@COLO ncaab 11-07, UCSD@SD wncaab 11-07, Murray St@Princeton wncaab 11-08), all neutral_site; the live UCSD@SD block's settled Q1/Q2 were swapped against the line score (00:21Z 11-08). The re-sim and pregame sim take home/away from ESPN's summary, the chip from the board slate
+- Falsification test: A reversed pair's block still disagrees with the chip's line score after the fix, or a same-frame chip's block changes
+- Verification: unit tests (reversed -> flipped, same -> unchanged, unknown -> unchanged; live college win None; final dropped at serve time; off != on); read-only dry-run over the fleet's chips for the 3 known reversed games; after reload-web: served live college settled periods == line score on the next college slate
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
