@@ -347,6 +347,7 @@ death, never life — do not invert it.
 - **STATUS 2026-10-20 16:38Z (11:38 AM CT): RECORDING MET, GRADING OWED.** `1006cb75` on the fleet (ff 16:04:36Z, refresh-worker TERM 16:18:24Z after a save, new pid 2971523). First build: 17 tagged paper rows (paper 9, paper:novig 3, paper:prophetx 5), 0 REFUSED_LIVE_INLINE; live unchanged (554 rows, env same). Owed: graded count after the 10-21 settlement pass + first tagged paper:kalshi/polymarket row. Follow-up (other lane's file): min_ev tuner counts a live bet and its paper twin twice -- proposed as its own session; hand-over in the b87af0fc notes folder.
 
 ### in-game-trading — OPEN — opened 2026-10-20 — session 15ceeb14-5d5b-47c4-9b84-e483511d5716
+- LOAN 2026-11-09 to lane `inplay-min-ask` (coordinator 332cb014; user "Yes, 0.55 floor" then "Yes, take the loan"): a min-ask guard in `inplay_entries_live.py` (`SYNDICATE_INPLAY_MIN_ASK`, default 0.55) plus its tests. Owner quiet since 11-02. No other change to this lane's files.
 - GOAL (verbatim): Measured in-play venue-vs-book edge on NBA/NHL (read-only) and a staged in-game trading plan (held-position loop, in-game fair price, in-play entries, Polymarket in-play rule, one-engine fit) in a findings file, each stage with its user decision -- GOAL: MET (2026-10-21, findings §6); lane stays OPEN for the follow-ons below.
 - Goal: Measured in-play venue-vs-book edge on NBA/NHL (read-only) and a staged in-game trading plan (held-position loop, in-game fair price, in-play entries, Polymarket in-play rule, one-engine fit) in a findings file, each stage with its user decision
   - Reading: findings §6 markout +300 s -1.26c (CI -1.80..-0.72, n=1,613) over 23:09Z-04:39Z, 11 games. Plan §3 has stages 1-5, each with its user decision; todo #715. Main 796e55f5.
@@ -941,6 +942,14 @@ death, never life — do not invert it.
 - Hypothesis: MEASURED before code: college pregame sims vs served chips by event id, 11-06..11-08 -- 3 REVERSED of 267 (SDSU@COLO ncaab 11-07, UCSD@SD wncaab 11-07, Murray St@Princeton wncaab 11-08), all neutral_site; the live UCSD@SD block's settled Q1/Q2 were swapped against the line score (00:21Z 11-08). The re-sim and pregame sim take home/away from ESPN's summary, the chip from the board slate
 - Falsification test: A reversed pair's block still disagrees with the chip's line score after the fix, or a same-frame chip's block changes
 - Verification: unit tests (reversed -> flipped, same -> unchanged, unknown -> unchanged; live college win None; final dropped at serve time; off != on); read-only dry-run over the fleet's chips for the 3 known reversed games; after reload-web: served live college settled periods == line score on the next college slate
+- Blocked by: none
+
+### inplay-min-ask — OPEN — opened 2026-11-09 — session 332cb014-904e-4069-b418-9283732e1e99
+- Goal: Live in-game entries refuse a decision ask below 0.55 (SYNDICATE_INPLAY_MIN_ASK, default 0.55; user 2026-11-09 'Yes, 0.55 floor')
+- Files: syndicate/features/shared/inplay_entries_live.py (min-ask guard ONLY -- LOAN from in-game-trading, user 2026-11-09 'Yes, take the loan'), tests/test_inplay_entries_live.py (min-ask tests ONLY -- same LOAN)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: fleet live-odds-worker log: LIVE_ENTRY result reason=below_inplay_min_ask on asks <0.55, and no in-game ledger fill below 0.55 after the restart
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
