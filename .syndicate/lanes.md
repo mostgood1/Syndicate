@@ -918,12 +918,6 @@ death, never life — do not invert it.
 - Verification: Probe table of tip mean minus target per value on production inputs; harness run read with scripts/ncaab_blowout_harness_read.py; findings + todo #768 on origin/main.
 - Blocked by: none
 
-### closed-lane-archive-20261108-1531 — CLOSED 2026-11-08 (GOAL MET: 2 blocks archived) — opened 2026-11-08 — session 65136ce9-82e6-4feb-a6fe-12051415d973
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness.py --idle-min 240 at 21:33Z (15:33 CST) gave SAFE for 2 of 21 CLOSED blocks; dry run, apply and the invariant check (no new FAIL vs baseline) all passed.
-- Moved to lanes_closed.md: exit-state-size, live-gameline-lane-age-gate. Table + deferrals: log/2026-11-08.md.
-
 ### closed-lane-archive-20261108-1640 — CLOSED 2026-11-08 (GOAL MET: 3 blocks archived) — opened 2026-11-08 — session 439d45fa-c87e-47fd-b05d-640af3819698
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
@@ -991,6 +985,12 @@ death, never life — do not invert it.
 - Falsification test: n/a
 - Verification: unit: off != on reachability (nhl/nfl rows gain actual_so_far only through the new branch), grader-identical field per market, display-only (no model_prob_over / live_aware / edge), stale-box and ambiguous-name refusals; fleet: livePlayerStats present on live games in live/nhl_live_lens.json and live/nfl_live_resim.json, LIVE_PROJECTION_JOIN sport=nhl|nfl display_only>0, served board live NHL + NFL props with Actual > 0 and 0 with edge_vs_market_pct, each Actual spot-checked against the box
 - Blocked by: none
+
+### closed-lane-archive-20261108-2040 — CLOSED 2026-11-08 (GOAL MET: 1 block archived) — opened 2026-11-08 — session 7f416731-a9ac-4983-bb8f-437c50b13de0
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 at ~02:40Z 11-09 (8:40 PM CST 11-08) gave SAFE for 1 of 22 CLOSED blocks; dry run, apply and the invariant check (no new FAIL vs baseline) all passed.
+- Moved to lanes_closed.md: closed-lane-archive-20261108-1531. Table + deferrals: log/2026-11-08.md.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1188,6 +1188,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261108-0445` — CLOSED 2026-11-08 (GOAL MET: 2 blocks archived) — opened 2026-11-08 — session ddab5a53-4bc0-4f4b-94b6-88aaf35a8127
 - `closed-lane-archive-20261108-0855` — CLOSED 2026-11-08 (GOAL MET: 1 block archived) — opened 2026-11-08 — session 0be02206-1b92-41af-bb1e-62a677d1a857
 - `closed-lane-archive-20261108-1311` — CLOSED 2026-11-08 (GOAL MET: 1 block archived) — opened 2026-11-08 — session c7bfc622-f09d-4be5-af1b-5d3f79c510eb
+- `closed-lane-archive-20261108-1531` — CLOSED 2026-11-08 (GOAL MET: 2 blocks archived) — opened 2026-11-08 — session 65136ce9-82e6-4feb-a6fe-12051415d973
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
