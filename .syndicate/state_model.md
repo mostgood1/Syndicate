@@ -869,6 +869,16 @@ lockout and busy by the time it lifts, which is exactly why waiting kept losing.
 
 ## [nhl-live-resim] NHL HAS A LIVE RE-SIM AND IT CAN NOW SEE ITS SLATE -- but no NHL game has yet reached the board with a probability `[measured on production 2026-09-25T03:01:14Z, lane nhl-live-resim]`
 
+- **2026-11-09 `[verified on the fleet, lane nhl-live-resim-slate-root]`: ON THE FLEET THE RE-SIM COULD NOT SEE ITS SLATE
+  AGAIN, and that is fixed.** `build_live_lens_snapshot` called `build_slate_features(date)` with no root, and
+  hockeysim `loaders.nhl_source_root()` honours only `SYNDICATE_ARTIFACT_ROOT_NHL` (unset), so it read the fleet
+  checkout's git mirror `~/Syndicate/data/nhl_source`, whose scoreboards end 2026-06-14. Every live game refused
+  `no_slate_features` (11-09 01:21Z: `liveResimmed 0`, `no_slate_features 4`). Fix `7d48129c5`:
+  `_slate_features_root()` = `default_nhl_source_root()` (the pregame producer's root) unless
+  `SYNDICATE_ARTIFACT_ROOT_NHL` is set; coverage carries `slateFeatureGames`. Loaded 03:53:10Z 11-09; the 11-09
+  snapshot reads `slateRows 3, slateFeatureGames 3`. **Not yet measured:** `liveResimmed > 0` on a game in play
+  (owed on the 11-09 slate, deploys.md 2026-11-09 01:25:21Z). Only the moneyline can gain a live number: the
+  producer publishes no margin/total distributions (below).
 - **"INERT until the season opens" was WRONG and is retracted.** NHL preseason began
   2026-09-19; eleven games were played on 2026-09-24 and six were live at once. The
   chain was exercised, not idle.
