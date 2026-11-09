@@ -18,13 +18,6 @@
 - **Decided, not built: NFL spreads stay blank.** The lane's own top-level `margin_dist` was graded a measured FAIL (closed lane `nfl-live-distribution-grade`: worst bucket 0.4290 vs `#499`'s 0.150, ~35-40% too narrow), the over-confidence that keeps college's raw margin off the display. Revisit only on a passing grade.
 - **Owed:** fleet ff + claimed refresh-worker TERM; then on the next live slate, per sport, served live game rows with a Live proj. vs the same-instant old-code count (`C:/tmp/livedisp/probe.py`), `LIVE_GAMELINE_JOIN display=` > 0 for college, and 0 display rows with `model_edge_pct` / `live_aware`. NHL needs lane `nhl-live-resim-slate-root`'s fix loaded to show anything.
 
-### `#770` — **`check_deploy_safety` LIVE-GAME NOTE NOW SEES NCAAB/WNCAAB (on main `6817e2180`); THE LIVE-SLATE FLEET READING IS OWED** (lane `deploy-safety-live-note-sports`, CLOSED)
-- **Built:** "No live games" came from `anyLive`, which covers only the live-refresh loop's 7 checker sports. The note now adds the NCAAB/WNCAAB re-sim snapshot counts, names each source with its age, and prints UNKNOWN (never "No live games") for a null, stale or unreadable reading. It stays a note, never a blocker. Details: `state_worker.md` `[local-production-host]`.
-- **Owed:** one read-only run of `python scripts/check_deploy_safety.py` from a worktree at `origin/main` while college basketball is live. On 11-08 that was 17:03Z-05:59Z; Monday tips start around 23:00Z.
-  - **PASS:** `WARNING: Live games in progress (ncaab: N live ...)`. N must equal the newest `NCAAB_LIVE_RESIM_TICK live=` line in `~/syndicate-prod/logs/live-odds-worker.log` (read within ~2 min). The `Live-game sources:` line must show ncaab/wncaab ages of 3m or less.
-  - **FAIL:** "No live games", or ncaab UNKNOWN, while those tick lines are fresh.
-  - Nothing on the fleet loads this script, so no deploy is needed.
-
 ### `#769` — **LIVE NHL / NFL PROPS HAD NO LIVE ACTUAL ON LAYER 2 (served 01:31Z 11-09: NHL 0 of 29, NFL 0 of 140). DISPLAY-ONLY BOX-SCORE ACTUAL ON MAIN `b2a5013e2`, LOADED on the fleet 11-09 14:48-14:50Z (config verify MET); the live served-board reading is owed (11-09 evening slate). NHL Live proj. NOT shipped: the live re-sim's per-player means run 4-13% hot (no `special_teams_cal`)** `[2026-11-09, lane nhl-nfl-live-prop-actuals, session 386d4115]`
 - **Built:** a `livePlayerStats` box block on each live game's snapshot.
   - NHL: live-odds-worker re-sim tick.

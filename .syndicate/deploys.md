@@ -57741,3 +57741,14 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **Deploy:** `git merge --ff-only 56f2e7a10` 17:04:42Z. TERM pid 325044; it had 2 live_resim_workers children. Respawn pid 354171 at 17:05:09Z.
 - **Verify (~17:05:30Z, in pid 354171's environ):** the key is unset, so effective `inplay_min_ask()` = 0.55; price band (0.40, 0.75); in-game entries on. 0 tracebacks since restart. 0 LIVE_ENTRY lines yet, because no in-play slate had started.
 - **Owed:** the first LIVE_ENTRY with `reason=below_inplay_min_ask` on tonight's slate, and 0 `ingame:` ledger fills with fill price < 0.55 after 17:05:09Z.
+
+## 2026-11-09 17:05:01Z (11:05 AM CST) -- MEASUREMENT, no deploy: `check_deploy_safety`'s live-game note on a live college slate (`6817e2180`, todo `#770`, lane `deploy-safety-live-note-sports`) -- **MET**
+- **What it measures:** a script run from a checkout. Nothing on the fleet loads it, so there is no restart and no claim. Read-only run from a worktree whose HEAD contains `6817e2180`; no later commit touches the script.
+- **Predicted:** with `anyLive` false and a college re-sim showing N live, the note prints `WARNING: Live games in progress (<league>: N live)`. N must match the newest `<LEAGUE>_LIVE_RESIM_TICK live=` line, and the source ages must be 3m or less.
+- **Read:**
+  - Tick lines just before (17:05:00Z) and just after (17:05:02Z) the check were identical: `WNCAAB_LIVE_RESIM_TICK ... live=3 resimmed=3 ... dropped_non_d1=3` at 17:03:42Z, and `NCAAB ... live=0 ... dropped_non_d1=1` at 17:03:29Z.
+  - The check printed `WARNING: Live games in progress (wncaab: 3 live) -- a restart interrupts live-lens ticks, live re-sims and live prop hydration`.
+  - It also printed `Live-game sources: live-refresh loop [mlb,wnba,nba,nhl,soccer,nfl,ncaaf]: none (0m ago); ncaab re-sim: 0 live (2m ago); wncaab re-sim: 3 live (1m ago)`.
+  - rc=1, NOT CLEAR, on an unrelated refresh-worker board build. The live games stayed a note.
+- **Verdict MET.** The old code read only `anyLive` (false here) and would have printed "No live games". Taken on WNCAAB, which goes through the same `resim_snapshot_reading` as NCAAB; men's D1-vs-D1 games tipped only at 23:00Z.
+- **Interim reading, 16:57:08Z:** "No live games on any source below" with 1 men's and 2 women's games against non-D1 opponents in play. That is correct for what a restart interrupts, because the re-sim drops them and the board does not price them. The note's "live" means a D1-vs-D1 board game (recorded in `state_worker.md` `[local-production-host]`).
