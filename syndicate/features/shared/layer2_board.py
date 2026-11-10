@@ -3273,6 +3273,11 @@ def build_layer2_rows(
             }
 
             candidate: dict[str, Any] = {field: row.get(field) for field in _IDENTITY_FIELDS}
+            # The engine's spelling of a book-named NBA player (`nba_player_identity`, lane
+            # nba-prop-engine-name-join). Copied only where stamped, so every other row is unchanged; the
+            # face, side and recent-form readers downstream of this candidate join on it.
+            if row.get("engine_player_name"):
+                candidate["engine_player_name"] = row.get("engine_player_name")
             candidate["side"] = side
             # THE ROW'S `line` IS THE AWAY HANDICAP, NOT THIS SIDE'S.
             #
@@ -4222,6 +4227,8 @@ def layer2_rows_to_board_cards(
                 # line on the side being taken, and matchup is the last resort.
                 "display_name": _pick_label(row) or (f"{away} @ {home}" if home and away else None),
                 "player_name": row.get("player_name"),
+                # Only on a book-named NBA player the engine spells differently (lane nba-prop-engine-name-join).
+                **({"engine_player_name": row.get("engine_player_name")} if row.get("engine_player_name") else {}),
                 "market": row.get("market"),
                 "market_key": row.get("market"),
                 "line": row.get("line"),

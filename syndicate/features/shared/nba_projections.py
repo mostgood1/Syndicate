@@ -181,11 +181,88 @@ def _row_game_tris(index: NbaPropProjectionIndex, row: Mapping[str, Any]) -> tup
     return entry.slate_date, entry.home_tri.upper(), entry.away_tri.upper()
 
 
+def _engine_scope_names(
+    index: NbaPropProjectionIndex, row: Mapping[str, Any], by_game: Mapping[tuple, list[str]], window: list[str]
+) -> tuple[tuple, list[str]]:
+    """(scope key, engine names) a row's name may resolve to: its own game's sim players when the sim has
+    that game (a book's prop for game G is about a player in G), else every sim player in the window."""
+    game = _row_game_tris(index, row)
+    if game is not None and by_game.get(game):
+        return ("game",) + game, list(by_game[game])
+    return ("window",), window
+
+
+def stamp_engine_player_names(grid: Iterable[Mapping[str, Any]], index: NbaPropProjectionIndex) -> dict[str, Any]:
+    """Resolve each NBA prop row's book name to the engine's spelling ONCE, before any join reads it
+    `[2026-11-10, lane nba-prop-engine-name-join]` (`nba_player_identity` has the rule and the measurement).
+
+    Every prop row, every market -- a double-double row has no ladder but still wants its face and side.
+    The exact key is checked across the whole window first, exactly as `_match_player` does, so a row
+    that joins today is never stamped. Only a row whose name no sim player carries gets the canonical
+    fallback, scoped by `_engine_scope_names`. A stamp is never removed: `_attach_projections_over_window`
+    may pass the grid through once per window date, and a later date's index not knowing the player is
+    not evidence against an earlier resolution.
+    """
+    from syndicate.features.shared.nba_player_identity import (
+        ALIAS,
+        AMBIGUOUS,
+        ENGINE_NAME_FIELD,
+        resolve_engine_name,
+    )
+
+    by_game: dict[tuple, list[str]] = {}
+    for entries in index.by_player.values():
+        for e in entries:
+            by_game.setdefault((e.slate_date, e.home_tri, e.away_tri), []).append(e.player_name)
+    window = [name for names in by_game.values() for name in names]
+    memo: dict[tuple, tuple[str | None, str]] = {}
+    outcome_rows: Counter[str] = Counter()
+    aliased: dict[str, str] = {}
+    ambiguous: set[str] = set()
+    for row in grid:
+        if str(row.get("kind") or "") != "prop":
+            continue
+        name = _norm_name(row.get("player_name"))
+        if not name or name in index.by_player:
+            continue
+        scope, names = _engine_scope_names(index, row, by_game, window)
+        key = scope + (name,)
+        if key not in memo:
+            memo[key] = resolve_engine_name(row.get("player_name"), names)
+        resolved, outcome = memo[key]
+        outcome_rows[outcome] += 1
+        if outcome == ALIAS and resolved:
+            row[ENGINE_NAME_FIELD] = resolved  # type: ignore[index]
+            aliased[str(row.get("player_name"))] = resolved
+        elif outcome == AMBIGUOUS:
+            ambiguous.add(str(row.get("player_name")))
+    summary = {
+        "alias_rows": int(outcome_rows.get(ALIAS, 0)),
+        "alias_players": dict(sorted(aliased.items())),
+        "ambiguous_rows": int(outcome_rows.get(AMBIGUOUS, 0)),
+        "ambiguous_players": sorted(ambiguous),
+        "unresolved_rows": int(sum(n for o, n in outcome_rows.items() if o not in (ALIAS, AMBIGUOUS))),
+    }
+    if aliased or ambiguous:
+        # print, not logger: logger.info never reached a role log (CLAUDE.md).
+        print(
+            "[nba_projections] NBA_PROP_ENGINE_NAME alias_rows=%d alias_players=%d ambiguous_rows=%d sample=%s ambiguous=%s"
+            % (summary["alias_rows"], len(aliased), summary["ambiguous_rows"],
+               sorted(aliased.items())[:6], sorted(ambiguous)[:6]),
+            flush=True,
+        )
+    return summary
+
+
 def _match_player(
     index: NbaPropProjectionIndex, row: Mapping[str, Any]
 ) -> tuple[NbaPlayerEntry | None, str | None]:
-    """(entry, refusal_reason). Exactly one is set."""
-    name = _norm_name(row.get("player_name"))
+    """(entry, refusal_reason). Exactly one is set.
+
+    Joins on the engine spelling `stamp_engine_player_names` resolved, else the row's own name."""
+    from syndicate.features.shared.nba_player_identity import engine_player_name
+
+    name = _norm_name(engine_player_name(row))
     if not name:
         return None, "row has no player name"
     game = _row_game_tris(index, row)
@@ -225,6 +302,10 @@ def attach_nba_prop_projections(
     unsupported_market_rows = 0
     refused: Counter[str] = Counter()
     edge_side: Counter[str] = Counter()
+
+    grid = list(grid)
+    # BEFORE every join below and every reader after this step (face, side, recent form): one resolution.
+    engine_names = stamp_engine_player_names(grid, index)
 
     for row in grid:
         if str(row.get("kind") or "") != "prop":
@@ -334,6 +415,7 @@ def attach_nba_prop_projections(
         "unsupported_market_rows": unsupported_market_rows,
         "unprojected_by_reason": dict(sorted(refused.items())),
         "edge_sign_by_side": dict(edge_side),
+        "engine_name_resolution": engine_names,
         "pct_projected": round(100.0 * attached / considered, 1) if considered else 0.0,
         "probability_fields": "empirical SmartSim hitProb ladder (cards_sim_detail), per line",
         "source_artifacts": index.source_files,

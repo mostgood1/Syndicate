@@ -688,7 +688,8 @@ def basketball_vs_position_text(row: Mapping[str, Any], opponent: str | None, *,
             return None
         from syndicate.features.shared.prop_evidence import common as C
 
-        name = str(row.get("player_name") or "")
+        # The engine's spelling where the board resolved one (lane nba-prop-engine-name-join).
+        name = str(row.get("engine_player_name") or row.get("player_name") or "")
         position = next((pos for known, pos in (table.get("player_positions") or {}).items() if C.names_match(known, name)), None)
         if position not in _BB_POSITION_WORD:
             return None

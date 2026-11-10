@@ -256,6 +256,36 @@ def player_stat_distributions_from_sim(sim_players: dict[str, Any] | None) -> tu
     return dist, display_names
 
 
+def _engine_name_raw_keys(attributed_players: dict[str, str], raw_player_props: dict[str, Any]) -> dict[str, str]:
+    """{attributed key: raw-feed key} for an NBA sim player whose own key has no book quotes, where the book
+    prints the name another way (`[2026-11-10, lane nba-prop-engine-name-join]`).
+
+    The attribution keys on the SIM's spelling ("herbert jones") and the raw feed on the book's ("herb jones"),
+    both `_canonical_player_key` (casefold only), so a split player's quotes were never attributed and his rows
+    were missing from this board altogether. Same rule as the Layer 2 board's `nba_player_identity`: the
+    engine's canonical key, accepted only when exactly one sim player of this game and exactly one unclaimed
+    raw key carry it. A raw key that is some attributed player's own exact key is never borrowed.
+    """
+    from syndicate.features.shared.nba_player_identity import engine_key
+
+    by_engine_attr: dict[str, list[str]] = {}
+    for key, player in attributed_players.items():
+        by_engine_attr.setdefault(engine_key(player), []).append(key)
+    by_engine_raw: dict[str, list[str]] = {}
+    for raw_key in raw_player_props:
+        if raw_key not in attributed_players:
+            by_engine_raw.setdefault(engine_key(raw_key), []).append(raw_key)
+    out: dict[str, str] = {}
+    for key, player in attributed_players.items():
+        if isinstance(raw_player_props.get(key), dict):
+            continue
+        canonical = engine_key(player)
+        raw_keys = by_engine_raw.get(canonical) or []
+        if canonical and len(by_engine_attr.get(canonical) or []) == 1 and len(raw_keys) == 1:
+            out[key] = raw_keys[0]
+    return out
+
+
 def basketball_market_board_rows_for_game(
     *,
     game_pk: Any,
@@ -413,10 +443,17 @@ def basketball_market_board_rows_for_game(
     attributed_players: dict[str, str] = {_canonical_player_key(player): player for player in recommended_props_by_entity}
     for normalized_entity, display_name in sim_display_names.items():
         attributed_players.setdefault(normalized_entity, display_name)
+    engine_fallback = (
+        _engine_name_raw_keys(attributed_players, raw_player_props)
+        if str(league or "").strip().lower() == "nba"
+        else {}
+    )
 
     covered_entity_stats: set[tuple[str, str]] = set()
     for normalized_entity, player in attributed_players.items():
         player_markets = raw_player_props.get(normalized_entity)
+        if not isinstance(player_markets, dict) and normalized_entity in engine_fallback:
+            player_markets = raw_player_props.get(engine_fallback[normalized_entity])
         if not isinstance(player_markets, dict):
             continue
         for stat_key, market in player_markets.items():

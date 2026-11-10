@@ -1445,12 +1445,31 @@ def _flag_out_player_props(grid: list, *, sport: str, selected_date: str) -> dic
         return {"out_player_props": {"feed_status": "absent", "rows_flagged": 0}}
     feed = out_players_for_date(source_root=root, date_str=selected_date)
     out = feed.get("out") or {}
+    # NBA: THE ENGINE'S NAME TOO (lane nba-prop-engine-name-join). `player_key` folds suffixes and periods but
+    # not the engine's nicknames, so a feed spelling "HERBERT JONES" (the official report's) never met a book's
+    # "Herb Jones". That miss was harmless while such a row had no model edge; the projection join now gives it
+    # one, so this flag must see the same resolution or an OUT player's line would carry an edge. Two extra
+    # lookups, both ONLY ADD a flag (which clears an edge): the stamped engine spelling, then the engine's
+    # canonical key when exactly one OUT player carries it. Measured 11-04..11-10: 0 rows needed it yet.
+    by_engine_key: dict[str, list] = {}
+    if sport == "nba":
+        from syndicate.features.shared.nba_player_identity import engine_key
+
+        for key, value in out.items():
+            by_engine_key.setdefault(engine_key(key), []).append(value)
     flagged = 0
+    flagged_via_engine_name = 0
     players: set[str] = set()
     for row in grid:
         if not isinstance(row, dict) or str(row.get("kind") or "") != "prop":
             continue
         entry = out.get(player_key(row.get("player_name")))
+        if not entry and by_engine_key:
+            hits = by_engine_key.get(engine_key(row.get("engine_player_name") or row.get("player_name"))) or []
+            entry = out.get(player_key(row.get("engine_player_name"))) if row.get("engine_player_name") else None
+            if not entry and len(hits) == 1:
+                entry = hits[0]
+            flagged_via_engine_name += bool(entry)
         if not entry:
             continue
         row["player_availability"] = {
@@ -1471,11 +1490,13 @@ def _flag_out_player_props(grid: list, *, sport: str, selected_date: str) -> dic
         "snapshot_date": feed.get("snapshot_date"),
         "out_players_on_feed": len(out),
         "rows_flagged": flagged,
+        "rows_flagged_via_engine_name": flagged_via_engine_name,
         "players": sorted(players),
     }
     print(
         f"[board_enrichment] OUT_PLAYER_PROPS_FLAGGED sport={sport} date={selected_date} "
-        f"snapshot={summary['snapshot_date']} out_on_feed={len(out)} rows={flagged} players={','.join(sorted(players)) or '<none>'}",
+        f"snapshot={summary['snapshot_date']} out_on_feed={len(out)} rows={flagged} via_engine_name={flagged_via_engine_name} "
+        f"players={','.join(sorted(players)) or '<none>'}",
         flush=True,
     )
     return {"out_player_props": summary}

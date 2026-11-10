@@ -140,7 +140,10 @@ class PropSubject:
         if not isinstance(row, dict):
             return None
         sport = str(row.get("sport") or "").strip().lower()
-        player = str(row.get("player_name") or "").strip()
+        # The ENGINE's spelling where the board resolved one (`engine_player_name`, NBA only, lane
+        # nba-prop-engine-name-join): every provider reads engine artifacts (sim, box scores, positions),
+        # and "Herb Jones" found 0 box games where "Herbert Jones" found 64 (fleet, 2026-11-10).
+        player = str(row.get("engine_player_name") or row.get("player_name") or "").strip()
         market = str(row.get("market") or "").strip()
         if not sport or not player or not market:
             return None
