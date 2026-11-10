@@ -458,6 +458,13 @@ def _decisive_sims(margin_dist: Any) -> int | None:
 # i.e. an old snapshot -- and is deliberately kept so that case stays
 # distinguishable from a genuinely absent projection.
 REASON_NO_LIVE_DISTRIBUTION = "live_resim_published_no_distribution_for_this_market"
+# THE PRODUCER PUBLISHED A MARGIN HISTOGRAM FOR DISPLAY ONLY (`#773`, lane nhl-live-puckline-display, 2026-11-10).
+# NHL's live re-sim carries `projection.displayMarginDist`, not `marginDist`: no NHL live puck-line estimator has
+# been graded, and `marginDist` is the key that opens spread pricing (`nhl/live_resim` module docstring). A spread
+# row whose only histogram is that one is refused by THIS name, not `REASON_NO_LIVE_DISTRIBUTION`, because a
+# number does exist and is on the Live column (`live_display_block`). It is the producer's declaration, read per
+# lane, not a sport switch here: publishing `marginDist` once graded is what lets the row price.
+REASON_MARGIN_DISPLAY_ONLY = "live_margin_published_for_display_only"
 REASON_NO_LINE = "row_carries_no_line_to_price_against"
 REASON_UNKNOWN_SIDE = "unrecognised_side_token"
 REASON_UNSUPPORTED_MARKET = "market_not_priced_from_a_live_distribution"
@@ -1057,6 +1064,10 @@ def live_gameline_from_lens(
             # to a wrong number.
             "total_runs_dist": projection.get("totalRunsDist") or {},
             "margin_dist": projection.get("marginDist") or {},
+            # A margin histogram the producer published for the LIVE COLUMN ONLY (NHL, `#773`). Never priced:
+            # pricing reads `margin_dist` above; this reaches `live_display_block` and names the refusal
+            # `REASON_MARGIN_DISPLAY_ONLY`. `{}` on every other producer and on an older NHL snapshot.
+            "margin_dist_display": projection.get("displayMarginDist") or {},
             "as_of": lens.get("liveStateAsOf"),
             # When the last score change the re-sim saw happened (NCAAB lanes, `#762`); judged by
             # `quote_behind_score_verdict`. Absent on other lanes and older snapshots: the state-fetch rule applies.
@@ -1349,6 +1360,9 @@ def live_display_block(
             dist, side = hit.get("margin_dist"), "home"
             if not dist and str(sport or "").strip().lower() in _RAW_MARGIN_DISPLAY_SPORTS:
                 dist = hit.get("margin_dist_raw")
+            if not dist:
+                # The producer's display-only margin (NHL puck line, `#773`). Last, so a priced histogram wins.
+                dist = hit.get("margin_dist_display")
         if dist:
             # `market_prob=None` stops the pricer after the model probability: nothing is priced here.
             prob = price_distribution_market(dist=dist, line=row.get("line"), side=side, market=market_key,
@@ -2233,8 +2247,25 @@ def attach_live_gamelines(
                     # from a global, so disabling MLB cannot silence WNBA or soccer.
                     sport=sport,
                 )
+            # A DISPLAY-ONLY HISTOGRAM IS NOT A PRICE (`#773`, NHL puck line). The row keeps the pricer's own
+            # no-distribution refusal -- no model probability, so `_apply_verdict` publishes no
+            # `live_model_prob_over` (the plausibility gate's input) and no edge -- under its own NAME, and the
+            # number goes to the Live column below, as the moneyline's does. Renamed, not rebuilt, so every other
+            # field on the verdict and the ledger record is exactly what the old producer's lane gave this row.
+            display_only_margin = (not dist and market_key in _SPREAD_MARKETS
+                                   and bool(hit.get("margin_dist_display"))
+                                   and verdict.get("withheld_reason") == REASON_NO_LIVE_DISTRIBUTION)
+            if display_only_margin:
+                verdict = {**verdict, "withheld_reason": REASON_MARGIN_DISPLAY_ONLY}
             _apply_verdict(row, projection, verdict, hit, coverage,
                            live_projected=verdict.get("model_prob"), sport=sport)
+            if (display_only_margin and isinstance(row, dict) and segment in _FULL_GAME_SEGMENTS
+                    and str(sport or "").strip().lower() in LIVE_DISPLAY_SPORTS
+                    and _display_lane_fresh(hit, build_now, sport)):
+                block = live_display_block(hit, row, sport=sport, basis=REASON_MARGIN_DISPLAY_ONLY)
+                if block is not None:
+                    row[LIVE_DISPLAY_KEY] = block
+                    _count_display(coverage)
             continue
 
         # THE LEG FRAME MUST MATCH. On a full-game row this is the raw home

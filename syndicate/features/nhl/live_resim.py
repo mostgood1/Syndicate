@@ -58,13 +58,26 @@ ONE MARKET FAMILY: the moneyline. The lane carries `modelHomeWinProb` and
 and `prob_std_err` derives the interval from `simsRun`. Nothing here relaxes
 `PRICEABLE_SIGMA`.
 
-THE REST-OF-GAME MARGIN AND TOTAL DISTRIBUTIONS ARE **NOT** PUBLISHED, though
-this re-sim has them in hand. `live_gameline_join` would price totals and
-puck lines off them the moment they appeared, and **no NHL live totals
-estimator has ever been graded**. `#499` is the precedent in the other
-direction: WNBA totals became priceable only after a 249-game backtest produced
-a measured interval. The projection block carries live MEANS for display and
-nothing a pricer reads.
+THE REST-OF-GAME MARGIN AND TOTAL DISTRIBUTIONS ARE **NOT** PUBLISHED FOR
+PRICING, though this re-sim has them in hand. `live_gameline_join` would price
+totals and puck lines off `totalRunsDist` / `marginDist` the moment they
+appeared, and **no NHL live totals or puck-line estimator has ever been
+graded**. `#499` is the precedent in the other direction: WNBA totals became
+priceable only after a 249-game backtest produced a measured interval. The
+projection block carries live MEANS for display and nothing a pricer reads.
+
+THE MARGIN HISTOGRAM RIDES AS `displayMarginDist`, FOR THE LIVE COLUMN ONLY
+(`#773`, lane nhl-live-puckline-display, 2026-11-10). Served 2026-11-09 NYR@EDM:
+moneyline 1 of 1 and totals 2 of 2 showed a live number, the puck line 0 of 1,
+refused `live_resim_published_no_distribution_for_this_market`. The join reads
+this key ONLY into `live_display_block`, which shows P(home covers) beside the
+row and prices nothing: the row is refused `live_margin_published_for_display_only`,
+with no edge. The same 200 sims as the moneyline; the sim is unchanged. Pricing
+a puck line needs this histogram GRADED first (the pregame puck line already
+ran ~4 pts under the fair on home -1.5 in 9 of 10, 2026-10-15, a possibly too
+narrow margin), and then publishing it as `marginDist`. The total histogram is
+not published at all: the totals row's live number is the mean, and nothing
+would read a display-only total.
 
 **NO FALLBACK TO THE PREGAME PROBABILITY, EVER** (`#414`). Every path that
 cannot produce a live probability returns an `NhlResimRefusal` with a named
@@ -413,7 +426,22 @@ def resim_live_game(
         "sims_run": len(margins),
         "home_margin_mean": sum(margins) / n,
         "total_mean": sum(totals) / n,
+        # THE DRAWS, not just their mean: `{str(home - away): count}`, HOME-POSITIVE, the shape
+        # `price_distribution_market` and `live_display_block` read. With the shootout on (the calibrated
+        # profile's setting) it credits the winner one goal (`engine.simulate_with_lineups`), so a final
+        # margin is never 0, which is how books settle a puck line.
+        # Published for DISPLAY ONLY -- see the module docstring and `build_game_lens`.
+        "margin_dist": _histogram(margins),
     }
+
+
+def _histogram(values: Sequence[int]) -> dict[str, int]:
+    """`{value: count}` over integer draws, keyed by str so it survives JSON (NFL's and NCAAF's shape)."""
+    out: dict[str, int] = {}
+    for value in values:
+        key = str(int(value))
+        out[key] = out.get(key, 0) + 1
+    return out
 
 
 def build_game_lens(
@@ -453,11 +481,16 @@ def build_game_lens(
         "liveStateAsOf": live_state_as_of or state.as_of,
         # DISPLAY ONLY. `live_gameline_join` reads `projection.total` and
         # `projection.homeMargin` for display and prices NEITHER: totals and
-        # puck lines are priced from distributions this lane deliberately does
-        # not carry, because no NHL live totals estimator has been graded.
+        # puck lines are priced from `totalRunsDist` / `marginDist`, which this
+        # lane deliberately does not carry, because no NHL live totals or
+        # puck-line estimator has been graded.
         "projection": {
             "homeMargin": result["home_margin_mean"],
             "total": result["total_mean"],
+            # THE PUCK LINE'S LIVE NUMBER, FOR DISPLAY (`#773`). NOT `marginDist`: that key opens
+            # pricing. The join reads this one only into the Live column and refuses the row
+            # `live_margin_published_for_display_only`. `{}` from a result without draws reads as absent.
+            "displayMarginDist": result.get("margin_dist") or {},
             "homeScore": state.home_score,
             "awayScore": state.away_score,
             "period": state.period,
