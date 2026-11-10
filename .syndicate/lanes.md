@@ -749,7 +749,7 @@ death, never life — do not invert it.
 - STATUS 2026-11-10 9:39 AM CST (15:39Z): FIX ON MAIN `97cb5d477`, NOT LOADED (the user's decision). Measurement in Hypothesis above and todo #774.
   - Code default ON: `SYNDICATE_COLLEGE_LIVE_RESIM_PRIOR_DATE_HOURS` absent = 4 h, "0" = off. A fleet ff + a live-odds-worker restart (its own recycle or a claimed TERM) loads it; no env change.
   - Tests: `tests/test_ncaab_live_resim_midnight.py` 15 passed (off != on through the env; the board's own index builder on the carryover date indexes the lane); 5 source mutations each caught; 364 passed across 15 college live / join / chip / evidence files.
-  - OWED after a load: the next night with a D1 game live at 00:00 CT (ESPN: USC @ CAL tips 04:00Z 11-11). MET if the first tick after 06:00Z reads `prior_live>=1 prior_resimmed>=1` and the carryover date's NCAAB LIVE_GAMELINE_JOIN reads `games_in_snapshot>=1` with `projected>0` until the game ends.
+  - OWED after a load: the next night with a D1 game live at 00:00 CT (ESPN: USC @ CAL tips 04:00Z 11-12 = 10:00 PM CST Wed 11-11; corrected 19:50Z 11-10, it was written as 11-11 UTC. Tonight the latest D1 tip is MONT @ SF 03:00Z 11-11). MET if the first tick after 06:00Z 11-12 reads `prior_live>=1 prior_resimmed>=1` and the carryover date's NCAAB LIVE_GAMELINE_JOIN reads `games_in_snapshot>=1` with `projected>0` until the game ends.
   - Follow-ups, not this lane: NBA's tick has the same date choice (2 of 7 slates crossed, +21.1 / +4.9 min); `live_evidence_log` files prior-date rows under the new date (lane live-evidence-log: read `slateDate`).
 - Blocked by: none
 
