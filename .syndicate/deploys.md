@@ -58415,3 +58415,26 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **RC46's live exposure was nil:** session watcher `wait_first_live.sh` read live-odds-worker's log every 10 min from the load to 22:54:40Z and found no `NCAAB_LIVE_RESIM_TICK` with `live>=1 resimmed>=1`; the post-revert ticks had `live=0` until the slate's first live game at 23:02:48Z, 6 min after the up. So no live NCAAB spread, moneyline or total was priced on RC46. Pregame: the 11-10 and 11-11 pregame sim files were written on RC46 between 07:50Z and the re-sim above (pregame totals are served raw from the sim; the replay's tip read had totals tied, mean -0.32 +- 0.25).
 - Measured: the revert's config is the reading above (MET). The load's registered EFFECT reading (07:49:30Z entry) still runs: it is a counterfactual replay of the 11-10 slate's completed games on both configs, so it does not need RC46 live (session watcher `wait_morning.sh`, deadline 11-11 18:00Z). The live split (`ncaab_live_totals_bias.py` at the load) has NO RC46 population (0 live NCAAB rows on RC46); its scratch copy's epoch E5_rc46 now ends at 22:56:28Z.
 - **re-load:** `python3 ~/bball_iv/k_scan/env_load_k.py --variant rc46` (refuses unless the value is exactly the 7 fields above), then the same drained down/up. Not planned: it needs a new decision on new evidence.
+
+## 2026-11-10 23:16:32Z (5:16 PM CST) -- todo #779 WEB LOADED: fleet ff `47450ce07` -> `0290d505a` + `reload-web` (lane `layer2-lookahead-live-dedupe`) -- **MET**
+
+- **change:** `pipeline/intelligence_state._drop_lookahead_duplicate_game_cards`, inside `_layer2_fallback_recommendations`. The served combined board drops a look-ahead board's copy of an earlier date's game when an earlier board carries that game. Display only: no shortlist, plan or order reads these cards.
+- **gates:** web claim, holder `layer2-lookahead-live-dedupe`, acquired 23:15:49Z (rc 0). All three claims had been held by `ncaab-score-effect-load` from 22:50:33Z for its RC46 revert. I waited for the release (23:15:40Z) and did not force. Fleet preflight ran from a worktree at origin/main `633a57501`, with `--target fleet --target-commit 0290d505a`: **CLEAR** (exit 0) at 23:16:19Z.
+  - Expectations: `lookahead_live_rows` 2 -> 0, `lookahead_blank_edge_rows` 2 -> 0, `live_games` 2 -> 2.
+  - Baseline read 23:16:08Z.
+- **load:**
+  - `git merge --ff-only 0290d505a` at **23:16:32.525Z**: HEAD `47450ce07` -> `0290d505a`, 16 commits. Runtime files: `pipeline/intelligence_state.py` and `scripts/local_watchdog.py`, plus tests.
+  - `local_production.py reload-web`: HUP to master 372071. New workers 378836 / 378837 up at +2.0 s, healthz 200, 0 failures, done 23:16:34.631Z.
+  - refresh-worker 372140 and live-odds-worker 372141 were not restarted. They load `0290d505a` at their next recycle (display-only code for them).
+- **ride-along `ebebe64bc`** (`local_watchdog`: recover on the first failing check after a WSL VM restart): dry-run from `~/Syndicate` at 23:16:56Z read `recover=false`, reason `supervisor up`, `attempts_last_hour` 0. Its one `fail` finding is unrelated to this load: Kalshi `RECONCILE_SINGLE_READ_FAILED` http_404 on one venue order id, 22:56-22:57Z.
+- **before** (served `POST /api/intelligence/query`, the board page's body; scratch `measure.py`; live GAME rows by `source_board_date`):
+  - 23:06:19Z, first live look-ahead (Florida @ Florida St, tip 23:00Z): 15 live game rows. 3 came from the 11-11 board for an 11-10 game, and **all 3 had a blank live number with a model edge** (4.25 / 5.00 / 1.11). 2 of today's own rows were also blank with an edge, because the 11-10 build at 22:51Z predates the tip.
+  - Fresh baseline 23:16:08Z: 27 live game rows. Look-ahead 2, both blank with an edge (4.25 / 5.00). Own rows 25 of 25 with a live number. 167 games on the board; 121 look-ahead-copy rows on the served board, live or not.
+- **after** 23:16:52Z (18 s after the reload):
+  - 27 live game rows, **look-ahead 0**, 27 of 27 with a live number, **blank with a model edge 0**. Live games 2, unchanged.
+  - `layer2_lookahead_rows_dropped=325` (`ncaab|2026-11-11` 312, `wncaab|2026-11-11` 13).
+  - Look-ahead-copy rows on the served board 121 -> 0.
+  - Games 167 -> 188, **0 lost** (21 new games from the 23:10:19Z state build). All 52 games that had a look-ahead copy are still served from their own date.
+- **verify: MET.** `lookahead_live_rows` 2 -> 0, `lookahead_blank_edge_rows` 2 -> 0, `live_games` 2 -> 2. The served payload's `layer2_lookahead_rows_dropped` is the discriminator: absent before (None), 325 after.
+- **not in this load:** the worker half, `select_shortlist`'s lower date bound (`9fee4160d`, on main, user decision "Yes, fix it too"). It gets its own refresh-worker deploy with its own before/after. Baseline 22:57Z: the 11-11 shortlist (22:36:43Z build) held 287 of 1,480 rows on 62 11-10 games; its plans held 0 such positions.
+- **revert:** revert `0290d505a` on main, ff the fleet to that revert, then `reload-web`.
