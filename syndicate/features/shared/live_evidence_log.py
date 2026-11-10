@@ -273,19 +273,47 @@ def _default_reader(root: Path) -> Callable[[str], Any]:
 
 
 class Collector:
-    """One collector pass per call. Holds only the last `t` per sport and the non-fresh lane signatures."""
+    """One collector pass per call. Holds only the last `t` per sport and the non-fresh lane signatures.
+
+    Each new tick also hands the snapshot to `live_prop_evidence` (lane `live-props-evidence`, 2026-11-10), which
+    keeps the games' `liveProps` in `<date>.props.jsonl`. `collect_once` returns LANE rows only, as before; the props
+    rows of the last pass are in `last_props` (`sport -> (rows, bytes)`)."""
 
     def __init__(self, *, root: Optional[Path] = None, read: Optional[Callable[[str], Any]] = None,
-                 sports: Optional[Mapping[str, str]] = None) -> None:
+                 sports: Optional[Mapping[str, str]] = None, props: Optional[bool] = None) -> None:
         self.root = _data_root(root)
         self.read = read or _default_reader(self.root)
         self.sports = dict(sports or LIVE_SNAPSHOTS)
         self.last_t: dict[str, str] = {}
         self.seen: dict[str, dict[tuple, tuple]] = {}
+        if props is None:
+            from syndicate.features.shared import live_prop_evidence
+
+            props = live_prop_evidence.enabled()
+        self.props_on = bool(props)
+        self.prop_seen: dict[str, dict[tuple, str]] = {}
+        self.last_props: dict[str, tuple[int, int]] = {}
+
+    def _collect_props(self, sport: str, snapshot: Mapping[str, Any], date_str: str, observed_at: str) -> None:
+        from syndicate.features.shared import live_prop_evidence
+
+        seen = self.prop_seen.setdefault(sport, {})
+        if len(seen) > 20_000:
+            seen.clear()  # a bound: the worst case is one repeated props row per game
+        try:
+            rows, updates = live_prop_evidence.snapshot_prop_rows(sport, snapshot, observed_at=observed_at, seen=seen)
+            count, nbytes = live_prop_evidence.append_rows(sport, date_str, rows, root=self.root)
+        except Exception as exc:  # noqa: BLE001 -- the props half can never stop the lane half or the worker
+            print(f"[live_evidence] PROPS_FAILED sport={sport} {type(exc).__name__}: {str(exc)[:120]}", flush=True)
+            return
+        seen.update(updates)
+        if count:
+            self.last_props[sport] = (count, nbytes)
 
     def collect_once(self, *, now: Optional[datetime] = None) -> dict[str, int]:
         observed_at = (now or datetime.now(timezone.utc)).isoformat()
         written: dict[str, int] = {}
+        self.last_props = {}
         for sport, name in self.sports.items():
             try:
                 snapshot = self.read(name)
@@ -309,6 +337,8 @@ class Collector:
             except Exception as exc:  # noqa: BLE001
                 print(f"[live_evidence] WRITE_FAILED sport={sport} {type(exc).__name__}: {str(exc)[:120]}", flush=True)
                 continue
+            if self.props_on:
+                self._collect_props(sport, snapshot, date_str, observed_at)
             if t is not None:
                 self.last_t[sport] = t
         return {k: v for k, v in written.items() if v}
@@ -325,6 +355,11 @@ def _loop(collector: Collector, interval: float) -> None:
             if written:
                 print("[live_evidence] TICK rows=" + str(sum(written.values())) + " by_sport="
                       + json.dumps(written, separators=(",", ":"), sort_keys=True), flush=True)
+            if collector.last_props:
+                props = {sport: list(v) for sport, v in collector.last_props.items()}
+                print(f"[live_evidence] PROPS rows={sum(v[0] for v in props.values())} "
+                      f"bytes={sum(v[1] for v in props.values())} by_sport="
+                      + json.dumps(props, separators=(",", ":"), sort_keys=True), flush=True)
         except Exception as exc:  # noqa: BLE001 -- the log can never stop a worker
             print(f"[live_evidence] TICK_FAILED {type(exc).__name__}: {str(exc)[:160]}", flush=True)
         time.sleep(max(1.0, interval - (time.monotonic() - started)))
@@ -339,10 +374,14 @@ def start_live_evidence_loop(env: Optional[Mapping[str, str]] = None) -> bool:
     if _LOOP_THREAD is not None and _LOOP_THREAD.is_alive():
         return False
     interval = interval_seconds(env)
-    _LOOP_THREAD = threading.Thread(target=_loop, args=(Collector(), interval), name="syndicate-live-evidence",
+    from syndicate.features.shared import live_prop_evidence
+
+    collector = Collector(props=live_prop_evidence.enabled(env))
+    _LOOP_THREAD = threading.Thread(target=_loop, args=(collector, interval), name="syndicate-live-evidence",
                                     daemon=True)
     _LOOP_THREAD.start()
-    print(f"[live_evidence] LOOP_STARTED interval_s={interval:g} sports={','.join(LIVE_SNAPSHOTS)}", flush=True)
+    print(f"[live_evidence] LOOP_STARTED interval_s={interval:g} sports={','.join(LIVE_SNAPSHOTS)} "
+          f"props={'on' if collector.props_on else 'off'}", flush=True)
     return True
 
 
