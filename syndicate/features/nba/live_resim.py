@@ -36,6 +36,31 @@ RUNS ON A WORKER. NEVER IN A REQUEST HANDLER.
 --------------------------------------------------------------------------
 
 `build_live_lens_snapshot` is a simulation and calls `refuse_if_compute_in_request_path`.
+
+--------------------------------------------------------------------------
+A GAME STILL LIVE AT MIDNIGHT CENTRAL (#776, lane nba-live-resim-midnight; the college fix is #774)
+--------------------------------------------------------------------------
+
+The loop's tick date is the Central date, and at 00:00 CT it read only the NEW date's scoreboard, so a West
+Coast game still going at midnight was never re-simmed again. Measured 2026-11-10 on the fleet's own history
+(`live_resim_history`, every regular-season slate 10-20..11-09 = 20; 11-03 had no games) and each slate checked
+against ESPN's last play: 4 of 20 had regulation or overtime play after the roll -- POR @ LAL 10-27 (Q3 4:05 at midnight CDT, 56.7 min to the end), MIA @ LAC 11-04
+(Q4 0:02.7 then overtime, 21.1 min), POR @ LAL 11-06 (Q4 0:14.9, 4.9 min), LAL @ LAC 10-28 (Q4 1:32, 2.6 min). On
+the fleet logs, the joins before the 11-05 and 11-07 rolls priced 25-76 NBA game-line rows; every join after it
+read `games_in_snapshot=0` (0 projected, `no_live_gameline_projection` on 103-127 rows) until the game ended.
+
+So the LOOP's tick (no explicit date) re-sims the previous date's in-progress games first, for
+`SYNDICATE_NBA_LIVE_RESIM_PRIOR_DATE_HOURS` after midnight Central (absent = 4 h, "0" = off, capped at 12), on
+THAT date's persisted inputs and props file, and publishes them in the same snapshot with `slateDate` on each row.
+The board's game-line join and the chips key this file by event id / team names, never by its `date`, so the
+carryover board finds the lane with no reader change. Each date's build gets its OWN rows of the last snapshot as
+`previous` (`previous_for_slate`), so stalest-first, the bounded carry and remembered lines run across the roll.
+Today's slate gets the budget they leave. A quiet night costs one scoreboard fetch per tick, and none once every
+event on it is final (`_PRIOR_SLATE_FINAL`). Tick line, inside the window only: `prior_date= prior_games=
+prior_resimmed= prior_carried= prior_skip=`; `games=`, `resimmed=` and `carried=` include those games. The tick
+history keeps every row in the TICK's file, as the live evidence log does, and marks a previous date's row
+`slate_date`. NOT covered: live PROPS of that game -- the board reads them from the page lens, which the live-lens
+loop builds for the new date only (`nba/live_lens._attach_native_resim`).
 """
 
 from __future__ import annotations
@@ -1364,6 +1389,121 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
     }
 
 
+# ------------------------------------------------------------------------------------- the midnight roll (#776)
+# Module docstring, "A GAME STILL LIVE AT MIDNIGHT CENTRAL", has the measurement.
+PRIOR_DATE_HOURS_ENV = "SYNDICATE_NBA_LIVE_RESIM_PRIOR_DATE_HOURS"
+DEFAULT_PRIOR_DATE_HOURS = 4.0
+MAX_PRIOR_DATE_HOURS = 12.0
+# The key a previous date's game row carries in today's snapshot, so a reader that files rows by date can tell it
+# from today's rows.
+SLATE_DATE_KEY = "slateDate"
+# (league, date) whose ESPN scoreboard read every event final: nothing on it can go live again, so later ticks in
+# the window skip the fetch. Per process; a restart re-reads it once.
+_PRIOR_SLATE_FINAL: set[tuple[str, str]] = set()
+
+
+def prior_date_hours(env: Optional[Mapping[str, str]] = None) -> float:
+    """Hours after midnight Central during which the loop's tick also re-sims the previous date's in-progress
+    games. Absent, unparseable, negative or not finite = DEFAULT_PRIOR_DATE_HOURS; "0" turns it off; capped at
+    MAX_PRIOR_DATE_HOURS."""
+    raw = str((env if env is not None else os.environ).get(PRIOR_DATE_HOURS_ENV, "") or "").strip()
+    try:
+        value = float(raw) if raw else DEFAULT_PRIOR_DATE_HOURS
+    except ValueError:
+        return DEFAULT_PRIOR_DATE_HOURS
+    if not math.isfinite(value) or value < 0:
+        return DEFAULT_PRIOR_DATE_HOURS
+    return min(value, MAX_PRIOR_DATE_HOURS)
+
+
+def prior_slate_date(now: Optional[datetime] = None, *, hours: Optional[float] = None) -> Optional[str]:
+    """The previous Central date while `now` is less than `hours` past midnight Central; else None (always None
+    when `hours` is 0). Elapsed time is measured in UTC, so a DST night counts real hours."""
+    from datetime import timedelta
+
+    from syndicate.features.shared.timezone import CENTRAL_TIMEZONE
+
+    window = prior_date_hours() if hours is None else float(hours)
+    if window <= 0:
+        return None
+    central = (now or datetime.now(timezone.utc)).astimezone(CENTRAL_TIMEZONE)
+    midnight = central.replace(hour=0, minute=0, second=0, microsecond=0)
+    if central.astimezone(timezone.utc) - midnight.astimezone(timezone.utc) >= timedelta(hours=window):
+        return None
+    return (central.date() - timedelta(days=1)).isoformat()
+
+
+def previous_for_slate(previous: Optional[Mapping[str, Any]], date_str: str) -> Optional[dict[str, Any]]:
+    """The last snapshot cut to ONE slate's rows, shaped as that slate's own snapshot (`date` = `date_str`) so
+    `_prior_live_rows` and `_prior_posted_lines` read it unchanged. A row belongs to its `slateDate`, else to the
+    snapshot's `date`: the first tick after the roll hands the previous date the whole pre-midnight snapshot, a
+    later tick hands it the rows stamped with it, and today never sees them. Every other key is the snapshot's own.
+    None when there is no snapshot."""
+    if not isinstance(previous, Mapping):
+        return None
+    snap_date = str(previous.get("date") or "")
+    games = [g for g in previous.get("games") or []
+             if isinstance(g, Mapping) and str(g.get(SLATE_DATE_KEY) or snap_date) == str(date_str)]
+    return {**previous, "date": str(date_str), "games": games}
+
+
+def prior_slate_snapshot(prior_date: str, *, fetch_scoreboard: Optional[Callable[..., Any]] = None,
+                         league: str = LEAGUE, **kwargs: Any) -> tuple[Optional[dict[str, Any]], str]:
+    """(the previous date's snapshot, "") when a game on it is still in progress; else (None, why it was skipped).
+    The build is `build_live_lens_snapshot` on THAT date -- its persisted engine inputs, its props file -- fed the
+    scoreboard read here, so a quiet night costs one scoreboard fetch and nothing else. `kwargs` go to the build
+    (the caller passes `previous` already cut to this slate)."""
+    from syndicate.features.shared import basketball_pbp as pbp
+
+    key = (str(league).lower(), str(prior_date))
+    if key in _PRIOR_SLATE_FINAL:
+        return None, "slate_final"
+    fetch = fetch_scoreboard or pbp.fetch_scoreboard
+    try:
+        board = fetch(league, str(prior_date).replace("-", ""))
+    except Exception as exc:  # noqa: BLE001 -- named on the tick line; today's slate still runs
+        return None, f"scoreboard_fetch_failed:{type(exc).__name__}"
+    states = [str(ev.get("status_state") or ev.get("state") or "").lower() for ev in pbp.scoreboard_events(board)]
+    if "in" not in states:
+        if states and all(state == "post" for state in states):
+            _PRIOR_SLATE_FINAL.add(key)
+            return None, "slate_final"
+        return None, "none_in_progress"
+    snapshot = build_live_lens_snapshot(str(prior_date), fetch_scoreboard=lambda *_a, **_k: board, league=league,
+                                        **kwargs)
+    return snapshot, ""
+
+
+def merge_prior_slate(snapshot: Mapping[str, Any], prior: Mapping[str, Any]) -> dict[str, Any]:
+    """Today's snapshot with the previous date's games in front, each stamped `slateDate`. The refusal and carry
+    counts and the tick's cost add up; `priorSlate` keeps the previous date's own. An event on both dates'
+    scoreboards keeps today's row."""
+    out = dict(snapshot)
+    today_games = list(snapshot.get("games") or [])
+    today_ids = {str(g.get("event_id")) for g in today_games if isinstance(g, Mapping)}
+    prior_date = str(prior.get("date") or "")
+    prior_games = [{**g, SLATE_DATE_KEY: prior_date} for g in prior.get("games") or []
+                   if isinstance(g, Mapping) and str(g.get("event_id")) not in today_ids]
+    out["games"] = prior_games + today_games
+    out["refusalsByReason"] = _refusals_by_reason(out["games"])
+    out["carriedForward"] = sum(1 for g in out["games"] for lane in g.get("gameLens") or [] if lane.get("carriedForward"))
+    out["elapsedSeconds"] = round(float(snapshot.get("elapsedSeconds") or 0.0) + float(prior.get("elapsedSeconds") or 0.0), 2)
+    out["priorSlate"] = {"date": prior_date, "games": len(prior_games),
+                         "resimmed": _fresh_lanes(prior_games),
+                         "carriedForward": sum(1 for g in prior_games for lane in g.get("gameLens") or []
+                                               if lane.get("carriedForward")),
+                         "elapsedSeconds": prior.get("elapsedSeconds"),
+                         "refusalsByReason": dict(prior.get("refusalsByReason") or {}),
+                         "dropped_also_today": len(prior.get("games") or []) - len(prior_games)}
+    return out
+
+
+def _fresh_lanes(games: Sequence[Mapping[str, Any]]) -> int:
+    """Lanes re-simmed THIS tick: a carried lane was not."""
+    return sum(1 for g in games for lane in g.get("gameLens") or []
+               if lane.get("source") == LIVE_RESIM_LENS_SOURCE and not lane.get("carriedForward"))
+
+
 def _lane_row(event_id: str, home: str, away: str, facts: Optional[ResumeFacts], result: Any,
               match: Optional[Mapping[str, Any]] = None, *, league: str = LEAGUE) -> dict[str, Any]:
     home_name = team_name(league, home)
@@ -1504,6 +1644,10 @@ def history_rows(snapshot: Mapping[str, Any]) -> list[dict[str, Any]]:
             })
             if lane.get("carriedForward"):
                 rows[-1]["carried_forward"] = True
+            if g.get(SLATE_DATE_KEY):
+                # #776: a previous date's game re-simmed after midnight. The row stays in the TICK's file under the
+                # tick's `date` (the live evidence log files it the same way); this says which slate it belongs to.
+                rows[-1]["slate_date"] = g.get(SLATE_DATE_KEY)
     return rows
 
 
@@ -1520,11 +1664,20 @@ def append_tick_history(snapshot: Mapping[str, Any], date_str: str, *, root: Opt
 
 
 def run_live_resim_tick(date_str: Optional[str] = None, **kwargs: Any) -> dict[str, Any]:
-    """One tick: build, size-check, write. Returns a small status dict (also printed, prefix NBA_LIVE_RESIM_TICK)."""
-    from syndicate.features.shared.refresh_state_store import write_json_file
-    from syndicate.features.shared.timezone import central_today_iso
+    """One tick: build, size-check, write. Returns a small status dict (also printed, prefix NBA_LIVE_RESIM_TICK).
 
-    date_str = date_str or central_today_iso()
+    With no `date_str` (the loop), for `prior_date_hours()` after midnight Central the previous date's in-progress
+    games are re-simmed first and published in the same snapshot (`merge_prior_slate`, #776); today's slate gets
+    the budget they leave. An explicit `date_str` re-sims that date only, as before."""
+    from syndicate.features.shared.refresh_state_store import write_json_file
+    from syndicate.features.shared.timezone import CENTRAL_TIMEZONE
+
+    prior_date = None
+    if not date_str:
+        # ONE clock read for both dates, so a tick that straddles 00:00 CT cannot pair the new day with no window.
+        clock_now = kwargs.get("now") or datetime.now(timezone.utc)
+        date_str = clock_now.astimezone(CENTRAL_TIMEZONE).date().isoformat()
+        prior_date = prior_slate_date(clock_now)
     started = time.monotonic()
     if "previous" not in kwargs:
         # The last snapshot this loop wrote -- what the budget-fairness order and the carry read. Unreadable is
@@ -1535,21 +1688,42 @@ def run_live_resim_tick(date_str: Optional[str] = None, **kwargs: Any) -> dict[s
             kwargs["previous"] = read_json_file(live_lens_snapshot_path())
         except Exception:  # noqa: BLE001
             kwargs["previous"] = None
-    snapshot = build_live_lens_snapshot(date_str, **kwargs)
+    previous = kwargs.pop("previous")
+    # Each date's build sees only its own rows of the last snapshot. For a snapshot with no `slateDate` row (every
+    # snapshot before #776, and every one outside the window) this is exactly what the build read before.
+    build_kwargs = {**kwargs, "previous": previous_for_slate(previous, date_str)}
+    prior, prior_skip = None, ""
+    if prior_date and prior_date != date_str:
+        try:
+            prior, prior_skip = prior_slate_snapshot(prior_date, **{**kwargs,
+                                                                    "previous": previous_for_slate(previous, prior_date)})
+        except Exception as exc:  # noqa: BLE001 -- the previous date must never cost today's slate its tick
+            prior, prior_skip = None, f"error:{type(exc).__name__}"
+            print(f"NBA_LIVE_RESIM_PRIOR_ERROR date={prior_date} {type(exc).__name__}: {str(exc)[:300]}", flush=True)
+        if prior is not None:
+            budget = float(build_kwargs.get("budget_seconds", DEFAULT_BUDGET_SECONDS))
+            build_kwargs["budget_seconds"] = max(0.0, budget - float(prior.get("elapsedSeconds") or 0.0))
+    snapshot = build_live_lens_snapshot(date_str, **build_kwargs)
+    if prior is not None:
+        snapshot = merge_prior_slate(snapshot, prior)
     snapshot, size = fit_snapshot_to_budget(snapshot)
     status = {
         "date": date_str,
         "games": len(snapshot.get("games") or []),
         # FRESH lanes only: a carried lane was not re-simmed this tick.
-        "resimmed": sum(1 for g in snapshot.get("games") or []
-                        for lane in g.get("gameLens") or []
-                        if lane.get("source") == LIVE_RESIM_LENS_SOURCE and not lane.get("carriedForward")),
+        "resimmed": _fresh_lanes(snapshot.get("games") or []),
         "carried": snapshot.get("carriedForward") or 0,
-        "refusals": snapshot.get("refusalsByReason") or {},
-        "bytes": size,
-        "written": False,
-        "elapsed_s": None,
     }
+    if prior_date:
+        # #776: only inside the window after midnight Central, and before `refusals` so every field a reader already
+        # parses keeps its place. The counts above already include these games.
+        prior_counts = snapshot.get("priorSlate") or {}
+        status.update({"prior_date": prior_date, "prior_games": int(prior_counts.get("games") or 0),
+                       "prior_resimmed": int(prior_counts.get("resimmed") or 0),
+                       "prior_carried": int(prior_counts.get("carriedForward") or 0),
+                       "prior_skip": prior_skip or "-"})
+    status.update({"refusals": snapshot.get("refusalsByReason") or {}, "bytes": size, "written": False,
+                   "elapsed_s": None})
     if size <= MAX_SNAPSHOT_BYTES:
         write_json_file(live_lens_snapshot_path(), snapshot)
         status["written"] = True
