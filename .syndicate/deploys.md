@@ -58244,3 +58244,28 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - (2) In Redis `live/nhl_live_lens.json`, the `live_resim` lanes carry `projection.displayMarginDist`, summing to `simsRun`, with no `marginDist` / `totalRunsDist`.
   - (3) Served `/api/intelligence/query`: live NHL `spreads` / `spreads_alt` rows carry `live_model_probability`, home + away = 1 on one line, and `model_edge_pct` / `edge_vs_market_pct` None on every one of them.
 - **revert:** `git revert efccead01` on main, ff the fleet to that SHA, then claimed TERMs of both workers. Either restart alone restores the old board behaviour. There is no env switch.
+
+## 2026-11-10 17:06:54Z (11:06 AM CST) -- DEPLOY `c468657e5` (`#775` NBA prop rows: the book's player name resolved to the engine's once, at the NBA prop join) to web + refresh-worker (live-odds-worker at its recycle): **LOADED; mechanism MET; served effect owed tonight** (lane `nba-prop-engine-name-join`, user "Yes, load it" in this session; the coordinator relayed the same yes from session c3e396a7)
+- **Range `efccead01..c468657e5`, 1 commit, mine.**
+  - Runtime files (vendor/ and engines/ included in the diff): exactly the 8 of `c468657e5`. 0 of the fleet's 14 dirty paths overlap.
+  - ff to my SHA only, so main's later code stayed off the fleet (`eeb2461c7` #776, `adddd1f18`, `53f8a0b26` #777).
+  - The fleet was at `efccead01` because lane `nhl-live-puckline-display` loaded it under its own claims, from ~16:08Z until they freed at 16:44:01Z. I waited for that release; the fleet HEAD was not touched under their claim.
+- **Claims:** web, refresh-worker and live-odds-worker, holder `nba-prop-engine-name-join`, from 16:44:28Z. web + live-odds-worker released 16:45:1xZ, refresh-worker at this entry.
+- **Baseline (16:44:41Z):** `fleet_checkout_head` efccead01; 0 `NBA_PROP_ENGINE_NAME` lines in the refresh-worker log; pids refresh-worker 296002, live-odds-worker 294524, web 27364/292863/295373.
+- **Preflight `--target fleet --target-commit c468657e5`, all with `--expect`/`--baseline`:**
+  - web and live-odds-worker CLEAR at 16:44:4xZ ("only infrastructure processes").
+  - refresh-worker read `TOO_SOON` (the NHL lane's 16:28:04Z restart was inside the 25-min spacing; not overridden), then HOLD on a board build from 16:53Z.
+  - Drained (`check_deploy_safety --drain --drain-owner nba-prop-engine-name-join`) at ~17:04Z. The worker acked and went idle about 1 min later, and the loop's next preflight read CLEAR.
+- **Deploy:**
+  - `git merge --ff-only c468657e5` at 16:44:56.283Z; `def stamp_engine_player_names` present.
+  - `reload-web` 16:44:5xZ: 2.0 s, 0 failures, healthz 200; workers 298522/298523.
+  - refresh-worker: CLEAR 17:05:11Z with 0 live children. TERM pid 296002 at 17:05:11.704Z; respawned as pid 306439 at 17:05:20Z on `c468657e5`. Drain cleared 17:05:30Z on the new pid.
+  - live-odds-worker: NOT restarted. Its only use of this change is the display-only NBA cards-page board, which loads at its next uptime recycle. That avoids killing its NBA pregame sims.
+- **expect / measured:**
+  - `fleet_checkout_head` -> c468657e5: **MET** at 16:44:56Z.
+  - Web workers respawned: **MET** (298522/298523, after the ff).
+  - refresh-worker respawned on the new code: **MET**. 17:05:36.702Z `OUT_PLAYER_PROPS_FLAGGED sport=nba ... via_engine_name=0`, a field only `c468657e5` emits, 16 s after boot.
+  - The same build's `PREGAME_PROJECTION_JOIN sport=nba considered=5663 projected=3944`. Tracebacks since boot: 0 (read 17:05:52Z).
+  - `NBA_PROP_ENGINE_NAME`: **NOT YET, as expected.** Tonight's only split-name book player is "Derrick Jones" (LAC, 19 rows), and LAC's sim is not built yet. At 17:06Z the window held 11-09's 8 games and one 11-10 game (BOS@PHI). No resolution was possible, so 0 stamped rows is correct, not a miss.
+- **Owed, verification (the lane's served reading):** once tonight's LAC sim builds, the served "Derrick Jones" NBA prop rows should carry `engine_player_name` "Derrick Jones Jr." plus `sim_projection`, `model_edge_pct`, `player_side` and `headshot_url`. The refresh-worker log should read `NBA_PROP_ENGINE_NAME alias_rows>0 ambiguous_rows=0`. Expected size (findings section 6): ~19 grid rows tonight; 60-240 on a slate with more split players.
+- **Revert:** `git revert c468657e5` on main, ff the fleet to that SHA, `reload-web`, and a claimed refresh-worker TERM. There is no env switch.

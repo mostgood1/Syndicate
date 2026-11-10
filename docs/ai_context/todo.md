@@ -103,6 +103,7 @@
   - **WNBA** `wnba/live_resim.run_live_resim_tick` has the same date choice. It is off-season, and its re-sim is off.
 
 ### `#775` — **NBA PROP ROWS FOR BOOK-NAMED PLAYERS THE ENGINE SPELLS DIFFERENTLY (Herb/Herbert Jones, Paul Reed Jr, C.J./CJ McCollum, Carlton/Bub Carrington, R.J./RJ Barrett, A.J./AJ Green, Derrick Jones Jr., Ron/Ronald Holland II) GET THE PREGAME MODEL, EDGE, FACE, SIDE AND RECENT FORM: ONE RESOLUTION STAMPED AT THE NBA PROP JOIN. FIX ON MAIN `c468657e5`, NOT LOADED (needs the user's yes)** `[2026-11-10, lane nba-prop-engine-name-join, session 2ba5509d]`
+- **STATUS 2026-11-10 11:06 AM CST (17:06Z): LOADED on web + refresh-worker (deploys.md 2026-11-10 17:06:54Z).** ff `c468657e5` 16:44:56Z, `reload-web`, refresh-worker TERM 17:05:11Z (drained after TOO_SOON/HOLD). Mechanism MET: the new worker's first NBA build printed `via_engine_name=0`; 0 tracebacks. live-odds-worker loads the cards-page part at its recycle. Owed: the served reading once tonight's LAC sim builds ("Derrick Jones" -> "Derrick Jones Jr.", 19 rows).
 - **Why:** every name-keyed join on an NBA prop row keyed the BOOK spelling with its own key, and none knew the engine's aliases:
   - the pregame sim join (`nba_projections._match_player`, `_norm_name`);
   - face and side (`player_ids.csv` via `_mlb_name_key`);
