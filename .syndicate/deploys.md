@@ -58183,3 +58183,21 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **What:** local `98a137df7` rebased onto main twice (main moved during the first push: `eeb2461c7`, `d8772d6fc`; neither touches the 4 files) -> `adddd1f18`. 68 tests passed after the first rebase, 24 (the experts' own) after the second.
 - **Fleet:** unchanged. Nothing in the app imports `engine_experts` (pinned by `test_nothing_in_the_app_reads_the_experts_yet`); the runner is a read-only script. The fleet checkout gets the files at its next ff, whoever does it.
 - **verify:** the Goal's readings were taken before the push (this file, 2026-11-10 16:10Z). Lane CLOSED, GOAL MET.
+
+## 2026-11-10 16:18:01Z (10:18 AM CST) -- LOAD lane `college-live-resim-midnight` (`97cb5d477`, todo #774: NCAAB/WNCAAB re-sim the previous Central date's in-progress games for 4 h after midnight) -- **LOADED in live-odds-worker pid 294524; 0 tick errors, 0 Tracebacks; inert until 00:00 CT by design; the behaviour reading is OWED tonight and on 11-11**
+- **User, in this chat:** "Yes, load it", answering "Load the midnight fix on the fleet before tomorrow's late USC @ CAL game?" The same user approved the ride-along in lane `nhl-nfl-actual-read-time` ("Go ahead, let it ride"; entry 15:45:23Z above).
+- **How it reached the fleet (no deploy action of this lane, so no claim, no preflight):**
+  - Disk: lane `nhl-nfl-actual-read-time`'s ff `564f8dbde -> fd05acb13` at 15:45:23Z. `fd05acb13` is the next commit after `97cb5d477`.
+  - Process: live-odds-worker restarted at 16:18:01Z, 27 s after a fleet ff to `efccead01` at 16:17:34Z (reflog; `efccead01` = #773, lane `nhl-live-puckline-display`). The restarting lane's entry was not yet in this file at 16:29Z. Its own recycle (due ~20:18Z) was not needed.
+- **Measured (load), read 16:28-16:29Z, read-only:**
+  - `~/Syndicate/syndicate/features/ncaab/live_resim.py`: mtime 15:45:22Z; it carries `prior_slate_date`, `prior_slate_snapshot` and `merge_prior_slate` (3 of 3).
+  - Fleet HEAD `efccead01`, which contains `97cb5d477`.
+  - live-odds-worker pid 294524 started 16:18:01Z, after that file. `NCAAB_LIVE_RESIM_LOOP_STARTED` and `WNCAAB_LIVE_RESIM_LOOP_STARTED` at 16:18:01Z, `workers=2`.
+  - First 6 college ticks 16:18-16:22Z: NCAAB `live=0`; WNCAAB `live=2 resimmed=1 refused=1` (`no_margin_anchor`); `worker_errors=0`.
+  - Since the start: 0 `*_LIVE_RESIM_TICK_ERROR`, 0 `*_LIVE_RESIM_PRIOR_ERROR`, 0 `Traceback`.
+  - No `prior_*` fields, as expected: the window is shut until 00:00 CT.
+- **Real-ESPN check of the new path** (local, 15:47Z): `prior_slate_snapshot("2026-11-09")` -> `slate_final` for both leagues after one fetch each; a second call fetched nothing.
+- **verify (OWED):**
+  - (1) Tonight, the first NCAAB tick after 06:00Z 11-11 carries `prior_date=2026-11-10`. That proves the predicate fires on the fleet. Expect `prior_skip=slate_final` or `none_in_progress`, because ESPN lists no D1 men's game tipping after 9:30 PM CST tonight.
+  - (2) The behaviour: night of 11-11, USC @ CAL tips 04:00Z. MET if the first tick after 06:00Z 11-12 reads `prior_live>=1 prior_resimmed>=1` and the carryover date's NCAAB `LIVE_GAMELINE_JOIN` reads `games_in_snapshot>=1` with `projected>0` until the game ends (baseline 11-09 / 11-10: `games_in_snapshot=0`, priceable 0, display 0).
+- **revert:** set `SYNDICATE_COLLEGE_LIVE_RESIM_PRIOR_DATE_HOURS=0` (an env change: a drained full down/up), or `git revert 97cb5d477`, ff the fleet, and restart live-odds-worker.
