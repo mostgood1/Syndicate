@@ -58438,3 +58438,11 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **verify: MET.** `lookahead_live_rows` 2 -> 0, `lookahead_blank_edge_rows` 2 -> 0, `live_games` 2 -> 2. The served payload's `layer2_lookahead_rows_dropped` is the discriminator: absent before (None), 325 after.
 - **not in this load:** the worker half, `select_shortlist`'s lower date bound (`9fee4160d`, on main, user decision "Yes, fix it too"). It gets its own refresh-worker deploy with its own before/after. Baseline 22:57Z: the 11-11 shortlist (22:36:43Z build) held 287 of 1,480 rows on 62 11-10 games; its plans held 0 such positions.
 - **revert:** revert `0290d505a` on main, ff the fleet to that revert, then `reload-web`.
+
+
+## 2026-11-10 23:24Z (5:24 PM CST) -- watchdog WSL-restart recovery (`ebebe64bc`) on the fleet via lane `wncaab-module`'s ff 47450ce07 -> 0290d505a (no deploy of mine) (lane `watchdog-wsl-restart-recovery`) -- **LOADED; mechanism unit-tested; live trigger owed on the next WSL VM restart**
+- **why:** 2026-11-09 23:46-23:47 CT Windows Update installed WSL 3.0.5.0 (System log: WindowsUpdateClient 43/19, MsiInstaller 1033, WSL Service -> disabled 23:47:16, VM up 23:47:57). The supervisor cannot restart alone; `recovery()` waited for a second failing check, so RECOVERY_START came at 00:00:57 (602 s) and the fleet was down ~13 min mid-slate.
+- **change:** `scripts/local_watchdog.py` `recovery(..., boot_age_s=wsl_boot_age_seconds())` -- /proc/uptime < `WSL_BOOT_WINDOW_SECONDS` (900) and supervisor down -> recover on the FIRST failing check. Pause file + 3/hour cap still apply; unreadable or old boot age keeps the two-check rule.
+- **readings [M]:** 28/28 `tests/test_local_watchdog.py` (6 new). Fleet `~/Syndicate/scripts/local_watchdog.py` carries `WSL_BOOT_WINDOW_SECONDS` (grep count 3) at 23:23Z; watchdog runs each 5 min as a fresh process, so no restart was needed. Fleet dry run (`--json --dry-run`): recovery reason `supervisor up`, recover False.
+- **owed:** the next unplanned WSL VM restart should log `RECOVERY_START ... WSL restarted N s ago` at the first check after boot.
+- **revert:** revert `ebebe64bc` on main; it loads at the next fleet ff (no restart).

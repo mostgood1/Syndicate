@@ -805,7 +805,7 @@ death, never life — do not invert it.
 - Verdict: GOAL MET. `owner_liveness.py --idle-min 240` read 1 SAFE of 6 CLOSED; moved to lanes_closed.md with one pointer; invariants unchanged vs origin/main baseline. Table and WAIT reasons: log/2026-11-10.md 18:40Z.
 - Moved: closed-lane-archive-20261110-0639.
 
-### watchdog-wsl-restart-recovery — OPEN — opened 2026-11-10 — session 86352bc9-921d-487c-bd24-c943dc6b8b98
+### watchdog-wsl-restart-recovery — CLOSED (GOAL MET: first-check recovery after a WSL VM restart, on the fleet via ff 0290d505a; deploys.md 2026-11-10 23:24Z) — opened 2026-11-10 — session 86352bc9-921d-487c-bd24-c943dc6b8b98
 - Goal: When the WSL VM itself restarted (e.g. a Windows Update install of WSL, 11-09 11:47 PM CT, fleet down ~13 min), the watchdog restarts the fleet at its first check after boot instead of waiting RECOVER_AFTER_SECONDS (9 min); deliberate down->up and the no_autostart pause behave as before
 - Files: scripts/local_watchdog.py (recovery() + a boot-age helper only), tests/test_local_watchdog.py (new boot-age tests only)
 - Hypothesis: n/a (cause measured: Windows event log 11-09 23:46-23:47 WSL 3.0.5.0 install; watchdog.log RECOVERY_START 00:00:57 after 602 s)
