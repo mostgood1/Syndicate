@@ -58338,3 +58338,16 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - The file's bytes through the full slate.
   - 0 `PREGAME_KEEP_FAILED`.
 - **Revert:** `SYNDICATE_DECISION_RECORD_PREGAME_KEEP=off` in `local_production.env` (`REFRESH_WORKER__` scope, then a drained `down`/`up`). Or `git revert 47450ce07` on main, ff the fleet to that SHA, and a claimed refresh-worker TERM. `#777` has its own revert in its lane.
+
+## 2026-11-10 19:52:19Z (1:52 PM CST) -- READING #772 pregame: Bobby Portis IS in the fleet's NBA engine frames (MIA @ UTA 11-10) -- **MET**; served live reading armed for tonight (lane `nba-roster-filter-name-key`)
+- **Read (fleet data, fleet code `8fc72076d`+, read-only, nice 19):**
+  - `live_resim.load_engine_inputs('2026-11-10','UTA','MIA')`, built 19:01:26Z on the new code. `away_players` has 15 players, including **`Bobby Portis Jr.`**: id 1626171, `_sim_min` 20.2, `starter_prob` 0.0 (filled by the merge's canonical-key match; it was NaN before the fix), `roll5_min` 17.4.
+  - `smart_sim_2026-11-10_UTA_MIA.json` (19:01:32Z): `props_pool.MIA` has `BOBBY PORTIS JR.`; `excluded.MIA` = Simone Fontecchio only; `players.away` has him.
+  - The books: 89 raw lines under "Bobby Portis" (points, rebounds, P+R, threes, double-double). The 11-10 props log has 0 `ROSTER_FILTER_DROPPED` lines: nobody dropped.
+  - On 11-07 and 11-08 he was absent from both frames. This is the lane's goal, measured on the fleet.
+- **Served live reading (the original symptom), ARMED:** MIA @ UTA tips 02:10Z 11-11 (8:10 PM CST 11-10; ESPN 401909963).
+  - One-time scheduled task `nba-portis-live-check-1110` at 9:15 PM CST, plus the backup `nba-portis-live-check-1110-backup` at 10:00 PM CST.
+  - Both run `side-session-notes/.../portis_live_check.py` (dry run 19:49Z: pregame True, lens Scheduled, 6 served pregame Portis rows, verdict NOT LIVE YET).
+  - PASS = game Live, >= 1 served live Portis prop row in a re-sim-priced market, and every such row with `projection.live_projected` and `projection.actual_so_far`.
+  - The run records its verdict here and in todo #772.
+- **Found beside it, not this lane (todo `#775`, lane `nba-prop-engine-name-join`, NOT LOADED):** the PREGAME sim join `nba_projections._match_player` keys "Bobby Portis Jr." as `bobby portis jr` and the books' "Bobby Portis" as `bobby portis`. So his pregame rows get no `sim_projection` / `model_edge_pct` until `#775` loads. The live join already uses the canonical key, so it is unaffected.
