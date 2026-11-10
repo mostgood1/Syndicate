@@ -724,6 +724,7 @@ death, never life — do not invert it.
 - Falsification test: n/a
 - Verification: Served board on a live NHL and NFL slate: per player/market group across layer2_shortlist and layer2_inplay_overlay rows, 0 groups with two Actual values; a spot check of board-build rows against the NHL gamecenter / ESPN box; web log LIVE_ACTUALS_REFRESHED_FROM_BOX lines with refreshed>0; 0 rows with live_projection or model_edge_pct.
 - Blocked by: none
+- STATUS 2026-11-10 9:53 AM CST (15:53Z): LOADED ON WEB, VERIFY OWED. `fd05acb13` on main (user "Push and reload web"); fleet ff + reload-web 15:45:23Z, 0 tracebacks, inert until a live NHL/NFL prop is served (deploys.md 2026-11-10 15:45:23Z). `97cb5d477` (#774) rides on disk unloaded, user OK. Replay: 147 of 147 served rows matched, NFL two-value groups 7 of 43 -> 0. Watcher in this session polls the served board from 00:20Z 11-11 every 10 min (C:\tmp\lpa\nhl_read_time_watch.py, deadline 05:00Z). NFL reading owed at TNF 11-12.
 
 ### nhl-live-puckline-display — OPEN — opened 2026-11-10 — session 87074b1f-3325-4c92-871d-b22851478134
 - Goal: Live NHL puck-line rows (spreads, spreads_alt) on the Layer 2 board show a DISPLAY-ONLY live number from the NHL re-sim's own margin histogram, with 0 edge and no live pricing; measured on a live NHL game as LIVE_GAMELINE_JOIN sport=nhl no longer refusing puck-line rows live_resim_published_no_distribution_for_this_market, and served /api/intelligence/query live NHL spreads rows carrying a Live proj. with edge_vs_market_pct None
