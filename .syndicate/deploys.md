@@ -58031,3 +58031,27 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **Owed:**
   - 05:30Z (11:30 PM CST): the NBA cross-check, full-day sizes, RSS.
   - The user's call on pushing the reader fix to main. No fleet load is needed: nothing on the fleet reads rows except the check script.
+
+## 2026-11-10 03:31:01Z (9:31 PM CST 11-09) -- VERIFY of `e2558013c` (`#762` (7) name splits): **MET on the served board** -- rows resolved only through the canonical key carry Live proj. and actual, and Herbert Jones is re-simmed for NOP@GSW. Lane `nba-live-proj-actuals` GOAL MET, CLOSED
+- **Watcher** (`C:/tmp/nbalive/wait_alias_live.py`, read-only): it read the served `/api/intelligence/query` `response.ranked_all` every ~6 min from 23:43Z 11-09 to 03:17Z 11-10, 35 polls. Exit 0 `MET` at 03:17:15Z.
+  - **Served alias rows:** 203 of 204 row-polls carried Live proj. AND actual. These are rows the exact key misses and only `_resolve_player` joins. The one miss came at 00:32Z, the first poll after the player entered.
+    - `Paul Reed Jr` and `Carlton Carrington` (odds-feed spellings), from 00:32Z. Example: Reed rebounds 6.5 over, live 8.21 / actual 2.
+    - `Herb Jones`, from 03:17Z: 20 of 20 rows. Example: points 8.5 under, live 13.44 / actual 0.
+  - **Join counter:** `player_alias=` on the live NBA joins ran 16-32 once those players were live (max 32), and 0 before.
+  - **Re-sim:** NOP@GSW is in the snapshot from 03:17Z with 65 `Herbert Jones` rows. On 11-08 there were 0, for want of CSV lines.
+  - **Coverage, all live NBA prop rows, from 00:32Z:** 95.3-100% with both numbers on every poll, 13 polls at 100%. The exception was 89.9% at 03:17Z, NOP@GSW's tip.
+  - **Missing rows** were players who had not yet entered. Each cleared within 1-3 polls: Cam Spencer 00:44-00:50Z, Naji Marshall 01:20-01:32Z, DeMar DeRozan 01:45-01:57Z, Collin Gillespie 02:15-02:28Z.
+  - **Doncic (accent fold, LAL@ATL):** 8 rows missing at 00:14Z. That was the first poll after tip, and the last join, at 00:09:51Z, predated it. He was absent from the missing list from 00:32Z on.
+- **Per game, same instant 03:19:44Z:** DEN@HOU 112/112, IND@DAL 61/61, SAS@PHX 126/126, NOP@GSW 169/233.
+  - NOP@GSW's 64 missing rows were 6 players: Derik Queen 22, De'Anthony Melton 15, Bennedict Mathurin 9, Brandon Williams 8, Georges Niang 7, Jordan Poole 2.
+  - All 6 were absent from BOTH the page lens and the re-sim. Those carried exactly the 10 players who had played (read 03:19:07Z): the not-yet-entered class.
+  - Re-read: 03:30:47Z NOP@GSW 153/156 (98.1%) once its bench entered; Mathurin, Melton, Queen, Williams, Niang now carry both numbers. DEN@HOU 83/83, IND@DAL 34/34, SAS@PHX 107/107. Engine read at the same instant: IND@DAL live/pregame median 1.517 (n=34), a late-game single read, not judged.
+- **Found, NOT this lane's fix (proposed as its own task):** name-split players are never priced.
+  - At 03:20:18Z, Herb Jones's 20 served live rows had no `sim_projection`, `sim_ladder`, `model_edge_pct`, `player_side`, `headshot_url` or recent-lines history (`sim_view` unpriced). They were the only such rows among 580 served NBA prop rows.
+  - Teammate Saddiq Bey's row carries all of them.
+  - The display join resolves Jones. The board's other name-keyed joins still use an exact or casefold key, e.g. `basketball_market_board._canonical_player_key`.
+  - Earlier tonight the Paul Reed Jr and Carrington rows also had `model_edge_pct` null.
+- **Engine read (reported, not judged; one instant, early game):** median live/pregame projection ratio per game at 03:19:44Z.
+  - DEN@HOU 0.993, SAS@PHX 0.971, NOP@GSW 1.132, IND@DAL 1.382.
+  - NOP@GSW starters: Matkovic 1.79 (started tonight, pregame 9.23 pts), Fears 1.47, Green 1.48, Podziemski 1.29, Curry 0.81.
+- **Housekeeping:** no deploy, no claim held, no fleet change.
