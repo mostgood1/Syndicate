@@ -750,12 +750,6 @@ death, never life — do not invert it.
 - Verification: deploys.md entry: claims on all three services, fleet preflight from an origin/main worktree (--target fleet --reinject-env; live-odds-worker --expect ncaab_live_mechanisms_keys=9 --baseline =7), joint CLEAR, drained down/up, 9 keys in /proc/<pid>/environ, 0 Tracebacks, first NCAAB tick clean, lens inputs.mechanisms names both fields; then the paired-probe reading. Revert: env_load_k.py --revert <backup> and the same drained down/up.
 - Blocked by: lane ncaab-blowout-off-live-read recording #768's live reading (a verdict, not INSUFFICIENT), and the user's explicit yes to load
 
-### closed-lane-archive-20261109-1840 — CLOSED 2026-11-09 (GOAL MET: 3 blocks archived) — opened 2026-11-09 — session ad7b1b3b-adea-4648-975a-efa6ffa82ce6
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. `owner_liveness.py --idle-min 240` read 3 SAFE of 14 CLOSED; moved to lanes_closed.md with one pointer each; invariants unchanged vs origin/main baseline. Table and WAIT reasons: log/2026-11-09.md 2026-11-10 00:45Z.
-- Moved: ncaab-board-slate, wncaab-module, closed-lane-archive-20261109-1350.
-
 ### closed-lane-archive-20261109-2040 — CLOSED 2026-11-09 (GOAL MET: 8 blocks archived) — opened 2026-11-09 — session 18d69976-44ee-429e-82c2-9c0b912735ad
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
@@ -766,6 +760,11 @@ death, never life — do not invert it.
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 2 SAFE; both moved: `inplay-min-ask`, `closed-lane-archive-20261109-1640`. 6 WAIT; table in log/2026-11-09.md.
+
+### closed-lane-archive-20261110-0040 — CLOSED 2026-11-10 (GOAL MET: 1 block archived) — opened 2026-11-10 — session 8d38da00-f2b3-4fb3-8fea-2767f3803a81
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness --idle-min 240 read SAFE for 1 of 7 CLOSED blocks; moved `closed-lane-archive-20261109-1840` to lanes_closed.md (pointer left). 6 WAIT; table and reasons in log/2026-11-10.md.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -974,6 +973,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261109-1350` — CLOSED 2026-11-09 (GOAL MET: 1 blocks archived) — opened 2026-11-09 — session e6b38892-f13e-48eb-b2a5-cae03c9d2880
 - `closed-lane-archive-20261109-1500` — CLOSED 2026-11-09 (GOAL MET: 3 blocks archived) — opened 2026-11-09 — session ea4bd446-eb91-4542-8f72-ce9c72813ed4
 - `closed-lane-archive-20261109-1640` — CLOSED 2026-11-09 (GOAL MET: 6 blocks archived) — opened 2026-11-09 — session 58599d10-e9ac-497b-a14f-8dc9b4bd6bb1
+- `closed-lane-archive-20261109-1840` — CLOSED 2026-11-09 (GOAL MET: 3 blocks archived) — opened 2026-11-09 — session ad7b1b3b-adea-4648-975a-efa6ffa82ce6
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
