@@ -114,7 +114,7 @@
   - **NCAAF and NFL** re-sims are week-scoped (`run_refresh_worker._run_ncaaf_live_resim_tick`), so the roll does not hit them.
   - **`live_evidence_log`** files every row under the snapshot's `date`, so a prior-date game's rows land in the new date's file. A one-line follow-up for lane `live-evidence-log`: `game.get("slateDate") or date_str`.
 
-### `#773` — **LIVE NHL PUCK-LINE ROWS GET A DISPLAY-ONLY Live proj. FROM THE RE-SIM'S OWN MARGIN HISTOGRAM; NO EDGE, NOT PRICED. BUILT AND TESTED, NOT ON MAIN** `[2026-11-10, lane nhl-live-puckline-display, session 87074b1f]`
+### `#773` — **LIVE NHL PUCK-LINE ROWS GET A DISPLAY-ONLY Live proj. FROM THE RE-SIM'S OWN MARGIN HISTOGRAM; NO EDGE, NOT PRICED. ON MAIN `efccead01`, LOADED ON BOTH WORKERS 16:28Z 11-10; LIVE READING OWED on the 11-10 evening slate (00:00Z)** `[2026-11-10, lane nhl-live-puckline-display, session 87074b1f]`
 - **Why:** served 2026-11-09 NYR@EDM: the NHL live moneyline (1 of 1) and totals (2 of 2) showed a live number; the puck line (0 of 1) did not. The join refused it `live_resim_published_no_distribution_for_this_market`: `nhl/live_resim.resim_live_game` counted 200 per-sim margins and returned only their mean.
 - **Change:**
   - **Producer:** returns the margins as a home-positive histogram and publishes them on the lane as `projection.displayMarginDist`. It does NOT publish `marginDist`, the key that opens spread pricing. Same sims; the sim is unchanged.
@@ -124,7 +124,8 @@
 - **Not done / not claimed:**
   - Pricing an NHL live puck line needs this histogram GRADED (cutoff replay against settled games, as `#499` / NCAAF totals did), then published as `marginDist`. The pregame puck line ran ~4 pts under the fair on home -1.5 in 9 of 10 games (2026-10-15 lead, `state_model.md`), so the live margin may be too narrow too. Display only until measured.
   - `tests/test_live_display_other_sports.py::test_nhl_shows_the_moneyline_and_the_total_count_but_no_puck_line` (lane `live-display-other-sports`) still passes. Its hand-built NHL lane has no display key, but its name and the `LIVE_DISPLAY_SPORTS` comment ("nfl/nhl spreads ... no probability") describe the old producer. Left to that lane.
-- **Owed:** user approval to push; fleet ff + a claimed live-odds-worker TERM (the producer runs there; refresh-worker's join loads at the same ff). Then read a live NHL game: `LIVE_GAMELINE_JOIN sport=nhl` names `live_margin_published_for_display_only` for puck-line rows with `display=` up, and served `/api/intelligence/query` live NHL `spreads` rows carry `live_model_probability` with `model_edge_pct` / `edge_vs_market_pct` None.
+- **Loaded** 2026-11-10 (user "Yes, push and load"): fleet ff `fd05acb13 -> efccead01` 16:17:34Z, claimed live-odds-worker TERM 16:17:51Z (producer, pid 294524), claimed refresh-worker TERM 16:28:02Z (join, pid 296002); 0 Tracebacks, first builds ok. Also loaded #774 (`97cb5d477`, user-approved). deploys.md 2026-11-10 16:17:34Z.
+- **Owed:** the live reading on the first live NHL game (00:00Z 11-11): `LIVE_GAMELINE_JOIN sport=nhl` names `live_margin_published_for_display_only` for puck-line rows with `display=` up; Redis `live/nhl_live_lens.json` live lanes carry `displayMarginDist`; served `/api/intelligence/query` live NHL `spreads` rows carry `live_model_probability` with `model_edge_pct` / `edge_vs_market_pct` None.
 
 ### `#772` — **NBA PREGAME POOL DROPPED PRICED PLAYERS WHOSE NAME DIFFERS ONLY BY "Jr." / "Jr": Bobby Portis (roster filter) and Terrence Shannon Jr. (recency readmit) both played and were not simulated. FIXED ON MAIN `8fc72076d`, NOT LOADED** `[2026-11-09, lane nba-roster-filter-name-key, session c7e5cb4c]`
 - **Cause:** `_norm_name_key` keeps periods, so it strips " JR" but not " JR.".

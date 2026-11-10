@@ -58201,3 +58201,46 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - (1) Tonight, the first NCAAB tick after 06:00Z 11-11 carries `prior_date=2026-11-10`. That proves the predicate fires on the fleet. Expect `prior_skip=slate_final` or `none_in_progress`, because ESPN lists no D1 men's game tipping after 9:30 PM CST tonight.
   - (2) The behaviour: night of 11-11, USC @ CAL tips 04:00Z. MET if the first tick after 06:00Z 11-12 reads `prior_live>=1 prior_resimmed>=1` and the carryover date's NCAAB `LIVE_GAMELINE_JOIN` reads `games_in_snapshot>=1` with `projected>0` until the game ends (baseline 11-09 / 11-10: `games_in_snapshot=0`, priceable 0, display 0).
 - **revert:** set `SYNDICATE_COLLEGE_LIVE_RESIM_PRIOR_DATE_HOURS=0` (an env change: a drained full down/up), or `git revert 97cb5d477`, ff the fleet, and restart live-odds-worker.
+
+## 2026-11-10 16:17:34Z (10:17 AM CST) -- FLEET ff fd05acb13 -> efccead01 + claimed live-odds-worker TERM 16:17:51Z + claimed refresh-worker TERM 16:28:02Z: live NHL puck-line rows get a DISPLAY-ONLY Live proj. from the re-sim's own margin histogram (`efccead01`, todo `#773`, lane `nhl-live-puckline-display`) -- **LOADED on both roles, 0 Tracebacks; inert until a live NHL game (first puck drop 00:00Z 11-11); the live reading is OWED tonight** (written 16:5xZ, 10:5x AM CST)
+- **User, in this chat:** "Yes, push and load", answering "Push 39b6ad549 to main and load it on the fleet before tonight's NHL games?" (`39b6ad549` became `efccead01` on the push rebase). On the #774 ride-along, the user picked the option "Yes, load #774 too" when asked whether to load #774 with this change. Lane `college-live-resim-midnight` records its own yes ("Yes, load it") in its 16:18:01Z entry above.
+- **What:**
+  - `nhl/live_resim.resim_live_game` returns its 200 per-sim final margins as a home-positive histogram. `build_game_lens` publishes them as `projection.displayMarginDist`, NOT `marginDist`: no NHL live puck-line estimator has been graded, and `marginDist` opens spread pricing.
+  - `live_gameline_join` reads that key into `live_display_block` only: P(home covers) at the row's away-frame line, Agresti-Coull. A fresh-quote puck-line row keeps the pricer's own no-distribution refusal, renamed `live_margin_published_for_display_only`. It has no model probability, no edge and no `live_model_prob_over`, and every other field is what the old lane gave it.
+  - Totals are untouched. Tests: 11 new, plus 704 across 31 neighbouring live-join/NHL files.
+- **Range `fd05acb13..efccead01`:**
+  - `3071a433d`: ledger only (lanes, log, state_layer2, todo).
+  - `efccead01`: `nhl/live_resim.py`, `shared/live_gameline_join.py`, its test, and todo.
+  - `vendor/` is empty.
+  - **ff to my SHA only.** main's tip then also carried `eeb2461c7` (#776, NBA midnight, not loaded), which was left off.
+  - **Already on disk from lane `nhl-nfl-actual-read-time`'s 15:45:23Z ff, and loaded by these restarts:**
+    - live-odds-worker: `97cb5d477` (#774, see above) and `99b9eb6ba` (the live evidence log reader).
+    - refresh-worker (it was on `564f8dbde`): `fd05acb13`'s `live_player_actuals.py` extraction (its commit says the refusal order and counters are unchanged) and the same evidence-log reader.
+- **Gates:**
+  - **Claims:** live-odds-worker 16:15:59Z and refresh-worker 16:16:00Z, holder `nhl-live-puckline-display`, ttl 5400. Web was then held by `nhl-nfl-actual-read-time`.
+  - **live-odds-worker preflight:** fleet, from a worktree at origin/main `efccead01`. **CLEAR** rc 0 at 16:17:08Z, 0 processes. It expected `fleet_checkout_head` fd05acb13 -> efccead01 and `nhl_join_puckline_reason` `live_resim_published_no_distribution_for_this_market` -> `live_margin_published_for_display_only`, with baselines read 16:16:19Z.
+  - **ff:** `git merge --ff-only efccead01` at 16:17:34Z (reflog). Blobs hash-equal to the commit: `live_resim.py` `7045d8e13d14`, `live_gameline_join.py` `1b4f455a3052`.
+  - **live-odds-worker TERM:**
+    - pid 263626 (`run_live_odds_refresh_worker.py`; its 2 children are the `live_resim_workers --serve` pool), TERM at 16:17:51.528Z.
+    - Respawned as pid 294524, started 16:18:00Z. `NBA/NCAAB/WNCAAB_LIVE_RESIM_LOOP_STARTED` at 16:18:01Z (`workers=2`). 0 Tracebacks.
+  - **refresh-worker drain:** `check_deploy_safety --drain --drain-owner nhl-live-puckline-display`, under refresh-worker's own environ. It waited ~8 min on live-odds-worker child jobs (`build_college_pregame_sims.py`, odds runs including `refresh_nhl_oddsapi.py`), then reached **CLEAR**.
+  - **refresh-worker preflight:** **CLEAR** rc 0 at 16:27:57Z. It expected `refresh_worker_loaded_commit` 564f8dbde -> efccead01, plus the same NHL reason field; baseline read 16:27:57Z.
+  - **refresh-worker TERM:**
+    - pid 27429 (0 children), TERM at 16:28:02.891Z.
+    - `role_restarts.jsonl`: exit 16:28:04Z, `claimed: true`, holder `nhl-live-puckline-display`, code 0, ran_s 31096.
+    - Respawned as pid 296002 by 16:28:10Z. `DRAIN_CLEARED owner=nhl-live-puckline-display`.
+  - Both claims released 16:43:11Z, with their tokens.
+- **Baseline: the last live NHL join on the old code** (11-10 05:44:51Z, NYR@EDM late): `considered=5 projected=4 priceable=0 withheld=5 display=2`, why `{prob_interval_swamps_edge: 1, live_resim_published_no_distribution_for_this_market: 3, quote_older_than_live_pricing_ceiling: 1}`. The 3 no-distribution rows are puck-line and totals rows together; the join line does not split by market. Served 01:40:57Z 11-10: puck line 0 of 1 with a live number.
+- **expect / measured (load):**
+  - `fleet_checkout_head` -> efccead01: **MET** at 16:17:34Z.
+  - `refresh_worker_loaded_commit` -> efccead01: **MET**.
+    - pid 296002 started after the ff.
+    - First builds: `BOARD_BUILD_TIMING ok=True` at 16:36:43Z (wall 236.7 s) and 16:38:47Z (50.5 s).
+    - Since 16:28:10Z: 0 `Traceback`, 0 `BOOK_GRID_LIVE_GAMELINE_FAILURE`.
+    - The NHL join ran on the new pid at 16:29:56Z and 16:41:40Z: `index=0 considered=0`, 7 games in the snapshot, all `pregame_only` (nothing live).
+  - `nhl_join_puckline_reason`: **OWED**. No NHL game is live until 00:00Z.
+- **verify (OWED, tonight: 7 NHL games from 00:00Z 11-11, 6 PM CST):**
+  - (1) A `LIVE_GAMELINE_JOIN sport=nhl` line with `index>=1` names `live_margin_published_for_display_only` for the fresh-quote puck-line rows, and `display=` rises by them. Any `live_resim_published_no_distribution_for_this_market` left equals the fresh-quote totals rows.
+  - (2) In Redis `live/nhl_live_lens.json`, the `live_resim` lanes carry `projection.displayMarginDist`, summing to `simsRun`, with no `marginDist` / `totalRunsDist`.
+  - (3) Served `/api/intelligence/query`: live NHL `spreads` / `spreads_alt` rows carry `live_model_probability`, home + away = 1 on one line, and `model_edge_pct` / `edge_vs_market_pct` None on every one of them.
+- **revert:** `git revert efccead01` on main, ff the fleet to that SHA, then claimed TERMs of both workers. Either restart alone restores the old board behaviour. There is no env switch.
