@@ -669,7 +669,7 @@ once this index exists: re-splitting would orphan the parts.
 | [sim-scheduling-blocker] | 2026-08-17 02:1xZ — VERIFIED (sim-scheduling): the primary goal has ONE blocker — **ARCHIVED 2026-08-19 to `st | `state_model.md` |
 | [sim-edge-analysis-2026-09-01] | FULL-PLATFORM SIM-ENGINE EDGE ANALYSIS — strategy synthesis + new from-code facts `[2026-09-01, session syndic | `state_model.md` |
 | [accuracy-autorun-rearm-state] | `#626`(h) IS ARMED, RAN, AND PASSED. The budget, not memory, is now the constraint. `[2026-09-04, lane accurac | `state_model.md` |
-| [nhl-live-resim] | NHL HAS A LIVE RE-SIM AND IT CAN NOW SEE ITS SLATE -- but no NHL game has yet reached the board with a probabi | `state_model.md` |
+| [nhl-live-resim] | NHL HAS A LIVE RE-SIM, IT SEES ITS SLATE, AND A LIVE NHL GAME REACHES THE BOARD -- moneyline and totals, not p | `state_model.md` |
 | [nhl-player-props] | NHL PLAYER PROPS ARE PROJECTED AND PRICED ON THE BOARD, PER-LINE GATED -- and the engine still loses to a play | `state_model.md` |
 | [model-edge-ceiling] | THE 15-POINT MAGNITUDE BOUND IS GONE: REPLACED 2026-10-19 BY THE PROBABILITY-SPACE TEST ITS OWN DOCSTRING DESC | `state_model.md` |
 | [prop-projection-support] | NFL PROP SUPPORT IS NOW PUBLISHED AND SERVED (0 of 1,070 -> 1,067 of 1,067, `5457b428`); NHL AND MLB STILL CAR | `state_model.md` |

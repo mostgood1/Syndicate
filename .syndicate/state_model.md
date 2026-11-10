@@ -867,7 +867,7 @@ under 25 seconds; **poll at ~12s**. CLEAR arrived on the 4th poll. Also expect t
 25-minute deploy-spacing lockout (`#563`) — the worker is often idle DURING the
 lockout and busy by the time it lifts, which is exactly why waiting kept losing.
 
-## [nhl-live-resim] NHL HAS A LIVE RE-SIM AND IT CAN NOW SEE ITS SLATE -- but no NHL game has yet reached the board with a probability `[measured on production 2026-09-25T03:01:14Z, lane nhl-live-resim]`
+## [nhl-live-resim] NHL HAS A LIVE RE-SIM, IT SEES ITS SLATE, AND A LIVE NHL GAME REACHES THE BOARD -- moneyline and totals, not puck lines `[measured on the fleet 2026-11-10T01:48Z, lane nhl-live-resim-slate-root; first measured 2026-09-25T03:01:14Z, lane nhl-live-resim]`
 
 - **2026-11-09 `[verified on the fleet, lane nhl-live-resim-slate-root]`: ON THE FLEET THE RE-SIM COULD NOT SEE ITS SLATE
   AGAIN, and that is fixed.** `build_live_lens_snapshot` called `build_slate_features(date)` with no root, and
@@ -876,8 +876,10 @@ lockout and busy by the time it lifts, which is exactly why waiting kept losing.
   `no_slate_features` (11-09 01:21Z: `liveResimmed 0`, `no_slate_features 4`). Fix `7d48129c5`:
   `_slate_features_root()` = `default_nhl_source_root()` (the pregame producer's root) unless
   `SYNDICATE_ARTIFACT_ROOT_NHL` is set; coverage carries `slateFeatureGames`. Loaded 03:53:10Z 11-09; the 11-09
-  snapshot reads `slateRows 3, slateFeatureGames 3`. **Not yet measured:** `liveResimmed > 0` on a game in play
-  (owed on the 11-09 slate, deploys.md 2026-11-09 01:25:21Z). A second blocker, also fixed: the snapshot
+  snapshot reads `slateRows 3, slateFeatureGames 3`. **Measured on a game in play `[2026-11-10 01:05-01:48Z]`:**
+  NYR@EDM `liveResimmed 1`, `LIVE_GAMELINE_JOIN sport=nhl index=1`, and on the served board moneyline 1 of 1 and totals
+  2 of 2 live NHL rows with a live number, puck line 0 of 1 (deploys.md 2026-11-09 01:25:21Z). Intermissions refuse
+  `in_intermission` and drop the join to `index=0` until play resumes (by design). A second blocker, also fixed: the snapshot
   published `/v1/score`'s SHORT names ('Rangers') while board rows and the join use full names; `365be1a90`
   publishes the scoreboard's names by gamePk (full names 3 of 3 on 11-09 17:20Z). Moneyline rows can gain a live
   probability and totals rows the live total COUNT (`projection.total`, the mean); puck lines cannot (no margin
