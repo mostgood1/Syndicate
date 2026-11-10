@@ -39531,3 +39531,19 @@ Slugs: basketball-schedule-adapter-native, coverage-gate-inactive-sports, deploy
 - **2026-11-09 14:20Z -- the same LOAN, WIDENED (recorded here, same user approval, same purpose):** live_gameline_join.py also gets a freshness rule on the three display writes (`_display_lane_fresh`, `_DISPLAY_PAST_LANE_CEILING_SPORTS = {"nba"}`): outside NBA a display number needs a lane as fresh as a price would, because college's carry is unbounded. NBA behaviour unchanged. test_college_never_shows_a_raw_margin gets a fresh `liveStateAsOf` on its college lane (its NBA fixture lane has none, and absent time now refuses college display). Commit `badf130f4` (local, landing next).
 - **2026-11-08 17:32Z -- LOAN noted (lane `ci-suite-red-697`), USER-APPROVED ("Yes, land the loan"):** `syndicate/features/shared/live_projection_join.py` display-only branch only -- `row["projection"] = refuse_published_certainty(shown)` (was unguarded since `3ae26ba6e`; tests/test_platform_certainty_refusal.py x2 red in the 11-08 nightly). Blanks only an exact 0/1 `model_prob_over` + its edge; live_projected / actual_so_far untouched. 60 tests passed. The message offering it to your session expired undelivered.
 - **RIDE-ALONG APPROVED 2026-11-07 23:47Z (5:47 PM CST), user "Ride the next restart":** `7d72f8e9d` (live prop join folds accents, so Jokić joins Jokic) may ride ANY lane's fleet ff to a main SHA that contains it, plus that lane's refresh-worker restart. No separate restart from this lane. A web reload is optional: on a miss the read-time refresh keeps the build's numbers. This lane verifies after the load: a live accented player's prop rows carry Live proj. / Live actual.
+
+## live-evidence-log -- superseded status lines, moved verbatim at checkpoint 2026-11-10 15:24Z
+
+- **STATUS `[2026-11-10 05:34Z]`: GOAL: NOT MET -- every reading PASSED; one step left, the user's call: push branch `le-nfl-normalize` (`1f5f79ea3` NFL reader normalization + independent probe, `5a8222f92` NBA cross-check by instant; 16 tests) to main. No fleet load needed. Readings: probe 31/31 (01:15Z); 15/15 with Monday night football (02:35Z), the new probe 17/17, unread 0; NBA 422/422 ticks, 0 field mismatches (05:31Z, by instant; as strings it read 0/422 and exited 0 -- check defect, fixed); ~6.9 MB for the 11-09 slate; memory NOT up (3,987 MB at 10 h vs 4,021-5,042 for the 7 earlier workers that reached 10 h); 0 tracebacks.** File date = the producer's `date`. Full record: deploys.md 05:30Z.
+  - Built:
+    - `syndicate/features/shared/live_evidence_log.py`: collector + `iter_rows` / `evidence_at`; switch `SYNDICATE_LIVE_EVIDENCE_LOG`, absent = on; every 30 s.
+    - the refresh-worker start call;
+    - `scripts/live_evidence_check.py`: `nba-crosscheck` / `probe` / `size`;
+    - 12 tests, plus 59 related tests passing.
+  - Dry run 11-09 18:15-18:18Z, reading the fleet's store and writing to `/tmp` only:
+    - wncaab: 3 live games, 9 fresh rows (~4.2 KB each). The same-moment probe matched 3 of 3 lanes, 0 mismatches.
+    - ncaaf 67, nfl 15 and nhl 3 pregame/refusal rows, once each.
+    - The first pass rewrote NHL's pregame lanes every tick (they carry the tick time). Fixed: refusal rows are compared without `liveStateAsOf`.
+  - Owed:
+    - the user's OK to push and load (fleet ff + refresh-worker TERM);
+    - then the NBA cross-check on a live NBA night, probes per live sport, and bytes/day.

@@ -675,19 +675,11 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### live-evidence-log — OPEN — opened 2026-11-09 — session e32fef1a-01e8-4afe-a284-01acd3728545
-- **STATUS `[2026-11-10 05:34Z]`: GOAL: NOT MET -- every reading PASSED; one step left, the user's call: push branch `le-nfl-normalize` (`1f5f79ea3` NFL reader normalization + independent probe, `5a8222f92` NBA cross-check by instant; 16 tests) to main. No fleet load needed. Readings: probe 31/31 (01:15Z); 15/15 with Monday night football (02:35Z), the new probe 17/17, unread 0; NBA 422/422 ticks, 0 field mismatches (05:31Z, by instant; as strings it read 0/422 and exited 0 -- check defect, fixed); ~6.9 MB for the 11-09 slate; memory NOT up (3,987 MB at 10 h vs 4,021-5,042 for the 7 earlier workers that reached 10 h); 0 tracebacks.** File date = the producer's `date`. Full record: deploys.md 05:30Z.
-  - Built:
-    - `syndicate/features/shared/live_evidence_log.py`: collector + `iter_rows` / `evidence_at`; switch `SYNDICATE_LIVE_EVIDENCE_LOG`, absent = on; every 30 s.
-    - the refresh-worker start call;
-    - `scripts/live_evidence_check.py`: `nba-crosscheck` / `probe` / `size`;
-    - 12 tests, plus 59 related tests passing.
-  - Dry run 11-09 18:15-18:18Z, reading the fleet's store and writing to `/tmp` only:
-    - wncaab: 3 live games, 9 fresh rows (~4.2 KB each). The same-moment probe matched 3 of 3 lanes, 0 mismatches.
-    - ncaaf 67, nfl 15 and nhl 3 pregame/refusal rows, once each.
-    - The first pass rewrote NHL's pregame lanes every tick (they carry the tick time). Fixed: refusal rows are compared without `liveStateAsOf`.
-  - Owed:
-    - the user's OK to push and load (fleet ff + refresh-worker TERM);
-    - then the NBA cross-check on a live NBA night, probes per live sport, and bytes/day.
+- **GOAL VERDICT `[2026-11-10 15:24Z]`: GOAL: NOT MET -- one reading left, NCAAF in play.** Goal, verbatim: "Phase 1B M0: every live projection the fleet's re-sims and lenses publish (nba, ncaab, wncaab, ncaaf, nfl, nhl; wnba when on) is kept as an append-only, as-of-stamped row per game lane per tick in <data root>/live_evidence/<sport>/<date>.jsonl, read by one as-of reader; on the fleet, the NBA rows reproduce NBA's own live_resim_history for the same ticks with 0 mismatches, a same-moment probe on each other live sport matches the rebuilt evidence with 0 mismatches, and the bytes per day are measured"
+  - **Met:** NBA rows reproduce `live_resim_history`, 422 of 422 ticks, 0 field mismatches on 8 fields (05:31Z, matched by instant). Same-moment probes 0 mismatched on every sport live in the window: nba, ncaab, wncaab, nhl (31/31, 01:15Z) and nfl with Monday night football (15/15, 02:35Z; the independent probe 17/17, unread 0, 02:38Z). Bytes/day measured: ~6.9 MB for the 11-09 slate (ncaab 4.34 MB / 1,556 rows the largest). 0 tracebacks. Refresh-worker memory not up (3,987 MB at 10 h vs 4,021-5,042 MB for the 7 earlier workers that reached 10 h). Record: deploys.md 2026-11-10 01:15Z, 02:35Z, 05:30Z.
+  - **Check fixes on main** (user "Yes, push them"): `99b9eb6ba` NFL lane-level state read under the shared names + a probe that reads the raw lane on its own; `90bb0cf7a` NBA cross-check matches by instant, and a missing tick fails. 16 tests. The fleet still runs `564f8dbde`: the writer is unchanged, so nothing is owed on the fleet; the reader reaches it at its next ff.
+  - **Left:** NCAAF was never live in the window (Monday), so no NCAAF in-game row has been probed. Tonight's MAC games (Kent State @ Bowling Green, Western Michigan @ Akron, Ohio @ Miami (OH)) are the first. A watcher in session e32fef1a polls from 23:30Z (5:30 PM CST) every 5 min, deadline 05:00Z; on the first fresh NCAAF lane it waits 6 min, then runs the probe (all sports) and an NCAAF row summary on main's reader. Close on 0 mismatched / 0 unread with NCAAF rows carrying `state`; on TIMEOUT (exit 3) record NOT YET and the next NCAAF game day.
+  - **Found for M1:** NFL ticks about every 8 min and publishes no down, distance or yard line (possession marginalised); NHL publishes no distributions. Superseded status lines: lanes_history.md.
 - Goal: Phase 1B M0: every live projection the fleet's re-sims and lenses publish (nba, ncaab, wncaab, ncaaf, nfl, nhl; wnba when on) is kept as an append-only, as-of-stamped row per game lane per tick in <data root>/live_evidence/<sport>/<date>.jsonl, read by one as-of reader; on the fleet, the NBA rows reproduce NBA's own live_resim_history for the same ticks with 0 mismatches, a same-moment probe on each other live sport matches the rebuilt evidence with 0 mismatches, and the bytes per day are measured
 - Files: syndicate/features/shared/live_evidence_log.py (NEW), scripts/live_evidence_check.py (NEW), tests/test_live_evidence_log.py (NEW), scripts/run_refresh_worker.py (the collector start call ONLY)
 - Hypothesis: n/a (build; the sport re-sim modules are read through the shared store, never edited)
