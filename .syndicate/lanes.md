@@ -816,6 +816,14 @@ death, never life — do not invert it.
 - Verification: unit tests: down + boot age < window -> recover on the first check; down + old boot -> waits as before; paused -> no recover; cap still applies. Fleet: after an ff carrying the commit, local_watchdog.py --json on the fleet runs clean (recover=false, supervisor up)
 - Blocked by: none
 
+### live-props-evidence — OPEN — opened 2026-11-10 — session e32fef1a-01e8-4afe-a284-01acd3728545
+- Goal: Phase 1B M1 live stat progress: every liveProps row the fleet's live re-sim snapshots publish (nba now; any other sport whose snapshot the evidence collector reads gets it with no code change) is kept compactly and losslessly as an as-of-stamped row per game per changed tick in <data root>/live_evidence/<sport>/<date>.props.jsonl, read back by one as-of reader; on the fleet a same-moment probe expands the logged rows back to the published liveProps with 0 mismatches, and the bytes per night are measured
+- Files: syndicate/features/shared/live_prop_evidence.py (NEW), tests/test_live_prop_evidence.py (NEW), syndicate/features/shared/live_evidence_log.py (LOAN from live-evidence-log; the Collector hook only)
+- Hypothesis: n/a (build; reads the re-sim snapshot through the shared store and never imports or edits a sport's re-sim module)
+- Falsification test: n/a
+- Verification: unit tests incl. off != on and a lossless round trip of build_live_props output; a dry run against the fleet's live NBA snapshot tonight into a scratch dir (bytes per tick, CPU per pass); after a user-approved load (refresh-worker TERM): a same-moment probe of expanded rows vs the published liveProps with 0 mismatches, bytes per night, 0 failures
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
