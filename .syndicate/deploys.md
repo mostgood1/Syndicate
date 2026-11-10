@@ -58295,3 +58295,46 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - On a night with no game at the roll: `prior_skip=slate_final` from the first post-roll tick.
 - **Not covered by this load:** NBA live PROPS after the roll. That is `#777` / `53f8a0b26`: on main, not on the fleet, and it needs its own ff plus `reload-web`.
 - **Revert:** `SYNDICATE_NBA_LIVE_RESIM_PRIOR_DATE_HOURS=0` in `local_production.env` (a drained `down`/`up`). Or `git revert eeb2461c7` on main, ff the fleet to that SHA, then a claimed live-odds-worker TERM.
+
+## 2026-11-10 18:14:18Z (12:14 PM CST) -- FLEET ff eeb2461c7 -> 47450ce07 + reload-web + drained refresh-worker TERM (lane `pregame-record-keep`, Phase 1B M1 slice 2: every pregame line's first and last DecisionRecord kept past tip-off; the ff also carries `#777` `53f8a0b26` and the engine experts `adddd1f18`) -- **LOADED on web + refresh-worker; mechanism MET (PREGAME_KEEP on the new worker's first three builds, accounting closes, 0 failures, 0 Tracebacks); live-odds-worker loads `#776` + `#777`'s lens at its own recycle**
+- **User, in this chat:** "Yes, load all three", answering "Load slice 2, #776 and #777 on the fleet together?". `#776` was already on the disk: its own lane ff'd `eeb2461c7` at 18:04:43Z (entry above) for live-odds-worker's own recycle. This load leaves that plan as it was.
+- **Range `eeb2461c7..47450ce07`:** the runtime files were exactly the expected five; the script refuses any other set.
+  - `syndicate/features/shared/decision_record.py`: mine, refresh-worker.
+  - `syndicate/features/nba/live_lens.py`: `#777`, live-odds-worker.
+  - `syndicate/blueprints/intelligence.py`: `#777`, web.
+  - `syndicate/features/shared/engine_experts.py` and `scripts/engine_experts.py`: the offline runner. Nothing imports them at run time.
+  - Nothing under `vendor/` or `engines/`, and no change to `wsgi.py`, `app.py`, `render.yaml` or `requirements.txt`. 0 overlap with the fleet's dirty paths. ff to my SHA only.
+- **Claims:** web + refresh-worker, holder `pregame-record-keep`, acquired 18:08:53Z (all services were free; `#776`'s lane had released live-odds-worker).
+- **Baseline (read 18:09:31Z):**
+  - `fleet_checkout_head` = eeb2461c7.
+  - refresh-worker: pid 306439 on `c468657e5`, 2 children.
+  - live-odds-worker: pid 294524. Web: 27364 / 316450 / 316589.
+  - On disk: 0 `def keep_pregame_lines`, 0 `prior_slate`, 0 `lens_slate_dates`.
+  - 0 `PREGAME_KEEP` lines in the whole refresh-worker log, and no `*.pregame_lines.jsonl.gz`.
+- **Preflight** `--target fleet --target-commit 47450ce07`, from a worktree at origin/main:
+  - web CLEAR at 18:09:57Z;
+  - refresh-worker CLEAR at 18:14:13Z, after the drain, with 0 processes.
+- **ff:** `git merge --ff-only 47450ce07` at 18:10:15Z. On disk: keep 1, `prior_slate` 12, `lens_slate_dates` 2.
+- **reload-web:** 18:10:25-30Z, 2.0 s, 0 failures, workers 317396/317397, healthz 200.
+- **refresh-worker:**
+  - The drain ran under the worker's own environ (`check_deploy_safety --drain --drain-owner pregame-record-keep`). From a Windows shell it refuses: it needs the keyvalue backend. The worker acked and went idle after its board build at 18:13:58Z.
+  - TERM pid 306439 at 18:14:18.711Z: 0 children, exit code 0, ran 4,141 s, and `role_restarts` shows `claimed: true, holder pregame-record-keep`.
+  - Respawned as pid 318579 at 18:14:23Z. Drain cleared at 18:14:31Z.
+- **live-odds-worker:** not touched. pid 294524 recycles around 22:10-22:50Z and then loads `#776` and `#777`'s lens together. Both NBA lanes were told by message, as information, quoting the user's words.
+- **expect / measured:**
+  - `fleet_checkout_head` -> 47450ce07: **MET** at 18:10:15Z.
+  - `refresh_worker_commit` -> 47450ce07: **MET.** pid 318579 started at 18:14:23Z, after the ff.
+  - `pregame_keep_lines_after_load` >= 1: **MET.**
+    - 18:23:49.910Z: `date=2026-11-10 lines=4051 added=4051 updated=0 kept=0 started=8 unknown_start=0 torn=0 bytes=644891 elapsed_s=0.23`.
+    - 18:26:35.608Z (the 11-11 look-ahead): `lines=1285 added=1285 bytes=212958 elapsed_s=0.076`.
+    - 18:29:28.698Z: `date=2026-11-10 lines=4187 added=136 updated=3891 kept=160 started=10 torn=0 bytes=989135 elapsed_s=0.311`.
+    - The accounting closes: 4051 + 136 = 4187 lines; 3891 + 160 = 4051; the build's 4,037 records = 3891 + 136 + 10.
+  - `pregame_keep_failed` = 0: **MET.** From 18:14:23Z to 18:29:33Z: 0 `PREGAME_KEEP_FAILED`, 0 `DECISION_RECORD_FAILED`, 0 Traceback.
+  - `web_lens_slate_dates_defined` 0 -> 1: **MET on disk**, and web is reloaded. The served reading belongs to lane `nba-live-props-midnight`.
+- **Memory, not attributed:** refresh-worker RSS was 1,964 MB at 18:23Z, 2,037 at 18:26Z and 2,384 at 18:29Z. That is the post-boot ratchet (memory `project_worker_memory_is_boot_confounded`). The dry run measured the keep's own peak at 1-2 MB. A reading by worker age is owed.
+- **verify (owed, tonight and 11-11):**
+  - 11-10's file still holds the NBA lines after tip-off, frozen by `started`.
+  - `scripts/engine_experts.py run --date 2026-11-10` reads `source=kept_lines`, with NBA pregame opinions for games that have already started.
+  - The file's bytes through the full slate.
+  - 0 `PREGAME_KEEP_FAILED`.
+- **Revert:** `SYNDICATE_DECISION_RECORD_PREGAME_KEEP=off` in `local_production.env` (`REFRESH_WORKER__` scope, then a drained `down`/`up`). Or `git revert 47450ce07` on main, ff the fleet to that SHA, and a claimed refresh-worker TERM. `#777` has its own revert in its lane.
