@@ -77,7 +77,13 @@ class FallbackLoaderTests(unittest.TestCase):
         self.assertEqual(rows[0]["sport"], "mlb")
 
     def test_multiple_dates_are_concatenated(self) -> None:
-        with patch.object(state, "read_layer2_shortlist", return_value={"cards": [_l2a_card()]}):
+        # One GAME per date: the same game on two dates is ONE GAME, ONE BOARD's case
+        # (tests/test_layer2_lookahead_dedupe.py), and only its earliest board's card is kept.
+        shortlists = {
+            "2026-08-08": {"cards": [_l2a_card(event_id="823191")]},
+            "2026-08-09": {"cards": [_l2a_card(event_id="823205", commence_time="2026-08-09T23:05:00Z")]},
+        }
+        with patch.object(state, "read_layer2_shortlist", side_effect=lambda d: shortlists.get(str(d))):
             rows = state._layer2_fallback_recommendations(["2026-08-08", "2026-08-09"])
         self.assertEqual(len(rows), 2)
         self.assertEqual({r["source_board_date"] for r in rows}, {"2026-08-08", "2026-08-09"})

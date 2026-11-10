@@ -1,5 +1,17 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#779` — **A LIVE GAME SHOWED STALE PREGAME EDGES FROM TOMORROW'S BOARD: the next-day Layer 2 shortlist carries tonight's NCAAB / WNCAAB games at older lines, and no live join ever sees them. FIX ON MAIN (web, display only), NOT LOADED** `[2026-11-10, lane layer2-lookahead-live-dedupe, session 345d60ab; lead 2026-11-09 from live-display-other-sports]`
+- **Cause, measured 2026-11-10 19:51Z (1:51 PM CST, pregame) on the fleet:**
+  - The 11-11 NCAAB shortlist (written 19:26Z) was 274 rows, all of them tonight's 11-10 games. `select_shortlist`'s horizon (`layer2_board._within_horizon`) has no lower bound, and the NCAAB quote shard `2026-11-11.jsonl` holds commence times from 11-10 05Z to 11-12 04Z.
+  - The board's line-level dedupe (`intelligence_board.dedupe_recommendation_items`) dropped the 143 identical lines. 131 NCAAB + 6 WNCAAB rows survived at OTHER lines. All 137 had their game on the 11-10 board too, with the same projection at an older line (UCF over 150.5 vs 151.5, edge 20.4); 114 carry a model edge.
+  - Once the game tips, the web restate (`_refresh_layer2_live_state`) turns them live. No live join ever sees them: the next-day board is rebuilt at most hourly and was pregame when built. 11-09 23:09Z: Marshall @ Ohio State, two live unders with pregame edges 6.05 / 3.97 and no live number.
+- **Fix:** `pipeline/intelligence_state._drop_lookahead_duplicate_game_cards`, run inside `_layer2_fallback_recommendations` before the restate. It drops a card when its game's own date is before the board date it came from AND an earlier board carries the game (sport, event id, kind). Replayed on the 19:51Z served board: 137 rows over 58 games dropped, 0 games lost. The payload carries `layer2_lookahead_rows_dropped`. Display only: the shortlist rows, plans and orders never read these cards.
+- **Owed:** load on web (`reload-web`), and a before/after on a live slate in `deploys.md`.
+- **Not fixed, for whoever picks it up:**
+  - (a) The trading path DOES read the look-ahead rows. The 11-11 venue plan is built from the 11-11 shortlist, so it holds tonight's games. After midnight CT it is "today's" plan until the first 11-11 build overwrites it. Orders refuse them only because they are past `commence_time` (Kalshi pregame-only, Polymarket `_refuse_after_commence`).
+  - (b) The source: `_within_horizon`'s missing lower bound, and an NCAAB shard that is not keyed by Central kickoff date.
+  - (c) Football games sit on several week boards before their own date (84 pregame rows, 11-10); left alone by this fix.
+
 ### `#777` — **AN NBA GAME STILL LIVE AT MIDNIGHT CENTRAL LOST ITS LIVE PROP NUMBERS ON THE BOARD: the page lens is built for the new date only. FIX ON MAIN, ON FLEET DISK: web half LIVE 18:10Z, lens half loads at the live-odds-worker's 6 h recycle (~22:18-22:50Z = 4:18-4:50 PM CST 11-10)** `[2026-11-10, lane nba-live-props-midnight, session cca33a3a]`
 - **Load state, verified read-only 12:15-12:20 PM CST (18:15-18:20Z) 11-10:**
   - Loaded on the user's "Yes, load all three", given in lane `pregame-record-keep`'s chat. That lane ff'd `eeb2461c7 -> 47450ce07` at 18:10:15Z and ran `reload-web` 18:10:25-18:10:30Z (its `deploys.md` entry).

@@ -1804,6 +1804,7 @@ def _layer2_fallback_recommendations(
     *,
     vintages: list[str] | None = None,
     dated_vintages: dict[str, str] | None = None,
+    lookahead_report: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Persisted L2-A cards for these dates, shaped like a merged candidate.
 
@@ -1833,6 +1834,10 @@ def _layer2_fallback_recommendations(
     measured 2026-09-17, the board read "stale" off tomorrow's 48-minute-old
     shortlist while today's was 13 minutes old, and nothing in the response
     could tell the two apart.
+
+    `lookahead_report`, when given, is filled by `_drop_lookahead_duplicate_game_cards`
+    (lane `layer2-lookahead-live-dedupe`): how many cards a later board date carried
+    for a game an earlier one already does, and were dropped.
     """
     cards: list[dict[str, Any]] = []
     for requested_date in requested_dates or ():
@@ -1887,6 +1892,15 @@ def _layer2_fallback_recommendations(
                 f"stamp={_stamp} reason=no_cards",
                 flush=True,
             )
+    # ONE GAME, ONE BOARD (lane `layer2-lookahead-live-dedupe`, todo `#779`). Before the
+    # restate, so a look-ahead copy is never turned live: no build's live join ever saw it.
+    # Never raises -- a failed dedupe leaves the board exactly as it was before this lane.
+    try:
+        report = _drop_lookahead_duplicate_game_cards(cards)
+        if lookahead_report is not None:
+            lookahead_report.update(report)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[intelligence_state] LAYER2_LOOKAHEAD_DEDUPE_FAILED {type(exc).__name__}: {exc}", flush=True)
     # `#367`: after the per-card work, because it needs the whole list to build
     # one scoreboard index instead of one lookup per card. Never raises -- a
     # scoreboard blip must leave the board stale, not empty.
@@ -1901,6 +1915,116 @@ def _layer2_fallback_recommendations(
     except Exception as exc:  # noqa: BLE001
         print(f"[intelligence_state] LAYER2_LIVE_RESTATE_FAILED {type(exc).__name__}: {exc}", flush=True)
     return cards
+
+
+def _lookahead_game_identity(card: Mapping[str, Any]) -> tuple[str, str, str] | None:
+    """`(sport, event_id, kind)`, or None when the card names no event.
+
+    The odds EVENT id, never the team pair: both boards are built from the same quote
+    store, so the same game carries the same id on every date (measured 2026-11-10: 137 of
+    137 look-ahead NCAAB/WNCAAB rows matched today's board by `event_id`), while a team
+    pair can be two games (`shared/doubleheader.py`). A card with no id is never dropped.
+    """
+    event_id = str(card.get("event_id") or "").strip()
+    if not event_id:
+        return None
+    sport = str(card.get("sport") or card.get("sport_slug") or "").strip().lower()
+    kind = str(card.get("kind") or card.get("candidate_type") or "").strip().lower()
+    return sport, event_id, kind
+
+
+def _drop_lookahead_duplicate_game_cards(cards: list[dict[str, Any]]) -> dict[str, Any]:
+    """ONE GAME, ONE BOARD: a look-ahead board's copy of an EARLIER date's game is dropped.
+
+    Lane `layer2-lookahead-live-dedupe` (todo `#779`, lead 2026-11-09 from
+    `live-display-other-sports`). The combined board reads one Layer 2 shortlist per window
+    date (today .. today+2), and a later date's shortlist can carry TODAY's games:
+    `select_shortlist`'s horizon has no LOWER bound, and the NCAAB quote shard for a date
+    holds whatever the capture for that date saw. Measured 2026-11-10 19:51Z: the 11-11
+    NCAAB shortlist (written 19:26Z) was 274 rows, ALL of them tonight's 11-10 games.
+
+    A card is dropped when BOTH hold:
+      * its game's own date (`game_date`) is before the board date it came from, and
+      * an earlier board date carries the same game (sport, event id, kind).
+
+    NOT the other direction. A week sport's game sits on several boards BEFORE its own date
+    (a Saturday NCAAF game on the Tuesday and Wednesday boards: 84 football rows on
+    2026-11-10). Those are pregame-only duplicates -- by the game's own day the earlier
+    boards have left the window -- so they never reach the live case this lane is about,
+    and they are left as they were (a lead, not this change).
+
+    The board's own dedupe (`intelligence_board.dedupe_recommendation_items`) drops only an
+    identical LINE. A look-ahead copy at another line survives -- 131 NCAAB + 6 WNCAAB rows
+    that evening, the same projection at an older line (UCF over 150.5 vs today's 151.5,
+    edge 20.4), 114 of them with a model edge. Once the game tips, `_refresh_layer2_live_state`
+    turns those cards live, but no build's live join ever saw them: later dates are rebuilt at
+    most once per SYNDICATE_INTELLIGENCE_BOARD_WINDOW_SLOW_REFRESH_SECONDS and were pregame
+    when built. 2026-11-09 23:09Z: Marshall @ Ohio State, two live unders from the 11-10
+    board with the pregame projection 161.4, pregame edges 6.05 / 3.97, no live number.
+
+    WHY DROP, NOT JOIN OR BLANK. The game's own-date board is its freshest copy: today's is
+    rebuilt every pass, gets the live join and the in-play overlay. A joined look-ahead copy
+    would still be up to an hour old and a second row for one game; a blanked one would
+    still be a second, older selection of the same game beside the fresh one, bypassing its
+    per-game cap. So the copy goes, pregame as well as live.
+
+    Per KIND (game / prop), so a later board's props for a game whose earlier board seats
+    no props are kept: only a duplicate is removed, never a game's only rows of a kind. A
+    card with no resolvable `game_date` or no event id is kept.
+    Display only: the shortlist rows, the portfolio plans and orders never read these cards.
+
+    Mutates `cards` in place; returns the counts, and prints them when anything was dropped.
+    """
+    earliest: dict[tuple[str, str, str], str] = {}
+    for card in cards:
+        identity = _lookahead_game_identity(card)
+        board_date = str(card.get("source_board_date") or "").strip()
+        if identity is None or not board_date:
+            continue
+        seen = earliest.get(identity)
+        if seen is None or board_date < seen:
+            earliest[identity] = board_date
+    kept: list[dict[str, Any]] = []
+    dropped: list[dict[str, Any]] = []
+    for card in cards:
+        identity = _lookahead_game_identity(card)
+        board_date = str(card.get("source_board_date") or "").strip()
+        game_date = str(card.get("game_date") or "").strip()[:10]
+        if (
+            identity is not None
+            and board_date
+            and len(game_date) == 10
+            and game_date < board_date
+            and earliest.get(identity, board_date) < board_date
+        ):
+            dropped.append(card)
+        else:
+            kept.append(card)
+    by_sport_date: dict[str, int] = {}
+    games: set[tuple[str, str]] = set()
+    with_model_edge = 0
+    for card in dropped:
+        sport, event_id, _kind = _lookahead_game_identity(card) or ("", "", "")
+        key = f"{sport}|{card.get('source_board_date')}"
+        by_sport_date[key] = by_sport_date.get(key, 0) + 1
+        games.add((sport, event_id))
+        edge = card.get("model_edge_pct")
+        if isinstance(edge, (int, float)) and not isinstance(edge, bool) and edge != 0:
+            with_model_edge += 1
+    report = {
+        "rows_dropped": len(dropped),
+        "games": len(games),
+        "rows_dropped_with_model_edge": with_model_edge,
+        "by_sport_board_date": by_sport_date,
+    }
+    if dropped:
+        cards[:] = kept
+        print(
+            f"[intelligence_state] LAYER2_LOOKAHEAD_DEDUPED rows={len(dropped)} games={len(games)} "
+            f"with_model_edge={with_model_edge} by_sport_board_date={by_sport_date}",
+            flush=True,
+        )
+    return report
 
 
 def _merge_inplay_overlay(cards: list[dict[str, Any]], requested_date: str, *, start: int = 0) -> dict[str, int]:
@@ -10465,9 +10589,13 @@ def read_combined_intelligence_response(
     # `#308`'s own monitor fell into. This keeps the pool independently readable.
     legacy_candidate_count = len(merged_recommendations)
     legacy_rows_withheld = 0
+    lookahead_report: dict[str, Any] = {}
     if board_l2a_fallback_enabled():
         fallback_cards = _layer2_fallback_recommendations(
-            requested_dates, vintages=artifact_vintages, dated_vintages=layer2_vintages_by_date
+            requested_dates,
+            vintages=artifact_vintages,
+            dated_vintages=layer2_vintages_by_date,
+            lookahead_report=lookahead_report,
         )
         if fallback_cards:
             # LEGACY PROP AND GAME ROWS LEAVE THE BOARD ONCE LAYER 2 HAS ROWS (lane
@@ -10696,6 +10824,13 @@ def read_combined_intelligence_response(
     if layer2_fallback_used:
         combined["state_meta"]["source"] = "combined_board_window+layer2_fallback"
         combined["layer2_fallback_rows"] = layer2_fallback_used
+        # Lane `layer2-lookahead-live-dedupe`: what ONE GAME, ONE BOARD removed, so the board
+        # can say a look-ahead copy was dropped rather than never built.
+        if lookahead_report:
+            combined["layer2_lookahead_rows_dropped"] = int(lookahead_report.get("rows_dropped") or 0)
+            combined["layer2_lookahead_dropped_by_sport_board_date"] = dict(
+                lookahead_report.get("by_sport_board_date") or {}
+            )
 
     sliced = slice_intelligence_board_state_for_request(combined, sport=sport, limit=limit)
     sliced["board_contract"] = board_contract

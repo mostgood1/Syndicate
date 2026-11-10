@@ -833,6 +833,14 @@ death, never life — do not invert it.
 - Verification: Unit: off != on (a file holding 1 game + 3 sims -> fixed export writes 3 games, existing entry byte-identical; a complete file is not rewritten, mtime unchanged). Replay on the fleet's 11-10 files: index games 1 -> 6, attach_projections priced NBA prop rows rise only on the 5 games. Fleet, after the user's yes: the next live-odds-worker NBA refresh writes the file with 6 games, served rows on those games carry sim_projection + model_edge_pct.
 - Blocked by: none
 
+### layer2-lookahead-live-dedupe — OPEN — opened 2026-11-10 — session 345d60ab-9db5-4a93-9d01-d57374578f65
+- Goal: On the served combined board (POST /api/intelligence/query ranked_all), 0 live game rows come from a LOOK-AHEAD board date for a game an earlier window date's board already carries, so 0 live look-ahead rows carry a pregame model edge with no live number; measured before/after on a live slate in deploys.md (todo #779, lead 2026-11-09 from live-display-other-sports)
+- Files: pipeline/intelligence_state.py (_layer2_fallback_recommendations + new _lookahead_game_identity + _drop_lookahead_duplicate_game_cards helpers + the lookahead_report plumbing in read_combined_intelligence_response ONLY), tests/test_layer2_lookahead_dedupe.py (NEW), tests/test_board_l2a_fallback.py (test_multiple_dates_are_concatenated ONLY), docs/ai_context/todo.md (#779 ONLY)
+- Hypothesis: Measured 2026-11-10 19:51Z (pregame): the 11-11 NCAAB Layer 2 shortlist (built 19:26Z) holds 274 rows, ALL tonight's 11-10 games, because select_shortlist's horizon has no lower bound and the NCAAB quote shard is a capture-date shard. 143 are exact-line dupes the board dedupe already drops; 131 NCAAB + 6 WNCAAB survive at OTHER lines (137 of 137 have their event on the 11-10 board; same projection, older line; 114 carry a model edge). Live, the web restate turns them live but no build's live join ever sees them (the 11-11 board is rebuilt <= hourly and was pregame at build). Fix: one game, one board -- a game's cards come only from the EARLIEST window date that carries it (today's board is rebuilt every pass, the look-ahead hourly).
+- Falsification test: After the web load, a live game row from a later source_board_date than another date carrying the same event survives on the served board, or a game (sport,event_id) present on the board before the load is absent after.
+- Verification: probe.py / by_board_date.py on the fleet before the load and after it on the 11-10 evening slate: per (sport, source_board_date, board_lane) live game rows, live-number rows, blank rows with a model edge; plus the set of (sport,event_id) before vs after.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
