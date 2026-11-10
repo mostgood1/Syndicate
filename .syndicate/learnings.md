@@ -3343,3 +3343,11 @@ I counted "unchanged re-appends" on the NBA and NHL quote shards (NHL: 41% of ro
 - **How to apply:**
   - Before landing a change that turns unpriced rows priced, list every gate that clears or refuses an edge (out-player, live-edge policy, certainty, venue). Confirm each one keys the newly priced rows the same way the new join does.
   - Count a name defect on the grid (`iter_book_quotes` -> `build_book_grid`), not on the served shortlist: the shortlist hides most of the population.
+
+## 2026-11-10 — `LIVE_PROJECTION_JOIN considered=None` is an EARLY RETURN with a reason, not "the join did not run"; and its reason reads the same on a quiet afternoon as on a broken night `[lane nba-live-props-midnight, session cca33a3a]`
+- **Belief overturned:** `#776` and the brief for this lane read the post-roll NBA props line `considered=None` as "the props join did not run".
+  - It ran. `attach_live_projections_for_sport` returned before its counters, and the line's `reason=` field named why: `live-lens snapshot for nba carries no liveProps (producer not wired)`.
+  - That exact string is ALSO what every NBA build prints when no game is in play (fleet logs 11-03..11-10, daytime). So "producer not wired" said nothing about the producer. The re-sim was publishing the game's props the whole time; the lens just never carried them.
+- **How to apply:**
+  - When a `*_JOIN` line reads `None` counters, grep the same line's `reason=` before deciding what did not run. The counters are absent BY DESIGN on early returns.
+  - Do not take a reason string's wording as its cause. Find the branch that prints it, and list every state that reaches that branch.
