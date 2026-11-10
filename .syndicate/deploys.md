@@ -57923,3 +57923,22 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - **h2h:** Ohio State (home) 0.926.
 - **The 2 blank rows are not the join's: they come from the look-ahead board date.** Both are Marshall @ Ohio State full-game unders (162.0, 161.5), `source_board_date` 2026-11-10, `board_lane` dead. They carry the PREGAME projection 161.4 and pregame edges 6.05 / 3.97 with no live number (`by_board_date.py`: 11-09 rows 16 of 16 live; 11-10 rows 0 of 2). They predate this change, which adds no edge. Filed as a lead, not fixed here.
 - **Earlier read, 23:07:47Z, two minutes before:** 14 of 18, 0 old code. The 4 blanks were the same 2 look-ahead rows plus the h2h row and the full-game under 162.5 (pregame edge 5.39). Both had a live number by 23:09:54Z. Same-day served rows can change between reads, so this entry rests on the 23:09:54Z read.
+
+## 2026-11-10 01:15Z (7:15 PM CST 11-09) -- live evidence log (lane `live-evidence-log`, `564f8dbde`): reading 1 of 3 -- **same-moment probe 31 of 31 live lanes MATCHED, 0 missing, 0 mismatched; 0 tracebacks** (written 01:22Z, 7:22 PM CST)
+- **What this verifies:** the `564f8dbde` load of 2026-11-09 19:18:04Z (entry above). For each sport, the probe read the CURRENT snapshot from the shared store, rebuilt the evidence at that snapshot's own `t` from the log, and compared every fresh lane on state, proj, marginDist, totalRunsDist, modelHomeWinProb, simsRun and as_of.
+- **Probe, read 01:15:24Z (worker pid 386232, 0 child processes):**
+  - nba 5/5; ncaab 24/24; wncaab 1/1; nhl 1/1 -- all matched, 0 missing, 0 mismatched.
+  - ncaaf and nfl: 0 fresh lanes, nothing to compare (Monday night football kicks off ~7:15 PM CST; the 8:35 PM probe below covers it).
+  - wnba: snapshot absent (off-season).
+- **Window:** `TICK` every ~30-60 s, 01:10:54Z-01:13:52Z (ncaab 24 + nhl 1, wncaab 1, nba 5). 0 tracebacks in the window, 0 since load.
+- **Sizes so far, producer date 2026-11-09:** nba 416,393 B / 91 rows; ncaab 1,757,994 B / 562; wncaab 439,739 B / 119; ncaaf 29,861 B / 67; nfl 6,633 B / 15; nhl 5,305 B / 10. Full-day bytes are owed at 11:30 PM CST.
+- **Found: the file date is the PRODUCER's `date`, not Central.**
+  - The football snapshots carry `date=2026-11-10` since about 00:02Z (6:02 PM CST), so `ncaaf/2026-11-10.jsonl` and `nfl/2026-11-10.jsonl` exist. Tonight's Monday night game (BUF @ MIN, `game_not_in_progress` at 01:13Z) will log under 11-10.
+  - Consumers must join on (sport, event, `t`), never on the file date. Sizing reads both dates.
+- **Memory (read 01:16:41Z, worker age 6.0 h):**
+  - RSS 3,590 MB: 3,528 MB anon, 62 MB file. High-water 3,897 MB.
+  - Host: 7.8 GB available of 15.7 GB; swap 680 MB used. Restart log: no exits since 19:18:06Z.
+  - **Not attributed.** No matched-age comparator without the collector, and worker memory is boot-confounded. It is inside the ~3.6 GB board-build peaks recorded earlier (deploys.md, fast-lane reading). Re-read at 11:30 PM CST.
+- **Owed:**
+  - 02:35Z (8:35 PM CST): the probe again with Monday night football in play (football's own fields: down, distance, yardLine, possession), plus sizes for both producer dates.
+  - 05:30Z (11:30 PM CST): the NBA cross-check against `live_resim_history`, plus sizes and RSS.

@@ -807,7 +807,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### live-evidence-log — OPEN — opened 2026-11-09 — session e32fef1a-01e8-4afe-a284-01acd3728545
-- **STATUS `[2026-11-09 19:22Z]`: GOAL: NOT MET -- LOADED on the fleet (`564f8dbde`, refresh-worker TERM 19:18:04Z); collector running and writing; the live readings are owed tonight (timers 01:15Z probe, 05:30Z NBA cross-check + sizes).** Earlier: built and dry-run 18:18Z (wncaab probe 3/3).
+- **STATUS `[2026-11-10 01:22Z]`: GOAL: NOT MET -- LOADED (`564f8dbde`, 19:18:04Z); reading 1 PASSED: probe 31/31 live lanes matched at 01:15Z (nba 5, ncaab 24, wncaab 1, nhl 1), 0 tracebacks. Owed: 02:35Z probe with Monday night football live; 05:30Z NBA cross-check + full-day sizes.** File date = the producer's `date` (football rolled to 11-10 at 6 PM CST). Earlier: built and dry-run 18:18Z (wncaab probe 3/3).
   - Built:
     - `syndicate/features/shared/live_evidence_log.py`: collector + `iter_rows` / `evidence_at`; switch `SYNDICATE_LIVE_EVIDENCE_LOG`, absent = on; every 30 s.
     - the refresh-worker start call;
