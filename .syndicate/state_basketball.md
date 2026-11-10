@@ -1061,7 +1061,15 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
 ## [nba-live-native-p3] NBA LIVE: native resumed re-sim PRICES the board's live game lines AND props (user decision 2026-10-20 "Display + money on everything"; `SYNDICATE_NBA_LIVE_PRICED=0` turns it off); props cover combos per draw, stl/blk/tov, every posted line +-3; in-play pulls fetch only games in play (3 h window); Kalshi in-play ENTRIES refused by `cd0901bf` regardless; totals-level regular-season gate still NOT PASSED -- the live model is unvalidated `[verified 2026-10-22 on the fleet, lanes nba-live-board / nba-live-prop-coverage / nba-inplay-only-pulls, session 9e18a0e7]`
 
 - **Verified 2026-10-20/22 (deploys.md 2026-10-21 00:02Z, 01:20Z, 2026-10-22 05:0xZ, 14:47Z):** served NBA board live_gamelines + live_projections supported=True; live prop rows with a live projection 106 of 137 (was 45-48; lens prop rows 37 -> 488); in-play pulls 104/104 ok on the 11-game 10-21 slate, 27% fewer game fetches than full pulls; window 4 h -> 3 h live 10-22 9:47 AM CT. Left: players missing from the sim roster get no live projection; double/triple-double (yes/no) unjoined.
-- **THE RE-SIM STARVES THE SCOREBOARD TAIL AT PEAK; the Layer 2 live columns lagged 15-25 min `[measured 2026-11-05 on the fleet, lane nba-live-proj-actuals, todo #761]`:** one 240 s deadline over ESPN scoreboard order. 11-02 01-02Z: 16 of 20 ticks exhausted it; UTA@SAS refused 10 ticks running. 11-05 01:37Z: 4 of 8 live games refused, two never re-simmed. **Web half LIVE** (`84bb34d26`, 01:41:40Z): NBA prop Live proj./actual refreshed from `live/nba_live_lens.json` at read time, 267/267 served rows == lens. **Re-sim half (stalest-first + carry <= 900 s) and the totals-only `live_total` fix are on main, NOT loaded** until live-odds-worker / refresh-worker restart. Findings `findings_2026-11-04_nba_live_proj_actuals.md`.
+- **NBA LIVE PROJ./ACTUAL ON LAYER 2: EVERY LIVE GAME SERVED `[verified 2026-11-10 03:31Z on the fleet, lane nba-live-proj-actuals CLOSED, todos #761/#762]`:** All of the following is loaded:
+  - the web read-time refresh from `live/nba_live_lens.json` (`84bb34d26`);
+  - the re-sim's stalest-first order with carry <= 900 s, and the totals-only `live_total` (`d6a691168`);
+  - `#762` display-only numbers for quarter/half, DD/TD and pulled-market rows;
+  - the accent fold (`7d72f8e9d`);
+  - name splits (`e2558013c`): the re-sim key is the engine's `normalize_player_name_key`, and the join falls back to a unique canonical key via `live_projection_join._resolve_player`, counted as `player_alias=`.
+  - **11-09 slate, served board:** 95.3-100% of live NBA prop rows carried both numbers per 6-min poll. Misses are players who have not entered: the lens carries only players who have played, and they clear within 1-3 polls. Alias-only rows: 203 of 204.
+  - **Open, NOT this subject's fix:** name-split players (Herb Jones, Paul Reed Jr, Carlton Carrington) are display-only. They have no `sim_projection` / `model_edge_pct` / side / headshot / history, because the board's other name joins are exact or casefold (`basketball_market_board._canonical_player_key`).
+  - Findings `findings_2026-11-04_nba_live_proj_actuals.md`; deploys.md 2026-11-10 03:31:01Z.
 
 - **Built** (on main, off by default):
   - `syndicate/features/nba/live_resim.py`: resumes P1's engine (production's `_engine_for_league_local("nba")`, #473 no-stack) from P2's LiveGameState on the persisted pregame inputs;
@@ -1549,4 +1557,4 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   - Final: `Final 114-102` at the first lens write after ESPN's `post`. 01:20Z: 3 live + 1 final + 3 pregame, 0 mismatches. `lens_live_games` equalled ESPN's live count on every join since tip (1 x7, then 3 at 01:24:09Z).
 - **The lens tick is ~170 s, not 60 s** (`TICK_COMPLETE` 22:13:33Z, then 22:16:24Z). A game can read `Scheduled` for up to one tick after tip.
 - **Cost, measured on the fleet:** a cold cards build is ~0.3 s of work plus two ~0.2 s deepcopies of a 1.79 MB-pickle context; a hit is 0.22 s.
-- **Open, not this subject:** the prop join's player key does not fold diacritics (lens `Nikola Jokić` vs board `nikola jokic`). Lane `nba-live-proj-actuals` owns that lookup.
+- **Diacritics in the live prop join: FIXED `[verified 2026-11-09 02:30Z, lane nba-live-proj-actuals, 7d72f8e9d]`:** the join folds accents. Lens `Karlo Matković` joins board `Karlo Matkovic` (7 of 7 rows), and Dončić joined on 11-09 LAL@ATL.
