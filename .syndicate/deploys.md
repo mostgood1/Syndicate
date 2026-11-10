@@ -58093,3 +58093,33 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 
   **Not pushed: a code push is the user's call.** No fleet load is needed for either, because the writer is unchanged and only the check script reads rows.
 - **Verdict:** the writer meets every reading in the lane's Goal. Not closed: NFL rows read with their state only through the unpushed reader. The goal names one as-of reader, so the lane closes when `le-nfl-normalize` reaches main.
+
+## 2026-11-10 05:49:42Z (11:49 PM CST 11-09) -- VERIFY lane `ncaab-live-resim-capacity` (the `workers=2` re-sim pool, `eb9afa26a` + `af4244afd`): the owed busy-slate reading -- **MET: 46 of 46 NCAAB ticks at 15-26 live re-simmed every game, 0 carried, 0 not reached, 0 worker errors; slowest tick 72.9 s against the 240 s budget** (written 06:03Z, 12:03 AM CST 11-10)
+- **Pre-registered** in lanes.md before the slate (STATUS 2026-11-09 11:08 AM CST, pushed `75f091b5a`): MET if >= 90% of NCAAB ticks with live >= 15 carry 0 and leave 0 not reached, with `worker_errors=0` on every tick and no error line; NOT MEASURED if fewer than 5 ticks reach 15 live.
+- **Sample:** live-odds-worker.log `NCAAB_LIVE_RESIM_TICK`, window 2026-11-09T22:00Z..the read at 05:49:42Z. 207 ticks, 174 with a live game (first 23:02:26Z, last 05:45:35Z). **Peak 26 live at 01:08:06Z (7:08 PM CST)**, below the 27-40 estimated from ESPN's listing; the 31-40 bucket was not reached.
+- **Measurement (ticks by live count):**
+
+  | live | ticks | elapsed median / p90 / max (s) | carried > 0 | not reached > 0 | worker_errors > 0 | per-game wall median (s) |
+  |---|---|---|---|---|---|---|
+  | 1-6 | 88 | 5.8 / 9.7 / 13.1 | 0 | 0 | 0 | 3.9 |
+  | 7-12 | 38 | 17.6 / 22.8 / 32.1 | 0 | 0 | 0 | 3.3 |
+  | 13-20 | 16 | 45.0 / 53.3 / 55.7 | 0 | 0 | 0 | 5.0 |
+  | 21-30 | 32 | 40.2 / 56.9 / 72.9 | 0 | 0 | 0 | 3.6 |
+
+  - 0 of 174 ticks at or over the 240 s budget. 0 error lines (`TICK_ERROR` / `WORKER_ERROR` / `LOOP_START_FAILED` / `POOL_DISABLED`), 0 timestamped tracebacks in the window.
+  - `workers=2` and `carry_bound=shadow` on every live tick. Draws at 0.98-1.00 of a core per child.
+- **Against the expectation:** the median at 21-30 live was 40.2 s, under the predicted 65-120 s, because per-game wall ran 3.6 s instead of the 6.0-7.2 s measured on 11-08. Nothing approached the 29+-live case that the slowest per-game cost (16.9 s) would push past 240 s.
+- **Baseline:** 11-07, before the pool: every NCAAB tick at the 240 s budget from 20:07:44Z, re-simming 1-6 of 8-13 games. 11-08 with the pool: 30 ticks at 7-14 live, 0 carried, medians 49.5 s (7-9) / 68.8 s (13-14) (deploys.md 2026-11-08 19:35:55Z).
+- **Carry bound (shadow), for the user's `on` decision:** `carry_expired` 0 on every tick, because nothing was carried. `on` would have refused nothing tonight. The bound stays shadow; `on` is not approved.
+- **Downstream, reported not gating (refresh-worker `LIVE_GAMELINE_JOIN sport=ncaab`, each join paired with the latest tick's live count):**
+  - 22 joins at >= 15 live: `lane_age_max` median 131.0 s, max 204.8 s, 0 over the 600 s pricing ceiling, `live_lane_older_than_pricing_ceiling` 0. 2 of 22 builds priced 0.
+  - 63 joins at 1-14 live: median 59.8 s, max 154.7 s, 0 over 600 s.
+  - The quote-side refusals stay the larger cause (at >= 15 live: `quote_older_than_the_score_the_model_saw` 3,395, `quote_older_than_live_pricing_ceiling` 1,638, over 22 builds); they are the market's quote age, not this lane's.
+- **Code running:** fleet head `564f8dbde` (lane `live-evidence-log`'s ff 19:17:57Z), not the pre-registered `56f2e7a10`. The runtime diff `56f2e7a10..564f8dbde` touches `nhl/live_resim.py`, `game_chip_intervals.py`, `kalshi_board_join.py`, `kalshi_catalogue.py`, `check_deploy_safety.py`, `live_evidence_log.py` and its start call in `run_refresh_worker.py`; nothing under `ncaab/` or `shared/live_resim_workers.py`. live-odds-worker recycled by design at 00:14:28Z (`max_uptime_seconds` 21,000) and the loop restarted 00:14:37Z with `workers=2`. The 46 ticks at >= 15 live ran 00:04:28Z..02:05:39Z: 4 in the process before the recycle, 42 in the one after. The re-sim code is the same in both.
+- **Fleet outage after the slate (not this lane's change, found by this read):** WSL stopped at ~05:47:11Z (11:47 PM CST) when Windows Update installed *Windows Subsystem for Linux 3.0.5.0* (System log, CST: install started 23:46:21; WSL Service start type set to disabled 23:47:16; install successful 23:47:48; the VM was back 23:47:57 with only redis). Last live-odds-worker line 05:47:11Z.
+  - The watchdog flagged it at 05:50:58Z (5 failing: stale supervisor pidfile, web, both workers, /healthz) and ran `RECOVERY_START task=SyndicateLocalProduction supervisor down 602 s` (attempt 1) at 06:00:57Z. Supervisor, web and both workers up 06:00:57-06:01:00Z with `--allow-live-execution`.
+  - After: head `564f8dbde` unchanged, `/healthz` 200 at 06:01:47Z, 0 tracebacks, NCAAB and WNCAAB loops restarted 06:01:01Z with `workers=2`. **Down ~13 min 46 s (05:47:11Z..06:00:57Z).**
+  - Nobody deployed; I started nothing. My first `wsl` status call (~23:47:5x CST) may be what booted the VM; WSL boot starts only redis, not the fleet. Whether the WSL package may auto-update on the production host is the user's call.
+  - **Separate, pre-existing gap seen at recovery:** the tick re-sims only `central_today_iso()` (`ncaab/live_resim.py:1527`). After midnight CST it reads 2026-11-10, so PORT @ HAW (11-09 slate, 10:59 PM CST tip, ESPN `in` at halftime at 06:02Z) is not re-simmed: tick 06:01:01Z `date=2026-11-10 live=0`. It happens at every midnight, outage or not. Proposed as its own task; not fixed here.
+- **Read:** `C:/tmp/ncaabcap/busy2_read.sh 2026-11-09T22:00 2026-11-10T10:00` (read-only), output `C:/tmp/ncaabcap/busy2_out.txt`. The waiting watcher died with WSL at 05:47Z; the read was run by hand at 05:49:42Z, after the last tick at 15+ live (02:05:39Z), so the verdict's population was complete.
+- **verify:** the reading above. Lane `ncaab-live-resim-capacity` goal met on a 26-live slate; closing it is the user's call.

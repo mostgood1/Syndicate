@@ -462,7 +462,7 @@
       - 161 of the 203 full-game ledger rows written since the restart are ones only this rule admits. wncaab is unchanged.
       - Second board build on the new pid 273.1 s (23:00:37Z), back to the day's 246 s median; the first, 2,321 s, was the cold start.
       - Coverage, not value (findings, finding 2). Live-money in-game entries do not trade NCAAB.
-      - **Owed:** a 13-40-live reading.
+      - ~~Owed: a 13-40-live reading.~~ **DONE 2026-11-10: MET** (deploys.md 2026-11-10 05:49:42Z). On 11-09's slate, peaking at 26 live: 46 of 46 ticks at 15-26 live re-simmed every game, 0 carried, 0 not reached, 0 worker errors; slowest 72.9 s against the 240 s budget. The carry bound's shadow `carry_expired` was 0, so `on` would have refused nothing; it stays shadow. 31-40 live was not reached.
 - **Three more live gaps, measured 11-06 03:27-03:41Z (deploys.md VERIFY part 2, lane `nba-live-proj-actuals`):**
   - (a) **Stale-quote rows lose the live number too.** `live_gameline_join`'s quote-age gate (NBA 600 s) refuses a row BEFORE any live number is attached. So, per price grid, 0-36 full-game rows of a game show no Live proj., although the lane prices any line. That is the likely cause; it is unproven per row. Withholding the edge is right; blanking the projection is not obviously so.
   - (b) **Full-game moneyline rows never carry Live proj.** The h2h branch withholds its HOME win probability because the Live column is side-blind. A side-aware publication would fix it.

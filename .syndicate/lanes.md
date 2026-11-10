@@ -628,6 +628,14 @@ death, never life — do not invert it.
   - **Rule (pre-registered):** MET if >= 90% of NCAAB ticks with live >= 15 carry 0 and leave 0 not reached, with `worker_errors=0` on every tick and no error line. NOT MET otherwise. NOT MEASURED if fewer than 5 ticks reach 15 live.
   - Reported, not gating: refresh-worker NCAAB joins at >= 15 live (`lane_age_max` <= 600 s, `live_lane_older_than_pricing_ceiling` = 0), and `carry_expired` (shadow) for the carry-bound decision.
   - Read (read-only): `C:/tmp/ncaabcap/busy2_read.sh 2026-11-09T22:00 2026-11-10T09:00`. Dry run on 11-08 reproduced peak 14 live, 0 carried.
+- STATUS 2026-11-10 12:03 AM CST (06:03Z): BUSY-SLATE READING **MET** against the pre-registered rule (deploys.md 2026-11-10 05:49:42Z).
+  - 46 of 46 NCAAB ticks at 15-26 live re-simmed every game: 0 carried, 0 not reached, 0 worker errors, 0 error lines. Peak 26 live at 01:08Z (7:08 PM CST); 31-40 live was not reached.
+  - Slowest tick 72.9 s against the 240 s budget; median 40.2 s at 21-30 live (predicted 65-120 s: per-game wall ran 3.6 s, not 6.0-7.2 s). 0 of 174 live ticks at the budget.
+  - Carry bound (shadow): `carry_expired` 0 because nothing was carried, so `on` would have refused nothing. It stays shadow.
+  - Joins at >= 15 live: `lane_age_max` max 204.8 s, 0 over the 600 s ceiling.
+  - Code: fleet `564f8dbde`; the college re-sim path is identical to the pre-registered `56f2e7a10`.
+  - Found after the read: a fleet outage 05:47-06:01Z (WSL updated by Windows Update; the watchdog auto-recovered), not this lane's. And a pre-existing gap: after midnight CST the tick reads only the new date, so a game still live from the previous slate is not re-simmed (PORT @ HAW tonight).
+  - **Goal met on every reading it names. Closing the lane is the user's call.**
 - Blocked by: none
 
 ### nhl-live-resim-slate-root — CLOSED 2026-11-10 (GOAL MET: NYR@EDM re-simmed live 11-09 7:05 PM CST, NHL join index=1, served moneyline 1 of 1 and totals 2 of 2 live NHL rows with a live number; puck line blank by design) — opened 2026-11-08 — session e1aa93b0-e5f4-4422-a186-b82171244058
