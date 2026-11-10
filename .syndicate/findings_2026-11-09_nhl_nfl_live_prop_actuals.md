@@ -102,3 +102,15 @@ Two ways to an honest NHL Live proj.:
   at 01:5xZ was logging `typical=38.7min`. NBA/MLB get a read-time refresh on web
   (`intelligence._refresh_live_columns_from_artifact`, lane `nba-live-proj-actuals`); NHL/NFL do not
   yet. Each Actual carries `live_actual_as_of`.
+
+## Live reading, 2026-11-10 02:52-03:00Z (MNF + the NHL evening slate)
+
+- **Presence:** served NHL PHI @ VAN 37 of 38 live props carry an Actual; NFL BUF @ MIN 123 of 125. 0 of 147 carry a Live proj. or `model_edge_pct`.
+- **Refusals seen live, all correct:**
+  - two Elias Petterssons on Vancouver (`ambiguous=8`);
+  - scratches (`absent`);
+  - NFL players with no stat yet: ESPN's summary box omits them, so 27-44 of ~270 rows had no Actual in the first half.
+- **Freshness:** at NFL halftime (stats frozen), in-play overlay rows matched the box 40 of 40. Board-build rows matched 13, were behind on 14 (Allen passing yards 70 vs 122) and ahead on 1 (rushing yards fell 7 to 6).
+  - The lag is the board build's, not the producer's: both snapshot blocks were stamped within 2 minutes of the read (NHL 02:51:23Z, NFL 02:48:16Z).
+  - NBA avoids it because web refreshes its prop rows from the lens at read time.
+- Detail: `deploys.md` 2026-11-09 14:50:05Z `Measured:`. Owed: todo `#769` (c).

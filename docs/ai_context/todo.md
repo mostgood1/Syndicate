@@ -28,7 +28,7 @@
   - NFL's live re-sim lane first reached the join 40 min after MNF kickoff (01:54:32Z vs 01:15Z; `sources_seen {'pregame': 15}` before).
   - Look-ahead board-date live rows keep the pregame edge (leads.md 2026-11-09).
 
-### `#769` — **LIVE NHL / NFL PROPS HAD NO LIVE ACTUAL ON LAYER 2 (served 01:31Z 11-09: NHL 0 of 29, NFL 0 of 140). DISPLAY-ONLY BOX-SCORE ACTUAL ON MAIN `b2a5013e2`, LOADED on the fleet 11-09 14:48-14:50Z (config verify MET); the live served-board reading is owed (11-09 evening slate). NHL Live proj. NOT shipped: the live re-sim's per-player means run 4-13% hot (no `special_teams_cal`)** `[2026-11-09, lane nhl-nfl-live-prop-actuals, session 386d4115]`
+### `#769` — **LIVE NHL / NFL PROPS HAD NO LIVE ACTUAL ON LAYER 2 (served 01:31Z 11-09: NHL 0 of 29, NFL 0 of 140). DISPLAY-ONLY BOX-SCORE ACTUAL ON MAIN `b2a5013e2`, LOADED on the fleet 11-09 14:48-14:50Z (config verify MET). LIVE READING MET 11-10 02:52Z: served NHL 37 of 38 and NFL 123 of 125 live props carry an Actual, 0 priced. The Actuals on the board build's own rows LAG the box (owed (c)). NHL Live proj. NOT shipped: the live re-sim's per-player means run 4-13% hot (no `special_teams_cal`)** `[2026-11-09, lane nhl-nfl-live-prop-actuals, session 386d4115]`
 - **Built:** a `livePlayerStats` box block on each live game's snapshot.
   - NHL: live-odds-worker re-sim tick.
   - NFL: refresh-worker re-sim tick.
@@ -36,12 +36,25 @@
   - Same-instant replay: NFL TB@CHI 54/74 (20 players not in the Q1 box yet); NHL PIT@ANA 25/27.
   - Findings: `.syndicate/findings_2026-11-09_nhl_nfl_live_prop_actuals.md`.
 - **Owed:**
-  - **(a) The live reading.** The load is done (`deploys.md` 2026-11-09 14:50:05Z). Read the served board on a live NHL and a live NFL slate: Actual > 0 and 0 rows with an edge. Record it in `deploys.md`.
+  - **(a) The live reading: MET `[2026-11-10 02:52-03:00Z]`.**
+    - Served board: NHL PHI @ VAN 37 of 38 live props with an Actual; NFL BUF @ MIN 123 of 125.
+    - 0 of 147 carry a Live proj. or `model_edge_pct`. Their `edge` / `ev_pct` is the quote layer's consensus price edge, which every live NBA prop row carries too.
+    - Join `display_only`: NHL 291 of 303, NFL 231 of 272.
+    - Recorded under `Measured:` in `deploys.md` 2026-11-09 14:50:05Z. Lane `nhl-nfl-live-prop-actuals` CLOSED.
   - **(b) NHL Live proj.** Measured on the fleet's 11-08 features (n=200): resuming at P1 20:00, 0-0 WITHOUT `special_teams_cal` (what `nhl/live_resim` runs) puts per-player SOG +5.7..+7.4%, goals +4.1..+10.5%, assists +6.4..+12.6%, points +5.5..+11.4%, saves +5.1..+7.1% above the pregame prop sim. WITH it, MAD is 0.0000. Two routes, neither taken:
     - pass the cal into the re-sim. This changes the PRICED live moneyline, so it needs the user and the nhl-live-resim owner;
     - run a separate calibrated prop resume (~3 s per game at puck drop).
-  - **(c) Freshness.** NHL/NFL Actuals reach the board at the Layer 2 build cadence (the build in flight 11-09 01:5xZ logged `typical=38.7min`). NBA/MLB have a web read-time refresh (`intelligence._refresh_live_columns_from_artifact`, held by lane `nba-live-proj-actuals`); NHL/NFL do not.
-  - **(d) NHL live game-line join never matches (NOT this lane).** The re-sim snapshot says `'Penguins'`; the board says `'Pittsburgh Penguins'`; `live_gameline_join._norm_team` is a plain lowercase. `canonical_team` fixes both sides. Lane `nhl-live-resim-slate-root` was told.
+  - **(c) Freshness: MEASURED 11-10, a real lag.**
+    - At NFL halftime, with the stats frozen:
+      - in-play overlay rows (`layer2_inplay_overlay`): 40 of 40 equal the box;
+      - board-build rows (`layer2_shortlist`): 13 equal, 14 behind (Allen passing yards 70 vs 122), 1 ahead (rushing yards can go down).
+    - One payload showed the same player and market at two values in 7 of 43 NFL groups, against 0 of 248 for NBA.
+    - Every NHL row is a board-build row (Michkov 0 SOG vs 1 on the box, 02:57Z).
+    - **Fix route:** add nhl/nfl to web's read-time refresh (`blueprints/intelligence._refresh_lens_prop_live_columns`, `_LENS_PROP_REFRESH_SPORTS = ("nba",)`), reading the `livePlayerStats` block. Actual only, never a Live proj.
+      - The function is held by lane `nba-live-proj-actuals`, so it needs that lane's loan.
+      - Shipping it is a web reload.
+  - **(d) NHL live game-line join never matched (NOT this lane): RESOLVED.** The re-sim snapshot said `'Penguins'`, the board `'Pittsburgh Penguins'`. Lane `nhl-live-resim-slate-root` closed 11-10 with GOAL MET: NHL join index=1, and on the served board 1 of 1 moneyline and 2 of 2 totals live NHL rows carry a live number.
+  - **Seen, not this item:** at 02:52-03:00Z 11-10 the served board carried no row at all, live or pregame, for live NYR @ EDM, although the join matched 118 of its 120 prop rows at 02:14Z.
 
 ### `#768` — **NCAAB LIVE TOTALS RUN ~2 LOW BECAUSE THE ENGINE'S NBA BLOWOUT RULE COVERS THE WHOLE COLLEGE SECOND HALF; NOT THE PRIOR, NOT END-GAME FOULING. FIX (three env fields) LOADED 11-08 11:13 PM CST (05:13Z 11-09) AFTER BOTH HARNESS GATES PASSED; 7 KEYS VERIFIED IN THE NEW live-odds-worker ENVIRON; THE LIVE BIAS READING IS OWED ON THE NEXT NCAAB SLATE** `[2026-11-08..09, lanes ncaab-live-totals-bias / ncaab-blowout-tip-recentre / ncaab-blowout-off-load, session 6df1b15d]`
 - **Findings:** `.syndicate/findings_2026-11-08_ncaab_live_totals_bias.md`.

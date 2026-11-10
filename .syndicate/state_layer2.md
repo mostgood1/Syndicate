@@ -1043,15 +1043,21 @@ After web `cc5bdfb1` (20:11:20Z): placeholder starts **43 -> 0**, "TBD" tokens *
 - **Player faces (sheets + play cards)** `[verified served 2026-10-15 04:16Z MLB / 12:05Z NHL]`: rows without a face are filled from the day's league rosters (MLB StatsAPI, NHL API -- the ones player-vs-player already fetches), plus positions; accent-safe matching; a nickname matches by initial + last name only when unique. 10-14: MLB 21/21, NHL 42/42 players. Soccer stays partial (38/100): ESPN has no photo for most MLS players; their cards show the crest.
 - **Known thin spots:** soccer has no fair line on its props, no DvP and no injury feed; NBA preseason is excluded by design until 10-20; the board's NHL headshots/side get the per-slate roster fix only at the next refresh-worker restart (the sheets already have it: NHL identity 47/47).
 
-## [nhl-nfl-live-prop-actuals] LIVE NHL / NFL PROPS GET A DISPLAY-ONLY BOX-SCORE ACTUAL -- LOADED on the fleet 11-09 (b2a5013e2), config verified; the live served reading is OWED `[verified 2026-11-09 14:53Z, lane nhl-nfl-live-prop-actuals, todo #769]`
+## [nhl-nfl-live-prop-actuals] LIVE NHL / NFL PROPS GET A DISPLAY-ONLY BOX-SCORE ACTUAL -- LOADED 11-09 (b2a5013e2), VERIFIED LIVE 11-10 02:52Z (served NHL 37/38, NFL 123/125, 0 priced); board-build rows LAG the box `[verified 2026-11-10 03:03Z, lane nhl-nfl-live-prop-actuals (CLOSED), todo #769]`
 - **Before:** live NHL/NFL props had no Live proj. and no Actual. Served 01:31Z 11-09: NHL 0/29, NFL 0/140. `attach_live_projections_for_sport` served only mlb/wnba/soccer(+nba).
 - **Now (on the fleet):**
   - NHL's live-odds-worker re-sim tick and NFL's refresh-worker re-sim tick put each live game's box on its snapshot as `livePlayerStats`.
   - `live_player_actuals.attach_live_player_actuals` writes `actual_so_far` onto live prop rows, using the settlement graders' market map and player matcher. It never writes `model_prob_over` or `live_aware`, so no edge.
   - Readable as `LIVE_PLAYER_ACTUALS_JOIN sport=nhl|nfl` (refresh-worker.log) and in `coverage.livePlayerStats` / `coverage.live_player_stats` on the two snapshots.
 - **No NHL Live proj., by measurement:** the live re-sim omits `special_teams_cal`, so its per-player rest-of-game means run +4..+13% above the pregame prop sim at the P1 20:00 identity. With the cal: exact.
-- **Not yet true:** a served live NHL/NFL prop row with an Actual (replay only: NFL 54/74, NHL 25/27). Actuals refresh at the board-build cadence, not at read time.
-- **Beside it:** NHL live game lines cannot join -- snapshot `'Penguins'` vs board `'Pittsburgh Penguins'`, plain lowercase compare in `live_gameline_join`.
+- **Verified live (served board 11-10 02:52Z):** NHL PHI @ VAN 37 of 38 live props carry an Actual; NFL BUF @ MIN 123 of 125. 0 carry a Live proj. or `model_edge_pct`.
+  - Refusals work as designed: two Elias Petterssons on VAN (ambiguous), scratches, and NFL players with no stat yet (ESPN's box omits them).
+  - Their `edge` / `ev_pct` is the quote layer's consensus price edge, which all live props carry, NBA included.
+- **Not yet true: read-time freshness.** Board-build rows (`layer2_shortlist`) keep the Actual from their own build.
+  - At NFL halftime, 14 of 28 lagged the box (Allen 70 vs 122 passing yards), while in-play overlay rows were 40 of 40 exact.
+  - One payload can show the same player and market at two values.
+  - Web refreshes NBA at read time; it does not refresh NHL/NFL (todo #769 (c)).
+- **Beside it:** the NHL live game-line name mismatch (snapshot `'Penguins'` vs board `'Pittsburgh Penguins'`) is RESOLVED: lane `nhl-live-resim-slate-root` closed 11-10 with GOAL MET.
 
 ## [layer2-live-display-other-sports] LIVE GAME-LINE ROWS THE JOIN WON'T PRICE SHOW A DISPLAY-ONLY Live proj. IN NCAAB / WNCAAB / NFL / NHL (NBA's #762 pattern) -- LOADED 11-09 (aa5f50ac5), VERIFIED on live slates; NCAAF unread `[verified 2026-11-10 02:10Z, lane live-display-other-sports, todo #771]`
 - **Mechanism:** `live_gameline_join.LIVE_DISPLAY_SPORTS` = nba, ncaab, wncaab, ncaaf, nfl, nhl. A live row the join refuses to price can still carry `live_display`; `layer2_board._live_projection_columns` maps it to `live_total` / `live_model_probability`. It never writes an edge or `live_aware`, and no code reads `live_model_probability` except the board column that writes it (`layer2_board.py:4059`).

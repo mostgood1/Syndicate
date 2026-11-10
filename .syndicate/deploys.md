@@ -57660,11 +57660,33 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - `live/nfl_live_resim.json` (14:53:16Z): `coverage.live_player_stats = {live_games: 0, ...}`. Baseline: absent.
   - refresh-worker.log: first ever `LIVE_PROJECTION_JOIN sport=nhl` at 14:50:32.630Z (baseline 0). `LIVE_PLAYER_ACTUALS_JOIN sport=nhl|nfl` from 14:50:32Z, all `considered=0` (no game in play).
   - 0 line-start Tracebacks on either worker since its restart.
-- **Measured:** <pending> -- the live reading. 11-09 evening: MNF, plus NHL games from 01:00Z 11-10. On the served `/api/intelligence/query`, live NHL and NFL prop rows:
-  - expected: Actual > 0 rows per live game;
-  - expected: 0 rows with `edge_vs_market_pct`;
-  - expected: `LIVE_PROJECTION_JOIN sport=nhl|nfl display_only=` > 0;
-  - each Actual spot-checked against the box.
+- **Measured `[2026-11-10 02:52-03:00Z, 8:52-9:00 PM CST 11-09]`: MET for presence and for "never priced". Actuals on the board build's own rows LAG the box (todo `#769` (c)).** This line supersedes "reading OWED" in the heading.
+  - **Served board** (`/api/intelligence/query` `top_opportunities`, watcher `C:/tmp/lpa/live_reading.py`, read 02:52:22Z):
+    - NHL PHI @ VAN (puck drop 02:40Z): **37 of 38** live prop rows carry an Actual.
+    - NFL BUF @ MIN (MNF, 2nd quarter): **123 of 125** live prop rows carry an Actual.
+    - NYR @ EDM was live too. The join matched its rows (118 of 120 at 02:14:25Z), but the served board carried no row of that game at all, live or pregame. Not this lane's.
+  - **Never priced:** 0 of 147 rows with an Actual carry a Live proj. or `model_edge_pct`. Every join line logged `projected=0 edged=0`.
+    - The expectation above named `edge_vs_market_pct`. Served rows have no such field, so "0 rows with it" was vacuous and is not counted as evidence.
+    - All 147 rows DO carry `edge` / `ev_pct`. That is the quote layer's consensus price edge (`gate.fair_method = consensus`, 3-5%). Every live NBA prop row carries it too (434 of 434, 03:00:30Z). This join does not write it.
+  - **Join counters** (refresh-worker.log, `[layer2_shortlist] LIVE_PROJECTION_JOIN`):
+    - NHL `display_only=291` of 303 considered (02:45:36Z, 2 live games).
+    - NFL `display_only=231` of 272 (02:45:00Z).
+    - 0 line-start Tracebacks on either worker since 00:00Z.
+  - **Refusals, all correct:**
+    - NHL `ambiguous=8`: Vancouver dresses two Elias Petterssons, so the join refuses rather than guesses.
+    - NHL `absent=2..4`: e.g. Matt Rempe, a scratch.
+    - NFL `absent=27..44`: ESPN's box lists a player only once he records a stat. Jordan Addison went from absent to matched after his first catch.
+  - **Spot check against the box**, at NFL halftime with the stats frozen (board 02:57:59Z, ESPN summary 02:55Z; `C:/tmp/lpa/spot_check.py`):
+    - In-play overlay rows (`source=layer2_inplay_overlay`): **40 of 40 equal**.
+    - Board-build rows (`source=layer2_shortlist`): **13 equal, 14 behind, 1 ahead**.
+      - Behind: Josh Allen passing yards 70 vs 122; DJ Moore receiving yards 15 vs 25; Jefferson receptions 0 vs 2.
+      - Ahead: Allen rushing yards 7 vs 6. Rushing yards can go down.
+    - One payload can show the same player and market at two values: Allen's passing yards read 70 on the shortlist rows and 122 on the overlay rows. This hit 7 of 43 NFL player-market groups, against 0 of 248 for NBA.
+    - Every NHL row is a board-build row:
+      - 02:57:59Z: Michkov and Martone show 0 SOG, against 1 on the box (02:55:38Z).
+      - 03:00:30Z: all 4 remaining NHL live rows equal the box.
+    - The served value also stepped backwards between reads. Michkov's SOG read 1.0 at 02:52:22Z and 0.0 from 02:53:58Z, on a different payload (3673 rows vs 3566).
+  - **Why NBA does not lag:** web refreshes `actual` / `live_projection` on live NBA prop rows from the lens at read time (`blueprints/intelligence._refresh_lens_prop_live_columns`, `_LENS_PROP_REFRESH_SPORTS = ("nba",)`). That function belongs to lane `nba-live-proj-actuals`.
 - **Revert:** revert `b2a5013e2` on main, then ff + a claimed refresh-worker TERM (join + NFL producer) and a live-odds-worker TERM (NHL producer). Without the producer block the join reads "no live game ... carries livePlayerStats" and writes nothing.
 
 ## 2026-11-09 14:48:33Z (8:48 AM CST) -- FLEET ff e2558013c -> aa5f50ac5 + claimed refresh-worker TERM: live game-line rows the join refuses to price get a DISPLAY-ONLY Live proj. in ncaab / wncaab / ncaaf / nfl / nhl (`aa5f50ac5`, todo `#771`, lane `live-display-other-sports`); carried `b2a5013e2` (lane `nhl-nfl-live-prop-actuals`, its user "Yes, push and load") -- **LOADED; first build clean; the live reading is OWED on the 11-09 evening slate** (written 14:59Z, 8:59 AM CST)
