@@ -1052,3 +1052,15 @@ After web `cc5bdfb1` (20:11:20Z): placeholder starts **43 -> 0**, "TBD" tokens *
 - **No NHL Live proj., by measurement:** the live re-sim omits `special_teams_cal`, so its per-player rest-of-game means run +4..+13% above the pregame prop sim at the P1 20:00 identity. With the cal: exact.
 - **Not yet true:** a served live NHL/NFL prop row with an Actual (replay only: NFL 54/74, NHL 25/27). Actuals refresh at the board-build cadence, not at read time.
 - **Beside it:** NHL live game lines cannot join -- snapshot `'Penguins'` vs board `'Pittsburgh Penguins'`, plain lowercase compare in `live_gameline_join`.
+
+## [layer2-live-display-other-sports] LIVE GAME-LINE ROWS THE JOIN WON'T PRICE SHOW A DISPLAY-ONLY Live proj. IN NCAAB / WNCAAB / NFL / NHL (NBA's #762 pattern) -- LOADED 11-09 (aa5f50ac5), VERIFIED on live slates; NCAAF unread `[verified 2026-11-10 02:10Z, lane live-display-other-sports, todo #771]`
+- **Mechanism:** `live_gameline_join.LIVE_DISPLAY_SPORTS` = nba, ncaab, wncaab, ncaaf, nfl, nhl. A live row the join refuses to price can still carry `live_display`; `layer2_board._live_projection_columns` maps it to `live_total` / `live_model_probability`. It never writes an edge or `live_aware`, and no code reads `live_model_probability` except the board column that writes it (`layer2_board.py:4059`).
+  - Display branches: stale-quote full-game rows, full-game moneyline (the home win %, restated per side), and college half/quarter rows (`segment_display_only`). Totals are shown raw; margins only where the producer anchored them.
+  - Outside NBA, a display number needs a lane as fresh as pricing would require (`_display_lane_fresh`).
+  - **Blank by decision:** NFL spreads (lane margins graded FAIL, 0.4290 vs 0.150) and NHL puck lines (no margin distribution).
+- **Served board, old code -> now on the same board** (deploys.md 2026-11-09 17:21:39Z, 23:09:54Z, 2026-11-10 02:10:49Z):
+  - WNCAAB 6 -> 19 of 22 live game rows with a Live proj.
+  - NCAAB 50 -> 244 of 260 on the evening slate (83 of the added rows are half rows).
+  - NFL 9 -> 10 of 21 and NHL 1 -> 2 of 3: +1 full-game moneyline each.
+- **Moneyline rows carry the join's own verdict.** The display attaches to every full-game h2h row the join touches, priced or refused. Such a row can show `live_aware` and an edge, both from `price_moneyline`, which this change leaves alone; it now also shows the live % beside them.
+- **Not yet true:** NCAAF has had no live game since the load (first 2026-11-11 00:00Z).
