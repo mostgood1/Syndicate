@@ -3332,3 +3332,14 @@ I counted "unchanged re-appends" on the NBA and NHL quote shards (NHL: 41% of ro
   - When fixing a name split, grep EVERY `_norm_name_key` call site that compares two different sources (roster file vs features, books vs logs, pem vs pool), not just the one in front of you.
   - Where an id exists on both sides (stats.nba PLAYER_ID), match on it first.
   - Keep `_norm_name_key` itself unchanged: it is the key of the exclusion map and the `props_pool` reuse stamp. Widen the comparison, not the key.
+
+## 2026-11-10 — A fix that GIVES rows a model edge must re-check every gate that was vacuous while they had none `[lane nba-prop-engine-name-join, session 2ba5509d]`
+- **What happened:** name-split NBA players (Herb/Herbert Jones, ...) had no pregame projection, so every edge gate on their rows was vacuous.
+  - The OUT-player flag (`_flag_out_player_props`, key `player_key`: suffixes only, no nicknames) could never miss anything that mattered: no edge to clear.
+  - The fix gives those rows an edge, and the flag's key still did not know the engine's nicknames. A feed spelling "HERBERT JONES" would have left an OUT player's "Herb Jones" line priced and rankable.
+  - Caught in the replay's own log line (`OUT_PLAYER_PROPS_FLAGGED`), not by any test. Fixed in the same commit; 0 rows needed it 11-04..11-10.
+- **Also overturned:** "Herb Jones is the only case" (1 player in 580 served rows). The fleet grids show 8 players, 610 rows over 6 slates.
+  - And the live EDGE was missing for a reason no live code showed: the live join prices against `market_fair_prob_over`, which only the PREGAME join writes.
+- **How to apply:**
+  - Before landing a change that turns unpriced rows priced, list every gate that clears or refuses an edge (out-player, live-edge policy, certainty, venue). Confirm each one keys the newly priced rows the same way the new join does.
+  - Count a name defect on the grid (`iter_book_quotes` -> `build_book_grid`), not on the served shortlist: the shortlist hides most of the population.
