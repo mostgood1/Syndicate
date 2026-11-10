@@ -58269,3 +58269,29 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - `NBA_PROP_ENGINE_NAME`: **NOT YET, as expected.** Tonight's only split-name book player is "Derrick Jones" (LAC, 19 rows), and LAC's sim is not built yet. At 17:06Z the window held 11-09's 8 games and one 11-10 game (BOS@PHI). No resolution was possible, so 0 stamped rows is correct, not a miss.
 - **Owed, verification (the lane's served reading):** once tonight's LAC sim builds, the served "Derrick Jones" NBA prop rows should carry `engine_player_name` "Derrick Jones Jr." plus `sim_projection`, `model_edge_pct`, `player_side` and `headshot_url`. The refresh-worker log should read `NBA_PROP_ENGINE_NAME alias_rows>0 ambiguous_rows=0`. Expected size (findings section 6): ~19 grid rows tonight; 60-240 on a slate with more split players.
 - **Revert:** `git revert c468657e5` on main, ff the fleet to that SHA, `reload-web`, and a claimed refresh-worker TERM. There is no env switch.
+
+## 2026-11-10 18:04:43Z (12:04 PM CST) -- FLEET ff c468657e5 -> eeb2461c7 (`#776`, lane `nba-live-resim-midnight`): the NBA re-sim keeps re-simming a game still live at midnight Central -- **ON THE FLEET DISK; live-odds-worker loads it at its own 6 h recycle (~22:10-22:50Z), no TERM; load reading OWED**
+- **User, in this chat:** "Yes, load it", answering "Load `eeb2461c7` on the fleet before tonight's OKC @ POR game?". Asked whether the unloaded `#775` (`c468657e5`) could ride onto the disk with it, the user answered "Yes, carry both". `#775` had in fact been loaded by its own lane at 17:06:54Z (entry above), so the range carries nothing of another lane's.
+- **Range `c468657e5..eeb2461c7`:** 5 commits. The only runtime file is `syndicate/features/nba/live_resim.py`, which is mine; the diff included `vendor/`, `engines/`, `wsgi.py`, `app.py`, `render.yaml` and `requirements.txt`. The other 4 commits are ledger only. **ff to my SHA only:** main's later `53f8a0b26` (`#777`, NBA live props at midnight, not loaded) and `47450ce07` (pregame-record-keep) were left off. 0 of the fleet's 14 dirty paths overlap.
+- **Claim:** live-odds-worker, holder `nba-live-resim-midnight`, acquired 18:02:09Z, ttl 5400. It was taken after lane `nba-prop-engine-name-join` released at 16:45Z. Earlier, at ~16:25Z, both workers were held by `nhl-live-puckline-display`, and I waited.
+- **Baseline (read 18:02:31Z):**
+  - `fleet_checkout_head` = c468657e5.
+  - `live_odds_worker_pid` = 294524, started 16:18:00Z. It runs `efccead01` + `#774`.
+  - `nba_post_roll_tick_games` = 0. That was the first NBA tick after the 11-07 roll, at 06:01:14Z: `date=2026-11-07 games=0 resimmed=0`, while POR @ LAL was still live until 06:04:52Z.
+- **Preflight** `--target fleet --target-commit eeb2461c7`, from a worktree at origin/main `a77660074`:
+  - 18:02:51Z HOLD: 3 odds jobs, the `refresh_nhl_oddsapi.py` chain under pid 294524.
+  - A background poll every 20 s then read **CLEAR** rc 0 at 18:04:33Z (0 processes).
+- **ff:** `git merge --ff-only eeb2461c7` at 18:04:43Z (reflog `2026-11-10 12:04:43 -0600`). `live_resim.py` on disk is hash-equal to the commit (`286cc004f4cb`).
+- **No TERM, on purpose.** live-odds-worker exits by design after ~6 h of uptime (`SYNDICATE_LIVE_ODDS_WORKER_MAX_UPTIME_SECONDS=21600`, read from its environ). The last two recycles came after 21,180 s (11-10 00:14Z) and 23,274 s (14:17Z). So pid 294524 recycles around 22:10-22:50Z and loads `eeb2461c7` without killing an odds job or an NBA pregame sim, ~7 h before midnight. Any other lane's claimed TERM before then loads it too.
+- **expect / measured:**
+  - `fleet_checkout_head` -> eeb2461c7: **MET** at 18:04:43Z.
+  - `live_odds_worker_pid` -> a new pid started after the ff: **OWED** at the recycle (~22:10-22:50Z). A watcher from this session reports the new pid, `NBA_LIVE_RESIM_LOOP_STARTED`, and the counts of Traceback, `NBA_LIVE_RESIM_TICK_ERROR` and `NBA_LIVE_RESIM_PRIOR_ERROR`.
+  - `nba_post_roll_tick_games` -> >=1 with `prior_date` set: **OWED** at 06:00Z 11-11.
+- **verify (tonight; OKC @ POR tips 04:00Z 11-11 = 10:00 PM CST, very likely live at 00:00 CT):**
+  - The first `NBA_LIVE_RESIM_TICK` after 06:00Z reads `prior_date=2026-11-10 prior_games>=1 prior_resimmed>=1 prior_skip=-`.
+  - `games=` and `resimmed=` include that game.
+  - The carryover's `LIVE_GAMELINE_JOIN sport=nba` reads `games_in_snapshot>=1` with `projected>0` until the game ends.
+  - Once the game ends: `prior_skip=slate_final`, and 0 `NBA_LIVE_RESIM_PRIOR_ERROR`.
+  - On a night with no game at the roll: `prior_skip=slate_final` from the first post-roll tick.
+- **Not covered by this load:** NBA live PROPS after the roll. That is `#777` / `53f8a0b26`: on main, not on the fleet, and it needs its own ff plus `reload-web`.
+- **Revert:** `SYNDICATE_NBA_LIVE_RESIM_PRIOR_DATE_HOURS=0` in `local_production.env` (a drained `down`/`up`). Or `git revert eeb2461c7` on main, ff the fleet to that SHA, then a claimed live-odds-worker TERM.
