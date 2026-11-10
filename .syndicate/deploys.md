@@ -57982,3 +57982,30 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - `live_model_probability` has no reader in `syndicate/` or `pipeline/` besides the board column that writes it (`layer2_board.py:4059`).
   - The probe's rule (`old = live and live_aware and market != h2h`) cannot tell a priced moneyline from a display-only one. The check now in use is the market split.
 - **Still OWED: NCAAF.** No games on 11-09. The first live NCAAF games are 2026-11-11 00:00Z (Tue 6 PM CST): Kent St @ Bowling Green and W Michigan @ Akron. NCAAF takes the same football path as NFL: stale quote + moneyline, spreads blank. Read with `probe.py` after ~00:10Z.
+
+## 2026-11-10 02:35Z (8:35 PM CST 11-09) -- live evidence log (lane `live-evidence-log`, `564f8dbde`): reading 2 of 3 -- **15/15 matched with Monday night football live, BUT the NFL rows hid their game state from the shared fields and the probe could not see it; reader fix built (branch only, not on main, nothing to load)** (written 02:40Z, 8:40 PM CST)
+- **Probe on the fleet's code, read 02:35:05Z:** nba 5/5, ncaab 8/8, nfl 1/1 (BUF @ MIN, live), nhl 1/1. 0 missing, 0 mismatched, 0 tracebacks.
+- **Then checked by eye: the NFL "match" was blind.**
+  - The NFL live re-sim publishes its game state and distributions at LANE level, snake_case: `live_state` {period, clock_seconds, home_score, away_score}, `margin_dist`, `total_dist`. Its `projection` holds only `homeMargin` and `total`.
+  - The writer kept all of it, verbatim, in the row's `extra`. **Nothing was lost.** But `state`, `marginDist` and `totalRunsDist` were empty on all 6 live NFL rows, so a reader of the shared fields saw no score and no distribution.
+  - The probe compared `lane_row(snapshot)` with the logged row. Both sides come from `lane_row`, so a field it never extracts is invisible to both. That is why the NFL lane "matched" with its state empty.
+  - nba / ncaab / wncaab / nhl rows carry `state` on every live row (259 / 1,129 / 116 / 46). nhl rows carry no distribution, because the NHL lens publishes none (a producer gap, for M1).
+- **Fix, built in worktree `loving-einstein-b3c45e` (NOT committed to main; the writer is unchanged, so nothing needs loading):**
+  - `live_evidence_log.normalize_row`, applied by `iter_rows`, fills `state` / `marginDist` / `totalRunsDist` from `extra.live_state` / `margin_dist` / `total_dist` when the projection supplied none. It never overrides a projection field, and names what it filled (`normalized`). Rows already written read correctly too.
+  - `live_evidence_check.py probe` gained an independent read: it takes the score, period and distributions straight off the raw snapshot lane under either naming, and counts `unread` when the row does not offer them. Exit 1 on any.
+  - Tests: 15 passed, 3 new. One is off != on: the un-normalized NFL row yields 5 unread fields, the normalized one 0.
+- **The fix on the fleet's real rows**, worktree code under the worker's env, read 02:38:54Z:
+  - nfl 6/6 live rows now read with `state` and `marginDist` (last: period 2, 242 s, 3-3).
+  - New probe: nba 5/5, ncaab 10/10, nfl 1/1, nhl 1/1 matched; unread 0, exit 0.
+- **Found for M1 (producer side, not M0):**
+  - The NFL live re-sim ticks about every 8 min (6 rows from 19:53 to 20:34 CST). Basketball ticks every 30-60 s.
+  - It marginalises possession (`possession_marginalised: true`), so no down, distance or yard line is published at all.
+- **Sizes, read 02:35Z:**
+  - Producer date 11-09: nba 1,021,912 B / 260 rows; ncaab 3,257,041 / 1,143; wncaab 534,104 / 160; nhl 27,879 / 50; ncaaf 29,861 / 67; nfl 6,633 / 15.
+  - Producer date 11-10: nfl 16,752 / 25; ncaaf 29,867 / 67.
+- **Memory:** RSS 3,732 MB at 7.3 h (3,590 MB at 6.0 h). Still not attributed.
+  - The collector's own retained state is bounded: the last `t` per sport, plus one signature per non-fresh lane, capped at 20,000 per sport.
+  - Re-read at 11:30 PM CST.
+- **Owed:**
+  - 05:30Z (11:30 PM CST): the NBA cross-check, full-day sizes, RSS.
+  - The user's call on pushing the reader fix to main. No fleet load is needed: nothing on the fleet reads rows except the check script.
