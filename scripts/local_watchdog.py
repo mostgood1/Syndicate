@@ -69,6 +69,11 @@ STATE_NAME = "watchdog_state.json"
 # for deliberate maintenance. The decision lives HERE (tested); watchdog.ps1 only acts on `recover`.
 RECOVER_AFTER_SECONDS = 9 * 60
 RECOVER_MAX_PER_HOUR = 3
+# A supervisor that is down because the WSL VM itself restarted cannot come back alone, and nobody chose it: on
+# 2026-11-09 23:46-23:47 CT Windows Update installed WSL 3.0.5.0, the VM restarted at 23:47:57, and waiting for the
+# second check kept the fleet down ~13 min mid-slate. So within this window of VM boot, the FIRST failing check
+# recovers (the hourly cap and the pause file still apply). Lane watchdog-wsl-restart-recovery.
+WSL_BOOT_WINDOW_SECONDS = 15 * 60
 NO_AUTOSTART_NAME = "watchdog_no_autostart"
 LOG_NAME = "watchdog.log"
 
@@ -283,11 +288,21 @@ def decide(findings: list[Finding], state: dict[str, Any], now: dt.datetime) -> 
     return result, {"active": active, "last_check": now.isoformat()}
 
 
-def recovery(findings: list[Finding], state: dict[str, Any], now: dt.datetime, *, paused: bool) -> tuple[dict[str, Any], dict[str, Any]]:
+def wsl_boot_age_seconds() -> float | None:
+    """Seconds since this (WSL) kernel booted, from /proc/uptime; None where it cannot be read."""
+    try:
+        return float(Path("/proc/uptime").read_text(encoding="ascii").split()[0])
+    except (OSError, ValueError, IndexError):
+        return None
+
+
+def recovery(findings: list[Finding], state: dict[str, Any], now: dt.datetime, *, paused: bool,
+             boot_age_s: float | None = None) -> tuple[dict[str, Any], dict[str, Any]]:
     """(decision, state updates). decision = {recover, reason, down_since, attempts_last_hour}.
 
     Only a SUPERVISOR failure is recovered (no pidfile / dead supervisor): that is the one state the fleet cannot leave
     by itself. A failing role under a live supervisor is the supervisor's job (it restarts roles that exit).
+    `boot_age_s` < WSL_BOOT_WINDOW_SECONDS means the VM itself restarted: recover on the first failing check.
     """
     down = any(f.key == "supervisor" and f.severity == FAIL for f in findings)
     attempts = [a for a in (state.get("recovery_attempts") or [])
@@ -299,10 +314,14 @@ def recovery(findings: list[Finding], state: dict[str, Any], now: dt.datetime, *
     down_for = (now - dt.datetime.fromisoformat(since)).total_seconds()
     if paused:
         reason, recover = f"paused by {NO_AUTOSTART_NAME}", False
-    elif down_for < RECOVER_AFTER_SECONDS:
-        reason, recover = f"down {int(down_for)} s < {RECOVER_AFTER_SECONDS} s; waiting one more check", False
     elif len(attempts) >= RECOVER_MAX_PER_HOUR:
         reason, recover = f"{len(attempts)} attempts in the last hour -- alert only, a human is needed", False
+    elif boot_age_s is not None and boot_age_s < WSL_BOOT_WINDOW_SECONDS:
+        reason, recover = (f"WSL restarted {int(boot_age_s)} s ago and the supervisor is down -- starting the fleet "
+                           f"(attempt {len(attempts) + 1})"), True
+        attempts.append(now.isoformat())
+    elif down_for < RECOVER_AFTER_SECONDS:
+        reason, recover = f"down {int(down_for)} s < {RECOVER_AFTER_SECONDS} s; waiting one more check", False
     else:
         reason, recover = f"supervisor down {int(down_for)} s -- starting the fleet (attempt {len(attempts) + 1})", True
         attempts.append(now.isoformat())
@@ -375,7 +394,8 @@ def main(argv: list[str] | None = None) -> int:
     if execution_on:
         result["email"] = _deliver_email(settings, now, findings, state, new_state, result, exec_readings,
                                          send=not args.dry_run)
-    decision, rec_state = recovery(findings, state, now, paused=(home / NO_AUTOSTART_NAME).exists())
+    decision, rec_state = recovery(findings, state, now, paused=(home / NO_AUTOSTART_NAME).exists(),
+                                   boot_age_s=wsl_boot_age_seconds())
     new_state.update(rec_state)
     result["recovery"] = decision
     result["recover"] = decision["recover"]

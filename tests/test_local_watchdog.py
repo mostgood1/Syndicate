@@ -172,6 +172,42 @@ def test_old_attempts_age_out_of_the_hourly_cap():
     assert d["recover"] is True
 
 
+# ---- WSL VM restart (lane watchdog-wsl-restart-recovery; 2026-11-09 23:47 CT WSL 3.0.5.0 auto-install) ----------
+
+def test_a_fresh_wsl_boot_recovers_on_the_first_failing_check():
+    d, s = wd.recovery(DOWN, {}, T0, paused=False, boot_age_s=180)
+    assert d["recover"] is True and "WSL restarted 180 s ago" in d["reason"]
+    assert len(s["recovery_attempts"]) == 1
+
+
+def test_an_old_boot_still_waits_for_a_second_check():
+    d, _ = wd.recovery(DOWN, {}, T0, paused=False, boot_age_s=wd.WSL_BOOT_WINDOW_SECONDS + 1)
+    assert d["recover"] is False and "waiting one more check" in d["reason"]
+
+
+def test_unknown_boot_age_keeps_the_old_rule():
+    d, _ = wd.recovery(DOWN, {}, T0, paused=False, boot_age_s=None)
+    assert d["recover"] is False
+
+
+def test_a_fresh_boot_still_honours_the_pause_file_and_the_cap():
+    paused, _ = wd.recovery(DOWN, {}, T0, paused=True, boot_age_s=60)
+    assert paused["recover"] is False and "paused" in paused["reason"]
+    capped_state = {"down_since": T0.isoformat(), "recovery_attempts": [T0.isoformat()] * wd.RECOVER_MAX_PER_HOUR}
+    capped, _ = wd.recovery(DOWN, capped_state, _at(1), paused=False, boot_age_s=60)
+    assert capped["recover"] is False and "alert only" in capped["reason"]
+
+
+def test_a_fresh_boot_with_the_supervisor_up_does_nothing():
+    d, _ = wd.recovery([], {}, T0, paused=False, boot_age_s=60)
+    assert d["recover"] is False
+
+
+def test_wsl_boot_age_reads_proc_uptime_or_returns_none():
+    age = wd.wsl_boot_age_seconds()
+    assert age is None or age > 0
+
+
 # --- refused vs slow (lane web-restart-healthz, 2026-10-06) -----------------
 
 def test_refused_is_DOWN_and_a_timeout_is_UP_BUT_SLOW():
