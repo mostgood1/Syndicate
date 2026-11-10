@@ -14840,3 +14840,18 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 3 of 20 CLOSED blocks SAFE (owner 6df1b15d idle 241m); moved to lanes_closed.md with 1 pointer each: ncaab-live-totals-bias, ncaab-blowout-tip-recentre, ncaab-blowout-off-load. 17 deferred; table in log/2026-11-09.md.
+
+### inplay-min-ask — CLOSED 2026-11-10 — opened 2026-11-09 — session 332cb014-904e-4069-b418-9283732e1e99
+- Goal: Live in-game entries refuse a decision ask below 0.55 (SYNDICATE_INPLAY_MIN_ASK, default 0.55; user 2026-11-09 'Yes, 0.55 floor')
+- Files: syndicate/features/shared/inplay_entries_live.py (min-ask guard ONLY -- LOAN from in-game-trading, user 2026-11-09 'Yes, take the loan'), tests/test_inplay_entries_live.py (min-ask tests ONLY -- same LOAN)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: fleet live-odds-worker log: LIVE_ENTRY result reason=below_inplay_min_ask on asks <0.55, and no in-game ledger fill below 0.55 after the restart
+- **Outcome: GOAL MET.** The first refusals came 2026-11-10 00:16:05Z (NBA spread at ask 0.44, total at ask 0.41, both `below_inplay_min_ask`). 0 in-game placements since the restart. The LOAN from in-game-trading is returned. Reading recorded in deploys.md under the 56f2e7a10 entry.
+- Blocked by: none
+
+### closed-lane-archive-20261109-1640 — CLOSED 2026-11-09 (GOAL MET: 6 blocks archived) — opened 2026-11-09 — session 58599d10-e9ac-497b-a14f-8dc9b4bd6bb1
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: MET. owner_liveness.py --idle-min 240 SAFE 6 of 18 CLOSED; watcher agreed; no session worktree held uncommitted .syndicate/ edits; check_lane_invariants unchanged vs baseline (2 pre-existing contested files).
+- Moved: `ci-suite-red-697`, `repo-move-script-fixes`, `deploy-safety-live-note-sports`, `rail-interval-frame-fixes`, `deploy-safety-live-note-d1-label`, `closed-lane-archive-20261109-1218`. Table and WAIT reasons in log/2026-11-09.md.

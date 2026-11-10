@@ -686,15 +686,6 @@ death, never life — do not invert it.
 - Blocked by: none
 - Taken over: 2026-11-09 21:39:53Z (3:39 PM CST) by session c2fd17f8-7d77-4eed-b025-0830211e05b3 (also lane `ncaab-score-effect-load`, whose load waits on this reading). User, in that chat: "Yes, take it", answering "Should I take #768's reading myself after tonight's slate?". Why: the owner, 6df1b15d, was idle over 4 h (its other three lanes were archived as orphaned at 21:01Z), and no scheduled task runs `C:\tmp\ncaab_postload\night_read.ps1`, so nothing would have taken the reading. UNCHANGED: the pre-registered hypothesis, falsification bar and verification above; the reading runs this lane's own script and its frozen code copy as written, after the last 11-09 NCAAB final. One reader only: if 6df1b15d returns, read this line before running anything.
 
-### inplay-min-ask — CLOSED 2026-11-10 — opened 2026-11-09 — session 332cb014-904e-4069-b418-9283732e1e99
-- Goal: Live in-game entries refuse a decision ask below 0.55 (SYNDICATE_INPLAY_MIN_ASK, default 0.55; user 2026-11-09 'Yes, 0.55 floor')
-- Files: syndicate/features/shared/inplay_entries_live.py (min-ask guard ONLY -- LOAN from in-game-trading, user 2026-11-09 'Yes, take the loan'), tests/test_inplay_entries_live.py (min-ask tests ONLY -- same LOAN)
-- Hypothesis: n/a
-- Falsification test: n/a
-- Verification: fleet live-odds-worker log: LIVE_ENTRY result reason=below_inplay_min_ask on asks <0.55, and no in-game ledger fill below 0.55 after the restart
-- **Outcome: GOAL MET.** The first refusals came 2026-11-10 00:16:05Z (NBA spread at ask 0.44, total at ask 0.41, both `below_inplay_min_ask`). 0 in-game placements since the restart. The LOAN from in-game-trading is returned. Reading recorded in deploys.md under the 56f2e7a10 entry.
-- Blocked by: none
-
 ### kalshi-five-char-codes — OPEN — opened 2026-11-09 — session 750e160f-f027-491e-9dc9-57257d2c6bec (handed off 2026-11-09 from e32fef1a)
 - **STATUS `[2026-11-09 18:30Z]`: GOAL: NOT MET -- LOADED on the fleet** (`722af0338`; live-odds-worker TERM 18:20:57Z, refresh-worker TERM 18:25:43Z).
   - Every live answer is identical on a same-moment replay.
@@ -751,12 +742,6 @@ death, never life — do not invert it.
 - Verification: deploys.md entry: claims on all three services, fleet preflight from an origin/main worktree (--target fleet --reinject-env; live-odds-worker --expect ncaab_live_mechanisms_keys=9 --baseline =7), joint CLEAR, drained down/up, 9 keys in /proc/<pid>/environ, 0 Tracebacks, first NCAAB tick clean, lens inputs.mechanisms names both fields; then the paired-probe reading. Revert: env_load_k.py --revert <backup> and the same drained down/up.
 - Blocked by: lane ncaab-blowout-off-live-read recording #768's live reading (a verdict, not INSUFFICIENT), and the user's explicit yes to load
 
-### closed-lane-archive-20261109-1640 — CLOSED 2026-11-09 (GOAL MET: 6 blocks archived) — opened 2026-11-09 — session 58599d10-e9ac-497b-a14f-8dc9b4bd6bb1
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: MET. owner_liveness.py --idle-min 240 SAFE 6 of 18 CLOSED; watcher agreed; no session worktree held uncommitted .syndicate/ edits; check_lane_invariants unchanged vs baseline (2 pre-existing contested files).
-- Moved: `ci-suite-red-697`, `repo-move-script-fixes`, `deploy-safety-live-note-sports`, `rail-interval-frame-fixes`, `deploy-safety-live-note-d1-label`, `closed-lane-archive-20261109-1218`. Table and WAIT reasons in log/2026-11-09.md.
-
 ### closed-lane-archive-20261109-1840 — CLOSED 2026-11-09 (GOAL MET: 3 blocks archived) — opened 2026-11-09 — session ad7b1b3b-adea-4648-975a-efa6ffa82ce6
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
@@ -768,6 +753,11 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 8 SAFE on origin/main `89c36a089`; all 8 moved to lanes_closed.md with one pointer each. Table and waits in log/2026-11-09.md.
 - Moved: `ncaab-late-gap-decomposition`, `ncaab-regulation-tie-shape`, `ncaab-late-spread-source`, `ncaab-spread-existing-levers`, `ncaab-real-possession-outcomes`, `ncaab-real-pullback`, `ncaab-score-effect-scan`, `closed-lane-archive-20261109-1500`.
+
+### closed-lane-archive-20261109-2240 — CLOSED 2026-11-09 (GOAL MET: 2 blocks archived) — opened 2026-11-09 — session c7c938f5-937b-4890-9717-7937d0920936
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 2 SAFE; both moved: `inplay-min-ask`, `closed-lane-archive-20261109-1640`. 6 WAIT; table in log/2026-11-09.md.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -975,6 +965,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261109-1218` — CLOSED 2026-11-09 (GOAL MET: 1 blocks archived) — opened 2026-11-09 — session 87365a6a-6674-4092-8c62-aa741d4c00b9
 - `closed-lane-archive-20261109-1350` — CLOSED 2026-11-09 (GOAL MET: 1 blocks archived) — opened 2026-11-09 — session e6b38892-f13e-48eb-b2a5-cae03c9d2880
 - `closed-lane-archive-20261109-1500` — CLOSED 2026-11-09 (GOAL MET: 3 blocks archived) — opened 2026-11-09 — session ea4bd446-eb91-4542-8f72-ce9c72813ed4
+- `closed-lane-archive-20261109-1640` — CLOSED 2026-11-09 (GOAL MET: 6 blocks archived) — opened 2026-11-09 — session 58599d10-e9ac-497b-a14f-8dc9b4bd6bb1
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
@@ -1043,6 +1034,7 @@ death, never life — do not invert it.
 - `hygiene-guards-1020` — CLOSED 2026-10-21 — opened 2026-10-20 — closed 2026-10-21 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
 - `inplay-cadence-block-trim` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `inplay-decision-record-deploy` — CLOSED 2026-11-01 (first in-play record joins its ledger row by key; 0 write failures) — opened 2026-11-01 — session 332cb014
+- `inplay-min-ask` — CLOSED 2026-11-10 — opened 2026-11-09 — session 332cb014-904e-4069-b418-9283732e1e99
 - `intelligence-idle-poll` — CLOSED 2026-09-18 (GOAL MET: an untouched post-deploy /intelligence tab stopped POSTing at minute 14; resume unit-tested only) — opened 2026-09-18 — session f26bba3b-72ee-4f8c-9721-3f8c7e4678f1
 - `kalshi-both-leg-grading` — CLOSED 2026-10-27 — opened 2026-10-27 — session a7978a13-a882-425f-bedf-41b4299704ff
 - `kalshi-combo-capture` — CLOSED 2026-10-30 (GOAL MET: capture live on the fleet; first full forward day 10-29 read MET) — opened 2026-10-27 — session a48b0f49-3a6b-4105-b194-5804a934487c (picked up 2026-10-27 as a side session of local_668211d5; opened by e32fef1a for pickup)
