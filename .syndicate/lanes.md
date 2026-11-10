@@ -699,12 +699,6 @@ death, never life — do not invert it.
 - Verification: deploys.md entry: claims on all three services, fleet preflight from an origin/main worktree (--target fleet --reinject-env; live-odds-worker --expect ncaab_live_mechanisms_keys=9 --baseline =7), joint CLEAR, drained down/up, 9 keys in /proc/<pid>/environ, 0 Tracebacks, first NCAAB tick clean, lens inputs.mechanisms names both fields; then the paired-probe reading. Revert: env_load_k.py --revert <backup> and the same drained down/up.
 - Blocked by: none `[2026-11-10 07:45Z]`: #768's reading is recorded (PARTLY, not falsified; lane ncaab-blowout-off-live-read CLOSED) and the user's yes is the APPROVED line above. Was: lane ncaab-blowout-off-live-read recording #768's live reading (a verdict, not INSUFFICIENT), and the user's explicit yes to load
 
-### closed-lane-archive-20261110-0639 — CLOSED 2026-11-10 (GOAL MET: 2 blocks archived) — opened 2026-11-10 — session 9af80f4f-4d14-4fb4-a4c5-2777fb426680
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. `owner_liveness.py --idle-min 240` read 2 SAFE of 5 CLOSED; moved to lanes_closed.md with one pointer each; invariants unchanged vs origin/main baseline. Table and WAIT reasons: log/2026-11-10.md 12:45Z.
-- Moved: ncaab-blowout-off-live-read, closed-lane-archive-20261110-0040.
-
 ### closed-lane-archive-20261110-0839 — CLOSED 2026-11-10 (GOAL MET: 1 block archived) — opened 2026-11-10 — session fbc4247e-70cc-47b1-964a-a7ed0651eb84
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
@@ -805,6 +799,12 @@ death, never life — do not invert it.
 - Verification: Unit: off != on through SYNDICATE_NBA_LIVE_RESIM_PRIOR_DATE_HOURS (prior rows reach the lens with it absent, not with 0), window bound, today's merge unchanged, the board's own attach_live_projections_for_sport on the carryover date projecting a prior-date live row from the published lens, web refresh refreshing a prior-date row; fleet after the user's load: on the next late-game night the carryover build's LIVE_PROJECTION_JOIN sport=nba reads considered>0 projected>0 after 06:00Z until the game ends
 - STATUS 2026-11-10 12:19 PM CST (18:19Z): FIX ON MAIN `53f8a0b26` (todo #777), ON FLEET DISK. Lane `pregame-record-keep` ff'd `eeb2461c7 -> 47450ce07` at 18:10:15Z on the user's "Yes, load all three", then `reload-web` at 18:10:25Z. Verified read-only: both SHAs are ancestors of the fleet HEAD, and the web workers started at 12:10:24 PM CST, so the WEB HALF IS LIVE. The LENS HALF IS NOT: live-odds-worker pid 294524 started at 16:18:00Z on old code, and its environ sets `MAX_UPTIME_SECONDS=21600`, so it recycles ~22:18-22:50Z. Baseline lens at 18:17:27Z: `native_resim` has no `prior_slate` key. This session runs a read-only watcher (every 180 s, TIMEOUT 23:45Z, exit 3). OWED: predicate `native_resim.prior_slate` key present in the Redis NBA lens; behaviour on the first night with NBA live at 00:00 CT (tonight OKC @ POR 10 PM CT if loaded in time, else 11-13 OKC @ LAC): `PRIOR_SLATE_ATTACHED ... with_live_props>=1` on live-odds-worker after 06:00Z and the carryover build's `LIVE_PROJECTION_JOIN sport=nba considered>0 projected>0` (was `considered=None`) until the game ends.
 - Blocked by: none
+
+### closed-lane-archive-20261110-1239 — CLOSED 2026-11-10 (GOAL MET: 1 block archived) — opened 2026-11-10 — session 6808b166-1396-4baf-a4b6-f28b9e5d9474
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. `owner_liveness.py --idle-min 240` read 1 SAFE of 6 CLOSED; moved to lanes_closed.md with one pointer; invariants unchanged vs origin/main baseline. Table and WAIT reasons: log/2026-11-10.md 18:40Z.
+- Moved: closed-lane-archive-20261110-0639.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1019,6 +1019,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261110-0040` — CLOSED 2026-11-10 (GOAL MET: 1 block archived) — opened 2026-11-10 — session 8d38da00-f2b3-4fb3-8fea-2767f3803a81
 - `closed-lane-archive-20261110-0240` — CLOSED 2026-11-10 (GOAL MET: 4 blocks archived) — opened 2026-11-10 — session 6ec8b1b3-e9af-4c9f-85b6-793bf9ea76c2
 - `closed-lane-archive-20261110-0439` — CLOSED 2026-11-10 (GOAL MET: 1 block archived) — opened 2026-11-10 — session 72b05050-a861-4e8d-84a2-22fc8f7efbf1
+- `closed-lane-archive-20261110-0639` — CLOSED 2026-11-10 (GOAL MET: 2 blocks archived) — opened 2026-11-10 — session 9af80f4f-4d14-4fb4-a4c5-2777fb426680
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
