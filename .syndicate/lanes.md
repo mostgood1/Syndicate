@@ -724,6 +724,14 @@ death, never life — do not invert it.
 - Verdict: GOAL MET. `owner_liveness.py --idle-min 240` read 1 SAFE of 4 CLOSED; moved with one pointer; invariants unchanged vs origin/main baseline. Table, WAIT reasons, dormant-OPEN report: log/2026-11-10.md 14:4xZ.
 - Moved: closed-lane-archive-20261110-0240.
 
+### nhl-nfl-actual-read-time — OPEN — opened 2026-11-10 — session 386d4115-6e7b-47e3-9ff7-be3914d851cb
+- Goal: Live NHL and NFL prop rows on the served board show the box score's current Actual on every row, whichever source built it: web's read-time refresh (blueprints/intelligence) re-reads the published livePlayerStats blocks, keyed by the build join's own lookup, Actual only, nothing priced. Done = on main, loaded on web, and a served reading on a live NHL and a live NFL slate where every board-build row's Actual equals the overlay's for the same player/market (0 split groups) and matches the box, 0 rows with a Live proj. or model edge, recorded in deploys.md (todo #769 (c)).
+- Files: syndicate/blueprints/intelligence.py (_refresh_live_columns_from_artifact's first try-block + new NHL/NFL read-time Actual refresh beside _refresh_lens_prop_live_columns only), syndicate/features/shared/live_player_actuals.py, tests/test_live_player_actuals.py, tests/test_nhl_nfl_actual_read_time.py (NEW), docs/ai_context/todo.md (#769 section only)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: Served board on a live NHL and NFL slate: per player/market group across layer2_shortlist and layer2_inplay_overlay rows, 0 groups with two Actual values; a spot check of board-build rows against the NHL gamecenter / ESPN box; web log LIVE_ACTUALS_REFRESHED_FROM_BOX lines with refreshed>0; 0 rows with live_projection or model_edge_pct.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
