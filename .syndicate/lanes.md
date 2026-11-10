@@ -648,16 +648,6 @@ death, never life — do not invert it.
 - Verification: Replay on fleet data: fleet code drops Portis at the filter, fixed code keeps him; unit test off != on; slate count before/after printed; on-fleet effect read after the next NBA pregame rebuild once loaded
 - Blocked by: none
 
-### ncaab-blowout-off-live-read — CLOSED 2026-11-10 (GOAL MET: reading recorded; verdict PARTLY, not falsified) — opened 2026-11-09 — session c2fd17f8-7d77-4eed-b025-0830211e05b3
-- Goal: Read the live effect of #768's 05:13:43Z 11-09 load (blowout rule off + solver_endgame_pts_per_team 0.2) on the first full NCAAB slate after it (11-09), with ncaab_live_totals_bias.py split by epoch at the load, and record it in deploys.md (reconciling the 05:13:12Z entry's pending marker), the findings and todo #768. Read-only; no fleet change.
-- Files: scripts/ncaab_live_totals_bias.py (EPOCHS + the per-epoch P1/P2 tags only), .syndicate/findings_2026-11-08_ncaab_live_totals_bias.md, docs/ai_context/todo.md (the #768 entry only)
-- Hypothesis: Pre-registered 2026-11-09 15:25Z (9:25 AM CST), before any post-load slate row exists. On states after 05:13:43Z (epoch E4_blowout_off): (1) MECHANISM: P2 live_update (model rem - prior rem) on h2 states with |m|>=15 ('h2 blowout flag ON') rises from -1.97 +- 0.09 (11-02..11-06) to roughly the same epoch's flag-off states; the flag-on minus flag-off gap (pre-load -2.66) closes to above -0.8; flag-off itself drops ~0.2-0.3 (the re-centre). (2) HEADLINE: P1 priced totals model - line, vs the same quote-rule regime's pre-load rows (E3q = 11-08 21:52:45Z..11-09 05:13:43Z): all rows about +0.5 higher, h2 flag-on rows about +0.7 higher (pre-gate 11-02..11-06 reference: -1.95 -> about -1.45, -2.74 -> about -2.0). (3) The step at |m|=15 (threshold 11-14 vs 15-19, -1.45 +- 0.43) vanishes.
-- Falsification test: E4's h2 flag-on minus flag-off live_update gap stays below -1.5 (the rule still acts), OR E4 model - line on priced rows moves DOWN vs E3q beyond 1.96 SE. A gap between -1.5 and -0.8 reads PARTLY, not met. Fewer than 15 E4 games with h2 |m|>=15 states reads INSUFFICIENT and waits for the next slate.
-- Verification: After the 11-09 slate ends: fresh work dir C:/tmp/ncaab_postload (fleet ledgers 11-08 + 11-09, pregame 11-08/09, a FRESH ESPN cache since the old one predates the finals); per-epoch tables with n rows / games named; result in deploys.md as a RECONCILED line for the 05:13:12Z entry, findings, todo #768.
-- Blocked by: none
-- Taken over: 2026-11-09 21:39:53Z (3:39 PM CST) by session c2fd17f8-7d77-4eed-b025-0830211e05b3 (also lane `ncaab-score-effect-load`, whose load waits on this reading). User, in that chat: "Yes, take it", answering "Should I take #768's reading myself after tonight's slate?". Why: the owner, 6df1b15d, was idle over 4 h (its other three lanes were archived as orphaned at 21:01Z), and no scheduled task runs `C:\tmp\ncaab_postload\night_read.ps1`, so nothing would have taken the reading. UNCHANGED: the pre-registered hypothesis, falsification bar and verification above; the reading runs this lane's own script and its frozen code copy as written, after the last 11-09 NCAAB final. One reader only: if 6df1b15d returns, read this line before running anything.
-- Outcome `[2026-11-10 07:45Z]`: verification RAN (lane script unchanged, work dir `C:\tmp\ncaab_postload\night_20261110T074137Z`). 24 E4 games with h2 |m| >= 15 (bar 15). Gap flag-on minus flag-off -1.37 +- 0.29 = PARTLY; flag-on update -1.97 -> -0.79 +- 0.11; priced model - line -1.26 +- 0.67 (E3q -1.93), h2 flag on -1.60 +- 0.77 (E3q -3.31): not falsified; step at 15 -0.56 +- 0.29. Recorded: deploys.md 05:13:12Z entry RECONCILED (READING line), findings "Live reading, 11-09 slate", todo #768.
-
 ### kalshi-five-char-codes — OPEN — opened 2026-11-09 — session 750e160f-f027-491e-9dc9-57257d2c6bec (handed off 2026-11-09 from e32fef1a)
 - **STATUS `[2026-11-09 18:30Z]`: GOAL: NOT MET -- LOADED on the fleet** (`722af0338`; live-odds-worker TERM 18:20:57Z, refresh-worker TERM 18:25:43Z).
   - Every live answer is identical on a same-moment replay.
@@ -715,11 +705,6 @@ death, never life — do not invert it.
 - Verification: deploys.md entry: claims on all three services, fleet preflight from an origin/main worktree (--target fleet --reinject-env; live-odds-worker --expect ncaab_live_mechanisms_keys=9 --baseline =7), joint CLEAR, drained down/up, 9 keys in /proc/<pid>/environ, 0 Tracebacks, first NCAAB tick clean, lens inputs.mechanisms names both fields; then the paired-probe reading. Revert: env_load_k.py --revert <backup> and the same drained down/up.
 - Blocked by: none `[2026-11-10 07:45Z]`: #768's reading is recorded (PARTLY, not falsified; lane ncaab-blowout-off-live-read CLOSED) and the user's yes is the APPROVED line above. Was: lane ncaab-blowout-off-live-read recording #768's live reading (a verdict, not INSUFFICIENT), and the user's explicit yes to load
 
-### closed-lane-archive-20261110-0040 — CLOSED 2026-11-10 (GOAL MET: 1 block archived) — opened 2026-11-10 — session 8d38da00-f2b3-4fb3-8fea-2767f3803a81
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness --idle-min 240 read SAFE for 1 of 7 CLOSED blocks; moved `closed-lane-archive-20261109-1840` to lanes_closed.md (pointer left). 6 WAIT; table and reasons in log/2026-11-10.md.
-
 ### closed-lane-archive-20261110-0240 — CLOSED 2026-11-10 (GOAL MET: 4 blocks archived) — opened 2026-11-10 — session 6ec8b1b3-e9af-4c9f-85b6-793bf9ea76c2
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
@@ -731,6 +716,12 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: GOAL MET. `owner_liveness.py --idle-min 240` read 1 SAFE of 5 CLOSED; moved to lanes_closed.md with one pointer; invariants unchanged vs origin/main baseline. Table and WAIT reasons: log/2026-11-10.md 10:39Z.
 - Moved: closed-lane-archive-20261109-2240.
+
+### closed-lane-archive-20261110-0639 — CLOSED 2026-11-10 (GOAL MET: 2 blocks archived) — opened 2026-11-10 — session 9af80f4f-4d14-4fb4-a4c5-2777fb426680
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. `owner_liveness.py --idle-min 240` read 2 SAFE of 5 CLOSED; moved to lanes_closed.md with one pointer each; invariants unchanged vs origin/main baseline. Table and WAIT reasons: log/2026-11-10.md 12:45Z.
+- Moved: ncaab-blowout-off-live-read, closed-lane-archive-20261110-0040.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -942,6 +933,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261109-1840` — CLOSED 2026-11-09 (GOAL MET: 3 blocks archived) — opened 2026-11-09 — session ad7b1b3b-adea-4648-975a-efa6ffa82ce6
 - `closed-lane-archive-20261109-2040` — CLOSED 2026-11-09 (GOAL MET: 8 blocks archived) — opened 2026-11-09 — session 18d69976-44ee-429e-82c2-9c0b912735ad
 - `closed-lane-archive-20261109-2240` — CLOSED 2026-11-09 (GOAL MET: 2 blocks archived) — opened 2026-11-09 — session c7c938f5-937b-4890-9717-7937d0920936
+- `closed-lane-archive-20261110-0040` — CLOSED 2026-11-10 (GOAL MET: 1 block archived) — opened 2026-11-10 — session 8d38da00-f2b3-4fb3-8fea-2767f3803a81
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
@@ -1162,6 +1154,7 @@ death, never life — do not invert it.
 - `nba-standins-shadow` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session 15f24a49-f7db-4e95-9863-43d1149e4d8f
 - `nba-vendor-delete` — CLOSED 2026-10-20 (GOAL MET) — opened 2026-10-20 — session 2d413211
 - `nba-vendor-deletion-prep` — CLOSED 2026-10-19 (GOAL MET) — opened 2026-10-19 — session 2d413211
+- `ncaab-blowout-off-live-read` — CLOSED 2026-11-10 (GOAL MET: reading recorded; verdict PARTLY, not falsified) — opened 2026-11-09 — session c2fd17f8-7d77-4eed-b025-0830211e05b3
 - `ncaab-blowout-off-load` — CLOSED 2026-11-09 (GOAL MET: preflight fix on main f52c6afa9; the pair loaded 05:13:12Z by a drained down/up, new live-odds-worker environ 7 keys; live reading owed, todo #768) — opened 2026-11-08 — session 6df1b15d-5ff8-4256-aba9-3a91f7304efc
 - `ncaab-blowout-tip-recentre` — CLOSED 2026-11-08 (GOAL MET: rule off + solver_endgame_pts_per_team 0.2 passes the paired gate vs production, tip +0.04 +- 0.10; 0.6 not recommended; nothing loaded, user's yes owed, todo #768) — opened 2026-11-08 — session 6df1b15d-5ff8-4256-aba9-3a91f7304efc
 - `ncaab-board-slate` — CLOSED (GOAL MET) — opened 2026-11-02 — closed 2026-11-08 — session 547fe65e-71ca-4e19-9589-237553cb4eab
