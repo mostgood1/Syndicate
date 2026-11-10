@@ -861,6 +861,11 @@ deployed three times on the evening of 2026-08-26. Same family as
 - **But the NCAAB rows it rebuilt had no live lane.** Every NCAAB `LIVE_GAMELINE_JOIN` after 06:00Z read `games_in_snapshot=0`: `no_live_gameline_projection`, priceable 0, display 0.
   - Cause: the college re-sim tick switched to the new date's scoreboard at the roll.
   - Fix on main `97cb5d477`, NOT LOADED: todo `#774`.
+- **NBA has the same gap, MEASURED `[2026-11-10, lane nba-live-resim-midnight; fleet live_resim_history + logs, ESPN]`:**
+  - 4 of 20 regular-season slates (10-20..11-09) had play after the roll: +56.7, +21.1 (OT), +4.9 and +2.6 min.
+  - Every NBA `LIVE_GAMELINE_JOIN` after the 11-05 and 11-07 rolls read `games_in_snapshot=0`, 0 projected; the joins just before read 25-76 / 31-42 priceable.
+  - Props `LIVE_PROJECTION_JOIN` read `considered=None` after the roll.
+  - Game-line fix on main `eeb2461c7`, NOT LOADED: todo `#776`. Props are NOT fixed: the page lens is built for today only.
 - Cost: while the carryover runs, today's board and the prior date alternate ~3-minute fast builds.
 
 
