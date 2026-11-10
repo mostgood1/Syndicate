@@ -771,12 +771,6 @@ death, never life — do not invert it.
 - Verification: pytest tests/test_engine_experts.py + tests/test_decision_record.py; on fleet data (read-only, nice 19): checklist exit 0, the coverage table, and the join reproduction count (half-point lines, same as_of: mismatches 0)
 - Blocked by: none
 
-### closed-lane-archive-20261110-1039 — CLOSED 2026-11-10 (GOAL MET: 1 block archived) — opened 2026-11-10 — session d0b0831a-d9ca-456c-bf6c-a4f259ffc0ba
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. `owner_liveness.py --idle-min 240` read 1 SAFE of 6 CLOSED; moved to lanes_closed.md with one pointer; invariants unchanged vs origin/main baseline. Table and WAIT reasons: log/2026-11-10.md 16:45Z.
-- Moved: closed-lane-archive-20261110-0439.
-
 ### pregame-record-keep — OPEN — opened 2026-11-10 — session e32fef1a-01e8-4afe-a284-01acd3728545
 - **GOAL VERDICT `[2026-11-10 18:30Z]`: GOAL: NOT MET -- LOADED on refresh-worker (`47450ce07`, TERM 18:14:18Z, user "Yes, load all three"); mechanism MET, the after-tip reading owed tonight.** Goal, verbatim: "Phase 1B M1 slice 2: every line the board listed before its game started keeps its FIRST and LAST pregame DecisionRecord (slim: identity, market, model, form, blend, fair_v1, prices) in reports/intelligence/decision_records/<date>.pregame_lines.jsonl.gz, merged in a stream each build (switch SYNDICATE_DECISION_RECORD_PREGAME_KEEP, absent = on), and the pregame experts read it with a time-to-start bucket; tests incl. off != on and a merge that never drops a line; on the fleet after the user-approved refresh-worker restart: the file holds the day's own games after they start (NBA lines on the first full slate after the load), merge cost per build and bytes per day measured, 0 PREGAME_KEEP_FAILED / DECISION_RECORD_FAILED, refresh-worker memory not up" -- Measured on the new worker: PREGAME_KEEP 18:23:49Z 11-10 lines=4051 added=4051 0.23 s; 18:29:28Z lines=4187 added=136 updated=3891 kept=160 started=10 0.311 s 989,135 B (accounting closes); 0 failures, 0 Tracebacks (deploys.md 18:14:18Z). Left: 11-10's NBA lines still in the file after tip (frozen by started), engine_experts on 11-10 reading source=kept_lines with opinions for started games, bytes through the slate, memory by worker age. Claims released.
 - Goal: Phase 1B M1 slice 2: every line the board listed before its game started keeps its FIRST and LAST pregame DecisionRecord (slim: identity, market, model, form, blend, fair_v1, prices) in reports/intelligence/decision_records/<date>.pregame_lines.jsonl.gz, merged in a stream each build (switch SYNDICATE_DECISION_RECORD_PREGAME_KEEP, absent = on), and the pregame experts read it with a time-to-start bucket; tests incl. off != on and a merge that never drops a line; on the fleet after the user-approved refresh-worker restart: the file holds the day's own games after they start (NBA lines on the first full slate after the load), merge cost per build and bytes per day measured, 0 PREGAME_KEEP_FAILED / DECISION_RECORD_FAILED, refresh-worker memory not up
@@ -841,6 +835,12 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: GOAL MET. `owner_liveness.py --idle-min 240` read 1 SAFE of 7 CLOSED; moved to lanes_closed.md with one pointer; invariants unchanged vs origin/main baseline. Table and WAIT reasons: log/2026-11-10.md 20:45Z.
 - Moved: closed-lane-archive-20261110-0839.
+
+### closed-lane-archive-20261110-1638 — CLOSED 2026-11-10 (GOAL MET: 1 block archived) — opened 2026-11-10 — session a53692c1-521c-4616-bb89-c92e9d844fa0
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. `owner_liveness.py --idle-min 240` read 1 SAFE of 7 CLOSED; moved to lanes_closed.md with one pointer; invariants unchanged vs origin/main baseline. Table and WAIT reasons: log/2026-11-10.md 22:40Z.
+- Moved: closed-lane-archive-20261110-1039.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1057,6 +1057,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261110-0439` — CLOSED 2026-11-10 (GOAL MET: 1 block archived) — opened 2026-11-10 — session 72b05050-a861-4e8d-84a2-22fc8f7efbf1
 - `closed-lane-archive-20261110-0639` — CLOSED 2026-11-10 (GOAL MET: 2 blocks archived) — opened 2026-11-10 — session 9af80f4f-4d14-4fb4-a4c5-2777fb426680
 - `closed-lane-archive-20261110-0839` — CLOSED 2026-11-10 (GOAL MET: 1 block archived) — opened 2026-11-10 — session fbc4247e-70cc-47b1-964a-a7ed0651eb84
+- `closed-lane-archive-20261110-1039` — CLOSED 2026-11-10 (GOAL MET: 1 block archived) — opened 2026-11-10 — session d0b0831a-d9ca-456c-bf6c-a4f259ffc0ba
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
