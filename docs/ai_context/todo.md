@@ -1,6 +1,12 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#777` — **AN NBA GAME STILL LIVE AT MIDNIGHT CENTRAL LOST ITS LIVE PROP NUMBERS ON THE BOARD: the page lens is built for the new date only. FIX ON MAIN, NOT LOADED (the user's decision)** `[2026-11-10, lane nba-live-props-midnight, session cca33a3a]`
+### `#777` — **AN NBA GAME STILL LIVE AT MIDNIGHT CENTRAL LOST ITS LIVE PROP NUMBERS ON THE BOARD: the page lens is built for the new date only. FIX ON MAIN, ON FLEET DISK: web half LIVE 18:10Z, lens half loads at the live-odds-worker's 6 h recycle (~22:18-22:50Z = 4:18-4:50 PM CST 11-10)** `[2026-11-10, lane nba-live-props-midnight, session cca33a3a]`
+- **Load state, verified read-only 12:15-12:20 PM CST (18:15-18:20Z) 11-10:**
+  - Loaded on the user's "Yes, load all three", given in lane `pregame-record-keep`'s chat. That lane ff'd `eeb2461c7 -> 47450ce07` at 18:10:15Z and ran `reload-web` 18:10:25-18:10:30Z (its `deploys.md` entry).
+  - `~/Syndicate` HEAD `47450ce07`: `53f8a0b26` and `eeb2461c7` are both ancestors. On disk: `prior_slate` 12 hits in `live_lens.py`, `lens_slate_dates` 2 in `intelligence.py`.
+  - **Web half LIVE:** the gunicorn workers 317396/317397 started 12:10:24 PM CST, after the ff.
+  - **Lens half NOT YET:** live-odds-worker pid 294524 started 10:18:00 AM CST (16:18:00Z), before `eeb2461c7` was on disk. Its environ sets `SYNDICATE_LIVE_ODDS_WORKER_MAX_UPTIME_SECONDS=21600`, so it recycles at the end of its first loop past 22:18Z (idle loop 900 s). Its re-sim pool children exit with it (their stdin pipe closes), so the recycle loads `#776` and this together. `SYNDICATE_NBA_LIVE_RESIM_PRIOR_DATE_HOURS` is unset in its environ, so the 4 h default applies.
+  - **Baseline:** the Redis lens at 12:17:27 PM CST has `native_resim` keys `merged, refusals, resim_generated_at, state_check`, with no `prior_slate` key. The re-sim snapshot is dated 2026-11-10 (0 games), so the predicate is readable as soon as the new code builds a lens. Caveat: a re-sim snapshot of another date returns early without the key, which would make the predicate read false with the code loaded.
 - **The follow-up `#776` named.** `#776` keeps the game's live RE-SIM (game lines) across the roll. Its props never reached the board.
 - **Cause, confirmed in the code (not the brief):**
   - The board's NBA props join (`board_enrichment.attach_live_projections_for_sport`) reads the page lens `live/nba_live_lens.json`, with no date check. It returns early, `considered=None`, when no lens game carries `liveProps`.
@@ -33,7 +39,7 @@
   - 8 source mutations, each caught.
   - 429 passed across 33 neighbouring files: every `test_nba_live_*` incl. `#776`'s midnight suite, the lens loop, the prop join, NBA lens state, web read-time refresh, NHL/NFL actuals, college midnight, the evidence log.
 - **Loads with:**
-  - A fleet ff to a SHA containing this commit. It also carries `eeb2461c7` (`#776`), which this needs: the re-sim publishes no previous-date rows without it. **The fleet is at `efccead01`, which does NOT contain `eeb2461c7`** (checked 11:00 AM CST).
+  - A fleet ff to a SHA containing this commit. It also carries `eeb2461c7` (`#776`), which this needs: the re-sim publishes no previous-date rows without it. (At 11:00 AM CST the fleet was at `efccead01`, which had neither. Superseded: see "Load state" above.)
   - Then a **live-odds-worker** restart, where the lens loop and the re-sim run (its own recycle or a claimed TERM). `#776` loads at the same restart.
   - Then a web `reload-web` for the read-time refresh half. Without it, the carryover's live prop rows keep the build's numbers (one carryover cycle, ~6-7 min) instead of 15 s refreshes.
   - refresh-worker: nothing.
