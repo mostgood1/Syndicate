@@ -57942,3 +57942,43 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **Owed:**
   - 02:35Z (8:35 PM CST): the probe again with Monday night football in play (football's own fields: down, distance, yardLine, possession), plus sizes for both producer dates.
   - 05:30Z (11:30 PM CST): the NBA cross-check against `live_resim_history`, plus sizes and RSS.
+
+## 2026-11-10 02:10:49Z (8:10 PM CST 11-09) -- VERIFY part 2b of the 14:48:33Z load (`aa5f50ac5`, display-only Live proj. beyond NBA, todo `#771`, lane `live-display-other-sports`): **NCAAB evening MET (+194 rows), NFL and NHL MET on their one live game each (+1 moneyline row each, the only rows they could gain); the code adds no edge or `live_aware` on any served row; NCAAF OWED 2026-11-11 00:00Z (first live game)** (written 02:1xZ, 8:1x PM CST)
+- **Code running:** fleet head `564f8dbde` (contains `aa5f50ac5`), refresh-worker pid 386232.
+- **Joins** (`LIVE_GAMELINE_JOIN`, 0 `BOOK_GRID_LIVE_GAMELINE_FAILURE`; watcher `C:/tmp/livedisp/wait_both.sh` exited 0 at 01:55:27Z):
+  - **NHL** (Rangers @ Oilers, the only live game; PHI @ VAN `PRE`, NYI @ SJS `FUT`):
+    - 01:05:36Z, considered 3, `display=1`. That is the moneyline; the other 2 rows refused `live_resim_published_no_distribution_for_this_market`.
+    - 02:06:55Z, considered 3, priceable 1, `display=1`.
+    - 01:45-01:59Z showed index 0 (`pregame_only` 3); the lens was `live_resim` again by 02:06:32Z.
+  - **NFL** (Bills @ Vikings, MNF, kicked off 01:15Z): **the live re-sim lane first reached the join at 01:54:32Z.** From 01:18 to 01:48Z it was `index=0`, `sources_seen {'pregame': 15}`, so no NFL live number of any kind was possible for the first ~40 min. That is upstream of this change.
+    - 01:54:32Z: considered 61, priceable 1, `display=3`.
+    - 02:06:43Z: considered 57, `display=5` (quote past the ceiling 4, plus the moneyline).
+- **Served** (`C:/tmp/livedisp/probe.py`; reads flip between consecutive builds' card sets, so each sport cites the read it rests on):
+
+  | sport | read | live game rows | Live proj. now | old code, same board | added |
+  |---|---|---|---|---|---|
+  | NCAAB | 02:05:57Z (4,446 cards) | 260 | 244 | 50 | **194** (88 full totals, 18 full spreads, 5 h2h, 83 half rows) |
+  | NCAAB | 02:10:49Z (4,342 cards) | 141 | 129 | 53 | 76 |
+  | NFL | 02:10:49Z | 21 | 10 | 9 | **1** (full-game moneyline) |
+  | NHL | 02:10:49Z | 3 | 2 | 1 | **1** (full-game moneyline) |
+  | WNCAAB | 02:10:49Z | 4 | 2 | 0 | 2 |
+
+  - **NFL:**
+    - BUF (away) 0.758 on the full-game moneyline.
+    - The 4 full-game spreads stay blank, by decision (lane margins graded FAIL, 0.4290 vs 0.150).
+    - The 9 old-code rows are totals the join had already filled (`live_total` 29.7 / 30.5, `live_aware`).
+    - The 6 blank totals are carried rows from builds before the lane existed (Actual 0.0 against 3.0 on the live rows).
+    - Segment rows stay blank by design.
+  - **NHL:**
+    - EDM (home) 0.819 on the moneyline (lens `modelHomeWinProb` 0.825, one tick apart).
+    - The totals row shows the live total 6.05 as a count; it was already shown before.
+    - The puck line stays blank: no margin distribution is published.
+- **The probe's "display row with an edge / `live_aware`" check flagged 5 rows at 02:10:49Z. All 5 are full-game moneyline rows, and none is a defect.** The moneyline display attaches to every full-game h2h row the join touches, priced or refused: the NBA `#762` pattern this change extends. On such a row, `live_aware` and any edge come from `_apply_verdict` / `price_moneyline`, which this change does not touch. The unit test "table on vs off changes nothing but `live_display`" pins that.
+  - NFL BUF: edge 14.41, priced.
+  - NHL EDM: edge 10.29, priced.
+  - 3 NCAAB home rows: `live_aware`, no edge, refused.
+  - **Before this change, those rows carried the same edge and no Live cell. Now they also show the live % the edge was computed from.**
+  - 0 of the non-moneyline added rows carry an edge or `live_aware` in any read.
+  - `live_model_probability` has no reader in `syndicate/` or `pipeline/` besides the board column that writes it (`layer2_board.py:4059`).
+  - The probe's rule (`old = live and live_aware and market != h2h`) cannot tell a priced moneyline from a display-only one. The check now in use is the market split.
+- **Still OWED: NCAAF.** No games on 11-09. The first live NCAAF games are 2026-11-11 00:00Z (Tue 6 PM CST): Kent St @ Bowling Green and W Michigan @ Akron. NCAAF takes the same football path as NFL: stale quote + moneyline, spreads blank. Read with `probe.py` after ~00:10Z.
