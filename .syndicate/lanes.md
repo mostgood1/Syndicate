@@ -872,12 +872,13 @@ death, never life — do not invert it.
 - Blocked by: none
 - Taken over: 2026-11-09 21:39:53Z (3:39 PM CST) by session c2fd17f8-7d77-4eed-b025-0830211e05b3 (also lane `ncaab-score-effect-load`, whose load waits on this reading). User, in that chat: "Yes, take it", answering "Should I take #768's reading myself after tonight's slate?". Why: the owner, 6df1b15d, was idle over 4 h (its other three lanes were archived as orphaned at 21:01Z), and no scheduled task runs `C:\tmp\ncaab_postload\night_read.ps1`, so nothing would have taken the reading. UNCHANGED: the pre-registered hypothesis, falsification bar and verification above; the reading runs this lane's own script and its frozen code copy as written, after the last 11-09 NCAAB final. One reader only: if 6df1b15d returns, read this line before running anything.
 
-### inplay-min-ask — OPEN — opened 2026-11-09 — session 332cb014-904e-4069-b418-9283732e1e99
+### inplay-min-ask — CLOSED 2026-11-10 — opened 2026-11-09 — session 332cb014-904e-4069-b418-9283732e1e99
 - Goal: Live in-game entries refuse a decision ask below 0.55 (SYNDICATE_INPLAY_MIN_ASK, default 0.55; user 2026-11-09 'Yes, 0.55 floor')
 - Files: syndicate/features/shared/inplay_entries_live.py (min-ask guard ONLY -- LOAN from in-game-trading, user 2026-11-09 'Yes, take the loan'), tests/test_inplay_entries_live.py (min-ask tests ONLY -- same LOAN)
 - Hypothesis: n/a
 - Falsification test: n/a
 - Verification: fleet live-odds-worker log: LIVE_ENTRY result reason=below_inplay_min_ask on asks <0.55, and no in-game ledger fill below 0.55 after the restart
+- **Outcome: GOAL MET.** The first refusals came 2026-11-10 00:16:05Z (NBA spread at ask 0.44, total at ask 0.41, both `below_inplay_min_ask`). 0 in-game placements since the restart. The LOAN from in-game-trading is returned. Reading recorded in deploys.md under the 56f2e7a10 entry.
 - Blocked by: none
 
 ### kalshi-five-char-codes — OPEN — opened 2026-11-09 — session 750e160f-f027-491e-9dc9-57257d2c6bec (handed off 2026-11-09 from e32fef1a)
