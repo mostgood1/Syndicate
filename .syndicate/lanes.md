@@ -768,6 +768,14 @@ death, never life — do not invert it.
 - Verification: Fleet logs: per-midnight last pre-roll and first post-roll NBA_LIVE_RESIM_TICK + LIVE_GAMELINE_JOIN sport=nba, with denominators; unit tests incl. off != on through the env and the history/carry/lines continuity across the roll; after the user's load: the first post-roll ticks on a late-game night read prior_live>=1 prior_resimmed>=1
 - Blocked by: none
 
+### engine-experts — OPEN — opened 2026-11-10 — session e32fef1a-01e8-4afe-a284-01acd3728545
+- Goal: Phase 1B M1 slice 1: one expert contract (an ExpertOpinion per line per instant: delta-logit against the market prior, sigma with its basis, phase, clock bucket, the inputs read, a named refusal) and three experts on it, in shadow with nothing in placement, sizing or the board reading them -- pregame sim and prop under-tilt from the DecisionRecord, live re-sim from the live evidence log against the live gameline ledger's prior -- each with an off != on reachability test and an input checklist that exits 1 on a consumed-but-unpopulated input; on the fleet's 2026-11-09 data, a coverage table per sport, phase and clock bucket, and the live re-sim expert reproducing the live join's own model probability on half-point lines where both read the same lane state with 0 mismatches
+- Files: syndicate/features/shared/engine_experts.py (NEW), scripts/engine_experts.py (NEW), tests/test_engine_experts.py (NEW), docs/ai_context/engine_experts.md (NEW), tests/test_decision_record.py (the _PAPER_READERS entry only)
+- Hypothesis: n/a (build; the DecisionRecord, the live evidence log and the live gameline ledger are read, never edited)
+- Falsification test: n/a
+- Verification: pytest tests/test_engine_experts.py + tests/test_decision_record.py; on fleet data (read-only, nice 19): checklist exit 0, the coverage table, and the join reproduction count (half-point lines, same as_of: mismatches 0)
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
