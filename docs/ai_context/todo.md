@@ -1,5 +1,53 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#777` — **AN NBA GAME STILL LIVE AT MIDNIGHT CENTRAL LOST ITS LIVE PROP NUMBERS ON THE BOARD: the page lens is built for the new date only. FIX ON MAIN, NOT LOADED (the user's decision)** `[2026-11-10, lane nba-live-props-midnight, session cca33a3a]`
+- **The follow-up `#776` named.** `#776` keeps the game's live RE-SIM (game lines) across the roll. Its props never reached the board.
+- **Cause, confirmed in the code (not the brief):**
+  - The board's NBA props join (`board_enrichment.attach_live_projections_for_sport`) reads the page lens `live/nba_live_lens.json`, with no date check. It returns early, `considered=None`, when no lens game carries `liveProps`.
+  - The live-lens loop builds that lens for `central_today_iso()`. So at 00:00 CT its games are the NEW date's card games.
+  - `nba/live_lens._attach_native_resim` copies the re-sim's `liveProps` onto those card games by event id, and only for a re-sim snapshot of the same date. The previous date's game is in neither.
+  - Web's read-time refresh (`intelligence._refresh_lens_prop_live_columns`) refreshes a live NBA prop row only when `row.game_date == lens.date`. So it would skip the carryover's rows even with the lens fixed.
+- **Measured** (fleet refresh-worker logs, read-only, 2026-11-10 ~10:50 AM CST):
+  - After both rolls with an NBA game live (11-05, 11-07), the carryover build of the previous date still had its NBA rows: `LIVE_GAMELINE_JOIN sport=nba considered=403` (11-05) / `396` (11-07).
+  - **Every** `LIVE_PROJECTION_JOIN sport=nba` after 06:00Z read `considered=None projected=0 lens_indexed=None reason=live-lens snapshot for nba carries no liveProps (producer not wired)`, both on today's builds and on the carryover's. That held until the game ended: 11-05 06:04-06:25Z (MIA @ LAC, OT), 11-07 06:05Z on.
+  - The last joins before the roll: 11-05 05:43-05:54Z `considered=285-291 projected=86-128`; 11-07 05:32-05:59Z `considered=282-553 projected=55-299 edged=0-140`.
+  - Denominator, from `#776`: 4 of 20 regular-season slates (10-20..11-09) had NBA play after the roll (+56.7, +21.1 OT, +4.9, +2.6 min).
+  - The same reason string is ALSO what a quiet afternoon prints (no game in play). It reads "producer not wired" for both. That is not changed here.
+- **Fix** (code default ON; no env change needed to load it):
+  - **Lens** (`nba/live_lens.py`, section "the midnight roll (#777)"):
+    - Inside the re-sim's OWN window, the lens carries each previous-date re-sim row as its own lens game. The window is `SYNDICATE_NBA_LIVE_RESIM_PRIOR_DATE_HOURS` after midnight CT (absent = 4 h, `0` = off), checked by `live_resim.prior_slate_date` against THIS lens's date. One switch covers both halves.
+    - Each such game gets: the identity the re-sim row carries, `gameLens`/`liveProps`/coverage, `slateDate`, and `status` `"Live"` (or `"Unknown"` for a refused row). It is appended after the new date's games, whose order is unchanged.
+    - No cards build for the previous date and no fetch: the re-sim row is everything the props join reads.
+    - A row belongs to its `slateDate`, else to the snapshot's `date` (`previous_for_slate`'s rule). So the pre-midnight re-sim file, read in the minutes before the re-sim's first post-roll tick, also feeds the previous date.
+    - Today's merge is unchanged. A previous-date row never lands on a today card, and an event on today's card keeps its own entry.
+    - New: `native_resim.prior_slate` in the published lens. It is `None` outside the window, and its presence is the predicate that the code is loaded. New line `[nba_live_lens] PRIOR_SLATE_ATTACHED`, printed only when a game was carried.
+  - **Web** (`intelligence.py`): `_lens_prop_index` records `lens_slate_dates`, the lens date plus every `slateDate`. The read-time refresh accepts a row whose `game_date` is one of them. An index without the field keeps the old own-date rule.
+  - **Why it cannot cross-attach:** the prop index keys on (player, market, line) only, and both readers touch LIVE rows only. A player cannot be live on both dates inside the window.
+- **Not changed:**
+  - The NBA live-lens PAGE (`page_context`/`api_payload`) still shows the new date's slate.
+  - The Layer 2 game state still comes from the chips (NBA is not in `_LIVE_GAME_STATE_SPORTS`).
+  - refresh-worker's code is not touched.
+- **Tests:** `tests/test_nba_live_props_midnight.py`, 11. The chain runs through the REAL re-sim tick (`run_live_resim_tick`, no date), which emits real priced `liveProps` rows (the posted line plus its neighbours). It then goes through the real lens builder (`build_live_lens_snapshot`, the new date's cards stubbed, `validate_live_lens_snapshot` passing), the board's own `attach_live_projections_for_sport` on the CARRYOVER date, and web's `_refresh_lens_prop_live_columns`.
+  - off != on through the env at all three hops. Off reproduces the fleet's exact `reason`.
+  - Covered: window bounds (9:00 AM CST, 4:00 AM CST exactly), a lens of any other date, the pre-midnight re-sim file, today's merge and the duplicate event, a refused row stays `Unknown`, web's index without the field.
+  - 8 source mutations, each caught.
+  - 429 passed across 33 neighbouring files: every `test_nba_live_*` incl. `#776`'s midnight suite, the lens loop, the prop join, NBA lens state, web read-time refresh, NHL/NFL actuals, college midnight, the evidence log.
+- **Loads with:**
+  - A fleet ff to a SHA containing this commit. It also carries `eeb2461c7` (`#776`), which this needs: the re-sim publishes no previous-date rows without it. **The fleet is at `efccead01`, which does NOT contain `eeb2461c7`** (checked 11:00 AM CST).
+  - Then a **live-odds-worker** restart, where the lens loop and the re-sim run (its own recycle or a claimed TERM). `#776` loads at the same restart.
+  - Then a web `reload-web` for the read-time refresh half. Without it, the carryover's live prop rows keep the build's numbers (one carryover cycle, ~6-7 min) instead of 15 s refreshes.
+  - refresh-worker: nothing.
+  - Needs the user's yes. A fleet ff ships ALL of main.
+- **Expected change, stated before any load:**
+  - **Predicate, any time after the live-odds-worker restart:** the Redis lens `live/nba_live_lens.json` has `native_resim.prior_slate` (`None` outside 00:00-04:00 CT).
+  - **On the first night with an NBA game live at 00:00 CT** (tonight 11-10, OKC @ POR tips 10:00 PM CT, if loaded before then; else 11-13 OKC @ LAC 9:30 PM CT):
+    - live-odds-worker prints `PRIOR_SLATE_ATTACHED date=2026-11-11 prior_date=2026-11-10 games>=1 with_live_props>=1` after 06:00Z, every lens tick while the game is in play.
+    - The **carryover** build's `LIVE_PROJECTION_JOIN sport=nba` goes from `considered=None projected=0` to `considered>0 projected>0 lens_indexed>0`, with `lens_live_games>=1`, until the game ends. The scale is one game's rows: the last pre-roll joins were `considered` 282-291, `projected` 55-128.
+    - **Today's** builds go from `considered=None` to `considered=0 projected=0 lens_indexed>0`. There are no live NBA prop rows on today's board, and the early return no longer fires.
+    - With web reloaded: `LIVE_COLUMNS_REFRESHED_FROM_ARTIFACT sport=nba` counts the previous date's live rows as `matched`, not `no_lens_for_date`.
+  - **MET if** the carryover join reads `projected>0` after 06:00Z. **Falsified if** the lens carries the game (`PRIOR_SLATE_ATTACHED with_live_props>=1`) and the carryover join still reads `projected=0`.
+- **Left for others (not edited, another lane's section):** `nba/live_resim.py`'s module docstring (lane `nba-live-resim-midnight`) still ends "NOT covered: live PROPS of that game". With this item on main that sentence is out of date.
+
 ### `#776` — **AN NBA GAME STILL LIVE AT MIDNIGHT CENTRAL LOST ITS LIVE RE-SIM, AND THE BOARD PRICED 0 OF ITS GAME LINES UNTIL THE END. FIX ON MAIN, NOT LOADED (the user's decision)** `[2026-11-10, lane nba-live-resim-midnight, session 63276f7e]`
 - **Cause:** `nba/live_resim.run_live_resim_tick` took its date from `central_today_iso()`. At 00:00 CT it reads only the new date's ESPN scoreboard, so a West Coast game still going at midnight is never re-simmed again. The college ticks had the same date choice (`#774`).
 - **Measured** (read-only, 2026-11-10 9:30-10:10 AM CST):

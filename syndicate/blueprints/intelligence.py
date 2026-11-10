@@ -1632,7 +1632,15 @@ def _lens_prop_index(sport: str, *, now: float | None = None) -> dict | None:
     indexed: dict | None = None
     if isinstance(snapshot, dict):
         indexed = build_live_prop_index(snapshot)
-        indexed["lens_date"] = str(snapshot.get("date") or "").strip()
+        lens_date = str(snapshot.get("date") or "").strip()
+        indexed["lens_date"] = lens_date
+        # #777: after midnight Central the NBA lens also carries the PREVIOUS date's games still in play, each
+        # stamped `slateDate` (`nba/live_lens._attach_prior_slate`). Every date it carries games for; a lens with
+        # no date of its own carries none.
+        indexed["lens_slate_dates"] = sorted({lens_date} | {
+            str(game.get("slateDate") or "").strip() for game in snapshot.get("games") or []
+            if isinstance(game, dict) and str(game.get("slateDate") or "").strip()
+        }) if lens_date else []
         indexed["lens_generated_at"] = str(snapshot.get("generated_at") or snapshot.get("generatedAt") or "")
     with _LENS_PROP_INDEX_LOCK:
         _LENS_PROP_INDEX_CACHE[sport] = (clock, indexed)
@@ -1650,8 +1658,9 @@ def _finite_float(value: object) -> float | None:
 def _refresh_lens_prop_live_columns(payload: dict[str, object]) -> dict[str, dict[str, int]]:
     """Overwrite `live_projection` / `actual` on live NBA prop rows with the live lens's current numbers.
 
-    Only rows the build already flagged live, only when the lens is for the row's own date (a lens with no date
-    joins nothing), and a row the lens does not carry keeps whatever the build gave it."""
+    Only rows the build already flagged live, only when the lens carries the row's own date (a lens with no date
+    joins nothing), and a row the lens does not carry keeps whatever the build gave it. The lens carries its own
+    date and, after midnight Central, the previous date's games still in play (`slateDate`, #777)."""
     from syndicate.features.shared.live_projection_join import live_prop_hit
 
     collections = [key for key in ("top_opportunities", "top_live_opportunities", "recommendations", "ranked_all") if isinstance(payload.get(key), list)]
@@ -1675,7 +1684,8 @@ def _refresh_lens_prop_live_columns(payload: dict[str, object]) -> dict[str, dic
         tally = counts.setdefault(sport, {"considered": 0, "matched": 0, "refreshed": 0, "no_lens_for_date": 0})
         tally["considered"] += 1
         game_date = str(candidate.get("game_date") or candidate.get("source_board_date") or "").strip()
-        if not indexed or not indexed.get("lens_date") or game_date != indexed["lens_date"]:
+        if not indexed or not indexed.get("lens_date") or game_date not in (
+                indexed.get("lens_slate_dates") or (indexed["lens_date"],)):
             tally["no_lens_for_date"] += 1
             return
         hit = live_prop_hit(indexed, candidate.get("player_name") or candidate.get("entity"),

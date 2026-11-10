@@ -607,20 +607,34 @@ def _without_sim_player_rows(games: list[Any]) -> list[Any]:
 _NATIVE_RESIM_GAME_KEYS = ("gameLens", "liveProps", "livePropsCoverage", "livePropsRefusal")
 
 
-def _attach_native_resim(games: list[dict[str, Any]], resolved_date: str) -> dict[str, Any]:
+def _attach_native_resim(games: list[dict[str, Any]], resolved_date: str, *, now: Any = None) -> dict[str, Any]:
     """Merge `nba/live_resim.py`'s published lanes and props into these games by ESPN `event_id`.
 
-    A READ of the file the dedicated re-sim thread writes -- never a re-sim here. Only a snapshot for the SAME date
-    is merged; anything else is reported, not used. The props join reads THIS snapshot's `liveProps`; the gameline
-    join reads the re-sim file directly (`board_enrichment._LIVE_GAMELINE_SNAPSHOT_PATHS`)."""
+    A READ of the file the dedicated re-sim thread writes -- never a re-sim here. Only rows of the SAME date are
+    merged; anything else is reported, not used. The props join reads THIS snapshot's `liveProps`; the gameline
+    join reads the re-sim file directly (`board_enrichment._LIVE_GAMELINE_SNAPSHOT_PATHS`).
+
+    The one exception is the previous date's games still in play after midnight Central (#777, below): inside the
+    re-sim's own window they are added to `games` as their own entries, stamped `slateDate`."""
+    from syndicate.features.nba.live_resim import SLATE_DATE_KEY
     from syndicate.features.nba.live_resim import live_lens_snapshot_path as _resim_path
 
     resim = read_json_file(_resim_path())
     if not isinstance(resim, dict):
         return {"merged": 0, "reason": "no_native_resim_snapshot"}
-    if str(resim.get("date") or "") != str(resolved_date):
+    resim_date = str(resim.get("date") or "")
+    prior_date = _prior_slate_for_lens(resolved_date, now)
+    # The re-sim file can still be the PRE-midnight one for a few minutes after the roll (its first tick on the new
+    # date has not run yet): every row in it then belongs to the previous date.
+    if resim_date != str(resolved_date) and not (prior_date and resim_date == prior_date):
         return {"merged": 0, "reason": "native_resim_snapshot_other_date", "resim_date": resim.get("date")}
-    by_event = {str(g.get("event_id") or ""): g for g in resim.get("games") or [] if isinstance(g, dict)}
+    rows = [g for g in resim.get("games") or [] if isinstance(g, dict)]
+
+    def _slate(row: dict[str, Any]) -> str:
+        # `live_resim.previous_for_slate`'s rule: a row belongs to its `slateDate`, else to the snapshot's `date`.
+        return str(row.get(SLATE_DATE_KEY) or resim_date)
+
+    by_event = {str(g.get("event_id") or ""): g for g in rows if _slate(g) == str(resolved_date)}
     merged = 0
     for game in games:
         src = by_event.get(str(game.get("event_id") or "").strip())
@@ -633,8 +647,94 @@ def _attach_native_resim(games: list[dict[str, Any]], resolved_date: str) -> dic
     state_check = _lens_state_vs_resim(games, by_event)
     if state_check["lens_not_started"]:
         _note_lens_state_behind_resim(str(resolved_date), state_check, resim.get("generatedAt"))
-    return {"merged": merged, "resim_generated_at": resim.get("generatedAt"),
-            "refusals": resim.get("refusalsByReason") or {}, "state_check": state_check}
+    out = {"merged": merged, "resim_generated_at": resim.get("generatedAt"),
+           "refusals": resim.get("refusalsByReason") or {}, "state_check": state_check,
+           # #777: None outside the window; its PRESENCE says this build carries the midnight-roll merge.
+           "prior_slate": None}
+    if prior_date:
+        out["prior_slate"] = _attach_prior_slate(games, [g for g in rows if _slate(g) == prior_date], prior_date,
+                                                 lens_date=str(resolved_date), resim=resim)
+    return out
+
+
+# ------------------------------------------------------------------------------------- the midnight roll (#777)
+#
+# AN NBA GAME STILL LIVE AT MIDNIGHT CENTRAL LOST ITS LIVE PROPS ON THE BOARD. The live-lens loop builds this
+# snapshot for `central_today_iso()`, so at 00:00 CT its games became the NEW date's card games, and a West Coast
+# game still in play was in none of them. Since `#776` the re-sim keeps re-simming that game after the roll and
+# publishes it in the same file stamped `slateDate`, but the merge above keys on THIS date's card games, so its
+# `liveProps` never reached the lens. Measured 2026-11-10 on the fleet's refresh-worker logs: the carryover build
+# of the previous date still had its NBA rows (`LIVE_GAMELINE_JOIN sport=nba considered=403` after the 11-05 roll,
+# 396 after 11-07), and every `LIVE_PROJECTION_JOIN sport=nba` read `considered=None reason=live-lens snapshot
+# for nba carries no liveProps (producer not wired)` until the game ended, where the joins just before the roll
+# projected 86-128 (11-05) and 55-299 (11-07) prop rows.
+#
+# So, inside the re-sim's OWN window (`SYNDICATE_NBA_LIVE_RESIM_PRIOR_DATE_HOURS` after midnight Central, absent =
+# 4 h, "0" = off -- one switch for both halves), each previous-date re-sim row becomes its own lens game: the
+# identity the re-sim row carries, the native keys, `slateDate`, and the lens's own status vocabulary. No cards
+# build for the previous date and no fetch: the re-sim row is everything the props join reads (`liveProps`). The
+# board's prop index keys on (player, market, line) only and the join touches LIVE rows only, so the carryover
+# board's live rows find these and today's pregame rows cannot. NOT changed: the page's `page_context` /
+# `api_payload` (the NBA live-lens PAGE still shows the new date's slate), and the Layer 2 game-state source (the
+# chips; NBA is not in `board_enrichment._LIVE_GAME_STATE_SPORTS`).
+
+# Identity a previous date's re-sim row carries (`nba/live_resim._lane_row`), copied onto its lens game.
+_PRIOR_SLATE_IDENTITY_KEYS = ("event_id", "home", "away", "home_name", "away_name", "home_code", "away_code")
+
+
+def _prior_slate_for_lens(resolved_date: Any, now: Any = None) -> str | None:
+    """The day before `resolved_date` while the re-sim's window after midnight Central is open for it, else None.
+
+    The re-sim's own clock and switch (`live_resim.prior_slate_date`), compared with THIS lens's date, so a lens
+    built for any other date never takes a previous date's rows."""
+    from datetime import date, timedelta
+
+    from syndicate.features.nba.live_resim import prior_slate_date
+
+    try:
+        expected = (date.fromisoformat(str(resolved_date).strip()) - timedelta(days=1)).isoformat()
+    except ValueError:
+        return None
+    return expected if prior_slate_date(now) == expected else None
+
+
+def _prior_slate_lens_game(row: dict[str, Any], prior_date: str) -> dict[str, Any]:
+    """A previous date's re-sim row as a lens game: identity, status, `slateDate`, the native keys."""
+    from syndicate.features.nba.live_resim import SLATE_DATE_KEY
+
+    game = {key: row[key] for key in _PRIOR_SLATE_IDENTITY_KEYS if key in row}
+    status = row.get("status") if isinstance(row.get("status"), dict) else {}
+    # The lens's vocabulary is a STRING (`nba/cards.py`: "Live" / "Final" / "Scheduled"). The re-sim publishes only
+    # games ESPN had in play; a row it refused without a game state says "Unknown", and so does this.
+    in_play = str(status.get("detailedState") or "").strip().lower() == "in progress"
+    game["status"] = "Live" if in_play else "Unknown"
+    game[SLATE_DATE_KEY] = prior_date
+    for key in _NATIVE_RESIM_GAME_KEYS:
+        if key in row:
+            game[key] = row[key]
+    return game
+
+
+def _attach_prior_slate(games: list[dict[str, Any]], prior_rows: list[dict[str, Any]], prior_date: str, *,
+                        lens_date: str, resim: dict[str, Any]) -> dict[str, Any]:
+    """Append the previous date's re-sim rows to `games` (after this date's, whose order is unchanged). An event
+    already among this date's games keeps its own entry, as `live_resim.merge_prior_slate` keeps today's row."""
+    lens_ids = {str(g.get("event_id") or "").strip() for g in games if isinstance(g, dict)}
+    added = [_prior_slate_lens_game(row, prior_date) for row in prior_rows
+             if str(row.get("event_id") or "").strip() and str(row.get("event_id")).strip() not in lens_ids]
+    games.extend(added)
+    info = {"date": prior_date, "games": len(added),
+            "live": sum(1 for g in added if g.get("status") == "Live"),
+            "with_live_props": sum(1 for g in added if g.get("liveProps")),
+            "live_props": sum(len(g.get("liveProps") or []) for g in added),
+            "dropped_also_today": len(prior_rows) - len(added)}
+    if added:
+        # print(), not logger.info (CLAUDE.md). Only when something was carried: a quiet window says nothing here,
+        # and `native_resim.prior_slate` in the published snapshot still shows the window was open.
+        print(f"[nba_live_lens] PRIOR_SLATE_ATTACHED date={lens_date} prior_date={prior_date} games={info['games']} "
+              f"live={info['live']} with_live_props={info['with_live_props']} live_props={info['live_props']} "
+              f"resim_date={resim.get('date')} resim_generated_at={resim.get('generatedAt')}", flush=True)
+    return info
 
 
 def _lens_game_state(game: dict[str, Any]) -> str:
