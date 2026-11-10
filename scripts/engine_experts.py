@@ -57,25 +57,42 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
 
 
 def pregame(date_str: str, sports: set[str] | None, root: Path | None) -> dict[str, Any]:
+    """The kept pregame lines (each line's first and last pregame record, slice 2) when the date has them; else the
+    latest build's record file, which has lost every line whose game had started by that build. The source used is
+    printed, never mixed."""
     from syndicate.features.shared import decision_record as dr
 
-    doc = dr.read_records(date_str, root=root)
-    if not isinstance(doc, dict):
-        return {"present": False, "by_sport": {}}
-    t = str(doc.get("written_at") or "")
-    records = [dr.expand_record(r) for r in doc.get("records") or [] if isinstance(r, dict)]
-    by_sport: dict[str, list[Any]] = {}
-    for rec in records:
-        sport = str(rec.identity.sport or "").lower()
-        if sports and sport not in sports:
-            continue
-        by_sport.setdefault(sport, []).append(rec)
-    out: dict[str, Any] = {"present": True, "t": t, "build_id": doc.get("build_id"), "by_sport": {}}
-    for sport, recs in sorted(by_sport.items()):
+    items_by_sport: dict[str, list[tuple[Any, str, str]]] = {}
+    kept = list(dr.read_pregame_lines(date_str, root=root))
+    if kept:
+        source, t_label, build = "kept_lines", f"{len(kept)} lines", None
+        for row in kept:
+            snaps = [(row["first"], row.get("ft"), "first")]
+            if row.get("last"):
+                snaps.append((row["last"], row.get("lt"), "last"))
+            for data, t, snap in snaps:
+                rec = dr.expand_record(data)
+                sport = str(rec.identity.sport or "").lower()
+                if not sports or sport in sports:
+                    items_by_sport.setdefault(sport, []).append((rec, str(t or ""), snap))
+    else:
+        doc = dr.read_records(date_str, root=root)
+        if not isinstance(doc, dict):
+            return {"present": False, "source": None, "by_sport": {}}
+        source, t_label, build = "latest_build", str(doc.get("written_at") or ""), doc.get("build_id")
+        for data in doc.get("records") or []:
+            if not isinstance(data, dict):
+                continue
+            rec = dr.expand_record(data)
+            sport = str(rec.identity.sport or "").lower()
+            if not sports or sport in sports:
+                items_by_sport.setdefault(sport, []).append((rec, t_label, "build"))
+    out: dict[str, Any] = {"present": True, "source": source, "t": t_label, "build_id": build, "by_sport": {}}
+    for sport, items in sorted(items_by_sport.items()):
         reader = ee.Reader()
-        ops = ee.pregame_opinions(recs, t, reader)
+        ops = ee.pregame_opinions_at(items, reader)
         out["by_sport"][sport] = {"opinions": ops, "checklist": ee.checklist(
-            ops, reader, {"decision_record": recs}, sport=sport)}
+            ops, reader, {"decision_record": [rec for rec, _t, _s in items]}, sport=sport)}
     return out
 
 
@@ -125,7 +142,7 @@ def run(args: argparse.Namespace) -> int:
     all_ops: list[Any] = []
 
     pre = pregame(args.date, sports, root)
-    print(f"PREGAME date={args.date} record_file={'present' if pre['present'] else 'MISSING'} t={pre.get('t')} "
+    print(f"PREGAME date={args.date} source={pre.get('source') or 'MISSING'} t={pre.get('t')} "
           f"build={pre.get('build_id')}")
     for sport, block in pre["by_sport"].items():
         ops = block["opinions"]

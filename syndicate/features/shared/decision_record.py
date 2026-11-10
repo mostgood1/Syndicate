@@ -30,6 +30,10 @@ The record, per line:
 
 Switch: `SYNDICATE_DECISION_RECORD=off|shadow`, absent = shadow. Shadow only WRITES a
 file nobody reads; `off` is the kill switch if the write ever costs the worker.
+
+Each build also keeps every line's FIRST and LAST pregame record, slim, past its game's
+start (`keep_pregame_lines`, `<date>.pregame_lines.jsonl.gz`; Phase 1B M1 slice 2, lane
+`pregame-record-keep`). `SYNDICATE_DECISION_RECORD_PREGAME_KEEP=off` stops that alone.
 """
 
 from __future__ import annotations
@@ -1171,6 +1175,141 @@ def read_records_file(path: Path | str) -> dict[str, Any] | None:
         return None
 
 
+# --------------------------------------------------------------------------- the kept pregame lines
+#
+# Phase 1B M1 slice 2 (lane `pregame-record-keep`, 2026-11-10). `write_records` keeps only a date's LATEST build,
+# and the board drops a line once its game starts, so a day's own games vanish from the record: the 11-09 file
+# (written 05:45Z 11-10) held no NBA line at all. A pregame learner needs each line's record from BEFORE the start.
+#
+# So each build also merges its PREGAME records into `<date>.pregame_lines.jsonl.gz`, one row per line key:
+#   first (`ft` / `fb`): the first build that listed the line pregame -- the early instant CLV is measured from;
+#   last  (`lt` / `lb`): the latest build that listed it pregame -- frozen once the game starts, because a started
+#                        line is never merged again.
+# A line the build no longer lists is kept as it is; nothing is ever dropped from a date's file. The records are
+# SLIM (`PREGAME_SLIM_SECTIONS`): gates, verdicts, sizes and contracts are 3.0 of a record's 4.7 KB (fleet,
+# 11-08..11-10) and are build-time policy, not evidence.
+#
+# STREAMED: the old file is read and rewritten one line at a time, so the worker holds this build's records (which
+# it already holds) and one line, never the file. Switch `SYNDICATE_DECISION_RECORD_PREGAME_KEEP=off` stops it;
+# absent = on (it only runs when the record itself is on). NOTHING READS IT for placement, sizing or the board.
+
+PREGAME_KEEP_ENV = "SYNDICATE_DECISION_RECORD_PREGAME_KEEP"
+PREGAME_KEEP_VERSION = "pregame_lines/1"
+PREGAME_SLIM_SECTIONS = ("key", "identity", "market", "model", "form", "blend", "fair_v1", "prices")
+
+
+def pregame_lines_path(selected_date: str, root: Path | None = None) -> Path:
+    return records_dir(root) / f"{selected_date}.pregame_lines.jsonl.gz"
+
+
+def slim_record(rec: DecisionRecord) -> dict[str, Any]:
+    """`_compact(rec)` restricted to `PREGAME_SLIM_SECTIONS`, computed section by section so the gates and verdicts
+    (most of a record) are never compacted just to be dropped."""
+    defaults = _defaults_of(DecisionRecord)
+    out: dict[str, Any] = {}
+    for name in PREGAME_SLIM_SECTIONS:
+        value = getattr(rec, name)
+        if name in defaults and value == defaults[name]:
+            continue
+        if isinstance(value, list) and not value:
+            continue
+        out[name] = _compact(value)
+    return out
+
+
+def read_pregame_lines(selected_date: str, root: Path | None = None) -> Iterable[dict[str, Any]]:
+    """Each kept line: {"k", "v", "ft", "fb", "lt", "lb", "n", "first", "last"}; `last` is None until a later build
+    lists the line again (then `first` is also the last). Torn lines are skipped."""
+    path = pregame_lines_path(selected_date, root)
+    if not path.exists():
+        return
+    with gzip.open(path, "rt", encoding="utf-8") as fh:
+        for line in fh:
+            try:
+                row = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(row, dict) and row.get("k"):
+                yield row
+
+
+def keep_pregame_lines(selected_date: str, records: Sequence[DecisionRecord], *, build_id: str,
+                       now: datetime | None = None, root: Path | None = None,
+                       env: Mapping[str, str] | None = None) -> dict[str, Any]:
+    """Merge this build's PREGAME records into the date's kept-lines file. Returns counts; never raises past the
+    caller's guard (`run_shadow` wraps it)."""
+    started = time.time()
+    if str((env if env is not None else os.environ).get(PREGAME_KEEP_ENV) or "").strip().lower() == "off":
+        return {"status": "off"}
+    now = now or datetime.now(timezone.utc)
+    stamp = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+    current: dict[str, DecisionRecord] = {}
+    skipped = {"started": 0, "unknown_start": 0, "no_key": 0}
+    for rec in records:
+        key = rec.identity.line_key
+        if not key:
+            skipped["no_key"] += 1
+            continue
+        live, _why = _is_live_state(rec.identity, now)
+        if live is None:
+            skipped["unknown_start"] += 1
+            continue
+        if live:
+            skipped["started"] += 1
+            continue
+        current[key] = rec
+    path = pregame_lines_path(selected_date, root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + f".tmp{os.getpid()}")
+    kept = updated = added = torn = 0
+    seen: set[str] = set()
+    try:
+        with gzip.open(tmp, "wt", encoding="utf-8", compresslevel=1) as out:
+            if path.exists():
+                with gzip.open(path, "rt", encoding="utf-8") as fh:
+                    for line in fh:
+                        try:
+                            row = json.loads(line)
+                        except ValueError:
+                            torn += 1
+                            continue
+                        key = row.get("k") if isinstance(row, dict) else None
+                        if not key or key in seen:
+                            continue
+                        seen.add(key)
+                        rec = current.get(key)
+                        if rec is None:
+                            out.write(line if line.endswith("\n") else line + "\n")
+                            kept += 1
+                            continue
+                        row["last"] = slim_record(rec)
+                        row["lt"], row["lb"] = stamp, build_id
+                        row["n"] = int(row.get("n") or 1) + 1
+                        out.write(json.dumps(row, separators=(",", ":"), default=str) + "\n")
+                        updated += 1
+            for key, rec in current.items():
+                if key in seen:
+                    continue
+                out.write(json.dumps({"k": key, "v": PREGAME_KEEP_VERSION, "ft": stamp, "fb": build_id, "lt": stamp,
+                                      "lb": build_id, "n": 1, "first": slim_record(rec), "last": None},
+                                     separators=(",", ":"), default=str) + "\n")
+                added += 1
+    except BaseException:
+        # The old file is untouched until `os.replace`; a failed read or write leaves it as it was.
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+        raise
+    os.replace(tmp, path)
+    summary = {"status": "ok", "lines": kept + updated + added, "added": added, "updated": updated, "kept": kept,
+               "torn": torn, **skipped, "bytes": path.stat().st_size, "elapsed_s": round(time.time() - started, 3)}
+    print(f"[decision_record] PREGAME_KEEP date={selected_date} lines={summary['lines']} added={added} "
+          f"updated={updated} kept={kept} started={skipped['started']} unknown_start={skipped['unknown_start']} "
+          f"torn={torn} bytes={summary['bytes']} elapsed_s={summary['elapsed_s']}", flush=True)
+    return summary
+
+
 # --------------------------------------------------------------------------- the worker hook
 
 
@@ -1235,6 +1374,10 @@ def run_shadow(selected_date: str, shortlist: Mapping[str, Any] | None, *, root:
         "bets": bets,
     })
     summary: dict[str, Any] = {"status": "ok", "records": len(records), "bets": bets, "path": str(path)}
+    try:
+        summary["pregame_keep"] = keep_pregame_lines(selected_date, records, build_id=build_id, root=root)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[decision_record] PREGAME_KEEP_FAILED date={selected_date} error={type(exc).__name__}: {exc}", flush=True)
     try:
         from syndicate.features.shared.decision_agreement import record_build_agreement
 

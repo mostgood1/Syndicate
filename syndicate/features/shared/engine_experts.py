@@ -78,8 +78,13 @@ CLOCK_BUCKETS: tuple[tuple[float, float, str], ...] = (
     (0.75, 0.95, "75-95"),
     (0.95, 1.0000001, "95-100"),
 )
-BUCKET_PREGAME = "pre"
+BUCKET_PREGAME = "pre"  # pregame, start time unknown
 BUCKET_OVERTIME = "ot"
+
+# The pregame analogue of the clock bucket: hours to the start at the record's instant (slice 2). Syndicate Fair v1
+# splits its families by time to start the same way (`tts`); the learner's pregame cells need the axis.
+PREGAME_BUCKETS: tuple[tuple[float, str], ...] = ((1.0, "pre<1h"), (6.0, "pre1-6h"), (24.0, "pre6-24h"))
+PREGAME_BUCKET_FAR = "pre>24h"
 
 # The live join's markets. The `_alt` ladders are priced the same way as the main line.
 _TOTALS = frozenset({"totals", "totals_alt"})
@@ -214,6 +219,18 @@ def elapsed_share(sport: str, state: Mapping[str, Any] | None) -> tuple[float | 
     return round(share, 4), CLOCK_BUCKETS[-1][2]
 
 
+def pregame_bucket(commence_time: Any, t: Any) -> str:
+    """Hours from the record's instant `t` to the start. Unknown either side -> "pre"."""
+    start, at = _parse(commence_time), _parse(t)
+    if start is None or at is None:
+        return BUCKET_PREGAME
+    hours = (start - at).total_seconds() / 3600.0
+    for limit, name in PREGAME_BUCKETS:
+        if hours < limit:
+            return name
+    return PREGAME_BUCKET_FAR
+
+
 def two_way_share(dist: Mapping[str, Any], line: float, *, over: bool = True) -> tuple[int, int, int]:
     """(k, n_two_way, n_push) for P(value > line) in a histogram {value: count}, push sims excluded from n.
 
@@ -286,7 +303,8 @@ def _record_head(expert: str, version: str, rec: Any, t: str, reader: Reader) ->
         sport=str(g("identity.sport") or ""), event_id=str(g("identity.event_id") or ""),
         line_key=str(g("identity.line_key") or ""), market=str(g("identity.market") or ""),
         segment=str(g("identity.segment") or ""), side=str(g("identity.side") or ""),
-        line=_f(g("identity.line")), player=g("identity.player"), clock_bucket=BUCKET_PREGAME,
+        line=_f(g("identity.line")), player=g("identity.player"),
+        clock_bucket=pregame_bucket(g("identity.commence_time"), t),
     )
     state = str(g("identity.game_state") or "").strip().lower()
     if state not in _PREGAME_STATES:
@@ -355,12 +373,22 @@ PREGAME_EXPERTS: dict[str, Callable[..., ExpertOpinion]] = {"sim": sim_expert, "
 
 def pregame_opinions(records: Iterable[Any], t: str, reader: Reader | None = None,
                      env: Mapping[str, str] | None = None) -> list[ExpertOpinion]:
+    """Every pregame expert on records that share one instant (a single build's record file)."""
+    return pregame_opinions_at(((rec, t, "build") for rec in records), reader, env)
+
+
+def pregame_opinions_at(items: Iterable[tuple[Any, str, str]], reader: Reader | None = None,
+                        env: Mapping[str, str] | None = None) -> list[ExpertOpinion]:
+    """Every pregame expert on (record, its own instant, snapshot) -- the kept pregame lines, where each line's
+    `first` and `last` records were written by different builds (`decision_record.keep_pregame_lines`)."""
     reader = reader or Reader()
     off = experts_off(env)
     out: list[ExpertOpinion] = []
-    for rec in records:
+    for rec, t, snapshot in items:
         for fn in PREGAME_EXPERTS.values():
-            out.append(fn(rec, t, reader, off))
+            op = fn(rec, t, reader, off)
+            op.inputs["snapshot"] = snapshot
+            out.append(op)
     return out
 
 
@@ -682,8 +710,7 @@ EXPECTED_SPARSE: dict[str, str] = {
     "sim:decision_record:market.book_age_seconds": "absent on venue-only priors",
     "under_tilt:decision_record:market.book_age_seconds": "absent on venue-only priors",
     "sim:decision_record:identity.game_state": "set by the board only once a game's state is known",
-    "under_tilt:decision_record:identity.game_state": "set by the board only once a game's state is known",
-    "live_resim:out:player": "the live join prices game lines only",
+    "under_tilt:decision_record:identity.game_state": "set by the board only once a game's state is known",    "live_resim:out:player": "the live join prices game lines only",
     "sim:out:player": "game lines carry no player; a sport whose record holds only game lines (NCAAB, 11-09) has none",
     "nhl:live_resim:out:line": "NHL live prices only the moneyline: its lanes publish no distributions",
     "nhl:live_resim:live_evidence:event_id": "NHL lanes carry no event id; the expert joins on team names",

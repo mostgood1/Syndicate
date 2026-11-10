@@ -113,6 +113,42 @@ def test_a_model_anchored_to_the_prior_is_refused_not_read_as_agreement():
     assert near.refusal is None and near.delta_logit is not None
 
 
+@pytest.mark.parametrize("commence,t,bucket", [
+    ("2026-11-11T00:30:00Z", "2026-11-11T00:00:00Z", "pre<1h"),
+    ("2026-11-11T00:30:00Z", "2026-11-10T20:30:00Z", "pre1-6h"),
+    ("2026-11-11T00:30:00Z", "2026-11-10T06:30:00Z", "pre6-24h"),
+    ("2026-11-11T00:30:00Z", "2026-11-09T00:30:00Z", "pre>24h"),
+    (None, "2026-11-10T06:30:00Z", "pre"),
+])
+def test_pregame_buckets_are_hours_to_the_start(commence, t, bucket):
+    assert ee.pregame_bucket(commence, t) == bucket
+
+
+def test_kept_pregame_lines_reach_the_experts_with_their_own_instants(tmp_path):
+    from datetime import datetime, timezone
+
+    row = {"sport": "nba", "event_id": "e1", "kind": "game", "market": "totals", "segment": "full",
+           "player_name": None, "side": "over", "line": 220.5, "commence_time": "2026-11-11T00:30:00Z",
+           "home_team": "H", "away_team": "A", "game_state": "pregame", "model_probability_cal": 0.58,
+           "projection": {"model_prob_over": 0.58, "basis": "sim_total_dist/full"},
+           "quote": {"fair_probability": 0.50, "fair_method": "consensus", "books_quoting": 6}}
+    ctx = dr.RecordContext(selected_date="2026-11-10")
+    t0 = datetime(2026, 11, 10, 6, 30, tzinfo=timezone.utc)
+    t1 = datetime(2026, 11, 11, 0, 5, tzinfo=timezone.utc)
+    dr.keep_pregame_lines("2026-11-10", dr.build_records([row], ctx), build_id="b1", now=t0, root=tmp_path, env={})
+    moved = {**row, "quote": {**row["quote"], "fair_probability": 0.55}}
+    dr.keep_pregame_lines("2026-11-10", dr.build_records([moved], ctx), build_id="b2", now=t1, root=tmp_path, env={})
+    items = []
+    for kept in dr.read_pregame_lines("2026-11-10", tmp_path):
+        items.append((dr.expand_record(kept["first"]), kept["ft"], "first"))
+        items.append((dr.expand_record(kept["last"]), kept["lt"], "last"))
+    ops = [o for o in ee.pregame_opinions_at(items) if o.expert == "sim"]
+    by = {o.inputs["snapshot"]: o for o in ops}
+    assert by["first"].clock_bucket == "pre6-24h" and by["last"].clock_bucket == "pre<1h"
+    assert by["first"].p_prior == pytest.approx(0.50) and by["last"].p_prior == pytest.approx(0.55)
+    assert by["last"].delta_logit < by["first"].delta_logit
+
+
 def test_a_started_game_is_not_a_pregame_opinion():
     op = ee.sim_expert(_record(game_state="live"), "t", ee.Reader())
     assert op.refusal == "game_not_pregame" and op.delta_logit is None
