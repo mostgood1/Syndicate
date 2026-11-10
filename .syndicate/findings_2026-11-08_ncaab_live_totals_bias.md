@@ -511,3 +511,22 @@ In-game bias, full total, all 285 games (model − final):
   against 0.4743.
 - **The probe's halftime state** is synthetic (first half scored at its prior share), with real teams and real
   production inputs.
+
+## Live reading, 11-09 slate `[read 2026-11-10 07:45Z, 1:45 AM CST 11-10]`: PARTLY by the pre-registered bar, not falsified
+
+Lane `ncaab-blowout-off-live-read` (hypothesis pre-registered 11-09 15:25Z; taken over by session c2fd17f8 at 21:39Z, user "Yes, take it", owner 6df1b15d idle). Read unchanged with the lane's `night_read.ps1` at 07:41:37Z, 20 min after ESPN showed all 50 men's D1 games final. Work dir `C:\tmp\ncaab_postload\night_20261110T074137Z`; frozen script main 80aec5a3f; 1,327 lane states, 54 ESPN games matched, 5 unmatched. E4 = rows after 05:13:43Z 11-09 (30 games: the 11-09 slate plus 2 late 11-08 games); E3q = 11-08 21:52:45Z..11-09 05:13:43Z (the same quote rule, 12 games).
+
+| reading | pre-load reference | E3q | E4 (after the load) | bar / prediction | verdict |
+|---|---|---|---|---|---|
+| h2 live update, flag ON | -1.97 +- 0.09 (11-02..06) | -1.41 +- 0.21 (26 / 4 g) | **-0.79 +- 0.11** (203 / 24 g) | rises toward flag off | moved |
+| h2 live update, flag off | +0.69 +- 0.16 | +1.76 +- 0.41 (61 / 9 g) | +0.58 +- 0.27 (187 / 21 g) | drops ~0.2-0.3 | -0.11 vs ref |
+| gap ON - off | -2.66 | -3.17 +- 0.46 | **-1.37 +- 0.29** | > -0.8 met; -1.5..-0.8 PARTLY; < -1.5 falsified | **PARTLY** |
+| priced model - line, all | -1.95 | -1.93 +- 0.96 (470 / 12 g) | **-1.26 +- 0.67** (2,294 / 30 g) | about +0.5 vs E3q; down beyond 1.96 SE falsifies | +0.66 +- 1.17, not falsified |
+| priced model - line, h2 flag ON | -2.74 | -3.31 +- 1.29 (85 / 4 g) | **-1.60 +- 0.77** (518 / 24 g) | about +0.7 | +1.71 +- 1.50 |
+| step 15-19 minus 11-14 | -1.45 +- 0.43 | (1 state at 11-14) | **-0.56 +- 0.29** | vanishes | shrunk, not gone |
+| enough data | | | 24 games with h2 |m| >= 15 | >= 15 games | yes |
+
+- **What remains is not the rule.** The load's environ parsed to `blowout_margin` / `blowout_q4_margin` 999, so the flag cannot fire. The residual reads as a slope in |m| (11-14: -0.65 +- 0.17; 15-19: -1.21 +- 0.24), not a step.
+- **Against the finals it points the right way:** h2 flag-ON prior - actual remaining +1.72 +- 1.45 (the prior ran high in blowouts), model - final +0.92 +- 1.46; flag off model - final -0.83 +- 1.82. Neither differs from 0. P1 all rows: model - final +0.33 +- 1.84, line - final +1.59 +- 2.01.
+- **Limits:** one slate, 30 games, games clustered (the SEs are per-game clustered as in every table above). The E3q comparison rests on 12 games (4 with h2 blowout states). The live totals still sit -1.26 under the line on priced rows; that is the next reading, not this one.
+- **Recorded:** deploys.md 2026-11-09 05:13:12Z entry RECONCILED (READING line), todo #768, lane CLOSED.
