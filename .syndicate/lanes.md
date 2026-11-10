@@ -725,6 +725,14 @@ death, never life — do not invert it.
 - Verification: Served board on a live NHL and NFL slate: per player/market group across layer2_shortlist and layer2_inplay_overlay rows, 0 groups with two Actual values; a spot check of board-build rows against the NHL gamecenter / ESPN box; web log LIVE_ACTUALS_REFRESHED_FROM_BOX lines with refreshed>0; 0 rows with live_projection or model_edge_pct.
 - Blocked by: none
 
+### nhl-live-puckline-display — OPEN — opened 2026-11-10 — session 87074b1f-3325-4c92-871d-b22851478134
+- Goal: Live NHL puck-line rows (spreads, spreads_alt) on the Layer 2 board show a DISPLAY-ONLY live number from the NHL re-sim's own margin histogram, with 0 edge and no live pricing; measured on a live NHL game as LIVE_GAMELINE_JOIN sport=nhl no longer refusing puck-line rows live_resim_published_no_distribution_for_this_market, and served /api/intelligence/query live NHL spreads rows carrying a Live proj. with edge_vs_market_pct None
+- Files: syndicate/features/nhl/live_resim.py (resim_live_game's return dict + build_game_lens's projection block + the module docstring's published/not-published section only), syndicate/features/shared/live_gameline_join.py (the new display-only margin hit key in live_gameline_from_lens + REASON_MARGIN_DISPLAY_ONLY + live_display_block's display-only margin read + the display-only margin branch in attach_live_gamelines' distribution path only), tests/test_nhl_live_puckline_display.py (NEW), docs/ai_context/todo.md (#773 section only)
+- Hypothesis: n/a (cause known: nhl/live_resim publishes no margin histogram, so the join refuses puck lines live_resim_published_no_distribution_for_this_market)
+- Falsification test: n/a
+- Verification: off != on reachability test (join indexes a puck-line row from a fixture snapshot and attaches a display block only with the new key); fleet: LIVE_GAMELINE_JOIN sport=nhl names the new display-only reason for puck-line rows and display= rises; served /api/intelligence/query live NHL spreads rows carry live_model_probability with model edge None
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
