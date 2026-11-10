@@ -6087,6 +6087,7 @@ class IntelligenceStateService:
             f"rows={len(shortlist.get('rows') or [])} "
             f"live_rows={_live_signal.get('live_rows')} chips_live={_live_signal.get('chips_live')} "
             f"considered={shortlist.get('opportunities_considered')} "
+            f"before_board_date={shortlist.get('rows_before_board_date')} "
             f"sports={shortlist.get('active_sports')} "
             f"kalshi_capture={_kalshi_capture} "
             f"elapsed_s={round(time.time() - started, 2)}",
@@ -7674,6 +7675,9 @@ class IntelligenceStateService:
                 # thin slate". The counters shipped with their rules as that
                 # discipline requires; the LOG LINE never caught up.
                 f"beyond_horizon={layer2_shortlist.get('rows_beyond_horizon')} "
+                # The lower date bound (todo #779): an earlier Central date's games, dropped from this date's board.
+                f"before_board_date={layer2_shortlist.get('rows_before_board_date')} "
+                f"before_board_date_by_sport={layer2_shortlist.get('rows_before_board_date_by_sport')} "
                 f"stale_kickoff={layer2_shortlist.get('rows_stale_kickoff')} "
                 f"beyond_quote_age={layer2_shortlist.get('rows_beyond_quote_age')} "
                 f"implausible_book={layer2_shortlist.get('rows_implausible_book')} "

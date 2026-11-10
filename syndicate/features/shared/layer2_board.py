@@ -5704,6 +5704,40 @@ def _within_horizon(row: Mapping[str, Any], now: datetime, horizon_days: int | N
     return (start.astimezone(timezone.utc).date() - now.date()).days <= int(horizon_days)
 
 
+def shortlist_lower_date_bound_enabled() -> bool:
+    """On unless SYNDICATE_SHORTLIST_LOWER_DATE_BOUND says 0/false/no/off. ABSENT IS ON, by user decision 2026-11-10."""
+    raw = str(os.environ.get("SYNDICATE_SHORTLIST_LOWER_DATE_BOUND") or "").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
+def _kicks_off_before(row: Mapping[str, Any], board_start: datetime) -> bool:
+    """Does this row's game start before `board_start` (midnight Central of the board's own date)?
+
+    THE LOWER DATE BOUND (lane `layer2-lookahead-live-dedupe`, todo `#779`; user decision 2026-11-10, "Yes, fix it
+    too"). `_within_horizon` bounds a board's dates from ABOVE only, so a board kept every earlier game its pool held.
+    Measured 2026-11-10 on the fleet: the 11-11 look-ahead shortlist carried that night's NCAAB games (tip 5-9 PM CT
+    11-10). The NCAAB quote shards are not keyed by Central kickoff date, so the 11-11 pool holds them. The 11-11
+    `portfolio_commit` plan is built from that shortlist, and only the venues' commence-time refusals kept those rows
+    from trading.
+
+    The prior date's own board keeps its games. The bound is the board's OWN midnight, never the wall clock, so the
+    `layer2-prior-date-live-carryover` rebuild of 11-10 at 1 AM CT 11-11 still keeps every 11-10 game.
+
+    A row with no start time, or one that does not parse, is KEPT, as in `_within_horizon`: dropping it would hide a
+    whole sport if a feed stopped stamping starts.
+    """
+    raw = row.get("commence_time")
+    if not raw:
+        return False
+    try:
+        start = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if start.tzinfo is None:
+        start = start.replace(tzinfo=timezone.utc)
+    return start.astimezone(timezone.utc) < board_start
+
+
 def _line_token(line: Any) -> str:
     try:
         return f"{float(line):g}"
@@ -5926,9 +5960,16 @@ def select_shortlist(
     on_unmeasured_model = 0
     on_unmeasured_model_by_market: dict[str, int] = {}
     horizon_now = reference_now
+    # The lower bound (see `_kicks_off_before`). Only a caller that names the board's own date gets one: an unanchored
+    # call (the in-play overlay's, `book_grid_artifact.build_inplay_overlay`) has no date to bound by.
+    board_start: datetime | None = None
+    before_board_date = 0
+    before_board_date_by_sport: dict[str, int] = {}
     if horizon_anchor is not None:
         anchor = horizon_anchor if horizon_anchor.tzinfo else horizon_anchor.replace(tzinfo=timezone.utc)
         horizon_now = max(reference_now, anchor.astimezone(timezone.utc))
+        if shortlist_lower_date_bound_enabled():
+            board_start = anchor.astimezone(timezone.utc)
     # Every flagged-OUT row the pool HOLDS, before any rule removes it (lane news-availability-gate, 2026-10-25). The
     # gate's own count only sees rows that survived every earlier `continue` (quote age, uninformative EV ...): on
     # 10-23 six flagged NHL rows went before reaching it and `rows_player_out_on_feed_by_sport` read no `nhl` at all,
@@ -5940,6 +5981,11 @@ def select_shortlist(
             pool_sport = str(row.get("sport") or "").strip().lower() or "unknown"
             player_out_in_pool_by_sport[pool_sport] = player_out_in_pool_by_sport.get(pool_sport, 0) + 1
     for row in opportunities:
+        if board_start is not None and _kicks_off_before(row, board_start):
+            before_board_date += 1
+            sport_key = str(row.get("sport") or "").strip().lower() or "unknown"
+            before_board_date_by_sport[sport_key] = before_board_date_by_sport.get(sport_key, 0) + 1
+            continue
         if not _within_horizon(row, horizon_now, horizon_days):
             beyond_horizon += 1
             continue
@@ -6340,6 +6386,11 @@ def select_shortlist(
         # Same contract for the two quality floors -- a board that shrinks must
         # say which rule shrank it, or the next reader diagnoses an outage.
         "rows_beyond_horizon": beyond_horizon,
+        # The lower bound's count, shipped with the rule (`#397`). `lower_date_bound` is None when no bound applied
+        # (an unanchored call, or SYNDICATE_SHORTLIST_LOWER_DATE_BOUND off), so "0 dropped" and "never ran" differ.
+        "rows_before_board_date": before_board_date,
+        "rows_before_board_date_by_sport": dict(sorted(before_board_date_by_sport.items())),
+        "lower_date_bound": board_start.strftime("%Y-%m-%dT%H:%M:%SZ") if board_start is not None else None,
         "rows_below_value_floor": below_value_floor,
         # Reported beside the rejection it is the mirror of. `#397`'s
         # discipline: the counter ships in the SAME commit as the rule that
