@@ -712,7 +712,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### live-evidence-log — OPEN — opened 2026-11-09 — session e32fef1a-01e8-4afe-a284-01acd3728545
-- **STATUS `[2026-11-10 02:40Z]`: GOAL: NOT MET -- LOADED (`564f8dbde`, 19:18:04Z). Reading 1 PASSED (01:15Z probe 31/31). Reading 2 (02:35Z, Monday night football live) matched 15/15, but the NFL rows kept their state only in `extra` (lane-level snake_case `live_state` / `margin_dist` / `total_dist`) and the probe was blind to it. Reader fix `normalize_row` + an independent probe built in the worktree: 15 tests; on fleet rows nfl 6/6 now read with state; new probe 17/17, unread 0. NOT on main (code push = the user's call; no load needed). Owed: 05:30Z NBA cross-check + full-day sizes.** File date = the producer's `date`. Earlier: built and dry-run 18:18Z (wncaab probe 3/3).
+- **STATUS `[2026-11-10 05:34Z]`: GOAL: NOT MET -- every reading PASSED; one step left, the user's call: push branch `le-nfl-normalize` (`1f5f79ea3` NFL reader normalization + independent probe, `5a8222f92` NBA cross-check by instant; 16 tests) to main. No fleet load needed. Readings: probe 31/31 (01:15Z); 15/15 with Monday night football (02:35Z), the new probe 17/17, unread 0; NBA 422/422 ticks, 0 field mismatches (05:31Z, by instant; as strings it read 0/422 and exited 0 -- check defect, fixed); ~6.9 MB for the 11-09 slate; memory NOT up (3,987 MB at 10 h vs 4,021-5,042 for the 7 earlier workers that reached 10 h); 0 tracebacks.** File date = the producer's `date`. Full record: deploys.md 05:30Z.
   - Built:
     - `syndicate/features/shared/live_evidence_log.py`: collector + `iter_rows` / `evidence_at`; switch `SYNDICATE_LIVE_EVIDENCE_LOG`, absent = on; every 30 s.
     - the refresh-worker start call;

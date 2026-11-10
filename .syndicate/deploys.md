@@ -58055,3 +58055,41 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - DEN@HOU 0.993, SAS@PHX 0.971, NOP@GSW 1.132, IND@DAL 1.382.
   - NOP@GSW starters: Matkovic 1.79 (started tonight, pregame 9.23 pts), Fears 1.47, Green 1.48, Podziemski 1.29, Curry 0.81.
 - **Housekeeping:** no deploy, no claim held, no fleet change.
+
+## 2026-11-10 05:30Z (11:30 PM CST 11-09) -- live evidence log (lane `live-evidence-log`, `564f8dbde`): reading 3 of 3 -- **NBA 422 of 422 ticks reproduced, 0 field mismatches, once the check keys on the instant; full-day bytes measured; memory NOT up against 13 earlier workers at the same age** (written 05:34Z, 11:34 PM CST)
+- **NBA cross-check as first run, on the fleet's code (05:30:17Z):** history_fresh 422, matched 0, missing 422, **exit 0**. Two defects in the CHECK, not the log:
+  - It keyed ticks on the `t` TEXT. NBA's history writes UTC (`2026-11-10T00:10:37+00:00`); the snapshot's `generatedAt` carries the Central offset (`-06:00`). Same instants, different strings.
+  - It exited 0 on 0 of 422, because only a field mismatch failed. Same family as the wait-loop TIMEOUT that exited 0 (learnings); no new entry.
+- **Re-run with the fix (worktree code, worker env, 05:31:01Z):** history_fresh 422, log_fresh 422, **matched 422, missing 0, log-only 0, field mismatches 0**, on all 8 fields: period, clock, home score, away score, total, margin, win probability, sims. Exit 0.
+  - Fix: key on (event, parsed instant); exit 1 on any missing tick.
+  - Test, off != on: a UTC history row matches a -06:00 log row; an extra history tick exits 1. 16 tests pass.
+- **Bytes per day**, producer date 2026-11-09, read 05:30Z (a heavy college night; a few NHL / ncaab ticks still arriving):
+
+  | sport | bytes | rows |
+  |---|---|---|
+  | ncaab | 4,337,458 | 1,556 |
+  | nba | 1,538,542 | 424 |
+  | wncaab | 794,779 | 228 |
+  | nhl | 143,445 | 253 |
+  | ncaaf | 29,861 | 67 |
+  | nfl | 6,633 | 15 |
+
+  - Plus producer date 11-10 (football rolled at 6 PM CST): nfl 41,097 B / 57 rows (Monday night football); ncaaf 29,867 / 67.
+  - **Total about 6.9 MB** for the slate.
+- **Memory, the lane's "not up" check, settled by a comparator:** container memory by worker age, from the worker's own `ALL_PROCESS_MEMORY` lines over the rotated logs (11-02..11-09).
+
+  | worker | @2h | @6h | @10h |
+  |---|---|---|---|
+  | **386232, with the collector** | **2,848** | **3,543** | **3,987** |
+  | 13 earlier workers (range) | 2,165-4,676 | 2,316-4,888 | 4,021-5,042 (7 of them reached 10 h) |
+
+  - Evening slope +163 MB/h, inside the earlier range of +97..+720.
+  - **Not up.** At 10 h it is the lowest of the 8 workers that reached 10 h.
+  - The memory guards read a 7,168 MB ceiling (`memory_max_mb`; not the 4,096 MB plan default). At 05:31Z the worker was at 55%, headroom 3,210 MB, and no memory gate had refused anything.
+- **0 tracebacks** since the load.
+- **Where the fixes are:** local branch `le-nfl-normalize` in worktree `loving-einstein-b3c45e`, 2 commits on `origin/main` `0c52ac07a`:
+  - `1f5f79ea3`: NFL reader normalization + an independent probe;
+  - `5a8222f92`: the cross-check by instant.
+
+  **Not pushed: a code push is the user's call.** No fleet load is needed for either, because the writer is unchanged and only the check script reads rows.
+- **Verdict:** the writer meets every reading in the lane's Goal. Not closed: NFL rows read with their state only through the unpushed reader. The goal names one as-of reader, so the lane closes when `le-nfl-normalize` reaches main.
