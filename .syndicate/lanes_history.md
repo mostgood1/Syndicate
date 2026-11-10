@@ -39547,3 +39547,8 @@ Slugs: basketball-schedule-adapter-native, coverage-gate-inactive-sports, deploy
   - Owed:
     - the user's OK to push and load (fleet ff + refresh-worker TERM);
     - then the NBA cross-check on a live NBA night, probes per live sport, and bytes/day.
+
+## engine-experts -- superseded status line, moved verbatim at close 2026-11-10 16:18Z
+
+### engine-experts — OPEN — opened 2026-11-10 — session e32fef1a-01e8-4afe-a284-01acd3728545
+- **GOAL VERDICT `[2026-11-10 16:10Z]`: GOAL: NOT MET -- every reading the Goal names is MET on the fleet's data; one step left, the user's push of local branch `engine-experts-m1` (`98a137df7`, 4 new files, 22 tests).** Goal, verbatim: "Phase 1B M1 slice 1: one expert contract (an ExpertOpinion per line per instant: delta-logit against the market prior, sigma with its basis, phase, clock bucket, the inputs read, a named refusal) and three experts on it, in shadow with nothing in placement, sizing or the board reading them -- pregame sim and prop under-tilt from the DecisionRecord, live re-sim from the live evidence log against the live gameline ledger's prior -- each with an off != on reachability test and an input checklist that exits 1 on a consumed-but-unpopulated input; on the fleet's 2026-11-09 data, a coverage table per sport, phase and clock bucket, and the live re-sim expert reproducing the live join's own model probability on half-point lines where both read the same lane state with 0 mismatches"

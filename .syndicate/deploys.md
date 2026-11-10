@@ -58177,3 +58177,9 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **Defects found and fixed in the code before these readings:** (1) the 11-10 first pass read every NBA/NCAAB pregame spread as delta 0 -- the model was the market restated; now refused `model_anchored_to_prior` (|p_model - p_market| < 1e-5). (2) the ledger's refusal rows (no lane state, no prices) were diluting the checklist; now named `ledger_refusal_row` and left out of the populated share. (3) a 1-line sample tripped the output-at-default check; it now needs 20 opined.
 - **verify:** met for the Goal's readings. Owed: the push of `engine-experts-m1` (user's call). No fleet load is needed: nothing on the fleet calls the experts.
 - **Ledger fix in the same commit:** my 46ae7f4f7 append put 16 CRLF lines into `lanes_history.md`, an LF file with 0 CRs before it; stripped back to LF (content unchanged).
+
+## 2026-11-10 16:18Z (10:18 AM CST) -- engine experts (lane `engine-experts`): pushed to main `adddd1f18` -- **code on main; nothing loaded, none owed**
+- **User, in this chat:** "Yes, push them", answering "Push the M1 experts to main?"
+- **What:** local `98a137df7` rebased onto main twice (main moved during the first push: `eeb2461c7`, `d8772d6fc`; neither touches the 4 files) -> `adddd1f18`. 68 tests passed after the first rebase, 24 (the experts' own) after the second.
+- **Fleet:** unchanged. Nothing in the app imports `engine_experts` (pinned by `test_nothing_in_the_app_reads_the_experts_yet`); the runner is a read-only script. The fleet checkout gets the files at its next ff, whoever does it.
+- **verify:** the Goal's readings were taken before the push (this file, 2026-11-10 16:10Z). Lane CLOSED, GOAL MET.
