@@ -1,5 +1,14 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#780` — **LIVE TOTALS EDGES ARE NOT REAL AGAINST A FRESH LINE: graded against finals, the board's priced live full-game totals claim +16 to +23 pp and realise ~0 when the quote is <= 30 s old; the realised "edge" grows with quote age (the pricing ceiling is 600 s). The model's mean is no better than the line and its spread is 10-30% too narrow. NOT FIXED** `[2026-11-10, session 8062940b, read-only; user "Yes, grade them"]`
+- **Population:** priced full-game totals states in the fleet's live gameline ledgers vs ESPN finals: NCAAB 19,420 states / 287 games (11-02..11-09), WNCAAB 2,657 / 53, NBA 12,633 / 144 (10-20..11-09), NCAAF 49,676 / 252 (10-02..11-07). NFL 0 priced rows.
+- **Quote <= 30 s, realised (hit - fair):** NCAAB +0.014 +- 0.054, NBA -0.001 +- 0.136, NCAAF -0.019 +- 0.054, WNCAAB +0.014 +- 0.143. **Quote > 300 s:** +0.08 to +0.22. Brier model - market: NCAAB +0.024 +- 0.015 (model WORSE), NCAAF +0.017 +- 0.016, NBA -0.001.
+- **One bet per game** (first state |edge| >= 10 pp): hit 0.514 / 0.514 / 0.508 (NCAAB / NBA / NCAAF) where the model claimed 0.66-0.70; -110 break-even is 0.524.
+- **Engine read:** model RMSE vs final 5-11% worse than the line early in games, about equal mid-game; implied sd 10-30% below the actual error sd (NCAAB late 5.9 vs 7.5, NBA late 6.3 vs 8.6, NCAAF early 12.6 vs 16.4).
+- **Not a real-money P&L:** live in-game entries ARE on (`LIVE_ODDS_WORKER__SYNDICATE_INPLAY_ENTRIES=on`, read 23:0xZ), but that rule prices book consensus vs Kalshi, not these probabilities. `/portfolio`'s live plan was not checked.
+- **Candidate fixes, none made:** (1) per-sport live pricing ceiling ~30-60 s for basketball/football (`live_gameline_join._MAX_QUOTE_AGE_BY_SPORT`); (2) fit the live totals spread to its measured error (estimator, per sport); (3) pre-register NCAAB fresh-quote |edge| >= 20 pp (134 games, hit 0.590 +- 0.083, found after ~12 cells) on unseen nights.
+- **Detail:** `.syndicate/findings_2026-11-10_live_totals_grade.md`. Re-run: `scripts/live_totals_grade.py` (on the fleet host, nice 19).
+
 ### `#779` — **A LIVE GAME SHOWED STALE PREGAME EDGES FROM TOMORROW'S BOARD: the next-day Layer 2 shortlist carries tonight's NCAAB / WNCAAB games at older lines, and no live join ever sees them. FIX ON MAIN (web, display only `0290d505a`; worker, lower date bound `9fee4160d`), NEITHER LOADED** `[2026-11-10, lane layer2-lookahead-live-dedupe, session 345d60ab; lead 2026-11-09 from live-display-other-sports]`
 - **Cause, measured 2026-11-10 19:51Z (1:51 PM CST, pregame) on the fleet:**
   - The 11-11 NCAAB shortlist (written 19:26Z) was 274 rows, all of them tonight's 11-10 games. `select_shortlist`'s horizon (`layer2_board._within_horizon`) has no lower bound, and the NCAAB quote shard `2026-11-11.jsonl` holds commence times from 11-10 05Z to 11-12 04Z.
@@ -167,7 +176,7 @@
 - **Reading owed after the load:** the next slate where one of the 8 has props, after the sims build. Served rows carry `engine_player_name` + `sim_projection` + `model_edge_pct` + `player_side` + `headshot_url`.
 - Findings: `.syndicate/findings_2026-11-10_nba_prop_engine_name_join.md`.
 
-### `#774` — **A COLLEGE GAME STILL LIVE AT MIDNIGHT CENTRAL LOST ITS LIVE RE-SIM, AND THE CARRYOVER BOARD PRICED IT FROM NOTHING. FIX ON MAIN `97cb5d477`, NOT LOADED (the user's decision)** `[2026-11-10, lane college-live-resim-midnight, session 8062940b]`
+### `#774` — **A COLLEGE GAME STILL LIVE AT MIDNIGHT CENTRAL LOST ITS LIVE RE-SIM, AND THE CARRYOVER BOARD PRICED IT FROM NOTHING. FIX ON MAIN `97cb5d477`, LOADED 16:18Z 11-10 (live-odds-worker pid 294524); readings owed 06:00Z 11-11 and 11-12 (USC @ CAL)** `[2026-11-10, lane college-live-resim-midnight, session 8062940b]`
 - **Cause:** `ncaab/live_resim.run_live_resim_tick` takes its date from `central_today_iso()`. At 00:00 CT it switches to the new date's ESPN scoreboard, so a game tipped late on the previous date is never re-simmed again. The same function runs both college loops (men's and women's).
 - **Measured** (read-only; fleet live-odds-worker + refresh-worker logs 11-05 16:23Z..11-10 15:21Z = 5 midnights; ESPN `groups=50` scoreboards and summaries for 7 slates, 11-03..11-09):
   - Men's: on **2 of 7 slates** a D1-vs-D1 game was live at the roll.
