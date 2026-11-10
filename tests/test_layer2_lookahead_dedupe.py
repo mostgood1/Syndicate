@@ -184,6 +184,50 @@ class ReachabilityTests(unittest.TestCase):
             rows = state._layer2_fallback_recommendations([TODAY, TOMORROW])
         self.assertEqual(len(rows), 3)
 
+    def test_after_the_midnight_roll_a_game_live_past_midnight_keeps_its_new_today_copy(self) -> None:
+        """The roll (asked by lane live-display-other-sports): at 12:15 AM CST 11-11 a game tipped 11-10 is
+        still live. The default window is today..today+2 CENTRAL, so the 11-10 carryover board is NOT read;
+        the 11-11 board (now today) is the only copy, and it must stay -- the drop needs an EARLIER board."""
+        late = _card(event_id="okc-por", sport="nba", sport_slug="nba", commence_time="2026-11-11T03:00:00Z",
+                     game_date=TODAY, live_total=221.4)
+        shortlists = {TODAY: {"cards": [dict(late, live_total=219.0)]}, TOMORROW: {"cards": [late]}}
+        read: list[str] = []
+
+        def _read(d):
+            read.append(str(d))
+            return shortlists.get(str(d))
+
+        state._COMBINED_INTELLIGENCE_RESPONSE_CACHE.clear()
+        try:
+            with patch.object(state, "central_today_iso", return_value=TOMORROW), \
+                 patch.object(state, "read_layer2_shortlist", side_effect=_read), \
+                 patch.object(state, "_merge_inplay_overlay", return_value={"replaced": 0, "added": 0}), \
+                 patch.object(state, "_refresh_layer2_live_state", return_value=0), \
+                 patch.object(state, "_read_single_date_response_for_combining", return_value=None), \
+                 patch.object(state, "board_l2a_fallback_enabled", return_value=True):
+                served = state.read_combined_intelligence_response()
+        finally:
+            state._COMBINED_INTELLIGENCE_RESPONSE_CACHE.clear()
+        self.assertNotIn(TODAY, read)  # the prior date is not in the served window
+        self.assertEqual(read[0], TOMORROW)
+        kept = [c for c in served.get("ranked_all") or [] if c.get("event_id") == "okc-por"]
+        self.assertEqual([(c.get("source_board_date"), c.get("live_total")) for c in kept], [(TOMORROW, 221.4)])
+        self.assertNotIn("layer2_lookahead_rows_dropped", {k for k, v in served.items() if v})
+
+    def test_both_date_orders_keep_the_own_date_copy_even_when_the_lookahead_copy_has_a_live_number(self) -> None:
+        """Before the roll, today's board is rebuilt every pass and runs the live join on its own rows; a
+        look-ahead copy's live number comes from a build up to an hour old, so it never wins."""
+        for dates in ([TODAY, TOMORROW], [TOMORROW, TODAY]):
+            shortlists = {
+                TODAY: {"cards": [_card(line=162.5, live_total=158.1)]},
+                TOMORROW: {"cards": [_card(line=162.0, live_total=161.4)]},
+            }
+            with patch.object(state, "read_layer2_shortlist", side_effect=lambda d: shortlists.get(str(d))), \
+                 patch.object(state, "_merge_inplay_overlay", return_value={"replaced": 0, "added": 0}), \
+                 patch.object(state, "_refresh_layer2_live_state", return_value=0):
+                rows = state._layer2_fallback_recommendations(dates)
+            self.assertEqual([(r["source_board_date"], r["live_total"]) for r in rows], [(TODAY, 158.1)], dates)
+
     def test_the_served_board_drops_the_copy_and_says_so(self) -> None:
         shortlists = self._shortlists()
         state._COMBINED_INTELLIGENCE_RESPONSE_CACHE.clear()
