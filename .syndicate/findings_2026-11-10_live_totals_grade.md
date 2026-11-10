@@ -93,3 +93,53 @@ The table splits each sport by progress (score so far / line) into the first and
 1. **Stop pricing live totals against old quotes.** Give basketball and football a per-sport ceiling of about 30-60 s in `_MAX_QUOTE_AGE_BY_SPORT`. That would remove the stale-quote "edges" from the board.
 2. **Fit the live totals spread to its measured error, per sport.** This is an estimator fit, not a new mechanism (`model_engine_standard.md`). It makes the claimed probabilities honest. It does not create edge.
 3. **Pre-register the one positive cell** (NCAAB fresh quote, |edge| >= 20 pp) and grade it on unseen nights before anything is staked on it.
+
+## Addendum (23:57Z 11-10 = 5:57 PM CST, same session): every market, by quote age; the real-money check
+
+**Quote age decides it, in totals, spreads and moneylines alike.** Script: `scripts/live_gameline_age_grade.py`. The rows are the same priced full-game rows, split by:
+- the quote's age at the build;
+- the game state: "moving" (state <= 120 s old) or "frozen" (older: halftime, timeouts, reviews).
+
+Cells shown are moving states.
+
+| sport / market | quote 0-30 s, realised | 90-120 s | 180-300 s | 300-600 s | Brier model - market, < 120 s |
+|---|---|---|---|---|---|
+| NCAAB totals | +0.005 +- 0.072 | -0.014 +- 0.071 | +0.024 +- 0.065 | +0.095 +- 0.057 | +0.020..+0.036 (worse) |
+| NCAAB spreads | -0.005 +- 0.080 | +0.030 +- 0.074 | +0.102 +- 0.062 | +0.172 +- 0.040 | +0.004..+0.017 (worse) |
+| NBA totals | -0.094 +- 0.150 | +0.078 +- 0.083 | +0.068 +- 0.066 | +0.152 +- 0.050 | +0.004..+0.086 (worse) |
+| NBA spreads | -0.019 +- 0.127 | +0.028 +- 0.100 | +0.062 +- 0.067 | +0.150 +- 0.055 | +0.016..+0.049 (worse) |
+| NCAAF totals | -0.009 +- 0.125 | +0.035 +- 0.060 | +0.111 +- 0.044 | +0.147 +- 0.037 | +0.025..+0.042 (worse) |
+| NCAAF spreads | +0.072 +- 0.123 | +0.044 +- 0.062 | +0.098 +- 0.047 | +0.159 +- 0.037 | +0.017..+0.046 (worse) |
+
+- **Frozen states read the same way.** NCAAF spreads, for example: +0.025 at 0-30 s and +0.183 +- 0.028 at 300-600 s.
+- **Moneylines (h2h) show no positive realised edge at any age under 300 s,** in NCAAB, NBA or NCAAF.
+- **WNCAAB** spreads and totals lean positive at every age, but the samples are small (15-35 games per cell) and every interval covers 0 below 120 s.
+- **The model "wins" only against a quote that has had time to go stale.** Under 120 s it loses to the market on Brier score everywhere it can be measured. This is the mechanism `live_gameline_join` already documents for MLB ("the MARKET decays"), which set MLB's 120 s ceiling. The code leaves every other sport at 600 s "until someone measures it". This is that measurement for NCAAB, WNCAAB, NBA and NCAAF.
+- **What a 120 s ceiling would cost** (share of priced rows at >= 120 s):
+
+  | sport | totals | spreads |
+  |---|---|---|
+  | NCAAB | 62% | 65% |
+  | NBA | 80% | 80% |
+  | NCAAF | 66% | 77% |
+  | WNCAAB | 69% | 77% |
+
+  Those rows carry the stale-quote "edges", and the measurement removes no real edge with them.
+- **Spread line convention, checked on rows:**
+  - `line` on a live spreads row is a threshold on the HOME margin, and P = P(home margin > line). Example: OSU up 21-9 carries `line 25.5`, model margin 29.6, P 0.57.
+  - A first spreads pass that used margin + line was wrong and is discarded.
+
+**Real money (fleet execution ledger: keyvalue doc + `execution_ledger_archive/orders_*.jsonl`, 40,924 distinct orders):**
+- **Model edges reach paper only.** Of 467 live-mode orders placed after their game started, 463 came from the in-play book-consensus rule (`position_key` `ingame:...`, `staked_probability_version` `inplay:inplay_book_media`), all on Kalshi. None came from the live re-sim's edges. Paper in-play orders from model edges do exist (`paper:*:ladder`, `price_shopping`).
+- **That rule's own live record, 10-20..11-10:**
+  - totals: 195 orders, $401.75 staked, -$29.87;
+  - spreads: 200 orders, $392.37, -$49.31;
+  - h2h: 70 orders, $153.64, +$22.27.
+  - Overall -$56.91 on ~$948 (-6%). Not tested for significance. It is lane in-game-trading's rule, not this finding's subject.
+- **Stale ledger line:** `state_kalshi.md` says live in-game entries are OFF. They are ON: `LIVE_ODDS_WORKER__SYNDICATE_INPLAY_ENTRIES=on`.
+
+**Proposed fix (NOT made: the user's decision, and three OPEN lanes list `live_gameline_join.py`):**
+- `_MAX_QUOTE_AGE_BY_SPORT` += `ncaab`, `wncaab`, `nba`, `ncaaf` at 120.0, the MLB value.
+- NFL and NHL stay at 600 s (unmeasured: 0 priced NFL rows, NHL 3 games).
+- Reachability test: off != on for each sport.
+- Then measure the share of rows refused (`quote_older_than_live_pricing_ceiling`) and the priced rows' Brier against finals.
