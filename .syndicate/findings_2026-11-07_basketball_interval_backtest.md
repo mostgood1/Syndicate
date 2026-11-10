@@ -1388,7 +1388,7 @@ is better:
   - `~/bball_iv/runs/ncaab2026_tieshape/spread_k.jsonl` (2,160 game-arm rows);
   - `~/bball_iv/runs/ncaab2026_se05_alt/` and `ncaab2026_se10_alt/` (`results.jsonl`, `report.md`).
 
-## PHASE 2 STEP 3h (NCAAB): the load, PREPARED — k 0.005 + strict alternation with the tip re-centred (`solver_endgame_pts_per_team` 0.2 -> 0.46); NOT loaded
+## PHASE 2 STEP 3h (NCAAB): the load, PREPARED — k 0.005 + strict alternation with the tip re-centred (`solver_endgame_pts_per_team` 0.2 -> 0.46); LOADED 2026-11-10 07:49:46Z (see STEP 3h, LOADED)
 
 `[2026-11-09 18:55Z-20:25Z (12:55-2:25 PM CST), lane ncaab-score-effect-load, session c2fd17f8; user "Yes, prepare it" here, and "yes proceed" in the parent session (relayed): PREPARE ONLY. The env edit and the drained down/up need the user's explicit yes]`
 
@@ -1513,3 +1513,9 @@ only).
 - Scripts in WSL `~/bball_iv/k_scan/`: `env_load_k.py`, `spreadk_rc.py`, `run_gate_se05rc46.sh`, plus the session
   scratchpad's `kanalyze_rc.py` and `kprob_rc.py`.
 - Runs: `~/bball_iv/runs/ncaab2026_se05_rc46/`, `ncaab2026_tieshape/spread_k_rc.jsonl`.
+
+## PHASE 2 STEP 3h, LOADED `[2026-11-10 07:49:46Z (1:49 AM CST), recorded 2026-11-10 07:52Z, lane ncaab-score-effect-load]`
+
+User "Yes, load then" (11-09 20:32Z), after #768's live reading (PARTLY, not falsified; read by this session under "Yes, take it"). The runbook above ran as written: claims 07:46:14Z, drain CLEAR ~07:48:50Z, joint preflight CLEAR 07:49:05Z (live-odds-worker expect 7 -> 9), env edit 07:49:30Z (`4a316bd1` -> `3b773c06`), `down` 07:49:30-33Z, up 07:49:46Z. Config VERIFIED: the new live-odds-worker's environ parses to 9 keys with the intended values; 0 Tracebacks; the one-time pregame re-sim (199 games) names both new fields. deploys.md 2026-11-10 07:49:30Z.
+
+- **Owed after the 11-10 slate (the "Expected readings" above, unchanged):** paired replay of the slate's completed games at minutes 30 and 36, old 7-field vs loaded config: served / old margin SD about 0.93 / 0.94, falsified outside 0.88-0.98; lens `inputs.mechanisms` names both fields; live model - line moves < +-0.2; the 11-11 tip about -0.02 (old-config 11-11 pregame file kept, copied before its rewrite).
