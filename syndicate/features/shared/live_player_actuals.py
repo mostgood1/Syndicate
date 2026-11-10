@@ -272,25 +272,15 @@ def _as_float(value: Any) -> float | None:
     return number if number == number else None
 
 
-def attach_live_player_actuals(
-    grid: Sequence[Any],
-    snapshot: Mapping[str, Any] | None,
-    *,
-    sport: str,
-    now: datetime | None = None,
-    max_age_seconds: float = MAX_BLOCK_AGE_SECONDS,
-) -> dict[str, Any]:
-    """Write a display-only Live actual onto live NHL/NFL prop rows. Returns a coverage payload.
+def index_live_player_blocks(snapshot: Mapping[str, Any] | None, *, sport: str) -> dict[str, Any]:
+    """Every live game's `livePlayerStats` block in a sport's snapshot, keyed by canonical club pair.
 
-    The counters use `attach_live_projections`' names where the meaning is the same, so the
-    existing `LIVE_PROJECTION_JOIN` line reads them: `display_only` is the rows given an Actual,
-    `projected` stays 0 (this writes no Live proj.), `edged` is 0 by construction.
+    The ONE index both readers use: the Layer 2 build's join (`attach_live_player_actuals`, refresh-worker)
+    and web's read-time refresh (`blueprints/intelligence._refresh_live_player_actual_columns`). With
+    `lookup_live_actual` it is the whole key, so web can never attach a block the build would refuse.
+    Two live games under one club pair (a doubleheader shape) are both dropped: neither is trusted.
     """
-    from syndicate.features.shared.probability_refusal import refuse_published_certainty
-    from syndicate.features.shared.segment_actuals import FULL_GAME_SEGMENT, order_segment
-
     sport = str(sport or "").strip().lower()
-    instant = now or datetime.now(timezone.utc)
     index: dict[tuple[str, str], Mapping[str, Any]] = {}
     duplicate_pairs: set[tuple[str, str]] = set()
     games_seen = 0
@@ -310,11 +300,89 @@ def attach_live_player_actuals(
         games_with_block += 1
         players_indexed += len(block["players"])
         if key in index:
-            # Two live games under one club pair (a doubleheader shape). Neither is trusted.
             duplicate_pairs.add(key)
         index[key] = block
     for key in duplicate_pairs:
         index.pop(key, None)
+    return {
+        "sport": sport,
+        "index": index,
+        "games_seen": games_seen,
+        "games_with_block": games_with_block,
+        "players_indexed": players_indexed,
+        "games_ambiguous": len(duplicate_pairs),
+    }
+
+
+def lookup_live_actual(
+    indexed: Mapping[str, Any],
+    *,
+    away: Any,
+    home: Any,
+    market: Any,
+    player_name: Any,
+    segment: Any = None,
+    now: datetime | None = None,
+    max_age_seconds: float = MAX_BLOCK_AGE_SECONDS,
+) -> tuple[dict[str, Any] | None, str]:
+    """One live prop's box count so far: `({value, field, source, as_of}, "")`, or `(None, <miss counter>)`.
+
+    The refusals, in the order the build has always applied them, each named by its coverage counter:
+    no block for the game, a stale block, a segment prop, no box field for the market, no player name,
+    the player absent from the box or matching two players, the stat not the player's role.
+    """
+    from syndicate.features.shared.segment_actuals import FULL_GAME_SEGMENT, order_segment
+
+    sport = str(indexed.get("sport") or "")
+    key = _game_key(sport, away, home)
+    block = indexed.get("index", {}).get(key) if key else None
+    if block is None:
+        return None, "miss_no_game"
+    as_of = _parse_instant(block.get("asOf"))
+    instant = now or datetime.now(timezone.utc)
+    if as_of is None or (instant - as_of).total_seconds() > float(max_age_seconds):
+        return None, "miss_stale_block"
+    if order_segment({"segment": segment}) != FULL_GAME_SEGMENT:
+        # The box is whole-game. A period/quarter prop shown the full-game count would show
+        # the wrong quantity -- the grader refuses it for the same reason.
+        return None, "miss_segment"
+    field = _market_field(sport, market)
+    if field is None:
+        return None, "miss_no_market_field"
+    if not str(player_name or "").strip():
+        return None, "miss_no_player"
+    player, why = _match_player(sport, block["players"], player_name)
+    if player is None:
+        return None, "miss_player_absent" if why == "absent" else "miss_player_ambiguous"
+    stats = player.get("stats") if isinstance(player.get("stats"), Mapping) else {}
+    value = _as_float(stats.get(field))
+    if value is None:
+        # A goalie's `goals` / a skater's `saves` is absent from that role's stats by
+        # construction, so a role mismatch lands here too.
+        return None, "miss_stat_unavailable"
+    return {"value": value, "field": field, "source": block.get("source"), "as_of": block.get("asOf")}, ""
+
+
+def attach_live_player_actuals(
+    grid: Sequence[Any],
+    snapshot: Mapping[str, Any] | None,
+    *,
+    sport: str,
+    now: datetime | None = None,
+    max_age_seconds: float = MAX_BLOCK_AGE_SECONDS,
+) -> dict[str, Any]:
+    """Write a display-only Live actual onto live NHL/NFL prop rows. Returns a coverage payload.
+
+    The counters use `attach_live_projections`' names where the meaning is the same, so the
+    existing `LIVE_PROJECTION_JOIN` line reads them: `display_only` is the rows given an Actual,
+    `projected` stays 0 (this writes no Live proj.), `edged` is 0 by construction.
+    """
+    from syndicate.features.shared.probability_refusal import refuse_published_certainty
+
+    sport = str(sport or "").strip().lower()
+    instant = now or datetime.now(timezone.utc)
+    indexed = index_live_player_blocks(snapshot, sport=sport)
+    games_with_block = indexed["games_with_block"]
 
     coverage: dict[str, Any] = {
         "supported": True,
@@ -324,10 +392,10 @@ def attach_live_player_actuals(
         "rows_live_edged": 0,
         "rows_live_display_only": 0,
         "rows_live_actual": 0,
-        "snapshot_games": games_seen,
+        "snapshot_games": indexed["games_seen"],
         "live_games_in_snapshot": games_with_block,
-        "snapshot_rows_indexed": players_indexed,
-        "games_ambiguous": len(duplicate_pairs),
+        "snapshot_rows_indexed": indexed["players_indexed"],
+        "games_ambiguous": indexed["games_ambiguous"],
         "miss_no_game": 0,
         "miss_stale_block": 0,
         "miss_segment": 0,
@@ -358,50 +426,27 @@ def attach_live_player_actuals(
         if str(game.get("state") or "").strip().lower() not in {"live", "in_progress"}:
             continue
         coverage["rows_live_considered"] += 1
-        key = _game_key(
-            sport,
-            row.get("away_team") or game.get("away_team"),
-            row.get("home_team") or game.get("home_team"),
+        hit, why = lookup_live_actual(
+            indexed,
+            away=row.get("away_team") or game.get("away_team"),
+            home=row.get("home_team") or game.get("home_team"),
+            market=row.get("market"),
+            player_name=row.get("player_name"),
+            segment=row.get("segment"),
+            now=instant,
+            max_age_seconds=max_age_seconds,
         )
-        block = index.get(key) if key else None
-        if block is None:
-            miss("miss_no_game", row)
-            continue
-        as_of = _parse_instant(block.get("asOf"))
-        if as_of is None or (instant - as_of).total_seconds() > float(max_age_seconds):
-            miss("miss_stale_block", row)
-            continue
-        if order_segment(row) != FULL_GAME_SEGMENT:
-            # The box is whole-game. A period/quarter prop shown the full-game count would show
-            # the wrong quantity -- the grader refuses it for the same reason.
-            miss("miss_segment", row)
-            continue
-        field = _market_field(sport, row.get("market"))
-        if field is None:
-            miss("miss_no_market_field", row)
-            continue
-        if not str(row.get("player_name") or "").strip():
-            miss("miss_no_player", row)
-            continue
-        player, why = _match_player(sport, block["players"], row.get("player_name"))
-        if player is None:
-            miss("miss_player_absent" if why == "absent" else "miss_player_ambiguous", row)
-            continue
-        stats = player.get("stats") if isinstance(player.get("stats"), Mapping) else {}
-        value = _as_float(stats.get(field))
-        if value is None:
-            # A goalie's `goals` / a skater's `saves` is absent from that role's stats by
-            # construction, so a role mismatch lands here too.
-            miss("miss_stat_unavailable", row)
+        if hit is None:
+            miss(why, row)
             continue
 
         shown = dict(row.get("projection") or {})
         shown.update({
-            "actual_so_far": value,
+            "actual_so_far": hit["value"],
             "live_display_only": True,
-            "live_actual_source": block.get("source"),
-            "live_actual_as_of": block.get("asOf"),
-            "live_actual_field": field,
+            "live_actual_source": hit["source"],
+            "live_actual_as_of": hit["as_of"],
+            "live_actual_field": hit["field"],
         })
         row["projection"] = refuse_published_certainty(shown)  # type: ignore[index]
         coverage["rows_live_display_only"] += 1

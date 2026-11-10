@@ -1510,11 +1510,17 @@ def _refresh_live_columns_from_artifact(payload: dict[str, object]) -> None:
     regardless of how many candidates match.
 
     NBA props get the same refresh from their own lens (`_refresh_lens_prop_live_columns`).
+    NHL and NFL props get their Actual (only) from the box their live tick publishes
+    (`_refresh_live_player_actual_columns`).
     """
     try:
         _refresh_lens_prop_live_columns(payload)
     except Exception as exc:  # noqa: BLE001 -- never break the board over a display refresh
         print(f"[intelligence] LIVE_COLUMN_REFRESH_FAILED sport=nba {type(exc).__name__}: {exc}", flush=True)
+    try:
+        _refresh_live_player_actual_columns(payload)
+    except Exception as exc:  # noqa: BLE001 -- never break the board over a display refresh
+        print(f"[intelligence] LIVE_COLUMN_REFRESH_FAILED sport=nhl,nfl {type(exc).__name__}: {exc}", flush=True)
 
     try:
         from syndicate.features.intelligence import _mlb_hydrate_live_prop_projection
@@ -1703,6 +1709,129 @@ def _refresh_lens_prop_live_columns(payload: dict[str, object]) -> dict[str, dic
             f"[intelligence] LIVE_COLUMNS_REFRESHED_FROM_ARTIFACT sport={sport} considered={tally['considered']} "
             f"matched={tally['matched']} refreshed={tally['refreshed']} no_lens_for_date={tally['no_lens_for_date']} "
             f"lens_date={indexed.get('lens_date') or None} lens_generated_at={indexed.get('lens_generated_at') or None}",
+            flush=True,
+        )
+    return counts
+
+
+# THE SAME READ-TIME REFRESH FOR NHL / NFL PROP ACTUALS `[2026-11-10, lane nhl-nfl-actual-read-time, todo #769 (c)]`.
+#
+# The Layer 2 build stamps a live NHL/NFL prop's Actual (`live_player_actuals.attach_live_player_actuals`) once
+# per build, so a board-build row (`source=layer2_shortlist`) shows the box as of that build. The in-play
+# overlay's rows are refreshed far more often, and both sit in one served payload. Measured on the served board
+# 2026-11-10 at NFL halftime (box frozen): overlay rows matched the ESPN box 40 of 40, board-build rows were
+# BEHIND on 14 of 28, and Josh Allen's passing yards read 70 on one row and 122 on another in the same response
+# (7 of 43 NFL player/market groups split two ways; 0 of 248 for NBA, which the refresh above covers). Every
+# NHL row was a board-build row.
+#
+# ACTUAL ONLY. Neither sport has a live player model, so there is no Live proj. to refresh, and nothing the edge,
+# the ranking or the gate reads is written. Keyed by the build join's OWN index and lookup
+# (`index_live_player_blocks` / `lookup_live_actual`), so a refresh attaches exactly what the next build would;
+# a row the lookup refuses (stale block, ambiguous name, segment prop...) keeps whatever the build gave it.
+# The sports and snapshot paths are board_enrichment's (`_live_actual_refresh_snapshots`), not a second list.
+_LIVE_ACTUAL_INDEX_CACHE: dict[str, tuple[float, dict | None]] = {}
+_LIVE_ACTUAL_INDEX_LOCK = threading.Lock()
+
+
+def _live_actual_refresh_snapshots() -> dict[str, str]:
+    """`{sport: live snapshot name}` for every sport the build routes to the display-only Actual join right now.
+
+    board_enrichment decides it in one place (`_LIVE_PLAYER_ACTUAL_SPORTS`, minus any sport admitted to the
+    priced prop join, read from `_LIVE_GAMELINE_SNAPSHOT_PATHS`). Reading it here means admitting NHL to the
+    priced join later moves web's refresh with the build instead of leaving a second writer behind."""
+    from syndicate.features.shared import board_enrichment as enrichment
+
+    priced = enrichment._live_prop_sports()
+    return {
+        sport: enrichment._LIVE_GAMELINE_SNAPSHOT_PATHS.get(sport, f"{sport}_live_lens.json")
+        for sport in sorted(enrichment._LIVE_PLAYER_ACTUAL_SPORTS)
+        if sport not in priced
+    }
+
+
+def _live_actual_index(sport: str, snapshot_name: str, *, now: float | None = None) -> dict | None:
+    """`index_live_player_blocks` over `<data root>/live/<snapshot_name>` (keyvalue-aware read), reused for
+    `_LENS_PROP_INDEX_TTL_SECONDS` per process: NHL's tick publishes every ~60 s and NFL's every 300 s."""
+    from syndicate.features.shared.live_player_actuals import index_live_player_blocks
+    from syndicate.features.shared.refresh_state_store import data_root
+
+    clock = time.monotonic() if now is None else now
+    with _LIVE_ACTUAL_INDEX_LOCK:
+        cached = _LIVE_ACTUAL_INDEX_CACHE.get(sport)
+        if cached is not None and clock - cached[0] < _LENS_PROP_INDEX_TTL_SECONDS:
+            return cached[1]
+    snapshot = read_json_file(data_root() / "live" / snapshot_name)
+    indexed = index_live_player_blocks(snapshot, sport=sport) if isinstance(snapshot, dict) else None
+    with _LIVE_ACTUAL_INDEX_LOCK:
+        _LIVE_ACTUAL_INDEX_CACHE[sport] = (clock, indexed)
+    return indexed
+
+
+def _refresh_live_player_actual_columns(
+    payload: dict[str, object], *, now: datetime | None = None
+) -> dict[str, dict[str, object]]:
+    """Overwrite `actual` on live NHL/NFL prop rows with the box count the sport's live tick last published.
+
+    Only rows the build flagged live, only the `actual` column, one snapshot read per sport per request (and at
+    most one per `_LENS_PROP_INDEX_TTL_SECONDS` per process). A row the lookup refuses keeps what the build gave it."""
+    from syndicate.features.shared.live_player_actuals import lookup_live_actual
+
+    routed = _live_actual_refresh_snapshots()
+    collections = [key for key in ("top_opportunities", "top_live_opportunities", "recommendations", "ranked_all") if isinstance(payload.get(key), list)]
+    by_sport = payload.get("by_sport") if isinstance(payload.get("by_sport"), dict) else {}
+    instant = now or datetime.now(timezone.utc)
+    indexes: dict[str, dict | None] = {}
+    counts: dict[str, dict[str, object]] = {}
+    seen: set[int] = set()
+
+    def _visit(candidate: object) -> None:
+        if not isinstance(candidate, dict) or id(candidate) in seen:
+            return
+        sport = str(candidate.get("sport_slug") or candidate.get("sport") or "").strip().lower()
+        if sport not in routed or not candidate.get("is_live"):
+            return
+        if not (candidate.get("player_name") or str(candidate.get("candidate_type") or "").strip().lower() == "prop"):
+            return
+        seen.add(id(candidate))
+        if sport not in indexes:
+            indexes[sport] = _live_actual_index(sport, routed[sport])
+        indexed = indexes[sport]
+        tally = counts.setdefault(sport, {"considered": 0, "matched": 0, "refreshed": 0, "no_snapshot": 0, "refused": {}})
+        tally["considered"] += 1  # type: ignore[operator]
+        if not indexed:
+            tally["no_snapshot"] += 1  # type: ignore[operator]
+            return
+        hit, why = lookup_live_actual(
+            indexed,
+            away=candidate.get("away_team"),
+            home=candidate.get("home_team"),
+            market=candidate.get("market"),
+            player_name=candidate.get("player_name"),
+            segment=candidate.get("segment"),
+            now=instant,
+        )
+        if hit is None:
+            refused = tally["refused"]
+            refused[why] = refused.get(why, 0) + 1  # type: ignore[index,union-attr]
+            return
+        tally["matched"] += 1  # type: ignore[operator]
+        if candidate.get("actual") != hit["value"]:
+            candidate["actual"] = hit["value"]
+            tally["refreshed"] += 1  # type: ignore[operator]
+
+    for key in collections:
+        for candidate in payload.get(key) or []:
+            _visit(candidate)
+    for items in by_sport.values():
+        if isinstance(items, list):
+            for candidate in items:
+                _visit(candidate)
+
+    for sport, tally in counts.items():
+        print(
+            f"[intelligence] LIVE_ACTUALS_REFRESHED_FROM_BOX sport={sport} snapshot={routed[sport]} "
+            f"considered={tally['considered']} matched={tally['matched']} refreshed={tally['refreshed']} "
+            f"no_snapshot={tally['no_snapshot']} refused={tally['refused']}",
             flush=True,
         )
     return counts
