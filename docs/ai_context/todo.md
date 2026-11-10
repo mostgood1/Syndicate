@@ -1,5 +1,32 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#775` — **NBA PROP ROWS FOR BOOK-NAMED PLAYERS THE ENGINE SPELLS DIFFERENTLY (Herb/Herbert Jones, Paul Reed Jr, C.J./CJ McCollum, Carlton/Bub Carrington, R.J./RJ Barrett, A.J./AJ Green, Derrick Jones Jr., Ron/Ronald Holland II) GET THE PREGAME MODEL, EDGE, FACE, SIDE AND RECENT FORM: ONE RESOLUTION STAMPED AT THE NBA PROP JOIN. FIX ON MAIN `c468657e5`, NOT LOADED (needs the user's yes)** `[2026-11-10, lane nba-prop-engine-name-join, session 2ba5509d]`
+- **Why:** every name-keyed join on an NBA prop row keyed the BOOK spelling with its own key, and none knew the engine's aliases:
+  - the pregame sim join (`nba_projections._match_player`, `_norm_name`);
+  - face and side (`player_ids.csv` via `_mlb_name_key`);
+  - recent form (`prop_evidence` `names_match`);
+  - the OUT flag (`player_key`);
+  - the NBA cards-page board (casefold).
+  - Only the live join resolved them (`e2558013c`). The live EDGE also needs the pregame join's `market_fair_prob_over`, which is why Herb Jones's live rows showed a Live proj. but no edge.
+- **Measured** (fleet book grids 11-04..11-10, fleet code `564f8dbde`): 15 player-slates and **610 prop rows** missed the sim only by spelling, 8 players, **0 ambiguous**.
+- **Fix:**
+  - `nba_player_identity.resolve_engine_name` (NEW) applies the live join's rule with its own key function: exact first, then a unique engine key; ambiguity refuses.
+  - `nba_projections.stamp_engine_player_names` runs at the top of `attach_nba_prop_projections`, which all three grid producers reach. It stamps `engine_player_name` ONLY where the exact key misses.
+  - The engine-data readers read the stamp: `_match_player`, face/side, `PropSubject`, vs-position, the Layer 2 candidate and card.
+  - `player_name`/`pick_id` are unchanged.
+  - The OUT flag (NBA) also matches the stamp and a unique engine key; it only ever adds a flag.
+  - The cards board attributes split-name quotes.
+  - New line `[nba_projections] NBA_PROP_ENGINE_NAME`.
+- **Tests:** `tests/test_nba_prop_engine_name_join.py` (32, off != on, including the Gary Payton II / Gary Payton ambiguity). Neighbouring suites pass (609).
+- **Replay, fleet artifacts, fleet code vs fix:** rows with an edge +66 / +57 / +130 / +239 on 11-04 / 07 / 08 / 09. 501 of 27,961 rows changed, every one stamped, and none had a value before. Face/side/recent form: OFF none, ON present (Herb Jones recent games 0 -> 10).
+- **Expected on load (stated before deploy):**
+  - ~60-240 more NBA prop grid rows per slate carry a projection and edge, plus those players' live rows become live-priceable. 0 other rows change.
+  - Served Layer 2 gains the subset that ranks. They can be suggested and reach the venue plan, which is the money path.
+  - `NBA_PROP_ENGINE_NAME ambiguous_rows=0`; `OUT_PLAYER_PROPS_FLAGGED via_engine_name=0`.
+- **Load:** fleet ff + refresh-worker (Layer 2 / book grid) + `reload-web` (serve-time grid, cards page) + live-odds-worker (cards context; can ride its recycle). Claims + preflight.
+- **Reading owed after the load:** the next slate where one of the 8 has props, after the sims build. Served rows carry `engine_player_name` + `sim_projection` + `model_edge_pct` + `player_side` + `headshot_url`.
+- Findings: `.syndicate/findings_2026-11-10_nba_prop_engine_name_join.md`.
+
 ### `#774` — **A COLLEGE GAME STILL LIVE AT MIDNIGHT CENTRAL LOST ITS LIVE RE-SIM, AND THE CARRYOVER BOARD PRICED IT FROM NOTHING. FIX ON MAIN `97cb5d477`, NOT LOADED (the user's decision)** `[2026-11-10, lane college-live-resim-midnight, session 8062940b]`
 - **Cause:** `ncaab/live_resim.run_live_resim_tick` takes its date from `central_today_iso()`. At 00:00 CT it switches to the new date's ESPN scoreboard, so a game tipped late on the previous date is never re-simmed again. The same function runs both college loops (men's and women's).
 - **Measured** (read-only; fleet live-odds-worker + refresh-worker logs 11-05 16:23Z..11-10 15:21Z = 5 midnights; ESPN `groups=50` scoreboards and summaries for 7 slates, 11-03..11-09):

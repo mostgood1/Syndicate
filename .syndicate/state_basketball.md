@@ -1069,6 +1069,7 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   - name splits (`e2558013c`): the re-sim key is the engine's `normalize_player_name_key`, and the join falls back to a unique canonical key via `live_projection_join._resolve_player`, counted as `player_alias=`.
   - **11-09 slate, served board:** 95.3-100% of live NBA prop rows carried both numbers per 6-min poll. Misses are players who have not entered: the lens carries only players who have played, and they clear within 1-3 polls. Alias-only rows: 203 of 204.
   - **Open, NOT this subject's fix:** name-split players (Herb Jones, Paul Reed Jr, Carlton Carrington) are display-only. They have no `sim_projection` / `model_edge_pct` / side / headshot / history, because the board's other name joins are exact or casefold (`basketball_market_board._canonical_player_key`).
+    - **FIXED ON MAIN `c468657e5`, NOT LOADED `[2026-11-10, lane nba-prop-engine-name-join, todo #775]`:** the NBA prop join resolves the book name to the engine's once (`engine_player_name`, exact first, unique engine key, ambiguity refuses). Fleet replay: +57..+239 edged rows per slate, 0 other rows changed. It also gives those players' live rows the pregame `market_fair_prob_over` the live edge needs.
   - Findings `findings_2026-11-04_nba_live_proj_actuals.md`; deploys.md 2026-11-10 03:31:01Z.
 
 - **Built** (on main, off by default):
