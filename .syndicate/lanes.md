@@ -786,6 +786,14 @@ death, never life — do not invert it.
 - Verdict: GOAL MET. `owner_liveness.py --idle-min 240` read 1 SAFE of 6 CLOSED; moved to lanes_closed.md with one pointer; invariants unchanged vs origin/main baseline. Table and WAIT reasons: log/2026-11-10.md 16:45Z.
 - Moved: closed-lane-archive-20261110-0439.
 
+### pregame-record-keep — OPEN — opened 2026-11-10 — session e32fef1a-01e8-4afe-a284-01acd3728545
+- Goal: Phase 1B M1 slice 2: every line the board listed before its game started keeps its FIRST and LAST pregame DecisionRecord (slim: identity, market, model, form, blend, fair_v1, prices) in reports/intelligence/decision_records/<date>.pregame_lines.jsonl.gz, merged in a stream each build (switch SYNDICATE_DECISION_RECORD_PREGAME_KEEP, absent = on), and the pregame experts read it with a time-to-start bucket; tests incl. off != on and a merge that never drops a line; on the fleet after the user-approved refresh-worker restart: the file holds the day's own games after they start (NBA lines on the first full slate after the load), merge cost per build and bytes per day measured, 0 PREGAME_KEEP_FAILED / DECISION_RECORD_FAILED, refresh-worker memory not up
+- Files: syndicate/features/shared/decision_record.py (keep_pregame_lines, slim_record, pregame_lines_path, the PREGAME_KEEP constants, and their one call in run_shadow), tests/test_decision_record_pregame_keep.py (NEW), syndicate/features/shared/engine_experts.py, scripts/engine_experts.py, tests/test_engine_experts.py, docs/ai_context/engine_experts.md
+- Hypothesis: n/a (build)
+- Falsification test: n/a
+- Verification: pytest; a fleet dry run of the merge against the live record file (cost, bytes); after the load: PREGAME_KEEP lines in refresh-worker.log, the file's line count and bytes through a full slate, the 11-11 NBA lines present after tip, engine_experts run on it, memory by worker age
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
