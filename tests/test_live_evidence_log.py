@@ -231,6 +231,40 @@ def test_the_probe_sees_a_field_lane_row_does_not_extract():
     assert all(p == r for _n, p, r in check._published_vs_read(lane, lel.normalize_row(raw_row)))
 
 
+def _load_check():
+    import importlib.util
+    from pathlib import Path
+
+    spec = importlib.util.spec_from_file_location(
+        "live_evidence_check", Path(__file__).resolve().parents[1] / "scripts" / "live_evidence_check.py")
+    check = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(check)
+    return check
+
+
+def test_nba_crosscheck_matches_by_instant_and_fails_on_a_missing_tick(tmp_path, capsys):
+    """NBA's history writes `t` in UTC, the snapshot carries the Central offset: same instant, different text
+    (fleet 2026-11-09: 0 of 422 matched as strings, 422 of 422 by instant). A missing tick must exit 1."""
+    from syndicate.features.nba import live_resim as nba
+
+    check = _load_check()
+    store = _Store()
+    c = lel.Collector(root=tmp_path, read=store.read, sports={"nba": "n.json"})
+    store.snaps["n.json"] = _bball_snapshot("2026-11-09T19:12:34-06:00")
+    c.collect_once()
+    hist = nba.live_resim_history_path("2026-11-09", root=tmp_path)
+    hist.parent.mkdir(parents=True, exist_ok=True)
+    base = {"event_id": "E1", "source": nba.LIVE_RESIM_LENS_SOURCE, "refusal": None, "period": 2, "clock_s": 431.0,
+            "home_score": 30, "away_score": 27, "total": 141.5, "margin": 4.2, "p_home": 0.62, "sims": 200}
+    hist.write_text(json.dumps({**base, "t": "2026-11-10T01:12:34+00:00"}) + "\n", encoding="utf-8")
+    assert check.nba_crosscheck("2026-11-09", root=tmp_path) == 0
+    assert "matched=1 missing=0" in capsys.readouterr().out
+    with hist.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps({**base, "t": "2026-11-10T01:14:00+00:00"}) + "\n")
+    assert check.nba_crosscheck("2026-11-09", root=tmp_path) == 1
+    assert "missing=1" in capsys.readouterr().out
+
+
 def test_an_unreadable_sport_never_stops_the_others(tmp_path):
     def read(name):
         if name == "f.json":

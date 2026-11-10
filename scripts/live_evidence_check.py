@@ -74,29 +74,37 @@ def nba_crosscheck(date: str, root: Path | None = None) -> int:
                 continue
             if r.get("refusal") is None and not r.get("carried_forward") and r.get("source") == nba.LIVE_RESIM_LENS_SOURCE:
                 fresh.append(r)
+    # Key on the INSTANT, never the text: the history writes `t` in UTC (`...+00:00`) and the snapshot's
+    # `generatedAt` carries the Central offset (`...-06:00`). Matched as strings, 422 of 422 same-instant ticks
+    # read as missing (fleet, 2026-11-09).
     ev = {}
     for row in lel.iter_rows("nba", date, root=root):
         if row.get("refusal") is None and not row.get("carried"):
-            ev[(str(row.get("event_id")), str(row.get("t")))] = row
-    matched, missing, mismatches = 0, [], []
+            ev[(str(row.get("event_id")), lel._parse(row.get("t")))] = row
+    matched, missing, mismatches, used = 0, [], [], set()
     for h in fresh:
-        key = (str(h.get("event_id")), str(h.get("t")))
+        key = (str(h.get("event_id")), lel._parse(h.get("t")))
         row = ev.get(key)
         if row is None:
-            missing.append(key)
+            missing.append((key[0], str(h.get("t"))))
             continue
         matched += 1
+        used.add(key)
         for path, field in NBA_FIELDS:
             if not _same(_get(row, path), h.get(field)):
-                mismatches.append((key, ".".join(path), _get(row, path), h.get(field)))
+                mismatches.append((key[0], str(h.get("t")), ".".join(path), _get(row, path), h.get(field)))
     coverage = (matched / len(fresh)) if fresh else None
-    print(f"NBA_CROSSCHECK date={date} history_fresh={len(fresh)} matched={matched} missing={len(missing)} "
-          f"coverage={coverage if coverage is None else round(coverage, 4)} field_mismatches={len(mismatches)}")
+    log_only = len(set(ev) - used)
+    print(f"NBA_CROSSCHECK date={date} history_fresh={len(fresh)} log_fresh={len(ev)} matched={matched} "
+          f"missing={len(missing)} log_only={log_only} coverage={coverage if coverage is None else round(coverage, 4)} "
+          f"field_mismatches={len(mismatches)}")
     for m in mismatches[:20]:
         print("   MISMATCH", m)
     for k in missing[:10]:
         print("   MISSING", k)
-    return 1 if mismatches else 0
+    # A tick the history has and the log does not is a FAILURE, not a pass: exit 0 on 0 of 422 matched was how
+    # the first reading came back green.
+    return 1 if (mismatches or missing) else 0
 
 
 def _fresh_lanes(snapshot: Mapping[str, Any]) -> list[tuple[tuple, Mapping[str, Any], Mapping[str, Any]]]:
