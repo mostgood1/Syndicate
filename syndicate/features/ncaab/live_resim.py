@@ -92,6 +92,27 @@ switches it; ABSENT, IT FOLLOWS `SYNDICATE_NCAAB_LIVE_RESIM` -- so it runs exact
 re-sim runs (the live-odds-worker) and nowhere else, and `SYNDICATE_WNCAAB_LIVE_RESIM=0` stops it
 alone. Its budget is its own (`SYNDICATE_WNCAAB_LIVE_RESIM_BUDGET_SECONDS`, default 120 s: the
 women's slate is about half the men's, and both threads share one interpreter).
+
+--------------------------------------------------------------------------
+A GAME STILL LIVE AT MIDNIGHT CENTRAL (#774, lane college-live-resim-midnight)
+--------------------------------------------------------------------------
+
+The tick's date is `central_today_iso()`, and at 00:00 CT it reads the NEW date's scoreboard, so a game tipped late on
+the previous date was never re-simmed again. Measured 2026-11-10 (fleet logs, 5 midnights; ESPN, 7 slates
+11-03..11-09): 2 of 7 men's slates had a D1-vs-D1 game live at the roll -- WICH vs USC (11-08) 30.4 min to its last
+play, PORT @ HAW (11-09) 78.5 min, its whole second half -- and 0 of 7 women's. Every tick after 06:00Z read live=0.
+Layer 2's carryover kept rebuilding that date's board while its chip read live, but every NCAAB join after the roll
+read `games_in_snapshot=0`: 0 rows priced and 0 displayed, where the last pre-roll joins priced 3-12 and displayed
+31-42.
+
+So the LOOP's tick (no explicit date) re-sims the previous date's in-progress board games first, for
+`SYNDICATE_COLLEGE_LIVE_RESIM_PRIOR_DATE_HOURS` after midnight Central (absent = 4 h, "0" = off, capped at 12; the
+latest measured end was 1:18 AM CT), on THAT date's inputs (odds names, anchor quotes and pregame sims, priors), and
+publishes them in the same snapshot with `slateDate` on each row. The board's join and the chips key this file by
+team names, never by its `date`, so the carryover board finds the lane with no reader change. Today's slate gets
+the budget they leave. A quiet night costs one scoreboard fetch per tick, and none once every event on it is final
+(`_PRIOR_SLATE_FINAL`). Tick line: `prior_date= prior_live= prior_resimmed= prior_carried_forward= prior_skip=`,
+inside the window only; `live=` and the other counts include those games.
 """
 
 from __future__ import annotations
@@ -1433,6 +1454,131 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
     }
 
 
+# ------------------------------------------------------------------------------------- the midnight roll (#774)
+# Module docstring, "A GAME STILL LIVE AT MIDNIGHT CENTRAL", has the measurement.
+PRIOR_DATE_HOURS_ENV = "SYNDICATE_COLLEGE_LIVE_RESIM_PRIOR_DATE_HOURS"
+DEFAULT_PRIOR_DATE_HOURS = 4.0
+MAX_PRIOR_DATE_HOURS = 12.0
+# The key a prior-date game row carries, so a reader that files rows by date can tell it from today's rows.
+SLATE_DATE_KEY = "slateDate"
+# (league, date) whose ESPN scoreboard read every event final: nothing on it can go live again, so later ticks in the
+# window skip the fetch. Per process; a restart re-reads it once.
+_PRIOR_SLATE_FINAL: set[tuple[str, str]] = set()
+
+
+def prior_date_hours(env: Optional[Mapping[str, str]] = None) -> float:
+    """Hours after midnight Central during which the tick also re-sims the previous date's in-progress games.
+    Absent, unparseable, negative or not finite = DEFAULT_PRIOR_DATE_HOURS; "0" turns it off; capped at
+    MAX_PRIOR_DATE_HOURS."""
+    import math
+
+    raw = str((env if env is not None else os.environ).get(PRIOR_DATE_HOURS_ENV, "") or "").strip()
+    try:
+        value = float(raw) if raw else DEFAULT_PRIOR_DATE_HOURS
+    except ValueError:
+        return DEFAULT_PRIOR_DATE_HOURS
+    if not math.isfinite(value) or value < 0:
+        return DEFAULT_PRIOR_DATE_HOURS
+    return min(value, MAX_PRIOR_DATE_HOURS)
+
+
+def prior_slate_date(now: Optional[datetime] = None, *, hours: Optional[float] = None) -> Optional[str]:
+    """The previous Central date while `now` is less than `hours` past midnight Central; else None (and always None
+    when `hours` is 0). Elapsed time is measured in UTC, so a DST night counts real hours."""
+    from syndicate.features.shared.timezone import CENTRAL_TIMEZONE
+
+    window = prior_date_hours() if hours is None else float(hours)
+    if window <= 0:
+        return None
+    central = (now or datetime.now(timezone.utc)).astimezone(CENTRAL_TIMEZONE)
+    midnight = central.replace(hour=0, minute=0, second=0, microsecond=0)
+    if central.astimezone(timezone.utc) - midnight.astimezone(timezone.utc) >= dt.timedelta(hours=window):
+        return None
+    return (central.date() - dt.timedelta(days=1)).isoformat()
+
+
+def _previous_lanes_for_slate(date_str: str, league: str = LEAGUE) -> dict[str, dict[str, Any]]:
+    """The last published snapshot's rows FOR `date_str`, keyed by event id: all of them when the snapshot is that
+    date's (the first tick after the roll reads the pre-midnight snapshot), else the rows stamped with it."""
+    try:
+        from syndicate.features.shared.refresh_state_store import read_json_file
+
+        prev = read_json_file(live_lens_snapshot_path(league))
+    except Exception:  # noqa: BLE001
+        return {}
+    if not isinstance(prev, Mapping):
+        return {}
+    snap_date = str(prev.get("date") or "")
+    return {str(g.get("event_id")): dict(g) for g in prev.get("games") or []
+            if isinstance(g, Mapping) and str(g.get(SLATE_DATE_KEY) or snap_date) == str(date_str)}
+
+
+def prior_slate_snapshot(prior_date: str, *, league: str = LEAGUE, fetch_scoreboard: Optional[Callable[..., Any]] = None,
+                         d1_ids: Optional[frozenset[str]] = None, **kwargs: Any) -> tuple[Optional[dict[str, Any]], str]:
+    """(the previous date's snapshot, "") when a board game on it is still in progress; else (None, why it was
+    skipped). The build is `build_live_lens_snapshot` on THAT date -- its odds names, its anchor quotes and pregame
+    sims, its priors -- fed the scoreboard read here, so a quiet night costs one scoreboard fetch and nothing else."""
+    from syndicate.features.shared import basketball_pbp as pbp
+    from syndicate.features.ncaab import slate
+
+    key = (league, str(prior_date))
+    if key in _PRIOR_SLATE_FINAL:
+        return None, "slate_final"
+    fetch = fetch_scoreboard or pbp.fetch_scoreboard
+    try:
+        board = fetch(league, str(prior_date).replace("-", ""))
+    except Exception as exc:  # noqa: BLE001 -- named on the tick line; today's slate still runs
+        return None, f"scoreboard_fetch_failed:{type(exc).__name__}"
+    events = pbp.scoreboard_events(board)
+    states = [str(ev.get("status_state") or ev.get("state") or "").lower() for ev in events]
+    d1 = slate._d1_ids(league) if d1_ids is None else d1_ids
+    in_play = [ev for ev, state in zip(events, states) if state == "in"
+               and (not d1 or {s for s in (str(ev.get("home_id") or ""), str(ev.get("away_id") or "")) if s} <= d1)]
+    if not in_play:
+        if states and all(state == "post" for state in states):
+            _PRIOR_SLATE_FINAL.add(key)
+            return None, "slate_final"
+        return None, "none_in_progress"
+    kwargs.pop("previous", None)  # a caller's `previous` describes today's slate, never this one
+    snapshot = build_live_lens_snapshot(str(prior_date), league=league, fetch_scoreboard=lambda *_a, **_k: board,
+                                        d1_ids=d1_ids, previous=_previous_lanes_for_slate(str(prior_date), league),
+                                        **kwargs)
+    return snapshot, ""
+
+
+def merge_prior_slate(snapshot: Mapping[str, Any], prior: Mapping[str, Any]) -> dict[str, Any]:
+    """Today's snapshot with the previous date's games in front, each stamped `slateDate`. `counts` and the tick's
+    cost add up (so `live=` counts every game this tick re-sims); `priorSlate` keeps the previous date's own counts.
+    An event on both dates' scoreboards keeps today's row."""
+    out = dict(snapshot)
+    today_games = list(snapshot.get("games") or [])
+    today_ids = {str(g.get("event_id")) for g in today_games if isinstance(g, Mapping)}
+    prior_date = str(prior.get("date") or "")
+    prior_games = [{**g, SLATE_DATE_KEY: prior_date} for g in prior.get("games") or []
+                   if isinstance(g, Mapping) and str(g.get("event_id")) not in today_ids]
+    out["games"] = prior_games + today_games
+    a, b = dict(snapshot.get("counts") or {}), dict(prior.get("counts") or {})
+    out["counts"] = {k: int(a.get(k) or 0) + int(b.get(k) or 0) for k in list(a) + [k for k in b if k not in a]}
+    out["refusalsByReason"] = _refusals_by_reason(out["games"])
+    ta, tb = dict(snapshot.get("resimTiming") or {}), dict(prior.get("resimTiming") or {})
+    timing = {**ta}
+    for k in ("resim_jobs", "worker_errors"):
+        timing[k] = int(ta.get(k) or 0) + int(tb.get(k) or 0)
+    for k in ("resim_wall_s", "resim_cpu_s"):
+        timing[k] = round(float(ta.get(k) or 0.0) + float(tb.get(k) or 0.0), 1)
+    timing["workers"] = max(int(ta.get("workers") or 0), int(tb.get("workers") or 0))
+    timing["worker_pids"] = sorted(set(ta.get("worker_pids") or []) | set(tb.get("worker_pids") or []))
+    out["resimTiming"] = timing
+    ca, cb = dict(snapshot.get("carryBound") or {}), dict(prior.get("carryBound") or {})
+    ages = [x for x in (ca.get("carriedAgeMaxSeconds"), cb.get("carriedAgeMaxSeconds")) if x is not None]
+    out["carryBound"] = {**ca, "carriedAgeMaxSeconds": max(ages) if ages else None}
+    out["elapsedSeconds"] = round(float(snapshot.get("elapsedSeconds") or 0.0) + float(prior.get("elapsedSeconds") or 0.0), 2)
+    out["priorSlate"] = {"date": prior_date, "counts": b, "elapsedSeconds": prior.get("elapsedSeconds"),
+                         "refusalsByReason": dict(prior.get("refusalsByReason") or {}),
+                         "dropped_also_today": len(prior.get("games") or []) - len(prior_games)}
+    return out
+
+
 # ------------------------------------------------------------------------------------------- size, tick, loop
 
 def fit_snapshot_to_budget(snapshot: dict[str, Any], *, max_bytes: int = MAX_SNAPSHOT_BYTES,
@@ -1520,13 +1666,36 @@ def _tick_kwargs(league: str, env: Optional[Mapping[str, str]] = None) -> dict[s
 
 
 def run_live_resim_tick(date_str: Optional[str] = None, *, league: str = LEAGUE, **kwargs: Any) -> dict[str, Any]:
-    """One tick: build, size-fit, write. Prints one line, prefix <LEAGUE>_LIVE_RESIM_TICK."""
-    from syndicate.features.shared.refresh_state_store import write_json_file
-    from syndicate.features.shared.timezone import central_today_iso
+    """One tick: build, size-fit, write. Prints one line, prefix <LEAGUE>_LIVE_RESIM_TICK.
 
-    date_str = date_str or central_today_iso()
+    With no `date_str` (the loop), for `prior_date_hours()` after midnight Central the previous date's in-progress
+    games are re-simmed first and published in the same snapshot (`merge_prior_slate`); today's slate gets the
+    budget they leave. An explicit `date_str` re-sims that date only, as before."""
+    from syndicate.features.shared.refresh_state_store import write_json_file
+    from syndicate.features.shared.timezone import CENTRAL_TIMEZONE
+
+    prior_date = None
+    if not date_str:
+        # ONE clock read for both dates, so a tick that straddles 00:00 CT cannot pair the new day with no window.
+        clock_now = kwargs.get("now") or datetime.now(timezone.utc)
+        date_str = clock_now.astimezone(CENTRAL_TIMEZONE).date().isoformat()
+        prior_date = prior_slate_date(clock_now)
     started = time.monotonic()
-    snapshot = build_live_lens_snapshot(date_str, league=league, **{**_tick_kwargs(league), **kwargs})
+    build_kwargs = {**_tick_kwargs(league), **kwargs}
+    prior, prior_skip = None, ""
+    if prior_date and prior_date != date_str:
+        try:
+            prior, prior_skip = prior_slate_snapshot(prior_date, league=league, **build_kwargs)
+        except Exception as exc:  # noqa: BLE001 -- the previous date must never cost today's slate its tick
+            prior, prior_skip = None, f"error:{type(exc).__name__}"
+            print(f"{league.upper()}_LIVE_RESIM_PRIOR_ERROR date={prior_date} {type(exc).__name__}: "
+                  f"{str(exc)[:300]}", flush=True)
+        if prior is not None:
+            budget = float(build_kwargs.get("budget_seconds", DEFAULT_BUDGET_SECONDS))
+            build_kwargs["budget_seconds"] = max(0.0, budget - float(prior.get("elapsedSeconds") or 0.0))
+    snapshot = build_live_lens_snapshot(date_str, league=league, **build_kwargs)
+    if prior is not None:
+        snapshot = merge_prior_slate(snapshot, prior)
     snapshot, size = fit_snapshot_to_budget(snapshot)
     carry = snapshot.get("carryBound") or {}
     timing = snapshot.get("resimTiming") or {}
@@ -1542,10 +1711,16 @@ def run_live_resim_tick(date_str: Optional[str] = None, *, league: str = LEAGUE,
         "resim_wall_s": timing.get("resim_wall_s", 0.0),
         "resim_cpu_s": timing.get("resim_cpu_s", 0.0),
         "worker_errors": timing.get("worker_errors", 0),
-        "refusals": snapshot.get("refusalsByReason") or {},
-        "bytes": size,
-        "written": False,
     }
+    if prior_date:
+        # #774: only inside the window after midnight Central, and before `refusals` so every field a reader already
+        # parses keeps its place. The counts above already include these games.
+        prior_counts = (snapshot.get("priorSlate") or {}).get("counts") or {}
+        status.update({"prior_date": prior_date, "prior_live": int(prior_counts.get("live") or 0),
+                       "prior_resimmed": int(prior_counts.get("resimmed") or 0),
+                       "prior_carried_forward": int(prior_counts.get("carried_forward") or 0),
+                       "prior_skip": prior_skip or "-"})
+    status.update({"refusals": snapshot.get("refusalsByReason") or {}, "bytes": size, "written": False})
     if size <= MAX_SNAPSHOT_BYTES:
         write_json_file(live_lens_snapshot_path(league), snapshot)
         status["written"] = True

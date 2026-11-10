@@ -1,5 +1,38 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#774` — **A COLLEGE GAME STILL LIVE AT MIDNIGHT CENTRAL LOST ITS LIVE RE-SIM, AND THE CARRYOVER BOARD PRICED IT FROM NOTHING. FIX ON MAIN, NOT LOADED (the user's decision)** `[2026-11-10, lane college-live-resim-midnight, session 8062940b]`
+- **Cause:** `ncaab/live_resim.run_live_resim_tick` takes its date from `central_today_iso()`. At 00:00 CT it switches to the new date's ESPN scoreboard, so a game tipped late on the previous date is never re-simmed again. The same function runs both college loops (men's and women's).
+- **Measured** (read-only; fleet live-odds-worker + refresh-worker logs 11-05 16:23Z..11-10 15:21Z = 5 midnights; ESPN `groups=50` scoreboards and summaries for 7 slates, 11-03..11-09):
+  - Men's: on **2 of 7 slates** a D1-vs-D1 game was live at the roll.
+    - WICH vs USC (11-08): tipped 04:00Z, last play 06:30:22Z, so **30.4 min** without a re-sim.
+    - PORT @ HAW (11-09): tipped 04:59Z, at halftime at the roll, last play 07:18:29Z, so **78.5 min** (the whole second half).
+  - Women's: 0 of 7. (A non-D1 game, BTHS @ HAW 11-06, ran to +78 min; it is not on the board.)
+  - At both rolls the last pre-midnight NCAAB tick read `live=1 resimmed=1`. Every NCAAB/WNCAAB tick from 06:00Z to 10:00Z on all 5 midnights read `live=0`.
+- **Downstream, same nights:** Layer 2's carryover (`[layer2-prior-date-carryover]`) kept rebuilding the previous date while its chip read live (11-09 06:08-06:37Z; 11-10 06:05-07:19Z, `chips_live=1`).
+  - But every NCAAB `LIVE_GAMELINE_JOIN` after 06:00Z read `games_in_snapshot=0`: `no_live_gameline_projection` on every live row, `priceable=0`, `display=0`.
+  - The last pre-roll joins on 11-10 priced 3-12 rows and displayed 31-42. The chip fell back to its pace block.
+  - The join and the chips key `live/<league>_live_resim.json` by TEAM NAMES and never read its `date`, so the lane was the only missing piece.
+- **Fix (code default ON; no env change needed to load it):**
+  - The LOOP's tick (no explicit date) re-sims the previous Central date's in-progress board games first, for `SYNDICATE_COLLEGE_LIVE_RESIM_PRIOR_DATE_HOURS` after midnight CT: absent = 4 h, `0` = off, capped at 12. The latest end measured was 1:18 AM CT.
+  - It runs on THAT date's inputs (odds names, anchor quotes and pregame sims, priors) and publishes those games in the same snapshot, each row stamped `slateDate`. Today's slate gets the budget they leave.
+  - A quiet night costs one scoreboard fetch per tick, and nothing once every event on that date is final (`_PRIOR_SLATE_FINAL`, per process).
+  - The tick line gains `prior_date= prior_live= prior_resimmed= prior_carried_forward= prior_skip=`, inside the window only and placed before `refusals=`. `live=` and the other counts include those games.
+  - An explicit `date_str` re-sims that date only, as before.
+- **Tests:** `tests/test_ncaab_live_resim_midnight.py`, 15, all through `run_live_resim_tick` with no date (the loop's call):
+  - off != on through the env;
+  - the published lane indexed by the board's own `build_live_gameline_index` on the carryover date (the hop that read 0);
+  - the window (incl. the DST night), the final-slate skip, the budget split, the carry across ticks, the women's loop, the failure isolation and the tick-line field order.
+  - 5 source mutations each fail at least one test. 364 passed across 15 college live / join / chip / evidence test files.
+- **Loads with:** a fleet ff to a SHA containing it, then a live-odds-worker restart: its own uptime recycle, or a claimed TERM. Needs the user's yes.
+- **Reading owed after the load:** the next night with a D1 game live at 00:00 CT. ESPN lists USC @ CAL tipping 04:00Z on 11-11, the same shape as WICH vs USC.
+  - MET if the first tick after 06:00Z reads `prior_live>=1 prior_resimmed>=1`, and the carryover date's NCAAB `LIVE_GAMELINE_JOIN` reads `games_in_snapshot>=1` with `projected>0` until the game ends.
+  - On a night with none, expect `prior_skip=slate_final` from the first post-roll tick on.
+- **Same date choice elsewhere (not fixed here):**
+  - **NBA** `nba/live_resim.run_live_resim_tick` (`central_today_iso()`): **2 of 7 NBA slates** had a game end after the roll (MIA @ LAC 11-04 +21.1 min, POR @ LAL 11-06 +4.9 min). At the 11-07 roll the last NBA ticks read `games=1-2`.
+  - **NHL** is driven by `live_lens_loop._run_live_lens_tick` with today's date: 0 of 7 slates crossed (NYI @ SJ 11-09 ended 1.0 min before).
+  - **NCAAF and NFL** re-sims are week-scoped (`run_refresh_worker._run_ncaaf_live_resim_tick`), so the roll does not hit them.
+  - **`live_evidence_log`** files every row under the snapshot's `date`, so a prior-date game's rows land in the new date's file. A one-line follow-up for lane `live-evidence-log`: `game.get("slateDate") or date_str`.
+
 ### `#772` — **NBA PREGAME POOL DROPPED PRICED PLAYERS WHOSE NAME DIFFERS ONLY BY "Jr." / "Jr": Bobby Portis (roster filter) and Terrence Shannon Jr. (recency readmit) both played and were not simulated. FIXED ON MAIN `8fc72076d`, NOT LOADED** `[2026-11-09, lane nba-roster-filter-name-key, session c7e5cb4c]`
 - **Cause:** `_norm_name_key` keeps periods, so it strips " JR" but not " JR.".
   - The roster filter (`basketball_props_smart_sim._filter_team_players_against_processed_roster_local`) dropped the pool's "Bobby Portis Jr." (2026-27 player_logs) against rosters_2026-27's "Bobby Portis". PLAYER_ID 1626171 is on both rows. He played 20 min on 11-08 and had 6-7 blank live rows (4 on 11-07).
