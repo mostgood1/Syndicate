@@ -468,6 +468,9 @@
   - reachable in the pregame sims: the rewritten 11-10 file names both new fields; the lens on a live state is still to read.
   - **OWED after the 11-10 slate:** the paired replay (old 7-field vs loaded config, minutes 30 and 36): served / old margin SD about 0.93 / 0.94, falsified outside 0.88-0.98; in-game total shift +0.0 to +0.1; live model - line moves < +-0.2; 11-11 tip about -0.02 (old-config file kept in `C:\tmp\score_effect_load\pregame_before\`).
 ### `#764` — **KALSHI TOTALS THAT NAME NO GAME PRICE ANOTHER GAME'S ROW: 26 of 26 measured sides wrong-game (men's and women's college basketball, college football). Polymarket is clean in every sport. WRONG-GAME PRICING FIXED AND VERIFIED 2026-11-07 (refused, then named); OPEN: games on our board whose Kalshi quotes still name no game, incl. the 5-character codes UTRGV / MASSL** — 2026-11-06, session e32fef1a (user "Yes, measure it here")
+- **UPDATE 2026-11-10 23:06Z (5:06 PM CST): 5-LETTER CODES VERIFIED LIVE -- MET** (lane `kalshi-five-char-codes` CLOSED).
+  - Texas St @ UTRGV was on the 11-10 board. Its Kalshi total is named by the fan-in (`texas state+ut rio grande valley`), and all 31 of its markets are `ok` in the board join. The pre-fix code gives `no_match` on all 31, on the same data.
+  - The 11-11 UTRGV / UMass Lowell games were not yet on a board. Record: `deploys.md` 2026-11-10 VERIFY entry.
 - **UPDATE 2026-11-09 18:30Z (12:30 PM CST): 5-LETTER CODE FIX LOADED** (`722af0338`, lane `kalshi-five-char-codes`).
   - **Load:** fleet ff + live-odds-worker TERM 18:20:57Z + refresh-worker TERM 18:25:43Z.
   - **Same-moment replay, loaded vs pre-fix:** every live answer identical; the 11-07 `PVUTRGV` control is named.

@@ -58374,3 +58374,29 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **Derrick Jones (LAC@PHX), 4 served rows:** `engine_player_name` 'Derrick Jones Jr.' 4/4, `sim_projection` + `model_edge_pct` 4/4 (one edge 4.77), headshot 4/4. `player_side` is None, the same as every LAC row on the board, plain names included (Rui Hachimura 23 rows, Keaton Wagler 6), so it is not a name-join gap. Robert Williams (POR) gained a projection, edge, face and side.
 - **REGRESSION (#775's code):** `player_headshots.headshot_url` and `_player_team` look `player_ids.csv` up by the ENGINE name only. The fleet's csv carries "BOBBY PORTIS" (the book's spelling, team MIL). On fleet code: `_basketball_resolve_player_id('nba', 'Bobby Portis')` = 1626171, but `'Bobby Portis Jr.'` = None. So his 5 served rows have no face. Before #775 the book name found it. The engine spelling is the one that hits for Derrick Jones Jr., AJ Green and Robert Williams III (their book spellings return None). The fix is to try the engine name first, then the book name. **Not done; needs the user's yes.**
 - The watcher `bnxyq2r56` was stopped. Its MET test also required `player_side`, which no LAC row carries.
+
+## 2026-11-10 23:06:23Z (5:06 PM CST) -- VERIFY of the 2026-11-09 18:25:43Z 5-letter Kalshi code load (lane kalshi-five-char-codes) -- **MET**
+
+- **Reader:** scheduled task `kalshi-five-char-live-read-1110`, session bd1dd044. Read-only: no ff, restart, env edit or venue call.
+- **Preconditions (all pass):** fleet HEAD `47450ce07` contains `722af0338`. `_KALSHI_FIVE_CHAR_CODES_ENABLED = True` count is 1. refresh-worker pid 372140 and live-odds-worker pid 372141 both started 2026-11-10 16:56:28Z, after 11-09 18:17Z.
+- **Population:** Kalshi market list `fetched_at` 2026-11-10T23:02:56Z, 14,891 markets. 6 events carry UTRGV or MASSL:
+  - `TXSTUTRGV` 11-10: 31 markets (2 GAME, 12 SPREAD, 17 TOTAL).
+  - `ACUTRGV` 11-11 and `MASSLBC` 11-11: women's GAME x2 each. `MASSLMASS` 11-11: men's GAME x2.
+  - `SFAUTRGV` 11-14 and `UTRGVHCU` 11-21: NCAAF, out of scope.
+- **On a board:** Texas St @ UTRGV only (tip 2026-11-11 00:30Z), and in BOTH places:
+  - ncaab book grid 11-10, generated 22:59:19Z: 711 rows, 118 games.
+  - board-join rows 11-10: shortlist 4,330 -> join 8,919 rows, 426 games.
+  - The three 11-11 games are on neither: the 11-11 grid had 0 rows, and they are absent from the 11-11 join rows (324 games).
+- **Fan-in (refresh-worker path), loaded code:** `KXNCAAMBTOTAL-26NOV10TXSTUTRGV-118` -> `texas state+ut rio grande valley`. That equals `game_token` of the grid game. **Pre-fix: None.**
+- **Board join (order-path resolver), loaded code:** the same market is `ok`, Texas State Bobcats @ UT Rio Grande Valley Vaqueros (event_id `62ff4677...`).
+  - Over all 31 TXSTUTRGV markets: **31/31 `ok` loaded; 0/31 pre-fix** (31 `no_match`).
+  - Pre-fix `_splits("TXSTUTRGV")` = `[]`. Loaded: `[(TXST, UTRGV), (TXSTU, TRGV)]`.
+  - Pre-fix = `git show 365be1a90` copies of `kalshi_catalogue.py` and `kalshi_board_join.py`, swapped into `sys.modules` AFTER the loaded run, on the same data and the same clock.
+- **Log, fan-in:** window `refresh-worker.log` 2026-11-09T21:12:06Z..2026-11-10T23:02:46Z. 444 `[venue_quote_fanin] UNNAMED_ROLE_KEY_GRID sport=ncaab` lines; **0** hold TXSTUTRGV. The last, at 22:59:43Z, reads `count=0 sample=[]`.
+- **Log, board join:** 71 `[kalshi_odds] JOIN_EVENTS` lines, 11-10 17:00Z..22:58Z. The blob is in **2** of them (17:48:46Z, 20:04:33Z), both `KXNCAAMBSPREAD-26NOV10TXSTUTRGV-UTRGV17` on the day=11-10 join. Neither is a fix failure:
+  - The 5 four-letter blobs sampled with it in those lines (`ALCNMURR`, `EVANMTU`, `DETXAV`, `UALRUNM`, `PRENCST`) were unmatched in the same lines too. The change does not touch them. All 5 resolve `ok` now, and so does `UTRGV17`.
+  - So those games were not on the join board then. Join extras grew from 4,246 to 4,744 between 17:48Z and 22:57Z.
+  - The absence from the other 69 lines is **NOT evidence**: the sample is capped at 8, it is saturated in all 71 lines, and 67 of them hold no ncaab entry at all.
+- **ORDER_PATH venue=kalshi** in `live-odds-worker.log` (window 17:26:25Z..23:02:48Z): 54 lines, 0 naming the blob. None was expected.
+- **Verdict MET:** a 5-letter game on a board (Texas St @ UTRGV, 11-10) is named by the fan-in, `ok` in the board join, and `no_match` under the pre-fix code, on the same data at the same clock.
+- RECONCILED: the 2026-11-09 18:25:43Z 5-letter Kalshi code load's owed positive live read. Measured above.

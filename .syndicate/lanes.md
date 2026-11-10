@@ -650,7 +650,15 @@ death, never life — do not invert it.
 - Verification: Replay on fleet data: fleet code drops Portis at the filter, fixed code keeps him; unit test off != on; slate count before/after printed; on-fleet effect read after the next NBA pregame rebuild once loaded
 - Blocked by: none
 
-### kalshi-five-char-codes — OPEN — opened 2026-11-09 — session 750e160f-f027-491e-9dc9-57257d2c6bec (handed off 2026-11-09 from e32fef1a)
+### kalshi-five-char-codes — CLOSED 2026-11-10 (GOAL MET: Texas St @ UTRGV named live by fan-in and board join; pre-fix no_match) — opened 2026-11-09 — session 750e160f-f027-491e-9dc9-57257d2c6bec (handed off 2026-11-09 from e32fef1a)
+- **GOAL VERDICT [2026-11-10 23:06Z]: GOAL: MET.** Goal verbatim: "Kalshi club codes of 5 characters (UTRGV, MASSL) resolve in kalshi_catalogue.match_event_blob, for the fan-in and the order path alike: PVUTRGV names Prairie View @ UT Rio Grande Valley; on a fleet replay over every live Kalshi game event, every answer that was ok before is identical and each changed answer is read by eye"
+  - The replay half was met 2026-11-09 17:11Z: 0 of 2,083 resolutions changed, and PVUTRGV was named.
+  - The live read was taken 23:06Z (5:06 PM CST) by scheduled task `kalshi-five-char-live-read-1110`, session bd1dd044, read-only. Texas St @ UTRGV was on the 11-10 ncaab grid (118 games) and in the join rows (426 games).
+  - Fan-in token `texas state+ut rio grande valley`; pre-fix None.
+  - Board join: 31/31 TXSTUTRGV markets `ok` loaded; 0/31 pre-fix.
+  - The 11-11 UTRGV / UMass Lowell games were on no board yet.
+  - Logs: 0 of 444 `UNNAMED_ROLE_KEY_GRID sport=ncaab` lines name the blob. 2 of 71 `JOIN_EVENTS` samples did (17:48Z, 20:04Z). That was board timing: the 4-letter blobs sampled with it also resolve now.
+  - Record: `deploys.md` 2026-11-10 VERIFY entry (RECONCILED).
 - **STATUS `[2026-11-09 18:30Z]`: GOAL: NOT MET -- LOADED on the fleet** (`722af0338`; live-odds-worker TERM 18:20:57Z, refresh-worker TERM 18:25:43Z).
   - Every live answer is identical on a same-moment replay.
   - **Left:** the positive live read, when a 5-letter game reaches a board (Texas St @ UTRGV 11-10, then the 11-11 games): named by the fan-in, `ok` in the board join.
