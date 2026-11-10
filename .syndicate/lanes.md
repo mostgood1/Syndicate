@@ -759,6 +759,14 @@ death, never life — do not invert it.
   - Follow-ups, not this lane: NBA's tick has the same date choice (2 of 7 slates crossed, +21.1 / +4.9 min); `live_evidence_log` files prior-date rows under the new date (lane live-evidence-log: read `slateDate`).
 - Blocked by: none
 
+### nba-live-resim-midnight — OPEN — opened 2026-11-10 — session 63276f7e-66a4-4ad9-a667-cfd46d19b0a9
+- Goal: An NBA game still live at midnight Central keeps its live re-sim: nba/live_resim.run_live_resim_tick also re-sims the PREVIOUS Central date's in-progress NBA games for a bounded window after the roll, into the same snapshot, with NBA's carry, stalest-first order, remembered lines and tick history intact; the gap re-measured on the fleet logs with its denominators and written to a new todo item (#775); fix on main with tests incl. off != on through the env, or the gap shown not to matter with numbers; loading it on the fleet is the user's decision
+- Files: syndicate/features/nba/live_resim.py (run_live_resim_tick, history_rows/append_tick_history's prior-date fields, a new prior-date section and its env switch, and a new module-docstring section on the midnight roll ONLY), tests/test_nba_live_resim_midnight.py (NEW), docs/ai_context/todo.md (#775 section only)
+- Hypothesis: After 00:00 CT run_live_resim_tick reads only the new date's ESPN scoreboard (central_today_iso), so an NBA game tipped late on the previous Central date gets no re-sim for the rest of the game and the board's game-line join reads no lane for it. Session 8062940b measured 2 of 7 slates (11-03..11-09) with a game ending after the roll (MIA @ LAC 11-04 +21.1 min, POR @ LAL 11-06 +4.9 min).
+- Falsification test: Fleet NBA_LIVE_RESIM_TICK lines in the first ticks after each 06:00Z/05:00Z roll read games>=1 resimmed>=1 for a prior-date game, or no slate in the logs' span has an NBA game in progress at the roll.
+- Verification: Fleet logs: per-midnight last pre-roll and first post-roll NBA_LIVE_RESIM_TICK + LIVE_GAMELINE_JOIN sport=nba, with denominators; unit tests incl. off != on through the env and the history/carry/lines continuity across the roll; after the user's load: the first post-roll ticks on a late-game night read prior_live>=1 prior_resimmed>=1
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
