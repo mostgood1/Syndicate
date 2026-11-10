@@ -1388,7 +1388,7 @@ is better:
   - `~/bball_iv/runs/ncaab2026_tieshape/spread_k.jsonl` (2,160 game-arm rows);
   - `~/bball_iv/runs/ncaab2026_se05_alt/` and `ncaab2026_se10_alt/` (`results.jsonl`, `report.md`).
 
-## PHASE 2 STEP 3h (NCAAB): the load, PREPARED — k 0.005 + strict alternation with the tip re-centred (`solver_endgame_pts_per_team` 0.2 -> 0.46); LOADED 2026-11-10 07:49:46Z (see STEP 3h, LOADED)
+## PHASE 2 STEP 3h (NCAAB): the load, PREPARED — k 0.005 + strict alternation with the tip re-centred (`solver_endgame_pts_per_team` 0.2 -> 0.46); LOADED 2026-11-10 07:49:46Z (see STEP 3h, LOADED); REVERTED 2026-11-10 22:56:28Z (see STEP 3h, REVERTED)
 
 `[2026-11-09 18:55Z-20:25Z (12:55-2:25 PM CST), lane ncaab-score-effect-load, session c2fd17f8; user "Yes, prepare it" here, and "yes proceed" in the parent session (relayed): PREPARE ONLY. The env edit and the drained down/up need the user's explicit yes]`
 
@@ -1519,3 +1519,25 @@ only).
 User "Yes, load then" (11-09 20:32Z), after #768's live reading (PARTLY, not falsified; read by this session under "Yes, take it"). The runbook above ran as written: claims 07:46:14Z, drain CLEAR ~07:48:50Z, joint preflight CLEAR 07:49:05Z (live-odds-worker expect 7 -> 9), env edit 07:49:30Z (`4a316bd1` -> `3b773c06`), `down` 07:49:30-33Z, up 07:49:46Z. Config VERIFIED: the new live-odds-worker's environ parses to 9 keys with the intended values; 0 Tracebacks; the one-time pregame re-sim (199 games) names both new fields. deploys.md 2026-11-10 07:49:30Z.
 
 - **Owed after the 11-10 slate (the "Expected readings" above, unchanged):** paired replay of the slate's completed games at minutes 30 and 36, old 7-field vs loaded config: served / old margin SD about 0.93 / 0.94, falsified outside 0.88-0.98; lens `inputs.mechanisms` names both fields; live model - line moves < +-0.2; the 11-11 tip about -0.02 (old-config 11-11 pregame file kept, copied before its rewrite).
+
+## PHASE 2 STEP 3h, REVERTED `[2026-11-10 22:56:28Z (4:56 PM CST), lane ncaab-score-effect-load]`
+
+User "Yes, revert now" (~22:48Z), answering "Revert NCAAB to the old 7-field config before tonight's 5 PM slate?" after the DIAGNOSTIC replays below. live-odds-worker is back on #768's 7 fields: 7 keys verified in pid 372141's environ, 0 Tracebacks (deploys.md 2026-11-10 22:55:46Z). **RC46 never priced a live NCAAB game:** no NCAAB tick had `live>=1` between the load (07:49:46Z) and the revert, and the slate tips 23:00Z.
+
+**Diagnostic replays, NOT pre-registered** (tooling `C:\tmp\score_effect_load\`: `paired_replay.py`, `paired_cp_score.py`, `paired_tip_score.py`). 240 rated 2026-27 games, 11-03..11-09, re-simmed from their real play-by-play state on OLD (7 fields) and RC46 with the same seeds. The priors are production's own (`ncaab/live_resim.build_engine_inputs`; no 2026-27 corpus exists), the sim is RAW (no market anchor), and the scores are against the real finals. NEW - OLD, 1.96 x bootstrap SE over games:
+
+| checkpoint | games | margin SD OLD -> NEW | margin in central 80% | win Brier | win log loss | total CRPS | total in central 80% |
+|---|---|---|---|---|---|---|---|
+| tip | 240 | 14.8 -> 10.75 (real 13.0) | -- | +0.003 +- 0.008 | +0.035 +- 0.048 | -0.135 +- 0.168 | 0.771 -> 0.783 |
+| 10 m | 235 | 12.96 -> 9.96 | 0.877 -> 0.715 | +0.007 +- 0.009 | +0.027 +- 0.034 | -0.028 +- 0.148 | 0.753 -> 0.779 |
+| 20 m | 240 | 10.61 -> 8.85 | 0.846 -> 0.775 | **+0.011 +- 0.009** | **+0.029 +- 0.025** | -0.034 +- 0.118 | 0.796 -> 0.825 |
+| 30 m | 235 | 7.54 -> 6.72 | 0.830 -> 0.745 | +0.001 +- 0.006 | +0.002 +- 0.019 | -0.089 +- 0.092 | 0.753 -> 0.809 |
+| 36 m | 235 | 4.86 -> 4.57 | 0.830 -> 0.787 | **+0.007 +- 0.005** | **+0.024 +- 0.018** | +0.001 +- 0.062 | 0.783 -> 0.774 |
+
+- **Totals tie** at every checkpoint (CRPS inside SE), with better 80% coverage in-game up to 30 m.
+- **Margins and win probability are worse.** RC46 narrows the margin past the real spread (coverage falls at every checkpoint), and the real SD of (final margin - sim mean) rises 0.22 / 0.21 / 0.02 / 0.14 at 10 / 20 / 30 / 36 m. Its leader pull-back (-0.10 pt per pt of lead at 30 m, 11-09 dry run) does not happen on this season's early mismatches. Margin CRPS is inside SE.
+- **The registered statistic's 11-09 preview** (34 games): served / old SD 0.944 +- 0.037 at 30 m (inside 0.88-0.98) and 0.983 +- 0.035 at 36 m (just outside). The pooled ratio mixes RC46's narrower within-game spread (median per-game 0.885 / 0.945) with a wider between-game part from the pull-back.
+- **Why it mattered live:** live full-game spreads (2,814 rows with `edge_pp`, 11-09) and moneylines (372) are priced off the re-sim's margin distribution. Pregame spreads and moneylines are the de-vigged market (margin weight absent = 0.0), and totals are raw from the sim.
+- **Against the 2025-26 gate:** that gate scored margins tying or helping from 30 m on 2025-26 games. On 2026-27 games the help does not show, and the 20 m and 36 m costs do. Caveats: the replay is unanchored (production shifts the margin mean toward the closing spread by a share, which moves neither the width nor the pull-back); it covers 11 days of an early-season population heavy in mismatches; and none of it was pre-registered.
+- **Still owed (unchanged by the revert):** the registered paired replay on the 11-10 slate's completed games. It is a counterfactual replay on both configs, so it does not need RC46 live (session watcher `wait_morning.sh`, deadline 11-11 18:00Z). The live split has no RC46 population.
+- **STATUS `[2026-11-10 23:05Z]`: REVERTED 22:56:28Z, 7 keys verified. Re-loading RC46 (`env_load_k.py --variant rc46`) needs a new decision on new evidence.**
