@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#774` — **A COLLEGE GAME STILL LIVE AT MIDNIGHT CENTRAL LOST ITS LIVE RE-SIM, AND THE CARRYOVER BOARD PRICED IT FROM NOTHING. FIX ON MAIN, NOT LOADED (the user's decision)** `[2026-11-10, lane college-live-resim-midnight, session 8062940b]`
+### `#774` — **A COLLEGE GAME STILL LIVE AT MIDNIGHT CENTRAL LOST ITS LIVE RE-SIM, AND THE CARRYOVER BOARD PRICED IT FROM NOTHING. FIX ON MAIN `97cb5d477`, NOT LOADED (the user's decision)** `[2026-11-10, lane college-live-resim-midnight, session 8062940b]`
 - **Cause:** `ncaab/live_resim.run_live_resim_tick` takes its date from `central_today_iso()`. At 00:00 CT it switches to the new date's ESPN scoreboard, so a game tipped late on the previous date is never re-simmed again. The same function runs both college loops (men's and women's).
 - **Measured** (read-only; fleet live-odds-worker + refresh-worker logs 11-05 16:23Z..11-10 15:21Z = 5 midnights; ESPN `groups=50` scoreboards and summaries for 7 slates, 11-03..11-09):
   - Men's: on **2 of 7 slates** a D1-vs-D1 game was live at the roll.

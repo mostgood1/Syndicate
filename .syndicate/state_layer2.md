@@ -824,7 +824,7 @@ deployed three times on the evening of 2026-08-26. Same family as
 
 **Grading:** `scripts/layer2_live_scorecard.py` (`a989e256`) settles `reports/intelligence/clv_openings/<date>.jsonl` against `/api/board/game-chips`. `--split-at` splits results into windows by `captured_at`. Departures: refresh-worker records which +EV markets LEFT the board at each build (`clv_departure_ledger`, live since `3e18be8e` 2026-09-13 14:14:19Z); web exports `reports/intelligence/clv_departures/<date>.jsonl` since `9c7d34bc` (14:44:53Z, `PUBLISH_OK` 14:45:37Z); the scorecard reports `n10`/`gone10` from it. Verified end-to-end 2026-09-13 21:45Z against a same-slate NFL capture: 209 of 209 verdicts agree (57 live). The day's file then held 34 builds, 1,739 departures and 665 returns (1,034,914 B). Builds were 222-1,421 s apart, against ~7 min on 09-12, and a later deciding build reads more gone (live 63% when it came within 15 min, 78% beyond). A sighting counts only if the log has a build at its stamp. Openings captured from refresh-worker's 20:20:09Z deploy carry `game_state`, `book_age_seconds`, `quote_seen_age_seconds` and `quote_source` (4,731 of 4,731; 0 of 19,658 before). FULL-SLATE reading (all 80 09-12 NCAAF finals, 1,661 +EV opportunities): in-play after the deploy 264-246-1, +23.56u (+4.61%, 61 games); in-play before it (by clock) 149-161, -9.41u (-3.04%, 33 games). Those are different games and hours, so the gap is not a gate effect. At the shown price, stale live rows did not settle worse (session capture: served under 5 min +5.81% on 71 games, 10 min+ +15.80% on 25), but they were gone at +10 min more often (61% vs 75%). Its team join is complete only with the NCAAF registry reachable (0 unmatched vs 32 without). The opening ledger is heavy: 09-11 closed at 22,607,063 B, 67.4% of the 32 MiB tripwire; 09-12 closed at 23,513,778 B (70.1%), last record captured 04:58:46Z, the Central date roll (full export 2026-09-13 07:35:57Z).
 
-## [layer2-prior-date-carryover] A GAME STILL LIVE AT MIDNIGHT CT LOST ITS LAYER 2 BOARD — the carryover and the stale-live label are LIVE; the midnight crossing itself is NOT yet measured `[verified 2026-09-13 13:23-16:24Z, lane layer2-prior-date-live-carryover]`
+## [layer2-prior-date-carryover] A GAME STILL LIVE AT MIDNIGHT CT LOST ITS LAYER 2 BOARD — the carryover and the stale-live label are LIVE; the midnight crossing is MEASURED on NCAAB (it rebuilds; the college live lane was the missing piece, #774) `[verified 2026-09-13 13:23-16:24Z, lane layer2-prior-date-live-carryover; crossing 2026-11-10, lane college-live-resim-midnight]`
 
 **Mechanism, measured on refresh-worker logs 2026-09-13:**
 - The board window is `_default_board_window_dates(central_today_iso())`: today..today+2, with future days kept only if they are in `_supported_intelligence_dates()`. At 05:00:00Z (midnight CDT) the prior date leaves it. The last `BOARD_WINDOW_QUEUED date=2026-09-12` was at 04:56:07Z; from 05:00:08Z only 09-13 was queued.
@@ -854,9 +854,13 @@ deployed three times on the evening of 2026-08-26. Same family as
 - W1 MET, 15:08:17Z: the 09-12 NCAAF board went 28 -> 0 `game_state=live`, with `rows_live_state_stale` 28. The 09-13 board (build 746 s old) kept its 10 live rows, 0 relabelled.
 - R1 MET, 16:23:59Z: `LAYER2_CARRYOVER date=2026-09-12 decision=skip reason=past_cap hours_since_roll=11.4 max_hours=6.0`, 6 s after `BACKGROUND_LOOP_START`.
 
-**NOT measured:**
-- Whether the carryover keeps rebuilding a board while a game is live across midnight CT, what spacing it holds under production contention, and whether it stops with 0 live rows.
-- These are owed to scheduled tasks `layer2-carryover-roll-reading-0914` (the 09-14 roll), `layer2-carryover-crossing-reading-0915`, and backup `layer2-carryover-crossing-reading-0919`.
+**The midnight crossing, MEASURED on NCAAB `[2026-11-10, lane college-live-resim-midnight; fleet refresh-worker logs]`:**
+- The carryover DOES keep rebuilding while a game is live across midnight CT, and stops when it ends.
+  - 11-09 roll (WICH vs USC): `decision=built` 06:08, 06:14, 06:21, 06:28, 06:37Z; then `skip reason=nothing_live_at_last_build` 06:41Z.
+  - 11-10 roll (PORT @ HAW): `built` 06:05-07:19Z, every ~6 min, a `rate_limited` wait between builds; then `skip` 07:22:30Z, 3 min after the build with `chips_live_now=0`. Each build took `elapsed_s` 40-114.
+- **But the NCAAB rows it rebuilt had no live lane.** Every NCAAB `LIVE_GAMELINE_JOIN` after 06:00Z read `games_in_snapshot=0`: `no_live_gameline_projection`, priceable 0, display 0.
+  - Cause: the college re-sim tick switched to the new date's scoreboard at the roll.
+  - Fix on main `97cb5d477`, NOT LOADED: todo `#774`.
 - Cost: while the carryover runs, today's board and the prior date alternate ~3-minute fast builds.
 
 
