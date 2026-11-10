@@ -4009,6 +4009,59 @@ def _build_cards_sim_detail_from_local_smart_sim(*, processed_root: Path, date_s
     return games_out
 
 
+def _merge_missing_cards_sim_detail_games(*, path: Path, processed_root: Path, date_str: str) -> int:
+    """Add to an existing `cards_sim_detail_<D>.json` every game that has a smart_sim file but no entry. Returns the
+    number of games added.
+
+    A FILE WRITTEN BEFORE THE SLATE WAS SIMMED FROZE THE DATE (lane `nba-sim-index-missing-games`, todo `#778`).
+    `_copy_existing_processed_artifact` returns the existing file whenever the source and destination are the same
+    path, which they are on the fleet, so `_build_cards_sim_detail_from_local_smart_sim` never ran again for a date
+    that already had a file. `cards_sim_detail_2026-11-10.json` was written on 11-09 at 06:03Z with only BOS@PHI;
+    live-odds-worker re-simmed all 6 games at 16:52, 17:26, 19:00 and 19:31Z, and the file never changed. The pregame
+    projection join (`nba_projections`) reads ONLY this file, so 343 of 413 served NBA prop rows on the other 5 games
+    carried no `sim_projection` and no `model_edge_pct`. The same shape on 10-30 (8 of 10 games), 11-04 (9 of 14) and
+    11-06 (5 of 9).
+
+    Only MISSING games are added. An entry already in the file is left exactly as it is, even when a newer sim
+    exists for that game, so a complete file is never rewritten (its mtime is unchanged). Whether already-indexed games
+    should follow later re-sims is a separate question: the fleet also rewrites a started game's pregame sim
+    mid-game. A game counts as present in either home/away orientation. An unreadable existing file is left alone.
+    """
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return 0
+    if not isinstance(payload, dict) or not isinstance(payload.get("games"), list):
+        return 0
+    games = payload["games"]
+    present = {
+        frozenset((str(g.get("home_tri") or "").strip().upper(), str(g.get("away_tri") or "").strip().upper()))
+        for g in games
+        if isinstance(g, dict)
+    }
+    added = []
+    for game in _build_cards_sim_detail_from_local_smart_sim(processed_root=processed_root, date_str=date_str):
+        key = frozenset((str(game.get("home_tri") or "").upper(), str(game.get("away_tri") or "").upper()))
+        if key in present:
+            continue
+        present.add(key)
+        added.append(game)
+    if not added:
+        return 0
+    out = dict(payload)
+    out["games"] = list(games) + added
+    tmp_path = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    tmp_path.write_text(json.dumps(out, indent=2), encoding="utf-8")
+    os.replace(tmp_path, path)
+    added_names = ["%s@%s" % (g.get("away_tri"), g.get("home_tri")) for g in added]
+    print(
+        f"[refresh_nba_oddsapi_props] CARDS_SIM_DETAIL_MISSING_GAMES_ADDED date={date_str} games_before={len(games)} "
+        f"added={len(added)} games_after={len(out['games'])} added_games={added_names}",
+        flush=True,
+    )
+    return len(added)
+
+
 def _export_cards_sim_detail_snapshot(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
     existing = _copy_existing_processed_artifact(
         source_root=source_root,
@@ -4016,6 +4069,10 @@ def _export_cards_sim_detail_snapshot(*, source_root: Path, date_str: str, proce
         file_name=f"cards_sim_detail_{date_str}.json",
     )
     if existing:
+        try:
+            _merge_missing_cards_sim_detail_games(path=Path(existing), processed_root=processed_root, date_str=date_str)
+        except Exception as exc:  # a failed merge must leave the pre-#778 behaviour, never break the export
+            print(f"[refresh_nba_oddsapi_props] CARDS_SIM_DETAIL_MISSING_GAMES_FAILED date={date_str} error={exc!r}", flush=True)
         return existing
     out_path = processed_root / f"cards_sim_detail_{date_str}.json"
     games_out = _build_cards_sim_detail_from_local_smart_sim(processed_root=processed_root, date_str=date_str)

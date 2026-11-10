@@ -12,6 +12,18 @@
   - (b) The source: `_within_horizon`'s missing lower bound, and an NCAAB shard that is not keyed by Central kickoff date.
   - (c) Football games sit on several week boards before their own date (84 pregame rows, 11-10); left alone by this fix.
 
+### `#778` — **NBA GAMES SIMMED AFTER THE DAY'S SIM INDEX WAS WRITTEN CARRY NO PREGAME PROJECTION: `cards_sim_detail_<D>.json` written on D-1 with a partial slate is never rebuilt. 11-10: 5 of 6 games, 343 of 413 served NBA prop rows unpriced. FIX ON MAIN, NOT LOADED (needs the user's yes)** `[2026-11-10, lane nba-sim-index-missing-games, session 2ba5509d]`
+- **Why:** `nba_projections` reads ONLY `cards_sim_detail_<D>.json`. `_export_cards_sim_detail_snapshot` returns an existing file untouched when source and destination are the same path (they are on the fleet), so a file first written on D-1 freezes the date.
+  - 11-10's file: written 11-09 06:03Z, 1 game (BOS@PHI). live-odds-worker re-simmed all 6 games at 16:52 / 17:26 / 19:00 / 19:31Z; the file never changed.
+  - Same shape on 10-30 (8 of 10 games missing), 11-04 (9 of 14), 11-06 (5 of 9). Complete slates had their file written early the same day.
+- **Fix:** `_merge_missing_cards_sim_detail_games` adds every game that has a smart_sim file but no entry. It leaves existing entries exactly as they are and never rewrites a complete file. Writes atomically. New line `CARDS_SIM_DETAIL_MISSING_GAMES_ADDED` in the NBA refresh run log.
+- **Tests:** `tests/test_nba_cards_sim_detail_missing_games.py` (8, OFF arm, failed-merge fallback, reachability into `load_nba_prop_projections`).
+- **Replay (fleet 11-10 files):** fleet code 1 -> 1 game, fix 1 -> 6, BOS@PHI entry unchanged. Book-grid NBA prop rows with an edge 371 -> 2,127 of 2,307; BOS@PHI's counts identical. Derrick Jones (#775): edge 0 -> 16 of 19.
+- **Expected on load (stated before any fleet change):** the next NBA props refresh writes the file with 6 games and logs `games_before=1 added=5 games_after=6`. ~1,750 more grid rows carry a projection and edge; the 5 games' props can rank, be suggested and reach the venue plan (money path). Complete slates: no change.
+- **Load:** the export runs in `refresh_nba_oddsapi_props.py`, a fresh subprocess per run, so a fleet ff alone loads it (no role restart). Fleet at `47450ce07`; an ff to this fix also carries `ebebe64bc` (lane `watchdog-wsl-restart-recovery`, not loaded).
+- **Not done:** games already in the file still do not follow later re-sims (late scratches); the fleet also rewrites started games' pregame sims mid-game, so that needs its own design. WNBA twin untouched (off-season).
+- Findings: `.syndicate/findings_2026-11-10_nba_sim_index_missing_games.md`.
+
 ### `#777` — **AN NBA GAME STILL LIVE AT MIDNIGHT CENTRAL LOST ITS LIVE PROP NUMBERS ON THE BOARD: the page lens is built for the new date only. FIX ON MAIN, ON FLEET DISK: web half LIVE 18:10Z, lens half loads at the live-odds-worker's 6 h recycle (~22:18-22:50Z = 4:18-4:50 PM CST 11-10)** `[2026-11-10, lane nba-live-props-midnight, session cca33a3a]`
 - **Load state, verified read-only 12:15-12:20 PM CST (18:15-18:20Z) 11-10:**
   - Loaded on the user's "Yes, load all three", given in lane `pregame-record-keep`'s chat. That lane ff'd `eeb2461c7 -> 47450ce07` at 18:10:15Z and ran `reload-web` 18:10:25-18:10:30Z (its `deploys.md` entry).
