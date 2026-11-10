@@ -108,6 +108,26 @@ def _fresh_lanes(snapshot: Mapping[str, Any]) -> list[tuple[tuple, Mapping[str, 
     return out
 
 
+def _published_vs_read(lane: Mapping[str, Any], row: Mapping[str, Any]) -> list[tuple[str, Any, Any]]:
+    """(field, what the snapshot lane published, what the read row offers), for the fields a live learner needs.
+
+    Read straight off the raw lane under either naming (projection camelCase or lane-level snake_case), so it does
+    not share lel.lane_row's notion of where a field lives."""
+    projection = lane.get("projection") if isinstance(lane.get("projection"), Mapping) else {}
+    live_state = lane.get("live_state") if isinstance(lane.get("live_state"), Mapping) else {}
+    state = row.get("state") if isinstance(row.get("state"), Mapping) else {}
+    out = []
+    for camel, snake in (("homeScore", "home_score"), ("awayScore", "away_score"), ("period", "period")):
+        published = projection.get(camel, live_state.get(snake))
+        if published is not None:
+            out.append((f"state.{camel}", published, state.get(camel)))
+    for camel, snake in (("marginDist", "margin_dist"), ("totalRunsDist", "total_dist")):
+        published = projection.get(camel) or lane.get(snake)
+        if isinstance(published, Mapping) and published:
+            out.append((camel, len(published), len(row.get(camel) or {})))
+    return out
+
+
 def probe(wait_s: float, root: Path | None = None) -> int:
     from syndicate.features.shared.refresh_state_store import data_root, read_json_file
 
@@ -129,22 +149,28 @@ def probe(wait_s: float, root: Path | None = None) -> int:
             if all(have.get(k) and have[k].get("t") == t for k, _g, _l in lanes) or time.monotonic() > deadline:
                 break
             time.sleep(5)
-        matched = missing = mismatched = 0
+        matched = missing = mismatched = unread = 0
         for key, g, lane in lanes:
             row = have.get(key)
             if row is None or row.get("t") != t:
                 missing += 1
                 continue
-            want = lel.lane_row(sport, date, t, row.get("observed_at"), g, lane)
+            want = lel.normalize_row(lel.lane_row(sport, date, t, row.get("observed_at"), g, lane))
             diffs = [k for k in ("state", "proj", "marginDist", "totalRunsDist", "modelHomeWinProb", "simsRun", "as_of")
                      if json.dumps(want.get(k), sort_keys=True, default=str) != json.dumps(row.get(k), sort_keys=True, default=str)]
-            if diffs:
-                mismatched += 1
-                print(f"   MISMATCH sport={sport} key={key} fields={diffs}")
+            # Independent of lane_row: a score or margin distribution the SNAPSHOT carries, wherever the producer put
+            # it, must be readable under the shared names. Comparing lane_row with itself cannot see a field
+            # lane_row never extracts (nfl 2026-11-09: state in `live_state`, 15/15 "matched" with state empty).
+            gaps = [name for name, published, logged in _published_vs_read(lane, row) if published != logged]
+            if diffs or gaps:
+                mismatched += bool(diffs)
+                unread += bool(gaps)
+                print(f"   MISMATCH sport={sport} key={key} fields={diffs} unread={gaps}")
             else:
                 matched += 1
-        bad += mismatched
-        print(f"PROBE sport={sport} t={t} fresh_lanes={len(lanes)} matched={matched} missing={missing} mismatched={mismatched}")
+        bad += mismatched + unread
+        print(f"PROBE sport={sport} t={t} fresh_lanes={len(lanes)} matched={matched} missing={missing} "
+              f"mismatched={mismatched} unread={unread}")
     return 1 if bad else 0
 
 

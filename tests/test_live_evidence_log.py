@@ -176,6 +176,61 @@ def test_an_oversized_row_drops_detail_and_says_so():
     assert len(json.dumps(row)) <= lel.ROW_MAX_BYTES
 
 
+def _nfl_lane(t: str) -> dict:
+    """The NFL live re-sim's lane shape on the fleet, Monday night football 2026-11-09."""
+    return {"source": "live_resim", "ok": True, "as_of": t, "modelHomeWinProb": 0.3427, "simsRun": 120,
+            "projection": {"homeMargin": -3.93, "total": 25.5},
+            "live_state": {"period": 2, "clock_seconds": 242, "home_score": 3, "away_score": 3},
+            "margin_dist": {"-4": 9, "7": 6}, "total_dist": {"16": 10, "25": 6},
+            "margin_mean": -3.93, "possession_marginalised": True}
+
+
+def _nfl_snapshot(t: str) -> dict:
+    return {"date": "2026-11-10", "generatedAt": t, "games": [
+        {"event_id": "N1", "home_name": "minnesota vikings", "away_name": "buffalo bills", "gameLens": [_nfl_lane(t)]}]}
+
+
+def test_a_lane_level_nfl_state_reads_under_the_shared_names(tmp_path):
+    store = _Store()
+    c = lel.Collector(root=tmp_path, read=store.read, sports={"nfl": "n.json"})
+    store.snaps["n.json"] = _nfl_snapshot("2026-11-09T20:34:32-06:00")
+    assert c.collect_once() == {"nfl": 1}
+    raw = json.loads(lel.log_path("nfl", "2026-11-10", root=tmp_path).read_text(encoding="utf-8"))
+    assert "state" not in raw and raw["extra"]["live_state"]["clock_seconds"] == 242  # stored verbatim
+    rows = list(lel.iter_rows("nfl", "2026-11-10", root=tmp_path))
+    assert rows[0]["state"] == {"period": 2, "clockSeconds": 242, "homeScore": 3, "awayScore": 3}
+    assert rows[0]["marginDist"] == {"-4": 9, "7": 6} and rows[0]["totalRunsDist"] == {"16": 10, "25": 6}
+    assert rows[0]["normalized"] == ["state", "marginDist", "totalRunsDist"]
+    assert lel.evidence_at(rows, "2026-11-09T20:35:00-06:00")[("N1", None)]["state"]["homeScore"] == 3
+
+
+def test_normalize_never_overrides_what_the_projection_supplied():
+    row = {"state": {"homeScore": 30}, "marginDist": {"1": 1},
+           "extra": {"live_state": {"home_score": 99}, "margin_dist": {"9": 9}, "total_dist": {"140": 2}}}
+    out = lel.normalize_row(row)
+    assert out["state"] == {"homeScore": 30} and out["marginDist"] == {"1": 1}
+    assert out["totalRunsDist"] == {"140": 2} and out["normalized"] == ["totalRunsDist"]
+    assert lel.normalize_row({"state": {"homeScore": 1}}) == {"state": {"homeScore": 1}}
+
+
+def test_the_probe_sees_a_field_lane_row_does_not_extract():
+    """off != on: the probe's independent read flags the un-normalized NFL row and passes the normalized one."""
+    import importlib.util
+    from pathlib import Path
+
+    spec = importlib.util.spec_from_file_location(
+        "live_evidence_check", Path(__file__).resolve().parents[1] / "scripts" / "live_evidence_check.py")
+    check = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(check)
+    t = "2026-11-09T20:34:32-06:00"
+    game = _nfl_snapshot(t)["games"][0]
+    lane = game["gameLens"][0]
+    raw_row = lel.lane_row("nfl", "2026-11-10", t, t, game, lane)
+    gaps = [name for name, published, read in check._published_vs_read(lane, raw_row) if published != read]
+    assert gaps == ["state.homeScore", "state.awayScore", "state.period", "marginDist", "totalRunsDist"]
+    assert all(p == r for _n, p, r in check._published_vs_read(lane, lel.normalize_row(raw_row)))
+
+
 def test_an_unreadable_sport_never_stops_the_others(tmp_path):
     def read(name):
         if name == "f.json":

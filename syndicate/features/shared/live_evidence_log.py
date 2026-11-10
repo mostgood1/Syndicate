@@ -20,6 +20,10 @@ the segment table, the lane's provenance (source, refusal, `liveStateAsOf`), and
 
 `evidence_at` answers "what had been published by `t`", using `t`, never `observed_at`.
 
+Not every producer puts its state in `projection`: the NFL re-sim publishes `live_state` / `margin_dist` /
+`total_dist` at lane level (2026-11-09). The writer keeps those verbatim in `extra`, and `iter_rows` fills the
+shared names (`state`, `marginDist`, `totalRunsDist`) through `normalize_row`. Read rows through `iter_rows`.
+
 WHAT IT KEEPS AND DROPS.
 - A FRESH projection lane: one row every tick it changes (its `t` moves).
 - A refusal or carried lane, and a pregame lane with no live state: a row only when its signature (source,
@@ -79,6 +83,16 @@ LANE_SKIP: frozenset[str] = frozenset({
     "projection", "inputs", "key", "label", "source", "liveResimRefusal", "liveResimRefusalDetail", "refusal",
     "liveStateAsOf", "as_of", "carriedForward", "carriedRefusal", "refusedStateAsOf", *LANE_SCALARS,
 })
+
+# The NFL live re-sim publishes its game state and distributions at LANE level, snake_case, with only `homeMargin`
+# and `total` in `projection` (fleet, Monday night football 2026-11-09): `live_state` {period, clock_seconds,
+# home_score, away_score}, `margin_dist`, `total_dist`. The writer keeps them verbatim in `extra`; `normalize_row`
+# fills the shared names from there on READ, so rows written before and after this read alike.
+LANE_STATE_ALIASES: dict[str, str] = {
+    "period": "period", "clock_seconds": "clockSeconds", "home_score": "homeScore", "away_score": "awayScore",
+    "down": "down", "distance": "distance", "yard_line": "yardLine", "possession": "possession",
+}
+LANE_DIST_ALIASES: dict[str, str] = {"margin_dist": "marginDist", "total_dist": "totalRunsDist"}
 
 
 def enabled(env: Optional[Mapping[str, str]] = None) -> bool:
@@ -349,7 +363,32 @@ def iter_rows(sport: str, date_str: str, *, root: Optional[Path] = None) -> Iter
             except ValueError:
                 continue  # a torn last line from a killed process is skipped, never fatal
             if isinstance(row, dict):
-                yield row
+                yield normalize_row(row)
+
+
+def normalize_row(row: Mapping[str, Any]) -> dict[str, Any]:
+    """`row` with `state` / `marginDist` / `totalRunsDist` filled from a lane-level snake_case copy in `extra`
+    (`live_state`, `margin_dist`, `total_dist`) when the projection supplied none. A field the projection supplied
+    is never overridden. Returns a new dict and names what it filled under `normalized`."""
+    out = dict(row)
+    extra = row.get("extra")
+    if not isinstance(extra, Mapping):
+        return out
+    filled: list[str] = []
+    live_state = extra.get("live_state")
+    if not out.get("state") and isinstance(live_state, Mapping):
+        state = {LANE_STATE_ALIASES[k]: v for k, v in live_state.items()
+                 if k in LANE_STATE_ALIASES and v is not None and _scalar(v)}
+        if state:
+            out["state"] = state
+            filled.append("state")
+    for src, dst in LANE_DIST_ALIASES.items():
+        if not out.get(dst) and isinstance(extra.get(src), Mapping) and extra.get(src):
+            out[dst] = dict(extra[src])
+            filled.append(dst)
+    if filled:
+        out["normalized"] = filled
+    return out
 
 
 def _parse(ts: Any) -> Optional[datetime]:
