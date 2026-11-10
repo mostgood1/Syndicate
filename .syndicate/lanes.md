@@ -824,6 +824,14 @@ death, never life — do not invert it.
 - Verification: unit tests incl. off != on and a lossless round trip of build_live_props output; a dry run against the fleet's live NBA snapshot tonight into a scratch dir (bytes per tick, CPU per pass); after a user-approved load (refresh-worker TERM): a same-moment probe of expanded rows vs the published liveProps with 0 mismatches, bytes per night, 0 failures
 - Blocked by: none
 
+### nba-sim-index-missing-games — OPEN — opened 2026-11-10 — session 2ba5509d-5605-427a-b4bd-acd7926e2bea
+- Goal: Every NBA game with a pregame smart_sim_<D>_*.json on the fleet is in cards_sim_detail_<D>.json, so its served prop rows carry sim_projection and model_edge_pct (11-10: LAC@PHX, MIA@UTA, MIL@NYK, OKC@POR, ORL@SAC served 0 of 343); games already in the file are left byte-identical.
+- Files: scripts/refresh_nba_oddsapi_props.py (_export_cards_sim_detail_snapshot and a new _merge_missing_cards_sim_detail_games helper beside it ONLY), tests/test_nba_cards_sim_detail_missing_games.py (NEW)
+- Hypothesis: _export_cards_sim_detail_snapshot calls _copy_existing_processed_artifact first; on the fleet source_root/data/processed IS processed_root, so it returns the existing file and _build_cards_sim_detail_from_local_smart_sim never runs again for that date. A file first written on D-1 (look-ahead, partial slate) freezes the date: 11-10's file (11-09 06:03Z) holds BOS@PHI only while live-odds-worker re-simmed all 6 games at 16:52/17:26/19:00/19:31Z.
+- Falsification test: Running the export on a copy of the fleet's 11-10 processed dir with fleet code adds the 5 missing games (then the cause is elsewhere: refresh_mode/do_export gate, or the export never runs).
+- Verification: Unit: off != on (a file holding 1 game + 3 sims -> fixed export writes 3 games, existing entry byte-identical; a complete file is not rewritten, mtime unchanged). Replay on the fleet's 11-10 files: index games 1 -> 6, attach_projections priced NBA prop rows rise only on the 5 games. Fleet, after the user's yes: the next live-odds-worker NBA refresh writes the file with 6 games, served rows on those games carry sim_projection + model_edge_pct.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
