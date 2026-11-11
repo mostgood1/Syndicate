@@ -58541,3 +58541,27 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **Owed:**
   - The midnight roll: after 00:00 CT, 11-10 games still in play leave the 11-11 board by design and stay on 11-10's carryover rebuild.
   - #778's own reading, appended separately.
+
+## 2026-11-11 00:40:24Z (6:40 PM CST 11-10) -- VERIFY, NHL half: web's read-time Actual refresh (`fd05acb13`, entry 2026-11-10 15:45:23Z, todo #769 (c), lane `nhl-nfl-actual-read-time`) -- **0 split groups and every row equal to the published box in all 3 polls; 0 Live proj.; BUT 16 / 0 / 24 live rows carried a PREGAME model edge (not this change); NFL half owed at TNF**
+- **How read:** watcher `C:\tmp\lpa\nhl_read_time_watch.py` (armed 15:52:20Z). It made three polls of the served board, `POST /api/intelligence/query`, at 00:20:04Z, 00:30:17Z and 00:40:24Z (`nhl_read_time_watch.jsonl`). For every live NHL prop row it compared the row's Actual with:
+  - the block live-odds-worker PUBLISHED (fleet Redis), looked up with the build join's own `lookup_live_actual`;
+  - the NHL box fetched at that moment by the same producer;
+  - and it counted split (player, market) groups.
+- **Rows read:** 151 / 19 / 62 live NHL props with an Actual:
+  - shortlist / overlay: 17/134, 2/17, 25/37;
+  - games with an Actual: 3, 3 and 4 (5 games had a published block by 00:40Z).
+- **(1) Split groups (two Actuals for one player/market): MET.** 0 of 144, 0 of 19, 0 of 56. The replay of 11-10 ~02:55Z, before the fix, had NFL 7 of 43.
+- **(2) Rows vs the box: MET, with the publish lag.**
+  - Every row equalled the PUBLISHED block, board-build rows included: 151/151, 19/19, 62/62 (232 of 232; 44 shortlist rows). Web's refresh applied.
+  - Against the box fetched at that moment: 144/151, 19/19, 60/62 equal (223 of 232). The 9 that differ are all behind, e.g. one goalie's saves 1 vs 4 at 00:20Z on BOTH row types.
+  - The published block trails the box. Measured 00:45:19-00:48:52Z (22 reads, every 10 s), the snapshot republished every 86-107 s, and blocks were up to 99 s old at read, plus web's 15 s cache.
+  - Separately, 2 of 4 reads at 00:43:01Z and 00:43:41Z found the published snapshot with NO player blocks: one window of at least 40 s, 2 of 26 reads tonight. While that lasts, web's refresh refuses (`miss_no_game`) and rows keep the build's value. Not chased. The tick at 18:46:26 CST ran 34.2 s against a 25 s budget, which may or may not be related.
+- **(3) Web log: MET.** 36 `LIVE_ACTUALS_REFRESHED_FROM_BOX sport=nhl` lines between 00:20Z and 00:40Z. The last, at 00:40:28Z, read `considered=257 matched=257 refreshed=96 no_snapshot=0 refused={}`. 0 `LIVE_COLUMN_REFRESH_FAILED` in the polls' web-log window.
+- **(4) Nothing priced: Live proj. MET, model edge NOT MET as stated.**
+  - `live_projection`: 0 rows in all 3 polls.
+  - `model_edge_pct`: 16 / 0 / 24 rows.
+  - At 00:41:23Z all 24 were `layer2_shortlist` rows on FLA @ CBJ (`commence_time` 00:40:00Z). They were priced PREGAME: quotes 74 min to 6 h old, pregame `sim_projection`, `actual` 0.0. They are served `is_live` from puck drop until the next board build replaces them; the 00:30Z poll had 0.
+  - The 16 at 00:20Z fit the same mechanism (00:00Z puck drops), but were not checked per row.
+  - Not this change: it writes `actual` only. The 02:55Z replay showed 0 because no game had just started.
+  - Recorded as a lead in `.syndicate/leads.md` (2026-11-11, from `nhl-nfl-actual-read-time`).
+- **verify (NFL):** OWED. Watcher `C:\tmp\lpa\nfl_read_time_watch.py`, armed 19:51:48Z, polls 01:30Z-04:45Z 11-13 (TNF WSH @ NYG, ESPN 401873052, kickoff 01:15Z).
