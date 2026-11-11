@@ -58594,3 +58594,36 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **verify, failures:** 0 `PREGAME_KEEP_FAILED`, 0 `DECISION_RECORD_FAILED`, 0 Traceback, 18:14Z 11-10 to 03:01Z 11-11 (the word matched 5 times, all inside `ALL_PROCESS_MEMORY` cmdline dumps).
 - **verify, memory:** memory by worker age (`ALL_PROCESS_MEMORY` rss of `run_refresh_worker.py`): the keep-only worker 318579 (18:15-22:57Z) read +1h 2,612 / +2h 2,778 / +3h 2,985 / +4h 3,049 MB against the same-day pre-load workers 27429 (2,351 / 2,296 / 2,567 / 2,716) and 386232 (2,314 / 2,792 / 2,768 / 2,825): within ~+250 MB, inside the spread of boots. The current worker 406676 (booted 00:31Z into the evening slate, by lane `layer2-lookahead-live-dedupe`'s load of `9fee4160d` with #778) reads 3,762 at +1h, the highest boot since 11-09; NOT attributed to the keep, whose own peak is 2.24 MB with nothing retained, and not attributed to anything else either.
 - **Correction `[2026-11-11 03:07Z]`:** in the 2026-11-11 03:06Z `pregame-record-keep` entry, the standalone keep-cost run was at 03:02-03:06Z (before that entry's push), not "~03:10Z" as written; the numbers stand.
+
+## 2026-11-11 06:05:02Z (12:05 AM CST 11-11) -- READING, the midnight roll after both `#779` loads (`0290d505a` web, `9fee4160d` refresh-worker; lane `layer2-lookahead-live-dedupe`) -- **the bound removed nothing at the roll and `#779`'s goal holds; the one game live at midnight left the board, for a reason that is NOT `#779` (lead recorded)**
+
+- **Population:** 1 game live at the roll.
+  - 11-10's last build before the roll (`LAYER2_FAST_REFRESH date=2026-11-10` 05:59:39Z) read `live_rows=367 chips_live=1`, all NBA.
+  - The game was OKC @ POR (ESPN 401909965, tip 04:14Z = 10:14 PM CST). From `live_resim_history`: Q3 at 05:58:40Z (POR 89-80); Q4 from 06:04:48Z; 99-84 with 10:08 left at 06:08:52Z.
+  - No college game was live at the roll.
+- **The bound at the roll:** `before_board_date=0` on every post-roll build of the dates involved:
+  - the 11-10 carryover (06:06:27Z);
+  - 11-11, now today (06:04:25Z, 06:07:48Z).
+  - The new look-ahead date's first build (`LAYER2_SHORTLIST date=2026-11-12` 06:02:49Z) dropped 12 NCAAB rows on 11-11 games (`before_board_date=12`), as designed.
+  - Tracebacks on refresh-worker since 05:30Z: 0.
+- **Plans** (scratch `midnight_plan.json`, read 06:05:03Z): 0 `EARLIER` positions in all 18 plans.
+  - The 9 plans of 11-10 were built 23:53-23:54 CST; main holds 6 positions, live_polymarket 4.
+  - The 9 plans of 11-11 were built at 23:57 CST; main 11, live_polymarket 1, paper2_prophetx 2.
+  - The 11-12 plans (06:02:54Z) were not read by date.
+- **Served board** 06:05:02Z (state 05:57:15Z, window 11-11..11-13, 112 games):
+  - 0 live game rows, so 0 rows with an edge and no live number;
+  - `layer2_lookahead_rows_dropped=0`.
+- **Where OKC @ POR went after midnight:**
+  - **The 11-11 board:** not there, by design. 11-11's candidates held 0 rows from an earlier date, so `#779` had nothing to drop. It did not remove this game.
+  - **The combined board:** not there. Its window starts at Central today, which is pre-existing (`pipeline/intelligence_state.py:181`).
+  - **The 11-10 carryover** (`/api/board/layer2-shortlist?date=2026-11-10`): built at 06:06:28Z (`decision=built reason=live_at_last_build`), 1,669 rows. **NBA rows 367 -> 0**, with `live_rows_now=0 chips_live_now=1`; the endpoint at 06:07:02Z served 0 live rows across 126 games.
+    - At 06:05:43Z the joins still had the game: `LIVE_GAMELINE_JOIN sport=nba games_in_snapshot=1 projected=103 priceable=52`, and `LIVE_PROJECTION_JOIN sport=nba projected=230`.
+    - But the build selected nothing: `per_sport.nba.available=0`, `by_lane.dead=6983`.
+    - **Cause (pre-existing, not `#779`):** NBA book-quote capture for the 11-10 game stopped at 05:59:54Z, the last write of `tracking/book_quotes/2026-11-10.jsonl`. 0 of its quotes (commence 04:14Z) are in the 11-11 shard after the roll.
+    - The rows' dead-lane reason is inferred, not read: `live_quote_unobserved`, quotes over 300 s old.
+    - Recorded as a lead in `.syndicate/leads.md` for lane `nba-live-resim-midnight`. `#776`'s MET predicate (`games_in_snapshot>=1 projected>0`) can read MET while the board shows the game nothing. Not chased.
+- **Verdict for `#779`:** its goal holds across the roll:
+  - 0 live look-ahead rows with a pregame edge and no live number;
+  - 0 `EARLIER` positions in any plan;
+  - the bound drops only earlier-date rows, and dropped 0 at the roll.
+  - The midnight reading owed in todo `#779` is DISCHARGED.
