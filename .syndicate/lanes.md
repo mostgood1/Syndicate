@@ -748,6 +748,14 @@ death, never life — do not invert it.
 - Verification: deploys entry: ff + TERM times, new pid, prior_slate_in_play on disk, 0 PRIOR_SLATE_ERROR / 0 tracebacks after ~10 min, sweeps continuing; the night reading stays with lane nba-quote-capture-midnight
 - Blocked by: none
 
+### live-mech-outcome-gate — OPEN — opened 2026-11-11 — session c2fd17f8-7d77-4eed-b025-0830211e05b3
+- Goal: todo #784: a change to any *_LIVE_MECHANISMS env key cannot pass fleet preflight without an outcome-scored receipt for that exact transition. scripts/live_mechanism_outcome_gate.py replays the CURRENT season's completed games on the current and candidate values (same seeds, production priors) at every checkpoint the live pricing reads, scores margin and total as distributions plus win probability against the finals, and writes a receipt; deploy_preflight.py --reinject-env on the fleet reads each role's derived env (local_production.py env, the loader up uses) against its running environ and returns OUTCOME_GATE (exit 7) for a changed key with no fresh matching receipt, or with worse-beyond-SE cells not explicitly accepted. Escape --no-outcome-gate REASON, recorded.
+- Files: scripts/live_mechanism_outcome_gate.py (NEW), scripts/deploy_preflight.py (the outcome-gate check only: OUTCOME_GATE verdict, fleet mechanism reader, --no-outcome-gate / --accept-outcome-regression), tests/test_live_mechanism_outcome_gate.py (NEW), docs/ai_context/todo.md (#784 section only)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: Tests: off != on for the preflight check (changed key + no receipt -> OUTCOME_GATE; matching fresh receipt -> CLEAR; stale / mismatched transition / unaccepted worse cells -> OUTCOME_GATE; waiver -> CLEAR, recorded), receipt hash round trip. Real run on the fleet's data reproduces the 240-game NCAAB result (RC46 vs #768's 7 fields, 2026-11-03..09): totals tie, win Brier worse beyond SE at 20 m and 36 m. The fleet mechanism reader run read-only against the live fleet (never a full preflight: learnings 2026-09-28) returns the live-odds-worker's 7-field value with no change.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
