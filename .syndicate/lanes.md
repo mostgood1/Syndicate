@@ -579,16 +579,6 @@ death, never life — do not invert it.
 - Verification: Hermetic tests: shape parity with e4_stage2_combo_prices.shape_cell on a ticker grid, off != on for the shaped read, budget reservation; A5 committed on origin/main before the ff; after the ff, the first full UTC day's store rows read on the fleet (shaped traded two-leg combos, trades_status counts, prints with taker_side, GETs) and recorded in deploys.md
 - Blocked by: none
 
-### live-display-other-sports — CLOSED 2026-11-11 (GOAL MET: display-only Live proj. verified live in all five sports -- NCAAF 43 -> 44 of 81, NCAAB 50 -> 244 of 260, WNCAAB 6 -> 19 of 22, NFL +1, NHL +1; 0 display rows priced) — opened 2026-11-09 — session cb29eaf2-7ec1-471b-ab8f-7215a7cb51f5
-- OWED READING OWNER `[2026-11-10 15:26Z]`: scheduled task `live-display-ncaaf-reading-1110` (user: "Yes, schedule it") fires 2026-11-11 00:15Z (6:15 PM CST), waits for the first NCAAF `LIVE_GAMELINE_JOIN` with display>0 (Kent St @ Bowling Green, W Michigan @ Akron 00:00Z; Ohio @ Miami (OH) 01:00Z), probes the served board 3x, records deploys.md and closes this lane if MET. Backup: session cb29eaf2's timer checks `list_task_runs` at 00:30Z and takes the reading by hand only if the task never started. The lending lane `nba-live-proj-actuals` CLOSED 2026-11-10, so the loan ends with this lane.
-- **VERDICT `[2026-11-11 00:22Z]`: GOAL: MET.** Goal, verbatim: "Live game-line rows the join refuses to price show a DISPLAY-ONLY Live proj. in ncaab, wncaab, ncaaf, nfl and nhl as NBA's do (#762 pattern): stale-quote full-game rows and full-game moneylines in all five, college half/quarter rows too (totals raw + anchored margins only); NFL spreads stay blank (margins graded FAIL); measured on the fleet's served board as live game rows with a Live proj. per sport before vs after, with 0 display-only rows carrying edge_vs_market_pct / live_aware / model_ev_pct". NCAAF: 43 -> 44 of 81 served live rows with a Live proj. (read 1; 27->28 of 46, 26->27 of 45 in reads 2-3), join display=8/12, 0 non-moneyline display rows priced. The one gain is the W. Michigan @ Akron full-game moneyline. Every NCAAF segment row stayed blank: the NCAAF live re-sim seems to publish no segment lane (live_gameline_join.py:2034). Join display=12 vs 1 row served is NOT traced. Both are recorded in deploys.md 2026-11-11 00:22:48Z. Earlier sports: deploys.md 2026-11-09 17:21:39Z / 23:09:54Z / 2026-11-10 02:10:49Z. LOAN ended: the lending lane nba-live-proj-actuals CLOSED 2026-11-10, so the three loaned files go back unclaimed.
-- Goal: Live game-line rows the join refuses to price show a DISPLAY-ONLY Live proj. in ncaab, wncaab, ncaaf, nfl and nhl as NBA's do (#762 pattern): stale-quote full-game rows and full-game moneylines in all five, college half/quarter rows too (totals raw + anchored margins only); NFL spreads stay blank (margins graded FAIL); measured on the fleet's served board as live game rows with a Live proj. per sport before vs after, with 0 display-only rows carrying edge_vs_market_pct / live_aware / model_ev_pct
-- Files: syndicate/features/shared/live_gameline_join.py (LOAN from nba-live-proj-actuals: LIVE_DISPLAY_SPORTS table + its comment + new _DISPLAY_PAST_LANE_CEILING_SPORTS / _display_lane_fresh + the freshness check on the three display writes + the segment_display_only docstring lines only), syndicate/features/shared/board_enrichment.py (LOAN from nba-live-proj-actuals: the segment_display_only argument in attach_live_gamelines_for_sport + its LIVE_DISPLAY_SPORTS import only), tests/test_nba_live_segment_display.py (LOAN from nba-live-proj-actuals: test_another_sports_stale_quote_is_untouched + the ncaab half of test_a_college_opt_in_cannot_price_nba_segments + the lane time in test_college_never_shows_a_raw_margin only), tests/test_live_display_other_sports.py (NEW), docs/ai_context/todo.md (#771 section only)
-- Hypothesis: n/a (the 11-08 23:23Z LIVE_GAMELINE_JOIN lines attribute the blanks: ncaab quote_older_than_the_score_the_model_saw 58 + segment_pricing_disabled 71 with display=0; LIVE_DISPLAY_SPORTS = {nba})
-- Falsification test: n/a
-- Verification: off != on unit tests; fleet: LIVE_GAMELINE_JOIN display= > 0 for ncaab/wncaab (and nfl/nhl/ncaaf when live); served /api/intelligence/query live game rows with Live proj. per sport before vs after; 0 display-only rows with edge_vs_market_pct/live_aware/model_ev_pct
-- Blocked by: none
-
 ### live-evidence-log — CLOSED 2026-11-11 (GOAL MET: NCAAF in-game probe 2/2 matched, 0 mismatched / 0 unread; deploys.md 2026-11-11 00:16Z) — opened 2026-11-09 — session e32fef1a-01e8-4afe-a284-01acd3728545
 - **GOAL VERDICT `[2026-11-11 00:17Z]`: GOAL: MET.** Goal, verbatim: "Phase 1B M0: every live projection the fleet's re-sims and lenses publish (nba, ncaab, wncaab, ncaaf, nfl, nhl; wnba when on) is kept as an append-only, as-of-stamped row per game lane per tick in <data root>/live_evidence/<sport>/<date>.jsonl, read by one as-of reader; on the fleet, the NBA rows reproduce NBA's own live_resim_history for the same ticks with 0 mismatches, a same-moment probe on each other live sport matches the rebuilt evidence with 0 mismatches, and the bytes per day are measured" -- the last reading owed was NCAAF in play: same-moment probe 00:16:13Z 11-11 (6 min after the first fresh NCAAF lane at 00:10:12Z): **ncaaf fresh_lanes=2 matched=2 missing=0 mismatched=0 unread=0**; ncaab 26/26, wncaab 3/3, nhl 3/3, all 0 mismatched / 0 unread; nba and nfl had nothing live; wnba snapshot absent (off). NCAAF row summary for `live_evidence/ncaaf/2026-11-11.jsonl`: 14 live rows over 2 games, 14/14 carry `state`, `marginDist` and `totalDist`, source `live_resim`; extra keys `levelShrink`, `possessionUnknown`. The probe ran from worktree `loving-einstein-b3c45e`: `scripts/live_evidence_check.py` is byte-equal to main and its reader is main's; the worktree's only difference in `live_evidence_log.py` is the unpushed props hook in `Collector`, which the probe never calls. The rows themselves were written by the fleet's own collector (fleet `0290d505a`).
   - **Met:** NBA rows reproduce `live_resim_history`, 422 of 422 ticks, 0 field mismatches on 8 fields (05:31Z, matched by instant). Same-moment probes 0 mismatched on every sport live in the window: nba, ncaab, wncaab, nhl (31/31, 01:15Z) and nfl with Monday night football (15/15, 02:35Z; the independent probe 17/17, unread 0, 02:38Z). Bytes/day measured: ~6.9 MB for the 11-09 slate (ncaab 4.34 MB / 1,556 rows the largest). 0 tracebacks. Refresh-worker memory not up (3,987 MB at 10 h vs 4,021-5,042 MB for the 7 earlier workers that reached 10 h). Record: deploys.md 2026-11-10 01:15Z, 02:35Z, 05:30Z.
@@ -749,11 +739,6 @@ death, never life — do not invert it.
 - Verification: node + pytest harness green incl. fresh-vs-stale cases; run-syndicate screenshot of a live (or fixture) rail card with the live line; served-board count of live games/markets with a live line and with a fresh edge recorded in the lane
 - Blocked by: none
 
-### closed-lane-archive-20261110-1840 — CLOSED 2026-11-10 (GOAL MET: 3 blocks archived) — opened 2026-11-10 — session 89fb7a7c-1a2c-42ed-a45e-ffa803a1a8c8
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. 3 CLOSED blocks moved to `lanes_closed.md` with one pointer each: `ncaab-live-resim-capacity`, `nba-roster-filter-name-key`, `closed-lane-archive-20261110-1239`. Table and deferrals in `.syndicate/log/2026-11-10.md`.
-
 ### closed-lane-archive-20261110-2040 — CLOSED 2026-11-10 (GOAL MET: 1 block archived) — opened 2026-11-10 — session f493b037-3c6b-4736-abcf-c5fad772fc38
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
@@ -763,6 +748,11 @@ death, never life — do not invert it.
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 SAFE for 3 of 11 CLOSED; moved `kalshi-five-char-codes`, `nhl-live-puckline-display`, `closed-lane-archive-20261110-1638` to lanes_closed.md. Table in log/2026-11-10.md.
+
+### closed-lane-archive-20261111-0039 — CLOSED 2026-11-11 (GOAL MET: 2 blocks archived) — opened 2026-11-11 — session 5d3833c0-a7f0-4732-87dd-e6050cfe8ef3
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. 2 CLOSED blocks moved to `lanes_closed.md` with one pointer each: `live-display-other-sports`, `closed-lane-archive-20261110-1840`. Table and deferrals in `.syndicate/log/2026-11-11.md`.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -983,6 +973,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261110-1239` — CLOSED 2026-11-10 (GOAL MET: 1 block archived) — opened 2026-11-10 — session 6808b166-1396-4baf-a4b6-f28b9e5d9474
 - `closed-lane-archive-20261110-1439` — CLOSED 2026-11-10 (GOAL MET: 1 block archived) — opened 2026-11-10 — session ef299df7-5a8b-4901-b3fa-c13f5efe9514
 - `closed-lane-archive-20261110-1638` — CLOSED 2026-11-10 (GOAL MET: 1 block archived) — opened 2026-11-10 — session a53692c1-521c-4616-bb89-c92e9d844fa0
+- `closed-lane-archive-20261110-1840` — CLOSED 2026-11-10 (GOAL MET: 3 blocks archived) — opened 2026-11-10 — session 89fb7a7c-1a2c-42ed-a45e-ffa803a1a8c8
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
@@ -1109,6 +1100,7 @@ death, never life — do not invert it.
 - `ledger-tab-escape-fix` — CLOSED 2026-09-18 — opened 2026-09-18 — session 4991d2ec-b2c2-4040-9042-d98867b768ab — **GOAL MET: 3 lines repaired, 0 tab or BEL bytes left in lanes.md / lanes_closed.md**
 - `ledger-trim-1004` — CLOSED — closed 2026-10-04 — opened 2026-10-04 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
 - `live-clv-contract-units` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-21 — session 3bd0b2d4
+- `live-display-other-sports` — CLOSED 2026-11-11 (GOAL MET: display-only Live proj. verified live in all five sports -- NCAAF 43 -> 44 of 81, NCAAB 50 -> 244 of 260, WNCAAB 6 -> 19 of 22, NFL +1, NHL +1; 0 display rows priced) — opened 2026-11-09 — session cb29eaf2-7ec1-471b-ab8f-7215a7cb51f5
 - `live-edge-basis` — live-edge-basis — CLOSED-VERIFIED 2026-08-17 — **SHIPPED AND MEASURED. `edge_basis` observed on served rows (refresh-worker `b20072cd`, build 17:44:30 → `lanes_closed.md`.
 - `live-event-concentration` — CLOSED 2026-10-29 — opened 2026-10-20 — session 8ac736cb-2ce0-4e2f-a6c6-66efbd351c25
 - `live-gameline-accuracy-cut-repoint` — CLOSED 2026-09-12 — session 50d991d1
