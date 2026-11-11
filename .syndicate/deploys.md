@@ -58802,3 +58802,14 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - Tracebacks in refresh-worker.log since 18:11:31Z: **0** in 883 lines.
 - **revert:** env `SYNDICATE_LIVE_GAMELINE_MAX_QUOTE_AGE_SECONDS=600` (every sport, incl. MLB back to 600) via `local_production.env` + a drained full down/up, or revert `0f6e4a723` on main, ff and TERM refresh-worker.
 - **Correction `[2026-11-11 18:14Z]`:** in the 2026-11-11 06:12Z `college-live-resim-midnight` entry, "live-odds-worker pid 533637, started 23:10:15Z 11-10" is wrong: the fleet's `ps lstart` prints Central time, so it started 23:10:15 CST 11-10 = 05:10:15Z 11-11. The reading stands.
+
+## 2026-11-11 18:24Z (12:24 PM CST) -- CORRECTION to the 18:11:22Z restate entry (`5c8eec41a`, lane `restate-live-edge-withhold`): the ride-along #780 / #782 are LOADED, not "on disk"; web's load re-confirmed
+- **What changed after my entry:**
+  - Lane `live-gameline-quote-ceiling-120` TERMed refresh-worker (entry 2026-11-11 18:11:24Z). Its `git merge --ff-only 0f6e4a723` was a no-op, because the fleet was already at `5c8eec41a`, so refresh-worker pid 191825 loaded `5c8eec41a`: #780 is LIVE there. This change's restate is inert in refresh-worker (it runs on web only).
+  - Lane `load-782-nba-quote-capture` TERMed live-odds-worker at 18:13:28Z (per that lane), pid 192537: #782 is LIVE there.
+  - Fleet HEAD read 18:23Z: still `5c8eec41a`, so all three roles run it.
+- **A peer relayed a doubt that web ran pre-ff code** ("workers started 12:11:19, ~3 s before the 12:11:22 ff"). Refuted, three ways:
+  1. web.log: `Handling signal: hup` at 18:11:21.872Z, and 191757/191758 `Booting worker` at 18:11:21.908Z. That HUP came from this load's `reload-web`, which runs only after its `git merge --ff-only` returned. The script's `ff done at 18:11:22Z` is a seconds-truncated `date` taken just before it.
+  2. Pid order: 191757/191758 < 191825 (refresh-worker) < 192537 (live-odds-worker). In this WSL `ps lstart` is NOT a usable clock: a process spawned at wall-clock 12:19:34.07 read 12:19:33, and 191825 reads 12:11:17, before the workers it was created after.
+  3. Functional: the 18:11:40Z read found 20 of 20 restated cards carrying `sim_model_edge_pct` and `model_edge_withheld_reason`, fields only `5c8eec41a`'s code writes.
+  - Since then both web workers recycled: 192845 booted 18:16:09Z and 193560 at 18:18:12Z, both minutes after the ff.
