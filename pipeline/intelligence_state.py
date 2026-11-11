@@ -2386,6 +2386,7 @@ def _refresh_layer2_live_state(
             if not has_state_text:
                 card["status_context"] = "live"
             _withhold_pregame_probability_on_live_card(card)
+            _withhold_pregame_edge_on_restated_card(card, "live")
             restated += 1
         elif state in {"final", "post", "completed"}:
             card["is_live"] = False
@@ -2393,6 +2394,7 @@ def _refresh_layer2_live_state(
             card["market_state"] = "final"
             if not has_state_text:
                 card["status_context"] = "final"
+            _withhold_pregame_edge_on_restated_card(card, "final")
             restated += 1
         # `attach_actual=False` is the combined board restating its STATE rows
         # (nfl-live-props-board-lane): state fields only. Deriving `actual` marks
@@ -2402,22 +2404,78 @@ def _refresh_layer2_live_state(
     return restated
 
 
-_PREGAME_WITHHELD_SPORTS = frozenset({"nfl", "ncaaf"})
+def _probability_withheld_sports() -> frozenset[str]:
+    """The BUILD's own set (`board_enrichment.LIVE_PROBABILITY_WITHHELD_SPORTS`), read rather than copied.
+
+    This module kept its own copy, `{"nfl", "ncaaf"}`. NCAAB + WNCAAB joined the build's set on 2026-11-03 (user "Yes,
+    blank it") and the copy never followed, so a men's or women's college card restated live HERE kept the pregame
+    Win% that the next build withholds (lane restate-live-edge-withhold, 2026-11-11). One set, one place.
+    """
+    from syndicate.features.shared.board_enrichment import LIVE_PROBABILITY_WITHHELD_SPORTS
+
+    return LIVE_PROBABILITY_WITHHELD_SPORTS
+
+
+def _card_is_live_aware(card: Mapping[str, Any]) -> bool:
+    """A live re-sim priced this card (the flag on the card, or on its projection where a card carries one)."""
+    projection = card.get("projection") if isinstance(card.get("projection"), Mapping) else {}
+    return bool(card.get("live_aware")) or bool(projection.get("live_aware"))
+
+
+def _withhold_pregame_edge_on_restated_card(card: dict[str, Any], state: str) -> None:
+    """A card this serve-time join turns live (or final) gets the build's live-EDGE rule (`#340`, every sport).
+
+    `board_enrichment._enforce_live_edge_policy` clears the model edge on every live or final row whose projection is
+    not live-aware (`live_edge_policy.live_edge_unavailable_reason`): "a pregame projection cannot be priced against a
+    live market". A card the build wrote while its game was still PREGAME is priced, legitimately, against a pregame
+    line; this join then restates it live from the scoreboard chip, and nothing re-applied that rule, so the card
+    served its pregame `model_edge_pct` -- and the "sim agrees / disagrees" verdict read off it -- on a live game until
+    the next build. Measured on the served board 2026-11-11 00:41:23Z: 24 live NHL props on FLA @ CBJ (puck drop
+    00:40:00Z) carried `model_edge_pct` 1.81-6.89 from the 00:38Z build, quotes 74 min to 6 h old (lane
+    restate-live-edge-withhold).
+
+    Same outcome as the build, card-shaped: `model_edge_pct` (and `model_edge_pct_raw` / `model_ev_pct`, which are the
+    same opinion) go to None, the pregame values are kept beside them as `sim_*` for anyone auditing, and the sim's
+    verdict becomes "unpriced" -- reason `live` (the page reads "sim, pregame") or, on a final game, `other`, which is
+    what the build's `_sim_unpriced_reason` gives a settled market. The projection itself stays: the policy withholds
+    the NUMBER, never the model's view. A live-aware card keeps everything.
+
+    NOT re-scored here. The card keeps the `score` (and lane order) its build computed, which can include the pregame
+    edge term, until the next build replaces it; the serve-time re-gate still dead-lanes a quote > 900 s unchanged.
+    Re-ranking at serve time is a separate decision.
+    """
+    if _card_is_live_aware(card) or card.get("model_edge_pct") is None:
+        return
+    from syndicate.features.shared.live_edge_policy import live_edge_unavailable_reason
+
+    for key in ("model_edge_pct", "model_edge_pct_raw", "model_ev_pct"):
+        value = card.get(key)
+        if value is not None:
+            card.setdefault(f"sim_{key}", value)
+            card[key] = None
+    card["model_edge_withheld_reason"] = live_edge_unavailable_reason({"game": {"state": state}})
+    if card.get("sim_view") not in (None, "none", "unpriced"):
+        card["sim_view"] = "unpriced"
+        card["sim_unpriced_reason"] = "live" if state == "live" else "other"
+        for key in ("sim_line_gap", "sim_view_basis", "sim_disagreement_pct"):
+            card.pop(key, None)
 
 
 def _withhold_pregame_probability_on_live_card(card: dict[str, Any]) -> None:
     """A card the scoreboard turns live HERE gets the build's pregame-probability rule (lane live-winpct-blank).
 
-    The build withholds a pregame sim probability on in-play NFL / NCAAF rows (`board_enrichment.
-    _withhold_pregame_probability`, user decision "Blank the live Win%"), but a card written while its game was still
+    The build withholds a pregame sim probability on in-play NFL / NCAAF / NCAAB / WNCAAB rows (`board_enrichment.
+    _withhold_pregame_probability`, user decisions "Blank the live Win%" and, for college basketball, "Yes, blank it"),
+    but a card written while its game was still
     pregame is restated live by this serve-time join and kept its Win% until the next build. Measured 10-25: at 12:14
     PM CT 501 of 648 live NFL cards carried `model_probability` and "Our sim has"; at 3:10 PM DEN @ ARI rendered
     "SIM: 55%" five minutes after kickoff. Same outcome as the build, card-shaped: the probability moves to
     `sim_model_probability`, the card is labelled `pregame_on_live` (the page reads "pregame proj"), and the sim's
     verdict becomes "sim, pregame" -- never an agree / disagree / contradicts read against an in-play line. A live-aware
-    card (a live re-sim) and every other sport are left as they are."""
+    card (a live re-sim) and every other sport are left as they are. The pregame EDGE is a separate rule that applies
+    to every sport: `_withhold_pregame_edge_on_restated_card`."""
     sport = str(card.get("sport") or card.get("sport_slug") or "").strip().lower()
-    if sport not in _PREGAME_WITHHELD_SPORTS or card.get("live_aware") or card.get("pregame_on_live"):
+    if sport not in _probability_withheld_sports() or card.get("live_aware") or card.get("pregame_on_live"):
         return
     card["pregame_on_live"] = True
     probability = card.get("model_probability")
