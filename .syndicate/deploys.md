@@ -58993,3 +58993,8 @@ ight.sh`, 01:05Z / 01:50Z / 02:45Z 11-12):** NCAAF segment spread rows with a Li
 - **Owed:** the next LIVE fractional fill recorded at its true size (lane `kalshi-fractional-fills`; ~1 a day since 10-25); 837e657b (decision).
 - **Revert:** `SYNDICATE_RECONCILE_AGED_OUT=off` / `SYNDICATE_KALSHI_FRACTIONAL_COUNTS=off` in `local_production.env` (`LIVE_ODDS_WORKER__` scope, drained `down`/`up`), or `git revert e102faf79 ddaf41d48` on main + ff + claimed TERM. The grade is reversible from `pre_operator_grade`, each repaired row from `fractional_repair.from`.
 - Claim live-odds-worker released after this entry.
+
+## 2026-11-11 20:56Z (2:56 PM CST) -- operator grade of Kalshi 837e657b (the one repaired entry settlement could not grade; lane `kalshi-fractional-fills`) -- **GRADED WON +$0.0562; ungraded-fill alarm CLEARED**
+- **No deploy.** A live ledger write on the user's "Yes, grade it" (answering "Grade 837e657b as won from Kalshi's result, the same way as 970ec063?").
+- **verify:** `scripts/kalshi_operator_grade.py --key 837e657b... --apply` 20:51:54Z (fleet `3f11114c2`): pre-checks held -- Kalshi `market_result=no`, settlement NO 1.10 covers our 0.1, venue grader `both_sides_held` -- `OPERATOR_GRADE ... leg=no outcome=won pnl=0.0562`. The alarm's own view: 0 live fills ungraded >= 3 d; `unreconciled_orders()` 0; a fresh repair plan: 0 entries, 0 exits. Watchdog 2:55:58 PM CST: `CLEARED: 1 live fill(s) ($0.04 staked) still UNGRADED` (837e657b); `0 failing, 1 warning` (the warning predates this work).
+- **Revert:** the row's `pre_operator_grade` holds every field the grade wrote (all null before).
