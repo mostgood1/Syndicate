@@ -1,24 +1,5 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#788` — **NBA BLOWOUTS (the #787 college study, done for NBA): play-by-play was already archived (160 of 160 live-re-simmed games, all score-matched); the bench slows scoring; the live re-sim's late-blowout error is ~0, and its late close-game miss is OVERTIME, not endgame fouling. CLOSED 2026-11-11, read-only, no engine change** `[2026-11-11, lane nba-pbp-blowout-bench, session 63276f7e; user "take a look at all the game shape work NCAAB/WNCAAB session (the layer 2 rail session just did) - do this for NBA now"]`
-- **Saved, verified on the fleet:**
-  - The nightly `basketball-rotation-stints` job has always covered `nba`: 2025-26 1,395 of 1,401 games match the official score; 2026-27 225 of 227 through 11-10 (the 2 misses are preseason).
-  - All 160 regular-season games the live re-sim saw (10-20..11-10) are archived and score-matched.
-  - `live_resim_history/` holds 8,526 fresh re-sim rows over 172 games since 10-16. No capture change was needed.
-- **When (2025-26, 1,321 graded games):** the leader's starters on the floor fall to 1.2 at a 25+ lead with 8-6 min left, 1.1 at 20-24 with 4-2 left, and 1.3 at 15-19 in the last 2. That is earlier and at smaller leads than NCAAB.
-- **Effect:**
-  - Bench lineups score slower than starters at the same lead: 0.85 / 0.88 vs 1.02 / 0.99 x the game's first-36-min rate at 10-14 / 15-19 (CIs apart); 0.95 vs 0.98 at 25+ (overlap).
-  - NBA 4th quarters barely speed up: close games with starters 1.06, against NCAAB's 1.34.
-- **Our live re-sim (2026-27, 160 games, 4th-quarter ticks):**
-  - Under the engine's own blowout flag: -0.4 +- 1.2 to 1.8 (77-78 games).
-  - At 25+ with the leader's bench on: -1.7 +- 1.4 (35 games), a lean. The production engine does not rest the leader's starters (`blowout_bench_rest` off). Routed to lane `basketball-scenario-calibration` via leads.md; no engine change here.
-  - Close games: +1.6 +- 1.6 (101). That is ALL overtime: the 8 OT games err +21 each, and without them it is -0.1 +- 1.2 (93). The open question is the re-sim's late P(overtime) (lead).
-  - No level bias: Q1..Q4 all within +-1.1, every CI covers 0.
-- **Pre-registered falsification:**
-  - (1), a 20+ bench cell excluding 0 by > 1.5: NOT met.
-  - (2), blowout vs no-flag intervals disjoint: MET by the letter in the last 6 min. The cause is the 8 OT games (without them the intervals overlap), so the clause was too loose.
-- Findings: `.syndicate/findings_2026-11-11_nba_blowout_bench.md`. Study: `scripts/nba_blowout_bench_study.py --start --end [--evidence]`. Tests: 14, with 6 mutations caught.
-
 ### `#787` — **COLLEGE BLOWOUTS: WOMEN'S COLLEGE PLAY-BY-PLAY WAS SAVED NOWHERE (now archived nightly); for MEN'S college, the bench in a blowout is NOT what our live re-sim misses -- the late miss is close games** `[2026-11-11, lane college-pbp-blowout-bench, session 0f519972; user "are we saving game shape data? ... South Alabama and Florida Atlantic" and "the pbp should be looked at...and tendencies for when bench players come into a blowout"]`
 - **Saved:**
   - Live re-sim per tick (`live_evidence/`, since 11-09, both leagues), final period scores, pregame per-period sims.
