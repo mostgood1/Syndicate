@@ -769,6 +769,14 @@ ight.sh`, 01:05Z / 01:50Z / 02:45Z 11-12, BUFF @ BALL, SAC @ CMU, MASS @ TOL). S
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 SAFE for 1 of 8 CLOSED blocks; moved `closed-lane-archive-20261111-0920` to lanes_closed.md with one pointer. 7 WAIT (table in `.syndicate/log/2026-11-11.md`).
 
+### kalshi-fractional-fills — OPEN — opened 2026-11-11 — session e32fef1a-01e8-4afe-a284-01acd3728545
+- Goal: Kalshi fills are recorded at their TRUE size: kalshi_orders.venue_order_view and the submit-response parser keep fractional counts (0.01 is a fill, not zero; switch SYNDICATE_KALSHI_FRACTIONAL_COUNTS, absent = on); a take-profit exit filled below one whole contract records the sliver as sold AND stays open for the whole contracts still held, with later fills accumulating on its one exit row (no more than _MAX_DEAD_RETRIES attempts); a dry-run repair lists the 17 sliver rows since 10-25 from /portfolio/fills; tests incl. off != on; on the fleet after a user-approved live-odds-worker load: the next fractional fill is recorded at its true size and entry 91822817's 0.03 fill reads filled
+- Files: syndicate/features/shared/kalshi_orders.py (venue_order_view + the submit-response filled_count parse + a new _count_or_none + its switch ONLY), syndicate/features/shared/execution_exits.py (LOAN from kalshi-exit-path approved by the user 2026-11-11 in chat choosing Record and exits keep going: the sliver-fill retry in run_exit_tick + the place_exit duplicate check + _exit_row_from_view + a new sliver helper ONLY), scripts/kalshi_fractional_repair.py (NEW), tests/test_kalshi_fractional_counts.py (NEW), tests/test_exit_sliver_retry.py (NEW)
+- Hypothesis: kalshi_orders._int_or_none truncates fill_count_fp, so a sliver fill reads 0: 7 live take-profit exits read dead and 10 live entries read rejected since 10-25 (todo #783)
+- Falsification test: a fresh /portfolio/fills read shows those orders' fills are whole contracts, or the view already keeps fractions
+- Verification: pytest (parser on/off, sliver exit recorded and retried with accumulated fills, retry cap, settlement's partial-close check explains the accumulated sale); a fleet dry run of the repair; after the load a reading of the next fractional fill and of 91822817, recorded in deploys.md
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
