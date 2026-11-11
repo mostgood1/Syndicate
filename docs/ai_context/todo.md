@@ -1,5 +1,24 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#786` — **LIVE QUOTES ARE PULLED SLOWER THAN THE NEW 120 s PRICING CEILING ALLOWS: since 18:11Z 11-11 most live full-game college lines go unpriced for quote age (NCAAB 320 of 570 evaluations, WNCAAB 281 of 433). For NCAAB it is OUR lag (pull + build), not the book. NOT FIXED** `[2026-11-11, lane layer2-live-rail-edges, session 0f519972; user question "do we need to get game lines more often on live games to align with live resim timing"]`
+- **Cadences, measured on the fleet logs 17:00-20:30Z 11-11** (median / max gap):
+  - In-play quote pull launches (`*_LIVE_AUTORUN_LAUNCHED`): NCAAB 133 s / 203 s, WNCAAB 245 s / 303 s (`interval_s=240`).
+  - Live re-sim ticks: NCAAB 127 s / 169 s, WNCAAB 127 s / 173 s (`SYNDICATE_*_LIVE_RESIM_INTERVAL_SECONDS`, default 120 s).
+  - In-play overlay builds (`INPLAY_OVERLAY sport=ncaab`): 145 s / 813 s.
+  - refresh-worker board join (`LIVE_GAMELINE_JOIN sport=ncaab`): 225 s / 1,143 s.
+  - None of these is synchronised with the others.
+- **Effect of the 120 s ceiling** (`0f6e4a723`, loaded 18:11Z; refresh-worker `LIVE_GAMELINE_JOIN` why-counts, non-segment evaluations):
+  - NCAAB: `quote_older_than_live_pricing_ceiling` 33 of 314 before vs **320 of 570 after**; priceable 25 vs 53.
+  - WNCAAB: 59 of 108 before vs **281 of 433 after**; priceable 3 vs 13.
+  - This is also why the #781 rail flag (needs a priced gap) has fired 0 times on the served page so far.
+- **Whose clock** (served board 19:5xZ, live rows, `book_age_seconds` vs `quote.quote_seen_age_seconds` at build):
+  - NCAAB overlay rows (n 31): book age median 181 s, seen age **136 s**, book minus seen 19 s; 30 of 31 over 120 s on either clock. The age is OUR pull-to-build lag, so pulling more often and pricing right after each pull would cut it.
+  - WNCAAB overlay rows (n 10): book age 220 s, seen age 48 s. The BOOK had not moved, so faster pulls barely help there (9 of 10 over 120 s by the book's clock, 3 by ours).
+- **Options, none made:**
+  - (1) Price right after each pull lands: trigger the in-play overlay build on the pull's completion, so a priced quote is as fresh as its pull. No extra OddsAPI calls.
+  - (2) Then, if NCAAB is still over 120 s, shorten the live pull for games with a live re-sim lane (e.g. 60 s). This costs OddsAPI credits per pull; measure the credit cost before choosing.
+  - Both are worker-side (live-odds-worker / book grid), so each needs its own load and before/after (priceable share, `quote_older_than_live_pricing_ceiling` count).
+
 ### `#785` — **LIVE NCAAF SEGMENT ROWS (h1 h2 q1-q4) SHOWED NO Live proj.: the NCAAF live re-sim published no segment blocks and the board built no NCAAF segment index. DISPLAY ONLY, graded per segment; LOADED on refresh-worker 2026-11-11 18:45:45Z (`b43236e17`), reachability MET 18:53Z; the served live reading is owed to the 11-12 00:30Z MACtion slate** `[2026-11-11, lane ncaaf-live-segment-display, session d979fc08]`
 - **Measured** (fleet refresh-worker log, 11-11 00:08:21-04:45:10Z, MACtion): 43 non-empty `LIVE_GAMELINE_JOIN sport=ncaaf` lines, 2,825 of 4,892 considered rows refused `segment_is_not_full_game` (25-104 per pass), display 481 (all full-game), 0 lines with a segment index. Served board 00:16-00:21Z (lane live-display-other-sports): 0 of 37 / 18 / 18 segment rows with a Live proj.
 - **Cause, traced** (fleet `4793d823c`): `ncaaf/live_resim.build_game_lens` published no `projection.segments` (0 occurrences in the file); `board_enrichment` built segment indexes for ncaab/wncaab (2989) and nba (3007) only, so `live_gameline_join` saw no own index (2046), refused `segment_is_not_full_game` (2066) and never reached the display branch (2070). The inputs existed: smartsim2's per-seed `quarter_log` and the live record's ESPN linescores.
