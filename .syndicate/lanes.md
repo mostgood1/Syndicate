@@ -813,6 +813,14 @@ ight.sh`, 01:05Z / 01:50Z / 02:45Z 11-12, BUFF @ BALL, SAC @ CMU, MASS @ TOL). S
 - Files: none (ledger-only)
 - GOAL MET: owner_liveness.py --idle-min 240 read 1 of 11 CLOSED blocks SAFE (~21:58Z); archived after a dry run, apply, and an unchanged invariants baseline. Moved: `nba-sim-index-missing-games`. Readings and Part B in `log/2026-11-11.md`.
 
+### nba-resim-overtime-prob — OPEN — opened 2026-11-11 — session 63276f7e-66a4-4ad9-a667-cfd46d19b0a9
+- Goal: Every fresh NBA live re-sim lane publishes its own chance of overtime (the share of draws whose regulation ends tied, as modelOvertimeProb) and each live_resim_history row keeps it as p_ot; on main with tests incl. a mutation check; scripts/nba_blowout_bench_study.py gains an overtime check (the re-sim's expected overtime points and, where rows carry p_ot, its P(OT) against the real overtime rate, game-clustered); loading it on live-odds-worker is the user's decision
+- Files: syndicate/features/nba/live_resim.py (resim_live_game's draw loop and result dict, build_game_lens's live lane, history_rows ONLY), tests/test_nba_live_resim_overtime_prob.py (NEW), scripts/nba_blowout_bench_study.py, tests/test_nba_blowout_bench_study.py, .syndicate/findings_2026-11-11_nba_blowout_bench.md, docs/ai_context/todo.md (#789 section only)
+- Hypothesis: The re-sim's late close-game miss (+1.6, all from the 8 overtime games of 160) means its P(overtime) late in close games is too LOW
+- Falsification test: On ticks in the last 6 min of a close game, the re-sim's expected overtime points (h2 - q3 - q4 segment means, rows since h2 carried OT) match the realised overtime points within the game-clustered CI -- then the miss is the normal variance of a rare event, not a low P(OT)
+- Verification: Tests: the field off != on through resim_live_game -> build_game_lens -> history_rows, a mutation of the tie rule caught; the study's overtime table run on the fleet data root with its denominators; after a user-approved load, a fleet live_resim_history row carrying p_ot
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
