@@ -1303,6 +1303,47 @@ def _int_or_none(value: Any) -> int | None:
         return None
 
 
+# ------------------------------------------------------------------
+# A FRACTION OF A CONTRACT IS A FILL. MEASURED 2026-11-11 (todo #783)
+# ------------------------------------------------------------------
+#
+# Kalshi fills slivers: `fill_count_fp='0.01'` on our 1-contract take-profit exit
+# `x403f59b5` (2026-10-25 17:41:00Z), `0.55` on a 1-contract entry. The counts went
+# through `_int_or_none`, and `int(float('0.01'))` is 0 -- so a filled-then-cancelled
+# IOC read `dead` and the sliver vanished from our books while Kalshi held it. Since
+# 10-25: 7 live exits recorded `dead` / 0 and 10 live entries recorded `rejected`
+# with a real fill, and entry `f67174cb` filled 1.06 is recorded 1. Exit `x403f59b5`
+# alone left entry `970ec063` ungraded for 16 days: its settlement carried a YES
+# leg nothing in our books explained (`both_sides_held`).
+#
+# So a count is read at its TRUE size. A whole number comes back as an `int`, so a
+# whole-contract row is byte-identical to before; only a fraction changes anything.
+# User decision 2026-11-11, in lane `kalshi-fractional-fills`: "Record, exits keep
+# going" -- every fill recorded at its size; `execution_exits` keeps a sliver-filled
+# exit open for the whole contracts still held.
+FRACTIONAL_COUNTS_ENV = "SYNDICATE_KALSHI_FRACTIONAL_COUNTS"  # absent = on; "off" = the old whole-contract truncation
+
+
+def fractional_counts_enabled() -> bool:
+    return str(os.environ.get(FRACTIONAL_COUNTS_ENV) or "").strip().lower() != "off"
+
+
+def _count_or_none(value: Any) -> int | float | None:
+    """A Kalshi contract COUNT (`*_count_fp`, a two-place decimal string) at its true size."""
+    if value is None:
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(number):
+        return None
+    if not fractional_counts_enabled():
+        return int(number)
+    number = round(number, 6)
+    return int(number) if number.is_integer() else number
+
+
 def _float_or_none(value: Any) -> float | None:
     if value is None:
         return None
@@ -1538,17 +1579,18 @@ def venue_order_view(order: Mapping[str, Any]) -> dict[str, Any]:
     """
     raw_status = str(order.get("status") or "").strip().lower()
 
-    filled = _int_or_none(_first_present(order, _COUNT_FILLED_FIELDS))
+    # Counts at their TRUE size (`_count_or_none`): a sliver is a fill, not zero.
+    filled = _count_or_none(_first_present(order, _COUNT_FILLED_FIELDS))
     if filled is None:
-        taker = _int_or_none(order.get("taker_fill_count")) or 0
-        maker = _int_or_none(order.get("maker_fill_count")) or 0
+        taker = _count_or_none(order.get("taker_fill_count")) or 0
+        maker = _count_or_none(order.get("maker_fill_count")) or 0
         if taker or maker:
-            filled = taker + maker
+            filled = _count_or_none(taker + maker)
     if filled is None:
-        initial = _int_or_none(_first_present(order, _COUNT_INITIAL_FIELDS))
-        remaining = _int_or_none(_first_present(order, _COUNT_REMAINING_FIELDS))
+        initial = _count_or_none(_first_present(order, _COUNT_INITIAL_FIELDS))
+        remaining = _count_or_none(_first_present(order, _COUNT_REMAINING_FIELDS))
         if initial is not None and remaining is not None:
-            filled = max(initial - remaining, 0)
+            filled = _count_or_none(max(initial - remaining, 0))
 
     if filled:
         state = "filled"
@@ -1716,10 +1758,8 @@ def _order_result(
     # precisely true of a resting limit order.
     raw_status = str(order.get("status") or "").strip().lower()
     filled_raw = order.get("filled_count")
-    try:
-        filled_count = int(float(filled_raw)) if filled_raw is not None else None
-    except (TypeError, ValueError):
-        filled_count = None
+    # At its TRUE size (`_count_or_none`): `int(float())` read a 0.01 fill as none.
+    filled_count = _count_or_none(filled_raw)
 
     executed = raw_status in _VENUE_FILLED_STATUSES or bool(filled_count)
     if executed:
@@ -1739,7 +1779,9 @@ def _order_result(
         "venue_order_id": order.get("order_id") or order.get("id"),
         "venue_status": raw_status or None,
         "fill_price": fill_price,
-        "fill_stake_dollars": round(contracts * float(price_dollars or 0.0), 2),
+        # Cents for whole contracts (unchanged); a sliver keeps its size -- 0.01 x $0.42 is not $0.00.
+        "fill_stake_dollars": round(contracts * float(price_dollars or 0.0),
+                                    2 if float(contracts or 0).is_integer() else 6),
         "contracts": contracts,
         "requested_contracts": requested,
     }

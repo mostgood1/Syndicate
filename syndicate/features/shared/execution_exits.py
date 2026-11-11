@@ -983,10 +983,49 @@ def _exit_view(order: Mapping[str, Any]) -> dict[str, Any]:
     return view
 
 
+# ------------------------------------------------------------------
+# A SLIVER IS SOLD, AND THE SALE IS NOT OVER. MEASURED 2026-11-11 (todo #783).
+# ------------------------------------------------------------------
+#
+# Kalshi fills fractions of a contract. Take-profit exit `x403f59b5` (entry
+# `970ec063`, 1 NO) was filled 0.01 of 1 at 17:41:00Z 2026-10-25; the count was
+# read as 0 and the row went `dead`, so nothing explained the 0.01 YES on the
+# settlement and the entry sat ungraded 16 days. Seven live exits went the same way
+# since 10-25, two of them on 6- and 8-contract holdings.
+#
+# User decision 2026-11-11 (lane `kalshi-fractional-fills`, "Record, exits keep
+# going"): a sliver is RECORDED as sold -- `filled`, with its size, price and fee,
+# which is what `venue_settlement._both_sides_is_our_partial_close` needs to explain
+# the settlement's opposite leg -- AND the exit stays open for the whole contracts
+# still held. A later attempt's fill ACCUMULATES on the same row (sold, average
+# price, summed fee), so the row always states everything this entry has sold, and
+# an attempt that trades nothing leaves the sliver standing. Attempts stay capped
+# at `_MAX_DEAD_RETRIES` per entry. One whole contract or more is a sale as before.
+_SLIVER_BELOW = 1.0
+
+
+def is_sliver_exit(row: Mapping[str, Any] | None) -> bool:
+    """A priced LIVE exit that has sold something, but less than one whole contract in all."""
+    if not isinstance(row, Mapping) or row.get("mode") != EXIT_LIVE or row.get("status") != EXIT_FILLED:
+        return False
+    sold = _as_float(row.get("filled_contracts"))
+    return sold is not None and 0.0 < sold < _SLIVER_BELOW and row.get("fill_price") is not None
+
+
+def _sold_before(row: Mapping[str, Any]) -> tuple[float, float, float | None]:
+    """(contracts, proceeds at our leg's price, fees) earlier attempts on this row sold, carried by `place_exit`.
+    An unknown fee stays None: `exit_adjusted_pnl` then estimates it rather than reading zero."""
+    sold = _as_float(row.get("prior_sold_contracts")) or 0.0
+    proceeds = _as_float(row.get("prior_sold_proceeds")) or 0.0
+    fees = _as_float(row.get("prior_exit_fee_dollars")) if sold > 0 else 0.0
+    return sold, proceeds, fees
+
+
 def _exit_row_from_view(row: dict[str, Any], view: Mapping[str, Any], position: Mapping[str, Any]) -> None:
     """Close a write-ahead exit row with what the VENUE says happened."""
     state = str(view.get("state") or "unknown")
     filled = view.get("filled_count") or 0
+    before_sold, before_proceeds, before_fees = _sold_before(row)
     row["venue_order_id"] = view.get("order_id") or row.get("venue_order_id")
     row["venue_status"] = view.get("venue_status")
     row["venue_resolved_at"] = _utc_now()
@@ -1009,10 +1048,27 @@ def _exit_row_from_view(row: dict[str, Any], view: Mapping[str, Any], position: 
                 traded = round(traded if reported == leg else 1.0 - traded, 4)
             else:
                 traded = None
+        fee = _as_float(view.get("fees_dollars"))
+        if before_sold > 0:
+            # ACCUMULATE onto the sliver an earlier attempt sold (see `is_sliver_exit`).
+            row["attempt_filled_contracts"] = filled
+            row["attempt_fill_price"] = traded
+            total = round(before_sold + float(filled), 6)
+            traded = None if traded is None else round((before_proceeds + float(filled) * traded) / total, 4)
+            fee = None if (fee is None or before_fees is None) else round(before_fees + fee, 6)
+            filled = int(total) if float(total).is_integer() else total
         row["status"] = EXIT_FILLED
         row["filled_contracts"] = filled
         row["fill_price"] = traded
-        row["exit_fee_dollars"] = _as_float(view.get("fees_dollars"))
+        row["exit_fee_dollars"] = fee
+    elif state == "dead" and before_sold > 0:
+        # This attempt traded nothing; the sliver sold before still stands, and the
+        # exit stays open (`is_sliver_exit`) until the attempt cap.
+        row["attempt_filled_contracts"] = 0
+        row["status"] = EXIT_FILLED
+        row["filled_contracts"] = round(before_sold, 6)
+        row["fill_price"] = round(before_proceeds / before_sold, 4)
+        row["exit_fee_dollars"] = None if before_fees is None else round(before_fees, 6)
     elif state == "dead":
         row["status"] = EXIT_DEAD
         row["filled_contracts"] = 0
@@ -1053,7 +1109,7 @@ def place_exit(
         # The paper decision on this entry is kept on the live row (below); it
         # must not read as a duplicate of a sale that never happened.
         existing = None
-    if existing is not None and existing.get("status") not in {EXIT_REJECTED, EXIT_DEAD}:
+    if existing is not None and existing.get("status") not in {EXIT_REJECTED, EXIT_DEAD} and not is_sliver_exit(existing):
         return {"refused": "duplicate", "row": existing}
     if exit_mode() != EXIT_LIVE:
         return {"refused": "exit_mode_not_live"}
@@ -1096,9 +1152,20 @@ def place_exit(
             k: paper.get(k) for k in ("decided_at", "rule", "bid", "edge_per_contract", "realized_pnl_dollars", "in_play")
         }
     if existing is not None:
+        attempt_fields = ("status", "submitted_at", "venue_order_id", "error")
+        if is_sliver_exit(existing):
+            attempt_fields += ("filled_contracts", "fill_price", "exit_fee_dollars")
         row["prior_attempts"] = (existing.get("prior_attempts") or []) + [
-            {k: existing.get(k) for k in ("status", "submitted_at", "venue_order_id", "error")}
+            {k: existing.get(k) for k in attempt_fields}
         ]
+        if is_sliver_exit(existing):
+            # WHAT THIS ENTRY HAS ALREADY SOLD (cumulative on the sliver row), carried
+            # so `_exit_row_from_view` accumulates instead of overwriting it.
+            sold = float(existing["filled_contracts"])
+            fee = _as_float(existing.get("exit_fee_dollars"))
+            row["prior_sold_contracts"] = round(sold, 6)
+            row["prior_sold_proceeds"] = round(sold * float(existing["fill_price"]), 6)
+            row["prior_exit_fee_dollars"] = None if fee is None else round(fee, 6)
     exits[key] = row
     (persist or _persist)(state)  # WRITE-AHEAD: on disk before the send
 
@@ -1427,12 +1494,19 @@ def _run_exit_tick_unlocked(
         if position.mode == "live" and mode == EXIT_LIVE:
             rules = set(str(decision.get("rule") or "").split("+"))
             prior = exits.get(key) or {}
-            sold_live = prior.get("mode") == EXIT_LIVE and prior.get("status") not in {EXIT_DEAD, EXIT_REJECTED}
+            # A SLIVER-FILLED exit is sold AND still open for the whole contracts held
+            # (`is_sliver_exit`, user 2026-11-11); its attempts count against the cap.
+            sliver = is_sliver_exit(prior)
+            sold_live = (prior.get("mode") == EXIT_LIVE and prior.get("status") not in {EXIT_DEAD, EXIT_REJECTED}
+                         and not sliver)
             # An unfilled (dead) IOC may be re-sent, but only by an ARMED rule and
             # only `_MAX_DEAD_RETRIES` times per entry. MEASURED 2026-10-21: the old
             # `sold_live` short-circuit skipped the rule check for any entry with a
             # live row, so model_fair alone re-sent 5x, 9x, and filled once.
-            unfilled_tries = (1 + len(prior.get("prior_attempts") or [])) if prior.get("status") == EXIT_DEAD else 0
+            unfilled_tries = (
+                (1 + len(prior.get("prior_attempts") or [])) if (prior.get("status") == EXIT_DEAD or sliver) else 0
+            )
+            rest = (venue_report.get("sellable") or {}).get(position.entry_key)
             cap_count, cap_dollars = live_exit_daily_caps()
             used_count, used_dollars = _live_exits_today(state, _utc_now()[:10])  # same clock as submitted_at
             notional = float(position.contracts) * float(decision.get("bid") or 0.0)
@@ -1444,6 +1518,9 @@ def _run_exit_tick_unlocked(
                 live_skip = "phase_not_armed"
             elif unfilled_tries >= _MAX_DEAD_RETRIES:
                 live_skip = "unfilled_retry_limit"
+            elif sliver and int(math.floor(min(float(position.contracts), float(rest or 0.0)))) < 1:
+                # Under one whole contract left (1 held, 0.01 sold): nothing an order can sell.
+                live_skip = "sliver_rest_under_one"
             elif used_count >= cap_count:
                 live_skip = "daily_count_cap"
             elif used_dollars + notional > cap_dollars + 1e-9:
