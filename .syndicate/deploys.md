@@ -58524,3 +58524,20 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - #779: the first 11-11 shortlist built by pid 406676 carries `rows_before_board_date` > 0 and 0 `EARLIER` rows. The 11-11 plans built from it hold 0 `EARLIER` positions. Its game count is otherwise unchanged apart from the slate's own movement.
   - #778: the next live-odds-worker NBA props run leaves both complete files byte-identical with mtime unchanged (`nba_simidx_1111_games` 5 -> 5). The fix's adding branch (`CARDS_SIM_DETAIL_MISSING_GAMES_ADDED`) can only show once a sim lands with no entry. Recorded as not yet observed until it does.
 - **revert:** off switch for #779 is `SYNDICATE_SHORTLIST_LOWER_DATE_BOUND=off` (`local_production.env`, then a drained full down/up). Code revert: revert either commit on main, ff, then TERM refresh-worker.
+
+## 2026-11-11 00:48:17Z (6:48 PM CST 11-10) -- VERIFY of the 00:30:09Z load, #779 worker half (`9fee4160d`, `select_shortlist` lower date bound, lane `layer2-lookahead-live-dedupe`) -- **MET**
+
+- **Ran on the new code:** `LAYER2_SHORTLIST` lines from refresh-worker pid 406676 carry the new field, which is absent before the load. Tracebacks since the restart: 0.
+  - `2026-11-11T00:47:00.430Z [intelligence_state] LAYER2_SHORTLIST date=2026-11-11 rows=1418 considered=4826 ... before_board_date=486 before_board_date_by_sport={'ncaab': 452, 'wncaab': 34}`.
+  - Today's builds read `before_board_date=0`: `LAYER2_FAST_REFRESH date=2026-11-10` at 00:35:41Z and `LAYER2_SHORTLIST date=2026-11-10` at 00:40:15Z. The rule ran there and had nothing earlier to drop.
+- **11-11 shortlist** (stored artifact, 00:47:00Z build, `lower_date_bound` 2026-11-11T06:00:00Z): **EARLIER rows 201 -> 0** (prediction 0, MET). Rows 1,593 -> 1,418.
+  - Own-date and later games by Central date, before -> after: 11-11 34 -> 37, 11-12 3 -> 3, 11-13 3 -> 3, 11-14 55 -> 56, 11-15 12 -> 12, 11-16 1 -> 1. **No own-date game lost.**
+- **11-11 plans** (00:47:01-00:47:07Z, built from that shortlist): **EARLIER positions 1 -> 0** (prediction 0, MET).
+  - main 2 (NCAAF 11-11, 11-14). Before: 3, one of them an 11-10 WNCAAB game.
+  - live_kalshi 1 (NCAAB 11-11), paper2_prophetx 2, live_polymarket 3 (NCAAF 11-14), the rest 0.
+  - All 9 plans: 0 positions on a game before 11-11.
+- **11-10** (today, unaffected as designed): shortlist 00:40:15Z, 4,703 rows, EARLIER 0, bound 2026-11-10T06:00:00Z. Its plans hold only 11-10-or-later games.
+- **served board** 00:48:35Z: `layer2_lookahead_rows_dropped` 325 -> 0, because the source no longer carries the copies. Look-ahead live rows 0; live game rows with a blank live number and a model edge 0 of 1,421 (42 live games).
+- **Owed:**
+  - The midnight roll: after 00:00 CT, 11-10 games still in play leave the 11-11 board by design and stay on 11-10's carryover rebuild.
+  - #778's own reading, appended separately.
