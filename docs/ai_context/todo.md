@@ -285,6 +285,12 @@
   - **`live_evidence_log`** files every row under the snapshot's `date`, so a prior-date game's rows land in the new date's file. A one-line follow-up for lane `live-evidence-log`: `game.get("slateDate") or date_str`.
 
 ### `#773` — **LIVE NHL PUCK-LINE ROWS GET A DISPLAY-ONLY Live proj. FROM THE RE-SIM'S OWN MARGIN HISTOGRAM; NO EDGE, NOT PRICED. ON MAIN `efccead01`, LOADED ON BOTH WORKERS 16:28Z 11-10; LIVE READING MET 11-11 00:08Z** `[2026-11-10, lane nhl-live-puckline-display, session 87074b1f]`
+- **GRADED 2026-11-11 18:11Z (12:11 PM CST), lane nhl-live-puckline-grade: DO NOT PRICE** (`.syndicate/findings_2026-11-11_nhl_live_puckline_grade.md`).
+  - Cutoff replay of the shipped re-sim over 284 games / 41 dates. The pooled ±1.5 grade passes only as an upper bound (worst bucket +0.056 vs 0.150; the season rate files leak).
+  - It FAILS decisively on a one-goal lead late in the third: P(leader by 2+) is 0.18 vs 0.43 at P3 05:00 (n=90) and 0.26 vs 0.50 at P3 10:00 (n=93). 98 of 229 last-5-minute goals were empty-netters.
+  - Cause: the live resume path never applies `NHL_GAME_MARKET_CALIBRATION`'s `empty_net_p 0.3006` / `tie_weight`, which the pregame puck line uses. It has only `engine.py`'s ad-hoc ×1.18 in the last 3 minutes.
+  - The DISPLAY number is wrong by the same amount in those states.
+  - Recorder (ledger v6 `display_prob` / `market_fair_prob_over`) built, NOT pushed.
 - **Why:** served 2026-11-09 NYR@EDM: the NHL live moneyline (1 of 1) and totals (2 of 2) showed a live number; the puck line (0 of 1) did not. The join refused it `live_resim_published_no_distribution_for_this_market`: `nhl/live_resim.resim_live_game` counted 200 per-sim margins and returned only their mean.
 - **Change:**
   - **Producer:** returns the margins as a home-positive histogram and publishes them on the lane as `projection.displayMarginDist`. It does NOT publish `marginDist`, the key that opens spread pricing. Same sims; the sim is unchanged.
