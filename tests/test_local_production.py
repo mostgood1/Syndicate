@@ -545,9 +545,9 @@ def test_role_code_prefers_the_reflog_over_a_stale_env_stamp(git_repo, monkeypat
     monkeypatch.setenv("GIT_COMMITTER_DATE", "1700000100 +0000")
     new = commit("syndicate/app.py", "v2\n")
     monkeypatch.setattr(lp, "role_loaded_commit", lambda pid: old)
-    monkeypatch.setattr(lp, "role_start_epoch", lambda pid, role="": 1700000200.0)
+    monkeypatch.setattr(lp, "role_start_epoch", lambda pid, role="", **_: 1700000200.0)
     assert lp.role_code(123, "live-odds-worker", repo) == (new, "reflog")
-    monkeypatch.setattr(lp, "role_start_epoch", lambda pid, role="": 1600000000.0)
+    monkeypatch.setattr(lp, "role_start_epoch", lambda pid, role="", **_: 1600000000.0)
     assert lp.role_code(123, "live-odds-worker", repo) == (old, "env")
 
 
@@ -624,6 +624,137 @@ def test_linux_start_epoch_is_none_off_linux():
     import os
 
     assert lp.linux_start_epoch(os.getpid()) is None
+
+
+# --- 2026-11-11: the /proc start DRIFTS EARLY with age on WSL (~1 s per minute) ----------------------------
+# refresh-worker pid 225134 spawned after its 20:45:28Z ff but read 106 s early by 22:4xZ, so `status` printed
+# the pre-ff commit as STALE; live-odds-worker 246202 drifted from 22:34:48.9Z to 22:33:44.4Z, before its own
+# 22:34:21Z ff. A wall-clock record made at spawn does not drift.
+
+
+class _EnvProc(_FakeProc):
+    def __init__(self, pid, created, kids=(), env=None):
+        super().__init__(pid, created, kids)
+        self._env = dict(env or {})
+
+    def environ(self):
+        return self._env
+
+
+def _now_repo(git_repo, monkeypatch):
+    """old commit, then the ff to new at T (whole seconds, ~2 h ago, so the role below has aged)."""
+    import time
+
+    repo, commit = git_repo
+    t = int(time.time()) - 7200
+    monkeypatch.setenv("GIT_COMMITTER_DATE", f"{t - 1000} +0000")
+    old = commit("syndicate/app.py", "v1\n")
+    monkeypatch.setenv("GIT_COMMITTER_DATE", f"{t} +0000")
+    new = commit("syndicate/app.py", "v2\n")
+    return repo, old, new, t
+
+
+def test_role_spawn_stamp_reads_the_supervisors_instance_id(monkeypatch):
+    _fake_psutil(monkeypatch, {
+        1: _EnvProc(1, 0.0, env={"RENDER_INSTANCE_ID": "local-live-odds-worker-1794440075"}),
+        2: _EnvProc(2, 0.0, env={"RENDER_INSTANCE_ID": "srv-abc123"}),          # a Render id: no stamp
+        3: _EnvProc(3, 0.0, env={}),
+        4: _FakeProc(4, 0.0),                                                     # environ unreadable
+    })
+    assert lp.role_spawn_stamp(1) == 1794440075.0
+    assert lp.role_spawn_stamp(2) is None
+    assert lp.role_spawn_stamp(3) is None
+    assert lp.role_spawn_stamp(4) is None
+    assert lp.role_spawn_stamp(None) is None
+
+
+def test_an_aged_worker_reads_its_post_ff_commit_from_the_spawn_stamp(git_repo, monkeypatch):
+    """The 225134 case: spawned 6 s after the ff, /proc now 106 s early (before the ff)."""
+    repo, old, new, t = _now_repo(git_repo, monkeypatch)
+    spawn = t + 6
+    _fake_psutil(monkeypatch, {30: _EnvProc(30, spawn - 107, env={"RENDER_INSTANCE_ID": f"local-refresh-worker-{spawn}"})})
+    monkeypatch.setattr(lp, "linux_start_epoch", lambda pid: spawn - 106.0)
+    monkeypatch.setattr(lp, "role_loaded_commit", lambda pid: old)
+    assert lp.role_start_epoch(30, "refresh-worker") == float(spawn)
+    assert lp.role_code(30, "refresh-worker", repo) == (new, "reflog")
+    # the defect it replaces: the drifted /proc start alone names the pre-ff commit
+    assert lp.head_at(spawn - 106.0, repo) == old
+
+
+def test_a_spawn_stamp_far_from_the_proc_start_is_not_trusted(git_repo, monkeypatch):
+    """A stamp that is not this process's own (minutes-to-hours off a 2 h-old process) falls back to /proc."""
+    repo, old, new, t = _now_repo(git_repo, monkeypatch)
+    estimate = t - 500.0                                                          # a process from before the ff
+    _fake_psutil(monkeypatch, {31: _EnvProc(31, estimate, env={"RENDER_INSTANCE_ID": f"local-refresh-worker-{t + 3000}"})})
+    monkeypatch.setattr(lp, "linux_start_epoch", lambda pid: estimate)
+    assert lp.role_start_epoch(31, "refresh-worker") == estimate
+    assert lp.role_code(31, "refresh-worker", repo) == (old, "reflog")
+
+
+def _web_log(tmp_path, lines, name="web.log"):
+    logs = tmp_path / "logs"
+    logs.mkdir(exist_ok=True)
+    (logs / name).write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return logs
+
+
+def test_gunicorn_worker_boot_epoch_reads_the_workers_own_boot_line(tmp_path):
+    import datetime as dt
+
+    logs = _web_log(tmp_path, [
+        "2026-11-11T23:38:21.866Z [2026-11-11 17:38:21 -0600] [1234] [INFO] Booting worker with pid: 1234",
+        # LATER in the file, so a search for "pid: 1234" from the end meets this line first
+        "2026-11-11T23:39:00.000Z [2026-11-11 17:39:00 -0600] [12345] [INFO] Booting worker with pid: 12345",
+        "[2026-11-11 17:40:37 -0600] [777] [INFO] Booting worker with pid: 777",
+    ])
+    iso = dt.datetime(2026, 11, 11, 23, 38, 21, 866000, tzinfo=dt.timezone.utc).timestamp()
+    assert lp.gunicorn_worker_boot_epoch(1234, logs) == pytest.approx(iso, abs=1e-3)        # not pid 12345's line
+    assert lp.gunicorn_worker_boot_epoch(12345, logs) == pytest.approx(iso + 38.134, abs=1e-3)
+    bracket = dt.datetime(2026, 11, 11, 23, 40, 37, tzinfo=dt.timezone.utc).timestamp()
+    assert lp.gunicorn_worker_boot_epoch(777, logs) == pytest.approx(bracket, abs=1e-3)      # gunicorn's own stamp, -0600
+    assert lp.gunicorn_worker_boot_epoch(999, logs) is None
+    assert lp.gunicorn_worker_boot_epoch(1234, None) is None
+    (logs / "web.log").write_text("", encoding="utf-8")                           # rotated away: read web.log.1
+    _web_log(tmp_path, ["2026-11-11T23:38:21.866Z [x] Booting worker with pid: 1234"], name="web.log.1")
+    assert lp.gunicorn_worker_boot_epoch(1234, logs) == pytest.approx(iso, abs=1e-3)
+
+
+def test_an_aged_web_worker_reads_its_post_ff_commit_from_its_boot_line(git_repo, monkeypatch, tmp_path):
+    import datetime as dt
+
+    repo, old, new, t = _now_repo(git_repo, monkeypatch)
+    boot = t + 4.5
+    iso = dt.datetime.fromtimestamp(boot, dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3]
+    logs = _web_log(tmp_path, [f"{iso}Z [g] [41] [INFO] Booting worker with pid: 41"])
+    kids = [_EnvProc(41, 0.0), _EnvProc(42, 0.0)]
+    # workers inherit the MASTER's stamp: it must not be read for web
+    _fake_psutil(monkeypatch, {40: _EnvProc(40, 0.0, kids, env={"RENDER_INSTANCE_ID": f"local-web-{t - 30000}"})})
+    monkeypatch.setattr(lp, "linux_start_epoch", lambda pid: {41: boot - 90.0, 42: boot + 600.0}[pid])
+    assert lp.role_start_epoch(40, "web", logs_dir=logs) == pytest.approx(boot, abs=1e-3)
+    assert lp.role_code(40, "web", repo, logs_dir=logs) == (new, "reflog")
+    assert lp.role_start_epoch(40, "web") == boot - 90.0                          # no logs: the /proc estimate
+
+
+def test_status_passes_its_logs_dir_to_role_code(tmp_path, monkeypatch, capsys):
+    """The call site `status` (and preflight, which parses it) runs: without `logs_dir`, web's boot line is never read."""
+    import argparse
+    import json
+    import os
+
+    home = tmp_path / "home"
+    settings = lp.Settings(home=home, port=1)                                     # nothing listens on port 1
+    settings.run_dir.mkdir(parents=True)
+    settings.logs_dir.mkdir(parents=True)
+    (settings.run_dir / lp.PIDFILE_NAME).write_text(json.dumps({
+        "supervisor_pid": os.getpid(), "started_at": "t", "state": "redis", "port": 1,
+        "roles": {"web": os.getpid(), "refresh-worker": os.getpid()},
+    }), encoding="utf-8")
+    seen = []
+    monkeypatch.setattr(lp, "role_code", lambda pid, role="", repo=None, logs_dir=None: seen.append((role, logs_dir)) or ("", "env"))
+    args = argparse.Namespace(home=str(home), port=1, host="127.0.0.1", state="redis", redis_url=settings.redis_url, lines=0)
+    lp.cmd_status(args)
+    capsys.readouterr()
+    assert seen == [("web", settings.logs_dir), ("refresh-worker", settings.logs_dir)]
 
 
 def test_a_ledger_only_gap_is_not_stale(git_repo):

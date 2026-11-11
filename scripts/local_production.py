@@ -2106,7 +2106,20 @@ def linux_start_epoch(pid: int) -> float | None:
     the fleet: btime sat 0.992 s before the true boot, and a process spawned
     just after a commit read as started BEFORE its reflog stamp in 58 of 60
     tries (0 of 60 with this). That is how `status` named web's previous commit
-    after the 2026-10-26 HUP of 7c9a2772 (workers 07:49:13 CT, ff 07:49:14)."""
+    after the 2026-10-26 HUP of 7c9a2772 (workers 07:49:13 CT, ff 07:49:14).
+
+    ONLY A FALLBACK FOR AN AGED PROCESS `[2026-11-11]`. The boot moment comes
+    from TODAY's wall-minus-boottime offset, and on WSL that offset drifts:
+    every process's computed start slid ~1 s earlier per minute of wall time.
+    Measured on the fleet:
+    - live-odds-worker pid 246202 read 22:34:48.9Z at ~22:46Z and 22:33:44.4Z at
+      23:39Z. That is before its 22:34:21Z ff, though it spawned at 22:34:53Z.
+    - refresh-worker pid 225134 spawned after its 20:45:28Z ff, but read 106 s
+      early by 22:4xZ, so `status` printed the pre-ff commit as STALE.
+    - web's 15 h master read 9 min early.
+    The ORDER of processes read at one moment is still right, because they share
+    the offset. `role_start_epoch` prefers a wall-clock record made at spawn
+    (`role_spawn_stamp`, `gunicorn_worker_boot_epoch`)."""
     try:
         ticks = proc_stat_start_ticks(Path(f"/proc/{int(pid)}/stat").read_text())
         boot = time.time() - time.clock_gettime(time.CLOCK_BOOTTIME)
@@ -2115,10 +2128,112 @@ def linux_start_epoch(pid: int) -> float | None:
         return None
 
 
-def role_start_epoch(pid: int | None, role: str = "") -> float | None:
-    """When the role's CODE was loaded. For web, gunicorn's OLDEST worker: a HUP
-    replaces the workers (which import the app) and keeps the master. For the
-    workers, the process itself; its children are sims, started later.
+_SPAWN_STAMP_RE = re.compile(r"^local-.+-(\d{9,11})$")
+
+
+def role_spawn_stamp(pid: int | None) -> float | None:
+    """The supervisor's own wall-clock record of when it spawned this process.
+
+    The record is the epoch in `RENDER_INSTANCE_ID=local-<role>-<epoch>`, read
+    from the process's own environ (that key only).
+    - On a restart, the supervisor sets the stamp to `int(time.time())`
+      immediately before `_spawn`.
+    - At `up`, the stamp is the boot moment, taken just before the roles
+      spawn. `RENDER_GIT_COMMIT` is exact then anyway.
+    The stamp is per process and fixed at exec, so unlike `linux_start_epoch` it
+    does not drift with age.
+
+    Measured 2026-11-11, the stamp against the role log's `==== start` line:
+    refresh-worker 22:58:12 vs 22:58:12.6; web's master 08:32:11 vs 08:32:11.1.
+
+    The stamp is whole seconds. `head_at` compares it with whole-second reflog
+    stamps, so it reads post-ff for any spawn in the ff's own second or later.
+    gunicorn workers inherit the MASTER's stamp, so web uses
+    `gunicorn_worker_boot_epoch` instead."""
+    if not pid:
+        return None
+    try:
+        import psutil
+
+        raw = psutil.Process(int(pid)).environ().get("RENDER_INSTANCE_ID") or ""
+    except Exception:
+        return None
+    match = _SPAWN_STAMP_RE.match(raw.strip())
+    return float(match.group(1)) if match else None
+
+
+_ISO_PREFIX_RE = re.compile(rb"^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?)Z ")
+_GUNICORN_TS_RE = re.compile(rb"\[(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d) ([+-]\d{4})\]")
+
+
+def gunicorn_worker_boot_epoch(pid: int, logs_dir: Path | None) -> float | None:
+    """The wall-clock moment gunicorn logged `Booting worker with pid: <pid>`.
+
+    The search covers `web.log`, then `web.log.1` (a running rotation copies the
+    log there). It prefers the line's own ISO prefix (ms) over gunicorn's
+    bracketed stamp (whole seconds). The line is exact for this pid: gunicorn
+    writes it from inside the new worker, so it carries no clock drift.
+    Measured 2026-11-11: worker 261286 logged 23:38:21.866Z, and its /proc start
+    read 23:38:19.0Z."""
+    if not logs_dir:
+        return None
+    needle = f"Booting worker with pid: {int(pid)}".encode()
+    for name in ("web.log", "web.log.1"):
+        path = Path(logs_dir) / name
+        try:
+            import mmap
+
+            with path.open("rb") as handle, mmap.mmap(handle.fileno(), 0, access=mmap.ACCESS_READ) as mm:
+                end = len(mm)
+                while True:
+                    at = mm.rfind(needle, 0, end)
+                    if at < 0:
+                        break
+                    after = mm[at + len(needle): at + len(needle) + 1]
+                    if after.isdigit():          # pid 12 must not match pid 123
+                        end = at
+                        continue
+                    line = mm[mm.rfind(b"\n", 0, at) + 1: at]
+                    iso = _ISO_PREFIX_RE.match(line)
+                    if iso:
+                        return dt.datetime.fromisoformat(iso.group(1).decode()).replace(tzinfo=dt.timezone.utc).timestamp()
+                    stamp = _GUNICORN_TS_RE.search(line)
+                    if stamp:
+                        return dt.datetime.strptime(b" ".join(stamp.groups()).decode(), "%Y-%m-%d %H:%M:%S %z").timestamp()
+                    break
+        except (OSError, ValueError):
+            continue
+    return None
+
+
+def _plausible(record: float | None, estimate: float | None, now: float) -> bool:
+    """Is the spawn-time record plausibly THIS process's start?
+
+    It must sit within max(300 s, 5% of the process's age) of the /proc
+    estimate. The drift measured 2026-11-11 was ~1.5% of age, and a record that
+    belongs to another process is minutes or hours off."""
+    if record is None:
+        return False
+    if estimate is None:
+        return record <= now + 5
+    return abs(record - estimate) <= max(300.0, 0.05 * max(0.0, now - estimate))
+
+
+def role_start_epoch(pid: int | None, role: str = "", logs_dir: Path | None = None) -> float | None:
+    """When the role's CODE was loaded, as a wall-clock epoch.
+
+    For web, gunicorn's OLDEST worker: a HUP replaces the workers (which import
+    the app) and keeps the master. For the workers, the process itself; its
+    children are sims, started later.
+
+    A wall-clock record made at spawn wins over the drifting /proc estimate
+    (see `linux_start_epoch`):
+    - workers use `role_spawn_stamp`;
+    - web's oldest worker uses `gunicorn_worker_boot_epoch`, when `logs_dir` is
+      given.
+    Each record must be `_plausible` against the estimate. The estimate also
+    picks web's oldest worker, which is safe because order at one moment does
+    not drift.
 
     `head_at` compares this with whole-second reflog stamps, so a role started
     in the same second as an ff but BEFORE it still reads as after it. A deploy
@@ -2132,24 +2247,30 @@ def role_start_epoch(pid: int | None, role: str = "") -> float | None:
             precise = linux_start_epoch(proc.pid)
             return precise if precise is not None else proc.create_time()
 
+        now = time.time()
         proc = psutil.Process(int(pid))
         if role == "web":
-            kids = [started(c) for c in proc.children()]
+            kids = [(started(c), c.pid) for c in proc.children()]
             if kids:
-                return min(kids)
-        return started(proc)
+                estimate, oldest = min(kids)
+                booted = gunicorn_worker_boot_epoch(oldest, logs_dir)
+                return booted if _plausible(booted, estimate, now) else estimate
+        estimate = started(proc)
+        stamp = role_spawn_stamp(pid)
+        return stamp if _plausible(stamp, estimate, now) else estimate
     except Exception:
         return None
 
 
-def role_code(pid: int | None, role: str = "", repo: Path = REPO_ROOT) -> tuple[str, str]:
+def role_code(pid: int | None, role: str = "", repo: Path = REPO_ROOT,
+              logs_dir: Path | None = None) -> tuple[str, str]:
     """(commit, source) for what a role RUNS: HEAD at its start (`reflog`), else
     the env stamp (`env`, exact only for a role started by `up`).
 
     Measured 2026-10-02: live-odds-worker read `code=927d1787` from its env
     while it ran c1067485, which it loaded at a role-only restart (its split log
     line exists only in c1067485)."""
-    started = role_start_epoch(pid, role)
+    started = role_start_epoch(pid, role, logs_dir=logs_dir)
     if started is not None:
         commit = head_at(started, repo)
         if commit:
@@ -2333,7 +2454,7 @@ def cmd_status(args: argparse.Namespace) -> int:
             except Exception:
                 pass
         cap = memory_cap_label(role_running_memory_cap_mb(pid), next_up, PLAN_MEMORY_MB.get(name))
-        loaded, source = role_code(pid, name)
+        loaded, source = role_code(pid, name, logs_dir=settings.logs_dir)
         code = ""
         if loaded:
             code = f"  code={loaded[:8]}" + ("" if source == "reflog" else "(env stamp)") + code_stamp_note(loaded, head)
