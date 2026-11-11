@@ -3351,3 +3351,13 @@ I counted "unchanged re-appends" on the NBA and NHL quote shards (NHL: 41% of ro
 - **How to apply:**
   - When a `*_JOIN` line reads `None` counters, grep the same line's `reason=` before deciding what did not run. The counters are absent BY DESIGN on early returns.
   - Do not take a reason string's wording as its cause. Find the branch that prints it, and list every state that reaches that branch.
+
+### 2026-11-11 — A lane's Verification read a BUILD counter; the goal named the SERVED board, and the two disagreed `[lane nba-live-props-midnight, todo #777 / #782, session cca33a3a]`
+- **What happened:** the Verification clause was "the carryover build's `LIVE_PROJECTION_JOIN sport=nba` reads `considered>0 projected>0`". On 11-11 06:05Z it read `considered=293 projected=230`, and the watcher exited 0.
+  - One GET of the surface the goal names, `layer2-shortlist?date=2026-11-10&sport=nba`, returned **0 rows**. The same build put 6,983 of 6,991 NBA candidates in the opportunity gate's `dead` lane (`live_rows_now=0`, 367 before the roll).
+  - The joined numbers were real, on rows nobody is served.
+- **How to apply:**
+  - Write the Verification against the surface the goal's first clause names: the served endpoint, counting rows of the target game and kind. Keep the stage counter as the diagnostic beside it, not in place of it.
+  - When a watcher exits 0 on a stage counter, take one served read before writing MET.
+  - The same build line already carried the tell: `live_rows_now=0 chips_live_now=1` in `LAYER2_CARRYOVER ... decision=built`. Read every field of the line that announces the build, not just the one you predicted.
+  - **Second error, same night:** I called the game's quotes "fresh" from `book-grid` ages read at 06:10:47Z (seen median 74 s). The grid was generated at 06:01:31Z, and its `*_age_seconds` are as of `generated_at`. Capture had stopped at 05:59:54Z. Before quoting an artifact's age field, subtract it from the artifact's own `generated_at`, not from now.
