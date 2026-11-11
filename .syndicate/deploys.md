@@ -58813,3 +58813,26 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   2. Pid order: 191757/191758 < 191825 (refresh-worker) < 192537 (live-odds-worker). In this WSL `ps lstart` is NOT a usable clock: a process spawned at wall-clock 12:19:34.07 read 12:19:33, and 191825 reads 12:11:17, before the workers it was created after.
   3. Functional: the 18:11:40Z read found 20 of 20 restated cards carrying `sim_model_edge_pct` and `model_edge_withheld_reason`, fields only `5c8eec41a`'s code writes.
   - Since then both web workers recycled: 192845 booted 18:16:09Z and 193560 at 18:18:12Z, both minutes after the ff.
+
+## 2026-11-11 18:22:59Z (12:22 PM CST) -- todo #782 LOADED on both workers by peer lanes' claimed TERMs (no claim, ff or signal by lane `nba-quote-capture-midnight`) -- **refresh-worker half MET (`dead_by_reason` served); live-odds-worker half loaded, inert until the roll; the midnight reading is OWED**
+- **User, in this lane's chat:** "Yes, load it", answering "Load the #782 fix on the fleet?". Then, asked about the ride-alongs (#780's 120 s live ceiling, #775's face fix), the user selected "Load all together (Recommended)".
+- **How it loaded (read-only reads):**
+  - ff `4793d823c -> 5c8eec41a` at 18:11:22Z (fleet reflog), by lane `restate-live-edge-withhold` (entry 18:11:22Z). `5c8eec41a` contains `eacc9f990` (#782), `0f6e4a723` (#780) and `c8d79b8ee` (#775).
+  - refresh-worker: claimed TERM by lane `live-gameline-quote-ceiling-120` (entry 18:11:24Z), new pid 191825.
+  - live-odds-worker: claimed TERM 18:13:28Z by lane `load-782-nba-quote-capture` (session 345d60ab, claim 18:11:56Z; as relayed, its own entry not yet written). New pid 192537. Its log: `NBA_LIVE_RESIM_LOOP_STARTED` 18:14:46.872Z, re-sim pool workers `parent=192537` 18:14:48Z.
+  - `ps lstart` is not used as a clock here (it drifts by seconds on this WSL; the 18:11:24Z entry's correction).
+- **verify, refresh-worker half: MET at 18:22:59Z.** The served `layer2-shortlist?date=2026-11-11` (build age 22 s) carries `per_sport_ingest.<sport>.dead_by_reason`, and on every sport it sums to `by_lane.dead`:
+  - ncaab 1,434 = `final:game_final` 1,258 + `live:live_market_stale` 87 + `live:live_quote_unobserved` 89;
+  - wncaab 140 = 94 + 20 + 26;
+  - ncaaf 512, all `pregame:pregame_market_stale`; nfl 120, all `pregame:pregame_market_stale`;
+  - nba, nhl, soccer: 0 dead, `{}`. mlb and wnba carry no ingest (no slate).
+  - Before (18:14:01Z, a build from before the restart): no sport carried the key.
+  - refresh-worker Traceback since 18:11:3xZ: 0.
+- **live-odds-worker half: LOADED, and inert by design until 00:00 CT.** pid 192537 runs `5c8eec41a`; `_nba_prior_slate_in_play` is on disk (2 hits). From 18:14:33Z to 18:22:59Z: Traceback 0, `NBA_LIVE_AUTORUN_PRIOR_SLATE_ERROR` 0, `NBA_LIVE_AUTORUN_ERROR` 0. Outside the window, `prior_slate_in_play` returns `(None, [])` and the lane behaves exactly as before.
+- **verify, OWED (the goal's served surface), on the first night with an NBA game live at 00:00 CT:**
+  - `NBA_LIVE_AUTORUN_LAUNCHED date=<prior> ... prior_slate_games=1` every ~240 s after 06:00Z;
+  - the `<prior>` nba shard's mtime advancing past 06:00Z;
+  - the SERVED `/api/board/layer2-shortlist?date=<prior>&sport=nba` with > 0 live rows of that game, and its `dead_by_reason` with no `live:live_quote_unobserved` for it.
+  - Tonight's latest tip is 9:10 PM CST (OKC @ POR, 11-11 grid), so a reading tonight needs that game to run past midnight.
+- **Seen in passing, not chased (not this lane):** at 12:22 PM CST NCAAB already has 176 live rows in `dead` (87 `live_market_stale`, 89 `live_quote_unobserved`) and WNCAAB 46. The new counter is what makes this readable.
+- **Correction to a relay of mine:** I told the #780 lane web was "likely on pre-ff code" from `ps lstart`. REFUTED: web.log shows the HUP at 18:11:21.872Z after the ff (the 18:11:24Z entry).
