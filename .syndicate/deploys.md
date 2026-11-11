@@ -58663,3 +58663,29 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **Game end:** ESPN last play `End of Game` wallclock 2026-11-11T06:30:30Z (12:30 AM CST), POR 123 OKC 103. The game was live for 30.5 min after the roll and the re-sim covered all of it.
 - **Verdict: MET.** All 4 pre-registered conditions hold: loaded; first post-roll tick `prior_date=2026-11-10 prior_games=1 prior_resimmed=1 prior_skip=-`; >=1 join with `games_in_snapshot>=1, projected>0` while live (4 of 11); 0 PRIOR_ERROR lines.
 - **Side observation, not part of #776 (a board-side matter):** after 06:05Z, `projected` falls from 103 to 3-4. The 06:16Z build gives `quote_older_than_live_pricing_ceiling` 129, and the board rows alternate with 0-match builds. That fits the `[layer2-prior-date-carryover]` note in `state_layer2`: the quote capture for this game stopped at 05:59:54Z. The re-sim side delivered on every tick.
+
+
+## 2026-11-11 17:27:13Z (11:27 AM CST) -- todo #781 WEB LOADED: fleet ff `9fee4160d` -> `4793d823c` + `reload-web` (lane `layer2-live-rail-edges`) -- **MET**
+
+- **change:** the Layer 2 Games rail shows a live line per full-game market on live cards (OURS = live re-sim, BOOK = main live line, AGE = quote age at pricing), plus a `MODEL ≠ LINE` flag and a rail filter that count only a gap priced on a quote <= 120 s old (#780 addendum). Display only (`intelligence.html` + `board_cards.css`); the join's 600 s ceiling is unchanged. User: "Yes, load web".
+- **gates:** web claim, holder `layer2-live-rail-edges`, acquired 17:25:10Z (rc 0, claim was free). Fleet preflight from a worktree at origin/main `b2647d881`, `--target fleet --target-commit 4793d823c`: **CLEAR** (exit 0) at 17:26:02Z, with "only infrastructure processes running".
+  - Expectations: `rail_live_block`, `rail_threshold_120` and `rail_css` each 0 -> 1.
+  - Baseline read 17:25:24Z.
+- **ride-along review** (listed in its own call before the merge): 13 commits. The runtime files are this lane's template and CSS, plus two read-only grading scripts (`scripts/live_totals_grade.py`, `scripts/live_gameline_age_grade.py`) that no role imports. Nothing under `vendor/` changed. Fleet dirty files (`engines/mlb/data/...`, `reports/...`) do not overlap.
+- **load:**
+  - `git merge --ff-only 4793d823c` at **17:27:13.246Z**.
+  - The first `reload-web` used Ubuntu's `python3`. It printed `web master 647 not readable (ModuleNotFoundError); nothing sent` and **still exited 0**. Web kept serving the old template.
+  - Re-run with `~/.venvs/syndicate/bin/python scripts/local_production.py reload-web`, 17:27:46-17:28:08.5Z: new workers 185081 / 185082, 12 probes healthz 200, 0 failures, max latency 0.9 s.
+  - refresh-worker and live-odds-worker were not restarted. Nothing in this ff is theirs.
+- **before** (17:25:24Z, served `/intelligence` + `/static/shared/board_cards.css` + `POST /api/intelligence/query`; scratch `measure_load.py`):
+  - `rail_live_block` 0, `rail_threshold_120` 0, `rail_css` 0.
+  - 2 live games, 24 live game rows (NCAAB full + h1/h2).
+- **after** (17:28:19Z):
+  - `rail_live_block` 1, `rail_threshold_120` 1, `rail_css` 1.
+  - 2 live games, 26 live game rows.
+- **served page, rendered** (headless Chromium on the fleet's `/intelligence`, no mocks, 17:30:05Z; scratch `served_read.py`):
+  - FDU @ ETAM (half): `Total 141.6 / 139.5 / 14m`, `ML ETAM 86% / ETAM −750 / 10m`.
+  - FAMU @ KC (H1 4:55): `Sprd – / KC −11.5 / 7m`, `Total – / 153.5 / 10m`, `ML – / KC −750 / 7m`. OURS is blank: the card has a `pregame_pace` block, not a re-sim, and the rows carry no live number.
+  - 0 flagged (filter `Model ≠ line 0`): every quote was 7-14 min old. 2 live WNCAAB games show no live line, because the board has no live rows for them. 0 page errors.
+- **verify: MET.** All 3 fields 0 -> 1, and the rail renders the live line on the served page. Owed (todo #781): a flag reading on an evening slate, when quotes are fresh.
+- **revert:** revert `3c38ef4c4` + `cb422f34a` on main, ff the fleet to that revert, then `reload-web` with the venv python.

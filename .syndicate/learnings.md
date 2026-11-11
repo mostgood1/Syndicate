@@ -3361,3 +3361,11 @@ I counted "unchanged re-appends" on the NBA and NHL quote shards (NHL: 41% of ro
   - When a watcher exits 0 on a stage counter, take one served read before writing MET.
   - The same build line already carried the tell: `live_rows_now=0 chips_live_now=1` in `LAYER2_CARRYOVER ... decision=built`. Read every field of the line that announces the build, not just the one you predicted.
   - **Second error, same night:** I called the game's quotes "fresh" from `book-grid` ages read at 06:10:47Z (seen median 74 s). The grid was generated at 06:01:31Z, and its `*_age_seconds` are as of `generated_at`. Capture had stopped at 05:59:54Z. Before quoting an artifact's age field, subtract it from the artifact's own `generated_at`, not from now.
+
+
+## 2026-11-11 -- `reload-web` EXITS 0 WHEN IT SENT NOTHING: run it with the venv python and read its RELOAD_WEB line, never its rc `[lane layer2-live-rail-edges, session 0f519972]`
+- **Belief overturned:** "`local_production.py reload-web` returned 0, so web reloaded." Run with Ubuntu's `python3`, it printed `web master 647 not readable (ModuleNotFoundError); nothing sent` and exited **0**. The fleet checkout was already at the new SHA, and web kept serving the old template.
+- **Measured:** 2026-11-11 17:27:13Z. The re-run with `~/.venvs/syndicate/bin/python` printed `RELOAD_WEB {... "state": "done", "failures": 0}` and new worker pids. Only that line moved the served markers 0 -> 1.
+- **How to apply:**
+  - Invoke it as `~/.venvs/syndicate/bin/python scripts/local_production.py reload-web` (the runbook: Ubuntu's `python3` has none of the requirements).
+  - Gate on `RELOAD_WEB ... "state": "done"` plus changed worker pids, then on a served-content field. A `nothing sent` line is a failed deploy.
