@@ -1767,6 +1767,9 @@ def build_layer2_shortlist(
                 "scored": int(result.get("scored") or 0),
                 "opportunities": len(sport_opportunities),
                 "by_lane": result.get("by_lane") or {},
+                # `#782`: why the gate put rows in `dead`, "<market_state>:<first reason>". This dict is an explicit
+                # key list (see `#444` below), so a producer key reaches nobody until it is named here.
+                "dead_by_reason": result.get("dead_by_reason") or {},
                 # `#444`. BOTH halves of the bettable-book restriction, for the
                 # reason every other rejection counter in this pipeline is
                 # reported: a rule that trims silently cannot be told apart

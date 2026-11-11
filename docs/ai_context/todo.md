@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#782` — **AFTER MIDNIGHT THE PREVIOUS DATE'S LAYER 2 BOARD SERVES 0 ROWS FOR AN NBA GAME STILL LIVE: the opportunity gate puts all of them in `dead`: quote capture for the game stops at the roll. Cause measured, reason inferred, NOT FIXED** `[2026-11-11, found by lane nba-live-props-midnight (#777), session cca33a3a; no lane yet]`
+### `#782` — **AFTER MIDNIGHT THE PREVIOUS DATE'S LAYER 2 BOARD SERVES 0 ROWS FOR AN NBA GAME STILL LIVE: the opportunity gate puts all of them in `dead`: quote capture for the game stops at the roll. FIX ON MAIN, NOT LOADED (the user's decision)** `[2026-11-11, found by lane nba-live-props-midnight (#777); lane nba-quote-capture-midnight, session cca33a3a]`
 - **Measured** (fleet, read-only, 11-11 00:08-00:11 CST, OKC @ POR live, END Q3 80-97):
   - `GET /api/board/layer2-shortlist?date=2026-11-10&sport=nba` at 06:08:09Z (build age 117 s) returned 0 rows. `per_sport.nba`: `available=0 selected=0`. `per_sport_ingest.nba`: `candidates=6991`, `by_lane {dead: 6983, opportunity: 8}`, `grid_rows=3645`, `quote_rows=66292`, `sweep_state=swept`, `window_dates=[2026-11-10]`. `projections.live_edge_enforced_reasons`: game final 1,595, game live 455.
   - The rebuild's line: `LAYER2_CARRYOVER date=2026-11-10 decision=built ... live_rows=367 ... rows=1669 live_rows_now=0 chips_live_now=1`. The last pre-roll build had 367 live rows; the post-roll rebuild has 0, with the game still live.
@@ -8,8 +8,39 @@
   - **Correction:** this item first said the quotes were FRESH, from `book-grid?date=2026-11-10&sport=nba` read at 06:10:47Z (prop `seen_age_seconds` median 74). That grid was generated at 06:01:31Z, and its ages are as of generation, not of the read.
   - **Older nights too:** every 11-04 carryover build on 11-05 (06:26-07:34Z) read `live_rows=0 ... live_rows_now=0 chips_live_now=1`. That is the same symptom, though there the pre-roll build also had 0.
   - The props join on the same rebuild works (`#777`: `considered=293 projected=230`). This is a later stage.
-- **Not read:** which `opportunity_gate.evaluate` branch fires (`opportunity_gate.py:299-314`). No log and no endpoint publishes `dead` reasons. The fix is on the CAPTURE side: keep capturing quotes for the previous date's in-play games after 00:00 CT, the way `#776` keeps re-simming them. Add a `dead`-reason count per sport to the ingest beside it, so the reason is read rather than inferred.
-- **Next step:** find what scopes NBA book-quote capture to the Central date at the roll, keep the previous date's live games in it inside the same window (`SYNDICATE_NBA_LIVE_RESIM_PRIOR_DATE_HOURS`), and test off != on. Readable only on a night with NBA live at 00:00 CT (11-13 OKC @ LAC next).
+- **Why capture stopped (confirmed in the code and the fleet log):**
+  - NBA game lines AND props both come from `scripts/fetch_basketball_oddsapi_props_local.py`. The live-odds-worker's NBA in-play lane launches it every 240 s (`_launch_autorun_nba_live_refresh`, `refresh_odds_sources --sports nba --phase live --force-refresh`, `--in-play-only`), from the in-play capture thread's 30 s tick.
+  - That lane decides with `central_today_iso()`: it returns unless `_nba_has_live_game(today)`. At 00:00 CT today became 11-11, which had no game live, so the pulls stopped.
+  - Fleet live-odds-worker log 11-11: `NBA_LIVE_AUTORUN_LAUNCHED date=2026-11-10` every ~240 s to **05:59:52Z**, none after. The shard's last write was 05:59:54Z. The game ran to 06:30:30Z (lane `nba-live-resim-midnight`'s reading).
+  - The fetcher keeps only events whose Eastern date equals `--date`, and `append_book_quotes` writes into `--date`'s shard. So a pull for the NEW date would not have taken the game either.
+- **Fix** (code default ON; no env change to load):
+  - `nba/live_lens.prior_slate_in_play(now)`: (the previous Central date, the event ids the #776 re-sim last published `In Progress` for it), inside the re-sim's OWN window (`SYNDICATE_NBA_LIVE_RESIM_PRIOR_DATE_HOURS`, absent = 4 h, "0" = off: one switch for the re-sim, the lens and now the pulls).
+    - The re-sim stamps `In Progress` on any game it resumed from ESPN's `in` state, which holds through halftime and quarter breaks. A refused row ("Unknown") does not count.
+    - A re-sim file older than 600 s, missing, or with no UTC offset names no game, so a stopped re-sim thread cannot keep paid pulls running.
+  - `run_live_odds_refresh_worker._launch_autorun_nba_live_refresh`: today's live game still wins, unchanged. Only when today has none and the previous date has a game in play does it launch for THAT date: the same forced in-play run it had at 23:59. `--in-play-only` takes only games tipped within 3 h, and the quotes file under that date's shard, the one the carryover reads. The 240 s interval gate is shared.
+    - The `LAUNCHED` line gains `prior_slate_games=N` on such a launch. A failure of the signal prints `NBA_LIVE_AUTORUN_PRIOR_SLATE_ERROR` and launches nothing.
+  - **`dead` reasons, read instead of inferred:** `layer2_board.build_layer2_rows` returns `dead_by_reason` ("<market_state>:<first reason>", e.g. `live:live_quote_unobserved`, `final:game_final`), and `pipeline/layer2_shortlist` names it in `per_sport_ingest` (an explicit key list, `#444`).
+  - Checked unchanged: the refresher has no today-relative branch (`refresh_odds_sources`, `refresh_nba_oddsapi_props`). The run's "latest" manifest is per lane (`live-odds-worker-nba-live`), which at 23:59 already said `date=2026-11-10`.
+- **Tests:** `tests/test_nba_live_autorun_midnight.py`, 14:
+  - the signal: window, off != on through the env, stale / missing / naive file, only the previous date's `In Progress` rows, the pre-midnight file;
+  - the lane, through the real `prior_slate_in_play` and window: launches `date=2026-11-10` at 00:05 CST; off != on through the env; today's live game wins; nothing in play launches nothing; a broken signal never breaks the lane; the 240 s interval holds;
+  - the real fetcher at 00:05 CST with `--date 2026-11-10 --in-play-only` takes OKC @ POR (tip 04:14Z) and not the next date's game;
+  - `dead_by_reason` from `build_layer2_rows`, and through the real `build_layer2_shortlist` into `per_sport_ingest`.
+  - 6 source mutations, each caught.
+  - 191 passed across 13 neighbouring files: the NBA in-play autorun and in-play-only pulls, the in-play cadence, `#776`/`#777`'s midnight suites, the Layer 2 board, shortlist wiring / sweep state / out-player gate / API, the basketball fetcher, NBA Layer 2 projections.
+- **Loads with:** a fleet ff to a SHA containing this commit (it ships ALL of main), then:
+  - a **live-odds-worker** restart (its own ~6 h recycle or a claimed TERM) for the pulls;
+  - a **refresh-worker** restart (claimed, drained, idle after a save) for `dead_by_reason` only. The pulls do not need it;
+  - web: nothing.
+  - Needs the user's yes.
+- **Expected change, stated before any load:**
+  - **Any time after the refresh-worker load:** the served `layer2-shortlist` payload's `per_sport_ingest.<sport>.dead_by_reason` exists, and sums to `by_lane.dead`.
+  - **On the first night with an NBA game live at 00:00 CT:**
+    - live-odds-worker prints `NBA_LIVE_AUTORUN_LAUNCHED date=<prior> ... prior_slate_games=1` every ~240 s after 06:00Z while the re-sim has the game In Progress, where 11-11 printed none.
+    - The `<prior>` nba shard's mtime keeps advancing past 06:00Z (11-11: stopped 05:59:54Z).
+    - The carryover's `LAYER2_CARRYOVER date=<prior> decision=built ... live_rows_now>0`, where 11-11 read 0.
+    - The SERVED `/api/board/layer2-shortlist?date=<prior>&sport=nba` returns > 0 live rows of that game, where 11-11 returned 0. Its `dead_by_reason` shows no `live:live_quote_unobserved` for that game.
+  - **Cost:** one in-play pull per 240 s for the minutes the game runs past midnight, ~49 credits a game a pull. 11-11 would have been ~8 pulls (06:00-06:30Z), ~400 credits. Denominator, from `#776`: 4 of 20 regular-season slates (10-20..11-09) had NBA play after the roll.
 
 ### `#781` — **LIVE GAMES ON THE LAYER 2 GAMES RAIL NOW SHOW OUR LIVE RE-SIM AGAINST THE BOOK'S LIVE LINE PER MARKET, WITH THE QUOTE'S AGE; A "MODEL ≠ LINE" FLAG AND A RAIL FILTER BY MARKET COUNT ONLY A GAP PRICED AGAINST A QUOTE <= 120 s OLD (#780 addendum), WORDED AS A DISAGREEMENT, NOT AN EDGE. WEB ONLY, LOADED 2026-11-11 17:28Z (`4793d823c`)** `[2026-11-10, lane layer2-live-rail-edges, session 0f519972]`
 - **Why live cards had no line:** display only, not the join. The chip's book line (`footer`) is pregame-only (`game_chip_scoreboard.py` `"footer": ... if state == "pregame"`), and `renderGameCards` never read the game's live board rows. On the fleet's served board, 2026-11-10 23:45Z (5:45 PM CST), all 50 live full-game rows over 5 college games carried the line, `live_total` or `live_model_probability`, the join's `model_edge_pct` (on `live_aware` rows), and `book_age_seconds`.

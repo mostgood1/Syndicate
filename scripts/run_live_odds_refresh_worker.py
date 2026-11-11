@@ -908,14 +908,34 @@ def _nba_live_autorun_status_path() -> Path:
     return reports_root() / "refresh_status" / "latest" / "nba_live_autorun_status.json"
 
 
+def _nba_prior_slate_in_play() -> tuple[str | None, list[str]]:
+    """`nba/live_lens.prior_slate_in_play`, never raising: (previous Central date, its games still in play)."""
+    try:
+        from syndicate.features.nba.live_lens import prior_slate_in_play
+
+        return prior_slate_in_play()
+    except Exception as exc:  # noqa: BLE001 -- the lane must keep running today's pulls
+        print(f"[live_odds_worker] NBA_LIVE_AUTORUN_PRIOR_SLATE_ERROR {type(exc).__name__}: {exc}", flush=True)
+        return None, []
+
+
 def _launch_autorun_nba_live_refresh() -> None:
     if not _nba_live_refresh_enabled():
         return
     selected_date = central_today_iso()
     from syndicate.features.shared.live_refresh_loop import _nba_has_live_game
 
+    prior_slate_games: list[str] = []
     if not _nba_has_live_game(selected_date):
-        return
+        # #782: a game still in play at midnight Central is on the PREVIOUS date, which "is a game live today?"
+        # never asks about, so its pulls stopped at the roll (11-11: last 05:59:52Z, OKC @ POR live to 06:30Z) and
+        # the carryover board dead-laned every row of it. Inside the #776 re-sim's window, with the re-sim still
+        # publishing that date's game In Progress, pull that DATE: the same forced in-play run it had at 23:59
+        # (`--in-play-only` takes only games tipped within 3 h), filed under that date's shard.
+        prior_date, prior_slate_games = _nba_prior_slate_in_play()
+        if not (prior_date and prior_slate_games):
+            return
+        selected_date = prior_date
     status_path = _nba_live_autorun_status_path()
     last_status = read_json_file(status_path) or {}
     if last_status and not last_status.get("reported"):
@@ -957,7 +977,8 @@ def _launch_autorun_nba_live_refresh() -> None:
                                   "runStamp": (result or {}).get("runStamp") or (result or {}).get("run_stamp"),
                                   "reported": False})
     print(f"[live_odds_worker] NBA_LIVE_AUTORUN_LAUNCHED date={selected_date} phase=live mode=fast force=nba "
-          f"lane={_nba_live_refresh_lane()} interval_s={_nba_live_refresh_interval_seconds()}", flush=True)
+          f"lane={_nba_live_refresh_lane()} interval_s={_nba_live_refresh_interval_seconds()}"
+          + (f" prior_slate_games={len(prior_slate_games)}" if prior_slate_games else ""), flush=True)
 
 
 def _nfl_lines_refresh_enabled() -> bool:

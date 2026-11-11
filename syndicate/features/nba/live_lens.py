@@ -737,6 +737,55 @@ def _attach_prior_slate(games: list[dict[str, Any]], prior_rows: list[dict[str, 
     return info
 
 
+# THE PREVIOUS DATE'S GAME STILL NEEDS ITS QUOTES (#782). With the lens and the re-sim carrying the game past the
+# roll, the carryover board joined its live numbers (11-11 06:05Z: `LIVE_PROJECTION_JOIN sport=nba considered=293
+# projected=230`) and then served 0 NBA rows: the live-odds-worker's NBA in-play lane asks "is a game live TODAY?",
+# so its last pull for OKC @ POR was 05:59:52Z, the shard's last write 05:59:54Z, and by the 06:05Z rebuild the
+# opportunity gate put 6,983 of 6,991 NBA candidates in `dead` (`live_rows_now=0`, 367 before the roll). This is
+# the signal that lane reads after the roll: the games the re-sim last published In Progress for the previous date.
+# Same window, same switch. A row the re-sim refused says "Unknown" and does not count; neither does a re-sim file
+# older than PRIOR_SLATE_IN_PLAY_MAX_AGE_SECONDS (a stopped re-sim thread must not keep paid pulls running).
+PRIOR_SLATE_IN_PLAY_MAX_AGE_SECONDS = 600.0
+
+
+def prior_slate_in_play(now: Any = None) -> tuple[str | None, list[str]]:
+    """(the previous Central date, the event ids the re-sim last published In Progress for it), inside the re-sim's
+    window after midnight Central (`live_resim.prior_slate_date`); (None, []) outside it or with the switch at "0".
+    A missing, unparseable or stale re-sim file gives (date, [])."""
+    from datetime import datetime, timezone
+
+    from syndicate.features.nba.live_resim import SLATE_DATE_KEY, prior_slate_date
+    from syndicate.features.nba.live_resim import live_lens_snapshot_path as _resim_path
+
+    prior = prior_slate_date(now)
+    if not prior:
+        return None, []
+    resim = read_json_file(_resim_path())
+    if not isinstance(resim, dict):
+        return prior, []
+    try:
+        generated = datetime.fromisoformat(str(resim.get("generatedAt") or "").strip())
+        if generated.tzinfo is None:
+            return prior, []
+        clock = now if now is not None else datetime.now(timezone.utc)
+        if (clock - generated).total_seconds() > PRIOR_SLATE_IN_PLAY_MAX_AGE_SECONDS:
+            return prior, []
+    except (TypeError, ValueError):
+        return prior, []
+    resim_date = str(resim.get("date") or "")
+    event_ids: list[str] = []
+    for row in resim.get("games") or []:
+        if not isinstance(row, dict) or str(row.get(SLATE_DATE_KEY) or resim_date) != prior:
+            continue
+        status = row.get("status") if isinstance(row.get("status"), dict) else {}
+        if str(status.get("detailedState") or "").strip().lower() != "in progress":
+            continue
+        event_id = str(row.get("event_id") or "").strip()
+        if event_id and event_id not in event_ids:
+            event_ids.append(event_id)
+    return prior, event_ids
+
+
 def _lens_game_state(game: dict[str, Any]) -> str:
     """`live` / `final` / `not_started`, from the normalized status `nba/cards.py` writes and its `live_state` row."""
     live_state = game.get("live_state") if isinstance(game.get("live_state"), dict) else {}

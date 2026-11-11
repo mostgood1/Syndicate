@@ -2957,6 +2957,9 @@ def build_layer2_rows(
     """
     candidates: list[dict[str, Any]] = []
     lanes: dict[str, int] = {}
+    # #782: `dead` by "<market_state>:<first reason>". On 11-11 a live game's 6,983 dead rows could only be
+    # explained by inference (`live_quote_unobserved`), because nothing published why the gate refused them.
+    dead_by_reason: dict[str, int] = {}
     rows_in = 0
     sides_priced = 0
     scored = 0
@@ -3364,6 +3367,11 @@ def build_layer2_rows(
             opportunity_gate.annotate(candidate, quote)
             lane = str(candidate.get("board_lane") or "unknown")
             lanes[lane] = lanes.get(lane, 0) + 1
+            if lane == opportunity_gate.LANE_DEAD:
+                verdict = candidate.get("gate") if isinstance(candidate.get("gate"), Mapping) else {}
+                reasons = verdict.get("reasons") or ()
+                dead_key = f"{verdict.get('market_state') or 'unknown'}:{reasons[0] if reasons else 'unnamed'}"
+                dead_by_reason[dead_key] = dead_by_reason.get(dead_key, 0) + 1
 
             ev = expected_value_pct(price, fair) if fair is not None else None
             # THE REFUSAL, NAMED. `_model_edge_for` has four `return None` paths and
@@ -3614,6 +3622,7 @@ def build_layer2_rows(
         "scored": scored,
         "opportunities": opportunities,
         "by_lane": lanes,
+        "dead_by_reason": dead_by_reason,
         "no_bettable_book": no_bettable_book,
         "repriced_to_bettable": repriced_to_bettable,
         "stale_book_skipped": stale_book_skipped,
