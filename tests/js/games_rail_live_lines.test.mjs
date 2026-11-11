@@ -40,7 +40,7 @@ const api = new Function('escapeHtml', 'trimClubAffixes', `
   ${formatAgeSrc[0]}
   ${buildSrc[0]}
   ${block[0]}
-  return { liveRailMarketKey, liveQuotePricingAgeSeconds, liveQuoteAgeNowSeconds, liveRowFreshEdge, liveRailMainRow,
+  return { liveRailMarketKey, liveRailSegmentKey, liveQuotePricingAgeSeconds, liveQuoteAgeNowSeconds, liveRowFreshEdge, liveRailMainRow,
            liveRailSummary, liveEdgeFilterMatches, renderLiveRailLines,
            LIVE_EDGE_FRESH_QUOTE_SECONDS, LIVE_EDGE_MIN_PP, LIVE_PRICE_STALE_AFTER_SECONDS };
 `)(escapeHtml, trimClubAffixes);
@@ -84,14 +84,18 @@ const fresh = () => [
     book_age_seconds: 40, quote: { fair_probability: 0.5, books_quoting: 5 } },
   { ...base, market: 'h2h', side: 'home', team: 'Florida St Seminoles', odds: 575, live_model_probability: 0.142,
     book_age_seconds: 104.5, quote: { fair_probability: 0.155 } },
-  // A first-half total: not a full-game line, never on the rail line.
-  { ...base, market: 'totals', segment: 'h1', line: 61.0, side: 'over', live_aware: true, model_edge_pct: 22,
-    book_age_seconds: 5, quote: { fair_probability: 0.5 } },
+  // A first-half total, as college interval rows are served: a display-only live number, NO priced edge
+  // (segment pricing is off, #763). It gets its own interval row and never flags.
+  { ...base, market: 'totals', segment: 'h1', segment_label: '1st half', line: 61.0, side: 'over', live_total: 62.3,
+    live_model_probability: 0.56, book_age_seconds: 5, quote: { fair_probability: 0.5 } },
 ];
 
 // ---------------------------------------------------------------- row selection
 check('a live full-game total is a rail row', api.liveRailMarketKey(fresh()[0]), 'totals');
-check('a first-half row is not', api.liveRailMarketKey(fresh()[8]), null);
+check('a first-half total is a rail row too, in its own interval', `${api.liveRailMarketKey(fresh()[8])}|${api.liveRailSegmentKey(fresh()[8])}`, 'totals|h1');
+check('a full-game row is segment "full"', api.liveRailSegmentKey(fresh()[0]), 'full');
+check('an NBA alt interval line is the same family', api.liveRailMarketKey({ ...fresh()[8], market: 'totals_alt' }), 'totals');
+check('a three-way interval moneyline is not', api.liveRailMarketKey({ ...fresh()[8], market: 'h2h_3_way' }), null);
 check('a pregame row is not', api.liveRailMarketKey({ ...fresh()[0], market_state: 'pregame', is_live: false }), null);
 check('a prop row is not', api.liveRailMarketKey({ ...fresh()[0], kind: 'prop' }), null);
 const mainTotal = api.liveRailMainRow(fresh().slice(0, 5), 'totals');
@@ -101,7 +105,7 @@ check('main spread names the favourite side of the line', mainSpread.line, -8.5)
 
 // ---------------------------------------------------------------- the live line renders for a live game with a priced row
 const live = api.liveRailSummary(fresh(), chip, response, NOW);
-check('three markets on the line', live.markets.map((m) => m.key).join(','), 'spreads,totals,h2h');
+check('the full game first, then the interval', live.markets.map((m) => `${m.segment}:${m.key}`).join(','), 'full:spreads,full:totals,full:h2h,h1:totals');
 const out = text(api.renderLiveRailLines(live));
 check('header: LIVE OURS BOOK AGE', /^LIVE OURS BOOK AGE/.test(out), true);
 check('total: our re-sim (the card\'s own Proj final) vs the main line, with the quote age at pricing', /Total 145\.9 147\.5 12s/.test(out), true);
@@ -109,7 +113,46 @@ check('spread: our margin restated for the line\'s team vs the book line', /Sprd
 check('moneyline: our live % vs the book price', /ML FSU 14% FSU \+575 2m/.test(out), true);
 check('fresh-quote gap is flagged as a disagreement with its line, size and quote age', /≠ Total u149: model \+10\.3 pts vs a 12s line/.test(out), true);
 check('the flag never calls itself an edge', /EDGE|edge/.test(out), false);
-check('the half-time row never reaches the line', /61/.test(out), false);
+check('interval row: no PROJ block on this chip, so OURS is the row\'s own live total', /1H Total 62\.3 61 5s/.test(out), true);
+check('a display-only interval never flags', /≠ 1H/.test(out), false);
+
+// ---------------------------------------------------------------- intervals against the card's own PROJ box
+const withBox = (periods) => ({ ...chip, intervals: { ...chip.intervals, periods } });
+const collegeBox = withBox([
+  { key: 'h1', label: '1H', away: 30, home: 32.4, state: 'in_progress' },
+  { key: 'h2', label: '2H', away: 35, home: 38, state: 'ahead' },
+]);
+const h2Row = { ...fresh()[8], segment: 'h2', segment_label: '2nd half', line: 74.5, live_total: 72.0 };
+const boxOut = text(api.renderLiveRailLines(api.liveRailSummary([...fresh(), h2Row], collegeBox, response, NOW)));
+check('1H OURS = the PROJ box\'s 1H (30 + 32.4), not the row', /1H Total 62\.4 61 5s/.test(boxOut), true);
+check('2H follows 1H, OURS = the box\'s 2H (35 + 38)', /1H Total 62\.4 61 5s 2H Total 73\.0 74\.5 5s/.test(boxOut), true);
+const settledBox = withBox([
+  { key: 'h1', label: '1H', away: 31, home: 29, state: 'settled' },
+  { key: 'h2', label: '2H', away: 35, home: 38, state: 'in_progress' },
+]);
+const settledOut = text(api.renderLiveRailLines(api.liveRailSummary([...fresh(), h2Row], settledBox, response, NOW)));
+check('a SETTLED interval is skipped even if a build still carries its row', /1H/.test(settledOut), false);
+check('...and the open one still shows', /2H Total 73\.0 74\.5/.test(settledOut), true);
+// A quarter-period card (NBA): the 1H market = Q1 as played + Q2 as projected.
+const nbaBox = { ...chip, sport: 'nba', intervals: { source: 'live_resim', final: { total: 228.0, home_margin: 6.0 }, periods: [
+  { key: 'q1', away: 25, home: 30, state: 'settled' }, { key: 'q2', away: 27.5, home: 28.5, state: 'in_progress' },
+  { key: 'q3', away: 28, home: 29, state: 'ahead' }, { key: 'q4', away: 27, home: 28, state: 'ahead' } ] } };
+const nbaH1 = [
+  { ...fresh()[8], market: 'totals_alt', line: 110.5, live_total: 109.0, quote: { fair_probability: 0.5 } },
+  { ...fresh()[8], market: 'spreads_alt', side: 'home', team: 'Florida St Seminoles', line: -5.5, live_model_probability: 0.55,
+    live_total: undefined, quote: { fair_probability: 0.5 } },
+];
+const nbaOut = text(api.renderLiveRailLines(api.liveRailSummary(nbaH1, nbaBox, response, NOW)));
+check('NBA 1H total = Q1 + Q2 from the box (55 + 56)', /1H Total 111\.0 110\.5/.test(nbaOut), true);
+check('NBA 1H spread = Q1 + Q2 home margin (5 + 1), named for the line\'s team', /1H Sprd FSU −6\.0 FSU −5\.5/.test(nbaOut), true);
+// A PRICED interval (e.g. MLB F5, or any interval the join prices) flags like any line, and counts in its family.
+const pricedH1 = fresh().map((row) => (row.segment === 'h1' ? { ...row, live_aware: true, model_edge_pct: 6.5 } : { ...row, live_aware: undefined }));
+const pricedSummary = api.liveRailSummary(pricedH1, chip, response, NOW);
+check('a priced interval gap on a fresh quote flags', pricedSummary.hasFreshEdge, true);
+check('...named with its interval', /≠ 1H Total o61: model \+6\.5 pts vs a 5s line/.test(text(api.renderLiveRailLines(pricedSummary))), true);
+check('...and counts toward the Total filter', api.liveEdgeFilterMatches(pricedSummary, 'totals'), true);
+const staleH1 = pricedH1.map((row) => (row.segment === 'h1' ? { ...row, book_age_seconds: 200 } : row));
+check('the same interval gap on a 200 s quote does not', api.liveRailSummary(staleH1, chip, response, NOW).hasFreshEdge, false);
 check('summary: fresh edge in totals only', JSON.stringify(live.freshEdges), '{"totals":true}');
 check('card highlight fires on a fresh-quote edge', live.hasFreshEdge, true);
 check('age cell green on a fresh quote, showing the age the flag tested', /game-mini-card__live-age is-fresh" title="Quote 12s old when priced; ≈32s now">12s</.test(api.renderLiveRailLines(live)), true);

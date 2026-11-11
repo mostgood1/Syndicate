@@ -3173,9 +3173,10 @@
   // `book_age_seconds`. So this is display only: it READS those rows (no
   // computation beyond picking and formatting; the web-reads-artifacts rule).
   //
-  // Per full-game market (spread, total, moneyline), one row: OURS (the live
-  // re-sim's number -- the card's own "Proj final" block where it has one, so
-  // the two lines on one card cannot disagree), BOOK (the market's main live
+  // Per market (spread, total, moneyline) -- the full game, then each interval
+  // (1H / 2H / Q1-Q4 ...) the book is still quoting -- one row: OURS (the live
+  // re-sim's number -- the card's own "Proj final" / PROJ box where it has one,
+  // so the lines on one card cannot disagree), BOOK (the market's main live
   // line: the one priced closest to even), and AGE.
   //
   // AGE IS THE CLOCK THE GRADE USED. `book_age_seconds` is how long the book's
@@ -3237,21 +3238,57 @@
     return Number.isFinite(n) ? n : null;
   }
 
-  // The rail's market key for a LIVE FULL-GAME game-line row, else null. Halves
-  // and quarters are left out: the rail line is the full game, and college
-  // segment pricing is off (#763).
+  // The rail's market family for a LIVE game-line row, else null: full game AND
+  // intervals (user 2026-11-11, "we need this for intervals too"). An `_alt`
+  // market is the same family -- NBA quotes most interval lines as
+  // `totals_alt` / `spreads_alt` -- and the main-line pick below still lands on
+  // the line priced closest to even. A three-way interval moneyline
+  // (`h2h_3_way`, a draw is possible) is a different market and is left out.
   function liveRailMarketKey(item) {
     if (!item || typeof item !== "object") return null;
     if (String(item.kind || item.candidate_type || "").trim().toLowerCase() !== "game") return null;
     const live = String(item.market_state || "").trim().toLowerCase() === "live" || item.is_live === true;
     if (!live) return null;
-    const segment = String(item.segment || "full").trim().toLowerCase();
-    if (segment !== "full" && segment !== "game") return null;
     const market = String(item.market || item.market_type || "").trim().toLowerCase();
-    if (market === "totals" || market === "total") return "totals";
-    if (market === "spreads" || market === "spread") return "spreads";
+    if (market === "totals" || market === "total" || market === "totals_alt") return "totals";
+    if (market === "spreads" || market === "spread" || market === "spreads_alt") return "spreads";
     if (market === "h2h" || market === "moneyline" || market === "ml") return "h2h";
     return null;
+  }
+
+  // "full" for a full-game row, else the board's own interval token (h1, h2,
+  // q1-q4, f5, p1, ...). Row and chip use the same tokens
+  // (`game_chip_intervals.PERIODS`).
+  function liveRailSegmentKey(item) {
+    const segment = String((item && item.segment) || "full").trim().toLowerCase();
+    return !segment || segment === "game" ? "full" : segment;
+  }
+
+  const LIVE_RAIL_SEGMENT_ORDER = ["full", "h1", "h2", "q1", "q2", "q3", "q4", "p1", "p2", "p3", "f1", "f3", "f5"];
+  const LIVE_RAIL_SEGMENT_LABELS = { h1: "1H", h2: "2H", q1: "Q1", q2: "Q2", q3: "Q3", q4: "Q4", p1: "P1", p2: "P2", p3: "P3", f1: "F1", f3: "F3", f5: "F5", first5: "F5" };
+  function liveRailSegmentLabel(segment) {
+    return segment === "full" ? "" : (LIVE_RAIL_SEGMENT_LABELS[segment] || String(segment).toUpperCase());
+  }
+
+  // Our live re-sim's numbers for one interval, from the CHIP's own projection
+  // block (the PROJ box on the same card, so the two cannot disagree):
+  // {total, home_margin, settled}. A half on a quarter-period card (NBA, WNBA,
+  // football) is its two quarters added -- a settled quarter's cell is the real
+  // score, so 1H mid-Q2 = Q1 as played + Q2 as projected, which is what the 1H
+  // market settles on. Null when the card has no live re-sim block for it.
+  function liveRailPeriodNumbers(iv, segment) {
+    const periods = iv && Array.isArray(iv.periods) ? iv.periods : [];
+    const one = (key) => periods.find((p) => p && String(p.key || "").toLowerCase() === key) || null;
+    const numbers = (list) => {
+      if (!list.length || list.some((p) => !p || liveRailNum(p.away) === null || liveRailNum(p.home) === null)) return null;
+      const away = list.reduce((sum, p) => sum + Number(p.away), 0);
+      const home = list.reduce((sum, p) => sum + Number(p.home), 0);
+      return { total: away + home, home_margin: home - away, settled: list.every((p) => p.state === "settled") };
+    };
+    const direct = one(segment);
+    if (direct) return numbers([direct]);
+    const halves = { h1: ["q1", "q2"], h2: ["q3", "q4"] }[segment];
+    return halves ? numbers(halves.map(one)) : null;
   }
 
   // The quote's age when the board priced it: the book's own "unchanged for"
@@ -3353,72 +3390,96 @@
     return n > 0 ? `+${n}` : `−${Math.abs(n)}`;
   }
 
-  // One rail card's live lines, from the game's live full-game rows and its
-  // chip. Returns {markets: [...], freshEdges: {market: true}, hasFreshEdge}.
-  // The edge half reads the ROWS only, so the filter never depends on a chip.
+  // One rail card's live lines, from the game's live game-line rows and its
+  // chip: the full game first, then each interval the book is still quoting,
+  // in period order. Returns {markets: [...], freshEdges: {market: true},
+  // hasFreshEdge}; a flag on an interval counts toward its market family in the
+  // filter. The edge half reads the ROWS only, so the filter never depends on a
+  // chip.
+  //
+  // INTERVALS (user 2026-11-11). Same columns and the same flag rule as the
+  // full game. OURS is the card's own PROJ box for that period where the card
+  // has a live re-sim block, else the row's own live number (`live_total`, the
+  // interval's display-only live total; `live_model_probability`). An interval
+  // the chip calls SETTLED is skipped: its market is over, whatever row a board
+  // build still carries. College interval rows carry no priced edge (segment
+  // pricing is off, #763), so they show the comparison and never flag -- the
+  // rule is applied per row, not per segment, so a priced interval (MLB F5)
+  // flags like any line.
   function liveRailSummary(rows, chip, response, nowMs) {
     const iv = chip && chip.intervals && chip.intervals.source === "live_resim" ? chip.intervals : null;
-    const final = iv && iv.final ? iv.final : {};
     const out = { markets: [], freshEdges: {}, hasFreshEdge: false };
-    for (const spec of LIVE_RAIL_MARKETS) {
-      const marketRows = (rows || []).filter((row) => liveRailMarketKey(row) === spec.key);
-      const main = marketRows.length ? liveRailMainRow(marketRows, spec.key) : null;
-      if (!main) continue;
-      const team = liveRailTeamLabel(main, chip);
-      const line = liveRailNum(main.line);
-      let ours = null;
-      let book = "–";
-      if (spec.key === "totals") {
-        const total = liveRailNum(final.total) ?? marketRows.map((row) => liveRailNum(row.live_total)).find((v) => v !== null) ?? null;
-        ours = total === null ? null : total.toFixed(1);
-        book = line === null ? "–" : (Number.isInteger(line) ? String(line) : line.toFixed(1));
-      } else if (spec.key === "spreads") {
-        // A spread row with no live number is blank BY DECISION upstream (NFL
-        // spreads: lane margins graded FAIL; NHL puck lines: no margin
-        // distribution), so the rail does not supply one from elsewhere.
-        const shown = marketRows.some((row) => liveRailNum(row.live_model_probability) !== null);
-        const margin = liveRailNum(final.home_margin);
-        const chipSide = liveRailChipSide(main, chip);
-        if (shown && margin !== null && chipSide) {
-          ours = `${team} ${liveRailSigned(chipSide === "home" ? -margin : margin, 1)}`;
-        } else if (liveRailNum(main.live_model_probability) !== null) {
-          ours = `${Math.round(liveRailNum(main.live_model_probability) * 100)}% cover`;
+    const rank = (segment) => { const i = LIVE_RAIL_SEGMENT_ORDER.indexOf(segment); return i < 0 ? LIVE_RAIL_SEGMENT_ORDER.length : i; };
+    const segments = [...new Set((rows || []).filter((row) => liveRailMarketKey(row)).map(liveRailSegmentKey))]
+      .sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+    for (const segment of segments) {
+      const period = segment === "full" ? null : liveRailPeriodNumbers(iv, segment);
+      if (period && period.settled) continue;
+      const final = segment === "full" ? (iv && iv.final ? iv.final : {}) : (period || {});
+      const prefix = liveRailSegmentLabel(segment);
+      for (const spec of LIVE_RAIL_MARKETS) {
+        const marketRows = (rows || []).filter((row) => liveRailMarketKey(row) === spec.key && liveRailSegmentKey(row) === segment);
+        const main = marketRows.length ? liveRailMainRow(marketRows, spec.key) : null;
+        if (!main) continue;
+        const team = liveRailTeamLabel(main, chip);
+        const line = liveRailNum(main.line);
+        let ours = null;
+        let book = "–";
+        if (spec.key === "totals") {
+          const total = liveRailNum(final.total) ?? marketRows.map((row) => liveRailNum(row.live_total)).find((v) => v !== null) ?? null;
+          ours = total === null ? null : total.toFixed(1);
+          book = line === null ? "–" : (Number.isInteger(line) ? String(line) : line.toFixed(1));
+        } else if (spec.key === "spreads") {
+          // A spread row with no live number is blank BY DECISION upstream (NFL
+          // spreads: lane margins graded FAIL; NHL puck lines: no margin
+          // distribution), so the rail does not supply one from elsewhere.
+          const shown = marketRows.some((row) => liveRailNum(row.live_model_probability) !== null);
+          const margin = liveRailNum(final.home_margin);
+          const chipSide = liveRailChipSide(main, chip);
+          if (shown && margin !== null && chipSide) {
+            ours = `${team} ${liveRailSigned(chipSide === "home" ? -margin : margin, 1)}`;
+          } else if (liveRailNum(main.live_model_probability) !== null) {
+            ours = `${Math.round(liveRailNum(main.live_model_probability) * 100)}% cover`;
+          }
+          book = line === null ? "–" : `${team} ${liveRailSigned(line, null)}`;
+        } else {
+          const p = liveRailNum(main.live_model_probability);
+          const hp = liveRailNum(final.home_win_prob);
+          if (p !== null) ours = `${team} ${Math.round(p * 100)}%`;
+          else if (hp !== null && chip) {
+            const fav = hp >= 0.5 ? "home" : "away";
+            ours = `${String((chip[fav] || {}).abbr || fav.toUpperCase())} ${Math.round((fav === "home" ? hp : 1 - hp) * 100)}%`;
+          }
+          book = `${team} ${liveRailAmerican(main.odds)}`;
         }
-        book = line === null ? "–" : `${team} ${liveRailSigned(line, null)}`;
-      } else {
-        const p = liveRailNum(main.live_model_probability);
-        const hp = liveRailNum(final.home_win_prob);
-        if (p !== null) ours = `${team} ${Math.round(p * 100)}%`;
-        else if (hp !== null && chip) {
-          const fav = hp >= 0.5 ? "home" : "away";
-          ours = `${String((chip[fav] || {}).abbr || fav.toUpperCase())} ${Math.round((fav === "home" ? hp : 1 - hp) * 100)}%`;
+        let best = null;
+        for (const row of marketRows) {
+          const fresh = liveRowFreshEdge(row, response, nowMs);
+          if (fresh && (!best || fresh.edge > best.edge)) best = { ...fresh, row };
         }
-        book = `${team} ${liveRailAmerican(main.odds)}`;
+        let edge = null;
+        if (best) {
+          const r = best.row;
+          const rLine = liveRailNum(r.line);
+          const side = spec.key === "totals"
+            ? `${String(r.side || "").toLowerCase() === "under" ? "u" : "o"}${rLine === null ? "" : rLine}`
+            : spec.key === "spreads"
+              ? `${liveRailTeamLabel(r, chip)} ${rLine === null ? "" : liveRailSigned(rLine, null)}`
+              : `${liveRailTeamLabel(r, chip)} ML`;
+          edge = { side, edge: best.edge, priced: best.priced, ageNow: best.ageNow };
+          out.freshEdges[spec.key] = true;
+          out.hasFreshEdge = true;
+        }
+        out.markets.push({
+          key: spec.key, segment,
+          label: prefix ? `${prefix} ${spec.label}` : spec.label,
+          short: prefix ? `${prefix} ${spec.short}` : spec.short,
+          ours, book,
+          ageNow: liveQuoteAgeNowSeconds(main, response, nowMs),
+          pricedAge: liveQuotePricingAgeSeconds(main),
+          edge,
+        });
       }
-      let best = null;
-      for (const row of marketRows) {
-        const fresh = liveRowFreshEdge(row, response, nowMs);
-        if (fresh && (!best || fresh.edge > best.edge)) best = { ...fresh, row };
-      }
-      let edge = null;
-      if (best) {
-        const r = best.row;
-        const rLine = liveRailNum(r.line);
-        const side = spec.key === "totals"
-          ? `${String(r.side || "").toLowerCase() === "under" ? "u" : "o"}${rLine === null ? "" : rLine}`
-          : spec.key === "spreads"
-            ? `${liveRailTeamLabel(r, chip)} ${rLine === null ? "" : liveRailSigned(rLine, null)}`
-            : `${liveRailTeamLabel(r, chip)} ML`;
-        edge = { side, edge: best.edge, priced: best.priced, ageNow: best.ageNow };
-        out.freshEdges[spec.key] = true;
-        out.hasFreshEdge = true;
-      }
-      out.markets.push({
-        key: spec.key, label: spec.label, short: spec.short, ours, book,
-        ageNow: liveQuoteAgeNowSeconds(main, response, nowMs),
-        pricedAge: liveQuotePricingAgeSeconds(main),
-        edge,
-      });
     }
     return out;
   }
