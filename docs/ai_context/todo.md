@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#786` — **LIVE QUOTES ARE PULLED SLOWER THAN THE NEW 120 s PRICING CEILING ALLOWS: since 18:11Z 11-11 most live full-game college lines go unpriced for quote age (NCAAB 320 of 570 evaluations, WNCAAB 281 of 433). For NCAAB it is OUR lag (pull + build), not the book. NOT FIXED** `[2026-11-11, lane layer2-live-rail-edges, session 0f519972; user question "do we need to get game lines more often on live games to align with live resim timing"]`
+### `#786` — **LIVE QUOTES ARE PULLED SLOWER THAN THE NEW 120 s PRICING CEILING ALLOWS: since 18:11Z 11-11 most live full-game college lines go unpriced for quote age (NCAAB 320 of 570 evaluations, WNCAAB 281 of 433). For NCAAB it is OUR lag (pull + build), not the book. OPTION 1 (PRICE ON PULL) ON MAIN, NOT LOADED** `[2026-11-11, lanes layer2-live-rail-edges / live-price-on-pull, session 0f519972; user question "do we need to get game lines more often on live games to align with live resim timing", then "Do this task here"]`
 - **Cadences, measured on the fleet logs 17:00-20:30Z 11-11** (median / max gap):
   - In-play quote pull launches (`*_LIVE_AUTORUN_LAUNCHED`): NCAAB 133 s / 203 s, WNCAAB 245 s / 303 s (`interval_s=240`).
   - Live re-sim ticks: NCAAB 127 s / 169 s, WNCAAB 127 s / 173 s (`SYNDICATE_*_LIVE_RESIM_INTERVAL_SECONDS`, default 120 s).
@@ -18,6 +18,16 @@
   - (1) Price right after each pull lands: trigger the in-play overlay build on the pull's completion, so a priced quote is as fresh as its pull. No extra OddsAPI calls.
   - (2) Then, if NCAAB is still over 120 s, shorten the live pull for games with a live re-sim lane (e.g. 60 s). This costs OddsAPI credits per pull; measure the credit cost before choosing.
   - Both are worker-side (live-odds-worker / book grid), so each needs its own load and before/after (priceable share, `quote_older_than_live_pricing_ceiling` count).
+- **Option (1) DONE IN CODE** (lane `live-price-on-pull`, `scripts/run_refresh_worker.py`, NOT loaded). The grid + overlay are built by REFRESH-WORKER's `_run_book_grid_artifact_tick`, not live-odds-worker.
+  - Between ticks, every main-loop pass (~37 s median, p90 77 s) rebuilds a sport if it was LIVE at its last build and its quote shard (`.jsonl` or `.state.json`) changed after that build read it.
+  - Bounds: the shard must have been quiet for 5 s; one sport is rebuilt at most every 30 s; only today's date.
+  - The regular 120 s tick and the liveness bookkeeping are unchanged. Off switch: `SYNDICATE_BOOK_GRID_PRICE_ON_PULL=off`.
+  - Cost, measured on the fleet: one NCAAB grid build 2.9 s / 1,107 rows; overlay 122 ms.
+  - `BOOK_GRID_TICK` gains `on_pull: [...]`.
+  - Tests: `tests/test_book_grid_price_on_pull.py`, 9, incl. off != on. 8 source mutations each caught. 423 passed across the 4 book-grid test files.
+- **Expected after the load:** overlay rows' seen age at pricing ~ pull duration + up to one loop pass (~40 s), against 136 s now.
+  - Falsified if the NCAAB `quote_older_than_live_pricing_ceiling` share of non-segment evaluations does not fall from 320 / 570, or the overlay seen-age median stays above 120 s.
+  - Load = fleet ff + a claimed refresh-worker TERM, which is the user's decision. Option (2) (faster pulls) waits on that reading.
 
 ### `#785` — **LIVE NCAAF SEGMENT ROWS (h1 h2 q1-q4) SHOWED NO Live proj.: the NCAAF live re-sim published no segment blocks and the board built no NCAAF segment index. DISPLAY ONLY, graded per segment; LOADED on refresh-worker 2026-11-11 18:45:45Z (`b43236e17`), reachability MET 18:53Z; the served live reading is owed to the 11-12 00:30Z MACtion slate** `[2026-11-11, lane ncaaf-live-segment-display, session d979fc08]`
 - **Measured** (fleet refresh-worker log, 11-11 00:08:21-04:45:10Z, MACtion): 43 non-empty `LIVE_GAMELINE_JOIN sport=ncaaf` lines, 2,825 of 4,892 considered rows refused `segment_is_not_full_game` (25-104 per pass), display 481 (all full-game), 0 lines with a segment index. Served board 00:16-00:21Z (lane live-display-other-sports): 0 of 37 / 18 / 18 segment rows with a Live proj.

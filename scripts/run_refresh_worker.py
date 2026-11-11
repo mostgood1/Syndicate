@@ -6847,6 +6847,77 @@ def _book_grid_sport_due_today(sport: str, selected_date: str, now: float, *, li
     return False, "not_live"
 
 
+# PRICE ON PULL `[2026-11-11, lane live-price-on-pull, todo #786; user: "do we need to get game lines
+# more often on live games to align with live resim timing", then "Do this task here"]`.
+#
+# The live join prices a quote only up to 120 s old for ncaab/wncaab/nba/ncaaf (`0f6e4a723`), and this
+# tick -- the one that prices live lines, by rebuilding the grid and its in-play overlay -- ran on its
+# own 120 s clock (~80 s per tick, one sport after another) while live-odds-worker pulls quotes on
+# ANOTHER clock (NCAAB launches ~133 s, captures ~243 s apart). Nothing tied the two, so a pull often
+# landed just after a build and waited out a whole tick. Measured 2026-11-11 19:5xZ on the served
+# board: NCAAB overlay rows had last been SEEN a median 136 s before their build while the book had
+# moved only 19 s before that look -- our lag, not the market's -- and from 18:11Z the join refused
+# 320 of 570 non-segment NCAAB evaluations (WNCAAB 281 of 433) as `quote_older_than_live_pricing_ceiling`.
+#
+# So between ticks, every main-loop pass (~37 s median, p90 77 s) checks the sports that were LIVE at
+# their last build: one whose quote shard (or its `.state.json` last-seen sidecar, rewritten on every
+# flush) changed after that build read its quotes is rebuilt now, alone. Measured cost: one NCAAB grid
+# build 2.9 s / 1,107 rows, the overlay 122 ms -- one extra build per pull for a live sport.
+#   - QUIET: the shard must be untouched for 5 s, so a pull still flushing is not read half-written.
+#   - MIN GAP: 30 s between two builds of one sport, whatever the shard does.
+#   - Only today's sports that were live at their last build; never a forward or previous date.
+#   - The regular tick is unchanged: same clock, same sports, same liveness bookkeeping.
+# Off switch: SYNDICATE_BOOK_GRID_PRICE_ON_PULL=off (the fixed clock only, as before). Default ON: the
+# fleet derives role env only at `up`, so a default-off switch could not be turned on without a full
+# restart (the NCAAB in-play lane's precedent).
+_BOOK_GRID_PRICE_ON_PULL_QUIET_SECONDS = 5.0
+_BOOK_GRID_PRICE_ON_PULL_MIN_GAP_SECONDS = 30.0
+
+
+def _book_grid_price_on_pull_enabled() -> bool:
+    raw = str(os.environ.get("SYNDICATE_BOOK_GRID_PRICE_ON_PULL") or "").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
+def _book_grid_shard_mtime(sport: str, day: str) -> float | None:
+    """When `sport`'s quote shard for `day` last changed: the newer of the `.jsonl` and its
+    `.state.json` sidecar. None when neither exists -- unknown is never "new quotes"."""
+    from syndicate.features.shared.odds_book_quotes import book_quotes_path
+
+    path = book_quotes_path(sport, day)
+    candidates = [path]
+    if path.name.endswith(".jsonl"):
+        candidates.append(path.with_name(path.name[: -len(".jsonl")] + ".state.json"))
+    stamps: list[float] = []
+    for candidate in candidates:
+        try:
+            stamps.append(candidate.stat().st_mtime)
+        except OSError:
+            continue
+    return max(stamps) if stamps else None
+
+
+def _book_grid_sports_with_new_live_quotes(selected_date: str, now: float) -> list[str]:
+    """Today's sports, LIVE at their last build, whose shard changed after that build read it."""
+    if not _book_grid_price_on_pull_enabled():
+        return []
+    due: list[str] = []
+    for sport, info in sorted(_BOOK_GRID_SPORT_STATE.items()):
+        if info.get("date") != selected_date or not info.get("live"):
+            continue
+        built_at = float(info.get("built_at") or 0.0)
+        if now - built_at < _BOOK_GRID_PRICE_ON_PULL_MIN_GAP_SECONDS:
+            continue
+        read_at = float(info.get("quotes_read_at") or built_at)
+        changed = _book_grid_shard_mtime(sport, selected_date)
+        if changed is None or changed <= read_at:
+            continue
+        if now - changed < _BOOK_GRID_PRICE_ON_PULL_QUIET_SECONDS:
+            continue
+        due.append(sport)
+    return due
+
+
 def _book_grid_per_sport_window_enabled() -> bool:
     """Prune (sport, date) pairs no board will ever read. `#565`.
 
@@ -7007,9 +7078,15 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
         return None
     interval = _book_grid_refresh_interval_seconds()
     now = time.time()
+    # PRICE ON PULL (see `_book_grid_sports_with_new_live_quotes`): between ticks, rebuild only the live
+    # sports whose quotes just landed. The regular clock is not touched by such a pass.
+    on_pull: list[str] = []
     if now - _BOOK_GRID_LAST_RUN.get("all", 0.0) < interval:
-        return None
-    _BOOK_GRID_LAST_RUN["all"] = now
+        on_pull = _book_grid_sports_with_new_live_quotes(central_today_iso(), now)
+        if not on_pull:
+            return None
+    else:
+        _BOOK_GRID_LAST_RUN["all"] = now
 
     from syndicate.features.shared.book_grid_artifact import (
         build_book_grid_artifact,
@@ -7041,6 +7118,10 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
     # `_book_grid_rebuild_dates`.
     rebuild_only = _book_grid_rebuild_dates(selected_date)
     dates.extend(day for day in sorted(rebuild_only) if day not in dates)
+    if on_pull:
+        # A price-on-pull pass is today's live sports and nothing else: no previous date, no
+        # requested rebuilds, no forward dates. Those stay on the regular tick.
+        dates, rebuild_previous, rebuild_only = [selected_date], False, {}
 
     # FORWARD DATES, so a slate window has something to read (`#329`).
     #
@@ -7066,7 +7147,7 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
     # BOOK_GRID_TICK already logs what it built, so the first ticks after this
     # ships are the measurement.
     forward_days = _book_grid_forward_days()
-    if forward_days > 0:
+    if forward_days > 0 and not on_pull:
         interval_forward = interval * _BOOK_GRID_FORWARD_INTERVAL_MULTIPLE
         if now - _BOOK_GRID_LAST_RUN.get("forward", 0.0) >= interval_forward:
             _BOOK_GRID_LAST_RUN["forward"] = now
@@ -7086,6 +7167,8 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
     live_cadence = _book_grid_live_cadence_active()
     for build_date in dates:
         for sport in ("mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "wncaab", "soccer"):
+            if on_pull and sport not in on_pull:
+                continue
             if build_date in rebuild_only and sport not in rebuild_only[build_date]:
                 continue
             # `#565`. Skip the pairs no board will ever read, BEFORE the shard
@@ -7159,6 +7242,8 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
                     if build_date == selected_date:
                         skipped.append(sport)
                     continue
+                # When this build read the shard: price-on-pull compares the shard's next change to this.
+                quotes_read_at = time.time()
                 payload = build_book_grid_artifact(sport, build_date)
                 if not payload:
                     if build_date == selected_date:
@@ -7168,7 +7253,8 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
                     # Per sport now, not "stop at the first live row": the next tick's skip
                     # decision needs every sport's own state (lever 2b).
                     sport_state = _book_grid_sport_state_from_payload(payload, now)
-                    _BOOK_GRID_SPORT_STATE[sport] = {"date": selected_date, "built_at": now, **sport_state}
+                    _BOOK_GRID_SPORT_STATE[sport] = {"date": selected_date, "built_at": now,
+                                                     "quotes_read_at": quotes_read_at, **sport_state}
                     if sport_state["live"]:
                         any_live_today = True
                         live_sports.append(sport)
@@ -7227,7 +7313,15 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
         sport for sport, info in _BOOK_GRID_SPORT_STATE.items()
         if info.get("date") == selected_date and not info.get("live") and _book_grid_sport_starting_soon(info, now)
     )
-    _BOOK_GRID_LAST_RUN["any_live"] = bool(any_live_today or starting_soon)
+    if on_pull:
+        # A price-on-pull pass built only its own sports; every other sport's state is as the last
+        # full tick left it, so liveness is read across all of today's state, never just this pass.
+        any_live_state = any(
+            info.get("live") for info in _BOOK_GRID_SPORT_STATE.values() if info.get("date") == selected_date
+        )
+        _BOOK_GRID_LAST_RUN["any_live"] = bool(any_live_state or starting_soon)
+    else:
+        _BOOK_GRID_LAST_RUN["any_live"] = bool(any_live_today or starting_soon)
 
     # Marked only after the pass, so a crash mid-rebuild retries next tick
     # rather than marking the day done and leaving it frozen for good.
@@ -7262,6 +7356,8 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
         "skipped_not_live": skipped_not_live,
         "live_cadence": live_cadence,
         "next_interval_seconds": _book_grid_refresh_interval_seconds(),
+        # Non-empty on a price-on-pull pass: the live sports rebuilt because their quotes just landed.
+        "on_pull": on_pull,
     }
 
 
