@@ -58770,3 +58770,35 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - Web log 18:11-18:12Z: 0 Tracebacks, 0 `*_RESTATE_FAILED`; `LAYER2_LIVE_RESTATED cards=63 of 5445` after the load.
 - **verify:** the reading above (a live tip window, the 18:00Z NCAAB/WNCAAB tips). NHL/NBA tonight read the same code path.
 - **revert:** `git revert 5c8eec41a` on main, ff the fleet to that SHA, `reload-web`. No env switch.
+
+## 2026-11-11 18:11:24Z (12:11 PM CST) -- claimed refresh-worker TERM to load `0f6e4a723` (todo #780: live quote ceiling 120 s for NCAAB / WNCAAB / NBA / NCAAF, lane `live-gameline-quote-ceiling-120`) -- **LOADED and MET for NCAAB (priced rows over 120 s: 1 -> 0, fresh rows still priced); NBA / NCAAF not yet exercised. The fleet was ALREADY at `5c8eec41a`, so this TERM ALSO loaded other lanes' refresh-worker code (RIDE-ALONG, listed below)**
+
+- **User, in this chat:** "Yes, load it", answering "Load the 120 s ceiling on the fleet before tonight's games?". (The change itself: "Yes, set 120 s".)
+- **gates:**
+  - Claim refresh-worker, holder `live-gameline-quote-ceiling-120`, 17:57:15Z (rc 0).
+  - Ride-along check before the claim, fleet HEAD then `4793d823c`: the range `4793d823c..0f6e4a723` held ONE runtime file, mine (`live_gameline_join.py`); the ff paths overlapped 0 of the fleet's 14 locally modified files.
+  - Preflight `--target fleet --target-commit 0f6e4a72350314803fdea0157a0448157d0693df` 17:58:02Z: HOLD (board build in `layer2_shortlist_build`).
+  - `check_deploy_safety.py --drain --drain-owner live-gameline-quote-ceiling-120` from the origin/main worktree under refresh-worker pid 712's environ (`C:\tmp\livegrade\drain.sh`): CLEAR after the build and three live-odds-worker child jobs finished.
+  - Preflight re-run 18:11:12Z: **CLEAR**. It read fleet HEAD `4793d823c`. Expectations (baseline 18:10:29Z, 15-min window of the live-gameline ledgers): `ncaab_priced_gt120` 1 -> 0, `wncaab_priced_gt120` 1 -> 0, `nba_priced_gt120` 0 -> 0, `ncaaf_priced_gt120` 0 -> 0 (priced full-game rows recorded with `quote_age_seconds` > 120, by the new pid).
+- **load (`C:\tmp\livegrade\load_ceiling.sh`):**
+  - `before: HEAD 5c8eec41a` -- NOT the `4793d823c` preflight read 12 s earlier. Lane `restate-live-edge-withhold` (web claim 18:09:45Z, its CLEAR preflight 18:10:54Z) moved the fleet to its own `5c8eec41a` in between; its entry above is stamped 18:11:22Z, 2 s before my ff.
+  - `git merge --ff-only 0f6e4a72...` at 18:11:24.478Z: "Already up to date" (`5c8eec41a` contains it). On disk: `"ncaab": 120.0` 1.
+  - `kill -TERM 712` at 18:11:24.495Z. Supervisor restart: **refresh-worker pid 191825**, started 18:11:31Z, running `5c8eec41a`.
+  - `--undrain`: `DRAIN_CLEARED` 18:12:40Z.
+  - web and live-odds-worker: NOT touched by me.
+- **RIDE-ALONG -- loaded into refresh-worker by this TERM, not by their owners** (runtime files `0f6e4a723..5c8eec41a` that refresh-worker imports):
+  - `c8d79b8ee` (#775 regression: face/side lookups try the engine spelling, then the book's; `nba_player_identity.py`, `player_headshots.py`).
+  - `eacc9f990` (#782 NBA live odds past midnight; refresh-worker half `pipeline/layer2_shortlist.py` +3, `layer2_board.py` +9). Lane `load-782-nba-quote-capture`'s opening note says the user scoped that lane's load to live-odds-worker only. But the restate lane's entry above (18:11:22Z) records the user's answer "Go ahead, let it ride (Recommended)" to whether its ff may carry #781, #775, #780, #782 and #778's commits, so the ff itself was user-approved. Loading #782's refresh-worker half NOW, at my TERM, was not something either lane measured for.
+  - `5c8eec41a` (lane `restate-live-edge-withhold`, `pipeline/intelligence_state.py`, 68 lines changed). Its entry says `_refresh_layer2_live_state` runs on web only (0 restate lines on either worker), so in refresh-worker it should be inert.
+  - Also on disk, not refresh-worker's: `63e56dbb4` (`refresh_nba_oddsapi_props.py`, a live-odds-worker subprocess), `df08d4d9a` (#781 interval rows, `intelligence.html`, web).
+  - Both deploying sessions were told at 18:13Z (cross-session messages to "NBA live props for a game live at midnight CT" and "Live rows on the look-ahead board date keep a pregame edge"): any refresh-worker "before" of theirs must come from before 18:11:24Z.
+- **Why it happened:** `git merge --ff-only <older sha>` is a silent no-op when the checkout has already moved past that SHA, and my script did not compare HEAD with the HEAD preflight read before sending the TERM. Preflight's receipt is per SHA, so it cannot see the checkout move between its read and the TERM. Rule written to learnings.md.
+- **verify, 18:16:40Z (12:16 PM CST), read-only** (`ceiling_read.py` over the live-gameline ledgers and refresh-worker's `LIVE_GAMELINE_JOIN` lines since pid 191825 started at 18:11:31Z):
+  - `ncaab_priced_gt120`: **1 -> 0, MET.** 28 NCAAB ledger records, 7 priced on 2 games, all 7 at quote age <= 120 s. So fresh quotes still price.
+  - `wncaab_priced_gt120`: 1 -> 0, MET, but thin: 0 WNCAAB ledger rows yet. The join line priced 0 of 34 and names `quote_older_than_live_pricing_ceiling` 22 times.
+  - NCAAB join 18:16:32Z: `considered=136 projected=10 priceable=7 display=61`, and `why` includes `quote_older_than_live_pricing_ceiling: 29`. Display is kept on refused rows.
+  - Same-day before, last join pre-load (17:57:29Z, old code): `considered=74 priceable=0 display=30`, `quote_older_than_live_pricing_ceiling: 6`. The population differs (more games live after 18:00Z tips), so this is not a share comparison.
+  - `nba_priced_gt120` / `ncaaf_priced_gt120`: 0 -> 0, NOT EXERCISED (no live NBA or NCAAF game yet; the joins read `considered=0`). Tonight's NBA slate is the first real read: `wsl -d Ubuntu-24.04 -- nice -n 19 python3 /mnt/c/tmp/livegrade/ceiling_read.py 2026-11-12T00:00 2026-11-12T05:00`.
+  - Tracebacks in refresh-worker.log since 18:11:31Z: **0** in 883 lines.
+- **revert:** env `SYNDICATE_LIVE_GAMELINE_MAX_QUOTE_AGE_SECONDS=600` (every sport, incl. MLB back to 600) via `local_production.env` + a drained full down/up, or revert `0f6e4a723` on main, ff and TERM refresh-worker.
+- **Correction `[2026-11-11 18:14Z]`:** in the 2026-11-11 06:12Z `college-live-resim-midnight` entry, "live-odds-worker pid 533637, started 23:10:15Z 11-10" is wrong: the fleet's `ps lstart` prints Central time, so it started 23:10:15 CST 11-10 = 05:10:15Z 11-11. The reading stands.
