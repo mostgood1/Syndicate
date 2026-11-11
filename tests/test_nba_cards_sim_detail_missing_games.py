@@ -155,6 +155,59 @@ def test_a_failed_merge_leaves_the_pre_fix_behaviour(roots, monkeypatch) -> None
     assert [_key(g) for g in _games(processed)] == ["BOS@PHI"]
 
 
+def test_the_added_line_reaches_the_run_log(roots) -> None:
+    """The script's stdout never reaches the run log (measured 2026-11-11: the 06:03Z merge of 5 games printed to no
+    fleet log), so the line is also appended to `log_file`."""
+    source_root, processed = roots
+    _partial_file_then_more_sims(source_root, processed)
+    log = source_root / "run.log"
+
+    nba._export_cards_sim_detail_snapshot(source_root=source_root, date_str=DATE, processed_root=processed, log_file=log)
+
+    text = log.read_text(encoding="utf-8")
+    assert "CARDS_SIM_DETAIL_MISSING_GAMES_ADDED date=2026-11-10 games_before=1 added=2 games_after=3" in text
+    assert "LAC@PHX" in text and "MIA@UTA" in text
+
+
+def test_no_log_file_writes_no_log_and_a_complete_file_logs_nothing(roots) -> None:
+    source_root, processed = roots
+    _partial_file_then_more_sims(source_root, processed)
+    _export(source_root, processed)  # off: no log_file
+    assert not list(source_root.glob("*.log"))
+    log = source_root / "run.log"
+    nba._export_cards_sim_detail_snapshot(source_root=source_root, date_str=DATE, processed_root=processed, log_file=log)
+    assert not log.exists()  # nothing missing any more, so nothing to say
+
+
+def test_a_failed_merge_is_logged(roots, monkeypatch) -> None:
+    source_root, processed = roots
+    _partial_file_then_more_sims(source_root, processed)
+    log = source_root / "run.log"
+
+    def _boom(**_):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(nba, "_merge_missing_cards_sim_detail_games", _boom)
+    nba._export_cards_sim_detail_snapshot(source_root=source_root, date_str=DATE, processed_root=processed, log_file=log)
+
+    assert "CARDS_SIM_DETAIL_MISSING_GAMES_FAILED date=2026-11-10 error=OSError('disk full')" in log.read_text(encoding="utf-8")
+
+
+def test_the_refresh_passes_its_run_log_to_the_export() -> None:
+    """Reachability: the fleet's call site (`_run_refresh_via_cli`) hands the export its run log."""
+    import ast
+    import inspect
+    import textwrap
+
+    tree = ast.parse(textwrap.dedent(inspect.getsource(nba._run_refresh_via_cli)))
+    calls = [
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "_export_cards_sim_detail_snapshot"
+    ]
+    assert calls, "the refresh no longer calls the export"
+    assert all(any(kw.arg == "log_file" for kw in call.keywords) for call in calls)
+
+
 def test_the_added_game_reaches_the_projection_index(roots, monkeypatch) -> None:
     """Reachability: the prop projection join's index sees the added game's players (off: absent; on: present)."""
     source_root, processed = roots

@@ -3301,6 +3301,7 @@ def _run_refresh_via_cli(
                 source_root=source_root,
                 date_str=date_str,
                 processed_root=source_processed_root,
+                log_file=log_file,
             )
         except Exception as exc:
             _append_log(log_file, f"cards_sim_detail snapshot export failed before parity gate: {exc}")
@@ -4009,7 +4010,7 @@ def _build_cards_sim_detail_from_local_smart_sim(*, processed_root: Path, date_s
     return games_out
 
 
-def _merge_missing_cards_sim_detail_games(*, path: Path, processed_root: Path, date_str: str) -> int:
+def _merge_missing_cards_sim_detail_games(*, path: Path, processed_root: Path, date_str: str, log_file: Path | None = None) -> int:
     """Add to an existing `cards_sim_detail_<D>.json` every game that has a smart_sim file but no entry. Returns the
     number of games added.
 
@@ -4026,6 +4027,10 @@ def _merge_missing_cards_sim_detail_games(*, path: Path, processed_root: Path, d
     exists for that game, so a complete file is never rewritten (its mtime is unchanged). Whether already-indexed games
     should follow later re-sims is a separate question: the fleet also rewrites a started game's pregame sim
     mid-game. A game counts as present in either home/away orientation. An unreadable existing file is left alone.
+
+    The result line goes to `log_file` (the run log, `syndicate_refresh_oddsapi_props_<D>.log`) as well as stdout:
+    the script's stdout never reaches that log. Measured 2026-11-11: the merge added 5 games to the 11-11 file at
+    06:03Z, and the printed line was in no fleet log.
     """
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -4054,15 +4059,19 @@ def _merge_missing_cards_sim_detail_games(*, path: Path, processed_root: Path, d
     tmp_path.write_text(json.dumps(out, indent=2), encoding="utf-8")
     os.replace(tmp_path, path)
     added_names = ["%s@%s" % (g.get("away_tri"), g.get("home_tri")) for g in added]
-    print(
+    line = (
         f"[refresh_nba_oddsapi_props] CARDS_SIM_DETAIL_MISSING_GAMES_ADDED date={date_str} games_before={len(games)} "
-        f"added={len(added)} games_after={len(out['games'])} added_games={added_names}",
-        flush=True,
+        f"added={len(added)} games_after={len(out['games'])} added_games={added_names}"
     )
+    print(line, flush=True)
+    if log_file is not None:
+        _append_log(log_file, line)
     return len(added)
 
 
-def _export_cards_sim_detail_snapshot(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
+def _export_cards_sim_detail_snapshot(
+    *, source_root: Path, date_str: str, processed_root: Path, log_file: Path | None = None
+) -> str | None:
     existing = _copy_existing_processed_artifact(
         source_root=source_root,
         processed_root=processed_root,
@@ -4070,9 +4079,14 @@ def _export_cards_sim_detail_snapshot(*, source_root: Path, date_str: str, proce
     )
     if existing:
         try:
-            _merge_missing_cards_sim_detail_games(path=Path(existing), processed_root=processed_root, date_str=date_str)
+            _merge_missing_cards_sim_detail_games(
+                path=Path(existing), processed_root=processed_root, date_str=date_str, log_file=log_file
+            )
         except Exception as exc:  # a failed merge must leave the pre-#778 behaviour, never break the export
-            print(f"[refresh_nba_oddsapi_props] CARDS_SIM_DETAIL_MISSING_GAMES_FAILED date={date_str} error={exc!r}", flush=True)
+            line = f"[refresh_nba_oddsapi_props] CARDS_SIM_DETAIL_MISSING_GAMES_FAILED date={date_str} error={exc!r}"
+            print(line, flush=True)
+            if log_file is not None:
+                _append_log(log_file, line)
         return existing
     out_path = processed_root / f"cards_sim_detail_{date_str}.json"
     games_out = _build_cards_sim_detail_from_local_smart_sim(processed_root=processed_root, date_str=date_str)
