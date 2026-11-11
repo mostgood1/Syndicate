@@ -54,7 +54,7 @@ Every complete slate checked (10-31, 11-01, 11-02, 11-05, 11-07, 11-08, 11-09) h
 - leaves an unreadable file alone;
 - writes atomically (tmp + `os.replace`); a merge that raises leaves the pre-fix behaviour (logged `CARDS_SIM_DETAIL_MISSING_GAMES_FAILED`);
 - prints `[refresh_nba_oddsapi_props] CARDS_SIM_DETAIL_MISSING_GAMES_ADDED date= games_before= added= games_after= added_games=`
-  into the NBA refresh run log.
+  into the NBA refresh run log. **Corrected 2026-11-11:** the print reached no fleet log, because the script's stdout does not go to the run log; only `_append_log` lines do. `63e56dbb4` also writes it via `_append_log`. The adding branch itself ran on 11-11 at 06:03Z: 5 -> 10 games.
 
 Tests: `tests/test_nba_cards_sim_detail_missing_games.py` (8), including an OFF arm (the pre-fix path leaves 1 game), a failed
 merge falling back to the pre-fix behaviour, and reachability into `load_nba_prop_projections` (the added game's players absent OFF, present ON).

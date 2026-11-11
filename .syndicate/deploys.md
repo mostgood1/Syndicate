@@ -58705,3 +58705,17 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - Pregame: `[nba_projections] NBA_PROP_ENGINE_NAME ... ('Bobby Portis', 'Bobby Portis Jr.')` from 02:02Z. todo #775's pregame-join alias was live by tip, so his pregame rows resolve too.
 - **Verdict:** his live prop rows stopped missing the live re-sim (18/20 -> 0 after the lens went live). That is MET on the join log. The pre-registered served-board rule (each served live row carries Live proj. AND actual) was NOT MEASURED.
 - **Next MIA game:** Thu 11-13, CLE @ MIA, 7:00 PM CST (01:00Z 11-14, ESPN 401909298). The same check script can read it if re-armed in a mode that will not stall.
+
+## 2026-11-11 17:55Z (11:55 AM CST) -- VERIFY of the 00:30:09Z load, #778 adding branch (`54c43581d`, lane `nba-sim-index-missing-games`, read-only) -- **OBSERVED; GOAL MET; lane CLOSED**
+- **No deploy.** These readings close the "adding branch: NOT YET OBSERVED" left by the 2026-11-11 02:46:45Z entry.
+- **The file:** `cards_sim_detail_2026-11-11.json` had 5 games at 02:46Z (mtime 22:36:21Z 11-10). At 17:4xZ it has **10** (mtime **06:03:36Z** 11-11), with 10 smart_sim files and 0 missing.
+  - Order: SAS@CHI, GSW@HOU, WAS@IND, BKN@NOP, OKC@POR, then DEN@MEM, LAL@MIL, CLE@NYK, BOS@TOR, ORL@UTA.
+  - The second five are the games the 06:01:31Z run priced (`Added 5 newly priced game(s) to the game_odds slate`, in the 11-11 props log). Each half is sorted by home team, the builder's order.
+  - A fresh build would sort all 10 together, and the pre-fix code returns an existing file untouched. So this is `_merge_missing_cards_sim_detail_games` keeping the 5 and appending 5.
+  - Byte-identity of the 5 kept entries rests on that and on the code, not a hash.
+- **Served** `ranked_all` at 17:50:53Z: all 10 games' NBA prop rows carry `sim_projection` + `model_edge_pct`, 316 of 332 rows. Per game [rows, projection, edge]:
+  - BOS@TOR [43,41,41]; BKN@NOP [46,38,38]; CLE@NYK [44,41,41]; DEN@MEM [25,23,23]; GSW@HOU [36,36,36];
+  - LAL@MIL [32,32,32]; OKC@POR [35,34,34]; ORL@UTA [8,8,8]; SAS@CHI [40,40,40]; WAS@IND [23,23,23].
+- **The log line was missing**, so it could not show this. `CARDS_SIM_DETAIL_MISSING_GAMES_ADDED` appears in no fleet log: not the props logs 11-10..11-13, not `live-odds-worker.log`, not `refresh-worker.log`. The 11-11 props log has 0 `[refresh_nba_oddsapi_props]` prefixed lines at all, because the script's stdout does not reach it; only `_append_log` lines do.
+  - Fixed on main in `63e56dbb4`: the line also goes through `_append_log`, and `_run_refresh_via_cli` passes its run log. NOT LOADED; the next ff loads it (a fresh subprocess per run).
+- **Also on main, not loaded:** `c8d79b8ee` (todo #775), the face/side fallback to the book's spelling for Bobby Portis.
