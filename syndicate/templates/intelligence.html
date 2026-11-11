@@ -668,6 +668,12 @@
     // `marketFamily`, which is only the game-vs-prop split. Options are built
     // from the markets actually present, so it can never offer an empty slice.
     betType: urlParams.get("bet_type") || "all",
+    // Games-rail live-edge filter (lane layer2-live-rail-edges, todo #781): "all" games, or only the live games
+    // with a FRESH-quote edge -- in any game-line market, or in one. A VIEW over the rail the reader picks, not
+    // a gate: it removes no row, pick or stake from the board (learnings 2026-10-05, no market is withheld).
+    // Kept out of FILTER_DEFAULTS on purpose -- those count and clear BOARD-row filters, and this one narrows
+    // only the rail.
+    liveEdge: ["any", "spreads", "totals", "h2h"].includes(String(urlParams.get("live_edge") || "")) ? urlParams.get("live_edge") : "all",
     // Blotter column sort, client-side only (not persisted to the URL --
     // this is a viewing preference for the current session, not a
     // shareable board configuration like sport/date/filters are). null
@@ -847,6 +853,7 @@
     // carry a parameter that changes nothing.
     if (state.altLines !== "main") url.searchParams.set("alt_lines", state.altLines); else url.searchParams.delete("alt_lines");
     if (state.betType !== "all") url.searchParams.set("bet_type", state.betType); else url.searchParams.delete("bet_type");
+    if (state.liveEdge !== "all") url.searchParams.set("live_edge", state.liveEdge); else url.searchParams.delete("live_edge");
     window.history.replaceState({}, "", url.toString());
   }
 
@@ -3152,6 +3159,308 @@
     return box + line;
   }
 
+  // ===== LIVE RAIL LINES -- BEGIN (lane layer2-live-rail-edges, todo #781) =====
+  //
+  // WHAT. A pregame rail card shows the sim ("Proj NEB −4.0 · O/U 150.0") and,
+  // under it, the book's line (`chip.footer`). A LIVE card showed the live
+  // re-sim ("Proj final ...") and NO line at all: the chip footer is pregame-
+  // only (`game_chip_scoreboard.py`, `"footer": ... if state == "pregame"`)
+  // and the rail never read the game's live board rows. The data was never
+  // missing -- measured on the fleet's served board 2026-11-10 23:45Z, 50 live
+  // full-game rows across 5 college games carried the line, `live_total` /
+  // `live_model_probability`, the join's `model_edge_pct` and
+  // `book_age_seconds`. So this is display only: it READS those rows (no
+  // computation beyond picking and formatting; the web-reads-artifacts rule).
+  //
+  // Per full-game market (spread, total, moneyline), one row: OURS (the live
+  // re-sim's number -- the card's own "Proj final" block where it has one, so
+  // the two lines on one card cannot disagree), BOOK (the market's main live
+  // line: the one priced closest to even), and AGE.
+  //
+  // AGE IS THE CLOCK THE GRADE USED. `book_age_seconds` is how long the book's
+  // price had stood unchanged at the board build -- the grid's `age_seconds`,
+  // the same field the live join reads as the quote's age and the live
+  // gameline ledger records as `quote_age_seconds`. Shown as of NOW: that age
+  // plus the time since the build (the row's own `price_grid_generated_at` on
+  // an in-play overlay row, else the page's build time, `boardBuildEpochMs`).
+  //
+  // THE EDGE FLAG COUNTS ONLY AN EDGE PRICED AGAINST A FRESH QUOTE. Graded
+  // against finals (todo #780, .syndicate/findings_2026-11-10_live_totals_grade.md):
+  // priced live full-game totals CLAIMED +16 to +23 points and REALISED about
+  // 0 when the quote was <= 30 s old (NCAAB +0.014 +- 0.054, NBA -0.001 +-
+  // 0.136, NCAAF -0.019 +- 0.054); the apparent edge appeared only on quotes
+  // 90 s to 10 min old -- the line not having moved yet, or a suspended
+  // market, neither of which can be bet at that price. The join still PRICES
+  // quotes up to 600 s (`live_gameline_join._DEFAULT_MAX_QUOTE_AGE_SECONDS`;
+  // MLB 120 s) -- tightening that is #780's candidate fix 1, a separate user
+  // decision, and NOT made here. So a highlight keyed on the edge alone would
+  // mostly flag stale quotes; this one also requires:
+  //   - the quote's age AT PRICING <= LIVE_EDGE_FRESH_QUOTE_SECONDS (30 s): the
+  //     bucket the totals grade measured as fresh in every sport. #780's
+  //     all-market addendum (23:57Z) puts the stale side later: totals,
+  //     spreads and moneylines realise ~0 under 120 s, and the fake "edge"
+  //     appears clearly from 180-300 s; 120 s is the ceiling it proposes for
+  //     the join. 30 s stays well inside that, on the conservative side;
+  //     raising it to 120 s is a product choice, not a measured gain (under
+  //     120 s the model's Brier was WORSE than the market);
+  //   - the price not stale NOW (age now <= LIVE_PRICE_STALE_AFTER_SECONDS, the
+  //     page's existing live-price rule), so a frozen board cannot keep a flag
+  //     lit on a price the card itself calls stale;
+  //   - a live-priced edge (`live_aware` and the join's `model_edge_pct`; a
+  //     pregame number on a live row never counts) of at least LIVE_EDGE_MIN_PP.
+  // A gap on an older quote is NOT shown as an edge anywhere on the rail: its
+  // AGE cell is simply old. Fresh is a property of the LINE (its quote age),
+  // never of the market (learnings 2026-10-05).
+  //
+  // Even a fresh-quote edge is not shown to be real: #780's fresh bucket
+  // realised ~0. The flag says "priced against a price you could still take",
+  // and nothing more.
+  const LIVE_EDGE_FRESH_QUOTE_SECONDS = 30;
+  // A -110 / -110 market needs ~2.4 points over the no-vig fair just to break
+  // even (52.4% vs 50%); a gap under 3 points is not an edge after the vig.
+  const LIVE_EDGE_MIN_PP = 3;
+  const LIVE_RAIL_MARKETS = [
+    { key: "spreads", label: "Spread", short: "Sprd" },
+    { key: "totals", label: "Total", short: "Total" },
+    { key: "h2h", label: "Moneyline", short: "ML" },
+  ];
+  const LIVE_EDGE_FILTER_TABS = [
+    { value: "all", label: "All games" },
+    { value: "any", label: "Live edge" },
+    { value: "spreads", label: "Spread" },
+    { value: "totals", label: "Total" },
+    { value: "h2h", label: "ML" },
+  ];
+
+  function liveRailNum(value) {
+    if (value === null || value === undefined || value === "" || typeof value === "boolean") return null;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  // The rail's market key for a LIVE FULL-GAME game-line row, else null. Halves
+  // and quarters are left out: the rail line is the full game, and college
+  // segment pricing is off (#763).
+  function liveRailMarketKey(item) {
+    if (!item || typeof item !== "object") return null;
+    if (String(item.kind || item.candidate_type || "").trim().toLowerCase() !== "game") return null;
+    const live = String(item.market_state || "").trim().toLowerCase() === "live" || item.is_live === true;
+    if (!live) return null;
+    const segment = String(item.segment || "full").trim().toLowerCase();
+    if (segment !== "full" && segment !== "game") return null;
+    const market = String(item.market || item.market_type || "").trim().toLowerCase();
+    if (market === "totals" || market === "total") return "totals";
+    if (market === "spreads" || market === "spread") return "spreads";
+    if (market === "h2h" || market === "moneyline" || market === "ml") return "h2h";
+    return null;
+  }
+
+  // The quote's age when the board priced it: the book's own "unchanged for"
+  // clock at the build. Unknown is null, and null is never fresh.
+  function liveQuotePricingAgeSeconds(item) {
+    const quote = item && item.quote && typeof item.quote === "object" ? item.quote : {};
+    const age = liveRailNum(item && item.book_age_seconds) ?? liveRailNum(quote.book_age_seconds);
+    return age !== null && age >= 0 ? age : null;
+  }
+
+  function liveQuoteAgeNowSeconds(item, response, nowMs) {
+    const priced = liveQuotePricingAgeSeconds(item);
+    if (priced === null) return null;
+    const own = Date.parse(String((item && item.price_grid_generated_at) || ""));
+    const builtAt = Number.isFinite(own) ? own : boardBuildEpochMs(response);
+    if (builtAt === null || builtAt === undefined || !Number.isFinite(builtAt)) return null;
+    const now = Number.isFinite(nowMs) ? nowMs : Date.now();
+    return priced + Math.max(0, (now - builtAt) / 1000);
+  }
+
+  // The live join's edge for this row, in points, or null. `live_aware` is set
+  // only where the live join ran on the row, so a pregame `model_edge_pct` on a
+  // live row is never read as a live edge.
+  function liveRowEdgePp(item) {
+    if (!item || item.live_aware !== true) return null;
+    return liveRailNum(item.model_edge_pct);
+  }
+
+  // {edge, priced, ageNow} when this row's live edge counts, else null. See the
+  // block comment: an edge, a fresh quote at pricing, and a price not stale now.
+  function liveRowFreshEdge(item, response, nowMs) {
+    const edge = liveRowEdgePp(item);
+    if (edge === null || edge < LIVE_EDGE_MIN_PP) return null;
+    const priced = liveQuotePricingAgeSeconds(item);
+    if (priced === null || priced > LIVE_EDGE_FRESH_QUOTE_SECONDS) return null;
+    const ageNow = liveQuoteAgeNowSeconds(item, response, nowMs);
+    if (ageNow === null || ageNow > LIVE_PRICE_STALE_AFTER_SECONDS) return null;
+    return { edge, priced, ageNow };
+  }
+
+  function liveRailFairProb(row) {
+    const quote = row && row.quote && typeof row.quote === "object" ? row.quote : {};
+    const fair = liveRailNum(quote.fair_probability) ?? liveRailNum(quote.fair_consensus_prob);
+    if (fair !== null) return fair;
+    const odds = liveRailNum(row && row.odds);
+    if (odds === null || odds === 0) return null;
+    return odds > 0 ? 100 / (odds + 100) : -odds / (-odds + 100);
+  }
+
+  // The market's MAIN live line among a game's rows of one market: the line
+  // priced closest to even (a de-vigged fair nearest 50%), which is what a
+  // book posts as its main number while the alternates sit either side.
+  // Moneyline: the side our live number favours.
+  function liveRailMainRow(rows, market) {
+    const age = (row) => { const a = liveQuotePricingAgeSeconds(row); return a === null ? Infinity : a; };
+    if (market === "h2h") {
+      const rank = (row) => {
+        const p = liveRailNum(row.live_model_probability);
+        return p === null ? 2 : (p >= 0.5 ? 0 : 1);
+      };
+      return rows.slice().sort((a, b) => rank(a) - rank(b) || age(a) - age(b))[0] || null;
+    }
+    const lined = rows.filter((row) => liveRailNum(row.line) !== null);
+    const off = (row) => { const p = liveRailFairProb(row); return p === null ? 1 : Math.round(Math.abs(p - 0.5) * 1e6); };
+    const books = (row) => liveRailNum((row.quote || {}).books_quoting) || 0;
+    // Two sides of one spread price equally far from even: name the favourite's.
+    const favourite = (row) => (market === "spreads" && liveRailNum(row.line) < 0 ? 0 : 1);
+    return lined.slice().sort((a, b) => off(a) - off(b) || favourite(a) - favourite(b) || books(b) - books(a) || age(a) - age(b))[0] || null;
+  }
+
+  // Which of the CHIP's sides this row's team is ("home" / "away"), or null.
+  // Through the server's canonical keys when both carry them, so a chip whose
+  // home/away disagree with the book's (game_chip_flipped_orientation) still
+  // gets the right team; else the row's own side.
+  function liveRailChipSide(row, chip) {
+    const side = String((row && row.side) || "").trim().toLowerCase();
+    if (side !== "home" && side !== "away") return null;
+    const other = side === "home" ? "away" : "home";
+    const rowKey = String((row && row[`${side}_key`]) || "").trim().toLowerCase();
+    const chipOther = String((chip && chip[other] && chip[other].key) || "").trim().toLowerCase();
+    return rowKey && chipOther && rowKey === chipOther ? other : side;
+  }
+
+  function liveRailTeamLabel(row, chip) {
+    const chipSide = liveRailChipSide(row, chip);
+    if (chipSide && chip && chip[chipSide] && chip[chipSide].abbr) return String(chip[chipSide].abbr);
+    return trimClubAffixes((row && (row.team || row.display_name)) || "");
+  }
+
+  function liveRailSigned(value, digits) {
+    if (Math.abs(value) < 0.05) return "PK";
+    const text = Number.isInteger(value) && digits === null ? String(Math.abs(value)) : Math.abs(value).toFixed(digits === null ? 1 : digits);
+    return `${value > 0 ? "+" : "−"}${text}`;
+  }
+
+  function liveRailAmerican(odds) {
+    const n = liveRailNum(odds);
+    if (n === null || n === 0) return "–";
+    return n > 0 ? `+${n}` : `−${Math.abs(n)}`;
+  }
+
+  // One rail card's live lines, from the game's live full-game rows and its
+  // chip. Returns {markets: [...], freshEdges: {market: true}, hasFreshEdge}.
+  // The edge half reads the ROWS only, so the filter never depends on a chip.
+  function liveRailSummary(rows, chip, response, nowMs) {
+    const iv = chip && chip.intervals && chip.intervals.source === "live_resim" ? chip.intervals : null;
+    const final = iv && iv.final ? iv.final : {};
+    const out = { markets: [], freshEdges: {}, hasFreshEdge: false };
+    for (const spec of LIVE_RAIL_MARKETS) {
+      const marketRows = (rows || []).filter((row) => liveRailMarketKey(row) === spec.key);
+      const main = marketRows.length ? liveRailMainRow(marketRows, spec.key) : null;
+      if (!main) continue;
+      const team = liveRailTeamLabel(main, chip);
+      const line = liveRailNum(main.line);
+      let ours = null;
+      let book = "–";
+      if (spec.key === "totals") {
+        const total = liveRailNum(final.total) ?? marketRows.map((row) => liveRailNum(row.live_total)).find((v) => v !== null) ?? null;
+        ours = total === null ? null : total.toFixed(1);
+        book = line === null ? "–" : (Number.isInteger(line) ? String(line) : line.toFixed(1));
+      } else if (spec.key === "spreads") {
+        // A spread row with no live number is blank BY DECISION upstream (NFL
+        // spreads: lane margins graded FAIL; NHL puck lines: no margin
+        // distribution), so the rail does not supply one from elsewhere.
+        const shown = marketRows.some((row) => liveRailNum(row.live_model_probability) !== null);
+        const margin = liveRailNum(final.home_margin);
+        const chipSide = liveRailChipSide(main, chip);
+        if (shown && margin !== null && chipSide) {
+          ours = `${team} ${liveRailSigned(chipSide === "home" ? -margin : margin, 1)}`;
+        } else if (liveRailNum(main.live_model_probability) !== null) {
+          ours = `${Math.round(liveRailNum(main.live_model_probability) * 100)}% cover`;
+        }
+        book = line === null ? "–" : `${team} ${liveRailSigned(line, null)}`;
+      } else {
+        const p = liveRailNum(main.live_model_probability);
+        const hp = liveRailNum(final.home_win_prob);
+        if (p !== null) ours = `${team} ${Math.round(p * 100)}%`;
+        else if (hp !== null && chip) {
+          const fav = hp >= 0.5 ? "home" : "away";
+          ours = `${String((chip[fav] || {}).abbr || fav.toUpperCase())} ${Math.round((fav === "home" ? hp : 1 - hp) * 100)}%`;
+        }
+        book = `${team} ${liveRailAmerican(main.odds)}`;
+      }
+      let best = null;
+      for (const row of marketRows) {
+        const fresh = liveRowFreshEdge(row, response, nowMs);
+        if (fresh && (!best || fresh.edge > best.edge)) best = { ...fresh, row };
+      }
+      let edge = null;
+      if (best) {
+        const r = best.row;
+        const rLine = liveRailNum(r.line);
+        const side = spec.key === "totals"
+          ? `${String(r.side || "").toLowerCase() === "under" ? "u" : "o"}${rLine === null ? "" : rLine}`
+          : spec.key === "spreads"
+            ? `${liveRailTeamLabel(r, chip)} ${rLine === null ? "" : liveRailSigned(rLine, null)}`
+            : `${liveRailTeamLabel(r, chip)} ML`;
+        edge = { side, edge: best.edge, priced: best.priced, ageNow: best.ageNow };
+        out.freshEdges[spec.key] = true;
+        out.hasFreshEdge = true;
+      }
+      out.markets.push({
+        key: spec.key, label: spec.label, short: spec.short, ours, book,
+        ageNow: liveQuoteAgeNowSeconds(main, response, nowMs),
+        pricedAge: liveQuotePricingAgeSeconds(main),
+        edge,
+      });
+    }
+    return out;
+  }
+
+  function liveEdgeFilterMatches(summary, filter) {
+    if (!filter || filter === "all") return true;
+    if (!summary) return false;
+    return filter === "any" ? Boolean(summary.hasFreshEdge) : Boolean(summary.freshEdges && summary.freshEdges[filter]);
+  }
+
+  function renderLiveRailLines(summary) {
+    if (!summary || !summary.markets || !summary.markets.length) return "";
+    const span = (cls, text) => `<span class="game-mini-card__live-${cls}">${escapeHtml(text)}</span>`;
+    const head = ["LIVE", "OURS", "BOOK", "AGE"].map((text) => span("label", text)).join("");
+    const body = summary.markets.map((m) => {
+      // AGE SHOWS THE CLOCK THE FLAG TESTS: the quote's age when the board
+      // priced it, so the number and its green agree (a "65s" in green, read
+      // on the fleet 2026-11-10, was a 25 s quote served 40 s later). Once the
+      // board itself is stale the age NOW replaces it, in orange: that is the
+      // number that matters then.
+      const stale = m.ageNow !== null && m.ageNow > LIVE_PRICE_STALE_AFTER_SECONDS;
+      const fresh = !stale && m.ageNow !== null && m.pricedAge !== null && m.pricedAge <= LIVE_EDGE_FRESH_QUOTE_SECONDS;
+      const shown = stale ? m.ageNow : m.pricedAge;
+      const age = shown === null ? null : formatAge(shown);
+      const ageCls = fresh ? " is-fresh" : stale ? " is-stale" : "";
+      const tip = `Quote ${m.pricedAge === null ? "age unknown" : `${formatAge(m.pricedAge)} old`} when priced; ${m.ageNow === null ? "no board build time" : `≈${formatAge(m.ageNow)} now`}`;
+      return span("mkt", m.short) + span("ours", m.ours === null ? "–" : m.ours) + span("book", m.book)
+        + `<span class="game-mini-card__live-age${ageCls}" title="${escapeHtml(tip)}">${escapeHtml(age || "?")}</span>`;
+    }).join("");
+    const title = "Live, full game: OURS is the live re-sim, BOOK the market's main live line (priced closest to even). "
+      + "AGE is how long the book's price had stood unchanged when the board priced it (orange: the board is over 5 min old, shown as the age now). "
+      + `An edge is flagged only when it was priced against a quote ${LIVE_EDGE_FRESH_QUOTE_SECONDS}s old or less (green): `
+      + "graded against finals (#780), live edges on older quotes were the line not having moved yet, not a price you could take.";
+    const edges = summary.markets.filter((m) => m.edge).map((m) => {
+      const tip = `Our live re-sim's probability minus the market's no-vig fair: +${m.edge.edge.toFixed(1)} points, priced against a quote ${formatAge(m.edge.priced) || "?"} old. Even fresh-quote live edges graded ~0 against finals so far (#780).`;
+      return `<div class="game-mini-card__live-edge" title="${escapeHtml(tip)}">▲ ${escapeHtml(m.label)} ${escapeHtml(m.edge.side)} +${escapeHtml(m.edge.edge.toFixed(1))} pts · ${escapeHtml(formatAge(m.edge.priced) || "?")} quote</div>`;
+    }).join("");
+    return `<div class="game-mini-card__live" title="${escapeHtml(title)}">${head}${body}</div>${edges}`;
+  }
+  // ===== LIVE RAIL LINES -- END =====
+
   // One mini card per underlying game (not per opportunity) so a user can
   // scan today's slate and jump straight to a specific matchup's
   // opportunities, instead of scrolling the full board looking for it.
@@ -3835,12 +4144,56 @@
       `;
       return;
     }
+    // LIVE LINES + LIVE-EDGE FILTER (lane layer2-live-rail-edges, todo #781;
+    // see the LIVE RAIL LINES block). Each live game's own live full-game rows,
+    // keyed through the #165 merge map exactly as the board's game filter is.
+    const liveRowsByGame = new Map();
+    for (const item of items) {
+      if (!liveRailMarketKey(item)) continue;
+      const raw = gameKey(item);
+      const key = raw ? (gameKeyMergeMap.get(raw) || raw) : null;
+      if (!key) continue;
+      if (!liveRowsByGame.has(key)) liveRowsByGame.set(key, []);
+      liveRowsByGame.get(key).push(item);
+    }
+    const nowMs = Date.now();
+    const liveSummaries = new Map();
+    for (const game of games) {
+      const chip = chipForGame(game);
+      if (!(chip ? chip.state === "live" : game.hasLive)) continue;
+      liveSummaries.set(game.key, liveRailSummary(liveRowsByGame.get(game.key) || [], chip, lastResponseForActions, nowMs));
+    }
+    const liveFilter = state.liveEdge || "all";
+    // The selected game always stays on the rail: hiding the card a reader just
+    // picked would strand the board's one-game filter with nothing to un-click.
+    const shownGames = games.filter((game) => game.key === state.game || liveEdgeFilterMatches(liveSummaries.get(game.key), liveFilter));
+    const edgeCounts = {};
+    for (const tab of LIVE_EDGE_FILTER_TABS) {
+      edgeCounts[tab.value] = tab.value === "all" ? games.length
+        : games.filter((game) => liveEdgeFilterMatches(liveSummaries.get(game.key), tab.value)).length;
+    }
+    // Shown whenever a live game is on the rail (or the filter is on, so it can
+    // always be turned off again).
+    const edgeFilter = liveSummaries.size || liveFilter !== "all"
+      ? `<div class="game-rail-filter" role="tablist" aria-label="Live-edge filter" title="Live games whose live re-sim has an edge priced against a quote ${LIVE_EDGE_FRESH_QUOTE_SECONDS}s old or less (#780: edges on older quotes are not counted)">${LIVE_EDGE_FILTER_TABS.map((tab) => {
+        const active = tab.value === liveFilter;
+        const empty = edgeCounts[tab.value] === 0 && !active;
+        return `<button type="button" role="tab" class="game-rail-filter__tab${active ? " is-active" : ""}${empty ? " is-empty" : ""}" aria-selected="${active}" data-live-edge-filter="${escapeHtml(tab.value)}">${escapeHtml(tab.label)}<span class="board-tab-count">${edgeCounts[tab.value]}</span></button>`;
+      }).join("")}</div>`
+      : "";
+    const emptyNote = !shownGames.length
+      ? `<div class="game-rail-filter__empty">No live game has ${liveFilter === "any" ? "an" : `a ${escapeHtml(((LIVE_RAIL_MARKETS.find((m) => m.key === liveFilter) || {}).label || "").toLowerCase())}`} edge priced against a quote ${LIVE_EDGE_FRESH_QUOTE_SECONDS}s old or less right now.</div>`
+      : "";
     container.innerHTML = `
       <h2 class="board-section-title">Games${renderChipFreshness()}</h2>
+      ${edgeFilter}${emptyNote}
       <div class="game-card-strip">
-        ${games.map((game) => {
+        ${shownGames.map((game) => {
           const isSelected = state.game === game.key;
           const chip = chipForGame(game);
+          const liveSummary = liveSummaries.get(game.key) || null;
+          const liveEdge = Boolean(liveSummary && liveSummary.hasFreshEdge);
+          const edgeBadge = liveEdge ? '<span class="game-mini-card__edge-badge" title="A live edge priced against a fresh quote -- see the lines below">▲ EDGE</span> ' : "";
           if (chip) {
             const isLive = chip.state === "live";
             // A game that will not be played is its own state (`postponed` /
@@ -3863,11 +4216,12 @@
             // than an impossible one. Without it a count-0 card is
             // indistinguishable from one whose opportunities failed to load.
             return `
-              <button type="button" class="game-mini-card${game.count ? "" : " game-mini-card--empty"}" data-game-key="${escapeHtml(game.key)}" aria-pressed="${isSelected}" title="${game.count} opportunit${game.count === 1 ? "y" : "ies"}">
-                <div class="game-mini-card__head"><span>${headLeft}</span><span>${stateLabel}</span></div>
+              <button type="button" class="game-mini-card${game.count ? "" : " game-mini-card--empty"}${liveEdge ? " game-mini-card--live-edge" : ""}" data-game-key="${escapeHtml(game.key)}" aria-pressed="${isSelected}" title="${game.count} opportunit${game.count === 1 ? "y" : "ies"}">
+                <div class="game-mini-card__head"><span>${headLeft}</span><span>${edgeBadge}${stateLabel}</span></div>
                 ${(isLive || chip.state === "final") && chipLineScore(chip) ? chipLineScore(chip) : `${chipTeamRow("away", chip)}${chipTeamRow("home", chip)}`}
                 ${isLive && chip.situation ? `<div class="game-mini-card__situation">${escapeHtml(chip.situation)}</div>` : ""}
                 ${chip.state !== "final" ? chipIntervals(chip) : ""}
+                ${isLive ? renderLiveRailLines(liveSummary) : ""}
                 ${footer ? `<div class="game-mini-card__footer">${escapeHtml(footer)}</div>` : ""}
                 <div class="game-mini-card__meta">${chipPlaysText(chip) || (game.count ? `${game.count} play${game.count === 1 ? "" : "s"}` : "no plays")}</div>
               </button>
@@ -3881,9 +4235,10 @@
           const chiplessSportLabel = cardSportLabel(game, null);
           const headLeft = fallbackDateLabel ? `${escapeHtml(chiplessSportLabel)} · ${escapeHtml(fallbackDateLabel)}` : escapeHtml(chiplessSportLabel);
           return `
-            <button type="button" class="game-mini-card" data-game-key="${escapeHtml(game.key)}" aria-pressed="${isSelected}">
-              <div class="game-mini-card__head"><span>${headLeft}</span><span>${stateLabel}</span></div>
+            <button type="button" class="game-mini-card${liveEdge ? " game-mini-card--live-edge" : ""}" data-game-key="${escapeHtml(game.key)}" aria-pressed="${isSelected}">
+              <div class="game-mini-card__head"><span>${headLeft}</span><span>${edgeBadge}${stateLabel}</span></div>
               <div class="game-mini-card__matchup">${escapeHtml(compactMatchup(game.matchup))}</div>
+              ${game.hasLive ? renderLiveRailLines(liveSummary) : ""}
               <div class="game-mini-card__meta">${game.count} opportunit${game.count === 1 ? "y" : "ies"}</div>
             </button>
           `;
@@ -3896,6 +4251,15 @@
         state.game = state.game === key ? "all" : key;
         syncUrlState();
         renderBoardBody();
+      });
+    });
+    // A rail-only view: re-renders the rail and leaves the board's rows alone.
+    container.querySelectorAll("[data-live-edge-filter]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const value = button.getAttribute("data-live-edge-filter");
+        state.liveEdge = LIVE_EDGE_FILTER_TABS.some((tab) => tab.value === value) ? value : "all";
+        syncUrlState();
+        renderGameCards(items);
       });
     });
   }

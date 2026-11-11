@@ -852,6 +852,15 @@ death, never life — do not invert it.
 - Verdict: GOAL MET. `owner_liveness.py --idle-min 240` read 1 SAFE of 7 CLOSED; moved to lanes_closed.md with one pointer; invariants unchanged vs origin/main baseline. Table and WAIT reasons: log/2026-11-10.md 22:40Z.
 - Moved: closed-lane-archive-20261110-1039.
 
+### layer2-live-rail-edges — OPEN — opened 2026-11-10 — session 0f519972-4890-45d3-8b52-767c7e0a0389
+- Goal: Live games on the Layer 2 Games rail show a live update line per full-game market (spread, total, moneyline where priced): our live re-sim number vs the current live book line with the quote's age; the compact card carries a live-edge highlight and the rail a live-edge filter by market, both counting ONLY an edge priced against a FRESH quote (threshold default + reason in code, #780); web-only display of served artifact fields, no change to the join's pricing ceiling; tests (line renders for a live priced row; highlight/filter fire on fresh, not stale) + a real-app screenshot; on main; loading web is the user's decision
+- Files: syndicate/templates/intelligence.html (the new LIVE RAIL LINES block after chipIntervals, renderGameCards, state.liveEdge + its one syncUrlState line ONLY), syndicate/static/shared/board_cards.css (new .game-mini-card__live-* / --live-edge / rail filter rules ONLY), tests/js/games_rail_live_lines.test.mjs (NEW), tests/test_layer2_live_rail_edges.py (NEW), docs/ai_context/todo.md (#781 section only)
+- Hypothesis: n/a (display feature); diagnostic part: live cards lack a live line because chip footer is pregame-only (game_chip_scoreboard.py:716) and renderGameCards never reads the game's live board rows, not because the join drops data
+- Falsification test: served live game rows lack line/live_total/model_edge_pct/book_age_seconds -> the gap is at the join, not display
+- Verification: node + pytest harness green incl. fresh-vs-stale cases; run-syndicate screenshot of a live (or fixture) rail card with the live line; served-board count of live games/markets with a live line and with a fresh edge recorded in the lane
+- Blocked by: none
+- STATUS 2026-11-10 6:2x PM CST (00:2xZ 11-11): DONE IN CODE, NOT LOADED (web; the user's decision). Hypothesis CONFIRMED, falsification did not fire: on the fleet's served board 23:45Z all 50 live full-game rows (5 college games) carried line / live_total or live_model_probability / model_edge_pct (live_aware) / book_age_seconds, so the gap was display only. Verification MET: node harness `tests/js/games_rail_live_lines.test.mjs` all passed via `tests/test_layer2_live_rail_edges.py` (4 passed; 78 passed with the layer2 page/ui suites), 5 source mutations each caught; run-syndicate replay of the fleet's 23:58:33Z served board through this code: 4 live games with a live line, 0 flagged (the 3 live-priced edges were on 46.8 / 51.8 / 153.5 s quotes); fixture (RUTG o149.5 quote set to 12 s): highlighted, Live edge / Total filters keep 1 game. Screenshots in the side-session notes folder. todo #781.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

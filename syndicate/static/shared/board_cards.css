@@ -2550,3 +2550,38 @@ table.board-blotter tbody tr:last-child td {
 
 /* Games rail card footer (mockup 4, lane games-rail-full-detail). */
 .game-mini-card__footer { font-size: 11px; line-height: 1.3; color: var(--cards-text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+
+/* Live lines on a live rail card: our live re-sim vs the book's main live line,
+   per full-game market, with the quote's age (lane layer2-live-rail-edges, #781).
+   AGE reads green only when the quote was fresh enough for an edge to count. */
+.game-mini-card__live {
+  display: grid;
+  grid-template-columns: auto auto auto auto;
+  column-gap: 8px;
+  row-gap: 1px;
+  align-items: baseline;
+  margin-top: 4px;
+  padding-top: 3px;
+  border-top: 1px dashed var(--cards-line);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.game-mini-card__live-label { font-size: 9.5px; letter-spacing: 0.04em; color: var(--cards-text-dim); }
+.game-mini-card__live-mkt { color: var(--cards-text-dim); }
+.game-mini-card__live-ours { color: var(--cards-text); font-style: italic; }
+.game-mini-card__live-book { color: var(--cards-text); }
+.game-mini-card__live-age { color: var(--cards-text-dim); text-align: right; }
+.game-mini-card__live-age.is-fresh { color: #6bd88f; }
+.game-mini-card__live-age.is-stale { color: #f3a76b; }
+.game-mini-card__live-edge { margin-top: 2px; font-size: 11px; font-weight: 600; color: #6bd88f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.game-mini-card--live-edge { border-color: #6bd88f; box-shadow: 0 0 0 1px rgba(107, 216, 143, 0.45), 0 0 12px rgba(107, 216, 143, 0.18); }
+.game-mini-card__edge-badge { display: inline-block; padding: 0 5px; border-radius: 999px; background: rgba(107, 216, 143, 0.18); color: #6bd88f; font-weight: 700; letter-spacing: 0.04em; }
+
+/* The rail's live-edge filter: a view over the rail, not a board filter. */
+.game-rail-filter { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
+.game-rail-filter__tab { appearance: none; font: inherit; font-size: 11.5px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--cards-line); background: transparent; color: var(--cards-text-soft, #9fb0c4); cursor: pointer; }
+.game-rail-filter__tab.is-active { border-color: #6bd88f; color: #6bd88f; background: rgba(107, 216, 143, 0.1); }
+.game-rail-filter__tab.is-empty { opacity: 0.5; }
+.game-rail-filter__tab .board-tab-count { margin-left: 5px; }
+.game-rail-filter__empty { margin: 0 0 8px; font-size: 12px; color: var(--cards-text-dim); }

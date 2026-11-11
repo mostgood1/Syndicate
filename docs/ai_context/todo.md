@@ -1,5 +1,25 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#781` — **LIVE GAMES ON THE LAYER 2 GAMES RAIL NOW SHOW OUR LIVE RE-SIM AGAINST THE BOOK'S LIVE LINE PER MARKET, WITH THE QUOTE'S AGE; A LIVE-EDGE HIGHLIGHT AND A RAIL FILTER BY MARKET COUNT ONLY AN EDGE PRICED AGAINST A QUOTE <= 30 s OLD (#780). WEB ONLY, ON MAIN, NOT LOADED** `[2026-11-10, lane layer2-live-rail-edges, session 0f519972]`
+- **Why live cards had no line:** display only, not the join. The chip's book line (`footer`) is pregame-only (`game_chip_scoreboard.py` `"footer": ... if state == "pregame"`), and `renderGameCards` never read the game's live board rows. On the fleet's served board, 2026-11-10 23:45Z (5:45 PM CST), all 50 live full-game rows over 5 college games carried the line, `live_total` or `live_model_probability`, the join's `model_edge_pct` (on `live_aware` rows), and `book_age_seconds`.
+- **What the card shows** (`intelligence.html`, LIVE RAIL LINES block): one row per full-game market, columns LIVE / OURS / BOOK / AGE.
+  - OURS is the card's own "Proj final" live re-sim. Where the card has no re-sim block, it falls back to the row's `live_total`, or to the cover %.
+  - BOOK is the main live line, the line priced closest to even.
+  - AGE is the quote's age at pricing: `book_age_seconds`, the grid `age_seconds` the join reads and the ledger records as `quote_age_seconds`. Once the board itself is over 300 s old, AGE shows the age now, in orange.
+  - Spreads with no live number upstream (NFL / NHL decisions) stay blank. Halves and quarters are left out.
+- **Edge flag** (card `▲ EDGE`, an edge line, and the rail filter All / Live edge / Spread / Total / ML, `?live_edge=`) requires all of:
+  - a `live_aware` row with `model_edge_pct` >= 3 (`LIVE_EDGE_MIN_PP`: the -110 vig);
+  - a quote <= 30 s old at pricing (`LIVE_EDGE_FRESH_QUOTE_SECONDS`, the only bucket #780 graded as fresh);
+  - an age now <= 300 s.
+  - The filter is a rail-only VIEW: it removes no board row.
+  - The join's own 600 s pricing ceiling is UNCHANGED. Tightening it is #780's candidate fix 1, a separate decision.
+- **Read on the fleet's served board, 23:58:33Z (5:58 PM CST), rendered by this code locally:**
+  - 4 live college games showed a live line: 3 with OURS from the re-sim, and WNCAAB HOW @ MRSH with OURS blank, because its block is `pregame_pace`, not a re-sim.
+  - **0 games flagged.** The 3 live-priced edges on the board then (RUTG o149.5 +10.0, RUTG o147.5 +14.2, GTWN o141.5 +8.0) were priced on quotes 46.8 s, 153.5 s and 51.8 s old.
+  - Fixture (that capture with the RUTG o149.5 quote set to 12 s): the card is highlighted, and the Live edge / Total filters each keep 1 game. Screenshots are in the session notes folder `local_997aa897...` (`layer2_live_rail_*.png`).
+- **Tests:** `tests/js/games_rail_live_lines.test.mjs` (fresh vs stale, the 30 s boundary, a frozen board, a pregame edge, under 3 pts, unknown age, the flipped chip, NFL blank spread, wiring) via `tests/test_layer2_live_rail_edges.py`. 5 source mutations, each caught.
+- **Owed:** loading web on the fleet (the user's decision; `reload-web` after claim + preflight), then a served read on a live slate.
+
 ### `#780` — **LIVE TOTALS EDGES ARE NOT REAL AGAINST A FRESH LINE: graded against finals, the board's priced live full-game totals claim +16 to +23 pp and realise ~0 when the quote is <= 30 s old; the realised "edge" grows with quote age (the pricing ceiling is 600 s). The model's mean is no better than the line and its spread is 10-30% too narrow. NOT FIXED; SAME IN SPREADS AND MONEYLINES; 120 s CEILING PROPOSED**  `[2026-11-10, session 8062940b, read-only; user "Yes, grade them"]`
 - **Population:** priced full-game totals states in the fleet's live gameline ledgers vs ESPN finals: NCAAB 19,420 states / 287 games (11-02..11-09), WNCAAB 2,657 / 53, NBA 12,633 / 144 (10-20..11-09), NCAAF 49,676 / 252 (10-02..11-07). NFL 0 priced rows.
 - **Quote <= 30 s, realised (hit - fair):** NCAAB +0.014 +- 0.054, NBA -0.001 +- 0.136, NCAAF -0.019 +- 0.054, WNCAAB +0.014 +- 0.143. **Quote > 300 s:** +0.08 to +0.22. Brier model - market: NCAAB +0.024 +- 0.015 (model WORSE), NCAAF +0.017 +- 0.016, NBA -0.001.
