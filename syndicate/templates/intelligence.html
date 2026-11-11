@@ -3194,11 +3194,13 @@
   // there; the apparent "edge" grows only on older quotes, clearly from
   // 180-300 s -- the line not having moved yet, or a suspended market,
   // neither of which can be bet at that price. (Totals alone claimed +16 to
-  // +23 points and realised ~0 at <= 30 s.) The join still PRICES quotes up
-  // to 600 s (`live_gameline_join._DEFAULT_MAX_QUOTE_AGE_SECONDS`; MLB 120 s).
-  // A 120 s join ceiling for ncaab/wncaab/nba/ncaaf is proposed in #780 and
-  // is the user's decision; it is NOT made here. So a highlight keyed on the
-  // gap alone would mostly flag stale quotes; this one also requires:
+  // +23 points and realised ~0 at <= 30 s.) The join's own pricing ceiling is
+  // another lane's (`live_gameline_join._MAX_QUOTE_AGE_BY_SPORT`): 120 s for
+  // MLB, and for ncaab/wncaab/nba/ncaaf since 2026-11-11 (`0f6e4a723`, user
+  // "Yes, set 120 s"); `_DEFAULT_MAX_QUOTE_AGE_SECONDS` 600 s for the rest.
+  // This flag is never looser than that ceiling for any sport (pinned by
+  // tests/test_layer2_live_rail_edges.py). On a 600 s sport a highlight keyed
+  // on the gap alone would mostly flag stale quotes; this one also requires:
   //   - the quote's age AT PRICING <= LIVE_EDGE_FRESH_QUOTE_SECONDS (120 s),
   //     in every game-line market: the measured boundary above, and the value
   //     the join already uses for MLB (`_MAX_QUOTE_AGE_BY_SPORT`);

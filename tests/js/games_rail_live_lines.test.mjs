@@ -52,7 +52,7 @@ check('fresh-quote threshold is 120 s (#780 addendum: ~0 under 120 s in every ma
 check('minimum live edge is 3 points', api.LIVE_EDGE_MIN_PP, 3);
 check('the block states the #780 reason in code', /#780/.test(block[0]) && /under 120 s/.test(block[0]) && /180-300 s/.test(block[0]), true);
 check('the block says a flag is a disagreement, not an edge', /A FLAG IS A DISAGREEMENT, NOT A PROVEN EDGE/.test(block[0]), true);
-check('the join ceiling is named and NOT changed here', /_DEFAULT_MAX_QUOTE_AGE_SECONDS/.test(block[0]) && /NOT made here/.test(block[0]), true);
+check('the join ceiling is named as another lane\'s, and the flag is never looser', /_MAX_QUOTE_AGE_BY_SPORT/.test(block[0]) && /never looser than that ceiling/.test(block[0]), true);
 
 // ---------------------------------------------------------------- fixtures (shaped like served rows, 2026-11-10 23:45Z)
 const NOW = Date.parse('2026-11-10T23:45:00Z');

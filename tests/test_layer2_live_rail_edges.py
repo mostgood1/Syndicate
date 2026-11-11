@@ -9,8 +9,10 @@ flag rests on, so a change to either is a visible test edit rather than a silent
     live totals, spreads and moneylines (NCAAB / NBA / NCAAF) at ~0 realised edge under 120 s, with the apparent
     edge only on older quotes (clearly from 180-300 s); 120 s is also the join's MLB ceiling. Even inside 120 s the
     realised edge is ~0, so the flag is worded as a model-vs-line disagreement, never as an edge.
-  - the live join's own pricing ceiling stays 600 s (MLB 120 s): tightening it is #780's candidate fix 1, a
-    separate user decision this lane does not make.
+  - the rail's threshold is never LOOSER than the live join's own pricing ceiling, for any sport. That ceiling is
+    another lane's to set (2026-11-11, `0f6e4a723`, user "Yes, set 120 s": 120 s for NCAAB / WNCAAB / NBA /
+    NCAAF; MLB already 120 s; the rest 600 s). This test pinned the old table until then, and went red when it
+    moved by decision -- so it now pins the relationship, not the table.
 """
 from __future__ import annotations
 
@@ -44,11 +46,14 @@ def test_fresh_quote_threshold_and_minimum_are_the_stated_ones() -> None:
     assert re.search(r"const LIVE_EDGE_MIN_PP = 3;", html)
 
 
-def test_the_join_pricing_ceiling_is_unchanged() -> None:
+def test_the_rail_threshold_is_never_looser_than_the_join_ceiling(monkeypatch) -> None:
+    """A flag on a quote the join itself would refuse to price would be a flag on a row with no live edge at all."""
     from syndicate.features.shared import live_gameline_join as join
 
-    assert join._DEFAULT_MAX_QUOTE_AGE_SECONDS == 600.0
-    assert join._MAX_QUOTE_AGE_BY_SPORT == {"mlb": 120.0}
+    monkeypatch.delenv("SYNDICATE_LIVE_GAMELINE_MAX_QUOTE_AGE_SECONDS", raising=False)
+    rail = float(re.search(r"const LIVE_EDGE_FRESH_QUOTE_SECONDS = (\d+(?:\.\d+)?);", _template()).group(1))
+    for sport in [None, *join._MAX_QUOTE_AGE_BY_SPORT]:
+        assert rail <= join.max_quote_age_seconds(sport), (sport, rail, join.max_quote_age_seconds(sport))
 
 
 def test_the_rail_flag_reads_the_clock_the_grade_used() -> None:
