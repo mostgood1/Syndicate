@@ -712,6 +712,14 @@ death, never life — do not invert it.
 - Verification: Unit: per sport and market, through attach_live_gamelines, a 119 s quote prices and a 180 s quote is withheld quote_older_than_live_pricing_ceiling; the env knob at 600 prices the same 180 s row (off != on); NFL at 180 s still prices. Fleet after the user's load: NCAAB/NBA LIVE_GAMELINE_JOIN withheld_by_reason gains quote_older_than_live_pricing_ceiling and priceable falls roughly by the measured share (NCAAB 62-65%, NBA 80%, NCAAF 66-77%), with display unchanged
 - Blocked by: none
 
+### restate-live-edge-withhold — OPEN — opened 2026-11-11 — session 386d4115-6e7b-47e3-9ff7-be3914d851cb
+- Goal: A board card the serve-time scoreboard restate turns live (pipeline/intelligence_state._refresh_layer2_live_state) gets the build's live rule: a projection that is not live-aware carries no model edge (model_edge_pct and the edge fields derived from it, every sport, live_edge_policy #340), and the pregame probability is withheld in the build's own LIVE_PROBABILITY_WITHHELD_SPORTS (not a stale copy). Done = on main, loaded where the restate runs, and a served reading at a live tip/puck drop with 0 restated-live, non-live-aware cards carrying model_edge_pct (baseline 11-11 00:41Z: 24 NHL), recorded in deploys.md.
+- Files: pipeline/intelligence_state.py (_refresh_layer2_live_state's live branch + _withhold_pregame_probability_on_live_card + _PREGAME_WITHHELD_SPORTS ONLY), tests/test_layer2_restate_live_edge.py (new)
+- Hypothesis: _refresh_layer2_live_state (serve time, pipeline/intelligence_state.py:2382) flips a card the build priced PREGAME to is_live/market_state live from the scoreboard chip, and applies only the NFL/NCAAF probability withhold: it never clears model_edge_pct for any sport, while the build's board_enrichment._enforce_live_edge_policy clears it on every live non-live-aware row. So from the chip flip to the next build, live cards serve the pregame edge (24 NHL rows FLA @ CBJ 00:41Z 11-11, built 00:38Z while pregame). The serve-time re-gate dead-lanes those whose quote is > 900 s unchanged; fresher ones stay in the Opportunity lane with the pregame edge and build score.
+- Falsification test: At tonight's first tip/puck drop: the served live rows carrying model_edge_pct are ALREADY live in the build artifact (/api/board/layer2-shortlist, same identity) -> the leak is in the build, not the restate; or they carry live_aware; or no restated-live card carries an edge at all.
+- Verification: Unit tests off != on (restated card loses model_edge_pct; live-aware and pregame cards untouched; ncaab probability withheld). Fleet: watcher at a live tip/puck drop, served vs artifact rows per sport: restated-live non-live-aware cards with model_edge_pct before vs after, board_lane of each; deploys.md.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
