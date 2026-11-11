@@ -1,5 +1,18 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#787` — **COLLEGE BLOWOUTS: WOMEN'S COLLEGE PLAY-BY-PLAY WAS SAVED NOWHERE (now archived nightly); for MEN'S college, the bench in a blowout is NOT what our live re-sim misses -- the late miss is close games** `[2026-11-11, lane college-pbp-blowout-bench, session 0f519972; user "are we saving game shape data? ... South Alabama and Florida Atlantic" and "the pbp should be looked at...and tendencies for when bench players come into a blowout"]`
+- **Saved:**
+  - Live re-sim per tick (`live_evidence/`, since 11-09, both leagues), final period scores, pregame per-period sims.
+  - NCAAB full play-by-play + lineup / player stints: 6,275 games 2025-26, 588 games 2026-27.
+- **Missing until now:** WNCAAB play-by-play. `basketball-rotation-stints` lacked the league, and live momentum capture keeps only scoring events, overwritten. Fixed: `LEAGUES` + `WINDOWS` gain `wncaab`, so the nightly job archives it from the next fleet ff (no restart). This season was backfilled on the fleet.
+- **NCAAB answer** (`.syndicate/findings_2026-11-11_college_blowout_bench.md`, 6,258 games):
+  - The leader's starters on the floor fall to 1.3 at a 25+ lead with 6-4 min left, and to 0.9 at 20-24 in the last 2 min.
+  - At 25+, bench lineups score SLOWER than starters at the same lead: 1.08 vs 1.16 x the game's own first-30-min rate, CIs apart.
+  - The live re-sim's late-blowout error is ~0 (25+ with the bench on: -0.7 +- 1.2, 27 games).
+  - The late miss is close games: +3.0 +- 2.7 (41 games); earlier cut +5 to +7 points still to come. That is lane `ncaab-score-effect-load`'s endgame problem.
+- **Owed:** the same reading for WNCAAB once its archive holds enough games. USA @ FAU (57-85) under-projected the last 2-3 min by 9-14 points.
+- Study: `scripts/college_blowout_bench_study.py --league ncaab|wncaab --start --end [--evidence]`.
+
 ### `#786` — **LIVE QUOTES ARE PULLED SLOWER THAN THE NEW 120 s PRICING CEILING ALLOWS: since 18:11Z 11-11 most live full-game college lines go unpriced for quote age (NCAAB 320 of 570 evaluations, WNCAAB 281 of 433). For NCAAB it is OUR lag (pull + build), not the book. OPTION 1 (PRICE ON PULL) ON MAIN, NOT LOADED** `[2026-11-11, lanes layer2-live-rail-edges / live-price-on-pull, session 0f519972; user question "do we need to get game lines more often on live games to align with live resim timing", then "Do this task here"]`
 - **Cadences, measured on the fleet logs 17:00-20:30Z 11-11** (median / max gap):
   - In-play quote pull launches (`*_LIVE_AUTORUN_LAUNCHED`): NCAAB 133 s / 203 s, WNCAAB 245 s / 303 s (`interval_s=240`).

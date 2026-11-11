@@ -58,7 +58,13 @@ if str(REPO) not in sys.path:
 
 from syndicate.features.shared import basketball_pbp as pbp  # noqa: E402
 
-LEAGUES = ("nba", "wnba", "ncaab")
+# wncaab added 2026-11-11 (lane college-pbp-blowout-bench, todo #787; user: "are we saving game shape data?" ...
+# "the pbp should be looked at...and tendencies for when bench players come into a blowout"). Women's college
+# play-by-play was kept nowhere: the live momentum capture streams it every 150 s but keeps only scoring events in
+# a file it overwrites. `basketball_pbp` already carries the women's college rules (4 x 10-min quarters, NCAA
+# fouls); this job only lacked the league. Nothing reads wncaab's tables yet -- they are the substrate for the
+# blowout / bench study and any future WNCAAB minutes model.
+LEAGUES = ("nba", "wnba", "ncaab", "wncaab")
 SOURCE = "syndicate_espn_pbp_v1"
 STINT_FIELDS = (
     "league", "season", "season_type", "date", "game_id", "event_id", "team", "team_id", "opp", "side", "period",
@@ -94,6 +100,8 @@ WINDOWS = {
     "nba": lambda y: (dt.date(y - 1, 10, 1), dt.date(y, 6, 30)),
     "wnba": lambda y: (dt.date(y, 4, 20), dt.date(y, 10, 31)),
     "ncaab": lambda y: (dt.date(y - 1, 11, 1), dt.date(y, 4, 15)),
+    # Same calendar as the men's: the women's season opens the first week of November, Final Four in early April.
+    "wncaab": lambda y: (dt.date(y - 1, 11, 1), dt.date(y, 4, 15)),
 }
 STALE_PENDING_DAYS = 7
 NOT_PLAYED = {"STATUS_POSTPONED", "STATUS_CANCELED", "STATUS_CANCELLED", "STATUS_FORFEIT", "STATUS_SUSPENDED"}
@@ -457,7 +465,7 @@ def run_league(league: str, *, seasons: list[int] | None, start: dt.date | None,
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("--league", default=",".join(LEAGUES), help="comma list of nba, wnba, ncaab")
+    ap.add_argument("--league", default=",".join(LEAGUES), help="comma list of nba, wnba, ncaab, wncaab")
     ap.add_argument("--season", default="", help="comma list of ESPN season years (default: current / most recent)")
     ap.add_argument("--start", default="", help="YYYY-MM-DD (overrides --season)")
     ap.add_argument("--end", default="", help="YYYY-MM-DD")

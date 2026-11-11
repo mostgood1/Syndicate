@@ -117,6 +117,49 @@ def test_incremental_run_skips_done_dates(root, monkeypatch):
     assert calls == [DAY, DAY + dt.timedelta(days=1), DAY + dt.timedelta(days=2), DAY + dt.timedelta(days=3)]
 
 
+# --- women's college (lane college-pbp-blowout-bench, todo #787) -------------------------------------------------
+def _wncaab_game():
+    """4 x 10-min quarters. Home: h6 for h1 at Q2 5:00 (stays), h7 for h2 at Q4 3:00 (the bench comes in)."""
+    from tests.basketball_pbp_fixtures import Game
+
+    g = Game("wncaab")
+    g.shot(1, "9:30", "home", "h1").shot(1, "9:00", "away", "a1", pts=3).end_period(1)
+    g.shot(2, "8:00", "home", "h2").sub(2, "5:00", "home", "h6", "h1").shot(2, "4:00", "home", "h6").end_period(2)
+    g.shot(3, "7:00", "away", "a2").shot(3, "3:00", "home", "h3").end_period(3)
+    g.sub(4, "3:00", "home", "h7", "h2").shot(4, "2:00", "home", "h7").shot(4, "1:00", "away", "a3").end_period(4)
+    return g
+
+
+def test_wncaab_is_a_nightly_league_with_a_college_window():
+    assert "wncaab" in producer.LEAGUES
+    assert producer.current_season("wncaab", dt.date(2026, 11, 20)) == 2027
+    assert producer.current_season("wncaab", dt.date(2026, 10, 9)) == 2026
+    # The scheduled job passes no --league, so the default list is what runs nightly.
+    from scripts import local_production
+
+    job = next(j for j in local_production.SCHEDULED_JOBS if j.name == "basketball-rotation-stints")
+    assert "--league" not in job.argv
+
+
+def test_wncaab_build_writes_stints_and_the_event_log(root):
+    minutes = {"h1": 15, "h6": 25, "h2": 37, "h7": 3, "h3": 40, "h4": 40, "h5": 40,
+               "a1": 40, "a2": 40, "a3": 40, "a4": 40, "a5": 40}
+    summary = _wncaab_game().summary(minutes=minutes)
+    entry = producer.build_date("wncaab", DAY, fetch_scoreboard=lambda *_: _board(("999", "post", "STATUS_FINAL", 2)),
+                                fetch_summary=lambda *_: summary, rate=0, today=TODAY)
+    assert entry["status"] == "done" and entry["games"] == 1 and entry["score_match"] == 1
+    base = root / "wncaab_source" / "data" / "processed" / "rotation_stints"
+    stints = pd.read_csv(base / "stints_2026-01-15.csv", dtype={"lineup_player_ids": str})
+    # 40 minutes a team -- four 10-minute quarters, not the NBA's 48.
+    assert stints.groupby("side")["duration_sec"].sum().to_dict() == {"away": 2400.0, "home": 2400.0}
+    players = pd.read_csv(base / "player_stints_2026-01-15.csv", dtype={"player_id": str})
+    bench = players[(players["player_id"] == "h7")]
+    assert len(bench) == 1 and bench.iloc[0]["period"] == 4 and bench.iloc[0]["duration_sec"] == 180.0
+    checks = pd.read_csv(base / "player_checks_2026-01-15.csv")
+    assert checks["within_1"].all()
+    assert (root / "wncaab_source" / "data" / "processed" / "pbp_events" / "2026" / "999.jsonl.gz").is_file()
+
+
 def test_current_season_windows():
     assert producer.current_season("nba", dt.date(2026, 10, 9)) == 2027  # 2026-27 preseason
     assert producer.current_season("nba", dt.date(2026, 8, 1)) == 2026  # offseason: most recent
