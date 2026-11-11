@@ -254,10 +254,16 @@ def test_absent_and_unrecognised_values_are_on():
 # ------------------------------------------------------------------------------------------------- the board
 
 def _producer_snapshot(monkeypatch):
-    """The REAL producer path (`build_live_lens_snapshot`) on a fake engine: Q2 6:40, 10-7, Q1 7-0."""
-    monkeypatch.setattr(live_resim, "simulate_game", _fake_sim(
-        [{"quarter": 2, "home_points": 7, "away_points": 3}, {"quarter": 3, "home_points": 7, "away_points": 0},
-         {"quarter": 4, "home_points": 3, "away_points": 7}], {"home": 27, "away": 17}))
+    """The REAL producer path (`build_live_lens_snapshot`) on a fake engine: Q2 6:40, 10-7, Q1 7-0. Odd seeds score
+    the rest of Q2 7-3 (h1 17-10, final 27-17), even seeds 0-3 (h1 10-10, final 20-17); Q3 7-0 and Q4 3-7 always."""
+    def simulate(sim_input, profile=None):  # noqa: ARG001
+        odd = sim_input.seed % 2 == 1
+        q2 = (7, 3) if odd else (0, 3)
+        log = ({"quarter": 2, "home_points": q2[0], "away_points": q2[1]},
+               {"quarter": 3, "home_points": 7, "away_points": 0}, {"quarter": 4, "home_points": 3, "away_points": 7})
+        return SimpleNamespace(quarter_log=log, final_score={"home": 10 + q2[0] + 10, "away": 7 + q2[1] + 7})
+
+    monkeypatch.setattr(live_resim, "simulate_game", simulate)
     as_of = (datetime.now(timezone.utc) - timedelta(seconds=30)).isoformat()
     row = {"in_progress": True, "final": False, "period": 2, "clock": "6:40", "home_score": 10, "away_score": 7,
            "possession_owner": "home", "situation": {}, "home_linescores": [7, 3], "away_linescores": [0, 7],
@@ -276,7 +282,7 @@ def _grid():
                 "sides": sides, "away_team": AWAY, "home_team": HOME, "age_seconds": 20.0, "updated_at": now,
                 "game": {"state": "live"}, "projection": {"market_fair_prob_over": 0.5}}
 
-    return [row("h1", "totals", 26.5), row("q3", "totals", 13.5), row("h1", "spreads", -3.5),
+    return [row("h1", "totals", 26.5), row("q3", "totals", 13.5), row("h1", "spreads", 3.5),
             row("h1", "h2h", None), row("q1", "totals", 6.5), row("q4", "totals", 9.5)]
 
 
@@ -296,11 +302,11 @@ def test_the_board_shows_segment_totals_for_display_and_prices_nothing(monkeypat
     assert coverage["segment_index_sizes"] == {s: 1 for s in live_resim.LIVE_SEGMENTS}
     assert coverage["segment_pricing_enabled"] is False
     h1_tot, q3_tot, h1_spr, h1_ml, q1_tot, q4_tot = grid
-    # h1: 10-7 on the board + Q2 rest 7-3 = 27, every draw; q3: 7-0, every draw.
-    assert h1_tot[lgj.LIVE_DISPLAY_KEY]["segment"] == "h1" and h1_tot[lgj.LIVE_DISPLAY_KEY]["total_mean"] == 27.0
+    # h1: 10-7 on the board + Q2 rest 7-3 (half the draws) or 0-3 -> 27 / 20, mean 23.5; q3: 7-0, every draw.
+    assert h1_tot[lgj.LIVE_DISPLAY_KEY]["segment"] == "h1" and h1_tot[lgj.LIVE_DISPLAY_KEY]["total_mean"] == 23.5
     assert h1_tot[lgj.LIVE_DISPLAY_KEY]["basis"] == lgj.REASON_SEGMENT_PRICING_DISABLED
     assert q3_tot[lgj.LIVE_DISPLAY_KEY]["total_mean"] == 7.0
-    assert _live_projection_columns({**h1_tot, "side": "over"})["live_total"] == 27.0
+    assert _live_projection_columns({**h1_tot, "side": "over"})["live_total"] == 23.5
     # q4's totals histogram failed its grade (0.240): the lane withholds it, so the row shows the live total and NO
     # probability -- the producer's choice, read off the real lane, not a join rule.
     q4_block = lane["projection"]["segments"]["q4"]
@@ -308,8 +314,16 @@ def test_the_board_shows_segment_totals_for_display_and_prices_nothing(monkeypat
     assert q4_tot[lgj.LIVE_DISPLAY_KEY]["total_mean"] == 10.0 and q4_tot[lgj.LIVE_DISPLAY_KEY]["prob_over"] is None
     q4_cols = _live_projection_columns({**q4_tot, "side": "over"})
     assert q4_cols["live_total"] == 10.0 and q4_cols.get("live_model_probability") is None
-    # Not shown: a segment moneyline (a quarter ties too often), an unanchored segment margin, a settled segment.
-    for row in (h1_spr, h1_ml, q1_tot):
+    # Spreads (user "Yes, add spreads"; every segment margin passed its grade): the h1 margin is +7 in half the draws
+    # and 0 in the rest, so home covers the away-frame line 3.5 in half -> P(home) 0.5; the away side restates it.
+    spread = h1_spr[lgj.LIVE_DISPLAY_KEY]
+    assert spread["segment"] == "h1" and spread["basis"] == lgj.REASON_SEGMENT_PRICING_DISABLED
+    assert spread["prob_over"] == pytest.approx(0.5, abs=1e-6)
+    home = _live_projection_columns({**h1_spr, "side": "home"})["live_model_probability"]
+    away = _live_projection_columns({**h1_spr, "side": "away"})["live_model_probability"]
+    assert home == pytest.approx(spread["prob_over"], abs=1e-4) and away == pytest.approx(1.0 - home, abs=1e-4)
+    # Not shown: a segment moneyline (unanchored, and a quarter ties too often), a settled segment.
+    for row in (h1_ml, q1_tot):
         assert lgj.LIVE_DISPLAY_KEY not in row
     for row in grid:
         for field in PRICING_FIELDS:
@@ -317,6 +331,18 @@ def test_the_board_shows_segment_totals_for_display_and_prices_nothing(monkeypat
         assert "live_gameline" not in row
     why = coverage["withheld_by_reason"]
     assert why.get(lgj.REASON_SEGMENT_PRICING_DISABLED) == 6 and lgj.REASON_SEGMENT_NOT_FULL_GAME not in why
+
+
+def test_the_spread_number_comes_from_the_raw_margin_table_and_only_from_it(monkeypatch):
+    """off != on for spreads: without ncaaf in `_RAW_MARGIN_DISPLAY_SPORTS` the same row shows nothing (the segment
+    margin is unanchored), and the totals rows beside it are unaffected."""
+    snapshot = _producer_snapshot(monkeypatch)
+    monkeypatch.setattr(lgj, "_RAW_MARGIN_DISPLAY_SPORTS", frozenset({"nba"}))
+    grid = _grid()
+    _attach_through_the_board(monkeypatch, snapshot, grid)
+    h1_tot, _q3, h1_spr, _ml, _q1, _q4 = grid
+    assert lgj.LIVE_DISPLAY_KEY not in h1_spr
+    assert h1_tot[lgj.LIVE_DISPLAY_KEY]["total_mean"] == 23.5
 
 
 def test_off_through_the_env_restores_the_old_board_reading(monkeypatch):

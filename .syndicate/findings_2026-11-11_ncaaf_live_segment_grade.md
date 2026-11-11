@@ -116,9 +116,9 @@ a q1 totals row shows nothing.
 
 | segment | totals (Live column) | spreads | moneyline |
 |---|---|---|---|
-| h1, h2, q2, q3 | live total + P(over) | histogram carried; shown only if `_RAW_MARGIN_DISPLAY_SPORTS` names ncaaf | blank by design (ties) |
-| q4 | live total only | as above | blank |
-| q1 | nothing | as above | blank |
+| h1, h2, q2, q3 | live total + P(over) | P(home covers), raw margin (`_RAW_MARGIN_DISPLAY_SPORTS` names ncaaf since 2026-11-11, user "Yes, add spreads") | blank by design (ties) |
+| q4 | live total only | P(home covers) | blank |
+| q1 | nothing | P(home covers) | blank |
 
 Every grade above is an upper bound (ratings postdate the games; pooled possession widens the draws). The bar it
 clears is `#499`'s for PRICING; this is DISPLAY only, priced nowhere, with `SYNDICATE_NCAAF_LIVE_SEGMENTS=0` as

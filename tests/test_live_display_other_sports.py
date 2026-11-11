@@ -132,8 +132,9 @@ def gate_on(monkeypatch):
 
 def test_the_table_names_the_five_sports_and_keeps_nba():
     assert lgj.LIVE_DISPLAY_SPORTS == frozenset({"nba", "ncaab", "wncaab", "ncaaf", "nfl", "nhl"})
-    # College's raw segment margin and every non-NBA stale lane stay off the Live column.
-    assert lgj._RAW_MARGIN_DISPLAY_SPORTS == frozenset({"nba"})
+    # College BASKETBALL's raw segment margin and every non-NBA stale lane stay off the Live column. NCAAF's raw
+    # segment margin is shown since todo #785 (graded per segment; tests/test_ncaaf_live_segments.py).
+    assert lgj._RAW_MARGIN_DISPLAY_SPORTS == frozenset({"nba", "ncaaf"})
     assert lgj._DISPLAY_PAST_LANE_CEILING_SPORTS == frozenset({"nba"})
 
 

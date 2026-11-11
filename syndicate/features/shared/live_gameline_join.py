@@ -1326,7 +1326,7 @@ def _edge_pp(model_prob: float, market_prob: float) -> float:
 LIVE_DISPLAY_KEY = "live_display"
 # Sports whose stale-quote and moneyline rows get the display number, and whose
 # quarter/half rows get it too where `board_enrichment` builds segment indexes (NBA,
-# NCAAB, WNCAAB) -- it passes `segment_display_only` from this table. An explicit
+# NCAAB, WNCAAB, and NCAAF since todo #785) -- it passes `segment_display_only` from this table. An explicit
 # table, as `lens_sources_for_sport` is: another sport's board changes when someone
 # has read it, not as a side effect of this.
 #
@@ -1340,7 +1340,11 @@ LIVE_DISPLAY_KEY = "live_display"
 #     game's is priced; a segment margin only where the producer anchored it
 #     (`_RAW_MARGIN_DISPLAY_SPORTS` leaves college out). Segment PRICING stays off for
 #     QUOTE lag (`COLLEGE_SEGMENT_PRICING_ENV`), which says nothing against the model.
-#   - ncaaf / nfl / nhl: stale quote + moneyline; their re-sims publish no segments.
+#   - ncaaf / nfl / nhl: stale quote + moneyline. NCAAF also its h1 h2 q1-q4 rows since
+#     2026-11-11 (todo #785, lane ncaaf-live-segment-display): its re-sim publishes segment
+#     blocks, graded per segment -- totals where they passed, a raw margin on every
+#     segment (see `_RAW_MARGIN_DISPLAY_SPORTS`), no segment moneyline (unanchored, and a
+#     football quarter ties too often). NFL and NHL publish no segments.
 #     A market with no distribution on the hit (nfl/nhl spreads, nhl totals) gets no
 #     probability, because `live_display_block` reads the hit pricing reads. NFL's
 #     margin draws do ride on its lane, but were graded a measured FAIL (worst bucket
@@ -1356,7 +1360,14 @@ LIVE_DISPLAY_SPORTS = frozenset({"nba", "ncaab", "wncaab", "ncaaf", "nfl", "nhl"
 # (synthetic inputs, 300 sims, 2026-11-06) against 7.9-9.6 across 163 real 2026 NBA
 # games. College is different -- its raw margin ran at half to two-thirds of the
 # market's, which is what `marginAnchored` exists for -- and is not listed.
-_RAW_MARGIN_DISPLAY_SPORTS = frozenset({"nba"})
+# NCAAF IS LISTED (2026-11-11, todo #785, user "Yes, add spreads"). Like NBA it prices its
+# full-game margin raw (both calibrators are identity), and its SEGMENT margin passed a
+# cutoff-replay grade of the shipped re-sim on every segment: 287 games, 120 sims,
+# production SP+, worst powered bucket at kickoff / at quarter-ends h1 0.144 / 0.102,
+# h2 0.114 / 0.143, q1 0.078, q2 0.108 / 0.102, q3 0.060 / 0.063, q4 0.119 / 0.134
+# against `#499`'s 0.150 (`.syndicate/findings_2026-11-11_ncaaf_live_segment_grade.md`).
+# Upper bounds: the ratings postdate the games. Display only; NCAAF prices no segment.
+_RAW_MARGIN_DISPLAY_SPORTS = frozenset({"nba", "ncaaf"})
 # Sports whose display number may come from a lane PAST its pricing ceiling
 # (`lane_age_verdict`). Everywhere else a display number must be as fresh as a price
 # would have to be. The stale branch fires on a stale LANE too, and college's carry
