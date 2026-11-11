@@ -696,6 +696,14 @@ death, never life — do not invert it.
 - Verification: Unit: off != on through SYNDICATE_NBA_LIVE_RESIM_PRIOR_DATE_HOURS (prior-date launch with it absent, none with 0), window bound, today's live game wins, a prior row not In Progress launches nothing, dead_by_reason reaches per_sport_ingest. Fleet after the user's load, first night with NBA live at 00:00 CT: NBA_LIVE_AUTORUN_LAUNCHED date=<prior> after 06:00Z every ~240 s while the game is live, the prior nba shard's mtime advancing, and the SERVED /api/board/layer2-shortlist?date=<prior>&sport=nba returning > 0 live rows of that game
 - Blocked by: none
 
+### nhl-live-puckline-grade — OPEN — opened 2026-11-11 — session 87074b1f-3325-4c92-871d-b22851478134
+- Goal: The NHL live re-sim's margin histogram (displayMarginDist, todo #773) is GRADED for live puck-line pricing: a cutoff-replay harness scores the SHIPPED nhl/live_resim.resim_live_game at production's sims over completed 2026-27 NHL games against real finals (P(home covers +-1.5) calibration by bucket, worst powered bucket vs #499's 0.150, model vs actual rest-of-game margin spread, bootstrap over games), with input provenance stated (season rate files postdate the games, so a PASS is an upper bound and only a FAIL is decisive), plus a written proposal for the smallest recorder change that captures production's own displayed P(cover) and the market fair price per live puck-line row; recommendation recorded in a findings file; no pricing change
+- Files: scripts/backtest_nhl_live_puckline.py (NEW), tests/test_backtest_nhl_live_puckline.py (NEW), .syndicate/findings_2026-11-11_nhl_live_puckline_grade.md (NEW), docs/ai_context/todo.md (#773 section only)
+- Hypothesis: The live margin histogram is too narrow (the pregame puck line ran ~4 pts under the fair on home -1.5 in 9 of 10, 2026-10-15), so confident P(cover) buckets over-predict
+- Falsification test: Worst powered bucket gap <= 0.150 and model rest-of-game margin sd within 10% of the actual residual sd at every cutoff
+- Verification: Harness run on the fleet host over all completed 2026-27 games with per-bucket n, worst powered bucket, sd ratio and bootstrap CIs over games; findings file states the provenance verdict and a price / keep-display-only recommendation
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
