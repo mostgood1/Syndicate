@@ -58956,3 +58956,21 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **Not recorded, by scope:** segment rows' display numbers (`#781`/`#785`) go through the refusal path, so the ledger still does not hold them.
 - **Revert:** `git revert 054e01f10` on main (only the ledger file matters; the harness and tests are inert), ff the fleet, then a claimed refresh-worker TERM. Readers ignore the extra keys, and nothing filters on `v`.
 - Claim refresh-worker released right after this entry.
+
+## 2026-11-11 20:15:54Z (2:15 PM CST) -- claimed refresh-worker TERM to load `96131f985` (todo #785 part 2: NCAAF live SEGMENT SPREADS show P(home covers) from the raw segment margin; lane `ncaaf-live-segment-display`) -- **LOADED, clean boot; the spreads reading is owed to tonight's 00:30Z MACtion slate**
+
+- **User:** "Yes, add spreads" (answering "Also show NCAAF segment spreads (all six passed the grade)?"), then "Load both together (Recommended)" for loading it with lane `nhl-live-puckline-grade`'s ledger v6 -- which that lane loaded itself first (entry 19:44:53Z), so this TERM carried only `96131f985`. Then "go ahead and load it". Also relayed by the parent session (`local_52af1e7f`): "Show spreads too".
+- **What it changes:** `live_gameline_join._RAW_MARGIN_DISPLAY_SPORTS` = {nba, ncaaf}. Only SEGMENT hits carry `margin_dist_raw`, so full-game rows are unchanged; segment moneylines stay blank; nothing priced. Grade: every NCAAF segment margin passed (worst h1 0.144 kickoff, h2 0.143 quarter-end; findings_2026-11-11_ncaaf_live_segment_grade.md).
+- **gates:**
+  - Lane-scope: the quote-ceiling lane's Files comma repaired to '+', its sections unchanged (`58bc0f1b0`), so the two lanes hold different sections of `live_gameline_join.py`.
+  - Claim refresh-worker 20:00:32Z (after `nhl-live-puckline-grade` released it 20:00:17Z).
+  - Ride-along: fleet HEAD `054e01f10` an ancestor; 5 paths, 0 overlap with the fleet's 14 local modifications; runtime file `live_gameline_join.py` only.
+  - First preflight 20:01:15Z: **TOO_SOON** (refresh-worker restarted 19:44:53Z by the NHL lane; 25-min spacing). Not overridden: drain released 20:01:29Z so the board kept building; re-drained 20:10:38Z, CLEAR.
+  - Preflight 20:15:4xZ `--target-commit 96131f985fe9760c3829fa8d9caa29a44daf0d29`: **CLEAR**, rc 0. Expectation `ncaaf_seg_spread_rows_live_proj_at_0105Z` 0 -> gt0 (baseline 20:15:39Z: 0 live NCAAF segment rows on the served board; no NCAAF game live).
+- **load (`C:	mp
+caafseg\load.sh`, aborts if HEAD moved):** before HEAD `054e01f10` = expected, pid 211471. ff 20:15:54.594Z -> `96131f985`; on disk `frozenset({"nba", "ncaaf"})` 1. TERM 20:15:54.600Z; new pid **217520** first seen 20:16:02.642Z. `DRAIN_CLEARED` 20:16:08Z. web / live-odds-worker not touched.
+- **verify (boot):** first build after the TERM, `written_at` 20:22:53Z: NCAAF `segment_index_sizes` 6 keys (unchanged, all 0: no game live); NCAAB `segment_index_sizes` {h1 3, h2 3}, display 51. Since 20:16:00Z: Traceback 0, `NCAAF_LIVE_RESIM_ERROR` 0; NCAAF re-sim tick 20:22:56Z clean (67 games, 0 live).
+- **Owed (tonight, watcher `C:	mp
+caafseg
+ight.sh`, 01:05Z / 01:50Z / 02:45Z 11-12):** NCAAF segment spread rows with a Live proj. > 0 (the expectation), segment totals as graded (q4 mean only, q1 nothing), segment moneylines 0, and 0 segment rows carrying `model_edge_pct` / `edge_vs_market_pct` / `model_ev_pct` / `live_aware`.
+- Claim refresh-worker released right after this entry.

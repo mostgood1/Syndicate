@@ -733,6 +733,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### ncaaf-live-segment-display — OPEN — opened 2026-11-11 — session d979fc08-9bbf-4e8b-af2d-8f0673e7e877
+- **SPREADS LOADED `[2026-11-11 20:15:54Z = 2:15 PM CST]`:** `96131f985` on refresh-worker (claimed TERM, pid 217520; first preflight TOO_SOON was waited out, not overridden). Clean boot 20:22:53Z build. GOAL NOT MET YET: the served reading tonight (watcher night.sh, 01:05Z / 01:50Z / 02:45Z 11-12).
 - **SPREADS `[2026-11-11 19:0xZ]`:** user "Yes, add spreads" (answering "Also show NCAAF segment spreads (all six passed the grade)?"). To edit `live_gameline_join.py` without crossing a lane, the quote-ceiling lane's Files scope was REPAIRED, not changed: its comma inside the parentheses ("the quote-age ceiling section, _MAX_QUOTE_AGE_BY_SPORT and its comment only") made `lane_claims` read a WHOLE-FILE claim (check_lane_invariants: contested); the comma is now " + ", the same two sections. This lane claims only the LIVE_DISPLAY_SPORTS comment + `_RAW_MARGIN_DISPLAY_SPORTS`.
 - **LOADED `[2026-11-11 18:45:45Z = 12:45 PM CST]`:** `b43236e17` on refresh-worker by a claimed TERM (pid 200205), behind drain + preflight CLEAR 18:45:31Z for that SHA; ff checked HEAD = the preflight read first. Reachability MET 18:53:29Z: the served shortlist's NCAAF `segment_index_sizes` 0 -> 6 keys, 0 tracebacks. Claim released. GOAL NOT MET YET: the served live reading (watcher `C:	mp
 caafseg
