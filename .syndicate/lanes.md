@@ -816,6 +816,14 @@ ight.sh`, 01:05Z / 01:50Z / 02:45Z 11-12, BUFF @ BALL, SAC @ CMU, MASS @ TOL). S
 - Verification: pytest (the 837e657b shape grades won from its own fill; an archived exit counts; a count we did not make, a second leg, a deferred exit or an unreadable archive still refuses; switch off reproduces the refusal); a read-only fleet replay of the real 837e657b row with its grade stripped in memory; after a user-approved live-odds-worker load, 0 new refusals and the alarm view still 0
 - Blocked by: none
 
+### fleet-status-start-drift — OPEN — opened 2026-11-11 — session 87074b1f-3325-4c92-871d-b22851478134
+- Goal: local_production.py status code= (and so preflight's live commit) names the commit a role actually loaded for an AGED role restarted shortly after an ff: workers from the supervisor's RENDER_INSTANCE_ID spawn stamp, web's oldest worker from gunicorn's Booting-worker line, /proc only as a plausibility-checked fallback; measured read-only on the fleet against the role logs' spawn lines
+- Files: scripts/local_production.py (linux_start_epoch docstring, NEW role_spawn_stamp / gunicorn_worker_boot_epoch / _plausible, role_start_epoch, role_code, and cmd_status's one role_code call ONLY), tests/test_local_production.py (the start-epoch tests only), .syndicate/leads.md (the 2026-11-11 status code= lead only), docs/ai_context/todo.md (a new item only)
+- Hypothesis: linux_start_epoch maps /proc start ticks with TODAY's wall-minus-boottime offset; on WSL that offset drifts ~1 s/min, so an aged role reads as started before an ff it followed
+- Falsification test: the same pid's linux_start_epoch is stable across reads minutes apart, or the spawn stamp disagrees with the role log's ==== start line
+- Verification: unit tests that fail on the old start-time logic (mutation-checked); a read-only fleet run of status from this commit's code naming each role's loaded commit consistent with its spawn line and the reflog
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
