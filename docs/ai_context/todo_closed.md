@@ -17,6 +17,26 @@ work takes the next free number (see the counter at the top of `todo.md`).
 ---
 
 
+### `#776` — **CLOSED 2026-11-11 (GOAL MET): an NBA game still live at midnight Central keeps its live re-sim. Fix `eeb2461c7`, loaded 22:07:26Z 11-10 at live-odds-worker's own recycle (no TERM); the reading across the 11-11 roll is MET.**
+- **Was:** `nba/live_resim.run_live_resim_tick` took its date from `central_today_iso()`. At 00:00 CT a late West Coast game was never re-simmed again, and the board priced 0 of its game lines until the end.
+  - Measured: 4 of 20 regular-season slates (10-20..11-09) had play after the roll (+56.7, +21.1 OT, +4.9, +2.6 min).
+  - Fleet, 11-07 roll: the first post-roll tick read `games=0`, and every join after it read `games_in_snapshot=0`.
+- **Fix:** the loop's tick also re-sims the previous Central date's in-progress games, for `SYNDICATE_NBA_LIVE_RESIM_PRIOR_DATE_HOURS` after midnight (absent = 4 h, `0` = off).
+  - It uses that date's inputs and writes into the same snapshot, stamping each row `slateDate`.
+  - Each date's build gets only its own rows, so the carry, stalest-first order and remembered lines continue across the roll.
+  - Tests: 19 in `tests/test_nba_live_resim_midnight.py`, incl. off != on through the env; 8 source mutations, each caught.
+- **Evidence (11-11 roll, OKC @ POR):**
+  - The first post-roll tick, at 06:00:45Z, read `prior_date=2026-11-10 prior_games=1 prior_resimmed=1 prior_skip=-`.
+  - 15 of 15 ticks read the same until ESPN's last play at 06:30:30Z. `prior_skip=slate_final` from 06:31:41Z. `NBA_LIVE_RESIM_PRIOR_ERROR`: 0.
+  - Board join: 11 of 11 builds `games_in_snapshot=1`, 4 of 11 `projected>0`. The rest fell to the board-side quote stop, `#782`.
+  - I re-read the fleet log at 2026-11-11 18:18Z and got the same counts.
+  - The one 11-11 `NBA_LIVE_RESIM_TICK_ERROR` came at 01:21:18Z, before the roll. It was a DNS failure on the same-day scoreboard and is not in the prior-date path.
+- **Records:** deploys.md 2026-11-10 18:04:43Z and 2026-11-11 06:33Z; lane `nba-live-resim-midnight` (CLOSED).
+- **Follow-ups, each owned elsewhere:**
+  - props after the roll: `#777`;
+  - quote capture after the roll: `#782`;
+  - WNBA's same gap, and the evidence-log filing rule: `leads.md` 2026-11-11.
+
 ### `#772` — **CLOSED 2026-11-11 (user "Close #772 now"): the cause is fixed and loaded, and Bobby Portis now reaches the NBA live re-sim. MET on the join log; the pre-registered served-board rule was NOT MEASURED.**
 - **Was:** "Bobby Portis Jr." (2026-27 player_logs) never matched the roster's "Bobby Portis" in the NBA pregame roster filter. `_norm_name_key` keeps periods, so it strips " JR" but not " JR.". So he was absent from the engine frames, and his live prop rows had no Live proj./actual (11-07, 11-08). The recency readmit dropped Terrence Shannon Jr. the same way (he played 18 min), and the expected-minutes merge missed both.
 - **Fix:** `8fc72076d` (id + canonical-key match; `ROSTER_FILTER_DROPPED` log line), loaded 2026-11-09 15:30:09Z by a fleet ff alone (the pool build runs in a fresh child per props job).
