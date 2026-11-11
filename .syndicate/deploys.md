@@ -59074,3 +59074,29 @@ ailload\load.sh 3f11114c2 e102faf79`):
 - **verify (so far):** fleet `a4127d11a` -> `1225c3418` (ff 22:58:02Z, runtime range exactly `live_evidence_log.py` + `live_prop_evidence.py`); refresh-worker pid 225134 -> 250882 (TERM 22:58:06Z, respawned 22:58:13Z); `22:58:16.490Z [live_evidence] LOOP_STARTED interval_s=30 sports=nba,wnba,ncaab,wncaab,ncaaf,nfl,nhl props=on` (the old boot printed no `props=`); window from 22:58:00Z at 22:58:30Z: TICK 1, PROPS 0 (no NBA game live yet), PROPS_FAILED / TICK_FAILED / READ_FAILED / WRITE_FAILED 0, Traceback 0; drain cleared on the new pid (`DRAIN_CLEARED owner=live-props-evidence`). **MET so far:** head, props=on, failures 0, tracebacks 0. **Owed:** PROPS lines > 0 once NBA games are live, and the lossless check: expanded logged rows vs the published `liveProps` for the same producer `t`, 0 mismatches (probe 00:20-02:50Z 11-12, `scratchpad/lpe_probe.py`, nice 19, read-only), and the night's bytes.
 - **Revert:** `REFRESH_WORKER__SYNDICATE_LIVE_EVIDENCE_PROPS=off` in `local_production.env` + a drained `down`/`up`; or `git revert 1225c3418` on main + ff + a claimed, drained refresh-worker TERM.
 - Claim refresh-worker released 22:59Z (before this entry).
+
+## 2026-11-11 23:39:26Z (5:39 PM CST) -- FLEET ff 1225c3418 -> 837320ab5 + claimed live-odds-worker TERM: todo #789 NBA re-sim P(overtime) (lane `nba-resim-overtime-prob`) -- **LOADED; boot MET; the `p_ot` reading is OWED to tonight's first NBA live tick**
+- **User, in this session's chat:** "Yes, load it" (answering "Load the overtime field on live-odds-worker before tonight's NBA tips?").
+- **Commit** `837320ab5` on main (pushed 22:5xZ). Tests: 7 new + 17 study + the NBA/WNBA live re-sim files, 97 passed.
+- **Range 1225c3418..837320ab5, runtime files:**
+  - `syndicate/features/nba/live_resim.py` (mine, +12 lines).
+  - `scripts/nba_blowout_bench_study.py` (mine, a read-only study no role imports).
+  - The rest is ledger and tests. `1225c3418` (lane `live-props-evidence`) was already the fleet HEAD, loaded by its own lane at 22:58Z, so it is not in this range.
+- **gates:**
+  - Claim live-odds-worker, holder `nba-resim-overtime-prob`, 23:36:19Z (rc 0).
+  - Spacing: the last live-odds-worker restart was 22:34:21Z, 65 min earlier.
+  - Preflight `--target fleet --target-commit 837320ab5`, from a worktree at origin/main. 23:36:31Z: HOLD (10 odds jobs). Then a 10 s loop: HOLD x12, **CLEAR 23:39:18Z** (rc 0, 0 jobs). Baseline read 23:36:11Z.
+- **load** (`C:	mp\otload\load.sh 837320ab5 1225c3418`; it aborts on a moved HEAD or a running odds job):
+  - `git merge --ff-only` at **23:39:26.720Z**: HEAD `837320ab5`. On disk: `"p_ot"` 1, the tie rule 1.
+  - `kill -TERM 246202` at 23:39:26.725Z. Its children were the 2 `live_resim_workers --serve` and 2 defunct; no odds job, no NBA or NHL game live.
+  - New supervised live-odds-worker **pid 263310**, first seen 23:41:16.068Z.
+  - Web and refresh-worker were not touched.
+- **expect / measured** (read 23:41:37Z):
+  - `fleet_checkout_head` 1225c3418 -> 837320ab5: **MET**.
+  - `p_ot_on_disk` 0 -> 1: **MET**.
+  - `local_production.py status`: `live-odds-worker pid=263310 up code=837320ab`.
+  - `NBA_LIVE_RESIM_LOOP_STARTED interval_s=120.0` at 23:41:15.833Z, and a tick at 23:41:16Z (`games=0`, before the tips).
+  - `low_tracebacks_first_10min` 0 -> 0: 0 so far (1,077 lines since the TERM). The 10-minute read is owed at 23:51Z.
+  - `nba_history_rows_with_p_ot` 0 -> >0: **OWED** to the first live NBA tick. Watcher: this session's background task (`C:	mp\otload\watch_pot.sh`, every 60 s for 60 min).
+- **Revert:** `git revert 837320ab5` on main + ff + a claimed live-odds-worker TERM. The field is additive: no code reads `modelOvertimeProb` or `p_ot` by name except `scripts/nba_blowout_bench_study.py` (grep of syndicate/, scripts/, pipeline/).
+- Claim live-odds-worker released after this entry.
