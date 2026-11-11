@@ -10,7 +10,12 @@
   - At 25+, bench lineups score SLOWER than starters at the same lead: 1.08 vs 1.16 x the game's own first-30-min rate, CIs apart.
   - The live re-sim's late-blowout error is ~0 (25+ with the bench on: -0.7 +- 1.2, 27 games).
   - The late miss is close games: +3.0 +- 2.7 (41 games); earlier cut +5 to +7 points still to come. That is lane `ncaab-score-effect-load`'s endgame problem.
-- **Owed:** the same reading for WNCAAB once its archive holds enough games. USA @ FAU (57-85) under-projected the last 2-3 min by 9-14 points.
+- **WNCAAB** (573 backfilled games 11-01..11-10; verifier 573 / 573 score match): same pattern.
+  - The leader's starters fall to 1.1 at 25+ with 6-4 min left.
+  - At 25+, bench lineups score 0.97 +- 0.05 vs starters 1.05 +- 0.06 x the early pace (slightly SLOWER).
+  - Live re-sim, 25+ with the bench on: -0.6 +- 3.2 (7 games).
+  - USA @ FAU (57-85): FAU's Q4 went 40 points against ~33 projected. The bench does not explain it.
+  - **Owed:** a re-read once ~2 more weeks of WNCAAB finals with live ticks are archived (nightly from `3f11114c2`).
 - Study: `scripts/college_blowout_bench_study.py --league ncaab|wncaab --start --end [--evidence]`.
 
 ### `#786` — **LIVE QUOTES ARE PULLED SLOWER THAN THE NEW 120 s PRICING CEILING ALLOWS: since 18:11Z 11-11 most live full-game college lines go unpriced for quote age (NCAAB 320 of 570 evaluations, WNCAAB 281 of 433). For NCAAB it is OUR lag (pull + build), not the book. OPTION 1 (PRICE ON PULL) ON MAIN, NOT LOADED** `[2026-11-11, lanes layer2-live-rail-edges / live-price-on-pull, session 0f519972; user question "do we need to get game lines more often on live games to align with live resim timing", then "Do this task here"]`

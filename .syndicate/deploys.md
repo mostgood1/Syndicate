@@ -58998,3 +58998,32 @@ ight.sh`, 01:05Z / 01:50Z / 02:45Z 11-12):** NCAAF segment spread rows with a Li
 - **No deploy.** A live ledger write on the user's "Yes, grade it" (answering "Grade 837e657b as won from Kalshi's result, the same way as 970ec063?").
 - **verify:** `scripts/kalshi_operator_grade.py --key 837e657b... --apply` 20:51:54Z (fleet `3f11114c2`): pre-checks held -- Kalshi `market_result=no`, settlement NO 1.10 covers our 0.1, venue grader `both_sides_held` -- `OPERATOR_GRADE ... leg=no outcome=won pnl=0.0562`. The alarm's own view: 0 live fills ungraded >= 3 d; `unreconciled_orders()` 0; a fresh repair plan: 0 entries, 0 exits. Watchdog 2:55:58 PM CST: `CLEARED: 1 live fill(s) ($0.04 staked) still UNGRADED` (837e657b); `0 failing, 1 warning` (the warning predates this work).
 - **Revert:** the row's `pre_operator_grade` holds every field the grade wrote (all null before).
+
+## 2026-11-11 20:45:28Z (2:45 PM CST) -- claimed refresh-worker TERM to load `3f11114c2`: todo #786 PRICE ON PULL (`949d10975`) + #787's nightly WNCAAB play-by-play archive (lanes `live-price-on-pull` / `college-pbp-blowout-bench`) -- **LOADED; reachability MET; behaviour reading owed tonight**
+- **User, in this session's chat:** "Yes, load it" (answering "Load price-on-pull on refresh-worker before tonight's slate?").
+- **gates:**
+  - Claim refresh-worker, holder `live-price-on-pull`, 20:25:5xZ (rc 0). It was free after lane `ncaaf-live-segment-display` released it; I waited and did not force.
+  - Ride-along check: fleet HEAD `e102faf79` already carried `949d10975`, because a peer's ff at 20:25:03Z included it. The running worker, pid 217520, had started at 20:16:01Z on `96131f985` and had 0 ticks with the `on_pull` field, so it was not loaded. `e102faf79..3f11114c2`: 3 commits, runtime = only #787 (`build_basketball_rotation_stints.py` LEAGUES/WINDOWS + the read-only study script).
+  - First preflight 20:33:04Z: **TOO_SOON** (rc 5). The last restart was 17 min earlier, inside the 25-min spacing, and the first board publish comes ~21 min after boot. I undrained at once so the drain would not hold that publish, and waited.
+  - Second drain CLEAR 20:45:07Z. Preflight `--target fleet --target-commit 3f11114c2` **CLEAR** (rc 0).
+    - Expectations: `ticks_with_on_pull_key` 0 -> >0, `book_grid_on_pull_passes` 0 -> >0.
+    - Baseline 20:41:30Z: 8 ticks since the 20:16:01Z boot, 0 with the key, 0 on-pull passes.
+  - The deploy-guard first refused the load because this session's lane marker named the other lane (`college-pbp-blowout-bench`). I re-pointed it to the claim-holding lane and re-ran.
+- **load** (`C:	mp
+ailload\load.sh 3f11114c2 e102faf79`):
+  - `git merge --ff-only` at **20:45:28.519Z**: HEAD `3f11114c2`; on disk, `def _book_grid_sports_with_new_live_quotes` count 1.
+  - `kill -TERM 217520` at 20:45:28.523Z. New supervised refresh-worker **pid 225134**, first seen 20:45:34.555Z.
+  - `--undrain` 20:45:39Z, `DRAIN_CLEARED`.
+  - web and live-odds-worker were not touched. The nightly `basketball-rotation-stints` job (11:45Z) reads `3f11114c2` from disk and archives WNCAAB from tonight.
+- **verify, reachability (`off != on`, production): MET 20:56:02Z.**
+  - `ticks_with_on_pull_key` 0 -> 5 (every new tick).
+  - `book_grid_on_pull_passes` 0 -> 2 (20:53:17Z, 20:55:22Z; `ncaab` x2, `wncaab` x1).
+  - NCAAB in-play overlays at 20:52:30 / 20:53:16 / 20:54:40 / 20:55:22Z, gaps 46 / 84 / 42 s, against a median of 145 s before.
+  - 0 Tracebacks since boot.
+- **first behaviour reading** (served board 20:56:15Z, NCAAB overlay rows, n 38):
+  - `quote_seen_age_seconds` median **78 s**, against 136 s at 19:5xZ; over 120 s: **0 of 38**, against 30 of 31.
+  - `book_age_seconds` (the clock the join gates on) median 136 s, against 181 s; over 120 s: 29 of 38, against 30 of 31.
+  - **So our pull-to-pricing lag is mostly gone. The book's own unchanged-price time now dominates, and it often still exceeds the 120 s ceiling.**
+  - The refusal share in the first 10 min is 51 of 117 (44%), against 394 of 674 (58%) 18:12Z-20:16Z and 95 of 260 (37%) 20:16Z-20:41Z. That is too noisy to call.
+- **Owed tonight** (lane `live-price-on-pull`, falsification as registered): on the evening NCAAB slate, compare the non-segment `quote_older_than_live_pricing_ceiling` share and the overlay seen-age median with the 11-11 afternoon baseline. Option (2) (faster pulls) only if the book clock, not ours, stays the binding one.
+- **revert:** `SYNDICATE_BOOK_GRID_PRICE_ON_PULL=off` needs a full fleet down/up (env is built at `up`). Faster: revert `949d10975` on main, ff the fleet, then a claimed refresh-worker TERM.

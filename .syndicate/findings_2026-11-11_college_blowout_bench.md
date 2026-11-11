@@ -79,11 +79,21 @@ The broader cut over all of 11-09..11-11, by lead only, agrees (from this sessio
 - The systematic late miss is CLOSE games (+3 to +7 points still to come): endgame fouling and overtime. That is lane `ncaab-score-effect-load`'s problem (#768 / RC46, `solver_endgame_pts_per_team`).
 - The NBA / WNBA engine's blowout bench-rest mechanism belongs to lane `basketball-scenario-calibration`.
 
-**WNCAAB: owed.** Its play-by-play is captured from this lane on (see below). The USA @ FAU late under-projection is one game, and the women's 10-19-lead cell earlier read +5.7 (n=72 ticks).
+**WNCAAB: same pattern, smaller sample; the bench is not what went wrong in USA @ FAU.**
+
+Measured on 2026-27, 11-01..11-10: 573 games backfilled this session. The job's own verifier passes: 573 of 573 games reproduce the official score, and 11,978 of 12,572 player-games are within 1 minute of the box score.
+
+- **Q1, when** (leader's starters on the floor):
+  - 25+ lead: 2.21 (10-8 min left), 1.11 (6-4), 0.68 (4-2).
+  - 20-24 lead: 1.36 (4-2), 0.82 (last 2).
+- **Q2, effect:** at 25+, bench lineups score 0.97 +- 0.05 (267 games) vs starters 1.05 +- 0.06 (196) x the game's own first-30-min rate, i.e. slightly SLOWER. Women's late games barely speed up over their early pace (close games 1.11 +- 0.07, against the men's 1.34).
+- **Q3, our model:** 25+ with the bench on: -0.6 +- 3.2 (7 games). Every 10-19-lead cell is 1-2 games, too few to read.
+- **USA @ FAU (57-85):** FAU's 4th quarter went 40 points (17 + 23) against ~33 projected at its start. The bench in a blowout lowers the scoring rate on average, so it does not explain a late under-projection.
+- **Re-read once the nightly job has archived ~2 more weeks of WNCAAB finals with live ticks:** `college_blowout_bench_study.py --league wncaab --evidence`.
 
 ## Capture change (this lane)
 
 - `scripts/build_basketball_rotation_stints.py`: `LEAGUES` gains `wncaab`, and `WINDOWS["wncaab"]` gets the men's calendar.
 - The nightly 11:45Z job runs the default list, so it now archives every WNCAAB final: pbp_events, stints, player_stints, the checks. That holds from the next fleet ff; the job runs from disk, so no restart is needed.
 - Tests: 2 new in `tests/test_basketball_rotation_stints.py`.
-- This season (11-01..11-10) was backfilled on the fleet from this lane's worktree.
+- This season (11-01..11-10) was backfilled on the fleet from this lane's worktree: 579 games, 573 event logs, 736 s, 1 request/s at nice 19. 11-11 onward comes from the nightly job, once the fleet carries `3f11114c2`.
