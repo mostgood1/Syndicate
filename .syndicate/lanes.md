@@ -808,6 +808,14 @@ ight.sh`, 01:05Z / 01:50Z / 02:45Z 11-12, BUFF @ BALL, SAC @ CMU, MASS @ TOL). S
 - Verification: Fleet: wncaab pbp_events + player_stints files exist for this season's dates with score_match rates reported by the job's own verifier; findings file with per-league tables (n games, n stints, rates with CIs).
 - Blocked by: none
 
+### nba-pbp-blowout-bench — OPEN — opened 2026-11-11 — session 63276f7e-66a4-4ad9-a667-cfd46d19b0a9
+- Goal: The college game-shape study (#787) done for NBA: confirm NBA play-by-play + lineup stints are archived nightly with coverage counts on the fleet; a measured answer to 'what happens when the bench comes in during an NBA blowout' -- when starters leave (lead x minutes left), the scoring rate of bench vs starter lineups against the game's own first-36-min pace, and the NBA live re-sim's late remaining-points error by lead x the leader's bench state and by the engine's own blowout flag -- in a findings file with denominators; study script + tests on main; todo #788; engine changes stay with lane basketball-scenario-calibration
+- Files: scripts/nba_blowout_bench_study.py (NEW), tests/test_nba_blowout_bench_study.py (NEW), .syndicate/findings_2026-11-11_nba_blowout_bench.md (NEW), docs/ai_context/todo.md (#788 section only)
+- Hypothesis: As in NCAAB (#787): the NBA leader's bench takes over late at big leads and scores no faster than starters; the NBA live re-sim's late-blowout remaining-points error is ~0, and any late miss sits in close games (endgame fouling) or is a level bias across all states (#695 noted ~+3 rest-of-game over-projection)
+- Falsification test: A 20+ lead bench cell in Q3 whose game-clustered 95% CI excludes 0 by more than 1.5 points, or engine-blowout ticks erring in a different direction from non-blowout ticks beyond both CIs -> the NBA re-sim mis-handles blowouts and the finding goes to lane basketball-scenario-calibration
+- Verification: Findings file with Q1/Q2 on 2025-26 regular+playoffs (score-matched games) and Q3 on live_resim_history 2026-10-20..11-10, every cell with games and ticks; tests pass; on main
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
