@@ -187,7 +187,7 @@
 - **Reading owed after the load:** the next slate where one of the 8 has props, after the sims build. Served rows carry `engine_player_name` + `sim_projection` + `model_edge_pct` + `player_side` + `headshot_url`.
 - Findings: `.syndicate/findings_2026-11-10_nba_prop_engine_name_join.md`.
 
-### `#774` — **A COLLEGE GAME STILL LIVE AT MIDNIGHT CENTRAL LOST ITS LIVE RE-SIM, AND THE CARRYOVER BOARD PRICED IT FROM NOTHING. FIX ON MAIN `97cb5d477`, LOADED 16:18Z 11-10 (live-odds-worker pid 294524); readings owed 06:00Z 11-11 and 11-12 (USC @ CAL)** `[2026-11-10, lane college-live-resim-midnight, session 8062940b]`
+### `#774` — **A COLLEGE GAME STILL LIVE AT MIDNIGHT CENTRAL LOST ITS LIVE RE-SIM, AND THE CARRYOVER BOARD PRICED IT FROM NOTHING. FIX ON MAIN `97cb5d477`, LOADED 16:18Z 11-10; READING 1 MET 06:00Z 11-11 (`prior_skip=slate_final`, 0 errors); reading 2 owed 06:00Z 11-12 (USC @ CAL)** `[2026-11-10, lane college-live-resim-midnight, session 8062940b]`
 - **Cause:** `ncaab/live_resim.run_live_resim_tick` takes its date from `central_today_iso()`. At 00:00 CT it switches to the new date's ESPN scoreboard, so a game tipped late on the previous date is never re-simmed again. The same function runs both college loops (men's and women's).
 - **Measured** (read-only; fleet live-odds-worker + refresh-worker logs 11-05 16:23Z..11-10 15:21Z = 5 midnights; ESPN `groups=50` scoreboards and summaries for 7 slates, 11-03..11-09):
   - Men's: on **2 of 7 slates** a D1-vs-D1 game was live at the roll.
@@ -211,7 +211,8 @@
   - the window (incl. the DST night), the final-slate skip, the budget split, the carry across ticks, the women's loop, the failure isolation and the tick-line field order.
   - 5 source mutations each fail at least one test. 364 passed across 15 college live / join / chip / evidence test files.
 - **Loads with:** a fleet ff to a SHA containing it, then a live-odds-worker restart: its own uptime recycle, or a claimed TERM. Needs the user's yes.
-- **Reading owed after the load:** the next night with a D1 game live at 00:00 CT. ESPN lists USC @ CAL tipping 04:00Z on 11-11, the same shape as WICH vs USC.
+- **Reading 1, MET** `[2026-11-11 06:12Z]`: every college tick 06:00-06:08Z 11-11 (10 of 10, both leagues) read `prior_date=2026-11-10 prior_live=0 prior_resimmed=0 prior_skip=slate_final`; no D1 game was live at the roll. 0 `prior_error`, 0 `worker_errors>0` in 709 college ticks, 0 Traceback frames in college code. deploys.md 2026-11-11 06:12Z.
+- **Reading 2, owed:** the next night with a D1 game live at 00:00 CT. ESPN lists USC @ CAL tipping 04:00Z 11-12 (10:00 PM CST Wed 11-11; re-read 06:11Z 11-11), the same shape as WICH vs USC.
   - MET if the first tick after 06:00Z reads `prior_live>=1 prior_resimmed>=1`, and the carryover date's NCAAB `LIVE_GAMELINE_JOIN` reads `games_in_snapshot>=1` with `projected>0` until the game ends.
   - On a night with none, expect `prior_skip=slate_final` from the first post-roll tick on.
 - **Same date choice elsewhere (not fixed here):**

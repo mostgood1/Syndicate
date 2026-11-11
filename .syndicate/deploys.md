@@ -58627,3 +58627,14 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - 0 `EARLIER` positions in any plan;
   - the bound drops only earlier-date rows, and dropped 0 at the roll.
   - The midnight reading owed in todo `#779` is DISCHARGED.
+
+## 2026-11-11 06:12Z (12:12 AM CST 11-11) -- VERIFY, reading 1 of 2, of the 2026-11-10 16:18:01Z load (`97cb5d477`, todo #774, lane `college-live-resim-midnight`: NCAAB/WNCAAB re-sim the previous Central date's in-progress games for 4 h after midnight) -- **the prior-date path RAN at the first post-roll tick and skipped correctly (`slate_final`); 0 errors**
+- **No deploy.** Read-only reads of `~/syndicate-prod/logs/live-odds-worker.log` (fleet HEAD `9fee4160d`, which contains `97cb5d477`; live-odds-worker pid 533637, started 23:10:15Z 11-10).
+- **verify, the branch ran:** first ticks after the roll, full lines:
+  - `2026-11-11T06:00:32.128Z NCAAB_LIVE_RESIM_TICK date=2026-11-11 live=0 resimmed=0 ... worker_errors=0 prior_date=2026-11-10 prior_live=0 prior_resimmed=0 prior_carried_forward=0 prior_skip=slate_final refusals={} ... elapsed_s=0.4`
+  - `2026-11-11T06:00:46.785Z WNCAAB_LIVE_RESIM_TICK date=2026-11-11 ... prior_date=2026-11-10 prior_live=0 prior_resimmed=0 prior_carried_forward=0 prior_skip=slate_final ... elapsed_s=0.4`
+  - Every tick 06:00-06:08Z (10 of 10, both leagues) carries `prior_date=2026-11-10 ... prior_skip=slate_final`. The last pre-roll ticks (05:56-05:58Z, `date=2026-11-10`) read `live=0` and carry no `prior_` fields, as designed (outside the window).
+- **Prediction** (lane, 16:29Z 11-10): "the first NCAAB tick after 06:00Z 11-11 carries `prior_date=2026-11-10`, expected `prior_skip=slate_final` or `none_in_progress`" -- **MET** (`slate_final`). It fits the night: no D1 game was live at the roll (the 05:56Z/05:58Z ticks for 11-10 read `live=0`; latest 11-10 D1 tip MONT @ SF 03:00Z).
+- **verify, failures:** `prior_error` lines 0; `worker_errors>0` college ticks 0 of 709 in the current log (17:26Z 11-10 on); Traceback frames in college code (`live_resim`, `ncaab`, `college_basketball`) 0. The log's 43 Traceback lines are soccer ESPN-lineup DNS/timeout errors (00:26Z 11-11 and earlier) and other non-college stacks; the 54 college-word hits within 15 lines of them are all `ALL_PROCESS_MEMORY` cmdline dumps.
+- **Cost:** the four post-roll ticks read in full (06:00-06:02Z) ran in 0.2-0.4 s, against 0.2-0.7 s for the four pre-roll ticks (05:56-05:58Z), so the final-slate skip adds nothing visible.
+- **Still OWED, reading 2 (closes the lane):** USC @ CAL tips 04:00Z 11-12 (10:00 PM CST Wed 11-11; ESPN re-read 06:11Z 11-11, still `Scheduled` 04:00Z). MET if the first tick after 06:00Z 11-12 reads `prior_live>=1 prior_resimmed>=1` and the carryover NCAAB `LIVE_GAMELINE_JOIN` reads `games_in_snapshot>=1` with `projected>0` until the game ends.
