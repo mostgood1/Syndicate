@@ -1495,6 +1495,101 @@ def _both_sides_is_our_partial_close(
     return abs(opposite_count - total_sold) < 1e-6 and held_count + 1e-6 >= total_sold
 
 
+# Absent = on. `off` puts back the refusal `_market_exit_close_leg` replaces.
+MARKET_EXIT_CLOSE_ENV = "SYNDICATE_SETTLE_MARKET_EXIT_CLOSE"
+
+
+def _market_exit_close_enabled() -> bool:
+    import os
+
+    return str(os.environ.get(MARKET_EXIT_CLOSE_ENV) or "").strip().lower() not in {"off", "0", "false", "no"}
+
+
+def _live_exits_with_archive(live_exits: Mapping[str, Mapping[str, Any]]) -> tuple[dict[str, dict], str | None]:
+    """The live exits document PLUS the archive, the document's copy winning per key. `(rows, error)`.
+
+    `_prune_exits` moves an exit to `execution_exits_archive/` about five days after its position's date, whether
+    or not its entry is graded, so a market settled (or graded) late can have its exits only there. An unreadable
+    archive is an error, never an empty one, for the reason `load_live_exits` gives.
+    """
+    try:
+        from syndicate.features.shared.execution_exits import EXIT_LIVE, archived_exit_rows
+
+        archived = archived_exit_rows()
+    except Exception as exc:
+        return {}, f"{type(exc).__name__}: {exc}"
+    merged: dict[str, dict] = {}
+    for row in archived:
+        if isinstance(row, Mapping) and str(row.get("mode") or "") == EXIT_LIVE and row.get("exit_key"):
+            merged[str(row["exit_key"])] = dict(row)
+    merged.update({str(k): dict(v) for k, v in live_exits.items()})
+    return merged, None
+
+
+def _market_exit_close_leg(
+    row: Mapping[str, Any],
+    market_orders: list[Mapping[str, Any]],
+    exits: Mapping[str, Mapping[str, Any]],
+) -> str | None:
+    """The leg we held when a `both_sides_held` row is OUR OWN BOOK closing itself across the WHOLE market; else None.
+
+    `_both_sides_is_our_partial_close` explains the opposite leg with the exits of the entries being GRADED only.
+    MEASURED 2026-11-11 on `KXNFLTOTAL-26OCT25SFATL-50`: entry 837e657b (0.1 NO, never exited) sat ungraded
+    `both_sides_held` for 16 days. The row's YES 1.00 was entry ffd5030f's exit `x954102a3` closing ffd5030f's NO,
+    and ffd5030f was already graded, so no target's exit explained it. It was graded by hand (operator grade, WON
+    +0.0562 from its own fill).
+
+    Allowed through only when it can be nothing else:
+    - every live order we hold on the market is on ONE leg, yes or no;
+    - every one of them has a known fill (filled, or rejected/failed with none), and no exit on the market is still
+      unreconciled (`defer`);
+    - at least one exit filled, every one of them closing that leg;
+    - the row's OPPOSITE count equals the contracts those exits filled, and its HELD count equals the contracts our
+      entries filled, so every contract on the row, on both legs, is ours.
+
+    `exits` must carry the archive too (`_live_exits_with_archive`): an exit that left the document still traded.
+    """
+    if not market_orders:
+        return None
+    legs = {_order_side_key("kalshi", order) for order in market_orders}
+    if len(legs) != 1 or not legs <= {"yes", "no"}:
+        return None
+    held = next(iter(legs))
+    opposite = "no" if held == "yes" else "yes"
+    held_count = _num(row.get(f"{held}_count_fp"))
+    opposite_count = _num(row.get(f"{opposite}_count_fp"))
+    if held_count is None or opposite_count is None or opposite_count <= 0:
+        return None
+    bought = 0.0
+    sold = 0.0
+    for order in market_orders:
+        status = str(order.get("status") or "")
+        if status in {"rejected", "failed"}:
+            continue
+        if status != "filled":
+            return None  # a fill we cannot see yet
+        contracts = _num(order.get("contracts"))
+        if contracts is None or contracts <= 0:
+            return None
+        bought += contracts
+        effect, exit_row = exit_for_order(order, exits)
+        if effect == _EXIT_DEFER:
+            return None
+        if effect != _EXIT_SOLD:
+            continue
+        if exit_row is None or str(exit_row.get("leg") or "").strip().lower() != held:
+            return None
+        filled = _num(exit_row.get("filled_contracts"))
+        if filled is None or filled <= 0:
+            return None
+        sold += filled
+    if sold <= 0:
+        return None
+    if abs(opposite_count - sold) < 1e-6 and abs(held_count - bought) < 1e-6:
+        return held
+    return None
+
+
 def fetch_kalshi_market_results(tickers: list[str]) -> tuple[dict[str, dict], str | None]:
     """`ticker -> {result, status}` for markets a fully sold position left.
 
@@ -1737,6 +1832,7 @@ def settle_from_venue(*, dry_run: bool = False) -> dict[str, Any]:
     matched_keys: set[tuple[str, str]] = set()
     graded_any = False
     unjoinable_rows: dict[str, list] = {}
+    exits_with_archive: tuple[dict[str, dict], str | None] | None = None
 
     for venue, rows in fetched.items():
         grade = grade_kalshi_settlement if venue == "kalshi" else grade_polymarket_resolution
@@ -1775,12 +1871,42 @@ def settle_from_venue(*, dry_run: bool = False) -> dict[str, Any]:
             )
             if partly_sold:
                 counters["exit_partial_both_sides"] = counters.get("exit_partial_both_sides", 0) + 1
+            # OUR BOOK CLOSING ITSELF ACROSS THE MARKET: the opposite leg is
+            # what our exits bought, possibly ANOTHER entry's (837e657b). Every
+            # target then grades on the one held leg -- exit-aware where it
+            # sold, from its own fill where it held. See `_market_exit_close_leg`.
+            market_close_leg = None
+            if (
+                venue == "kalshi"
+                and not partly_sold
+                and not exits_error
+                and verdict.get("reason") == "both_sides_held"
+                and _market_exit_close_enabled()
+            ):
+                if exits_with_archive is None:  # read once per pass, and only for such a row
+                    exits_with_archive = _live_exits_with_archive(live_exits)
+                merged_exits, archive_error = exits_with_archive
+                if archive_error:
+                    counters["errors"]["exits_archive"] = archive_error
+                else:
+                    market_close_leg = _market_exit_close_leg(row, orders_by_key.get(key) or [], merged_exits)
+                if market_close_leg is not None:
+                    effects = [exit_for_order(order, merged_exits) for order in targets]
+                    counters["exit_market_close"] = counters.get("exit_market_close", 0) + 1
+                    print(
+                        f"[venue_settlement] MARKET_EXIT_CLOSE ticker={row.get('ticker')} leg={market_close_leg}"
+                        f" result={row.get('market_result')} targets={len(targets)}"
+                        f" sold={sum(1 for e, _r in effects if e == _EXIT_SOLD)}"
+                        f" held={sum(1 for e, _r in effects if e == _EXIT_NONE)}",
+                        flush=True,
+                    )
             # WE GENUINELY HELD BOTH LEGS, with no sale involved: each order
             # grades on its own leg from the row's result, at its own fill.
             # See `_both_legs_grades` for the shape checks and the 08-27 guard.
             both_legs = (
                 None
-                if partly_sold or venue != "kalshi" or verdict.get("reason") != "both_sides_held"
+                if partly_sold or market_close_leg is not None
+                or venue != "kalshi" or verdict.get("reason") != "both_sides_held"
                 or any(effect != _EXIT_NONE for effect, _r in effects)
                 else _both_legs_grades(row, targets, orders_by_key.get(key) or [])
             )
@@ -1802,7 +1928,7 @@ def settle_from_venue(*, dry_run: bool = False) -> dict[str, Any]:
                     per_venue["settled"] += 1
                     graded_any = True
                 continue
-            if not verdict.get("graded") and not (sold_out or partly_sold):
+            if not verdict.get("graded") and not (sold_out or partly_sold or market_close_leg is not None):
                 reason = str(verdict.get("reason"))
                 counters["refused"][reason] = counters["refused"].get(reason, 0) + 1
                 continue
@@ -1882,8 +2008,33 @@ def settle_from_venue(*, dry_run: bool = False) -> dict[str, Any]:
                     per_venue["settled"] += 1
                     graded_any = True
                     continue
+                if market_close_leg is not None:
+                    # HELD TO SETTLEMENT on a market our exits partly closed.
+                    # The row's P&L is the whole market's, so this entry's money
+                    # comes from its own fill, as for several orders below.
+                    outcome = _kalshi_outcome_from_leg(row.get("market_result"), market_close_leg)
+                    if outcome is None:
+                        counters["refused"]["exit_outcome_unreadable"] = (
+                            counters["refused"].get("exit_outcome_unreadable", 0) + 1
+                        )
+                        left_open += 1
+                        continue
+                    order["outcome"] = outcome
+                    order["settled_by"] = "venue"
+                    order["settled_at_venue"] = row.get("settled_time")
+                    order["graded_at"] = _utc_now()
+                    order["held_side"] = market_close_leg
+                    order["venue_grade_basis"] = "market_exit_close"
+                    derived = _derived_pnl(order, outcome)
+                    if derived is not None:
+                        order["pnl_dollars"] = derived
+                    counters["pnl_derived"] += 1
+                    counters["settled"] += 1
+                    per_venue["settled"] += 1
+                    graded_any = True
+                    continue
                 if not verdict.get("graded"):
-                    continue  # unreachable: `sold_out`/`partly_sold` require every target sold
+                    continue  # unreachable: `sold_out`/`partly_sold`/`market_close_leg` cover every ungraded verdict
                 order["outcome"] = verdict["outcome"]
                 order["settled_by"] = "venue"
                 order["settled_at_venue"] = verdict.get("settled_at_venue")
