@@ -13,6 +13,8 @@ report.
   Q3  OUR MODEL: the live re-sim's remaining-points error (actual final total - projected total) on 4th-quarter
       ticks, by lead x the leader's lineup at the tick; by the engine's OWN blowout flag x minutes left; and, for
       scale, every regulation tick by period (a level bias shows in all of them, a blowout miss only late).
+  Q4  OVERTIME (todo #789): the re-sim's expected overtime points and, on rows that carry it, its own P(overtime),
+      against the game's real overtime, by |lead| x minutes left in the 4th (`q4_overtime`).
 
 NBA geometry: 4 x 12 min = 48. The college study's windows are the game's last quarter of time (10 of 40) against
 the rest (30); here that is the 4th quarter (12 of 48) against the first 36 minutes.
@@ -56,6 +58,11 @@ BASELINE_SECONDS = GAME_SECONDS - LATE_SECONDS  # a game's own pace: its first 3
 LEFT_BUCKETS = (("12-10", 600, 720), ("10-8", 480, 600), ("8-6", 360, 480), ("6-4", 240, 360), ("4-2", 120, 240),
                 ("2-0", 0, 120))
 HALF_BUCKETS = (("12-6", 360, 720), ("6-0", 0, 360))
+OT_LEAD_BUCKETS = (("0-2", 0, 3), ("3-5", 3, 6), ("6-9", 6, 10), ("10+", 10, 10_000))
+# History rows' `h2` segment carries every overtime only from `3d376da7c` (#762), loaded on live-odds-worker at
+# 2026-11-06 15:51:30Z (deploys.md). Before it `h2` was regulation-only, so `h2 - q3 - q4` read 0 on every row
+# (measured on the fleet: 0 of 578 rows on 11-04/11-05 above 0; 256 of 403 on 11-06).
+H2_CARRIES_OT_SINCE = dt.datetime(2026, 11, 6, 15, 51, 30, tzinfo=dt.timezone.utc)
 
 # basketball_engine/engine.py EventSimConfig defaults; tests/test_nba_blowout_bench_study.py pins them to the engine.
 ENGINE_BLOWOUT_MARGIN = 18  # from the 3rd period (LeagueParams.second_half_first_period)
@@ -233,6 +240,74 @@ def q3_model(games, finals, ticks: Iterable[dict[str, Any]]) -> dict[str, Any]:
             "by_period_all_ticks": _cells_out(by_period)}
 
 
+def _regulation_total(teams) -> float:
+    any_team = next(iter(teams.values()))  # one team's stints carry every point (pts_for + pts_against)
+    return sum(s["points"] for s in any_team)
+
+
+def _overtime_cell(r: dict[str, Any], per: int, left: float) -> tuple[str, str]:
+    if per < N_PERIODS:
+        return ("Q1-Q3", "all")
+    lead = abs(float(r["home_score"]) - float(r["away_score"]))
+    # A tick AT the 4th-quarter tip has exactly 12:00 left, the top bucket's open end: it belongs to 12-6.
+    return (_bucket(lead, OT_LEAD_BUCKETS) or "?", _bucket(min(left, LATE_SECONDS - 1e-6), HALF_BUCKETS) or "?")
+
+
+def _tick_time(r: dict[str, Any]) -> dt.datetime | None:
+    try:
+        t = dt.datetime.fromisoformat(str(r.get("t")).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return t if t.tzinfo else None
+
+
+def q4_overtime(games, finals, ticks: Iterable[dict[str, Any]]) -> dict[str, Any]:
+    """Does the re-sim give overtime the right weight? (todo #789; #788 found its whole late close-game miss was the
+    8 overtime games of 160.) Two readings per regulation tick, game-clustered, by |lead| x minutes left in the 4th
+    (earlier ticks in one cell for scale):
+
+      expected_ot_points  the re-sim's expected overtime points, `h2 - q3 - q4` of the row's segment means (h2 is
+                          q3 + q4 + every overtime, over the same draws), against the game's real overtime points
+                          (official final - the play-by-play's regulation total). Rows since H2_CARRIES_OT_SINCE only.
+      p_ot                the re-sim's own P(overtime) (`p_ot`, the share of draws level after regulation), against
+                          whether the game went to overtime. Rows carrying `p_ot` only (#789's field).
+    `error` is actual - expected: positive = the re-sim under-weights overtime."""
+    pts: dict[tuple[str, str], dict[str, list[tuple[float, float]]]] = defaultdict(lambda: defaultdict(list))
+    prob: dict[tuple[str, str], dict[str, list[tuple[float, float]]]] = defaultdict(lambda: defaultdict(list))
+    for r in ticks:
+        eid = str(r.get("event_id"))
+        if eid not in finals or eid not in games:
+            continue
+        per, clk = r.get("period"), r.get("clock_s")
+        if None in (per, clk, r.get("home_score"), r.get("away_score")) or not 1 <= int(per) <= N_PERIODS:
+            continue
+        left = GAME_SECONDS - ((int(per) - 1) * PERIOD_SECONDS + (PERIOD_SECONDS - float(clk)))
+        if not 0 <= left <= GAME_SECONDS:
+            continue
+        cell = _overtime_cell(r, int(per), left)
+        actual = finals[eid] - _regulation_total(games[eid])
+        seg = r.get("segments") or {}
+        when = _tick_time(r)
+        if when is not None and when >= H2_CARRIES_OT_SINCE and all(seg.get(k) is not None for k in ("h2", "q3", "q4")):
+            pts[cell][eid].append((float(seg["h2"]) - float(seg["q3"]) - float(seg["q4"]), actual))
+        if r.get("p_ot") is not None:
+            prob[cell][eid].append((float(r["p_ot"]), 1.0 if actual > 0 else 0.0))
+
+    def out(cells, label: str) -> dict[str, Any]:
+        res = {}
+        for key, by_game in sorted(cells.items()):
+            exp = [statistics.fmean(e for e, _ in v) for v in by_game.values()]
+            act = [v[0][1] for v in by_game.values()]
+            mean, half, n = _ci([a - e for a, e in zip(act, exp)])
+            res["|".join(key)] = {label: round(statistics.fmean(exp), 3), "actual": round(statistics.fmean(act), 3),
+                                  "error": mean, "ci95": half, "games": n,
+                                  "ot_games": sum(1 for a in act if a > 0),
+                                  "ticks": sum(len(v) for v in by_game.values())}
+        return res
+
+    return {"expected_ot_points": out(pts, "expected"), "p_ot": out(prob, "p_ot")}
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--start", required=True)
@@ -250,7 +325,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.evidence:
         # A game still live at midnight Central has its post-roll ticks in the NEXT date's file (#776).
         history_days = list(_dates(start, end + dt.timedelta(days=1)))
-        report["q3_live_resim_remaining_error"] = q3_model(games, finals, history_ticks(root, history_days))
+        ticks = list(history_ticks(root, history_days))
+        report["q3_live_resim_remaining_error"] = q3_model(games, finals, ticks)
+        report["q4_overtime"] = q4_overtime(games, finals, ticks)
     print(json.dumps(report, indent=1))
     return 0
 

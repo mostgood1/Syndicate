@@ -18,6 +18,7 @@ work takes the next free number (see the counter at the top of `todo.md`).
 
 
 ### `#788` — **NBA BLOWOUTS (the #787 college study, done for NBA): play-by-play was already archived (160 of 160 live-re-simmed games, all score-matched); the bench slows scoring; the live re-sim's late-blowout error is ~0, and its late close-game miss is OVERTIME, not endgame fouling. CLOSED 2026-11-11, read-only, no engine change** `[2026-11-11, lane nba-pbp-blowout-bench, session 63276f7e; user "take a look at all the game shape work NCAAB/WNCAAB session (the layer 2 rail session just did) - do this for NBA now"]`
+- **CORRECTED 2026-11-11 by `#789`:** the "late close-game miss is OVERTIME" below is mostly the pre-`#763` projection, not a wrong overtime chance. 7 of the 8 overtime games came before `#763` put overtime in the projected total (live-odds-worker 2026-11-05 22:37:35Z), so each erred by its whole overtime by construction. Falsification (2)'s firing is the same omission. The blowout and bench results stand.
 - **Saved, verified on the fleet:**
   - The nightly `basketball-rotation-stints` job has always covered `nba`: 2025-26 1,395 of 1,401 games match the official score; 2026-27 225 of 227 through 11-10 (the 2 misses are preseason).
   - All 160 regular-season games the live re-sim saw (10-20..11-10) are archived and score-matched.

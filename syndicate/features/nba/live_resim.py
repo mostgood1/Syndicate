@@ -552,6 +552,7 @@ def resim_live_game(inputs: Mapping[str, Any], game_state: Any, *, sims: int = D
     periods_a: list[list[int]] = []
     ot_h: list[int] = []
     ot_a: list[int] = []
+    reg_ties = 0
     rem: dict[str, dict[str, dict[str, list[int]]]] = {"home": {}, "away": {}}
     for i in range(int(sims)):
         if deadline is not None and clock() >= deadline:
@@ -576,11 +577,18 @@ def resim_live_game(inputs: Mapping[str, Any], game_state: Any, *, sims: int = D
         periods_a.append([int(x) for x in aq])
         ot_h.append(ot_home)
         ot_a.append(ot_away)
+        # THE DRAW'S OWN OVERTIME CHANCE (todo #789). `hq`/`aq` hold the full regulation (banked periods included),
+        # so a draw whose regulation ends level is one that played overtime -- the event the full-game numbers above
+        # fold in and can no longer show (the margin histogram has no 0 once OT is played). Measured 2026-11-11
+        # (#788): the re-sim's whole late close-game miss was the 8 overtime games of 160, +21 points each, and
+        # whether it priced that chance right could not be checked because nothing kept it.
+        reg_ties += int(sum(hq)) == int(sum(aq))
     n = len(totals)
     wins = sum(1 for m in margins if m > 0)
     out: dict[str, Any] = {
         "sims_run": n,
         "home_win_prob": wins / n,
+        "overtime_prob": reg_ties / n,
         "total_mean": float(np.mean(totals)),
         "home_margin_mean": float(np.mean(margins)),
         "total_dist": _hist(totals),
@@ -1131,6 +1139,9 @@ def build_game_lens(facts: Optional[ResumeFacts], result: Any, *, live_state_as_
         "source": LIVE_RESIM_LENS_SOURCE,
         "closed": False,
         "modelHomeWinProb": result["home_win_prob"],
+        # Share of draws whose regulation ended tied (#789). `.get`: a result built before the field (a test double,
+        # an old caller) publishes no number rather than a made-up 0.
+        "modelOvertimeProb": result.get("overtime_prob"),
         "simsRun": result["sims_run"],
         "liveStateAsOf": live_state_as_of or facts.as_of,
         "projection": {
@@ -1638,6 +1649,7 @@ def history_rows(snapshot: Mapping[str, Any]) -> list[dict[str, Any]]:
                 "home_score": proj.get("homeScore"), "away_score": proj.get("awayScore"),
                 "score_source": proj.get("scoreSource"),
                 "total": proj.get("total"), "margin": proj.get("homeMargin"), "p_home": lane.get("modelHomeWinProb"),
+                "p_ot": lane.get("modelOvertimeProb"),  # #789: graded against whether the game went to overtime
                 "sims": lane.get("simsRun"), "total_dist": proj.get("totalRunsDist"), "margin_dist": proj.get("marginDist"),
                 "segments": {k: (v or {}).get("total_mean") for k, v in (proj.get("segments") or {}).items()},
                 "resume": lane.get("resumeMatch"),

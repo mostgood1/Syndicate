@@ -14,7 +14,7 @@ import pytest
 
 from scripts import nba_blowout_bench_study as study
 
-DAY, NEXT_DAY = "2026-11-05", "2026-11-06"
+DAY, NEXT_DAY = "2026-11-07", "2026-11-08"  # after h2 carried overtime (#789)
 H5 = ["h1", "h2", "h3", "h4", "h5"]
 HB = ["h6", "h7", "h8", "h9", "h10"]
 A5 = ["a1", "a2", "a3", "a4", "a5"]
@@ -74,7 +74,9 @@ def root(tmp_path: Path) -> Path:
         row("BAD", 4, 600, 80, 60, 150.0),  # score mismatch: excluded
     ]
     after_midnight = [
-        row("G1", 4, 100, 117, 95, 219.0, slate_date=DAY),  # 1:40 left, +22: error -2
+        # 1:40 left, +22: error -2. Since h2 carries overtime, its segments say 0.4 expected OT points; p_ot 0.02 (#789)
+        row("G1", 4, 100, 117, 95, 219.0, slate_date=DAY, t="2026-11-08T06:10:00+00:00",
+            segments={"q3": 50.0, "q4": 60.0, "h2": 110.4}, p_ot=0.02),
         row("G1", 5, 200, 117, 95, 240.0, slate_date=DAY),  # an overtime tick: regulation only, in every table
     ]
     (hist / f"{DAY}.jsonl").write_text("".join(json.dumps(r) + "\n" for r in today), encoding="utf-8")
@@ -154,6 +156,58 @@ def test_main_reads_the_next_days_history_only_with_evidence(root, capsys):
     assert on != off
     # the post-midnight tick lives in NEXT_DAY's file and is still read (#776)
     assert on["q3_live_resim_remaining_error"]["by_lead_bench"]["20-24|bench<=1"]["ticks"] == 1
+    # ... and reaches the overtime check: G1 went to no overtime (its official final is its regulation total)
+    assert on["q4_overtime"] == {
+        "expected_ot_points": {"10+|6-0": {"expected": 0.4, "actual": 0.0, "error": -0.4, "ci95": None, "games": 1,
+                                           "ot_games": 0, "ticks": 1}},
+        "p_ot": {"10+|6-0": {"p_ot": 0.02, "actual": 0.0, "error": -0.02, "ci95": None, "games": 1, "ot_games": 0,
+                             "ticks": 1}},
+    }
+
+
+# ---- Q4: overtime (#789) ----
+
+def _ot_tick(eid, per, clk, hs, as_, *, t="2026-11-08T03:00:00+00:00", seg=None, p_ot=None):
+    return {"event_id": eid, "period": per, "clock_s": clk, "home_score": hs, "away_score": as_, "t": t,
+            "segments": seg or {}, "p_ot": p_ot}
+
+
+OT_GAMES = {"OT": {"H": [{"points": 100.0}, {"points": 100.0}]}, "REG": {"H": [{"points": 210.0}]}}
+OT_FINALS = {"OT": 222.0, "REG": 210.0}  # OT: 200 in regulation + 22 in overtime
+
+
+def test_q4_expected_overtime_points_against_the_real_overtime():
+    ticks = [
+        _ot_tick("OT", 4, 60, 98, 98, seg={"q3": 50.0, "q4": 50.0, "h2": 104.0}),  # tied, 1:00 left: 4 expected
+        _ot_tick("OT", 4, 30, 99, 99, seg={"q3": 50.0, "q4": 51.0, "h2": 109.0}),  # 0:30 left: 8 expected
+        _ot_tick("REG", 4, 60, 105, 95, seg={"q3": 50.0, "q4": 55.0, "h2": 105.5}),  # +10: 0.5 expected, none came
+        _ot_tick("REG", 2, 300, 50, 45, seg={"q3": 52.0, "q4": 53.0, "h2": 106.0}),  # earlier ticks: one cell
+    ]
+    q4 = study.q4_overtime(OT_GAMES, OT_FINALS, ticks)["expected_ot_points"]
+    assert q4["0-2|6-0"] == {"expected": 6.0, "actual": 22.0, "error": 16.0, "ci95": None, "games": 1, "ot_games": 1,
+                             "ticks": 2}
+    assert q4["10+|6-0"]["error"] == -0.5 and q4["10+|6-0"]["ot_games"] == 0
+    assert q4["Q1-Q3|all"]["expected"] == 1.0
+    tip = _ot_tick("REG", 4, 720, 80, 60, seg={"q3": 50.0, "q4": 55.0, "h2": 105.25})  # exactly 12:00 left
+    assert set(study.q4_overtime(OT_GAMES, OT_FINALS, [tip])["expected_ot_points"]) == {"10+|12-6"}
+
+
+def test_q4_rows_before_h2_carried_overtime_are_not_read_as_zero_expected():
+    before = _ot_tick("OT", 4, 60, 98, 98, t="2026-11-06T15:51:29+00:00", seg={"q3": 50.0, "q4": 50.0, "h2": 100.0})
+    after = _ot_tick("OT", 4, 60, 98, 98, t="2026-11-06T15:51:30+00:00", seg={"q3": 50.0, "q4": 50.0, "h2": 104.0})
+    assert study.q4_overtime(OT_GAMES, OT_FINALS, [before])["expected_ot_points"] == {}
+    assert study.q4_overtime(OT_GAMES, OT_FINALS, [before, after])["expected_ot_points"]["0-2|6-0"]["expected"] == 4.0
+    no_time = {**after, "t": None}
+    assert study.q4_overtime(OT_GAMES, OT_FINALS, [no_time])["expected_ot_points"] == {}
+
+
+def test_q4_p_ot_against_whether_the_game_went_to_overtime():
+    ticks = [_ot_tick("OT", 4, 30, 99, 99, p_ot=0.4), _ot_tick("REG", 4, 30, 99, 99, p_ot=0.2),
+             _ot_tick("REG", 4, 20, 99, 99)]  # no p_ot: an old row, not a 0
+    q4 = study.q4_overtime(OT_GAMES, OT_FINALS, ticks)["p_ot"]
+    cell = q4["0-2|6-0"]
+    assert (cell["p_ot"], cell["actual"], cell["games"], cell["ot_games"], cell["ticks"]) == (0.3, 0.5, 2, 1, 2)
+    assert cell["error"] == 0.2  # mean of (1 - 0.4) and (0 - 0.2)
 
 
 def test_season_types_flag_reaches_the_loader(root, capsys):

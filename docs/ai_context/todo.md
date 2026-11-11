@@ -1,5 +1,27 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#789` — **NBA LIVE RE-SIM RECORDS ITS OWN P(OVERTIME): the share of draws level after regulation, on the lane (`modelOvertimeProb`) and in every `live_resim_history` row (`p_ot`). ON MAIN, NOT LOADED (live-odds-worker; user decision). And #788's "late miss is overtime" was mostly the pre-`#763` projection: 7 of the 8 overtime games came before overtime was in the total** `[2026-11-11, lane nba-resim-overtime-prob, session 63276f7e; user "Yes, record it" to "Should the re-sim record its overtime chance so it can be checked?"]`
+- **Change:** in `syndicate/features/nba/live_resim.py`:
+  - `resim_live_game` counts the draws whose regulation (banked periods included) ends level, as `overtime_prob`.
+  - `build_game_lens` publishes it as `modelOvertimeProb`. A result without it publishes None, not 0.
+  - `history_rows` keeps it as `p_ot`. Carried and refused lanes keep None.
+  - WNBA's re-sim reuses this snapshot builder, so its lanes gain the field too when it runs; it is off for the season.
+- **Tests:** `tests/test_nba_live_resim_overtime_prob.py` (7), incl. off != on through lane -> history, and the real engine (in OT 1.0; tied 30 s > 60 s > 0; a rout 0). 6 source mutations, each caught.
+- **Study:** `scripts/nba_blowout_bench_study.py --evidence` gains `q4_overtime`:
+  - `expected_ot_points`: the row's `h2 - q3 - q4` against the game's real overtime points, on rows since `3d376da7c` (h2 carries OT, live-odds-worker 2026-11-06 15:51:30Z).
+  - `p_ot`: graded against whether the game went to overtime.
+  - Tests: 14 -> 17 in `tests/test_nba_blowout_bench_study.py`, 7 mutations caught.
+- **Correction to #788 (fleet, read-only):**
+  - `#763` (overtime in the projected total) reached live-odds-worker at 2026-11-05 22:37:35Z. 7 of the 8 overtime games came before it; their late close ticks err +21.2 +- 4.5, and their `h2 - q3 - q4` reads 0.0. That is the omission, by construction.
+  - The one overtime game after the fix (401909942, 11-07 slate) had 5.5 expected OT points late and scored 25.
+  - The lane's hypothesis ("P(OT) too low late") is NOT SUPPORTED: its evidence was the old omission. After the fix it is undecided.
+- **Expected vs real overtime since 3d376da7c** (37 games, 11-06..11-10): Q1-Q3 ticks 17.3 OT points expected over the games, 25 scored (1 overtime game). That is ~0.8 overtime games expected against 1, consistent. Every late cell has 0 or 1 overtime game.
+- **Engine, not pinned** (synthetic inputs): tied with the ball, P(OT) is 1.0 with <= 6 s left and 0.57 at 8 s. The engine scores nothing in the last 6 s. Lead to `basketball-scenario-calibration`.
+- **Owed:**
+  1. The load on live-odds-worker (user decision). Reading: a fleet `live_resim_history` row carrying `p_ot`.
+  2. After a few weeks of slates, `q4_overtime.p_ot` on late close ticks.
+- Findings: `.syndicate/findings_2026-11-11_nba_blowout_bench.md` "Addendum (#789)".
+
 ### `#787` — **COLLEGE BLOWOUTS: WOMEN'S COLLEGE PLAY-BY-PLAY WAS SAVED NOWHERE (now archived nightly); for MEN'S college, the bench in a blowout is NOT what our live re-sim misses -- the late miss is close games** `[2026-11-11, lane college-pbp-blowout-bench, session 0f519972; user "are we saving game shape data? ... South Alabama and Florida Atlantic" and "the pbp should be looked at...and tendencies for when bench players come into a blowout"]`
 - **Saved:**
   - Live re-sim per tick (`live_evidence/`, since 11-09, both leagues), final period scores, pregame per-period sims.

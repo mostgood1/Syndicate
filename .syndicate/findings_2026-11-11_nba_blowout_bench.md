@@ -5,6 +5,12 @@
 User asked, 2026-11-11: "take a look at all the game shape work NCAAB/WNCAAB session (the layer 2 rail session just
 did) - do this for NBA now". That work is todo `#787` (`.syndicate/findings_2026-11-11_college_blowout_bench.md`).
 
+> **CORRECTED the same day (todo #789, lane `nba-resim-overtime-prob`): the overtime miss below is mostly an OLD BUG,
+> not a wrong overtime chance.** 7 of the 8 overtime games were played before `#763` reached live-odds-worker
+> (2026-11-05 22:37:35Z). Until then the re-sim's projected total left overtime points out ENTIRELY, so those games
+> erred by their whole overtime by construction. The 8th game, after the fix, is one game. See "Addendum (#789)" at
+> the end. The blowout and bench results are unaffected: no overtime game was a blowout.
+
 Script: `scripts/nba_blowout_bench_study.py`, the college study on NBA geometry.
 - Q1 and Q2 use the 4th quarter (12 of 48 minutes) against the first 36 minutes. The college study used the last 10 of 40 against the first 30.
 - Q1 weights each stint by its seconds inside each minutes-left bucket. NBA stints are cut at every period, so the college rule (whole stint under its start) would drop every stint starting at the 4th-quarter tip.
@@ -100,6 +106,7 @@ No level bias across the game (every regulation tick, by period):
   - No engine change was made here.
 - The late miss in close games is OVERTIME, not endgame fouling: the 8 OT games err by +21 each; without them close games err by -0.1 +- 1.2.
   - So the open question is whether the re-sim's P(overtime) late in close games is right. That needs the per-sim regulation tie rate, which the history does not keep (leads.md 2026-11-11).
+  - **CORRECTED (#789):** 7 of the 8 came before `#763` put overtime in the projected total (2026-11-05 22:37:35Z). Their +21 is that old omission, not a P(overtime) estimate. See the addendum.
 - No level bias (Q1-Q4 all within +-1.1, every CI covers 0). The ~+3 rest-of-game over-projection `#695` noted on 10-13 (P3's backtest gate) does not show in the 2026-27 live ticks.
 
 **Pre-registered falsification, by the letter:**
@@ -120,3 +127,44 @@ No level bias across the game (every regulation tick, by period):
 | re-sim late close-game error | +3.0 +- 2.7 (endgame) | n/a | +1.6 +- 1.6, all of it overtime |
 
 Re-run: `python scripts/nba_blowout_bench_study.py --start 2026-10-20 --end <date> --evidence --data-root ~/syndicate-prod/data`. The Q3 sample doubles in about three weeks.
+
+## Addendum (#789, 2026-11-11, lane `nba-resim-overtime-prob`): the overtime miss was the pre-#763 projection
+
+The user said "Yes, record it" to recording the re-sim's own overtime chance. Before building that, I dated the 8 overtime games against the two changes that decide what a history row can say about overtime:
+- `d6a691168` (`#763`) put overtime points in the projected total. live-odds-worker loaded it at 2026-11-05 22:37:35Z (deploys.md). Before it, a simulated overtime counted as a regulation tie with no OT points.
+- `3d376da7c` (`#762`) made the `h2` segment q3 + q4 + every overtime. It was loaded at 2026-11-06 15:51:30Z. On the fleet, 0 of 578 rows on 11-04/11-05 have `h2 - q3 - q4` above 0, against 256 of 403 on 11-06.
+
+| | before #763 | after #763 |
+|---|---|---|
+| overtime games, late close ticks (6-0 min, lead < 10) | +21.2 +- 4.5 (7 games) | +24.7 (1 game, 401909942, 11-07 slate) |
+| no-overtime games, same ticks | +0.7 +- 0.9 (65) | +1.6 +- 3.8 (17) |
+
+- The 7 early games each erred by about their whole overtime (15-26 points). That is the omission, by construction: their late-close rows' `h2 - q3 - q4` reads 0.0.
+- The one game after the fix had 5.5 expected overtime points across its late close ticks and scored 25 in overtime.
+- **The lane's hypothesis ("P(OT) too low late in close games") is NOT SUPPORTED.** Its evidence was the old omission. After the fix it is undecided: one overtime game.
+
+**The re-sim's expected overtime points against the real ones** (`q4_overtime.expected_ot_points`, rows since 3d376da7c, 37 games 11-06..11-10, game-clustered):
+
+| tick | expected OT points | actual | games (OT games) |
+|---|---|---|---|
+| Q1-Q3, all ticks | 0.47 | 0.68 | 37 (1) |
+| Q4 12-6 min, lead 0-2 | 1.30 | 3.13 | 8 (1) |
+| Q4 6-0 min, lead 0-2 | 2.77 | 8.33 | 3 (1) |
+| Q4 6-0 min, lead 3-5 | 1.00 | 0 | 12 (0) |
+| Q4 6-0 min, lead 6-9 | 0.43 | 0 | 16 (0) |
+| Q4, lead 10+ | 0.03-0.09 | 0 | 26-28 (0) |
+
+- Summed over the 37 games' Q1-Q3 ticks: 17.3 overtime points expected and 25 scored (one game), about 0.8 overtime games expected at the 21.6 points the season's 8 overtimes averaged, against 1. Consistent.
+- A rare event: with 0 or 1 overtime game a cell's interval only measures the expected side, so read the counts, not the ci95.
+
+**What now records it:**
+- `resim_live_game` counts the draws whose regulation ends level: `overtime_prob`, published on the lane as `modelOvertimeProb` and kept in `live_resim_history` as `p_ot`. ON MAIN; loading it on live-odds-worker is the user's decision.
+- `q4_overtime.p_ot` grades it against whether each game went to overtime, on rows that carry it.
+- Overtime is rare (8 of 160 games this season, 5%), so a decisive sample of late close ticks will take weeks of slates.
+
+**Engine finding, not pinned (synthetic test inputs, 300 draws):**
+- Tied, home ball: P(OT) is 1.0 at 2, 4 and 6 seconds left, 0.57 at 8, 0.48-0.52 at 10-20 and 0.36 at 30.
+- So the engine scores nothing in the last 6 seconds, and its P(OT) for a tied game in that window is too HIGH. A real final possession sometimes scores.
+- Few ticks land there (the re-sim ticks about once a minute). Routed to lane `basketball-scenario-calibration` (leads.md).
+
+Re-run: `python scripts/nba_blowout_bench_study.py --start 2026-10-20 --end <date> --evidence --data-root ~/syndicate-prod/data` (`q4_overtime`).
