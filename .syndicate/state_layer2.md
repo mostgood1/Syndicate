@@ -1106,5 +1106,5 @@ After web `cc5bdfb1` (20:11:20Z): placeholder starts **43 -> 0**, "TBD" tokens *
   - It is never called an edge, and it is a rail view that removes no board row. The join's 600 s ceiling is unchanged.
 - **Served board 23:58:33Z:** 4 live games with a line; 2 flagged (RUTG o149.5 +10.0 on 47 s, GTWN o141.5 +8.0 on 52 s). RUTG o147.5 +14.2 on 153.5 s was not flagged.
 - **Served page (17:30Z, after the load):** FDU @ ETAM `Total 141.6 / 139.5 / 14m`, `ML ETAM 86% / −750 / 10m`. FAMU @ KC shows the book lines with OURS blank (a `pregame_pace` block, not a re-sim). 0 flagged, with quotes 7-14 min old. The filter shows `Model ≠ line 0`.
-- **Intervals (on main, not loaded):** each interval the book still quotes gets its own row after the full game (1H / 2H / Q1-Q4 ...). OURS comes from the card's PROJ box (a half on a quarter card = Q+Q). Settled periods are skipped; `_alt` lines count as their family. College interval rows never flag (no priced edge, #763).
-- **Not yet true:** a flag on the served page with fresh quotes (evening slate), and interval rows on the served page (needs a web load).
+- **Intervals (LIVE since 18:11:22Z 11-11; served page read 19:37Z, UIW @ UCD 1H/2H rows):** each interval the book still quotes gets its own row after the full game (1H / 2H / Q1-Q4 ...). OURS comes from the card's PROJ box (a half on a quarter card = Q+Q). Settled periods are skipped; `_alt` lines count as their family. College interval rows never flag (no priced edge, #763).
+- **Not yet true:** a flag on the served page with fresh quotes (evening slate).

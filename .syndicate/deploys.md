@@ -58907,3 +58907,18 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **Fleet:** untouched. No ff, no TERM, no env change; the deploy-guard needs no change (it passes only `verdict == CLEAR`).
 - **verify MET:** (1) 19 new tests + 77 preflight tests + 126 deploy-guard tests pass, incl. off != on through `main()`. (2) Real run on the fleet's data 18:26-18:56Z: RC46 vs the running 7 fields, 11-03..09, 240 / 235 games -> WORSE `20m:win_brier` +0.0113 +- 0.0089, `36m:win_brier` +0.0068 +- 0.0046 and both log losses; totals tie (the 11-10 replay's numbers exactly). Receipt `ncaab__c40157b4ea7f__911f9565fe7f.json` in the primary tree. (3) Preflight's check on it: re-load -> OUTCOME_GATE naming the 4 cells; accepted -> CLEAR. (4) The fleet reader read-only: live-odds-worker running == derived `911f9565fe7f`; no full preflight was run (learnings 2026-09-28).
 - Measured: the reading above. No fleet measurement is owed: nothing was loaded.
+
+## 2026-11-11 19:37:49Z (1:37 PM CST) -- READING, no deploy of mine: todo #781 interval rows are LIVE on the served page (lane `layer2-live-rail-edges`) -- **MET**
+- **How it loaded:** my interval commit `df08d4d9a` rode lane `restate-live-edge-withhold`'s fleet ff to `5c8eec41a` and its `reload-web` (HUP 18:11:21.872Z; entries 18:11:22Z / 18:24Z). My test-fix / comment commit `b7abb3729` rode the 18:45:45Z ff to `b43236e17` (lane `ncaaf-live-segment-display`); web workers recycled since.
+  - I asked the user to approve the ff at 18:10Z, from a fleet read at 18:10:13Z (HEAD `4793d823c`). The answer ("Load all together now") came at ~19:36Z, by which time the five ride-alongs I listed were already live through their own lanes' loads.
+  - I took the web claim at ~19:36Z (token released at 19:37Z) and did NO ff and NO reload.
+- **reading** (19:36:56Z, served `/intelligence` + `POST /api/intelligence/query`; scratch `measure_load2.py`):
+  - `rail_intervals` 1, `rail_ceiling_comment` 1.
+  - 5 live games, 31 live game rows.
+  - Live-priced rows: ncaab 2 (1 of them on a quote > 120 s), wncaab 1.
+- **served page, rendered** (headless Chromium on the fleet's `/intelligence`, no mocks, 19:37:49Z; scratch `served_read.py`):
+  - UIW @ UCD (H1 11:43): `Total 152.7 / 146.5 / 13m`, `ML UCD 90% / −1011 / 2m`, **`1H Total 74.4 / 72.5 / 2m`, `2H Total 78.4 / 76.5 / 3m`**.
+  - DART @ UALB (H2 7:08): `Sprd UALB +15.9 / UALB +11.5 / 5m`, `Total 160.3 / 160.5`, `ML DART 97% / −3233`, **`2H Total 75.3 / 76.5 / 5m`**. 1H is settled and skipped.
+  - WNCAAB BCU @ BYU, USA @ FAU, QUIN @ SJU: full-game total only (the board carries no interval rows for them). QUIN @ SJU has OURS blank (a `pregame_pace` block).
+  - 0 flagged (`Model ≠ line 0`). 0 page errors.
+- **verify: MET.** Interval rows render on the served page with OURS from the card's PROJ box, and the settled half is skipped. Owed: a flag reading on fresh quotes (evening slate).
