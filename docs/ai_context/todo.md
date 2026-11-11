@@ -278,7 +278,7 @@ ight.sh`, 01:05Z / 01:50Z / 02:45Z 11-12): NCAAF segment rows with a Live proj. 
   - It FAILS decisively on a one-goal lead late in the third: P(leader by 2+) is 0.18 vs 0.43 at P3 05:00 (n=90) and 0.26 vs 0.50 at P3 10:00 (n=93). 98 of 229 last-5-minute goals were empty-netters.
   - Cause: the live resume path never applies `NHL_GAME_MARKET_CALIBRATION`'s `empty_net_p 0.3006` / `tie_weight`, which the pregame puck line uses. It has only `engine.py`'s ad-hoc ×1.18 in the last 3 minutes.
   - The DISPLAY number is wrong by the same amount in those states.
-  - Recorder (ledger v6 `display_prob` / `market_fair_prob_over`) built, NOT pushed.
+  - Recorder (ledger v6 `display_prob` / `market_fair_prob_over`) on main `054e01f10`, LOADED on refresh-worker 19:44:53Z (pid 211471, user "Yes, push and load"); reachability MET 19:47:30Z on NCAAB (13 of 13 records v6). The NHL puck-line reading (records carry both numbers, re-recorded on a 2 dp move) is owed to the 11-11 slate (deploys.md 19:44:53Z).
 - **Why:** served 2026-11-09 NYR@EDM: the NHL live moneyline (1 of 1) and totals (2 of 2) showed a live number; the puck line (0 of 1) did not. The join refused it `live_resim_published_no_distribution_for_this_market`: `nhl/live_resim.resim_live_game` counted 200 per-sim margins and returned only their mean.
 - **Change:**
   - **Producer:** returns the margins as a home-positive histogram and publishes them on the lane as `projection.displayMarginDist`. It does NOT publish `marginDist`, the key that opens spread pricing. Same sims; the sim is unchanged.

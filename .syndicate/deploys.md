@@ -58922,3 +58922,37 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - WNCAAB BCU @ BYU, USA @ FAU, QUIN @ SJU: full-game total only (the board carries no interval rows for them). QUIN @ SJU has OURS blank (a `pregame_pace` block).
   - 0 flagged (`Model ≠ line 0`). 0 page errors.
 - **verify: MET.** Interval rows render on the served page with OURS from the card's PROJ box, and the settled half is skipped. Owed: a flag reading on fresh quotes (evening slate).
+
+## 2026-11-11 19:44:53Z (1:44 PM CST) -- claimed refresh-worker TERM to load `054e01f10` (todo #773 recorder: live gameline ledger v6 stores the board's display-only number and the market's fair price for the same event; a display-only puck-line row re-records when either moves at 2 dp), lane `nhl-live-puckline-grade`, session 87074b1f -- **LOADED; reachability MET on the first post-load ledger write (NCAAB 19:47:30Z, 13 of 13 records v6); the NHL puck-line reading is owed to tonight's slate (first puck 00:00Z)**
+
+- **User, in this session's chat:** "yes, build the recorder too", then "Yes, push and load" (answering "Push the recorder and load it on refresh-worker before tonight's games?").
+- **gates:**
+  - Claim refresh-worker, holder `nhl-live-puckline-grade`, 19:41:16Z (rc 0).
+  - Ride-along check, fleet HEAD `b43236e17` (an ancestor of the target). Runtime paths: mine (`live_gameline_ledger.py`, plus the new harness `scripts/backtest_nhl_live_puckline.py`), and #784's `scripts/deploy_preflight.py` and `scripts/live_mechanism_outcome_gate.py` (tools that no role imports; already in force from origin/main worktrees).
+  - Drain (`C:\tmp\nhlrec\drain.sh`, `check_deploy_safety.py --drain` under refresh-worker's environ, from this lane's worktree at origin/main `054e01f10`): it waited out the board build (LOOP_ITERATION 19:43:52Z) and a live-odds-worker child job, then CLEAR, exit 0, 19:44:14Z.
+  - Preflight `--target fleet --target-commit 054e01f1012def83903699b75c6403f8d91c9515` 19:44:29Z: **CLEAR**, rc 0. It read fleet HEAD `b43236e1`; last deploy 59 min earlier (#785's TERM 18:45:47Z).
+    - Expectation `live_gameline_ledger_v6_records_written` 0 -> >0.
+    - Baseline 19:44:20Z: every sport's newest ledger file was all v5; NCAAB 11-11 had n=539, 0 with the v6 keys.
+- **load (`C:\tmp\nhlrec\load.sh <target> <expected HEAD>`):**
+  - First attempt: FF_FAILED, because the fleet checkout had not fetched `054e01f10`. No ff and no TERM happened. `git fetch github` on the fleet, the same four-file ride-along diff re-read, then:
+  - before: HEAD `b43236e17` = expected; refresh-worker pid 200205.
+  - `git merge --ff-only 054e01f10` 19:44:53.177Z: HEAD `054e01f10`. On disk: `LEDGER_VERSION = 6` 1, `def _display_fields` 1.
+  - `kill -TERM 200205` 19:44:53.183Z. New supervised refresh-worker **pid 211471**, first seen 19:45:01.221Z.
+  - `--undrain`: `DRAIN_CLEARED` 19:45:07Z.
+  - web and live-odds-worker were NOT touched. Neither writes the ledger; web reaches `054e01f10` at its next reload.
+- **verify (reachability, `off != on`, production): MET 19:47:32Z.**
+  - The first post-load ledger write was NCAAB 11-11 (`recorded_at` 19:47:30Z, `LIVE_GAMELINE_BUILD sport=ncaab written=13`). 13 of 13 records are `v: 6`; before, 539 of 539 were v5 and 0 had the keys.
+  - The 2 h2h rows carry `display_prob` (0.029 / 0.870, basis `moneyline_not_published`) and `market_fair_prob_over` None (h2h, by design).
+  - The 4 full-game spreads rows carry `market_fair_prob_over`.
+  - The 6 segment rows (`segment_pricing_disabled`) come through the refusal path and carry the keys as null, by design.
+  - `nhl written=0` at 19:46:56Z: no live NHL game.
+- **No harm:**
+  - First post-load board save: STATE_PERSIST_BEGIN 19:56:51Z (`candidate_count` 2654; 2604 on the pre-load save), LOOP_ITERATION 19:57:58Z. The cold build took ~13 min.
+  - Lines STARTING with `Traceback` since the TERM: 0.
+  - Note: the worker's ALL_PROCESS_MEMORY line logs every process's cmdline, so a watcher that greps for `Traceback` matches its own command line. Count only lines that start with it.
+- **Owed (NHL, tonight's 6 games, 00:00Z to ~05:30Z):** `C:\tmp\nhlrec\nhl_night.py <since>` on the NHL 11-11 ledger.
+  - Expected: `live_margin_published_for_display_only` records carry non-null `display_prob` and `market_fair_prob_over`, 0 are priced or carry an edge, and keys are re-recorded when either value moves at 2 dp.
+  - **Before** (11-10, v5): 34 display-only puck-line records in 1 game, 34 distinct keys, 0 re-recorded, 0 with a number or a market price.
+- **Not recorded, by scope:** segment rows' display numbers (`#781`/`#785`) go through the refusal path, so the ledger still does not hold them.
+- **Revert:** `git revert 054e01f10` on main (only the ledger file matters; the harness and tests are inert), ff the fleet, then a claimed refresh-worker TERM. Readers ignore the extra keys, and nothing filters on `v`.
+- Claim refresh-worker released right after this entry.
