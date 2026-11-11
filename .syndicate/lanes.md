@@ -781,6 +781,15 @@ ight.sh`, 01:05Z / 01:50Z / 02:45Z 11-12, BUFF @ BALL, SAC @ CMU, MASS @ TOL). S
 - Verification: pytest (parser on/off, sliver exit recorded and retried with accumulated fills, retry cap, settlement's partial-close check explains the accumulated sale); a fleet dry run of the repair; after the load a reading of the next fractional fill and of 91822817, recorded in deploys.md
 - Blocked by: none
 
+### live-price-on-pull — OPEN — opened 2026-11-11 — session 0f519972-4890-45d3-8b52-767c7e0a0389
+- STATUS 2026-11-11 2:4x PM CST (20:4xZ): DONE IN CODE, ON MAIN, NOT LOADED. _run_book_grid_artifact_tick rebuilds a live sport between ticks when its shard changed after its last read (quiet 5 s, gap 30 s, today only; SYNDICATE_BOOK_GRID_PRICE_ON_PULL=off). 9 tests incl. off != on, 8 mutations caught, 423 book-grid tests pass. Measured cost: NCAAB build 2.9 s. Next: the user's load decision (fleet ff + claimed refresh-worker TERM), then the falsification reading on a live NCAAB slate (todo #786).
+- Goal: Live lines are priced right after each quote pull lands: refresh-worker's book-grid tick rebuilds a LIVE sport's today grid + in-play overlay as soon as its quote shard has new quotes since that sport's last build (checked every main-loop pass, quiet 5 s, min 30 s apart per sport; SYNDICATE_BOOK_GRID_PRICE_ON_PULL=off restores the fixed clock), so the quote age at pricing tracks the pull instead of the unsynchronised 120 s tick; tests incl. off != on; on main; fleet load (refresh-worker) is the user's decision, measured as NCAAB/WNCAAB quote_older_than_live_pricing_ceiling share and overlay seen age before/after (todo #786)
+- Files: scripts/run_refresh_worker.py (_run_book_grid_artifact_tick + new _book_grid_price_on_pull_* / _book_grid_sports_with_new_live_quotes helpers ONLY), tests/test_book_grid_price_on_pull.py (NEW), docs/ai_context/todo.md (#786 section only)
+- Hypothesis: NCAAB live lines are refused for quote age because pricing (refresh-worker grid tick: 120 s clock, ~80 s per tick, overlay builds median 145 s apart) is not synchronised with the live pull (NCAAB launches ~133 s, captures ~243 s); measured 19:5xZ 11-11: overlay rows' seen age median 136 s while the book moved only 19 s before our look. Pricing within one main-loop pass (~37 s, p90 77 s) of a pull should put most NCAAB quotes under 120 s at pricing.
+- Falsification test: After the load, on a live NCAAB slate: quote_older_than_live_pricing_ceiling among non-segment NCAAB evaluations does not fall from the 11-11 baseline (320 of 570), or the overlay rows' quote_seen_age_seconds median stays above 120 s.
+- Verification: Unit: off != on through SYNDICATE_BOOK_GRID_PRICE_ON_PULL (a live sport with a newer shard rebuilds between ticks when on, not when off), quiet + min-gap bounds, non-live sports never take the path, any_live not clobbered. Fleet after the user's load: BOOK_GRID_TICK on_pull entries every pull, overlay seen-age median and the ceiling-refusal share vs baseline.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
