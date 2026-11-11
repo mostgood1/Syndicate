@@ -1080,16 +1080,16 @@ After web `cc5bdfb1` (20:11:20Z): placeholder starts **43 -> 0**, "TBD" tokens *
 - **Moneyline rows carry the join's own verdict.** The display attaches to every full-game h2h row the join touches, priced or refused. Such a row can show `live_aware` and an edge, both from `price_moneyline`, which this change leaves alone; it now also shows the live % beside them.
 - **Not yet true:** NCAAF has had no live game since the load (first 2026-11-11 00:00Z).
 
-## [layer2-live-rail-edges] LIVE RAIL CARDS SHOW OUR LIVE RE-SIM VS THE BOOK'S LIVE LINE PER MARKET, AND FLAG A LIVE EDGE ONLY ON A QUOTE <= 30 s OLD AT PRICING -- ON MAIN `3c38ef4c4`, NOT LOADED `[verified 2026-11-10 23:45-23:58Z on the fleet's served payload rendered by this code locally; lane layer2-live-rail-edges, todo #781]`
+## [layer2-live-rail-edges] LIVE RAIL CARDS SHOW OUR LIVE RE-SIM VS THE BOOK'S LIVE LINE PER MARKET; A "MODEL ≠ LINE" FLAG ONLY ON A QUOTE <= 120 s OLD AT PRICING, WORDED AS A DISAGREEMENT -- ON MAIN, NOT LOADED `[verified 2026-11-10 23:45-23:58Z on the fleet's served payload rendered by this code locally; lane layer2-live-rail-edges, todo #781]`
 - **Why live cards had no line: display, not data.** The chip `footer` (the book line) is pregame-only. On the served board at 23:45Z, all 50 live full-game rows carried `line`, `live_total` / `live_model_probability`, `model_edge_pct` (on `live_aware` rows) and `book_age_seconds`.
 - **The card** (`intelligence.html` LIVE RAIL LINES block):
   - LIVE / OURS / BOOK / AGE per full-game spread, total and moneyline.
   - OURS is the card's own live re-sim "Proj final"; BOOK is the line priced closest to even.
   - AGE is `book_age_seconds`, the grid's `age_seconds`: the clock #780 graded. Once the board is over 300 s old, AGE shows the age now, in orange.
-- **The flag** (`▲ EDGE`, the edge line, and the rail filter All / Live edge / Spread / Total / ML, `?live_edge=`) needs all of:
+- **The flag** (`MODEL ≠ LINE` badge, a "≠ ... model +x pts vs a 47s line" line, and the rail filter All games / Model ≠ line / Spread / Total / ML, `?live_edge=`) needs all of:
   - a `live_aware` `model_edge_pct` >= 3;
-  - a quote <= 30 s old at pricing;
+  - a quote <= 120 s old at pricing, in every market (#780 addendum: realised ~0 under 120 s; the fake edge clearly from 180-300 s);
   - an age now <= 300 s.
-  - It is a rail view and removes no board row. The join's 600 s ceiling is unchanged.
-- **Served board 23:58:33Z:** 4 live games with a line; 0 flagged. The 3 priced edges sat on quotes 46.8 / 51.8 / 153.5 s old.
+  - It is never called an edge, and it is a rail view that removes no board row. The join's 600 s ceiling is unchanged.
+- **Served board 23:58:33Z:** 4 live games with a line; 2 flagged (RUTG o149.5 +10.0 on 47 s, GTWN o141.5 +8.0 on 52 s). RUTG o147.5 +14.2 on 153.5 s was not flagged.
 - **Not yet true:** web is not loaded, so no served page on the fleet shows any of this.
