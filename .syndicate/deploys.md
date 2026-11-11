@@ -58881,3 +58881,22 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - `eacc9f990` is LOADED on both roles that run it: live-odds-worker pid 192537 since 18:14:45Z (this lane's TERM) and refresh-worker pid 191825 since 18:11:31Z (`live-gameline-quote-ceiling-120`'s TERM).
   - The behaviour reading is yours. That lane's block is not edited here.
 - Claim live-odds-worker released after this entry.
+
+## 2026-11-11 18:45:45Z (12:45 PM CST) -- claimed refresh-worker TERM to load `b43236e17` (todo #785: NCAAF live segment rows h1/h2/q1-q4 get a display-only Live proj., lane `ncaaf-live-segment-display`) -- **LOADED; reachability MET on the first post-load build (18:53:14Z); the served live reading is owed to tonight's 00:30Z MACtion slate**
+
+- **Task:** the side-session brief from the session that started this lane (`local_52af1e7f`, lane `live-display-other-sports`): "Fix with tests, land on main, and load it on the fleet behind deploy_claim.py + deploy_preflight.py." No ride-along needed a user decision: refresh-worker had already loaded `5c8eec41a` (with #780) at 18:11:24Z on the user's "Yes, load it" (entry above).
+- **gates:**
+  - Claim refresh-worker, holder `ncaaf-live-segment-display`, 18:43:34Z (rc 0, token d511...).
+  - Ride-along check, fleet HEAD `5c8eec41a` (an ancestor of the target): `git diff --name-only` 25 paths, overlap with the fleet's 14 locally modified files 0. Runtime files: mine (`ncaaf/live_resim.py`, `board_enrichment.py`) and `syndicate/templates/intelligence.html` (`b7abb3729`, a 12-line JS COMMENT, no behaviour).
+  - Drain (`C:\tmp\ncaafseg\drain.sh`, `check_deploy_safety.py --drain` under refresh-worker's environ, from this lane's worktree at origin/main `b43236e17`): waited out an in-flight board build; CLEAR, exit 0, ~18:45:2xZ.
+  - Preflight `--target fleet --target-commit b43236e17301662ad6ce6d376a8f4ef2203d640d` 18:45:31Z: **CLEAR**, rc 0. It read fleet HEAD `5c8eec41`. Expectation `ncaaf_segment_index_keys` 0 -> 6 (baseline 18:44:10Z: the served `layer2-shortlist?date=2026-11-11` carried NO `per_sport_ingest.ncaaf.enrichment.live_gamelines.segment_index_sizes`; ncaab's had 2 keys).
+- **load (`C:\tmp\ncaafseg\load.sh <target> <expected HEAD>`, which ABORTS if HEAD moved since preflight -- today's 18:11Z lesson):**
+  - before: HEAD `5c8eec41a` = expected; refresh-worker pid 191825.
+  - `git merge --ff-only b43236e17...` 18:45:45.086Z: HEAD `b43236e17`. On disk: `LIVE_SEGMENTS_ENV` 1 definition, the `elif sport == "ncaaf":` index branch 1.
+  - `kill -TERM 191825` 18:45:45.093Z. New supervised refresh-worker **pid 200205**, first seen 18:45:53.135Z.
+  - `--undrain`: `DRAIN_CLEARED` 18:46:09Z.
+  - web and live-odds-worker: NOT touched. web reaches `b43236e17` at its next reload; the only web-side file is the JS comment.
+- **verify (reachability, `off != on` on production):** **MET 18:53:29Z.** The first build written after the TERM (`written_at` 18:53:14Z, age 15.9 s) serves `per_sport_ingest.ncaaf.enrichment.live_gamelines.segment_index_sizes = {"h1": 0, "h2": 0, "q1": 0, "q2": 0, "q3": 0, "q4": 0}`: `ncaaf_segment_index_keys` **0 -> 6**, as predicted. All empty because no NCAAF game is live (the NCAAF re-sim tick 18:52:22Z: 67 games, `live_resimmed 0`, `game_not_in_progress 3`, `no_live_state 64`). Same build, ncaab for contrast: `{"h1": 2, "h2": 2}`. refresh-worker since 18:45:50Z: Traceback 0, `NCAAF_LIVE_RESIM_ERROR` 0. This proves the board hop is LIVE (the index exists, so a live segment row now refuses `segment_pricing_disabled`); it does NOT yet show a number on a row -- that needs a live game.
+- **Owed:** the served reading during a live NCAAF game (`C:\tmp\ncaafseg\night.sh`, attached to this session, readings 01:05Z / 01:50Z / 02:45Z on 11-12): NCAAF segment rows with a Live proj. / segment rows, with 0 carrying `model_edge_pct` / `edge_vs_market_pct` / `model_ev_pct` / `live_aware`; join `why{}` moves segment rows from `segment_is_not_full_game` to `segment_pricing_disabled`. **Before** (same slate type, 11-11 00:08-04:45Z, old code): 2,825 of 4,892 considered rows refused `segment_is_not_full_game`, 0 segment rows displayed; served 0 of 37 / 18 / 18 segment rows with a Live proj. (lane live-display-other-sports, 00:16-00:21Z).
+- Off switch: `SYNDICATE_NCAAF_LIVE_SEGMENTS=0` in `local_production.env` (`REFRESH_WORKER__` scope) + a drained down/up restores the old lane and label. Revert: none needed for a display-only change; the switch is the lever.
+- Claim refresh-worker released right after this entry.
