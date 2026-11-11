@@ -59027,3 +59027,42 @@ ailload\load.sh 3f11114c2 e102faf79`):
   - The refusal share in the first 10 min is 51 of 117 (44%), against 394 of 674 (58%) 18:12Z-20:16Z and 95 of 260 (37%) 20:16Z-20:41Z. That is too noisy to call.
 - **Owed tonight** (lane `live-price-on-pull`, falsification as registered): on the evening NCAAB slate, compare the non-segment `quote_older_than_live_pricing_ceiling` share and the overlay seen-age median with the 11-11 afternoon baseline. Option (2) (faster pulls) only if the book clock, not ours, stays the binding one.
 - **revert:** `SYNDICATE_BOOK_GRID_PRICE_ON_PULL=off` needs a full fleet down/up (env is built at `up`). Faster: revert `949d10975` on main, ff the fleet, then a claimed refresh-worker TERM.
+
+## 2026-11-11 22:34:21Z (4:34 PM CST) -- FLEET ff 3f11114c2 -> a4127d11a + claimed live-odds-worker TERM: todo #773 NHL live END-GAME (lane `nhl-live-endgame-calibration`) -- **LOADED; reachability MET on production inputs; served reading owed from first puck 00:00Z**
+- **User, in this session's chat:** "Yes, push and load" (answering "Push the end-game fix and load it on live-odds-worker before tonight's games?").
+- **Commit** `a4127d11a` on main: one rebase over two ledger commits, pushed 22:3xZ. Tests: the 15 end-game tests plus the neighbouring NHL / join / ledger suites, 602 passed.
+- **Range 3f11114c2..a4127d11a, runtime files:** `syndicate/features/nhl/live_resim.py` (mine), `scripts/backtest_nhl_live_puckline.py` (mine, offline harness), `scripts/nba_blowout_bench_study.py` (lane `nba-pbp-blowout-bench`, a read-only study script no role imports). Nothing else.
+- **gates:**
+  - Claim live-odds-worker, holder `nhl-live-endgame-calibration`, 22:32:23Z (rc 0).
+  - Spacing: the last live-odds-worker restart was 20:25:42Z, 130 min earlier.
+  - Preflight `--target fleet --target-commit a4127d11a`, run from a worktree at origin/main: **CLEAR** 22:34:00Z (rc 0), 0 jobs enumerated. Baseline read 22:33:08Z.
+- **load** (`C:\tmp\nhlrec\load_low.sh a4127d11a 3f11114c2`):
+  - `git merge --ff-only` at **22:34:21.497Z**: HEAD `a4127d11a`. On disk: the end-game constant 1, `"empty_net_p": 0.38` 1.
+  - `kill -TERM 220176` at 22:34:21.502Z. Its children: 2 `live_resim_workers --serve`, no odds job, no NHL game live.
+  - New supervised live-odds-worker **pid 246202**, first seen 22:34:55.005Z.
+  - Web and refresh-worker were not touched.
+- **expect / measured:**
+  - `fleet_checkout_head` 3f11114c2 -> a4127d11a: **MET** 22:34:21Z.
+  - `endgame_constant_on_disk` 0 -> 1: **MET**.
+  - `low_pid_started_after_a4127d11a` no -> yes: **MET** (pid 246202; `local_production.py status` reads `code=a4127d11`).
+  - `low_env_endgame_key` absent -> absent: **MET**. Under the role's own environ, `live_endgame_calibration()` resolves `{empty_net_p: 0.38, ramp_seconds: 90.0}`.
+  - `low_tracebacks_first_10min` 0 -> **0**: MET (raw `^Traceback` lines, 22:34:21Z-22:45Z).
+  - `nhl_live_lanes_with_liveEndgame_on_0.38_90` 0 -> **OWED** from first puck 00:00Z. Watcher `C:\tmp\nhlrec\snap_watch.sh` reads from 00:05Z; log `snap_watch.log`.
+- **Reachability (`off != on`) on production's code, env and inputs, 22:4xZ:**
+  - The call: `resim_live_game` under live-odds-worker's environ, on tonight's real slate features (6 games), for a synthetic P3 05:00 2-1 home lead in Tampa Bay Lightning @ Buffalo Sabres. 200 sims, same seed.
+  - P(home by 2+): **0.250 off -> 0.450 on**; `empty_net_goals` 41.
+  - Total mean 3.935 both ways (margin only). Nothing was published.
+- **Error lines, 10 min after the restart vs 10 min before** (`C:\tmp\nhlrec\low_tags.sh`):
+  - Raw `^Traceback` lines: 0. Timestamped lines: 1,944 after (22:34:55-22:44:55Z) vs 1,717 before (22:24:21-22:34:21Z).
+  - `[execution_exits_fast] PASS_FAILED` (KeyValuePayloadTooLarge): 36 -> 35. `[live_lens_loop] NFL_LIVE_STATE_CAPTURE`: 7 -> 7. `VENUE_SETTLEMENT`: 2 -> 2.
+  - New in the window, each a boot-time or periodic line: `LIVE_LEDGER_ROW` x25 (the boot dump of today's ledger rows; the match is `error=None`; 75 in the 3 earlier boots); `POLYMARKET_US_V1 ... http_404` x3 (Polymarket's own `/v1/sports` catalogue; 9 earlier in the log); `KALSHI_SERIES_CATALOGUE status=ok` x1 (once per boot).
+  - None of them comes from this load. No `nhl_live_resim` lines either way: no NHL game is live before 00:00Z.
+- **Instrument note (lead recorded):** `status` and preflight read refresh-worker pid 225134 as `code=e102faf7` (STALE), although it loaded `3f11114c2`.
+  - It was spawned at 20:45:3xZ, after the 20:45:28Z ff, but its `linux_start_epoch` now reads 20:43:48.7Z, 106 s early.
+  - Before this load, live-odds-worker pid 220176 likewise read `96131f98` although it loaded `e102faf79`.
+  - pid 246202 reads correctly while it is young.
+- **Owed:**
+  - The served reading above.
+  - The v6 ledger reading (the 19:44:53Z entry): NHL puck-line rows carrying `display_prob` beside `market_fair_prob_over`. Watcher `bpi8ljygh` reads from 01:00Z.
+- **Revert:** `LIVE_ODDS_WORKER__SYNDICATE_NHL_LIVE_ENDGAME_CALIBRATION=off` in `local_production.env` + a drained `down`/`up`; or `git revert a4127d11a` on main + ff + a claimed live-odds-worker TERM.
+- Claim live-odds-worker released after this entry.
