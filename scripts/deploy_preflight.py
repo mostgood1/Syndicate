@@ -68,6 +68,8 @@ Exit codes:  0 = CLEAR (only infrastructure running)
              4 = OFF_MAIN (the target SHA is not contained in origin/main)
              5 = TOO_SOON (deployed again inside this service's minimum spacing)
              6 = NO_EXPECTATION (no stated prediction with a fresh baseline for its fields)
+             7 = OUTCOME_GATE (--reinject-env changes a *_LIVE_MECHANISMS value with no
+                 fresh outcome-scored receipt for that exact transition; todo #784)
 
 THE THREE PROPERTIES, because they are independent and each was learned
 separately -- a deploy needs all three and no two of them imply the third:
@@ -211,6 +213,29 @@ EXIT_TOO_SOON = 5
 # count means nothing for a worker env deploy; a fresh baseline for the field
 # you predict always does.
 EXIT_NO_EXPECTATION = 6
+# 7 = an env re-inject changes a `SYNDICATE_<LEAGUE>_LIVE_MECHANISMS` value and no
+# fresh receipt from `scripts/live_mechanism_outcome_gate.py` scores THAT
+# transition against outcomes (or its WORSE cells were not explicitly accepted).
+# Separate from NO_EXPECTATION because the remedy is a replay, not two lines.
+#
+# WHY, measured 2026-11-10/11 (todo #765 step 3h, #784; learnings 2026-11-11).
+# NCAAB's RC46 passed a gate that scored the margin's MEAN, while live spreads
+# and moneylines price off the margin's DISTRIBUTION from the tip on. It went
+# live at 07:49:46Z with every lock passing. Scored on 240 games of the current
+# season, win Brier was worse beyond 1.96 SE at 20 m and 36 m; it was reverted
+# six minutes before the slate's first live game. Its registered post-load
+# reading (an effect ratio) came back NOT FALSIFIED: no step asked the outcome
+# question. The gate is a CHECK because a rule had already been written down
+# beside the gap ("the harness has no distribution to score") and the load
+# went out anyway.
+#
+# WHAT IT READS: each role's env as `up` will build it (`local_production.py env`,
+# the SAME loader -- learnings 2026-09-21) against that role's running
+# /proc/<pid>/environ, `*_LIVE_MECHANISMS` keys only. So the env file must be
+# edited BEFORE this preflight (env is built only at `up`, so editing early is
+# inert); an edit made after the CLEAR is not seen, and the guard does not
+# re-read it.
+EXIT_OUTCOME_GATE = 7
 
 # Equal to deploy-guard.py's PREFLIGHT_TTL_SECONDS: a baseline older than the
 # CLEAR it rides on describes a world the deploy will not land in.
@@ -594,6 +619,132 @@ def fleet_status() -> tuple[str, dict[str, dict]]:
         if line.startswith("HEAD="):
             head = line[5:].strip()
     return head, parse_fleet_status(text)
+
+
+_MECHANISM_LINE_RE = re.compile(r"^([A-Z0-9_]+_LIVE_MECHANISMS)=(.*)$")
+
+
+def _outcome_gate_module():
+    """`scripts/live_mechanism_outcome_gate.py`, loaded by path: ONE source for the value hash, the receipt name
+    and the receipt predicate, so preflight cannot accept a receipt the gate would not have written."""
+    import importlib.util
+
+    name = "live_mechanism_outcome_gate_for_preflight"
+    if name in sys.modules:
+        return sys.modules[name]
+    spec = importlib.util.spec_from_file_location(name, REPO_ROOT / "scripts" / "live_mechanism_outcome_gate.py")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def parse_mechanism_sections(text: str) -> tuple[dict[str, str], dict[str, str]]:
+    """`fleet_mechanism_values`' shell output -> (running, derived). Raises unless both sections were read."""
+    running: dict[str, str] = {}
+    derived: dict[str, str] = {}
+    section = None
+    env_rc = proc = None
+    for line in text.splitlines():
+        if line in ("@@DERIVED", "@@RUNNING"):
+            section = line
+        elif line.startswith("@@ENVRC="):
+            env_rc = line.split("=", 1)[1].strip()
+        elif line.startswith("@@PROC="):
+            proc = line.split("=", 1)[1].strip()
+        else:
+            match = _MECHANISM_LINE_RE.match(line)
+            if match and section == "@@DERIVED":
+                derived[match.group(1)] = match.group(2)
+            elif match and section == "@@RUNNING":
+                running[match.group(1)] = match.group(2)
+    if env_rc != "0":
+        raise RuntimeError(f"`local_production.py env` rc={env_rc}")
+    if proc != "ok":
+        raise RuntimeError(f"the role's /proc environ is {proc or 'unread'}")
+    return running, derived
+
+
+def fleet_mechanism_values(role: str, pid) -> tuple[dict[str, str], dict[str, str]]:
+    """(running, derived) `*_LIVE_MECHANISMS` values for one fleet role.
+
+    derived = what `up` would inject NOW (`local_production.py env --role`, the loader `up` uses; masked output, and
+    `*_LIVE_MECHANISMS` matches none of its SECRET_HINTS, so nothing is unmasked); running = the role process's own
+    /proc environ. Only matching keys leave the fleet shell. Raises when either side cannot be read."""
+    if not str(pid or "").isdigit():
+        raise RuntimeError(f"no running pid for {role} ({pid!r})")
+    checkout = os.environ.get("SYNDICATE_FLEET_CHECKOUT") or FLEET_CHECKOUT_DEFAULT
+    home = os.environ.get("SYNDICATE_LOCAL_HOME") or FLEET_HOME_DEFAULT
+    python = os.environ.get("SYNDICATE_FLEET_PYTHON") or FLEET_PYTHON_DEFAULT
+    pattern = "'^[A-Z0-9_]+_LIVE_MECHANISMS='"
+    text = _fleet_shell(
+        f"cd {checkout} || exit 3\n"
+        "echo @@DERIVED\n"
+        f"{python} scripts/local_production.py --home {home} env --role {role} 2>/dev/null | grep -E {pattern}\n"
+        'echo "@@ENVRC=${PIPESTATUS[0]}"\n'
+        "echo @@RUNNING\n"
+        f"if [ -r /proc/{int(pid)}/environ ]; then tr '\\0' '\\n' < /proc/{int(pid)}/environ | grep -E {pattern}; "
+        "echo @@PROC=ok; else echo @@PROC=unreadable; fi\n")
+    return parse_mechanism_sections(text)
+
+
+def mechanism_changes(running: dict[str, str], derived: dict[str, str]) -> list[dict]:
+    """Keys whose value `up` would change, absent counting as '' (unset). Hashes only: values never leave here."""
+    gate = _outcome_gate_module()
+    changes = []
+    for key in sorted(set(running) | set(derived)):
+        current, candidate = running.get(key, ""), derived.get(key, "")
+        current_hash, candidate_hash = gate.value_hash(current), gate.value_hash(candidate)
+        if current_hash != candidate_hash:
+            changes.append({"key": key, "league": gate.league_of_key(key) or "?",
+                            "current_hash": current_hash, "candidate_hash": candidate_hash,
+                            "current_set": bool(gate.canonical_value(current)),
+                            "candidate_set": bool(gate.canonical_value(candidate))})
+    return changes
+
+
+def outcome_gate_problem(changes, read_error, required, directory, now_epoch, waiver="", accept_regression=""):
+    """(problem or None, detail) for `OUTCOME_GATE`. Pure apart from reading receipt files: `main()` owns the verdict.
+
+    `required` is --reinject-env: only a deploy that declares it re-injects env gets a verdict from this, and for it
+    an UNREADABLE env is a problem (rule 1: unknown is not clear). The waiver is checked first and recorded."""
+    detail: dict = {"changes": [{k: (v[:12] if k.endswith("_hash") else v) for k, v in c.items()} for c in changes],
+                    "read_error": read_error or None, "receipts": [], "waived": None}
+    reason = str(waiver or "").strip()
+    if reason:
+        detail["waived"] = reason
+        return None, detail
+    if not required:
+        return None, detail
+    if read_error:
+        return (f"cannot read the role's *_LIVE_MECHANISMS values ({read_error}), so whether this env re-inject "
+                f"changes one is unknown"), detail
+    gate = _outcome_gate_module()
+    for change in changes:
+        problem, receipt = gate.check_receipt(Path(directory), change["league"], change["candidate_hash"],
+                                              change["current_hash"], now_epoch, accept_regression)
+        detail["receipts"].append(receipt)
+        if problem:
+            return f"{change['key']} changes: {problem}", detail
+    return None, detail
+
+
+def _outcome_gate_clear_note(detail: dict) -> str:
+    """What a CLEAR carried through the outcome gate, so the reason line says it rather than implying 'nothing'."""
+    if not detail:
+        return ""
+    if detail.get("waived"):
+        return "; OUTCOME GATE WAIVED: " + str(detail["waived"])
+    receipts = detail.get("receipts") or []
+    if not receipts:
+        return "; outcome gate: no *_LIVE_MECHANISMS change"
+    parts = []
+    for receipt in receipts:
+        text = f"{Path(str(receipt.get('receipt') or '?')).name} ({receipt.get('games')} games)"
+        if receipt.get("accepted_regression"):
+            text += f" WORSE {receipt.get('worse')} ACCEPTED: {receipt['accepted_regression']}"
+        parts.append(text)
+    return "; outcome gate: " + ", ".join(parts)
 
 
 def fleet_live_commits_from(status: dict[str, dict]) -> dict[str, dict]:
@@ -1054,6 +1205,9 @@ def _write_receipt(args, report, verdict, reason, live_commit) -> None:
             # `NO_EXPECTATION`. On the receipt so the stated prediction and the
             # baseline it rests on outlive the session that made them.
             "expectation": report.get("expectation"),
+            # todo #784: which *_LIVE_MECHANISMS transition this deploy carries and the receipt that scored it
+            # (or the waiver), so a later reader can see what the guard let through.
+            "outcome_gate": report.get("outcome_gate"),
         }
         (RECEIPT_DIR / f"{args.service}.json").write_text(
             json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
@@ -1092,6 +1246,13 @@ def main() -> int:
     parser.add_argument("--no-expectation", default="", metavar="REASON",
                         help="waive the expectation check (a revert, an env re-inject). The "
                              "reason is recorded on the receipt; say it in deploys.md too.")
+    parser.add_argument("--no-outcome-gate", default="", metavar="REASON",
+                        help="waive the outcome gate for a *_LIVE_MECHANISMS change (an urgent "
+                             "revert, a league the gate cannot replay yet). Recorded on the receipt; "
+                             "say it in deploys.md too.")
+    parser.add_argument("--accept-outcome-regression", default="", metavar="REASON",
+                        help="load a candidate whose outcome-gate receipt has WORSE cells anyway. "
+                             "Recorded on the receipt with the cells it accepts.")
     parser.add_argument("--max-sample-age-seconds", type=int, default=DEFAULT_MAX_SAMPLE_AGE_SECONDS)
     parser.add_argument("--json", action="store_true")
     parser.add_argument(
@@ -1340,6 +1501,26 @@ def main() -> int:
         args.expect, args.baseline, args.baseline_read_at, args.no_expectation, now)
     report["expectation"] = {**expectation_detail, "problem": expectation_issue}
 
+    # THE OUTCOME GATE (todo #784). Only an env re-inject on a fleet role reads it: that is the path every env
+    # change takes (drained down/up), and a TERM / reload-web reuses the old env.
+    outcome_issue, outcome_detail = None, {}
+    if on_fleet and fleet_role and args.reinject_env:
+        changes, read_error = [], ""
+        try:
+            running_mech, derived_mech = fleet_mechanism_values(
+                fleet_role, (status.get(fleet_role) or {}).get("pid"))
+            changes = mechanism_changes(running_mech, derived_mech)
+        except Exception as exc:  # noqa: BLE001 -- unreadable is decided by outcome_gate_problem, never "no change"
+            read_error = f"{type(exc).__name__}: {exc}"
+        try:
+            gate_dir = _outcome_gate_module().receipt_dir(_main_worktree_root())
+        except Exception as exc:  # noqa: BLE001
+            gate_dir, read_error = Path("."), read_error or f"outcome gate module: {type(exc).__name__}: {exc}"
+        outcome_issue, outcome_detail = outcome_gate_problem(
+            changes, read_error, True, gate_dir, now.timestamp(),
+            args.no_outcome_gate, args.accept_outcome_regression)
+    report["outcome_gate"] = {**outcome_detail, "problem": outcome_issue} if outcome_detail else None
+
     stale = (cron_in_flight is None) if is_cron else (age is None or age > args.max_sample_age_seconds)
     if off_main:
         verdict, code = "OFF_MAIN", EXIT_OFF_MAIN
@@ -1415,6 +1596,14 @@ def main() -> int:
     elif redundant:
         verdict, code = "HOLD", EXIT_HOLD
         reason = f"{args.target_commit[:8]} is already contained in live {live_commit[:8]} -- the deploy is redundant"
+    elif outcome_issue:
+        # After every "wait" verdict (a replay never fixes a job in flight), before NO_EXPECTATION: both are fixed
+        # by the operator, and this one is the expensive fix, so it is named first.
+        verdict, code = "OUTCOME_GATE", EXIT_OUTCOME_GATE
+        reason = (outcome_issue
+                  + ". The gate replays this season's completed games on both values and scores them against the "
+                    "finals (scripts/live_mechanism_outcome_gate.py, run on the fleet). For an urgent revert or a "
+                    'league it cannot replay, --no-outcome-gate "<reason>".')
     elif expectation_issue:
         # LAST BEFORE CLEAR, deliberately. Every verdict above means "do not deploy
         # now" for a reason the operator cannot write away; this one is fixed by
@@ -1434,7 +1623,7 @@ def main() -> int:
         ) + (
             "; EXPECTATION WAIVED: " + str(expectation_detail.get("no_expectation_reason"))
             if expectation_detail.get("no_expectation_reason") else ""
-        )
+        ) + _outcome_gate_clear_note(outcome_detail)
     report["verdict"] = verdict
     report["reason"] = reason
     _write_receipt(args, report, verdict, reason, live_commit)
@@ -1489,6 +1678,13 @@ def main() -> int:
             print(f"  expect       {_field}: {_before} -> {_value}")
     else:
         print("expectation    NONE -- --expect FIELD=VALUE --baseline FIELD=VALUE --baseline-read-at <UTC>")
+    _gate = report.get("outcome_gate") or {}
+    if _gate:
+        _changed = ", ".join(f"{c['key']} {c['current_hash']}->{c['candidate_hash']}" for c in _gate.get("changes") or [])
+        print("outcome gate   " + (f"WAIVED: {_gate['waived']}" if _gate.get("waived") else
+                                   f"UNREADABLE: {_gate['read_error']}" if _gate.get("read_error") else
+                                   f"changes: {_changed}" if _changed else "no *_LIVE_MECHANISMS change")
+              + (f"   PROBLEM: {_gate['problem']}" if _gate.get("problem") else ""))
     # A CRON'S RECEIPT MUST NOT DISPLAY AN INSTRUMENT IT NEVER USED. Printing
     # `sample NONE` for a cron is the exact shape of a FAILED process read --
     # which for every other service means UNKNOWN -- so the line named the wrong
