@@ -83,7 +83,35 @@ from syndicate.features.shared.sharp_books import SHARP_BOOKS
 #
 # Earlier records cannot be repaired: neither mean is recoverable from what was
 # stored. A reader that needs them must filter to `v >= 5`.
-LEDGER_VERSION = 5
+#
+# v6 (2026-11-11, lane nhl-live-puckline-grade) carries `display_prob`,
+# `display_basis` and `market_fair_prob_over`: the DISPLAY-ONLY live number the
+# board showed beside the row (`live_display.prob_over` -- P(over) on totals,
+# P(home covers) at the row's away-frame line on spreads, P(home) on h2h) and the
+# market's de-vigged price for THAT SAME EVENT on a totals or spreads row. ADDITIVE
+# for every row but one kind (see `_moved`): `record_key` is untouched.
+#
+# It exists because a display-only number cannot be GRADED from this file. `#773`
+# made live NHL puck-line rows show P(home covers) off the re-sim's own histogram,
+# refused `live_margin_published_for_display_only`, and the v5 record of such a
+# row carried `model_home_win_prob: None, market_fair_prob: None` -- by design,
+# since nothing was priced -- so production's own number and the market beside it
+# were thrown away every build. Pricing it needs exactly that pair, graded against
+# finals. A reader that needs them must filter to `v >= 6`.
+LEDGER_VERSION = 6
+
+# THE ROW KEY THE JOIN WRITES ITS DISPLAY NUMBER UNDER, and the one refusal whose
+# display rows are recorded on movement. Imported by NAME for the reason the
+# `REFUSAL_KEY` import below gives.
+from syndicate.features.shared.live_gameline_join import LIVE_DISPLAY_KEY as _LIVE_DISPLAY_KEY
+from syndicate.features.shared.live_gameline_join import (
+    REASON_MARGIN_DISPLAY_ONLY as _REASON_MARGIN_DISPLAY_ONLY,
+)
+
+# MOVEMENT RESOLUTION for the display branch of `_moved`: 2 dp, the resolution the
+# join's own refusal observations are rounded to (`REFUSAL_KEY`). A 200-sim
+# Agresti-Coull number steps by ~0.005, so every re-sim would otherwise be a write.
+_DISPLAY_MOVE_DP = 2
 
 # THE KEY THE JOIN STAMPS ON A ROW IT REFUSED ABOVE THE ATTACH SITE. Imported by
 # NAME rather than re-spelled here, so the two files cannot drift into
@@ -245,7 +273,45 @@ def _moved(previous: Mapping[str, Any] | None, current: Mapping[str, Any]) -> bo
     for field in ("model_home_win_prob", "market_fair_prob", "edge_pp", "priceable"):
         if previous.get(field) != current.get(field):
             return True
+    # A DISPLAY-ONLY PUCK-LINE ROW (v6) MOVES WHEN ITS SHOWN NUMBER OR ITS MARKET DOES.
+    # Its four fields above are constant (None, None, None, False), so without this it
+    # is written ONCE per key per day -- at first sighting -- and the series a grade
+    # needs (every state the board showed, beside the market at that instant) never
+    # exists. SCOPED TO THIS ONE REFUSAL ON PURPOSE: the display fields ride on every
+    # record, but triggering on them for every stale-quote and segment display row in
+    # every sport would rewrite most of the board each build against
+    # `_MAX_RECORDS_PER_FILE`, the hazard the refusal-record comment below records.
+    # NHL puck lines are ~1 row per live game per build.
+    if current.get("withheld_reason") == _REASON_MARGIN_DISPLAY_ONLY:
+        for field in ("display_prob", "market_fair_prob_over"):
+            if _rounded(previous.get(field)) != _rounded(current.get(field)):
+                return True
     return False
+
+
+def _rounded(value: Any) -> float | None:
+    try:
+        return round(float(value), _DISPLAY_MOVE_DP) if value is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _display_fields(row: Mapping[str, Any]) -> dict[str, Any]:
+    """v6: the board's display-only live number for this row, and the market's price for the same event.
+
+    `market_fair_prob_over` is the de-vig of the grid's FIRST side -- `over` on totals, `home` on spreads
+    (`attach_live_gamelines`' side-token comment) -- so on those markets it describes the event
+    `display_prob` does. On h2h it is P(home), which `market_fair_prob` already carries, so it is left
+    None there rather than stored twice under a second name.
+    """
+    display = row.get(_LIVE_DISPLAY_KEY) if isinstance(row.get(_LIVE_DISPLAY_KEY), Mapping) else {}
+    projection = row.get("projection") if isinstance(row.get("projection"), Mapping) else {}
+    market = str(row.get("market") or "").strip().lower()
+    return {
+        "display_prob": display.get("prob_over"),
+        "display_basis": display.get("basis"),
+        "market_fair_prob_over": projection.get("market_fair_prob_over") if market != "h2h" else None,
+    }
 
 
 def build_records(
@@ -431,6 +497,8 @@ def build_records(
                 # close covers about half the population and the join must know.
                 "sharp_books": [b for b in books if b in _SHARP_BOOKS],
                 "has_pinnacle": "pinnacle" in books,
+                # v6: the display-only number and its market (`_display_fields`).
+                **_display_fields(row),
             }
         )
 
@@ -534,6 +602,10 @@ def build_records(
                 "quote_updated_at": None,
                 "sharp_books": [b for b in books if b in _SHARP_BOOKS],
                 "has_pinnacle": "pinnacle" in books,
+                # v6 keys, null for the same reason the game-state fields are: written once, never refreshed.
+                "display_prob": None,
+                "display_basis": None,
+                "market_fair_prob_over": None,
             }
         )
 
