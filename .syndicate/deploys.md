@@ -58836,3 +58836,48 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - Tonight's latest tip is 9:10 PM CST (OKC @ POR, 11-11 grid), so a reading tonight needs that game to run past midnight.
 - **Seen in passing, not chased (not this lane):** at 12:22 PM CST NCAAB already has 176 live rows in `dead` (87 `live_market_stale`, 89 `live_quote_unobserved`) and WNCAAB 46. The new counter is what makes this readable.
 - **Correction to a relay of mine:** I told the #780 lane web was "likely on pre-ff code" from `ps lstart`. REFUTED: web.log shows the HUP at 18:11:21.872Z after the ff (the 18:11:24Z entry).
+
+## 2026-11-11 18:13:28Z (12:13 PM CST) -- claimed live-odds-worker TERM: todo #782 NBA midnight quote pulls (`eacc9f990`, lane `nba-quote-capture-midnight`) LOADED, scope live-odds-worker ONLY (lane `load-782-nba-quote-capture`)
+
+- **The user's words, in this session's chat:** "load #782". Asked about scope (the restart range also carries #780's 120 s ceiling, #775's headshot fix and #778's log line), they chose **"Live-odds-worker only"**. So there was no refresh-worker restart from this lane, and `dead_by_reason` was not loaded by this lane.
+- **No ff by this lane.** Lane `restate-live-edge-withhold` had already fast-forwarded `~/Syndicate` to `5c8eec41a` for its web load (claim held 18:11Z). That SHA contains `eacc9f990` and is on origin/main.
+  - On disk: `def prior_slate_in_play` 1, `prior_slate_games` 4 hits in `run_live_odds_refresh_worker.py`.
+  - **Refresh-worker was ALREADY on `5c8eec41a` from 18:11:31Z (pid 191825)**, loaded by lane `live-gameline-quote-ceiling-120`'s claimed TERM. That lane's own ff to `0f6e4a723` found the fleet past it, so it was a no-op (its message to this session; its deploys.md entry).
+    - So `#782`'s refresh-worker half (`dead_by_reason`), `#780`'s 120 s ceiling and `#775`'s `c8d79b8ee` are live on refresh-worker through THAT restart, not this one.
+    - The user's "Live-odds-worker only" scope held for this lane's own action.
+- **gates:**
+  - Claim live-odds-worker, holder `load-782-nba-quote-capture`, 18:11:56Z (rc 0).
+  - Fleet preflight from a worktree at origin/main, `--target fleet --target-commit 5c8eec41a`: **CLEAR** 18:13:08Z, with 0 worker jobs enumerated ("only infrastructure processes").
+  - Baseline read 18:12:26Z: pid 52912 started 14:05:57Z, before the ff; 0 `NBA_LIVE_AUTORUN_PRIOR_SLATE*` lines; 0 `NBA_LIVE_AUTORUN_LAUNCHED` since 14:06Z (no NBA game live).
+  - The baseline's "1 Traceback" was a false match inside an `ALL_PROCESS_MEMORY` telemetry line. The raw `^Traceback` count in the whole log is the honest instrument.
+- **load:** `kill -TERM 52912` at **18:13:28.931Z**. Supervisor restart: **live-odds-worker pid 192537**, started 18:14:45Z on `5c8eec41a`.
+- **What this load can show today, and what it cannot:**
+  - The new code acts only between 00:00 and 04:00 CT (the re-sim's window, `SYNDICATE_NBA_LIVE_RESIM_PRIOR_DATE_HOURS` absent = 4 h), and only when a previous-date NBA game is In Progress.
+  - So the midday reading below is a no-harm and loaded reading only. The behaviour reading is owed to lane `nba-quote-capture-midnight` on the first night an NBA game is live at 00:00 CT (todo #782's expected-change list).
+
+## 2026-11-11 18:25:13Z (12:25 PM CST) -- VERIFY of the 18:13:28Z live-odds-worker load (`#782`, lane `load-782-nba-quote-capture`) -- **LOADED AND NO HARM: MET; behaviour reading OWED to lane `nba-quote-capture-midnight`**
+
+- **Expectations from the preflight, read 18:24:57-18:25:13Z:**
+  - `low_pid_started_after_5c8eec41a`: no -> **yes** (pid 192537, started 18:14:45Z on `5c8eec41a`, still running at 18:25:08Z).
+  - `nba_prior_slate_error_lines`: 0 -> **0**. `NBA_LIVE_AUTORUN_PRIOR_SLATE_ERROR` since the restart: 0. `NBA_LIVE_AUTORUN_LAUNCHED`: 0, as expected: no NBA game live, and outside 00:00-04:00 CT.
+  - `low_tracebacks_first_10min`: **0**. Raw `^Traceback` lines in the whole log: 0.
+- **Error lines are unchanged in kind and rate.** Error-word lines by tag, 10 min before the TERM vs 10 min after the restart:
+  - `[execution_exits_fast] PASS_FAILED` (KeyValuePayloadTooLarge): 36 -> 33;
+  - `[execution_ledger] RECONCILE_SINGLE_READ_FAILED` (the known Kalshi http_404 on key 970ec063): 3 -> 5;
+  - `LIVE ODDS REFRESH SKIP/ERROR` (pregame cooldown): 4 -> 2.
+  - All are pre-existing. None is from this load.
+- **The loops run on the new pid** (2,144 timestamped lines in 10 min):
+  - `NBA_LIVE_RESIM_TICK date=2026-11-11 games=0` x6;
+  - `NCAAB_LIVE_RESIM_TICK live=3` x5;
+  - `WNCAAB_LIVE_RESIM_TICK live=4` x5;
+  - Polymarket order-state reads 175, Kalshi odds titles 103, `LIVE_LEDGER_ROW` 25.
+  - Tag mix comparable to the 10 min before.
+- **OWED (lane `nba-quote-capture-midnight`, todo `#782`):** the first night an NBA game is live at 00:00 CT. Possibly tonight, 11-11: OKC @ POR tips 03:10Z = 9:10 PM CST; otherwise 11-13, OKC @ LAC. After 06:00Z, while the game is In Progress:
+  - `NBA_LIVE_AUTORUN_LAUNCHED date=<prior> ... prior_slate_games=1` every ~240 s;
+  - the prior nba `book_quotes` shard's mtime advancing;
+  - `LAYER2_CARRYOVER ... live_rows_now>0`;
+  - the served `layer2-shortlist?date=<prior>&sport=nba` with > 0 live rows, and its `dead_by_reason` showing no `live:live_quote_unobserved` for the game.
+- **STATUS for lane `nba-quote-capture-midnight` (session cca33a3a)** `[2026-11-11 18:25Z]`:
+  - `eacc9f990` is LOADED on both roles that run it: live-odds-worker pid 192537 since 18:14:45Z (this lane's TERM) and refresh-worker pid 191825 since 18:11:31Z (`live-gameline-quote-ceiling-120`'s TERM).
+  - The behaviour reading is yours. That lane's block is not edited here.
+- Claim live-odds-worker released after this entry.

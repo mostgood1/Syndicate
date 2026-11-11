@@ -741,7 +741,12 @@ death, never life — do not invert it.
 - Verification: Unit: segment points from quarter_log + linescores (resume at every quarter + quarter break + halftime) match hand-computed values; off != on through the env and through board_enrichment's own index builder on a fake grid; h2h segment rows get no display; no display row carries an edge. Grade: backtest_ncaaf_live_totals --market segment_total/segment_margin over completed 2026 games at 120 sims with per-segment worst powered bucket. Fleet after load: LIVE_GAMELINE_JOIN sport=ncaaf why{} moves segment rows from segment_is_not_full_game to segment_pricing_disabled with segment_index_sizes > 0 and display rising; served board probe: NCAAF segment rows with a Live proj. / segment rows, and 0 carrying an edge or live_aware.
 - Blocked by: none
 
-### load-782-nba-quote-capture — OPEN — opened 2026-11-11 — session 345d60ab-9db5-4a93-9d01-d57374578f65
+### load-782-nba-quote-capture — CLOSED 2026-11-11 (GOAL MET: #782 loaded on live-odds-worker, no harm) — opened 2026-11-11 — session 345d60ab-9db5-4a93-9d01-d57374578f65
+- **GOAL VERDICT `[2026-11-11 18:25Z / 12:25 PM CST]`.** Goal, verbatim: "Todo #782's NBA midnight quote pulls are LOADED on the fleet: ~/Syndicate fast-forwarded to exactly eacc9f990 and live-odds-worker restarted under a claim + CLEAR preflight (user 2026-11-11 'load #782', scope 'Live-odds-worker only'); the new pid runs it (prior_slate_in_play on disk, 0 NBA_LIVE_AUTORUN_PRIOR_SLATE_ERROR, 0 tracebacks); refresh-worker NOT restarted" -- **GOAL: MET.**
+  - The reading (deploys.md 18:13:28Z + 18:25:13Z): pid 192537 started 18:14:45Z on `5c8eec41a`; 0 PRIOR_SLATE_ERROR and 0 raw tracebacks; loops running; error families unchanged.
+  - Correction to the goal's wording: no ff by this lane. Lane `restate-live-edge-withhold` had already put the fleet on `5c8eec41a`, which contains `eacc9f990`.
+  - Refresh-worker was restarted, but by lane `live-gameline-quote-ceiling-120` at 18:11:31Z, not by this lane.
+  - The behaviour reading is owed to lane `nba-quote-capture-midnight`.
 - Goal: Todo #782's NBA midnight quote pulls are LOADED on the fleet: ~/Syndicate fast-forwarded to exactly eacc9f990 and live-odds-worker restarted under a claim + CLEAR preflight (user 2026-11-11 'load #782', scope 'Live-odds-worker only'); the new pid runs it (prior_slate_in_play on disk, 0 NBA_LIVE_AUTORUN_PRIOR_SLATE_ERROR, 0 tracebacks); refresh-worker NOT restarted
 - Files: none (deploy-only: fleet ff + live-odds-worker TERM)
 - Hypothesis: n/a (deploy)
