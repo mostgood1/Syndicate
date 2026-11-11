@@ -58239,11 +58239,37 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
     - First builds: `BOARD_BUILD_TIMING ok=True` at 16:36:43Z (wall 236.7 s) and 16:38:47Z (50.5 s).
     - Since 16:28:10Z: 0 `Traceback`, 0 `BOOK_GRID_LIVE_GAMELINE_FAILURE`.
     - The NHL join ran on the new pid at 16:29:56Z and 16:41:40Z: `index=0 considered=0`, 7 games in the snapshot, all `pregame_only` (nothing live).
-  - `nhl_join_puckline_reason`: **OWED**. No NHL game is live until 00:00Z.
+  - `nhl_join_puckline_reason`: **OWED**. No NHL game is live until 00:00Z. **MET 00:08:27Z 11-11** (`Measured (live)` below).
 - **verify (OWED, tonight: 7 NHL games from 00:00Z 11-11, 6 PM CST):**
   - (1) A `LIVE_GAMELINE_JOIN sport=nhl` line with `index>=1` names `live_margin_published_for_display_only` for the fresh-quote puck-line rows, and `display=` rises by them. Any `live_resim_published_no_distribution_for_this_market` left equals the fresh-quote totals rows.
   - (2) In Redis `live/nhl_live_lens.json`, the `live_resim` lanes carry `projection.displayMarginDist`, summing to `simsRun`, with no `marginDist` / `totalRunsDist`.
   - (3) Served `/api/intelligence/query`: live NHL `spreads` / `spreads_alt` rows carry `live_model_probability`, home + away = 1 on one line, and `model_edge_pct` / `edge_vs_market_pct` None on every one of them.
+- **Measured (live, 11-11 00:08-00:22Z, 6:08-6:22 PM CST; read-only):**
+  - **The processes read were not my pids.** Lane NCAAB RC46's drained full `down`/`up` (entry 22:55:46Z) restarted every role at 22:56:28Z on fleet code `47450ce07`, which contains `efccead01` (`git merge-base --is-ancestor`): refresh-worker 372140, live-odds-worker 372141. The fleet HEAD is now `0290d505a` (ff 23:16:32Z, web reload only).
+  - (1) **MET.**
+    - `LIVE_GAMELINE_JOIN sport=nhl` at 00:08:27.621Z (WSH@OTT, the first live game): `index=1 considered=3 projected=3 priceable=1 withheld=2 display=2`, why `{live_margin_published_for_display_only: 1, live_resim_published_no_distribution_for_this_market: 1}`.
+    - At 00:16:26.820Z: `index=3 considered=12 priceable=3 withheld=9 display=6`, why `{live_margin_published_for_display_only: 3, live_resim_published_no_distribution_for_this_market: 6}`.
+    - The 6 no-distribution rows are totals: the puck-line markets now take the new name, and moneylines are priced by their own branch. So 12 = 3 moneyline + 3 puck line + 6 totals.
+    - At 00:12:48Z: `index=3 considered=0` (that build had no live NHL quote rows).
+  - (2) **MET.** Redis `live/nhl_live_lens.json` at 00:09:38Z had 2 `live_resim` lanes (WSH@OTT, NJD@WPG). On each:
+    - `simsRun=200`, and `displayMarginDist` sums to 200, with no `0` key.
+    - The histogram mean equals `homeMargin` (-0.38 / -0.72), and its share of positive margins equals `modelHomeWinProb` (0.455 / 0.36).
+    - `marginDist` and `totalRunsDist` are absent.
+    - At 00:20:18Z: 4 live lanes, same shape.
+  - (3) **MET for the number, its frame and the null edge. The home + away = 1 check could not be read on the served board.**
+    - A poll from 00:11:45Z to 00:19:52Z read the snapshot every 15 s and the served board about every 70 s.
+    - COL@TOR `spreads home 1.5` served `live_model_probability` 0.745098, which is exactly the Agresti-Coull P(margin > -1.5) of the 00:11:12Z histogram (p_home 0.50). It then served 0.808824, exactly the same quantity for the 00:15:48Z histogram (p_home 0.56). So the home +1.5 row reads P(home covers +1.5) off the published histogram, in the right frame.
+    - On every served live NHL puck-line row, `model_edge_pct`, `edge_vs_market_pct` and `model_ev_pct` are None.
+    - The served board carried ONE puck-line row per game (the home side), so the pair cannot be read there. `tests/test_nhl_live_puckline_display.py` covers it.
+  - **Seen, not explained:**
+    - WSH@OTT's served puck-line row held 0.843137 from 00:09:31Z to 00:18:44Z. That value matches none of the OTT histograms the poll recorded (from 00:11:12Z on). It fits the 00:07:51Z snapshot (p_home 0.61), the one the 00:08:27Z join read.
+    - Over the same window, TOR's row followed its snapshot. The OTT row was off the served board by 00:19:52Z.
+    - Which path kept serving it is not known. Candidates: the book-grid artifact's own join, and web's `#779` live dedupe (reloaded 23:16:32Z).
+    - Served NHL moneylines also lag the snapshot by one build (OTT 0.451 served vs 0.505 current at 00:21:46Z). That is the normal build cadence.
+    - Lead filed.
+  - **Errors since the load:**
+    - refresh-worker: 0 `Traceback`, 0 `BOOK_GRID_LIVE_GAMELINE_FAILURE` (16:28:10Z to 00:09Z).
+    - live-odds-worker: 0 Traceback blocks (the 35 grep hits are all inside `ALL_PROCESS_MEMORY` telemetry command lines) and 0 NHL re-sim error lines. `LIVE_PLAYER_STATS liveGames=4 attached=4` at 00:22:15Z.
 - **revert:** `git revert efccead01` on main, ff the fleet to that SHA, then claimed TERMs of both workers. Either restart alone restores the old board behaviour. There is no env switch.
 
 ## 2026-11-10 17:06:54Z (11:06 AM CST) -- DEPLOY `c468657e5` (`#775` NBA prop rows: the book's player name resolved to the engine's once, at the NBA prop join) to web + refresh-worker (live-odds-worker at its recycle): **LOADED; mechanism MET; served effect owed tonight** (lane `nba-prop-engine-name-join`, user "Yes, load it" in this session; the coordinator relayed the same yes from session c3e396a7)
