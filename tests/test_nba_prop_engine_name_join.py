@@ -260,6 +260,71 @@ def test_the_side_reads_the_engine_name(id_index):
     assert player_side(_prop("Herb Jones")) is None  # off
 
 
+@pytest.fixture
+def book_spelled_id_index(monkeypatch):
+    """player_ids.csv files most players under the engine's spelling, but the fleet's has "BOBBY PORTIS" (the
+    book's) where the engine says "Bobby Portis Jr." (measured 2026-11-11). The team is the test's away side."""
+    from syndicate.blueprints import home
+    from syndicate.features.shared import player_headshots as H
+
+    monkeypatch.setitem(home._BASKETBALL_PLAYER_ID_CACHE, "nba", {
+        ("NOP", "herbert jones"): 1630529, ("", "herbert jones"): 1630529,
+        ("NOP", "bobby portis"): 1626171, ("", "bobby portis"): 1626171,
+    })
+    H._basketball_teams.cache_clear()
+    yield
+    H._basketball_teams.cache_clear()
+
+
+def _engine_name_only(monkeypatch):
+    """The pre-fix lookup: the engine spelling alone."""
+    monkeypatch.setattr(I, "join_name_candidates", lambda row: (I.engine_player_name(row),))
+
+
+PORTIS = {**_prop("Bobby Portis"), "engine_player_name": "Bobby Portis Jr."}
+
+
+def test_the_face_falls_back_to_the_book_spelling(book_spelled_id_index, monkeypatch):
+    from syndicate.features.shared.player_headshots import headshot_url
+
+    assert headshot_url(PORTIS) == "https://cdn.nba.com/headshots/nba/latest/1040x760/1626171.png"
+    _engine_name_only(monkeypatch)
+    assert headshot_url(PORTIS) is None  # off: "Bobby Portis Jr." is not in the file
+
+
+def test_the_side_falls_back_to_the_book_spelling(book_spelled_id_index, monkeypatch):
+    from syndicate.features.shared.player_headshots import player_side
+
+    assert player_side(PORTIS) == "away"
+    _engine_name_only(monkeypatch)
+    assert player_side(PORTIS) is None  # off
+
+
+def test_the_engine_spelling_still_comes_first(monkeypatch):
+    """Where both spellings are filed, the engine's wins: the fallback never changes a face that already resolved."""
+    from syndicate.blueprints import home
+    from syndicate.features.shared import player_headshots as H
+
+    monkeypatch.setitem(home._BASKETBALL_PLAYER_ID_CACHE, "nba", {
+        ("NOP", "herbert jones"): 1630529, ("", "herbert jones"): 1630529,
+        ("NOP", "herb jones"): 999, ("", "herb jones"): 999,
+    })
+    H._basketball_teams.cache_clear()
+    try:
+        stamped = {**_prop("Herb Jones"), "engine_player_name": "Herbert Jones"}
+        assert H.headshot_url(stamped) == "https://cdn.nba.com/headshots/nba/latest/1040x760/1630529.png"
+    finally:
+        H._basketball_teams.cache_clear()
+
+
+def test_join_name_candidates_order_and_dedupe():
+    assert I.join_name_candidates(PORTIS) == ("Bobby Portis Jr.", "Bobby Portis")
+    assert I.join_name_candidates(_prop("Saddiq Bey")) == ("Saddiq Bey",)
+    assert I.join_name_candidates({**_prop("Saddiq Bey"), "engine_player_name": "Saddiq Bey"}) == ("Saddiq Bey",)
+    assert I.join_name_candidates(None) == ()
+    assert I.join_name_candidates({"player_name": "  "}) == ()
+
+
 def test_the_evidence_subject_reads_the_engine_name():
     from syndicate.features.shared.prop_evidence.contract import PropSubject
 

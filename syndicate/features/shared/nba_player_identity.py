@@ -95,6 +95,24 @@ def engine_player_name(row: Mapping[str, Any] | None) -> str:
     return stamped or str(row.get("player_name") or "").strip()
 
 
+def join_name_candidates(row: Mapping[str, Any] | None) -> tuple[str, ...]:
+    """The names to try, in order, against a name-keyed file whose spelling is NOT always the engine's: the
+    engine spelling first, then the row's own.
+
+    `player_ids.csv` (face and side) holds most players in the engine's spelling, but not all. Measured on the
+    fleet 2026-11-11 over 10 split players: 9 resolve a player id only under the engine spelling (Derrick Jones
+    Jr., AJ Green, Herbert Jones...), and Bobby Portis only under the book's ("BOBBY PORTIS"). Reading the
+    engine spelling alone cost his rows their face once `engine_player_name` was stamped (todo #775).
+    """
+    if not isinstance(row, Mapping):
+        return ()
+    names: list[str] = []
+    for name in (engine_player_name(row), str(row.get("player_name") or "").strip()):
+        if name and name not in names:
+            names.append(name)
+    return tuple(names)
+
+
 __all__ = [
     "ABSENT",
     "ALIAS",
@@ -105,5 +123,6 @@ __all__ = [
     "engine_key",
     "engine_player_name",
     "exact_key",
+    "join_name_candidates",
     "resolve_engine_name",
 ]

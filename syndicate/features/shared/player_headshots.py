@@ -202,10 +202,15 @@ def headshot_url(row: Mapping[str, Any]) -> str | None:
             return f"https://assets.nhle.com/mugs/nhl/latest/{pid}.png" if pid else None
         if sport in {"nba", "wnba"}:
             from syndicate.blueprints.home import _basketball_resolve_player_id
-            from syndicate.features.shared.nba_player_identity import engine_player_name
+            from syndicate.features.shared.nba_player_identity import join_name_candidates
 
-            # player_ids.csv is the ENGINE's spelling: join on the resolved one (lane nba-prop-engine-name-join).
-            pid = _basketball_resolve_player_id(sport, player_name=engine_player_name(row) or player)
+            # player_ids.csv is mostly the ENGINE's spelling, but not always: the resolved name first, then the
+            # book's (lane nba-prop-engine-name-join; "BOBBY PORTIS" is filed under the book's spelling).
+            pid = None
+            for name in join_name_candidates(row):
+                pid = _basketball_resolve_player_id(sport, player_name=name)
+                if pid is not None:
+                    break
             if pid is None:
                 return None
             if sport == "wnba":
@@ -243,9 +248,11 @@ def _player_team(row: Mapping[str, Any]) -> str | None:
     if sport in {"nba", "wnba"}:
         try:
             from syndicate.blueprints.home import _mlb_name_key
-            from syndicate.features.shared.nba_player_identity import engine_player_name
+            from syndicate.features.shared.nba_player_identity import join_name_candidates
 
-            return _basketball_teams(sport).get(_mlb_name_key(engine_player_name(row) or player))
+            teams = _basketball_teams(sport)
+            # The resolved name first, then the book's: the same file as the face (see headshot_url).
+            return next((team for team in (teams.get(_mlb_name_key(name)) for name in join_name_candidates(row)) if team), None)
         except Exception:  # noqa: BLE001
             return None
     return None
