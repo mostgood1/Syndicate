@@ -58565,3 +58565,22 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - Not this change: it writes `actual` only. The 02:55Z replay showed 0 because no game had just started.
   - Recorded as a lead in `.syndicate/leads.md` (2026-11-11, from `nhl-nfl-actual-read-time`).
 - **verify (NFL):** OWED. Watcher `C:\tmp\lpa\nfl_read_time_watch.py`, armed 19:51:48Z, polls 01:30Z-04:45Z 11-13 (TNF WSH @ NYG, ESPN 401873052, kickoff 01:15Z).
+
+## 2026-11-11 02:46:45Z (8:46 PM CST 11-10) -- VERIFY of the 00:30:09Z load, #778 ride-along (`54c43581d`, NBA `cards_sim_detail` missing-games merge, lane `nba-sim-index-missing-games`) -- **post-condition HOLDS; adding branch NOT YET OBSERVED**
+
+- **Runs on the new code:** `refresh_nba_oddsapi_props.py` runs as a new subprocess for each step (`scripts/refresh_odds_sources.py _step_command_with_mode`), so every run after the 00:30:09Z ff loads `54c43581d`. The live-odds-worker restart is not needed.
+  - From `~/syndicate-prod/data/nba_source/logs/syndicate_refresh_oddsapi_props_<D>.log`, after the ff:
+    - 11-10: 30 runs, 00:42:43Z to 02:44:03Z, every ~4 min, most of 2-5 s. Two longer runs (00:50:55-00:52:08Z, 01:03:12-01:05:34Z) rebuilt game_cards. In-game re-sims rewrote 3 sim files: MIL@NYK 00:24:49Z, LAC@PHX 00:51:44Z, MIA@UTA 00:52:01Z.
+    - 11-11: 1 run, 01:20:11-01:21:28Z, "no player-prop lines offered", so props edges and the recommendations export were skipped.
+  - My run watcher (scratch `wait_778.sh`, a `ps` match polled every 20 s) never matched a run, and timed out at 02:45:18Z. I did not chase why. These runs are read from the logs above.
+- **after, #778** (read-only; same `simidx_read.py`), 02:46:45Z, against the 00:24:23Z before:
+  - `cards_sim_detail_2026-11-10.json`: **6 -> 6 games**. Mtime still 22:50:20Z and size 8,683,631 B, so it was not rewritten. All 6 per-entry sha256 values are unchanged. The sim files now cover 6 games (4 at the before read, which landed during the re-sims above), and 0 are missing from the file.
+  - `cards_sim_detail_2026-11-11.json`: **5 -> 5 games** (`nba_simidx_1111_games` 5 -> 5, prediction MET). Mtime still 22:36:21Z, all 5 sha256 values unchanged, 5 sim files, 0 missing.
+  - 2026-11-12: no file and no sims, as before.
+- **Prediction:** "leaves both complete files byte-identical with mtime unchanged" -- **MET** for both dates.
+- **Adding branch: NOT YET OBSERVED.**
+  - No game had a sim and no entry at either read, so there was nothing for `_merge_missing_cards_sim_detail_games` to add.
+  - `CARDS_SIM_DETAIL_MISSING_GAMES_ADDED` or `_FAILED` lines: 0 in the props logs and 0 in `live-odds-worker.log`. The function prints only when it adds or fails, so these logs cannot show that the merge step itself ran. The reading shows only that nothing was harmed.
+  - Tracebacks since the ff: 0 in the props logs, 0 in `live-odds-worker.log`.
+  - It can first show on a date whose index was written before every game's pregame sim landed (the 11-09 shape of BOS@PHI only). Still owed to lane `nba-sim-index-missing-games`.
+- **STATUS for lane `nba-sim-index-missing-games` (owner session 2ba5509d)** `[2026-11-11 02:47Z]`: `54c43581d` LOADED 00:30:09Z. The no-harm half has been read: 11-10 6 -> 6, 11-11 5 -> 5, byte-identical, 0 tracebacks. The adding branch is not yet observed. The lane's block is left for its owner.
