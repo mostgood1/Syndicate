@@ -58493,3 +58493,34 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - Gap left OPEN for whoever picks it up: the join logged display=8 (00:08Z) / 12 (00:15Z), yet the served board showed only 1 NCAAF row a pre-change board would not. Where the other display rows went (rows not served, or display blocks the probe does not read) is NOT traced.
 - Verdict, by the task's mechanical criteria: display_added > 0 in at least one read (1, 1, 1), join display > 0 (8, 12), NCAAF non-moneyline violations 0 in all three reads -> **MET**. Substantively the NCAAF gain is the one moneyline. College segment display for NCAAF is NOT shown.
 - Scratch: C:\tmp\livedisp\ncaaf_wait_1111.out, probe_ncaaf_{1,2,3}.txt.
+
+## 2026-11-11 00:30:09Z (6:30 PM CST 11-10) -- FLEET ff `0290d505a` -> `9fee4160d` + claimed refresh-worker TERM: todo #779 worker half (`select_shortlist` lower date bound, lane `layer2-lookahead-live-dedupe`) WITH todo #778 `54c43581d` (NBA sim index, lane `nba-sim-index-missing-games`) -- LOADED; readings below
+
+- **Two lanes' code, one update.** The ff to `9fee4160d` necessarily carries `54c43581d`.
+  - `9fee4160d` -- user decision 2026-11-10, "Yes, fix it too", given in the parent session's chat (`local_52af1e7f`, lane `live-display-other-sports`) and relayed by it.
+  - `54c43581d` -- the user's own words, asked in the same parent chat ("May the shortlist deploy also load the NBA sim-index fix (#778)?"): **"Yes, load both"**.
+  - Runtime files in range (11 commits): `pipeline/intelligence_state.py` (two log fields), `syndicate/features/shared/layer2_board.py`, `scripts/refresh_nba_oddsapi_props.py`, plus 3 test files. Nothing else.
+- **STATUS for lane `nba-sim-index-missing-games` (session 2ba5509d): `54c43581d` IS LOADED on the fleet since 00:30:09Z.** `refresh_nba_oddsapi_props.py` runs as a fresh subprocess per live-odds-worker NBA refresh, so the next one runs the fix. That lane's block is not edited here.
+- **gates:**
+  - Waited for the parent's NCAAF reading entry (00:22:48Z) as it asked. That was 94 min after the 22:55:46Z down/up.
+  - Claims refresh-worker + live-odds-worker, holder `layer2-lookahead-live-dedupe`, 00:24:07Z (rc 0 each).
+  - Fleet preflight from a worktree at origin/main, `--target fleet --target-commit 9fee4160d`. First try 00:24:38Z: HOLD on both (refresh-worker: a board build in stage `layer2_shortlist_build`; live-odds-worker: 3 odds jobs, one of them `refresh_nba_oddsapi_props.py --date 2026-11-10`).
+  - `check_deploy_safety.py --drain --drain-owner layer2-lookahead-live-dedupe`, run under the worker's /proc environ: CLEAR 00:29:46Z (acked, idle, no build, no child job).
+  - Preflight re-run: **CLEAR on both**. Expectations: `shortlist_1111_earlier_rows` 201 -> 0, `plan_1111_earlier_positions` 1 -> 0, `nba_simidx_1111_games` 5 -> 5. Baseline read 00:24:21Z.
+- **load:**
+  - `git merge --ff-only 9fee4160d` at **00:30:09.001Z**. On disk: `def _kicks_off_before` 1, `def _merge_missing_cards_sim_detail_games` 1.
+  - `kill -TERM 372140` at 00:30:09.011Z. Supervisor restart: **refresh-worker pid 406676**, started 00:30:15Z.
+  - `--undrain` against pid 406676: `DRAIN_CLEARED` 00:30:27Z.
+  - live-odds-worker pid 372141 was not restarted; its NBA props subprocess picks up the fix on its next spawn. web keeps `0290d505a` workers until its next recycle; `9fee4160d` changes nothing web serves.
+- **before, #779 worker half** (read-only, fleet artifacts under the worker's environ; scratch `plan_read.sh`; `EARLIER` = a game whose Central date is before the board's own date):
+  - 22:57Z: the 11-11 shortlist (22:36:43Z build) held 287 of 1,480 rows on 62 11-10 games (NCAAB 276, WNCAAB 11). Its plans then held 0 such positions.
+  - **00:24:21Z: the 11-11 shortlist (00:13:23Z build) held 201 of 1,593 rows on 52 11-10 games (NCAAB 188, WNCAAB 13).** The 11-11 main plan (00:13:26Z) held 3 positions, **1 of them on an 11-10 WNCAAB game**. The venue plans held none: live_kalshi 1 (11-11), paper2_prophetx 2, live_polymarket 4 (11-14).
+- **before, #778** (read-only; scratch `simidx_read.py` over `~/syndicate-prod/data/nba_source/data/processed`), 00:24:23Z:
+  - `cards_sim_detail_2026-11-10.json` holds 6 games (mtime 22:50:20Z, the one-off rebuild).
+  - `cards_sim_detail_2026-11-11.json` holds 5 games, with 5 `smart_sim_2026-11-11_*` files and 0 missing (mtime 22:36:21Z).
+  - No 2026-11-12 file and no 11-12 sims yet.
+  - Per-entry sha256 recorded so 'left byte-identical' can be checked.
+- **verify (owed, appended below):**
+  - #779: the first 11-11 shortlist built by pid 406676 carries `rows_before_board_date` > 0 and 0 `EARLIER` rows. The 11-11 plans built from it hold 0 `EARLIER` positions. Its game count is otherwise unchanged apart from the slate's own movement.
+  - #778: the next live-odds-worker NBA props run leaves both complete files byte-identical with mtime unchanged (`nba_simidx_1111_games` 5 -> 5). The fix's adding branch (`CARDS_SIM_DETAIL_MISSING_GAMES_ADDED`) can only show once a sim lands with no entry. Recorded as not yet observed until it does.
+- **revert:** off switch for #779 is `SYNDICATE_SHORTLIST_LOWER_DATE_BOUND=off` (`local_production.env`, then a drained full down/up). Code revert: revert either commit on main, ff, then TERM refresh-worker.
