@@ -58643,3 +58643,23 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - verify (a) MET: `[nba_live_lens] PRIOR_SLATE_ATTACHED date=2026-11-11 prior_date=2026-11-10 games=1 live=1 with_live_props=1 live_props=1114`, first 06:01:02Z; 5 genuine lines to 06:06:13Z, anchored on ts + tag (unanchored greps also hit `ALL_PROCESS_MEMORY` telemetry).
 - verify (b) MET: chips `date=2026-11-10` 06:05:31Z, then `LIVE_PROJECTION_JOIN sport=nba considered=293 projected=230 edged=219 lens_indexed=1114 lens_live_games=1 miss_player=0 miss_line=0`, then `LAYER2_CARRYOVER date=2026-11-10 decision=built` 06:06:28Z. Was `considered=None` on 11-05 / 11-07. Today's build 06:03:41Z: `considered=0 lens_indexed=1114`, as predicted.
 - NOT MET, the user-visible surface: `GET /api/board/layer2-shortlist?date=2026-11-10&sport=nba` 06:08:09Z (build age 117 s) returned 0 rows. `per_sport.nba available=0`; ingest `by_lane {dead: 6983, opportunity: 8}`; `live_rows_now=0` against 367 pre-roll. CAUSE, measured by lane `layer2-lookahead-live-dedupe` (entry above) and re-read here: NBA book-quote capture for the 11-10 game stopped at the roll. `nba_source/tracking/book_quotes/2026-11-10.jsonl` mtime is 05:59:54Z (read 06:14Z), so the gate most likely dead-laned the rows on observed age > 300 s; the reason is inferred, not read. CORRECTION: my own read of book-grid (06:10:47Z, prop `seen_age_seconds` median 74) was NOT fresh: the grid was generated at 06:01:31Z and its ages are as of then. A later stage than this fix; todo #782.
+
+## 2026-11-11 06:33Z (12:33 AM CST) -- READING #776 (lane nba-live-resim-midnight): MET
+- **No deploy.** Read-only reads of `~/syndicate-prod/logs/live-odds-worker.log` and `refresh-worker.log` (scheduled reading `nba-midnight-resim-reading-1111`), plus ESPN's public summary for OKC @ POR (event 401909965).
+- **Loaded:** live-odds-worker pid 533637 started 2026-11-10 23:10:15 CST (05:10:15Z 11-11), after the 18:04:43Z ff; fleet HEAD `9fee4160d`, `merge-base --is-ancestor eeb2461c7 HEAD` = yes. Replacements since 18:00Z: `RECYCLING` 22:07:17Z (loop started 22:07:27Z), loop restart 22:56:29Z, `RECYCLING` 05:10:07Z (loop started 05:10:16Z).
+- **Last pre-roll tick:** `2026-11-11T05:58:43.473Z NBA_LIVE_RESIM_TICK date=2026-11-10 games=1 resimmed=1 carried=0 refusals={} ... written=True elapsed_s=3.5`.
+- **First post-roll tick:** `2026-11-11T06:00:45.833Z NBA_LIVE_RESIM_TICK date=2026-11-11 games=1 resimmed=1 carried=0 prior_date=2026-11-10 prior_games=1 prior_resimmed=1 prior_carried=0 prior_skip=- refusals={} bytes=230122 written=True elapsed_s=2.4 history_rows=1`.
+  - 15 of 15 NBA ticks 06:00:45Z-06:29:40Z read `prior_games=1 prior_resimmed=1 prior_skip=-`, elapsed 0.8-4.6 s (one 23.0 s at 06:19:33Z).
+  - `NBA_LIVE_RESIM_PRIOR_ERROR` 0, `NBA_LIVE_RESIM_TICK_ERROR` 0, Traceback 0 in both live-odds logs after 05:45Z.
+- **Board join, `LIVE_GAMELINE_JOIN sport=nba`, 06:00-06:30Z (game live):** 11 builds, every one `games_in_snapshot=1 indexed=1`, source `live_resim`.
+  - 4 of 11 with `projected>0`:
+    - 06:05:43Z considered=462 projected=103 priceable=52 display=120
+    - 06:16:27Z 462 / 4 / 0 / 213
+    - 06:21:46Z 462 / 3 / 3 / 216
+    - 06:28:38Z 462 / 3 / 1 / 152
+  - 7 of 11 read `considered=0 projected=0`, reason "1 nba game(s) indexed from 1 in the snapshot, but no board row matched them": 06:03:41, 06:07:02, 06:10:41, 06:18:29, 06:23:03, 06:26:03, 06:29:33Z.
+  - Pre-roll comparison (05:30-06:00Z): 7 builds, 6 with projected 117-137, 1 zero (05:56:22Z, same "no board row matched" reason).
+  - Baseline 11-07 roll: first post-roll tick `games=0`, every join after it `games_in_snapshot=0, projected=0`.
+- **Game end:** ESPN last play `End of Game` wallclock 2026-11-11T06:30:30Z (12:30 AM CST), POR 123 OKC 103. The game was live for 30.5 min after the roll and the re-sim covered all of it.
+- **Verdict: MET.** All 4 pre-registered conditions hold: loaded; first post-roll tick `prior_date=2026-11-10 prior_games=1 prior_resimmed=1 prior_skip=-`; >=1 join with `games_in_snapshot>=1, projected>0` while live (4 of 11); 0 PRIOR_ERROR lines.
+- **Side observation, not part of #776 (a board-side matter):** after 06:05Z, `projected` falls from 103 to 3-4. The 06:16Z build gives `quote_older_than_live_pricing_ceiling` 129, and the board rows alternate with 0-match builds. That fits the `[layer2-prior-date-carryover]` note in `state_layer2`: the quote capture for this game stopped at 05:59:54Z. The re-sim side delivered on every tick.
