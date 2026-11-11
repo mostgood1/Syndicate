@@ -113,6 +113,8 @@ third would publish a confident number about a game that is nearly over.
 from __future__ import annotations
 
 import json
+import os
+import random
 import time
 import urllib.request
 from dataclasses import dataclass
@@ -130,6 +132,113 @@ _PERIOD_SECONDS = 20 * 60
 
 _DEFAULT_SIMS = 200
 _DEFAULT_BUDGET_SECONDS = 25.0
+
+# THE LIVE END-GAME (lane nhl-live-endgame-calibration, todo #773, 2026-11-11). A cutoff replay of
+# this producer over 284 regular-season games (findings_2026-11-11_nhl_live_puckline_grade.md) found
+# the live histogram's one decisive miss: with a ONE-GOAL LEAD LATE IN THE THIRD the leader went on to
+# win by 2+ in 0.43 of games (P3 05:00, n=90) and 0.50 (P3 10:00, n=93) against the model's 0.18 /
+# 0.26, and 98 of the 229 goals in the last 5 minutes were into an empty net. The event engine's only
+# end-game logic is `engine.py`'s last-3-minute heuristic. The PREGAME game-market path closes the same
+# gap post-sim with `NHL_GAME_MARKET_CALIBRATION['empty_net_p']` 0.3006, but that number was fit on a
+# plain per-period Poisson sim with NO end-game logic at all, so it is not this engine's number (and
+# that path's `tie_weight` would make this one worse: the live engine already gives the trailer slightly
+# too many ties). This applies the SAME MECHANISM -- a sim that finishes REGULATION with a one-goal lead
+# gets one more goal for the leader with probability p -- with p FIT ON THIS ENGINE by walk-forward
+# replay. `ramp_seconds` is the regulation time a one-goal margin needs to carry its FULL empty-net
+# chance: a sim whose margin last changed with less regulation left than that (the trailer cut it to
+# one, or the leader went ahead, with 30 s to go -- there is barely time to pull the goalie) gets p
+# scaled linearly by the time it had. That time is read off the sim's OWN goal events
+# (`seconds_left_at_last_goal`); a sim with no goal after the cutoff carries the cutoff's regulation
+# time. Applied post-sim with its own RNG, so the engine's draws are untouched and `off` reproduces the
+# old histogram seed for seed. OT/shootout sims are never touched (their margin is the one-goal OT/SO
+# result).
+# THE MARGIN ONLY, NOT THE TOTAL. The same replay measured the live total mean already HIGH early
+# (+0.81 goals at puck drop, +0.34 at P2 10:00; the event engine's scoring rate, the issue the pregame
+# path's `regulation_scale` corrects), and adding these goals would push it +0.11 higher. A mechanism
+# goes in with a re-fit of what absorbs it (model_engine_standard 4.4); the total's level is set by that
+# separately-biased rate, so the total waits for its own fit.
+# FIT (findings_2026-11-11_nhl_live_endgame_calibration.md): 284 games / 41 dates, 8 cutoffs, the
+# board's +-1.5 Brier; walk-forward fits p 0.35-0.55, ramp 90-120 s; out of sample (185 games) the late
+# one-goal states went from +0.20..+0.28 under to within +-0.035. Full-sample fit below.
+# Off switch: SYNDICATE_NHL_LIVE_ENDGAME_CALIBRATION=off.
+NHL_LIVE_ENDGAME_CALIBRATION: dict[str, float] = {
+    "empty_net_p": 0.38,
+    "ramp_seconds": 90.0,
+}
+LEGACY_LIVE_ENDGAME: dict[str, float] = {"empty_net_p": 0.0, "ramp_seconds": 0.0}
+LIVE_ENDGAME_ENV = "SYNDICATE_NHL_LIVE_ENDGAME_CALIBRATION"
+# `regulation_one_goal_seconds` bins: fine enough for any ramp, capped well past one.
+_ONE_GOAL_SECONDS_BIN = 5
+_ONE_GOAL_SECONDS_CAP = 600
+
+
+def live_endgame_calibration() -> dict[str, float]:
+    """The end-game production uses: the fitted one unless the env switch says off."""
+    raw = str(os.environ.get(LIVE_ENDGAME_ENV) or "").strip().lower()
+    return dict(LEGACY_LIVE_ENDGAME if raw in {"off", "0", "false", "legacy"} else NHL_LIVE_ENDGAME_CALIBRATION)
+
+
+def regulation_seconds_left(period: int, clock_seconds: int) -> int:
+    """Regulation seconds left at a 1-based scoreboard state; 0 in overtime."""
+    if int(period) > _REGULATION_PERIODS:
+        return 0
+    return (_REGULATION_PERIODS - int(period)) * _PERIOD_SECONDS + max(0, int(clock_seconds))
+
+
+def endgame_empty_net_prob(calibration: Mapping[str, Any], *, seconds_left: float) -> float:
+    """p for ONE sim whose regulation ended with a one-goal margin that had `seconds_left` of regulation to
+    run when it last changed: the full p from `ramp_seconds` up, linear below. 0 when the calibration is off."""
+    try:
+        p = float(calibration.get("empty_net_p") or 0.0)
+        ramp = float(calibration.get("ramp_seconds") or 0.0)
+        left = float(seconds_left)
+    except (TypeError, ValueError):
+        return 0.0
+    if not (p > 0.0):
+        return 0.0
+    p = min(p, 1.0)
+    if ramp <= 0.0:
+        return p
+    return p * max(0.0, min(1.0, left / ramp))
+
+
+def seconds_left_at_last_goal(events: Any, *, start_period_idx: int, start_seconds: int, default: float) -> float:
+    """Regulation seconds left when this sim's LAST regulation goal went in -- the moment its final margin
+    was set. `default` (the cutoff's regulation time) when no regulation goal was scored after the cutoff.
+
+    The engine times a goal `t = within + period_idx * T`, where T is THAT period's length: the resumed
+    period runs only `start_seconds` (`simulate_with_lineups` passes `period_seconds = resume_seconds_remaining`),
+    every later one 1200. So `within = t - period_idx * T`, and the time left is `(T - within)` plus the
+    full periods still to come."""
+    best: Optional[float] = None
+    for event in events or ():
+        if getattr(event, "kind", None) != "goal":
+            continue
+        try:
+            pd = int(getattr(event, "period", 0) or 0) - 1
+            t = float(getattr(event, "t", 0.0) or 0.0)
+        except (TypeError, ValueError):
+            continue
+        if pd < int(start_period_idx) or pd >= _REGULATION_PERIODS:
+            continue
+        length = float(start_seconds) if pd == int(start_period_idx) else float(_PERIOD_SECONDS)
+        within = t - pd * length
+        left = max(0.0, length - within) + (_REGULATION_PERIODS - 1 - pd) * _PERIOD_SECONDS
+        best = left if best is None else min(best, left)
+    return float(default) if best is None else best
+
+
+def _went_past_regulation(events: Any) -> bool:
+    """Did this sim need OT or a shootout? The engine stamps goal events `period = period_idx + 1`
+    (so OT is 4) and the shootout credit `period = periods + 1`."""
+    for event in events or ():
+        if getattr(event, "kind", None) in ("goal", "shootout"):
+            try:
+                if int(getattr(event, "period", 0) or 0) > _REGULATION_PERIODS:
+                    return True
+            except (TypeError, ValueError):
+                continue
+    return False
 
 _SCORE_URL = "https://api-web.nhle.com/v1/score/{date}"
 # See `fetch_score_rows`: the endpoint 403s Python's default UA.
@@ -325,8 +434,12 @@ def resim_live_game(
     sims: int = _DEFAULT_SIMS,
     profile: Any = None,
     base_seed: Optional[int] = None,
+    endgame: Optional[Mapping[str, Any]] = None,
 ) -> dict[str, Any] | NhlResimRefusal:
     """Run `sims` resumed games and aggregate the moneyline.
+
+    `endgame` defaults to :func:`live_endgame_calibration` (production); pass
+    `LEGACY_LIVE_ENDGAME` for the pre-calibration histogram, reproduced seed for seed.
 
     `features` is a `HockeyGameFeatures` -- the SAME object the pregame board
     builds from -- so the live number rests on the same rates, lineups and
@@ -390,11 +503,23 @@ def resim_live_game(
     st_away = dict(getattr(away_feat, "special_teams", {}) or {}) or None
 
     seed0 = int(base_seed if base_seed is not None else abs(hash(state.game_pk)) % 1_000_003)
+    calibration = dict(endgame if endgame is not None else live_endgame_calibration())
+    in_regulation = state.period <= _REGULATION_PERIODS      # resumed in OT: no regulation left to end
+    p_empty_net = endgame_empty_net_prob(calibration, seconds_left=float("inf")) if in_regulation else 0.0
+    cutoff_left = float(regulation_seconds_left(state.period, state.clock_seconds))
+    one_goal_seconds: dict[str, dict[str, int]] = {"1": {}, "-1": {}}
+    # Its own stream, so the engine's draws (and `off`'s histogram) are identical with it on or off.
+    empty_net_rng = random.Random((seed0 * 2_654_435_761 + 0xE6) % (2**32))
     home_wins = 0
+    empty_net_goals = 0
     margins: list[int] = []
     totals: list[int] = []
+    # The RAW margins (before the end-game), split by how the sim ended. A grade applies any p to these
+    # in expectation without re-simulating (scripts/backtest_nhl_live_puckline.py).
+    regulation_margins: list[int] = []
+    overtime_margins: list[int] = []
     for i in range(int(sims)):
-        gs, _events = run_hockeysim_game_from_state(
+        gs, events = run_hockeysim_game_from_state(
             state.home_name,
             state.away_name,
             roster_home,
@@ -412,10 +537,25 @@ def resim_live_game(
             seed=seed0 + i,
         )
         hs, as_ = int(gs.home.score), int(gs.away.score)
+        totals.append(hs + as_)        # BEFORE the end-game: it moves the margin only (see the constant)
+        past_regulation = _went_past_regulation(events)
+        (overtime_margins if past_regulation else regulation_margins).append(hs - as_)
+        if not past_regulation and abs(hs - as_) == 1:
+            left = seconds_left_at_last_goal(events, start_period_idx=period_idx, start_seconds=seconds_remaining,
+                                             default=cutoff_left)
+            side = one_goal_seconds["1" if hs > as_ else "-1"]
+            key = str(int(min(left, _ONE_GOAL_SECONDS_CAP) // _ONE_GOAL_SECONDS_BIN * _ONE_GOAL_SECONDS_BIN))
+            side[key] = side.get(key, 0) + 1
+            p_sim = endgame_empty_net_prob(calibration, seconds_left=left) if in_regulation else 0.0
+            if p_sim > 0.0 and empty_net_rng.random() < p_sim:
+                if hs > as_:
+                    hs += 1
+                else:
+                    as_ += 1
+                empty_net_goals += 1
         if hs > as_:
             home_wins += 1
         margins.append(hs - as_)
-        totals.append(hs + as_)
 
     if not margins:
         return NhlResimRefusal("no_sims_run", state.game_pk)
@@ -431,7 +571,19 @@ def resim_live_game(
         # profile's setting) it credits the winner one goal (`engine.simulate_with_lineups`), so a final
         # margin is never 0, which is how books settle a puck line.
         # Published for DISPLAY ONLY -- see the module docstring and `build_game_lens`.
+        # AFTER the end-game (`NHL_LIVE_ENDGAME_CALIBRATION`).
         "margin_dist": _histogram(margins),
+        # BEFORE the end-game, split by how each sim ended (not published; the grade reads them).
+        "regulation_margin_dist": _histogram(regulation_margins),
+        "overtime_margin_dist": _histogram(overtime_margins),
+        # The regulation-end +-1 sims by the regulation time their margin had left (5 s bins, capped).
+        "regulation_one_goal_seconds": one_goal_seconds,
+        "endgame": {
+            "empty_net_p": p_empty_net,
+            "ramp_seconds": float(calibration.get("ramp_seconds") or 0.0),
+            "empty_net_goals": empty_net_goals,
+            "calibration": "on" if float(calibration.get("empty_net_p") or 0.0) > 0.0 else "off",
+        },
     }
 
 
@@ -479,6 +631,9 @@ def build_game_lens(
         "modelHomeWinProb": result["home_win_prob"],
         "simsRun": result["sims_run"],
         "liveStateAsOf": live_state_as_of or state.as_of,
+        # Which end-game this number carries (lane nhl-live-endgame-calibration): a production reading
+        # can tell `on` from `off` and see the p this state got. Lane-level, so no pricer reads it.
+        "liveEndgame": dict(result.get("endgame") or {}),
         # DISPLAY ONLY. `live_gameline_join` reads `projection.total` and
         # `projection.homeMargin` for display and prices NEITHER: totals and
         # puck lines are priced from `totalRunsDist` / `marginDist`, which this

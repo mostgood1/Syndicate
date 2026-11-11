@@ -36,6 +36,19 @@ sample's own home/away regulation scoring rates (Skellam), a regulation tie reso
 OT/SO win share. It knows the score and the clock and nothing about the teams. An engine that cannot beat it on
 Brier is adding team knowledge that does not survive.
 
+THE LIVE END-GAME (lane nhl-live-endgame-calibration). The first run (2026-11-11) failed the live histogram on
+one state: a one-goal lead late in the third, where the leader's chance to win by 2+ was 0.18 against 0.43
+realised, the empty-net goal the event engine under-produces. `resim_live_game` now applies a post-sim
+empty-net goal to sims that finish REGULATION with a one-goal lead (`NHL_LIVE_ENDGAME_CALIBRATION`), and it
+returns the RAW margins split by how each sim ended (`regulation_margin_dist`, `overtime_margin_dist`). The
+replay runs with the end-game OFF by default and stores those splits, so any (p, ramp) applies to a row IN
+EXPECTATION with no re-simulation: a fraction p of the regulation-end +-1 sims moves to +-2 (`endgame_hist`).
+`--fit-endgame` fits (p, ramp) WALK-FORWARD -- for each date, only on the dates before it -- and grades the
+out-of-sample dates on vs off, beside a full-sample fit (the number a ship would use). The ramp reads, PER SIM, the
+regulation time its one-goal margin had left when it was set (`regulation_one_goal_seconds`, from the sim's own
+goal events): a lead that became one with 20 s to go has almost no empty-net chance. Two late cutoffs (P3 03:00,
+P3 01:30) put many such sims in the last minutes, where the ramp is identified.
+
 Usage (on the fleet host, nice 19, from the fleet checkout so the code graded is production's):
     cd ~/Syndicate && nice -n 19 ~/.venvs/syndicate/bin/python /path/to/backtest_nhl_live_puckline.py \\
         --start 2026-10-01 --end 2026-11-10 --source-root ~/syndicate-prod/data/nhl_source \\
@@ -78,7 +91,16 @@ CUTOFFS: tuple[tuple[int, int, str], ...] = (
     (3, 1200, "P3 20:00"),
     (3, 600, "P3 10:00"),
     (3, 300, "P3 05:00"),
+    (3, 180, "P3 03:00"),    # lane nhl-live-endgame-calibration: the ramp is identified on these two
+    (3, 90, "P3 01:30"),
 )
+# Excluded from the width-ratio interval: the last minutes are where the end-game itself is being measured.
+LATE_CUTOFFS = ("P3 05:00", "P3 03:00", "P3 01:30")
+
+# --fit-endgame: the grid and the walk-forward warm-up.
+ENDGAME_P_GRID = tuple(round(i / 100.0, 2) for i in range(0, 81))
+ENDGAME_RAMP_GRID = (0.0, 15.0, 30.0, 45.0, 60.0, 75.0, 90.0, 120.0, 150.0, 180.0, 240.0)
+WALK_FORWARD_MIN_DATES = 14
 
 PRIMARY_LINES = (-1.5, 1.5)      # the puck line: home +1.5, home -1.5
 ALT_LINES = (-2.5, 2.5)
@@ -178,18 +200,22 @@ def stable_seed(pk: str, cutoff_index: int) -> int:
 # ---------------------------------------------------------------------------
 
 def replay_game(features: Any, game: Mapping[str, Any], *, sims: int = DEFAULT_SIMS,
-                resim: Any = None) -> list[dict[str, Any]]:
-    """One row per cutoff: the producer's histogram at the rebuilt state, beside the official final."""
+                resim: Any = None, endgame: Mapping[str, Any] | None = None) -> list[dict[str, Any]]:
+    """One row per cutoff: the producer's histogram at the rebuilt state, beside the official final.
+
+    `endgame` is passed to the producer when given (`LR.LEGACY_LIVE_ENDGAME` = the raw histogram); None runs
+    production's own setting."""
     from syndicate.features.nhl import live_resim as LR
 
     resim = resim or LR.resim_live_game
+    extra = {"endgame": endgame} if endgame is not None else {}
     rows = []
     for idx, (period, remaining, label) in enumerate(CUTOFFS):
         h, a = score_at(game["goals"], period, remaining)
         state = LR.NhlLiveGameState(
             game_pk=str(game["pk"]), home_name=str(game["home"]), away_name=str(game["away"]),
             home_score=h, away_score=a, period=period, clock_seconds=remaining, as_of="replay")
-        result = resim(features, state, sims=sims, base_seed=stable_seed(str(game["pk"]), idx))
+        result = resim(features, state, sims=sims, base_seed=stable_seed(str(game["pk"]), idx), **extra)
         if isinstance(result, LR.NhlResimRefusal):
             rows.append({"pk": game["pk"], "cutoff": label, "refused": result.reason})
             continue
@@ -201,14 +227,24 @@ def replay_game(features: Any, game: Mapping[str, Any], *, sims: int = DEFAULT_S
             "sims_run": result["sims_run"],
             "home_win_prob": result["home_win_prob"],
             "margin_mean": result["home_margin_mean"],
+            "total_mean": result.get("total_mean"),
             "hist": result["margin_dist"],
+            # RAW (pre-end-game) margins by how the sim ended; absent from an older producer.
+            "reg_hist": result.get("regulation_margin_dist"),
+            "ot_hist": result.get("overtime_margin_dist"),
+            "reg_one_goal_secs": result.get("regulation_one_goal_seconds"),
+            "endgame": result.get("endgame"),
         })
     return rows
 
 
 def replay_date(args_tuple: tuple) -> dict[str, Any]:
     """Pool worker: every completed game on one date. Returns rows + per-date accounting."""
-    date, source_root, cache_dir, sims = args_tuple
+    date, source_root, cache_dir, sims = args_tuple[:4]
+    endgame_mode = args_tuple[4] if len(args_tuple) > 4 else "off"
+    from syndicate.features.nhl import live_resim as LR
+
+    endgame = LR.LEGACY_LIVE_ENDGAME if endgame_mode == "off" else None
     from syndicate.features.nhl.sim_engine.hockeysim.features.loaders import build_slate_features
 
     out: dict[str, Any] = {"date": date, "rows": [], "games_completed": 0, "games_no_features": [],
@@ -236,7 +272,7 @@ def replay_date(args_tuple: tuple) -> dict[str, Any]:
         if f is None:
             out["games_no_features"].append(g["pk"])
             continue
-        for r in replay_game(f, g, sims=sims):
+        for r in replay_game(f, g, sims=sims, endgame=endgame):
             r["date"] = date
             out["rows"].append(r)
     out["elapsed_s"] = round(time.monotonic() - started, 1)
@@ -247,8 +283,9 @@ def replay_date(args_tuple: tuple) -> dict[str, Any]:
 # grading (pure)
 # ---------------------------------------------------------------------------
 
-def hist_ints(hist: Mapping[Any, Any]) -> dict[int, int]:
-    return {int(k): int(v) for k, v in hist.items()}
+def hist_ints(hist: Mapping[Any, Any]) -> dict[int, float]:
+    """`{margin: count}`. Counts stay FLOAT: an end-game applied in expectation moves fractions of a sim."""
+    return {int(k): float(v) for k, v in hist.items()}
 
 
 def p_cover(hist: Mapping[int, int], line: float, *, smoothed: bool = True) -> float:
@@ -444,12 +481,224 @@ def grade(rows: Sequence[Mapping[str, Any]], games_meta: Sequence[Mapping[str, A
     pk_list = sorted(by_pk)
 
     def _ratio(sample):
-        rs = [r for g in sample for r in by_pk[g] if r["cutoff"] != "P3 05:00"]
+        rs = [r for g in sample for r in by_pk[g] if r["cutoff"] not in LATE_CUTOFFS]
         w = width_stats(rs)
         return w.get("ratio_actual_over_model")
 
     report["width_ratio_all_but_last_cutoff_ci95"] = [round(x, 3) for x in game_bootstrap(pk_list, _ratio, reps=300)]
     return report
+
+
+# ---------------------------------------------------------------------------
+# the live end-game (lane nhl-live-endgame-calibration), applied IN EXPECTATION to the raw splits
+# ---------------------------------------------------------------------------
+
+def _one_goal_bins(row: Mapping[str, Any]) -> dict[int, dict[float, float]]:
+    """The regulation-end +-1 sims of a row by the regulation time their margin had left: {sign: {secs: n}},
+    at each 5 s bin's midpoint. A row from a producer without the bins puts every such sim at the cutoff's
+    own regulation time (no goal after the cutoff), which is exact for p and an upper bound for the ramp."""
+    from syndicate.features.nhl import live_resim as LR
+
+    reg = hist_ints(row.get("reg_hist") or {})
+    out: dict[int, dict[float, float]] = {1: {}, -1: {}}
+    bins = row.get("reg_one_goal_secs")
+    if isinstance(bins, Mapping):
+        half = LR._ONE_GOAL_SECONDS_BIN / 2.0
+        for sign in (1, -1):
+            for k, v in (bins.get(str(sign)) or {}).items():
+                mid = float(k) + (half if float(k) < LR._ONE_GOAL_SECONDS_CAP else 0.0)
+                out[sign][mid] = out[sign].get(mid, 0.0) + float(v)
+        return out
+    left = float(LR.regulation_seconds_left(int(row["period"]), int(row["remaining"])))
+    for sign in (1, -1):
+        if reg.get(sign):
+            out[sign][left] = reg[sign]
+    return out
+
+
+def endgame_moved(row: Mapping[str, Any], calibration: Mapping[str, Any]) -> tuple[float, float]:
+    """(home +1 -> +2, home -1 -> -2) sims moved in expectation: sum over the timing bins of p(secs) * n, with
+    `live_resim.endgame_empty_net_prob` (one definition, the producer's). 0 in an overtime state."""
+    from syndicate.features.nhl import live_resim as LR
+
+    if int(row["period"]) > REGULATION_PERIODS:
+        return 0.0, 0.0
+    bins = _one_goal_bins(row)
+    moved = []
+    for sign in (1, -1):
+        moved.append(sum(LR.endgame_empty_net_prob(calibration, seconds_left=secs) * n
+                         for secs, n in bins[sign].items()))
+    return moved[0], moved[1]
+
+
+def endgame_hist(row: Mapping[str, Any], calibration: Mapping[str, Any] | None) -> dict[int, float]:
+    """The final-margin histogram with the end-game, in expectation: the moved share of the regulation-end
+    +-1 sims goes to +-2; OT/SO sims are untouched. `None` (or p = 0) returns the raw histogram exactly."""
+    out: dict[int, float] = {}
+    for part in ("reg_hist", "ot_hist"):
+        for k, v in hist_ints(row.get(part) or {}).items():
+            out[k] = out.get(k, 0.0) + v
+    if calibration:
+        for sign, moved in zip((1, -1), endgame_moved(row, calibration)):
+            if moved:
+                out[sign] = out.get(sign, 0.0) - moved
+                out[2 * sign] = out.get(2 * sign, 0.0) + moved
+    return out
+
+
+def with_endgame(rows: Sequence[Mapping[str, Any]], calibration: Mapping[str, Any] | None = None, *,
+                 p_by_date: Mapping[str, Mapping[str, Any]] | None = None) -> list[dict[str, Any]]:
+    """Rows whose `hist` is rebuilt from the raw splits at the end-game: one `calibration` for every row, or a
+    per-date one (`p_by_date`, the walk-forward fits). Rows without splits are dropped, never passed raw."""
+    out = []
+    for r in rows:
+        if "hist" not in r or r.get("reg_hist") is None or r.get("ot_hist") is None:
+            continue
+        cal = p_by_date.get(r.get("date")) if p_by_date is not None else calibration
+        if p_by_date is not None and cal is None:
+            continue
+        moved = endgame_moved(r, cal) if cal else (0.0, 0.0)
+        n = sum(hist_ints(r["hist"]).values()) or 1.0
+        # the producer moves the MARGIN only (`NHL_LIVE_ENDGAME_CALIBRATION`): `total_mean` is unchanged
+        out.append(dict(r, hist=endgame_hist(r, cal), endgame_moved=round(sum(moved) / n, 6)))
+    return out
+
+
+def _cover_parts(rows: Sequence[Mapping[str, Any]]) -> list[tuple]:
+    """Per row, what P(cover +-1.5) needs at any (p, ramp), so a fit is arithmetic:
+    (period, n, raw count over -1.5, raw count over +1.5, timing bins +1, timing bins -1, y(-1.5), y(+1.5)).
+    The count over -1.5 loses the moved -1s (now -2); the count over +1.5 gains the moved +1s."""
+    parts = []
+    for r in rows:
+        if "hist" not in r or r.get("reg_hist") is None or r.get("ot_hist") is None:
+            continue
+        raw = endgame_hist(r, None)
+        bins = _one_goal_bins(r)
+        parts.append((int(r["period"]), sum(raw.values()),
+                      sum(v for k, v in raw.items() if k > -1.5), sum(v for k, v in raw.items() if k > 1.5),
+                      bins[1], bins[-1], int(r["final_margin"] > -1.5), int(r["final_margin"] > 1.5)))
+    return parts
+
+
+def _endgame_terms(parts: Sequence[tuple], ramp: float) -> list[tuple[float, float, float, float]]:
+    """Per row at this ramp: the board's number on each line is e + p*g (Agresti-Coull is linear in the count):
+    (e_lo, g_lo, e_hi, g_hi), e = AC(raw) - y, g = the ramp-weighted +-1 count / (n + 4), signed."""
+    from syndicate.features.nhl import live_resim as LR
+
+    unit = {"empty_net_p": 1.0, "ramp_seconds": ramp}
+    out = []
+    for period, n, c_lo, c_hi, pos, neg, y_lo, y_hi in parts:
+        d = n + 4.0
+        if period > REGULATION_PERIODS:
+            w_pos = w_neg = 0.0
+        else:
+            w_pos = sum(LR.endgame_empty_net_prob(unit, seconds_left=secs) * k for secs, k in pos.items())
+            w_neg = sum(LR.endgame_empty_net_prob(unit, seconds_left=secs) * k for secs, k in neg.items())
+        out.append(((c_lo + 2.0) / d - y_lo, -w_neg / d, (c_hi + 2.0) / d - y_hi, w_pos / d))
+    return out
+
+
+def _endgame_brier(parts: Sequence[tuple], p: float, ramp: float) -> float:
+    """Brier of the board's number (Agresti-Coull) on both +-1.5 lines, at (p, ramp)."""
+    terms = _endgame_terms(parts, ramp)
+    if not terms:
+        return float("nan")
+    return sum((el + p * gl) ** 2 + (eh + p * gh) ** 2 for el, gl, eh, gh in terms) / (2 * len(terms))
+
+
+def fit_endgame(rows: Sequence[Mapping[str, Any]], *, p_grid: Sequence[float] = ENDGAME_P_GRID,
+                ramp_grid: Sequence[float] = ENDGAME_RAMP_GRID) -> dict[str, Any]:
+    """(p, ramp) minimising the +-1.5 Brier of the board's number over `rows`.
+
+    For a fixed ramp the Brier is QUADRATIC in p, so its minimiser is closed-form: p* = -sum(e*g) / sum(g*g),
+    clipped to the grid's range and rounded to its step (0.01). The ramp is a grid. Ties go to the smaller
+    ramp."""
+    parts = _cover_parts(rows)
+    if not parts:
+        return {"rows": 0}
+    lo, hi = min(p_grid), max(p_grid)
+    best = None
+    for ramp in ramp_grid:
+        terms = _endgame_terms(parts, ramp)
+        gg = sum(gl * gl + gh * gh for _el, gl, _eh, gh in terms)
+        eg = sum(el * gl + eh * gh for el, gl, eh, gh in terms)
+        p_star = min(hi, max(lo, (-eg / gg) if gg > 0 else 0.0))
+        p_star = round(round(p_star / 0.01) * 0.01, 2)
+        b = sum((el + p_star * gl) ** 2 + (eh + p_star * gh) ** 2 for el, gl, eh, gh in terms) / (2 * len(terms))
+        if best is None or b < best[0] - 1e-12:
+            best = (b, p_star, ramp)
+    return {"rows": len(parts), "empty_net_p": best[1], "ramp_seconds": best[2], "brier": round(best[0], 6),
+            "brier_at_p0": round(_endgame_brier(parts, 0.0, 0.0), 6)}
+
+
+def walk_forward(rows: Sequence[Mapping[str, Any]], *, min_dates: int = WALK_FORWARD_MIN_DATES) -> dict[str, Any]:
+    """For each date after the first `min_dates`, fit on the dates BEFORE it only. Returns the per-date fits."""
+    dates = sorted({r["date"] for r in rows if "hist" in r})
+    fits: dict[str, dict[str, Any]] = {}
+    for i, d in enumerate(dates):
+        if i < min_dates:
+            continue
+        train = set(dates[:i])
+        f = fit_endgame([r for r in rows if r.get("date") in train])
+        fits[d] = {"empty_net_p": f.get("empty_net_p"), "ramp_seconds": f.get("ramp_seconds"),
+                   "train_dates": i, "train_rows": f.get("rows")}
+    ps = [f["empty_net_p"] for f in fits.values() if f.get("empty_net_p") is not None]
+    ramps = [f["ramp_seconds"] for f in fits.values() if f.get("ramp_seconds") is not None]
+    return {"fits": fits, "oos_dates": sorted(fits), "p_range": [min(ps), max(ps)] if ps else None,
+            "ramp_range": [min(ramps), max(ramps)] if ramps else None}
+
+
+def lead_states(rows: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """The decisive table: per cutoff and lead (1, 2), oriented to the LEADER -- the model's P(leader wins by
+    2+) and P(trailer ties or wins) against what happened. The 0.18 vs 0.43 failure lives here."""
+    agg: dict[tuple[str, int], list[float]] = {}
+    order = {label: i for i, (_p, _r, label) in enumerate(CUTOFFS)}
+    for r in rows:
+        if "hist" not in r:
+            continue
+        cur = int(r["home_score"]) - int(r["away_score"])
+        if abs(cur) not in (1, 2):
+            continue
+        sign = 1 if cur > 0 else -1
+        h = {k * sign: v for k, v in hist_ints(r["hist"]).items()}
+        n = sum(h.values()) or 1.0
+        fin = int(r["final_margin"]) * sign
+        a = agg.setdefault((r["cutoff"], abs(cur)), [0, 0.0, 0, 0.0, 0])
+        a[0] += 1
+        a[1] += sum(v for k, v in h.items() if k >= 2) / n
+        a[2] += int(fin >= 2)
+        a[3] += sum(v for k, v in h.items() if k <= -1) / n
+        a[4] += int(fin <= -1)
+    out = []
+    for (label, lead), (n, p2, y2, pt, yt) in sorted(agg.items(), key=lambda kv: (order.get(kv[0][0], 99), kv[0][1])):
+        out.append({"cutoff": label, "lead": lead, "n": n,
+                    "model_leader_by_2plus": round(p2 / n, 3), "obs_leader_by_2plus": round(y2 / n, 3),
+                    "gap_leader_by_2plus": round((y2 - p2) / n, 3),
+                    "model_trailer_ties_or_wins": round(pt / n, 3), "obs_trailer_ties_or_wins": round(yt / n, 3),
+                    "gap_trailer": round((yt - pt) / n, 3)})
+    return out
+
+
+def endgame_report(rows: Sequence[Mapping[str, Any]], meta: Sequence[Mapping[str, Any]], *,
+                   min_dates: int = WALK_FORWARD_MIN_DATES) -> dict[str, Any]:
+    """Walk-forward fit, then the OUT-OF-SAMPLE dates graded off vs on (same rows, same games), plus the
+    full-sample fit a ship would use."""
+    split = [r for r in rows if "hist" in r and r.get("reg_hist") is not None and r.get("ot_hist") is not None]
+    wf = walk_forward(split, min_dates=min_dates)
+    oos = [r for r in split if r.get("date") in set(wf["oos_dates"])]
+    off = with_endgame(oos, None)
+    on = with_endgame(oos, p_by_date=wf["fits"])
+    full = fit_endgame(split)
+    oos_meta = [g for g in meta if str(g["pk"]) in {str(r["pk"]) for r in oos}]
+    return {
+        "rows_with_splits": len(split),
+        "walk_forward": wf,
+        "full_sample_fit": full,
+        "oos": {"dates": len(wf["oos_dates"]), "games": len({r["pk"] for r in oos}), "rows": len(oos),
+                "off": grade(off, oos_meta), "on": grade(on, oos_meta),
+                "lead_states_off": lead_states(off), "lead_states_on": lead_states(on)},
+        "in_sample_full_fit_lead_states": lead_states(with_endgame(split, full)) if full.get("rows") else [],
+    }
 
 
 def _count(values: Iterable[Any]) -> dict[str, int]:
@@ -526,8 +775,45 @@ def _text(report: Mapping[str, Any]) -> str:
     lines.append("\nWIDTH (final margin): model sd vs realised RMSE about the model mean; central-80% coverage")
     for label, w in g["width_by_cutoff"].items():
         lines.append(f"  {label}: {w}")
-    lines.append(f"  realised/model ratio (all but P3 05:00) ci95: {g['width_ratio_all_but_last_cutoff_ci95']}")
+    lines.append(f"  realised/model ratio (all but {', '.join(LATE_CUTOFFS)}) ci95: "
+                 f"{g['width_ratio_all_but_last_cutoff_ci95']}")
+    lines.append("\nLEAD STATES (the rows as replayed), oriented to the leader:")
+    lines.extend(_lead_lines(report.get("lead_states") or []))
+    e = report.get("endgame")
+    if e:
+        lines.append("\n=== LIVE END-GAME (lane nhl-live-endgame-calibration) ===")
+        wf = e["walk_forward"]
+        lines.append(f"rows with splits {e['rows_with_splits']}; walk-forward: {len(wf['oos_dates'])} out-of-sample "
+                     f"dates, p range {wf['p_range']}, ramp range {wf['ramp_range']}")
+        lines.append(f"full-sample fit (the number a ship would use): {e['full_sample_fit']}")
+        o = e["oos"]
+        lines.append(f"OUT OF SAMPLE: {o['games']} games on {o['dates']} dates, {o['rows']} rows")
+        for tag in ("off", "on"):
+            for fam, f in o[tag]["families"].items():
+                w = f["worst_powered"] or {}
+                lines.append(f"  [{tag}] {fam}: verdict={f['verdict']} worst {w.get('bucket')} n={w.get('n')} "
+                             f"gap={w.get('gap')} |gap| ci95={f['worst_powered_abs_gap_ci95']}; Brier {f['brier_model']}"
+                             f" vs baseline {f['brier_skellam_baseline']} (diff ci95 {f['brier_model_minus_baseline_ci95']})")
+                for b in f["calibration"]:
+                    if b["n"]:
+                        lines.append(f"      {b['bucket']} n={b['n']:5d} pred={b['pred']:.3f} obs={b['obs']:.3f} "
+                                     f"gap={b['gap']:+.3f}{'' if b['powered'] else '  (unpowered)'}")
+            for label, w in o[tag]["width_by_cutoff"].items():
+                lines.append(f"     width {label}: ratio {w.get('ratio_actual_over_model')} "
+                             f"cov80 {w.get('central80_coverage')}")
+        for tag in ("off", "on"):
+            lines.append(f"  lead states OOS [{tag}]:")
+            lines.extend(_lead_lines(o[f"lead_states_{tag}"]))
+        lines.append("  lead states IN SAMPLE at the full-sample fit:")
+        lines.extend(_lead_lines(e["in_sample_full_fit_lead_states"]))
     return "\n".join(lines)
+
+
+def _lead_lines(states: Sequence[Mapping[str, Any]]) -> list[str]:
+    return [f"    {s['cutoff']} lead {s['lead']}: n={s['n']:4d}  leader by 2+ model {s['model_leader_by_2plus']:.3f} "
+            f"obs {s['obs_leader_by_2plus']:.3f} gap {s['gap_leader_by_2plus']:+.3f} | trailer ties/wins model "
+            f"{s['model_trailer_ties_or_wins']:.3f} obs {s['obs_trailer_ties_or_wins']:.3f} gap {s['gap_trailer']:+.3f}"
+            for s in states]
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -541,6 +827,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     ap.add_argument("--sims", type=int, default=DEFAULT_SIMS)
     ap.add_argument("--workers", type=int, default=1)
     ap.add_argument("--grade-only", action="store_true")
+    ap.add_argument("--endgame", choices=("off", "production"), default="off",
+                    help="the producer's end-game during the replay: off = the raw histogram (the splits a fit "
+                         "needs are stored either way), production = whatever NHL_LIVE_ENDGAME_CALIBRATION says")
+    ap.add_argument("--fit-endgame", action="store_true",
+                    help="walk-forward fit of the end-game (p, ramp) and an out-of-sample on-vs-off grade")
+    ap.add_argument("--wf-min-dates", type=int, default=WALK_FORWARD_MIN_DATES)
     args = ap.parse_args(argv)
 
     out_dir = Path(os.path.expanduser(args.out_dir))
@@ -557,7 +849,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 done.add(json.loads(line).get("date"))
         todo = [d for d in dates if d not in done]
         accounting = []
-        tasks = [(d, str(root) if root else None, str(cache), args.sims) for d in todo]
+        tasks = [(d, str(root) if root else None, str(cache), args.sims, args.endgame) for d in todo]
         if args.workers > 1:
             import multiprocessing as mp
             with mp.get_context("fork" if hasattr(os, "fork") else "spawn").Pool(args.workers) as pool:
@@ -584,7 +876,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         "grade": grade(rows, meta),
         "sims": args.sims,
         "range": [args.start, args.end],
+        "lead_states": lead_states(rows),
     }
+    if args.fit_endgame:
+        report["endgame"] = endgame_report(rows, meta, min_dates=args.wf_min_dates)
     (out_dir / "report.json").write_text(json.dumps(report, indent=1), encoding="utf-8")
     text = _text(report)
     (out_dir / "report.txt").write_text(text, encoding="utf-8")
