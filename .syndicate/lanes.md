@@ -589,39 +589,6 @@ death, never life — do not invert it.
 - Verification: off != on unit tests; fleet: LIVE_GAMELINE_JOIN display= > 0 for ncaab/wncaab (and nfl/nhl/ncaaf when live); served /api/intelligence/query live game rows with Live proj. per sport before vs after; 0 display-only rows with edge_vs_market_pct/live_aware/model_ev_pct
 - Blocked by: none
 
-### kalshi-five-char-codes — CLOSED 2026-11-10 (GOAL MET: Texas St @ UTRGV named live by fan-in and board join; pre-fix no_match) — opened 2026-11-09 — session 750e160f-f027-491e-9dc9-57257d2c6bec (handed off 2026-11-09 from e32fef1a)
-- **GOAL VERDICT [2026-11-10 23:06Z]: GOAL: MET.** Goal verbatim: "Kalshi club codes of 5 characters (UTRGV, MASSL) resolve in kalshi_catalogue.match_event_blob, for the fan-in and the order path alike: PVUTRGV names Prairie View @ UT Rio Grande Valley; on a fleet replay over every live Kalshi game event, every answer that was ok before is identical and each changed answer is read by eye"
-  - The replay half was met 2026-11-09 17:11Z: 0 of 2,083 resolutions changed, and PVUTRGV was named.
-  - The live read was taken 23:06Z (5:06 PM CST) by scheduled task `kalshi-five-char-live-read-1110`, session bd1dd044, read-only. Texas St @ UTRGV was on the 11-10 ncaab grid (118 games) and in the join rows (426 games).
-  - Fan-in token `texas state+ut rio grande valley`; pre-fix None.
-  - Board join: 31/31 TXSTUTRGV markets `ok` loaded; 0/31 pre-fix.
-  - The 11-11 UTRGV / UMass Lowell games were on no board yet.
-  - Logs: 0 of 444 `UNNAMED_ROLE_KEY_GRID sport=ncaab` lines name the blob. 2 of 71 `JOIN_EVENTS` samples did (17:48Z, 20:04Z). That was board timing: the 4-letter blobs sampled with it also resolve now.
-  - Record: `deploys.md` 2026-11-10 VERIFY entry (RECONCILED).
-- **STATUS `[2026-11-09 18:30Z]`: GOAL: NOT MET -- LOADED on the fleet** (`722af0338`; live-odds-worker TERM 18:20:57Z, refresh-worker TERM 18:25:43Z).
-  - Every live answer is identical on a same-moment replay.
-  - **Left:** the positive live read, when a 5-letter game reaches a board (Texas St @ UTRGV 11-10, then the 11-11 games): named by the fan-in, `ok` in the board join.
-  - Record: `deploys.md` 2026-11-09 18:25:43Z.
-  - **Live-read task `[2026-11-09 19:15Z]`** (user "Yes, schedule it"): `kalshi-five-char-live-read-1110`, one-time Tue 11-10 5:00 PM CST, enabled.
-    - It reads Texas St @ UTRGV (else the 11-11 UTRGV / UMass Lowell games): fan-in token, board-join status, and the pre-fix counterfactual.
-    - It records MET / NOT MET / NOT YET, reconciles the pending marker if MET, and closes this lane if MET. Ledger only.
-- **STATUS `[2026-11-09 17:28Z]`: GOAL: NOT MET -- written, tested and replayed; on a branch only, NOT on main, NOT loaded.**
-  - **Hypothesis CONFIRMED:**
-    - `_splits` capped codes at 4 characters.
-    - With 2-5 allowed, the 11-07 `PVUTRGV` control goes `no_match` -> Prairie View Panthers @ UT Rio Grande Valley Vaqueros.
-  - **Replay 17:11Z on fleet data**, fleet code + this change, one Kalshi read: 2,083 event x board resolutions across nine sports, **0 changed**.
-  - **Also changed:** `kalshi_board_join._resolve_event`'s collided-code ends read the same lengths, so the refusal widens in step. That file was added to `Files:`.
-  - **Tests:** 2,371 passed over 107 Kalshi / venue / fan-in / Polymarket test files (11 min), plus the 14 new.
-  - **Left:**
-    - the user's call to push and load: the order path places live money;
-    - a live read on the first 5-letter game on a board, Texas St @ UTRGV (`TXSTUTRGV`), 11-10.
-- Goal: Kalshi club codes of 5 characters (UTRGV, MASSL) resolve in kalshi_catalogue.match_event_blob, for the fan-in and the order path alike: PVUTRGV names Prairie View @ UT Rio Grande Valley; on a fleet replay over every live Kalshi game event, every answer that was ok before is identical and each changed answer is read by eye
-- Files: syndicate/features/shared/kalshi_catalogue.py, syndicate/features/shared/kalshi_board_join.py, tests/test_kalshi_five_char_codes.py (NEW)
-- Hypothesis: kalshi_catalogue._splits caps a club code at 4 characters, so a blob holding a 5-character code (UTRGV, MASSL) has no correct split and returns no_match whatever names Kalshi supplies (PVUTRGV-124, 11-07)
-- Falsification test: with 5-character splits allowed, PVUTRGV against the 11-07 ncaab board still returns no_match; or any event that resolved ok before changes its answer
-- Verification: off != on unit tests (matcher, order-path _resolve_event, fan-in naming); fleet replay old vs new over every live Kalshi game event and each board date held, every status change listed and read by eye; ncaab/wncaab fan-in A/B at one clock
-- Blocked by: none
-
 ### live-evidence-log — CLOSED 2026-11-11 (GOAL MET: NCAAF in-game probe 2/2 matched, 0 mismatched / 0 unread; deploys.md 2026-11-11 00:16Z) — opened 2026-11-09 — session e32fef1a-01e8-4afe-a284-01acd3728545
 - **GOAL VERDICT `[2026-11-11 00:17Z]`: GOAL: MET.** Goal, verbatim: "Phase 1B M0: every live projection the fleet's re-sims and lenses publish (nba, ncaab, wncaab, ncaaf, nfl, nhl; wnba when on) is kept as an append-only, as-of-stamped row per game lane per tick in <data root>/live_evidence/<sport>/<date>.jsonl, read by one as-of reader; on the fleet, the NBA rows reproduce NBA's own live_resim_history for the same ticks with 0 mismatches, a same-moment probe on each other live sport matches the rebuilt evidence with 0 mismatches, and the bytes per day are measured" -- the last reading owed was NCAAF in play: same-moment probe 00:16:13Z 11-11 (6 min after the first fresh NCAAF lane at 00:10:12Z): **ncaaf fresh_lanes=2 matched=2 missing=0 mismatched=0 unread=0**; ncaab 26/26, wncaab 3/3, nhl 3/3, all 0 mismatched / 0 unread; nba and nfl had nothing live; wnba snapshot absent (off). NCAAF row summary for `live_evidence/ncaaf/2026-11-11.jsonl`: 14 live rows over 2 games, 14/14 carry `state`, `marginDist` and `totalDist`, source `live_resim`; extra keys `levelShrink`, `possessionUnknown`. The probe ran from worktree `loving-einstein-b3c45e`: `scripts/live_evidence_check.py` is byte-equal to main and its reader is main's; the worktree's only difference in `live_evidence_log.py` is the unpushed props hook in `Collector`, which the probe never calls. The rows themselves were written by the fleet's own collector (fleet `0290d505a`).
   - **Met:** NBA rows reproduce `live_resim_history`, 422 of 422 ticks, 0 field mismatches on 8 fields (05:31Z, matched by instant). Same-moment probes 0 mismatched on every sport live in the window: nba, ncaab, wncaab, nhl (31/31, 01:15Z) and nfl with Monday night football (15/15, 02:35Z; the independent probe 17/17, unread 0, 02:38Z). Bytes/day measured: ~6.9 MB for the 11-09 slate (ncaab 4.34 MB / 1,556 rows the largest). 0 tracebacks. Refresh-worker memory not up (3,987 MB at 10 h vs 4,021-5,042 MB for the 7 earlier workers that reached 10 h). Record: deploys.md 2026-11-10 01:15Z, 02:35Z, 05:30Z.
@@ -658,16 +625,6 @@ death, never life — do not invert it.
 - STATUS 2026-11-10 9:53 AM CST (15:53Z): LOADED ON WEB, VERIFY OWED. `fd05acb13` on main (user "Push and reload web"); fleet ff + reload-web 15:45:23Z, 0 tracebacks, inert until a live NHL/NFL prop is served (deploys.md 2026-11-10 15:45:23Z). `97cb5d477` (#774) rides on disk unloaded, user OK. Replay: 147 of 147 served rows matched, NFL two-value groups 7 of 43 -> 0. Watcher in this session polls the served board from 00:20Z 11-11 every 10 min (C:\tmp\lpa\nhl_read_time_watch.py, deadline 05:00Z). NFL reading owed at TNF 11-12.
 - STATUS 2026-11-10 1:51 PM CST (19:51Z): both readings ARMED in this session. NHL: watcher from 00:20Z 11-11 (C:\tmp\lpa\nhl_read_time_watch.py). NFL (user "Yes, arm it now"): TNF Commanders @ Giants, ESPN 401873052, kickoff 01:15Z 11-13; watcher polls the served board every 10 min 01:30Z..04:45Z 11-13 (C:\tmp\lpa\nfl_read_time_watch.py -> nfl_read_time_watch.jsonl), exit at >= 10 live NFL props with an Actual after 01:50Z. Dry run 19:51Z: board 3508 rows, NFL snapshot 14 games / 0 live blocks, ESPN box producer read 401873051 (68 players). Both watchers die with this session; if it is gone, run them by hand.
 - STATUS 2026-11-10 6:52 PM CST (00:52Z 11-11): NHL HALF READ (deploys.md 2026-11-11 00:40:24Z). Split groups 0 in 3 polls; 232 of 232 rows equal to the published block; web log matched 257 of 257; 0 Live proj. GOAL CLAUSE 'model edge 0' NOT MET as stated: 16 / 0 / 24 rows carried a PREGAME edge (board-build rows served live from puck drop to the next build). Not this change; a lead was filed. NFL half owed at TNF, watcher armed.
-
-### nhl-live-puckline-display — CLOSED 2026-11-11 (GOAL MET) — opened 2026-11-10 — session 87074b1f-3325-4c92-871d-b22851478134
-- **CLOSED 2026-11-11 00:24Z (6:24 PM CST): GOAL MET.** On a live NHL slate the join names `live_margin_published_for_display_only` for the puck-line rows (1 at 00:08:27Z; 3 of 3 games at 00:16:26Z). The served COL@TOR home +1.5 row equalled the published histogram's P(home covers) exactly on two snapshots, and every served puck-line row has no edge (deploys.md 2026-11-10 16:17:34Z, `Measured (live)`). Open lead, not this lane's: one served row (WSH@OTT) held a stale value for ~10 min.
-- Goal: Live NHL puck-line rows (spreads, spreads_alt) on the Layer 2 board show a DISPLAY-ONLY live number from the NHL re-sim's own margin histogram, with 0 edge and no live pricing; measured on a live NHL game as LIVE_GAMELINE_JOIN sport=nhl no longer refusing puck-line rows live_resim_published_no_distribution_for_this_market, and served /api/intelligence/query live NHL spreads rows carrying a Live proj. with edge_vs_market_pct None
-- Files: syndicate/features/nhl/live_resim.py (resim_live_game's return dict + build_game_lens's projection block + the module docstring's published/not-published section only), syndicate/features/shared/live_gameline_join.py (the new display-only margin hit key in live_gameline_from_lens + REASON_MARGIN_DISPLAY_ONLY + live_display_block's display-only margin read + the display-only margin branch in attach_live_gamelines' distribution path only), tests/test_nhl_live_puckline_display.py (NEW), docs/ai_context/todo.md (#773 section only)
-- Hypothesis: n/a (cause known: nhl/live_resim publishes no margin histogram, so the join refuses puck lines live_resim_published_no_distribution_for_this_market)
-- Falsification test: n/a
-- Verification: off != on reachability test (join indexes a puck-line row from a fixture snapshot and attaches a display block only with the new key); fleet: LIVE_GAMELINE_JOIN sport=nhl names the new display-only reason for puck-line rows and display= rises; served /api/intelligence/query live NHL spreads rows carry live_model_probability with model edge None
-- Blocked by: none
-- STATUS 2026-11-10 10:44 AM CST (16:44Z): ON MAIN `efccead01` (user "Yes, push and load"), LOADED: fleet ff 16:17:34Z, claimed TERMs live-odds-worker 16:17:51Z + refresh-worker 16:28:02Z, 0 Tracebacks, claims released 16:43Z (deploys.md 2026-11-10 16:17:34Z). GOAL NOT MET until the live reading on the 11-10 evening NHL slate (7 games from 00:00Z).
 
 ### nba-prop-engine-name-join — OPEN — opened 2026-11-10 — session 2ba5509d-5605-427a-b4bd-acd7926e2bea
 - **GOAL VERDICT 2026-11-10 4:54 PM CST (22:54Z):** NBA prop rows whose odds-feed player spelling differs from the engine's (Herb Jones / Herbert Jones, Paul Reed Jr / Paul Reed, Carlton / Bub Carrington) carry the same pregame model fields as every other player on the Layer 2 board (sim_projection, sim_ladder, model_edge_pct, projected, player_side, headshot_url, recent_values): the odds name resolved to the engine's name ONCE at the NBA prop enrichment choke point (exact first, unique canonical key, ambiguity refuses), a slate count of affected players/rows, tests incl. off != on, and a replay on a fleet artifact showing the rows gain a projection and edge -- on main -- **GOAL: NOT MET** (LOADED 17:05Z on web + refresh-worker. Served sim fields MET: Derrick Jones 4 of 4 rows with engine_player_name, sim_projection, model_edge_pct and headshot; player_side is None, as on every LAC row including plain names. REGRESSION found: `player_headshots.headshot_url`/`_player_team` look up `player_ids.csv` by the engine name only, and the fleet csv has "BOBBY PORTIS", so `'Bobby Portis Jr.'` resolves to None where the book name gave 1626171 and his 5 served rows lost their face. Fix to try the engine name, then the book name: not done, needs the user's yes. deploys.md 22:54Z. todo #775.)
@@ -776,12 +733,6 @@ death, never life — do not invert it.
 - Verification: probe.py / by_board_date.py on the fleet before the load and after it on the 11-10 evening slate: per (sport, source_board_date, board_lane) live game rows, live-number rows, blank rows with a model edge; plus the set of (sport,event_id) before vs after.
 - Blocked by: none
 
-### closed-lane-archive-20261110-1638 — CLOSED 2026-11-10 (GOAL MET: 1 block archived) — opened 2026-11-10 — session a53692c1-521c-4616-bb89-c92e9d844fa0
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. `owner_liveness.py --idle-min 240` read 1 SAFE of 7 CLOSED; moved to lanes_closed.md with one pointer; invariants unchanged vs origin/main baseline. Table and WAIT reasons: log/2026-11-10.md 22:40Z.
-- Moved: closed-lane-archive-20261110-1039.
-
 ### layer2-live-rail-edges — OPEN — opened 2026-11-10 — session 0f519972-4890-45d3-8b52-767c7e0a0389
 - **GOAL VERDICT `[2026-11-11 00:2xZ / 6:2x PM CST 11-10]`:** Goal, verbatim: "Live games on the Layer 2 Games rail show a live update line per full-game market (spread, total, moneyline where priced): our live re-sim number vs the current live book line with the quote's age; the compact card carries a live-edge highlight and the rail a live-edge filter by market, both counting ONLY an edge priced against a FRESH quote (threshold default + reason in code, #780); web-only display of served artifact fields, no change to the join's pricing ceiling; tests (line renders for a live priced row; highlight/filter fire on fresh, not stale) + a real-app screenshot; on main; loading web is the user's decision" -- **GOAL: MET.** Readings: threshold set to 120 s on the parent session's relay of #780's all-market addendum (first shipped at 30 s, `3c38ef4c4`); flag worded MODEL ≠ LINE, never 'edge'. node harness all passed + pytest 78 passed, 5 source mutations each caught; run-syndicate replay of the fleet's UNMODIFIED 23:58:33Z served board: 4 live games with a live line, 2 flagged (RUTG o149.5 +10.0 on 47 s, GTWN o141.5 +8.0 on 52 s), RUTG o147.5 on 153.5 s not; Model ≠ line / Total filters keep 2. Hypothesis CONFIRMED (display only). Kept OPEN only as the holder for the web load (the user's decision, todo #781); close after the post-load served read, or when the user declines.
 - Goal: Live games on the Layer 2 Games rail show a live update line per full-game market (spread, total, moneyline where priced): our live re-sim number vs the current live book line with the quote's age; the compact card carries a live-edge highlight and the rail a live-edge filter by market, both counting ONLY an edge priced against a FRESH quote (threshold default + reason in code, #780); web-only display of served artifact fields, no change to the join's pricing ceiling; tests (line renders for a live priced row; highlight/filter fire on fresh, not stale) + a real-app screenshot; on main; loading web is the user's decision
@@ -800,6 +751,11 @@ death, never life — do not invert it.
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness --idle-min 240 read 1 SAFE of 10 CLOSED; 9 WAIT (owner or last-modifier < 240m, or a transcript not found). Moved: closed-lane-archive-20261110-1439. Table in log/2026-11-10.md.
+
+### closed-lane-archive-20261110-2240 — CLOSED 2026-11-10 (GOAL MET: 3 blocks archived) — opened 2026-11-10 — session 228e6697-a03e-4b30-a245-26613f897824
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 SAFE for 3 of 11 CLOSED; moved `kalshi-five-char-codes`, `nhl-live-puckline-display`, `closed-lane-archive-20261110-1638` to lanes_closed.md. Table in log/2026-11-10.md.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1019,6 +975,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261110-1039` — CLOSED 2026-11-10 (GOAL MET: 1 block archived) — opened 2026-11-10 — session d0b0831a-d9ca-456c-bf6c-a4f259ffc0ba
 - `closed-lane-archive-20261110-1239` — CLOSED 2026-11-10 (GOAL MET: 1 block archived) — opened 2026-11-10 — session 6808b166-1396-4baf-a4b6-f28b9e5d9474
 - `closed-lane-archive-20261110-1439` — CLOSED 2026-11-10 (GOAL MET: 1 block archived) — opened 2026-11-10 — session ef299df7-5a8b-4901-b3fa-c13f5efe9514
+- `closed-lane-archive-20261110-1638` — CLOSED 2026-11-10 (GOAL MET: 1 block archived) — opened 2026-11-10 — session a53692c1-521c-4616-bb89-c92e9d844fa0
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
@@ -1093,6 +1050,7 @@ death, never life — do not invert it.
 - `kalshi-combo-capture` — CLOSED 2026-10-30 (GOAL MET: capture live on the fleet; first full forward day 10-29 read MET) — opened 2026-10-27 — session a48b0f49-3a6b-4105-b194-5804a934487c (picked up 2026-10-27 as a side session of local_668211d5; opened by e32fef1a for pickup)
 - `kalshi-fanin-college-naming` — CLOSED (GOAL MET) — opened 2026-11-07 — closed 2026-11-07 — session e32fef1a-01e8-4afe-a284-01acd3728545
 - `kalshi-fanin-reversed-orientation` — CLOSED 2026-11-07 (GOAL MET: 79c8aac12 loaded on the fleet refresh-worker 23:41:12Z; the worker's first ncaab build logs the new code's counts) — opened 2026-11-07 — session e32fef1a-01e8-4afe-a284-01acd3728545
+- `kalshi-five-char-codes` — CLOSED 2026-11-10 (GOAL MET: Texas St @ UTRGV named live by fan-in and board join; pre-fix no_match) — opened 2026-11-09 — session 750e160f-f027-491e-9dc9-57257d2c6bec (handed off 2026-11-09 from e32fef1a)
 - `kalshi-line-aware-rungs` — ORPHANED, **UNOWNED** [ownership sweep 2026-08-31: owning session gone, no live session on this machine] — — **CLAIMS RELEASED 2026-08-26 03:3xZ, sess
 - `kalshi-maker-entry-paper` — CLOSED — opened 2026-10-19 — closed 2026-10-19 — session 2636b326-71e6-4908-8692-de0d92b6f94d
 - `kalshi-maker-pilot` — CLOSED (GOAL MET) — opened 2026-10-24 — closed 2026-10-26 — session 78880f41-ba0e-410c-aaac-d6cbeb02b884
@@ -1336,6 +1294,7 @@ death, never life — do not invert it.
 - `nhl-hitrate-pool-team-match` — CLOSED 2026-10-28 (GOAL MET with A1: on main c1a2fb4a, measured; first build FALSIFIED as registered) — opened 2026-10-28 — session a6134f5b-5e22-4d44-a4a2-4f2c1ba43772
 - `nhl-lines-backtest` — CLOSED — opened 2026-10-02 — closed 2026-10-05 — session 9ed26377-0ef3-4416-bc7b-54428f87ce5c
 - `nhl-lineup-status` — CLOSED 2026-10-21 (GOAL MET) — opened 2026-10-16 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
+- `nhl-live-puckline-display` — CLOSED 2026-11-11 (GOAL MET) — opened 2026-11-10 — session 87074b1f-3325-4c92-871d-b22851478134
 - `nhl-live-resim-slate-root` — CLOSED 2026-11-10 (GOAL MET: NYR@EDM re-simmed live 11-09 7:05 PM CST, NHL join index=1, served moneyline 1 of 1 and totals 2 of 2 live NHL rows with a live number; puck line blank by design) — opened 2026-11-08 — session e1aa93b0-e5f4-4422-a186-b82171244058
 - `nhl-ncaab-club-maps` — CLOSED — opened 2026-09-23, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `nhl-nfl-live-prop-actuals` — CLOSED 2026-11-10 (GOAL MET: served 11-10 02:52Z NHL 37/38 and NFL 123/125 live props carry an Actual, 0 priced; NHL Live proj. withheld by measurement; read-time freshness owed as todo #769 (c)) — opened 2026-11-08 — session 386d4115-6e7b-47e3-9ff7-be3914d851cb
