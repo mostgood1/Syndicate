@@ -682,11 +682,6 @@ death, never life — do not invert it.
 - Verification: node + pytest harness green incl. fresh-vs-stale cases; run-syndicate screenshot of a live (or fixture) rail card with the live line; served-board count of live games/markets with a live line and with a fresh edge recorded in the lane
 - Blocked by: none
 
-### closed-lane-archive-20261111-0920 — CLOSED 2026-11-11 (GOAL MET: 8 blocks archived) — opened 2026-11-11 — session e1590a02-8fc4-477a-bb69-9a075e55d321
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. 8 CLOSED blocks moved to `lanes_closed.md` with one pointer each: `live-evidence-log`, `engine-experts`, `pregame-record-keep`, `watchdog-wsl-restart-recovery`, `layer2-lookahead-live-dedupe`, `closed-lane-archive-20261110-2040`, `closed-lane-archive-20261110-2240`, `closed-lane-archive-20261111-0039`. Table and deferrals in `.syndicate/log/2026-11-11.md`.
-
 ### nba-quote-capture-midnight — OPEN — opened 2026-11-11 — session cca33a3a-b09d-4b06-9e0f-59b0deb9dd6c
 - **GOAL VERDICT `[2026-11-11 18:25Z]`:** Goal, verbatim: "An NBA game still live at midnight Central keeps rows on the SERVED Layer 2 board: the live-odds-worker's NBA in-play lane keeps pulling its quotes after 00:00 CT (launching for the previous Central date while the #776 re-sim publishes that date's game In Progress, inside SYNDICATE_NBA_LIVE_RESIM_PRIOR_DATE_HOURS), so the previous date's shard stays observed and the carryover's opportunity gate does not dead-lane it; the gate's dead reasons counted per sport in the ingest; todo #782; fix on main with tests incl. off != on through the env; loading on the fleet is the user's decision". **GOAL: NOT MET.** Done: fix `eacc9f990` (todo #782) LOADED on the fleet on the user's "Yes, load it" / "Load all together (Recommended)": refresh-worker pid 191825 and live-odds-worker pid 192537 (peer lanes' claimed TERMs after the 18:11:22Z ff to `5c8eec41a`); `dead_by_reason` MET on the served board (sums to `by_lane.dead` on every sport, 18:22:59Z). Left: the Verification's served-board reading on the first night with NBA live at 00:00 CT. Blocking: the calendar (tonight only if the 9:10 PM CST tip runs past midnight).
 - Goal: An NBA game still live at midnight Central keeps rows on the SERVED Layer 2 board: the live-odds-worker's NBA in-play lane keeps pulling its quotes after 00:00 CT (launching for the previous Central date while the #776 re-sim publishes that date's game In Progress, inside SYNDICATE_NBA_LIVE_RESIM_PRIOR_DATE_HOURS), so the previous date's shard stays observed and the carryover's opportunity gate does not dead-lane it; the gate's dead reasons counted per sport in the ingest; todo #782; fix on main with tests incl. off != on through the env; loading on the fleet is the user's decision
@@ -766,6 +761,11 @@ ight.sh`, 01:05Z / 01:50Z / 02:45Z 11-12, BUFF @ BALL, SAC @ CMU, MASS @ TOL). S
 - Falsification test: n/a
 - Verification: Tests: off != on for the preflight check (changed key + no receipt -> OUTCOME_GATE; matching fresh receipt -> CLEAR; stale / mismatched transition / unaccepted worse cells -> OUTCOME_GATE; waiver -> CLEAR, recorded), receipt hash round trip. Real run on the fleet's data reproduces the 240-game NCAAB result (RC46 vs #768's 7 fields, 2026-11-03..09): totals tie, win Brier worse beyond SE at 20 m and 36 m. The fleet mechanism reader run read-only against the live fleet (never a full preflight: learnings 2026-09-28) returns the live-odds-worker's 7-field value with no change.
 - Blocked by: none
+
+### closed-lane-archive-20261111-1332 — CLOSED 2026-11-11 (GOAL MET: 1 block archived) — opened 2026-11-11 — session 8377f65c-ace3-4d3e-8282-54cf154aee70
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 SAFE for 1 of 8 CLOSED blocks; moved `closed-lane-archive-20261111-0920` to lanes_closed.md with one pointer. 7 WAIT (table in `.syndicate/log/2026-11-11.md`).
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -990,6 +990,7 @@ ight.sh`, 01:05Z / 01:50Z / 02:45Z 11-12, BUFF @ BALL, SAC @ CMU, MASS @ TOL). S
 - `closed-lane-archive-20261110-2040` — CLOSED 2026-11-10 (GOAL MET: 1 block archived) — opened 2026-11-10 — session f493b037-3c6b-4736-abcf-c5fad772fc38
 - `closed-lane-archive-20261110-2240` — CLOSED 2026-11-10 (GOAL MET: 3 blocks archived) — opened 2026-11-10 — session 228e6697-a03e-4b30-a245-26613f897824
 - `closed-lane-archive-20261111-0039` — CLOSED 2026-11-11 (GOAL MET: 2 blocks archived) — opened 2026-11-11 — session 5d3833c0-a7f0-4732-87dd-e6050cfe8ef3
+- `closed-lane-archive-20261111-0920` — CLOSED 2026-11-11 (GOAL MET: 8 blocks archived) — opened 2026-11-11 — session e1590a02-8fc4-477a-bb69-9a075e55d321
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b

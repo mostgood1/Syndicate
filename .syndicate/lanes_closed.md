@@ -15164,3 +15164,8 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - Verdict: GOAL MET. 2 CLOSED blocks moved to `lanes_closed.md` with one pointer each: `live-display-other-sports`, `closed-lane-archive-20261110-1840`. Table and deferrals in `.syndicate/log/2026-11-11.md`.
+
+### closed-lane-archive-20261111-0920 — CLOSED 2026-11-11 (GOAL MET: 8 blocks archived) — opened 2026-11-11 — session e1590a02-8fc4-477a-bb69-9a075e55d321
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. 8 CLOSED blocks moved to `lanes_closed.md` with one pointer each: `live-evidence-log`, `engine-experts`, `pregame-record-keep`, `watchdog-wsl-restart-recovery`, `layer2-lookahead-live-dedupe`, `closed-lane-archive-20261110-2040`, `closed-lane-archive-20261110-2240`, `closed-lane-archive-20261111-0039`. Table and deferrals in `.syndicate/log/2026-11-11.md`.
