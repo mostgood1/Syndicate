@@ -24,6 +24,9 @@ WHAT IS CHECKED (key -> severity). Every `exec:` finding is emailed.
                               buyingPower but cannot be spent yet)                          warn
   exec:unknown_submits        a LIVE order failed with no venue answer and no venue id --
                               it may or may not be a position                               fail
+  exec:ungraded_fills         a LIVE `filled` row still has no outcome UNGRADED_FILL_DAYS after
+                              the later of its fill and its slate date -- money held that
+                              nothing is grading (970ec063 sat 16 days, 2026-10-25..11-10)  warn
   exec:log_errors:<group>     >= LOG_ERRORS_PER_CHECK failure lines from the order adapters
                               / execution tick in one check; held LOG_HOLD_MINUTES          fail
   exec:log_errors:cancel      ONE failed cancel of a resting order (`CANCEL_FAILED`) -- the
@@ -37,7 +40,7 @@ THRESHOLDS are overridable in `<home>/alerts.env` (the same file as the SMTP set
   SYNDICATE_ALERT_HEARTBEAT_MAX_MINUTES (25)   SYNDICATE_ALERT_UNRECONCILED_MINUTES (20)
   SYNDICATE_ALERT_BALANCE_STALE_MINUTES (30)   SYNDICATE_ALERT_MIN_BALANCE_KALSHI (50)
   SYNDICATE_ALERT_MIN_BALANCE_POLYMARKET (25)  SYNDICATE_ALERT_LOG_ERRORS_PER_CHECK (3)
-  SYNDICATE_ALERT_DIGEST_HOUR_CT (8)
+  SYNDICATE_ALERT_DIGEST_HOUR_CT (8)           SYNDICATE_ALERT_UNGRADED_FILL_DAYS (3)
 
 STATE lives inside the fleet watchdog's state file under `execution` (log cursor, digest accumulator,
 log-burst holds), so one file says what the watchdog knows.
@@ -82,8 +85,10 @@ DEFAULTS = {
     "min_balance_polymarket": 25.0,
     "log_errors_per_check": 3.0,
     "digest_hour_ct": 8.0,
+    "ungraded_fill_days": 3.0,
 }
 _THRESHOLD_ENV = {
+    "ungraded_fill_days": "SYNDICATE_ALERT_UNGRADED_FILL_DAYS",
     "heartbeat_max_minutes": "SYNDICATE_ALERT_HEARTBEAT_MAX_MINUTES",
     "unreconciled_minutes": "SYNDICATE_ALERT_UNRECONCILED_MINUTES",
     "balance_stale_minutes": "SYNDICATE_ALERT_BALANCE_STALE_MINUTES",
@@ -221,7 +226,7 @@ def _lean(order: Mapping[str, Any]) -> dict[str, Any]:
     keep = ("idempotency_key", "mode", "venue", "sport", "market", "side", "line", "venue_ticker", "status",
             "outcome", "pnl_dollars", "graded_at", "submitted_at", "venue_resolved_at", "reconciled_at",
             "venue_order_id", "operator_resolution", "error", "requested_stake_dollars", "fill_stake_dollars",
-            "fill_price", "fees_dollars", "selected_date", "player")
+            "fill_price", "fees_dollars", "selected_date", "player", "commence_time")
     return {k: order.get(k) for k in keep if k in order}
 
 
@@ -385,6 +390,35 @@ def stuck_unreconciled(orders: Iterable[Mapping[str, Any]], now: dt.datetime, mi
     return out
 
 
+def ungraded_fills(orders: Iterable[Mapping[str, Any]], now: dt.datetime, days: float) -> list[dict[str, Any]]:
+    """LIVE `filled` rows with no outcome `days` after the later of the fill and the slate date.
+
+    WHY. Key `970ec063` (Kalshi, 1 NO, filled 2026-10-25, WON) sat ungraded for 16 days and nothing said so:
+    the venue grader refused it on every pass (`both_sides_held`) and only a reconcile 404 loop, after the
+    order aged out at the venue, made any noise. A refusal is not an alarm; an age is. The clock starts at the
+    LATEST of the fill (`venue_resolved_at`, else `submitted_at`), the game's `commence_time` and the slate
+    date's midnight UTC, so a fill placed ahead of its game is not aged from the placement. MEASURED on the
+    fleet 2026-11-11: three NCAAF bets bought on slate 11-08 for games on 11-14 read 3.1 days old from the
+    slate alone. A row with no time at all is reported, not skipped: an unknown age must not read as a young one.
+    """
+    out = []
+    for o in orders:
+        if str(o.get("mode") or "") != LIVE or str(o.get("status") or "") != "filled" or o.get("outcome"):
+            continue
+        if is_non_position(o):
+            continue
+        starts = [_parse_time(o.get("venue_resolved_at") or o.get("submitted_at")), _parse_time(o.get("commence_time"))]
+        slate = str(o.get("selected_date") or "")[:10]
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", slate):
+            starts.append(_parse_time(f"{slate}T00:00:00+00:00"))
+        starts = [t for t in starts if t is not None]
+        age = (now - max(starts)).total_seconds() / 86400.0 if starts else None
+        if age is None or age >= days:
+            out.append({**o, "_age_days": age})
+    out.sort(key=lambda o: -(o["_age_days"] if o["_age_days"] is not None else float("inf")))
+    return out
+
+
 def _order_label(o: Mapping[str, Any]) -> str:
     what = " ".join(str(o.get(k)) for k in ("sport", "market", "player", "side", "line") if o.get(k) not in (None, ""))
     return (f"{o.get('venue')} {o.get('venue_ticker') or ''} {what} stake {_money(o.get('requested_stake_dollars'))} "
@@ -501,6 +535,20 @@ def evaluate(readings: Mapping[str, Any], now: dt.datetime, limits: Mapping[str,
             add("unknown_submits", FAIL, f"{len(unknown)} live submit(s) with NO venue answer (${dollars:,.2f}) -- each may "
                                          "or may not be a position. A Kalshi one is resolved automatically once Kalshi lists it "
                                          "under our key (execution_self_heal); anything else waits for /portfolio/live: " + "; ".join(rows))
+        ungraded_days = float(limits.get("ungraded_fill_days", DEFAULTS["ungraded_fill_days"]))
+        ungraded = ungraded_fills(orders, now, ungraded_days)
+        if ungraded:
+            def _days(o: Mapping[str, Any]) -> str:
+                return "?" if o["_age_days"] is None else f"{o['_age_days']:.1f}"
+
+            rows = "; ".join(f"{_order_label(o)} filled {fmt_ct(o.get('venue_resolved_at') or o.get('submitted_at'))} "
+                             f"({_days(o)} d)" for o in ungraded[:5])
+            dollars = sum(_num(o.get("fill_stake_dollars")) or _num(o.get("requested_stake_dollars")) or 0.0
+                          for o in ungraded)
+            add("ungraded_fills", WARN, f"{len(ungraded)} live fill(s) (${dollars:,.2f} staked) still UNGRADED "
+                                        f">= {ungraded_days:.0f} d after fill / slate date -- money "
+                                        "held that nothing is grading; read the settlement pass's `refused=` reasons "
+                                        "for these tickers: " + rows)
 
     balances = readings.get("venue_balances")
     if not readings.get("monitor_error") and isinstance(state, Mapping):

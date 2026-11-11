@@ -1120,6 +1120,110 @@ def acknowledge_grade_conflict(
     raise OperatorResolutionError(f"order_not_found: {key}")
 
 
+# The fields an operator grade writes, kept as they were under `pre_operator_grade`.
+_OPERATOR_GRADE_FIELDS = ("outcome", "pnl_dollars", "settled_by", "settled_at_venue", "graded_at", "held_side")
+
+
+def operator_grade_from_venue(
+    idempotency_key: str,
+    *,
+    market_result: str,
+    settled_at_venue: Any,
+    evidence: Mapping[str, Any],
+    note: str,
+    venue: str = "kalshi",
+) -> dict[str, Any]:
+    """Grade ONE live fill from the venue's own settled result, where the venue
+    grader has a NAMED refusal it cannot get past. An operator's act, with its
+    evidence kept on the row.
+
+    WHY IT EXISTS. Key `970ec063` bought 1 NO on `KXNFLGAME-26OCT25MIANYJ-NYJ`
+    @ 0.43 in play on 2026-10-25; Kalshi settled `market_result=no` at 20:01:52Z,
+    so it WON. The settlement row also carried `yes_count_fp=0.01`: our own
+    take-profit exit `x403f59b5` (venue order `01a17426`) was filled 0.01 of 1
+    contract, and `kalshi_orders._int_or_none` read 0.01 as 0, so the exit was
+    recorded `dead`. `grade_kalshi_settlement` refuses `both_sides_held`,
+    `_both_sides_is_our_partial_close` needs a FILLED exit of 0.01 and found a
+    dead one, and the score grader has no score for an h2h NO -- so nothing
+    could ever grade the row. Sixteen days later its order aged out of Kalshi's
+    order routes and the reconciler logged it every pass.
+
+    WHAT IT DECIDES AND WHAT IT DOES NOT. The OUTCOME is the venue's: the
+    order's own leg against `market_result` (`_kalshi_outcome_from_leg`, the
+    rule the both-legs path grades with), never an operator's opinion. The
+    MONEY is this order's own fill (`_derived_pnl`), the arithmetic the venue
+    grader uses whenever it cannot hand the venue's total to one row -- right
+    here, because the row's revenue also covers a leg this order never held.
+    The operator supplies the result, the evidence and a note; all of it is
+    stored on the row with the time, and every field it overwrites is kept
+    under `pre_operator_grade`, as `resolve_unknown_submit` keeps
+    `pre_resolution_*`. `settled_by` is `venue` because the result is the
+    venue's word; `operator_grade` says who wrote it.
+
+    Refuses (OperatorResolutionError): no note, a result that is not yes/no,
+    not found, not LIVE, another venue, already graded, not `filled`, a leg it
+    cannot map, or a P&L it cannot derive from the order's own fill.
+    """
+    from syndicate.features.shared import venue_settlement as vs
+
+    result = str(market_result or "").strip().lower()
+    if result not in {"yes", "no"}:
+        raise OperatorResolutionError(f"unsupported_market_result:{result or 'absent'}")
+    text = str(note or "").strip()
+    if not text:
+        raise OperatorResolutionError("note_required: an operator grade must say why")
+    key = str(idempotency_key or "").strip()
+    if not key:
+        raise OperatorResolutionError("no_idempotency_key")
+    venue_name = str(venue or "").strip().lower()
+
+    state = _load()
+    for order in state.get("orders") or []:
+        if str(order.get("idempotency_key") or "") != key:
+            continue
+        if str(order.get("mode") or "") != LIVE:
+            raise OperatorResolutionError(f"not_live: mode={order.get('mode')}")
+        if not str(order.get("venue") or "").strip().lower().startswith(venue_name):
+            raise OperatorResolutionError(f"venue_mismatch: {order.get('venue')} != {venue_name}")
+        if order.get("outcome"):
+            raise OperatorResolutionError(f"already_settled: outcome={order.get('outcome')}")
+        if str(order.get("status") or "") != STATUS_FILLED:
+            raise OperatorResolutionError(f"not_filled: status={order.get('status')}")
+        leg = vs._order_side_key(venue_name, order)
+        outcome = vs._kalshi_outcome_from_leg(result, leg)
+        if outcome is None:
+            raise OperatorResolutionError(f"unmappable_leg: {leg!r}")
+        pnl = vs._derived_pnl(order, outcome)
+        if pnl is None:
+            raise OperatorResolutionError("pnl_not_derivable: no fill stake or fill price on the row")
+        at = _utc_now()
+        order["pre_operator_grade"] = {field: order.get(field) for field in _OPERATOR_GRADE_FIELDS}
+        order["outcome"] = outcome
+        order["pnl_dollars"] = pnl
+        order["settled_by"] = "venue"
+        order["settled_at_venue"] = settled_at_venue
+        order["graded_at"] = at
+        order["held_side"] = leg
+        order["operator_grade"] = {
+            "market_result": result,
+            "outcome": outcome,
+            "pnl_dollars": pnl,
+            "pnl_basis": "own_fill",
+            "evidence": dict(evidence or {}),
+            "note": text,
+            "at": at,
+        }
+        _persist(state)
+        print(
+            f"[execution_ledger] OPERATOR_GRADE key={key} venue={order.get('venue')}"
+            f" ticker={order.get('venue_ticker')} leg={leg} market_result={result}"
+            f" outcome={outcome} pnl={pnl}",
+            flush=True,
+        )
+        return dict(order)
+    raise OperatorResolutionError(f"order_not_found: {key}")
+
+
 # `#656`. How many times `_persist` re-reads, re-merges and re-SETs before it
 # stops insisting on atomicity for one write. Five conflicts in a row need five
 # other SETs landing in five consecutive ~0.3-0.5 s windows; the densest burst
@@ -2586,6 +2690,75 @@ def _venue_single_order_reader(venue: str):
     return getattr(adapter, "fetch_order", None)
 
 
+# ------------------------------------------------------------------------------
+# AGED OUT AT THE VENUE IS NOT MISSING.
+# ------------------------------------------------------------------------------
+#
+# MEASURED 2026-11-10/11 on live-odds-worker. Kalshi stopped serving order
+# `01a1740e` (key `970ec063`, 1 NO filled 2026-10-25 17:14Z) from BOTH the orders
+# list and `GET /portfolio/orders/{id}` between 09:54Z and 10:00Z on 11-10 --
+# ~15.7 days after the fill -- while `/portfolio/fills` and
+# `/portfolio/settlements` still listed it. The row was `filled` / `executed` /
+# remaining 0 from an earlier POSITIVE read, and still ungraded (its settlement
+# was refused), so it stayed a candidate: every pass spent a per-order read on it
+# and printed RECONCILE_SINGLE_READ_FAILED ("still unaccounted for") about an
+# order whose venue state can no longer change. 276 lines by 23:49Z; the
+# watchdog's `exec:log_errors:orders:kalshi` went red at 5:01 PM CT and stayed red.
+#
+# Only a row the VENUE already called terminal qualifies, and only on a 404
+# `not_found` -- never a 5xx, a timeout or an unreadable answer. A `submitted`
+# row NEVER qualifies: an order we cannot account for might be a live position,
+# and placing again could double it. That guard is unchanged.
+AGED_OUT_ENV = "SYNDICATE_RECONCILE_AGED_OUT"  # absent = on; "off" restores the read-every-pass behaviour
+_VENUE_TERMINAL_STATUSES = frozenset({"executed", "filled", "canceled", "cancelled"})
+# One RECONCILE_AGED_OUT line per key per process -- the point is to stop a line
+# per pass, not to rename it.
+_AGED_OUT_ANNOUNCED: set[str] = set()
+
+
+def _aged_out_enabled() -> bool:
+    return str(os.environ.get(AGED_OUT_ENV) or "").strip().lower() != "off"
+
+
+def _venue_terminal_fill(order: Mapping[str, Any]) -> bool:
+    """A row an earlier POSITIVE venue read left `filled` with nothing working:
+    venue status executed/canceled, remaining 0, and a venue id it was read by."""
+    if str(order.get("status") or "") != STATUS_FILLED:
+        return False
+    if str(order.get("venue_status") or "").strip().lower() not in _VENUE_TERMINAL_STATUSES:
+        return False
+    if not str(order.get("venue_order_id") or "").strip():
+        return False
+    try:
+        remaining = float(order.get("venue_remaining_count"))
+    except (TypeError, ValueError):
+        return False
+    return remaining == 0
+
+
+def _is_venue_not_found(reason: Any) -> bool:
+    """The per-order read's NAMED 404 -- `KalshiAuthError: http_404: <url>:
+    {"error":{"code":"not_found",...}}` on the fleet 2026-11-11. Nothing else is
+    evidence that the venue dropped the order."""
+    text = str(reason or "").lower()
+    return bool(re.search(r"\bhttp_404\b", text)) and "not_found" in text
+
+
+def _announce_aged_out(key: str, order: Mapping[str, Any], venue: str) -> None:
+    if key in _AGED_OUT_ANNOUNCED:
+        return
+    _AGED_OUT_ANNOUNCED.add(key)
+    print(
+        f"[execution_ledger] RECONCILE_AGED_OUT key={key} venue={venue}"
+        f" venue_order_id={order.get('venue_order_id')} status={order.get('status')}"
+        f" venue_status={order.get('venue_status')} outcome={order.get('outcome')}"
+        f" aged_out_at={order.get('venue_aged_out_at')} -- venue-terminal since an earlier"
+        " positive read, and the venue no longer serves it by id: aged out, not unaccounted"
+        " for. Not read again; logged once per process.",
+        flush=True,
+    )
+
+
 # How far past the requested stake a fill may land before it is refused as a
 # parse error. Generous on purpose: fees and rounding ride along in the venue's
 # numbers, and the failure this bound exists to catch is a fixed-point scale
@@ -2886,6 +3059,9 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
     recovered = 0
     recovery_budget = _NOT_FOUND_SINGLE_READ_BUDGET
     recovery_skipped = 0
+    aged_out = 0
+    aged_out_stamped = 0
+    aged_out_on = _aged_out_enabled()
 
     for order in candidates:
         key = str(order.get("idempotency_key") or "")
@@ -2924,6 +3100,14 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
             # cannot account for after asking about it directly keeps blocking,
             # which is correct -- placing again could double a live position.
             venue_id = str(order.get("venue_order_id") or "").strip()
+            terminal = aged_out_on and _venue_terminal_fill(order)
+            if terminal and order.get("venue_aged_out_at"):
+                # ALREADY ESTABLISHED on an earlier pass: venue-terminal, and the
+                # venue answered 404 for it. Nothing a read could return would
+                # change it, so it spends no budget and prints no per-pass line.
+                aged_out += 1
+                _announce_aged_out(key, order, venue)
+                continue
             if not venue_id:
                 # Nothing to fetch BY. The write-ahead record exists precisely
                 # for a lost submit response, and such an order has no venue id.
@@ -2953,6 +3137,17 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
                         )
                 else:
                     reason = single.get("reason") if isinstance(single, Mapping) else "unreadable"
+                    if terminal and _is_venue_not_found(reason):
+                        # AGED OUT, see `_venue_terminal_fill`. Stamped so later
+                        # passes skip it; the row's status, fill and outcome are
+                        # untouched -- grading is settlement's business.
+                        now_stamp = _utc_now()
+                        order["venue_aged_out_at"] = now_stamp
+                        order["reconciled_at"] = now_stamp
+                        aged_out += 1
+                        aged_out_stamped += 1
+                        _announce_aged_out(key, order, venue)
+                        continue
                     print(
                         f"[execution_ledger] RECONCILE_SINGLE_READ_FAILED key={key}"
                         f" venue={venue} venue_order_id={venue_id} reason={reason!r}"
@@ -3443,7 +3638,7 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
     # logged as `submitted->rejected`, and then silently dropped. A mutation
     # that is logged but not persisted is worse than one that never happened,
     # because the log says it did.
-    if stamped or changed:
+    if stamped or changed or aged_out_stamped:
         _persist(state)
     if changed:
         for row in changed:
@@ -3580,6 +3775,7 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
         # says the budget bound -- a truncation nobody can see reads as full
         # coverage.
         f" recovered={recovered} recovery_skipped={recovery_skipped}"
+        f" aged_out={aged_out}"
         f" stamped={stamped}"
         # COVERAGE ON THE SAME LINE AS THE COUNTS IT QUALIFIES. Read without
         # it, `not_found=0 venue_orders=15` on a per-order venue looks exactly
@@ -3601,6 +3797,9 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
         # a test of the latch has to check.
         "recovered": recovered,
         "recovery_skipped": recovery_skipped,
+        # Venue-terminal fills the venue no longer serves by id (`_venue_terminal_fill`);
+        # counted here instead of `not_found`, which they are not.
+        "aged_out": aged_out,
         "unknown": unknown,
         "implausible": implausible,
         "stamped": stamped,
