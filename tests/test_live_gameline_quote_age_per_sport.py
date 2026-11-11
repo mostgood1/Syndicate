@@ -20,10 +20,12 @@ An edge harvested from a 186-second-old median quote is not collectable. This
 gate removes a fake edge; it does not create a real one, and at 120s roughly 77%
 of live rows stop being priced.
 
-PER SPORT, BECAUSE ONLY MLB WAS MEASURED. Both readings are baseball. A sport
-whose quotes legitimately sit still between plays could be badly served by 120s,
-so everything else keeps 600s until somebody measures it -- the same reason
-`lens_sources_for_sport` is an explicit table rather than a relaxed default.
+PER SPORT, BECAUSE EACH SPORT IS MEASURED ON ITS OWN. Both readings above are
+baseball. A sport whose quotes legitimately sit still between plays could be
+badly served by 120s, so a sport keeps 600s until somebody measures it -- the
+same reason `lens_sources_for_sport` is an explicit table rather than a relaxed
+default. NCAAB, WNCAAB, NBA and NCAAF were measured 2026-11-10 (`#780`) and are
+at 120s too; `test_live_gameline_quote_ceiling_120.py` pins them.
 """
 
 from __future__ import annotations
@@ -56,11 +58,13 @@ class TestTheCeilingIsPerSport:
     def test_mlb_is_120s(self):
         assert max_quote_age_seconds("mlb") == pytest.approx(120.0)
 
-    @pytest.mark.parametrize("sport", ["ncaaf", "nfl", "wnba", "soccer", "nba", "nhl"])
+    @pytest.mark.parametrize("sport", ["nfl", "wnba", "soccer", "nhl"])
     def test_every_UNMEASURED_sport_keeps_600s(self, sport):
-        """Only MLB has a measurement behind it. An unmeasured sport must not
-        inherit baseball's number -- that would be a guess wearing the clothes
-        of a safety fix, which is what the 600s note warned against."""
+        """An unmeasured sport must not inherit another sport's number -- that
+        would be a guess wearing the clothes of a safety fix, which is what the
+        600s note warned against. NCAAB, WNCAAB, NBA and NCAAF were measured
+        on their own (`#780`) and moved to 120s:
+        `test_live_gameline_quote_ceiling_120.py`."""
         assert max_quote_age_seconds(sport) == pytest.approx(600.0)
 
     def test_an_absent_sport_keeps_600s_not_the_tighter_value(self):
@@ -80,7 +84,7 @@ class TestTheVerdict:
         """The heart of the change: 186s was the MEDIAN quote age in the bucket
         that looked most profitable, and it used to price."""
         assert quote_age_verdict(186.0, sport="mlb")["withheld_reason"] == REASON_STALE_QUOTE
-        assert quote_age_verdict(186.0, sport="ncaaf") is None
+        assert quote_age_verdict(186.0, sport="nfl") is None
 
     @pytest.mark.parametrize("age", [0.0, 27.0, 119.9, 120.0])
     def test_a_fresh_mlb_quote_still_prices(self, age):

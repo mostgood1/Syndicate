@@ -532,11 +532,12 @@ REASON_UNSUPPORTED_MARKET = "market_not_priced_from_a_live_distribution"
 # ~77% of live rows stop being priced. This change does not create a profitable
 # bucket. It removes a fake one, which is the more valuable of the two.
 #
-# PER SPORT, BECAUSE ONLY MLB WAS MEASURED. Both measurements are baseball. A
-# 120s ceiling might be badly wrong for a sport whose quotes legitimately sit
-# still between plays, so every other sport keeps 600s until someone measures
-# it. `lens_sources_for_sport` is an explicit table for the same reason -- an
-# unmeasured sport must not inherit another one's number.
+# PER SPORT, BECAUSE EACH SPORT IS MEASURED ON ITS OWN. Both measurements above
+# are baseball. A 120s ceiling might be badly wrong for a sport whose quotes
+# legitimately sit still between plays, so a sport keeps 600s until someone
+# measures it (college basketball, NBA and NCAAF were measured 2026-11-10: see
+# the table below). `lens_sources_for_sport` is an explicit table for the same
+# reason -- an unmeasured sport must not inherit another one's number.
 #
 # ABSENT AGE IS REFUSED, NOT PASSED. `unknown must not default permissive` is a
 # standing rule here. Every one of the 72,587 measured records carried
@@ -550,7 +551,42 @@ _DEFAULT_MAX_QUOTE_AGE_SECONDS = 600.0
 # conservative direction here: it prices MORE rows, but it is the behaviour that
 # has been running, so an unmeasured sport is left exactly as it was rather than
 # silently inheriting baseball's ceiling.
-_MAX_QUOTE_AGE_BY_SPORT: dict[str, float] = {"mlb": 120.0}
+#
+# NCAAB, WNCAAB, NBA, NCAAF -> 120s (`#780`, lane live-gameline-quote-ceiling-120;
+# user 2026-11-11 "Yes, set 120 s"). MEASURED 2026-11-10 on the fleet's
+# live-gameline ledgers: priced full-game rows graded against ESPN finals, one
+# unit per distinct re-sim state, game-clustered SEs
+# (`scripts/live_gameline_age_grade.py`,
+# `.syndicate/findings_2026-11-10_live_totals_grade.md`). Realised edge (hit
+# minus the de-vigged market's fair price for the model's side), on re-sim
+# states <=120s old at the build (frozen states read the same), by quote age:
+#
+#                    0-30 s            90-120 s          180-300 s         300-600 s
+#   ncaab  totals    +0.005 +- 0.072   -0.014 +- 0.071   +0.024 +- 0.065   +0.095 +- 0.057
+#   ncaab  spreads   -0.005 +- 0.080   +0.030 +- 0.074   +0.102 +- 0.062   +0.172 +- 0.040
+#   nba    totals    -0.094 +- 0.150   +0.078 +- 0.083   +0.068 +- 0.066   +0.152 +- 0.050
+#   nba    spreads   -0.019 +- 0.127   +0.028 +- 0.100   +0.062 +- 0.067   +0.150 +- 0.055
+#   ncaaf  totals    -0.009 +- 0.125   +0.035 +- 0.060   +0.111 +- 0.044   +0.147 +- 0.037
+#   ncaaf  spreads   +0.072 +- 0.123   +0.044 +- 0.062   +0.098 +- 0.047   +0.159 +- 0.037
+#
+# Under 120s the model LOSES to the market on Brier in every one of those cells
+# (+0.004..+0.086, model minus market), and h2h shows no positive realised edge
+# at any age under 300s. The "edge" appears only once the quote has had time to
+# go stale: the MLB mechanism again, the market decays. WNCAAB leans positive at
+# every age on 15-35 games a cell, every interval covering 0 below 120s; it
+# shares NCAAB's producer and the same quote feed, so it takes NCAAB's number.
+# Cost, share of priced rows refused (totals / spreads): NCAAB 62% / 65%, NBA
+# 80% / 80%, NCAAF 66% / 77%, WNCAAB 69% / 77%. The live DISPLAY number is kept
+# on a refused row (`#762`); only the edge goes.
+#
+# NFL and NHL stay at 600s: not measured (0 priced NFL rows, 3 NHL games).
+_MAX_QUOTE_AGE_BY_SPORT: dict[str, float] = {
+    "mlb": 120.0,
+    "ncaab": 120.0,
+    "wncaab": 120.0,
+    "nba": 120.0,
+    "ncaaf": 120.0,
+}
 
 
 def max_quote_age_seconds(sport: Any = None) -> float:

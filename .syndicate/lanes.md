@@ -704,6 +704,14 @@ death, never life — do not invert it.
 - Verification: Harness run on the fleet host over all completed 2026-27 games with per-bucket n, worst powered bucket, sd ratio and bootstrap CIs over games; findings file states the provenance verdict and a price / keep-display-only recommendation
 - Blocked by: none
 
+### live-gameline-quote-ceiling-120 — OPEN — opened 2026-11-11 — session 8062940b-57fd-454a-8de5-25fdd4804d85
+- Goal: NCAAB, WNCAAB, NBA and NCAAF live game lines (h2h, totals, spreads) are priced only against quotes at most 120 s old: _MAX_QUOTE_AGE_BY_SPORT gains ncaab/wncaab/nba/ncaaf = 120.0 (NFL, NHL, WNBA, soccer unchanged at 600), the #780 measurement in the comment, tests incl. off != on per sport through the join, on main; the fleet load is the user's decision
+- Files: syndicate/features/shared/live_gameline_join.py (the quote-age ceiling section, _MAX_QUOTE_AGE_BY_SPORT and its comment only), tests/test_live_gameline_quote_ceiling_120.py (NEW), tests/test_live_gameline_quote_age_per_sport.py, docs/ai_context/todo.md (#780 section only)
+- Hypothesis: n/a (user decision 2026-11-11 'Yes, set 120 s', on the #780 measurement: under 120 s quote age the model's live edge realises ~0 and loses on Brier in every market; the edge appears at 180-300 s, i.e. a stale market)
+- Falsification test: n/a
+- Verification: Unit: per sport and market, through attach_live_gamelines, a 119 s quote prices and a 180 s quote is withheld quote_older_than_live_pricing_ceiling; the env knob at 600 prices the same 180 s row (off != on); NFL at 180 s still prices. Fleet after the user's load: NCAAB/NBA LIVE_GAMELINE_JOIN withheld_by_reason gains quote_older_than_live_pricing_ceiling and priceable falls roughly by the measured share (NCAAB 62-65%, NBA 80%, NCAAF 66-77%), with display unchanged
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
