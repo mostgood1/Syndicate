@@ -739,6 +739,14 @@ death, never life — do not invert it.
 - Verification: Unit: segment points from quarter_log + linescores (resume at every quarter + quarter break + halftime) match hand-computed values; off != on through the env and through board_enrichment's own index builder on a fake grid; h2h segment rows get no display; no display row carries an edge. Grade: backtest_ncaaf_live_totals --market segment_total/segment_margin over completed 2026 games at 120 sims with per-segment worst powered bucket. Fleet after load: LIVE_GAMELINE_JOIN sport=ncaaf why{} moves segment rows from segment_is_not_full_game to segment_pricing_disabled with segment_index_sizes > 0 and display rising; served board probe: NCAAF segment rows with a Live proj. / segment rows, and 0 carrying an edge or live_aware.
 - Blocked by: none
 
+### load-782-nba-quote-capture — OPEN — opened 2026-11-11 — session 345d60ab-9db5-4a93-9d01-d57374578f65
+- Goal: Todo #782's NBA midnight quote pulls are LOADED on the fleet: ~/Syndicate fast-forwarded to exactly eacc9f990 and live-odds-worker restarted under a claim + CLEAR preflight (user 2026-11-11 'load #782', scope 'Live-odds-worker only'); the new pid runs it (prior_slate_in_play on disk, 0 NBA_LIVE_AUTORUN_PRIOR_SLATE_ERROR, 0 tracebacks); refresh-worker NOT restarted
+- Files: none (deploy-only: fleet ff + live-odds-worker TERM)
+- Hypothesis: n/a (deploy)
+- Falsification test: the new live-odds-worker pid logs NBA_LIVE_AUTORUN_PRIOR_SLATE_ERROR or a Traceback, or its odds sweeps stop
+- Verification: deploys entry: ff + TERM times, new pid, prior_slate_in_play on disk, 0 PRIOR_SLATE_ERROR / 0 tracebacks after ~10 min, sweeps continuing; the night reading stays with lane nba-quote-capture-midnight
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
