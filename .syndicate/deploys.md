@@ -58725,3 +58725,48 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **The log line was missing**, so it could not show this. `CARDS_SIM_DETAIL_MISSING_GAMES_ADDED` appears in no fleet log: not the props logs 11-10..11-13, not `live-odds-worker.log`, not `refresh-worker.log`. The 11-11 props log has 0 `[refresh_nba_oddsapi_props]` prefixed lines at all, because the script's stdout does not reach it; only `_append_log` lines do.
   - Fixed on main in `63e56dbb4`: the line also goes through `_append_log`, and `_run_refresh_via_cli` passes its run log. NOT LOADED; the next ff loads it (a fresh subprocess per run).
 - **Also on main, not loaded:** `c8d79b8ee` (todo #775), the face/side fallback to the book's spelling for Bobby Portis.
+
+## 2026-11-11 18:11:22Z (12:11 PM CST) -- web: restated-live board cards get the build's live-edge rule (`5c8eec41a`, lane `restate-live-edge-withhold`) -- **MET on the same build snapshot: restated-live pregame-priced cards carrying a model edge 20 -> 0, college cards serving the pregame Win% 20 -> 0; 0 tracebacks**
+- **User, in this chat:** "push and reload web". Ride-along: "Go ahead, let it ride (Recommended)", answering whether the ff may also carry #781, #775, #780, #782 and #778's commits.
+- **Cause:**
+  - `pipeline/intelligence_state._refresh_layer2_live_state` runs on web only. Since 17:00Z, web logged 46 `LAYER2_LIVE_RESTATED` and 45 `COMBINED_STATE_LIVE_RESTATED` lines; both workers logged 0.
+  - It restates a card the build priced PREGAME as live (or final) from the scoreboard chip. It never re-applied `live_edge_policy` (#340), which `board_enrichment._enforce_live_edge_policy` applies at build to every live row whose projection is not live-aware.
+  - It withheld the pregame probability from a stale `{nfl, ncaaf}` copy, missing NCAAB/WNCAAB (user 2026-11-03, already in the build).
+  - Found by lane `nhl-nfl-actual-read-time`'s NHL reading: 24 live NHL props on FLA @ CBJ at 00:41:23Z 11-11, built 00:38Z while pregame.
+- **What:**
+  - `_withhold_pregame_edge_on_restated_card` covers every sport, live and final. `model_edge_pct` / `model_edge_pct_raw` / `model_ev_pct` go to None, the pregame values are kept as `sim_*`, and `model_edge_withheld_reason` is set from the policy's own text.
+  - `sim_view` becomes `unpriced`, with `sim_unpriced_reason` `live` (the page reads "sim, pregame") or `other` on a final game.
+  - A live-aware card keeps everything.
+  - The probability withhold reads `board_enrichment.LIVE_PROBABILITY_WITHHELD_SPORTS`.
+  - NOT re-scored: a restated card keeps its build `score` until the next build.
+  - Tests: 19 new; 15 fail on the old code, and the 4 that pass both ways are the leave-alone cases. The 13 files that drive the restate also pass: 160.
+- **Hypothesis test, before the load:** probe `C:\tmp\lpa\edge_probe\restate_probe.py`, served board vs the build artifact, 18:09:53Z.
+  - 20 live, non-live-aware cards carried `model_edge_pct`: NCAAB 14, WNCAAB 6. 20 of 20 were PREGAME in the build artifact (written 18:00:12Z), and 20 of 20 artifact rows carried the same edge.
+  - Lanes: 3 opportunity, 17 dead. All 20 also served the pregame `model_probability`.
+  - Falsification (live at build, or live-aware) did not occur.
+  - At 17:49-18:01Z (before the 18:00Z tips restated anything) the count was 0, i.e. the window is chip flip -> next build.
+- **Claim + preflight:** `deploy_claim.py acquire --service web --holder restate-live-edge-withhold` 18:09:45Z. Preflight (fleet, worktree at origin/main) CLEAR at 18:10:54Z for `5c8eec41a`:
+  - expect loaded_commit 4793d823c -> 5c8eec41a;
+  - expect restated_live_edge_nonaware 20 -> 0;
+  - expect college_live_prob_nonaware 20 -> 0;
+  - baseline read 18:09:53Z.
+- **Applied:** guarded script.
+  - Fleet HEAD == `4793d823c`, `git fetch github main`. The 6 locally modified runtime files (statcast features, manifests, odds reports) are untouched by the incoming diff. `vendor/` diff 0.
+  - `git merge --ff-only 5c8eec41a...` at 18:11:22Z, then `reload-web`: HUP of master 647, workers [191167, 191492] -> [191757, 191758], started 12:11:21 CST, 2.0 s, 0 failures.
+- **Ride-along, loaded on web with this reload:**
+  - `df08d4d9a` #781 (rail interval rows 1H/2H/Q1-Q4, `intelligence.html`);
+  - `c8d79b8ee` #775 (NBA face/side lookup tries the engine spelling, then the book's; its served headshot reading is now due to its lane).
+- **Ride-along, on the fleet's disk, NOT loaded:**
+  - `0f6e4a723` #780 (120 s live quote ceiling for NCAAB/WNCAAB/NBA/NCAAF). Its join callers run in refresh-worker, which still loads `9fee4160`, so it goes live at the NEXT refresh-worker restart, whoever does it.
+  - `eacc9f990` #782 (NBA live odds past midnight Central). Goes live at the NEXT live-odds-worker restart.
+  - `63e56dbb4` #778 (props-run log line, a script).
+- **Measured (load), same build snapshot (artifact written 18:00:12Z both sides, 66 live rows, 3810 served):**
+  - loaded_commit: **MET.** Fleet HEAD `5c8eec41a`; new web workers started 12:11:21 CST.
+  - restated_live_edge_nonaware: **MET, 20 -> 0** at 18:11:40Z.
+  - college_live_prob_nonaware: **MET, 20 -> 0** at 18:11:40Z.
+  - The same 20 cards carry `sim_model_edge_pct`, `sim_view` unpriced/live, the policy reason, `sim_model_probability` and `pregame_on_live` (20 of 20 each).
+  - The 6 of 8 live-aware cards that carry a live edge kept it.
+  - Example: Dartmouth @ Albany over 141.5, opportunity lane, served a pregame +19.05-point model edge on a live total before the load; `model_edge_pct` null after.
+  - Web log 18:11-18:12Z: 0 Tracebacks, 0 `*_RESTATE_FAILED`; `LAYER2_LIVE_RESTATED cards=63 of 5445` after the load.
+- **verify:** the reading above (a live tip window, the 18:00Z NCAAB/WNCAAB tips). NHL/NBA tonight read the same code path.
+- **revert:** `git revert 5c8eec41a` on main, ff the fleet to that SHA, `reload-web`. No env switch.
