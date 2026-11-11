@@ -58689,3 +58689,19 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - 0 flagged (filter `Model ≠ line 0`): every quote was 7-14 min old. 2 live WNCAAB games show no live line, because the board has no live rows for them. 0 page errors.
 - **verify: MET.** All 3 fields 0 -> 1, and the rail renders the live line on the served page. Owed (todo #781): a flag reading on an evening slate, when quotes are fresh.
 - **revert:** revert `3c38ef4c4` + `cb422f34a` on main, ff the fleet to that revert, then `reload-web` with the venv python.
+
+## 2026-11-11 17:33:14Z (11:33 AM CST) -- READING #772: Bobby Portis served live rows, MIA @ UTA 11-10 -- **SERVED RULE NOT MEASURED** (both scheduled runs stopped at a permission prompt); **join instrument: MET** on a before/after of the role log (lane `nba-roster-filter-name-key`, session c7e5cb4c)
+- **What happened to the armed reading:** `nba-portis-live-check-1110` (9:15 PM CST) and `-backup` (10:00 PM CST) both dispatched (list_task_runs: 1 run each, "succeeded"). Each transcript ends at its FIRST shell command with "Request interrupted by user for tool use".
+  - The tasks were created in a turn started by another session's message, so they ran in the app's DEFAULT permission mode, and the unattended WSL call waited on a prompt nobody answered.
+  - Nothing was recorded. The served board's live rows are gone after the final, so the pre-registered served PASS rule cannot be read for 11-10.
+- **What the fleet logged (read-only, rotated role logs, same instrument both nights):**
+  - ESPN box (recon_props_2026-11-10): Portis played 17 min (5 pts, 1 reb, 1 ast).
+  - The books posted live Portis props throughout (live_lens_registry: e.g. assists, 56 observations 02:15Z-04:00Z).
+  - `LIVE_PROJECTION_JOIN sport=nba` (refresh-worker), every join in the window -- joins whose miss sample names Bobby Portis (`player_in_lens: False`):
+    - **BEFORE** 11-09 02:00-04:59Z (MIA @ SAC, Portis absent from the frames): **18 of 20 joins**.
+    - **AFTER** 11-11 02:00-04:59Z (MIA @ UTA, Portis in the frames): **1 of 30**. That one was at 02:21:44Z, 11 min after tip, in a join with `miss_not_live=212`, before the lens flipped the game live; 0 after that.
+  - `miss_player` is 0 in both windows, so it is not the counter that caught him. `player_alias` (absent before e2558013c) resolved 22-34 rows per in-game join.
+  - `NBA_LIVE_RESIM_TICK` (live-odds-worker): 75 ticks, `resimmed == games`, `refusals={}`.
+  - Pregame: `[nba_projections] NBA_PROP_ENGINE_NAME ... ('Bobby Portis', 'Bobby Portis Jr.')` from 02:02Z. todo #775's pregame-join alias was live by tip, so his pregame rows resolve too.
+- **Verdict:** his live prop rows stopped missing the live re-sim (18/20 -> 0 after the lens went live). That is MET on the join log. The pre-registered served-board rule (each served live row carries Live proj. AND actual) was NOT MEASURED.
+- **Next MIA game:** Thu 11-13, CLE @ MIA, 7:00 PM CST (01:00Z 11-14, ESPN 401909298). The same check script can read it if re-armed in a mode that will not stall.
