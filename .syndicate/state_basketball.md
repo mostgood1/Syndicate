@@ -1529,6 +1529,7 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   - Other sports: lane `all-sport-interval-projections`.
 - **Engine switches live per ROLE `[verified 2026-11-07 23:4xZ, /proc environ, booleans only]`:** the college pregame sims and the live re-sim run on live-odds-worker.
   - It has `SYNDICATE_NCAAB_HALF_SPLIT` and `SYNDICATE_NCAAB_EXACT_TARGET` truthy, and `SYNDICATE_NCAAB_LIVE_MECHANISMS` non-empty. refresh-worker has none of them.
+  - `SYNDICATE_NCAAB_LIVE_MECHANISMS` holds #768's 7 fields (`solver_endgame_pts_per_team` 0.2, no `score_effect_k`) `[verified 2026-11-11 17:28Z, live-odds-worker pid 52912 environ parsed with the fleet's code, env sha 4a316bd1]`. RC46 (+ `score_effect_k` 0.005, `possession_alternation` 1.0, solver 0.46) was loaded 2026-11-10 07:49:46Z and REVERTED 22:56:28Z on outcome scoring before any live game (deploys.md 22:55:46Z; learnings 2026-11-11).
   - All 177 pregame sims 11-03..11-07 carry `halfSplit: True`. Production h1 vs 147 finals: +1.27 (n.s.), h2 -0.78, full +0.50 (#765 correction).
 - **Live overtime counts in college full-game totals `[verified 2026-11-08 on the ledger]`:** 3 men's OT games' late totals sat at their finals (158-163 vs 163; 162.4 vs 163; 184.4 vs 186), not at the regulation score.
 - **College quote-order gate (`59638f001`) refuses on both leagues `[verified 2026-11-07/08]`:**

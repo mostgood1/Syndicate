@@ -1541,3 +1541,21 @@ User "Yes, revert now" (~22:48Z), answering "Revert NCAAB to the old 7-field con
 - **Against the 2025-26 gate:** that gate scored margins tying or helping from 30 m on 2025-26 games. On 2026-27 games the help does not show, and the 20 m and 36 m costs do. Caveats: the replay is unanchored (production shifts the margin mean toward the closing spread by a share, which moves neither the width nor the pull-back); it covers 11 days of an early-season population heavy in mismatches; and none of it was pre-registered.
 - **Still owed (unchanged by the revert):** the registered paired replay on the 11-10 slate's completed games. It is a counterfactual replay on both configs, so it does not need RC46 live (session watcher `wait_morning.sh`, deadline 11-11 18:00Z). The live split has no RC46 population.
 - **STATUS `[2026-11-10 23:05Z]`: REVERTED 22:56:28Z, 7 keys verified. Re-loading RC46 (`env_load_k.py --variant rc46`) needs a new decision on new evidence.**
+
+## PHASE 2 STEP 3h, EFFECT READING `[2026-11-11 17:50Z (11:50 AM CST), lane ncaab-score-effect-load, CLOSED]`
+
+The registered reading of the RC46 load, taken on the 11-10 slate after the revert (it is a counterfactual replay, so it needs no live RC46). 54 completed games re-simmed on both configs, same seeds, production's priors, 100 sims per arm (11 more refused `team_unrated`, as in production). Run `C:\tmp\score_effect_load\replay\paired_2026-11-10.jsonl`, output `analyze_1110.txt`.
+
+| reading | pre-stated | measured | verdict |
+|---|---|---|---|
+| served / old margin SD, 30 m | about 0.93; falsified outside 0.88-0.98 | **0.943 +- 0.038** | not falsified |
+| served / old margin SD, 36 m | about 0.94; falsified outside 0.88-0.98 | **0.942 +- 0.025** | not falsified |
+| in-game total shift | +0.0 to +0.1 | 30 m -0.17 +- 0.28, 36 m +0.07 +- 0.24 | as expected |
+| tip total shift | about 0 (gate -0.02 +- 0.11) | **-0.59 +- 0.53** | missed |
+| lens / live model - line | names both fields; moves < +-0.2 | no population (reverted before the first live game) | not taken |
+
+Against the slate's finals (diagnostic; these 54 games are not among the 240 behind the revert): mixed. Margin 80% coverage falls at every checkpoint (beyond SE at the tip and 10 m). Win log loss is better on RC46 at 30 m (-0.018 +- 0.016), total CRPS worse at 30 m (+0.230 +- 0.208), everything else inside SE.
+
+- **What this settles.** The mechanism works as registered: it narrows the late regulation margin by about 6%, and the in-game totals barely move. The registered statistic measured the mechanism's EFFECT, not whether the effect improves calibration against outcomes. That second question is what decided the revert (240-game replay: totals tie, win Brier worse beyond SE at 20 m and 36 m, margin coverage down everywhere) and the 11-10 slate does not overturn it.
+- **What a re-load would need:** an outcome-scored gate on 2026-27 games at every checkpoint the live pricing uses (tip, 10, 20, 30, 36 m; margin and total), not only the 30 / 36 m SD ratio from the 2025-26 corpus. The OLD config is itself over-wide (margin 80% coverage 0.83-0.91); RC46 overshoots to under-wide (0.69-0.83). A width fix between the two, tested that way, is the open question for #765 NCAAB, not RC46 as loaded.
+- **STATUS `[2026-11-11 17:50Z]`: step 3h CLOSED. RC46 reverted (live 22:56:28Z 11-10); effect reading NOT FALSIFIED; no re-load planned.**
