@@ -2,7 +2,8 @@
 //
 // A live rail card now shows, per full-game market, our live re-sim number against the book's main live line
 // and the quote's age; the card is highlighted, and the rail filter keeps it, ONLY when a live edge was priced
-// against a FRESH quote (todo #780: live edges on quotes older than ~30 s graded as the line not having moved).
+// against a FRESH quote (todo #780 + addendum: every game-line market realises ~0 under 120 s; the "edge" on
+// older quotes is the line not having moved). The flag is worded as a disagreement, never as an edge.
 // This pins the page's OWN block (extracted from intelligence.html, not restated) and that renderGameCards
 // calls it.
 //
@@ -47,9 +48,10 @@ const api = new Function('escapeHtml', 'trimClubAffixes', `
 const text = (out) => out.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 
 // ---------------------------------------------------------------- the stated defaults
-check('fresh-quote threshold is 30 s (the bucket #780 graded as fresh)', api.LIVE_EDGE_FRESH_QUOTE_SECONDS, 30);
+check('fresh-quote threshold is 120 s (#780 addendum: ~0 under 120 s in every market; MLB join ceiling)', api.LIVE_EDGE_FRESH_QUOTE_SECONDS, 120);
 check('minimum live edge is 3 points', api.LIVE_EDGE_MIN_PP, 3);
-check('the block states the #780 reason in code', /#780/.test(block[0]) && /REALISED/.test(block[0]), true);
+check('the block states the #780 reason in code', /#780/.test(block[0]) && /under 120 s/.test(block[0]) && /180-300 s/.test(block[0]), true);
+check('the block says a flag is a disagreement, not an edge', /A FLAG IS A DISAGREEMENT, NOT A PROVEN EDGE/.test(block[0]), true);
 check('the join ceiling is named and NOT changed here', /_DEFAULT_MAX_QUOTE_AGE_SECONDS/.test(block[0]) && /NOT made here/.test(block[0]), true);
 
 // ---------------------------------------------------------------- fixtures (shaped like served rows, 2026-11-10 23:45Z)
@@ -105,12 +107,13 @@ check('header: LIVE OURS BOOK AGE', /^LIVE OURS BOOK AGE/.test(out), true);
 check('total: our re-sim (the card\'s own Proj final) vs the main line, with the quote age at pricing', /Total 145\.9 147\.5 12s/.test(out), true);
 check('spread: our margin restated for the line\'s team vs the book line', /Sprd FLA −10\.2 FLA −8\.5 40s/.test(out), true);
 check('moneyline: our live % vs the book price', /ML FSU 14% FSU \+575 2m/.test(out), true);
-check('fresh-quote edge is flagged with its line, size and quote age', /▲ Total u149 \+10\.3 pts · 12s quote/.test(out), true);
+check('fresh-quote gap is flagged as a disagreement with its line, size and quote age', /≠ Total u149: model \+10\.3 pts vs a 12s line/.test(out), true);
+check('the flag never calls itself an edge', /EDGE|edge/.test(out), false);
 check('the half-time row never reaches the line', /61/.test(out), false);
 check('summary: fresh edge in totals only', JSON.stringify(live.freshEdges), '{"totals":true}');
 check('card highlight fires on a fresh-quote edge', live.hasFreshEdge, true);
 check('age cell green on a fresh quote, showing the age the flag tested', /game-mini-card__live-age is-fresh" title="Quote 12s old when priced; ≈32s now">12s</.test(api.renderLiveRailLines(live)), true);
-check('a 40 s quote is not green', /is-fresh[^>]*>40s</.test(api.renderLiveRailLines(live)), false);
+check('a 40 s quote is green too (inside 120 s)', /is-fresh[^>]*>40s</.test(api.renderLiveRailLines(live)), true);
 
 // ---------------------------------------------------------------- the filter
 check('filter all keeps it', api.liveEdgeFilterMatches(live, 'all'), true);
@@ -127,11 +130,13 @@ check('stale quote: NO highlight', stale.hasFreshEdge, false);
 check('stale quote: filter any drops the game', api.liveEdgeFilterMatches(stale, 'any'), false);
 check('stale quote: filter totals drops the game', api.liveEdgeFilterMatches(stale, 'totals'), false);
 const staleOut = text(api.renderLiveRailLines(stale));
-check('stale quote: no edge line anywhere on the card', /▲|pts/.test(staleOut), false);
+check('stale quote: no flag line anywhere on the card', /≠|pts/.test(staleOut), false);
 check('stale quote: the line still renders, with its age', /Total 145\.9 147\.5 4m/.test(staleOut), true);
-check('the boundary: 30 s is fresh, 31 s is not',
-  Boolean(api.liveRowFreshEdge({ ...fresh()[2], book_age_seconds: 30 }, response, NOW))
-  && !api.liveRowFreshEdge({ ...fresh()[2], book_age_seconds: 31, quote: {} }, response, NOW), true);
+check('the boundary: 120 s is fresh, 121 s is not',
+  Boolean(api.liveRowFreshEdge({ ...fresh()[2], book_age_seconds: 120 }, response, NOW))
+  && !api.liveRowFreshEdge({ ...fresh()[2], book_age_seconds: 121, quote: {} }, response, NOW), true);
+check('a 46.8 s quote counts (the 11-10 RUTG o149.5 row)', Boolean(api.liveRowFreshEdge({ ...fresh()[2], book_age_seconds: 46.8 }, response, NOW)), true);
+check('a 153.5 s quote does not (the 11-10 RUTG o147.5 row)', api.liveRowFreshEdge({ ...fresh()[2], book_age_seconds: 153.5, quote: {} }, response, NOW), null);
 
 // Fresh at pricing, but the board has not been rebuilt for 10 minutes: the page already calls that price stale.
 const frozen = fresh().map((row) => ({ ...row, price_grid_generated_at: '2026-11-10T23:35:00Z' }));
@@ -188,7 +193,9 @@ check('a chip-less live card renders them too', /\$\{game\.hasLive \? renderLive
 check('the card highlight is the fresh-edge flag', /liveEdge \? " game-mini-card--live-edge" : ""/.test(r), true);
 check('the rail is filtered by the live-edge filter', /games\.filter\(\(game\) => game\.key === state\.game \|\| liveEdgeFilterMatches\(liveSummaries\.get\(game\.key\), liveFilter\)\)/.test(r), true);
 check('the filter tabs are rendered', /data-live-edge-filter=/.test(r), true);
-check('the empty note says "an edge" / "a moneyline edge"', r.includes('liveFilter === "any" ? "an" : `a ${escapeHtml(((LIVE_RAIL_MARKETS.find('), true);
+check('the empty note speaks of a fresh line, not an edge', r.includes('No live game has our model off a fresh ${liveFilter === "any" ? "" :'), true);
+check('the card badge reads MODEL ≠ LINE, never EDGE', /MODEL ≠ LINE<\/span>/.test(r) && !/>▲ EDGE</.test(r), true);
+check('the first filter tab is "Model ≠ line"', /\{ value: "any", label: "Model ≠ line" \}/.test(block[0]), true);
 check('the filter is in the URL', /url\.searchParams\.set\("live_edge", state\.liveEdge\)/.test(html), true);
 check('the filter is NOT a board-row default (rail-only view)', /FILTER_DEFAULTS = \{[^}]*liveEdge/.test(html), false);
 

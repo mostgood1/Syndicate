@@ -668,8 +668,9 @@
     // `marketFamily`, which is only the game-vs-prop split. Options are built
     // from the markets actually present, so it can never offer an empty slice.
     betType: urlParams.get("bet_type") || "all",
-    // Games-rail live-edge filter (lane layer2-live-rail-edges, todo #781): "all" games, or only the live games
-    // with a FRESH-quote edge -- in any game-line market, or in one. A VIEW over the rail the reader picks, not
+    // Games-rail live model-vs-line filter (lane layer2-live-rail-edges, todo #781): "all" games, or only the live
+    // games whose live re-sim disagrees with a FRESH line (quote <= 120 s when priced) -- in any game-line market,
+    // or in one. A disagreement, not a proven edge (#780). A VIEW over the rail the reader picks, not
     // a gate: it removes no row, pick or stake from the board (learnings 2026-10-05, no market is withheld).
     // Kept out of FILTER_DEFAULTS on purpose -- those count and clear BOARD-row filters, and this one narrows
     // only the rail.
@@ -3184,38 +3185,36 @@
   // plus the time since the build (the row's own `price_grid_generated_at` on
   // an in-play overlay row, else the page's build time, `boardBuildEpochMs`).
   //
-  // THE EDGE FLAG COUNTS ONLY AN EDGE PRICED AGAINST A FRESH QUOTE. Graded
-  // against finals (todo #780, .syndicate/findings_2026-11-10_live_totals_grade.md):
-  // priced live full-game totals CLAIMED +16 to +23 points and REALISED about
-  // 0 when the quote was <= 30 s old (NCAAB +0.014 +- 0.054, NBA -0.001 +-
-  // 0.136, NCAAF -0.019 +- 0.054); the apparent edge appeared only on quotes
-  // 90 s to 10 min old -- the line not having moved yet, or a suspended
-  // market, neither of which can be bet at that price. The join still PRICES
-  // quotes up to 600 s (`live_gameline_join._DEFAULT_MAX_QUOTE_AGE_SECONDS`;
-  // MLB 120 s) -- tightening that is #780's candidate fix 1, a separate user
-  // decision, and NOT made here. So a highlight keyed on the edge alone would
-  // mostly flag stale quotes; this one also requires:
-  //   - the quote's age AT PRICING <= LIVE_EDGE_FRESH_QUOTE_SECONDS (30 s): the
-  //     bucket the totals grade measured as fresh in every sport. #780's
-  //     all-market addendum (23:57Z) puts the stale side later: totals,
-  //     spreads and moneylines realise ~0 under 120 s, and the fake "edge"
-  //     appears clearly from 180-300 s; 120 s is the ceiling it proposes for
-  //     the join. 30 s stays well inside that, on the conservative side;
-  //     raising it to 120 s is a product choice, not a measured gain (under
-  //     120 s the model's Brier was WORSE than the market);
+  // THE FLAG COUNTS ONLY A MODEL-VS-LINE GAP PRICED AGAINST A FRESH QUOTE.
+  // Graded against finals (todo #780 and its all-market addendum,
+  // .syndicate/findings_2026-11-10_live_totals_grade.md): priced live totals,
+  // spreads and moneylines in NCAAB, NBA and NCAAF realise ~0 when the book
+  // quote is under 120 s old, and the model's Brier is WORSE than the market
+  // there; the apparent "edge" grows only on older quotes, clearly from
+  // 180-300 s -- the line not having moved yet, or a suspended market,
+  // neither of which can be bet at that price. (Totals alone claimed +16 to
+  // +23 points and realised ~0 at <= 30 s.) The join still PRICES quotes up
+  // to 600 s (`live_gameline_join._DEFAULT_MAX_QUOTE_AGE_SECONDS`; MLB 120 s).
+  // A 120 s join ceiling for ncaab/wncaab/nba/ncaaf is proposed in #780 and
+  // is the user's decision; it is NOT made here. So a highlight keyed on the
+  // gap alone would mostly flag stale quotes; this one also requires:
+  //   - the quote's age AT PRICING <= LIVE_EDGE_FRESH_QUOTE_SECONDS (120 s),
+  //     in every game-line market: the measured boundary above, and the value
+  //     the join already uses for MLB (`_MAX_QUOTE_AGE_BY_SPORT`);
   //   - the price not stale NOW (age now <= LIVE_PRICE_STALE_AFTER_SECONDS, the
   //     page's existing live-price rule), so a frozen board cannot keep a flag
   //     lit on a price the card itself calls stale;
-  //   - a live-priced edge (`live_aware` and the join's `model_edge_pct`; a
+  //   - a live-priced gap (`live_aware` and the join's `model_edge_pct`; a
   //     pregame number on a live row never counts) of at least LIVE_EDGE_MIN_PP.
-  // A gap on an older quote is NOT shown as an edge anywhere on the rail: its
-  // AGE cell is simply old. Fresh is a property of the LINE (its quote age),
-  // never of the market (learnings 2026-10-05).
+  // A gap on an older quote is NOT shown anywhere on the rail: its AGE cell is
+  // simply old. Fresh is a property of the LINE (its quote age), never of the
+  // market (learnings 2026-10-05).
   //
-  // Even a fresh-quote edge is not shown to be real: #780's fresh bucket
-  // realised ~0. The flag says "priced against a price you could still take",
-  // and nothing more.
-  const LIVE_EDGE_FRESH_QUOTE_SECONDS = 30;
+  // A FLAG IS A DISAGREEMENT, NOT A PROVEN EDGE, AND IS WORDED THAT WAY. Even
+  // inside 120 s the realised edge was ~0. It says "our live model disagrees
+  // with a line you could still take", and nothing more -- hence "MODEL ≠
+  // LINE" and "model +x pts vs a 47s line", never "EDGE".
+  const LIVE_EDGE_FRESH_QUOTE_SECONDS = 120;
   // A -110 / -110 market needs ~2.4 points over the no-vig fair just to break
   // even (52.4% vs 50%); a gap under 3 points is not an edge after the vig.
   const LIVE_EDGE_MIN_PP = 3;
@@ -3226,7 +3225,7 @@
   ];
   const LIVE_EDGE_FILTER_TABS = [
     { value: "all", label: "All games" },
-    { value: "any", label: "Live edge" },
+    { value: "any", label: "Model ≠ line" },
     { value: "spreads", label: "Spread" },
     { value: "totals", label: "Total" },
     { value: "h2h", label: "ML" },
@@ -3451,11 +3450,11 @@
     }).join("");
     const title = "Live, full game: OURS is the live re-sim, BOOK the market's main live line (priced closest to even). "
       + "AGE is how long the book's price had stood unchanged when the board priced it (orange: the board is over 5 min old, shown as the age now). "
-      + `An edge is flagged only when it was priced against a quote ${LIVE_EDGE_FRESH_QUOTE_SECONDS}s old or less (green): `
-      + "graded against finals (#780), live edges on older quotes were the line not having moved yet, not a price you could take.";
+      + `A model-vs-line gap is flagged only when it was priced against a quote ${LIVE_EDGE_FRESH_QUOTE_SECONDS}s old or less (green): `
+      + "graded against finals (#780), gaps on older quotes were the line not having moved yet, and even fresh-quote gaps have realised ~0 -- a disagreement, not a proven edge.";
     const edges = summary.markets.filter((m) => m.edge).map((m) => {
-      const tip = `Our live re-sim's probability minus the market's no-vig fair: +${m.edge.edge.toFixed(1)} points, priced against a quote ${formatAge(m.edge.priced) || "?"} old. Even fresh-quote live edges graded ~0 against finals so far (#780).`;
-      return `<div class="game-mini-card__live-edge" title="${escapeHtml(tip)}">▲ ${escapeHtml(m.label)} ${escapeHtml(m.edge.side)} +${escapeHtml(m.edge.edge.toFixed(1))} pts · ${escapeHtml(formatAge(m.edge.priced) || "?")} quote</div>`;
+      const tip = `Our live re-sim disagrees with a fresh line: its probability is ${m.edge.edge.toFixed(1)} points above the market's no-vig fair, priced against a quote ${formatAge(m.edge.priced) || "?"} old. Graded against finals, such gaps have realised ~0 so far (#780): not a proven edge.`;
+      return `<div class="game-mini-card__live-edge" title="${escapeHtml(tip)}">≠ ${escapeHtml(m.label)} ${escapeHtml(m.edge.side)}: model +${escapeHtml(m.edge.edge.toFixed(1))} pts vs a ${escapeHtml(formatAge(m.edge.priced) || "?")} line</div>`;
     }).join("");
     return `<div class="game-mini-card__live" title="${escapeHtml(title)}">${head}${body}</div>${edges}`;
   }
@@ -4175,14 +4174,14 @@
     // Shown whenever a live game is on the rail (or the filter is on, so it can
     // always be turned off again).
     const edgeFilter = liveSummaries.size || liveFilter !== "all"
-      ? `<div class="game-rail-filter" role="tablist" aria-label="Live-edge filter" title="Live games whose live re-sim has an edge priced against a quote ${LIVE_EDGE_FRESH_QUOTE_SECONDS}s old or less (#780: edges on older quotes are not counted)">${LIVE_EDGE_FILTER_TABS.map((tab) => {
+      ? `<div class="game-rail-filter" role="tablist" aria-label="Live model-vs-line filter" title="Live games where our live re-sim disagrees with a line priced on a quote ${LIVE_EDGE_FRESH_QUOTE_SECONDS}s old or less (#780: gaps on older quotes are not counted, and fresh-quote gaps have realised ~0 so far -- a disagreement, not a proven edge)">${LIVE_EDGE_FILTER_TABS.map((tab) => {
         const active = tab.value === liveFilter;
         const empty = edgeCounts[tab.value] === 0 && !active;
         return `<button type="button" role="tab" class="game-rail-filter__tab${active ? " is-active" : ""}${empty ? " is-empty" : ""}" aria-selected="${active}" data-live-edge-filter="${escapeHtml(tab.value)}">${escapeHtml(tab.label)}<span class="board-tab-count">${edgeCounts[tab.value]}</span></button>`;
       }).join("")}</div>`
       : "";
     const emptyNote = !shownGames.length
-      ? `<div class="game-rail-filter__empty">No live game has ${liveFilter === "any" ? "an" : `a ${escapeHtml(((LIVE_RAIL_MARKETS.find((m) => m.key === liveFilter) || {}).label || "").toLowerCase())}`} edge priced against a quote ${LIVE_EDGE_FRESH_QUOTE_SECONDS}s old or less right now.</div>`
+      ? `<div class="game-rail-filter__empty">No live game has our model off a fresh ${liveFilter === "any" ? "" : `${escapeHtml(((LIVE_RAIL_MARKETS.find((m) => m.key === liveFilter) || {}).label || "").toLowerCase())} `}line (a quote ${LIVE_EDGE_FRESH_QUOTE_SECONDS}s old or less when priced) right now.</div>`
       : "";
     container.innerHTML = `
       <h2 class="board-section-title">Games${renderChipFreshness()}</h2>
@@ -4193,7 +4192,7 @@
           const chip = chipForGame(game);
           const liveSummary = liveSummaries.get(game.key) || null;
           const liveEdge = Boolean(liveSummary && liveSummary.hasFreshEdge);
-          const edgeBadge = liveEdge ? '<span class="game-mini-card__edge-badge" title="A live edge priced against a fresh quote -- see the lines below">▲ EDGE</span> ' : "";
+          const edgeBadge = liveEdge ? '<span class="game-mini-card__edge-badge" title="Our live re-sim disagrees with a fresh line (see the lines below). Graded against finals, such gaps have realised ~0 so far (#780): a disagreement, not a proven edge.">MODEL ≠ LINE</span> ' : "";
           if (chip) {
             const isLive = chip.state === "live";
             // A game that will not be played is its own state (`postponed` /

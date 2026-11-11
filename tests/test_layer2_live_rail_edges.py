@@ -5,8 +5,10 @@ assertions live in the node harness `tests/js/games_rail_live_lines.test.mjs`, w
 the template and runs it. This wrapper puts the harness in the pytest suite, and pins the two numbers the
 flag rests on, so a change to either is a visible test edit rather than a silent one:
 
-  - LIVE_EDGE_FRESH_QUOTE_SECONDS = 30: the only quote-age bucket todo #780 graded as fresh. Graded against
-    finals, priced live totals edges realised ~0 at <= 30 s and appeared only on quotes 90 s - 10 min old.
+  - LIVE_EDGE_FRESH_QUOTE_SECONDS = 120, in every game-line market: todo #780's all-market addendum graded priced
+    live totals, spreads and moneylines (NCAAB / NBA / NCAAF) at ~0 realised edge under 120 s, with the apparent
+    edge only on older quotes (clearly from 180-300 s); 120 s is also the join's MLB ceiling. Even inside 120 s the
+    realised edge is ~0, so the flag is worded as a model-vs-line disagreement, never as an edge.
   - the live join's own pricing ceiling stays 600 s (MLB 120 s): tightening it is #780's candidate fix 1, a
     separate user decision this lane does not make.
 """
@@ -38,7 +40,7 @@ def test_live_rail_lines_node_harness() -> None:
 
 def test_fresh_quote_threshold_and_minimum_are_the_stated_ones() -> None:
     html = _template()
-    assert re.search(r"const LIVE_EDGE_FRESH_QUOTE_SECONDS = 30;", html)
+    assert re.search(r"const LIVE_EDGE_FRESH_QUOTE_SECONDS = 120;", html)
     assert re.search(r"const LIVE_EDGE_MIN_PP = 3;", html)
 
 
