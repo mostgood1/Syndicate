@@ -799,6 +799,14 @@ ight.sh`, 01:05Z / 01:50Z / 02:45Z 11-12, BUFF @ BALL, SAC @ CMU, MASS @ TOL). S
 - Verification: Walk-forward replay (fit on earlier dates, score later ones) on the fleet host: by-state table on vs off with n, pooled worst powered bucket and Brier with game-bootstrap CIs; unit tests: off == today's histogram seed for seed, on moves only regulation-end one-goal sims, reachability through build_live_lens_snapshot; findings file with a load / do-not-load recommendation
 - Blocked by: none
 
+### college-pbp-blowout-bench — OPEN — opened 2026-11-11 — session 0f519972-4890-45d3-8b52-767c7e0a0389
+- Goal: Women's college basketball play-by-play is archived like men's: the nightly basketball-rotation-stints job covers wncaab (pbp_events/<season>/<event>.jsonl.gz + dated stints/player_stints), this season backfilled on the fleet; and a measured answer to 'what happens when the bench comes in during a blowout' for college: when starters leave (margin x time), the scoring rate before vs after, and our live re-sim's late-blowout remaining-points error, in a findings file with denominators; tests incl. a wncaab build; on main; engine changes stay with lane basketball-scenario-calibration
+- Files: scripts/build_basketball_rotation_stints.py (LEAGUES + WINDOWS wncaab entries + --league help ONLY), tests/test_basketball_rotation_stints.py (new wncaab tests ONLY), scripts/college_blowout_bench_study.py (NEW), .syndicate/findings_2026-11-11_college_blowout_bench.md (NEW), docs/ai_context/todo.md (#787 section only)
+- Hypothesis: User 2026-11-11: three games badly wrong today (latest WNCAAB South Alabama @ Florida Atlantic, 57-85, re-sim under-projected the last 2-3 minutes' points by 9-14). Hypothesis: when the bench comes in during a blowout the scoring rate changes in a way the live re-sim does not model; for WNCAAB we cannot test it because no play-by-play is kept.
+- Falsification test: NCAAB (6,863 archived games): scoring rate with bench-heavy lineups in blowout state is within its CI of the starter-heavy / same-game baseline, AND the live re-sim's late-blowout remaining-points error stays ~0 -> no bench effect to model for men's college (EXONERATED for ncaab); WNCAAB judged only once its backfill exists.
+- Verification: Fleet: wncaab pbp_events + player_stints files exist for this season's dates with score_match rates reported by the job's own verifier; findings file with per-league tables (n games, n stints, rates with CIs).
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
