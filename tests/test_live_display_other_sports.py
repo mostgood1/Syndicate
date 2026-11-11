@@ -349,11 +349,12 @@ def test_an_away_moneyline_row_shows_its_own_sides_win_percent(gate_on):
     assert home == pytest.approx(0.7, abs=0.01) and away == pytest.approx(1.0 - home, abs=1e-5)
 
 
-@pytest.mark.parametrize("sport,segmented", [("ncaab", True), ("wncaab", True), ("ncaaf", False),
+@pytest.mark.parametrize("sport,segmented", [("ncaab", True), ("wncaab", True), ("ncaaf", True),
                                              ("nfl", False), ("nhl", False), ("mlb", False)])
 def test_the_board_caller_passes_the_display_flag_from_the_table(monkeypatch, sport, segmented):
     """College gets segment indexes and the display flag with its pricing OFF; a sport outside the table gets no
-    flag. The flag is inert without segment indexes, so football and hockey segments stay blank."""
+    flag. The flag is inert without segment indexes, so NFL and hockey segments stay blank. NCAAF gets its
+    indexes since todo #785 (`ncaaf/live_resim.live_segment_frames`; tests/test_ncaaf_live_segments.py)."""
     seen = {}
 
     def fake_attach(grid, index, **kwargs):
@@ -361,6 +362,7 @@ def test_the_board_caller_passes_the_display_flag_from_the_table(monkeypatch, sp
         return lgj.new_coverage()
 
     monkeypatch.delenv(lgj.COLLEGE_SEGMENT_PRICING_ENV, raising=False)
+    monkeypatch.delenv("SYNDICATE_NCAAF_LIVE_SEGMENTS", raising=False)
     monkeypatch.setattr(lgj, "attach_live_gamelines", fake_attach)
     from syndicate.features.shared import refresh_state_store
 

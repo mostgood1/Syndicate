@@ -243,6 +243,13 @@ class NcaafLiveGameState:
     # `resim_live_game`, which marginalises over both rather than picking one.
     possession_owner: str | None = None
     as_of: str = ""
+    # ESPN's per-period points, index 0 = Q1, `None` for a hole
+    # (`segment_actuals.linescores_from_competitor`). Read ONLY by the live segment
+    # blocks (`live_segment_frames`) to split the score already on the board into the
+    # quarters it was scored in; the rest-of-game sim never sees them. Empty = not
+    # provided, and a segment that needs one is refused by name, never guessed.
+    home_linescores: tuple[int | None, ...] = ()
+    away_linescores: tuple[int | None, ...] = ()
 
     @property
     def home_margin(self) -> int:
@@ -387,7 +394,22 @@ def live_state_from_espn_event(
         field_position=field_position,
         possession_owner=possession_owner,
         as_of=str(state.get("as_of") or datetime.now(timezone.utc).isoformat()),
+        home_linescores=_linescore_tuple(state.get("home_linescores")),
+        away_linescores=_linescore_tuple(state.get("away_linescores")),
     )
+
+
+def _linescore_tuple(values: Any) -> tuple[int | None, ...]:
+    """The record's per-period list as a tuple, holes kept as `None` (a shifted list grades the wrong quarter)."""
+    if not isinstance(values, (list, tuple)):
+        return ()
+    out: list[int | None] = []
+    for value in values:
+        try:
+            out.append(int(value) if value is not None else None)
+        except (TypeError, ValueError):
+            out.append(None)
+    return tuple(out)
 
 
 def _positive_int(value: Any, *, default: int, hi: int) -> int:
@@ -609,6 +631,261 @@ def calibrate_margin_distribution(margins: list[int]) -> tuple[float, dict[str, 
     return moved_sum / len(margins), out
 
 
+# ---------------------------------------------------------------------------
+# LIVE SEGMENTS: h1 h2 q1-q4, FOR THE LIVE COLUMN ONLY
+# `[2026-11-11, lane ncaaf-live-segment-display, todo #785]`
+# ---------------------------------------------------------------------------
+# WHAT WAS MISSING. Measured on the fleet 2026-11-11 00:08-04:45Z (MACtion): 43
+# NCAAF board joins refused 2,825 of 4,892 live game rows `segment_is_not_full_game`
+# and none of them reached the Live column, while NCAAB showed a display-only live
+# number on its half rows. Two gaps, both traced: this module published no
+# `projection.segments`, and `board_enrichment` built per-segment indexes for
+# NCAAB/WNCAAB/NBA only. The numbers existed one level down: `simulate_game`
+# returns a per-quarter `quarter_log` for every seed, and the live-state record
+# carries ESPN's `home_linescores`/`away_linescores`. This only stops discarding
+# them. No new engine input and no new mechanism -- the same seeds, re-binned.
+#
+# HOW A SEGMENT IS ASSEMBLED, per simulated rest-of-game:
+#     points already on the board for it  (the score, split by quarter)
+#   + the sim's points in its quarters from the resume point on  (`quarter_log`)
+#   + the sim's overtime points, for `h2` only
+# binned exactly as `segment_actuals.SEGMENT_PERIODS["ncaaf"]` grades: q4 is
+# regulation only, h2 = q3 + q4 + every overtime period. A distribution binned
+# differently from how it settles is worse than none
+# (`football_segment_distributions` says the same of the pregame sidecar).
+#
+# THE SCORE ALREADY ON THE BOARD needs the linescore only for the quarters the
+# score cannot separate: a segment reaching the current quarter takes the score so
+# far minus the completed quarters OUTSIDE it (h1 in Q2 needs none: the whole score
+# is h1's), and one that ended takes its own completed quarters. A hole there is a
+# NAMED refusal for that segment (`linescore_missing`), never a zero; a linescore
+# summing past the score is `linescores_exceed_score`.
+#
+# NOTHING HERE PRICES. `board_enrichment` builds NCAAF's segment indexes with
+# segment pricing OFF (it is the college BASKETBALL switch), so a segment row still
+# refuses -- now `segment_pricing_disabled` -- and carries the number for display
+# only (`live_gameline_join.live_display_block`). `marginAnchored` is False: NCAAF
+# has no pregame margin anchor, so `_segment_hit` publishes no segment win
+# probability and no priced margin. That keeps segment MONEYLINES blank on
+# purpose: a football quarter ends level often enough that "P(home leads)" and its
+# complement are not the two sides of the bet.
+#
+# NOT CALIBRATED SEPARATELY: both full-game calibrators are identity
+# (`calibrate_total_distribution`, `calibrate_margin_distribution`), so the full
+# game and its segments are the same raw draws and h1 + h2 sums to the full game,
+# draw by draw. What the segment draws are worth is graded by
+# `scripts/backtest_ncaaf_live_totals.py --market segment_total|segment_margin`.
+#
+# OFF SWITCH: `SYNDICATE_NCAAF_LIVE_SEGMENTS=0` (or false/no/off). ABSENT IS ON,
+# which is the deliberate default: off restores the old payload byte for byte, and
+# `board_enrichment` reads the same switch, so the board's old refusal label returns
+# with it.
+LIVE_SEGMENTS_ENV = "SYNDICATE_NCAAF_LIVE_SEGMENTS"
+_LIVE_SEGMENTS_OFF = frozenset({"0", "false", "no", "off"})
+# The board's NCAAF segment tokens, the keys `board_enrichment` builds one index for each of.
+LIVE_SEGMENTS: tuple[str, ...] = ("h1", "h2", "q1", "q2", "q3", "q4")
+_QUARTER_SECONDS = 900
+
+
+def live_segments_enabled(environ: Mapping[str, str] | None = None) -> bool:
+    """ON unless `SYNDICATE_NCAAF_LIVE_SEGMENTS` is 0/false/no/off. Read by this module AND `board_enrichment`."""
+    source = os.environ if environ is None else environ
+    return str(source.get(LIVE_SEGMENTS_ENV) or "").strip().lower() not in _LIVE_SEGMENTS_OFF
+
+
+def _segment_periods() -> Mapping[str, tuple[int | None, ...]]:
+    from syndicate.features.shared.segment_actuals import SEGMENT_PERIODS
+
+    return SEGMENT_PERIODS["ncaaf"]
+
+
+@dataclass(frozen=True)
+class LiveSegmentFrame:
+    """One segment at one resume point: what it already holds, and which simulated quarters finish it."""
+
+    segment: str
+    known_home: int
+    known_away: int
+    sim_quarters: tuple[int, ...]
+    includes_overtime: bool
+    settled: bool
+    remaining_fraction: float
+
+
+def _linescore_at(values: tuple[int | None, ...], quarter: int) -> int | None:
+    return values[quarter - 1] if 0 < quarter <= len(values) else None
+
+
+def live_segment_frames(state: NcaafLiveGameState) -> tuple[dict[str, LiveSegmentFrame], dict[str, str]]:
+    """`({segment: frame}, {segment: refusal})` at this resume point. Every segment lands in exactly one of the two."""
+    period = int(state.period)
+    clock = max(0, int(state.clock_seconds))
+    frames: dict[str, LiveSegmentFrame] = {}
+    refused: dict[str, str] = {}
+    for name in LIVE_SEGMENTS:
+        periods = _segment_periods().get(name)
+        if not periods:
+            refused[name] = "segment_not_graded"
+            continue
+        regular = tuple(int(q) for q in periods if q is not None)
+        overtime = any(q is None for q in periods)
+        in_now = period in regular
+        # The completed quarters whose points must be READ: outside the segment when it reaches the current quarter
+        # (the score minus them is the segment's), inside it otherwise (they ARE the segment's).
+        need = tuple(q for q in range(1, period) if (q not in regular) == in_now)
+        read_home = read_away = 0
+        missing = False
+        for quarter in need:
+            home_q = _linescore_at(state.home_linescores, quarter)
+            away_q = _linescore_at(state.away_linescores, quarter)
+            if home_q is None or away_q is None:
+                missing = True
+                break
+            read_home += home_q
+            read_away += away_q
+        if missing:
+            refused[name] = "linescore_missing"
+            continue
+        if read_home > int(state.home_score) or read_away > int(state.away_score):
+            refused[name] = "linescores_exceed_score"
+            continue
+        if in_now:
+            known_home, known_away = int(state.home_score) - read_home, int(state.away_score) - read_away
+        else:
+            known_home, known_away = read_home, read_away
+        sim_quarters = tuple(q for q in regular if q >= period)
+        remaining = sum(_QUARTER_SECONDS for q in regular if q > period) + (clock if in_now else 0)
+        frames[name] = LiveSegmentFrame(
+            segment=name,
+            known_home=known_home,
+            known_away=known_away,
+            sim_quarters=sim_quarters,
+            includes_overtime=overtime,
+            # Over when no regulation second of it is left and it takes no overtime (h2 closes only with the game).
+            settled=remaining == 0 and not overtime,
+            remaining_fraction=remaining / float(_QUARTER_SECONDS * len(regular)),
+        )
+    return frames, refused
+
+
+def _sim_quarter_points(out: Any, state: NcaafLiveGameState) -> tuple[dict[int, tuple[int, int]], tuple[int, int]] | None:
+    """`({quarter: (home, away)} scored AFTER the resume point, (overtime home, away))`, or None if the log is unusable.
+
+    `quarter_log`'s first entry is the RESUMED quarter, counted from the carried-in score; overtime is appended to no
+    quarter (`football_segment_distributions`), so it is the final score less the carried-in score less the log."""
+    per: dict[int, tuple[int, int]] = {}
+    for entry in getattr(out, "quarter_log", None) or ():
+        try:
+            quarter, home, away = int(entry["quarter"]), int(entry["home_points"]), int(entry["away_points"])
+        except (KeyError, TypeError, ValueError):
+            return None
+        prior = per.get(quarter, (0, 0))
+        per[quarter] = (prior[0] + home, prior[1] + away)
+    final = getattr(out, "final_score", None) or {}
+    try:
+        ot_home = int(final["home"]) - int(state.home_score) - sum(v[0] for v in per.values())
+        ot_away = int(final["away"]) - int(state.away_score) - sum(v[1] for v in per.values())
+    except (KeyError, TypeError, ValueError):
+        return None
+    if ot_home < 0 or ot_away < 0:
+        return None
+    return per, (ot_home, ot_away)
+
+
+class _LiveSegmentAccumulator:
+    """Histograms per segment over the re-sim's draws. Counts only, never the draws."""
+
+    def __init__(self, frames: Mapping[str, LiveSegmentFrame]):
+        self.frames = dict(frames)
+        self.totals: dict[str, dict[int, int]] = {name: {} for name in self.frames}
+        self.margins: dict[str, dict[int, int]] = {name: {} for name in self.frames}
+        self.home_sum: dict[str, int] = {name: 0 for name in self.frames}
+        self.away_sum: dict[str, int] = {name: 0 for name in self.frames}
+        self.sims = 0
+        self.unusable = 0
+
+    def add(self, out: Any, state: NcaafLiveGameState) -> None:
+        split = _sim_quarter_points(out, state)
+        if split is None:
+            self.unusable += 1
+            return
+        per, (ot_home, ot_away) = split
+        for name, frame in self.frames.items():
+            home, away = frame.known_home, frame.known_away
+            for quarter in frame.sim_quarters:
+                q_home, q_away = per.get(quarter, (0, 0))
+                home += q_home
+                away += q_away
+            if frame.includes_overtime:
+                home += ot_home
+                away += ot_away
+            total, margin = home + away, home - away
+            self.totals[name][total] = self.totals[name].get(total, 0) + 1
+            self.margins[name][margin] = self.margins[name].get(margin, 0) + 1
+            self.home_sum[name] += home
+            self.away_sum[name] += away
+        self.sims += 1
+
+    def payload(self) -> dict[str, Any]:
+        if self.sims <= 0:
+            return {}
+        n = float(self.sims)
+        out: dict[str, Any] = {}
+        for name, frame in self.frames.items():
+            totals = self.totals[name]
+            out[name] = {
+                # The keys `live_gameline_join._segment_hit` reads, in NCAAB's shape.
+                "total_mean": round(sum(t * c for t, c in totals.items()) / n, 3),
+                "total_dist": {str(k): int(v) for k, v in sorted(totals.items())},
+                "margin_dist": {str(k): int(v) for k, v in sorted(self.margins[name].items())},
+                "sims": self.sims,
+                "home_points_mean": round(self.home_sum[name] / n, 3),
+                "away_points_mean": round(self.away_sum[name] / n, 3),
+                "includesOvertime": frame.includes_overtime,
+                "remainingFraction": round(frame.remaining_fraction, 4),
+                "settled": frame.settled,
+                "marginAnchored": False,
+                "knownScore": {"home": frame.known_home, "away": frame.known_away},
+            }
+        return out
+
+
+# WHICH SEGMENT TOTALS REACH THE LANE, from the cutoff-replay grade of the SHIPPED `resim_live_game`
+# (`.syndicate/findings_2026-11-11_ncaaf_live_segment_grade.md`): 287 completed games on six October-November
+# Saturdays, production's SP+ ratings, 120 sims, at kickoff (287 rows) and at the end of Q1/Q2/Q3 (861 rows);
+# `#499`'s bar is a worst powered bucket <= 0.150. Worst gap kickoff / quarter-end:
+#   h1 0.085 / 0.077, h2 0.135 / 0.140, q2 0.049 / 0.077, q3 0.095 / 0.141   -> PASS, the lane carries them
+#   q4 0.100 / **0.240**  -> where the model put the over under 10% it landed 31% (n=35): the last quarter's
+#        right tail is too thin. The HISTOGRAM is withheld; the mean (bias -0.14, MAE 6.06 against 14.03 for
+#        "nobody scores again") rides alone, as NHL totals do: a live total and no probability.
+#   q1 **0.186** (kickoff, its only open cutoff) with the mean running +1.41 points HIGH (the sim over-scores the
+#        first quarter; buckets 0.2-0.9 realise 4-19 pp under predicted). Both withheld: the row shows nothing.
+# Every segment MARGIN passes (worst h1 0.144 at kickoff, h2 0.143 at quarter-end); the lane keeps them all.
+# `resim_live_game` still returns every histogram so the harness can re-grade; this table is the one place to
+# reopen a segment. name -> (keep the mean, reason stamped on the lane).
+_SEGMENT_TOTALS_WITHHELD: Mapping[str, tuple[bool, str]] = {
+    "q1": (False, "q1_totals_failed_kickoff_grade_0.186_mean_+1.41"),
+    "q4": (True, "q4_totals_failed_cutoff_grade_0.240"),
+}
+
+
+def _graded_segment_blocks(segments: Mapping[str, Any]) -> dict[str, Any]:
+    """The lane's copy of the segment blocks, minus each totals number its grade failed."""
+    out: dict[str, Any] = {}
+    for name, block in (segments or {}).items():
+        if not isinstance(block, Mapping):
+            continue
+        block = dict(block)
+        if name in _SEGMENT_TOTALS_WITHHELD:
+            keep_mean, reason = _SEGMENT_TOTALS_WITHHELD[name]
+            block["total_dist"] = {}
+            if not keep_mean:
+                block["total_mean"] = None
+            block["totalDistWithheld"] = reason
+        out[name] = block
+    return out
+
+
 def resim_live_game(
     state: NcaafLiveGameState,
     *,
@@ -680,6 +957,12 @@ def resim_live_game(
     ties = 0
     margins: list[int] = []
     totals: list[int] = []
+    # The live segments (`live_segment_frames`): None when switched off, so the result carries no segment keys at all.
+    segment_acc: _LiveSegmentAccumulator | None = None
+    segments_refused: dict[str, str] = {}
+    if live_segments_enabled():
+        frames, segments_refused = live_segment_frames(state)
+        segment_acc = _LiveSegmentAccumulator(frames)
     per_plan = max(1, n // len(plans))
     ran = 0
     for owner, field_position in plans:
@@ -691,6 +974,8 @@ def resim_live_game(
                 **base,
             )
             out = simulate_game(sim_input, profile=profile)
+            if segment_acc is not None:
+                segment_acc.add(out, state)
             home_points = int(out.final_score["home"])
             away_points = int(out.final_score["away"])
             margins.append(home_points - away_points)
@@ -732,7 +1017,15 @@ def resim_live_game(
     calibrated_total_mean, total_dist = calibrate_total_distribution(totals)
     calibrated_margin_mean, margin_dist = calibrate_margin_distribution(margins)
 
+    segment_keys: dict[str, Any] = {}
+    if segment_acc is not None:
+        segment_keys["segments"] = segment_acc.payload()
+        if segment_acc.unusable:
+            segments_refused = {**segments_refused, "_unusable_sims": str(segment_acc.unusable)}
+        segment_keys["segments_refused"] = segments_refused
+
     return {
+        **segment_keys,
         "home_win_prob": round(home_win_prob, 6),
         "sims_run": ran,
         "home_margin_mean": round(calibrated_margin_mean, 3),
@@ -781,7 +1074,7 @@ def build_game_lens(
         }]
 
     assert state is not None  # a result implies a state
-    return [{
+    lane = {
         "key": "live",
         "label": "Live",
         "source": LIVE_RESIM_LENS_SOURCE,
@@ -825,7 +1118,15 @@ def build_game_lens(
             "period": state.period,
             "clockSeconds": state.clock_seconds,
         },
-    }]
+    }
+    # THE SEGMENT BLOCKS, only when the re-sim built them (`live_segment_frames`), so with
+    # `SYNDICATE_NCAAF_LIVE_SEGMENTS` off the lane is byte-identical to before. Display only: see the
+    # LIVE SEGMENTS section above.
+    if result.get("segments"):
+        lane["projection"]["segments"] = _graded_segment_blocks(result["segments"])
+    if result.get("segments_refused"):
+        lane["projection"]["segmentsRefused"] = dict(result["segments_refused"])
+    return [lane]
 
 
 def possession_side_from_espn(competition: Any, *, home_id: Any, away_id: Any) -> tuple[str | None, dict[str, Any]]:

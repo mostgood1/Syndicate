@@ -3016,6 +3016,26 @@ def attach_live_gamelines_for_sport(grid: list, *, sport: str, selected_date: st
                     )
                     for seg in ("q1", "q2", "q3", "q4", "h1", "h2")
                 }
+            # NCAAF HALVES AND QUARTERS, DISPLAY ONLY (todo #785, lane ncaaf-live-segment-display). The re-sim's own
+            # segment blocks (`ncaaf/live_resim.live_segment_frames`), one index per segment as above. Never priced:
+            # `college_pricing` below is False for football. Off with the producer's switch, so off restores the old
+            # `segment_is_not_full_game` label rather than an empty index's `segment_pricing_disabled`.
+            elif sport == "ncaaf":
+                from syndicate.features.ncaaf.live_resim import LIVE_SEGMENTS as _NCAAF_LIVE_SEGMENTS
+                from syndicate.features.ncaaf.live_resim import live_segments_enabled as _ncaaf_live_segments_enabled
+
+                if _ncaaf_live_segments_enabled():
+                    segment_indexes = {
+                        seg: build_live_gameline_index(
+                            snapshot,
+                            sources=lens_sources_for_sport(sport),
+                            analytic_std_err=analytic_std_err_for_sport(sport),
+                            sport=sport,
+                            slate_date=selected_date,
+                            segment=seg,
+                        )
+                        for seg in _NCAAF_LIVE_SEGMENTS
+                    }
             college_pricing = sport in ("ncaab", "wncaab") and college_segment_pricing_enabled()
             coverage = attach_live_gamelines(
                 grid,

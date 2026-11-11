@@ -81,6 +81,9 @@ ESPN = "https://site.api.espn.com/apis/site/v2/sports/football/college-football/
 # play-by-play is needed -- which is what makes a powered sample reachable from
 # the scoreboard alone. Q4 is excluded: there is no rest of game to simulate.
 CUTOFF_PERIODS = (1, 2, 3)
+# `--cutoffs 0` adds KICKOFF (Q1 15:00, 0-0): the only cutoff at which `q1` is open, so the
+# segment grade can score it (todo #785). The full-game grade's default set is unchanged.
+KICKOFF_CUTOFF = 0
 
 # Calibration buckets over the PREDICTED probability.
 BUCKETS = ((0.0, 0.1), (0.1, 0.2), (0.2, 0.3), (0.3, 0.4), (0.4, 0.5),
@@ -209,7 +212,8 @@ def _ratings_index(season: int):
         return None, None, f"{type(exc).__name__}: {exc}"
 
 
-def replay_game(game: dict[str, Any], *, sp_index, means, sims: int) -> list[dict[str, Any]]:
+def replay_game(game: dict[str, Any], *, sp_index, means, sims: int,
+                cutoffs: tuple[int, ...] = CUTOFF_PERIODS) -> list[dict[str, Any]]:
     """One completed game -> a row per cutoff, or [] when it cannot be rated."""
     from scripts.generate_smartsim2_ncaaf_projections import sp_offense_defense_rating
     from syndicate.features.ncaaf.live_resim import NcaafLiveGameState, resim_live_game
@@ -224,19 +228,25 @@ def replay_game(game: dict[str, Any], *, sp_index, means, sims: int) -> list[dic
 
     actual_total = game["home_final"] + game["away_final"]
     actual_margin = game["home_final"] - game["away_final"]
+    segment_actuals = actual_segment_points(game)
     rows: list[dict[str, Any]] = []
-    for period in CUTOFF_PERIODS:
+    for period in cutoffs:
         home_at = sum(game["home_line"][:period])
         away_at = sum(game["away_line"][:period])
         state = NcaafLiveGameState(
             home_team=game["home_team"],
             away_team=game["away_team"],
-            period=period,
-            clock_seconds=0,
+            # KICKOFF is Q1 with the full clock; every other cutoff is the END of its quarter.
+            period=max(1, period),
+            clock_seconds=900 if period == KICKOFF_CUTOFF else 0,
             home_score=home_at,
             away_score=away_at,
             possession_owner=None,
             as_of=game["date"],
+            # What ESPN shows at the cutoff: the quarters played so far. The live segment blocks read them
+            # (`live_resim.live_segment_frames`); the rest-of-game sim does not.
+            home_linescores=tuple(game["home_line"][:period]),
+            away_linescores=tuple(game["away_line"][:period]),
         )
         result = resim_live_game(
             state,
@@ -263,8 +273,100 @@ def replay_game(game: dict[str, Any], *, sp_index, means, sims: int) -> list[dic
             "margin_dist": result.get("margin_dist") or {},
             "sims_run": result.get("sims_run"),
             "possession_unknown": bool(result.get("possession_unknown")),
+            # The SHIPPED segment blocks still open at this cutoff, beside what each segment really scored.
+            "segments": {
+                name: {k: block.get(k) for k in ("total_dist", "margin_dist", "total_mean", "knownScore",
+                                                 "remainingFraction")}
+                for name, block in (result.get("segments") or {}).items()
+                if isinstance(block, Mapping) and not block.get("settled")
+            },
+            "segment_actuals": segment_actuals,
         })
     return rows
+
+
+# ---------------------------------------------------------------------------
+# SEGMENT GRADE (todo #785, lane ncaaf-live-segment-display)
+# ---------------------------------------------------------------------------
+# The live re-sim now publishes h1 h2 q1-q4 blocks for the board's Live column. They
+# are the SAME draws the full-game grade scored, re-binned by quarter, so what is new
+# is the BINNING and the quarter-level dispersion: a quarter has few scores, lumped on
+# 3 and 7. This grades each open segment at each cutoff against what that segment
+# really scored, binned the way it settles (`segment_actuals.SEGMENT_PERIODS["ncaaf"]`:
+# q4 regulation only, h2 = q3 + q4 + overtime).
+#
+# THE LADDER IS CENTRED ON THE SEGMENT'S FROZEN VALUE, the points already in it at the
+# cutoff -- observed, not modelled, for the reason `MARGIN_LINE_OFFSETS` gives. Totals
+# step up from it by half-points across what one or two quarters can add.
+SEGMENT_TOTAL_OFFSETS = (0.5, 3.5, 6.5, 9.5, 13.5, 16.5, 20.5, 23.5, 27.5, 30.5, 34.5)
+
+
+def actual_segment_points(game: Mapping[str, Any]) -> dict[str, list[int]]:
+    """`{segment: [home, away]}` actually scored; overtime = the final less regulation. {} when they disagree."""
+    from syndicate.features.shared.segment_actuals import SEGMENT_PERIODS
+
+    home_line, away_line = list(game["home_line"]), list(game["away_line"])
+    ot_home = int(game["home_final"]) - sum(home_line[:4])
+    ot_away = int(game["away_final"]) - sum(away_line[:4])
+    if ot_home < 0 or ot_away < 0:
+        return {}
+    out: dict[str, list[int]] = {}
+    for name, periods in SEGMENT_PERIODS["ncaaf"].items():
+        home = sum(ot_home if q is None else home_line[q - 1] for q in periods)
+        away = sum(ot_away if q is None else away_line[q - 1] for q in periods)
+        out[name] = [home, away]
+    return out
+
+
+def segment_total_lines_for(known_total: float, open_quarters: int) -> list[float]:
+    cap = 17.5 * max(1, open_quarters) + 3.0
+    return [float(known_total) + off for off in SEGMENT_TOTAL_OFFSETS if off <= cap]
+
+
+def segment_pseudo_rows(rows: list[dict[str, Any]], *, only: str | None = None) -> list[dict[str, Any]]:
+    """One `score()`-shaped row per (cutoff, open segment), so the full-game ruler grades segments unchanged."""
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        actuals = row.get("segment_actuals") or {}
+        for name, block in (row.get("segments") or {}).items():
+            if only and name != only:
+                continue
+            real = actuals.get(name)
+            known = (block or {}).get("knownScore") or {}
+            if not real or not block.get("total_dist"):
+                continue
+            k_home, k_away = int(known.get("home") or 0), int(known.get("away") or 0)
+            margin_dist = block.get("margin_dist") or {}
+            n = sum(int(v) for v in margin_dist.values()) or 1
+            share = float(block.get("remainingFraction") or 0.0)
+            out.append({
+                "event_id": row["event_id"],
+                "segment": name,
+                "cutoff_period": row.get("cutoff_period"),
+                "score_at_cutoff": [k_away, k_home],
+                "total_at_cutoff": k_home + k_away,
+                "actual_total": real[0] + real[1],
+                "actual_margin": real[0] - real[1],
+                "projected_total": block.get("total_mean"),
+                "projected_margin": sum(int(m) * int(c) for m, c in margin_dist.items()) / n,
+                "total_dist": block.get("total_dist") or {},
+                "margin_dist": margin_dist,
+                "possession_unknown": bool(row.get("possession_unknown")),
+                # A share of 1.0 is two quarters open only for h2 at the end of Q1 or later; one otherwise.
+                "total_lines": segment_total_lines_for(k_home + k_away, 2 if (name in ("h1", "h2") and share > 0.5) else 1),
+            })
+    return out
+
+
+def score_segments(rows: list[dict[str, Any]], *, market: str) -> dict[str, Any]:
+    """The segment grade: pooled over every open segment, and per segment. `market` is total or margin."""
+    pooled = segment_pseudo_rows(rows)
+    report = {"pooled": score(pooled, lines=[], market=market), "by_segment": {}}
+    for name in ("h1", "h2", "q1", "q2", "q3", "q4"):
+        subset = [r for r in pooled if r["segment"] == name]
+        if subset:
+            report["by_segment"][name] = score(subset, lines=[], market=market)
+    return report
 
 
 def calibrate_dist(dist: Mapping[str, Any], *, shift: float, spread: float) -> dict[str, float]:
@@ -384,7 +486,8 @@ def score(rows: list[dict[str, Any]], *, lines: list[float],
         dist_for_scoring = row["margin_dist"] if market == "margin" else row["total_dist"]
         if shift or spread != 1.0:
             dist_for_scoring = calibrate_dist(dist_for_scoring, shift=shift, spread=spread)
-        row_lines = margin_lines_for(row) if market == "margin" else lines
+        # A segment row brings its own ladder (`segment_pseudo_rows`); a full-game row uses the fixed one.
+        row_lines = margin_lines_for(row) if market == "margin" else (row.get("total_lines") or lines)
         for line in row_lines:
             prob = _p_over(dist_for_scoring, line)
             if prob is None:
@@ -474,9 +577,14 @@ def main(argv: list[str] | None = None) -> int:
                         help="save replay rows so variants can be scored without re-simulating")
     parser.add_argument("--score-only", default=None,
                         help="score saved rows instead of simulating")
-    parser.add_argument("--market", default="total", choices=("total", "margin"))
+    parser.add_argument("--market", default="total",
+                        choices=("total", "margin", "segment_total", "segment_margin"),
+                        help="segment_* grades the live h1/h2/q1-q4 blocks (todo #785), pooled and per segment")
+    parser.add_argument("--cutoffs", default=",".join(str(p) for p in CUTOFF_PERIODS),
+                        help="quarter-end cutoffs to replay; 0 = kickoff (q1's only open cutoff)")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
+    cutoffs = tuple(int(x) for x in str(args.cutoffs).split(",") if x.strip())
 
     dates = _dates(args)
     if not dates:
@@ -491,7 +599,10 @@ def main(argv: list[str] | None = None) -> int:
         saved = json.loads(Path(args.score_only).read_text(encoding="utf-8"))
         rows = saved["rows"]
         lines = [float(x) for x in str(args.lines).split(",") if x.strip()]
-        result = score(rows, lines=lines, shift=args.shift, spread=args.spread, market=args.market)
+        if args.market.startswith("segment_"):
+            result = score_segments(rows, market=args.market.split("_", 1)[1])
+        else:
+            result = score(rows, lines=lines, shift=args.shift, spread=args.spread, market=args.market)
         result.update({k: saved.get(k) for k in
                        ("dates", "completed_games_found", "duplicate_events_skipped",
                         "games_unrated_refused", "ratings_source", "sims_per_cutoff")})
@@ -545,7 +656,7 @@ def main(argv: list[str] | None = None) -> int:
     rows: list[dict[str, Any]] = []
     unrated = 0
     for game in games:
-        replayed = replay_game(game, sp_index=sp_index, means=means, sims=args.sims)
+        replayed = replay_game(game, sp_index=sp_index, means=means, sims=args.sims, cutoffs=cutoffs)
         if not replayed:
             unrated += 1
         rows.extend(replayed)
@@ -563,7 +674,13 @@ def main(argv: list[str] | None = None) -> int:
         print(f"dumped {len(rows)} rows -> {args.dump_rows}", flush=True)
 
     lines = [float(x) for x in str(args.lines).split(",") if x.strip()]
-    result = score(rows, lines=lines, shift=args.shift, spread=args.spread)
+    if args.market.startswith("segment_"):
+        result = score_segments(rows, market=args.market.split("_", 1)[1])
+        result.update({"dates": len(dates), "completed_games_found": len(games), "duplicate_events_skipped": duplicates,
+                       "games_unrated_refused": unrated, "sims_per_cutoff": args.sims, "ratings_source": ratings_provenance})
+        print(json.dumps(result, indent=1, sort_keys=True))
+        return 0
+    result = score(rows, lines=lines, shift=args.shift, spread=args.spread, market=args.market)
     result["dates"] = len(dates)
     result["completed_games_found"] = len(games)
     result["duplicate_events_skipped"] = duplicates

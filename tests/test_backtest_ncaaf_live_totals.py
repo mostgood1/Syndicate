@@ -245,3 +245,43 @@ def test_the_TOTALS_transform_is_IDENTITY_and_the_lens_publishes_the_raw_draws()
         live_state_as_of="2026-09-19",
     )[0]
     assert lane["projection"]["totalRunsDist"] == corrected
+
+# --------------------------------------------------------------------------
+# the SEGMENT grade (todo #785, lane ncaaf-live-segment-display)
+# --------------------------------------------------------------------------
+
+def _game(home_line, away_line, home_final, away_final):
+    return {"event_id": "g1", "date": "2026-10-24", "home_team": "H", "away_team": "A",
+            "home_line": home_line, "away_line": away_line, "home_final": home_final, "away_final": away_final}
+
+
+def test_segment_actuals_bin_overtime_into_h2_only():
+    # 17-17 after regulation, home wins 23-17 in overtime (ESPN lists the OT period as a 5th linescore).
+    real = bt.actual_segment_points(_game([7, 3, 0, 7, 6], [0, 10, 7, 0, 0], 23, 17))
+    assert real["q4"] == [7, 0] and real["h1"] == [10, 10]
+    assert real["h2"] == [13, 7]                      # q3 0-7 + q4 7-0 + OT 6-0
+    assert [a + b for a, b in zip(real["h1"], real["h2"])] == [23, 17]
+
+
+def test_segment_actuals_refuse_a_linescore_past_the_final():
+    assert bt.actual_segment_points(_game([7, 7, 7, 7], [0, 0, 0, 0], 21, 0)) == {}
+
+
+def test_segment_rows_ladder_from_the_frozen_value_and_grade_each_segment():
+    row = {
+        "event_id": "g1", "cutoff_period": 1, "possession_unknown": True,
+        "segment_actuals": {"h1": [10, 3], "q2": [3, 3]},
+        "segments": {
+            "h1": {"total_dist": {"10": 50, "17": 50}, "margin_dist": {"7": 50, "4": 50}, "total_mean": 13.5,
+                   "knownScore": {"home": 7, "away": 0}, "remainingFraction": 0.5},
+            "q2": {"total_dist": {"0": 50, "7": 50}, "margin_dist": {"0": 50, "-7": 50}, "total_mean": 3.5,
+                   "knownScore": {"home": 0, "away": 0}, "remainingFraction": 1.0},
+        },
+    }
+    pseudo = bt.segment_pseudo_rows([row])
+    by = {r["segment"]: r for r in pseudo}
+    assert by["h1"]["actual_total"] == 13 and by["h1"]["actual_margin"] == 7
+    assert by["h1"]["total_lines"][0] == 7.5 and max(by["h1"]["total_lines"]) <= 7 + 20.5   # one quarter left
+    assert by["q2"]["score_at_cutoff"] == [0, 0]
+    report = bt.score_segments([row], market="total")
+    assert set(report["by_segment"]) == {"h1", "q2"} and report["pooled"]["cutoff_rows"] == 2
