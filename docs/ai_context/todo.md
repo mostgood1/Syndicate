@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#795` — **COLLEGE ODDS-FEED TEAM NAMES THAT DID NOT RESOLVE: "CSU Bakersfield Roadrunners" (both leagues), WNCAAB "Montana Grizzlies", "Western Kentucky Hilltoppers". Their games drew chip-less cards on the Games rail. FIXED BY RULE ON MAIN `986a718fd`, NOT LOADED; the audit is now a committed script** `[2026-11-12, lane college-odds-feed-team-names, session 0f519972; user "still have college teams not matching" + a screenshot of CSUB @ WIU (NCAAB) and CSUB @ WASH (WNCAAB), 11-12]`
+### `#795` — **COLLEGE ODDS-FEED TEAM NAMES THAT DID NOT RESOLVE: "CSU Bakersfield Roadrunners" (both leagues), WNCAAB "Montana Grizzlies", "Western Kentucky Hilltoppers". Their games drew chip-less cards on the Games rail. FIXED BY RULE, LOADED 22:02-22:04Z 11-12 (refresh-worker + live-odds-worker, user "Yes, load it"): served rows 0 of 5 -> 3 of 3 keyed, both rail cards on their chips; the audit is now a committed script** `[2026-11-12, lane college-odds-feed-team-names, session 0f519972; user "still have college teams not matching" + a screenshot of CSUB @ WIU (NCAAB) and CSUB @ WASH (WNCAAB), 11-12]`
 - **Cause:** the cards are real games (ESPN `401920135`, tip 00:00Z 11-13, and `401921495`, tip 03:00Z), but ESPN's registry says "Cal State Bakersfield" and the odds feed says "CSU Bakersfield". `chip_join_key` returned None, so the board rows carried no `away_key`, and the card found no chip. The same key feeds the slate's odds join and the live re-sim's margin anchor (`no_margin_anchor`).
 - **Audit** (`scripts/college_team_name_audit.py`, fleet, every quote shard): ncaab 2 of 550 events, wncaab 3 of 173, on 3 names. With `986a718fd`: 0 and 0.
   - The ESPN evidence pairs each name through its opponent: Cal State Bakersfield 2 games, "Montana Lady Griz", "Western Kentucky Lady Toppers".
@@ -12,7 +12,8 @@
   - Tests: `tests/test_college_odds_feed_team_names.py`, 18; 3 mutations each caught; 1,418 passed over the 57 alias test files.
 - **Why it kept recurring:** 11-03 and 11-07 were the same report, each fixed by hand after a user spotted the card. The 11-03 deploy entry already said to audit the quote logs before a big slate. The audit now exists as a script: exit 1 on any unresolved name, with the ESPN spelling to alias it to.
   - Owed (not started): run it on a schedule ahead of each slate, so a new spelling is caught before the rail shows it.
-- **Load** (the user's call; tonight's tips are 00:00Z and 03:00Z):
+- **LOADED** (deploys.md 2026-11-12 22:02:53Z): rows keyed 22:14:12Z; rail read 22:16:09Z with both CSUB cards on their chips. **Owed:** at the 00:00Z / 03:00Z tips, both games' live re-sims publish with a margin anchor (`no_margin_anchor` before; the anchor key is present on production quotes with the new code).
+- **Load** (done; tonight's tips are 00:00Z and 03:00Z):
   - fleet ff `0fe6631d7` -> `986a718fd`. Runtime: this change plus a docstring-only `nba/live_resim.py`.
   - refresh-worker TERM: Layer 2 stamps the row keys, which drive the rail.
   - live-odds-worker TERM: the college pregame sim and the live re-sim's margin anchor run there.

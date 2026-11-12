@@ -704,6 +704,10 @@ death, never life — do not invert it.
 - Moved: college-live-resim-midnight, live-gameline-quote-ceiling-120, ncaaf-live-segment-display, closed-lane-archive-20261112-0850
 
 ### college-odds-feed-team-names — OPEN — opened 2026-11-12 — session 0f519972-4890-45d3-8b52-767c7e0a0389
+- STATUS 2026-11-12 4:16 PM CST (22:16Z): LOADED (refresh-worker 22:02:53Z, live-odds-worker 22:03:57Z, user "Yes, load it").
+  - Served rows 0 of 5 -> 3 of 3 keyed (22:14:12Z); both rail cards on their chips (22:16:09Z).
+  - Claims released 22:16:38Z.
+  - Lane stays OPEN for the tip reading: the live re-sim margin anchor at 00:00Z / 03:00Z.
 - STATUS 2026-11-12 3:5x PM CST (21:5xZ): DONE IN CODE, ON MAIN `986a718fd`, NOT LOADED.
   - Audit: 3 names in 5 of 723 events -> 0. Maps: 0 keys lost or changed.
   - 18 tests; 3 mutations caught; 1,418 passed across the alias test files.

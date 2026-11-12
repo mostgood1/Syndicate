@@ -59342,3 +59342,36 @@ ailload\load.sh 3f11114c2 e102faf79`):
   - #791 alone: `REFRESH_WORKER__SYNDICATE_LIVE_GAMELINE_TEAM_ALIASES=off` in `local_production.env` + a drained `down`/`up`.
   - Or `git revert 0fe6631d7` on main + ff + a claimed, drained refresh-worker TERM.
 - Claim refresh-worker released right after this entry.
+
+## 2026-11-12 22:02:53Z (4:02 PM CST) -- FLEET ff 0fe6631d7 -> 986a718fd + refresh-worker TERM 22:02:53Z + live-odds-worker TERM 22:03:57Z: todo #795 college odds-feed team names ("CSU X" -> "Cal State X"; a women's team's men's mascot), lane `college-odds-feed-team-names` -- **LOADED; anchor reachability MET on production inputs; rows VERIFIED (CSUB 0 of 5 keyed -> 3 of 3); rail VERIFIED (both cards on their chips)**
+- **User, in this chat:** "still have college teams not matching", with a screenshot of two chip-less cards: CSU Bakersfield @ Western Illinois (NCAAB) and CSU Bakersfield @ Washington (WNCAAB). Then "Yes, load it", answering "Load the team-name fix on both workers before the 6 PM tip?".
+- **Range `0fe6631d7..986a718fd`:** runtime is `shared/ncaab_team_registry.py` and the new `scripts/college_team_name_audit.py` (mine), plus `07fbcbf92` (`nba/live_resim.py`, docstring text only; diff read). Everything else in the range is ledger-only.
+- **Gates:**
+  - Claims refresh-worker + live-odds-worker 21:57:46Z (rc 0 each).
+  - refresh-worker:
+    - Drain (`C:\tmp\railload\drain2.sh`, `check_deploy_safety.py --drain` under its environ, from this lane's worktree at origin/main) waited out a board build and a live-odds-worker odds job, then CLEAR 22:02:31Z.
+    - Preflight `--target fleet --target-commit 986a718fd...` 22:02:41Z **CLEAR**, rc 0.
+    - `load2.sh`: HEAD guard, ff 22:02:53.205Z, TERM pid 78399 22:02:53.208Z, new pid **145748** 22:02:59Z. Undrain 22:03:04Z.
+  - live-odds-worker:
+    - First preflight 21:59:24Z: **HOLD**, an odds-refresh job in flight. Its baseline stamp was also wrong (22:01:30Z, i.e. in the future); re-read below.
+    - Second preflight 22:03:47Z **CLEAR**, rc 0, infrastructure processes only.
+    - `term_low.sh`: HEAD guard, TERM pid 117643 22:03:57.867Z, new pid **146047** 22:04:05.955Z.
+  - A wait that wanted 0 children never ends here: live-odds-worker always runs 2 `live_resim_workers --serve` children. Stopped; the preflight's JOB/infrastructure split is the gate.
+- **Boot:** 0 tracebacks in either role log since the restarts. Three `grep Traceback` hits in live-odds-worker's log were my own grep's command line inside `ALL_PROCESS_MEMORY`; 0 lines start with `Traceback`.
+- **Baselines / expectations:**
+  - refresh-worker, served board 21:58:34Z: CSUB rows **0 of 5 keyed** (ncaab 0/3, wncaab 0/2). Both chips are keyed `cal state bakersfield @ western illinois` / `@ washington`. Expect 5/5 keyed after the first Layer 2 build.
+  - live-odds-worker: the live re-sim's closing-spread index (`ncaab.live_resim.home_spread_quotes`) on production quote data, 22:03:18Z, with the RUNNING code (`git archive 0fe6631d7`).
+    - The CSUB games sit under `('western illinois', 'csu bakersfield roadrunners')` and `('washington', 'csu bakersfield roadrunners')`. The ESPN-side key is ABSENT, so both would refuse `no_margin_anchor` at tip.
+    - With `986a718fd`: the key `('western illinois', 'cal state bakersfield')` / `('washington', 'cal state bakersfield')` is PRESENT, for both 11-12 and 11-13 shards (reachability MET, off != on).
+- **verify, rows: MET.** Served board (`served_csub.py`, polled every 3 min, `watch_keys.py`):
+  - 22:04:43Z and 22:07:51Z: 0 keyed (the old board).
+  - 22:11:03Z: ncaab 2 of 3 keyed, `cal state bakersfield @ western illinois`.
+  - **22:14:12Z: ncaab 2 of 2, wncaab 1 of 1**, `cal state bakersfield @ washington`.
+  - Row counts move with each build, and every CSUB row on the board is keyed.
+- **verify, rail: MET.** Headless Chromium on the served `/intelligence?view=cards`, read after the page's own query landed (22:15:39Z), at 22:16:09Z. Both cards render on their chips:
+  - `NCAAB · 6:00P CT PREGAME CSUB – WIU – PROJ 1H 2H T ... Proj CSUB −2.3 · O/U 151.0 CSUB −9 · o/u 147 2 plays`;
+  - `WNCAAB · 9:00P CT PREGAME CSUB – WASH – PROJ Q1-Q4 ... Proj WASH −42.2 · O/U 135.7 WASH −42.5 · o/u 131.5 1 play`.
+  - Before: chip-less "CSU Bakersfield Roadrunners @ ... · N opportunities" (user screenshot). Screenshot: session scratchpad `rail_csub_after.png`.
+- **Owed:** at the 00:00Z tip (6 PM CST), CSUB @ WIU's live re-sim publishes with `marginAnchor` (no `no_margin_anchor`); WNCAAB CSUB @ WASH at 03:00Z.
+- **Revert:** `git revert 986a718fd` on main, then ff + a claimed refresh-worker TERM and live-odds-worker TERM.
+- Claims refresh-worker + live-odds-worker released 22:16:38Z (before this entry was pushed).
