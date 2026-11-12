@@ -1081,7 +1081,11 @@ After web `cc5bdfb1` (20:11:20Z): placeholder starts **43 -> 0**, "TBD" tokens *
 - **Beside it:** the NHL live game-line name mismatch (snapshot `'Penguins'` vs board `'Pittsburgh Penguins'`) is RESOLVED: lane `nhl-live-resim-slate-root` closed 11-10 with GOAL MET.
 
 ## [layer2-live-display-other-sports] LIVE GAME-LINE ROWS THE JOIN WON'T PRICE SHOW A DISPLAY-ONLY Live proj. IN NCAAB / WNCAAB / NFL / NHL (NBA's #762 pattern) -- LOADED 11-09 (aa5f50ac5), VERIFIED on live slates; NCAAF verified 2026-11-11 `[verified 2026-11-10 02:10Z, lane live-display-other-sports, todo #771]`
-- NCAAF `[verified 2026-11-11]`: 43 -> 44 of 81 served live rows with a Live proj. (the one gain is a full-game moneyline; segment rows blank, as the NCAAF live re-sim publishes no segment lane, inferred); deploys.md 2026-11-11 00:22:48Z.
+- NCAAF `[verified 2026-11-12 02:45Z, lanes live-display-other-sports + ncaaf-live-segment-display, todos #771 + #785]`:
+  - Full-game: 43 -> 44 of 81 served live rows with a Live proj. (the one gain is a full-game moneyline; deploys.md 2026-11-11 00:22:48Z).
+  - SEGMENT rows (h1 h2 q1-q4) since `b43236e17` + `96131f985`: the NCAAF live re-sim publishes per-segment blocks (smartsim2 `quarter_log` + ESPN linescores) and `board_enrichment` builds NCAAF segment indexes with segment pricing off.
+  - Shown, by the per-segment grade (`.syndicate/findings_2026-11-11_ncaaf_live_segment_grade.md`): totals h1 / h2 / q2 / q3 show the live total + P(over), q4 the live total only, q1 nothing; spreads show P(home covers) on all six (`_RAW_MARGIN_DISPLAY_SPORTS` = nba, ncaaf); moneylines stay blank.
+  - Served 11-12 01:05-02:45Z: 28 of 28 rows the grade allows on the games the join matches; 0 of 48 segment rows with an edge or `live_aware` (deploys.md 2026-11-12 02:55Z). Off switch `SYNDICATE_NCAAF_LIVE_SEGMENTS=0`.
 - **Mechanism:** `live_gameline_join.LIVE_DISPLAY_SPORTS` = nba, ncaab, wncaab, ncaaf, nfl, nhl. A live row the join refuses to price can still carry `live_display`; `layer2_board._live_projection_columns` maps it to `live_total` / `live_model_probability`. It never writes an edge or `live_aware`, and no code reads `live_model_probability` except the board column that writes it (`layer2_board.py:4059`).
   - Display branches: stale-quote full-game rows, full-game moneyline (the home win %, restated per side), and college half/quarter rows (`segment_display_only`). Totals are shown raw; margins only where the producer anchored them.
   - Outside NBA, a display number needs a lane as fresh as pricing would require (`_display_lane_fresh`).
@@ -1091,7 +1095,7 @@ After web `cc5bdfb1` (20:11:20Z): placeholder starts **43 -> 0**, "TBD" tokens *
   - NCAAB 50 -> 244 of 260 on the evening slate (83 of the added rows are half rows).
   - NFL 9 -> 10 of 21 and NHL 1 -> 2 of 3: +1 full-game moneyline each.
 - **Moneyline rows carry the join's own verdict.** The display attaches to every full-game h2h row the join touches, priced or refused. Such a row can show `live_aware` and an edge, both from `price_moneyline`, which this change leaves alone; it now also shows the live % beside them.
-- **Not yet true:** NCAAF has had no live game since the load (first 2026-11-11 00:00Z).
+- **Not yet true:** an NCAAF game whose ESPN team name differs from the odds feed's shows no Live proj. on ANY row: UMass @ Toledo on 11-11 (`Massachusetts Minutemen` vs `UMass Minutemen`; the join keys on exact names). Todo #791.
 
 ## [layer2-live-rail-edges] LIVE RAIL CARDS SHOW OUR LIVE RE-SIM VS THE BOOK'S LIVE LINE PER MARKET; A "MODEL ≠ LINE" FLAG ONLY ON A QUOTE <= 120 s OLD AT PRICING, WORDED AS A DISAGREEMENT -- LOADED ON WEB 2026-11-11 17:28Z `[verified 2026-11-10 23:45-23:58Z (payload) + 2026-11-11 17:30Z (served page) + 2026-11-11 23:15Z-00:46Z 11-12 (evening flags, MET); lane layer2-live-rail-edges, todo #781]`
 - **Why live cards had no line: display, not data.** The chip `footer` (the book line) is pregame-only. On the served board at 23:45Z, all 50 live full-game rows carried `line`, `live_total` / `live_model_probability`, `model_edge_pct` (on `live_aware` rows) and `book_age_seconds`.

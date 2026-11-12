@@ -59220,3 +59220,33 @@ ailload\load.sh 3f11114c2 e102faf79`):
 - **verify:** same-moment probe 00:20:55Z-02:50:12Z 11-12 (fleet code, read-only, every 20 s against `live/nba_live_resim.json`): 51 published snapshots, 274 STRICT pairs (a logged row at exactly the snapshot's `t`) covering 257,408 published prop rows, **0 mismatches**; 9 snapshots with no row at their `t` (an unchanged tick) all matched through the as-of reader `props_at`; 0 not collected; 0 read errors; refresh-worker pid 250882 since the 22:58Z boot: 53 `PROPS` writes, 0 PROPS_FAILED / TICK_FAILED / READ_FAILED / WRITE_FAILED, 0 tracebacks. **MET.**
 - **Bytes so far:** `live_evidence/nba/2026-11-11.props.jsonl` 14,099,453 B / 277 rows at 02:50:57Z (~51 KB a row, one row per game per changed tick; late games still going); nothing prunes `live_evidence/` (no retention in either module).
 - **Owed:** the final size of `live_evidence/nba/2026-11-11.props.jsonl` once the slate ends (a session read after the late games), then the lane closes.
+
+## 02:55Z (8:55 PM CST 11-11) -- READING, no deploy: todo `#785` NCAAF live SEGMENT rows on the served board, after the 18:45:45Z (`b43236e17`) and 20:15:54Z (`96131f985`) refresh-worker loads (lane `ncaaf-live-segment-display`) -- **MET on both games the join matches: every segment row the grade allows shows a Live proj. (28 of 28), 0 carry an edge. UMass @ Toledo shows nothing on ANY row, full-game included (a team-name miss, NEW `#791`)**
+
+- **Expectation** `ncaaf_seg_spread_rows_live_proj_at_0105Z` gt0: **MET**, 1 (the h1 spread, P(home covers)).
+- **Served board** (POST `/api/intelligence/query`, `response.ranked_all`; live NCAAF game rows whose segment is h1/h2/q1-q4; `C:/tmp/ncaafseg/seg_probe.py --rows`, run by the watcher `C:/tmp/ncaafseg/night.sh`). Live games: BUFF @ BALL, SAC @ CMU, MASS @ TOL.
+
+| read (UTC / CST) | segment rows | with Live proj. | with P | carrying an edge or `live_aware` |
+|---|---|---|---|---|
+| 01:05Z / 7:05 PM | 6 | 1 | 1 | 0 |
+| 01:50Z / 7:50 PM | 35 | 21 | 19 | 0 |
+| 02:45Z / 8:45 PM | 7 | 6 | 6 | 0 |
+
+- **Split by cause** (totals + spreads rows on the two games the join matches):
+  - 01:05Z: 1 of 3. The 2 misses are q1 totals, withheld by the grade (0.186 FAIL).
+  - 01:50Z: 21 of 21 (h1 4/4, h2 4/4, q2 6/6, q3 5/5, q4 2/2). 19 carry P(over); the 2 without are the q4 totals, mean only by the grade (0.240 FAIL).
+  - 02:45Z: 6 of 6 (h2 totals 1, q3 totals 2, q3 spreads 3), all with P.
+  - **Every row the grade allows: 28 of 28.** Segment moneyline rows: 0 of 6 across the three reads, blank by design.
+  - UMass @ Toledo: 0 of 12 segment totals/spreads rows (1 at 01:05Z, 11 at 01:50Z).
+- **UMass @ Toledo is not this change.** At 02:46Z its FULL-GAME rows show 0 of 5 as well; the other two games show 23 of 23 (`C:/tmp/ncaafseg/matchup_probe.py`).
+  - The fleet's NCAAF live lens (keyvalue `live/ncaaf_live_lens.json`, generatedAt 2026-11-11T20:45:59-06:00) holds a `live_resim` lane with all 6 segment blocks for `Massachusetts Minutemen @ Toledo Rockets`.
+  - The board's rows say `UMass Minutemen`. The join keys on exact normalized names (`live_gameline_join._norm_team`, :1731), so every row refuses `no_live_gameline_projection` (20 of 172 considered at the 02:45:06Z join).
+  - Filed as `#791`. One read of the board's team pairs against the lens: 2 miss on exactly one name, (`umass minutemen`, `toledo rockets`) and (`louisiana ragin cajuns`, `ul monroe warhawks`).
+- **Fleet join** (`LIVE_GAMELINE_JOIN sport=ncaaf`, refresh-worker.log, `C:/tmp/ncaafseg/join_sum.py`):
+  - Before (11-11 00:08-04:45Z, 43 lines): 2,825 of 4,892 considered rows refused `segment_is_not_full_game`; 0 `segment_pricing_disabled`.
+  - After (11-12 00:33-02:45Z, 14 lines): **0** of 2,180 refused `segment_is_not_full_game`; 1,288 `segment_pricing_disabled` (the display-only path).
+  - `display` 481 -> 859 is the producer counter (it counts every grid line), not a served count. The table above is the reading.
+- **Served before** (11-11 00:16-00:21Z, lane `live-display-other-sports`): 0 of 37 / 18 / 18 segment rows with a Live proj.
+- **Code read:** refresh-worker is pid 250882, respawned 22:58:13Z by lane `live-props-evidence`'s load of `1225c3418` (deploys.md 2026-11-11 23:01Z). `1225c3418` contains both `b43236e17` and `96131f985` (`git merge-base --is-ancestor`). The lens carries 6 segment blocks on each of the 3 re-simmed games.
+- **No harm:** 0 of 48 segment rows carry `model_edge_pct` / `edge_vs_market_pct` / `model_ev_pct` / `live_aware`. Lines starting `Traceback` since 00:00Z: 0. `NCAAF_LIVE_RESIM_ERROR`: 0 (`C:/tmp/ncaafseg/night_rw_*.txt`).
+- **Verdict: GOAL MET.** Lane `ncaaf-live-segment-display` CLOSED; `#785` closed to `todo_closed.md`.
