@@ -59115,3 +59115,32 @@ ailload\load.sh 3f11114c2 e102faf79`):
   - The watcher (every 60 s from 23:42Z) saw 0 rows until then: no NBA game was live.
 - `low_tracebacks_first_10min` 0 -> **0: MET.** 23:41:16-23:51:16Z: 2,692 lines, `^Traceback` 0, `NBA_LIVE_RESIM_TICK_ERROR` 0. Through 00:12Z: 7,685 lines, 0 and 0.
 - Observation, NOT a regression: the engine may give overtime about HALF its real chance early in games. Real: 60 of 1,321 graded 2025-26 games went to overtime (4.5%), and 8 of 160 this season (5.0%). Engine: the first `p_ot` row (WAS @ IND, 0-0 at the tip) reads 0.01 on 100 draws. `#763` measured 2.9% of draws tied across 6,215 live lanes. Since 11-06, Q1-Q3 ticks expect 0.47 overtime points per game, about 2% at ~21 points per overtime. Recorded in todo #789; one row is not evidence.
+
+## 2026-11-12 00:28Z (6:28 PM CST 11-11) -- READINGS, no deploy: todo `#749`, `#747`, `#746` (the three owed one-read items; lane `one-read-746-747-749`) -- **#749 MET; #747 MET (most NBA prop edges are the book's, by design); #746 MET**
+- **#749 NFL prop artifact relaunch on odds** (fleet `refresh-worker.log*`, read 00:23Z; the logs reach back to 11-03). The week 9 -> 10 rollover, 11-10:
+  - 04:36:21Z `NFL_PROP_PROJECTION_LAUNCHING season=2026 week=10 reason=artifact_missing_no_prior_launch`. The week's capture did not exist yet: every wk10 `JOIN` 03:00-05:36Z reads `odds_rows=0 sim_rows=0`.
+  - 04:38-05:31Z: 6 rate-limited `SEASON_PROJECTION_ARTIFACT_MISSING sport=nfl_props artifact_missing_after_launch` lines (~55 min).
+  - The capture was written 2,643 s after that launch (~05:20Z, by its mtime then).
+  - 05:36:38Z `reason=odds_newer_than_launch odds_lead_seconds=2643 overriding[artifact_missing_after_launch since_launch_seconds=3617 ...]`: the relaunch fired on the first tick past the 3,600 s cooldown, ~16 min after the capture.
+  - From 05:36Z the wk10 join reads `sim_source=artifact odds_rows=645`. The next relaunch (06:37:18Z) is the normal `odds_newer ... overriding[artifact_fresh ...]`.
+  - Launch reasons since 11-03: wk9 133 `odds_newer`; wk10 42 `odds_newer`, 1 `odds_newer_than_launch`, 1 `artifact_missing_no_prior_launch`. On disk: `nfl_prop_projections_2026_wk10.json` 530,824 B, mtime 00:09:08Z 11-12.
+  - **MET:** the relaunch followed the week's first capture within one cooldown, and the missing-artifact run lasted ~1 h, not hours. Before the fix (wk5, 10-06) it was ~10 h, and would have been 24 h without a manual publish.
+- **#747 NBA Layer 2 prop projections** (fleet `/api/board/layer2-shortlist`, `written_at` 00:22:12Z, read 00:24:44Z, date 2026-11-11; `per_sport_ingest.nba.enrichment.projections`):
+  - Props: `prop_rows_with_projection` **3,187 / 3,377 (94.4%)**, `rows_with_probability` 3,187, `rows_with_edge` 2,069.
+  - Unprojected 190: 177 double-double / triple-double (unsupported: the sim publishes per-stat ladders, not the joint draws these need) and 13 player not in the NBA sim. Name resolution: 54 rows joined through 4 aliases, 14 unresolved.
+  - Games: `game_rows_with_projection` 6,056 / 6,126 (98.9%). All rows: 9,243 / 9,503 (97.3%); probability 9,217.
+  - Edge sign by side, props: `favours_over` 315, `favours_under` 473 (60% under among signed edges). Not a one-sided pile.
+  - **1,281 of 2,069 (62%) priced prop edges are exactly 0, by design.** The fleet's `nba_prop_book_blend.json` (enabled, mtime 2026-10-05) gives the model weight 0.0 for pts / ast / pa / pr / blk / threes, 0.05 for pra / ra / stl and 0.1 for reb. So the served probability is the book's no-vig for most NBA props.
+  - Served shortlist: 69 NBA prop rows, 63 with `model_edge_pct` (33 over / 30 under), median 0.0.
+  - **MET** for what was owed (prop projections present, 94.4%). NBA props are projected but barely model-ranked. The blend was fit before this season; a refit on 2026-27 rows is a lead, not part of this reading.
+- **#746 NBA regular-season grading** (`/daily-accuracy` driver, rc 0; `/api/model-scorecard` `generated_at` 2026-11-11T11:30:00Z, slate 11-11, fresh):
+  - NBA status `graded`. 28d window: 181 games / 24 dates, 810,695 graded of 824,145 considered rows, **ungraded 1.63%**:
+    - `extra_dnp_void` 9,402 (1.14%);
+    - `push` 3,716 (0.45%);
+    - `final_score_unparseable` 332 (0.04%).
+  - 7d window (11-05..11-11, regular season only): 53 games / 7 dates, 277,124 graded of 282,786, **ungraded 2.00%**. All 332 `final_score_unparseable` rows fall in it, so they are new this week.
+  - Verdicts on NBA cells:
+    - 1 `beats_market`: player PRA, full game, pregame, diff -0.00068, 115 g / 21 d, lodo-stable.
+    - 9 `loses_to_market`, 8 of them live player props: +0.016 to +0.026 Brier, 78-112 g, all lodo-stable.
+  - **MET:** NBA regular-season games grade, at a 1.6-2.0% ungraded rate.
+- Leads (`leads.md`): the NBA prop book-blend refit; the 332 NBA `final_score_unparseable` rows this week.

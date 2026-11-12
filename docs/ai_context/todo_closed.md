@@ -17,6 +17,27 @@ work takes the next free number (see the counter at the top of `todo.md`).
 ---
 
 
+### `#749` — **CLOSED 2026-11-11 (READ, MET) — NFL PROP ARTIFACT RELAUNCH ON ODDS (`544cbb4e`): at the week 9 -> 10 rollover the build relaunched on the week's first capture within one cooldown (`odds_newer_than_launch`, 05:36:38Z 11-10), and the missing-artifact run lasted ~1 h, not hours** — 2026-10-30, handed off from closed lane `nfl-prop-missing-odds-relaunch` (owner d81bf86d idle since 10-07) by lane `stale-lane-triage`; read 2026-11-12 00:23Z by lane `one-read-746-747-749`, session 345d60ab
+- **Reading** (fleet `refresh-worker.log*`, back to 11-03; deploys.md 2026-11-12 00:28Z):
+  - 04:36:21Z 11-10: `reason=artifact_missing_no_prior_launch`. The week's capture did not exist yet (every wk10 `JOIN` 03:00-05:36Z `odds_rows=0`).
+  - 04:38-05:31Z: 6 rate-limited `SEASON_PROJECTION_ARTIFACT_MISSING ... artifact_missing_after_launch` lines.
+  - The capture landed ~05:20Z (2,643 s after the launch). 05:36:38Z `reason=odds_newer_than_launch odds_lead_seconds=2643 overriding[artifact_missing_after_launch since_launch_seconds=3617 ...]`: the first tick past the 3,600 s cooldown.
+  - From 05:36Z the wk10 join reads `sim_source=artifact odds_rows=645`; later relaunches are the normal `odds_newer` (wk10: 42). Before the fix (wk5, 10-06) the same gap was ~10 h, and would have been 24 h without a manual publish.
+- Superseded owed line: "at a week rollover, grep the fleet refresh-worker log for `NFL_PROP_PROJECTION_LAUNCHING reason=odds_newer_than_launch` following that week's first odds capture within one cooldown, with no multi-hour `ARTIFACT_MISSING` run."
+
+### `#747` — **CLOSED 2026-11-11 (READ, MET) — NBA LAYER 2 PROP PROJECTIONS: on the regular-season board 3,187 of 3,377 NBA prop rows (94.4%) carry a projection and a probability; games 6,056 / 6,126. 62% of priced prop edges are exactly 0 BY DESIGN (the book blend gives the model weight 0 on 6 of 10 stats)** — 2026-10-30, handed off from closed lane `nba-layer2-projections` (owner ed75e56a idle since 10-05) by lane `stale-lane-triage`; read 2026-11-12 00:24Z by lane `one-read-746-747-749`, session 345d60ab
+- **Reading** (fleet `/api/board/layer2-shortlist`, `written_at` 00:22:12Z 11-12, date 2026-11-11, `per_sport_ingest.nba.enrichment.projections`; deploys.md 2026-11-12 00:28Z):
+  - Props 3,187 / 3,377 projected, `rows_with_probability` 3,187, `rows_with_edge` 2,069. Unprojected: 177 double / triple-double (the sim publishes per-stat ladders, not joint draws), 13 player not in the sim.
+  - Edge sign by side: `favours_over` 315, `favours_under` 473 (60% under among signed edges). Not a one-sided pile.
+  - 1,281 of 2,069 edges are exactly 0: `nba_prop_book_blend.json` (fleet, mtime 2026-10-05) w = 0.0 for pts / ast / pa / pr / blk / threes, 0.05 pra / ra / stl, 0.1 reb. Most NBA props are served at the book's no-vig. A 2026-27 refit is a lead (`leads.md` 2026-11-11), not this item.
+- The served prop probability is the NBA book blend (`served_prop_probability`, `SYNDICATE_NBA_PROP_BOOK_BLEND=0` restores the ladder).
+
+### `#746` — **CLOSED 2026-11-11 (READ, MET) — DAILY ACCURACY SUITE: the NBA regular-season grading reading (OWED (b)) is recorded: NBA `graded`, 181 games / 24 dates, ungraded 1.63% (28d); 53 games / 7 dates, ungraded 2.00% (7d, regular season only). NCAAB registration (OWED (c)) was struck 10-12** — 2026-10-30, handed off from closed UNOWNED lane `daily-accuracy-suite` (owner 9b88f9a2 archived 09-20) by lane `stale-lane-triage`; read 2026-11-12 00:26Z by lane `one-read-746-747-749`, session 345d60ab
+- **Reading** (`.claude/skills/daily-accuracy/driver.py`, rc 0; `/api/model-scorecard` `generated_at` 2026-11-11T11:30:00Z, fresh; deploys.md 2026-11-12 00:28Z):
+  - 28d: 810,695 graded of 824,145 considered. Ungraded: `extra_dnp_void` 9,402 (1.14%), `push` 3,716 (0.45%), `final_score_unparseable` 332 (0.04%, all in the last 7 days; a lead).
+  - Verdicts: 1 NBA cell `beats_market` (player PRA full pregame, -0.00068, 115 g); 9 `loses_to_market`, 8 of them live player props (+0.016 to +0.026 Brier, all lodo-stable).
+- **Loan note:** `syndicate/features/shared/population_outcomes_espn.py` was lent to OPEN lane `cheat-sheets` (2026-10-15) "returns on close". The lender is now closed, so the file simply stays with `cheat-sheets` until that lane closes.
+
 ### `#788` — **NBA BLOWOUTS (the #787 college study, done for NBA): play-by-play was already archived (160 of 160 live-re-simmed games, all score-matched); the bench slows scoring; the live re-sim's late-blowout error is ~0, and its late close-game miss is OVERTIME, not endgame fouling. CLOSED 2026-11-11, read-only, no engine change** `[2026-11-11, lane nba-pbp-blowout-bench, session 63276f7e; user "take a look at all the game shape work NCAAB/WNCAAB session (the layer 2 rail session just did) - do this for NBA now"]`
 - **CORRECTED 2026-11-11 by `#789`:** the "late close-game miss is OVERTIME" below is mostly the pre-`#763` projection, not a wrong overtime chance. 7 of the 8 overtime games came before `#763` put overtime in the projected total (live-odds-worker 2026-11-05 22:37:35Z), so each erred by its whole overtime by construction. Falsification (2)'s firing is the same omission. The blowout and bench results stand.
 - **Saved, verified on the fleet:**

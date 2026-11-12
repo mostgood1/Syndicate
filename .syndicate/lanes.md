@@ -826,7 +826,8 @@ ight.sh`, 01:05Z / 01:50Z / 02:45Z 11-12, BUFF @ BALL, SAC @ CMU, MASS @ TOL). S
 - Verification: unit tests that fail on the old start-time logic (mutation-checked); a read-only fleet run of status from this commit's code naming each role's loaded commit consistent with its spawn line and the reflog
 - Blocked by: none
 
-### one-read-746-747-749 — OPEN — opened 2026-11-11 — session 345d60ab-9db5-4a93-9d01-d57374578f65
+### one-read-746-747-749 — CLOSED 2026-11-11 (GOAL MET: #749 / #747 / #746 read and recorded, deploys.md 2026-11-12 00:28Z; all three archived to todo_closed.md) — opened 2026-11-11 — session 345d60ab-9db5-4a93-9d01-d57374578f65
+- **GOAL VERDICT `[2026-11-12 00:3xZ]`: GOAL: MET.** Goal, verbatim: "Take the three owed one-read readings with no lane and record each in deploys.md: #749 NFL prop artifact relaunch on odds at a week rollover (refresh-worker log), #747 NBA Layer 2 prop projection coverage + edge sign by side (served board), #746 NBA regular-season grading + ungraded rate (model-scorecard); close or update each todo with its reading". #749 MET (wk10 relaunch `odds_newer_than_launch` 05:36:38Z 11-10, ~1 h missing-artifact run); #747 MET (props 3,187 / 3,377 = 94.4% projected; over 315 / under 473; 62% of edges exactly 0 by the book blend's design); #746 MET (NBA graded, 181 g / 24 d, ungraded 1.63% 28d, 2.00% 7d). Two leads filed in leads.md. Read-only: no fleet write, no deploy.
 - Goal: Take the three owed one-read readings with no lane and record each in deploys.md: #749 NFL prop artifact relaunch on odds at a week rollover (refresh-worker log), #747 NBA Layer 2 prop projection coverage + edge sign by side (served board), #746 NBA regular-season grading + ungraded rate (model-scorecard); close or update each todo with its reading
 - Files: docs/ai_context/todo.md (#746 + #747 + #749 sections only), docs/ai_context/todo_closed.md (new entries at the top only)
 - Hypothesis: n/a (readings, read-only on the fleet)
