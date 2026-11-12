@@ -1,5 +1,23 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#795` — **COLLEGE ODDS-FEED TEAM NAMES THAT DID NOT RESOLVE: "CSU Bakersfield Roadrunners" (both leagues), WNCAAB "Montana Grizzlies", "Western Kentucky Hilltoppers". Their games drew chip-less cards on the Games rail. FIXED BY RULE ON MAIN `986a718fd`, NOT LOADED; the audit is now a committed script** `[2026-11-12, lane college-odds-feed-team-names, session 0f519972; user "still have college teams not matching" + a screenshot of CSUB @ WIU (NCAAB) and CSUB @ WASH (WNCAAB), 11-12]`
+- **Cause:** the cards are real games (ESPN `401920135`, tip 00:00Z 11-13, and `401921495`, tip 03:00Z), but ESPN's registry says "Cal State Bakersfield" and the odds feed says "CSU Bakersfield". `chip_join_key` returned None, so the board rows carried no `away_key`, and the card found no chip. The same key feeds the slate's odds join and the live re-sim's margin anchor (`no_margin_anchor`).
+- **Audit** (`scripts/college_team_name_audit.py`, fleet, every quote shard): ncaab 2 of 550 events, wncaab 3 of 173, on 3 names. With `986a718fd`: 0 and 0.
+  - The ESPN evidence pairs each name through its opponent: Cal State Bakersfield 2 games, "Montana Lady Griz", "Western Kentucky Lady Toppers".
+- **Fix:** two derivation rules in `ncaab_team_registry._odds_feed_spellings`.
+  - "CSU X" for ESPN "Cal State X".
+  - For wncaab, the men's registry mascot (same ESPN id) in COMPOSITE spellings only. 29 women's schools carry a different mascot, e.g. "Texas Tech Red Raiders", "UMass Minutemen", "Oklahoma State Cowboys".
+  - The 11-03 one-offs these now derive are removed: "CSU Fullerton Titans", "Penn State Nittany Lions".
+  - Maps: ncaab 2,018 -> 2,021 keys, wncaab 2,083 -> 2,123; 0 lost, 0 changed school.
+  - Tests: `tests/test_college_odds_feed_team_names.py`, 18; 3 mutations each caught; 1,418 passed over the 57 alias test files.
+- **Why it kept recurring:** 11-03 and 11-07 were the same report, each fixed by hand after a user spotted the card. The 11-03 deploy entry already said to audit the quote logs before a big slate. The audit now exists as a script: exit 1 on any unresolved name, with the ESPN spelling to alias it to.
+  - Owed (not started): run it on a schedule ahead of each slate, so a new spelling is caught before the rail shows it.
+- **Load** (the user's call; tonight's tips are 00:00Z and 03:00Z):
+  - fleet ff `0fe6631d7` -> `986a718fd`. Runtime: this change plus a docstring-only `nba/live_resim.py`.
+  - refresh-worker TERM: Layer 2 stamps the row keys, which drive the rail.
+  - live-odds-worker TERM: the college pregame sim and the live re-sim's margin anchor run there.
+  - Precedent: 11-03 (`9d47c77b5`).
+
 ### `#793` — **NBA PROP ROWS THE 2025-26 PLAYER TABLE CANNOT PLACE GET THEIR SIDE AND FACE FROM THE CURRENT ESPN ROSTER. Board 2026-11-11 23:47Z: 126 of 477 served NBA prop rows (36 players) had no `player_side`, 67 (18 players) no headshot. FIX ON MAIN `4b9553b93`, NOT LOADED (user decision); fleet replay on the served 11-12 board: face 313 -> 339, side 228 -> 339 of 339, 0 already-set changed** `[2026-11-12, lane nba-prop-side-face-current-roster, session 2ba5509d; user "Yes, fix it here"]`
 - **Cause (fleet probe 11-11 23:49-23:51Z):** `player_headshots._player_team` / `headshot_url` read only `player_ids.csv` with a lowercase-only key. Of the 36 side-less players: 17 are filed under two teams (traded: Tyler Herro MIA/MIL, Julius Randle, DeMar DeRozan), 11 are absent (rookies, Damian Lillard), 6 miss on spelling (Luka Doncic, Michael Porter Jr), 2 are filed on their old team (Anthony Davis DAL, Nic Claxton BKN). The fleet's own `rosters_2026-27.csv` (`nba_current_rosters`, written by the props refresh) placed all 36 in their game and held a stats.nba id for all 18 faceless players.
 - **Fix `4b9553b93`:** NBA side = the current roster's team FIRST, then the table; NBA face = the table's id first, then the roster's stats id (`RosterIndex.stats_id_by_key`, a key on two ids dropped). Re-read when the roster file changes; the producer's switch `SYNDICATE_NBA_CURRENT_ROSTERS` and its one-day replay rule apply. WNBA untouched. 14 tests (off != on), 283 pass across the headshot / side / roster suites.
