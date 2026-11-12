@@ -59375,3 +59375,26 @@ ailload\load.sh 3f11114c2 e102faf79`):
 - **Owed:** at the 00:00Z tip (6 PM CST), CSUB @ WIU's live re-sim publishes with `marginAnchor` (no `no_margin_anchor`); WNCAAB CSUB @ WASH at 03:00Z.
 - **Revert:** `git revert 986a718fd` on main, then ff + a claimed refresh-worker TERM and live-odds-worker TERM.
 - Claims refresh-worker + live-odds-worker released 22:16:38Z (before this entry was pushed).
+
+## 2026-11-12 22:53:02Z (4:53 PM CST) -- FLEET ff 986a718fd -> a133df703, NO role restart: the college team-name audit runs in the fleet watchdog before each slate (todo #795, lane `college-odds-feed-team-names`) -- **LIVE: the watchdog's 22:55:55Z run audited 6 shards / 219 events, 0 unresolved**
+- **User, in this chat:** "run the audit before each slate automatically".
+- **Why the watchdog and not a `ScheduledJob`:**
+  - A new job loads only at a full supervisor down/up: on 10-13 that took web down for 26 s.
+  - Until that restart, the watchdog, which reads `SCHEDULED_JOBS` from disk, would warn "did not run".
+  - The watchdog itself runs every 5 min from disk under the venv python, so a fleet ff loads the check.
+  - Its `exec:` findings are emailed (`execution_watchdog.emailable`).
+- **Range:** runtime is `scripts/college_team_name_watch.py` (new) and `scripts/local_watchdog.py` (main() + docstring), both mine. Every other commit is ledger-only. No role imports either file.
+- **Gates:**
+  - Claim web 22:52:4xZ (rc 0). An ff reaches web at its next recycle, and web loads neither file.
+  - Baseline 22:52:45Z: `watchdog_state.json` keys without `team_names`.
+  - Preflight `--target fleet --target-commit a133df703...` 22:52:53Z **CLEAR**, rc 0.
+  - `ff_only.sh`: HEAD guard `986a718fd`, ff 22:53:02.525Z, no TERM.
+- **verify: MET.** The watchdog's next run, 22:55:55Z, wrote `team_names`: `audited_at` 22:55:55Z, `since` 2026-11-11, ncaab 3 shards / 170 events / 0 unresolved, wncaab 3 / 49 / 0, `error` null. Status ok, no alert.
+- **Behaviour:**
+  - Audits at most hourly over shards dated yesterday (UTC) on; the cached result holds the finding between runs.
+  - `exec:team_names:<league>` warn names the team, events, dates and ESPN's spelling, emailed when new and then once a day while it persists.
+  - A crash is `exec:team_names:watch_error`.
+  - No shard means no finding (offseason).
+- Fleet dry run before the ff (worktree code): whole watchdog 1.37 s.
+- **Revert:** `SYNDICATE_WATCHDOG_TEAM_NAMES=0` in the watchdog's environment, or `git revert a133df703` + a fleet ff.
+- Claim web released 22:56Z.

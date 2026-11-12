@@ -11,7 +11,7 @@
   - Maps: ncaab 2,018 -> 2,021 keys, wncaab 2,083 -> 2,123; 0 lost, 0 changed school.
   - Tests: `tests/test_college_odds_feed_team_names.py`, 18; 3 mutations each caught; 1,418 passed over the 57 alias test files.
 - **Why it kept recurring:** 11-03 and 11-07 were the same report, each fixed by hand after a user spotted the card. The 11-03 deploy entry already said to audit the quote logs before a big slate. The audit now exists as a script: exit 1 on any unresolved name, with the ESPN spelling to alias it to.
-  - Owed (not started): run it on a schedule ahead of each slate, so a new spelling is caught before the rail shows it.
+  - **Now automatic** (user "run the audit before each slate automatically"; deploys.md 2026-11-12 22:53:02Z): the fleet watchdog audits hourly over shards from yesterday on. Any unresolved name is an EMAILED `exec:team_names:<league>` warn naming the team and ESPN's spelling (`scripts/college_team_name_watch.py`). Live since the 22:55:55Z watchdog run: 219 events, 0 unresolved.
 - **LOADED** (deploys.md 2026-11-12 22:02:53Z): rows keyed 22:14:12Z; rail read 22:16:09Z with both CSUB cards on their chips. **Owed:** at the 00:00Z / 03:00Z tips, both games' live re-sims publish with a margin anchor (`no_margin_anchor` before; the anchor key is present on production quotes with the new code).
 - **Load** (done; tonight's tips are 00:00Z and 03:00Z):
   - fleet ff `0fe6631d7` -> `986a718fd`. Runtime: this change plus a docstring-only `nba/live_resim.py`.

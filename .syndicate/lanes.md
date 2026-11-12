@@ -704,6 +704,7 @@ death, never life — do not invert it.
 - Moved: college-live-resim-midnight, live-gameline-quote-ceiling-120, ncaaf-live-segment-display, closed-lane-archive-20261112-0850
 
 ### college-odds-feed-team-names — OPEN — opened 2026-11-12 — session 0f519972-4890-45d3-8b52-767c7e0a0389
+- STATUS 2026-11-12 4:56 PM CST (22:56Z): the audit is LIVE in the fleet watchdog (ff a133df703, no restart). The 22:55:55Z run audited 219 events, 0 unresolved. Claim web released. Still owed: the tip reading (margin anchor, 00:00Z / 03:00Z).
 - STATUS 2026-11-12 4:3x PM CST (22:3xZ): user "run the audit before each slate automatically".
   - The audit becomes a watchdog check (every 5 min from disk, audits at most hourly, today's and later shards).
   - It is emailed as `exec:team_names:<league>` with the names and ESPN's spelling.
