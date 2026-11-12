@@ -1732,6 +1732,73 @@ def _norm_team(value: Any) -> str:
     return " ".join(str(value or "").strip().lower().split())
 
 
+# ---------------------------------------------------------------------------
+# TEAM-NAME ALIAS FALLBACK (NCAAF) -- todo #791 `[2026-11-12, lane ncaaf-live-join-team-alias]`
+# ---------------------------------------------------------------------------
+# The exact-name key holds where both sides come from one source. NCAAF's do not: the board's rows are named by the
+# ODDS feed, while the NCAAF live lens publishes ESPN's `displayName` (`run_refresh_worker`'s lens-naming block, which
+# measured 7 of 8 and left the 8th as a named miss rather than guess an alias -- no vetted map existed then). One
+# does now: `team_aliases.chip_join_key`, the CFBD registry plus its hand-verified supplement, behind the collision
+# pass that keeps `MAS` from resolving to UMass Dartmouth (`team_aliases._ncaaf_alias_to_name`).
+#
+# Measured 2026-11-12 on the fleet, every non-inplay NCAAF book grid 2026-10-01..11-21 (34 dates) against the
+# producer's own ESPN read: 433 odds-feed game pairs, 390 exact, 43 (9.9%) ONLY through that map -- App State,
+# Hawai'i, Ragin' Cajuns, Southern Miss, San José State, Sam Houston, McNeese, The Citadel, UMass -- 0 neither,
+# 0 ambiguous. Those games could never join their live lane: UMass @ Toledo on 11-11 showed 0 of 5 full-game and
+# 0 of 12 segment rows with a Live proj. while its lane, all six segments, sat in the lens as "Massachusetts".
+#
+# EXACT FIRST, ALWAYS: the fallback is read only when the exact pair has no candidate, so every row that joins today
+# joins identically. Both teams on both sides must resolve, so an unresolvable name stays a named miss
+# (`no_live_gameline_projection`). Two lens games under one canonical pair are separated as a doubleheader is and
+# refused AMBIGUOUS when they cannot be. `SYNDICATE_LIVE_GAMELINE_TEAM_ALIASES=off` restores exact-only (absent = on).
+TEAM_ALIAS_JOIN_ENV = "SYNDICATE_LIVE_GAMELINE_TEAM_ALIASES"
+_TEAM_ALIAS_JOIN_OFF = frozenset({"0", "false", "no", "off"})
+_TEAM_ALIAS_JOIN_SPORTS = frozenset({"ncaaf"})
+# `resolve_live_gameline`'s reason for a hit found only through the fallback; counted as `rows_joined_by_team_alias`.
+TEAM_ALIAS_HIT = "team_alias"
+
+
+def team_alias_join_enabled(sport: Any, environ: Mapping[str, str] | None = None) -> bool:
+    """True for a sport in `_TEAM_ALIAS_JOIN_SPORTS` unless the switch reads off. Absent = ON."""
+    if str(sport or "").strip().lower() not in _TEAM_ALIAS_JOIN_SPORTS:
+        return False
+    env = os.environ if environ is None else environ
+    return str(env.get(TEAM_ALIAS_JOIN_ENV) or "").strip().lower() not in _TEAM_ALIAS_JOIN_OFF
+
+
+def team_alias_pair_key(sport: Any, away: Any, home: Any) -> tuple[str, str] | None:
+    """The canonical `(away, home)` pair, or None when the fallback is off or either team does not resolve."""
+    if not team_alias_join_enabled(sport):
+        return None
+    slug = str(sport).strip().lower()
+    try:
+        from syndicate.features.shared.team_aliases import chip_join_key
+
+        away_key = chip_join_key(slug, away)
+        home_key = chip_join_key(slug, home)
+    except Exception:
+        # The registry is read off disk; a sport that cannot resolve degrades to exact-only, never to an error.
+        return None
+    if not away_key or not home_key:
+        return None
+    return (str(away_key), str(home_key))
+
+
+def _count_team_alias_hit(coverage: dict[str, Any], why: Any) -> None:
+    """`rows_joined_by_team_alias`: rows whose live lane was found only through the fallback (absent = none were)."""
+    if why == TEAM_ALIAS_HIT:
+        coverage["rows_joined_by_team_alias"] = int(coverage.get("rows_joined_by_team_alias") or 0) + 1
+
+
+def _alias_candidates(index: Any, sport: Any, row_teams: Any) -> list[dict[str, Any]] | None:
+    """The lens games filed under this row's canonical pair, or None (no pool, no teams, or no key)."""
+    pool = getattr(index, "alias_candidates", None)
+    if not pool or not isinstance(row_teams, (tuple, list)) or len(row_teams) != 2:
+        return None
+    key = team_alias_pair_key(sport, row_teams[0], row_teams[1])
+    return pool.get(key) if key is not None else None
+
+
 REASON_GAME_AMBIGUOUS = "team_pair_covers_more_than_one_game"
 
 
@@ -1756,6 +1823,9 @@ class LiveGamelineIndex(dict):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.candidates: dict[tuple[str, str], list[dict[str, Any]]] = {}
+        # The same projections again, filed under their CANONICAL pair (`team_alias_pair_key`; NCAAF only, #791).
+        # Read by `resolve_live_gameline` only after the exact pair has no candidate.
+        self.alias_candidates: dict[tuple[str, str], list[dict[str, Any]]] = {}
 
 
 def resolve_live_gameline(
@@ -1765,6 +1835,7 @@ def resolve_live_gameline(
     target_start: Any = None,
     game_pk: Any = None,
     sport: Any = None,
+    row_teams: tuple[Any, Any] | None = None,
 ) -> tuple[Mapping[str, Any] | None, str]:
     """`(projection, reason)` -- the ONE game this row's team pair means.
 
@@ -1781,12 +1852,33 @@ def resolve_live_gameline(
 
     A plain `dict` (a caller's literal, a fixture) has no `candidates`, so it
     falls back to the mapping and keeps its old behaviour.
+
+    `row_teams` (the row's raw away/home names) is read ONLY when the exact pair has no candidate: the lens games
+    filed under the row's canonical pair (`alias_candidates`, NCAAF, #791) are then separated by the same rules, and
+    a hit returns `TEAM_ALIAS_HIT`.
     """
     pool = getattr(index, "candidates", None)
     rows = pool.get(key) if isinstance(pool, dict) else None
     if not rows:
         hit = index.get(key)
-        return (hit, SINGLE) if hit is not None else (None, NO_CANDIDATES)
+        if hit is not None:
+            return hit, SINGLE
+        alias_rows = _alias_candidates(index, sport, row_teams)
+        if not alias_rows:
+            return None, NO_CANDIDATES
+        alias_hit, alias_why = _pick_candidate(alias_rows, target_start=target_start, game_pk=game_pk, sport=sport)
+        return (alias_hit, TEAM_ALIAS_HIT) if alias_hit is not None else (None, alias_why)
+    return _pick_candidate(rows, target_start=target_start, game_pk=game_pk, sport=sport)
+
+
+def _pick_candidate(
+    rows: list[Mapping[str, Any]],
+    *,
+    target_start: Any = None,
+    game_pk: Any = None,
+    sport: Any = None,
+) -> tuple[Mapping[str, Any] | None, str]:
+    """One candidate answers itself; several are separated by `game_pk`, then by start time, else AMBIGUOUS."""
     if len(rows) == 1:
         return rows[0], SINGLE
 
@@ -1879,6 +1971,9 @@ def build_live_gameline_index(
             "sources_seen": {},
             "accepted_sources": list(sources or _DEFAULT_LENS_SOURCES),
         })
+        if team_alias_join_enabled(sport):
+            # Games ALSO filed under a canonical pair (#791). 0 with games indexed = the registry did not resolve here.
+            diag["alias_keys"] = 0
 
     index = LiveGamelineIndex()
     if not isinstance(snapshot, Mapping):
@@ -1907,6 +2002,7 @@ def build_live_gameline_index(
         # half-match and produce a key built from two different games.
         matchup = game.get("matchup") if isinstance(game.get("matchup"), Mapping) else {}
         key: tuple[str, str] | None = None
+        key_names: tuple[Any, Any] = (None, None)
         for away_raw, home_raw in (
             (matchup.get("away"), matchup.get("home")),
             (game.get("away"), game.get("home")),
@@ -1917,6 +2013,7 @@ def build_live_gameline_index(
             candidate = (_norm_team(away_name), _norm_team(home_name))
             if candidate[0] and candidate[1]:
                 key = candidate
+                key_names = (away_name, home_name)
                 break
         if key is None:
             if diag is not None:
@@ -1962,6 +2059,11 @@ def build_live_gameline_index(
         # the resolver are for.
         index.candidates.setdefault(key, []).append(projection)
         index.setdefault(key, projection)
+        alias_key = team_alias_pair_key(sport, *key_names)
+        if alias_key is not None:
+            index.alias_candidates.setdefault(alias_key, []).append(projection)
+            if diag is not None:
+                diag["alias_keys"] = int(diag.get("alias_keys") or 0) + 1
         if diag is not None:
             diag["indexed"] = int(diag["indexed"]) + 1
     return index
@@ -2053,6 +2155,7 @@ def attach_live_gamelines(
                     target_start=row.get("commence_time"),
                     game_pk=row.get("game_pk") or game.get("game_pk"),
                     sport=sport,
+                    row_teams=(row.get("away_team"), row.get("home_team")),
                 )
             own_segment_index = segment_indexes is not None and segment in segment_indexes
             priceable_segment = (
@@ -2086,7 +2189,9 @@ def attach_live_gamelines(
                     target_start=row.get("commence_time"),
                     game_pk=row.get("game_pk") or game.get("game_pk"),
                     sport=sport,
+                    row_teams=(row.get("away_team"), row.get("home_team")),
                 )
+                _count_team_alias_hit(coverage, _disp_why)
                 if (isinstance(disp_hit, Mapping) and not disp_hit.get("segment_settled")
                         and _display_lane_fresh(disp_hit, build_now, sport)):
                     block = live_display_block(disp_hit, row, sport=sport, basis=seg_reason)
@@ -2186,7 +2291,9 @@ def attach_live_gamelines(
             target_start=row.get("commence_time"),
             game_pk=row.get("game_pk") or game.get("game_pk"),
             sport=sport,
+            row_teams=(row.get("away_team"), row.get("home_team")),
         )
+        _count_team_alias_hit(coverage, why)
         if hit is None:
             # AMBIGUOUS IS ITS OWN REASON. "we could not tell which of this
             # pair's two games you are" and "there is no live projection for
