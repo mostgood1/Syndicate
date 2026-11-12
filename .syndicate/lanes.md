@@ -826,6 +826,14 @@ ight.sh`, 01:05Z / 01:50Z / 02:45Z 11-12, BUFF @ BALL, SAC @ CMU, MASS @ TOL). S
 - Verification: unit tests that fail on the old start-time logic (mutation-checked); a read-only fleet run of status from this commit's code naming each role's loaded commit consistent with its spawn line and the reflog
 - Blocked by: none
 
+### one-read-746-747-749 — OPEN — opened 2026-11-11 — session 345d60ab-9db5-4a93-9d01-d57374578f65
+- Goal: Take the three owed one-read readings with no lane and record each in deploys.md: #749 NFL prop artifact relaunch on odds at a week rollover (refresh-worker log), #747 NBA Layer 2 prop projection coverage + edge sign by side (served board), #746 NBA regular-season grading + ungraded rate (model-scorecard); close or update each todo with its reading
+- Files: docs/ai_context/todo.md (#746 + #747 + #749 sections only), docs/ai_context/todo_closed.md (new entries at the top only)
+- Hypothesis: n/a (readings, read-only on the fleet)
+- Falsification test: n/a
+- Verification: each reading quoted with its read time and denominators in deploys.md; todo moves pass the #71 check
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
