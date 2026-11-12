@@ -17,6 +17,24 @@ work takes the next free number (see the counter at the top of `todo.md`).
 ---
 
 
+### `#771` — **CLOSED 2026-11-11 (GOAL MET): live game-line rows the join refuses to price get a DISPLAY-ONLY Live proj. in NCAAB / WNCAAB / NCAAF / NFL / NHL (the `#762` NBA pattern). `aa5f50ac5`, loaded 11-09 14:48Z. MET in all five on the served board: WNCAAB 6 -> 19 of 22, NCAAB evening 50 -> 244 of 260, NFL 9 -> 10 of 21, NHL 1 -> 2 of 3, NCAAF 43 -> 44 of 81; 0 added non-moneyline rows with a model edge. The join's display= vs served gap is dead quotes plus selection, traced 11-12 00:46-00:53Z** `[2026-11-09, lane live-display-other-sports, session cb29eaf2]`
+- **UPDATE 2026-11-12 00:59Z (6:59 PM CST 11-11): the display= vs served gap is TRACED, item CLOSED.** The join counts every grid line; the board serves only rows observed within 300 s that win selection. NCAAF funnel (3 reads, 00:46-00:53Z 11-12): 42 / 42 / 51 grid display rows -> 5 / 5 / 8 served as display, 11 / 11 / 31 dead, 21 / 17 / 9 not selected. NCAAF segment rows were never this item's scope (`live_gameline_join.py:1307`); they are `#785`. deploys.md 2026-11-11 00:22:48Z ADDENDUM; log 2026-11-11 17:45Z.
+- **UPDATE 2026-11-11 00:22Z: NCAAF MET** -- 43 -> 44 of 81 served live NCAAF rows with a Live proj. (join index=2, display=8/12; 0 non-moneyline display rows priced). The gain is one full-game moneyline. NCAAF segment rows stayed blank (no producer segment lane, inferred), and join display=12 vs 1 served is untraced. deploys.md 2026-11-11 00:22:48Z.
+- **Why:** served board 2026-11-08 23:35Z, live game rows with a Live proj.: ncaab 15 of 43 (h1/h2 totals 0 of 14, h2h 0 of 2), wncaab 2 of 29, nfl spreads 0 of 7, h2h 0 of 4. refresh-worker `LIVE_GAMELINE_JOIN` 23:23Z: ncaab `quote_older_than_the_score_the_model_saw` 58 + `segment_pricing_disabled` 71, `display=0`; `LIVE_DISPLAY_SPORTS` was `{nba}`.
+- **Built:** `live_gameline_join.LIVE_DISPLAY_SPORTS` + the five. College: stale quote, moneyline and half/quarter rows (totals raw; margins only where the producer anchored them). ncaaf/nfl/nhl: stale quote + moneyline. New `_display_lane_fresh`: outside NBA a display number needs a lane as fresh as a price would (college carry is unbounded). `board_enrichment` passes `segment_display_only` from the same table. Nothing prices: the table on vs off changes no row but `live_display`.
+- **Decided, not built: NFL spreads stay blank.** The lane's own top-level `margin_dist` was graded a measured FAIL (closed lane `nfl-live-distribution-grade`: worst bucket 0.4290 vs `#499`'s 0.150, ~35-40% too narrow), the over-confidence that keeps college's raw margin off the display. Revisit only on a passing grade.
+- **Loaded:** fleet ff `e2558013c -> aa5f50ac5` + claimed refresh-worker TERM 14:48:33Z (deploys.md 2026-11-09 14:48:33Z).
+- **Verified on the served board** (live game rows with a Live proj., old code -> now on the same board; `C:/tmp/livedisp/probe.py`):
+  - WNCAAB 6 -> 19 of 22 (17:21:39Z).
+  - NCAAB 2 -> 16 of 18 on the first game (23:09:54Z); 50 -> 244 of 260 on the evening slate (02:05:57Z 11-10), incl. 83 half rows.
+  - NFL 9 -> 10 of 21 and NHL 1 -> 2 of 3 (02:10:49Z 11-10): +1 full-game moneyline each (BUF 0.758, EDM 0.819). NFL spreads and the NHL puck line stay blank by design.
+  - 0 added non-moneyline rows carry an edge or `live_aware`. Moneyline rows keep the join's own verdict, priced or refused, now with the live % beside it (the `#762` NBA pattern).
+  - Readings in deploys.md 2026-11-09 17:21:39Z, 23:09:54Z and 2026-11-10 02:10:49Z.
+- **Owed:** ~~NCAAF~~ DONE: MET 11-11 00:22Z, gap traced 11-12 00:46-00:53Z. Lane CLOSED 11-11 (`7af5c3426`).
+- **Seen, not this item:**
+  - NFL's live re-sim lane first reached the join 40 min after MNF kickoff (01:54:32Z vs 01:15Z; `sources_seen {'pregame': 15}` before).
+  - Look-ahead board-date live rows keep the pregame edge (leads.md 2026-11-09).
+
 ### `#749` — **CLOSED 2026-11-11 (READ, MET) — NFL PROP ARTIFACT RELAUNCH ON ODDS (`544cbb4e`): at the week 9 -> 10 rollover the build relaunched on the week's first capture within one cooldown (`odds_newer_than_launch`, 05:36:38Z 11-10), and the missing-artifact run lasted ~1 h, not hours** — 2026-10-30, handed off from closed lane `nfl-prop-missing-odds-relaunch` (owner d81bf86d idle since 10-07) by lane `stale-lane-triage`; read 2026-11-12 00:23Z by lane `one-read-746-747-749`, session 345d60ab
 - **Reading** (fleet `refresh-worker.log*`, back to 11-03; deploys.md 2026-11-12 00:28Z):
   - 04:36:21Z 11-10: `reason=artifact_missing_no_prior_launch`. The week's capture did not exist yet (every wk10 `JOIN` 03:00-05:36Z `odds_rows=0`).

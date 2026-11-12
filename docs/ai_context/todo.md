@@ -395,23 +395,6 @@ ight.sh`, 01:05Z / 01:50Z / 02:45Z 11-12): NCAAF segment rows with a Live proj. 
   - Every served puck-line row has no edge.
   - **Open lead:** WSH@OTT's served puck-line number held its 00:07:51Z value for ~10 min while its snapshot moved (TOR's did not). Which path served it is not known.
 
-### `#771` — **LIVE GAME-LINE ROWS THE JOIN REFUSES TO PRICE GET A DISPLAY-ONLY Live proj. IN NCAAB / WNCAAB / NCAAF / NFL / NHL (the `#762` NBA pattern). ON MAIN `aa5f50ac5`, LOADED 11-09 14:48Z; VERIFIED LIVE IN NCAAB / WNCAAB / NFL / NHL (NCAAB evening 50 -> 244 of 260 served live rows with a Live proj.); NCAAF READING OWED 2026-11-11 00:00Z** `[2026-11-09, lane live-display-other-sports, session cb29eaf2]`
-- **UPDATE 2026-11-11 00:22Z: NCAAF MET** -- 43 -> 44 of 81 served live NCAAF rows with a Live proj. (join index=2, display=8/12; 0 non-moneyline display rows priced). The gain is one full-game moneyline. NCAAF segment rows stayed blank (no producer segment lane, inferred), and join display=12 vs 1 served is untraced. deploys.md 2026-11-11 00:22:48Z.
-- **Why:** served board 2026-11-08 23:35Z, live game rows with a Live proj.: ncaab 15 of 43 (h1/h2 totals 0 of 14, h2h 0 of 2), wncaab 2 of 29, nfl spreads 0 of 7, h2h 0 of 4. refresh-worker `LIVE_GAMELINE_JOIN` 23:23Z: ncaab `quote_older_than_the_score_the_model_saw` 58 + `segment_pricing_disabled` 71, `display=0`; `LIVE_DISPLAY_SPORTS` was `{nba}`.
-- **Built:** `live_gameline_join.LIVE_DISPLAY_SPORTS` + the five. College: stale quote, moneyline and half/quarter rows (totals raw; margins only where the producer anchored them). ncaaf/nfl/nhl: stale quote + moneyline. New `_display_lane_fresh`: outside NBA a display number needs a lane as fresh as a price would (college carry is unbounded). `board_enrichment` passes `segment_display_only` from the same table. Nothing prices: the table on vs off changes no row but `live_display`.
-- **Decided, not built: NFL spreads stay blank.** The lane's own top-level `margin_dist` was graded a measured FAIL (closed lane `nfl-live-distribution-grade`: worst bucket 0.4290 vs `#499`'s 0.150, ~35-40% too narrow), the over-confidence that keeps college's raw margin off the display. Revisit only on a passing grade.
-- **Loaded:** fleet ff `e2558013c -> aa5f50ac5` + claimed refresh-worker TERM 14:48:33Z (deploys.md 2026-11-09 14:48:33Z).
-- **Verified on the served board** (live game rows with a Live proj., old code -> now on the same board; `C:/tmp/livedisp/probe.py`):
-  - WNCAAB 6 -> 19 of 22 (17:21:39Z).
-  - NCAAB 2 -> 16 of 18 on the first game (23:09:54Z); 50 -> 244 of 260 on the evening slate (02:05:57Z 11-10), incl. 83 half rows.
-  - NFL 9 -> 10 of 21 and NHL 1 -> 2 of 3 (02:10:49Z 11-10): +1 full-game moneyline each (BUF 0.758, EDM 0.819). NFL spreads and the NHL puck line stay blank by design.
-  - 0 added non-moneyline rows carry an edge or `live_aware`. Moneyline rows keep the join's own verdict, priced or refused, now with the live % beside it (the `#762` NBA pattern).
-  - Readings in deploys.md 2026-11-09 17:21:39Z, 23:09:54Z and 2026-11-10 02:10:49Z.
-- **Owed:** NCAAF. No live game since the load; the first is 2026-11-11 00:00Z (Kent St @ Bowling Green, W Michigan @ Akron). Read `probe.py` after ~00:10Z, record it in deploys.md, then close the lane and return the loan to `nba-live-proj-actuals`.
-- **Seen, not this item:**
-  - NFL's live re-sim lane first reached the join 40 min after MNF kickoff (01:54:32Z vs 01:15Z; `sources_seen {'pregame': 15}` before).
-  - Look-ahead board-date live rows keep the pregame edge (leads.md 2026-11-09).
-
 ### `#769` — **LIVE NHL / NFL PROPS HAD NO LIVE ACTUAL ON LAYER 2 (served 01:31Z 11-09: NHL 0 of 29, NFL 0 of 140). DISPLAY-ONLY BOX-SCORE ACTUAL ON MAIN `b2a5013e2`, LOADED on the fleet 11-09 14:48-14:50Z (config verify MET). LIVE READING MET 11-10 02:52Z: served NHL 37 of 38 and NFL 123 of 125 live props carry an Actual, 0 priced. The Actuals on the board build's own rows LAG the box: (c) FIX `fd05acb13` LOADED on web 11-10 15:45Z, live reading owed. NHL Live proj. NOT shipped: the live re-sim's per-player means run 4-13% hot (no `special_teams_cal`)** `[2026-11-09, lane nhl-nfl-live-prop-actuals, session 386d4115]`
 - **Built:** a `livePlayerStats` box block on each live game's snapshot.
   - NHL: live-odds-worker re-sim tick.
