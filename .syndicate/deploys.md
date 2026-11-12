@@ -59310,3 +59310,35 @@ ailload\load.sh 3f11114c2 e102faf79`):
   - Code: `syndicate/features/ncaab/inplay_lane.py:191` `launch_autorun_ncaab_live_refresh` selects `central_today_iso()` only. This is the college analogue of NBA's `#782`.
   - Before the roll, the same game's ledger priced its lines on quotes 4-94 s old (05:30-05:59Z).
 - **verify:** the lane's Verification line (`prior_live>0 prior_resimmed>0`, and the carryover join `games_in_snapshot>0`) is MET. The stricter `projected>0` I added in OWED (2) is NOT MET, for the capture reason above. Lane CLOSED as GOAL MET for the re-sim. The priced half is filed as todo `#792` (not fixed; the fix needs the user's yes).
+
+## 2026-11-12 15:25:08Z (9:25 AM CST) -- FLEET ff 5b30d2415 -> 0fe6631d7 + claimed refresh-worker TERM: todo #791 NCAAF live join team-name alias (lane `ncaaf-live-join-team-alias`), with #793 (`4b9553b93`) and #792 (`dd7a5bf2d`) riding along -- user "Load all three" -- **LOADED; boot MET; #793 MET; the #791 served reading is owed tonight (Louisiana @ UL Monroe, 8:00 PM CST)**
+
+- **User decision, quoted:** "Load all three", answering "Load the NCAAF name fix on refresh-worker today?". The ask named the ride-alongs: #793 loads with this restart; #792 lands on disk and loads at live-odds-worker's next recycle.
+- **What the ff carried** (`git diff --stat 5b30d2415 0fe6631d7`, runtime files): `live_gameline_join.py` (#791), `ncaab/inplay_lane.py` (#792, live-odds-worker), `nba_current_rosters.py` + `player_headshots.py` (#793, refresh-worker board build), `scripts/local_production.py` (`373a2d911`, status tooling only), plus ledger/tests.
+- **Locks:**
+  - Claim refresh-worker 15:21:43Z (token held by the lane).
+  - Drain CLEAR ~15:24:30Z (idle, no board build or child job in flight).
+  - Preflight 15:24:49Z `--target-commit 0fe6631d73aa0f07459eca4fbb0273dfaf8a0b48`: **CLEAR**, rc 0. Spacing: last deploy 478 min earlier (fleet role start, pid 504).
+  - Baseline read 15:22:29Z (served board) / 15:24:36Z (fleet log).
+- **Expect** (baseline -> expected):
+  - `ncaaf_join_index_why_alias_keys`: absent -> present.
+  - `ncaaf_alias_pair_rows_live_proj_tonight`: 0 -> gt0.
+  - `nba_prop_rows_no_player_side`: 111 -> 0.
+  - `nba_prop_rows_no_headshot_url`: 26 -> 0.
+- **Load** (`C:/tmp/ncaafseg/load791.sh`, which aborts if HEAD moved since preflight):
+  - The first run refused `FF_FAILED` (the fleet had not fetched the SHA); nothing changed. `git fetch github`, then rerun.
+  - Before: HEAD `5b30d2415` = the preflight read; pid 504. ff 15:25:08.212Z -> `0fe6631d7`; on disk `TEAM_ALIAS_JOIN_ENV` 1.
+  - TERM 15:25:08.219Z; `==== start 2026-11-12T15:25:15Z`; new pid **78399** first seen 15:25:16Z. `DRAIN_CLEARED owner=ncaaf-live-join-team-alias` ~15:25:35Z (explicit undrain).
+  - web and live-odds-worker were not restarted; they pick up the ff at their own recycles.
+- **verify:**
+  - **Boot MET:** the first NCAAF `LIVE_GAMELINE_JOIN` after the boot (15:26:30.165Z) prints `index_why={... 'alias_keys': 0}`. The pre-load line (15:21:03Z) had no `alias_keys`. It reads 0 because no NCAAF game is live (67 lens games, all `pregame`). Lines starting `Traceback` since the boot: 0.
+  - **#793 MET** (served board, `C:/tmp/ncaafseg/nba_props_probe.py`, snapshot 15:34:56Z, the first after the boot): NBA prop rows with no `player_side` 111 of 339 -> **0 of 337**; with no `headshot_url` 26 -> **0**. #793's own owed reading, recorded here for its lane.
+  - **#792:** on disk only; its reading belongs to lane `college-quote-capture-midnight` after live-odds-worker's next recycle.
+- **Owed (#791), tonight 11-13 UTC:** watcher `C:/tmp/ncaafseg/night791.sh` at 01:40Z / 02:40Z / 03:30Z / 04:20Z (7:40 / 8:40 / 9:30 / 10:20 PM CST).
+  - Louisiana Ragin Cajuns @ UL Monroe (02:00Z, alias-only: ESPN `Louisiana Ragin' Cajuns`) rows with a Live proj. > 0.
+  - Shortlist `rows_joined_by_team_alias` > 0 and `index_why.alias_keys` >= 1.
+  - Control: Memphis @ South Florida (01:00Z, exact) unchanged.
+- **Revert:**
+  - #791 alone: `REFRESH_WORKER__SYNDICATE_LIVE_GAMELINE_TEAM_ALIASES=off` in `local_production.env` + a drained `down`/`up`.
+  - Or `git revert 0fe6631d7` on main + ff + a claimed, drained refresh-worker TERM.
+- Claim refresh-worker released right after this entry.
