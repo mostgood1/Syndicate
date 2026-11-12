@@ -59282,3 +59282,8 @@ ailload\load.sh 3f11114c2 e102faf79`):
   - The join lines and the ledger come from different callers and ticks, so their counts are not reconciled here (for example, NCAAF priceable 128 in the join, 0 priced in the ledger).
 - **verify: MET.** This is the lane's Verification: the joins name `quote_older_than_live_pricing_ceiling`, priceable falls by about the measured share, and display is kept. No priced ledger row in any of the four sports is over 120 s. Lane `live-gameline-quote-ceiling-120` CLOSED.
 - **Still owed (todo #780, outside this lane's Verification):** re-grade the priced rows' Brier against finals on the post-load population, after several nights (`scripts/live_gameline_age_grade.py`).
+
+## 2026-11-12 06:03Z (12:03 AM CST) -- refresh-worker: live-props evidence BYTES PER NIGHT measured; lane `live-props-evidence` CLOSED, GOAL MET -- **25.8 MB for the 10-game 11-11 NBA slate, 0 failures**
+- **What was read:** the last reading the 23:01Z and 02:52Z entries owed; read-only, no deploy.
+- **verify:** final `live_evidence/nba/2026-11-11.props.jsonl` 25,795,412 B / 494 rows, last write 05:30:07Z 11-12 (read 06:02Z, unchanged 30 min): 10 games, 1.97-3.41 MB a game (mean 2.58 MB), 42-59 rows a game (one per game per changed tick), 464,203 published prop rows kept = 55.6 B a published prop row; refresh-worker pid 250882 since the 22:58Z boot: 123 `PROPS` writes, 0 PROPS_FAILED / TICK_FAILED / READ_FAILED / WRITE_FAILED, 0 tracebacks (read 06:02Z). **MET.**
+- **Disk:** nothing prunes `live_evidence/`; at 2.58 MB a game an 82-game NBA regular season (1,230 games) is ~3.2 GB, against 754 GB free of 1,081 GB on the fleet data disk (06:02Z) -- no action owed this season.
