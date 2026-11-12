@@ -691,12 +691,6 @@ death, never life — do not invert it.
 - Verification: Unit: exact join byte-identical on/off; alias-only pair joins on, misses off; two lens games one alias key -> ambiguous refusal not a pick; non-ncaaf sport never aliases; segment display + full-game + first5 lookups all use the fallback; counters. Fleet before the load: chip_join_key reachability under refresh-worker's environ for all 43 pairs. After a user-approved refresh-worker load: index_why alias_keys > 0 and rows_joined_by_team_alias > 0 on a live slate with a renamed team, and those rows carry a Live proj. on the served board.
 - Blocked by: none
 
-### closed-lane-archive-20261112-1255 — CLOSED 2026-11-12 (GOAL MET: 5 blocks archived) — opened 2026-11-12 — session c90f40ab-ce3b-4239-9a96-b33a3962fa3d
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 5 of 10 CLOSED blocks SAFE; all 5 moved to lanes_closed.md with one pointer each. Invariants show only the 2 contested files already in the baseline. Table in log/2026-11-12.md.
-- Moved: live-props-evidence, nhl-live-puckline-grade, kalshi-aged-out-grade, nhl-live-endgame-calibration, fleet-status-start-drift
-
 ### closed-lane-archive-20261112-1439 — CLOSED 2026-11-12 (GOAL MET: 4 blocks archived) — opened 2026-11-12 — session 462be4be-21d9-46dc-82e5-292010cff546
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
@@ -723,6 +717,11 @@ death, never life — do not invert it.
 - Falsification test: After the rules, the audit over the same quote logs still shows an unresolved name, or any key of the current ncaab/wncaab alias map resolves to a different school, or a new key collides
 - Verification: Audit script 0 unresolved over every ncaab/wncaab quote shard on the fleet; old-map keys identical in the new map; tests pass; on main. Load (refresh-worker TERM stamps the keys) is the user's decision
 - Blocked by: none
+
+### closed-lane-archive-20261112-1715 — CLOSED 2026-11-12 (GOAL MET: 1 block archived) — opened 2026-11-12 — session 138f0a96-2f9d-40bb-84cd-e8487ec470bb
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 gave SAFE for 1 of 4 CLOSED blocks. Moved: closed-lane-archive-20261112-1255. The reading and the WAIT reasons are in `.syndicate/log/2026-11-12.md`.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -956,6 +955,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261111-2240` — CLOSED 2026-11-11 (GOAL MET: 5 blocks archived) — opened 2026-11-11 — session 411f2d1b-9065-4d3c-a24c-7a12da6979c8
 - `closed-lane-archive-20261112-0040` — CLOSED 2026-11-12 (GOAL MET: 2 blocks archived) — opened 2026-11-12 — session 2d6174f2-41f6-4934-aec9-922b92fc9818
 - `closed-lane-archive-20261112-0850` — CLOSED 2026-11-12 (GOAL MET: 3 blocks archived) — opened 2026-11-12 — session 0450cd8e-9c6f-4f41-8b7a-aefe4e677886
+- `closed-lane-archive-20261112-1255` — CLOSED 2026-11-12 (GOAL MET: 5 blocks archived) — opened 2026-11-12 — session c90f40ab-ce3b-4239-9a96-b33a3962fa3d
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b

@@ -15410,3 +15410,9 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 3 of 11 CLOSED blocks SAFE, and all 3 moved to lanes_closed.md with one pointer each. Invariants show only the 2 contested files that were already in the baseline. Table in log/2026-11-12.md.
 - Moved: closed-lane-archive-20261111-2040, closed-lane-archive-20261111-2240, closed-lane-archive-20261112-0040
+
+### closed-lane-archive-20261112-1255 — CLOSED 2026-11-12 (GOAL MET: 5 blocks archived) — opened 2026-11-12 — session c90f40ab-ce3b-4239-9a96-b33a3962fa3d
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 5 of 10 CLOSED blocks SAFE; all 5 moved to lanes_closed.md with one pointer each. Invariants show only the 2 contested files already in the baseline. Table in log/2026-11-12.md.
+- Moved: live-props-evidence, nhl-live-puckline-grade, kalshi-aged-out-grade, nhl-live-endgame-calibration, fleet-status-start-drift
