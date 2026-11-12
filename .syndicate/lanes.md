@@ -643,26 +643,6 @@ death, never life — do not invert it.
 - Verification: unit tests incl. off != on and a lossless round trip of build_live_props output; a dry run against the fleet's live NBA snapshot tonight into a scratch dir (bytes per tick, CPU per pass); after a user-approved load (refresh-worker TERM): a same-moment probe of expanded rows vs the published liveProps with 0 mismatches, bytes per night, 0 failures
 - Blocked by: none
 
-### layer2-live-rail-edges — CLOSED 2026-11-11 6:58 PM CST (GOAL MET: live rail lines for full game + intervals loaded on web; evening flag reading 14 of 14 flags valid, 0 false) — opened 2026-11-10 — session 0f519972-4890-45d3-8b52-767c7e0a0389
-- CLOSED 2026-11-12 00:58Z (6:58 PM CST 11-11). Verification ran:
-  - node + pytest harness green (`tests/test_layer2_live_rail_edges.py`).
-  - Served-page readings: 17:30Z load, 19:37Z intervals, and the evening flag reading 23:15Z-00:46Z (deploys.md 2026-11-12 00:56Z).
-  - 14 flagged cards over 4 of 10 readings. Each matched a qualifying served row (`live_aware`, edge >= 3, quote <= 120 s at pricing) at the same line, quote age and edge (within 0.1). 0 flags without one. Every unflagged qualifying game was past the 300 s age-now rule.
-  - After ~00:15Z the flags went dark because refresh-worker's book-grid tick saturated once NBA was live (NBA in-play overlay 94-234 s per build, so the NCAAB overlay refreshed every ~5 min). That is todo #790, not the rail.
-  - The goal is met.
-  - Display nit noted in #781, not changed: `formatAge` shows 90-149 s as `2m`.
-- **GOAL VERDICT `[2026-11-11 00:2xZ / 6:2x PM CST 11-10]`:** Goal, verbatim: "Live games on the Layer 2 Games rail show a live update line per full-game market (spread, total, moneyline where priced): our live re-sim number vs the current live book line with the quote's age; the compact card carries a live-edge highlight and the rail a live-edge filter by market, both counting ONLY an edge priced against a FRESH quote (threshold default + reason in code, #780); web-only display of served artifact fields, no change to the join's pricing ceiling; tests (line renders for a live priced row; highlight/filter fire on fresh, not stale) + a real-app screenshot; on main; loading web is the user's decision" -- **GOAL: MET.** Readings: threshold set to 120 s on the parent session's relay of #780's all-market addendum (first shipped at 30 s, `3c38ef4c4`); flag worded MODEL ≠ LINE, never 'edge'. node harness all passed + pytest 78 passed, 5 source mutations each caught; run-syndicate replay of the fleet's UNMODIFIED 23:58:33Z served board: 4 live games with a live line, 2 flagged (RUTG o149.5 +10.0 on 47 s, GTWN o141.5 +8.0 on 52 s), RUTG o147.5 on 153.5 s not; Model ≠ line / Total filters keep 2. Hypothesis CONFIRMED (display only). Kept OPEN only as the holder for the web load (the user's decision, todo #781); close after the post-load served read, or when the user declines.
-- STATUS 2026-11-11 1:55 PM CST (19:55Z): flag reading ARMED (user "check the flags tonight when games are live"): session watcher night_watch.py polls the served page every 10 min 23:15Z-04:30Z (DOM flags + the same board's qualifying rows), stops after 3 flagged readings. Found while arming: live quote pulls (NCAAB 133 s, WNCAAB 245 s) are slower than the 120 s ceiling -> most live lines unpriced, so flags are rare (todo #786, not this lane's to fix).
-- STATUS 2026-11-11 1:38 PM CST (19:38Z): INTERVALS LIVE -- rode lane restate-live-edge-withhold's ff to 5c8eec41a + reload-web (18:11:22Z); no deploy of mine (claim taken 19:36Z, released 19:37Z, no ff/reload). Served page 19:37:49Z: UIW @ UCD 1H/2H rows, DART @ UALB settled 1H skipped, 0 flagged (deploys.md 19:37:49Z). Owed: a flag reading on fresh quotes (evening slate); then close.
-- STATUS 2026-11-11 12:0x PM CST (18:0xZ): INTERVALS DONE IN CODE, ON MAIN, NOT LOADED (user "we need this for intervals too"): interval rows (1H/2H/Q1-Q4...) on the live line, OURS from the card's PROJ box, settled periods skipped, _alt families included; 9 mutations caught; replays of the 11-10 23:58Z and 11-11 17:38Z fleet boards render them (todo #781). Next web load is the user's decision.
-- STATUS 2026-11-11 11:31 AM CST (17:31Z): LOADED ON WEB (user "Yes, load web"): fleet ff 9fee4160d -> 4793d823c 17:27:13Z + reload-web (venv python) done 17:28:08Z; rail_live_block / rail_threshold_120 / rail_css 0 -> 1; served page renders the live line on 2 live NCAAB games (deploys.md 17:27:13Z). Web claim released. NEXT, same lane (user 11-11 "we need this for intervals too"): interval rows on the live line.
-- Goal: Live games on the Layer 2 Games rail show a live update line per full-game market (spread, total, moneyline where priced): our live re-sim number vs the current live book line with the quote's age; the compact card carries a live-edge highlight and the rail a live-edge filter by market, both counting ONLY an edge priced against a FRESH quote (threshold default + reason in code, #780); web-only display of served artifact fields, no change to the join's pricing ceiling; tests (line renders for a live priced row; highlight/filter fire on fresh, not stale) + a real-app screenshot; on main; loading web is the user's decision
-- Files: syndicate/templates/intelligence.html (the new LIVE RAIL LINES block after chipIntervals, renderGameCards, state.liveEdge + its one syncUrlState line ONLY), syndicate/static/shared/board_cards.css (new .game-mini-card__live-* / --live-edge / rail filter rules ONLY), tests/js/games_rail_live_lines.test.mjs (NEW), tests/test_layer2_live_rail_edges.py (NEW), docs/ai_context/todo.md (#781 section only)
-- Hypothesis: n/a (display feature); diagnostic part: live cards lack a live line because chip footer is pregame-only (game_chip_scoreboard.py:716) and renderGameCards never reads the game's live board rows, not because the join drops data
-- Falsification test: served live game rows lack line/live_total/model_edge_pct/book_age_seconds -> the gap is at the join, not display
-- Verification: node + pytest harness green incl. fresh-vs-stale cases; run-syndicate screenshot of a live (or fixture) rail card with the live line; served-board count of live games/markets with a live line and with a fresh edge recorded in the lane
-- Blocked by: none
-
 ### nba-quote-capture-midnight — OPEN — opened 2026-11-11 — session cca33a3a-b09d-4b06-9e0f-59b0deb9dd6c
 - **GOAL VERDICT `[2026-11-12 06:10Z]`:** Goal, verbatim: "An NBA game still live at midnight Central keeps rows on the SERVED Layer 2 board: the live-odds-worker's NBA in-play lane keeps pulling its quotes after 00:00 CT (launching for the previous Central date while the #776 re-sim publishes that date's game In Progress, inside SYNDICATE_NBA_LIVE_RESIM_PRIOR_DATE_HOURS), so the previous date's shard stays observed and the carryover's opportunity gate does not dead-lane it; the gate's dead reasons counted per sport in the ingest; todo #782; fix on main with tests incl. off != on through the env; loading on the fleet is the user's decision". **GOAL: NOT MET.** Done: fix `eacc9f990` (todo #782) LOADED on the fleet on the user's "Yes, load it" / "Load all together (Recommended)": refresh-worker pid 191825 and live-odds-worker pid 192537 (peer lanes' claimed TERMs after the 18:11:22Z ff to `5c8eec41a`); `dead_by_reason` MET on the served board (sums to `by_lane.dead` on every sport, 18:22:59Z). Left: the Verification's served-board reading on the first night with NBA live at 00:00 CT. The 11-12 roll had NOTHING TO READ: the 11-11 slate ended 11:31 PM CST (re-sim `games=0` 05:31:47Z; post-roll `prior_skip=slate_final`), so the path was not exercised -- no evidence either way (deploys.md 2026-11-12 06:10Z). Blocking: the calendar -- next candidate 11-13 OKC @ LAC (9:30 PM CST tip), only if it runs past midnight; the 11-12, 11-14, 11-15 and 11-16 slates' last tips are 7:00-8:00 PM CST (ESPN scoreboard, read 06:07Z).
 - Goal: An NBA game still live at midnight Central keeps rows on the SERVED Layer 2 board: the live-odds-worker's NBA in-play lane keeps pulling its quotes after 00:00 CT (launching for the previous Central date while the #776 re-sim publishes that date's game In Progress, inside SYNDICATE_NBA_LIVE_RESIM_PRIOR_DATE_HOURS), so the previous date's shard stays observed and the carryover's opportunity gate does not dead-lane it; the gate's dead reasons counted per sport in the ingest; todo #782; fix on main with tests incl. off != on through the env; loading on the fleet is the user's decision
@@ -772,11 +752,6 @@ death, never life — do not invert it.
 - Verification: unit tests that fail on the old start-time logic (mutation-checked); a read-only fleet run of status from this commit's code naming each role's loaded commit consistent with its spawn line and the reflog
 - Blocked by: none
 
-### closed-lane-archive-20261111-1840 — CLOSED 2026-11-11 (GOAL MET: 3 blocks archived) — opened 2026-11-11 — session 7e5bed26-0f4a-4a50-a34b-294ef794e5be
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 3 SAFE at ~00:41Z 11-12; all 3 moved to lanes_closed.md with pointers: ncaab-score-effect-load, live-mech-outcome-gate, closed-lane-archive-20261111-1332. Table + waits in log/2026-11-11.md.
-
 ### closed-lane-archive-20261111-2040 — CLOSED 2026-11-11 (GOAL MET: 1 block archived) — opened 2026-11-11 — session 1fa345f1-31d9-4cfd-b411-2d631e69b46f
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
@@ -787,6 +762,12 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 5 of 14 CLOSED blocks SAFE, and all 5 moved to lanes_closed.md with one pointer each. Invariants show only the 2 contested files that were already in the baseline. Table in log/2026-11-11.md.
 - Moved: nba-live-resim-midnight, nba-pbp-blowout-bench, nba-resim-overtime-prob, closed-lane-archive-20261111-1639, one-read-746-747-749
+
+### closed-lane-archive-20261112-0040 — CLOSED 2026-11-12 (GOAL MET: 2 blocks archived) — opened 2026-11-12 — session 2d6174f2-41f6-4934-aec9-922b92fc9818
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 2 of 12 CLOSED blocks SAFE, and both moved to lanes_closed.md with one pointer each. Invariants show only the 2 contested files that were already in the baseline. Table in log/2026-11-12.md.
+- Moved: layer2-live-rail-edges, closed-lane-archive-20261111-1840
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1015,6 +996,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261111-1332` — CLOSED 2026-11-11 (GOAL MET: 1 block archived) — opened 2026-11-11 — session 8377f65c-ace3-4d3e-8282-54cf154aee70
 - `closed-lane-archive-20261111-1557` — CLOSED 2026-11-11 (GOAL MET: 1 block archived) — opened 2026-11-11 — session 74ba138f-8e0c-4ba4-b351-edd9799ccec1
 - `closed-lane-archive-20261111-1639` — CLOSED 2026-11-11 (GOAL MET: 2 blocks archived) — opened 2026-11-11 — session 78bd124e-27ae-4ff8-81c6-d225d6cd69f1
+- `closed-lane-archive-20261111-1840` — CLOSED 2026-11-11 (GOAL MET: 3 blocks archived) — opened 2026-11-11 — session 7e5bed26-0f4a-4a50-a34b-294ef794e5be
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
@@ -1125,6 +1107,7 @@ death, never life — do not invert it.
 - `layer2-hidden-row-split` — CLOSED 2026-10-04 — opened 2026-10-04 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
 - `layer2-interval-selector` — CLOSED 2026-10-25 (GOAL MET: per-interval Period tabs live on the fleet web b2cdb6ed, served counts sum to Game intervals) — opened 2026-10-24 — session 4b29d941-3df8-4b0d-b2d0-f5ec0f49d3a3
 - `layer2-line-movement-scoring` — CLOSED 2026-09-20 — opened 2026-09-20 — session 105fd5dd-14d4-4ec6-904e-057f574d8ad8
+- `layer2-live-rail-edges` — CLOSED 2026-11-11 6:58 PM CST (GOAL MET: live rail lines for full game + intervals loaded on web; evening flag reading 14 of 14 flags valid, 0 false) — opened 2026-11-10 — session 0f519972-4890-45d3-8b52-767c7e0a0389
 - `layer2-live-scorecard-gate` — CLOSED 2026-09-13 — opened 2026-09-12 — session dafdacab-025f-41bf-9381-dfa4860e54a4 — **GOAL MET: the scorecard grades Layer 2 openings on settled results AND on whether the price was still on the board 10 min later, both from worker-recorded data (the departure log agreed with a same-slate NFL capture on 209 of 209 sightings, 57 live, 2026-09-13 21:45Z). The in-play observation gate (served live rows observed over 400s: 1,637 of 3,716 -> 0 of 14,103) and the `in_play_market_fair` refusal (41) are live.**
 - `layer2-live-segment-actuals` — CLOSED 2026-10-26 (GOAL MET) — opened 2026-10-13 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
 - `layer2-lookahead-live-dedupe` — CLOSED 2026-11-11 (GOAL MET: both goals MET and held across the midnight roll) — opened 2026-11-10 — session 345d60ab-9db5-4a93-9d01-d57374578f65
