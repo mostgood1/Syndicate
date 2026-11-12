@@ -59287,3 +59287,13 @@ ailload\load.sh 3f11114c2 e102faf79`):
 - **What was read:** the last reading the 23:01Z and 02:52Z entries owed; read-only, no deploy.
 - **verify:** final `live_evidence/nba/2026-11-11.props.jsonl` 25,795,412 B / 494 rows, last write 05:30:07Z 11-12 (read 06:02Z, unchanged 30 min): 10 games, 1.97-3.41 MB a game (mean 2.58 MB), 42-59 rows a game (one per game per changed tick), 464,203 published prop rows kept = 55.6 B a published prop row; refresh-worker pid 250882 since the 22:58Z boot: 123 `PROPS` writes, 0 PROPS_FAILED / TICK_FAILED / READ_FAILED / WRITE_FAILED, 0 tracebacks (read 06:02Z). **MET.**
 - **Disk:** nothing prunes `live_evidence/`; at 2.58 MB a game an 82-game NBA regular season (1,230 games) is ~3.2 GB, against 754 GB free of 1,081 GB on the fleet data disk (06:02Z) -- no action owed this season.
+
+## 2026-11-12 06:10Z (12:10 AM CST) -- live-odds-worker: #782 midnight reading for the 11-11 slate -- **NOTHING TO READ: no NBA game in play at the roll**
+- **What was read:** the reading the 2026-11-11 18:22:59Z entry owed; read-only, no deploy, no claim. Session watcher `mid782.sh` (polls 05:56Z-07:30Z) exited 4 at 06:06:05Z: 3 post-roll re-sim ticks, max `prior_games` 0.
+- **Readings (fleet live-odds-worker log, API):**
+  - re-sim `date=2026-11-11 games=1` 05:11:32Z, `games=0` 05:31:47Z (11:31 PM CST); post-roll ticks 06:01:50Z and 06:05:51Z: `date=2026-11-12 games=0 ... prior_date=2026-11-11 prior_games=0 prior_skip=slate_final`.
+  - last `NBA_LIVE_AUTORUN_LAUNCHED date=2026-11-11` 05:27:14Z (today's path); 0 with `prior_slate_games=`; `nba_source/tracking/book_quotes/2026-11-11.jsonl` last written 05:30:03Z.
+  - served `GET /api/board/layer2-shortlist?date=2026-11-11&sport=nba` 06:06:05Z (build age 373 s): 0 rows; `per_sport_ingest.nba.dead_by_reason` `{final:game_final: 11157}` -- every candidate dead because its game is final, none `live:*`.
+  - health since the load (18:14Z 11-11): 0 `NBA_LIVE_AUTORUN_PRIOR_SLATE_ERROR`, 0 `NBA_LIVE_AUTORUN_ERROR`; the only tracebacks are one chained `requests` connection error in `poll_soccer_live_state.py` at 19:28:15Z. live-odds-worker now pid 459823 (`NBA_LIVE_RESIM_LOOP_STARTED` 06:07:09Z); fleet HEAD `5b30d2415` contains `eacc9f990`.
+- **verify: NOT READABLE.** The fix's path (a prior-date launch) needs a game in play after 00:00 CT; there was none, so this reading is no evidence for or against it.
+- **Still owed (todo #782, lanes `nba-quote-capture-midnight` and `nba-live-props-midnight`):** next candidate 11-13 OKC @ LAC (9:30 PM CST tip), only if it runs past midnight; the 11-12, 11-14, 11-15 and 11-16 slates' last tips are 7:00-8:00 PM CST (ESPN scoreboard, read 06:07Z). Denominator from `#776`: 4 of 20 regular-season slates had NBA play after the roll.
