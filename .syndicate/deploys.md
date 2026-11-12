@@ -59260,3 +59260,25 @@ ailload\load.sh 3f11114c2 e102faf79`):
 - Coverage over the night (every 5-min read 01:05-02:57Z): re-simmed lanes carrying `liveEndgame` on/0.38/90 = re-simmed lanes on every read (2 or 3 of 6 games; the rest in intermission or not started). 0 lanes without it.
 - Instrument note: the 01:0xZ TaskStop of the first watcher did not stop its bash loop. It kept running beside the re-armed one (the log interleaves two read series ~1.5 min apart), and both exited DONE at 02:55:53Z / 02:57:14Z. Both re-read `snap_read.py` every iteration, so both used the fixed reader after 01:05Z. No process left.
 - **verify:** `nhl_live_lanes_with_liveEndgame_on_0.38_90` **MET** (01:05Z entry); P3 one-goal served P(by 2+) **MET** (0.475 / 0.42 vs 0.425 on, 0.261 off). All of the 22:34:21Z entry's expectations are now MET. Lane CLOSED.
+
+## 2026-11-12 03:30Z (9:30 PM CST 11-11) -- READING, no deploy: the owed NBA / NCAAF reading of the 18:11:24Z refresh-worker load (todo #780, 120 s live quote ceiling, lane `live-gameline-quote-ceiling-120`) -- **MET: 2,689 NBA rows priced on 9 games, 0 of them on a quote older than 120 s; lane CLOSED**
+
+- **Read:** `C:\tmp\livegrade\ceiling_read.py`, read-only at nice 19, run by a watcher armed 18:18:10Z. It reads the fleet's live gameline ledgers (written by `book_grid_artifact`) and refresh-worker's `[layer2_shortlist] LIVE_GAMELINE_JOIN` lines. Window: 23:30Z 11-11 to 03:30Z 11-12 (5:30-9:30 PM CST).
+- **Code that ran:** at 03:34Z, fleet HEAD `5b30d2415` contains `0f6e4a723`, and its `_MAX_QUOTE_AGE_BY_SPORT` still reads ncaab / wncaab / nba / ncaaf = 120.0.
+  - refresh-worker restarted 3 times after 18:11:24Z, each a claimed restart (supervisor log: holders `ncaaf-live-segment-display`, `live-price-on-pull`, `live-props-evidence`). Every one ran on a HEAD that contains `0f6e4a723`. The current pid is 250882.
+  - 0 Tracebacks in refresh-worker.log in the window.
+- **Ledger, priced rows by quote age:**
+  - `nba_priced_gt120`: **0 -> 0, MET, and now exercised.** 2,689 priced rows on 9 games, all at quote age <= 120 s (14,289 records).
+  - NCAAB: 2,016 priced rows on 40 games, all <= 120 s.
+  - WNCAAB: 82 priced rows on 8 games, all <= 120 s.
+  - NCAAF: 0 priced of 507 records (240 `no_two_sided_market_price`, 261 `segment_pricing_disabled`), so 0 over 120 s, trivially.
+  - **Control, NHL (still at 600 s):** 17 priced, 10 of them over 120 s, max 300 s. The reader does count over-120 s priced rows where the ceiling allows them, so the zeros above are not instrument blindness.
+- **Join lines (layer2_shortlist), summed over the window's 29-31 lines per sport:** the share of resolved rows refused for quote age is `quote_older_than_live_pricing_ceiling` / (that + `quote_older_than_the_score_the_model_saw` + `projected`). That denominator follows the gate order in `attach_live_gamelines` (`live_gameline_join.py:2229`): quote age first, then quote-behind-score, then pricing.
+  - NBA: 13,470 / 17,774 = **76%** (measured 80%). Priceable 1,652; display 43,439 of 63,980 considered.
+  - NCAAB: 5,865 / 9,238 = **63%** (measured 62-65%). Priceable 899; display 12,371.
+  - NCAAF: 459 / 760 = **60%** (measured 66-77%). Priceable 128; display 1,056.
+  - WNCAAB: 701 / 896 = **78%** (measured 69-77%). Priceable 24; display 855.
+  - Display stays far above priceable in every sport: refused rows keep their live number (#762).
+  - The join lines and the ledger come from different callers and ticks, so their counts are not reconciled here (for example, NCAAF priceable 128 in the join, 0 priced in the ledger).
+- **verify: MET.** This is the lane's Verification: the joins name `quote_older_than_live_pricing_ceiling`, priceable falls by about the measured share, and display is kept. No priced ledger row in any of the four sports is over 120 s. Lane `live-gameline-quote-ceiling-120` CLOSED.
+- **Still owed (todo #780, outside this lane's Verification):** re-grade the priced rows' Brier against finals on the post-load population, after several nights (`scripts/live_gameline_age_grade.py`).
