@@ -78,6 +78,12 @@ def registry_rows(league: str = "ncaab") -> tuple[dict[str, str], ...]:
     return rows + tuple(dict(row) for row in missing if row["espn_id"] not in present)
 
 
+@lru_cache(maxsize=1)
+def _mens_mascot_by_espn_id() -> dict[str, str]:
+    """The men's registry mascot per ESPN id: a school's id is shared by its men's and women's teams."""
+    return {str(row.get("espn_id") or ""): str(row.get("mascot") or "").strip() for row in registry_rows("ncaab")}
+
+
 def iter_team_alias_offers(league: str = "ncaab") -> Iterator[Tuple[str, str]]:
     """Yield ``(alias_token, canonical_school)`` for every name a feed may emit.
 
@@ -92,6 +98,7 @@ def iter_team_alias_offers(league: str = "ncaab") -> Iterator[Tuple[str, str]]:
     handful that ARE unique, and it would put the collision policy in two
     places. Offer everything; let one collision pass decide.
     """
+    mens_mascots = _mens_mascot_by_espn_id() if str(league).lower() == "wncaab" else {}
     for row in registry_rows(league):
         school = str(row.get("school") or "").strip()
         if not school:
@@ -103,7 +110,9 @@ def iter_team_alias_offers(league: str = "ncaab") -> Iterator[Tuple[str, str]]:
         slug = str(row.get("slug") or "").strip()
         if slug:
             yield slug.replace("-", " "), school
-        yield from _odds_feed_spellings(row, school)
+        mens = mens_mascots.get(str(row.get("espn_id") or ""), "")
+        extra = (mens,) if mens and mens != str(row.get("mascot") or "").strip() else ()
+        yield from _odds_feed_spellings(row, school, extra_mascots=extra)
     for token, school in _ODDS_FEED_ALIASES:
         yield token, school
 
@@ -118,7 +127,9 @@ def iter_team_alias_offers(league: str = "ncaab") -> Iterator[Tuple[str, str]]:
 # Each spelling below is derived from the row it names, so it can only point at
 # that school; the collision pass in `team_aliases` still drops any token two
 # schools both produce.
-def _odds_feed_spellings(row: dict[str, str], school: str) -> Iterator[Tuple[str, str]]:
+def _odds_feed_spellings(
+    row: dict[str, str], school: str, extra_mascots: Tuple[str, ...] = ()
+) -> Iterator[Tuple[str, str]]:
     mascot = str(row.get("mascot") or "").strip()
     short = str(row.get("short_display_name") or "").strip()
     abbreviation = str(row.get("abbreviation") or "").strip()
@@ -129,10 +140,21 @@ def _odds_feed_spellings(row: dict[str, str], school: str) -> Iterator[Tuple[str
     mascots = [mascot] if mascot else []
     if mascot.startswith("Lady ") and len(mascot) > len("Lady "):
         mascots.append(mascot[len("Lady "):])
+    # THE MEN'S MASCOT ON A WOMEN'S TEAM (2026-11-12, user "still have college teams not matching"). The odds feed
+    # prices women's games under the school's men's mascot where ESPN's women's registry has its own: "Montana
+    # Grizzlies" (ESPN "Lady Griz"), "Western Kentucky Hilltoppers" ("Lady Toppers"), and on 11-03 "Penn State Nittany
+    # Lions" ("Lady Lions"). 29 of the women's schools carry a mascot that differs from the men's row with the same
+    # ESPN id. The caller passes the men's mascot for those; like the "Lady" stem, it enters COMPOSITE spellings only.
+    mascots.extend(name for name in extra_mascots if name and name not in mascots)
     stems = {school}
     if school.endswith(" State"):
         base = school[: -len(" State")]
         stems |= {f"{base} St", f"{base} St."}
+    # "CSU X" FOR ESPN'S "Cal State X" (2026-11-12): the odds feed's "CSU Bakersfield Roadrunners" left both of
+    # Bakersfield's 11-12 games (men's @ Western Illinois, women's @ Washington) chip-less on the Games rail; the 11-03
+    # "CSU Fullerton Titans" was the same spelling, added then as a one-off entry. Bakersfield, Fullerton, Northridge.
+    if school.startswith("Cal State "):
+        stems.add("CSU " + school[len("Cal State "):])
     if school.endswith(" University"):
         stems.add(school[: -len(" University")])
     if school.startswith("Mount "):
@@ -170,11 +192,9 @@ _ODDS_FEED_ALIASES: tuple[tuple[str, str], ...] = (
     # both leagues). Unresolved, the Games rail drew a chip-less "N opportunities" card for each game, and the
     # live re-sim's margin anchor could not find the game's close.
     ("Cal Baptist Lancers", "California Baptist"),
-    ("CSU Fullerton Titans", "Cal State Fullerton"),
     ("Fort Wayne Mastodons", "Purdue Fort Wayne"),
     ("New Orleans Privateers", "LSU New Orleans"),
     ("Sam Houston St Bearkats", "Sam Houston"),
-    ("Penn State Nittany Lions", "Penn State"),  # the women's registry carries ESPN's "Lady Lions"
     # 2026-11-07: every name in the 11-04..11-08 men's quote logs that still did not resolve (user: games on the
     # rail "not matched"). IUPUI renamed itself IU Indianapolis in 2024; the feed kept the old name.
     ("Albany Great Danes", "UAlbany"),
