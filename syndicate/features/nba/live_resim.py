@@ -59,8 +59,18 @@ Today's slate gets the budget they leave. A quiet night costs one scoreboard fet
 event on it is final (`_PRIOR_SLATE_FINAL`). Tick line, inside the window only: `prior_date= prior_games=
 prior_resimmed= prior_carried= prior_skip=`; `games=`, `resimmed=` and `carried=` include those games. The tick
 history keeps every row in the TICK's file, as the live evidence log does, and marks a previous date's row
-`slate_date`. NOT covered: live PROPS of that game -- the board reads them from the page lens, which the live-lens
-loop builds for the new date only (`nba/live_lens._attach_native_resim`).
+`slate_date`.
+
+Two more readers follow the game across the roll. Both read THIS file, inside the same window and under the same switch:
+- live PROPS (#777): the live-lens loop builds the page lens for the new date and appends the previous date's rows
+  from here, `slateDate` kept (`nba/live_lens._attach_native_resim` -> `_attach_prior_slate`). So the carryover
+  board's props join and web's read-time prop refresh still find them.
+- sportsbook QUOTES (#782): when today has no NBA game live, the live-odds-worker's NBA in-play pull launches for the
+  previous date if a row of that date here reads `status.detailedState` "In Progress" and `generatedAt` is at
+  most 600 s old (`nba/live_lens.prior_slate_in_play`, `run_live_odds_refresh_worker._launch_autorun_nba_live_refresh`).
+  So that date's quotes stay observed, and the board's opportunity gate does not dead-lane the game.
+`slateDate`, the "In Progress" stamp and an offset-aware `generatedAt` are therefore a contract with those readers:
+changing one of them stops the props and the pulls with no error.
 """
 
 from __future__ import annotations
