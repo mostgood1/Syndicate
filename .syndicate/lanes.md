@@ -704,6 +704,10 @@ death, never life — do not invert it.
 - Moved: college-live-resim-midnight, live-gameline-quote-ceiling-120, ncaaf-live-segment-display, closed-lane-archive-20261112-0850
 
 ### college-odds-feed-team-names — OPEN — opened 2026-11-12 — session 0f519972-4890-45d3-8b52-767c7e0a0389
+- STATUS 2026-11-12 4:3x PM CST (22:3xZ): user "run the audit before each slate automatically".
+  - The audit becomes a watchdog check (every 5 min from disk, audits at most hourly, today's and later shards).
+  - It is emailed as `exec:team_names:<league>` with the names and ESPN's spelling.
+  - It loads with a fleet ff and needs no restart. A ScheduledJob would need a full supervisor down/up.
 - STATUS 2026-11-12 4:16 PM CST (22:16Z): LOADED (refresh-worker 22:02:53Z, live-odds-worker 22:03:57Z, user "Yes, load it").
   - Served rows 0 of 5 -> 3 of 3 keyed (22:14:12Z); both rail cards on their chips (22:16:09Z).
   - Claims released 22:16:38Z.
@@ -713,7 +717,7 @@ death, never life — do not invert it.
   - 18 tests; 3 mutations caught; 1,418 passed across the alias test files.
   - Load = ff + refresh-worker TERM + live-odds-worker TERM, before the 00:00Z / 03:00Z tips. The user's decision (todo #795).
 - Goal: Every college team name in the fleet's ncaab/wncaab quote logs resolves through team_aliases.chip_join_key (audit: 0 unresolved, was 3 names / 5 events incl. CSU Bakersfield Roadrunners both leagues, WNCAAB Montana Grizzlies, Western Kentucky Hilltoppers), by derivation rules not one-off entries, with no existing key changing its school; and the audit is a committed script
-- Files: syndicate/features/shared/ncaab_team_registry.py (_odds_feed_spellings + _ODDS_FEED_ALIASES + a men's-mascot offer for wncaab ONLY), scripts/college_team_name_audit.py (NEW), tests/test_college_odds_feed_team_names.py (NEW)
+- Files: syndicate/features/shared/ncaab_team_registry.py (_odds_feed_spellings + _ODDS_FEED_ALIASES + a men's-mascot offer for wncaab ONLY), scripts/college_team_name_audit.py (NEW), tests/test_college_odds_feed_team_names.py (NEW), scripts/college_team_name_watch.py (NEW), tests/test_college_team_name_watch.py (NEW), scripts/local_watchdog.py (main(): one team-names block beside the min_ev tuner block + the WHAT IS CHECKED docstring lines ONLY)
 - Hypothesis: The Games rail's chip-less CSU Bakersfield cards (user 2026-11-12 'still have college teams not matching') are an odds-feed spelling the registry never offers: 'CSU X' for ESPN 'Cal State X', and the men's mascot on women's teams (ESPN 'Lady Griz' / 'Lady Toppers')
 - Falsification test: After the rules, the audit over the same quote logs still shows an unresolved name, or any key of the current ncaab/wncaab alias map resolves to a different school, or a new key collides
 - Verification: Audit script 0 unresolved over every ncaab/wncaab quote shard on the fleet; old-map keys identical in the new map; tests pass; on main. Load (refresh-worker TERM stamps the keys) is the user's decision
