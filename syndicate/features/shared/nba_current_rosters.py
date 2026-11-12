@@ -321,6 +321,9 @@ class RosterIndex:
     team_by_key: Dict[str, str] = field(default_factory=dict)
     team_by_stats_id: Dict[str, str] = field(default_factory=dict)
     teams: Dict[str, List[str]] = field(default_factory=dict)
+    # name key -> stats.nba PLAYER_ID, for the Layer 2 headshot (lane nba-prop-side-face-current-roster, #793). A key
+    # on two different ids is dropped, as team_by_key drops a key on two teams.
+    stats_id_by_key: Dict[str, str] = field(default_factory=dict)
 
     def team_for(self, *, player_id: object = None, player_name: object = None) -> Optional[str]:
         pid = str(player_id or "").strip()
@@ -349,6 +352,7 @@ def current_roster_index(processed_root: Path, date_str: str, *, env: Optional[M
             return None
         idx = RosterIndex(season=season, fetched_at=fetched)
         ambiguous: set = set()
+        ambiguous_ids: set = set()
         for r in rows:
             tri = str(r.get("TEAM_ABBREVIATION") or "").strip().upper()
             k = name_key(r.get("PLAYER"))
@@ -363,8 +367,13 @@ def current_roster_index(processed_root: Path, date_str: str, *, env: Optional[M
                 pid = pid[:-2]
             if pid:
                 idx.team_by_stats_id[pid] = tri
+                if idx.stats_id_by_key.get(k, pid) != pid:
+                    ambiguous_ids.add(k)
+                idx.stats_id_by_key[k] = pid
         for k in ambiguous:  # two current players share a key on different teams: never guess between them
             idx.team_by_key.pop(k, None)
+        for k in ambiguous | ambiguous_ids:
+            idx.stats_id_by_key.pop(k, None)
         if len(idx.teams) != N_TEAMS or any(len(v) < MIN_TEAM_PLAYERS for v in idx.teams.values()):
             return None
         return idx

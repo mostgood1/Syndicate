@@ -17,6 +17,9 @@ process and cached:
              uses the same form since e5438b8d.
   * NBA / WNBA -- `home._basketball_resolve_player_id` (the existing index:
              nba player_ids.csv, wnba boxscores) -> cdn.nba.com / cdn.wnba.com.
+             NBA also reads the current ESPN roster (`rosters_<season>.csv`,
+             #793): its team FIRST for the side, its stats.nba id when the
+             index has none for the face.
   * NCAAF -- `ncaaf_roster_snapshot.csv` (`player_id` IS the ESPN athlete id:
              Arch Manning 4870906 -> 200 on the ESPN college-football path),
              disambiguated by the row's two teams through the ESPN team ids in
@@ -180,6 +183,64 @@ def _basketball_teams(sport: str) -> dict[str, str]:
     return _unique((name, team) for (team, name), _pid in _basketball_player_id_index(sport).items() if team)
 
 
+def _row_slate_date(row: Mapping[str, Any]) -> str:
+    """The row's slate date (YYYY-MM-DD), else the game's Central date from `commence_time`, else today Central."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    central = ZoneInfo("America/Chicago")
+    for key in ("date", "game_date", "slate_date"):
+        text = str(row.get(key) or "").strip()[:10]
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", text):
+            return text
+    try:
+        start = datetime.fromisoformat(str(row.get("commence_time") or "").strip().replace("Z", "+00:00"))
+        if start.tzinfo is not None:
+            return start.astimezone(central).date().isoformat()
+    except ValueError:
+        pass
+    return datetime.now(central).date().isoformat()
+
+
+@lru_cache(maxsize=8)
+def _nba_roster_for(root: str, stamp: tuple[int, int], date_str: str) -> Any:
+    from syndicate.features.shared.nba_current_rosters import current_roster_index
+
+    return current_roster_index(Path(root), date_str)
+
+
+def _nba_current_roster(row: Mapping[str, Any]) -> Any:
+    """The fleet's current ESPN roster (`rosters_<season>.csv`, written by the NBA props refresh) valid for the row's
+    slate, or None (switch `SYNDICATE_NBA_CURRENT_ROSTERS` off, no file, incomplete, or fetched more than a day after
+    the slate). Re-read whenever the file changes. Lane nba-prop-side-face-current-roster, todo #793: `player_ids.csv`
+    is the 2025-26 table -- on the 2026-11-11 board it could not place 36 of the players on 126 of 477 served NBA prop
+    rows (traded, rookies, absent, spelled differently), and this file placed all 36 in their game."""
+    try:
+        from syndicate.features.nba.sources import artifact_processed_root
+        from syndicate.features.shared.nba_current_rosters import enabled, roster_path, season_for_date
+
+        if not enabled():
+            return None
+        date_str = _row_slate_date(row)
+        root = artifact_processed_root()
+        stat = roster_path(root, season_for_date(date_str)).stat()
+        return _nba_roster_for(str(root), (stat.st_mtime_ns, stat.st_size), date_str)
+    except Exception:  # noqa: BLE001 -- no roster is the pre-#793 behaviour, never an error
+        return None
+
+
+def _nba_roster_lookup(row: Mapping[str, Any], field: str) -> str | None:
+    """`team_by_key` / `stats_id_by_key` of the current roster for the row's player: engine spelling, then book's."""
+    roster = _nba_current_roster(row)
+    if roster is None:
+        return None
+    from syndicate.features.shared.nba_current_rosters import name_key
+    from syndicate.features.shared.nba_player_identity import join_name_candidates
+
+    table = getattr(roster, field, None) or {}
+    return next((table[key] for key in (name_key(name) for name in join_name_candidates(row)) if key in table), None)
+
+
 @lru_cache(maxsize=1)
 def _soccer_urls() -> dict[str, str]:
     for root in _roots("soccer"):
@@ -211,6 +272,11 @@ def headshot_url(row: Mapping[str, Any]) -> str | None:
                 pid = _basketball_resolve_player_id(sport, player_name=name)
                 if pid is not None:
                     break
+            if pid is None and sport == "nba":
+                # Not in the 2025-26 id table (rookies, Lillard, other spellings): the current roster's stats.nba
+                # id (#793). Second, so every face the table already gives stays exactly as it was.
+                found = _nba_roster_lookup(row, "stats_id_by_key")
+                pid = found if found and found.isdigit() else None
             if pid is None:
                 return None
             if sport == "wnba":
@@ -247,6 +313,12 @@ def _player_team(row: Mapping[str, Any]) -> str | None:
         return _soccer_teams().get(_norm(player))
     if sport in {"nba", "wnba"}:
         try:
+            if sport == "nba":
+                # The CURRENT roster first (#793): the 2025-26 table files a traded player under his old team, or
+                # under two teams (then nothing), so on 2026-11-11 Anthony Davis read DAL and Tyler Herro MIA/MIL.
+                team = _nba_roster_lookup(row, "team_by_key")
+                if team:
+                    return team
             from syndicate.blueprints.home import _mlb_name_key
             from syndicate.features.shared.nba_player_identity import join_name_candidates
 
