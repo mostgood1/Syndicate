@@ -27,6 +27,8 @@ WHAT IS CHECKED (each a `fail` or a `warn`):
   disk:<path>     < 10 GB free on the data root or the off-disk archive      warn
   exec:min_ev_tuner:*  the tuner's daily pass missing by 13:00Z / failed (warn), or a
                   non-shadow mode with no recorded user decision (fail) -- scripts/min_ev_tuner_watch.py
+  exec:team_names:<league>  an ncaab / wncaab odds-feed team name, in a quote shard from yesterday on, that
+                  matches no ESPN school; audited at most hourly (warn) -- scripts/college_team_name_watch.py
 
 ALERTING. A finding alerts when it is NEW, again while it persists (fail every
 6 h, warn every 24 h), and once when it clears. State lives in
@@ -387,10 +389,20 @@ def main(argv: list[str] | None = None) -> int:
 
         tuner_findings, tuner_row = tw.run(home, settings.logs_dir, settings.data_root, state, now)
         findings.extend(Finding(key, severity, message) for key, severity, message in tuner_findings)
+    # COLLEGE TEAM NAMES (lane college-odds-feed-team-names, 2026-11-12, user "run the audit before each slate
+    # automatically"): odds-feed team names that match no ESPN school, audited at most hourly over today's and later
+    # quote shards (scripts/college_team_name_watch.py). Emailed (`exec:` key). Never fatal here.
+    names_row = state.get("team_names") or {}
+    if os.environ.get("SYNDICATE_WATCHDOG_TEAM_NAMES", "1").strip().lower() not in {"0", "off", "false", "no"}:
+        from scripts import college_team_name_watch as nw
+
+        name_findings, names_row = nw.run(settings.data_root, state, now)
+        findings.extend(Finding(key, severity, message) for key, severity, message in name_findings)
     result, new_state = decide(findings, state, now)
     new_state["restarts"] = readings.get("restarts") or {}
     new_state["execution"] = exec_state
     new_state["min_ev_tuner"] = tuner_row
+    new_state["team_names"] = names_row
     if execution_on:
         result["email"] = _deliver_email(settings, now, findings, state, new_state, result, exec_readings,
                                          send=not args.dry_run)
