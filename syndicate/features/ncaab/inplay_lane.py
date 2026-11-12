@@ -22,6 +22,20 @@ turns that run into `--in-play-only`.
 DEFAULT ON, the NBA lane's precedent: the local fleet derives role env only at
 `up`, so a default-off switch could not be turned on without restarting every
 role. SYNDICATE_ENABLE_NCAAB_LIVE_REFRESH_AUTORUN=0 turns it off.
+
+A GAME STILL LIVE AT MIDNIGHT CENTRAL (#792). The lane asked only "is a game
+live on TODAY's slate?", so at 00:00 CT a game tipped late on the previous date
+lost its pulls. Measured 11-12 (USC @ CAL, tip 04:00Z): the last
+NCAAB_LIVE_AUTORUN_LAUNCHED was 05:58:49Z (date=2026-11-11), the game's
+sportsbook captures in book_quotes/2026-11-11.jsonl end at 05:58Z, and the
+carryover board's join priced 0 of its rows 06:02-06:13Z, every one refused for
+quote age -- while the #774 re-sim kept re-simming it. Now, when today's slate
+has no live game, the lane pulls the PREVIOUS date while the #774 re-sim, inside
+its own window (SYNDICATE_COLLEGE_LIVE_RESIM_PRIOR_DATE_HOURS: absent 4 h, "0"
+off), last published one of that date's games In Progress (`prior_slate_in_play`).
+The pull is the same forced in-play run it had at 23:59: `--in-play-only` keeps
+only games that have tipped, and files them under the date passed, which is the
+shard the carryover board reads. NBA's #782 is the same fix for NBA's lane.
 """
 from __future__ import annotations
 
@@ -178,8 +192,59 @@ def maybe_launch_pregame_sims(leagues: tuple[str, ...] = ("ncaab", "wncaab"), *,
     return {"leagues": list(leagues), "dates": dates, "pregame_games": pregame, "budget_s": budget}
 
 
-def launch_autorun_ncaab_live_refresh(league: str = "ncaab") -> dict[str, Any] | None:
-    """One tick of the lane for `league` (`ncaab` / `wncaab`). Returns what it launched, or None."""
+# A re-sim file older than this names no game (#792): a stopped re-sim thread must not keep paid pulls running
+# for the rest of the window. The re-sim publishes every ~2 min while a game is live; NBA's #782 uses the same 600 s.
+PRIOR_SLATE_IN_PLAY_MAX_AGE_SECONDS = 600.0
+
+
+def prior_slate_in_play(league: str = "ncaab", now: datetime | None = None) -> tuple[str | None, list[str]]:
+    """(the previous Central date, the event ids the #774 re-sim last published In Progress for it), inside the
+    re-sim's own window after midnight Central (`live_resim.prior_slate_date`); (None, []) outside it or with the
+    switch at "0". A missing, unparseable or stale re-sim file gives (date, []). A row the re-sim could not resume
+    says "Unknown" and does not count; neither does a row of today's date."""
+    from syndicate.features.ncaab.live_resim import SLATE_DATE_KEY, live_lens_snapshot_path, prior_slate_date
+
+    prior = prior_slate_date(now)
+    if not prior:
+        return None, []
+    resim = read_json_file(live_lens_snapshot_path(league))
+    if not isinstance(resim, dict):
+        return prior, []
+    try:
+        generated = datetime.fromisoformat(str(resim.get("generatedAt") or "").strip().replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return prior, []
+    if generated.tzinfo is None:
+        return prior, []
+    clock = now if now is not None else datetime.now(timezone.utc)
+    if (clock - generated).total_seconds() > PRIOR_SLATE_IN_PLAY_MAX_AGE_SECONDS:
+        return prior, []
+    resim_date = str(resim.get("date") or "")
+    event_ids: list[str] = []
+    for row in resim.get("games") or []:
+        if not isinstance(row, dict) or str(row.get(SLATE_DATE_KEY) or resim_date) != prior:
+            continue
+        status = row.get("status") if isinstance(row.get("status"), dict) else {}
+        if str(status.get("detailedState") or "").strip().lower() != "in progress":
+            continue
+        event_id = str(row.get("event_id") or "").strip()
+        if event_id and event_id not in event_ids:
+            event_ids.append(event_id)
+    return prior, event_ids
+
+
+def _prior_slate_in_play_safe(league: str, now: datetime | None = None) -> tuple[str | None, list[str]]:
+    """`prior_slate_in_play`, never raising: the lane must keep running today's pulls."""
+    try:
+        return prior_slate_in_play(league, now)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[live_odds_worker] {league.upper()}_LIVE_AUTORUN_PRIOR_SLATE_ERROR {type(exc).__name__}: {exc}", flush=True)
+        return None, []
+
+
+def launch_autorun_ncaab_live_refresh(league: str = "ncaab", *, now: datetime | None = None) -> dict[str, Any] | None:
+    """One tick of the lane for `league` (`ncaab` / `wncaab`). Returns what it launched, or None. `now` is the
+    clock for the midnight-roll check only (tests); the loop passes nothing."""
     tag = league.upper()
     if league == "ncaab":
         try:
@@ -190,8 +255,15 @@ def launch_autorun_ncaab_live_refresh(league: str = "ncaab") -> dict[str, Any] |
         return None
     selected_date = central_today_iso()
     live_games = ncaab_live_game_count(selected_date, league=league)
+    prior_slate_games: list[str] = []
     if live_games <= 0:
-        return None
+        # #792: a game still in play at midnight Central is on the PREVIOUS date. Today's live game still wins;
+        # with none, pull that date while the #774 re-sim still publishes one of its games In Progress.
+        prior_date, prior_slate_games = _prior_slate_in_play_safe(league, now)
+        if not (prior_date and prior_slate_games):
+            return None
+        selected_date = prior_date
+        live_games = len(prior_slate_games)
     # The rail's live line (run + bonus) for both college leagues: one capture thread per process,
     # started the first time either league has a live game (`college_basketball/momentum_capture.py`).
     try:
@@ -241,8 +313,12 @@ def launch_autorun_ncaab_live_refresh(league: str = "ncaab") -> dict[str, Any] |
     write_json_file(status_path, {"epoch": time.time(), "sports": league, "date": selected_date,
                                   "runStamp": run_stamp, "live_games": live_games, "reported": False})
     print(f"[live_odds_worker] {tag}_LIVE_AUTORUN_LAUNCHED date={selected_date} phase=live mode=fast force={league} "
-          f"live_games={live_games} lane={ncaab_live_refresh_lane(league)} interval_s={ncaab_live_refresh_interval_seconds(league)}", flush=True)
-    return {"date": selected_date, "live_games": live_games, "runStamp": run_stamp}
+          f"live_games={live_games} lane={ncaab_live_refresh_lane(league)} interval_s={ncaab_live_refresh_interval_seconds(league)}"
+          + (f" prior_slate_games={len(prior_slate_games)}" if prior_slate_games else ""), flush=True)
+    out: dict[str, Any] = {"date": selected_date, "live_games": live_games, "runStamp": run_stamp}
+    if prior_slate_games:
+        out["prior_slate_games"] = list(prior_slate_games)
+    return out
 
 
 def launch_autorun_wncaab_live_refresh() -> dict[str, Any] | None:
