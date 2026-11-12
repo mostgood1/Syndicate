@@ -769,6 +769,14 @@ death, never life — do not invert it.
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 2 of 12 CLOSED blocks SAFE, and both moved to lanes_closed.md with one pointer each. Invariants show only the 2 contested files that were already in the baseline. Table in log/2026-11-12.md.
 - Moved: layer2-live-rail-edges, closed-lane-archive-20261111-1840
 
+### college-quote-capture-midnight — OPEN — opened 2026-11-12 — session 8062940b-57fd-454a-8de5-25fdd4804d85
+- Goal: A college basketball game still live at midnight Central keeps its in-play odds pulls: launch_autorun_ncaab_live_refresh (NCAAB and WNCAAB), when today's slate has no live game, launches the same forced in-play run for the PREVIOUS Central date while the #774 re-sim (inside its own window, file <= 600 s old) last published a game of that date In Progress; the launch line says prior_slate_games=N; tests incl. off != on through SYNDICATE_COLLEGE_LIVE_RESIM_PRIOR_DATE_HOURS; on main; loading it on the fleet is the user's decision
+- Files: syndicate/features/ncaab/inplay_lane.py (launch_autorun_ncaab_live_refresh, a new prior_slate_in_play helper and a new module-docstring section ONLY), tests/test_ncaab_inplay_midnight.py (NEW), docs/ai_context/todo.md (#792 section only)
+- Hypothesis: After 00:00 CT the lane asks only whether TODAY's slate has a live game, so a previous-date game in progress gets no in-play pull and its sportsbook quotes freeze at the roll (measured 11-12: last NCAAB_LIVE_AUTORUN_LAUNCHED 05:58:49Z, USC @ CAL book captures end 05:58Z, join priced 0 of its rows 06:02-06:13Z)
+- Falsification test: A post-roll NCAAB_LIVE_AUTORUN_LAUNCHED date=<prior> already appears on a late night without this change, or the game's sportsbook rows keep landing in the prior shard after 06:00Z
+- Verification: Unit: with today quiet and the re-sim publishing a prior-date In Progress row, the lane launches date=<prior> with the same forced live args; with the env switch at 0, with a stale (>600 s) or missing re-sim file, outside the window, or with only Unknown/today rows it does not; today's live game still wins. Fleet after the user's load, on the next late college night: NCAAB_LIVE_AUTORUN_LAUNCHED date=<prior> ... prior_slate_games>=1 after 06:00Z, the game's sportsbook rows in book_quotes/<prior>.jsonl captured after 06:00Z, and the carryover NCAAB LIVE_GAMELINE_JOIN projected>0 / priceable>0 for it
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
