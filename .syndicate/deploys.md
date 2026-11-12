@@ -59250,3 +59250,13 @@ ailload\load.sh 3f11114c2 e102faf79`):
 - **Code read:** refresh-worker is pid 250882, respawned 22:58:13Z by lane `live-props-evidence`'s load of `1225c3418` (deploys.md 2026-11-11 23:01Z). `1225c3418` contains both `b43236e17` and `96131f985` (`git merge-base --is-ancestor`). The lens carries 6 segment blocks on each of the 3 re-simmed games.
 - **No harm:** 0 of 48 segment rows carry `model_edge_pct` / `edge_vs_market_pct` / `model_ev_pct` / `live_aware`. Lines starting `Traceback` since 00:00Z: 0. `NCAAF_LIVE_RESIM_ERROR`: 0 (`C:/tmp/ncaafseg/night_rw_*.txt`).
 - **Verdict: GOAL MET.** Lane `ncaaf-live-segment-display` CLOSED; `#785` closed to `todo_closed.md`.
+
+## 2026-11-12 02:57Z (8:57 PM CST 11-11) -- VERIFY, no deploy: the last owed reading of the 22:34:21Z live-odds-worker load (todo #773 NHL live END-GAME, lane `nhl-live-endgame-calibration`) -- **MET: a served P3 one-goal lead reads the fitted regime (0.475 / 0.42), not the old one (~0.26); lane CLOSED**
+- Watcher `C:\tmp\nhlrec\snap_watch.sh` (fixed reader, 01:0xZ re-arm), keyvalue `live/nhl_live_lens.json` under refresh-worker's environ.
+- The state: New York Rangers @ Calgary Flames, P3, NYR leads 2-1, 200 sims, `liveEndgame` on/0.38/90.
+  - 20:54:30 CST build (12:12 left): leader P(by 2+) **0.475**, `empty_net_goals` 25.
+  - 20:56:24 CST build (11:19 left): leader P(by 2+) **0.42**, `empty_net_goals` 25.
+- The prediction (`.syndicate/findings_2026-11-11_nhl_live_endgame_calibration.md`, out of sample, P3 10:00, one-goal lead, n 63): on 0.425, off 0.261, observed 0.460. Both served reads sit in the on regime: within 1.5 binomial SE (about 0.035 at 200 sims) of 0.425, and 4-6 SE above 0.261. One game is a reachability reading on production, not a calibration test; the calibration evidence is the walk-forward table.
+- Coverage over the night (every 5-min read 01:05-02:57Z): re-simmed lanes carrying `liveEndgame` on/0.38/90 = re-simmed lanes on every read (2 or 3 of 6 games; the rest in intermission or not started). 0 lanes without it.
+- Instrument note: the 01:0xZ TaskStop of the first watcher did not stop its bash loop. It kept running beside the re-armed one (the log interleaves two read series ~1.5 min apart), and both exited DONE at 02:55:53Z / 02:57:14Z. Both re-read `snap_read.py` every iteration, so both used the fixed reader after 01:05Z. No process left.
+- **verify:** `nhl_live_lanes_with_liveEndgame_on_0.38_90` **MET** (01:05Z entry); P3 one-goal served P(by 2+) **MET** (0.475 / 0.42 vs 0.425 on, 0.261 off). All of the 22:34:21Z entry's expectations are now MET. Lane CLOSED.
