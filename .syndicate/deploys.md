@@ -59199,3 +59199,18 @@ ailload\load.sh 3f11114c2 e102faf79`):
   - #781 flag reading: **MET** (14 of 14 flags valid, 0 false).
   - #786: **our-lag MET, refusal-share FALSIFIED** (the book's clock binds).
   - New defect **#790**: the NBA in-play overlay build saturates the book-grid tick. Fix not started: the user's call.
+
+## 2026-11-12 01:05Z (7:05 PM CST 11-11) -- READINGS, no deploy: the owed NHL readings of the 19:44:53Z refresh-worker load (ledger v6, lane `nhl-live-puckline-grade`) and the 22:34:21Z live-odds-worker load (end-game, lane `nhl-live-endgame-calibration`) -- **v6 ledger MET; served `liveEndgame` MET; the late one-goal reading is still OWED**
+- **Ledger v6** (`C:\tmp\nhlrec\nhl_night.py 2026-11-11T19:44:53`, NHL 11-11 ledger, read 01:00:04Z, nice 19). The 19:44:53Z entry's expectation: display-only records carry non-null `display_prob` and `market_fair_prob_over`, 0 are priced, and keys re-record when either moves at 2 dp. **MET:**
+  - 26 records since the load, all `v` 6.
+  - 12 are display-only puck-line rows (`spreads`, `live_margin_published_for_display_only`) in 2 games: Tampa Bay Lightning @ Buffalo Sabres 10, New York Rangers @ Calgary Flames 2.
+  - `display_prob` non-null 12 of 12, `market_fair_prob_over` non-null 12 of 12, priced or carrying an edge 0.
+  - 3 distinct keys, all 3 re-recorded; 9 consecutive pairs, 9 moved at 2 dp, 0 unchanged (no duplicate re-records).
+  - e.g. 00:41:24Z TBL @ BUF -1.5 at 0-0: display 0.716, market fair 0.701; 00:59:36Z NYR @ CGY -1.5 at 0-0: display 0.618, market fair 0.645.
+  - The reader printed "in 1 games": it counted `game_pk`, which is None on 26 of 26 NHL rows tonight and 321 of 321 v5 rows on 11-10 (pre-existing, not v6). The ledger keys a game by `event_id` (`live_gameline_ledger.py:224`); the graders that read NHL rows (`live_totals_grade.py`, `live_gameline_age_grade.py`) join on `event_id` and team names, and only MLB's `score_live_gameline_offline.py` joins on `game_pk`. Not a defect for grading.
+- **Served end-game** (`nhl_live_lanes_with_liveEndgame_on_0.38_90`, 22:34:21Z entry): 0 -> **2 of 2 re-simmed lanes at 01:05Z: MET.** Keyvalue `live/nhl_live_lens.json` read under refresh-worker's environ from `~/Syndicate`:
+  - 01:00:55Z build: 6 games, 1 re-simmed (NYR @ CGY), `liveEndgame` {calibration on, empty_net_p 0.38, ramp_seconds 90.0, empty_net_goals 21}; TBL @ BUF refused `in_intermission`, 4 `game_not_started`.
+  - 01:02:43Z build: 2 re-simmed, both `on/0.38/90.0`.
+  - **Instrument note: the watcher was BLIND 00:05-01:00Z.** `snap_read.py` walked `games[].lanes[]`; the served lanes are `games[].gameLens[]`, with score and clock under `lane.projection`. It printed "lanes 0" on all 12 reads whatever was served, so those reads are not evidence of anything. Found by dumping the snapshot's shape when the ledger showed TBL @ BUF re-simmed at 00:41Z. The reader is fixed (the 01:05Z numbers above are the fixed reader's), and the watcher was re-armed at 01:0xZ.
+- **Owed:** a P3 one-goal state's leader P(by 2+) from the served `displayMarginDist` (the fit's prediction: about 0.40 for P3 05:00). Watcher `C:\tmp\nhlrec\snap_watch.sh` (5-min reads, deadline 05:30Z).
+- **verify:** v6 ledger **MET**; served `liveEndgame` **MET**; late one-goal P(by 2+) **OWED**.
