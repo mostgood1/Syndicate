@@ -1,5 +1,24 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#790` — **WITH NBA LIVE, THE NBA IN-PLAY OVERLAY BUILD SATURATES REFRESH-WORKER'S BOOK-GRID TICK: 94-234 s per build (2,100-2,765 in-play rows -> ~2,000 cards), so every sport's live lines are re-priced only every ~5 min (book-grid tick median 65 s -> 307 s; NCAAB overlay 84 s -> 292 s), and at 00:32Z 11-12 web dropped the NCAAB overlay as stale (371 s). Found, NOT fixed** `[2026-11-11, lane live-price-on-pull, session 0f519972; found on the user's "check the flags tonight when games are live"]`
+- **Measured** (fleet `refresh-worker.log{,.1}`, `web.log`; deploys.md 2026-11-12 00:56Z):
+  - `INPLAY_OVERLAY sport=nba elapsed_ms`: median 136 s, max 234 s, over 6 builds, 00:10-00:50Z 11-12 (3 NBA games live, then more). Last night (11-10): median 38 s on 1,186 rows.
+  - The overlay is built inside `_run_book_grid_artifact_tick`, one sport after another, NBA before NCAAB.
+  - `BOOK_GRID_TICK` gap: median 65 s with college only -> 307 s with NBA live. `on_pull` was `[]` on every tick, because the regular tick was always already due. So #786's price-on-pull cannot help while NBA is live.
+  - NCAAB overlay gap: 84 s -> 292 s median, 3 of 7 over 300 s. Web's merge logged `ncaab: 'stale_371s'` at 00:32:06Z: the board fell back to the ~12-min shortlist for live NCAAB.
+  - The live re-sim is NOT delayed: `[live_evidence] TICK` median 32 s, `CHIP_PUBLISH_TICK` 141 s.
+- **Where the time goes** (read-only cProfile, writes refused, nice 19; fleet code + data, the 00:46Z NBA grid's 2,112 in-play rows; `C:	mpailload\prof_overlay.py`):
+  - On 600 rows at default shortlist settings: 81.8 s for 18 cards. 97% of it is per-card context in `layer2_rows_to_board_cards`:
+    - `prop_evidence/basketball.py:_box_games`: 39.8 s, 6.6 s per prop card, 991k CSV rows scanned;
+    - `closing_line_history._parse` via `_chart_columns` -> `past_main_lines`: 38.2 s, 17 parses, 1.93M `_norm` calls.
+  - The candidate build itself (`build_layer2_rows`) took 2.5 s.
+  - The worker runs `SYNDICATE_SHORTLIST_ROWS_PER_GAME=0` and `SYNDICATE_LAYER2_ROWS_PER_SPORT=2000`, so its overlay keeps ~2,000 NBA cards. A warm (second-call) profile at those settings: see the UPDATE below when it lands.
+- **Options, none chosen:**
+  - (a) Cache the parsed box-score and closing-line tables in-process, keyed by file + mtime. `closing_line_history.py` is in no open lane; `prop_evidence/` is held by lanes `cheat-sheets`, `nba-prop-engine-name-join` and `live-props-evidence`.
+  - (b) Build in-play overlay cards WITHOUT the pregame context (recent-matchup text, chart columns) and carry those fields from the shortlist card each one replaces. The overlay exists to re-price.
+  - (c) Give the NBA overlay its own slower cadence, or build it after the college sports, so one sport's cost cannot hold the others' live prices. `run_refresh_worker.py` is this lane's.
+  - Each is a refresh-worker load: the user's decision.
+
 ### `#789` — **NBA LIVE RE-SIM RECORDS ITS OWN P(OVERTIME): the share of draws level after regulation, on the lane (`modelOvertimeProb`) and in every `live_resim_history` row (`p_ot`). LOADED on live-odds-worker 23:39:26Z 11-11 (`837320ab5`, user "Yes, load it"); the first fleet row carrying `p_ot` 00:11:31Z 11-12 (MET). And #788's "late miss is overtime" was mostly the pre-`#763` projection: 7 of the 8 overtime games came before overtime was in the total** `[2026-11-11, lane nba-resim-overtime-prob, session 63276f7e; user "Yes, record it" to "Should the re-sim record its overtime chance so it can be checked?"]`
 - **Change:** in `syndicate/features/nba/live_resim.py`:
   - `resim_live_game` counts the draws whose regulation (banked periods included) ends level, as `overtime_prob`.
@@ -41,7 +60,20 @@
   - **Owed:** a re-read once ~2 more weeks of WNCAAB finals with live ticks are archived (nightly from `3f11114c2`).
 - Study: `scripts/college_blowout_bench_study.py --league ncaab|wncaab --start --end [--evidence]`.
 
-### `#786` — **LIVE QUOTES ARE PULLED SLOWER THAN THE NEW 120 s PRICING CEILING ALLOWS: since 18:11Z 11-11 most live full-game college lines go unpriced for quote age (NCAAB 320 of 570 evaluations, WNCAAB 281 of 433). For NCAAB it is OUR lag (pull + build), not the book. OPTION 1 (PRICE ON PULL) ON MAIN, NOT LOADED** `[2026-11-11, lanes layer2-live-rail-edges / live-price-on-pull, session 0f519972; user question "do we need to get game lines more often on live games to align with live resim timing", then "Do this task here"]`
+### `#786` — **LIVE QUOTES ARE PULLED SLOWER THAN THE NEW 120 s PRICING CEILING ALLOWS: since 18:11Z 11-11 most live full-game college lines go unpriced for quote age (NCAAB 320 of 570 evaluations, WNCAAB 281 of 433). For NCAAB it is OUR lag (pull + build), not the book. OPTION 1 (PRICE ON PULL) LOADED 20:45Z 11-11: OUR LAG HALVED (overlay gap 148 -> 84 s), BUT THE REFUSAL SHARE DID NOT MOVE (60% -> 58%): the ceiling tests the BOOK's unchanged-price clock, so faster pulls (option 2) cannot help either. With NBA live, the book-grid tick saturates (#790)** `[2026-11-11, lanes layer2-live-rail-edges / live-price-on-pull, session 0f519972; user question "do we need to get game lines more often on live games to align with live resim timing", then "Do this task here"]`
+- **VERDICT 2026-11-12 00:56Z (6:56 PM CST 11-11), deploys.md same stamp:**
+  - Our clock: **MET**.
+    - Overlay seen age at pricing 136 s -> 78 s.
+    - NCAAB in-play overlay gap median 148 s / p90 193 s (11-10 evening) -> 84 s / 163 s (11-11 23:00-00:10Z, college only), 0 of 44 over 300 s.
+  - Refusal share: **NOT MOVED**, falsified as pre-registered. `quote_older_than_live_pricing_ceiling` among non-segment NCAAB evaluations:
+    - 60% (441 / 741, 18:12-20:16Z, old code);
+    - 58% (831 / 1,445, 23:00-00:10Z, on-pull);
+    - 57% (1,099 / 1,924, NBA live).
+    - Priceable 8% -> 11% / 14%.
+  - Why: the ceiling reads `book_age_seconds`, how long the BOOK's price has stood unchanged. A price re-confirmed by our pull 10 s ago but unmoved for 3 min is a 180 s quote. Pricing sooner cut our part; most of the remaining refusals are the book's own clock.
+  - **Option (2), faster pulls, would not move it either.** Recommend dropping it. It is the user's call whether to close #786 here.
+  - Price-on-pull stays loaded: it halves our lag at no OddsAPI cost.
+  - **But with NBA live it is moot:** refresh-worker's book-grid tick runs back to back (median gap 307 s, `on_pull: []` every tick), because the NBA in-play overlay build takes 94-234 s. See #790.
 - **UPDATE 2026-11-11 20:35Z (2:35 PM CST): ON THE FLEET DISK, NOT LOADED** -- carried by lane `kalshi-fractional-fills`'s ff 96131f985 -> e102faf79 at 20:25:03Z (user "Yes, carry it"). refresh-worker pid 217520 started 20:16:01Z, before it, so it is not running #786; the next refresh-worker restart, from any lane, loads it. deploys.md 2026-11-11 20:25:12Z.
 - **Cadences, measured on the fleet logs 17:00-20:30Z 11-11** (median / max gap):
   - In-play quote pull launches (`*_LIVE_AUTORUN_LAUNCHED`): NCAAB 133 s / 203 s, WNCAAB 245 s / 303 s (`interval_s=240`).
@@ -148,7 +180,14 @@ ight.sh`, 01:05Z / 01:50Z / 02:45Z 11-12): NCAAF segment rows with a Live proj. 
     - The SERVED `/api/board/layer2-shortlist?date=<prior>&sport=nba` returns > 0 live rows of that game, where 11-11 returned 0. Its `dead_by_reason` shows no `live:live_quote_unobserved` for that game.
   - **Cost:** one in-play pull per 240 s for the minutes the game runs past midnight, ~49 credits a game a pull. 11-11 would have been ~8 pulls (06:00-06:30Z), ~400 credits. Denominator, from `#776`: 4 of 20 regular-season slates (10-20..11-09) had NBA play after the roll.
 
-### `#781` — **LIVE GAMES ON THE LAYER 2 GAMES RAIL NOW SHOW OUR LIVE RE-SIM AGAINST THE BOOK'S LIVE LINE PER MARKET, WITH THE QUOTE'S AGE; A "MODEL ≠ LINE" FLAG AND A RAIL FILTER BY MARKET COUNT ONLY A GAP PRICED AGAINST A QUOTE <= 120 s OLD (#780 addendum), WORDED AS A DISAGREEMENT, NOT AN EDGE. WEB ONLY, LOADED 2026-11-11 17:28Z (`4793d823c`)** `[2026-11-10, lane layer2-live-rail-edges, session 0f519972]`
+### `#781` — **LIVE GAMES ON THE LAYER 2 GAMES RAIL NOW SHOW OUR LIVE RE-SIM AGAINST THE BOOK'S LIVE LINE PER MARKET, WITH THE QUOTE'S AGE; A "MODEL ≠ LINE" FLAG AND A RAIL FILTER BY MARKET COUNT ONLY A GAP PRICED AGAINST A QUOTE <= 120 s OLD (#780 addendum), WORDED AS A DISAGREEMENT, NOT AN EDGE. WEB ONLY, LOADED 2026-11-11 17:28Z (`4793d823c`); EVENING FLAG READING MET 11-11 (14 of 14 flags valid, 0 false)** `[2026-11-10, lane layer2-live-rail-edges, session 0f519972]`
+- **EVENING FLAG READING, 2026-11-11 23:15Z-00:46Z (5:15-6:46 PM CST), deploys.md 2026-11-12 00:56Z: MET.**
+  - 14 flagged cards over 4 of 10 readings. Each matched a qualifying served row (`live_aware`, edge >= 3, quote <= 120 s at pricing) at the same line and quote age, with the edge within 0.1. 0 flags without one.
+  - Examples: NCAT @ ECU `u134.5 +31.9 / 66s`, COFC @ TEM `u159.5 +23.7 / 18s`, UML @ MASS `UML ML +7.0 / 17s`.
+  - Unflagged qualifying games were all past the 300 s age-now rule when shown.
+  - After ~00:15Z the flags went dark. The rail was not at fault: refresh-worker built the NCAAB in-play overlay only every ~5 min once NBA was live (#790), so quotes reached the page ~5 min old.
+  - Watcher caveat: the page paints its cached embed first (up to 10 min stale while it refreshes) and replaces it ~80 s later with its own query. A DOM read must wait for that query.
+  - Display nit, no change made: `formatAge` rounds 90-149 s to `2m`, so a 103 s quote reads "vs a 2m line".
 - **Why live cards had no line:** display only, not the join. The chip's book line (`footer`) is pregame-only (`game_chip_scoreboard.py` `"footer": ... if state == "pregame"`), and `renderGameCards` never read the game's live board rows. On the fleet's served board, 2026-11-10 23:45Z (5:45 PM CST), all 50 live full-game rows over 5 college games carried the line, `live_total` or `live_model_probability`, the join's `model_edge_pct` (on `live_aware` rows), and `book_age_seconds`.
 - **What the card shows** (`intelligence.html`, LIVE RAIL LINES block): one row per full-game market, columns LIVE / OURS / BOOK / AGE.
   - OURS is the card's own "Proj final" live re-sim. Where the card has no re-sim block, it falls back to the row's `live_total`, or to the cover %.

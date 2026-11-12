@@ -59144,3 +59144,43 @@ ailload\load.sh 3f11114c2 e102faf79`):
     - 9 `loses_to_market`, 8 of them live player props: +0.016 to +0.026 Brier, 78-112 g, all lodo-stable.
   - **MET:** NBA regular-season games grade, at a 1.6-2.0% ungraded rate.
 - Leads (`leads.md`): the NBA prop book-blend refit; the 332 NBA `final_score_unparseable` rows this week.
+
+## 2026-11-12 00:56Z (6:56 PM CST 11-11) -- READING, no deploy: the #781 rail flag on the evening slate, and #786 price-on-pull's behaviour reading (lanes `layer2-live-rail-edges` / `live-price-on-pull`) -- **flag rule MET; #786 our-clock MET, refusal share NOT MOVED; NEW: the NBA in-play overlay saturates refresh-worker's book-grid tick (#790)**
+- **Instruments** (all read-only):
+  - Watcher `night_watch.py` (scratchpad): 9 polls 23:15:00Z-00:38:43Z of the served `/intelligence?view=cards` in headless Chromium, plus its own `POST /api/intelligence/query` seconds after each DOM read.
+  - `same_instant.py`: one reading at 00:44:24Z. It intercepts the page's OWN query, waits for it to land (00:46:04Z, 80 s after the embed painted), and reads the DOM 6 s later.
+  - Fleet logs `refresh-worker.log{,.1}` and `web.log`: `C:\tmp\railload\lag*.{sh,py}`, `rw_measure2.py`.
+- **The flag rule held in every reading.**
+  - 14 flagged cards over 4 readings: 23:15Z 2, 23:25Z 1, 23:46Z 4, 00:38Z 7. Each matched a qualifying payload row (`live_aware`, `model_edge_pct` >= 3, `book_age_seconds` <= 120) at the same line, the same quote age, and the same edge within 0.1 pt. Examples:
+    - NCAT @ ECU `≠ Total u134.5: model +31.9 pts vs a 66s line`;
+    - COFC @ TEM `u159.5 +23.7 / 18s`;
+    - UML @ MASS `UML ML +7.0 / 17s`.
+  - 0 flags without a qualifying row.
+  - Every qualifying game left unflagged was past the 300 s "age now" rule at the DOM. NBA rows were at 328-335 s at 00:38Z. At the same-instant reading, 15 qualifying games sat at 299-323 s: the overlay they came from was built at 00:41:50Z and served at 00:46Z.
+  - 3 readings (23:35Z, 00:17Z, 00:28Z) showed 7-20 min ages on every card. The watcher read the page's cached embed (`_home_embed_*`, up to 10 min stale while it refreshes) before its own query landed (80 s later at 00:46Z), so it was not reading the fresh board. That is correct behaviour: a stale board never flags.
+- **Why the flags went dark after ~00:15Z: NBA.**
+  - Once 3 NBA games were live, every `INPLAY_OVERLAY sport=nba` build took **94-234 s** (median 136 s; 2,110-2,765 in-play rows -> 1,980-2,000 cards). It runs inside refresh-worker's `_run_book_grid_artifact_tick`, before ncaab.
+  - `BOOK_GRID_TICK` gap: median 65 s (23:00-00:10Z, college only) -> **307 s** (00:10-00:55Z). `on_pull` was `[]` on every tick: the regular tick was always already due.
+  - NCAAB overlay gap: median 84 s, 0 of 44 over 300 s (college only) -> **292 s**, 3 of 7 over 300 s.
+  - At 00:32:06Z web's merge logged `ncaab: 'stale_371s'`: the NCAAB in-play overlay was dropped from the board, which fell back to the ~12-min shortlist.
+  - Last night (11-10, old code) NBA overlay builds were median 38 s on 1,186 rows, with NCAAB gaps median 161 s.
+  - The live re-sim is NOT delayed: `[live_evidence] TICK` median 61 s -> 32 s, `CHIP_PUBLISH_TICK` 129 s -> 141 s.
+  - Profile (read-only, writes refused, nice 19, fleet code + data, 600 of the 2,112 live NBA rows in the 00:46Z grid artifact): 81.8 s for 18 cards, 97% of it per-card context in `layer2_rows_to_board_cards`:
+    - `prop_evidence/basketball.py:_box_games`: 39.8 s, 6 prop cards at 6.6 s each, 991k CSV rows scanned;
+    - `closing_line_history._parse`: 38.2 s, 17 parses, 1.93M `_norm` calls.
+  - A warm-run profile at the worker's settings (`SYNDICATE_SHORTLIST_ROWS_PER_GAME=0`, 2,000 rows per sport) is running.
+- **#786 behaviour reading** (pre-registered: the `quote_older_than_live_pricing_ceiling` share of non-segment NCAAB evaluations must fall, and the overlay seen-age median must be under 120 s):
+  - **Our clock: MET.**
+    - Overlay seen age 136 s -> 78 s (20:56Z).
+    - NCAAB overlay gap median 148 s / p90 193 s (11-10 evening, old code) -> 84 s / 163 s (11-11, 23:00-00:10Z, college only).
+  - **Refusal share: NOT MOVED, falsified.**
+    - 18:12-20:16Z (old code): 441 of 741 = 60%.
+    - 23:00-00:10Z (on-pull): 831 of 1,445 = **58%**.
+    - 00:10-01:00Z (NBA live): 1,099 of 1,924 = 57%.
+    - Priceable share: 8% -> 11% / 14%.
+  - **Why:** the 120 s ceiling tests `book_age_seconds`, the book's own "price unchanged since" clock. Pricing sooner after a pull shortens OUR part, but a price the book has not moved in 2 min is still refused. Faster pulls (#786 option 2) cannot move that clock either.
+  - For comparison only: last night ran a 600 s NCAAB ceiling, so its refusal counts are not comparable.
+- **verify:**
+  - #781 flag reading: **MET** (14 of 14 flags valid, 0 false).
+  - #786: **our-lag MET, refusal-share FALSIFIED** (the book's clock binds).
+  - New defect **#790**: the NBA in-play overlay build saturates the book-grid tick. Fix not started: the user's call.

@@ -1093,7 +1093,7 @@ After web `cc5bdfb1` (20:11:20Z): placeholder starts **43 -> 0**, "TBD" tokens *
 - **Moneyline rows carry the join's own verdict.** The display attaches to every full-game h2h row the join touches, priced or refused. Such a row can show `live_aware` and an edge, both from `price_moneyline`, which this change leaves alone; it now also shows the live % beside them.
 - **Not yet true:** NCAAF has had no live game since the load (first 2026-11-11 00:00Z).
 
-## [layer2-live-rail-edges] LIVE RAIL CARDS SHOW OUR LIVE RE-SIM VS THE BOOK'S LIVE LINE PER MARKET; A "MODEL ≠ LINE" FLAG ONLY ON A QUOTE <= 120 s OLD AT PRICING, WORDED AS A DISAGREEMENT -- LOADED ON WEB 2026-11-11 17:28Z `[verified 2026-11-10 23:45-23:58Z (payload) + 2026-11-11 17:30Z (served page); lane layer2-live-rail-edges, todo #781]`
+## [layer2-live-rail-edges] LIVE RAIL CARDS SHOW OUR LIVE RE-SIM VS THE BOOK'S LIVE LINE PER MARKET; A "MODEL ≠ LINE" FLAG ONLY ON A QUOTE <= 120 s OLD AT PRICING, WORDED AS A DISAGREEMENT -- LOADED ON WEB 2026-11-11 17:28Z `[verified 2026-11-10 23:45-23:58Z (payload) + 2026-11-11 17:30Z (served page) + 2026-11-11 23:15Z-00:46Z 11-12 (evening flags, MET); lane layer2-live-rail-edges, todo #781]`
 - **Why live cards had no line: display, not data.** The chip `footer` (the book line) is pregame-only. On the served board at 23:45Z, all 50 live full-game rows carried `line`, `live_total` / `live_model_probability`, `model_edge_pct` (on `live_aware` rows) and `book_age_seconds`.
 - **The card** (`intelligence.html` LIVE RAIL LINES block):
   - LIVE / OURS / BOOK / AGE per full-game spread, total and moneyline.
@@ -1107,4 +1107,7 @@ After web `cc5bdfb1` (20:11:20Z): placeholder starts **43 -> 0**, "TBD" tokens *
 - **Served board 23:58:33Z:** 4 live games with a line; 2 flagged (RUTG o149.5 +10.0 on 47 s, GTWN o141.5 +8.0 on 52 s). RUTG o147.5 +14.2 on 153.5 s was not flagged.
 - **Served page (17:30Z, after the load):** FDU @ ETAM `Total 141.6 / 139.5 / 14m`, `ML ETAM 86% / −750 / 10m`. FAMU @ KC shows the book lines with OURS blank (a `pregame_pace` block, not a re-sim). 0 flagged, with quotes 7-14 min old. The filter shows `Model ≠ line 0`.
 - **Intervals (LIVE since 18:11:22Z 11-11; served page read 19:37Z, UIW @ UCD 1H/2H rows):** each interval the book still quotes gets its own row after the full game (1H / 2H / Q1-Q4 ...). OURS comes from the card's PROJ box (a half on a quarter card = Q+Q). Settled periods are skipped; `_alt` lines count as their family. College interval rows never flag (no priced edge, #763).
-- **Not yet true:** a flag on the served page with fresh quotes (evening slate).
+- **Evening slate, 2026-11-11 23:15Z-00:46Z (deploys.md 2026-11-12 00:56Z):**
+  - 14 flags on the served page over 4 of 10 readings. Every one matched a qualifying row at the same line, quote age and edge; 0 false.
+  - Flags go dark when refresh-worker's book-grid tick saturates. With NBA live, the NBA in-play overlay takes 94-234 s per build, so the college overlays refresh every ~5 min and their quotes pass 300 s before they are shown (todo #790).
+  - A DOM reader must wait for the page's own query, which lands ~80 s after the cached embed paints.
