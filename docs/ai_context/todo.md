@@ -1,5 +1,16 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#792` — **COLLEGE IN-PLAY ODDS CAPTURE STOPS AT MIDNIGHT CENTRAL: a game still live after the roll keeps its live re-sim (`#774`), but its sportsbook quotes freeze, so the board prices 0 of its lines for the rest of the game. The NCAAB / WNCAAB analogue of NBA's `#782`. NOT FIXED** `[2026-11-12, found by lane college-live-resim-midnight (#774 reading 2), session 8062940b]`
+- **Measured** (fleet, read-only, 11-12 06:00-06:20Z, USC @ CAL, tip 04:00Z):
+  - live-odds-worker: `NCAAB_LIVE_AUTORUN_LAUNCHED date=2026-11-11 phase=live ... live_games=1` every ~4 min, last at 05:58:49Z. No launch for the game after the roll.
+  - `ncaab_source/tracking/book_quotes/2026-11-11.jsonl`, the game's captures by minute: 36-42 rows from 6 sportsbooks per pull through 05:58Z (newest `book_updated_at` 05:58:45Z). After the roll: 1 Polymarket row (06:00Z) and 3 Kalshi rows (06:06Z, 06:12Z). The 11-12 shard holds 0 of its rows captured after 06:00Z.
+  - Layer 2's NCAAB join, 5 lines 06:02-06:13Z: `games_in_snapshot=1`, `projected=0 priceable=0`, display 4-36. Last line: `why={quote_older_than_live_pricing_ceiling: 3, quote_older_than_the_score_the_model_saw: 1}`.
+  - Before the roll, the ledger priced the game's lines on quotes 4-94 s old (05:30-05:59Z).
+  - Size: this night ~15 min of a live game with no priceable line (06:00-06:15Z). From `#774`'s measurement, 2 of 7 men's slates had a D1 game live at the roll, running 30 and 78 min past it.
+- **Cause, traced:** `syndicate/features/ncaab/inplay_lane.py:191`, `launch_autorun_ncaab_live_refresh`, takes `selected_date = central_today_iso()` and launches `launch_refresh_run(phase="live")` only if `ncaab_live_game_count(selected_date)` > 0. After 00:00 CT that is the new date's slate, so a game in progress on the previous date gets no in-play pull. The same function serves WNCAAB.
+- **Not the cause:** the 120 s ceiling (`#780`) only names the staleness. At the old 600 s the join would have priced against quotes 2-10 min old, which `#780` measured as the stale-market "edge".
+- **Fix shape (not started):** mirror `#782`'s NBA fix (`eacc9f990`, `_nba_prior_slate_in_play` in `scripts/run_live_odds_refresh_worker.py`). Inside `#774`'s window (`SYNDICATE_COLLEGE_LIVE_RESIM_PRIOR_DATE_HOURS`), also launch the in-play refresh for the previous Central date while that date has a game the re-sim last published in progress. Tests incl. off != on, then a reading on the next late college night. Cost: one in-play pull per 240 s for the minutes a game runs past midnight. Loading needs a fleet ff + a live-odds-worker restart: the user's decision.
+
 ### `#791` — **NCAAF LIVE JOIN DROPS A GAME WHOSE ESPN TEAM NAME DIFFERS FROM THE ODDS FEED'S: UMass @ Toledo showed no Live proj. on ANY row, full-game and segment, on 11-11 while its live re-sim lane was published** `[2026-11-12, found by lane ncaaf-live-segment-display while reading #785, session d979fc08]`
 - **Measured** (served board, `C:/tmp/ncaafseg/matchup_probe.py` 02:46Z 11-12 + `seg_probe.py` 01:05Z / 01:50Z): UMass @ Toledo live rows with a Live proj.: full-game totals 0 of 4, spreads 0 of 1; segment 0 of 12. The other two live NCAAF games: full-game 23 of 23, segment 28 of 28 of the rows the #785 grade allows.
 - **Cause, traced:** the fleet's NCAAF live lens (keyvalue `live/ncaaf_live_lens.json`, generatedAt 2026-11-11T20:45:59-06:00) holds a `live_resim` lane, with all 6 segment blocks, for `Massachusetts Minutemen @ Toledo Rockets`. The board's odds rows say `UMass Minutemen`. `live_gameline_join` keys the index and the row lookup on exact normalized names (`_norm_team` :1731; index :1917; lookups :2052 / :2085 / :2178), so every row of that game refuses `no_live_gameline_projection` (20 of 172 considered at the 02:45:06Z `LIVE_GAMELINE_JOIN sport=ncaaf`).
@@ -341,40 +352,6 @@ ailload\prof_overlay.py`):
 - **Load:** fleet ff + refresh-worker (Layer 2 / book grid) + `reload-web` (serve-time grid, cards page) + live-odds-worker (cards context; can ride its recycle). Claims + preflight.
 - **Reading owed after the load:** the next slate where one of the 8 has props, after the sims build. Served rows carry `engine_player_name` + `sim_projection` + `model_edge_pct` + `player_side` + `headshot_url`.
 - Findings: `.syndicate/findings_2026-11-10_nba_prop_engine_name_join.md`.
-
-### `#774` — **A COLLEGE GAME STILL LIVE AT MIDNIGHT CENTRAL LOST ITS LIVE RE-SIM, AND THE CARRYOVER BOARD PRICED IT FROM NOTHING. FIX ON MAIN `97cb5d477`, LOADED 16:18Z 11-10; READING 1 MET 06:00Z 11-11 (`prior_skip=slate_final`, 0 errors); reading 2 owed 06:00Z 11-12 (USC @ CAL)** `[2026-11-10, lane college-live-resim-midnight, session 8062940b]`
-- **Cause:** `ncaab/live_resim.run_live_resim_tick` takes its date from `central_today_iso()`. At 00:00 CT it switches to the new date's ESPN scoreboard, so a game tipped late on the previous date is never re-simmed again. The same function runs both college loops (men's and women's).
-- **Measured** (read-only; fleet live-odds-worker + refresh-worker logs 11-05 16:23Z..11-10 15:21Z = 5 midnights; ESPN `groups=50` scoreboards and summaries for 7 slates, 11-03..11-09):
-  - Men's: on **2 of 7 slates** a D1-vs-D1 game was live at the roll.
-    - WICH vs USC (11-08): tipped 04:00Z, last play 06:30:22Z, so **30.4 min** without a re-sim.
-    - PORT @ HAW (11-09): tipped 04:59Z, at halftime at the roll, last play 07:18:29Z, so **78.5 min** (the whole second half).
-  - Women's: 0 of 7. (A non-D1 game, BTHS @ HAW 11-06, ran to +78 min; it is not on the board.)
-  - At both rolls the last pre-midnight NCAAB tick read `live=1 resimmed=1`. Every NCAAB/WNCAAB tick from 06:00Z to 10:00Z on all 5 midnights read `live=0`.
-- **Downstream, same nights:** Layer 2's carryover (`[layer2-prior-date-carryover]`) kept rebuilding the previous date while its chip read live (11-09 06:08-06:37Z; 11-10 06:05-07:19Z, `chips_live=1`).
-  - But every NCAAB `LIVE_GAMELINE_JOIN` after 06:00Z read `games_in_snapshot=0`: `no_live_gameline_projection` on every live row, `priceable=0`, `display=0`.
-  - The last pre-roll joins on 11-10 priced 3-12 rows and displayed 31-42. The chip fell back to its pace block.
-  - The join and the chips key `live/<league>_live_resim.json` by TEAM NAMES and never read its `date`, so the lane was the only missing piece.
-- **Fix (code default ON; no env change needed to load it):**
-  - The LOOP's tick (no explicit date) re-sims the previous Central date's in-progress board games first, for `SYNDICATE_COLLEGE_LIVE_RESIM_PRIOR_DATE_HOURS` after midnight CT: absent = 4 h, `0` = off, capped at 12. The latest end measured was 1:18 AM CT.
-  - It runs on THAT date's inputs (odds names, anchor quotes and pregame sims, priors) and publishes those games in the same snapshot, each row stamped `slateDate`. Today's slate gets the budget they leave.
-  - A quiet night costs one scoreboard fetch per tick, and nothing once every event on that date is final (`_PRIOR_SLATE_FINAL`, per process).
-  - The tick line gains `prior_date= prior_live= prior_resimmed= prior_carried_forward= prior_skip=`, inside the window only and placed before `refusals=`. `live=` and the other counts include those games.
-  - An explicit `date_str` re-sims that date only, as before.
-- **Tests:** `tests/test_ncaab_live_resim_midnight.py`, 15, all through `run_live_resim_tick` with no date (the loop's call):
-  - off != on through the env;
-  - the published lane indexed by the board's own `build_live_gameline_index` on the carryover date (the hop that read 0);
-  - the window (incl. the DST night), the final-slate skip, the budget split, the carry across ticks, the women's loop, the failure isolation and the tick-line field order.
-  - 5 source mutations each fail at least one test. 364 passed across 15 college live / join / chip / evidence test files.
-- **Loads with:** a fleet ff to a SHA containing it, then a live-odds-worker restart: its own uptime recycle, or a claimed TERM. Needs the user's yes.
-- **Reading 1, MET** `[2026-11-11 06:12Z]`: every college tick 06:00-06:08Z 11-11 (10 of 10, both leagues) read `prior_date=2026-11-10 prior_live=0 prior_resimmed=0 prior_skip=slate_final`; no D1 game was live at the roll. 0 `prior_error`, 0 `worker_errors>0` in 709 college ticks, 0 Traceback frames in college code. deploys.md 2026-11-11 06:12Z.
-- **Reading 2, owed:** the next night with a D1 game live at 00:00 CT. ESPN lists USC @ CAL tipping 04:00Z 11-12 (10:00 PM CST Wed 11-11; re-read 06:11Z 11-11), the same shape as WICH vs USC.
-  - MET if the first tick after 06:00Z reads `prior_live>=1 prior_resimmed>=1`, and the carryover date's NCAAB `LIVE_GAMELINE_JOIN` reads `games_in_snapshot>=1` with `projected>0` until the game ends.
-  - On a night with none, expect `prior_skip=slate_final` from the first post-roll tick on.
-- **Same date choice elsewhere (not fixed here):**
-  - **NBA** `nba/live_resim.run_live_resim_tick` (`central_today_iso()`): **2 of 7 NBA slates** had a game end after the roll (MIA @ LAC 11-04 +21.1 min, POR @ LAL 11-06 +4.9 min). At the 11-07 roll the last NBA ticks read `games=1-2`.
-  - **NHL** is driven by `live_lens_loop._run_live_lens_tick` with today's date: 0 of 7 slates crossed (NYI @ SJ 11-09 ended 1.0 min before).
-  - **NCAAF and NFL** re-sims are week-scoped (`run_refresh_worker._run_ncaaf_live_resim_tick`), so the roll does not hit them.
-  - **`live_evidence_log`** files every row under the snapshot's `date`, so a prior-date game's rows land in the new date's file. A one-line follow-up for lane `live-evidence-log`: `game.get("slateDate") or date_str`.
 
 ### `#773` — **LIVE NHL PUCK-LINE ROWS GET A DISPLAY-ONLY Live proj. FROM THE RE-SIM'S OWN MARGIN HISTOGRAM; NO EDGE, NOT PRICED. ON MAIN `efccead01`, LOADED ON BOTH WORKERS 16:28Z 11-10; LIVE READING MET 11-11 00:08Z** `[2026-11-10, lane nhl-live-puckline-display, session 87074b1f]`
 - **GRADED 2026-11-11 18:11Z (12:11 PM CST), lane nhl-live-puckline-grade: DO NOT PRICE** (`.syndicate/findings_2026-11-11_nhl_live_puckline_grade.md`).
