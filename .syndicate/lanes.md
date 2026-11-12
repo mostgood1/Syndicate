@@ -703,6 +703,14 @@ death, never life — do not invert it.
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 4 of 6 CLOSED blocks SAFE; all 4 moved to lanes_closed.md with one pointer each. Invariants show only the 2 contested files already in the baseline. Table in log/2026-11-12.md.
 - Moved: college-live-resim-midnight, live-gameline-quote-ceiling-120, ncaaf-live-segment-display, closed-lane-archive-20261112-0850
 
+### college-odds-feed-team-names — OPEN — opened 2026-11-12 — session 0f519972-4890-45d3-8b52-767c7e0a0389
+- Goal: Every college team name in the fleet's ncaab/wncaab quote logs resolves through team_aliases.chip_join_key (audit: 0 unresolved, was 3 names / 5 events incl. CSU Bakersfield Roadrunners both leagues, WNCAAB Montana Grizzlies, Western Kentucky Hilltoppers), by derivation rules not one-off entries, with no existing key changing its school; and the audit is a committed script
+- Files: syndicate/features/shared/ncaab_team_registry.py (_odds_feed_spellings + _ODDS_FEED_ALIASES + a men's-mascot offer for wncaab ONLY), scripts/college_team_name_audit.py (NEW), tests/test_college_odds_feed_team_names.py (NEW)
+- Hypothesis: The Games rail's chip-less CSU Bakersfield cards (user 2026-11-12 'still have college teams not matching') are an odds-feed spelling the registry never offers: 'CSU X' for ESPN 'Cal State X', and the men's mascot on women's teams (ESPN 'Lady Griz' / 'Lady Toppers')
+- Falsification test: After the rules, the audit over the same quote logs still shows an unresolved name, or any key of the current ncaab/wncaab alias map resolves to a different school, or a new key collides
+- Verification: Audit script 0 unresolved over every ncaab/wncaab quote shard on the fleet; old-map keys identical in the new map; tests pass; on main. Load (refresh-worker TERM stamps the keys) is the user's decision
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
