@@ -779,11 +779,6 @@ ight.sh`, 01:05Z / 01:50Z / 02:45Z 11-12, BUFF @ BALL, SAC @ CMU, MASS @ TOL). S
 - Verification: Findings file with Q1/Q2 on 2025-26 regular+playoffs (score-matched games) and Q3 on live_resim_history 2026-10-20..11-10, every cell with games and ticks; tests pass; on main
 - Blocked by: none
 
-### closed-lane-archive-20261111-1557 — CLOSED 2026-11-11 (GOAL MET: 1 block archived) — opened 2026-11-11 — session 74ba138f-8e0c-4ba4-b351-edd9799ccec1
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- GOAL MET: owner_liveness.py --idle-min 240 read 1 of 11 CLOSED blocks SAFE (~21:58Z); archived after a dry run, apply, and an unchanged invariants baseline. Moved: `nba-sim-index-missing-games`. Readings and Part B in `log/2026-11-11.md`.
-
 ### nba-resim-overtime-prob — CLOSED 2026-11-11 6:13 PM CST (GOAL MET: p_ot on the fleet's live_resim_history from 00:11:31Z 11-12, 0 tracebacks; 837320ab5 loaded on live-odds-worker 23:39:26Z; #788's overtime miss was the pre-#763 projection; todo #789 stays open for the P(OT) reading) — opened 2026-11-11 — session 63276f7e-66a4-4ad9-a667-cfd46d19b0a9
 - **GOAL VERDICT `[2026-11-12 00:13Z]`:** Goal, verbatim: "Every fresh NBA live re-sim lane publishes its own chance of overtime (the share of draws whose regulation ends tied, as modelOvertimeProb) and each live_resim_history row keeps it as p_ot; on main with tests incl. a mutation check; scripts/nba_blowout_bench_study.py gains an overtime check (the re-sim's expected overtime points and, where rows carry p_ot, its P(OT) against the real overtime rate, game-clustered); loading it on live-odds-worker is the user's decision". **GOAL: MET.** Readings: tests 7 + 17 with 6 + 7 mutations caught; the study's `q4_overtime` ran on the fleet data root (findings Addendum #789). The user approved the load ("Yes, load it"): 837320ab5 on live-odds-worker, claimed TERM 23:39:26Z, pid 263310 `code=837320ab`. The first fleet row carrying `p_ot` was 00:11:31Z (WAS @ IND, 0.01 at the tip); 0 tracebacks in the first 10 min (deploys.md 2026-11-12 00:13Z). The hypothesis (P(OT) too low LATE) is NOT SUPPORTED: its evidence was the pre-#763 projection. A new question, P(OT) about half the real rate EARLY, is in todo #789.
 - Goal: Every fresh NBA live re-sim lane publishes its own chance of overtime (the share of draws whose regulation ends tied, as modelOvertimeProb) and each live_resim_history row keeps it as p_ot; on main with tests incl. a mutation check; scripts/nba_blowout_bench_study.py gains an overtime check (the re-sim's expected overtime points and, where rows carry p_ot, its P(OT) against the real overtime rate, game-clustered); loading it on live-odds-worker is the user's decision
@@ -829,6 +824,11 @@ ight.sh`, 01:05Z / 01:50Z / 02:45Z 11-12, BUFF @ BALL, SAC @ CMU, MASS @ TOL). S
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 3 SAFE at ~00:41Z 11-12; all 3 moved to lanes_closed.md with pointers: ncaab-score-effect-load, live-mech-outcome-gate, closed-lane-archive-20261111-1332. Table + waits in log/2026-11-11.md.
+
+### closed-lane-archive-20261111-2040 — CLOSED 2026-11-11 (GOAL MET: 1 block archived) — opened 2026-11-11 — session 1fa345f1-31d9-4cfd-b411-2d631e69b46f
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 SAFE for 1 of 11 CLOSED blocks; moved `closed-lane-archive-20261111-1557` to lanes_closed.md with one pointer. 10 WAIT (table in `.syndicate/log/2026-11-11.md`).
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1055,6 +1055,7 @@ ight.sh`, 01:05Z / 01:50Z / 02:45Z 11-12, BUFF @ BALL, SAC @ CMU, MASS @ TOL). S
 - `closed-lane-archive-20261111-0039` — CLOSED 2026-11-11 (GOAL MET: 2 blocks archived) — opened 2026-11-11 — session 5d3833c0-a7f0-4732-87dd-e6050cfe8ef3
 - `closed-lane-archive-20261111-0920` — CLOSED 2026-11-11 (GOAL MET: 8 blocks archived) — opened 2026-11-11 — session e1590a02-8fc4-477a-bb69-9a075e55d321
 - `closed-lane-archive-20261111-1332` — CLOSED 2026-11-11 (GOAL MET: 1 block archived) — opened 2026-11-11 — session 8377f65c-ace3-4d3e-8282-54cf154aee70
+- `closed-lane-archive-20261111-1557` — CLOSED 2026-11-11 (GOAL MET: 1 block archived) — opened 2026-11-11 — session 74ba138f-8e0c-4ba4-b351-edd9799ccec1
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
