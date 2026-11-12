@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#789` — **NBA LIVE RE-SIM RECORDS ITS OWN P(OVERTIME): the share of draws level after regulation, on the lane (`modelOvertimeProb`) and in every `live_resim_history` row (`p_ot`). ON MAIN, NOT LOADED (live-odds-worker; user decision). And #788's "late miss is overtime" was mostly the pre-`#763` projection: 7 of the 8 overtime games came before overtime was in the total** `[2026-11-11, lane nba-resim-overtime-prob, session 63276f7e; user "Yes, record it" to "Should the re-sim record its overtime chance so it can be checked?"]`
+### `#789` — **NBA LIVE RE-SIM RECORDS ITS OWN P(OVERTIME): the share of draws level after regulation, on the lane (`modelOvertimeProb`) and in every `live_resim_history` row (`p_ot`). LOADED on live-odds-worker 23:39:26Z 11-11 (`837320ab5`, user "Yes, load it"); the first fleet row carrying `p_ot` 00:11:31Z 11-12 (MET). And #788's "late miss is overtime" was mostly the pre-`#763` projection: 7 of the 8 overtime games came before overtime was in the total** `[2026-11-11, lane nba-resim-overtime-prob, session 63276f7e; user "Yes, record it" to "Should the re-sim record its overtime chance so it can be checked?"]`
 - **Change:** in `syndicate/features/nba/live_resim.py`:
   - `resim_live_game` counts the draws whose regulation (banked periods included) ends level, as `overtime_prob`.
   - `build_game_lens` publishes it as `modelOvertimeProb`. A result without it publishes None, not 0.
@@ -18,8 +18,9 @@
 - **Expected vs real overtime since 3d376da7c** (37 games, 11-06..11-10): Q1-Q3 ticks 17.3 OT points expected over the games, 25 scored (1 overtime game). That is ~0.8 overtime games expected against 1, consistent. Every late cell has 0 or 1 overtime game.
 - **Engine, not pinned** (synthetic inputs): tied with the ball, P(OT) is 1.0 with <= 6 s left and 0.57 at 8 s. The engine scores nothing in the last 6 s. Lead to `basketball-scenario-calibration`.
 - **Owed:**
-  1. The load on live-odds-worker (user decision). Reading: a fleet `live_resim_history` row carrying `p_ot`.
-  2. After a few weeks of slates, `q4_overtime.p_ot` on late close ticks.
+  1. ~~The load~~ DONE: 837320ab5, claimed TERM 23:39:26Z, pid 263310; the first `p_ot` row 00:11:31Z 11-12; 0 tracebacks (deploys.md 2026-11-12 00:13Z).
+  2. **NEW QUESTION, from the first reading: the engine may give overtime about HALF its real chance early in games. Real: 60 of 1,321 graded 2025-26 games went to overtime (4.5%), and 8 of 160 this season (5.0%). Engine: the first `p_ot` row (WAS @ IND, 0-0 at the tip) reads 0.01 on 100 draws. `#763` measured 2.9% of draws tied across 6,215 live lanes. Since 11-06, Q1-Q3 ticks expect 0.47 overtime points per game, about 2% at ~21 points per overtime.** The comparison that settles it: the mean `p_ot` on each game's first tick, against the 4.5% base rate. A week of slates (~60 games, each 100-200 draws) is enough. If confirmed, it is about 0.4 points on a full-game total at the tip, and an engine question for lane `basketball-scenario-calibration` (end-of-game play for the tie).
+  3. After a few weeks of slates, `q4_overtime.p_ot` on late close ticks.
 - Findings: `.syndicate/findings_2026-11-11_nba_blowout_bench.md` "Addendum (#789)".
 
 ### `#787` — **COLLEGE BLOWOUTS: WOMEN'S COLLEGE PLAY-BY-PLAY WAS SAVED NOWHERE (now archived nightly); for MEN'S college, the bench in a blowout is NOT what our live re-sim misses -- the late miss is close games** `[2026-11-11, lane college-pbp-blowout-bench, session 0f519972; user "are we saving game shape data? ... South Alabama and Florida Atlantic" and "the pbp should be looked at...and tendencies for when bench players come into a blowout"]`
