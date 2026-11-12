@@ -127,3 +127,15 @@ the off switch.
 Reproduce: `C:/tmp/ncaafseg/grade.sh` (fleet host, nice 19) per Saturday with `--dump-rows`, then
 `py -3 C:/tmp/ncaafseg/score_merged.py <repo> <dir>`; rows in `C:/tmp/ncaafseg/rows_*.json` (quarter-end) and
 `kick_*.json` (kickoff).
+
+## 5. Served reading after the load — GOAL MET `[2026-11-12 02:45Z, deploys.md 2026-11-12 02:55Z]`
+
+Served board 11-12 01:05Z / 01:50Z / 02:45Z (BUFF @ BALL, SAC @ CMU, MASS @ TOL), `C:/tmp/ncaafseg/seg_probe.py --rows`:
+- On the two games the join matches, every segment row the table in §4 allows shows a Live proj.: **28 of 28** (the h1
+  spread at 01:05Z; at 01:50Z h1 4/4, h2 4/4, q2 6/6, q3 5/5 totals with P(over) and q4 2/2 with the mean only; at
+  02:45Z h2 totals 1, q3 totals 2, q3 spreads 3). q1 totals and segment moneylines (0 of 6) stayed blank, as §4 says.
+- 0 of 48 segment rows carry `model_edge_pct` / `edge_vs_market_pct` / `model_ev_pct` / `live_aware`.
+- Join: `segment_is_not_full_game` 2,825 of 4,892 (11-11) -> 0 of 2,180 (11-12 00:33-02:45Z); `segment_pricing_disabled`
+  0 -> 1,288.
+- UMass @ Toledo showed nothing on ANY row, full-game included. The lens names the team `Massachusetts Minutemen`, the
+  odds rows `UMass Minutemen`, and the join keys on exact names. Pre-existing, not this fix: todo `#791`.
