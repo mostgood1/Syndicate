@@ -15296,3 +15296,20 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 3 SAFE at ~00:41Z 11-12; all 3 moved to lanes_closed.md with pointers: ncaab-score-effect-load, live-mech-outcome-gate, closed-lane-archive-20261111-1332. Table + waits in log/2026-11-11.md.
+
+### closed-lane-archive-20261111-2040 — CLOSED 2026-11-11 (GOAL MET: 1 block archived) — opened 2026-11-11 — session 1fa345f1-31d9-4cfd-b411-2d631e69b46f
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 SAFE for 1 of 11 CLOSED blocks; moved `closed-lane-archive-20261111-1557` to lanes_closed.md with one pointer. 10 WAIT (table in `.syndicate/log/2026-11-11.md`).
+
+### closed-lane-archive-20261111-2240 — CLOSED 2026-11-11 (GOAL MET: 5 blocks archived) — opened 2026-11-11 — session 411f2d1b-9065-4d3c-a24c-7a12da6979c8
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 5 of 14 CLOSED blocks SAFE, and all 5 moved to lanes_closed.md with one pointer each. Invariants show only the 2 contested files that were already in the baseline. Table in log/2026-11-11.md.
+- Moved: nba-live-resim-midnight, nba-pbp-blowout-bench, nba-resim-overtime-prob, closed-lane-archive-20261111-1639, one-read-746-747-749
+
+### closed-lane-archive-20261112-0040 — CLOSED 2026-11-12 (GOAL MET: 2 blocks archived) — opened 2026-11-12 — session 2d6174f2-41f6-4934-aec9-922b92fc9818
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 2 of 12 CLOSED blocks SAFE, and both moved to lanes_closed.md with one pointer each. Invariants show only the 2 contested files that were already in the baseline. Table in log/2026-11-12.md.
+- Moved: layer2-live-rail-edges, closed-lane-archive-20261111-1840

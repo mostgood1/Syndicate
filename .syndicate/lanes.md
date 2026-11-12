@@ -753,23 +753,6 @@ death, never life — do not invert it.
 - Verification: unit tests that fail on the old start-time logic (mutation-checked); a read-only fleet run of status from this commit's code naming each role's loaded commit consistent with its spawn line and the reflog
 - Blocked by: none
 
-### closed-lane-archive-20261111-2040 — CLOSED 2026-11-11 (GOAL MET: 1 block archived) — opened 2026-11-11 — session 1fa345f1-31d9-4cfd-b411-2d631e69b46f
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness.py --idle-min 240 SAFE for 1 of 11 CLOSED blocks; moved `closed-lane-archive-20261111-1557` to lanes_closed.md with one pointer. 10 WAIT (table in `.syndicate/log/2026-11-11.md`).
-
-### closed-lane-archive-20261111-2240 — CLOSED 2026-11-11 (GOAL MET: 5 blocks archived) — opened 2026-11-11 — session 411f2d1b-9065-4d3c-a24c-7a12da6979c8
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 5 of 14 CLOSED blocks SAFE, and all 5 moved to lanes_closed.md with one pointer each. Invariants show only the 2 contested files that were already in the baseline. Table in log/2026-11-11.md.
-- Moved: nba-live-resim-midnight, nba-pbp-blowout-bench, nba-resim-overtime-prob, closed-lane-archive-20261111-1639, one-read-746-747-749
-
-### closed-lane-archive-20261112-0040 — CLOSED 2026-11-12 (GOAL MET: 2 blocks archived) — opened 2026-11-12 — session 2d6174f2-41f6-4934-aec9-922b92fc9818
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 2 of 12 CLOSED blocks SAFE, and both moved to lanes_closed.md with one pointer each. Invariants show only the 2 contested files that were already in the baseline. Table in log/2026-11-12.md.
-- Moved: layer2-live-rail-edges, closed-lane-archive-20261111-1840
-
 ### college-quote-capture-midnight — OPEN — opened 2026-11-12 — session 8062940b-57fd-454a-8de5-25fdd4804d85
 - Goal: A college basketball game still live at midnight Central keeps its in-play odds pulls: launch_autorun_ncaab_live_refresh (NCAAB and WNCAAB), when today's slate has no live game, launches the same forced in-play run for the PREVIOUS Central date while the #774 re-sim (inside its own window, file <= 600 s old) last published a game of that date In Progress; the launch line says prior_slate_games=N; tests incl. off != on through SYNDICATE_COLLEGE_LIVE_RESIM_PRIOR_DATE_HOURS; on main; loading it on the fleet is the user's decision
 - Files: syndicate/features/ncaab/inplay_lane.py (launch_autorun_ncaab_live_refresh, a new prior_slate_in_play helper and a new module-docstring section ONLY), tests/test_ncaab_inplay_midnight.py (NEW), docs/ai_context/todo.md (#792 section only)
@@ -785,6 +768,12 @@ death, never life — do not invert it.
 - Falsification test: a replay where the current roster gives a side or face to fewer than ~all of those players, or changes a side/face already set
 - Verification: fleet replay over the served board rows (side None and faceless counts before/after, changed-already-set count); after load, the same counts read from the served board
 - Blocked by: none
+
+### closed-lane-archive-20261112-0850 — CLOSED 2026-11-12 (GOAL MET: 3 blocks archived) — opened 2026-11-12 — session 0450cd8e-9c6f-4f41-8b7a-aefe4e677886
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 3 of 11 CLOSED blocks SAFE, and all 3 moved to lanes_closed.md with one pointer each. Invariants show only the 2 contested files that were already in the baseline. Table in log/2026-11-12.md.
+- Moved: closed-lane-archive-20261111-2040, closed-lane-archive-20261111-2240, closed-lane-archive-20261112-0040
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1014,6 +1003,9 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261111-1557` — CLOSED 2026-11-11 (GOAL MET: 1 block archived) — opened 2026-11-11 — session 74ba138f-8e0c-4ba4-b351-edd9799ccec1
 - `closed-lane-archive-20261111-1639` — CLOSED 2026-11-11 (GOAL MET: 2 blocks archived) — opened 2026-11-11 — session 78bd124e-27ae-4ff8-81c6-d225d6cd69f1
 - `closed-lane-archive-20261111-1840` — CLOSED 2026-11-11 (GOAL MET: 3 blocks archived) — opened 2026-11-11 — session 7e5bed26-0f4a-4a50-a34b-294ef794e5be
+- `closed-lane-archive-20261111-2040` — CLOSED 2026-11-11 (GOAL MET: 1 block archived) — opened 2026-11-11 — session 1fa345f1-31d9-4cfd-b411-2d631e69b46f
+- `closed-lane-archive-20261111-2240` — CLOSED 2026-11-11 (GOAL MET: 5 blocks archived) — opened 2026-11-11 — session 411f2d1b-9065-4d3c-a24c-7a12da6979c8
+- `closed-lane-archive-20261112-0040` — CLOSED 2026-11-12 (GOAL MET: 2 blocks archived) — opened 2026-11-12 — session 2d6174f2-41f6-4934-aec9-922b92fc9818
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
