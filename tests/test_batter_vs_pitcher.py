@@ -66,7 +66,7 @@ def test_the_sheet_sections_split_batters_from_pitchers_and_stay_compact():
             row("Snell", 53, market="strikeouts", ev=-2.4, kind="pitcher_vs_lineup"),
             row("Snell", 53, market="strikeouts", side="under", ev=-4.9, kind="pitcher_vs_lineup"),
             row("Snell", 53, market="outs", ev=-1.8, kind="pitcher_vs_lineup")]
-    s = cs.sections(rows)
+    s = cs.sections(rows, rules=1)   # the v1 admission (a history exists); v2+ direction: test_cheat_sheet_section_rules_v2
     assert [(rows[i]["player"], rows[i]["side"]) for i in s["pvp_batters"]] == [("A", "under"), ("D", "over")]   # one row per hitter
     assert [(rows[i]["player"], rows[i]["market"], rows[i]["side"]) for i in s["pvp_pitchers"]] == [("Snell", "strikeouts", "over")]
 

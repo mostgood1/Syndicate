@@ -71,5 +71,5 @@ def test_the_sheet_section_needs_forty_possessions_one_row_a_player():
                 "pvp": {"kind": "scorer_vs_defenders", "line": {"poss": poss}}}
 
     rows = [row("SGA", 110.0), row("SGA", 110.0, market="player_assists", ev=2.0), row("Few", 12.5), row("Brunson", 355.5)]
-    assert [(rows[i]["player"], rows[i]["market"]) for i in cs.sections(rows)["pvp_scorers"]] == [
+    assert [(rows[i]["player"], rows[i]["market"]) for i in cs.sections(rows, rules=1)["pvp_scorers"]] == [
         ("Brunson", "player_points"), ("SGA", "player_assists")]

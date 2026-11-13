@@ -386,8 +386,13 @@ def featurable(row: Mapping[str, Any]) -> bool:
 #   - Matchups admit on the same-line vs-opponent record (basketball +19.7% [+9.0, +30.8]); a defense's rank alone no
 #     longer admits (NFL rank-only overs -32.8% on 65);
 #   - player-vs-player sections admit a row only when its own history points to its side (on probation).
-SECTION_RULES = 2
+# Version 3 (user 2026-11-13 "Yes, cap at 2"): "Sim vs the line" keeps at most SIM_EDGE_PER_PLAYER picks per player per
+# game, biggest edges first. A player's picks move together: replay 10-15..11-12, NBA, a 2nd pick hit 73.1% when the 1st
+# won vs 33.9% when it lost. A player's 3rd+ pick returned +0.9% [-16.6, +18.7] (205 bets) against +8.3% / +10.0% for the
+# 1st / 2nd. Top 25 a day: no cap +7.6%, max 2 +9.6%, max 1 +7.2% (all within noise; the cap is for concentration).
+SECTION_RULES = 3
 SIM_EDGE_MIN = 0.05
+SIM_EDGE_PER_PLAYER = 2
 RETIRED_SECTIONS = {"hot_form": "2026-11-13"}
 
 # The measured record behind "Sim vs the line" before it was published: the main line, the sim's side, edge >= 5%,
@@ -587,8 +592,10 @@ def sections(rows: Iterable[Mapping[str, Any]], *, top: int = 25, rules: int = S
                         key=lambda i: -ev(i, "ev_market")),
         # Sim vs the line (rules v2): the main line, the side SmartSim projects at least SIM_EDGE_MIN beyond it, the
         # biggest edge first. Two-sided prices only: a one-sided "fair" was measured 3.9 pts overstated.
-        "sim_edge": sorted((i for i in idx if v2 and featurable(rows[i]) and verdict(i) != "one_sided_fair"
-                            and sim_backs(rows[i])), key=lambda i: -edge(i)),
+        # Rules v3: at most SIM_EDGE_PER_PLAYER per player per game (`_cap_per_player`), applied before the top cut.
+        "sim_edge": _cap_per_player(rows, sorted((i for i in idx if v2 and featurable(rows[i]) and verdict(i) != "one_sided_fair"
+                                                  and sim_backs(rows[i])), key=lambda i: -edge(i)),
+                                    SIM_EDGE_PER_PLAYER if rules >= 3 else None),
         "streaks_with_room": sorted((i for i in idx if verdict(i) == "streak_with_room"),
                                     key=lambda i: -ev(i, "ev_posterior")),
         "streaks_priced_in": sorted((i for i in idx if verdict(i) == "streak_priced_in"),
@@ -949,6 +956,20 @@ def _pvp_kind(row: Mapping[str, Any]) -> str | None:
 def _ev_of(row: Mapping[str, Any]) -> float:
     ev = (row.get("check") or {}).get("ev_market")
     return float(ev) if isinstance(ev, (int, float)) else float("-inf")
+
+
+def _cap_per_player(rows: Sequence[Mapping[str, Any]], ids: Sequence[int], cap: int | None) -> list[int]:
+    """The first `cap` rows of each player in each game, in the caller's order; every row when `cap` is None."""
+    if cap is None:
+        return list(ids)
+    seen: dict[tuple, int] = {}
+    out: list[int] = []
+    for i in ids:
+        who = (str(rows[i].get("player") or "").casefold(), rows[i].get("event_id"))
+        if seen.get(who, 0) < cap:
+            seen[who] = seen.get(who, 0) + 1
+            out.append(i)
+    return out
 
 
 def _one_per_player(rows: Sequence[Mapping[str, Any]], ids: Sequence[int]) -> list[int]:

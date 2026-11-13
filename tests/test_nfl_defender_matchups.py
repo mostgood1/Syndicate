@@ -102,6 +102,6 @@ def test_the_sheet_sections_need_two_plays_and_keep_every_quarterback():
     rows = [row("Sutton", 3), row("Once", 1), row("Waddle", 5),
             row("Nix", 0, kind="qb_vs_defenders", market="Interceptions", hawks=[{"name": "Julian Love"}]),
             row("Nobody", 0, kind="qb_vs_defenders", market="Passing Yards")]
-    s = cs.sections(rows)
+    s = cs.sections(rows, rules=1)   # the v1 admission (a history exists); v2+ direction: test_cheat_sheet_section_rules_v2
     assert [rows[i]["player"] for i in s["pvp_receivers"]] == ["Waddle", "Sutton"]
     assert [rows[i]["player"] for i in s["pvp_qbs"]] == ["Nix"]

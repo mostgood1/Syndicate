@@ -73,5 +73,9 @@ sheet's own version, so a rule change never rewrites a past day. Version 2 (2026
   30+ bets.
 - **Picks** are capped at the featured price band.
 
+Version 3 (2026-11-13, user "Yes, cap at 2"): **Sim vs the line** keeps at most 2 picks per player per game. One
+player's picks move together: a 2nd pick hit 73% when the 1st won and 34% when it lost. In the replay, 3rd-and-later
+picks showed no edge.
+
 Better than results, when it exists: the price at the close. `scripts/grade_play_cards.py` already measures EV at the
 closing line for play cards; extending it to every featured bet is the next step for this review.

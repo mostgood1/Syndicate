@@ -806,7 +806,7 @@ function render() {
     return;
   }
   let html = picksBlock(d, game) + sgpBlock(d, game) + crossBlock(d, game) + (game ? "" : slateBlock(d));
-  if (rulesOf(d) >= 2) html += sectionShell("sim_edge", "Sim vs the line", `The main line, on the side SmartSim projects at least 5% beyond it, the biggest gap first. ${esc(d.sim_edge_measured || "")} The sim's projection is the reason here; the price and its fair sit beside it.`, `${(secs.sim_edge || []).length} props`, withAfter("sim_edge", ids => simTable(d, ids)));
+  if (rulesOf(d) >= 2) html += sectionShell("sim_edge", "Sim vs the line", `The main line, on the side SmartSim projects at least 5% beyond it, the biggest gap first${rulesOf(d) >= 3 ? ", at most two per player (one player's props move together)" : ""}. ${esc(d.sim_edge_measured || "")} The sim's projection is the reason here; the price and its fair sit beside it.`, `${(secs.sim_edge || []).length} props`, withAfter("sim_edge", ids => simTable(d, ids)));
   html += SECTIONS.map(([key, title, blurb]) => {
     const ids = secs[key] || [];
     if (key === "value" && rulesOf(d) >= 2) blurb = VALUE_V2;

@@ -31,7 +31,7 @@ def test_sim_edge_is_the_projection_beyond_the_line_toward_the_side():
 def test_sheet_rules_reads_the_stamp_and_an_unstamped_sheet_is_v1():
     assert cs.sheet_rules({}) == 1 and cs.sheet_rules(None) == 1 and cs.sheet_rules({"section_rules": True}) == 1
     assert cs.sheet_rules({"section_rules": "2"}) == 1 and cs.sheet_rules({"section_rules": 2}) == 2
-    assert cs.SECTION_RULES == 2
+    assert cs.SECTION_RULES == 3
 
 
 def test_v2_takes_the_sims_side_of_the_main_line_v1_the_better_ev_side():
@@ -150,3 +150,21 @@ def test_the_page_derives_sections_under_the_sheets_stamp_and_says_what_the_sim_
     assert v1["section_rules"] == 1 and v1["sections"]["sim_edge"] == []
     assert "1,251 bets, ROI +8.0%" in v2["sim_edge_measured"]
     assert "has not beaten the price" in cs.sim_edge_measured_text("nfl")
+
+
+def test_v3_caps_sim_vs_the_line_at_two_per_player_per_game_and_v2_days_keep_every_pick():
+    def three(player, event, base):
+        # three different stats for one player, each on its main line with the sim far beyond it
+        return [_row(player, "under", 20.5, projected=base, market="player_points", event_id=event),
+                _row(player, "under", 8.5, projected=base * 0.4 - 1.0, market="player_rebounds", event_id=event),
+                _row(player, "under", 6.5, projected=base * 0.3 - 1.0, market="player_assists", event_id=event)]
+    rows = three("Stack", "e1", 12.0) + three("Other", "e2", 14.0) + [_row("Stack", "under", 1.5, projected=0.5, market="player_threes", event_id="e3")]
+    v2 = [(rows[i]["player"], rows[i].get("event_id")) for i in cs.sections(rows, rules=2)["sim_edge"]]
+    v3 = [(rows[i]["player"], rows[i].get("event_id")) for i in cs.sections(rows, rules=3)["sim_edge"]]
+    assert v2.count(("Stack", "e1")) == 3 and v2.count(("Other", "e2")) == 3              # off: every pick
+    assert v3.count(("Stack", "e1")) == 2 and v3.count(("Other", "e2")) == 2              # on: two per player per game
+    assert ("Stack", "e3") in v3                                                          # a different game is its own cap
+    kept = cs.sections(rows, rules=3)["sim_edge"]
+    assert all(cs.sim_edge(rows[i]) >= cs.sim_edge(rows[j]) for i in kept for j in cs.sections(rows, rules=2)["sim_edge"]
+               if j not in kept and rows[j]["player"] == rows[i]["player"] and rows[j].get("event_id") == rows[i].get("event_id"))
+    assert cs.sections(rows, rules=3)["value"] == cs.sections(rows, rules=2)["value"]      # only this section changes
