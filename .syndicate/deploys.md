@@ -59659,3 +59659,34 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **Not read here:** whether the season-phase cache changed web's NBA projections. Its owner lane measured identical rows offline. refresh-worker, which builds the grid, still runs the old code.
 - **Revert:** `git revert 754d5f3e4`, then a fleet ff + `reload-web`. Days stamped 3 then read as rules 3 under code that no longer knows 3; `sheet_rules` keeps the integer, and `rules >= 2` keeps every v2 rule.
 - **Claims:** web released right after this entry.
+
+## 2026-11-13 19:53:10Z (1:53 PM CST) -- claimed refresh-worker TERM to load `754d5f3e4` (contains `3422cb018`, #790's season-phase-once-per-scoreboard fix; lane `book-grid-overlay-starvation`) -- **LOADED; reachability MET; first NBA builds confounded by the cold board build; warm reading OWED**
+- **User, in this session's chat:** "go ahead and look into the NBA grid build time now", then "Fix it here once the profile shows the cause", then "Load it before tip". A peer relayed the user's "load 3422cb018" from session cca33a3a as well.
+- **Cause** (read-only fleet replays, nice 19, write guard, 0 writes attempted):
+  - The isolated NBA grid build takes 21.5-39.3 s, plus a 3 s json.dump. In the worker the same build took 66-212 s (median 132 s). So about 2/3 of the in-worker time is contention: the board build runs CPU-bound (cpu 327 s of wall 334 s) on a background thread of the same process.
+  - `season_phase_for_date` took 9.2-10.2 s = 43-44% of the isolated build. It was called 5,238 times, once per priced game-line row, and each call re-read and re-parsed the same ESPN scoreboard file.
+  - **Fix `3422cb018`:** cache the phase by the file's (path, mtime_ns, size). Off switch: `SYNDICATE_NBA_SEASON_PHASE_CACHE=off`.
+  - Fleet replay, one frozen shard copy: off 23.7 s, on 10.5-16.9 s; 6,000 of 6,000 rows with identical projections; payload equal minus clock fields.
+  - 15 new tests, 7 of 7 mutations caught; 1,795 pass across the 105 test files touching NBA projections and the grid build.
+- **gates:**
+  - Claim refresh-worker, holder `book-grid-overlay-starvation`, 19:46:15Z (rc 0; free). The last refresh-worker restart before this was 17:56:02Z (this lane).
+  - **The fleet moved under the claim:** lane `cheat-sheet-section-optimization` ff'd `0eb6f8d99 -> 754d5f3e4` at 19:51:17Z under its web claim (cheat sheets rules v3). `754d5f3e4` contains `3422cb018`, so no ff of mine was needed. The TERM loads `754d5f3e4`.
+  - **Web already runs `3422cb018`.** Per that lane's cross-lane note (`fad333910`), it rode the 19:51:28Z `reload-web` with the user's "Load both now", because `layer2_board` imports `nba_game_projections`. The cache returns identical phases, so web's served projections are unchanged by it.
+  - Ride-along for refresh-worker in `89e2d2a0c..754d5f3e4` (its previous loaded commit):
+    - `team_logos.py` (#798): its own entry above says refresh-worker takes it at its next restart.
+    - `cheat_sheets.py` v3: changes only `sections()` + `SECTION_RULES`, which only the cheat-sheet scripts and the record page call; refresh-worker imports only unchanged helpers.
+    - `prop_fair_side.py` and `engine_experts.py`: no runtime importer. `nhl/live_resim.py`: live-odds-worker only.
+    - 0 of 16 ff files overlap the fleet's locally modified files.
+  - Drain 19:46:25Z: it waited out live-odds-worker odds child jobs, then **CLEAR**.
+  - Baseline 19:52:02Z: warm NBA grid `build_seconds` since 18:25Z, n 8, median **120.5 s** (65.6-256.1).
+  - Preflight `--target fleet --target-commit 754d5f3e4` **CLEAR** 19:53:01Z (rc 0). Expectation: `nba_grid_build_seconds_median` 120.5 -> <=80.
+- **load** (`C:\tmp\railload\load790b.sh 754d5f3e4 754d5f3e4`):
+  - The ff was a no-op ("Already up to date") at 19:53:10.312Z. On disk, `_SEASON_PHASE_CACHE` is defined.
+  - `kill -TERM 444147` at 19:53:10.340Z. New supervised refresh-worker **pid 465592**, first seen 19:53:20Z. `--undrain` 19:53:27Z, `DRAIN_CLEARED`.
+- **verify:**
+  - **Reachability MET** (read 20:07:59Z): 3 ticks, all carrying `build_seconds`; 0 Tracebacks, 0 BOOK_GRID_TICK_ERROR, 0 INPLAY_OVERLAY_FAILED. The fix's off != on is proven by the replay (5,238 parses -> 1). The worker's count is not logged.
+  - **First NBA builds 109.3 s (20:01:25Z) and 135.5 s (20:07:46Z): CONFOUNDED, not a reading.** Both overlapped the new worker's first board build (no BOARD_BUILD_TIMING since the boot by 20:07:59Z). That is the same confound as the morning's 321 s / 103 s.
+  - **Warm reading OWED:** the median of >= 5 NBA builds after a board save. Falsified if it stays > 100 s.
+  - The next refresh-worker restart belongs to the parent session (the #780 spreads scale `273a4a599`, which contains `3422cb018`). So the warm reading will be taken on that worker, excluding its cold window.
+- **Revert:** `SYNDICATE_NBA_SEASON_PHASE_CACHE=off` in `local_production.env` + a drained full `down`/`up`; or `git revert 3422cb018`, a fleet ff, and a claimed refresh-worker TERM.
+- **Claims:** refresh-worker released right after this entry, for the parent session's #780 load.
