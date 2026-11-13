@@ -17,6 +17,18 @@ work takes the next free number (see the counter at the top of `todo.md`).
 ---
 
 
+### `#800` — **CLOSED 2026-11-13 (GOAL MET): the shared primary checkout keeps itself on origin/main. `scripts/primary_tree_ff.py` (`d692f4e6a`) fast-forwards it only when every guard passes, and every session start launches it (`2c773a9cb`). A real session start moved it 2c773a9cb -> 10a2155b3 on its own** `[2026-11-13, lane primary-tree-auto-ff, session 386d4115; user "Push: session start"]`
+- **Why:** every session loads its hooks, its git hooks and the digest from the primary checkout, and nothing moved it. It was fast-forwarded by hand 12 times 09-15..11-13 at 190-2,539 commits behind; meanwhile a hook landed on main was not live and the digest read stale ledger content.
+- **Guards:** it refuses, touching nothing, on any of:
+  - a linked worktree, a branch other than main, or an operation in progress;
+  - staged or unmerged paths, or HEAD not an ancestor of an exact origin/main SHA;
+  - a local edit the target does not carry, or a local edit to a file the target deletes;
+  - an untracked or IGNORED file the target adds with other content (plain git overwrites an ignored file silently: a test shows it);
+  - a file where the target needs a directory, or a case-only rename.
+  A blocker or collision already equal to the target is backed up and reset or moved. Hashes are re-checked right before acting, and a failed merge rolls back.
+- **Trigger:** the last command in `session-start.sh`. It runs detached at Idle priority, after 20 s, at most once per 10 min. A refusal, or no run for 24 h, prints one digest line. Off switch: `SYNDICATE_PRIMARY_FF=off`.
+- **Verified:** 25 tests, 9/9 guard mutations caught, an end-to-end spawn on a throwaway checkout, the install run (29 commits, 7.5 s), and the first automatic run (4 commits, 19.4 s).
+
 ### `#798` — **CLOSED 2026-11-13 (GOAL MET): women's college basketball rows get team crests. Fix `0eb6f8d99`, LOADED 19:19:16Z (fleet ff 866e0e18e -> 0eb6f8d99 + reload-web, user "Yes, load it"). Served: WNCAAB rows with no crest 6 -> 0 of 6, NCAAB 3 -> 0 (Lindenwood); each new crest is the school's ESPN id** `[2026-11-13, lane wncaab-team-crests, session 2ba5509d; found verifying #796; user "Do this task here"]`
 - **Cause:** `syndicate/features/shared/team_logos.py` `_SPORTS = ("mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab")`, so `logo_url("wncaab", ...)` returned None, and `scripts/build_team_branding_snapshot.py` had no `wncaab` entry. NCAAB's 3 crest-less rows: the fleet reads the July men's snapshot from its data disk (`~/syndicate-prod/data/ncaab_source/...`, ahead of the repo copy), and it lacks Lindenwood / Queens / Southern Indiana and has West Florida with no URL. ESPN's list today has all four.
 - **Fix:**
