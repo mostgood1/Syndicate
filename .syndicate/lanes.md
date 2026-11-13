@@ -805,12 +805,6 @@ death, never life — do not invert it.
 - Verification: Fit table on the fleet (walk-forward per sport); unit tests through attach_live_gamelines incl. env off != on; a fleet replay of the served NBA/NCAAF board build showing P(over) moved by the scale and nothing else changed; after the user's load, LIVE_GAMELINE_JOIN rows carry prob_scale and the ledger's unscaled field
 - Blocked by: none
 
-### closed-lane-archive-20261113-1040 — CLOSED 2026-11-13 (GOAL MET: 1 block archived) — opened 2026-11-13 — session bffcc5ab-631c-4977-b8b5-829506b085ad
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness --idle-min 240 read 1 SAFE of 10 CLOSED; archived it. 9 deferred (owners live or blocks recent; detail in log/2026-11-13.md).
-- Moved: closed-lane-archive-20261113-0440
-
 ### ncaab-gate-noise-and-se2 — CLOSED 2026-11-13 (GOAL MET: the gate's null runs flag WORSE cells; SE2 passes; nothing loaded) — opened 2026-11-13 — session c2fd17f8-7d77-4eed-b025-0830211e05b3
 - **VERDICT `[2026-11-13 19:35Z]`:** Goal (verbatim): "todo #765 Phase 2 NCAAB, after STEP 3i: (1) measure the #784 outcome gate's noise on a NULL transition -- two A/A runs (the running 7 fields against themselves, the candidate arm's seeds salted 1 and 2) on 2026-11-03..12 -- and say whether the shared current arm explains STEP 3i's 10 m / 20 m win-Brier cost; (2) score SE2 = 7 fields + score_effect_k 0.002 + solver_endgame_pts_per_team 0.30 (possession_alternation left at 0.85) through the gate on the same dates and name whether it passes (no WORSE cell). Adds --seed-salt to the gate (candidate arm only; a salted receipt never clears preflight). Read-only on the fleet; nothing is loaded (a load is the user's decision)." -- **GOAL: MET.**
   - **(1) A/A:** `ncaab__911f9565fe7f__911f9565fe7f__salt1.json` / `ncaab__911f9565fe7f__911f9565fe7f__salt2.json` flag 4 and 2 WORSE cells on a NULL transition (pre-registered 0-3: FALSIFIED). The shared current arm explains STEP 3i's cost PARTLY by the rule: mean A/A win Brier +0.0029 at 10 m, +0.0045 at 20 m, against STEP 3i's +0.0044 / +0.0041 (ALT1).
@@ -994,6 +988,11 @@ death, never life — do not invert it.
 - Falsification test: With an explicit regulation flag the resumed period's events are identical to today's (no 3-on-3 shifts, same PP segments, same score-effect clock); or pregame output changes; or the replay shows no change in the live moneyline / total
 - Verification: tests (off != on on the real engine; pregame and period-start identity); replay on vs off same inputs with keep and end-game re-fit; paired game-clustered grade; reachability under the fleet's code and inputs; load only on the user's yes
 - Blocked by: none
+
+### closed-lane-archive-20261113-1640 — CLOSED 2026-11-13 (GOAL MET: 1 block archived) — opened 2026-11-13 — session a65fa8b2-2351-4268-9726-baaa238a4cdb
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: MET. owner_liveness --idle-min 240 read 1 of 19 CLOSED blocks SAFE; moved to lanes_closed.md with one pointer: closed-lane-archive-20261113-1040. Table and WAIT reasons in log/2026-11-13.md.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1238,6 +1237,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261113-0440` — CLOSED 2026-11-13 (GOAL MET: 2 blocks archived) — opened 2026-11-13 — session 7892d138-f9c4-46ae-88f1-f80e105ede73
 - `closed-lane-archive-20261113-0640` — CLOSED 2026-11-13 (GOAL MET: 1 block archived) — opened 2026-11-13 — session 38196abb-579a-4240-ab44-f099e35ef716
 - `closed-lane-archive-20261113-0840` — CLOSED 2026-11-13 (GOAL MET: 1 block archived) — opened 2026-11-13 — session 754c7c5a-fa6d-41cc-8c2e-c9ea87309053
+- `closed-lane-archive-20261113-1040` — CLOSED 2026-11-13 (GOAL MET: 1 block archived) — opened 2026-11-13 — session bffcc5ab-631c-4977-b8b5-829506b085ad
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
