@@ -418,7 +418,7 @@
         - 223 of 232 equal to the box at that moment, the rest behind by the ~90 s publish cadence;
         - 0 Live proj.
         - BUT 16 / 0 / 24 rows carried a PREGAME model edge: board-build rows served live from puck drop to the next build. Not this change; lead filed 11-11.
-      - Owed: the NFL game (TNF 11-12), watcher armed.
+      - Owed: the NFL reading. TNF 11-12 was MISSED: a Windows Update reboot at 1:32 AM CST 11-12 killed the watcher. The web log shows the refresh ran on that game: 216 of 222 passes matched rows, and 143 rewrote a stale build Actual. There was no served read, so it is not the reading. Re-armed for Sunday 11-15 (lane `nhl-nfl-actual-read-time` STATUS 2026-11-13).
   - **(d) NHL live game-line join never matched (NOT this lane): RESOLVED.** The re-sim snapshot said `'Penguins'`, the board `'Pittsburgh Penguins'`. Lane `nhl-live-resim-slate-root` closed 11-10 with GOAL MET: NHL join index=1, and on the served board 1 of 1 moneyline and 2 of 2 totals live NHL rows carry a live number.
   - **Seen, not this item:** at 02:52-03:00Z 11-10 the served board carried no row at all, live or pregame, for live NYR @ EDM, although the join matched 118 of its 120 prop rows at 02:14Z.
 
