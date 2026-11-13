@@ -863,6 +863,14 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 gave SAFE for 1 of 14 CLOSED blocks. Moved: closed-lane-archive-20261113-0640. The reading and the WAIT reasons are in `.syndicate/log/2026-11-13.md`.
 
+### primary-tree-auto-ff — OPEN — opened 2026-11-13 — session 386d4115-6e7b-47e3-9ff7-be3914d851cb
+- Goal: The shared primary checkout stops drifting behind origin/main: scripts/primary_tree_ff.py fast-forwards it to origin/main ONLY when every guard passes (main worktree on main, not mid-operation, 0 staged, HEAD an ancestor of an exact origin/main SHA, every locally modified file the target changes identical to the target, every on-disk file the target adds identical to it), backs up whatever it resets or moves, re-hashes before acting, rolls back on failure, and records each run; a refusal or a stale run surfaces as one line in the session-start digest; the trigger is installed only on the user's explicit OK
+- Files: scripts/primary_tree_ff.py, tests/test_primary_tree_ff.py, .claude/hooks/session-start.sh (the primary-tree auto-ff digest/trigger block only)
+- Hypothesis: n/a (build)
+- Falsification test: n/a
+- Verification: pytest tests/test_primary_tree_ff.py (every refusal leaves HEAD and every dirty file byte-identical; a clean ff lands; a fault-injected merge failure restores; off != on); a dry run against the real primary tree reports correctly; after the user's trigger choice, one real automatic run seen in the status file and the digest silent on success
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
