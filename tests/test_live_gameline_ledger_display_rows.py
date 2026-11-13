@@ -73,7 +73,7 @@ def test_reachability_the_record_carries_the_number_the_board_shows(snapshot):
     (row,) = _joined(snapshot, [_row()])
     assert row["live_gameline"]["withheld_reason"] == REASON_MARGIN_DISPLAY_ONLY      # the branch under test
     (rec,) = L.build_records([row], sport="nhl", date_str=DATE)
-    assert rec["v"] == 6
+    assert rec["v"] >= 6  # v7 (#780 prob scale) is additive: every v6 key is still here
     assert rec["display_prob"] == row[LIVE_DISPLAY_KEY]["prob_over"] is not None
     assert rec["display_basis"] == REASON_MARGIN_DISPLAY_ONLY
     assert rec["market_fair_prob_over"] == 0.62
@@ -132,5 +132,5 @@ def test_refusal_records_carry_the_v6_keys_as_null():
     row = _row()
     row[lgj.REFUSAL_KEY] = {"withheld_reason": "segment_is_not_full_game"}
     (rec,) = L.build_records([row], sport="nhl", date_str=DATE)
-    assert rec["v"] == 6
+    assert rec["v"] >= 6  # v7 (#780 prob scale) is additive: every v6 key is still here
     assert rec["display_prob"] is None and rec["market_fair_prob_over"] is None and rec["display_basis"] is None

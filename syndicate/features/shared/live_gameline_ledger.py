@@ -98,7 +98,14 @@ from syndicate.features.shared.sharp_books import SHARP_BOOKS
 # since nothing was priced -- so production's own number and the market beside it
 # were thrown away every build. Pricing it needs exactly that pair, graded against
 # finals. A reader that needs them must filter to `v >= 6`.
-LEDGER_VERSION = 6
+#
+# v7 (2026-11-13, lane live-totals-prob-scale, todo #780) carries `prob_scale` and
+# `model_home_win_prob_unscaled`: a full-game totals P(over) is now tempered per
+# sport by its measured over-confidence (`live_gameline_join.totals_prob_scale`),
+# so `model_home_win_prob` is the TEMPERED number where `prob_scale` != 1 and the
+# engine's own is beside it. ADDITIVE; `record_key` is untouched. A v<=6 record
+# was never tempered.
+LEDGER_VERSION = 7
 
 # THE ROW KEY THE JOIN WRITES ITS DISPLAY NUMBER UNDER, and the one refusal whose
 # display rows are recorded on movement. Imported by NAME for the reason the
@@ -458,6 +465,10 @@ def build_records(
                 "point_estimator": lg.get("point_estimator"),
                 "model_home_win_prob_raw": lg.get("model_prob_raw"),
                 "prob_std_err": lg.get("prob_std_err"),
+                # v7 (#780): the over-confidence scale a full-game totals probability was tempered by, and the
+                # engine's own number before it. `prob_scale` 1.0 = untempered; None = not a distribution totals row.
+                "prob_scale": lg.get("prob_scale"),
+                "model_home_win_prob_unscaled": lg.get("model_prob_unscaled"),
                 "sims_run": lg.get("sims_run"),
                 "live_state_as_of": lg.get("as_of"),
                 "carried_forward": bool(lg.get("carried_forward")),

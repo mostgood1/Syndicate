@@ -306,7 +306,19 @@
   - **NBA READING MET, 03:30Z 11-12** (9:30 PM CST 11-11; deploys.md 2026-11-12 03:30Z). From 23:30Z to 03:30Z, NBA priced 2,689 rows on 9 games, NCAAB 2,016 on 40, WNCAAB 82 on 8: all at quote age <= 120 s. NCAAF priced 0. The NHL control (600 s) priced 10 rows over 120 s.
     - The joins refused for quote age 76% of resolved NBA rows (measured 80%), NCAAB 63% (62-65%), NCAAF 60% (66-77%) and WNCAAB 78% (69-77%). Display kept. Lane `live-gameline-quote-ceiling-120` CLOSED.
   - **OWED, after several nights (from 11-17):** grade the priced rows' Brier against finals again on the post-load population (`scripts/live_gameline_age_grade.py`, rows after 18:11:24Z 11-11 only).
-- **Later, not proposed yet:** fit the live spread width to its measured error (estimator, per sport).
+- **CANDIDATE FIX 2, THE LIVE TOTALS PROBABILITY SCALE: ON MAIN, NOT LOADED (the user's decision)** `[2026-11-13, user "Fit it now", lane live-totals-prob-scale, .syndicate/findings_2026-11-13_live_totals_width_fit.md]`:
+  - The transform: P_k(over) = Phi(Phi^-1(P)/k) on live full-game totals. It is an estimator that moves no mean.
+  - Walk-forward fit against finals on the fleet ledgers:
+    - NBA: k 2.16, Brier -0.006 +- 0.005.
+    - NCAAF: k 2.48, Brier -0.015 +- 0.006. Model minus market goes from +0.012 to -0.004.
+    - NCAAB stays at 1. After `#768` (11-09..11-12, 135 games) its walk-forward gain is -0.001 +- 0.003 and k is 1.2. The all-date 1.68 came from the pre-fix mean.
+    - WNCAAB stays at 1: no gain measured.
+  - Why k exceeds the width gap (1.1-1.4): regressing (final - line) on (mean - line) gives slopes of 0.18-0.75 (NBA) and 0.38-0.70 (NCAAF). The model's distance from the line overstates what it knows, early in games most.
+  - Replay on production ledger rows: NBA priced 262 -> 256, median |edge| 14.6 -> 6.7 pp. NCAAF 3,655 -> 3,553, 20.6 -> 8.9 pp. NCAAB unchanged.
+  - Code: `live_gameline_join.totals_prob_scale` (off switch `SYNDICATE_LIVE_TOTALS_PROB_SCALE=off`). It applies to the priced path and the display number. Ledger v7 records `prob_scale` and `model_home_win_prob_unscaled`.
+  - Tests: `tests/test_live_totals_prob_scale.py`, 36, incl. off != on through the join and the production caller. 7 mutations are caught. 1,453 pass across the 72 test files that drive the join and the ledger.
+  - Load: a fleet ff plus a claimed refresh-worker restart.
+  - Not covered yet: spreads and moneylines, a separate fit.
 - **PRE-REGISTERED 2026-11-13** (lane `ncaab-live-edge20-prereg`, `.syndicate/findings_2026-11-13_ncaab_edge20_prereg.md`):
   - The cell: NCAAB fresh-quote (<= 30 s) |edge| >= 20 pp, one bet per game, ledger dates >= 11-13, the first 200 games.
   - PASS if the one-sided 95% lower bound clears 0.524 (hit >= 0.581). KILL if hit <= 0.524. INCONCLUSIVE extends once to 400 games.

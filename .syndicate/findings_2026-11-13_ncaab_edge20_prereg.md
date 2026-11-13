@@ -100,6 +100,26 @@ The test is of the rule as the fleet serves it, not of a frozen model. Known cha
 - **Any NCAAB live-engine change that loads before the grade**, e.g. `#780` candidate fix 2, a spread-width fit. It
   changes which edges this rule selects. Record it here, with its load time, before grading.
 
+## Amendments
+
+Both were made 2026-11-13, before any game in the window existed. `PREREG_780=count` read 0 states after each.
+
+1. **The registered grade reads the engine's own probability.**
+   - It reads `model_home_win_prob_unscaled` whenever the join tempered P(over); ledger v7, todo `#780` candidate
+     fix 2, lane `live-totals-prob-scale`. Otherwise it reads `model_home_win_prob`.
+   - The cell was found on untempered probabilities, so a later scale must not change which games it selects.
+   - NCAAB's scale is 1, so today this changes nothing.
+   - One residual effect: if NCAAB is ever scaled, the precision gate judges the tempered edge. That would move a few
+     rows between `priceable` true and false. If that happens before the grade, record it here.
+2. **Finals are re-fetched until a date is over.**
+   - The grade's `finals()` trusted an ESPN scoreboard cached at any time. A file cached before that date's games
+     ended dropped every one of them as unmatched.
+   - Measured: the 11-10 / 11-11 NCAAB files, cached 11-10 ~17:00 CST, unmatched 16,631 states of the width fit.
+     The 11-13 file had been cached that morning, before its games, so the registered grade would have lost all of
+     11-13.
+   - Now a cached scoreboard is reused only once it was written after noon UTC on the following day
+     (`final_cutoff`). This is a bug fix, not a rule change.
+
 ## Runs
 
 ```

@@ -61,6 +61,7 @@ import math
 import os
 from collections.abc import Mapping
 from datetime import datetime, timezone
+from statistics import NormalDist
 from typing import Any
 from syndicate.features.shared.doubleheader import (
     MAX_SAME_GAME_GAP_SECONDS,
@@ -1179,6 +1180,79 @@ def _segment_hit(lens: Mapping[str, Any], projection: Mapping[str, Any], segment
     }
 
 
+# LIVE FULL-GAME TOTALS P(OVER) IS TEMPERED BY ITS MEASURED OVER-CONFIDENCE `[2026-11-13, todo #780 candidate fix 2,
+# lane live-totals-prob-scale, user "Fit it now"]`.
+#
+# P_k(over) = Phi(Phi^-1(P) / k). Widening a normal predictive distribution by k around its own mean divides every
+# line's z by k, so this moves no mean and adds no mechanism (`model_engine_standard.md` 4.4): it is an estimator
+# fitted on outcomes. It is larger than the width gap alone (error sd / implied sd 1.07-1.42) because it also absorbs
+# the bigger miss: regressing (final - line) on (model mean - line) gives slopes of 0.18 / 0.61 / 0.75 in NBA and
+# 0.38 / 0.54 / 0.70 in NCAAF (score / line < 0.40, 0.40-0.75, >= 0.75), so the model's distance from the line
+# overstates what it knows, early in games most.
+#
+# MEASURED 2026-11-13 on the fleet's live gameline ledgers (`scripts/live_totals_width_fit.py`): totals / full rows
+# with a model probability, one per state, against ESPN finals; walk-forward by ledger date (fit on every earlier
+# date, score the next), Brier change against k = 1, game-clustered 95%:
+#
+#   sport   graded states / games   k, all dates   walk-forward Brier gain   model - market Brier, k=1 -> k
+#   nba     26,289 / 162            2.156          -0.006 +- 0.005 (21)      +0.004 +- 0.012 -> -0.002 +- 0.010
+#   ncaaf   94,505 / 325            2.482          -0.015 +- 0.006 (27)      +0.012 +- 0.012 -> -0.004 +- 0.005
+#   ncaab   15,858 / 135 (*)        1.195          -0.001 +- 0.003 (2)       not scaled
+#   wncaab   4,493 /  79            1.469          -0.001 +- 0.012 (8)       not scaled
+#
+#   (*) Ledger dates 11-09..11-12 only, after the `#768` bias fix loaded (05:13Z 11-09). Over 11-02..11-12 the fit
+#   read 1.68, driven by the pre-fix mean; after the fix the walk-forward shows no gain, so NCAAB stays at 1, and so
+#   does WNCAAB. Re-fit both once more nights exist. NBA's walk-forward k held 2.13-2.16 over its last 8 steps.
+#
+# FULL-GAME totals only: segment totals were not fitted. The unscaled probability and k ride on the verdict
+# (`model_prob_unscaled`, `prob_scale`) and into the ledger (v7), so a grade can always recover the engine's own number.
+_TOTALS_PROB_SCALE_BY_SPORT: dict[str, float] = {
+    "nba": 2.16,
+    "ncaaf": 2.48,
+}
+_TOTALS_PROB_SCALE_ENV = "SYNDICATE_LIVE_TOTALS_PROB_SCALE"
+
+
+def totals_prob_scale(sport: Any = None) -> float:
+    """k for one sport's live full-game totals; 1.0 leaves today's probability.
+
+    `SYNDICATE_LIVE_TOTALS_PROB_SCALE=off` (or 0 / false / no) turns the scale off for every sport.
+    `SYNDICATE_LIVE_TOTALS_PROB_SCALE_<SPORT>=<k>` sets one sport (k > 0, finite). An unparseable or non-positive
+    value falls back to the table, not to "off": a knob that can be typo'd into a different behaviour is the shape
+    `#603` shipped inert twice.
+    """
+    raw = str(os.environ.get(_TOTALS_PROB_SCALE_ENV) or "").strip().lower()
+    if raw in {"off", "0", "false", "no"}:
+        return 1.0
+    key = str(sport or "").strip().lower()
+    per = str(os.environ.get(f"{_TOTALS_PROB_SCALE_ENV}_{key.upper()}") or "").strip() if key else ""
+    if per:
+        try:
+            value = float(per)
+        except ValueError:
+            value = 0.0
+        if value > 0.0 and math.isfinite(value):
+            return value
+    return _TOTALS_PROB_SCALE_BY_SPORT.get(key, 1.0)
+
+
+def scale_prob(probability: float, scale: float) -> float:
+    """Phi(Phi^-1(p) / k); p itself when k is 1 or p is not strictly inside (0, 1)."""
+    if scale == 1.0 or not (0.0 < probability < 1.0):
+        return probability
+    nd = NormalDist()
+    return nd.cdf(nd.inv_cdf(probability) / scale)
+
+
+def scale_prob_std_err(probability: float, std_err: float, scale: float) -> float:
+    """The scaled probability's sim error by the delta method: dP_k/dP = phi(z/k) / (k phi(z)), z = Phi^-1(p)."""
+    if scale == 1.0 or not (0.0 < probability < 1.0):
+        return std_err
+    nd = NormalDist()
+    z = nd.inv_cdf(probability)
+    return std_err * nd.pdf(z / scale) / (scale * nd.pdf(z))
+
+
 def price_distribution_market(
     *,
     dist: Any,
@@ -1189,6 +1263,7 @@ def price_distribution_market(
     sims: Any,
     sigma: float = PRICEABLE_SIGMA,
     sport: Any = None,
+    prob_scale: float = 1.0,
 ) -> dict[str, Any]:
     """Price a live TOTALS or SPREADS row off the re-sim's own histogram.
 
@@ -1220,6 +1295,10 @@ def price_distribution_market(
         "priceable": False,
         "withheld_reason": None,
         "sigma": float(sigma),
+        # #780 totals prob scale: set on a priced-path totals row (1.0 = untempered); None on everything else, so a
+        # refused verdict keeps the priced one's shape.
+        "prob_scale": None,
+        "model_prob_unscaled": None,
     }
     if not isinstance(dist, Mapping) or not dist:
         out["withheld_reason"] = REASON_NO_LIVE_DISTRIBUTION
@@ -1285,6 +1364,16 @@ def price_distribution_market(
         model_prob = smoothed
         out["model_prob"] = smoothed
         out["point_estimator"] = "agresti_coull"
+    # THE MEASURED OVER-CONFIDENCE (`totals_prob_scale`, #780). After the point estimator, so k tempers the number
+    # that would otherwise be priced, and the precision gate below judges the scaled edge against the scaled error.
+    if key in _TOTALS_MARKETS:
+        out["prob_scale"] = float(prob_scale)
+        if prob_scale != 1.0:
+            out["model_prob_unscaled"] = float(model_prob)
+            std_err = scale_prob_std_err(float(model_prob), std_err, prob_scale)
+            out["prob_std_err"] = std_err
+            model_prob = scale_prob(float(model_prob), prob_scale)
+            out["model_prob"] = model_prob
     edge = _edge_pp(float(model_prob), market_p)
     out["edge_pp"] = round(edge, 2)
     # THE SAME BAR AS THE MONEYLINE, deliberately. A histogram answers "what is
@@ -1425,6 +1514,9 @@ def live_display_block(
         prob = None
     if prob is not None and not (0.0 < prob < 1.0):
         prob = None
+    # The same tempering as the priced path (#780), so the Live column and a price never disagree on one row.
+    if prob is not None and market_key in _TOTALS_MARKETS and (hit.get("segment") or "full") in _FULL_GAME_SEGMENTS:
+        prob = scale_prob(prob, totals_prob_scale(sport))
     total_mean = hit.get("total_mean") if market_key in _TOTALS_MARKETS else None
     if prob is None and total_mean is None:
         return None
@@ -2400,6 +2492,9 @@ def attach_live_gamelines(
                     # SPORT-SCOPED PUBLISH SWITCH. Threaded rather than read
                     # from a global, so disabling MLB cannot silence WNBA or soccer.
                     sport=sport,
+                    # #780: full-game totals only, the population the scale was fitted on.
+                    prob_scale=(totals_prob_scale(sport)
+                                if market_key in _TOTALS_MARKETS and segment in _FULL_GAME_SEGMENTS else 1.0),
                 )
             # A DISPLAY-ONLY HISTOGRAM IS NOT A PRICE (`#773`, NHL puck line). The row keeps the pricer's own
             # no-distribution refusal -- no model probability, so `_apply_verdict` publishes no

@@ -35,7 +35,7 @@ def finals_detail(sport, d):
     out = {}
     for gr in groups:
         data = g.fetch(f"https://site.api.espn.com/apis/site/v2/sports/{path}/scoreboard?dates={d.strftime('%Y%m%d')}&limit=500" + (f"&groups={gr}" if gr else ""),
-                       os.path.join(g.CACHE, sport, f"{d:%Y%m%d}_{gr}.json")) or {}
+                       os.path.join(g.CACHE, sport, f"{d:%Y%m%d}_{gr}.json"), fresh_after=g.final_cutoff(d)) or {}
         for ev in data.get("events") or []:
             comp = (ev.get("competitions") or [{}])[0]
             if not ((comp.get("status") or ev.get("status") or {}).get("type") or {}).get("completed"):

@@ -61,6 +61,17 @@ PREREG_DEADLINE = "2026-12-15"
 PREREG_MIN_N_AT_DEADLINE = 100
 
 
+def model_prob(r):
+    """The model P(over) a grade reads. PREREG_780 reads the ENGINE'S OWN number (`model_home_win_prob_unscaled`,
+    ledger v7) whenever the join tempered it (`#780` totals prob scale): the registered cell was found on untempered
+    probabilities, and a later scale must not change which games it selects (amendment 1, 2026-11-13, made before any
+    game in the window existed). NCAAB's scale is 1 at registration, so this reads `model_home_win_prob` there today.
+    The default mode reads the SERVED (tempered) number."""
+    if PREREG_MODE and r.get("model_home_win_prob_unscaled") is not None:
+        return r.get("model_home_win_prob_unscaled")
+    return r.get("model_home_win_prob")
+
+
 def prereg_window():
     lo = os.environ.get("PREREG_DATE_FROM") or PREREG_FROM
     hi = os.environ.get("PREREG_DATE_TO") or "9999-12-31"
@@ -144,8 +155,17 @@ def norm(s):
     return re.sub(r"[^a-z0-9]", "", str(s or "").lower())
 
 
-def fetch(url, path):
-    if os.path.exists(path):
+def final_cutoff(d):
+    """Epoch after which ESPN date d's games are all over: noon UTC the next day. A scoreboard cached before it may
+    hold games that were not final yet, and trusting it forever drops them as unmatched (measured 2026-11-13: the
+    11-10 / 11-11 NCAAB files were cached 11-10 ~17:00 CST, so 16,631 states of the width fit had no final)."""
+    from datetime import datetime, timezone
+    return datetime(d.year, d.month, d.day, 12, tzinfo=timezone.utc).timestamp() + 86400
+
+
+def fetch(url, path, fresh_after=None):
+    """A cached file is reused only when it was written at or after `fresh_after` (epoch; None = always)."""
+    if os.path.exists(path) and (fresh_after is None or os.path.getmtime(path) >= fresh_after):
         try:
             return json.load(open(path))
         except Exception:
@@ -170,7 +190,7 @@ def finals(sport, d):
     for g in groups:
         q = f"dates={d.strftime('%Y%m%d')}&limit=500" + (f"&groups={g}" if g else "")
         data = fetch(f"https://site.api.espn.com/apis/site/v2/sports/{path}/scoreboard?{q}",
-                     os.path.join(CACHE, sport, f"{d:%Y%m%d}_{g}.json")) or {}
+                     os.path.join(CACHE, sport, f"{d:%Y%m%d}_{g}.json"), fresh_after=final_cutoff(d)) or {}
         for ev in data.get("events") or []:
             comp = (ev.get("competitions") or [{}])[0]
             if not ((comp.get("status") or ev.get("status") or {}).get("type") or {}).get("completed"):
@@ -279,7 +299,7 @@ def main():
                         and os.environ.get("PREREG_780_INCLUDE") != "1"):
                     held_out[0] += 1
                     continue
-                pm, pf, ln = r.get("model_home_win_prob"), r.get("market_fair_prob"), r.get("line")
+                pm, pf, ln = model_prob(r), r.get("market_fair_prob"), r.get("line")
                 if pm is None or pf is None or ln is None:
                     continue
                 key = (r.get("event_id"), r.get("live_state_as_of") or r.get("recorded_at"), float(ln))
@@ -322,7 +342,7 @@ def main():
             if final == ln:
                 continue
             y = 1.0 if final > ln else 0.0
-            pm, pf = float(r["model_home_win_prob"]), float(r["market_fair_prob"])
+            pm, pf = float(model_prob(r)), float(r["market_fair_prob"])
             mt = r.get("model_total_mean")
             if mt is not None and pm != pf:
                 dir_check[0] += 1
