@@ -954,6 +954,14 @@ death, never life — do not invert it.
 - Verification: findings file with per-family games, dBrier [CI], calibration slope and PIT; entries + lookup on main; served NFL segment rows carry status measured with established_loss_rel equal to the entry; web loaded and read
 - Blocked by: none
 
+### nba-live-margin-anchor — OPEN — opened 2026-11-13 — session 8062940b-57fd-454a-8de5-25fdd4804d85
+- Goal: The NBA live re-sim's full-game margin is anchored to the market like college's: shifted by (closing consensus home margin - the pregame sim's margin mean) x the share of regulation still to play, with P(home) re-derived; NBA only (WNBA, segments and live props untouched); no anchor = today's raw numbers, flagged by name; a switch; reachability off != on; a replay on the fleet's per-tick history graded against finals shows it helps; the NBA spreads scale re-fitted on anchored margins (the standard's 4.4 two-part change); on main; loading is the user's decision
+- Files: syndicate/features/nba/live_resim.py (a new margin-anchor section + its call in build_live_lens_snapshot + the lane's anchor fields in build_game_lens ONLY), tests/test_nba_live_margin_anchor.py (NEW), scripts/replay_nba_live_margin_anchor.py (NEW), .syndicate/findings_2026-11-13_nba_live_margin_anchor.md (NEW), syndicate/features/shared/live_gameline_join.py (_SPREADS_PROB_SCALE_BY_SPORT nba value + its comment ONLY, if the re-fit moves it), tests/test_live_margin_prob_scale.py (the NBA k constant ONLY, if it moves), docs/ai_context/todo.md (#780 section only)
+- Hypothesis: Written before building (2026-11-13 22:05Z). Anchoring the NBA live margin to the closing line cuts the live moneyline's model - market Brier gap (+0.018 over 3,962 states) by at least half, mostly at tip / early (+0.039 / +0.029 now), and the anchored spreads need a smaller temper (NBA spreads k 2.02 now; predicted 1.2-1.6 after).
+- Falsification test: Replayed on the fleet's live_resim_history against ESPN finals: anchored h2h Brier is not below raw on the same states, or anchored is worse than raw beyond noise in any progress band, or the anchor is found for fewer than 90% of NBA games (coverage)
+- Verification: scripts/replay_nba_live_margin_anchor.py on the fleet (read-only): anchor coverage per game; raw vs anchored h2h Brier and model - market by progress band with game-clustered 95%; anchored spreads walk-forward k; tests incl. off != on through build_live_lens_snapshot and the board join
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
