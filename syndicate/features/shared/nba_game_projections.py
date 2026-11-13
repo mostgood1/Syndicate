@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import date, timedelta
@@ -93,6 +94,30 @@ def nba_processed_candidates(filename: str) -> list[Path]:
 
 _ESPN_SEASON_PHASE = {1: "preseason", 2: "regular", 3: "postseason"}
 
+# ONE READ PER FILE VERSION, not one per row (todo #790, lane book-grid-overlay-starvation). `_project_row` asks
+# for the phase of every priced game-line row, and each ask re-read and re-parsed the same scoreboard file:
+# measured on the fleet 2026-11-13, 5,238 calls in one NBA book-grid build, 9.2-10.2 s = 43-44% of the build,
+# which runs on refresh-worker's main thread beside the board build and held every sport's live tick.
+# Keyed on the file's (mtime_ns, size), so a rewritten scoreboard is read again on the next call: the answer is
+# a pure function of the file's bytes, and the cache never serves a phase the file no longer says.
+# Off switch: SYNDICATE_NBA_SEASON_PHASE_CACHE=off reads the file on every call, as before.
+_SEASON_PHASE_CACHE: dict[str, tuple[tuple[int, int], str | None]] = {}
+_SEASON_PHASE_CACHE_MAX = 64
+
+
+def _season_phase_cache_enabled() -> bool:
+    return str(os.environ.get("SYNDICATE_NBA_SEASON_PHASE_CACHE") or "").strip().lower() not in {"0", "off", "false", "no"}
+
+
+def _season_phase_from_file(path: Path) -> str | None:
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+        types = {int((ev.get("season") or {}).get("type")) for ev in doc.get("events") or []
+                 if (ev.get("season") or {}).get("type") is not None}
+    except Exception:  # noqa: BLE001
+        return None
+    return _ESPN_SEASON_PHASE.get(types.pop()) if len(types) == 1 else None
+
 
 def season_phase_for_date(slate_date: str | None) -> str | None:
     """The NBA season phase of a slate date from the ESPN scoreboard the sim caches
@@ -103,13 +128,22 @@ def season_phase_for_date(slate_date: str | None) -> str | None:
     path = nba_processed_file(f"_espn_cache/nba/scoreboard_{str(slate_date)[:10].replace('-', '')}.json")
     if path is None:
         return None
+    if not _season_phase_cache_enabled():
+        return _season_phase_from_file(path)
     try:
-        doc = json.loads(path.read_text(encoding="utf-8"))
-        types = {int((ev.get("season") or {}).get("type")) for ev in doc.get("events") or []
-                 if (ev.get("season") or {}).get("type") is not None}
-    except Exception:  # noqa: BLE001
-        return None
-    return _ESPN_SEASON_PHASE.get(types.pop()) if len(types) == 1 else None
+        stat = path.stat()
+        stamp = (int(stat.st_mtime_ns), int(stat.st_size))
+    except OSError:
+        return _season_phase_from_file(path)
+    key = str(path)
+    hit = _SEASON_PHASE_CACHE.get(key)
+    if hit is not None and hit[0] == stamp:
+        return hit[1]
+    phase = _season_phase_from_file(path)
+    if len(_SEASON_PHASE_CACHE) >= _SEASON_PHASE_CACHE_MAX:
+        _SEASON_PHASE_CACHE.clear()
+    _SEASON_PHASE_CACHE[key] = (stamp, phase)
+    return phase
 
 
 def nba_processed_file(filename: str) -> Path | None:
