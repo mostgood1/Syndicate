@@ -226,6 +226,25 @@ _TOTAL_KEEP_BOUNDS = (0.5, 1.0)
 LIVE_OVERTIME_ENV = "SYNDICATE_NHL_LIVE_OVERTIME"
 
 
+# THE REST OF THE CURRENT PERIOD IS REGULATION (lane nhl-live-period-remainder, todo #773, 2026-11-13). The engine
+# inferred overtime from a period's LENGTH, and a resume's first period is always short, so every live re-sim
+# played the rest of the CURRENT regulation period as overtime: 3-on-3 skaters, score-effect urgency on that
+# period's clock alone (end-of-game pushing in P1 / P2), and the game's power-play seconds packed into the
+# remainder (capped at 0.45 of it). On, the engine is told the period's kind (`engine.simulate_with_lineups(
+# explicit_period_kind=True)`); whole periods and OT are unchanged. A correction, not a fit: it has no parameter,
+# but it moves the engine's goals, so the total keep and the end-game above were re-fit with it -- both stay
+# (findings_2026-11-13_nhl_live_period_remainder.md: 301 games, 14 cutoffs; moneyline Brier -0.00057 [-0.00160,
+# +0.00045], +-1.5 -0.00002, total CRPS +0.0014 [-0.0015, +0.0044]).
+# Off switch: SYNDICATE_NHL_LIVE_PERIOD_REMAINDER=off (the old play).
+LIVE_PERIOD_REMAINDER_ENV = "SYNDICATE_NHL_LIVE_PERIOD_REMAINDER"
+
+
+def live_period_remainder_regulation() -> bool:
+    """Whether production plays the rest of the current period as regulation: on unless the env switch says off."""
+    raw = str(os.environ.get(LIVE_PERIOD_REMAINDER_ENV) or "").strip().lower()
+    return raw not in {"off", "0", "false", "legacy"}
+
+
 def live_overtime_sudden_death() -> bool:
     """Whether production plays OT as sudden death: on unless the env switch says off."""
     raw = str(os.environ.get(LIVE_OVERTIME_ENV) or "").strip().lower()
@@ -551,8 +570,12 @@ def resim_live_game(
     scoring: Optional[Mapping[str, Any]] = None,
     record_sims: bool = False,
     overtime_sudden_death: Optional[bool] = None,
+    period_remainder_regulation: Optional[bool] = None,
 ) -> dict[str, Any] | NhlResimRefusal:
     """Run `sims` resumed games and aggregate the moneyline.
+
+    `period_remainder_regulation` defaults to :func:`live_period_remainder_regulation` (production: on); pass
+    False for the old play (the rest of the current period simulated as overtime), reproduced seed for seed.
 
     `overtime_sudden_death` defaults to :func:`live_overtime_sudden_death` (production: on); pass False for
     the old OT (one whole 5:00 segment, goals summed), reproduced seed for seed.
@@ -602,6 +625,8 @@ def resim_live_game(
     late_seconds = scoring_late_seconds(scoring_cal)
     endgame_in_total = bool(scoring_cal.get("count_endgame_in_total"))
     sudden_death = live_overtime_sudden_death() if overtime_sudden_death is None else bool(overtime_sudden_death)
+    period_regulation = (live_period_remainder_regulation() if period_remainder_regulation is None
+                         else bool(period_remainder_regulation))
     rates = RateModels(
         home=TeamRates(
             shots_per_60=float(home_feat.shots_per_60),
@@ -674,6 +699,7 @@ def resim_live_game(
             profile=profile,
             seed=seed0 + i,
             ot_sudden_death=sudden_death,
+            explicit_period_kind=period_regulation,
         )
         hs, as_ = int(gs.home.score), int(gs.away.score)
         raw_total = hs + as_
@@ -763,6 +789,13 @@ def resim_live_game(
             # Resumed IN OT: the OT clock the sims played (on) -- off played a fresh 5:00 regardless.
             "resumed_ot_clock_seconds": None if in_regulation else int(state.clock_seconds),
         },
+        # How the rest of the CURRENT period is played (lane nhl-live-period-remainder). Lane-level; no pricer
+        # reads it. `resumed_period_seconds` is what was left of it (a whole period plays the same either way).
+        "period_remainder": {
+            "play": "regulation" if period_regulation else "inferred_from_length",
+            "calibration": "on" if period_regulation else "off",
+            "resumed_period_seconds": int(seconds_remaining) if in_regulation else None,
+        },
         **({"sim_records": sim_records} if record_sims else {}),
     }
 
@@ -819,6 +852,8 @@ def build_game_lens(
         "liveScoring": dict(result.get("scoring") or {}),
         # Which OT (lane nhl-live-overtime): sudden death on the clock shown, or the old full segment.
         "liveOvertime": dict(result.get("overtime") or {}),
+        # How the rest of the current period was played (lane nhl-live-period-remainder).
+        "livePeriodRemainder": dict(result.get("period_remainder") or {}),
         # DISPLAY ONLY. `live_gameline_join` reads `projection.total` and
         # `projection.homeMargin` for display and prices NEITHER: totals and
         # puck lines are priced from `totalRunsDist` / `marginDist`, which this

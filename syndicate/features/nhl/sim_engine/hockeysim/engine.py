@@ -304,6 +304,16 @@ class SimConfig:
     faceoff_multi_event_segment_model: bool = True
 
 
+def _score_effect_clock(periods: int, seconds_per_period: int, period_idx: int, time_remaining: float,
+                        ot_period: bool) -> float:
+    """The game time the score effects' urgency reads. A regulation period counts the whole periods still to
+    come after it; OT counts its own clock. (This expression was inline in `simulate_period_with_lines`; lane
+    nhl-live-period-remainder lifted it so the period's KIND, not its length, decides which applies.)"""
+    if not ot_period:
+        return float((max(0, int(periods) - 1 - int(period_idx)) * int(seconds_per_period)) + time_remaining)
+    return float(time_remaining)
+
+
 def _cut_at_first_goal(hg: int, ag: int, events: List[Event], home_name: str) -> Tuple[int, int, List[Event]]:
     """An overtime segment cut at its FIRST goal: sudden death (`simulate_with_lineups(ot_sudden_death=True)`).
 
@@ -597,6 +607,7 @@ class PeriodSimulator:
         st_away: Optional[Dict[str, float]] = None,
         special_teams_cal: Optional[Dict[str, float]] = None,
         period_seconds: Optional[int] = None,
+        is_overtime: Optional[bool] = None,
     ) -> Tuple[int, int, List[Event]]:
         """Segment the period by EV lines and simulate events with simple score effects.
 
@@ -605,8 +616,19 @@ class PeriodSimulator:
                 - Score effects: trailing team shoots more and leading team shoots less, with strength
                     increasing late in games and with larger score differentials (capped to [0.6, 1.4]).
         - Goals drawn proportionally to shots.
+
+        `is_overtime` (lane nhl-live-period-remainder, todo #773). None -- the default, and what pregame
+        passes -- infers overtime from the period's LENGTH (`T != seconds_per_period`), as this always did:
+        right for a whole regulation period and for OT. A live resume's first period is SHORT, so that
+        inference read the rest of a regulation period as overtime in four places: 3-on-3 skaters, the
+        score-effect clock (this period's time only, so end-of-game urgency in P1 / P2), the power-play
+        share (the game's PP seconds over this period's remainder, capped at 0.45), and shorter segments.
+        True / False states it instead; `simulate_with_lineups(explicit_period_kind=True)` passes it.
         """
         T = int(period_seconds or self.cfg.seconds_per_period)
+        # The four checks below read these. None keeps each one's old expression exactly.
+        ot_period = (int(T) != int(self.cfg.seconds_per_period)) if is_overtime is None else bool(is_overtime)
+        short_segments = (T < self.cfg.seconds_per_period) if is_overtime is None else bool(is_overtime)
 
         usage_model = str(getattr(self.cfg, "usage_model", "deterministic") or "deterministic").strip().lower()
         if usage_model in ("legacy", "stable", "fixed"):
@@ -635,7 +657,7 @@ class PeriodSimulator:
                 return float(default)
         # Use more realistic shift-like segments to improve TOI realism.
         # Regulation: ~45s target; OT: slightly shorter segments.
-        target_seg = 40.0 if T < self.cfg.seconds_per_period else 45.0
+        target_seg = 40.0 if short_segments else 45.0
         segments = int(max(6, round(T / max(1.0, target_seg))))
         seg_len = T / max(1, segments)
         events: List[Event] = []
@@ -1358,7 +1380,7 @@ class PeriodSimulator:
             reg_game_seconds = float(max(1.0, float(self.cfg.periods) * float(self.cfg.seconds_per_period)))
             denom_seconds = reg_game_seconds
             # In OT, treat the OT window as its own clock.
-            if int(T) != int(self.cfg.seconds_per_period):
+            if ot_period:
                 denom_seconds = float(max(1.0, float(T)))
             pp_frac_total = max(0.0, min(0.45, float(pp_seconds_total) / float(denom_seconds)))
         except _PPTimeResolved:
@@ -1566,10 +1588,8 @@ class PeriodSimulator:
             else:
                 diff = 0
             # Approximate game time remaining for regulation periods.
-            if int(period_seconds or self.cfg.seconds_per_period) == int(self.cfg.seconds_per_period):
-                game_seconds_remaining = float((max(0, int(self.cfg.periods) - 1 - int(period_idx)) * int(self.cfg.seconds_per_period)) + time_remaining)
-            else:
-                game_seconds_remaining = float(time_remaining)
+            game_seconds_remaining = _score_effect_clock(int(self.cfg.periods), int(self.cfg.seconds_per_period),
+                                                         int(period_idx), float(time_remaining), ot_period)
 
             if score_mode == "dynamic":
                 score_delta_home = _score_effect_delta(diff, game_seconds_remaining)
@@ -1995,7 +2015,7 @@ class PeriodSimulator:
                 ice_h = (ice_h or [])[:4]
             else:
                 # EV: 5 skaters or 3v3 in OT
-                is_ot = (T != self.cfg.seconds_per_period)
+                is_ot = ot_period
                 if not is_ot:
                     # Allocate EV rotation over EV segments only (avoids PP-skipping bias).
                     ih = rot_lh_ev[ev_ptr % max(1, len(rot_lh_ev) or 1)] if rot_lh_ev else 0
@@ -2275,8 +2295,15 @@ class GameSimulator:
         resume_home_score: int = 0,
         resume_away_score: int = 0,
         ot_sudden_death: bool = False,
+        explicit_period_kind: bool = False,
     ) -> Tuple[GameState, List[Event]]:
         """Simulate a game, optionally RESUMING from a live state.
+
+        `explicit_period_kind` (lane nhl-live-period-remainder; the live resume passes True, pregame never
+        does): every regulation period is simulated AS regulation and OT as OT, stated to
+        `simulate_period_with_lines(is_overtime=...)` rather than inferred from the period's length. Off --
+        the default -- a resumed, shortened regulation period was simulated as overtime (3-on-3, end-of-game
+        score effects, the power play packed into what was left). Whole periods are unchanged either way.
 
         `ot_sudden_death` (lane nhl-live-overtime, todo #773; the live resume passes True, pregame never
         does, so the default keeps every pregame number). Regular-season overtime as it is played: OT ends
@@ -2344,7 +2371,7 @@ class GameSimulator:
                 # would be a no-op anyway, but the event stream would carry a
                 # period that did not happen.
                 continue
-            hg, ag, ev = self.period_sim.simulate_period_with_lines(gs, self.rates, pd, lineup_home, lineup_away, st_home=st_home, st_away=st_away, special_teams_cal=special_teams_cal, period_seconds=period_seconds)
+            hg, ag, ev = self.period_sim.simulate_period_with_lines(gs, self.rates, pd, lineup_home, lineup_away, st_home=st_home, st_away=st_away, special_teams_cal=special_teams_cal, period_seconds=period_seconds, is_overtime=(False if explicit_period_kind else None))
             gs.home.score += int(hg)
             gs.away.score += int(ag)
             has_assist_events = any(getattr(x, "kind", None) == "assist" for x in (ev or []))
@@ -2394,7 +2421,7 @@ class GameSimulator:
                 # Resumed IN overtime: only the time on the OT clock is left (0 = straight to the shootout).
                 ot_seconds = max(0, min(ot_seconds, int(resume_seconds_remaining)))
             if ot_seconds > 0:
-                hg, ag, ev = self.period_sim.simulate_period_with_lines(gs, self.rates, ot_idx, lineup_home, lineup_away, st_home=st_home, st_away=st_away, special_teams_cal=special_teams_cal, period_seconds=ot_seconds)
+                hg, ag, ev = self.period_sim.simulate_period_with_lines(gs, self.rates, ot_idx, lineup_home, lineup_away, st_home=st_home, st_away=st_away, special_teams_cal=special_teams_cal, period_seconds=ot_seconds, is_overtime=(True if explicit_period_kind else None))
                 if ot_sudden_death and int(hg) + int(ag) > 0:
                     hg, ag, ev = _cut_at_first_goal(hg, ag, ev, gs.home.name)
                 gs.home.score += int(hg)
