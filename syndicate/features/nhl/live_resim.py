@@ -215,6 +215,23 @@ _GOAL_SCALE_BOUNDS = (0.5, 1.5)
 _TOTAL_KEEP_BOUNDS = (0.5, 1.0)
 
 
+# OVERTIME AS IT IS PLAYED (lane nhl-live-overtime, todo #773, 2026-11-13). The engine used to play OT as one
+# whole 5:00 segment and sum its goals, and a state resumed IN OT got a fresh 5:00 whatever the clock showed:
+# ~10% of sims that reached OT ended 2-3 goals past the tie (a stub P4 2-2 state: 31 of 300), which no
+# regular-season game can. On, OT is sudden death on the clock shown (`engine.simulate_with_lineups(
+# ot_sudden_death=True)`): every sim that reaches OT ends exactly one past the tie, by an OT goal or the
+# shootout credit. A rule, not a fit: nothing here has a parameter. Sims that end in regulation are untouched
+# seed for seed (OT comes last, and the cut draws nothing).
+# Off switch: SYNDICATE_NHL_LIVE_OVERTIME=off (the old OT).
+LIVE_OVERTIME_ENV = "SYNDICATE_NHL_LIVE_OVERTIME"
+
+
+def live_overtime_sudden_death() -> bool:
+    """Whether production plays OT as sudden death: on unless the env switch says off."""
+    raw = str(os.environ.get(LIVE_OVERTIME_ENV) or "").strip().lower()
+    return raw not in {"off", "0", "false", "legacy"}
+
+
 def live_endgame_calibration() -> dict[str, float]:
     """The end-game production uses: the fitted one unless the env switch says off."""
     raw = str(os.environ.get(LIVE_ENDGAME_ENV) or "").strip().lower()
@@ -533,8 +550,12 @@ def resim_live_game(
     endgame: Optional[Mapping[str, Any]] = None,
     scoring: Optional[Mapping[str, Any]] = None,
     record_sims: bool = False,
+    overtime_sudden_death: Optional[bool] = None,
 ) -> dict[str, Any] | NhlResimRefusal:
     """Run `sims` resumed games and aggregate the moneyline.
+
+    `overtime_sudden_death` defaults to :func:`live_overtime_sudden_death` (production: on); pass False for
+    the old OT (one whole 5:00 segment, goals summed), reproduced seed for seed.
 
     `endgame` defaults to :func:`live_endgame_calibration` (production); pass
     `LEGACY_LIVE_ENDGAME` for the pre-calibration histogram, reproduced seed for seed.
@@ -580,6 +601,7 @@ def resim_live_game(
     total_keep = scoring_total_keep(scoring_cal)
     late_seconds = scoring_late_seconds(scoring_cal)
     endgame_in_total = bool(scoring_cal.get("count_endgame_in_total"))
+    sudden_death = live_overtime_sudden_death() if overtime_sudden_death is None else bool(overtime_sudden_death)
     rates = RateModels(
         home=TeamRates(
             shots_per_60=float(home_feat.shots_per_60),
@@ -651,6 +673,7 @@ def resim_live_game(
             st_away=st_away,
             profile=profile,
             seed=seed0 + i,
+            ot_sudden_death=sudden_death,
         )
         hs, as_ = int(gs.home.score), int(gs.away.score)
         raw_total = hs + as_
@@ -732,6 +755,14 @@ def resim_live_game(
             "endgame_in_total": endgame_in_total,
             "calibration": "on" if (goal_scale != 1.0 or total_keep != 1.0 or endgame_in_total) else "off",
         },
+        # Which OT this number carries (lane nhl-live-overtime). Lane-level; no pricer reads it.
+        "overtime": {
+            "rule": "sudden_death" if sudden_death else "full_segment",
+            "calibration": "on" if sudden_death else "off",
+            "sims_past_regulation": len(overtime_margins),
+            # Resumed IN OT: the OT clock the sims played (on) -- off played a fresh 5:00 regardless.
+            "resumed_ot_clock_seconds": None if in_regulation else int(state.clock_seconds),
+        },
         **({"sim_records": sim_records} if record_sims else {}),
     }
 
@@ -786,6 +817,8 @@ def build_game_lens(
         # Which scoring level (lane nhl-live-total-calibration): `goal_scale` and whether the end-game's
         # goals are in `projection.total`. Lane-level, so no pricer reads it.
         "liveScoring": dict(result.get("scoring") or {}),
+        # Which OT (lane nhl-live-overtime): sudden death on the clock shown, or the old full segment.
+        "liveOvertime": dict(result.get("overtime") or {}),
         # DISPLAY ONLY. `live_gameline_join` reads `projection.total` and
         # `projection.homeMargin` for display and prices NEITHER: totals and
         # puck lines are priced from `totalRunsDist` / `marginDist`, which this

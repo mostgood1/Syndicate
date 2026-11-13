@@ -77,8 +77,12 @@ def run_hockeysim_game_from_state(
     special_teams_cal: Optional[Dict[str, float]] = None,
     profile: Optional[SimConfig] = None,
     seed: Optional[int] = None,
+    ot_sudden_death: bool = False,
 ) -> Tuple[GameState, List[Event]]:
     """Simulate the REMAINDER of a game already in progress.
+
+    `ot_sudden_death` passes straight to `simulate_with_lineups` (OT ends at its first goal; a state
+    resumed IN OT plays only the clock shown). `live_resim` turns it on; off is the old OT.
 
     The live-lens resume this module's header reserves a place for. It runs the
     same production path as `run_hockeysim_game` -- `simulate_with_lineups` --
@@ -117,4 +121,5 @@ def run_hockeysim_game_from_state(
         resume_seconds_remaining=int(seconds_remaining),
         resume_home_score=int(home_score),
         resume_away_score=int(away_score),
+        ot_sudden_death=bool(ot_sudden_death),
     )

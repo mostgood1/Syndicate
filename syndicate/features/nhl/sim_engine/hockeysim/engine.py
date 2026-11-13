@@ -304,6 +304,26 @@ class SimConfig:
     faceoff_multi_event_segment_model: bool = True
 
 
+def _cut_at_first_goal(hg: int, ag: int, events: List[Event], home_name: str) -> Tuple[int, int, List[Event]]:
+    """An overtime segment cut at its FIRST goal: sudden death (`simulate_with_lineups(ot_sudden_death=True)`).
+
+    Returns `(home goals, away goals, events)` with exactly one goal, the earliest by `t`, and the events
+    up to it (its own shot and assists share its `t`). The segment's goals are drawn in time order (segment
+    `k` covers `[k * seg_len, (k + 1) * seg_len)`), so the earliest goal is the one a sudden-death game
+    stops at. Defensive: goals counted with no goal event fall back to the count's own sign, and a tied
+    count is no winner (the shootout settles it), so an OT can never end more than one past the tie."""
+    goals = [e for e in events or [] if getattr(e, "kind", None) == "goal"]
+    if not goals:
+        if int(hg) == int(ag):
+            return 0, 0, []
+        return (1, 0, []) if int(hg) > int(ag) else (0, 1, [])
+    first = min(goals, key=lambda e: float(e.t))
+    t_end = float(first.t)
+    kept = [e for e in events if float(e.t) < t_end
+            or (float(e.t) == t_end and (getattr(e, "kind", None) != "goal" or e is first))]
+    return (1, 0, kept) if first.team == home_name else (0, 1, kept)
+
+
 class _PPTimeResolved(Exception):
     """Control flow only: the `per_minor` PP-time path resolved `pp_frac_total` (lane nhl-pp-time)."""
 
@@ -2254,8 +2274,18 @@ class GameSimulator:
         resume_seconds_remaining: Optional[int] = None,
         resume_home_score: int = 0,
         resume_away_score: int = 0,
+        ot_sudden_death: bool = False,
     ) -> Tuple[GameState, List[Event]]:
         """Simulate a game, optionally RESUMING from a live state.
+
+        `ot_sudden_death` (lane nhl-live-overtime, todo #773; the live resume passes True, pregame never
+        does, so the default keeps every pregame number). Regular-season overtime as it is played: OT ends
+        at its FIRST goal, and a state resumed IN overtime plays only the OT time the scoreboard shows
+        (`resume_seconds_remaining`), not a fresh 5:00. Off -- the default -- OT is one whole
+        `overtime_seconds` segment whose goals are all summed, so a sim could end 2-3 goals past the tie
+        (a stub P4 2-2 state: 31 of 300), which no real regular-season game can. The OT segment is drawn
+        exactly as before and then cut at its first goal: the engine is causal, so the events up to that
+        goal ARE a sudden-death game's, and no RNG draw moves (nothing before OT, in any sim, changes).
 
         THE RESUME ARGUMENTS ARE ADDITIVE AND DEFAULT TO THE PREGAME RUN. With
         `resume_period_idx=0`, `resume_seconds_remaining=None` and both scores 0
@@ -2359,10 +2389,17 @@ class GameSimulator:
         # Overtime if tied after regulation
         if self.cfg.ot_enabled and gs.home.score == gs.away.score:
             ot_idx = self.cfg.periods
-            hg, ag, ev = self.period_sim.simulate_period_with_lines(gs, self.rates, ot_idx, lineup_home, lineup_away, st_home=st_home, st_away=st_away, special_teams_cal=special_teams_cal, period_seconds=self.cfg.overtime_seconds)
-            gs.home.score += int(hg)
-            gs.away.score += int(ag)
-            events_all.extend(ev)
+            ot_seconds = int(self.cfg.overtime_seconds)
+            if ot_sudden_death and start_idx >= self.cfg.periods and resume_seconds_remaining is not None:
+                # Resumed IN overtime: only the time on the OT clock is left (0 = straight to the shootout).
+                ot_seconds = max(0, min(ot_seconds, int(resume_seconds_remaining)))
+            if ot_seconds > 0:
+                hg, ag, ev = self.period_sim.simulate_period_with_lines(gs, self.rates, ot_idx, lineup_home, lineup_away, st_home=st_home, st_away=st_away, special_teams_cal=special_teams_cal, period_seconds=ot_seconds)
+                if ot_sudden_death and int(hg) + int(ag) > 0:
+                    hg, ag, ev = _cut_at_first_goal(hg, ag, ev, gs.home.name)
+                gs.home.score += int(hg)
+                gs.away.score += int(ag)
+                events_all.extend(ev)
         # Shootout resolution if still tied; does not affect boxscore stats
         if self.cfg.shootout_enabled and gs.home.score == gs.away.score:
             # Randomly select winner; minimal bias via rates
