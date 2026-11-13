@@ -82,3 +82,70 @@ an unresolvable orientation. 162 final games in the window.
 
 Every primary cell has at least 30 games. About 84% of the opined rows (57,000 of 68,000) sit at a quote older
 than 120 s.
+
+## Result `[2026-11-13 22:25Z (4:25 PM CST)]` -- the hypothesis HOLDS: no primary test passes, so `#763` stays off
+
+Run once on the fleet, read-only, at nice 19, with the registered grader (blob `dbcdcce69a22`, checked against the
+working copy before the run). 162 final games and 67,985 graded rows; 82 pushes were dropped, and 67,985 + 82 matches
+the 68,067 registered. The enumeration grew by 59 rows, all of them tonight's (11-13) games, which are outside the
+window.
+
+### The eight registered tests
+
+d = engine Brier minus books Brier; negative means the engine was better.
+
+| half | market | quote age | games | rows | engine | books | d | 95% interval | family-wise interval | status |
+|---|---|---|---|---|---|---|---|---|---|---|
+| first | totals | <= 30 s | 110 | 235 | 0.2585 | 0.2477 | +0.0108 | -0.0100..+0.0332 | -0.0179..+0.0423 | no_edge |
+| first | totals | <= 120 s | 157 | 2,880 | 0.2557 | 0.2482 | +0.0074 | -0.0055..+0.0207 | -0.0102..+0.0263 | no_edge |
+| first | spreads | <= 30 s | 107 | 201 | 0.2536 | 0.2511 | +0.0024 | -0.0115..+0.0169 | -0.0168..+0.0229 | no_edge |
+| first | spreads | <= 120 s | 157 | 2,513 | 0.2478 | 0.2494 | -0.0016 | -0.0094..+0.0062 | -0.0127..+0.0094 | no_edge |
+| second | totals | <= 30 s | 99 | 191 | 0.2383 | 0.2496 | -0.0113 | -0.0279..+0.0065 | -0.0348..+0.0140 | no_edge |
+| second | totals | <= 120 s | 155 | 2,885 | 0.2569 | 0.2496 | +0.0073 | -0.0066..+0.0218 | -0.0115..+0.0280 | no_edge |
+| second | spreads | <= 30 s | 94 | 174 | 0.2473 | 0.2484 | -0.0011 | -0.0174..+0.0155 | -0.0242..+0.0216 | no_edge |
+| second | spreads | <= 120 s | 155 | 2,477 | 0.2547 | 0.2496 | +0.0051 | -0.0061..+0.0163 | -0.0105..+0.0211 | no_edge |
+
+Against quotes 2 minutes old or younger, the engine is within about 0.01 Brier of the books on every pair. It is
+slightly worse in five of the eight cells and better in three, none of them beyond noise. The 95% half-widths
+(0.008-0.014 at <= 120 s, 0.014-0.022 at <= 30 s) are the size of edge this sample could have missed.
+
+### Beside it (not decisions)
+
+**By disjoint quote age**, d with its 95% interval:
+
+| half / market | 0-30 s | 30-120 s | 120-300 s | 300-900 s |
+|---|---|---|---|---|
+| first / totals | +0.0089 (-0.012..+0.031) | +0.0075 (-0.005..+0.021) | -0.0114 (-0.023..+0.000) | **-0.0592 (-0.071..-0.046)** |
+| first / spreads | +0.0010 (-0.014..+0.016) | -0.0018 (-0.010..+0.006) | **-0.0227 (-0.030..-0.015)** | **-0.0710 (-0.082..-0.060)** |
+| second / totals | -0.0123 (-0.029..+0.006) | +0.0086 (-0.006..+0.024) | -0.0024 (-0.016..+0.012) | **-0.0340 (-0.047..-0.020)** |
+| second / spreads | -0.0007 (-0.017..+0.016) | +0.0054 (-0.006..+0.017) | -0.0014 (-0.012..+0.009) | **-0.0258 (-0.037..-0.014)** |
+
+**Claimed vs realised edge** where the engine and books differ by 5 pp or more, betting the engine's side at the
+books' fair (realised with its 95% interval):
+
+| half / market | <= 120 s: rows, claimed, realised | all ages: rows, claimed, realised |
+|---|---|---|
+| first / totals | 2,002, 13.7 pp, 3.6 pp (-2.0..+9.3) | 13,506, 20.6 pp, 17.6 pp (+14.4..+20.7) |
+| first / spreads | 1,479, 11.5 pp, 5.3 pp (+0.1..+10.5) | 11,765, 21.0 pp, 20.2 pp (+17.6..+22.7) |
+| second / totals | 1,946, 13.3 pp, 3.9 pp (-2.3..+10.0) | 15,468, 18.6 pp, 13.3 pp (+9.1..+17.4) |
+| second / spreads | 1,560, 11.1 pp, 2.2 pp (-5.0..+9.5) | 12,281, 17.3 pp, 10.9 pp (+6.6..+15.1) |
+
+### What it says
+
+1. **No edge against fresh books.** The verdict the registration fixed: `#763`'s college segment pricing stays off
+   on this evidence. No quote-age ceiling is supported, because nothing passed at 30 s or at 120 s.
+2. **The instrument could see one.** The same grade, on the same games, finds the engine far better than quotes 5-15
+   minutes old: d -0.026 to -0.071, two to six half-widths from zero, every interval clear of 0. So the
+   fresh-quote result is not blindness; any edge there is smaller than about 0.01 Brier.
+3. **The advantage is the quote's age, as hypothesised.** d falls with age in every pair, and the realised edge
+   against stale quotes (11-20 pp) is real against the price we LOGGED. Whether any venue would still have taken a
+   half bet at a price 5+ minutes old is not in this data. The game has moved on, which is exactly why the engine
+   (which knows the state) wins against it. This is `#780`'s finding again, on halves.
+4. **Against fresh books the engine's gaps are mostly over-confidence.** It claims 11-14 pp and realises 2-5 pp
+   (intervals spanning 0 in three of four pairs). Segments are untempered (k 1); `#780` measured the same pattern on
+   full games and tempers those.
+5. **84% of the opinion rows sit on quotes older than 120 s.** In-play segment capture is the bottleneck `#763`
+   already names (the in-play lane fetches every 240 s). Even where the quotes were fresh, there was no edge.
+
+**Limits:** four nights, 162 games, NCAAB only (WNCAAB has no segment quotes); a first-half spreads realised edge of
+5.3 pp at <= 120 s (interval +0.1..+10.5) is one of eight secondary readings at nominal 95%, not evidence.
