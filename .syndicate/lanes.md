@@ -823,6 +823,14 @@ death, never life — do not invert it.
 - Verification: Unit tests: salt 0 leaves the seed unchanged and a salt changes it; jobs salt the candidate arm only; main() refuses candidate == current without a salt and runs with one; a salted receipt has its own file name and check_receipt refuses one renamed to the gate's name. Fleet: 3 receipts (2 salted A/A, 1 SE2) on >= 150 games; SE2's current arm equals STEP 3i's; findings STEP 3j table against these ranges; todo #765 names SE2's verdict with its receipt.
 - Blocked by: none
 
+### primary-tree-ff-1113 — OPEN — opened 2026-11-13 — session 386d4115-6e7b-47e3-9ff7-be3914d851cb
+- Goal: The shared PRIMARY checkout C:/Users/tempadmin/Coding/Syndicate is fast-forwarded from 9936ef1fb to an exact origin/main SHA with every previously-dirty path either still present or proven duplicated upstream, every dirty file sha256-backed-up outside the repo first (recipe: auto-memory project_primary_tree_fast_forward_recipe)
+- Files: none (ledger-only in git: this lane block + the log entry; the ff rewrites the primary tree's working copy, not repo content)
+- Hypothesis: n/a (maintenance)
+- Falsification test: n/a
+- Verification: git -C <primary> rev-parse HEAD == the target SHA; 0 staged; kept files byte-identical to the backup; backup manifest sha256 re-verified; check_lane_invariants.py from the primary tree compared before vs after and vs a worktree at the target
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
