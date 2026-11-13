@@ -689,43 +689,6 @@ death, never life — do not invert it.
 - Verification: Unit: exact join byte-identical on/off; alias-only pair joins on, misses off; two lens games one alias key -> ambiguous refusal not a pick; non-ncaaf sport never aliases; segment display + full-game + first5 lookups all use the fallback; counters. Fleet before the load: chip_join_key reachability under refresh-worker's environ for all 43 pairs. After a user-approved refresh-worker load: index_why alias_keys > 0 and rows_joined_by_team_alias > 0 on a live slate with a renamed team, and those rows carry a Live proj. on the served board.
 - Blocked by: none
 
-### college-odds-feed-team-names — CLOSED 2026-11-12 (GOAL MET: audit 3 names / 5 events -> 0 unresolved; CSUB rows 0 of 5 -> 3 of 3 keyed; both live re-sims anchored at tip; audit automatic in the watchdog) — opened 2026-11-12 — session 0f519972-4890-45d3-8b52-767c7e0a0389
-- **GOAL VERDICT 2026-11-12 9:05 PM CST (03:05Z 11-13): GOAL MET.**
-  - Audit over every fleet ncaab/wncaab quote shard: 3 names in 5 events -> 0, by two derivation rules. The 11-03 one-offs are removed.
-  - Maps: 0 keys lost or changed school. 18 tests, plus 6 for the watch.
-  - On main `986a718fd` (rules + audit) and `a133df703` (watchdog). Both LOADED (deploys.md 22:02:53Z, 22:53:02Z; user "Yes, load it" / "run the audit before each slate automatically").
-  - Served CSUB rows 0 of 5 -> 3 of 3 keyed; both rail cards on their chips.
-  - Tip readings MET:
-    - NCAAB CSUB @ WIU, 00:04:46Z: anchored -7.475 vs raw -0.94, offset -6.71.
-    - WNCAAB CSUB @ WASH, 03:03:18Z: 43.31 vs 42.03, offset 1.29.
-    - Both re-derive by hand (deploys.md 00:05:34Z, 03:04:41Z).
-  - todo #795 is closed in `todo_closed.md`. No claim held.
-- STATUS 2026-11-12 6:07 PM CST (00:07Z 11-13): tip reading 1 of 2 MET. NCAAB CSUB @ WIU's first live re-sim (00:04:46Z) published with the margin anchor: offset -6.71, home margin -7.475 vs raw -0.94 (deploys.md 00:05:34Z). Reading 2 of 2 (WNCAAB CSUB @ WASH, tip 03:00Z): watcher running, deadline 03:50Z. The lane closes on it.
-- STATUS 2026-11-12 4:56 PM CST (22:56Z): the audit is LIVE in the fleet watchdog (ff a133df703, no restart). The 22:55:55Z run audited 219 events, 0 unresolved. Claim web released. Still owed: the tip reading (margin anchor, 00:00Z / 03:00Z).
-- STATUS 2026-11-12 4:3x PM CST (22:3xZ): user "run the audit before each slate automatically".
-  - The audit becomes a watchdog check (every 5 min from disk, audits at most hourly, today's and later shards).
-  - It is emailed as `exec:team_names:<league>` with the names and ESPN's spelling.
-  - It loads with a fleet ff and needs no restart. A ScheduledJob would need a full supervisor down/up.
-- STATUS 2026-11-12 4:16 PM CST (22:16Z): LOADED (refresh-worker 22:02:53Z, live-odds-worker 22:03:57Z, user "Yes, load it").
-  - Served rows 0 of 5 -> 3 of 3 keyed (22:14:12Z); both rail cards on their chips (22:16:09Z).
-  - Claims released 22:16:38Z.
-  - Lane stays OPEN for the tip reading: the live re-sim margin anchor at 00:00Z / 03:00Z.
-- STATUS 2026-11-12 3:5x PM CST (21:5xZ): DONE IN CODE, ON MAIN `986a718fd`, NOT LOADED.
-  - Audit: 3 names in 5 of 723 events -> 0. Maps: 0 keys lost or changed.
-  - 18 tests; 3 mutations caught; 1,418 passed across the alias test files.
-  - Load = ff + refresh-worker TERM + live-odds-worker TERM, before the 00:00Z / 03:00Z tips. The user's decision (todo #795).
-- Goal: Every college team name in the fleet's ncaab/wncaab quote logs resolves through team_aliases.chip_join_key (audit: 0 unresolved, was 3 names / 5 events incl. CSU Bakersfield Roadrunners both leagues, WNCAAB Montana Grizzlies, Western Kentucky Hilltoppers), by derivation rules not one-off entries, with no existing key changing its school; and the audit is a committed script
-- Files: syndicate/features/shared/ncaab_team_registry.py (_odds_feed_spellings + _ODDS_FEED_ALIASES + a men's-mascot offer for wncaab ONLY), scripts/college_team_name_audit.py (NEW), tests/test_college_odds_feed_team_names.py (NEW), scripts/college_team_name_watch.py (NEW), tests/test_college_team_name_watch.py (NEW), scripts/local_watchdog.py (main(): one team-names block beside the min_ev tuner block + the WHAT IS CHECKED docstring lines ONLY)
-- Hypothesis: The Games rail's chip-less CSU Bakersfield cards (user 2026-11-12 'still have college teams not matching') are an odds-feed spelling the registry never offers: 'CSU X' for ESPN 'Cal State X', and the men's mascot on women's teams (ESPN 'Lady Griz' / 'Lady Toppers')
-- Falsification test: After the rules, the audit over the same quote logs still shows an unresolved name, or any key of the current ncaab/wncaab alias map resolves to a different school, or a new key collides
-- Verification: Audit script 0 unresolved over every ncaab/wncaab quote shard on the fleet; old-map keys identical in the new map; tests pass; on main. Load (refresh-worker TERM stamps the keys) is the user's decision
-- Blocked by: none
-
-### closed-lane-archive-20261112-2039 — CLOSED 2026-11-12 (GOAL MET: 1 block archived) — opened 2026-11-12 — session 0234760b-308f-4a39-9834-b53c83c2afe9
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness.py --idle-min 240 gave SAFE for 1 of 4 CLOSED blocks. Moved: nba-prop-side-face-current-roster. The reading and the WAIT reasons are in `.syndicate/log/2026-11-13.md`.
-
 ### closed-lane-archive-20261112-2240 — CLOSED 2026-11-12 (GOAL MET: 1 block archived) — opened 2026-11-12 — session 2a493cc1-7eb8-41bb-97dc-4a09dc9f7662
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
@@ -737,6 +700,11 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness --idle-min 240 at ~06:42Z (00:42 AM CST) gave 1 SAFE of 6 CLOSED; 1 moved to lanes_closed.md with a pointer. Reading and Part B in .syndicate/log/2026-11-13.md.
 - Moved: closed-lane-archive-20261112-1859
+
+### closed-lane-archive-20261113-0240 — CLOSED 2026-11-13 (GOAL MET: 2 blocks archived) — opened 2026-11-13 — session 3614e560-22cb-4c27-8284-d1b36a481e8b
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 gave SAFE for 2 of 6 CLOSED blocks. Moved: college-odds-feed-team-names, closed-lane-archive-20261112-2039. The reading and the WAIT reasons are in `.syndicate/log/2026-11-13.md`.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -974,12 +942,14 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261112-1439` — CLOSED 2026-11-12 (GOAL MET: 4 blocks archived) — opened 2026-11-12 — session 462be4be-21d9-46dc-82e5-292010cff546
 - `closed-lane-archive-20261112-1715` — CLOSED 2026-11-12 (GOAL MET: 1 block archived) — opened 2026-11-12 — session 138f0a96-2f9d-40bb-84cd-e8487ec470bb
 - `closed-lane-archive-20261112-1859` — CLOSED 2026-11-12 (GOAL MET: 1 block archived) — opened 2026-11-12 — session 839ddac0-7b41-4691-843a-09a83a6fb75b
+- `closed-lane-archive-20261112-2039` — CLOSED 2026-11-12 (GOAL MET: 1 block archived) — opened 2026-11-12 — session 0234760b-308f-4a39-9834-b53c83c2afe9
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
 - `clv-openings-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session 366eb355-d5e9-442a-8b77-e5d6b325dc5c
 - `college-basketball-settlement` — CLOSED 2026-11-03 (GOAL MET: 6 of 6 11-02 NCAAB paper bets graded = ESPN finals; scorecard grades ncaab 28,687 rows incl. halves + wncaab 1,668; first WNCAAB paper settlement owed under todo #755 (a)) — opened 2026-11-02 — session 911dbcee-3893-4ca0-993f-3d78598b80f0
 - `college-live-resim-midnight` — CLOSED 2026-11-12 12:20 AM CST (GOAL MET: USC @ CAL re-simmed past the roll, 7 ticks prior_resimmed=1, join games_in_snapshot=1; its lines priced 0, because the in-play odds lane stops at the roll, todo #792; deploys.md 2026-11-12 06:16Z) — opened 2026-11-10 — session 8062940b-57fd-454a-8de5-25fdd4804d85
+- `college-odds-feed-team-names` — CLOSED 2026-11-12 (GOAL MET: audit 3 names / 5 events -> 0 unresolved; CSUB rows 0 of 5 -> 3 of 3 keyed; both live re-sims anchored at tip; audit automatic in the watchdog) — opened 2026-11-12 — session 0f519972-4890-45d3-8b52-767c7e0a0389
 - `combined-board-rows-unreadable-tripwire` — CLOSED 2026-09-15 — opened 2026-09-15 — session 3a65723e-e0d5-42da-bea1-0c61b0c94add — **GOAL MET: live on web `da268e07` (15:36:46Z); the field is served on every date, 0 `ROWS_UNREADABLE` lines; stored 113 vs rows 111 is the per-sport `by_sport` cap, not a defect.**
 - `combined-board-state-rows-lost` — CLOSED 2026-09-15 — opened 2026-09-14 — session 3a65723e-e0d5-42da-bea1-0c61b0c94add — **GOAL MET: Q1-Q3 answered with production readings. The reader fix is live on web `b6a0e346` (14:10:07Z): `by_date` 09-15 106 (was 0), 0 `VINTAGE_IGNORED`. One prediction was WRONG (`computed_at` moved to the refused heavy build's state stamp). User decision 2026-09-15: keep the `stale` label, it is true. Postmortem in `learnings.md`.**
 - `commit-guard-reads-wrong-index` — commit-guard-reads-wrong-index — CLOSED 2026-08-16 — the guard read the MAIN worktree's index while the commit used another one — session: `live-gamel → `lanes_closed.md`.
