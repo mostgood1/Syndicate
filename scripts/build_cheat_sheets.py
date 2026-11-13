@@ -191,20 +191,32 @@ def _day_groups(rows: list[dict[str, Any]], day: str) -> set[tuple]:
             and str(r.get("segment") or "full").lower() in ("full", "full_game") and central_day(r.get("commence_time")) == day}
 
 
+def collapsed_read(rows: list[dict[str, Any]], prior: dict[str, Any] | None, day: str, *,
+                   now: datetime) -> tuple[int, int] | None:
+    """(groups this read holds, groups the prior sheet held) for games not yet started, when the read holds under 60% of
+    them; None when it does not, or when the prior sheet held under 10 such groups (no baseline)."""
+    started = lambda r: str(r.get("commence_time") or "") <= now.isoformat()
+    before = {(r.get("event_id"), r.get("player"), r.get("market")) for r in (prior or {}).get("rows") or [] if not started(r)}
+    have = len(_day_groups(rows, day))
+    if len(before) < 10 or have >= 0.6 * len(before):
+        return None
+    return have, len(before)
+
+
 def steady_rows(fetch: Any, rows: list[dict[str, Any]], prior: dict[str, Any] | None, day: str, *, now: datetime,
                 tries: int = 3, wait_s: float = 50.0, sleep: Any = time.sleep) -> list[dict[str, Any]]:
     """Never build a sheet off a COLLAPSED board read. Measured 2026-10-15: the NFL sheet went 157 -> 28 rows (63 -> 20
     groups) on the 12:30 PM CT build and 66 -> 21 groups at 10:57 AM, both while the refresh-worker was mid board
     build; minutes later the board served ~64 groups again. A sheet REPLACES its pregame rows on every build, so one
     unlucky read wiped most of it. When a read holds under 60% of the prior sheet's groups for games not yet started,
-    re-read (up to `tries` more, `wait_s` apart) and keep the fullest read."""
-    started = lambda r: str(r.get("commence_time") or "") <= now.isoformat()
-    before = {(r.get("event_id"), r.get("player"), r.get("market")) for r in (prior or {}).get("rows") or [] if not started(r)}
-    best, have = rows, len(_day_groups(rows, day))
-    if len(before) < 10 or have >= 0.6 * len(before):
+    re-read (up to `tries` more, `wait_s` apart) and keep the fullest read. A read STILL collapsed after them is not built
+    on at all: `main_build` keeps the prior sheet (`collapsed_read`, 2026-11-13)."""
+    still = collapsed_read(rows, prior, day, now=now)
+    if still is None:
         return rows
+    best, (have, before) = rows, still
     for attempt in range(1, tries + 1):
-        print(f"CHEAT_SHEET board read looks collapsed: {have} groups vs {len(before)} on the prior sheet -- re-read {attempt}/{tries} "
+        print(f"CHEAT_SHEET board read looks collapsed: {have} groups vs {before} on the prior sheet -- re-read {attempt}/{tries} "
               f"in {wait_s:.0f}s", flush=True)
         sleep(wait_s)
         try:
@@ -215,7 +227,7 @@ def steady_rows(fetch: Any, rows: list[dict[str, Any]], prior: dict[str, Any] | 
         n = len(_day_groups(again, day))
         if n > have:
             best, have = again, n
-        if have >= 0.6 * len(before):
+        if have >= 0.6 * before:
             break
     return best
 
@@ -1423,6 +1435,16 @@ def main_build(args: Any, data_root: Path) -> int:
                                    selected, now=datetime.now(timezone.utc))
         except Exception as exc:  # noqa: BLE001
             print(f"CHEAT_SHEET {sport} fetch failed: {type(exc).__name__}: {exc}", flush=True)
+            continue
+        # STILL COLLAPSED after the re-reads: keep the prior sheet, write nothing (2026-11-13, user "Trace it here"). A
+        # collapse outlasts `steady_rows`' 150 s: 16 collapsed reads 10-20..11-12, 0 recovered by a re-read, and each build
+        # REPLACED the rows of every game it still priced. Where that build was the game's last pregame one, the day's
+        # record kept the collapse: NFL 11-12 (WAS @ NYG) 52 groups -> 2 at the 3:30 PM build, soccer 10-29 82 -> 19,
+        # soccer 11-06 115 -> 65. The next build, or the picks refresh, picks the sheet up again.
+        still = None if args.from_quotes else collapsed_read(rows, prior, selected, now=datetime.now(timezone.utc))
+        if still:
+            print(f"CHEAT_SHEET {sport} date={selected} board read still collapsed after re-reads: {still[0]} groups vs "
+                  f"{still[1]} on the prior sheet -- kept the prior sheet, nothing written", flush=True)
             continue
         today = central_today()
         sheet = build_sport(sport, rows, selected_date=selected, cap=args.cap or DEFAULT_CAPS.get(sport, 80), dvp=dvp,

@@ -738,6 +738,54 @@ def test_a_collapsed_board_read_is_re_read_not_built():
     assert m.steady_rows(lambda: 1 / 0, thin, started, "2026-10-15", now=now, sleep=waits.append) is thin
 
 
+def test_a_read_still_collapsed_after_the_re_reads_keeps_the_prior_sheet(monkeypatch, capsys, tmp_path):
+    # 2026-11-12: the NFL sheet (WAS @ NYG) went 52 groups -> 2 at the 3:30 PM build. All 3 re-reads held 2, the build
+    # replaced the game's rows, and it was the game's last pregame build, so the day's record kept 4 rows of 181.
+    _unset_data_root_until_teardown(monkeypatch)
+    m = _script()
+    from datetime import datetime as real_dt, timezone
+    import syndicate.features.shared.interval_history as ih
+    import syndicate.features.shared.layer2_row_context as rc
+
+    class Fixed(real_dt):
+        @classmethod
+        def now(cls, tz=None):
+            return real_dt(2026, 10, 15, 21, 30, tzinfo=timezone.utc)
+
+    monkeypatch.setattr(m, "datetime", Fixed)
+    monkeypatch.setattr(m, "central_today", lambda: "2026-10-15")
+    monkeypatch.setattr(m, "latest_nfl_dvp", lambda root: {})
+    monkeypatch.setattr(m, "_position_indexes", lambda: {})
+    monkeypatch.setattr(m, "fetch_board_cards", lambda base: [])
+    monkeypatch.setattr(ih.IntervalHistory, "warm", lambda self, sport, day: 0)
+    monkeypatch.setattr(rc, "load_layer2_row_context", lambda day: {})
+    real_steady = m.steady_rows
+    monkeypatch.setattr(m, "steady_rows", lambda *a, **k: real_steady(*a, **dict(k, sleep=lambda s: None)))
+    thin = [{"kind": "prop", "game_state": "pregame", "segment": "full", "event_id": "e1", "player_name": f"P{i}",
+             "market": "Receptions", "commence_time": "2026-10-16T00:15:00Z"} for i in range(2)]
+    reads = []
+    monkeypatch.setattr(m, "fetch_rows", lambda base, sport, day=None: reads.append(day) or list(thin))
+    sheet = tmp_path / "cheatsheets" / "nfl" / "2026-10-15.json"
+    sheet.parent.mkdir(parents=True)
+
+    def run(commence):
+        prior = {"date": "2026-10-15", "generated_at": "2026-10-15T17:30:00Z", "games": [], "sections": {},
+                 "rows": [{"event_id": "e1", "player": f"P{i}", "market": "Receptions", "line": 4.5, "side": "over",
+                           "commence_time": commence} for i in range(52)]}
+        sheet.write_text(json.dumps(prior), encoding="utf-8")
+        before = sheet.read_bytes()
+        reads.clear()
+        m.main(["--data-root", str(tmp_path), "--date", "2026-10-15", "--sports", "nfl", "--base-url", "http://127.0.0.1:9"])
+        return before, sheet.read_bytes(), capsys.readouterr().out
+
+    before, after, out = run("2026-10-16T00:15:00Z")            # not started: 2 of 52 groups, the re-reads hold 2
+    assert len(reads) == 4 and "re-read 3/3" in out             # the first read and all three re-reads ran
+    assert "board read still collapsed after re-reads: 2 groups vs 52 on the prior sheet -- kept the prior sheet" in out
+    assert after == before                                      # nothing written: the 52 groups stay on the record
+    before, after, out = run("2026-10-15T17:00:00Z")            # the prior's game STARTED: no baseline, the build runs
+    assert "still collapsed" not in out and after != before
+
+
 def test_recent_form_says_where_once():
     # NFL labels carry their own "vs" / "@" (the George Holani pick read "4 v vs SF, 5 v @WAS", 2026-10-15).
     nfl = cs.recent_points([4, 1, 5], line=1.5, side="under", opponents=["vs SF", "vs LAC", "@WAS"])
