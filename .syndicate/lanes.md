@@ -672,29 +672,6 @@ death, never life — do not invert it.
 - Verification: Unit: with today quiet and the re-sim publishing a prior-date In Progress row, the lane launches date=<prior> with the same forced live args; with the env switch at 0, with a stale (>600 s) or missing re-sim file, outside the window, or with only Unknown/today rows it does not; today's live game still wins. Fleet after the user's load, on the next late college night: NCAAB_LIVE_AUTORUN_LAUNCHED date=<prior> ... prior_slate_games>=1 after 06:00Z, the game's sportsbook rows in book_quotes/<prior>.jsonl captured after 06:00Z, and the carryover NCAAB LIVE_GAMELINE_JOIN projected>0 / priceable>0 for it
 - Blocked by: none
 
-### ncaaf-live-join-team-alias — CLOSED 2026-11-12 (GOAL MET: alias-only Louisiana Ragin' Cajuns @ UL Monroe rows with a Live proj. 10 of 10 / 13 of 13 / 19 of 19; 55-65 rows a read joined through the alias; exact-match control unchanged) — opened 2026-11-12 — session d979fc08-9bbf-4e8b-af2d-8f0673e7e877
-- **GOAL VERDICT `[2026-11-13 05:43Z = 11:43 PM CST 11-12]`: GOAL: MET.**
-  - Goal, verbatim: "Live NCAAF board rows whose odds-feed team names differ from the ESPN displayName the NCAAF live lens publishes (UMass/Massachusetts, App State, Hawai'i, Ragin' Cajuns, Southern Miss, San José State, Sam Houston, McNeese, The Citadel) join their live re-sim lane: live_gameline_join keeps its exact-name key FIRST and, for ncaaf only, falls back to the canonical pair from team_aliases.chip_join_key (the vetted CFBD-registry map with its collision pass; no fuzzy match), counted (index alias_keys, rows_joined_by_team_alias) and switchable (SYNDICATE_LIVE_GAMELINE_TEAM_ALIASES=off restores exact-only); tests incl. off != on through attach_live_gamelines; on main; loaded on the fleet only with the user's OK; done = on a live NCAAF slate a renamed team's rows carry a Live proj. (and price exactly as matched games do), before/after with denominators in deploys.md and todo #791"
-  - Reading (deploys.md 2026-11-13 05:43:14Z), served board 11-13, Louisiana Ragin' Cajuns @ UL Monroe (alias-only): rows with a Live proj. 10 of 10 / 13 of 13 / 19 of 19 at 02:40Z / 03:30Z / 04:20Z.
-  - Shortlist `rows_joined_by_team_alias` 63 / 55 / 65; `index_why.alias_keys` 2.
-  - The exact-match control (Memphis @ South Florida) was unchanged.
-  - Segment rows carry no edge field; full-game rows are priced as the control's are.
-  - 0 tracebacks since the boot.
-  - Todo #791 closed in `todo_closed.md`. No claim held.
-  - Superseded status bullets moved verbatim to lanes_history.md.
-- Goal: Live NCAAF board rows whose odds-feed team names differ from the ESPN displayName the NCAAF live lens publishes (UMass/Massachusetts, App State, Hawai'i, Ragin' Cajuns, Southern Miss, San José State, Sam Houston, McNeese, The Citadel) join their live re-sim lane: live_gameline_join keeps its exact-name key FIRST and, for ncaaf only, falls back to the canonical pair from team_aliases.chip_join_key (the vetted CFBD-registry map with its collision pass; no fuzzy match), counted (index alias_keys, rows_joined_by_team_alias) and switchable (SYNDICATE_LIVE_GAMELINE_TEAM_ALIASES=off restores exact-only); tests incl. off != on through attach_live_gamelines; on main; loaded on the fleet only with the user's OK; done = on a live NCAAF slate a renamed team's rows carry a Live proj. (and price exactly as matched games do), before/after with denominators in deploys.md and todo #791
-- Files: syndicate/features/shared/live_gameline_join.py (LiveGamelineIndex + resolve_live_gameline + build_live_gameline_index + the three team-pair lookups in attach_live_gamelines + a new team-alias fallback section and its env switch ONLY), tests/test_live_gameline_team_alias.py (NEW), docs/ai_context/todo.md (#791 section only)
-- Hypothesis: Measured 2026-11-12 on the fleet (C:/tmp/ncaafseg/alias_size.py, read-only, the producer's own scripts/poll_ncaaf_live_state._fetch_scoreboard + _game_from_event against every non-inplay ncaaf book_grid 2026-10-01..11-21, 34 dates): of 433 odds-feed game pairs, 390 match the ESPN displayName pair exactly (live_gameline_join._norm_team), 43 (9.9%) match ONLY through team_aliases.chip_join_key, 0 match neither, 0 alias keys ambiguous; all 43 read correct by eye. So ~1 NCAAF game in 10 can never join its live lane today (UMass @ Toledo 11-11: 0 of 5 full-game, 0 of 12 segment rows). An exact-first, canonical-pair fallback closes all 43 without changing any exact join.
-- Falsification test: If chip_join_key on refresh-worker (fleet registry) does not resolve both spellings to one name (e.g. umass minutemen vs massachusetts minutemen), or the fallback changes any row that joins exactly today (off vs on differ on an exact-match fixture), or a live renamed-team game still shows no Live proj. after the load, the hypothesis is wrong or incomplete.
-- Verification: Unit: exact join byte-identical on/off; alias-only pair joins on, misses off; two lens games one alias key -> ambiguous refusal not a pick; non-ncaaf sport never aliases; segment display + full-game + first5 lookups all use the fallback; counters. Fleet before the load: chip_join_key reachability under refresh-worker's environ for all 43 pairs. After a user-approved refresh-worker load: index_why alias_keys > 0 and rows_joined_by_team_alias > 0 on a live slate with a renamed team, and those rows carry a Live proj. on the served board.
-- Blocked by: none
-
-### closed-lane-archive-20261112-2240 — CLOSED 2026-11-12 (GOAL MET: 1 block archived) — opened 2026-11-12 — session 2a493cc1-7eb8-41bb-97dc-4a09dc9f7662
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness (--idle-min 240) read 1 of 5 CLOSED blocks SAFE; archived it with the dry-run/apply tool, invariants unchanged vs the origin/main baseline. Readings in .syndicate/log/2026-11-13.md.
-- Moved: closed-lane-archive-20261112-1715
-
 ### closed-lane-archive-20261113-0040 — CLOSED 2026-11-13 (GOAL MET: 1 block archived) — opened 2026-11-13 — session 202219a7-b735-4566-85f5-54b440276263
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
@@ -705,6 +682,12 @@ death, never life — do not invert it.
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 gave SAFE for 2 of 6 CLOSED blocks. Moved: college-odds-feed-team-names, closed-lane-archive-20261112-2039. The reading and the WAIT reasons are in `.syndicate/log/2026-11-13.md`.
+
+### closed-lane-archive-20261113-0440 — CLOSED 2026-11-13 (GOAL MET: 2 blocks archived) — opened 2026-11-13 — session 7892d138-f9c4-46ae-88f1-f80e105ede73
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET -- owner_liveness --idle-min 240 read 2 SAFE of 5 CLOSED; both moved to lanes_closed.md with one pointer each; invariants unchanged vs origin/main baseline (same 2 contested files).
+- Moved: ncaaf-live-join-team-alias, closed-lane-archive-20261112-2240. Table + Part B in .syndicate/log/2026-11-13.md.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -943,6 +926,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261112-1715` — CLOSED 2026-11-12 (GOAL MET: 1 block archived) — opened 2026-11-12 — session 138f0a96-2f9d-40bb-84cd-e8487ec470bb
 - `closed-lane-archive-20261112-1859` — CLOSED 2026-11-12 (GOAL MET: 1 block archived) — opened 2026-11-12 — session 839ddac0-7b41-4691-843a-09a83a6fb75b
 - `closed-lane-archive-20261112-2039` — CLOSED 2026-11-12 (GOAL MET: 1 block archived) — opened 2026-11-12 — session 0234760b-308f-4a39-9834-b53c83c2afe9
+- `closed-lane-archive-20261112-2240` — CLOSED 2026-11-12 (GOAL MET: 1 block archived) — opened 2026-11-12 — session 2a493cc1-7eb8-41bb-97dc-4a09dc9f7662
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
@@ -1211,6 +1195,7 @@ death, never life — do not invert it.
 - `ncaaf-live-cadence` — **CLOSED-VERIFIED 2026-09-08** — opened 2026-09-03 — session 3492626c-1ec4-4366-9dbe-f194ae319c84 — **DIAGNOSED, BUILT, LANDED ON `origin/main` AS `a9
 - `ncaaf-live-gameline-build-cap` — CLOSED — opened 2026-09-26, closed 2026-09-26 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
 - `ncaaf-live-h2h-top-scores` — CLOSED, GOAL MET (2026-09-21 ~20:3xZ: explained; the named fix is NO CHANGE on current evidence) — opened 2026-09-21 — session a1e40980-cceb-493f-adf9-5a5ca879acf6
+- `ncaaf-live-join-team-alias` — CLOSED 2026-11-12 (GOAL MET: alias-only Louisiana Ragin' Cajuns @ UL Monroe rows with a Live proj. 10 of 10 / 13 of 13 / 19 of 19; 55-65 rows a read joined through the alias; exact-match control unchanged) — opened 2026-11-12 — session d979fc08-9bbf-4e8b-af2d-8f0673e7e877
 - `ncaaf-live-resim` — **ORPHANED 2026-09-08** — opened 2026-09-05 — session 3492626c — NCAAF has a full live slate and produces NO live-aware model edge To resume: **NO DEP
 - `ncaaf-live-resim-blend` — CLOSED 2026-09-19 (GOAL: MET; live re-sim on inseason_blend_wk3, 138 teams, refresh-worker `c03351aa`) — opened 2026-09-18 — session 259d6003-bff3-416d-835f-12f4f7f584d8
 - `ncaaf-live-resim-wire` — CLOSED 2026-09-10 — opened 2026-09-05 — session 520cd594 — **GOAL: MET on its one testable outcome (`sources_seen {live_resim: 9}` = `live_resimmed 9`; 74-83 rows `live_aware`); edge clause withheld by design; residuals moved to `leads.md`**
