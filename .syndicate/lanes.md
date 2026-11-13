@@ -850,6 +850,14 @@ death, never life — do not invert it.
 - Verification: pytest tests/test_engine_experts.py; fleet replay at nice 19 on 2026-11-11 and 2026-11-12 NBA ledger rows: re-tempered rows JOIN mismatched > 0 on the old reading and 0 on the new; untouched rows 0 mismatched, CHECKLIST ok
 - Blocked by: none
 
+### prop-fair-side-lean — OPEN — opened 2026-11-13 — session 35bdf3a7-5afc-483e-98bb-d0d7f4d2ecc3
+- Goal: Measure the over/under lean of the board's two-sided prop fair per sport and market on the board's own graded population (game-clustered CIs), show its mechanism from the raw book quotes, and if real build a side correction with an off != on test and a held-out check -- brought to the user before any wiring into the fair-price-v2 sections or any fleet load
+- Files: scripts/prop_fair_side_lean.py (NEW), tests/test_prop_fair_side_lean.py (NEW), syndicate/features/shared/prop_fair_side.py (NEW), tests/test_prop_fair_side.py (NEW), .syndicate/findings_2026-11-13_prop_fair_side_lean.md (NEW)
+- Hypothesis: Board population 10-17..11-08 (suggested-grade pulls): NBA two-sided consensus props, overs y-fp -3.36 [-4.97, -1.70] (56,428 rows / 146 games), flat across markets / fair levels / priced books / date halves / book age; NFL -1.53 [-5.23, +2.87]; NHL, NCAAF ~0. Registered BEFORE the quote-level run: H-A (de-vig method) the lean is the same within 1 pt under multiplicative, power and Shin; H-D (margin loaded on the over) the lean grows with the books' hold and a fair that takes the under's price at face removes >= 2/3 of it; H-E (the line itself is shaded) the lean does not depend on hold and persists at the close; H-C (book mix) a sharp book's own fair (pinnacle where it quotes both sides) shows no lean.
+- Falsification test: H-A false if any method's lean differs from Shin's by >= 1 pt. H-D false if the lean's slope on hold has a CI including 0. H-E false if the close-fair lean has a CI including 0. CORRECTION: a per-sport side shift fitted on kickoffs before 11-02 must cut log loss on 11-02..11-12 with a game-clustered CI below 0 in NBA, else it is not proposed.
+- Verification: findings file with the per-sport per-market lean, the H-A/H-C/H-D/H-E verdicts with CIs, and the held-out log-loss reading; the correction (if any) as a tested module with off != on; a user decision recorded before any wiring
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
