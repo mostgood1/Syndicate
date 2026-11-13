@@ -21,10 +21,22 @@ reads (tip, 10, 20, 30, 36 min for NCAAB) it scores both arms against the real f
   total:   CRPS, |central-80% coverage - 0.80|          (totals are served raw from the sim)
   win:     Brier and log loss of the result's home_win_prob
 
-paired candidate - current over games, with 1.96 x bootstrap SE (1000 draws, seed 13). Every metric is
-lower-is-better; a cell is WORSE when its lower bound is above 0 and BETTER when its upper bound is below 0. Coverage is
-scored as distance from nominal, not as "higher", because the 7-field config over-covers (0.83-0.91) and RC46 under-
-covers (0.69-0.83): neither direction is good by itself.
+paired candidate - current over games. Every metric is lower-is-better. Coverage is scored as distance from nominal,
+not as "higher", because the 7-field config over-covers (0.83-0.91) and RC46 under-covers (0.69-0.83): neither
+direction is good by itself.
+
+THE FLAG RULE (todo #784, lane `outcome-gate-null-baseline`, 2026-11-13). A cell is WORSE when its z (paired diff over
+its bootstrap SD) exceeds a FAMILY-WISE critical value: the 95th percentile, over one joint bootstrap of games, of the
+largest standardized deviation among all 30 cells (max-T). So a NULL change is refused in any cell with probability
+about 5%, not 1 - 0.975^30. BETTER is the mirror. And the CURRENT arm is the mean of K seed-salted Monte Carlo draws
+(`--current-salts`, default 4: salts 0, 1001, 1002, 1003), not one draw.
+
+Why both: until 2026-11-13 a cell was WORSE when its own 1.96 x SE interval cleared 0, against ONE current-arm draw.
+Two A/A runs (the running value against itself, candidate seeds salted; findings PHASE 2 STEP 3j) then flagged 4 and 2
+cells on 11-03..12, repeating 10 m margin CRPS and 20 m log loss. Every candidate on those dates shared that one draw,
+which happened to score well there, and all three candidates scored that day were refused on it. `--current-salts 1
+--flag-rule per-cell` is the old rule (the off switch); every receipt also carries a `legacy` block computed that way
+for audit. The per-cell 1.96 x SE is still printed beside each cell, for reading, not for flagging.
 
 THE RECEIPT. `<main tree>/.syndicate/deploy/outcome_gate/<league>__<candidate12>__<current12>.json`, keyed on the
 sha256 of the canonical JSON of each value, so it names the exact TRANSITION. `deploy_preflight.py` reads it (through
@@ -40,6 +52,10 @@ Run it ON THE FLEET (WSL), at nice 19, from a worktree at origin/main with the f
 The half-split and exact-target switches are copied from the running role's environ (booleans; nothing else is read).
 Values are printed: a mechanisms value is engine config, not a secret. Exit 0 = receipt written with no WORSE cell,
 1 = receipt written WITH worse cells, 2 = no receipt (too few games, bad value, unsupported league).
+
+One run can score several candidates (`--candidate-file` repeated) and A/A noise checks (`--aa-salts 1,2`) against ONE
+shared K-draw current arm, so the current arm is paid for once: the cost is K + candidates arms. `--dump-arms PATH`
+writes every arm's per-game features, so a rule can be re-scored without re-simulating.
 
 Read-only against production: reads the fleet's data root and one process's environ, writes only the receipt.
 
@@ -91,6 +107,12 @@ MAX_RECEIPT_AGE_SECONDS = 7 * 24 * 3600
 RECEIPT_SUBDIR = Path(".syndicate") / "deploy" / "outcome_gate"
 COVERAGE_NOMINAL = 0.80
 METRICS = ("margin_crps", "margin_cov80_dev", "total_crps", "total_cov80_dev", "win_brier", "win_logloss")
+# The current arm: mean of K draws. Salt 0 is production's own seed (and the candidate's, so a real candidate keeps
+# common random numbers with draw 0); the others sit far from any candidate or A/A salt.
+DEFAULT_CURRENT_SALTS = 4
+CURRENT_SALT_BASE = 1000
+FAMILY_ALPHA = 0.05
+FAMILY_DRAWS = 2000
 _KEY_RE = re.compile(r"^SYNDICATE_([A-Z0-9]+)_LIVE_MECHANISMS$")
 
 
@@ -338,6 +360,106 @@ def flag_cells(cells: Mapping[str, Mapping[str, Mapping[str, float]]]) -> tuple[
     return worse, better
 
 
+def current_salt_list(k: int) -> list[int]:
+    """The current arm's K salts: 0 (production's seed) then CURRENT_SALT_BASE + 1 .. K - 1."""
+    return [0] + [CURRENT_SALT_BASE + j for j in range(1, max(1, int(k)))]
+
+
+def average_arms(arms: list) -> dict:
+    """features[game][cp] averaged over K draws of the same value. A game x checkpoint missing from ANY draw is
+    dropped, so every averaged value rests on all K. Each draw's metric is averaged (not its sims pooled), so the
+    finite-sims terms in Brier and CRPS stay the same size as the candidate's single draw. K = 1 returns the draw."""
+    if not arms:
+        return {}
+    out: dict[str, dict[str, dict[str, float]]] = {}
+    for game, by_cp in arms[0].items():
+        for cp, feats in by_cp.items():
+            rows = [a.get(game, {}).get(cp) for a in arms]
+            if any(r is None for r in rows):
+                continue
+            keys = set(feats).intersection(*(set(r) for r in rows))
+            out.setdefault(game, {})[cp] = {k: float(sum(r[k] for r in rows) / len(rows)) for k in sorted(keys)}
+    return out
+
+
+def pair(current: Mapping[str, Mapping[str, Mapping[str, float]]],
+         candidate: Mapping[str, Mapping[str, Mapping[str, float]]]) -> dict:
+    """paired[game][cp] = {current, candidate} for every game x checkpoint both arms scored."""
+    paired: dict[str, dict[str, dict[str, Mapping[str, float]]]] = {}
+    for game, by_cp in candidate.items():
+        for cp, feats in by_cp.items():
+            cur = current.get(game, {}).get(cp)
+            if cur is not None:
+                paired.setdefault(game, {})[cp] = {"current": cur, "candidate": feats}
+    return paired
+
+
+def family_flags(paired: Mapping[str, Mapping[str, Mapping[str, Mapping[str, float]]]], checkpoints: Iterable[str],
+                 alpha: float = FAMILY_ALPHA, draws: int = FAMILY_DRAWS, seed: int = 17) -> dict[str, Any]:
+    """WORSE / BETTER against a family-wise max-T critical value, one-sided each way.
+
+    ONE joint bootstrap over games: a game drawn once counts at every checkpoint it has, so the cells' draws are
+    correlated the way the cells are. Per cell z = diff / sd(boot). The WORSE critical value is the (1 - alpha)
+    quantile over draws of max over cells of (boot - diff) / sd, so a null change crosses it in ANY cell with
+    probability about alpha. BETTER is the mirror. A cell whose draws do not vary (identical arms) is never flagged."""
+    import numpy as np
+
+    cps = list(checkpoints)
+    games = sorted({g for g, by_cp in paired.items() for cp in cps
+                    if cp in by_cp and {"current", "candidate"} <= set(by_cp[cp])})
+    result: dict[str, Any] = {"rule": f"max-T family-wise one-sided alpha {alpha}", "alpha": alpha, "draws": draws,
+                              "worse": [], "better": [], "z": {}, "critical_worse": None, "critical_better": None,
+                              "n_cells": 0, "games": len(games)}
+    if not games:
+        return result
+    n = len(games)
+    idx = np.random.default_rng(seed).integers(0, n, size=(draws, n))
+    weights = np.bincount((idx + n * np.arange(draws)[:, None]).ravel(), minlength=draws * n).reshape(draws, n)
+    weights = weights.astype(float)
+    labels, points, boots = [], [], []
+    for cp in cps:
+        mask = np.array([1.0 if cp in paired[g] and {"current", "candidate"} <= set(paired[g][cp]) else 0.0
+                         for g in games])
+        if not mask.any():
+            continue
+        wsum = weights @ mask
+        live = wsum > 0
+
+        def col(arm: str, key: str):
+            return np.array([float(paired[g][cp][arm][key]) if mask[i] else 0.0 for i, g in enumerate(games)])
+
+        for metric in METRICS:
+            if metric.endswith("_cov80_dev"):
+                base = "margin_in80" if metric.startswith("margin") else "total_in80"
+                cur, cand = col("current", base) * mask, col("candidate", base) * mask
+                point = abs(cand.sum() / mask.sum() - COVERAGE_NOMINAL) - abs(cur.sum() / mask.sum() - COVERAGE_NOMINAL)
+                safe = np.where(live, wsum, 1.0)
+                boot = np.abs(weights @ cand / safe - COVERAGE_NOMINAL) - np.abs(weights @ cur / safe - COVERAGE_NOMINAL)
+            else:
+                d = (col("candidate", metric) - col("current", metric)) * mask
+                point = d.sum() / mask.sum()
+                boot = weights @ d / np.where(live, wsum, 1.0)
+            boot = np.where(live, boot, point)
+            labels.append(f"{cp}:{metric}")
+            points.append(float(point))
+            boots.append(boot)
+    point_arr, boot_arr = np.array(points), np.vstack(boots)
+    sd = boot_arr.std(axis=1)
+    ok = sd > 0
+    safe_sd = np.where(ok, sd, 1.0)
+    z = np.where(ok, point_arr / safe_sd, 0.0)
+    t = np.where(ok[:, None], (boot_arr - point_arr[:, None]) / safe_sd[:, None], 0.0)
+    crit_w = float(np.quantile(t.max(axis=0), 1 - alpha))
+    crit_b = float(np.quantile((-t).max(axis=0), 1 - alpha))
+    result.update(
+        n_cells=len(labels), critical_worse=crit_w, critical_better=crit_b,
+        z={lab: float(v) for lab, v in zip(labels, z)},
+        worse=[lab for lab, v, o in zip(labels, z, ok) if o and v > crit_w],
+        better=[lab for lab, v, o in zip(labels, z, ok) if o and -v > crit_b],
+    )
+    return result
+
+
 def write_receipt(directory: Path, payload: Mapping[str, Any]) -> Path:
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
@@ -448,11 +570,11 @@ def ncaab_tasks(data_root: Path, date: str) -> tuple[list[dict], dict]:
     return tasks, cov
 
 
-def build_jobs(tasks: Iterable[dict], values: Mapping[str, str], checkpoints: Mapping[str, float], sims: int,
-               seed_salt: int = 0) -> list[tuple]:
-    """One job per game and arm. The salt goes to the CANDIDATE arm only: the current arm keeps production's seeds."""
-    return [(t, arm, values[arm], checkpoints, sims, int(seed_salt or 0) if arm == "candidate" else 0)
-            for t in tasks for arm in ("current", "candidate")]
+def build_jobs(tasks: Iterable[dict], arms: Iterable[tuple], checkpoints: Mapping[str, float], sims: int) -> list[tuple]:
+    """One job per game and arm. `arms` = (arm_id, value, salt): each arm carries its own salt, so the current arm's K
+    draws and every candidate (or A/A) arm are explicit."""
+    arms = list(arms)
+    return [(t, arm_id, value, checkpoints, sims, int(salt or 0)) for t in tasks for arm_id, value, salt in arms]
 
 
 def _replay_one(job) -> dict:
@@ -512,20 +634,21 @@ def _replay_ncaab(task, arm, value, checkpoints, sims, salt=0) -> dict:
     return out
 
 
-def run_replay(league: str, values: Mapping[str, str], dates: list[str], data_root: Path, sims: int, procs: int,
-               log=print, seed_salt: int = 0) -> tuple[dict, dict]:
-    """(paired features[game][cp][arm], coverage). Same seeds on both arms (common random numbers)."""
+def run_arms(league: str, arms: Iterable[tuple], dates: list[str], data_root: Path, sims: int, procs: int,
+             log=print) -> tuple[dict, dict]:
+    """(features[arm_id][game][cp], coverage) for every (arm_id, value, salt) in `arms`, in one pool."""
     from multiprocessing import get_context
 
     spec = LEAGUES[league]
+    arms = list(arms)
     tasks, coverage = [], {}
     for date in dates:
         got, cov = ncaab_tasks(data_root, date)
         coverage[date] = cov
         tasks += got
-    log(f"tasks {len(tasks)} over {len(dates)} dates")
-    jobs = build_jobs(tasks, values, spec["checkpoints"], sims, seed_salt)
-    paired: dict[str, dict[str, dict[str, dict[str, float]]]] = {}
+    log(f"tasks {len(tasks)} over {len(dates)} dates x {len(arms)} arms")
+    jobs = build_jobs(tasks, arms, spec["checkpoints"], sims)
+    by_arm: dict[str, dict[str, dict[str, dict[str, float]]]] = {arm_id: {} for arm_id, _v, _s in arms}
     notes: dict[str, int] = {}
     with get_context("fork").Pool(procs) as pool:
         for i, res in enumerate(pool.imap_unordered(_replay_one, jobs), 1):
@@ -542,11 +665,11 @@ def run_replay(league: str, values: Mapping[str, str], dates: list[str], data_ro
                 continue
             for cp, data in res["cps"].items():
                 if "rows" in data:
-                    paired.setdefault(res["game_id"], {}).setdefault(cp, {})[res["arm"]] = game_features(data, fh, fa)
-            if i % 50 == 0:
+                    by_arm[res["arm"]].setdefault(res["game_id"], {})[cp] = game_features(data, fh, fa)
+            if i % 100 == 0:
                 log(f"{i}/{len(jobs)} game-arms done")
     coverage["_notes"] = notes
-    return paired, coverage
+    return by_arm, coverage
 
 
 def _git_head(path: Path) -> str:
@@ -576,11 +699,47 @@ def _read_value(text: Optional[str], path: Optional[str]) -> Optional[str]:
     return text
 
 
+def _print_candidate(label: str, cps: list, cells: Mapping, fam: Mapping, flag_rule: str, worse: list, better: list,
+                     legacy: Mapping) -> None:
+    for cp in cps:
+        if cp not in cells:
+            continue
+        c = cells[cp]
+        i = c["_info"]
+        print(f"\n### {label} {cp}: {int(c['_n']['games'])} games | margin SD {i['margin_sd_current']:.2f} -> "
+              f"{i['margin_sd_candidate']:.2f} | real SD of (final - mean) {i['resid_sd_current']:.2f} -> "
+              f"{i['resid_sd_candidate']:.2f}")
+        if "total_mean_shift" in i:
+            print(f"  mean shift (not scored): total {i['total_mean_shift']:+.3f} +- {i['total_mean_shift_se196']:.3f}"
+                  f" | home margin {i['margin_mean_shift']:+.3f} +- {i['margin_mean_shift_se196']:.3f}")
+        for metric in METRICS:
+            m = c[metric]
+            cell = f"{cp}:{metric}"
+            tag = "  WORSE" if cell in worse else "  better" if cell in better else ""
+            extra = (f" (coverage {m['current_coverage']:.3f} -> {m['candidate_coverage']:.3f})"
+                     if "current_coverage" in m else "")
+            z = fam.get("z", {}).get(cell)
+            zs = f"  z {z:+.2f}" if z is not None else ""
+            print(f"  {metric:16s} {m['current']:.4f} -> {m['candidate']:.4f}  diff {m['diff']:+.4f} +- {m['se196']:.4f}"
+                  f"{zs}{extra}{tag}")
+    if fam.get("critical_worse") is None:
+        print(f"\n{label}: no cell scored")
+    elif flag_rule == "family":
+        print(f"\n{label}: family rule, critical z {fam['critical_worse']:+.2f} (worse) / {fam['critical_better']:+.2f} "
+              f"(better), alpha {fam['alpha']} over {fam['n_cells']} cells")
+    else:
+        print(f"\n{label}: per-cell rule (1.96 x SE per cell; the pre-2026-11-13 rule)")
+    print(f"{label}: WORSE {worse or 'none'} | better {better or 'none'}")
+    print(f"{label}: legacy (current salt 0 only, 1.96 per cell): WORSE {legacy['worse'] or 'none'} | "
+          f"better {legacy['better'] or 'none'}")
+
+
 def main(argv: Optional[list[str]] = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--league", required=True)
     ap.add_argument("--candidate", help="the new value (JSON); '' means unset")
-    ap.add_argument("--candidate-file")
+    ap.add_argument("--candidate-file", action="append", default=[],
+                    help="a file holding a candidate value; repeat to score several against one shared current arm")
     ap.add_argument("--current", help="the value running now; default: read from the running role")
     ap.add_argument("--current-file")
     ap.add_argument("--current-from-role", action="store_true", default=None,
@@ -593,11 +752,36 @@ def main(argv: Optional[list[str]] = None) -> int:
     ap.add_argument("--min-games", type=int, default=MIN_GAMES)
     ap.add_argument("--receipt-dir", default="", help="default: <main tree>/.syndicate/deploy/outcome_gate")
     ap.add_argument("--seed-salt", type=int, default=0,
-                    help="re-seed the CANDIDATE arm only (noise check; candidate may equal current). The receipt gets "
-                         "its own name and can never clear preflight. 0 = the gate's paired seeds")
+                    help="re-seed every CANDIDATE arm (a candidate equal to current then is a noise check). The "
+                         "receipt gets its own name and can never clear preflight. 0 = the gate's own seeds")
+    ap.add_argument("--aa-salts", default="",
+                    help="comma list: also score the CURRENT value against itself with these candidate salts (A/A "
+                         "noise checks; their receipts never clear preflight)")
+    ap.add_argument("--current-salts", type=int, default=DEFAULT_CURRENT_SALTS,
+                    help=f"the current arm is the mean of this many seed-salted draws (default {DEFAULT_CURRENT_SALTS}; "
+                         "1 = one draw, the pre-2026-11-13 arm)")
+    ap.add_argument("--flag-rule", choices=("family", "per-cell"), default="family",
+                    help="family = max-T family-wise (default); per-cell = 1.96 x SE per cell (the pre-2026-11-13 rule)")
+    ap.add_argument("--family-alpha", type=float, default=FAMILY_ALPHA)
+    ap.add_argument("--dump-arms", default="", help="write every arm's per-game features (JSON) here")
     args = ap.parse_args(argv)
     if args.seed_salt < 0:
         print("REFUSE: --seed-salt must be >= 0")
+        return 2
+    if args.current_salts < 1:
+        print("REFUSE: --current-salts must be >= 1")
+        return 2
+    if not 0 < args.family_alpha < 0.5:
+        print("REFUSE: --family-alpha must be in (0, 0.5)")
+        return 2
+    try:
+        aa_salts = [int(s) for s in str(args.aa_salts or "").replace(" ", "").split(",") if s]
+    except ValueError:
+        print("REFUSE: --aa-salts is a comma list of integers")
+        return 2
+    cur_salts = current_salt_list(args.current_salts)
+    if any(s <= 0 or s in cur_salts for s in aa_salts) or len(set(aa_salts)) != len(aa_salts):
+        print(f"REFUSE: --aa-salts must be distinct, > 0 and outside the current arm's salts {cur_salts}")
         return 2
 
     league = args.league.lower()
@@ -605,9 +789,14 @@ def main(argv: Optional[list[str]] = None) -> int:
         print(f"REFUSE: no replay for league {league!r}; supported: {sorted(LEAGUES)}")
         return 2
     spec = LEAGUES[league]
-    candidate = _read_value(args.candidate, args.candidate_file)
-    if candidate is None:
-        print("REFUSE: give --candidate or --candidate-file")
+    candidates: list[tuple[str, str, int]] = []  # (label, value, salt)
+    if args.candidate is not None:
+        candidates.append(("candidate", args.candidate, args.seed_salt))
+    for i, path in enumerate(args.candidate_file):
+        label = "candidate" if args.candidate is None and len(args.candidate_file) == 1 else f"cand{i + 1}"
+        candidates.append((label, _read_value(None, path), args.seed_salt))
+    if not candidates and not aa_salts:
+        print("REFUSE: give --candidate, --candidate-file or --aa-salts")
         return 2
     current = _read_value(args.current, args.current_file)
     switches: dict[str, str] = {}
@@ -620,6 +809,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         if current is None:
             current = env.get(spec["env_key"], "")
         switches = {k: env[k] for k in spec["switch_keys"] if k in env}
+    candidates += [(f"aa{s}", current, s) for s in aa_salts]
     if not args.data_root:
         print("REFUSE: --data-root (or SYNDICATE_DATA_ROOT) is required: the fleet's data, never a checkout's mirror")
         return 2
@@ -634,7 +824,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     sys.path.insert(0, str(REPO))
     from syndicate.features.ncaab import live_resim as lr
 
-    for label, value in (("candidate", candidate), ("current", current)):
+    for label, value in [("current", current)] + [(lab, val) for lab, val, _s in candidates]:
         try:
             want = json.loads(value) if canonical_value(value) else {}
         except ValueError:
@@ -647,60 +837,74 @@ def main(argv: Optional[list[str]] = None) -> int:
         if len(got) != len(want):
             print(f"REFUSE: the {label} value parses to {len(got)} of its {len(want)} fields with this code")
             return 2
-    if canonical_value(candidate) == canonical_value(current) and not args.seed_salt:
-        print("REFUSE: candidate and current are the same value; there is no transition to score "
-              "(an A/A noise check needs --seed-salt)")
-        return 2
+    for label, value, salt in candidates:
+        if canonical_value(value) == canonical_value(current) and (not salt or salt in cur_salts):
+            print(f"REFUSE: {label} is the current value with a salt the current arm uses ({salt}); there is no "
+                  f"transition to score (an A/A noise check needs --aa-salts or --seed-salt outside {cur_salts})")
+            return 2
 
     dates = expand_dates(args.dates)
     t0 = time.time()
+    code = _git_head(REPO)
     print(f"league {league} key {spec['env_key']} dates {dates[0]}..{dates[-1]} ({len(dates)}) sims {args.sims} "
-          f"switches {sorted(switches)} code {_git_head(REPO)[:9]}"
-          + (f" seed_salt {args.seed_salt} (candidate arm only: a NOISE CHECK, not a gate reading)" if args.seed_salt else ""),
-          flush=True)
-    print(f"current   {canonical_value(current) or '(unset)'}\ncandidate {canonical_value(candidate) or '(unset)'}", flush=True)
-    paired, coverage = run_replay(league, {"current": current, "candidate": candidate}, dates, data_root,
-                                  args.sims, args.procs, log=lambda m: print(m, flush=True), seed_salt=args.seed_salt)
+          f"switches {sorted(switches)} code {code[:9]} current arm = mean of {len(cur_salts)} draws {cur_salts} "
+          f"flag rule {args.flag_rule}", flush=True)
+    print(f"current   {canonical_value(current) or '(unset)'}", flush=True)
+    for label, value, salt in candidates:
+        noise = " (NOISE CHECK, not a gate reading)" if canonical_value(value) == canonical_value(current) else ""
+        print(f"{label:9s} {canonical_value(value) or '(unset)'} salt {salt}{noise}", flush=True)
+    arms = [(f"current@{s}", current, s) for s in cur_salts] + [(label, value, salt) for label, value, salt in candidates]
+    by_arm, coverage = run_arms(league, arms, dates, data_root, args.sims, args.procs, log=lambda m: print(m, flush=True))
     cps = list(spec["checkpoints"])
-    cells = score_cells(paired, cps)
-    games = min((int(cells[cp]["_n"]["games"]) for cp in cells), default=0)
-    worse, better = flag_cells(cells)
-    for cp in cps:
-        if cp not in cells:
+    current_avg = average_arms([by_arm[f"current@{s}"] for s in cur_salts])
+    if args.dump_arms:
+        dump = {"league": league, "env_key": spec["env_key"], "dates": dates, "sims": args.sims, "code_commit": code,
+                "current_hash": value_hash(current), "current_salts": cur_salts,
+                "arms": {arm_id: {"value_hash": value_hash(value), "salt": salt, "games": by_arm[arm_id]}
+                         for arm_id, value, salt in arms}}
+        path = Path(args.dump_arms).expanduser()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(dump), encoding="utf-8")
+        os.replace(tmp, path)
+        print(f"ARMS {path}")
+    rc = 0
+    for label, value, salt in candidates:
+        paired = pair(current_avg, by_arm[label])
+        cells = score_cells(paired, cps)
+        fam = family_flags(paired, cps, alpha=args.family_alpha)
+        worse, better = (fam["worse"], fam["better"]) if args.flag_rule == "family" else flag_cells(cells)
+        legacy_cells = score_cells(pair(by_arm["current@0"], by_arm[label]), cps)
+        lw, lb = flag_cells(legacy_cells)
+        legacy = {"current_salts": [0], "rule": "per-cell 1.96 x SE", "cells": legacy_cells, "worse": lw, "better": lb}
+        _print_candidate(label, cps, cells, fam, args.flag_rule, worse, better, legacy)
+        games = min((int(cells[cp]["_n"]["games"]) for cp in cells), default=0)
+        if games < args.min_games or games < MIN_GAMES:
+            print(f"{label}: NO RECEIPT: {games} games scored on every checkpoint, floor "
+                  f"{max(args.min_games, MIN_GAMES)}. Widen --dates.")
+            rc = 2
             continue
-        c = cells[cp]
-        print(f"\n### {cp}: {int(c['_n']['games'])} games | margin SD {c['_info']['margin_sd_current']:.2f} -> "
-              f"{c['_info']['margin_sd_candidate']:.2f} | real SD of (final - mean) {c['_info']['resid_sd_current']:.2f} -> "
-              f"{c['_info']['resid_sd_candidate']:.2f}")
-        if "total_mean_shift" in c["_info"]:
-            i = c["_info"]
-            print(f"  mean shift (not scored): total {i['total_mean_shift']:+.3f} +- {i['total_mean_shift_se196']:.3f}"
-                  f" | home margin {i['margin_mean_shift']:+.3f} +- {i['margin_mean_shift_se196']:.3f}")
-        for metric in METRICS:
-            m = c[metric]
-            tag = ("  WORSE" if f"{cp}:{metric}" in worse else "  better" if f"{cp}:{metric}" in better else "")
-            extra = (f" (coverage {m['current_coverage']:.3f} -> {m['candidate_coverage']:.3f})"
-                     if "current_coverage" in m else "")
-            print(f"  {metric:16s} {m['current']:.4f} -> {m['candidate']:.4f}  diff {m['diff']:+.4f} +- {m['se196']:.4f}{extra}{tag}")
-    print(f"\nWORSE beyond 1.96 SE: {worse or 'none'}\nbetter beyond 1.96 SE: {better or 'none'}")
-    if games < args.min_games or games < MIN_GAMES:
-        print(f"NO RECEIPT: {games} games scored on every checkpoint, floor {max(args.min_games, MIN_GAMES)}. Widen --dates.")
-        return 2
-    payload = {
-        "league": league, "env_key": spec["env_key"],
-        "candidate_hash": value_hash(candidate), "current_hash": value_hash(current),
-        "candidate": canonical_value(candidate), "current": canonical_value(current),
-        "dates": dates, "games": games, "sims": args.sims, "checkpoints": spec["checkpoints"], "seed_salt": args.seed_salt,
-        "switches": {k: bool(str(v).strip()) for k, v in switches.items()},
-        "code_commit": _git_head(REPO), "data_root": str(data_root),
-        "coverage": coverage, "cells": cells, "worse": worse, "better": better,
-        "written_at": time.time(),
-        "written_at_iso": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "elapsed_seconds": round(time.time() - t0, 1),
-    }
-    path = write_receipt(Path(args.receipt_dir) if args.receipt_dir else receipt_dir(), payload)
-    print(f"RECEIPT {path}")
-    return 1 if worse else 0
+        payload = {
+            "league": league, "env_key": spec["env_key"],
+            "candidate_hash": value_hash(value), "current_hash": value_hash(current),
+            "candidate": canonical_value(value), "current": canonical_value(current),
+            "dates": dates, "games": games, "sims": args.sims, "checkpoints": spec["checkpoints"], "seed_salt": salt,
+            "current_salts": cur_salts, "flag_rule": args.flag_rule,
+            "family": {k: fam[k] for k in ("rule", "alpha", "draws", "critical_worse", "critical_better", "n_cells",
+                                            "z", "worse", "better")},
+            "legacy": legacy,
+            "switches": {k: bool(str(v).strip()) for k, v in switches.items()},
+            "code_commit": code, "data_root": str(data_root),
+            "coverage": coverage, "cells": cells, "worse": worse, "better": better,
+            "written_at": time.time(),
+            "written_at_iso": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "elapsed_seconds": round(time.time() - t0, 1),
+        }
+        path = write_receipt(Path(args.receipt_dir) if args.receipt_dir else receipt_dir(), payload)
+        print(f"{label}: RECEIPT {path}")
+        if worse and rc == 0:
+            rc = 1
+    return rc
 
 
 if __name__ == "__main__":

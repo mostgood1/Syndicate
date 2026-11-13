@@ -298,12 +298,14 @@ class SeedSaltTests(unittest.TestCase):
         self.assertEqual(s1, gate.salted_seed(123456, 1))
         self.assertTrue(0 <= s1 < 2 ** 31 and 0 <= s2 < 2 ** 31)
 
-    def test_jobs_salt_the_candidate_arm_only(self) -> None:
-        jobs = gate.build_jobs([{"game_id": "a"}, {"game_id": "b"}], {"current": OLD, "candidate": NEW}, {"0m": 0.0}, 5, 2)
-        self.assertEqual(len(jobs), 4)
-        self.assertEqual({(j[1], j[5]) for j in jobs}, {("current", 0), ("candidate", 2)})
-        self.assertEqual({j[5] for j in gate.build_jobs([{"game_id": "a"}], {"current": OLD, "candidate": NEW},
-                                                         {"0m": 0.0}, 5)}, {0})
+    def test_every_arm_carries_its_own_salt(self) -> None:
+        arms = [("current@0", OLD, 0), ("current@1001", OLD, 1001), ("candidate", NEW, 2)]
+        jobs = gate.build_jobs([{"game_id": "a"}, {"game_id": "b"}], arms, {"0m": 0.0}, 5)
+        self.assertEqual(len(jobs), 6)
+        self.assertEqual({(j[1], j[2], j[5]) for j in jobs},
+                         {("current@0", OLD, 0), ("current@1001", OLD, 1001), ("candidate", NEW, 2)})
+        self.assertEqual(gate.current_salt_list(4), [0, 1001, 1002, 1003])
+        self.assertEqual(gate.current_salt_list(1), [0])
 
     def test_the_replay_seeds_the_engine_with_the_salted_seed(self) -> None:
         sys.path.insert(0, str(ROOT))
@@ -347,30 +349,154 @@ class SeedSaltTests(unittest.TestCase):
             self.assertIn("noise check", problem)
 
     def test_main_refuses_an_a_to_a_without_a_salt_and_runs_one_with_a_salt(self) -> None:
-        calls: list[int] = []
+        calls: list[list[tuple]] = []
 
-        def fake_run(league, values, dates, data_root, sims, procs, log=print, seed_salt=0):
-            calls.append(seed_salt)
-            self.assertEqual(values["current"], values["candidate"])
-            return {}, {}
+        def fake_run(league, arms, dates, data_root, sims, procs, log=print):
+            calls.append([(a, s) for a, _v, s in arms])
+            return {a: {} for a, _v, _s in arms}, {}
 
-        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(gate, "run_replay", side_effect=fake_run), \
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(gate, "run_arms", side_effect=fake_run), \
                 mock.patch.dict("os.environ"):
-            base = ["--league", "ncaab", "--candidate", OLD, "--current", OLD, "--dates", "2026-11-05",
-                    "--data-root", tmp, "--receipt-dir", tmp]
-            buf = io.StringIO()
-            with redirect_stdout(buf):
-                rc = gate.main(base)
-            self.assertEqual(rc, 2)
-            self.assertIn("same value", buf.getvalue())
+            common =["--league", "ncaab", "--current", OLD, "--dates", "2026-11-05", "--data-root", tmp,
+                      "--receipt-dir", tmp]
+            base = common + ["--candidate", OLD]
+            refused = [base, base + ["--seed-salt", "1001"], common + ["--aa-salts", "1002"],
+                       common + ["--aa-salts", "0"], common + ["--aa-salts", "3,3"]]
+            for argv in refused:
+                buf = io.StringIO()
+                with redirect_stdout(buf):
+                    rc = gate.main(argv)
+                self.assertEqual(rc, 2, argv)
+                self.assertTrue("no transition to score" in buf.getvalue() or "--aa-salts must" in buf.getvalue(),
+                                (argv, buf.getvalue()))
             self.assertEqual(calls, [])
             buf = io.StringIO()
             with redirect_stdout(buf):
                 rc = gate.main(base + ["--seed-salt", "1"])
-            self.assertEqual(calls, [1])
+            self.assertEqual(calls, [[("current@0", 0), ("current@1001", 1001), ("current@1002", 1002),
+                                      ("current@1003", 1003), ("candidate", 1)]])
             self.assertIn("NOISE CHECK", buf.getvalue())
             self.assertEqual(rc, 2)  # no games -> no receipt
             self.assertIn("NO RECEIPT", buf.getvalue())
+
+
+CPS5 = ["0m", "10m", "20m", "30m", "36m"]
+LINEAR = ("margin_crps", "total_crps", "win_brier", "win_logloss")
+
+
+def _base(n_games: int, seed: int = 5) -> dict:
+    import numpy as np
+
+    rng = np.random.default_rng(seed)
+    return {cp: {**{m: rng.normal(1.0, 0.5, n_games) for m in LINEAR},
+                 "in80": (rng.random(n_games) < 0.85).astype(float)} for cp in CPS5}
+
+
+def _arm(base: dict, noise_seed: int, n_games: int, shift: dict | None = None, scale: float = 0.1) -> dict:
+    """features[game][cp]: the shared per-game base + this draw's MEAN-ZERO noise + an exact shift per (cp, metric),
+    so a cell's paired diff is exactly the shift and its SD is the noise's."""
+    import numpy as np
+
+    rng = np.random.default_rng(noise_seed)
+    out: dict = {}
+    for cp in CPS5:
+        for metric in LINEAR:
+            e = rng.normal(0.0, scale, n_games)
+            e -= e.mean()
+            delta = (shift or {}).get((cp, metric), 0.0)
+            for g in range(n_games):
+                out.setdefault(f"g{g}", {}).setdefault(cp, {})[metric] = float(base[cp][metric][g] + e[g] + delta)
+        for g in range(n_games):
+            out[f"g{g}"][cp].update(margin_in80=float(base[cp]["in80"][g]), total_in80=float(base[cp]["in80"][g]),
+                                    margin_sd=10.0, margin_err=0.0, total_mean=140.0, margin_mean=0.0)
+    return out
+
+
+class NullBaselineTests(unittest.TestCase):
+    """lane outcome-gate-null-baseline: the current arm is the mean of K draws and WORSE is family-wise (max-T), because
+    two A/A runs flagged 4 and 2 cells against one fixed current draw (findings STEP 3j)."""
+
+    def test_average_arms_is_the_draw_at_k1_and_needs_every_draw(self) -> None:
+        a = {"g1": {"0m": {"x": 0.1, "y": 2.0}}, "g2": {"0m": {"x": 0.3}}}
+        b = {"g1": {"0m": {"x": 0.3, "y": 4.0}}}
+        self.assertEqual(gate.average_arms([a]), a)
+        avg = gate.average_arms([a, b])
+        self.assertEqual(set(avg), {"g1"})  # g2 is missing from draw b: dropped, not averaged over one draw
+        self.assertAlmostEqual(avg["g1"]["0m"]["x"], 0.2)
+        self.assertAlmostEqual(avg["g1"]["0m"]["y"], 3.0)
+
+    def test_family_rule_flags_a_strong_effect_but_not_a_z_2_4_cell_the_per_cell_rule_flags(self) -> None:
+        n = 300
+        base = _base(n)
+        paired = gate.pair(_arm(base, 1, n), _arm(base, 2, n, shift={("20m", "win_brier"): 0.0196,
+                                                                    ("36m", "win_logloss"): 0.065}))
+        per_cell_worse, _ = gate.flag_cells(gate.score_cells(paired, CPS5))
+        self.assertEqual(per_cell_worse, ["20m:win_brier", "36m:win_logloss"])
+        fam = gate.family_flags(paired, CPS5)
+        self.assertGreater(fam["z"]["20m:win_brier"], 1.96)
+        self.assertLess(fam["z"]["20m:win_brier"], fam["critical_worse"])
+        self.assertEqual(fam["worse"], ["36m:win_logloss"])
+        self.assertEqual(fam["better"], [])
+        self.assertTrue(2.4 < fam["critical_worse"] < 3.3, fam["critical_worse"])
+        self.assertEqual(fam["n_cells"], 30)
+
+    def test_the_critical_value_rises_with_the_number_of_cells(self) -> None:
+        n = 300
+        base = _base(n)
+        paired = gate.pair(_arm(base, 1, n), _arm(base, 2, n))
+        one, five = gate.family_flags(paired, ["0m"]), gate.family_flags(paired, CPS5)
+        self.assertTrue(1.7 < one["critical_worse"] < 2.7, one["critical_worse"])
+        self.assertGreater(five["critical_worse"], one["critical_worse"] + 0.3)
+        self.assertEqual((one["worse"], five["worse"], five["better"]), ([], [], []))
+
+    def test_identical_arms_never_flag(self) -> None:
+        n = 200
+        arm = _arm(_base(n), 1, n)
+        fam = gate.family_flags(gate.pair(arm, arm), CPS5)
+        self.assertEqual((fam["worse"], fam["better"]), ([], []))
+        self.assertTrue(all(z == 0.0 for z in fam["z"].values()))
+
+    def test_off_switch_through_main_restores_the_one_draw_per_cell_refusal(self) -> None:
+        """off != on through main(): an A/A whose current draw 0 is LUCKY on 20 m win Brier (STEP 3j's shape). The
+        default (mean of 4 draws, family rule) writes no WORSE cell; --current-salts 1 --flag-rule per-cell refuses
+        it, and every receipt's legacy block does too."""
+        n = 200
+        base = _base(n)
+        table = {"current@0": _arm(base, 11, n, shift={("20m", "win_brier"): -0.06}),
+                 "current@1001": _arm(base, 12, n), "current@1002": _arm(base, 13, n),
+                 "current@1003": _arm(base, 14, n),
+                 # + a z ~2.5 cell against the 4-draw mean: the per-cell rule would refuse it, the family rule must not
+                 "aa1": _arm(base, 15, n, shift={("30m", "win_brier"): 0.02})}
+        seen: list[list[str]] = []
+
+        def fake_run(league, arms, dates, data_root, sims, procs, log=print):
+            seen.append([a for a, _v, _s in arms])
+            return {a: table[a] for a, _v, _s in arms}, {}
+
+        h = gate.value_hash(OLD)
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(gate, "run_arms", side_effect=fake_run), \
+                mock.patch.dict("os.environ"):
+            common = ["--league", "ncaab", "--current", OLD, "--aa-salts", "1", "--dates", "2026-11-05",
+                      "--data-root", tmp, "--receipt-dir", tmp]
+            receipt = Path(tmp) / gate.receipt_name("ncaab", h, h, 1)
+            with redirect_stdout(io.StringIO()):
+                rc_on = gate.main(common)
+            on = json.loads(receipt.read_text(encoding="utf-8"))
+            with redirect_stdout(io.StringIO()):
+                rc_off = gate.main(common + ["--current-salts", "1", "--flag-rule", "per-cell"])
+            off = json.loads(receipt.read_text(encoding="utf-8"))
+        self.assertEqual(seen[0], ["current@0", "current@1001", "current@1002", "current@1003", "aa1"])
+        self.assertEqual(seen[1], ["current@0", "aa1"])
+        self.assertEqual((rc_on, on["worse"], on["flag_rule"], on["current_salts"]), (0, [], "family", [0, 1001, 1002, 1003]))
+        self.assertIn("30m:win_brier", gate.flag_cells(on["cells"])[0])  # main() applied the family rule, not 1.96
+        self.assertTrue(1.96 < on["family"]["z"]["30m:win_brier"] < on["family"]["critical_worse"])
+        self.assertIn("20m:win_brier", on["legacy"]["worse"])
+        self.assertEqual((rc_off, off["flag_rule"], off["current_salts"]), (1, "per-cell", [0]))
+        self.assertIn("20m:win_brier", off["worse"])
+        self.assertEqual(off["worse"], off["legacy"]["worse"])
+        self.assertEqual(off["legacy"]["cells"], off["cells"])  # K = 1 + per-cell IS the legacy computation
+        self.assertEqual(on["seed_salt"], 1)
+        self.assertLess(on["cells"]["20m"]["win_brier"]["diff"], off["cells"]["20m"]["win_brier"]["diff"])
 
 
 if __name__ == "__main__":
