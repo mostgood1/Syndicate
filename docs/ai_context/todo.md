@@ -256,7 +256,12 @@
   - **NBA READING MET, 03:30Z 11-12** (9:30 PM CST 11-11; deploys.md 2026-11-12 03:30Z). From 23:30Z to 03:30Z, NBA priced 2,689 rows on 9 games, NCAAB 2,016 on 40, WNCAAB 82 on 8: all at quote age <= 120 s. NCAAF priced 0. The NHL control (600 s) priced 10 rows over 120 s.
     - The joins refused for quote age 76% of resolved NBA rows (measured 80%), NCAAB 63% (62-65%), NCAAF 60% (66-77%) and WNCAAB 78% (69-77%). Display kept. Lane `live-gameline-quote-ceiling-120` CLOSED.
   - **OWED, after several nights (from 11-17):** grade the priced rows' Brier against finals again on the post-load population (`scripts/live_gameline_age_grade.py`, rows after 18:11:24Z 11-11 only).
-- **Later, not proposed yet:** fit the live spread width to its measured error (estimator, per sport); pre-register NCAAB fresh-quote |edge| >= 20 pp (134 games, hit 0.590 +- 0.083, found after ~12 cells) on unseen nights.
+- **Later, not proposed yet:** fit the live spread width to its measured error (estimator, per sport).
+- **PRE-REGISTERED 2026-11-13** (lane `ncaab-live-edge20-prereg`, `.syndicate/findings_2026-11-13_ncaab_edge20_prereg.md`):
+  - The cell: NCAAB fresh-quote (<= 30 s) |edge| >= 20 pp, one bet per game, ledger dates >= 11-13, the first 200 games.
+  - PASS if the one-sided 95% lower bound clears 0.524 (hit >= 0.581). KILL if hit <= 0.524. INCONCLUSIVE extends once to 400 games.
+  - Count any time with `PREREG_780=count`. Grade ONCE, at 200 games, with `PREREG_780=grade` (deadline 12-15).
+  - The window starts at 11-13, not 11-10. Before registering, a default-mode run printed the cell over 11-02..11-12 (151 games, 0.596).
 - **Detail:** `.syndicate/findings_2026-11-10_live_totals_grade.md`. Re-run on the fleet host (nice 19): `scripts/live_totals_grade.py` (totals, engine read) and `scripts/live_gameline_age_grade.py` (every market, by quote age).
 
 ### `#778` — **CLOSED 2026-11-11 (GOAL MET) — NBA GAMES SIMMED AFTER THE DAY'S SIM INDEX WAS WRITTEN CARRY NO PREGAME PROJECTION: `cards_sim_detail_<D>.json` written on D-1 with a partial slate was never rebuilt. FIX `54c43581d` LOADED 00:30:09Z 11-11; ADDING BRANCH OBSERVED 11-11 06:03Z (5 -> 10 games); run-log line `63e56dbb4` not loaded** `[2026-11-10, lane nba-sim-index-missing-games, session 2ba5509d]`

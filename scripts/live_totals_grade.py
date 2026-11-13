@@ -12,6 +12,14 @@ SEs are game-clustered. Pushes, unmatched games and states whose score exceeds t
 Run ON THE FLEET HOST (WSL; it reads ~/syndicate-prod/data directly), at nice 19:
     wsl -d Ubuntu-24.04 -- nice -n 19 python3 /mnt/c/<repo>/scripts/live_totals_grade.py /mnt/c/tmp/livegrade/espn </dev/null
     SPORTS=ncaab,nba  (env) limits the sports; default ncaab,wncaab,nba,ncaaf (NFL had 0 priced rows on 11-10).
+
+PRE-REGISTERED CELL (lane ncaab-live-edge20-prereg; .syndicate/findings_2026-11-13_ncaab_edge20_prereg.md):
+    PREREG_780=count  prints ONLY how many games qualify so far, per ledger date. No hit, edge or Brier is printed.
+    PREREG_780=grade  the ONE registered grade. Run it once, when the count reaches PREREG_N (or at the deadline).
+    The cell: NCAAB priced full-game totals on ledger dates >= PREREG_FROM; each game's FIRST state with
+    |model - market fair| >= 20 pp and quote age <= 30 s; bet the model's side; the first PREREG_N such games in
+    time order. PREREG_DATE_FROM / PREREG_DATE_TO override the window for the code check on the ALREADY-SEEN
+    11-02..11-09 dates only; the output then says it is not the registered window.
 """
 import glob
 import json
@@ -35,6 +43,101 @@ ESPN = {
     "nfl": ("football/nfl", (None,)),
 }
 UA = {"User-Agent": "Mozilla/5.0 (research script)"}
+
+# The pre-registered cell (registered 2026-11-13, before any outcome on these dates was read). Do not edit these
+# after the registration commit; a changed rule is a new registration with a new name.
+PREREG_MODE = (os.environ.get("PREREG_780") or "").strip().lower()
+PREREG_SPORT = "ncaab"
+# 2026-11-13, not 11-10: a default-mode run of this script before 14:38Z 11-13 printed the cell over ledger dates
+# 11-02..11-12 (151 games), so ~17 games from 11-10..11-12 were seen in aggregate before the registration.
+PREREG_FROM = "2026-11-13"
+PREREG_N = 200
+PREREG_N_EXTENDED = 400
+PREREG_EDGE_PP = 20.0
+PREREG_MAX_QUOTE_AGE_S = 30.0
+PREREG_BREAK_EVEN = 110.0 / 210.0  # -110
+PREREG_Z = 1.645  # one-sided 95%
+PREREG_DEADLINE = "2026-12-15"
+PREREG_MIN_N_AT_DEADLINE = 100
+
+
+def prereg_window():
+    lo = os.environ.get("PREREG_DATE_FROM") or PREREG_FROM
+    hi = os.environ.get("PREREG_DATE_TO") or "9999-12-31"
+    return lo, hi, (lo, hi) != (PREREG_FROM, "9999-12-31")
+
+
+def _utc_key(t):
+    s = str(t or "").strip().replace("Z", "+00:00")
+    try:
+        from datetime import datetime, timezone
+        d = datetime.fromisoformat(s)
+        return (d if d.tzinfo else d.replace(tzinfo=timezone.utc)).timestamp()
+    except ValueError:
+        return float("inf")
+
+
+def prereg_first_states(rows):
+    """Each game's first qualifying state, games in time order (the registered sample order)."""
+    first = {}
+    for x in sorted(rows, key=lambda x: _utc_key(x["t"])):
+        if x["g"] in first:
+            continue
+        if x["edge"] >= PREREG_EDGE_PP and x["qa"] is not None and x["qa"] <= PREREG_MAX_QUOTE_AGE_S:
+            first[x["g"]] = x
+    return sorted(first.values(), key=lambda x: _utc_key(x["t"]))
+
+
+def prereg_verdict(fb):
+    n = len(fb)
+    hit = sum(x["win"] for x in fb) / n
+    lb = hit - PREREG_Z * math.sqrt(hit * (1 - hit) / n)
+    if lb > PREREG_BREAK_EVEN:
+        v = "PASS"
+    elif hit <= PREREG_BREAK_EVEN:
+        v = "KILL"
+    else:
+        v = "INCONCLUSIVE"
+    return hit, lb, v
+
+
+def prereg(rows, mode):
+    lo, hi, overridden = prereg_window()
+    fb = prereg_first_states(rows)
+    if overridden:
+        print(f"  ** window {lo}..{hi} is NOT the registered window ({PREREG_FROM}..); a code check only **")
+    by_date = defaultdict(int)
+    for x in fb:
+        by_date[x["date"]] += 1
+    print(f"  PREREG_780 cell: {len(fb)} qualifying games on ledger dates {lo}..{hi if hi < '9999' else ''} "
+          f"(registered sample: the first {PREREG_N}); per date {dict(sorted(by_date.items()))}")
+    if mode != "grade":
+        return
+    if len(fb) < PREREG_N and not overridden:
+        print(f"  not graded: {len(fb)} < {PREREG_N}. Grade at the deadline {PREREG_DEADLINE} only if >= "
+              f"{PREREG_MIN_N_AT_DEADLINE}.")
+        return
+    if not fb:
+        return
+    for step, n_cap in enumerate((PREREG_N, PREREG_N_EXTENDED)):
+        if step == 1 and len(fb) < PREREG_N_EXTENDED:
+            print(f"  extension pending: {len(fb)} of {PREREG_N_EXTENDED} games; grade the extension once at "
+                  f"{PREREG_N_EXTENDED}.")
+            break
+        s = fb[:n_cap]
+        hit, lb, v = prereg_verdict(s)
+        re_ = cl_mean([(x["g"], x["win"] - x["psf"]) for x in s])
+        print(f"  FIRST {len(s)} GAMES ({s[0]['date']}..{s[-1]['date']}): hit {hit:.3f}, one-sided 95% lower bound "
+              f"{lb:.3f} vs break-even {PREREG_BREAK_EVEN:.3f} -> {v}; market fair {sum(x['psf'] for x in s) / len(s):.3f}, "
+              f"model claimed {sum(x['psm'] for x in s) / len(s):.3f}, realised edge {fmt(re_[0], re_[1])}, "
+              f"ROI at -110 {hit * (1 + 100 / 110) - 1:+.3f}; over {sum(x['over'] for x in s)} / under "
+              f"{sum(not x['over'] for x in s)}")
+        if v != "INCONCLUSIVE":
+            break
+        if step == 0:
+            print(f"  INCONCLUSIVE at {len(s)}: the registration extends ONCE to the first {PREREG_N_EXTENDED} games.")
+        else:
+            print(f"  INCONCLUSIVE at {len(s)} counts as KILL (registered).")
 
 
 def norm(s):
@@ -151,9 +254,15 @@ def split(rows, label, keyf, cuts):
 
 def main():
     sports = [s for s in (os.environ.get("SPORTS") or "ncaab,wncaab,nba,ncaaf").split(",")]
+    if PREREG_MODE:
+        if PREREG_MODE not in ("count", "grade"):
+            sys.exit(f"PREREG_780 must be 'count' or 'grade', not {PREREG_MODE!r}")
+        sports = [PREREG_SPORT]
+        win_lo, win_hi, _ = prereg_window()
     for sport in sports:
         files = sorted(glob.glob(f"{DATA}/{sport}_source/data/live_gameline_ledger/live_gameline_ledger_*.jsonl"))
         states = {}
+        held_out = [0]
         for f in files:
             for line in open(f):
                 try:
@@ -162,11 +271,22 @@ def main():
                     continue
                 if r.get("market") != "totals" or r.get("segment") != "full" or not r.get("priceable"):
                     continue
+                if PREREG_MODE and not (win_lo <= str(r.get("date") or "") <= win_hi):
+                    continue
+                # THE DEFAULT MODE MUST NOT READ THE REGISTERED WINDOW: its one-bet and split lines print the
+                # registered cell itself. Override only after the registered grade has run.
+                if (not PREREG_MODE and sport == PREREG_SPORT and str(r.get("date") or "") >= PREREG_FROM
+                        and os.environ.get("PREREG_780_INCLUDE") != "1"):
+                    held_out[0] += 1
+                    continue
                 pm, pf, ln = r.get("model_home_win_prob"), r.get("market_fair_prob"), r.get("line")
                 if pm is None or pf is None or ln is None:
                     continue
                 key = (r.get("event_id"), r.get("live_state_as_of") or r.get("recorded_at"), float(ln))
                 states.setdefault(key, r)
+        if held_out[0]:
+            print(f"\n(held out: {held_out[0]} {sport} ledger rows on dates >= {PREREG_FROM}, the PREREG_780 window; "
+                  f"PREREG_780_INCLUDE=1 reads them, only after the registered grade has run)")
         if not states:
             print(f"\n## {sport}: 0 priced full-game totals states on {len(files)} ledger dates")
             continue
@@ -220,6 +340,9 @@ def main():
               f"score>final dropped {len(bad)}; graded states {len(rows)} / {len(games)} games; "
               f"direction check {dir_check[1]}/{dir_check[0]}")
         if not rows:
+            continue
+        if PREREG_MODE:
+            prereg(rows, PREREG_MODE)
             continue
         bm = cl_mean([(x["g"], (x["pm"] - x["y"]) ** 2 - (x["pf"] - x["y"]) ** 2) for x in rows])
         print(f"  Brier model - market (negative = model better): {fmt(bm[0], bm[1])}   "

@@ -748,6 +748,15 @@ death, never life — do not invert it.
 - Verification: Unit: indexed _box_games == the scan on fixtures (order, one line per date, DNP, opponents); the off switch restores the scan; the overlay passes one build context (budget per build, not per minute), and its switch restores the old call. Fleet replay (read-only): old == new for every NBA/WNBA player on today's props, per-call ms before/after. After the user's load, on an NBA night: NBA overlay elapsed_ms median, NCAAB overlay gap median, 0 stale college overlays in web's merge log.
 - Blocked by: none
 
+### ncaab-live-edge20-prereg — OPEN — opened 2026-11-13 — session 8062940b-57fd-454a-8de5-25fdd4804d85
+- STATUS 2026-11-13 8:40 AM CST (14:40Z): **GOAL: NOT MET** (registered; the grade waits for 200 games, ~11-25). Registered: `findings_2026-11-13_ncaab_edge20_prereg.md` + `scripts/live_totals_grade.py` PREREG_780. The window starts at 2026-11-13, not 11-10: a default-mode run before registering printed the cell over 11-02..11-12 (151 games, 0.596). The default mode now holds out the window. Code check on the seen 11-02..11-09: 134 games / 0.590, an exact match. Count at registration: 0 games.
+- Goal: The #780 positive cell (NCAAB priced full-game live totals: a game's first state with |model - market fair| >= 20 pp at quote age <= 30 s, bet the model's side) is pre-registered on main BEFORE any outcome on ledger dates >= 2026-11-10 is read: rule, population, sample size (first 200 games) and pass/kill thresholds fixed, with a count-only check and the registered grade in scripts/live_totals_grade.py (PREREG_780); graded once, when the count reaches 200
+- Files: scripts/live_totals_grade.py (PREREG_780 / DATE_FROM additions ONLY), .syndicate/findings_2026-11-13_ncaab_edge20_prereg.md (NEW), docs/ai_context/todo.md (#780 section only)
+- Hypothesis: The 0.590 +- 0.083 hit over 134 NCAAB games (11-02..11-09) is a real edge, not the best of ~12 cells read
+- Falsification test: On the first 200 unseen qualifying games the hit is <= 0.524 (the -110 break-even)
+- Verification: Registration commit on origin/main with a timestamp earlier than any grade run on dates >= 2026-11-10; count-only check prints counts and no outcomes; the single registered grade run recorded with its verdict
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
