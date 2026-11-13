@@ -1685,3 +1685,65 @@ What it says:
 - **STATUS `[2026-11-13 19:30Z]`: step 3j CLOSED. NOTHING loaded.**
   - Loading SE2 is the user's decision, by the #784 recipe: edit `local_production.env` first, then preflight `--reinject-env` with 3 claims and a joint CLEAR, then a drained down/up.
   - A registered post-load reading is owed if it loads.
+
+## PHASE 2 STEP 3k (NCAAB, todo #784): the null-baseline gate redesign -- it removed the A/A refusals but let RC46 through, so it is FALSIFIED as a default and the one-draw per-cell rule is restored `[2026-11-13 23:10Z (5:10 PM CST), lane outcome-gate-null-baseline, CLOSED]`
+
+STEP 3j showed the #784 gate refusing NULL changes. The fix tried here has two parts: a current arm averaged over K draws, and a family-wise flag rule. **It removes the null refusals, but it also stops refusing RC46, the change reverted on 2026-11-10. So it is not the default.**
+
+- **Pre-registered** on main `fff161e1b` (19:39Z), before the code and the run.
+- **Built `6095654a3` (all opt-in since `94ceabecc`):**
+  - `--current-salts K`: the current arm is the mean of K seed-salted draws per game x checkpoint.
+  - `--flag-rule family`: WORSE when z exceeds the 95th percentile of the largest standardized deviation over all 30 cells, in one joint bootstrap of games (max-T).
+  - Several `--candidate-file` arms plus `--aa-salts` A/A arms per run, scored against one shared current arm.
+  - `--dump-arms`, and a `legacy` block in every receipt (one draw, 1.96 per cell).
+  - 30 tests; 4 of 4 mutations caught.
+- **Run:**
+  - One fleet run, nice 19, 11 procs, 20:05Z-22:58Z: 10 arms x 368 tasks, 2026-11-03..12, 100 sims.
+  - K = 4 (salts 0 / 1001 / 1002 / 1003); 360 games per candidate; 0 errors.
+  - Arm dump `C:\tmp\score_effect_load\arms_3k.json`. Receipts archived in `C:\tmp\score_effect_load\receipts_3k\` (see below).
+
+Family critical = the WORSE critical z. Legacy = one current draw, 1.96 x SE per cell:
+
+| candidate | family critical | WORSE (family, K=4) | WORSE (legacy) | max z (family) | 20 m win Brier z, K=4 / legacy |
+|---|---|---|---|---|---|
+| AA1 (null) | 2.98 | none | tip total coverage, 10 m margin CRPS, 20 m win Brier, 20 m log loss | +2.51 (tip total coverage) | +2.07 / +2.91 |
+| AA2 (null) | 3.15 | none | 10 m margin CRPS, 20 m log loss | +1.82 | +1.02 / +1.92 |
+| RC46 | 3.47 | none (better: 20 m margin coverage) | 20 m and 36 m win Brier and log loss | +3.10 (20 m win Brier) | +3.10 / +3.47 |
+| SE2 | 3.41 | none (better: tip margin coverage) | none | +1.62 | +0.66 / +1.61 |
+| ALT1 | 3.11 | none | 10 m margin CRPS, win Brier, log loss; 20 m win Brier | +1.63 | +1.24 / +2.08 |
+| SE2_ALT | 3.63 | none | 10 m win Brier; 20 m win Brier and log loss | +1.96 | +1.88 / +2.66 |
+
+Against the pre-registration:
+
+| pre-registered | measured | verdict |
+|---|---|---|
+| the legacy block reproduces the 5 old 11-03..12 receipts exactly | 185 of 185 values each, 0 differ; WORSE / better lists equal | held |
+| A/A: 0 WORSE in both, max z under the critical value | 0 and 0; 2.51 < 2.98, 1.82 < 3.15 | held |
+| RC46: WORSE on >= 1 of 20 / 36 m win Brier / log loss | none: z 3.10 / 2.74 / 2.82 / 2.52, against a critical value of 3.47 | **FALSIFIED** |
+| critical value 2.6-3.1 (falsified outside 2.3-3.5) | 2.98-3.63 | **FALSIFIED** (SE2_ALT 3.63) |
+| SE2: 0 WORSE; better on tip or 10 m margin coverage | none; better at the tip | held |
+| ALT1 / SE2_ALT: 0 WORSE (informational) | none / none | held |
+
+What it says:
+
+- **The default is the one-draw per-cell rule again (`94ceabecc`), because that rule refuses RC46.**
+  - Before that commit, the six receipts this run wrote were moved to `receipts_3k\`. Read through `check_receipt`, they would have cleared RC46, ALT1 and SE2_ALT.
+  - The prior receipts were restored byte for byte. `check_receipt` again refuses RC46, ALT1 and SE2_ALT and clears SE2.
+  - No preflight receipt was written between 22:58Z and the restore.
+- **Why the family rule failed: the coverage cells.**
+  - `|coverage - 0.80|` folds near 0.80, so its bootstrap is skewed. Standardized, its tail dominates the max.
+  - That pushes the critical value to 3.0-3.6. It is highest for the candidates whose coverage sits near 0.80 (SE2_ALT 3.63, RC46 3.47, SE2 3.41), which are exactly the width changes the gate exists to judge.
+- **Post hoc, from the arm dump (no new sims, NOT pre-registered):**
+  - **Smooth cells only.** Over the 20 smooth cells (CRPS, Brier, log loss) the critical value is 2.82-2.95 for all six candidates. The family rule then refuses RC46 on 20 m and 36 m win Brier, the cells its revert rested on, and flags nothing for the two A/A runs, SE2, ALT1 or SE2_ALT.
+  - **Null refusal rates.** These come from pairings among the six draws of the running value; the pairings share draws, so the rates are indicative.
+    - one draw + 1.96 per cell (the rule in force): **17 of 30 = 57%**;
+    - mean of 3 + 1.96 per cell: 37 of 60 = 62%;
+    - mean of 3 + family over 30 cells: 0 of 60;
+    - mean of 3 + family over the 20 smooth cells: **1 of 60**.
+  - **So the rule in force refuses a null change more often than not on these dates.** A refusal from it means little alone: read every WORSE cell beside an A/A receipt for the same dates (learnings 2026-11-13).
+- **For #765:** SE2 passes under every rule tried (legacy, family over 30 cells, family over 20). ALT1 and SE2_ALT pass under both family variants but stay refused under the rule in force. Given that rule's null refusal rate, those refusals are weak evidence against strict alternation.
+- **Next (not done; it needs fresh games):**
+  - Pre-register "K = 4, family over the 20 smooth cells". Coverage is reported but not flagged, or scored with a smooth interval score.
+  - Confirm it on dates NOT used here: >= 150 games after 11-12, about 11-13..11-18. Include two A/A salts and RC46 as the known-bad check.
+  - Only then make it the default.
+- **STATUS `[2026-11-13 23:10Z]`: lane CLOSED, goal NOT MET.** The default is the legacy rule, which refuses RC46. The tooling is on main, opt-in. Nothing loaded.
