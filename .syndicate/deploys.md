@@ -59416,3 +59416,25 @@ ailload\load.sh 3f11114c2 e102faf79`):
   - The served anchored margin sits 1.5 points on WIU's side of the close. That matches what the design allows: at the tip the offset is fixed, and the live state (WIU up 1) plus a 200-sim raw mean move the rest.
 - **Trap, recorded:** my first read of the quote log printed home lines +4.5 / +5 / +5.5 at 23:58Z for this game. Those rows are not in the anchor's full-game set; its own filter, re-run above, gives 8.5-9.5. Read the anchor through `home_spread_quotes`, not a grep for `"spreads"`.
 - **Owed:** reading 2 of 2, WNCAAB CSUB @ Washington (`401921495`, tip 03:00Z = 9 PM CST). Watcher started 00:07Z, deadline 03:50Z. Pre-tip at 00:07:15Z, its anchor sources are present: `('washington', 'cal state bakersfield')`, 3 books at a median Washington -43.5, and a pregame sim of +42.21.
+
+## 2026-11-13 03:04:41Z (9:04 PM CST 11-12) -- READING, no deploy: todo #795 tip reading 2 of 2, WNCAAB CSU Bakersfield @ Washington (ESPN `401921495`, tip 03:00Z), lane `college-odds-feed-team-names` -- **MET: the first live re-sim published with the margin anchor, and the anchor re-derives by hand. Both CSUB games MET; #795 CLOSED**
+- **Read:** the same watcher, over `live_evidence/wncaab/2026-11-12.jsonl`.
+- **First `live_resim` row**, observed 03:03:18Z (9:03 PM CST), at Q1 586 s, 0-0:
+  - `refusal` null, 1 row, 0 refusals.
+  - `proj.homeMargin` **43.31** vs `rawHomeMargin` 42.03.
+  - `modelHomeWinProb` 0.995 vs raw 0.99.
+  - Segment `h1`: `marginAnchored` true, `marginAnchorOffset` 0.64 at `remainingFraction` 0.4942.
+- **Anchor re-derived (03:04Z)**, fleet code `a133df703`, with a cutoff of 03:02Z:
+  - `('washington', 'cal state bakersfield')`, 6 home-spread quotes.
+  - Each book's last quote before the tip: betrivers -43.5 (03:01:03Z), caesars -43.5, draftkings -42.5 (03:01:03Z), fanduel -43.5.
+  - `closing_home_margin` = **43.5 from 4 books**. The median is the same with or without the two 03:01Z quotes.
+  - Pregame sim 42.21. Offset = 43.5 - 42.21 = **1.29**.
+    - Full game: 42.03 + 1.29 x 0.9942 = 43.31, matching the served value.
+    - H1: 1.29 x 0.4942 = 0.64, matching the served value.
+- **#795 verdict: GOAL MET.**
+  - Audit: 0 unresolved on the fleet.
+  - Served rows: 3 of 3 keyed.
+  - Rail: both cards on their chips.
+  - Both CSUB live re-sims published anchored, where `no_margin_anchor` was the baseline.
+  - The audit now runs in the watchdog.
+  - Lane closed; todo #795 moved to `todo_closed.md`.

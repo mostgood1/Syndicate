@@ -1,25 +1,5 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#795` — **COLLEGE ODDS-FEED TEAM NAMES THAT DID NOT RESOLVE: "CSU Bakersfield Roadrunners" (both leagues), WNCAAB "Montana Grizzlies", "Western Kentucky Hilltoppers". Their games drew chip-less cards on the Games rail. FIXED BY RULE, LOADED 22:02-22:04Z 11-12 (refresh-worker + live-odds-worker, user "Yes, load it"): served rows 0 of 5 -> 3 of 3 keyed, both rail cards on their chips; the audit is now a committed script** `[2026-11-12, lane college-odds-feed-team-names, session 0f519972; user "still have college teams not matching" + a screenshot of CSUB @ WIU (NCAAB) and CSUB @ WASH (WNCAAB), 11-12]`
-- **Cause:** the cards are real games (ESPN `401920135`, tip 00:00Z 11-13, and `401921495`, tip 03:00Z), but ESPN's registry says "Cal State Bakersfield" and the odds feed says "CSU Bakersfield". `chip_join_key` returned None, so the board rows carried no `away_key`, and the card found no chip. The same key feeds the slate's odds join and the live re-sim's margin anchor (`no_margin_anchor`).
-- **Audit** (`scripts/college_team_name_audit.py`, fleet, every quote shard): ncaab 2 of 550 events, wncaab 3 of 173, on 3 names. With `986a718fd`: 0 and 0.
-  - The ESPN evidence pairs each name through its opponent: Cal State Bakersfield 2 games, "Montana Lady Griz", "Western Kentucky Lady Toppers".
-- **Fix:** two derivation rules in `ncaab_team_registry._odds_feed_spellings`.
-  - "CSU X" for ESPN "Cal State X".
-  - For wncaab, the men's registry mascot (same ESPN id) in COMPOSITE spellings only. 29 women's schools carry a different mascot, e.g. "Texas Tech Red Raiders", "UMass Minutemen", "Oklahoma State Cowboys".
-  - The 11-03 one-offs these now derive are removed: "CSU Fullerton Titans", "Penn State Nittany Lions".
-  - Maps: ncaab 2,018 -> 2,021 keys, wncaab 2,083 -> 2,123; 0 lost, 0 changed school.
-  - Tests: `tests/test_college_odds_feed_team_names.py`, 18; 3 mutations each caught; 1,418 passed over the 57 alias test files.
-- **Why it kept recurring:** 11-03 and 11-07 were the same report, each fixed by hand after a user spotted the card. The 11-03 deploy entry already said to audit the quote logs before a big slate. The audit now exists as a script: exit 1 on any unresolved name, with the ESPN spelling to alias it to.
-  - **Now automatic** (user "run the audit before each slate automatically"; deploys.md 2026-11-12 22:53:02Z): the fleet watchdog audits hourly over shards from yesterday on. Any unresolved name is an EMAILED `exec:team_names:<league>` warn naming the team and ESPN's spelling (`scripts/college_team_name_watch.py`). Live since the 22:55:55Z watchdog run: 219 events, 0 unresolved.
-- **LOADED** (deploys.md 2026-11-12 22:02:53Z): rows keyed 22:14:12Z; rail read 22:16:09Z with both CSUB cards on their chips. **Owed:** at the 00:00Z / 03:00Z tips, both games' live re-sims publish with a margin anchor (`no_margin_anchor` before; the anchor key is present on production quotes with the new code).
-  - **Tip reading 1 of 2: MET** (deploys.md 2026-11-13 00:05:34Z). NCAAB CSUB @ WIU's first live re-sim, 00:04:46Z (6:04 PM CST), published anchored: home margin -7.475 vs raw -0.94. The offset is -6.71, from a 9-book close of WIU +9.0 and a pregame sim of -2.29, and it re-derives by hand. **Reading 2 of 2 owed:** WNCAAB CSUB @ WASH, tip 03:00Z; its anchor sources are already present.
-- **Load** (done; tonight's tips are 00:00Z and 03:00Z):
-  - fleet ff `0fe6631d7` -> `986a718fd`. Runtime: this change plus a docstring-only `nba/live_resim.py`.
-  - refresh-worker TERM: Layer 2 stamps the row keys, which drive the rail.
-  - live-odds-worker TERM: the college pregame sim and the live re-sim's margin anchor run there.
-  - Precedent: 11-03 (`9d47c77b5`).
-
 ### `#792` — **COLLEGE IN-PLAY ODDS CAPTURE STOPS AT MIDNIGHT CENTRAL: a game still live after the roll keeps its live re-sim (`#774`), but its sportsbook quotes freeze, so the board prices 0 of its lines for the rest of the game. The NCAAB / WNCAAB analogue of NBA's `#782`. FIX ON MAIN `dd7a5bf2d` (user "Yes, fix it here"), NOT LOADED: user 11-12 "Ride next deploy" (it loads with the next fleet ff past `dd7a5bf2d` + a live-odds-worker restart)** `[2026-11-12, found by lane college-live-resim-midnight (#774 reading 2); fixed by lane college-quote-capture-midnight, session 8062940b]`
 - **Measured** (fleet, read-only, 11-12 06:00-06:20Z, USC @ CAL, tip 04:00Z):
   - live-odds-worker: `NCAAB_LIVE_AUTORUN_LAUNCHED date=2026-11-11 phase=live ... live_games=1` every ~4 min, last at 05:58:49Z. No launch for the game after the roll.

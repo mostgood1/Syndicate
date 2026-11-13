@@ -682,7 +682,17 @@ death, never life — do not invert it.
 - Verification: Unit: exact join byte-identical on/off; alias-only pair joins on, misses off; two lens games one alias key -> ambiguous refusal not a pick; non-ncaaf sport never aliases; segment display + full-game + first5 lookups all use the fallback; counters. Fleet before the load: chip_join_key reachability under refresh-worker's environ for all 43 pairs. After a user-approved refresh-worker load: index_why alias_keys > 0 and rows_joined_by_team_alias > 0 on a live slate with a renamed team, and those rows carry a Live proj. on the served board.
 - Blocked by: none
 
-### college-odds-feed-team-names — OPEN — opened 2026-11-12 — session 0f519972-4890-45d3-8b52-767c7e0a0389
+### college-odds-feed-team-names — CLOSED 2026-11-12 (GOAL MET: audit 3 names / 5 events -> 0 unresolved; CSUB rows 0 of 5 -> 3 of 3 keyed; both live re-sims anchored at tip; audit automatic in the watchdog) — opened 2026-11-12 — session 0f519972-4890-45d3-8b52-767c7e0a0389
+- **GOAL VERDICT 2026-11-12 9:05 PM CST (03:05Z 11-13): GOAL MET.**
+  - Audit over every fleet ncaab/wncaab quote shard: 3 names in 5 events -> 0, by two derivation rules. The 11-03 one-offs are removed.
+  - Maps: 0 keys lost or changed school. 18 tests, plus 6 for the watch.
+  - On main `986a718fd` (rules + audit) and `a133df703` (watchdog). Both LOADED (deploys.md 22:02:53Z, 22:53:02Z; user "Yes, load it" / "run the audit before each slate automatically").
+  - Served CSUB rows 0 of 5 -> 3 of 3 keyed; both rail cards on their chips.
+  - Tip readings MET:
+    - NCAAB CSUB @ WIU, 00:04:46Z: anchored -7.475 vs raw -0.94, offset -6.71.
+    - WNCAAB CSUB @ WASH, 03:03:18Z: 43.31 vs 42.03, offset 1.29.
+    - Both re-derive by hand (deploys.md 00:05:34Z, 03:04:41Z).
+  - todo #795 is closed in `todo_closed.md`. No claim held.
 - STATUS 2026-11-12 6:07 PM CST (00:07Z 11-13): tip reading 1 of 2 MET. NCAAB CSUB @ WIU's first live re-sim (00:04:46Z) published with the margin anchor: offset -6.71, home margin -7.475 vs raw -0.94 (deploys.md 00:05:34Z). Reading 2 of 2 (WNCAAB CSUB @ WASH, tip 03:00Z): watcher running, deadline 03:50Z. The lane closes on it.
 - STATUS 2026-11-12 4:56 PM CST (22:56Z): the audit is LIVE in the fleet watchdog (ff a133df703, no restart). The 22:55:55Z run audited 219 events, 0 unresolved. Claim web released. Still owed: the tip reading (margin anchor, 00:00Z / 03:00Z).
 - STATUS 2026-11-12 4:3x PM CST (22:3xZ): user "run the audit before each slate automatically".
