@@ -15431,3 +15431,8 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Falsification test: a replay where the current roster gives a side or face to fewer than ~all of those players, or changes a side/face already set
 - Verification: fleet replay over the served board rows (side None and faceless counts before/after, changed-already-set count); after load, the same counts read from the served board
 - Blocked by: none
+
+### closed-lane-archive-20261112-1715 — CLOSED 2026-11-12 (GOAL MET: 1 block archived) — opened 2026-11-12 — session 138f0a96-2f9d-40bb-84cd-e8487ec470bb
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 gave SAFE for 1 of 4 CLOSED blocks. Moved: closed-lane-archive-20261112-1255. The reading and the WAIT reasons are in `.syndicate/log/2026-11-12.md`.
