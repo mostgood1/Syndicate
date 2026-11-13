@@ -839,6 +839,14 @@ death, never life — do not invert it.
 - Verification: fleet replay over the served board under the worker environ: WNCAAB and NCAAB rows lacking a crest before and after, crests already set changed (all sports); after load the same read from the served board
 - Blocked by: none
 
+### live-resim-join-unscaled — OPEN — opened 2026-11-13 — session e32fef1a-01e8-4afe-a284-01acd3728545
+- Goal: The live_resim expert's join check (engine_experts.join_reproduction) compares the expert's histogram share with the join's UNTEMPERED probability: on a live gameline ledger record whose prob_scale is set and != 1 (#780 v7, NBA / NCAAF full-game totals) join_model_p is model_home_win_prob_unscaled, else model_home_win_prob; a test fails on the old reading; on the fleet's real NBA ledger rows, re-tempered by the join's own scale_prob, JOIN reports 0 mismatched with the fix and > 0 without, and the untouched rows still read 0 mismatched with the checklist ok. No stake, order, board or worker reads it.
+- Files: syndicate/features/shared/engine_experts.py (live_resim_expert's join_model_p read + its EXPECTED_SPARSE entries ONLY), tests/test_engine_experts.py, docs/ai_context/engine_experts.md
+- Hypothesis: once #780 fix 2 (89e2d2a0c) loads, the ledger's model_home_win_prob on NBA / NCAAF full-game totals is the TEMPERED number, so the check (which reads it) flags every such half-point total as mismatched
+- Falsification test: the re-tempered fleet rows read 0 mismatched WITHOUT the fix (the check never sees tempered rows, so the lead is wrong and nothing is changed)
+- Verification: pytest tests/test_engine_experts.py; fleet replay at nice 19 on 2026-11-11 and 2026-11-12 NBA ledger rows: re-tempered rows JOIN mismatched > 0 on the old reading and 0 on the new; untouched rows 0 mismatched, CHECKLIST ok
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
