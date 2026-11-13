@@ -739,6 +739,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### book-grid-overlay-starvation — OPEN — opened 2026-11-13 — session 0f519972-4890-45d3-8b52-767c7e0a0389
+- STATUS 2026-11-13 12:2x PM CST (18:2xZ): **LOADED** on refresh-worker, `89e2d2a0c` (ff 17:55:57Z, TERM -> pid 444147; user "Yes, load it", then "Both, v2 rides along", then "89e2d2a0c, all three"). Reachability MET 18:13Z (`build_seconds` on 4 of 4 ticks, `evidence_s` on 4 of 4 overlays, 0 Tracebacks); `deferred_slow ['nba', 'nfl']` fired on tick 2. NEW: NBA's grid alone is slow before tip (321 s cold, 103 s next; both during the first board build, confounded). Lane stays OPEN for the NBA-night reading: warm `build_seconds.nba`, NBA overlay median (falsified > 60 s), NBA overlay age at web vs the 360 s cutoff, NCAAB overlay gap (goal <= 120 s). Claim released after the deploys.md entry.
 - STATUS 2026-11-13 10:04 AM CST (16:04Z): option (c) ON MAIN `b681f2891`, NOT LOADED.
   - A sport whose grid + overlay build took >= 45 s is built every other tick, never on pull, and stays live for the cadence. Off switch: SYNDICATE_BOOK_GRID_SLOW_SPORT_SCHEDULE=off.
   - 7 tests, 7 of 7 mutations caught; 1,496 of 1,497 pass across the 74 run_refresh_worker files (the failure is pre-existing: a Windows path-separator assert in test_slate_phase_wiring).

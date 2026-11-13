@@ -59519,3 +59519,46 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **Readers of `model_home_win_prob`:** it is now the tempered number on NBA / NCAAF totals. The unscaled one is `model_home_win_prob_unscaled`. Lane `live-resim-join-unscaled` already moves the #736 live_resim join check to it; the PREREG_780 grade reads it by amendment 1.
 - **Off switch:** `SYNDICATE_LIVE_TOTALS_PROB_SCALE=off` in `local_production.env` + a drained full `down`/`up` (env is built only at `up`). **Revert:** `git revert 89e2d2a0c`, then a fleet ff + a claimed refresh-worker TERM.
 - **Claims:** web released right after this entry. refresh-worker is held by `book-grid-overlay-starvation`.
+
+## 2026-11-13 17:55:57Z (11:55 AM CST) -- claimed refresh-worker TERM to load `89e2d2a0c`: todo #790 overlay fix (`019b5d15d`) + slower schedule for a slow sport (`b681f2891`), with #797 cheat-sheet rules v2 (`9cd7a15d2`) and #780 totals scale (`89e2d2a0c`) riding (lane `book-grid-overlay-starvation`) -- **LOADED; reachability MET; the schedule fired at its first chance; NBA's grid is slow even before tip (confounded); NBA-night reading owed**
+- **User, in this session's chat:**
+  - "Yes, load it" (answering "Load both #790 changes on refresh-worker before tonight's NBA games?").
+  - Asked whether cheat sheets v2 (#797, another lane's unloaded change, live at the next cheat-sheet task run) should ride along: "Both, v2 rides along".
+  - Asked which SHA after the parent session relayed the #780 session's "Load all three": "89e2d2a0c, all three".
+- **gates:**
+  - Claim refresh-worker, holder `book-grid-overlay-starvation`, 17:49:48Z (rc 0; it was free). The last refresh-worker restart before this was 15:59:54Z (`team-logo-canonical-names`), 116 min earlier.
+  - Ride-along read `eb4a43688..89e2d2a0c`, runtime paths:
+    - mine: `prop_evidence/basketball.py`, `book_grid_artifact.py`, `layer2_row_context.py`, `run_refresh_worker.py`.
+    - #797 cheat sheets v2: `cheat_sheets.py`, `cheat_sheet_record.py`, `templates/cheat_sheets.html`, and `build_`/`review_`/`reconcile_cheat_sheets.py`. The `SyndicateCheatSheets*` tasks run `build_cheat_sheets.py` from `~/Syndicate`, so v2 is live from their next run.
+    - #780: `live_gameline_join.py`, `live_gameline_ledger.py`.
+    - 4 offline scripts: `live_totals_grade.py`, `live_totals_width_fit.py`, `live_gameline_age_grade.py`, `cheat_sheet_section_study.py`.
+    - 0 of the 43 ff files overlap the fleet's 14 locally modified files.
+  - Drain requested 17:50:34Z, **CLEAR** once the in-flight board build finished. Baseline re-read 17:55:22Z. Preflight `--target fleet --target-commit 89e2d2a0c` **CLEAR** 17:55:45Z (rc 0).
+    - Expectations: `ticks_with_build_seconds_key` 0 -> >0, `inplay_overlay_lines_with_evidence_s` 0 -> >0.
+    - Baseline 17:55:22Z: 73 BOOK_GRID_TICK since the 15:59:54Z boot, 0 with `build_seconds`; 73 INPLAY_OVERLAY lines, 0 with `evidence_s`; 0 Tracebacks.
+- **load** (`C:\tmp\railload\load790.sh 89e2d2a0c... eb4a43688...`):
+  - `git merge --ff-only` at **17:55:57.800Z**: HEAD `89e2d2a0c`; on disk, `def _book_grid_slow_sport_deferred` 1 and `def inplay_overlay_row_context` 1.
+  - `kill -TERM 426085` at 17:55:57.819Z. New supervised refresh-worker **pid 444147**, first seen 17:56:08Z. `--undrain` 17:56:21Z, `DRAIN_CLEARED`.
+  - I did not touch web or live-odds-worker. The parent session held web for #797's `reload-web` (its entry above).
+  - **Fleet HEAD moved again at 17:57:46Z** to `866e0e18e`, a later ff by lane `nhl-live-total-calibration` (holding live-odds-worker). Runtime delta: `nhl/live_resim.py` (NHL live total) and `engine_experts.py` / `scripts/engine_experts.py` (stat_progress shadow expert). refresh-worker imports neither (`board_enrichment.py` names `nhl/live_resim.py` only in comments; `shared/engine_experts.py` is imported only by `scripts/engine_experts.py`). So pid 444147's code is `89e2d2a0c` for every module it loads.
+- **verify, reachability (`off != on`, production): MET 18:13:03Z.**
+  - The first tick (18:13:01.834Z) carries `build_seconds` for every sport it built. INPLAY_OVERLAY lines carry `rows_ms` / `shortlist_ms` / `cards_ms` / `evidence_s` / `evidence_budget_s` (WNCAAB: evidence 0.0 s of a 20 s budget).
+  - By 18:20:58Z: 4 of 4 ticks carry `build_seconds` and 4 of 4 overlays carry `evidence_s`; 0 Tracebacks, 0 BOOK_GRID_TICK_ERROR, 0 INPLAY_OVERLAY_FAILED.
+  - **The slow-sport schedule fired at its first chance:**
+    - tick 1 (cold, 18:13:01Z): nba 320.9 s, nfl 83.4, soccer 37.0, ncaab 14.7, nhl 6.5, ncaaf 4.8, wncaab 4.2;
+    - tick 2 (18:16:53Z): `deferred_slow ['nba', 'nfl']`, the other 5 built;
+    - tick 3 (18:20:11Z): nba 102.6 s, nfl 8.9 s (NFL fast again, so built every tick), wncaab 3.6;
+    - tick 4 (18:20:49Z): wncaab 0.4.
+- **NEW, not predicted: NBA's book grid is slow BEFORE any NBA game is live.**
+  - There were 0 NBA in-play rows (no NBA INPLAY_OVERLAY line), so the 321 s and 103 s are the NBA grid itself, not the overlay.
+  - My 11-13 claim, "if the overlay fix holds, NBA builds well under 45 s and the schedule never triggers", is **wrong as stated**: the schedule triggers for NBA from the grid alone.
+  - **Confounded:** both NBA builds overlapped the new worker's first board build, in the same process. That build was in flight from ~18:15Z, with `layer2_shortlist_build` entered at 18:17:22Z and still running at 18:21Z. The warm NBA grid time is the first thing to read.
+- **Owed tonight (NBA night, lane `book-grid-overlay-starvation`):**
+  - warm `build_seconds.nba` before tip and with NBA live;
+  - INPLAY_OVERLAY sport=nba `elapsed_ms` median and `evidence_s` (falsified if the median is > 60 s);
+  - how often `deferred_slow` holds NBA, and NBA's overlay age at web, which drops overlays older than 360 s: every other tick with a ~100 s grid could push NBA's overlay past 360 s;
+  - the NCAAB overlay gap median (goal <= 120 s; 292 s on 11-11) and 0 stale college overlays in web's INPLAY_OVERLAY_MERGED.
+- **Revert:**
+  - The schedule only: `SYNDICATE_BOOK_GRID_SLOW_SPORT_SCHEDULE=off`, or a higher `SYNDICATE_BOOK_GRID_SLOW_SPORT_SECONDS`, in `local_production.env`, then a drained full `down`/`up`.
+  - Code: `git revert b681f2891` and/or `019b5d15d`, then a fleet ff and a claimed refresh-worker TERM.
+- **Claims:** refresh-worker released right after this entry.
