@@ -638,7 +638,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### live-price-on-pull — CLOSED 2026-11-13 (mechanism MET: overlay seen age at pricing 136 -> 78 s, NCAAB overlay gap 148 -> 84 s, college only; the refusal-share prediction FALSIFIED 60% -> 58%; #790 moved to lane book-grid-overlay-starvation) — opened 2026-11-11 — session 0f519972-4890-45d3-8b52-767c7e0a0389
-- **GOAL VERDICT 2026-11-13 8:4x AM CST (14:4xZ):** the mechanism is MET and its predicted effect is FALSIFIED.
+- **GOAL VERDICT 2026-11-13 8:29 AM CST (14:29Z):** the mechanism is MET and its predicted effect is FALSIFIED.
   - Price-on-pull is LOADED (on the fleet disk via the `e102faf79` ff, running since 20:45Z 11-11 per todo #786) and read in deploys.md 2026-11-12 00:56Z: our lag halved.
   - The pre-registered falsification test fired: the `quote_older_than_live_pricing_ceiling` share did not fall. The ceiling reads the BOOK's unchanged-price clock, not ours. That lesson is recorded in todo #786's verdict.
   - The lane was held open only for the user's #790 decision. The user said "Yes, fix #790 here" (11-13), and that work is in its own lane, `book-grid-overlay-starvation`, which does not edit `run_refresh_worker.py`. This lane releases its claim.
@@ -736,11 +736,15 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### book-grid-overlay-starvation — OPEN — opened 2026-11-13 — session 0f519972-4890-45d3-8b52-767c7e0a0389
-- STATUS 2026-11-13 ~11:xx AM CST: SCOPE EXTENDED by the user's choice of option (c).
+- STATUS 2026-11-13 10:04 AM CST (16:04Z): option (c) ON MAIN `b681f2891`, NOT LOADED.
+  - A sport whose grid + overlay build took >= 45 s is built every other tick, never on pull, and stays live for the cadence. Off switch: SYNDICATE_BOOK_GRID_SLOW_SPORT_SCHEDULE=off.
+  - 7 tests, 7 of 7 mutations caught; 1,496 of 1,497 pass across the 74 run_refresh_worker files (the failure is pre-existing: a Windows path-separator assert in test_slate_phase_wiring).
+  - Load (with `019b5d15d`) = fleet ff + claimed refresh-worker TERM: the user's decision.
+- STATUS 2026-11-13 9:44 AM CST (15:44Z): SCOPE EXTENDED by the user's choice of option (c).
   - User in this chat: "Slower NBA schedule", answering "Which option (c) variant should I build for #790?". The relayed "build NBA after college" was asked about first: measured, it changes only the phase inside a tick, not the college gap.
   - Adds `scripts/run_refresh_worker.py` (the book-grid tick's per-sport schedule + price-on-pull's sport pick ONLY). The closed lane live-price-on-pull released it.
   - Goal clause added: a live sport whose last grid + overlay build ran long is rebuilt on a slower schedule, so the other sports keep their cadence. It is inert when the sport is fast. It has an off switch, and tests incl. off != on.
-- STATUS 2026-11-13 ~10:3x AM CST (16:3xZ): DONE IN CODE, ON MAIN `019b5d15d`, NOT LOADED.
+- STATUS 2026-11-13 9:07 AM CST (15:07Z): DONE IN CODE, ON MAIN `019b5d15d`, NOT LOADED.
   - Fleet replay (read-only): lookup identical for 121 of 121 NBA players, 587 -> 8.2 ms per call. Overlay cards on the same 2,000 rows: 341 s -> 27 s, 0 cards differ in any displayed field.
   - 27 tests, 9 of 9 mutations caught; 1,512 pass across 118 files.
   - Hypothesis holds in the replay; its live half (NBA overlay median <= 60 s) is owed after the load.
