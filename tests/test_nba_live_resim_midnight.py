@@ -384,5 +384,8 @@ def test_the_tick_line_keeps_every_existing_field_in_place(fleet, capsys):
     fleet["tick"](ROLL_PLUS_3)
     keys = [tok.split("=", 1)[0] for tok in capsys.readouterr().out.strip().splitlines()[-1].split(" ")[1:]
             if "=" in tok and not tok.startswith(("'", "{"))]
-    assert keys == ["date", "games", "resimmed", "carried", "prior_date", "prior_games", "prior_resimmed",
-                    "prior_carried", "prior_skip", "refusals", "bytes", "written", "elapsed_s", "history_rows"]
+    existing = ["date", "games", "resimmed", "carried", "prior_date", "prior_games", "prior_resimmed",
+                "prior_carried", "prior_skip", "refusals", "bytes", "written", "elapsed_s", "history_rows"]
+    # Every existing field in its place; #780's margin-anchor counts (lane nba-live-margin-anchor) only ever AFTER them.
+    assert keys[:len(existing)] == existing
+    assert keys[len(existing):] in ([], ["anchored", "anchor_missing"])

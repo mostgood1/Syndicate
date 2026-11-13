@@ -1105,6 +1105,9 @@ def live_gameline_from_lens(
             # pricing reads `margin_dist` above; this reaches `live_display_block` and names the refusal
             # `REASON_MARGIN_DISPLAY_ONLY`. `{}` on every other producer and on an older NHL snapshot.
             "margin_dist_display": projection.get("displayMarginDist") or {},
+            # Whether the producer anchored this lane's margin to the market (NBA `marginAnchor` on the lane; college
+            # on its projection). `spreads_prob_scale` picks the k fitted on margins of the same kind (#780).
+            "margin_anchored": bool(lens.get("marginAnchor") or projection.get("marginAnchor")),
             "as_of": lens.get("liveStateAsOf"),
             # When the last score change the re-sim saw happened (NCAAB lanes, `#762`); judged by
             # `quote_behind_score_verdict`. Absent on other lanes and older snapshots: the state-fetch rule applies.
@@ -1280,23 +1283,47 @@ _SPREADS_PROB_SCALE_BY_SPORT: dict[str, float] = {
 }
 _SPREADS_PROB_SCALE_ENV = "SYNDICATE_LIVE_SPREADS_PROB_SCALE"
 
+# THE SAME SPORT'S k ON MARKET-ANCHORED MARGINS `[2026-11-13, lane nba-live-margin-anchor, user "Build it now"]`. The
+# NBA live margin anchor (`nba/live_resim.py` "margin anchor") removes most of the over-confidence the 2.02 above was
+# absorbing (`model_engine_standard.md` 4.4: a mechanism and the re-fit of what absorbed it ship together). Measured by
+# REPLAYING the anchor on the fleet's recorded ticks (`scripts/replay_nba_live_margin_anchor.py`, 10-21..11-12, 21,713
+# ledger spreads states / 160 games, re-priced through `price_distribution_market`): k on the anchored numbers 1.568
+# (walk-forward 1.55-1.68 over its last 4 steps; gain -0.003 +- 0.004), against 2.147 on the raw ones over the same
+# states. A lane says whether it is anchored (`margin_anchored` on the hit), so each lane gets the k of its own kind,
+# whichever worker loads first. College lanes are always anchored and their table above was fitted on anchored margins,
+# so they have no entry here.
+_SPREADS_PROB_SCALE_ANCHORED_BY_SPORT: dict[str, float] = {
+    "nba": 1.57,
+}
 
-def spreads_prob_scale(sport: Any = None) -> float:
-    """k for one sport's live full-game spreads; 1.0 leaves today's probability. Knobs as `totals_prob_scale`."""
+
+def spreads_prob_scale(sport: Any = None, *, anchored: bool = False) -> float:
+    """k for one sport's live full-game spreads; 1.0 leaves today's probability. Knobs as `totals_prob_scale`; an
+    explicit `_<SPORT>` value wins over both tables. `anchored`: the lane's margin is market-anchored."""
+    key = str(sport or "").strip().lower()
+    if anchored and key in _SPREADS_PROB_SCALE_ANCHORED_BY_SPORT:
+        raw = str(os.environ.get(_SPREADS_PROB_SCALE_ENV) or "").strip().lower()
+        if raw in {"off", "0", "false", "no"}:
+            return 1.0
+        per = str(os.environ.get(f"{_SPREADS_PROB_SCALE_ENV}_{key.upper()}") or "").strip()
+        if per:
+            return _prob_scale_from(_SPREADS_PROB_SCALE_ENV, _SPREADS_PROB_SCALE_BY_SPORT, sport)
+        return _SPREADS_PROB_SCALE_ANCHORED_BY_SPORT[key]
     return _prob_scale_from(_SPREADS_PROB_SCALE_ENV, _SPREADS_PROB_SCALE_BY_SPORT, sport)
 
 
-def full_game_prob_scale(market: Any, segment: Any, sport: Any) -> float:
+def full_game_prob_scale(market: Any, segment: Any, sport: Any, *, anchored: bool = False) -> float:
     """The scale the join applies to one row: totals or spreads on the full game, 1.0 for everything else (h2h,
     segments). An absent segment is NOT full here (the join's rule: unknown must not take the permissive branch); a
-    caller holding a full-game index hit, whose segment may be unset, says "full" itself."""
+    caller holding a full-game index hit, whose segment may be unset, says "full" itself. `anchored` is the hit's
+    `margin_anchored` (spreads only: an anchor moves no total)."""
     key = str(market or "").strip().lower()
     if str(segment or "").strip().lower() not in _FULL_GAME_SEGMENTS:
         return 1.0
     if key in _TOTALS_MARKETS:
         return totals_prob_scale(sport)
     if key in _SPREAD_MARKETS:
-        return spreads_prob_scale(sport)
+        return spreads_prob_scale(sport, anchored=anchored)
     return 1.0
 
 
@@ -1581,7 +1608,8 @@ def live_display_block(
         prob = None
     # The same tempering as the priced path (#780), so the Live column and a price never disagree on one row.
     if prob is not None:
-        prob = scale_prob(prob, full_game_prob_scale(market_key, hit.get("segment") or "full", sport))
+        prob = scale_prob(prob, full_game_prob_scale(market_key, hit.get("segment") or "full", sport,
+                                                     anchored=bool(hit.get("margin_anchored"))))
     total_mean = hit.get("total_mean") if market_key in _TOTALS_MARKETS else None
     if prob is None and total_mean is None:
         return None
@@ -2558,7 +2586,8 @@ def attach_live_gamelines(
                     # from a global, so disabling MLB cannot silence WNBA or soccer.
                     sport=sport,
                     # #780: full-game totals and spreads only, the populations the scales were fitted on.
-                    prob_scale=full_game_prob_scale(market_key, segment, sport),
+                    prob_scale=full_game_prob_scale(market_key, segment, sport,
+                                                    anchored=bool(hit.get("margin_anchored"))),
                 )
             # A DISPLAY-ONLY HISTOGRAM IS NOT A PRICE (`#773`, NHL puck line). The row keeps the pricer's own
             # no-distribution refusal -- no model probability, so `_apply_verdict` publishes no

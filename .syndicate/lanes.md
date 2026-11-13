@@ -958,6 +958,18 @@ death, never life — do not invert it.
 - STATUS 2026-11-13 4:25 PM CST (22:25Z): GRADED as pre-registered (44 games, 746 lines, weeks 7-10): totals parity +0.0065 [-0.0132, +0.0264], spreads parity +0.0089 [-0.0016, +0.0200], h2h LOSES +0.0123 [+0.0017, +0.0237]; model weight beside the market +0.14 / -0.72 / -0.57. Hypothesis supported for h2h, not falsified for totals/spreads (parity, underpowered). BUILT, NOT PUSHED: 18 registry entries + the producer no longer stamps a note. Replay on the served 11-13 grid: 46 of 46 segment rows from the registry, probabilities 46 of 46 identical. Owed: push + reload web (user), served reading. Findings: .syndicate/findings_2026-11-13_nfl_segment_skill.md.
 
 ### nba-live-margin-anchor — OPEN — opened 2026-11-13 — session 8062940b-57fd-454a-8de5-25fdd4804d85
+- STATUS 2026-11-13 4:30 PM CST (22:30Z): **GOAL: NOT MET.** Built, replayed and tested; on main once pushed. Loading (live-odds-worker for the anchor, refresh-worker for the anchored k) is the user's decision.
+  - Hypothesis CONFIRMED on the replay (171 of 171 games anchored):
+    - moneyline anchored - raw -0.006 +- 0.005, better in every band;
+    - model - market +0.016 -> +0.008;
+    - spreads anchored - raw -0.009;
+    - spreads k 1.57 on anchored margins (predicted 1.2-1.6).
+  - The re-fit ships as an anchored-lane k (`_SPREADS_PROB_SCALE_ANCHORED_BY_SPORT`), chosen by the hit's `margin_anchored`, so the two workers can load in either order.
+  - Tests 28, 11 mutations caught.
+  - Scope as built (recorded here, wider than the Files line below):
+    - `nba/live_resim.py`: also `history_rows`' anchor fields and the tick line's `_anchor_counts`;
+    - `live_gameline_join.py`: the anchored table, `spreads_prob_scale` / `full_game_prob_scale`'s `anchored` param, the hit's `margin_anchored`, and the two call sites;
+    - `tests/test_nba_live_resim_midnight.py`: the tick-line test only.
 - Goal: The NBA live re-sim's full-game margin is anchored to the market like college's: shifted by (closing consensus home margin - the pregame sim's margin mean) x the share of regulation still to play, with P(home) re-derived; NBA only (WNBA, segments and live props untouched); no anchor = today's raw numbers, flagged by name; a switch; reachability off != on; a replay on the fleet's per-tick history graded against finals shows it helps; the NBA spreads scale re-fitted on anchored margins (the standard's 4.4 two-part change); on main; loading is the user's decision
 - Files: syndicate/features/nba/live_resim.py (a new margin-anchor section + its call in build_live_lens_snapshot + the lane's anchor fields in build_game_lens ONLY), tests/test_nba_live_margin_anchor.py (NEW), scripts/replay_nba_live_margin_anchor.py (NEW), .syndicate/findings_2026-11-13_nba_live_margin_anchor.md (NEW), syndicate/features/shared/live_gameline_join.py (_SPREADS_PROB_SCALE_BY_SPORT nba value + its comment ONLY, if the re-fit moves it), tests/test_live_margin_prob_scale.py (the NBA k constant ONLY, if it moves), docs/ai_context/todo.md (#780 section only)
 - Hypothesis: Written before building (2026-11-13 22:05Z). Anchoring the NBA live margin to the closing line cuts the live moneyline's model - market Brier gap (+0.018 over 3,962 states) by at least half, mostly at tip / early (+0.039 / +0.029 now), and the anchored spreads need a smaller temper (NBA spreads k 2.02 now; predicted 1.2-1.6 after).

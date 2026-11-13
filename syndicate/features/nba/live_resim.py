@@ -93,6 +93,7 @@ PREGAME_LENS_SOURCE = "pregame_only"
 
 LEAGUE = "nba"
 _REGULATION_PERIODS = 4
+QUARTER_SECONDS = 720  # NBA; only the margin anchor's remaining-regulation share reads it (NBA-only by design)
 
 # Sims per game per tick, and the tick's wall-clock budget. Measured 2026-10-09 on recorded production
 # inputs (Idle, loaded host): 570-690 ms/draw pregame, 415-505 end Q1, 145-215 end Q3, 76-107 at 5:00 Q4.
@@ -1169,7 +1170,193 @@ def build_game_lens(facts: Optional[ResumeFacts], result: Any, *, live_state_as_
             "segments": result.get("segments") or {},
         },
         "resumeMatch": dict(match_report or {}),
+        **_anchor_lane_fields(result),
     }]
+
+
+# ------------------------------------------------------------------------------------------- margin anchor (#780)
+#
+# THE NBA LIVE MARGIN IS ANCHORED TO THE MARKET, AS COLLEGE'S IS `[2026-11-13, todo #780, lane nba-live-margin-anchor,
+# user "Build it now"]`. `ncaab/live_resim.py` "margin anchor" has the design; this is the same rule for NBA.
+#
+# WHY (`.syndicate/findings_2026-11-13_nba_live_anchor_trace.md`, fleet, 171 games 10-21..11-12): the pregame market
+# anchor DOES reach this resume (the anchored `target_home/away_points` are persisted engine inputs), but the engine
+# follows its target loosely. Its output margin lands 2.43 points from the market on average (sd 3.18) where the
+# target sat 0.31 away, and that departure predicts nothing: slope on (final - market) -0.26 [-0.89, +0.40] over 170
+# games, margin MSE 222.3 vs the market's 206.8. The live re-sim carries it into the game: at the first live state
+# 24 of 65 games were >= 10 pp off the market, the same 24 as pregame. The live moneyline's model - market Brier gap
+# (+0.018) sits there, worst at tip (+0.039).
+#
+# THE RULE: the live FULL-GAME margin histogram moves by (the closing consensus home margin - the pregame sim's home
+# margin mean) x the share of REGULATION still to play, and P(home) is re-derived from it (a shifted margin of 0 counts
+# half to each side). At the tip the anchored margin is the market's; after that the scored points are real and only
+# the simulated remainder is corrected. The closing margin is each book's last full-game home spread before the
+# commence, median across books -- `ncaab/live_resim.closing_home_margin`, read from the same quote log through the
+# same key function. The pregame sim margin is `score.margin_mean` of `smart_sim_<date>_<HOME>_<AWAY>.json` (the
+# regulation margin; overtime moves it by well under a point).
+#
+# NBA ONLY: WNBA shares this module and is untouched. SEGMENTS (quarters, halves) stay raw, and so do live props (the
+# player remainders). `overtime_prob` stays the raw sim's.
+#
+# NO ANCHOR IS NOT A REFUSAL. A game with no closing spread or no pregame sim margin publishes today's raw numbers with
+# `marginAnchorRefusal` naming why. A refusal would also take the game's live props down, which the anchor has nothing
+# to do with. `SYNDICATE_NBA_LIVE_MARGIN_ANCHOR=off` serves the raw sim everywhere (absent = on).
+MARGIN_ANCHOR_ENV = "SYNDICATE_NBA_LIVE_MARGIN_ANCHOR"
+_ANCHOR_SOURCES_TTL_S = 600.0
+_ANCHOR_SOURCES: dict[tuple[str, str], tuple[float, Any]] = {}
+_ANCHOR_CACHE: dict[tuple[str, str, str], "NbaMarginAnchor"] = {}
+
+
+def margin_anchor_enabled(env: Optional[Mapping[str, str]] = None) -> bool:
+    raw = str((env if env is not None else os.environ).get(MARGIN_ANCHOR_ENV, "") or "").strip().lower()
+    return raw not in {"0", "false", "off", "no"}
+
+
+@dataclass(frozen=True)
+class NbaMarginAnchor:
+    market_home_margin: float  # closing consensus, live home orientation
+    sim_home_margin: float     # the pregame sim's mean, same orientation
+    books: int
+
+    @property
+    def offset(self) -> float:
+        return self.market_home_margin - self.sim_home_margin
+
+    def as_dict(self) -> dict[str, Any]:
+        return {"marketHomeMargin": round(self.market_home_margin, 2), "simHomeMargin": round(self.sim_home_margin, 2),
+                "offset": round(self.offset, 2), "books": self.books, "source": "book_quotes_close+pregame_smart_sim"}
+
+
+def smart_sim_path(date: str, home: str, away: str, *, root: Optional[Path] = None, league: str = LEAGUE) -> Path:
+    if root is None:
+        from syndicate.features.shared.basketball_live_state import source_root
+
+        root = source_root(league)
+    return Path(root) / "data" / "processed" / f"smart_sim_{date}_{str(home).upper()}_{str(away).upper()}.json"
+
+
+def pregame_sim_margin(date: str, home: str, away: str, *, root: Optional[Path] = None,
+                       league: str = LEAGUE) -> Optional[float]:
+    """The pregame SmartSim's home margin mean for the game, or None (no artifact, unreadable, no number)."""
+    import json as _json
+
+    try:
+        doc = _json.loads(smart_sim_path(date, home, away, root=root, league=league).read_text(encoding="utf-8"))
+        value = float(((doc or {}).get("score") or {}).get("margin_mean"))
+    except Exception:  # noqa: BLE001 -- any miss is "no pregame margin", named by the caller
+        return None
+    return value if math.isfinite(value) else None
+
+
+def closing_market_home_margin(market: Mapping[Any, Any], home_name: str, away_name: str,
+                               *, league: str = LEAGUE) -> Optional[tuple[float, int]]:
+    """(closing consensus home margin, books) in the LIVE home orientation, from `home_spread_quotes`'s map; the odds
+    feed's orientation is tried both ways, as college's is."""
+    from syndicate.features.ncaab.live_resim import _join_key, closing_home_margin
+
+    home, away = _join_key(league, home_name), _join_key(league, away_name)
+    for key, flip in (((home, away), False), ((away, home), True)):
+        close = closing_home_margin(market.get(key) or ())
+        if close is not None:
+            margin, books = close
+            return (-margin if flip else margin), books
+    return None
+
+
+def _anchor_market(league: str, date: str, clock: Callable[[], float] = time.monotonic) -> Any:
+    """The date's home-spread quotes, re-read at most every `_ANCHOR_SOURCES_TTL_S` (the quote log grows all day)."""
+    from syndicate.features.ncaab.live_resim import home_spread_quotes
+
+    key = (str(league).lower(), str(date))
+    hit = _ANCHOR_SOURCES.get(key)
+    if hit is not None and clock() - hit[0] < _ANCHOR_SOURCES_TTL_S:
+        return hit[1]
+    try:
+        market = home_spread_quotes(league, str(date))
+    except Exception:  # noqa: BLE001 -- an unreadable log is "no closing spread", named by the caller
+        market = {}
+    _ANCHOR_SOURCES[key] = (clock(), market)
+    return market
+
+
+def margin_anchor_for(date: str, event_id: str, home: str, away: str, *, league: str = LEAGUE,
+                      root: Optional[Path] = None, market: Optional[Mapping[Any, Any]] = None):
+    """The game's anchor, or `NbaResimRefusal` naming why there is none. A found anchor is kept for the process: the
+    close is fixed once the game has started, so it never drifts during a game."""
+    cache_key = (str(league).lower(), str(date), str(event_id))
+    if cache_key in _ANCHOR_CACHE:
+        return _ANCHOR_CACHE[cache_key]
+    sim = pregame_sim_margin(date, home, away, root=root, league=league)
+    if sim is None:
+        return NbaResimRefusal("no_pregame_sim_margin", smart_sim_path(date, home, away, root=root, league=league).name)
+    close = closing_market_home_margin(market if market is not None else _anchor_market(league, date),
+                                       team_name(league, home), team_name(league, away), league=league)
+    if close is None:
+        return NbaResimRefusal("no_closing_spread", f"{home}_{away}")
+    anchor = NbaMarginAnchor(market_home_margin=float(close[0]), sim_home_margin=float(sim), books=int(close[1]))
+    _ANCHOR_CACHE[cache_key] = anchor
+    return anchor
+
+
+def remaining_regulation_fraction(period: Any, clock_seconds: Any) -> float:
+    """Share of regulation still to play: 1.0 at the tip, 0.5 at halftime, 0.0 in overtime. An absent period reads as
+    the first, an absent clock as the period's start (the resume always sets both; this is only the edge)."""
+    q = float(QUARTER_SECONDS)
+    try:
+        period_i = int(period or 1)
+        clock_s = float(clock_seconds) if clock_seconds is not None else q
+    except (TypeError, ValueError):
+        return 1.0
+    if period_i > _REGULATION_PERIODS:
+        return 0.0
+    remaining = (_REGULATION_PERIODS - period_i) * q + max(0.0, min(clock_s, q))
+    return max(0.0, min(1.0, remaining / (_REGULATION_PERIODS * q)))
+
+
+def anchor_result(result: Mapping[str, Any], anchor: NbaMarginAnchor, *, remaining_fraction: float) -> dict[str, Any]:
+    """The full-game margin histogram moved by the anchor's offset x `remaining_fraction`, P(home) and the mean
+    re-derived from it; the sim's own numbers kept as `raw_*`. Segments, totals, props and `overtime_prob` untouched."""
+    from syndicate.features.ncaab.live_resim import _shift_margin_hist
+
+    fraction = max(0.0, min(1.0, float(remaining_fraction)))
+    offset = float(anchor.offset) * fraction
+    shifted = _shift_margin_hist(result.get("margin_dist"), offset)
+    n = sum(shifted.values())
+    out = dict(result)
+    out["raw_home_win_prob"] = result.get("home_win_prob")
+    out["raw_home_margin_mean"] = result.get("home_margin_mean")
+    out["margin_anchor"] = {**anchor.as_dict(), "remainingFraction": round(fraction, 4), "appliedOffset": round(offset, 2)}
+    if n <= 0:
+        return out
+    out["margin_dist"] = {str(m): c for m, c in sorted(shifted.items())}
+    out["home_margin_mean"] = sum(m * c for m, c in shifted.items()) / n
+    out["home_win_prob"] = (sum(c for m, c in shifted.items() if m > 0) + 0.5 * shifted.get(0, 0)) / n
+    return out
+
+
+def apply_margin_anchor(result: Mapping[str, Any], facts: ResumeFacts, *, date: str, home: str, away: str,
+                        league: str = LEAGUE, root: Optional[Path] = None,
+                        env: Optional[Mapping[str, str]] = None) -> dict[str, Any]:
+    """The tick's one call: NBA + switch on -> anchored, or the raw result with `margin_anchor_refusal`."""
+    if str(league).lower() != "nba" or not margin_anchor_enabled(env):
+        return dict(result)
+    anchor = margin_anchor_for(date, facts.event_id, home, away, league=league, root=root)
+    if isinstance(anchor, NbaResimRefusal):
+        return {**result, "margin_anchor_refusal": anchor.reason}
+    return anchor_result(result, anchor,
+                         remaining_fraction=remaining_regulation_fraction(facts.period, facts.clock_seconds))
+
+
+def _anchor_lane_fields(result: Any) -> dict[str, Any]:
+    """The lane's anchor provenance: absent keys when the anchor never ran (WNBA, switch off), so those lanes are
+    byte-identical to before."""
+    if not isinstance(result, Mapping):
+        return {}
+    if result.get("margin_anchor") is not None:
+        return {"rawModelHomeWinProb": result.get("raw_home_win_prob"), "marginAnchor": result["margin_anchor"]}
+    if result.get("margin_anchor_refusal"):
+        return {"marginAnchorRefusal": result["margin_anchor_refusal"]}
+    return {}
 
 
 # ------------------------------------------------------------------------------------------- the snapshot
@@ -1371,6 +1558,10 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
         if isinstance(result, NbaResimRefusal) and result.reason == "budget_exhausted":
             games.append(_carry_or_refuse(event_id, home, away, facts, result, match))
             continue
+        if not isinstance(result, NbaResimRefusal):
+            # #780: NBA full-game margin anchored to the close (see "margin anchor"); props below read the raw remainders.
+            result = apply_margin_anchor(result, facts, date=str(date_str), home=home, away=away, league=league,
+                                         root=inputs_root)
         row = _lane_row(event_id, home, away, facts, result, match, league=league)
         if not isinstance(result, NbaResimRefusal):
             lines = lines_from_props_csv(props_csv_path(str(date_str), root=inputs_root, league=league),
@@ -1666,6 +1857,13 @@ def history_rows(snapshot: Mapping[str, Any]) -> list[dict[str, Any]]:
             })
             if lane.get("carriedForward"):
                 rows[-1]["carried_forward"] = True
+            # #780 margin anchor: the sim's own P(home) and the anchor applied, or why there was none. Only when the
+            # anchor ran, so WNBA and switched-off rows are unchanged.
+            if lane.get("marginAnchor") is not None:
+                rows[-1]["p_home_raw"] = lane.get("rawModelHomeWinProb")
+                rows[-1]["margin_anchor"] = lane.get("marginAnchor")
+            elif lane.get("marginAnchorRefusal"):
+                rows[-1]["margin_anchor_refusal"] = lane.get("marginAnchorRefusal")
             if g.get(SLATE_DATE_KEY):
                 # #776: a previous date's game re-simmed after midnight. The row stays in the TICK's file under the
                 # tick's `date` (the live evidence log files it the same way); this says which slate it belongs to.
@@ -1755,8 +1953,30 @@ def run_live_resim_tick(date_str: Optional[str] = None, **kwargs: Any) -> dict[s
         except Exception as exc:  # noqa: BLE001 -- history must never stop the tick
             status["history_rows"] = f"FAILED:{type(exc).__name__}"
     status["elapsed_s"] = round(time.monotonic() - started, 1)
+    # #780 margin anchor, LAST on the line so every field a reader already parses keeps its place.
+    anchor_counts = _anchor_counts(snapshot.get("games") or [])
+    if anchor_counts:
+        status.update(anchor_counts)
     print("NBA_LIVE_RESIM_TICK " + " ".join(f"{k}={v}" for k, v in status.items()), flush=True)
     return status
+
+
+def _anchor_counts(games: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """`anchored=` fresh lanes carrying a margin anchor, `anchor_missing=` why the rest had none; empty when the anchor
+    never ran this tick (switch off), so the tick line is unchanged then."""
+    anchored, missing = 0, {}
+    for g in games:
+        for lane in g.get("gameLens") or []:
+            if lane.get("carriedForward") or lane.get("source") != LIVE_RESIM_LENS_SOURCE:
+                continue
+            if lane.get("marginAnchor") is not None:
+                anchored += 1
+            elif lane.get("marginAnchorRefusal"):
+                reason = str(lane["marginAnchorRefusal"])
+                missing[reason] = missing.get(reason, 0) + 1
+    if not anchored and not missing:
+        return {}
+    return {"anchored": anchored, "anchor_missing": missing or "-"}
 
 
 def _loop() -> None:

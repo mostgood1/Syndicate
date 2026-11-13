@@ -345,7 +345,17 @@
     - The loss is INSIDE THE ENGINE (`engine.py:1114-1175`). Over 171 games the anchored target is 0.31 points (mean abs) from the market; the engine's output margin is 2.43 points from it (sd 3.18) and 2.38 from its own target.
     - That departure is noise: slope on (final - market) -0.26 [-0.89, +0.40] over 170 games. Margin MSE: market 206.8, target 208.3, engine 222.3. The raw model's own view slopes -0.25 [-0.52, -0.01].
     - At tip, the same 65 games: pregame 24 >= 10 pp off the market, live 24. The live re-sim carries the pregame engine's noise into the game.
-    - **CANDIDATE FIX, OPEN (not built):** an NBA post-sim margin anchor like college's (`ncaab/live_resim._anchor_segments`): shift the live margin histogram by (`market_anchor.anchored_margin` - `score.margin_mean`) x the share of regulation still to play. It is a mechanism (`model_engine_standard.md`): reachability test, a re-check of the spreads / totals scales fitted on un-anchored margins, and a walk-forward grade before any load. Not a market-wide pause: every line is its own decision.
+    - **FIX BUILT, ON MAIN, NOT LOADED (the user's decision): the NBA live margin anchor** `[2026-11-13, user "Build it now", lane nba-live-margin-anchor, .syndicate/findings_2026-11-13_nba_live_margin_anchor.md]`.
+      - The rule is college's: shift the full-game margin by (closing consensus - pregame SmartSim margin) x the share of regulation left, and re-derive P(home). NBA only; segments, totals and props untouched. With no anchor, the raw numbers are published flagged by name. Switch `SYNDICATE_NBA_LIVE_MARGIN_ANCHOR`.
+      - Replayed on every recorded tick (10-21..11-12): coverage 171 of 171 games.
+        - Moneyline anchored - raw Brier: -0.006 +- 0.005, tip -0.015, early -0.011.
+        - Model - market: +0.016 -> +0.008 (halved; tip +0.043 -> +0.024).
+        - First-state >= 10 pp off the market: 49 -> 33 of 160.
+        - Spreads anchored - raw: -0.009 +- 0.007.
+      - The 4.4 re-fit: NBA spreads k is 1.57 on anchored margins (2.15 raw). The join picks k by the lane's `margin_anchored`, so either worker can load first.
+      - Tests: 28, 11 mutations caught.
+      - Load: an ff + a claimed live-odds-worker restart (the anchor) + a refresh-worker restart (the anchored k).
+      - What remains: the moneyline still trails the market by +0.008, mostly at tip.
 - **PRE-REGISTERED 2026-11-13** (lane `ncaab-live-edge20-prereg`, `.syndicate/findings_2026-11-13_ncaab_edge20_prereg.md`):
   - The cell: NCAAB fresh-quote (<= 30 s) |edge| >= 20 pp, one bet per game, ledger dates >= 11-13, the first 200 games.
   - PASS if the one-sided 95% lower bound clears 0.524 (hit >= 0.581). KILL if hit <= 0.524. INCONCLUSIVE extends once to 400 games.
