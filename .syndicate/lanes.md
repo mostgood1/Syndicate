@@ -906,6 +906,14 @@ death, never life — do not invert it.
 - Verification: pytest tests/test_engine_experts.py; fleet run at nice 19 (read-only) on 2026-11-11 and 2026-11-12, NCAAB with NBA / WNCAAB reported beside it: SEG_JOIN 0 mismatched on half-point lines, SEG_PRIOR 0 mismatched, SEG_FRAME medians against falsifier (b), game match rate against (a), opined count against (c), CHECKLIST ok, expert off -> 0 opined
 - Blocked by: none
 
+### nhl-live-overtime — OPEN — opened 2026-11-13 — session 87074b1f-3325-4c92-871d-b22851478134
+- Goal: The NHL live re-sim plays overtime as sudden death on the clock the scoreboard shows: every sim that reaches OT (resumed in OT or tied at the end of regulation) ends exactly one goal past the tie (an OT goal or the shootout credit), so a live OT state's margin histogram is only +-1 and its total is the tied total + 1; measured off != on on a stub OT state and on production's code and inputs, pregame byte-identical, then on a served lane after a user-approved load
+- Files: syndicate/features/nhl/sim_engine/hockeysim/engine.py (simulate_with_lineups OT block + its new resume-only kwargs only), syndicate/features/nhl/sim_engine/hockeysim/runtime.py (run_hockeysim_game_from_state pass-through only), syndicate/features/nhl/live_resim.py (LOAN from nhl-live-total-calibration; user 'Yes; fix overtime'; resim_live_game's engine call + its overtime block + build_game_lens liveOvertime line only), tests/test_nhl_live_overtime.py (NEW), .syndicate/findings_2026-11-13_nhl_live_overtime.md (NEW), docs/ai_context/todo.md (#773 section only)
+- Hypothesis: engine.simulate_with_lineups plays OT as a full self.cfg.overtime_seconds segment and sums its goals (not sudden death), and a state resumed IN OT gets the full 5:00 whatever the clock shows; so ~10% of OT sims end 2-3 past the tie (stub P4 2-2: 31 of 300)
+- Falsification test: With the fix a stub OT state still yields a sim with |margin| > 1 or a total other than tied + 1; or the OT goal events carry no usable time order to name the first goal; or pregame run_hockeysim_game output changes
+- Verification: tests (off != on on the real engine; pregame identity); replay under the fleet's code and inputs: OT and tied-late states' OT sims end +-1 only; moneyline/total shift reported per state; served lanes carry liveOvertime after the user's yes to load
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
