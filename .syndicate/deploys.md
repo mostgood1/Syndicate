@@ -59021,8 +59021,7 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
     - Expectations: `ticks_with_on_pull_key` 0 -> >0, `book_grid_on_pull_passes` 0 -> >0.
     - Baseline 20:41:30Z: 8 ticks since the 20:16:01Z boot, 0 with the key, 0 on-pull passes.
   - The deploy-guard first refused the load because this session's lane marker named the other lane (`college-pbp-blowout-bench`). I re-pointed it to the claim-holding lane and re-ran.
-- **load** (`C:	mp
-ailload\load.sh 3f11114c2 e102faf79`):
+- **load** (`C:\tmp\railload\load.sh 3f11114c2 e102faf79`):
   - `git merge --ff-only` at **20:45:28.519Z**: HEAD `3f11114c2`; on disk, `def _book_grid_sports_with_new_live_quotes` count 1.
   - `kill -TERM 217520` at 20:45:28.523Z. New supervised refresh-worker **pid 225134**, first seen 20:45:34.555Z.
   - `--undrain` 20:45:39Z, `DRAIN_CLEARED`.

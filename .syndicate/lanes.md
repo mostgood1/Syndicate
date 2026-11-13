@@ -647,7 +647,14 @@ death, never life — do not invert it.
 - Verification: Unit: off != on through SYNDICATE_BOOK_GRID_PRICE_ON_PULL (a live sport with a newer shard rebuilds between ticks when on, not when off), quiet + min-gap bounds, non-live sports never take the path, any_live not clobbered. Fleet after the user's load: BOOK_GRID_TICK on_pull entries every pull, overlay seen-age median and the ceiling-refusal share vs baseline.
 - Blocked by: none
 
-### college-pbp-blowout-bench — OPEN — opened 2026-11-11 — session 0f519972-4890-45d3-8b52-767c7e0a0389
+### college-pbp-blowout-bench — CLOSED 2026-11-13 (GOAL MET: WNCAAB play-by-play archived nightly + season backfilled; college blowout-bench answer in the findings file; the WNCAAB re-read stays owed in todo #787) — opened 2026-11-11 — session 0f519972-4890-45d3-8b52-767c7e0a0389
+- **GOAL VERDICT 2026-11-13 8:1x AM CST (14:1xZ): GOAL MET.**
+  - Archive: the nightly `basketball-rotation-stints` job covers wncaab (from `3f11114c2`).
+  - Fleet read-only check at 14:1xZ, `wncaab_source/data/processed/`: dated `player_stints` files run through 2026-11-12 (12 files), and `pbp_events/2027/` holds 693 games. The 11-01..11-10 backfill had 573 games, 573 of 573 score-matched.
+  - Answer: `.syndicate/findings_2026-11-11_college_blowout_bench.md`, both leagues with denominators. For men's college the bench in a blowout is EXONERATED (6,258 games); the late miss is close games, which is lane `ncaab-score-effect-load`'s. For women's college the pattern is the same on small n.
+  - Tests and study script are on main.
+  - **Not done here:** the WNCAAB re-read once ~2 more weeks of finals with live ticks are archived (about 11-25). It stays owed in todo #787 for whichever session picks it up: `college_blowout_bench_study.py --league wncaab --evidence`.
+  - No claim held; no fleet change by this lane beyond the archive.
 - Goal: Women's college basketball play-by-play is archived like men's: the nightly basketball-rotation-stints job covers wncaab (pbp_events/<season>/<event>.jsonl.gz + dated stints/player_stints), this season backfilled on the fleet; and a measured answer to 'what happens when the bench comes in during a blowout' for college: when starters leave (margin x time), the scoring rate before vs after, and our live re-sim's late-blowout remaining-points error, in a findings file with denominators; tests incl. a wncaab build; on main; engine changes stay with lane basketball-scenario-calibration
 - Files: scripts/build_basketball_rotation_stints.py (LEAGUES + WINDOWS wncaab entries + --league help ONLY), tests/test_basketball_rotation_stints.py (new wncaab tests ONLY), scripts/college_blowout_bench_study.py (NEW), .syndicate/findings_2026-11-11_college_blowout_bench.md (NEW), docs/ai_context/todo.md (#787 section only)
 - Hypothesis: User 2026-11-11: three games badly wrong today (latest WNCAAB South Alabama @ Florida Atlantic, 57-85, re-sim under-projected the last 2-3 minutes' points by 9-14). Hypothesis: when the bench comes in during a blowout the scoring rate changes in a way the live re-sim does not model; for WNCAAB we cannot test it because no play-by-play is kept.
