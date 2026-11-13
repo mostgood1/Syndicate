@@ -33,6 +33,22 @@ expert agrees with the market" from "the expert had nothing to say". Off switch:
 | `sim` | pregame | the record's `model.p_model` (calibrated sim) | `None`, basis `unrecorded:no_sims_in_record`: the record has no sim count | `model_anchored_to_prior` (below), `game_not_pregame`, `no_model_probability` |
 | `under_tilt` | pregame | prior + the SUPPORTED prop under-bias (`matchup_signals.likelihood_adjustments`: NBA 1.23 pp, NCAAF 2.38 pp) | the measured residual's own uncertainty: max(binomial SE, half the two-window gap) = 0.30 pp NBA, 0.60 pp NCAAF | `signal_not_applicable` |
 | `live_resim` | live | the live re-sim histogram at the instant the join priced the line: two-way (push sims out), Agresti-Coull smoothed | Monte Carlo SE of that estimate, logit scale | `ledger_refusal_row`, `no_prior`, `no_game_match`, `no_evidence_before_instant`, `evidence_stale` (> 900 s), `segment_settled`, `segment_margin_unanchored`, `no_distribution` |
+| `stat_progress` (slice 3, lane `live-stat-progress-expert`) | live | one player prop's published live P(over) at one logged tick (banked actual + the re-sim's rest-of-game draws), Agresti-Coull smoothed at n = `simsRun` (100 on NBA) | Monte Carlo SE of that estimate, logit scale | producer reasons verbatim (`quote_pulled`, `certainty_refused`), `no_quote_before_instant`, `prior_one_sided`, `prior_unpaired`, `prior_stale` (> 900 s), `prior_implausible_hold` |
+
+**The `stat_progress` prior** (`prop_prior`) is the live BOOK prior at the props row's instant `t`, rebuilt from
+`book_quotes` with the board's own rules (`odds_book_quotes._fair_value_fields`):
+- per (book, side), the freshest quote by observed stamp, among those CAPTURED by `t`;
+- a book counts only with both sides within 600 s of each other;
+- each book de-vigged within itself, then the median across books, renormalised;
+- refused when the best prices imply a hold below -5% (a dead leg).
+
+One rule is added in play: a book whose newer side is older than `PROP_QUOTE_MAX_AGE_S = 900` s is left out.
+`book_quotes` appends on a change, so the age is time since the price last moved. Doubles markets are Yes/No with a
+NaN line: Yes is OVER the producer's fixed line (1.5 / 2.5).
+
+**Not a line.** The re-sim publishes each posted line with +-3 neighbour lines. A row at a line no book quoted that
+day (`line_not_quoted`), or for a player and market no book quoted that day (`no_quotes_for_player_market`), is
+counted and never becomes an opinion, so the coverage table's `lines` are lines a bettor could have taken.
 
 **`model_anchored_to_prior`.** A pregame model probability within `ANCHOR_TOL = 1e-5` of the prior is the prior
 restated. Measured on the fleet's 11-10 record (build 16:00:47Z):
@@ -76,6 +92,22 @@ scripts/engine_experts.py live()  ledger rows + evidence rows (date -1 .. +1)
   engine_experts.live_opinions -> live_resim_expert
 ```
 
+**Live (`stat_progress`).**
+
+```
+NBA live re-sim tick  ->  live/nba_live_resim.json games[].liveProps (overwritten)
+  syndicate/features/nba/live_resim.py build_live_props           (rows per player, stat, posted line +-3)
+  live_evidence_log.Collector -> live_prop_evidence.snapshot_prop_rows
+    writes live_evidence/<sport>/<date>.props.jsonl                (one row per game per changed tick; lossless)
+odds fetchers (OddsAPI books, Kalshi direct)
+  odds_book_quotes.append_book_quotes
+    writes <sport>_source/tracking/book_quotes/<date>.jsonl[.gz]   (append-on-change, per book/market/selection)
+scripts/engine_experts.py stat_progress()  props rows + the date's quote shard + evidence rows (date -1 .. +1)
+  engine_experts.PropQuoteIndex (by team names + folded player + market -> line; streamed, counts population)
+  engine_experts.stat_progress_opinions -> stat_progress_expert -> prop_prior
+  engine_experts.prior_reproduction    (the board's _fair_value_fields on the same quotes: the gate)
+```
+
 Nothing writes opinions under the data root. `run --opinions OUT` writes them where pointed.
 
 ## The gate (plan §3 M1: off != on per expert; a coverage table per sport, phase and clock bucket)
@@ -90,6 +122,26 @@ Nothing writes opinions under the data root. `run --opinions OUT` writes them wh
   - Documented gaps are in `EXPECTED_SPARSE`, each with its reason.
 - **Join reproduction**, the expert's own correctness check: on half-point totals/spreads where the expert and the
   join read the same lane state, `p_expert` must equal the join's model probability.
+- **Prior reproduction** (`stat_progress`): every opined line's prior, recomputed by the board's
+  `_fair_value_fields` from the same quotes, and its `p_expert`, recomputed from the published P(over), must match
+  to 1e-6. Fleet readings 2026-11-13 (the worktree's code on fleet data, read-only, nice 19):
+
+  | night | props rows | published rows | not a line | lines | opined | prior / p mismatched | checklist |
+  |---|---|---|---|---|---|---|---|
+  | 11-11 (10 games) | 494 | 464,203 | 124,116 | 340,087 | 84,773 | 0 / 0 | ok |
+  | 11-12 (4 games) | 237 | 229,149 | 63,676 | 165,473 | 40,057 | 0 / 0 | ok |
+
+  - Prior age of the opined lines: median 249-255 s, p90 720-722 s.
+  - Books per prior: median 2, range 1-10.
+  - Opined share falls through the game, 40-44% in 0-25 to under 5% in 95-100. Late lines are mostly `quote_pulled`.
+  - Median |delta| is 0.59-0.74 logit in regulation; mean delta is negative everywhere (the re-sim is below the
+    books on over).
+  - 11-12: corr(logit prior, logit expert) 0.35, so the join is not random.
+
+  The biggest early disagreements have two shapes, both for the engine read rather than the expert:
+  - The sim's minutes for some players: Aldama's projected 1.08 rebounds against 7 books at about 0.5 for over 3.5.
+  - A single book quoting a pregame line long after it was passed: P.J. Washington PRA 21.5 at 0.46 with 12
+    banked at 24% elapsed.
 - **Readings:** `.syndicate/deploys.md` and the lane block in `lanes.md`.
 
 ## Known gaps (not this slice)
@@ -98,8 +150,9 @@ Nothing writes opinions under the data root. `run --opinions OUT` writes them wh
   first and last pregame record (`keep_pregame_lines`). It reaches production with a refresh-worker restart. The
   fleet dry run on 11-10's real record measured 0.17-0.33 s per build (write_records itself: 0.68 s), a peak of
   1-2 MB, and about 0.9 MB for 3,925 lines.
-- **Stat progress** needs per-player live prop projections per tick. NBA's `liveProps` are overwritten each tick and
-  kept nowhere, the evidence log included.
+- **Stat progress** is NBA only: the props log keeps any sport whose snapshot carries `liveProps`, and only NBA's does
+  today. The prior does not yet prefer Kalshi's mid, which the plan names as the in-play prior where an identity check
+  holds; Kalshi is one book in the median.
 - **NFL live totals/spreads have no prior.** The live join refuses every one as `no_distribution`, because the NFL
   lane publishes its histograms at lane level (snake_case); leads 2026-11-10.
 - **NHL live** prices only the moneyline (no distributions).

@@ -33,6 +33,12 @@ THE THREE EXPERTS IN SLICE 1.
   sims excluded, like the de-vigged price it is compared with) and Agresti-Coull smoothed, as the join smooths;
   sigma is the Monte Carlo error of that estimate on the logit scale.
 
+SLICE 3 (lane `live-stat-progress-expert`, 2026-11-13).
+- `stat_progress` (live): a player's banked actual plus the re-sim's rest-of-game draws, i.e. the published live
+  P(over) of one player prop at one logged tick (`live_prop_evidence`), against the live BOOK prior at that instant,
+  rebuilt from `book_quotes` with the board's own de-vig rules (`prop_prior`). Agresti-Coull at n = simsRun, MC sigma,
+  as `live_resim`. Rows at a ladder line no book quoted are counted, not opined (`stat_progress_opinions`).
+
 Every expert reads its inputs through `Reader`, which records the paths it actually touched, so the input
 checklist (`scripts/engine_experts.py checklist`) compares CONSUMED (observed at run time, never a name grep)
 against POPULATED (measured on real rows).
@@ -558,7 +564,286 @@ def live_resim_expert(ledger_row: Mapping[str, Any], index: EvidenceIndex, reade
     return _finish(op, p_adj, sigma_logit_from_se(p_adj, se), "mc_agresti_coull")
 
 
-LIVE_EXPERTS: dict[str, Callable[..., ExpertOpinion]] = {"live_resim": live_resim_expert}
+# ----------------------------------------------------------------------------- live expert: stat progress (props)
+#
+# Lane `live-stat-progress-expert` (2026-11-13, user "Yes, start it"). The live re-sim publishes, per player, stat and
+# line, P(over) from its rest-of-game draws given what the player has already banked (`nba/live_resim.py
+# build_live_props`); `live_prop_evidence` keeps every such row per game per changed tick. This expert reads one row at
+# its tick and opines against the live book prior AT THAT INSTANT, rebuilt from `book_quotes` (the append-only per-book
+# change log, which carries in-play prop quotes: 168,511 in-game NBA prop rows from 11 books on 11-11).
+
+# A book's pair is the market only while its newer side moved within this of the instant. `book_quotes` appends on a
+# CHANGE, so an old row can still be the posted price; but an in-play prop that has not moved in 15 min is more likely
+# suspended than standing. Same bound as the lane-state gate (`LIVE_EVIDENCE_MAX_AGE_S`); the opinion carries the age.
+PROP_QUOTE_MAX_AGE_S = 900.0
+# Yes/No markets are a count of stats reaching ten, so Yes is OVER the producer's fixed line
+# (`nba/live_resim.DOUBLES_LINES`); the books quote them with no line (NaN).
+DOUBLES_MARKET_LINES: dict[str, float] = {"player_double_double": 1.5, "player_triple_double": 2.5}
+_PROP_SELECTIONS = {"over": "over", "under": "under", "yes": "over", "no": "under"}
+# The quote fields the index reads, in the board's observed-time order (`odds_book_quotes._fair_value_fields`).
+_QUOTE_PATHS = ("kind", "market", "selection", "line", "price", "bookmaker", "player_name", "home_team", "away_team",
+                "captured_at", "book_updated_at", "snapshot_ts")
+
+
+def _fold_player(name: Any) -> str:
+    from syndicate.features.shared.odds_book_quotes import fold_market_identity_term
+
+    return fold_market_identity_term("player_name", name)
+
+
+class PropQuoteIndex:
+    """`book_quotes` PROP rows for one sport-date, by (home, away, folded player, market) -> line -> entries in the
+    order we CAPTURED them. An entry is (captured_at, observed stamp, book, side, price, raw selection). Only those
+    scalars are kept, so a busy night's shard (283k prop rows on 11-11) does not sit in memory as dicts.
+
+    Every field read goes through `reader` as source `book_quotes`, and the non-null count of each is kept, so the
+    input checklist measures population on every row ingested (`populated`)."""
+
+    def __init__(self, rows: Iterable[Mapping[str, Any]], reader: Reader | None = None,
+                 expert: str = "stat_progress") -> None:
+        self.by_key: dict[tuple[str, str, str, str], dict[float, list[tuple]]] = {}
+        self.rows = 0
+        self.non_null: dict[str, int] = {}
+        reader = reader or Reader()
+        for row in rows:
+            got = {path: reader.get(expert, "book_quotes", row, path) for path in _QUOTE_PATHS}
+            if str(got["kind"] or "") != "prop":
+                continue
+            self.rows += 1
+            for path, value in got.items():
+                if value is not None and not (isinstance(value, float) and value != value):
+                    self.non_null[path] = self.non_null.get(path, 0) + 1
+            market = str(got["market"] or "").lower()
+            side = _PROP_SELECTIONS.get(str(got["selection"] or "").strip().lower())
+            seen = _parse(got["captured_at"])
+            price = _f(got["price"])
+            line = DOUBLES_MARKET_LINES.get(market, _f(got["line"]))
+            if side is None or seen is None or price is None or line is None:
+                continue
+            stamp = _parse(got["book_updated_at"]) or _parse(got["snapshot_ts"]) or seen
+            key = (team_key(got["home_team"]), team_key(got["away_team"]), _fold_player(got["player_name"]), market)
+            self.by_key.setdefault(key, {}).setdefault(float(line), []).append(
+                (seen, stamp, str(got["bookmaker"] or "").lower(), side, int(price), str(got["selection"] or "")))
+        for lines in self.by_key.values():
+            for entries in lines.values():
+                entries.sort(key=lambda e: e[0])
+
+    def populated(self) -> tuple[int, dict[str, int]]:
+        return self.rows, dict(self.non_null)
+
+    def lookup(self, home: Any, away: Any, player: Any, market: Any, line: Any) -> tuple[list[tuple] | None, str]:
+        name, mkt = _fold_player(player), str(market or "").lower()
+        lines = self.by_key.get((team_key(home), team_key(away), name, mkt)) or \
+            self.by_key.get((team_key(away), team_key(home), name, mkt))
+        if lines is None:
+            return None, "no_quotes_for_player_market"
+        value = DOUBLES_MARKET_LINES.get(mkt, _f(line))
+        entries = None if value is None else lines.get(float(value))
+        if entries is None:
+            return None, "line_not_quoted"
+        return entries, "quoted_line"
+
+
+def prop_prior(entries: Sequence[tuple], at: datetime, *,
+               max_age_s: float = PROP_QUOTE_MAX_AGE_S) -> dict[str, Any]:
+    """The live book prior for OVER at one line at instant `at`, from `PropQuoteIndex` entries.
+
+    The board's own rules (`odds_book_quotes._fair_value_fields`): per (book, side) the freshest quote by observed
+    stamp, among those CAPTURED by `at`; a book counts only with both sides observed within
+    `_FAIR_PAIR_TOLERANCE_S` of each other; each book de-vigged within itself, median across books, renormalised
+    (`opportunity_signals.consensus_fair_probability`); refused when the best prices imply a hold below
+    `_IMPLAUSIBLE_HOLD_PCT` (a dead leg, not an arbitrage). One rule more, because this is in play: a book whose newer
+    side is older than `max_age_s` is left out (`stale_books`)."""
+    from syndicate.features.shared.odds_book_quotes import _FAIR_PAIR_TOLERANCE_S, _IMPLAUSIBLE_HOLD_PCT
+    from syndicate.features.shared.opportunity_signals import (
+        consensus_fair_probability, fair_probability_by_book, hold_pct, implied_probability,
+    )
+
+    freshest: dict[tuple[str, str], tuple[datetime, int]] = {}
+    for seen, stamp, book, side, price, _sel in entries:
+        if seen > at:
+            break
+        previous = freshest.get((book, side))
+        if previous is None or stamp >= previous[0]:
+            freshest[(book, side)] = (stamp, price)
+    sides: dict[str, dict[str, tuple[datetime, int]]] = {}
+    for (book, side), value in freshest.items():
+        sides.setdefault(book, {})[side] = value
+    usable: dict[str, dict[str, int]] = {}
+    newest: datetime | None = None
+    dropped = {"one_sided_books": [], "unpaired_books": [], "stale_books": []}
+    for book, pair in sorted(sides.items()):
+        if set(pair) != {"over", "under"}:
+            dropped["one_sided_books"].append(book)
+            continue
+        s_over, s_under = pair["over"][0], pair["under"][0]
+        if abs((s_over - s_under).total_seconds()) > _FAIR_PAIR_TOLERANCE_S:
+            dropped["unpaired_books"].append(book)
+            continue
+        latest = max(s_over, s_under)
+        if (at - latest).total_seconds() > max_age_s:
+            dropped["stale_books"].append(book)
+            continue
+        usable[book] = {"over": pair["over"][1], "under": pair["under"][1]}
+        newest = latest if newest is None else max(newest, latest)
+    out: dict[str, Any] = {"p": None, "refusal": None, "books": len(usable), "book_p": {}, "age_s": None,
+                           "hold_pct": None, **{k: v for k, v in dropped.items() if v}}
+    if not freshest:
+        out["refusal"] = "no_quote_before_instant"
+        return out
+    if not usable:
+        out["refusal"] = ("prior_stale" if dropped["stale_books"] else
+                          "prior_unpaired" if dropped["unpaired_books"] else "prior_one_sided")
+        return out
+    best = {side: min((p[side] for p in usable.values()), key=lambda x: implied_probability(x) or 1.0)
+            for side in ("over", "under")}
+    out["hold_pct"] = hold_pct([best["over"], best["under"]])
+    if out["hold_pct"] is not None and out["hold_pct"] < _IMPLAUSIBLE_HOLD_PCT:
+        out["refusal"] = "prior_implausible_hold"
+        return out
+    consensus = consensus_fair_probability(usable)
+    if not consensus or "over" not in consensus:
+        out["refusal"] = "prior_no_consensus"
+        return out
+    out["p"] = consensus["over"]
+    out["book_p"] = {book: round(p["over"], 6) for book, p in sorted(fair_probability_by_book(usable).items())}
+    out["age_s"] = round((at - newest).total_seconds(), 1) if newest is not None else None
+    return out
+
+
+def stat_progress_expert(prop: Mapping[str, Any], props_row: Mapping[str, Any], quotes: PropQuoteIndex,
+                         index: EvidenceIndex, reader: Reader, off: frozenset[str] = frozenset()) -> ExpertOpinion:
+    """One published `liveProps` row (`prop`) of one logged game tick (`props_row`) -> an opinion on OVER.
+
+    p_expert: the re-sim's own P(over) given the banked actual, Agresti-Coull smoothed at n = `simsRun` (the live
+    join's estimator, as `live_resim`); sigma: its Monte Carlo error on the logit scale. Prior: `prop_prior` at the
+    tick's instant `t`. Clock bucket: the lane row the evidence log kept for the same game at that tick."""
+    name, version = "stat_progress", "stat_progress/1"
+    g = lambda path: reader.get(name, "props_log", props_row, path)  # noqa: E731
+    pr = lambda path: reader.get(name, "live_props", prop, path)  # noqa: E731
+    sport = str(g("sport") or "").lower()
+    event_id = str(g("event_id") or "")
+    t = str(g("t") or "")
+    market = str(pr("prop") or "").lower()
+    line = _f(pr("line"))
+    player = pr("playerName")
+    op = _opinion(name, version, PHASE_LIVE, t=t, sport=sport, event_id=event_id, market=market, segment="full",
+                  side="over", line=line, player=None if player is None else str(player),
+                  line_key="|".join([sport, event_id, market, "full", str(player or ""), "over",
+                                     "" if line is None else f"{line:g}"]))
+    op.prior_basis = "book_quotes:median_devig_2way"
+    published = _f(pr("liveModelProbOver"))
+    sims = _f(pr("simsRun"))
+    op.inputs = {"actual_so_far": pr("actualSoFar"), "live_projection": pr("liveProjection"),
+                 "published_p": published, "sims": sims, "team_side": pr("side"),
+                 "unpriced_reason": pr("unpricedReason")}
+    if name in off:
+        op.refusal = "expert_off"
+        return op
+    at = _parse(t)
+    if at is None:
+        op.refusal = "no_instant"
+        return op
+    home, away = g("home_name"), g("away_name")
+    entries, quoted = quotes.lookup(home, away, player, market, line)
+    op.inputs.update({"home_name": home, "away_name": away, "quote_match": quoted})
+    if entries is None:
+        op.refusal = quoted
+        return op
+    row, match = index.lookup(home, away, at, None)
+    op.inputs["evidence_match"] = match
+    if row is not None:
+        e = lambda path: reader.get(name, "live_evidence", row, path)  # noqa: E731
+        ev_t = _parse(e("t"))
+        age = None if ev_t is None else (at - ev_t).total_seconds()
+        op.inputs["evidence_age_s"] = None if age is None else round(age, 1)
+        if age is not None and age <= LIVE_EVIDENCE_MAX_AGE_S:
+            op.elapsed_share, op.clock_bucket = elapsed_share(sport, e("state"))
+    if published is None:
+        op.refusal = str(pr("unpricedReason") or "no_model_probability")
+        return op
+    if sims is None or sims <= 0:
+        op.refusal = "no_sims"
+        return op
+    prior = prop_prior(entries, at)
+    op.inputs.update({"prior_books": prior["books"], "book_p": prior["book_p"], "prior_hold_pct": prior["hold_pct"],
+                      **{k: prior[k] for k in ("one_sided_books", "unpaired_books", "stale_books") if k in prior}})
+    if prior["p"] is None:
+        op.refusal = prior["refusal"]
+        return op
+    op.p_prior = round(prior["p"], 6)
+    op.prior_age_s = prior["age_s"]
+    k = published * sims
+    p_adj, se = agresti_coull(k, sims)
+    op.inputs.update({"k": round(k, 3), "n": sims})
+    return _finish(op, p_adj, sigma_logit_from_se(p_adj, se), "mc_agresti_coull")
+
+
+def stat_progress_opinions(props_rows: Iterable[Mapping[str, Any]], quotes: PropQuoteIndex, index: EvidenceIndex,
+                           reader: Reader | None = None, env: Mapping[str, str] | None = None,
+                           keep_rows: list[Mapping[str, Any]] | None = None
+                           ) -> tuple[list[ExpertOpinion], dict[str, int]]:
+    """Every published prop row of every logged tick -> opinions, plus what was not a line.
+
+    The re-sim publishes each posted line with +-3 neighbour lines (`LIVE_LINE_WINDOW`), so most rows are a ladder
+    no book quotes. A row at a line no book quoted that day (`line_not_quoted`), or for a player + market no book
+    quoted that day (`no_quotes_for_player_market`), is not a line: it is COUNTED in the second value and never becomes
+    an opinion, so the coverage table's `lines` are lines a bettor could have taken. `keep_rows`, when given, collects
+    the published rows that did become opinions (the checklist's `live_props` population)."""
+    from syndicate.features.shared.live_prop_evidence import expand_props
+
+    reader = reader or Reader()
+    off = experts_off(env)
+    out: list[ExpertOpinion] = []
+    skipped: dict[str, int] = {}
+    for props_row in props_rows:
+        for prop in expand_props(props_row.get("props") or []):
+            op = stat_progress_expert(prop, props_row, quotes, index, reader, off)
+            if op.refusal in ("line_not_quoted", "no_quotes_for_player_market"):
+                skipped[op.refusal] = skipped.get(op.refusal, 0) + 1
+                continue
+            out.append(op)
+            if keep_rows is not None:
+                keep_rows.append(prop)
+    return out, skipped
+
+
+def prior_reproduction(opinions: Sequence[ExpertOpinion], quotes: PropQuoteIndex, tol: float = 1e-6) -> dict[str, Any]:
+    """The stat-progress prior against the BOARD's own fair-value function, recomputed from the raw index entries.
+
+    For each opined line: the entries captured by `t` from the books the expert used (`book_p`), handed to
+    `odds_book_quotes._fair_value_fields` -- the function the board prices with -- must give the same `p_prior`.
+    And the expert's probability must be the published P(over) smoothed at n = simsRun."""
+    from syndicate.features.shared.odds_book_quotes import _fair_value_fields
+
+    out: dict[str, Any] = {"checked": 0, "prior_mismatched": 0, "p_mismatched": 0, "examples": []}
+    for op in opinions:
+        if op.expert != "stat_progress" or op.p_prior is None or op.p_expert is None:
+            continue
+        at = _parse(op.t)
+        entries, _ = quotes.lookup(op.inputs.get("home_name"), op.inputs.get("away_name"), op.player, op.market,
+                                   op.line)
+        books = set((op.inputs.get("book_p") or {}).keys())
+        rows = [{"bookmaker": book, "selection": side, "price": price, "book_updated_at": stamp.isoformat()}
+                for seen, stamp, book, side, price, _sel in (entries or []) if seen <= at and book in books]
+        best = min((r["price"] for r in rows if r["selection"] == "over"), default=None)
+        fair = _fair_value_fields(rows, selection="over", price=best or 100, best_price=best or 100)
+        out["checked"] += 1
+        p_board = fair.get("fair_probability")
+        bad_prior = p_board is None or abs(float(p_board) - float(op.p_prior)) > tol
+        k, n = op.inputs.get("k"), op.inputs.get("n")
+        p_adj = None if k is None or not n else agresti_coull(float(k), float(n))[0]
+        bad_p = p_adj is None or abs(round(clip(p_adj), 6) - float(op.p_expert)) > tol
+        out["prior_mismatched"] += int(bad_prior)
+        out["p_mismatched"] += int(bad_p)
+        if (bad_prior or bad_p) and len(out["examples"]) < 10:
+            out["examples"].append({"line_key": op.line_key, "t": op.t, "p_prior": op.p_prior, "board": p_board,
+                                    "p_expert": op.p_expert, "p_from_published": p_adj, "books": sorted(books)})
+    return out
+
+
+LIVE_EXPERTS: dict[str, Callable[..., ExpertOpinion]] = {"live_resim": live_resim_expert,
+                                                         "stat_progress": stat_progress_expert}
 
 
 def live_opinions(ledger_rows: Iterable[Mapping[str, Any]], index: EvidenceIndex, reader: Reader | None = None,
@@ -647,7 +932,8 @@ def _field_default(f: Any) -> Any:
 
 def checklist(opinions: Sequence[ExpertOpinion], reader: Reader, sources: Mapping[str, Sequence[Any]],
               *, sport: str = "", expected_sparse: Mapping[str, str] | None = None,
-              floor: float = 0.01, min_opined: int = 20) -> dict[str, Any]:
+              floor: float = 0.01, min_opined: int = 20,
+              populated: Mapping[str, tuple[int, Mapping[str, int]]] | None = None) -> dict[str, Any]:
     """`model_engine_standard.md` §1 for the experts, for ONE sport's run.
 
     CONSUMED: every input path an expert read during THIS run (`Reader.consumed`), never a name list.
@@ -658,7 +944,10 @@ def checklist(opinions: Sequence[ExpertOpinion], reader: Reader, sources: Mappin
     Also, over `dataclasses.fields(ExpertOpinion)`: an output field that sits at its default on EVERY opined
     opinion of an expert is an alarm unless documented as `expert:out:field` (sigma None on `sim` is one). Checked
     only once an expert has `min_opined` opinions: "always at default" over one line is not evidence of anything
-    (11-10: one WNCAAB moneyline tripped it)."""
+    (11-10: one WNCAAB moneyline tripped it).
+
+    `populated` gives a source's (rows, non-null count per path) measured while streaming it (`PropQuoteIndex`
+    counts every prop row of a shard it does not keep as dicts); it takes the place of `sources` for that source."""
     expected_sparse = dict(EXPECTED_SPARSE if expected_sparse is None else expected_sparse)
     alarms: list[dict[str, Any]] = []
     inputs: list[dict[str, Any]] = []
@@ -666,16 +955,21 @@ def checklist(opinions: Sequence[ExpertOpinion], reader: Reader, sources: Mappin
     for expert, paths in sorted(reader.consumed.items()):
         for qualified in sorted(paths):
             source, path = qualified.split(":", 1)
-            rows = sources.get(source) or []
-            populated = sum(1 for r in rows if probe.get("_", source, r, path) is not None)
-            share = (populated / len(rows)) if rows else None
-            entry = {"sport": sport, "expert": expert, "input": qualified, "rows": len(rows),
+            if populated is not None and source in populated:
+                n_rows, counts = populated[source]
+                n_populated = int(counts.get(path, 0))
+            else:
+                rows = sources.get(source) or []
+                n_rows = len(rows)
+                n_populated = sum(1 for r in rows if probe.get("_", source, r, path) is not None)
+            share = (n_populated / n_rows) if n_rows else None
+            entry = {"sport": sport, "expert": expert, "input": qualified, "rows": n_rows,
                      "populated_share": None if share is None else round(share, 4)}
             documented = expected_sparse.get(f"{expert}:{qualified}") or expected_sparse.get(f"{sport}:{expert}:{qualified}")
             if documented:
                 entry["documented_sparse"] = documented
             inputs.append(entry)
-            if rows and share is not None and share < floor and not documented:
+            if n_rows and share is not None and share < floor and not documented:
                 alarms.append({**entry, "alarm": "CONSUMED_UNPOPULATED"})
     outputs: list[dict[str, Any]] = []
     for expert in sorted({o.expert for o in opinions}):

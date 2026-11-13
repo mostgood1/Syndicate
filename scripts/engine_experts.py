@@ -13,8 +13,11 @@ Prints, per sport:
               totals/spreads (the gate: mismatched must be 0); whole-number lines and moneylines reported beside it
   CHECKLIST   model_engine_standard.md §1: an input an expert CONSUMED this run that is unpopulated on real rows, or
               an output field at its default on every opined opinion, unless documented in EXPECTED_SPARSE
+  STAT_PROGRESS  the props log (`live_evidence/<sport>/<date>.props.jsonl`) priced against the date's `book_quotes`
+              shard: COVERAGE as above; PRIOR, the expert's prior recomputed by the board's own fair-value function and
+              its probability recomputed from the published P(over) (the gate: both mismatch counts must be 0)
 
-Exit 1 on any checklist alarm or any JOIN mismatch; 0 otherwise. Run on the fleet with the worker's environment, at
+Exit 1 on any checklist alarm or any JOIN / PRIOR mismatch; 0 otherwise. Run on the fleet with the worker's environment, at
 nice 19 (it reads ~50 MB of NBA ledger on a busy night).
 """
 
@@ -126,6 +129,62 @@ def live(date_str: str, sports: set[str] | None, root: Path | None) -> dict[str,
     return out
 
 
+def _iter_quote_rows(sport: str, date_str: str):
+    from syndicate.features.shared import odds_book_quotes as obq
+
+    path = obq.resolve_book_quotes_path(sport, date_str)
+    if not path.exists():
+        return
+    with obq._open_book_quotes_text(path) as fh:
+        for line in fh:
+            try:
+                row = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(row, dict):
+                yield row
+
+
+def stat_progress(date_str: str, sports: set[str] | None, root: Path | None) -> dict[str, Any]:
+    """The stat-progress expert over one date's props log (`live_evidence/<sport>/<date>.props.jsonl`), priced against
+    that date's `book_quotes` shard, bucketed by the lane rows of the same ticks."""
+    from syndicate.features.shared import live_evidence_log as lel
+    from syndicate.features.shared import live_prop_evidence as lpe
+
+    out: dict[str, Any] = {}
+    for sport in LIVE_SPORTS:
+        if sports and sport not in sports:
+            continue
+        props_rows = list(lpe.iter_prop_rows(sport, date_str, root=root))
+        if not props_rows:
+            continue
+        evidence = [row for d in _days_around(date_str) for row in lel.iter_rows(sport, d, root=root)]
+        index = ee.EvidenceIndex(evidence)
+        reader = ee.Reader()
+        quotes = ee.PropQuoteIndex(_iter_quote_rows(sport, date_str), reader)
+        kept: list[Any] = []
+        ops, skipped = ee.stat_progress_opinions(props_rows, quotes, index, reader, keep_rows=kept)
+        opined = [o for o in ops if o.delta_logit is not None]
+        ages = sorted(o.prior_age_s for o in opined if o.prior_age_s is not None)
+        books = sorted(o.inputs.get("prior_books") or 0 for o in opined)
+        out[sport] = {
+            "opinions": ops,
+            "props_rows": len(props_rows),
+            "published_rows": len(kept) + sum(skipped.values()),
+            "skipped": skipped,
+            "quote_prop_rows": quotes.rows,
+            "evidence_rows": len(evidence),
+            "prior_age_s": {"p50": ages[len(ages) // 2], "p90": ages[int(len(ages) * 0.9)], "max": ages[-1]}
+            if ages else None,
+            "prior_books": {"p50": books[len(books) // 2], "min": books[0], "max": books[-1]} if books else None,
+            "reproduction": ee.prior_reproduction(ops, quotes),
+            "checklist": ee.checklist(ops, reader, {"props_log": props_rows, "live_props": kept,
+                                                    "live_evidence": evidence},
+                                      sport=sport, populated={"book_quotes": quotes.populated()}),
+        }
+    return out
+
+
 def _print_coverage(sport: str, ops: list[Any]) -> None:
     for row in ee.coverage(ops):
         refusals = ", ".join(f"{k} {v}" for k, v in list(row["refusals"].items())[:4])
@@ -177,6 +236,29 @@ def run(args: argparse.Namespace) -> int:
         bad += len(cl["alarms"])
         report["live"][sport] = {"coverage": ee.coverage(ops), "join": j, "checklist": cl,
                                  "ledger_rows": block["ledger_rows"], "evidence_rows": block["evidence_rows"]}
+
+    report["stat_progress"] = {}
+    for sport, block in stat_progress(args.date, sports, root).items():
+        ops = block["opinions"]
+        all_ops += ops
+        print(f"STAT_PROGRESS sport={sport} props_rows={block['props_rows']} published_rows={block['published_rows']} "
+              f"not_a_line={json.dumps(block['skipped'], sort_keys=True)} quote_prop_rows={block['quote_prop_rows']} "
+              f"evidence_rows={block['evidence_rows']} prior_age_s={block['prior_age_s']} "
+              f"prior_books={block['prior_books']}")
+        _print_coverage(sport, ops)
+        rep = block["reproduction"]
+        print(f"   PRIOR {sport} checked={rep['checked']} prior_mismatched={rep['prior_mismatched']} "
+              f"p_mismatched={rep['p_mismatched']}")
+        for ex in rep["examples"][:5]:
+            print("      MISMATCH", json.dumps(ex, default=str))
+        bad += rep["prior_mismatched"] + rep["p_mismatched"]
+        cl = block["checklist"]
+        print(f"   CHECKLIST {sport} stat_progress ok={cl['ok']} alarms={len(cl['alarms'])}")
+        for a in cl["alarms"][:12]:
+            print("      ALARM", json.dumps(a, default=str))
+        bad += len(cl["alarms"])
+        report["stat_progress"][sport] = {k: v for k, v in block.items() if k != "opinions"} | {
+            "coverage": ee.coverage(ops)}
 
     if args.json:
         Path(args.json).write_text(json.dumps(report, indent=1, default=str), encoding="utf-8")

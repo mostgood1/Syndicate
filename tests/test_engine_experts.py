@@ -279,6 +279,164 @@ def test_checklist_alarms_on_an_output_field_at_its_default_everywhere():
     assert ee.checklist(ops, reader, {"decision_record": []}, sport="nba", expected_sparse={})["ok"]
 
 
+# ----------------------------------------------------------------------------- stat progress (slice 3)
+# Shapes from the fleet on 2026-11-12/13: a `live_prop_evidence` props row (ESPN event id, team full names, `t` in the
+# producer's -06:00 offset, `simsRun` 100) and `book_quotes` prop rows (OddsAPI event id, over/under, Yes/No with a
+# NaN line on the doubles markets, `captured_at` beside the book's own `book_updated_at`).
+
+T_TICK = "2026-11-12T19:00:00-06:00"  # 01:00:00Z on 11-13
+
+
+def _prop(line=24.5, p=0.82, *, player="Tyrese Maxey", prop="player_points", sims=100, actual=11.0, extra=None):
+    row = {"playerName": player, "prop": prop, "line": line, "liveProjection": 26.4, "liveModelProbOver": p,
+           "actualSoFar": actual, "simsRun": sims, "side": "home"}
+    row.update(extra or {})
+    return row
+
+
+def _props_row(props, t=T_TICK):
+    from syndicate.features.shared import live_prop_evidence as lpe
+
+    return {"v": 1, "kind": "props", "sport": "nba", "date": "2026-11-12", "t": t,
+            "observed_at": "2026-11-13T01:00:04+00:00", "event_id": "401909976", "home": "PHI", "away": "TOR",
+            "home_name": "Philadelphia 76ers", "away_name": "Toronto Raptors", "n": len(props), "refusal": None,
+            "props": lpe.compact_props(props)}
+
+
+def _quote(book, selection, price, *, line=24.5, captured="2026-11-13T00:58:00Z", updated="2026-11-13T00:57:50Z",
+           player="Tyrese Maxey", market="player_points"):
+    return {"captured_at": captured, "snapshot_ts": updated or captured, "book_updated_at": updated, "sport": "nba",
+            "date": "2026-11-12", "kind": "prop", "event_id": "ab12", "commence_time": "2026-11-13T00:10:00Z",
+            "home_team": "Philadelphia 76ers", "away_team": "Toronto Raptors", "bookmaker": book, "market": market,
+            "segment": "full", "selection": selection, "player_name": player, "line": line, "price": price}
+
+
+def _two_books(**kw):
+    return [_quote("fanduel", "over", -120, **kw), _quote("fanduel", "under", 100, **kw),
+            _quote("draftkings", "over", -110, **kw), _quote("draftkings", "under", -110, **kw)]
+
+
+def _sp(props, quotes, *, evidence=None, env=None):
+    index = ee.EvidenceIndex(evidence if evidence is not None else
+                             [_evidence(t=T_TICK, home="Philadelphia 76ers", away="Toronto Raptors")])
+    reader = ee.Reader()
+    qi = ee.PropQuoteIndex(quotes, reader)
+    ops, skipped = ee.stat_progress_opinions([_props_row(props)], qi, index, reader, env=env)
+    return ops, skipped, qi, reader
+
+
+def test_stat_progress_on_then_off():
+    on, _, _, _ = _sp([_prop()], _two_books())
+    off, _, _, _ = _sp([_prop()], _two_books(), env={ee.OFF_ENV: "stat_progress"})
+    assert on[0].refusal is None and on[0].delta_logit is not None
+    assert off[0].refusal == "expert_off" and off[0].delta_logit is None and off[0].p_expert is None
+
+
+def test_stat_progress_is_the_published_p_smoothed_at_sims_against_the_book_median():
+    ops, _, _, _ = _sp([_prop(p=0.82)], _two_books())
+    op = ops[0]
+    p_adj, se = ee.agresti_coull(82.0, 100.0)
+    assert op.p_expert == pytest.approx(round(p_adj, 6))
+    assert op.sigma == pytest.approx(round(ee.sigma_logit_from_se(p_adj, se), 6))
+    # fanduel -120/+100 de-vigs to 0.521739 over, draftkings -110/-110 to 0.5; median of two, renormalised
+    fd = (120 / 220) / (120 / 220 + 0.5)
+    assert op.p_prior == pytest.approx(round((fd + 0.5) / 2, 6))
+    assert op.delta_logit == pytest.approx(round(ee.logit(p_adj) - ee.logit(op.p_prior), 6), abs=2e-6)
+    assert op.inputs["book_p"] == {"draftkings": 0.5, "fanduel": round(fd, 6)}
+    assert op.prior_age_s == 130.0  # 01:00:00Z - the newest book stamp 00:57:50Z
+    assert (op.side, op.segment, op.player, op.market, op.line) == ("over", "full", "Tyrese Maxey", "player_points", 24.5)
+    assert (op.clock_bucket, op.elapsed_share) == ("25-50", 0.375)
+
+
+def test_a_quote_captured_after_the_instant_is_not_the_prior():
+    late = [_quote("draftkings", "over", -300, captured="2026-11-13T01:00:30Z", updated="2026-11-13T01:00:20Z"),
+            _quote("draftkings", "under", 220, captured="2026-11-13T01:00:30Z", updated="2026-11-13T01:00:20Z")]
+    ops, _, _, _ = _sp([_prop()], _two_books() + late)
+    assert ops[0].inputs["book_p"]["draftkings"] == 0.5
+
+
+@pytest.mark.parametrize("quotes, refusal", [
+    ([_quote("fanduel", "over", -120)], "prior_one_sided"),
+    ([_quote("fanduel", "over", -120), _quote("fanduel", "under", 100, updated="2026-11-13T00:40:00Z",
+                                              captured="2026-11-13T00:40:05Z")], "prior_unpaired"),
+    (_two_books(captured="2026-11-13T00:40:05Z", updated="2026-11-13T00:40:00Z"), "prior_stale"),
+    ([_quote("fanduel", "over", 150), _quote("fanduel", "under", 150)], "prior_implausible_hold"),
+    (_two_books(captured="2026-11-13T01:05:00Z"), "no_quote_before_instant"),
+])
+def test_prior_refusals_are_named(quotes, refusal):
+    ops, _, _, _ = _sp([_prop()], quotes)
+    assert ops[0].refusal == refusal and ops[0].delta_logit is None and ops[0].p_prior is None
+
+
+def test_producer_refusals_pass_through_by_their_own_name():
+    pulled = _prop(p=None, extra={"unpricedReason": "quote_pulled", "quotePulled": True, "liveDisplayProbOver": 0.4})
+    certain = _prop(line=24.5, p=None, player="Joel Embiid", extra={"unpricedReason": "certainty_refused"})
+    quotes = _two_books() + _two_books(player="Joel Embiid")
+    ops, _, _, _ = _sp([pulled, certain], quotes)
+    assert sorted(o.refusal for o in ops) == ["certainty_refused", "quote_pulled"]
+    assert all(o.delta_logit is None for o in ops)
+
+
+def test_ladder_rows_are_counted_not_opined():
+    rows = [_prop(line=24.5), _prop(line=22.5, p=0.9), _prop(player="Paul Reed", line=6.5, p=0.4)]
+    ops, skipped, _, _ = _sp(rows, _two_books())
+    assert [o.line for o in ops] == [24.5]
+    assert skipped == {"line_not_quoted": 1, "no_quotes_for_player_market": 1}
+
+
+def test_the_player_name_folds_and_the_team_order_does_not_matter():
+    quotes = [dict(q, player_name="TYRESE  Maxey", home_team="Toronto Raptors", away_team="Philadelphia 76ers")
+              for q in _two_books()]
+    ops, skipped, _, _ = _sp([_prop()], quotes)
+    assert skipped == {} and ops[0].refusal is None
+
+
+def test_doubles_yes_is_over_the_fixed_line():
+    nan = float("nan")
+    dd = _prop(line=1.5, p=0.35, prop="player_double_double")
+    quotes = [_quote("espnbet", "Yes", 180, line=nan, market="player_double_double"),
+              _quote("espnbet", "No", -240, line=nan, market="player_double_double"),
+              _quote("fanduel", "Yes", 170, line=nan, market="player_double_double")]
+    ops, skipped, _, _ = _sp([dd], quotes)
+    assert skipped == {}
+    op = ops[0]
+    assert op.refusal is None and op.inputs["prior_books"] == 1 and op.inputs["one_sided_books"] == ["fanduel"]
+    over, under = 100 / 280, 240 / 340
+    assert op.p_prior == pytest.approx(round(over / (over + under), 6))
+
+
+def test_no_lane_row_leaves_the_bucket_unknown_not_the_opinion():
+    ops, _, _, _ = _sp([_prop()], _two_books(), evidence=[])
+    assert ops[0].refusal is None and ops[0].clock_bucket is None
+    assert ops[0].inputs["evidence_match"] == "no_game_match"
+
+
+def test_the_prior_reproduces_the_boards_own_fair_value_function():
+    rows = [_prop(line=24.5, p=0.82), _prop(line=24.5, p=0.3, player="Joel Embiid")]
+    quotes = _two_books() + [_quote("betmgm", "over", 105), _quote("betmgm", "under", -135)] + \
+        _two_books(player="Joel Embiid") + [_quote("kalshi", "over", -105, player="Joel Embiid", updated=None),
+                                            _quote("kalshi", "under", -102, player="Joel Embiid", updated=None)]
+    ops, _, qi, _ = _sp(rows, quotes)
+    rep = ee.prior_reproduction(ops, qi)
+    assert rep["checked"] == 2 and rep["prior_mismatched"] == 0 and rep["p_mismatched"] == 0, rep
+
+
+def test_stat_progress_checklist_reads_the_streamed_population():
+    pulled = _prop(p=None, extra={"unpricedReason": "quote_pulled", "quotePulled": True})
+    ops, _, qi, reader = _sp([_prop(), pulled], _two_books())
+    props_row = _props_row([_prop(), pulled])
+    # the fleet's nights: unpricedReason on 42-45% of the rows at quoted lines (11-11, 11-12)
+    cl = ee.checklist(ops, reader, {"props_log": [props_row], "live_props": [_prop(), pulled],
+                                    "live_evidence": [_evidence(t=T_TICK)]},
+                      sport="nba", min_opined=1, populated={"book_quotes": qi.populated()})
+    consumed = {row["input"] for row in cl["inputs"] if row["expert"] == "stat_progress"}
+    assert {"book_quotes:price", "book_quotes:captured_at", "live_props:liveModelProbOver", "props_log:t",
+            "live_evidence:state"} <= consumed
+    assert cl["ok"], cl["alarms"]
+    starved = ee.PropQuoteIndex([dict(q, captured_at=None) for q in _two_books()], ee.Reader())
+    assert starved.populated() == (4, {k: 4 for k in starved.non_null}) and "captured_at" not in starved.non_null
+
+
 # ----------------------------------------------------------------------------- shadow: no reader, no order module
 
 
