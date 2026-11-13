@@ -59709,3 +59709,18 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - **Falsified if** a scaled sport's priced share falls by more than 10%, a WNCAAB spreads row is tempered, or ANY h2h row carries a scale.
 - **Off switch:** `SYNDICATE_LIVE_SPREADS_PROB_SCALE=off` (or `_<SPORT>=1`) in `local_production.env` + a drained full `down`/`up`. **Revert:** `git revert 273a4a599`, a fleet ff and a claimed refresh-worker TERM.
 - **Claims:** refresh-worker released right after this entry.
+
+## 2026-11-13 21:30:47Z (3:30 PM CST) -- READING, no deploy: the warm NBA grid build time on refresh-worker after #790's season-phase fix (`3422cb018`; lane `book-grid-overlay-starvation`) -- **MET: NBA `build_seconds` median 120.5 -> 51.0 s (n 5; prediction <= 80 s, falsified > 100 s); the tail that remains is contention with the board loop**
+- **What was read:** the worker loaded at 20:18:40Z by lane `live-margin-prob-scale` (pid 469244, `273a4a599`, which contains `3422cb018`). The fleet's later ff to `acb7e47b7` (21:28:10Z, NHL live overtime #773) did not restart refresh-worker; pid 469244 was unchanged at 21:31:50Z.
+- **Warm window:** NBA builds after the worker's first board save (BOARD_BUILD_TIMING 20:36:34Z). That excludes the cold window that confounded 109 / 136 s on the previous worker.
+- **verify** (`BOOK_GRID_TICK build_seconds.nba`, read 21:31:49Z with `C:\tmp\railload\nba_build_base.py 2026-11-13T20:36:35`):
+  - 20:43:41Z 145.9 s; 20:52:33Z 34.3 s; 21:04:39Z 51.0 s; 21:16:06Z 26.2 s; 21:30:47Z 113.3 s.
+  - **median 51.0 s** (min 26.2, max 145.9). Baseline (old code, warm, read 19:52:02Z): n 8, median 120.5 s (65.6-256.1).
+  - 0 Tracebacks, 0 BOOK_GRID_TICK_ERROR, 0 INPLAY_OVERLAY_FAILED since the 20:18:52Z boot.
+- **Contention, estimated from the tick's per-sport sum (NBA assumed first in its tick):**
+  - 145.9 and 51.0 s overlapped `layer2_shortlist_build` (20:39:16-20:44:37, 21:00:01-21:05:12).
+  - 113.3 s overlapped the loop's per-sport layer2 / venue fan-in work (21:28:39-21:31:06), outside BOARD_BUILD_TIMING.
+  - 34.3 and 26.2 s fell in the board loop's persist phase only. Isolated replay of the new code: 10.5-16.9 s + about 3 s of json.dump.
+  - The board loop was about as busy as in the baseline window: build wall 344-477 s now vs 326-595 s then.
+- **Reading:** the fix cut the NBA grid's own work as the replay said, and moved the warm median well under 80 s. What is left of the tail is the GIL shared with the board loop, which runs almost back to back. This fix does not touch it, and it stays recorded as unfixed. n is 5, so the median is coarse.
+- **Still owed:** the NBA-night reading (overlay elapsed and gaps once NBA is live; watcher on pid 469244, 7:30 PM CST).
