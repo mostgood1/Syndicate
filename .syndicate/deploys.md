@@ -47709,7 +47709,7 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
 - **change (config, not code):** `LIVE_ODDS_WORKER__SYNDICATE_LOCAL_MEMORY_LIMIT_MB=3072` appended to `~/syndicate-prod/local_production.env` (role-scoped; one-line diff; backup `local_production.env.bak_lomemcap_20261008T013304Z`). Derived env before the restart: web 2048, refresh-worker 6144, live-odds-worker 3072, and no scoped key leaked into the other roles.
 - **expected behaviour change:** live-lens ticks (300 MB floor) now refuse only above 2772 MB. The odds-refresh-during-MLB-sim gate (`live_refresh_loop.py:6005`, floor 1800) now OPENS whenever the role is under 1272 MB (about 85% of samples), so live-odds odds refreshes no longer always pause while an MLB sim runs.
 - **locks:** web 656f..., refresh-worker 260c..., live-odds-worker 7da7... (holder `live-odds-memory-cap`), acquired 01:39:26Z, all three released 01:43:36Z. `watchdog_no_autostart` set before `down`, cleared after.
-- **safety:** filtered `check_deploy_safety` with refresh-worker's env (`C:	mp\iec_safety.py`, values never printed), polled every 60 s. The REFRESH-WORKER side read idle at **01:39:01Z** ("Board build idle ... persisted", MLB sim finished, no refresh-worker child). ACCEPTED and killed: 6 live-odds-worker children under 30 s old (odds refreshes / soccer schedule / ESPN status; retried next tick) and live-lens ticks during the outage (live-games WARNING).
+- **safety:** filtered `check_deploy_safety` with refresh-worker's env (`C:\tmp\iec_safety.py`, values never printed), polled every 60 s. The REFRESH-WORKER side read idle at **01:39:01Z** ("Board build idle ... persisted", MLB sim finished, no refresh-worker child). ACCEPTED and killed: 6 live-odds-worker children under 30 s old (odds refreshes / soccer schedule / ESPN status; retried next tick) and live-lens ticks during the outage (live-games WARNING).
 - **no ride-along:** fleet checkout NOT fast-forwarded; it stays at `27424623`, which all three roles already ran.
 - **timeline (UTC):** `down` 01:39:40 -> `down.` 01:40:30; `Start-ScheduledTask SyndicateLocalProduction` 01:41:16 (task state Ready before); `/healthz` 200 at **01:42:30** (outage ~2m50s). Roles web 3493817, refresh-worker 3493885, live-odds-worker 3493886, all `code=27424623`, restarts 0.
 - **verify (READ):** live-odds-worker pid 3493886 process environ `SYNDICATE_LOCAL_MEMORY_LIMIT_MB=3072` (refresh-worker 6144). Its own `ALL_PROCESS_MEMORY` at 01:43:03.464Z: **`container_memory_max_mb: 3072.0`**, `container_memory_mb` 639.2, pct 20.8. NOTE: `local_production.py status` still labels the role "Render plan 2048 MB"; that label prints `PLAN_MEMORY_MB`, not the effective cap (`:1898`), so it is cosmetic.
@@ -51754,7 +51754,7 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - First build after boot, 16:37:07-16:37:16Z: `PAPER_ALONGSIDE_LIVE` x3, `EXECUTED date=2026-10-20 mode=paper venue=paper ... placed=9 filled=9`, `venue=paper:novig placed=3`, `venue=paper:prophetx placed=5`. 0 `REFUSED_LIVE_INLINE`, 0 `PAPER_FLUSH_FAILED`, 0 Traceback since BOOTED.
   - Ledger: **17 new paper rows, all tagged** `selection=suggested_only season_phase=regular paper_alongside_live=True` (paper 9, paper:novig 3, paper:prophetx 5). Live: still 554 rows, all filled; refresh-worker wrote no live row.
   - paper:kalshi / paper:polymarket placed 0 in this build because their paper2 plans had 0 positions (`below_min_ev_pct` / `_net_of_fee`), not because of a refusal. Earlier today the Kalshi plan was non-zero in 8-9 builds/hour (11-12Z).
-- **owed (the grading half):** these are 10-20 slate rows; their games settle tonight. Reading: count of `paper_alongside_live=True` rows with `outcome` set, per venue, after tomorrow's first settlement pass (>= 2026-10-21 13:00Z), plus the first `paper:kalshi` / `paper:polymarket` row with the tags. Script: `C:	mp\paperlive\ledger_read.py` (counts only, refresh-worker state env).
+- **owed (the grading half):** these are 10-20 slate rows; their games settle tonight. Reading: count of `paper_alongside_live=True` rows with `outcome` set, per venue, after tomorrow's first settlement pass (>= 2026-10-21 13:00Z), plus the first `paper:kalshi` / `paper:polymarket` row with the tags. Script: `C:\tmp\paperlive\ledger_read.py` (counts only, refresh-worker state env).
 - **rollback:** code revert of 1006cb75's two runtime files + a gated refresh-worker TERM; or `REFRESH_WORKER__SYNDICATE_PAPER_ALONGSIDE_LIVE=off` + full down/up (env is frozen at `up`).
 
 ## 2026-10-20 16:56:17Z (11:56 AM CT) -- fleet ff 1006cb75 -> 72407b6c + live-odds-worker ROLE-ONLY restart: D2 live budget by PLACEMENT day (lane `future-dated-live-orders-scope`, session 0ffeb586, todo #707) + D4 rides along -- **MET (D2 as predicted: no change in today's reads; D4 loaded: exit watcher 19 -> 42)**
@@ -52399,7 +52399,7 @@ Same applies, with far lower stakes, to my own `live_lens` postponed-bucket fix:
 - **rollback:** `LIVE_ODDS_WORKER__SYNDICATE_EXECUTION_VENUE_CONTRACT_DEDUPE=off` (needs a full down/up), or revert `4ffb4e64`, ff, then a gated live-odds-worker TERM.
 
 ## 2026-10-21 14:56:53Z (9:56 AM CT) -- READING: paper-alongside-live grading (lane paper-alongside-live) -- **MET** (run by hand: the 8:45 AM CT scheduled task did not fire; the app's scheduled tasks are not firing)
-- **source:** one read each at 14:55-14:57Z, refresh-worker state env (pid 3258427, BOOTED 08:43:52Z), counts only. Scripts in C:	mp\paperlive (base.sh, venue_books.sh, twins.sh, fills.sh, readout_run.sh -> scripts/paper_ladder_readout.py). Window: submitted from 2026-10-20T16:18-16:30Z.
+- **source:** one read each at 14:55-14:57Z, refresh-worker state env (pid 3258427, BOOTED 08:43:52Z), counts only. Scripts in C:\tmp\paperlive (base.sh, venue_books.sh, twins.sh, fills.sh, readout_run.sh -> scripts/paper_ladder_readout.py). Window: submitted from 2026-10-20T16:18-16:30Z.
 - **verdict MET:**
   - Tagged paper rows ARE graded: 10-20 slate, 15 settled in the venue books + ladders.
   - `REFUSED_LIVE_INLINE` = 0 since the 08:43:52Z boot, against `PAPER_ALONGSIDE_LIVE` = 472.
@@ -54798,7 +54798,7 @@ which is about the two sizing bases and not about the refusal boundary.
   - D, drill registry lost (empty registry copy, real clock): **ALERT `REGISTRY LOST ... (0 tasks, 0 enabled)`, exit 1** (`--no-toast`).
   - E, `pythonw.exe` (the job's interpreter), live: UNJUDGED, exit 0, log line written.
 - **standby guard has a live population:** 72 x 506 / 73 x 507 in the last 30 days, none in the last 3. Reachability is a test: the same inputs without the power history ALERT.
-- **OWED:** (1) Windows job `SyndicateTaskRegistryCheck` via `deploy/local/install_task_registry_check.ps1` (every 2 h at :50 past even hours, Interactive, StartWhenAvailable, script copied to `C:\SyndicateProd	ask_registry_check`) -- ONLY on the user's explicit yes. (2) The first REAL OK reading: the earliest judgeable due time is 10-28 09:15 CT, so a run after 10:45 CT should read OK with the watchdog's 09:15 run in state.json.
+- **OWED:** (1) Windows job `SyndicateTaskRegistryCheck` via `deploy/local/install_task_registry_check.ps1` (every 2 h at :50 past even hours, Interactive, StartWhenAvailable, script copied to `C:\SyndicateProd\task_registry_check`) -- ONLY on the user's explicit yes. (2) The first REAL OK reading: the earliest judgeable due time is 10-28 09:15 CT, so a run after 10:45 CT should read OK with the watchdog's 09:15 run in state.json.
 
 
 ## 2026-10-28 14:01:54Z (9:01 AM CT) -- FLEET ff 84967f75 -> 1f339cc2 + ENV KEY + FULL DOWN/UP: in-game entries step up to ~$3/order (lane live-min-stake-five, coordinator 332cb014) -- **DEPLOYED; first multi-contract entry OWED**
@@ -59097,7 +59097,7 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - Claim live-odds-worker, holder `nba-resim-overtime-prob`, 23:36:19Z (rc 0).
   - Spacing: the last live-odds-worker restart was 22:34:21Z, 65 min earlier.
   - Preflight `--target fleet --target-commit 837320ab5`, from a worktree at origin/main. 23:36:31Z: HOLD (10 odds jobs). Then a 10 s loop: HOLD x12, **CLEAR 23:39:18Z** (rc 0, 0 jobs). Baseline read 23:36:11Z.
-- **load** (`C:	mp\otload\load.sh 837320ab5 1225c3418`; it aborts on a moved HEAD or a running odds job):
+- **load** (`C:\tmp\otload\load.sh 837320ab5 1225c3418`; it aborts on a moved HEAD or a running odds job):
   - `git merge --ff-only` at **23:39:26.720Z**: HEAD `837320ab5`. On disk: `"p_ot"` 1, the tie rule 1.
   - `kill -TERM 246202` at 23:39:26.725Z. Its children were the 2 `live_resim_workers --serve` and 2 defunct; no odds job, no NBA or NHL game live.
   - New supervised live-odds-worker **pid 263310**, first seen 23:41:16.068Z.
@@ -59108,7 +59108,7 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - `local_production.py status`: `live-odds-worker pid=263310 up code=837320ab`.
   - `NBA_LIVE_RESIM_LOOP_STARTED interval_s=120.0` at 23:41:15.833Z, and a tick at 23:41:16Z (`games=0`, before the tips).
   - `low_tracebacks_first_10min` 0 -> 0: 0 so far (1,077 lines since the TERM). The 10-minute read is owed at 23:51Z.
-  - `nba_history_rows_with_p_ot` 0 -> >0: **OWED** to the first live NBA tick. Watcher: this session's background task (`C:	mp\otload\watch_pot.sh`, every 60 s for 60 min).
+  - `nba_history_rows_with_p_ot` 0 -> >0: **OWED** to the first live NBA tick. Watcher: this session's background task (`C:\tmp\otload\watch_pot.sh`, every 60 s for 60 min).
 - **Revert:** `git revert 837320ab5` on main + ff + a claimed live-odds-worker TERM. The field is additive: no code reads `modelOvertimeProb` or `p_ot` by name except `scripts/nba_blowout_bench_study.py` (grep of syndicate/, scripts/, pipeline/).
 - Claim live-odds-worker released after this entry.
 

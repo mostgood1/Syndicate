@@ -263,7 +263,7 @@ Full read with per-module evidence: `.syndicate/tier5_live_modules_2026-08-14.md
   `pairs 421,656`, `first_date 2021-03-15`, **`through 2026-09-16`** (29 raw Statcast chunks
   already on the worker's disk covered 2026-03-15..09-16; the git cache supplied only
   2021..2025-11-01). Web IS serving it, isolated from the fallback by the only field that
-  separates them â the table title prints the SOURCE's horizon: `career, through 2026-09-16`
+  separates them — the table title prints the SOURCE's horizon: `career, through 2026-09-16`
   where the legacy scan printed `2026-05-09`. **MLB prop Ask median 18.25 s -> 11.62 s**, and
   one identical board row 16.79 s -> 3.57 s. The launch gate did not refuse; Render's logs API
   was erroring throughout, so this rests on the artifact's own `built_at` and mtimes.
@@ -277,7 +277,7 @@ Full read with per-module evidence: `.syndicate/tier5_live_modules_2026-08-14.md
   deployed service): 0.14-0.27 s per answer** (median of 3; WNBA 0.27, NFL 0.14, NCAAF
   0.14), peak traced allocation 2.4-15.9 MB, retained 0.6-1.6 MB, ~6 KB added to a
   payload already ~8 MB. Against a 15-26 s Ask and web's 650 MB per-worker anon recycle
-  that is noise â which is why this lane told the web deploy queue its two commits are
+  that is noise — which is why this lane told the web deploy queue its two commits are
   safe to ride along with someone else's deploy.
 - **THE MLB BvP TABLE WAS 4 MONTHS STALE AND SAID 'THROUGH TODAY'.** The git-tracked cache
   web reads covers 2021-03-15..**2026-05-11** (47 files, 1,158 dates, 384,382 pairs); the
