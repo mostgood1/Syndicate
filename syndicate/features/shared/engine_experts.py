@@ -487,10 +487,11 @@ def live_resim_expert(ledger_row: Mapping[str, Any], index: EvidenceIndex, reade
     op.prior_basis = "live_gameline_ledger.market_fair_prob"
     op.prior_age_s = _f(g("quote_age_seconds"))
     # THE ENGINE'S NUMBER, NOT #780's TEMPERED ONE. A ledger v7 record on a full-game total (NBA k 2.16, NCAAF 2.48;
-    # `live_gameline_join.totals_prob_scale`) carries the TEMPERED P(over) in `model_home_win_prob` and the engine's own
-    # in `model_home_win_prob_unscaled`, which the join sets only where `prob_scale` != 1. This expert reads the
-    # histogram the engine priced, so `join_model_p` (the join check's input) is the engine's number wherever the
-    # record says it was tempered; a tempered record without it carries None and is not checked.
+    # `live_gameline_join.totals_prob_scale`) or, from 2026-11-13 (`273a4a599`), a full-game spread (NBA 2.02, NCAAF
+    # 1.80, NCAAB 1.34; `spreads_prob_scale`) carries the TEMPERED probability in `model_home_win_prob` and the
+    # engine's own in `model_home_win_prob_unscaled`, which the join sets only where `prob_scale` != 1. This expert
+    # reads the histogram the engine priced, so `join_model_p` (the join check's input) is the engine's number wherever
+    # the record says it was tempered; a tempered record without it carries None and is not checked.
     join_p = _f(g("model_home_win_prob"))
     prob_scale = _f(g("prob_scale"))
     if prob_scale is not None and prob_scale != 1.0:
@@ -1187,7 +1188,8 @@ def segment_frame_check(ledger_rows: Iterable[Mapping[str, Any]], quotes: GameLi
         if not values:
             return None
         v = sorted(values)
-        return {"n": len(v), "median_pp": round(100 * v[len(v) // 2], 3), "p90_pp": round(100 * v[int(len(v) * 0.9)], 3),
+        return {"n": len(v), "median_pp": round(100 * v[len(v) // 2], 3),
+                "p90_pp": round(100 * v[int(len(v) * 0.9)], 3),
                 "within_2pp": round(sum(1 for x in v if x <= 0.02) / len(v), 4)}
 
     return {"totals": summary(diffs["totals"]), "spreads": summary(diffs["spreads"]),
@@ -1397,9 +1399,10 @@ EXPECTED_SPARSE: dict[str, str] = {
     "nhl:live_resim:live_evidence:marginDist": "NHL lanes publish no distributions",
     "nhl:live_resim:live_evidence:totalRunsDist": "NHL lanes publish no distributions",
     "live_resim:live_gameline_ledger:point_estimator": "None on records written before 2026-09-06",
-    "live_resim:live_gameline_ledger:prob_scale": "ledger v7 (#780, 2026-11-13): set only on totals rows the join "
-                                                  "priced from a distribution; None on spreads and moneylines, and "
-                                                  "absent from every record written before v7",
+    "live_resim:live_gameline_ledger:prob_scale": "ledger v7 (#780, 2026-11-13): set only on totals and spreads rows "
+                                                  "the join priced from a distribution (spreads from 273a4a599 on); "
+                                                  "None on moneylines and on spreads written before it, and absent "
+                                                  "from every record written before v7",
     "live_segment:out:player": "segment lines are game lines; no player",
     "nba:live_segment:segment_block:marginAnchored": "NBA's segment blocks carry no margin anchor (fleet 11-11 / "
                                                      "11-12: 0 of every block read), so its segment spreads refuse "
@@ -1407,5 +1410,6 @@ EXPECTED_SPARSE: dict[str, str] = {
     "nba:live_segment:segment_block:remainingFraction": "NBA's segment blocks do not carry it; recorded in inputs "
                                                         "only, nothing branches on it",
     "live_resim:live_gameline_ledger:model_home_win_prob_unscaled": "ledger v7 (#780): set only where prob_scale != 1 "
-                                                                    "(NBA / NCAAF full-game totals), and read only there",
+                                                                    "(NBA / NCAAF full-game totals; NBA / NCAAF / "
+                                                                    "NCAAB full-game spreads), and read only there",
 }

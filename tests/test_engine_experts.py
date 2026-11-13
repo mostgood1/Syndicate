@@ -234,6 +234,39 @@ def test_the_join_check_reads_the_engines_number_on_a_tempered_total(monkeypatch
     assert broken.p_expert == op.p_expert  # the opinion itself never read the join's number
 
 
+def test_the_join_check_reads_the_engines_number_on_a_tempered_spread(monkeypatch):
+    """#780 fix 2b (`273a4a599`) tempers full-game SPREADS too (NBA k 2.02), and the ledger writes their k and
+    unscaled number into the same v7 fields. The check keys on `prob_scale`, not on the market, so a tempered spread
+    is compared on the engine's number exactly as a tempered total is."""
+    from syndicate.features.shared import live_gameline_join as lgj
+
+    for key in ("SYNDICATE_LIVE_SPREADS_PROB_SCALE", "SYNDICATE_LIVE_SPREADS_PROB_SCALE_NBA"):
+        monkeypatch.delenv(key, raising=False)
+    ev = _evidence()
+    index = ee.EvidenceIndex([ev])
+    k = lgj.full_game_prob_scale("spreads", "full", "nba")
+    assert k == lgj.spreads_prob_scale("nba") and k != 1.0  # with k = 1 this test proves nothing
+    assert lgj.full_game_prob_scale("spreads", "h2", "nba") == 1.0  # segments stay untempered (live_segment's k)
+    line = -4.5  # home covers on 75 of 100 sims, so the temper moves the number
+    join = lgj.price_distribution_market(dist=ev["marginDist"], line=line, side="home", market="spreads",
+                                         market_prob=0.5, sims=100, prob_scale=k)
+    assert abs(join["model_prob"] - join["model_prob_unscaled"]) > 0.05
+    rec = {**_ledger("spreads", line, join_p=join["model_prob"]), "v": 7, "prob_scale": join["prob_scale"],
+           "model_home_win_prob_unscaled": join["model_prob_unscaled"]}
+    op = ee.live_resim_expert(rec, index, ee.Reader())
+    assert op.refusal is None and op.inputs["join_prob_scale"] == pytest.approx(k)
+    assert op.inputs["join_model_p"] == pytest.approx(join["model_prob_unscaled"], abs=1e-12)
+    rep = ee.join_reproduction([op])
+    assert rep["checked"] == 1 and rep["mismatched"] == 0
+    # a spreads row written before 273a4a599 (prob_scale None) is read as the untempered number it was
+    pre = ee.live_resim_expert({**rec, "prob_scale": None, "model_home_win_prob": join["model_prob_unscaled"],
+                                "model_home_win_prob_unscaled": None}, index, ee.Reader())
+    assert ee.join_reproduction([pre])["mismatched"] == 0
+    # and reading the tempered number as the join's would be caught
+    assert ee.join_reproduction([ee.live_resim_expert({**rec, "prob_scale": None}, index, ee.Reader())])[
+        "mismatched"] == 1
+
+
 def test_a_pre_v7_ledger_reads_as_before_and_its_new_inputs_are_documented_sparse():
     index = ee.EvidenceIndex([_evidence()])
     reader = ee.Reader()

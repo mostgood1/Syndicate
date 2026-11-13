@@ -155,8 +155,10 @@ Nothing writes opinions under the data root. `run --opinions OUT` writes them wh
 - **Join reproduction**, the expert's own correctness check: on half-point totals/spreads where the expert and the
   join read the same lane state, `p_expert` must equal the join's model probability.
   - **The join's number is the engine's, never `#780`'s tempered one** (lane `live-resim-join-unscaled`). On a ledger
-    v7 record with `prob_scale` != 1 (NBA / NCAAF full-game totals), `model_home_win_prob` is the TEMPERED P(over). The
-    check reads `model_home_win_prob_unscaled` there instead; a tempered record without it is not checked.
+    v7 record with `prob_scale` != 1, `model_home_win_prob` is the TEMPERED probability. That is NBA / NCAAF full-game
+    totals, and from `273a4a599` (2026-11-13) NBA / NCAAF / NCAAB full-game spreads. The check reads
+    `model_home_win_prob_unscaled` there instead; a tempered record without it is not checked. The rule keys on
+    `prob_scale`, not on the market, so spreads needed no code change (`test_the_join_check_reads_the_engines_number_on_a_tempered_spread`).
   - Fleet replay 2026-11-13: the 11-11 / 11-12 NBA ledgers (all v6, so nothing tempered yet), re-tempered with the
     join's own `scale_prob` at k 2.16. 5,552 / 4,831 tempered half-point totals were checked and 0 mismatched. Read
     the old way, 5,506 / 4,779 mismatched. The untouched rows: 0 mismatched, checklist ok, opinions identical.
@@ -216,8 +218,8 @@ Nothing writes opinions under the data root. `run --opinions OUT` writes them wh
   lane publishes its histograms at lane level (snake_case); leads 2026-11-10.
 - **NHL live** prices only the moneyline (no distributions).
 - **Segments:** WNCAAB has segment blocks but no segment quotes, so no prior. NBA segment spreads refuse for want of a
-  margin anchor. `#780`'s measured over-confidence was on FULL-GAME totals (k NBA 2.16, NCAAF 2.48); the segment
-  histograms are untempered, which is right for an expert (the learner weighs it), but a segment edge must never be
+  margin anchor. `#780`'s measured over-confidence was on FULL-GAME totals (k NBA 2.16, NCAAF 2.48) and full-game
+  spreads (NBA 2.02, NCAAF 1.80, NCAAB 1.34); segments were not fitted, and the segment histograms are untempered, which is right for an expert (the learner weighs it), but a segment edge must never be
   priced off them raw. If college segment pricing is ever switched on, `live_resim` will opine on the same lines from
   the ledger, and the learner must use one of the two.
 - **Rest, referee crew, weather, steam** are collected but not turned into a line shift anywhere (survey
