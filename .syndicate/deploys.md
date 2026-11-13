@@ -59562,3 +59562,28 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - The schedule only: `SYNDICATE_BOOK_GRID_SLOW_SPORT_SCHEDULE=off`, or a higher `SYNDICATE_BOOK_GRID_SLOW_SPORT_SECONDS`, in `local_production.env`, then a drained full `down`/`up`.
   - Code: `git revert b681f2891` and/or `019b5d15d`, then a fleet ff and a claimed refresh-worker TERM.
 - **Claims:** refresh-worker released right after this entry.
+
+## 2026-11-13 19:19:16Z (1:19 PM CST) -- FLEET ff 866e0e18e -> 0eb6f8d99 + reload-web: women's college basketball crests (todo #798, lane `wncaab-team-crests`) -- **MET: served WNCAAB rows with no crest 6 -> 0 of 6, NCAAB 3 -> 0 (Lindenwood); each new crest is the school's ESPN id**
+- **User, in this chat:** "Yes, load it".
+- **Range:** 16 commits, re-listed at 19:18:51Z in a separate call before the ff (fleet HEAD `866e0e18e`, an ancestor of the target).
+  - Runtime paths (`syndicate pipeline vendor engines wsgi.py app.py render.yaml requirements.txt`): `syndicate/features/shared/team_logos.py` (mine) and `syndicate/features/shared/engine_experts.py` (`2f4dea263`, lane live-resim-join-unscaled, CLOSED).
+  - **No role imports `engine_experts.py`.** Its only importer is the read-only CLI `scripts/engine_experts.py` (grep over `syndicate`, `pipeline` and `scripts` for .py/.ps1/.sh/.yaml/.json/.toml, 19:21Z). So `team_logos.py` is the only change a role loads.
+  - Scripts: `build_team_branding_snapshot.py` (mine) and `live_mechanism_outcome_gate.py` (#765, offline). Data: the new `wncaab_team_branding.csv` (363 teams). vendor/: none.
+- **Gates:**
+  - Claim web 19:17:52Z, ACQUIRED.
+  - Baseline 19:17:59Z, served board, 4,290 rows:
+    - WNCAAB rows missing a crest 6 of 6 (LSU, Denver, West Virginia, Northwestern). NCAAB 3 of 194 (Lindenwood Lions, 3).
+    - Every other sport 0. NBA props with no side 0 of 423.
+  - Preflight web `--target fleet --target-commit 0eb6f8d99...`, 19:18:40Z: **CLEAR**, rc 0. Expectations and baseline were stated (above).
+  - `ff798.sh`:
+    - Guards: HEAD is an ancestor; the runtime range is exactly `engine_experts.py` + `team_logos.py`; the scripts range is exactly the 2 above; no dirty fleet file is in range (the fleet's dirty files are `reports/` and `engines/mlb` data).
+    - ff at 19:19:16.923Z; `_COLLEGE_SIBLING` block present 1; csv 364 lines.
+    - `reload-web`: HUP to master 438, workers [458117, 458619] -> [458837, 458838] in 2.1 s, 0 failures, healthz 200.
+  - **No refresh-worker restart.** `player_side` uses crests only for props, and the college rows are games. refresh-worker keeps its loaded commit until its next restart, when it loads `team_logos.py` too. The 17:59Z replay showed NBA prop sides unchanged under this code.
+- **verify: MET.** Served board 19:19:27Z, 8 s after the reload, 4,176 rows:
+  - WNCAAB rows missing a crest 6 -> **0** of 6. NCAAB 3 -> **0** of 153.
+  - nba 0/1,493, ncaaf 0/1,040, nfl 0/1,025, nhl 0/380, soccer 0/79. NBA props with no side 0 of 424.
+  - Crest per school (19:19:57Z): LSU `99.png`, Denver `2172.png`, West Virginia `277.png`, Northwestern `77.png`, Lindenwood `2815.png`. Each is that school's ESPN team id in the committed women's snapshot.
+  - Not shown by this read: whether a crest already set changed. The served read cannot tell; the pre-load replay (17:59Z, 3,946 rows) measured it at 0.
+- **Revert:** `git revert 0eb6f8d99`, then a fleet ff + `reload-web`.
+- **Claims:** web released right after this entry.
