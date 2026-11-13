@@ -958,7 +958,7 @@ death, never life — do not invert it.
 - STATUS 2026-11-13 4:25 PM CST (22:25Z): GRADED as pre-registered (44 games, 746 lines, weeks 7-10): totals parity +0.0065 [-0.0132, +0.0264], spreads parity +0.0089 [-0.0016, +0.0200], h2h LOSES +0.0123 [+0.0017, +0.0237]; model weight beside the market +0.14 / -0.72 / -0.57. Hypothesis supported for h2h, not falsified for totals/spreads (parity, underpowered). BUILT, NOT PUSHED: 18 registry entries + the producer no longer stamps a note. Replay on the served 11-13 grid: 46 of 46 segment rows from the registry, probabilities 46 of 46 identical. Owed: push + reload web (user), served reading. Findings: .syndicate/findings_2026-11-13_nfl_segment_skill.md.
 
 ### nba-live-margin-anchor — OPEN — opened 2026-11-13 — session 8062940b-57fd-454a-8de5-25fdd4804d85
-- STATUS 2026-11-13 4:30 PM CST (22:30Z): **GOAL: NOT MET.** Built, replayed and tested; on main once pushed. Loading (live-odds-worker for the anchor, refresh-worker for the anchored k) is the user's decision.
+- STATUS 2026-11-13 4:36 PM CST (22:36Z): **GOAL: NOT MET.** Built, replayed and tested; on main `68fbb8eeb`, NOT loaded. **Ride-along hazard:** live-odds-worker recycles about every 6 h, so an ff past `68fbb8eeb` loads the anchor at its next recycle without a decision; check this lane before carrying it. Loading (live-odds-worker for the anchor, refresh-worker for the anchored k) is the user's decision.
   - Hypothesis CONFIRMED on the replay (171 of 171 games anchored):
     - moneyline anchored - raw -0.006 +- 0.005, better in every band;
     - model - market +0.016 -> +0.008;
