@@ -59617,3 +59617,18 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **Not touched by this lane:** web and refresh-worker. Both read `code=89e2d2a0` (STALE for the 4 files above); neither produces the NHL live lanes. Web picks them up at its next worker recycle.
 - **revert:** `SYNDICATE_NHL_LIVE_SCORING_CALIBRATION=off` in `local_production.env` needs a drained full down/up. Faster: revert `866e0e18e` on main, ff the fleet, then a claimed live-odds-worker TERM (allow ~5 min for the pass to drain).
 - **verify:** tonight from 02:05Z, served NHL lanes carry `liveScoring` on / 0.85 / 240 / endgame in total, and the published `projection.total` sits below what LEGACY would print at P1 / P2 states.
+
+## 2026-11-13 19:25:09Z (1:25 PM CST) -- READING, manual build, no deploy: the first cheat-sheet section rules v2 build (todo #797, lane `cheat-sheet-section-optimization`, session 35bdf3a7) -- **MET: every 11-13 sheet is stamped `section_rules` 2, "Sim vs the line" is filled, Hot form is empty, and the page serves each sport's pre-launch record**
+- **What ran:** the user, in chat: "can we do a manual build?". `Start-ScheduledTask SyndicateCheatSheets` ran the production command unchanged, on fleet code `0eb6f8d99`, which contains `9cd7a15d2`. Start 19:25:09Z; sheets written 19:28:17Z (NCAAF) .. 19:35:37Z (NCAAB); LastTaskResult 0; 0 Tracebacks in `cheat_sheets.log`. Nothing was deployed.
+- **Baseline:** every 11-13 sheet unstamped (rules 1, the 11:30 AM build). The 1:00 PM `SyndicateCheatSheetsTomorrow` run, already on the new code, had stamped NHL 11-14 (sim_edge 1) and NCAAF 11-14 (sim_edge 25) rules 2.
+- **verify (files):**
+  - NBA 11-13: rules 2, sim_edge 25, value 17, hot_form 0, matchup_spots 4, 229 rows (128 locked groups).
+  - NHL 11-13: rules 2, sim_edge 18, matchup_spots 12, 68 rows.
+  - NCAAF 11-13: rules 2, sim_edge 25, 99 rows.
+  - NCAAB 11-13: rules 2, 0 rows.
+- **verify (served):**
+  - `/api/cheatsheets/{nba,nhl,ncaaf}/2026-11-13` return section_rules 2 with the same section sizes.
+  - `/cheatsheets` is 200 and carries the pre-launch records: NBA "1,251 bets, ROI +8.0%", NCAAF 863 +2.9%, NHL 755 +0.5%, and NCAAB "Not yet measured".
+  - `/cheatsheets/record` is 200.
+- **11-13 is a mixed day, as flagged before the load:** its morning locks were made under v1, and the record now reads the whole day under v2.
+- **Owed:** `record.json` carrying `sim_edge` after the 10:50 PM CST reconcile, and the review's "against the price" lines (the 11-14 morning review).
