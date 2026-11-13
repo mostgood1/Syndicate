@@ -6897,6 +6897,65 @@ def _book_grid_shard_mtime(sport: str, day: str) -> float | None:
     return max(stamps) if stamps else None
 
 
+# A SLOW SPORT GETS A SLOWER SCHEDULE (todo #790 option (c); user 2026-11-13 "Slower NBA schedule", lane
+# book-grid-overlay-starvation).
+#
+# This tick builds every due sport one after another, and the next tick starts only after the last one.
+# So one slow sport sets EVERY sport's live cadence. Measured 2026-11-11 with NBA live: the NBA grid + in-play
+# overlay took 94-234 s, the tick gap went 65 -> 307 s, the NCAAB overlay went 292 s between builds, and web
+# dropped it as stale (`stale_371s`). Building NBA LAST would not change that: the next tick still waits for it.
+#
+# So a sport whose last today-build (grid + overlay, timed below) took SLOW_SPORT_SECONDS or more is skipped
+# on the regular tick right after the one that built it: every other tick. The ticks in between are short,
+# and the other sports keep their cadence. A slow sport also never takes the price-on-pull path, which would
+# hold the main loop the same way. A fast sport is never affected, so this is inert once the overlay is
+# cheap (`019b5d15d`, same todo: 341 -> 27 s for 2,000 NBA cards in replay).
+#
+# Every other TICK, not a time gap: a slow build makes its own tick long, so a time gap would already have
+# elapsed by the next tick (234 s on 11-11). The cost lands on the slow sport: its overlay is rewritten about
+# half as often, and web drops an overlay older than 360 s.
+# A skipped sport that was live still counts as live, so the tick keeps the live cadence.
+#   SYNDICATE_BOOK_GRID_SLOW_SPORT_SECONDS  the threshold (default 45; college grids build in ~3 s)
+#   SYNDICATE_BOOK_GRID_SLOW_SPORT_SCHEDULE=off  every due sport every tick, as before
+_BOOK_GRID_SLOW_SPORT_SECONDS_DEFAULT = 45.0
+
+
+def _book_grid_slow_sport_enabled() -> bool:
+    raw = str(os.environ.get("SYNDICATE_BOOK_GRID_SLOW_SPORT_SCHEDULE") or "").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
+def _book_grid_slow_sport_seconds() -> float:
+    raw = str(os.environ.get("SYNDICATE_BOOK_GRID_SLOW_SPORT_SECONDS") or "").strip()
+    try:
+        value = float(raw)
+    except ValueError:
+        return _BOOK_GRID_SLOW_SPORT_SECONDS_DEFAULT
+    return value if value > 0 else _BOOK_GRID_SLOW_SPORT_SECONDS_DEFAULT
+
+
+def _book_grid_sport_is_slow(info: Mapping[str, Any] | None) -> bool:
+    """Its last today-build took the threshold or more. Unknown (never timed) is not slow."""
+    if not _book_grid_slow_sport_enabled() or not info:
+        return False
+    try:
+        return float(info.get("build_seconds")) >= _book_grid_slow_sport_seconds()
+    except (TypeError, ValueError):
+        return False
+
+
+def _book_grid_slow_sport_deferred(sport: str, selected_date: str, tick_seq: int) -> bool:
+    """Skip a slow sport on the regular tick right after the one that built it."""
+    info = _BOOK_GRID_SPORT_STATE.get(sport)
+    if not info or info.get("date") != selected_date or not _book_grid_sport_is_slow(info):
+        return False
+    return info.get("built_tick") == tick_seq - 1
+
+
+# Clock for timing a sport's build; a module attribute so a test can drive it.
+_book_grid_build_clock = time.perf_counter
+
+
 def _book_grid_sports_with_new_live_quotes(selected_date: str, now: float) -> list[str]:
     """Today's sports, LIVE at their last build, whose shard changed after that build read it."""
     if not _book_grid_price_on_pull_enabled():
@@ -6905,6 +6964,8 @@ def _book_grid_sports_with_new_live_quotes(selected_date: str, now: float) -> li
     for sport, info in sorted(_BOOK_GRID_SPORT_STATE.items()):
         if info.get("date") != selected_date or not info.get("live"):
             continue
+        if _book_grid_sport_is_slow(info):
+            continue  # a slow sport builds on its own schedule only (#790): on pull it would hold the loop
         built_at = float(info.get("built_at") or 0.0)
         if now - built_at < _BOOK_GRID_PRICE_ON_PULL_MIN_GAP_SECONDS:
             continue
@@ -7087,6 +7148,9 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
             return None
     else:
         _BOOK_GRID_LAST_RUN["all"] = now
+        # Regular ticks only: a slow sport skips the tick right after the one that built it (#790).
+        _BOOK_GRID_LAST_RUN["tick_seq"] = int(_BOOK_GRID_LAST_RUN.get("tick_seq", 0)) + 1
+    tick_seq = int(_BOOK_GRID_LAST_RUN.get("tick_seq", 0))
 
     from syndicate.features.shared.book_grid_artifact import (
         build_book_grid_artifact,
@@ -7160,6 +7224,8 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
     written: list[str] = []
     skipped: list[str] = []
     skipped_not_live: list[str] = []
+    deferred_slow: list[str] = []
+    build_seconds: dict[str, float] = {}
     live_sports: list[str] = []
     any_live_today = False
     out_of_window = 0
@@ -7182,6 +7248,12 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
                 if not due:
                     # Skipped BEFORE the shard reconcile too, the expensive half (lever 2b).
                     skipped_not_live.append(sport)
+                    continue
+                if not on_pull and _book_grid_slow_sport_deferred(sport, selected_date, tick_seq):
+                    # Its slower schedule (#790). Still live for the cadence: its state is last tick's.
+                    deferred_slow.append(sport)
+                    if (_BOOK_GRID_SPORT_STATE.get(sport) or {}).get("live"):
+                        any_live_today = True
                     continue
             try:
                 # RECONCILE THE SHARD FIRST (`#331`). This worker is not the
@@ -7244,6 +7316,7 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
                     continue
                 # When this build read the shard: price-on-pull compares the shard's next change to this.
                 quotes_read_at = time.time()
+                build_started = _book_grid_build_clock()
                 payload = build_book_grid_artifact(sport, build_date)
                 if not payload:
                     if build_date == selected_date:
@@ -7254,11 +7327,19 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
                     # decision needs every sport's own state (lever 2b).
                     sport_state = _book_grid_sport_state_from_payload(payload, now)
                     _BOOK_GRID_SPORT_STATE[sport] = {"date": selected_date, "built_at": now,
-                                                     "quotes_read_at": quotes_read_at, **sport_state}
+                                                     "quotes_read_at": quotes_read_at, **sport_state,
+                                                     # Which regular tick built it (None on a price-on-pull pass).
+                                                     "built_tick": None if on_pull else tick_seq}
                     if sport_state["live"]:
                         any_live_today = True
                         live_sports.append(sport)
                 path = write_book_grid_artifact(sport, build_date, payload)
+                if build_date == selected_date:
+                    # Grid + in-play overlay (written by `write_book_grid_artifact`): what the next
+                    # tick's slow-sport schedule reads (#790), and what BOOK_GRID_TICK reports.
+                    elapsed = round(_book_grid_build_clock() - build_started, 1)
+                    build_seconds[sport] = elapsed
+                    _BOOK_GRID_SPORT_STATE[sport]["build_seconds"] = elapsed
                 label = f"{sport}:{payload.get('rows_total')}"
                 written.append(label if build_date == selected_date else f"{label}@{build_date}")
                 try:
@@ -7333,7 +7414,7 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
             hit = next((w for w in written if w.startswith(f"{sport}:") and w.endswith(f"@{day}")), None)
             print(f"[refresh_worker] BOOK_GRID_REBUILD_DONE sport={sport} date={day} written={hit}", flush=True)
 
-    if not written and not skipped:
+    if not written and not skipped and not deferred_slow:
         return None
     return {
         "date": selected_date,
@@ -7358,6 +7439,9 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
         "next_interval_seconds": _book_grid_refresh_interval_seconds(),
         # Non-empty on a price-on-pull pass: the live sports rebuilt because their quotes just landed.
         "on_pull": on_pull,
+        # #790: today's grid + overlay seconds per sport built, and the slow sports this tick skipped.
+        "build_seconds": build_seconds,
+        "deferred_slow": deferred_slow,
     }
 
 

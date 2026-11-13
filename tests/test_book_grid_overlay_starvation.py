@@ -325,3 +325,123 @@ def test_with_a_context_the_budget_does_not_restart_with_the_minute(counted_text
     assert rc.row_recent_matchup_text(PROP, context) is None
     clock[0] += 120
     assert rc.row_recent_matchup_text(PROP, context) is None and counted_text == []
+
+
+# --- option (c): a slow sport's slower schedule in the book-grid tick (user 2026-11-13 "Slower NBA schedule") --
+
+import importlib.util as _ilu
+from datetime import datetime as _dt, timezone as _tz
+from unittest.mock import patch as _patch
+
+_SPEC = _ilu.spec_from_file_location(
+    "run_refresh_worker_slow_sport", Path(__file__).resolve().parent.parent / "scripts" / "run_refresh_worker.py"
+)
+worker = _ilu.module_from_spec(_SPEC)
+_SPEC.loader.exec_module(worker)
+
+TODAY = "2026-11-11"
+T0 = _dt(2026, 11, 12, 0, 10, tzinfo=_tz.utc).timestamp()
+LIVE = {"rows": [{"game": {"state": "live"}, "commence_time": "2026-11-12T00:00:00Z"}], "rows_total": 1}
+SLOW_ENV = ("SYNDICATE_BOOK_GRID_SLOW_SPORT_SCHEDULE", "SYNDICATE_BOOK_GRID_SLOW_SPORT_SECONDS",
+            "SYNDICATE_BOOK_GRID_PRICE_ON_PULL", "SYNDICATE_BOOK_GRID_SKIP_NONLIVE_SPORTS",
+            "SYNDICATE_BOOK_GRID_REFRESH_INTERVAL_SECONDS")
+
+
+@pytest.fixture()
+def tick(tmp_path, monkeypatch):
+    """Drive the REAL `_run_book_grid_artifact_tick` (the price-on-pull tests' harness) with a build clock
+    that advances by each sport's build time: NBA 90 s (the 11-11 overlay: 94-234 s), NCAAB 3 s."""
+    worker._BOOK_GRID_LAST_RUN.clear()
+    worker._BOOK_GRID_SPORT_STATE.clear()
+    for name in SLOW_ENV:
+        monkeypatch.delenv(name, raising=False)
+    shard = tmp_path / f"{TODAY}.jsonl"
+    shard.write_text("{}\n", encoding="utf-8")
+    clock = [1000.0]
+    durations = {"nba": 90.0, "ncaab": 3.0}
+    monkeypatch.setattr(worker, "_book_grid_build_clock", lambda: clock[0])
+    history = []
+
+    def run(k: int, payloads=None):
+        built = []
+        payloads = payloads or {"nba": LIVE, "ncaab": LIVE}
+
+        def build(sport, day):
+            if day != TODAY or sport not in payloads:
+                return None
+            built.append(sport)
+            clock[0] += durations.get(sport, 1.0)
+            return payloads[sport]
+
+        with _patch.object(worker.time, "time", return_value=T0 + 130 * k), \
+             _patch.object(worker, "central_today_iso", return_value=TODAY), \
+             _patch.object(worker, "_book_grid_forward_days", return_value=0), \
+             _patch.object(worker, "_book_grid_refresh_interval_seconds", return_value=120), \
+             _patch("syndicate.features.shared.book_grid_artifact.build_book_grid_artifact", side_effect=build), \
+             _patch("syndicate.features.shared.book_grid_artifact.write_book_grid_artifact", return_value=shard), \
+             _patch("syndicate.features.shared.artifact_publisher.publish_hot_artifact", return_value=None), \
+             _patch("syndicate.features.shared.artifact_publisher.pull_streamed_artifact", return_value=None), \
+             _patch("syndicate.features.shared.odds_book_quotes.book_quotes_path", return_value=shard), \
+             _patch("syndicate.features.shared.refresh_state_store.data_root", return_value=tmp_path):
+            meta = worker._run_book_grid_artifact_tick()
+        history.append((built, meta))
+        return built, meta
+
+    run.durations = durations
+    return run
+
+
+def test_a_slow_sport_is_built_every_other_tick_and_the_others_every_tick(tick):
+    built = [tick(k)[0] for k in range(1, 6)]
+    assert [("nba" in b, "ncaab" in b) for b in built] == [
+        (True, True), (False, True), (True, True), (False, True), (True, True)]
+    _, meta = tick(6)
+    assert meta["deferred_slow"] == ["nba"] and meta["build_seconds"] == {"ncaab": 3.0}
+
+
+def test_the_tick_reports_build_seconds_and_the_skip(tick):
+    _, first = tick(1)
+    assert first["build_seconds"] == {"nba": 90.0, "ncaab": 3.0} and first["deferred_slow"] == []
+    assert worker._BOOK_GRID_SPORT_STATE["nba"]["build_seconds"] == 90.0
+    _, second = tick(2)
+    assert second["deferred_slow"] == ["nba"]
+
+
+def test_off_restores_every_due_sport_every_tick(tick, monkeypatch):
+    monkeypatch.setenv("SYNDICATE_BOOK_GRID_SLOW_SPORT_SCHEDULE", "off")
+    assert all("nba" in tick(k)[0] for k in range(1, 5))
+
+
+def test_a_fast_sport_is_never_skipped(tick):
+    tick.durations["nba"] = 20.0  # the overlay after 019b5d15d
+    assert all("nba" in tick(k)[0] for k in range(1, 5))
+
+
+def test_the_threshold_is_tunable(tick, monkeypatch):
+    monkeypatch.setenv("SYNDICATE_BOOK_GRID_SLOW_SPORT_SECONDS", "120")
+    assert all("nba" in tick(k)[0] for k in range(1, 5))
+    monkeypatch.setenv("SYNDICATE_BOOK_GRID_SLOW_SPORT_SECONDS", "60")
+    assert "nba" not in tick(5)[0]
+
+
+def test_a_skipped_live_sport_keeps_the_live_cadence(tick):
+    """NBA alone live and skipped: the next tick must stay on the live cadence."""
+    tick(1, {"nba": LIVE})
+    for sport in ("mlb", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "wncaab", "soccer"):
+        # Built recently with nothing live: not due on the live cadence, so the skip is all this tick does.
+        worker._BOOK_GRID_SPORT_STATE[sport] = {"date": TODAY, "built_at": T0 + 250, "live": False, "next_start": None}
+    _, meta = tick(2, {"nba": LIVE})
+    assert meta is not None, "a tick whose only act is the skip must still report it"
+    assert meta["deferred_slow"] == ["nba"] and meta["written"] == [] and meta["skipped_no_shard"] == []
+    assert worker._BOOK_GRID_LAST_RUN["any_live"] is True
+
+
+def test_a_slow_sport_never_takes_price_on_pull(tick, tmp_path):
+    tick(1)
+    later = tmp_path / f"{TODAY}.jsonl"
+    stamp = T0 + 130 + 60
+    os.utime(later, (stamp, stamp))
+    with _patch("syndicate.features.shared.odds_book_quotes.book_quotes_path", return_value=later):
+        assert worker._book_grid_sports_with_new_live_quotes(TODAY, stamp + 30) == ["ncaab"]
+        worker._BOOK_GRID_SPORT_STATE["nba"]["build_seconds"] = 20.0
+        assert worker._book_grid_sports_with_new_live_quotes(TODAY, stamp + 30) == ["nba", "ncaab"]
