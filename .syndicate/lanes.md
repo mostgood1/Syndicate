@@ -879,6 +879,7 @@ death, never life — do not invert it.
 - Falsification test: n/a
 - Verification: pytest tests/test_primary_tree_ff.py (every refusal leaves HEAD and every dirty file byte-identical; a clean ff lands; a fault-injected merge failure restores; off != on); a dry run against the real primary tree reports correctly; after the user's trigger choice, one real automatic run seen in the status file and the digest silent on success
 - Blocked by: none
+- STATUS 2026-11-13 1:55 PM CST (19:55Z): BUILT AND VERIFIED, NOT PUSHED. Local commit `2568f1b4c` (changes on rebase). Tests 25/25, 9/9 guard mutations caught, digest block checked on a throwaway tree, dry run on the real primary CLEAR. Owed: the user's push OK + trigger choice (session-start spawn or a scheduled task), then a hand --apply to install and one automatic run seen (log 2026-11-13 19:55Z).
 
 ### live-margin-prob-scale — OPEN — opened 2026-11-13 — session 8062940b-57fd-454a-8de5-25fdd4804d85
 - Goal: Live full-game SPREADS and MONEYLINE probabilities in the Layer 2 join are tempered per sport by their measured over-confidence (P_k = Phi(Phi^-1(P)/k)), k fitted walk-forward against finals on the fleet's live gameline ledgers: a sport is scaled only where the walk-forward Brier gain is measured, otherwise k=1; the ledger records the unscaled probability and k; tests incl. off != on through the env and the production caller; on main; loading it is the user's decision
