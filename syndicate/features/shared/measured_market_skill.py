@@ -708,6 +708,84 @@ for _alias, _base in (("totals_alt", "totals"), ("spreads_alt", "spreads"), ("h2
     MEASURED_MARKET_SKILL[("soccer", _alias, "full", PHASE_PREGAME)] = _entry
 del _alias, _base, _entry
 
+# ---- NFL QUARTERS AND HALVES, PREGAME `[2026-11-13, lane nfl-segment-skill, todo #752]` ----------------
+# `nfl_segment_projections` prices h1/h2/q1-q4 rows off the sim's own segment histograms
+# (`ace49609b`, 2026-10-08) and stamped every one `{"state": "unmeasured"}`, which
+# `projection_skill.normalize_existing_note` then labelled `status: measured` with no
+# loss -- so they ranked at full weight, unmeasured. Graded by `scripts/nfl_segment_skill.py`
+# as PRE-REGISTERED in the lane before any data was read: each book's last pregame pair,
+# de-vigged, at the consensus line; production's own `probability_above` on the sidecar;
+# final ESPN linescores (h2 = q3 + q4 + OT); one observation per game x segment x market;
+# POOLED per market family over the six segments, game-clustered bootstrap. Each segment
+# key carries its family's measurement; the segment's own figure (descriptive only, every
+# one spans 0) rides in `segment_alone`.
+_NFL_SEGMENT_SOURCE = (
+    "scripts/nfl_segment_skill.py: fleet nfl_source/tracking/book_quotes pregame segment "
+    "quotes (captured since a126ae951, 10-22) vs the sidecar smartsim2_segment_distributions_"
+    "2026_wk7-10 (built from weeks < W, so as-of) and ESPN final linescores; "
+    ".syndicate/findings_2026-11-13_nfl_segment_skill.md"
+)
+_NFL_SEGMENT_FAMILIES = {
+    "totals": {"n": 262, "games": 44, "brier_model": 0.25476, "brier_market": 0.24826, "diff": 0.0065,
+               "ci95": (-0.01321, 0.02638), "verdict_class": VERDICT_PARITY,
+               "slope_model": 0.219, "slope_market": 1.678, "w_model": 0.141},
+    "spreads": {"n": 263, "games": 44, "brier_model": 0.25859, "brier_market": 0.24973, "diff": 0.00886,
+                "ci95": (-0.00162, 0.02003), "verdict_class": VERDICT_PARITY,
+                "slope_model": -0.266, "slope_market": 0.777, "w_model": -0.719},
+    "h2h": {"n": 221, "games": 44, "brier_model": 0.23286, "brier_market": 0.22056, "diff": 0.0123,
+            "ci95": (0.00167, 0.02373), "verdict_class": VERDICT_LOSES,
+            "slope_model": 1.483, "slope_market": 2.091, "w_model": -0.566},
+}
+# (dBrier, CI low, CI high, n) for the segment alone -- descriptive, not the verdict.
+_NFL_SEGMENT_ALONE = {
+    ("totals", "h1"): (0.02018, -0.0232, 0.06762, 44),
+    ("totals", "h2"): (-0.01031, -0.04075, 0.02032, 44),
+    ("totals", "q1"): (0.01095, -0.01514, 0.03865, 43),
+    ("totals", "q2"): (0.02545, -0.0092, 0.06244, 44),
+    ("totals", "q3"): (0.00858, -0.01664, 0.03442, 43),
+    ("totals", "q4"): (-0.01571, -0.0417, 0.01205, 44),
+    ("spreads", "h1"): (0.01914, -0.00187, 0.04127, 44),
+    ("spreads", "h2"): (0.00333, -0.01732, 0.0244, 44),
+    ("spreads", "q1"): (0.01249, -0.00688, 0.03223, 44),
+    ("spreads", "q2"): (0.0199, -0.00088, 0.0411, 43),
+    ("spreads", "q3"): (-0.00101, -0.01686, 0.0149, 44),
+    ("spreads", "q4"): (-0.00044, -0.01802, 0.01761, 44),
+    ("h2h", "h1"): (0.01676, -0.00128, 0.03274, 42),
+    ("h2h", "h2"): (0.01227, -0.00801, 0.03318, 40),
+    ("h2h", "q1"): (0.00981, -0.01474, 0.03344, 37),
+    ("h2h", "q2"): (0.01575, -0.00582, 0.03667, 41),
+    ("h2h", "q3"): (0.00511, -0.00962, 0.02028, 33),
+    ("h2h", "q4"): (0.01239, -0.00899, 0.03306, 28),
+}
+_NFL_SEGMENT_WORDS = {VERDICT_PARITY: "parity with", VERDICT_LOSES: "loses to", VERDICT_BEATS: "beats"}
+for (_market, _segment), _alone in _NFL_SEGMENT_ALONE.items():
+    _fam = _NFL_SEGMENT_FAMILIES[_market]
+    MEASURED_MARKET_SKILL[("nfl", _market, _segment, PHASE_PREGAME)] = {
+        "sample_games": _fam["games"],
+        "seasons": (
+            f"2026 weeks 7-10 pregame (10-23..11-13 kickoffs); {_fam['n']} lines over {_fam['games']} games, "
+            f"pooled over h1/h2/q1-q4 as pre-registered; {_segment} alone: dBrier {_alone[0]:+.4f} "
+            f"[{_alone[1]:+.4f}, {_alone[2]:+.4f}], n {_alone[3]}"
+        ),
+        "brier_model": _fam["brier_model"],
+        "brier_market": _fam["brier_market"],
+        "diff": _fam["diff"],
+        "ci95": _fam["ci95"],
+        "segment_alone": _alone,
+        # Logistic fit of the outcome on logit(market) + logit(model): the model's weight beside
+        # the market, and each side's own calibration slope. The verdict line carries the gist.
+        "info_beyond_line": {"w_model": _fam["w_model"], "slope_model": _fam["slope_model"],
+                             "slope_market": _fam["slope_market"]},
+        "verdict": (
+            f"NFL quarter/half {_market}: {_NFL_SEGMENT_WORDS[_fam['verdict_class']]} the pregame close, "
+            f"Brier {_fam['diff']:+.4f} [{_fam['ci95'][0]:+.4f}, {_fam['ci95'][1]:+.4f}], "
+            f"{_fam['games']} games; nothing beyond the line"
+        ),
+        "verdict_class": _fam["verdict_class"],
+        "source": _NFL_SEGMENT_SOURCE,
+    }
+del _market, _segment, _alone, _fam
+
 
 def _norm(value: Any) -> str:
     return str(value or "").strip().lower()

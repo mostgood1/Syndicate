@@ -143,10 +143,18 @@ def attach_nfl_segment_projections(
             unmatched += 1
             continue
         projection["source"] = SOURCE
-        projection["model_skill"] = {"state": "unmeasured", "note": "NFL segment probabilities have no measured market skill yet"}
+        # NO NOTE FROM THIS PRODUCER `[2026-11-13, lane nfl-segment-skill, todo #752]`. It used
+        # to stamp `{"state": "unmeasured", ...}` here. `projection_skill` keeps ANY non-empty
+        # producer note and marks it `status: measured`, so every NFL quarter/half row served
+        # "measured" with no loss and ranked at full weight, and the registry was never asked.
+        # Left absent, `attach_projection_skill` (which runs after this join) reads
+        # `measured_market_skill` -- graded per segment market since 2026-11-13 -- and stamps a
+        # real `unmeasured` note for anything the registry does not cover. `segment_projection`
+        # puts NCAAF's own note on every view it builds, so it is dropped here, not overwritten.
+        projection.pop("model_skill", None)
         if full_spread and existing is not None:
-            # Keep the full-game module's projected margin and its provenance.
-            for key in ("projected", "generated_at"):
+            # Keep the full-game module's projected margin, its provenance and its own note.
+            for key in ("projected", "generated_at", "model_skill"):
                 if existing.get(key) is not None:
                     projection[key] = existing.get(key)
         _price_against_market(row, projection, _no_vig_over_probability)
