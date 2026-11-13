@@ -757,6 +757,14 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness --idle-min 240 read 1 of 8 CLOSED blocks SAFE; moved to lanes_closed.md with one pointer: closed-lane-archive-20261113-0240. Table, WAIT reasons and Part B (dormant set CHANGED, 14 -> 12) in .syndicate/log/2026-11-13.md.
 
+### cheat-sheet-section-optimization — OPEN — opened 2026-11-13 — session 35bdf3a7-5afc-483e-98bb-d0d7f4d2ecc3
+- Goal: Every featured cheat-sheet section is judged per sport against the fair AND against matched non-members (game-clustered 95% CIs) in a committed study script and findings file; sections that measurably add nothing are retired or re-ruled, a new SmartSim-vs-the-line section ships, and the daily review reports excess-over-fair beside ROI -- each change read back on the reconciled record after it reaches the fleet
+- Files: .syndicate/findings_2026-11-13_cheat_sheet_section_assessment.md (NEW), scripts/cheat_sheet_section_study.py (NEW), tests/test_cheat_sheet_section_study.py (NEW), docs/ai_context/todo.md (#797 section ONLY); PENDING USER APPROVAL (claimed by OPEN lane cheat-sheets, holder session 9e18a0e7 no longer exists): syndicate/features/shared/cheat_sheets.py (sections + select_picks ONLY), syndicate/features/shared/cheat_sheet_record.py (section list ONLY), scripts/review_cheat_sheets.py, syndicate/templates/cheat_sheets.html (section copy ONLY), tests/test_build_cheat_sheets.py, tests/test_cheat_sheet_record.py, tests/test_review_cheat_sheets.py, .claude/skills/cheat-sheet-review/SKILL.md
+- Hypothesis: Sections that choose their bet's side by EV at the best price (Value, every player-vs-player section) inherit the consensus fair's errors and lose to it; sections that choose by evidence the price under-weights (basketball vs-opponent record, the NBA/WNBA sim projection) beat it
+- Falsification test: Value members hit at or above the fair, or the SmartSim-vs-line rule's game-clustered ROI CI includes 0 in NBA on the official window (10-15..11-12), or the new section's first 30 graded NBA days go below 0 ROI beyond noise
+- Verification: study script reproduces the findings numbers from the fleet's reconciled sheets; after deploy, the section appears on served NBA sheets and its bets enter record.json; review prints excess-over-fair per section
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
