@@ -46,6 +46,8 @@ SPORT_CONFIG: dict[str, tuple[str, str, str]] = {
     "ncaaf": ("football/college-football", "SYNDICATE_NCAAF_SOURCE_ROOT", "ncaaf_source"),
     "nba": ("basketball/nba", "SYNDICATE_NBA_SOURCE_ROOT", "nba_source"),
     "ncaab": ("basketball/mens-college-basketball", "SYNDICATE_NCAAB_SOURCE_ROOT", "ncaab_source"),
+    # Women's college basketball (#798): its board rows had no crest at all.
+    "wncaab": ("basketball/womens-college-basketball", "SYNDICATE_WNCAAB_SOURCE_ROOT", "wncaab_source"),
     "mlb": ("baseball/mlb", "SYNDICATE_MLB_SOURCE_ROOT", "mlb_source"),
     "nhl": ("hockey/nhl", "SYNDICATE_NHL_SOURCE_ROOT", "nhl_source"),
     "wnba": ("basketball/wnba", "SYNDICATE_WNBA_SOURCE_ROOT", "wnba_source"),

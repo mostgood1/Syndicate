@@ -15,8 +15,9 @@ Lookup order per name: the normalised display name, location or abbreviation;
 then `team_aliases.canonical_team` (the one alias map -- nflverse `LA`/`WAS` vs
 ESPN `LAR`/`WSH`, short club names) and the same index again. The index also
 keys each club's canonical name (#796: ESPN "LA Clippers", the odds feed "Los
-Angeles Clippers"). Unknown -> None, never a guess: a wrong crest on a betting
-row reads as a different game.
+Angeles Clippers"). College basketball only: a school its own league's snapshot
+does not hold takes the other league's crest (#798, below). Unknown -> None,
+never a guess: a wrong crest on a betting row reads as a different game.
 """
 
 from __future__ import annotations
@@ -28,8 +29,18 @@ from typing import Any, Iterable
 
 from syndicate.features.shared.team_branding import read_team_branding_snapshot
 
-_SPORTS = ("mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab")
+_SPORTS = ("mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "wncaab")
 _REPO_DATA = Path(__file__).resolve().parents[3] / "data"
+
+# The other college basketball league, asked only when a school's own league has
+# no crest for it (#798). ESPN files a school's men's and women's teams under one
+# team id, and measured 2026-11-13 the two snapshots carry the same logo URL for
+# 358 of the 360 ids both hold. The two that differ show why the OWN league goes
+# first: Tennessee's women's crest is `2633_ncw.png`, the Lady Vols mark, and the
+# men's 07-20 snapshot has West Florida with no URL at all. The fallback fills
+# schools a snapshot lacks (the fleet's men's copy predates Lindenwood's and
+# Queens' entry in ESPN's list); it never replaces a crest the own league has.
+_COLLEGE_SIBLING = {"ncaab": "wncaab", "wncaab": "ncaab"}
 
 
 def _norm(text: Any) -> str:
@@ -124,6 +135,36 @@ def logo_url(sport: Any, *names: Any) -> str | None:
     slug = str(sport or "").strip().lower()
     if slug not in _SPORTS and slug != "soccer":
         return None
+    hit = _lookup(slug, names)
+    if hit is None and slug in _COLLEGE_SIBLING:
+        sibling = _COLLEGE_SIBLING[slug]
+        hit = _lookup(sibling, names)
+        if hit:
+            # The sibling named a school. If the own league holds that school (same ESPN id) with a crest,
+            # that crest wins: a men's row named "Tennessee Lady Volunteers" is still the men's team.
+            own_urls, _ = _by_team_id(slug)
+            _, sibling_ids = _by_team_id(sibling)
+            hit = own_urls.get(sibling_ids.get(hit, "")) or hit
+    return hit
+
+
+@lru_cache(maxsize=16)
+def _by_team_id(sport: str) -> tuple[dict[str, str], dict[str, str]]:
+    """(ESPN team id -> logo URL, logo URL -> team id) over the sport's snapshot, rows with a URL only."""
+    url_by_id: dict[str, str] = {}
+    id_by_url: dict[str, str] = {}
+    for path in _branding_files(sport):
+        for row in read_team_branding_snapshot(path):
+            url = str(getattr(row, "logo_url", "") or "").strip()
+            team_id = str(getattr(row, "team_id", "") or "").strip()
+            if url and team_id:
+                url_by_id.setdefault(team_id, url)
+                id_by_url.setdefault(url, team_id)
+    return url_by_id, id_by_url
+
+
+def _lookup(slug: str, names: tuple[Any, ...]) -> str | None:
+    """`slug`'s own index: each name as given, then each name's canonical form."""
     index = _index(slug)
     if not index:
         return None

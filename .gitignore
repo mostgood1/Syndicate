@@ -109,6 +109,15 @@ data/ncaab_source/source_artifacts/data/*
 !data/ncaab_source/source_artifacts/data/processed/
 data/ncaab_source/source_artifacts/data/processed/*
 !data/ncaab_source/source_artifacts/data/processed/team_branding/
+# WNCAAB the same way (2026-11-13, todo #798): 39 of 39 served women's college
+# rows had no crest because no wncaab branding snapshot existed anywhere.
+!data/wncaab_source/source_artifacts/
+data/wncaab_source/source_artifacts/*
+!data/wncaab_source/source_artifacts/data/
+data/wncaab_source/source_artifacts/data/*
+!data/wncaab_source/source_artifacts/data/processed/
+data/wncaab_source/source_artifacts/data/processed/*
+!data/wncaab_source/source_artifacts/data/processed/team_branding/
 
 # SmartSim 2.0 historical-truth caches: regenerable via ncaaf_historical_loader.py /
 # nfl_historical_loader.py (CFBD API / nflverse release download); mirror caches, not source.
