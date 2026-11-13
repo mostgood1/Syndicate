@@ -479,8 +479,16 @@ def live_resim_expert(ledger_row: Mapping[str, Any], index: EvidenceIndex, reade
     op.p_prior = None if p_prior is None else round(p_prior, 6)
     op.prior_basis = "live_gameline_ledger.market_fair_prob"
     op.prior_age_s = _f(g("quote_age_seconds"))
+    # THE ENGINE'S NUMBER, NOT #780's TEMPERED ONE. A ledger v7 record on a full-game total (NBA k 2.16, NCAAF 2.48;
+    # `live_gameline_join.totals_prob_scale`) carries the TEMPERED P(over) in `model_home_win_prob` and the engine's own
+    # in `model_home_win_prob_unscaled`, which the join sets only where `prob_scale` != 1. This expert reads the
+    # histogram the engine priced, so `join_model_p` (the join check's input) is the engine's number wherever the
+    # record says it was tempered; a tempered record without it carries None and is not checked.
     join_p = _f(g("model_home_win_prob"))
-    op.inputs = {"join_model_p": join_p, "join_point_estimator": g("point_estimator"),
+    prob_scale = _f(g("prob_scale"))
+    if prob_scale is not None and prob_scale != 1.0:
+        join_p = _f(g("model_home_win_prob_unscaled"))
+    op.inputs = {"join_model_p": join_p, "join_prob_scale": prob_scale, "join_point_estimator": g("point_estimator"),
                  "join_sims": g("sims_run"), "join_priceable": g("priceable")}
     if name in off:
         op.refusal = "expert_off"
@@ -1017,4 +1025,9 @@ EXPECTED_SPARSE: dict[str, str] = {
     "nhl:live_resim:live_evidence:marginDist": "NHL lanes publish no distributions",
     "nhl:live_resim:live_evidence:totalRunsDist": "NHL lanes publish no distributions",
     "live_resim:live_gameline_ledger:point_estimator": "None on records written before 2026-09-06",
+    "live_resim:live_gameline_ledger:prob_scale": "ledger v7 (#780, 2026-11-13): set only on totals rows the join "
+                                                  "priced from a distribution; None on spreads and moneylines, and "
+                                                  "absent from every record written before v7",
+    "live_resim:live_gameline_ledger:model_home_win_prob_unscaled": "ledger v7 (#780): set only where prob_scale != 1 "
+                                                                    "(NBA / NCAAF full-game totals), and read only there",
 }

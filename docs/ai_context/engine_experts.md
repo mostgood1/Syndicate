@@ -122,6 +122,12 @@ Nothing writes opinions under the data root. `run --opinions OUT` writes them wh
   - Documented gaps are in `EXPECTED_SPARSE`, each with its reason.
 - **Join reproduction**, the expert's own correctness check: on half-point totals/spreads where the expert and the
   join read the same lane state, `p_expert` must equal the join's model probability.
+  - **The join's number is the engine's, never `#780`'s tempered one** (lane `live-resim-join-unscaled`). On a ledger
+    v7 record with `prob_scale` != 1 (NBA / NCAAF full-game totals), `model_home_win_prob` is the TEMPERED P(over). The
+    check reads `model_home_win_prob_unscaled` there instead; a tempered record without it is not checked.
+  - Fleet replay 2026-11-13: the 11-11 / 11-12 NBA ledgers (all v6, so nothing tempered yet), re-tempered with the
+    join's own `scale_prob` at k 2.16. 5,552 / 4,831 tempered half-point totals were checked and 0 mismatched. Read
+    the old way, 5,506 / 4,779 mismatched. The untouched rows: 0 mismatched, checklist ok, opinions identical.
 - **Prior reproduction** (`stat_progress`): every opined line's prior, recomputed by the board's
   `_fair_value_fields` from the same quotes, and its `p_expert`, recomputed from the published P(over), must match
   to 1e-6. Fleet readings 2026-11-13 (the worktree's code on fleet data, read-only, nice 19):

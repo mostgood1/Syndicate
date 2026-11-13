@@ -190,6 +190,61 @@ def test_live_resim_reproduces_the_joins_probability_on_a_half_point_line():
     assert rep["checked"] == 2 and rep["mismatched"] == 1  # the check can fail: a wrong join value is caught
 
 
+def _v7(join, line):
+    """A ledger v7 totals record as `live_gameline_ledger.build_records` writes one from the join's verdict (#780)."""
+    return {**_ledger("totals", line, join_p=join["model_prob"]), "v": 7, "prob_scale": join["prob_scale"],
+            "model_home_win_prob_unscaled": join["model_prob_unscaled"]}
+
+
+def test_the_join_check_reads_the_engines_number_on_a_tempered_total(monkeypatch):
+    """#780: a v7 full-game total's `model_home_win_prob` is the TEMPERED P(over); the engine's own is
+    `model_home_win_prob_unscaled`. The expert reads the engine's histogram, so the check compares the engine's
+    number. Read the tempered one and every tempered half-point total is a mismatch."""
+    from syndicate.features.shared import live_gameline_join as lgj
+
+    for key in ("SYNDICATE_LIVE_TOTALS_PROB_SCALE", "SYNDICATE_LIVE_TOTALS_PROB_SCALE_NBA"):
+        monkeypatch.delenv(key, raising=False)
+    ev = _evidence()
+    index = ee.EvidenceIndex([ev])
+    k = lgj.totals_prob_scale("nba")
+    assert k != 1.0  # with k = 1 nothing is tempered and this test proves nothing
+    line = 211.5  # 70 of 100 sims over, so the temper moves the number (at 0.5 it would not)
+    join = lgj.price_distribution_market(dist=ev["totalRunsDist"], line=line, side="over", market="totals",
+                                         market_prob=0.5, sims=100, prob_scale=k)
+    assert abs(join["model_prob"] - join["model_prob_unscaled"]) > 0.05
+    op = ee.live_resim_expert(_v7(join, line), index, ee.Reader())
+    assert op.inputs["join_prob_scale"] == pytest.approx(k)
+    assert op.inputs["join_model_p"] == pytest.approx(join["model_prob_unscaled"], abs=1e-12)
+    rep = ee.join_reproduction([op])
+    assert rep["checked"] == 1 and rep["mismatched"] == 0
+    # the old reading -- the tempered number taken as the join's -- is caught as a mismatch
+    old = ee.live_resim_expert({**_v7(join, line), "prob_scale": None}, index, ee.Reader())
+    assert old.inputs["join_model_p"] == pytest.approx(join["model_prob"]) and \
+        ee.join_reproduction([old])["mismatched"] == 1
+    # k = 1 (NCAAB, segments): the join writes no unscaled number and the check reads model_home_win_prob as before
+    flat = lgj.price_distribution_market(dist=ev["totalRunsDist"], line=line, side="over", market="totals",
+                                         market_prob=0.5, sims=100, prob_scale=1.0)
+    assert flat["prob_scale"] == 1.0 and flat["model_prob_unscaled"] is None
+    same = ee.live_resim_expert(_v7(flat, line), index, ee.Reader())
+    assert same.inputs["join_model_p"] == pytest.approx(flat["model_prob"]) and \
+        ee.join_reproduction([same])["mismatched"] == 0
+    # a tempered record missing the engine's number is not checked, rather than checked against the tempered one
+    broken = ee.live_resim_expert({**_v7(join, line), "model_home_win_prob_unscaled": None}, index, ee.Reader())
+    assert broken.inputs["join_model_p"] is None and ee.join_reproduction([broken])["checked"] == 0
+    assert broken.p_expert == op.p_expert  # the opinion itself never read the join's number
+
+
+def test_a_pre_v7_ledger_reads_as_before_and_its_new_inputs_are_documented_sparse():
+    index = ee.EvidenceIndex([_evidence()])
+    reader = ee.Reader()
+    rows = [_ledger(join_p=0.5), _ledger(join_p=0.5)]
+    ops = ee.live_opinions(rows, index, reader)
+    assert all(o.inputs["join_model_p"] == 0.5 and o.inputs["join_prob_scale"] is None for o in ops)
+    assert "live_gameline_ledger:prob_scale" in reader.consumed["live_resim"]
+    res = ee.checklist(ops, reader, {"live_gameline_ledger": rows, "live_evidence": [_evidence()]}, sport="nba")
+    assert not [a for a in res["alarms"] if "prob_scale" in str(a.get("input"))], res["alarms"]
+
+
 def test_live_resim_is_two_way_on_a_whole_number_where_the_join_is_not():
     ev = _evidence(total={"214": 40, "215": 20, "216": 40})
     op = ee.live_resim_expert(_ledger("totals", 215.0), ee.EvidenceIndex([ev]), ee.Reader())
@@ -265,7 +320,8 @@ def test_checklist_alarms_on_a_consumed_input_nothing_populates_and_documentatio
     assert any(a.get("input") == "live_gameline_ledger:quote_age_seconds" for a in res["alarms"])
     quiet = ee.checklist(ops, reader, sources, sport="nba", expected_sparse={
         "live_resim:out:player": "x", "live_resim:out:prior_age_s": "x",
-        "nba:live_resim:live_gameline_ledger:quote_age_seconds": "fixture"})
+        "nba:live_resim:live_gameline_ledger:quote_age_seconds": "fixture",
+        "live_resim:live_gameline_ledger:prob_scale": "v5 fixture rows predate ledger v7"})
     assert quiet["ok"], quiet["alarms"]
 
 
