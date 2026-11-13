@@ -932,7 +932,13 @@ death, never life — do not invert it.
 - Verification: scripts/live_moneyline_gap.py run on the fleet (read-only, nice 19) reproduces the fit script's model - market Brier (NBA +0.020, NCAAB +0.009) on the same population, then prints each hypothesis's table with game-clustered intervals; findings file names the verdict per hypothesis
 - Blocked by: none
 
-### nba-live-anchor-trace — OPEN — opened 2026-11-13 — session 8062940b-57fd-454a-8de5-25fdd4804d85
+### nba-live-anchor-trace — CLOSED 2026-11-13 (GOAL MET: the anchor reaches the live resume; the engine loses it, as noise) — opened 2026-11-13 — session 8062940b-57fd-454a-8de5-25fdd4804d85
+- GOAL VERDICT 2026-11-13 3:55 PM CST (21:55Z): **GOAL: MET.**
+  - **Trace:** anchor pre-sim `basketball_props_smart_sim.py:1218` -> `target_home/away_points` `orchestrator/smart_sim.py:1568` -> persisted `nba/live_resim.py:108` -> loaded by the live resume. The loss is inside `engine.py:1114-1175`.
+  - **Fleet reading:** over 171 games, target - market is 0.31 points mean abs; engine - market 2.43 (sd 3.18), slope on outcomes -0.26 [-0.89, +0.40], MSE 222.3 vs the market's 206.8. At tip, 24 of 65 games are >= 10 pp off the market both pregame and live.
+  - **H FALSIFIED;** the prediction was wrong in both parts.
+  - **Candidate fix (NBA post-sim margin anchor, like college's):** recorded under todo #780 as OPEN, not built.
+  - Findings: `.syndicate/findings_2026-11-13_nba_live_anchor_trace.md`.
 - Goal: State, with file:line evidence and a fleet reading at tip, whether the NBA pregame market anchor (#721, market_anchor) reaches the NBA live re-sim's resumed engine, and if not, where it is lost; findings committed; nothing changed in production
 - Files: .syndicate/findings_2026-11-13_nba_live_anchor_trace.md (NEW), docs/ai_context/todo.md (#780 section only)
 - Hypothesis: Written before tracing (2026-11-13 21:05Z). H: the #721 anchor is applied to the pregame SmartSim's OUTPUT (or to a layer the live resume does not read), so the NBA live re-sim resumes un-anchored engine inputs; at tip the live P(home) tracks the raw pregame engine, not the market. Prediction: persist_engine_inputs saves kwargs that carry no market line, and at tip the live P(home) sits farther from the market than the served pregame number does.
