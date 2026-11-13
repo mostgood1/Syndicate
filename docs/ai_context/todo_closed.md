@@ -17,6 +17,35 @@ work takes the next free number (see the counter at the top of `todo.md`).
 ---
 
 
+### `#791` — **CLOSED 2026-11-12 (GOAL MET): NCAAF live rows whose ESPN team name differs from the odds feed's now join their live re-sim lane, through the vetted canonical-pair map (exact key first, ncaaf only). LOADED 15:25:08Z 11-12 (user "Load all three"). Served Louisiana Ragin' Cajuns @ UL Monroe (alias-only): 10 of 10 / 13 of 13 / 19 of 19 rows with a Live proj., the shortlist joining 55-65 rows a read through the alias; the exact-match control unchanged** `[2026-11-12, found by lane ncaaf-live-segment-display while reading #785; fixed by lane ncaaf-live-join-team-alias, session d979fc08]`
+- **Measured** (served board, `C:/tmp/ncaafseg/matchup_probe.py` 02:46Z 11-12 + `seg_probe.py` 01:05Z / 01:50Z): UMass @ Toledo live rows with a Live proj.: full-game totals 0 of 4, spreads 0 of 1; segment 0 of 12. The other two live NCAAF games: full-game 23 of 23, segment 28 of 28 of the rows the #785 grade allows.
+- **Cause, traced:** the fleet's NCAAF live lens (keyvalue `live/ncaaf_live_lens.json`, generatedAt 2026-11-11T20:45:59-06:00) holds a `live_resim` lane, with all 6 segment blocks, for `Massachusetts Minutemen @ Toledo Rockets`. The board's odds rows say `UMass Minutemen`. `live_gameline_join` keys the index and the row lookup on exact normalized names (`_norm_team` :1731; index :1917; lookups :2052 / :2085 / :2178), so every row of that game refuses `no_live_gameline_projection` (20 of 172 considered at the 02:45:06Z `LIVE_GAMELINE_JOIN sport=ncaaf`).
+- **Size, one read (11-12 02:5xZ):** of the board's NCAAF team pairs, 2 miss the lens on exactly ONE name: (`umass minutemen`, `toledo rockets`) and (`louisiana ragin cajuns`, `ul monroe warhawks`). The rest miss on both names because their games were not in that night's lens, so this read cannot size the gap beyond those 2.
+- **Pre-existing**, not caused by #785: full-game rows miss the same way. **Prior art, read first:** `todo_closed.md` (~line 263): a registry with no `UMass` alias, where a loose fix made `MAS` resolve to `UMass Dartmouth`. An alias here must be an explicit pair, never a fuzzy match.
+- **Sized over the season** `[2026-11-12, lane ncaaf-live-join-team-alias]`.
+  - Method: the fleet, read-only, `C:/tmp/ncaafseg/alias_size.py`. Every non-inplay NCAAF book grid 2026-10-01..11-21 (34 dates) against the producer's own ESPN read (`poll_ncaaf_live_state._fetch_scoreboard` + `_game_from_event`).
+  - Result: 433 odds-feed game pairs; 390 match exactly; **43 (9.9%) match ONLY through `team_aliases.chip_join_key`**; 0 match neither way; 0 alias keys ambiguous.
+  - All 43 read correct by eye: App State, Hawai'i, Ragin' Cajuns, Southern Miss, San José State, Sam Houston, McNeese, The Citadel, UMass. About 1 NCAAF game in 10 could never join its live lane.
+- **Fix (`0fe6631d7`)**, `live_gameline_join` only:
+  - The exact-name key is tried FIRST, unchanged.
+  - Only on an exact miss, and for ncaaf only, the lookup reads the lens games filed under the row's CANONICAL pair (`team_alias_pair_key` -> `team_aliases.chip_join_key`: the CFBD registry + hand-verified supplement, behind its collision pass; `MAS` -> None).
+  - Both teams on both sides must resolve. Two games under one canonical pair are refused `team_pair_covers_more_than_one_game`, never picked.
+  - All three row lookups use it (full-game, segment display, first5 observation).
+  - Counted: `index_diagnostics.alias_keys` (in `LIVE_GAMELINE_JOIN index_why=`) and `rows_joined_by_team_alias` (shortlist coverage).
+  - Switch `SYNDICATE_LIVE_GAMELINE_TEAM_ALIASES=off` restores exact-only (absent = on).
+- **Tests:** `tests/test_live_gameline_team_alias.py`, 18.
+  - Through `board_enrichment.attach_live_gamelines_for_sport` on the real producer: a renamed game's 6 rows come out identical to the same game spelled alike; an exact join is identical on or off; off != on; ambiguity is refused; an unresolvable name stays a miss.
+  - 4 of 4 source mutations caught. 1,270 passed across the 63 test files that touch the join.
+- **Reachability on production inputs, before the load:** the sizing ran `chip_join_key` under refresh-worker's own environ against the fleet's registry, and all 43 pairs resolved.
+- **Loaded** 15:25:08Z 11-12: fleet ff `5b30d2415` -> `0fe6631d7` + a claimed refresh-worker TERM (user "Load all three"; deploys.md 2026-11-12 15:25:08Z).
+  - Boot MET: `alias_keys` in the join line, 0 tracebacks.
+  - It is a live-money change: a renamed game's full-game rows are priced exactly as a matched game's are.
+- **Reading MET** (served board, 11-13 02:40Z / 03:30Z / 04:20Z; deploys.md 2026-11-13 05:43:14Z):
+  - Louisiana Ragin' Cajuns @ UL Monroe (ESPN `Louisiana Ragin' Cajuns`, odds feed `Louisiana Ragin Cajuns`): rows with a Live proj. 10 of 10 / 13 of 13 / 19 of 19 of the rows the grade allows. Before: UMass @ Toledo 11-11, 0 of 17.
+  - Shortlist `rows_joined_by_team_alias` 63 of 126 / 55 of 121 / 65 of 128 considered.
+  - Priced like the matched control (Memphis @ South Florida, unchanged at every read): Louisiana full-game 10 of 13 rows with an edge field (Memphis 9 of 13); segment rows 0 with an edge field.
+  - 0 tracebacks since the boot.
+
 ### `#795` — **CLOSED 2026-11-12 (GOAL MET): college odds-feed team names that matched no ESPN school ("CSU Bakersfield Roadrunners" both leagues, WNCAAB "Montana Grizzlies", "Western Kentucky Hilltoppers") resolve by two derivation rules; LOADED 22:02-22:04Z (user "Yes, load it"); served CSUB rows 0 of 5 -> 3 of 3 keyed, both rail cards on their chips, both live re-sims anchored at tip; the audit runs hourly in the fleet watchdog, emailed on any new name (user "run the audit before each slate automatically")** `[2026-11-12, lane college-odds-feed-team-names, session 0f519972; user "still have college teams not matching" + a screenshot of CSUB @ WIU (NCAAB) and CSUB @ WASH (WNCAAB), 11-12]`
 - **Cause:** the cards are real games (ESPN `401920135`, tip 00:00Z 11-13, and `401921495`, tip 03:00Z), but ESPN's registry says "Cal State Bakersfield" and the odds feed says "CSU Bakersfield". `chip_join_key` returned None, so the board rows carried no `away_key`, and the card found no chip. The same key feeds the slate's odds join and the live re-sim's margin anchor (`no_margin_anchor`).
 - **Audit** (`scripts/college_team_name_audit.py`, fleet, every quote shard): ncaab 2 of 550 events, wncaab 3 of 173, on 3 names. With `986a718fd`: 0 and 0.

@@ -59438,3 +59438,35 @@ ailload\load.sh 3f11114c2 e102faf79`):
   - Both CSUB live re-sims published anchored, where `no_margin_anchor` was the baseline.
   - The audit now runs in the watchdog.
   - Lane closed; todo #795 moved to `todo_closed.md`.
+
+## 2026-11-13 05:43:14Z (11:43 PM CST 11-12) -- READING, no deploy: todo #791 served reading, NCAAF Louisiana Ragin' Cajuns @ UL Monroe (kickoff 02:00Z; ESPN `Louisiana Ragin' Cajuns`, odds feed `Louisiana Ragin Cajuns`: alias-only), lane `ncaaf-live-join-team-alias` -- **MET: the renamed game's rows carry a Live proj. exactly as the exact-match control's do, and the shortlist joined 55-65 rows a read through the alias. #791 CLOSED**
+- **Read:**
+  - The served board at 01:40Z / 02:40Z / 03:30Z / 04:20Z (`C:/tmp/ncaafseg/night791.sh`: `matchup_probe.py` + `alias_cov.py` + the fleet log).
+  - `C:/tmp/ncaafseg/edge791.py` at 04:21:09Z.
+  - A post-game read at 05:41:43Z (`C:/tmp/ncaafseg/night791_post.sh`).
+  - Live NCAAF game rows only.
+- **Fleet code during the reading:** `a133df703`, not `0fe6631d7`.
+  - Lane `college-odds-feed-team-names` restarted refresh-worker at 22:02:59Z (deploys.md 22:02:53Z).
+  - `a133df703` contains `0fe6631d7`. Its diff past it touches `ncaab_team_registry.py`, `nba/live_resim.py` and the audit script: no NCAAF name and no join code.
+  - `rows_joined_by_team_alias` counts only the alias path's hits, so the rows below joined through #791.
+- **Louisiana @ UL Monroe, rows with a Live proj. / rows the grade allows** (q1 totals and segment moneylines are blank by design and excluded):
+  - 02:40Z: **10 of 10** (full spreads 3, totals 6; q3 totals 1). Blank by design: q1 totals 1, q2 h2h 1, q3 h2h 1.
+  - 03:30Z: **13 of 13** (full h2h 1, spreads 2, totals 10).
+  - 04:20Z: **19 of 19** (full h2h 2, spreads 5, totals 6; h2 / q3 / q4 totals 2 each).
+  - Before the load, the same case (UMass @ Toledo 11-11): 0 of 17 live rows, full-game 0 of 5 (deploys.md 2026-11-12 02:55Z).
+- **Shortlist coverage** (`/api/board/layer2-shortlist`, `enrichment.live_gamelines`):
+  - `rows_joined_by_team_alias`: absent at 01:40Z (Louisiana not yet live); then **63 of 126** considered (02:40Z), **55 of 121** (03:30Z), **65 of 128** (04:20Z).
+  - `index_why.alias_keys` 1 -> 2. It counts every indexed game, exact ones too; 2 games were live.
+  - Fleet log `LIVE_GAMELINE_JOIN sport=ncaaf` 02:37:39Z: `index=2 ... 'alias_keys': 2`.
+- **Control, Memphis @ South Florida** (kickoff 01:00Z, exact names): every row the grade allows carries a Live proj. at all four reads.
+  - 3 of 3, 11 of 11, 14 of 14, 18 of 18.
+  - Blank by design: q1 totals 2 and q2 h2h 1 (01:40Z); q3 h2h 1 (03:30Z).
+- **Priced like a matched game** (`edge791.py`, 04:21:09Z). This is the live-money effect stated at the load.
+  - Louisiana: full-game 13 of 13 with a Live proj., 10 carrying an edge field; segment 6 of 6, 0 with an edge field or `live_aware`.
+  - Memphis: full-game 13 of 13, 9 with an edge field; segment 5 of 5, 0.
+- **Tracebacks** in refresh-worker.log since the 15:25:15Z boot (through the 22:02:59Z restart): 0 at each read.
+- **Post-game** (05:41:43Z): Louisiana's last live rows on the board were at 05:31:38Z (2 matchup keys); 0 at 05:41:43Z. The producer still saw the game in progress at 05:41:18Z, and ESPN read Final (Louisiana 42, UL Monroe 21) at 05:42:30Z. The last NCAAF join while it was live (05:40:24Z build): 51 of 51 considered rows joined through the alias. Tracebacks since the boot: 0.
+- **Observation, not investigated (not #791's):** at the 04:20Z fetch, the payload's `snapshot_generated_at` read 03:26:05Z. Its live rows had moved on by then: h2 / q4 rows absent at 03:30Z were present.
+- **#791 verdict: GOAL MET.**
+  - Lane `ncaaf-live-join-team-alias` closed; todo #791 moved to `todo_closed.md`.
+  - No claim held.

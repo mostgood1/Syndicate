@@ -1095,7 +1095,10 @@ After web `cc5bdfb1` (20:11:20Z): placeholder starts **43 -> 0**, "TBD" tokens *
   - NCAAB 50 -> 244 of 260 on the evening slate (83 of the added rows are half rows).
   - NFL 9 -> 10 of 21 and NHL 1 -> 2 of 3: +1 full-game moneyline each.
 - **Moneyline rows carry the join's own verdict.** The display attaches to every full-game h2h row the join touches, priced or refused. Such a row can show `live_aware` and an edge, both from `price_moneyline`, which this change leaves alone; it now also shows the live % beside them.
-- **Not yet true:** an NCAAF game whose ESPN team name differs from the odds feed's shows no Live proj. on ANY row: UMass @ Toledo on 11-11 (`Massachusetts Minutemen` vs `UMass Minutemen`; the join keys on exact names). Todo #791.
+- **Now true (todo #791, LOADED 2026-11-12 15:25:08Z):** an NCAAF game whose ESPN team name differs from the odds feed's joins its live re-sim lane.
+  - `live_gameline_join` tries the exact-name key first, then, for ncaaf only, the canonical pair from `team_aliases.chip_join_key`.
+  - Served 11-13 02:40-04:20Z, Louisiana Ragin' Cajuns @ UL Monroe (alias-only): 10 of 10 / 13 of 13 / 19 of 19 rows with a Live proj. The shortlist counted `rows_joined_by_team_alias` 55-65 a read (deploys.md 2026-11-13 05:43:14Z). Was: UMass @ Toledo 11-11, 0 of 17.
+  - Off switch `SYNDICATE_LIVE_GAMELINE_TEAM_ALIASES=off`.
 
 ## [layer2-live-rail-edges] LIVE RAIL CARDS SHOW OUR LIVE RE-SIM VS THE BOOK'S LIVE LINE PER MARKET; A "MODEL ≠ LINE" FLAG ONLY ON A QUOTE <= 120 s OLD AT PRICING, WORDED AS A DISAGREEMENT -- LOADED ON WEB 2026-11-11 17:28Z `[verified 2026-11-10 23:45-23:58Z (payload) + 2026-11-11 17:30Z (served page) + 2026-11-11 23:15Z-00:46Z 11-12 (evening flags, MET); lane layer2-live-rail-edges, todo #781]`
 - **Why live cards had no line: display, not data.** The chip `footer` (the book line) is pregame-only. On the served board at 23:45Z, all 50 live full-game rows carried `line`, `live_total` / `live_model_probability`, `model_edge_pct` (on `live_aware` rows) and `book_age_seconds`.
