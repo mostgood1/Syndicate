@@ -59471,3 +59471,34 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **What was read:** the reading the 11-11 23:49Z entry owed at the next live-odds-worker boot.
 - **verify:** live-odds-worker has run `5b30d2415` or later since the first start after the 11-11 23:48:16Z ff (worker env `RENDER_GIT_COMMIT=5b30d2415257`: the fleet was brought up on that HEAD before the 11-12 15:25Z ff; restarts since: 22:03:57Z 11-12 for #795, and ~09:23Z 11-13 after the worker exited code 0 and the supervisor restarted it, pid 273104); settlement: the last `both_sides_held` refusal is 20:48:50Z 11-11 (837e657b, operator-graded 20:51:54Z), and every `VENUE_SETTLEMENT` pass since reads `refused={}` (rotated logs .2/.1 and the current log, the current one 92 of 92 through 14:09:46Z 11-13); `MARKET_EXIT_CLOSE` lines 0 (no row has needed the new branch yet: its live evidence stays the 11-11 replay of the real 837e657b row, won +0.0562); ungraded-fill alarm `ungraded_fills(3d)` = 0 at 14:12Z; 0 lines starting `Traceback` (the 3 grep hits after the 11-12 load are inside `ALL_PROCESS_MEMORY` JSON). **MET.**
 - **Also read (lane `kalshi-fractional-fills`, not yet):** 0 fractional Kalshi fills since the 11-11 20:25:42Z load: 60 live entries filled (63 placed) and 37 live exits with a fill, none fractional; before the load 10 of 765 filled entries and 7 of 350 filled exits were fractional (17 of 1,115 = 1.5%), so 0 of 97 is unremarkable (~23% at that rate); 91822817 reads filled 0.03 natively (no repair flag). Entries now run ~21 a day against ~48 before.
+
+## 2026-11-13 15:47:13Z (9:47 AM CST) -- FLEET ff a133df703 -> eb4a43688 + reload-web + refresh-worker TERM: the Clippers crest and their players' side (todo #796, lane `team-logo-canonical-names`) -- **MET: served NBA rows with no crest 145 -> 0, NBA props with no side 19 -> 0 of 354, Clippers props home 0 -> 18**
+- **User, in this chat:** "Yes, load it".
+- **Range:** 38 commits. Runtime is `syndicate/features/shared/team_logos.py` only (`_index` + docstring, mine). The other 22 files are offline scripts no role runs (the `_primary_tree` path move, the #784 gate's mean-shift reporting, two football scenario scripts). Re-listed 15:45:50Z, in a separate call before the ff.
+- **Gates:**
+  - Claims: refresh-worker 15:45:14Z, web 15:45:23Z, both ACQUIRED.
+  - Baseline 15:45:23Z, served board, 3,703 rows:
+    - NBA rows missing a crest 145 of 1,453, all "Los Angeles Clippers"; ncaab 6 of 136 (West Florida 4, Lindenwood 2); every other sport 0.
+    - NBA props with no `player_side` 19 of 376, all Thunder @ Clippers. Clippers rows with the LAC crest 0 of 145; Clippers props: no side 19, away 28.
+  - Preflight `--target fleet --target-commit eb4a43688...`:
+    - web 15:46:29Z **CLEAR**, rc 0.
+    - refresh-worker 15:46:08Z HOLD: a board build in flight (`layer2_shortlist_build`).
+  - `ff796.sh`: HEAD guard, runtime-range guard (`team_logos.py` only, 22 scripts), ff 15:47:13.599Z. Then `reload-web`: HUP to master 438, workers [415800, 422612] -> [423030, 423031] in 2.0 s, 0 failures.
+  - `wait796.sh`, refresh-worker:
+    - Polled preflight every ~20 s; HOLD through `layer2_shortlist_build` and `portfolio_commit`. That build ended at `BOARD_BUILD_TIMING` 15:56:36Z, wall 776 s. At 15:59:30Z: HOLD, 1 job in flight.
+    - **CLEAR** rc 0 at 15:59:49Z, then TERM 145748 at 15:59:49.997Z with no live children.
+    - New pid 426085, `==== start` 15:59:59Z, head `eb4a43688`. Baseline re-read 15:59:08Z: no side 19 of 377.
+- **verify: MET.**
+  - **Web half**, read at 15:47:21Z, 8 s after the reload, on the same board build (3,703 rows):
+    - NBA rows missing a crest 145 -> **0** of 1,453; Clippers rows with the LAC crest 0 -> 145.
+    - ncaab 6 of 136, unchanged; every other sport 0.
+    - NBA props with no side still 19 of 376. That is predicted: the side is stamped in refresh-worker's build and the crest in web's hydrate, so the split is now measured, not just read from code.
+  - **Worker half**, from the new worker's first build (`BOARD_BUILD_TIMING` 16:20:13Z, wall 408 s, ok=True). Served reads at 16:21:11Z and 16:23:47Z (3,832 and 3,831 rows):
+    - NBA props with no side **0 of 354**; the 45 Clippers props read home 18, away 27.
+    - NBA rows missing a crest 0 of 1,442.
+    - Tracebacks since the boot: 0.
+  - **Rows still without a crest:**
+    - ncaab Lindenwood 2 and West Florida 1: not in ESPN's branding snapshot (known, in #796).
+    - wncaab Loyola (MD) @ Towson, 2-3 of 2-3 rows: **not this change.** `_SPORTS` excludes `wncaab` in both `a133df703` and `eb4a43688`, and the fleet has no `wncaab_source` branding snapshot, so WNCAAB rows have never carried a crest. These are the first WNCAAB rows on a board read in this lane.
+- **Revert:** `git revert eb4a43688`, then a fleet ff + `reload-web` + a claimed refresh-worker TERM.
+- **Claims:** web released 16:01:00Z. refresh-worker released right after this entry.
