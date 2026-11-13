@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import ast
 import logging
+import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -216,11 +217,118 @@ def _box_sources(sport: str, as_of: str) -> list[Path]:
     return paths
 
 
+# BOX-SCORE INDEX (lane book-grid-overlay-starvation, todo #790; user 2026-11-13 "Yes, fix #790 here").
+#
+# `_box_games` used to read EVERY box row of every source on every call and keep the player's: the whole
+# league history, file by file, for one name. Inside a build's read cache the files are parsed once, but
+# the walk is not. Measured on the fleet 2026-11-13, warm, NBA: 577 ms median per call, of a 617 ms
+# recent-form card. The in-play overlay re-prices ~2,000 NBA cards a build with lines that move every
+# pull, so most cards are new to the sentence memo. On 11-11 that held refresh-worker's book-grid tick at
+# 94-234 s a build with NBA live, and every other sport's live prices waited behind it (#790).
+#
+# So inside a read cache (a board build), the sources are indexed ONCE: each row filed under every key of
+# its player's name (`common.name_keys`, the keys `names_match` intersects), plus the game -> teams map.
+# A call then reads only the rows filed under the asked name's keys, in the original source and row order,
+# and re-checks `names_match` on each. Same rows, same order, same one-line-per-date rule, same
+# opponents: the result is identical, and a test holds it so.
+#
+# Only inside a read cache, which a build owns and frees. Outside one (an Ask click) nothing is kept
+# across calls, as before. The index lives in that cache, keyed by every source's (path, mtime, size),
+# so a rewritten file is read again.
+# Off switch: SYNDICATE_PROP_EVIDENCE_BOX_INDEX=off (the walk, every call).
+_BOX_INDEX_OFF = frozenset({"0", "false", "no", "off"})
+
+
+def _box_index_enabled() -> bool:
+    return str(os.environ.get("SYNDICATE_PROP_EVIDENCE_BOX_INDEX") or "").strip().lower() not in _BOX_INDEX_OFF
+
+
+def _box_row_identity(sport: str, row: dict[str, Any]) -> tuple[str, str, str]:
+    """(game_id, team, player name) of one box row, the same way for the walk and the index."""
+    game_id = str(row.get("game_id") or row.get("gameId") or "").strip()
+    team = _code(sport, row.get("TEAM_ABBREVIATION") or row.get("teamTricode"))
+    name = str(row.get("PLAYER_NAME") or "").strip() or " ".join(
+        p for p in (str(row.get("firstName") or "").strip(), str(row.get("familyName") or "").strip()) if p)
+    return game_id, team, name
+
+
+def _box_index(sport: str, sources: list[Path]) -> tuple[list[tuple], dict[str, list[int]], dict[str, set[str]]] | None:
+    """(rows, positions by name key, game -> teams) for these sources, built once per read cache. None when
+    the index is off, no read cache is active, or a source cannot be stat'ed (the walk then runs as before)."""
+    if not _box_index_enabled():
+        return None
+    cache = C._READ_CACHE.get()
+    if cache is None:
+        return None
+    signature = tuple(C._cache_key(path) for path in sources)
+    if any(part is None for part in signature):
+        return None
+    key = ("box_index", sport, signature)
+    hit = cache.get(key)
+    if hit is not None:
+        return hit
+    rows: list[tuple] = []
+    by_key: dict[str, list[int]] = {}
+    by_game_teams: dict[str, set[str]] = {}
+    for path in sources:
+        try:
+            for row in C.iter_csv(path):
+                game_id, team, name = _box_row_identity(sport, row)
+                if game_id and team:
+                    by_game_teams.setdefault(game_id, set()).add(team)
+                keys = C.name_keys(name)
+                if not keys:
+                    continue  # names_match is False for a name with no keys: never a hit
+                position = len(rows)
+                rows.append((name, str(row.get("date") or "")[:10], game_id, team,
+                             tuple(row.get(col) for col in _BOX_COLUMNS)))
+                for name_key in keys:
+                    by_key.setdefault(name_key, []).append(position)
+        except Exception:
+            logger.exception("prop_evidence basketball: unreadable %s", path)
+    index = (rows, by_key, by_game_teams)
+    cache[key] = index
+    return index
+
+
+def _played_games(mine: dict[str, dict[str, Any]], by_game_teams: dict[str, set[str]]) -> list[dict[str, Any]]:
+    played: list[dict[str, Any]] = []
+    for entry in mine.values():
+        # A 0-minute line is a DNP: books void the bet, so it is not a miss.
+        if not entry.get("MIN"):
+            continue
+        others = by_game_teams.get(entry["game_id"], set()) - {entry["team"]}
+        entry["opponent"] = next(iter(others), "")
+        played.append(entry)
+    played.sort(key=lambda g: g["date"], reverse=True)
+    return played
+
+
 def _box_games(sport: str, player_name: str, as_of: str) -> tuple[list[dict[str, Any]], Path | None]:
     """The player's PLAYED box rows (newest first, one per game), each with its opponent tricode."""
     sources = _box_sources(sport, as_of)
     if not sources:
         return [], None
+    index = _box_index(sport, sources)
+    if index is not None:
+        indexed_rows, by_key, indexed_teams = index
+        positions: set[int] = set()
+        for name_key in C.name_keys(player_name):
+            positions.update(by_key.get(name_key, ()))
+        found: dict[str, dict[str, Any]] = {}
+        for position in sorted(positions):
+            name, date, game_id, team, raw = indexed_rows[position]
+            if not C.names_match(name, player_name):
+                continue
+            # one line per player per DATE, first source wins (the walk's `setdefault` below)
+            key = date or game_id
+            if key in found:
+                continue
+            entry: dict[str, Any] = {"date": date, "game_id": game_id, "team": team}
+            for col, value in zip(_BOX_COLUMNS, raw):
+                entry[col] = C.to_float(value)
+            found[key] = entry
+        return _played_games(found, indexed_teams), sources[0]
     by_game_teams: dict[str, set[str]] = {}
     mine: dict[str, dict[str, Any]] = {}
     for path in sources:
@@ -244,16 +352,7 @@ def _box_games(sport: str, player_name: str, as_of: str) -> tuple[list[dict[str,
                 mine.setdefault(key, entry)
         except Exception:
             logger.exception("prop_evidence basketball: unreadable %s", path)
-    played: list[dict[str, Any]] = []
-    for entry in mine.values():
-        # A 0-minute line is a DNP: books void the bet, so it is not a miss.
-        if not entry.get("MIN"):
-            continue
-        others = by_game_teams.get(entry["game_id"], set()) - {entry["team"]}
-        entry["opponent"] = next(iter(others), "")
-        played.append(entry)
-    played.sort(key=lambda g: g["date"], reverse=True)
-    return played, sources[0]
+    return _played_games(mine, by_game_teams), sources[0]
 
 
 def _days_between(earlier: str, later: str) -> int | None:

@@ -505,7 +505,13 @@ def row_recent_matchup_text(row: Mapping[str, Any], context: Mapping[str, Any] |
                 _RECENT_MATCHUP_MODULE.pop(stale, None)
             state = _RECENT_MATCHUP_MODULE.setdefault(bucket, {"read_cache": {}, "spent": {}, "logged": set()})
         spent = state["spent"].get(sport, 0.0)
-        if spent >= _recent_matchup_budget(sport):
+        budget = _recent_matchup_budget(sport)
+        # A caller's own per-build budget (the in-play overlay's, `book_grid_artifact`; lane
+        # book-grid-overlay-starvation, todo #790). Absent or not a positive number: the table above.
+        override = context.get("recent_matchup_budget_seconds") if isinstance(context, Mapping) else None
+        if isinstance(override, (int, float)) and not isinstance(override, bool) and override > 0:
+            budget = float(override)
+        if spent >= budget:
             if sport not in state["logged"]:
                 state["logged"].add(sport)
                 print(f"[layer2_row_context] RECENT_MATCHUP_BUDGET_SPENT sport={sport} seconds={spent:.1f}", flush=True)

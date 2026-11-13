@@ -962,11 +962,64 @@ def _remember_inplay_rows(sport: Any, date_str: Any, generated_at: Any, grid: An
         pass
 
 
+# ONE CONTEXT PER OVERLAY BUILD (lane book-grid-overlay-starvation, todo #790; user 2026-11-13 "Yes, fix
+# #790 here").
+#
+# The overlay used to call the card builder with no row context. A prop card's recent-form evidence
+# (`layer2_row_context.row_recent_matchup_text`) then fell back to a module state keyed on the WALL-CLOCK
+# MINUTE: its read cache (every box-score file parsed) and its 60 s per-sport budget both started over
+# each minute. A build spanning four minutes re-parsed the files four times and got four 60 s budgets. On
+# 11-11 the NBA overlay took 94-234 s a build with NBA live (median 136 s), and refresh-worker's book-grid
+# tick, which prices every sport's live lines one sport after another, ran back to back (median gap
+# 65 -> 307 s). The NCAAB overlay went 292 s between builds and web dropped it as stale (`stale_371s`).
+#
+# Now each build passes one context: one read cache, one budget for the whole build, and the board's
+# date (so the sentence memo the shortlist build fills is shared). The budget is the overlay's own,
+# smaller than the shortlist's 60 s: an in-play card re-prices first, and its "Recent form" sentence is
+# context. A card past the budget shows no sentence that build. The sentence memo (30 min, keyed on the
+# line) carries every card whose line did not move.
+#   SYNDICATE_INPLAY_OVERLAY_EVIDENCE_SECONDS  per-sport evidence budget per build (default 20)
+#   SYNDICATE_INPLAY_OVERLAY_BUILD_CONTEXT=off the bare call, as before
+_INPLAY_EVIDENCE_SECONDS_DEFAULT = 20
+
+
+def inplay_overlay_build_context_enabled() -> bool:
+    raw = str(os.environ.get("SYNDICATE_INPLAY_OVERLAY_BUILD_CONTEXT") or "").strip().lower()
+    return raw not in _INPLAY_OFF_VALUES
+
+
+def inplay_overlay_evidence_seconds() -> int:
+    return _env_seconds("SYNDICATE_INPLAY_OVERLAY_EVIDENCE_SECONDS", _INPLAY_EVIDENCE_SECONDS_DEFAULT)
+
+
+def inplay_overlay_row_context(date_str: str) -> dict[str, Any] | None:
+    """The card builder's context for ONE overlay build, or None when switched off (the bare call)."""
+    if not inplay_overlay_build_context_enabled():
+        return None
+    return {
+        "selected_date": str(date_str or "").strip(),
+        "recent_matchup": {"read_cache": {}, "spent": {}, "logged": set()},
+        "recent_matchup_budget_seconds": float(inplay_overlay_evidence_seconds()),
+    }
+
+
+def _accepts_row_context(card_builder: Any) -> bool:
+    """Whether the card builder takes `row_context` (`layer2_shortlist`'s guard for `openings`, same reason)."""
+    import inspect
+
+    try:
+        return "row_context" in inspect.signature(card_builder).parameters
+    except (TypeError, ValueError):
+        return False
+
+
 def build_inplay_overlay(
     sport: str, date_str: str, rows: list[Mapping[str, Any]], *, grid_generated_at: Any = None
 ) -> dict[str, Any]:
     """The overlay payload: board cards for these in-play rows, built by the
     shortlist's own chain. Raises on a card-builder failure; the writer catches."""
+    import time as _time
+
     from syndicate.features.shared.layer2_board import (
         build_layer2_rows,
         layer2_rows_to_board_cards,
@@ -976,14 +1029,29 @@ def build_inplay_overlay(
     slug = str(sport or "").strip().lower()
     cards: list[dict[str, Any]] = []
     opportunities: list[dict[str, Any]] = []
+    # Where a build's time goes, for the INPLAY_OVERLAY line: candidates, shortlist, cards, and the
+    # recent-form evidence inside the cards (#790).
+    timings: dict[str, Any] = {}
+    context = inplay_overlay_row_context(date_str)
     if rows:
+        started = _time.perf_counter()
         result = build_layer2_rows(rows)
+        timings["rows_ms"] = round((_time.perf_counter() - started) * 1000)
         opportunities = [dict(item) for item in (result.get("opportunities") or []) if isinstance(item, Mapping)]
         for item in opportunities:
             if not str(item.get("sport") or "").strip():
                 item["sport"] = slug
+        started = _time.perf_counter()
         chosen = ((select_shortlist(opportunities) or {}).get("rows") or []) if opportunities else []
-        for card in layer2_rows_to_board_cards(chosen):
+        timings["shortlist_ms"] = round((_time.perf_counter() - started) * 1000)
+        started = _time.perf_counter()
+        if context is not None and _accepts_row_context(layer2_rows_to_board_cards):
+            built = layer2_rows_to_board_cards(chosen, row_context=context)
+        else:
+            context = None  # the bare call: nothing to report as this build's evidence
+            built = layer2_rows_to_board_cards(chosen)
+        timings["cards_ms"] = round((_time.perf_counter() - started) * 1000)
+        for card in built:
             if not isinstance(card, Mapping):
                 continue
             tagged = dict(card)
@@ -991,6 +1059,12 @@ def build_inplay_overlay(
             tagged["inplay_overlay"] = True
             tagged["price_grid_generated_at"] = grid_generated_at
             cards.append(tagged)
+    if context is not None:
+        spent = (context.get("recent_matchup") or {}).get("spent") or {}
+        timings["evidence_s"] = round(float(sum(spent.values())), 1)
+        timings["evidence_budget_s"] = context.get("recent_matchup_budget_seconds")
+    else:
+        timings["evidence_s"] = None
     return {
         "version": INPLAY_OVERLAY_VERSION,
         "sport": slug,
@@ -1001,6 +1075,7 @@ def build_inplay_overlay(
         "rows_inplay": len(rows or []),
         "opportunities": len(opportunities),
         "cards": cards,
+        "timings": timings,
     }
 
 
@@ -1056,7 +1131,9 @@ def _write_inplay_overlay_best_effort(sport: str, date_str: str, payload: Mappin
         print(
             f"[book_grid] INPLAY_OVERLAY sport={key[0]} date={key[1]} rows_inplay={overlay['rows_inplay']} "
             f"opportunities={overlay['opportunities']} cards={len(overlay['cards'])} published={published} "
-            f"elapsed_ms={(_time.monotonic() - started) * 1000:.0f}",
+            f"elapsed_ms={(_time.monotonic() - started) * 1000:.0f} "
+            # The phases (#790): candidates, shortlist, cards, and the cards' recent-form evidence.
+            + " ".join(f"{name}={value}" for name, value in (overlay.get("timings") or {}).items()),
             flush=True,
         )
     except Exception as exc:  # noqa: BLE001 -- an overlay must never cost the grid
