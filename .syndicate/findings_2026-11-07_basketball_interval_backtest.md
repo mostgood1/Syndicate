@@ -1559,3 +1559,57 @@ Against the slate's finals (diagnostic; these 54 games are not among the 240 beh
 - **What this settles.** The mechanism works as registered: it narrows the late regulation margin by about 6%, and the in-game totals barely move. The registered statistic measured the mechanism's EFFECT, not whether the effect improves calibration against outcomes. That second question is what decided the revert (240-game replay: totals tie, win Brier worse beyond SE at 20 m and 36 m, margin coverage down everywhere) and the 11-10 slate does not overturn it.
 - **What a re-load would need:** an outcome-scored gate on 2026-27 games at every checkpoint the live pricing uses (tip, 10, 20, 30, 36 m; margin and total), not only the 30 / 36 m SD ratio from the 2025-26 corpus. The OLD config is itself over-wide (margin 80% coverage 0.83-0.91); RC46 overshoots to under-wide (0.69-0.83). A width fix between the two, tested that way, is the open question for #765 NCAAB, not RC46 as loaded.
 - **STATUS `[2026-11-11 17:50Z]`: step 3h CLOSED. RC46 reverted (live 22:56:28Z 11-10); effect reading NOT FALSIFIED; no re-load planned.**
+
+## PHASE 2 STEP 3i (NCAAB): two width candidates through the #784 outcome gate -- SE2_ALT lands the width, but NEITHER passes (win Brier WORSE at 10 m / 20 m); strict alternation alone carries that cost `[2026-11-13 16:15Z (10:15 AM CST), lane ncaab-margin-width-candidates, CLOSED]`
+
+The question STEP 3h left: a margin width between production's 7 fields (over-wide, margin 80% coverage 0.83-0.91) and RC46 (under-wide, 0.69-0.83) that the #784 outcome gate passes. **Answer for the two candidates registered: none passes.**
+
+- **Candidates (lane block, pre-registered on main `79409616b` at 14:19Z, before either run):**
+  - ALT1 = the 7 fields + `possession_alternation` 1.0.
+  - SE2_ALT = the 7 fields + `score_effect_k` 0.002 + `possession_alternation` 1.0 + `solver_endgame_pts_per_team` 0.2 -> 0.30 (the tip re-centre scaled from RC46's 0.46 by k).
+- **Run:** `scripts/live_mechanism_outcome_gate.py` at `d62325009` on the fleet's data (nice 19, 3 procs each, the two runs concurrent, 6,494 s / 6,537 s), 2026-11-03..12, 100 sims, 368 tasks: 366 games at the tip and 20 m, 360 at 10 / 30 / 36 m. Current = the running 7 fields (`911f9565fe7f`). Receipts in the primary tree's `.syndicate/deploy/outcome_gate/`: `ncaab__9533e89030b5__911f9565fe7f.json` (ALT1) and `ncaab__21c49cf1c580__911f9565fe7f.json` (SE2_ALT). Both exit 1 (WORSE cells). Logs `C:\tmp\score_effect_load\width_alt1.log` / `width_se2_alt.log`, side-by-side `width_compare.py`.
+
+Candidate - current, 1.96 x bootstrap SE over games; **bold** = beyond SE (the gate's WORSE / better):
+
+| checkpoint | arm | margin SD cur -> cand (ratio) | margin 80% cov | real SD of (final - sim mean) | win Brier | win log loss | margin CRPS | total CRPS | total mean shift |
+|---|---|---|---|---|---|---|---|---|---|
+| tip | ALT1 | 14.82 -> 14.47 (0.977) | 0.861 -> 0.847 | 13.30 -> 13.39 | +0.0005 +- 0.0051 | +0.004 +- 0.017 | +0.042 +- 0.126 | -0.080 +- 0.128 | +0.06 +- 0.19 |
+| tip | SE2_ALT | 14.82 -> 12.82 (0.866) | 0.861 -> 0.787 | 13.30 -> 13.20 | -0.0019 +- 0.0050 | -0.009 +- 0.014 | -0.112 +- 0.131 | +0.016 +- 0.139 | -0.14 +- 0.19 |
+| 10 m | ALT1 | 12.96 -> 12.58 (0.971) | **0.869 -> 0.839** | 11.43 -> 11.69 | **+0.0044 +- 0.0044** | **+0.017 +- 0.014** | **+0.134 +- 0.110** | -0.053 +- 0.120 | -0.10 +- 0.18 |
+| 10 m | SE2_ALT | 12.96 -> 11.40 (0.879) | **0.869 -> 0.806** | 11.43 -> 11.68 | **+0.0058 +- 0.0053** | +0.016 +- 0.017 | +0.079 +- 0.140 | -0.051 +- 0.115 | +0.04 +- 0.17 |
+| 20 m | ALT1 | 10.65 -> 10.30 (0.968) | 0.869 -> 0.877 | 8.99 -> 9.06 | **+0.0041 +- 0.0039** | +0.021 +- 0.024 | +0.060 +- 0.091 | -0.084 +- 0.091 | +0.07 +- 0.15 |
+| 20 m | SE2_ALT | 10.65 -> 9.70 (0.912) | 0.869 -> 0.855 | 8.99 -> 9.06 | **+0.0055 +- 0.0041** | **+0.027 +- 0.025** | +0.032 +- 0.104 | -0.054 +- 0.101 | +0.00 +- 0.15 |
+| 30 m | ALT1 | 7.55 -> 7.33 (0.970) | 0.850 -> 0.825 | 6.95 -> 7.01 | -0.0010 +- 0.0029 | -0.002 +- 0.009 | +0.019 +- 0.068 | +0.035 +- 0.077 | +0.08 +- 0.11 |
+| 30 m | SE2_ALT | 7.55 -> 7.08 (0.938) | **0.850 -> 0.814** | 6.95 -> 7.00 | +0.0023 +- 0.0037 | +0.007 +- 0.011 | +0.029 +- 0.079 | -0.029 +- 0.068 | +0.09 +- 0.11 |
+| 36 m | ALT1 | 4.89 -> 4.72 (0.966) | 0.850 -> 0.831 | 4.45 -> 4.51 | +0.0023 +- 0.0027 | +0.008 +- 0.011 | +0.023 +- 0.048 | -0.014 +- 0.049 | +0.10 +- 0.08 |
+| 36 m | SE2_ALT | 4.89 -> 4.67 (0.957) | 0.850 -> 0.828 | 4.45 -> 4.46 | +0.0024 +- 0.0026 | +0.018 +- 0.022 | -0.014 +- 0.049 | -0.019 +- 0.051 | +0.03 +- 0.08 |
+
+Against the pre-registration:
+
+| arm | pre-registered | measured | verdict |
+|---|---|---|---|
+| ALT1 | margin SD -2% to -6% at every checkpoint | -2.3 / -2.9 / -3.2 / -3.0 / -3.4% | held |
+| ALT1 | mean total shift within +-0.2 everywhere | +0.06 / -0.10 / +0.07 / +0.08 / +0.10 | held |
+| ALT1 | tip margin coverage stays >= 0.83 | 0.847 | held |
+| ALT1 | no WORSE cell and none better | WORSE 10 m margin CRPS, win Brier, log loss and 20 m win Brier; better 10 m margin coverage | **FALSIFIED** |
+| SE2_ALT | margin SD -8% to -16% at tip / 10 / 20 m | -13.4 / -12.1 / -8.8% | held |
+| SE2_ALT | margin SD -2% to -7% at 30 / 36 m | -6.2 / -4.3% | held |
+| SE2_ALT | tip SD ratio inside 0.84-0.92 (the k scaling) | 0.866 | held |
+| SE2_ALT | tip margin coverage 0.78-0.83 | 0.787 | held |
+| SE2_ALT | tip total shift -0.4 to +0.3 | -0.14 | held |
+| SE2_ALT | win Brier +0.000 to +0.006 at 20 m and 36 m, inside SE | 20 m +0.0055 +- 0.0041 (in range, beyond SE); 36 m +0.0024 +- 0.0026 | **FALSIFIED** at 20 m |
+| SE2_ALT | no WORSE cell | WORSE 10 m win Brier, 20 m win Brier and log loss | **FALSIFIED** |
+
+- **Decision rule (pre-registered):** best = no WORSE cell, then the lowest mean |margin coverage - 0.80| over the 5 checkpoints. Both candidates have WORSE cells, so **none passes**. For the record, the width part alone: mean |coverage - 0.80| is 0.060 on the current config, 0.044 on ALT1 and 0.023 on SE2_ALT.
+- **The width half worked.** The k scaling from steps 3g / 3h held. SE2_ALT puts margin coverage at 0.787 / 0.806 / 0.855 / 0.814 / 0.828 (current 0.861 / 0.869 / 0.869 / 0.850 / 0.850), which is the band the question asked for. Totals tie everywhere, and tip win Brier and log loss are slightly better (inside SE).
+- **The cost comes with strict alternation, not with the score effect (believed, not verified).** ALT1 has no score effect and moves margin SD only about 3%, yet it is WORSE on win Brier at 10 m and 20 m. Its real SD of (final - sim mean) rises 11.43 -> 11.69 at 10 m. The same rise shows in SE2_ALT (11.68) and in RC46 (+0.22 at 10 m, STEP 3h, REVERTED), and all three carry `possession_alternation` 1.0. SE2_ALT's win Brier is +0.0014 above ALT1's at both 10 m and 20 m. Those two arms are not paired with each other, so the score effect's own cost is not resolved.
+- **Why "believed".** All three comparisons share ONE current arm: the same games, the same seeds, with RC46's 11-03..09 games a subset of these. If the current arm's Monte Carlo ran lucky at 10 m, every candidate would show the same "cost".
+  - Size: with 100 sims, re-drawing the Monte Carlo moves the 10 m residual SD by about +-0.1. The +0.26 rise is about 2.5-3 of those.
+  - The possession arithmetic does not explain it either. At 1.0 the engine flips `offense_home` every possession; at 0.85 it flips with P 0.85, else it is a coin flip (`engine.py:1680-1682`). That changes a game's expected possession split by about a quarter of a possession, roughly 0.25 pt. A rise from 11.43 to 11.69 needs about 2.4 pts per game added in quadrature.
+  - The gate's false-WORSE rate under a null transition has never been measured. Each candidate is tested on 30 cells, at a one-sided 2.5% each, and the cells are correlated.
+- **Next, for #765 NCAAB (each pre-registered before it runs):**
+  - (1) **An A/A run of the gate:** the current 7 fields with re-salted seeds against themselves. This needs a seed-salt option in the gate. It measures how many WORSE cells a null transition produces, and whether the shared current arm explains the common 10 m / 20 m cost.
+  - (2) **A score-effect-only candidate:** the 7 fields + `score_effect_k` 0.002-0.003 + solver 0.30, with alternation left at 0.85.
+    - Width predicted from the two receipts if the effects multiply: SD ratio about 0.886 / 0.905 / 0.942 / 0.967 / 0.991 at tip / 10 / 20 / 30 / 36 m at k 0.002, so the late checkpoints barely narrow.
+    - Without alternation the late width fix is mostly lost. That trade is the question the candidate answers.
+- **STATUS `[2026-11-13 16:15Z]`: step 3i CLOSED. NOTHING loaded. Production stays on the 7 fields (`911f9565fe7f`). A load is the user's decision, and no candidate has a passing receipt.**
