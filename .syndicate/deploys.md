@@ -58982,12 +58982,9 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - Ride-along: fleet HEAD `054e01f10` an ancestor; 5 paths, 0 overlap with the fleet's 14 local modifications; runtime file `live_gameline_join.py` only.
   - First preflight 20:01:15Z: **TOO_SOON** (refresh-worker restarted 19:44:53Z by the NHL lane; 25-min spacing). Not overridden: drain released 20:01:29Z so the board kept building; re-drained 20:10:38Z, CLEAR.
   - Preflight 20:15:4xZ `--target-commit 96131f985fe9760c3829fa8d9caa29a44daf0d29`: **CLEAR**, rc 0. Expectation `ncaaf_seg_spread_rows_live_proj_at_0105Z` 0 -> gt0 (baseline 20:15:39Z: 0 live NCAAF segment rows on the served board; no NCAAF game live).
-- **load (`C:	mp
-caafseg\load.sh`, aborts if HEAD moved):** before HEAD `054e01f10` = expected, pid 211471. ff 20:15:54.594Z -> `96131f985`; on disk `frozenset({"nba", "ncaaf"})` 1. TERM 20:15:54.600Z; new pid **217520** first seen 20:16:02.642Z. `DRAIN_CLEARED` 20:16:08Z. web / live-odds-worker not touched.
+- **load (`C:\tmp\ncaafseg\load.sh`, aborts if HEAD moved):** before HEAD `054e01f10` = expected, pid 211471. ff 20:15:54.594Z -> `96131f985`; on disk `frozenset({"nba", "ncaaf"})` 1. TERM 20:15:54.600Z; new pid **217520** first seen 20:16:02.642Z. `DRAIN_CLEARED` 20:16:08Z. web / live-odds-worker not touched.
 - **verify (boot):** first build after the TERM, `written_at` 20:22:53Z: NCAAF `segment_index_sizes` 6 keys (unchanged, all 0: no game live); NCAAB `segment_index_sizes` {h1 3, h2 3}, display 51. Since 20:16:00Z: Traceback 0, `NCAAF_LIVE_RESIM_ERROR` 0; NCAAF re-sim tick 20:22:56Z clean (67 games, 0 live).
-- **Owed (tonight, watcher `C:	mp
-caafseg
-ight.sh`, 01:05Z / 01:50Z / 02:45Z 11-12):** NCAAF segment spread rows with a Live proj. > 0 (the expectation), segment totals as graded (q4 mean only, q1 nothing), segment moneylines 0, and 0 segment rows carrying `model_edge_pct` / `edge_vs_market_pct` / `model_ev_pct` / `live_aware`.
+- **Owed (tonight, watcher `C:\tmp\ncaafseg\night.sh`, 01:05Z / 01:50Z / 02:45Z 11-12):** NCAAF segment spread rows with a Live proj. > 0 (the expectation), segment totals as graded (q4 mean only, q1 nothing), segment moneylines 0, and 0 segment rows carrying `model_edge_pct` / `edge_vs_market_pct` / `model_ev_pct` / `live_aware`.
 - Claim refresh-worker released right after this entry.
 
 ## 2026-11-11 20:25:12Z (2:25 PM CST) -- FLEET ff 96131f985 -> e102faf79 + claimed live-odds-worker TERM (lanes `kalshi-aged-out-grade` + `kalshi-fractional-fills`, todo #783), then the operator grade of 970ec063 and the fractional repair -- **LOADED; all five expectations MET; 970ec063 WON +$0.5528; 8 of 9 repaired entries graded**

@@ -633,6 +633,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### live-price-on-pull — OPEN — opened 2026-11-11 — session 0f519972-4890-45d3-8b52-767c7e0a0389
+- NOTE `[2026-11-13 14:09Z = 8:09 AM CST]`, from session d979fc08 (lane ncaaf-live-join-team-alias, closed), at the user's request ("fix the #790 mangled path too"): repaired one shell-mangled path in todo #790's section, `C:<TAB>mp<CR><LF>ailload\prof_overlay.py` -> `C:\tmp\railload\prof_overlay.py` (the file is there). Bytes only, no wording changed. The same mangling remains in this lane's deploys.md load entry (`C:\tmp\railload\load.sh`), not edited.
 - STATUS 2026-11-11 6:58 PM CST (00:58Z 11-12): BEHAVIOUR READ (deploys.md 00:56Z).
   - Our lag: MET. NCAAB overlay gap 148 -> 84 s median, college only; seen age 136 -> 78 s.
   - Refusal share: FALSIFIED as pre-registered, 60% -> 58%. The 120 s ceiling tests the book's unchanged-price clock, so faster pulls (option 2) would not help either.

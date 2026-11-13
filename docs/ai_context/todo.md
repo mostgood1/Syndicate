@@ -25,8 +25,7 @@
   - `BOOK_GRID_TICK` gap: median 65 s with college only -> 307 s with NBA live. `on_pull` was `[]` on every tick, because the regular tick was always already due. So #786's price-on-pull cannot help while NBA is live.
   - NCAAB overlay gap: 84 s -> 292 s median, 3 of 7 over 300 s. Web's merge logged `ncaab: 'stale_371s'` at 00:32:06Z: the board fell back to the ~12-min shortlist for live NCAAB.
   - The live re-sim is NOT delayed: `[live_evidence] TICK` median 32 s, `CHIP_PUBLISH_TICK` 141 s.
-- **Where the time goes** (read-only cProfile, writes refused, nice 19; fleet code + data, the 00:46Z NBA grid's 2,112 in-play rows; `C:	mp
-ailload\prof_overlay.py`):
+- **Where the time goes** (read-only cProfile, writes refused, nice 19; fleet code + data, the 00:46Z NBA grid's 2,112 in-play rows; `C:\tmp\railload\prof_overlay.py`):
   - On 600 rows at default shortlist settings: 81.8 s for 18 cards. 97% of it is per-card context in `layer2_rows_to_board_cards`:
     - `prop_evidence/basketball.py:_box_games`: 39.8 s, 6.6 s per prop card, 991k CSV rows scanned;
     - `closing_line_history._parse` via `_chart_columns` -> `past_main_lines`: 38.2 s, 17 parses, 1.93M `_norm` calls.
