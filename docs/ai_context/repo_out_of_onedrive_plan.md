@@ -130,7 +130,7 @@ an external worktree and an internal `.claude\worktrees` worktree, absolute `cor
 - The recorder is handed `--env <repo>\.env`. A missing repo logs `SYNC_FAILED repo not found`.
 - `inplay_recorder.py` `--env` defaults to the first existing candidate; `SYNDICATE_ENV_FILE` overrides.
 - `tests/test_inplay_repo_paths.py`: 5 pass, and 16 existing in-play tests pass. Today both defaults resolve to the OneDrive path, so behaviour is unchanged until the move.
-- **Re-arm gate:** the runner at `C:	mp\inplay_runner` picks up the change at its next self-sync (the 08:00 CST run of `\Syndicate inplay nightly`). Its log must show `SYNC origin/main=<sha at or after 74767d036>`, or the runner copy of `inplay_recorder.py` must contain `ENV_CANDIDATES`.
+- **Re-arm gate:** the runner at `C:\tmp\inplay_runner` picks up the change at its next self-sync (the 08:00 CST run of `\Syndicate inplay nightly`). Its log must show `SYNC origin/main=<sha at or after 74767d036>`, or the runner copy of `inplay_recorder.py` must contain `ENV_CANDIDATES`.
 
 ---
 

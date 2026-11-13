@@ -28,10 +28,8 @@ worked; the scheduled read uses that path.
 ## INTERIM 2026-10-13 ~16:10Z -- NO VERDICT (n_with_close 90 < 100; weeks 4 + 5 complete incl. MNF)
 
 Data: fleet `~/syndicate-prod/data/nfl_source` copied read-only 2026-10-13T16:04:36Z via `\wsl.localhost` (25 files,
-sha256 in `C:	mp
-flbt\kalshi_pooled\PROVENANCE.txt`; the 10-09 copy kept as `quotes_interim_2026-10-09\`). Output
-`C:	mp
-flbt\kalshi_pooledead_2026-10-13\`. 1,390,891 quotes loaded; script unchanged.
+sha256 in `C:\tmp\nflbt\kalshi_pooled\PROVENANCE.txt`; the 10-09 copy kept as `quotes_interim_2026-10-09\`). Output
+`C:\tmp\nflbt\kalshi_pooled\read_2026-10-13\`. 1,390,891 quotes loaded; script unchanged.
 
 | cohort | n | games | n with close | mean entry EV | mean fee-net CLV [game-clustered 95% CI] | share CLV>0 | slope CLV~EV | realized ROI [95% CI] (n graded) |
 |---|---|---|---|---|---|---|---|---|

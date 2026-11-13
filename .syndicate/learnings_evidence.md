@@ -26259,13 +26259,13 @@ Web workers had never had `#285`'s arena cap (`configure_malloc_arenas` is calle
 - **Checking more often is the tempting fix and it is the wrong one** — it would have bought ~7 MB of the 45.
 - Corollary for the instrument: `growth_episodes` in `/api/ops/memory` RE-BASELINES ON EVERY READ (`baseline_age_s` ~6 s), so `episodes_captured=0` and `max_anon_rise_seen_mb=0.0` are what it prints while a worker grows 500 MB between two reads. A zero from an instrument that resets itself is not a measurement of zero.
 
-### 2026-09-17 (session 4a583d41, lane prop-evidence-parity) â FORBIDDEN: treating your own commit on `main` as inert because YOU have not deployed it
+### 2026-09-17 (session 4a583d41, lane prop-evidence-parity) — FORBIDDEN: treating your own commit on `main` as inert because YOU have not deployed it
 
 **What happened.** Two web commits sat on `origin/main` while this lane waited for deploy
 approval, and I described them to the user as "landed, not deployed" as though that were a
 stable state. A peer lane (`a1e40980`) pointed out what it actually is: **the next web deploy
-by ANY lane ships them.** That queue was three lanes deep at the time â my two plus
-web-memory-guard's per-worker memory limit change â and no lane's expectation covered another
+by ANY lane ships them.** That queue was three lanes deep at the time — my two plus
+web-memory-guard's per-worker memory limit change — and no lane's expectation covered another
 lane's change.
 
 **Why `autoDeploy = no` does not save you.** It stops a PUSH from deploying. It does nothing

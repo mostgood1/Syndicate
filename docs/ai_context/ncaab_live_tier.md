@@ -158,10 +158,8 @@ size test over a synthetic 200-game slate before the builder is registered.
 ## Corpus and results
 
 **Substrate:** a LOCAL corpus built 2026-10-09 by `build_ncaab_pbp_corpus.py`
-from ESPN, at `C:	mp\syndicate-data
-caab_source\data\pbp_corpus\pbp_corpus_2026.jsonl.gz`
-(45 MB, 6,275 games; the full report is `C:	mp\syndicate-data
-caab_corpus_baseline_2026.json`).
+from ESPN, at `C:\tmp\syndicate-data\ncaab_source\data\pbp_corpus\pbp_corpus_2026.jsonl.gz`
+(45 MB, 6,275 games; the full report is `C:\tmp\syndicate-data\ncaab_corpus_baseline_2026.json`).
 It is not on the fleet. These numbers describe ESPN's 2025-26 record, not
 anything production computed. Re-run with
 `py -3 scripts/ncaab_corpus_baseline.py --season 2026 --json-out <path>`.
@@ -238,13 +236,11 @@ The -4 to -5 total bias is the half split below. A flat rate cannot represent it
 ## P4 backtest: P1's engine resumed, walk-forward, 2025-26 (run 2026-10-12)
 
 `scripts/ncaab_live_resim_backtest.py --regular-sample 300 --sims 100`. **Substrate: LOCAL**
-(corpus + player box under `C:	mp\syndicate-data
-caab_source`). 608 games graded: 210 regular
+(corpus + player box under `C:\tmp\syndicate-data\ncaab_source`). 608 games graded: 210 regular
 season (sampled, seed 20261012) and 398 tournament (every conf / NCAA / other postseason game).
 96 were skipped before simulation: 11 first date, 38 no team prior, 47 under 5 prior games.
 0 refusals inside the simulation. On-court five mapped on 83-98% of in-half checkpoints.
-Report: `C:	mp\syndicate-data
-caab_live_resim_backtest_2026.json`.
+Report: `C:\tmp\syndicate-data\ncaab_live_resim_backtest_2026.json`.
 
 Paired, per game, engine minus comparator (negative = engine better), 95% CI:
 
@@ -278,8 +274,7 @@ H2 10:00 / 5:00 / 2:00. Engine total BIAS +6.42 / -1.85 / -3.90 / -4.45 / -4.56.
 
 User: "test the exact target calibration first". The same 608 games and seeds were run with
 `SYNDICATE_NCAAB_EXACT_TARGET=1` (engine `EXACT_TARGET_CALIBRATION`). Reachability first: 0 of 52
-early games were identical between arms. Report: `C:	mp\syndicate-data
-caab_live_resim_backtest_2026_exact.json`.
+early games were identical between arms. Report: `C:\tmp\syndicate-data\ncaab_live_resim_backtest_2026_exact.json`.
 Paired, exact minus default, abs total error, 95% CI:
 
 | | tip | half | H2 10:00 | H2 5:00 | H2 2:00 |
@@ -303,8 +298,7 @@ The engine split each game's target evenly, so it projected first halves ~7.5 to
 47.43%). Possessions are equal by half (34.2 / 34.9 per team), so the split is scoring per possession.
 `SYNDICATE_NCAAB_HALF_SPLIT` feeds the engine's own per-period targets (`quarters`) with that share.
 Same 608 games and seeds as the default run; paired, arm minus DEFAULT, abs total error, 95% CI.
-Reports: `C:	mp\syndicate-data
-caab_bt_half.json`, `ncaab_bt_half_exact.json`.
+Reports: `C:\tmp\syndicate-data\ncaab_bt_half.json`, `ncaab_bt_half_exact.json`.
 
 | arm, phase | tip | half | H2 10:00 | H2 5:00 | H2 2:00 |
 |---|---|---|---|---|---|
@@ -329,8 +323,7 @@ baseline at every second-half checkpoint.
 ### Late-game arms on top of half split + exact: measured 2026-10-13
 
 `SYNDICATE_NCAAB_LIVE_MECHANISMS`, the same 608 games and seeds, paired against half+exact. Reports:
-`C:	mp\syndicate-data
-caab_bt_e1.json`, `ncaab_bt_e2.json`.
+`C:\tmp\syndicate-data\ncaab_bt_e1.json`, `ncaab_bt_e2.json`.
 - E1 = P3's end-game intentional fouling, set from NCAAB's own measurement:
   `{"endgame_foul_window_s": 120, "endgame_foul_max_deficit": 10, "endgame_foul_p_by_deficit": [0.25, 0.5, 0.6], "endgame_extend_possessions": true}`.
 - E2 = E1 + bonus free throws (`bonus_nonshoot_foul_per_poss` 0.08, `bonus_second_half_mult` 1.5).

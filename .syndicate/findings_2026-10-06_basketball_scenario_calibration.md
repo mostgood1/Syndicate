@@ -86,9 +86,8 @@ recorded as groundwork; there is no gate and no mechanism.
    engine has no intentional-foul free throws at all, so S6's late-game row is a structural mechanism candidate
    regardless.
 3. **Real-side lines.** ESPN summaries carry no odds after the final. The pregame spread/total for the spread
-   buckets comes from the OddsAPI pre-tip game-line backfill (NBA: C:	mp
-ba_bt\out\cache\oddsapi_hist\games;
-   WNBA: C:	mp\wnba_bt\odds_hist), joined by date + teams.
+   buckets comes from the OddsAPI pre-tip game-line backfill (NBA: C:\tmp\nba_bt\out\cache\oddsapi_hist\games;
+   WNBA: C:\tmp\wnba_bt\odds_hist), joined by date + teams.
 4. **Extraction counts (FIT only; validation NOT extracted):** NBA 816 games (2025-11-01..2026-02-28), WNBA 217
    games (2026-05-01..07-31), 0 fetch failures.
 
@@ -333,7 +332,7 @@ Columns are base / L1 1.0 / L3 0.0. The real CI half-width is in brackets.
 **Target:** S8 margin-vs-spread SD, sim 18.89 (J1) vs real 14.00 [13.19, 14.71]. L1-L3 are exonerated.
 
 **Data:**
-- J1 full-FIT draws (`C:	mpball_scit_j1\sim_nba`, 200 draws × 791 paired games).
+- J1 full-FIT draws (`C:\tmp\bball_sc\fit_j1\sim_nba`, 200 draws × 791 paired games).
 - Real ESPN boxes (`real_nba.jsonl`), FIT window, regular season, the same 791 games.
 - Fields common to both: per-team FGA, 3PA, FTA, TOV. Sim draws carry no makes and no OREB; real carries OREB but no
   makes in the stored record.
@@ -888,7 +887,7 @@ later one overwrites the smart_sim file. Source not traced; see the next leads.m
   game model's ~3-pt level, with no significant MAE gain on top. The switches do the work; the calibration is a small
   safety term.
 - Seed for opening night (final 14 days, switched raw): +2.50.
-- Calibration files for the 12 dates were written to `C:	mpball_sc\calfiles_sw` (walk-forward, switched raw)
+- Calibration files for the 12 dates were written to `C:\tmp\bball_sc\calfiles_sw` (walk-forward, switched raw)
   for measurement (2), which was launched 2026-10-09 17:51Z.
 
 ### Phase 2 #1f — measurement (2) RESULT: end-to-end with the switches (read 2026-10-09)
@@ -990,7 +989,7 @@ walk-forward on the switched raw.
 on hold, including fitting `score_effect_k`, until #473 is fixed.
 - #473: NBA team_adj was unfed on 0/30 team-sides and starter flags on 0/517 over real 10-05..08 production sims.
 - **This lane's corpus, checked directly** (probe at the native engine boundary, own as-of replay, 2 dates
-  2025-11-13 and 2026-02-25, 18 engine calls; script C:	mpball_sc\probe_inputs.py):
+  2025-11-13 and 2026-02-25, 18 engine calls; script C:\tmp\bball_sc\probe_inputs.py):
   - home/away_team_adj present and non-neutral on 18/18 calls: FED here, unlike production;
   - starter flags (`starter_prob` / `is_starter` non-zero) on 0/18: UNFED here too.
 - => The corpus is PARTLY affected. The M-B sweep running since 22:06Z is kept as a dose-response
@@ -1138,7 +1137,7 @@ stay untouched.
 - `score_effect_k = 0.002` joins the accepted Phase 2 config.
 - **Next (pre-registered):** the full FIT re-run with k = 0.002 on the #473 inputs, launched 2026-10-12 ~13:40Z.
   - 3 workers, nice 19, SYNDICATE_NBA_TEAM_INPUTS=1.
-  - Walk-forward calibration files for all FIT dates: 105 files, C:	mpball_sc\calfiles_sw_all.
+  - Walk-forward calibration files for all FIT dates: 105 files, C:\tmp\bball_sc\calfiles_sw_all.
   - Then k and its readings go to P3.
 - Nothing in production.
 
@@ -2337,12 +2336,12 @@ levers, 0 errors.
 
 **FULL FIT LAUNCHED 2026-10-14 19:27Z (user: "yes, run the full FIT").**
 - The Phase 2 #3 config exactly as written under the PK2 result; FIT window 2025-11-01..2026-02-28.
-- 3 workers at nice 19, 200 sims, `--track-oncourt`. Out `C:	mpball_scit_f3`, logs `~/bball_sc/fit_f3_w*.log`,
+- 3 workers at nice 19, 200 sims, `--track-oncourt`. Out `C:\tmp\bball_sc\fit_f3`, logs `~/bball_sc/fit_f3_w*.log`,
   research copy `~/bball_sc/code_pk`.
 - Pass rule (P3's amendment): foul-outs 0.193 ± 0.04, with the guards (FTA, H2/Q4/S8, total bias, P(6th | 5th),
   closers-on) on the full window. Then P3's §7.
 
-**FULL-FIT ENGINE CONFIG, machine-readable** (for P3's live re-gate, which loads it verbatim; copy at `C:	mpball_scit_f3_config.json`):
+**FULL-FIT ENGINE CONFIG, machine-readable** (for P3's live re-gate, which loads it verbatim; copy at `C:\tmp\bball_sc\fit_f3_config.json`):
 
 ```json
 {
@@ -2645,10 +2644,10 @@ draws each, 0 errors):
 | Q4 FTA share | **0.272** (was 0.265) | ≥ 0.254 | ✓ (P3's new p moves it toward real 0.279) |
 
 - Readings: team PF 19.69; P(top ≥ 5) 0.478.
-- **FULL FIT `fit_f5` STARTED 15:44Z:** 3 workers at nice 19, `--track-oncourt`, out `C:	mpball_scit_f5`, research
+- **FULL FIT `fit_f5` STARTED 15:44Z:** 3 workers at nice 19, `--track-oncourt`, out `C:\tmp\bball_sc\fit_f5`, research
   copy `~/bball_sc/code_5a_diag`.
 - **FINAL CONFIG, machine-readable** (supersedes fit_f3; handed to P3 for §7c / the live re-gate; copy at
-  `C:	mpball_scit_f5_config.json`):
+  `C:\tmp\bball_sc\fit_f5_config.json`):
 
 ```json
 {
@@ -2786,14 +2785,14 @@ n ≈ 780 per checkpoint.
 
 **Walk-forward calibration files for the VALID dates (2026-03-01..2026-04-12 regular; postseason dates read the newest
 file on or before the day before):**
-1. Extract real ESPN boxes for 2026-03-01..2026-06-30 into `C:	mpball_scealv` (harness `real` phase; FIT's
+1. Extract real ESPN boxes for 2026-03-01..2026-06-30 into `C:\tmp\bball_sc\realv` (harness `real` phase; FIT's
    `realx` is untouched). These are needed causally: date D's file uses only games before D, as production would.
 2. A raw-inputs pass on the VALID dates (harness `sim`, n-sims 1, no calibration files) for each game's pregame job
    (ratings, pace, outs, market).
    - Its sim draws are NOT read and are deleted after the jobs are copied.
 3. Build the files with the #1f recipe (`wf_switched_all.py`: switched raw = no def subtraction, no outs penalty;
    `build_nba_totals_calibration.calibration_terms`, 14-day window) over FIT + VALID jobs, one file per VALID date,
-   anchored the day before. Out: `C:	mpball_sc\calfiles_sw_valid`.
+   anchored the day before. Out: `C:\tmp\bball_sc\calfiles_sw_valid`.
 4. Printed: only file counts, global-term ranges and the identity check (recomputed raw = recorded raw). No sim-vs-real
    or calibrated-vs-real error on VALID.
 
@@ -2898,7 +2897,7 @@ daily totals-calibration job + seed +2.50.
 - "Absent = identical" is proven by a DETERMINISTIC unit test: the same engine object and the same draws as a direct
   call. A harness A/B cannot show it, by the measurement above.
 
-**VALID calibration files BUILT 2026-10-15 19:36Z** (`C:	mpball_sc\calfiles_sw_valid`, `DONE` marker written):
+**VALID calibration files BUILT 2026-10-15 19:36Z** (`C:\tmp\bball_sc\calfiles_sw_valid`, `DONE` marker written):
 - Real VALID boxes extracted into `realv`: 422 games. Regular 335 (03: 239, 04: 96); play-in 6; playoffs 81.
   4 ESPN summary 404s (events 401869402, 401871334, 401871337, 401873343).
 - Raw-inputs pass: 42 VALID slate dates, 334 regular-season jobs, 0 tracebacks. Its sim draws were DELETED unread.
@@ -2910,7 +2909,7 @@ daily totals-calibration job + seed +2.50.
 
 **THE VALID ARMS LAUNCHED 2026-10-15 19:37Z** (both co-signed; nothing is read until both finish and THE READ is
 announced):
-- **PROD** (`C:	mpball_scalid_prod`): no levers or engine flags, the total-inputs file {skip_def only}, no
+- **PROD** (`C:\tmp\bball_sc\valid_prod`): no levers or engine flags, the total-inputs file {skip_def only}, no
   calibration files.
 - **FINAL** (`valid_final`): fit_f5 levers + flags, both total-input keys, calfiles_sw_all + calfiles_sw_valid.
 - Shared by both arms: 2026-03-01..2026-06-30 (regular VALID + postseason), 200 draws, 3 workers each at nice 19,
@@ -2932,7 +2931,7 @@ FIT only, FINAL − PROD).
   bucket, mechanism on vs off. Not acted on before the read.
 
 **THE VALID READ — scoring decisions fixed BEFORE the read** (the arms finished 23:07Z: 83 dates each, 0 errors; the
-script `C:	mpball_sc\diagalid_read.py` was dry-run on FIT data only (fit_f3 vs fit_f5) and on a 1-date FIT pair
+script `C:\tmp\bball_sc\diag\valid_read.py` was dry-run on FIT data only (fit_f3 vs fit_f5) and on a 1-date FIT pair
 for G4; no VALID number computed):
 - **G1:** per game, the mean Brier over every available q1–q4 + h1 total (P over) and spread (P home covers) line, from
   `asof/period_lines`. Sim pushes are excluded from P; actual pushes are dropped. One pooled number per game, then the
@@ -2950,7 +2949,7 @@ for G4; no VALID number computed):
 ## THE VALID READ — RESULT 2026-10-15 23:12Z (read ONCE): **FAIL**. FINAL does not clear every gate; nothing is enabled
 
 **Population:** regular VALID 2026-03-01..04-12, 334 of 335 games paired. PROD vs FINAL, game-clustered paired
-bootstrap (2,000). Raw output is in `C:	mpball_scalid_read_regular.txt` / `valid_read_post.txt`.
+bootstrap (2,000). Raw output is in `C:\tmp\bball_sc\valid_read_regular.txt` / `valid_read_post.txt`.
 
 | gate | n | PROD | FINAL | FINAL − PROD [95% CI] | verdict |
 |---|---|---|---|---|---|
