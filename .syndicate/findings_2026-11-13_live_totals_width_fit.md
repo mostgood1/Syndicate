@@ -50,7 +50,7 @@
 - **It does not use the market price.** It tempers the model's own confidence toward 1/2, so every edge keeps its
   sign and its order and becomes smaller.
 
-## What was built (on main, NOT LOADED: the user's decision)
+## What was built (on main `89e2d2a0c`, NOT LOADED: the user's decision)
 
 - **`live_gameline_join._TOTALS_PROB_SCALE_BY_SPORT`:** NBA 2.16, NCAAF 2.48. Every other sport is 1, including
   NCAAB and WNCAAB, where the walk-forward shows no gain. Re-fit those two once more post-fix nights exist.
