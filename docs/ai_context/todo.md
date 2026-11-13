@@ -34,7 +34,7 @@
   - **Fleet reading owed after the load:** on the first night with a college game live at 00:00 CT: `NCAAB_LIVE_AUTORUN_LAUNCHED date=<prior> ... prior_slate_games>=1` after 06:00Z, the game's sportsbook rows in `book_quotes/<prior>.jsonl` captured after 06:00Z, and the carryover NCAAB `LIVE_GAMELINE_JOIN` `priceable>0` for it. Known slates (fleet, read 14:58Z 11-12) have no tip after 9:30 PM CST: tonight WNCAAB ARIZ @ UCLA 9:30 PM, Fri 11-13 NCAAB UAPB @ CBU 9:30 PM. So the reading probably waits for a later 10 PM+ tip.
 - **Fix shape (as planned):** mirror `#782`'s NBA fix (`eacc9f990`, `_nba_prior_slate_in_play` in `scripts/run_live_odds_refresh_worker.py`). Inside `#774`'s window (`SYNDICATE_COLLEGE_LIVE_RESIM_PRIOR_DATE_HOURS`), also launch the in-play refresh for the previous Central date while that date has a game the re-sim last published in progress. Tests incl. off != on, then a reading on the next late college night. Cost: one in-play pull per 240 s for the minutes a game runs past midnight. Loading needs a fleet ff + a live-odds-worker restart: the user's decision.
 
-### `#790` — **WITH NBA LIVE, THE NBA IN-PLAY OVERLAY BUILD SATURATES REFRESH-WORKER'S BOOK-GRID TICK: 94-234 s per build (2,100-2,765 in-play rows -> ~2,000 cards), so every sport's live lines are re-priced only every ~5 min (book-grid tick median 65 s -> 307 s; NCAAB overlay 84 s -> 292 s), and at 00:32Z 11-12 web dropped the NCAAB overlay as stale (371 s). Found, NOT fixed** `[2026-11-11, lane live-price-on-pull, session 0f519972; found on the user's "check the flags tonight when games are live"]`
+### `#790` — **WITH NBA LIVE, THE NBA IN-PLAY OVERLAY BUILD SATURATES REFRESH-WORKER'S BOOK-GRID TICK: 94-234 s per build (2,100-2,765 in-play rows -> ~2,000 cards), so every sport's live lines are re-priced only every ~5 min (book-grid tick median 65 s -> 307 s; NCAAB overlay 84 s -> 292 s), and at 00:32Z 11-12 web dropped the NCAAB overlay as stale (371 s). FIXED ON MAIN `019b5d15d` (user 11-13 "Yes, fix #790 here"), NOT LOADED: the overlay's per-card box-score scan is an indexed lookup (identical results), and each overlay build gets one evidence context; fleet replay 341 s -> 27 s for 2,000 NBA cards, 0 cards changed** `[2026-11-11, lane live-price-on-pull, session 0f519972; found on the user's "check the flags tonight when games are live"; fixed by lane book-grid-overlay-starvation]`
 - **Measured** (fleet `refresh-worker.log{,.1}`, `web.log`; deploys.md 2026-11-12 00:56Z):
   - `INPLAY_OVERLAY sport=nba elapsed_ms`: median 136 s, max 234 s, over 6 builds, 00:10-00:50Z 11-12 (3 NBA games live, then more). Last night (11-10): median 38 s on 1,186 rows.
   - The overlay is built inside `_run_book_grid_artifact_tick`, one sport after another, NBA before NCAAB.
@@ -54,6 +54,37 @@
   - (b) Build in-play overlay cards WITHOUT the pregame context (recent-matchup text, chart columns) and carry those fields from the shortlist card each one replaces. The overlay exists to re-price.
   - (c) Give the NBA overlay its own slower cadence, or build it after the college sports, so one sport's cost cannot hold the others' live prices. `run_refresh_worker.py` is this lane's.
   - Each is a refresh-worker load: the user's decision.
+- **Cause, measured 2026-11-13 off-slate** (read-only, nice 19, refresh-worker's environ; `C:\tmp\railload\bench_box.py`, `prof_warm.py`, `replay790.py`):
+  - Warm, one NBA prop card's recent-form evidence costs a median 617 ms. 577 ms of that is `_box_games` walking every box row of every source for one name.
+  - The overlay called the card builder with NO row context, so `row_recent_matchup_text` used its fallback state keyed on the wall-clock MINUTE. Its read cache (the box files parsed) and its 60 s per-sport budget both restarted every minute. A 4-minute build got four budgets and four parses.
+  - In-play lines move every pull, and the sentence memo is keyed on the line, so most overlay cards are new to it.
+  - The production log agrees: `RECENT_MATCHUP_BUDGET_SPENT sport=nba` inside the long builds, e.g. 00:20:44Z within the 234 s build that ended 00:21:15Z (11-12).
+  - Not the cause:
+    - `closing_line_history` caches per file mtime; those files change once a day.
+    - The cold 11-11 profile's 38 s was first parses.
+    - `build_layer2_rows` is 2-3 s.
+- **Fix `019b5d15d`** (lane `book-grid-overlay-starvation`), ON MAIN, NOT LOADED:
+  - (a), sharpened by the measurement: inside a build's read cache, `_box_games` reads from an index built once (rows filed under every name key, game -> teams). Off switch: `SYNDICATE_PROP_EVIDENCE_BOX_INDEX=off`.
+  - The overlay passes ONE context per build: one read cache, one evidence budget of 20 s per sport (`SYNDICATE_INPLAY_OVERLAY_EVIDENCE_SECONDS`), and the board's date, so it shares the shortlist's sentence memo. Off switch: `SYNDICATE_INPLAY_OVERLAY_BUILD_CONTEXT=off`.
+  - `INPLAY_OVERLAY` lines now carry `rows_ms shortlist_ms cards_ms evidence_s evidence_budget_s`.
+  - (c) was NOT built. Building NBA after college changes only the phase inside a tick: the next tick still waits for NBA, so the college gap is unchanged. (b) was not needed once the cards were cheap.
+- **Replay (fleet data 11-13, worktree code):**
+  - Lookup: 121 of 121 NBA prop players identical, walk vs index. Per call 587 -> 8.2 ms median (p90 15 ms); 85.6 s -> 3.5 s for all 121.
+  - Overlay cards, 2,700 NBA grid rows -> 2,000 cards, the SAME chosen rows in one process:
+    - old 341.1 s, new 26.7 s (the new run went first and paid the cold file parse);
+    - 0 of 2,000 cards differ in `detail`, `recent_values`, `recent_dates`, `recent_opponents`, `recent_lines`, `team_recent` or `sim_ladder`;
+    - 708 of 712 prop cards charted in both;
+    - new evidence time 10.3 s of the 20 s budget.
+  - Separate processes: old 384.2 s, new 20.0 s. Peak RSS 598 vs 656 MB (the per-build index; freed after the build).
+  - Caveat: these are pregame rows in a cold process, every card new to the memo, which is the worst case for evidence. In play, the memo carries every card whose line did not move.
+- **Tests:** `tests/test_book_grid_overlay_starvation.py`, 27 tests (off != on for both switches). 9 of 9 mutations caught; 1,512 pass across 118 board / evidence / grid test files.
+- **Load = the user's decision:** an exact-SHA fleet ff to a SHA containing `019b5d15d`, plus a claimed refresh-worker TERM (claim, idle after save, preflight). The overlay runs there.
+  - Web reads none of the changed paths on a request. It runs this code only in builds, and an ff reaches it at its next recycle.
+  - **Owed after load, on an NBA night:**
+    - `INPLAY_OVERLAY sport=nba` `elapsed_ms` median (was 136 s) and its `evidence_s`;
+    - the `BOOK_GRID_TICK` gap and the NCAAB overlay gap with NBA live (was 307 s / 292 s; goal <= 120 s);
+    - 0 `stale_` college overlays in web's `INPLAY_OVERLAY_MERGED` lines.
+  - Falsified if the NBA overlay median stays > 60 s.
 
 ### `#789` — **NBA LIVE RE-SIM RECORDS ITS OWN P(OVERTIME): the share of draws level after regulation, on the lane (`modelOvertimeProb`) and in every `live_resim_history` row (`p_ot`). LOADED on live-odds-worker 23:39:26Z 11-11 (`837320ab5`, user "Yes, load it"); the first fleet row carrying `p_ot` 00:11:31Z 11-12 (MET). And #788's "late miss is overtime" was mostly the pre-`#763` projection: 7 of the 8 overtime games came before overtime was in the total** `[2026-11-11, lane nba-resim-overtime-prob, session 63276f7e; user "Yes, record it" to "Should the re-sim record its overtime chance so it can be checked?"]`
 - **Change:** in `syndicate/features/nba/live_resim.py`:

@@ -736,6 +736,11 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### book-grid-overlay-starvation — OPEN — opened 2026-11-13 — session 0f519972-4890-45d3-8b52-767c7e0a0389
+- STATUS 2026-11-13 ~10:3x AM CST (16:3xZ): DONE IN CODE, ON MAIN `019b5d15d`, NOT LOADED.
+  - Fleet replay (read-only): lookup identical for 121 of 121 NBA players, 587 -> 8.2 ms per call. Overlay cards on the same 2,000 rows: 341 s -> 27 s, 0 cards differ in any displayed field.
+  - 27 tests, 9 of 9 mutations caught; 1,512 pass across 118 files.
+  - Hypothesis holds in the replay; its live half (NBA overlay median <= 60 s) is owed after the load.
+  - Load = fleet ff + claimed refresh-worker TERM: the user's decision (todo #790).
 - Goal: With NBA live, the NBA in-play overlay build no longer holds refresh-worker's book-grid tick: its per-card prop evidence costs a lookup, not a scan of the league's box-score history (identical outputs), and its evidence time per build is capped, so the tick keeps its college cadence (NCAAB overlay gap median <= 120 s with NBA live; 292 s on 11-11) and web drops no college overlay as stale; tests incl. off != on; a fleet replay showing the per-card cost cut; on main; load (refresh-worker) is the user's decision (todo #790)
 - Files: syndicate/features/shared/prop_evidence/basketball.py (_box_games + a new box-score index helper ONLY), syndicate/features/shared/book_grid_artifact.py (build_inplay_overlay + the INPLAY_OVERLAY log line + a new overlay evidence-context helper ONLY), syndicate/features/shared/layer2_row_context.py (the budget read in row_recent_matchup_text ONLY), tests/test_book_grid_overlay_starvation.py (NEW), docs/ai_context/todo.md (#790 section only)
 - Hypothesis: The NBA overlay's 94-234 s builds are prop recent-form evidence. Warm, each call scans the whole box-score history (fleet bench 11-13: _box_games median 577 ms of a 617 ms card). The overlay passes no build context, so its 60 s per-sport budget and its read cache reset every wall-clock minute (the minute bucket in row_recent_matchup_text).
