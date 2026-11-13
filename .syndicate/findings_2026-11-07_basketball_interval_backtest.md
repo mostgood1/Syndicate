@@ -1613,3 +1613,75 @@ Against the pre-registration:
     - Width predicted from the two receipts if the effects multiply: SD ratio about 0.886 / 0.905 / 0.942 / 0.967 / 0.991 at tip / 10 / 20 / 30 / 36 m at k 0.002, so the late checkpoints barely narrow.
     - Without alternation the late width fix is mostly lost. That trade is the question the candidate answers.
 - **STATUS `[2026-11-13 16:15Z]`: step 3i CLOSED. NOTHING loaded. Production stays on the 7 fields (`911f9565fe7f`). A load is the user's decision, and no candidate has a passing receipt.**
+
+## PHASE 2 STEP 3j (NCAAB): the #784 gate's null runs flag WORSE cells too -- STEP 3i's refusals were mostly the shared current arm; SE2 (score effect without strict alternation) PASSES `[2026-11-13 19:30Z (1:30 PM CST), lane ncaab-gate-noise-and-se2, CLOSED]`
+
+STEP 3i left two questions. Is the 10 m / 20 m win-Brier cost common to every candidate real, or the one current arm they all share? And does the score effect pass without strict alternation? **Answers: mostly the shared arm, and yes.**
+
+- **Pre-registered** on main `2027ac336` (17:46Z), before any run.
+- **Code:** `--seed-salt` in the gate (`cb02b574e`; re-seeds the candidate arm only; a salted receipt has its own name and `check_receipt` refuses one). 5 new tests, 25 pass; 3 of 3 mutations caught.
+- **Runs:** three concurrent on the fleet's data, nice 19, 3 procs each, 5,792-5,874 s; 2026-11-03..12, 100 sims, 360 games at every checkpoint. All against the running 7 fields (`911f9565fe7f`):
+  - AA1 / AA2 = the 7 fields against themselves, candidate seeds salted 1 / 2.
+  - SE2 = the 7 fields + `score_effect_k` 0.002 + `solver_endgame_pts_per_team` 0.30, `possession_alternation` left at 0.85.
+- **Receipts** in the primary tree's `.syndicate/deploy/outcome_gate/`: `ncaab__911f9565fe7f__911f9565fe7f__salt1.json`, `ncaab__911f9565fe7f__911f9565fe7f__salt2.json`, `ncaab__2b625cfc1363__911f9565fe7f.json`.
+- **All three current arms equal STEP 3i's exactly**, in 30 of 30 cells. Salt 0 is inert, and every candidate on these dates was scored against the same draw.
+
+Candidate - current, 1.96 x bootstrap SE over games. W = WORSE, B = better (beyond SE):
+
+| checkpoint | arm | margin SD ratio | margin 80% cov | real SD of (final - sim mean) | win Brier | win log loss | margin CRPS | total CRPS | total mean shift |
+|---|---|---|---|---|---|---|---|---|---|
+| tip | AA1 | 1.000 | 0.861 -> 0.861 | 13.30 -> 13.32 | -0.0018 +- 0.0051 | -0.001 +- 0.015 | -0.024 +- 0.128 | -0.016 +- 0.154 | -0.08 +- 0.23 |
+| tip | AA2 | 1.001 | 0.861 -> 0.847 | 13.30 -> 13.43 | +0.0007 +- 0.0052 | +0.006 +- 0.016 | +0.037 +- 0.126 | -0.040 +- 0.166 | -0.23 +- 0.24 |
+| tip | **SE2** | 0.880 | **0.861 -> 0.809 B** | 13.30 -> 13.23 | +0.0010 +- 0.0046 | +0.008 +- 0.016 | -0.093 +- 0.100 | -0.010 +- 0.116 | -0.08 +- 0.15 |
+| 10 m | AA1 | 1.005 | 0.869 -> 0.842 | 11.43 -> 11.71 | +0.0031 +- 0.0047 | +0.009 +- 0.012 | **+0.144 +- 0.114 W** | -0.107 +- 0.127 | +0.03 +- 0.20 |
+| 10 m | AA2 | 1.001 | 0.869 -> 0.856 | 11.43 -> 11.68 | +0.0028 +- 0.0042 | +0.005 +- 0.012 | **+0.115 +- 0.107 W** | -0.090 +- 0.132 | +0.09 +- 0.21 |
+| 10 m | **SE2** | 0.907 | **0.869 -> 0.817 B** | 11.43 -> 11.55 | +0.0029 +- 0.0049 | +0.010 +- 0.017 | +0.038 +- 0.116 | -0.036 +- 0.098 | -0.02 +- 0.15 |
+| 20 m | AA1 | 1.008 | 0.869 -> 0.877 | 8.99 -> 9.04 | **+0.0052 +- 0.0035 W** | **+0.015 +- 0.011 W** | +0.035 +- 0.088 | -0.076 +- 0.112 | +0.14 +- 0.17 |
+| 20 m | AA2 | 1.005 | 0.869 -> 0.874 | 8.99 -> 9.06 | +0.0039 +- 0.0039 | **+0.012 +- 0.010 W** | +0.025 +- 0.084 | -0.073 +- 0.107 | +0.03 +- 0.17 |
+| 20 m | **SE2** | 0.942 | 0.869 -> 0.850 | 8.99 -> 9.01 | +0.0033 +- 0.0040 | +0.011 +- 0.014 | -0.019 +- 0.095 | -0.008 +- 0.078 | -0.02 +- 0.12 |
+| 30 m | AA1 | 1.010 | 0.850 -> 0.861 | 6.95 -> 6.92 | +0.0010 +- 0.0030 | +0.003 +- 0.010 | -0.020 +- 0.065 | -0.025 +- 0.081 | +0.05 +- 0.12 |
+| 30 m | AA2 | 1.006 | 0.850 -> 0.853 | 6.95 -> 6.97 | +0.0001 +- 0.0033 | +0.006 +- 0.015 | -0.001 +- 0.067 | -0.012 +- 0.078 | +0.02 +- 0.12 |
+| 30 m | **SE2** | 0.962 | 0.850 -> 0.831 | 6.95 -> 6.92 | +0.0012 +- 0.0033 | +0.005 +- 0.011 | -0.047 +- 0.066 | +0.009 +- 0.056 | -0.05 +- 0.09 |
+| 36 m | AA1 | 0.996 | 0.850 -> 0.853 | 4.45 -> 4.51 | +0.0003 +- 0.0023 | +0.002 +- 0.007 | +0.022 +- 0.048 | +0.003 +- 0.059 | +0.06 +- 0.09 |
+| 36 m | AA2 | 0.994 | 0.850 -> 0.836 | 4.45 -> 4.46 | +0.0019 +- 0.0023 | +0.005 +- 0.007 | -0.007 +- 0.043 | +0.009 +- 0.058 | +0.03 +- 0.08 |
+| 36 m | **SE2** | 0.985 | 0.850 -> 0.844 | 4.45 -> 4.47 | +0.0006 +- 0.0018 | +0.002 +- 0.006 | -0.006 +- 0.036 | -0.001 +- 0.037 | +0.04 +- 0.06 |
+
+AA1 also has WORSE on tip total coverage (0.776 -> 0.732, |cov - 0.80| +0.044 +- 0.032).
+
+Against the pre-registration:
+
+| arm | pre-registered | measured | verdict |
+|---|---|---|---|
+| A/A | 0-3 WORSE cells across the two runs' 60 (falsified at >= 4) | **6**: AA1 tip total coverage, 10 m margin CRPS, 20 m win Brier and log loss; AA2 10 m margin CRPS, 20 m log loss | **FALSIFIED** |
+| A/A | margin SD ratio 0.99-1.01 (falsified outside 0.97-1.03) | 0.994-1.010 | held |
+| A/A | mean total shift within +-0.15 | AA2 tip -0.23 +- 0.24; the rest inside | missed once, inside its SE |
+| A/A | not every diff exactly 0 (the salt reaches the engine) | non-zero everywhere | held |
+| all | salt 0 reproduces STEP 3i's current arm | 30 of 30 cells exact, in all three receipts | held |
+| A/A | shared-arm test: mean A/A win Brier >= +0.003 at both 10 m and 20 m = explains; <= +0.0015 at both = does not; predicted PARTLY (10 m +0.0015..+0.003, 20 m +0.000..+0.002) | 10 m **+0.0029**, 20 m **+0.0045** | PARTLY by the rule (10 m sits 0.0001 under the line); the 20 m range missed HIGH |
+| SE2 | SD ratio within +-0.03 of 0.886 / 0.905 / 0.942 / 0.967 / 0.991 | 0.880 / 0.907 / 0.942 / 0.962 / 0.985 | held (every checkpoint within 0.006) |
+| SE2 | tip SD ratio 0.85-0.92; tip coverage 0.79-0.83; tip total shift -0.4..+0.3 | 0.880; 0.809; -0.08 | held |
+| SE2 | win Brier <= +0.003 at 10 m and 20 m | +0.0029 / +0.0033 | 10 m held; 20 m missed by 0.0003, inside SE and under the A/A null's +0.0045 |
+| SE2 | mean margin-coverage distance from 0.80, 0.060 -> 0.035-0.045 | 0.060 -> **0.030** | missed, in the good direction |
+| SE2 | no WORSE cell (the gate's rule) | **none**; better on tip and 10 m margin coverage | **held: SE2 PASSES** |
+
+What it says:
+
+- **The gate flags a NULL change against this current arm.** Each of two A/A runs flagged WORSE cells, and they repeat the same ones (10 m margin CRPS in both, 20 m log loss in both).
+  - Why: every comparison on these dates is against ONE Monte Carlo draw of the current arm (100 sims per game, fixed seeds), and that draw happens to score well at 10 m and 20 m. Every candidate inherits that luck as a "cost".
+  - The 30-cell, one-sided-2.5% reading assumed in #784 does not describe this gate. Its measured false-refusal rate on these dates is 2 of 2 null runs.
+- **STEP 3i is CORRECTED.** The 10 m rise in the real SD of (final - sim mean), 11.43 -> 11.69 (ALT1) / 11.68 (SE2_ALT), shows up identically in the null runs (11.71 / 11.68). It is the current arm's draw, not strict alternation.
+  - Net of the A/A mean, ALT1's win-Brier excess is +0.0015 at 10 m and -0.0004 at 20 m; SE2_ALT's is +0.0029 and +0.0010. All are inside noise.
+  - So STEP 3i's two refusals were mostly the shared arm, and entirely so at 20 m. Whether strict alternation has a real cost is UNRESOLVED.
+  - RC46's refusal still stands net of the null: 20 m +0.0113 against +0.0045, 36 m +0.0068 against about +0.001. That comparison is approximate, because RC46 ran on the 11-03..09 subset.
+- **SE2 passes, and it is the best candidate so far.**
+  - It has no WORSE cell, and margin coverage is better beyond SE at the tip (0.861 -> 0.809) and 10 m (0.869 -> 0.817). The mean distance from 0.80 halves, 0.060 -> 0.030.
+  - Win Brier and log loss sit at the null's level (10 m +0.0029 against the A/A +0.0029; 20 m +0.0033 against +0.0045). Totals tie at every checkpoint, with shifts of 0.08 pt or less.
+  - It narrows mostly early. 36 m is 0.985 (coverage 0.844), so the late over-width that steps 3c-3f measured remains. That was the job of strict alternation, whose cost is now unresolved rather than shown.
+- **The width model held.** "SE2_ALT / ALT1" predicted SE2's SD ratio within 0.006 at every checkpoint, so the two mechanisms' width effects multiply.
+- **For the gate (#784), not done here:** a WORSE cell needs a null to be read against.
+  - Options: score the candidate against an A/A run on the same dates (flag only beyond the null's spread); average the current arm over several salts; or raise the sims.
+  - Until then, read any WORSE cell beside an A/A receipt for the same dates.
+- **SE2's value** (hash `2b625cfc1363`): `{"blowout_margin":999,"blowout_q4_margin":999,"endgame_extend_possessions":true,"endgame_foul_max_deficit":10,"endgame_foul_p_by_deficit":[0.25,0.5,0.6],"endgame_foul_window_s":120,"score_effect_k":0.002,"solver_endgame_pts_per_team":0.3}`. Its receipt is valid until 2026-11-20 19:29Z, and preflight would CLEAR the outcome gate for `911f9565fe7f -> 2b625cfc1363`.
+- **STATUS `[2026-11-13 19:30Z]`: step 3j CLOSED. NOTHING loaded.**
+  - Loading SE2 is the user's decision, by the #784 recipe: edit `local_production.env` first, then preflight `--reinject-env` with 3 claims and a joint CLEAR, then a drained down/up.
+  - A registered post-load reading is owed if it loads.
