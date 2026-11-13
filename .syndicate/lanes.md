@@ -714,6 +714,14 @@ death, never life — do not invert it.
 - Verification: git grep result + targeted pytest
 - Blocked by: none
 
+### team-logo-canonical-names — OPEN — opened 2026-11-13 — session 2ba5509d-5605-427a-b4bd-acd7926e2bea
+- Goal: A team the odds feed names differently from ESPN's branding snapshot (Los Angeles Clippers vs ESPN LA Clippers / LAC: 177 of 1567 NBA rows on the 11-13 board with no Clippers crest, and the 22 Clippers prop rows with no player_side) resolves to its crest: team_logos._index also keys each branding row's team_aliases.canonical_team name (existing keys win; a canonical name on two crests is dropped), with tests incl. off != on, a fleet replay over every served team showing the gain and 0 changed crests or sides already set, and -- once loaded -- a served reading
+- Files: syndicate/features/shared/team_logos.py (_index only), tests/test_team_logos_canonical_names.py (NEW), docs/ai_context/todo.md (#796 section only)
+- Hypothesis: logo_url's alias pass maps 'Los Angeles Clippers' to canonical 'los angeles clippers' but the index holds only ESPN's display_name/location/abbreviation ('LA Clippers', 'LA', 'LAC'); canonical_team maps LA Clippers and LAC to the same name (fleet 11-13 14:11Z), so indexing canonical names closes it
+- Falsification test: the replay leaves a Clippers row without a crest or side, or changes any crest or side that resolves today
+- Verification: fleet replay over the served board: rows with a side lacking a crest by sport, NBA prop rows with no player_side, changed-already-set count; after load, the same read from the served board
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
