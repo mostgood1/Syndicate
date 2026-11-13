@@ -90,3 +90,15 @@ def test_holdout_fits_before_and_scores_after_or_reads_a_frozen_shift():
     off = m.holdout(rows, sport="nba", fit=None, test=("2026-11-02", "2026-11-12"), delta=0.0)
     assert off["dll"] == 0.0 and not off["passes"]                                   # off != on
     assert m.holdout(rows, sport="nfl", fit=("2026-10-01", "2026-11-01"), test=("2026-11-02", "2026-11-12")) is None
+
+
+def test_pull_keeps_opportunity_props_only_and_reads_the_local_disk(tmp_path):
+    m = _script()
+    (tmp_path / "reports").mkdir()
+    (tmp_path / "reports" / "x.jsonl").write_text("hello", encoding="utf-8")
+    reader = m.LocalReader(tmp_path)
+    assert reader.text("reports/x.jsonl") == "hello" and reader.text("reports/missing.jsonl") is None
+    recs = [{"k": "prop", "ln": "opportunity"}, {"k": "game", "ln": "opportunity"}, {"k": "prop", "ln": "watch"}]
+    ident = {"prop": {"player_name": "A"}, "game": {"player_name": ""}}
+    got = m.prop_records(["t1", None], lambda text: recs if text else [], lambda k: ident.get(k))
+    assert got == [recs[0]]

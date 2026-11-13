@@ -290,6 +290,97 @@ def analyze(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     return out
 
 
+# ----------------------------------------------------------------------------- pull (the forward read's input)
+
+
+class LocalReader:
+    """`score_ranking_backtest`'s web reader, swapped for the data root's own disk (the fleet: one shared disk)."""
+
+    def __init__(self, root: Path) -> None:
+        self.root = Path(root)
+
+    def text(self, relative: str) -> str | None:
+        path = self.root / relative
+        return path.read_text(encoding="utf-8") if path.is_file() else None
+
+
+def _srb() -> Any:
+    spec = importlib.util.spec_from_file_location("score_ranking_backtest_pfsl", REPO_ROOT / "scripts" / "score_ranking_backtest.py")
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = mod
+    assert spec.loader is not None
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def prop_records(texts: Iterable[str | None], parse: Callable[[str], list[dict[str, Any]]],
+                 identity: Callable[[str], Mapping[str, Any] | None]) -> list[dict[str, Any]]:
+    """Opportunity-lane PROP records (a player in the key) from population parts -- the suggested-grade 'all' set."""
+    out = []
+    for text in texts:
+        for r in parse(text or ""):
+            if r.get("ln") == "opportunity" and (identity(str(r.get("k") or "")) or {}).get("player_name"):
+                out.append(r)
+    return out
+
+
+def pull(data_root: Path, *, start: str, end: str, sports: Sequence[str], out: Path, cache: Path) -> dict[str, Any]:
+    """Grade every opportunity-lane prop record sighted on `start`..`end` whose kickoff is on or before `end`, with
+    `score_ranking_backtest.grade_rows` -- the grader, settlers and selection rule the suggested-grade pulls use."""
+    from datetime import date as date_cls
+
+    srb = _srb()
+    bs = srb.msc.load_bucket_search()
+    pub = srb._load_publisher()
+    reader = LocalReader(data_root)
+
+    def parts():
+        for day in srb._days(start, end):
+            for sport in sports:
+                for part in range(bs.MAX_PARTS):
+                    text = reader.text(f"reports/intelligence/{bs.POPULATION_SUBDIR}/{day}__{sport}__part{part:03d}.jsonl")
+                    if text is None:
+                        break
+                    yield text
+
+    records = prop_records(parts(), bs.parse_records_text, srb.parse_population_key)
+    print(f"RECORDS props {len(records)} {start}..{end} sports={list(sports)}", flush=True)
+
+    from syndicate.features.mlb.prop_outcomes import MlbPropGrader
+    from syndicate.features.shared.population_outcomes import build_extra_settler
+
+    cache.mkdir(parents=True, exist_ok=True)
+    mlb = MlbPropGrader(cache_dir=cache / "statsapi")
+    settler = build_extra_settler(cache_dir=cache / "settlers", fetch_export=reader.text)
+    bs.SCORECARD.index_chips = srb.stable_chip_index(bs.SCORECARD.index_chips)
+    chip_lists: dict[str, list[Any]] = {}
+
+    def chips_for(day: str) -> list[Any]:
+        if day not in chip_lists:
+            local = cache / "chips" / f"{day}.json"
+            if local.exists():
+                chip_lists[day] = json.loads(local.read_text(encoding="utf-8"))
+            else:
+                chip_lists[day] = pub.fetch_chips_with_retry(bs, day)
+                local.parent.mkdir(parents=True, exist_ok=True)
+                local.write_text(json.dumps(chip_lists[day]), encoding="utf-8")
+        return chip_lists[day]
+
+    def grade(recs, chips_by_date, named, *, today):
+        return bs.grade_population(recs, chips_by_date, named, today=today, prop_settler=mlb.settle,
+                                   score_source=mlb.final_score, extra_settler=settler)
+
+    today = (date_cls.fromisoformat(end) + timedelta(days=1)).isoformat()
+    rows, reasons = srb.grade_rows(records, grade=grade, chips_for=chips_for, central_date=bs.SCORECARD.central_date,
+                                   today=today)
+    with _open(out, "wt") as fh:
+        for r in rows:
+            fh.write(json.dumps(dict(r, kind="prop")) + "\n")
+    summary = {"records": len(records), "graded": len(rows), "reasons": dict(reasons.most_common(10)), "out": str(out)}
+    print(f"PULL {json.dumps(summary)}", flush=True)
+    return summary
+
+
 def holdout(rows: Sequence[Mapping[str, Any]], *, sport: str, fit: tuple[str, str] | None, test: tuple[str, str],
             delta: float | None = None) -> dict[str, Any] | None:
     """The registered check: a shift FITTED on `fit` dates (or a frozen `delta`) scored on `test` dates by log loss.
@@ -338,7 +429,20 @@ def main(argv: list[str] | None = None) -> int:
     ho.add_argument("--fit", default=None, help="FROM..TO kickoff dates the shift is fitted on")
     ho.add_argument("--delta", type=float, default=None, help="a FROZEN shift instead of a fit (forward reads)")
     ho.add_argument("--test", required=True, help="FROM..TO kickoff dates it is scored on")
+    pl = sub.add_parser("pull", help="grade the board's prop population from the data root's own disk")
+    pl.add_argument("--data-root", required=True)
+    pl.add_argument("--start", required=True, help="first SIGHTING date (population part) -- a day before the first kickoff")
+    pl.add_argument("--end", required=True, help="last kickoff date graded")
+    pl.add_argument("--sports", default="nba,nfl")
+    pl.add_argument("--out", required=True)
+    pl.add_argument("--cache", default=None)
     args = ap.parse_args(argv)
+    if args.cmd == "pull":
+        out = Path(args.out).expanduser()
+        pull(Path(args.data_root).expanduser(), start=args.start, end=args.end,
+             sports=[s.strip() for s in args.sports.split(",") if s.strip()], out=out,
+             cache=Path(args.cache).expanduser() if args.cache else out.parent / "pull_cache")
+        return 0
     if args.cmd == "holdout":
         sports = {s.strip() for s in args.sports.split(",") if s.strip()}
         seen: dict[tuple, dict[str, Any]] = {}
