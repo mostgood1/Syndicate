@@ -913,6 +913,14 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: MET. owner_liveness --idle-min 240 read 2 of 17 CLOSED blocks SAFE; both moved to lanes_closed.md with one pointer each: onedrive-path-refs, closed-lane-archive-20261113-0840. Table and WAIT reasons in log/2026-11-13.md.
 
+### live-moneyline-gap-diagnosis — OPEN — opened 2026-11-13 — session 8062940b-57fd-454a-8de5-25fdd4804d85
+- Goal: Name, with game-clustered 95% intervals on the fleet's live gameline ledgers, where the live full-game moneyline's Brier gap to the market comes from in NBA (+0.020) and NCAAB (+0.009): signed bias, game stage, state staleness, and whether the market encompasses the model; findings committed; nothing changed in production
+- Files: scripts/live_moneyline_gap.py (NEW), scripts/live_totals_width_fit.py (a __main__ guard ONLY, so its helpers import), .syndicate/findings_2026-11-13_live_moneyline_gap.md (NEW), docs/ai_context/todo.md (#780 section only)
+- Hypothesis: Written before any test (2026-11-13 20:30Z). H1 BIAS: the model's P(home wins) is signed-biased against outcomes where the market's is not (mean y - p differs from 0, or the model's favourite wins less often than it says). H2 STAGE: the gap is concentrated early (points scored / model total < 0.40), i.e. the prior, not the live update. H3 STALENESS: the gap grows with state age (recorded_at - live_state_as_of) or where the quote is newer than the state, i.e. the market has seen score the model has not. H4 INFORMATION: after H1-H3, logit(y) on logit(p_model) and logit(p_market) gives the model's coefficient near 0 (the market encompasses it). Prediction: H3 carries the largest share in NBA; H4 holds in both (model coefficient < 0.3).
+- Falsification test: H1 falsified if model and market have the same signed residual within CI and the same calibration slope; H2 if the gap is no larger early than late; H3 if the gap does not differ by state-age band (CIs overlap and point estimates within 0.005); H4 if the model's encompassing coefficient's 95% interval excludes 0 and exceeds 0.3
+- Verification: scripts/live_moneyline_gap.py run on the fleet (read-only, nice 19) reproduces the fit script's model - market Brier (NBA +0.020, NCAAB +0.009) on the same population, then prints each hypothesis's table with game-clustered intervals; findings file names the verdict per hypothesis
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
