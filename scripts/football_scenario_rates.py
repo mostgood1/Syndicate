@@ -54,7 +54,9 @@ REPO = Path(__file__).resolve().parents[1]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
-PRIMARY = Path(r"C:\Users\tempadmin\OneDrive\Coding\Syndicate")
+from scripts._primary_tree import primary_tree  # noqa: E402
+
+PRIMARY = primary_tree()
 OUT_ROOT = Path(r"C:\tmp\football_scenarios")
 QUARTER_SECONDS = 900
 GARBAGE_MARGIN = {"nfl": 17, "ncaaf": 21}          # pre-registered (S2)

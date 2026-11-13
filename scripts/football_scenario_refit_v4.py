@@ -328,7 +328,7 @@ def cfbd_close(season: int) -> Dict[str, Tuple[Optional[float], Optional[float]]
     else the primary checkout's data/ncaaf_source/data."""
     from scripts import backtest_ncaaf_lines_props as H
     base = Path(os.environ.get("FOOTBALL_SCENARIO_NCAAF_LINES_DIR")
-                or r"C:\Users\tempadmin\OneDrive\Coding\Syndicate\data\ncaaf_source\data")
+                or F.PRIMARY / "data" / "ncaaf_source" / "data")
     out = {}
     for path in sorted(base.glob("cfbd_lines_wk*.json")):
         for row in json.loads(path.read_text(encoding="utf-8")):
