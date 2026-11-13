@@ -287,5 +287,91 @@ class PreflightReachabilityTests(unittest.TestCase):
         self.assertIn("no *_LIVE_MECHANISMS change", got["reason"])
 
 
+class SeedSaltTests(unittest.TestCase):
+    """todo #765 STEP 3j: `--seed-salt` re-seeds the candidate arm only (an A/A noise check), salt 0 is inert, and a
+    salted receipt can never clear preflight."""
+
+    def test_salt_zero_is_the_gates_own_seed_and_each_salt_is_a_different_one(self) -> None:
+        self.assertEqual(gate.salted_seed(123456, 0), 123456)
+        s1, s2 = gate.salted_seed(123456, 1), gate.salted_seed(123456, 2)
+        self.assertNotIn(s1, (123456, s2))
+        self.assertEqual(s1, gate.salted_seed(123456, 1))
+        self.assertTrue(0 <= s1 < 2 ** 31 and 0 <= s2 < 2 ** 31)
+
+    def test_jobs_salt_the_candidate_arm_only(self) -> None:
+        jobs = gate.build_jobs([{"game_id": "a"}, {"game_id": "b"}], {"current": OLD, "candidate": NEW}, {"0m": 0.0}, 5, 2)
+        self.assertEqual(len(jobs), 4)
+        self.assertEqual({(j[1], j[5]) for j in jobs}, {("current", 0), ("candidate", 2)})
+        self.assertEqual({j[5] for j in gate.build_jobs([{"game_id": "a"}], {"current": OLD, "candidate": NEW},
+                                                         {"0m": 0.0}, 5)}, {0})
+
+    def test_the_replay_seeds_the_engine_with_the_salted_seed(self) -> None:
+        sys.path.insert(0, str(ROOT))
+        from syndicate.features.ncaab import live_resim as lr
+
+        seen: list[int] = []
+
+        def fake_resim(inputs, state, *, sims, base_seed, simulate, league):
+            seen.append(base_seed)
+            return {"home_win_prob": 0.5}
+
+        mech = lr.live_mechanisms_from_env({KEY: OLD})
+        inputs = {**{k: None for k in lr._ENGINE_KWARGS}, "cfg": types.SimpleNamespace(**mech),
+                  "home_players": {"athlete_id": [], "player_name": []},
+                  "away_players": {"athlete_id": [], "player_name": []}}
+        task = {"game_id": "401999", "date": "2026-11-05", "team_ids": {"home": 1, "away": 2}, "neutral": False,
+                "codes": {"home": "AAA", "away": "BBB"}, "final": {"home": 70, "away": 60}}
+        with mock.patch.object(lr, "build_engine_inputs", return_value=inputs), \
+             mock.patch.object(lr, "ncaab_engine"), \
+             mock.patch.object(lr, "resim_live_game", side_effect=fake_resim), \
+             mock.patch.object(gate, "_harness"), \
+             mock.patch.dict("os.environ"):
+            for salt in (0, 1):
+                out = gate._replay_ncaab(task, "candidate", OLD, {"0m": 0.0}, 3, salt)
+                self.assertIn("0m", out["cps"], out)
+        base = lr.stable_seed("401999", 0, "ncaab")
+        self.assertEqual(seen, [base, gate.salted_seed(base, 1)])
+        self.assertNotEqual(seen[0], seen[1])
+
+    def test_a_salted_receipt_has_its_own_name_and_never_clears(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            d = Path(tmp)
+            path = gate.write_receipt(d, {"league": "ncaab", "candidate_hash": gate.value_hash(OLD),
+                                          "current_hash": gate.value_hash(OLD), "games": 360, "worse": [],
+                                          "better": [], "written_at": time.time(), "seed_salt": 1})
+            self.assertTrue(path.name.endswith("__salt1.json"), path.name)
+            problem, _ = gate.check_receipt(d, "ncaab", gate.value_hash(OLD), gate.value_hash(OLD), time.time())
+            self.assertIn("no outcome-gate receipt", problem)
+            path.rename(d / gate.receipt_name("ncaab", gate.value_hash(OLD), gate.value_hash(OLD)))
+            problem, _ = gate.check_receipt(d, "ncaab", gate.value_hash(OLD), gate.value_hash(OLD), time.time())
+            self.assertIn("noise check", problem)
+
+    def test_main_refuses_an_a_to_a_without_a_salt_and_runs_one_with_a_salt(self) -> None:
+        calls: list[int] = []
+
+        def fake_run(league, values, dates, data_root, sims, procs, log=print, seed_salt=0):
+            calls.append(seed_salt)
+            self.assertEqual(values["current"], values["candidate"])
+            return {}, {}
+
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(gate, "run_replay", side_effect=fake_run), \
+                mock.patch.dict("os.environ"):
+            base = ["--league", "ncaab", "--candidate", OLD, "--current", OLD, "--dates", "2026-11-05",
+                    "--data-root", tmp, "--receipt-dir", tmp]
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                rc = gate.main(base)
+            self.assertEqual(rc, 2)
+            self.assertIn("same value", buf.getvalue())
+            self.assertEqual(calls, [])
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                rc = gate.main(base + ["--seed-salt", "1"])
+            self.assertEqual(calls, [1])
+            self.assertIn("NOISE CHECK", buf.getvalue())
+            self.assertEqual(rc, 2)  # no games -> no receipt
+            self.assertIn("NO RECEIPT", buf.getvalue())
+
+
 if __name__ == "__main__":
     unittest.main()

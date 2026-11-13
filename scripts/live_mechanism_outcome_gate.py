@@ -42,6 +42,13 @@ Values are printed: a mechanisms value is engine config, not a secret. Exit 0 = 
 1 = receipt written WITH worse cells, 2 = no receipt (too few games, bad value, unsupported league).
 
 Read-only against production: reads the fleet's data root and one process's environ, writes only the receipt.
+
+`--seed-salt N` (todo #765 STEP 3j) re-seeds the CANDIDATE arm only, so the same value can be run against itself: an
+A/A run, which measures how many WORSE cells a null transition produces. Why it is needed: the two arms' streams
+diverge within a few possessions of any real change, so the "paired" comparison is close to unpaired in its Monte Carlo
+part, and every candidate scored on the same dates shares ONE current arm (STEP 3i: three candidates, one common 10 m /
+20 m cost). A salted receipt carries `seed_salt` and its own file name, and `check_receipt` refuses one, so a noise
+check can never clear a load.
 """
 from __future__ import annotations
 
@@ -55,6 +62,7 @@ import subprocess
 import sys
 import time
 import traceback
+import zlib
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Optional
 
@@ -110,8 +118,17 @@ def league_of_key(key: str) -> Optional[str]:
     return match.group(1).lower() if match else None
 
 
-def receipt_name(league: str, candidate_hash: str, current_hash: str) -> str:
-    return f"{league}__{candidate_hash[:12]}__{current_hash[:12]}.json"
+def receipt_name(league: str, candidate_hash: str, current_hash: str, seed_salt: int = 0) -> str:
+    """The gate's name for one transition. A salted (noise-check) run gets its own name, so preflight never reads it."""
+    suffix = f"__salt{int(seed_salt)}" if int(seed_salt or 0) else ""
+    return f"{league}__{candidate_hash[:12]}__{current_hash[:12]}{suffix}.json"
+
+
+def salted_seed(seed: int, salt: int) -> int:
+    """`seed` unchanged at salt 0 (the gate's own paired seeds); otherwise a different 31-bit seed per salt."""
+    if not int(salt or 0):
+        return int(seed)
+    return zlib.crc32(f"{int(seed)}|seed-salt|{int(salt)}".encode("utf-8")) & 0x7FFFFFFF
 
 
 def root_from_gitfile(text: str, repo: Path, windows: bool) -> Optional[Path]:
@@ -189,6 +206,9 @@ def check_receipt(directory: Path, league: str, candidate_hash: str, current_has
         return f"outcome-gate receipt {path.name} is unreadable ({type(exc).__name__})", detail
     if receipt.get("candidate_hash") != candidate_hash or receipt.get("current_hash") != current_hash:
         return f"outcome-gate receipt {path.name} names a different transition than its file name", detail
+    if int(receipt.get("seed_salt") or 0):
+        return (f"outcome-gate receipt {path.name} is a seed-salted noise check (salt {receipt.get('seed_salt')}), "
+                f"not a gate reading: run the gate without --seed-salt"), detail
     written = receipt.get("written_at")
     age = (now - float(written)) if isinstance(written, (int, float)) else None
     detail.update(written_at_iso=receipt.get("written_at_iso"), games=receipt.get("games"),
@@ -321,7 +341,8 @@ def flag_cells(cells: Mapping[str, Mapping[str, Mapping[str, float]]]) -> tuple[
 def write_receipt(directory: Path, payload: Mapping[str, Any]) -> Path:
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
-    path = directory / receipt_name(payload["league"], payload["candidate_hash"], payload["current_hash"])
+    path = directory / receipt_name(payload["league"], payload["candidate_hash"], payload["current_hash"],
+                                    int(payload.get("seed_salt") or 0))
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
     os.replace(tmp, path)
@@ -427,15 +448,22 @@ def ncaab_tasks(data_root: Path, date: str) -> tuple[list[dict], dict]:
     return tasks, cov
 
 
+def build_jobs(tasks: Iterable[dict], values: Mapping[str, str], checkpoints: Mapping[str, float], sims: int,
+               seed_salt: int = 0) -> list[tuple]:
+    """One job per game and arm. The salt goes to the CANDIDATE arm only: the current arm keeps production's seeds."""
+    return [(t, arm, values[arm], checkpoints, sims, int(seed_salt or 0) if arm == "candidate" else 0)
+            for t in tasks for arm in ("current", "candidate")]
+
+
 def _replay_one(job) -> dict:
-    task, arm, value, checkpoints, sims = job
+    task, arm, value, checkpoints, sims, salt = job
     try:
-        return _replay_ncaab(task, arm, value, checkpoints, sims)
+        return _replay_ncaab(task, arm, value, checkpoints, sims, salt)
     except Exception:  # noqa: BLE001 -- a failed game is reported, never silently dropped
         return {"game_id": task["game_id"], "arm": arm, "error": traceback.format_exc()[-1200:]}
 
 
-def _replay_ncaab(task, arm, value, checkpoints, sims) -> dict:
+def _replay_ncaab(task, arm, value, checkpoints, sims, salt=0) -> dict:
     from syndicate.features.basketball_engine.resume import GameState
     from syndicate.features.ncaab import live_resim as lr
     from syndicate.features.shared import basketball_interval_backtest as bib
@@ -475,8 +503,8 @@ def _replay_ncaab(task, arm, value, checkpoints, sims) -> dict:
             rows.append([int(sum(hq[:2])) - h0, int(sum(aq[:2])) - a0, lr._ot_points(hb), lr._ot_points(ab)])
             return hb, ab, hq, aq
 
-        res = lr.resim_live_game(inputs, state_obj, sims=sims, base_seed=lr.stable_seed(task["game_id"], seed_key, "ncaab"),
-                                 simulate=simulate, league="ncaab")
+        seed = salted_seed(lr.stable_seed(task["game_id"], seed_key, "ncaab"), salt)
+        res = lr.resim_live_game(inputs, state_obj, sims=sims, base_seed=seed, simulate=simulate, league="ncaab")
         if isinstance(res, lr.NcaabResimRefusal):
             out["cps"][cp] = {"refusal": res.reason}
             continue
@@ -485,7 +513,7 @@ def _replay_ncaab(task, arm, value, checkpoints, sims) -> dict:
 
 
 def run_replay(league: str, values: Mapping[str, str], dates: list[str], data_root: Path, sims: int, procs: int,
-               log=print) -> tuple[dict, dict]:
+               log=print, seed_salt: int = 0) -> tuple[dict, dict]:
     """(paired features[game][cp][arm], coverage). Same seeds on both arms (common random numbers)."""
     from multiprocessing import get_context
 
@@ -496,7 +524,7 @@ def run_replay(league: str, values: Mapping[str, str], dates: list[str], data_ro
         coverage[date] = cov
         tasks += got
     log(f"tasks {len(tasks)} over {len(dates)} dates")
-    jobs = [(t, arm, values[arm], spec["checkpoints"], sims) for t in tasks for arm in ("current", "candidate")]
+    jobs = build_jobs(tasks, values, spec["checkpoints"], sims, seed_salt)
     paired: dict[str, dict[str, dict[str, dict[str, float]]]] = {}
     notes: dict[str, int] = {}
     with get_context("fork").Pool(procs) as pool:
@@ -564,7 +592,13 @@ def main(argv: Optional[list[str]] = None) -> int:
     ap.add_argument("--procs", type=int, default=4)
     ap.add_argument("--min-games", type=int, default=MIN_GAMES)
     ap.add_argument("--receipt-dir", default="", help="default: <main tree>/.syndicate/deploy/outcome_gate")
+    ap.add_argument("--seed-salt", type=int, default=0,
+                    help="re-seed the CANDIDATE arm only (noise check; candidate may equal current). The receipt gets "
+                         "its own name and can never clear preflight. 0 = the gate's paired seeds")
     args = ap.parse_args(argv)
+    if args.seed_salt < 0:
+        print("REFUSE: --seed-salt must be >= 0")
+        return 2
 
     league = args.league.lower()
     if league not in LEAGUES:
@@ -613,17 +647,20 @@ def main(argv: Optional[list[str]] = None) -> int:
         if len(got) != len(want):
             print(f"REFUSE: the {label} value parses to {len(got)} of its {len(want)} fields with this code")
             return 2
-    if canonical_value(candidate) == canonical_value(current):
-        print("REFUSE: candidate and current are the same value; there is no transition to score")
+    if canonical_value(candidate) == canonical_value(current) and not args.seed_salt:
+        print("REFUSE: candidate and current are the same value; there is no transition to score "
+              "(an A/A noise check needs --seed-salt)")
         return 2
 
     dates = expand_dates(args.dates)
     t0 = time.time()
     print(f"league {league} key {spec['env_key']} dates {dates[0]}..{dates[-1]} ({len(dates)}) sims {args.sims} "
-          f"switches {sorted(switches)} code {_git_head(REPO)[:9]}", flush=True)
+          f"switches {sorted(switches)} code {_git_head(REPO)[:9]}"
+          + (f" seed_salt {args.seed_salt} (candidate arm only: a NOISE CHECK, not a gate reading)" if args.seed_salt else ""),
+          flush=True)
     print(f"current   {canonical_value(current) or '(unset)'}\ncandidate {canonical_value(candidate) or '(unset)'}", flush=True)
     paired, coverage = run_replay(league, {"current": current, "candidate": candidate}, dates, data_root,
-                                  args.sims, args.procs, log=lambda m: print(m, flush=True))
+                                  args.sims, args.procs, log=lambda m: print(m, flush=True), seed_salt=args.seed_salt)
     cps = list(spec["checkpoints"])
     cells = score_cells(paired, cps)
     games = min((int(cells[cp]["_n"]["games"]) for cp in cells), default=0)
@@ -653,7 +690,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         "league": league, "env_key": spec["env_key"],
         "candidate_hash": value_hash(candidate), "current_hash": value_hash(current),
         "candidate": canonical_value(candidate), "current": canonical_value(current),
-        "dates": dates, "games": games, "sims": args.sims, "checkpoints": spec["checkpoints"],
+        "dates": dates, "games": games, "sims": args.sims, "checkpoints": spec["checkpoints"], "seed_salt": args.seed_salt,
         "switches": {k: bool(str(v).strip()) for k, v in switches.items()},
         "code_commit": _git_head(REPO), "data_root": str(data_root),
         "coverage": coverage, "cells": cells, "worse": worse, "better": better,
