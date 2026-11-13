@@ -554,6 +554,21 @@ if command -v python >/dev/null 2>&1; then
     fi
   done
 fi
+
+# --- Primary-tree auto fast-forward (lane primary-tree-auto-ff, 2026-11-13) ---
+# Every session loads its hooks, its git hooks and this digest from the PRIMARY
+# checkout, and nothing moved it: it was fast-forwarded BY HAND 12 times
+# between 09-15 and 11-13, at 190-2,539 commits behind, and while it lagged
+# a hook landed on main was not live and this digest read stale ledger content.
+# `scripts/primary_tree_ff.py` keeps it on origin/main and REFUSES rather than
+# risk anyone's uncommitted file. This prints ONE line, only when a human is
+# needed (the last run refused or failed, or no run for 24 h); a healthy tree
+# prints nothing. Emitted outside BUDGET, like LEDGER INCOHERENT, for the same
+# reason. Fails open: no python or no script leaves the line off.
+PRIMARY_FF=""
+if command -v python >/dev/null 2>&1 && [ -f scripts/primary_tree_ff.py ]; then
+  PRIMARY_FF=$(python scripts/primary_tree_ff.py --digest 2>/dev/null | head -c 400)
+fi
 # NOT via `add`. The body is hard-capped (`head -c "$BUDGET"`) and this section
 # sits at the tail, so the first version of this line was emitted as
 # "LEDGER INCOHERENT: state.md (scripts/state_key_" -- cut mid-word. This file
@@ -583,6 +598,7 @@ if [ "${LEN:-0}" -gt "$BUDGET" ]; then
 fi
 [ -n "$NOTES" ] && echo "DIGEST NOTES: ${NOTES}"
 [ -n "$INCOHERENT" ] && echo "LEDGER INCOHERENT: ${INCOHERENT%, } — the file's own rules are being broken; run it before trusting what the file says."
+[ -n "$PRIMARY_FF" ] && echo "$PRIMARY_FF"
 
 printf '%s' "$BODY" | head -c "$BUDGET"
 echo
