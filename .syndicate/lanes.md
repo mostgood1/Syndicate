@@ -690,6 +690,14 @@ death, never life — do not invert it.
 - Verdict: GOAL MET -- owner_liveness --idle-min 240 read 1 SAFE of 4 CLOSED; moved to lanes_closed.md with one pointer; invariants unchanged vs origin/main baseline (same 2 contested files).
 - Moved: closed-lane-archive-20261113-0040. Table in .syndicate/log/2026-11-13.md.
 
+### nhl-live-total-calibration — OPEN — opened 2026-11-13 — session 87074b1f-3325-4c92-871d-b22851478134
+- Goal: The NHL live re-sim's total stops running high early: a fitted live scoring scale on the event engine's goals_per_60 (the same full-game-rate-used-as-regulation issue the pregame path's regulation_scale 0.9398 corrects), with the end-game's empty-net goals counted in the total, fit walk-forward on the cutoff replay; off switch SYNDICATE_NHL_LIVE_SCORING_CALIBRATION=off reproducing today's numbers seed for seed; the margin/puck-line/end-game and moneyline re-graded at the fitted scale so nothing else gets worse
+- Files: syndicate/features/nhl/live_resim.py (resim_live_game + the scoring calibration constants/helper only), scripts/backtest_nhl_live_puckline.py, tests/test_nhl_live_total_calibration.py (NEW), tests/test_backtest_nhl_live_puckline.py, .syndicate/findings_2026-11-13_nhl_live_total_calibration.md (NEW), .syndicate/leads.md (the 2026-11-11 live total lead only), docs/ai_context/todo.md (#773 section only)
+- Hypothesis: The early total bias (+0.81 goals at puck drop, +0.34 at P2 10:00) is a scoring-rate level error: goals_per_60 is the projection's full-game rate (incl. OT goals and SO credits) used as a regulation rate, as on the pregame path; one constant scale on it removes the early bias, and counting the end-game's empty-net goals removes most of the late under-count
+- Falsification test: Out of sample, no single scale brings BOTH the P1 20:00 and the P2 10:00 total bias inside +-0.15 goals (the bias is not a rate level), or the fitted scale worsens the +-1.5 puck-line Brier or the moneyline Brier vs today's production setting by more than its game-bootstrap noise
+- Verification: Grid replays (scale 1.00..0.80) on the fleet host at nice 19 with production inputs; walk-forward scale per date; by-cutoff total bias + discrete CRPS on vs off with game-bootstrap CIs; end-game p re-fit at the chosen scale; puck-line and moneyline Brier on vs production; unit tests (off == today seed for seed, reachability through build_live_lens_snapshot, mutation-checked); findings file with a load / do-not-load recommendation
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
