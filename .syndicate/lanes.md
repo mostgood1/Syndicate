@@ -722,6 +722,14 @@ death, never life — do not invert it.
 - Verification: fleet replay over the served board: rows with a side lacking a crest by sport, NBA prop rows with no player_side, changed-already-set count; after load, the same read from the served board
 - Blocked by: none
 
+### ncaab-margin-width-candidates — OPEN — opened 2026-11-13 — session c2fd17f8-7d77-4eed-b025-0830211e05b3
+- Goal: todo #765 Phase 2 NCAAB: name the live-mechanisms candidate whose margin width sits between production's 7 fields and RC46 and that the #784 outcome gate passes (no WORSE cell), or report that none does. Two candidates, each a gate receipt against the running 7-field value on 2026-11-03..12: ALT1 = 7 fields + possession_alternation 1.0; SE2_ALT = 7 fields + score_effect_k 0.002 + possession_alternation 1.0 + solver_endgame_pts_per_team 0.30. Read-only; nothing is loaded (a load is the user's decision).
+- Files: .syndicate/findings_2026-11-07_basketball_interval_backtest.md (a new PHASE 2 STEP 3i section only), docs/ai_context/todo.md (#765 section only)
+- Hypothesis: Pre-registered 2026-11-13 14:2xZ, before either run. ALT1: margin SD -2% to -6% at every checkpoint; mean total shift within +-0.2 everywhere; no WORSE cell and none BETTER (too small to resolve); tip margin coverage stays >= 0.83. SE2_ALT: margin SD -8% to -16% at tip / 10 / 20 m and -2% to -7% at 30 / 36 m; tip margin coverage 0.78-0.83 (from 0.858); win Brier diff at 20 m and 36 m +0.000 to +0.006 and inside SE, so no WORSE cell; tip total shift -0.4 to +0.3. Decision rule: best = no WORSE cell and the lowest mean margin-coverage distance from 0.80 over the 5 checkpoints; if neither moves that mean toward 0.80, 'none'.
+- Falsification test: SE2_ALT has any WORSE cell (the cost is steeper than linear in k), or its tip margin SD ratio falls outside 0.84-0.92 (the k scaling is wrong). ALT1 shows a WORSE cell, or moves margin SD by more than 8% anywhere.
+- Verification: Two receipts in .syndicate/deploy/outcome_gate/ (ncaab__<candidate>__911f9565fe7f.json) on >= 150 games each, the same dates and seeds; a findings STEP 3i table of every cell for both candidates beside the pre-registered ranges; todo #765 names the best candidate or 'none' with its receipt.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
