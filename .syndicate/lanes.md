@@ -782,6 +782,14 @@ death, never life — do not invert it.
 - Verification: test_ledger_bytes.py green over throwaway repos (new damage blocked, pre-existing passes, CRLF working copy vs LF blob, override env); the existing ledger hook suites still green; a live trial in this worktree: a damaged staged line is refused by the real hook, then accepted once fixed; a rescan of origin/main finds 0 damaged characters across every ledger markdown file.
 - Blocked by: none
 
+### live-stat-progress-expert — OPEN — opened 2026-11-13 — session e32fef1a-01e8-4afe-a284-01acd3728545
+- Goal: Phase 1B M1 live stat progress, shadow only: a stat_progress live expert in engine_experts.py turns every logged NBA liveProps row (live_evidence/<sport>/<date>.props.jsonl, read through props_at's rows) at a line the books quoted into an ExpertOpinion against the live book prior at the same instant (book_quotes, each book's two-way de-vig, median across books, the board's simultaneity and hold rules), with a named refusal wherever it cannot opine; off != on reachability tests pass; and on the fleet scripts/engine_experts.py prints the stat_progress coverage table by clock bucket for the logged NBA nights (2026-11-11, 2026-11-12) with 0 checklist alarms. No stake, order, board or worker reads it.
+- Files: syndicate/features/shared/engine_experts.py, scripts/engine_experts.py, tests/test_engine_experts.py, docs/ai_context/engine_experts.md
+- Hypothesis: n/a (build; whether it carries an edge is M2's held-out test, not this lane's)
+- Falsification test: n/a for edge. For the build: the expert's probability for a priced row must equal the published liveModelProbOver smoothed by Agresti-Coull at n = simsRun, and its prior must equal an independent recomputation from the raw book_quotes rows at that instant; any mismatch on the fleet nights fails the lane
+- Verification: pytest tests/test_engine_experts.py (off != on per expert; refusals named); fleet run of scripts/engine_experts.py run --date 2026-11-11 and 2026-11-12 --sports nba at nice 19: stat_progress COVERAGE rows printed per clock bucket, CHECKLIST ok, PRIOR recomputation 0 mismatches
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
