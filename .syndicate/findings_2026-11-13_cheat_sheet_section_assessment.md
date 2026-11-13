@@ -155,3 +155,42 @@ whatever a featured section does.
    same fair it is selected on.
 8. **For the fair owners, not this lane:** NBA and NFL prop fairs lean OVER by 2-4 pts, and Bovada's off-consensus
    prices are a trap. Route this to the fair lanes (`fair-price-v2` / `syndicate-fair-v1`).
+
+## 6. Follow-up 11-13: rank NHL "Sim vs the line" by the model's chance instead of the gap? NO
+
+Asked by the user ("Measure it") after reading the 11-13 NHL picks. The section's gap is (projection - line) /
+max(line, 1). On a 0.5 line the projection is a MEAN, and a mean above 0.5 does not make the over likelier (Poisson: only
+above 0.693). Two of that day's 19 picks had the model's own chance well under the fair: Forsberg Over 0.5 points
+(51.2 vs 60.1) and Stamkos Under 0.5 goals (64.2 vs 69.7). Hypothesis: ranking by chance minus fair beats the gap in NHL.
+
+- NHL `check.p_model` IS Poisson(`projected`) for the row's side: 1,937 of 1,939 replay rows within 0.2 pts (MLB: 9%).
+- Replay with the section 3 population and filters (official 10-15..11-12, main line, featurable, two-sided; ROI at
+  the best price; excess = y - fair; 95% CI by game, 2,000 resamples):
+
+| NHL rule | bets / games | hit vs fair | ROI | excess (pts) |
+|---|---|---|---|---|
+| shipped: gap >= 5% | 755 / 174 | 59.7 vs 58.8 | +0.5% [-5.6, +6.4] | +0.9 [-2.6, +4.6] |
+| gap >= 5% AND chance >= fair | 545 / 163 | 59.4 vs 58.8 | +0.3% [-7.0, +7.5] | +0.7 [-3.7, +4.9] |
+| what that filter drops (chance < fair) | 210 / 112 | 60.5 vs 58.9 | +1.2% [-9.9, +12.5] | +1.5 [-5.5, +8.2] |
+| chance - fair > 0, either side | 904 / 186 | 54.4 vs 54.6 | -1.4% [-7.7, +4.8] | -0.2 [-3.5, +3.1] |
+| chance - fair > 5 pts | 467 / 160 | 52.9 vs 54.3 | -4.9% [-13.1, +3.9] | -1.4 [-6.1, +3.2] |
+| chance - fair > 10 pts | 172 / 104 | 53.5 vs 53.0 | -1.8% [-15.3, +12.1] | +0.5 [-6.5, +7.6] |
+| gap rule, 0.5 lines | 487 / 158 | 63.2 vs 61.2 | +3.2% [-4.3, +10.5] | +2.1 [-2.4, +6.6] |
+| gap rule, lines >= 1 (mostly SOG) | 268 / 124 | 53.4 vs 54.5 | -4.3% [-14.4, +5.2] | -1.2 [-6.4, +3.9] |
+
+- Weight the outcomes put on the model beyond the fair (fit w in logit p = logit fair + w * (logit p_model - logit
+  fair), one row per main-line group, CI by game): NHL w = +0.28 [-0.14, +0.69], although the model and the fair sit 5+
+  pts apart on 52% of groups. The NHL model's disagreements with the price are mostly noise.
+- The same chance filter on the shipped rule, other sports: NCAAF, the rows it would DROP did better, excess +8.1
+  [+0.8, +15.0] (167) vs kept +3.4 [-0.6, +7.3] (696). NBA kept +6.1 [+2.4, +9.8] (492) vs dropped +2.7 [-1.2, +7.1]
+  (759), within noise of each other. NFL kept -0.5 vs dropped -5.9 (137), within noise. MLB (8 games) and WNBA (7 games)
+  are readings only.
+- For the model owners, not this lane: NBA `p_model` is the market blend (only 3% of groups 5+ pts from the fair), and
+  its w = +2.50 [+0.93, +4.01] says the blend shrinks the model toward the market too hard.
+
+**Verdict: no change.** Neither the gap nor the model's chance beats the price in NHL. The 0.5-line rows the hypothesis
+blamed are the better half, within noise. In NCAAF a chance filter would have cut the better rows. The mean-vs-chance
+mismatch on 0.5 lines is real arithmetic but costs nothing measurable, because the NHL chance carries little beyond the
+fair. The NHL header keeps printing that the section has not beaten the price. About 40 cells were read; the few
+intervals that exclude 0 (e.g. NHL SOG rows the filter drops, -24.3% on 50, one of 15 market cells) are treated as noise.
+Scripts and outputs: `C:\tmp\edge-analyses\nhl-sim-chance\` (`replay.py`, `sports.py`, `replay_nhl.txt`, `sports.txt`).
