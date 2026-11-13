@@ -1,6 +1,15 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#792` — **COLLEGE IN-PLAY ODDS CAPTURE STOPS AT MIDNIGHT CENTRAL: a game still live after the roll keeps its live re-sim (`#774`), but its sportsbook quotes freeze, so the board prices 0 of its lines for the rest of the game. The NCAAB / WNCAAB analogue of NBA's `#782`. FIX ON MAIN `dd7a5bf2d` (user "Yes, fix it here"), NOT LOADED: user 11-12 "Ride next deploy" (it loads with the next fleet ff past `dd7a5bf2d` + a live-odds-worker restart)** `[2026-11-12, found by lane college-live-resim-midnight (#774 reading 2); fixed by lane college-quote-capture-midnight, session 8062940b]`
+### `#792` — **COLLEGE IN-PLAY ODDS CAPTURE STOPS AT MIDNIGHT CENTRAL: a game still live after the roll keeps its live re-sim (`#774`), but its sportsbook quotes freeze, so the board prices 0 of its lines for the rest of the game. The NCAAB / WNCAAB analogue of NBA's `#782`. FIX ON MAIN `dd7a5bf2d` (user "Yes, fix it here"), LOADED: it rode the 15:25Z 11-12 fleet ff to `0fe6631d7` (lane ncaaf-live-join-team-alias), per the user's 11-12 "Ride next deploy", and live-odds-worker has run it since its 22:03:57Z 11-12 TERM (the `#795` deploy). The midnight FLEET READING IS OWED (the 11-12 roll had no college game live)** `[2026-11-12, found by lane college-live-resim-midnight (#774 reading 2); fixed by lane college-quote-capture-midnight, session 8062940b]`
+- **Load and the 11-12 roll** (fleet, read-only, 14:06-14:12Z 11-13):
+  - Fleet `~/Syndicate` HEAD `a133df703` contains `dd7a5bf2d` (`merge-base --is-ancestor`). Reflog: ff to `0fe6631d7` at 15:25:08Z 11-12; deploys.md's entry at that stamp names `dd7a5bf2d` riding.
+  - live-odds-worker: TERM 22:03:57Z 11-12 (deploys.md, `#795`). The current process has been up since about 09:23Z 11-13 (`ps`; the hour scale makes lstart's few-second drift immaterial). So it has run the fix since 22:04Z 11-12.
+  - The 11-12 -> 11-13 roll had no college game live. The last college launch was `WNCAAB_LIVE_AUTORUN_LAUNCHED date=2026-11-12 ... live_games=1` at 05:32:00Z (ARIZ @ UCLA), with none after. `prior_slate_games=` appears 0 times in `live-odds-worker.log{,.1}`. That is a null with no population, not a failure.
+  - Next candidates (fleet scoreboards, read 14:12Z 11-13):
+    - Tonight: NCAAB UAPB @ CBU, tip 03:30Z (9:30 PM CST). It counts only if it runs past midnight.
+    - Sat 11-14: no tip at or after 9:30 PM CST in either league.
+    - 11-15 onward: the scoreboards are not written yet.
+    - The reading probably waits for a later tip (Hawaii / West Coast).
 - **Measured** (fleet, read-only, 11-12 06:00-06:20Z, USC @ CAL, tip 04:00Z):
   - live-odds-worker: `NCAAB_LIVE_AUTORUN_LAUNCHED date=2026-11-11 phase=live ... live_games=1` every ~4 min, last at 05:58:49Z. No launch for the game after the roll.
   - `ncaab_source/tracking/book_quotes/2026-11-11.jsonl`, the game's captures by minute: 36-42 rows from 6 sportsbooks per pull through 05:58Z (newest `book_updated_at` 05:58:45Z). After the roll: 1 Polymarket row (06:00Z) and 3 Kalshi rows (06:06Z, 06:12Z). The 11-12 shard holds 0 of its rows captured after 06:00Z.
