@@ -59587,3 +59587,33 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - Not shown by this read: whether a crest already set changed. The served read cannot tell; the pre-load replay (17:59Z, 3,946 rows) measured it at 0.
 - **Revert:** `git revert 0eb6f8d99`, then a fleet ff + `reload-web`.
 - **Claims:** web released right after this entry.
+
+## 2026-11-13 17:57:46Z (11:57 AM CST) -- FLEET ff 89e2d2a0c -> 866e0e18e + claimed live-odds-worker TERM: todo #773 NHL live TOTAL (lane `nhl-live-total-calibration`) -- **LOADED; reachability MET on production's code, env and inputs; served reading owed from first puck 02:00Z**
+- **User, in this session's chat:** "Yes, push and load" (answering "Push the live total fix and load it on live-odds-worker?"). Then, asked how to proceed because the ff also carries three other lanes' unloaded code (#780 totals prob scale, #790 slower NBA schedule, #797 cheat-sheet rules v2): "Load all + restart refresh" (ff now, restart live-odds-worker for mine, plus a claimed refresh-worker restart so #780 and #790 go live now).
+- **The refresh-worker half was done by its owners, not me:** when I went to claim it, lane `book-grid-overlay-starvation` held refresh-worker (and `live-totals-prob-scale` held web). That lane ff'd the fleet eb4a43688 -> 89e2d2a0c at 17:55:57Z and TERMed refresh-worker at 17:56:02Z (role_restarts: claimed, holder `book-grid-overlay-starvation`), which loads #780, both #790 commits and #797. I did NOT restart refresh-worker again (a second restart minutes later only rebuilds the board cold).
+- **Commit** `866e0e18e` on main: two rebases over other lanes' commits, pushed 17:47:41Z (11:47 AM CST). The NHL live suites on the rebased tree: 102 passed.
+- **Range 89e2d2a0c..866e0e18e, runtime files:** `syndicate/features/nhl/live_resim.py` (mine), `scripts/backtest_nhl_live_puckline.py` (mine, offline harness), `scripts/engine_experts.py` + `syndicate/features/shared/engine_experts.py` (`00d55f97a`, lane `live-stat-progress-expert`, shadow only: no importer in syndicate/, pipeline/ or a role runner, and no fleet job runs it).
+- **What live-odds-worker loads besides mine:** it was still on `a133df70` (status at preflight), so the TERM also loaded a133df703..89e2d2a0c into it: offline scripts, `team_logos.py` (#796, loaded on web and refresh-worker by its owner 15:47Z / 15:59Z), and the #790 / #797 / #780 code above. The join and the book-grid tick run on refresh-worker, not here: 0 `LIVE_GAMELINE_JOIN` lines in the last 30 MB of live-odds-worker.log vs 449 in refresh-worker.log.
+- **gates:**
+  - Claim live-odds-worker, holder `nhl-live-total-calibration`, 17:53:40Z (rc 0). The refresh-worker acquire was refused (held by `book-grid-overlay-starvation`), so refresh-worker was not touched by this lane.
+  - Spacing: live-odds-worker pid 420215 had run 9,410 s at 17:57:02Z (started ~15:20Z), 157 min earlier.
+  - Preflight `--service live-odds-worker --target-commit 866e0e18e` (fleet), run from a worktree at origin/main: **CLEAR** 17:57:14Z (rc 0), 0 processes enumerated. Baseline read 17:57:02Z.
+- **load** (`C:\tmp\nhlrec\load_total.sh 866e0e18e 89e2d2a0c`):
+  - `git merge --ff-only` at **17:57:46.791Z**: HEAD `866e0e18e`. On disk: the scoring constant 1, `"total_keep": 0.85` 1.
+  - `kill -TERM 420215` at 17:57:46.830Z; `STOP_SIGNAL` logged 17:57:46.870Z. Its children: 2 `live_resim_workers --serve`; no NHL game live.
+  - **The worker drains its whole pass on TERM, so the respawn took 4 min 43 s** (11-11: 34 s, when the TERM landed mid-sleep). It finished the live-lens tick, wrote the Polymarket slate (18:00:13Z), ran both live EXECUTION ticks (Kalshi 18:01:40Z, Polymarket 18:02:13Z; placed 0), logged `loop_finally` at 18:02:16Z and exited code 0 after 9,732 s. New supervised live-odds-worker **pid 445457**, first seen 18:02:29.815Z. load_total.sh's own 120 s respawn wait timed out (rc 6) on this; a second watcher saw the respawn. A TERM can wait out a full pass: give the respawn wait >= 10 min.
+  - role_restarts.jsonl records refresh-worker restarts only; it has no live-odds-worker rows, before or now.
+- **expect / measured:**
+  - `fleet_checkout_head` 89e2d2a0c -> 866e0e18e: **MET** 17:57:46Z.
+  - `scoring_constant_on_disk` 0 -> 1: **MET**.
+  - `low_pid_started_after_866e0e18e` no -> yes: **MET** (pid 445457; `local_production.py status` reads `code=866e0e18`).
+  - `low_env_scoring_key` absent -> absent: **MET** (0 in /proc/445457/environ). Under the role's own environ, `live_scoring_calibration()` resolves `{goal_scale 1.0, total_keep 0.85, total_keep_late_seconds 240.0, count_endgame_in_total True}`, and the end-game still `{0.38, 90}`.
+  - `low_tracebacks_first_10min` 0 -> 0: **MET** (the 10 min after the respawn, 18:02:29-18:12:29Z, against the 10 min before the TERM: 0 `^Traceback` lines in the last 20,000 of the log; error-ish lines 2 vs 9, all `PROCESS_ENUM_DEBUG error_count`; `[execution_exits_fast] PASS_FAILED` 31 vs 32, a recurring line at the same rate before and after; nhl lines 185 vs 95).
+  - `nhl_live_lanes_liveScoring_on_0.85_240` 0 -> **OWED** from first puck 02:00Z (NYR @ VAN 8:00 PM CST; NSH @ VGK 03:00Z). The served snapshot at 18:03:06Z: 2 games, 2 lanes, 0 resimmed (pregame). Watcher `C:\tmp\nhlrec\snap_watch_total.sh` reads from 02:05Z; log `snap_watch_total.log`.
+- **Reachability (`off != on`) on production's code, env and inputs, 18:0xZ:** `resim_live_game` under pid 445457's environ from ~/Syndicate, on today's slate features (2 games), New York Rangers @ Vancouver Canucks, 200 sims, seed 7, LEGACY vs the resolved default:
+  - P1 15:00 0-0: total 6.820 -> **5.975**. P2 10:00 1-1: 5.650 -> **5.325**. P3 05:00 2-1: 3.910 -> **4.120** (the end-game's empty-net goals now count in the total).
+  - Margin histogram identical and home win probability identical in all three (0.2600 / 0.3250 / 0.8700). Nothing was published.
+  - The new worker's live-lens ticks complete with `nhl: True` (2 by 18:05Z).
+- **Not touched by this lane:** web and refresh-worker. Both read `code=89e2d2a0` (STALE for the 4 files above); neither produces the NHL live lanes. Web picks them up at its next worker recycle.
+- **revert:** `SYNDICATE_NHL_LIVE_SCORING_CALIBRATION=off` in `local_production.env` needs a drained full down/up. Faster: revert `866e0e18e` on main, ff the fleet, then a claimed live-odds-worker TERM (allow ~5 min for the pass to drain).
+- **verify:** tonight from 02:05Z, served NHL lanes carry `liveScoring` on / 0.85 / 240 / endgame in total, and the published `projection.total` sits below what LEGACY would print at P1 / P2 states.
