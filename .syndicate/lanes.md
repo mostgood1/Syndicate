@@ -690,12 +690,6 @@ death, never life — do not invert it.
 - Verification: Unit: with today quiet and the re-sim publishing a prior-date In Progress row, the lane launches date=<prior> with the same forced live args; with the env switch at 0, with a stale (>600 s) or missing re-sim file, outside the window, or with only Unknown/today rows it does not; today's live game still wins. Fleet after the user's load, on the next late college night: NCAAB_LIVE_AUTORUN_LAUNCHED date=<prior> ... prior_slate_games>=1 after 06:00Z, the game's sportsbook rows in book_quotes/<prior>.jsonl captured after 06:00Z, and the carryover NCAAB LIVE_GAMELINE_JOIN projected>0 / priceable>0 for it
 - Blocked by: none
 
-### closed-lane-archive-20261113-0640 — CLOSED 2026-11-13 (GOAL MET: 1 block archived) — opened 2026-11-13 — session 38196abb-579a-4240-ab44-f099e35ef716
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET -- owner_liveness --idle-min 240 read 1 SAFE of 4 CLOSED; moved to lanes_closed.md with one pointer; invariants unchanged vs origin/main baseline (same 2 contested files).
-- Moved: closed-lane-archive-20261113-0040. Table in .syndicate/log/2026-11-13.md.
-
 ### nhl-live-total-calibration — OPEN — opened 2026-11-13 — session 87074b1f-3325-4c92-871d-b22851478134
 - STATUS 2026-11-13 16:4xZ (10:4x AM CST): FIT DONE, code COMMITTED LOCALLY, push/load awaits the user. Engine-level goal_scale (5 replays 1.00..0.80) fixed the early total but moved the +-1.5 / moneyline Brier slightly worse (+0.0005 / +0.0010, within noise); SHIPPED instead a TOTAL-ONLY thinning (margin, puck line, moneyline byte-identical): regular-play goals (more than 240 s of regulation left) kept with p 0.85, the end-game's goals counted. Full sample (301 games / 43 dates): every cutoff within +-0.08 goals (today +0.87 at puck drop), CRPS 0.6950 -> 0.6692; out of sample (202 games) CRPS -0.0172 [-0.0366, +0.0014], late window vs uniform -0.0025 [-0.0045, -0.0007]. Tests 23 + NHL live suites 98 + 20 neighbouring suites 894; 18 of 18 mutations caught. findings_2026-11-13_nhl_live_total_calibration.md.
 - Goal: The NHL live re-sim's total stops running high early: a fitted live scoring scale on the event engine's goals_per_60 (the same full-game-rate-used-as-regulation issue the pregame path's regulation_scale 0.9398 corrects), with the end-game's empty-net goals counted in the total, fit walk-forward on the cutoff replay; off switch SYNDICATE_NHL_LIVE_SCORING_CALIBRATION=off reproducing today's numbers seed for seed; the margin/puck-line/end-game and moneyline re-graded at the fitted scale so nothing else gets worse
@@ -862,6 +856,11 @@ death, never life — do not invert it.
 - Falsification test: H-A false if any method's lean differs from Shin's by >= 1 pt. H-D false if the lean's slope on hold has a CI including 0. H-E false if the close-fair lean has a CI including 0. CORRECTION: a per-sport side shift fitted on kickoffs before 11-02 must cut log loss on 11-02..11-12 with a game-clustered CI below 0 in NBA, else it is not proposed.
 - Verification: findings file with the per-sport per-market lean, the H-A/H-C/H-D/H-E verdicts with CIs, and the held-out log-loss reading; the correction (if any) as a tested module with off != on; a user decision recorded before any wiring
 - Blocked by: none
+
+### closed-lane-archive-20261113-1239 — CLOSED 2026-11-13 (GOAL MET: 1 block archived) — opened 2026-11-13 — session 55ea853b-e2bc-4587-909b-39828f95ffb8
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 gave SAFE for 1 of 14 CLOSED blocks. Moved: closed-lane-archive-20261113-0640. The reading and the WAIT reasons are in `.syndicate/log/2026-11-13.md`.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1104,6 +1103,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261113-0040` — CLOSED 2026-11-13 (GOAL MET: 1 block archived) — opened 2026-11-13 — session 202219a7-b735-4566-85f5-54b440276263
 - `closed-lane-archive-20261113-0240` — CLOSED 2026-11-13 (GOAL MET: 2 blocks archived) — opened 2026-11-13 — session 3614e560-22cb-4c27-8284-d1b36a481e8b
 - `closed-lane-archive-20261113-0440` — CLOSED 2026-11-13 (GOAL MET: 2 blocks archived) — opened 2026-11-13 — session 7892d138-f9c4-46ae-88f1-f80e105ede73
+- `closed-lane-archive-20261113-0640` — CLOSED 2026-11-13 (GOAL MET: 1 block archived) — opened 2026-11-13 — session 38196abb-579a-4240-ab44-f099e35ef716
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
