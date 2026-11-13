@@ -246,6 +246,10 @@ def game_features(cp: Mapping[str, Any], final_home: int, final_away: int) -> di
         "win_logloss": -(win * np.log(p) + (1 - win) * np.log(1 - p)),
         "margin_sd": float(margin.std()),
         "margin_err": float(real_margin - margin.mean()),
+        # The MEANS, reported as shifts (not scored): totals are served raw from the sim's mean, so a candidate that
+        # moves the mean total moves every priced total, whether or not CRPS can resolve it.
+        "total_mean": float(total.mean()),
+        "margin_mean": float(margin.mean()),
     }
 
 
@@ -263,9 +267,12 @@ def score_cells(paired: Mapping[str, Mapping[str, Mapping[str, Mapping[str, floa
             continue
         n = len(games)
         idx = np.random.default_rng(seed).integers(0, n, size=(draws, n))
-        col = {arm: {k: np.array([paired[g][cp][arm][k] for g in games], float)
-                     for k in ("margin_crps", "margin_in80", "total_crps", "total_in80", "win_brier",
-                               "win_logloss", "margin_sd", "margin_err")}
+        keys = ["margin_crps", "margin_in80", "total_crps", "total_in80", "win_brier", "win_logloss", "margin_sd",
+                "margin_err"]
+        has_means = all("total_mean" in paired[g][cp][arm] for g in games for arm in ("current", "candidate"))
+        if has_means:
+            keys += ["total_mean", "margin_mean"]
+        col = {arm: {k: np.array([paired[g][cp][arm][k] for g in games], float) for k in keys}
                for arm in ("current", "candidate")}
         out: dict[str, dict[str, float]] = {"_n": {"games": float(n)}}
         for metric in METRICS:
@@ -287,6 +294,11 @@ def score_cells(paired: Mapping[str, Mapping[str, Mapping[str, Mapping[str, floa
                         "margin_sd_candidate": float(col["candidate"]["margin_sd"].mean()),
                         "resid_sd_current": float(col["current"]["margin_err"].std()),
                         "resid_sd_candidate": float(col["candidate"]["margin_err"].std())}
+        if has_means:
+            for name in ("total_mean", "margin_mean"):
+                d = col["candidate"][name] - col["current"][name]
+                out["_info"][f"{name}_shift"] = float(d.mean())
+                out["_info"][f"{name}_shift_se196"] = float(1.96 * d[idx].mean(axis=1).std())
         cells[cp] = out
     return cells
 
@@ -623,6 +635,10 @@ def main(argv: Optional[list[str]] = None) -> int:
         print(f"\n### {cp}: {int(c['_n']['games'])} games | margin SD {c['_info']['margin_sd_current']:.2f} -> "
               f"{c['_info']['margin_sd_candidate']:.2f} | real SD of (final - mean) {c['_info']['resid_sd_current']:.2f} -> "
               f"{c['_info']['resid_sd_candidate']:.2f}")
+        if "total_mean_shift" in c["_info"]:
+            i = c["_info"]
+            print(f"  mean shift (not scored): total {i['total_mean_shift']:+.3f} +- {i['total_mean_shift_se196']:.3f}"
+                  f" | home margin {i['margin_mean_shift']:+.3f} +- {i['margin_mean_shift_se196']:.3f}")
         for metric in METRICS:
             m = c[metric]
             tag = ("  WORSE" if f"{cp}:{metric}" in worse else "  better" if f"{cp}:{metric}" in better else "")

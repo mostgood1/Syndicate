@@ -99,6 +99,17 @@ class ScoringTests(unittest.TestCase):
         self.assertIn("30m:margin_cov80_dev", better)
         self.assertNotIn("30m:margin_cov80_dev", worse)
 
+    def test_the_mean_shifts_are_reported_when_the_features_carry_means(self) -> None:
+        def feats(total_mean):
+            return {**self._features(0.1, 1.0), "total_mean": total_mean, "margin_mean": 3.0}
+        paired = {f"g{i}": {"0m": {"current": feats(140.0), "candidate": feats(140.5)}} for i in range(30)}
+        info = gate.score_cells(paired, ["0m"])["0m"]["_info"]
+        self.assertAlmostEqual(info["total_mean_shift"], 0.5)
+        self.assertAlmostEqual(info["margin_mean_shift"], 0.0)
+        # features without means (older callers) still score, with no shift reported
+        self.assertNotIn("total_mean_shift", gate.score_cells(
+            {"g": {"0m": {"current": self._features(0.1, 1.0), "candidate": self._features(0.1, 1.0)}}}, ["0m"])["0m"]["_info"])
+
     def test_game_features_reads_state_window_and_overtime(self) -> None:
         cp = {"rows": [[10, 5, 0, 0], [12, 6, 5, 3]], "h0": 60, "a0": 50, "home_win_prob": 0.9}
         f = gate.game_features(cp, 72, 56)
