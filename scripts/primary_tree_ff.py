@@ -461,13 +461,14 @@ def _write_status(state, rec):
         fh.write(json.dumps(rec) + "\n")
 
 
-def run(tree, do_apply=False, target=None, fetch=True, merge=None, state=None):
+def run(tree, do_apply=False, target=None, fetch=True, merge=None, state=None, trigger="manual"):
     """One run. Returns (exit_code, record). Only an --apply run that got past the lock writes status."""
     tree = Path(tree)
     if os.environ.get(OFF_ENV, "").strip().lower() == "off":
         return EXIT_SKIPPED, {"result": "skipped", "reasons": ["%s=off" % OFF_ENV]}
     state = Path(state) if state else state_dir_for(tree)
-    rec = {"at": _utc(), "tree": str(tree), "mode": "apply" if do_apply else "dry_run"}
+    rec = {"at": _utc(), "tree": str(tree), "mode": "apply" if do_apply else "dry_run", "trigger": trigger,
+           "pid": os.getpid()}
     lock = None
     if do_apply:
         lock = _lock(state)
@@ -557,8 +558,12 @@ def spawn(tree, delay, popen=None):
             return False
     except OSError:
         pass
+    # Claim the gap NOW, not when the child starts after its delay: several sessions starting in the same
+    # second would otherwise each launch one (the lock would serialise them, but each would still fetch).
+    state.mkdir(parents=True, exist_ok=True)
+    (state / "last_attempt").write_text("spawned " + _utc(), encoding="utf-8")
     args = [sys.executable, str(Path(__file__).resolve()), "--apply", "--quiet", "--delay", str(delay),
-            "--tree", str(tree)]
+            "--tree", str(tree), "--trigger", "session-start"]
     kw = {"stdin": subprocess.DEVNULL, "stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL,
           "close_fds": True, "cwd": str(tree)}
     if os.name == "nt":
@@ -601,6 +606,7 @@ def main(argv=None):
     ap.add_argument("--delay", type=float, default=0.0, help="seconds to wait before starting")
     ap.add_argument("--quiet", action="store_true")
     ap.add_argument("--json", action="store_true")
+    ap.add_argument("--trigger", default="manual", help="recorded with the run (--spawn passes session-start)")
     a = ap.parse_args(argv)
     if os.environ.get(OFF_ENV, "").strip().lower() == "off":
         return EXIT_SKIPPED if not a.digest else EXIT_OK
@@ -621,7 +627,7 @@ def main(argv=None):
         return EXIT_OK
     if a.delay:
         time.sleep(a.delay)
-    code, rec = run(tree, do_apply=a.apply, target=a.target, fetch=not a.no_fetch)
+    code, rec = run(tree, do_apply=a.apply, target=a.target, fetch=not a.no_fetch, trigger=a.trigger)
     if not a.quiet:
         _print(rec, a.json)
     return code

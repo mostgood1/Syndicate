@@ -603,4 +603,14 @@ fi
 printf '%s' "$BODY" | head -c "$BUDGET"
 echo
 echo "=== end digest — full ledger in .syndicate/ ==="
+
+# --- Trigger for the primary-tree auto fast-forward (user decision 2026-11-13: "Push: session start") ---
+# Starts `primary_tree_ff.py --apply` DETACHED, at Idle priority, after a 20 s delay, and at most once per
+# 10 min across all sessions; it returns at once, so it adds no wait (a full run takes several seconds on
+# the primary tree). It is LAST on purpose: the run can rewrite this very file, and bash reads a script as
+# it executes it. Off switch: SYNDICATE_PRIMARY_FF=off. Fails open.
+if [ "${SYNDICATE_PRIMARY_FF:-on}" != "off" ] && command -v python >/dev/null 2>&1 \
+   && [ -f scripts/primary_tree_ff.py ]; then
+  python scripts/primary_tree_ff.py --spawn >/dev/null 2>&1 </dev/null || true
+fi
 exit 0

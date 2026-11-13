@@ -332,6 +332,9 @@ def test_spawn_is_throttled_by_a_recent_attempt(r):
     assert m.spawn(r.primary, 0, popen=fake) is True and len(launched) == 1
     args, kw = launched[0]
     assert "--apply" in args and kw["stdin"] is m.subprocess.DEVNULL and kw["stdout"] is m.subprocess.DEVNULL
-    r.state.mkdir(parents=True, exist_ok=True)
-    (r.state / "last_attempt").write_text("now")
+    assert args[args.index("--trigger") + 1] == "session-start"
+    # the spawner claimed the gap itself, so a second session starting at once launches nothing
     assert m.spawn(r.primary, 0, popen=fake) is False and len(launched) == 1
+    old = time.time() - m.SPAWN_MIN_GAP_S - 60
+    os.utime(r.state / "last_attempt", (old, old))
+    assert m.spawn(r.primary, 0, popen=fake) is True and len(launched) == 2
