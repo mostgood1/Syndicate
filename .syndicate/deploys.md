@@ -59632,3 +59632,30 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - `/cheatsheets/record` is 200.
 - **11-13 is a mixed day, as flagged before the load:** its morning locks were made under v1, and the record now reads the whole day under v2.
 - **Owed:** `record.json` carrying `sim_edge` after the 10:50 PM CST reconcile, and the review's "against the price" lines (the 11-14 morning review).
+
+## 2026-11-13 19:51:17Z (1:51 PM CST) -- FLEET ff 0eb6f8d99 -> 754d5f3e4 + reload-web + a manual cheat-sheet build: section rules v3, Sim vs the line at most 2 picks per player per game (todo #797, lane `cheat-sheet-section-optimization`, session 35bdf3a7), with #790's NBA season-phase cache (`3422cb018`) riding -- **MET: every 11-13 sheet is rules 3, and no player has more than 2 Sim vs the line picks (NBA and NHL 3 -> 2)**
+- **User, in this chat:** "Yes, cap at 2". Asked whether #790's unloaded season-phase cache should ride along: "Load both now".
+- **Range** (re-listed at 19:49:41Z in its own call; fleet HEAD `0eb6f8d99`, an ancestor of the target):
+  - Runtime paths (`syndicate pipeline vendor engines wsgi.py app.py render.yaml requirements.txt`):
+    - `cheat_sheets.py` and `templates/cheat_sheets.html` (mine);
+    - `prop_fair_side.py` (mine, lane `prop-fair-side-lean`; only importer `scripts/prop_fair_side_lean.py`, an offline CLI, so no role loads it);
+    - `nba_game_projections.py` (#790 `3422cb018`, lane `book-grid-overlay-starvation`: the season phase is cached per scoreboard file version, default ON, off switch `SYNDICATE_NBA_SEASON_PHASE_CACHE=off`; the lane's fleet replay found 6,000 of 6,000 rows identical). It is imported by `layer2_board`, so web runs it from this reload. refresh-worker does NOT run it until its next restart.
+  - Scripts: `prop_fair_side_lean.py` (offline). vendor/: none.
+- **Gates:**
+  - Claim web 19:49:52Z, ACQUIRED (token d2b611eb...).
+  - Baseline 19:50:05Z, served `/api/cheatsheets`: NBA 11-13 rules 2, sim_edge 25, per-player max 3 (Reed Sheppard). NHL 11-13 rules 2, 18, max 3. NCAAF 11-13 rules 2, max 2.
+  - Preflight web `--target fleet --target-commit 754d5f3e4...`, 19:50:18Z: **CLEAR**, rc 0, with the expectations below.
+  - ff via `ff_v3.sh`, which guards that HEAD is the expected commit, the target descends from it, the runtime range is exactly those 4 files, and no dirty fleet file is in range. Done 19:51:17.446Z.
+  - Two earlier attempts stopped at the HEAD guard and changed nothing: WSL inherited the Windows worktree cwd, then Git Bash rewrote `--cd`.
+  - `reload-web` (venv python): HUP to master 438, workers [461977, 462664] -> [465255, 465256] in 2.0 s, 0 failures, healthz 200.
+  - `Start-ScheduledTask SyndicateCheatSheets` 19:51:35Z (1:51 PM CST): the production command, LastTaskResult 0, 0 Tracebacks.
+- **verify: MET.** Served at 20:03:38Z:
+  - NBA 11-13: rules 3, sim_edge 25, per-player max **3 -> 2**.
+  - NHL 11-13: rules 3, 19, max **3 -> 2**.
+  - NCAAF 11-13: rules 3, 25, max 2.
+  - `/cheatsheets` embeds 4 sheets at `"section_rules": 3` and the v3 header ("at most two per player").
+  - NBA: Reed Sheppard's 3rd pick (Under 13.5 pts+ast) is out. Patrick Williams (Under 1.5 threes, a prop new since the 1:35 PM build) and Obi Toppin (Over 9.5 pts) are in. Julian Champagnie fell out of the top 25.
+  - 11-14's sheets stay rules 2 until their next build.
+- **Not read here:** whether the season-phase cache changed web's NBA projections. Its owner lane measured identical rows offline. refresh-worker, which builds the grid, still runs the old code.
+- **Revert:** `git revert 754d5f3e4`, then a fleet ff + `reload-web`. Days stamped 3 then read as rules 3 under code that no longer knows 3; `sheet_rules` keeps the integer, and `rules >= 2` keeps every v2 rule.
+- **Claims:** web released right after this entry.
