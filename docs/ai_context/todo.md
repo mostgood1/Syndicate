@@ -316,7 +316,7 @@
   - Tests: `tests/test_live_totals_prob_scale.py`, 36, incl. off != on through the join and the production caller. 7 mutations are caught. 1,453 pass across the 72 test files that drive the join and the ledger.
   - Load: a fleet ff plus a claimed refresh-worker restart.
   - Spreads and moneylines: the next bullet.
-- **CANDIDATE FIX 2b, THE LIVE SPREADS PROBABILITY SCALE: ON MAIN, NOT LOADED (the user's decision); MONEYLINES NOT TEMPERED (measured no gain)** `[2026-11-13, user "Fit them now", lane live-margin-prob-scale, .syndicate/findings_2026-11-13_live_margin_width_fit.md]`:
+- **CANDIDATE FIX 2b, THE LIVE SPREADS PROBABILITY SCALE: ON MAIN `273a4a599`, NOT LOADED (the user's decision); MONEYLINES NOT TEMPERED (measured no gain)** `[2026-11-13, user "Fit them now", lane live-margin-prob-scale, .syndicate/findings_2026-11-13_live_margin_width_fit.md]`:
   - Same transform, its own table and switch (`SYNDICATE_LIVE_SPREADS_PROB_SCALE`).
   - Spreads, walk-forward against finals:
     - NBA: k 2.02, Brier -0.006 +- 0.007. The interval reaches 0; the per-bucket fit (-0.008 +- 0.007) and a ~0 early slope carry it.
