@@ -106,6 +106,11 @@ The test is of the rule as the fleet serves it, not of a frozen model. Known cha
   - `#790` (`019b5d15d` + `b681f2891`): the in-play overlay no longer starves the book-grid tick, and a sport whose
     build took >= 45 s is built every other tick. That changes how often NCAAB lines are re-priced, so it can change
     `quote_age_seconds` on NCAAB rows. It does not change any probability.
+- **Loaded 19:53:10Z 11-13 (refresh-worker, `754d5f3e4`):** `#790`'s NBA grid season-phase fix (`3422cb018`). It
+  touches no NCAAB probability.
+- **Loaded 20:18:40Z 11-13 (refresh-worker, `273a4a599`):** `#780` fix 2b, the SPREADS probability scale. NCAAB
+  spreads are tempered at k 1.34. NCAAB TOTALS are untouched, both probability and gate, so the cell's selection and
+  its outcome are unchanged.
 
 ## Amendments
 

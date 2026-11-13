@@ -317,7 +317,8 @@
   - Tests: `tests/test_live_totals_prob_scale.py`, 36, incl. off != on through the join and the production caller. 7 mutations are caught. 1,453 pass across the 72 test files that drive the join and the ledger.
   - Load: a fleet ff plus a claimed refresh-worker restart.
   - Spreads and moneylines: the next bullet.
-- **CANDIDATE FIX 2b, THE LIVE SPREADS PROBABILITY SCALE: ON MAIN `273a4a599`, NOT LOADED (the user's decision); MONEYLINES NOT TEMPERED (measured no gain)** `[2026-11-13, user "Fit them now", lane live-margin-prob-scale, .syndicate/findings_2026-11-13_live_margin_width_fit.md]`:
+- **CANDIDATE FIX 2b, THE LIVE SPREADS PROBABILITY SCALE: LOADED ON THE FLEET 20:18:40Z 11-13 (2:18 PM CST), `273a4a599`; MONEYLINES NOT TEMPERED (measured no gain)** `[2026-11-13, user "Fit them now", then "Load it now", lane live-margin-prob-scale, .syndicate/findings_2026-11-13_live_margin_width_fit.md]`:
+  - **Load:** fleet ff `754d5f3e4` -> `273a4a599` 20:18:40.406Z, refresh-worker TERM 465592 -> 469244 20:18:40.732Z, drained first (idle 20:18:21Z), preflight CLEAR 20:18:26Z, undrained after. Under the new worker's environ: spreads NBA 2.02 / NCAAF 1.80 / NCAAB 1.34 / others 1.0, h2h and segments 1.0, no scale env key set. The NBA / NCAAF / NCAAB reading is in tonight's watcher (`read780.py` judges spreads from the restart on; `.syndicate/deploys.md` 2026-11-13 20:18:40Z).
   - Same transform, its own table and switch (`SYNDICATE_LIVE_SPREADS_PROB_SCALE`).
   - Spreads, walk-forward against finals:
     - NBA: k 2.02, Brier -0.006 +- 0.007. The interval reaches 0; the per-bucket fit (-0.008 +- 0.007) and a ~0 early slope carry it.

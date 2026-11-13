@@ -59690,3 +59690,22 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - The next refresh-worker restart belongs to the parent session (the #780 spreads scale `273a4a599`, which contains `3422cb018`). So the warm reading will be taken on that worker, excluding its cold window.
 - **Revert:** `SYNDICATE_NBA_SEASON_PHASE_CACHE=off` in `local_production.env` + a drained full `down`/`up`; or `git revert 3422cb018`, a fleet ff, and a claimed refresh-worker TERM.
 - **Claims:** refresh-worker released right after this entry, for the parent session's #780 load.
+
+## 2026-11-13 20:18:40Z (2:18 PM CST) -- FLEET ff 754d5f3e4 -> 273a4a599 + claimed, drained refresh-worker TERM: todo #780 fix 2b, the live SPREADS probability scale (lane `live-margin-prob-scale`, session 8062940b) -- **reachability MET on production rows (NCAAB spreads at k 1.34 with the engine's number beside it); the NBA / NCAAF reading is OWED to tonight's watcher**
+- **User, in this chat:** "Fit them now", then "Load it now".
+- **Range `754d5f3e4..273a4a599`:** runtime `live_gameline_join.py`, `live_gameline_ledger.py` (comment only), both this lane's; scripts `live_mechanism_outcome_gate.py` (offline, #784) and `live_totals_width_fit.py` (offline, this lane). Listed 19:53Z; `ff_sp.sh` refused any other base or runtime / scripts set.
+- **Sequence:**
+  - Lane `book-grid-overlay-starvation` had restarted refresh-worker at 19:53:10Z on `754d5f3e4` (#790 `3422cb018`) before this lane could fold `273a4a599` into it; it released the claim 20:10:05Z for this load.
+  - `wait_sp.sh`: claim ACQUIRED 20:10:09Z (token in `claim_rw.txt`). Worker pid 465592, head `754d5f3e4`, checked before acting.
+  - Drain 20:10:10Z (`check_deploy_safety.py --drain` under the worker's own environ). Its first board build finished inside the window; `DRAINED ... idle` by 20:18:21Z.
+  - Preflight `--target fleet --target-commit 273a4a599d3b2...`, baseline read 20:18:21Z (`fleet_checkout_head=754d5f3e4`, `refresh_worker_pid=465592`, `spreads_rows_with_prob_scale=0`): **CLEAR** rc 0 at 20:18:26Z.
+  - ff 20:18:40.406Z (`spreads table present: 1`); TERM 465592 at 20:18:40.732Z with no live children; new pid 469244 at 20:18:49Z, head `273a4a599`. Undrained against the new pid (`DRAIN_CLEARED`).
+- **verify, part 1 (reachability): MET.**
+  - Under pid 469244's own environ, the loaded code resolves spreads NBA 2.02 / NCAAF 1.80 / NCAAB 1.34 / WNCAAB, NHL, NFL 1.0; totals unchanged (NBA 2.16 / NCAAF 2.48); `full_game_prob_scale` h2h 1.0, spreads h1 1.0. No `SYNDICATE_LIVE_*PROB_SCALE*` key is set.
+  - The new worker's first full-game spreads ledger rows (NCAAB, recorded after 20:18:41Z, read 20:21:54Z): 2 rows, `prob_scale` 1.34 with `model_home_win_prob_unscaled` present. Exactly the designed shape for a tempered sport.
+  - refresh-worker since the restart: 839 log lines, 0 tracebacks. The first `BOOK_GRID_TICK` lines carry `build_seconds` (`#790`).
+- **verify, part 2 (OWED, tonight):** `C:\tmp\livegrade\load780\read780.py` (run by the armed `watch780.sh`, 02:00-06:45Z 11-14) now also judges spreads rows recorded >= 20:18:41Z (`spreads_t0.txt`).
+  - Expected: each scaled sport's rows at v7 / its k with the unscaled number; priced share per row within 10% of the same rows' unscaled gate; median priced |edge| roughly halves (replay: NBA 16.1 -> 8.3 pp, NCAAF 18.2 -> 10.3, NCAAB 12.9 -> 9.6).
+  - **Falsified if** a scaled sport's priced share falls by more than 10%, a WNCAAB spreads row is tempered, or ANY h2h row carries a scale.
+- **Off switch:** `SYNDICATE_LIVE_SPREADS_PROB_SCALE=off` (or `_<SPORT>=1`) in `local_production.env` + a drained full `down`/`up`. **Revert:** `git revert 273a4a599`, a fleet ff and a claimed refresh-worker TERM.
+- **Claims:** refresh-worker released right after this entry.
