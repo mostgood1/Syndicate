@@ -99,6 +99,13 @@ The test is of the rule as the fleet serves it, not of a frozen model. Known cha
 - **`#795`, college team names,** 22:03Z 11-12. It anchors more games.
 - **Any NCAAB live-engine change that loads before the grade**, e.g. `#780` candidate fix 2, a spread-width fit. It
   changes which edges this rule selects. Record it here, with its load time, before grading.
+- **Loaded 17:55:57Z 11-13 (refresh-worker, `89e2d2a0c`), before the window's first NCAAB ledger row** (at 17:56:38Z the
+  newest NCAAB ledger file on the fleet was 11-12's):
+  - `#780` candidate fix 2, the totals probability scale. NCAAB's k is 1, so NCAAB probabilities, edges and the
+    precision gate are unchanged. Ledger rows become v7 and carry `prob_scale` 1.0.
+  - `#790` (`019b5d15d` + `b681f2891`): the in-play overlay no longer starves the book-grid tick, and a sport whose
+    build took >= 45 s is built every other tick. That changes how often NCAAB lines are re-priced, so it can change
+    `quote_age_seconds` on NCAAB rows. It does not change any probability.
 
 ## Amendments
 
