@@ -189,11 +189,17 @@ Nothing writes opinions under the data root. `run --opinions OUT` writes them wh
 
   | night | sport | games quoted / matched | lines | opined | SEG_JOIN checked / mismatched | SEG_PRIOR mismatched | SEG_FRAME median spreads / flipped / totals | checklist |
   |---|---|---|---|---|---|---|---|---|
-  | 11-11 | NCAAB | 94 / 89 | 43,324 | 41,762 | 40,876 / 0 | 0 | 0.24 / 4.9 / 0.17 pp | ok |
-  | 11-12 | NCAAB | 37 / 34 | 22,704 | 21,902 | 21,020 / 0 | 0 | 0.21 / 4.2 / 0.20 pp | ok |
+  | 11-11 | NCAAB | 94 / 89 | 21,662 | 20,881 | 20,438 / 0 | 0 | 0.24 / 4.9 / 0.17 pp | ok |
+  | 11-12 | NCAAB | 37 / 34 | 11,352 | 10,951 | 10,510 / 0 | 0 | 0.21 / 4.2 / 0.20 pp | ok |
   | 11-11 | NBA | 10 / 10 | 110,808 | 47,562 | 43,056 / 0 | 0 | 0.10 / 39.9 / 0.22 pp | ok |
   | 11-12 | NBA | 4 / 4 | 52,495 | 21,995 | 19,872 / 0 | 0 | 0.06 / 41.7 / 0.21 pp | ok |
 
+  - **The NCAAB rows were first recorded DOUBLE** (43,324 / 41,762 and 22,704 / 21,902; SEG_JOIN 40,876 and
+    21,020). `EvidenceIndex` filed each NCAAB evidence row under its names and its abbreviations, which reduce to the
+    same key, so every tick sat twice in one series and every opinion was written twice. Fixed in lane
+    `college-segment-grade` (each distinct key once; pinned by a test); the counts above are the re-run of
+    2026-11-13. The 0-mismatch gates held either way (the copies were identical); NBA's distinct abbreviations were
+    never doubled.
   - WNCAAB: no segment quotes in `book_quotes` on either night, so no prior and no opinion.
   - Unmatched NCAAB games are team-name misses between the ESPN lanes and the odds feed (UMKC / Florida A&M, South
     Florida / Saint Joseph's on both nights).
@@ -202,7 +208,12 @@ Nothing writes opinions under the data root. `run --opinions OUT` writes them wh
   - Before `sample_certainty` existed, 442 of 21,462 NCAAB half-point lines on 11-12 were 200 of 200 (or 0): lines the
     join refuses as a certainty (#624). They are refused now.
   - Expert off: 0 opined of the same lines on every sport and night.
-  - The shifts are NOT edges: nothing here is graded against an outcome or a close. That is M2's job.
+  - The shifts are NOT edges by themselves. **Graded once, pre-registered** (lane `college-segment-grade`,
+    `.syndicate/findings_2026-11-13_college_segment_grade.md`, `scripts/college_segment_grade.py`): over 162 NCAAB
+    games (11-09..11-12), the engine does NOT beat the books on any half line at a quote <= 120 s old (all eight
+    tests `no_edge`; engine minus books Brier -0.0016..+0.0074). It beats quotes 5-15 minutes old by a wide margin,
+    which is the game outrunning the quote (`#780`'s pattern), not a bettable price. College segment pricing (`#763`)
+    stays off.
 - **Readings:** `.syndicate/deploys.md` and the lane block in `lanes.md`.
 
 ## Known gaps (not this slice)
