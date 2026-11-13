@@ -136,7 +136,18 @@ function sits next to lane `fair-price-v2`'s claimed section. No order path was 
 this fair: a grep of `execution_guard` / `*_orders.py` for prop / player found nothing. The effect would be on the
 board's EV, rank, Suggested picks and the cheat sheets' EV.
 
-## 5. Proposal (the user's decision; nothing is wired)
+## 5. Proposal and decision
+
+**DECISION 2026-11-13 (user, in chat): "Forward read first".** Nothing is wired. The NBA shift is frozen at −0.146 and is read on kickoffs 11-13..11-26 on or after 11-27:
+
+```
+nice -n 19 ~/.venvs/syndicate/bin/python scripts/prop_fair_side_lean.py pull --data-root ~/syndicate-prod/data --start 2026-11-12 --end 2026-11-26 --sports nba,nfl --out <dir>/props_1112_1126.jsonl.gz
+python3 scripts/prop_fair_side_lean.py holdout --graded <dir>/props_1112_1126.jsonl.gz --sports nba --delta -0.146 --test 2026-11-13..2026-11-26
+```
+
+The `pull` reproduces the weekly suggested-grade pull exactly: NBA props for 11-12, 8,200 of 8,200 rows with the same outcome, fair and sighting time. A one-time scheduled task (`prop-fair-forward-read`, 9:00 AM CST 11-27) runs it.
+
+The options as they were put:
 
 1. **Recommended: a forward read, with no fleet change.** The corrected fair is a pure function of the recorded `fp`,
    so it can be scored offline from any later pull.
