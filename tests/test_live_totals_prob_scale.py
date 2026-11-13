@@ -182,13 +182,16 @@ def test_ncaab_totals_are_untouched():
 
 
 @pytest.mark.parametrize("market,line", [("spreads", 5.5), ("h2h", None)])
-def test_nba_spreads_and_moneylines_are_untouched(monkeypatch, market, line):
+def test_the_totals_switch_leaves_nba_spreads_and_moneylines_alone(monkeypatch, market, line):
+    """Spreads have their own scale and switch (`test_live_margin_prob_scale.py`); h2h has none."""
     on, off = [_row(market, line, market_prob=0.40)], [_row(market, line, market_prob=0.40)]
     _attach(on, "nba")
     monkeypatch.setenv(ENV, "off")
     _attach(off, "nba")
     assert on[0]["live_gameline"].get("model_prob") == off[0]["live_gameline"].get("model_prob")
-    assert on[0]["live_gameline"].get("prob_scale") is None
+    assert on[0]["live_gameline"].get("prob_scale") == off[0]["live_gameline"].get("prob_scale")
+    if market == "h2h":
+        assert on[0]["live_gameline"].get("prob_scale") is None
 
 
 # --------------------------------------------------------------------------------------------- display and ledger

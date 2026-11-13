@@ -315,7 +315,21 @@
   - Code: `live_gameline_join.totals_prob_scale` (off switch `SYNDICATE_LIVE_TOTALS_PROB_SCALE=off`). It applies to the priced path and the display number. Ledger v7 records `prob_scale` and `model_home_win_prob_unscaled`.
   - Tests: `tests/test_live_totals_prob_scale.py`, 36, incl. off != on through the join and the production caller. 7 mutations are caught. 1,453 pass across the 72 test files that drive the join and the ledger.
   - Load: a fleet ff plus a claimed refresh-worker restart.
-  - Not covered yet: spreads and moneylines, a separate fit.
+  - Spreads and moneylines: the next bullet.
+- **CANDIDATE FIX 2b, THE LIVE SPREADS PROBABILITY SCALE: ON MAIN, NOT LOADED (the user's decision); MONEYLINES NOT TEMPERED (measured no gain)** `[2026-11-13, user "Fit them now", lane live-margin-prob-scale, .syndicate/findings_2026-11-13_live_margin_width_fit.md]`:
+  - Same transform, its own table and switch (`SYNDICATE_LIVE_SPREADS_PROB_SCALE`).
+  - Spreads, walk-forward against finals:
+    - NBA: k 2.02, Brier -0.006 +- 0.007. The interval reaches 0; the per-bucket fit (-0.008 +- 0.007) and a ~0 early slope carry it.
+    - NCAAF: k 1.80, -0.006 +- 0.004.
+    - NCAAB: k 1.34 after `#768`, -0.003 +- 0.003 on 2 dates. All dates read 1.60, -0.004 +- 0.003.
+    - WNCAAB: k 1. The fit hurts (+0.006 +- 0.005).
+  - Moneylines: no gain in any sport (NBA +0.003 +- 0.005, NCAAF -0.001, NCAAB +0.001, WNCAAB -0.001), so h2h is untouched.
+    - The model's moneyline is still worse than the market in NBA (+0.020 Brier) and NCAAB (+0.009). That is a bias / discrimination gap, not over-confidence, and stays OPEN here.
+  - Why: a spread line is the market's margin estimate. The model's distance from it has slopes of -0.01 / 0.44 / 0.69 (NBA, early / mid / late). At margin 0 (h2h) the slopes are 0.76-0.97. It is not a width fix: the width ratio is 0.84-1.23.
+  - Replay on production rows: NBA priced 262 -> 257, median |edge| 16.1 -> 8.3 pp. NCAAF 3,389 -> 3,355, 18.2 -> 10.3 pp. NCAAB 2,252 -> 2,188, 12.9 -> 9.6 pp. WNCAAB unchanged.
+  - Code: `live_gameline_join.spreads_prob_scale` and `full_game_prob_scale` (one place decides a row's k for the pricer and the Live column). Ledger v7 unchanged in shape; spreads rows now carry `prob_scale`.
+  - Tests: `tests/test_live_margin_prob_scale.py`, 43, incl. off != on through the join and the production caller. 8 mutations caught. 1,512 of 1,513 pass across the 73 join/ledger test files; the one failure was a display test asserting the untempered NCAAF spreads number, updated to read both.
+  - Load: a fleet ff plus a claimed refresh-worker restart.
 - **PRE-REGISTERED 2026-11-13** (lane `ncaab-live-edge20-prereg`, `.syndicate/findings_2026-11-13_ncaab_edge20_prereg.md`):
   - The cell: NCAAB fresh-quote (<= 30 s) |edge| >= 20 pp, one bet per game, ledger dates >= 11-13, the first 200 games.
   - PASS if the one-sided 95% lower bound clears 0.524 (hit >= 0.581). KILL if hit <= 0.524. INCONCLUSIVE extends once to 400 games.

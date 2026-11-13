@@ -1213,6 +1213,23 @@ _TOTALS_PROB_SCALE_BY_SPORT: dict[str, float] = {
 _TOTALS_PROB_SCALE_ENV = "SYNDICATE_LIVE_TOTALS_PROB_SCALE"
 
 
+def _prob_scale_from(env_name: str, table: Mapping[str, float], sport: Any) -> float:
+    """The shared knob rule for the totals and spreads scales (see `totals_prob_scale`)."""
+    raw = str(os.environ.get(env_name) or "").strip().lower()
+    if raw in {"off", "0", "false", "no"}:
+        return 1.0
+    key = str(sport or "").strip().lower()
+    per = str(os.environ.get(f"{env_name}_{key.upper()}") or "").strip() if key else ""
+    if per:
+        try:
+            value = float(per)
+        except ValueError:
+            value = 0.0
+        if value > 0.0 and math.isfinite(value):
+            return value
+    return table.get(key, 1.0)
+
+
 def totals_prob_scale(sport: Any = None) -> float:
     """k for one sport's live full-game totals; 1.0 leaves today's probability.
 
@@ -1221,19 +1238,66 @@ def totals_prob_scale(sport: Any = None) -> float:
     value falls back to the table, not to "off": a knob that can be typo'd into a different behaviour is the shape
     `#603` shipped inert twice.
     """
-    raw = str(os.environ.get(_TOTALS_PROB_SCALE_ENV) or "").strip().lower()
-    if raw in {"off", "0", "false", "no"}:
+    return _prob_scale_from(_TOTALS_PROB_SCALE_ENV, _TOTALS_PROB_SCALE_BY_SPORT, sport)
+
+
+# LIVE FULL-GAME SPREADS P(HOME COVERS) IS TEMPERED THE SAME WAY `[2026-11-13, todo #780, lane live-margin-prob-scale,
+# user "Fit them now"]`. Same transform, same knob rule, its own table and switch (`SYNDICATE_LIVE_SPREADS_PROB_SCALE`,
+# `_<SPORT>`), so either market can be turned off alone.
+#
+# MEASURED 2026-11-13 on the fleet's live gameline ledgers (`MARKET=spreads scripts/live_totals_width_fit.py`):
+# spreads / full rows with a model probability, one per state, the final margin in the ledger's home orientation;
+# walk-forward by ledger date, Brier change against k = 1, game-clustered 95%:
+#
+#   sport   graded states / games   k fitted        walk-forward Brier gain   model - market Brier, k=1 -> k
+#   nba     22,036 / 162            2.017           -0.006 +- 0.007 (21)      +0.004 +- 0.014 -> -0.002 +- 0.008
+#   ncaaf   93,683 / 325            1.797           -0.006 +- 0.004 (27)      -0.003 +- 0.011 -> -0.008 +- 0.007
+#   ncaab   10,786 / 136 (*)        1.339           -0.003 +- 0.003 (2)       +0.007 +- 0.013 -> +0.003 +- 0.010
+#   wncaab   3,354 /  74            1.190           +0.006 +- 0.005 (8)       not scaled: the fit hurts
+#
+#   (*) After `#768` (ledger 11-09..11-12). Over 11-02..11-12 it read 1.597 (-0.004 +- 0.003 over 9 dates), and its
+#   walk-forward k fell 2.04 -> 1.61 as post-fix nights entered, so the post-fix fit is used.
+#
+# THE RULE, the same one that decided the totals table: a sport is scaled when its walk-forward one-k gain is at
+# least 0.003 Brier and the model's Brier against the market does not get worse. NBA's interval reaches 0; its k held
+# 2.02-2.03 over the last 4 steps, and the slope below is ~0 early, so it is scaled -- `_NBA=1` turns it back.
+#
+# WHY SPREADS NEED IT AND MONEYLINES DO NOT. (final margin - line) on (model margin mean - line) gives slopes of
+# -0.01 / 0.44 / 0.69 in NBA and 0.46 / 0.73 / 0.79 in NCAAF (points scored / model total < 0.40, 0.40-0.75, >= 0.75):
+# a spread line is the market's own margin estimate, and the model's distance from it is mostly noise. A moneyline
+# asks the same distribution about margin 0, where the model's mean carries real information (slopes 0.81-0.97), and
+# the same fit there finds no gain in any sport (`MARKET=h2h`: NBA +0.003 +- 0.005, NCAAF -0.001 +- 0.003, NCAAB
+# +0.001 +- 0.001, WNCAAB -0.001 +- 0.014). So h2h is NOT tempered. This is not a width fix -- the pure width ratio
+# (error sd / implied sd) is 0.84-1.23 and walk-forward width scaling gains nothing -- it is a correction toward the
+# market's line, fitted only on outcomes.
+#
+# FULL-GAME spreads only (the `_SPREAD_MARKETS` keys, as `_TOTALS_MARKETS` for totals): segment spreads were not
+# fitted. The unscaled probability and k ride on the verdict and into the ledger exactly as for totals.
+_SPREADS_PROB_SCALE_BY_SPORT: dict[str, float] = {
+    "nba": 2.02,
+    "ncaaf": 1.80,
+    "ncaab": 1.34,
+}
+_SPREADS_PROB_SCALE_ENV = "SYNDICATE_LIVE_SPREADS_PROB_SCALE"
+
+
+def spreads_prob_scale(sport: Any = None) -> float:
+    """k for one sport's live full-game spreads; 1.0 leaves today's probability. Knobs as `totals_prob_scale`."""
+    return _prob_scale_from(_SPREADS_PROB_SCALE_ENV, _SPREADS_PROB_SCALE_BY_SPORT, sport)
+
+
+def full_game_prob_scale(market: Any, segment: Any, sport: Any) -> float:
+    """The scale the join applies to one row: totals or spreads on the full game, 1.0 for everything else (h2h,
+    segments). An absent segment is NOT full here (the join's rule: unknown must not take the permissive branch); a
+    caller holding a full-game index hit, whose segment may be unset, says "full" itself."""
+    key = str(market or "").strip().lower()
+    if str(segment or "").strip().lower() not in _FULL_GAME_SEGMENTS:
         return 1.0
-    key = str(sport or "").strip().lower()
-    per = str(os.environ.get(f"{_TOTALS_PROB_SCALE_ENV}_{key.upper()}") or "").strip() if key else ""
-    if per:
-        try:
-            value = float(per)
-        except ValueError:
-            value = 0.0
-        if value > 0.0 and math.isfinite(value):
-            return value
-    return _TOTALS_PROB_SCALE_BY_SPORT.get(key, 1.0)
+    if key in _TOTALS_MARKETS:
+        return totals_prob_scale(sport)
+    if key in _SPREAD_MARKETS:
+        return spreads_prob_scale(sport)
+    return 1.0
 
 
 def scale_prob(probability: float, scale: float) -> float:
@@ -1295,8 +1359,8 @@ def price_distribution_market(
         "priceable": False,
         "withheld_reason": None,
         "sigma": float(sigma),
-        # #780 totals prob scale: set on a priced-path totals row (1.0 = untempered); None on everything else, so a
-        # refused verdict keeps the priced one's shape.
+        # #780 prob scale: set on a priced-path totals or spreads row (1.0 = untempered); None on everything else, so
+        # a refused verdict keeps the priced one's shape.
         "prob_scale": None,
         "model_prob_unscaled": None,
     }
@@ -1364,9 +1428,10 @@ def price_distribution_market(
         model_prob = smoothed
         out["model_prob"] = smoothed
         out["point_estimator"] = "agresti_coull"
-    # THE MEASURED OVER-CONFIDENCE (`totals_prob_scale`, #780). After the point estimator, so k tempers the number
-    # that would otherwise be priced, and the precision gate below judges the scaled edge against the scaled error.
-    if key in _TOTALS_MARKETS:
+    # THE MEASURED OVER-CONFIDENCE (`totals_prob_scale` / `spreads_prob_scale`, #780). After the point estimator, so k
+    # tempers the number that would otherwise be priced, and the precision gate below judges the scaled edge against
+    # the scaled error. Totals and spreads both record their k (1.0 = untempered); the caller decides k.
+    if key in _DIST_MARKETS:
         out["prob_scale"] = float(prob_scale)
         if prob_scale != 1.0:
             out["model_prob_unscaled"] = float(model_prob)
@@ -1515,8 +1580,8 @@ def live_display_block(
     if prob is not None and not (0.0 < prob < 1.0):
         prob = None
     # The same tempering as the priced path (#780), so the Live column and a price never disagree on one row.
-    if prob is not None and market_key in _TOTALS_MARKETS and (hit.get("segment") or "full") in _FULL_GAME_SEGMENTS:
-        prob = scale_prob(prob, totals_prob_scale(sport))
+    if prob is not None:
+        prob = scale_prob(prob, full_game_prob_scale(market_key, hit.get("segment") or "full", sport))
     total_mean = hit.get("total_mean") if market_key in _TOTALS_MARKETS else None
     if prob is None and total_mean is None:
         return None
@@ -2492,9 +2557,8 @@ def attach_live_gamelines(
                     # SPORT-SCOPED PUBLISH SWITCH. Threaded rather than read
                     # from a global, so disabling MLB cannot silence WNBA or soccer.
                     sport=sport,
-                    # #780: full-game totals only, the population the scale was fitted on.
-                    prob_scale=(totals_prob_scale(sport)
-                                if market_key in _TOTALS_MARKETS and segment in _FULL_GAME_SEGMENTS else 1.0),
+                    # #780: full-game totals and spreads only, the populations the scales were fitted on.
+                    prob_scale=full_game_prob_scale(market_key, segment, sport),
                 )
             # A DISPLAY-ONLY HISTOGRAM IS NOT A PRICE (`#773`, NHL puck line). The row keeps the pricer's own
             # no-distribution refusal -- no model probability, so `_apply_verdict` publishes no

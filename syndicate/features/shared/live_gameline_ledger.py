@@ -467,6 +467,8 @@ def build_records(
                 "prob_std_err": lg.get("prob_std_err"),
                 # v7 (#780): the over-confidence scale a full-game totals probability was tempered by, and the
                 # engine's own number before it. `prob_scale` 1.0 = untempered; None = not a distribution totals row.
+                # Spreads rows carry it too from lane live-margin-prob-scale on (2026-11-13; still v7: a spreads row
+                # with `prob_scale` None was written before that, one with a value after it). h2h stays None.
                 "prob_scale": lg.get("prob_scale"),
                 "model_home_win_prob_unscaled": lg.get("model_prob_unscaled"),
                 "sims_run": lg.get("sims_run"),

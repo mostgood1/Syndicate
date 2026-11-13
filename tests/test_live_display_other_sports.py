@@ -256,13 +256,29 @@ def test_nhl_shows_the_moneyline_and_the_total_count_but_no_puck_line(gate_on):
     assert grid[3][LIVE_DISPLAY_KEY]["basis"] == "moneyline_not_published"
 
 
-def test_ncaaf_stale_quote_reads_its_graded_margin_and_its_moneyline_shows(gate_on):
-    grid = [_row("ncaaf", market="spreads", line=3.5, market_prob=0.5, age=900.0),
-            _row("ncaaf", market="h2h", line=None, market_prob=0.6)]
+def test_ncaaf_stale_quote_reads_its_graded_margin_and_its_moneyline_shows(gate_on, monkeypatch):
+    def grid_():
+        return [_row("ncaaf", market="spreads", line=3.5, market_prob=0.5, age=900.0),
+                _row("ncaaf", market="h2h", line=None, market_prob=0.6)]
+
+    # The engine's own number first: #780's spreads scale (lane live-margin-prob-scale) off.
+    monkeypatch.setenv("SYNDICATE_LIVE_SPREADS_PROB_SCALE", "off")
+    grid = grid_()
     _attach(grid, _snapshot(_football_lane()), "ncaaf")
     assert grid[0][LIVE_DISPLAY_KEY]["prob_over"] == pytest.approx(0.7, abs=0.02)
     assert grid[1][LIVE_DISPLAY_KEY]["prob_over"] == pytest.approx(0.7, abs=0.01)
     _assert_nothing_priced(grid[0])
+    # With the scale on (the default), the full-game spreads display is tempered exactly as its price would be; the
+    # moneyline's is not.
+    monkeypatch.delenv("SYNDICATE_LIVE_SPREADS_PROB_SCALE")
+    on = grid_()
+    _attach(on, _snapshot(_football_lane()), "ncaaf")
+    k = lgj.spreads_prob_scale("ncaaf")
+    assert k != 1.0
+    assert on[0][LIVE_DISPLAY_KEY]["prob_over"] == pytest.approx(
+        lgj.scale_prob(grid[0][LIVE_DISPLAY_KEY]["prob_over"], k), abs=1e-12)
+    assert on[1][LIVE_DISPLAY_KEY]["prob_over"] == grid[1][LIVE_DISPLAY_KEY]["prob_over"]
+    _assert_nothing_priced(on[0])
 
 
 def test_a_football_lane_past_its_ceiling_shows_nothing(gate_on):
