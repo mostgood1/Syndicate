@@ -37,7 +37,11 @@ def get_json(url, headers=UA, timeout=40):
         return json.loads(r.read().decode()), {k.lower(): v for k, v in dict(r.headers).items()}
 
 
-PRIMARY_TREE = Path(r"C:\Users\tempadmin\OneDrive\Coding\Syndicate")
+if str(REPO) not in sys.path:
+    sys.path.insert(0, str(REPO))
+from scripts._primary_tree import primary_tree  # noqa: E402
+
+PRIMARY_TREE = primary_tree()
 
 
 def odds_api_key():

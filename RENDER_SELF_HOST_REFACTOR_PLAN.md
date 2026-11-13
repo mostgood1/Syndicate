@@ -2,7 +2,7 @@
 
 This document answers the stricter question behind Render readiness: what still has to change before Syndicate can refresh itself on Render without external source repos.
 
-For the execution-ordered version of this plan, use [RENDER_SELF_HOST_BACKLOG.md](c:/Users/mostg/OneDrive/Coding/Syndicate/RENDER_SELF_HOST_BACKLOG.md). This file remains the architectural overview; the backlog file is the implementation tracker.
+For the execution-ordered version of this plan, use [RENDER_SELF_HOST_BACKLOG.md](RENDER_SELF_HOST_BACKLOG.md). This file remains the architectural overview; the backlog file is the implementation tracker.
 
 ## Current state
 
@@ -12,9 +12,9 @@ Syndicate is not yet a self-refreshing hosted system. The remaining gap is not t
 
 Today that path still depends on three assumptions:
 
-1. [scripts/refresh_odds_sources.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_odds_sources.py) now resolves local bundle roots for the MLB, NHL, NFL, and NCAAF lanes and runs source-owned commands only where a sport still needs them.
-2. The generation layer is still partially source-owned even though the per-sport mirror scripts under [scripts](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts) can now import from neutral artifact bundles instead of relying on repo layouts.
-3. [syndicate/features/shared/ops_refresh.py](c:/Users/mostg/OneDrive/Coding/Syndicate/syndicate/features/shared/ops_refresh.py) launches background refresh jobs with `subprocess.Popen` and persists run state under repo-local `reports/`, which implies writable durable storage and a process model friendlier than a standard Render web dyno.
+1. [scripts/refresh_odds_sources.py](scripts/refresh_odds_sources.py) now resolves local bundle roots for the MLB, NHL, NFL, and NCAAF lanes and runs source-owned commands only where a sport still needs them.
+2. The generation layer is still partially source-owned even though the per-sport mirror scripts under [scripts](scripts) can now import from neutral artifact bundles instead of relying on repo layouts.
+3. [syndicate/features/shared/ops_refresh.py](syndicate/features/shared/ops_refresh.py) launches background refresh jobs with `subprocess.Popen` and persists run state under repo-local `reports/`, which implies writable durable storage and a process model friendlier than a standard Render web dyno.
 
 Render can host the web app now. Render cannot yet replace the whole local refresh workflow.
 
@@ -27,7 +27,7 @@ Current source refresh owner:
 - `tools.web.flask_frontend._persist_live_lens_tick`
 
 Current Syndicate mirror behavior:
-- [scripts/refresh_mlb_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_mlb_source_mirror.ps1) copies processed daily artifacts, live-lens files, market refresh history, raw feed snapshots, and season eval outputs out of the repo-owned MLB bundle.
+- [scripts/refresh_mlb_source_mirror.ps1](scripts/refresh_mlb_source_mirror.ps1) copies processed daily artifacts, live-lens files, market refresh history, raw feed snapshots, and season eval outputs out of the repo-owned MLB bundle.
 
 Required Render-safe refactor:
 - Move the canonical MLB OddsAPI refresh and live-lens rebuild into a Syndicate-owned package, or publish the canonical MLB artifacts to a neutral storage location that Syndicate can ingest.
@@ -38,7 +38,7 @@ Current source refresh owner:
 - `nba_betting.refresh_oddsapi_props_job`
 
 Current Syndicate mirror behavior:
-- [scripts/refresh_nba_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_nba_source_mirror.ps1) copies processed and raw artifacts out of the owned NBA bundle root.
+- [scripts/refresh_nba_source_mirror.ps1](scripts/refresh_nba_source_mirror.ps1) copies processed and raw artifacts out of the owned NBA bundle root.
 
 Required Render-safe refactor:
 - The source-app bootstrap fallback used to emit live-state snapshots has already been removed from the mirror layer.
@@ -50,7 +50,7 @@ Current source refresh owner:
 - `wnba_betting.refresh_oddsapi_props_job`
 
 Current Syndicate mirror behavior:
-- [scripts/refresh_wnba_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_wnba_source_mirror.ps1) copies processed, raw, and live-lens artifacts out of the owned WNBA bundle root.
+- [scripts/refresh_wnba_source_mirror.ps1](scripts/refresh_wnba_source_mirror.ps1) copies processed, raw, and live-lens artifacts out of the owned WNBA bundle root.
 
 Required Render-safe refactor:
 - Same pattern as NBA, but the mirror layer is simpler because it is currently copy-only.
@@ -59,10 +59,10 @@ Required Render-safe refactor:
 ### NHL
 
 Current source refresh owner:
-- Syndicate-owned [scripts/refresh_nhl_oddsapi.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_nhl_oddsapi.py) for scoreboard, team odds, and player-props lines
+- Syndicate-owned [scripts/refresh_nhl_oddsapi.py](scripts/refresh_nhl_oddsapi.py) for scoreboard, team odds, and player-props lines
 
 Current Syndicate mirror behavior:
-- [scripts/refresh_nhl_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_nhl_source_mirror.ps1) ingests the local or published artifact bundle and can still backfill extra processed/live-lens files when a source repo is available.
+- [scripts/refresh_nhl_source_mirror.ps1](scripts/refresh_nhl_source_mirror.ps1) ingests the local or published artifact bundle and can still backfill extra processed/live-lens files when a source repo is available.
 
 Required Render-safe refactor:
 - Keep the owned odds-snapshot lane stable.
@@ -71,10 +71,10 @@ Required Render-safe refactor:
 ### NFL
 
 Current source refresh owner:
-- Syndicate-owned [scripts/refresh_nfl_oddsapi.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_nfl_oddsapi.py) plus local helper modules for team odds and player props
+- Syndicate-owned [scripts/refresh_nfl_oddsapi.py](scripts/refresh_nfl_oddsapi.py) plus local helper modules for team odds and player props
 
 Current Syndicate mirror behavior:
-- [scripts/refresh_nfl_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_nfl_source_mirror.ps1) ingests weekly recommendations, real betting lines, props snapshots, calibration files, and manifests from the local or published artifact bundle.
+- [scripts/refresh_nfl_source_mirror.ps1](scripts/refresh_nfl_source_mirror.ps1) ingests weekly recommendations, real betting lines, props snapshots, calibration files, and manifests from the local or published artifact bundle.
 
 Required Render-safe refactor:
 - Keep the owned weekly artifact contract stable and verify any remaining deeper NFL generation/runtime seams separately from this odds-refresh boundary.
@@ -82,10 +82,10 @@ Required Render-safe refactor:
 ### NCAAF
 
 Current source refresh owner:
-- Syndicate-owned [scripts/refresh_ncaaf_oddsapi.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_ncaaf_oddsapi.py)
+- Syndicate-owned [scripts/refresh_ncaaf_oddsapi.py](scripts/refresh_ncaaf_oddsapi.py)
 
 Current Syndicate mirror behavior:
-- [scripts/refresh_ncaaf_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_ncaaf_source_mirror.ps1) ingests weekly recommendation summaries and the small recommendation bundle from the local or published artifact bundle.
+- [scripts/refresh_ncaaf_source_mirror.ps1](scripts/refresh_ncaaf_source_mirror.ps1) ingests weekly recommendation summaries and the small recommendation bundle from the local or published artifact bundle.
 
 Required Render-safe refactor:
 - Keep the owned line-refresh bundle stable and maintain the local predicted-schedule/recommendation contract.
@@ -96,7 +96,7 @@ Current source refresh owner:
 - `ncaab_model.cli fetch-odds-history --mode current`
 
 Current Syndicate mirror behavior:
-- [scripts/refresh_ncaab_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_ncaab_source_mirror.ps1) is not just a copy script.
+- [scripts/refresh_ncaab_source_mirror.ps1](scripts/refresh_ncaab_source_mirror.ps1) is not just a copy script.
 - By default it rebuilds the local API bundle from mirrored raw outputs already stored under `data/ncaab_source/raw_outputs`.
 - A manual compatibility switch can still resync those raw outputs from the sibling source repo before exporting the API bundle.
 
@@ -110,7 +110,7 @@ These are the implementation changes required regardless of sport.
 
 ### 1. Split refresh generation from mirror ingestion
 
-Right now [scripts/refresh_odds_sources.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_odds_sources.py) performs both orchestration and source-repo command resolution.
+Right now [scripts/refresh_odds_sources.py](scripts/refresh_odds_sources.py) performs both orchestration and source-repo command resolution.
 
 Render-safe shape:
 - A Syndicate-owned refresh layer generates canonical artifacts directly, or
@@ -122,7 +122,7 @@ What must change:
 
 ### 2. Replace repo-local status storage with durable hosted storage
 
-Current behavior in [syndicate/features/shared/ops_refresh.py](c:/Users/mostg/OneDrive/Coding/Syndicate/syndicate/features/shared/ops_refresh.py):
+Current behavior in [syndicate/features/shared/ops_refresh.py](syndicate/features/shared/ops_refresh.py):
 - writes status to `reports/refresh_status`
 - writes job outputs to `reports/migration_runs`
 - launches background refreshes with `subprocess.Popen`
@@ -137,9 +137,9 @@ What must change:
 - treat the web service as a reader of job state, not the parent process of the job
 
 Current implementation progress:
-- [syndicate/features/shared/refresh_state_store.py](c:/Users/mostg/OneDrive/Coding/Syndicate/syndicate/features/shared/refresh_state_store.py) now provides the shared state seam for refresh manifests, recent run history, stdout/stderr payloads, and the latest daily-update manifest.
+- [syndicate/features/shared/refresh_state_store.py](syndicate/features/shared/refresh_state_store.py) now provides the shared state seam for refresh manifests, recent run history, stdout/stderr payloads, and the latest daily-update manifest.
 - That seam supports both the existing filesystem mode and a Key Value-backed mode suitable for Render-style shared status storage.
-- [scripts/run_refresh_worker.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/run_refresh_worker.py) now provides the long-running worker loop that can consume queued refresh manifests outside the web process.
+- [scripts/run_refresh_worker.py](scripts/run_refresh_worker.py) now provides the long-running worker loop that can consume queued refresh manifests outside the web process.
 
 ### 3. Convert mirror scripts from source-repo copy jobs into neutral import jobs
 
@@ -174,9 +174,9 @@ What must change:
 1. Decide whether Render should be read-only or self-refreshing.
 2. If read-only, deploy now and keep refresh outside Render.
 3. If self-refreshing, replace the remaining source-owned generation jobs now that the normal mirror bootstrap paths are gone.
-4. Next replace [scripts/refresh_odds_sources.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_odds_sources.py) with a Syndicate-owned refresh runner or a remote artifact puller.
-5. Then move [syndicate/features/shared/ops_refresh.py](c:/Users/mostg/OneDrive/Coding/Syndicate/syndicate/features/shared/ops_refresh.py) off detached subprocess execution and onto durable hosted job state.
-6. Only after that expand [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml) into a full self-refreshing deployment blueprint.
+4. Next replace [scripts/refresh_odds_sources.py](scripts/refresh_odds_sources.py) with a Syndicate-owned refresh runner or a remote artifact puller.
+5. Then move [syndicate/features/shared/ops_refresh.py](syndicate/features/shared/ops_refresh.py) off detached subprocess execution and onto durable hosted job state.
+6. Only after that expand [render.yaml](render.yaml) into a full self-refreshing deployment blueprint.
 
 ## What counts as done
 

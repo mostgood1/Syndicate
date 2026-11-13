@@ -54,7 +54,9 @@ from typing import Any, Iterable
 csv.field_size_limit(10 ** 9)
 
 DATA_ROOT = os.path.expanduser("~/syndicate-prod/data")
-CFBD_LINES_DIR = "/mnt/c/Users/tempadmin/OneDrive/Coding/Syndicate/data/ncaaf_source/data"
+# The Windows primary checkout's git-tracked CFBD lines, as WSL sees it (the repo left OneDrive on 2026-11-09).
+CFBD_LINES_DIR = (os.environ.get("SYNDICATE_PRIMARY_TREE", "").strip() or "/mnt/c/Users/tempadmin/Coding/Syndicate") \
+    + "/data/ncaaf_source/data"
 OUT_DIR = "/mnt/c/tmp/e3/extract"
 
 

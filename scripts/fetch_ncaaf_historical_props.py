@@ -32,9 +32,11 @@ if str(REPO) not in sys.path:
 
 from scripts import backfill_nfl_historical_props as B  # noqa: E402
 
-TRUTH = Path(r"C:\Users\tempadmin\OneDrive\Coding\Syndicate\data\ncaaf_source\historical_truth")
+from scripts._primary_tree import primary_tree  # noqa: E402
+
+TRUTH = primary_tree() / "data" / "ncaaf_source" / "historical_truth"
 OUT = Path(r"C:\tmp\football_scenarios\ncaaf_props")
-ENV = Path(r"C:\Users\tempadmin\OneDrive\Coding\Syndicate\.env")
+ENV = primary_tree() / ".env"
 OFFSET_MIN = 10
 # The NCAAF markets books actually post (2026 wk1 capture: Anytime TD, Receiving Yards, Receptions,
 # Rushing Yards, Passing Yards, Passing TDs) plus rush attempts; 7 x 10 credits per event.

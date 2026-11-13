@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Relocate this repo's `.git` store off OneDrive, and repoint every worktree.
 
+SUPERSEDED 2026-11-09, NEVER RUN: the whole repo moved out of OneDrive to `C:\\Users\\tempadmin\\Coding\\Syndicate`
+(docs/ai_context/repo_out_of_onedrive_plan.md), so `.git` is already off OneDrive. Do not run this; kept as history.
+
 WHY THIS EXISTS `[2026-09-05, lane git-out-of-onedrive]`. The repo lives at
 `C:\\Users\\<user>\\OneDrive\\Coding\\Syndicate`, so OneDrive's Cloud Files
 filter manages `.git` as well as the working tree. Measured 2026-09-05: every

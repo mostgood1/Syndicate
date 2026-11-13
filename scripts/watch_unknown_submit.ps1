@@ -37,7 +37,7 @@
 [CmdletBinding()]
 param(
     [string]$BaseUrl  = 'https://syndicate-an21.onrender.com/api/portfolio/live?on=all',
-    [string]$RepoRoot = 'C:\Users\tempadmin\OneDrive\Coding\Syndicate',
+    [string]$RepoRoot = (Split-Path -Parent $PSScriptRoot),
     [int]$RecentWindowMinutes = 60
 )
 

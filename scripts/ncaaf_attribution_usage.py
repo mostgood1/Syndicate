@@ -19,11 +19,16 @@ import json
 import re
 from collections import defaultdict
 from pathlib import Path
+import sys
 from typing import Dict, List, Optional, Tuple
 
-TRUTH = Path(r"C:\Users\tempadmin\OneDrive\Coding\Syndicate\data\ncaaf_source\historical_truth")
-BOX = Path(r"C:\Users\tempadmin\OneDrive\Coding\Syndicate\data\ncaaf_source\source_artifacts\data\processed"
-           r"\player_game_stats\ncaaf_player_game_stats_snapshot.csv")
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from scripts._primary_tree import primary_tree  # noqa: E402
+
+_NCAAF = primary_tree() / "data" / "ncaaf_source"
+TRUTH = _NCAAF / "historical_truth"
+BOX = (_NCAAF / "source_artifacts" / "data" / "processed" / "player_game_stats"
+       / "ncaaf_player_game_stats_snapshot.csv")
 OUT = Path(r"C:\tmp\football_scenarios\ncaaf_attribution")
 
 RUN = re.compile(r"^(?P<a>.+?) run for ")

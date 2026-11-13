@@ -32,7 +32,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
-PRIMARY = "/mnt/c/Users/tempadmin/OneDrive/Coding/Syndicate"
+# The Windows primary checkout as WSL sees it. Runs on the fleet, where `git --git-common-dir` names ~/Syndicate, so
+# this cannot use scripts/_primary_tree.py. The repo left OneDrive on 2026-11-09; override with SYNDICATE_PRIMARY_TREE.
+PRIMARY = os.environ.get("SYNDICATE_PRIMARY_TREE", "").strip() or "/mnt/c/Users/tempadmin/Coding/Syndicate"
 
 # name -> (source dir, filename regex or None, what it is)
 SETS: dict[str, tuple[str, str | None, str]] = {

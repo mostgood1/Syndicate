@@ -5,13 +5,13 @@
 
 Syndicate is the new unified multi-sport app that will eventually replace the separate sport-specific frontends.
 
-The official phased implementation plan for reaching the world-class target state lives in [docs/syndicate_world_class_implementation_plan.md](c:/Users/tempadmin/OneDrive/Coding/Syndicate/docs/syndicate_world_class_implementation_plan.md).
+The official phased implementation plan for reaching the world-class target state lives in [docs/syndicate_world_class_implementation_plan.md](docs/syndicate_world_class_implementation_plan.md).
 
-Workspace Copilot skills for intelligence planning, advanced-data analysis, live-lens debugging, readiness, deployment parity, and sport-specific question answering are documented in [docs/syndicate-skills.md](c:/Users/tempadmin/OneDrive/Coding/Syndicate/docs/syndicate-skills.md).
+Workspace Copilot skills for intelligence planning, advanced-data analysis, live-lens debugging, readiness, deployment parity, and sport-specific question answering are documented in [docs/syndicate-skills.md](docs/syndicate-skills.md).
 
-The current intelligence / betting board assessment lives in [docs/intelligence_betting_board_assessment.md](c:/Users/tempadmin/OneDrive/Coding/Syndicate/docs/intelligence_betting_board_assessment.md).
+The current intelligence / betting board assessment lives in [docs/intelligence_betting_board_assessment.md](docs/intelligence_betting_board_assessment.md).
 
-The canonical cross-sport daily-update simulation reference lives in [docs/daily_update_workflow.md](c:/Users/tempadmin/OneDrive/Coding/Syndicate/docs/daily_update_workflow.md) and the generated latest simulation contract under [reports/daily_update/latest/unified_daily_update_latest_simulation_contract.json](c:/Users/tempadmin/OneDrive/Coding/Syndicate/reports/daily_update/latest/unified_daily_update_latest_simulation_contract.json).
+The canonical cross-sport daily-update simulation reference lives in [docs/daily_update_workflow.md](docs/daily_update_workflow.md) and the generated latest simulation contract under [reports/daily_update/latest/unified_daily_update_latest_simulation_contract.json](reports/daily_update/latest/unified_daily_update_latest_simulation_contract.json).
 
 ## Core principles
 
@@ -44,7 +44,7 @@ The canonical cross-sport daily-update simulation reference lives in [docs/daily
 
 The daily-update simulation contract is the preferred cross-sport reference when you are reasoning about how MLB, NBA, WNBA, NHL, NFL, NCAAF, and NCAAB consume available data in the sim engine.
 
-Use the generated latest contract at [reports/daily_update/latest/unified_daily_update_latest_simulation_contract.json](c:/Users/tempadmin/OneDrive/Coding/Syndicate/reports/daily_update/latest/unified_daily_update_latest_simulation_contract.json) together with [docs/daily_update_workflow.md](c:/Users/tempadmin/OneDrive/Coding/Syndicate/docs/daily_update_workflow.md) when you need the authoritative source-mode, freshness, and source-path reference for a run.
+Use the generated latest contract at [reports/daily_update/latest/unified_daily_update_latest_simulation_contract.json](reports/daily_update/latest/unified_daily_update_latest_simulation_contract.json) together with [docs/daily_update_workflow.md](docs/daily_update_workflow.md) when you need the authoritative source-mode, freshness, and source-path reference for a run.
 
 ## Current state
 
@@ -69,7 +69,7 @@ py -3 app.py
 
 ## Render deploy
 
-This repo is ready to deploy to Render as a Blueprint-backed Flask app using [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml).
+This repo is ready to deploy to Render as a Blueprint-backed Flask app using [render.yaml](render.yaml).
 
 Current hosted boundary:
 
@@ -81,7 +81,7 @@ Current hosted boundary:
 Render setup:
 
 1. In Render, choose New + and create a Blueprint instance from the GitHub repo `mostgood1/Syndicate`.
-2. Let Render read [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml), which now defines three resources:
+2. Let Render read [render.yaml](render.yaml), which now defines three resources:
   - `syndicate`: the public Flask web service that reads the repo-local `data/` and `reports/` trees.
   - `refresh-worker`: the background worker that polls for queued refresh jobs and owns the refresh state contract.
   - `live-odds-worker`: the live odds refresh worker used for the separate odds loop.
@@ -94,12 +94,12 @@ Hosted state overrides:
 
 - `SYNDICATE_REPORTS_ROOT`: optional absolute path for refresh status, latest manifests, logs, and daily-update state. Defaults to `reports/` under the repo.
 - `SYNDICATE_DATA_ROOT`: optional absolute path for mirrored data roots such as `mlb_source/` and `nba_source/`. Defaults to `data/` under the repo.
-- `SYNDICATE_ARTIFACT_ROOT_MLB`: optional published MLB artifact bundle root used by [scripts/refresh_mlb_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_mlb_source_mirror.ps1) during ingest mode. When set, Syndicate can import MLB daily/live/eval artifacts from that neutral bundle path instead of requiring any external MLB checkout.
-- `SYNDICATE_ARTIFACT_ROOT_NBA`: optional published NBA artifact bundle root used by [scripts/refresh_nba_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_nba_source_mirror.ps1) during ingest mode. When set, Syndicate can import NBA processed, raw, web, live-lens, and live-snapshot artifacts from that neutral bundle path.
-- `SYNDICATE_ARTIFACT_ROOT_NFL`: optional published NFL artifact bundle root used by [scripts/refresh_nfl_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_nfl_source_mirror.ps1) during ingest mode. When set, Syndicate can import NFL calibration, recommendations, props, and manifest artifacts from that neutral bundle path instead of a sibling `NFL-Betting` checkout.
-- `SYNDICATE_ARTIFACT_ROOT_NCAAF`: optional published NCAAF artifact bundle root used by [scripts/refresh_ncaaf_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_ncaaf_source_mirror.ps1) during ingest mode. When set, Syndicate can import NCAAF recommendations, lines, and predicted-schedule artifacts from that neutral bundle path instead of a sibling `NCAAFCompare` checkout.
-- `SYNDICATE_ARTIFACT_ROOT_NHL`: optional published NHL artifact bundle root used by [scripts/refresh_nhl_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_nhl_source_mirror.ps1) during ingest mode. When set, Syndicate can import NHL processed, live-lens, team-odds, and props artifacts from that neutral bundle path.
-- `SYNDICATE_ARTIFACT_ROOT_WNBA`: optional published WNBA artifact bundle root used by [scripts/refresh_wnba_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_wnba_source_mirror.ps1) during ingest mode. When set, Syndicate can import WNBA processed, raw, and live-lens artifacts from that neutral bundle path.
+- `SYNDICATE_ARTIFACT_ROOT_MLB`: optional published MLB artifact bundle root used by [scripts/refresh_mlb_source_mirror.ps1](scripts/refresh_mlb_source_mirror.ps1) during ingest mode. When set, Syndicate can import MLB daily/live/eval artifacts from that neutral bundle path instead of requiring any external MLB checkout.
+- `SYNDICATE_ARTIFACT_ROOT_NBA`: optional published NBA artifact bundle root used by [scripts/refresh_nba_source_mirror.ps1](scripts/refresh_nba_source_mirror.ps1) during ingest mode. When set, Syndicate can import NBA processed, raw, web, live-lens, and live-snapshot artifacts from that neutral bundle path.
+- `SYNDICATE_ARTIFACT_ROOT_NFL`: optional published NFL artifact bundle root used by [scripts/refresh_nfl_source_mirror.ps1](scripts/refresh_nfl_source_mirror.ps1) during ingest mode. When set, Syndicate can import NFL calibration, recommendations, props, and manifest artifacts from that neutral bundle path instead of a sibling `NFL-Betting` checkout.
+- `SYNDICATE_ARTIFACT_ROOT_NCAAF`: optional published NCAAF artifact bundle root used by [scripts/refresh_ncaaf_source_mirror.ps1](scripts/refresh_ncaaf_source_mirror.ps1) during ingest mode. When set, Syndicate can import NCAAF recommendations, lines, and predicted-schedule artifacts from that neutral bundle path instead of a sibling `NCAAFCompare` checkout.
+- `SYNDICATE_ARTIFACT_ROOT_NHL`: optional published NHL artifact bundle root used by [scripts/refresh_nhl_source_mirror.ps1](scripts/refresh_nhl_source_mirror.ps1) during ingest mode. When set, Syndicate can import NHL processed, live-lens, team-odds, and props artifacts from that neutral bundle path.
+- `SYNDICATE_ARTIFACT_ROOT_WNBA`: optional published WNBA artifact bundle root used by [scripts/refresh_wnba_source_mirror.ps1](scripts/refresh_wnba_source_mirror.ps1) during ingest mode. When set, Syndicate can import WNBA processed, raw, and live-lens artifacts from that neutral bundle path.
 - `SYNDICATE_STATE_ROOT`: optional fallback root for reports-style state when `SYNDICATE_REPORTS_ROOT` is not set. This is mainly useful when the hosted runtime mounts one persistent state directory and you want Syndicate to treat it as the reports root.
 - `SYNDICATE_REQUIRE_HOSTED_STORAGE`: set this to `true` in hosted environments to make Syndicate fail fast if `SYNDICATE_DATA_ROOT` or `SYNDICATE_REPORTS_ROOT` is missing. Render now uses this as an app requirement so the web service and worker do not fall back to repo-local paths.
 - `SYNDICATE_REFRESH_STATE_BACKEND`: controls how refresh manifests, recent run history, stdout/stderr payloads, and the latest daily-update manifest are stored. Defaults to `filesystem`. Set it to `keyvalue` for a shared Redis or Render Key Value-backed state store that both the web service and worker can read.
@@ -109,11 +109,11 @@ Hosted state overrides:
 
 Blueprint defaults:
 
-- The checked-in [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml) sets `SYNDICATE_REFRESH_LAUNCH_MODE=manifest_only` on the hosted services so the ops refresh endpoint records queued work instead of spawning a local refresh subprocess on Render.
-- The checked-in [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml) sets `SYNDICATE_REFRESH_STATE_BACKEND=keyvalue` on the web service.
-- The checked-in [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml) wires `SYNDICATE_REFRESH_STATE_URL` from the Render Key Value service connection string.
-- The checked-in [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml) points the web service at the repo-backed `data/` and `reports/` trees, while the worker keeps the mounted disk for write paths and refresh jobs.
-- The checked-in [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml) intentionally does not hardcode any `SYNDICATE_ARTIFACT_ROOT_*` values. Published bundle locations are deployment-specific, so set the matching artifact-root overrides on the worker when you want hosted ingest to pull from neutral artifact bundles instead of the repo-backed `data/` tree.
+- The checked-in [render.yaml](render.yaml) sets `SYNDICATE_REFRESH_LAUNCH_MODE=manifest_only` on the hosted services so the ops refresh endpoint records queued work instead of spawning a local refresh subprocess on Render.
+- The checked-in [render.yaml](render.yaml) sets `SYNDICATE_REFRESH_STATE_BACKEND=keyvalue` on the web service.
+- The checked-in [render.yaml](render.yaml) wires `SYNDICATE_REFRESH_STATE_URL` from the Render Key Value service connection string.
+- The checked-in [render.yaml](render.yaml) points the web service at the repo-backed `data/` and `reports/` trees, while the worker keeps the mounted disk for write paths and refresh jobs.
+- The checked-in [render.yaml](render.yaml) intentionally does not hardcode any `SYNDICATE_ARTIFACT_ROOT_*` values. Published bundle locations are deployment-specific, so set the matching artifact-root overrides on the worker when you want hosted ingest to pull from neutral artifact bundles instead of the repo-backed `data/` tree.
 
 When the site is running in one of those queued hosted modes, a worker can pick up the latest queued refresh contract with:
 
@@ -126,14 +126,14 @@ python .\scripts\run_refresh_worker.py --poll-seconds 30
 python .\scripts\run_refresh_worker.py --run-once
 ```
 
-That runner script claims the queued manifest, marks it `running`, and executes the persisted `externalRunner` contract through [scripts/run_refresh_odds_job.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/run_refresh_odds_job.py). This is the first worker-side pickup path for the hosted refresh contract.
+That runner script claims the queued manifest, marks it `running`, and executes the persisted `externalRunner` contract through [scripts/run_refresh_odds_job.py](scripts/run_refresh_odds_job.py). This is the first worker-side pickup path for the hosted refresh contract.
 
-[scripts/run_refresh_worker.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/run_refresh_worker.py) is the long-running worker entrypoint for hosted environments. It polls the latest queued manifest and invokes [scripts/run_queued_refresh_job.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/run_queued_refresh_job.py) whenever the ops control plane records a new `pending_external` refresh run. Use `SYNDICATE_REFRESH_WORKER_POLL_SECONDS` to control the polling interval when the default 15-second loop is not appropriate.
+[scripts/run_refresh_worker.py](scripts/run_refresh_worker.py) is the long-running worker entrypoint for hosted environments. It polls the latest queued manifest and invokes [scripts/run_queued_refresh_job.py](scripts/run_queued_refresh_job.py) whenever the ops control plane records a new `pending_external` refresh run. Use `SYNDICATE_REFRESH_WORKER_POLL_SECONDS` to control the polling interval when the default 15-second loop is not appropriate.
 
 Important Render constraint:
 
 - Render persistent disks are attached to only one service instance and cannot be shared between the web service and a background worker.
-- Because of that single-service disk limit, a self-refreshing Render deployment should use the shared state backend in [syndicate/features/shared/refresh_state_store.py](c:/Users/mostg/OneDrive/Coding/Syndicate/syndicate/features/shared/refresh_state_store.py) with `SYNDICATE_REFRESH_STATE_BACKEND=keyvalue` instead of trying to share a local `reports/` disk between web and worker.
+- Because of that single-service disk limit, a self-refreshing Render deployment should use the shared state backend in [syndicate/features/shared/refresh_state_store.py](syndicate/features/shared/refresh_state_store.py) with `SYNDICATE_REFRESH_STATE_BACKEND=keyvalue` instead of trying to share a local `reports/` disk between web and worker.
 - The current refresh-state abstraction now supports both the default filesystem mode and a shared Key Value mode for refresh manifests, recent run history, stdout/stderr log payloads, and the latest daily-update manifest.
 - `SYNDICATE_DATA_ROOT` is still separate from the shared refresh-state backend. Public mirrored artifacts and per-sport source data are still file-backed, so the remaining self-hosting work is now about deployment wiring and broader artifact ownership rather than only report-state sharing.
 
@@ -148,11 +148,11 @@ Hosted smoke checklist:
 5. Restart or redeploy the web service and confirm the latest refresh status still appears, proving that refresh state is coming from Key Value instead of the web filesystem.
 6. Treat any sport-level refresh failure as an artifact-generation ownership issue, not a refresh-state or worker-wiring failure, unless the status itself fails to update.
 
-If the goal is a self-refreshing hosted instance rather than a repo-backed read-only deployment, start with [RENDER_SELF_HOST_BACKLOG.md](c:/Users/mostg/OneDrive/Coding/Syndicate/RENDER_SELF_HOST_BACKLOG.md) for the execution order and use [RENDER_SELF_HOST_REFACTOR_PLAN.md](c:/Users/mostg/OneDrive/Coding/Syndicate/RENDER_SELF_HOST_REFACTOR_PLAN.md) for the architectural rationale behind that backlog.
+If the goal is a self-refreshing hosted instance rather than a repo-backed read-only deployment, start with [RENDER_SELF_HOST_BACKLOG.md](RENDER_SELF_HOST_BACKLOG.md) for the execution order and use [RENDER_SELF_HOST_REFACTOR_PLAN.md](RENDER_SELF_HOST_REFACTOR_PLAN.md) for the architectural rationale behind that backlog.
 
 ## GitHub automation
 
-The repo now includes a GitHub Actions workflow at [.github/workflows/ci.yml](c:/Users/mostg/OneDrive/Coding/Syndicate/.github/workflows/ci.yml). It runs on pushes and pull requests to `main`, installs the app dependencies, and executes the archive regression suite so the repo badge reflects real app health instead of a placeholder status image.
+The repo now includes a GitHub Actions workflow at [.github/workflows/ci.yml](.github/workflows/ci.yml). It runs on pushes and pull requests to `main`, installs the app dependencies, and executes the archive regression suite so the repo badge reflects real app health instead of a placeholder status image.
 
 ## Regression checks
 
@@ -186,11 +186,11 @@ powershell -ExecutionPolicy Bypass -File .\scripts\refresh_and_gate.ps1 -Date 20
 powershell -ExecutionPolicy Bypass -File .\scripts\refresh_and_gate.ps1 -Date 2026-05-18 -RefreshOdds -OddsPhase all
 ```
 
-This wrapper refreshes MLB, NBA, NHL, and WNBA mirrors for the selected date and then runs [scripts/migration_gate.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/migration_gate.py). Use `-BaseUrl` to reuse an already-running local server for the browser smoke phase, and use `-SkipMLB`, `-SkipNBA`, `-SkipNHL`, or `-SkipWNBA` when a sport does not need a mirror refresh for the current slice.
+This wrapper refreshes MLB, NBA, NHL, and WNBA mirrors for the selected date and then runs [scripts/migration_gate.py](scripts/migration_gate.py). Use `-BaseUrl` to reuse an already-running local server for the browser smoke phase, and use `-SkipMLB`, `-SkipNBA`, `-SkipNHL`, or `-SkipWNBA` when a sport does not need a mirror refresh for the current slice.
 
-When `-RefreshOdds` is enabled, the wrapper first calls the new shared odds refresh orchestrator at [scripts/refresh_odds_sources.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_odds_sources.py). That tool runs the real per-sport source refresh commands first, then the existing Syndicate mirror scripts keep the local mirrors in sync. `-OddsPhase` accepts `pregame`, `live`, or `all`, `-OddsSports` accepts a comma-separated sport list such as `mlb,nba,nhl`, and `-OddsRegions` forwards a region string like `us` to the source commands that support it.
+When `-RefreshOdds` is enabled, the wrapper first calls the new shared odds refresh orchestrator at [scripts/refresh_odds_sources.py](scripts/refresh_odds_sources.py). That tool runs the real per-sport source refresh commands first, then the existing Syndicate mirror scripts keep the local mirrors in sync. `-OddsPhase` accepts `pregame`, `live`, or `all`, `-OddsSports` accepts a comma-separated sport list such as `mlb,nba,nhl`, and `-OddsRegions` forwards a region string like `us` to the source commands that support it.
 
-The same per-sport source-root overrides are honored end to end by the direct mirror scripts and by [scripts/refresh_and_gate.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_and_gate.ps1), because those wrappers simply invoke the shared orchestrator and mirror scripts in the current environment.
+The same per-sport source-root overrides are honored end to end by the direct mirror scripts and by [scripts/refresh_and_gate.ps1](scripts/refresh_and_gate.ps1), because those wrappers simply invoke the shared orchestrator and mirror scripts in the current environment.
 
 ## Central Odds Refresh
 
@@ -218,9 +218,9 @@ That keeps Syndicate aligned with the existing source models for pregame and liv
 
 For the required Render data-root contract, mounted disk layout, and fallback order, see [docs/render_data_authority.md](docs/render_data_authority.md).
 
-For NHL specifically, source mode now generates `scoreboard.csv`, team odds, and player-props lines directly inside [scripts/refresh_nhl_oddsapi.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_nhl_oddsapi.py) and writes them into the local or published artifact bundle root. Passing `--source-root` is now optional and only backfills extra processed or live-lens artifacts when needed for compatibility runs.
+For NHL specifically, source mode now generates `scoreboard.csv`, team odds, and player-props lines directly inside [scripts/refresh_nhl_oddsapi.py](scripts/refresh_nhl_oddsapi.py) and writes them into the local or published artifact bundle root. Passing `--source-root` is now optional and only backfills extra processed or live-lens artifacts when needed for compatibility runs.
 
-For NCAAB specifically, source mode now writes the raw odds snapshot locally through [scripts/refresh_ncaab_odds_history.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_ncaab_odds_history.py), and `--mirror-only` still takes the hosted-friendly path through [scripts/refresh_ncaab_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_ncaab_source_mirror.ps1) with `-UseExistingRawOutputs`. That means both fresh raw-output generation and API export can now run without requiring a sibling `NCAAB` checkout on the normal path.
+For NCAAB specifically, source mode now writes the raw odds snapshot locally through [scripts/refresh_ncaab_odds_history.py](scripts/refresh_ncaab_odds_history.py), and `--mirror-only` still takes the hosted-friendly path through [scripts/refresh_ncaab_source_mirror.ps1](scripts/refresh_ncaab_source_mirror.ps1) with `-UseExistingRawOutputs`. That means both fresh raw-output generation and API export can now run without requiring a sibling `NCAAB` checkout on the normal path.
 
 Use `--dry-run` when you want the tool to resolve source roots, working directories, and commands without executing any refreshes. This is the safest way to validate a new schedule, a narrowed sport list, or a deployment environment before turning the job loose.
 
@@ -234,13 +234,13 @@ python .\scripts\refresh_odds_sources.py --date 2026-05-18 --phase live --sports
 
 Supported override variables follow the same pattern: `SYNDICATE_SOURCE_ROOT_MLB`, `SYNDICATE_SOURCE_ROOT_NBA`, `SYNDICATE_SOURCE_ROOT_NHL`, `SYNDICATE_SOURCE_ROOT_NFL`, `SYNDICATE_SOURCE_ROOT_WNBA`, `SYNDICATE_SOURCE_ROOT_NCAAB`, and `SYNDICATE_SOURCE_ROOT_NCAAF`.
 
-Those variables are also respected when you run the per-sport mirror scripts directly, for example [scripts/refresh_mlb_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_mlb_source_mirror.ps1) or [scripts/refresh_nba_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_nba_source_mirror.ps1), so path overrides stay consistent across the whole refresh pipeline.
+Those variables are also respected when you run the per-sport mirror scripts directly, for example [scripts/refresh_mlb_source_mirror.ps1](scripts/refresh_mlb_source_mirror.ps1) or [scripts/refresh_nba_source_mirror.ps1](scripts/refresh_nba_source_mirror.ps1), so path overrides stay consistent across the whole refresh pipeline.
 
-If the goal is a self-refreshing Render deployment instead of a read-only site backed by prebuilt mirrors, see [RENDER_SELF_HOST_REFACTOR_PLAN.md](c:/Users/mostg/OneDrive/Coding/Syndicate/RENDER_SELF_HOST_REFACTOR_PLAN.md). That plan documents the remaining refresh wiring and the exact refactors needed before Syndicate can refresh itself from its own local bundles.
+If the goal is a self-refreshing Render deployment instead of a read-only site backed by prebuilt mirrors, see [RENDER_SELF_HOST_REFACTOR_PLAN.md](RENDER_SELF_HOST_REFACTOR_PLAN.md). That plan documents the remaining refresh wiring and the exact refactors needed before Syndicate can refresh itself from its own local bundles.
 
-Each unattended run now writes a timestamped artifact bundle under [reports](c:/Users/mostg/OneDrive/Coding/Syndicate/reports) by default. That bundle includes the per-sport mirror refresh outputs, the gate console output, and persisted `migration_gate_report.json` plus `migration_gate_report.txt` files. Use `-ArtifactsDir` on [scripts/refresh_and_gate.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_and_gate.ps1) or `--write-dir` on [scripts/migration_gate.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/migration_gate.py) if you want those reports written somewhere else.
+Each unattended run now writes a timestamped artifact bundle under [reports](reports) by default. That bundle includes the per-sport mirror refresh outputs, the gate console output, and persisted `migration_gate_report.json` plus `migration_gate_report.txt` files. Use `-ArtifactsDir` on [scripts/refresh_and_gate.ps1](scripts/refresh_and_gate.ps1) or `--write-dir` on [scripts/migration_gate.py](scripts/migration_gate.py) if you want those reports written somewhere else.
 
-The refresh wrapper now also publishes a stable latest-status manifest at [reports/refresh_status/latest/refresh_status_latest.json](c:/Users/mostg/OneDrive/Coding/Syndicate/reports/refresh_status/latest/refresh_status_latest.json). That file points at the last `refresh_and_gate` artifact bundle and is the durable read target for admin/status tooling.
+The refresh wrapper now also publishes a stable latest-status manifest at [reports/refresh_status/latest/refresh_status_latest.json](reports/refresh_status/latest/refresh_status_latest.json). That file points at the last `refresh_and_gate` artifact bundle and is the durable read target for admin/status tooling.
 
 ## Ops Status API
 
@@ -251,7 +251,7 @@ GET /api/ops/odds-refresh/status
 GET /api/ops/odds-refresh/plan?date=2026-05-18&sports=mlb,nba&phase=live&skip_mirror=1
 ```
 
-Set `ADMIN_TOKEN` (or `SYNDICATE_ADMIN_TOKEN`) in the environment, then pass it as either `Authorization: Bearer <token>`, `X-Admin-Token: <token>`, or `?admin_token=<token>`. The `status` endpoint reads the stable latest manifests under [reports/refresh_status](c:/Users/mostg/OneDrive/Coding/Syndicate/reports/refresh_status) and [reports/daily_update/latest](c:/Users/mostg/OneDrive/Coding/Syndicate/reports/daily_update/latest); the `plan` endpoint resolves the dry-run command plan without executing any source refreshes.
+Set `ADMIN_TOKEN` (or `SYNDICATE_ADMIN_TOKEN`) in the environment, then pass it as either `Authorization: Bearer <token>`, `X-Admin-Token: <token>`, or `?admin_token=<token>`. The `status` endpoint reads the stable latest manifests under [reports/refresh_status](reports/refresh_status) and [reports/daily_update/latest](reports/daily_update/latest); the `plan` endpoint resolves the dry-run command plan without executing any source refreshes.
 
 ## Daily Update
 
@@ -269,7 +269,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\daily_update.ps1 -Date 2026-0
 
 The PowerShell daily-update wrappers auto-import repo-root `.env` and `.env.local` values into process scope before they resolve per-sport credentials. Keys such as `ODDS_API_KEY` can therefore live in the same local env files the Python refresh scripts already use, while explicit process env and persisted Windows `User` or `Machine` env vars still win.
 
-This daily update writes a timestamped run under [reports/daily_update](c:/Users/mostg/OneDrive/Coding/Syndicate/reports/daily_update), keeps a rolling latest manifest under [reports/daily_update/latest](c:/Users/mostg/OneDrive/Coding/Syndicate/reports/daily_update/latest), emits `module_tracker_snapshot.json`, and now publishes `module_tracker_gap_report.txt` so each run shows the highest-leverage MLB parity gaps and a ranked module backlog alongside migration health.
+This daily update writes a timestamped run under [reports/daily_update](reports/daily_update), keeps a rolling latest manifest under [reports/daily_update/latest](reports/daily_update/latest), emits `module_tracker_snapshot.json`, and now publishes `module_tracker_gap_report.txt` so each run shows the highest-leverage MLB parity gaps and a ranked module backlog alongside migration health.
 
 ## Unified Daily Runner
 
@@ -282,11 +282,11 @@ powershell -ExecutionPolicy Bypass -File .\scripts\unified_daily_update.ps1 -Dat
 powershell -ExecutionPolicy Bypass -File .\scripts\unified_daily_update.ps1 -Date 2026-05-24 -BaseUrl http://127.0.0.1:5000 -SkipSmoke
 ```
 
-This wrapper is the temporary bridge until Syndicate owns all generation locally. MLB now runs through the Syndicate-owned [scripts/refresh_mlb_oddsapi.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_mlb_oddsapi.py) path against the repo-owned [data/mlb_source](c:/Users/mostg/OneDrive/Coding/Syndicate/data/mlb_source) bundle. NBA and WNBA now route through the Syndicate-owned [scripts/refresh_nba_oddsapi_props.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_nba_oddsapi_props.py) and [scripts/refresh_wnba_oddsapi_props.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_wnba_oddsapi_props.py) entrypoints against the local Syndicate bundle roots. NCAAB now uses the Syndicate-owned [scripts/refresh_ncaab_odds_history.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_ncaab_odds_history.py) path when an NCAAB or TheOddsAPI key is available, otherwise it reuses the already mirrored local raw bundle. NHL, NFL, and NCAAF still run their existing source daily-update entrypoints with source-side git push explicitly disabled. After those generation steps complete, the wrapper runs [scripts/refresh_and_gate.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_and_gate.ps1), and only after that succeeds stages, commits, and pushes each remaining dirty source repo plus Syndicate itself.
+This wrapper is the temporary bridge until Syndicate owns all generation locally. MLB now runs through the Syndicate-owned [scripts/refresh_mlb_oddsapi.py](scripts/refresh_mlb_oddsapi.py) path against the repo-owned [data/mlb_source](data/mlb_source) bundle. NBA and WNBA now route through the Syndicate-owned [scripts/refresh_nba_oddsapi_props.py](scripts/refresh_nba_oddsapi_props.py) and [scripts/refresh_wnba_oddsapi_props.py](scripts/refresh_wnba_oddsapi_props.py) entrypoints against the local Syndicate bundle roots. NCAAB now uses the Syndicate-owned [scripts/refresh_ncaab_odds_history.py](scripts/refresh_ncaab_odds_history.py) path when an NCAAB or TheOddsAPI key is available, otherwise it reuses the already mirrored local raw bundle. NHL, NFL, and NCAAF still run their existing source daily-update entrypoints with source-side git push explicitly disabled. After those generation steps complete, the wrapper runs [scripts/refresh_and_gate.ps1](scripts/refresh_and_gate.ps1), and only after that succeeds stages, commits, and pushes each remaining dirty source repo plus Syndicate itself.
 
 The runner also enforces the current temporary runtime policy for the heaviest simulation steps so refreshes stay consistent and fast enough to use operationally: NBA and WNBA run with `DAILY_SMARTSIM_NSIMS=1000` and at least `DAILY_SMARTSIM_WORKERS=4`, NHL runs `-SimSamples 1000` with `-PropsBoxscoreNSims 1000`, and NFL sets `DAILY_UPDATE_SCENARIO_N_SIMS=1000`. MLB now uses the local Syndicate refresh/materialization path rooted at `data/mlb_source` and publishes the current artifact bundle to `data/mlb_source/source_artifacts`. NCAAB now refreshes its raw odds snapshot locally into `data/ncaab_source/raw_outputs/by_date/<date>` and the normal mirror step rebuilds from the local raw bundle without `-RefreshRawOutputsFromSource`. NCAAF currently still runs its native daily-update default because this wrapper does not yet have a verified low-risk local generation replacement for that path. That policy is emitted into the run manifest so dry runs and completed runs both show the exact values used.
 
-The unified runner writes [reports/daily_update/<date>/<stamp>/unified_daily_update_run.json](c:/Users/mostg/OneDrive/Coding/Syndicate/reports/daily_update) plus a rolling latest copy at [reports/daily_update/latest/unified_daily_update_latest.json](c:/Users/mostg/OneDrive/Coding/Syndicate/reports/daily_update/latest). Those manifests record the exact source commands invoked and the final per-repo push results.
+The unified runner writes [reports/daily_update/<date>/<stamp>/unified_daily_update_run.json](reports/daily_update) plus a rolling latest copy at [reports/daily_update/latest/unified_daily_update_latest.json](reports/daily_update/latest). Those manifests record the exact source commands invoked and the final per-repo push results.
 
 Use `-SkipGitPush` when you want the full source-refresh plus mirror-plus-gate validation without committing anything, and use the existing per-sport `-SkipMLB`, `-SkipNBA`, `-SkipNHL`, `-SkipWNBA`, `-SkipNFL`, `-SkipNCAAF`, and `-SkipNCAAB` switches to narrow the run. The script refuses to push if `-SkipRefreshGate` is set, because the intended contract is gate-first, publish-second.
 
@@ -329,11 +329,11 @@ powershell -ExecutionPolicy Bypass -File .\scripts\refresh_mlb_source_mirror.ps1
 powershell -ExecutionPolicy Bypass -File .\scripts\refresh_mlb_source_mirror.ps1 -Date 2026-05-15 -UseExistingMirrorArtifacts
 ```
 
-The script copies the main live-lens report and JSONL, live prop registry files, daily snapshot and sim folders, archived market refresh history, and archived StatsAPI live feed files into [data/mlb_source](c:/Users/mostg/OneDrive/Coding/Syndicate/data/mlb_source).
+The script copies the main live-lens report and JSONL, live prop registry files, daily snapshot and sim folders, archived market refresh history, and archived StatsAPI live feed files into [data/mlb_source](data/mlb_source).
 
-MLB now supports the same two mirror modes as the in-season board modules. The default run prefers the repo-owned bundle under [data/mlb_source](c:/Users/mostg/OneDrive/Coding/Syndicate/data/mlb_source) and the `-UseExistingMirrorArtifacts` switch rewrites the MLB mirror manifest from the already mirrored files under that same bundle. A sibling MLB checkout is now only an optional override path if you explicitly set it.
+MLB now supports the same two mirror modes as the in-season board modules. The default run prefers the repo-owned bundle under [data/mlb_source](data/mlb_source) and the `-UseExistingMirrorArtifacts` switch rewrites the MLB mirror manifest from the already mirrored files under that same bundle. A sibling MLB checkout is now only an optional override path if you explicitly set it.
 
-Each run also writes [data/mlb_source/manifests/mirror_refresh_latest.json](c:/Users/mostg/OneDrive/Coding/Syndicate/data/mlb_source/manifests/mirror_refresh_latest.json), and the migration gate now validates that manifest for the core mirrored MLB artifact families: daily summary, ladders, top props, ops, snapshots, sims, and season eval payloads.
+Each run also writes [data/mlb_source/manifests/mirror_refresh_latest.json](data/mlb_source/manifests/mirror_refresh_latest.json), and the migration gate now validates that manifest for the core mirrored MLB artifact families: daily summary, ladders, top props, ops, snapshots, sims, and season eval payloads.
 
 ## In-Season Mirror Refresh
 
@@ -350,15 +350,15 @@ powershell -ExecutionPolicy Bypass -File .\scripts\refresh_ncaab_source_mirror.p
 powershell -ExecutionPolicy Bypass -File .\scripts\refresh_ncaab_source_mirror.ps1 -Date 2026-04-06 -RefreshRawOutputsFromSource
 ```
 
-These scripts populate [data/nba_source](c:/Users/mostg/OneDrive/Coding/Syndicate/data/nba_source), [data/nhl_source](c:/Users/mostg/OneDrive/Coding/Syndicate/data/nhl_source), and [data/wnba_source](c:/Users/mostg/OneDrive/Coding/Syndicate/data/wnba_source) with the date-scoped processed artifacts that Syndicate already reads for cards, archive, picks, props, and sim-backed detail lanes.
+These scripts populate [data/nba_source](data/nba_source), [data/nhl_source](data/nhl_source), and [data/wnba_source](data/wnba_source) with the date-scoped processed artifacts that Syndicate already reads for cards, archive, picks, props, and sim-backed detail lanes.
 
-NBA now supports the same two mirror modes. The default run prefers the repo-owned bundle under [data/nba_source](c:/Users/mostg/OneDrive/Coding/Syndicate/data/nba_source) and the `-UseExistingMirrorArtifacts` switch rewrites the NBA mirror manifest from the already mirrored files under that same bundle. That gives the shared ingest path a hosted-safe local mirror mode.
+NBA now supports the same two mirror modes. The default run prefers the repo-owned bundle under [data/nba_source](data/nba_source) and the `-UseExistingMirrorArtifacts` switch rewrites the NBA mirror manifest from the already mirrored files under that same bundle. That gives the shared ingest path a hosted-safe local mirror mode.
 
-NHL now supports two mirror modes as well. The default run prefers the repo-owned bundle under [data/nhl_source](c:/Users/mostg/OneDrive/Coding/Syndicate/data/nhl_source) and the `-UseExistingMirrorArtifacts` switch rewrites the NHL mirror manifest from the already mirrored files under that same bundle. That gives the shared ingest path a hosted-safe local mirror mode.
+NHL now supports two mirror modes as well. The default run prefers the repo-owned bundle under [data/nhl_source](data/nhl_source) and the `-UseExistingMirrorArtifacts` switch rewrites the NHL mirror manifest from the already mirrored files under that same bundle. That gives the shared ingest path a hosted-safe local mirror mode.
 
-WNBA now supports the same two mirror modes. The default run prefers the repo-owned bundle under [data/wnba_source](c:/Users/mostg/OneDrive/Coding/Syndicate/data/wnba_source) and the `-UseExistingMirrorArtifacts` switch rewrites the WNBA mirror manifest from the already mirrored files under that same bundle. That gives the shared ingest path a hosted-safe local mirror mode.
+WNBA now supports the same two mirror modes. The default run prefers the repo-owned bundle under [data/wnba_source](data/wnba_source) and the `-UseExistingMirrorArtifacts` switch rewrites the WNBA mirror manifest from the already mirrored files under that same bundle. That gives the shared ingest path a hosted-safe local mirror mode.
 
-NCAAB now defaults to the artifact-only mirror path. Running [scripts/refresh_ncaab_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_ncaab_source_mirror.ps1) without extra switches rebuilds `data/ncaab_source/api` directly from the already mirrored bundle under [data/ncaab_source/raw_outputs](c:/Users/mostg/OneDrive/Coding/Syndicate/data/ncaab_source/raw_outputs). Use `-RefreshRawOutputsFromSource` only when you explicitly want a local compatibility run that re-syncs those raw outputs from a sibling `NCAAB` checkout before exporting the API bundle.
+NCAAB now defaults to the artifact-only mirror path. Running [scripts/refresh_ncaab_source_mirror.ps1](scripts/refresh_ncaab_source_mirror.ps1) without extra switches rebuilds `data/ncaab_source/api` directly from the already mirrored bundle under [data/ncaab_source/raw_outputs](data/ncaab_source/raw_outputs). Use `-RefreshRawOutputsFromSource` only when you explicitly want a local compatibility run that re-syncs those raw outputs from a sibling `NCAAB` checkout before exporting the API bundle.
 
 The source-backed NCAAB raw mirror contract is now intentionally narrow. Syndicate only mirrors the files currently needed to regenerate the local API bundle: `live_lens_tuning.json` plus `predictions_<date>.csv`, `predictions_unified_enriched_<date>.csv`, and `live_features_<date>.csv`.
 

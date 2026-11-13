@@ -29,7 +29,9 @@ if str(REPO) not in sys.path:
 
 from scripts import backtest_nfl_lines_props as H  # noqa: E402
 
-ROOT = Path(r"C:\Users\tempadmin\OneDrive\Coding\Syndicate\data\nfl_source")
+from scripts._primary_tree import primary_tree  # noqa: E402
+
+ROOT = primary_tree() / "data" / "nfl_source"
 OUT = Path(r"C:\tmp\football_scenarios\passing_yards_coin")
 STATS = ("passing_yards", "passing_attempts")
 

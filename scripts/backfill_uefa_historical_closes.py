@@ -14,7 +14,7 @@ DRY RUN BY DEFAULT: it prints the window count and the credit estimate. Spending
 
     py -3 scripts/backfill_uefa_historical_closes.py --uefa-root C:/tmp/uefa-offsets --out C:/tmp/uefa-closes
     ODDS_API_KEY= py -3 scripts/backfill_uefa_historical_closes.py ... --execute --max-credits 12000 \
-        --env-file C:/Users/tempadmin/OneDrive/Coding/Syndicate/.env
+        --env-file C:/Users/tempadmin/Coding/Syndicate/.env
 """
 
 from __future__ import annotations

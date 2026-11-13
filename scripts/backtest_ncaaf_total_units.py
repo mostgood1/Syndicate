@@ -64,11 +64,13 @@ REPO = Path(__file__).resolve().parents[1]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
+from scripts._primary_tree import primary_tree  # noqa: E402
+
 # The committed mirror. `data/` is excluded from session worktrees, so fall back
 # to the primary checkout rather than silently fitting on nothing.
 _CANDIDATES = (
     REPO / "data" / "ncaaf_source" / "historical_truth",
-    Path(r"C:\Users\tempadmin\OneDrive\Coding\Syndicate\data\ncaaf_source\historical_truth"),
+    primary_tree() / "data" / "ncaaf_source" / "historical_truth",
 )
 PRIOR_GAMES = 4.0  # mirrors NFL_TOTAL / NFL_RATING_PRIOR_GAMES
 
@@ -292,7 +294,7 @@ def run_asof() -> None:
 
     data_root = None
     for cand in (REPO / "data" / "ncaaf_source",
-                 _P(r"C:\Users\tempadmin\OneDrive\Coding\Syndicate\data\ncaaf_source")):
+                 primary_tree() / "data" / "ncaaf_source"):
         if (cand / "historical_truth").exists():
             data_root = cand
             break

@@ -32,7 +32,10 @@ import subprocess
 import sys
 import types
 
-REPO = pathlib.Path(r"C:\Users\tempadmin\OneDrive\Coding\Syndicate")
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+from scripts._primary_tree import primary_tree  # noqa: E402
+
+REPO = primary_tree()
 LANES = ".syndicate/lanes.md"
 # `lanes_closed.md` was split by date into `lanes_closed_archive.md` on
 # 2026-08-31. A released claim can now land in either, so both are searched.

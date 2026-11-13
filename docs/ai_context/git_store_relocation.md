@@ -1,5 +1,10 @@
 # Moving the git store off OneDrive — runbook
 
+> **SUPERSEDED 2026-11-09 — never run.** The whole repo moved out of OneDrive to
+> `C:\Users\tempadmin\Coding\Syndicate` instead (`docs/ai_context/repo_out_of_onedrive_plan.md`,
+> lanes `repo-out-of-onedrive-plan` and `repo-move-script-fixes`). `.git` now sits beside its working tree, outside
+> OneDrive, so the store-only move below and `scripts/move_git_store.py` are obsolete. Kept as history.
+
 `[2026-09-05, lane git-out-of-onedrive]` Written after a night in which OneDrive's
 management of `.git` produced 36 invisible dead worktree registrations, 16 husk
 directories, and a `git worktree remove` that half-fails by design. **Not run

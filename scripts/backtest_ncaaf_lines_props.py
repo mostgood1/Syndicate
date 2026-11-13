@@ -240,7 +240,9 @@ def _load_dotenv() -> None:
     """CFBD_API_KEY from the primary checkout's .env; the value is never printed."""
     if os.environ.get("CFBD_API_KEY"):
         return
-    for cand in (REPO / ".env", Path(r"C:\Users\tempadmin\OneDrive\Coding\Syndicate\.env")):
+    from scripts._primary_tree import primary_tree
+
+    for cand in (REPO / ".env", primary_tree() / ".env"):
         if cand.exists():
             for line in cand.read_text(encoding="utf-8", errors="replace").splitlines():
                 if line.startswith("CFBD_API_KEY="):
@@ -395,7 +397,9 @@ def cfbd_book(row: dict) -> dict[str, Any] | None:
 
 def load_cfbd_lines_2025() -> dict[int, dict]:
     """The primary checkout's cached 2025 `/lines` weeks (git-tracked CFBD history)."""
-    base = Path(r"C:\Users\tempadmin\OneDrive\Coding\Syndicate\data\ncaaf_source\data")
+    from scripts._primary_tree import primary_tree
+
+    base = primary_tree() / "data" / "ncaaf_source" / "data"
     out: dict[int, dict] = {}
     for path in sorted(base.glob("cfbd_lines_wk*.json")):
         for row in _read_json(path):

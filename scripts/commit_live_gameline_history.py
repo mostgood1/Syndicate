@@ -29,8 +29,11 @@ import sys
 import tempfile
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from scripts._primary_tree import primary_tree  # noqa: E402
+
 REL = "reports/live_gameline_accuracy/history.jsonl"
-PRIMARY = Path(r"C:\Users\tempadmin\OneDrive\Coding\Syndicate")
+PRIMARY = primary_tree()
 TRAILER = "Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 
 

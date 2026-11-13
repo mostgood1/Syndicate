@@ -32,8 +32,9 @@ if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
 from scripts import backtest_nfl_lines_props as H  # noqa: E402
+from scripts._primary_tree import primary_tree  # noqa: E402
 
-ROOT = Path(r"C:\Users\tempadmin\OneDrive\Coding\Syndicate\data\nfl_source")
+ROOT = primary_tree() / "data" / "nfl_source"
 OUT = Path(r"C:\tmp\football_scenarios\attribution")
 TABLES = OUT / "attribution_tables_2023-2024.json"
 SEEDS = 300

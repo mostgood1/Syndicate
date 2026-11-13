@@ -1,6 +1,6 @@
 # Render Self-Host Backlog
 
-This backlog translates [RENDER_SELF_HOST_REFACTOR_PLAN.md](c:/Users/mostg/OneDrive/Coding/Syndicate/RENDER_SELF_HOST_REFACTOR_PLAN.md) into an execution sequence. The goal is not to make Syndicate merely deployable on Render. The goal is to make it self-refreshing and operationally complete on Render without external source repos.
+This backlog translates [RENDER_SELF_HOST_REFACTOR_PLAN.md](RENDER_SELF_HOST_REFACTOR_PLAN.md) into an execution sequence. The goal is not to make Syndicate merely deployable on Render. The goal is to make it self-refreshing and operationally complete on Render without external source repos.
 
 ## Current hosted boundary
 
@@ -8,7 +8,7 @@ Today Syndicate is safe to run on Render as a read-only web app backed by mirror
 
 Today Syndicate is not yet safe to run on Render as a self-refreshing system because:
 
-- [scripts/refresh_odds_sources.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_odds_sources.py) now uses local bundle roots for the normal MLB, NHL, NFL, and NCAAF odds-refresh lanes, but several sports still keep deeper source-owned generation seams behind their current artifact bundles.
+- [scripts/refresh_odds_sources.py](scripts/refresh_odds_sources.py) now uses local bundle roots for the normal MLB, NHL, NFL, and NCAAF odds-refresh lanes, but several sports still keep deeper source-owned generation seams behind their current artifact bundles.
 - Deployment proof is still incomplete: the Render blueprint and docs need manual `SYNDICATE_ARTIFACT_ROOT_*` wiring per environment before hosted refreshes can actually ingest published bundles.
 - The normal mirror bootstrap blockers are closed, but multiple sports still depend on source-owned generation jobs.
 
@@ -56,9 +56,9 @@ Purpose:
 Keep the current Render deployment usable while the self-host work is in progress.
 
 Tasks:
-- Leave [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml) in single-web-service mode until the runtime split is ready.
-- Keep [README.md](c:/Users/mostg/OneDrive/Coding/Syndicate/README.md) explicit that the current Render model is read-only and mirror-backed.
-- Keep [syndicate/blueprints/ops.py](c:/Users/mostg/OneDrive/Coding/Syndicate/syndicate/blueprints/ops.py) usable as a status and planning surface, even if full hosted refresh launch remains gated.
+- Leave [render.yaml](render.yaml) in single-web-service mode until the runtime split is ready.
+- Keep [README.md](README.md) explicit that the current Render model is read-only and mirror-backed.
+- Keep [syndicate/blueprints/ops.py](syndicate/blueprints/ops.py) usable as a status and planning surface, even if full hosted refresh launch remains gated.
 
 Exit criteria:
 - The current Render deployment remains stable while the refactor proceeds.
@@ -73,15 +73,15 @@ Continue stripping source-owned generation assumptions now that the normal mirro
 
 Current status:
 - Completed. The normal NCAAB mirror path is now artifact-only by default.
-- [scripts/export_ncaab_source_mirror.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/export_ncaab_source_mirror.py) rebuilds the local API bundle from mirrored raw outputs.
-- [scripts/refresh_ncaab_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_ncaab_source_mirror.ps1) keeps source-backed raw-output sync only behind the explicit manual switch `-RefreshRawOutputsFromSource`.
-- [scripts/refresh_ncaab_odds_history.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_ncaab_odds_history.py) now fetches The Odds API data directly inside Syndicate, so the normal source-mode refresh path no longer imports `ncaab_model` from an external checkout.
+- [scripts/export_ncaab_source_mirror.py](scripts/export_ncaab_source_mirror.py) rebuilds the local API bundle from mirrored raw outputs.
+- [scripts/refresh_ncaab_source_mirror.ps1](scripts/refresh_ncaab_source_mirror.ps1) keeps source-backed raw-output sync only behind the explicit manual switch `-RefreshRawOutputsFromSource`.
+- [scripts/refresh_ncaab_odds_history.py](scripts/refresh_ncaab_odds_history.py) now fetches The Odds API data directly inside Syndicate, so the normal source-mode refresh path no longer imports `ncaab_model` from an external checkout.
 
 Owning files:
-- [scripts/refresh_ncaab_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_ncaab_source_mirror.ps1)
-- [scripts/export_ncaab_source_mirror.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/export_ncaab_source_mirror.py)
-- [syndicate/features/ncaab](c:/Users/mostg/OneDrive/Coding/Syndicate/syndicate/features/ncaab)
-- [data/ncaab_source](c:/Users/mostg/OneDrive/Coding/Syndicate/data/ncaab_source)
+- [scripts/refresh_ncaab_source_mirror.ps1](scripts/refresh_ncaab_source_mirror.ps1)
+- [scripts/export_ncaab_source_mirror.py](scripts/export_ncaab_source_mirror.py)
+- [syndicate/features/ncaab](syndicate/features/ncaab)
+- [data/ncaab_source](data/ncaab_source)
 
 Outcome:
 - Normal NCAAB mirror refresh no longer boots the source app.
@@ -95,13 +95,13 @@ Next NCAAB gap:
 ### Workstream 1B: NBA live-state bootstrap removal
 
 Current status:
-- Completed. [scripts/refresh_nba_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_nba_source_mirror.ps1) no longer contains the source-app bootstrap helper or the `/api/live_state` fallback path.
-- Focused regression coverage in [tests/test_nba_mirror_script.py](c:/Users/mostg/OneDrive/Coding/Syndicate/tests/test_nba_mirror_script.py) asserts that the bootstrap helper and source-app fallback hooks are absent.
+- Completed. [scripts/refresh_nba_source_mirror.ps1](scripts/refresh_nba_source_mirror.ps1) no longer contains the source-app bootstrap helper or the `/api/live_state` fallback path.
+- Focused regression coverage in [tests/test_nba_mirror_script.py](tests/test_nba_mirror_script.py) asserts that the bootstrap helper and source-app fallback hooks are absent.
 
 Owning files:
-- [scripts/refresh_nba_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_nba_source_mirror.ps1)
-- [data/nba_source](c:/Users/mostg/OneDrive/Coding/Syndicate/data/nba_source)
-- [syndicate/features/nba](c:/Users/mostg/OneDrive/Coding/Syndicate/syndicate/features/nba)
+- [scripts/refresh_nba_source_mirror.ps1](scripts/refresh_nba_source_mirror.ps1)
+- [data/nba_source](data/nba_source)
+- [syndicate/features/nba](syndicate/features/nba)
 
 Outcome:
 - Normal NBA mirror refresh no longer boots the source Flask app.
@@ -116,17 +116,17 @@ Purpose:
 Break the current assumption that Syndicate refresh orchestration must run commands inside sibling source repos.
 
 Owning files:
-- [scripts/refresh_odds_sources.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_odds_sources.py)
-- [scripts/refresh_mlb_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_mlb_source_mirror.ps1)
-- [scripts/refresh_nba_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_nba_source_mirror.ps1)
-- [scripts/refresh_nhl_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_nhl_source_mirror.ps1)
-- [scripts/refresh_nfl_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_nfl_source_mirror.ps1)
-- [scripts/refresh_wnba_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_wnba_source_mirror.ps1)
-- [scripts/refresh_ncaab_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_ncaab_source_mirror.ps1)
-- [scripts/refresh_ncaaf_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_ncaaf_source_mirror.ps1)
+- [scripts/refresh_odds_sources.py](scripts/refresh_odds_sources.py)
+- [scripts/refresh_mlb_source_mirror.ps1](scripts/refresh_mlb_source_mirror.ps1)
+- [scripts/refresh_nba_source_mirror.ps1](scripts/refresh_nba_source_mirror.ps1)
+- [scripts/refresh_nhl_source_mirror.ps1](scripts/refresh_nhl_source_mirror.ps1)
+- [scripts/refresh_nfl_source_mirror.ps1](scripts/refresh_nfl_source_mirror.ps1)
+- [scripts/refresh_wnba_source_mirror.ps1](scripts/refresh_wnba_source_mirror.ps1)
+- [scripts/refresh_ncaab_source_mirror.ps1](scripts/refresh_ncaab_source_mirror.ps1)
+- [scripts/refresh_ncaaf_source_mirror.ps1](scripts/refresh_ncaaf_source_mirror.ps1)
 
 Tasks:
-- Split the current planner in [scripts/refresh_odds_sources.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_odds_sources.py) into two explicit layers:
+- Split the current planner in [scripts/refresh_odds_sources.py](scripts/refresh_odds_sources.py) into two explicit layers:
   - generation jobs
   - ingestion jobs
 - Define one neutral ingest contract per sport. Each ingest contract should assume a stable artifact payload, not a repo layout tied to an external source checkout.
@@ -154,26 +154,26 @@ Purpose:
 Make the ops dashboard a control plane and reader, not the parent process of refresh work.
 
 Owning files:
-- [syndicate/features/shared/ops_refresh.py](c:/Users/mostg/OneDrive/Coding/Syndicate/syndicate/features/shared/ops_refresh.py)
-- [syndicate/blueprints/ops.py](c:/Users/mostg/OneDrive/Coding/Syndicate/syndicate/blueprints/ops.py)
-- [reports/refresh_status](c:/Users/mostg/OneDrive/Coding/Syndicate/reports/refresh_status)
-- [reports/migration_runs](c:/Users/mostg/OneDrive/Coding/Syndicate/reports/migration_runs)
+- [syndicate/features/shared/ops_refresh.py](syndicate/features/shared/ops_refresh.py)
+- [syndicate/blueprints/ops.py](syndicate/blueprints/ops.py)
+- [reports/refresh_status](reports/refresh_status)
+- [reports/migration_runs](reports/migration_runs)
 
 Tasks:
-- Replace `subprocess.Popen`-driven detached job launching in [syndicate/features/shared/ops_refresh.py](c:/Users/mostg/OneDrive/Coding/Syndicate/syndicate/features/shared/ops_refresh.py) with a worker-oriented execution contract.
+- Replace `subprocess.Popen`-driven detached job launching in [syndicate/features/shared/ops_refresh.py](syndicate/features/shared/ops_refresh.py) with a worker-oriented execution contract.
 - Define a durable state location for:
   - latest refresh manifest
   - recent run history
   - stdout/stderr log payloads
   - latest daily-update summary
 - Keep the state boundary independent from Render local disks. Render persistent disks are single-service mounts, so the final hosted state backend must be readable by both the web control plane and the worker without assuming a shared filesystem path.
-- Make [syndicate/blueprints/ops.py](c:/Users/mostg/OneDrive/Coding/Syndicate/syndicate/blueprints/ops.py) read job state through an abstraction layer instead of assuming repo-local reports.
+- Make [syndicate/blueprints/ops.py](syndicate/blueprints/ops.py) read job state through an abstraction layer instead of assuming repo-local reports.
 - Preserve the current UI endpoint `/ops/odds-refresh` and JSON ops endpoints while swapping the backend state store.
 - Add tests that simulate missing local `reports/` state but valid external or mounted state.
 
 Current status:
-- The worker-oriented execution contract is now in place via [scripts/run_queued_refresh_job.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/run_queued_refresh_job.py) and [scripts/run_refresh_worker.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/run_refresh_worker.py).
-- The refresh-state abstraction now exists in [syndicate/features/shared/refresh_state_store.py](c:/Users/mostg/OneDrive/Coding/Syndicate/syndicate/features/shared/refresh_state_store.py) and supports both filesystem and Key Value-backed refresh status/log storage.
+- The worker-oriented execution contract is now in place via [scripts/run_queued_refresh_job.py](scripts/run_queued_refresh_job.py) and [scripts/run_refresh_worker.py](scripts/run_refresh_worker.py).
+- The refresh-state abstraction now exists in [syndicate/features/shared/refresh_state_store.py](syndicate/features/shared/refresh_state_store.py) and supports both filesystem and Key Value-backed refresh status/log storage.
 - The remaining hosted gap in this milestone is deployment wiring and proving the shared backend in a real hosted configuration, not the absence of a worker/read abstraction.
 
 Exit criteria:
@@ -187,16 +187,16 @@ Purpose:
 Only after the refresh and state boundaries are hosted-safe should the deployment blueprint grow beyond a single web service.
 
 Owning files:
-- [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml)
-- [README.md](c:/Users/mostg/OneDrive/Coding/Syndicate/README.md)
-- [RENDER_SELF_HOST_REFACTOR_PLAN.md](c:/Users/mostg/OneDrive/Coding/Syndicate/RENDER_SELF_HOST_REFACTOR_PLAN.md)
+- [render.yaml](render.yaml)
+- [README.md](README.md)
+- [RENDER_SELF_HOST_REFACTOR_PLAN.md](RENDER_SELF_HOST_REFACTOR_PLAN.md)
 
 Tasks:
-- Extend [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml) to represent the hosted runtime model actually required:
+- Extend [render.yaml](render.yaml) to represent the hosted runtime model actually required:
   - web service
   - worker or job service
   - shared durable state dependency such as Render Key Value for refresh status, or another external store if that proves a better fit
-- Document exact environment variables, mounted paths, and responsibilities per service in [README.md](c:/Users/mostg/OneDrive/Coding/Syndicate/README.md).
+- Document exact environment variables, mounted paths, and responsibilities per service in [README.md](README.md).
 - Add a hosted smoke checklist that verifies:
   - the web app reads current status
   - refresh jobs can run outside the web process
@@ -229,10 +229,10 @@ Treat Render self-hosting as done only when all of the following are true:
 
 - No normal refresh path requires `..\<source-repo>` lookup.
 - No normal refresh path boots a source Flask app.
-- [scripts/refresh_odds_sources.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_odds_sources.py) plans hosted-safe jobs or hosted-safe imports only.
-- [syndicate/features/shared/ops_refresh.py](c:/Users/mostg/OneDrive/Coding/Syndicate/syndicate/features/shared/ops_refresh.py) no longer launches detached local subprocesses from the web-facing control path.
+- [scripts/refresh_odds_sources.py](scripts/refresh_odds_sources.py) plans hosted-safe jobs or hosted-safe imports only.
+- [syndicate/features/shared/ops_refresh.py](syndicate/features/shared/ops_refresh.py) no longer launches detached local subprocesses from the web-facing control path.
 - Ops status and logs survive a web restart.
-- [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml) describes the actual hosted architecture required for self-refresh operation.
+- [render.yaml](render.yaml) describes the actual hosted architecture required for self-refresh operation.
 
 ## Recommended next implementation slice
 

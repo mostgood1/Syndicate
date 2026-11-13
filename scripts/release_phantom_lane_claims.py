@@ -57,10 +57,17 @@ import time
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 LANES = ROOT / ".syndicate" / "lanes.md"
-TRANSCRIPTS = (
-    pathlib.Path.home()
-    / ".claude" / "projects" / "C--Users-tempadmin-OneDrive-Coding-Syndicate"
-)
+sys.path.insert(0, str(ROOT))
+from scripts._primary_tree import primary_tree  # noqa: E402
+
+
+def _project_key(tree: pathlib.Path) -> str:
+    """Claude Code's per-project folder name: the main tree's path with every non-alphanumeric character as `-`
+    (`C:\\Users\\tempadmin\\Coding\\Syndicate` -> `C--Users-tempadmin-Coding-Syndicate`)."""
+    return "".join(c if c.isalnum() else "-" for c in str(tree))
+
+
+TRANSCRIPTS = pathlib.Path.home() / ".claude" / "projects" / _project_key(primary_tree())
 RELEASE_TOKEN = "released:"
 
 

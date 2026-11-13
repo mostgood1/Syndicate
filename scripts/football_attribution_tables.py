@@ -28,7 +28,9 @@ if str(REPO) not in sys.path:
 
 from syndicate.features.football.sim_engine.smartsim2 import player_attribution as A  # noqa: E402
 
-PBP = Path(r"C:\Users\tempadmin\OneDrive\Coding\Syndicate\data\nfl_source\tracking\nflverse\pbp")
+from scripts._primary_tree import primary_tree  # noqa: E402
+
+PBP = primary_tree() / "data" / "nfl_source" / "tracking" / "nflverse" / "pbp"
 SMOOTH = 20.0
 OUT = Path(r"C:\tmp\football_scenarios\attribution")
 
