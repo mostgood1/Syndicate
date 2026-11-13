@@ -59724,3 +59724,32 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - The board loop was about as busy as in the baseline window: build wall 344-477 s now vs 326-595 s then.
 - **Reading:** the fix cut the NBA grid's own work as the replay said, and moved the warm median well under 80 s. What is left of the tail is the GIL shared with the board loop, which runs almost back to back. This fix does not touch it, and it stays recorded as unfixed. n is 5, so the median is coarse.
 - **Still owed:** the NBA-night reading (overlay elapsed and gaps once NBA is live; watcher on pid 469244, 7:30 PM CST).
+
+## 2026-11-13 21:28:10Z (3:28 PM CST) -- FLEET ff 273a4a599 -> acb7e47b7 + claimed live-odds-worker TERM: todo #773 NHL live OVERTIME as sudden death (lane `nhl-live-overtime`) -- **LOADED; reachability MET on production's code, env and inputs; served reading owed from first puck 02:00Z**
+- **User, in this session's chat:** "Yes, push and load" (answering "Push the overtime fix and load it on live-odds-worker?"). Earlier: "Yes, fix overtime".
+- **Commit** `acb7e47b7` on main, pushed 21:2xZ (3:2x PM CST); main had not moved since the tests ran (`tests/test_nhl_live_overtime.py` 12 passed, 3 mutations caught; NHL live + hockeysim neighbours 247 passed). Findings: `findings_2026-11-13_nhl_live_overtime.md`.
+- **What it changes:** `engine.simulate_with_lineups(ot_sudden_death=True)` cuts OT at its first goal and, resumed IN OT, plays only the clock shown; `live_resim` turns it on (`SYNDICATE_NHL_LIVE_OVERTIME`, default on) and the lane publishes `liveOvertime`. Pregame never passes the flag (default off), so pregame is unchanged.
+- **Range 273a4a599..acb7e47b7, runtime files:** `syndicate/features/nhl/live_resim.py`, `syndicate/features/nhl/sim_engine/hockeysim/engine.py`, `.../hockeysim/runtime.py` (mine); `.claude/hooks/session-start.sh` + `scripts/primary_tree_ff.py` (lane `primary-tree-auto-ff`: the dev checkout's session-start hook; no fleet role runs either).
+- **What live-odds-worker loads besides mine:** it was still on `866e0e18` (status: STALE, 17 runtime files), so the TERM also loaded 866e0e18e..273a4a599 into its main loop: `live_gameline_join.py` / `live_gameline_ledger.py` (#780 fix 2b; the join runs on refresh-worker), `cheat_sheets.py` + template (#797), `nba_game_projections.py` (#790), `team_logos.py` + the WNCAAB branding snapshot (#798), `prop_fair_side.py`, `engine_experts.py` (shadow), offline scripts and hooks. Every one was already loaded on web and refresh-worker by its owner (both `code=273a4a59`), and this worker's child jobs already read them from disk.
+- **gates:**
+  - Claim live-odds-worker, holder `nhl-live-overtime`, 21:22:25Z (rc 0).
+  - Spacing: pid 445457 had run 12,088 s at 21:23:57Z (since 18:02:29Z, this lane's previous load).
+  - Preflight `--service live-odds-worker --target-commit acb7e47b7` (fleet), run from a worktree at origin/main: **HOLD** 21:23:21Z, 4 jobs in flight (`run_refresh_odds_job` -> `refresh_odds_sources` -> `build_soccer_schedule`, and `fetch_espn_live_status`). Re-run every 30 s (`C:\tmp\nhlrec\wait_clear_ot.sh`): **CLEAR** 21:27:58Z (rc 0), 0 processes enumerated. Baseline read 21:23:57Z.
+- **load** (`C:\tmp\nhlrec\load_ot.sh acb7e47b7 273a4a599`):
+  - `git merge --ff-only` at **21:28:10.911Z**: HEAD `acb7e47b7`. On disk: `LIVE_OVERTIME_ENV` 1, `_cut_at_first_goal` 1.
+  - `kill -TERM 445457` at 21:28:10.921Z; `STOP_SIGNAL` logged 21:28:10.973Z. New supervised live-odds-worker **pid 482349**, first seen 21:29:24.017Z (1 min 13 s: the drain was short this time; 17:57Z's took 4 min 43 s). The old pid is gone.
+- **expect / measured:**
+  - `fleet_checkout_head` 273a4a599 -> acb7e47b7: **MET** 21:28:10Z.
+  - `overtime_switch_on_disk` 0 -> 1: **MET**.
+  - `low_pid_started_after_acb7e47b7` no -> yes: **MET** (pid 482349; `local_production.py status` reads `code=acb7e47b`).
+  - `low_env_overtime_key` absent -> absent: **MET** (0 in /proc/482349/environ). Under the role's own environ, `live_overtime_sudden_death()` resolves True; scoring `{1.0, 0.85, 240.0, True}` and end-game `{0.38, 90}` unchanged.
+  - `low_new_traceback_kinds_first_10min` 0 -> 0: **MET** (the 10 min after the respawn, 21:29:24-21:39:24Z, against the 10 min before the TERM: 0 `^Traceback` lines in the last 20,000 of the log; error-ish lines 4 vs 4, all `PROCESS_ENUM_DEBUG error_count`; nhl lines 222 vs 193).
+  - `low_live_lens_ticks_with_nhl`: the new worker logged 11 `TICK_COMPLETE` by 21:39:49Z, each with `nhl: True` (`mlb`, `nba`, `wnba`, `soccer`, `nfl` True too).
+  - `nhl_live_lanes_liveOvertime_sudden_death` 0 -> **OWED** from first puck 02:00Z (NYR @ VAN 8:00 PM CST; NSH @ VGK 03:00Z). The served snapshot's reader (`C:\tmp\nhlrec\snap_total.py`, polled by the total lane's watcher `snap_watch_total.sh` from 02:05Z) now also tallies `liveOvertime`.
+- **Reachability (`off != on`) on production's code, env and inputs, 21:3xZ:** `resim_live_game` under pid 482349's environ from ~/Syndicate, today's slate features, New York Rangers @ Vancouver Canucks, 400 sims, seed 7, OT off vs on (`C:\tmp\nhlrec\ot_reach.py`); identical to the worktree run before the push:
+  - P4 05:00 / 02:00 / 00:00 at 2-2: OT sims ending 2+ past the tie 21 -> **0** of 400; total 5.240 -> **5.000**; P(home -1.5) 0.0125 -> **0**; home win 0.4450 -> 0.4600 / 0.4750 / 0.4675 (a shorter OT clock sends more sims to the shootout).
+  - Tied late (P3 01:00 2-2): 22 -> 0 of 364, total 5.242 -> 5.035, home win unchanged 0.4175. P3 05:00 2-1: 6 -> 0 of 86, total 4.135 -> 4.070, home win 0.8325 -> 0.8350.
+  - Regulation margin histogram identical off vs on in every state. Nothing was published.
+- **Not touched by this lane:** web and refresh-worker read `code=273a4a59` (STALE for the 5 files above). Neither produces the NHL live lanes; refresh-worker's pregame sims never pass the flag, so the new `engine.py` on disk leaves them unchanged.
+- **revert:** `SYNDICATE_NHL_LIVE_OVERTIME=off` in `local_production.env` needs a drained full down/up. Faster: revert `acb7e47b7` on main, ff the fleet, then a claimed live-odds-worker TERM (allow up to ~5 min for the pass to drain).
+- **verify:** tonight from 02:05Z, every re-simmed NHL lane carries `liveOvertime` sudden_death / on; if a game reaches OT, its lane's `displayMarginDist` holds only +-1 and `projection.total` equals the tied total + 1.
